@@ -385,7 +385,7 @@ mod test {
         let mut middle_b = cfg_builder
             .simple_block_builder(FunctionType::new(type_row![NAT], type_row![NAT]), 1)?;
         let middle = {
-            let c = middle_b.add_load_const(ops::Const::unary_unit_sum(), ExtensionSet::new())?;
+            let c = middle_b.add_load_const(ops::Const::unary_unit_sum())?;
             let [inw] = middle_b.input_wires_arr();
             middle_b.finish_with_outputs(c, [inw])?
         };
@@ -398,8 +398,7 @@ mod test {
     #[test]
     fn test_dom_edge() -> Result<(), BuildError> {
         let mut cfg_builder = CFGBuilder::new(FunctionType::new(type_row![NAT], type_row![NAT]))?;
-        let sum_tuple_const =
-            cfg_builder.add_constant(ops::Const::unary_unit_sum(), ExtensionSet::new())?;
+        let sum_tuple_const = cfg_builder.add_constant(ops::Const::unary_unit_sum())?;
         let sum_variants = vec![type_row![]];
 
         let mut entry_b =
@@ -427,8 +426,7 @@ mod test {
     #[test]
     fn test_non_dom_edge() -> Result<(), BuildError> {
         let mut cfg_builder = CFGBuilder::new(FunctionType::new(type_row![NAT], type_row![NAT]))?;
-        let sum_tuple_const =
-            cfg_builder.add_constant(ops::Const::unary_unit_sum(), ExtensionSet::new())?;
+        let sum_tuple_const = cfg_builder.add_constant(ops::Const::unary_unit_sum())?;
         let sum_variants = vec![type_row![]];
         let mut middle_b = cfg_builder
             .simple_block_builder(FunctionType::new(type_row![NAT], type_row![NAT]), 1)?;

@@ -143,9 +143,7 @@ fn static_targets() {
     )
     .unwrap();
 
-    let c = dfg
-        .add_constant(ConstUsize::new(1).into(), ExtensionSet::new())
-        .unwrap();
+    let c = dfg.add_constant(ConstUsize::new(1).into()).unwrap();
 
     let load = dfg.load_const(&c).unwrap();
 

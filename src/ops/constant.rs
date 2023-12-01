@@ -161,25 +161,19 @@ mod test {
             type_row![],
             TypeRow::from(vec![pred_ty.clone()]),
         ))?;
-        let c = b.add_constant(
-            Const::tuple_sum(
-                0,
-                Value::tuple([
-                    CustomTestValue(TypeBound::Eq, ExtensionSet::new()).into(),
-                    serialized_float(5.1),
-                ]),
-                pred_rows.clone(),
-            )?,
-            ExtensionSet::new(), // ALAN remove given above?
-        )?;
+        let c = b.add_constant(Const::tuple_sum(
+            0,
+            Value::tuple([
+                CustomTestValue(TypeBound::Eq, ExtensionSet::new()).into(),
+                serialized_float(5.1),
+            ]),
+            pred_rows.clone(),
+        )?)?;
         let w = b.load_const(&c)?;
         b.finish_hugr_with_outputs([w], &test_registry()).unwrap();
 
         let mut b = DFGBuilder::new(FunctionType::new(type_row![], TypeRow::from(vec![pred_ty])))?;
-        let c = b.add_constant(
-            Const::tuple_sum(1, Value::unit(), pred_rows)?,
-            ExtensionSet::new(),
-        )?;
+        let c = b.add_constant(Const::tuple_sum(1, Value::unit(), pred_rows)?)?;
         let w = b.load_const(&c)?;
         b.finish_hugr_with_outputs([w], &test_registry()).unwrap();
 
