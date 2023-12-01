@@ -423,7 +423,7 @@ pub mod test {
     }
 
     #[test]
-    fn hierarchy_order() {
+    fn canonicalisation() {
         let mut hugr = closed_dfg_root_hugr(FunctionType::new(vec![QB], vec![QB]));
         let [old_in, out] = hugr.get_io(hugr.root()).unwrap();
         hugr.connect(old_in, 0, out, 0).unwrap();
@@ -436,11 +436,8 @@ pub mod test {
         hugr.remove_node(old_in).unwrap();
         hugr.update_validate(&PRELUDE_REGISTRY).unwrap();
 
-        let ser = serde_json::to_vec(&hugr).unwrap();
-        let new_hugr: Hugr = serde_json::from_slice(&ser).unwrap();
+        let new_hugr: Hugr = check_hugr_roundtrip(&hugr);
         new_hugr.validate(&EMPTY_REG).unwrap_err();
         new_hugr.validate(&PRELUDE_REGISTRY).unwrap();
-
-        check_hugr_roundtrip(&hugr);
     }
 }
