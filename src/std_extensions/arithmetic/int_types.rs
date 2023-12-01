@@ -203,7 +203,7 @@ lazy_static! {
     pub static ref EXTENSION: Extension = extension();
 }
 
-/// get an integer type variable, given the integer type definition
+/// get an integer type with width corresponding to a type variable with id `var_size`
 pub(super) fn int_tv(var_id: usize) -> Type {
     Type::new_extension(
         EXTENSION
