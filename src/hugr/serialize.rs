@@ -257,10 +257,13 @@ pub mod test {
         DataflowSubContainer, HugrBuilder, ModuleBuilder,
     };
     use crate::extension::prelude::BOOL_T;
+    use crate::extension::simple_op::MakeRegisteredOp;
     use crate::extension::{EMPTY_REG, PRELUDE_REGISTRY};
     use crate::hugr::hugrmut::sealed::HugrMutInternals;
     use crate::hugr::NodeType;
+    use crate::ops::custom::{ExtensionOp, OpaqueOp};
     use crate::ops::{dataflow::IOTrait, Input, LeafOp, Module, Output, DFG};
+    use crate::std_extensions::logic::NotOp;
     use crate::types::{FunctionType, Type};
     use crate::OutgoingPort;
     use itertools::Itertools;
@@ -298,8 +301,22 @@ pub mod test {
 
         assert_eq!(new_hugr.root, h_canon.root);
         assert_eq!(new_hugr.hierarchy, h_canon.hierarchy);
-        assert_eq!(new_hugr.op_types, h_canon.op_types);
         assert_eq!(new_hugr.metadata, h_canon.metadata);
+
+        // Extension operations may have been downgraded to opaque operations.
+        for node in new_hugr.nodes() {
+            let new_op = new_hugr.get_optype(node);
+            let old_op = h_canon.get_optype(node);
+            if let OpType::LeafOp(LeafOp::CustomOp(new_ext)) = new_op {
+                if let OpType::LeafOp(LeafOp::CustomOp(old_ext)) = old_op {
+                    assert_eq!(new_ext.clone().as_opaque(), old_ext.clone().as_opaque());
+                } else {
+                    panic!("Expected old_op to be a custom op");
+                }
+            } else {
+                assert_eq!(new_op, old_op);
+            }
+        }
 
         // Check that the graphs are equivalent up to port renumbering.
         let new_graph = &new_hugr.graph;
@@ -417,6 +434,29 @@ pub mod test {
                 .out_wire(0);
         }
         let hugr = dfg.finish_hugr_with_outputs(params, &EMPTY_REG)?;
+
+        check_hugr_roundtrip(&hugr);
+        Ok(())
+    }
+
+    #[test]
+    fn opaque_ops() -> Result<(), Box<dyn std::error::Error>> {
+        let tp: Vec<Type> = vec![BOOL_T; 1];
+        let mut dfg = DFGBuilder::new(FunctionType::new_endo(tp))?;
+        let [wire] = dfg.input_wires_arr();
+
+        // Add an extension operation
+        let extension_op: ExtensionOp = NotOp.to_extension_op().unwrap();
+        let wire = dfg
+            .add_dataflow_op(extension_op.clone(), [wire])
+            .unwrap()
+            .out_wire(0);
+
+        // Add an unresolved opaque operation
+        let opaque_op: OpaqueOp = extension_op.into();
+        let wire = dfg.add_dataflow_op(opaque_op, [wire]).unwrap().out_wire(0);
+
+        let hugr = dfg.finish_hugr_with_outputs([wire], &PRELUDE_REGISTRY)?;
 
         check_hugr_roundtrip(&hugr);
         Ok(())
