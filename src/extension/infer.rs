@@ -317,15 +317,11 @@ impl UnificationContext {
             match node_type.io_extensions() {
                 // Input extensions are open
                 None => {
-                    let c = if let Some(sig) = node_type.op_signature() {
-                        let delta = sig.extension_reqs;
-                        if delta.is_empty() {
-                            Constraint::Equal(m_input)
-                        } else {
-                            Constraint::Plus(delta, m_input)
-                        }
-                    } else {
+                    let delta = node_type.op().extension_delta();
+                    let c = if delta.is_empty() {
                         Constraint::Equal(m_input)
+                    } else {
+                        Constraint::Plus(delta, m_input)
                     };
                     self.add_constraint(m_output, c);
                 }

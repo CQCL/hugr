@@ -9,6 +9,7 @@ pub mod leaf;
 pub mod module;
 pub mod tag;
 pub mod validate;
+use crate::extension::ExtensionSet;
 use crate::types::{EdgeKind, FunctionType, Type};
 use crate::{Direction, OutgoingPort, Port};
 use crate::{IncomingPort, PortIndex};
@@ -278,6 +279,13 @@ pub trait OpTrait {
     fn dataflow_signature(&self) -> Option<FunctionType> {
         None
     }
+
+    /// The delta between the input extensions specified for a node,
+    /// and the output extensions calculated for that node
+    fn extension_delta(&self) -> ExtensionSet {
+        ExtensionSet::new()
+    }
+
     /// The edge kind for the non-dataflow or constant inputs of the operation,
     /// not described by the signature.
     ///

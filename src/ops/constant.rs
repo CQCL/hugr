@@ -1,6 +1,7 @@
 //! Constant value definitions.
 
 use crate::{
+    extension::ExtensionSet,
     types::{ConstTypeError, EdgeKind, Type, TypeRow},
     values::{CustomConst, KnownTypeConst, Value},
 };
@@ -94,6 +95,10 @@ impl StaticTag for Const {
 impl OpTrait for Const {
     fn description(&self) -> &str {
         self.value.description()
+    }
+
+    fn extension_delta(&self) -> ExtensionSet {
+        self.value.extension_reqs()
     }
 
     fn tag(&self) -> OpTag {

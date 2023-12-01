@@ -125,16 +125,9 @@ impl NodeType {
     /// `None`` if the [Self::input_extensions] is `None`.
     /// Otherwise, will return Some, with the output extensions computed from the node's delta
     pub fn io_extensions(&self) -> Option<(&ExtensionSet, ExtensionSet)> {
-        self.input_extensions.as_ref().map(|e| {
-            (
-                e,
-                self.op
-                    .dataflow_signature()
-                    .map(|ft| ft.extension_reqs)
-                    .unwrap_or_default()
-                    .union(e),
-            )
-        })
+        self.input_extensions
+            .as_ref()
+            .map(|e| (e, self.op.extension_delta().union(e)))
     }
 
     /// Gets the underlying [OpType] i.e. without any [input_extensions]
