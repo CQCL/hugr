@@ -648,11 +648,12 @@ impl UnificationContext {
     fn search_variable_deps(&self) -> HashSet<Meta> {
         let mut seen = HashSet::new();
         let mut new_variables: HashSet<Meta> = self.variables.clone();
+        let constraints_for_solved = HashSet::new();
         while !new_variables.is_empty() {
             new_variables = new_variables
                 .into_iter()
                 .filter(|m| seen.insert(*m))
-                .flat_map(|m| self.get_constraints(&m).unwrap())
+                .flat_map(|m| self.get_constraints(&m).unwrap_or(&constraints_for_solved))
                 .map(|c| match c {
                     Constraint::Plus(_, other) => self.resolve(*other),
                     Constraint::Equal(other) => self.resolve(*other),

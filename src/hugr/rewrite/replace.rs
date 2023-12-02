@@ -477,12 +477,11 @@ mod test {
             .unwrap()
             .into();
         let just_list = TypeRow::from(vec![listy.clone()]);
+        let exset = ExtensionSet::singleton(&collections::EXTENSION_NAME);
         let intermed = TypeRow::from(vec![listy.clone(), USIZE_T]);
 
         let mut cfg = CFGBuilder::new(
-            // One might expect an extension_delta of "collections" here, but push/pop
-            // have an empty delta themselves, pending https://github.com/CQCL/hugr/issues/388
-            FunctionType::new_endo(just_list.clone()),
+            FunctionType::new_endo(just_list.clone()).with_extension_delta(&exset),
         )?;
 
         let pred_const = cfg.add_constant(ops::Const::unary_unit_sum())?;
@@ -628,13 +627,31 @@ mod test {
                 },
                 op_sig.input()
             );
-            h.simple_entry_builder(op_sig.output, 1, op_sig.extension_reqs.clone())?
+            h.simple_entry_builder(op_sig.output.clone(), 1, op_sig.extension_reqs.clone())?
         } else {
-            h.simple_block_builder(op_sig, 1)?
+            h.simple_block_builder(op_sig.clone(), 1)?
         };
         let op: OpType = op.into();
         let op = bb.add_dataflow_op(op, bb.input_wires())?;
-        let load_pred = bb.load_const(pred_const)?;
+        let mut load_pred = bb.load_const(pred_const)?;
+        let const_ty = bb
+            .hugr()
+            .get_optype(pred_const.node())
+            .as_const()
+            .unwrap()
+            .const_type()
+            .clone();
+        for e in op_sig.extension_reqs.iter() {
+            [load_pred] = bb
+                .add_dataflow_op(
+                    LeafOp::Lift {
+                        type_row: vec![const_ty.clone()].into(),
+                        new_extension: e.clone(),
+                    },
+                    [load_pred],
+                )?
+                .outputs_arr();
+        }
         bb.finish_with_outputs(load_pred, op.outputs())
     }
 
