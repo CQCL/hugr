@@ -287,8 +287,9 @@ impl SiblingSubgraph {
         &self.outputs
     }
 
-    /// The signature of the subgraph.
+    /// The signature of the subgraph, excluding any extension delta
     pub fn signature(&self, hugr: &impl HugrView) -> FunctionType {
+        // We cannot calculate the delta from just the extensions at the input and output!
         let input = self
             .inputs
             .iter()
@@ -344,7 +345,12 @@ impl SiblingSubgraph {
         let Some([rep_input, rep_output]) = replacement.get_io(rep_root) else {
             return Err(InvalidReplacement::InvalidDataflowParent);
         };
-        if dfg_optype.dataflow_signature() != Some(self.signature(hugr)) {
+        if !dfg_optype.dataflow_signature().is_some_and(|rep_sig| {
+            rep_sig
+                == self
+                    .signature(hugr)
+                    .with_extension_delta(&rep_sig.extension_reqs)
+        }) {
             return Err(InvalidReplacement::InvalidSignature);
         }
 
@@ -408,8 +414,15 @@ impl SiblingSubgraph {
         &self,
         hugr: &impl HugrView,
         name: impl Into<String>,
+        extension_delta: &crate::extension::ExtensionSet,
     ) -> Result<Hugr, HugrError> {
-        let mut builder = FunctionBuilder::new(name, self.signature(hugr).into()).unwrap();
+        let mut builder = FunctionBuilder::new(
+            name,
+            self.signature(hugr)
+                .with_extension_delta(extension_delta)
+                .into(),
+        )
+        .unwrap();
         // Take the unfinished Hugr from the builder, to avoid unnecessary
         // validation checks that require connecting the inputs and outputs.
         let mut extracted = mem::take(builder.hugr_mut());
@@ -675,8 +688,9 @@ mod tests {
 
     use cool_asserts::assert_matches;
 
-    use crate::extension::PRELUDE_REGISTRY;
-    use crate::utils::test_quantum_extension::cx_gate;
+    use crate::extension::{ExtensionSet, PRELUDE_REGISTRY};
+    use crate::ops::LeafOp;
+    use crate::utils::test_quantum_extension::{cx_gate, EXTENSION_ID};
     use crate::{
         builder::{
             BuildError, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
@@ -723,17 +737,26 @@ mod tests {
         let mut mod_builder = ModuleBuilder::new();
         let func = mod_builder.declare(
             "test",
-            FunctionType::new_endo(type_row![QB_T, QB_T, QB_T]).into(),
+            FunctionType::new_endo(type_row![QB_T, QB_T, QB_T])
+                .with_extension_delta(&ExtensionSet::singleton(&EXTENSION_ID))
+                .into(),
         )?;
         let func_id = {
             let mut dfg = mod_builder.define_declaration(&func)?;
             let [w0, w1, w2] = dfg.input_wires_arr();
             let [w0, w1] = dfg.add_dataflow_op(cx_gate(), [w0, w1])?.outputs_arr();
+            let [w2] = dfg
+                .add_dataflow_op(
+                    LeafOp::Lift {
+                        type_row: vec![QB_T].into(),
+                        new_extension: EXTENSION_ID,
+                    },
+                    [w2],
+                )?
+                .outputs_arr();
             dfg.finish_with_outputs([w0, w1, w2])?
         };
-        let hugr = mod_builder
-            .finish_prelude_hugr()
-            .map_err(|e| -> BuildError { e.into() })?;
+        let hugr = mod_builder.finish_prelude_hugr()?;
         Ok((hugr, func_id.node()))
     }
 
@@ -797,18 +820,32 @@ mod tests {
         let sub = SiblingSubgraph::try_new_dataflow_subgraph(&func)?;
 
         let empty_dfg = {
-            let builder = DFGBuilder::new(FunctionType::new_endo(type_row![QB_T, QB_T])).unwrap();
+            let mut builder = DFGBuilder::new(
+                FunctionType::new_endo(type_row![QB_T, QB_T, QB_T])
+                    .with_extension_delta(&ExtensionSet::singleton(&EXTENSION_ID)),
+            )
+            .unwrap();
             let inputs = builder.input_wires();
-            builder.finish_prelude_hugr_with_outputs(inputs).unwrap()
+            let lifted = builder
+                .add_dataflow_op(
+                    LeafOp::Lift {
+                        type_row: type_row![QB_T, QB_T, QB_T],
+                        new_extension: EXTENSION_ID,
+                    },
+                    inputs,
+                )
+                .unwrap();
+            builder.set_outputs(lifted.outputs()).unwrap();
+            builder.finish_prelude_hugr().unwrap()
         };
 
         let rep = sub.create_simple_replacement(&func, empty_dfg).unwrap();
 
-        assert_eq!(rep.subgraph().nodes().len(), 1);
+        assert_eq!(rep.subgraph().nodes().len(), 2);
 
-        assert_eq!(hugr.node_count(), 5); // Module + Def + In + CX + Out
+        assert_eq!(hugr.node_count(), 6); // Module + Def + In + CX + Lift + Out
         hugr.apply_rewrite(rep).unwrap();
-        assert_eq!(hugr.node_count(), 4); // Module + Def + In + Out
+        assert_eq!(hugr.node_count(), 5); // Module + Def + In + Lift + Out
 
         Ok(())
     }
@@ -818,11 +855,10 @@ mod tests {
         let (hugr, dfg) = build_hugr().unwrap();
         let func: SiblingGraph<'_, FuncID<true>> = SiblingGraph::try_new(&hugr, dfg).unwrap();
         let sub = SiblingSubgraph::try_new_dataflow_subgraph(&func)?;
-        // The identity wire on the third qubit is ignored, so the subgraph's signature only contains
-        // the first two qubits.
+        // The third wire is included because of the "Lift" node
         assert_eq!(
             sub.signature(&func),
-            FunctionType::new_endo(type_row![QB_T, QB_T])
+            FunctionType::new_endo(type_row![QB_T, QB_T, QB_T])
         );
         Ok(())
     }
@@ -855,7 +891,7 @@ mod tests {
                 .unwrap()
                 .nodes()
                 .len(),
-            1
+            2 // Include Lift node
         )
     }
 
@@ -960,7 +996,8 @@ mod tests {
         let func_graph: SiblingGraph<'_, FuncID<true>> =
             SiblingGraph::try_new(&hugr, func_root).unwrap();
         let subgraph = SiblingSubgraph::try_new_dataflow_subgraph(&func_graph).unwrap();
-        let extracted = subgraph.extract_subgraph(&hugr, "region")?;
+        let extracted =
+            subgraph.extract_subgraph(&hugr, "region", &ExtensionSet::singleton(&EXTENSION_ID))?;
 
         extracted.validate(&PRELUDE_REGISTRY).unwrap();
 
