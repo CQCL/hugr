@@ -16,7 +16,7 @@ use crate::macros::const_extension_ids;
 use crate::ops::dataflow::IOTrait;
 use crate::ops::{self, Const, LeafOp, OpType};
 use crate::std_extensions::logic::test::{and_op, or_op};
-use crate::std_extensions::logic::{self, NotOp};
+use crate::std_extensions::logic::{self, NotOp, EXTENSION_ID};
 use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
 use crate::types::{CustomType, FunctionType, PolyFuncType, Type, TypeBound, TypeRow};
 use crate::values::Value;
@@ -360,17 +360,18 @@ fn cfg_children_restrictions() {
 
 #[test]
 fn test_ext_edge() -> Result<(), HugrError> {
-    let mut h = closed_dfg_root_hugr(FunctionType::new(
-        type_row![BOOL_T, BOOL_T],
-        type_row![BOOL_T],
-    ));
+    let delta = ExtensionSet::singleton(&EXTENSION_ID);
+    let mut h = closed_dfg_root_hugr(
+        FunctionType::new(type_row![BOOL_T, BOOL_T], type_row![BOOL_T])
+            .with_extension_delta(&delta),
+    );
     let [input, output] = h.get_io(h.root()).unwrap();
 
     // Nested DFG BOOL_T -> BOOL_T
     let sub_dfg = h.add_node_with_parent(
         h.root(),
         ops::DFG {
-            signature: FunctionType::new_endo(type_row![BOOL_T]),
+            signature: FunctionType::new_endo(type_row![BOOL_T]).with_extension_delta(&delta),
         },
     )?;
     // this Xor has its 2nd input unconnected
