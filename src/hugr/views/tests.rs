@@ -3,10 +3,7 @@ use rstest::{fixture, rstest};
 
 use crate::{
     builder::{BuildError, BuildHandle, Container, DFGBuilder, Dataflow, DataflowHugr},
-    extension::{
-        prelude::{PRELUDE_ID, QB_T},
-        ExtensionSet,
-    },
+    extension::prelude::QB_T,
     ops::handle::{DataflowOpID, NodeHandle},
     type_row,
     types::FunctionType,
@@ -135,7 +132,7 @@ fn value_types() {
 #[rustversion::since(1.75)] // uses impl in return position
 #[test]
 fn static_targets() {
-    use crate::extension::prelude::{ConstUsize, USIZE_T};
+    use crate::extension::{ExtensionSet, prelude::{ConstUsize, USIZE_T, PRELUDE_ID}};
     use itertools::Itertools;
     let mut dfg = DFGBuilder::new(
         FunctionType::new(type_row![], type_row![USIZE_T])
