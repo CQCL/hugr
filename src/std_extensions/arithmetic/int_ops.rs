@@ -468,9 +468,11 @@ mod test {
             PRELUDE.to_owned(),
         ])
         .unwrap();
+        let delta = ExtensionSet::singleton(&EXTENSION_ID);
         assert_eq!(
             iwiden_s.compute_signature(&[ta(3), ta(4)], &reg).unwrap(),
-            FunctionType::new(vec![int_type(ta(3))], vec![int_type(ta(4))],)
+            FunctionType::new(vec![int_type(ta(3))], vec![int_type(ta(4))])
+                .with_extension_delta(&delta)
         );
 
         let iwiden_u = EXTENSION.get_op("iwiden_u").unwrap();
@@ -482,7 +484,8 @@ mod test {
 
         assert_eq!(
             inarrow_s.compute_signature(&[ta(2), ta(1)], &reg).unwrap(),
-            FunctionType::new(vec![int_type(ta(2))], vec![sum_with_error(int_type(ta(1)))],)
+            FunctionType::new(vec![int_type(ta(2))], vec![sum_with_error(int_type(ta(1)))])
+                .with_extension_delta(&delta)
         );
 
         let inarrow_u = EXTENSION.get_op("inarrow_u").unwrap();
