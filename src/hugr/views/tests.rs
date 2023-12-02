@@ -132,7 +132,10 @@ fn value_types() {
 #[rustversion::since(1.75)] // uses impl in return position
 #[test]
 fn static_targets() {
-    use crate::extension::{ExtensionSet, prelude::{ConstUsize, USIZE_T, PRELUDE_ID}};
+    use crate::extension::{
+        prelude::{ConstUsize, PRELUDE_ID, USIZE_T},
+        ExtensionSet,
+    };
     use itertools::Itertools;
     let mut dfg = DFGBuilder::new(
         FunctionType::new(type_row![], type_row![USIZE_T])
