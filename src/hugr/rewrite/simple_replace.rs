@@ -221,7 +221,7 @@ pub(in crate::hugr::rewrite) mod test {
         HugrBuilder, ModuleBuilder,
     };
     use crate::extension::prelude::BOOL_T;
-    use crate::extension::{EMPTY_REG, PRELUDE_REGISTRY};
+    use crate::extension::{ExtensionSet, EMPTY_REG, PRELUDE_REGISTRY};
     use crate::hugr::views::{HugrView, SiblingSubgraph};
     use crate::hugr::{Hugr, HugrMut, Rewrite};
     use crate::ops::dataflow::DataflowOpTrait;
@@ -230,7 +230,7 @@ pub(in crate::hugr::rewrite) mod test {
     use crate::std_extensions::logic::test::and_op;
     use crate::type_row;
     use crate::types::{FunctionType, Type};
-    use crate::utils::test_quantum_extension::{cx_gate, h_gate};
+    use crate::utils::test_quantum_extension::{cx_gate, h_gate, EXTENSION_ID};
     use crate::{IncomingPort, Node};
 
     use super::SimpleReplacement;
@@ -249,9 +249,12 @@ pub(in crate::hugr::rewrite) mod test {
     fn make_hugr() -> Result<Hugr, BuildError> {
         let mut module_builder = ModuleBuilder::new();
         let _f_id = {
+            let delta = ExtensionSet::singleton(&EXTENSION_ID);
             let mut func_builder = module_builder.define_function(
                 "main",
-                FunctionType::new(type_row![QB, QB, QB], type_row![QB, QB, QB]).into(),
+                FunctionType::new_endo(type_row![QB, QB, QB])
+                    .with_extension_delta(&delta)
+                    .into(),
             )?;
 
             let [qb0, qb1, qb2] = func_builder.input_wires_arr();
@@ -259,7 +262,7 @@ pub(in crate::hugr::rewrite) mod test {
             let q_out = func_builder.add_dataflow_op(h_gate(), vec![qb2])?;
 
             let mut inner_builder = func_builder.dfg_builder(
-                FunctionType::new(type_row![QB, QB], type_row![QB, QB]),
+                FunctionType::new_endo(type_row![QB, QB]).with_extension_delta(&delta),
                 None,
                 [qb0, qb1],
             )?;
