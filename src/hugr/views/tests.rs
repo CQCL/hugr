@@ -3,7 +3,7 @@ use rstest::{fixture, rstest};
 
 use crate::{
     builder::{BuildError, BuildHandle, Container, DFGBuilder, Dataflow, DataflowHugr},
-    extension::prelude::QB_T,
+    extension::{prelude::QB_T, ExtensionSet},
     ops::handle::{DataflowOpID, NodeHandle},
     type_row,
     types::FunctionType,
@@ -163,10 +163,14 @@ fn test_dataflow_ports_only() {
     use crate::builder::DataflowSubContainer;
     use crate::extension::{prelude::BOOL_T, PRELUDE_REGISTRY};
     use crate::hugr::views::PortIterator;
-    use crate::std_extensions::logic::NotOp;
+    use crate::std_extensions::logic::{NotOp, EXTENSION_ID};
     use itertools::Itertools;
 
-    let mut dfg = DFGBuilder::new(FunctionType::new(type_row![BOOL_T], type_row![BOOL_T])).unwrap();
+    let mut dfg = DFGBuilder::new(
+        FunctionType::new_endo(type_row![BOOL_T])
+            .with_extension_delta(&ExtensionSet::singleton(&EXTENSION_ID)),
+    )
+    .unwrap();
     let local_and = {
         let local_and = dfg
             .define_function(
@@ -189,6 +193,25 @@ fn test_dataflow_ports_only() {
         )
         .unwrap();
     dfg.add_other_wire(not.node(), call.node()).unwrap();
+
+    // As temporary workaround for https://github.com/CQCL/hugr/issues/695
+    // We force the input-extensions of the FuncDefn node to include the logic
+    // extension, so the static edge from the FuncDefn to the call has the same
+    // extensions as the result of the "not".
+    {
+        let nt = dfg.hugr_mut().op_types.get_mut(local_and.node().pg_index());
+        assert_eq!(nt.input_extensions, Some(ExtensionSet::new()));
+        nt.input_extensions = Some(ExtensionSet::singleton(&EXTENSION_ID));
+    }
+    // Note that presently the builder sets too many input-exts that could be
+    // left to the inference (https://github.com/CQCL/hugr/issues/702) hence we
+    // must manually change these too, although we can let inference deal with them
+    for node in dfg.hugr().get_io(local_and.node()).unwrap() {
+        let nt = dfg.hugr_mut().op_types.get_mut(node.pg_index());
+        assert_eq!(nt.input_extensions, Some(ExtensionSet::new()));
+        nt.input_extensions = None;
+    }
+
     let h = dfg
         .finish_hugr_with_outputs(not.outputs(), &PRELUDE_REGISTRY)
         .unwrap();
