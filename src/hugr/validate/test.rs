@@ -412,7 +412,10 @@ const_extension_ids! {
 
 #[test]
 fn test_local_const() -> Result<(), HugrError> {
-    let mut h = closed_dfg_root_hugr(FunctionType::new(type_row![BOOL_T], type_row![BOOL_T]));
+    let mut h = closed_dfg_root_hugr(
+        FunctionType::new_endo(type_row![BOOL_T])
+            .with_extension_delta(&ExtensionSet::singleton(&EXTENSION_ID)),
+    );
     let [input, output] = h.get_io(h.root()).unwrap();
     let and = h.add_node_with_parent(h.root(), and_op())?;
     h.connect(input, 0, and, 0)?;
