@@ -357,6 +357,22 @@ mod test {
                 .signature(),
             FunctionType::new(vec![int_type(ta(3))], vec![int_type(ta(4))],)
         );
+        assert_eq!(
+            IntOpDef::iwiden_s
+                .with_two_widths(3, 3)
+                .to_extension_op()
+                .unwrap()
+                .signature(),
+            FunctionType::new(vec![int_type(ta(3))], vec![int_type(ta(3))],)
+        );
+        assert_eq!(
+            IntOpDef::inarrow_s
+                .with_two_widths(3, 3)
+                .to_extension_op()
+                .unwrap()
+                .signature(),
+            FunctionType::new(vec![int_type(ta(3))], vec![sum_with_error(int_type(ta(3)))],)
+        );
         assert!(
             IntOpDef::iwiden_u
                 .with_two_widths(4, 3)
