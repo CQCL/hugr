@@ -114,14 +114,15 @@ fn plus() -> Result<(), InferExtensionError> {
     let hugr = Hugr::default();
     let mut ctx = UnificationContext::new(&hugr);
 
-    let metas: Vec<Meta> = (2..8)
-        .map(|i| {
+    let mut metas = Vec::<Meta>::new();
+    for n in 1..4 {
+        for d in Direction::BOTH {
             let meta = ctx.fresh_meta();
             ctx.extensions
-                .insert((NodeIndex::new(i).into(), Direction::Incoming), meta);
-            meta
-        })
-        .collect();
+                .insert((NodeIndex::new(n).into(), d), meta);
+            metas.push(meta);
+        }
+    }
 
     ctx.solved.insert(metas[2], ExtensionSet::singleton(&A));
     ctx.add_constraint(metas[1], Constraint::Equal(metas[2]));
@@ -198,11 +199,17 @@ fn open_variables() -> Result<(), InferExtensionError> {
     let ab = ctx.fresh_meta();
     // Some nonsense so that the constraints register as "live"
     ctx.extensions
+        .insert((NodeIndex::new(2).into(), Direction::Incoming), a);
+    ctx.extensions
         .insert((NodeIndex::new(2).into(), Direction::Outgoing), a);
+    ctx.extensions
+        .insert((NodeIndex::new(3).into(), Direction::Incoming), b);
     ctx.extensions
         .insert((NodeIndex::new(3).into(), Direction::Outgoing), b);
     ctx.extensions
         .insert((NodeIndex::new(4).into(), Direction::Incoming), ab);
+    ctx.extensions
+        .insert((NodeIndex::new(4).into(), Direction::Outgoing), ab);
     ctx.variables.insert(a);
     ctx.variables.insert(b);
     ctx.add_constraint(ab, Constraint::Plus(ExtensionSet::singleton(&A), b));
