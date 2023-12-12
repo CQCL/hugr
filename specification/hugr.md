@@ -1004,7 +1004,11 @@ There are three classes of type: ``AnyType`` $\supset$ ``CopyableType`` $\supset
 
     In fully qubit-counted contexts programs take in a number of qubits as input and return the same number, with no discarding. See [quantum extension](#quantum-extension) for more.
 
-  - The next class is ``CopyableType``, i.e. types holding ordinary classical data, where values can be copied (and discarded, the 0-ary copy). This allows multiple (or 0) outgoing edges from an outport; also these types can be sent down Static edges.
+  - The next class is ``CopyableType``, i.e. types holding ordinary classical
+    data, where values can be copied (and discarded, the 0-ary copy). This
+    allows multiple (or 0) outgoing edges from an outport; also these types can
+    be sent down Static edges. Note dataflow inputs (Value and Static) always
+    require a single a connection.
 
   - The final class is ``EqType``: these are copyable types with a well-defined
   notion of equality between values. (While *some* notion of equality is defined on
