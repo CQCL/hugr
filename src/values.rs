@@ -122,10 +122,7 @@ impl Value {
         match self {
             Value::Extension { c } => c.0.extension_reqs().clone(),
             Value::Function { .. } => ExtensionSet::new(), // no extensions reqd to load Hugr (only to run)
-            Value::Tuple { vs } => vs
-                .iter()
-                .map(Value::extension_reqs)
-                .fold(ExtensionSet::new(), |a, b| a.union(&b)),
+            Value::Tuple { vs } => ExtensionSet::union_over(vs.iter().map(Value::extension_reqs)),
             Value::Sum { value, .. } => value.extension_reqs(),
         }
     }
