@@ -727,7 +727,7 @@ impl UnificationContext {
                     Constraint::Plus(_, other_m) => solutions.get(&self.resolve(*other_m)),
                     Constraint::Equal(_) => None,
                 })
-                .fold(ExtensionSet::new(), |a, b| a.union(b));
+                .fold(ExtensionSet::new(), ExtensionSet::union);
 
             for m in cc.iter() {
                 self.add_solution(*m, combined_solution.clone());
