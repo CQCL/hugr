@@ -337,7 +337,7 @@ control-flow merge.
 
 A **TupleSum(T0, T1…TN)** type is an algebraic “sum of products” type,
 defined as `Sum(Tuple(#T0), Tuple(#T1), ...Tuple(#Tn))` (see [type
-system](#type-system)), where `#Ti` is the *i*th Row defining it.
+system](#type-system)), where `#Ti` is the *i*th row (sequence of types) defining it.
 
 ```mermaid
 flowchart
@@ -395,7 +395,7 @@ The first child is the entry block and must be a `DFB`, with inputs the same as 
 `Exit` node, whose inputs match the outputs of the CFG-node.
 The remaining children are either `DFB`s or [scoped definitions](#scoped-definitions).
 
-The first output of the DSG contained in a `BasicBlock` has type
+The first output of the graph contained in a `BasicBlock` has type
 `TupleSum(#t0,...#t(n-1))`, where the node has `n` successors, and the
 remaining outputs are a row `#x`. `#ti` with `#x` appended matches the
 inputs of successor `i`.
@@ -404,7 +404,7 @@ Some normalizations are possible:
 
   - If the entry node has no predecessors (i.e. is not a loop header),
     then its contents can be moved outside the CFG node into a containing
-    DSG.
+    graph.
   - If the entry node has only one successor and that successor is the
     exit node, the CFG node itself can be removed.
 
@@ -1016,7 +1016,7 @@ There are three classes of type: ``AnyType`` $\supset$ ``CopyableType`` $\supset
 
 For example, a `float` type (defined in an extension) would be a ``CopyableType``, but not an ``EqType``. Also, Hugr "classes" loosely correspond to Tierkreis' notion of "constraints".
 
-**Row Types** The `#` is a *row type* which consists of zero or more types. Types in the row can optionally be given names in metadata i.e. this does not affect behaviour of the HUGR.
+**Rows** The `#` is a *row* which is a sequence of zero or more types. Types in the row can optionally be given names in metadata i.e. this does not affect behaviour of the HUGR.
 
 The Hugr defines a number of type constructors, that can be instantiated into types by providing some collection of types as arguments. The constructors are given in the following grammar:
 
@@ -1024,7 +1024,7 @@ The Hugr defines a number of type constructors, that can be instantiated into ty
 
 Extensions ::= (Extension)* -- a set, not a list
 
-Type ::= Tuple(#) -- fixed-arity, heterogenous components 
+Type ::= Tuple(#) -- fixed-arity, heterogeneous components 
        | Sum(#)   -- disjoint union of other types, ??tagged by unsigned int??
        | Function[Extensions](#, #) -- monomorphic
        | Opaque(Name, TypeArgs) -- a (instantiation of a) custom type defined by an extension
