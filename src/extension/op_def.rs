@@ -245,7 +245,10 @@ impl SignatureFunc {
             }
         };
 
-        let res = pf.instantiate(args, exts)?;
+        let mut res = pf.instantiate(args, exts)?;
+        res.extension_reqs = res
+            .extension_reqs
+            .union(&ExtensionSet::singleton(&def.extension()));
         Ok(res)
     }
 }
@@ -343,11 +346,7 @@ impl OpDef {
         args: &[TypeArg],
         exts: &ExtensionRegistry,
     ) -> Result<FunctionType, SignatureError> {
-        let mut functy = self.signature_func.compute_signature(self, args, exts)?;
-        functy.extension_reqs = functy
-            .extension_reqs
-            .union(&ExtensionSet::singleton(&self.extension));
-        Ok(functy)
+        self.signature_func.compute_signature(self, args, exts)
     }
 
     /// Fallibly returns a Hugr that may replace an instance of this OpDef
