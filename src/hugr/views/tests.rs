@@ -132,18 +132,22 @@ fn value_types() {
 #[rustversion::since(1.75)] // uses impl in return position
 #[test]
 fn static_targets() {
-    use crate::extension::prelude::{ConstUsize, USIZE_T};
+    use crate::extension::{
+        prelude::{ConstUsize, PRELUDE_ID, USIZE_T},
+        ExtensionSet,
+    };
     use itertools::Itertools;
+    let mut dfg = DFGBuilder::new(
+        FunctionType::new(type_row![], type_row![USIZE_T])
+            .with_extension_delta(&ExtensionSet::singleton(&PRELUDE_ID)),
+    )
+    .unwrap();
 
-    let mut dfg = DFGBuilder::new(FunctionType::new(type_row![], type_row![USIZE_T])).unwrap();
-
-    let c = dfg.add_constant(ConstUsize::new(1).into(), None).unwrap();
+    let c = dfg.add_constant(ConstUsize::new(1).into()).unwrap();
 
     let load = dfg.load_const(&c).unwrap();
 
-    let h = dfg
-        .finish_hugr_with_outputs([load], &crate::extension::PRELUDE_REGISTRY)
-        .unwrap();
+    let h = dfg.finish_prelude_hugr_with_outputs([load]).unwrap();
 
     assert_eq!(h.static_source(load.node()), Some(c.node()));
 

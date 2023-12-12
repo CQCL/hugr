@@ -70,12 +70,8 @@ pub trait Container {
     ///
     /// This function will return an error if there is an error in adding the
     /// [`OpType::Const`] node.
-    fn add_constant(
-        &mut self,
-        constant: ops::Const,
-        extensions: impl Into<Option<ExtensionSet>>,
-    ) -> Result<ConstID, BuildError> {
-        let const_n = self.add_child_node(NodeType::new(constant, extensions.into()))?;
+    fn add_constant(&mut self, constant: ops::Const) -> Result<ConstID, BuildError> {
+        let const_n = self.add_child_node(NodeType::new(constant, ExtensionSet::new()))?;
 
         Ok(const_n.into())
     }
@@ -356,20 +352,16 @@ pub trait Dataflow: Container {
     fn load_const(&mut self, cid: &ConstID) -> Result<Wire, BuildError> {
         let const_node = cid.node();
         let nodetype = self.hugr().get_nodetype(const_node);
-        let input_extensions = nodetype.input_extensions().cloned();
         let op: ops::Const = nodetype
             .op()
             .clone()
             .try_into()
             .expect("ConstID does not refer to Const op.");
 
-        let load_n = self.add_dataflow_node(
-            NodeType::new(
-                ops::LoadConstant {
-                    datatype: op.const_type().clone(),
-                },
-                input_extensions,
-            ),
+        let load_n = self.add_dataflow_op(
+            ops::LoadConstant {
+                datatype: op.const_type().clone(),
+            },
             // Constant wire from the constant value node
             vec![Wire::new(const_node, OutgoingPort::from(0))],
         )?;
@@ -382,12 +374,8 @@ pub trait Dataflow: Container {
     /// # Errors
     ///
     /// This function will return an error if there is an error when adding the node.
-    fn add_load_const(
-        &mut self,
-        constant: ops::Const,
-        extensions: ExtensionSet,
-    ) -> Result<Wire, BuildError> {
-        let cid = self.add_constant(constant, extensions)?;
+    fn add_load_const(&mut self, constant: ops::Const) -> Result<Wire, BuildError> {
+        let cid = self.add_constant(constant)?;
         self.load_const(&cid)
     }
 

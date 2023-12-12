@@ -1,6 +1,7 @@
 //! Constant value definitions.
 
 use crate::{
+    extension::ExtensionSet,
     types::{ConstTypeError, EdgeKind, Type, TypeRow},
     values::{CustomConst, KnownTypeConst, Value},
 };
@@ -96,6 +97,10 @@ impl OpTrait for Const {
         self.value.description()
     }
 
+    fn extension_delta(&self) -> ExtensionSet {
+        self.value.extension_reqs()
+    }
+
     fn tag(&self) -> OpTag {
         <Self as StaticTag>::TAG
     }
@@ -156,22 +161,19 @@ mod test {
             type_row![],
             TypeRow::from(vec![pred_ty.clone()]),
         ))?;
-        let c = b.add_constant(
-            Const::tuple_sum(
-                0,
-                Value::tuple([CustomTestValue(TypeBound::Eq).into(), serialized_float(5.1)]),
-                pred_rows.clone(),
-            )?,
-            ExtensionSet::new(),
-        )?;
+        let c = b.add_constant(Const::tuple_sum(
+            0,
+            Value::tuple([
+                CustomTestValue(TypeBound::Eq, ExtensionSet::new()).into(),
+                serialized_float(5.1),
+            ]),
+            pred_rows.clone(),
+        )?)?;
         let w = b.load_const(&c)?;
         b.finish_hugr_with_outputs([w], &test_registry()).unwrap();
 
         let mut b = DFGBuilder::new(FunctionType::new(type_row![], TypeRow::from(vec![pred_ty])))?;
-        let c = b.add_constant(
-            Const::tuple_sum(1, Value::unit(), pred_rows)?,
-            ExtensionSet::new(),
-        )?;
+        let c = b.add_constant(Const::tuple_sum(1, Value::unit(), pred_rows)?)?;
         let w = b.load_const(&c)?;
         b.finish_hugr_with_outputs([w], &test_registry()).unwrap();
 
@@ -233,7 +235,12 @@ mod test {
             ex_id.clone(),
             TypeBound::Eq,
         );
-        let val: Value = CustomSerialized::new(typ_int.clone(), YamlValue::Number(6.into())).into();
+        let val: Value = CustomSerialized::new(
+            typ_int.clone(),
+            YamlValue::Number(6.into()),
+            ExtensionSet::singleton(&ex_id),
+        )
+        .into();
         let classic_t = Type::new_extension(typ_int.clone());
         assert_matches!(classic_t.least_upper_bound(), TypeBound::Eq);
         classic_t.check_type(&val).unwrap();

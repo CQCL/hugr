@@ -5,7 +5,7 @@ use std::num::NonZeroU64;
 use smol_str::SmolStr;
 
 use crate::{
-    extension::ExtensionId,
+    extension::{ExtensionId, ExtensionSet},
     types::{
         type_param::{TypeArg, TypeArgError, TypeParam},
         ConstTypeError, CustomCheckFailure, CustomType, Type, TypeBound,
@@ -161,6 +161,10 @@ impl CustomConst for ConstIntU {
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
         crate::values::downcast_equal_consts(self, other)
     }
+
+    fn extension_reqs(&self) -> ExtensionSet {
+        ExtensionSet::singleton(&EXTENSION_ID)
+    }
 }
 
 #[typetag::serde]
@@ -179,6 +183,10 @@ impl CustomConst for ConstIntS {
     }
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
         crate::values::downcast_equal_consts(self, other)
+    }
+
+    fn extension_reqs(&self) -> ExtensionSet {
+        ExtensionSet::singleton(&EXTENSION_ID)
     }
 }
 

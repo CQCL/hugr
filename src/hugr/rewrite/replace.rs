@@ -477,14 +477,15 @@ mod test {
             .unwrap()
             .into();
         let just_list = TypeRow::from(vec![listy.clone()]);
-        let exset = ExtensionSet::singleton(&collections::EXTENSION_NAME);
         let intermed = TypeRow::from(vec![listy.clone(), USIZE_T]);
 
         let mut cfg = CFGBuilder::new(
-            FunctionType::new_endo(just_list.clone()).with_extension_delta(&exset),
+            // One might expect an extension_delta of "collections" here, but push/pop
+            // have an empty delta themselves, pending https://github.com/CQCL/hugr/issues/388
+            FunctionType::new_endo(just_list.clone()),
         )?;
 
-        let pred_const = cfg.add_constant(ops::Const::unary_unit_sum(), None)?;
+        let pred_const = cfg.add_constant(ops::Const::unary_unit_sum())?;
 
         let entry = single_node_block(&mut cfg, pop, &pred_const, true)?;
         let bb2 = single_node_block(&mut cfg, push, &pred_const, false)?;

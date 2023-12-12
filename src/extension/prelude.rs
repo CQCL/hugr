@@ -14,7 +14,7 @@ use crate::{
     Extension,
 };
 
-use super::{ExtensionRegistry, SignatureError, SignatureFromArgs};
+use super::{ExtensionRegistry, ExtensionSet, SignatureError, SignatureFromArgs};
 struct ArrayOpCustom;
 
 const MAX: &[TypeParam; 1] = &[TypeParam::max_nat()];
@@ -180,6 +180,10 @@ impl CustomConst for ConstUsize {
 
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
         crate::values::downcast_equal_consts(self, other)
+    }
+
+    fn extension_reqs(&self) -> ExtensionSet {
+        ExtensionSet::singleton(&PRELUDE_ID)
     }
 }
 
