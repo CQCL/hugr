@@ -137,22 +137,13 @@ A `Static` edge can only carry a `CopyableType`. For
 more details see the [Type System](#type-system) section.
 
 As well as the type, dataflow edges are also parametrized by a
-`Locality`. There are three possible localities:
-
-  - `Local`: Source and target nodes must have the same parent.
-  - `Ext`: Edges "in" from an ancestor, i.e. where parent(src) ==
-    parent<sup>i</sup>(dest) for i\>1; see
-    [Non-local Edges](#non-local-edges).
-  - `Dom`: Edges from a dominating basic block in a control-flow graph
-    that is the parent of the source; see
-    [Non-local Edges](#non-local-edges)
+`Locality`, which declares whether the edge crosses levels in the hierarchy. See
+[Edge Locality](#edge-locality) for details.
 
 ```
 AnyType ⊃ CopyableType
 
 EdgeKind ::= Hierarchy | Value(Locality, AnyType) | Static(Local | Ext, CopyableType) | Order | ControlFlow
-
-Locality ::= Local | Ext | Dom
 ```
 
 Note that a port is associated with a node and zero or more dataflow edges (adjoining
@@ -533,50 +524,28 @@ may be a `FuncDefn`, `TailLoop`, `DFG`, `Case` or `DFB` node.
 | -------------- | ------------ |
 | Hierarchy      | Defines hierarchy; each node has \<=1 parent                                                                                                                                                            |
 | Order, Control | Local (Source + target have same parent) |
-| Value          | Local, Ext or Dom - see [Non-local edges](#non-local-edges) |
-| Static         | Local or Ext - see [Non-local edges](#non-local-edges) |
+| Value          | Local, Ext or Dom - see [Edge Locality](#edge-locality) |
+| Static         | Local or Ext - see [Edge Locality](#edge-locality) |
 
-### Exception Handling
 
-#### Panic
+### Edge Locality
+There are three possible `CopyableType` edge localities:
 
-  - Any operation may panic, e.g. integer divide when denominator is
-    zero
-  - Panicking aborts the current graph, and recursively the container
-    node also panics, etc.
-  - Nodes that are independent of the panicking node may have executed
-    or not, at the discretion of the runtime/compiler.
-  - If there are multiple nodes that may panic where neither has
-    dependences on the other (including Order edges), it is at the
-    discretion of the compiler as to which one panics first
+  - `Local`: Source and target nodes must have the same parent.
+  - `Ext`: Edges "in" from a dataflow ancestor.
+  - `Dom`: Edges from a dominating basic block in a control-flow graph.
 
-#### `ErrorType`
 
-  - There is some type of errors, perhaps just a string, or
-    `Tuple(USize,String)` with some errorcode, that is returned along with
-    the fact that the graph/program panicked.
-
-#### Catch
-
-  - At some point we expect to add a first-order `catch` node, somewhat
-    like a DFG-node. This contains a DSG, and (like a DFG node) has
-    inputs matching the child DSG; but one output, of type
-    `Sum(O,ErrorType)` where O is the outputs of the child DSG.
-  - There is also a higher-order `catch` operation in the Tierkreis
-    extension, taking a graph argument; and `run_circuit` will return the
-    same way.
-
-#### **Non-local Edges**
-
-**For ``CopyableType`` values only** we allow dataflow edges (i.e. both Value and Static)
+We allow non-local dataflow edged
 n<sub>1</sub>→n<sub>2</sub> where parent(n<sub>1</sub>) \!=
 parent(n<sub>2</sub>) when the edge's locality is:
   * for Value edges, Ext or Dom;
   * for Static edges, Ext.
+
 Each of these localities have additional constraints as follows:
 
-1.  For Ext edges, ** we require parent(n<sub>1</sub>) ==
-    parent<sup>i</sup>(n<sub>2</sub>) for some i\>1, *and* for Value edges only there must be a order edge from parent(n<sub>1</sub>) to
+1.  For Ext edges, we require parent(n<sub>1</sub>) ==
+    parent<sup>i</sup>(n<sub>2</sub>) for some i\>1, *and* for Value edges only there must be a order edge from n<sub>1</sub> to
     parent<sup>i-1</sup>(n<sub>2</sub>).
 
     The order edge records the
@@ -717,6 +686,37 @@ flowchart
     F == "angle" ==> G
     linkStyle 12,13,14,15,16,17 stroke:#ff3,stroke-width:4px;
 ```
+
+### Exception Handling
+
+#### Panic
+
+  - Any operation may panic, e.g. integer divide when denominator is
+    zero
+  - Panicking aborts the current graph, and recursively the container
+    node also panics, etc.
+  - Nodes that are independent of the panicking node may have executed
+    or not, at the discretion of the runtime/compiler.
+  - If there are multiple nodes that may panic where neither has
+    dependences on the other (including Order edges), it is at the
+    discretion of the compiler as to which one panics first
+
+#### `ErrorType`
+
+  - There is some type of errors, perhaps just a string, or
+    `Tuple(USize,String)` with some errorcode, that is returned along with
+    the fact that the graph/program panicked.
+
+#### Catch
+
+  - At some point we expect to add a first-order `catch` node, somewhat
+    like a DFG-node. This contains a DSG, and (like a DFG node) has
+    inputs matching the child DSG; but one output, of type
+    `Sum(O,ErrorType)` where O is the outputs of the child DSG.
+  - There is also a higher-order `catch` operation in the Tierkreis
+    extension, taking a graph argument; and `run_circuit` will return the
+    same way.
+
 
 ### Operation Extensibility
 
