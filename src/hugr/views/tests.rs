@@ -3,7 +3,7 @@ use rstest::{fixture, rstest};
 
 use crate::{
     builder::{BuildError, BuildHandle, Container, DFGBuilder, Dataflow, DataflowHugr},
-    extension::{prelude::QB_T, ExtensionSet},
+    extension::prelude::QB_T,
     ops::handle::{DataflowOpID, NodeHandle},
     type_row,
     types::FunctionType,
@@ -161,7 +161,7 @@ fn static_targets() {
 #[test]
 fn test_dataflow_ports_only() {
     use crate::builder::DataflowSubContainer;
-    use crate::extension::{prelude::BOOL_T, PRELUDE_REGISTRY};
+    use crate::extension::{prelude::BOOL_T, ExtensionSet, PRELUDE_REGISTRY};
     use crate::hugr::views::PortIterator;
     use crate::std_extensions::logic::{NotOp, EXTENSION_ID};
     use itertools::Itertools;
