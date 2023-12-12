@@ -653,7 +653,7 @@ mod test {
                 s,
                 String::new(),
                 vec![],
-                Some(utou.clone()),
+                utou.clone(),
             )))
         };
         let mut h = DFGBuilder::new(FunctionType::new(

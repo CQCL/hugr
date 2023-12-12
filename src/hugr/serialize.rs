@@ -257,13 +257,17 @@ pub mod test {
         DataflowSubContainer, HugrBuilder, ModuleBuilder,
     };
     use crate::extension::prelude::BOOL_T;
+    use crate::extension::simple_op::MakeRegisteredOp;
     use crate::extension::{EMPTY_REG, PRELUDE_REGISTRY};
     use crate::hugr::hugrmut::sealed::HugrMutInternals;
     use crate::hugr::NodeType;
+    use crate::ops::custom::{ExtensionOp, OpaqueOp};
     use crate::ops::{dataflow::IOTrait, Input, LeafOp, Module, Output, DFG};
+    use crate::std_extensions::logic::NotOp;
     use crate::types::{FunctionType, Type};
     use crate::OutgoingPort;
     use itertools::Itertools;
+    use portgraph::LinkView;
     use portgraph::{
         multiportgraph::MultiPortGraph, Hierarchy, LinkMut, PortMut, PortView, UnmanagedDenseMap,
     };
@@ -277,9 +281,59 @@ pub mod test {
         assert_eq!(ser_roundtrip(&hg), hg);
     }
 
+    /// Serialize and deserialize a value.
     pub fn ser_roundtrip<T: Serialize + serde::de::DeserializeOwned>(g: &T) -> T {
         let v = rmp_serde::to_vec_named(g).unwrap();
         rmp_serde::from_slice(&v[..]).unwrap()
+    }
+
+    /// Serialize and deserialize a HUGR, and check that the result is the same as the original.
+    ///
+    /// Returns the deserialized HUGR.
+    pub fn check_hugr_roundtrip(hugr: &Hugr) -> Hugr {
+        let new_hugr: Hugr = ser_roundtrip(hugr);
+
+        // Original HUGR, with canonicalized node indices
+        //
+        // The internal port indices may still be different.
+        let mut h_canon = hugr.clone();
+        h_canon.canonicalize_nodes(|_, _| {});
+
+        assert_eq!(new_hugr.root, h_canon.root);
+        assert_eq!(new_hugr.hierarchy, h_canon.hierarchy);
+        assert_eq!(new_hugr.metadata, h_canon.metadata);
+
+        // Extension operations may have been downgraded to opaque operations.
+        for node in new_hugr.nodes() {
+            let new_op = new_hugr.get_optype(node);
+            let old_op = h_canon.get_optype(node);
+            if let OpType::LeafOp(LeafOp::CustomOp(new_ext)) = new_op {
+                if let OpType::LeafOp(LeafOp::CustomOp(old_ext)) = old_op {
+                    assert_eq!(new_ext.clone().as_opaque(), old_ext.clone().as_opaque());
+                } else {
+                    panic!("Expected old_op to be a custom op");
+                }
+            } else {
+                assert_eq!(new_op, old_op);
+            }
+        }
+
+        // Check that the graphs are equivalent up to port renumbering.
+        let new_graph = &new_hugr.graph;
+        let old_graph = &h_canon.graph;
+        assert_eq!(new_graph.node_count(), old_graph.node_count());
+        assert_eq!(new_graph.port_count(), old_graph.port_count());
+        assert_eq!(new_graph.link_count(), old_graph.link_count());
+        for n in old_graph.nodes_iter() {
+            assert_eq!(new_graph.num_inputs(n), old_graph.num_inputs(n));
+            assert_eq!(new_graph.num_outputs(n), old_graph.num_outputs(n));
+            assert_eq!(
+                new_graph.output_neighbours(n).collect_vec(),
+                old_graph.output_neighbours(n).collect_vec()
+            );
+        }
+
+        new_hugr
     }
 
     /// Generate an optype for a node with a matching amount of inputs and outputs.
@@ -323,7 +377,7 @@ pub mod test {
             op_types[n] = NodeType::new_pure(gen_optype(&g, n));
         }
 
-        let hg = Hugr {
+        let hugr = Hugr {
             graph: g,
             hierarchy: h,
             root,
@@ -331,10 +385,7 @@ pub mod test {
             metadata: Default::default(),
         };
 
-        let v = rmp_serde::to_vec_named(&hg).unwrap();
-
-        let newhg = rmp_serde::from_slice(&v[..]).unwrap();
-        assert_eq!(hg, newhg);
+        check_hugr_roundtrip(&hugr);
     }
 
     #[test]
@@ -368,44 +419,7 @@ pub mod test {
             module_builder.finish_prelude_hugr().unwrap()
         };
 
-        let ser_hugr: SerHugrV0 = (&hugr).try_into().unwrap();
-        // HUGR internal structures are not preserved across serialization, so
-        // test equality on SerHugrV0 instead.
-        assert_eq!(ser_roundtrip(&ser_hugr), ser_hugr);
-    }
-
-    #[test]
-    fn metadata_hugr_ser() {
-        let hugr = {
-            let mut module_builder = ModuleBuilder::new();
-            let t_row = vec![Type::new_sum(vec![NAT, QB])];
-            let mut f_build = module_builder
-                .define_function("main", FunctionType::new(t_row.clone(), t_row).into())
-                .unwrap();
-
-            let outputs = f_build
-                .input_wires()
-                .map(|in_wire| {
-                    f_build
-                        .add_dataflow_op(
-                            LeafOp::Noop {
-                                ty: f_build.get_wire_type(in_wire).unwrap(),
-                            },
-                            [in_wire],
-                        )
-                        .unwrap()
-                        .out_wire(0)
-                })
-                .collect_vec();
-
-            f_build.finish_with_outputs(outputs).unwrap();
-            module_builder.finish_prelude_hugr().unwrap()
-        };
-
-        let ser_hugr: SerHugrV0 = (&hugr).try_into().unwrap();
-        // HUGR internal structures are not preserved across serialization, so
-        // test equality on SerHugrV0 instead.
-        assert_eq!(ser_roundtrip(&ser_hugr), ser_hugr);
+        check_hugr_roundtrip(&hugr);
     }
 
     #[test]
@@ -419,20 +433,32 @@ pub mod test {
                 .unwrap()
                 .out_wire(0);
         }
-        let h = dfg.finish_hugr_with_outputs(params, &EMPTY_REG)?;
+        let hugr = dfg.finish_hugr_with_outputs(params, &EMPTY_REG)?;
 
-        let ser = serde_json::to_string(&h)?;
-        let h_deser: Hugr = serde_json::from_str(&ser)?;
+        check_hugr_roundtrip(&hugr);
+        Ok(())
+    }
 
-        // Check the canonicalization works
-        let mut h_canon = h;
-        h_canon.canonicalize_nodes(|_, _| {});
+    #[test]
+    fn opaque_ops() -> Result<(), Box<dyn std::error::Error>> {
+        let tp: Vec<Type> = vec![BOOL_T; 1];
+        let mut dfg = DFGBuilder::new(FunctionType::new_endo(tp))?;
+        let [wire] = dfg.input_wires_arr();
 
-        for node in h_deser.nodes() {
-            assert_eq!(h_deser.get_optype(node), h_canon.get_optype(node));
-            assert_eq!(h_deser.get_parent(node), h_canon.get_parent(node));
-        }
+        // Add an extension operation
+        let extension_op: ExtensionOp = NotOp.to_extension_op().unwrap();
+        let wire = dfg
+            .add_dataflow_op(extension_op.clone(), [wire])
+            .unwrap()
+            .out_wire(0);
 
+        // Add an unresolved opaque operation
+        let opaque_op: OpaqueOp = extension_op.into();
+        let wire = dfg.add_dataflow_op(opaque_op, [wire]).unwrap().out_wire(0);
+
+        let hugr = dfg.finish_hugr_with_outputs([wire], &PRELUDE_REGISTRY)?;
+
+        check_hugr_roundtrip(&hugr);
         Ok(())
     }
 
@@ -450,18 +476,8 @@ pub mod test {
         hugr.remove_node(old_in).unwrap();
         hugr.update_validate(&PRELUDE_REGISTRY).unwrap();
 
-        let ser = serde_json::to_vec(&hugr).unwrap();
-        let new_hugr: Hugr = serde_json::from_slice(&ser).unwrap();
+        let new_hugr: Hugr = check_hugr_roundtrip(&hugr);
         new_hugr.validate(&EMPTY_REG).unwrap_err();
         new_hugr.validate(&PRELUDE_REGISTRY).unwrap();
-
-        // Check the canonicalization works
-        let mut h_canon = hugr.clone();
-        h_canon.canonicalize_nodes(|_, _| {});
-
-        for node in new_hugr.nodes() {
-            assert_eq!(new_hugr.get_optype(node), h_canon.get_optype(node));
-            assert_eq!(new_hugr.get_parent(node), h_canon.get_parent(node));
-        }
     }
 }

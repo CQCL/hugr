@@ -349,13 +349,6 @@ impl OpDef {
         self.signature_func.compute_signature(self, args, exts)
     }
 
-    pub(crate) fn should_serialize_signature(&self) -> bool {
-        match self.signature_func {
-            SignatureFunc::TypeScheme { .. } => false,
-            SignatureFunc::CustomFunc { .. } => true,
-        }
-    }
-
     /// Fallibly returns a Hugr that may replace an instance of this OpDef
     /// given a set of available extensions that may be used in the Hugr.
     pub fn try_lower(&self, args: &[TypeArg], available_extensions: &ExtensionSet) -> Option<Hugr> {
