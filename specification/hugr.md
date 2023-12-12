@@ -177,7 +177,7 @@ The root node has no non-hierarchy edges (and this supercedes any other requirem
 edges of specific node types).
 
 A _sibling graph_ is a subgraph of the HUGR containing all nodes with
-a particular parent, plus any `Order`, `Value` and `ControlFlow` edges between
+a particular parent, plus any `Order`, `Value` `Static`, and `ControlFlow` edges between
 them.
 
 #### `Value` edges
@@ -197,8 +197,8 @@ these edges; see [operations](#node-operations).
 
 #### `Order` edges
 
-`Order` edges represent constraints on ordering that may be specified
-explicitly (e.g. for operations that are stateful). These can be seen as
+`Order` edges represent explicit constraints on ordering between nodes
+(e.g. useful for stateful operations). These can be seen as
 local value edges of unit type `()`, i.e. that pass no data, and where
 the source and target nodes must have the same parent. There can be at
 most one `Order` edge between any two nodes.
