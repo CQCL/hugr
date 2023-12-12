@@ -68,10 +68,8 @@ impl CustomConst for ListValue {
     }
 
     fn extension_reqs(&self) -> ExtensionSet {
-        self.0
-            .iter()
-            .map(Value::extension_reqs)
-            .fold(ExtensionSet::singleton(&EXTENSION_NAME), |a, b| a.union(&b))
+        ExtensionSet::union_over(self.0.iter().map(Value::extension_reqs))
+            .union(&ExtensionSet::singleton(&EXTENSION_NAME))
     }
 }
 const TP: TypeParam = TypeParam::Type { b: TypeBound::Any };

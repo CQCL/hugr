@@ -147,7 +147,7 @@ impl FunctionBuilder<Hugr> {
     ///
     /// Error in adding DFG child nodes.
     pub fn new(name: impl Into<String>, signature: PolyFuncType) -> Result<Self, BuildError> {
-        let body = signature.body.clone();
+        let body = signature.body().clone();
         let op = ops::FuncDefn {
             signature,
             name: name.into(),

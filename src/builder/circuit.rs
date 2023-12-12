@@ -190,7 +190,7 @@ mod test {
                 "MyOp",
                 "unknown op".to_string(),
                 vec![],
-                Some(FunctionType::new(vec![QB, NAT], vec![QB])),
+                FunctionType::new(vec![QB, NAT], vec![QB]),
             ))
             .into(),
         );

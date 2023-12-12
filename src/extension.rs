@@ -387,6 +387,16 @@ impl ExtensionSet {
         self
     }
 
+    /// Returns the union of an arbitrary collection of [ExtensionSet]s
+    pub fn union_over(sets: impl IntoIterator<Item = Self>) -> Self {
+        // `union` clones the receiver, which we do not need to do here
+        let mut res = ExtensionSet::new();
+        for s in sets {
+            res.0.extend(s.0)
+        }
+        res
+    }
+
     /// The things in other which are in not in self
     pub fn missing_from(&self, other: &Self) -> Self {
         ExtensionSet::from_iter(other.0.difference(&self.0).cloned())

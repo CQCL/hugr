@@ -700,7 +700,7 @@ impl UnificationContext {
                         });
 
                 let (rs, other_ms): (Vec<_>, Vec<_>) = plus_constraints.unzip();
-                let solution = rs.iter().fold(ExtensionSet::new(), ExtensionSet::union);
+                let solution = ExtensionSet::union_over(rs);
                 let unresolved_metas = other_ms
                     .into_iter()
                     .filter(|other_m| m != *other_m)
@@ -728,7 +728,7 @@ impl UnificationContext {
                     Constraint::Plus(_, other_m) => solutions.get(&self.resolve(*other_m)),
                     Constraint::Equal(_) => None,
                 })
-                .fold(ExtensionSet::new(), |a, b| a.union(b));
+                .fold(ExtensionSet::new(), ExtensionSet::union);
 
             for m in cc.iter() {
                 self.add_solution(*m, combined_solution.clone());

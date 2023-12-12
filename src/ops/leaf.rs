@@ -170,7 +170,7 @@ impl DataflowOpTrait for LeafOp {
 
         match self {
             LeafOp::Noop { ty: typ } => FunctionType::new(vec![typ.clone()], vec![typ.clone()]),
-            LeafOp::CustomOp(ext) => ext.dataflow_signature(),
+            LeafOp::CustomOp(ext) => ext.signature(),
             LeafOp::MakeTuple { tys: types } => {
                 FunctionType::new(types.clone(), vec![Type::new_tuple(types.clone())])
             }

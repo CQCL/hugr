@@ -450,8 +450,7 @@ fn extension_adding_sequence() -> Result<(), Box<dyn Error>> {
 }
 
 fn make_opaque(extension: impl Into<ExtensionId>, signature: FunctionType) -> ops::LeafOp {
-    let opaque =
-        ops::custom::OpaqueOp::new(extension.into(), "", "".into(), vec![], Some(signature));
+    let opaque = ops::custom::OpaqueOp::new(extension.into(), "", "".into(), vec![], signature);
     ops::custom::ExternalOp::from(opaque).into()
 }
 
@@ -874,7 +873,7 @@ fn plus_on_self() -> Result<(), Box<dyn std::error::Error>> {
         "2qb_op",
         String::new(),
         vec![],
-        Some(ft),
+        ft,
     ))
     .into();
     let unary_sig = FunctionType::new_endo(type_row![QB_T])
@@ -884,7 +883,7 @@ fn plus_on_self() -> Result<(), Box<dyn std::error::Error>> {
         "1qb_op",
         String::new(),
         vec![],
-        Some(unary_sig),
+        unary_sig,
     ))
     .into();
     // Constrain q1,q2 as PLUS(ext1, inputs):
