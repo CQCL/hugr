@@ -248,7 +248,7 @@ impl SignatureFunc {
         let mut res = pf.instantiate(args, exts)?;
         res.extension_reqs = res
             .extension_reqs
-            .union(&ExtensionSet::singleton(&def.extension()));
+            .union(&ExtensionSet::singleton(def.extension()));
         Ok(res)
     }
 }
