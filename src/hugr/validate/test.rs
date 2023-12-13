@@ -4,7 +4,6 @@ use super::*;
 use crate::builder::test::closed_dfg_root_hugr;
 use crate::builder::{
     BuildError, Container, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder,
-    ModuleBuilder,
 };
 use crate::extension::prelude::{BOOL_T, PRELUDE, USIZE_T};
 use crate::extension::{
@@ -533,44 +532,37 @@ fn too_many_extension() -> Result<(), BuildError> {
 /// requirements `[A,BOOL_T]`. A slightly more complex test of the error from
 /// `missing_lift_node`.
 fn extensions_mismatch() -> Result<(), BuildError> {
-    let mut module_builder = ModuleBuilder::new();
-
     let all_rs = ExtensionSet::from_iter([XA, XB]);
 
-    let main_sig = FunctionType::new(type_row![], type_row![NAT])
+    let main_sig = FunctionType::new_endo(type_row![NAT, NAT])
         .with_extension_delta(&all_rs)
         .into();
 
-    let mut main = module_builder.define_function("main", main_sig)?;
+    let mut main = FunctionBuilder::new("main", main_sig)?;
+    let [left_wire, right_wire] = main.input_wires_arr();
 
     let [left_wire] = main
-        .dfg_builder(
-            FunctionType::new(type_row![], type_row![NAT]),
-            Some(ExtensionSet::singleton(&XA)),
-            [],
+        .add_dataflow_node(
+            NodeType::new_pure(LeafOp::Lift {
+                type_row: type_row![NAT],
+                new_extension: XA,
+            }),
+            [left_wire],
         )?
-        .finish_with_outputs([])?
         .outputs_arr();
 
     let [right_wire] = main
-        .dfg_builder(
-            FunctionType::new(type_row![], type_row![NAT]),
-            Some(ExtensionSet::singleton(&XB)),
-            [],
+        .add_dataflow_node(
+            NodeType::new_pure(LeafOp::Lift {
+                type_row: type_row![NAT],
+                new_extension: XB,
+            }),
+            [right_wire],
         )?
-        .finish_with_outputs([])?
         .outputs_arr();
+    main.set_outputs([left_wire, right_wire])?;
 
-    let builder = main.dfg_builder(
-        FunctionType::new(type_row![NAT, NAT], type_row![NAT]),
-        Some(all_rs),
-        [left_wire, right_wire],
-    )?;
-    let [_left, _right] = builder.input_wires_arr();
-    let [output] = builder.finish_with_outputs([])?.outputs_arr();
-
-    main.finish_with_outputs([output])?;
-    let handle = module_builder.hugr().validate(&PRELUDE_REGISTRY);
+    let handle = main.hugr().validate(&PRELUDE_REGISTRY);
     assert_matches!(
         handle,
         Err(ValidationError::ExtensionError(
