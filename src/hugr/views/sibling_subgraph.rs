@@ -690,6 +690,7 @@ mod tests {
 
     use crate::extension::{ExtensionSet, PRELUDE_REGISTRY};
     use crate::ops::LeafOp;
+    use crate::std_extensions::logic;
     use crate::utils::test_quantum_extension::{cx_gate, EXTENSION_ID};
     use crate::{
         builder::{
@@ -762,7 +763,12 @@ mod tests {
 
     fn build_3not_hugr() -> Result<(Hugr, Node), BuildError> {
         let mut mod_builder = ModuleBuilder::new();
-        let func = mod_builder.declare("test", FunctionType::new_endo(type_row![BOOL_T]).into())?;
+        let func = mod_builder.declare(
+            "test",
+            FunctionType::new_endo(type_row![BOOL_T])
+                .with_extension_delta(&ExtensionSet::singleton(&logic::EXTENSION_ID))
+                .into(),
+        )?;
         let func_id = {
             let mut dfg = mod_builder.define_declaration(&func)?;
             let outs1 = dfg.add_dataflow_op(NotOp, dfg.input_wires())?;
@@ -781,7 +787,9 @@ mod tests {
         let mut mod_builder = ModuleBuilder::new();
         let func = mod_builder.declare(
             "test",
-            FunctionType::new(type_row![BOOL_T], type_row![BOOL_T]).into(),
+            FunctionType::new_endo(type_row![BOOL_T])
+                .with_extension_delta(&ExtensionSet::singleton(&logic::EXTENSION_ID))
+                .into(),
         )?;
         let func_id = {
             let mut dfg = mod_builder.define_declaration(&func)?;
@@ -987,7 +995,12 @@ mod tests {
             SiblingGraph::try_new(&hugr, func_root).unwrap();
         let func = SiblingSubgraph::try_new_dataflow_subgraph(&func_graph).unwrap();
         let func_defn = hugr.get_optype(func_root).as_func_defn().unwrap();
-        assert_eq!(func_defn.signature, func.signature(&func_graph).into());
+        assert_eq!(
+            func_defn.signature,
+            func.signature(&func_graph)
+                .with_extension_delta(&func_defn.signature.body().extension_reqs)
+                .into()
+        );
     }
 
     #[test]
