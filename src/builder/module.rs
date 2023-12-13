@@ -90,7 +90,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
             NodeType::new_pure(ops::FuncDefn { name, signature }),
         )?;
 
-        let db = DFGBuilder::create_with_io(self.hugr_mut(), f_node, body, None)?;
+        let db = DFGBuilder::create_with_io(self.hugr_mut(), f_node, body)?;
         Ok(FunctionBuilder::from_dfg_builder(db))
     }
 
