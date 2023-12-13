@@ -323,19 +323,13 @@ impl UnificationContext {
                 self.add_constraint(m_output, Constraint::Equal(m_exit));
             }
 
-            match node_type.io_extensions() {
-                // Input extensions are open
-                None => {
-                    let delta = node_type.op().extension_delta();
-                    self.add_constraint(m_output, make_constraint(delta, m_input));
-                }
-                // We have a solution for everything!
-                Some((input_exts, output_exts)) => {
-                    self.add_solution(m_input, input_exts.clone());
-                    self.add_solution(m_output, output_exts);
-                }
+            let delta = node_type.op().extension_delta();
+            self.add_constraint(m_output, make_constraint(delta, m_input));
+            if let Some(input_exts) = node_type.input_extensions() {
+                self.add_solution(m_input, input_exts.clone());
             }
         }
+
         // Separate loop so that we can assume that a metavariable has been
         // added for every (Node, Direction) in the graph already.
         for tgt_node in hugr.nodes() {
