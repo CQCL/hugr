@@ -996,10 +996,10 @@ mod tests {
         let func_graph: SiblingGraph<'_, FuncID<true>> =
             SiblingGraph::try_new(&hugr, func_root).unwrap();
         let subgraph = SiblingSubgraph::try_new_dataflow_subgraph(&func_graph).unwrap();
-        let extracted =
+        let mut extracted =
             subgraph.extract_subgraph(&hugr, "region", &ExtensionSet::singleton(&EXTENSION_ID))?;
 
-        extracted.validate(&PRELUDE_REGISTRY).unwrap();
+        extracted.update_validate(&PRELUDE_REGISTRY).unwrap();
 
         Ok(())
     }
