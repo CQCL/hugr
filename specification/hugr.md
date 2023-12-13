@@ -1272,6 +1272,7 @@ The new hugr is then derived as follows:
     For each child $C$ of $P$ (in order), if $C \in S$, redirect the hierarchy edge $P \rightarrow C$ to
     target the next node in $N$. Stop if there are no more nodes in $N$.
     Add any remaining nodes in $N$ to the end of $P$'s list of children.
+    (Reindexing may be necessary after this step.)
 6.  For each node $(n, b = B(n))$ and for each child $m$ of $b$, replace the
     hierarchy edge from $b$ to $m$ with a hierarchy edge from the new copy of
     $n$ to $m$ (preserving the order).
