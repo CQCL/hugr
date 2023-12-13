@@ -203,13 +203,10 @@ fn test_dataflow_ports_only() {
         assert_eq!(nt.input_extensions, Some(ExtensionSet::new()));
         nt.input_extensions = Some(ExtensionSet::singleton(&EXTENSION_ID));
     }
-    // Note that presently the builder sets too many input-exts that could be
-    // left to the inference (https://github.com/CQCL/hugr/issues/702) hence we
-    // must manually change these too, although we can let inference deal with them
+    // Just (sanity-)check that no input-extensions have been set by the builder
     for node in dfg.hugr().get_io(local_and.node()).unwrap() {
-        let nt = dfg.hugr_mut().op_types.get_mut(node.pg_index());
-        assert_eq!(nt.input_extensions, Some(ExtensionSet::new()));
-        nt.input_extensions = None;
+        let nt = dfg.hugr().op_types.get(node.pg_index());
+        assert_eq!(nt.input_extensions, None);
     }
 
     let h = dfg

@@ -263,7 +263,6 @@ pub(in crate::hugr::rewrite) mod test {
 
             let mut inner_builder = func_builder.dfg_builder(
                 FunctionType::new_endo(type_row![QB, QB]).with_extension_delta(&delta),
-                None,
                 [qb0, qb1],
             )?;
             let inner_graph = {

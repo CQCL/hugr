@@ -4,7 +4,6 @@ use super::*;
 use crate::builder::test::closed_dfg_root_hugr;
 use crate::builder::{
     BuildError, Container, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder,
-    ModuleBuilder,
 };
 use crate::extension::prelude::{BOOL_T, PRELUDE, USIZE_T};
 use crate::extension::{
@@ -14,7 +13,7 @@ use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::hugr::{HugrError, HugrMut, NodeType};
 use crate::macros::const_extension_ids;
 use crate::ops::dataflow::IOTrait;
-use crate::ops::{self, Const, LeafOp, OpType};
+use crate::ops::{self, Const, Input, LeafOp, OpType, Output};
 use crate::std_extensions::logic::test::{and_op, or_op};
 use crate::std_extensions::logic::{self, NotOp, EXTENSION_ID};
 use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
@@ -447,30 +446,35 @@ fn test_local_const() -> Result<(), HugrError> {
 
 #[test]
 /// A wire with no extension requirements is wired into a node which has
-/// [A,BOOL_T] extensions required on its inputs and outputs. This could be fixed
+/// [A,B] extensions required on its inputs and outputs. This could be fixed
 /// by adding a lift node, but for validation this is an error.
 fn missing_lift_node() -> Result<(), BuildError> {
-    let mut module_builder = ModuleBuilder::new();
-    let mut main = module_builder.define_function(
-        "main",
-        FunctionType::new(type_row![NAT], type_row![NAT]).into(),
+    let exset = ExtensionSet::from_iter([XA, XB]);
+    let mut main = Hugr::new(NodeType::new_pure(FuncDefn {
+        name: "main".into(),
+        signature: FunctionType::new_endo(type_row![NAT])
+            .with_extension_delta(&exset)
+            .into(),
+    }));
+    let inp = main.add_node_with_parent(
+        main.root(),
+        NodeType::new_pure(Input {
+            types: type_row![NAT],
+        }),
     )?;
-    let [main_input] = main.input_wires_arr();
-
-    let f_builder = main.dfg_builder(
-        FunctionType::new(type_row![NAT], type_row![NAT]),
-        // Inner DFG has extension requirements that the wire wont satisfy
-        Some(ExtensionSet::from_iter([XA, XB])),
-        [main_input],
+    let out = main.add_node_with_parent(
+        main.root(),
+        NodeType::new(
+            Output {
+                types: type_row![NAT],
+            },
+            exset,
+        ),
     )?;
-    let f_inputs = f_builder.input_wires();
-    let f_handle = f_builder.finish_with_outputs(f_inputs)?;
-    let [f_output] = f_handle.outputs_arr();
-    main.finish_with_outputs([f_output])?;
-    let handle = module_builder.hugr().validate(&PRELUDE_REGISTRY);
+    main.connect(inp, 0, out, 0)?;
 
     assert_matches!(
-        handle,
+        main.validate(&PRELUDE_REGISTRY),
         Err(ValidationError::ExtensionError(
             ExtensionError::TgtExceedsSrcExtensionsAtPort { .. }
         ))
@@ -484,28 +488,41 @@ fn missing_lift_node() -> Result<(), BuildError> {
 /// unification, so don't allow open extension variables on the function
 /// signature, so this fails.
 fn too_many_extension() -> Result<(), BuildError> {
-    let mut module_builder = ModuleBuilder::new();
+    let mut main = Hugr::new(NodeType::new_pure(FuncDefn {
+        name: "main".into(),
+        signature: FunctionType::new_endo(type_row![NAT]).into(),
+    }));
+    // Explicitly specify all input extensions so there is nothing to infer
+    let inp = main.add_node_with_parent(
+        main.root(),
+        NodeType::new_pure(Input {
+            types: type_row![NAT],
+        }),
+    )?;
+    let out = main.add_node_with_parent(
+        main.root(),
+        NodeType::new_pure(Output {
+            types: type_row![NAT],
+        }),
+    )?;
+    let lift = main.add_node_with_parent(
+        main.root(),
+        NodeType::new_pure(LeafOp::Lift {
+            type_row: type_row![NAT],
+            new_extension: XA,
+        }),
+    )?;
 
-    let main_sig = FunctionType::new(type_row![NAT], type_row![NAT]).into();
+    main.connect(inp, 0, lift, 0)?;
+    main.connect(lift, 0, out, 0)?;
 
-    let mut main = module_builder.define_function("main", main_sig)?;
-    let [main_input] = main.input_wires_arr();
-
-    let inner_sig = FunctionType::new(type_row![NAT], type_row![NAT])
-        .with_extension_delta(&ExtensionSet::singleton(&XA));
-
-    let f_builder = main.dfg_builder(inner_sig, Some(ExtensionSet::new()), [main_input])?;
-    let f_inputs = f_builder.input_wires();
-    let f_handle = f_builder.finish_with_outputs(f_inputs)?;
-    let [f_output] = f_handle.outputs_arr();
-    main.finish_with_outputs([f_output])?;
-    let handle = module_builder.hugr().validate(&PRELUDE_REGISTRY);
     assert_matches!(
-        handle,
+        main.validate(&PRELUDE_REGISTRY),
         Err(ValidationError::ExtensionError(
             ExtensionError::SrcExceedsTgtExtensionsAtPort { .. }
         ))
     );
+
     Ok(())
 }
 
@@ -515,44 +532,44 @@ fn too_many_extension() -> Result<(), BuildError> {
 /// requirements `[A,BOOL_T]`. A slightly more complex test of the error from
 /// `missing_lift_node`.
 fn extensions_mismatch() -> Result<(), BuildError> {
-    let mut module_builder = ModuleBuilder::new();
-
     let all_rs = ExtensionSet::from_iter([XA, XB]);
 
-    let main_sig = FunctionType::new(type_row![], type_row![NAT])
+    let main_sig = FunctionType::new_endo(type_row![NAT, NAT])
         .with_extension_delta(&all_rs)
         .into();
 
-    let mut main = module_builder.define_function("main", main_sig)?;
+    let mut main = FunctionBuilder::new("main", main_sig)?;
+    let [left_wire, right_wire] = main.input_wires_arr();
 
     let [left_wire] = main
-        .dfg_builder(
-            FunctionType::new(type_row![], type_row![NAT]),
-            Some(ExtensionSet::singleton(&XA)),
-            [],
+        .add_dataflow_node(
+            NodeType::new_pure(LeafOp::Lift {
+                type_row: type_row![NAT],
+                new_extension: XA,
+            }),
+            [left_wire],
         )?
-        .finish_with_outputs([])?
         .outputs_arr();
 
     let [right_wire] = main
-        .dfg_builder(
-            FunctionType::new(type_row![], type_row![NAT]),
-            Some(ExtensionSet::singleton(&XB)),
-            [],
+        .add_dataflow_node(
+            NodeType::new_pure(LeafOp::Lift {
+                type_row: type_row![NAT],
+                new_extension: XB,
+            }),
+            [right_wire],
         )?
-        .finish_with_outputs([])?
         .outputs_arr();
+    main.set_outputs([left_wire, right_wire])?;
 
-    let builder = main.dfg_builder(
-        FunctionType::new(type_row![NAT, NAT], type_row![NAT]),
-        Some(all_rs),
-        [left_wire, right_wire],
-    )?;
-    let [_left, _right] = builder.input_wires_arr();
-    let [output] = builder.finish_with_outputs([])?.outputs_arr();
-
-    main.finish_with_outputs([output])?;
-    let handle = module_builder.hugr().validate(&PRELUDE_REGISTRY);
+    // Avoid needing inference (which cannot succeed) by manually setting extensionsets
+    let mut hugr = main.hugr().clone();
+    let [inp, out] = hugr.get_io(hugr.root()).unwrap();
+    assert_eq!(hugr.get_nodetype(inp).input_extensions, None);
+    hugr.replace_op(inp, NodeType::new_pure(hugr.get_optype(inp).clone()))?;
+    assert_eq!(hugr.get_nodetype(out).input_extensions, None);
+    hugr.replace_op(out, NodeType::new(hugr.get_optype(out).clone(), all_rs))?;
+    let handle = hugr.validate(&PRELUDE_REGISTRY);
     assert_matches!(
         handle,
         Err(ValidationError::ExtensionError(

@@ -138,7 +138,6 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> ConditionalBuilder<B> {
             self.hugr_mut(),
             case_node,
             FunctionType::new(inputs, outputs).with_extension_delta(&extension_delta),
-            None,
         )?;
 
         Ok(CaseBuilder::from_dfg_builder(dfg_builder))
@@ -197,7 +196,7 @@ impl CaseBuilder<Hugr> {
         };
         let base = Hugr::new(NodeType::new_open(op));
         let root = base.root();
-        let dfg_builder = DFGBuilder::create_with_io(base, root, signature, None)?;
+        let dfg_builder = DFGBuilder::create_with_io(base, root, signature)?;
 
         Ok(CaseBuilder::from_dfg_builder(dfg_builder))
     }

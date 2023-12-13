@@ -13,7 +13,7 @@
 use super::ExtensionSet;
 use crate::{
     hugr::views::HugrView,
-    ops::{OpTag, OpTrait},
+    ops::{FuncDefn, OpTag, OpTrait, OpType},
     types::EdgeKind,
     Direction, Node,
 };
@@ -186,6 +186,14 @@ struct UnificationContext {
     fresh_name: u32,
 }
 
+fn make_constraint(delta: ExtensionSet, other: Meta) -> Constraint {
+    if delta.is_empty() {
+        Constraint::Equal(other)
+    } else {
+        Constraint::Plus(delta, other)
+    }
+}
+
 /// Invariant: Constraint::Plus always points to a fresh metavariable
 impl UnificationContext {
     /// Create a new unification context, and populate it with constraints from
@@ -283,15 +291,16 @@ impl UnificationContext {
                     // op_signature, so the Incoming and Outgoing ports will
                     // have equal extension requirements.
                     // The function that it contains, however, may have an
-                    // extension delta, so its output shouldn't be equal to the
-                    // FuncDefn's output.
-                    //
-                    // TODO: Add a constraint that the extensions of the output
-                    // node of a FuncDefn should be those of the input node plus
-                    // the extension delta specified in the function signature.
-                    if node_type.tag() != OpTag::FuncDefn {
-                        self.add_constraint(m_output_node, Constraint::Equal(m_output));
-                    }
+                    // extension delta - and the Input/Output nodes relate to that instead.
+                    self.add_constraint(
+                        m_output_node,
+                        match node_type.op() {
+                            OpType::FuncDefn(FuncDefn { signature, .. }) => {
+                                make_constraint(signature.body().extension_reqs.clone(), m_output)
+                            }
+                            _ => Constraint::Equal(m_output),
+                        },
+                    );
                 }
             }
 
@@ -314,24 +323,13 @@ impl UnificationContext {
                 self.add_constraint(m_output, Constraint::Equal(m_exit));
             }
 
-            match node_type.io_extensions() {
-                // Input extensions are open
-                None => {
-                    let delta = node_type.op().extension_delta();
-                    let c = if delta.is_empty() {
-                        Constraint::Equal(m_input)
-                    } else {
-                        Constraint::Plus(delta, m_input)
-                    };
-                    self.add_constraint(m_output, c);
-                }
-                // We have a solution for everything!
-                Some((input_exts, output_exts)) => {
-                    self.add_solution(m_input, input_exts.clone());
-                    self.add_solution(m_output, output_exts);
-                }
+            let delta = node_type.op().extension_delta();
+            self.add_constraint(m_output, make_constraint(delta, m_input));
+            if let Some(input_exts) = node_type.input_extensions() {
+                self.add_solution(m_input, input_exts.clone());
             }
         }
+
         // Separate loop so that we can assume that a metavariable has been
         // added for every (Node, Direction) in the graph already.
         for tgt_node in hugr.nodes() {
