@@ -14,7 +14,7 @@ use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::hugr::{HugrError, HugrMut, NodeType};
 use crate::macros::const_extension_ids;
 use crate::ops::dataflow::IOTrait;
-use crate::ops::{self, Const, LeafOp, OpType};
+use crate::ops::{self, Const, Input, LeafOp, OpType, Output};
 use crate::std_extensions::logic::test::{and_op, or_op};
 use crate::std_extensions::logic::{self, NotOp, EXTENSION_ID};
 use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
@@ -484,28 +484,41 @@ fn missing_lift_node() -> Result<(), BuildError> {
 /// unification, so don't allow open extension variables on the function
 /// signature, so this fails.
 fn too_many_extension() -> Result<(), BuildError> {
-    let mut module_builder = ModuleBuilder::new();
+    let mut main = Hugr::new(NodeType::new_pure(FuncDefn {
+        name: "main".into(),
+        signature: FunctionType::new_endo(type_row![NAT]).into(),
+    }));
+    // Explicitly specify all input extensions so there is nothing to infer
+    let inp = main.add_node_with_parent(
+        main.root(),
+        NodeType::new_pure(Input {
+            types: type_row![NAT],
+        }),
+    )?;
+    let out = main.add_node_with_parent(
+        main.root(),
+        NodeType::new_pure(Output {
+            types: type_row![NAT],
+        }),
+    )?;
+    let lift = main.add_node_with_parent(
+        main.root(),
+        NodeType::new_pure(LeafOp::Lift {
+            type_row: type_row![NAT],
+            new_extension: XA,
+        }),
+    )?;
 
-    let main_sig = FunctionType::new(type_row![NAT], type_row![NAT]).into();
+    main.connect(inp, 0, lift, 0)?;
+    main.connect(lift, 0, out, 0)?;
 
-    let mut main = module_builder.define_function("main", main_sig)?;
-    let [main_input] = main.input_wires_arr();
-
-    let inner_sig = FunctionType::new(type_row![NAT], type_row![NAT])
-        .with_extension_delta(&ExtensionSet::singleton(&XA));
-
-    let f_builder = main.dfg_builder(inner_sig, Some(ExtensionSet::new()), [main_input])?;
-    let f_inputs = f_builder.input_wires();
-    let f_handle = f_builder.finish_with_outputs(f_inputs)?;
-    let [f_output] = f_handle.outputs_arr();
-    main.finish_with_outputs([f_output])?;
-    let handle = module_builder.hugr().validate(&PRELUDE_REGISTRY);
     assert_matches!(
-        handle,
+        main.validate(&PRELUDE_REGISTRY),
         Err(ValidationError::ExtensionError(
             ExtensionError::SrcExceedsTgtExtensionsAtPort { .. }
         ))
     );
+
     Ok(())
 }
 
