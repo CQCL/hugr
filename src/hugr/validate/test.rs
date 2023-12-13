@@ -562,7 +562,14 @@ fn extensions_mismatch() -> Result<(), BuildError> {
         .outputs_arr();
     main.set_outputs([left_wire, right_wire])?;
 
-    let handle = main.hugr().validate(&PRELUDE_REGISTRY);
+    // Avoid needing inference (which cannot succeed) by manually setting extensionsets
+    let mut hugr = main.hugr().clone();
+    let [inp, out] = hugr.get_io(hugr.root()).unwrap();
+    assert_eq!(hugr.get_nodetype(inp).input_extensions, None);
+    hugr.replace_op(inp, NodeType::new_pure(hugr.get_optype(inp).clone()))?;
+    assert_eq!(hugr.get_nodetype(out).input_extensions, None);
+    hugr.replace_op(out, NodeType::new(hugr.get_optype(out).clone(), all_rs))?;
+    let handle = hugr.validate(&PRELUDE_REGISTRY);
     assert_matches!(
         handle,
         Err(ValidationError::ExtensionError(
