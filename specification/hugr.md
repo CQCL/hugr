@@ -1245,7 +1245,9 @@ Note that considering all three $\mu$ lists together,
    - the `TgtNode` + `TgtPos`s of all `NewEdgeSpec`s with `EdgeKind` == `Value` will be unique
    - and similarly for `EdgeKind` == `Static`
 
-The well-formedness requirements of Hugr imply that $\mu\_\textrm{inp}$ and $\mu\_\textrm{out}$ may only contain `NewEdgeSpec`s with certain `EdgeKind`s, depending on $P$:
+The well-formedness requirements of Hugr imply that $\mu\_\textrm{inp}$,
+$\mu\_\textrm{out}$ and $\mu\_\textrm{new}$ may only contain `NewEdgeSpec`s with
+certain `EdgeKind`s, depending on $P$:
    - if $P$ is a dataflow container, `EdgeKind`s may be `Order`, `Value` or `Static` only (no `ControlFlow`)
    - if $P$ is a CFG node, `EdgeKind`s may be `ControlFlow`, `Value`, or `Static` only (no `Order`)
    - if $P$ is a Module node, there may be `Value` or `Static` only (no `Order`).
