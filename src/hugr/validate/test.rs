@@ -447,27 +447,18 @@ fn test_local_const() -> Result<(), HugrError> {
 
 #[test]
 /// A wire with no extension requirements is wired into a node which has
-/// [A,BOOL_T] extensions required on its inputs and outputs. This could be fixed
+/// [A,B] extensions required on its inputs and outputs. This could be fixed
 /// by adding a lift node, but for validation this is an error.
 fn missing_lift_node() -> Result<(), BuildError> {
-    let mut module_builder = ModuleBuilder::new();
-    let mut main = module_builder.define_function(
+    let mut main = FunctionBuilder::new(
         "main",
-        FunctionType::new(type_row![NAT], type_row![NAT]).into(),
+        FunctionType::new(type_row![NAT], type_row![NAT])
+            .with_extension_delta(&ExtensionSet::from_iter([XA, XB]))
+            .into(),
     )?;
     let [main_input] = main.input_wires_arr();
-
-    let f_builder = main.dfg_builder(
-        FunctionType::new(type_row![NAT], type_row![NAT]),
-        // Inner DFG has extension requirements that the wire wont satisfy
-        Some(ExtensionSet::from_iter([XA, XB])),
-        [main_input],
-    )?;
-    let f_inputs = f_builder.input_wires();
-    let f_handle = f_builder.finish_with_outputs(f_inputs)?;
-    let [f_output] = f_handle.outputs_arr();
-    main.finish_with_outputs([f_output])?;
-    let handle = module_builder.hugr().validate(&PRELUDE_REGISTRY);
+    main.set_outputs([main_input])?;
+    let handle = main.hugr().validate(&PRELUDE_REGISTRY);
 
     assert_matches!(
         handle,
