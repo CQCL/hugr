@@ -450,18 +450,32 @@ fn test_local_const() -> Result<(), HugrError> {
 /// [A,B] extensions required on its inputs and outputs. This could be fixed
 /// by adding a lift node, but for validation this is an error.
 fn missing_lift_node() -> Result<(), BuildError> {
-    let mut main = FunctionBuilder::new(
-        "main",
-        FunctionType::new(type_row![NAT], type_row![NAT])
-            .with_extension_delta(&ExtensionSet::from_iter([XA, XB]))
+    let exset = ExtensionSet::from_iter([XA, XB]);
+    let mut main = Hugr::new(NodeType::new_pure(FuncDefn {
+        name: "main".into(),
+        signature: FunctionType::new_endo(type_row![NAT])
+            .with_extension_delta(&exset)
             .into(),
+    }));
+    let inp = main.add_node_with_parent(
+        main.root(),
+        NodeType::new_pure(Input {
+            types: type_row![NAT],
+        }),
     )?;
-    let [main_input] = main.input_wires_arr();
-    main.set_outputs([main_input])?;
-    let handle = main.hugr().validate(&PRELUDE_REGISTRY);
+    let out = main.add_node_with_parent(
+        main.root(),
+        NodeType::new(
+            Output {
+                types: type_row![NAT],
+            },
+            exset,
+        ),
+    )?;
+    main.connect(inp, 0, out, 0)?;
 
     assert_matches!(
-        handle,
+        main.validate(&PRELUDE_REGISTRY),
         Err(ValidationError::ExtensionError(
             ExtensionError::TgtExceedsSrcExtensionsAtPort { .. }
         ))
