@@ -986,6 +986,7 @@ fn funcdefn_signature_mismatch() -> Result<(), Box<dyn Error>> {
         result,
         Err(ValidationError::CantInfer(
             InferExtensionError::MismatchedConcreteWithLocations { .. }
+                | InferExtensionError::EdgeMismatch(ExtensionError::SrcExceedsTgtExtensions { .. })
         ))
     );
     Ok(())
