@@ -3,7 +3,8 @@ use std::error::Error;
 use super::*;
 use crate::builder::test::closed_dfg_root_hugr;
 use crate::builder::{
-    Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder, ModuleBuilder,
+    BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
+    FunctionBuilder, HugrBuilder, ModuleBuilder,
 };
 use crate::extension::prelude::QB_T;
 use crate::extension::ExtensionId;
@@ -154,36 +155,25 @@ fn plus() -> Result<(), InferExtensionError> {
 }
 
 #[test]
-// This generates a solution that causes validation to fail
-// because of a missing lift node
+// We can't infer a solution here because of a missing lift node between
+// Input and Output
 fn missing_lift_node() -> Result<(), Box<dyn Error>> {
-    let mut hugr = Hugr::new(NodeType::new_pure(ops::DFG {
-        signature: FunctionType::new(type_row![NAT], type_row![NAT])
-            .with_extension_delta(&ExtensionSet::singleton(&A)),
-    }));
-
-    let input = hugr.add_node_with_parent(
-        hugr.root(),
-        NodeType::new_pure(ops::Input {
-            types: type_row![NAT],
-        }),
+    let main = FunctionBuilder::new(
+        "main",
+        FunctionType::new_endo(type_row![NAT])
+            .with_extension_delta(&ExtensionSet::singleton(&A))
+            .into(),
     )?;
 
-    let output = hugr.add_node_with_parent(
-        hugr.root(),
-        NodeType::new_pure(ops::Output {
-            types: type_row![NAT],
-        }),
-    )?;
+    let [inps] = main.input_wires_arr();
+    let result = main.finish_prelude_hugr_with_outputs([inps]);
 
-    hugr.connect(input, 0, output, 0)?;
-
-    // Fail to catch the actual error because it's a difference between I/O
+    // Don't try to match the actual error because it's a difference between I/O
     // nodes and their parents and `report_mismatch` isn't yet smart enough
     // to handle that.
     assert_matches!(
-        hugr.update_validate(&PRELUDE_REGISTRY),
-        Err(ValidationError::CantInfer(_))
+        result,
+        Err(BuildError::InvalidHUGR(ValidationError::CantInfer(_)))
     );
     Ok(())
 }
