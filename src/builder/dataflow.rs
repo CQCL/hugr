@@ -246,11 +246,8 @@ pub(crate) mod test {
                         [int],
                     )?
                     .outputs_arr();
-                let inner_builder = func_builder.dfg_builder(
-                    FunctionType::new(type_row![NAT], type_row![NAT]),
-                    None,
-                    [int],
-                )?;
+                let inner_builder = func_builder
+                    .dfg_builder(FunctionType::new(type_row![NAT], type_row![NAT]), [int])?;
                 let inner_id = n_identity(inner_builder)?;
 
                 func_builder.finish_with_outputs(inner_id.outputs().chain(q_out.outputs()))?
@@ -372,7 +369,7 @@ pub(crate) mod test {
             let i1 = noop.out_wire(0);
 
             let mut nested =
-                f_build.dfg_builder(FunctionType::new(type_row![], type_row![BIT]), None, [])?;
+                f_build.dfg_builder(FunctionType::new(type_row![], type_row![BIT]), [])?;
 
             let id = nested.add_dataflow_op(LeafOp::Noop { ty: BIT }, [i1])?;
 
@@ -395,8 +392,7 @@ pub(crate) mod test {
         let noop = f_build.add_dataflow_op(LeafOp::Noop { ty: QB }, [i1])?;
         let i1 = noop.out_wire(0);
 
-        let mut nested =
-            f_build.dfg_builder(FunctionType::new(type_row![], type_row![QB]), None, [])?;
+        let mut nested = f_build.dfg_builder(FunctionType::new(type_row![], type_row![QB]), [])?;
 
         let id_res = nested.add_dataflow_op(LeafOp::Noop { ty: QB }, [i1]);
 
@@ -474,7 +470,7 @@ pub(crate) mod test {
             FunctionType::new(type_row![BIT], type_row![BIT]).with_extension_delta(&ab_extensions);
 
         // A box which adds extensions A and B, via child Lift nodes
-        let mut add_ab = parent.dfg_builder(add_ab_sig, Some(ExtensionSet::new()), [w])?;
+        let mut add_ab = parent.dfg_builder(add_ab_sig, [w])?;
         let [w] = add_ab.input_wires_arr();
 
         let lift_a = add_ab.add_dataflow_op(
@@ -503,7 +499,7 @@ pub(crate) mod test {
 
         // Add another node (a sibling to add_ab) which adds extension C
         // via a child lift node
-        let mut add_c = parent.dfg_builder(add_c_sig, Some(ab_extensions.clone()), [w])?;
+        let mut add_c = parent.dfg_builder(add_c_sig, [w])?;
         let [w] = add_c.input_wires_arr();
         let lift_c = add_c.add_dataflow_node(
             NodeType::new(
@@ -528,10 +524,10 @@ pub(crate) mod test {
     fn non_cfg_ancestor() -> Result<(), BuildError> {
         let unit_sig = FunctionType::new(type_row![Type::UNIT], type_row![Type::UNIT]);
         let mut b = DFGBuilder::new(unit_sig.clone())?;
-        let b_child = b.dfg_builder(unit_sig.clone(), None, [b.input().out_wire(0)])?;
+        let b_child = b.dfg_builder(unit_sig.clone(), [b.input().out_wire(0)])?;
         let b_child_in_wire = b_child.input().out_wire(0);
         b_child.finish_with_outputs([])?;
-        let b_child_2 = b.dfg_builder(unit_sig.clone(), None, [])?;
+        let b_child_2 = b.dfg_builder(unit_sig.clone(), [])?;
 
         // DFG block has edge coming a sibling block, which is only valid for
         // CFGs
@@ -552,17 +548,16 @@ pub(crate) mod test {
     fn no_relation_edge() -> Result<(), BuildError> {
         let unit_sig = FunctionType::new(type_row![Type::UNIT], type_row![Type::UNIT]);
         let mut b = DFGBuilder::new(unit_sig.clone())?;
-        let mut b_child = b.dfg_builder(unit_sig.clone(), None, [b.input().out_wire(0)])?;
-        let b_child_child =
-            b_child.dfg_builder(unit_sig.clone(), None, [b_child.input().out_wire(0)])?;
+        let mut b_child = b.dfg_builder(unit_sig.clone(), [b.input().out_wire(0)])?;
+        let b_child_child = b_child.dfg_builder(unit_sig.clone(), [b_child.input().out_wire(0)])?;
         let b_child_child_in_wire = b_child_child.input().out_wire(0);
 
         b_child_child.finish_with_outputs([])?;
         b_child.finish_with_outputs([])?;
 
-        let mut b_child_2 = b.dfg_builder(unit_sig.clone(), None, [])?;
+        let mut b_child_2 = b.dfg_builder(unit_sig.clone(), [])?;
         let b_child_2_child =
-            b_child_2.dfg_builder(unit_sig.clone(), None, [b_child_2.input().out_wire(0)])?;
+            b_child_2.dfg_builder(unit_sig.clone(), [b_child_2.input().out_wire(0)])?;
 
         let res = b_child_2_child.finish_with_outputs([b_child_child_in_wire]);
 

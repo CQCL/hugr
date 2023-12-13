@@ -242,11 +242,8 @@ pub(super) mod test {
                 .outputs_arr();
 
             let inner_id = {
-                let inner_builder = func_builder.dfg_builder(
-                    FunctionType::new_endo(type_row![NAT]),
-                    None,
-                    [int],
-                )?;
+                let inner_builder =
+                    func_builder.dfg_builder(FunctionType::new_endo(type_row![NAT]), [int])?;
                 let w = inner_builder.input_wires();
                 inner_builder.finish_with_outputs(w)
             }?;

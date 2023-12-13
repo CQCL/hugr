@@ -689,7 +689,7 @@ mod test {
         let case1 = case1.finish_with_outputs(foo.outputs())?.node();
         let mut case2 = cond.case_builder(1)?;
         let bar = case2.add_dataflow_op(mk_op("bar"), case2.input_wires())?;
-        let mut baz_dfg = case2.dfg_builder(utou.clone(), None, bar.outputs())?;
+        let mut baz_dfg = case2.dfg_builder(utou.clone(), bar.outputs())?;
         let baz = baz_dfg.add_dataflow_op(mk_op("baz"), baz_dfg.input_wires())?;
         let baz_dfg = baz_dfg.finish_with_outputs(baz.outputs())?;
         let case2 = case2.finish_with_outputs(baz_dfg.outputs())?.node();

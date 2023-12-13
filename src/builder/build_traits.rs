@@ -296,13 +296,12 @@ pub trait Dataflow: Container {
     fn dfg_builder(
         &mut self,
         signature: FunctionType,
-        input_extensions: Option<ExtensionSet>,
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<DFGBuilder<&mut Hugr>, BuildError> {
         let op = ops::DFG {
             signature: signature.clone(),
         };
-        let nodetype = NodeType::new(op, input_extensions);
+        let nodetype = NodeType::new_auto(op);
         let (dfg_n, _) = add_node_with_wires(self, nodetype, input_wires.into_iter().collect())?;
 
         DFGBuilder::create_with_io(self.hugr_mut(), dfg_n, signature)
