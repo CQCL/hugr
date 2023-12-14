@@ -13,7 +13,7 @@ use std::collections::HashSet;
 use std::mem;
 
 use itertools::Itertools;
-use portgraph::algorithms::{ConvexChecker, TopoConvexChecker};
+use portgraph::algorithms::ConvexChecker;
 use portgraph::{view::Subgraph, Direction, PortView};
 use thiserror::Error;
 
@@ -157,7 +157,7 @@ impl SiblingSubgraph {
         outgoing: OutgoingPorts,
         hugr: &impl HugrView,
     ) -> Result<Self, InvalidSubgraph> {
-        let checker = TopoConvexChecker::new(hugr.portgraph());
+        let checker = TopoConvexChecker::new(hugr);
         Self::try_new_with_checker(incoming, outgoing, hugr, &checker)
     }
 
@@ -218,7 +218,7 @@ impl SiblingSubgraph {
         nodes: impl Into<Vec<Node>>,
         hugr: &impl HugrView,
     ) -> Result<Self, InvalidSubgraph> {
-        let checker = TopoConvexChecker::new(hugr.portgraph());
+        let checker = TopoConvexChecker::new(hugr);
         Self::try_from_nodes_with_checker(nodes, hugr, &checker)
     }
 
@@ -442,6 +442,33 @@ fn combine_in_out<'a>(
         .flatten()
         .map(|(n, p)| (*n, (*p).into()))
         .chain(outputs.iter().map(|(n, p)| (*n, (*p).into())))
+}
+
+/// Precompute convexity information for a HUGR.
+///
+/// This can be used when constructing multiple sibling subgraphs to speed up
+/// convexity checking.
+pub struct TopoConvexChecker<'g, Base: 'g + HugrView>(
+    portgraph::algorithms::TopoConvexChecker<Base::Portgraph<'g>>,
+);
+
+impl<'g, Base: HugrView> TopoConvexChecker<'g, Base> {
+    /// Create a new convexity checker.
+    pub fn new(base: &'g Base) -> Self {
+        let pg = base.portgraph();
+        Self(portgraph::algorithms::TopoConvexChecker::new(pg))
+    }
+}
+
+impl<'g, Base: HugrView> ConvexChecker for TopoConvexChecker<'g, Base> {
+    fn is_convex(
+        &self,
+        nodes: impl IntoIterator<Item = portgraph::NodeIndex>,
+        inputs: impl IntoIterator<Item = portgraph::PortIndex>,
+        outputs: impl IntoIterator<Item = portgraph::PortIndex>,
+    ) -> bool {
+        self.0.is_convex(nodes, inputs, outputs)
+    }
 }
 
 /// The type of all ports in the iterator.
