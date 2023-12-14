@@ -1338,7 +1338,7 @@ remove it. (If there is an intergraph edge from `n0` to a descendent of
 
 ###### `InsertConstIgnore`
 
-Given a `Const<T>` node `c`, and optionally a DSG `P`, add a new
+Given a `Const<T>` node `c`, and optionally `P`, a parent of a DSG, add a new
 `LoadConstant<T>` node `n` as a child of `P` with a `Static<T>` edge
 from `c` to `n` and no outgoing edges from `n`. Also add an Order edge
 from the Input node under `P` to `n`. Return the ID of `n`. If `P` is
