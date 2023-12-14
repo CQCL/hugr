@@ -1088,50 +1088,35 @@ which stands in for a row. Hence, when checking the inputs and outputs
 align, we’re introducing a *row equality constraint*, rather than the
 equality constraint of `typeof(b) ~ Bool`.
 
-### Types of built-ins
+### Rewriting Extension Requirements
 
-We will provide some built in modules to provide basic functionality.
-We will define them in terms of extensions. We have the “builtin”
-extension which should always be available when writing hugr plugins.
-This includes Conditional and TailLoop nodes, and nodes like `Call`:
+Extensions requirements help denote different runtime capabilities.
+For example, a quantum computer may not be able to handle arithmetic
+while running a circuit, so its use is tracked in the function type so that
+rewrites can be performed which remove the arithmetic.
 
-$\displaystyle{\frac{\mathrm{args} : [R] \vec{I}}{\textbf{call} \langle \textbf{Function}[R](\vec{I}, \vec{O}) \rangle (\mathrm{args}) : [R] \vec{O}}}$
-
-**Call** - This operation, like **to\_const**, uses its Static graph as
-a type parameter.
-
-On top of that, we're definitely going to want modules which handle
-graph-based control flow at runtime, arithmetic and basic quantum
-circuits.
-
-These should all be defined as a part of their own extension
-inferface(s). For example, we don’t assume that we can handle arithmetic
-while running a circuit, so we track its use in the Graph’s type so that
-we can perform rewrites which remove the arithmetic.
-
-We would expect standard circuits to look something like
+Simple circuits may look something like:
 
 ```
 Function[Quantum](Array(5, Q), (ms: Array(5, Qubit), results: Array(5, Bit)))
 ```
 
-A circuit built using our higher-order extension to manage control flow
+A circuit built using a higher-order extension to manage control flow
 could then look like:
 
 ```
 Function[Quantum, HigherOrder](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit)))
 ```
 
-So we’d need to perform some graph transformation pass to turn the
+So the compiler would need to perform some graph transformation pass to turn the
 graph-based control flow into a CFG node that a quantum computer could
-run, which removes the `HigherOrder` extension requirement:
+run, which removes the `HigherOrder` extension requirement.
 
 ```
 precompute :: Function[](Function[Quantum,HigherOrder](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit))),
                                          Function[Quantum](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit))))
 ```
 
-Before we can run the circuit.
 
 ## Replacement and Pattern Matching
 
