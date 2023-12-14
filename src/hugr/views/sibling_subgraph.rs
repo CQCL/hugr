@@ -444,22 +444,6 @@ fn combine_in_out<'a>(
         .chain(outputs.iter().map(|(n, p)| (*n, (*p).into())))
 }
 
-/// Precompute convexity information for a HUGR.
-///
-/// This can be used when constructing multiple sibling subgraphs to speed up
-/// convexity checking.
-// pub struct ConvexChecker<'g, Base: 'g + HugrView>(
-//     portgraph::algorithms::TopoConvexChecker<Base::Portgraph<'g>>,
-// );
-
-// impl<'g, Base: HugrView> ConvexChecker<'g, Base> {
-//     /// Create a new convexity checker.
-//     pub fn new(base: &'g Base) -> Self {
-//         let pg = base.portgraph();
-//         Self(portgraph::algorithms::TopoConvexChecker::new(pg))
-//     }
-// }
-
 /// The type of all ports in the iterator.
 ///
 /// If the array is empty or a port does not exist, returns `None`.
