@@ -1350,8 +1350,8 @@ wiring its predecessor to its successor.
 
 Insert an Order edge from `n0` to `n1` where `n0` and `n1` are distinct
 siblings in a DSG such that there is no path in the DSG from `n1` to
-`n0`. If there is already an order edge from `n0` to `n1` this does
-nothing (but is not an error).
+`n0`. (Thus acyclicity is preserved.) If there is already an order edge from
+`n0` to `n1` this does nothing (but is not an error).
 
 ###### `RemoveOrder`
 
