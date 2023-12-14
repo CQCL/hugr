@@ -1356,8 +1356,8 @@ siblings in a DSG such that there is no path in the DSG from `n1` to
 ###### `RemoveOrder`
 
 Given nodes `n0` and `n1`, if there is an Order edge from `n0` to `n1`,
-remove it. (If there is an intergraph edge from `n0` to a descendent of
-`n1`, this invalidates the hugr. TODO should this be an error?)
+remove it. (If there is a non-local edge from `n0` to a descendent of `n1`, this
+invalidates the hugr. TODO should this be an error?)
 
 ##### Insertion and removal of const loads
 
