@@ -1396,7 +1396,7 @@ nodes.
 
 The most basic case – replacing a convex set of Op nodes in a DSG with
 another graph of Op nodes having the same signature – is implemented by
-having T map everything to the parent node, and bot(G) is empty.
+`SimpleReplace`.
 
 If one of the nodes in the region is a complex container node that we
 wish to preserve in the replacement without doing a deep copy, we can
