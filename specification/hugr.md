@@ -1734,14 +1734,14 @@ that *v* is lifted to have extension requirement
 R so that it matches the type
 of input to the next iterations of the loop.
 
-$\displaystyle{\frac{\Theta : [R] \textbf{Function}[R](\vec{X}, \vec{Y}) \quad \vec{x} : [R] \vec{X}}{\textbf{call\\_indirect}(\Theta, \vec{x}) : [R] \vec{Y}}}$
+$\displaystyle{\frac{\Theta : [R] \textbf{Function}[R](\vec{X}, \vec{Y}) \quad \vec{x} : [R] \vec{X}}{\textbf{call\_indirect}(\Theta, \vec{x}) : [R] \vec{Y}}}$
 
 **CallIndirect** - This has the same feature as **loop**: running a
 graph requires it’s extensions.
 
-$\displaystyle{\frac{}{\textbf{to\\_const} \langle \textbf{Function}[R](\vec{I}, \vec{O}) \rangle (\mathrm{name}) : [\emptyset] \textbf{Function}[R](\vec{I}, \vec{O})}}$
+$\displaystyle{\frac{}{\textbf{load\_const} \langle \textbf{Function}[R](\vec{I}, \vec{O}) \rangle (\mathrm{name}) : [\emptyset] \textbf{Function}[R](\vec{I}, \vec{O})}}$
 
-**to_const** - For operations which instantiate a graph (**to\_const**
+**load_const** - For operations which instantiate a graph (**load\_const**
 and **Call**) the functions are given an extra parameter at graph
 construction time which corresponds to the function type that they are
 meant to instantiate. This type will be given by a typeless edge from
