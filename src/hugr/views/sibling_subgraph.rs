@@ -13,6 +13,7 @@ use std::collections::HashSet;
 use std::mem;
 
 use itertools::Itertools;
+use portgraph::algorithms::ConvexChecker;
 use portgraph::{view::Subgraph, Direction, PortView};
 use thiserror::Error;
 
@@ -156,7 +157,7 @@ impl SiblingSubgraph {
         outgoing: OutgoingPorts,
         hugr: &impl HugrView,
     ) -> Result<Self, InvalidSubgraph> {
-        let checker = ConvexChecker::new(hugr);
+        let checker = TopoConvexChecker::new(hugr);
         Self::try_new_with_checker(incoming, outgoing, hugr, &checker)
     }
 
@@ -168,11 +169,11 @@ impl SiblingSubgraph {
     ///
     /// Refer to [`SiblingSubgraph::try_new`] for the full
     /// documentation.
-    pub fn try_new_with_checker<'c, 'h: 'c, H: HugrView>(
+    pub fn try_new_with_checker(
         inputs: IncomingPorts,
         outputs: OutgoingPorts,
-        hugr: &'h H,
-        checker: &'c ConvexChecker<'h, H>,
+        hugr: &impl HugrView,
+        checker: &impl ConvexChecker,
     ) -> Result<Self, InvalidSubgraph> {
         let pg = hugr.portgraph();
 
@@ -187,7 +188,7 @@ impl SiblingSubgraph {
         let nodes = subpg.nodes_iter().map_into().collect_vec();
         validate_subgraph(hugr, &nodes, &inputs, &outputs)?;
 
-        if !subpg.is_convex_with_checker(&checker.0) {
+        if !subpg.is_convex_with_checker(checker) {
             return Err(InvalidSubgraph::NotConvex);
         }
 
@@ -217,7 +218,7 @@ impl SiblingSubgraph {
         nodes: impl Into<Vec<Node>>,
         hugr: &impl HugrView,
     ) -> Result<Self, InvalidSubgraph> {
-        let checker = ConvexChecker::new(hugr);
+        let checker = TopoConvexChecker::new(hugr);
         Self::try_from_nodes_with_checker(nodes, hugr, &checker)
     }
 
@@ -232,7 +233,7 @@ impl SiblingSubgraph {
     pub fn try_from_nodes_with_checker<'c, 'h: 'c, H: HugrView>(
         nodes: impl Into<Vec<Node>>,
         hugr: &'h H,
-        checker: &'c ConvexChecker<'h, H>,
+        checker: &impl ConvexChecker,
     ) -> Result<Self, InvalidSubgraph> {
         let nodes = nodes.into();
         let nodes_set = nodes.iter().copied().collect::<HashSet<_>>();
@@ -447,15 +448,26 @@ fn combine_in_out<'a>(
 ///
 /// This can be used when constructing multiple sibling subgraphs to speed up
 /// convexity checking.
-pub struct ConvexChecker<'g, Base: 'g + HugrView>(
-    portgraph::algorithms::ConvexChecker<Base::Portgraph<'g>>,
+pub struct TopoConvexChecker<'g, Base: 'g + HugrView>(
+    portgraph::algorithms::TopoConvexChecker<Base::Portgraph<'g>>,
 );
 
-impl<'g, Base: HugrView> ConvexChecker<'g, Base> {
+impl<'g, Base: HugrView> TopoConvexChecker<'g, Base> {
     /// Create a new convexity checker.
     pub fn new(base: &'g Base) -> Self {
         let pg = base.portgraph();
-        Self(portgraph::algorithms::ConvexChecker::new(pg))
+        Self(portgraph::algorithms::TopoConvexChecker::new(pg))
+    }
+}
+
+impl<'g, Base: HugrView> ConvexChecker for TopoConvexChecker<'g, Base> {
+    fn is_convex(
+        &self,
+        nodes: impl IntoIterator<Item = portgraph::NodeIndex>,
+        inputs: impl IntoIterator<Item = portgraph::PortIndex>,
+        outputs: impl IntoIterator<Item = portgraph::PortIndex>,
+    ) -> bool {
+        self.0.is_convex(nodes, inputs, outputs)
     }
 }
 

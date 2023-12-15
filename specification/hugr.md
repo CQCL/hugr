@@ -137,22 +137,13 @@ A `Static` edge can only carry a `CopyableType`. For
 more details see the [Type System](#type-system) section.
 
 As well as the type, dataflow edges are also parametrized by a
-`Locality`. There are three possible localities:
-
-  - `Local`: Source and target nodes must have the same parent.
-  - `Ext`: Edges "in" from an ancestor, i.e. where parent(src) ==
-    parent<sup>i</sup>(dest) for i\>1; see
-    [Non-local Edges](#non-local-edges).
-  - `Dom`: Edges from a dominating basic block in a control-flow graph
-    that is the parent of the source; see
-    [Non-local Edges](#non-local-edges)
+`Locality`, which declares whether the edge crosses levels in the hierarchy. See
+[Edge Locality](#edge-locality) for details.
 
 ```
 AnyType ⊃ CopyableType
 
 EdgeKind ::= Hierarchy | Value(Locality, AnyType) | Static(Local | Ext, CopyableType) | Order | ControlFlow
-
-Locality ::= Local | Ext | Dom
 ```
 
 Note that a port is associated with a node and zero or more dataflow edges (adjoining
@@ -186,7 +177,7 @@ The root node has no non-hierarchy edges (and this supercedes any other requirem
 edges of specific node types).
 
 A _sibling graph_ is a subgraph of the HUGR containing all nodes with
-a particular parent, plus any `Order`, `Value` and `ControlFlow` edges between
+a particular parent, plus any `Order`, `Value` `Static`, and `ControlFlow` edges between
 them.
 
 #### `Value` edges
@@ -206,8 +197,8 @@ these edges; see [operations](#node-operations).
 
 #### `Order` edges
 
-`Order` edges represent constraints on ordering that may be specified
-explicitly (e.g. for operations that are stateful). These can be seen as
+`Order` edges represent explicit constraints on ordering between nodes
+(e.g. useful for stateful operations). These can be seen as
 local value edges of unit type `()`, i.e. that pass no data, and where
 the source and target nodes must have the same parent. There can be at
 most one `Order` edge between any two nodes.
@@ -346,7 +337,7 @@ control-flow merge.
 
 A **TupleSum(T0, T1…TN)** type is an algebraic “sum of products” type,
 defined as `Sum(Tuple(#T0), Tuple(#T1), ...Tuple(#Tn))` (see [type
-system](#type-system)), where `#Ti` is the *i*th Row defining it.
+system](#type-system)), where `#Ti` is the *i*th row (sequence of types) defining it.
 
 ```mermaid
 flowchart
@@ -404,7 +395,7 @@ The first child is the entry block and must be a `DFB`, with inputs the same as 
 `Exit` node, whose inputs match the outputs of the CFG-node.
 The remaining children are either `DFB`s or [scoped definitions](#scoped-definitions).
 
-The first output of the DSG contained in a `BasicBlock` has type
+The first output of the graph contained in a `BasicBlock` has type
 `TupleSum(#t0,...#t(n-1))`, where the node has `n` successors, and the
 remaining outputs are a row `#x`. `#ti` with `#x` appended matches the
 inputs of successor `i`.
@@ -413,7 +404,7 @@ Some normalizations are possible:
 
   - If the entry node has no predecessors (i.e. is not a loop header),
     then its contents can be moved outside the CFG node into a containing
-    DSG.
+    graph.
   - If the entry node has only one successor and that successor is the
     exit node, the CFG node itself can be removed.
 
@@ -533,50 +524,28 @@ may be a `FuncDefn`, `TailLoop`, `DFG`, `Case` or `DFB` node.
 | -------------- | ------------ |
 | Hierarchy      | Defines hierarchy; each node has \<=1 parent                                                                                                                                                            |
 | Order, Control | Local (Source + target have same parent) |
-| Value          | Local, Ext or Dom - see [Non-local edges](#non-local-edges) |
-| Static         | Local or Ext - see [Non-local edges](#non-local-edges) |
+| Value          | Local, Ext or Dom - see [Edge Locality](#edge-locality) |
+| Static         | Local or Ext - see [Edge Locality](#edge-locality) |
 
-### Exception Handling
 
-#### Panic
+### Edge Locality
+There are three possible `CopyableType` edge localities:
 
-  - Any operation may panic, e.g. integer divide when denominator is
-    zero
-  - Panicking aborts the current graph, and recursively the container
-    node also panics, etc.
-  - Nodes that are independent of the panicking node may have executed
-    or not, at the discretion of the runtime/compiler.
-  - If there are multiple nodes that may panic where neither has
-    dependences on the other (including Order edges), it is at the
-    discretion of the compiler as to which one panics first
+  - `Local`: Source and target nodes must have the same parent.
+  - `Ext`: Edges "in" from a dataflow ancestor.
+  - `Dom`: Edges from a dominating basic block in a control-flow graph.
 
-#### `ErrorType`
 
-  - There is some type of errors, perhaps just a string, or
-    `Tuple(USize,String)` with some errorcode, that is returned along with
-    the fact that the graph/program panicked.
-
-#### Catch
-
-  - At some point we expect to add a first-order `catch` node, somewhat
-    like a DFG-node. This contains a DSG, and (like a DFG node) has
-    inputs matching the child DSG; but one output, of type
-    `Sum(O,ErrorType)` where O is the outputs of the child DSG.
-  - There is also a higher-order `catch` operation in the Tierkreis
-    extension, taking a graph argument; and `run_circuit` will return the
-    same way.
-
-#### **Non-local Edges**
-
-**For ``CopyableType`` values only** we allow dataflow edges (i.e. both Value and Static)
+We allow non-local dataflow edges
 n<sub>1</sub>→n<sub>2</sub> where parent(n<sub>1</sub>) \!=
 parent(n<sub>2</sub>) when the edge's locality is:
   * for Value edges, Ext or Dom;
   * for Static edges, Ext.
+
 Each of these localities have additional constraints as follows:
 
-1.  For Ext edges, ** we require parent(n<sub>1</sub>) ==
-    parent<sup>i</sup>(n<sub>2</sub>) for some i\>1, *and* for Value edges only there must be a order edge from parent(n<sub>1</sub>) to
+1.  For Ext edges, we require parent(n<sub>1</sub>) ==
+    parent<sup>i</sup>(n<sub>2</sub>) for some i\>1, *and* for Value edges only there must be a order edge from n<sub>1</sub> to
     parent<sup>i-1</sup>(n<sub>2</sub>).
 
     The order edge records the
@@ -717,6 +686,37 @@ flowchart
     F == "angle" ==> G
     linkStyle 12,13,14,15,16,17 stroke:#ff3,stroke-width:4px;
 ```
+
+### Exception Handling
+
+#### Panic
+
+  - Any operation may panic, e.g. integer divide when denominator is
+    zero
+  - Panicking aborts the current graph, and recursively the container
+    node also panics, etc.
+  - Nodes that are independent of the panicking node may have executed
+    or not, at the discretion of the runtime/compiler.
+  - If there are multiple nodes that may panic where neither has
+    dependences on the other (including Order edges), it is at the
+    discretion of the compiler as to which one panics first
+
+#### `ErrorType`
+
+  - There is some type of errors, perhaps just a string, or
+    `Tuple(USize,String)` with some errorcode, that is returned along with
+    the fact that the graph/program panicked.
+
+#### Catch
+
+  - At some point we expect to add a first-order `catch` node, somewhat
+    like a DFG-node. This contains a DSG, and (like a DFG node) has
+    inputs matching the child DSG; but one output, of type
+    `Sum(O,ErrorType)` where O is the outputs of the child DSG.
+  - There is also a higher-order `catch` operation in the Tierkreis
+    extension, taking a graph argument; and `run_circuit` will return the
+    same way.
+
 
 ### Operation Extensibility
 
@@ -1004,7 +1004,11 @@ There are three classes of type: ``AnyType`` $\supset$ ``CopyableType`` $\supset
 
     In fully qubit-counted contexts programs take in a number of qubits as input and return the same number, with no discarding. See [quantum extension](#quantum-extension) for more.
 
-  - The next class is ``CopyableType``, i.e. types holding ordinary classical data, where values can be copied (and discarded, the 0-ary copy). This allows multiple (or 0) outgoing edges from an outport; also these types can be sent down Static edges.
+  - The next class is ``CopyableType``, i.e. types holding ordinary classical
+    data, where values can be copied (and discarded, the 0-ary copy). This
+    allows multiple (or 0) outgoing edges from an outport; also these types can
+    be sent down Static edges. Note: dataflow inputs (Value and Static) always
+    require a single connection.
 
   - The final class is ``EqType``: these are copyable types with a well-defined
   notion of equality between values. (While *some* notion of equality is defined on
@@ -1012,7 +1016,7 @@ There are three classes of type: ``AnyType`` $\supset$ ``CopyableType`` $\supset
 
 For example, a `float` type (defined in an extension) would be a ``CopyableType``, but not an ``EqType``. Also, Hugr "classes" loosely correspond to Tierkreis' notion of "constraints".
 
-**Row Types** The `#` is a *row type* which consists of zero or more types. Types in the row can optionally be given names in metadata i.e. this does not affect behaviour of the HUGR.
+**Rows** The `#` is a *row* which is a sequence of zero or more types. Types in the row can optionally be given names in metadata i.e. this does not affect behaviour of the HUGR.
 
 The Hugr defines a number of type constructors, that can be instantiated into types by providing some collection of types as arguments. The constructors are given in the following grammar:
 
@@ -1020,7 +1024,7 @@ The Hugr defines a number of type constructors, that can be instantiated into ty
 
 Extensions ::= (Extension)* -- a set, not a list
 
-Type ::= Tuple(#) -- fixed-arity, heterogenous components 
+Type ::= Tuple(#) -- fixed-arity, heterogeneous components 
        | Sum(#)   -- disjoint union of other types, ??tagged by unsigned int??
        | Function[Extensions](#, #) -- monomorphic
        | Opaque(Name, TypeArgs) -- a (instantiation of a) custom type defined by an extension
@@ -1084,50 +1088,35 @@ which stands in for a row. Hence, when checking the inputs and outputs
 align, we’re introducing a *row equality constraint*, rather than the
 equality constraint of `typeof(b) ~ Bool`.
 
-### Types of built-ins
+### Rewriting Extension Requirements
 
-We will provide some built in modules to provide basic functionality.
-We will define them in terms of extensions. We have the “builtin”
-extension which should always be available when writing hugr plugins.
-This includes Conditional and TailLoop nodes, and nodes like `Call`:
+Extension requirements help denote different runtime capabilities.
+For example, a quantum computer may not be able to handle arithmetic
+while running a circuit, so its use is tracked in the function type so that
+rewrites can be performed which remove the arithmetic.
 
-$\displaystyle{\frac{\mathrm{args} : [R] \vec{I}}{\textbf{call} \langle \textbf{Function}[R](\vec{I}, \vec{O}) \rangle (\mathrm{args}) : [R] \vec{O}}}$
-
-**Call** - This operation, like **to\_const**, uses its Static graph as
-a type parameter.
-
-On top of that, we're definitely going to want modules which handle
-graph-based control flow at runtime, arithmetic and basic quantum
-circuits.
-
-These should all be defined as a part of their own extension
-inferface(s). For example, we don’t assume that we can handle arithmetic
-while running a circuit, so we track its use in the Graph’s type so that
-we can perform rewrites which remove the arithmetic.
-
-We would expect standard circuits to look something like
+Simple circuits may look something like:
 
 ```
 Function[Quantum](Array(5, Q), (ms: Array(5, Qubit), results: Array(5, Bit)))
 ```
 
-A circuit built using our higher-order extension to manage control flow
+A circuit built using a higher-order extension to manage control flow
 could then look like:
 
 ```
 Function[Quantum, HigherOrder](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit)))
 ```
 
-So we’d need to perform some graph transformation pass to turn the
+So the compiler would need to perform some graph transformation pass to turn the
 graph-based control flow into a CFG node that a quantum computer could
-run, which removes the `HigherOrder` extension requirement:
+run, which removes the `HigherOrder` extension requirement.
 
 ```
 precompute :: Function[](Function[Quantum,HigherOrder](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit))),
                                          Function[Quantum](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit))))
 ```
 
-Before we can run the circuit.
 
 ## Replacement and Pattern Matching
 
@@ -1345,14 +1334,14 @@ nothing (but is not an error).
 ###### `RemoveOrder`
 
 Given nodes `n0` and `n1`, if there is an Order edge from `n0` to `n1`,
-remove it. (If there is an intergraph edge from `n0` to a descendent of
+remove it. (If there is an non-local edge from `n0` to a descendent of
 `n1`, this invalidates the hugr. TODO should this be an error?)
 
 ##### Insertion and removal of const loads
 
 ###### `InsertConstIgnore`
 
-Given a `Const<T>` node `c`, and optionally a DSG `P`, add a new
+Given a `Const<T>` node `c`, and optionally `P`, a parent of a DSG, add a new
 `LoadConstant<T>` node `n` as a child of `P` with a `Static<T>` edge
 from `c` to `n` and no outgoing edges from `n`. Also add an Order edge
 from the Input node under `P` to `n`. Return the ID of `n`. If `P` is
@@ -1717,7 +1706,6 @@ Conversions between integers and floats:
 | Name           | Inputs    | Outputs                  | Meaning               |
 | -------------- | --------- | ------------------------ | --------------------- |
 | `trunc_u<N>`   | `float64` | `Sum(int<N>, ErrorType)` | float to unsigned int. Returns an error when the float is non-finite or cannot be exactly stored in N bits. |
-
 | `trunc_s<N>`   | `float64` | `Sum(int<N>, ErrorType)` | float to signed int. Returns an error when the float is non-finite or cannot be exactly stored in N bits. |
 | `convert_u<N>` | `int<N>`  | `float64`                | unsigned int to float |
 | `convert_s<N>` | `int<N>`  | `float64`                | signed int to float   |
@@ -1752,11 +1740,11 @@ of input to the next iterations of the loop.
 $\displaystyle{\frac{\Theta : [R] \textbf{Function}[R](\vec{X}, \vec{Y}) \quad \vec{x} : [R] \vec{X}}{\textbf{call\\_indirect}(\Theta, \vec{x}) : [R] \vec{Y}}}$
 
 **CallIndirect** - This has the same feature as **loop**: running a
-graph requires it’s extensions.
+graph requires its extensions.
 
-$\displaystyle{\frac{}{\textbf{to\\_const} \langle \textbf{Function}[R](\vec{I}, \vec{O}) \rangle (\mathrm{name}) : [\emptyset] \textbf{Function}[R](\vec{I}, \vec{O})}}$
+$\displaystyle{\frac{}{\textbf{load\\_const} \langle \textbf{Function}[R](\vec{I}, \vec{O}) \rangle (\mathrm{name}) : [\emptyset] \textbf{Function}[R](\vec{I}, \vec{O})}}$
 
-**to_const** - For operations which instantiate a graph (**to\_const**
+**load_const** - For operations which instantiate a graph (**load\_const**
 and **Call**) the functions are given an extra parameter at graph
 construction time which corresponds to the function type that they are
 meant to instantiate. This type will be given by a typeless edge from
