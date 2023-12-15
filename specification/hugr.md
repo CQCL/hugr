@@ -536,7 +536,7 @@ There are three possible `CopyableType` edge localities:
   - `Dom`: Edges from a dominating basic block in a control-flow graph.
 
 
-We allow non-local dataflow edged
+We allow non-local dataflow edges
 n<sub>1</sub>→n<sub>2</sub> where parent(n<sub>1</sub>) \!=
 parent(n<sub>2</sub>) when the edge's locality is:
   * for Value edges, Ext or Dom;
@@ -1007,8 +1007,8 @@ There are three classes of type: ``AnyType`` $\supset$ ``CopyableType`` $\supset
   - The next class is ``CopyableType``, i.e. types holding ordinary classical
     data, where values can be copied (and discarded, the 0-ary copy). This
     allows multiple (or 0) outgoing edges from an outport; also these types can
-    be sent down Static edges. Note dataflow inputs (Value and Static) always
-    require a single a connection.
+    be sent down Static edges. Note: dataflow inputs (Value and Static) always
+    require a single connection.
 
   - The final class is ``EqType``: these are copyable types with a well-defined
   notion of equality between values. (While *some* notion of equality is defined on
@@ -1090,7 +1090,7 @@ equality constraint of `typeof(b) ~ Bool`.
 
 ### Rewriting Extension Requirements
 
-Extensions requirements help denote different runtime capabilities.
+Extension requirements help denote different runtime capabilities.
 For example, a quantum computer may not be able to handle arithmetic
 while running a circuit, so its use is tracked in the function type so that
 rewrites can be performed which remove the arithmetic.
@@ -1734,12 +1734,12 @@ that *v* is lifted to have extension requirement
 R so that it matches the type
 of input to the next iterations of the loop.
 
-$\displaystyle{\frac{\Theta : [R] \textbf{Function}[R](\vec{X}, \vec{Y}) \quad \vec{x} : [R] \vec{X}}{\textbf{call\_indirect}(\Theta, \vec{x}) : [R] \vec{Y}}}$
+$\displaystyle{\frac{\Theta : [R] \textbf{Function}[R](\vec{X}, \vec{Y}) \quad \vec{x} : [R] \vec{X}}{\textbf{call\\_indirect}(\Theta, \vec{x}) : [R] \vec{Y}}}$
 
 **CallIndirect** - This has the same feature as **loop**: running a
-graph requires it’s extensions.
+graph requires its extensions.
 
-$\displaystyle{\frac{}{\textbf{load\_const} \langle \textbf{Function}[R](\vec{I}, \vec{O}) \rangle (\mathrm{name}) : [\emptyset] \textbf{Function}[R](\vec{I}, \vec{O})}}$
+$\displaystyle{\frac{}{\textbf{load\\_const} \langle \textbf{Function}[R](\vec{I}, \vec{O}) \rangle (\mathrm{name}) : [\emptyset] \textbf{Function}[R](\vec{I}, \vec{O})}}$
 
 **load_const** - For operations which instantiate a graph (**load\_const**
 and **Call**) the functions are given an extra parameter at graph
