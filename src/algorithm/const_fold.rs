@@ -69,12 +69,9 @@ pub fn fold_const(op: &OpType, consts: &[(IncomingPort, Const)]) -> ConstFoldRes
 
 #[cfg(test)]
 mod test {
-    use crate::{
-        extension::{ExtensionRegistry, PRELUDE},
-        ops::LeafOp,
-        std_extensions::arithmetic::int_types::{ConstIntU, INT_TYPES},
-        types::TypeArg,
-    };
+    use crate::std_extensions::arithmetic::int_ops::IntOpDef;
+    use crate::std_extensions::arithmetic::int_types::{ConstIntU, INT_TYPES};
+
     use rstest::rstest;
 
     use super::*;
@@ -87,18 +84,6 @@ mod test {
         .unwrap()
     }
 
-    fn u64_add() -> LeafOp {
-        let reg = ExtensionRegistry::try_new([
-            PRELUDE.to_owned(),
-            crate::std_extensions::arithmetic::int_ops::EXTENSION.to_owned(),
-            crate::std_extensions::arithmetic::int_types::EXTENSION.to_owned(),
-        ])
-        .unwrap();
-        crate::std_extensions::arithmetic::int_ops::EXTENSION
-            .instantiate_extension_op("iadd", [TypeArg::BoundedNat { n: 5 }], &reg)
-            .unwrap()
-            .into()
-    }
     #[rstest]
     #[case(0, 0, 0)]
     #[case(0, 1, 1)]
@@ -106,7 +91,7 @@ mod test {
     // c = a + b
     fn test_add(#[case] a: u64, #[case] b: u64, #[case] c: u64) {
         let consts = vec![(0.into(), i2c(a)), (1.into(), i2c(b))];
-        let add_op: OpType = u64_add().into();
+        let add_op: OpType = IntOpDef::iadd.with_width(6).into();
         let out = fold_const(&add_op, &consts).unwrap();
 
         assert_eq!(&out[..], &[(0.into(), i2c(c))]);
