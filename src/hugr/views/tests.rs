@@ -102,9 +102,10 @@ fn all_ports(sample_hugr: (Hugr, BuildHandle<DataflowOpID>, BuildHandle<Dataflow
 fn value_types() {
     use crate::builder::Container;
     use crate::extension::prelude::BOOL_T;
-    use crate::std_extensions::logic::test::not_op;
+    use crate::std_extensions::logic::NotOp;
     use crate::utils::test_quantum_extension::h_gate;
     use itertools::Itertools;
+
     let mut dfg = DFGBuilder::new(FunctionType::new(
         type_row![QB_T, BOOL_T],
         type_row![BOOL_T, QB_T],
@@ -113,7 +114,7 @@ fn value_types() {
 
     let [q, b] = dfg.input_wires_arr();
     let n1 = dfg.add_dataflow_op(h_gate(), [q]).unwrap();
-    let n2 = dfg.add_dataflow_op(not_op(), [b]).unwrap();
+    let n2 = dfg.add_dataflow_op(NotOp, [b]).unwrap();
     dfg.add_other_wire(n1.node(), n2.node()).unwrap();
     let h = dfg
         .finish_prelude_hugr_with_outputs([n2.out_wire(0), n1.out_wire(0)])
@@ -131,18 +132,22 @@ fn value_types() {
 #[rustversion::since(1.75)] // uses impl in return position
 #[test]
 fn static_targets() {
-    use crate::extension::prelude::{ConstUsize, USIZE_T};
+    use crate::extension::{
+        prelude::{ConstUsize, PRELUDE_ID, USIZE_T},
+        ExtensionSet,
+    };
     use itertools::Itertools;
+    let mut dfg = DFGBuilder::new(
+        FunctionType::new(type_row![], type_row![USIZE_T])
+            .with_extension_delta(&ExtensionSet::singleton(&PRELUDE_ID)),
+    )
+    .unwrap();
 
-    let mut dfg = DFGBuilder::new(FunctionType::new(type_row![], type_row![USIZE_T])).unwrap();
-
-    let c = dfg.add_constant(ConstUsize::new(1).into(), None).unwrap();
+    let c = dfg.add_constant(ConstUsize::new(1).into()).unwrap();
 
     let load = dfg.load_const(&c).unwrap();
 
-    let h = dfg
-        .finish_hugr_with_outputs([load], &crate::extension::PRELUDE_REGISTRY)
-        .unwrap();
+    let h = dfg.finish_prelude_hugr_with_outputs([load]).unwrap();
 
     assert_eq!(h.static_source(load.node()), Some(c.node()));
 
@@ -158,8 +163,9 @@ fn test_dataflow_ports_only() {
     use crate::builder::DataflowSubContainer;
     use crate::extension::{prelude::BOOL_T, PRELUDE_REGISTRY};
     use crate::hugr::views::PortIterator;
-    use crate::std_extensions::logic::test::not_op;
+    use crate::std_extensions::logic::NotOp;
     use itertools::Itertools;
+
     let mut dfg = DFGBuilder::new(FunctionType::new(type_row![BOOL_T], type_row![BOOL_T])).unwrap();
     let local_and = {
         let local_and = dfg
@@ -173,7 +179,7 @@ fn test_dataflow_ports_only() {
     };
     let [in_bool] = dfg.input_wires_arr();
 
-    let not = dfg.add_dataflow_op(not_op(), [in_bool]).unwrap();
+    let not = dfg.add_dataflow_op(NotOp, [in_bool]).unwrap();
     let call = dfg
         .call(
             local_and.handle(),

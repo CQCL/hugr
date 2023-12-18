@@ -14,7 +14,7 @@ use crate::{
     Extension,
 };
 
-use super::{ExtensionRegistry, SignatureError, SignatureFromArgs};
+use super::{ExtensionRegistry, ExtensionSet, SignatureError, SignatureFromArgs};
 struct ArrayOpCustom;
 
 const MAX: &[TypeParam; 1] = &[TypeParam::max_nat()];
@@ -29,7 +29,7 @@ impl SignatureFromArgs for ArrayOpCustom {
         let other_row = vec![array_type(TypeArg::BoundedNat { n }, elem_ty_var.clone())];
 
         Ok(PolyFuncType::new(
-            vec![TypeParam::Type(TypeBound::Any)],
+            vec![TypeBound::Any.into()],
             FunctionType::new(var_arg_row, other_row),
         ))
     }
@@ -57,7 +57,7 @@ lazy_static! {
         prelude
             .add_type(
                 SmolStr::new_inline("array"),
-                vec![ TypeParam::max_nat(),TypeParam::Type(TypeBound::Any)],
+                vec![ TypeParam::max_nat(), TypeBound::Any.into()],
                 "array".into(),
                 TypeDefBound::FromParams(vec![1]),
             )
@@ -180,6 +180,10 @@ impl CustomConst for ConstUsize {
 
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
         crate::values::downcast_equal_consts(self, other)
+    }
+
+    fn extension_reqs(&self) -> ExtensionSet {
+        ExtensionSet::singleton(&PRELUDE_ID)
     }
 }
 

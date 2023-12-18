@@ -15,8 +15,8 @@ use crate::hugr::{HugrError, HugrMut, NodeType};
 use crate::macros::const_extension_ids;
 use crate::ops::dataflow::IOTrait;
 use crate::ops::{self, Const, LeafOp, OpType};
-use crate::std_extensions::logic;
-use crate::std_extensions::logic::test::{and_op, not_op, or_op};
+use crate::std_extensions::logic::test::{and_op, or_op};
+use crate::std_extensions::logic::{self, NotOp};
 use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
 use crate::types::{CustomType, FunctionType, PolyFuncType, Type, TypeBound, TypeRow};
 use crate::values::Value;
@@ -453,13 +453,10 @@ fn missing_lift_node() -> Result<(), BuildError> {
     )?;
     let [main_input] = main.input_wires_arr();
 
-    let inner_sig = FunctionType::new(type_row![NAT], type_row![NAT])
-        // Inner DFG has extension requirements that the wire wont satisfy
-        .with_input_extensions(ExtensionSet::from_iter([XA, XB]));
-
     let f_builder = main.dfg_builder(
-        inner_sig.signature,
-        Some(inner_sig.input_extensions),
+        FunctionType::new(type_row![NAT], type_row![NAT]),
+        // Inner DFG has extension requirements that the wire wont satisfy
+        Some(ExtensionSet::from_iter([XA, XB])),
         [main_input],
     )?;
     let f_inputs = f_builder.input_wires();
@@ -491,14 +488,9 @@ fn too_many_extension() -> Result<(), BuildError> {
     let [main_input] = main.input_wires_arr();
 
     let inner_sig = FunctionType::new(type_row![NAT], type_row![NAT])
-        .with_extension_delta(&ExtensionSet::singleton(&XA))
-        .with_input_extensions(ExtensionSet::new());
+        .with_extension_delta(&ExtensionSet::singleton(&XA));
 
-    let f_builder = main.dfg_builder(
-        inner_sig.signature,
-        Some(inner_sig.input_extensions),
-        [main_input],
-    )?;
+    let f_builder = main.dfg_builder(inner_sig, Some(ExtensionSet::new()), [main_input])?;
     let f_inputs = f_builder.input_wires();
     let f_handle = f_builder.finish_with_outputs(f_inputs)?;
     let [f_output] = f_handle.outputs_arr();
@@ -529,19 +521,10 @@ fn extensions_mismatch() -> Result<(), BuildError> {
 
     let mut main = module_builder.define_function("main", main_sig)?;
 
-    let inner_left_sig = FunctionType::new(type_row![], type_row![NAT])
-        .with_input_extensions(ExtensionSet::singleton(&XA));
-
-    let inner_right_sig = FunctionType::new(type_row![], type_row![NAT])
-        .with_input_extensions(ExtensionSet::singleton(&XB));
-
-    let inner_mult_sig =
-        FunctionType::new(type_row![NAT, NAT], type_row![NAT]).with_input_extensions(all_rs);
-
     let [left_wire] = main
         .dfg_builder(
-            inner_left_sig.signature,
-            Some(inner_left_sig.input_extensions),
+            FunctionType::new(type_row![], type_row![NAT]),
+            Some(ExtensionSet::singleton(&XA)),
             [],
         )?
         .finish_with_outputs([])?
@@ -549,16 +532,16 @@ fn extensions_mismatch() -> Result<(), BuildError> {
 
     let [right_wire] = main
         .dfg_builder(
-            inner_right_sig.signature,
-            Some(inner_right_sig.input_extensions),
+            FunctionType::new(type_row![], type_row![NAT]),
+            Some(ExtensionSet::singleton(&XB)),
             [],
         )?
         .finish_with_outputs([])?
         .outputs_arr();
 
     let builder = main.dfg_builder(
-        inner_mult_sig.signature,
-        Some(inner_mult_sig.input_extensions),
+        FunctionType::new(type_row![NAT, NAT], type_row![NAT]),
+        Some(all_rs),
         [left_wire, right_wire],
     )?;
     let [_left, _right] = builder.input_wires_arr();
@@ -619,8 +602,8 @@ fn dfg_with_cycles() -> Result<(), HugrError> {
     ));
     let [input, output] = h.get_io(h.root()).unwrap();
     let or = h.add_node_with_parent(h.root(), or_op())?;
-    let not1 = h.add_node_with_parent(h.root(), not_op())?;
-    let not2 = h.add_node_with_parent(h.root(), not_op())?;
+    let not1 = h.add_node_with_parent(h.root(), NotOp)?;
+    let not2 = h.add_node_with_parent(h.root(), NotOp)?;
     h.connect(input, 0, or, 0)?;
     h.connect(or, 0, not1, 0)?;
     h.connect(not1, 0, or, 1)?;
@@ -671,7 +654,7 @@ fn invalid_types() {
     let mut e = Extension::new(name.clone());
     e.add_type(
         "MyContainer".into(),
-        vec![TypeParam::Type(TypeBound::Copyable)],
+        vec![TypeBound::Copyable.into()],
         "".into(),
         TypeDefBound::Explicit(TypeBound::Any),
     )
@@ -709,7 +692,7 @@ fn invalid_types() {
     assert_eq!(
         validate_to_sig_error(element_outside_bound),
         SignatureError::TypeArgMismatch(TypeArgError::TypeMismatch {
-            param: TypeParam::Type(TypeBound::Copyable),
+            param: TypeBound::Copyable.into(),
             arg: TypeArg::Type { ty: valid }
         })
     );
@@ -813,7 +796,7 @@ fn typevars_declared() -> Result<(), Box<dyn std::error::Error>> {
     let f = FunctionBuilder::new(
         "myfunc",
         PolyFuncType::new(
-            [TypeParam::Type(TypeBound::Any)],
+            [TypeBound::Any.into()],
             FunctionType::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
         ),
     )?;
@@ -823,7 +806,7 @@ fn typevars_declared() -> Result<(), Box<dyn std::error::Error>> {
     let f = FunctionBuilder::new(
         "myfunc",
         PolyFuncType::new(
-            [TypeParam::Type(TypeBound::Any)],
+            [TypeBound::Any.into()],
             FunctionType::new_endo(vec![Type::new_var_use(1, TypeBound::Any)]),
         ),
     )?;
@@ -833,7 +816,7 @@ fn typevars_declared() -> Result<(), Box<dyn std::error::Error>> {
     let f = FunctionBuilder::new(
         "myfunc",
         PolyFuncType::new(
-            [TypeParam::Type(TypeBound::Any)],
+            [TypeBound::Any.into()],
             FunctionType::new_endo(vec![Type::new_var_use(1, TypeBound::Copyable)]),
         ),
     )?;
@@ -884,7 +867,9 @@ fn nested_typevars() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
     use crate::std_extensions::collections;
-    const BOUND: TypeParam = TypeParam::Type(TypeBound::Copyable);
+    const BOUND: TypeParam = TypeParam::Type {
+        b: TypeBound::Copyable,
+    };
     let list_of_var = Type::new_extension(
         collections::EXTENSION
             .get_type(&collections::LIST_TYPENAME)
@@ -903,7 +888,7 @@ fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
     let empty_list = Value::Extension {
         c: (Box::new(collections::ListValue::new(vec![])),),
     };
-    let cst = def.add_load_const(Const::new(empty_list, list_of_var)?, just_colns)?;
+    let cst = def.add_load_const(Const::new(empty_list, list_of_var)?)?;
     let res = def.finish_hugr_with_outputs([cst], &reg);
     assert_matches!(
         res.unwrap_err(),

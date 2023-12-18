@@ -115,6 +115,9 @@ impl<T: DataflowOpTrait> OpTrait for T {
     fn dataflow_signature(&self) -> Option<FunctionType> {
         Some(DataflowOpTrait::signature(self))
     }
+    fn extension_delta(&self) -> ExtensionSet {
+        DataflowOpTrait::signature(self).extension_reqs.clone()
+    }
     fn other_input(&self) -> Option<EdgeKind> {
         DataflowOpTrait::other_input(self)
     }

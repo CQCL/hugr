@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 
 use crate::{
-    extension::{ExtensionId, TypeDef, TypeDefBound},
+    extension::{ExtensionId, ExtensionSet, TypeDef, TypeDefBound},
     types::{
         type_param::{TypeArg, TypeParam},
         CustomCheckFailure, CustomType, FunctionType, PolyFuncType, Type, TypeBound,
@@ -66,8 +66,13 @@ impl CustomConst for ListValue {
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
         crate::values::downcast_equal_consts(self, other)
     }
+
+    fn extension_reqs(&self) -> ExtensionSet {
+        ExtensionSet::union_over(self.0.iter().map(Value::extension_reqs))
+            .union(&ExtensionSet::singleton(&EXTENSION_NAME))
+    }
 }
-const TP: TypeParam = TypeParam::Type(TypeBound::Any);
+const TP: TypeParam = TypeParam::Type { b: TypeBound::Any };
 
 fn extension() -> Extension {
     let mut extension = Extension::new(EXTENSION_NAME);

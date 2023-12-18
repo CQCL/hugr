@@ -23,13 +23,14 @@ pub use infer::{infer_extensions, ExtensionSolution, InferExtensionError};
 
 mod op_def;
 pub use op_def::{
-    CustomSignatureFunc, CustomValidator, OpDef, SignatureFromArgs, ValidateJustArgs,
-    ValidateTypeArgs,
+    CustomSignatureFunc, CustomValidator, OpDef, SignatureFromArgs, SignatureFunc,
+    ValidateJustArgs, ValidateTypeArgs,
 };
 mod type_def;
 pub use type_def::{TypeDef, TypeDefBound};
 mod const_fold;
 pub mod prelude;
+pub mod simple_op;
 pub mod validate;
 pub use const_fold::{ConstFold, ConstFoldResult};
 pub use prelude::{PRELUDE, PRELUDE_REGISTRY};
@@ -386,6 +387,16 @@ impl ExtensionSet {
     pub fn union(mut self, other: &Self) -> Self {
         self.0.extend(other.0.iter().cloned());
         self
+    }
+
+    /// Returns the union of an arbitrary collection of [ExtensionSet]s
+    pub fn union_over(sets: impl IntoIterator<Item = Self>) -> Self {
+        // `union` clones the receiver, which we do not need to do here
+        let mut res = ExtensionSet::new();
+        for s in sets {
+            res.0.extend(s.0)
+        }
+        res
     }
 
     /// The things in other which are in not in self

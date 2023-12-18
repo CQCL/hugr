@@ -5,7 +5,7 @@ use std::num::NonZeroU64;
 use smol_str::SmolStr;
 
 use crate::{
-    extension::ExtensionId,
+    extension::{ExtensionId, ExtensionSet},
     types::{
         type_param::{TypeArg, TypeArgError, TypeParam},
         ConstTypeError, CustomCheckFailure, CustomType, Type, TypeBound,
@@ -161,6 +161,10 @@ impl CustomConst for ConstIntU {
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
         crate::values::downcast_equal_consts(self, other)
     }
+
+    fn extension_reqs(&self) -> ExtensionSet {
+        ExtensionSet::singleton(&EXTENSION_ID)
+    }
 }
 
 #[typetag::serde]
@@ -179,6 +183,10 @@ impl CustomConst for ConstIntS {
     }
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
         crate::values::downcast_equal_consts(self, other)
+    }
+
+    fn extension_reqs(&self) -> ExtensionSet {
+        ExtensionSet::singleton(&EXTENSION_ID)
     }
 }
 
@@ -203,8 +211,8 @@ lazy_static! {
     pub static ref EXTENSION: Extension = extension();
 }
 
-/// get an integer type variable, given the integer type definition
-pub(super) fn int_type_var(var_id: usize) -> Type {
+/// get an integer type with width corresponding to a type variable with id `var_id`
+pub(super) fn int_tv(var_id: usize) -> Type {
     Type::new_extension(
         EXTENSION
             .get_type(&INT_TYPE_ID)

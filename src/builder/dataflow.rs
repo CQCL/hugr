@@ -147,7 +147,7 @@ impl FunctionBuilder<Hugr> {
     ///
     /// Error in adding DFG child nodes.
     pub fn new(name: impl Into<String>, signature: PolyFuncType) -> Result<Self, BuildError> {
-        let body = signature.body.clone();
+        let body = signature.body().clone();
         let op = ops::FuncDefn {
             signature,
             name: name.into(),
@@ -437,9 +437,8 @@ pub(crate) mod test {
             FunctionType::new(type_row![BIT], type_row![BIT]).with_extension_delta(&abc_extensions);
         let mut parent = DFGBuilder::new(parent_sig)?;
 
-        let add_c_sig = FunctionType::new(type_row![BIT], type_row![BIT])
-            .with_extension_delta(&c_extensions)
-            .with_input_extensions(ab_extensions.clone());
+        let add_c_sig =
+            FunctionType::new(type_row![BIT], type_row![BIT]).with_extension_delta(&c_extensions);
 
         let [w] = parent.input_wires_arr();
 
@@ -476,8 +475,7 @@ pub(crate) mod test {
 
         // Add another node (a sibling to add_ab) which adds extension C
         // via a child lift node
-        let mut add_c =
-            parent.dfg_builder(add_c_sig.signature, Some(add_c_sig.input_extensions), [w])?;
+        let mut add_c = parent.dfg_builder(add_c_sig, Some(ab_extensions.clone()), [w])?;
         let [w] = add_c.input_wires_arr();
         let lift_c = add_c.add_dataflow_node(
             NodeType::new(

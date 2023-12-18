@@ -13,6 +13,7 @@ use std::collections::HashSet;
 use std::mem;
 
 use itertools::Itertools;
+use portgraph::algorithms::ConvexChecker;
 use portgraph::{view::Subgraph, Direction, PortView};
 use thiserror::Error;
 
@@ -156,7 +157,7 @@ impl SiblingSubgraph {
         outgoing: OutgoingPorts,
         hugr: &impl HugrView,
     ) -> Result<Self, InvalidSubgraph> {
-        let checker = ConvexChecker::new(hugr);
+        let checker = TopoConvexChecker::new(hugr);
         Self::try_new_with_checker(incoming, outgoing, hugr, &checker)
     }
 
@@ -168,11 +169,11 @@ impl SiblingSubgraph {
     ///
     /// Refer to [`SiblingSubgraph::try_new`] for the full
     /// documentation.
-    pub fn try_new_with_checker<'c, 'h: 'c, H: HugrView>(
+    pub fn try_new_with_checker(
         inputs: IncomingPorts,
         outputs: OutgoingPorts,
-        hugr: &'h H,
-        checker: &'c ConvexChecker<'h, H>,
+        hugr: &impl HugrView,
+        checker: &impl ConvexChecker,
     ) -> Result<Self, InvalidSubgraph> {
         let pg = hugr.portgraph();
 
@@ -187,7 +188,7 @@ impl SiblingSubgraph {
         let nodes = subpg.nodes_iter().map_into().collect_vec();
         validate_subgraph(hugr, &nodes, &inputs, &outputs)?;
 
-        if !subpg.is_convex_with_checker(&checker.0) {
+        if !subpg.is_convex_with_checker(checker) {
             return Err(InvalidSubgraph::NotConvex);
         }
 
@@ -217,7 +218,7 @@ impl SiblingSubgraph {
         nodes: impl Into<Vec<Node>>,
         hugr: &impl HugrView,
     ) -> Result<Self, InvalidSubgraph> {
-        let checker = ConvexChecker::new(hugr);
+        let checker = TopoConvexChecker::new(hugr);
         Self::try_from_nodes_with_checker(nodes, hugr, &checker)
     }
 
@@ -232,7 +233,7 @@ impl SiblingSubgraph {
     pub fn try_from_nodes_with_checker<'c, 'h: 'c, H: HugrView>(
         nodes: impl Into<Vec<Node>>,
         hugr: &'h H,
-        checker: &'c ConvexChecker<'h, H>,
+        checker: &impl ConvexChecker,
     ) -> Result<Self, InvalidSubgraph> {
         let nodes = nodes.into();
         let nodes_set = nodes.iter().copied().collect::<HashSet<_>>();
@@ -447,15 +448,26 @@ fn combine_in_out<'a>(
 ///
 /// This can be used when constructing multiple sibling subgraphs to speed up
 /// convexity checking.
-pub struct ConvexChecker<'g, Base: 'g + HugrView>(
-    portgraph::algorithms::ConvexChecker<Base::Portgraph<'g>>,
+pub struct TopoConvexChecker<'g, Base: 'g + HugrView>(
+    portgraph::algorithms::TopoConvexChecker<Base::Portgraph<'g>>,
 );
 
-impl<'g, Base: HugrView> ConvexChecker<'g, Base> {
+impl<'g, Base: HugrView> TopoConvexChecker<'g, Base> {
     /// Create a new convexity checker.
     pub fn new(base: &'g Base) -> Self {
         let pg = base.portgraph();
-        Self(portgraph::algorithms::ConvexChecker::new(pg))
+        Self(portgraph::algorithms::TopoConvexChecker::new(pg))
+    }
+}
+
+impl<'g, Base: HugrView> ConvexChecker for TopoConvexChecker<'g, Base> {
+    fn is_convex(
+        &self,
+        nodes: impl IntoIterator<Item = portgraph::NodeIndex>,
+        inputs: impl IntoIterator<Item = portgraph::PortIndex>,
+        outputs: impl IntoIterator<Item = portgraph::PortIndex>,
+    ) -> bool {
+        self.0.is_convex(nodes, inputs, outputs)
     }
 }
 
@@ -689,7 +701,7 @@ mod tests {
         hugr::views::{HierarchyView, SiblingGraph},
         hugr::HugrMut,
         ops::handle::{DfgID, FuncID, NodeHandle},
-        std_extensions::logic::test::{and_op, not_op},
+        std_extensions::logic::{test::and_op, NotOp},
         type_row,
     };
 
@@ -742,9 +754,9 @@ mod tests {
         let func = mod_builder.declare("test", FunctionType::new_endo(type_row![BOOL_T]).into())?;
         let func_id = {
             let mut dfg = mod_builder.define_declaration(&func)?;
-            let outs1 = dfg.add_dataflow_op(not_op(), dfg.input_wires())?;
-            let outs2 = dfg.add_dataflow_op(not_op(), outs1.outputs())?;
-            let outs3 = dfg.add_dataflow_op(not_op(), outs2.outputs())?;
+            let outs1 = dfg.add_dataflow_op(NotOp, dfg.input_wires())?;
+            let outs2 = dfg.add_dataflow_op(NotOp, outs1.outputs())?;
+            let outs3 = dfg.add_dataflow_op(NotOp, outs2.outputs())?;
             dfg.finish_with_outputs(outs3.outputs())?
         };
         let hugr = mod_builder
@@ -976,10 +988,7 @@ mod tests {
         let mut builder =
             DFGBuilder::new(FunctionType::new(one_bit.clone(), two_bit.clone())).unwrap();
         let inw = builder.input_wires().exactly_one().unwrap();
-        let outw1 = builder
-            .add_dataflow_op(not_op(), [inw])
-            .unwrap()
-            .out_wire(0);
+        let outw1 = builder.add_dataflow_op(NotOp, [inw]).unwrap().out_wire(0);
         let outw2 = builder
             .add_dataflow_op(and_op(), [inw, outw1])
             .unwrap()

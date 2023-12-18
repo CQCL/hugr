@@ -142,7 +142,7 @@ impl Rewrite for OutlineCfg {
                 .unwrap();
             let cfg = cfg.finish_sub_container().unwrap();
             let unit_sum = new_block_bldr
-                .add_constant(ops::Const::unary_unit_sum(), ExtensionSet::new())
+                .add_constant(ops::Const::unary_unit_sum())
                 .unwrap();
             let pred_wire = new_block_bldr.load_const(&unit_sum).unwrap();
             new_block_bldr
