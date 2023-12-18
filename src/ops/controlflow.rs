@@ -235,10 +235,6 @@ impl OpTrait for Case {
     fn tag(&self) -> OpTag {
         <Self as StaticTag>::TAG
     }
-
-    fn dataflow_signature(&self) -> Option<FunctionType> {
-        Some(self.signature.clone())
-    }
 }
 
 impl Case {
@@ -250,6 +246,11 @@ impl Case {
     /// The output signature of the contained dataflow graph.
     pub fn dataflow_output(&self) -> &TypeRow {
         &self.signature.output
+    }
+
+    /// The signature of the dataflow sibling graph contained in the [`Case`]
+    pub fn inner_signature(&self) -> FunctionType {
+        self.signature.clone()
     }
 }
 
