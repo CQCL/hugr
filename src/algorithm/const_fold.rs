@@ -2,16 +2,69 @@
 
 use crate::{
     extension::ConstFoldResult,
-    ops::{Const, OpType},
+    ops::{Const, LeafOp, OpType},
+    types::{Type, TypeEnum},
+    values::Value,
     IncomingPort,
 };
 
+fn out_row(consts: impl IntoIterator<Item = Const>) -> ConstFoldResult {
+    let vec = consts
+        .into_iter()
+        .enumerate()
+        .map(|(i, c)| (i.into(), c))
+        .collect();
+
+    Some(vec)
+}
+
+fn sort_by_in_port(consts: &[(IncomingPort, Const)]) -> Vec<&(IncomingPort, Const)> {
+    let mut v: Vec<_> = consts.iter().collect();
+    v.sort_by_key(|(i, _)| i);
+    v
+}
+
+fn sorted_consts(consts: &[(IncomingPort, Const)]) -> Vec<&Const> {
+    sort_by_in_port(consts)
+        .into_iter()
+        .map(|(_, c)| c)
+        .collect()
+}
 /// For a given op and consts, attempt to evaluate the op.
 pub fn fold_const(op: &OpType, consts: &[(IncomingPort, Const)]) -> ConstFoldResult {
     let op = op.as_leaf_op()?;
-    let ext_op = op.as_extension_op()?;
 
-    ext_op.constant_fold(consts)
+    match op {
+        LeafOp::Noop { .. } => out_row([consts.first()?.1.clone()]),
+        LeafOp::MakeTuple { .. } => {
+            out_row([Const::new_tuple(sorted_consts(consts).into_iter().cloned())])
+        }
+        LeafOp::UnpackTuple { .. } => {
+            let c = &consts.first()?.1;
+
+            if let Value::Tuple { vs } = c.value() {
+                if let TypeEnum::Tuple(tys) = c.const_type().as_type_enum() {
+                    return out_row(tys.iter().zip(vs.iter()).map(|(t, v)| {
+                        Const::new(v.clone(), t.clone())
+                            .expect("types should already have been checked")
+                    }));
+                }
+            }
+            None
+        }
+
+        LeafOp::Tag { tag, variants } => out_row([Const::new(
+            Value::sum(*tag, consts.first()?.1.value().clone()),
+            Type::new_sum(variants.clone()),
+        )
+        .unwrap()]),
+        LeafOp::CustomOp(_) => {
+            let ext_op = op.as_extension_op()?;
+
+            ext_op.constant_fold(consts)
+        }
+        _ => None,
+    }
 }
 
 #[cfg(test)]
