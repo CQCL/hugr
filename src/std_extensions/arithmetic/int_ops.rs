@@ -1,11 +1,10 @@
 //! Basic integer operations.
 
-use super::int_types::{get_log_width, int_tv, ConstIntU, INT_TYPES, LOG_WIDTH_TYPE_PARAM};
+use super::int_types::{get_log_width, int_tv, LOG_WIDTH_TYPE_PARAM};
 use crate::extension::prelude::{sum_with_error, BOOL_T};
 use crate::extension::simple_op::{MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError};
 use crate::extension::{
-    ConstFoldResult, CustomValidator, ExtensionRegistry, OpDef, SignatureFunc, ValidateJustArgs,
-    PRELUDE,
+    CustomValidator, ExtensionRegistry, OpDef, SignatureFunc, ValidateJustArgs, PRELUDE,
 };
 use crate::ops::custom::ExtensionOp;
 use crate::ops::OpName;
@@ -18,12 +17,12 @@ use crate::{
     types::{type_param::TypeArg, Type, TypeRow},
     Extension,
 };
-use crate::{ops, IncomingPort};
 
 use lazy_static::lazy_static;
 use smol_str::SmolStr;
 use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 
+mod fold;
 /// The extension identifier.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.int");
 
@@ -218,10 +217,9 @@ impl MakeOpDef for IntOpDef {
             (rightmost bits replace leftmost bits)",
         }.into()
     }
+
     fn post_opdef(&self, def: &mut OpDef) {
-        if self == &Self::iadd {
-            def.set_constant_folder(iadd_fold);
-        }
+        fold::set_fold(self, def)
     }
 }
 fn int_polytype(
@@ -244,29 +242,6 @@ fn ibinop_sig() -> PolyFuncType {
 fn iunop_sig() -> PolyFuncType {
     let int_type_var = int_tv(0);
     int_polytype(1, vec![int_type_var.clone()], vec![int_type_var])
-}
-
-fn iadd_fold(consts: &[(IncomingPort, ops::Const)]) -> ConstFoldResult {
-    // TODO get width from const
-    let width = 5;
-    match consts {
-        [(_, c1), (_, c2)] => {
-            let [c1, c2]: [&ConstIntU; 2] = [c1, c2].map(|c| c.get_custom_value().unwrap());
-
-            Some(vec![(
-                0.into(),
-                ops::Const::new(
-                    ConstIntU::new(width, c1.value() + c2.value())
-                        .unwrap()
-                        .into(),
-                    INT_TYPES[5].to_owned(),
-                )
-                .unwrap(),
-            )])
-        }
-
-        _ => None,
-    }
 }
 
 lazy_static! {
