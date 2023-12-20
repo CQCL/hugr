@@ -1,11 +1,16 @@
 //! Constant folding routines.
 
+use itertools::Itertools;
+
 use crate::{
-    extension::ConstFoldResult,
+    builder::{DFGBuilder, Dataflow, DataflowHugr},
+    extension::{ConstFoldResult, ExtensionSet, PRELUDE_REGISTRY},
+    hugr::views::SiblingSubgraph,
     ops::{Const, LeafOp, OpType},
-    types::{Type, TypeEnum},
+    type_row,
+    types::{FunctionType, Type, TypeEnum},
     values::Value,
-    IncomingPort,
+    Hugr, HugrView, IncomingPort, OutgoingPort, SimpleReplacement,
 };
 
 fn out_row(consts: impl IntoIterator<Item = Const>) -> ConstFoldResult {
@@ -67,8 +72,76 @@ pub fn fold_const(op: &OpType, consts: &[(IncomingPort, Const)]) -> ConstFoldRes
     }
 }
 
+fn const_graph(mut consts: Vec<(OutgoingPort, Const)>) -> Hugr {
+    consts.sort_by_key(|(o, _)| *o);
+    let consts = consts.into_iter().map(|(_, c)| c).collect_vec();
+    let const_types = consts.iter().map(Const::const_type).cloned().collect_vec();
+    // TODO need to get const extensions.
+    let extensions: ExtensionSet = consts
+        .iter()
+        .map(|c| c.value().extension_reqs())
+        .fold(ExtensionSet::new(), |e, e2| e.union(&e2));
+    let mut b = DFGBuilder::new(FunctionType::new(type_row![], const_types)).unwrap();
+
+    let outputs = consts
+        .into_iter()
+        .map(|c| b.add_load_const(c).unwrap())
+        .collect_vec();
+
+    b.finish_hugr_with_outputs(outputs, &PRELUDE_REGISTRY)
+        .unwrap()
+}
+
+fn find_consts(
+    hugr: &impl HugrView,
+    reg: &ExtensionRegistry,
+) -> impl Iterator<Item = SimpleReplacement> + '_ {
+    hugr.nodes().filter_map(|n| {
+        let op = hugr.get_optype(n);
+
+        op.is_load_constant().then_some(())?;
+
+        let neighbour = hugr.output_neighbours(n).exactly_one().ok()?;
+
+        let mut remove_nodes = vec![neighbour];
+
+        let all_ins = hugr
+            .node_inputs(neighbour)
+            .filter_map(|in_p| {
+                let (in_n, _) = hugr.single_linked_output(neighbour, in_p)?;
+                let op = hugr.get_optype(in_n);
+
+                op.is_load_constant().then_some(())?;
+
+                let const_node = hugr.input_neighbours(in_n).exactly_one().ok()?;
+                let const_op = hugr.get_optype(const_node).as_const()?;
+
+                remove_nodes.push(const_node);
+                remove_nodes.push(in_n);
+
+                // TODO avoid const clone here
+                Some((in_p, const_op.clone()))
+            })
+            .collect_vec();
+
+        let neighbour_op = hugr.get_optype(neighbour);
+
+        let folded = fold_const(neighbour_op, &all_ins)?;
+
+        let replacement = const_graph(folded);
+
+        let sibling_graph = SiblingSubgraph::try_from_nodes(remove_nodes, hugr)
+            .expect("Make unmake should be valid subgraph.");
+
+        sibling_graph
+            .create_simple_replacement(hugr, replacement)
+            .ok()
+    })
+}
+
 #[cfg(test)]
 mod test {
+    use crate::extension::{ExtensionRegistry, PRELUDE};
     use crate::std_extensions::arithmetic::int_ops::IntOpDef;
     use crate::std_extensions::arithmetic::int_types::{ConstIntU, INT_TYPES};
 
@@ -95,5 +168,32 @@ mod test {
         let out = fold_const(&add_op, &consts).unwrap();
 
         assert_eq!(&out[..], &[(0.into(), i2c(c))]);
+    }
+
+    #[test]
+    fn test_fold() {
+        let mut b = DFGBuilder::new(FunctionType::new(
+            type_row![],
+            vec![INT_TYPES[5].to_owned()],
+        ))
+        .unwrap();
+
+        let one = b.add_load_const(i2c(1)).unwrap();
+        let two = b.add_load_const(i2c(2)).unwrap();
+
+        let add = b
+            .add_dataflow_op(IntOpDef::iadd.with_width(5), [one, two])
+            .unwrap();
+        let reg = ExtensionRegistry::try_new([
+            PRELUDE.to_owned(),
+            crate::std_extensions::arithmetic::int_types::EXTENSION.to_owned(),
+            crate::std_extensions::arithmetic::int_ops::EXTENSION.to_owned(),
+        ])
+        .unwrap();
+        let h = b.finish_hugr_with_outputs(add.outputs(), &reg).unwrap();
+
+        let consts = find_consts(&h).collect_vec();
+
+        dbg!(consts);
     }
 }
