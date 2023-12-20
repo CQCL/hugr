@@ -233,20 +233,20 @@ impl Rewrite for Replacement {
                     e.clone(),
                 ));
             }
-            e.check_src(h, &e)?;
+            e.check_src(h, e)?;
         }
         self.mu_out.iter().try_for_each(|e| {
             self.replacement.valid_non_root(e.src).map_err(|_| {
                 ReplaceError::BadEdgeSpec(Direction::Outgoing, WhichHugr::Replacement, e.clone())
             })?;
-            e.check_src(&self.replacement, &e)
+            e.check_src(&self.replacement, e)
         })?;
         // Edge targets...
         self.mu_inp.iter().try_for_each(|e| {
             self.replacement.valid_non_root(e.tgt).map_err(|_| {
                 ReplaceError::BadEdgeSpec(Direction::Incoming, WhichHugr::Replacement, e.clone())
             })?;
-            e.check_tgt(&self.replacement, &e)
+            e.check_tgt(&self.replacement, e)
         })?;
         for e in self.mu_out.iter().chain(self.mu_new.iter()) {
             if !h.contains_node(e.tgt) || removed.contains(&e.tgt) {
@@ -256,7 +256,7 @@ impl Rewrite for Replacement {
                     e.clone(),
                 ));
             }
-            e.check_tgt(h, &e)?;
+            e.check_tgt(h, e)?;
             // The descendant check is to allow the case where the old edge is nonlocal
             // from a part of the Hugr being moved (which may require changing source,
             // depending on where the transplanted portion ends up). While this subsumes
@@ -353,8 +353,8 @@ fn transfer_edges<'a>(
         h.valid_node(e.tgt).map_err(|_| {
             ReplaceError::BadEdgeSpec(Direction::Incoming, WhichHugr::Retained, oe.clone())
         })?;
-        e.check_src(h, &oe)?;
-        e.check_tgt(h, &oe)?;
+        e.check_src(h, oe)?;
+        e.check_tgt(h, oe)?;
         match e.kind {
             NewEdgeKind::Order => {
                 h.add_other_edge(e.src, e.tgt).unwrap();
