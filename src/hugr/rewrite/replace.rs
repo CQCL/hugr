@@ -353,8 +353,15 @@ fn transfer_edges<'a>(
         h.valid_node(e.tgt).map_err(|_| {
             ReplaceError::BadEdgeSpec(Direction::Incoming, WhichHugr::Retained, oe.clone())
         })?;
-        e.check_src(h)?;
-        e.check_tgt(h)?;
+        let fix_edge_nums = |err| match err {
+            ReplaceError::BadEdgeKind(d, e2) => {
+                assert_eq!(e, e2);
+                ReplaceError::BadEdgeKind(d, oe.clone())
+            }
+            _ => panic!("{err} not a BadEdgeKind"),
+        };
+        e.check_src(h).map_err(fix_edge_nums)?;
+        e.check_tgt(h).map_err(fix_edge_nums)?;
         match e.kind {
             NewEdgeKind::Order => {
                 h.add_other_edge(e.src, e.tgt).unwrap();
