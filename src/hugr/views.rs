@@ -23,11 +23,12 @@ use portgraph::dot::{DotFormat, EdgeStyle, NodeStyle, PortStyle};
 use portgraph::{multiportgraph, LinkView, MultiPortGraph, PortView};
 
 use super::{Hugr, HugrError, NodeMetadata, NodeMetadataMap, NodeType, DEFAULT_NODETYPE};
+use crate::ops::dataflow::DataflowParent;
 use crate::ops::handle::NodeHandle;
-use crate::ops::{FuncDecl, FuncDefn, OpName, OpTag, OpTrait, OpType, DFG};
+use crate::ops::{OpName, OpTag, OpTrait, OpType};
 #[rustversion::since(1.75)] // uses impl in return position
 use crate::types::Type;
-use crate::types::{EdgeKind, FunctionType, PolyFuncType};
+use crate::types::{EdgeKind, FunctionType};
 use crate::{Direction, IncomingPort, Node, OutgoingPort, Port};
 #[rustversion::since(1.75)] // uses impl in return position
 use itertools::Either;
@@ -336,14 +337,16 @@ pub trait HugrView: sealed::HugrInternals {
 
     /// For function-like HUGRs (DFG, FuncDefn, FuncDecl), report the function
     /// type. Otherwise return None.
-    fn get_function_type(&self) -> Option<PolyFuncType> {
+    fn get_function_type(&self) -> Option<FunctionType> {
         let op = self.get_nodetype(self.root());
-        match &op.op {
-            OpType::DFG(DFG { signature }) => Some(signature.clone().into()),
-            OpType::FuncDecl(FuncDecl { signature, .. })
-            | OpType::FuncDefn(FuncDefn { signature, .. }) => Some(signature.clone()),
-            _ => None,
-        }
+        Some(match &op.op {
+            OpType::DFG(dfg) => dfg.inner_signature(),
+            OpType::Case(case) => case.inner_signature(),
+            OpType::BasicBlock(block) => block.inner_signature(),
+            OpType::FuncDecl(decl) => decl.inner_signature(),
+            OpType::FuncDefn(def) => def.inner_signature(),
+            _ => return None,
+        })
     }
 
     /// Return a wrapper over the view that can be used in petgraph algorithms.

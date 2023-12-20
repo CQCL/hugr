@@ -11,6 +11,7 @@ use crate::extension::{prelude::PRELUDE_REGISTRY, ExtensionSet};
 use crate::hugr::{validate::ValidationError, Hugr, HugrMut, HugrView, NodeType};
 use crate::macros::const_extension_ids;
 use crate::ops::custom::{ExternalOp, OpaqueOp};
+use crate::ops::dataflow::DataflowParent;
 use crate::ops::{self, dataflow::IOTrait, handle::NodeHandle};
 use crate::ops::{LeafOp, OpType};
 

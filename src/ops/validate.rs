@@ -12,6 +12,7 @@ use thiserror::Error;
 
 use crate::types::{FunctionType, Type, TypeRow};
 
+use super::dataflow::DataflowParent;
 use super::{impl_validate_op, BasicBlock, OpTag, OpTrait, OpType, ValidateOp};
 
 /// A set of property flags required for an operation.
@@ -79,8 +80,8 @@ impl ValidateOp for super::FuncDefn {
     ) -> Result<(), ChildrenValidationError> {
         // We check type-variables are declared in `validate_subtree`, so here
         // we can just assume all type variables are valid regardless of binders.
-        let FunctionType { input, output, .. } = self.signature.body();
-        validate_io_nodes(input, output, "function definition", children)
+        let FunctionType { input, output, .. } = self.inner_signature();
+        validate_io_nodes(&input, &output, "function definition", children)
     }
 }
 
@@ -136,7 +137,7 @@ impl ValidateOp for super::Conditional {
             let case_op = optype
                 .as_case()
                 .expect("Child check should have already checked valid ops.");
-            let sig = &case_op.signature;
+            let sig = &case_op.inner_signature();
             if sig.input != self.case_input_row(i).unwrap() || sig.output != self.outputs {
                 return Err(ChildrenValidationError::ConditionalCaseSignature {
                     child,
@@ -343,12 +344,8 @@ impl ValidateOp for super::Case {
         &self,
         children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
     ) -> Result<(), ChildrenValidationError> {
-        validate_io_nodes(
-            &self.signature.input,
-            &self.signature.output,
-            "Conditional",
-            children,
-        )
+        let sig = self.inner_signature();
+        validate_io_nodes(&sig.input, &sig.output, "Conditional", children)
     }
 }
 

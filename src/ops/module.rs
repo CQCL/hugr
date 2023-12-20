@@ -2,9 +2,10 @@
 
 use smol_str::SmolStr;
 
-use crate::types::{EdgeKind, PolyFuncType};
+use crate::types::{EdgeKind, FunctionType, PolyFuncType};
 use crate::types::{Type, TypeBound};
 
+use super::dataflow::DataflowParent;
 use super::StaticTag;
 use super::{impl_op_name, OpTag, OpTrait};
 
@@ -43,6 +44,13 @@ impl_op_name!(FuncDefn);
 impl StaticTag for FuncDefn {
     const TAG: OpTag = OpTag::FuncDefn;
 }
+
+impl DataflowParent for FuncDefn {
+    fn inner_signature(&self) -> FunctionType {
+        self.signature.body().clone()
+    }
+}
+
 impl OpTrait for FuncDefn {
     fn description(&self) -> &str {
         "A function definition"
@@ -70,6 +78,13 @@ impl_op_name!(FuncDecl);
 impl StaticTag for FuncDecl {
     const TAG: OpTag = OpTag::Function;
 }
+
+impl DataflowParent for FuncDecl {
+    fn inner_signature(&self) -> FunctionType {
+        self.signature.body().clone()
+    }
+}
+
 impl OpTrait for FuncDecl {
     fn description(&self) -> &str {
         "External function declaration, linked at runtime"

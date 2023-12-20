@@ -442,11 +442,7 @@ mod test {
     fn flat_mut(mut simple_dfg_hugr: Hugr) {
         simple_dfg_hugr.update_validate(&PRELUDE_REGISTRY).unwrap();
         let root = simple_dfg_hugr.root();
-        let signature = simple_dfg_hugr
-            .get_function_type()
-            .unwrap()
-            .instantiate(&[], &PRELUDE_REGISTRY)
-            .unwrap();
+        let signature = simple_dfg_hugr.get_function_type().unwrap();
 
         let sib_mut = SiblingMut::<CfgID>::try_new(&mut simple_dfg_hugr, root);
         assert_eq!(
