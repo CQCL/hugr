@@ -115,7 +115,7 @@ jobs:
           echo $MSG
           echo $MSG  >> "$GITHUB_OUTPUT"
       - name: Upload current HEAD sha
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: head-sha.txt
           path: head-sha.txt
