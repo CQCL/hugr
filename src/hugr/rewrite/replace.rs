@@ -86,8 +86,14 @@ pub struct Replacement {
 
 impl NewEdgeSpec {
     fn check_src(&self, h: &impl HugrView) -> Result<(), ReplaceError> {
+        self.src_ok(h)
+            .then_some(())
+            .ok_or(ReplaceError::BadEdgeKind(Direction::Outgoing, self.clone()))
+    }
+
+    fn src_ok(&self, h: &impl HugrView) -> bool {
         let optype = h.get_optype(self.src);
-        let ok = match self.kind {
+        match self.kind {
             NewEdgeKind::Order => optype.other_output() == Some(EdgeKind::StateOrder),
             NewEdgeKind::Value { src_pos, .. } => {
                 matches!(optype.port_kind(src_pos), Some(EdgeKind::Value(_)))
@@ -98,13 +104,18 @@ impl NewEdgeSpec {
             NewEdgeKind::ControlFlow { src_pos } => {
                 matches!(optype.port_kind(src_pos), Some(EdgeKind::ControlFlow))
             }
-        };
-        ok.then_some(())
-            .ok_or(ReplaceError::BadEdgeKind(Direction::Outgoing, self.clone()))
+        }
     }
+
     fn check_tgt(&self, h: &impl HugrView) -> Result<(), ReplaceError> {
+        self.tgt_ok(h)
+            .then_some(())
+            .ok_or(ReplaceError::BadEdgeKind(Direction::Incoming, self.clone()))
+    }
+
+    fn tgt_ok(&self, h: &impl HugrView) -> bool {
         let optype = h.get_optype(self.tgt);
-        let ok = match self.kind {
+        match self.kind {
             NewEdgeKind::Order => optype.other_input() == Some(EdgeKind::StateOrder),
             NewEdgeKind::Value { tgt_pos, .. } => {
                 matches!(optype.port_kind(tgt_pos), Some(EdgeKind::Value(_)))
@@ -116,9 +127,7 @@ impl NewEdgeSpec {
                 optype.port_kind(IncomingPort::from(0)),
                 Some(EdgeKind::ControlFlow)
             ),
-        };
-        ok.then_some(())
-            .ok_or(ReplaceError::BadEdgeKind(Direction::Incoming, self.clone()))
+        }
     }
 
     fn check_existing_edge(
@@ -353,15 +362,12 @@ fn transfer_edges<'a>(
         h.valid_node(e.tgt).map_err(|_| {
             ReplaceError::BadEdgeSpec(Direction::Incoming, WhichHugr::Retained, oe.clone())
         })?;
-        let fix_edge_nums = |err| match err {
-            ReplaceError::BadEdgeKind(d, e2) => {
-                assert_eq!(e, e2);
-                ReplaceError::BadEdgeKind(d, oe.clone())
-            }
-            _ => panic!("{err} not a BadEdgeKind"),
-        };
-        e.check_src(h).map_err(fix_edge_nums)?;
-        e.check_tgt(h).map_err(fix_edge_nums)?;
+        e.src_ok(h)
+            .then_some(())
+            .ok_or(ReplaceError::BadEdgeKind(Direction::Outgoing, oe.clone()))?;
+        e.tgt_ok(h)
+            .then_some(())
+            .ok_or(ReplaceError::BadEdgeKind(Direction::Incoming, oe.clone()))?;
         match e.kind {
             NewEdgeKind::Order => {
                 h.add_other_edge(e.src, e.tgt).unwrap();
