@@ -820,7 +820,7 @@ mod test {
                 mu_out: vec![new_out_edge.clone()],
                 ..r.clone()
             }),
-            Err(ReplaceError::NoRemovedEdge(new_out_edge))
+            Err(ReplaceError::BadEdgeKind(Direction::Outgoing, new_out_edge))
         );
         Ok(())
     }
