@@ -343,12 +343,16 @@ pub enum HugrError {
 }
 
 #[cfg(test)]
-mod test {
+pub(crate) mod test {
+    use itertools::Itertools;
+    use portgraph::{LinkView, PortView};
+
     use super::{Hugr, HugrView};
     use crate::builder::test::closed_dfg_root_hugr;
     use crate::extension::ExtensionSet;
     use crate::hugr::HugrMut;
-    use crate::ops;
+    use crate::ops::LeafOp;
+    use crate::ops::{self, OpType};
     use crate::type_row;
     use crate::types::{FunctionType, Type};
 
@@ -397,5 +401,41 @@ mod test {
         );
         assert_eq!(hugr.get_nodetype(output).input_extensions().unwrap(), &r);
         Ok(())
+    }
+
+    pub(crate) fn assert_hugr_equality(hugr: &Hugr, other: &Hugr) {
+        assert_eq!(other.root, hugr.root);
+        assert_eq!(other.hierarchy, hugr.hierarchy);
+        assert_eq!(other.metadata, hugr.metadata);
+
+        // Extension operations may have been downgraded to opaque operations.
+        for node in other.nodes() {
+            let new_op = other.get_optype(node);
+            let old_op = hugr.get_optype(node);
+            if let OpType::LeafOp(LeafOp::CustomOp(new_ext)) = new_op {
+                if let OpType::LeafOp(LeafOp::CustomOp(old_ext)) = old_op {
+                    assert_eq!(new_ext.clone().as_opaque(), old_ext.clone().as_opaque());
+                } else {
+                    panic!("Expected old_op to be a custom op");
+                }
+            } else {
+                assert_eq!(new_op, old_op);
+            }
+        }
+
+        // Check that the graphs are equivalent up to port renumbering.
+        let new_graph = &other.graph;
+        let old_graph = &hugr.graph;
+        assert_eq!(new_graph.node_count(), old_graph.node_count());
+        assert_eq!(new_graph.port_count(), old_graph.port_count());
+        assert_eq!(new_graph.link_count(), old_graph.link_count());
+        for n in old_graph.nodes_iter() {
+            assert_eq!(new_graph.num_inputs(n), old_graph.num_inputs(n));
+            assert_eq!(new_graph.num_outputs(n), old_graph.num_outputs(n));
+            assert_eq!(
+                new_graph.output_neighbours(n).collect_vec(),
+                old_graph.output_neighbours(n).collect_vec()
+            );
+        }
     }
 }
