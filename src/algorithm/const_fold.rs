@@ -35,7 +35,7 @@ fn sort_by_in_port(consts: &[(IncomingPort, Const)]) -> Vec<&(IncomingPort, Cons
     v
 }
 
-fn sorted_consts(consts: &[(IncomingPort, Const)]) -> Vec<&Const> {
+pub fn sorted_consts(consts: &[(IncomingPort, Const)]) -> Vec<&Const> {
     sort_by_in_port(consts)
         .into_iter()
         .map(|(_, c)| c)
