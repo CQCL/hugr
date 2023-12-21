@@ -77,7 +77,7 @@ impl MakeOpDef for FloatOps {
             fabs => "absolute value",
             fmul => "multiplication",
             fdiv => "division",
-            ffloor => "floot",
+            ffloor => "floor",
             fceil => "ceiling",
         }
         .to_string()
