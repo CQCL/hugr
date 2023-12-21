@@ -8,6 +8,7 @@ use crate::{
         prelude::sum_with_error,
         simple_op::{MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError},
         ExtensionId, ExtensionRegistry, ExtensionSet, OpDef, SignatureError, SignatureFunc,
+        PRELUDE,
     },
     ops::{custom::ExtensionOp, OpName},
     type_row,
@@ -69,11 +70,20 @@ impl MakeOpDef for ConvertOpDef {
     }
 }
 
+impl ConvertOpDef {
+    /// INitialise a conversion op with an integer log width type argument.
+    pub fn with_width(self, log_width: u8) -> ConvertOpType {
+        ConvertOpType {
+            def: self,
+            log_width: log_width as u64,
+        }
+    }
+}
 /// Concrete convert operation with integer width set.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ConvertOpType {
     def: ConvertOpDef,
-    width: u64,
+    log_width: u64,
 }
 
 impl OpName for ConvertOpType {
@@ -89,11 +99,14 @@ impl MakeExtensionOp for ConvertOpType {
             [TypeArg::BoundedNat { n }] => n,
             _ => return Err(SignatureError::InvalidTypeArgs.into()),
         };
-        Ok(Self { def, width })
+        Ok(Self {
+            def,
+            log_width: width,
+        })
     }
 
     fn type_args(&self) -> Vec<crate::types::TypeArg> {
-        vec![TypeArg::BoundedNat { n: self.width }]
+        vec![TypeArg::BoundedNat { n: self.log_width }]
     }
 }
 
@@ -115,6 +128,7 @@ lazy_static! {
 
     /// Registry of extensions required to validate integer operations.
     pub static ref CONVERT_OPS_REGISTRY: ExtensionRegistry  = ExtensionRegistry::try_new([
+        PRELUDE.to_owned(),
         super::int_types::EXTENSION.to_owned(),
         super::float_types::EXTENSION.to_owned(),
         EXTENSION.to_owned(),

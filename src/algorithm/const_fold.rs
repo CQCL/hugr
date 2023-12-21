@@ -25,7 +25,6 @@ fn out_row(consts: impl IntoIterator<Item = Const>) -> ConstFoldResult {
         .enumerate()
         .map(|(i, c)| (i.into(), c))
         .collect();
-
     Some(vec)
 }
 
@@ -35,7 +34,7 @@ fn sort_by_in_port(consts: &[(IncomingPort, Const)]) -> Vec<&(IncomingPort, Cons
     v
 }
 
-pub fn sorted_consts(consts: &[(IncomingPort, Const)]) -> Vec<&Const> {
+pub(crate) fn sorted_consts(consts: &[(IncomingPort, Const)]) -> Vec<&Const> {
     sort_by_in_port(consts)
         .into_iter()
         .map(|(_, c)| c)
@@ -132,12 +131,12 @@ fn fold_op(
     let (op_outs, consts): (Vec<_>, Vec<_>) = folded.into_iter().unzip();
     let nu_out = op_outs
         .into_iter()
-        .flat_map(|out| {
+        .enumerate()
+        .filter_map(|(i, out)| {
             // map from the ports the op was linked to, to the output ports of
             // the replacement.
-            hugr.linked_inputs(op_node, out)
-                .enumerate()
-                .map(|(i, np)| (np, i.into()))
+            hugr.single_linked_input(op_node, out)
+                .map(|np| (np, i.into()))
         })
         .collect();
     let replacement = const_graph(consts, reg);
@@ -199,11 +198,15 @@ pub fn constant_fold_pass(h: &mut impl HugrMut, reg: &ExtensionRegistry) {
 #[cfg(test)]
 mod test {
 
+    use crate::extension::prelude::sum_with_error;
     use crate::extension::{ExtensionRegistry, PRELUDE};
     use crate::hugr::rewrite::consts::RemoveConst;
 
     use crate::hugr::HugrMut;
     use crate::std_extensions::arithmetic;
+    use crate::std_extensions::arithmetic::conversions::ConvertOpDef;
+    use crate::std_extensions::arithmetic::float_ops::FloatOps;
+    use crate::std_extensions::arithmetic::float_types::{ConstF64, FLOAT64_TYPE};
     use crate::std_extensions::arithmetic::int_ops::IntOpDef;
     use crate::std_extensions::arithmetic::int_types::{ConstIntU, INT_TYPES};
 
@@ -217,6 +220,10 @@ mod test {
             INT_TYPES[5].to_owned(),
         )
         .unwrap()
+    }
+
+    fn f2c(f: f64) -> Const {
+        ConstF64::new(f).into()
     }
 
     #[rstest]
@@ -267,6 +274,59 @@ mod test {
         assert_fully_folded(&h, &i2c(3));
     }
 
+    #[test]
+    fn test_big() {
+        /*
+           Test approximately calculates
+           let x = (5.6, 3.2);
+           int(x.0 - x.1) == 2
+        */
+        let sum_type = sum_with_error(INT_TYPES[5].to_owned());
+        let mut build =
+            DFGBuilder::new(FunctionType::new(type_row![], vec![sum_type.clone()])).unwrap();
+
+        let tup = build
+            .add_load_const(Const::new_tuple([f2c(5.6), f2c(3.2)]))
+            .unwrap();
+
+        let unpack = build
+            .add_dataflow_op(
+                LeafOp::UnpackTuple {
+                    tys: type_row![FLOAT64_TYPE, FLOAT64_TYPE],
+                },
+                [tup],
+            )
+            .unwrap();
+
+        let sub = build
+            .add_dataflow_op(FloatOps::fsub, unpack.outputs())
+            .unwrap();
+        let to_int = build
+            .add_dataflow_op(ConvertOpDef::trunc_u.with_width(5), sub.outputs())
+            .unwrap();
+
+        let reg = ExtensionRegistry::try_new([
+            PRELUDE.to_owned(),
+            arithmetic::int_types::EXTENSION.to_owned(),
+            arithmetic::float_types::EXTENSION.to_owned(),
+            arithmetic::float_ops::EXTENSION.to_owned(),
+            arithmetic::conversions::EXTENSION.to_owned(),
+        ])
+        .unwrap();
+        let mut h = build
+            .finish_hugr_with_outputs(to_int.outputs(), &reg)
+            .unwrap();
+        assert_eq!(h.node_count(), 8);
+
+        constant_fold_pass(&mut h, &reg);
+
+        let expected = Value::Sum {
+            tag: 0,
+            value: Box::new(i2c(2).value().clone()),
+        };
+        let expected = Const::new(expected, sum_type).unwrap();
+        assert_fully_folded(&h, &expected);
+    }
     fn assert_fully_folded(h: &Hugr, expected_const: &Const) {
         // check the hugr just loads and returns a single const
         let mut node_count = 0;

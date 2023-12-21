@@ -1,5 +1,8 @@
 use crate::{
-    extension::{prelude::ConstError, ConstFold, ConstFoldResult, OpDef},
+    extension::{
+        prelude::{sum_with_error, ConstError},
+        ConstFold, ConstFoldResult, OpDef,
+    },
     ops,
     std_extensions::arithmetic::{
         float_types::ConstF64,
@@ -37,24 +40,35 @@ fn fold_trunc(
 ) -> ConstFoldResult {
     let f: &ConstF64 = get_input(consts)?;
     let f = f.value();
-
+    let [arg] = type_args else {
+        return None;
+    };
+    let log_width = get_log_width(arg).ok()?;
+    let int_type = INT_TYPES[log_width as usize].to_owned();
+    let sum_type = sum_with_error(int_type.clone());
     let err_value = || {
-        ConstError {
+        let err_val = ConstError {
             signal: 0,
             message: "Can't truncate non-finite float".to_string(),
-        }
-        .into()
+        };
+        let sum_val = Value::Sum {
+            tag: 1,
+            value: Box::new(err_val.into()),
+        };
+
+        ops::Const::new(sum_val, sum_type.clone()).unwrap()
     };
     let out_const: ops::Const = if !f.is_finite() {
         err_value()
     } else {
-        let [arg] = type_args else {
-            return None;
-        };
-        let log_width = get_log_width(arg).ok()?;
         let cv = convert(f, log_width);
         if let Ok(cv) = cv {
-            ops::Const::new(cv, INT_TYPES[log_width as usize].to_owned()).unwrap()
+            let sum_val = Value::Sum {
+                tag: 0,
+                value: Box::new(cv),
+            };
+
+            ops::Const::new(sum_val, sum_type).unwrap()
         } else {
             err_value()
         }
