@@ -7,7 +7,11 @@ use itertools::Itertools;
 use crate::{
     builder::{DFGBuilder, Dataflow, DataflowHugr},
     extension::{ConstFoldResult, ExtensionRegistry},
-    hugr::{rewrite::consts::RemoveConstIgnore, views::SiblingSubgraph},
+    hugr::{
+        rewrite::consts::{RemoveConst, RemoveConstIgnore},
+        views::SiblingSubgraph,
+        HugrMut,
+    },
     ops::{Const, LeafOp, OpType},
     type_row,
     types::{FunctionType, Type, TypeEnum},
@@ -165,10 +169,31 @@ fn get_const(
 
     let const_op = hugr.get_optype(const_node).as_const()?;
 
-    // remove_nodes.push(in_n);
-
     // TODO avoid const clone here
     Some(((in_p, const_op.clone()), RemoveConstIgnore(load_n)))
+}
+
+pub fn constant_fold_pass(h: &mut impl HugrMut, reg: &ExtensionRegistry) {
+    loop {
+        // would be preferable if the candidates were updated to be just the
+        // neighbouring nodes of those added.
+        let rewrites = find_consts(h, h.nodes(), reg).collect_vec();
+        if rewrites.is_empty() {
+            break;
+        }
+        for (replace, removes) in rewrites {
+            h.apply_rewrite(replace).unwrap();
+            for rem in removes {
+                if let Ok(const_node) = h.apply_rewrite(rem) {
+                    // if the LoadConst was removed, try removing the Const too.
+                    if h.apply_rewrite(RemoveConst(const_node)).is_err() {
+                        // const cannot be removed - no problem
+                        continue;
+                    }
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -231,13 +256,12 @@ mod test {
         assert_eq!(h.node_count(), 8);
 
         let (repl, removes) = find_consts(&h, h.nodes(), &reg).exactly_one().ok().unwrap();
+        let [remove_1, remove_2] = removes.try_into().unwrap();
+
         h.apply_rewrite(repl).unwrap();
-        for rem in removes {
-            if let Ok(const_node) = h.apply_rewrite(rem) {
-                if h.apply_rewrite(RemoveConst(const_node)).is_err() {
-                    continue;
-                }
-            }
+        for rem in [remove_1, remove_2] {
+            let const_node = h.apply_rewrite(rem).unwrap();
+            h.apply_rewrite(RemoveConst(const_node)).unwrap();
         }
 
         assert_fully_folded(&h, &i2c(3));
