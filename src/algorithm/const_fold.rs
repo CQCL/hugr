@@ -1,16 +1,18 @@
 //! Constant folding routines.
 
+use std::collections::{BTreeSet, HashMap};
+
 use itertools::Itertools;
 
 use crate::{
     builder::{DFGBuilder, Dataflow, DataflowHugr},
-    extension::{ConstFoldResult, ExtensionSet, PRELUDE_REGISTRY},
-    hugr::views::SiblingSubgraph,
+    extension::{ConstFoldResult, ExtensionRegistry},
+    hugr::{rewrite::consts::RemoveConstIgnore, views::SiblingSubgraph},
     ops::{Const, LeafOp, OpType},
     type_row,
     types::{FunctionType, Type, TypeEnum},
     values::Value,
-    Hugr, HugrView, IncomingPort, OutgoingPort, SimpleReplacement,
+    Hugr, HugrView, IncomingPort, Node, SimpleReplacement,
 };
 
 fn out_row(consts: impl IntoIterator<Item = Const>) -> ConstFoldResult {
@@ -72,15 +74,8 @@ pub fn fold_const(op: &OpType, consts: &[(IncomingPort, Const)]) -> ConstFoldRes
     }
 }
 
-fn const_graph(mut consts: Vec<(OutgoingPort, Const)>) -> Hugr {
-    consts.sort_by_key(|(o, _)| *o);
-    let consts = consts.into_iter().map(|(_, c)| c).collect_vec();
+fn const_graph(consts: Vec<Const>, reg: &ExtensionRegistry) -> Hugr {
     let const_types = consts.iter().map(Const::const_type).cloned().collect_vec();
-    // TODO need to get const extensions.
-    let extensions: ExtensionSet = consts
-        .iter()
-        .map(|c| c.value().extension_reqs())
-        .fold(ExtensionSet::new(), |e, e2| e.union(&e2));
     let mut b = DFGBuilder::new(FunctionType::new(type_row![], const_types)).unwrap();
 
     let outputs = consts
@@ -88,60 +83,100 @@ fn const_graph(mut consts: Vec<(OutgoingPort, Const)>) -> Hugr {
         .map(|c| b.add_load_const(c).unwrap())
         .collect_vec();
 
-    b.finish_hugr_with_outputs(outputs, &PRELUDE_REGISTRY)
-        .unwrap()
+    b.finish_hugr_with_outputs(outputs, reg).unwrap()
 }
 
-fn find_consts(
+pub fn find_consts<'a, 'r: 'a>(
+    hugr: &'a impl HugrView,
+    reg: &'r ExtensionRegistry,
+) -> impl Iterator<Item = (SimpleReplacement, Vec<RemoveConstIgnore>)> + 'a {
+    let mut used_neighbours = BTreeSet::new();
+
+    hugr.nodes()
+        .filter_map(move |n| {
+            hugr.get_optype(n).is_load_constant().then_some(())?;
+
+            let (out_p, _) = hugr.out_value_types(n).exactly_one().ok()?;
+            let neighbours = hugr
+                .linked_inputs(n, out_p)
+                .filter(|(n, _)| used_neighbours.insert(*n))
+                .collect_vec();
+            if neighbours.is_empty() {
+                return None;
+            }
+            let fold_iter = neighbours
+                .into_iter()
+                .filter_map(|(neighbour, _)| fold_op(hugr, neighbour, reg));
+            Some(fold_iter)
+        })
+        .flatten()
+}
+
+fn fold_op(
     hugr: &impl HugrView,
+    op_node: Node,
     reg: &ExtensionRegistry,
-) -> impl Iterator<Item = SimpleReplacement> + '_ {
-    hugr.nodes().filter_map(|n| {
-        let op = hugr.get_optype(n);
+) -> Option<(SimpleReplacement, Vec<RemoveConstIgnore>)> {
+    let (in_consts, removals): (Vec<_>, Vec<_>) = hugr
+        .node_inputs(op_node)
+        .filter_map(|in_p| get_const(hugr, op_node, in_p))
+        .unzip();
+    let neighbour_op = hugr.get_optype(op_node);
+    let folded = fold_const(neighbour_op, &in_consts)?;
+    let (op_outs, consts): (Vec<_>, Vec<_>) = folded.into_iter().unzip();
+    let nu_out = op_outs
+        .into_iter()
+        .flat_map(|out| {
+            // map from the ports the op was linked to, to the output ports of
+            // the replacement.
+            hugr.linked_inputs(op_node, out)
+                .enumerate()
+                .map(|(i, np)| (np, i.into()))
+        })
+        .collect();
+    let replacement = const_graph(consts, reg);
+    let sibling_graph = SiblingSubgraph::try_from_nodes([op_node], hugr)
+        .expect("Load consts and operation should form valid subgraph.");
 
-        op.is_load_constant().then_some(())?;
+    let simple_replace = SimpleReplacement::new(
+        sibling_graph,
+        replacement,
+        // no inputs to replacement
+        HashMap::new(),
+        nu_out,
+    );
+    Some((simple_replace, removals))
+}
 
-        let neighbour = hugr.output_neighbours(n).exactly_one().ok()?;
+fn get_const(
+    hugr: &impl HugrView,
+    op_node: Node,
+    in_p: IncomingPort,
+) -> Option<((IncomingPort, Const), RemoveConstIgnore)> {
+    let (load_n, _) = hugr.single_linked_output(op_node, in_p)?;
+    let load_op = hugr.get_optype(load_n).as_load_constant()?;
+    let const_node = hugr
+        .linked_outputs(load_n, load_op.constant_port())
+        .exactly_one()
+        .ok()?
+        .0;
 
-        let mut remove_nodes = vec![neighbour];
+    let const_op = hugr.get_optype(const_node).as_const()?;
 
-        let all_ins = hugr
-            .node_inputs(neighbour)
-            .filter_map(|in_p| {
-                let (in_n, _) = hugr.single_linked_output(neighbour, in_p)?;
-                let op = hugr.get_optype(in_n);
+    // remove_nodes.push(in_n);
 
-                op.is_load_constant().then_some(())?;
-
-                let const_node = hugr.input_neighbours(in_n).exactly_one().ok()?;
-                let const_op = hugr.get_optype(const_node).as_const()?;
-
-                remove_nodes.push(const_node);
-                remove_nodes.push(in_n);
-
-                // TODO avoid const clone here
-                Some((in_p, const_op.clone()))
-            })
-            .collect_vec();
-
-        let neighbour_op = hugr.get_optype(neighbour);
-
-        let folded = fold_const(neighbour_op, &all_ins)?;
-
-        let replacement = const_graph(folded);
-
-        let sibling_graph = SiblingSubgraph::try_from_nodes(remove_nodes, hugr)
-            .expect("Make unmake should be valid subgraph.");
-
-        sibling_graph
-            .create_simple_replacement(hugr, replacement)
-            .ok()
-    })
+    // TODO avoid const clone here
+    Some(((in_p, const_op.clone()), RemoveConstIgnore(load_n)))
 }
 
 #[cfg(test)]
 mod test {
+
     use crate::extension::{ExtensionRegistry, PRELUDE};
+    use crate::hugr::rewrite::consts::RemoveConst;
+
+    use crate::hugr::HugrMut;
+    use crate::std_extensions::arithmetic;
     use crate::std_extensions::arithmetic::int_ops::IntOpDef;
     use crate::std_extensions::arithmetic::int_types::{ConstIntU, INT_TYPES};
 
@@ -186,14 +221,39 @@ mod test {
             .unwrap();
         let reg = ExtensionRegistry::try_new([
             PRELUDE.to_owned(),
-            crate::std_extensions::arithmetic::int_types::EXTENSION.to_owned(),
-            crate::std_extensions::arithmetic::int_ops::EXTENSION.to_owned(),
+            arithmetic::int_types::EXTENSION.to_owned(),
+            arithmetic::int_ops::EXTENSION.to_owned(),
         ])
         .unwrap();
-        let h = b.finish_hugr_with_outputs(add.outputs(), &reg).unwrap();
+        let mut h = b.finish_hugr_with_outputs(add.outputs(), &reg).unwrap();
+        assert_eq!(h.node_count(), 8);
 
-        let consts = find_consts(&h).collect_vec();
+        let (repl, removes) = find_consts(&h, &reg).exactly_one().ok().unwrap();
+        h.apply_rewrite(repl).unwrap();
+        for rem in removes {
+            if let Ok(const_node) = h.apply_rewrite(rem) {
+                if h.apply_rewrite(RemoveConst(const_node)).is_err() {
+                    continue;
+                }
+            }
+        }
 
-        dbg!(consts);
+        assert_fully_folded(&h, &i2c(3));
+    }
+
+    fn assert_fully_folded(h: &Hugr, expected_const: &Const) {
+        // check the hugr just loads and returns a single const
+        let mut node_count = 0;
+
+        for node in h.children(h.root()) {
+            let op = h.get_optype(node);
+            match op {
+                OpType::Input(_) | OpType::Output(_) | OpType::LoadConstant(_) => node_count += 1,
+                OpType::Const(c) if c == expected_const => node_count += 1,
+                _ => panic!("unexpected op: {:?}", op),
+            }
+        }
+
+        assert_eq!(node_count, 4);
     }
 }
