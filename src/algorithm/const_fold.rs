@@ -88,11 +88,13 @@ fn const_graph(consts: Vec<Const>, reg: &ExtensionRegistry) -> Hugr {
 
 pub fn find_consts<'a, 'r: 'a>(
     hugr: &'a impl HugrView,
+    candidate_nodes: impl IntoIterator<Item = Node> + 'a,
     reg: &'r ExtensionRegistry,
 ) -> impl Iterator<Item = (SimpleReplacement, Vec<RemoveConstIgnore>)> + 'a {
     let mut used_neighbours = BTreeSet::new();
 
-    hugr.nodes()
+    candidate_nodes
+        .into_iter()
         .filter_map(move |n| {
             hugr.get_optype(n).is_load_constant().then_some(())?;
 
@@ -228,7 +230,7 @@ mod test {
         let mut h = b.finish_hugr_with_outputs(add.outputs(), &reg).unwrap();
         assert_eq!(h.node_count(), 8);
 
-        let (repl, removes) = find_consts(&h, &reg).exactly_one().ok().unwrap();
+        let (repl, removes) = find_consts(&h, h.nodes(), &reg).exactly_one().ok().unwrap();
         h.apply_rewrite(repl).unwrap();
         for rem in removes {
             if let Ok(const_node) = h.apply_rewrite(rem) {
