@@ -86,7 +86,7 @@ pub(crate) mod test_quantum_extension {
     lazy_static! {
         /// Quantum extension definition.
         pub static ref EXTENSION: Extension = extension();
-        static ref REG: ExtensionRegistry = ExtensionRegistry::try_new([EXTENSION.to_owned(), PRELUDE.to_owned(), float_types::extension()]).unwrap();
+        static ref REG: ExtensionRegistry = ExtensionRegistry::try_new([EXTENSION.to_owned(), PRELUDE.to_owned(), float_types::EXTENSION.to_owned()]).unwrap();
 
     }
     fn get_gate(gate_name: &str) -> LeafOp {

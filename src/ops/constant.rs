@@ -148,7 +148,7 @@ mod test {
     use super::*;
 
     fn test_registry() -> ExtensionRegistry {
-        ExtensionRegistry::try_new([PRELUDE.to_owned(), float_types::extension()]).unwrap()
+        ExtensionRegistry::try_new([PRELUDE.to_owned(), float_types::EXTENSION.to_owned()]).unwrap()
     }
 
     #[test]
