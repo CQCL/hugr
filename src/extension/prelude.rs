@@ -193,7 +193,9 @@ impl KnownTypeConst for ConstUsize {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 /// Structure for holding constant usize values.
 pub struct ConstError {
+    /// Integer tag/signal for the error.
     pub signal: u32,
+    /// Error message.
     pub message: String,
 }
 
