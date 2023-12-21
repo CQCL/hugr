@@ -43,7 +43,7 @@ impl ValidateJustArgs for IOValidator {
         Ok(())
     }
 }
-/// Logic extension operation definitions.
+/// Integer extension operation definitions.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, EnumIter, IntoStaticStr, EnumString)]
 #[allow(missing_docs, non_camel_case_types)]
 pub enum IntOpDef {
