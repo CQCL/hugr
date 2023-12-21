@@ -1,103 +1,119 @@
 //! Basic floating-point operations.
 
-use crate::{
-    extension::{ExtensionId, ExtensionSet},
-    type_row,
-    types::{FunctionType, PolyFuncType},
-    Extension,
-};
+use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 
 use super::float_types::FLOAT64_TYPE;
+use crate::{
+    extension::{
+        prelude::BOOL_T,
+        simple_op::{MakeOpDef, MakeRegisteredOp, OpLoadError},
+        ExtensionId, ExtensionRegistry, ExtensionSet, OpDef, SignatureFunc, PRELUDE,
+    },
+    type_row,
+    types::FunctionType,
+    Extension,
+};
+use lazy_static::lazy_static;
 
 /// The extension identifier.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.float");
 
-/// Extension for basic arithmetic operations.
-pub fn extension() -> Extension {
-    let mut extension = Extension::new_with_reqs(
-        EXTENSION_ID,
-        ExtensionSet::singleton(&super::float_types::EXTENSION_ID),
-    );
+/// Integer extension operation definitions.
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, EnumIter, IntoStaticStr, EnumString)]
+#[allow(missing_docs, non_camel_case_types)]
+pub enum FloatOps {
+    feq,
+    fne,
+    flt,
+    fgt,
+    fle,
+    fge,
+    fmax,
+    fmin,
+    fadd,
+    fsub,
+    fneg,
+    fabs,
+    fmul,
+    fdiv,
+    ffloor,
+    fceil,
+}
 
-    let fcmp_sig: PolyFuncType = FunctionType::new(
-        type_row![FLOAT64_TYPE; 2],
-        type_row![crate::extension::prelude::BOOL_T],
-    )
-    .into();
-    let fbinop_sig: PolyFuncType =
-        FunctionType::new(type_row![FLOAT64_TYPE; 2], type_row![FLOAT64_TYPE]).into();
-    let funop_sig: PolyFuncType =
-        FunctionType::new(type_row![FLOAT64_TYPE], type_row![FLOAT64_TYPE]).into();
-    extension
-        .add_op("feq".into(), "equality test".to_owned(), fcmp_sig.clone())
-        .unwrap();
-    extension
-        .add_op("fne".into(), "inequality test".to_owned(), fcmp_sig.clone())
-        .unwrap();
-    extension
-        .add_op("flt".into(), "\"less than\"".to_owned(), fcmp_sig.clone())
-        .unwrap();
-    extension
-        .add_op(
-            "fgt".into(),
-            "\"greater than\"".to_owned(),
-            fcmp_sig.clone(),
-        )
-        .unwrap();
-    extension
-        .add_op(
-            "fle".into(),
-            "\"less than or equal\"".to_owned(),
-            fcmp_sig.clone(),
-        )
-        .unwrap();
-    extension
-        .add_op(
-            "fge".into(),
-            "\"greater than or equal\"".to_owned(),
-            fcmp_sig,
-        )
-        .unwrap();
-    extension
-        .add_op("fmax".into(), "maximum".to_owned(), fbinop_sig.clone())
-        .unwrap();
-    extension
-        .add_op("fmin".into(), "minimum".to_owned(), fbinop_sig.clone())
-        .unwrap();
-    extension
-        .add_op("fadd".into(), "addition".to_owned(), fbinop_sig.clone())
-        .unwrap();
-    extension
-        .add_op("fsub".into(), "subtraction".to_owned(), fbinop_sig.clone())
-        .unwrap();
-    extension
-        .add_op("fneg".into(), "negation".to_owned(), funop_sig.clone())
-        .unwrap();
-    extension
-        .add_op(
-            "fabs".into(),
-            "absolute value".to_owned(),
-            funop_sig.clone(),
-        )
-        .unwrap();
-    extension
-        .add_op(
-            "fmul".into(),
-            "multiplication".to_owned(),
-            fbinop_sig.clone(),
-        )
-        .unwrap();
-    extension
-        .add_op("fdiv".into(), "division".to_owned(), fbinop_sig)
-        .unwrap();
-    extension
-        .add_op("ffloor".into(), "floor".to_owned(), funop_sig.clone())
-        .unwrap();
-    extension
-        .add_op("fceil".into(), "ceiling".to_owned(), funop_sig)
-        .unwrap();
+impl MakeOpDef for FloatOps {
+    fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError> {
+        crate::extension::simple_op::try_from_name(op_def.name())
+    }
 
-    extension
+    fn signature(&self) -> SignatureFunc {
+        use FloatOps::*;
+
+        match self {
+            feq | fne | flt | fgt | fle | fge => {
+                FunctionType::new(type_row![FLOAT64_TYPE; 2], type_row![BOOL_T])
+            }
+            fmax | fmin | fadd | fsub | fmul | fdiv => {
+                FunctionType::new(type_row![FLOAT64_TYPE; 2], type_row![FLOAT64_TYPE])
+            }
+            fneg | fabs | ffloor | fceil => FunctionType::new_endo(type_row![FLOAT64_TYPE]),
+        }
+        .into()
+    }
+
+    fn description(&self) -> String {
+        use FloatOps::*;
+        match self {
+            feq => "equality test",
+            fne => "inequality test",
+            flt => "\"less than\"",
+            fgt => "\"greater than\"",
+            fle => "\"less than or equal\"",
+            fge => "\"greater than or equal\"",
+            fmax => "maximum",
+            fmin => "minimum",
+            fadd => "addition",
+            fsub => "subtraction",
+            fneg => "negation",
+            fabs => "absolute value",
+            fmul => "multiplication",
+            fdiv => "division",
+            ffloor => "floor",
+            fceil => "ceiling",
+        }
+        .to_string()
+    }
+}
+
+lazy_static! {
+    /// Extension for basic float operations.
+    pub static ref EXTENSION: Extension = {
+        let mut extension = Extension::new_with_reqs(
+            EXTENSION_ID,
+            ExtensionSet::singleton(&super::int_types::EXTENSION_ID),
+        );
+
+        FloatOps::load_all_ops(&mut extension).unwrap();
+
+        extension
+    };
+
+    /// Registry of extensions required to validate float operations.
+    pub static ref FLOAT_OPS_REGISTRY: ExtensionRegistry  = ExtensionRegistry::try_new([
+        PRELUDE.to_owned(),
+        super::float_types::EXTENSION.to_owned(),
+        EXTENSION.to_owned(),
+    ])
+    .unwrap();
+}
+
+impl MakeRegisteredOp for FloatOps {
+    fn extension_id(&self) -> ExtensionId {
+        EXTENSION_ID.to_owned()
+    }
+
+    fn registry<'s, 'r: 's>(&'s self) -> &'r ExtensionRegistry {
+        &FLOAT_OPS_REGISTRY
+    }
 }
 
 #[cfg(test)]
@@ -106,7 +122,7 @@ mod test {
 
     #[test]
     fn test_float_ops_extension() {
-        let r = extension();
+        let r = &EXTENSION;
         assert_eq!(r.name() as &str, "arithmetic.float");
         assert_eq!(r.types().count(), 0);
         for (name, _) in r.operations() {
