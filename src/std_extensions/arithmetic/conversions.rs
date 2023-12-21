@@ -18,7 +18,7 @@ use crate::{
 use super::int_types::int_tv;
 use super::{float_types::FLOAT64_TYPE, int_types::LOG_WIDTH_TYPE_PARAM};
 use lazy_static::lazy_static;
-
+mod fold;
 /// The extension identifier.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.conversions");
 
@@ -62,6 +62,10 @@ impl MakeOpDef for ConvertOpDef {
             convert_s => "signed int to float",
         }
         .to_string()
+    }
+
+    fn post_opdef(&self, def: &mut OpDef) {
+        fold::set_fold(self, def)
     }
 }
 
