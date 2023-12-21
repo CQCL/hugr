@@ -137,12 +137,11 @@ pub fn new_array_op(element_ty: Type, size: u64) -> LeafOp {
         .into()
 }
 
+/// The custom type for Errors.
+pub const ERROR_CUSTOM_TYPE: CustomType =
+    CustomType::new_simple(ERROR_TYPE_NAME, PRELUDE_ID, TypeBound::Eq);
 /// Unspecified opaque error type.
-pub const ERROR_TYPE: Type = Type::new_extension(CustomType::new_simple(
-    ERROR_TYPE_NAME,
-    PRELUDE_ID,
-    TypeBound::Eq,
-));
+pub const ERROR_TYPE: Type = Type::new_extension(ERROR_CUSTOM_TYPE);
 
 /// The string name of the error type.
 pub const ERROR_TYPE_NAME: SmolStr = SmolStr::new_inline("error");
@@ -189,6 +188,36 @@ impl CustomConst for ConstUsize {
 
 impl KnownTypeConst for ConstUsize {
     const TYPE: CustomType = USIZE_CUSTOM_T;
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+/// Structure for holding constant usize values.
+pub struct ConstError {
+    pub signal: u32,
+    pub message: String,
+}
+
+#[typetag::serde]
+impl CustomConst for ConstError {
+    fn name(&self) -> SmolStr {
+        format!("ConstError({:?}, {:?})", self.signal, self.message).into()
+    }
+
+    fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
+        self.check_known_type(typ)
+    }
+
+    fn equal_consts(&self, other: &dyn CustomConst) -> bool {
+        crate::values::downcast_equal_consts(self, other)
+    }
+
+    fn extension_reqs(&self) -> ExtensionSet {
+        ExtensionSet::singleton(&PRELUDE_ID)
+    }
+}
+
+impl KnownTypeConst for ConstError {
+    const TYPE: CustomType = ERROR_CUSTOM_TYPE;
 }
 
 #[cfg(test)]
