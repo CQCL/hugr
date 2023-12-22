@@ -138,6 +138,7 @@ impl ExtensionOp {
         self.def.as_ref()
     }
 
+    /// Attempt to evaluate this operation. See [`OpDef::constant_fold`].
     pub fn constant_fold(&self, consts: &[(IncomingPort, ops::Const)]) -> ConstFoldResult {
         self.def().constant_fold(self.args(), consts)
     }

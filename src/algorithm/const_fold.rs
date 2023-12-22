@@ -89,6 +89,12 @@ fn const_graph(consts: Vec<Const>, reg: &ExtensionRegistry) -> Hugr {
     b.finish_hugr_with_outputs(outputs, reg).unwrap()
 }
 
+/// Given some `candidate_nodes` to search for LoadConstant operations in `hugr`,
+/// return an iterator of possible constant folding rewrites. The
+/// [`SimpleReplacement`] replaces an operation with constants that result from
+/// evaluating it, the extension registry `reg` is used to validate the
+/// replacement HUGR. The vector of [`RemoveConstIgnore`] refer to the
+/// LoadConstant nodes that could be removed.
 pub fn find_consts<'a, 'r: 'a>(
     hugr: &'a impl HugrView,
     candidate_nodes: impl IntoIterator<Item = Node> + 'a,
@@ -172,6 +178,7 @@ fn get_const(
     Some(((in_p, const_op.clone()), RemoveConstIgnore(load_n)))
 }
 
+/// Exhaustively apply constant folding to a HUGR.
 pub fn constant_fold_pass(h: &mut impl HugrMut, reg: &ExtensionRegistry) {
     loop {
         // would be preferable if the candidates were updated to be just the
