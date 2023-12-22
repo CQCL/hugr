@@ -260,7 +260,6 @@ pub mod test {
     use crate::extension::simple_op::MakeRegisteredOp;
     use crate::extension::{EMPTY_REG, PRELUDE_REGISTRY};
     use crate::hugr::hugrmut::sealed::HugrMutInternals;
-    use crate::hugr::test::assert_hugr_equality;
     use crate::hugr::NodeType;
     use crate::ops::custom::{ExtensionOp, OpaqueOp};
     use crate::ops::{dataflow::IOTrait, Input, LeafOp, Module, Output, DFG};
@@ -268,6 +267,7 @@ pub mod test {
     use crate::types::{FunctionType, Type};
     use crate::OutgoingPort;
     use itertools::Itertools;
+    use portgraph::LinkView;
     use portgraph::{
         multiportgraph::MultiPortGraph, Hierarchy, LinkMut, PortMut, PortView, UnmanagedDenseMap,
     };
@@ -298,7 +298,40 @@ pub mod test {
         // The internal port indices may still be different.
         let mut h_canon = hugr.clone();
         h_canon.canonicalize_nodes(|_, _| {});
-        assert_hugr_equality(&h_canon, &new_hugr);
+
+        assert_eq!(new_hugr.root, h_canon.root);
+        assert_eq!(new_hugr.hierarchy, h_canon.hierarchy);
+        assert_eq!(new_hugr.metadata, h_canon.metadata);
+
+        // Extension operations may have been downgraded to opaque operations.
+        for node in new_hugr.nodes() {
+            let new_op = new_hugr.get_optype(node);
+            let old_op = h_canon.get_optype(node);
+            if let OpType::LeafOp(LeafOp::CustomOp(new_ext)) = new_op {
+                if let OpType::LeafOp(LeafOp::CustomOp(old_ext)) = old_op {
+                    assert_eq!(new_ext.clone().as_opaque(), old_ext.clone().as_opaque());
+                } else {
+                    panic!("Expected old_op to be a custom op");
+                }
+            } else {
+                assert_eq!(new_op, old_op);
+            }
+        }
+
+        // Check that the graphs are equivalent up to port renumbering.
+        let new_graph = &new_hugr.graph;
+        let old_graph = &h_canon.graph;
+        assert_eq!(new_graph.node_count(), old_graph.node_count());
+        assert_eq!(new_graph.port_count(), old_graph.port_count());
+        assert_eq!(new_graph.link_count(), old_graph.link_count());
+        for n in old_graph.nodes_iter() {
+            assert_eq!(new_graph.num_inputs(n), old_graph.num_inputs(n));
+            assert_eq!(new_graph.num_outputs(n), old_graph.num_outputs(n));
+            assert_eq!(
+                new_graph.output_neighbours(n).collect_vec(),
+                old_graph.output_neighbours(n).collect_vec()
+            );
+        }
 
         new_hugr
     }
