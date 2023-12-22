@@ -199,6 +199,16 @@ pub struct ConstError {
     pub message: String,
 }
 
+impl ConstError {
+    /// Define a new error value.
+    pub fn new(signal: u32, message: impl ToString) -> Self {
+        Self {
+            signal,
+            message: message.to_string(),
+        }
+    }
+}
+
 #[typetag::serde]
 impl CustomConst for ConstError {
     fn name(&self) -> SmolStr {
@@ -250,7 +260,7 @@ mod test {
     }
 
     #[test]
-    /// Test building a HUGR involving a new_array operation.
+    /// test the prelude error type.
     fn test_error_type() {
         let ext_def = PRELUDE
             .get_type(&ERROR_TYPE_NAME)
@@ -260,5 +270,18 @@ mod test {
 
         let ext_type = Type::new_extension(ext_def);
         assert_eq!(ext_type, ERROR_TYPE);
+
+        let error_val = ConstError::new(2, "my message");
+
+        assert_eq!(error_val.name(), "ConstError(2, \"my message\")");
+
+        assert!(error_val.check_custom_type(&ERROR_CUSTOM_TYPE).is_ok());
+
+        assert_eq!(
+            error_val.extension_reqs(),
+            ExtensionSet::singleton(&PRELUDE_ID)
+        );
+        assert!(error_val.equal_consts(&ConstError::new(2, "my message")));
+        assert!(!error_val.equal_consts(&ConstError::new(3, "my message")));
     }
 }
