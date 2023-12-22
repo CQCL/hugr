@@ -22,6 +22,7 @@ use lazy_static::lazy_static;
 use smol_str::SmolStr;
 use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 
+mod fold;
 /// The extension identifier.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.int");
 
@@ -215,6 +216,10 @@ impl MakeOpDef for IntOpDef {
             irotr => "rotate first input right by k bits where k is unsigned interpretation of second input \
             (rightmost bits replace leftmost bits)",
         }.into()
+    }
+
+    fn post_opdef(&self, def: &mut OpDef) {
+        fold::set_fold(self, def)
     }
 }
 fn int_polytype(
