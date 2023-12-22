@@ -70,8 +70,8 @@ pub trait Container {
     ///
     /// This function will return an error if there is an error in adding the
     /// [`OpType::Const`] node.
-    fn add_constant(&mut self, constant: ops::Const) -> Result<ConstID, BuildError> {
-        let const_n = self.add_child_node(NodeType::new(constant, ExtensionSet::new()))?;
+    fn add_constant(&mut self, constant: impl Into<ops::Const>) -> Result<ConstID, BuildError> {
+        let const_n = self.add_child_node(NodeType::new(constant.into(), ExtensionSet::new()))?;
 
         Ok(const_n.into())
     }
@@ -374,7 +374,7 @@ pub trait Dataflow: Container {
     /// # Errors
     ///
     /// This function will return an error if there is an error when adding the node.
-    fn add_load_const(&mut self, constant: ops::Const) -> Result<Wire, BuildError> {
+    fn add_load_const(&mut self, constant: impl Into<ops::Const>) -> Result<Wire, BuildError> {
         let cid = self.add_constant(constant)?;
         self.load_const(&cid)
     }

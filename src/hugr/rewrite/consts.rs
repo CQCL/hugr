@@ -6,6 +6,7 @@ use crate::{
     hugr::{HugrError, HugrMut},
     HugrView, Node,
 };
+#[rustversion::since(1.75)] // uses impl in return position
 use itertools::Itertools;
 use thiserror::Error;
 
@@ -32,6 +33,7 @@ pub enum RemoveConstIgnoreError {
     RemoveFail(#[from] HugrError),
 }
 
+#[rustversion::since(1.75)] // uses impl in return position
 impl Rewrite for RemoveConstIgnore {
     type Error = RemoveConstIgnoreError;
 
@@ -131,5 +133,99 @@ impl Rewrite for RemoveConst {
 
     fn invalidation_set(&self) -> Self::InvalidationSet<'_> {
         iter::once(self.0)
+    }
+}
+
+#[rustversion::since(1.75)] // uses impl in return position
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::{
+        builder::{Container, Dataflow, HugrBuilder, ModuleBuilder, SubContainer},
+        extension::{
+            prelude::{ConstUsize, USIZE_T},
+            PRELUDE_REGISTRY,
+        },
+        hugr::HugrMut,
+        ops::{handle::NodeHandle, LeafOp},
+        type_row,
+        types::FunctionType,
+    };
+    #[test]
+    fn test_const_remove() -> Result<(), Box<dyn std::error::Error>> {
+        let mut build = ModuleBuilder::new();
+        let con_node = build.add_constant(ConstUsize::new(2))?;
+
+        let mut dfg_build =
+            build.define_function("main", FunctionType::new_endo(type_row![]).into())?;
+        let load_1 = dfg_build.load_const(&con_node)?;
+        let load_2 = dfg_build.load_const(&con_node)?;
+        let tup = dfg_build.add_dataflow_op(
+            LeafOp::MakeTuple {
+                tys: type_row![USIZE_T, USIZE_T],
+            },
+            [load_1, load_2],
+        )?;
+        dfg_build.finish_sub_container()?;
+
+        let mut h = build.finish_prelude_hugr()?;
+        assert_eq!(h.node_count(), 8);
+        let tup_node = tup.node();
+        // can't remove invalid node
+        assert_eq!(
+            h.apply_rewrite(RemoveConst(tup_node)),
+            Err(RemoveConstError::InvalidNode(tup_node))
+        );
+
+        assert_eq!(
+            h.apply_rewrite(RemoveConstIgnore(tup_node)),
+            Err(RemoveConstIgnoreError::InvalidNode(tup_node))
+        );
+        let load_1_node = load_1.node();
+        let load_2_node = load_2.node();
+        let con_node = con_node.node();
+
+        let remove_1 = RemoveConstIgnore(load_1_node);
+        assert_eq!(
+            remove_1.invalidation_set().exactly_one().ok(),
+            Some(load_1_node)
+        );
+
+        let remove_2 = RemoveConstIgnore(load_2_node);
+
+        let remove_con = RemoveConst(con_node);
+        assert_eq!(
+            remove_con.invalidation_set().exactly_one().ok(),
+            Some(con_node)
+        );
+
+        // can't remove nodes in use
+        assert_eq!(
+            h.apply_rewrite(remove_1.clone()),
+            Err(RemoveConstIgnoreError::ValueUsed(load_1_node))
+        );
+
+        // remove the use
+        h.remove_node(tup_node)?;
+
+        // remove first load
+        let reported_con_node = h.apply_rewrite(remove_1)?;
+        assert_eq!(reported_con_node, con_node);
+
+        // still can't remove const, in use by second load
+        assert_eq!(
+            h.apply_rewrite(remove_con.clone()),
+            Err(RemoveConstError::ValueUsed(con_node))
+        );
+
+        // remove second use
+        let reported_con_node = h.apply_rewrite(remove_2)?;
+        assert_eq!(reported_con_node, con_node);
+        // remove const
+        assert_eq!(h.apply_rewrite(remove_con)?, h.root());
+
+        assert_eq!(h.node_count(), 4);
+        assert!(h.validate(&PRELUDE_REGISTRY).is_ok());
+        Ok(())
     }
 }
