@@ -198,12 +198,13 @@ pub fn constant_fold_pass(h: &mut impl HugrMut, reg: &ExtensionRegistry) {
 #[cfg(test)]
 mod test {
 
+    use crate::extension::prelude::sum_with_error;
     use crate::extension::{ExtensionRegistry, PRELUDE};
     use crate::hugr::rewrite::consts::RemoveConst;
 
     use crate::hugr::HugrMut;
     use crate::std_extensions::arithmetic;
-
+    use crate::std_extensions::arithmetic::conversions::ConvertOpDef;
     use crate::std_extensions::arithmetic::float_ops::FloatOps;
     use crate::std_extensions::arithmetic::float_types::{ConstF64, FLOAT64_TYPE};
     use crate::std_extensions::arithmetic::int_ops::IntOpDef;
@@ -278,13 +279,14 @@ mod test {
         /*
            Test approximately calculates
            let x = (5.6, 3.2);
-           x.0 - x.1 == 2.4
+           int(x.0 - x.1) == 2
         */
+        let sum_type = sum_with_error(INT_TYPES[5].to_owned());
         let mut build =
-            DFGBuilder::new(FunctionType::new(type_row![], type_row![FLOAT64_TYPE])).unwrap();
+            DFGBuilder::new(FunctionType::new(type_row![], vec![sum_type.clone()])).unwrap();
 
         let tup = build
-            .add_load_const(Const::new_tuple([f2c(5.5), f2c(3.25)]))
+            .add_load_const(Const::new_tuple([f2c(5.6), f2c(3.2)]))
             .unwrap();
 
         let unpack = build
@@ -299,19 +301,31 @@ mod test {
         let sub = build
             .add_dataflow_op(FloatOps::fsub, unpack.outputs())
             .unwrap();
+        let to_int = build
+            .add_dataflow_op(ConvertOpDef::trunc_u.with_width(5), sub.outputs())
+            .unwrap();
 
         let reg = ExtensionRegistry::try_new([
             PRELUDE.to_owned(),
+            arithmetic::int_types::EXTENSION.to_owned(),
             arithmetic::float_types::EXTENSION.to_owned(),
             arithmetic::float_ops::EXTENSION.to_owned(),
+            arithmetic::conversions::EXTENSION.to_owned(),
         ])
         .unwrap();
-        let mut h = build.finish_hugr_with_outputs(sub.outputs(), &reg).unwrap();
-        assert_eq!(h.node_count(), 7);
+        let mut h = build
+            .finish_hugr_with_outputs(to_int.outputs(), &reg)
+            .unwrap();
+        assert_eq!(h.node_count(), 8);
 
         constant_fold_pass(&mut h, &reg);
 
-        assert_fully_folded(&h, &f2c(2.25));
+        let expected = Value::Sum {
+            tag: 0,
+            value: Box::new(i2c(2).value().clone()),
+        };
+        let expected = Const::new(expected, sum_type).unwrap();
+        assert_fully_folded(&h, &expected);
     }
     fn assert_fully_folded(h: &Hugr, expected_const: &Const) {
         // check the hugr just loads and returns a single const
