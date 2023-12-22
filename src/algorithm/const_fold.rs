@@ -19,6 +19,7 @@ use crate::{
     Hugr, HugrView, IncomingPort, Node, SimpleReplacement,
 };
 
+/// Tag some output constants with [`OutgoingPort`] inferred from the ordering.
 fn out_row(consts: impl IntoIterator<Item = Const>) -> ConstFoldResult {
     let vec = consts
         .into_iter()
@@ -28,12 +29,14 @@ fn out_row(consts: impl IntoIterator<Item = Const>) -> ConstFoldResult {
     Some(vec)
 }
 
+/// Sort folding inputs with [`IncomingPort`] as key
 fn sort_by_in_port(consts: &[(IncomingPort, Const)]) -> Vec<&(IncomingPort, Const)> {
     let mut v: Vec<_> = consts.iter().collect();
     v.sort_by_key(|(i, _)| i);
     v
 }
 
+/// Sort some input constants by port and just return the constants.
 pub(crate) fn sorted_consts(consts: &[(IncomingPort, Const)]) -> Vec<&Const> {
     sort_by_in_port(consts)
         .into_iter()
@@ -60,7 +63,7 @@ pub fn fold_const(op: &OpType, consts: &[(IncomingPort, Const)]) -> ConstFoldRes
                     }));
                 }
             }
-            None
+            None // could panic
         }
 
         LeafOp::Tag { tag, variants } => out_row([Const::new(
@@ -77,6 +80,8 @@ pub fn fold_const(op: &OpType, consts: &[(IncomingPort, Const)]) -> ConstFoldRes
     }
 }
 
+/// Generate a graph that loads and outputs `consts` in order, validating
+/// against `reg`.
 fn const_graph(consts: Vec<Const>, reg: &ExtensionRegistry) -> Hugr {
     let const_types = consts.iter().map(Const::const_type).cloned().collect_vec();
     let mut b = DFGBuilder::new(FunctionType::new(type_row![], const_types)).unwrap();
@@ -206,15 +211,10 @@ pub fn constant_fold_pass(h: &mut impl HugrMut, reg: &ExtensionRegistry) {
 mod test {
 
     use crate::extension::{ExtensionRegistry, PRELUDE};
-    use crate::hugr::rewrite::consts::RemoveConst;
-
-    use crate::hugr::HugrMut;
     use crate::std_extensions::arithmetic;
 
     use crate::std_extensions::arithmetic::float_ops::FloatOps;
     use crate::std_extensions::arithmetic::float_types::{ConstF64, FLOAT64_TYPE};
-    use crate::std_extensions::arithmetic::int_ops::IntOpDef;
-    use crate::std_extensions::arithmetic::int_types::{ConstIntU, INT_TYPES};
 
     use rstest::rstest;
 
