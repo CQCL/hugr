@@ -417,10 +417,14 @@ impl OpDef {
         self.misc.insert(k.to_string(), v)
     }
 
+    /// Set the constant folding function for this Op, which can evaluate it
+    /// given constant inputs.
     pub fn set_constant_folder(&mut self, fold: impl ConstFold + 'static) {
         self.constant_folder = Box::new(fold)
     }
 
+    /// Evaluate an instance of this [`OpDef`] defined by the `type_args`, given
+    /// [`crate::ops::Const`] values for inputs at [`crate::IncomingPort`]s.
     pub fn constant_fold(
         &self,
         type_args: &[TypeArg],

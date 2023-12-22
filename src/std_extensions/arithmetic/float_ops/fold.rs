@@ -18,6 +18,7 @@ pub(super) fn set_fold(op: &FloatOps, def: &mut OpDef) {
     }
 }
 
+/// Extract float values from constants in port order.
 fn get_floats<const N: usize>(consts: &[(IncomingPort, ops::Const)]) -> Option<[f64; N]> {
     let consts: [&ops::Const; N] = sorted_consts(consts).try_into().ok()?;
 
@@ -29,6 +30,7 @@ fn get_floats<const N: usize>(consts: &[(IncomingPort, ops::Const)]) -> Option<[
     }))
 }
 
+/// Fold binary operations
 struct BinaryFold(Box<dyn Fn(f64, f64) -> f64 + Send + Sync>);
 impl BinaryFold {
     fn from_op(op: &FloatOps) -> Self {
@@ -57,6 +59,7 @@ impl ConstFold for BinaryFold {
     }
 }
 
+/// Fold comparisons.
 struct CmpFold(Box<dyn Fn(f64, f64) -> bool + Send + Sync>);
 impl CmpFold {
     fn from_op(op: FloatOps) -> Self {
@@ -93,6 +96,7 @@ impl ConstFold for CmpFold {
     }
 }
 
+/// Fold unary operations
 struct UnaryFold(Box<dyn Fn(f64) -> f64 + Send + Sync>);
 impl UnaryFold {
     fn from_op(op: &FloatOps) -> Self {
