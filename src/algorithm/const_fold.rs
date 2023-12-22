@@ -220,6 +220,7 @@ mod test {
 
     use super::*;
 
+    /// int to constant
     fn i2c(b: u64) -> Const {
         Const::new(
             ConstIntU::new(5, b).unwrap().into(),
@@ -228,6 +229,7 @@ mod test {
         .unwrap()
     }
 
+    /// float to constant
     fn f2c(f: f64) -> Const {
         ConstF64::new(f).into()
     }
@@ -239,7 +241,7 @@ mod test {
     // c = a + b
     fn test_add(#[case] a: u64, #[case] b: u64, #[case] c: u64) {
         let consts = vec![(0.into(), i2c(a)), (1.into(), i2c(b))];
-        let add_op: OpType = IntOpDef::iadd.with_width(6).into();
+        let add_op: OpType = IntOpDef::iadd.with_width(5).into();
         let out = fold_const(&add_op, &consts).unwrap();
 
         assert_eq!(&out[..], &[(0.into(), i2c(c))]);
@@ -247,6 +249,10 @@ mod test {
 
     #[test]
     fn test_fold() {
+        /*
+           Test hugr calculates
+           1 + 2 == 3
+        */
         let mut b = DFGBuilder::new(FunctionType::new(
             type_row![],
             vec![INT_TYPES[5].to_owned()],
@@ -283,9 +289,9 @@ mod test {
     #[test]
     fn test_big() {
         /*
-           Test approximately calculates
-           let x = (5.6, 3.2);
-           x.0 - x.1 == 2.4
+           Test hugr approximately calculates
+           let x = (5.5, 3.25);
+           x.0 - x.1 == 2.25
         */
         let mut build =
             DFGBuilder::new(FunctionType::new(type_row![], type_row![FLOAT64_TYPE])).unwrap();

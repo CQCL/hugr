@@ -37,6 +37,8 @@ impl Default for Box<dyn ConstFold> {
     }
 }
 
+/// Blanket implementation for functions that only require the constants to
+/// evaluate - type arguments are not relevant.
 impl<T> ConstFold for T
 where
     T: Fn(&[(crate::IncomingPort, crate::ops::Const)]) -> ConstFoldResult + Send + Sync,
