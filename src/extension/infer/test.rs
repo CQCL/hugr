@@ -11,7 +11,7 @@ use crate::extension::{prelude::PRELUDE_REGISTRY, ExtensionSet};
 use crate::hugr::{validate::ValidationError, Hugr, HugrMut, HugrView, NodeType};
 use crate::macros::const_extension_ids;
 use crate::ops::custom::{ExternalOp, OpaqueOp};
-use crate::ops::{self, dataflow::IOTrait, handle::NodeHandle, OpTrait};
+use crate::ops::{self, dataflow::IOTrait, handle::NodeHandle};
 use crate::ops::{LeafOp, OpType};
 
 use crate::type_row;
@@ -314,12 +314,8 @@ fn test_conditional_inference() -> Result<(), Box<dyn Error>> {
         first_ext: ExtensionId,
         second_ext: ExtensionId,
     ) -> Result<Node, Box<dyn Error>> {
-        let [case, case_in, case_out] = create_with_io(
-            hugr,
-            conditional_node,
-            op.clone(),
-            Into::<OpType>::into(op).dataflow_signature().unwrap(),
-        )?;
+        let [case, case_in, case_out] =
+            create_with_io(hugr, conditional_node, op.clone(), op.inner_signature())?;
 
         let lift1 = hugr.add_node_with_parent(
             case,

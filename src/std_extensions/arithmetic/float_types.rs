@@ -8,6 +8,7 @@ use crate::{
     values::{CustomConst, KnownTypeConst},
     Extension,
 };
+use lazy_static::lazy_static;
 
 /// The extension identifier.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.float.types");
@@ -72,29 +73,30 @@ impl CustomConst for ConstF64 {
     }
 }
 
-/// Extension for basic floating-point types.
-pub fn extension() -> Extension {
-    let mut extension = Extension::new(EXTENSION_ID);
+lazy_static! {
+    /// Extension defining the float type.
+    pub static ref EXTENSION: Extension = {
+        let mut extension = Extension::new(EXTENSION_ID);
 
-    extension
-        .add_type(
-            FLOAT_TYPE_ID,
-            vec![],
-            "64-bit IEEE 754-2019 floating-point value".to_owned(),
-            TypeBound::Copyable.into(),
-        )
-        .unwrap();
+        extension
+            .add_type(
+                FLOAT_TYPE_ID,
+                vec![],
+                "64-bit IEEE 754-2019 floating-point value".to_owned(),
+                TypeBound::Copyable.into(),
+            )
+            .unwrap();
 
-    extension
+        extension
+    };
 }
-
 #[cfg(test)]
 mod test {
     use super::*;
 
     #[test]
     fn test_float_types_extension() {
-        let r = extension();
+        let r = &EXTENSION;
         assert_eq!(r.name() as &str, "arithmetic.float.types");
         assert_eq!(r.types().count(), 1);
         assert_eq!(r.operations().count(), 0);
