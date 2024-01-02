@@ -267,10 +267,7 @@ the following basic dataflow operations are available (in addition to the
 
   - `Input/Output`: input/output nodes, the outputs of `Input` node are
     the inputs to the function, and the inputs to `Output` are the
-    outputs of the function. In a data dependency subgraph, a valid
-    ordering of operations can be achieved by topologically sorting the
-    nodes starting from `Input` with respect to the Value and Order
-    edges.
+    outputs of the function.
   - `Call`: Call a statically defined function. There is an incoming
     `Static<Function>` edge to specify the graph being called. The
     signature of the node (defined by its incoming and outgoing `Value` edges) matches the function being called.
@@ -512,10 +509,11 @@ graph:
 cycles. The common parent is a CFG-node.
 
 **Dataflow Sibling Graph (DSG)**: nodes are operations, `CFG`,
-`Conditional`, `TailLoop` and `DFG` nodes; edges are `Value`, `Order` and `Static`;
-and must be acyclic. There is a unique Input node and Output node. All nodes must be
-reachable from the Input node, and must reach the Output node. The common parent
-may be a `FuncDefn`, `TailLoop`, `DFG`, `Case` or `DFB` node.
+`Conditional`, `TailLoop` and `DFG` nodes; edges are `Value`, `Order` and `Static`, and must be acyclic.
+(Thus a valid ordering of operations can be achieved by topologically sorting the
+nodes.)
+There is a unique Input node and Output node.
+The common parent may be a `FuncDefn`, `TailLoop`, `DFG`, `Case` or `DFB` node.
 
 | **Edge Kind**  | **Locality** |
 | -------------- | ------------ |
@@ -1337,8 +1335,7 @@ remove it. (If there is an non-local edge from `n0` to a descendent of
 
 Given a `Const<T>` node `c`, and optionally `P`, a parent of a DSG, add a new
 `LoadConstant<T>` node `n` as a child of `P` with a `Static<T>` edge
-from `c` to `n` and no outgoing edges from `n`. Also add an Order edge
-from the Input node under `P` to `n`. Return the ID of `n`. If `P` is
+from `c` to `n` and no outgoing edges from `n`.  Return the ID of `n`. If `P` is
 omitted it defaults to the parent of `c` (in this case said `c` will
 have to be in a DSG or CSG rather than under the Module Root.) If `P` is
 provided, it must be a descendent of the parent of `c`.
@@ -1346,7 +1343,7 @@ provided, it must be a descendent of the parent of `c`.
 ###### `RemoveConstIgnore`
 
 Given a `LoadConstant<T>` node `n` that has no outgoing edges, remove
-it (and its incoming value and Order edges) from the hugr.
+it (and its incoming Static edge and any Order edges) from the hugr.
 
 ##### Insertion and removal of const nodes
 
