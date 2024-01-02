@@ -177,7 +177,7 @@ mod test {
         let reg = ExtensionRegistry::try_new([
             EXTENSION.to_owned(),
             PRELUDE.to_owned(),
-            float_types::extension(),
+            float_types::EXTENSION.to_owned(),
         ])
         .unwrap();
         let pop_sig = get_op(&POP_NAME)
