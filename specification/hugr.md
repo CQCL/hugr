@@ -276,10 +276,7 @@ the following basic dataflow operations are available (in addition to the
     signature of the node (defined by its incoming and outgoing `Value` edges) matches the function being called.
   - `LoadConstant<T>`: has an incoming `Static<T>` edge, where `T` is a `CopyableType`, and a
     `Value<Local,T>` output, used to load a static constant into the local
-    dataflow graph. They also have an incoming `Order` edge connecting
-    them to the `Input` node, as should all operations that
-    take no dataflow input, to ensure they lie in the causal cone of the
-    `Input` node when traversing.
+    dataflow graph.
   - `identity<T>`: pass-through, no operation is performed.
   - `DFG`: A nested dataflow graph.
     These nodes are parents in the hierarchy.
