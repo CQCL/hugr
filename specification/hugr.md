@@ -408,8 +408,6 @@ Some normalizations are possible:
   - If the entry node has only one successor and that successor is the
     exit node, the CFG node itself can be removed.
 
-An special `passthrough<T>` `DFB` is defined having no effect on the data.
-
 The CFG in the example below has three inputs: one (call it `v`) of type "P"
 (not specified, but with a conversion to boolean represented by the nodes labelled "P?1" and "P?2"), one of
 type "qubit" and one (call it `t`) of type "angle".
@@ -1325,14 +1323,13 @@ the children of that CFG node.
 
 ###### `InsertIdentity`
 
-Given an edge between sibling nodes in a DSG or CFG, insert an `identity<T>` or
-`passthrough<T>` node having its source as predecessor and its target as
-successor.
+Given an edge between sibling nodes in a DSG, insert an `identity<T>`
+node having its source as predecessor and its target as successor.
 
 ###### `RemoveIdentity`
 
-Remove an `identity<T>` node from a DSG, or a `passthrough<T>` node from a CFG,
-wiring its predecessor to its successor.
+Remove an `identity<T>` node from a DSG, wiring its predecessor to its
+successor.
 
 ##### Order insertion and removal methods
 
