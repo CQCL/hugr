@@ -1200,8 +1200,9 @@ nodes is itself a HUGR with some "holes" (edges and nodes that get "filled in"
 by the `Replace` operation). To fully specify the operation, some further data
 are needed:
 
-  - The replacement may containg container nodes with no children, which replace
-    removed container nodes, adopting all their (non-removed) children.
+  - The replacement may include container nodes with no children, which adopt
+    the children of removed container nodes and prevent those children being
+    removed.
   - All new incoming edges from the retained nodes to the new nodes, all
     outgoing edges from the new nodes to the retained nodes, and any new edges
     that bypass the replacement (going between retained nodes) must be
