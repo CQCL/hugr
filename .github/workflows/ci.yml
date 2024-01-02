@@ -56,13 +56,13 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        rust: ['1.70', stable, beta, nightly]
+        rust: ['1.75', stable, beta, nightly]
         # workaround to ignore non-stable tests when running the merge queue checks
         # see: https://github.community/t/how-to-conditionally-include-exclude-items-in-matrix-eg-based-on-branch/16853/6
         isMerge:
             - ${{ github.event_name == 'merge_group' }}
         exclude:
-          - rust: '1.70'
+          - rust: '1.75'
             isMerge: true
           - rust: beta
             isMerge: true

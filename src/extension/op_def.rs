@@ -7,7 +7,8 @@ use std::sync::Arc;
 use smol_str::SmolStr;
 
 use super::{
-    Extension, ExtensionBuildError, ExtensionId, ExtensionRegistry, ExtensionSet, SignatureError,
+    ConstFold, ConstFoldResult, Extension, ExtensionBuildError, ExtensionId, ExtensionRegistry,
+    ExtensionSet, SignatureError,
 };
 
 use crate::types::type_param::{check_type_args, TypeArg, TypeParam};
@@ -307,6 +308,9 @@ pub struct OpDef {
     // can only treat them as opaque/black-box ops.
     #[serde(flatten)]
     lower_funcs: Vec<LowerFunc>,
+
+    #[serde(skip)]
+    constant_folder: Box<dyn ConstFold>,
 }
 
 impl OpDef {
@@ -412,6 +416,22 @@ impl OpDef {
     ) -> Option<serde_yaml::Value> {
         self.misc.insert(k.to_string(), v)
     }
+
+    /// Set the constant folding function for this Op, which can evaluate it
+    /// given constant inputs.
+    pub fn set_constant_folder(&mut self, fold: impl ConstFold + 'static) {
+        self.constant_folder = Box::new(fold)
+    }
+
+    /// Evaluate an instance of this [`OpDef`] defined by the `type_args`, given
+    /// [`crate::ops::Const`] values for inputs at [`crate::IncomingPort`]s.
+    pub fn constant_fold(
+        &self,
+        type_args: &[TypeArg],
+        consts: &[(crate::IncomingPort, crate::ops::Const)],
+    ) -> ConstFoldResult {
+        self.constant_folder.fold(type_args, consts)
+    }
 }
 
 impl Extension {
@@ -432,6 +452,7 @@ impl Extension {
             signature_func: signature_func.into(),
             misc: Default::default(),
             lower_funcs: Default::default(),
+            constant_folder: Default::default(),
         };
 
         match self.operations.entry(op.name.clone()) {
