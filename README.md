@@ -42,7 +42,7 @@ This project is licensed under Apache License, Version 2.0 ([LICENSE][] or http:
 
   [API documentation here]: https://docs.rs/quantinuum-hugr/
   [build_status]: https://github.com/CQCL/hugr/workflows/Continuous%20integration/badge.svg?branch=main
-  [msrv]: https://img.shields.io/badge/rust-1.70.0%2B-blue.svg
+  [msrv]: https://img.shields.io/badge/rust-1.75.0%2B-blue.svg
   [codecov]: https://img.shields.io/codecov/c/gh/CQCL/hugr?logo=codecov
   [LICENSE]: LICENCE
   [CHANGELOG]: CHANGELOG.md

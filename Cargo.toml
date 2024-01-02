@@ -12,7 +12,7 @@ description = "Hierarchical Unified Graph Representation"
 #categories = [] # TODO
 
 edition = "2021"
-rust-version = "1.70"
+rust-version = "1.75"
 
 [lib]
 # Using different names for the lib and for the package is supported, but may be confusing.
