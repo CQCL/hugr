@@ -63,7 +63,7 @@ pub fn fold_const(op: &OpType, consts: &[(IncomingPort, Const)]) -> ConstFoldRes
                     }));
                 }
             }
-            None // could panic
+            panic!("This op always takes a Tuple input.");
         }
 
         LeafOp::Tag { tag, variants } => out_row([Const::new(
@@ -99,7 +99,8 @@ fn const_graph(consts: Vec<Const>, reg: &ExtensionRegistry) -> Hugr {
 /// [`SimpleReplacement`] replaces an operation with constants that result from
 /// evaluating it, the extension registry `reg` is used to validate the
 /// replacement HUGR. The vector of [`RemoveConstIgnore`] refer to the
-/// LoadConstant nodes that could be removed.
+/// LoadConstant nodes that could be removed - they are not automatically
+/// removed as they may be used by other operations.
 pub fn find_consts<'a, 'r: 'a>(
     hugr: &'a impl HugrView,
     candidate_nodes: impl IntoIterator<Item = Node> + 'a,
