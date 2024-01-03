@@ -71,7 +71,7 @@ impl MakeOpDef for ConvertOpDef {
 }
 
 impl ConvertOpDef {
-    /// INitialise a conversion op with an integer log width type argument.
+    /// Initialise a conversion op with an integer log width type argument.
     pub fn with_width(self, log_width: u8) -> ConvertOpType {
         ConvertOpType {
             def: self,
