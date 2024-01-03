@@ -6,7 +6,7 @@ use super::{
 };
 
 use crate::ops::handle::NodeHandle;
-use crate::ops::{self, dataflow::DataflowParent, BasicBlock, OpType};
+use crate::ops::{self, dataflow::DataflowParent, Exit, OpType, DFB};
 use crate::{
     extension::{ExtensionRegistry, ExtensionSet},
     types::FunctionType,
@@ -86,7 +86,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         output: TypeRow,
     ) -> Result<Self, BuildError> {
         let n_out_wires = output.len();
-        let exit_block_type = OpType::BasicBlock(BasicBlock::Exit {
+        let exit_block_type = OpType::Exit(Exit {
             cfg_outputs: output,
         });
         let exit_node = base
@@ -102,7 +102,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         })
     }
 
-    /// Return a builder for a non-entry [`BasicBlock::DFB`] child graph with `inputs`
+    /// Return a builder for a non-entry [`DFB`] child graph with `inputs`
     /// and `outputs` and the variants of the branching TupleSum value
     /// specified by `tuple_sum_rows`.
     ///
@@ -134,7 +134,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         entry: bool,
     ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
         let tuple_sum_rows: Vec<_> = tuple_sum_rows.into_iter().collect();
-        let op = OpType::BasicBlock(BasicBlock::DFB {
+        let op = OpType::DFB(DFB {
             inputs: inputs.clone(),
             other_outputs: other_outputs.clone(),
             tuple_sum_rows: tuple_sum_rows.clone(),
@@ -153,7 +153,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         BlockBuilder::create(self.hugr_mut(), block_n)
     }
 
-    /// Return a builder for a non-entry [`BasicBlock::DFB`] child graph with `inputs`
+    /// Return a builder for a non-entry [`DFB`] child graph with `inputs`
     /// and `outputs` and a UnitSum type: a Sum of `n_cases` unit types.
     ///
     /// # Errors
@@ -172,7 +172,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         )
     }
 
-    /// Return a builder for the entry [`BasicBlock::DFB`] child graph with `inputs`
+    /// Return a builder for the entry [`DFB`] child graph with `inputs`
     /// and `outputs` and the variants of the branching TupleSum value
     /// specified by `tuple_sum_rows`.
     ///
@@ -192,7 +192,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         self.any_block_builder(inputs, tuple_sum_rows, other_outputs, extension_delta, true)
     }
 
-    /// Return a builder for the entry [`BasicBlock::DFB`] child graph with `inputs`
+    /// Return a builder for the entry [`DFB`] child graph with `inputs`
     /// and `outputs` and a UnitSum type: a Sum of `n_cases` unit types.
     ///
     /// # Errors
@@ -229,7 +229,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
     }
 }
 
-/// Builder for a [`BasicBlock::DFB`] child graph.
+/// Builder for a [`DFB`] child graph.
 pub type BlockBuilder<B> = DFGWrapper<B, BasicBlockID>;
 
 impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
@@ -243,7 +243,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
         Dataflow::set_outputs(self, [branch_wire].into_iter().chain(outputs))
     }
     fn create(base: B, block_n: Node) -> Result<Self, BuildError> {
-        let block_op = base.get_optype(block_n).as_basic_block().unwrap();
+        let block_op = base.get_optype(block_n).as_dfb().unwrap();
         let signature = block_op.inner_signature();
         let inp_ex = base
             .as_ref()
@@ -269,7 +269,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
 }
 
 impl BlockBuilder<Hugr> {
-    /// Initialize a [`BasicBlock::DFB`] rooted HUGR builder
+    /// Initialize a [`DFB`] rooted HUGR builder
     pub fn new(
         inputs: impl Into<TypeRow>,
         input_extensions: impl Into<Option<ExtensionSet>>,
@@ -280,7 +280,7 @@ impl BlockBuilder<Hugr> {
         let inputs = inputs.into();
         let tuple_sum_rows: Vec<_> = tuple_sum_rows.into_iter().collect();
         let other_outputs = other_outputs.into();
-        let op = BasicBlock::DFB {
+        let op = DFB {
             inputs: inputs.clone(),
             other_outputs: other_outputs.clone(),
             tuple_sum_rows: tuple_sum_rows.clone(),

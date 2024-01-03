@@ -289,7 +289,7 @@ fn cfg_children_restrictions() {
     let block = b
         .add_node_with_parent(
             cfg,
-            ops::BasicBlock::DFB {
+            ops::DFB {
                 inputs: type_row![BOOL_T],
                 tuple_sum_rows: vec![type_row![]],
                 other_outputs: type_row![BOOL_T],
@@ -301,7 +301,7 @@ fn cfg_children_restrictions() {
     let exit = b
         .add_node_with_parent(
             cfg,
-            ops::BasicBlock::Exit {
+            ops::Exit {
                 cfg_outputs: type_row![BOOL_T],
             },
         )
@@ -315,7 +315,7 @@ fn cfg_children_restrictions() {
     let exit2 = b
         .add_node_after(
             exit,
-            ops::BasicBlock::Exit {
+            ops::Exit {
                 cfg_outputs: type_row![BOOL_T],
             },
         )
@@ -330,7 +330,7 @@ fn cfg_children_restrictions() {
     // Change the types in the BasicBlock node to work on qubits instead of bits
     b.replace_op(
         block,
-        NodeType::new_pure(ops::BasicBlock::DFB {
+        NodeType::new_pure(ops::DFB {
             inputs: type_row![Q],
             tuple_sum_rows: vec![type_row![]],
             other_outputs: type_row![Q],
