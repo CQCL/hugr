@@ -1191,7 +1191,19 @@ The new hugr is then derived as follows:
 
 ###### `Replace`
 
-This is the general subgraph-replacement method.
+This is the general subgraph-replacement method. Intuitively, it takes a set of
+sibling nodes to remove and replace with a new set of nodes. The new set of
+nodes is itself a HUGR with some "holes" (edges and nodes that get "filled in"
+by the `Replace` operation). To fully specify the operation, some further data
+are needed:
+
+  - The replacement may include container nodes with no children, which adopt
+    the children of removed container nodes and prevent those children being
+    removed.
+  - All new incoming edges from the retained nodes to the new nodes, all
+    outgoing edges from the new nodes to the retained nodes, and any new edges
+    that bypass the replacement (going between retained nodes) must be
+    specified.
 
 Given a set $S$ of nodes in a hugr, let $S^\*$ be the set of all nodes
 descended from nodes in $S$ (i.e. reachable from $S$ by following hierarchy edges),
@@ -1328,8 +1340,8 @@ successor.
 
 Insert an Order edge from `n0` to `n1` where `n0` and `n1` are distinct
 siblings in a DSG such that there is no path in the DSG from `n1` to
-`n0`. If there is already an order edge from `n0` to `n1` this does
-nothing (but is not an error).
+`n0`. (Thus acyclicity is preserved.) If there is already an order edge from
+`n0` to `n1` this does nothing (but is not an error).
 
 ###### `RemoveOrder`
 
@@ -1374,7 +1386,7 @@ nodes.
 
 The most basic case – replacing a convex set of Op nodes in a DSG with
 another graph of Op nodes having the same signature – is implemented by
-having T map everything to the parent node, and bot(G) is empty.
+`SimpleReplace`.
 
 If one of the nodes in the region is a complex container node that we
 wish to preserve in the replacement without doing a deep copy, we can
