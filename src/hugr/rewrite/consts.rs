@@ -6,7 +6,7 @@ use crate::{
     hugr::{HugrError, HugrMut},
     HugrView, Node,
 };
-#[rustversion::since(1.75)] // uses impl in return position
+
 use itertools::Itertools;
 use thiserror::Error;
 
@@ -33,7 +33,6 @@ pub enum RemoveConstIgnoreError {
     RemoveFail(#[from] HugrError),
 }
 
-#[rustversion::since(1.75)] // uses impl in return position
 impl Rewrite for RemoveConstIgnore {
     type Error = RemoveConstIgnoreError;
 
@@ -136,7 +135,6 @@ impl Rewrite for RemoveConst {
     }
 }
 
-#[rustversion::since(1.75)] // uses impl in return position
 #[cfg(test)]
 mod test {
     use super::*;
