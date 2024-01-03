@@ -103,7 +103,7 @@ impl<const DEF: bool> AliasID<DEF> {
 pub struct ConstID(Node);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
-/// Handle to a [BasicBlock](crate::ops::BasicBlock) node.
+/// Handle to a [DFB](crate::ops::DFB) or [Exit](crate::ops::Exit) node.
 pub struct BasicBlockID(Node);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]

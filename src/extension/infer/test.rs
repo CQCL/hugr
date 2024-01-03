@@ -461,7 +461,7 @@ fn make_block(
     let tuple_sum_type = Type::new_tuple_sum(tuple_sum_rows.clone());
     let dfb_sig = FunctionType::new(inputs.clone(), vec![tuple_sum_type])
         .with_extension_delta(&extension_delta.clone());
-    let dfb = ops::BasicBlock::DFB {
+    let dfb = ops::DFB {
         inputs,
         other_outputs: type_row![],
         tuple_sum_rows,
@@ -496,7 +496,7 @@ fn create_entry_exit(
     exit_types: impl Into<TypeRow>,
 ) -> Result<([Node; 3], Node), Box<dyn Error>> {
     let entry_tuple_sum = Type::new_tuple_sum(entry_variants.clone());
-    let dfb = ops::BasicBlock::DFB {
+    let dfb = ops::DFB {
         inputs: inputs.clone(),
         other_outputs: type_row![],
         tuple_sum_rows: entry_variants,
@@ -505,7 +505,7 @@ fn create_entry_exit(
 
     let exit = hugr.add_node_with_parent(
         root,
-        ops::BasicBlock::Exit {
+        ops::Exit {
             cfg_outputs: exit_types.into(),
         },
     )?;

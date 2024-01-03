@@ -12,7 +12,8 @@ use thiserror::Error;
 
 use crate::types::{FunctionType, Type, TypeRow};
 
-use super::{impl_validate_op, BasicBlock, OpTag, OpTrait, OpType, ValidateOp};
+use super::controlflow::BasicBlock;
+use super::{impl_validate_op, Exit, OpTag, OpTrait, OpType, ValidateOp, DFB};
 
 /// A set of property flags required for an operation.
 #[non_exhaustive]
@@ -285,21 +286,16 @@ pub struct ChildrenEdgeData {
     /// Target port.
     pub target_port: PortOffset,
 }
-
-impl ValidateOp for BasicBlock {
+impl ValidateOp for DFB {
     /// Returns the set of allowed parent operation types.
     fn validity_flags(&self) -> OpValidityFlags {
-        match self {
-            BasicBlock::DFB { .. } => OpValidityFlags {
-                allowed_children: OpTag::DataflowChild,
-                allowed_first_child: OpTag::Input,
-                allowed_second_child: OpTag::Output,
-                requires_children: true,
-                requires_dag: true,
-                ..Default::default()
-            },
-            // Default flags are valid for non-container operations
-            BasicBlock::Exit { .. } => Default::default(),
+        OpValidityFlags {
+            allowed_children: OpTag::DataflowChild,
+            allowed_first_child: OpTag::Input,
+            allowed_second_child: OpTag::Output,
+            requires_children: true,
+            requires_dag: true,
+            ..Default::default()
         }
     }
 
@@ -308,20 +304,26 @@ impl ValidateOp for BasicBlock {
         &self,
         children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
     ) -> Result<(), ChildrenValidationError> {
-        match self {
-            BasicBlock::DFB {
-                inputs,
-                tuple_sum_rows: tuple_sum_variants,
-                other_outputs: outputs,
-                extension_delta: _,
-            } => {
-                let tuple_sum_type = Type::new_tuple_sum(tuple_sum_variants.clone());
-                let node_outputs: TypeRow = [&[tuple_sum_type], outputs.as_ref()].concat().into();
-                validate_io_nodes(inputs, &node_outputs, "basic block graph", children)
-            }
-            // Exit nodes do not have children
-            BasicBlock::Exit { .. } => Ok(()),
-        }
+        let tuple_sum_type = Type::new_tuple_sum(self.tuple_sum_rows.clone());
+        let node_outputs: TypeRow = [&[tuple_sum_type], self.other_outputs.as_ref()]
+            .concat()
+            .into();
+        validate_io_nodes(&self.inputs, &node_outputs, "basic block graph", children)
+    }
+}
+
+impl ValidateOp for Exit {
+    /// Returns the set of allowed parent operation types.
+    fn validity_flags(&self) -> OpValidityFlags {
+        Default::default()
+    }
+
+    /// Validate the ordered list of children.
+    fn validate_op_children<'a>(
+        &self,
+        _children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
+    ) -> Result<(), ChildrenValidationError> {
+        Ok(())
     }
 }
 
@@ -412,14 +414,18 @@ fn validate_io_nodes<'a>(
 
 /// Validate an edge between two basic blocks in a CFG sibling graph.
 fn validate_cfg_edge(edge: ChildrenEdgeData) -> Result<(), EdgeValidationError> {
-    let [source, target]: [&BasicBlock; 2] = [&edge.source_op, &edge.target_op].map(|op| {
-        let block_op = op
-            .as_basic_block()
-            .expect("CFG sibling graphs can only contain basic block operations.");
-        block_op
-    });
+    let source = &edge
+        .source_op
+        .as_dfb()
+        .expect("CFG sibling graphs can only contain basic block operations.");
 
-    if source.successor_input(edge.source_port.index()).as_ref() != Some(target.dataflow_input()) {
+    let target_input = match &edge.target_op {
+        OpType::DFB(dfb) => dfb.dataflow_input(),
+        OpType::Exit(exit) => exit.dataflow_input(),
+        _ => panic!("CFG sibling graphs can only contain basic block operations."),
+    };
+
+    if source.successor_input(edge.source_port.index()).as_ref() != Some(target_input) {
         return Err(EdgeValidationError::CFGEdgeSignatureMismatch { edge });
     }
 

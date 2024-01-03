@@ -449,7 +449,7 @@ mod test {
     use crate::ops::custom::{ExternalOp, OpaqueOp};
     use crate::ops::dataflow::DataflowOpTrait;
     use crate::ops::handle::{BasicBlockID, ConstID, NodeHandle};
-    use crate::ops::{self, BasicBlock, Case, LeafOp, OpTag, OpType, DFG};
+    use crate::ops::{self, Case, LeafOp, OpTag, OpType, DFB, DFG};
     use crate::std_extensions::collections;
     use crate::types::{FunctionType, Type, TypeArg, TypeRow};
     use crate::{type_row, Direction, Hugr, HugrView, OutgoingPort};
@@ -504,14 +504,8 @@ mod test {
             let popp = h.get_parent(pop).unwrap();
             let pushp = h.get_parent(push).unwrap();
             assert_ne!(popp, pushp); // Two different BBs
-            assert!(matches!(
-                h.get_optype(popp),
-                OpType::BasicBlock(BasicBlock::DFB { .. })
-            ));
-            assert!(matches!(
-                h.get_optype(pushp),
-                OpType::BasicBlock(BasicBlock::DFB { .. })
-            ));
+            assert!(h.get_optype(popp).is_dfb());
+            assert!(h.get_optype(pushp).is_dfb());
 
             assert_eq!(h.get_parent(popp).unwrap(), h.get_parent(pushp).unwrap());
         }
@@ -523,7 +517,7 @@ mod test {
         }));
         let r_bb = replacement.add_node_with_parent(
             replacement.root(),
-            BasicBlock::DFB {
+            DFB {
                 inputs: vec![listy.clone()].into(),
                 tuple_sum_rows: vec![type_row![]],
                 other_outputs: vec![listy.clone()].into(),
@@ -596,10 +590,7 @@ mod test {
 
             let grandp = h.get_parent(popp).unwrap();
             assert_eq!(grandp, h.get_parent(pushp).unwrap());
-            assert!(matches!(
-                h.get_optype(grandp),
-                OpType::BasicBlock(BasicBlock::DFB { .. })
-            ));
+            assert!(h.get_optype(grandp).is_dfb());
         }
 
         Ok(())
