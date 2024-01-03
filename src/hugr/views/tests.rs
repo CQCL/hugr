@@ -69,7 +69,6 @@ fn dot_string(sample_hugr: (Hugr, BuildHandle<DataflowOpID>, BuildHandle<Dataflo
     insta::assert_yaml_snapshot!(h.dot_string());
 }
 
-#[rustversion::since(1.75)] // uses impl in return position
 #[rstest]
 fn all_ports(sample_hugr: (Hugr, BuildHandle<DataflowOpID>, BuildHandle<DataflowOpID>)) {
     use itertools::Itertools;
@@ -97,7 +96,6 @@ fn all_ports(sample_hugr: (Hugr, BuildHandle<DataflowOpID>, BuildHandle<Dataflow
     );
 }
 
-#[rustversion::since(1.75)] // uses impl in return position
 #[test]
 fn value_types() {
     use crate::builder::Container;
@@ -129,7 +127,6 @@ fn value_types() {
     assert_eq!(&out_types[..], &[(0.into(), BOOL_T), (1.into(), QB_T)]);
 }
 
-#[rustversion::since(1.75)] // uses impl in return position
 #[test]
 fn static_targets() {
     use crate::extension::{
@@ -157,7 +154,6 @@ fn static_targets() {
     )
 }
 
-#[rustversion::since(1.75)] // uses impl in return position
 #[test]
 fn test_dataflow_ports_only() {
     use crate::builder::DataflowSubContainer;
