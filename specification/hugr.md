@@ -267,19 +267,13 @@ the following basic dataflow operations are available (in addition to the
 
   - `Input/Output`: input/output nodes, the outputs of `Input` node are
     the inputs to the function, and the inputs to `Output` are the
-    outputs of the function. In a data dependency subgraph, a valid
-    ordering of operations can be achieved by topologically sorting the
-    nodes starting from `Input` with respect to the Value and Order
-    edges.
+    outputs of the function.
   - `Call`: Call a statically defined function. There is an incoming
     `Static<Function>` edge to specify the graph being called. The
     signature of the node (defined by its incoming and outgoing `Value` edges) matches the function being called.
   - `LoadConstant<T>`: has an incoming `Static<T>` edge, where `T` is a `CopyableType`, and a
     `Value<Local,T>` output, used to load a static constant into the local
-    dataflow graph. They also have an incoming `Order` edge connecting
-    them to the `Input` node, as should all operations that
-    take no dataflow input, to ensure they lie in the causal cone of the
-    `Input` node when traversing.
+    dataflow graph.
   - `identity<T>`: pass-through, no operation is performed.
   - `DFG`: A nested dataflow graph.
     These nodes are parents in the hierarchy.
@@ -515,10 +509,11 @@ graph:
 cycles. The common parent is a CFG-node.
 
 **Dataflow Sibling Graph (DSG)**: nodes are operations, `CFG`,
-`Conditional`, `TailLoop` and `DFG` nodes; edges are `Value`, `Order` and `Static`;
-and must be acyclic. There is a unique Input node and Output node. All nodes must be
-reachable from the Input node, and must reach the Output node. The common parent
-may be a `FuncDefn`, `TailLoop`, `DFG`, `Case` or `DFB` node.
+`Conditional`, `TailLoop` and `DFG` nodes; edges are `Value`, `Order` and `Static`, and must be acyclic.
+(Thus a valid ordering of operations can be achieved by topologically sorting the
+nodes.)
+There is a unique Input node and Output node.
+The common parent may be a `FuncDefn`, `TailLoop`, `DFG`, `Case` or `DFB` node.
 
 | **Edge Kind**  | **Locality** |
 | -------------- | ------------ |
@@ -1191,7 +1186,19 @@ The new hugr is then derived as follows:
 
 ###### `Replace`
 
-This is the general subgraph-replacement method.
+This is the general subgraph-replacement method. Intuitively, it takes a set of
+sibling nodes to remove and replace with a new set of nodes. The new set of
+nodes is itself a HUGR with some "holes" (edges and nodes that get "filled in"
+by the `Replace` operation). To fully specify the operation, some further data
+are needed:
+
+  - The replacement may include container nodes with no children, which adopt
+    the children of removed container nodes and prevent those children being
+    removed.
+  - All new incoming edges from the retained nodes to the new nodes, all
+    outgoing edges from the new nodes to the retained nodes, and any new edges
+    that bypass the replacement (going between retained nodes) must be
+    specified.
 
 Given a set $S$ of nodes in a hugr, let $S^\*$ be the set of all nodes
 descended from nodes in $S$ (i.e. reachable from $S$ by following hierarchy edges),
@@ -1234,7 +1241,9 @@ Note that considering all three $\mu$ lists together,
    - the `TgtNode` + `TgtPos`s of all `NewEdgeSpec`s with `EdgeKind` == `Value` will be unique
    - and similarly for `EdgeKind` == `Static`
 
-The well-formedness requirements of Hugr imply that $\mu\_\textrm{inp}$ and $\mu\_\textrm{out}$ may only contain `NewEdgeSpec`s with certain `EdgeKind`s, depending on $P$:
+The well-formedness requirements of Hugr imply that $\mu\_\textrm{inp}$,
+$\mu\_\textrm{out}$ and $\mu\_\textrm{new}$ may only contain `NewEdgeSpec`s with
+certain `EdgeKind`s, depending on $P$:
    - if $P$ is a dataflow container, `EdgeKind`s may be `Order`, `Value` or `Static` only (no `ControlFlow`)
    - if $P$ is a CFG node, `EdgeKind`s may be `ControlFlow`, `Value`, or `Static` only (no `Order`)
    - if $P$ is a Module node, there may be `Value` or `Static` only (no `Order`).
@@ -1262,7 +1271,8 @@ The new hugr is then derived as follows:
 6.  For each node $(n, b = B(n))$ and for each child $m$ of $b$, replace the
     hierarchy edge from $b$ to $m$ with a hierarchy edge from the new copy of
     $n$ to $m$ (preserving the order).
-7.  Remove all nodes in $R$ and edges adjoining them.
+7.  Remove all nodes in $R$ and edges adjoining them. (Reindexing may be
+    necessary after this step.)
 
 ##### Outlining methods
 
@@ -1325,8 +1335,8 @@ successor.
 
 Insert an Order edge from `n0` to `n1` where `n0` and `n1` are distinct
 siblings in a DSG such that there is no path in the DSG from `n1` to
-`n0`. If there is already an order edge from `n0` to `n1` this does
-nothing (but is not an error).
+`n0`. (Thus acyclicity is preserved.) If there is already an order edge from
+`n0` to `n1` this does nothing (but is not an error).
 
 ###### `RemoveOrder`
 
@@ -1340,8 +1350,7 @@ remove it. (If there is an non-local edge from `n0` to a descendent of
 
 Given a `Const<T>` node `c`, and optionally `P`, a parent of a DSG, add a new
 `LoadConstant<T>` node `n` as a child of `P` with a `Static<T>` edge
-from `c` to `n` and no outgoing edges from `n`. Also add an Order edge
-from the Input node under `P` to `n`. Return the ID of `n`. If `P` is
+from `c` to `n` and no outgoing edges from `n`.  Return the ID of `n`. If `P` is
 omitted it defaults to the parent of `c` (in this case said `c` will
 have to be in a DSG or CSG rather than under the Module Root.) If `P` is
 provided, it must be a descendent of the parent of `c`.
@@ -1349,7 +1358,7 @@ provided, it must be a descendent of the parent of `c`.
 ###### `RemoveConstIgnore`
 
 Given a `LoadConstant<T>` node `n` that has no outgoing edges, remove
-it (and its incoming value and Order edges) from the hugr.
+it (and its incoming Static edge and any Order edges) from the hugr.
 
 ##### Insertion and removal of const nodes
 
@@ -1371,7 +1380,7 @@ nodes.
 
 The most basic case – replacing a convex set of Op nodes in a DSG with
 another graph of Op nodes having the same signature – is implemented by
-having T map everything to the parent node, and bot(G) is empty.
+`SimpleReplace`.
 
 If one of the nodes in the region is a complex container node that we
 wish to preserve in the replacement without doing a deep copy, we can

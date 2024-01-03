@@ -25,11 +25,11 @@ use portgraph::{multiportgraph, LinkView, MultiPortGraph, PortView};
 use super::{Hugr, HugrError, NodeMetadata, NodeMetadataMap, NodeType, DEFAULT_NODETYPE};
 use crate::ops::handle::NodeHandle;
 use crate::ops::{FuncDecl, FuncDefn, OpName, OpTag, OpTrait, OpType, DFG};
-#[rustversion::since(1.75)] // uses impl in return position
+
 use crate::types::Type;
 use crate::types::{EdgeKind, FunctionType, PolyFuncType};
 use crate::{Direction, IncomingPort, Node, OutgoingPort, Port};
-#[rustversion::since(1.75)] // uses impl in return position
+
 use itertools::Either;
 
 /// A trait for inspecting HUGRs.
@@ -183,7 +183,6 @@ pub trait HugrView: sealed::HugrInternals {
     /// Iterator over the nodes and ports connected to a port.
     fn linked_ports(&self, node: Node, port: impl Into<Port>) -> Self::PortLinks<'_>;
 
-    #[rustversion::since(1.75)] // uses impl in return position
     /// Iterator over all the nodes and ports connected to a node in a given direction.
     fn all_linked_ports(
         &self,
@@ -205,7 +204,6 @@ pub trait HugrView: sealed::HugrInternals {
         }
     }
 
-    #[rustversion::since(1.75)] // uses impl in return position
     /// Iterator over all the nodes and ports connected to a node's inputs.
     fn all_linked_outputs(&self, node: Node) -> impl Iterator<Item = (Node, OutgoingPort)> {
         self.all_linked_ports(node, Direction::Incoming)
@@ -213,7 +211,6 @@ pub trait HugrView: sealed::HugrInternals {
             .unwrap()
     }
 
-    #[rustversion::since(1.75)] // uses impl in return position
     /// Iterator over all the nodes and ports connected to a node's outputs.
     fn all_linked_inputs(&self, node: Node) -> impl Iterator<Item = (Node, IncomingPort)> {
         self.all_linked_ports(node, Direction::Outgoing)
@@ -411,7 +408,6 @@ pub trait HugrView: sealed::HugrInternals {
             .map(|(n, _)| n)
     }
 
-    #[rustversion::since(1.75)] // uses impl in return position
     /// If a node has a static output, return the targets.
     fn static_targets(&self, node: Node) -> Option<impl Iterator<Item = (Node, IncomingPort)>> {
         Some(self.linked_inputs(node, self.get_optype(node).static_output_port()?))
@@ -423,7 +419,6 @@ pub trait HugrView: sealed::HugrInternals {
         self.get_optype(node).dataflow_signature()
     }
 
-    #[rustversion::since(1.75)] // uses impl in return position
     /// Iterator over all outgoing ports that have Value type, along
     /// with corresponding types.
     fn value_types(&self, node: Node, dir: Direction) -> impl Iterator<Item = (Port, Type)> {
@@ -432,7 +427,6 @@ pub trait HugrView: sealed::HugrInternals {
             .flat_map(move |port| sig.port_type(port).map(|typ| (port, typ.clone())))
     }
 
-    #[rustversion::since(1.75)] // uses impl in return position
     /// Iterator over all incoming ports that have Value type, along
     /// with corresponding types.
     fn in_value_types(&self, node: Node) -> impl Iterator<Item = (IncomingPort, Type)> {
@@ -440,7 +434,6 @@ pub trait HugrView: sealed::HugrInternals {
             .map(|(p, t)| (p.as_incoming().unwrap(), t))
     }
 
-    #[rustversion::since(1.75)] // uses impl in return position
     /// Iterator over all incoming ports that have Value type, along
     /// with corresponding types.
     fn out_value_types(&self, node: Node) -> impl Iterator<Item = (OutgoingPort, Type)> {
@@ -618,7 +611,6 @@ impl<T: AsRef<Hugr>> HugrView for T {
     }
 }
 
-#[rustversion::since(1.75)] // uses impl in return position
 /// Trait implementing methods on port iterators.
 pub trait PortIterator<P>: Iterator<Item = (Node, P)>
 where
@@ -636,7 +628,7 @@ where
         })
     }
 }
-#[rustversion::since(1.75)] // uses impl in return position
+
 impl<I, P> PortIterator<P> for I
 where
     I: Iterator<Item = (Node, P)>,
