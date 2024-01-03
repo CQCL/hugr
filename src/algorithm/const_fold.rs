@@ -217,6 +217,7 @@ pub fn constant_fold_pass(h: &mut impl HugrMut, reg: &ExtensionRegistry) {
 #[cfg(test)]
 mod test {
 
+    use super::*;
     use crate::extension::prelude::sum_with_error;
     use crate::extension::{ExtensionRegistry, PRELUDE};
     use crate::std_extensions::arithmetic;
@@ -224,8 +225,7 @@ mod test {
     use crate::std_extensions::arithmetic::float_ops::FloatOps;
     use crate::std_extensions::arithmetic::float_types::{ConstF64, FLOAT64_TYPE};
     use crate::std_extensions::arithmetic::int_types::{ConstIntU, INT_TYPES};
-
-    use super::*;
+    use rstest::rstest;
 
     /// int to constant
     fn i2c(b: u64) -> Const {
@@ -241,6 +241,18 @@ mod test {
         ConstF64::new(f).into()
     }
 
+    #[rstest]
+    #[case(0.0, 0.0, 0.0)]
+    #[case(0.0, 1.0, 1.0)]
+    #[case(23.5, 435.5, 459.0)]
+    // c = a + b
+    fn test_add(#[case] a: f64, #[case] b: f64, #[case] c: f64) {
+        let consts = vec![(0.into(), f2c(a)), (1.into(), f2c(b))];
+        let add_op: OpType = FloatOps::fadd.into();
+        let out = fold_const(&add_op, &consts).unwrap();
+
+        assert_eq!(&out[..], &[(0.into(), f2c(c))]);
+    }
     #[test]
     fn test_big() {
         /*
