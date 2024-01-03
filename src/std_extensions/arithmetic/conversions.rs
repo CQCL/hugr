@@ -19,6 +19,7 @@ use crate::{
 use super::int_types::int_tv;
 use super::{float_types::FLOAT64_TYPE, int_types::LOG_WIDTH_TYPE_PARAM};
 use lazy_static::lazy_static;
+mod const_fold;
 /// The extension identifier.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.conversions");
 
@@ -63,8 +64,21 @@ impl MakeOpDef for ConvertOpDef {
         }
         .to_string()
     }
+
+    fn post_opdef(&self, def: &mut OpDef) {
+        const_fold::set_fold(self, def)
+    }
 }
 
+impl ConvertOpDef {
+    /// Initialise a conversion op with an integer log width type argument.
+    pub fn with_width(self, log_width: u8) -> ConvertOpType {
+        ConvertOpType {
+            def: self,
+            log_width: log_width as u64,
+        }
+    }
+}
 /// Concrete convert operation with integer width set.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ConvertOpType {
