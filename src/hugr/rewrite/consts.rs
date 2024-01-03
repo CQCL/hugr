@@ -16,11 +16,11 @@ use super::Rewrite;
 #[derive(Debug, Clone)]
 pub struct RemoveConstIgnore(pub Node);
 
-/// Error from an [`RemoveConstIgnore`] operation.
+/// Error from an [`RemoveConst`] or [`RemoveConstIgnore`] operation.
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
-pub enum RemoveConstIgnoreError {
+pub enum RemoveError {
     /// Invalid node.
-    #[error("Node is invalid (either not in HUGR or not LoadConstant).")]
+    #[error("Node is invalid (either not in HUGR or not correct operation).")]
     InvalidNode(Node),
     /// Node in use.
     #[error("Node: {0:?} has non-zero outgoing connections.")]
@@ -31,7 +31,7 @@ pub enum RemoveConstIgnoreError {
 }
 
 impl Rewrite for RemoveConstIgnore {
-    type Error = RemoveConstIgnoreError;
+    type Error = RemoveError;
 
     // The Const node the LoadConstant was connected to.
     type ApplyResult = Node;
@@ -44,14 +44,14 @@ impl Rewrite for RemoveConstIgnore {
         let node = self.0;
 
         if (!h.contains_node(node)) || (!h.get_optype(node).is_load_constant()) {
-            return Err(RemoveConstIgnoreError::InvalidNode(node));
+            return Err(RemoveError::InvalidNode(node));
         }
 
         if h.out_value_types(node)
             .next()
             .is_some_and(|(p, _)| h.linked_inputs(node, p).next().is_some())
         {
-            return Err(RemoveConstIgnoreError::ValueUsed(node));
+            return Err(RemoveError::ValueUsed(node));
         }
 
         Ok(())
@@ -79,22 +79,8 @@ impl Rewrite for RemoveConstIgnore {
 #[derive(Debug, Clone)]
 pub struct RemoveConst(pub Node);
 
-/// Error from an [`RemoveConst`] operation.
-#[derive(Debug, Clone, Error, PartialEq, Eq)]
-pub enum RemoveConstError {
-    /// Invalid node.
-    #[error("Node is invalid (either not in HUGR or not Const).")]
-    InvalidNode(Node),
-    /// Node in use.
-    #[error("Node: {0:?} has non-zero outgoing connections.")]
-    ValueUsed(Node),
-    /// Removal error
-    #[error("Removing node caused error: {0:?}.")]
-    RemoveFail(#[from] HugrError),
-}
-
 impl Rewrite for RemoveConst {
-    type Error = RemoveConstError;
+    type Error = RemoveError;
 
     // The parent of the Const node.
     type ApplyResult = Node;
@@ -107,11 +93,11 @@ impl Rewrite for RemoveConst {
         let node = self.0;
 
         if (!h.contains_node(node)) || (!h.get_optype(node).is_const()) {
-            return Err(RemoveConstError::InvalidNode(node));
+            return Err(RemoveError::InvalidNode(node));
         }
 
         if h.output_neighbours(node).next().is_some() {
-            return Err(RemoveConstError::ValueUsed(node));
+            return Err(RemoveError::ValueUsed(node));
         }
 
         Ok(())
@@ -171,12 +157,12 @@ mod test {
         // can't remove invalid node
         assert_eq!(
             h.apply_rewrite(RemoveConst(tup_node)),
-            Err(RemoveConstError::InvalidNode(tup_node))
+            Err(RemoveError::InvalidNode(tup_node))
         );
 
         assert_eq!(
             h.apply_rewrite(RemoveConstIgnore(tup_node)),
-            Err(RemoveConstIgnoreError::InvalidNode(tup_node))
+            Err(RemoveError::InvalidNode(tup_node))
         );
         let load_1_node = load_1.node();
         let load_2_node = load_2.node();
@@ -199,7 +185,7 @@ mod test {
         // can't remove nodes in use
         assert_eq!(
             h.apply_rewrite(remove_1.clone()),
-            Err(RemoveConstIgnoreError::ValueUsed(load_1_node))
+            Err(RemoveError::ValueUsed(load_1_node))
         );
 
         // remove the use
@@ -212,7 +198,7 @@ mod test {
         // still can't remove const, in use by second load
         assert_eq!(
             h.apply_rewrite(remove_con.clone()),
-            Err(RemoveConstError::ValueUsed(con_node))
+            Err(RemoveError::ValueUsed(con_node))
         );
 
         // remove second use
