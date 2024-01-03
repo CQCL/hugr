@@ -40,7 +40,7 @@ impl std::ops::Deref for ConstF64 {
 
 impl ConstF64 {
     /// Create a new [`ConstF64`]
-    pub const fn new(value: f64) -> Self {
+    pub fn new(value: f64) -> Self {
         Self { value }
     }
 

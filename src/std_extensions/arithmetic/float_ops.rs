@@ -14,7 +14,7 @@ use crate::{
     Extension,
 };
 use lazy_static::lazy_static;
-mod fold;
+
 /// The extension identifier.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.float");
 
@@ -81,10 +81,6 @@ impl MakeOpDef for FloatOps {
             fceil => "ceiling",
         }
         .to_string()
-    }
-
-    fn post_opdef(&self, def: &mut OpDef) {
-        fold::set_fold(self, def)
     }
 }
 

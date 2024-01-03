@@ -8,7 +8,6 @@ use crate::{
         prelude::sum_with_error,
         simple_op::{MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError},
         ExtensionId, ExtensionRegistry, ExtensionSet, OpDef, SignatureError, SignatureFunc,
-        PRELUDE,
     },
     ops::{custom::ExtensionOp, OpName},
     type_row,
@@ -19,6 +18,7 @@ use crate::{
 use super::int_types::int_tv;
 use super::{float_types::FLOAT64_TYPE, int_types::LOG_WIDTH_TYPE_PARAM};
 use lazy_static::lazy_static;
+
 /// The extension identifier.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.conversions");
 
@@ -69,7 +69,7 @@ impl MakeOpDef for ConvertOpDef {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ConvertOpType {
     def: ConvertOpDef,
-    log_width: u64,
+    width: u64,
 }
 
 impl OpName for ConvertOpType {
@@ -85,14 +85,11 @@ impl MakeExtensionOp for ConvertOpType {
             [TypeArg::BoundedNat { n }] => n,
             _ => return Err(SignatureError::InvalidTypeArgs.into()),
         };
-        Ok(Self {
-            def,
-            log_width: width,
-        })
+        Ok(Self { def, width })
     }
 
     fn type_args(&self) -> Vec<crate::types::TypeArg> {
-        vec![TypeArg::BoundedNat { n: self.log_width }]
+        vec![TypeArg::BoundedNat { n: self.width }]
     }
 }
 
@@ -114,7 +111,6 @@ lazy_static! {
 
     /// Registry of extensions required to validate integer operations.
     pub static ref CONVERT_OPS_REGISTRY: ExtensionRegistry  = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
         super::int_types::EXTENSION.to_owned(),
         super::float_types::EXTENSION.to_owned(),
         EXTENSION.to_owned(),

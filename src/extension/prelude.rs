@@ -137,11 +137,12 @@ pub fn new_array_op(element_ty: Type, size: u64) -> LeafOp {
         .into()
 }
 
-/// The custom type for Errors.
-pub const ERROR_CUSTOM_TYPE: CustomType =
-    CustomType::new_simple(ERROR_TYPE_NAME, PRELUDE_ID, TypeBound::Eq);
 /// Unspecified opaque error type.
-pub const ERROR_TYPE: Type = Type::new_extension(ERROR_CUSTOM_TYPE);
+pub const ERROR_TYPE: Type = Type::new_extension(CustomType::new_simple(
+    ERROR_TYPE_NAME,
+    PRELUDE_ID,
+    TypeBound::Eq,
+));
 
 /// The string name of the error type.
 pub const ERROR_TYPE_NAME: SmolStr = SmolStr::new_inline("error");
@@ -190,48 +191,6 @@ impl KnownTypeConst for ConstUsize {
     const TYPE: CustomType = USIZE_CUSTOM_T;
 }
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-/// Structure for holding constant usize values.
-pub struct ConstError {
-    /// Integer tag/signal for the error.
-    pub signal: u32,
-    /// Error message.
-    pub message: String,
-}
-
-impl ConstError {
-    /// Define a new error value.
-    pub fn new(signal: u32, message: impl ToString) -> Self {
-        Self {
-            signal,
-            message: message.to_string(),
-        }
-    }
-}
-
-#[typetag::serde]
-impl CustomConst for ConstError {
-    fn name(&self) -> SmolStr {
-        format!("ConstError({:?}, {:?})", self.signal, self.message).into()
-    }
-
-    fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
-        self.check_known_type(typ)
-    }
-
-    fn equal_consts(&self, other: &dyn CustomConst) -> bool {
-        crate::values::downcast_equal_consts(self, other)
-    }
-
-    fn extension_reqs(&self) -> ExtensionSet {
-        ExtensionSet::singleton(&PRELUDE_ID)
-    }
-}
-
-impl KnownTypeConst for ConstError {
-    const TYPE: CustomType = ERROR_CUSTOM_TYPE;
-}
-
 #[cfg(test)]
 mod test {
     use crate::{
@@ -260,7 +219,7 @@ mod test {
     }
 
     #[test]
-    /// test the prelude error type.
+    /// Test building a HUGR involving a new_array operation.
     fn test_error_type() {
         let ext_def = PRELUDE
             .get_type(&ERROR_TYPE_NAME)
@@ -270,18 +229,5 @@ mod test {
 
         let ext_type = Type::new_extension(ext_def);
         assert_eq!(ext_type, ERROR_TYPE);
-
-        let error_val = ConstError::new(2, "my message");
-
-        assert_eq!(error_val.name(), "ConstError(2, \"my message\")");
-
-        assert!(error_val.check_custom_type(&ERROR_CUSTOM_TYPE).is_ok());
-
-        assert_eq!(
-            error_val.extension_reqs(),
-            ExtensionSet::singleton(&PRELUDE_ID)
-        );
-        assert!(error_val.equal_consts(&ConstError::new(2, "my message")));
-        assert!(!error_val.equal_consts(&ConstError::new(3, "my message")));
     }
 }

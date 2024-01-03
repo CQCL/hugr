@@ -11,7 +11,6 @@ use crate::ops::OpName;
 use crate::type_row;
 use crate::types::{FunctionType, PolyFuncType};
 use crate::utils::collect_array;
-
 use crate::{
     extension::{ExtensionId, ExtensionSet, SignatureError},
     types::{type_param::TypeArg, Type, TypeRow},

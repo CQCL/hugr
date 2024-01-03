@@ -4,11 +4,11 @@ use smol_str::SmolStr;
 use std::sync::Arc;
 use thiserror::Error;
 
-use crate::extension::{ConstFoldResult, ExtensionId, ExtensionRegistry, OpDef, SignatureError};
+use crate::extension::{ExtensionId, ExtensionRegistry, OpDef, SignatureError};
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::hugr::{HugrView, NodeType};
 use crate::types::{type_param::TypeArg, FunctionType};
-use crate::{ops, Hugr, IncomingPort, Node};
+use crate::{Hugr, Node};
 
 use super::dataflow::DataflowOpTrait;
 use super::tag::OpTag;
@@ -136,11 +136,6 @@ impl ExtensionOp {
     /// Returns a reference to the [`OpDef`] of this [`ExtensionOp`].
     pub fn def(&self) -> &OpDef {
         self.def.as_ref()
-    }
-
-    /// Attempt to evaluate this operation. See [`OpDef::constant_fold`].
-    pub fn constant_fold(&self, consts: &[(IncomingPort, ops::Const)]) -> ConstFoldResult {
-        self.def().constant_fold(self.args(), consts)
     }
 }
 
