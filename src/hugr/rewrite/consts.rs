@@ -45,11 +45,12 @@ impl Rewrite for RemoveConstIgnore {
         if (!h.contains_node(node)) || (!h.get_optype(node).is_load_constant()) {
             return Err(RemoveError::InvalidNode(node));
         }
-
-        if h.out_value_types(node)
-            .next()
-            .is_some_and(|(p, _)| h.linked_inputs(node, p).next().is_some())
-        {
+        let (p, _) = h
+            .out_value_types(node)
+            .exactly_one()
+            .ok()
+            .expect("LoadConstant has only one output.");
+        if h.linked_inputs(node, p).next().is_some() {
             return Err(RemoveError::ValueUsed(node));
         }
 
