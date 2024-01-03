@@ -6,7 +6,6 @@ use crate::{
     hugr::{HugrError, HugrMut},
     HugrView, Node,
 };
-
 use itertools::Itertools;
 use thiserror::Error;
 
