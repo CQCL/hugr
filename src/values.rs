@@ -10,6 +10,7 @@ use smol_str::SmolStr;
 
 use crate::extension::ExtensionSet;
 use crate::macros::impl_box_clone;
+
 use crate::{Hugr, HugrView};
 
 use crate::types::{CustomCheckFailure, CustomType};
