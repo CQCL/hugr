@@ -12,7 +12,7 @@ use thiserror::Error;
 
 use super::Rewrite;
 
-/// Remove a [`crate::ops::LoadConstant`] node with no outputs.
+/// Remove a [`crate::ops::LoadConstant`] node with no consumers.
 #[derive(Debug, Clone)]
 pub struct RemoveConstIgnore(pub Node);
 
@@ -20,7 +20,7 @@ pub struct RemoveConstIgnore(pub Node);
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
 pub enum RemoveConstIgnoreError {
     /// Invalid node.
-    #[error("Node is invalid (either not in HUGR or not LoadConst).")]
+    #[error("Node is invalid (either not in HUGR or not LoadConstant).")]
     InvalidNode(Node),
     /// Node in use.
     #[error("Node: {0:?} has non-zero outgoing connections.")]
@@ -122,12 +122,12 @@ impl Rewrite for RemoveConst {
     fn apply(self, h: &mut impl HugrMut) -> Result<Self::ApplyResult, Self::Error> {
         self.verify(h)?;
         let node = self.0;
-        let source = h
+        let parent = h
             .get_parent(node)
             .expect("Const node without a parent shouldn't happen.");
         h.remove_node(node)?;
 
-        Ok(source)
+        Ok(parent)
     }
 
     fn invalidation_set(&self) -> Self::InvalidationSet<'_> {
@@ -167,6 +167,7 @@ mod test {
         dfg_build.finish_sub_container()?;
 
         let mut h = build.finish_prelude_hugr()?;
+        // nodes are Module, Function, Input, Output, Const, LoadConstant*2, MakeTuple
         assert_eq!(h.node_count(), 8);
         let tup_node = tup.node();
         // can't remove invalid node
