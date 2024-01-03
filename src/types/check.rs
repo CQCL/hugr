@@ -58,10 +58,8 @@ fn check_ts(v: &Hugr, t: &PolyFuncType) -> bool {
     {
         signature == t
     } else {
-        v.get_function_type().is_some_and(|ft| {
-            let value_ts: PolyFuncType = ft.into();
-            &value_ts == t
-        })
+        v.get_function_type()
+            .is_some_and(|ft| &PolyFuncType::from(ft) == t)
     }
 }
 
