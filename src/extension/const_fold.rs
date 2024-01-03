@@ -31,12 +31,6 @@ impl Debug for Box<dyn ConstFold> {
     }
 }
 
-impl Default for Box<dyn ConstFold> {
-    fn default() -> Self {
-        Box::new(|&_: &_| None)
-    }
-}
-
 /// Blanket implementation for functions that only require the constants to
 /// evaluate - type arguments are not relevant.
 impl<T> ConstFold for T

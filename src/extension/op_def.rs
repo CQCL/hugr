@@ -311,7 +311,7 @@ pub struct OpDef {
 
     /// Operations can optionally implement [`ConstFold`] to implement constant folding.
     #[serde(skip)]
-    constant_folder: Box<dyn ConstFold>,
+    constant_folder: Option<Box<dyn ConstFold>>,
 }
 
 impl OpDef {
@@ -421,7 +421,7 @@ impl OpDef {
     /// Set the constant folding function for this Op, which can evaluate it
     /// given constant inputs.
     pub fn set_constant_folder(&mut self, fold: impl ConstFold + 'static) {
-        self.constant_folder = Box::new(fold)
+        self.constant_folder = Some(Box::new(fold))
     }
 
     /// Evaluate an instance of this [`OpDef`] defined by the `type_args`, given
@@ -431,7 +431,7 @@ impl OpDef {
         type_args: &[TypeArg],
         consts: &[(crate::IncomingPort, crate::ops::Const)],
     ) -> ConstFoldResult {
-        self.constant_folder.fold(type_args, consts)
+        (self.constant_folder.as_ref())?.fold(type_args, consts)
     }
 }
 
