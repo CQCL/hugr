@@ -309,6 +309,7 @@ pub struct OpDef {
     #[serde(flatten)]
     lower_funcs: Vec<LowerFunc>,
 
+    /// Operations can optionally implement [`ConstFold`] to implement constant folding.
     #[serde(skip)]
     constant_folder: Box<dyn ConstFold>,
 }
