@@ -312,20 +312,7 @@ impl ValidateOp for DFB {
     }
 }
 
-impl ValidateOp for Exit {
-    /// Returns the set of allowed parent operation types.
-    fn validity_flags(&self) -> OpValidityFlags {
-        Default::default()
-    }
-
-    /// Validate the ordered list of children.
-    fn validate_op_children<'a>(
-        &self,
-        _children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
-    ) -> Result<(), ChildrenValidationError> {
-        Ok(())
-    }
-}
+impl ValidateOp for Exit {}
 
 impl ValidateOp for super::Case {
     /// Returns the set of allowed parent operation types.
