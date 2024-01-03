@@ -25,9 +25,6 @@ pub enum RemoveConstIgnoreError {
     /// Node in use.
     #[error("Node: {0:?} has non-zero outgoing connections.")]
     ValueUsed(Node),
-    /// Not connected to a Const.
-    #[error("Node: {0:?} is not connected to a Const node.")]
-    NoConst(Node),
     /// Removal error
     #[error("Removing node caused error: {0:?}.")]
     RemoveFail(#[from] HugrError),
@@ -66,7 +63,8 @@ impl Rewrite for RemoveConstIgnore {
         let source = h
             .input_neighbours(node)
             .exactly_one()
-            .map_err(|_| RemoveConstIgnoreError::NoConst(node))?;
+            .ok()
+            .expect("Validation should check a Const is connected to LoadConstant.");
         h.remove_node(node)?;
 
         Ok(source)
