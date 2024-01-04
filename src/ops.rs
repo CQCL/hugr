@@ -10,7 +10,7 @@ pub mod module;
 pub mod tag;
 pub mod validate;
 use crate::extension::ExtensionSet;
-use crate::types::{EdgeKind, FunctionType, Type};
+use crate::types::{EdgeKind, FunctionType};
 use crate::{Direction, OutgoingPort, Port};
 use crate::{IncomingPort, PortIndex};
 use paste::paste;
@@ -109,11 +109,12 @@ impl Default for OpType {
 }
 
 impl OpType {
-    /// The edge kind for the non-dataflow or constant ports of the
-    /// operation, not described by the signature.
+    /// The edge kind for the non-dataflow ports of the operation, not described
+    /// by the signature.
     ///
-    /// If not None, a single extra multiport of that kind will be present on
-    /// the given direction.
+    /// If not None, a single extra port of that kind will be present on
+    /// the given direction after any dataflow or constant ports.
+    #[inline]
     pub fn other_port_kind(&self, dir: Direction) -> Option<EdgeKind> {
         match dir {
             Direction::Incoming => self.other_input(),
@@ -121,21 +122,46 @@ impl OpType {
         }
     }
 
+    /// The edge kind for the constant ports of the operation, not described by
+    /// the dataflow signature.
+    ///
+    /// If not None, an extra input port of that kind will be present on the
+    /// given direction after any dataflow ports and before any
+    /// [`OpType::other_port_kind`] ports.
+    #[inline]
+    pub fn static_port_kind(&self, dir: Direction) -> Option<EdgeKind> {
+        match dir {
+            Direction::Incoming => self.static_input(),
+            Direction::Outgoing => self.static_output(),
+        }
+    }
+
     /// Returns the edge kind for the given port.
+    ///
+    /// The result may be a value port, a static port, or a non-dataflow port.
+    /// See [`OpType::value_port_kind`], [`OpType::static_port_kind`], and
+    /// [`OpType::dataflow_signature`].
     pub fn port_kind(&self, port: impl Into<Port>) -> Option<EdgeKind> {
         let signature = self.dataflow_signature().unwrap_or_default();
         let port: Port = port.into();
-        let port_as_in = port.as_incoming().ok();
         let dir = port.direction();
-
         let port_count = signature.port_count(dir);
+
+        // Dataflow ports
         if port.index() < port_count {
-            signature.port_type(port).cloned().map(EdgeKind::Value)
-        } else if port_as_in.is_some() && port_as_in == self.static_input_port() {
-            Some(EdgeKind::Static(static_in_type(self)))
-        } else {
-            self.other_port_kind(dir)
+            return signature.port_type(port).cloned().map(EdgeKind::Value);
         }
+
+        // Constant port
+        let static_kind = self.static_port_kind(dir);
+        if port.index() == port_count {
+            if let Some(kind) = static_kind {
+                return Some(kind);
+            }
+        }
+
+        // Non-dataflow ports
+        self.other_port_kind(dir)
     }
 
     /// The non-dataflow port for the operation, not described by the signature.
@@ -155,7 +181,47 @@ impl OpType {
         }
     }
 
+    /// The non-dataflow input port for the operation, not described by the signature.
+    /// See `[OpType::other_port]`.
+    #[inline]
+    pub fn other_input_port(&self) -> Option<IncomingPort> {
+        self.other_port(Direction::Incoming)
+            .map(|p| p.as_incoming().unwrap())
+    }
+
+    /// The non-dataflow input port for the operation, not described by the signature.
+    /// See `[OpType::other_port]`.
+    #[inline]
+    pub fn other_output_port(&self) -> Option<OutgoingPort> {
+        self.other_port(Direction::Outgoing)
+            .map(|p| p.as_outgoing().unwrap())
+    }
+
+    /// If the op has a static port, the port of that input.
+    ///
+    /// See [`OpType::static_input_port`] and [`OpType::static_output_port`].
+    #[inline]
+    pub fn static_port(&self, dir: Direction) -> Option<Port> {
+        self.static_port_kind(dir)?;
+        Some(Port::new(dir, self.value_port_count(dir)))
+    }
+
+    /// If the op has a static input ([`Call`] and [`LoadConstant`]), the port of that input.
+    #[inline]
+    pub fn static_input_port(&self) -> Option<IncomingPort> {
+        self.static_port(Direction::Incoming)
+            .map(|p| p.as_incoming().unwrap())
+    }
+
+    /// If the op has a static output ([`Const`], [`FuncDefn`], [`FuncDecl`]), the port of that output.
+    #[inline]
+    pub fn static_output_port(&self) -> Option<OutgoingPort> {
+        self.static_port(Direction::Outgoing)
+            .map(|p| p.as_outgoing().unwrap())
+    }
+
     /// The number of Value ports in given direction.
+    #[inline]
     pub fn value_port_count(&self, dir: portgraph::Direction) -> usize {
         self.dataflow_signature()
             .map(|sig| sig.port_count(dir))
@@ -163,73 +229,41 @@ impl OpType {
     }
 
     /// The number of Value input ports.
+    #[inline]
     pub fn value_input_count(&self) -> usize {
         self.value_port_count(Direction::Incoming)
     }
 
     /// The number of Value output ports.
+    #[inline]
     pub fn value_output_count(&self) -> usize {
         self.value_port_count(Direction::Outgoing)
     }
 
-    /// The non-dataflow input port for the operation, not described by the signature.
-    /// See `[OpType::other_port]`.
-    pub fn other_input_port(&self) -> Option<Port> {
-        self.other_port(Direction::Incoming)
-    }
-
-    /// The non-dataflow input port for the operation, not described by the signature.
-    /// See `[OpType::other_port]`.
-    pub fn other_output_port(&self) -> Option<Port> {
-        self.other_port(Direction::Outgoing)
-    }
-
-    /// If the op has a static input (Call and LoadConstant), the port of that input.
-    pub fn static_input_port(&self) -> Option<IncomingPort> {
-        match self {
-            OpType::Call(call) => Some(call.called_function_port()),
-            OpType::LoadConstant(l) => Some(l.constant_port()),
-            _ => None,
-        }
-    }
-
-    /// If the op has a static output (Const, FuncDefn, FuncDecl), the port of that output.
-    pub fn static_output_port(&self) -> Option<OutgoingPort> {
-        OpTag::StaticOutput
-            .is_superset(self.tag())
-            .then_some(0.into())
-    }
-
     /// Returns the number of ports for the given direction.
+    #[inline]
     pub fn port_count(&self, dir: Direction) -> usize {
+        let static_input = self.static_port_kind(dir).is_some() as usize;
         let non_df_count = self.non_df_port_count(dir);
-        // if there is a static input it comes before the non_df_ports
-        let static_input =
-            (dir == Direction::Incoming && OpTag::StaticInput.is_superset(self.tag())) as usize;
-        self.value_port_count(dir) + non_df_count + static_input
+        self.value_port_count(dir) + static_input + non_df_count
     }
 
     /// Returns the number of inputs ports for the operation.
+    #[inline]
     pub fn input_count(&self) -> usize {
         self.port_count(Direction::Incoming)
     }
 
     /// Returns the number of outputs ports for the operation.
+    #[inline]
     pub fn output_count(&self) -> usize {
         self.port_count(Direction::Outgoing)
     }
 
     /// Checks whether the operation can contain children nodes.
+    #[inline]
     pub fn is_container(&self) -> bool {
         self.validity_flags().allowed_children != OpTag::None
-    }
-}
-
-fn static_in_type(op: &OpType) -> Type {
-    match op {
-        OpType::Call(call) => Type::new_function(call.called_function_type().clone()),
-        OpType::LoadConstant(load) => load.constant_type().clone(),
-        _ => panic!("this function should not be called if the optype is not known to be Call or LoadConst.")
     }
 }
 
@@ -286,10 +320,10 @@ pub trait OpTrait {
         ExtensionSet::new()
     }
 
-    /// The edge kind for the non-dataflow or constant inputs of the operation,
+    /// The edge kind for the non-dataflow inputs of the operation,
     /// not described by the signature.
     ///
-    /// If not None, a single extra output multiport of that kind will be
+    /// If not None, a single extra input port of that kind will be
     /// present.
     fn other_input(&self) -> Option<EdgeKind> {
         None
@@ -298,9 +332,27 @@ pub trait OpTrait {
     /// The edge kind for the non-dataflow outputs of the operation, not
     /// described by the signature.
     ///
-    /// If not None, a single extra output multiport of that kind will be
+    /// If not None, a single extra output port of that kind will be
     /// present.
     fn other_output(&self) -> Option<EdgeKind> {
+        None
+    }
+
+    /// The edge kind for a single constant input of the operation, not
+    /// described by the dataflow signature.
+    ///
+    /// If not None, an extra input port of that kind will be present after the
+    /// dataflow input ports and before any [`OpTrait::other_input`] ports.
+    fn static_input(&self) -> Option<EdgeKind> {
+        None
+    }
+
+    /// The edge kind for a single constant output of the operation, not
+    /// described by the dataflow signature.
+    ///
+    /// If not None, an extra output port of that kind will be present after the
+    /// dataflow input ports and before any [`OpTrait::other_output`] ports.
+    fn static_output(&self) -> Option<EdgeKind> {
         None
     }
 
