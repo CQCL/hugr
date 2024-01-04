@@ -214,7 +214,7 @@ impl OpTrait for Exit {
 
 /// Functionality shared by DFB and Exit CFG block types.
 pub trait BasicBlock {
-    /// The input signature of the contained dataflow graph.
+    /// The input dataflow signature of the CFG block.
     fn dataflow_input(&self) -> &TypeRow;
 }
 
