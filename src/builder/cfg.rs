@@ -5,7 +5,7 @@ use super::{
     BasicBlockID, BuildError, CfgID, Container, Dataflow, HugrBuilder, Wire,
 };
 
-use crate::ops::{self, Exit, OpType, DFB};
+use crate::ops::{self, DataflowBlock, ExitBlock, OpType};
 use crate::{
     extension::{ExtensionRegistry, ExtensionSet},
     types::FunctionType,
@@ -86,7 +86,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         output: TypeRow,
     ) -> Result<Self, BuildError> {
         let n_out_wires = output.len();
-        let exit_block_type = OpType::Exit(Exit {
+        let exit_block_type = OpType::ExitBlock(ExitBlock {
             cfg_outputs: output,
         });
         let exit_node = base
@@ -102,7 +102,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         })
     }
 
-    /// Return a builder for a non-entry [`DFB`] child graph with `inputs`
+    /// Return a builder for a non-entry [`DataflowBlock`] child graph with `inputs`
     /// and `outputs` and the variants of the branching TupleSum value
     /// specified by `tuple_sum_rows`.
     ///
@@ -134,7 +134,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         entry: bool,
     ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
         let tuple_sum_rows: Vec<_> = tuple_sum_rows.into_iter().collect();
-        let op = OpType::DFB(DFB {
+        let op = OpType::DataflowBlock(DataflowBlock {
             inputs: inputs.clone(),
             other_outputs: other_outputs.clone(),
             tuple_sum_rows: tuple_sum_rows.clone(),
@@ -159,7 +159,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         )
     }
 
-    /// Return a builder for a non-entry [`DFB`] child graph with `inputs`
+    /// Return a builder for a non-entry [`DataflowBlock`] child graph with `inputs`
     /// and `outputs` and a UnitSum type: a Sum of `n_cases` unit types.
     ///
     /// # Errors
@@ -178,7 +178,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         )
     }
 
-    /// Return a builder for the entry [`DFB`] child graph with `inputs`
+    /// Return a builder for the entry [`DataflowBlock`] child graph with `inputs`
     /// and `outputs` and the variants of the branching TupleSum value
     /// specified by `tuple_sum_rows`.
     ///
@@ -198,7 +198,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         self.any_block_builder(inputs, tuple_sum_rows, other_outputs, extension_delta, true)
     }
 
-    /// Return a builder for the entry [`DFB`] child graph with `inputs`
+    /// Return a builder for the entry [`DataflowBlock`] child graph with `inputs`
     /// and `outputs` and a UnitSum type: a Sum of `n_cases` unit types.
     ///
     /// # Errors
@@ -235,7 +235,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
     }
 }
 
-/// Builder for a [`DFB`] child graph.
+/// Builder for a [`DataflowBlock`] child graph.
 pub type BlockBuilder<B> = DFGWrapper<B, BasicBlockID>;
 
 impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
@@ -285,7 +285,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
 }
 
 impl BlockBuilder<Hugr> {
-    /// Initialize a [`DFB`] rooted HUGR builder
+    /// Initialize a [`DataflowBlock`] rooted HUGR builder
     pub fn new(
         inputs: impl Into<TypeRow>,
         input_extensions: impl Into<Option<ExtensionSet>>,
@@ -296,7 +296,7 @@ impl BlockBuilder<Hugr> {
         let inputs = inputs.into();
         let tuple_sum_rows: Vec<_> = tuple_sum_rows.into_iter().collect();
         let other_outputs = other_outputs.into();
-        let op = DFB {
+        let op = DataflowBlock {
             inputs: inputs.clone(),
             other_outputs: other_outputs.clone(),
             tuple_sum_rows: tuple_sum_rows.clone(),

@@ -117,7 +117,7 @@ impl DataflowOpTrait for CFG {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 /// A CFG basic block node. The signature is that of the internal Dataflow graph.
 #[allow(missing_docs)]
-pub struct DFB {
+pub struct DataflowBlock {
     pub inputs: TypeRow,
     pub other_outputs: TypeRow,
     pub tuple_sum_rows: Vec<TypeRow>,
@@ -127,32 +127,32 @@ pub struct DFB {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 /// The single exit node of the CFG, has no children,
 /// stores the types of the CFG node output.
-pub struct Exit {
+pub struct ExitBlock {
     /// Output type row of the CFG.
     pub cfg_outputs: TypeRow,
 }
 
-impl OpName for DFB {
+impl OpName for DataflowBlock {
     fn name(&self) -> SmolStr {
-        "DFB".into()
+        "DataflowBlock".into()
     }
 }
 
-impl OpName for Exit {
+impl OpName for ExitBlock {
     fn name(&self) -> SmolStr {
         "Exit".into()
     }
 }
 
-impl StaticTag for DFB {
+impl StaticTag for DataflowBlock {
     const TAG: OpTag = OpTag::BasicBlock;
 }
 
-impl StaticTag for Exit {
+impl StaticTag for ExitBlock {
     const TAG: OpTag = OpTag::BasicBlockExit;
 }
 
-impl OpTrait for DFB {
+impl OpTrait for DataflowBlock {
     fn description(&self) -> &str {
         "A CFG basic block node"
     }
@@ -183,7 +183,7 @@ impl OpTrait for DFB {
     }
 }
 
-impl OpTrait for Exit {
+impl OpTrait for ExitBlock {
     fn description(&self) -> &str {
         "A CFG exit block node"
     }
@@ -212,18 +212,18 @@ impl OpTrait for Exit {
     }
 }
 
-/// Functionality shared by DFB and Exit CFG block types.
+/// Functionality shared by DataflowBlock and Exit CFG block types.
 pub trait BasicBlock {
     /// The input dataflow signature of the CFG block.
     fn dataflow_input(&self) -> &TypeRow;
 }
 
-impl BasicBlock for DFB {
+impl BasicBlock for DataflowBlock {
     fn dataflow_input(&self) -> &TypeRow {
         &self.inputs
     }
 }
-impl DFB {
+impl DataflowBlock {
     /// The correct inputs of any successors. Returns None if successor is not a
     /// valid index.
     pub fn successor_input(&self, successor: usize) -> Option<TypeRow> {
@@ -234,7 +234,7 @@ impl DFB {
     }
 }
 
-impl BasicBlock for Exit {
+impl BasicBlock for ExitBlock {
     fn dataflow_input(&self) -> &TypeRow {
         &self.cfg_outputs
     }

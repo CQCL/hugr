@@ -13,7 +13,7 @@ use thiserror::Error;
 use crate::types::{FunctionType, Type, TypeRow};
 
 use super::controlflow::BasicBlock;
-use super::{impl_validate_op, Exit, OpTag, OpTrait, OpType, ValidateOp, DFB};
+use super::{impl_validate_op, DataflowBlock, ExitBlock, OpTag, OpTrait, OpType, ValidateOp};
 
 /// A set of property flags required for an operation.
 #[non_exhaustive]
@@ -286,7 +286,7 @@ pub struct ChildrenEdgeData {
     /// Target port.
     pub target_port: PortOffset,
 }
-impl ValidateOp for DFB {
+impl ValidateOp for DataflowBlock {
     /// Returns the set of allowed parent operation types.
     fn validity_flags(&self) -> OpValidityFlags {
         OpValidityFlags {
@@ -312,7 +312,7 @@ impl ValidateOp for DFB {
     }
 }
 
-impl ValidateOp for Exit {}
+impl ValidateOp for ExitBlock {}
 
 impl ValidateOp for super::Case {
     /// Returns the set of allowed parent operation types.
@@ -403,12 +403,12 @@ fn validate_io_nodes<'a>(
 fn validate_cfg_edge(edge: ChildrenEdgeData) -> Result<(), EdgeValidationError> {
     let source = &edge
         .source_op
-        .as_dfb()
+        .as_dataflow_block()
         .expect("CFG sibling graphs can only contain basic block operations.");
 
     let target_input = match &edge.target_op {
-        OpType::DFB(dfb) => dfb.dataflow_input(),
-        OpType::Exit(exit) => exit.dataflow_input(),
+        OpType::DataflowBlock(dfb) => dfb.dataflow_input(),
+        OpType::ExitBlock(exit) => exit.dataflow_input(),
         _ => panic!("CFG sibling graphs can only contain basic block operations."),
     };
 
