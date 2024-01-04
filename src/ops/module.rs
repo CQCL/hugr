@@ -79,12 +79,6 @@ impl StaticTag for FuncDecl {
     const TAG: OpTag = OpTag::Function;
 }
 
-impl DataflowParent for FuncDecl {
-    fn inner_signature(&self) -> FunctionType {
-        self.signature.body().clone()
-    }
-}
-
 impl OpTrait for FuncDecl {
     fn description(&self) -> &str {
         "External function declaration, linked at runtime"

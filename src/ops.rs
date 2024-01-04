@@ -343,6 +343,7 @@ impl OpParent for LeafOp {}
 impl OpParent for TailLoop {}
 impl OpParent for CFG {}
 impl OpParent for Conditional {}
+impl OpParent for FuncDecl {}
 
 #[enum_dispatch]
 /// Methods for Ops to validate themselves and children
