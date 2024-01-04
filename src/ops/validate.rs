@@ -10,12 +10,10 @@ use itertools::Itertools;
 use portgraph::{NodeIndex, PortOffset};
 use thiserror::Error;
 
-use crate::types::{FunctionType, Type, TypeRow};
+use crate::types::TypeRow;
 
 use super::dataflow::DataflowParent;
-use super::{
-    impl_validate_op, BasicBlock, DataflowBlock, ExitBlock, OpTag, OpTrait, OpType, ValidateOp,
-};
+use super::{impl_validate_op, BasicBlock, ExitBlock, OpTag, OpTrait, OpType, ValidateOp};
 
 /// A set of property flags required for an operation.
 #[non_exhaustive]
@@ -61,50 +59,6 @@ impl ValidateOp for super::Module {
             requires_children: false,
             ..Default::default()
         }
-    }
-}
-
-impl ValidateOp for super::FuncDefn {
-    fn validity_flags(&self) -> OpValidityFlags {
-        OpValidityFlags {
-            allowed_children: OpTag::DataflowChild,
-            allowed_first_child: OpTag::Input,
-            allowed_second_child: OpTag::Output,
-            requires_children: true,
-            requires_dag: true,
-            ..Default::default()
-        }
-    }
-
-    fn validate_op_children<'a>(
-        &self,
-        children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
-    ) -> Result<(), ChildrenValidationError> {
-        // We check type-variables are declared in `validate_subtree`, so here
-        // we can just assume all type variables are valid regardless of binders.
-        let FunctionType { input, output, .. } = self.inner_signature();
-        validate_io_nodes(&input, &output, "function definition", children)
-    }
-}
-
-impl ValidateOp for super::DFG {
-    fn validity_flags(&self) -> OpValidityFlags {
-        OpValidityFlags {
-            allowed_children: OpTag::DataflowChild,
-            allowed_first_child: OpTag::Input,
-            allowed_second_child: OpTag::Output,
-            requires_children: true,
-            requires_dag: true,
-            ..Default::default()
-        }
-    }
-
-    fn validate_op_children<'a>(
-        &self,
-        children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
-    ) -> Result<(), ChildrenValidationError> {
-        let sig = self.dataflow_signature().unwrap_or_default();
-        validate_io_nodes(&sig.input, &sig.output, "nested graph", children)
     }
 }
 
@@ -288,35 +242,8 @@ pub struct ChildrenEdgeData {
     /// Target port.
     pub target_port: PortOffset,
 }
-impl ValidateOp for DataflowBlock {
-    /// Returns the set of allowed parent operation types.
-    fn validity_flags(&self) -> OpValidityFlags {
-        OpValidityFlags {
-            allowed_children: OpTag::DataflowChild,
-            allowed_first_child: OpTag::Input,
-            allowed_second_child: OpTag::Output,
-            requires_children: true,
-            requires_dag: true,
-            ..Default::default()
-        }
-    }
 
-    /// Validate the ordered list of children.
-    fn validate_op_children<'a>(
-        &self,
-        children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
-    ) -> Result<(), ChildrenValidationError> {
-        let tuple_sum_type = Type::new_tuple_sum(self.tuple_sum_rows.clone());
-        let node_outputs: TypeRow = [&[tuple_sum_type], self.other_outputs.as_ref()]
-            .concat()
-            .into();
-        validate_io_nodes(&self.inputs, &node_outputs, "basic block graph", children)
-    }
-}
-
-impl ValidateOp for ExitBlock {}
-
-impl ValidateOp for super::Case {
+impl<T: DataflowParent> ValidateOp for T {
     /// Returns the set of allowed parent operation types.
     fn validity_flags(&self) -> OpValidityFlags {
         OpValidityFlags {
@@ -335,7 +262,7 @@ impl ValidateOp for super::Case {
         children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
     ) -> Result<(), ChildrenValidationError> {
         let sig = self.inner_signature();
-        validate_io_nodes(&sig.input, &sig.output, "Conditional", children)
+        validate_io_nodes(&sig.input, &sig.output, "DataflowParent", children)
     }
 }
 
@@ -489,3 +416,4 @@ impl_validate_op!(Call);
 impl_validate_op!(LoadConstant);
 impl_validate_op!(CallIndirect);
 impl_validate_op!(LeafOp);
+impl_validate_op!(ExitBlock);
