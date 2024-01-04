@@ -23,9 +23,8 @@ use portgraph::dot::{DotFormat, EdgeStyle, NodeStyle, PortStyle};
 use portgraph::{multiportgraph, LinkView, MultiPortGraph, PortView};
 
 use super::{Hugr, HugrError, NodeMetadata, NodeMetadataMap, NodeType, DEFAULT_NODETYPE};
-use crate::ops::dataflow::DataflowParent;
 use crate::ops::handle::NodeHandle;
-use crate::ops::{OpName, OpTag, OpTrait, OpType};
+use crate::ops::{OpName, OpParent, OpTag, OpTrait, OpType};
 
 use crate::types::Type;
 use crate::types::{EdgeKind, FunctionType};
@@ -336,14 +335,7 @@ pub trait HugrView: sealed::HugrInternals {
     /// type. Otherwise return None.
     fn get_function_type(&self) -> Option<FunctionType> {
         let op = self.get_nodetype(self.root());
-        Some(match &op.op {
-            OpType::DFG(dfg) => dfg.inner_signature(),
-            OpType::Case(case) => case.inner_signature(),
-            OpType::BasicBlock(block) => block.inner_signature(),
-            OpType::FuncDecl(decl) => decl.inner_signature(),
-            OpType::FuncDefn(def) => def.inner_signature(),
-            _ => return None,
-        })
+        op.op.inner_function_type()
     }
 
     /// Return a wrapper over the view that can be used in petgraph algorithms.

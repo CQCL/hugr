@@ -22,12 +22,12 @@ use enum_dispatch::enum_dispatch;
 
 pub use constant::Const;
 pub use controlflow::{BasicBlock, Case, Conditional, TailLoop, CFG};
-pub use dataflow::{Call, CallIndirect, Input, LoadConstant, Output, DFG};
+pub use dataflow::{Call, CallIndirect, DataflowParent, Input, LoadConstant, Output, DFG};
 pub use leaf::LeafOp;
 pub use module::{AliasDecl, AliasDefn, FuncDecl, FuncDefn, Module};
 pub use tag::OpTag;
 
-#[enum_dispatch(OpTrait, OpName, ValidateOp)]
+#[enum_dispatch(OpTrait, OpName, ValidateOp, OpParent)]
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 /// The concrete operation types for a node in the HUGR.
 // TODO: Link the NodeHandles to the OpType.
@@ -313,6 +313,36 @@ pub trait OpTrait {
         .is_some() as usize
     }
 }
+
+/// Properties of child graphs of ops, if the op has children.
+#[enum_dispatch]
+pub trait OpParent {
+    /// The inner function type of the operation, if it has a child dataflow
+    /// sibling graph.
+    fn inner_function_type(&self) -> Option<FunctionType> {
+        None
+    }
+}
+
+impl<T: DataflowParent> OpParent for T {
+    fn inner_function_type(&self) -> Option<FunctionType> {
+        Some(DataflowParent::inner_signature(self))
+    }
+}
+
+impl OpParent for Module {}
+impl OpParent for AliasDecl {}
+impl OpParent for AliasDefn {}
+impl OpParent for Const {}
+impl OpParent for Input {}
+impl OpParent for Output {}
+impl OpParent for Call {}
+impl OpParent for CallIndirect {}
+impl OpParent for LoadConstant {}
+impl OpParent for LeafOp {}
+impl OpParent for TailLoop {}
+impl OpParent for CFG {}
+impl OpParent for Conditional {}
 
 #[enum_dispatch]
 /// Methods for Ops to validate themselves and children
