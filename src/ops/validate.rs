@@ -6,11 +6,11 @@
 //! It also defines a `validate_op_children` method for more complex tests that
 //! require traversing the children.
 
+use crate::types::TypeRow;
 use itertools::Itertools;
 use portgraph::{NodeIndex, PortOffset};
+use std::any::type_name;
 use thiserror::Error;
-
-use crate::types::TypeRow;
 
 use super::controlflow::BasicBlock;
 use super::dataflow::DataflowParent;
@@ -263,7 +263,7 @@ impl<T: DataflowParent> ValidateOp for T {
         children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
     ) -> Result<(), ChildrenValidationError> {
         let sig = self.inner_signature();
-        validate_io_nodes(&sig.input, &sig.output, "DataflowParent", children)
+        validate_io_nodes(&sig.input, &sig.output, type_name::<T>(), children)
     }
 }
 
