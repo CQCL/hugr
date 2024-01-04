@@ -267,7 +267,6 @@ mod test {
     use crate::hugr::views::sibling::SiblingMut;
     use crate::hugr::HugrMut;
     use crate::ops::handle::{BasicBlockID, CfgID, NodeHandle};
-    use crate::ops::OpType;
     use crate::types::FunctionType;
     use crate::{type_row, HugrView, Node};
     use cool_asserts::assert_matches;
@@ -408,9 +407,9 @@ mod test {
             .unwrap();
         h.update_validate(&PRELUDE_REGISTRY).unwrap();
         assert_eq!(new_block, h.children(h.root()).next().unwrap());
-        assert_matches!(h.get_optype(new_block), OpType::DFB(_));
+        assert!(h.get_optype(new_block).is_dfb());
         assert_eq!(h.get_parent(new_cfg), Some(new_block));
-        assert_matches!(h.get_optype(new_cfg), OpType::CFG(_));
+        assert!(h.get_optype(new_cfg).is_cfg());
         for n in other_blocks {
             assert_eq!(depth(&h, n), 1);
         }
