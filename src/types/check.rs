@@ -49,7 +49,7 @@ pub enum ConstTypeError {
     CustomCheckFail(#[from] CustomCheckFailure),
 }
 
-fn check_ts(v: &Hugr, t: &PolyFuncType) -> bool {
+fn type_sig_equal(v: &Hugr, t: &PolyFuncType) -> bool {
     // exact signature equality, in future this may need to be
     // relaxed to be compatibility checks between the signatures.
     let root_op = v.get_optype(v.root());
@@ -75,7 +75,7 @@ impl Type {
                 e_val.0.check_custom_type(e)?;
                 Ok(())
             }
-            (TypeEnum::Function(t), Value::Function { hugr: v }) if check_ts(v, t) => Ok(()),
+            (TypeEnum::Function(t), Value::Function { hugr: v }) if type_sig_equal(v, t) => Ok(()),
             (TypeEnum::Tuple(t), Value::Tuple { vs: t_v }) => {
                 if t.len() != t_v.len() {
                     return Err(ConstTypeError::TupleWrongLength);
