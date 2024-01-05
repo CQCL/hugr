@@ -45,7 +45,7 @@ pub(crate) trait DataflowOpTrait {
     /// described by the dataflow signature.
     ///
     /// If not None, an extra output port of that kind will be present after the
-    /// dataflow input ports and before any [`DataflowOpTrait::other_output`] ports.
+    /// dataflow output ports and before any [`DataflowOpTrait::other_output`] ports.
     #[inline]
     fn static_output(&self) -> Option<EdgeKind> {
         None
