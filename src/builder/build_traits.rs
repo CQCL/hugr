@@ -233,7 +233,7 @@ pub trait Dataflow: Container {
 
         if dangling_wires.len() != type_row.len() {
             // Complain loudly
-            panic!("piss off");
+            panic!("not good!");
         }
         let mut current_node: Option<BuildHandle<DataflowOpID>> = None;
         for ext in extensions.iter() {
