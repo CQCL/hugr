@@ -115,50 +115,50 @@ impl DataflowOpTrait for CFG {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[serde(tag = "block")]
-/// Basic block ops - nodes valid in control flow graphs.
+/// A CFG basic block node. The signature is that of the internal Dataflow graph.
 #[allow(missing_docs)]
-pub enum BasicBlock {
-    /// A CFG basic block node. The signature is that of the internal Dataflow graph.
-    DFB {
-        inputs: TypeRow,
-        other_outputs: TypeRow,
-        tuple_sum_rows: Vec<TypeRow>,
-        extension_delta: ExtensionSet,
-    },
-    /// The single exit node of the CFG, has no children,
-    /// stores the types of the CFG node output.
-    Exit { cfg_outputs: TypeRow },
+pub struct DataflowBlock {
+    pub inputs: TypeRow,
+    pub other_outputs: TypeRow,
+    pub tuple_sum_rows: Vec<TypeRow>,
+    pub extension_delta: ExtensionSet,
 }
 
-impl OpName for BasicBlock {
-    /// The name of the operation.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+/// The single exit node of the CFG. Has no children,
+/// stores the types of the CFG node output.
+pub struct ExitBlock {
+    /// Output type row of the CFG.
+    pub cfg_outputs: TypeRow,
+}
+
+impl OpName for DataflowBlock {
     fn name(&self) -> SmolStr {
-        match self {
-            BasicBlock::DFB { .. } => "DFB".into(),
-            BasicBlock::Exit { .. } => "Exit".into(),
-        }
+        "DataflowBlock".into()
     }
 }
 
-impl StaticTag for BasicBlock {
+impl OpName for ExitBlock {
+    fn name(&self) -> SmolStr {
+        "ExitBlock".into()
+    }
+}
+
+impl StaticTag for DataflowBlock {
     const TAG: OpTag = OpTag::BasicBlock;
 }
 
-impl OpTrait for BasicBlock {
-    /// The description of the operation.
+impl StaticTag for ExitBlock {
+    const TAG: OpTag = OpTag::BasicBlockExit;
+}
+
+impl OpTrait for DataflowBlock {
     fn description(&self) -> &str {
-        match self {
-            BasicBlock::DFB { .. } => "A CFG basic block node",
-            BasicBlock::Exit { .. } => "A CFG exit block node",
-        }
+        "A CFG basic block node"
     }
     /// Tag identifying the operation.
     fn tag(&self) -> OpTag {
-        match self {
-            BasicBlock::DFB { .. } => OpTag::BasicBlock,
-            BasicBlock::Exit { .. } => OpTag::BasicBlockExit,
-        }
+        Self::TAG
     }
 
     fn other_input(&self) -> Option<EdgeKind> {
@@ -170,43 +170,73 @@ impl OpTrait for BasicBlock {
     }
 
     fn dataflow_signature(&self) -> Option<FunctionType> {
-        Some(match self {
-            BasicBlock::DFB {
-                extension_delta, ..
-            } => FunctionType::new(type_row![], type_row![]).with_extension_delta(extension_delta),
-            BasicBlock::Exit { .. } => FunctionType::new(type_row![], type_row![]),
-        })
+        Some(
+            FunctionType::new(type_row![], type_row![]).with_extension_delta(&self.extension_delta),
+        )
     }
 
     fn non_df_port_count(&self, dir: Direction) -> usize {
-        match self {
-            Self::DFB { tuple_sum_rows, .. } if dir == Direction::Outgoing => tuple_sum_rows.len(),
-            Self::Exit { .. } if dir == Direction::Outgoing => 0,
-            _ => 1,
+        match dir {
+            Direction::Incoming => 1,
+            Direction::Outgoing => self.tuple_sum_rows.len(),
         }
     }
 }
 
-impl BasicBlock {
-    /// The input signature of the contained dataflow graph.
-    pub fn dataflow_input(&self) -> &TypeRow {
-        match self {
-            BasicBlock::DFB { inputs, .. } => inputs,
-            BasicBlock::Exit { cfg_outputs } => cfg_outputs,
-        }
+impl OpTrait for ExitBlock {
+    fn description(&self) -> &str {
+        "A CFG exit block node"
+    }
+    /// Tag identifying the operation.
+    fn tag(&self) -> OpTag {
+        Self::TAG
     }
 
+    fn other_input(&self) -> Option<EdgeKind> {
+        Some(EdgeKind::ControlFlow)
+    }
+
+    fn other_output(&self) -> Option<EdgeKind> {
+        Some(EdgeKind::ControlFlow)
+    }
+
+    fn dataflow_signature(&self) -> Option<FunctionType> {
+        Some(FunctionType::new(type_row![], type_row![]))
+    }
+
+    fn non_df_port_count(&self, dir: Direction) -> usize {
+        match dir {
+            Direction::Incoming => 1,
+            Direction::Outgoing => 0,
+        }
+    }
+}
+
+/// Functionality shared by DataflowBlock and Exit CFG block types.
+pub trait BasicBlock {
+    /// The input dataflow signature of the CFG block.
+    fn dataflow_input(&self) -> &TypeRow;
+}
+
+impl BasicBlock for DataflowBlock {
+    fn dataflow_input(&self) -> &TypeRow {
+        &self.inputs
+    }
+}
+impl DataflowBlock {
     /// The correct inputs of any successors. Returns None if successor is not a
     /// valid index.
     pub fn successor_input(&self, successor: usize) -> Option<TypeRow> {
-        match self {
-            BasicBlock::DFB {
-                tuple_sum_rows,
-                other_outputs: outputs,
-                ..
-            } => Some(tuple_sum_first(tuple_sum_rows.get(successor)?, outputs)),
-            BasicBlock::Exit { .. } => panic!("Exit should have no successors"),
-        }
+        Some(tuple_sum_first(
+            self.tuple_sum_rows.get(successor)?,
+            &self.other_outputs,
+        ))
+    }
+}
+
+impl BasicBlock for ExitBlock {
+    fn dataflow_input(&self) -> &TypeRow {
+        &self.cfg_outputs
     }
 }
 

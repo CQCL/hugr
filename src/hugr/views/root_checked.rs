@@ -74,7 +74,7 @@ mod test {
     use crate::hugr::hugrmut::sealed::HugrMutInternals;
     use crate::hugr::{HugrError, HugrMut, NodeType};
     use crate::ops::handle::{BasicBlockID, CfgID, DataflowParentID, DfgID};
-    use crate::ops::{BasicBlock, LeafOp, OpTag};
+    use crate::ops::{DataflowBlock, LeafOp, OpTag};
     use crate::{ops, type_row, types::FunctionType, Hugr, HugrView};
 
     #[test]
@@ -94,7 +94,7 @@ mod test {
         let mut dfg_v = RootChecked::<&mut Hugr, DfgID>::try_new(&mut h).unwrap();
         // That is a HugrMutInternal, so we can try:
         let root = dfg_v.root();
-        let bb = NodeType::new_pure(BasicBlock::DFB {
+        let bb = NodeType::new_pure(DataflowBlock {
             inputs: type_row![],
             other_outputs: type_row![],
             tuple_sum_rows: vec![type_row![]],

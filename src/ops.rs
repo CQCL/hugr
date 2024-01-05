@@ -21,7 +21,7 @@ use smol_str::SmolStr;
 use enum_dispatch::enum_dispatch;
 
 pub use constant::Const;
-pub use controlflow::{BasicBlock, Case, Conditional, TailLoop, CFG};
+pub use controlflow::{Case, Conditional, DataflowBlock, ExitBlock, TailLoop, CFG};
 pub use dataflow::{Call, CallIndirect, Input, LoadConstant, Output, DFG};
 pub use leaf::LeafOp;
 pub use module::{AliasDecl, AliasDefn, FuncDecl, FuncDefn, Module};
@@ -48,7 +48,8 @@ pub enum OpType {
     LoadConstant,
     DFG,
     LeafOp,
-    BasicBlock,
+    DataflowBlock,
+    ExitBlock,
     TailLoop,
     CFG,
     Conditional,
@@ -93,7 +94,8 @@ impl_op_ref_try_into!(CallIndirect);
 impl_op_ref_try_into!(LoadConstant);
 impl_op_ref_try_into!(DFG, dfg);
 impl_op_ref_try_into!(LeafOp);
-impl_op_ref_try_into!(BasicBlock);
+impl_op_ref_try_into!(DataflowBlock);
+impl_op_ref_try_into!(ExitBlock);
 impl_op_ref_try_into!(TailLoop);
 impl_op_ref_try_into!(CFG, cfg);
 impl_op_ref_try_into!(Conditional);

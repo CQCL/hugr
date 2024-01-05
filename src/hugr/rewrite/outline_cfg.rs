@@ -12,9 +12,10 @@ use crate::hugr::rewrite::Rewrite;
 use crate::hugr::views::sibling::SiblingMut;
 use crate::hugr::{HugrMut, HugrView};
 use crate::ops;
+use crate::ops::controlflow::BasicBlock;
 use crate::ops::dataflow::DataflowOpTrait;
 use crate::ops::handle::{BasicBlockID, CfgID, NodeHandle};
-use crate::ops::{BasicBlock, OpType};
+use crate::ops::{DataflowBlock, OpType};
 use crate::PortIndex;
 use crate::{type_row, Node};
 
@@ -114,12 +115,13 @@ impl Rewrite for OutlineCfg {
             self.compute_entry_exit_outside_extensions(h)?;
         // 1. Compute signature
         // These panic()s only happen if the Hugr would not have passed validate()
-        let OpType::BasicBlock(BasicBlock::DFB { inputs, .. }) = h.get_optype(entry) else {
+        let OpType::DataflowBlock(DataflowBlock { inputs, .. }) = h.get_optype(entry) else {
             panic!("Entry node is not a basic block")
         };
         let inputs = inputs.clone();
         let outputs = match h.get_optype(outside) {
-            OpType::BasicBlock(b) => b.dataflow_input().clone(),
+            OpType::DataflowBlock(dfb) => dfb.dataflow_input().clone(),
+            OpType::ExitBlock(exit) => exit.dataflow_input().clone(),
             _ => panic!("External successor not a basic block"),
         };
         let outer_cfg = h.get_parent(entry).unwrap();
@@ -265,7 +267,6 @@ mod test {
     use crate::hugr::views::sibling::SiblingMut;
     use crate::hugr::HugrMut;
     use crate::ops::handle::{BasicBlockID, CfgID, NodeHandle};
-    use crate::ops::{BasicBlock, OpType};
     use crate::types::FunctionType;
     use crate::{type_row, HugrView, Node};
     use cool_asserts::assert_matches;
@@ -348,12 +349,9 @@ mod test {
             h.output_neighbours(tail).take(2).collect::<HashSet<Node>>(),
             HashSet::from([exit, new_block])
         );
-        assert_matches!(
-            h.get_optype(new_block),
-            OpType::BasicBlock(BasicBlock::DFB { .. })
-        );
+        assert!(h.get_optype(new_block).is_dataflow_block());
         assert_eq!(h.base_hugr().get_parent(new_cfg), Some(new_block));
-        assert_matches!(h.base_hugr().get_optype(new_cfg), OpType::CFG(_));
+        assert!(h.base_hugr().get_optype(new_cfg).is_cfg());
     }
 
     #[test]
@@ -409,12 +407,9 @@ mod test {
             .unwrap();
         h.update_validate(&PRELUDE_REGISTRY).unwrap();
         assert_eq!(new_block, h.children(h.root()).next().unwrap());
-        assert_matches!(
-            h.get_optype(new_block),
-            OpType::BasicBlock(BasicBlock::DFB { .. })
-        );
+        assert!(h.get_optype(new_block).is_dataflow_block());
         assert_eq!(h.get_parent(new_cfg), Some(new_block));
-        assert_matches!(h.get_optype(new_cfg), OpType::CFG(_));
+        assert!(h.get_optype(new_cfg).is_cfg());
         for n in other_blocks {
             assert_eq!(depth(&h, n), 1);
         }
