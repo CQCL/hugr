@@ -139,8 +139,8 @@ impl OpType {
     /// Returns the edge kind for the given port.
     ///
     /// The result may be a value port, a static port, or a non-dataflow port.
-    /// See [`OpType::value_port_kind`], [`OpType::static_port_kind`], and
-    /// [`OpType::dataflow_signature`].
+    /// See [`OpType::dataflow_signature`], [`OpType::static_port_kind`], and
+    /// [`OpType::other_port_kind`].
     pub fn port_kind(&self, port: impl Into<Port>) -> Option<EdgeKind> {
         let signature = self.dataflow_signature().unwrap_or_default();
         let port: Port = port.into();

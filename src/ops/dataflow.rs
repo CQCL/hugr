@@ -209,6 +209,8 @@ impl Call {
     /// let op = OpType::Call(call.clone());
     /// assert_eq!(op.static_input_port(), Some(call.called_function_port()));
     /// ```
+    ///
+    /// [`OpType::static_input_port`]: crate::ops::OpType::static_input_port
     #[inline]
     pub fn called_function_port(&self) -> IncomingPort {
         self.called_function_type().input_count().into()
@@ -281,6 +283,8 @@ impl LoadConstant {
     /// let op = OpType::LoadConstant(load_constant.clone());
     /// assert_eq!(op.static_input_port(), Some(load_constant.constant_port()));
     /// ```
+    ///
+    /// [`OpType::static_input_port`]: crate::ops::OpType::static_input_port
     #[inline]
     pub fn constant_port(&self) -> IncomingPort {
         0.into()
