@@ -2,9 +2,10 @@ use cool_asserts::assert_matches;
 
 use super::*;
 use crate::builder::test::closed_dfg_root_hugr;
+#[cfg(feature = "extension_inference")]
+use crate::builder::ModuleBuilder;
 use crate::builder::{
     BuildError, Container, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder,
-    ModuleBuilder,
 };
 use crate::extension::prelude::{BOOL_T, PRELUDE, USIZE_T};
 use crate::extension::{
@@ -12,6 +13,7 @@ use crate::extension::{
 };
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::hugr::{HugrError, HugrMut, NodeType};
+#[cfg(feature = "extension_inference")]
 use crate::macros::const_extension_ids;
 use crate::ops::dataflow::IOTrait;
 use crate::ops::{self, Const, LeafOp, OpType};
@@ -23,6 +25,7 @@ use crate::values::Value;
 use crate::{type_row, Direction, IncomingPort, Node};
 
 const NAT: Type = crate::extension::prelude::USIZE_T;
+#[cfg(feature = "extension_inference")]
 const Q: Type = crate::extension::prelude::QB_T;
 
 /// Creates a hugr with a single function definition that copies a bit `copies` times.
@@ -71,6 +74,7 @@ fn add_df_children(b: &mut Hugr, parent: Node, copies: usize) -> (Node, Node, No
 /// Intended to be used to populate a BasicBlock node in a CFG.
 ///
 /// Returns the node indices of each of the operations.
+#[cfg(feature = "extension_inference")]
 fn add_block_children(
     b: &mut Hugr,
     parent: Node,
@@ -257,6 +261,7 @@ fn df_children_restrictions() {
     );
 }
 
+#[cfg(feature = "extension_inference")]
 #[test]
 /// Validation errors in a dataflow subgraph.
 fn cfg_children_restrictions() {
@@ -404,6 +409,7 @@ fn test_ext_edge() -> Result<(), HugrError> {
     Ok(())
 }
 
+#[cfg(feature = "extension_inference")]
 const_extension_ids! {
     const XA: ExtensionId = "A";
     const XB: ExtensionId = "BOOL_EXT";
@@ -441,6 +447,7 @@ fn test_local_const() -> Result<(), HugrError> {
     Ok(())
 }
 
+#[cfg(feature = "extension_inference")]
 #[test]
 /// A wire with no extension requirements is wired into a node which has
 /// [A,BOOL_T] extensions required on its inputs and outputs. This could be fixed
@@ -474,6 +481,7 @@ fn missing_lift_node() -> Result<(), BuildError> {
     Ok(())
 }
 
+#[cfg(feature = "extension_inference")]
 #[test]
 /// A wire with extension requirement `[A]` is wired into a an output with no
 /// extension req. In the validation extension typechecking, we don't do any
@@ -505,6 +513,7 @@ fn too_many_extension() -> Result<(), BuildError> {
     Ok(())
 }
 
+#[cfg(feature = "extension_inference")]
 #[test]
 /// A wire with extension requirements `[A]` and another with requirements
 /// `[BOOL_T]` are both wired into a node which requires its inputs to have
@@ -558,6 +567,7 @@ fn extensions_mismatch() -> Result<(), BuildError> {
     Ok(())
 }
 
+#[cfg(feature = "extension_inference")]
 #[test]
 fn parent_signature_mismatch() -> Result<(), BuildError> {
     let rs = ExtensionSet::singleton(&XA);
@@ -740,6 +750,7 @@ fn invalid_types() {
     );
 }
 
+#[cfg(feature = "extension_inference")]
 #[test]
 fn parent_io_mismatch() {
     // The DFG node declares that it has an empty extension delta,

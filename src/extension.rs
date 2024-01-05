@@ -18,8 +18,11 @@ use crate::types::type_param::{check_type_args, TypeArgError};
 use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::{check_typevar_decl, CustomType, PolyFuncType, Substitution, TypeBound};
 
+#[allow(dead_code)]
 mod infer;
-pub use infer::{infer_extensions, ExtensionSolution, InferExtensionError};
+#[cfg(feature = "extension_inference")]
+pub use infer::infer_extensions;
+pub use infer::{ExtensionSolution, InferExtensionError};
 
 mod op_def;
 pub use op_def::{

@@ -9,10 +9,11 @@ use petgraph::visit::{Topo, Walker};
 use portgraph::{LinkView, PortView};
 use thiserror::Error;
 
+#[cfg(feature = "extension_inference")]
+use crate::extension::validate::ExtensionValidator;
 use crate::extension::SignatureError;
 use crate::extension::{
-    validate::{ExtensionError, ExtensionValidator},
-    ExtensionRegistry, ExtensionSolution, InferExtensionError,
+    validate::ExtensionError, ExtensionRegistry, ExtensionSolution, InferExtensionError,
 };
 
 use crate::ops::custom::CustomOpError;
@@ -36,6 +37,7 @@ struct ValidationContext<'a, 'b> {
     /// Dominator tree for each CFG region, using the container node as index.
     dominators: HashMap<Node, Dominators<Node>>,
     /// Context for the extension validation.
+    #[cfg(feature = "extension_inference")]
     extension_validator: ExtensionValidator,
     /// Registry of available Extensions
     extension_registry: &'b ExtensionRegistry,
@@ -64,6 +66,9 @@ impl Hugr {
 
 impl<'a, 'b> ValidationContext<'a, 'b> {
     /// Create a new validation context.
+    // Allow unused "extension_closure" variable for when
+    // the "extension_inference" feature is disabled.
+    #[allow(unused_variables)]
     pub fn new(
         hugr: &'a Hugr,
         extension_closure: ExtensionSolution,
@@ -72,6 +77,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         Self {
             hugr,
             dominators: HashMap::new(),
+            #[cfg(feature = "extension_inference")]
             extension_validator: ExtensionValidator::new(hugr, extension_closure),
             extension_registry,
         }
@@ -163,6 +169,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
 
         // FuncDefns have no resources since they're static nodes, but the
         // functions they define can have any extension delta.
+        #[cfg(feature = "extension_inference")]
         if node_type.tag() != OpTag::FuncDefn {
             // If this is a container with I/O nodes, check that the extension they
             // define match the extensions of the container.
@@ -240,6 +247,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
             let other_node: Node = self.hugr.graph.port_node(link).unwrap().into();
             let other_offset = self.hugr.graph.port_offset(link).unwrap().into();
 
+            #[cfg(feature = "extension_inference")]
             self.extension_validator
                 .check_extensions_compatible(&(node, port), &(other_node, other_offset))?;
 

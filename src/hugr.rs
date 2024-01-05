@@ -8,6 +8,8 @@ pub mod serialize;
 pub mod validate;
 pub mod views;
 
+#[cfg(not(feature = "extension_inference"))]
+use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::iter;
 
@@ -23,9 +25,9 @@ use thiserror::Error;
 
 pub use self::views::{HugrView, RootTagged};
 use crate::core::NodeIndex;
-use crate::extension::{
-    infer_extensions, ExtensionRegistry, ExtensionSet, ExtensionSolution, InferExtensionError,
-};
+#[cfg(feature = "extension_inference")]
+use crate::extension::infer_extensions;
+use crate::extension::{ExtensionRegistry, ExtensionSet, ExtensionSolution, InferExtensionError};
 use crate::ops::custom::resolve_extension_ops;
 use crate::ops::{OpTag, OpTrait, OpType, DEFAULT_OPTYPE};
 use crate::types::FunctionType;
@@ -197,12 +199,19 @@ impl Hugr {
     /// Infer extension requirements and add new information to `op_types` field
     ///
     /// See [`infer_extensions`] for details on the "closure" value
+    #[cfg(feature = "extension_inference")]
     pub fn infer_extensions(&mut self) -> Result<ExtensionSolution, InferExtensionError> {
         let (solution, extension_closure) = infer_extensions(self)?;
         self.instantiate_extensions(solution);
         Ok(extension_closure)
     }
+    /// Do nothing - this functionality is gated by the feature "extension_inference"
+    #[cfg(not(feature = "extension_inference"))]
+    pub fn infer_extensions(&mut self) -> Result<ExtensionSolution, InferExtensionError> {
+        Ok(HashMap::new())
+    }
 
+    #[allow(dead_code)]
     /// Add extension requirement information to the hugr in place.
     fn instantiate_extensions(&mut self, solution: ExtensionSolution) {
         // We only care about inferred _input_ extensions, because `NodeType`
@@ -345,13 +354,20 @@ pub enum HugrError {
 #[cfg(test)]
 mod test {
     use super::{Hugr, HugrView};
+    #[cfg(feature = "extension_inference")]
     use crate::builder::test::closed_dfg_root_hugr;
+    #[cfg(feature = "extension_inference")]
     use crate::extension::ExtensionSet;
+    #[cfg(feature = "extension_inference")]
     use crate::hugr::HugrMut;
+    #[cfg(feature = "extension_inference")]
     use crate::ops;
+    #[cfg(feature = "extension_inference")]
     use crate::type_row;
+    #[cfg(feature = "extension_inference")]
     use crate::types::{FunctionType, Type};
 
+    #[cfg(feature = "extension_inference")]
     use std::error::Error;
 
     #[test]
@@ -371,6 +387,7 @@ mod test {
         assert_matches!(hugr.get_io(hugr.root()), Some(_));
     }
 
+    #[cfg(feature = "extension_inference")]
     #[test]
     fn extension_instantiation() -> Result<(), Box<dyn Error>> {
         const BIT: Type = crate::extension::prelude::USIZE_T;

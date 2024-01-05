@@ -22,6 +22,9 @@ name = "hugr"
 bench = false
 path = "src/lib.rs"
 
+[features]
+extension_inference = []
+
 [dependencies]
 thiserror = "1.0.28"
 portgraph = { version = "0.11.0", features = ["serde", "petgraph"] }
