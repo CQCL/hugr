@@ -1,6 +1,6 @@
 # HUGR design document
 
-The Hierarchical Unified Graph Representation (HUGR, pronounced *hugger* 
+The Hierarchical Unified Graph Representation (HUGR, pronounced *hugger*
 🫂) is a proposed new
 common internal representation used across TKET2, Tierkreis, and the L3
 compiler. The HUGR project aims to give a faithful representation of
@@ -182,7 +182,7 @@ them.
 
 A `Value` edge represents dataflow that happens at runtime - i.e. the
 source of the edge will, at runtime, produce a value that is consumed by
-the edge’s target. Value edges are from an outgoing port of the
+the edge's target. Value edges are from an outgoing port of the
 source node, to an incoming port of the target node.
 
 #### `Static` edges
@@ -255,7 +255,7 @@ no `FuncDecl/AliasDecl` nodes.
 
 An **executable HUGR** or **executable module** is a loadable HUGR where the
 root Module node has a `FuncDefn` child with function name
-“main”, that is the designated entry point. Modules that act as libraries need
+"main", that is the designated entry point. Modules that act as libraries need
 not be executable.
 
 #### Dataflow
@@ -285,7 +285,7 @@ the following basic dataflow operations are available (in addition to the
     These nodes are parents in the hierarchy.
     The signature of the operation comprises the output signature of the child
     Input node (as input) and the input signature of the child Output node (as
-    output). 
+    output).
   - `OpaqueOp`: an operation defined by an [Extension](#extension-system).
 
 The example below shows two DFGs, one nested within the other. Each has an Input
@@ -336,7 +336,7 @@ outputs of the Conditional; that child is evaluated, but the others are
 not. That is, Conditional-nodes act as "if-then-else" followed by a
 control-flow merge.
 
-A **TupleSum(T0, T1…TN)** type is an algebraic “sum of products” type,
+A **TupleSum(T0, T1…TN)** type is an algebraic "sum of products" type,
 defined as `Sum(Tuple(#T0), Tuple(#T1), ...Tuple(#Tn))` (see [type
 system](#type-system)), where `#Ti` is the *i*th row (sequence of types) defining it.
 
@@ -486,7 +486,7 @@ flowchart
 #### Hierarchical Relationships and Constraints
 
 To clarify the possible hierarchical relationships, using the operation
-definitions above and also defining “*O”* to be all non-nested dataflow
+definitions above and also defining "*O"* to be all non-nested dataflow
 operations, we can define the relationships in the following table.
 **D** and **C** are useful (and intersecting) groupings of operations:
 dataflow nodes and the nodes which contain them. The "Parent" column in the
@@ -608,7 +608,7 @@ allocation, as that representation makes storage explicit. For example,
 when a true/false subgraph of a Conditional-node wants a value from the
 outside, we add an outgoing port to the Input node of each subgraph, a
 corresponding incoming port to the Conditional-node, and discard nodes to each
-subgraph that doesn’t use the value. It is straightforward to turn an
+subgraph that doesn't use the value. It is straightforward to turn an
 edge between graphs into a combination of intra-graph edges and extra
 input/output ports+nodes in such a way, but this is akin to
 decompression.
@@ -743,7 +743,7 @@ structures.
 
 For each node, the metadata is a dictionary keyed by strings. Keys are
 used to identify applications or users so these do not (accidentally)
-interfere with each other’s metadata; for example a reverse-DNS system
+interfere with each other's metadata; for example a reverse-DNS system
 (`com.quantinuum.username....` or `com.quantinuum.tket....`). The values
 are tuples of (1) any serializable struct, and (2) a list of node
 indices. References from the serialized struct to other nodes should
@@ -793,7 +793,7 @@ The Hugr defines a number of type constructors, that can be instantiated into ty
 
 Extensions ::= (Extension)* -- a set, not a list
 
-Type ::= Tuple(#) -- fixed-arity, heterogeneous components 
+Type ::= Tuple(#) -- fixed-arity, heterogeneous components
        | Sum(#)   -- disjoint union of other types, ??tagged by unsigned int??
        | Opaque(Name, [TypeArg]) -- a (instantiation of a) custom type defined by an extension
        | Function(TypeParams, #, #, Extensions) -- polymorphic with type parameters,
@@ -864,7 +864,7 @@ Concretely, if a plugin writer adds an extension
 *X*, then some function from
 a plugin needs to provide a mechanism to convert the
 *X* to some other extension
-requirement before it can interface with other plugins which don’t know
+requirement before it can interface with other plugins which don't know
 about *X*.
 
 A runtime could have access to means of
@@ -900,7 +900,7 @@ function from below.
 
 Note that here, any letter with vector notation refers to a variable
 which stands in for a row. Hence, when checking the inputs and outputs
-align, we’re introducing a *row equality constraint*, rather than the
+align, we're introducing a *row equality constraint*, rather than the
 equality constraint of `typeof(b) ~ Bool`.
 
 ### Rewriting Extension Requirements
@@ -955,19 +955,19 @@ docs](https://mlir.llvm.org/docs/DefiningDialects/Operations/#motivation)
 
 > MLIR allows pluggable dialects, and dialects contain, among others, a
 > list of operations. This open and extensible ecosystem leads to the
-> “stringly” type IR problem, e.g., repetitive string comparisons
+> "stringly" type IR problem, e.g., repetitive string comparisons
 > during optimization and analysis passes, unintuitive accessor methods
-> (e.g., generic/error prone `getOperand(3)` vs
-> self-documenting `getStride()`) with more generic return types,
+> (e.g., generic/error prone `getOperand(3)` vs
+> self-documenting `getStride()`) with more generic return types,
 > verbose and generic constructors without default arguments, verbose
 > textual IR dumps, and so on. Furthermore, operation verification is:
-> 
+>
 > 1\. best case: a central string-to-verification-function map
-> 
+>
 > 2\. middle case: duplication of verification across the code base, or
-> 
+>
 > 3\. worst case: no verification functions.
-> 
+>
 > The fix is to support defining ops in a table-driven manner. Then for
 > each dialect, we can have a central place that contains everything you
 > need to know about each op, including its constraints, custom assembly
@@ -1174,7 +1174,7 @@ graph under n is *convex* (DFG-convex or CFG-convex respectively) if
 every node on every path in the sibling graph that starts and ends in S
 is itself in S.
 
-The meaning of “convex” is: if A and B are nodes in the convex set S,
+The meaning of "convex" is: if A and B are nodes in the convex set S,
 then any sibling node on a path from A to B is also in S.
 
 #### API methods
@@ -1212,9 +1212,9 @@ The method takes as input:
       * $\textrm{out}_H(T \setminus \\{\texttt{Output}\\})$ is just the input ports to the $\texttt{Output}$ node (their source must all be in $H$)
       * in order to produce a valid hugr, all keys $\textrm{out}_{\Gamma}(S)$ must be present
       * ...and each possible value must be either Copyable and/or present exactly once. Any that is absent could just be omitted from $H$....
-  
+
 The new hugr is then derived as follows:
-  
+
   1. Make a copy in $\Gamma$ of all children of $R$, excluding Input and Output,
      and all edges between them. Make all the newly added nodes children of $P$.
      Notation: for each port $p$ of a node in $R$ of which a copy is made, write
@@ -1422,8 +1422,8 @@ containers. This simplifies the API, and is not a serious restriction
 since we can use the outlining and inlining methods to target a group of
 nodes.
 
-The most basic case – replacing a convex set of Op nodes in a DSG with
-another graph of Op nodes having the same signature – is implemented by
+The most basic case -- replacing a convex set of Op nodes in a DSG with
+another graph of Op nodes having the same signature -- is implemented by
 `SimpleReplace`.
 
 If one of the nodes in the region is a complex container node that we
@@ -1431,17 +1431,17 @@ wish to preserve in the replacement without doing a deep copy, we can
 use an empty node in the replacement and have B map this node to the old
 one.
 
-We can, for example, implement “turning a Conditional-node with known
-TupleSum into a DFG-node” by a `Replace` where the Conditional (and its
+We can, for example, implement "turning a Conditional-node with known
+TupleSum into a DFG-node" by a `Replace` where the Conditional (and its
 preceding TupleSum) is replaced by an empty DFG and the map B specifies
-the “good” child of the Conditional as the surrogate parent of the new
-DFG’s children. (If the good child was just an Op, we could either
-remove it and include it in the replacement, or – to avoid this overhead
-– outline it in a DFG first.)
+the "good" child of the Conditional as the surrogate parent of the new
+DFG's children. (If the good child was just an Op, we could either
+remove it and include it in the replacement, or -- to avoid this overhead
+-- outline it in a DFG first.)
 
 Similarly, replacement of a CFG node having a single BasicBlock child
 with a DFG node can be achieved using `Replace` (specifying the
-BasicBlock node as the surrogate parent for the new DFG’s children).
+BasicBlock node as the surrogate parent for the new DFG's children).
 
 Arbitrary node insertion on dataflow edges can be achieved using
 `InsertIdentity` followed by `Replace`. Removal of a node in a DSG
@@ -1547,7 +1547,7 @@ pseudocode, though we advocate MessagePack format in practice (see
 [Serialization implementation](schema/serialization.md)).
 Note in particular that hierarchical relationships
 have a special encoding outside `edges`, as a field `parent`
-in a node definition. 
+in a node definition.
 The unique root node of the HUGR reports itself as the parent.
 
 The other required field in a node is `op` which identifies an operation by
@@ -1822,7 +1822,7 @@ Conversions between integers and floats:
     function exists but without giving a definition. May be the source
     of Static-edges to Call nodes and others.
   - **FuncDefn node**: child of a module node, defines a function (by being
-    parent to the function’s body). May be the source of Static-edges to
+    parent to the function's body). May be the source of Static-edges to
     Call nodes and others.
   - **DFG node**: A node representing a data-flow graph. Its children
     are all data-dependency nodes.
@@ -1897,12 +1897,12 @@ Conversions between integers and floats:
   - We *could* parse a CFG into a DSG with only Conditional-nodes and
     TailLoop-nodes by introducing extra variables, as per [Google
     paper](https://dl.acm.org/doi/pdf/10.1145/2693261), and then expect
-    LLVM to remove those extra variables later. However that’s a
+    LLVM to remove those extra variables later. However that's a
     significant amount of analysis and transformation, which is
     undesirable for using the HUGR as a common interchange format (e.g.
     QIR → HUGR → LLVM) when little optimization is being done (perhaps
     no cross-basic-block optimization).
-  - It’s possible that maintaining support for CFGs-nodes may become a
+  - It's possible that maintaining support for CFGs-nodes may become a
     burden, i.e. if we find we are not using CFGs much. However, I
     believe that this burden can be kept acceptably low if we are
     willing to drop support for rewriting across basic block boundaries,
@@ -1944,8 +1944,8 @@ e.g. for authors of "rewrite rules" and other optimisations.
 
 ##### Comparison with MLIR
 
-There are a lot of broad similarities here, with MLIR’s regions
-providing hierarchy, and “graph” regions being like DSGs. Significant
+There are a lot of broad similarities here, with MLIR's regions
+providing hierarchy, and "graph" regions being like DSGs. Significant
 differences include:
 
   - MLIR uses names everywhere, which internally are mapped to some kind
@@ -1954,12 +1954,12 @@ differences include:
         SSA/SSI name.
       - MLIR does not do linearity or SSI.
   - Our CFGs are Single Entry Single Exit (results defined by the output
-    node of the exit block), rather than MLIR’s Single Entry Multiple
+    node of the exit block), rather than MLIR's Single Entry Multiple
     Exit (with `return` instruction)
   - MLIR allows multiple regions inside a single operation, whereas we
     introduce extra levels of hierarchy to allow this.
   - I note re. closures that MLIR expects the enclosing scope to make
-    sure any referenced values are kept ‘live’ for long enough. Not what
+    sure any referenced values are kept 'live' for long enough. Not what
     we do in Tierkreis (the closure-maker copies them)\!
 
 ### Appendix 2: Node types and their edges
@@ -1974,7 +1974,7 @@ The "Root" row of the table applies to whichever node is the HUGR root,
 including `Module`.
 
 | Node type      | `Value` | `Order` | `Static` | `ControlFlow` | `Hierarchy` | Children |
-| -------------- | ------- | ------- |--------- | ------------- | ----------- | -------- | 
+| -------------- | ------- | ------- |--------- | ------------- | ----------- | -------- |
 | Root           | 0, 0    | 0, 0    | 0, 0     | 0, 0          | 0, ✱        |          |
 | `FuncDefn`          | 0, 0    | 0, 0    | 0, ✱     | 0, 0          | 1, +        | DSG      |
 | `FuncDecl`      | 0, 0    | 0, 0    | 0, ✱     | 0, 0          | 1, 0        |          |
@@ -1990,7 +1990,7 @@ including `Module`.
 | `CFG`          | ✱, ✱    | ✱, ✱    | 0, 0     | 0, 0          | 1, +        | CSG      |
 | `DFB`          | 0, 0    | 0, 0    | 0, 0     | ✱, ✱          | 1, +        | DSG      |
 | `Exit`         | 0, 0    | 0, 0    | 0, 0     | +, 0          | 1, 0        |          |
-| `TailLoop`     | ✱, ✱    | ✱, ✱    | 0, 0     | 0, 0          | 1, +        | DSG      | 
+| `TailLoop`     | ✱, ✱    | ✱, ✱    | 0, 0     | 0, 0          | 1, +        | DSG      |
 | `Conditional`  | ✱, ✱    | ✱, ✱    | 0, 0     | 0, 0          | 1, +        | `Case`   |
 | `Case`         | 0, 0    | 0, 0    | 0, 0     | 0, 0          | 1, +        | DSG      |
 
