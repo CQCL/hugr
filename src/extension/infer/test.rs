@@ -118,8 +118,7 @@ fn plus() -> Result<(), InferExtensionError> {
     for n in 1..4 {
         for d in Direction::BOTH {
             let meta = ctx.fresh_meta();
-            ctx.extensions
-                .insert((NodeIndex::new(n).into(), d), meta);
+            ctx.extensions.insert((NodeIndex::new(n).into(), d), meta);
             metas.push(meta);
         }
     }
@@ -1038,10 +1037,16 @@ fn funcdefn_signature_mismatch2() -> Result<(), Box<dyn Error>> {
 fn call_bug() -> Result<(), Box<dyn Error>> {
     use crate::builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder};
     use crate::extension::prelude::{ConstUsize, PRELUDE_ID, USIZE_T};
+    use crate::utils::test::viz_dotstr;
     use crate::values::Value;
 
     let mut module = ModuleBuilder::new();
-    let mut outer = module.define_function("outer", FunctionType::new(vec![], vec![]).into())?;
+    let mut outer = module.define_function(
+        "outer",
+        FunctionType::new(vec![], vec![])
+            .with_extension_delta(&ExtensionSet::from_iter([PRELUDE_ID, A, B]))
+            .into(),
+    )?;
 
     let inner = outer.define_function("inner", FunctionType::new(vec![USIZE_T], vec![]).into())?;
     let [w] = inner.input_wires_arr();
@@ -1058,8 +1063,13 @@ fn call_bug() -> Result<(), Box<dyn Error>> {
         ops::Const::new(int_value, USIZE_T, ExtensionSet::from_iter([PRELUDE_ID, B])).unwrap();
     let const_x_id = outer.add_constant(constant_x)?;
     let const_x = outer.load_const(&const_x_id)?;
+    let lift_x_node = outer.add_lift_nodes(ExtensionSet::from_iter([PRELUDE_ID, A]), [const_x], [USIZE_T])?.unwrap();
+    let [const_x] = lift_x_node.outputs_arr();
+
     let const_y_id = outer.add_constant(constant_y)?;
     let const_y = outer.load_const(&const_y_id)?;
+    let lift_y_node = outer.add_lift_nodes(ExtensionSet::from_iter([PRELUDE_ID, B]), [const_y], [USIZE_T])?.unwrap();
+    let [const_y] = lift_y_node.outputs_arr();
 
     outer
         .call(f_id.handle(), &[], [const_x], &PRELUDE_REGISTRY)?
@@ -1069,6 +1079,12 @@ fn call_bug() -> Result<(), Box<dyn Error>> {
         .node();
 
     outer.finish_with_outputs([])?;
+    println!("HWFG!");
+    infer_extensions_with_debug(module.hugr(), |metas| {
+        viz_dotstr(module.hugr().dot_string_with_metas(metas))
+    })?;
+    println!("Did the thing! Validation is going wrong");
+    //viz_hugr(module.hugr());
     module.finish_prelude_hugr()?;
 
     Ok(())

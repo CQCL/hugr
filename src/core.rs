@@ -15,7 +15,7 @@ use crate::hugr::HugrError;
 )]
 #[serde(transparent)]
 pub struct Node {
-    index: portgraph::NodeIndex,
+    pub index: portgraph::NodeIndex,
 }
 
 /// A handle to a port for a node in the HUGR.

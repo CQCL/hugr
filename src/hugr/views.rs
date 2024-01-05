@@ -20,7 +20,9 @@ pub use sibling_subgraph::SiblingSubgraph;
 use context_iterators::{ContextIterator, IntoContextIterator, MapWithCtx};
 use itertools::{Itertools, MapInto};
 use portgraph::dot::{DotFormat, EdgeStyle, NodeStyle, PortStyle};
+use portgraph::NodeIndex;
 use portgraph::{multiportgraph, LinkView, MultiPortGraph, PortView};
+use std::collections::HashMap;
 
 use super::{Hugr, HugrError, NodeMetadata, NodeMetadataMap, NodeType, DEFAULT_NODETYPE};
 use crate::ops::handle::NodeHandle;
@@ -357,17 +359,30 @@ pub trait HugrView: sealed::HugrInternals {
 
     /// Return dot string showing underlying graph and hierarchy side by side.
     fn dot_string(&self) -> String {
+        self.dot_string_with_metas(HashMap::new())
+    }
+
+    /// Return dot string, including metavariables from unification if provided
+    fn dot_string_with_metas(&self, metas: HashMap<NodeIndex, (u32, u32)>) -> String {
         let hugr = self.base_hugr();
         let graph = self.portgraph();
         graph
             .dot_format()
             .with_hierarchy(&hugr.hierarchy)
             .with_node_style(|n| {
-                NodeStyle::Box(format!(
-                    "({ni}) {name}",
-                    ni = n.index(),
-                    name = self.get_optype(n.into()).name()
-                ))
+                if let Some((mi, mo)) = metas.get(&n) {
+                    NodeStyle::Box(format!(
+                        "[{mi}]\n({ni}) {name}\n[{mo}]",
+                        ni = n.index(),
+                        name = self.get_optype(n.into()).name()
+                    ))
+                } else {
+                    NodeStyle::Box(format!(
+                        "({ni}) {name}",
+                        ni = n.index(),
+                        name = self.get_optype(n.into()).name()
+                    ))
+                }
             })
             .with_port_style(|port| {
                 let node = graph.port_node(port).unwrap();

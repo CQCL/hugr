@@ -21,10 +21,13 @@ use crate::{
 use super::validate::ExtensionError;
 
 use petgraph::graph as pg;
+use petgraph::visit::EdgeRef;
 use petgraph::{Directed, EdgeType, Undirected};
+use portgraph::NodeIndex;
 
 use std::collections::{HashMap, HashSet, VecDeque};
 
+use std::fmt::Debug;
 use thiserror::Error;
 
 /// A mapping from nodes on the hugr to extension requirement sets which have
@@ -40,10 +43,20 @@ pub type ExtensionSolution = HashMap<Node, ExtensionSet>;
 pub fn infer_extensions(
     hugr: &impl HugrView,
 ) -> Result<(ExtensionSolution, ExtensionSolution), InferExtensionError> {
+    infer_extensions_with_debug(hugr, |_| ())
+}
+
+pub fn infer_extensions_with_debug<F>(
+    hugr: &impl HugrView,
+    debug_closure: F,
+) -> Result<(ExtensionSolution, ExtensionSolution), InferExtensionError>
+where
+    F: Fn(HashMap<NodeIndex, (u32, u32)>),
+{
     let mut ctx = UnificationContext::new(hugr);
     let solution = ctx.main_loop()?;
     ctx.instantiate_variables();
-    let closed_solution = ctx.main_loop()?;
+    let closed_solution = ctx.main_loop_with_debug(debug_closure)?;
     let closure: ExtensionSolution = closed_solution
         .into_iter()
         .filter(|(node, _)| !solution.contains_key(node))
@@ -110,6 +123,7 @@ pub enum InferExtensionError {
 /// A graph of metavariables connected by constraints.
 /// The edges represent `Equal` constraints in the undirected graph and `Plus`
 /// constraints in the directed case.
+#[derive(Debug)]
 struct GraphContainer<Dir: EdgeType> {
     graph: pg::Graph<Meta, (), Dir>,
     node_map: HashMap<Meta, pg::NodeIndex>,
@@ -617,10 +631,60 @@ impl UnificationContext {
     /// *concrete* `ExtensionSet`, e.g. if the ExtensionSet relies on an open
     /// variable in the toplevel graph, don't include that location in the map
     pub fn main_loop(&mut self) -> Result<ExtensionSolution, InferExtensionError> {
+        self.main_loop_with_debug(|_| ())
+    }
+
+    fn main_loop_with_debug<F>(&mut self, viz: F) -> Result<ExtensionSolution, InferExtensionError>
+    where
+        F: Fn(HashMap<NodeIndex, (u32, u32)>) -> (),
+    {
+        // Remaining nodes to work through
         let mut remaining = HashSet::<Meta>::from_iter(self.constraints.keys().cloned());
 
+        let mut hingy: HashMap<NodeIndex, (u32, u32)>;
         // Keep going as long as we're making progress (= merging and solving nodes)
         loop {
+            // All input extensinos
+            let inputs = self
+                .extensions
+                .iter()
+                .filter(|((_, dir), _)| *dir == Direction::Incoming)
+                .map(|((n, _), m)| (n, m))
+                .collect::<HashMap<_, _>>();
+            let outputs = self
+                .extensions
+                .iter()
+                .filter(|((_, dir), _)| *dir == Direction::Outgoing)
+                .map(|((n, _), m)| (n, m))
+                .collect::<HashMap<_, _>>();
+            for n in self.extensions.keys().map(|(n, _)| n) {
+                let input = self.extensions.get(&(*n, Direction::Incoming)).is_some();
+                let output = self.extensions.get(&(*n, Direction::Outgoing)).is_some();
+                if !(input && output) {
+                    for x in self.extensions.iter() {
+                        println!("{:?}", x);
+                    }
+                    viz(HashMap::new());
+                    if input {
+                        panic!("Node {n} has missing output!");
+                    } else {
+                        panic!("Node {n} has missing input!");
+                    }
+                }
+            }
+
+            hingy = inputs
+                .into_iter()
+                .map(|(n, mi)| {
+                    (
+                        n.index,
+                        (
+                            self.resolve(*mi).0,
+                            self.resolve(**outputs.get(n).unwrap()).0,
+                        ),
+                    )
+                })
+                .collect();
             // Try to solve metas with the information we have now. This may
             // register new equalities on the EqGraph
             let to_delete = self.solve_constraints(&remaining)?;
@@ -644,6 +708,7 @@ impl UnificationContext {
             }
             remaining.extend(new)
         }
+        viz(hingy);
         self.results()
     }
 

@@ -458,6 +458,8 @@ mod test {
 
     #[test]
     fn cfg() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::utils::test::viz_hugr;
+
         let reg =
             ExtensionRegistry::try_new([PRELUDE.to_owned(), collections::EXTENSION.to_owned()])
                 .unwrap();
@@ -493,6 +495,7 @@ mod test {
         cfg.branch(&entry, 0, &bb2)?;
         cfg.branch(&bb2, 0, &exit)?;
 
+        viz_hugr(cfg.hugr());
         let mut h = cfg.finish_hugr(&reg).unwrap();
         {
             let pop = find_node(&h, "pop");

@@ -4,6 +4,7 @@ use crate::hugr::views::HugrView;
 use crate::hugr::{NodeMetadata, ValidationError};
 use crate::ops::{self, LeafOp, OpTag, OpTrait, OpType};
 use crate::{IncomingPort, Node, OutgoingPort};
+use crate::type_row;
 
 use std::iter;
 
@@ -216,6 +217,34 @@ pub trait Dataflow: Container {
         let outs = add_node_with_wires(self, nodetype, input_wires.into_iter().collect())?;
 
         Ok(outs.into())
+    }
+
+    // Add a bunch of lift nodes (chaining them together in an order that shouldn't matter
+    // returns a handle to the last one
+    // Promise me that the type row is the right length
+    fn add_lift_nodes<const N: usize>(
+        &mut self,
+        extensions: ExtensionSet,
+        input_wires: [Wire; N],
+        types: [Type; N], // Type row
+    ) -> Result<Option<BuildHandle<DataflowOpID>>, BuildError> {
+        let mut dangling_wires: [Wire; N] = input_wires;
+        let type_row = TypeRow::from(types.to_vec());
+
+        if dangling_wires.len() != type_row.len() {
+            // Complain loudly
+            panic!("piss off");
+        }
+        let mut current_node: Option<BuildHandle<DataflowOpID>> = None;
+        for ext in extensions.iter() {
+            let lift = self.add_dataflow_op(ops::LeafOp::Lift {
+                type_row: type_row.clone(),
+                new_extension: ext.clone(),
+            }, dangling_wires)?;
+            dangling_wires = lift.outputs_arr::<N>();
+            current_node = Some(lift);
+        }
+        Ok(current_node)
     }
 
     /// Insert a hugr-defined op to the sibling graph, wiring up the
