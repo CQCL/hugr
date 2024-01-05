@@ -125,7 +125,7 @@ pub struct DataflowBlock {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-/// The single exit node of the CFG, has no children,
+/// The single exit node of the CFG. Has no children,
 /// stores the types of the CFG node output.
 pub struct ExitBlock {
     /// Output type row of the CFG.
@@ -140,7 +140,7 @@ impl OpName for DataflowBlock {
 
 impl OpName for ExitBlock {
     fn name(&self) -> SmolStr {
-        "Exit".into()
+        "ExitBlock".into()
     }
 }
 
