@@ -40,16 +40,6 @@ pub(crate) trait DataflowOpTrait {
     fn static_input(&self) -> Option<EdgeKind> {
         None
     }
-
-    /// The edge kind for a single constant output of the operation, not
-    /// described by the dataflow signature.
-    ///
-    /// If not None, an extra output port of that kind will be present after the
-    /// dataflow output ports and before any [`DataflowOpTrait::other_output`] ports.
-    #[inline]
-    fn static_output(&self) -> Option<EdgeKind> {
-        None
-    }
 }
 
 /// Helpers to construct input and output nodes
@@ -150,10 +140,6 @@ impl<T: DataflowOpTrait> OpTrait for T {
 
     fn static_input(&self) -> Option<EdgeKind> {
         DataflowOpTrait::static_input(self)
-    }
-
-    fn static_output(&self) -> Option<EdgeKind> {
-        DataflowOpTrait::static_output(self)
     }
 }
 impl<T: DataflowOpTrait> StaticTag for T {
