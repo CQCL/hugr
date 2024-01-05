@@ -260,7 +260,7 @@ impl SiblingSubgraph {
                     return false;
                 }
                 // TODO: what if there are multiple outgoing edges?
-                // See https://github.com/CQCL-DEV/hugr/issues/518
+                // See https://github.com/CQCL/hugr/issues/518
                 let (in_n, _) = hugr.linked_ports(n, p).next().unwrap();
                 !nodes_set.contains(&in_n)
             })
@@ -350,7 +350,7 @@ impl SiblingSubgraph {
         }
 
         // TODO: handle state order edges. For now panic if any are present.
-        // See https://github.com/CQCL-DEV/hugr/discussions/432
+        // See https://github.com/CQCL/hugr/discussions/432
         let rep_inputs = replacement.node_outputs(rep_input).map(|p| (rep_input, p));
         let rep_outputs = replacement.node_inputs(rep_output).map(|p| (rep_output, p));
         let (rep_inputs, in_order_ports): (Vec<_>, Vec<_>) = rep_inputs.partition(|&(n, p)| {
@@ -981,7 +981,7 @@ mod tests {
 
     #[test]
     fn edge_both_output_and_copy() {
-        // https://github.com/CQCL-DEV/hugr/issues/518
+        // https://github.com/CQCL/hugr/issues/518
         let one_bit = type_row![BOOL_T];
         let two_bit = type_row![BOOL_T, BOOL_T];
 

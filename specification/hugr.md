@@ -1597,7 +1597,7 @@ crate. A base PortGraph is composed with hierarchy (as an alternate
 implementation of `Hierarchy` relationships) and weight components. The
 implementation of this design document is available on GitHub.
 
-<https://github.com/CQCL-DEV/hugr>
+<https://github.com/CQCL/hugr>
 
 ## Standard Library
 
