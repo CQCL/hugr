@@ -127,29 +127,30 @@ impl ExtensionValidator {
         input: Node,
         output: Node,
     ) -> Result<(), ExtensionError> {
-        #[cfg(feature = "extension_inference")] {
-        let parent_input_extensions = self.query_extensions(parent, Direction::Incoming)?;
-        let parent_output_extensions = self.query_extensions(parent, Direction::Outgoing)?;
-        for dir in Direction::BOTH {
-            let input_extensions = self.query_extensions(input, dir)?;
-            let output_extensions = self.query_extensions(output, dir)?;
-            if parent_input_extensions != input_extensions {
-                return Err(ExtensionError::ParentIOExtensionMismatch {
-                    parent,
-                    parent_extensions: parent_input_extensions.clone(),
-                    child: input,
-                    child_extensions: input_extensions.clone(),
-                });
-            };
-            if parent_output_extensions != output_extensions {
-                return Err(ExtensionError::ParentIOExtensionMismatch {
-                    parent,
-                    parent_extensions: parent_output_extensions.clone(),
-                    child: output,
-                    child_extensions: output_extensions.clone(),
-                });
-            };
-        }
+        #[cfg(feature = "extension_inference")]
+        {
+            let parent_input_extensions = self.query_extensions(parent, Direction::Incoming)?;
+            let parent_output_extensions = self.query_extensions(parent, Direction::Outgoing)?;
+            for dir in Direction::BOTH {
+                let input_extensions = self.query_extensions(input, dir)?;
+                let output_extensions = self.query_extensions(output, dir)?;
+                if parent_input_extensions != input_extensions {
+                    return Err(ExtensionError::ParentIOExtensionMismatch {
+                        parent,
+                        parent_extensions: parent_input_extensions.clone(),
+                        child: input,
+                        child_extensions: input_extensions.clone(),
+                    });
+                };
+                if parent_output_extensions != output_extensions {
+                    return Err(ExtensionError::ParentIOExtensionMismatch {
+                        parent,
+                        parent_extensions: parent_output_extensions.clone(),
+                        child: output,
+                        child_extensions: output_extensions.clone(),
+                    });
+                };
+            }
         }
         Ok(())
     }
