@@ -1,23 +1,21 @@
 use std::error::Error;
 
 use super::*;
-#[cfg(feature = "extension_inference")]
-use crate::builder::test::closed_dfg_root_hugr;
 use crate::builder::{
     Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder, ModuleBuilder,
 };
 use crate::extension::prelude::QB_T;
 use crate::extension::ExtensionId;
 use crate::extension::{prelude::PRELUDE_REGISTRY, ExtensionSet};
-#[cfg(feature = "extension_inference")]
-use crate::hugr::validate::ValidationError;
 use crate::hugr::{Hugr, HugrMut, HugrView, NodeType};
 use crate::macros::const_extension_ids;
 use crate::ops::custom::{ExternalOp, OpaqueOp};
-#[cfg(feature = "extension_inference")]
-use crate::ops::handle::NodeHandle;
 use crate::ops::{self, dataflow::IOTrait};
 use crate::ops::{LeafOp, OpType};
+#[cfg(feature = "extension_inference")]
+use crate::{
+    builder::test::closed_dfg_root_hugr, hugr::validate::ValidationError, ops::handle::NodeHandle,
+};
 
 use crate::type_row;
 use crate::types::{FunctionType, Type, TypeRow};

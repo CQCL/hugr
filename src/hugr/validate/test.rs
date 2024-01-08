@@ -1,9 +1,10 @@
 use cool_asserts::assert_matches;
 
+#[cfg(feature = "extension_inference")]
+use crate::{builder::ModuleBuilder, macros::const_extension_ids};
+
 use super::*;
 use crate::builder::test::closed_dfg_root_hugr;
-#[cfg(feature = "extension_inference")]
-use crate::builder::ModuleBuilder;
 use crate::builder::{
     BuildError, Container, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder,
 };
@@ -13,8 +14,6 @@ use crate::extension::{
 };
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::hugr::{HugrError, HugrMut, NodeType};
-#[cfg(feature = "extension_inference")]
-use crate::macros::const_extension_ids;
 use crate::ops::dataflow::IOTrait;
 use crate::ops::{self, Const, LeafOp, OpType};
 use crate::std_extensions::logic::test::{and_op, or_op};
