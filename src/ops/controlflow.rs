@@ -4,7 +4,7 @@ use smol_str::SmolStr;
 
 use crate::extension::ExtensionSet;
 use crate::types::{EdgeKind, FunctionType, Type, TypeRow};
-use crate::{type_row, Direction};
+use crate::Direction;
 
 use super::dataflow::{DataflowOpTrait, DataflowParent};
 use super::OpTag;
@@ -179,10 +179,8 @@ impl OpTrait for DataflowBlock {
         Some(EdgeKind::ControlFlow)
     }
 
-    fn dataflow_signature(&self) -> Option<FunctionType> {
-        Some(
-            FunctionType::new(type_row![], type_row![]).with_extension_delta(&self.extension_delta),
-        )
+    fn extension_delta(&self) -> ExtensionSet {
+        self.extension_delta.clone()
     }
 
     fn non_df_port_count(&self, dir: Direction) -> usize {
@@ -208,10 +206,6 @@ impl OpTrait for ExitBlock {
 
     fn other_output(&self) -> Option<EdgeKind> {
         Some(EdgeKind::ControlFlow)
-    }
-
-    fn dataflow_signature(&self) -> Option<FunctionType> {
-        Some(FunctionType::new(type_row![], type_row![]))
     }
 
     fn non_df_port_count(&self, dir: Direction) -> usize {

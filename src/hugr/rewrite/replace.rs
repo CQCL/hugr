@@ -521,7 +521,9 @@ mod test {
                 inputs: vec![listy.clone()].into(),
                 tuple_sum_rows: vec![type_row![]],
                 other_outputs: vec![listy.clone()].into(),
-                extension_delta: ExtensionSet::singleton(&collections::EXTENSION_NAME),
+                // This should be ExtensionSet::singleton(&collections::EXTENSION_NAME),
+                // at least when https://github.com/CQCL/issues/388 is fixed
+                extension_delta: ExtensionSet::new(),
             },
         )?;
         let r_df1 = replacement.add_node_with_parent(
