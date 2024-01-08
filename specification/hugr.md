@@ -272,7 +272,7 @@ the following basic dataflow operations are available (in addition to the
     `Static<Function>` edge to specify the graph being called. The
     signature of the node (defined by its incoming and outgoing `Value` edges) matches the function being called.
   - `LoadConstant<T>`: has an incoming `Static<T>` edge, where `T` is a `CopyableType`, and a
-    `Value<Local,T>` output, used to load a static constant into the local
+    `Value<T>` output, used to load a static constant into the local
     dataflow graph.
   - `identity<T>`: pass-through, no operation is performed.
   - `DFG`: A nested dataflow graph.
@@ -765,7 +765,7 @@ indices after the list of node indices?
 
 ## Type System
 
-There are three classes of type: ``AnyType`` $\supset$ ``CopyableType`` $\supset$ ``EqType``. Types in these classes  are distinguished by the operations possible on (runtime) values of those types:
+There are three classes of type: ``AnyType`` $\supset$ ``CopyableType`` $\supset$ ``EqType``. Types in these classes are distinguished by the operations possible on (runtime) values of those types:
   - For the broadest class (``AnyType``), the only operation supported is the identity operation (aka no-op, or `lift` - see [Extension Tracking](#extension-tracking) below). Specifically, we do not require it to be possible to copy or discard all values, hence the requirement that outports of linear type must have exactly one edge. (That is, a type not known to be in the copyable subset). All incoming ports must have exactly one edge.
 
     In fully qubit-counted contexts programs take in a number of qubits as input and return the same number, with no discarding. See [quantum extension](#quantum-extension) for more.
@@ -1083,9 +1083,9 @@ the value of each member of `params` is given by the following production:
 ```
 TypeParam ::= "Type"("Any"|"Copyable"|"Eq") | "BoundedUSize(u64)" | "Extensions" | "List"(TypeParam) | "Tuple"([TypeParam]) | Opaque
 
-Opaque ::= string<[TypeArgs]>
+Opaque ::= string<[TypeArg]>
 
-TypeArgs ::= Type(Type) | BoundedUSize(u64) | Extensions | List([TypeArg]) | Tuple([TypeArg])
+TypeArg ::= Type(Type) | BoundedUSize(u64) | Extensions | List([TypeArg]) | Tuple([TypeArg])
 
 Type ::= Name<[TypeArg]>
 ```
