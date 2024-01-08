@@ -226,7 +226,8 @@ operations have value ports, but some have Static or other
 edges. The following operations are *only* valid as immediate children of a
 `Module` node.
 
-  - `FuncDecl`: an external function declaration. The name of the function 
+  - `FuncDecl`: an external function declaration. The name of the function,
+    a list of type parameters (TypeParams, see [Type System](#type-system))
     and function attributes (relevant for compilation)
     define the node weight. The node has an outgoing `Static<Function>`
     edge for each use of the function. The function name is used at link time to
@@ -269,8 +270,13 @@ the following basic dataflow operations are available (in addition to the
     the inputs to the function, and the inputs to `Output` are the
     outputs of the function.
   - `Call`: Call a statically defined function. There is an incoming
-    `Static<Function>` edge to specify the graph being called. The
-    signature of the node (defined by its incoming and outgoing `Value` edges) matches the function being called.
+    `Static<Function>` edge to specify the graph being called. The `Call`
+    node specifies any type arguments to the function in the node weight,
+    and the signature of the node (defined by its incoming and outgoing `Value` edges)
+    matches the (type-instantiated) function being called.
+  - `TypeApply`: has a `Value<Function>` input, whose type is polymorphic (i.e. declares some type parameters);
+    the node specifies some type arguments (matching those parameters) in the node weight;
+    and there is  a `Value<Function>` output (corresponding to the type instantiation of the input)
   - `LoadConstant<T>`: has an incoming `Static<T>` edge, where `T` is a `CopyableType`, and a
     `Value<T>` output, used to load a static constant into the local
     dataflow graph.
@@ -792,17 +798,58 @@ Extensions ::= (Extension)* -- a set, not a list
 
 Type ::= Tuple(#) -- fixed-arity, heterogeneous components 
        | Sum(#)   -- disjoint union of other types, ??tagged by unsigned int??
-       | Function[Extensions](#, #) -- monomorphic
-       | Opaque(Name, TypeArgs) -- a (instantiation of a) custom type defined by an extension
+       | Opaque(Name, [TypeArg]) -- a (instantiation of a) custom type defined by an extension
+       | Function(TypeParams, #, #, Extensions) -- polymorphic with type parameters, function arguments + results
+       | Variable -- refers to a TypeParam bound by the nearest enclosing FuncDefn node, or an enclosing Function Type
 ```
-<!--      Function(TypeParams, #, #, Extensions) -- polymorphic, so move TypeParams section here
-#       | Variable -- refers to a TypeParam bound by an enclosing Graph-->
-
 The majority of types will be Opaque ones defined by extensions including the [standard library](#standard-library). However a number of types can be constructed using only the core type constructors: for example the empty tuple type, aka `unit`, with exactly one instance (so 0 bits of data); the empty sum, with no instances; the empty Function type (taking no arguments and producing no results - `void -> void`); and compositions thereof.
 
 Types representing functions are generally ``CopyableType``, but not ``EqType``. (It is undecidable whether two functions produce the same result for all possible inputs, or similarly whether one computation graph can be rewritten into another by semantic-preserving rewrites).
 
 Tuples and Sums are ``CopyableType`` (respectively, ``EqType``) if all their components are; they are also fixed-size if their components are.
+
+### Polymorphism
+
+`Function` types are polymorphic: they may declare a number of type parameters of kinds as follows:
+
+```haskell
+TypeParam ::= Type(Any|Copyable|Eq)
+            | BoundedUSize(u64|) -- note optional bound
+            | Extensions
+            | List(TypeParam) -- homogenous, any sized
+            | Tuple([TypeParam]) -- heterogenous, fixed size
+            | Opaque(Name, [TypeArg]) -- e.g. Opaque("Array", [5, Opaque("usize", [])])
+```
+(We write `[Foo]` to indicate a list of Foo's.)
+
+For each such TypeParam, the body of the FunctionType (input, output, and extensions - see [Extension Tracking](#extension-tracking))
+may contain "type variables" referring to that TypeParam, i.e. the binder. (The type variable is typically a type, but
+not necessarily, depending upon the TypeParam.)
+
+When the `Function` is `Call`ed, TypeArgs appropriate for the TypeParams must be provided by the Call:
+
+```
+TypeArg ::= Type(Type)
+          | BoundedUSize(u64)
+          | Extensions(Extensions)
+          | Sequence([TypeArg])
+          | Opaque(Value)
+          | Variable -- refers to an enclosing TypeParam (binder)
+```
+
+A `Sequence` argument is appropriate for a parameter of kind either `List` or `Tuple`.
+For example, a Function declaring a `TypeParam::Opaque("Array", [5, TypeArg::Type(Type::Opaque("usize"))])`
+means that any `Call` to it must statically provide a *value* that is an array of 5 `usize`s;
+or a Function declaring a `TypeParam::BoundedUSize(5)` and a `TypeParam::Type(Any)` requires two TypeArgs,
+firstly a non-negative integer less than 5, secondly a type (which might be from an extension, e.g. `usize`).
+
+Given TypeArgs, the body of the `Function` type can be converted to a monomorphic signature by substitution,
+placing the provided TypeArg into any place in the body referring to the corresponding type variable.
+This is infallible as long as the TypeArgs match the declared TypeParams, which can be checked statically.
+
+Note that when within a `Function` type, TypeParams of kind `List`, `Tuple` or `Opaque` can only be used
+to instantiate polymorphic type declarations in extensions; these TypeParams have other uses in defining
+extension ops. See [Operation Extensibility](#operation-extensibility).
 
 ### Extension Tracking
 
@@ -945,18 +992,21 @@ at runtime. In many cases this is desirable.
 
 To strike a balance then, every extension provides YAML that declares its opaque
 types and a number of named **OpDef**s (operation-definitions), which may be
-polymorphic in type. Each OpDef specifies one of two methods for how the type
-of individual operations is computed:
+polymorphic in type. Each OpDef *either*:
 
-1. A type scheme is included in the YAML, to be processed by a "type scheme interpreter"
-   that is built into tools that process the HUGR.
-2. The extension self-registers binary code (e.g. a Rust trait) providing a function
-   `compute_signature` that computes the type.
+1. Provides a `Function` type, as per [Type System](#type-system), which may declare TypeParams; *or*
+2. The extension may self-register binary code (e.g. a Rust trait) providing a function
+   `compute_signature` that fallibly computes a `Function` type given some type arguments.
+   The operation declares the arguments required by the `compute_signature` function as a list
+   of TypeParams (notably including `TypeParam::List`, `Tuple` and `Opaque`);
+   the returned `Function` type may then declare additional TypeParams.
 
-Each OpDef may declare named type parameters---if so then the individual operation nodes
-in a HUGR will provide for each a static-constant "type argument": a value that in many
-cases will be a type. These type arguments are processed by the type scheme interpreter
-or the `compute_signature` implementation to compute the type of that operation node.
+Individual operation nodes in a HUGR provide static-constant TypeArgs - in many cases
+these will be types. For operations defining binary `compute_signature`, each node will
+provide TypeArgs for *both* the binary function *and* the `Function` type that returns;
+note the args to `compute_signature` may *not* refer to any type variables declared by
+ancestor nodes in the Hugr (specifically, may *not* use variables declared by the
+enclosing FuncDefn) i.e. these must be static constants unaffected by substitution.
 
 When serializing the node, we also serialize the type arguments; we can also serialize
 the resulting (computed) type with the operation, and this will be useful when the type
@@ -1077,21 +1127,7 @@ extensions:
       extensions: ["arithmetic.int", r] # r is the ExtensionSet in "params"
 ```
 
-The declaration of the `params` uses a language that is a distinct, simplified
-form of the [Type System](#type-system) - writing terminals that appear in the YAML in quotes,
-the value of each member of `params` is given by the following production:
-```
-TypeParam ::= "Type"("Any"|"Copyable"|"Eq") | "BoundedUSize(u64)" | "Extensions" | "List"(TypeParam) | "Tuple"([TypeParam]) | Opaque
-
-Opaque ::= string<[TypeArg]>
-
-TypeArg ::= Type(Type) | BoundedUSize(u64) | Extensions | List([TypeArg]) | Tuple([TypeArg])
-
-Type ::= Name<[TypeArg]>
-```
-(We write `[Foo]` to indicate a list of Foo's; and omit `<>` where the contents is the empty list).
-
-To use an OpDef as an Op, or a TypeDef as a type, the user must provide a type argument for each type param in the def: a type in the appropriate class, a bounded usize, a set of extensions, a list or tuple of arguments.
+<!-- To use an OpDef as an Op, or a TypeDef as a type, the user must provide a type argument for each type param in the def: a type in the appropriate class, a bounded usize, a set of extensions, a list or tuple of arguments. -->
 
 **Implementation note** Reading this format into Rust is made easy by `serde` and
 [serde\_yaml](https://github.com/dtolnay/serde-yaml) (see the
