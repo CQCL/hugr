@@ -13,9 +13,9 @@ use super::Rewrite;
 
 /// Remove a [`crate::ops::LoadConstant`] node with no consumers.
 #[derive(Debug, Clone)]
-pub struct RemoveConstIgnore(pub Node);
+pub struct RemoveLoadConstant(pub Node);
 
-/// Error from an [`RemoveConst`] or [`RemoveConstIgnore`] operation.
+/// Error from an [`RemoveConst`] or [`RemoveLoadConstant`] operation.
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
 pub enum RemoveError {
     /// Invalid node.
@@ -29,7 +29,7 @@ pub enum RemoveError {
     RemoveFail(#[from] HugrError),
 }
 
-impl Rewrite for RemoveConstIgnore {
+impl Rewrite for RemoveLoadConstant {
     type Error = RemoveError;
 
     // The Const node the LoadConstant was connected to.
@@ -161,20 +161,20 @@ mod test {
         );
 
         assert_eq!(
-            h.apply_rewrite(RemoveConstIgnore(tup_node)),
+            h.apply_rewrite(RemoveLoadConstant(tup_node)),
             Err(RemoveError::InvalidNode(tup_node))
         );
         let load_1_node = load_1.node();
         let load_2_node = load_2.node();
         let con_node = con_node.node();
 
-        let remove_1 = RemoveConstIgnore(load_1_node);
+        let remove_1 = RemoveLoadConstant(load_1_node);
         assert_eq!(
             remove_1.invalidation_set().exactly_one().ok(),
             Some(load_1_node)
         );
 
-        let remove_2 = RemoveConstIgnore(load_2_node);
+        let remove_2 = RemoveLoadConstant(load_2_node);
 
         let remove_con = RemoveConst(con_node);
         assert_eq!(

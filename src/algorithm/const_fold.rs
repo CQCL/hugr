@@ -8,7 +8,7 @@ use crate::{
     builder::{DFGBuilder, Dataflow, DataflowHugr},
     extension::{ConstFoldResult, ExtensionRegistry},
     hugr::{
-        rewrite::consts::{RemoveConst, RemoveConstIgnore},
+        rewrite::consts::{RemoveConst, RemoveLoadConstant},
         views::SiblingSubgraph,
         HugrMut,
     },
@@ -96,14 +96,14 @@ fn const_graph(consts: Vec<Const>, reg: &ExtensionRegistry) -> Hugr {
 /// return an iterator of possible constant folding rewrites. The
 /// [`SimpleReplacement`] replaces an operation with constants that result from
 /// evaluating it, the extension registry `reg` is used to validate the
-/// replacement HUGR. The vector of [`RemoveConstIgnore`] refer to the
+/// replacement HUGR. The vector of [`RemoveLoadConstant`] refer to the
 /// LoadConstant nodes that could be removed - they are not automatically
 /// removed as they may be used by other operations.
 pub fn find_consts<'a, 'r: 'a>(
     hugr: &'a impl HugrView,
     candidate_nodes: impl IntoIterator<Item = Node> + 'a,
     reg: &'r ExtensionRegistry,
-) -> impl Iterator<Item = (SimpleReplacement, Vec<RemoveConstIgnore>)> + 'a {
+) -> impl Iterator<Item = (SimpleReplacement, Vec<RemoveLoadConstant>)> + 'a {
     // track nodes for operations that have already been considered for folding
     let mut used_neighbours = BTreeSet::new();
 
@@ -135,14 +135,14 @@ fn fold_op(
     hugr: &impl HugrView,
     op_node: Node,
     reg: &ExtensionRegistry,
-) -> Option<(SimpleReplacement, Vec<RemoveConstIgnore>)> {
+) -> Option<(SimpleReplacement, Vec<RemoveLoadConstant>)> {
     // only support leaf folding for now.
     let neighbour_op = hugr.get_optype(op_node).as_leaf_op()?;
     let (in_consts, removals): (Vec<_>, Vec<_>) = hugr
         .node_inputs(op_node)
         .filter_map(|in_p| {
             let (con_op, load_n) = get_const(hugr, op_node, in_p)?;
-            Some(((in_p, con_op), RemoveConstIgnore(load_n)))
+            Some(((in_p, con_op), RemoveLoadConstant(load_n)))
         })
         .unzip();
     // attempt to evaluate op
