@@ -148,11 +148,10 @@ impl TryFrom<&Hugr> for SerHugrV0 {
             .expect("Could not reach one of the nodes");
 
         let find_offset = |node: Node, offset: usize, dir: Direction, hugr: &Hugr| {
-            let sig = hugr.signature(node).unwrap_or_default();
-            let offset = match offset < sig.port_count(dir) {
-                true => Some(offset as u16),
-                false => None,
-            };
+            let op = hugr.get_optype(node);
+            let is_value_port = offset < op.value_port_count(dir);
+            let is_static_input = op.static_port(dir).map_or(false, |p| p.index() == offset);
+            let offset = (is_value_port || is_static_input).then_some(offset as u16);
             (node_rekey[&node], offset)
         };
 
@@ -263,6 +262,8 @@ pub mod test {
     use crate::hugr::NodeType;
     use crate::ops::custom::{ExtensionOp, OpaqueOp};
     use crate::ops::{dataflow::IOTrait, Input, LeafOp, Module, Output, DFG};
+    use crate::std_extensions::arithmetic::float_ops::FLOAT_OPS_REGISTRY;
+    use crate::std_extensions::arithmetic::float_types::{ConstF64, FLOAT64_TYPE};
     use crate::std_extensions::logic::NotOp;
     use crate::types::{FunctionType, Type};
     use crate::OutgoingPort;
@@ -479,5 +480,19 @@ pub mod test {
         let new_hugr: Hugr = check_hugr_roundtrip(&hugr);
         new_hugr.validate(&EMPTY_REG).unwrap_err();
         new_hugr.validate(&PRELUDE_REGISTRY).unwrap();
+    }
+
+    #[test]
+    fn constants_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
+        let mut builder = DFGBuilder::new(FunctionType::new(vec![], vec![FLOAT64_TYPE])).unwrap();
+        let w = builder.add_load_const(ConstF64::new(0.5))?;
+        let hugr = builder.finish_hugr_with_outputs([w], &FLOAT_OPS_REGISTRY)?;
+
+        let ser = serde_json::to_string(&hugr)?;
+        let deser = serde_json::from_str(&ser)?;
+
+        assert_eq!(hugr, deser);
+
+        Ok(())
     }
 }

@@ -5,13 +5,12 @@ use super::{
     BasicBlockID, BuildError, CfgID, Container, Dataflow, HugrBuilder, Wire,
 };
 
-use crate::ops::{self, DataflowBlock, ExitBlock, OpType};
+use crate::ops::{self, handle::NodeHandle, DataflowBlock, DataflowParent, ExitBlock, OpType};
 use crate::{
     extension::{ExtensionRegistry, ExtensionSet},
     types::FunctionType,
 };
 use crate::{hugr::views::HugrView, types::TypeRow};
-use crate::{ops::handle::NodeHandle, types::Type};
 
 use crate::Node;
 use crate::{
@@ -150,13 +149,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
             self.hugr_mut().add_node_with_parent(parent, op)
         }?;
 
-        BlockBuilder::create(
-            self.hugr_mut(),
-            block_n,
-            tuple_sum_rows,
-            other_outputs,
-            inputs,
-        )
+        BlockBuilder::create(self.hugr_mut(), block_n)
     }
 
     /// Return a builder for a non-entry [`DataflowBlock`] child graph with `inputs`
@@ -248,19 +241,9 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
     ) -> Result<(), BuildError> {
         Dataflow::set_outputs(self, [branch_wire].into_iter().chain(outputs))
     }
-
-    fn create(
-        base: B,
-        block_n: Node,
-        tuple_sum_rows: impl IntoIterator<Item = TypeRow>,
-        other_outputs: TypeRow,
-        inputs: TypeRow,
-    ) -> Result<Self, BuildError> {
-        // The node outputs a TupleSum before the data outputs of the block node
-        let tuple_sum_type = Type::new_tuple_sum(tuple_sum_rows);
-        let mut node_outputs = vec![tuple_sum_type];
-        node_outputs.extend_from_slice(&other_outputs);
-        let signature = FunctionType::new(inputs, TypeRow::from(node_outputs));
+    fn create(base: B, block_n: Node) -> Result<Self, BuildError> {
+        let block_op = base.get_optype(block_n).as_dataflow_block().unwrap();
+        let signature = block_op.inner_signature();
         let inp_ex = base
             .as_ref()
             .get_nodetype(block_n)
@@ -305,7 +288,7 @@ impl BlockBuilder<Hugr> {
 
         let base = Hugr::new(NodeType::new(op, input_extensions));
         let root = base.root();
-        Self::create(base, root, tuple_sum_rows, other_outputs, inputs)
+        Self::create(base, root)
     }
 
     /// [Set outputs](BlockBuilder::set_outputs) and [finish_hugr](`BlockBuilder::finish_hugr`).

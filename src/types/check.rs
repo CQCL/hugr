@@ -1,9 +1,13 @@
 //! Logic for checking values against types.
 use thiserror::Error;
 
-use crate::{values::Value, HugrView};
+use crate::{
+    ops::{FuncDecl, FuncDefn, OpType},
+    values::Value,
+    Hugr, HugrView,
+};
 
-use super::{CustomType, Type, TypeEnum};
+use super::{CustomType, PolyFuncType, Type, TypeEnum};
 
 /// Struct for custom type check fails.
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
@@ -45,6 +49,20 @@ pub enum ConstTypeError {
     CustomCheckFail(#[from] CustomCheckFailure),
 }
 
+fn type_sig_equal(v: &Hugr, t: &PolyFuncType) -> bool {
+    // exact signature equality, in future this may need to be
+    // relaxed to be compatibility checks between the signatures.
+    let root_op = v.get_optype(v.root());
+    if let OpType::FuncDecl(FuncDecl { signature, .. })
+    | OpType::FuncDefn(FuncDefn { signature, .. }) = root_op
+    {
+        signature == t
+    } else {
+        v.get_function_type()
+            .is_some_and(|ft| &PolyFuncType::from(ft) == t)
+    }
+}
+
 impl Type {
     /// Check that a [`Value`] is a valid instance of this [`Type`].
     ///
@@ -57,13 +75,7 @@ impl Type {
                 e_val.0.check_custom_type(e)?;
                 Ok(())
             }
-            (TypeEnum::Function(t), Value::Function { hugr: v })
-                if v.get_function_type().is_some_and(|f| **t == f) =>
-            {
-                // exact signature equality, in future this may need to be
-                // relaxed to be compatibility checks between the signatures.
-                Ok(())
-            }
+            (TypeEnum::Function(t), Value::Function { hugr: v }) if type_sig_equal(v, t) => Ok(()),
             (TypeEnum::Tuple(t), Value::Tuple { vs: t_v }) => {
                 if t.len() != t_v.len() {
                     return Err(ConstTypeError::TupleWrongLength);

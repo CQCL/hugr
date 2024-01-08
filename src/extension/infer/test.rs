@@ -14,7 +14,9 @@ use crate::ops::{self, dataflow::IOTrait};
 use crate::ops::{LeafOp, OpType};
 #[cfg(feature = "extension_inference")]
 use crate::{
-    builder::test::closed_dfg_root_hugr, hugr::validate::ValidationError, ops::handle::NodeHandle,
+    builder::test::closed_dfg_root_hugr,
+    hugr::validate::ValidationError,
+    ops::{dataflow::DataflowParent, handle::NodeHandle},
 };
 
 use crate::type_row;

@@ -1355,7 +1355,7 @@ omitted it defaults to the parent of `c` (in this case said `c` will
 have to be in a DSG or CSG rather than under the Module Root.) If `P` is
 provided, it must be a descendent of the parent of `c`.
 
-###### `RemoveConstIgnore`
+###### `RemoveLoadConstant`
 
 Given a `LoadConstant<T>` node `n` that has no outgoing edges, remove
 it (and its incoming Static edge and any Order edges) from the hugr.
@@ -1408,7 +1408,7 @@ using `Replace` (with a set of `identity<T>` nodes) followed by
 ### Normalisation
 
 We envisage that some kind of pass can be used after a rewrite or series
-of rewrites to automatically apply RemoveConstIgnore for any unused
+of rewrites to automatically apply RemoveLoadConstant for any unused
 load\_constants, and other such
 tidies. This might be global, or by tracking which parts of the Hugr
 have been touched.
