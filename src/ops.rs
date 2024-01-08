@@ -243,9 +243,9 @@ impl OpType {
     /// Returns the number of ports for the given direction.
     #[inline]
     pub fn port_count(&self, dir: Direction) -> usize {
-        let static_input = self.static_port_kind(dir).is_some() as usize;
+        let has_static_port = self.static_port_kind(dir).is_some();
         let non_df_count = self.non_df_port_count(dir);
-        self.value_port_count(dir) + static_input + non_df_count
+        self.value_port_count(dir) + has_static_port as usize + non_df_count
     }
 
     /// Returns the number of inputs ports for the operation.
