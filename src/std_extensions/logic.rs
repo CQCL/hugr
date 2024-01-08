@@ -3,6 +3,7 @@
 use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 
 use crate::{
+    algorithm::const_fold::sorted_consts,
     extension::{
         prelude::BOOL_T,
         simple_op::{try_from_name, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError},
@@ -14,7 +15,7 @@ use crate::{
         type_param::{TypeArg, TypeParam},
         FunctionType,
     },
-    Extension,
+    Extension, IncomingPort,
 };
 use lazy_static::lazy_static;
 /// Name of extension false value.
@@ -45,6 +46,21 @@ impl MakeOpDef for NaryLogic {
 
     fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError> {
         try_from_name(op_def.name())
+    }
+
+    fn post_opdef(&self, def: &mut OpDef) {
+        def.set_constant_folder(match self {
+            NaryLogic::And => |consts: &_| {
+                let inps = read_inputs(consts)?;
+                let res = inps.into_iter().all(|x| x);
+                Some(vec![(0.into(), const_from_bool(res))])
+            },
+            NaryLogic::Or => |consts: &_| {
+                let inps = read_inputs(consts)?;
+                let res = inps.into_iter().any(|x| x);
+                Some(vec![(0.into(), const_from_bool(res))])
+            },
+        })
     }
 }
 
@@ -168,6 +184,33 @@ impl MakeRegisteredOp for NotOp {
 
     fn registry<'s, 'r: 's>(&'s self) -> &'r ExtensionRegistry {
         &LOGIC_REG
+    }
+}
+
+fn read_inputs(consts: &[(IncomingPort, ops::Const)]) -> Option<Vec<bool>> {
+    let true_val = ops::Const::true_val();
+    let false_val = ops::Const::false_val();
+    let inps: Option<Vec<bool>> = sorted_consts(consts)
+        .into_iter()
+        .map(|c| {
+            if c == &true_val {
+                Some(true)
+            } else if c == &false_val {
+                Some(false)
+            } else {
+                None
+            }
+        })
+        .collect();
+    let inps = inps?;
+    Some(inps)
+}
+
+pub(crate) fn const_from_bool(res: bool) -> ops::Const {
+    if res {
+        ops::Const::true_val()
+    } else {
+        ops::Const::false_val()
     }
 }
 
