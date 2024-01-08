@@ -315,13 +315,11 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMut for T {
         let src_port = self
             .get_optype(src)
             .other_output_port()
-            .expect("Source operation has no non-dataflow outgoing edges")
-            .as_outgoing()?;
+            .expect("Source operation has no non-dataflow outgoing edges");
         let dst_port = self
             .get_optype(dst)
             .other_input_port()
-            .expect("Destination operation has no non-dataflow incoming edges")
-            .as_incoming()?;
+            .expect("Destination operation has no non-dataflow incoming edges");
         self.connect(src, src_port, dst, dst_port)?;
         Ok((src_port, dst_port))
     }

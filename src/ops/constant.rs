@@ -105,7 +105,7 @@ impl OpTrait for Const {
         <Self as StaticTag>::TAG
     }
 
-    fn other_output(&self) -> Option<EdgeKind> {
+    fn static_output(&self) -> Option<EdgeKind> {
         Some(EdgeKind::Static(self.typ.clone()))
     }
 }

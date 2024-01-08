@@ -52,7 +52,7 @@ impl OpTrait for FuncDefn {
         <Self as StaticTag>::TAG
     }
 
-    fn other_output(&self) -> Option<EdgeKind> {
+    fn static_output(&self) -> Option<EdgeKind> {
         Some(EdgeKind::Static(Type::new_function(self.signature.clone())))
     }
 }
@@ -79,7 +79,7 @@ impl OpTrait for FuncDecl {
         <Self as StaticTag>::TAG
     }
 
-    fn other_output(&self) -> Option<EdgeKind> {
+    fn static_output(&self) -> Option<EdgeKind> {
         Some(EdgeKind::Static(Type::new_function(self.signature.clone())))
     }
 }

@@ -17,6 +17,7 @@ pub(crate) trait DataflowOpTrait {
     ///
     /// If not None, a single extra output multiport of that kind will be
     /// present.
+    #[inline]
     fn other_input(&self) -> Option<EdgeKind> {
         Some(EdgeKind::StateOrder)
     }
@@ -25,8 +26,19 @@ pub(crate) trait DataflowOpTrait {
     ///
     /// If not None, a single extra output multiport of that kind will be
     /// present.
+    #[inline]
     fn other_output(&self) -> Option<EdgeKind> {
         Some(EdgeKind::StateOrder)
+    }
+
+    /// The edge kind for a single constant input of the operation, not
+    /// described by the dataflow signature.
+    ///
+    /// If not None, an extra input port of that kind will be present after the
+    /// dataflow input ports and before any [`DataflowOpTrait::other_input`] ports.
+    #[inline]
+    fn static_input(&self) -> Option<EdgeKind> {
+        None
     }
 }
 
@@ -125,6 +137,10 @@ impl<T: DataflowOpTrait> OpTrait for T {
     fn other_output(&self) -> Option<EdgeKind> {
         DataflowOpTrait::other_output(self)
     }
+
+    fn static_input(&self) -> Option<EdgeKind> {
+        DataflowOpTrait::static_input(self)
+    }
 }
 impl<T: DataflowOpTrait> StaticTag for T {
     const TAG: OpTag = T::TAG;
@@ -132,9 +148,9 @@ impl<T: DataflowOpTrait> StaticTag for T {
 
 /// Call a function directly.
 ///
-/// The first ports correspond to the signature of the function being
-/// called. Immediately following those ports, the first input port is
-/// connected to the def/declare block with a `ConstE<Graph>` edge.
+/// The first ports correspond to the signature of the function being called.
+/// The port immediately following those those is connected to the def/declare
+/// block with a [`EdgeKind::Static`] edge.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Call {
     /// Signature of function being called
@@ -152,6 +168,11 @@ impl DataflowOpTrait for Call {
     fn signature(&self) -> FunctionType {
         self.signature.clone()
     }
+
+    fn static_input(&self) -> Option<EdgeKind> {
+        let fn_typ = Type::new_function(self.called_function_type().clone());
+        Some(EdgeKind::Static(fn_typ))
+    }
 }
 impl Call {
     #[inline]
@@ -161,6 +182,21 @@ impl Call {
     }
 
     /// The IncomingPort which links to the function being called.
+    ///
+    /// This matches [`OpType::static_input_port`].
+    ///
+    /// ```
+    /// # use hugr::ops::dataflow::Call;
+    /// # use hugr::ops::OpType;
+    /// # use hugr::types::FunctionType;
+    /// # use hugr::extension::prelude::QB_T;
+    /// let signature = FunctionType::new(vec![QB_T, QB_T], vec![QB_T, QB_T]);
+    /// let call = Call { signature };
+    /// let op = OpType::Call(call.clone());
+    /// assert_eq!(op.static_input_port(), Some(call.called_function_port()));
+    /// ```
+    ///
+    /// [`OpType::static_input_port`]: crate::ops::OpType::static_input_port
     #[inline]
     pub fn called_function_port(&self) -> IncomingPort {
         self.called_function_type().input_count().into()
@@ -208,6 +244,10 @@ impl DataflowOpTrait for LoadConstant {
     fn signature(&self) -> FunctionType {
         FunctionType::new(TypeRow::new(), vec![self.datatype.clone()])
     }
+
+    fn static_input(&self) -> Option<EdgeKind> {
+        Some(EdgeKind::Static(self.constant_type().clone()))
+    }
 }
 impl LoadConstant {
     #[inline]
@@ -217,6 +257,20 @@ impl LoadConstant {
     }
 
     /// The IncomingPort which links to the loaded constant.
+    ///
+    /// This matches [`OpType::static_input_port`].
+    ///
+    /// ```
+    /// # use hugr::ops::dataflow::LoadConstant;
+    /// # use hugr::ops::OpType;
+    /// # use hugr::types::Type;
+    /// let datatype = Type::UNIT;
+    /// let load_constant = LoadConstant { datatype };
+    /// let op = OpType::LoadConstant(load_constant.clone());
+    /// assert_eq!(op.static_input_port(), Some(load_constant.constant_port()));
+    /// ```
+    ///
+    /// [`OpType::static_input_port`]: crate::ops::OpType::static_input_port
     #[inline]
     pub fn constant_port(&self) -> IncomingPort {
         0.into()
