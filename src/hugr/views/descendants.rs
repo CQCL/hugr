@@ -261,7 +261,7 @@ pub(super) mod test {
 
         assert_eq!(
             region.get_function_type(),
-            Some(FunctionType::new(type_row![NAT, QB], type_row![NAT, QB]))
+            Some(FunctionType::new_endo(type_row![NAT, QB]))
         );
         let inner_region: DescendantsGraph = DescendantsGraph::try_new(&hugr, inner)?;
         assert_eq!(

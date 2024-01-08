@@ -331,8 +331,8 @@ pub trait HugrView: sealed::HugrInternals {
         }
     }
 
-    /// For function-like HUGRs (DFG, FuncDefn, FuncDecl), report the function
-    /// type. Otherwise return None.
+    /// For HUGRs with a [`DataflowParent`][crate::ops::DataflowParent] root operation, report the
+    /// signature of the inner dataflow sibling graph. Otherwise return None.
     fn get_function_type(&self) -> Option<FunctionType> {
         let op = self.get_nodetype(self.root());
         op.op.inner_function_type()
