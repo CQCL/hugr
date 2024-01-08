@@ -355,19 +355,6 @@ pub enum HugrError {
 mod test {
     use super::{Hugr, HugrView};
     #[cfg(feature = "extension_inference")]
-    use crate::builder::test::closed_dfg_root_hugr;
-    #[cfg(feature = "extension_inference")]
-    use crate::extension::ExtensionSet;
-    #[cfg(feature = "extension_inference")]
-    use crate::hugr::HugrMut;
-    #[cfg(feature = "extension_inference")]
-    use crate::ops;
-    #[cfg(feature = "extension_inference")]
-    use crate::type_row;
-    #[cfg(feature = "extension_inference")]
-    use crate::types::{FunctionType, Type};
-
-    #[cfg(feature = "extension_inference")]
     use std::error::Error;
 
     #[test]
@@ -390,6 +377,13 @@ mod test {
     #[cfg(feature = "extension_inference")]
     #[test]
     fn extension_instantiation() -> Result<(), Box<dyn Error>> {
+        use crate::builder::test::closed_dfg_root_hugr;
+        use crate::extension::ExtensionSet;
+        use crate::hugr::HugrMut;
+        use crate::ops::LeafOp;
+        use crate::type_row;
+        use crate::types::{FunctionType, Type};
+
         const BIT: Type = crate::extension::prelude::USIZE_T;
         let r = ExtensionSet::singleton(&"R".try_into().unwrap());
 
@@ -399,7 +393,7 @@ mod test {
         let [input, output] = hugr.get_io(hugr.root()).unwrap();
         let lift = hugr.add_node_with_parent(
             hugr.root(),
-            ops::LeafOp::Lift {
+            LeafOp::Lift {
                 type_row: type_row![BIT],
                 new_extension: "R".try_into().unwrap(),
             },
