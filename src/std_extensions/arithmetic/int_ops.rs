@@ -350,13 +350,15 @@ mod test {
     }
     #[test]
     fn test_binary_signatures() {
+        let delta = ExtensionSet::singleton(&EXTENSION_ID);
         assert_eq!(
             IntOpDef::iwiden_s
                 .with_two_widths(3, 4)
                 .to_extension_op()
                 .unwrap()
                 .signature(),
-            FunctionType::new(vec![int_type(ta(3))], vec![int_type(ta(4))],)
+            FunctionType::new(vec![int_type(ta(3))], vec![int_type(ta(4))])
+                .with_extension_delta(&delta),
         );
         assert_eq!(
             IntOpDef::iwiden_s
@@ -364,7 +366,8 @@ mod test {
                 .to_extension_op()
                 .unwrap()
                 .signature(),
-            FunctionType::new(vec![int_type(ta(3))], vec![int_type(ta(3))],)
+            FunctionType::new(vec![int_type(ta(3))], vec![int_type(ta(3))])
+                .with_extension_delta(&delta),
         );
         assert_eq!(
             IntOpDef::inarrow_s
@@ -372,7 +375,8 @@ mod test {
                 .to_extension_op()
                 .unwrap()
                 .signature(),
-            FunctionType::new(vec![int_type(ta(3))], vec![sum_with_error(int_type(ta(3)))],)
+            FunctionType::new(vec![int_type(ta(3))], vec![sum_with_error(int_type(ta(3)))])
+                .with_extension_delta(&delta),
         );
         assert!(
             IntOpDef::iwiden_u
@@ -388,7 +392,8 @@ mod test {
                 .to_extension_op()
                 .unwrap()
                 .signature(),
-            FunctionType::new(vec![int_type(ta(2))], vec![sum_with_error(int_type(ta(1)))],)
+            FunctionType::new(vec![int_type(ta(2))], vec![sum_with_error(int_type(ta(1)))])
+                .with_extension_delta(&delta)
         );
 
         assert!(IntOpDef::inarrow_u

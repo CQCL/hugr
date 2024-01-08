@@ -201,10 +201,11 @@ where
 pub(super) mod test {
     use crate::{
         builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
-        ops::handle::NodeHandle,
+        extension::ExtensionSet,
+        ops::{handle::NodeHandle, LeafOp},
         type_row,
         types::{FunctionType, Type},
-        utils::test_quantum_extension::h_gate,
+        utils::test_quantum_extension::{h_gate, EXTENSION_ID},
     };
 
     use super::*;
@@ -222,16 +223,27 @@ pub(super) mod test {
         let (f_id, inner_id) = {
             let mut func_builder = module_builder.define_function(
                 "main",
-                FunctionType::new(type_row![NAT, QB], type_row![NAT, QB]).into(),
+                FunctionType::new_endo(type_row![NAT, QB])
+                    .with_extension_delta(&ExtensionSet::singleton(&EXTENSION_ID))
+                    .into(),
             )?;
 
             let [int, qb] = func_builder.input_wires_arr();
 
             let q_out = func_builder.add_dataflow_op(h_gate(), vec![qb])?;
+            let [int] = func_builder
+                .add_dataflow_op(
+                    LeafOp::Lift {
+                        type_row: type_row![NAT],
+                        new_extension: EXTENSION_ID,
+                    },
+                    [int],
+                )?
+                .outputs_arr();
 
             let inner_id = {
                 let inner_builder = func_builder.dfg_builder(
-                    FunctionType::new(type_row![NAT], type_row![NAT]),
+                    FunctionType::new_endo(type_row![NAT]),
                     None,
                     [int],
                 )?;
@@ -249,11 +261,11 @@ pub(super) mod test {
 
     #[test]
     fn full_region() -> Result<(), Box<dyn std::error::Error>> {
-        let (hugr, def, inner) = make_module_hgr()?;
+        let (hugr, def, inner) = make_module_hgr().unwrap();
 
         let region: DescendantsGraph = DescendantsGraph::try_new(&hugr, def)?;
 
-        assert_eq!(region.node_count(), 7);
+        assert_eq!(region.node_count(), 8);
         assert!(region.nodes().all(|n| n == def
             || hugr.get_parent(n) == Some(def)
             || hugr.get_parent(n) == Some(inner)));
@@ -261,7 +273,11 @@ pub(super) mod test {
 
         assert_eq!(
             region.get_function_type(),
-            Some(FunctionType::new(type_row![NAT, QB], type_row![NAT, QB]).into())
+            Some(
+                FunctionType::new_endo(type_row![NAT, QB])
+                    .with_extension_delta(&ExtensionSet::singleton(&EXTENSION_ID))
+                    .into()
+            )
         );
         let inner_region: DescendantsGraph = DescendantsGraph::try_new(&hugr, inner)?;
         assert_eq!(

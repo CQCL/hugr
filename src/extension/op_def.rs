@@ -224,7 +224,7 @@ impl SignatureFunc {
     ///
     /// This function will return an error if the type arguments are invalid or
     /// there is some error in type computation.
-    pub fn compute_signature(
+    fn compute_signature(
         &self,
         def: &OpDef,
         args: &[TypeArg],
@@ -246,10 +246,10 @@ impl SignatureFunc {
             }
         };
 
-        let res = pf.instantiate(args, exts)?;
-        // TODO bring this assert back once resource inference is done?
-        // https://github.com/CQCL/hugr/issues/388
-        // debug_assert!(res.extension_reqs.contains(def.extension()));
+        let mut res = pf.instantiate(args, exts)?;
+        res.extension_reqs = res
+            .extension_reqs
+            .union(&ExtensionSet::singleton(def.extension()));
         Ok(res)
     }
 }
@@ -563,10 +563,10 @@ mod test {
         let args = [TypeArg::BoundedNat { n: 3 }, USIZE_T.into()];
         assert_eq!(
             def.compute_signature(&args, &PRELUDE_REGISTRY),
-            Ok(FunctionType::new(
-                vec![USIZE_T; 3],
-                vec![Type::new_tuple(vec![USIZE_T; 3])]
-            ))
+            Ok(
+                FunctionType::new(vec![USIZE_T; 3], vec![Type::new_tuple(vec![USIZE_T; 3])])
+                    .with_extension_delta(&ExtensionSet::singleton(&EXT_ID))
+            )
         );
         assert_eq!(def.validate_args(&args, &PRELUDE_REGISTRY, &[]), Ok(()));
 
@@ -576,10 +576,10 @@ mod test {
         let args = [TypeArg::BoundedNat { n: 3 }, tyvar.clone().into()];
         assert_eq!(
             def.compute_signature(&args, &PRELUDE_REGISTRY),
-            Ok(FunctionType::new(
-                tyvars.clone(),
-                vec![Type::new_tuple(tyvars)]
-            ))
+            Ok(
+                FunctionType::new(tyvars.clone(), vec![Type::new_tuple(tyvars)])
+                    .with_extension_delta(&ExtensionSet::singleton(&EXT_ID))
+            )
         );
         def.validate_args(&args, &PRELUDE_REGISTRY, &[TypeBound::Eq.into()])
             .unwrap();
@@ -632,7 +632,8 @@ mod test {
         def.validate_args(&args, &EMPTY_REG, &decls).unwrap();
         assert_eq!(
             def.compute_signature(&args, &EMPTY_REG),
-            Ok(FunctionType::new_endo(vec![tv]))
+            Ok(FunctionType::new_endo(vec![tv])
+                .with_extension_delta(&ExtensionSet::singleton(&EXT_ID)))
         );
         Ok(())
     }

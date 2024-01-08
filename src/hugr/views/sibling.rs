@@ -387,7 +387,7 @@ mod test {
 
         let region: SiblingGraph = SiblingGraph::try_new(&hugr, def)?;
 
-        assert_eq!(region.node_count(), 5);
+        assert_eq!(region.node_count(), 6);
         assert!(region
             .nodes()
             .all(|n| n == def || hugr.get_parent(n) == Some(def)));
