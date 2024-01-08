@@ -120,12 +120,14 @@ impl ExtensionValidator {
 
     /// Check that a pair of input and output nodes declare the same extensions
     /// as in the signature of their parents.
+    #[allow(unused_variables)]
     pub fn validate_io_extensions(
         &self,
         parent: Node,
         input: Node,
         output: Node,
     ) -> Result<(), ExtensionError> {
+        #[cfg(feature = "extension_inference")] {
         let parent_input_extensions = self.query_extensions(parent, Direction::Incoming)?;
         let parent_output_extensions = self.query_extensions(parent, Direction::Outgoing)?;
         for dir in Direction::BOTH {
@@ -147,6 +149,7 @@ impl ExtensionValidator {
                     child_extensions: output_extensions.clone(),
                 });
             };
+        }
         }
         Ok(())
     }

@@ -9,7 +9,6 @@ use petgraph::visit::{Topo, Walker};
 use portgraph::{LinkView, PortView};
 use thiserror::Error;
 
-#[cfg(feature = "extension_inference")]
 use crate::extension::validate::ExtensionValidator;
 use crate::extension::SignatureError;
 use crate::extension::{
@@ -37,7 +36,7 @@ struct ValidationContext<'a, 'b> {
     /// Dominator tree for each CFG region, using the container node as index.
     dominators: HashMap<Node, Dominators<Node>>,
     /// Context for the extension validation.
-    #[cfg(feature = "extension_inference")]
+    #[allow(dead_code)]
     extension_validator: ExtensionValidator,
     /// Registry of available Extensions
     extension_registry: &'b ExtensionRegistry,
@@ -77,7 +76,6 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         Self {
             hugr,
             dominators: HashMap::new(),
-            #[cfg(feature = "extension_inference")]
             extension_validator: ExtensionValidator::new(hugr, extension_closure),
             extension_registry,
         }
