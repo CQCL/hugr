@@ -1,19 +1,23 @@
 use std::error::Error;
 
 use super::*;
-use crate::builder::test::closed_dfg_root_hugr;
 use crate::builder::{
     Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder, ModuleBuilder,
 };
 use crate::extension::prelude::QB_T;
 use crate::extension::ExtensionId;
 use crate::extension::{prelude::PRELUDE_REGISTRY, ExtensionSet};
-use crate::hugr::{validate::ValidationError, Hugr, HugrMut, HugrView, NodeType};
+use crate::hugr::{Hugr, HugrMut, HugrView, NodeType};
 use crate::macros::const_extension_ids;
 use crate::ops::custom::{ExternalOp, OpaqueOp};
-use crate::ops::dataflow::DataflowParent;
-use crate::ops::{self, dataflow::IOTrait, handle::NodeHandle};
+use crate::ops::{self, dataflow::IOTrait};
 use crate::ops::{LeafOp, OpType};
+#[cfg(feature = "extension_inference")]
+use crate::{
+    builder::test::closed_dfg_root_hugr,
+    hugr::validate::ValidationError,
+    ops::{dataflow::DataflowParent, handle::NodeHandle},
+};
 
 use crate::type_row;
 use crate::types::{FunctionType, Type, TypeRow};
@@ -154,6 +158,7 @@ fn plus() -> Result<(), InferExtensionError> {
     Ok(())
 }
 
+#[cfg(feature = "extension_inference")]
 #[test]
 // This generates a solution that causes validation to fail
 // because of a missing lift node
@@ -215,6 +220,7 @@ fn open_variables() -> Result<(), InferExtensionError> {
     Ok(())
 }
 
+#[cfg(feature = "extension_inference")]
 #[test]
 // Infer the extensions on a child node with no inputs
 fn dangling_src() -> Result<(), Box<dyn Error>> {
@@ -306,6 +312,7 @@ fn create_with_io(
     Ok([node, input, output])
 }
 
+#[cfg(feature = "extension_inference")]
 #[test]
 fn test_conditional_inference() -> Result<(), Box<dyn Error>> {
     fn build_case(
@@ -968,6 +975,7 @@ fn simple_funcdefn() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+#[cfg(feature = "extension_inference")]
 #[test]
 fn funcdefn_signature_mismatch() -> Result<(), Box<dyn Error>> {
     let mut builder = ModuleBuilder::new();
@@ -998,6 +1006,7 @@ fn funcdefn_signature_mismatch() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+#[cfg(feature = "extension_inference")]
 #[test]
 // Test that the difference between a FuncDefn's input and output nodes is being
 // constrained to be the same as the extension delta in the FuncDefn signature.

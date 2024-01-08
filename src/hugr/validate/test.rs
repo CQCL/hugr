@@ -4,7 +4,6 @@ use super::*;
 use crate::builder::test::closed_dfg_root_hugr;
 use crate::builder::{
     BuildError, Container, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder,
-    ModuleBuilder,
 };
 use crate::extension::prelude::{BOOL_T, PRELUDE, USIZE_T};
 use crate::extension::{
@@ -12,7 +11,6 @@ use crate::extension::{
 };
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::hugr::{HugrError, HugrMut, NodeType};
-use crate::macros::const_extension_ids;
 use crate::ops::dataflow::IOTrait;
 use crate::ops::{self, Const, LeafOp, OpType};
 use crate::std_extensions::logic::test::{and_op, or_op};
@@ -23,7 +21,6 @@ use crate::values::Value;
 use crate::{type_row, Direction, IncomingPort, Node};
 
 const NAT: Type = crate::extension::prelude::USIZE_T;
-const Q: Type = crate::extension::prelude::QB_T;
 
 /// Creates a hugr with a single function definition that copies a bit `copies` times.
 ///
@@ -64,38 +61,6 @@ fn add_df_children(b: &mut Hugr, parent: Node, copies: usize) -> (Node, Node, No
     }
 
     (input, copy, output)
-}
-
-/// Adds an input{BOOL_T}, tag_constant(0, BOOL_T^tuple_sum_size), tag(BOOL_T^tuple_sum_size), and
-/// output{Sum{unit^tuple_sum_size}, BOOL_T} operation to a dataflow container.
-/// Intended to be used to populate a BasicBlock node in a CFG.
-///
-/// Returns the node indices of each of the operations.
-fn add_block_children(
-    b: &mut Hugr,
-    parent: Node,
-    tuple_sum_size: usize,
-) -> (Node, Node, Node, Node) {
-    let const_op = ops::Const::unit_sum(0, tuple_sum_size as u8);
-    let tag_type = Type::new_unit_sum(tuple_sum_size as u8);
-
-    let input = b
-        .add_node_with_parent(parent, ops::Input::new(type_row![BOOL_T]))
-        .unwrap();
-    let output = b
-        .add_node_with_parent(parent, ops::Output::new(vec![tag_type.clone(), BOOL_T]))
-        .unwrap();
-    let tag_def = b.add_node_with_parent(b.root(), const_op).unwrap();
-    let tag = b
-        .add_node_with_parent(parent, ops::LoadConstant { datatype: tag_type })
-        .unwrap();
-
-    b.connect(tag_def, 0, tag, 0).unwrap();
-    b.add_other_edge(input, tag).unwrap();
-    b.connect(tag, 0, output, 0).unwrap();
-    b.connect(input, 0, output, 1).unwrap();
-
-    (input, tag_def, tag, output)
 }
 
 #[test]
@@ -258,107 +223,6 @@ fn df_children_restrictions() {
 }
 
 #[test]
-/// Validation errors in a dataflow subgraph.
-fn cfg_children_restrictions() {
-    let (mut b, def) = make_simple_hugr(1);
-    let (_input, _output, copy) = b
-        .hierarchy
-        .children(def.pg_index())
-        .map_into()
-        .collect_tuple()
-        .unwrap();
-    // Write Extension annotations into the Hugr while it's still well-formed
-    // enough for us to compute them
-    let closure = b.infer_extensions().unwrap();
-    b.instantiate_extensions(closure);
-    b.validate(&EMPTY_REG).unwrap();
-    b.replace_op(
-        copy,
-        NodeType::new_pure(ops::CFG {
-            signature: FunctionType::new(type_row![BOOL_T], type_row![BOOL_T]),
-        }),
-    )
-    .unwrap();
-    assert_matches!(
-        b.validate(&EMPTY_REG),
-        Err(ValidationError::ContainerWithoutChildren { .. })
-    );
-    let cfg = copy;
-
-    // Construct a valid CFG, with one BasicBlock node and one exit node
-    let block = b
-        .add_node_with_parent(
-            cfg,
-            ops::DataflowBlock {
-                inputs: type_row![BOOL_T],
-                tuple_sum_rows: vec![type_row![]],
-                other_outputs: type_row![BOOL_T],
-                extension_delta: ExtensionSet::new(),
-            },
-        )
-        .unwrap();
-    add_block_children(&mut b, block, 1);
-    let exit = b
-        .add_node_with_parent(
-            cfg,
-            ops::ExitBlock {
-                cfg_outputs: type_row![BOOL_T],
-            },
-        )
-        .unwrap();
-    b.add_other_edge(block, exit).unwrap();
-    assert_eq!(b.update_validate(&EMPTY_REG), Ok(()));
-
-    // Test malformed errors
-
-    // Add an internal exit node
-    let exit2 = b
-        .add_node_after(
-            exit,
-            ops::ExitBlock {
-                cfg_outputs: type_row![BOOL_T],
-            },
-        )
-        .unwrap();
-    assert_matches!(
-        b.validate(&EMPTY_REG),
-        Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::InternalExitChildren { child, .. }, .. })
-            => {assert_eq!(parent, cfg); assert_eq!(child, exit2.pg_index())}
-    );
-    b.remove_node(exit2).unwrap();
-
-    // Change the types in the BasicBlock node to work on qubits instead of bits
-    b.replace_op(
-        block,
-        NodeType::new_pure(ops::DataflowBlock {
-            inputs: type_row![Q],
-            tuple_sum_rows: vec![type_row![]],
-            other_outputs: type_row![Q],
-            extension_delta: ExtensionSet::new(),
-        }),
-    )
-    .unwrap();
-    let mut block_children = b.hierarchy.children(block.pg_index());
-    let block_input = block_children.next().unwrap().into();
-    let block_output = block_children.next_back().unwrap().into();
-    b.replace_op(
-        block_input,
-        NodeType::new_pure(ops::Input::new(type_row![Q])),
-    )
-    .unwrap();
-    b.replace_op(
-        block_output,
-        NodeType::new_pure(ops::Output::new(type_row![Type::new_unit_sum(1), Q])),
-    )
-    .unwrap();
-    assert_matches!(
-        b.validate(&EMPTY_REG),
-        Err(ValidationError::InvalidEdges { parent, source: EdgeValidationError::CFGEdgeSignatureMismatch { .. }, .. })
-            => assert_eq!(parent, cfg)
-    );
-}
-
-#[test]
 fn test_ext_edge() -> Result<(), HugrError> {
     let mut h = closed_dfg_root_hugr(FunctionType::new(
         type_row![BOOL_T, BOOL_T],
@@ -404,11 +268,6 @@ fn test_ext_edge() -> Result<(), HugrError> {
     Ok(())
 }
 
-const_extension_ids! {
-    const XA: ExtensionId = "A";
-    const XB: ExtensionId = "BOOL_EXT";
-}
-
 #[test]
 fn test_local_const() -> Result<(), HugrError> {
     let mut h = closed_dfg_root_hugr(FunctionType::new(type_row![BOOL_T], type_row![BOOL_T]));
@@ -438,159 +297,6 @@ fn test_local_const() -> Result<(), HugrError> {
     assert_eq!(h.static_source(lcst), Some(cst));
     // There is no edge from Input to LoadConstant, but that's OK:
     h.update_validate(&EMPTY_REG).unwrap();
-    Ok(())
-}
-
-#[test]
-/// A wire with no extension requirements is wired into a node which has
-/// [A,BOOL_T] extensions required on its inputs and outputs. This could be fixed
-/// by adding a lift node, but for validation this is an error.
-fn missing_lift_node() -> Result<(), BuildError> {
-    let mut module_builder = ModuleBuilder::new();
-    let mut main = module_builder.define_function(
-        "main",
-        FunctionType::new(type_row![NAT], type_row![NAT]).into(),
-    )?;
-    let [main_input] = main.input_wires_arr();
-
-    let f_builder = main.dfg_builder(
-        FunctionType::new(type_row![NAT], type_row![NAT]),
-        // Inner DFG has extension requirements that the wire wont satisfy
-        Some(ExtensionSet::from_iter([XA, XB])),
-        [main_input],
-    )?;
-    let f_inputs = f_builder.input_wires();
-    let f_handle = f_builder.finish_with_outputs(f_inputs)?;
-    let [f_output] = f_handle.outputs_arr();
-    main.finish_with_outputs([f_output])?;
-    let handle = module_builder.hugr().validate(&PRELUDE_REGISTRY);
-
-    assert_matches!(
-        handle,
-        Err(ValidationError::ExtensionError(
-            ExtensionError::TgtExceedsSrcExtensionsAtPort { .. }
-        ))
-    );
-    Ok(())
-}
-
-#[test]
-/// A wire with extension requirement `[A]` is wired into a an output with no
-/// extension req. In the validation extension typechecking, we don't do any
-/// unification, so don't allow open extension variables on the function
-/// signature, so this fails.
-fn too_many_extension() -> Result<(), BuildError> {
-    let mut module_builder = ModuleBuilder::new();
-
-    let main_sig = FunctionType::new(type_row![NAT], type_row![NAT]).into();
-
-    let mut main = module_builder.define_function("main", main_sig)?;
-    let [main_input] = main.input_wires_arr();
-
-    let inner_sig = FunctionType::new(type_row![NAT], type_row![NAT])
-        .with_extension_delta(&ExtensionSet::singleton(&XA));
-
-    let f_builder = main.dfg_builder(inner_sig, Some(ExtensionSet::new()), [main_input])?;
-    let f_inputs = f_builder.input_wires();
-    let f_handle = f_builder.finish_with_outputs(f_inputs)?;
-    let [f_output] = f_handle.outputs_arr();
-    main.finish_with_outputs([f_output])?;
-    let handle = module_builder.hugr().validate(&PRELUDE_REGISTRY);
-    assert_matches!(
-        handle,
-        Err(ValidationError::ExtensionError(
-            ExtensionError::SrcExceedsTgtExtensionsAtPort { .. }
-        ))
-    );
-    Ok(())
-}
-
-#[test]
-/// A wire with extension requirements `[A]` and another with requirements
-/// `[BOOL_T]` are both wired into a node which requires its inputs to have
-/// requirements `[A,BOOL_T]`. A slightly more complex test of the error from
-/// `missing_lift_node`.
-fn extensions_mismatch() -> Result<(), BuildError> {
-    let mut module_builder = ModuleBuilder::new();
-
-    let all_rs = ExtensionSet::from_iter([XA, XB]);
-
-    let main_sig = FunctionType::new(type_row![], type_row![NAT])
-        .with_extension_delta(&all_rs)
-        .into();
-
-    let mut main = module_builder.define_function("main", main_sig)?;
-
-    let [left_wire] = main
-        .dfg_builder(
-            FunctionType::new(type_row![], type_row![NAT]),
-            Some(ExtensionSet::singleton(&XA)),
-            [],
-        )?
-        .finish_with_outputs([])?
-        .outputs_arr();
-
-    let [right_wire] = main
-        .dfg_builder(
-            FunctionType::new(type_row![], type_row![NAT]),
-            Some(ExtensionSet::singleton(&XB)),
-            [],
-        )?
-        .finish_with_outputs([])?
-        .outputs_arr();
-
-    let builder = main.dfg_builder(
-        FunctionType::new(type_row![NAT, NAT], type_row![NAT]),
-        Some(all_rs),
-        [left_wire, right_wire],
-    )?;
-    let [_left, _right] = builder.input_wires_arr();
-    let [output] = builder.finish_with_outputs([])?.outputs_arr();
-
-    main.finish_with_outputs([output])?;
-    let handle = module_builder.hugr().validate(&PRELUDE_REGISTRY);
-    assert_matches!(
-        handle,
-        Err(ValidationError::ExtensionError(
-            ExtensionError::TgtExceedsSrcExtensionsAtPort { .. }
-        ))
-    );
-    Ok(())
-}
-
-#[test]
-fn parent_signature_mismatch() -> Result<(), BuildError> {
-    let rs = ExtensionSet::singleton(&XA);
-
-    let main_signature =
-        FunctionType::new(type_row![NAT], type_row![NAT]).with_extension_delta(&rs);
-
-    let mut hugr = Hugr::new(NodeType::new_pure(ops::DFG {
-        signature: main_signature,
-    }));
-    let input = hugr.add_node_with_parent(
-        hugr.root(),
-        NodeType::new_pure(ops::Input {
-            types: type_row![NAT],
-        }),
-    )?;
-    let output = hugr.add_node_with_parent(
-        hugr.root(),
-        NodeType::new(
-            ops::Output {
-                types: type_row![NAT],
-            },
-            rs,
-        ),
-    )?;
-    hugr.connect(input, 0, output, 0)?;
-
-    assert_matches!(
-        hugr.validate(&PRELUDE_REGISTRY),
-        Err(ValidationError::ExtensionError(
-            ExtensionError::TgtExceedsSrcExtensionsAtPort { .. }
-        ))
-    );
     Ok(())
 }
 
@@ -741,56 +447,6 @@ fn invalid_types() {
 }
 
 #[test]
-fn parent_io_mismatch() {
-    // The DFG node declares that it has an empty extension delta,
-    // but it's child graph adds extension "XB", causing a mismatch.
-    let mut hugr = Hugr::new(NodeType::new_pure(ops::DFG {
-        signature: FunctionType::new(type_row![USIZE_T], type_row![USIZE_T]),
-    }));
-
-    let input = hugr
-        .add_node_with_parent(
-            hugr.root(),
-            NodeType::new_pure(ops::Input {
-                types: type_row![USIZE_T],
-            }),
-        )
-        .unwrap();
-    let output = hugr
-        .add_node_with_parent(
-            hugr.root(),
-            NodeType::new(
-                ops::Output {
-                    types: type_row![USIZE_T],
-                },
-                ExtensionSet::singleton(&XB),
-            ),
-        )
-        .unwrap();
-
-    let lift = hugr
-        .add_node_with_parent(
-            hugr.root(),
-            NodeType::new_pure(ops::LeafOp::Lift {
-                type_row: type_row![USIZE_T],
-                new_extension: XB,
-            }),
-        )
-        .unwrap();
-
-    hugr.connect(input, 0, lift, 0).unwrap();
-    hugr.connect(lift, 0, output, 0).unwrap();
-
-    let result = hugr.validate(&PRELUDE_REGISTRY);
-    assert_matches!(
-        result,
-        Err(ValidationError::ExtensionError(
-            ExtensionError::ParentIOExtensionMismatch { .. }
-        ))
-    );
-}
-
-#[test]
 fn typevars_declared() -> Result<(), Box<dyn std::error::Error>> {
     // Base case
     let f = FunctionBuilder::new(
@@ -901,4 +557,354 @@ fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
         })
     );
     Ok(())
+}
+
+#[cfg(feature = "extension_inference")]
+mod extension_tests {
+    use super::*;
+    use crate::builder::ModuleBuilder;
+    use crate::macros::const_extension_ids;
+
+    const_extension_ids! {
+        const XA: ExtensionId = "A";
+        const XB: ExtensionId = "BOOL_EXT";
+    }
+
+    const Q: Type = crate::extension::prelude::QB_T;
+
+    /// Adds an input{BOOL_T}, tag_constant(0, BOOL_T^tuple_sum_size), tag(BOOL_T^tuple_sum_size), and
+    /// output{Sum{unit^tuple_sum_size}, BOOL_T} operation to a dataflow container.
+    /// Intended to be used to populate a BasicBlock node in a CFG.
+    ///
+    /// Returns the node indices of each of the operations.
+    fn add_block_children(
+        b: &mut Hugr,
+        parent: Node,
+        tuple_sum_size: usize,
+    ) -> (Node, Node, Node, Node) {
+        let const_op = ops::Const::unit_sum(0, tuple_sum_size as u8);
+        let tag_type = Type::new_unit_sum(tuple_sum_size as u8);
+
+        let input = b
+            .add_node_with_parent(parent, ops::Input::new(type_row![BOOL_T]))
+            .unwrap();
+        let output = b
+            .add_node_with_parent(parent, ops::Output::new(vec![tag_type.clone(), BOOL_T]))
+            .unwrap();
+        let tag_def = b.add_node_with_parent(b.root(), const_op).unwrap();
+        let tag = b
+            .add_node_with_parent(parent, ops::LoadConstant { datatype: tag_type })
+            .unwrap();
+
+        b.connect(tag_def, 0, tag, 0).unwrap();
+        b.add_other_edge(input, tag).unwrap();
+        b.connect(tag, 0, output, 0).unwrap();
+        b.connect(input, 0, output, 1).unwrap();
+
+        (input, tag_def, tag, output)
+    }
+
+    #[test]
+    /// Validation errors in a dataflow subgraph.
+    fn cfg_children_restrictions() {
+        let (mut b, def) = make_simple_hugr(1);
+        let (_input, _output, copy) = b
+            .hierarchy
+            .children(def.pg_index())
+            .map_into()
+            .collect_tuple()
+            .unwrap();
+        // Write Extension annotations into the Hugr while it's still well-formed
+        // enough for us to compute them
+        let closure = b.infer_extensions().unwrap();
+        b.instantiate_extensions(closure);
+        b.validate(&EMPTY_REG).unwrap();
+        b.replace_op(
+            copy,
+            NodeType::new_pure(ops::CFG {
+                signature: FunctionType::new(type_row![BOOL_T], type_row![BOOL_T]),
+            }),
+        )
+        .unwrap();
+        assert_matches!(
+            b.validate(&EMPTY_REG),
+            Err(ValidationError::ContainerWithoutChildren { .. })
+        );
+        let cfg = copy;
+
+        // Construct a valid CFG, with one BasicBlock node and one exit node
+        let block = b
+            .add_node_with_parent(
+                cfg,
+                ops::DataflowBlock {
+                    inputs: type_row![BOOL_T],
+                    tuple_sum_rows: vec![type_row![]],
+                    other_outputs: type_row![BOOL_T],
+                    extension_delta: ExtensionSet::new(),
+                },
+            )
+            .unwrap();
+        add_block_children(&mut b, block, 1);
+        let exit = b
+            .add_node_with_parent(
+                cfg,
+                ops::ExitBlock {
+                    cfg_outputs: type_row![BOOL_T],
+                },
+            )
+            .unwrap();
+        b.add_other_edge(block, exit).unwrap();
+        assert_eq!(b.update_validate(&EMPTY_REG), Ok(()));
+
+        // Test malformed errors
+
+        // Add an internal exit node
+        let exit2 = b
+            .add_node_after(
+                exit,
+                ops::ExitBlock {
+                    cfg_outputs: type_row![BOOL_T],
+                },
+            )
+            .unwrap();
+        assert_matches!(
+            b.validate(&EMPTY_REG),
+            Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::InternalExitChildren { child, .. }, .. })
+                => {assert_eq!(parent, cfg); assert_eq!(child, exit2.pg_index())}
+        );
+        b.remove_node(exit2).unwrap();
+
+        // Change the types in the BasicBlock node to work on qubits instead of bits
+        b.replace_op(
+            block,
+            NodeType::new_pure(ops::DataflowBlock {
+                inputs: type_row![Q],
+                tuple_sum_rows: vec![type_row![]],
+                other_outputs: type_row![Q],
+                extension_delta: ExtensionSet::new(),
+            }),
+        )
+        .unwrap();
+        let mut block_children = b.hierarchy.children(block.pg_index());
+        let block_input = block_children.next().unwrap().into();
+        let block_output = block_children.next_back().unwrap().into();
+        b.replace_op(
+            block_input,
+            NodeType::new_pure(ops::Input::new(type_row![Q])),
+        )
+        .unwrap();
+        b.replace_op(
+            block_output,
+            NodeType::new_pure(ops::Output::new(type_row![Type::new_unit_sum(1), Q])),
+        )
+        .unwrap();
+        assert_matches!(
+            b.validate(&EMPTY_REG),
+            Err(ValidationError::InvalidEdges { parent, source: EdgeValidationError::CFGEdgeSignatureMismatch { .. }, .. })
+                => assert_eq!(parent, cfg)
+        );
+    }
+
+    #[test]
+    fn parent_io_mismatch() {
+        // The DFG node declares that it has an empty extension delta,
+        // but it's child graph adds extension "XB", causing a mismatch.
+        let mut hugr = Hugr::new(NodeType::new_pure(ops::DFG {
+            signature: FunctionType::new(type_row![USIZE_T], type_row![USIZE_T]),
+        }));
+
+        let input = hugr
+            .add_node_with_parent(
+                hugr.root(),
+                NodeType::new_pure(ops::Input {
+                    types: type_row![USIZE_T],
+                }),
+            )
+            .unwrap();
+        let output = hugr
+            .add_node_with_parent(
+                hugr.root(),
+                NodeType::new(
+                    ops::Output {
+                        types: type_row![USIZE_T],
+                    },
+                    ExtensionSet::singleton(&XB),
+                ),
+            )
+            .unwrap();
+
+        let lift = hugr
+            .add_node_with_parent(
+                hugr.root(),
+                NodeType::new_pure(ops::LeafOp::Lift {
+                    type_row: type_row![USIZE_T],
+                    new_extension: XB,
+                }),
+            )
+            .unwrap();
+
+        hugr.connect(input, 0, lift, 0).unwrap();
+        hugr.connect(lift, 0, output, 0).unwrap();
+
+        let result = hugr.validate(&PRELUDE_REGISTRY);
+        assert_matches!(
+            result,
+            Err(ValidationError::ExtensionError(
+                ExtensionError::ParentIOExtensionMismatch { .. }
+            ))
+        );
+    }
+
+    #[test]
+    /// A wire with no extension requirements is wired into a node which has
+    /// [A,BOOL_T] extensions required on its inputs and outputs. This could be fixed
+    /// by adding a lift node, but for validation this is an error.
+    fn missing_lift_node() -> Result<(), BuildError> {
+        let mut module_builder = ModuleBuilder::new();
+        let mut main = module_builder.define_function(
+            "main",
+            FunctionType::new(type_row![NAT], type_row![NAT]).into(),
+        )?;
+        let [main_input] = main.input_wires_arr();
+
+        let f_builder = main.dfg_builder(
+            FunctionType::new(type_row![NAT], type_row![NAT]),
+            // Inner DFG has extension requirements that the wire wont satisfy
+            Some(ExtensionSet::from_iter([XA, XB])),
+            [main_input],
+        )?;
+        let f_inputs = f_builder.input_wires();
+        let f_handle = f_builder.finish_with_outputs(f_inputs)?;
+        let [f_output] = f_handle.outputs_arr();
+        main.finish_with_outputs([f_output])?;
+        let handle = module_builder.hugr().validate(&PRELUDE_REGISTRY);
+
+        assert_matches!(
+            handle,
+            Err(ValidationError::ExtensionError(
+                ExtensionError::TgtExceedsSrcExtensionsAtPort { .. }
+            ))
+        );
+        Ok(())
+    }
+
+    #[test]
+    /// A wire with extension requirement `[A]` is wired into a an output with no
+    /// extension req. In the validation extension typechecking, we don't do any
+    /// unification, so don't allow open extension variables on the function
+    /// signature, so this fails.
+    fn too_many_extension() -> Result<(), BuildError> {
+        let mut module_builder = ModuleBuilder::new();
+
+        let main_sig = FunctionType::new(type_row![NAT], type_row![NAT]).into();
+
+        let mut main = module_builder.define_function("main", main_sig)?;
+        let [main_input] = main.input_wires_arr();
+
+        let inner_sig = FunctionType::new(type_row![NAT], type_row![NAT])
+            .with_extension_delta(&ExtensionSet::singleton(&XA));
+
+        let f_builder = main.dfg_builder(inner_sig, Some(ExtensionSet::new()), [main_input])?;
+        let f_inputs = f_builder.input_wires();
+        let f_handle = f_builder.finish_with_outputs(f_inputs)?;
+        let [f_output] = f_handle.outputs_arr();
+        main.finish_with_outputs([f_output])?;
+        let handle = module_builder.hugr().validate(&PRELUDE_REGISTRY);
+        assert_matches!(
+            handle,
+            Err(ValidationError::ExtensionError(
+                ExtensionError::SrcExceedsTgtExtensionsAtPort { .. }
+            ))
+        );
+        Ok(())
+    }
+
+    #[test]
+    /// A wire with extension requirements `[A]` and another with requirements
+    /// `[BOOL_T]` are both wired into a node which requires its inputs to have
+    /// requirements `[A,BOOL_T]`. A slightly more complex test of the error from
+    /// `missing_lift_node`.
+    fn extensions_mismatch() -> Result<(), BuildError> {
+        let mut module_builder = ModuleBuilder::new();
+
+        let all_rs = ExtensionSet::from_iter([XA, XB]);
+
+        let main_sig = FunctionType::new(type_row![], type_row![NAT])
+            .with_extension_delta(&all_rs)
+            .into();
+
+        let mut main = module_builder.define_function("main", main_sig)?;
+
+        let [left_wire] = main
+            .dfg_builder(
+                FunctionType::new(type_row![], type_row![NAT]),
+                Some(ExtensionSet::singleton(&XA)),
+                [],
+            )?
+            .finish_with_outputs([])?
+            .outputs_arr();
+
+        let [right_wire] = main
+            .dfg_builder(
+                FunctionType::new(type_row![], type_row![NAT]),
+                Some(ExtensionSet::singleton(&XB)),
+                [],
+            )?
+            .finish_with_outputs([])?
+            .outputs_arr();
+
+        let builder = main.dfg_builder(
+            FunctionType::new(type_row![NAT, NAT], type_row![NAT]),
+            Some(all_rs),
+            [left_wire, right_wire],
+        )?;
+        let [_left, _right] = builder.input_wires_arr();
+        let [output] = builder.finish_with_outputs([])?.outputs_arr();
+
+        main.finish_with_outputs([output])?;
+        let handle = module_builder.hugr().validate(&PRELUDE_REGISTRY);
+        assert_matches!(
+            handle,
+            Err(ValidationError::ExtensionError(
+                ExtensionError::TgtExceedsSrcExtensionsAtPort { .. }
+            ))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn parent_signature_mismatch() -> Result<(), BuildError> {
+        let rs = ExtensionSet::singleton(&XA);
+
+        let main_signature =
+            FunctionType::new(type_row![NAT], type_row![NAT]).with_extension_delta(&rs);
+
+        let mut hugr = Hugr::new(NodeType::new_pure(ops::DFG {
+            signature: main_signature,
+        }));
+        let input = hugr.add_node_with_parent(
+            hugr.root(),
+            NodeType::new_pure(ops::Input {
+                types: type_row![NAT],
+            }),
+        )?;
+        let output = hugr.add_node_with_parent(
+            hugr.root(),
+            NodeType::new(
+                ops::Output {
+                    types: type_row![NAT],
+                },
+                rs,
+            ),
+        )?;
+        hugr.connect(input, 0, output, 0)?;
+
+        assert_matches!(
+            hugr.validate(&PRELUDE_REGISTRY),
+            Err(ValidationError::ExtensionError(
+                ExtensionError::TgtExceedsSrcExtensionsAtPort { .. }
+            ))
+        );
+        Ok(())
+    }
 }

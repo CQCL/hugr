@@ -3,7 +3,7 @@ name: Continuous integration
 on:
   push:
     branches:
-      - main 
+      - main
   pull_request:
     branches:
       - main
@@ -33,7 +33,7 @@ jobs:
       - name: Check formatting
         run: cargo fmt -- --check
       - name: Run clippy
-        run: cargo clippy --all-targets -- -D warnings
+        run: cargo clippy --all-targets --all-features -- -D warnings
       - name: Build docs
         run: cargo doc --no-deps --all-features
         env:
@@ -102,9 +102,9 @@ jobs:
       - name: Run tests with coverage instrumentation
         run: |
             cargo llvm-cov clean --workspace
-            cargo llvm-cov --doctests
+            cargo llvm-cov --all-features --doctests
       - name: Generate coverage report
-        run: cargo llvm-cov report --codecov --output-path coverage.json
+        run: cargo llvm-cov --all-features report --codecov --output-path coverage.json
       - name: Upload coverage to codecov.io
         uses: codecov/codecov-action@v3
         with:
