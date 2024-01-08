@@ -217,7 +217,7 @@ pub fn constant_fold_pass(h: &mut impl HugrMut, reg: &ExtensionRegistry) {
 mod test {
 
     use super::*;
-    use crate::extension::prelude::sum_with_error;
+    use crate::extension::prelude::{sum_with_error, BOOL_T};
     use crate::extension::{ExtensionRegistry, PRELUDE};
     use crate::ops::OpType;
     use crate::std_extensions::arithmetic;
@@ -225,6 +225,7 @@ mod test {
     use crate::std_extensions::arithmetic::float_ops::FloatOps;
     use crate::std_extensions::arithmetic::float_types::{ConstF64, FLOAT64_TYPE};
     use crate::std_extensions::arithmetic::int_types::{ConstIntU, INT_TYPES};
+    use crate::std_extensions::logic::{self, const_from_bool, NaryLogic};
     use rstest::rstest;
 
     /// int to constant
@@ -306,6 +307,31 @@ mod test {
         let expected = Const::new(expected, sum_type).unwrap();
         assert_fully_folded(&h, &expected);
     }
+
+    #[rstest]
+    #[case(NaryLogic::And, [true, true, true], true)]
+    #[case(NaryLogic::And, [true, false, true], false)]
+    #[case(NaryLogic::Or, [false, false, true], true)]
+    #[case(NaryLogic::Or, [false, false, false], false)]
+    fn test_logic_and(
+        #[case] op: NaryLogic,
+        #[case] ins: [bool; 3],
+        #[case] out: bool,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut build = DFGBuilder::new(FunctionType::new(type_row![], vec![BOOL_T])).unwrap();
+
+        let ins = ins.map(|b| build.add_load_const(const_from_bool(b)).unwrap());
+        let logic_op = build.add_dataflow_op(op.with_n_inputs(ins.len() as u64), ins)?;
+
+        let reg =
+            ExtensionRegistry::try_new([PRELUDE.to_owned(), logic::EXTENSION.to_owned()]).unwrap();
+        let mut h = build.finish_hugr_with_outputs(logic_op.outputs(), &reg)?;
+        constant_fold_pass(&mut h, &reg);
+
+        assert_fully_folded(&h, &const_from_bool(out));
+        Ok(())
+    }
+
     fn assert_fully_folded(h: &Hugr, expected_const: &Const) {
         // check the hugr just loads and returns a single const
         let mut node_count = 0;
