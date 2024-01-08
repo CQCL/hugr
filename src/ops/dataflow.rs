@@ -277,6 +277,12 @@ impl LoadConstant {
     }
 }
 
+/// Operations that is the parent of a dataflow graph.
+pub trait DataflowParent {
+    /// Signature of the inner dataflow graph.
+    fn inner_signature(&self) -> FunctionType;
+}
+
 /// A simply nested dataflow graph.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct DFG {
@@ -285,6 +291,13 @@ pub struct DFG {
 }
 
 impl_op_name!(DFG);
+
+impl DataflowParent for DFG {
+    fn inner_signature(&self) -> FunctionType {
+        self.signature.clone()
+    }
+}
+
 impl DataflowOpTrait for DFG {
     const TAG: OpTag = OpTag::Dfg;
 
@@ -293,6 +306,6 @@ impl DataflowOpTrait for DFG {
     }
 
     fn signature(&self) -> FunctionType {
-        self.signature.clone()
+        self.inner_signature()
     }
 }

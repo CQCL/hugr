@@ -6,7 +6,7 @@ use crate::extension::ExtensionSet;
 use crate::types::{EdgeKind, FunctionType, Type, TypeRow};
 use crate::{type_row, Direction};
 
-use super::dataflow::DataflowOpTrait;
+use super::dataflow::{DataflowOpTrait, DataflowParent};
 use super::OpTag;
 use super::{impl_op_name, OpName, OpTrait, StaticTag};
 
@@ -152,6 +152,16 @@ impl StaticTag for ExitBlock {
     const TAG: OpTag = OpTag::BasicBlockExit;
 }
 
+impl DataflowParent for DataflowBlock {
+    fn inner_signature(&self) -> FunctionType {
+        // The node outputs a TupleSum before the data outputs of the block node
+        let tuple_sum_type = Type::new_tuple_sum(self.tuple_sum_rows.clone());
+        let mut node_outputs = vec![tuple_sum_type];
+        node_outputs.extend_from_slice(&self.other_outputs);
+        FunctionType::new(self.inputs.clone(), TypeRow::from(node_outputs))
+    }
+}
+
 impl OpTrait for DataflowBlock {
     fn description(&self) -> &str {
         "A CFG basic block node"
@@ -253,6 +263,12 @@ impl StaticTag for Case {
     const TAG: OpTag = OpTag::Case;
 }
 
+impl DataflowParent for Case {
+    fn inner_signature(&self) -> FunctionType {
+        self.signature.clone()
+    }
+}
+
 impl OpTrait for Case {
     fn description(&self) -> &str {
         "A case node inside a conditional"
@@ -276,11 +292,6 @@ impl Case {
     /// The output signature of the contained dataflow graph.
     pub fn dataflow_output(&self) -> &TypeRow {
         &self.signature.output
-    }
-
-    /// The signature of the dataflow sibling graph contained in the [`Case`]
-    pub fn inner_signature(&self) -> FunctionType {
-        self.signature.clone()
     }
 }
 
