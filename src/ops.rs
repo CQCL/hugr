@@ -122,7 +122,7 @@ impl OpType {
         }
     }
 
-    /// The edge kind for the constant ports of the operation, not described by
+    /// The edge kind for the static ports of the operation, not described by
     /// the dataflow signature.
     ///
     /// If not None, an extra input port of that kind will be present on the
@@ -189,7 +189,7 @@ impl OpType {
             .map(|p| p.as_incoming().unwrap())
     }
 
-    /// The non-dataflow input port for the operation, not described by the signature.
+    /// The non-dataflow output port for the operation, not described by the signature.
     /// See `[OpType::other_port]`.
     #[inline]
     pub fn other_output_port(&self) -> Option<OutgoingPort> {
