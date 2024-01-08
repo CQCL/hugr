@@ -102,7 +102,7 @@ jobs:
       - name: Run tests with coverage instrumentation
         run: |
             cargo llvm-cov clean --workspace
-            cargo llvm-cov --doctests
+            cargo llvm-cov --all-features --doctests
       - name: Generate coverage report
         run: cargo llvm-cov --all-features report --codecov --output-path coverage.json
       - name: Upload coverage to codecov.io
