@@ -332,6 +332,49 @@ mod test {
         Ok(())
     }
 
+    #[cfg(not(feature = "extension_inference"))] // inference fails for test graph, shouldn't
+    #[test]
+    fn test_list_ops() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::std_extensions::collections::{self, make_list_const, ListOp, ListValue};
+        use crate::types::TypeArg;
+
+        let reg = ExtensionRegistry::try_new([
+            PRELUDE.to_owned(),
+            logic::EXTENSION.to_owned(),
+            collections::EXTENSION.to_owned(),
+        ])
+        .unwrap();
+        let list = make_list_const(
+            ListValue::new(vec![Value::unit_sum(1)]),
+            &[TypeArg::Type { ty: BOOL_T }],
+        );
+        let mut build = DFGBuilder::new(FunctionType::new(
+            type_row![],
+            vec![list.const_type().clone()],
+        ))
+        .unwrap();
+
+        let list_wire = build.add_load_const(list.clone())?;
+
+        let pop = build.add_dataflow_op(
+            ListOp::Pop.with_type(BOOL_T).to_extension_op(&reg).unwrap(),
+            [list_wire],
+        )?;
+
+        let push = build.add_dataflow_op(
+            ListOp::Push
+                .with_type(BOOL_T)
+                .to_extension_op(&reg)
+                .unwrap(),
+            pop.outputs(),
+        )?;
+        let mut h = build.finish_hugr_with_outputs(push.outputs(), &reg)?;
+        constant_fold_pass(&mut h, &reg);
+
+        assert_fully_folded(&h, &list);
+        Ok(())
+    }
+
     fn assert_fully_folded(h: &Hugr, expected_const: &Const) {
         // check the hugr just loads and returns a single const
         let mut node_count = 0;
