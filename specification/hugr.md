@@ -851,7 +851,10 @@ extension ops. See [Extension System](#extension-system).
 
 ### Extension Tracking
 
-The type of `Function` includes a set of extensions (that is, [Extensions](#extension-implementation)) which are required to execute the graph. Every node in the HUGR is annotated with the set of extensions required to produce its inputs, and the set of extensions required to execute the node; the union of these two must match the set of extensions on each successor node.
+The type of `Function` includes a set of [extensions](#extension-system) which are required to execute the graph.
+Every node in the HUGR is annotated with the set of extensions required to produce its inputs,
+and each operation provides (a way to compute) the set of extensions required to execute the node;
+the union of these two must match the set of extensions on each successor node.
 
 Keeping track of the extension requirements like this allows extension designers
 and third-party tooling to control how/where a module is run.
