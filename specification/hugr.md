@@ -1610,12 +1610,6 @@ either differs from or is not part of the
 [WebAssembly](https://webassembly.github.io/spec/core/exec/numerics.html)
 specification.
 
-Const nodes:
-
-| Name                   | Inputs | Outputs  | Meaning                                                               |
-| ---------------------- | ------ | -------- | --------------------------------------------------------------------- |
-| `iconst_u<N, x>`( \* ) | none   | `int<N>` | const node producing unsigned value x (where 0 \<= x \< 2^N)          |
-| `iconst_s<N, x>`( \* ) | none   | `int<N>` | const node producing signed value x (where -2^(N-1) \<= x \< 2^(N-1)) |
 
 Casts:
 
@@ -1687,7 +1681,6 @@ except where stated.
 
 | Name              | Inputs               | Outputs   | Meaning                                                                  |
 | ----------------- | -------------------- | --------- | ------------------------------------------------------------------------ |
-| `fconst<x>`( \* ) | none                 | `float64` | const node producing a float                                             |
 | `feq`( \* )       | `float64`, `float64` | `bool`    | equality test (as WASM but with 0 and 1 interpreted as `bool`)           |
 | `fne`( \* )       | `float64`, `float64` | `bool`    | inequality test (as WASM but with 0 and 1 interpreted as `bool`)         |
 | `flt`( \* )       | `float64`, `float64` | `bool`    | "less than" (as WASM but with 0 and 1 interpreted as `bool`)             |
