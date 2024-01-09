@@ -705,8 +705,8 @@ flowchart
   - At some point we expect to add a first-order `catch` node, somewhat
     like a DFG-node. This contains a DSG, and (like a DFG node) has
     inputs matching the child DSG; but one output, of type
-    `Sum(O,ErrorType)` where O is the outputs of the child DSG.
-  - It is also possible to use a higher-order `catch` operation in an
+    `Sum(Tuple(#O),ErrorType)` where O is the outputs of the child DSG.
+  - It is also possible to define a higher-order `catch` operation in an
     extension, taking a graph argument.
 
 
@@ -901,7 +901,7 @@ extensions:
       extensions: r # Indicates that running this operation also invokes extensions r
     lowering:
       file: "graph_op_hugr.bin"
-      extensions: ["arithmetic", r] # r is the ExtensionSet in "params"
+      extensions: ["arithmetic.int", r] # r is the ExtensionSet in "params"
 ```
 
 The declaration of the `params` uses a language that is a distinct, simplified
@@ -1034,7 +1034,7 @@ Tuples and Sums are ``CopyableType`` (respectively, ``EqType``) if all their com
 The type of `Function` includes a set of extensions (that is, [Extensions](#extension-implementation)) which are required to execute the graph. Every node in the HUGR is annotated with the set of extensions required to produce its inputs, and the set of extensions required to execute the node; the union of these two must match the set of extensions on each successor node.
 
 Keeping track of the extension requirements like this allows extension designers
-and backends to control how/where a module is run.
+and third-party tooling to control how/where a module is run.
 
 Concretely, if a plugin writer adds an extension
 *X*, then some function from
