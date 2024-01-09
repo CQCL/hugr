@@ -1145,8 +1145,6 @@ extensions:
       extensions: ["arithmetic.int", r] # r is the ExtensionSet in "params"
 ```
 
-<!-- To use an OpDef as an Op, or a TypeDef as a type, the user must provide a type argument for each type param in the def: a type in the appropriate class, a bounded usize, a set of extensions, a list or tuple of arguments. -->
-
 **Implementation note** Reading this format into Rust is made easy by `serde` and
 [serde\_yaml](https://github.com/dtolnay/serde-yaml) (see the
 Serialization section). It is also trivial to serialize these
