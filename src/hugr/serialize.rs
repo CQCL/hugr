@@ -483,6 +483,9 @@ pub mod test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "Extension ops cannot be used with miri.")]
+    // Miri doesn't run the extension registration required by `typetag` for registering `CustomConst`s.
+    // https://github.com/rust-lang/miri/issues/450
     fn constants_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
         let mut builder = DFGBuilder::new(FunctionType::new(vec![], vec![FLOAT64_TYPE])).unwrap();
         let w = builder.add_load_const(ConstF64::new(0.5))?;
