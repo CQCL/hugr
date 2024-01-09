@@ -1611,7 +1611,7 @@ A few additonal operations not included in WebAssembly are also
 specified, and there are some other small differences (highlighted
 below).
 
-### `arithmetic.int.types`
+#### `arithmetic.int.types`
 
 The `int<N>` type is parametrized by its width `N`, which is a positive
 integer.
@@ -1632,7 +1632,7 @@ either differs from or is not part of the
 [WebAssembly](https://webassembly.github.io/spec/core/exec/numerics.html)
 specification.
 
-### `arithmetic.int`
+#### `arithmetic.int`
 
 This extension defines operations on the integer types.
 
@@ -1697,13 +1697,13 @@ Other operations:
 | `irotr<N,M>`( \* )     | `int<N>`, `int<M>` | `int<N>`                           | rotate first input right by k bits where k is unsigned interpretation of second input (rightmost bits replace leftmost bits)                             |
 
 
-### `arithmetic.float.types`
+#### `arithmetic.float.types`
 
 The `float64` type represents IEEE 754-2019 floating-point data of 64
 bits.
 
 
-### `arithmetic.float`
+#### `arithmetic.float`
 
 Floating-point operations are defined as follows. All operations below
 follow
@@ -1729,7 +1729,7 @@ except where stated.
 | `ffloor`          | `float64`            | `float64` | floor                                                                    |
 | `fceil`           | `float64`            | `float64` | ceiling                                                                  |
 
-### `arithmetic.conversions`
+#### `arithmetic.conversions`
 
 
 Conversions between integers and floats:
