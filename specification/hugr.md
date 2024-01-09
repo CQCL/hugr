@@ -85,10 +85,8 @@ processes that produce values - either statically, i.e. at compile time,
 or at runtime. Each node is uniquely identified by its **node index**,
 although this may not be stable under graph structure modifications.
 Each node is defined by its **operation**; the possible operations are
-outlined in [Node
-Operations](#node-operations)
-but may be [extended by
-Extensions](#operation-extensibility).
+outlined in [Node Operations](#node-operations)
+but may be [extended by Extensions](#extension-system).
 
 **Simple HUGR example**
 ```mermaid
@@ -849,7 +847,7 @@ This is infallible as long as the TypeArgs match the declared TypeParams, which 
 
 Note that when within a `Function` type, TypeParams of kind `List`, `Tuple` or `Opaque` can only be used
 to instantiate polymorphic type declarations in extensions; these TypeParams have other uses in defining
-extension ops. See [Operation Extensibility](#operation-extensibility).
+extension ops. See [Extension System](#extension-system).
 
 ### Extension Tracking
 
@@ -930,7 +928,7 @@ precompute :: Function[](Function[Quantum,HigherOrder](Array(5, Qubit), (ms: Arr
                                          Function[Quantum](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit))))
 ```
 
-## Operation Extensibility
+## Extension System
 
 ### Goals and constraints
 
@@ -990,9 +988,15 @@ at runtime. In many cases this is desirable.
 
 ### Extension Implementation
 
-To strike a balance then, every extension provides YAML that declares its opaque
-types and a number of named **OpDef**s (operation-definitions), which may be
-polymorphic in type. Each OpDef *either*:
+To strike a balance then, every extension provides YAML (or equivalent Rust structs)
+that declares named opaque **TypeDef**s and **OpDef**s. These are (potentially-polymorphic)
+definitions of types and operations, respectively---polymorphism arises because both may
+declare any number TypeParams (as per [Type System](#type-system)). To use a TypeDef as a type,
+it must be instantiated with TypeArgs appropriate for its TypeParams, and similarly
+to use an OpDef as a node operation: each node stores a static-constant list of TypeArgs.
+
+For TypeDef's, any set of TypeArgs conforming to its TypeParams, produces a valid type.
+However, for OpDef's, greater flexibility is allowed: each OpDef *either*
 
 1. Provides a `Function` type, as per [Type System](#type-system), which may declare TypeParams; *or*
 2. The extension may self-register binary code (e.g. a Rust trait) providing a function
@@ -1001,29 +1005,40 @@ polymorphic in type. Each OpDef *either*:
    of TypeParams (notably including `TypeParam::List`, `Tuple` and `Opaque`);
    the returned `Function` type may then declare additional TypeParams.
 
-Individual operation nodes in a HUGR provide static-constant TypeArgs - in many cases
-these will be types. For operations defining binary `compute_signature`, each node will
-provide TypeArgs for *both* the binary function *and* the `Function` type that returns;
-note the args to `compute_signature` may *not* refer to any type variables declared by
-ancestor nodes in the Hugr (specifically, may *not* use variables declared by the
-enclosing FuncDefn) i.e. these must be static constants unaffected by substitution.
+For example, the TypeDef for `array` in the prelude declares two TypeParams: a `BoundedUSize`
+(the array length) and a `Type`. Any valid instantiation (e.g. `array<5, usize>`) is a type.
+Much the same applies for OpDef's that provide a `Function` type.
+
+However, for OpDefs providing binary `compute_signature`,
+* each node will provide TypeArgs for *both* the binary function *and* the `Function` type that returns
+* the operation is only valid if `compute_signature` succeeds, and returns a `Function` type
+  into whose TypeParams the *remaining* TypeArgs (in the node) fit
+* the args to `compute_signature` may *not* refer to any type variables declared by
+  ancestor nodes in the Hugr (specifically, may *not* use variables declared by the
+  enclosing FuncDefn) i.e. these must be static constants unaffected by substitution.
 
 When serializing the node, we also serialize the type arguments; we can also serialize
 the resulting (computed) type with the operation, and this will be useful when the type
 is computed by binary code, to allow the operation to be treated opaquely by tools that
-do not have the binary code available. (The YAML definition can be sent with the HUGR).
+do not have the binary code available. (That is: the YAML definition, including all types
+but only OpDefs that do not have binary `compute_signature`, can be sent with the HUGR).
 
 This mechanism allows new operations to be passed through tools that do not understand
 what the operations *do*---that is, new operations may be be defined independently of
 any tool, but without providing any way for the tooling to treat them as anything other
-than a black box. The *semantics* of any operation are necessarily specific to both
-operation *and* tool (e.g. compiler or runtime). However we also provide two ways for
-extensions to provide semantics portable across tools.
+than a black box. Similarly, tools may understand that operations may consume/produce
+values of new types---whose *existence* is carried in the YAML---but the *semantics*
+of each operation and/or type are necessarily specific to both operation *and* tool
+(e.g. compiler or runtime).
 
-1. They *may* provide binary code (e.g. a Rust trait) implementing a function `try_lower`
+However we also provide ways for extensions to provide semantics portable across tools.
+For types, there is a fallback to serialized json; for operations, extensions *may* provide
+either or both:
+
+1. binary code (e.g. a Rust trait) implementing a function `try_lower`
    that takes the type arguments and a set of target extensions and may fallibly return
    a subgraph or function-body-HUGR using only those target extensions.
-2. They may provide a HUGR, that declares functions implementing those operations. This
+2. a HUGR, that declares functions implementing those operations. This
    is a simple case of the above (where the binary code is a constant function) but
    easy to pass between tools. However note this will only be possible for operations
    with sufficiently simple type (schemes), and is considered a "fallback" for use
@@ -1032,8 +1047,8 @@ extensions to provide semantics portable across tools.
 
 Whether a particular OpDef provides binary code for `try_lower` is independent
 of whether it provides a binary `compute_signature`, but it will not generally
-be possible to provide a HUGR for a function whose type cannot be expressed
-in YAML.
+be possible to provide a HUGR for an operation whose type cannot be expressed
+as a constant (polymorphic) `Function` type
 
 ### Declarative format
 
