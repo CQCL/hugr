@@ -220,12 +220,14 @@ mod test {
     use crate::extension::prelude::{sum_with_error, BOOL_T};
     use crate::extension::{ExtensionRegistry, PRELUDE};
     use crate::ops::OpType;
-    use crate::std_extensions::arithmetic;
     use crate::std_extensions::arithmetic::conversions::ConvertOpDef;
     use crate::std_extensions::arithmetic::float_ops::FloatOps;
     use crate::std_extensions::arithmetic::float_types::{ConstF64, FLOAT64_TYPE};
     use crate::std_extensions::arithmetic::int_types::{ConstIntU, INT_TYPES};
+    use crate::std_extensions::collections::{make_list_const, ListOp, ListValue};
     use crate::std_extensions::logic::{self, const_from_bool, NaryLogic};
+    use crate::std_extensions::{arithmetic, collections};
+    use crate::types::TypeArg;
     use rstest::rstest;
 
     /// int to constant
@@ -329,6 +331,45 @@ mod test {
         constant_fold_pass(&mut h, &reg);
 
         assert_fully_folded(&h, &const_from_bool(out));
+        Ok(())
+    }
+
+    #[test]
+    fn test_list_ops() -> Result<(), Box<dyn std::error::Error>> {
+        let reg = ExtensionRegistry::try_new([
+            PRELUDE.to_owned(),
+            logic::EXTENSION.to_owned(),
+            collections::EXTENSION.to_owned(),
+        ])
+        .unwrap();
+        let list = make_list_const(
+            ListValue::new(vec![Value::unit_sum(1)]),
+            &[TypeArg::Type { ty: BOOL_T }],
+        );
+        let mut build = DFGBuilder::new(FunctionType::new(
+            type_row![],
+            vec![list.const_type().clone()],
+        ))
+        .unwrap();
+
+        let list_wire = build.add_load_const(list.clone())?;
+
+        let pop = build.add_dataflow_op(
+            ListOp::Pop.with_type(BOOL_T).to_extension_op(&reg).unwrap(),
+            [list_wire],
+        )?;
+
+        let push = build.add_dataflow_op(
+            ListOp::Push
+                .with_type(BOOL_T)
+                .to_extension_op(&reg)
+                .unwrap(),
+            pop.outputs(),
+        )?;
+        let mut h = build.finish_hugr_with_outputs(push.outputs(), &reg)?;
+        constant_fold_pass(&mut h, &reg);
+
+        assert_fully_folded(&h, &list);
         Ok(())
     }
 
