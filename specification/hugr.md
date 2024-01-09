@@ -708,9 +708,8 @@ flowchart
     like a DFG-node. This contains a DSG, and (like a DFG node) has
     inputs matching the child DSG; but one output, of type
     `Sum(O,ErrorType)` where O is the outputs of the child DSG.
-  - There is also a higher-order `catch` operation in the Tierkreis
-    extension, taking a graph argument; and `run_circuit` will return the
-    same way.
+  - It is also possible to use a higher-order `catch` operation in an
+    extension, taking a graph argument.
 
 
 ### Operation Extensibility
@@ -719,8 +718,7 @@ flowchart
 
 The goal here is to allow the use of operations and types in the
 representation that are user defined, or defined and used by extension
-tooling. Here “extension tooling” can be our own, e.g. TKET2 or
-Tierkreis. These operations cover various flavours:
+tooling. These operations cover various flavours:
 
   - Instruction sets specific to a target.
   - Operations that are best expressed in some other format that can be
@@ -1009,7 +1007,7 @@ There are three classes of type: ``AnyType`` $\supset$ ``CopyableType`` $\supset
   notion of equality between values. (While *some* notion of equality is defined on
   any type with a binary representation, that if the bits are equal then the value is, the converse is not necessarily true - values that are indistinguishable can have different bit representations.)
 
-For example, a `float` type (defined in an extension) would be a ``CopyableType``, but not an ``EqType``. Also, Hugr "classes" loosely correspond to Tierkreis' notion of "constraints".
+For example, a `float` type (defined in an extension) would be a ``CopyableType``, but not an ``EqType``.
 
 **Rows** The `#` is a *row* which is a sequence of zero or more types. Types in the row can optionally be given names in metadata i.e. this does not affect behaviour of the HUGR.
 
@@ -1037,8 +1035,8 @@ Tuples and Sums are ``CopyableType`` (respectively, ``EqType``) if all their com
 
 The type of `Function` includes a set of extensions (that is, [Extensions](#extension-implementation)) which are required to execute the graph. Every node in the HUGR is annotated with the set of extensions required to produce its inputs, and the set of extensions required to execute the node; the union of these two must match the set of extensions on each successor node.
 
-Keeping track of the extension requirements like this allows extension designers and backends
-(like tierkreis) to control how/where a module is run.
+Keeping track of the extension requirements like this allows extension designers
+and backends to control how/where a module is run.
 
 Concretely, if a plugin writer adds an extension
 *X*, then some function from
@@ -1047,8 +1045,8 @@ a plugin needs to provide a mechanism to convert the
 requirement before it can interface with other plugins which don’t know
 about *X*.
 
-A Tierkreis runtime could be connected to workers which provide means of
-running different extensions. By the same mechanism, Tierkreis can reason
+A runtime could have access to means of
+running different extensions. By the same mechanism, the runtime can reason
 about where to run different parts of the graph by inspecting their
 extension requirements.
 
@@ -1716,46 +1714,6 @@ Conversions between integers and floats:
 | `convert_u<N>` | `int<N>`  | `float64`                | unsigned int to float |
 | `convert_s<N>` | `int<N>`  | `float64`                | signed int to float   |
 
-### Higher-order (Tierkreis) Extension
-
-In **some** contexts, notably the Tierkreis runtime, higher-order
-operations allow graphs to be valid dataflow values, and be executed.
-These operations allow this.
-
-  - `CallIndirect`: Call a function indirectly. Like `Call`, but the
-    first input is a standard dataflow function type. This is essentially
-    `eval` in Tierkreis.
-  - `catch`: like `CallIndirect`, the first argument is of type
-    `Function[R]<I,O>` and the rest of the arguments are of type `I`.
-    However the result is not `O` but `Sum(O,ErrorType)`
-  - `parallel`, `sequence`, `partial`? Note that these could be executed
-    in first order graphs as straightforward (albeit expensive)
-    manipulations of Graph `struct`s/protobufs\!
-
-$\displaystyle{\frac{\mathrm{body} : [R] \textbf{Function}[R]([R] \textrm{Var}(I), [R] \textrm{Sum}(\textrm{Var}(I), \textrm{Var}(O))) \quad v : [R] \textrm{Var}(I)}{\textrm{loop}(\mathrm{body}, v) : [R] \textrm{Var}(O)}}$
-
-**loop** - In order to run the *body* graph, we need the extensions
-R that the graph requires, so
-calling the **loop** function requires those same extensions. Since the
-result of the body is fed into the input of the graph, it needs to have
-the same extension requirements on its inputs and outputs. We require
-that *v* is lifted to have extension requirement
-R so that it matches the type
-of input to the next iterations of the loop.
-
-$\displaystyle{\frac{\Theta : [R] \textbf{Function}[R](\vec{X}, \vec{Y}) \quad \vec{x} : [R] \vec{X}}{\textbf{call\\_indirect}(\Theta, \vec{x}) : [R] \vec{Y}}}$
-
-**CallIndirect** - This has the same feature as **loop**: running a
-graph requires its extensions.
-
-$\displaystyle{\frac{}{\textbf{load\\_const} \langle \textbf{Function}[R](\vec{I}, \vec{O}) \rangle (\mathrm{name}) : [\emptyset] \textbf{Function}[R](\vec{I}, \vec{O})}}$
-
-**load_const** - For operations which instantiate a graph (**load\_const**
-and **Call**) the functions are given an extra parameter at graph
-construction time which corresponds to the function type that they are
-meant to instantiate. This type will be given by a typeless edge from
-the graph in question to the operation, with the graph’s type added as
-an edge weight.
 
 ## Glossary
 
