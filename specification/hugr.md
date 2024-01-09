@@ -1555,8 +1555,29 @@ implementation of this design document is available on GitHub.
 
 ## Standard Library
 
-`panic`: panics unconditionally; no inputs, any type of outputs (these
-are never produced)
+A collection of extensions form the "standard library" for HUGR, and are defined
+in this repository.
+
+### Prelude
+
+The prelude extension is assumed to be valid and available in all contexts, and
+so must be supported by all third-party tooling.
+
+#### Types
+
+`usize`: a positive integer size type.
+
+`array<N, T>`: a known-size (N) array of type T.
+
+`qubit`: a linear (non-copyable) qubit type.
+
+`error`: error type. See [`ErrorType`](#errortype).
+
+### Operations
+| Name                           | Inputs    | Outputs                    | Meaning                                                         |
+|--------------------------------|-----------|----------------------------|-----------------------------------------------------------------|
+| `new_array<N, T>` | `T` x N   | `array<N, T>` | Create an array from all the inputs                             |
+| `panic`                        | ErrorType | -                          | Immediately end execution and pass contents of error to context |
 
 ### Logic Extension
 
