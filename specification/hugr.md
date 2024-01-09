@@ -1572,10 +1572,10 @@ so must be supported by all third-party tooling.
 `error`: error type. See [`ErrorType`](#errortype).
 
 ### Operations
-| Name                           | Inputs    | Outputs                    | Meaning                                                         |
-|--------------------------------|-----------|----------------------------|-----------------------------------------------------------------|
+| Name              | Inputs    | Outputs       | Meaning                                                         |
+|-------------------|-----------|---------------|-----------------------------------------------------------------|
 | `new_array<N, T>` | `T` x N   | `array<N, T>` | Create an array from all the inputs                             |
-| `panic`                        | ErrorType | -                          | Immediately end execution and pass contents of error to context |
+| `panic`           | ErrorType | -             | Immediately end execution and pass contents of error to context |
 
 ### Logic Extension
 
