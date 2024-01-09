@@ -27,6 +27,13 @@ The library crate is called `hugr`.
 
 Please read the [API documentation here][].
 
+## Experimental Features
+
+- `extension_inference`:
+  Experimental feature which allows automatic inference of extension usages and
+  requirements in a HUGR and validation that extensions are correctly specified.
+  Not enabled by default.
+
 ## Recent Changes
 
 See [CHANGELOG][] for a list of changes. The minimum supported rust
