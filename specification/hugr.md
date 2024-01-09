@@ -1576,10 +1576,11 @@ The following operations are defined:
 Note that an `and<0>` operation produces the constant value "true" and an
 `or<0>` operation produces the constant value "false".
 
-### Arithmetic Extension
+### Arithmetic Extensions
 
-The Arithmetic Extension provides types and operations for integer and
-floating-point operations.
+Types and operations for integer and
+floating-point operations are provided by a collection of extensions under the
+namespace `arithmetic`.
 
 We largely adopt (a subset of) the definitions of
 [WebAssembly 2.0](https://webassembly.github.io/spec/core/index.html),
@@ -1590,6 +1591,8 @@ inputs), we use a Sum type to hold the result.
 A few additonal operations not included in WebAssembly are also
 specified, and there are some other small differences (highlighted
 below).
+
+### `arithmetic.int.types`
 
 The `int<N>` type is parametrized by its width `N`, which is a positive
 integer.
@@ -1610,6 +1613,9 @@ either differs from or is not part of the
 [WebAssembly](https://webassembly.github.io/spec/core/exec/numerics.html)
 specification.
 
+### `arithmetic.int`
+
+This extension defines operations on the integer types.
 
 Casts:
 
@@ -1671,8 +1677,14 @@ Other operations:
 | `irotl<N,M>`( \* )     | `int<N>`, `int<M>` | `int<N>`                           | rotate first input left by k bits where k is unsigned interpretation of second input (leftmost bits replace rightmost bits)                              |
 | `irotr<N,M>`( \* )     | `int<N>`, `int<M>` | `int<N>`                           | rotate first input right by k bits where k is unsigned interpretation of second input (rightmost bits replace leftmost bits)                             |
 
+
+### `arithmetic.float.types`
+
 The `float64` type represents IEEE 754-2019 floating-point data of 64
 bits.
+
+
+### `arithmetic.float`
 
 Floating-point operations are defined as follows. All operations below
 follow
@@ -1697,6 +1709,9 @@ except where stated.
 | `fdiv`            | `float64`, `float64` | `float64` | division                                                                 |
 | `ffloor`          | `float64`            | `float64` | floor                                                                    |
 | `fceil`           | `float64`            | `float64` | ceiling                                                                  |
+
+### `arithmetic.conversions`
+
 
 Conversions between integers and floats:
 
