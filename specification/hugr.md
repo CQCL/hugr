@@ -710,231 +710,6 @@ flowchart
     extension, taking a graph argument.
 
 
-### Operation Extensibility
-
-#### Goals and constraints
-
-The goal here is to allow the use of operations and types in the
-representation that are user defined, or defined and used by extension
-tooling. These operations cover various flavours:
-
-  - Instruction sets specific to a target.
-  - Operations that are best expressed in some other format that can be
-    compiled in to a graph (e.g. ZX).
-  - Ephemeral operations used by specific compiler passes.
-
-A nice-to-have for this extensibility is a human-friendly format for
-specifying such operations.
-
-The key difficulty with this task is well stated in the [MLIR Operation
-Definition Specification
-docs](https://mlir.llvm.org/docs/DefiningDialects/Operations/#motivation)
-:
-
-> MLIR allows pluggable dialects, and dialects contain, among others, a
-> list of operations. This open and extensible ecosystem leads to the
-> “stringly” type IR problem, e.g., repetitive string comparisons
-> during optimization and analysis passes, unintuitive accessor methods
-> (e.g., generic/error prone `getOperand(3)` vs
-> self-documenting `getStride()`) with more generic return types,
-> verbose and generic constructors without default arguments, verbose
-> textual IR dumps, and so on. Furthermore, operation verification is:
-> 
-> 1\. best case: a central string-to-verification-function map
-> 
-> 2\. middle case: duplication of verification across the code base, or
-> 
-> 3\. worst case: no verification functions.
-> 
-> The fix is to support defining ops in a table-driven manner. Then for
-> each dialect, we can have a central place that contains everything you
-> need to know about each op, including its constraints, custom assembly
-> form, etc. This description is also used to generate helper functions
-> and classes to allow building, verification, parsing, printing,
-> analysis, and many more.
-
-As we see above MLIR's solution to this is to provide a declarative
-syntax which is then used to generate C++ at MLIR compile time. This is
-in fact one of the core factors that ties the use of MLIR to C++ so
-tightly, as managing a new dialect necessarily involves generating,
-compiling, and linking C++ code.
-
-We can do something similar in Rust, and we wouldn't even need to parse
-another format, sufficiently nice rust macros/proc\_macros should
-provide a human-friendly-enough definition experience.  However, we also
-provide a declarative YAML format, below.
-
-Ultimately though, we cannot avoid the "stringly" type problem if we
-want *runtime* extensibility - extensions that can be specified and used
-at runtime. In many cases this is desirable.
-
-#### Extension Implementation
-
-To strike a balance then, every extension provides YAML that declares its opaque
-types and a number of named **OpDef**s (operation-definitions), which may be
-polymorphic in type. Each OpDef specifies one of two methods for how the type
-of individual operations is computed:
-
-1. A type scheme is included in the YAML, to be processed by a "type scheme interpreter"
-   that is built into tools that process the HUGR.
-2. The extension self-registers binary code (e.g. a Rust trait) providing a function
-   `compute_signature` that computes the type.
-
-Each OpDef may declare named type parameters---if so then the individual operation nodes
-in a HUGR will provide for each a static-constant "type argument": a value that in many
-cases will be a type. These type arguments are processed by the type scheme interpreter
-or the `compute_signature` implementation to compute the type of that operation node.
-
-When serializing the node, we also serialize the type arguments; we can also serialize
-the resulting (computed) type with the operation, and this will be useful when the type
-is computed by binary code, to allow the operation to be treated opaquely by tools that
-do not have the binary code available. (The YAML definition can be sent with the HUGR).
-
-This mechanism allows new operations to be passed through tools that do not understand
-what the operations *do*---that is, new operations may be be defined independently of
-any tool, but without providing any way for the tooling to treat them as anything other
-than a black box. The *semantics* of any operation are necessarily specific to both
-operation *and* tool (e.g. compiler or runtime). However we also provide two ways for
-extensions to provide semantics portable across tools.
-
-1. They *may* provide binary code (e.g. a Rust trait) implementing a function `try_lower`
-   that takes the type arguments and a set of target extensions and may fallibly return
-   a subgraph or function-body-HUGR using only those target extensions.
-2. They may provide a HUGR, that declares functions implementing those operations. This
-   is a simple case of the above (where the binary code is a constant function) but
-   easy to pass between tools. However note this will only be possible for operations
-   with sufficiently simple type (schemes), and is considered a "fallback" for use
-   when a higher-performance (e.g. native HW) implementation is not available.
-   Such a HUGR may itself require other extensions.
-
-Whether a particular OpDef provides binary code for `try_lower` is independent
-of whether it provides a binary `compute_signature`, but it will not generally
-be possible to provide a HUGR for a function whose type cannot be expressed
-in YAML.
-
-#### Declarative format
-
-The declarative format needs to specify some required data that is
-needed by the compiler to correctly treat the operation (the minimum
-case is opaque operations that should be left untouched). However, we
-wish to also leave it expressive enough to specify arbitrary extra data
-that may be used by compiler extensions. This suggests a flexible
-standard format such as YAML would be suitable. Here we provide an
-illustrative example:
-
-See [Type System](#type-system) for more on Extensions.
-
-```yaml
-# may need some top level data, e.g. namespace?
-
-# Import other header files to use their custom types
-  # TODO: allow qualified, and maybe locally-scoped
-imports: [Quantum, Array]
-
-extensions:
-- name: MyGates
-  # Declare custom types
-  types:
-  - name: QubitVector
-    # Opaque types can take type arguments, with specified names
-    params: [["size", USize]]
-  operations:
-  - name: measure
-    description: "measure a qubit"
-    signature:
-      # The first element of each pair is an optional parameter name.
-      inputs: [[null, Q]]  # Q is defined in Quantum extension
-      outputs: [[null, Q], ["measured", B]]
-  - name: ZZPhase
-    description: "Apply a parametric ZZPhase gate"
-    signature:
-      inputs: [[null, Q], [null, Q], ["angle", Angle]]
-      outputs: [[null, Q], [null, Q]]
-    misc:
-      # extra data that may be used by some compiler passes
-      # and is passed to try_lower and compute_signature
-      equivalent: [0, 1]
-      basis: [Z, Z]
-  - name: SU2
-    description: "One qubit unitary matrix"
-    params: # per-node values passed to the type-scheme interpreter, but not used in signature
-      - matrix: Opaque(complex_matrix,2,2)
-    signature:
-      inputs: [[null, Q]]
-      outputs: [[null, Q]]
-  - name: MatMul
-    description: "Multiply matrices of statically-known size"
-    params:  # per-node values passed to type-scheme-interpreter and used in signature
-      - i: USize
-      - j: USize
-      - k: USize
-    signature:
-      inputs: [["a", Array<i>(Array<j>(F64))], ["b", Array<j>(Array<k>(F64))]]
-      outputs: [[null, Array<i>(Array<k>(F64))]]
-      #alternative inputs: [["a", Opaque(complex_matrix,i,j)], ["b", Opaque(complex_matrix,j,k)]]
-      #alternative outputs: [[null, Opaque(complex_matrix,i,k)]]
-  - name: max_float
-    description: "Variable number of inputs"
-    params:
-      - n: USize
-    signature:
-      # Where an element of a signature has three subelements, the third is the number of repeats
-      inputs: [[null, F64, n]] # (defaulting to 1 if omitted)
-      outputs: [[null, F64, 1]]
-  - name: ArrayConcat
-    description: "Concatenate two arrays. Extension provides a compute_signature implementation."
-    params:
-      - t: Type  # Classic or Quantum
-      - i: USize
-      - j: USize
-    # inputs could be: Array<i>(t), Array<j>(t)
-    # outputs would be, in principle: Array<i+j>(t)
-    # - but default type scheme interpreter does not support such addition
-    # Hence, no signature block => will look up a compute_signature in registry.
-  - name: GraphOp
-    description: "Involves running an argument Graph. E.g. run it some variable number of times."
-    params:
-      - r: ExtensionSet
-    signature:
-      inputs: [[null, Function[r](USize -> USize)], ["arg", USize]]
-      outputs: [[null, USize]]
-      extensions: r # Indicates that running this operation also invokes extensions r
-    lowering:
-      file: "graph_op_hugr.bin"
-      extensions: ["arithmetic.int", r] # r is the ExtensionSet in "params"
-```
-
-The declaration of the `params` uses a language that is a distinct, simplified
-form of the [Type System](#type-system) - writing terminals that appear in the YAML in quotes,
-the value of each member of `params` is given by the following production:
-```
-TypeParam ::= "Type"("Any"|"Copyable"|"Eq") | "BoundedUSize(u64)" | "Extensions" | "List"(TypeParam) | "Tuple"([TypeParam]) | Opaque
-
-Opaque ::= string<[TypeArgs]>
-
-TypeArgs ::= Type(Type) | BoundedUSize(u64) | Extensions | List([TypeArg]) | Tuple([TypeArg])
-
-Type ::= Name<[TypeArg]>
-```
-(We write `[Foo]` to indicate a list of Foo's; and omit `<>` where the contents is the empty list).
-
-To use an OpDef as an Op, or a TypeDef as a type, the user must provide a type argument for each type param in the def: a type in the appropriate class, a bounded usize, a set of extensions, a list or tuple of arguments.
-
-**Implementation note** Reading this format into Rust is made easy by `serde` and
-[serde\_yaml](https://github.com/dtolnay/serde-yaml) (see the
-Serialization section). It is also trivial to serialize these
-definitions in to the overall HUGR serialization format.
-
-Note the only required fields are `name` and `description`. `signature` is optional, but if present
-must have children `inputs` and `outputs`, each lists, and may have `extensions`.
-
-The optional `misc` field is used for arbitrary YAML, which is read in as-is and passed to compiler
- passes and (if no `signature` is present) the`compute_signature` function; e.g. a pass can use the `basis` information to perform commutation.
-
-The optional `params` field can be used to specify the types of static+const arguments to each operation
----for example the matrix needed to define an SU2 operation. If `params` are not specified
-then it is assumed empty.
-
 ### Extensible metadata
 
 Each node in the HUGR may have arbitrary metadata attached to it. This
@@ -1107,6 +882,231 @@ run, which removes the `HigherOrder` extension requirement.
 precompute :: Function[](Function[Quantum,HigherOrder](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit))),
                                          Function[Quantum](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit))))
 ```
+
+## Operation Extensibility
+
+### Goals and constraints
+
+The goal here is to allow the use of operations and types in the
+representation that are user defined, or defined and used by extension
+tooling. These operations cover various flavours:
+
+  - Instruction sets specific to a target.
+  - Operations that are best expressed in some other format that can be
+    compiled in to a graph (e.g. ZX).
+  - Ephemeral operations used by specific compiler passes.
+
+A nice-to-have for this extensibility is a human-friendly format for
+specifying such operations.
+
+The key difficulty with this task is well stated in the [MLIR Operation
+Definition Specification
+docs](https://mlir.llvm.org/docs/DefiningDialects/Operations/#motivation)
+:
+
+> MLIR allows pluggable dialects, and dialects contain, among others, a
+> list of operations. This open and extensible ecosystem leads to the
+> “stringly” type IR problem, e.g., repetitive string comparisons
+> during optimization and analysis passes, unintuitive accessor methods
+> (e.g., generic/error prone `getOperand(3)` vs
+> self-documenting `getStride()`) with more generic return types,
+> verbose and generic constructors without default arguments, verbose
+> textual IR dumps, and so on. Furthermore, operation verification is:
+> 
+> 1\. best case: a central string-to-verification-function map
+> 
+> 2\. middle case: duplication of verification across the code base, or
+> 
+> 3\. worst case: no verification functions.
+> 
+> The fix is to support defining ops in a table-driven manner. Then for
+> each dialect, we can have a central place that contains everything you
+> need to know about each op, including its constraints, custom assembly
+> form, etc. This description is also used to generate helper functions
+> and classes to allow building, verification, parsing, printing,
+> analysis, and many more.
+
+As we see above MLIR's solution to this is to provide a declarative
+syntax which is then used to generate C++ at MLIR compile time. This is
+in fact one of the core factors that ties the use of MLIR to C++ so
+tightly, as managing a new dialect necessarily involves generating,
+compiling, and linking C++ code.
+
+We can do something similar in Rust, and we wouldn't even need to parse
+another format, sufficiently nice rust macros/proc\_macros should
+provide a human-friendly-enough definition experience.  However, we also
+provide a declarative YAML format, below.
+
+Ultimately though, we cannot avoid the "stringly" type problem if we
+want *runtime* extensibility - extensions that can be specified and used
+at runtime. In many cases this is desirable.
+
+### Extension Implementation
+
+To strike a balance then, every extension provides YAML that declares its opaque
+types and a number of named **OpDef**s (operation-definitions), which may be
+polymorphic in type. Each OpDef specifies one of two methods for how the type
+of individual operations is computed:
+
+1. A type scheme is included in the YAML, to be processed by a "type scheme interpreter"
+   that is built into tools that process the HUGR.
+2. The extension self-registers binary code (e.g. a Rust trait) providing a function
+   `compute_signature` that computes the type.
+
+Each OpDef may declare named type parameters---if so then the individual operation nodes
+in a HUGR will provide for each a static-constant "type argument": a value that in many
+cases will be a type. These type arguments are processed by the type scheme interpreter
+or the `compute_signature` implementation to compute the type of that operation node.
+
+When serializing the node, we also serialize the type arguments; we can also serialize
+the resulting (computed) type with the operation, and this will be useful when the type
+is computed by binary code, to allow the operation to be treated opaquely by tools that
+do not have the binary code available. (The YAML definition can be sent with the HUGR).
+
+This mechanism allows new operations to be passed through tools that do not understand
+what the operations *do*---that is, new operations may be be defined independently of
+any tool, but without providing any way for the tooling to treat them as anything other
+than a black box. The *semantics* of any operation are necessarily specific to both
+operation *and* tool (e.g. compiler or runtime). However we also provide two ways for
+extensions to provide semantics portable across tools.
+
+1. They *may* provide binary code (e.g. a Rust trait) implementing a function `try_lower`
+   that takes the type arguments and a set of target extensions and may fallibly return
+   a subgraph or function-body-HUGR using only those target extensions.
+2. They may provide a HUGR, that declares functions implementing those operations. This
+   is a simple case of the above (where the binary code is a constant function) but
+   easy to pass between tools. However note this will only be possible for operations
+   with sufficiently simple type (schemes), and is considered a "fallback" for use
+   when a higher-performance (e.g. native HW) implementation is not available.
+   Such a HUGR may itself require other extensions.
+
+Whether a particular OpDef provides binary code for `try_lower` is independent
+of whether it provides a binary `compute_signature`, but it will not generally
+be possible to provide a HUGR for a function whose type cannot be expressed
+in YAML.
+
+### Declarative format
+
+The declarative format needs to specify some required data that is
+needed by the compiler to correctly treat the operation (the minimum
+case is opaque operations that should be left untouched). However, we
+wish to also leave it expressive enough to specify arbitrary extra data
+that may be used by compiler extensions. This suggests a flexible
+standard format such as YAML would be suitable. Here we provide an
+illustrative example:
+
+See [Type System](#type-system) for more on Extensions.
+
+```yaml
+# may need some top level data, e.g. namespace?
+
+# Import other header files to use their custom types
+  # TODO: allow qualified, and maybe locally-scoped
+imports: [Quantum, Array]
+
+extensions:
+- name: MyGates
+  # Declare custom types
+  types:
+  - name: QubitVector
+    # Opaque types can take type arguments, with specified names
+    params: [["size", USize]]
+  operations:
+  - name: measure
+    description: "measure a qubit"
+    signature:
+      # The first element of each pair is an optional parameter name.
+      inputs: [[null, Q]]  # Q is defined in Quantum extension
+      outputs: [[null, Q], ["measured", B]]
+  - name: ZZPhase
+    description: "Apply a parametric ZZPhase gate"
+    signature:
+      inputs: [[null, Q], [null, Q], ["angle", Angle]]
+      outputs: [[null, Q], [null, Q]]
+    misc:
+      # extra data that may be used by some compiler passes
+      # and is passed to try_lower and compute_signature
+      equivalent: [0, 1]
+      basis: [Z, Z]
+  - name: SU2
+    description: "One qubit unitary matrix"
+    params: # per-node values passed to the type-scheme interpreter, but not used in signature
+      - matrix: Opaque(complex_matrix,2,2)
+    signature:
+      inputs: [[null, Q]]
+      outputs: [[null, Q]]
+  - name: MatMul
+    description: "Multiply matrices of statically-known size"
+    params:  # per-node values passed to type-scheme-interpreter and used in signature
+      - i: USize
+      - j: USize
+      - k: USize
+    signature:
+      inputs: [["a", Array<i>(Array<j>(F64))], ["b", Array<j>(Array<k>(F64))]]
+      outputs: [[null, Array<i>(Array<k>(F64))]]
+      #alternative inputs: [["a", Opaque(complex_matrix,i,j)], ["b", Opaque(complex_matrix,j,k)]]
+      #alternative outputs: [[null, Opaque(complex_matrix,i,k)]]
+  - name: max_float
+    description: "Variable number of inputs"
+    params:
+      - n: USize
+    signature:
+      # Where an element of a signature has three subelements, the third is the number of repeats
+      inputs: [[null, F64, n]] # (defaulting to 1 if omitted)
+      outputs: [[null, F64, 1]]
+  - name: ArrayConcat
+    description: "Concatenate two arrays. Extension provides a compute_signature implementation."
+    params:
+      - t: Type  # Classic or Quantum
+      - i: USize
+      - j: USize
+    # inputs could be: Array<i>(t), Array<j>(t)
+    # outputs would be, in principle: Array<i+j>(t)
+    # - but default type scheme interpreter does not support such addition
+    # Hence, no signature block => will look up a compute_signature in registry.
+  - name: GraphOp
+    description: "Involves running an argument Graph. E.g. run it some variable number of times."
+    params:
+      - r: ExtensionSet
+    signature:
+      inputs: [[null, Function[r](USize -> USize)], ["arg", USize]]
+      outputs: [[null, USize]]
+      extensions: r # Indicates that running this operation also invokes extensions r
+    lowering:
+      file: "graph_op_hugr.bin"
+      extensions: ["arithmetic.int", r] # r is the ExtensionSet in "params"
+```
+
+The declaration of the `params` uses a language that is a distinct, simplified
+form of the [Type System](#type-system) - writing terminals that appear in the YAML in quotes,
+the value of each member of `params` is given by the following production:
+```
+TypeParam ::= "Type"("Any"|"Copyable"|"Eq") | "BoundedUSize(u64)" | "Extensions" | "List"(TypeParam) | "Tuple"([TypeParam]) | Opaque
+
+Opaque ::= string<[TypeArgs]>
+
+TypeArgs ::= Type(Type) | BoundedUSize(u64) | Extensions | List([TypeArg]) | Tuple([TypeArg])
+
+Type ::= Name<[TypeArg]>
+```
+(We write `[Foo]` to indicate a list of Foo's; and omit `<>` where the contents is the empty list).
+
+To use an OpDef as an Op, or a TypeDef as a type, the user must provide a type argument for each type param in the def: a type in the appropriate class, a bounded usize, a set of extensions, a list or tuple of arguments.
+
+**Implementation note** Reading this format into Rust is made easy by `serde` and
+[serde\_yaml](https://github.com/dtolnay/serde-yaml) (see the
+Serialization section). It is also trivial to serialize these
+definitions in to the overall HUGR serialization format.
+
+Note the only required fields are `name` and `description`. `signature` is optional, but if present
+must have children `inputs` and `outputs`, each lists, and may have `extensions`.
+
+The optional `misc` field is used for arbitrary YAML, which is read in as-is and passed to compiler
+ passes and (if no `signature` is present) the`compute_signature` function; e.g. a pass can use the `basis` information to perform commutation.
+
+The optional `params` field can be used to specify the types of static+const arguments to each operation
+---for example the matrix needed to define an SU2 operation. If `params` are not specified
+then it is assumed empty.
 
 
 ## Replacement and Pattern Matching
