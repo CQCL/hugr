@@ -1006,8 +1006,8 @@ However, for OpDef's, greater flexibility is allowed: each OpDef *either*
 2. The extension may self-register binary code (e.g. a Rust trait) providing a function
    `compute_signature` that fallibly computes a `Function` type given some type arguments.
    The operation declares the arguments required by the `compute_signature` function as a list
-   of TypeParams (notably including `TypeParam::List`, `Tuple` and `Opaque`);
-   the returned `Function` type may then declare additional TypeParams.
+   of TypeParams; if this successfully returns a `Function` type, then that may then require
+   additional TypeParams.
 
 For example, the TypeDef for `array` in the prelude declares two TypeParams: a `BoundedUSize`
 (the array length) and a `Type`. Any valid instantiation (e.g. `array<5, usize>`) is a type.
@@ -1016,8 +1016,11 @@ Much the same applies for OpDef's that provide a `Function` type.
 However, for OpDefs providing binary `compute_signature`,
 * each node will provide TypeArgs for *both* the binary function *and* the `Function` type that returns
 * the operation is only valid if `compute_signature` succeeds, and returns a `Function` type
-  into whose TypeParams the *remaining* TypeArgs (in the node) fit
-* the args to `compute_signature` may *not* refer to any type variables declared by
+  into whose TypeParams the *remaining* TypeArgs (in the node) fit. Note that this means
+  the binary function may use the values of its TypeArgs---specifically including `List`, `Tuple` and
+  `Opaque`---to determine the structure of the returned `Function` type such that the latter's own TypeParams
+  depend upon the values of the TypeArgs passed into the binary.
+* the TypeArgs passed to `compute_signature` may *not* refer to any type variables declared by
   ancestor nodes in the Hugr (specifically, may *not* use variables declared by the
   enclosing FuncDefn) i.e. these must be static constants unaffected by substitution.
 
