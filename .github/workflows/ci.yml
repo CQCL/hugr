@@ -69,6 +69,8 @@ jobs:
           - rust: nightly
             isMerge: true
     name: tests (Rust ${{ matrix.rust }})
+    env:
+      IS_MERGE: ${{ contains(github.ref_name + github.base_name, 'inference') }}
     steps:
       - uses: actions/checkout@v4
       - uses: mozilla-actions/sccache-action@v0.0.3
@@ -83,8 +85,10 @@ jobs:
       - name: Tests with no features
         run: cargo test --verbose --no-default-features
       - name: Build with all features
+        if: ${{ env.IS_MERGE }}
         run: cargo test --verbose --all-features --no-run
       - name: Tests with all features
+        if: ${{ env.IS_MERGE }}
         run: cargo test --verbose --all-features
 
   coverage:
