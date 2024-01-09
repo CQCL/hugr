@@ -698,9 +698,7 @@ flowchart
 
 #### `ErrorType`
 
-  - There is some type of errors, perhaps just a string, or
-    `Tuple(USize,String)` with some errorcode, that is returned along with
-    the fact that the graph/program panicked.
+  - A type which operations can use to indicate an error occurred.
 
 #### Catch
 
