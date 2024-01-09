@@ -64,6 +64,16 @@ impl Const {
         Self::unit_sum(1, 2)
     }
 
+    /// Generate a constant equivalent of a boolean,
+    /// see [`Const::true_val`] and [`Const::false_val`].
+    pub fn from_bool(b: bool) -> Self {
+        if b {
+            Self::true_val()
+        } else {
+            Self::false_val()
+        }
+    }
+
     /// Constant "false" value, i.e. the first variant of Sum((), ()).
     pub fn false_val() -> Self {
         Self::unit_sum(0, 2)

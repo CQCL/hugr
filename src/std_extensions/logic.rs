@@ -53,12 +53,12 @@ impl MakeOpDef for NaryLogic {
             NaryLogic::And => |consts: &_| {
                 let inps = read_inputs(consts)?;
                 let res = inps.into_iter().all(|x| x);
-                Some(vec![(0.into(), const_from_bool(res))])
+                Some(vec![(0.into(), ops::Const::from_bool(res))])
             },
             NaryLogic::Or => |consts: &_| {
                 let inps = read_inputs(consts)?;
                 let res = inps.into_iter().any(|x| x);
-                Some(vec![(0.into(), const_from_bool(res))])
+                Some(vec![(0.into(), ops::Const::from_bool(res))])
             },
         })
     }
@@ -204,14 +204,6 @@ fn read_inputs(consts: &[(IncomingPort, ops::Const)]) -> Option<Vec<bool>> {
         .collect();
     let inps = inps?;
     Some(inps)
-}
-
-pub(crate) fn const_from_bool(res: bool) -> ops::Const {
-    if res {
-        ops::Const::true_val()
-    } else {
-        ops::Const::false_val()
-    }
 }
 
 #[cfg(test)]
