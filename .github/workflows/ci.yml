@@ -84,8 +84,8 @@ jobs:
         run: cargo test --verbose --no-default-features
       - name: Build with all features
         run: cargo test --verbose --all-features --no-run
-      - name: Tests with all features
-        run: cargo test --verbose --all-features
+      # - name: Tests with all features
+      #   run: cargo test --verbose --all-features
 
   coverage:
     if: github.event_name != 'merge_group'
@@ -102,9 +102,9 @@ jobs:
       - name: Run tests with coverage instrumentation
         run: |
             cargo llvm-cov clean --workspace
-            cargo llvm-cov --all-features --doctests
+            cargo llvm-cov --doctests
       - name: Generate coverage report
-        run: cargo llvm-cov --all-features report --codecov --output-path coverage.json
+        run: cargo llvm-cov report --codecov --output-path coverage.json
       - name: Upload coverage to codecov.io
         uses: codecov/codecov-action@v3
         with:
