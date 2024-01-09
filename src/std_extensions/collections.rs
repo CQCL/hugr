@@ -259,7 +259,7 @@ impl MakeExtensionOp for ListOpInst {
 
 impl ListOpInst {
     /// Convert this list operation to an [`ExtensionOp`] by providing a
-    /// registry to validate the element tyoe against.
+    /// registry to validate the element type against.
     pub fn to_extension_op(self, elem_type_registry: &ExtensionRegistry) -> Option<ExtensionOp> {
         let registry = ExtensionRegistry::try_new(
             elem_type_registry
