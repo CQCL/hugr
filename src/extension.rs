@@ -72,6 +72,16 @@ impl ExtensionRegistry {
     }
 }
 
+impl IntoIterator for ExtensionRegistry {
+    type Item = (ExtensionId, Extension);
+
+    type IntoIter = <BTreeMap<ExtensionId, Extension> as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
 /// An Extension Registry containing no extensions.
 pub const EMPTY_REG: ExtensionRegistry = ExtensionRegistry(BTreeMap::new());
 
