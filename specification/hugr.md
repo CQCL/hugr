@@ -797,7 +797,8 @@ Extensions ::= (Extension)* -- a set, not a list
 Type ::= Tuple(#) -- fixed-arity, heterogeneous components 
        | Sum(#)   -- disjoint union of other types, ??tagged by unsigned int??
        | Opaque(Name, [TypeArg]) -- a (instantiation of a) custom type defined by an extension
-       | Function(TypeParams, #, #, Extensions) -- polymorphic with type parameters, function arguments + results
+       | Function(TypeParams, #, #, Extensions) -- polymorphic with type parameters,
+                                                -- function arguments + results, and delta (see below)
        | Variable -- refers to a TypeParam bound by the nearest enclosing FuncDefn node, or an enclosing Function Type
 ```
 The majority of types will be Opaque ones defined by extensions including the [standard library](#standard-library). However a number of types can be constructed using only the core type constructors: for example the empty tuple type, aka `unit`, with exactly one instance (so 0 bits of data); the empty sum, with no instances; the empty Function type (taking no arguments and producing no results - `void -> void`); and compositions thereof.
@@ -853,7 +854,7 @@ extension ops. See [Extension System](#extension-system).
 
 The type of `Function` includes a set of [extensions](#extension-system) which are required to execute the graph.
 Every node in the HUGR is annotated with the set of extensions required to produce its inputs,
-and each operation provides (a way to compute) the set of extensions required to execute the node;
+and each operation provides (a way to compute) the set of extensions required to execute the node, known as the "delta";
 the union of these two must match the set of extensions on each successor node.
 
 Keeping track of the extension requirements like this allows extension designers
