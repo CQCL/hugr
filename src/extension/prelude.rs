@@ -6,6 +6,7 @@ use smol_str::SmolStr;
 use crate::{
     extension::{ExtensionId, TypeDefBound},
     ops::LeafOp,
+    type_row,
     types::{
         type_param::{TypeArg, TypeParam},
         CustomCheckFailure, CustomType, FunctionType, PolyFuncType, Type, TypeBound,
@@ -87,6 +88,13 @@ lazy_static! {
         )
         .unwrap();
         prelude
+        .add_op(
+            SmolStr::new_inline(PANIC_OP_ID),
+            "Panic with input error".to_string(),
+            FunctionType::new(type_row![Type::new_extension(ERROR_CUSTOM_TYPE)], type_row![]),
+        )
+        .unwrap();
+        prelude
     };
     /// An extension registry containing only the prelude
     pub static ref PRELUDE_REGISTRY: ExtensionRegistry =
@@ -121,6 +129,8 @@ pub fn array_type(size: TypeArg, element_ty: Type) -> Type {
 
 /// Name of the operation in the prelude for creating new arrays.
 pub const NEW_ARRAY_OP_ID: &str = "new_array";
+/// Name of the prelude panic operation.
+pub const PANIC_OP_ID: &str = "panic";
 
 /// Initialize a new array op of element type `element_ty` of length `size`
 pub fn new_array_op(element_ty: Type, size: u64) -> LeafOp {
@@ -260,7 +270,7 @@ mod test {
     }
 
     #[test]
-    /// test the prelude error type.
+    /// test the prelude error type and panic op.
     fn test_error_type() {
         let ext_def = PRELUDE
             .get_type(&ERROR_TYPE_NAME)
@@ -283,5 +293,17 @@ mod test {
         );
         assert!(error_val.equal_consts(&ConstError::new(2, "my message")));
         assert!(!error_val.equal_consts(&ConstError::new(3, "my message")));
+
+        let mut b = DFGBuilder::new(FunctionType::new_endo(type_row![])).unwrap();
+
+        let err = b.add_load_const(error_val).unwrap();
+
+        let op = PRELUDE
+            .instantiate_extension_op(PANIC_OP_ID, [], &PRELUDE_REGISTRY)
+            .unwrap();
+
+        b.add_dataflow_op(op, [err]).unwrap();
+
+        b.finish_prelude_hugr_with_outputs([]).unwrap();
     }
 }
