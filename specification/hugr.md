@@ -274,7 +274,7 @@ the following basic dataflow operations are available (in addition to the
     matches the (type-instantiated) function being called.
   - `TypeApply`: has a `Value<Function>` input, whose type is polymorphic (i.e. declares some type parameters);
     the node specifies some type arguments (matching those parameters) in the node weight;
-    and there is  a `Value<Function>` output (corresponding to the type instantiation of the input)
+    and there is  a `Value<Function>` output (corresponding to the type instantiation of the input).
   - `LoadConstant<T>`: has an incoming `Static<T>` edge, where `T` is a `CopyableType`, and a
     `Value<T>` output, used to load a static constant into the local
     dataflow graph.
