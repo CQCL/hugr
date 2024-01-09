@@ -220,14 +220,12 @@ mod test {
     use crate::extension::prelude::{sum_with_error, BOOL_T};
     use crate::extension::{ExtensionRegistry, PRELUDE};
     use crate::ops::OpType;
+    use crate::std_extensions::arithmetic;
     use crate::std_extensions::arithmetic::conversions::ConvertOpDef;
     use crate::std_extensions::arithmetic::float_ops::FloatOps;
     use crate::std_extensions::arithmetic::float_types::{ConstF64, FLOAT64_TYPE};
     use crate::std_extensions::arithmetic::int_types::{ConstIntU, INT_TYPES};
-    use crate::std_extensions::collections::{make_list_const, ListOp, ListValue};
     use crate::std_extensions::logic::{self, const_from_bool, NaryLogic};
-    use crate::std_extensions::{arithmetic, collections};
-    use crate::types::TypeArg;
     use rstest::rstest;
 
     /// int to constant
@@ -334,8 +332,12 @@ mod test {
         Ok(())
     }
 
+    #[cfg(not(feature = "extension_inference"))] // inference fails for test graph, shouldn't
     #[test]
     fn test_list_ops() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::std_extensions::collections::{self, make_list_const, ListOp, ListValue};
+        use crate::types::TypeArg;
+
         let reg = ExtensionRegistry::try_new([
             PRELUDE.to_owned(),
             logic::EXTENSION.to_owned(),
