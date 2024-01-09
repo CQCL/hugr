@@ -86,11 +86,7 @@ impl ConstFold for CmpFold {
     ) -> ConstFoldResult {
         let [f1, f2] = get_floats(consts)?;
 
-        let res = if (self.0)(f1, f2) {
-            ops::Const::true_val()
-        } else {
-            ops::Const::false_val()
-        };
+        let res = ops::Const::from_bool((self.0)(f1, f2));
 
         Some(vec![(0.into(), res)])
     }

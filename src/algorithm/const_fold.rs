@@ -225,7 +225,7 @@ mod test {
     use crate::std_extensions::arithmetic::float_ops::FloatOps;
     use crate::std_extensions::arithmetic::float_types::{ConstF64, FLOAT64_TYPE};
     use crate::std_extensions::arithmetic::int_types::{ConstIntU, INT_TYPES};
-    use crate::std_extensions::logic::{self, const_from_bool, NaryLogic};
+    use crate::std_extensions::logic::{self, NaryLogic};
     use rstest::rstest;
 
     /// int to constant
@@ -320,7 +320,7 @@ mod test {
     ) -> Result<(), Box<dyn std::error::Error>> {
         let mut build = DFGBuilder::new(FunctionType::new(type_row![], vec![BOOL_T])).unwrap();
 
-        let ins = ins.map(|b| build.add_load_const(const_from_bool(b)).unwrap());
+        let ins = ins.map(|b| build.add_load_const(Const::from_bool(b)).unwrap());
         let logic_op = build.add_dataflow_op(op.with_n_inputs(ins.len() as u64), ins)?;
 
         let reg =
@@ -328,7 +328,7 @@ mod test {
         let mut h = build.finish_hugr_with_outputs(logic_op.outputs(), &reg)?;
         constant_fold_pass(&mut h, &reg);
 
-        assert_fully_folded(&h, &const_from_bool(out));
+        assert_fully_folded(&h, &Const::from_bool(out));
         Ok(())
     }
 
