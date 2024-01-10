@@ -7,7 +7,7 @@ use crate::{
 use itertools::Itertools;
 
 use super::type_param::{check_type_args, TypeArg, TypeParam};
-use super::{FunctionType, Substitution};
+use super::{FunctionType, Substitution, Type, TypeBound};
 
 /// A polymorphic function type, e.g. of a [Graph], or perhaps an [OpDef].
 /// (Nodes/operations in the Hugr are not polymorphic.)
@@ -158,6 +158,27 @@ impl<'a> Substitution for SubstValues<'a> {
             .expect("Undeclared type variable - call validate() ?");
         debug_assert_eq!(check_type_arg(arg, decl), Ok(()));
         arg.clone()
+    }
+
+    fn apply_typevar_in_row(&self, idx: usize, bound: TypeBound) -> Vec<Type> {
+        let arg = self
+            .0
+            .get(idx)
+            .expect("Undeclared type variable - call validate() ?");
+        match arg {
+            TypeArg::Sequence { elems } => elems
+                .iter()
+                .map(|ta| match ta {
+                    TypeArg::Type { ty } => ty.clone(),
+                    _ => panic!("Not a list of types - did validate() ?"),
+                })
+                .collect(),
+            TypeArg::Type { ty } => {
+                debug_assert_eq!(check_type_arg(arg, &TypeParam::Type { b: bound }), Ok(()));
+                vec![ty.clone()]
+            }
+            _ => panic!("Not a type or list of types - did validate() ?"),
+        }
     }
 
     fn extension_registry(&self) -> &ExtensionRegistry {

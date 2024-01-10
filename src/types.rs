@@ -316,6 +316,23 @@ impl Type {
         }
     }
 
+    fn validate_in_row(
+        &self,
+        extension_registry: &ExtensionRegistry,
+        var_decls: &[TypeParam],
+    ) -> Result<(), SignatureError> {
+        if let TypeEnum::Variable(idx, bound) = &self.0 {
+            // Allow also the Variable to be a *list* of types of the specified bound
+            let list_bound = TypeParam::List {
+                param: Box::new((*bound).into()),
+            };
+            if check_typevar_decl(var_decls, *idx, &list_bound).is_ok() {
+                return Ok(());
+            };
+        }
+        self.validate(extension_registry, var_decls)
+    }
+
     pub(crate) fn substitute(&self, t: &impl Substitution) -> Self {
         match &self.0 {
             TypeEnum::Alias(_) | TypeEnum::Sum(SumType::Unit { .. }) => self.clone(),
@@ -324,6 +341,13 @@ impl Type {
             TypeEnum::Function(bf) => Type::new_function(bf.substitute(t)),
             TypeEnum::Tuple(elems) => Type::new_tuple(subst_row(elems, t)),
             TypeEnum::Sum(SumType::General { row }) => Type::new_sum(subst_row(row, t)),
+        }
+    }
+
+    fn substitute_in_row(&self, t: &impl Substitution) -> Vec<Self> {
+        match &self.0 {
+            TypeEnum::Variable(idx, bound) => t.apply_typevar_in_row(*idx, *bound),
+            _ => vec![self.substitute(t)],
         }
     }
 }
@@ -344,6 +368,13 @@ pub(crate) trait Substitution {
     /// Apply to a variable whose kind is any given [TypeParam]
     fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg;
 
+    fn apply_typevar_in_row(&self, idx: usize, bound: TypeBound) -> Vec<Type> {
+        let TypeArg::Type { ty } = self.apply_var(idx, &TypeParam::Type { b: bound }) else {
+            panic!("Applying to type did not produce type")
+        };
+        vec![ty]
+    }
+
     fn extension_registry(&self) -> &ExtensionRegistry;
 }
 
@@ -352,13 +383,14 @@ fn valid_row(
     exts: &ExtensionRegistry,
     var_decls: &[TypeParam],
 ) -> Result<(), SignatureError> {
-    row.iter().try_for_each(|t| t.validate(exts, var_decls))
+    row.iter()
+        .try_for_each(|t| t.validate_in_row(exts, var_decls))
 }
 
 fn subst_row(row: &TypeRow, tr: &impl Substitution) -> TypeRow {
     let res = row
         .iter()
-        .map(|ty| ty.substitute(tr))
+        .flat_map(|ty| ty.substitute_in_row(tr))
         .collect::<Vec<_>>()
         .into();
     res
