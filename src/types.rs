@@ -305,9 +305,9 @@ impl Type {
         // There is no need to check the components against the bound,
         // that is guaranteed by construction (even for deserialization)
         match &self.0 {
-            TypeEnum::Tuple(row) | TypeEnum::Sum(SumType::General { row }) => row
-                .iter()
-                .try_for_each(|t| t.validate(extension_registry, var_decls)),
+            TypeEnum::Tuple(row) | TypeEnum::Sum(SumType::General { row }) => {
+                valid_row(row, extension_registry, var_decls)
+            }
             TypeEnum::Sum(SumType::Unit { .. }) => Ok(()), // No leaves there
             TypeEnum::Alias(_) => Ok(()),
             TypeEnum::Extension(custy) => custy.validate(extension_registry, var_decls),
@@ -345,6 +345,14 @@ pub(crate) trait Substitution {
     fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg;
 
     fn extension_registry(&self) -> &ExtensionRegistry;
+}
+
+fn valid_row(
+    row: &TypeRow,
+    exts: &ExtensionRegistry,
+    var_decls: &[TypeParam],
+) -> Result<(), SignatureError> {
+    row.iter().try_for_each(|t| t.validate(exts, var_decls))
 }
 
 fn subst_row(row: &TypeRow, tr: &impl Substitution) -> TypeRow {
