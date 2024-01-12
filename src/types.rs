@@ -268,7 +268,7 @@ impl Type {
     /// New use (occurrence) of the type variable with specified DeBruijn index.
     /// For use in type schemes only: `bound` must match that with which the
     /// variable was declared (i.e. as a [TypeParam::Type]`(bound)`).
-    pub fn new_var_use(idx: usize, bound: TypeBound) -> Self {
+    pub const fn new_var_use(idx: usize, bound: TypeBound) -> Self {
         Self(TypeEnum::Variable(idx, bound), bound)
     }
 
