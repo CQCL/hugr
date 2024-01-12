@@ -4,6 +4,7 @@ use super::*;
 use crate::builder::test::closed_dfg_root_hugr;
 use crate::builder::{
     BuildError, Container, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder,
+    HugrBuilder,
 };
 use crate::extension::prelude::{BOOL_T, PRELUDE, USIZE_T};
 use crate::extension::{
@@ -576,6 +577,33 @@ fn inner_row_variables() -> Result<(), Box<dyn std::error::Error>> {
     // (the Functions themselves have variable arity, but that's fine as we are not calling them)
     let id = fb.add_dataflow_op(LeafOp::Noop { ty: inner_ft }, fb.input_wires())?;
     fb.finish_hugr_with_outputs(id.outputs(), &EMPTY_REG)?;
+    Ok(())
+}
+
+#[test]
+fn no_outer_row_variables() -> Result<(), Box<dyn std::error::Error>> {
+    let tv = Type::new_var_use(0, TypeBound::Any);
+    let fb = FunctionBuilder::new(
+        "impossible_id_of_unknown_arity",
+        PolyFuncType::new(
+            [TypeParam::List {
+                param: Box::new(TypeParam::Type { b: TypeBound::Any }),
+            }],
+            FunctionType::new_endo(vec![tv]),
+        ),
+    )?;
+    // Input and Output nodes have a Port whose type is List(Type(Any))
+    // - so this is illegal because the wire between them is not a type:
+    let err = fb
+        .clone()
+        .finish_hugr_with_outputs(fb.input_wires(), &EMPTY_REG)
+        .unwrap_err();
+    assert_matches!(
+        err,
+        BuildError::InvalidHUGR(ValidationError::SignatureError { .. })
+    );
+    // Also try leaving no inputs/outputs - so this should be illegal because the ports are unconnected
+    fb.finish_hugr(&EMPTY_REG).unwrap_err();
     Ok(())
 }
 
