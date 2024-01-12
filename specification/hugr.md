@@ -38,7 +38,7 @@ represent (typed) data or control dependencies.
 
 - Translations to other representations. While the HUGR should be able
   to encode programs in languages such as QIR, the translation should
-  be implemented by separately.
+  be implemented separately.
 - Execution, or any kind of interpretation of the program. The HUGR
   describes the graph representation and control flow, without fixing
   the semantics of any extension operations defined outside the core
@@ -53,8 +53,9 @@ represent (typed) data or control dependencies.
   unconnected.
 - Control-flow support with ability to capture both LLVM SSACFG style
   programs and programs from future front-ends designed to target
-  HUGR. These including the upcoming Python eDSL for quantum-classical
-  programming, and BRAT (which already uses an internal graph-like
+  HUGR. These include the [guppylang](https://github.com/CQCL/guppylang)
+  Python eDSL for quantum-classical programming,
+  and BRAT (which already uses an internal graph-like
   representation for classical functional programs and quantum
   kernels). We expect that these front-ends will provide
   programmer-facing control flow constructs that map to the preferred
@@ -74,11 +75,11 @@ represent (typed) data or control dependencies.
 
 ## Functional description
 
-A HUGR is a directed graph. There are several different types of node, and
-several different types of edge, with different semantics, described below.
+A HUGR is a directed graph. There are several different types of nodes, and
+several different types of edges, with different semantics, described below.
 
 A node usually has additional data associated with it, which we will
-refer to as it's node weight.
+refer to as its *node weight*.
 
 The nodes represent
 processes that produce values - either statically, i.e. at compile time,
@@ -140,7 +141,7 @@ As well as the type, dataflow edges are also parametrized by a
 `Locality`, which declares whether the edge crosses levels in the hierarchy. See
 [Edge Locality](#edge-locality) for details.
 
-```ebnf
+```haskell
 AnyType ⊃ CopyableType
 
 EdgeKind ::= Hierarchy | Value(Locality, AnyType) | Static(Local | Ext, CopyableType) | Order | ControlFlow
@@ -718,8 +719,8 @@ flowchart
 ### Extensible metadata
 
 Each node in the HUGR may have arbitrary metadata attached to it. This
-is preserved during graph modifications, and, [when possible](##Metadata updates on replacement), copied when
-rewriting.
+is preserved during graph modifications, and,
+[when possible](#metadata-updates-on-replacement), copied when rewriting.
 Additionally the metadata may record references to other nodes; these
 references are updated along with node indices.
 
@@ -751,15 +752,15 @@ are tuples of (1) any serializable struct, and (2) a list of node
 indices. References from the serialized struct to other nodes should
 indirect through the list of node indices stored with the struct.
 
-TODO: Specify format, constraints, and serialization. Is YAML syntax
+**TODO**: Specify format, constraints, and serialization. Is YAML syntax
 appropriate?
 
 There is an API to add metadata, or extend existing metadata, or read
 existing metadata, given the node ID.
 
-TODO Examples illustrating this API.
+**TODO** Examples illustrating this API.
 
-TODO Do we want to reserve any top-level metadata keys, e.g. `Name`,
+**TODO** Do we want to reserve any top-level metadata keys, e.g. `Name`,
 `Ports` (for port metadata) or `History` (for use by the rewrite
 engine)?
 
@@ -779,7 +780,7 @@ There are three classes of type: ``AnyType`` $\supset$ ``CopyableType`` $\supset
 - The next class is ``CopyableType``, i.e. types holding ordinary classical
   data, where values can be copied (and discarded, the 0-ary copy). This
   allows multiple (or 0) outgoing edges from an outport; also these types can
-  be sent down Static edges. Note: dataflow inputs (Value and Static) always
+  be sent down `Static` edges. Note: dataflow inputs (`Value` and `Static`) always
   require a single connection.
 
 - The final class is ``EqType``: these are copyable types with a well-defined
@@ -999,7 +1000,7 @@ at runtime. In many cases this is desirable.
 To strike a balance then, every extension provides declarative structs containing
 named **TypeDef**s and **OpDef**s---see [Declarative Format](#declarative-format).
 These are (potentially polymorphic) definitions of types and operations, respectively---polymorphism arises because both may
-declare any number TypeParams (as per [Type System](#type-system)). To use a TypeDef as a type,
+declare any number of TypeParams (as per [Type System](#type-system)). To use a TypeDef as a type,
 it must be instantiated with TypeArgs appropriate for its TypeParams, and similarly
 to use an OpDef as a node operation: each `OpaqueOp` node stores a static-constant list of TypeArgs.
 
@@ -1395,7 +1396,7 @@ siblings in a DSG such that there is no path in the DSG from `n1` to
 
 Given nodes `n0` and `n1`, if there is an Order edge from `n0` to `n1`,
 remove it. (If there is an non-local edge from `n0` to a descendent of
-`n1`, this invalidates the hugr. TODO should this be an error?)
+`n1`, this invalidates the hugr. **TODO** should this be an error?)
 
 ##### Insertion and removal of const loads
 
@@ -1530,7 +1531,7 @@ of the child-rewiring lists.
 - Fast serialization/deserialization in Rust.
 - Ability to generate and consume from Python.
 - Reasonably small sized files/payloads.
-- Ability to send over wire. Myqos will need to do things like:
+- Ability to send over wire. Nexus will need to do things like:
   - Store the program in a database
   - Search the program(?) (Increasingly
     unlikely with larger more complicated programs)
@@ -1587,7 +1588,7 @@ struct Edge = ((Int, Optional<Int>), (Int, Optional<Int>))
 
 Node indices, used within the
 definitions of nodes and edges, directly correspond to indices of the
-node list. An edge is defined by the source and target nodes, and
+`nodes` list. An edge is defined by the source and target nodes, and
 optionally the offset of the output/input ports within those nodes, if the edge
 kind is one that connects to a port. This scheme
 enforces that nodes are contiguous - a node index must always point to a
@@ -1598,15 +1599,13 @@ while keeping all other indices pointing to the same node.
 ## Architecture
 
 The HUGR is implemented as a Rust crate named `quantinuum-hugr`. This
-crate is intended to be a common dependency for all projects, and is to
-be published on the <http://crates.io> registry.
+crate is intended to be a common dependency for all projects, and is published
+at the [crates.io registry](https://crates.io/crates/quantinuum-hugr).
 
 The HUGR is represented internally using structures from the `portgraph`
 crate. A base PortGraph is composed with hierarchy (as an alternate
 implementation of `Hierarchy` relationships) and weight components. The
-implementation of this design document is available on GitHub.
-
-<https://github.com/CQCL/hugr>
+implementation of this design document is [available on GitHub](https://github.com/CQCL/hugr).
 
 ## Standard Library
 
@@ -1945,7 +1944,7 @@ e.g. for authors of "rewrite rules" and other optimisations.
   the return address is the extra boolean variable, likely to be very
   cheap). However, I think this means pattern-matching will want to
   span across function-call boundaries; and it rules out using
-  non-local edges for called functions. TODO are those objections
+  non-local edges for called functions. **TODO** are those objections
   sufficient to rule this out?
 
 ##### Comparison with MLIR

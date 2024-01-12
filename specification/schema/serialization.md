@@ -1,6 +1,5 @@
- 
 
-# Options
+# Serialization Options
 
 Given most of our tooling is in Rust it is useful to narrow our search
 to options that have good [serde](https://serde.rs/) compatibility. For
@@ -31,9 +30,7 @@ schema-related problems mentioned above.
 The highest performing target is
 [bincode](https://github.com/bincode-org/bincode), but it does not seem
 to be widely used and has poor python support. Another notable mention
-is [CBOR](https://cbor.io/), ~~which is used for sending execution
-outputs over the wire by the hardware team~~ (they went with Protobuf
-instead). It is however not very well performing on the benchmarks.
+is [CBOR](https://cbor.io/), it is however not very well performing on the benchmarks.
 
 If we take a good balance between performance and language compatibility
 MessagePack (or [msgpack](https://msgpack.org/) ) appears to be a very
