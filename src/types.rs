@@ -439,9 +439,15 @@ pub(crate) mod test {
     pub(crate) use poly_func::test::nested_func;
 
     use super::*;
+    use crate::extension::PRELUDE;
+    use crate::{const_extension_ids, Extension};
     use crate::{extension::prelude::USIZE_T, ops::AliasDecl};
 
     use crate::types::TypeBound;
+
+    const_extension_ids! {
+        const MY_EXT: ExtensionId = "my_extension";
+    }
 
     #[test]
     fn construct() {
@@ -451,7 +457,7 @@ pub(crate) mod test {
             Type::new_extension(CustomType::new(
                 "my_custom",
                 [],
-                "my_extension".try_into().unwrap(),
+                MY_EXT,
                 TypeBound::Copyable,
             )),
             Type::new_alias(AliasDecl::new("my_alias", TypeBound::Eq)),
@@ -461,6 +467,17 @@ pub(crate) mod test {
             "Tuple([usize([]), Function(forall . [[]][]), my_custom([]), Alias(my_alias)])"
                 .to_string()
         );
+
+        let mut ext = Extension::new(MY_EXT);
+        ext.add_type(
+            "my_custom".into(),
+            vec![],
+            "".into(),
+            TypeBound::Copyable.into(),
+        )
+        .unwrap();
+        let reg = ExtensionRegistry::try_new([PRELUDE.to_owned(), ext]).unwrap();
+        t.validate(&reg, &[]).unwrap()
     }
 
     #[test]
