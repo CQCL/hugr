@@ -1,7 +1,7 @@
 {
     "$defs": {
         "Array": {
-            "description": "Known size array of type T",
+            "description": "Known size array whose elements are of the same type.",
             "properties": {
                 "ty": {
                     "$ref": "#/$defs/Type"
@@ -96,7 +96,7 @@
             "type": "object"
         },
         "Call": {
-            "description": "Call a function directly.\n\nThe first port is connected to the def/declare of the function being called\ndirectly, with a `Static<FunctionType>` edge. The signature of the remaining ports matches\nthe function being called.",
+            "description": "Operation to call a function directly. The first port is connected to the def/declare of the function being called directly, with a `Static<FunctionType>` edge. The signature of the remaining ports matches the function being called.",
             "properties": {
                 "parent": {
                     "title": "Parent",
@@ -125,7 +125,7 @@
             "type": "object"
         },
         "CallIndirect": {
-            "description": "Call a function indirectly.\n\nLike call, but the first input is a standard dataflow graph type.",
+            "description": "Operation to call a function indirectly. Like call, but the first input is a standard dataflow graph type.",
             "properties": {
                 "parent": {
                     "title": "Parent",
@@ -306,15 +306,7 @@
                     "type": "string"
                 },
                 "signature": {
-                    "anyOf": [
-                        {
-                            "$ref": "#/$defs/FunctionType"
-                        },
-                        {
-                            "type": "null"
-                        }
-                    ],
-                    "default": null
+                    "$ref": "#/$defs/FunctionType"
                 },
                 "description": {
                     "default": "",
@@ -442,7 +434,7 @@
             "type": "object"
         },
         "ExitBlock": {
-            "description": "The single exit node of the CFG, has no children, stores the types of\nthe CFG node output.",
+            "description": "The single exit node of the CFG, has no children, stores the types of the CFG node output.",
             "properties": {
                 "parent": {
                     "title": "Parent",
@@ -589,7 +581,7 @@
             "type": "object"
         },
         "FunctionType": {
-            "description": "A graph encoded as a value. It contains a concrete signature and a set of\nrequired resources.",
+            "description": "A graph encoded as a value. It contains a concrete signature and a set of required resources.",
             "properties": {
                 "input": {
                     "items": {
@@ -639,7 +631,7 @@
             "type": "object"
         },
         "GeneralSum": {
-            "description": "General sum type that explicitly stores the types of the variants",
+            "description": "General sum type that explicitly stores the types of the variants.",
             "properties": {
                 "t": {
                     "const": "Sum",
@@ -666,7 +658,7 @@
             "type": "object"
         },
         "Input": {
-            "description": "An input node. The outputs of this node are the inputs to the function.",
+            "description": "An input node. The outputs of this node are the inputs to the parent node.",
             "properties": {
                 "parent": {
                     "title": "Parent",
@@ -698,23 +690,16 @@
             "title": "Input",
             "type": "object"
         },
-        "Int": {
-            "description": "An arbitrary size integer.",
+        "USize": {
+            "description": "Unsigned integer size type.",
             "properties": {
                 "t": {
                     "const": "I",
                     "default": "I",
                     "title": "T"
-                },
-                "width": {
-                    "title": "Width",
-                    "type": "integer"
                 }
             },
-            "required": [
-                "width"
-            ],
-            "title": "Int",
+            "title": "USize",
             "type": "object"
         },
         "LeafOp": {
@@ -768,7 +753,7 @@
             "type": "object"
         },
         "LoadConstant": {
-            "description": "Load a static constant in to the local dataflow graph.",
+            "description": "An operation that loads a static constant in to the local dataflow graph.",
             "properties": {
                 "parent": {
                     "title": "Parent",
@@ -1081,7 +1066,7 @@
             "type": "object"
         },
         "PolyFuncType": {
-            "description": "A graph encoded as a value. It contains a concrete signature and a set of\nrequired resources.",
+            "description": "A graph encoded as a value. It contains a concrete signature and a set of required resources.",
             "properties": {
                 "t": {
                     "const": "G",
@@ -1140,7 +1125,7 @@
             "type": "object"
         },
         "Sum": {
-            "description": "A Sum variant\n\nFor any Sum type where this value meets the type of the variant indicated by the tag",
+            "description": "A Sum variant For any Sum type where this value meets the type of the variant indicated by the tag.",
             "properties": {
                 "v": {
                     "const": "Sum",
@@ -1297,7 +1282,7 @@
             "type": "object"
         },
         "TupleType": {
-            "description": "Product type, known-size tuple over elements of type row",
+            "description": "Product type, known-size tuple over elements of type row.",
             "properties": {
                 "t": {
                     "const": "Tuple",
@@ -1323,7 +1308,7 @@
                 "mapping": {
                     "Array": "#/$defs/Array",
                     "G": "#/$defs/PolyFuncType",
-                    "I": "#/$defs/Int",
+                    "I": "#/ $defs/USize",
                     "Opaque": "#/$defs/Opaque",
                     "Q": "#/$defs/Qubit",
                     "Sum": {
@@ -1356,7 +1341,7 @@
                     "$ref": "#/$defs/Variable"
                 },
                 {
-                    "$ref": "#/$defs/Int"
+                    "$ref": "#/ $defs/USize"
                 },
                 {
                     "$ref": "#/$defs/PolyFuncType"
@@ -1390,7 +1375,7 @@
             ]
         },
         "TypeApplication": {
-            "description": "Records details of an application of a PolyFuncType to some TypeArgs and the\nresult (a less-, but still potentially-, polymorphic type).\n\nNote that Guppy only generates full type applications, where the result is a\nmonomorphic type. Partial type applications are not used by Guppy.",
+            "description": "Records details of an application of a PolyFuncType to some TypeArgs and the result (a less-, but still potentially-, polymorphic type).",
             "properties": {
                 "input": {
                     "$ref": "#/$defs/PolyFuncType"
@@ -1415,7 +1400,7 @@
             "type": "object"
         },
         "TypeApply": {
-            "description": "Fixes some TypeParams of a polymorphic type by providing TypeArgs",
+            "description": "Fixes some TypeParams of a polymorphic type by providing TypeArgs.",
             "properties": {
                 "parent": {
                     "title": "Parent",
@@ -1551,7 +1536,7 @@
             "type": "object"
         },
         "UnitSum": {
-            "description": "Simple predicate where all variants are empty tuples",
+            "description": "Simple predicate where all variants are empty tuples.",
             "properties": {
                 "t": {
                     "const": "Sum",
@@ -1718,9 +1703,10 @@
         }
     },
     "required": [
+        "version",
         "nodes",
         "edges"
     ],
-    "title": "RawHugr",
+    "title": "Hugr",
     "type": "object"
 }
