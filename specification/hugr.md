@@ -1496,7 +1496,7 @@ conversion to/from the binary serialised form.
 
 We propose the following simple serialized structure, expressed here in
 pseudocode, though we advocate MessagePack format in practice (see
-[Serialization implementation](serialization.md)).
+[Serialization implementation](schema/serialization.md)).
 Note in particular that hierarchical relationships
 have a special encoding outside `edges`, as a field `parent`
 in a node definition. 
