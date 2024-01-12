@@ -369,10 +369,7 @@ pub(crate) trait Substitution {
     fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg;
 
     fn apply_typevar_in_row(&self, idx: usize, bound: TypeBound) -> Vec<Type> {
-        let TypeArg::Type { ty } = self.apply_var(idx, &TypeParam::Type { b: bound }) else {
-            panic!("Applying to type did not produce type")
-        };
-        vec![ty]
+        vec![self.apply_typevar(idx, bound)]
     }
 
     fn extension_registry(&self) -> &ExtensionRegistry;
