@@ -559,6 +559,26 @@ fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+#[test]
+fn inner_row_variables() -> Result<(), Box<dyn std::error::Error>> {
+    let tv = Type::new_var_use(0, TypeBound::Any);
+    let inner_ft = Type::new_function(FunctionType::new_endo(vec![tv]));
+    let mut fb = FunctionBuilder::new(
+        "id",
+        PolyFuncType::new(
+            [TypeParam::List {
+                param: Box::new(TypeParam::Type { b: TypeBound::Any }),
+            }],
+            FunctionType::new_endo(vec![inner_ft.clone()]),
+        ),
+    )?;
+    // All the wires here are carrying higher-order Function values
+    // (the Functions themselves have variable arity, but that's fine as we are not calling them)
+    let id = fb.add_dataflow_op(LeafOp::Noop { ty: inner_ft }, fb.input_wires())?;
+    fb.finish_hugr_with_outputs(id.outputs(), &EMPTY_REG)?;
+    Ok(())
+}
+
 #[cfg(feature = "extension_inference")]
 mod extension_tests {
     use super::*;
