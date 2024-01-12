@@ -153,10 +153,14 @@ pub enum TypeEnum {
     #[allow(missing_docs)]
     #[display(fmt = "Function({})", "_0")]
     Function(Box<PolyFuncType>),
-    // DeBruijn index, and cache of TypeBound (checked in validation)
+    /// DeBruijn index, and cache of TypeBound of [TypeParam::Type] (checked in validation)
     #[allow(missing_docs)]
     #[display(fmt = "Variable({})", _0)]
     Variable(usize, TypeBound),
+    /// DeBruijn index, and cache of inner TypeBound - matches a [TypeParam::List] of [TypeParam::Type]
+    /// of this bound (checked in validation)
+    #[display(fmt = "RowVar({})", _0)]
+    RowVariable(usize, TypeBound),
     #[allow(missing_docs)]
     #[display(fmt = "Tuple({})", "_0")]
     Tuple(TypeRow),
@@ -171,7 +175,7 @@ impl TypeEnum {
             TypeEnum::Extension(c) => c.bound(),
             TypeEnum::Alias(a) => a.bound,
             TypeEnum::Function(_) => TypeBound::Copyable,
-            TypeEnum::Variable(_, b) => *b,
+            TypeEnum::Variable(_, b) | TypeEnum::RowVariable(_, b) => *b,
             TypeEnum::Sum(SumType::Unit { size: _ }) => TypeBound::Eq,
             TypeEnum::Sum(SumType::General { row }) => {
                 least_upper_bound(row.iter().map(Type::least_upper_bound))
@@ -272,6 +276,13 @@ impl Type {
         Self(TypeEnum::Variable(idx, bound), bound)
     }
 
+    /// New use (occurrence) of the row variable with specified DeBruijn index.
+    /// For use in type schemes only: `bound` must match that with which the
+    /// variable was declared (i.e. as a [TypeParam::List]`(`[TypeParam::Type]`(bound))`).
+    pub const fn new_row_var(idx: usize, bound: TypeBound) -> Self {
+        Self(TypeEnum::RowVariable(idx, bound), bound)
+    }
+
     /// Report the least upper TypeBound, if there is one.
     #[inline(always)]
     pub const fn least_upper_bound(&self) -> TypeBound {
@@ -313,6 +324,9 @@ impl Type {
             TypeEnum::Extension(custy) => custy.validate(extension_registry, var_decls),
             TypeEnum::Function(ft) => ft.validate(extension_registry, var_decls),
             TypeEnum::Variable(idx, bound) => check_typevar_decl(var_decls, *idx, &(*bound).into()),
+            TypeEnum::RowVariable(idx, _) => {
+                Err(SignatureError::RowTypeVarOutsideRow { idx: *idx })
+            }
         }
     }
 
@@ -321,22 +335,23 @@ impl Type {
         extension_registry: &ExtensionRegistry,
         var_decls: &[TypeParam],
     ) -> Result<(), SignatureError> {
-        if let TypeEnum::Variable(idx, bound) = &self.0 {
-            // Allow also the Variable to be a *list* of types of the specified bound
-            let list_bound = TypeParam::List {
-                param: Box::new((*bound).into()),
+        if let TypeEnum::RowVariable(idx, bound) = self.0 {
+            let t = TypeParam::List {
+                param: Box::new(bound.into()),
             };
-            if check_typevar_decl(var_decls, *idx, &list_bound).is_ok() {
-                return Ok(());
-            };
+            check_typevar_decl(var_decls, idx, &t)
+        } else {
+            self.validate(extension_registry, var_decls)
         }
-        self.validate(extension_registry, var_decls)
     }
 
     pub(crate) fn substitute(&self, t: &impl Substitution) -> Self {
         match &self.0 {
             TypeEnum::Alias(_) | TypeEnum::Sum(SumType::Unit { .. }) => self.clone(),
             TypeEnum::Variable(idx, bound) => t.apply_typevar(*idx, *bound),
+            TypeEnum::RowVariable(_, _) => {
+                panic!("Row Variable found outside of row - should have been detected in validate")
+            }
             TypeEnum::Extension(cty) => Type::new_extension(cty.substitute(t)),
             TypeEnum::Function(bf) => Type::new_function(bf.substitute(t)),
             TypeEnum::Tuple(elems) => Type::new_tuple(subst_row(elems, t)),
@@ -346,7 +361,7 @@ impl Type {
 
     fn substitute_in_row(&self, t: &impl Substitution) -> Vec<Self> {
         match &self.0 {
-            TypeEnum::Variable(idx, bound) => t.apply_typevar_in_row(*idx, *bound),
+            TypeEnum::RowVariable(idx, bound) => t.apply_rowvar(*idx, *bound),
             _ => vec![self.substitute(t)],
         }
     }
@@ -368,7 +383,7 @@ pub(crate) trait Substitution {
     /// Apply to a variable whose kind is any given [TypeParam]
     fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg;
 
-    fn apply_typevar_in_row(&self, idx: usize, bound: TypeBound) -> Vec<Type> {
+    fn apply_rowvar(&self, idx: usize, bound: TypeBound) -> Vec<Type> {
         vec![self.apply_typevar(idx, bound)]
     }
 

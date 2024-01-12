@@ -17,6 +17,7 @@ pub(super) enum SerSimpleType {
     Opaque(CustomType),
     Alias(AliasDecl),
     V { i: usize, b: TypeBound },
+    R { i: usize, b: TypeBound },
 }
 
 impl From<Type> for SerSimpleType {
@@ -34,6 +35,7 @@ impl From<Type> for SerSimpleType {
             TypeEnum::Alias(a) => SerSimpleType::Alias(a),
             TypeEnum::Function(sig) => SerSimpleType::G(sig),
             TypeEnum::Variable(i, b) => SerSimpleType::V { i, b },
+            TypeEnum::RowVariable(i, b) => SerSimpleType::R { i, b },
             TypeEnum::Sum(sum) => SerSimpleType::Sum(sum),
             TypeEnum::Tuple(inner) => SerSimpleType::Tuple { inner },
         }
@@ -54,6 +56,7 @@ impl From<SerSimpleType> for Type {
             SerSimpleType::Opaque(custom) => Type::new_extension(custom),
             SerSimpleType::Alias(a) => Type::new_alias(a),
             SerSimpleType::V { i, b } => Type::new_var_use(i, b),
+            SerSimpleType::R { i, b } => Type::new_row_var(i, b),
         }
     }
 }

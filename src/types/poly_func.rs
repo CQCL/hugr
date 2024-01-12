@@ -160,7 +160,7 @@ impl<'a> Substitution for SubstValues<'a> {
         arg.clone()
     }
 
-    fn apply_typevar_in_row(&self, idx: usize, bound: TypeBound) -> Vec<Type> {
+    fn apply_rowvar(&self, idx: usize, bound: TypeBound) -> Vec<Type> {
         let arg = self
             .0
             .get(idx)
@@ -652,7 +652,7 @@ pub(crate) mod test {
             }],
             FunctionType::new(
                 vec![USIZE_T, Type::new_var_use(0, TypeBound::Any)],
-                vec![Type::new_sum(vec![Type::new_var_use(0, TypeBound::Any)])],
+                vec![Type::new_sum(vec![Type::new_row_var(0, TypeBound::Any)])],
             ),
             &PRELUDE_REGISTRY,
         )
@@ -663,8 +663,8 @@ pub(crate) mod test {
                 param: Box::new(TP),
             }],
             FunctionType::new(
-                vec![USIZE_T, Type::new_var_use(0, TypeBound::Any)],
-                vec![Type::new_sum(vec![Type::new_var_use(0, TypeBound::Any)])],
+                vec![USIZE_T, Type::new_row_var(0, TypeBound::Any)],
+                vec![Type::new_sum(vec![Type::new_row_var(0, TypeBound::Any)])],
             ),
             &PRELUDE_REGISTRY,
         )
@@ -697,7 +697,7 @@ pub(crate) mod test {
 
     #[test]
     fn row_variables_inner() {
-        let inner_fty = Type::new_function(FunctionType::new_endo(vec![Type::new_var_use(
+        let inner_fty = Type::new_function(FunctionType::new_endo(vec![Type::new_row_var(
             0,
             TypeBound::Copyable,
         )]));

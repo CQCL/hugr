@@ -123,6 +123,9 @@ pub enum SignatureError {
     /// A type variable that was used has not been declared
     #[error("Type variable {idx} was not declared ({num_decls} in scope)")]
     FreeTypeVar { idx: usize, num_decls: usize },
+    /// A row variable was found outside of a row
+    #[error("Row variable {idx} was found outside of a type row")]
+    RowTypeVarOutsideRow { idx: usize },
     /// The type stored in a [LeafOp::TypeApply] is not what we compute from the
     /// [ExtensionRegistry].
     ///

@@ -562,7 +562,7 @@ fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn inner_row_variables() -> Result<(), Box<dyn std::error::Error>> {
-    let tv = Type::new_var_use(0, TypeBound::Any);
+    let tv = Type::new_row_var(0, TypeBound::Any);
     let inner_ft = Type::new_function(FunctionType::new_endo(vec![tv]));
     let mut fb = FunctionBuilder::new(
         "id",
@@ -582,7 +582,7 @@ fn inner_row_variables() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn no_outer_row_variables() -> Result<(), Box<dyn std::error::Error>> {
-    let tv = Type::new_var_use(0, TypeBound::Any);
+    let tv = Type::new_row_var(0, TypeBound::Any);
     let fb = FunctionBuilder::new(
         "impossible_id_of_unknown_arity",
         PolyFuncType::new(
