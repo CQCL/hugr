@@ -291,7 +291,7 @@ pub mod test {
             JSONSchema::options()
                 .with_draft(Draft::Draft7)
                 .compile(&schema_val)
-                .expect("A valid schema")
+                .expect("Schema is invalid.")
         };
     }
 

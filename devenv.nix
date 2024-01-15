@@ -16,7 +16,7 @@ in
     (with pkgs.darwin.apple_sdk; [
       frameworks.CoreServices
       frameworks.CoreFoundation
-      # added for json schema validation tess
+      # added for json schema validation tests
       frameworks.SystemConfiguration
     ]);
 
