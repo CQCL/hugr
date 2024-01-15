@@ -307,6 +307,7 @@ pub mod test {
     }
 
     /// Serialize and deserialize a value, optionally validating against a schema.
+    #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
     pub fn ser_roundtrip_validate<T: Serialize + serde::de::DeserializeOwned>(
         g: &T,
         schema: Option<&JSONSchema>,
