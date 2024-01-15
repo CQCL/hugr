@@ -284,8 +284,8 @@ pub mod test {
 
     /// Serialize and deserialize a value.
     pub fn ser_roundtrip<T: Serialize + serde::de::DeserializeOwned>(g: &T) -> T {
-        let v = rmp_serde::to_vec_named(g).unwrap();
-        rmp_serde::from_slice(&v[..]).unwrap()
+        let s = serde_json::to_string(g).unwrap();
+        serde_json::from_str(&s).unwrap()
     }
 
     /// Serialize and deserialize a HUGR, and check that the result is the same as the original.
