@@ -1014,18 +1014,21 @@ However, for OpDef's, greater flexibility is allowed: each OpDef *either*
 
 For example, the TypeDef for `array` in the prelude declares two TypeParams: a `BoundedUSize`
 (the array length) and a `Type`. Any valid instantiation (e.g. `array<5, usize>`) is a type.
-Much the same applies for OpDef's that provide a `Function` type.
+Much the same applies for OpDef's that provide a `Function` type, but binary `compute_signature`
+introduces the possibility of failure[^1].
 
-However, for OpDefs providing binary `compute_signature`,
-* each node will provide TypeArgs for *both* the binary function *and* the `Function` type that returns
-* the operation is only valid if `compute_signature` succeeds, and returns a `Function` type
-  into whose TypeParams the *remaining* TypeArgs (in the node) fit. Note that this means
-  the binary function may use the values of its TypeArgs---specifically including `List`, `Tuple` and
-  `Opaque`---to determine the structure of the returned `Function` type such that the latter's own TypeParams
-  depend upon the values of the TypeArgs passed into the binary.
-* the TypeArgs passed to `compute_signature` may *not* refer to any type variables declared by
-  ancestor nodes in the Hugr (specifically, may *not* use variables declared by the
-  enclosing FuncDefn) i.e. these must be static constants unaffected by substitution.
+[^1]: specifically:
+* the operation node provides a list of TypeArgs, at least as many as required by the binary function
+* the first $n$ of those (where $n$ is the number of TypeParams declared by the OpDef) are passed to the binary function
+* if the binary function returns an error, the operation is invalid;
+* otherwise, the binary function returns a `Function` type (which may itself be polymorphic)
+* any remaining TypeArgs in the node (after the first $n$) are then substituted into that returned `Function` type
+  (the number in the node must match exactly). Note this allows the binary function to use the values (TypeArgs) passed in
+  to determine the structure (and degree of polymorphism) of the returned `Function` type, e.g. by inspecting inside `List`
+  or `Opaque` TypeArgs passed to the binary `compute_signature`.
+* Note the TypeArgs passed to `compute_signature` may *not* refer to any type variables declared by
+  ancestor nodes in the Hugr (specifically, may *not* use variables declared by the enclosing
+  FuncDefn)---these must be static constants unaffected by substitution.
 
 When serializing the node, we also serialize the type arguments; we can also serialize
 the resulting (computed) type with the operation, and this will be useful when the type
