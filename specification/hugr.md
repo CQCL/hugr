@@ -1015,20 +1015,7 @@ However, for OpDef's, greater flexibility is allowed: each OpDef *either*
 For example, the TypeDef for `array` in the prelude declares two TypeParams: a `BoundedUSize`
 (the array length) and a `Type`. Any valid instantiation (e.g. `array<5, usize>`) is a type.
 Much the same applies for OpDef's that provide a `Function` type, but binary `compute_signature`
-introduces the possibility of failure[^1].
-
-[^1]: specifically:
-* the operation node provides a list of TypeArgs, at least as many as required by the binary function
-* the first $n$ of those (where $n$ is the number of TypeParams declared by the OpDef) are passed to the binary function
-* if the binary function returns an error, the operation is invalid;
-* otherwise, the binary function returns a `Function` type (which may itself be polymorphic)
-* any remaining TypeArgs in the node (after the first $n$) are then substituted into that returned `Function` type
-  (the number in the node must match exactly). Note this allows the binary function to use the values (TypeArgs) passed in
-  to determine the structure (and degree of polymorphism) of the returned `Function` type, e.g. by inspecting inside `List`
-  or `Opaque` TypeArgs passed to the binary `compute_signature`.
-* Note the TypeArgs passed to `compute_signature` may *not* refer to any type variables declared by
-  ancestor nodes in the Hugr (specifically, may *not* use variables declared by the enclosing
-  FuncDefn)---these must be static constants unaffected by substitution.
+introduces the possibility of failure (see full details in [appendix](#appendix-3-binary-compute_signature)).
 
 When serializing the node, we also serialize the type arguments; we can also serialize
 the resulting (computed) type with the operation, and this will be useful when the type
@@ -2007,3 +1994,19 @@ including `Module`.
 | `TailLoop`     | ✱, ✱    | ✱, ✱    | 0, 0     | 0, 0          | 1, +        | DSG      | 
 | `Conditional`  | ✱, ✱    | ✱, ✱    | 0, 0     | 0, 0          | 1, +        | `Case`   |
 | `Case`         | 0, 0    | 0, 0    | 0, 0     | 0, 0          | 1, +        | DSG      |
+
+### Appendix 3: Binary `compute_signature`
+
+When an OpDef provides a binary `compute_signature` function, and an operation node uses that OpDef:
+* the node provides a list of TypeArgs, at least as many as the $n$ TypeParams declared by the OpDef
+* the first $n$ of those are passed to the binary `compute_signature`
+* if the binary function returns an error, the operation is invalid;
+* otherwise, `compute_signature` returns a `Function` type (which may itself be polymorphic)
+* any remaining TypeArgs in the node (after the first $n$) are then substituted into that returned `Function` type
+  (the number remaining in the node must match exactly).
+  **Note** this allows the binary function to use the values (TypeArgs) passed in---e.g.
+  by looking inside `List` or `Opaque` TypeArgs---to determine the structure (and degree of polymorphism) of the returned `Function` type.
+* We require that the TypeArgs to be passed to `compute_signature` (the first $n$)
+  must *not* refer to any type variables (declared by ancestor nodes in the Hugr - the nearest enclosing FuncDefn);
+  these first $n$ must be static constants unaffected by substitution.
+  This restriction does not apply to TypeArgs after the first $n$.
