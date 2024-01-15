@@ -85,10 +85,8 @@ processes that produce values - either statically, i.e. at compile time,
 or at runtime. Each node is uniquely identified by its **node index**,
 although this may not be stable under graph structure modifications.
 Each node is defined by its **operation**; the possible operations are
-outlined in [Node
-Operations](#node-operations)
-but may be [extended by
-Extensions](#operation-extensibility).
+outlined in [Node Operations](#node-operations)
+but may be [extended by Extensions](#extension-system).
 
 **Simple HUGR example**
 ```mermaid
@@ -226,7 +224,8 @@ operations have value ports, but some have Static or other
 edges. The following operations are *only* valid as immediate children of a
 `Module` node.
 
-  - `FuncDecl`: an external function declaration. The name of the function 
+  - `FuncDecl`: an external function declaration. The name of the function,
+    a list of type parameters (TypeParams, see [Type System](#type-system))
     and function attributes (relevant for compilation)
     define the node weight. The node has an outgoing `Static<Function>`
     edge for each use of the function. The function name is used at link time to
@@ -269,10 +268,17 @@ the following basic dataflow operations are available (in addition to the
     the inputs to the function, and the inputs to `Output` are the
     outputs of the function.
   - `Call`: Call a statically defined function. There is an incoming
-    `Static<Function>` edge to specify the graph being called. The
-    signature of the node (defined by its incoming and outgoing `Value` edges) matches the function being called.
+    `Static<Function>` edge to specify the graph being called. The `Call`
+    node specifies any type arguments to the function in the node weight,
+    and the signature of the node (defined by its incoming and outgoing `Value` edges)
+    matches the (type-instantiated) function being called.
+  - `TypeApply`: has a `Value<Function>` input, whose type is polymorphic (i.e. declares some type parameters);
+    the node specifies some number of type arguments (matching those parameters) in the node weight;
+    and there is  a `Value<Function>` output (corresponding to the type instantiation of the input
+    - for a *partial* type application, i.e. with fewer arguments than declared type parameters,
+    the output type will also be polymorphic).
   - `LoadConstant<T>`: has an incoming `Static<T>` edge, where `T` is a `CopyableType`, and a
-    `Value<Local,T>` output, used to load a static constant into the local
+    `Value<T>` output, used to load a static constant into the local
     dataflow graph.
   - `identity<T>`: pass-through, no operation is performed.
   - `DFG`: A nested dataflow graph.
@@ -280,6 +286,7 @@ the following basic dataflow operations are available (in addition to the
     The signature of the operation comprises the output signature of the child
     Input node (as input) and the input signature of the child Output node (as
     output). 
+  - `OpaqueOp`: an operation defined by an [Extension](#extension-system).
 
 The example below shows two DFGs, one nested within the other. Each has an Input
 and an Output node, whose outputs and inputs respectively match the inputs and
@@ -710,9 +717,228 @@ flowchart
     extension, taking a graph argument.
 
 
-### Operation Extensibility
+### Extensible metadata
 
-#### Goals and constraints
+Each node in the HUGR may have arbitrary metadata attached to it. This
+is preserved during graph modifications, and, [when possible](##Metadata updates on replacement), copied when
+rewriting.
+Additionally the metadata may record references to other nodes; these
+references are updated along with node indices.
+
+The metadata could either be built into the hugr itself (metadata as
+node weights) or separated from it (keep a separate map from node ID to
+metadata). The advantages of the first approach are:
+
+  - just one object to have around, not two;
+  - reassignment of node IDs doesn't mess with metadata.
+
+The advantages of the second approach are:
+
+  - Metadata should make no difference to the semantics of the hugr (by
+    definition, otherwise it isn't metadata but data), so it makes sense
+    to be separated from the core structure.
+  - We can be more agile with the details, such as formatting and
+    versioning.
+
+The problem of reassignment can be solved by having an API function that
+operates on both together atomically. We will therefore tentatively
+adopt the second approach, keeping metadata and hugr in separate
+structures.
+
+For each node, the metadata is a dictionary keyed by strings. Keys are
+used to identify applications or users so these do not (accidentally)
+interfere with each other’s metadata; for example a reverse-DNS system
+(`com.quantinuum.username....` or `com.quantinuum.tket....`). The values
+are tuples of (1) any serializable struct, and (2) a list of node
+indices. References from the serialized struct to other nodes should
+indirect through the list of node indices stored with the struct.
+
+TODO: Specify format, constraints, and serialization. Is YAML syntax
+appropriate?
+
+There is an API to add metadata, or extend existing metadata, or read
+existing metadata, given the node ID.
+
+TODO Examples illustrating this API.
+
+TODO Do we want to reserve any top-level metadata keys, e.g. `Name`,
+`Ports` (for port metadata) or `History` (for use by the rewrite
+engine)?
+
+**TODO** Do we allow per-port metadata (using the same mechanism?)
+
+**TODO** What about references to ports? Should we add a list of port
+indices after the list of node indices?
+
+## Type System
+
+There are three classes of type: ``AnyType`` $\supset$ ``CopyableType`` $\supset$ ``EqType``. Types in these classes are distinguished by the operations possible on (runtime) values of those types:
+  - For the broadest class (``AnyType``), the only operation supported is the identity operation (aka no-op, or `lift` - see [Extension Tracking](#extension-tracking) below). Specifically, we do not require it to be possible to copy or discard all values, hence the requirement that outports of linear type must have exactly one edge. (That is, a type not known to be in the copyable subset). All incoming ports must have exactly one edge.
+
+    In fully qubit-counted contexts programs take in a number of qubits as input and return the same number, with no discarding. See [quantum extension](#quantum-extension) for more.
+
+  - The next class is ``CopyableType``, i.e. types holding ordinary classical
+    data, where values can be copied (and discarded, the 0-ary copy). This
+    allows multiple (or 0) outgoing edges from an outport; also these types can
+    be sent down Static edges. Note: dataflow inputs (Value and Static) always
+    require a single connection.
+
+  - The final class is ``EqType``: these are copyable types with a well-defined
+  notion of equality between values. (While *some* notion of equality is defined on
+  any type with a binary representation, that if the bits are equal then the value is, the converse is not necessarily true - values that are indistinguishable can have different bit representations.)
+
+For example, a `float` type (defined in an extension) would be a ``CopyableType``, but not an ``EqType``.
+
+**Rows** The `#` is a *row* which is a sequence of zero or more types. Types in the row can optionally be given names in metadata i.e. this does not affect behaviour of the HUGR.
+
+The Hugr defines a number of type constructors, that can be instantiated into types by providing some collection of types as arguments. The constructors are given in the following grammar:
+
+```haskell
+
+Extensions ::= (Extension)* -- a set, not a list
+
+Type ::= Tuple(#) -- fixed-arity, heterogeneous components 
+       | Sum(#)   -- disjoint union of other types, ??tagged by unsigned int??
+       | Opaque(Name, [TypeArg]) -- a (instantiation of a) custom type defined by an extension
+       | Function(TypeParams, #, #, Extensions) -- polymorphic with type parameters,
+                                                -- function arguments + results, and delta (see below)
+       | Variable -- refers to a TypeParam bound by the nearest enclosing FuncDefn node, or an enclosing Function Type
+```
+(We write `[Foo]` to indicate a list of Foo's.)
+
+The majority of types will be Opaque ones defined by extensions including the [standard library](#standard-library). However a number of types can be constructed using only the core type constructors: for example the empty tuple type, aka `unit`, with exactly one instance (so 0 bits of data); the empty sum, with no instances; the empty Function type (taking no arguments and producing no results - `void -> void`); and compositions thereof.
+
+Types representing functions are generally ``CopyableType``, but not ``EqType``. (It is undecidable whether two functions produce the same result for all possible inputs, or similarly whether one computation graph can be rewritten into another by semantic-preserving rewrites).
+
+Tuples and Sums are ``CopyableType`` (respectively, ``EqType``) if all their components are; they are also fixed-size if their components are.
+
+### Polymorphism
+
+`Function` types are polymorphic: they may declare a number of type parameters of kinds as follows:
+
+```haskell
+TypeParam ::= Type(Any|Copyable|Eq)
+            | BoundedUSize(u64|) -- note optional bound
+            | Extensions
+            | List(TypeParam) -- homogenous, any sized
+            | Tuple([TypeParam]) -- heterogenous, fixed size
+            | Opaque(Name, [TypeArg]) -- e.g. Opaque("Array", [5, Opaque("usize", [])])
+```
+
+For each such TypeParam, the body of the FunctionType (input, output, and extensions - see [Extension Tracking](#extension-tracking))
+may contain "type variables" referring to that TypeParam, i.e. the binder. (The type variable is typically a type, but
+not necessarily, depending upon the TypeParam.)
+
+When a `FuncDefn` or `FuncDecl` with such a `Function` type is `Call`ed, the `Call` node statically provides
+TypeArgs appropriate for the TypeParams (and similarly for `TypeApply` nodes):
+
+```
+TypeArg ::= Type(Type)
+          | BoundedUSize(u64)
+          | Extensions(Extensions)
+          | Sequence([TypeArg])
+          | Opaque(Value)
+          | Variable -- refers to an enclosing TypeParam (binder)
+```
+
+A `Sequence` argument is appropriate for a parameter of kind either `List` or `Tuple`.
+For example, a Function declaring a `TypeParam::Opaque("Array", [5, TypeArg::Type(Type::Opaque("usize"))])`
+means that any `Call` to it must statically provide a *value* that is an array of 5 `usize`s;
+or a Function declaring a `TypeParam::BoundedUSize(5)` and a `TypeParam::Type(Any)` requires two TypeArgs,
+firstly a non-negative integer less than 5, secondly a type (which might be from an extension, e.g. `usize`).
+
+Given TypeArgs, the body of the `Function` type can be converted to a monomorphic signature by substitution,
+i.e. replacing each type variable in the body with the corresponding TypeArg. This is guaranteed to produce
+a valid type as long as the TypeArgs match the declared TypeParams, which can be checked in advance.
+
+(Note that when within a `Function` type, type variables of kind `List`, `Tuple` or `Opaque` will only be usable
+as arguments to Opaque types---see [Extension System](#extension-system).)
+
+### Extension Tracking
+
+The type of `Function` includes a set of [extensions](#extension-system) which are required to execute the graph.
+Every node in the HUGR is annotated with the set of extensions required to produce its inputs,
+and each operation provides (a way to compute) the set of extensions required to execute the node, known as the "delta";
+the union of these two must match the set of extensions on each successor node.
+
+Keeping track of the extension requirements like this allows extension designers
+and third-party tooling to control how/where a module is run.
+
+Concretely, if a plugin writer adds an extension
+*X*, then some function from
+a plugin needs to provide a mechanism to convert the
+*X* to some other extension
+requirement before it can interface with other plugins which don’t know
+about *X*.
+
+A runtime could have access to means of
+running different extensions. By the same mechanism, the runtime can reason
+about where to run different parts of the graph by inspecting their
+extension requirements.
+
+To allow extension annotations on nodes to be made equal, we will have operations
+ **lift** and **liftGraph** which can add extension constraints to values.
+
+$\displaystyle{\frac{v : [ \rho ] T}{\textbf{lift} \langle X \rangle (v) : [X, \rho] T}}$
+
+**lift** - Takes as a node weight parameter the single extension
+**X** which it adds to the
+extension requirements of its argument.
+
+$\displaystyle{\frac{f : [ \rho ] \textbf{Function}[R](\vec{I}, \vec{O})}{\textbf{liftGraph} \langle X \rangle (f) : [ \rho ] \textbf{Function}[X, R](\vec{I}, \vec{O})}}$
+
+**liftGraph** - Like **lift**, takes an
+extension X as a constant node
+weight parameter. Given a graph, it will add extension
+X to the requirements of the
+graph.
+
+Having these as explicit nodes on the graph allows us to search for the
+point before extensions were added when we want to copy graphs, allowing
+us to get the version with minimal extension requirements.
+
+Graphs which are almost alike can both be squeezed into a
+Conditional-node that selects one or the other, by wrapping them in a
+parent graph to correct the inputs/outputs and using the **lift**
+function from below.
+
+Note that here, any letter with vector notation refers to a variable
+which stands in for a row. Hence, when checking the inputs and outputs
+align, we’re introducing a *row equality constraint*, rather than the
+equality constraint of `typeof(b) ~ Bool`.
+
+### Rewriting Extension Requirements
+
+Extension requirements help denote different runtime capabilities.
+For example, a quantum computer may not be able to handle arithmetic
+while running a circuit, so its use is tracked in the function type so that
+rewrites can be performed which remove the arithmetic.
+
+Simple circuits may look something like:
+
+```
+Function[Quantum](Array(5, Q), (ms: Array(5, Qubit), results: Array(5, Bit)))
+```
+
+A circuit built using a higher-order extension to manage control flow
+could then look like:
+
+```
+Function[Quantum, HigherOrder](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit)))
+```
+
+So the compiler would need to perform some graph transformation pass to turn the
+graph-based control flow into a CFG node that a quantum computer could
+run, which removes the `HigherOrder` extension requirement.
+
+```
+precompute :: Function[](Function[Quantum,HigherOrder](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit))),
+                                         Function[Quantum](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit))))
+```
+
+## Extension System
+
+### Goals and constraints
 
 The goal here is to allow the use of operations and types in the
 representation that are user defined, or defined and used by extension
@@ -768,39 +994,52 @@ Ultimately though, we cannot avoid the "stringly" type problem if we
 want *runtime* extensibility - extensions that can be specified and used
 at runtime. In many cases this is desirable.
 
-#### Extension Implementation
+### Extension Implementation
 
-To strike a balance then, every extension provides YAML that declares its opaque
-types and a number of named **OpDef**s (operation-definitions), which may be
-polymorphic in type. Each OpDef specifies one of two methods for how the type
-of individual operations is computed:
+To strike a balance then, every extension provides declarative structs containing
+named **TypeDef**s and **OpDef**s---see [Declarative Format](#declarative-format).
+These are (potentially polymorphic) definitions of types and operations, respectively---polymorphism arises because both may
+declare any number TypeParams (as per [Type System](#type-system)). To use a TypeDef as a type,
+it must be instantiated with TypeArgs appropriate for its TypeParams, and similarly
+to use an OpDef as a node operation: each `OpaqueOp` node stores a static-constant list of TypeArgs.
 
-1. A type scheme is included in the YAML, to be processed by a "type scheme interpreter"
-   that is built into tools that process the HUGR.
-2. The extension self-registers binary code (e.g. a Rust trait) providing a function
-   `compute_signature` that computes the type.
+For TypeDef's, any set of TypeArgs conforming to its TypeParams, produces a valid type.
+However, for OpDef's, greater flexibility is allowed: each OpDef *either*
 
-Each OpDef may declare named type parameters---if so then the individual operation nodes
-in a HUGR will provide for each a static-constant "type argument": a value that in many
-cases will be a type. These type arguments are processed by the type scheme interpreter
-or the `compute_signature` implementation to compute the type of that operation node.
+1. Provides a `Function` type, as per [Type System](#type-system), which may declare TypeParams; *or*
+2. The extension may self-register binary code (e.g. a Rust trait) providing a function
+   `compute_signature` that fallibly computes a `Function` type given some type arguments.
+   The operation declares the arguments required by the `compute_signature` function as a list
+   of TypeParams; if this successfully returns a `Function` type, then that may then require
+   additional TypeParams.
+
+For example, the TypeDef for `array` in the prelude declares two TypeParams: a `BoundedUSize`
+(the array length) and a `Type`. Any valid instantiation (e.g. `array<5, usize>`) is a type.
+Much the same applies for OpDef's that provide a `Function` type, but binary `compute_signature`
+introduces the possibility of failure (see full details in [appendix](#appendix-3-binary-compute_signature)).
 
 When serializing the node, we also serialize the type arguments; we can also serialize
 the resulting (computed) type with the operation, and this will be useful when the type
 is computed by binary code, to allow the operation to be treated opaquely by tools that
-do not have the binary code available. (The YAML definition can be sent with the HUGR).
+do not have the binary code available. (That is: the YAML definition, including all types
+but only OpDefs that do not have binary `compute_signature`, can be sent with the HUGR).
 
 This mechanism allows new operations to be passed through tools that do not understand
 what the operations *do*---that is, new operations may be be defined independently of
 any tool, but without providing any way for the tooling to treat them as anything other
-than a black box. The *semantics* of any operation are necessarily specific to both
-operation *and* tool (e.g. compiler or runtime). However we also provide two ways for
-extensions to provide semantics portable across tools.
+than a black box. Similarly, tools may understand that operations may consume/produce
+values of new types---whose *existence* is carried in the YAML---but the *semantics*
+of each operation and/or type are necessarily specific to both operation *and* tool
+(e.g. compiler or runtime).
 
-1. They *may* provide binary code (e.g. a Rust trait) implementing a function `try_lower`
+However we also provide ways for extensions to provide semantics portable across tools.
+For types, there is a fallback to serialized json; for operations, extensions *may* provide
+either or both:
+
+1. binary code (e.g. a Rust trait) implementing a function `try_lower`
    that takes the type arguments and a set of target extensions and may fallibly return
    a subgraph or function-body-HUGR using only those target extensions.
-2. They may provide a HUGR, that declares functions implementing those operations. This
+2. a HUGR, that declares functions implementing those operations. This
    is a simple case of the above (where the binary code is a constant function) but
    easy to pass between tools. However note this will only be possible for operations
    with sufficiently simple type (schemes), and is considered a "fallback" for use
@@ -809,17 +1048,18 @@ extensions to provide semantics portable across tools.
 
 Whether a particular OpDef provides binary code for `try_lower` is independent
 of whether it provides a binary `compute_signature`, but it will not generally
-be possible to provide a HUGR for a function whose type cannot be expressed
-in YAML.
+be possible to provide a HUGR for an operation whose type cannot be expressed
+as a constant (polymorphic) `Function` type
 
-#### Declarative format
+### Declarative format
 
 The declarative format needs to specify some required data that is
 needed by the compiler to correctly treat the operation (the minimum
 case is opaque operations that should be left untouched). However, we
 wish to also leave it expressive enough to specify arbitrary extra data
 that may be used by compiler extensions. This suggests a flexible
-standard format such as YAML would be suitable. Here we provide an
+standard format such as YAML would be suitable. (The internal Rust structs
+may also be used directly.) Here we provide an
 illustrative example:
 
 See [Type System](#type-system) for more on Extensions.
@@ -904,22 +1144,6 @@ extensions:
       extensions: ["arithmetic.int", r] # r is the ExtensionSet in "params"
 ```
 
-The declaration of the `params` uses a language that is a distinct, simplified
-form of the [Type System](#type-system) - writing terminals that appear in the YAML in quotes,
-the value of each member of `params` is given by the following production:
-```
-TypeParam ::= "Type"("Any"|"Copyable"|"Eq") | "BoundedUSize(u64)" | "Extensions" | "List"(TypeParam) | "Tuple"([TypeParam]) | Opaque
-
-Opaque ::= string<[TypeArgs]>
-
-TypeArgs ::= Type(Type) | BoundedUSize(u64) | Extensions | List([TypeArg]) | Tuple([TypeArg])
-
-Type ::= Name<[TypeArg]>
-```
-(We write `[Foo]` to indicate a list of Foo's; and omit `<>` where the contents is the empty list).
-
-To use an OpDef as an Op, or a TypeDef as a type, the user must provide a type argument for each type param in the def: a type in the appropriate class, a bounded usize, a set of extensions, a list or tuple of arguments.
-
 **Implementation note** Reading this format into Rust is made easy by `serde` and
 [serde\_yaml](https://github.com/dtolnay/serde-yaml) (see the
 Serialization section). It is also trivial to serialize these
@@ -934,179 +1158,6 @@ The optional `misc` field is used for arbitrary YAML, which is read in as-is and
 The optional `params` field can be used to specify the types of static+const arguments to each operation
 ---for example the matrix needed to define an SU2 operation. If `params` are not specified
 then it is assumed empty.
-
-### Extensible metadata
-
-Each node in the HUGR may have arbitrary metadata attached to it. This
-is preserved during graph modifications, and, [when possible](##Metadata updates on replacement), copied when
-rewriting.
-Additionally the metadata may record references to other nodes; these
-references are updated along with node indices.
-
-The metadata could either be built into the hugr itself (metadata as
-node weights) or separated from it (keep a separate map from node ID to
-metadata). The advantages of the first approach are:
-
-  - just one object to have around, not two;
-  - reassignment of node IDs doesn't mess with metadata.
-
-The advantages of the second approach are:
-
-  - Metadata should make no difference to the semantics of the hugr (by
-    definition, otherwise it isn't metadata but data), so it makes sense
-    to be separated from the core structure.
-  - We can be more agile with the details, such as formatting and
-    versioning.
-
-The problem of reassignment can be solved by having an API function that
-operates on both together atomically. We will therefore tentatively
-adopt the second approach, keeping metadata and hugr in separate
-structures.
-
-For each node, the metadata is a dictionary keyed by strings. Keys are
-used to identify applications or users so these do not (accidentally)
-interfere with each other’s metadata; for example a reverse-DNS system
-(`com.quantinuum.username....` or `com.quantinuum.tket....`). The values
-are tuples of (1) any serializable struct, and (2) a list of node
-indices. References from the serialized struct to other nodes should
-indirect through the list of node indices stored with the struct.
-
-TODO: Specify format, constraints, and serialization. Is YAML syntax
-appropriate?
-
-There is an API to add metadata, or extend existing metadata, or read
-existing metadata, given the node ID.
-
-TODO Examples illustrating this API.
-
-TODO Do we want to reserve any top-level metadata keys, e.g. `Name`,
-`Ports` (for port metadata) or `History` (for use by the rewrite
-engine)?
-
-**TODO** Do we allow per-port metadata (using the same mechanism?)
-
-**TODO** What about references to ports? Should we add a list of port
-indices after the list of node indices?
-
-## Type System
-
-There are three classes of type: ``AnyType`` $\supset$ ``CopyableType`` $\supset$ ``EqType``. Types in these classes  are distinguished by the operations possible on (runtime) values of those types:
-  - For the broadest class (``AnyType``), the only operation supported is the identity operation (aka no-op, or `lift` - see [Extension Tracking](#extension-tracking) below). Specifically, we do not require it to be possible to copy or discard all values, hence the requirement that outports of linear type must have exactly one edge. (That is, a type not known to be in the copyable subset). All incoming ports must have exactly one edge.
-
-    In fully qubit-counted contexts programs take in a number of qubits as input and return the same number, with no discarding. See [quantum extension](#quantum-extension) for more.
-
-  - The next class is ``CopyableType``, i.e. types holding ordinary classical
-    data, where values can be copied (and discarded, the 0-ary copy). This
-    allows multiple (or 0) outgoing edges from an outport; also these types can
-    be sent down Static edges. Note: dataflow inputs (Value and Static) always
-    require a single connection.
-
-  - The final class is ``EqType``: these are copyable types with a well-defined
-  notion of equality between values. (While *some* notion of equality is defined on
-  any type with a binary representation, that if the bits are equal then the value is, the converse is not necessarily true - values that are indistinguishable can have different bit representations.)
-
-For example, a `float` type (defined in an extension) would be a ``CopyableType``, but not an ``EqType``.
-
-**Rows** The `#` is a *row* which is a sequence of zero or more types. Types in the row can optionally be given names in metadata i.e. this does not affect behaviour of the HUGR.
-
-The Hugr defines a number of type constructors, that can be instantiated into types by providing some collection of types as arguments. The constructors are given in the following grammar:
-
-```haskell
-
-Extensions ::= (Extension)* -- a set, not a list
-
-Type ::= Tuple(#) -- fixed-arity, heterogeneous components 
-       | Sum(#)   -- disjoint union of other types, ??tagged by unsigned int??
-       | Function[Extensions](#, #) -- monomorphic
-       | Opaque(Name, TypeArgs) -- a (instantiation of a) custom type defined by an extension
-```
-<!--      Function(TypeParams, #, #, Extensions) -- polymorphic, so move TypeParams section here
-#       | Variable -- refers to a TypeParam bound by an enclosing Graph-->
-
-The majority of types will be Opaque ones defined by extensions including the [standard library](#standard-library). However a number of types can be constructed using only the core type constructors: for example the empty tuple type, aka `unit`, with exactly one instance (so 0 bits of data); the empty sum, with no instances; the empty Function type (taking no arguments and producing no results - `void -> void`); and compositions thereof.
-
-Types representing functions are generally ``CopyableType``, but not ``EqType``. (It is undecidable whether two functions produce the same result for all possible inputs, or similarly whether one computation graph can be rewritten into another by semantic-preserving rewrites).
-
-Tuples and Sums are ``CopyableType`` (respectively, ``EqType``) if all their components are; they are also fixed-size if their components are.
-
-### Extension Tracking
-
-The type of `Function` includes a set of extensions (that is, [Extensions](#extension-implementation)) which are required to execute the graph. Every node in the HUGR is annotated with the set of extensions required to produce its inputs, and the set of extensions required to execute the node; the union of these two must match the set of extensions on each successor node.
-
-Keeping track of the extension requirements like this allows extension designers
-and third-party tooling to control how/where a module is run.
-
-Concretely, if a plugin writer adds an extension
-*X*, then some function from
-a plugin needs to provide a mechanism to convert the
-*X* to some other extension
-requirement before it can interface with other plugins which don’t know
-about *X*.
-
-A runtime could have access to means of
-running different extensions. By the same mechanism, the runtime can reason
-about where to run different parts of the graph by inspecting their
-extension requirements.
-
-To allow extension annotations on nodes to be made equal, we will have operations
- **lift** and **liftGraph** which can add extension constraints to values.
-
-$\displaystyle{\frac{v : [ \rho ] T}{\textbf{lift} \langle X \rangle (v) : [X, \rho] T}}$
-
-**lift** - Takes as a node weight parameter the single extension
-**X** which it adds to the
-extension requirements of its argument.
-
-$\displaystyle{\frac{f : [ \rho ] \textbf{Function}[R](\vec{I}, \vec{O})}{\textbf{liftGraph} \langle X \rangle (f) : [ \rho ] \textbf{Function}[X, R](\vec{I}, \vec{O})}}$
-
-**liftGraph** - Like **lift**, takes an
-extension X as a constant node
-weight parameter. Given a graph, it will add extension
-X to the requirements of the
-graph.
-
-Having these as explicit nodes on the graph allows us to search for the
-point before extensions were added when we want to copy graphs, allowing
-us to get the version with minimal extension requirements.
-
-Graphs which are almost alike can both be squeezed into a
-Conditional-node that selects one or the other, by wrapping them in a
-parent graph to correct the inputs/outputs and using the **lift**
-function from below.
-
-Note that here, any letter with vector notation refers to a variable
-which stands in for a row. Hence, when checking the inputs and outputs
-align, we’re introducing a *row equality constraint*, rather than the
-equality constraint of `typeof(b) ~ Bool`.
-
-### Rewriting Extension Requirements
-
-Extension requirements help denote different runtime capabilities.
-For example, a quantum computer may not be able to handle arithmetic
-while running a circuit, so its use is tracked in the function type so that
-rewrites can be performed which remove the arithmetic.
-
-Simple circuits may look something like:
-
-```
-Function[Quantum](Array(5, Q), (ms: Array(5, Qubit), results: Array(5, Bit)))
-```
-
-A circuit built using a higher-order extension to manage control flow
-could then look like:
-
-```
-Function[Quantum, HigherOrder](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit)))
-```
-
-So the compiler would need to perform some graph transformation pass to turn the
-graph-based control flow into a CFG node that a quantum computer could
-run, which removes the `HigherOrder` extension requirement.
-
-```
-precompute :: Function[](Function[Quantum,HigherOrder](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit))),
-                                         Function[Quantum](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit))))
-```
 
 
 ## Replacement and Pattern Matching
@@ -1945,3 +1996,19 @@ including `Module`.
 | `TailLoop`     | ✱, ✱    | ✱, ✱    | 0, 0     | 0, 0          | 1, +        | DSG      | 
 | `Conditional`  | ✱, ✱    | ✱, ✱    | 0, 0     | 0, 0          | 1, +        | `Case`   |
 | `Case`         | 0, 0    | 0, 0    | 0, 0     | 0, 0          | 1, +        | DSG      |
+
+### Appendix 3: Binary `compute_signature`
+
+When an OpDef provides a binary `compute_signature` function, and an operation node uses that OpDef:
+* the node provides a list of TypeArgs, at least as many as the $n$ TypeParams declared by the OpDef
+* the first $n$ of those are passed to the binary `compute_signature`
+* if the binary function returns an error, the operation is invalid;
+* otherwise, `compute_signature` returns a `Function` type (which may itself be polymorphic)
+* any remaining TypeArgs in the node (after the first $n$) are then substituted into that returned `Function` type
+  (the number remaining in the node must match exactly).
+  **Note** this allows the binary function to use the values (TypeArgs) passed in---e.g.
+  by looking inside `List` or `Opaque` TypeArgs---to determine the structure (and degree of polymorphism) of the returned `Function` type.
+* We require that the TypeArgs to be passed to `compute_signature` (the first $n$)
+  must *not* refer to any type variables (declared by ancestor nodes in the Hugr - the nearest enclosing FuncDefn);
+  these first $n$ must be static constants unaffected by substitution.
+  This restriction does not apply to TypeArgs after the first $n$.
