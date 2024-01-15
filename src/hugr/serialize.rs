@@ -274,20 +274,16 @@ pub mod test {
     use portgraph::{
         multiportgraph::MultiPortGraph, Hierarchy, LinkMut, PortMut, PortView, UnmanagedDenseMap,
     };
-    use std::fs;
 
     const NAT: Type = crate::extension::prelude::USIZE_T;
     const QB: Type = crate::extension::prelude::QB_T;
 
     lazy_static! {
         static ref SCHEMA: JSONSchema = {
-            let path = format!(
-                "{}/specification/schema/hugr_schema_v0.json",
-                env!("CARGO_MANIFEST_DIR")
-            );
-            let data = fs::read_to_string(path).unwrap();
-            let schema_val: serde_json::Value = serde_json::from_str(&data).unwrap();
-
+            let schema_val: serde_json::Value = serde_json::from_str(include_str!(
+                "../../specification/schema/hugr_schema_v0.json"
+            ))
+            .unwrap();
             JSONSchema::options()
                 .with_draft(Draft::Draft7)
                 .compile(&schema_val)
@@ -307,7 +303,6 @@ pub mod test {
     }
 
     /// Serialize and deserialize a value, optionally validating against a schema.
-    #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
     pub fn ser_roundtrip_validate<T: Serialize + serde::de::DeserializeOwned>(
         g: &T,
         schema: Option<&JSONSchema>,
