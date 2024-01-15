@@ -273,8 +273,10 @@ the following basic dataflow operations are available (in addition to the
     and the signature of the node (defined by its incoming and outgoing `Value` edges)
     matches the (type-instantiated) function being called.
   - `TypeApply`: has a `Value<Function>` input, whose type is polymorphic (i.e. declares some type parameters);
-    the node specifies some type arguments (matching those parameters) in the node weight;
-    and there is  a `Value<Function>` output (corresponding to the type instantiation of the input).
+    the node specifies some number of type arguments (matching those parameters) in the node weight;
+    and there is  a `Value<Function>` output (corresponding to the type instantiation of the input
+    - for a *partial* type application, i.e. with fewer arguments than declared type parameters,
+    the output type will also be polymorphic).
   - `LoadConstant<T>`: has an incoming `Static<T>` edge, where `T` is a `CopyableType`, and a
     `Value<T>` output, used to load a static constant into the local
     dataflow graph.
@@ -826,7 +828,8 @@ For each such TypeParam, the body of the FunctionType (input, output, and extens
 may contain "type variables" referring to that TypeParam, i.e. the binder. (The type variable is typically a type, but
 not necessarily, depending upon the TypeParam.)
 
-When the `Function` is `Call`ed, TypeArgs appropriate for the TypeParams must be provided by the Call:
+When a `FuncDefn` or `FuncDecl` with such a `Function` type is `Call`ed, the `Call` node statically provides
+TypeArgs appropriate for the TypeParams (and similarly for `TypeApply` nodes):
 
 ```
 TypeArg ::= Type(Type)
@@ -844,12 +847,11 @@ or a Function declaring a `TypeParam::BoundedUSize(5)` and a `TypeParam::Type(An
 firstly a non-negative integer less than 5, secondly a type (which might be from an extension, e.g. `usize`).
 
 Given TypeArgs, the body of the `Function` type can be converted to a monomorphic signature by substitution,
-placing the provided TypeArg into any place in the body referring to the corresponding type variable.
-This is infallible as long as the TypeArgs match the declared TypeParams, which can be checked statically.
+i.e. replacing each type variable in the body with the corresponding TypeArg. This is guaranteed to produce
+a valid type as long as the TypeArgs match the declared TypeParams, which can be checked in advance.
 
-Note that when within a `Function` type, TypeParams of kind `List`, `Tuple` or `Opaque` can only be used
-to instantiate polymorphic type declarations in extensions; these TypeParams have other uses in defining
-extension ops. See [Extension System](#extension-system).
+(Note that when within a `Function` type, type variables of kind `List`, `Tuple` or `Opaque` will only be usable
+as arguments to Opaque types---see [Extension System](#extension-system).)
 
 ### Extension Tracking
 
