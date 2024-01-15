@@ -61,6 +61,7 @@ webbrowser = "0.8.10"
 urlencoding = "2.1.2"
 cool_asserts = "2.0.3"
 insta = { version = "1.34.0", features = ["yaml"] }
+jsonschema = "0.17.1"
 
 [[bench]]
 name = "bench_main"

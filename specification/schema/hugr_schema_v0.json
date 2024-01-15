@@ -74,11 +74,7 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "items": {
-                        "type": "string"
-                    },
-                    "title": "Input Extensions",
-                    "type": "array"
+                    "$ref": "#/$defs/InputExtensions"
                 },
                 "op": {
                     "const": "CFG",
@@ -103,11 +99,7 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "items": {
-                        "type": "string"
-                    },
-                    "title": "Input Extensions",
-                    "type": "array"
+                    "$ref": "#/$defs/InputExtensions"
                 },
                 "op": {
                     "const": "Call",
@@ -132,11 +124,7 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "items": {
-                        "type": "string"
-                    },
-                    "title": "Input Extensions",
-                    "type": "array"
+                    "$ref": "#/$defs/InputExtensions"
                 },
                 "op": {
                     "const": "CallIndirect",
@@ -161,11 +149,7 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "items": {
-                        "type": "string"
-                    },
-                    "title": "Input Extensions",
-                    "type": "array"
+                    "$ref": "#/$defs/InputExtensions"
                 },
                 "op": {
                     "const": "Case",
@@ -190,11 +174,7 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "items": {
-                        "type": "string"
-                    },
-                    "title": "Input Extensions",
-                    "type": "array"
+                    "$ref": "#/$defs/InputExtensions"
                 },
                 "op": {
                     "const": "Conditional",
@@ -247,11 +227,7 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "items": {
-                        "type": "string"
-                    },
-                    "title": "Input Extensions",
-                    "type": "array"
+                    "$ref": "#/$defs/InputExtensions"
                 },
                 "op": {
                     "const": "Const",
@@ -281,11 +257,7 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "items": {
-                        "type": "string"
-                    },
-                    "title": "Input Extensions",
-                    "type": "array"
+                    "$ref": "#/$defs/InputExtensions"
                 },
                 "op": {
                     "const": "LeafOp",
@@ -355,11 +327,7 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "items": {
-                        "type": "string"
-                    },
-                    "title": "Input Extensions",
-                    "type": "array"
+                    "$ref": "#/$defs/InputExtensions"
                 },
                 "op": {
                     "const": "DFG",
@@ -384,11 +352,7 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "items": {
-                        "type": "string"
-                    },
-                    "title": "Input Extensions",
-                    "type": "array"
+                    "$ref": "#/$defs/InputExtensions"
                 },
                 "op": {
                     "const": "DataflowBlock",
@@ -441,11 +405,7 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "items": {
-                        "type": "string"
-                    },
-                    "title": "Input Extensions",
-                    "type": "array"
+                    "$ref": "#/$defs/InputExtensions"
                 },
                 "op": {
                     "const": "ExitBlock",
@@ -520,11 +480,7 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "items": {
-                        "type": "string"
-                    },
-                    "title": "Input Extensions",
-                    "type": "array"
+                    "$ref": "#/$defs/InputExtensions"
                 },
                 "op": {
                     "const": "FuncDecl",
@@ -554,11 +510,7 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "items": {
-                        "type": "string"
-                    },
-                    "title": "Input Extensions",
-                    "type": "array"
+                    "$ref": "#/$defs/InputExtensions"
                 },
                 "op": {
                     "const": "FuncDefn",
@@ -665,11 +617,7 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "items": {
-                        "type": "string"
-                    },
-                    "title": "Input Extensions",
-                    "type": "array"
+                    "$ref": "#/$defs/InputExtensions"
                 },
                 "op": {
                     "const": "Input",
@@ -689,6 +637,20 @@
             ],
             "title": "Input",
             "type": "object"
+        },
+        "InputExtensions": {
+            "anyOf": [
+                {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": "array"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "default": null
         },
         "USize": {
             "description": "Unsigned integer size type.",
@@ -760,11 +722,7 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "items": {
-                        "type": "string"
-                    },
-                    "title": "Input Extensions",
-                    "type": "array"
+                    "$ref": "#/$defs/InputExtensions"
                 },
                 "op": {
                     "const": "LoadConstant",
@@ -790,11 +748,7 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "items": {
-                        "type": "string"
-                    },
-                    "title": "Input Extensions",
-                    "type": "array"
+                    "$ref": "#/$defs/InputExtensions"
                 },
                 "op": {
                     "const": "LeafOp",
@@ -828,11 +782,7 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "items": {
-                        "type": "string"
-                    },
-                    "title": "Input Extensions",
-                    "type": "array"
+                    "$ref": "#/$defs/InputExtensions"
                 },
                 "op": {
                     "const": "Module",
@@ -854,11 +804,7 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "items": {
-                        "type": "string"
-                    },
-                    "title": "Input Extensions",
-                    "type": "array"
+                    "$ref": "#/$defs/InputExtensions"
                 },
                 "op": {
                     "const": "LeafOp",
@@ -1040,11 +986,7 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "items": {
-                        "type": "string"
-                    },
-                    "title": "Input Extensions",
-                    "type": "array"
+                    "$ref": "#/$defs/InputExtensions"
                 },
                 "op": {
                     "const": "Output",
@@ -1155,11 +1097,7 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "items": {
-                        "type": "string"
-                    },
-                    "title": "Input Extensions",
-                    "type": "array"
+                    "$ref": "#/$defs/InputExtensions"
                 },
                 "op": {
                     "const": "LeafOp",
@@ -1199,11 +1137,7 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "items": {
-                        "type": "string"
-                    },
-                    "title": "Input Extensions",
-                    "type": "array"
+                    "$ref": "#/$defs/InputExtensions"
                 },
                 "op": {
                     "const": "TailLoop",
@@ -1303,31 +1237,32 @@
             "title": "TupleType",
             "type": "object"
         },
+        "SumType": {
+            "discriminator": {
+                "mapping": {
+                    "General": "#/$defs/GeneralSum",
+                    "Unit": "#/$defs/UnitSum"
+                },
+                "propertyName": "s"
+            },
+            "oneOf": [
+                {
+                    "$ref": "#/$defs/UnitSum"
+                },
+                {
+                    "$ref": "#/$defs/GeneralSum"
+                }
+            ]
+        },
         "Type": {
             "discriminator": {
                 "mapping": {
                     "Array": "#/$defs/Array",
                     "G": "#/$defs/PolyFuncType",
-                    "I": "#/ $defs/USize",
+                    "I": "#/$defs/USize",
                     "Opaque": "#/$defs/Opaque",
                     "Q": "#/$defs/Qubit",
-                    "Sum": {
-                        "discriminator": {
-                            "mapping": {
-                                "General": "#/$defs/GeneralSum",
-                                "Unit": "#/$defs/UnitSum"
-                            },
-                            "propertyName": "s"
-                        },
-                        "oneOf": [
-                            {
-                                "$ref": "#/$defs/UnitSum"
-                            },
-                            {
-                                "$ref": "#/$defs/GeneralSum"
-                            }
-                        ]
-                    },
+                    "Sum": "#/$defs/SumType",
                     "Tuple": "#/$defs/TupleType",
                     "V": "#/$defs/Variable"
                 },
@@ -1341,7 +1276,7 @@
                     "$ref": "#/$defs/Variable"
                 },
                 {
-                    "$ref": "#/ $defs/USize"
+                    "$ref": "#/$defs/USize"
                 },
                 {
                     "$ref": "#/$defs/PolyFuncType"
@@ -1353,21 +1288,7 @@
                     "$ref": "#/$defs/TupleType"
                 },
                 {
-                    "discriminator": {
-                        "mapping": {
-                            "General": "#/$defs/GeneralSum",
-                            "Unit": "#/$defs/UnitSum"
-                        },
-                        "propertyName": "s"
-                    },
-                    "oneOf": [
-                        {
-                            "$ref": "#/$defs/UnitSum"
-                        },
-                        {
-                            "$ref": "#/$defs/GeneralSum"
-                        }
-                    ]
+                    "$ref": "#/$defs/SumType"
                 },
                 {
                     "$ref": "#/$defs/Opaque"
@@ -1407,11 +1328,7 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "items": {
-                        "type": "string"
-                    },
-                    "title": "Input Extensions",
-                    "type": "array"
+                    "$ref": "#/$defs/InputExtensions"
                 },
                 "op": {
                     "const": "LeafOp",
@@ -1567,11 +1484,7 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "items": {
-                        "type": "string"
-                    },
-                    "title": "Input Extensions",
-                    "type": "array"
+                    "$ref": "#/$defs/InputExtensions"
                 },
                 "op": {
                     "const": "LeafOp",
