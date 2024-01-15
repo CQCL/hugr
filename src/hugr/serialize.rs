@@ -268,13 +268,32 @@ pub mod test {
     use crate::types::{FunctionType, Type};
     use crate::OutgoingPort;
     use itertools::Itertools;
+    use jsonschema::{Draft, JSONSchema};
+    use lazy_static::lazy_static;
     use portgraph::LinkView;
     use portgraph::{
         multiportgraph::MultiPortGraph, Hierarchy, LinkMut, PortMut, PortView, UnmanagedDenseMap,
     };
+    use std::fs;
 
     const NAT: Type = crate::extension::prelude::USIZE_T;
     const QB: Type = crate::extension::prelude::QB_T;
+
+    lazy_static! {
+        static ref SCHEMA: JSONSchema = {
+            let path = format!(
+                "{}/specification/schema/hugr_schema_v0.json",
+                env!("CARGO_MANIFEST_DIR")
+            );
+            let data = fs::read_to_string(path).unwrap();
+            let schema_val: serde_json::Value = serde_json::from_str(&data).unwrap();
+
+            JSONSchema::options()
+                .with_draft(Draft::Draft7)
+                .compile(&schema_val)
+                .expect("Schema is invalid.")
+        };
+    }
 
     #[test]
     fn empty_hugr_serialize() {
@@ -284,15 +303,37 @@ pub mod test {
 
     /// Serialize and deserialize a value.
     pub fn ser_roundtrip<T: Serialize + serde::de::DeserializeOwned>(g: &T) -> T {
-        let v = rmp_serde::to_vec_named(g).unwrap();
-        rmp_serde::from_slice(&v[..]).unwrap()
+        ser_roundtrip_validate(g, None)
+    }
+
+    /// Serialize and deserialize a value, optionally validating against a schema.
+    pub fn ser_roundtrip_validate<T: Serialize + serde::de::DeserializeOwned>(
+        g: &T,
+        schema: Option<&JSONSchema>,
+    ) -> T {
+        let s = serde_json::to_string(g).unwrap();
+        let val: serde_json::Value = serde_json::from_str(&s).unwrap();
+
+        if let Some(schema) = schema {
+            let validate = schema.validate(&val);
+
+            if let Err(errors) = validate {
+                // errors don't necessarily implement Debug
+                for error in errors {
+                    println!("Validation error: {}", error);
+                    println!("Instance path: {}", error.instance_path);
+                }
+                panic!("Serialization test failed.");
+            }
+        }
+        serde_json::from_str(&s).unwrap()
     }
 
     /// Serialize and deserialize a HUGR, and check that the result is the same as the original.
     ///
     /// Returns the deserialized HUGR.
     pub fn check_hugr_roundtrip(hugr: &Hugr) -> Hugr {
-        let new_hugr: Hugr = ser_roundtrip(hugr);
+        let new_hugr: Hugr = ser_roundtrip_validate(hugr, Some(&SCHEMA));
 
         // Original HUGR, with canonicalized node indices
         //

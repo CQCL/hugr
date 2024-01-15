@@ -16,6 +16,8 @@ in
     (with pkgs.darwin.apple_sdk; [
       frameworks.CoreServices
       frameworks.CoreFoundation
+      # added for json schema validation tests
+      frameworks.SystemConfiguration
     ]);
 
   # https://devenv.sh/scripts/
