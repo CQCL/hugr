@@ -801,6 +801,8 @@ Type ::= Tuple(#) -- fixed-arity, heterogeneous components
                                                 -- function arguments + results, and delta (see below)
        | Variable -- refers to a TypeParam bound by the nearest enclosing FuncDefn node, or an enclosing Function Type
 ```
+(We write `[Foo]` to indicate a list of Foo's.)
+
 The majority of types will be Opaque ones defined by extensions including the [standard library](#standard-library). However a number of types can be constructed using only the core type constructors: for example the empty tuple type, aka `unit`, with exactly one instance (so 0 bits of data); the empty sum, with no instances; the empty Function type (taking no arguments and producing no results - `void -> void`); and compositions thereof.
 
 Types representing functions are generally ``CopyableType``, but not ``EqType``. (It is undecidable whether two functions produce the same result for all possible inputs, or similarly whether one computation graph can be rewritten into another by semantic-preserving rewrites).
@@ -819,7 +821,6 @@ TypeParam ::= Type(Any|Copyable|Eq)
             | Tuple([TypeParam]) -- heterogenous, fixed size
             | Opaque(Name, [TypeArg]) -- e.g. Opaque("Array", [5, Opaque("usize", [])])
 ```
-(We write `[Foo]` to indicate a list of Foo's.)
 
 For each such TypeParam, the body of the FunctionType (input, output, and extensions - see [Extension Tracking](#extension-tracking))
 may contain "type variables" referring to that TypeParam, i.e. the binder. (The type variable is typically a type, but
