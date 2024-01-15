@@ -13,7 +13,7 @@ ecosystem.
 It provides a high-fidelity representation of operations, that facilitates
 compilation and encodes runnable programs.
 
-The HUGR specification is [here](specification/hugr.md).
+The HUGR specification is [here](https://github.com/CQCL/hugr/blob/main/specification/hugr.md).
 
 ## Usage
 
@@ -41,7 +41,7 @@ version will only change on major releases.
 
 ## Development
 
-See [DEVELOPMENT.md](DEVELOPMENT.md) for instructions on setting up the development environment.
+See [DEVELOPMENT.md](https://github.com/CQCL/hugr/blob/main/DEVELOPMENT.md) for instructions on setting up the development environment.
 
 ## License
 
@@ -52,5 +52,5 @@ This project is licensed under Apache License, Version 2.0 ([LICENSE][] or http:
   [msrv]: https://img.shields.io/badge/rust-1.75.0%2B-blue.svg
   [crates]: https://img.shields.io/crates/v/quantinuum-hugr
   [codecov]: https://img.shields.io/codecov/c/gh/CQCL/hugr?logo=codecov
-  [LICENSE]: LICENCE
-  [CHANGELOG]: CHANGELOG.md
+  [LICENSE]: https://github.com/CQCL/hugr/blob/main/LICENCE
+  [CHANGELOG]: https://github.com/CQCL/hugr/blob/main/CHANGELOG.md
