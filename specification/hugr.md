@@ -995,9 +995,9 @@ at runtime. In many cases this is desirable.
 
 ### Extension Implementation
 
-To strike a balance then, every extension provides YAML (or equivalent Rust structs)
-that declares named opaque **TypeDef**s and **OpDef**s. These are (potentially-polymorphic)
-definitions of types and operations, respectively---polymorphism arises because both may
+To strike a balance then, every extension provides declarative structs containing
+named **TypeDef**s and **OpDef**s---see [Declarative Format](#declarative-format).
+These are (potentially polymorphic) definitions of types and operations, respectively---polymorphism arises because both may
 declare any number TypeParams (as per [Type System](#type-system)). To use a TypeDef as a type,
 it must be instantiated with TypeArgs appropriate for its TypeParams, and similarly
 to use an OpDef as a node operation: each node stores a static-constant list of TypeArgs.
@@ -1057,7 +1057,8 @@ needed by the compiler to correctly treat the operation (the minimum
 case is opaque operations that should be left untouched). However, we
 wish to also leave it expressive enough to specify arbitrary extra data
 that may be used by compiler extensions. This suggests a flexible
-standard format such as YAML would be suitable. Here we provide an
+standard format such as YAML would be suitable. (The internal Rust structs
+may also be used directly.) Here we provide an
 illustrative example:
 
 See [Type System](#type-system) for more on Extensions.
