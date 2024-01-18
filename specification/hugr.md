@@ -1585,7 +1585,7 @@ valid node - whereas in tooling implementations it may be necessary to
 implement stable indexing where removing a node invalidates that index
 while keeping all other indices pointing to the same node.
 
-### Architecture
+## Architecture
 
 The HUGR is implemented as a Rust crate named `quantinuum-hugr`. This
 crate is intended to be a common dependency for all projects, and is to
