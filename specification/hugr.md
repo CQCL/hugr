@@ -441,8 +441,7 @@ flowchart
         subgraph BB1
             direction TB
             BB1In["Input"] -- "angle" --> G
-            BB1In -. "(Order)" .-> BB1_["Const"]
-            BB1_ -- "[()]" --> BB1Out["Output"]
+            BB1_["Const"] -- "[()]" --> BB1Out["Output"]
             BB1In -- "qubit" --> BB1Out
             G -- "angle" --> BB1Out
         end
@@ -455,9 +454,8 @@ flowchart
         end
         subgraph BB3
             direction TB
-            BB3In["Input"] -. "(Order)" .-> C
-            BB3In -. "(Order)" .-> BB3_["Const"]
-            BB3_ -- "[()]" --> BB3Out["Output"]
+            BB3In["Input"]
+            BB3_["Const"] -- "[()]" --> BB3Out["Output"]
             BB3In -- "qubit" --> BB3Out
             C -- "angle" --> BB3Out
         end
@@ -465,8 +463,7 @@ flowchart
             direction TB
             BB4In["Input"] -- "qubit" --> Rz
             BB4In -- "angle" --> Rz
-            BB4In -. "(Order)" .-> BB4_["Const"]
-            BB4_ -- "[()]" --> BB4Out["Output"]
+            BB4_["Const"] -- "[()]" --> BB4Out["Output"]
             Rz -- "qubit" --> BB4Out
         end
         subgraph Exit
@@ -655,8 +652,8 @@ flowchart
         end
         subgraph BB1
             direction TB
-            BB1In["Input"] -. "(Order)" .-> BB1_["Const"]
-            BB1_ -- "[()]" --> BB1Out["Output"]
+            BB1In["Input"]
+            BB1_["Const"] -- "[()]" --> BB1Out["Output"]
             G -- "angle" --> BB1Out
         end
         subgraph BB2
@@ -666,9 +663,8 @@ flowchart
         end
         subgraph BB3
             direction TB
-            BB3In["Input"] -. "(Order)" .-> C
-            BB3In -. "(Order)" .-> BB3_["Const"]
-            BB3_ -- "[()]" --> BB3Out["Output"]
+            BB3In["Input"]
+            BB3_["Const"] -- "[()]" --> BB3Out["Output"]
             C -- "angle" --> BB3Out
         end
         subgraph Exit
