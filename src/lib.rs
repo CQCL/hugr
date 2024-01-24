@@ -120,11 +120,11 @@
 //!         type_row![QB_T, QB_T, BOOL_T],
 //!     ))?;
 //!     let [wire0, wire1] = dfg_builder.input_wires_arr();
-//!     let wire2 = dfg_builder.add_dataflow_op(h_gate(), vec![wire0])?;
-//!     let wire3 = dfg_builder.add_dataflow_op(h_gate(), vec![wire1])?;
-//!     let wire45 = dfg_builder.add_dataflow_op(cx_gate(), wire2.outputs().chain(wire3.outputs()))?;
-//!     let wire67 = dfg_builder.add_dataflow_op(measure(), wire45.outputs().last())?;
-//!     dfg_builder.finish_prelude_hugr_with_outputs(wire45.outputs().take(1).chain(wire67.outputs()))
+//!     let h0 = dfg_builder.add_dataflow_op(h_gate(), vec![wire0])?;
+//!     let h1 = dfg_builder.add_dataflow_op(h_gate(), vec![wire1])?;
+//!     let cx = dfg_builder.add_dataflow_op(cx_gate(), h0.outputs().chain(h1.outputs()))?;
+//!     let measure = dfg_builder.add_dataflow_op(measure(), cx.outputs().last())?;
+//!     dfg_builder.finish_prelude_hugr_with_outputs(cx.outputs().take(1).chain(measure.outputs()))
 //! }
 //!
 //! let h: Hugr = make_dfg_hugr().unwrap();
