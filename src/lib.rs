@@ -113,7 +113,7 @@
 //! //      ├───┤┌─┴─┐┌─┐
 //! // q_1: ┤ H ├┤ X ├┤M├
 //! //      └───┘└───┘└╥┘
-//! // c:              ╩═
+//! // c:              ╚═
 //! fn make_dfg_hugr() -> Result<Hugr, BuildError> {
 //!     let mut dfg_builder = DFGBuilder::new(FunctionType::new(
 //!         type_row![QB_T, QB_T],
