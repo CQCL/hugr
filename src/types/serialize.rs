@@ -35,7 +35,6 @@ impl From<Type> for SerSimpleType {
             TypeEnum::Alias(a) => SerSimpleType::Alias(a),
             TypeEnum::Function(sig) => SerSimpleType::G(sig),
             TypeEnum::Variable(i, b) => SerSimpleType::V { i, b },
-            TypeEnum::RowVariable(i, b) => SerSimpleType::R { i, b },
             TypeEnum::Sum(sum) => SerSimpleType::Sum(sum),
             TypeEnum::Tuple(inner) => SerSimpleType::Tuple { inner },
         }

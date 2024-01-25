@@ -5,6 +5,7 @@ use itertools::Either;
 use std::fmt::{self, Display, Write};
 
 use super::type_param::TypeParam;
+use super::type_row::TypeRowV;
 use super::{subst_row, valid_row, Substitution, Type, TypeRow};
 
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
@@ -15,9 +16,9 @@ use crate::{Direction, IncomingPort, OutgoingPort, Port};
 /// and also the target (value) of a call (static).
 pub struct FunctionType {
     /// Value inputs of the function.
-    pub input: TypeRow,
+    pub input: TypeRowV,
     /// Value outputs of the function.
-    pub output: TypeRow,
+    pub output: TypeRowV,
     /// The extension requirements which are added by the operation
     pub extension_reqs: ExtensionSet,
 }
@@ -58,7 +59,7 @@ impl FunctionType {
 
 impl FunctionType {
     /// Create a new signature with specified inputs and outputs.
-    pub fn new(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Self {
+    pub fn new(input: impl Into<TypeRowV>, output: impl Into<TypeRowV>) -> Self {
         Self {
             input: input.into(),
             output: output.into(),
