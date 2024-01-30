@@ -19,7 +19,107 @@ use crate::{
 };
 
 /// Builder for a [`crate::ops::CFG`] child control
-/// flow graph
+/// flow graph.
+///
+/// These builder methods should ensure that the first two children of a CFG
+/// node are the entry node and the exit node.
+///
+/// # Example
+/// ```
+/// /*  Build a control flow graph with the following structure:
+///            +-----------+
+///            |   Entry   |
+///            +-/-----\---+
+///             /       \
+///            /         \
+///           /           \
+///          /             \
+///   +-----/----+       +--\-------+
+///   | Branch A |       | Branch B |
+///   +-----\----+       +----/-----+
+///          \               /
+///           \             /
+///            \           /
+///             \         /
+///            +-\-------/--+
+///            |    Exit    |
+///            +------------+
+/// */
+/// use cool_asserts::assert_matches;
+/// use hugr::{
+///   builder::{BuildError, CFGBuilder, Container, Dataflow, HugrBuilder},
+///   Hugr,
+///   extension::{ExtensionSet, prelude},
+///   types::{FunctionType, Type},
+///   ops,
+///   type_row,
+///   values::Value,
+/// };
+///
+/// const NAT: Type = prelude::USIZE_T;
+///
+/// fn make_cfg() -> Result<Hugr, BuildError> {
+///     let mut cfg_builder = CFGBuilder::new(FunctionType::new(type_row![NAT], type_row![NAT]))?;
+///
+///     // Outputs from basic blocks must be packed in a sum which corresponds to
+///     // which successor to pick. We'll either choose the first branch and pass
+///     // it a NAT, or the second branch and pass it nothing.
+///     let sum_variants = vec![type_row![NAT], type_row![]];
+///
+///     // The second argument says what types will be passed through to every
+///     // successor, in addition to the appropriate `sum_variants` type.
+///     let mut entry_b =
+///         cfg_builder.entry_builder(sum_variants.clone(), type_row![NAT], ExtensionSet::new())?;
+///
+///     let [inw] = entry_b.input_wires_arr();
+///     let entry = {
+///         // Pack the const "42" into the appropriate sum type.
+///         let left_42 =
+///             ops::Const::tuple_sum(0,
+///                                   Value::tuple([prelude::ConstUsize::new(42).into()]),
+///                                   sum_variants.clone())?;
+///         let sum = entry_b.add_load_const(left_42)?;
+///
+///         entry_b.finish_with_outputs(sum, [inw])?
+///     };
+///
+///     // This block will be the first successor of the entry node. It takes two
+///     // `NAT` arguments: one from the `sum_variants` type, and another from the
+///     // entry node's `other_outputs`.
+///     let mut successor_builder =
+///         cfg_builder.simple_block_builder(
+///           FunctionType::new(type_row![NAT, NAT], type_row![NAT]),
+///           1
+///         )?;
+///     let successor_a = {
+///         // This branch has one successor. The choice is denoted by a unary sum.
+///         let sum_unary = successor_builder.add_load_const(ops::Const::unary_unit_sum())?;
+///
+///         // The input wires of a node start with the data embedded in the variant
+///         // which selected this block.
+///         let [_forty_two, in_wire] = successor_builder.input_wires_arr();
+///         successor_builder.finish_with_outputs(sum_unary, [in_wire])?
+///     };
+///
+///    // The only argument to this block is the entry node's `other_outputs`.
+///    let mut successor_builder =
+///        cfg_builder.simple_block_builder(FunctionType::new(type_row![NAT], type_row![NAT]), 1)?;
+///    let successor_b = {
+///        let sum_unary = successor_builder.add_load_const(ops::Const::unary_unit_sum())?;
+///        let [in_wire] = successor_builder.input_wires_arr();
+///        successor_builder.finish_with_outputs(sum_unary, [in_wire])?
+///    };
+///     let exit = cfg_builder.exit_block();
+///     cfg_builder.branch(&entry, 0, &successor_a)?;
+///     cfg_builder.branch(&entry, 1, &successor_b)?;
+///     cfg_builder.branch(&successor_a, 0, &exit)?;
+///     cfg_builder.branch(&successor_b, 0, &exit)?;
+///     let hugr = cfg_builder.finish_prelude_hugr()?;
+///     Ok(hugr)
+/// };
+///
+/// assert_matches!(make_cfg(), Ok(_));
+/// ```
 #[derive(Debug, PartialEq)]
 pub struct CFGBuilder<T> {
     pub(super) base: T,
