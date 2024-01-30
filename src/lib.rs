@@ -33,6 +33,8 @@
 //! use hugr::type_row;
 //! use hugr::types::FunctionType;
 //!
+//! // The type of qubits, `QB_T` is in the prelude but, by default, no gateset
+//! // is defined. This module provides Hadamard and CX gates.
 //! mod mini_quantum_extension {
 //!     use smol_str::SmolStr;
 //!
