@@ -140,7 +140,7 @@ mod test {
     use crate::{
         builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
         extension::{
-            prelude::{ConstUsize, USIZE_T},
+            prelude::{ConstUsize, USIZE_CUSTOM_T, USIZE_T},
             ExtensionId, ExtensionRegistry, ExtensionSet, PRELUDE,
         },
         std_extensions::arithmetic::float_types::{self, ConstF64, FLOAT64_TYPE},
@@ -174,7 +174,7 @@ mod test {
         let c = b.add_constant(Const::tuple_sum(
             0,
             Value::tuple([
-                CustomTestValue(TypeBound::Eq, ExtensionSet::new()).into(),
+                CustomTestValue(USIZE_CUSTOM_T).into(),
                 serialized_float(5.1),
             ]),
             pred_rows.clone(),

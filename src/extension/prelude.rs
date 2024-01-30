@@ -194,6 +194,10 @@ impl CustomConst for ConstUsize {
     fn extension_reqs(&self) -> ExtensionSet {
         ExtensionSet::singleton(&PRELUDE_ID)
     }
+
+    fn typ(&self) -> CustomType {
+        USIZE_CUSTOM_T
+    }
 }
 
 impl KnownTypeConst for ConstUsize {
@@ -235,6 +239,9 @@ impl CustomConst for ConstError {
 
     fn extension_reqs(&self) -> ExtensionSet {
         ExtensionSet::singleton(&PRELUDE_ID)
+    }
+    fn typ(&self) -> CustomType {
+        ERROR_CUSTOM_TYPE
     }
 }
 

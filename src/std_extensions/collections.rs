@@ -31,13 +31,13 @@ pub const EXTENSION_NAME: ExtensionId = ExtensionId::new_unchecked("Collections"
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 /// Dynamically sized list of values, all of the same type.
-pub struct ListValue(Vec<Value>);
+pub struct ListValue(Vec<Value>, Type);
 
 impl ListValue {
     /// Create a new [CustomConst] for a list of values.
     /// (The caller will need these to all be of the same type, but that is not checked here.)
-    pub fn new(contents: Vec<Value>) -> Self {
-        Self(contents)
+    pub fn new(t: Type, contents: Vec<Value>) -> Self {
+        Self(contents, t)
     }
 }
 
@@ -45,6 +45,13 @@ impl ListValue {
 impl CustomConst for ListValue {
     fn name(&self) -> SmolStr {
         SmolStr::new_inline("list")
+    }
+
+    fn typ(&self) -> CustomType {
+        let list_type_def = EXTENSION.get_type(&LIST_TYPENAME).unwrap();
+        list_type_def
+            .instantiate(vec![Into::<TypeArg>::into(self.1.clone())])
+            .unwrap()
     }
 
     fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
@@ -96,20 +103,16 @@ impl ConstFold for PopFold {
         let list: &ListValue = list.get_custom_value().expect("Should be list value.");
         let mut list = list.clone();
         let elem = list.0.pop()?; // empty list fails to evaluate "pop"
-        let list = make_list_const(list, type_args);
+        let list = make_list_const(list);
         let elem = ops::Const::new(elem, ty.clone()).unwrap();
 
         Some(vec![(0.into(), list), (1.into(), elem)])
     }
 }
 
-pub(crate) fn make_list_const(list: ListValue, type_args: &[TypeArg]) -> ops::Const {
-    let list_type_def = EXTENSION.get_type(&LIST_TYPENAME).unwrap();
-    ops::Const::new(
-        list.into(),
-        Type::new_extension(list_type_def.instantiate(type_args).unwrap()),
-    )
-    .unwrap()
+pub(crate) fn make_list_const(list: ListValue) -> ops::Const {
+    let t = list.typ();
+    ops::Const::new(list.into(), Type::new_extension(t)).unwrap()
 }
 
 struct PushFold;
@@ -117,14 +120,14 @@ struct PushFold;
 impl ConstFold for PushFold {
     fn fold(
         &self,
-        type_args: &[TypeArg],
+        _type_args: &[TypeArg],
         consts: &[(crate::IncomingPort, ops::Const)],
     ) -> crate::extension::ConstFoldResult {
         let [list, elem]: [&ops::Const; 2] = sorted_consts(consts).try_into().ok()?;
         let list: &ListValue = list.get_custom_value().expect("Should be list value.");
         let mut list = list.clone();
         list.0.push(elem.value().clone());
-        let list = make_list_const(list, type_args);
+        let list = make_list_const(list);
 
         Some(vec![(0.into(), list)])
     }
@@ -316,11 +319,11 @@ mod test {
             .is_err());
 
         list_def.check_custom(&list_type).unwrap();
-        let list_value = ListValue(vec![ConstUsize::new(3).into()]);
+        let list_value = ListValue(vec![ConstUsize::new(3).into()], USIZE_T);
 
         list_value.check_custom_type(&list_type).unwrap();
 
-        let wrong_list_value = ListValue(vec![ConstF64::new(1.2).into()]);
+        let wrong_list_value = ListValue(vec![ConstF64::new(1.2).into()], USIZE_T);
         assert!(wrong_list_value.check_custom_type(&list_type).is_err());
     }
 

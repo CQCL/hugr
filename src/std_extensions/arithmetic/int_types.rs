@@ -165,6 +165,12 @@ impl CustomConst for ConstIntU {
     fn extension_reqs(&self) -> ExtensionSet {
         ExtensionSet::singleton(&EXTENSION_ID)
     }
+
+    fn typ(&self) -> CustomType {
+        int_custom_type(TypeArg::BoundedNat {
+            n: self.log_width as u64,
+        })
+    }
 }
 
 #[typetag::serde]
@@ -187,6 +193,12 @@ impl CustomConst for ConstIntS {
 
     fn extension_reqs(&self) -> ExtensionSet {
         ExtensionSet::singleton(&EXTENSION_ID)
+    }
+
+    fn typ(&self) -> CustomType {
+        int_custom_type(TypeArg::BoundedNat {
+            n: self.log_width as u64,
+        })
     }
 }
 

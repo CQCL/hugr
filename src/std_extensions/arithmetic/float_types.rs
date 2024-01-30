@@ -64,6 +64,10 @@ impl CustomConst for ConstF64 {
         self.check_known_type(typ)
     }
 
+    fn typ(&self) -> CustomType {
+        Self::TYPE
+    }
+
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
         crate::values::downcast_equal_consts(self, other)
     }

@@ -162,6 +162,9 @@ pub trait CustomConst:
         // false unless overloaded
         false
     }
+
+    /// report the type
+    fn typ(&self) -> CustomType;
 }
 
 /// Const equality for types that have PartialEq
@@ -241,6 +244,9 @@ impl CustomConst for CustomSerialized {
     fn extension_reqs(&self) -> ExtensionSet {
         self.extensions.clone()
     }
+    fn typ(&self) -> CustomType {
+        self.typ.clone()
+    }
 }
 
 impl PartialEq for dyn CustomConst {
@@ -257,13 +263,13 @@ pub(crate) mod test {
     use crate::builder::test::simple_dfg_hugr;
     use crate::std_extensions::arithmetic::float_types::{self, FLOAT64_CUSTOM_TYPE};
     use crate::type_row;
-    use crate::types::{FunctionType, Type, TypeBound};
+    use crate::types::{FunctionType, Type};
 
     #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 
     /// A custom constant value used in testing that purports to be an instance
     /// of a custom type with a specific type bound.
-    pub(crate) struct CustomTestValue(pub TypeBound, pub ExtensionSet);
+    pub(crate) struct CustomTestValue(pub CustomType);
     #[typetag::serde]
     impl CustomConst for CustomTestValue {
         fn name(&self) -> SmolStr {
@@ -271,7 +277,7 @@ pub(crate) mod test {
         }
 
         fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
-            if self.0 == typ.bound() {
+            if self.0 == *typ {
                 Ok(())
             } else {
                 Err(CustomCheckFailure::Message(
@@ -281,7 +287,11 @@ pub(crate) mod test {
         }
 
         fn extension_reqs(&self) -> ExtensionSet {
-            self.1.clone()
+            ExtensionSet::singleton(self.0.extension())
+        }
+
+        fn typ(&self) -> CustomType {
+            self.0.clone()
         }
     }
 
