@@ -119,18 +119,32 @@ impl Rewrite for InlineDFG {
 mod test {
     use crate::builder::{DFGBuilder, Dataflow, DataflowHugr};
 
-    use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE};
+    use crate::extension::prelude::QB_T;
+    use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE, PRELUDE_REGISTRY};
     use crate::hugr::rewrite::inline_dfg::InlineDFGError;
     use crate::hugr::HugrMut;
     use crate::ops::handle::{DfgID, NodeHandle};
     use crate::ops::Const;
+    use crate::std_extensions::arithmetic::float_types;
     use crate::std_extensions::arithmetic::int_ops::{self, IntOpDef};
     use crate::std_extensions::arithmetic::int_types::{self, ConstIntU};
     use crate::types::FunctionType;
+    use crate::utils::test_quantum_extension;
     use crate::values::Value;
-    use crate::{HugrView, Node};
+    use crate::{type_row, Direction, HugrView, Node, Port};
 
     use super::InlineDFG;
+
+    fn find_dfgs(h: &impl HugrView) -> Vec<Node> {
+        h.nodes()
+            .filter(|n| h.get_optype(*n).as_dfg().is_some())
+            .collect()
+    }
+    fn extension_ops(h: &impl HugrView) -> Vec<Node> {
+        h.nodes()
+            .filter(|n| h.get_optype(*n).as_leaf_op().is_some())
+            .collect()
+    }
 
     #[test]
     fn simple() -> Result<(), Box<dyn std::error::Error>> {
@@ -173,16 +187,6 @@ mod test {
         let a1_sub_b = outer.add_dataflow_op(IntOpDef::isub.with_width(6), [a1, b])?;
         let mut outer = outer.finish_hugr_with_outputs(a1_sub_b.outputs(), &reg)?;
 
-        fn find_dfgs(h: &impl HugrView) -> Vec<Node> {
-            h.nodes()
-                .filter(|n| h.get_optype(*n).as_dfg().is_some())
-                .collect()
-        }
-        fn extension_ops(h: &impl HugrView) -> Vec<Node> {
-            h.nodes()
-                .filter(|n| h.get_optype(*n).as_leaf_op().is_some())
-                .collect()
-        }
         // Sanity checks
         assert_eq!(find_dfgs(&outer), vec![outer.root(), inner.node()]);
         let [add, sub] = extension_ops(&outer).try_into().unwrap();
@@ -202,6 +206,75 @@ mod test {
         assert_eq!(
             outer.node_connections(add, sub).collect::<Vec<_>>().len(),
             1
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn permutation() -> Result<(), Box<dyn std::error::Error>> {
+        let swap = DFGBuilder::new(FunctionType::new_endo(type_row![QB_T, QB_T]))?;
+        let [a, b] = swap.input_wires_arr();
+        let swap = swap.finish_hugr_with_outputs([b, a], &PRELUDE_REGISTRY)?;
+
+        let mut h = DFGBuilder::new(
+            FunctionType::new_endo(type_row![QB_T, QB_T]).with_extension_delta(
+                &ExtensionSet::singleton(&test_quantum_extension::EXTENSION_ID),
+            ),
+        )?;
+        let [p, q] = h.input_wires_arr();
+        let [p_h] = h
+            .add_dataflow_op(test_quantum_extension::h_gate(), [p])?
+            .outputs_arr();
+        let swap = h.add_hugr_with_wires(swap, [p_h, q])?;
+        let [q, p] = swap.outputs_arr();
+        let cx = h.add_dataflow_op(test_quantum_extension::cx_gate(), [q, p])?;
+        let reg = ExtensionRegistry::try_new([
+            test_quantum_extension::EXTENSION.to_owned(),
+            PRELUDE.to_owned(),
+            float_types::EXTENSION.to_owned(),
+        ])
+        .unwrap();
+
+        let mut h = h.finish_hugr_with_outputs(cx.outputs(), &reg)?;
+        assert_eq!(find_dfgs(&h), vec![h.root(), swap.node()]);
+        assert_eq!(h.nodes().len(), 8); // Dfg+I+O, H, CX, Dfg+I+O
+                                        // No permutation outside the swap DFG:
+        assert_eq!(
+            h.node_connections(p_h.node(), swap.node())
+                .collect::<Vec<_>>(),
+            vec![[
+                Port::new(Direction::Outgoing, 0),
+                Port::new(Direction::Incoming, 0)
+            ]]
+        );
+        assert_eq!(
+            h.node_connections(swap.node(), cx.node())
+                .collect::<Vec<_>>(),
+            vec![
+                [
+                    Port::new(Direction::Outgoing, 0),
+                    Port::new(Direction::Incoming, 0)
+                ],
+                [
+                    Port::new(Direction::Outgoing, 1),
+                    Port::new(Direction::Incoming, 1)
+                ]
+            ]
+        );
+
+        h.apply_rewrite(InlineDFG(DfgID::from(swap.node())))?;
+        assert_eq!(find_dfgs(&h), vec![h.root()]);
+        assert_eq!(h.nodes().len(), 5); // Dfg+I+O
+        let mut ops = extension_ops(&h);
+        ops.sort_by_key(|n| h.num_outputs(*n)); // Put H before CX
+        let [h_gate, cx] = ops.try_into().unwrap();
+        // Now permutation exists:
+        assert_eq!(
+            h.node_connections(h_gate, cx).collect::<Vec<_>>(),
+            vec![[
+                Port::new(Direction::Outgoing, 0),
+                Port::new(Direction::Incoming, 1)
+            ]]
         );
         Ok(())
     }
