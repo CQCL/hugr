@@ -652,7 +652,8 @@ impl UnificationContext {
             new_variables = new_variables
                 .into_iter()
                 .filter(|m| seen.insert(*m))
-                .flat_map(|m| self.get_constraints(&m).unwrap())
+                .flat_map(|m| self.get_constraints(&m))
+                .flatten()
                 .map(|c| match c {
                     Constraint::Plus(_, other) => self.resolve(*other),
                     Constraint::Equal(other) => self.resolve(*other),
