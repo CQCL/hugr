@@ -124,7 +124,7 @@ mod test {
     use crate::hugr::rewrite::inline_dfg::InlineDFGError;
     use crate::hugr::HugrMut;
     use crate::ops::handle::{DfgID, NodeHandle};
-    use crate::ops::Const;
+    use crate::ops::{Const, LeafOp};
     use crate::std_extensions::arithmetic::float_types;
     use crate::std_extensions::arithmetic::int_ops::{self, IntOpDef};
     use crate::std_extensions::arithmetic::int_types::{self, ConstIntU};
@@ -142,13 +142,13 @@ mod test {
     }
     fn extension_ops(h: &impl HugrView) -> Vec<Node> {
         h.nodes()
-            .filter(|n| h.get_optype(*n).as_leaf_op().is_some())
+            .filter(|n| matches!(h.get_optype(*n).as_leaf_op(), Some(LeafOp::CustomOp(_))))
             .collect()
     }
 
     #[test]
     fn simple() -> Result<(), Box<dyn std::error::Error>> {
-        let delta = ExtensionSet::singleton(&int_ops::EXTENSION_ID);
+        let delta = ExtensionSet::from_iter([int_ops::EXTENSION_ID, int_types::EXTENSION_ID]);
         let reg = ExtensionRegistry::try_new([
             PRELUDE.to_owned(),
             int_ops::EXTENSION.to_owned(),
@@ -165,6 +165,16 @@ mod test {
             c: (Box::new(ConstIntU::new(6, 15)?),),
         };
         let c1 = inner.add_load_const(Const::new(const_val, int_ty.clone())?)?;
+        let type_row = vec![int_ty.clone()].into();
+        let [c1] = inner
+            .add_dataflow_op(
+                LeafOp::Lift {
+                    type_row,
+                    new_extension: int_ops::EXTENSION_ID,
+                },
+                [c1],
+            )?
+            .outputs_arr();
         let a1 = inner.add_dataflow_op(IntOpDef::iadd.with_width(6), [a, c1])?;
         let inner = inner.finish_hugr_with_outputs(a1.outputs(), &reg)?;
         {
@@ -176,7 +186,7 @@ mod test {
             );
             assert_eq!(h, inner); // unchanged
         }
-        assert_eq!(inner.nodes().len(), 6); // DFG, Input, Output, const, load_const, add
+        assert_eq!(inner.nodes().len(), 7); // DFG, Input, Output, const, load_const, lift, add
         let mut outer = DFGBuilder::new(
             FunctionType::new(vec![int_ty.clone(); 2], vec![int_ty.clone()])
                 .with_extension_delta(&delta),
@@ -194,11 +204,11 @@ mod test {
             outer.get_parent(outer.get_parent(add).unwrap()),
             outer.get_parent(sub)
         );
-        assert_eq!(outer.nodes().len(), 10); // 6 above + DFG + Input + Output + sub
+        assert_eq!(outer.nodes().len(), 11); // 7 above + DFG + Input + Output + sub
 
         outer.apply_rewrite(InlineDFG(DfgID::from(inner.node())))?;
         outer.validate(&reg)?;
-        assert_eq!(outer.nodes().len(), 7);
+        assert_eq!(outer.nodes().len(), 8);
         assert_eq!(find_dfgs(&outer), vec![outer.root()]);
         let [add, sub] = extension_ops(&outer).try_into().unwrap();
         assert_eq!(outer.get_parent(add), Some(outer.root()));
