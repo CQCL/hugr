@@ -117,7 +117,9 @@ impl Rewrite for InlineDFG {
 
 #[cfg(test)]
 mod test {
-    use crate::builder::{DFGBuilder, Dataflow, DataflowHugr};
+    use rstest::rstest;
+
+    use crate::builder::{DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer};
 
     use crate::extension::prelude::QB_T;
     use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE, PRELUDE_REGISTRY};
@@ -146,8 +148,10 @@ mod test {
             .collect()
     }
 
-    #[test]
-    fn simple() -> Result<(), Box<dyn std::error::Error>> {
+    #[rstest]
+    #[case(true)]
+    #[case(false)]
+    fn inline_add_load_const(#[case] nonlocal: bool) -> Result<(), Box<dyn std::error::Error>> {
         let delta = ExtensionSet::from_iter([int_ops::EXTENSION_ID, int_types::EXTENSION_ID]);
         let reg = ExtensionRegistry::try_new([
             PRELUDE.to_owned(),
@@ -157,54 +161,64 @@ mod test {
         .unwrap();
         let int_ty = &int_types::INT_TYPES[6];
 
-        let mut inner = DFGBuilder::new(
-            FunctionType::new_endo(vec![int_ty.clone()]).with_extension_delta(&delta),
-        )?;
-        let [a] = inner.input_wires_arr();
-        let const_val = Value::Extension {
-            c: (Box::new(ConstIntU::new(6, 15)?),),
-        };
-        let c1 = inner.add_load_const(Const::new(const_val, int_ty.clone())?)?;
-        let type_row = vec![int_ty.clone()].into();
-        let [c1] = inner
-            .add_dataflow_op(
-                LeafOp::Lift {
-                    type_row,
-                    new_extension: int_ops::EXTENSION_ID,
-                },
-                [c1],
-            )?
-            .outputs_arr();
-        let a1 = inner.add_dataflow_op(IntOpDef::iadd.with_width(6), [a, c1])?;
-        let inner = inner.finish_hugr_with_outputs(a1.outputs(), &reg)?;
-        {
-            // Check we can't inline that DFG
-            let mut h = inner.clone();
-            assert_eq!(
-                h.apply_rewrite(InlineDFG(DfgID::from(h.root()))),
-                Err(InlineDFGError::NoParent)
-            );
-            assert_eq!(h, inner); // unchanged
-        }
-        assert_eq!(inner.nodes().len(), 7); // DFG, Input, Output, const, load_const, lift, add
         let mut outer = DFGBuilder::new(
             FunctionType::new(vec![int_ty.clone(); 2], vec![int_ty.clone()])
                 .with_extension_delta(&delta),
         )?;
         let [a, b] = outer.input_wires_arr();
-        let inner = outer.add_hugr_with_wires(inner, [a])?;
+        let cst = Const::new(
+            Value::Extension {
+                c: (Box::new(ConstIntU::new(6, 15)?),),
+            },
+            int_ty.clone(),
+        )?;
+        let c1 = nonlocal.then(|| outer.add_load_const(cst.clone()).unwrap());
+        let inner = {
+            let mut inner = outer.dfg_builder(
+                FunctionType::new_endo(vec![int_ty.clone()]).with_extension_delta(&delta),
+                None,
+                [a],
+            )?;
+            let [a] = inner.input_wires_arr();
+            let c1 = c1.unwrap_or_else(|| inner.add_load_const(cst).unwrap());
+            let [c1] = inner
+                .add_dataflow_op(
+                    LeafOp::Lift {
+                        type_row: vec![int_ty.clone()].into(),
+                        new_extension: int_ops::EXTENSION_ID,
+                    },
+                    [c1],
+                )?
+                .outputs_arr();
+            let a1 = inner.add_dataflow_op(IntOpDef::iadd.with_width(6), [a, c1])?;
+            inner.finish_with_outputs(a1.outputs())?
+        };
         let [a1] = inner.outputs_arr();
+
         let a1_sub_b = outer.add_dataflow_op(IntOpDef::isub.with_width(6), [a1, b])?;
         let mut outer = outer.finish_hugr_with_outputs(a1_sub_b.outputs(), &reg)?;
 
         // Sanity checks
+        assert_eq!(
+            outer.children(inner.node()).len(),
+            if nonlocal { 4 } else { 6 }
+        ); // Input, Output, const, load_const, lift, add
         assert_eq!(find_dfgs(&outer), vec![outer.root(), inner.node()]);
         let [add, sub] = extension_ops(&outer).try_into().unwrap();
         assert_eq!(
             outer.get_parent(outer.get_parent(add).unwrap()),
             outer.get_parent(sub)
         );
-        assert_eq!(outer.nodes().len(), 11); // 7 above + DFG + Input + Output + sub
+        assert_eq!(outer.nodes().len(), 11); // 6 above + inner DFG + outer (DFG + Input + Output + sub)
+        {
+            // Check we can't inline the outer DFG
+            let mut h = outer.clone();
+            assert_eq!(
+                h.apply_rewrite(InlineDFG(DfgID::from(h.root()))),
+                Err(InlineDFGError::NoParent)
+            );
+            assert_eq!(h, outer); // unchanged
+        }
 
         outer.apply_rewrite(InlineDFG(DfgID::from(inner.node())))?;
         outer.validate(&reg)?;
