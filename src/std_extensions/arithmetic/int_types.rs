@@ -66,7 +66,7 @@ pub(super) fn get_log_width(arg: &TypeArg) -> Result<u8, TypeArgError> {
     }
 }
 
-pub(super) const fn type_arg(log_width: u8) -> TypeArg {
+const fn type_arg(log_width: u8) -> TypeArg {
     TypeArg::BoundedNat {
         n: log_width as u64,
     }
@@ -150,7 +150,7 @@ impl CustomConst for ConstIntU {
         format!("u{}({})", self.log_width, self.value).into()
     }
     fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
-        if typ == &int_custom_type(type_arg(self.log_width)) {
+        if typ == &self.typ() {
             Ok(())
         } else {
             Err(CustomCheckFailure::Message(
@@ -167,9 +167,7 @@ impl CustomConst for ConstIntU {
     }
 
     fn typ(&self) -> CustomType {
-        int_custom_type(TypeArg::BoundedNat {
-            n: self.log_width as u64,
-        })
+        int_custom_type(type_arg(self.log_width))
     }
 }
 
@@ -179,7 +177,7 @@ impl CustomConst for ConstIntS {
         format!("i{}({})", self.log_width, self.value).into()
     }
     fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
-        if typ == &int_custom_type(type_arg(self.log_width)) {
+        if typ == &self.typ() {
             Ok(())
         } else {
             Err(CustomCheckFailure::Message(
@@ -196,9 +194,7 @@ impl CustomConst for ConstIntS {
     }
 
     fn typ(&self) -> CustomType {
-        int_custom_type(TypeArg::BoundedNat {
-            n: self.log_width as u64,
-        })
+        int_custom_type(type_arg(self.log_width))
     }
 }
 
