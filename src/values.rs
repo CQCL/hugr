@@ -154,7 +154,17 @@ pub trait CustomConst:
     fn extension_reqs(&self) -> ExtensionSet;
 
     /// Check the value is a valid instance of the provided type.
-    fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure>;
+    fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
+        let expected = self.typ();
+        if typ == &expected {
+            Ok(())
+        } else {
+            Err(CustomCheckFailure::TypeMismatch {
+                expected,
+                found: typ.clone(),
+            })
+        }
+    }
 
     /// Compare two constants for equality, using downcasting and comparing the definitions.
     // Can't derive PartialEq for trait objects
@@ -176,25 +186,6 @@ pub fn downcast_equal_consts<T: CustomConst + PartialEq>(
         value == other
     } else {
         false
-    }
-}
-
-/// Simpler trait for constant structs that have a known custom type to check against.
-pub trait KnownTypeConst {
-    /// The type of the constants.
-    const TYPE: CustomType;
-
-    /// Fixed implementation of [CustomConst::check_custom_type] that checks
-    /// against known correct type.
-    fn check_known_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
-        if typ == &Self::TYPE {
-            Ok(())
-        } else {
-            Err(CustomCheckFailure::TypeMismatch {
-                expected: Self::TYPE,
-                found: typ.clone(),
-            })
-        }
     }
 }
 
@@ -224,17 +215,6 @@ impl CustomSerialized {
 impl CustomConst for CustomSerialized {
     fn name(&self) -> SmolStr {
         format!("yaml:{:?}", self.value).into()
-    }
-
-    fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
-        if &self.typ == typ {
-            Ok(())
-        } else {
-            Err(CustomCheckFailure::TypeMismatch {
-                expected: typ.clone(),
-                found: self.typ.clone(),
-            })
-        }
     }
 
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
@@ -267,8 +247,7 @@ pub(crate) mod test {
 
     #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 
-    /// A custom constant value used in testing that purports to be an instance
-    /// of a custom type with a specific type bound.
+    /// A custom constant value used in testing
     pub(crate) struct CustomTestValue(pub CustomType);
     #[typetag::serde]
     impl CustomConst for CustomTestValue {

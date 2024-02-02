@@ -9,9 +9,9 @@ use crate::{
     type_row,
     types::{
         type_param::{TypeArg, TypeParam},
-        CustomCheckFailure, CustomType, FunctionType, PolyFuncType, Type, TypeBound,
+        CustomType, FunctionType, PolyFuncType, Type, TypeBound,
     },
-    values::{CustomConst, KnownTypeConst},
+    values::CustomConst,
     Extension,
 };
 
@@ -183,10 +183,6 @@ impl CustomConst for ConstUsize {
         format!("ConstUsize({:?})", self.0).into()
     }
 
-    fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
-        self.check_known_type(typ)
-    }
-
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
         crate::values::downcast_equal_consts(self, other)
     }
@@ -198,10 +194,6 @@ impl CustomConst for ConstUsize {
     fn typ(&self) -> CustomType {
         USIZE_CUSTOM_T
     }
-}
-
-impl KnownTypeConst for ConstUsize {
-    const TYPE: CustomType = USIZE_CUSTOM_T;
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -229,10 +221,6 @@ impl CustomConst for ConstError {
         format!("ConstError({:?}, {:?})", self.signal, self.message).into()
     }
 
-    fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
-        self.check_known_type(typ)
-    }
-
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
         crate::values::downcast_equal_consts(self, other)
     }
@@ -243,10 +231,6 @@ impl CustomConst for ConstError {
     fn typ(&self) -> CustomType {
         ERROR_CUSTOM_TYPE
     }
-}
-
-impl KnownTypeConst for ConstError {
-    const TYPE: CustomType = ERROR_CUSTOM_TYPE;
 }
 
 #[cfg(test)]

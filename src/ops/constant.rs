@@ -3,7 +3,7 @@
 use crate::{
     extension::ExtensionSet,
     types::{ConstTypeError, EdgeKind, Type, TypeRow},
-    values::{CustomConst, KnownTypeConst, Value},
+    values::{CustomConst, Value},
 };
 
 use smol_str::SmolStr;
@@ -124,12 +124,13 @@ impl OpTrait for Const {
 // without initial type check.
 impl<T> From<T> for Const
 where
-    T: KnownTypeConst + CustomConst,
+    T: CustomConst,
 {
     fn from(value: T) -> Self {
+        let typ = Type::new_extension(value.typ());
         Const {
             value: Value::custom(value),
-            typ: Type::new_extension(T::TYPE),
+            typ,
         }
     }
 }

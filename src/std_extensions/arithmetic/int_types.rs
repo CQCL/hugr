@@ -150,7 +150,7 @@ impl CustomConst for ConstIntU {
         format!("u{}({})", self.log_width, self.value).into()
     }
     fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
-        if typ.clone() == int_custom_type(type_arg(self.log_width)) {
+        if typ == &int_custom_type(type_arg(self.log_width)) {
             Ok(())
         } else {
             Err(CustomCheckFailure::Message(
@@ -179,7 +179,7 @@ impl CustomConst for ConstIntS {
         format!("i{}({})", self.log_width, self.value).into()
     }
     fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
-        if typ.clone() == int_custom_type(type_arg(self.log_width)) {
+        if typ == &int_custom_type(type_arg(self.log_width)) {
             Ok(())
         } else {
             Err(CustomCheckFailure::Message(

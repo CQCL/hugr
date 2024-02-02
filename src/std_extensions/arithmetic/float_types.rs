@@ -4,8 +4,8 @@ use smol_str::SmolStr;
 
 use crate::{
     extension::{ExtensionId, ExtensionSet},
-    types::{CustomCheckFailure, CustomType, Type, TypeBound},
-    values::{CustomConst, KnownTypeConst},
+    types::{CustomType, Type, TypeBound},
+    values::CustomConst,
     Extension,
 };
 use lazy_static::lazy_static;
@@ -50,22 +50,14 @@ impl ConstF64 {
     }
 }
 
-impl KnownTypeConst for ConstF64 {
-    const TYPE: CustomType = FLOAT64_CUSTOM_TYPE;
-}
-
 #[typetag::serde]
 impl CustomConst for ConstF64 {
     fn name(&self) -> SmolStr {
         format!("f64({})", self.value).into()
     }
 
-    fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
-        self.check_known_type(typ)
-    }
-
     fn typ(&self) -> CustomType {
-        Self::TYPE
+        FLOAT64_CUSTOM_TYPE
     }
 
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {

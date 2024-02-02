@@ -335,7 +335,7 @@ mod test {
     #[cfg(not(feature = "extension_inference"))] // inference fails for test graph, shouldn't
     #[test]
     fn test_list_ops() -> Result<(), Box<dyn std::error::Error>> {
-        use crate::std_extensions::collections::{self, make_list_const, ListOp, ListValue};
+        use crate::std_extensions::collections::{self, ListOp, ListValue};
 
         let reg = ExtensionRegistry::try_new([
             PRELUDE.to_owned(),
@@ -343,7 +343,7 @@ mod test {
             collections::EXTENSION.to_owned(),
         ])
         .unwrap();
-        let list = make_list_const(ListValue::new(BOOL_T, vec![Value::unit_sum(1)]));
+        let list: Const = ListValue::new(BOOL_T, vec![Value::unit_sum(1)]).into();
         let mut build = DFGBuilder::new(FunctionType::new(
             type_row![],
             vec![list.const_type().clone()],

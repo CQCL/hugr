@@ -34,10 +34,15 @@ pub const EXTENSION_NAME: ExtensionId = ExtensionId::new_unchecked("Collections"
 pub struct ListValue(Vec<Value>, Type);
 
 impl ListValue {
-    /// Create a new [CustomConst] for a list of values.
-    /// (The caller will need these to all be of the same type, but that is not checked here.)
-    pub fn new(t: Type, contents: Vec<Value>) -> Self {
-        Self(contents, t)
+    /// Create a new [CustomConst] for a list of values of type `typ`.
+    /// That all values ore of type `typ` is not checked here.
+    pub fn new(typ: Type, contents: Vec<Value>) -> Self {
+        Self(contents, typ)
+    }
+
+    /// Create a new [CustomConst] for an empty list of values of type `typ`.
+    pub fn new_empty(typ: Type) -> Self {
+        Self(vec![], typ)
     }
 }
 
@@ -103,16 +108,10 @@ impl ConstFold for PopFold {
         let list: &ListValue = list.get_custom_value().expect("Should be list value.");
         let mut list = list.clone();
         let elem = list.0.pop()?; // empty list fails to evaluate "pop"
-        let list = make_list_const(list);
         let elem = ops::Const::new(elem, ty.clone()).unwrap();
 
-        Some(vec![(0.into(), list), (1.into(), elem)])
+        Some(vec![(0.into(), list.into()), (1.into(), elem)])
     }
-}
-
-pub(crate) fn make_list_const(list: ListValue) -> ops::Const {
-    let t = list.typ();
-    ops::Const::new(list.into(), Type::new_extension(t)).unwrap()
 }
 
 struct PushFold;
@@ -127,9 +126,8 @@ impl ConstFold for PushFold {
         let list: &ListValue = list.get_custom_value().expect("Should be list value.");
         let mut list = list.clone();
         list.0.push(elem.value().clone());
-        let list = make_list_const(list);
 
-        Some(vec![(0.into(), list)])
+        Some(vec![(0.into(), list.into())])
     }
 }
 const TP: TypeParam = TypeParam::Type { b: TypeBound::Any };
