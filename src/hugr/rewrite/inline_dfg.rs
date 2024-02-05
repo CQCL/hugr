@@ -120,7 +120,6 @@ mod test {
     use rstest::rstest;
 
     use crate::builder::{DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer};
-
     use crate::extension::prelude::QB_T;
     use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE, PRELUDE_REGISTRY};
     use crate::hugr::rewrite::inline_dfg::InlineDFGError;
@@ -134,6 +133,7 @@ mod test {
     use crate::utils::test_quantum_extension;
     use crate::values::Value;
     use crate::{type_row, Direction, HugrView, Node, Port};
+    use crate::{Hugr, Wire};
 
     use super::InlineDFG;
 
@@ -166,22 +166,18 @@ mod test {
                 .with_extension_delta(&delta),
         )?;
         let [a, b] = outer.input_wires_arr();
-        let cst = Const::new(
-            Value::Extension {
-                c: (Box::new(ConstIntU::new(6, 15)?),),
-            },
-            int_ty.clone(),
-        )?;
-        let c1 = nonlocal.then(|| outer.add_load_const(cst.clone()).unwrap());
-        let inner = {
-            let mut inner = outer.dfg_builder(
-                FunctionType::new_endo(vec![int_ty.clone()]).with_extension_delta(&delta),
-                None,
-                [a],
+        fn make_const<T: AsMut<Hugr> + AsRef<Hugr>>(
+            d: &mut DFGBuilder<T>,
+        ) -> Result<Wire, Box<dyn std::error::Error>> {
+            let int_ty = &int_types::INT_TYPES[6];
+            let cst = Const::new(
+                Value::Extension {
+                    c: (Box::new(ConstIntU::new(6, 15)?),),
+                },
+                int_ty.clone(),
             )?;
-            let [a] = inner.input_wires_arr();
-            let c1 = c1.unwrap_or_else(|| inner.add_load_const(cst).unwrap());
-            let [c1] = inner
+            let c1 = d.add_load_const(cst)?;
+            let [lifted] = d
                 .add_dataflow_op(
                     LeafOp::Lift {
                         type_row: vec![int_ty.clone()].into(),
@@ -190,6 +186,17 @@ mod test {
                     [c1],
                 )?
                 .outputs_arr();
+            Ok(lifted)
+        }
+        let c1 = nonlocal.then(|| make_const(&mut outer));
+        let inner = {
+            let mut inner = outer.dfg_builder(
+                FunctionType::new_endo(vec![int_ty.clone()]).with_extension_delta(&delta),
+                None,
+                [a],
+            )?;
+            let [a] = inner.input_wires_arr();
+            let c1 = c1.unwrap_or_else(|| make_const(&mut inner))?;
             let a1 = inner.add_dataflow_op(IntOpDef::iadd.with_width(6), [a, c1])?;
             inner.finish_with_outputs(a1.outputs())?
         };
@@ -201,8 +208,8 @@ mod test {
         // Sanity checks
         assert_eq!(
             outer.children(inner.node()).len(),
-            if nonlocal { 4 } else { 6 }
-        ); // Input, Output, const, load_const, lift, add
+            if nonlocal { 3 } else { 6 }
+        ); // Input, Output, add; + const, load_const, lift
         assert_eq!(find_dfgs(&outer), vec![outer.root(), inner.node()]);
         let [add, sub] = extension_ops(&outer).try_into().unwrap();
         assert_eq!(
