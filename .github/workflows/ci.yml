@@ -106,7 +106,7 @@ jobs:
       - name: Generate coverage report
         run: cargo llvm-cov --all-features report --codecov --output-path coverage.json
       - name: Upload coverage to codecov.io
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           files: coverage.json
           name: ubuntu
