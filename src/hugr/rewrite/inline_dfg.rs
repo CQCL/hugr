@@ -332,6 +332,29 @@ mod test {
 
     #[test]
     fn order_edges() -> Result<(), Box<dyn std::error::Error>> {
+        /*      -----|-----|-----
+         *           |     |
+         *          H_a   H_b
+         *           |.    /         NB. Order edge H_a to nested DFG
+         *           | .  |
+         *           |  /-|--------\
+         *           |  | | .  Cst | NB. Order edge Input to LCst
+         *           |  | |  . |   |
+         *           |  | |   LCst |
+         *           |  |  \ /     |
+         *           |  |  RZ      |
+         *           |  |  |       |
+         *           |  |  meas    |
+         *           |  |  | \     |
+         *           |  |  |  if   |
+         *           |  |  |  .    | NB. State edge if to Output
+         *           |  \--|-------/
+         *           |  .  |
+         *           | .   |         NB. Order edge nested DFG to H_a2
+         *           H_a2  /
+         *             \  /
+         *              CX
+         */
         let delta = ExtensionSet::from_iter([float_types::EXTENSION_ID]);
         // Extension inference here relies on quantum ops not requiring their own test_quantum_extension
         let reg = ExtensionRegistry::try_new([
