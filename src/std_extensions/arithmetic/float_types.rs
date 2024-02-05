@@ -56,7 +56,7 @@ impl CustomConst for ConstF64 {
         format!("f64({})", self.value).into()
     }
 
-    fn typ(&self) -> CustomType {
+    fn custom_type(&self) -> CustomType {
         FLOAT64_CUSTOM_TYPE
     }
 

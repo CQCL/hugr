@@ -1,5 +1,6 @@
 //! List type and operations.
 
+use itertools::Itertools;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
@@ -36,8 +37,8 @@ pub struct ListValue(Vec<Value>, Type);
 impl ListValue {
     /// Create a new [CustomConst] for a list of values of type `typ`.
     /// That all values ore of type `typ` is not checked here.
-    pub fn new(typ: Type, contents: Vec<Value>) -> Self {
-        Self(contents, typ)
+    pub fn new(typ: Type, contents: impl IntoIterator<Item = Value>) -> Self {
+        Self(contents.into_iter().collect_vec(), typ)
     }
 
     /// Create a new [CustomConst] for an empty list of values of type `typ`.
@@ -52,7 +53,7 @@ impl CustomConst for ListValue {
         SmolStr::new_inline("list")
     }
 
-    fn typ(&self) -> CustomType {
+    fn custom_type(&self) -> CustomType {
         let list_type_def = EXTENSION.get_type(&LIST_TYPENAME).unwrap();
         list_type_def
             .instantiate(vec![Into::<TypeArg>::into(self.1.clone())])

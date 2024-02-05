@@ -155,7 +155,7 @@ pub trait CustomConst:
 
     /// Check the value is a valid instance of the provided type.
     fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
-        let expected = self.typ();
+        let expected = self.custom_type();
         if typ == &expected {
             Ok(())
         } else {
@@ -174,7 +174,7 @@ pub trait CustomConst:
     }
 
     /// report the type
-    fn typ(&self) -> CustomType;
+    fn custom_type(&self) -> CustomType;
 }
 
 /// Const equality for types that have PartialEq
@@ -224,7 +224,7 @@ impl CustomConst for CustomSerialized {
     fn extension_reqs(&self) -> ExtensionSet {
         self.extensions.clone()
     }
-    fn typ(&self) -> CustomType {
+    fn custom_type(&self) -> CustomType {
         self.typ.clone()
     }
 }
@@ -269,7 +269,7 @@ pub(crate) mod test {
             ExtensionSet::singleton(self.0.extension())
         }
 
-        fn typ(&self) -> CustomType {
+        fn custom_type(&self) -> CustomType {
             self.0.clone()
         }
     }

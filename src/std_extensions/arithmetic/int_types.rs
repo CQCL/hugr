@@ -150,7 +150,7 @@ impl CustomConst for ConstIntU {
         format!("u{}({})", self.log_width, self.value).into()
     }
     fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
-        if typ == &self.typ() {
+        if typ == &self.custom_type() {
             Ok(())
         } else {
             Err(CustomCheckFailure::Message(
@@ -166,7 +166,7 @@ impl CustomConst for ConstIntU {
         ExtensionSet::singleton(&EXTENSION_ID)
     }
 
-    fn typ(&self) -> CustomType {
+    fn custom_type(&self) -> CustomType {
         int_custom_type(type_arg(self.log_width))
     }
 }
@@ -177,7 +177,7 @@ impl CustomConst for ConstIntS {
         format!("i{}({})", self.log_width, self.value).into()
     }
     fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
-        if typ == &self.typ() {
+        if typ == &self.custom_type() {
             Ok(())
         } else {
             Err(CustomCheckFailure::Message(
@@ -193,7 +193,7 @@ impl CustomConst for ConstIntS {
         ExtensionSet::singleton(&EXTENSION_ID)
     }
 
-    fn typ(&self) -> CustomType {
+    fn custom_type(&self) -> CustomType {
         int_custom_type(type_arg(self.log_width))
     }
 }

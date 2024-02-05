@@ -127,7 +127,7 @@ where
     T: CustomConst,
 {
     fn from(value: T) -> Self {
-        let typ = Type::new_extension(value.typ());
+        let typ = Type::new_extension(value.custom_type());
         Const {
             value: Value::custom(value),
             typ,
