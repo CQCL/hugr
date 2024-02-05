@@ -48,8 +48,8 @@ impl<X> VisitOrder<X> {
 }
 
 /// Return an iterator over root and the immediate children of root.
-/// [Preorder](root) will be the first result of the iterator and
-/// [PostOrder](root) will be the last.  No other [Preorder] nodes will be
+/// `VisitOrder::PreOrder(root)` will be the first result of the iterator and
+/// `VisitOrder::PostOrder(root)` will be the last.  No other [VisitOrder::PreOrder] nodes will be
 /// present.  Children will be visited before any of their out_neighbours when
 /// the graph is acyclic. Otherwise they will be visited in a Dfs order starting
 /// from the first child(as returned by hugr.children()).
@@ -110,7 +110,7 @@ impl<'a> RecurseIterator<'a> {
 /// `[Preorder](node)` items will be returned for nodes with children, before
 /// any of those children. `[PostOrder](node)` items will be returned for all
 /// nodes, after any children of that node.  Nodes will be visited before any of
-/// their `out_neighbours` when their [SiblingSubgraph] is acyclic. Otherwise
+/// their `out_neighbours` when their [SiblingGraph] is acyclic. Otherwise
 /// they will be visited in a Dfs order starting from the first child of the
 /// parent(as returned by hugr.children()).
 pub fn recursive_children(
@@ -121,7 +121,7 @@ pub fn recursive_children(
 }
 
 /// Return an iterator over root and transitive children of root.  Nodes will be
-///  visited before any of their `out_neighbours` when their [SiblingSubgraph]
+///  visited before any of their `out_neighbours` when their [SiblingGraph]
 ///  is acyclic. Otherwise they will be visited in a Dfs order starting from the
 ///  first child of the parent(as returned by hugr.children()).
 pub fn recursive_children_postorder(
