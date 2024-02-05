@@ -123,7 +123,6 @@ impl Rewrite for InlineDFG {
     }
 
     fn invalidation_set(&self) -> Self::InvalidationSet<'_> {
-        // TODO should we return Input + Output as well?
         [self.0.node()].into_iter()
     }
 }
