@@ -15,13 +15,13 @@ pub enum InlineDFGError {
     /// Node to inline was not a DFG. (E.g. node has been overwritten since the DfgID originated.)
     #[error("Node {0} was not a DFG")]
     NotDFG(Node),
-    /// DFG has no parent (is the root)
+    /// DFG has no parent (is the root).
     #[error("Node did not have a parent into which to inline")]
     NoParent,
 }
 
 impl Rewrite for InlineDFG {
-    /// Returns the removed nodes: the DFG, and its Input and Output children,
+    /// Returns the removed nodes: the DFG, and its Input and Output children.
     type ApplyResult = [Node; 3];
     type Error = InlineDFGError;
 
