@@ -106,6 +106,10 @@ pub(crate) mod test_quantum_extension {
     pub(crate) fn measure() -> LeafOp {
         get_gate("Measure")
     }
+
+    pub(crate) fn rz_f64() -> LeafOp {
+        get_gate("RzF64")
+    }
 }
 
 #[allow(dead_code)]

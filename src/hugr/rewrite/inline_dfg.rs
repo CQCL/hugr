@@ -130,9 +130,13 @@ impl Rewrite for InlineDFG {
 
 #[cfg(test)]
 mod test {
+    use std::collections::HashSet;
+
     use rstest::rstest;
 
-    use crate::builder::{DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer};
+    use crate::builder::{
+        Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, SubContainer,
+    };
     use crate::extension::prelude::QB_T;
     use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE};
     use crate::hugr::rewrite::inline_dfg::InlineDFGError;
@@ -323,6 +327,87 @@ mod test {
                 Port::new(Direction::Outgoing, 0),
                 Port::new(Direction::Incoming, 1)
             ]]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn order_edges() -> Result<(), Box<dyn std::error::Error>> {
+        let delta = ExtensionSet::from_iter([float_types::EXTENSION_ID]);
+        // Extension inference here relies on quantum ops not requiring their own test_quantum_extension
+        let reg = ExtensionRegistry::try_new([
+            test_quantum_extension::EXTENSION.to_owned(),
+            float_types::EXTENSION.to_owned(),
+            PRELUDE.to_owned(),
+        ])
+        .unwrap();
+        let mut outer = DFGBuilder::new(
+            FunctionType::new_endo(type_row![QB_T, QB_T]).with_extension_delta(&delta),
+        )?;
+        let [a, b] = outer.input_wires_arr();
+        let h_a = outer.add_dataflow_op(test_quantum_extension::h_gate(), [a])?;
+        let h_b = outer.add_dataflow_op(test_quantum_extension::h_gate(), [b])?;
+        let mut inner = outer.dfg_builder(
+            FunctionType::new_endo(type_row![QB_T]).with_extension_delta(&delta),
+            None,
+            h_b.outputs(),
+        )?;
+        let [i] = inner.input_wires_arr();
+        let f = inner.add_load_const(float_types::ConstF64::new(1.0))?;
+        inner.add_other_wire(inner.input().node(), f.node())?;
+        let r = inner.add_dataflow_op(test_quantum_extension::rz_f64(), [i, f])?;
+        let [m, b] = inner
+            .add_dataflow_op(test_quantum_extension::measure(), r.outputs())?
+            .outputs_arr();
+        // Node using the boolean. Here we just select between two empty computations.
+        let mut if_n = inner.conditional_builder(
+            ([type_row![], type_row![]], b),
+            [],
+            type_row![],
+            ExtensionSet::new(),
+        )?;
+        if_n.case_builder(0)?.finish_with_outputs([])?;
+        if_n.case_builder(1)?.finish_with_outputs([])?;
+        let if_n = if_n.finish_sub_container()?;
+        inner.add_other_wire(if_n.node(), inner.output().node())?;
+        let inner = inner.finish_with_outputs([m])?;
+        outer.add_other_wire(h_a.node(), inner.node())?;
+        let h_a2 = outer.add_dataflow_op(test_quantum_extension::h_gate(), h_a.outputs())?;
+        outer.add_other_wire(inner.node(), h_a2.node())?;
+        let cx = outer.add_dataflow_op(
+            test_quantum_extension::cx_gate(),
+            h_a2.outputs().chain(inner.outputs()),
+        )?;
+        let mut outer = outer.finish_hugr_with_outputs(cx.outputs(), &reg)?;
+
+        outer.apply_rewrite(InlineDFG(*inner.handle()))?;
+        outer.validate(&reg)?;
+        let order_neighbours = |n, d| {
+            let p = outer.get_optype(n).other_port(d).unwrap();
+            outer
+                .linked_ports(n, p)
+                .map(|(n, _)| n)
+                .collect::<HashSet<_>>()
+        };
+        // h_a should have Order edges added to Rz and the F64 load_const
+        assert_eq!(
+            order_neighbours(h_a.node(), Direction::Outgoing),
+            HashSet::from([r.node(), f.node()])
+        );
+        // Likewise the load_const should have Order edges from the inputs to the inner DFG, i.e. h_a and h_b
+        assert_eq!(
+            order_neighbours(f.node(), Direction::Incoming),
+            HashSet::from([h_a.node(), h_b.node()])
+        );
+        // h_a2 should have Order edges from the measure and if
+        assert_eq!(
+            order_neighbours(h_a2.node(), Direction::Incoming),
+            HashSet::from([m.node(), if_n.node()])
+        );
+        // the if should have Order edges to the CX and h_a2
+        assert_eq!(
+            order_neighbours(if_n.node(), Direction::Outgoing),
+            HashSet::from([h_a2.node(), cx.node()])
         );
         Ok(())
     }
