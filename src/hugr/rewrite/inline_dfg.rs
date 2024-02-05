@@ -121,7 +121,7 @@ mod test {
 
     use crate::builder::{DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer};
     use crate::extension::prelude::QB_T;
-    use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE, PRELUDE_REGISTRY};
+    use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE};
     use crate::hugr::rewrite::inline_dfg::InlineDFGError;
     use crate::hugr::HugrMut;
     use crate::ops::handle::{DfgID, NodeHandle};
@@ -227,7 +227,7 @@ mod test {
             assert_eq!(h, outer); // unchanged
         }
 
-        outer.apply_rewrite(InlineDFG(DfgID::from(inner.node())))?;
+        outer.apply_rewrite(InlineDFG(*inner.handle()))?;
         outer.validate(&reg)?;
         assert_eq!(outer.nodes().len(), 8);
         assert_eq!(find_dfgs(&outer), vec![outer.root()]);
@@ -243,10 +243,6 @@ mod test {
 
     #[test]
     fn permutation() -> Result<(), Box<dyn std::error::Error>> {
-        let swap = DFGBuilder::new(FunctionType::new_endo(type_row![QB_T, QB_T]))?;
-        let [a, b] = swap.input_wires_arr();
-        let swap = swap.finish_hugr_with_outputs([b, a], &PRELUDE_REGISTRY)?;
-
         let mut h = DFGBuilder::new(
             FunctionType::new_endo(type_row![QB_T, QB_T]).with_extension_delta(
                 &ExtensionSet::singleton(&test_quantum_extension::EXTENSION_ID),
@@ -256,7 +252,15 @@ mod test {
         let [p_h] = h
             .add_dataflow_op(test_quantum_extension::h_gate(), [p])?
             .outputs_arr();
-        let swap = h.add_hugr_with_wires(swap, [p_h, q])?;
+        let swap = {
+            let swap = h.dfg_builder(
+                FunctionType::new_endo(type_row![QB_T, QB_T]),
+                None,
+                [p_h, q],
+            )?;
+            let [a, b] = swap.input_wires_arr();
+            swap.finish_with_outputs([b, a])?
+        };
         let [q, p] = swap.outputs_arr();
         let cx = h.add_dataflow_op(test_quantum_extension::cx_gate(), [q, p])?;
         let reg = ExtensionRegistry::try_new([
@@ -293,7 +297,7 @@ mod test {
             ]
         );
 
-        h.apply_rewrite(InlineDFG(DfgID::from(swap.node())))?;
+        h.apply_rewrite(InlineDFG(*swap.handle()))?;
         assert_eq!(find_dfgs(&h), vec![h.root()]);
         assert_eq!(h.nodes().len(), 5); // Dfg+I+O
         let mut ops = extension_ops(&h);
