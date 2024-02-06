@@ -276,7 +276,7 @@ mod test {
 
         assert_eq!(error_val.name(), "ConstError(2, \"my message\")");
 
-        assert!(error_val.check_custom_type(&ERROR_CUSTOM_TYPE).is_ok());
+        assert!(error_val.validate().is_ok());
 
         assert_eq!(
             error_val.extension_reqs(),

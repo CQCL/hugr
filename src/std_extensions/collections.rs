@@ -60,7 +60,8 @@ impl CustomConst for ListValue {
             .unwrap()
     }
 
-    fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
+    fn validate(&self) -> Result<(), CustomCheckFailure> {
+        let typ = self.custom_type();
         let error = || {
             // TODO more bespoke errors
             CustomCheckFailure::Message("List type check fail.".to_string())
@@ -69,7 +70,7 @@ impl CustomConst for ListValue {
         EXTENSION
             .get_type(&LIST_TYPENAME)
             .unwrap()
-            .check_custom(typ)
+            .check_custom(&typ)
             .map_err(|_| error())?;
 
         // constant can only hold classic type.
@@ -320,10 +321,10 @@ mod test {
         list_def.check_custom(&list_type).unwrap();
         let list_value = ListValue(vec![ConstUsize::new(3).into()], USIZE_T);
 
-        list_value.check_custom_type(&list_type).unwrap();
+        list_value.validate().unwrap();
 
         let wrong_list_value = ListValue(vec![ConstF64::new(1.2).into()], USIZE_T);
-        assert!(wrong_list_value.check_custom_type(&list_type).is_err());
+        assert!(wrong_list_value.validate().is_err());
     }
 
     #[test]

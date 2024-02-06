@@ -154,16 +154,8 @@ pub trait CustomConst:
     fn extension_reqs(&self) -> ExtensionSet;
 
     /// Check the value is a valid instance of the provided type.
-    fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
-        let expected = self.custom_type();
-        if typ == &expected {
-            Ok(())
-        } else {
-            Err(CustomCheckFailure::TypeMismatch {
-                expected,
-                found: typ.clone(),
-            })
-        }
+    fn validate(&self) -> Result<(), CustomCheckFailure> {
+        Ok(())
     }
 
     /// Compare two constants for equality, using downcasting and comparing the definitions.
@@ -253,16 +245,6 @@ pub(crate) mod test {
     impl CustomConst for CustomTestValue {
         fn name(&self) -> SmolStr {
             format!("CustomTestValue({:?})", self.0).into()
-        }
-
-        fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
-            if self.0 == *typ {
-                Ok(())
-            } else {
-                Err(CustomCheckFailure::Message(
-                    "CustomTestValue check fail.".into(),
-                ))
-            }
         }
 
         fn extension_reqs(&self) -> ExtensionSet {
