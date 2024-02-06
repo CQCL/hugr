@@ -110,4 +110,5 @@ jobs:
         with:
           files: coverage.json
           name: ubuntu
-          token: ${{ secrets.CODECOV_TOKEN }}
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
