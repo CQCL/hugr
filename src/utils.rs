@@ -27,6 +27,23 @@ pub fn collect_array<const N: usize, T: Debug>(arr: &[T]) -> [&T; N] {
     arr.iter().collect_vec().try_into().unwrap()
 }
 
+/// Helper method to skip serialization of default values in serde.
+///
+/// ```ignore
+/// use serde::Serialize;
+///
+/// #[derive(Serialize)]
+/// struct MyStruct {
+///     #[serde(skip_serializing_if = "crate::utils::is_default")]
+///     field: i32,
+/// }
+/// ```
+///
+/// From https://github.com/serde-rs/serde/issues/818.
+pub(crate) fn is_default<T: Default + PartialEq>(t: &T) -> bool {
+    *t == Default::default()
+}
+
 #[cfg(test)]
 pub(crate) mod test_quantum_extension {
     use smol_str::SmolStr;

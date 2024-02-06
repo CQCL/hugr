@@ -37,6 +37,7 @@ pub mod simple_op;
 pub mod validate;
 pub use const_fold::{ConstFold, ConstFoldResult};
 pub use prelude::{PRELUDE, PRELUDE_REGISTRY};
+mod declarative;
 
 /// Extension Registries store extensions to be looked up e.g. during validation.
 #[derive(Clone, Debug)]
