@@ -40,7 +40,7 @@ MessagePack (or [msgpack](https://msgpack.org/) ) appears to be a very
 solid option. It has good serde support (as well as very wide language
 support in general, including a fast python package implemented in C),
 is one of the top performers on benchmarks (see also [this
-thesis](https://uh-ir.tdl.org/bitstream/handle/10657/13140/CASEY-THESIS-2022.pdf?sequence=1)),
+thesis](https://hdl.handle.net/10657/13140)),
 and has small data size. Another nice benefit is that, like CBOR, it is
 very similar to JSON when decoded, which, given that serde can easily
 let us go between JSON and msgpack, gives us human-friendly text

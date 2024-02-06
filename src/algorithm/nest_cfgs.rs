@@ -8,7 +8,7 @@
 //!  (this last condition is necessary because loop backedges do not affect (post)dominance).
 //!
 //! # Algorithm
-//! See paper: <https://dl.acm.org/doi/10.1145/773473.178258>, approximately:
+//! See paper: <https://doi.org/10.1145/178243.178258>, approximately:
 //! 1. those three conditions are equivalent to:
 //! *a and b are cycle-equivalent in the CFG with an extra edge from the exit node to the entry*
 //! where cycle-equivalent means every cycle has either both a and b, or neither

@@ -1896,7 +1896,7 @@ Conversions between integers and floats:
         true.
   - We *could* parse a CFG into a DSG with only Conditional-nodes and
     TailLoop-nodes by introducing extra variables, as per [Google
-    paper](https://dl.acm.org/doi/pdf/10.1145/2693261), and then expect
+    paper](https://doi.org/10.1145/2693261), and then expect
     LLVM to remove those extra variables later. However that's a
     significant amount of analysis and transformation, which is
     undesirable for using the HUGR as a common interchange format (e.g.
@@ -1918,13 +1918,13 @@ e.g. for authors of "rewrite rules" and other optimisations.
 
 #### **Alternative representations considered but rejected**
 
-  - A [Google paper](https://dl.acm.org/doi/pdf/10.1145/2693261) allows
+  - A [Google paper](https://doi.org/10.1145/2693261) allows
     for the introduction of extra variables into the DSG that can be
     eliminated at compile-time (ensuring no runtime cost), but only if
     stringent well-formedness conditions are maintained on the DSG, and
     there are issues with variable liveness.
   - [Lawrence's
-    thesis](https://www.cl.cam.ac.uk/techreports/UCAM-CL-TR-705.pdf)
+    thesis](https://doi.org/10.48456/tr-705)
     handles some cases (e.g. shortcircuit evaluation) but cannot handle
     arbitrary (even reducible) control flow and the multi-stage approach
     makes it hard to see what amount of code duplication will be
