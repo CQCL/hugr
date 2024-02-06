@@ -60,7 +60,6 @@ impl Rewrite for InlineDFG {
             // Order edge from src_n to DFG => add order edge to each successor of Input node
             debug_assert_eq!(Some(src_p), h.get_optype(src_n).other_output_port());
             for tgt_n in h.output_neighbours(input).collect::<Vec<_>>() {
-                println!("ALAN adding order edge from {src_n} to {tgt_n}");
                 h.add_other_edge(src_n, tgt_n).unwrap();
             }
         }
@@ -109,6 +108,7 @@ impl Rewrite for InlineDFG {
 
             for (tgt_n, tgt_p) in h.linked_inputs(n, outport).collect::<Vec<_>>() {
                 h.connect(src_n, src_p, tgt_n, tgt_p).unwrap();
+                // Ensure order-predecessors of Output node execute before any node consuming a DFG output
                 for (src, _) in output_ord_preds.iter() {
                     h.add_other_edge(*src, tgt_n).unwrap();
                 }
@@ -347,7 +347,7 @@ mod test {
          *           |  |  meas    |
          *           |  |  | \     |
          *           |  |  |  if   |
-         *           |  |  |  .    | NB. State edge if to Output
+         *           |  |  |  .    | NB. Order edge if to Output
          *           |  \--|-------/
          *           |  .  |
          *           | .   |         NB. Order edge nested DFG to H_a2
