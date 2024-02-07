@@ -16,7 +16,9 @@ use crate::ops;
 use crate::ops::custom::{ExtensionOp, OpaqueOp};
 use crate::types::type_param::{check_type_args, TypeArgError};
 use crate::types::type_param::{TypeArg, TypeParam};
-use crate::types::{check_typevar_decl, CustomType, PolyFuncType, Substitution, TypeBound};
+use crate::types::{
+    check_typevar_decl, CustomType, PolyFuncType, Substitution, TypeBound, TypeName,
+};
 
 #[allow(dead_code)]
 mod infer;
@@ -37,6 +39,7 @@ pub mod simple_op;
 pub mod validate;
 pub use const_fold::{ConstFold, ConstFoldResult};
 pub use prelude::{PRELUDE, PRELUDE_REGISTRY};
+
 mod declarative;
 
 /// Extension Registries store extensions to be looked up e.g. during validation.
@@ -93,7 +96,7 @@ pub const EMPTY_REG: ExtensionRegistry = ExtensionRegistry(BTreeMap::new());
 pub enum SignatureError {
     /// Name mismatch
     #[error("Definition name ({0}) and instantiation name ({1}) do not match.")]
-    NameMismatch(SmolStr, SmolStr),
+    NameMismatch(TypeName, TypeName),
     /// Extension mismatch
     #[error("Definition extension ({0:?}) and instantiation extension ({1:?}) do not match.")]
     ExtensionMismatch(ExtensionId, ExtensionId),
@@ -108,7 +111,7 @@ pub enum SignatureError {
     ExtensionNotFound(ExtensionId),
     /// The Extension was found in the registry, but did not contain the Type(Def) referenced in the Signature
     #[error("Extension '{exn}' did not contain expected TypeDef '{typ}'")]
-    ExtensionTypeNotFound { exn: ExtensionId, typ: SmolStr },
+    ExtensionTypeNotFound { exn: ExtensionId, typ: TypeName },
     /// The bound recorded for a CustomType doesn't match what the TypeDef would compute
     #[error("Bound on CustomType ({actual}) did not match TypeDef ({expected})")]
     WrongBound {
@@ -137,8 +140,13 @@ pub enum SignatureError {
 
 /// Concrete instantiations of types and operations defined in extensions.
 trait CustomConcrete {
+    /// A generic identifier to the element.
+    ///
+    /// This may either refer to a [`TypeName`] or an [`OpName`].
     fn def_name(&self) -> &SmolStr;
+    /// The concrete type arguments for the instantiation.
     fn type_args(&self) -> &[TypeArg];
+    /// Extension required by the instantiation.
     fn parent_extension(&self) -> &ExtensionId;
 }
 
@@ -158,6 +166,7 @@ impl CustomConcrete for OpaqueOp {
 
 impl CustomConcrete for CustomType {
     fn def_name(&self) -> &SmolStr {
+        // Casts the `TypeName` to a generic string.
         self.name()
     }
 
@@ -228,7 +237,7 @@ pub struct Extension {
     /// for any possible [TypeArg].
     pub extension_reqs: ExtensionSet,
     /// Types defined by this extension.
-    types: HashMap<SmolStr, TypeDef>,
+    types: HashMap<TypeName, TypeDef>,
     /// Static values defined by this extension.
     values: HashMap<SmolStr, ExtensionValue>,
     /// Operation declarations with serializable definitions.
@@ -283,7 +292,7 @@ impl Extension {
     }
 
     /// Iterator over the types of this [`Extension`].
-    pub fn types(&self) -> impl Iterator<Item = (&SmolStr, &TypeDef)> {
+    pub fn types(&self) -> impl Iterator<Item = (&TypeName, &TypeDef)> {
         self.types.iter()
     }
 

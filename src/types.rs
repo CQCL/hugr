@@ -12,6 +12,7 @@ pub use check::{ConstTypeError, CustomCheckFailure};
 pub use custom::CustomType;
 pub use poly_func::PolyFuncType;
 pub use signature::FunctionType;
+use smol_str::SmolStr;
 pub use type_param::TypeArg;
 pub use type_row::TypeRow;
 
@@ -25,6 +26,9 @@ use crate::type_row;
 use std::fmt::Debug;
 
 use self::type_param::TypeParam;
+
+/// A unique identifier for a type.
+pub type TypeName = SmolStr;
 
 /// The kinds of edges in a HUGR, excluding Hierarchy.
 #[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]

@@ -3,13 +3,11 @@ use std::collections::hash_map::Entry;
 use super::{CustomConcrete, ExtensionBuildError};
 use super::{Extension, ExtensionId, SignatureError, TypeParametrised};
 
-use crate::types::{least_upper_bound, CustomType};
+use crate::types::{least_upper_bound, CustomType, TypeName};
 
 use crate::types::type_param::TypeArg;
 
 use crate::types::type_param::TypeParam;
-
-use smol_str::SmolStr;
 
 use crate::types::TypeBound;
 
@@ -36,7 +34,7 @@ pub struct TypeDef {
     /// The unique Extension owning this TypeDef (of which this TypeDef is a member)
     extension: ExtensionId,
     /// The unique name of the type
-    name: SmolStr,
+    name: TypeName,
     /// Declaration of type parameters. The TypeDef must be instantiated
     /// with the same number of [`TypeArg`]'s to make an actual type.
     ///
@@ -133,7 +131,7 @@ impl TypeParametrised for TypeDef {
         &self.params
     }
 
-    fn name(&self) -> &SmolStr {
+    fn name(&self) -> &TypeName {
         &self.name
     }
 
@@ -146,7 +144,7 @@ impl Extension {
     /// Add an exported type to the extension.
     pub fn add_type(
         &mut self,
-        name: SmolStr,
+        name: TypeName,
         params: Vec<TypeParam>,
         description: String,
         bound: TypeDefBound,
