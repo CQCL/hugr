@@ -1094,16 +1094,16 @@ extensions:
   - name: SU2
     description: "One qubit unitary matrix"
     params: # per-node values passed to the type-scheme interpreter, but not used in signature
-      - matrix: Opaque(complex_matrix,2,2)
+      matrix: Opaque(complex_matrix,2,2)
     signature:
       inputs: [[null, Q]]
       outputs: [[null, Q]]
   - name: MatMul
     description: "Multiply matrices of statically-known size"
     params:  # per-node values passed to type-scheme-interpreter and used in signature
-      - i: USize
-      - j: USize
-      - k: USize
+      i: USize
+      j: USize
+      k: USize
     signature:
       inputs: [["a", Array<i>(Array<j>(F64))], ["b", Array<j>(Array<k>(F64))]]
       outputs: [[null, Array<i>(Array<k>(F64))]]
@@ -1112,7 +1112,7 @@ extensions:
   - name: max_float
     description: "Variable number of inputs"
     params:
-      - n: USize
+      n: USize
     signature:
       # Where an element of a signature has three subelements, the third is the number of repeats
       inputs: [[null, F64, n]] # (defaulting to 1 if omitted)
@@ -1120,9 +1120,9 @@ extensions:
   - name: ArrayConcat
     description: "Concatenate two arrays. Extension provides a compute_signature implementation."
     params:
-      - t: Type  # Classic or Quantum
-      - i: USize
-      - j: USize
+      t: Type  # Classic or Quantum
+      i: USize
+      j: USize
     # inputs could be: Array<i>(t), Array<j>(t)
     # outputs would be, in principle: Array<i+j>(t)
     # - but default type scheme interpreter does not support such addition
