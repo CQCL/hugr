@@ -1134,7 +1134,7 @@ extensions:
     signature:
       inputs: [[null, Function[r](USize -> USize)], ["arg", USize]]
       outputs: [[null, USize]]
-      extensions: r # Indicates that running this operation also invokes extensions r
+      extensions: [r] # Indicates that running this operation also invokes extensions r
     lowering:
       file: "graph_op_hugr.bin"
       extensions: ["arithmetic.int", r] # r is the ExtensionSet in "params"

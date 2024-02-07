@@ -37,7 +37,7 @@ struct ExtensionSetDeclaration {
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq)]
 struct ExtensionDeclaration {
     /// The name of the extension.
-    name: String,
+    name: ExtensionId,
     /// A list of types that this extension provides.
     #[serde(default)]
     #[serde(skip_serializing_if = "crate::utils::is_default")]

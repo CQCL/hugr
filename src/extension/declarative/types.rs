@@ -7,9 +7,7 @@
 //! [specification]: https://github.com/CQCL/hugr/blob/main/specification/hugr.md#declarative-format
 //! [`ExtensionSetDeclaration`]: super::ExtensionSetDeclaration
 
-use crate::types::TypeBound;
-
-use super::ExtensionId;
+use crate::types::{TypeBound, TypeName};
 
 use serde::ser::SerializeSeq;
 use serde::{Deserialize, Serialize};
@@ -18,7 +16,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq)]
 pub(super) struct TypeDeclaration {
     /// The name of the type.
-    name: String,
+    name: TypeName,
     /// The [`TypeBound`] describing what can be done to instances of this type.
     /// Options are `Eq`, `Copyable`, or `Any`.
     #[serde(default)]
@@ -36,8 +34,8 @@ pub(super) struct TypeDeclaration {
 
 /// A declarative TypeBound definition.
 ///
-/// Equivalent to [`TypeBound`]. Provides human-friendly serialized names for the
-/// type bounds, using their full names.
+/// Equivalent to a [`TypeBound`]. Provides human-friendly serialization, using
+/// the full names.
 #[derive(
     Debug, Copy, Clone, Serialize, Deserialize, Hash, PartialEq, Eq, Default, derive_more::Display,
 )]
@@ -73,21 +71,22 @@ impl From<TypeBound> for TypeBoundDeclaration {
 
 /// A declarative type parameter definition.
 ///
-/// Serialized as a 2-element list, where the first element is the human-readable name of the type parameter,
-/// and the second element is the type id.
+/// Serialized as a 2-element list, where the first element is an optional
+/// human-readable name of the type parameter, and the second element is the
+/// type id.
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 struct TypeParamDeclaration {
-    /// The name of the parameter.
-    name: String,
+    /// The name of the parameter. May be `null`.
+    description: Option<String>,
     /// The parameter type.
-    id: ExtensionId,
+    type_name: TypeName,
 }
 
 impl Serialize for TypeParamDeclaration {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut seq = serializer.serialize_seq(Some(2))?;
-        seq.serialize_element(&self.name)?;
-        seq.serialize_element(&self.id)?;
+        seq.serialize_element(&self.description)?;
+        seq.serialize_element(&self.type_name)?;
         seq.end()
     }
 }
@@ -108,13 +107,16 @@ impl<'de> Deserialize<'de> for TypeParamDeclaration {
                 self,
                 mut seq: A,
             ) -> Result<Self::Value, A::Error> {
-                let name = seq
+                let description = seq
                     .next_element()?
                     .ok_or_else(|| serde::de::Error::invalid_length(0, &EXPECTED_MSG))?;
-                let id = seq
+                let type_name = seq
                     .next_element()?
                     .ok_or_else(|| serde::de::Error::invalid_length(1, &EXPECTED_MSG))?;
-                Ok(TypeParamDeclaration { name, id })
+                Ok(TypeParamDeclaration {
+                    description,
+                    type_name,
+                })
             }
         }
 
