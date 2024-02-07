@@ -1,5 +1,6 @@
 //! List type and operations.
 
+use itertools::Itertools;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
@@ -31,13 +32,18 @@ pub const EXTENSION_NAME: ExtensionId = ExtensionId::new_unchecked("Collections"
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 /// Dynamically sized list of values, all of the same type.
-pub struct ListValue(Vec<Value>);
+pub struct ListValue(Vec<Value>, Type);
 
 impl ListValue {
-    /// Create a new [CustomConst] for a list of values.
-    /// (The caller will need these to all be of the same type, but that is not checked here.)
-    pub fn new(contents: Vec<Value>) -> Self {
-        Self(contents)
+    /// Create a new [CustomConst] for a list of values of type `typ`.
+    /// That all values ore of type `typ` is not checked here.
+    pub fn new(typ: Type, contents: impl IntoIterator<Item = Value>) -> Self {
+        Self(contents.into_iter().collect_vec(), typ)
+    }
+
+    /// Create a new [CustomConst] for an empty list of values of type `typ`.
+    pub fn new_empty(typ: Type) -> Self {
+        Self(vec![], typ)
     }
 }
 
@@ -47,7 +53,15 @@ impl CustomConst for ListValue {
         SmolStr::new_inline("list")
     }
 
-    fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
+    fn custom_type(&self) -> CustomType {
+        let list_type_def = EXTENSION.get_type(&LIST_TYPENAME).unwrap();
+        list_type_def
+            .instantiate(vec![Into::<TypeArg>::into(self.1.clone())])
+            .unwrap()
+    }
+
+    fn validate(&self) -> Result<(), CustomCheckFailure> {
+        let typ = self.custom_type();
         let error = || {
             // TODO more bespoke errors
             CustomCheckFailure::Message("List type check fail.".to_string())
@@ -56,7 +70,7 @@ impl CustomConst for ListValue {
         EXTENSION
             .get_type(&LIST_TYPENAME)
             .unwrap()
-            .check_custom(typ)
+            .check_custom(&typ)
             .map_err(|_| error())?;
 
         // constant can only hold classic type.
@@ -96,20 +110,10 @@ impl ConstFold for PopFold {
         let list: &ListValue = list.get_custom_value().expect("Should be list value.");
         let mut list = list.clone();
         let elem = list.0.pop()?; // empty list fails to evaluate "pop"
-        let list = make_list_const(list, type_args);
         let elem = ops::Const::new(elem, ty.clone()).unwrap();
 
-        Some(vec![(0.into(), list), (1.into(), elem)])
+        Some(vec![(0.into(), list.into()), (1.into(), elem)])
     }
-}
-
-pub(crate) fn make_list_const(list: ListValue, type_args: &[TypeArg]) -> ops::Const {
-    let list_type_def = EXTENSION.get_type(&LIST_TYPENAME).unwrap();
-    ops::Const::new(
-        list.into(),
-        Type::new_extension(list_type_def.instantiate(type_args).unwrap()),
-    )
-    .unwrap()
 }
 
 struct PushFold;
@@ -117,16 +121,15 @@ struct PushFold;
 impl ConstFold for PushFold {
     fn fold(
         &self,
-        type_args: &[TypeArg],
+        _type_args: &[TypeArg],
         consts: &[(crate::IncomingPort, ops::Const)],
     ) -> crate::extension::ConstFoldResult {
         let [list, elem]: [&ops::Const; 2] = sorted_consts(consts).try_into().ok()?;
         let list: &ListValue = list.get_custom_value().expect("Should be list value.");
         let mut list = list.clone();
         list.0.push(elem.value().clone());
-        let list = make_list_const(list, type_args);
 
-        Some(vec![(0.into(), list)])
+        Some(vec![(0.into(), list.into())])
     }
 }
 const TP: TypeParam = TypeParam::Type { b: TypeBound::Any };
@@ -316,12 +319,12 @@ mod test {
             .is_err());
 
         list_def.check_custom(&list_type).unwrap();
-        let list_value = ListValue(vec![ConstUsize::new(3).into()]);
+        let list_value = ListValue(vec![ConstUsize::new(3).into()], USIZE_T);
 
-        list_value.check_custom_type(&list_type).unwrap();
+        list_value.validate().unwrap();
 
-        let wrong_list_value = ListValue(vec![ConstF64::new(1.2).into()]);
-        assert!(wrong_list_value.check_custom_type(&list_type).is_err());
+        let wrong_list_value = ListValue(vec![ConstF64::new(1.2).into()], USIZE_T);
+        assert!(wrong_list_value.validate().is_err());
     }
 
     #[test]

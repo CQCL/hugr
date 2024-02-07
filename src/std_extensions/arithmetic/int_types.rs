@@ -8,7 +8,7 @@ use crate::{
     extension::{ExtensionId, ExtensionSet},
     types::{
         type_param::{TypeArg, TypeArgError, TypeParam},
-        ConstTypeError, CustomCheckFailure, CustomType, Type, TypeBound,
+        ConstTypeError, CustomType, Type, TypeBound,
     },
     values::CustomConst,
     Extension,
@@ -66,7 +66,7 @@ pub(super) fn get_log_width(arg: &TypeArg) -> Result<u8, TypeArgError> {
     }
 }
 
-pub(super) const fn type_arg(log_width: u8) -> TypeArg {
+const fn type_arg(log_width: u8) -> TypeArg {
     TypeArg::BoundedNat {
         n: log_width as u64,
     }
@@ -149,21 +149,16 @@ impl CustomConst for ConstIntU {
     fn name(&self) -> SmolStr {
         format!("u{}({})", self.log_width, self.value).into()
     }
-    fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
-        if typ.clone() == int_custom_type(type_arg(self.log_width)) {
-            Ok(())
-        } else {
-            Err(CustomCheckFailure::Message(
-                "Unsigned integer constant type mismatch.".into(),
-            ))
-        }
-    }
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
         crate::values::downcast_equal_consts(self, other)
     }
 
     fn extension_reqs(&self) -> ExtensionSet {
         ExtensionSet::singleton(&EXTENSION_ID)
+    }
+
+    fn custom_type(&self) -> CustomType {
+        int_custom_type(type_arg(self.log_width))
     }
 }
 
@@ -172,21 +167,16 @@ impl CustomConst for ConstIntS {
     fn name(&self) -> SmolStr {
         format!("i{}({})", self.log_width, self.value).into()
     }
-    fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
-        if typ.clone() == int_custom_type(type_arg(self.log_width)) {
-            Ok(())
-        } else {
-            Err(CustomCheckFailure::Message(
-                "Signed integer constant type mismatch.".into(),
-            ))
-        }
-    }
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
         crate::values::downcast_equal_consts(self, other)
     }
 
     fn extension_reqs(&self) -> ExtensionSet {
         ExtensionSet::singleton(&EXTENSION_ID)
+    }
+
+    fn custom_type(&self) -> CustomType {
+        int_custom_type(type_arg(self.log_width))
     }
 }
 
@@ -274,31 +264,15 @@ mod test {
         assert!(const_u32_7.equal_consts(&ConstIntU::new(5, 7).unwrap()));
         assert_eq!(const_u32_7.log_width(), 5);
         assert_eq!(const_u32_7.value(), 7);
-        assert!(const_u32_7
-            .check_custom_type(&int_custom_type(TypeArg::BoundedNat { n: 5 }))
-            .is_ok());
-        assert!(const_u32_7
-            .check_custom_type(&int_custom_type(TypeArg::BoundedNat { n: 6 }))
-            .is_err());
+        assert!(const_u32_7.validate().is_ok());
 
         assert_eq!(const_u32_7.name(), "u5(7)");
-        assert!(const_u32_7
-            .check_custom_type(&int_custom_type(TypeArg::BoundedNat { n: 19 }))
-            .is_err());
 
         let const_i32_2 = ConstIntS::new(5, -2).unwrap();
         assert!(const_i32_2.equal_consts(&ConstIntS::new(5, -2).unwrap()));
         assert_eq!(const_i32_2.log_width(), 5);
         assert_eq!(const_i32_2.value(), -2);
-        assert!(const_i32_2
-            .check_custom_type(&int_custom_type(TypeArg::BoundedNat { n: 5 }))
-            .is_ok());
-        assert!(const_i32_2
-            .check_custom_type(&int_custom_type(TypeArg::BoundedNat { n: 6 }))
-            .is_err());
-        assert!(const_i32_2
-            .check_custom_type(&int_custom_type(TypeArg::BoundedNat { n: 19 }))
-            .is_err());
+        assert!(const_i32_2.validate().is_ok());
         assert_eq!(const_i32_2.name(), "i5(-2)");
 
         ConstIntS::new(50, -2).unwrap_err();

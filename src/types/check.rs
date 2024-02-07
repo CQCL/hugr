@@ -71,9 +71,17 @@ impl Type {
     /// This function will return an error if there is a type check error.
     pub fn check_type(&self, val: &Value) -> Result<(), ConstTypeError> {
         match (&self.0, val) {
-            (TypeEnum::Extension(e), Value::Extension { c: e_val }) => {
-                e_val.0.check_custom_type(e)?;
-                Ok(())
+            (TypeEnum::Extension(expected), Value::Extension { c: (e_val,) }) => {
+                let found = e_val.custom_type();
+                if found == *expected {
+                    Ok(e_val.validate()?)
+                } else {
+                    Err(CustomCheckFailure::TypeMismatch {
+                        expected: expected.clone(),
+                        found,
+                    }
+                    .into())
+                }
             }
             (TypeEnum::Function(t), Value::Function { hugr: v }) if type_sig_equal(v, t) => Ok(()),
             (TypeEnum::Tuple(t), Value::Tuple { vs: t_v }) => {

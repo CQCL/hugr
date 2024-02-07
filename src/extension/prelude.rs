@@ -9,9 +9,9 @@ use crate::{
     type_row,
     types::{
         type_param::{TypeArg, TypeParam},
-        CustomCheckFailure, CustomType, FunctionType, PolyFuncType, Type, TypeBound,
+        CustomType, FunctionType, PolyFuncType, Type, TypeBound,
     },
-    values::{CustomConst, KnownTypeConst},
+    values::CustomConst,
     Extension,
 };
 
@@ -183,10 +183,6 @@ impl CustomConst for ConstUsize {
         format!("ConstUsize({:?})", self.0).into()
     }
 
-    fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
-        self.check_known_type(typ)
-    }
-
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
         crate::values::downcast_equal_consts(self, other)
     }
@@ -194,10 +190,10 @@ impl CustomConst for ConstUsize {
     fn extension_reqs(&self) -> ExtensionSet {
         ExtensionSet::singleton(&PRELUDE_ID)
     }
-}
 
-impl KnownTypeConst for ConstUsize {
-    const TYPE: CustomType = USIZE_CUSTOM_T;
+    fn custom_type(&self) -> CustomType {
+        USIZE_CUSTOM_T
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -225,10 +221,6 @@ impl CustomConst for ConstError {
         format!("ConstError({:?}, {:?})", self.signal, self.message).into()
     }
 
-    fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
-        self.check_known_type(typ)
-    }
-
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
         crate::values::downcast_equal_consts(self, other)
     }
@@ -236,10 +228,9 @@ impl CustomConst for ConstError {
     fn extension_reqs(&self) -> ExtensionSet {
         ExtensionSet::singleton(&PRELUDE_ID)
     }
-}
-
-impl KnownTypeConst for ConstError {
-    const TYPE: CustomType = ERROR_CUSTOM_TYPE;
+    fn custom_type(&self) -> CustomType {
+        ERROR_CUSTOM_TYPE
+    }
 }
 
 #[cfg(test)]
@@ -285,7 +276,7 @@ mod test {
 
         assert_eq!(error_val.name(), "ConstError(2, \"my message\")");
 
-        assert!(error_val.check_custom_type(&ERROR_CUSTOM_TYPE).is_ok());
+        assert!(error_val.validate().is_ok());
 
         assert_eq!(
             error_val.extension_reqs(),

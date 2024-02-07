@@ -154,7 +154,9 @@ pub trait CustomConst:
     fn extension_reqs(&self) -> ExtensionSet;
 
     /// Check the value is a valid instance of the provided type.
-    fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure>;
+    fn validate(&self) -> Result<(), CustomCheckFailure> {
+        Ok(())
+    }
 
     /// Compare two constants for equality, using downcasting and comparing the definitions.
     // Can't derive PartialEq for trait objects
@@ -162,6 +164,9 @@ pub trait CustomConst:
         // false unless overloaded
         false
     }
+
+    /// report the type
+    fn custom_type(&self) -> CustomType;
 }
 
 /// Const equality for types that have PartialEq
@@ -173,25 +178,6 @@ pub fn downcast_equal_consts<T: CustomConst + PartialEq>(
         value == other
     } else {
         false
-    }
-}
-
-/// Simpler trait for constant structs that have a known custom type to check against.
-pub trait KnownTypeConst {
-    /// The type of the constants.
-    const TYPE: CustomType;
-
-    /// Fixed implementation of [CustomConst::check_custom_type] that checks
-    /// against known correct type.
-    fn check_known_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
-        if typ == &Self::TYPE {
-            Ok(())
-        } else {
-            Err(CustomCheckFailure::TypeMismatch {
-                expected: Self::TYPE,
-                found: typ.clone(),
-            })
-        }
     }
 }
 
@@ -223,23 +209,15 @@ impl CustomConst for CustomSerialized {
         format!("yaml:{:?}", self.value).into()
     }
 
-    fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
-        if &self.typ == typ {
-            Ok(())
-        } else {
-            Err(CustomCheckFailure::TypeMismatch {
-                expected: typ.clone(),
-                found: self.typ.clone(),
-            })
-        }
-    }
-
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
         Some(self) == other.downcast_ref()
     }
 
     fn extension_reqs(&self) -> ExtensionSet {
         self.extensions.clone()
+    }
+    fn custom_type(&self) -> CustomType {
+        self.typ.clone()
     }
 }
 
@@ -257,31 +235,24 @@ pub(crate) mod test {
     use crate::builder::test::simple_dfg_hugr;
     use crate::std_extensions::arithmetic::float_types::{self, FLOAT64_CUSTOM_TYPE};
     use crate::type_row;
-    use crate::types::{FunctionType, Type, TypeBound};
+    use crate::types::{FunctionType, Type};
 
     #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 
-    /// A custom constant value used in testing that purports to be an instance
-    /// of a custom type with a specific type bound.
-    pub(crate) struct CustomTestValue(pub TypeBound, pub ExtensionSet);
+    /// A custom constant value used in testing
+    pub(crate) struct CustomTestValue(pub CustomType);
     #[typetag::serde]
     impl CustomConst for CustomTestValue {
         fn name(&self) -> SmolStr {
             format!("CustomTestValue({:?})", self.0).into()
         }
 
-        fn check_custom_type(&self, typ: &CustomType) -> Result<(), CustomCheckFailure> {
-            if self.0 == typ.bound() {
-                Ok(())
-            } else {
-                Err(CustomCheckFailure::Message(
-                    "CustomTestValue check fail.".into(),
-                ))
-            }
+        fn extension_reqs(&self) -> ExtensionSet {
+            ExtensionSet::singleton(self.0.extension())
         }
 
-        fn extension_reqs(&self) -> ExtensionSet {
-            self.1.clone()
+        fn custom_type(&self) -> CustomType {
+            self.0.clone()
         }
     }
 

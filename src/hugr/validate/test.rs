@@ -542,7 +542,9 @@ fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
         ),
     )?;
     let empty_list = Value::Extension {
-        c: (Box::new(collections::ListValue::new(vec![])),),
+        c: (Box::new(collections::ListValue::new_empty(
+            Type::new_var_use(0, TypeBound::Copyable),
+        )),),
     };
     let cst = def.add_load_const(Const::new(empty_list, list_of_var)?)?;
     let res = def.finish_hugr_with_outputs([cst], &reg);
