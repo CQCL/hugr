@@ -40,7 +40,7 @@ pub mod validate;
 pub use const_fold::{ConstFold, ConstFoldResult};
 pub use prelude::{PRELUDE, PRELUDE_REGISTRY};
 
-mod declarative;
+pub mod declarative;
 
 /// Extension Registries store extensions to be looked up e.g. during validation.
 #[derive(Clone, Debug)]
@@ -73,6 +73,21 @@ impl ExtensionRegistry {
             ext.validate(&res).map_err(|e| (ext.name().clone(), e))?;
         }
         Ok(res)
+    }
+
+    /// Returns the number of extensions in the registry.
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Returns `true` if the registry contains no extensions.
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// Returns an iterator over the extensions in the registry.
+    pub fn iter(&self) -> impl Iterator<Item = (&ExtensionId, &Extension)> {
+        self.0.iter()
     }
 }
 

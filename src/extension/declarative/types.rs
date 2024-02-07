@@ -7,6 +7,8 @@
 //! [specification]: https://github.com/CQCL/hugr/blob/main/specification/hugr.md#declarative-format
 //! [`ExtensionSetDeclaration`]: super::ExtensionSetDeclaration
 
+use crate::extension::{ExtensionBuildError, TypeDef, TypeDefBound};
+use crate::types::type_param::TypeParam;
 use crate::types::{TypeBound, TypeName};
 
 use serde::ser::SerializeSeq;
@@ -17,11 +19,19 @@ use serde::{Deserialize, Serialize};
 pub(super) struct TypeDeclaration {
     /// The name of the type.
     name: TypeName,
-    /// The [`TypeBound`] describing what can be done to instances of this type.
-    /// Options are `Eq`, `Copyable`, or `Any`.
+    /// A description for the type.
     #[serde(default)]
     #[serde(skip_serializing_if = "crate::utils::is_default")]
-    bound: TypeBoundDeclaration,
+    description: String,
+    /// The type bound describing what can be done to instances of this type.
+    /// Options are `Eq`, `Copyable`, or `Any`.
+    ///
+    /// See [`TypeBound`] and [`TypeDefBound`].
+    ///
+    /// TODO: Derived bounds from the parameters (see [`TypeDefBound`]) are not yet supported.
+    #[serde(default)]
+    #[serde(skip_serializing_if = "crate::utils::is_default")]
+    bound: TypeDefBoundDeclaration,
     /// A list of type parameters for this type.
     ///
     /// Each element in the list is a 2-element list, where the first element is
@@ -32,14 +42,36 @@ pub(super) struct TypeDeclaration {
     params: Vec<TypeParamDeclaration>,
 }
 
+impl TypeDeclaration {
+    /// Register this type in the given extension.
+    pub fn register<'ext>(
+        &self,
+        ext: &'ext mut crate::Extension,
+    ) -> Result<&'ext TypeDef, ExtensionBuildError> {
+        let params = self
+            .params
+            .iter()
+            .map(TypeParamDeclaration::make_type_param)
+            .collect();
+        ext.add_type(
+            self.name.clone(),
+            params,
+            self.description.clone(),
+            self.bound.into(),
+        )
+    }
+}
+
 /// A declarative TypeBound definition.
 ///
-/// Equivalent to a [`TypeBound`]. Provides human-friendly serialization, using
+/// Equivalent to a [`TypeDefBound`]. Provides human-friendly serialization, using
 /// the full names.
+///
+/// TODO: Support derived bounds
 #[derive(
     Debug, Copy, Clone, Serialize, Deserialize, Hash, PartialEq, Eq, Default, derive_more::Display,
 )]
-enum TypeBoundDeclaration {
+enum TypeDefBoundDeclaration {
     /// The equality operation is valid on this type.
     Eq,
     /// The type can be copied in the program.
@@ -49,22 +81,12 @@ enum TypeBoundDeclaration {
     Any,
 }
 
-impl From<TypeBoundDeclaration> for TypeBound {
-    fn from(bound: TypeBoundDeclaration) -> Self {
+impl From<TypeDefBoundDeclaration> for TypeDefBound {
+    fn from(bound: TypeDefBoundDeclaration) -> Self {
         match bound {
-            TypeBoundDeclaration::Eq => Self::Eq,
-            TypeBoundDeclaration::Copyable => Self::Copyable,
-            TypeBoundDeclaration::Any => Self::Any,
-        }
-    }
-}
-
-impl From<TypeBound> for TypeBoundDeclaration {
-    fn from(bound: TypeBound) -> Self {
-        match bound {
-            TypeBound::Eq => Self::Eq,
-            TypeBound::Copyable => Self::Copyable,
-            TypeBound::Any => Self::Any,
+            TypeDefBoundDeclaration::Eq => Self::Explicit(TypeBound::Eq),
+            TypeDefBoundDeclaration::Copyable => Self::Explicit(TypeBound::Copyable),
+            TypeDefBoundDeclaration::Any => Self::Explicit(TypeBound::Any),
         }
     }
 }
@@ -77,9 +99,22 @@ impl From<TypeBound> for TypeBoundDeclaration {
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 struct TypeParamDeclaration {
     /// The name of the parameter. May be `null`.
+    ///
+    /// TODO: This field is ignored, there's no place to put it in a `TypeParam`.
     description: Option<String>,
     /// The parameter type.
     type_name: TypeName,
+}
+
+impl TypeParamDeclaration {
+    /// Create a [`TypeParam`] from this declaration.
+    ///
+    /// Only opaque types are supported for now.
+    pub fn make_type_param(&self) -> TypeParam {
+        // TODO: We have to resolve the type id to a real type.
+        let _ty = unimplemented!();
+        //TypeParam::Opaque { ty }
+    }
 }
 
 impl Serialize for TypeParamDeclaration {

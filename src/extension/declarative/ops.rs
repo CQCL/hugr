@@ -14,12 +14,12 @@ use serde::ser::SerializeSeq;
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 
-use crate::extension::ExtensionId;
+use crate::extension::{ExtensionBuildError, ExtensionSet, OpDef, SignatureFunc};
 use crate::types::TypeName;
 use crate::utils::is_default;
 
 /// A declarative operation definition.
-#[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub(super) struct OperationDeclaration {
     /// The identifier the operation.
     name: SmolStr,
@@ -27,19 +27,10 @@ pub(super) struct OperationDeclaration {
     #[serde(default)]
     #[serde(skip_serializing_if = "crate::utils::is_default")]
     description: String,
-}
-
-/// A declarative operation signature definition.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-struct SignatureDeclaration {
-    /// The inputs to the operation.
-    inputs: Vec<SignaturePortDeclaration>,
-    /// The outputs of the operation.
-    outputs: Vec<SignaturePortDeclaration>,
-    /// A set of extensions invoked while running this operation.
+    /// The signature of the operation.
     #[serde(default)]
     #[serde(skip_serializing_if = "crate::utils::is_default")]
-    extensions: Vec<ExtensionId>,
+    signature: Option<SignatureDeclaration>,
     /// A set of per-node parameters required to instantiate this operation.
     #[serde(default)]
     #[serde(skip_serializing_if = "crate::utils::is_default")]
@@ -54,6 +45,29 @@ struct SignatureDeclaration {
     #[serde(default)]
     #[serde(skip_serializing_if = "crate::utils::is_default")]
     lowering: Option<LoweringDeclaration>,
+}
+impl OperationDeclaration {
+    /// Register this operation in the given extension.
+    pub fn register<'ext>(
+        &self,
+        ext: &'ext mut crate::Extension,
+    ) -> Result<&'ext mut OpDef, ExtensionBuildError> {
+        let signature_func: SignatureFunc = unimplemented!("signature_func");
+        ext.add_op(self.name.clone(), self.description.clone(), signature_func)
+    }
+}
+
+/// A declarative operation signature definition.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+struct SignatureDeclaration {
+    /// The inputs to the operation.
+    inputs: Vec<SignaturePortDeclaration>,
+    /// The outputs of the operation.
+    outputs: Vec<SignaturePortDeclaration>,
+    /// A set of extensions invoked while running this operation.
+    #[serde(default)]
+    #[serde(skip_serializing_if = "crate::utils::is_default")]
+    extensions: ExtensionSet,
 }
 
 /// A declarative definition for a number of ports in a signature's input or output.
@@ -178,5 +192,5 @@ struct LoweringDeclaration {
     /// A set of extensions invoked while running this operation.
     #[serde(default)]
     #[serde(skip_serializing_if = "crate::utils::is_default")]
-    extensions: Vec<ExtensionId>,
+    extensions: ExtensionSet,
 }

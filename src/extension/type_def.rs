@@ -181,7 +181,7 @@ mod test {
                 b: TypeBound::Copyable,
             }],
             extension: "MyRsrc".try_into().unwrap(),
-            description: "Some parameterised type".into(),
+            description: "Some parametrised type".into(),
             bound: TypeDefBound::FromParams(vec![0]),
         };
         let typ = Type::new_extension(

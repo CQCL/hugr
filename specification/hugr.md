@@ -1072,6 +1072,7 @@ extensions:
   # Declare custom types
   types:
   - name: QubitVector
+    description: "A vector of qubits"
     # Opaque types can take type arguments, with specified names
     params: [["size", USize]]
   operations:
