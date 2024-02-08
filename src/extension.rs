@@ -399,24 +399,6 @@ pub enum ExtensionBuildError {
     /// Existing [`TypeDef`]
     #[error("Extension already has an type called {0}.")]
     TypeDefExists(SmolStr),
-    /// Referenced an unknown type.
-    #[error("Extension {ext} referenced an unknown type {ty}.")]
-    MissingType {
-        /// The extension that referenced the unknown type.
-        ext: ExtensionId,
-        /// The unknown type.
-        ty: TypeName,
-    },
-    /// Parametric types are not currently supported as type parameters.
-    ///
-    /// TODO: Support this.
-    #[error("Found an unsupported higher-order type parameter {ty} in extension {ext}")]
-    ParametricTypeParameter {
-        /// The extension that referenced the unsupported type parameter.
-        ext: ExtensionId,
-        /// The unsupported type parameter.
-        ty: TypeName,
-    },
 }
 
 /// A set of extensions identified by their unique [`ExtensionId`].

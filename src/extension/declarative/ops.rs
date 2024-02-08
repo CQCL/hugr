@@ -10,16 +10,15 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use serde::ser::SerializeSeq;
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 
-use crate::extension::{
-    ExtensionBuildError, ExtensionRegistry, ExtensionSet, OpDef, SignatureFunc,
-};
-use crate::types::TypeName;
-use crate::utils::is_default;
+use crate::extension::{ExtensionRegistry, ExtensionSet, OpDef, SignatureFunc};
+use crate::types::type_param::TypeParam;
 use crate::Extension;
+
+use super::signature::SignatureDeclaration;
+use super::ExtensionDeclarationError;
 
 /// A declarative operation definition.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -52,123 +51,36 @@ pub(super) struct OperationDeclaration {
 
 impl OperationDeclaration {
     /// Register this operation in the given extension.
-    #[allow(unused, unreachable_code, clippy::diverging_sub_expression)]
     pub fn register<'ext>(
         &self,
         ext: &'ext mut Extension,
         scope: &ExtensionSet,
         registry: &ExtensionRegistry,
-    ) -> Result<&'ext mut OpDef, ExtensionBuildError> {
-        let signature_func: SignatureFunc = unimplemented!("signature_func");
-        ext.add_op(self.name.clone(), self.description.clone(), signature_func)
-    }
-}
+    ) -> Result<&'ext mut OpDef, ExtensionDeclarationError> {
+        // We currently only support explicit signatures.
+        //
+        // TODO: Support missing signatures?
+        let Some(signature) = &self.signature else {
+            return Err(ExtensionDeclarationError::MissingSignature {
+                ext: ext.name().clone(),
+                op: self.name.clone(),
+            });
+        };
 
-/// A declarative operation signature definition.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-struct SignatureDeclaration {
-    /// The inputs to the operation.
-    inputs: Vec<SignaturePortDeclaration>,
-    /// The outputs of the operation.
-    outputs: Vec<SignaturePortDeclaration>,
-    /// A set of extensions invoked while running this operation.
-    #[serde(default)]
-    #[serde(skip_serializing_if = "crate::utils::is_default")]
-    extensions: ExtensionSet,
-}
-
-/// A declarative definition for a number of ports in a signature's input or output.
-///
-/// Serialized as a 2 or 3-element list, where:
-/// - The first element is an optional human-readable name of the port.
-/// - The second element is the port type id.
-/// - The optional third element is either:
-///     - A number, indicating a repetition of the port that amount of times.
-///     - A parameter identifier, to use as the repetition number.
-///     - Nothing, in which case we default to a single repetition.
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
-struct SignaturePortDeclaration {
-    /// The description of the ports. May be `null`.
-    description: Option<String>,
-    /// The type identifier for the port.
-    ///
-    /// TODO: The spec definition is more complex than just a type identifier,
-    /// we should be able to support expressions like:
-    ///
-    /// - `Q`
-    /// - `Array<i>(Array<j>(F64))`
-    /// - `Function[r](USize -> USize)`
-    /// - `Opaque(complex_matrix,i,j)`
-    type_name: TypeName,
-    /// The number of repetitions for this port definition.
-    repeat: PortRepetitionDeclaration,
-}
-
-impl Serialize for SignaturePortDeclaration {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let len = if is_default(&self.repeat) { 2 } else { 3 };
-        let mut seq = serializer.serialize_seq(Some(len))?;
-        seq.serialize_element(&self.description)?;
-        seq.serialize_element(&self.type_name)?;
-        if !is_default(&self.repeat) {
-            seq.serialize_element(&self.repeat)?;
+        // We currently do not support parametric operations.
+        if !self.params.is_empty() {
+            return Err(ExtensionDeclarationError::ParametricOperation {
+                ext: ext.name().clone(),
+                op: self.name.clone(),
+            });
         }
-        seq.end()
-    }
-}
+        let params: Vec<TypeParam> = vec![];
 
-impl<'de> Deserialize<'de> for SignaturePortDeclaration {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        struct TypeParamVisitor;
-        const EXPECTED_MSG: &str = "a 2-element list containing a type parameter name and id";
+        let signature_func: SignatureFunc =
+            signature.make_signature(ext, scope, registry, &params)?;
 
-        impl<'de> serde::de::Visitor<'de> for TypeParamVisitor {
-            type Value = SignaturePortDeclaration;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str(EXPECTED_MSG)
-            }
-
-            fn visit_seq<A: serde::de::SeqAccess<'de>>(
-                self,
-                mut seq: A,
-            ) -> Result<Self::Value, A::Error> {
-                let description = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::invalid_length(0, &EXPECTED_MSG))?;
-                let type_name = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::invalid_length(1, &EXPECTED_MSG))?;
-                let repeat = seq.next_element()?.unwrap_or_default();
-                Ok(SignaturePortDeclaration {
-                    description,
-                    type_name,
-                    repeat,
-                })
-            }
-        }
-
-        deserializer.deserialize_seq(TypeParamVisitor)
-    }
-}
-
-/// A number of repetitions for a signature's port definition.
-///
-/// This value may be either:
-/// - A number, indicating a repetition of the port that amount of times.
-/// - A parameter identifier, to use as the repetition number.
-#[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(untagged)]
-enum PortRepetitionDeclaration {
-    /// A constant number of repetitions for the port definition.
-    Count(usize),
-    /// An (integer) operation parameter identifier to use as the number of repetitions.
-    Parameter(SmolStr),
-}
-
-impl Default for PortRepetitionDeclaration {
-    fn default() -> Self {
-        PortRepetitionDeclaration::Count(1)
+        let op_def = ext.add_op(self.name.clone(), self.description.clone(), signature_func)?;
+        Ok(op_def)
     }
 }
 
@@ -182,7 +94,7 @@ impl Default for PortRepetitionDeclaration {
 ///
 /// [`TypeParam`]: crate::types::type_param::TypeParam
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
-struct ParamDeclaration(
+pub(super) struct ParamDeclaration(
     /// TODO: Store a [`TypeParam`], and implement custom parsers.
     ///
     /// [`TypeParam`]: crate::types::type_param::TypeParam

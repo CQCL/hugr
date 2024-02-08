@@ -7,15 +7,15 @@
 //! [specification]: https://github.com/CQCL/hugr/blob/main/specification/hugr.md#declarative-format
 //! [`ExtensionSetDeclaration`]: super::ExtensionSetDeclaration
 
-use crate::extension::{
-    ExtensionBuildError, ExtensionRegistry, ExtensionSet, TypeDef, TypeDefBound, TypeParametrised,
-};
+use crate::extension::{ExtensionRegistry, ExtensionSet, TypeDef, TypeDefBound, TypeParametrised};
 use crate::types::type_param::TypeParam;
 use crate::types::{CustomType, TypeBound, TypeName};
 use crate::Extension;
 
 use serde::ser::SerializeSeq;
 use serde::{Deserialize, Serialize};
+
+use super::ExtensionDeclarationError;
 
 /// A declarative type definition.
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq)]
@@ -55,18 +55,19 @@ impl TypeDeclaration {
         ext: &'ext mut Extension,
         scope: &ExtensionSet,
         registry: &ExtensionRegistry,
-    ) -> Result<&'ext TypeDef, ExtensionBuildError> {
+    ) -> Result<&'ext TypeDef, ExtensionDeclarationError> {
         let params = self
             .params
             .iter()
             .map(|param| param.make_type_param(ext, scope, registry))
             .collect::<Result<Vec<TypeParam>, _>>()?;
-        ext.add_type(
+        let type_def = ext.add_type(
             self.name.clone(),
             params,
             self.description.clone(),
             self.bound.into(),
-        )
+        )?;
+        Ok(type_def)
     }
 }
 
@@ -125,11 +126,11 @@ impl TypeParamDeclaration {
         extension: &Extension,
         scope: &ExtensionSet,
         registry: &ExtensionRegistry,
-    ) -> Result<TypeParam, ExtensionBuildError> {
-        let instantiate_type = |ty: &TypeDef| -> Result<CustomType, ExtensionBuildError> {
+    ) -> Result<TypeParam, ExtensionDeclarationError> {
+        let instantiate_type = |ty: &TypeDef| -> Result<CustomType, ExtensionDeclarationError> {
             match ty.params() {
                 [] => Ok(ty.instantiate([]).unwrap()),
-                _ => Err(ExtensionBuildError::ParametricTypeParameter {
+                _ => Err(ExtensionDeclarationError::ParametricTypeParameter {
                     ext: extension.name().clone(),
                     ty: self.type_name.clone(),
                 }),
@@ -157,7 +158,7 @@ impl TypeParamDeclaration {
             }
         }
 
-        Err(ExtensionBuildError::MissingType {
+        Err(ExtensionDeclarationError::MissingType {
             ext: extension.name().clone(),
             ty: self.type_name.clone(),
         })

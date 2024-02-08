@@ -7,16 +7,19 @@
 //! [specification]: https://github.com/CQCL/hugr/blob/main/specification/hugr.md#declarative-format
 
 mod ops;
+mod signature;
 mod types;
 
 use std::fs::File;
 
+use crate::types::TypeName;
 use crate::Extension;
 
 use super::{
     ExtensionBuildError, ExtensionId, ExtensionRegistry, ExtensionRegistryError, ExtensionSet,
 };
 use ops::OperationDeclaration;
+use smol_str::SmolStr;
 use types::TypeDeclaration;
 
 use serde::{Deserialize, Serialize};
@@ -157,13 +160,80 @@ pub enum ExtensionDeclarationError {
         /// The missing imported extension.
         ext: ExtensionId,
     },
+    /// Referenced an unknown type.
+    #[error("Extension {ext} referenced an unknown type {ty}.")]
+    MissingType {
+        /// The extension that referenced the unknown type.
+        ext: ExtensionId,
+        /// The unknown type.
+        ty: TypeName,
+    },
+    /// Parametric types are not currently supported as type parameters.
+    ///
+    /// TODO: Support this.
+    #[error("Found a currently unsupported higher-order type parameter {ty} in extension {ext}")]
+    ParametricTypeParameter {
+        /// The extension that referenced the unsupported type parameter.
+        ext: ExtensionId,
+        /// The unsupported type parameter.
+        ty: TypeName,
+    },
+    /// Parametric types are not currently supported as type parameters.
+    ///
+    /// TODO: Support this.
+    #[error("Found a currently unsupported parametric operation {op} in extension {ext}")]
+    ParametricOperation {
+        /// The extension that referenced the unsupported op parameter.
+        ext: ExtensionId,
+        /// The operation.
+        op: SmolStr,
+    },
+    /// Operation definitions with no signature are not currently supported.
+    ///
+    /// TODO: Support this.
+    #[error(
+        "Operation {op} in extension {ext} has no signature. This is not currently supported."
+    )]
+    MissingSignature {
+        /// The extension containing the operation.
+        ext: ExtensionId,
+        /// The operation with no signature.
+        op: SmolStr,
+    },
+    /// Since currently we hard-code some basic types, we require the prelude to be in scope when using them.
+    ///
+    /// TODO: Don't require this.
+    #[error("Extension {ext} uses prelude types, but the prelude is not in scope.")]
+    NoPreludeInScope {
+        /// The extension that references the prelude.
+        ext: ExtensionId,
+    },
+    /// An unknown type was specified in a signature.
+    #[error("Type {ty} is not in scope. In extension {ext}.")]
+    UnknownType {
+        /// The extension that referenced the type.
+        ext: ExtensionId,
+        /// The unsupported type.
+        ty: String,
+    },
+    /// Parametric port repetitions are not currently supported.
+    ///
+    /// TODO: Support this.
+    #[error("Unsupported port repetition {parametric_repetition} in extension {ext}")]
+    UnsupportedPortRepetition {
+        /// The extension that referenced the type.
+        ext: crate::hugr::IdentList,
+        /// The repetition expression
+        parametric_repetition: SmolStr,
+    },
 }
 
 #[cfg(test)]
 mod test {
     use rstest::rstest;
 
-    use crate::extension::EMPTY_REG;
+    use crate::extension::prelude::PRELUDE_ID;
+    use crate::extension::PRELUDE_REGISTRY;
 
     use super::*;
 
@@ -175,6 +245,8 @@ extensions:
 
     /// A yaml extension defining an extension with one type and two operations.
     const BASIC_YAML: &str = r#"
+imports: [prelude]
+
 extensions:
 - name: SimpleExt
   types:
@@ -186,8 +258,11 @@ extensions:
     signature:
       inputs: []
       outputs: []
-  - name: UnusableOperation
-    description: An operation without a defined signature
+  - name: AnotherOperation
+    description: An operation from 2 qubits to 2 qubits
+    signature:
+        inputs: [["Target", Q], ["Control", Q, 1]]
+        outputs: [[null, Q, 2]]
 "#;
 
     #[rstest]
@@ -199,13 +274,18 @@ extensions:
         #[case] num_types: usize,
         #[case] num_operations: usize,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let mut reg = EMPTY_REG.to_owned();
+        let mut reg = PRELUDE_REGISTRY.to_owned();
         load_extensions(yaml, &mut reg)?;
 
-        assert_eq!(reg.len(), num_declarations);
-        assert_eq!(reg.iter().flat_map(|(_, e)| e.types()).count(), num_types);
+        let non_prelude_regs = || reg.iter().filter(|(id, _)| *id != &PRELUDE_ID);
+
+        assert_eq!(non_prelude_regs().count(), num_declarations);
         assert_eq!(
-            reg.iter().flat_map(|(_, e)| e.operations()).count(),
+            non_prelude_regs().flat_map(|(_, e)| e.types()).count(),
+            num_types
+        );
+        assert_eq!(
+            non_prelude_regs().flat_map(|(_, e)| e.operations()).count(),
             num_operations
         );
         Ok(())
