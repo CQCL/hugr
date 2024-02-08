@@ -3,7 +3,8 @@
 //! TODO: YAML declaration and parsing. This should be similar to a plugin
 //! system (outside the `types` module), which also parses nested [`OpDef`]s.
 
-use std::collections::hash_map::Entry;
+use std::collections::btree_map;
+use std::collections::hash_map;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
@@ -52,15 +53,22 @@ impl ExtensionRegistry {
         self.0.get(name)
     }
 
+    /// Returns `true` if the registry contains an extension with the given name.
+    pub fn contains(&self, name: &str) -> bool {
+        self.0.contains_key(name)
+    }
+
     /// Makes a new ExtensionRegistry, validating all the extensions in it
     pub fn try_new(
         value: impl IntoIterator<Item = Extension>,
-    ) -> Result<Self, (ExtensionId, SignatureError)> {
+    ) -> Result<Self, ExtensionRegistryError> {
         let mut exts = BTreeMap::new();
         for ext in value.into_iter() {
             let prev = exts.insert(ext.name.clone(), ext);
             if let Some(prev) = prev {
-                panic!("Multiple extensions with same name: {}", prev.name)
+                return Err(ExtensionRegistryError::AlreadyRegistered(
+                    prev.name().clone(),
+                ));
             };
         }
         // Note this potentially asks extensions to validate themselves against other extensions that
@@ -70,9 +78,22 @@ impl ExtensionRegistry {
         // cyclically dependent, so there is no perfect solution, and this is at least simple.
         let res = ExtensionRegistry(exts);
         for ext in res.0.values() {
-            ext.validate(&res).map_err(|e| (ext.name().clone(), e))?;
+            ext.validate(&res)
+                .map_err(|e| ExtensionRegistryError::InvalidSignature(ext.name().clone(), e))?;
         }
         Ok(res)
+    }
+
+    /// Registers a new extension to the registry.
+    ///
+    /// Returns a reference to the registered extension if successful.
+    pub fn register(&mut self, extension: Extension) -> Result<&Extension, ExtensionRegistryError> {
+        match self.0.entry(extension.name().clone()) {
+            btree_map::Entry::Occupied(_) => Err(ExtensionRegistryError::AlreadyRegistered(
+                extension.name().clone(),
+            )),
+            btree_map::Entry::Vacant(ve) => Ok(ve.insert(extension)),
+        }
     }
 
     /// Returns the number of extensions in the registry.
@@ -323,8 +344,10 @@ impl Extension {
             typed_value,
         };
         match self.values.entry(extension_value.name.clone()) {
-            Entry::Occupied(_) => Err(ExtensionBuildError::OpDefExists(extension_value.name)),
-            Entry::Vacant(ve) => Ok(ve.insert(extension_value)),
+            hash_map::Entry::Occupied(_) => {
+                Err(ExtensionBuildError::OpDefExists(extension_value.name))
+            }
+            hash_map::Entry::Vacant(ve) => Ok(ve.insert(extension_value)),
         }
     }
 
@@ -356,8 +379,18 @@ impl PartialEq for Extension {
     }
 }
 
-/// An error that can occur in computing the signature of a node.
-/// TODO: decide on failure modes
+/// An error that can occur in defining an extension registry.
+#[derive(Debug, Clone, Error, PartialEq, Eq)]
+pub enum ExtensionRegistryError {
+    /// Extension already defined.
+    #[error("The registry already contains an extension with id {0}.")]
+    AlreadyRegistered(ExtensionId),
+    /// A registered extension has invalid signatures.
+    #[error("The extension {0} contains an invalid signature, {1}.")]
+    InvalidSignature(ExtensionId, #[source] SignatureError),
+}
+
+/// An error that can occur in building a new extension.
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
 pub enum ExtensionBuildError {
     /// Existing [`OpDef`]
@@ -366,6 +399,24 @@ pub enum ExtensionBuildError {
     /// Existing [`TypeDef`]
     #[error("Extension already has an type called {0}.")]
     TypeDefExists(SmolStr),
+    /// Referenced an unknown type.
+    #[error("Extension {ext} referenced an unknown type {ty}.")]
+    MissingType {
+        /// The extension that referenced the unknown type.
+        ext: ExtensionId,
+        /// The unknown type.
+        ty: TypeName,
+    },
+    /// Parametric types are not currently supported as type parameters.
+    ///
+    /// TODO: Support this.
+    #[error("Found an unsupported higher-order type parameter {ty} in extension {ext}")]
+    ParametricTypeParameter {
+        /// The extension that referenced the unsupported type parameter.
+        ext: ExtensionId,
+        /// The unsupported type parameter.
+        ty: TypeName,
+    },
 }
 
 /// A set of extensions identified by their unique [`ExtensionId`].

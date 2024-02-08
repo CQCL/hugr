@@ -13,25 +13,35 @@ use std::fs::File;
 
 use crate::Extension;
 
-use super::{ExtensionBuildError, ExtensionId, ExtensionRegistry, ExtensionSet, SignatureError};
+use super::{
+    ExtensionBuildError, ExtensionId, ExtensionRegistry, ExtensionRegistryError, ExtensionSet,
+};
 use ops::OperationDeclaration;
 use types::TypeDeclaration;
 
 use serde::{Deserialize, Serialize};
 
-/// Load a set of extensions from a YAML string.
-pub fn load_extensions(yaml: &str) -> Result<ExtensionRegistry, ExtensionDeclarationError> {
+/// Load a set of extensions from a YAML string into a registry.
+///
+/// Any required extensions must already be present in the registry.
+pub fn load_extensions(
+    yaml: &str,
+    registry: &mut ExtensionRegistry,
+) -> Result<(), ExtensionDeclarationError> {
     let ext: ExtensionSetDeclaration = serde_yaml::from_str(yaml)?;
-    ext.make_registry()
+    ext.add_to_registry(registry)
 }
 
-/// Load a set of extensions from a file.
+/// Load a set of extensions from a file into a registry.
+///
+/// Any required extensions must already be present in the registry.
 pub fn load_extensions_file(
     path: &std::path::Path,
-) -> Result<ExtensionRegistry, ExtensionDeclarationError> {
+    registry: &mut ExtensionRegistry,
+) -> Result<(), ExtensionDeclarationError> {
     let file = File::open(path)?;
     let ext: ExtensionSetDeclaration = serde_yaml::from_reader(file)?;
-    ext.make_registry()
+    ext.add_to_registry(registry)
 }
 
 /// A set of declarative extension definitions with some metadata.
@@ -70,30 +80,56 @@ struct ExtensionDeclaration {
 
 impl ExtensionSetDeclaration {
     /// Register this set of extensions with the given registry.
-    pub fn make_registry(&self) -> Result<ExtensionRegistry, ExtensionDeclarationError> {
-        let exts = self
-            .extensions
-            .iter()
-            .map(|ext| ext.make_extension(&self.imports))
-            .collect::<Result<Vec<Extension>, _>>()?;
-        Ok(ExtensionRegistry::try_new(exts)?)
+    pub fn add_to_registry(
+        &self,
+        registry: &mut ExtensionRegistry,
+    ) -> Result<(), ExtensionDeclarationError> {
+        // All dependencies must be present in the registry.
+        for imp in self.imports.iter() {
+            if !registry.contains(imp) {
+                return Err(ExtensionDeclarationError::MissingExtension { ext: imp.clone() });
+            }
+        }
+
+        // A set of extensions that are in scope for the definition. This is a
+        // subset of `registry` that includes `self.imports` and the previous
+        // extensions defined in the declaration.
+        let mut scope = self.imports.clone();
+
+        // Registers extensions sequentially, adding them to the current scope.
+        for decl in &self.extensions {
+            let ext = decl.make_extension(&self.imports, &scope, registry)?;
+            let ext = registry.register(ext)?;
+            scope.insert(ext.name())
+        }
+
+        Ok(())
     }
 }
 
 impl ExtensionDeclaration {
     /// Create an [`Extension`] from this declaration.
+    ///
+    /// Parameters:
+    /// - `imports`: The set of extensions that this extension depends on.
+    /// - `scope`: The set of extensions that are in scope for this extension.
+    ///     This may include other extensions in the same file, in addition to `imports`.
+    /// - `registry`: The registry to use for resolving dependencies.
+    ///     Extensions not in `scope` will be ignored.
     pub fn make_extension(
         &self,
         imports: &ExtensionSet,
+        scope: &ExtensionSet,
+        registry: &ExtensionRegistry,
     ) -> Result<Extension, ExtensionDeclarationError> {
         let mut ext = Extension::new_with_reqs(self.name.clone(), imports.clone());
 
         for t in &self.types {
-            t.register(&mut ext)?;
+            t.register(&mut ext, scope, registry)?;
         }
 
         for o in &self.operations {
-            o.register(&mut ext)?;
+            o.register(&mut ext, scope, registry)?;
         }
 
         Ok(ext)
@@ -106,31 +142,28 @@ pub enum ExtensionDeclarationError {
     /// An error occurred while deserializing the extension set.
     #[error("Error while parsing the extension set yaml: {0}")]
     Deserialize(#[from] serde_yaml::Error),
-    /// An error in the validation of the loaded extensions.
-    #[error("Error validating extension {ext}: {err}")]
-    ExtensionValidationError {
-        /// The extension that failed validation.
-        ext: ExtensionId,
-        /// The error that occurred.
-        err: SignatureError,
-    },
+    /// An error in registering the loaded extensions.
+    #[error("Error registering the extensions.")]
+    ExtensionRegistryError(#[from] ExtensionRegistryError),
     /// An error occurred while adding operations or types to the extension.
     #[error("Error while adding operations or types to the extension: {0}")]
     ExtensionBuildError(#[from] ExtensionBuildError),
     /// Invalid yaml file.
     #[error("Invalid yaml declaration file {0}")]
     InvalidFile(#[from] std::io::Error),
-}
-
-impl From<(ExtensionId, SignatureError)> for ExtensionDeclarationError {
-    fn from((ext, err): (ExtensionId, SignatureError)) -> Self {
-        ExtensionDeclarationError::ExtensionValidationError { ext, err }
-    }
+    /// A required extension is missing.
+    #[error("Missing required extension {ext}")]
+    MissingExtension {
+        /// The missing imported extension.
+        ext: ExtensionId,
+    },
 }
 
 #[cfg(test)]
 mod test {
     use rstest::rstest;
+
+    use crate::extension::EMPTY_REG;
 
     use super::*;
 
@@ -166,12 +199,13 @@ extensions:
         #[case] num_types: usize,
         #[case] num_operations: usize,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let ext: ExtensionRegistry = load_extensions(yaml)?;
+        let mut reg = EMPTY_REG.to_owned();
+        load_extensions(yaml, &mut reg)?;
 
-        assert_eq!(ext.len(), num_declarations);
-        assert_eq!(ext.iter().flat_map(|(_, e)| e.types()).count(), num_types);
+        assert_eq!(reg.len(), num_declarations);
+        assert_eq!(reg.iter().flat_map(|(_, e)| e.types()).count(), num_types);
         assert_eq!(
-            ext.iter().flat_map(|(_, e)| e.operations()).count(),
+            reg.iter().flat_map(|(_, e)| e.operations()).count(),
             num_operations
         );
         Ok(())

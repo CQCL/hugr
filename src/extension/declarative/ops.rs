@@ -14,9 +14,12 @@ use serde::ser::SerializeSeq;
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 
-use crate::extension::{ExtensionBuildError, ExtensionSet, OpDef, SignatureFunc};
+use crate::extension::{
+    ExtensionBuildError, ExtensionRegistry, ExtensionSet, OpDef, SignatureFunc,
+};
 use crate::types::TypeName;
 use crate::utils::is_default;
+use crate::Extension;
 
 /// A declarative operation definition.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -46,11 +49,15 @@ pub(super) struct OperationDeclaration {
     #[serde(skip_serializing_if = "crate::utils::is_default")]
     lowering: Option<LoweringDeclaration>,
 }
+
 impl OperationDeclaration {
     /// Register this operation in the given extension.
+    #[allow(unused, unreachable_code, clippy::diverging_sub_expression)]
     pub fn register<'ext>(
         &self,
-        ext: &'ext mut crate::Extension,
+        ext: &'ext mut Extension,
+        scope: &ExtensionSet,
+        registry: &ExtensionRegistry,
     ) -> Result<&'ext mut OpDef, ExtensionBuildError> {
         let signature_func: SignatureFunc = unimplemented!("signature_func");
         ext.add_op(self.name.clone(), self.description.clone(), signature_func)

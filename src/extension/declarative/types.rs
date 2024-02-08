@@ -7,9 +7,12 @@
 //! [specification]: https://github.com/CQCL/hugr/blob/main/specification/hugr.md#declarative-format
 //! [`ExtensionSetDeclaration`]: super::ExtensionSetDeclaration
 
-use crate::extension::{ExtensionBuildError, TypeDef, TypeDefBound};
+use crate::extension::{
+    ExtensionBuildError, ExtensionRegistry, ExtensionSet, TypeDef, TypeDefBound, TypeParametrised,
+};
 use crate::types::type_param::TypeParam;
-use crate::types::{TypeBound, TypeName};
+use crate::types::{CustomType, TypeBound, TypeName};
+use crate::Extension;
 
 use serde::ser::SerializeSeq;
 use serde::{Deserialize, Serialize};
@@ -44,15 +47,20 @@ pub(super) struct TypeDeclaration {
 
 impl TypeDeclaration {
     /// Register this type in the given extension.
+    ///
+    /// Types in the definition will be resolved using the extensions in `scope`
+    /// and the current extension.
     pub fn register<'ext>(
         &self,
-        ext: &'ext mut crate::Extension,
+        ext: &'ext mut Extension,
+        scope: &ExtensionSet,
+        registry: &ExtensionRegistry,
     ) -> Result<&'ext TypeDef, ExtensionBuildError> {
         let params = self
             .params
             .iter()
-            .map(TypeParamDeclaration::make_type_param)
-            .collect();
+            .map(|param| param.make_type_param(ext, scope, registry))
+            .collect::<Result<Vec<TypeParam>, _>>()?;
         ext.add_type(
             self.name.clone(),
             params,
@@ -109,11 +117,50 @@ struct TypeParamDeclaration {
 impl TypeParamDeclaration {
     /// Create a [`TypeParam`] from this declaration.
     ///
-    /// Only opaque types are supported for now.
-    pub fn make_type_param(&self) -> TypeParam {
-        // TODO: We have to resolve the type id to a real type.
-        let _ty = unimplemented!();
-        //TypeParam::Opaque { ty }
+    /// Resolves any type ids using both the current extension and any other in `scope`.
+    ///
+    /// TODO: Only non-parametric opaque types are supported for now.
+    pub fn make_type_param(
+        &self,
+        extension: &Extension,
+        scope: &ExtensionSet,
+        registry: &ExtensionRegistry,
+    ) -> Result<TypeParam, ExtensionBuildError> {
+        let instantiate_type = |ty: &TypeDef| -> Result<CustomType, ExtensionBuildError> {
+            match ty.params() {
+                [] => Ok(ty.instantiate([]).unwrap()),
+                _ => Err(ExtensionBuildError::ParametricTypeParameter {
+                    ext: extension.name().clone(),
+                    ty: self.type_name.clone(),
+                }),
+            }
+        };
+
+        // First try the previously defined types in the current extension.
+        if let Some(ty) = extension.get_type(&self.type_name) {
+            return Ok(TypeParam::Opaque {
+                ty: instantiate_type(ty)?,
+            });
+        }
+
+        // Try every extension in scope.
+        //
+        // TODO: Can we resolve the extension id from the type name instead?
+        for ext in scope.iter() {
+            if let Some(ty) = registry
+                .get(ext)
+                .and_then(|ext| ext.get_type(&self.type_name))
+            {
+                return Ok(TypeParam::Opaque {
+                    ty: instantiate_type(ty)?,
+                });
+            }
+        }
+
+        Err(ExtensionBuildError::MissingType {
+            ext: extension.name().clone(),
+            ty: self.type_name.clone(),
+        })
     }
 }
 
