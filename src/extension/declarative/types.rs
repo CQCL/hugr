@@ -12,7 +12,6 @@ use crate::types::type_param::TypeParam;
 use crate::types::{CustomType, TypeBound, TypeName};
 use crate::Extension;
 
-use serde::ser::SerializeSeq;
 use serde::{Deserialize, Serialize};
 
 use super::{DeclarationContext, ExtensionDeclarationError};
@@ -101,17 +100,13 @@ impl From<TypeDefBoundDeclaration> for TypeDefBound {
 
 /// A declarative type parameter definition.
 ///
-/// Serialized as a 2-element list, where the first element is an optional
-/// human-readable name of the type parameter, and the second element is the
-/// type id.
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
-struct TypeParamDeclaration {
-    /// The name of the parameter. May be `null`.
-    ///
-    /// TODO: This field is ignored, there's no place to put it in a `TypeParam`.
-    description: Option<String>,
-    /// The parameter type.
-    type_name: TypeName,
+/// Either a type, or a 2-element list containing a human-readable name and a type id.
+#[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
+enum TypeParamDeclaration {
+    /// Just the type id.
+    Type(TypeName),
+    /// A 2-tuple containing a human-readable name and a type id.
+    WithDescription(String, TypeName),
 }
 
 impl TypeParamDeclaration {
@@ -120,6 +115,7 @@ impl TypeParamDeclaration {
     /// Resolves any type ids using both the current extension and any other in `scope`.
     ///
     /// TODO: Only non-parametric opaque types are supported for now.
+    /// TODO: The parameter description is currently ignored.
     pub fn make_type_param(
         &self,
         extension: &Extension,
@@ -130,13 +126,13 @@ impl TypeParamDeclaration {
                 [] => Ok(ty.instantiate([]).unwrap()),
                 _ => Err(ExtensionDeclarationError::ParametricTypeParameter {
                     ext: extension.name().clone(),
-                    ty: self.type_name.clone(),
+                    ty: self.type_name().clone(),
                 }),
             }
         };
 
         // First try the previously defined types in the current extension.
-        if let Some(ty) = extension.get_type(&self.type_name) {
+        if let Some(ty) = extension.get_type(self.type_name()) {
             return Ok(TypeParam::Opaque {
                 ty: instantiate_type(ty)?,
             });
@@ -149,7 +145,7 @@ impl TypeParamDeclaration {
             if let Some(ty) = ctx
                 .registry
                 .get(ext)
-                .and_then(|ext| ext.get_type(&self.type_name))
+                .and_then(|ext| ext.get_type(self.type_name()))
             {
                 return Ok(TypeParam::Opaque {
                     ty: instantiate_type(ty)?,
@@ -159,49 +155,15 @@ impl TypeParamDeclaration {
 
         Err(ExtensionDeclarationError::MissingType {
             ext: extension.name().clone(),
-            ty: self.type_name.clone(),
+            ty: self.type_name().clone(),
         })
     }
-}
 
-impl Serialize for TypeParamDeclaration {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let mut seq = serializer.serialize_seq(Some(2))?;
-        seq.serialize_element(&self.description)?;
-        seq.serialize_element(&self.type_name)?;
-        seq.end()
-    }
-}
-
-impl<'de> Deserialize<'de> for TypeParamDeclaration {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        struct TypeParamVisitor;
-        const EXPECTED_MSG: &str = "a 2-element list containing a type parameter name and id";
-
-        impl<'de> serde::de::Visitor<'de> for TypeParamVisitor {
-            type Value = TypeParamDeclaration;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str(EXPECTED_MSG)
-            }
-
-            fn visit_seq<A: serde::de::SeqAccess<'de>>(
-                self,
-                mut seq: A,
-            ) -> Result<Self::Value, A::Error> {
-                let description = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::invalid_length(0, &EXPECTED_MSG))?;
-                let type_name = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::invalid_length(1, &EXPECTED_MSG))?;
-                Ok(TypeParamDeclaration {
-                    description,
-                    type_name,
-                })
-            }
+    /// Returns the type name of this type parameter.
+    fn type_name(&self) -> &TypeName {
+        match self {
+            Self::Type(ty) => ty,
+            Self::WithDescription(_, ty) => ty,
         }
-
-        deserializer.deserialize_seq(TypeParamVisitor)
     }
 }
