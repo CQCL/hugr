@@ -94,10 +94,6 @@ struct SignaturePortDeclaration {
 
 impl SignaturePortDeclaration {
     /// Return an iterator with the types for this port declaration.
-    ///
-    /// Only a fixed number of repetitions is supported for now.
-    ///
-    /// TODO: We may need to use custom signature functions if `repeat` depends on a variable.
     fn make_types(
         &self,
         ext: &Extension,
@@ -172,9 +168,9 @@ impl<'de> Deserialize<'de> for SignaturePortDeclaration {
 
 /// A number of repetitions for a signature's port definition.
 ///
-/// This value may be either:
-/// - A number, indicating a repetition of the port that amount of times.
-/// - A parameter identifier, to use as the repetition number.
+/// This value must be a number, indicating a repetition of the port that amount of times.
+///
+/// Generic expressions are not yet supported.
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
 enum PortRepetitionDeclaration {
