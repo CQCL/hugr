@@ -19,6 +19,7 @@ mod signature;
 mod types;
 
 use std::fs::File;
+use std::path::Path;
 
 use crate::extension::prelude::PRELUDE_ID;
 use crate::types::TypeName;
@@ -49,7 +50,7 @@ pub fn load_extensions(
 ///
 /// Any required extensions must already be present in the registry.
 pub fn load_extensions_file(
-    path: &std::path::Path,
+    path: &Path,
     registry: &mut ExtensionRegistry,
 ) -> Result<(), ExtensionDeclarationError> {
     let file = File::open(path)?;
@@ -255,10 +256,12 @@ pub enum ExtensionDeclarationError {
 
 #[cfg(test)]
 mod test {
+    use itertools::Itertools;
     use rstest::rstest;
+    use std::path::PathBuf;
 
-    use crate::extension::prelude::PRELUDE_ID;
     use crate::extension::PRELUDE_REGISTRY;
+    use crate::std_extensions;
 
     use super::*;
 
@@ -277,6 +280,7 @@ extensions:
   types:
   - name: MyType
     description: A simple type with no parameters
+    bound: Any
   operations:
   - name: MyOperation
     description: A simple operation with no inputs nor outputs
@@ -290,29 +294,106 @@ extensions:
         outputs: [[Q, 1], [Control, Q, 2]]
 "#;
 
+    /// A yaml extension with unsupported features.
+    const UNSUPPORTED_YAML: &str = r#"
+extensions:
+- name: UnsupportedExt
+  types:
+  - name: MyType
+    description: A simple type with no parameters
+    # Parametric types are not currently supported.
+    params: [Any, ["An unbounded natural number", USize]]
+  operations:
+  - name: UnsupportedOperation
+    description: An operation from 3 qubits to 3 qubits
+    params:
+        # Parametric operations are not currently supported.
+        param1: USize
+    signature:
+        # Type declarations will have their own syntax.
+        inputs: []
+        outputs: ["Array<param1>[USize]"]
+"#;
+
+    /// The yaml used in the module documentation.
+    const EXAMPLE_YAML_FILE: &str = "examples/extension/declarative.yaml";
+
     #[rstest]
-    #[case(EMPTY_YAML, 1, 0, 0)]
-    #[case(BASIC_YAML, 1, 1, 2)]
+    #[case(EMPTY_YAML, 1, 0, 0, &PRELUDE_REGISTRY)]
+    #[case(BASIC_YAML, 1, 1, 2, &PRELUDE_REGISTRY)]
     fn test_decode(
         #[case] yaml: &str,
         #[case] num_declarations: usize,
         #[case] num_types: usize,
         #[case] num_operations: usize,
+        #[case] dependencies: &ExtensionRegistry,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let mut reg = PRELUDE_REGISTRY.to_owned();
+        let mut reg = dependencies.clone();
         load_extensions(yaml, &mut reg)?;
 
-        let non_prelude_regs = || reg.iter().filter(|(id, _)| *id != &PRELUDE_ID);
+        let new_exts = new_extensions(&reg, dependencies).collect_vec();
 
-        assert_eq!(non_prelude_regs().count(), num_declarations);
+        assert_eq!(new_exts.len(), num_declarations);
         assert_eq!(
-            non_prelude_regs().flat_map(|(_, e)| e.types()).count(),
+            new_exts.iter().flat_map(|(_, e)| e.types()).count(),
             num_types
         );
         assert_eq!(
-            non_prelude_regs().flat_map(|(_, e)| e.operations()).count(),
+            new_exts.iter().flat_map(|(_, e)| e.operations()).count(),
             num_operations
         );
         Ok(())
+    }
+
+    #[rstest]
+    #[case(EXAMPLE_YAML_FILE, 1, 1, 2, &std_extensions::logic::LOGIC_REG)]
+    fn test_decode_file(
+        #[case] yaml_file: &str,
+        #[case] num_declarations: usize,
+        #[case] num_types: usize,
+        #[case] num_operations: usize,
+        #[case] dependencies: &ExtensionRegistry,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut reg = dependencies.clone();
+        load_extensions_file(&PathBuf::from(yaml_file), &mut reg)?;
+
+        let new_exts = new_extensions(&reg, dependencies).collect_vec();
+
+        assert_eq!(new_exts.len(), num_declarations);
+        assert_eq!(
+            new_exts.iter().flat_map(|(_, e)| e.types()).count(),
+            num_types
+        );
+        assert_eq!(
+            new_exts.iter().flat_map(|(_, e)| e.operations()).count(),
+            num_operations
+        );
+        Ok(())
+    }
+
+    #[rstest]
+    #[case(UNSUPPORTED_YAML, &PRELUDE_REGISTRY)]
+    fn test_unsupported(
+        #[case] yaml: &str,
+        #[case] dependencies: &ExtensionRegistry,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut reg = dependencies.clone();
+
+        // The parsing should not fail.
+        let ext: ExtensionSetDeclaration = serde_yaml::from_str(yaml)?;
+
+        assert!(ext.add_to_registry(&mut reg).is_err());
+
+        Ok(())
+    }
+
+    /// Returns a list of new extensions that have been defined in a register,
+    /// comparing against a set of pre-included dependencies.
+    fn new_extensions<'a>(
+        reg: &'a ExtensionRegistry,
+        dependencies: &'a ExtensionRegistry,
+    ) -> impl Iterator<Item = (&'a ExtensionId, &'a Extension)> {
+        reg.iter()
+            .filter(move |(id, _)| !dependencies.contains(id) && *id != &PRELUDE_ID)
     }
 }

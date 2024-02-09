@@ -102,6 +102,7 @@ impl From<TypeDefBoundDeclaration> for TypeDefBound {
 ///
 /// Either a type, or a 2-element list containing a human-readable name and a type id.
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
 enum TypeParamDeclaration {
     /// Just the type id.
     Type(TypeName),
