@@ -37,6 +37,7 @@ pub(super) struct SignatureDeclaration {
 }
 
 impl SignatureDeclaration {
+    /// Register this signature in the given extension.
     pub fn make_signature(
         &self,
         ext: &Extension,
@@ -44,9 +45,24 @@ impl SignatureDeclaration {
         registry: &ExtensionRegistry,
         op_params: &[TypeParam],
     ) -> Result<SignatureFunc, ExtensionDeclarationError> {
+        fn make_type_row(
+            v: &[SignaturePortDeclaration],
+            ext: &Extension,
+            scope: &ExtensionSet,
+            registry: &ExtensionRegistry,
+            op_params: &[TypeParam],
+        ) -> Result<TypeRow, ExtensionDeclarationError> {
+            let types = v
+                .iter()
+                .map(|port_decl| port_decl.make_types(ext, scope, registry, op_params))
+                .flatten_ok()
+                .collect::<Result<Vec<Type>, _>>()?;
+            Ok(types.into())
+        }
+
         let body = FunctionType {
-            input: self.make_type_row(&self.inputs, ext, scope, registry, op_params)?,
-            output: self.make_type_row(&self.outputs, ext, scope, registry, op_params)?,
+            input: make_type_row(&self.inputs, ext, scope, registry, op_params)?,
+            output: make_type_row(&self.outputs, ext, scope, registry, op_params)?,
             extension_reqs: self.extensions.clone(),
         };
 
@@ -54,23 +70,6 @@ impl SignatureDeclaration {
         Ok(SignatureFunc::TypeScheme(CustomValidator::from_polyfunc(
             poly_func,
         )))
-    }
-
-    /// Create a type row from a list of port declarations.
-    fn make_type_row(
-        &self,
-        v: &[SignaturePortDeclaration],
-        ext: &Extension,
-        scope: &ExtensionSet,
-        registry: &ExtensionRegistry,
-        op_params: &[TypeParam],
-    ) -> Result<TypeRow, ExtensionDeclarationError> {
-        let types = v
-            .iter()
-            .map(|port_decl| port_decl.make_types(ext, scope, registry, op_params))
-            .flatten_ok()
-            .collect::<Result<Vec<Type>, _>>()?;
-        Ok(types.into())
     }
 }
 
