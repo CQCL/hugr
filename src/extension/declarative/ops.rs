@@ -8,7 +8,6 @@
 //! [`ExtensionSetDeclaration`]: super::ExtensionSetDeclaration
 
 use std::collections::HashMap;
-use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
@@ -21,6 +20,8 @@ use super::signature::SignatureDeclaration;
 use super::ExtensionDeclarationError;
 
 /// A declarative operation definition.
+///
+/// TODO: The "Lowering" attribute is not yet supported.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub(super) struct OperationDeclaration {
     /// The identifier the operation.
@@ -42,11 +43,13 @@ pub(super) struct OperationDeclaration {
     /// This data is kept in the Hugr, and may be accessed by the relevant runtime.
     #[serde(default)]
     #[serde(skip_serializing_if = "crate::utils::is_default")]
-    misc: HashMap<SmolStr, serde_yaml::Value>,
+    misc: HashMap<String, serde_yaml::Value>,
     /// A pre-compiled lowering routine.
+    ///
+    /// This is not yet supported, and will raise an error if present.
     #[serde(default)]
     #[serde(skip_serializing_if = "crate::utils::is_default")]
-    lowering: Option<LoweringDeclaration>,
+    lowering: Option<String>,
 }
 
 impl OperationDeclaration {
@@ -76,10 +79,22 @@ impl OperationDeclaration {
         }
         let params: Vec<TypeParam> = vec![];
 
+        if self.lowering.is_some() {
+            return Err(ExtensionDeclarationError::LoweringNotSupported {
+                ext: ext.name().clone(),
+                op: self.name.clone(),
+            });
+        }
+
         let signature_func: SignatureFunc =
             signature.make_signature(ext, scope, registry, &params)?;
 
-        let op_def = ext.add_op(self.name.clone(), self.description.clone(), signature_func)?;
+        let op_def = ext.add_op_with_misc(
+            self.name.clone(),
+            self.description.clone(),
+            signature_func,
+            self.misc.clone(),
+        )?;
         Ok(op_def)
     }
 }
@@ -100,16 +115,3 @@ pub(super) struct ParamDeclaration(
     /// [`TypeParam`]: crate::types::type_param::TypeParam
     String,
 );
-
-/// Reference to a binary lowering function.
-///
-/// TODO: How this works is not defined in the spec. This is currently a stub.
-#[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
-struct LoweringDeclaration {
-    /// Path to the lowering executable.
-    file: PathBuf,
-    /// A set of extensions invoked while running this operation.
-    #[serde(default)]
-    #[serde(skip_serializing_if = "crate::utils::is_default")]
-    extensions: ExtensionSet,
-}

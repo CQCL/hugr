@@ -228,6 +228,16 @@ pub enum ExtensionDeclarationError {
         /// The repetition expression
         parametric_repetition: SmolStr,
     },
+    /// Lowering definitions for an operation are not currently supported.
+    ///
+    /// TODO: Support this.
+    #[error("Unsupported lowering definition for op {op} in extension {ext}")]
+    LoweringNotSupported {
+        /// The extension.
+        ext: crate::hugr::IdentList,
+        /// The operation with the lowering definition.
+        op: SmolStr,
+    },
 }
 
 #[cfg(test)]
