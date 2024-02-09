@@ -345,6 +345,7 @@ extensions:
         Ok(())
     }
 
+    #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
     #[rstest]
     #[case(EXAMPLE_YAML_FILE, 1, 1, 2, &std_extensions::logic::LOGIC_REG)]
     fn test_decode_file(
