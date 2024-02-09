@@ -12,12 +12,12 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 
-use crate::extension::{ExtensionRegistry, ExtensionSet, OpDef, SignatureFunc};
+use crate::extension::{OpDef, SignatureFunc};
 use crate::types::type_param::TypeParam;
 use crate::Extension;
 
 use super::signature::SignatureDeclaration;
-use super::ExtensionDeclarationError;
+use super::{DeclarationContext, ExtensionDeclarationError};
 
 /// A declarative operation definition.
 ///
@@ -57,8 +57,7 @@ impl OperationDeclaration {
     pub fn register<'ext>(
         &self,
         ext: &'ext mut Extension,
-        scope: &ExtensionSet,
-        registry: &ExtensionRegistry,
+        ctx: DeclarationContext<'_>,
     ) -> Result<&'ext mut OpDef, ExtensionDeclarationError> {
         // We currently only support explicit signatures.
         //
@@ -86,8 +85,7 @@ impl OperationDeclaration {
             });
         }
 
-        let signature_func: SignatureFunc =
-            signature.make_signature(ext, scope, registry, &params)?;
+        let signature_func: SignatureFunc = signature.make_signature(ext, ctx, &params)?;
 
         let op_def = ext.add_op_with_misc(
             self.name.clone(),

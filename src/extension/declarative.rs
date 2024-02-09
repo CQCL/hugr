@@ -111,7 +111,11 @@ impl ExtensionSetDeclaration {
 
         // Registers extensions sequentially, adding them to the current scope.
         for decl in &self.extensions {
-            let ext = decl.make_extension(&self.imports, &scope, registry)?;
+            let ctx = DeclarationContext {
+                scope: &scope,
+                registry,
+            };
+            let ext = decl.make_extension(&self.imports, ctx)?;
             let ext = registry.register(ext)?;
             scope.insert(ext.name())
         }
@@ -122,31 +126,32 @@ impl ExtensionSetDeclaration {
 
 impl ExtensionDeclaration {
     /// Create an [`Extension`] from this declaration.
-    ///
-    /// Parameters:
-    /// - `imports`: The set of extensions that this extension depends on.
-    /// - `scope`: The set of extensions that are in scope for this extension.
-    ///     This may include other extensions in the same file, in addition to `imports`.
-    /// - `registry`: The registry to use for resolving dependencies.
-    ///     Extensions not in `scope` will be ignored.
     pub fn make_extension(
         &self,
         imports: &ExtensionSet,
-        scope: &ExtensionSet,
-        registry: &ExtensionRegistry,
+        ctx: DeclarationContext<'_>,
     ) -> Result<Extension, ExtensionDeclarationError> {
         let mut ext = Extension::new_with_reqs(self.name.clone(), imports.clone());
 
         for t in &self.types {
-            t.register(&mut ext, scope, registry)?;
+            t.register(&mut ext, ctx)?;
         }
 
         for o in &self.operations {
-            o.register(&mut ext, scope, registry)?;
+            o.register(&mut ext, ctx)?;
         }
 
         Ok(ext)
     }
+}
+
+/// Some context data used while translating a declarative extension definition.
+#[derive(Debug, Copy, Clone)]
+struct DeclarationContext<'a> {
+    /// The set of extensions that are in scope for this extension.
+    pub scope: &'a ExtensionSet,
+    /// The registry to use for resolving dependencies.
+    pub registry: &'a ExtensionRegistry,
 }
 
 /// Errors that can occur while loading an extension set.

@@ -13,15 +13,13 @@ use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 
 use crate::extension::prelude::PRELUDE_ID;
-use crate::extension::{
-    CustomValidator, ExtensionRegistry, ExtensionSet, SignatureFunc, TypeDef, TypeParametrised,
-};
+use crate::extension::{CustomValidator, ExtensionSet, SignatureFunc, TypeDef, TypeParametrised};
 use crate::types::type_param::TypeParam;
 use crate::types::{CustomType, FunctionType, PolyFuncType, Type, TypeRow};
 use crate::utils::is_default;
 use crate::Extension;
 
-use super::ExtensionDeclarationError;
+use super::{DeclarationContext, ExtensionDeclarationError};
 
 /// A declarative operation signature definition.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -41,28 +39,22 @@ impl SignatureDeclaration {
     pub fn make_signature(
         &self,
         ext: &Extension,
-        scope: &ExtensionSet,
-        registry: &ExtensionRegistry,
+        ctx: DeclarationContext<'_>,
         op_params: &[TypeParam],
     ) -> Result<SignatureFunc, ExtensionDeclarationError> {
-        fn make_type_row(
-            v: &[SignaturePortDeclaration],
-            ext: &Extension,
-            scope: &ExtensionSet,
-            registry: &ExtensionRegistry,
-            op_params: &[TypeParam],
-        ) -> Result<TypeRow, ExtensionDeclarationError> {
-            let types = v
-                .iter()
-                .map(|port_decl| port_decl.make_types(ext, scope, registry, op_params))
-                .flatten_ok()
-                .collect::<Result<Vec<Type>, _>>()?;
-            Ok(types.into())
-        }
+        let make_type_row =
+            |v: &[SignaturePortDeclaration]| -> Result<TypeRow, ExtensionDeclarationError> {
+                let types = v
+                    .iter()
+                    .map(|port_decl| port_decl.make_types(ext, ctx, op_params))
+                    .flatten_ok()
+                    .collect::<Result<Vec<Type>, _>>()?;
+                Ok(types.into())
+            };
 
         let body = FunctionType {
-            input: make_type_row(&self.inputs, ext, scope, registry, op_params)?,
-            output: make_type_row(&self.outputs, ext, scope, registry, op_params)?,
+            input: make_type_row(&self.inputs)?,
+            output: make_type_row(&self.outputs)?,
             extension_reqs: self.extensions.clone(),
         };
 
@@ -97,8 +89,7 @@ impl SignaturePortDeclaration {
     fn make_types(
         &self,
         ext: &Extension,
-        scope: &ExtensionSet,
-        registry: &ExtensionRegistry,
+        ctx: DeclarationContext<'_>,
         op_params: &[TypeParam],
     ) -> Result<impl Iterator<Item = Type>, ExtensionDeclarationError> {
         let n: usize = match &self.repeat {
@@ -111,7 +102,7 @@ impl SignaturePortDeclaration {
             }
         };
 
-        let ty = self.type_decl.make_type(ext, scope, registry, op_params)?;
+        let ty = self.type_decl.make_type(ext, ctx, op_params)?;
         let ty = Type::new_extension(ty);
 
         Ok(itertools::repeat_n(ty, n))
@@ -216,15 +207,14 @@ impl TypeDeclaration {
     pub fn make_type(
         &self,
         ext: &Extension,
-        scope: &ExtensionSet,
-        registry: &ExtensionRegistry,
+        ctx: DeclarationContext<'_>,
         _op_params: &[TypeParam],
     ) -> Result<CustomType, ExtensionDeclarationError> {
         // The prelude is always in scope.
-        debug_assert!(scope.contains(&PRELUDE_ID));
+        debug_assert!(ctx.scope.contains(&PRELUDE_ID));
 
         // Only hard-coded prelude types are supported for now.
-        let prelude = registry.get(&PRELUDE_ID).unwrap();
+        let prelude = ctx.registry.get(&PRELUDE_ID).unwrap();
         let op_def: &TypeDef = match self.0.as_str() {
             "USize" => prelude.get_type("usize"),
             "Q" => prelude.get_type("qubit"),

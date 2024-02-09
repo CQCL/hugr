@@ -7,7 +7,7 @@
 //! [specification]: https://github.com/CQCL/hugr/blob/main/specification/hugr.md#declarative-format
 //! [`ExtensionSetDeclaration`]: super::ExtensionSetDeclaration
 
-use crate::extension::{ExtensionRegistry, ExtensionSet, TypeDef, TypeDefBound, TypeParametrised};
+use crate::extension::{TypeDef, TypeDefBound, TypeParametrised};
 use crate::types::type_param::TypeParam;
 use crate::types::{CustomType, TypeBound, TypeName};
 use crate::Extension;
@@ -15,7 +15,7 @@ use crate::Extension;
 use serde::ser::SerializeSeq;
 use serde::{Deserialize, Serialize};
 
-use super::ExtensionDeclarationError;
+use super::{DeclarationContext, ExtensionDeclarationError};
 
 /// A declarative type definition.
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq)]
@@ -53,13 +53,12 @@ impl TypeDeclaration {
     pub fn register<'ext>(
         &self,
         ext: &'ext mut Extension,
-        scope: &ExtensionSet,
-        registry: &ExtensionRegistry,
+        ctx: DeclarationContext<'_>,
     ) -> Result<&'ext TypeDef, ExtensionDeclarationError> {
         let params = self
             .params
             .iter()
-            .map(|param| param.make_type_param(ext, scope, registry))
+            .map(|param| param.make_type_param(ext, ctx))
             .collect::<Result<Vec<TypeParam>, _>>()?;
         let type_def = ext.add_type(
             self.name.clone(),
@@ -124,8 +123,7 @@ impl TypeParamDeclaration {
     pub fn make_type_param(
         &self,
         extension: &Extension,
-        scope: &ExtensionSet,
-        registry: &ExtensionRegistry,
+        ctx: DeclarationContext<'_>,
     ) -> Result<TypeParam, ExtensionDeclarationError> {
         let instantiate_type = |ty: &TypeDef| -> Result<CustomType, ExtensionDeclarationError> {
             match ty.params() {
@@ -147,8 +145,9 @@ impl TypeParamDeclaration {
         // Try every extension in scope.
         //
         // TODO: Can we resolve the extension id from the type name instead?
-        for ext in scope.iter() {
-            if let Some(ty) = registry
+        for ext in ctx.scope.iter() {
+            if let Some(ty) = ctx
+                .registry
                 .get(ext)
                 .and_then(|ext| ext.get_type(&self.type_name))
             {
