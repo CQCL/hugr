@@ -12,11 +12,13 @@ mod types;
 
 use std::fs::File;
 
+use crate::extension::prelude::PRELUDE_ID;
 use crate::types::TypeName;
 use crate::Extension;
 
 use super::{
     ExtensionBuildError, ExtensionId, ExtensionRegistry, ExtensionRegistryError, ExtensionSet,
+    PRELUDE,
 };
 use ops::OperationDeclaration;
 use smol_str::SmolStr;
@@ -98,6 +100,14 @@ impl ExtensionSetDeclaration {
         // subset of `registry` that includes `self.imports` and the previous
         // extensions defined in the declaration.
         let mut scope = self.imports.clone();
+
+        // The prelude is auto-imported.
+        if !registry.contains(&PRELUDE_ID) {
+            registry.register(PRELUDE.clone())?;
+        }
+        if !scope.contains(&PRELUDE_ID) {
+            scope.insert(&PRELUDE_ID);
+        }
 
         // Registers extensions sequentially, adding them to the current scope.
         for decl in &self.extensions {
@@ -199,14 +209,6 @@ pub enum ExtensionDeclarationError {
         ext: ExtensionId,
         /// The operation with no signature.
         op: SmolStr,
-    },
-    /// Since currently we hard-code some basic types, we require the prelude to be in scope when using them.
-    ///
-    /// TODO: Don't require this.
-    #[error("Extension {ext} uses prelude types, but the prelude is not in scope.")]
-    NoPreludeInScope {
-        /// The extension that references the prelude.
-        ext: ExtensionId,
     },
     /// An unknown type was specified in a signature.
     #[error("Type {ty} is not in scope. In extension {ext}.")]

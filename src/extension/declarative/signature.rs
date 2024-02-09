@@ -225,11 +225,8 @@ impl TypeDeclaration {
         registry: &ExtensionRegistry,
         _op_params: &[TypeParam],
     ) -> Result<CustomType, ExtensionDeclarationError> {
-        if !scope.contains(&PRELUDE_ID) {
-            return Err(ExtensionDeclarationError::NoPreludeInScope {
-                ext: ext.name().clone(),
-            });
-        }
+        // The prelude is always in scope.
+        debug_assert!(scope.contains(&PRELUDE_ID));
 
         // Only hard-coded prelude types are supported for now.
         let prelude = registry.get(&PRELUDE_ID).unwrap();
