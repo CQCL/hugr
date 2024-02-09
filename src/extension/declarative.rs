@@ -1,8 +1,16 @@
 //! Declarative extension definitions.
 //!
-//! This module defines a YAML schema for defining extensions in a declarative way.
+//! This module includes functions to dynamically load HUGR extensions defined in a YAML file.
+//!
+//! An extension file may define multiple extensions, each with a set of types and operations.
 //!
 //! See the [specification] for more details.
+//!
+//! ### Example
+//!
+//! ```yaml
+#![doc = include_str!("../../examples/extension/declarative.yaml")]
+//! ```
 //!
 //! [specification]: https://github.com/CQCL/hugr/blob/main/specification/hugr.md#declarative-format
 
@@ -276,10 +284,10 @@ extensions:
       inputs: []
       outputs: []
   - name: AnotherOperation
-    description: An operation from 2 qubits to 2 qubits
+    description: An operation from 3 qubits to 3 qubits
     signature:
-        inputs: [["Target", Q], ["Control", Q, 1]]
-        outputs: [[null, Q, 2]]
+        inputs: [Q, Q, Q]
+        outputs: [[Q, 1], [Control, Q, 2]]
 "#;
 
     #[rstest]

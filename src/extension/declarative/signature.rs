@@ -8,7 +8,6 @@
 //! [`ExtensionSetDeclaration`]: super::ExtensionSetDeclaration
 
 use itertools::Itertools;
-use serde::ser::SerializeSeq;
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 
@@ -16,7 +15,6 @@ use crate::extension::prelude::PRELUDE_ID;
 use crate::extension::{CustomValidator, ExtensionSet, SignatureFunc, TypeDef, TypeParametrised};
 use crate::types::type_param::TypeParam;
 use crate::types::{CustomType, FunctionType, PolyFuncType, Type, TypeRow};
-use crate::utils::is_default;
 use crate::Extension;
 
 use super::{DeclarationContext, ExtensionDeclarationError};
@@ -67,21 +65,16 @@ impl SignatureDeclaration {
 
 /// A declarative definition for a number of ports in a signature's input or output.
 ///
-/// Serialized as a 2 or 3-element list, where:
-/// - The first element is an optional human-readable name of the port.
-/// - The second element is the port type id.
-/// - The optional third element is either:
-///     - A number, indicating a repetition of the port that amount of times.
-///     - A parameter identifier, to use as the repetition number.
-///     - Nothing, in which case we default to a single repetition.
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
-struct SignaturePortDeclaration {
-    /// The description of the ports. May be `null`.
-    description: Option<String>,
-    /// The type for the port.
-    type_decl: TypeDeclaration,
-    /// The number of repetitions for this port definition.
-    repeat: PortRepetitionDeclaration,
+/// Serialized as a single type, or as a 2 or 3-element lists.
+#[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+enum SignaturePortDeclaration {
+    /// A single port type.
+    Type(TypeDeclaration),
+    /// A 2-tuple with the type and a repetition declaration.
+    TypeRepeat(TypeDeclaration, PortRepetitionDeclaration),
+    /// A 3-tuple with a description, a type declaration, and a repetition declaration.
+    DescriptionTypeRepeat(String, TypeDeclaration, PortRepetitionDeclaration),
 }
 
 impl SignaturePortDeclaration {
@@ -92,7 +85,7 @@ impl SignaturePortDeclaration {
         ctx: DeclarationContext<'_>,
         op_params: &[TypeParam],
     ) -> Result<impl Iterator<Item = Type>, ExtensionDeclarationError> {
-        let n: usize = match &self.repeat {
+        let n: usize = match self.repeat() {
             PortRepetitionDeclaration::Count(n) => *n,
             PortRepetitionDeclaration::Parameter(parametric_repetition) => {
                 return Err(ExtensionDeclarationError::UnsupportedPortRepetition {
@@ -102,58 +95,29 @@ impl SignaturePortDeclaration {
             }
         };
 
-        let ty = self.type_decl.make_type(ext, ctx, op_params)?;
+        let ty = self.type_decl().make_type(ext, ctx, op_params)?;
         let ty = Type::new_extension(ty);
 
         Ok(itertools::repeat_n(ty, n))
     }
-}
 
-impl Serialize for SignaturePortDeclaration {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let len = if is_default(&self.repeat) { 2 } else { 3 };
-        let mut seq = serializer.serialize_seq(Some(len))?;
-        seq.serialize_element(&self.description)?;
-        seq.serialize_element(&self.type_decl)?;
-        if !is_default(&self.repeat) {
-            seq.serialize_element(&self.repeat)?;
+    /// Get the type declaration for this port.
+    fn type_decl(&self) -> &TypeDeclaration {
+        match self {
+            SignaturePortDeclaration::Type(ty) => ty,
+            SignaturePortDeclaration::TypeRepeat(ty, _) => ty,
+            SignaturePortDeclaration::DescriptionTypeRepeat(_, ty, _) => ty,
         }
-        seq.end()
     }
-}
 
-impl<'de> Deserialize<'de> for SignaturePortDeclaration {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        struct TypeParamVisitor;
-        const EXPECTED_MSG: &str = "a 2-element list containing a type parameter name and id";
-
-        impl<'de> serde::de::Visitor<'de> for TypeParamVisitor {
-            type Value = SignaturePortDeclaration;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str(EXPECTED_MSG)
-            }
-
-            fn visit_seq<A: serde::de::SeqAccess<'de>>(
-                self,
-                mut seq: A,
-            ) -> Result<Self::Value, A::Error> {
-                let description = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::invalid_length(0, &EXPECTED_MSG))?;
-                let type_decl = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::invalid_length(1, &EXPECTED_MSG))?;
-                let repeat = seq.next_element()?.unwrap_or_default();
-                Ok(SignaturePortDeclaration {
-                    description,
-                    type_decl,
-                    repeat,
-                })
-            }
+    /// Get the repetition declaration for this port.
+    fn repeat(&self) -> &PortRepetitionDeclaration {
+        static DEFAULT_REPEAT: PortRepetitionDeclaration = PortRepetitionDeclaration::Count(1);
+        match self {
+            SignaturePortDeclaration::DescriptionTypeRepeat(_, _, repeat) => repeat,
+            SignaturePortDeclaration::TypeRepeat(_, repeat) => repeat,
+            _ => &DEFAULT_REPEAT,
         }
-
-        deserializer.deserialize_seq(TypeParamVisitor)
     }
 }
 
