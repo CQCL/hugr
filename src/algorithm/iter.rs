@@ -120,10 +120,10 @@ pub fn recursive_children(
     children(hugr, root).flat_map(move |x| RecurseIterator::new(hugr, root, x))
 }
 
-/// Return an iterator over root and transitive children of root.  Nodes will be
-///  visited before any of their `out_neighbours` when their [SiblingGraph]
-///  is acyclic. Otherwise they will be visited in a Dfs order starting from the
-///  first child of the parent(as returned by hugr.children()).
+/// Return an iterator over root and transitive children of root. Nodes will be
+/// visited before any of their `out_neighbours` when their [SiblingGraph]
+/// is acyclic. Otherwise they will be visited in a Dfs order starting from the
+/// first child of the parent (as returned by hugr.children()).
 pub fn recursive_children_postorder(
     hugr: &impl HugrView,
     root: Node,
