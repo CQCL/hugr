@@ -3,7 +3,8 @@
 //! TODO: YAML declaration and parsing. This should be similar to a plugin
 //! system (outside the `types` module), which also parses nested [`OpDef`]s.
 
-use std::collections::hash_map::Entry;
+use std::collections::btree_map;
+use std::collections::hash_map;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
@@ -16,7 +17,9 @@ use crate::ops;
 use crate::ops::custom::{ExtensionOp, OpaqueOp};
 use crate::types::type_param::{check_type_args, TypeArgError};
 use crate::types::type_param::{TypeArg, TypeParam};
-use crate::types::{check_typevar_decl, CustomType, PolyFuncType, Substitution, TypeBound};
+use crate::types::{
+    check_typevar_decl, CustomType, PolyFuncType, Substitution, TypeBound, TypeName,
+};
 
 #[allow(dead_code)]
 mod infer;
@@ -38,6 +41,8 @@ pub mod validate;
 pub use const_fold::{ConstFold, ConstFoldResult};
 pub use prelude::{PRELUDE, PRELUDE_REGISTRY};
 
+pub mod declarative;
+
 /// Extension Registries store extensions to be looked up e.g. during validation.
 #[derive(Clone, Debug)]
 pub struct ExtensionRegistry(BTreeMap<ExtensionId, Extension>);
@@ -48,15 +53,22 @@ impl ExtensionRegistry {
         self.0.get(name)
     }
 
+    /// Returns `true` if the registry contains an extension with the given name.
+    pub fn contains(&self, name: &str) -> bool {
+        self.0.contains_key(name)
+    }
+
     /// Makes a new ExtensionRegistry, validating all the extensions in it
     pub fn try_new(
         value: impl IntoIterator<Item = Extension>,
-    ) -> Result<Self, (ExtensionId, SignatureError)> {
+    ) -> Result<Self, ExtensionRegistryError> {
         let mut exts = BTreeMap::new();
         for ext in value.into_iter() {
             let prev = exts.insert(ext.name.clone(), ext);
             if let Some(prev) = prev {
-                panic!("Multiple extensions with same name: {}", prev.name)
+                return Err(ExtensionRegistryError::AlreadyRegistered(
+                    prev.name().clone(),
+                ));
             };
         }
         // Note this potentially asks extensions to validate themselves against other extensions that
@@ -66,9 +78,37 @@ impl ExtensionRegistry {
         // cyclically dependent, so there is no perfect solution, and this is at least simple.
         let res = ExtensionRegistry(exts);
         for ext in res.0.values() {
-            ext.validate(&res).map_err(|e| (ext.name().clone(), e))?;
+            ext.validate(&res)
+                .map_err(|e| ExtensionRegistryError::InvalidSignature(ext.name().clone(), e))?;
         }
         Ok(res)
+    }
+
+    /// Registers a new extension to the registry.
+    ///
+    /// Returns a reference to the registered extension if successful.
+    pub fn register(&mut self, extension: Extension) -> Result<&Extension, ExtensionRegistryError> {
+        match self.0.entry(extension.name().clone()) {
+            btree_map::Entry::Occupied(_) => Err(ExtensionRegistryError::AlreadyRegistered(
+                extension.name().clone(),
+            )),
+            btree_map::Entry::Vacant(ve) => Ok(ve.insert(extension)),
+        }
+    }
+
+    /// Returns the number of extensions in the registry.
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Returns `true` if the registry contains no extensions.
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// Returns an iterator over the extensions in the registry.
+    pub fn iter(&self) -> impl Iterator<Item = (&ExtensionId, &Extension)> {
+        self.0.iter()
     }
 }
 
@@ -92,7 +132,7 @@ pub const EMPTY_REG: ExtensionRegistry = ExtensionRegistry(BTreeMap::new());
 pub enum SignatureError {
     /// Name mismatch
     #[error("Definition name ({0}) and instantiation name ({1}) do not match.")]
-    NameMismatch(SmolStr, SmolStr),
+    NameMismatch(TypeName, TypeName),
     /// Extension mismatch
     #[error("Definition extension ({0:?}) and instantiation extension ({1:?}) do not match.")]
     ExtensionMismatch(ExtensionId, ExtensionId),
@@ -107,7 +147,7 @@ pub enum SignatureError {
     ExtensionNotFound(ExtensionId),
     /// The Extension was found in the registry, but did not contain the Type(Def) referenced in the Signature
     #[error("Extension '{exn}' did not contain expected TypeDef '{typ}'")]
-    ExtensionTypeNotFound { exn: ExtensionId, typ: SmolStr },
+    ExtensionTypeNotFound { exn: ExtensionId, typ: TypeName },
     /// The bound recorded for a CustomType doesn't match what the TypeDef would compute
     #[error("Bound on CustomType ({actual}) did not match TypeDef ({expected})")]
     WrongBound {
@@ -136,8 +176,13 @@ pub enum SignatureError {
 
 /// Concrete instantiations of types and operations defined in extensions.
 trait CustomConcrete {
+    /// A generic identifier to the element.
+    ///
+    /// This may either refer to a [`TypeName`] or an [`OpName`].
     fn def_name(&self) -> &SmolStr;
+    /// The concrete type arguments for the instantiation.
     fn type_args(&self) -> &[TypeArg];
+    /// Extension required by the instantiation.
     fn parent_extension(&self) -> &ExtensionId;
 }
 
@@ -157,6 +202,7 @@ impl CustomConcrete for OpaqueOp {
 
 impl CustomConcrete for CustomType {
     fn def_name(&self) -> &SmolStr {
+        // Casts the `TypeName` to a generic string.
         self.name()
     }
 
@@ -227,7 +273,7 @@ pub struct Extension {
     /// for any possible [TypeArg].
     pub extension_reqs: ExtensionSet,
     /// Types defined by this extension.
-    types: HashMap<SmolStr, TypeDef>,
+    types: HashMap<TypeName, TypeDef>,
     /// Static values defined by this extension.
     values: HashMap<SmolStr, ExtensionValue>,
     /// Operation declarations with serializable definitions.
@@ -282,7 +328,7 @@ impl Extension {
     }
 
     /// Iterator over the types of this [`Extension`].
-    pub fn types(&self) -> impl Iterator<Item = (&SmolStr, &TypeDef)> {
+    pub fn types(&self) -> impl Iterator<Item = (&TypeName, &TypeDef)> {
         self.types.iter()
     }
 
@@ -298,8 +344,10 @@ impl Extension {
             typed_value,
         };
         match self.values.entry(extension_value.name.clone()) {
-            Entry::Occupied(_) => Err(ExtensionBuildError::OpDefExists(extension_value.name)),
-            Entry::Vacant(ve) => Ok(ve.insert(extension_value)),
+            hash_map::Entry::Occupied(_) => {
+                Err(ExtensionBuildError::OpDefExists(extension_value.name))
+            }
+            hash_map::Entry::Vacant(ve) => Ok(ve.insert(extension_value)),
         }
     }
 
@@ -331,8 +379,18 @@ impl PartialEq for Extension {
     }
 }
 
-/// An error that can occur in computing the signature of a node.
-/// TODO: decide on failure modes
+/// An error that can occur in defining an extension registry.
+#[derive(Debug, Clone, Error, PartialEq, Eq)]
+pub enum ExtensionRegistryError {
+    /// Extension already defined.
+    #[error("The registry already contains an extension with id {0}.")]
+    AlreadyRegistered(ExtensionId),
+    /// A registered extension has invalid signatures.
+    #[error("The extension {0} contains an invalid signature, {1}.")]
+    InvalidSignature(ExtensionId, #[source] SignatureError),
+}
+
+/// An error that can occur in building a new extension.
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
 pub enum ExtensionBuildError {
     /// Existing [`OpDef`]

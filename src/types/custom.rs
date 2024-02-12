@@ -1,11 +1,11 @@
 //! Opaque types, used to represent a user-defined [`Type`].
 //!
 //! [`Type`]: super::Type
-use smol_str::SmolStr;
 use std::fmt::{self, Display};
 
 use crate::extension::{ExtensionId, ExtensionRegistry, SignatureError, TypeDef};
 
+use super::TypeName;
 use super::{
     type_param::{TypeArg, TypeParam},
     Substitution, TypeBound,
@@ -19,7 +19,7 @@ pub struct CustomType {
     /// Same as the corresponding [`TypeDef`]
     ///
     /// [`TypeDef`]: crate::extension::TypeDef
-    id: SmolStr,
+    id: TypeName,
     /// Arguments that fit the [`TypeParam`]s declared by the typedef
     ///
     /// [`TypeParam`]: super::type_param::TypeParam
@@ -31,7 +31,7 @@ pub struct CustomType {
 impl CustomType {
     /// Creates a new opaque type.
     pub fn new(
-        id: impl Into<SmolStr>,
+        id: impl Into<TypeName>,
         args: impl Into<Vec<TypeArg>>,
         extension: ExtensionId,
         bound: TypeBound,
@@ -45,7 +45,7 @@ impl CustomType {
     }
 
     /// Creates a new opaque type (constant version, no type arguments)
-    pub const fn new_simple(id: SmolStr, extension: ExtensionId, bound: TypeBound) -> Self {
+    pub const fn new_simple(id: TypeName, extension: ExtensionId, bound: TypeBound) -> Self {
         Self {
             id,
             args: vec![],
@@ -107,7 +107,7 @@ impl CustomType {
     }
 
     /// unique name of the type.
-    pub fn name(&self) -> &SmolStr {
+    pub fn name(&self) -> &TypeName {
         &self.id
     }
 
