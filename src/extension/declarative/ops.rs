@@ -87,12 +87,12 @@ impl OperationDeclaration {
 
         let signature_func: SignatureFunc = signature.make_signature(ext, ctx, &params)?;
 
-        let op_def = ext.add_op_with_misc(
-            self.name.clone(),
-            self.description.clone(),
-            signature_func,
-            self.misc.clone(),
-        )?;
+        let op_def = ext.add_op(self.name.clone(), self.description.clone(), signature_func)?;
+
+        for (k, v) in &self.misc {
+            op_def.add_misc(k, v.clone());
+        }
+
         Ok(op_def)
     }
 }

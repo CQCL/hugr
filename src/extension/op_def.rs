@@ -446,28 +446,12 @@ impl Extension {
         description: String,
         signature_func: impl Into<SignatureFunc>,
     ) -> Result<&mut OpDef, ExtensionBuildError> {
-        self.add_op_with_misc(name, description, signature_func, Default::default())
-    }
-
-    /// Add an operation definition to the extension. Must be a type scheme
-    /// (defined by a [`PolyFuncType`]), a type scheme along with binary
-    /// validation for type arguments ([`CustomValidator`]), or a custom binary
-    /// function for computing the signature given type arguments (`impl [CustomSignatureFunc]`).
-    ///
-    /// Includes a `misc` field for additional data that can be associated with the operation.
-    pub fn add_op_with_misc(
-        &mut self,
-        name: SmolStr,
-        description: String,
-        signature_func: impl Into<SignatureFunc>,
-        misc: HashMap<String, serde_yaml::Value>,
-    ) -> Result<&mut OpDef, ExtensionBuildError> {
         let op = OpDef {
             extension: self.name.clone(),
             name,
             description,
             signature_func: signature_func.into(),
-            misc,
+            misc: Default::default(),
             lower_funcs: Default::default(),
             constant_folder: Default::default(),
         };
