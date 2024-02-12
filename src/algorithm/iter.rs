@@ -55,7 +55,7 @@ impl<X> VisitOrder<X> {
 /// from the first child(as returned by hugr.children()).
 pub fn children(hugr: &impl HugrView, root: Node) -> impl '_ + Iterator<Item = VisitOrder<Node>> {
     let region = SiblingGraph::try_new(hugr, root).expect("Failed to create SiblingGraph");
-    let walker = if OpTag::DataflowChild.is_superset(hugr.get_optype(root).tag()) {
+    let walker = if OpTag::DataflowParent.is_superset(hugr.get_optype(root).tag()) {
         // These nodes never have cycles, so a Topo will give all nodes in topological order
         SiblingWalker::Dataflow(Topo::new(region.as_petgraph()))
     } else {
