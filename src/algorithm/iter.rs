@@ -209,14 +209,11 @@ mod test {
     #[test]
     fn out_of_order() -> Result<(), Box<dyn Error>> {
         use crate::ops::handle::NodeHandle;
-        let sig = crate::types::PolyFuncType::new(
-            [],
-            FunctionType::new(type_row![USIZE_T], type_row![USIZE_T]),
-        );
-        let mut fun_builder = FunctionBuilder::new("f3", sig.clone())?;
+        let sig = FunctionType::new_endo(type_row![USIZE_T]);
+        let mut fun_builder = FunctionBuilder::new("f3", sig.clone().into())?;
         let [i] = fun_builder.input_wires_arr();
         let noop = fun_builder.add_dataflow_op(ops::LeafOp::Noop { ty: USIZE_T }, [i])?;
-        let dfg_builder = fun_builder.dfg_builder(sig.body().clone(), None, [noop.out_wire(0)])?;
+        let dfg_builder = fun_builder.dfg_builder(sig.clone(), None, [noop.out_wire(0)])?;
         let [i1] = dfg_builder.input_wires_arr();
         let dfg = dfg_builder.finish_with_outputs([i1])?;
         let mut h = fun_builder.finish_prelude_hugr_with_outputs([dfg.out_wire(0)])?;
