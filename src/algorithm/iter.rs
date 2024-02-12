@@ -112,7 +112,7 @@ impl<'a> RecurseIterator<'a> {
 /// nodes, after any children of that node.  Nodes will be visited before any of
 /// their `out_neighbours` when their [SiblingGraph] is acyclic. Otherwise
 /// they will be visited in a Dfs order starting from the first child of the
-/// parent(as returned by hugr.children()).
+/// parent (as returned by hugr.children()).
 pub fn recursive_children(
     hugr: &impl HugrView,
     root: Node,
