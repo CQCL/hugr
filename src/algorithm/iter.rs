@@ -52,7 +52,7 @@ impl<X> VisitOrder<X> {
 /// `VisitOrder::PostOrder(root)` will be the last.  No other [VisitOrder::PreOrder] nodes will be
 /// present.  Children will be visited before any of their out_neighbours when
 /// the graph is acyclic. Otherwise they will be visited in a Dfs order starting
-/// from the first child(as returned by hugr.children()).
+/// from the first child (as returned by hugr.children()).
 pub fn children(hugr: &impl HugrView, root: Node) -> impl '_ + Iterator<Item = VisitOrder<Node>> {
     let region = SiblingGraph::try_new(hugr, root).expect("Failed to create SiblingGraph");
     let walker = if OpTag::DataflowParent.is_superset(hugr.get_optype(root).tag()) {
