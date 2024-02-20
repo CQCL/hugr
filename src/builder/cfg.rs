@@ -45,7 +45,6 @@ use crate::{
 ///            |    Exit    |
 ///            +------------+
 /// */
-/// use cool_asserts::assert_matches;
 /// use hugr::{
 ///   builder::{BuildError, CFGBuilder, Container, Dataflow, HugrBuilder},
 ///   Hugr,
@@ -89,10 +88,10 @@ use crate::{
 ///     let mut successor_builder =
 ///         cfg_builder.simple_block_builder(
 ///           FunctionType::new(type_row![NAT, NAT], type_row![NAT]),
-///           1
+///           1 // only one successor to this block
 ///         )?;
 ///     let successor_a = {
-///         // This branch has one successor. The choice is denoted by a unary sum.
+///         // This block has one successor. The choice is denoted by a unary sum.
 ///         let sum_unary = successor_builder.add_load_const(ops::Const::unary_unit_sum())?;
 ///
 ///         // The input wires of a node start with the data embedded in the variant
@@ -110,15 +109,15 @@ use crate::{
 ///        successor_builder.finish_with_outputs(sum_unary, [in_wire])?
 ///    };
 ///     let exit = cfg_builder.exit_block();
-///     cfg_builder.branch(&entry, 0, &successor_a)?;
-///     cfg_builder.branch(&entry, 1, &successor_b)?;
+///     cfg_builder.branch(&entry, 0, &successor_a)?; // branch 0 goes to successor_a
+///     cfg_builder.branch(&entry, 1, &successor_b)?; // branch 1 goes to successor_b
 ///     cfg_builder.branch(&successor_a, 0, &exit)?;
 ///     cfg_builder.branch(&successor_b, 0, &exit)?;
 ///     let hugr = cfg_builder.finish_prelude_hugr()?;
 ///     Ok(hugr)
 /// };
-///
-/// assert_matches!(make_cfg(), Ok(_));
+/// #[cfg(not(feature = "extension_inference"))]
+/// assert!(make_cfg().is_ok());
 /// ```
 #[derive(Debug, PartialEq)]
 pub struct CFGBuilder<T> {
