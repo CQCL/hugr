@@ -4,8 +4,6 @@
 
 ### Documentation
 
-- Fix crates.io badge in README ([#809](https://github.com/CQCL/hugr/pull/809))
-- Use absolute links in the README ([#811](https://github.com/CQCL/hugr/pull/811))
 - Remove input->const order edges from spec diagrams ([#812](https://github.com/CQCL/hugr/pull/812))
 - Remove incorrect indentation in spec ([#813](https://github.com/CQCL/hugr/pull/813))
 - Tweaks to main example ([#825](https://github.com/CQCL/hugr/pull/825))
