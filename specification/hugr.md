@@ -24,53 +24,53 @@ represent (typed) data or control dependencies.
 
 ### Goals
 
-  - Modular design, allowing new operations, data types, and rewrite
-    methods defined by third-parties.
-  - Represent mixed quantum-classical programs, allowing for efficient
-    lowering through bespoke compilation to dedicated targets.
-  - Efficiently serializable. Different tools should be able to send and
-    receive HUGRs via a serialized interface when sharing the in-memory
-    structure is not possible.
-  - Provide a common interface for rewrite operations with support for
-    opaque types.
+- Modular design, allowing new operations, data types, and rewrite
+  methods defined by third-parties.
+- Represent mixed quantum-classical programs, allowing for efficient
+  lowering through bespoke compilation to dedicated targets.
+- Efficiently serializable. Different tools should be able to send and
+  receive HUGRs via a serialized interface when sharing the in-memory
+  structure is not possible.
+- Provide a common interface for rewrite operations with support for
+  opaque types.
 
 ### Non-goals
 
-  - Translations to other representations. While the HUGR should be able
-    to encode programs in languages such as QIR, the translation should
-    be implemented by separate crates.
-  - Execution, or any kind of interpretation of the program. The HUGR
-    describes the graph representation and control flow, without fixing
-    the semantics of any extension operations defined outside the core
-    set in this document, which will be most in actual use.
+- Translations to other representations. While the HUGR should be able
+  to encode programs in languages such as QIR, the translation should
+  be implemented by separately.
+- Execution, or any kind of interpretation of the program. The HUGR
+  describes the graph representation and control flow, without fixing
+  the semantics of any extension operations defined outside the core
+  set in this document, which will be most in actual use.
 
 ### Main requirements
 
-  - A directed graph structure with extensible operation types in the
-    nodes and data types in the edges.
-  - Indexed connection ports for each operation node, which may be
-    connected to another port with the same data type or remain
-    unconnected.
-  - Control-flow support with ability to capture both LLVM SSACFG style
-    programs and programs from future front-ends designed to target
-    HUGR. These including the upcoming Python eDSL for quantum-classical
-    programming, and BRAT (which already uses an internal graph-like
-    representation for classical functional programs and quantum
-    kernels). We expect that these front-ends will provide
-    programmer-facing control flow constructs that map to the preferred
-    constructs in HUGR without first having to pass through an
-    LLVM/SSACFG intermediate.
-  - Support for nested structures. The nodes form a tree-like hierarchy
-    with nested graphs encoded as children of their containing node.
-  - User-defined metadata, such as debug information, can be efficiently
-    attached to nodes and queried.
-  - All user-provided information can be encoded and decoded in a stable
-    (versioned) efficient serialized format.
-  - A type system for checking valid operation connectivity + (nice to
-    have) only operations supported on specific targets are used.
-  - A space efficient and user friendly specification of a subgraph and
-    replacement graph, along with an efficient routine for performing
-    the replacement.
+- A directed graph structure with extensible operation types in the
+  nodes and data types in the edges.
+- Indexed connection ports for each operation node, which may be
+  connected to another port with the same data type or remain
+  unconnected.
+- Control-flow support with ability to capture both LLVM SSACFG style
+  programs and programs from future front-ends designed to target
+  HUGR. These including the upcoming Python eDSL for quantum-classical
+  programming, and BRAT (which already uses an internal graph-like
+  representation for classical functional programs and quantum
+  kernels). We expect that these front-ends will provide
+  programmer-facing control flow constructs that map to the preferred
+  constructs in HUGR without first having to pass through an
+  LLVM/SSACFG intermediate.
+- Support for nested structures. The nodes form a tree-like hierarchy
+  with nested graphs encoded as children of their containing node.
+- User-defined metadata, such as debug information, can be efficiently
+  attached to nodes and queried.
+- All user-provided information can be encoded and decoded in a stable
+  (versioned) efficient serialized format.
+- A type system for checking valid operation connectivity + (nice to
+  have) only operations supported on specific targets are used.
+- A space efficient and user friendly specification of a subgraph and
+  replacement graph, along with an efficient routine for performing
+  the replacement.
 
 ## Functional description
 
@@ -88,7 +88,8 @@ Each node is defined by its **operation**; the possible operations are
 outlined in [Node Operations](#node-operations)
 but may be [extended by Extensions](#extension-system).
 
-**Simple HUGR example**
+### Simple HUGR example
+
 ```mermaid
 graph  LR
     Input -->|0:0| H
@@ -97,6 +98,7 @@ graph  LR
     CNOT -->|0:0| Output
     CNOT -->|1:1| Output
 ```
+
 In the example above, a 2-qubit circuit is described as a dataflow
 region of a HUGR with one `H` operation and one `CNOT` operation. The
 operations have an incoming and outgoing list of ports, with each
@@ -118,7 +120,7 @@ carry an edge weight:
 
 - `Order` edges are plain directed edges, and express requirements on the
   ordering. They have no edge weight.
-- `Value` edges carry typed data at runtime. They have a _port_ at each end, associated
+- `Value` edges carry typed data at runtime. They have a *port* at each end, associated
   with the source and target nodes. They have an `AnyType`as an edge weight.
 - `Static` edges are similar to `Value` edges but carry static data (knowable at
   compilation time). They have a `CopyableType` as an edge weight.
@@ -127,7 +129,7 @@ carry an edge weight:
 - `Hierarchy` edges express the relationship between container nodes and their
   children. They have no edge weight.
 
-`Value` and `Static` edges are sometimes referred to as _dataflow_ edges.
+`Value` and `Static` edges are sometimes referred to as *dataflow* edges.
 A `Value` edge can carry data of any `AnyType`: these include the `CopyableType`s
 (which can be freely copied or discarded - i.e. ordinary classical data)
 as well as anything which cannot - e.g. quantum data.
@@ -138,7 +140,7 @@ As well as the type, dataflow edges are also parametrized by a
 `Locality`, which declares whether the edge crosses levels in the hierarchy. See
 [Edge Locality](#edge-locality) for details.
 
-```
+```ebnf
 AnyType ⊃ CopyableType
 
 EdgeKind ::= Hierarchy | Value(Locality, AnyType) | Static(Local | Ext, CopyableType) | Order | ControlFlow
@@ -150,14 +152,14 @@ with a port have the same type; thus a port has a well-defined type, matching th
 of its adjoining edges. The incoming and outgoing ports of a node are (separately) ordered.
 
 The sequences of incoming and outgoing port types (carried on `Value` edges) of a node constitute its
-_signature_.
+*signature*.
 
 Note that the locality is not fixed or even specified by the signature.
 
 A source port with a `CopyableType` may have any number of edges associated with
 it (including zero, which means "discard"). Any other port
 must have exactly one edge associated with it. This captures the property of
-linear types that the value is used exactly once. See [Linearity](#linearity).
+linear types that the value is used exactly once.
 
 The `Hierarchy` and `ControlFlow` edges from a node
 are ordered (the children of a container node have a linear ordering, as do the
@@ -174,7 +176,7 @@ with a unique root node. The HUGR is characterized by the type of its root node.
 The root node has no non-hierarchy edges (and this supercedes any other requirements on the
 edges of specific node types).
 
-A _sibling graph_ is a subgraph of the HUGR containing all nodes with
+A *sibling graph* is a subgraph of the HUGR containing all nodes with
 a particular parent, plus any `Order`, `Value` `Static`, and `ControlFlow` edges between
 them.
 
@@ -211,7 +213,7 @@ always local, i.e. source and target have the same parent.
 
 Here we define some core types of operation required to represent
 full programs, including dataflow operations (in
-[functions](#functions)).
+[functions](#dataflow)).
 
 #### Module
 
@@ -224,16 +226,16 @@ operations have value ports, but some have Static or other
 edges. The following operations are *only* valid as immediate children of a
 `Module` node.
 
-  - `FuncDecl`: an external function declaration. The name of the function,
-    a list of type parameters (TypeParams, see [Type System](#type-system))
-    and function attributes (relevant for compilation)
-    define the node weight. The node has an outgoing `Static<Function>`
-    edge for each use of the function. The function name is used at link time to
-    look up definitions in linked
-    modules (other hugr instances specified to the linker).
-  - `AliasDecl`: an external type alias declaration. At link time this can be
-    replaced with the definition. An alias declared with `AliasDecl` is equivalent to a
-    named opaque type.
+- `FuncDecl`: an external function declaration. The name of the function,
+  a list of type parameters (TypeParams, see [Type System](#type-system))
+  and function attributes (relevant for compilation)
+  define the node weight. The node has an outgoing `Static<Function>`
+  edge for each use of the function. The function name is used at link time to
+  look up definitions in linked
+  modules (other hugr instances specified to the linker).
+- `AliasDecl`: an external type alias declaration. At link time this can be
+  replaced with the definition. An alias declared with `AliasDecl` is equivalent to a
+  named opaque type.
 
 There may also be other [scoped definitions](#scoped-definitions).
 
@@ -242,13 +244,13 @@ There may also be other [scoped definitions](#scoped-definitions).
 The following operations are valid at the module level as well as in dataflow
 regions and control-flow regions:
 
-  - `Const<T>` : a static constant value of type T stored in the node
-    weight. Like `FuncDecl` and `FuncDefn` this has one `Static<T>` out-edge per use.
-  - `FuncDefn` : a function definition. Like `FuncDecl` but with a function body.
-    The function body is defined by the sibling graph formed by its children.
-    At link time `FuncDecl` nodes are replaced by `FuncDefn`.
-  - `AliasDefn`: type alias definition. At link time `AliasDecl` can be replaced with
-    `AliasDefn`.
+- `Const<T>` : a static constant value of type T stored in the node
+  weight. Like `FuncDecl` and `FuncDefn` this has one `Static<T>` out-edge per use.
+- `FuncDefn` : a function definition. Like `FuncDecl` but with a function body.
+  The function body is defined by the sibling graph formed by its children.
+  At link time `FuncDecl` nodes are replaced by `FuncDefn`.
+- `AliasDefn`: type alias definition. At link time `AliasDecl` can be replaced with
+  `AliasDefn`.
 
 A **loadable HUGR** is a module HUGR where all input ports are connected and there are
 no `FuncDecl/AliasDecl` nodes.
@@ -264,29 +266,29 @@ Within dataflow regions, which include function definitions,
 the following basic dataflow operations are available (in addition to the
 [scoped definitions](#scoped-definitions)):
 
-  - `Input/Output`: input/output nodes, the outputs of `Input` node are
-    the inputs to the function, and the inputs to `Output` are the
-    outputs of the function.
-  - `Call`: Call a statically defined function. There is an incoming
-    `Static<Function>` edge to specify the graph being called. The `Call`
-    node specifies any type arguments to the function in the node weight,
-    and the signature of the node (defined by its incoming and outgoing `Value` edges)
-    matches the (type-instantiated) function being called.
-  - `TypeApply`: has a `Value<Function>` input, whose type is polymorphic (i.e. declares some type parameters);
-    the node specifies some number of type arguments (matching those parameters) in the node weight;
-    and there is  a `Value<Function>` output (corresponding to the type instantiation of the input
-    - for a *partial* type application, i.e. with fewer arguments than declared type parameters,
-    the output type will also be polymorphic).
-  - `LoadConstant<T>`: has an incoming `Static<T>` edge, where `T` is a `CopyableType`, and a
-    `Value<T>` output, used to load a static constant into the local
-    dataflow graph.
-  - `identity<T>`: pass-through, no operation is performed.
-  - `DFG`: A nested dataflow graph.
-    These nodes are parents in the hierarchy.
-    The signature of the operation comprises the output signature of the child
-    Input node (as input) and the input signature of the child Output node (as
-    output).
-  - `OpaqueOp`: an operation defined by an [Extension](#extension-system).
+- `Input/Output`: input/output nodes, the outputs of `Input` node are
+  the inputs to the function, and the inputs to `Output` are the
+  outputs of the function.
+- `Call`: Call a statically defined function. There is an incoming
+  `Static<Function>` edge to specify the graph being called. The `Call`
+  node specifies any type arguments to the function in the node weight,
+  and the signature of the node (defined by its incoming and outgoing `Value` edges)
+  matches the (type-instantiated) function being called.
+- `TypeApply`: has a `Value<Function>` input, whose type is polymorphic (i.e. declares some type parameters);
+  the node specifies some number of type arguments (matching those parameters) in the node weight;
+  and there is  a `Value<Function>` output (corresponding to the type instantiation of the input
+  - for a *partial* type application, i.e. with fewer arguments than declared type parameters,
+  the output type will also be polymorphic).
+- `LoadConstant<T>`: has an incoming `Static<T>` edge, where `T` is a `CopyableType`, and a
+  `Value<T>` output, used to load a static constant into the local
+  dataflow graph.
+- `identity<T>`: pass-through, no operation is performed.
+- `DFG`: A nested dataflow graph.
+  These nodes are parents in the hierarchy.
+  The signature of the operation comprises the output signature of the child
+  Input node (as input) and the input signature of the child Output node (as
+  output).
+- `OpaqueOp`: an operation defined by an [Extension](#extension-system).
 
 The example below shows two DFGs, one nested within the other. Each has an Input
 and an Output node, whose outputs and inputs respectively match the inputs and
@@ -370,11 +372,12 @@ inside the `TupleSum` unpacked).
 
 Evaluation of the node begins by feeding the node inputs into the child graph
 and evaluating it.  The `TupleSum` produced controls iteration of the loop:
-   * The first variant (`#I`) means that these values, along with the other
-     sibling-graph outputs `#X`, are fed back into the top of the loop,
-     and the body is evaluated again (thus perhaps many times)
-   * The second variant (`#O`) means that evaluation of the `TailLoop` node
-     terminates, returning all the values produced as a row of outputs `#O:#X`.
+
+- The first variant (`#I`) means that these values, along with the other
+ sibling-graph outputs `#X`, are fed back into the top of the loop,
+ and the body is evaluated again (thus perhaps many times)
+- The second variant (`#O`) means that evaluation of the `TailLoop` node
+ terminates, returning all the values produced as a row of outputs `#O:#X`.
 
 ##### Control Flow Graphs
 
@@ -403,11 +406,11 @@ inputs of successor `i`.
 
 Some normalizations are possible:
 
-  - If the entry node has no predecessors (i.e. is not a loop header),
-    then its contents can be moved outside the CFG node into a containing
-    graph.
-  - If the entry node has only one successor and that successor is the
-    exit node, the CFG node itself can be removed.
+- If the entry node has no predecessors (i.e. is not a loop header),
+  then its contents can be moved outside the CFG node into a containing
+  graph.
+- If the entry node has only one successor and that successor is the
+  exit node, the CFG node itself can be removed.
 
 The CFG in the example below has three inputs: one (call it `v`) of type "P"
 (not specified, but with a conversion to boolean represented by the nodes labelled "P?1" and "P?2"), one of
@@ -526,45 +529,45 @@ The common parent may be a `FuncDefn`, `TailLoop`, `DFG`, `Case` or `DFB` node.
 | Value          | Local, Ext or Dom - see [Edge Locality](#edge-locality) |
 | Static         | Local or Ext - see [Edge Locality](#edge-locality) |
 
-
 ### Edge Locality
+
 There are three possible `CopyableType` edge localities:
 
-  - `Local`: Source and target nodes must have the same parent.
-  - `Ext`: Edges "in" from a dataflow ancestor.
-  - `Dom`: Edges from a dominating basic block in a control-flow graph.
-
+- `Local`: Source and target nodes must have the same parent.
+- `Ext`: Edges "in" from a dataflow ancestor.
+- `Dom`: Edges from a dominating basic block in a control-flow graph.
 
 We allow non-local dataflow edges
 n<sub>1</sub>→n<sub>2</sub> where parent(n<sub>1</sub>) \!=
 parent(n<sub>2</sub>) when the edge's locality is:
-  * for Value edges, Ext or Dom;
-  * for Static edges, Ext.
+
+- for Value edges, Ext or Dom;
+- for Static edges, Ext.
 
 Each of these localities have additional constraints as follows:
 
-1.  For Ext edges, we require parent(n<sub>1</sub>) ==
-    parent<sup>i</sup>(n<sub>2</sub>) for some i\>1, *and* for Value edges only there must be a order edge from n<sub>1</sub> to
-    parent<sup>i-1</sup>(n<sub>2</sub>).
+1. For Ext edges, we require parent(n<sub>1</sub>) ==
+   parent<sup>i</sup>(n<sub>2</sub>) for some i\>1, *and* for Value edges only there must be a order edge from n<sub>1</sub> to
+   parent<sup>i-1</sup>(n<sub>2</sub>).
 
-    The order edge records the
-    ordering requirement that results, i.e. it must be possible to
-    execute the entire n<sub>1</sub> node before executing
-    parent<sup>i-1</sup>(n<sub>2</sub>). (Further recall that
-    order+value edges together must be acyclic). We record the
-    relationship between the Value edge and the
-    corresponding order edge via metadata on each edge.
+   The order edge records the
+   ordering requirement that results, i.e. it must be possible to
+   execute the entire n<sub>1</sub> node before executing
+   parent<sup>i-1</sup>(n<sub>2</sub>). (Further recall that
+   order+value edges together must be acyclic). We record the
+   relationship between the Value edge and the
+   corresponding order edge via metadata on each edge.
 
-    For Static edges this order edge is not required since the source is
-    guaranteed to causally precede the target.
+   For Static edges this order edge is not required since the source is
+   guaranteed to causally precede the target.
 
-2.  For Dom edges, we must have that parent<sup>2</sup>(n<sub>1</sub>)
-    == parent<sup>i</sup>(n<sub>2</sub>) is a CFG-node, for some i\>1,
-    **and** parent(n<sub>1</sub>) strictly dominates
-    parent<sup>i-1</sup>(n<sub>2</sub>) in the CFG (strictly as in
-    parent(n<sub>1</sub>) \!= parent<sup>i-1</sup>(n<sub>2</sub>). (The
-    i\>1 allows the node to target an arbitrarily-deep descendant of the
-    dominated block, similar to an Ext edge.)
+2. For Dom edges, we must have that parent<sup>2</sup>(n<sub>1</sub>)
+   == parent<sup>i</sup>(n<sub>2</sub>) is a CFG-node, for some i\>1,
+   **and** parent(n<sub>1</sub>) strictly dominates
+   parent<sup>i-1</sup>(n<sub>2</sub>) in the CFG (strictly as in
+   parent(n<sub>1</sub>) \!= parent<sup>i-1</sup>(n<sub>2</sub>). (The
+   i\>1 allows the node to target an arbitrarily-deep descendant of the
+   dominated block, similar to an Ext edge.)
 
 Specifically, these rules allow for edges where in a given execution of
 the HUGR the source of the edge executes once, but the target may
@@ -624,11 +627,11 @@ done for only a subpart of the HUGR at a time.
 
 The following CFG is equivalent to the previous example. In this diagram:
 
-* the thick arrow from "angle source" to "F" is an `Ext` edge (from an
+- the thick arrow from "angle source" to "F" is an `Ext` edge (from an
   ancestral DFG into the CFG's entry block);
-* the thick arrow from "F" to "G" is a `Dom` edge (from a dominating basic
+- the thick arrow from "F" to "G" is a `Dom` edge (from a dominating basic
   block);
-* the `Rz` operation has been moved outside the CFG into the surrounding DFG, so
+- the `Rz` operation has been moved outside the CFG into the surrounding DFG, so
   the qubit does not need to be passed in to the CFG.
 
 As a further normalization it would be possible to move F out of the CFG.
@@ -689,29 +692,28 @@ flowchart
 
 #### Panic
 
-  - Any operation may panic, e.g. integer divide when denominator is
-    zero
-  - Panicking aborts the current graph, and recursively the container
-    node also panics, etc.
-  - Nodes that are independent of the panicking node may have executed
-    or not, at the discretion of the runtime/compiler.
-  - If there are multiple nodes that may panic where neither has
-    dependences on the other (including Order edges), it is at the
-    discretion of the compiler as to which one panics first
+- Any operation may panic, e.g. integer divide when denominator is
+  zero
+- Panicking aborts the current graph, and recursively the container
+  node also panics, etc.
+- Nodes that are independent of the panicking node may have executed
+  or not, at the discretion of the runtime/compiler.
+- If there are multiple nodes that may panic where neither has
+  dependences on the other (including Order edges), it is at the
+  discretion of the compiler as to which one panics first
 
 #### `ErrorType`
 
-  - A type which operations can use to indicate an error occurred.
+- A type which operations can use to indicate an error occurred.
 
 #### Catch
 
-  - At some point we expect to add a first-order `catch` node, somewhat
-    like a DFG-node. This contains a DSG, and (like a DFG node) has
-    inputs matching the child DSG; but one output, of type
-    `Sum(Tuple(#O),ErrorType)` where O is the outputs of the child DSG.
-  - It is also possible to define a higher-order `catch` operation in an
-    extension, taking a graph argument.
-
+- At some point we expect to add a first-order `catch` node, somewhat
+  like a DFG-node. This contains a DSG, and (like a DFG node) has
+  inputs matching the child DSG; but one output, of type
+  `Sum(Tuple(#O),ErrorType)` where O is the outputs of the child DSG.
+- It is also possible to define a higher-order `catch` operation in an
+  extension, taking a graph argument.
 
 ### Extensible metadata
 
@@ -725,16 +727,16 @@ The metadata could either be built into the hugr itself (metadata as
 node weights) or separated from it (keep a separate map from node ID to
 metadata). The advantages of the first approach are:
 
-  - just one object to have around, not two;
-  - reassignment of node IDs doesn't mess with metadata.
+- just one object to have around, not two;
+- reassignment of node IDs doesn't mess with metadata.
 
 The advantages of the second approach are:
 
-  - Metadata should make no difference to the semantics of the hugr (by
-    definition, otherwise it isn't metadata but data), so it makes sense
-    to be separated from the core structure.
-  - We can be more agile with the details, such as formatting and
-    versioning.
+- Metadata should make no difference to the semantics of the hugr (by
+  definition, otherwise it isn't metadata but data), so it makes sense
+  to be separated from the core structure.
+- We can be more agile with the details, such as formatting and
+  versioning.
 
 The problem of reassignment can be solved by having an API function that
 operates on both together atomically. We will therefore tentatively
@@ -769,17 +771,18 @@ indices after the list of node indices?
 ## Type System
 
 There are three classes of type: ``AnyType`` $\supset$ ``CopyableType`` $\supset$ ``EqType``. Types in these classes are distinguished by the operations possible on (runtime) values of those types:
-  - For the broadest class (``AnyType``), the only operation supported is the identity operation (aka no-op, or `lift` - see [Extension Tracking](#extension-tracking) below). Specifically, we do not require it to be possible to copy or discard all values, hence the requirement that outports of linear type must have exactly one edge. (That is, a type not known to be in the copyable subset). All incoming ports must have exactly one edge.
 
-    In fully qubit-counted contexts programs take in a number of qubits as input and return the same number, with no discarding. See [quantum extension](#quantum-extension) for more.
+- For the broadest class (``AnyType``), the only operation supported is the identity operation (aka no-op, or `lift` - see [Extension Tracking](#extension-tracking) below). Specifically, we do not require it to be possible to copy or discard all values, hence the requirement that outports of linear type must have exactly one edge. (That is, a type not known to be in the copyable subset). All incoming ports must have exactly one edge.
 
-  - The next class is ``CopyableType``, i.e. types holding ordinary classical
-    data, where values can be copied (and discarded, the 0-ary copy). This
-    allows multiple (or 0) outgoing edges from an outport; also these types can
-    be sent down Static edges. Note: dataflow inputs (Value and Static) always
-    require a single connection.
+    In fully qubit-counted contexts programs take in a number of qubits as input and return the same number, with no discarding.
 
-  - The final class is ``EqType``: these are copyable types with a well-defined
+- The next class is ``CopyableType``, i.e. types holding ordinary classical
+  data, where values can be copied (and discarded, the 0-ary copy). This
+  allows multiple (or 0) outgoing edges from an outport; also these types can
+  be sent down Static edges. Note: dataflow inputs (Value and Static) always
+  require a single connection.
+
+- The final class is ``EqType``: these are copyable types with a well-defined
   notion of equality between values. (While *some* notion of equality is defined on
   any type with a binary representation, that if the bits are equal then the value is, the converse is not necessarily true - values that are indistinguishable can have different bit representations.)
 
@@ -794,12 +797,13 @@ The Hugr defines a number of type constructors, that can be instantiated into ty
 Extensions ::= (Extension)* -- a set, not a list
 
 Type ::= Tuple(#) -- fixed-arity, heterogeneous components
-       | Sum(#)   -- disjoint union of other types, ??tagged by unsigned int??
+       | Sum(#)   -- disjoint union of other types, tagged by unsigned int
        | Opaque(Name, [TypeArg]) -- a (instantiation of a) custom type defined by an extension
        | Function(TypeParams, #, #, Extensions) -- polymorphic with type parameters,
                                                 -- function arguments + results, and delta (see below)
        | Variable -- refers to a TypeParam bound by the nearest enclosing FuncDefn node, or an enclosing Function Type
 ```
+
 (We write `[Foo]` to indicate a list of Foo's.)
 
 The majority of types will be Opaque ones defined by extensions including the [standard library](#standard-library). However a number of types can be constructed using only the core type constructors: for example the empty tuple type, aka `unit`, with exactly one instance (so 0 bits of data); the empty sum, with no instances; the empty Function type (taking no arguments and producing no results - `void -> void`); and compositions thereof.
@@ -828,7 +832,7 @@ not necessarily, depending upon the TypeParam.)
 When a `FuncDefn` or `FuncDecl` with such a `Function` type is `Call`ed, the `Call` node statically provides
 TypeArgs appropriate for the TypeParams (and similarly for `TypeApply` nodes):
 
-```
+```haskell
 TypeArg ::= Type(Type)
           | BoundedUSize(u64)
           | Extensions(Extensions)
@@ -912,14 +916,14 @@ rewrites can be performed which remove the arithmetic.
 
 Simple circuits may look something like:
 
-```
+```haskell
 Function[Quantum](Array(5, Q), (ms: Array(5, Qubit), results: Array(5, Bit)))
 ```
 
 A circuit built using a higher-order extension to manage control flow
 could then look like:
 
-```
+```haskell
 Function[Quantum, HigherOrder](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit)))
 ```
 
@@ -927,7 +931,7 @@ So the compiler would need to perform some graph transformation pass to turn the
 graph-based control flow into a CFG node that a quantum computer could
 run, which removes the `HigherOrder` extension requirement.
 
-```
+```haskell
 precompute :: Function[](Function[Quantum,HigherOrder](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit))),
                                          Function[Quantum](Array(5, Qubit), (ms: Array(5, Qubit), results: Array(5, Bit))))
 ```
@@ -940,10 +944,10 @@ The goal here is to allow the use of operations and types in the
 representation that are user defined, or defined and used by extension
 tooling. These operations cover various flavours:
 
-  - Instruction sets specific to a target.
-  - Operations that are best expressed in some other format that can be
-    compiled in to a graph (e.g. ZX).
-  - Ephemeral operations used by specific compiler passes.
+- Instruction sets specific to a target.
+- Operations that are best expressed in some other format that can be
+  compiled in to a graph (e.g. ZX).
+- Ephemeral operations used by specific compiler passes.
 
 A nice-to-have for this extensibility is a human-friendly format for
 specifying such operations.
@@ -1156,7 +1160,6 @@ The optional `params` field can be used to specify the types of static+const arg
 ---for example the matrix needed to define an SU2 operation. If `params` are not specified
 then it is assumed empty.
 
-
 ## Replacement and Pattern Matching
 
 We wish to define an API method on the HUGR that allows replacement of a
@@ -1190,28 +1193,28 @@ leaf nodes.
 
 Given a set $X$ of nodes in a hugr $G$, let:
 
-  - $\textrm{inp}_G(X)$ be the set of input ports of nodes in $X$ whose source
-    is in $G \setminus X$;
-  - $\textrm{out}_G(X)$ be the set of input ports of nodes in $G \setminus X$
-    whose source is in $X$.
+- $\textrm{inp}_G(X)$ be the set of input ports of nodes in $X$ whose source
+  is in $G \setminus X$;
+- $\textrm{out}_G(X)$ be the set of input ports of nodes in $G \setminus X$
+  whose source is in $X$.
 
 Notation: given an input port $p$, let $p^-$ be its unique predecessor port.
 
 The method takes as input:
 
-  - the ID of a DFG node $P$ in $\Gamma$;
-  - a DFG-convex set $S$ of IDs of leaf nodes that are children of $P$ (not
-    including the Input and Output nodes), and that have no incoming or outgoing
-    Ext edges;
-  - a hugr $H$ whose root is a DFG node $R$ with only leaf nodes as children --
-    let $T$ be the set of children of $R$;
-  - a map $\nu\_\textrm{inp}: \textrm{inp}\_H(T \setminus \\{\texttt{Input}\\}) \to \textrm{inp}\_{\Gamma}(S)$; note that
-      * $\nu\_\textrm{inp}: \textrm{inp}\_H(T \setminus \\{\texttt{Input}\\})$ is just "the successors of $\texttt{Input}$", so could be expressed as outputs of the $\texttt{Input}$ node
-      * in order to produce a valid Hugr, all possible keys must be present; and all possible values must be present exactly once unless Copyable);
-  - a map $\nu_\textrm{out}: \textrm{out}_{\Gamma}(S) \to \textrm{out}_H(T \setminus \\{\texttt{Output}\\})$; again note that
-      * $\textrm{out}_H(T \setminus \\{\texttt{Output}\\})$ is just the input ports to the $\texttt{Output}$ node (their source must all be in $H$)
-      * in order to produce a valid hugr, all keys $\textrm{out}_{\Gamma}(S)$ must be present
-      * ...and each possible value must be either Copyable and/or present exactly once. Any that is absent could just be omitted from $H$....
+- the ID of a DFG node $P$ in $\Gamma$;
+- a DFG-convex set $S$ of IDs of leaf nodes that are children of $P$ (not
+  including the Input and Output nodes), and that have no incoming or outgoing
+  Ext edges;
+- a hugr $H$ whose root is a DFG node $R$ with only leaf nodes as children --
+  let $T$ be the set of children of $R$;
+- a map $\nu\_\textrm{inp}: \textrm{inp}\_H(T \setminus \\{\texttt{Input}\\}) \to \textrm{inp}\_{\Gamma}(S)$; note that
+  - $\nu\_\textrm{inp}: \textrm{inp}\_H(T \setminus \\{\texttt{Input}\\})$ is just "the successors of $\texttt{Input}$", so could be expressed as outputs of the $\texttt{Input}$ node
+  - in order to produce a valid Hugr, all possible keys must be present; and all possible values must be present exactly once unless Copyable);
+- a map $\nu_\textrm{out}: \textrm{out}_{\Gamma}(S) \to \textrm{out}_H(T \setminus \\{\texttt{Output}\\})$; again note that
+  - $\textrm{out}_H(T \setminus \\{\texttt{Output}\\})$ is just the input ports to the $\texttt{Output}$ node (their source must all be in $H$)
+  - in order to produce a valid hugr, all keys $\textrm{out}_{\Gamma}(S)$ must be present
+  - ...and each possible value must be either Copyable and/or present exactly once. Any that is absent could just be omitted from $H$....
 
 The new hugr is then derived as follows:
 
@@ -1236,13 +1239,13 @@ nodes is itself a HUGR with some "holes" (edges and nodes that get "filled in"
 by the `Replace` operation). To fully specify the operation, some further data
 are needed:
 
-  - The replacement may include container nodes with no children, which adopt
-    the children of removed container nodes and prevent those children being
-    removed.
-  - All new incoming edges from the retained nodes to the new nodes, all
-    outgoing edges from the new nodes to the retained nodes, and any new edges
-    that bypass the replacement (going between retained nodes) must be
-    specified.
+- The replacement may include container nodes with no children, which adopt
+  the children of removed container nodes and prevent those children being
+  removed.
+- All new incoming edges from the retained nodes to the new nodes, all
+  outgoing edges from the new nodes to the retained nodes, and any new edges
+  that bypass the replacement (going between retained nodes) must be
+  specified.
 
 Given a set $S$ of nodes in a hugr, let $S^\*$ be the set of all nodes
 descended from nodes in $S$ (i.e. reachable from $S$ by following hierarchy edges),
@@ -1251,72 +1254,76 @@ including $S$ itself.
 A `NewEdgeSpec` specifies an edge inserted between an existing node and a new node.
 It contains the following fields:
 
-  - `SrcNode`: the source node of the new edge.
-  - `TgtNode`: the target node of the new edge.
-  - `EdgeKind`: may be `Value`, `Order`, `Static` or `ControlFlow`.
-  - `SrcPos`: for `Value` and `Static` edges, the position of the source port;
-    for `ControlFlow` edges, the position among the outgoing edges.
-  - `TgtPos`: (for `Value` and `Static` edges only) the desired position among
-    the incoming ports to the new node.
+- `SrcNode`: the source node of the new edge.
+- `TgtNode`: the target node of the new edge.
+- `EdgeKind`: may be `Value`, `Order`, `Static` or `ControlFlow`.
+- `SrcPos`: for `Value` and `Static` edges, the position of the source port;
+  for `ControlFlow` edges, the position among the outgoing edges.
+- `TgtPos`: (for `Value` and `Static` edges only) the desired position among
+  the incoming ports to the new node.
 
 The `Replace` method takes as input:
-  - the ID of a container node $P$ in $\Gamma$;
-  - a set $S$ of IDs of nodes that are children of $P$
-  - a Hugr $G$ whose root is a node of the same type as $P$.
-    Note this Hugr need not be valid, in that it may be missing:
-      * edges to/from some ports (i.e. it may have unconnected ports)---not just Copyable dataflow outputs, which may occur even in valid Hugrs, but also incoming and/or non-Copyable dataflow ports, and ControlFlow ports,
-      * all children for some container nodes strictly beneath the root (i.e. it may have container nodes with no outgoing hierarchy edges)
-      * some children of the root, for container nodes that require particular children (e.g.
-        $\mathtt{Input}$ and/or $\mathtt{Output}$ if $P$ is a dataflow container, the exit node
-        of a CFG, the required number of children of a conditional)
-  - a map $B$ *from* container nodes in $G$ that have no children *to* container nodes in $S^\*$
-    none of which is an ancestor of another.
-    Let $X$ be the set of children of nodes in the image of $B$, and $R = S^\* \setminus X^\*$.
-  - a list $\mu\_\textrm{inp}$ of `NewEdgeSpec` which all have their `TgtNode`in
-    $G$ and `SrcNode` in $\Gamma \setminus R$;
-  - a list $\mu\_\textrm{out}$ of `NewEdgeSpec` which all have their `SrcNode`in
-    $G$ and `TgtNode` in $\Gamma \setminus R$, where `TgtNode` and `TgtPos` describe
-    an existing incoming edge of that kind from a node in $S^\*$.
-  - a list $\mu\_\textrm{new}$ of `NewEdgeSpec` which all have both `SrcNode` and `TgtNode`
-    in $\Gamma \setminus R$, where `TgtNode` and `TgtPos` describe an existing incoming
-    edge of that kind from a node in $S^\*$.
+
+- the ID of a container node $P$ in $\Gamma$;
+- a set $S$ of IDs of nodes that are children of $P$
+- a Hugr $G$ whose root is a node of the same type as $P$.
+  Note this Hugr need not be valid, in that it may be missing:
+  - edges to/from some ports (i.e. it may have unconnected ports)---not just Copyable dataflow outputs, which may occur even in valid Hugrs, but also incoming and/or non-Copyable dataflow ports, and ControlFlow ports,
+  - all children for some container nodes strictly beneath the root (i.e. it may have container nodes with no outgoing hierarchy edges)
+  - some children of the root, for container nodes that require particular children (e.g.
+    $\mathtt{Input}$ and/or $\mathtt{Output}$ if $P$ is a dataflow container, the exit node
+    of a CFG, the required number of children of a conditional)
+- a map $B$ *from* container nodes in $G$ that have no children *to* container nodes in $S^\*$
+  none of which is an ancestor of another.
+  Let $X$ be the set of children of nodes in the image of $B$, and $R = S^\* \setminus X^\*$.
+- a list $\mu\_\textrm{inp}$ of `NewEdgeSpec` which all have their `TgtNode`in
+  $G$ and `SrcNode` in $\Gamma \setminus R$;
+- a list $\mu\_\textrm{out}$ of `NewEdgeSpec` which all have their `SrcNode`in
+  $G$ and `TgtNode` in $\Gamma \setminus R$, where `TgtNode` and `TgtPos` describe
+  an existing incoming edge of that kind from a node in $S^\*$.
+- a list $\mu\_\textrm{new}$ of `NewEdgeSpec` which all have both `SrcNode` and `TgtNode`
+  in $\Gamma \setminus R$, where `TgtNode` and `TgtPos` describe an existing incoming
+  edge of that kind from a node in $S^\*$.
 
 Note that considering all three $\mu$ lists together,
-   - the `TgtNode` + `TgtPos`s of all `NewEdgeSpec`s with `EdgeKind` == `Value` will be unique
-   - and similarly for `EdgeKind` == `Static`
+
+- the `TgtNode` + `TgtPos`s of all `NewEdgeSpec`s with `EdgeKind` == `Value` will be unique
+- and similarly for `EdgeKind` == `Static`
 
 The well-formedness requirements of Hugr imply that $\mu\_\textrm{inp}$,
 $\mu\_\textrm{out}$ and $\mu\_\textrm{new}$ may only contain `NewEdgeSpec`s with
 certain `EdgeKind`s, depending on $P$:
-   - if $P$ is a dataflow container, `EdgeKind`s may be `Order`, `Value` or `Static` only (no `ControlFlow`)
-   - if $P$ is a CFG node, `EdgeKind`s may be `ControlFlow`, `Value`, or `Static` only (no `Order`)
-   - if $P$ is a Module node, there may be `Value` or `Static` only (no `Order`).
+
+- if $P$ is a dataflow container, `EdgeKind`s may be `Order`, `Value` or `Static` only (no `ControlFlow`)
+- if $P$ is a CFG node, `EdgeKind`s may be `ControlFlow`, `Value`, or `Static` only (no `Order`)
+- if $P$ is a Module node, there may be `Value` or `Static` only (no `Order`).
+
 (in the case of $P$ being a CFG or Module node, any `Value` edges will be nonlocal, like Static edges.)
 
 The new hugr is then derived as follows:
 
-1.  Make a copy in $\Gamma$ of all the nodes in $G$ *except the root*, and all edges except
-    hierarchy edges from the root.
-2.  For each $\sigma\_\mathrm{inp} \in \mu\_\textrm{inp}$, insert a new edge going into the new
-    copy of the `TgtNode` of $\sigma\_\mathrm{inp}$ according to the specification $\sigma\_\mathrm{inp}$.
-    Where these edges are from ports that currently have edges to nodes in $R$,
-    the existing edges are replaced.
-3.  For each $\sigma\_\mathrm{out} \in \mu\_\textrm{out}$, insert a new edge going out of the new
-    copy of the `SrcNode` of $\sigma\_\mathrm{out}$ according to the specification $\sigma\_\mathrm{out}$.
-    For Value or Static edges, the target port must have an existing edge whose source is in $R$;
-    this edge is removed.
-4.  For each $\sigma\_\mathrm{new} \in \mu\_\textrm{new}$, insert a new edge
-    between the existing `SrcNode` and `TgtNode` in $\Gamma$. For Value/Static edges,
-    the target port must have an existing edge whose source is in $R$; this edge is removed.
-5.  Let $N$ be the ordered list of the copies made in $\Gamma$ of the children of the root node of $G$.
-    For each child $C$ of $P$ (in order), if $C \in S$, redirect the hierarchy edge $P \rightarrow C$ to
-    target the next node in $N$. Stop if there are no more nodes in $N$.
-    Add any remaining nodes in $N$ to the end of $P$'s list of children.
-6.  For each node $(n, b = B(n))$ and for each child $m$ of $b$, replace the
-    hierarchy edge from $b$ to $m$ with a hierarchy edge from the new copy of
-    $n$ to $m$ (preserving the order).
-7.  Remove all nodes in $R$ and edges adjoining them. (Reindexing may be
-    necessary after this step.)
+1. Make a copy in $\Gamma$ of all the nodes in $G$ *except the root*, and all edges except
+   hierarchy edges from the root.
+2. For each $\sigma\_\mathrm{inp} \in \mu\_\textrm{inp}$, insert a new edge going into the new
+   copy of the `TgtNode` of $\sigma\_\mathrm{inp}$ according to the specification $\sigma\_\mathrm{inp}$.
+   Where these edges are from ports that currently have edges to nodes in $R$,
+   the existing edges are replaced.
+3. For each $\sigma\_\mathrm{out} \in \mu\_\textrm{out}$, insert a new edge going out of the new
+   copy of the `SrcNode` of $\sigma\_\mathrm{out}$ according to the specification $\sigma\_\mathrm{out}$.
+   For Value or Static edges, the target port must have an existing edge whose source is in $R$;
+   this edge is removed.
+4. For each $\sigma\_\mathrm{new} \in \mu\_\textrm{new}$, insert a new edge
+   between the existing `SrcNode` and `TgtNode` in $\Gamma$. For Value/Static edges,
+   the target port must have an existing edge whose source is in $R$; this edge is removed.
+5. Let $N$ be the ordered list of the copies made in $\Gamma$ of the children of the root node of $G$.
+   For each child $C$ of $P$ (in order), if $C \in S$, redirect the hierarchy edge $P \rightarrow C$ to
+   target the next node in $N$. Stop if there are no more nodes in $N$.
+   Add any remaining nodes in $N$ to the end of $P$'s list of children.
+6. For each node $(n, b = B(n))$ and for each child $m$ of $b$, replace the
+   hierarchy edge from $b$ to $m$ with a hierarchy edge from the new copy of
+   $n$ to $m$ (preserving the order).
+7. Remove all nodes in $R$ and edges adjoining them. (Reindexing may be
+   necessary after this step.)
 
 ##### Outlining methods
 
@@ -1330,18 +1337,20 @@ nodes as children.
 Replace a set of CFG sibling nodes with a single BasicBlock node having a
 CFG node child which has as its children the set of BasicBlock nodes
 originally specified. The set of basic blocks must satisfy constraints:
-* There must be at most one node in the set with incoming (controlflow) edges
+
+- There must be at most one node in the set with incoming (controlflow) edges
  from nodes outside the set. Specifically,
-   * *either* the set includes the CFG's entry node, and any edges from outside
-     the set (there may be none or more) target said entry node;
-   * *or* the set does not include the CFG's entry node, but contains exactly one
-     node which is the target of at least one edge(s) from outside the set.
-* The set may not include the Exit block.
-* There must be exactly one edge from a node in the set to a node outside it.
+  - *either* the set includes the CFG's entry node, and any edges from outside
+    the set (there may be none or more) target said entry node;
+  - *or* the set does not include the CFG's entry node, but contains exactly one
+    node which is the target of at least one edge(s) from outside the set.
+- The set may not include the Exit block.
+- There must be exactly one edge from a node in the set to a node outside it.
 
 Situations in which multiple nodes have edges leaving the set, or where the Exit block
 would be in the set, can be converted to this form by a combination of InsertIdentity
 operations and one Replace. For example, rather than moving the Exit block into the nested CFG:
+
 1. An Identity node with a single successor can be added onto each edge into the Exit
 2. If there is more than one edge into the Exit, these Identity nodes can then all be combined
    by a Replace operation changing them all for a single Identity (keeping the same number
@@ -1479,17 +1488,17 @@ attached to the replaced subgraph (except for rewired child nodes).
 
 Other policies could include:
 
-  - to each of the new nodes added, insert a piece of metadata in its
-    `History` section that captures all the chosen metadata with the
-    keys of the replaced nodes:
-      - ` History: {Replaced: [{node1: old_node1_metadata, node2:
-        old_node2_metadata, ...}, {...}, ...]}  `where `Replaced`
-        specifies an ordered list of replacements, and the new
-        replacement appends to the list (or creates a new list if
-        `Replaced` doesn't yet exist);
-  - to the root node of Γ, attach metadata capturing a serialization of the
-    replacement (both the set of nodes replaced and its replacement):
-      - `History: {Replacements: [...]}`
+- to each of the new nodes added, insert a piece of metadata in its
+ `History` section that captures all the chosen metadata with the
+ keys of the replaced nodes:
+  - `History: {Replaced: [{node1: old_node1_metadata, node2:
+    old_node2_metadata, ...}, {...}, ...]}` where `Replaced`
+    specifies an ordered list of replacements, and the new
+    replacement appends to the list (or creates a new list if
+    `Replaced` doesn't yet exist);
+- to the root node of Γ, attach metadata capturing a serialization of the
+ replacement (both the set of nodes replaced and its replacement):
+  - `History: {Replacements: [...]}`
 
 Further policies may be defined in the future; none of these polices
 (except for the default forgetful policy) form part of this
@@ -1518,16 +1527,16 @@ of the child-rewiring lists.
 
 ### Goals
 
-  - Fast serialization/deserialization in Rust.
-  - Ability to generate and consume from Python.
-  - Reasonably small sized files/payloads.
-  - Ability to send over wire. Myqos will need to do things like:
-      - Store the program in a database
-      - Search the program(?) (Increasingly
-        unlikely with larger more complicated programs)
-      - Validate the data
-      - **Most important:** version the data for compiler/runtime
-        compatibility
+- Fast serialization/deserialization in Rust.
+- Ability to generate and consume from Python.
+- Reasonably small sized files/payloads.
+- Ability to send over wire. Myqos will need to do things like:
+  - Store the program in a database
+  - Search the program(?) (Increasingly
+    unlikely with larger more complicated programs)
+  - Validate the data
+  - **Most important:** version the data for compiler/runtime
+    compatibility
 
 ### Non-goals
 
@@ -1620,6 +1629,7 @@ so must be supported by all third-party tooling.
 `error`: error type. See [`ErrorType`](#errortype).
 
 ### Operations
+
 | Name              | Inputs    | Outputs       | Meaning                                                         |
 |-------------------|-----------|---------------|-----------------------------------------------------------------|
 | `new_array<N, T>` | `T` x N   | `array<N, T>` | Create an array from all the inputs                             |
@@ -1670,10 +1680,10 @@ The `int<N>` type represents an arbitrary bit string of length `N`.
 Semantics are defined by the operations. There are three possible
 interpretations of a value:
 
-  - as a bit string $(a_{N-1}, a_{N-2}, \ldots, a_0)$ where
-    $a_i \in \\{0,1\\}$;
-  - as an unsigned integer $\sum_{i \lt N} 2^i a_i$;
-  - as a signed integer $\sum_{i \lt N-1} 2^i a_i - 2^{N-1} a_{N-1}$.
+- as a bit string $(a_{N-1}, a_{N-2}, \ldots, a_0)$ where
+  $a_i \in \\{0,1\\}$;
+- as an unsigned integer $\sum_{i \lt N} 2^i a_i$;
+- as a signed integer $\sum_{i \lt N-1} 2^i a_i - 2^{N-1} a_{N-1}$.
 
 An asterix ( \* ) in the tables below indicates that the definition
 either differs from or is not part of the
@@ -1744,12 +1754,10 @@ Other operations:
 | `irotl<N,M>`( \* )     | `int<N>`, `int<M>` | `int<N>`                           | rotate first input left by k bits where k is unsigned interpretation of second input (leftmost bits replace rightmost bits)                              |
 | `irotr<N,M>`( \* )     | `int<N>`, `int<M>` | `int<N>`                           | rotate first input right by k bits where k is unsigned interpretation of second input (rightmost bits replace leftmost bits)                             |
 
-
 #### `arithmetic.float.types`
 
 The `float64` type represents IEEE 754-2019 floating-point data of 64
 bits.
-
 
 #### `arithmetic.float`
 
@@ -1779,7 +1787,6 @@ except where stated.
 
 #### `arithmetic.conversions`
 
-
 Conversions between integers and floats:
 
 | Name           | Inputs    | Outputs                  | Meaning               |
@@ -1789,97 +1796,96 @@ Conversions between integers and floats:
 | `convert_u<N>` | `int<N>`  | `float64`                | unsigned int to float |
 | `convert_s<N>` | `int<N>`  | `float64`                | signed int to float   |
 
-
 ## Glossary
 
-  - **BasicBlock node**: A child of a CFG node (i.e. a basic block
-    within a control-flow graph).
-  - **Call node**: TODO
-  - **child node**: A child of a node is an adjacent node in the
-    hierarchy that is further from the root node; equivalently, the
-    target of a hierarchy edge from the current (parent) node.
-  - **const edge**: TODO
-  - **const node**: TODO
-  - **container node**: TODO
-  - **control-flow edge**: An edge between BasicBlock nodes in the same
-    CFG (i.e. having the same parent CFG node).
-  - **control-flow graph (CFG)**: The set of all children of a given CFG
-    node, with all the edges between them. Includes exactly one entry
-    and one exit node. Nodes are basic blocks, edges point to possible
-    successors.
-  - **Dataflow edge** either a Value edge or a Static edge; has a type,
-    and runs between an output port and an input port.
-  - **Dataflow Sibling Graph (DSG)**: The set of all children of a given
-    Dataflow container node, with all edges between them. Includes
-    exactly one input node (unique node having no input edges) and one
-    output node (unique node having no output edges). Nodes are
-    processes that operate on input data and produce output data. Edges
-    in a DSG are either value or order edges. The DSG must be acyclic.
-  - **data-dependency node**: an input, output, operation, DFG, CFG,
-    Conditional or TailLoop node. All incoming and outgoing edges are
-    value edges.
-  - **FuncDecl node**: child of a module, indicates that an external
-    function exists but without giving a definition. May be the source
-    of Static-edges to Call nodes and others.
-  - **FuncDefn node**: child of a module node, defines a function (by being
-    parent to the function's body). May be the source of Static-edges to
-    Call nodes and others.
-  - **DFG node**: A node representing a data-flow graph. Its children
-    are all data-dependency nodes.
-  - **edge kind**: There are five kinds of edge: value edge, order edge,
-    control-flow edge, Static edge, and hierarchy edge.
-  - **edge type:** Typing information attached to a value edge or Static
-    edge (representing the data type of value that the edge carries).
-  - **entry node**: The distinguished node of a CFG representing the
-    point where execution begins.
-  - **exit node**: The distinguished node of a CFG representing the
-    point where execution ends.
-  - **function:** TODO
-  - **Conditional node:** TODO
-  - **hierarchy**: A tree whose nodes comprise all nodes of the HUGR,
-    rooted at the HUGR's root node.
-  - **hierarchy edge**: An edge in the hierarchy tree. The edge is considered to
-    be directed, with the source node the parent of the target node.
-  - **input node**: The distinguished node of a DSG representing the
-    point where data processing begins.
-  - **input signature**: The input signature of a node is the mapping
-    from identifiers of input ports to their associated edge types.
-  - **Inter-graph Edge**: Deprecated, see *non-local edge*
-  - **CFG node**: A node representing a control-flow graph. Its children
-    are all BasicBlock nodes, of which there is exactly one entry node
-    and exactly one exit node.
-  - **load-constant node**: TODO
-  - **metadata:** TODO
-  - **module**: TODO
-  - **node index**: An identifier for a node that is unique within the
-    HUGR.
-  - **non-local edge**: A Value or Static edge with Locality Ext,
-    or a Value edge with locality Dom (i.e. not Local)
-  - **operation**: TODO
-  - **output node**: The distinguished node of a DSG representing the
-    point where data processing ends.
-  - **output signature**: The output signature of a node is the mapping
-    from identifiers of output ports to their associated edge types.
-  - **parent node**: The parent of a non-root node is the adjacent node
-    in the hierarchy that is nearer to the root node.
-  - **port**: A notional entry or exit point from a data-dependency
-    node, which has an identifier that is unique for the given node.
-    Each incoming or outgoing value edge is associated with a specific
-    port.
-  - **port index**: An identifier for a port that is unique within the
-    HUGR.
-  - **replacement**: TODO
-  - **extension**: TODO
-  - **sibling graph**: TODO
-  - **signature**: The signature of a node is the combination of its
-    input and output signatures.
-  - **simple type**: a quantum or classical type annotated with the
-    Extensions required to produce the value
-  - **order edge**: An edge implying dependency of the target node on
-    the source node.
-  - **TailLoop node**: TODO
-  - **value edge:** An edge between data-dependency nodes. Has a fixed
-    edge type.
+- **BasicBlock node**: A child of a CFG node (i.e. a basic block
+  within a control-flow graph).
+- **Call node**: TODO
+- **child node**: A child of a node is an adjacent node in the
+  hierarchy that is further from the root node; equivalently, the
+  target of a hierarchy edge from the current (parent) node.
+- **const edge**: TODO
+- **const node**: TODO
+- **container node**: TODO
+- **control-flow edge**: An edge between BasicBlock nodes in the same
+  CFG (i.e. having the same parent CFG node).
+- **control-flow graph (CFG)**: The set of all children of a given CFG
+  node, with all the edges between them. Includes exactly one entry
+  and one exit node. Nodes are basic blocks, edges point to possible
+  successors.
+- **Dataflow edge** either a Value edge or a Static edge; has a type,
+  and runs between an output port and an input port.
+- **Dataflow Sibling Graph (DSG)**: The set of all children of a given
+  Dataflow container node, with all edges between them. Includes
+  exactly one input node (unique node having no input edges) and one
+  output node (unique node having no output edges). Nodes are
+  processes that operate on input data and produce output data. Edges
+  in a DSG are either value or order edges. The DSG must be acyclic.
+- **data-dependency node**: an input, output, operation, DFG, CFG,
+  Conditional or TailLoop node. All incoming and outgoing edges are
+  value edges.
+- **FuncDecl node**: child of a module, indicates that an external
+  function exists but without giving a definition. May be the source
+  of Static-edges to Call nodes and others.
+- **FuncDefn node**: child of a module node, defines a function (by being
+  parent to the function's body). May be the source of Static-edges to
+  Call nodes and others.
+- **DFG node**: A node representing a data-flow graph. Its children
+  are all data-dependency nodes.
+- **edge kind**: There are five kinds of edge: value edge, order edge,
+  control-flow edge, Static edge, and hierarchy edge.
+- **edge type:** Typing information attached to a value edge or Static
+  edge (representing the data type of value that the edge carries).
+- **entry node**: The distinguished node of a CFG representing the
+  point where execution begins.
+- **exit node**: The distinguished node of a CFG representing the
+  point where execution ends.
+- **function:** TODO
+- **Conditional node:** TODO
+- **hierarchy**: A tree whose nodes comprise all nodes of the HUGR,
+  rooted at the HUGR's root node.
+- **hierarchy edge**: An edge in the hierarchy tree. The edge is considered to
+  be directed, with the source node the parent of the target node.
+- **input node**: The distinguished node of a DSG representing the
+  point where data processing begins.
+- **input signature**: The input signature of a node is the mapping
+  from identifiers of input ports to their associated edge types.
+- **Inter-graph Edge**: Deprecated, see *non-local edge*
+- **CFG node**: A node representing a control-flow graph. Its children
+  are all BasicBlock nodes, of which there is exactly one entry node
+  and exactly one exit node.
+- **load-constant node**: TODO
+- **metadata:** TODO
+- **module**: TODO
+- **node index**: An identifier for a node that is unique within the
+  HUGR.
+- **non-local edge**: A Value or Static edge with Locality Ext,
+  or a Value edge with locality Dom (i.e. not Local)
+- **operation**: TODO
+- **output node**: The distinguished node of a DSG representing the
+  point where data processing ends.
+- **output signature**: The output signature of a node is the mapping
+  from identifiers of output ports to their associated edge types.
+- **parent node**: The parent of a non-root node is the adjacent node
+  in the hierarchy that is nearer to the root node.
+- **port**: A notional entry or exit point from a data-dependency
+  node, which has an identifier that is unique for the given node.
+  Each incoming or outgoing value edge is associated with a specific
+  port.
+- **port index**: An identifier for a port that is unique within the
+  HUGR.
+- **replacement**: TODO
+- **extension**: TODO
+- **sibling graph**: TODO
+- **signature**: The signature of a node is the combination of its
+  input and output signatures.
+- **simple type**: a quantum or classical type annotated with the
+  Extensions required to produce the value
+- **order edge**: An edge implying dependency of the target node on
+  the source node.
+- **TailLoop node**: TODO
+- **value edge:** An edge between data-dependency nodes. Has a fixed
+  edge type.
 
 ## Appendices
 
@@ -1887,30 +1893,30 @@ Conversions between integers and floats:
 
 #### **Justification of the need for CFG-nodes**
 
-  - Conditional + TailLoop are not able to express arbitrary control
-    flow without introduction of extra variables (dynamic overhead, i.e.
-    runtime cost) and/or code duplication (static overhead, i.e. code
-    size).
-      - Specifically, the most common case is *shortcircuit evaluation*:
-        `if (P && Q) then A; else B;` where Q is only evaluated if P is
-        true.
-  - We *could* parse a CFG into a DSG with only Conditional-nodes and
-    TailLoop-nodes by introducing extra variables, as per [Google
-    paper](https://doi.org/10.1145/2693261), and then expect
-    LLVM to remove those extra variables later. However that's a
-    significant amount of analysis and transformation, which is
-    undesirable for using the HUGR as a common interchange format (e.g.
-    QIR → HUGR → LLVM) when little optimization is being done (perhaps
-    no cross-basic-block optimization).
-  - It's possible that maintaining support for CFGs-nodes may become a
-    burden, i.e. if we find we are not using CFGs much. However, I
-    believe that this burden can be kept acceptably low if we are
-    willing to drop support for rewriting across basic block boundaries,
-    which would be fine if we find we are not using CFGs much (e.g.
-    either we rely on turning relevant CFG/fragments into
-    Conditional/TailLoop-nodes first, which might constitute rewriting
-    in itself; or programmers are mainly using (our) front-end tools
-    that build Conditional/TailLoop-nodes directly.)
+- Conditional + TailLoop are not able to express arbitrary control
+  flow without introduction of extra variables (dynamic overhead, i.e.
+  runtime cost) and/or code duplication (static overhead, i.e. code
+  size).
+  - Specifically, the most common case is *shortcircuit evaluation*:
+    `if (P && Q) then A; else B;` where Q is only evaluated if P is
+    true.
+- We *could* parse a CFG into a DSG with only Conditional-nodes and
+  TailLoop-nodes by introducing extra variables, as per [Google
+  paper](https://doi.org/10.1145/2693261), and then expect
+  LLVM to remove those extra variables later. However that's a
+  significant amount of analysis and transformation, which is
+  undesirable for using the HUGR as a common interchange format (e.g.
+  QIR → HUGR → LLVM) when little optimization is being done (perhaps
+  no cross-basic-block optimization).
+- It's possible that maintaining support for CFGs-nodes may become a
+  burden, i.e. if we find we are not using CFGs much. However, I
+  believe that this burden can be kept acceptably low if we are
+  willing to drop support for rewriting across basic block boundaries,
+  which would be fine if we find we are not using CFGs much (e.g.
+  either we rely on turning relevant CFG/fragments into
+  Conditional/TailLoop-nodes first, which might constitute rewriting
+  in itself; or programmers are mainly using (our) front-end tools
+  that build Conditional/TailLoop-nodes directly.)
 
 …and the converse: we want `Conditional` and `TailLoop` *as well* as
 `CFG` because we believe they are much easier to work with conceptually
@@ -1918,29 +1924,29 @@ e.g. for authors of "rewrite rules" and other optimisations.
 
 #### **Alternative representations considered but rejected**
 
-  - A [Google paper](https://doi.org/10.1145/2693261) allows
-    for the introduction of extra variables into the DSG that can be
-    eliminated at compile-time (ensuring no runtime cost), but only if
-    stringent well-formedness conditions are maintained on the DSG, and
-    there are issues with variable liveness.
-  - [Lawrence's
-    thesis](https://doi.org/10.48456/tr-705)
-    handles some cases (e.g. shortcircuit evaluation) but cannot handle
-    arbitrary (even reducible) control flow and the multi-stage approach
-    makes it hard to see what amount of code duplication will be
-    necessary to turn the IR back into a CFG (e.g. following a rewrite).
-  - We could extend Conditional/TailLoop nodes to be more expressive
-    (i.e. allowing them or others to capture *more* common cases, indeed
-    arbitrary reducible code, in a DSG-like fashion), perhaps something
-    like WASM. However although this would allow removing the CFG, the
-    DSG nodes get more complicated, and start to behave in very
-    non-DSG-like ways.
-  - We could use function calls to avoid code duplication (essentially
-    the return address is the extra boolean variable, likely to be very
-    cheap). However, I think this means pattern-matching will want to
-    span across function-call boundaries; and it rules out using
-    non-local edges for called functions. TODO are those objections
-    sufficient to rule this out?
+- A [Google paper](https://doi.org/10.1145/2693261) allows
+  for the introduction of extra variables into the DSG that can be
+  eliminated at compile-time (ensuring no runtime cost), but only if
+  stringent well-formedness conditions are maintained on the DSG, and
+  there are issues with variable liveness.
+- [Lawrence's
+  thesis](https://doi.org/10.48456/tr-705)
+  handles some cases (e.g. shortcircuit evaluation) but cannot handle
+  arbitrary (even reducible) control flow and the multi-stage approach
+  makes it hard to see what amount of code duplication will be
+  necessary to turn the IR back into a CFG (e.g. following a rewrite).
+- We could extend Conditional/TailLoop nodes to be more expressive
+  (i.e. allowing them or others to capture *more* common cases, indeed
+  arbitrary reducible code, in a DSG-like fashion), perhaps something
+  like WASM. However although this would allow removing the CFG, the
+  DSG nodes get more complicated, and start to behave in very
+  non-DSG-like ways.
+- We could use function calls to avoid code duplication (essentially
+  the return address is the extra boolean variable, likely to be very
+  cheap). However, I think this means pattern-matching will want to
+  span across function-call boundaries; and it rules out using
+  non-local edges for called functions. TODO are those objections
+  sufficient to rule this out?
 
 ##### Comparison with MLIR
 
@@ -1948,19 +1954,19 @@ There are a lot of broad similarities here, with MLIR's regions
 providing hierarchy, and "graph" regions being like DSGs. Significant
 differences include:
 
-  - MLIR uses names everywhere, which internally are mapped to some kind
-    of hyperedge; we have explicit edges in the structure.
-      - However, we can think of every output nodeport being a unique
-        SSA/SSI name.
-      - MLIR does not do linearity or SSI.
-  - Our CFGs are Single Entry Single Exit (results defined by the output
-    node of the exit block), rather than MLIR's Single Entry Multiple
-    Exit (with `return` instruction)
-  - MLIR allows multiple regions inside a single operation, whereas we
-    introduce extra levels of hierarchy to allow this.
-  - I note re. closures that MLIR expects the enclosing scope to make
-    sure any referenced values are kept 'live' for long enough. Not what
-    we do in Tierkreis (the closure-maker copies them)\!
+- MLIR uses names everywhere, which internally are mapped to some kind
+  of hyperedge; we have explicit edges in the structure.
+  - However, we can think of every output nodeport being a unique
+    SSA/SSI name.
+  - MLIR does not do linearity or SSI.
+- Our CFGs are Single Entry Single Exit (results defined by the output
+  node of the exit block), rather than MLIR's Single Entry Multiple
+  Exit (with `return` instruction)
+- MLIR allows multiple regions inside a single operation, whereas we
+  introduce extra levels of hierarchy to allow this.
+- I note re. closures that MLIR expects the enclosing scope to make
+  sure any referenced values are kept 'live' for long enough. Not what
+  we do in Tierkreis (the closure-maker copies them)\!
 
 ### Appendix 2: Node types and their edges
 
@@ -1997,15 +2003,16 @@ including `Module`.
 ### Appendix 3: Binary `compute_signature`
 
 When an OpDef provides a binary `compute_signature` function, and an operation node uses that OpDef:
-* the node provides a list of TypeArgs, at least as many as the $n$ TypeParams declared by the OpDef
-* the first $n$ of those are passed to the binary `compute_signature`
-* if the binary function returns an error, the operation is invalid;
-* otherwise, `compute_signature` returns a `Function` type (which may itself be polymorphic)
-* any remaining TypeArgs in the node (after the first $n$) are then substituted into that returned `Function` type
+
+- the node provides a list of TypeArgs, at least as many as the $n$ TypeParams declared by the OpDef
+- the first $n$ of those are passed to the binary `compute_signature`
+- if the binary function returns an error, the operation is invalid;
+- otherwise, `compute_signature` returns a `Function` type (which may itself be polymorphic)
+- any remaining TypeArgs in the node (after the first $n$) are then substituted into that returned `Function` type
   (the number remaining in the node must match exactly).
   **Note** this allows the binary function to use the values (TypeArgs) passed in---e.g.
   by looking inside `List` or `Opaque` TypeArgs---to determine the structure (and degree of polymorphism) of the returned `Function` type.
-* We require that the TypeArgs to be passed to `compute_signature` (the first $n$)
+- We require that the TypeArgs to be passed to `compute_signature` (the first $n$)
   must *not* refer to any type variables (declared by ancestor nodes in the Hugr - the nearest enclosing FuncDefn);
   these first $n$ must be static constants unaffected by substitution.
   This restriction does not apply to TypeArgs after the first $n$.

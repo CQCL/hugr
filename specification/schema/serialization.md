@@ -58,7 +58,7 @@ Python dictionaries.
   standalone module - this could well be [a set of MLIR
   dialects](https://github.com/PennyLaneAI/catalyst/tree/main/mlir) .
 
-**Note**
+## Note
 
 One important downside of this approach, particularly in comparison with
 code-generating options like Protobuf, is that non-Rust languages (in
