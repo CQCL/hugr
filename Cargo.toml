@@ -1,18 +1,16 @@
 [package]
 name = "quantinuum-hugr"
 version = "0.1.0"
-license = "Apache-2.0"
-
-readme = "README.md"
-#documentation = "https://docs.rs/hugr/"
-repository = "https://github.com/CQCL/hugr"
-
-description = "Hierarchical Unified Graph Representation"
-#keywords = [] # TODO
-#categories = [] # TODO
-
 edition = "2021"
 rust-version = "1.75"
+
+license = "Apache-2.0"
+readme = "README.md"
+documentation = "https://docs.rs/hugr/"
+repository = "https://github.com/CQCL/hugr"
+description = "Quantinuum's Hierarchical Unified Graph Representation"
+keywords = ["Quantum", "Quantinuum"]
+categories = ["Compilers"]
 
 [lib]
 # Using different names for the lib and for the package is supported, but may be confusing.
