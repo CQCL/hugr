@@ -10,7 +10,7 @@ documentation = "https://docs.rs/hugr/"
 repository = "https://github.com/CQCL/hugr"
 description = "Quantinuum's Hierarchical Unified Graph Representation"
 keywords = ["Quantum", "Quantinuum"]
-categories = ["Compilers"]
+categories = ["compilers"]
 
 [lib]
 # Using different names for the lib and for the package is supported, but may be confusing.
