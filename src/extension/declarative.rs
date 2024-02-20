@@ -12,6 +12,16 @@
 #![doc = include_str!("../../examples/extension/declarative.yaml")]
 //! ```
 //!
+//! The definition can be loaded into a registry using the [`load_extensions`] or [`load_extensions_file`] functions.
+//!
+//! ```rust
+//! # const DECLARATIVE_YAML: &str = include_str!("../../examples/extension/declarative.yaml");
+//! # use hugr::extension::declarative::load_extensions;
+//! // Required extensions must already be present in the registry.
+//! let mut reg = hugr::std_extensions::logic::LOGIC_REG.clone();
+//! load_extensions(DECLARATIVE_YAML, &mut reg).unwrap();
+//! ```
+//!
 //! [specification]: https://github.com/CQCL/hugr/blob/main/specification/hugr.md#declarative-format
 
 mod ops;
@@ -290,8 +300,8 @@ extensions:
   - name: AnotherOperation
     description: An operation from 3 qubits to 3 qubits
     signature:
-        inputs: [Q, Q, Q]
-        outputs: [[Q, 1], [Control, Q, 2]]
+        inputs: [MyType, Q, Q]
+        outputs: [[MyType, 1], [Control, Q, 2]]
 "#;
 
     /// A yaml extension with unsupported features.
@@ -347,7 +357,7 @@ extensions:
 
     #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
     #[rstest]
-    #[case(EXAMPLE_YAML_FILE, 1, 1, 2, &std_extensions::logic::LOGIC_REG)]
+    #[case(EXAMPLE_YAML_FILE, 1, 1, 3, &std_extensions::logic::LOGIC_REG)]
     fn test_decode_file(
         #[case] yaml_file: &str,
         #[case] num_declarations: usize,

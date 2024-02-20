@@ -177,27 +177,53 @@ impl TypeDeclaration {
         // The prelude is always in scope.
         debug_assert!(ctx.scope.contains(&PRELUDE_ID));
 
-        // Only hard-coded prelude types are supported for now.
-        let prelude = ctx.registry.get(&PRELUDE_ID).unwrap();
-        let op_def: &TypeDef = match self.0.as_str() {
-            "USize" => prelude.get_type("usize"),
-            "Q" => prelude.get_type("qubit"),
-            _ => {
-                return Err(ExtensionDeclarationError::UnknownType {
-                    ext: ext.name().clone(),
-                    ty: self.0.clone(),
-                })
-            }
-        }
-        .ok_or(ExtensionDeclarationError::UnknownType {
-            ext: ext.name().clone(),
-            ty: self.0.clone(),
-        })?;
+        let Some(op_def) = self.resolve_type(ext, ctx) else {
+            return Err(ExtensionDeclarationError::UnknownType {
+                ext: ext.name().clone(),
+                ty: self.0.clone(),
+            });
+        };
 
         // The hard-coded types are not parametric.
         assert!(op_def.params().is_empty());
         let op = op_def.instantiate(&[]).unwrap();
 
         Ok(op)
+    }
+
+    /// Resolve a type name to a type definition.
+    fn resolve_type<'a>(
+        &'a self,
+        ext: &'a Extension,
+        ctx: DeclarationContext<'a>,
+    ) -> Option<&'a TypeDef> {
+        // The prelude is always in scope.
+        debug_assert!(ctx.scope.contains(&PRELUDE_ID));
+
+        // Some hard-coded prelude types are supported.
+        let prelude = ctx.registry.get(&PRELUDE_ID).unwrap();
+        match self.0.as_str() {
+            "USize" => return prelude.get_type("usize"),
+            "Q" => return prelude.get_type("qubit"),
+            _ => {}
+        }
+
+        // Try to resolve the type in the current extension.
+        if let Some(ty) = ext.get_type(self.0.as_str()) {
+            return Some(ty);
+        }
+
+        // Try to resolve the type in the other extensions in scope.
+        for ext in ctx.scope.iter() {
+            if let Some(ty) = ctx
+                .registry
+                .get(ext)
+                .and_then(|ext| ext.get_type(self.0.as_str()))
+            {
+                return Some(ty);
+            }
+        }
+
+        None
     }
 }
