@@ -7,7 +7,7 @@ extensions:
     types:
       - # Types must have a name.
         # Parameters are not currently supported.
-        name: Copyable type
+        name: CopyableType
         description: A simple type with no parameters
         # Types may have a "Eq", "Copyable", or "Any" bound.
         # This field is optional and defaults to "Any".
@@ -29,3 +29,8 @@ extensions:
               [Q, 1]
             - # Or as a description, followed by the type and a number of repetitions.
               [Control, Q, 2]
+      - name: YetAnotherOperation
+        description: An operation that uses the declared Custom type
+        signature:
+          inputs: [CopyableType]
+          outputs: [CopyableType, CopyableType]
