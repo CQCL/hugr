@@ -869,7 +869,7 @@ fn plus_on_self() -> Result<(), Box<dyn std::error::Error>> {
     let ft = FunctionType::new_endo(type_row![QB_T, QB_T]).with_extension_delta(&delta);
     let mut dfg = DFGBuilder::new(ft.clone())?;
 
-    // While https://github.com/CQCL-DEV/hugr/issues/388 is unsolved,
+    // While https://github.com/CQCL/hugr/issues/388 is unsolved,
     // most operations have empty extension_reqs (not including their own extension).
     // Define some that do.
     let binop: LeafOp = ExternalOp::Opaque(OpaqueOp::new(

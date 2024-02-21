@@ -1,6 +1,5 @@
- 
 
-# Options
+# Serialization Options
 
 Given most of our tooling is in Rust it is useful to narrow our search
 to options that have good [serde](https://serde.rs/) compatibility. For
@@ -31,16 +30,14 @@ schema-related problems mentioned above.
 The highest performing target is
 [bincode](https://github.com/bincode-org/bincode), but it does not seem
 to be widely used and has poor python support. Another notable mention
-is [CBOR](https://cbor.io/), ~~which is used for sending execution
-outputs over the wire by the hardware team~~ (they went with Protobuf
-instead). It is however not very well performing on the benchmarks.
+is [CBOR](https://cbor.io/); it is however not very well performing on the benchmarks.
 
 If we take a good balance between performance and language compatibility
 MessagePack (or [msgpack](https://msgpack.org/) ) appears to be a very
 solid option. It has good serde support (as well as very wide language
 support in general, including a fast python package implemented in C),
 is one of the top performers on benchmarks (see also [this
-thesis](https://uh-ir.tdl.org/bitstream/handle/10657/13140/CASEY-THESIS-2022.pdf?sequence=1)),
+thesis](https://hdl.handle.net/10657/13140)),
 and has small data size. Another nice benefit is that, like CBOR, it is
 very similar to JSON when decoded, which, given that serde can easily
 let us go between JSON and msgpack, gives us human-friendly text
@@ -58,7 +55,7 @@ Python dictionaries.
   standalone module - this could well be [a set of MLIR
   dialects](https://github.com/PennyLaneAI/catalyst/tree/main/mlir) .
 
-**Note**
+## Note
 
 One important downside of this approach, particularly in comparison with
 code-generating options like Protobuf, is that non-Rust languages (in
@@ -69,7 +66,6 @@ relatively simply with [Pydantic](https://docs.pydantic.dev/). This also
 brings with it Python-side schema generation and validation. As an
 example, the below fully implements serialization/deserialization of the
 spec described in the [main document](hugr.md).
-
 
 ```python
 from typing import Any
