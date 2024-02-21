@@ -75,8 +75,8 @@ represent (typed) data or control dependencies.
 
 ## Functional description
 
-A HUGR is a directed graph. There are several different types of nodes, and
-several different types of edges, with different semantics, described below.
+A HUGR is a directed graph. There are several different types of node, and
+several different types of edge, with different semantics, described below.
 
 A node usually has additional data associated with it, which we will
 refer to as its *node weight*.
@@ -213,8 +213,7 @@ always local, i.e. source and target have the same parent.
 ### Node Operations
 
 Here we define some core types of operation required to represent
-full programs, including dataflow operations (in
-[functions](#dataflow)).
+full programs, including [dataflow operations](#dataflow).
 
 #### Module
 
@@ -771,23 +770,23 @@ indices after the list of node indices?
 
 ## Type System
 
-There are three classes of type: ``AnyType`` $\supset$ ``CopyableType`` $\supset$ ``EqType``. Types in these classes are distinguished by the operations possible on (runtime) values of those types:
+There are three classes of type: `AnyType` $\supset$ `CopyableType` $\supset$ `EqType`. Types in these classes are distinguished by the operations possible on (runtime) values of those types:
 
-- For the broadest class (``AnyType``), the only operation supported is the identity operation (aka no-op, or `lift` - see [Extension Tracking](#extension-tracking) below). Specifically, we do not require it to be possible to copy or discard all values, hence the requirement that outports of linear type must have exactly one edge. (That is, a type not known to be in the copyable subset). All incoming ports must have exactly one edge.
+- For the broadest class (`AnyType`), the only operation supported is the identity operation (aka no-op, or `lift` - see [Extension Tracking](#extension-tracking) below). Specifically, we do not require it to be possible to copy or discard all values, hence the requirement that outports of linear type must have exactly one edge. (That is, a type not known to be in the copyable subset). All incoming ports must have exactly one edge.
 
     In fully qubit-counted contexts programs take in a number of qubits as input and return the same number, with no discarding.
 
-- The next class is ``CopyableType``, i.e. types holding ordinary classical
+- The next class is `CopyableType`, i.e. types holding ordinary classical
   data, where values can be copied (and discarded, the 0-ary copy). This
   allows multiple (or 0) outgoing edges from an outport; also these types can
   be sent down `Static` edges. Note: dataflow inputs (`Value` and `Static`) always
   require a single connection.
 
-- The final class is ``EqType``: these are copyable types with a well-defined
+- The final class is `EqType`: these are copyable types with a well-defined
   notion of equality between values. (While *some* notion of equality is defined on
   any type with a binary representation, that if the bits are equal then the value is, the converse is not necessarily true - values that are indistinguishable can have different bit representations.)
 
-For example, a `float` type (defined in an extension) would be a ``CopyableType``, but not an ``EqType``.
+For example, a `float` type (defined in an extension) would be a `CopyableType`, but not an `EqType`.
 
 **Rows** The `#` is a *row* which is a sequence of zero or more types. Types in the row can optionally be given names in metadata i.e. this does not affect behaviour of the HUGR.
 
@@ -809,9 +808,9 @@ Type ::= Tuple(#) -- fixed-arity, heterogeneous components
 
 The majority of types will be Opaque ones defined by extensions including the [standard library](#standard-library). However a number of types can be constructed using only the core type constructors: for example the empty tuple type, aka `unit`, with exactly one instance (so 0 bits of data); the empty sum, with no instances; the empty Function type (taking no arguments and producing no results - `void -> void`); and compositions thereof.
 
-Types representing functions are generally ``CopyableType``, but not ``EqType``. (It is undecidable whether two functions produce the same result for all possible inputs, or similarly whether one computation graph can be rewritten into another by semantic-preserving rewrites).
+Types representing functions are generally `CopyableType`, but not `EqType`. (It is undecidable whether two functions produce the same result for all possible inputs, or similarly whether one computation graph can be rewritten into another by semantic-preserving rewrites).
 
-Tuples and Sums are ``CopyableType`` (respectively, ``EqType``) if all their components are; they are also fixed-size if their components are.
+Tuples and Sums are `CopyableType` (respectively, `EqType`) if all their components are; they are also fixed-size if their components are.
 
 ### Polymorphism
 

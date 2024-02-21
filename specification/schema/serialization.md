@@ -30,7 +30,7 @@ schema-related problems mentioned above.
 The highest performing target is
 [bincode](https://github.com/bincode-org/bincode), but it does not seem
 to be widely used and has poor python support. Another notable mention
-is [CBOR](https://cbor.io/), it is however not very well performing on the benchmarks.
+is [CBOR](https://cbor.io/); it is however not very well performing on the benchmarks.
 
 If we take a good balance between performance and language compatibility
 MessagePack (or [msgpack](https://msgpack.org/) ) appears to be a very
@@ -66,7 +66,6 @@ relatively simply with [Pydantic](https://docs.pydantic.dev/). This also
 brings with it Python-side schema generation and validation. As an
 example, the below fully implements serialization/deserialization of the
 spec described in the [main document](hugr.md).
-
 
 ```python
 from typing import Any
