@@ -655,16 +655,16 @@ mod test {
         ))?;
         let [i, b] = h.input_wires_arr();
         let mut cond = h.conditional_builder(
-            (vec![type_row![]; 2], b),
+            (vec![Type::UNIT; 2], b),
             [(USIZE_T, i)],
             type_row![USIZE_T],
             ExtensionSet::new(),
         )?;
         let mut case1 = cond.case_builder(0)?;
-        let foo = case1.add_dataflow_op(mk_op("foo"), case1.input_wires())?;
+        let foo = case1.add_dataflow_op(mk_op("foo"), case1.input_wires().skip(1))?;
         let case1 = case1.finish_with_outputs(foo.outputs())?.node();
         let mut case2 = cond.case_builder(1)?;
-        let bar = case2.add_dataflow_op(mk_op("bar"), case2.input_wires())?;
+        let bar = case2.add_dataflow_op(mk_op("bar"), case2.input_wires().skip(1))?;
         let mut baz_dfg = case2.dfg_builder(utou.clone(), None, bar.outputs())?;
         let baz = baz_dfg.add_dataflow_op(mk_op("baz"), baz_dfg.input_wires())?;
         let baz_dfg = baz_dfg.finish_with_outputs(baz.outputs())?;

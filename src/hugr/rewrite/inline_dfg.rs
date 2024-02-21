@@ -145,7 +145,7 @@ mod test {
     use crate::std_extensions::arithmetic::float_types;
     use crate::std_extensions::arithmetic::int_ops::{self, IntOpDef};
     use crate::std_extensions::arithmetic::int_types::{self, ConstIntU};
-    use crate::types::FunctionType;
+    use crate::types::{FunctionType, Type};
     use crate::utils::test_quantum_extension;
     use crate::values::Value;
     use crate::{type_row, Direction, HugrView, Node, Port};
@@ -383,7 +383,7 @@ mod test {
             .outputs_arr();
         // Node using the boolean. Here we just select between two empty computations.
         let mut if_n = inner.conditional_builder(
-            ([type_row![], type_row![]], b),
+            ([Type::UNIT, Type::UNIT], b),
             [],
             type_row![],
             ExtensionSet::new(),

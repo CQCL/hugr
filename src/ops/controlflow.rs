@@ -1,5 +1,6 @@
 //! Control flow operations.
 
+use itertools::Itertools;
 use smol_str::SmolStr;
 
 use crate::extension::ExtensionSet;
@@ -57,7 +58,7 @@ impl TailLoop {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Conditional {
     /// The possible rows of the TupleSum input
-    pub tuple_sum_rows: Vec<TypeRow>,
+    pub tuple_sum_rows: Vec<Type>,
     /// Remaining input types
     pub other_inputs: TypeRow,
     /// Output types
@@ -78,7 +79,7 @@ impl DataflowOpTrait for Conditional {
         let mut inputs = self.other_inputs.clone();
         inputs
             .to_mut()
-            .insert(0, Type::new_tuple_sum(self.tuple_sum_rows.clone()));
+            .insert(0, Type::new_sum(self.tuple_sum_rows.clone()));
         FunctionType::new(inputs, self.outputs.clone()).with_extension_delta(&self.extension_delta)
     }
 }
@@ -86,10 +87,17 @@ impl DataflowOpTrait for Conditional {
 impl Conditional {
     /// Build the input TypeRow of the nth child graph of a Conditional node.
     pub(crate) fn case_input_row(&self, case: usize) -> Option<TypeRow> {
-        Some(tuple_sum_first(
-            self.tuple_sum_rows.get(case)?,
-            &self.other_inputs,
-        ))
+        if case < self.tuple_sum_rows.len() {
+            Some(
+                std::iter::once(&self.tuple_sum_rows[case])
+                    .chain(self.other_inputs.iter())
+                    .cloned()
+                    .collect_vec()
+                    .into(),
+            )
+        } else {
+            None
+        }
     }
 }
 

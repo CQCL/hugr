@@ -425,7 +425,7 @@ pub trait Dataflow: Container {
     /// the Conditional node.
     fn conditional_builder(
         &mut self,
-        (tuple_sum_rows, tuple_sum_wire): (impl IntoIterator<Item = TypeRow>, Wire),
+        (tuple_sum_rows, tuple_sum_wire): (impl IntoIterator<Item = Type>, Wire),
         other_inputs: impl IntoIterator<Item = (Type, Wire)>,
         output_types: TypeRow,
         extension_delta: ExtensionSet,

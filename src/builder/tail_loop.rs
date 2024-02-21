@@ -100,7 +100,9 @@ mod test {
         extension::ExtensionSet,
         hugr::ValidationError,
         ops::Const,
-        type_row, Hugr,
+        type_row,
+        types::Type,
+        Hugr,
     };
 
     use super::*;
@@ -158,20 +160,20 @@ mod test {
                     let conditional_id = {
                         let output_row = loop_b.internal_output_row()?;
                         let mut conditional_b = loop_b.conditional_builder(
-                            ([type_row![], type_row![]], const_wire),
+                            ([Type::UNIT, Type::UNIT], const_wire),
                             vec![(BIT, b1)],
                             output_row,
                             ExtensionSet::new(),
                         )?;
 
                         let mut branch_0 = conditional_b.case_builder(0)?;
-                        let [b1] = branch_0.input_wires_arr();
+                        let [_, b1] = branch_0.input_wires_arr();
 
                         let continue_wire = branch_0.make_continue(signature.clone(), [b1])?;
                         branch_0.finish_with_outputs([continue_wire])?;
 
                         let mut branch_1 = conditional_b.case_builder(1)?;
-                        let [_b1] = branch_1.input_wires_arr();
+                        let [_, _b1] = branch_1.input_wires_arr();
 
                         let wire = branch_1.add_load_const(ConstUsize::new(2))?;
                         let break_wire = branch_1.make_break(signature, [wire])?;

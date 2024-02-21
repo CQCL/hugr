@@ -10,7 +10,7 @@ use itertools::Itertools;
 use portgraph::{NodeIndex, PortOffset};
 use thiserror::Error;
 
-use crate::types::TypeRow;
+use crate::types::{Type, TypeRow};
 
 use super::dataflow::DataflowParent;
 use super::{impl_validate_op, BasicBlock, ExitBlock, OpTag, OpTrait, OpType, ValidateOp};
@@ -188,7 +188,7 @@ pub enum ChildrenValidationError {
     InvalidConditionalTupleSum {
         child: NodeIndex,
         expected_count: usize,
-        actual_sum_rows: Vec<TypeRow>,
+        actual_sum_rows: Vec<Type>,
     },
 }
 

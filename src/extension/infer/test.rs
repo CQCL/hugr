@@ -348,7 +348,7 @@ fn test_conditional_inference() -> Result<(), Box<dyn Error>> {
         Ok(case)
     }
 
-    let tuple_sum_rows = vec![type_row![]; 2];
+    let tuple_sum_rows = vec![Type::UNIT; 2];
     let rs = ExtensionSet::from_iter([A, B]);
 
     let inputs = type_row![NAT];

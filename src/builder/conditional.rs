@@ -1,7 +1,7 @@
 use crate::extension::ExtensionRegistry;
 use crate::hugr::views::HugrView;
 use crate::ops::dataflow::DataflowOpTrait;
-use crate::types::{FunctionType, TypeRow};
+use crate::types::{FunctionType, Type, TypeRow};
 
 use crate::ops;
 use crate::ops::handle::CaseID;
@@ -158,7 +158,7 @@ impl HugrBuilder for ConditionalBuilder<Hugr> {
 impl ConditionalBuilder<Hugr> {
     /// Initialize a Conditional rooted HUGR builder
     pub fn new(
-        tuple_sum_rows: impl IntoIterator<Item = TypeRow>,
+        tuple_sum_rows: impl IntoIterator<Item = Type>,
         other_inputs: impl Into<TypeRow>,
         outputs: impl Into<TypeRow>,
         extension_delta: ExtensionSet,
@@ -223,7 +223,7 @@ mod test {
     #[test]
     fn basic_conditional() -> Result<(), BuildError> {
         let mut conditional_b = ConditionalBuilder::new(
-            [type_row![], type_row![]],
+            [Type::UNIT, Type::UNIT],
             type_row![NAT],
             type_row![NAT],
             ExtensionSet::new(),
@@ -248,9 +248,9 @@ mod test {
                 let [int] = fbuild.input_wires_arr();
                 let conditional_id = {
                     let other_inputs = vec![(NAT, int)];
-                    let outputs = vec![NAT].into();
+                    let outputs = vec![Type::UNIT, NAT].into();
                     let mut conditional_b = fbuild.conditional_builder(
-                        ([type_row![], type_row![]], const_wire),
+                        ([Type::UNIT, Type::UNIT], const_wire),
                         other_inputs,
                         outputs,
                         ExtensionSet::new(),
@@ -261,7 +261,7 @@ mod test {
 
                     conditional_b.finish_sub_container()?
                 };
-                let [int] = conditional_id.outputs_arr();
+                let [_, int] = conditional_id.outputs_arr();
                 fbuild.finish_with_outputs([int])?
             };
             Ok(module_builder.finish_prelude_hugr()?)
@@ -275,7 +275,7 @@ mod test {
     #[test]
     fn test_not_all_cases() -> Result<(), BuildError> {
         let mut builder = ConditionalBuilder::new(
-            [type_row![], type_row![]],
+            [Type::UNIT, Type::UNIT],
             type_row![],
             type_row![],
             ExtensionSet::new(),
@@ -293,7 +293,7 @@ mod test {
     #[test]
     fn test_case_already_built() -> Result<(), BuildError> {
         let mut builder = ConditionalBuilder::new(
-            [type_row![], type_row![]],
+            [Type::UNIT, Type::UNIT],
             type_row![],
             type_row![],
             ExtensionSet::new(),
