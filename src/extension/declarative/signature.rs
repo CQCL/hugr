@@ -174,10 +174,7 @@ impl TypeDeclaration {
         ctx: DeclarationContext<'_>,
         _op_params: &[TypeParam],
     ) -> Result<CustomType, ExtensionDeclarationError> {
-        // The prelude is always in scope.
-        debug_assert!(ctx.scope.contains(&PRELUDE_ID));
-
-        let Some(op_def) = self.resolve_type(ext, ctx) else {
+        let Some(type_def) = self.resolve_type(ext, ctx) else {
             return Err(ExtensionDeclarationError::UnknownType {
                 ext: ext.name().clone(),
                 ty: self.0.clone(),
@@ -185,8 +182,8 @@ impl TypeDeclaration {
         };
 
         // The hard-coded types are not parametric.
-        assert!(op_def.params().is_empty());
-        let op = op_def.instantiate(&[]).unwrap();
+        assert!(type_def.params().is_empty());
+        let op = type_def.instantiate(&[]).unwrap();
 
         Ok(op)
     }
