@@ -157,10 +157,14 @@ pub enum TypeEnum {
     #[allow(missing_docs)]
     #[display(fmt = "Function({})", "_0")]
     Function(Box<PolyFuncType>),
-    // DeBruijn index, and cache of TypeBound (checked in validation)
+    /// DeBruijn index, and cache of TypeBound of [TypeParam::Type] (checked in validation)
     #[allow(missing_docs)]
     #[display(fmt = "Variable({})", _0)]
     Variable(usize, TypeBound),
+    /// DeBruijn index, and cache of inner TypeBound - matches a [TypeParam::List] of [TypeParam::Type]
+    /// of this bound (checked in validation)
+    #[display(fmt = "RowVar({})", _0)]
+    RowVariable(usize, TypeBound),
     #[allow(missing_docs)]
     #[display(fmt = "Tuple({})", "_0")]
     Tuple(TypeRow),
@@ -175,7 +179,7 @@ impl TypeEnum {
             TypeEnum::Extension(c) => c.bound(),
             TypeEnum::Alias(a) => a.bound,
             TypeEnum::Function(_) => TypeBound::Copyable,
-            TypeEnum::Variable(_, b) => *b,
+            TypeEnum::Variable(_, b) | TypeEnum::RowVariable(_, b) => *b,
             TypeEnum::Sum(SumType::Unit { size: _ }) => TypeBound::Eq,
             TypeEnum::Sum(SumType::General { row }) => {
                 least_upper_bound(row.iter().map(Type::least_upper_bound))
@@ -272,8 +276,15 @@ impl Type {
     /// New use (occurrence) of the type variable with specified DeBruijn index.
     /// For use in type schemes only: `bound` must match that with which the
     /// variable was declared (i.e. as a [TypeParam::Type]`(bound)`).
-    pub fn new_var_use(idx: usize, bound: TypeBound) -> Self {
+    pub const fn new_var_use(idx: usize, bound: TypeBound) -> Self {
         Self(TypeEnum::Variable(idx, bound), bound)
+    }
+
+    /// New use (occurrence) of the row variable with specified DeBruijn index.
+    /// For use in type schemes only: `bound` must match that with which the
+    /// variable was declared (i.e. as a [TypeParam::List]`(`[TypeParam::Type]`(bound))`).
+    pub const fn new_row_var(idx: usize, bound: TypeBound) -> Self {
+        Self(TypeEnum::RowVariable(idx, bound), bound)
     }
 
     /// Report the least upper TypeBound, if there is one.
@@ -309,14 +320,32 @@ impl Type {
         // There is no need to check the components against the bound,
         // that is guaranteed by construction (even for deserialization)
         match &self.0 {
-            TypeEnum::Tuple(row) | TypeEnum::Sum(SumType::General { row }) => row
-                .iter()
-                .try_for_each(|t| t.validate(extension_registry, var_decls)),
+            TypeEnum::Tuple(row) | TypeEnum::Sum(SumType::General { row }) => {
+                valid_row(row, extension_registry, var_decls)
+            }
             TypeEnum::Sum(SumType::Unit { .. }) => Ok(()), // No leaves there
             TypeEnum::Alias(_) => Ok(()),
             TypeEnum::Extension(custy) => custy.validate(extension_registry, var_decls),
             TypeEnum::Function(ft) => ft.validate(extension_registry, var_decls),
             TypeEnum::Variable(idx, bound) => check_typevar_decl(var_decls, *idx, &(*bound).into()),
+            TypeEnum::RowVariable(idx, _) => {
+                Err(SignatureError::RowTypeVarOutsideRow { idx: *idx })
+            }
+        }
+    }
+
+    fn validate_in_row(
+        &self,
+        extension_registry: &ExtensionRegistry,
+        var_decls: &[TypeParam],
+    ) -> Result<(), SignatureError> {
+        if let TypeEnum::RowVariable(idx, bound) = self.0 {
+            let t = TypeParam::List {
+                param: Box::new(bound.into()),
+            };
+            check_typevar_decl(var_decls, idx, &t)
+        } else {
+            self.validate(extension_registry, var_decls)
         }
     }
 
@@ -324,10 +353,20 @@ impl Type {
         match &self.0 {
             TypeEnum::Alias(_) | TypeEnum::Sum(SumType::Unit { .. }) => self.clone(),
             TypeEnum::Variable(idx, bound) => t.apply_typevar(*idx, *bound),
+            TypeEnum::RowVariable(_, _) => {
+                panic!("Row Variable found outside of row - should have been detected in validate")
+            }
             TypeEnum::Extension(cty) => Type::new_extension(cty.substitute(t)),
             TypeEnum::Function(bf) => Type::new_function(bf.substitute(t)),
             TypeEnum::Tuple(elems) => Type::new_tuple(subst_row(elems, t)),
             TypeEnum::Sum(SumType::General { row }) => Type::new_sum(subst_row(row, t)),
+        }
+    }
+
+    fn substitute_in_row(&self, t: &impl Substitution) -> Vec<Self> {
+        match &self.0 {
+            TypeEnum::RowVariable(idx, bound) => t.apply_rowvar(*idx, *bound),
+            _ => vec![self.substitute(t)],
         }
     }
 }
@@ -348,13 +387,26 @@ pub(crate) trait Substitution {
     /// Apply to a variable whose kind is any given [TypeParam]
     fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg;
 
+    fn apply_rowvar(&self, idx: usize, bound: TypeBound) -> Vec<Type> {
+        vec![self.apply_typevar(idx, bound)]
+    }
+
     fn extension_registry(&self) -> &ExtensionRegistry;
+}
+
+fn valid_row(
+    row: &TypeRow,
+    exts: &ExtensionRegistry,
+    var_decls: &[TypeParam],
+) -> Result<(), SignatureError> {
+    row.iter()
+        .try_for_each(|t| t.validate_in_row(exts, var_decls))
 }
 
 fn subst_row(row: &TypeRow, tr: &impl Substitution) -> TypeRow {
     let res = row
         .iter()
-        .map(|ty| ty.substitute(tr))
+        .flat_map(|ty| ty.substitute_in_row(tr))
         .collect::<Vec<_>>()
         .into();
     res
@@ -403,9 +455,15 @@ pub(crate) mod test {
     pub(crate) use poly_func::test::nested_func;
 
     use super::*;
+    use crate::extension::PRELUDE;
+    use crate::{const_extension_ids, Extension};
     use crate::{extension::prelude::USIZE_T, ops::AliasDecl};
 
     use crate::types::TypeBound;
+
+    const_extension_ids! {
+        const MY_EXT: ExtensionId = "my_extension";
+    }
 
     #[test]
     fn construct() {
@@ -415,7 +473,7 @@ pub(crate) mod test {
             Type::new_extension(CustomType::new(
                 "my_custom",
                 [],
-                "my_extension".try_into().unwrap(),
+                MY_EXT,
                 TypeBound::Copyable,
             )),
             Type::new_alias(AliasDecl::new("my_alias", TypeBound::Eq)),
@@ -425,6 +483,17 @@ pub(crate) mod test {
             "Tuple([usize([]), Function(forall . [[]][]), my_custom([]), Alias(my_alias)])"
                 .to_string()
         );
+
+        let mut ext = Extension::new(MY_EXT);
+        ext.add_type(
+            "my_custom".into(),
+            vec![],
+            "".into(),
+            TypeBound::Copyable.into(),
+        )
+        .unwrap();
+        let reg = ExtensionRegistry::try_new([PRELUDE.to_owned(), ext]).unwrap();
+        t.validate(&reg, &[]).unwrap()
     }
 
     #[test]

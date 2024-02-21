@@ -5,7 +5,7 @@ use itertools::Either;
 use std::fmt::{self, Display, Write};
 
 use super::type_param::TypeParam;
-use super::{subst_row, Substitution, Type, TypeRow};
+use super::{subst_row, valid_row, Substitution, Type, TypeRow};
 
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 use crate::{Direction, IncomingPort, OutgoingPort, Port};
@@ -34,10 +34,8 @@ impl FunctionType {
         extension_registry: &ExtensionRegistry,
         var_decls: &[TypeParam],
     ) -> Result<(), SignatureError> {
-        self.input
-            .iter()
-            .chain(self.output.iter())
-            .try_for_each(|t| t.validate(extension_registry, var_decls))?;
+        valid_row(&self.input, extension_registry, var_decls)?;
+        valid_row(&self.output, extension_registry, var_decls)?;
         self.extension_reqs.validate(var_decls)
     }
 
