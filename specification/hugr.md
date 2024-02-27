@@ -1556,8 +1556,8 @@ pseudocode, though we advocate MessagePack format in practice (see
 [Serialization implementation](schema/serialization.md)).
 Note in particular that hierarchical relationships
 have a special encoding outside `edges`, as a field `parent`
-in a node definition.
-The unique root node of the HUGR reports itself as the parent.
+in a node definition. Nodes are identified by their position in the `nodes`
+list. The unique root node of the HUGR reports itself as the parent.
 
 The other required field in a node is `op` which identifies an operation by
 name, and is used as a discriminating tag in validating the remaining fields.
@@ -1586,7 +1586,7 @@ struct Edge = ((Int, Optional<Int>), (Int, Optional<Int>))
 ```
 
 Node indices, used within the
-definitions of nodes and edges, directly correspond to indices of the
+definitions of nodes and edges, directly correspond to positions in the
 `nodes` list. An edge is defined by the source and target nodes, and
 optionally the offset of the output/input ports within those nodes, if the edge
 kind is one that connects to a port. This scheme
@@ -1594,6 +1594,10 @@ enforces that nodes are contiguous - a node index must always point to a
 valid node - whereas in tooling implementations it may be necessary to
 implement stable indexing where removing a node invalidates that index
 while keeping all other indices pointing to the same node.
+
+Nodes with `Input` and `Output` children are expected to appear earlier in the
+list than those children, and `Input` nodes should appear before their matching
+`Output` nodes.
 
 ## Architecture
 
