@@ -69,6 +69,14 @@ fn dot_string(sample_hugr: (Hugr, BuildHandle<DataflowOpID>, BuildHandle<Dataflo
     insta::assert_yaml_snapshot!(h.dot_string());
 }
 
+#[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
+#[rstest]
+fn mermaid_string(sample_hugr: (Hugr, BuildHandle<DataflowOpID>, BuildHandle<DataflowOpID>)) {
+    let (h, _, _) = sample_hugr;
+
+    insta::assert_display_snapshot!(h.mermaid_string());
+}
+
 #[rstest]
 fn all_ports(sample_hugr: (Hugr, BuildHandle<DataflowOpID>, BuildHandle<DataflowOpID>)) {
     use itertools::Itertools;
