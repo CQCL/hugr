@@ -50,13 +50,17 @@ pub trait NodeIndex {
 }
 
 /// A port in the incoming direction.
-#[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash, Default)]
+#[derive(
+    Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash, Default, serde::Serialize, serde::Deserialize,
+)]
 pub struct IncomingPort {
     index: u16,
 }
 
 /// A port in the outgoing direction.
-#[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash, Default)]
+#[derive(
+    Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash, Default, serde::Serialize, serde::Deserialize,
+)]
 pub struct OutgoingPort {
     index: u16,
 }
@@ -64,7 +68,9 @@ pub struct OutgoingPort {
 /// The direction of a port.
 pub type Direction = portgraph::Direction;
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
 /// A DataFlow wire, defined by a Value-kind output port of a node
 // Stores node and offset to output port
 pub struct Wire(Node, OutgoingPort);
@@ -223,7 +229,9 @@ impl Wire {
 ///
 /// Falls back to [`Wire`] if the wire is not linear or if it's not possible to
 /// track the origin.
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub enum CircuitUnit {
     /// Arbitrary input wire.
     Wire(Wire),
