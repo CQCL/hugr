@@ -59,20 +59,27 @@ pub fn edge_style<H: HugrView>(
         let tgt_node = graph.port_node(tgt).unwrap();
         let tgt_offset = graph.port_offset(tgt).unwrap();
 
+        let port_kind = src_optype.port_kind(src_offset).unwrap();
+
         let style = if hugr.hierarchy.parent(src_node) != hugr.hierarchy.parent(tgt_node) {
             EdgeStyle::Solid
-        } else if src_optype.port_kind(src_offset) == Some(EdgeKind::StateOrder) {
+        } else if port_kind == EdgeKind::StateOrder {
             EdgeStyle::Dotted
         } else {
             EdgeStyle::Solid
         };
 
-        match show_port_offsets {
-            true => {
-                let label = format!("{}:{}", src_offset.index(), tgt_offset.index());
-                style.with_label(label)
-            }
-            false => style,
+        if !show_port_offsets {
+            return style;
         }
+        let label = match port_kind {
+            EdgeKind::StateOrder | EdgeKind::ControlFlow => {
+                format!("{}:{}", src_offset.index(), tgt_offset.index())
+            }
+            EdgeKind::Static(ty) | EdgeKind::Value(ty) => {
+                format!("{}:{}\n{ty}", src_offset.index(), tgt_offset.index())
+            }
+        };
+        style.with_label(label)
     })
 }
