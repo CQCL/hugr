@@ -7,15 +7,15 @@
 //!
 //! - [ModuleBuilder]: For building a module with function declarations and
 //!       definitions.
-//! - [DFGBuilder]: For building a Dataflow Graph.
+//! - [DFGBuilder]: For building a dataflow graph.
 //! - [FunctionBuilder]: A `DFGBuilder` specialised in defining functions with a
-//!       Dataflow Graph.
-//! - [CFGBuilder]: For building a Control Flow Graph.
-//! - [ConditionalBuilder]: For building a Conditional node.
-//! - [TailLoopBuilder]: For building a TailLoop node.
+//!       dataflow graph.
+//! - [CFGBuilder]: For building a control flow graph.
+//! - [ConditionalBuilder]: For building a conditional node.
+//! - [TailLoopBuilder]: For building a tail-loop node.
 //!
 //! Additionally, the [CircuitBuilder] provides an alternative to the
-//! [DFGBuilder] when working with circuits, some inputs of operations directly
+//! [DFGBuilder] when working with circuits, where some inputs of operations directly
 //! correspond to some outputs and operations can be directly appended using
 //! unit indices.
 //!
@@ -66,12 +66,12 @@
 //!         // Add multiple operations, indicating only the wire index.
 //!         circuit.append(NotOp, [0])?.append(NotOp, [1])?;
 //!
-//!         // Finish the circuit, and return the dfg after connecting its outputs.
+//!         // Finish the circuit, and return the dataflow graph after connecting its outputs.
 //!         let outputs = circuit.finish();
 //!         dfg.finish_with_outputs(outputs)
 //!     }?;
 //!
-//!     // Finish building the hugr, consuming the builder.
+//!     // Finish building the HUGR, consuming the builder.
 //!     //
 //!     // Requires a registry with all the extensions used in the module.
 //!     module_builder.finish_hugr(&LOGIC_REG)
@@ -79,7 +79,7 @@
 //!
 //! // The built HUGR is always valid.
 //! hugr.validate(&LOGIC_REG).unwrap_or_else(|e| {
-//!     panic!("Hugr validation failed: {e}");
+//!     panic!("HUGR validation failed: {e}");
 //! });
 //! # Ok(())
 //! # }
