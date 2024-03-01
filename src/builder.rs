@@ -21,8 +21,9 @@
 //!
 //! # Example
 //!
-//! The following example shows how to build a simple HUGR module with a generic
-//! dataflow graph, a control flow graph, and a circuit.
+//! The following example shows how to build a simple HUGR module with two
+//! dataflow functions, one built using the `DFGBuilder` and the other using the
+//! `CircuitBuilder`.
 //!
 //! ```rust
 //! # use hugr::Hugr;
