@@ -484,7 +484,7 @@ pub(in crate::hugr::rewrite) mod test {
     fn test_replace_cx_cross() {
         let q_row: Vec<Type> = vec![QB, QB];
         let mut builder = DFGBuilder::new(FunctionType::new(q_row.clone(), q_row)).unwrap();
-        let mut circ = builder.as_circuit(builder.input_wires().collect());
+        let mut circ = builder.as_circuit(builder.input_wires());
         circ.append(cx_gate(), [0, 1]).unwrap();
         circ.append(cx_gate(), [1, 0]).unwrap();
         let wires = circ.finish();

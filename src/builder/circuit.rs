@@ -27,8 +27,11 @@ pub enum CircuitBuildError {
 impl<'a, T: Dataflow + ?Sized> CircuitBuilder<'a, T> {
     /// Construct a new [`CircuitBuilder`] from a vector of incoming wires and the
     /// builder for the graph
-    pub fn new(wires: Vec<Wire>, builder: &'a mut T) -> Self {
-        Self { wires, builder }
+    pub fn new(wires: impl IntoIterator<Item = Wire>, builder: &'a mut T) -> Self {
+        Self {
+            wires: wires.into_iter().collect(),
+            builder,
+        }
     }
 
     /// Number of wires tracked, upper bound of valid wire indices
@@ -188,7 +191,7 @@ mod test {
             |mut f_build| {
                 let [q0, q1, angle]: [Wire; 3] = f_build.input_wires_arr();
 
-                let mut linear = f_build.as_circuit(vec![q0, q1]);
+                let mut linear = f_build.as_circuit([q0, q1]);
 
                 let measure_out = linear
                     .append(cx_gate(), [0, 1])?

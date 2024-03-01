@@ -1,4 +1,89 @@
-//! Tools for building valid HUGRs.
+//! Utilities for building valid HUGRs.
+//!
+//! This module includes various tools for building HUGRs.
+//!
+//! Depending on the type of HUGR you want to build, you may want to use one of
+//! the following builders:
+//!
+//! - [ModuleBuilder]: For building a module with function declarations and
+//!       definitions.
+//! - [DFGBuilder]: For building a Dataflow Graph.
+//! - [FunctionBuilder]: A `DFGBuilder` specialised in defining functions with a
+//!       Dataflow Graph.
+//! - [CFGBuilder]: For building a Control Flow Graph.
+//! - [ConditionalBuilder]: For building a Conditional node.
+//! - [TailLoopBuilder]: For building a TailLoop node.
+//!
+//! Additionally, the [CircuitBuilder] provides an alternative to the
+//! [DFGBuilder] when working with circuits, some inputs of operations directly
+//! correspond to some outputs and operations can be directly appended using
+//! unit indices.
+//!
+//! # Example
+//!
+//! The following example shows how to build a simple HUGR module with a generic
+//! dataflow graph, a control flow graph, and a circuit.
+//!
+//! ```rust
+//! # use hugr::Hugr;
+//! # use hugr::builder::{BuildError, BuildHandle, Container, DFGBuilder, Dataflow, DataflowHugr, ModuleBuilder, DataflowSubContainer, HugrBuilder};
+//! use hugr::extension::prelude::BOOL_T;
+//! use hugr::std_extensions::logic::{NotOp, LOGIC_REG};
+//! use hugr::types::FunctionType;
+//!
+//! # fn doctest() -> Result<(), BuildError> {
+//! let hugr = {
+//!     let mut module_builder = ModuleBuilder::new();
+//!
+//!     // Add a `main` function with signature `bool -> bool`.
+//!     //
+//!     // This block returns a handle to the built function.
+//!     let _dfg_handle = {
+//!         let mut dfg = module_builder.define_function(
+//!             "main",
+//!             FunctionType::new(vec![BOOL_T], vec![BOOL_T]).into(),
+//!         )?;
+//!
+//!         // Get the wires from the function inputs.
+//!         let [w] = dfg.input_wires_arr();
+//!
+//!         // Add an operation connected to the input wire, and get the new dangling wires.
+//!         let [w] = dfg.add_dataflow_op(NotOp, [w])?.outputs_arr();
+//!
+//!         // Finish the function, connecting some wires to the output.
+//!         dfg.finish_with_outputs([w])
+//!     }?;
+//!
+//!     // Add a similar function, using the circuit builder interface.
+//!     let _circuit_handle = {
+//!         let mut dfg = module_builder.define_function(
+//!             "circuit",
+//!             FunctionType::new(vec![BOOL_T, BOOL_T], vec![BOOL_T, BOOL_T]).into(),
+//!         )?;
+//!         let mut circuit = dfg.as_circuit(dfg.input_wires());
+//!
+//!         // Add multiple operations, indicating only the wire index.
+//!         circuit.append(NotOp, [0])?.append(NotOp, [1])?;
+//!
+//!         // Finish the circuit, and return the dfg after connecting its outputs.
+//!         let outputs = circuit.finish();
+//!         dfg.finish_with_outputs(outputs)
+//!     }?;
+//!
+//!     // Finish building the hugr, consuming the builder.
+//!     //
+//!     // Requires a registry with all the extensions used in the module.
+//!     module_builder.finish_hugr(&LOGIC_REG)
+//! }?;
+//!
+//! // The built HUGR is always valid.
+//! hugr.validate(&LOGIC_REG).unwrap_or_else(|e| {
+//!     panic!("Hugr validation failed: {e}");
+//! });
+//! # Ok(())
+//! # }
+//! # doctest().unwrap();
+//! ```
 //!
 use thiserror::Error;
 
