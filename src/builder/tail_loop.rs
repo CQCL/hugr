@@ -127,7 +127,7 @@ mod test {
             let mut fbuild = module_builder.define_function(
                 "main",
                 FunctionType::new(type_row![BIT], type_row![NAT])
-                    .with_extension_delta(&ExtensionSet::singleton(&PRELUDE_ID))
+                    .with_extension_delta(PRELUDE_ID)
                     .into(),
             )?;
             let _fdef = {

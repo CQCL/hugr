@@ -129,14 +129,10 @@ fn value_types() {
 
 #[test]
 fn static_targets() {
-    use crate::extension::{
-        prelude::{ConstUsize, PRELUDE_ID, USIZE_T},
-        ExtensionSet,
-    };
+    use crate::extension::prelude::{ConstUsize, PRELUDE_ID, USIZE_T};
     use itertools::Itertools;
     let mut dfg = DFGBuilder::new(
-        FunctionType::new(type_row![], type_row![USIZE_T])
-            .with_extension_delta(&ExtensionSet::singleton(&PRELUDE_ID)),
+        FunctionType::new(type_row![], type_row![USIZE_T]).with_extension_delta(PRELUDE_ID),
     )
     .unwrap();
 

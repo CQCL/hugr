@@ -142,7 +142,7 @@ mod test {
         builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
         extension::{
             prelude::{ConstUsize, USIZE_CUSTOM_T, USIZE_T},
-            ExtensionId, ExtensionRegistry, ExtensionSet, PRELUDE,
+            ExtensionId, ExtensionRegistry, PRELUDE,
         },
         std_extensions::arithmetic::float_types::{self, ConstF64, FLOAT64_TYPE},
         type_row,
@@ -246,12 +246,9 @@ mod test {
             ex_id.clone(),
             TypeBound::Eq,
         );
-        let val: Value = CustomSerialized::new(
-            typ_int.clone(),
-            YamlValue::Number(6.into()),
-            ExtensionSet::singleton(&ex_id),
-        )
-        .into();
+        let val: Value =
+            CustomSerialized::new(typ_int.clone(), YamlValue::Number(6.into()), ex_id.clone())
+                .into();
         let classic_t = Type::new_extension(typ_int.clone());
         assert_matches!(classic_t.least_upper_bound(), TypeBound::Eq);
         classic_t.check_type(&val).unwrap();

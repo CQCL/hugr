@@ -288,14 +288,14 @@ pub struct Extension {
 impl Extension {
     /// Creates a new extension with the given name.
     pub fn new(name: ExtensionId) -> Self {
-        Self::new_with_reqs(name, Default::default())
+        Self::new_with_reqs(name, ExtensionSet::default())
     }
 
     /// Creates a new extension with the given name and requirements.
-    pub fn new_with_reqs(name: ExtensionId, extension_reqs: ExtensionSet) -> Self {
+    pub fn new_with_reqs(name: ExtensionId, extension_reqs: impl Into<ExtensionSet>) -> Self {
         Self {
             name,
-            extension_reqs,
+            extension_reqs: extension_reqs.into(),
             types: Default::default(),
             values: Default::default(),
             operations: Default::default(),

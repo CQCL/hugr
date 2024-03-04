@@ -6,11 +6,11 @@ use super::custom::{ExtensionOp, ExternalOp};
 use super::dataflow::DataflowOpTrait;
 use super::{OpName, OpTag};
 
-use crate::extension::{ExtensionRegistry, SignatureError};
+use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 use crate::types::type_param::TypeArg;
 use crate::types::PolyFuncType;
 use crate::{
-    extension::{ExtensionId, ExtensionSet},
+    extension::ExtensionId,
     types::{EdgeKind, FunctionType, Type, TypeRow},
 };
 
@@ -185,7 +185,7 @@ impl DataflowOpTrait for LeafOp {
                 type_row,
                 new_extension,
             } => FunctionType::new(type_row.clone(), type_row.clone())
-                .with_extension_delta(&ExtensionSet::singleton(new_extension)),
+                .with_extension_delta(ExtensionSet::singleton(new_extension)),
             LeafOp::TypeApply { ta } => FunctionType::new(
                 vec![Type::new_function(ta.input.clone())],
                 vec![Type::new_function(ta.output.clone())],

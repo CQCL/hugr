@@ -79,7 +79,8 @@ impl DataflowOpTrait for Conditional {
         inputs
             .to_mut()
             .insert(0, Type::new_tuple_sum(self.tuple_sum_rows.clone()));
-        FunctionType::new(inputs, self.outputs.clone()).with_extension_delta(&self.extension_delta)
+        FunctionType::new(inputs, self.outputs.clone())
+            .with_extension_delta(self.extension_delta.clone())
     }
 }
 
