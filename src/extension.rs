@@ -502,6 +502,12 @@ impl ExtensionSet {
     }
 }
 
+impl From<ExtensionId> for ExtensionSet {
+    fn from(id: ExtensionId) -> Self {
+        Self::singleton(&id)
+    }
+}
+
 fn as_typevar(e: &ExtensionId) -> Option<usize> {
     // Type variables are represented as radix-10 numbers, which are illegal
     // as standard ExtensionIds. Hence if an ExtensionId starts with a digit,
