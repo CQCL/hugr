@@ -365,7 +365,7 @@ pub trait HugrView: sealed::HugrInternals {
             .mermaid_format()
             .with_hierarchy(&hugr.hierarchy)
             .with_node_style(render::node_style(self))
-            .with_edge_style(render::edge_style(self, true))
+            .with_edge_style(render::edge_style(self, true, true))
             .finish()
     }
 
@@ -383,7 +383,7 @@ pub trait HugrView: sealed::HugrInternals {
             .with_hierarchy(&hugr.hierarchy)
             .with_node_style(render::node_style(self))
             .with_port_style(render::port_style(self))
-            .with_edge_style(render::edge_style(self, false))
+            .with_edge_style(render::edge_style(self, false, false))
             .finish()
     }
 

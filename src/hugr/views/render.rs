@@ -9,7 +9,7 @@ use crate::types::EdgeKind;
 use crate::HugrView;
 
 /// Formatter method to compute a node style.
-pub fn node_style<H: HugrView>(h: &H) -> Box<dyn FnMut(NodeIndex) -> NodeStyle + '_> {
+pub(super) fn node_style<H: HugrView>(h: &H) -> Box<dyn FnMut(NodeIndex) -> NodeStyle + '_> {
     Box::new(move |n| {
         NodeStyle::Box(format!(
             "({ni}) {name}",
@@ -20,7 +20,7 @@ pub fn node_style<H: HugrView>(h: &H) -> Box<dyn FnMut(NodeIndex) -> NodeStyle +
 }
 
 /// Formatter method to compute a port style.
-pub fn port_style<H: HugrView>(h: &H) -> Box<dyn FnMut(PortIndex) -> PortStyle + '_> {
+pub(super) fn port_style<H: HugrView>(h: &H) -> Box<dyn FnMut(PortIndex) -> PortStyle + '_> {
     let graph = h.portgraph();
     Box::new(move |port| {
         let node = graph.port_node(port).unwrap();
@@ -40,9 +40,10 @@ pub fn port_style<H: HugrView>(h: &H) -> Box<dyn FnMut(PortIndex) -> PortStyle +
 
 /// Formatter method to compute an edge style.
 #[allow(clippy::type_complexity)]
-pub fn edge_style<H: HugrView>(
+pub(super) fn edge_style<H: HugrView>(
     h: &H,
-    show_port_offsets: bool,
+    port_offsets_in_edges: bool,
+    type_labels_in_edges: bool,
 ) -> Box<
     dyn FnMut(
             <H::Portgraph<'_> as LinkView>::LinkEndpoint,
@@ -50,35 +51,34 @@ pub fn edge_style<H: HugrView>(
         ) -> EdgeStyle
         + '_,
 > {
-    let hugr = h.base_hugr();
     let graph = h.portgraph();
     Box::new(move |src, tgt| {
         let src_node = graph.port_node(src).unwrap();
         let src_optype = h.get_optype(src_node.into());
         let src_offset = graph.port_offset(src).unwrap();
-        let tgt_node = graph.port_node(tgt).unwrap();
         let tgt_offset = graph.port_offset(tgt).unwrap();
 
         let port_kind = src_optype.port_kind(src_offset).unwrap();
 
-        let style = if hugr.hierarchy.parent(src_node) != hugr.hierarchy.parent(tgt_node) {
-            EdgeStyle::Solid
-        } else if port_kind == EdgeKind::StateOrder {
-            EdgeStyle::Dotted
-        } else {
-            EdgeStyle::Solid
+        // StateOrder edges: Dotted line.
+        // Control flow edges: Solid line.
+        // Static and Value edges: Solid line with label.
+        let style = match port_kind {
+            EdgeKind::StateOrder => EdgeStyle::Dotted,
+            EdgeKind::ControlFlow => EdgeStyle::Dashed,
+            EdgeKind::Static(_) | EdgeKind::Value(_) => EdgeStyle::Solid,
         };
 
-        if !show_port_offsets {
-            return style;
-        }
-        let label = match port_kind {
-            EdgeKind::StateOrder | EdgeKind::ControlFlow => {
-                format!("{}:{}", src_offset.index(), tgt_offset.index())
-            }
-            EdgeKind::Static(ty) | EdgeKind::Value(ty) => {
+        // Compute the label for the edge, given the setting flags.
+        //
+        // Only static and value edges have types to display.
+        let label = match (port_offsets_in_edges, type_labels_in_edges, port_kind) {
+            (true, true, EdgeKind::Static(ty) | EdgeKind::Value(ty)) => {
                 format!("{}:{}\n{ty}", src_offset.index(), tgt_offset.index())
             }
+            (true, _, _) => format!("{}:{}", src_offset.index(), tgt_offset.index()),
+            (false, true, EdgeKind::Static(ty) | EdgeKind::Value(ty)) => format!("{}", ty),
+            _ => return style,
         };
         style.with_label(label)
     })
