@@ -55,7 +55,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
             parent,
             NodeType::new(
                 output,
-                input_extensions.map(|inp| inp.union(&signature.extension_reqs)),
+                input_extensions.map(|inp| inp.union(signature.extension_reqs)),
             ),
         )?;
 
@@ -430,7 +430,7 @@ pub(crate) mod test {
         let xb: ExtensionId = "B".try_into().unwrap();
         let xc: ExtensionId = "C".try_into().unwrap();
         let ab_extensions = ExtensionSet::from_iter([xa.clone(), xb.clone()]);
-        let abc_extensions = ab_extensions.clone().union(&xc.clone().into());
+        let abc_extensions = ab_extensions.clone().union(xc.clone().into());
 
         let parent_sig =
             FunctionType::new(type_row![BIT], type_row![BIT]).with_extension_delta(abc_extensions);

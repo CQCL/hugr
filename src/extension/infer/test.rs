@@ -255,7 +255,7 @@ fn dangling_src() -> Result<(), Box<dyn Error>> {
     assert_eq!(hugr.get_nodetype(src.node()).io_extensions().unwrap().1, rs);
     assert_eq!(
         hugr.get_nodetype(mult.node()).io_extensions().unwrap(),
-        (&rs.clone(), rs)
+        (rs.clone(), rs)
     );
     Ok(())
 }
@@ -366,11 +366,11 @@ fn test_conditional_inference() -> Result<(), Box<dyn Error>> {
     for node in [case0_node, case1_node, conditional_node] {
         assert_eq!(
             hugr.get_nodetype(node).io_extensions().unwrap().0,
-            &ExtensionSet::new()
+            ExtensionSet::new()
         );
         assert_eq!(
             hugr.get_nodetype(node).io_extensions().unwrap().0,
-            &ExtensionSet::new()
+            ExtensionSet::new()
         );
     }
     Ok(())
@@ -724,7 +724,10 @@ fn make_looping_cfg(
     bb1_ext: ExtensionSet,
     bb2_ext: ExtensionSet,
 ) -> Result<Hugr, Box<dyn Error>> {
-    let hugr_delta = entry_ext.clone().union(&bb1_ext).union(&bb2_ext);
+    let hugr_delta = entry_ext
+        .clone()
+        .union(bb1_ext.clone())
+        .union(bb2_ext.clone());
 
     let mut hugr = Hugr::new(NodeType::new_open(ops::CFG {
         signature: FunctionType::new(type_row![NAT], type_row![NAT])
