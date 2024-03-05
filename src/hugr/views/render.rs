@@ -92,7 +92,7 @@ pub(super) fn edge_style<H: HugrView>(
         let port_kind = src_optype.port_kind(src_offset).unwrap();
 
         // StateOrder edges: Dotted line.
-        // Control flow edges: Solid line.
+        // Control flow edges: Dashed line.
         // Static and Value edges: Solid line with label.
         let style = match port_kind {
             EdgeKind::StateOrder => EdgeStyle::Dotted,
