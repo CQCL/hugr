@@ -2,7 +2,7 @@
 
 pub mod descendants;
 pub mod petgraph;
-mod render;
+pub mod render;
 mod root_checked;
 pub mod sibling;
 pub mod sibling_subgraph;
@@ -13,6 +13,7 @@ mod tests;
 use std::iter::Map;
 
 pub use self::petgraph::PetgraphWrapper;
+use self::render::RenderConfig;
 pub use descendants::DescendantsGraph;
 pub use root_checked::RootChecked;
 pub use sibling::SiblingGraph;
@@ -359,13 +360,30 @@ pub trait HugrView: sealed::HugrInternals {
     where
         Self: Sized,
     {
+        self.mermaid_string_with_config(RenderConfig {
+            port_offsets_in_edges: true,
+            type_labels_in_edges: true,
+        })
+    }
+
+    /// Return the mermaid representation of the underlying hierarchical graph.
+    ///
+    /// The hierarchy is represented using subgraphs. Edges are labelled with
+    /// their source and target ports.
+    ///
+    /// For a more detailed representation, use the [`HugrView::dot_string`]
+    /// format instead.
+    fn mermaid_string_with_config(&self, config: RenderConfig) -> String
+    where
+        Self: Sized,
+    {
         let hugr = self.base_hugr();
         let graph = self.portgraph();
         graph
             .mermaid_format()
             .with_hierarchy(&hugr.hierarchy)
             .with_node_style(render::node_style(self))
-            .with_edge_style(render::edge_style(self, true, true))
+            .with_edge_style(render::edge_style(self, config))
             .finish()
     }
 
@@ -378,12 +396,13 @@ pub trait HugrView: sealed::HugrInternals {
     {
         let hugr = self.base_hugr();
         let graph = self.portgraph();
+        let config = RenderConfig::default();
         graph
             .dot_format()
             .with_hierarchy(&hugr.hierarchy)
             .with_node_style(render::node_style(self))
             .with_port_style(render::port_style(self))
-            .with_edge_style(render::edge_style(self, false, false))
+            .with_edge_style(render::edge_style(self, config))
             .finish()
     }
 

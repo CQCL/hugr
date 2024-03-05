@@ -8,6 +8,16 @@ use crate::ops::OpName;
 use crate::types::EdgeKind;
 use crate::HugrView;
 
+/// Configuration for rendering a HUGR graph.
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub struct RenderConfig {
+    /// Show port offsets in the graph edges.
+    pub port_offsets_in_edges: bool,
+    /// Show type labels on edges.
+    pub type_labels_in_edges: bool,
+}
+
 /// Formatter method to compute a node style.
 pub(super) fn node_style<H: HugrView>(h: &H) -> Box<dyn FnMut(NodeIndex) -> NodeStyle + '_> {
     Box::new(move |n| {
@@ -42,8 +52,7 @@ pub(super) fn port_style<H: HugrView>(h: &H) -> Box<dyn FnMut(PortIndex) -> Port
 #[allow(clippy::type_complexity)]
 pub(super) fn edge_style<H: HugrView>(
     h: &H,
-    port_offsets_in_edges: bool,
-    type_labels_in_edges: bool,
+    config: RenderConfig,
 ) -> Box<
     dyn FnMut(
             <H::Portgraph<'_> as LinkView>::LinkEndpoint,
@@ -72,7 +81,11 @@ pub(super) fn edge_style<H: HugrView>(
         // Compute the label for the edge, given the setting flags.
         //
         // Only static and value edges have types to display.
-        let label = match (port_offsets_in_edges, type_labels_in_edges, port_kind) {
+        let label = match (
+            config.port_offsets_in_edges,
+            config.type_labels_in_edges,
+            port_kind,
+        ) {
             (true, true, EdgeKind::Static(ty) | EdgeKind::Value(ty)) => {
                 format!("{}:{}\n{ty}", src_offset.index(), tgt_offset.index())
             }
