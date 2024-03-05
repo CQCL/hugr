@@ -194,7 +194,8 @@ pub struct CustomSerialized {
 
 impl CustomSerialized {
     /// Creates a new [`CustomSerialized`].
-    pub fn new(typ: CustomType, value: serde_yaml::Value, extensions: ExtensionSet) -> Self {
+    pub fn new(typ: CustomType, value: serde_yaml::Value, exts: impl Into<ExtensionSet>) -> Self {
+        let extensions = exts.into();
         Self {
             typ,
             value,
@@ -260,7 +261,7 @@ pub(crate) mod test {
         Value::custom(CustomSerialized {
             typ: FLOAT64_CUSTOM_TYPE,
             value: serde_yaml::Value::Number(f.into()),
-            extensions: ExtensionSet::singleton(&float_types::EXTENSION_ID),
+            extensions: float_types::EXTENSION_ID.into(),
         })
     }
 

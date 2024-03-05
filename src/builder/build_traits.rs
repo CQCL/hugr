@@ -71,7 +71,7 @@ pub trait Container {
     /// This function will return an error if there is an error in adding the
     /// [`OpType::Const`] node.
     fn add_constant(&mut self, constant: impl Into<ops::Const>) -> Result<ConstID, BuildError> {
-        let const_n = self.add_child_node(NodeType::new(constant.into(), ExtensionSet::new()))?;
+        let const_n = self.add_child_node(NodeType::new_pure(constant.into()))?;
 
         Ok(const_n.into())
     }
@@ -89,13 +89,10 @@ pub trait Container {
         signature: PolyFuncType,
     ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
         let body = signature.body().clone();
-        let f_node = self.add_child_node(NodeType::new(
-            ops::FuncDefn {
-                name: name.into(),
-                signature,
-            },
-            ExtensionSet::new(),
-        ))?;
+        let f_node = self.add_child_node(NodeType::new_pure(ops::FuncDefn {
+            name: name.into(),
+            signature,
+        }))?;
 
         let db =
             DFGBuilder::create_with_io(self.hugr_mut(), f_node, body, Some(ExtensionSet::new()))?;
@@ -335,9 +332,9 @@ pub trait Dataflow: Container {
             NodeType::new(
                 ops::CFG {
                     signature: FunctionType::new(inputs.clone(), output_types.clone())
-                        .with_extension_delta(&extension_delta),
+                        .with_extension_delta(extension_delta),
                 },
-                input_extensions,
+                input_extensions.into(),
             ),
             input_wires,
         )?;

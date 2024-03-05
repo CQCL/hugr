@@ -388,7 +388,7 @@ mod test {
         let r = ExtensionSet::singleton(&"R".try_into().unwrap());
 
         let mut hugr = closed_dfg_root_hugr(
-            FunctionType::new(type_row![BIT], type_row![BIT]).with_extension_delta(&r),
+            FunctionType::new(type_row![BIT], type_row![BIT]).with_extension_delta(r.clone()),
         );
         let [input, output] = hugr.get_io(hugr.root()).unwrap();
         let lift = hugr.add_node_with_parent(
