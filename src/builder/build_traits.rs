@@ -613,7 +613,7 @@ pub trait Dataflow: Container {
 
     /// For the vector of `wires`, produce a `CircuitBuilder` where ops can be
     /// added using indices in to the vector.
-    fn as_circuit(&mut self, wires: Vec<Wire>) -> CircuitBuilder<Self> {
+    fn as_circuit(&mut self, wires: impl IntoIterator<Item = Wire>) -> CircuitBuilder<Self> {
         CircuitBuilder::new(wires, self)
     }
 }

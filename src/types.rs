@@ -422,8 +422,7 @@ pub(crate) mod test {
         ]);
         assert_eq!(
             t.to_string(),
-            "Tuple([usize([]), Function(forall . [[]][]), my_custom([]), Alias(my_alias)])"
-                .to_string()
+            "Tuple([usize, Function(forall . [[]][]), my_custom, Alias(my_alias)])".to_string()
         );
     }
 
