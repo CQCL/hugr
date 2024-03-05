@@ -61,20 +61,30 @@ fn node_connections(
     Ok(())
 }
 
+/// Render some hugrs into dot format.
+///
+/// The first parameter `test_name` is required due to insta and rstest limitations.
+/// See https://github.com/la10736/rstest/issues/183
 #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
 #[rstest]
-fn dot_string(sample_hugr: (Hugr, BuildHandle<DataflowOpID>, BuildHandle<DataflowOpID>)) {
-    let (h, _, _) = sample_hugr;
-
-    insta::assert_yaml_snapshot!(h.dot_string());
+#[case::dfg("dot_dfg", sample_hugr().0)]
+#[case::cfg("dot_cfg", crate::builder::test::simple_cfg_hugr())]
+#[case::empty_dfg("dot_empty_dfg", crate::builder::test::simple_dfg_hugr())]
+fn dot_string(#[case] test_name: &str, #[case] h: Hugr) {
+    insta::assert_yaml_snapshot!(test_name, h.dot_string());
 }
 
+/// Render some hugrs into mermaid format.
+///
+/// The first parameter `test_name` is required due to insta and rstest limitations.
+/// See https://github.com/la10736/rstest/issues/183
 #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
 #[rstest]
-fn mermaid_string(sample_hugr: (Hugr, BuildHandle<DataflowOpID>, BuildHandle<DataflowOpID>)) {
-    let (h, _, _) = sample_hugr;
-
-    insta::assert_display_snapshot!(h.mermaid_string());
+#[case::dfg("mmd_dfg", sample_hugr().0)]
+#[case::cfg("mmd_cfg", crate::builder::test::simple_cfg_hugr())]
+#[case::empty_dfg("mmd_empty_dfg", crate::builder::test::simple_dfg_hugr())]
+fn mermaid_string(#[case] test_name: &str, #[case] h: Hugr) {
+    insta::assert_snapshot!(test_name, h.mermaid_string());
 }
 
 #[rstest]

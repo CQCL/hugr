@@ -404,7 +404,7 @@ impl BlockBuilder<Hugr> {
 }
 
 #[cfg(test)]
-mod test {
+pub(crate) mod test {
     use crate::builder::build_traits::HugrBuilder;
     use crate::builder::{DataflowSubContainer, ModuleBuilder};
 
@@ -453,7 +453,7 @@ mod test {
         Ok(())
     }
 
-    fn build_basic_cfg<T: AsMut<Hugr> + AsRef<Hugr>>(
+    pub(crate) fn build_basic_cfg<T: AsMut<Hugr> + AsRef<Hugr>>(
         cfg_builder: &mut CFGBuilder<T>,
     ) -> Result<(), BuildError> {
         let sum2_variants = vec![type_row![NAT], type_row![NAT]];
