@@ -455,8 +455,8 @@ impl ExtensionSet {
     }
 
     /// Returns the union of two extension sets.
-    pub fn union(mut self, other: &Self) -> Self {
-        self.0.extend(other.0.iter().cloned());
+    pub fn union(mut self, other: Self) -> Self {
+        self.0.extend(other.0);
         self
     }
 

@@ -31,7 +31,7 @@ impl ExtensionValidator {
                 .map(|s| s.extension_reqs)
                 .unwrap_or_default();
 
-            let outgoing_sol = extension_reqs.union(&incoming_sol);
+            let outgoing_sol = extension_reqs.union(incoming_sol.clone());
 
             extensions.insert((node, Direction::Incoming), incoming_sol);
             extensions.insert((node, Direction::Outgoing), outgoing_sol);

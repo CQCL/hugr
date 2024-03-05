@@ -25,7 +25,7 @@ pub struct FunctionType {
 impl FunctionType {
     /// Builder method, add extension_reqs to an FunctionType
     pub fn with_extension_delta(mut self, rs: impl Into<ExtensionSet>) -> Self {
-        self.extension_reqs = self.extension_reqs.union(&rs.into());
+        self.extension_reqs = self.extension_reqs.union(rs.into());
         self
     }
 
