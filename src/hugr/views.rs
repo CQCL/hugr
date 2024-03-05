@@ -361,6 +361,7 @@ pub trait HugrView: sealed::HugrInternals {
         Self: Sized,
     {
         self.mermaid_string_with_config(RenderConfig {
+            node_indices: true,
             port_offsets_in_edges: true,
             type_labels_in_edges: true,
         })
@@ -382,7 +383,7 @@ pub trait HugrView: sealed::HugrInternals {
         graph
             .mermaid_format()
             .with_hierarchy(&hugr.hierarchy)
-            .with_node_style(render::node_style(self))
+            .with_node_style(render::node_style(self, config))
             .with_edge_style(render::edge_style(self, config))
             .finish()
     }
@@ -400,8 +401,8 @@ pub trait HugrView: sealed::HugrInternals {
         graph
             .dot_format()
             .with_hierarchy(&hugr.hierarchy)
-            .with_node_style(render::node_style(self))
-            .with_port_style(render::port_style(self))
+            .with_node_style(render::node_style(self, config))
+            .with_port_style(render::port_style(self, config))
             .with_edge_style(render::edge_style(self, config))
             .finish()
     }

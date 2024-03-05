@@ -9,28 +9,50 @@ use crate::types::EdgeKind;
 use crate::HugrView;
 
 /// Configuration for rendering a HUGR graph.
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub struct RenderConfig {
+    /// Show the node index in the graph nodes.
+    pub node_indices: bool,
     /// Show port offsets in the graph edges.
     pub port_offsets_in_edges: bool,
     /// Show type labels on edges.
     pub type_labels_in_edges: bool,
 }
 
+impl Default for RenderConfig {
+    fn default() -> Self {
+        Self {
+            node_indices: true,
+            port_offsets_in_edges: true,
+            type_labels_in_edges: true,
+        }
+    }
+}
+
 /// Formatter method to compute a node style.
-pub(super) fn node_style<H: HugrView>(h: &H) -> Box<dyn FnMut(NodeIndex) -> NodeStyle + '_> {
-    Box::new(move |n| {
-        NodeStyle::Box(format!(
-            "({ni}) {name}",
-            ni = n.index(),
-            name = h.get_optype(n.into()).name()
-        ))
-    })
+pub(super) fn node_style<H: HugrView>(
+    h: &H,
+    config: RenderConfig,
+) -> Box<dyn FnMut(NodeIndex) -> NodeStyle + '_> {
+    if config.node_indices {
+        Box::new(move |n| {
+            NodeStyle::Box(format!(
+                "({ni}) {name}",
+                ni = n.index(),
+                name = h.get_optype(n.into()).name()
+            ))
+        })
+    } else {
+        Box::new(move |n| NodeStyle::Box(h.get_optype(n.into()).name().to_string()))
+    }
 }
 
 /// Formatter method to compute a port style.
-pub(super) fn port_style<H: HugrView>(h: &H) -> Box<dyn FnMut(PortIndex) -> PortStyle + '_> {
+pub(super) fn port_style<H: HugrView>(
+    h: &H,
+    _config: RenderConfig,
+) -> Box<dyn FnMut(PortIndex) -> PortStyle + '_> {
     let graph = h.portgraph();
     Box::new(move |port| {
         let node = graph.port_node(port).unwrap();
