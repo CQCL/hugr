@@ -178,8 +178,8 @@ pub(crate) mod test {
 
     use super::handle::BuildHandle;
     use super::{
-        BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, FuncID, FunctionBuilder,
-        ModuleBuilder,
+        BuildError, CFGBuilder, Container, DFGBuilder, Dataflow, DataflowHugr, FuncID,
+        FunctionBuilder, ModuleBuilder,
     };
     use super::{DataflowSubContainer, HugrBuilder};
 
@@ -212,6 +212,14 @@ pub(crate) mod test {
             DFGBuilder::new(FunctionType::new(type_row![BIT], type_row![BIT])).unwrap();
         let [i1] = dfg_builder.input_wires_arr();
         dfg_builder.finish_prelude_hugr_with_outputs([i1]).unwrap()
+    }
+
+    #[fixture]
+    pub(crate) fn simple_cfg_hugr() -> Hugr {
+        let mut cfg_builder =
+            CFGBuilder::new(FunctionType::new(type_row![NAT], type_row![NAT])).unwrap();
+        super::cfg::test::build_basic_cfg(&mut cfg_builder).unwrap();
+        cfg_builder.finish_prelude_hugr().unwrap()
     }
 
     /// A helper method which creates a DFG rooted hugr with closed resources,

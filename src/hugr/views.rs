@@ -2,6 +2,7 @@
 
 pub mod descendants;
 pub mod petgraph;
+pub mod render;
 mod root_checked;
 pub mod sibling;
 pub mod sibling_subgraph;
@@ -12,6 +13,7 @@ mod tests;
 use std::iter::Map;
 
 pub use self::petgraph::PetgraphWrapper;
+use self::render::RenderConfig;
 pub use descendants::DescendantsGraph;
 pub use root_checked::RootChecked;
 pub use sibling::SiblingGraph;
@@ -19,12 +21,12 @@ pub use sibling_subgraph::SiblingSubgraph;
 
 use context_iterators::{ContextIterator, IntoContextIterator, MapWithCtx};
 use itertools::{Itertools, MapInto};
-use portgraph::dot::{DotFormat, EdgeStyle, NodeStyle, PortStyle};
+use portgraph::render::{DotFormat, MermaidFormat};
 use portgraph::{multiportgraph, LinkView, MultiPortGraph, PortView};
 
 use super::{Hugr, HugrError, NodeMetadata, NodeMetadataMap, NodeType, DEFAULT_NODETYPE};
 use crate::ops::handle::NodeHandle;
-use crate::ops::{OpName, OpParent, OpTag, OpTrait, OpType};
+use crate::ops::{OpParent, OpTag, OpTrait, OpType};
 
 use crate::types::Type;
 use crate::types::{EdgeKind, FunctionType};
@@ -347,52 +349,61 @@ pub trait HugrView: sealed::HugrInternals {
         PetgraphWrapper { hugr: self }
     }
 
-    /// Return dot string showing underlying graph and hierarchy side by side.
-    fn dot_string(&self) -> String {
+    /// Return the mermaid representation of the underlying hierarchical graph.
+    ///
+    /// The hierarchy is represented using subgraphs. Edges are labelled with
+    /// their source and target ports.
+    ///
+    /// For a more detailed representation, use the [`HugrView::dot_string`]
+    /// format instead.
+    fn mermaid_string(&self) -> String
+    where
+        Self: Sized,
+    {
+        self.mermaid_string_with_config(RenderConfig {
+            node_indices: true,
+            port_offsets_in_edges: true,
+            type_labels_in_edges: true,
+        })
+    }
+
+    /// Return the mermaid representation of the underlying hierarchical graph.
+    ///
+    /// The hierarchy is represented using subgraphs. Edges are labelled with
+    /// their source and target ports.
+    ///
+    /// For a more detailed representation, use the [`HugrView::dot_string`]
+    /// format instead.
+    fn mermaid_string_with_config(&self, config: RenderConfig) -> String
+    where
+        Self: Sized,
+    {
         let hugr = self.base_hugr();
         let graph = self.portgraph();
         graph
+            .mermaid_format()
+            .with_hierarchy(&hugr.hierarchy)
+            .with_node_style(render::node_style(self, config))
+            .with_edge_style(render::edge_style(self, config))
+            .finish()
+    }
+
+    /// Return the graphviz representation of the underlying graph and hierarchy side by side.
+    ///
+    /// For a simpler representation, use the [`HugrView::mermaid_string`] format instead.
+    fn dot_string(&self) -> String
+    where
+        Self: Sized,
+    {
+        let hugr = self.base_hugr();
+        let graph = self.portgraph();
+        let config = RenderConfig::default();
+        graph
             .dot_format()
             .with_hierarchy(&hugr.hierarchy)
-            .with_node_style(|n| {
-                NodeStyle::Box(format!(
-                    "({ni}) {name}",
-                    ni = n.index(),
-                    name = self.get_optype(n.into()).name()
-                ))
-            })
-            .with_port_style(|port| {
-                let node = graph.port_node(port).unwrap();
-                let optype = self.get_optype(node.into());
-                let offset = graph.port_offset(port).unwrap();
-                match optype.port_kind(offset).unwrap() {
-                    EdgeKind::Static(ty) => {
-                        PortStyle::new(html_escape::encode_text(&format!("{}", ty)))
-                    }
-                    EdgeKind::Value(ty) => {
-                        PortStyle::new(html_escape::encode_text(&format!("{}", ty)))
-                    }
-                    EdgeKind::StateOrder => match graph.port_links(port).count() > 0 {
-                        true => PortStyle::text("", false),
-                        false => PortStyle::Hidden,
-                    },
-                    _ => PortStyle::text("", true),
-                }
-            })
-            .with_edge_style(|src, tgt| {
-                let src_node = graph.port_node(src).unwrap();
-                let src_optype = self.get_optype(src_node.into());
-                let src_offset = graph.port_offset(src).unwrap();
-                let tgt_node = graph.port_node(tgt).unwrap();
-
-                if hugr.hierarchy.parent(src_node) != hugr.hierarchy.parent(tgt_node) {
-                    EdgeStyle::Dashed
-                } else if src_optype.port_kind(src_offset) == Some(EdgeKind::StateOrder) {
-                    EdgeStyle::Dotted
-                } else {
-                    EdgeStyle::Solid
-                }
-            })
+            .with_node_style(render::node_style(self, config))
+            .with_port_style(render::port_style(self, config))
+            .with_edge_style(render::edge_style(self, config))
             .finish()
     }
 

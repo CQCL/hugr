@@ -1,0 +1,5 @@
+---
+source: src/hugr/views/tests.rs
+expression: h.dot_string()
+---
+"digraph {\n0 [shape=plain label=<<table border=\"1\"><tr><td align=\"text\" border=\"0\" colspan=\"1\">(0) DFG</td></tr></table>>]\n1 [shape=plain label=<<table border=\"1\"><tr><td align=\"text\" border=\"0\" colspan=\"1\">(1) Input</td></tr><tr><td port=\"out0\" align=\"text\" colspan=\"1\" cellpadding=\"1\" >0: Sum(UnitSum(2))</td></tr></table>>]\n1:out0 -> 2:in0 [style=\"\"]\n2 [shape=plain label=<<table border=\"1\"><tr><td port=\"in0\" align=\"text\" colspan=\"1\" cellpadding=\"1\" >0: Sum(UnitSum(2))</td></tr><tr><td align=\"text\" border=\"0\" colspan=\"1\">(2) Output</td></tr></table>>]\nhier0 [shape=plain label=\"0\"]\nhier0 -> hier1  [style = \"dashed\"] \nhier0 -> hier2  [style = \"dashed\"] \nhier1 [shape=plain label=\"1\"]\nhier2 [shape=plain label=\"2\"]\n}\n"
