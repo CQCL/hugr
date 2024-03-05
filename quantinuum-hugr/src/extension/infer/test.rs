@@ -451,7 +451,7 @@ fn make_block(
     extension_delta: ExtensionSet,
 ) -> Result<Node, Box<dyn Error>> {
     let tuple_sum_rows: Vec<_> = tuple_sum_rows.into_iter().collect();
-    let tuple_sum_type = Type::new_tuple_sum(tuple_sum_rows.clone());
+    let tuple_sum_type = Type::new_sum(tuple_sum_rows.clone());
     let dfb_sig = FunctionType::new(inputs.clone(), vec![tuple_sum_type])
         .with_extension_delta(extension_delta.clone());
     let dfb = ops::DataflowBlock {
@@ -473,11 +473,11 @@ fn make_block(
 }
 
 fn oneway(ty: Type) -> Vec<Type> {
-    vec![Type::new_tuple_sum([vec![ty]])]
+    vec![Type::new_sum([vec![ty].into()])]
 }
 
 fn twoway(ty: Type) -> Vec<Type> {
-    vec![Type::new_tuple_sum([vec![ty.clone()], vec![ty]])]
+    vec![Type::new_sum([vec![ty.clone()].into(), vec![ty].into()])]
 }
 
 fn create_entry_exit(
@@ -488,7 +488,7 @@ fn create_entry_exit(
     entry_extensions: ExtensionSet,
     exit_types: impl Into<TypeRow>,
 ) -> Result<([Node; 3], Node), Box<dyn Error>> {
-    let entry_tuple_sum = Type::new_tuple_sum(entry_variants.clone());
+    let entry_tuple_sum = Type::new_sum(entry_variants.clone());
     let dfb = ops::DataflowBlock {
         inputs: inputs.clone(),
         other_outputs: type_row![],

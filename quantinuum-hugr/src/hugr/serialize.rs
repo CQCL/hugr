@@ -263,7 +263,7 @@ pub mod test {
     use crate::std_extensions::arithmetic::float_types::{ConstF64, FLOAT64_TYPE};
     use crate::std_extensions::logic::NotOp;
     use crate::types::{FunctionType, Type};
-    use crate::OutgoingPort;
+    use crate::{type_row, OutgoingPort};
     use itertools::Itertools;
     use jsonschema::{Draft, JSONSchema};
     use lazy_static::lazy_static;
@@ -429,7 +429,7 @@ pub mod test {
             let mut module_builder = ModuleBuilder::new();
             module_builder.set_metadata("name", "test");
 
-            let t_row = vec![Type::new_sum(vec![NAT, QB])];
+            let t_row = vec![Type::new_sum([type_row![NAT], type_row![QB]])];
             let mut f_build = module_builder
                 .define_function("main", FunctionType::new(t_row.clone(), t_row).into())
                 .unwrap();

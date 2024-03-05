@@ -63,6 +63,7 @@ mod test {
     use crate::extension::prelude::USIZE_T;
     use crate::hugr::serialize::test::ser_roundtrip;
     use crate::std_extensions::arithmetic::float_types::FLOAT64_TYPE;
+    use crate::type_row;
     use crate::types::FunctionType;
     use crate::types::Type;
 
@@ -77,7 +78,7 @@ mod test {
         assert_eq!(ser_roundtrip(&t), t);
 
         // A Classic sum
-        let t = Type::new_sum(vec![USIZE_T, FLOAT64_TYPE]);
+        let t = Type::new_sum([type_row![USIZE_T], type_row![FLOAT64_TYPE]]);
         assert_eq!(ser_roundtrip(&t), t);
 
         let t = Type::new_unit_sum(4);

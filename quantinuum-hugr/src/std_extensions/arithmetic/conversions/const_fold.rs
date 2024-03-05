@@ -53,7 +53,7 @@ fn fold_trunc(
         };
         let sum_val = Value::Sum {
             tag: 1,
-            value: Box::new(err_val.into()),
+            values: [Box::new(err_val.into())].to_vec(),
         };
 
         ops::Const::new(sum_val, sum_type.clone()).unwrap()
@@ -65,7 +65,7 @@ fn fold_trunc(
         if let Ok(cv) = cv {
             let sum_val = Value::Sum {
                 tag: 0,
-                value: Box::new(cv),
+                values: [Box::new(cv)].to_vec(),
             };
 
             ops::Const::new(sum_val, sum_type).unwrap()

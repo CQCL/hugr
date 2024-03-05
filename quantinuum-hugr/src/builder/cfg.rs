@@ -74,8 +74,8 @@ use crate::{
 ///     let entry = {
 ///         // Pack the const "42" into the appropriate sum type.
 ///         let left_42 =
-///             ops::Const::tuple_sum(0,
-///                                   Value::tuple([prelude::ConstUsize::new(42).into()]),
+///             ops::Const::sum(0,
+///                                   [prelude::ConstUsize::new(42).into()],
 ///                                   sum_variants.clone())?;
 ///         let sum = entry_b.add_load_const(left_42);
 ///
@@ -463,7 +463,7 @@ pub(crate) mod test {
         let entry = {
             let [inw] = entry_b.input_wires_arr();
 
-            let sum = entry_b.make_tuple_sum(1, sum2_variants, [inw])?;
+            let sum = entry_b.make_tag(1, sum2_variants, [inw])?;
             entry_b.finish_with_outputs(sum, [])?
         };
         let mut middle_b = cfg_builder

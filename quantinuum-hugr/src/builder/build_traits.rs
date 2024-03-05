@@ -501,32 +501,30 @@ pub trait Dataflow: Container {
     fn make_tag(
         &mut self,
         tag: usize,
-        variants: impl Into<TypeRow>,
-        value: Wire,
+        variants: impl IntoIterator<Item = TypeRow>,
+        values: impl IntoIterator<Item = Wire>,
     ) -> Result<Wire, BuildError> {
         let make_op = self.add_dataflow_op(
             LeafOp::Tag {
                 tag,
-                variants: variants.into(),
+                variants: variants.into_iter().map(Into::into).collect_vec(),
             },
-            vec![value],
+            values.into_iter().collect_vec(),
         )?;
         Ok(make_op.out_wire(0))
     }
 
-    /// Add [`LeafOp::MakeTuple`] and [`LeafOp::Tag`] nodes to construct the
-    /// `tag` variant of a TupleSum type.
-    fn make_tuple_sum(
-        &mut self,
-        tag: usize,
-        tuple_sum_rows: impl IntoIterator<Item = TypeRow>,
-        values: impl IntoIterator<Item = Wire>,
-    ) -> Result<Wire, BuildError> {
-        let tuple = self.make_tuple(values)?;
-        let variants = crate::types::tuple_sum_row(tuple_sum_rows);
-        let make_op = self.add_dataflow_op(LeafOp::Tag { tag, variants }, vec![tuple])?;
-        Ok(make_op.out_wire(0))
-    }
+    // /// Add [`LeafOp::MakeTuple`] and [`LeafOp::Tag`] nodes to construct the
+    // /// `tag` variant of a TupleSum type.
+    // fn make_sum(
+    //     &mut self,
+    //     tag: usize,
+    //     tuple_sum_rows: impl IntoIterator<Item = TypeRow>,
+    //     values: impl IntoIterator<Item = Wire>,
+    // ) -> Result<Wire, BuildError> {
+    //     let make_op = self.add_dataflow_op(LeafOp::Tag { tag, variants: tuple_sum_rows }, values)?;
+    //     Ok(make_op.out_wire(0))
+    // }
 
     /// Use the wires in `values` to return a wire corresponding to the
     /// "Continue" variant of a [`ops::TailLoop`] with `loop_signature`.
@@ -542,7 +540,7 @@ pub trait Dataflow: Container {
         tail_loop: ops::TailLoop,
         values: impl IntoIterator<Item = Wire>,
     ) -> Result<Wire, BuildError> {
-        self.make_tuple_sum(0, [tail_loop.just_inputs, tail_loop.just_outputs], values)
+        self.make_tag(0, [tail_loop.just_inputs, tail_loop.just_outputs], values)
     }
 
     /// Use the wires in `values` to return a wire corresponding to the
@@ -559,7 +557,7 @@ pub trait Dataflow: Container {
         loop_op: ops::TailLoop,
         values: impl IntoIterator<Item = Wire>,
     ) -> Result<Wire, BuildError> {
-        self.make_tuple_sum(1, [loop_op.just_inputs, loop_op.just_outputs], values)
+        self.make_tag(1, [loop_op.just_inputs, loop_op.just_outputs], values)
     }
 
     /// Add a [`ops::Call`] node, calling `function`, with inputs

@@ -37,13 +37,13 @@ impl Const {
 
     /// Sum of Tuples, used for branching.
     /// Tuple rows are defined in order by input rows.
-    pub fn tuple_sum(
+    pub fn sum(
         tag: usize,
-        value: Value,
+        values: impl IntoIterator<Item = Value>,
         variant_rows: impl IntoIterator<Item = TypeRow>,
     ) -> Result<Self, ConstTypeError> {
-        let typ = Type::new_tuple_sum(variant_rows);
-        Self::new(Value::sum(tag, value), typ)
+        let typ = Type::new_sum(variant_rows);
+        Self::new(Value::sum(tag, values), typ)
     }
 
     /// Constant Sum over units, used as branching values.
@@ -165,26 +165,26 @@ mod test {
     #[test]
     fn test_tuple_sum() -> Result<(), BuildError> {
         use crate::builder::Container;
-        let pred_rows = vec![type_row![USIZE_T, FLOAT64_TYPE], type_row![]];
-        let pred_ty = Type::new_tuple_sum(pred_rows.clone());
+        let pred_rows = vec![type_row![USIZE_T, FLOAT64_TYPE], Type::EMPTY_TYPEROW];
+        let pred_ty = Type::new_sum(pred_rows.clone());
 
         let mut b = DFGBuilder::new(FunctionType::new(
             type_row![],
             TypeRow::from(vec![pred_ty.clone()]),
         ))?;
-        let c = b.add_constant(Const::tuple_sum(
+        let c = b.add_constant(Const::sum(
             0,
-            Value::tuple([
+            [
                 CustomTestValue(USIZE_CUSTOM_T).into(),
                 serialized_float(5.1),
-            ]),
+            ],
             pred_rows.clone(),
         )?);
         let w = b.load_const(&c);
         b.finish_hugr_with_outputs([w], &test_registry()).unwrap();
 
         let mut b = DFGBuilder::new(FunctionType::new(type_row![], TypeRow::from(vec![pred_ty])))?;
-        let c = b.add_constant(Const::tuple_sum(1, Value::unit(), pred_rows)?);
+        let c = b.add_constant(Const::sum(1, [], pred_rows)?);
         let w = b.load_const(&c);
         b.finish_hugr_with_outputs([w], &test_registry()).unwrap();
 
@@ -193,10 +193,10 @@ mod test {
 
     #[test]
     fn test_bad_tuple_sum() {
-        let pred_rows = [type_row![USIZE_T, FLOAT64_TYPE], type_row![]];
+        let pred_rows = [type_row![USIZE_T, FLOAT64_TYPE], Type::EMPTY_TYPEROW];
 
-        let res = Const::tuple_sum(0, Value::tuple([]), pred_rows);
-        assert_matches!(res, Err(ConstTypeError::TupleWrongLength));
+        let res = Const::sum(0, [Value::tuple([])], pred_rows);
+        assert_matches!(res, Err(ConstTypeError::SumWrongLength));
     }
 
     #[test]
