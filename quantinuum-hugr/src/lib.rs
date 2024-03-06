@@ -135,7 +135,6 @@
 //! ```
 //!
 
-#![warn(missing_docs)]
 // Unstable check, may cause false positives.
 // https://github.com/rust-lang/rust-clippy/issues/5112
 #![warn(clippy::debug_assert_with_mut_call)]

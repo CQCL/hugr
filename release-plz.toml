@@ -1,2 +1,11 @@
 [workspace]
 changelog_config = "cliff.toml" # use a custom git-cliff configuration
+# disable the changelog for all packages
+changelog_update = false
+
+[[package]]
+name = "quantinuum-hugr"
+# enable the changelog for this package
+changelog_update = true
+# set the path of the changelog to the root of the repository
+changelog_path = "./CHANGELOG.md"

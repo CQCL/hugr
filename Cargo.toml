@@ -1,70 +1,25 @@
-[package]
-name = "quantinuum-hugr"
-version = "0.2.0"
-edition = "2021"
+[profile.release]
+lto = "thin"
+
+[workspace]
+resolver = "2"
+members = ["quantinuum-hugr"]
+default-members = ["quantinuum-hugr"]
+
+[workspace.package]
 rust-version = "1.75"
-
+edition = "2021"
+homepage = "https://github.com/CQCL/tket2"
+repository = "https://github.com/CQCL/tket2"
 license = "Apache-2.0"
-readme = "README.md"
-documentation = "https://docs.rs/hugr/"
-repository = "https://github.com/CQCL/hugr"
-description = "Quantinuum's Hierarchical Unified Graph Representation"
-keywords = ["Quantum", "Quantinuum"]
-categories = ["compilers"]
+# authors
 
-[lib]
-# Using different names for the lib and for the package is supported, but may be confusing.
-# https://github.com/rust-lang/cargo/issues/6827
-# TODO: Should we rename one of them?
-name = "hugr"
-bench = false
-path = "src/lib.rs"
+[workspace.lints.rust]
+missing_docs = "warn"
 
-[features]
-extension_inference = []
-
-[dependencies]
-thiserror = "1.0.28"
-portgraph = { version = "0.12.0", features = ["serde", "petgraph"] }
-regex = "1.9.5"
-cgmath = { version = "0.18.0", features = ["serde"] }
-num-rational = { version = "0.4.1", features = ["serde"] }
-downcast-rs = "1.2.0"
-serde = { version = "1.0", features = [
-    # Rc used here for Extension, but unfortunately we must turn the feature on globally
-    "derive",
-    "rc",
-] }
-serde_yaml = "0.9.19"
-typetag = "0.2.7"
-smol_str = { version = "0.2.0", features = ["serde"] }
-derive_more = "0.99.17"
-itertools = "0.12.0"
-html-escape = "0.2.13"
-bitvec = { version = "1.0.1", features = ["serde"] }
-enum_dispatch = "0.3.11"
-lazy_static = "1.4.0"
-petgraph = { version = "0.6.3", default-features = false }
-context-iterators = "0.2.0"
-serde_json = "1.0.97"
-delegate = "0.12.0"
-paste = "1.0"
-strum = "0.26.1"
-strum_macros = "0.26.1"
-
-[dev-dependencies]
-criterion = { version = "0.5.1", features = ["html_reports"] }
-rstest = "0.18.1"
-webbrowser = "0.8.10"
-urlencoding = "2.1.2"
-cool_asserts = "2.0.3"
-insta = { version = "1.34.0", features = ["yaml"] }
-jsonschema = "0.17.1"
-
-[[bench]]
-name = "bench_main"
-harness = false
-
+[workspace.dependencies]
+portgraph = { version = "0.12.0" }
+insta = { version = "1.34.0" }
 
 [profile.dev.package.insta]
 opt-level = 3

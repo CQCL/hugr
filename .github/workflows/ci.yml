@@ -33,9 +33,9 @@ jobs:
       - name: Check formatting
         run: cargo fmt -- --check
       - name: Run clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --all-targets --all-features --workspace -- -D warnings
       - name: Build docs
-        run: cargo doc --no-deps --all-features
+        run: cargo doc --no-deps --all-features --workspace
         env:
           RUSTDOCFLAGS: "-Dwarnings"
 
@@ -48,9 +48,9 @@ jobs:
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: Build benchmarks with no features
-        run: cargo bench --verbose --no-run --no-default-features
+        run: cargo bench --verbose --no-run --workspace --no-default-features
       - name: Build benchmarks with all features
-        run: cargo bench --verbose --no-run --all-features
+        run: cargo bench --verbose --no-run --workspace --all-features
 
   tests:
     runs-on: ubuntu-latest
@@ -79,13 +79,13 @@ jobs:
       - name: Configure default rust toolchain
         run: rustup override set ${{steps.toolchain.outputs.name}}
       - name: Build with no features
-        run: cargo test --verbose --no-default-features --no-run
+        run: cargo test --verbose --workspace --no-default-features --no-run
       - name: Tests with no features
-        run: cargo test --verbose --no-default-features
+        run: cargo test --verbose --workspace --no-default-features
       - name: Build with all features
-        run: cargo test --verbose --all-features --no-run
+        run: cargo test --verbose --workspace --all-features --no-run
       - name: Tests with all features
-        run: cargo test --verbose --all-features
+        run: cargo test --verbose --workspace --all-features
 
   coverage:
     if: github.event_name != 'merge_group'
@@ -102,10 +102,10 @@ jobs:
       - name: Run tests with coverage instrumentation
         run: |
             cargo llvm-cov clean --workspace
-            cargo llvm-cov --no-report --no-default-features --doctests
-            cargo llvm-cov --no-report --all-features --doctests
+            cargo llvm-cov --no-report --workspace --no-default-features --doctests
+            cargo llvm-cov --no-report --workspace --all-features --doctests
       - name: Generate coverage report
-        run: cargo llvm-cov --all-features report --codecov --output-path coverage.json
+        run: cargo llvm-cov --all-features --workspace report --codecov --output-path coverage.json
       - name: Upload coverage to codecov.io
         uses: codecov/codecov-action@v4
         with:
