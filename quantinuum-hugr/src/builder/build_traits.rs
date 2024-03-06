@@ -498,7 +498,7 @@ pub trait Dataflow: Container {
     ///
     /// This function will return an error if there is an error adding the
     /// Tag node.
-    fn make_tag(
+    fn make_sum(
         &mut self,
         tag: usize,
         variants: impl IntoIterator<Item = TypeRow>,
@@ -540,7 +540,7 @@ pub trait Dataflow: Container {
         tail_loop: ops::TailLoop,
         values: impl IntoIterator<Item = Wire>,
     ) -> Result<Wire, BuildError> {
-        self.make_tag(0, [tail_loop.just_inputs, tail_loop.just_outputs], values)
+        self.make_sum(0, [tail_loop.just_inputs, tail_loop.just_outputs], values)
     }
 
     /// Use the wires in `values` to return a wire corresponding to the
@@ -557,7 +557,7 @@ pub trait Dataflow: Container {
         loop_op: ops::TailLoop,
         values: impl IntoIterator<Item = Wire>,
     ) -> Result<Wire, BuildError> {
-        self.make_tag(1, [loop_op.just_inputs, loop_op.just_outputs], values)
+        self.make_sum(1, [loop_op.just_inputs, loop_op.just_outputs], values)
     }
 
     /// Add a [`ops::Call`] node, calling `function`, with inputs

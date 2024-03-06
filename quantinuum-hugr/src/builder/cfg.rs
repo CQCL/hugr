@@ -463,7 +463,7 @@ pub(crate) mod test {
         let entry = {
             let [inw] = entry_b.input_wires_arr();
 
-            let sum = entry_b.make_tag(1, sum2_variants, [inw])?;
+            let sum = entry_b.make_sum(1, sum2_variants, [inw])?;
             entry_b.finish_with_outputs(sum, [])?
         };
         let mut middle_b = cfg_builder

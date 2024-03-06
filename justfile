@@ -8,7 +8,7 @@ test:
 
 # Auto-fix all clippy warnings
 fix:
-    cargo clippy --all-targets --all-features --workspace --fix --allow-staged
+    cargo clippy --all-targets --all-features --workspace --fix --allow-staged --allow-untracked
 
 # Run the pre-commit checks
 check:

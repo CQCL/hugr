@@ -595,16 +595,19 @@
                     "default": "General",
                     "title": "S"
                 },
-                "row": {
+                "rows": {
                     "items": {
-                        "$ref": "#/$defs/Type"
+                        "items": {
+                            "$ref": "#/$defs/Type",
+                            "type": "array"
+                        }
                     },
-                    "title": "Row",
+                    "title": "Rows",
                     "type": "array"
                 }
             },
             "required": [
-                "row"
+                "rows"
             ],
             "title": "GeneralSum",
             "type": "object"
@@ -1552,8 +1555,8 @@
     },
     "properties": {
         "version": {
-            "const": "v0",
-            "default": "v0",
+            "const": "v1",
+            "default": "v1",
             "title": "Version"
         },
         "nodes": {

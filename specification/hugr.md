@@ -331,18 +331,15 @@ express control flow, i.e. conditional or repeated evaluation.
 ##### `Conditional` nodes
 
 These are parents to multiple `Case` nodes; the children have no edges.
-The first input to the Conditional-node is of TupleSum type (see below), whose
+The first input to the Conditional-node is of Sum type (see below), whose
 arity matches the number of children of the Conditional-node. At runtime
-the constructor (tag) selects which child to execute; the unpacked
-contents of the TupleSum with all remaining inputs to Conditional
-appended are sent to this child, and all outputs of the child are the
+the constructor (tag) selects which child to execute; the elements of the tagged row
+of the Sum, with all remaining inputs to Conditional
+appended, are sent to this child, and all outputs of the child are the
 outputs of the Conditional; that child is evaluated, but the others are
 not. That is, Conditional-nodes act as "if-then-else" followed by a
 control-flow merge.
 
-A **TupleSum(T0, T1…TN)** type is an algebraic "sum of products" type,
-defined as `Sum(Tuple(#T0), Tuple(#T1), ...Tuple(#Tn))` (see [type
-system](#type-system)), where `#Ti` is the *i*th row (sequence of types) defining it.
 
 ```mermaid
 flowchart
@@ -367,13 +364,13 @@ flowchart
 
 These provide tail-controlled loops. The dataflow sibling graph within the
 TailLoop-node defines the loop body: this computes a row of outputs, whose
-first element has type `TupleSum(#I, #O)` and the remainder is a row `#X`
+first element has type `Sum(#I, #O)` and the remainder is a row `#X`
 (perhaps empty). Inputs to the contained graph and to the TailLoop node itself
 are the row `#I:#X`, where `:` indicates row concatenation (with the tuple
 inside the `TupleSum` unpacked).
 
 Evaluation of the node begins by feeding the node inputs into the child graph
-and evaluating it.  The `TupleSum` produced controls iteration of the loop:
+and evaluating it.  The `Sum` produced controls iteration of the loop:
 
 - The first variant (`#I`) means that these values, along with the other
  sibling-graph outputs `#X`, are fed back into the top of the loop,
@@ -402,7 +399,7 @@ The first child is the entry block and must be a `DFB`, with inputs the same as 
 The remaining children are either `DFB`s or [scoped definitions](#scoped-definitions).
 
 The first output of the graph contained in a `BasicBlock` has type
-`TupleSum(#t0,...#t(n-1))`, where the node has `n` successors, and the
+`Sum(#t0,...#t(n-1))`, where the node has `n` successors, and the
 remaining outputs are a row `#x`. `#ti` with `#x` appended matches the
 inputs of successor `i`.
 
@@ -428,8 +425,7 @@ output of each of these is a sum type, whose arity is the number of outgoing
 control edges; the remaining outputs are those that are passed to all
 succeeding nodes.
 
-The three nodes labelled "Const" are simply generating a TupleSum with one empty
-value to pass to the Output node.
+The three nodes labelled "Tag 0" are simply generating a 1-variant unary Sum (i.e. a Sum one variant with empty rows) to the Output node.
 
 ```mermaid
 flowchart
@@ -439,28 +435,28 @@ flowchart
             direction TB
             EntryIn["Input"] -- "angle" --> F
             EntryIn -- "P" --> Entry_["P?1"]
-            Entry_ -- "[()|(P)]" --> EntryOut["Output"]
+            Entry_ -- "[|P]" --> EntryOut["Output"]
             F -- "angle" --> EntryOut
             EntryIn -- "qubit" --> EntryOut
         end
         subgraph BB1
             direction TB
             BB1In["Input"] -- "angle" --> G
-            BB1_["Const"] -- "[()]" --> BB1Out["Output"]
+            BB1_["Tag 0"] -- "[]" --> BB1Out["Output"]
             BB1In -- "qubit" --> BB1Out
             G -- "angle" --> BB1Out
         end
         subgraph BB2
             direction TB
             BB2In["Input"] -- "P" --> H -- "P" --> BB2_["P?2"]
-            BB2_ -- "[(angle)|()]" --> BB2Out["Output"]
+            BB2_ -- "[angle|]" --> BB2Out["Output"]
             BB2In -- "angle" --> BB2_
             BB2In -- "qubit" --> BB2Out
         end
         subgraph BB3
             direction TB
             BB3In["Input"]
-            BB3_["Const"] -- "[()]" --> BB3Out["Output"]
+            BB3_["Tag 0"] -- "[]" --> BB3Out["Output"]
             BB3In -- "qubit" --> BB3Out
             C -- "angle" --> BB3Out
         end
@@ -468,7 +464,7 @@ flowchart
             direction TB
             BB4In["Input"] -- "qubit" --> Rz
             BB4In -- "angle" --> Rz
-            BB4_["Const"] -- "[()]" --> BB4Out["Output"]
+            BB4_["Tag 0"] -- "[]" --> BB4Out["Output"]
             Rz -- "qubit" --> BB4Out
         end
         subgraph Exit
@@ -713,7 +709,7 @@ flowchart
 - At some point we expect to add a first-order `catch` node, somewhat
   like a DFG-node. This contains a DSG, and (like a DFG node) has
   inputs matching the child DSG; but one output, of type
-  `Sum(Tuple(#O),ErrorType)` where O is the outputs of the child DSG.
+  `Sum(#O,#(ErrorType))` where O is the outputs of the child DSG.
 - It is also possible to define a higher-order `catch` operation in an
   extension, taking a graph argument.
 
@@ -790,7 +786,7 @@ There are three classes of type: `AnyType` $\supset$ `CopyableType` $\supset$ `E
 
 For example, a `float` type (defined in an extension) would be a `CopyableType`, but not an `EqType`.
 
-**Rows** The `#` is a *row* which is a sequence of zero or more types. Types in the row can optionally be given names in metadata i.e. this does not affect behaviour of the HUGR.
+**Rows** The `#` is a *row* which is a sequence of zero or more types. Types in the row can optionally be given names in metadata i.e. this does not affect behaviour of the HUGR. When writing literal types, we use `#` to distinguish between tuples and rows, e.g. `(int<1>,int<2>)` is a tuple while `Sum(#(int<1>),#(int<2>))` contains two rows.
 
 The Hugr defines a number of type constructors, that can be instantiated into types by providing some collection of types as arguments. The constructors are given in the following grammar:
 
@@ -799,7 +795,7 @@ The Hugr defines a number of type constructors, that can be instantiated into ty
 Extensions ::= (Extension)* -- a set, not a list
 
 Type ::= Tuple(#) -- fixed-arity, heterogeneous components
-       | Sum(#)   -- disjoint union of other types, tagged by unsigned int
+       | Sum([#]) -- disjoint union of rows of other types, tagged by unsigned int
        | Opaque(Name, [TypeArg]) -- a (instantiation of a) custom type defined by an extension
        | Function(TypeParams, #, #, Extensions) -- polymorphic with type parameters,
                                                 -- function arguments + results, and delta (see below)
@@ -1443,8 +1439,8 @@ use an empty node in the replacement and have B map this node to the old
 one.
 
 We can, for example, implement "turning a Conditional-node with known
-TupleSum into a DFG-node" by a `Replace` where the Conditional (and its
-preceding TupleSum) is replaced by an empty DFG and the map B specifies
+Sum into a DFG-node" by a `Replace` where the Conditional (and its
+preceding Sum) is replaced by an empty DFG and the map B specifies
 the "good" child of the Conditional as the surrogate parent of the new
 DFG's children. (If the good child was just an Op, we could either
 remove it and include it in the replacement, or -- to avoid this overhead
@@ -1644,7 +1640,7 @@ so must be supported by all third-party tooling.
 
 The Logic Extension provides a boolean type and basic logical operations.
 
-The boolean type `bool` is defined to be `Sum((),())`, with the convention that the
+The boolean type `bool` is defined to be `Sum(#(),#())`, with the convention that the
 first option in the sum represents "false" and the second represents "true".
 
 The following operations are defined:
@@ -1705,8 +1701,8 @@ Casts:
 | ---------------------- | -------- | ------------------------ | -------------------------------------------------------------------------------------------- |
 | `iwiden_u<M,N>`( \* )  | `int<M>` | `int<N>`                 | widen an unsigned integer to a wider one with the same value (where M \<= N)                 |
 | `iwiden_s<M,N>`( \* )  | `int<M>` | `int<N>`                 | widen a signed integer to a wider one with the same value (where M \<= N)                    |
-| `inarrow_u<M,N>`( \* ) | `int<M>` | `Sum(int<N>, ErrorType)` | narrow an unsigned integer to a narrower one with the same value if possible, and an error otherwise (where M \>= N) |
-| `inarrow_s<M,N>`( \* ) | `int<M>` | `Sum(int<N>, ErrorType)` | narrow a signed integer to a narrower one with the same value if possible, and an error otherwise (where M \>= N)    |
+| `inarrow_u<M,N>`( \* ) | `int<M>` | `Sum(#(int<N>), #(ErrorType))` | narrow an unsigned integer to a narrower one with the same value if possible, and an error otherwise (where M \>= N) |
+| `inarrow_s<M,N>`( \* ) | `int<M>` | `Sum(#(int<N>), #(ErrorType))` | narrow a signed integer to a narrower one with the same value if possible, and an error otherwise (where M \>= N)    |
 | `itobool` ( \* )       | `int<1>` | `bool`                   | convert to `bool` (1 is true, 0 is false)                                                    |
 | `ifrombool` ( \* )     | `bool`   | `int<1>`                 | convert from `bool` (1 is true, 0 is false)                                                  |
 
@@ -1737,17 +1733,17 @@ Other operations:
 | `isub<N>`              | `int<N>`, `int<N>` | `int<N>`                           | subtraction modulo 2^N (signed and unsigned versions are the same op)                                                                                    |
 | `ineg<N>`              | `int<N>`           | `int<N>`                           | negation modulo 2^N (signed and unsigned versions are the same op)                                                                                       |
 | `imul<N>`              | `int<N>`, `int<N>` | `int<N>`                           | multiplication modulo 2^N (signed and unsigned versions are the same op)                                                                                 |
-| `idivmod_checked_u<N,M>`( \* ) | `int<N>`, `int<M>` | `Sum((int<N>, int<M>), ErrorType)` | given unsigned integers 0 \<= n \< 2^N, 0 \<= m \< 2^M, generates unsigned q, r where q\*m+r=n, 0\<=r\<m (m=0 is an error)                               |
+| `idivmod_checked_u<N,M>`( \* ) | `int<N>`, `int<M>` | `Sum(#(int<N>, int<M>), #(ErrorType))` | given unsigned integers 0 \<= n \< 2^N, 0 \<= m \< 2^M, generates unsigned q, r where q\*m+r=n, 0\<=r\<m (m=0 is an error)                               |
 | `idivmod_u<N,M>` | `int<N>`, `int<M>` | `(int<N>, int<M>)` | given unsigned integers 0 \<= n \< 2^N, 0 \<= m \< 2^M, generates unsigned q, r where q\*m+r=n, 0\<=r\<m (m=0 will call panic)                               |
-| `idivmod_checked_s<N,M>`( \* ) | `int<N>`, `int<M>` | `Sum((int<N>, int<M>), ErrorType)` | given signed integer -2^{N-1} \<= n \< 2^{N-1} and unsigned 0 \<= m \< 2^M, generates signed q and unsigned r where q\*m+r=n, 0\<=r\<m (m=0 is an error) |
+| `idivmod_checked_s<N,M>`( \* ) | `int<N>`, `int<M>` | `Sum(#(int<N>, int<M>), #(ErrorType))` | given signed integer -2^{N-1} \<= n \< 2^{N-1} and unsigned 0 \<= m \< 2^M, generates signed q and unsigned r where q\*m+r=n, 0\<=r\<m (m=0 is an error) |
 | `idivmod_s<N,M>`( \* ) | `int<N>`, `int<M>` | `(int<N>, int<M>)` | given signed integer -2^{N-1} \<= n \< 2^{N-1} and unsigned 0 \<= m \< 2^M, generates signed q and unsigned r where q\*m+r=n, 0\<=r\<m (m=0 will call panic) |
-| `idiv_checked_u<N,M>` ( \* )          | `int<N>`, `int<M>` | `Sum(int<N>, ErrorType)`           | as `idivmod_checked_u` but discarding the second output                                                                                                          |
+| `idiv_checked_u<N,M>` ( \* )          | `int<N>`, `int<M>` | `Sum(#(int<N>),#( ErrorType))`           | as `idivmod_checked_u` but discarding the second output                                                                                                          |
 | `idiv_u<N,M>`          | `int<N>`, `int<M>` | `int<N>`           | as `idivmod_u` but discarding the second output                                                                                                          |
-| `imod_checked_u<N,M>` ( \* )         | `int<N>`, `int<M>` | `Sum(int<M>, ErrorType)`           | as `idivmod_checked_u` but discarding the first output                                                                                                           |
+| `imod_checked_u<N,M>` ( \* )         | `int<N>`, `int<M>` | `Sum(#(int<M>), #(ErrorType))`           | as `idivmod_checked_u` but discarding the first output                                                                                                           |
 | `imod_u<N,M>`          | `int<N>`, `int<M>` | `int<M>`           | as `idivmod_u` but discarding the first output                                                                                                           |
-| `idiv_checked_s<N,M>`( \* )    | `int<N>`, `int<M>` | `Sum(int<N>, ErrorType)`           | as `idivmod_checked_s` but discarding the second output                                                                                                          |
+| `idiv_checked_s<N,M>`( \* )    | `int<N>`, `int<M>` | `Sum(#(int<N>), #(ErrorType))`           | as `idivmod_checked_s` but discarding the second output                                                                                                          |
 | `idiv_s<N,M>`          | `int<N>`, `int<M>` | `int<N>`           | as `idivmod_s` but discarding the second output                                                                                                          |
-| `imod_checked_s<N,M>`( \* )    | `int<N>`, `int<M>` | `Sum(int<M>, ErrorType)`           | as `idivmod_checked_s` but discarding the first output                                                                                                           |
+| `imod_checked_s<N,M>`( \* )    | `int<N>`, `int<M>` | `Sum(#(int<M>), #(ErrorType))`           | as `idivmod_checked_s` but discarding the first output                                                                                                           |
 | `imod_s<N,M>`          | `int<N>`, `int<M>` | `int<M>`           | as `idivmod_s` but discarding the first output                                                                                                           |
 | `iabs<N>`              | `int<N>`           | `int<N>`                           | convert signed to unsigned by taking absolute value                                                                                                      |
 | `iand<N>`              | `int<N>`, `int<N>` | `int<N>`                           | bitwise AND                                                                                                                                              |
@@ -1796,8 +1792,8 @@ Conversions between integers and floats:
 
 | Name           | Inputs    | Outputs                  | Meaning               |
 | -------------- | --------- | ------------------------ | --------------------- |
-| `trunc_u<N>`   | `float64` | `Sum(int<N>, ErrorType)` | float to unsigned int. Returns an error when the float is non-finite or cannot be exactly stored in N bits. |
-| `trunc_s<N>`   | `float64` | `Sum(int<N>, ErrorType)` | float to signed int. Returns an error when the float is non-finite or cannot be exactly stored in N bits. |
+| `trunc_u<N>`   | `float64` | `Sum(#(int<N>), #(ErrorType))` | float to unsigned int. Returns an error when the float is non-finite or cannot be exactly stored in N bits. |
+| `trunc_s<N>`   | `float64` | `Sum(#(int<N>), #(ErrorType))` | float to signed int. Returns an error when the float is non-finite or cannot be exactly stored in N bits. |
 | `convert_u<N>` | `int<N>`  | `float64`                | unsigned int to float |
 | `convert_s<N>` | `int<N>`  | `float64`                | signed int to float   |
 
