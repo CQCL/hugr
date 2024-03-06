@@ -86,6 +86,10 @@ pub(crate) mod test_quantum_extension {
             .unwrap();
 
         extension
+            .add_op(SmolStr::new_inline("CZ"), "CZ".into(), two_qb_func())
+            .unwrap();
+
+        extension
             .add_op(SmolStr::new_inline("CX"), "CX".into(), two_qb_func())
             .unwrap();
 
@@ -94,6 +98,22 @@ pub(crate) mod test_quantum_extension {
                 SmolStr::new_inline("Measure"),
                 "Measure a qubit, returning the qubit and the measurement result.".into(),
                 FunctionType::new(type_row![QB_T], type_row![QB_T, BOOL_T]),
+            )
+            .unwrap();
+
+        extension
+            .add_op(
+                SmolStr::new_inline("QAlloc"),
+                "Allocate a new qubit.".into(),
+                FunctionType::new(type_row![], type_row![QB_T]),
+            )
+            .unwrap();
+
+        extension
+            .add_op(
+                SmolStr::new_inline("QDiscard"),
+                "Discard a qubit.".into(),
+                FunctionType::new(type_row![QB_T], type_row![]),
             )
             .unwrap();
 
@@ -120,12 +140,24 @@ pub(crate) mod test_quantum_extension {
         get_gate("CX")
     }
 
+    pub(crate) fn cz_gate() -> LeafOp {
+        get_gate("CZ")
+    }
+
     pub(crate) fn measure() -> LeafOp {
         get_gate("Measure")
     }
 
     pub(crate) fn rz_f64() -> LeafOp {
         get_gate("RzF64")
+    }
+
+    pub(crate) fn q_alloc() -> LeafOp {
+        get_gate("QAlloc")
+    }
+
+    pub(crate) fn q_discard() -> LeafOp {
+        get_gate("QDiscard")
     }
 }
 
