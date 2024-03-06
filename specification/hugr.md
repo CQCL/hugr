@@ -151,7 +151,8 @@ Note that a port is associated with a node and zero or more dataflow edges.
 Incoming ports are associated with exactly one edge, or many `ControlFlow` edges.
 All dataflow edges associated with a port have the same type; thus a port has a
 well defined type, matching that of its adjoining edges. The incoming and
-outgoing ports of a node are (separately) ordered.
+outgoing ports of a node are ordered and have separate namespaces meaning that
+the first output port will be "0" regardless of how many input ports there are.
 
 The sequences of incoming and outgoing port types (carried on `Value` edges) of a node constitute its
 *signature*.
