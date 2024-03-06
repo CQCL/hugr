@@ -62,16 +62,23 @@ macro_rules! impl_op_ref_try_into {
             impl OpType {
                 #[doc = "If is an instance of `" $Op "` return a reference to it."]
                 pub fn [<as_ $sname:snake>](&self) -> Option<&$Op> {
-                    if let OpType::$Op(l) = self {
-                        Some(l)
-                    } else {
-                        None
-                    }
+                    TryInto::<&$Op>::try_into(self).ok()
                 }
 
-                #[doc = "If is an instance of `" $Op "`."]
+                #[doc = "Returns `true` if the operation is an instance of `" $Op "`."]
                 pub fn [<is_ $sname:snake>](&self) -> bool {
                     self.[<as_ $sname:snake>]().is_some()
+                }
+            }
+
+            impl<'a> TryFrom<&'a OpType> for &'a $Op {
+                type Error = ();
+                fn try_from(optype: &'a OpType) -> Result<Self, Self::Error> {
+                    if let OpType::$Op(l) = optype {
+                        Ok(l)
+                    } else {
+                        Err(())
+                    }
                 }
             }
         }
