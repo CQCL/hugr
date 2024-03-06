@@ -65,7 +65,7 @@ macro_rules! impl_op_ref_try_into {
                     TryInto::<&$Op>::try_into(self).ok()
                 }
 
-                #[doc = "If is an instance of `" $Op "`."]
+                #[doc = "Returns `true` if the operation is an instance of `" $Op "`."]
                 pub fn [<is_ $sname:snake>](&self) -> bool {
                     self.[<as_ $sname:snake>]().is_some()
                 }
