@@ -105,7 +105,7 @@ jobs:
             cargo llvm-cov --no-report --workspace --no-default-features --doctests
             cargo llvm-cov --no-report --workspace --all-features --doctests
       - name: Generate coverage report
-        run: cargo llvm-cov --all-features --workspace report --codecov --output-path coverage.json
+        run: cargo llvm-cov --all-features report --codecov --output-path coverage.json
       - name: Upload coverage to codecov.io
         uses: codecov/codecov-action@v4
         with:
