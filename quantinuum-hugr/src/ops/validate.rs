@@ -79,11 +79,11 @@ impl ValidateOp for super::Conditional {
         let children = children.collect_vec();
         // The first input to the ɣ-node is a value of Sum type,
         // whose arity matches the number of children of the ɣ-node.
-        if self.tuple_sum_rows.len() != children.len() {
-            return Err(ChildrenValidationError::InvalidConditionalTupleSum {
+        if self.sum_rows.len() != children.len() {
+            return Err(ChildrenValidationError::InvalidConditionalSum {
                 child: children[0].0, // Pass an arbitrary child
                 expected_count: children.len(),
-                actual_sum_rows: self.tuple_sum_rows.clone(),
+                actual_sum_rows: self.sum_rows.clone(),
             });
         }
 
@@ -183,9 +183,9 @@ pub enum ChildrenValidationError {
     #[error("A conditional case has optype {optype:?}, which differs from the signature of Conditional container")]
     ConditionalCaseSignature { child: NodeIndex, optype: OpType },
     /// The conditional container's branching value does not match the number of children.
-    #[error("The conditional container's branch TupleSum input should be a sum with {expected_count} elements, but it had {} elements. TupleSum rows: {actual_sum_rows:?}",
+    #[error("The conditional container's branch Sum input should be a sum with {expected_count} elements, but it had {} elements. Sum rows: {actual_sum_rows:?}",
         actual_sum_rows.len())]
-    InvalidConditionalTupleSum {
+    InvalidConditionalSum {
         child: NodeIndex,
         expected_count: usize,
         actual_sum_rows: Vec<TypeRow>,
@@ -200,7 +200,7 @@ impl ChildrenValidationError {
             ChildrenValidationError::InternalExitChildren { child, .. } => *child,
             ChildrenValidationError::ConditionalCaseSignature { child, .. } => *child,
             ChildrenValidationError::IOSignatureMismatch { child, .. } => *child,
-            ChildrenValidationError::InvalidConditionalTupleSum { child, .. } => *child,
+            ChildrenValidationError::InvalidConditionalSum { child, .. } => *child,
         }
     }
 }

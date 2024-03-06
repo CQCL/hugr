@@ -181,16 +181,6 @@
                     "default": "Conditional",
                     "title": "Op"
                 },
-                "tuple_sum_rows": {
-                    "items": {
-                        "items": {
-                            "$ref": "#/$defs/Type"
-                        },
-                        "type": "array"
-                    },
-                    "title": "Tuple Sum Rows",
-                    "type": "array"
-                },
                 "other_inputs": {
                     "items": {
                         "$ref": "#/$defs/Type"
@@ -373,7 +363,7 @@
                     "title": "Other Outputs",
                     "type": "array"
                 },
-                "tuple_sum_rows": {
+                "sum_rows": {
                     "items": {
                         "items": {
                             "$ref": "#/$defs/Type"

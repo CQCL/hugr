@@ -26,7 +26,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> TailLoopBuilder<B> {
         Ok(TailLoopBuilder::from_dfg_builder(dfg_build))
     }
     /// Set the outputs of the [`ops::TailLoop`], with `out_variant` as the value of the
-    /// termination TupleSum, and `rest` being the remaining outputs
+    /// termination Sum, and `rest` being the remaining outputs
     pub fn set_outputs(
         &mut self,
         out_variant: Wire,
@@ -47,7 +47,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> TailLoopBuilder<B> {
             })
     }
 
-    /// The output types of the child graph, including the TupleSum as the first.
+    /// The output types of the child graph, including the Sum as the first.
     pub fn internal_output_row(&self) -> Result<TypeRow, BuildError> {
         self.loop_signature().map(ops::TailLoop::body_output_row)
     }

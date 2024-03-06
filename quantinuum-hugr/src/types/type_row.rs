@@ -11,6 +11,7 @@ use super::Type;
 use crate::utils::display_list;
 use crate::PortIndex;
 use delegate::delegate;
+use itertools::Itertools;
 
 /// List of types, used for function signatures.
 #[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
@@ -47,6 +48,11 @@ impl TypeRow {
     /// Returns the port type given an offset. Returns `None` if the offset is out of bounds.
     pub fn get_mut(&mut self, offset: impl PortIndex) -> Option<&mut Type> {
         self.types.to_mut().get_mut(offset.index())
+    }
+
+    /// Returns a new `TypeRow` with `xs` concatenated onto `self`.
+    pub fn extend<'a>(&'a self, rest: impl IntoIterator<Item = &'a Type>) -> Self {
+        self.iter().chain(rest).cloned().collect_vec().into()
     }
 
     delegate! {

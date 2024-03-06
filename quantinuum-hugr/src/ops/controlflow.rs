@@ -32,7 +32,7 @@ impl DataflowOpTrait for TailLoop {
 
     fn signature(&self) -> FunctionType {
         let [inputs, outputs] =
-            [&self.just_inputs, &self.just_outputs].map(|row| tuple_sum_first(row, &self.rest));
+            [&self.just_inputs, &self.just_outputs].map(|row| row.extend(self.rest.iter()));
         FunctionType::new(inputs, outputs)
     }
 }
@@ -40,23 +40,23 @@ impl DataflowOpTrait for TailLoop {
 impl TailLoop {
     /// Build the output TypeRow of the child graph of a TailLoop node.
     pub(crate) fn body_output_row(&self) -> TypeRow {
-        let tuple_sum_type = Type::new_sum([self.just_inputs.clone(), self.just_outputs.clone()]);
-        let mut outputs = vec![tuple_sum_type];
+        let sum_type = Type::new_sum([self.just_inputs.clone(), self.just_outputs.clone()]);
+        let mut outputs = vec![sum_type];
         outputs.extend_from_slice(&self.rest);
         outputs.into()
     }
 
     /// Build the input TypeRow of the child graph of a TailLoop node.
     pub(crate) fn body_input_row(&self) -> TypeRow {
-        tuple_sum_first(&self.just_inputs, &self.rest)
+        self.just_inputs.extend(self.rest.iter())
     }
 }
 
 /// Conditional operation, defined by child `Case` nodes for each branch.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Conditional {
-    /// The possible rows of the TupleSum input
-    pub tuple_sum_rows: Vec<TypeRow>,
+    /// The possible rows of the Sum input
+    pub sum_rows: Vec<TypeRow>,
     /// Remaining input types
     pub other_inputs: TypeRow,
     /// Output types
@@ -77,7 +77,7 @@ impl DataflowOpTrait for Conditional {
         let mut inputs = self.other_inputs.clone();
         inputs
             .to_mut()
-            .insert(0, Type::new_sum(self.tuple_sum_rows.clone()));
+            .insert(0, Type::new_sum(self.sum_rows.clone()));
         FunctionType::new(inputs, self.outputs.clone()).with_extension_delta(self.extension_delta.clone())
     }
 }
@@ -85,10 +85,7 @@ impl DataflowOpTrait for Conditional {
 impl Conditional {
     /// Build the input TypeRow of the nth child graph of a Conditional node.
     pub(crate) fn case_input_row(&self, case: usize) -> Option<TypeRow> {
-        Some(tuple_sum_first(
-            self.tuple_sum_rows.get(case)?,
-            &self.other_inputs,
-        ))
+        Some(self.sum_rows.get(case)?.extend(self.other_inputs.iter()))
     }
 }
 
@@ -119,7 +116,7 @@ impl DataflowOpTrait for CFG {
 pub struct DataflowBlock {
     pub inputs: TypeRow,
     pub other_outputs: TypeRow,
-    pub tuple_sum_rows: Vec<TypeRow>,
+    pub sum_rows: Vec<TypeRow>,
     pub extension_delta: ExtensionSet,
 }
 
@@ -153,9 +150,9 @@ impl StaticTag for ExitBlock {
 
 impl DataflowParent for DataflowBlock {
     fn inner_signature(&self) -> FunctionType {
-        // The node outputs a TupleSum before the data outputs of the block node
-        let tuple_sum_type = Type::new_sum(self.tuple_sum_rows.clone());
-        let mut node_outputs = vec![tuple_sum_type];
+        // The node outputs a Sum before the data outputs of the block node
+        let sum_type = Type::new_sum(self.sum_rows.clone());
+        let mut node_outputs = vec![sum_type];
         node_outputs.extend_from_slice(&self.other_outputs);
         FunctionType::new(self.inputs.clone(), TypeRow::from(node_outputs))
     }
@@ -185,7 +182,7 @@ impl OpTrait for DataflowBlock {
     fn non_df_port_count(&self, dir: Direction) -> usize {
         match dir {
             Direction::Incoming => 1,
-            Direction::Outgoing => self.tuple_sum_rows.len(),
+            Direction::Outgoing => self.sum_rows.len(),
         }
     }
 }
@@ -230,10 +227,11 @@ impl DataflowBlock {
     /// The correct inputs of any successors. Returns None if successor is not a
     /// valid index.
     pub fn successor_input(&self, successor: usize) -> Option<TypeRow> {
-        Some(tuple_sum_first(
-            self.tuple_sum_rows.get(successor)?,
-            &self.other_outputs,
-        ))
+        Some(
+            self.sum_rows
+                .get(successor)?
+                .extend(self.other_outputs.iter()),
+        )
     }
 }
 
@@ -286,14 +284,4 @@ impl Case {
     pub fn dataflow_output(&self) -> &TypeRow {
         &self.signature.output
     }
-}
-
-fn tuple_sum_first(tuple_sum_row: &TypeRow, rest: &TypeRow) -> TypeRow {
-    TypeRow::from(
-        tuple_sum_row
-            .iter()
-            .cloned()
-            .chain(rest.iter().cloned())
-            .collect::<Vec<_>>(),
-    )
 }

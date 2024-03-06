@@ -272,15 +272,6 @@ impl Type {
         Self(type_e, bound)
     }
 
-    // /// New Sum of Tuple types, used in branching control.
-    // /// Tuple rows are defined in order by input rows.
-    // pub fn new_tuple_sum<V>(variant_rows: impl IntoIterator<Item = V>) -> Self
-    // where
-    //     V: Into<TypeRow>,
-    // {
-    //     Self::new_sum(tuple_sum_row(variant_rows))
-    // }
-
     /// New UnitSum with empty Tuple variants
     pub const fn new_unit_sum(size: u8) -> Self {
         // should be the only way to avoid going through SumType::new
@@ -407,19 +398,6 @@ pub(crate) fn check_typevar_decl(
         }
     }
 }
-
-// /// Return the type row of variants required to define a Sum of Tuples type
-// /// given the rows of each tuple
-// pub(crate) fn tuple_sum_row<V>(variant_rows: impl IntoIterator<Item = V>) -> TypeRow
-// where
-//     V: Into<TypeRow>,
-// {
-//     variant_rows
-//         .into_iter()
-//         .map(Type::new_tuple)
-//         .collect_vec()
-//         .into()
-// }
 
 #[cfg(test)]
 pub(crate) mod test {

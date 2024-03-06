@@ -97,7 +97,8 @@ impl Value {
         }
     }
 
-    /// Sum value (could be of any compatible type - e.g., if `value` was a Tuple, a TupleSum type)
+    /// Sum value (could be of any compatible type - i.e. a Sum type where the
+    /// `tag`th row is equal in length and compatible elementwise with `values`)
     pub fn sum(tag: usize, values: impl IntoIterator<Item = Value>) -> Self {
         Self::Sum {
             tag,

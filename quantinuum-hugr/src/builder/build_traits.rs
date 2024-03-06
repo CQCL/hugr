@@ -408,8 +408,8 @@ pub trait Dataflow: Container {
     }
 
     /// Return a builder for a [`crate::ops::Conditional`] node.
-    /// `tuple_sum_rows` and `tuple_sum_wire` define the type of the TupleSum
-    /// variants and the wire carrying the TupleSum respectively.
+    /// `sum_rows` and `sum_wire` define the type of the Sum
+    /// variants and the wire carrying the Sum respectively.
     ///
     /// The `other_inputs` must be an iterable over pairs of the type of the input and
     /// the corresponding wire.
@@ -421,24 +421,24 @@ pub trait Dataflow: Container {
     /// the Conditional node.
     fn conditional_builder(
         &mut self,
-        (tuple_sum_rows, tuple_sum_wire): (impl IntoIterator<Item = TypeRow>, Wire),
+        (sum_rows, sum_wire): (impl IntoIterator<Item = TypeRow>, Wire),
         other_inputs: impl IntoIterator<Item = (Type, Wire)>,
         output_types: TypeRow,
         extension_delta: ExtensionSet,
     ) -> Result<ConditionalBuilder<&mut Hugr>, BuildError> {
-        let mut input_wires = vec![tuple_sum_wire];
+        let mut input_wires = vec![sum_wire];
         let (input_types, rest_input_wires): (Vec<Type>, Vec<Wire>) =
             other_inputs.into_iter().unzip();
 
         input_wires.extend(rest_input_wires);
         let inputs: TypeRow = input_types.into();
-        let tuple_sum_rows: Vec<_> = tuple_sum_rows.into_iter().collect();
-        let n_cases = tuple_sum_rows.len();
+        let sum_rows: Vec<_> = sum_rows.into_iter().collect();
+        let n_cases = sum_rows.len();
         let n_out_wires = output_types.len();
 
         let conditional_id = self.add_dataflow_op(
             ops::Conditional {
-                tuple_sum_rows,
+                sum_rows,
                 other_inputs: inputs,
                 outputs: output_types,
                 extension_delta,
@@ -513,18 +513,6 @@ pub trait Dataflow: Container {
         )?;
         Ok(make_op.out_wire(0))
     }
-
-    // /// Add [`LeafOp::MakeTuple`] and [`LeafOp::Tag`] nodes to construct the
-    // /// `tag` variant of a TupleSum type.
-    // fn make_sum(
-    //     &mut self,
-    //     tag: usize,
-    //     tuple_sum_rows: impl IntoIterator<Item = TypeRow>,
-    //     values: impl IntoIterator<Item = Wire>,
-    // ) -> Result<Wire, BuildError> {
-    //     let make_op = self.add_dataflow_op(LeafOp::Tag { tag, variants: tuple_sum_rows }, values)?;
-    //     Ok(make_op.out_wire(0))
-    // }
 
     /// Use the wires in `values` to return a wire corresponding to the
     /// "Continue" variant of a [`ops::TailLoop`] with `loop_signature`.

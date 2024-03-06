@@ -355,7 +355,7 @@ flowchart
         end
         Case0 ~~~ Case1
     end
-    TupleSum["case 0 inputs | case 1 inputs"] --> Conditional
+    Sum["case 0 inputs | case 1 inputs"] --> Conditional
     OI["other inputs"] --> Conditional
     Conditional --> outputs
 ```
@@ -366,8 +366,8 @@ These provide tail-controlled loops. The dataflow sibling graph within the
 TailLoop-node defines the loop body: this computes a row of outputs, whose
 first element has type `Sum(#I, #O)` and the remainder is a row `#X`
 (perhaps empty). Inputs to the contained graph and to the TailLoop node itself
-are the row `#I:#X`, where `:` indicates row concatenation (with the tuple
-inside the `TupleSum` unpacked).
+are the row `#I:#X`, where `:` indicates row concatenation (with the row
+inside the `Sum`).
 
 Evaluation of the node begins by feeding the node inputs into the child graph
 and evaluating it.  The `Sum` produced controls iteration of the loop:
