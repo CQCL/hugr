@@ -6,9 +6,7 @@ use crate::builder::{
     BuildError, Container, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder,
 };
 use crate::extension::prelude::{BOOL_T, PRELUDE, USIZE_T};
-use crate::extension::{
-    Extension, ExtensionId, ExtensionSet, TypeDefBound, EMPTY_REG, PRELUDE_REGISTRY,
-};
+use crate::extension::{Extension, ExtensionId, TypeDefBound, EMPTY_REG, PRELUDE_REGISTRY};
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::hugr::{HugrError, HugrMut, NodeType};
 use crate::ops::dataflow::IOTrait;
@@ -533,12 +531,12 @@ fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
             .instantiate(vec![TypeArg::new_var_use(0, BOUND)])?,
     );
     let reg = ExtensionRegistry::try_new([collections::EXTENSION.to_owned()]).unwrap();
-    let just_colns = ExtensionSet::singleton(&collections::EXTENSION_NAME);
     let mut def = FunctionBuilder::new(
         "myfunc",
         PolyFuncType::new(
             [BOUND],
-            FunctionType::new(vec![], vec![list_of_var.clone()]).with_extension_delta(&just_colns),
+            FunctionType::new(vec![], vec![list_of_var.clone()])
+                .with_extension_delta(collections::EXTENSION_NAME),
         ),
     )?;
     let empty_list = Value::Extension {
@@ -565,6 +563,7 @@ fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
 mod extension_tests {
     use super::*;
     use crate::builder::ModuleBuilder;
+    use crate::extension::ExtensionSet;
     use crate::macros::const_extension_ids;
 
     const_extension_ids! {
@@ -730,7 +729,7 @@ mod extension_tests {
                     ops::Output {
                         types: type_row![USIZE_T],
                     },
-                    ExtensionSet::singleton(&XB),
+                    Some(XB.into()),
                 ),
             )
             .unwrap();
@@ -803,8 +802,7 @@ mod extension_tests {
         let mut main = module_builder.define_function("main", main_sig)?;
         let [main_input] = main.input_wires_arr();
 
-        let inner_sig = FunctionType::new(type_row![NAT], type_row![NAT])
-            .with_extension_delta(&ExtensionSet::singleton(&XA));
+        let inner_sig = FunctionType::new(type_row![NAT], type_row![NAT]).with_extension_delta(XA);
 
         let f_builder = main.dfg_builder(inner_sig, Some(ExtensionSet::new()), [main_input])?;
         let f_inputs = f_builder.input_wires();
@@ -832,7 +830,7 @@ mod extension_tests {
         let all_rs = ExtensionSet::from_iter([XA, XB]);
 
         let main_sig = FunctionType::new(type_row![], type_row![NAT])
-            .with_extension_delta(&all_rs)
+            .with_extension_delta(all_rs.clone())
             .into();
 
         let mut main = module_builder.define_function("main", main_sig)?;
@@ -840,7 +838,7 @@ mod extension_tests {
         let [left_wire] = main
             .dfg_builder(
                 FunctionType::new(type_row![], type_row![NAT]),
-                Some(ExtensionSet::singleton(&XA)),
+                Some(XA.into()),
                 [],
             )?
             .finish_with_outputs([])?
@@ -849,7 +847,7 @@ mod extension_tests {
         let [right_wire] = main
             .dfg_builder(
                 FunctionType::new(type_row![], type_row![NAT]),
-                Some(ExtensionSet::singleton(&XB)),
+                Some(XB.into()),
                 [],
             )?
             .finish_with_outputs([])?
@@ -876,10 +874,8 @@ mod extension_tests {
 
     #[test]
     fn parent_signature_mismatch() -> Result<(), BuildError> {
-        let rs = ExtensionSet::singleton(&XA);
-
         let main_signature =
-            FunctionType::new(type_row![NAT], type_row![NAT]).with_extension_delta(&rs);
+            FunctionType::new(type_row![NAT], type_row![NAT]).with_extension_delta(XA);
 
         let mut hugr = Hugr::new(NodeType::new_pure(ops::DFG {
             signature: main_signature,
@@ -896,7 +892,7 @@ mod extension_tests {
                 ops::Output {
                     types: type_row![NAT],
                 },
-                rs,
+                Some(XA.into()),
             ),
         )?;
         hugr.connect(input, 0, output, 0)?;

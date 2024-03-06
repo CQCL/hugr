@@ -96,7 +96,6 @@ impl DataflowOpTrait for Input {
 
     fn signature(&self) -> FunctionType {
         FunctionType::new(TypeRow::new(), self.types.clone())
-            .with_extension_delta(&ExtensionSet::new())
     }
 }
 impl DataflowOpTrait for Output {

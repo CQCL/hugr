@@ -122,7 +122,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> ConditionalBuilder<B> {
         let outputs = cond.outputs;
         let case_op = ops::Case {
             signature: FunctionType::new(inputs.clone(), outputs.clone())
-                .with_extension_delta(&extension_delta),
+                .with_extension_delta(extension_delta.clone()),
         };
         let case_node =
             // add case before any existing subsequent cases
@@ -137,7 +137,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> ConditionalBuilder<B> {
         let dfg_builder = DFGBuilder::create_with_io(
             self.hugr_mut(),
             case_node,
-            FunctionType::new(inputs, outputs).with_extension_delta(&extension_delta),
+            FunctionType::new(inputs, outputs).with_extension_delta(extension_delta),
             None,
         )?;
 

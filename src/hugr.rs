@@ -126,10 +126,10 @@ impl NodeType {
     ///
     /// `None`` if the [Self::input_extensions] is `None`.
     /// Otherwise, will return Some, with the output extensions computed from the node's delta
-    pub fn io_extensions(&self) -> Option<(&ExtensionSet, ExtensionSet)> {
+    pub fn io_extensions(&self) -> Option<(ExtensionSet, ExtensionSet)> {
         self.input_extensions
-            .as_ref()
-            .map(|e| (e, self.op.extension_delta().union(e)))
+            .clone()
+            .map(|e| (e.clone(), self.op.extension_delta().union(e)))
     }
 
     /// Gets the underlying [OpType] i.e. without any [input_extensions]
@@ -388,7 +388,7 @@ mod test {
         let r = ExtensionSet::singleton(&"R".try_into().unwrap());
 
         let mut hugr = closed_dfg_root_hugr(
-            FunctionType::new(type_row![BIT], type_row![BIT]).with_extension_delta(&r),
+            FunctionType::new(type_row![BIT], type_row![BIT]).with_extension_delta(r.clone()),
         );
         let [input, output] = hugr.get_io(hugr.root()).unwrap();
         let lift = hugr.add_node_with_parent(

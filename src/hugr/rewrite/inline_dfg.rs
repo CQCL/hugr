@@ -179,7 +179,7 @@ mod test {
 
         let mut outer = DFGBuilder::new(
             FunctionType::new(vec![int_ty.clone(); 2], vec![int_ty.clone()])
-                .with_extension_delta(&delta),
+                .with_extension_delta(delta.clone()),
         )?;
         let [a, b] = outer.input_wires_arr();
         fn make_const<T: AsMut<Hugr> + AsRef<Hugr>>(
@@ -207,7 +207,7 @@ mod test {
         let c1 = nonlocal.then(|| make_const(&mut outer));
         let inner = {
             let mut inner = outer.dfg_builder(
-                FunctionType::new_endo(vec![int_ty.clone()]).with_extension_delta(&delta),
+                FunctionType::new_endo(vec![int_ty.clone()]).with_extension_delta(delta),
                 None,
                 [a],
             )?;
@@ -260,9 +260,8 @@ mod test {
     #[test]
     fn permutation() -> Result<(), Box<dyn std::error::Error>> {
         let mut h = DFGBuilder::new(
-            FunctionType::new_endo(type_row![QB_T, QB_T]).with_extension_delta(
-                &ExtensionSet::singleton(&test_quantum_extension::EXTENSION_ID),
-            ),
+            FunctionType::new_endo(type_row![QB_T, QB_T])
+                .with_extension_delta(test_quantum_extension::EXTENSION_ID),
         )?;
         let [p, q] = h.input_wires_arr();
         let [p_h] = h
@@ -355,7 +354,6 @@ mod test {
          *             \  /
          *              CX
          */
-        let delta = ExtensionSet::from_iter([float_types::EXTENSION_ID]);
         // Extension inference here relies on quantum ops not requiring their own test_quantum_extension
         let reg = ExtensionRegistry::try_new([
             test_quantum_extension::EXTENSION.to_owned(),
@@ -364,13 +362,14 @@ mod test {
         ])
         .unwrap();
         let mut outer = DFGBuilder::new(
-            FunctionType::new_endo(type_row![QB_T, QB_T]).with_extension_delta(&delta),
+            FunctionType::new_endo(type_row![QB_T, QB_T])
+                .with_extension_delta(float_types::EXTENSION_ID),
         )?;
         let [a, b] = outer.input_wires_arr();
         let h_a = outer.add_dataflow_op(test_quantum_extension::h_gate(), [a])?;
         let h_b = outer.add_dataflow_op(test_quantum_extension::h_gate(), [b])?;
         let mut inner = outer.dfg_builder(
-            FunctionType::new_endo(type_row![QB_T]).with_extension_delta(&delta),
+            FunctionType::new_endo(type_row![QB_T]).with_extension_delta(float_types::EXTENSION_ID),
             None,
             h_b.outputs(),
         )?;

@@ -512,7 +512,7 @@ impl UnificationContext {
                 // to a set which already contained it.
                 Constraint::Plus(r, other_meta) => {
                     if let Some(rs) = self.get_solution(other_meta) {
-                        let rrs = rs.clone().union(r);
+                        let rrs = rs.clone().union(r.clone());
                         match self.get_solution(&meta) {
                             // Let's check that this is right?
                             Some(rs) => {
@@ -725,7 +725,7 @@ impl UnificationContext {
                 .iter()
                 .flat_map(|m| self.get_constraints(m).unwrap())
                 .filter_map(|c| match c {
-                    Constraint::Plus(_, other_m) => solutions.get(&self.resolve(*other_m)),
+                    Constraint::Plus(_, other_m) => solutions.get(&self.resolve(*other_m)).cloned(),
                     Constraint::Equal(_) => None,
                 })
                 .fold(ExtensionSet::new(), ExtensionSet::union);

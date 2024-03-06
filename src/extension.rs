@@ -288,14 +288,14 @@ pub struct Extension {
 impl Extension {
     /// Creates a new extension with the given name.
     pub fn new(name: ExtensionId) -> Self {
-        Self::new_with_reqs(name, Default::default())
+        Self::new_with_reqs(name, ExtensionSet::default())
     }
 
     /// Creates a new extension with the given name and requirements.
-    pub fn new_with_reqs(name: ExtensionId, extension_reqs: ExtensionSet) -> Self {
+    pub fn new_with_reqs(name: ExtensionId, extension_reqs: impl Into<ExtensionSet>) -> Self {
         Self {
             name,
-            extension_reqs,
+            extension_reqs: extension_reqs.into(),
             types: Default::default(),
             values: Default::default(),
             operations: Default::default(),
@@ -455,8 +455,8 @@ impl ExtensionSet {
     }
 
     /// Returns the union of two extension sets.
-    pub fn union(mut self, other: &Self) -> Self {
-        self.0.extend(other.0.iter().cloned());
+    pub fn union(mut self, other: Self) -> Self {
+        self.0.extend(other.0);
         self
     }
 
@@ -499,6 +499,12 @@ impl ExtensionSet {
                 _ => panic!("value for type var was not extension set - type scheme should be validated first"),
             },
         }))
+    }
+}
+
+impl From<ExtensionId> for ExtensionSet {
+    fn from(id: ExtensionId) -> Self {
+        Self::singleton(&id)
     }
 }
 

@@ -91,7 +91,7 @@ impl CustomConst for ListValue {
 
     fn extension_reqs(&self) -> ExtensionSet {
         ExtensionSet::union_over(self.0.iter().map(Value::extension_reqs))
-            .union(&ExtensionSet::singleton(&EXTENSION_NAME))
+            .union(EXTENSION_NAME.into())
     }
 }
 
