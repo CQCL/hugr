@@ -1557,7 +1557,8 @@ pseudocode, though we advocate MessagePack format in practice (see
 Note in particular that hierarchical relationships
 have a special encoding outside `edges`, as a field `parent`
 in a node definition. Nodes are identified by their position in the `nodes`
-list. The unique root node of the HUGR reports itself as the parent.
+list, starting from 0. The unique root node of the HUGR reports itself as the
+parent.
 
 The other required field in a node is `op` which identifies an operation by
 name, and is used as a discriminating tag in validating the remaining fields.
