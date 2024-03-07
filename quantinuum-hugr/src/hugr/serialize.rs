@@ -281,7 +281,7 @@ pub mod test {
     lazy_static! {
         static ref SCHEMA: JSONSchema = {
             let schema_val: serde_json::Value = serde_json::from_str(include_str!(
-                "../../specification/schema/hugr_schema_v0.json"
+                "../../../specification/schema/hugr_schema_v0.json"
             ))
             .unwrap();
             JSONSchema::options()
