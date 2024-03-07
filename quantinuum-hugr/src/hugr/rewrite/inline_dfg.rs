@@ -73,7 +73,7 @@ impl Rewrite for InlineDFG {
             };
             // Hugr is invalid if there is no output linked to the DFG input.
             let (src_n, src_p) = h.single_linked_output(n, inp).unwrap();
-            h.disconnect(n, inp);
+            h.disconnect(n, inp); // These disconnects allow permutations to work trivially.
             let outp = OutgoingPort::from(inp.index());
             let targets = h.linked_inputs(input, outp).collect::<Vec<_>>();
             h.disconnect(input, outp);
