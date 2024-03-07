@@ -86,8 +86,6 @@ pub trait HugrView: sealed::HugrInternals {
     fn contains_node(&self, node: Node) -> bool;
 
     /// Validates that a node is valid in the graph.
-    ///
-    /// Returns a [`HugrError::InvalidNode`] otherwise.
     #[inline]
     fn valid_node(&self, node: Node) -> bool {
         self.contains_node(node)
@@ -96,8 +94,6 @@ pub trait HugrView: sealed::HugrInternals {
     /// Validates that a node is a valid root descendant in the graph.
     ///
     /// To include the root node use [`HugrView::valid_node`] instead.
-    ///
-    /// Returns a [`HugrError::InvalidNode`] otherwise.
     #[inline]
     fn valid_non_root(&self, node: Node) -> bool {
         self.root() != node && self.valid_node(node)
