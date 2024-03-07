@@ -68,7 +68,7 @@ fn type_sig_equal(v: &Hugr, t: &PolyFuncType) -> bool {
 }
 
 impl super::SumType {
-    /// Check that a [`Value`] is a valid instance of this [`SumType`].
+    /// Check that a [`Value`] is a valid instance of this [`crate::types::SumType`].
     ///
     /// # Errors
     ///
