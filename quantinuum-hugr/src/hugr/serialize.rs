@@ -209,7 +209,7 @@ impl TryFrom<SerHugrV0> for Hugr {
             hugr.add_node_with_parent(
                 node_ser.parent,
                 NodeType::new(node_ser.op, node_ser.input_extensions),
-            )?;
+            );
         }
 
         for (node, metadata) in metadata.into_iter().enumerate() {
@@ -240,7 +240,7 @@ impl TryFrom<SerHugrV0> for Hugr {
             let src_port = unwrap_offset(src, from_offset, Direction::Outgoing, &hugr)?;
             let dst_port = unwrap_offset(dst, to_offset, Direction::Incoming, &hugr)?;
 
-            hugr.connect(src, src_port, dst, dst_port)?;
+            hugr.connect(src, src_port, dst, dst_port);
         }
 
         Ok(hugr)
@@ -501,22 +501,23 @@ pub mod test {
     }
 
     #[test]
-    fn hierarchy_order() {
+    fn hierarchy_order() -> Result<(), Box<dyn std::error::Error>> {
         let mut hugr = closed_dfg_root_hugr(FunctionType::new(vec![QB], vec![QB]));
         let [old_in, out] = hugr.get_io(hugr.root()).unwrap();
-        hugr.connect(old_in, 0, out, 0).unwrap();
+        hugr.connect(old_in, 0, out, 0);
 
         // Now add a new input
         let new_in = hugr.add_node(Input::new([QB].to_vec()).into());
-        hugr.disconnect(old_in, OutgoingPort::from(0)).unwrap();
-        hugr.connect(new_in, 0, out, 0).unwrap();
-        hugr.move_before_sibling(new_in, old_in).unwrap();
-        hugr.remove_node(old_in).unwrap();
-        hugr.update_validate(&PRELUDE_REGISTRY).unwrap();
+        hugr.disconnect(old_in, OutgoingPort::from(0));
+        hugr.connect(new_in, 0, out, 0);
+        hugr.move_before_sibling(new_in, old_in);
+        hugr.remove_node(old_in);
+        hugr.update_validate(&PRELUDE_REGISTRY)?;
 
         let new_hugr: Hugr = check_hugr_roundtrip(&hugr);
         new_hugr.validate(&EMPTY_REG).unwrap_err();
-        new_hugr.validate(&PRELUDE_REGISTRY).unwrap();
+        new_hugr.validate(&PRELUDE_REGISTRY)?;
+        Ok(())
     }
 
     #[test]

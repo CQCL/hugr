@@ -101,12 +101,12 @@ impl Rewrite for SimpleReplacement {
         for &node in replacement_inner_nodes {
             // Add the nodes.
             let op: &OpType = self.replacement.get_optype(node);
-            let new_node = h.add_node_after(self_output_node, op.clone()).unwrap();
+            let new_node = h.add_node_after(self_output_node, op.clone());
             index_map.insert(node, new_node);
 
             // Move the metadata
             let meta: Option<NodeMetadataMap> = self.replacement.take_node_metadata(node);
-            h.overwrite_node_metadata(new_node, meta).unwrap();
+            h.overwrite_node_metadata(new_node, meta);
         }
         // Add edges between all newly added nodes matching those in replacement.
         // TODO This will probably change when implicit copies are implemented.
@@ -116,8 +116,7 @@ impl Rewrite for SimpleReplacement {
                 for target in self.replacement.linked_inputs(node, outport) {
                     if self.replacement.get_optype(target.0).tag() != OpTag::Output {
                         let new_target = index_map.get(&target.0).unwrap();
-                        h.connect(*new_node, outport, *new_target, target.1)
-                            .unwrap();
+                        h.connect(*new_node, outport, *new_target, target.1);
                     }
                 }
             }
@@ -130,15 +129,14 @@ impl Rewrite for SimpleReplacement {
                 let (rem_inp_pred_node, rem_inp_pred_port) = h
                     .single_linked_output(*rem_inp_node, *rem_inp_port)
                     .unwrap();
-                h.disconnect(*rem_inp_node, *rem_inp_port).unwrap();
+                h.disconnect(*rem_inp_node, *rem_inp_port);
                 let new_inp_node = index_map.get(rep_inp_node).unwrap();
                 h.connect(
                     rem_inp_pred_node,
                     rem_inp_pred_port,
                     *new_inp_node,
                     *rep_inp_port,
-                )
-                .unwrap();
+                );
             }
         }
         // 3.3. For each q = self.nu_out[p] such that the predecessor of q is not an Input port, add an
@@ -150,14 +148,13 @@ impl Rewrite for SimpleReplacement {
                 .unwrap();
             if self.replacement.get_optype(rep_out_pred_node).tag() != OpTag::Input {
                 let new_out_node = index_map.get(&rep_out_pred_node).unwrap();
-                h.disconnect(*rem_out_node, *rem_out_port).unwrap();
+                h.disconnect(*rem_out_node, *rem_out_port);
                 h.connect(
                     *new_out_node,
                     rep_out_pred_port,
                     *rem_out_node,
                     *rem_out_port,
-                )
-                .unwrap();
+                );
             }
         }
         // 3.4. For each q = self.nu_out[p1], p0 = self.nu_inp[q], add an edge from the predecessor of p0
@@ -169,20 +166,19 @@ impl Rewrite for SimpleReplacement {
                 let (rem_inp_pred_node, rem_inp_pred_port) = h
                     .single_linked_output(*rem_inp_node, *rem_inp_port)
                     .unwrap();
-                h.disconnect(*rem_inp_node, *rem_inp_port).unwrap();
-                h.disconnect(*rem_out_node, *rem_out_port).unwrap();
+                h.disconnect(*rem_inp_node, *rem_inp_port);
+                h.disconnect(*rem_out_node, *rem_out_port);
                 h.connect(
                     rem_inp_pred_node,
                     rem_inp_pred_port,
                     *rem_out_node,
                     *rem_out_port,
-                )
-                .unwrap();
+                );
             }
         }
         // 3.5. Remove all nodes in self.removal and edges between them.
         for &node in self.subgraph.nodes() {
-            h.remove_node(node).unwrap();
+            h.remove_node(node);
         }
         Ok(())
     }
@@ -635,8 +631,8 @@ pub(in crate::hugr::rewrite) mod test {
                 }
             })
             .collect();
-        replacement.remove_node(in_).unwrap();
-        replacement.remove_node(out).unwrap();
+        replacement.remove_node(in_);
+        replacement.remove_node(out);
         Replacement {
             removal: s.subgraph.nodes().to_vec(),
             replacement,

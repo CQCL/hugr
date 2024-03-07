@@ -190,7 +190,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         let exit_node = base
             .as_mut()
             // Make the extensions a parameter
-            .add_node_with_parent(cfg_node, exit_block_type)?;
+            .add_node_with_parent(cfg_node, exit_block_type);
         Ok(Self {
             base,
             cfg_node,
@@ -246,7 +246,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         } else {
             // TODO: Make extensions a parameter
             self.hugr_mut().add_node_with_parent(parent, op)
-        }?;
+        };
 
         BlockBuilder::create(self.hugr_mut(), block_n)
     }
@@ -323,7 +323,8 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
     ) -> Result<(), BuildError> {
         let from = predecessor.node();
         let to = successor.node();
-        Ok(self.hugr_mut().connect(from, branch, to, 0)?)
+        self.hugr_mut().connect(from, branch, to, 0);
+        Ok(())
     }
 }
 

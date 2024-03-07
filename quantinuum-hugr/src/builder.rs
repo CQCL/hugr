@@ -235,15 +235,13 @@ pub(crate) mod test {
             ops::Input {
                 types: signature.input,
             },
-        )
-        .unwrap();
+        );
         hugr.add_node_with_parent(
             hugr.root(),
             ops::Output {
                 types: signature.output,
             },
-        )
-        .unwrap();
+        );
         hugr
     }
 }

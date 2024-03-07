@@ -397,9 +397,9 @@ mod test {
                 type_row: type_row![BIT],
                 new_extension: "R".try_into().unwrap(),
             },
-        )?;
-        hugr.connect(input, 0, lift, 0)?;
-        hugr.connect(lift, 0, output, 0)?;
+        );
+        hugr.connect(input, 0, lift, 0);
+        hugr.connect(lift, 0, output, 0);
         hugr.infer_extensions()?;
 
         assert_eq!(

@@ -75,21 +75,17 @@ impl Rewrite for IdentityInsertion {
             .single_linked_output(self.post_node, self.post_port)
             .expect("Value kind input can only have one connection.");
 
-        h.disconnect(self.post_node, self.post_port).unwrap();
+        h.disconnect(self.post_node, self.post_port);
         let parent = h
             .get_parent(self.post_node)
             .ok_or(IdentityInsertionError::InvalidParentNode)?;
         if !OpTag::DataflowParent.is_superset(h.get_optype(parent).tag()) {
             return Err(IdentityInsertionError::InvalidParentNode);
         }
-        let new_node = h
-            .add_node_with_parent(parent, LeafOp::Noop { ty })
-            .expect("Parent validity already checked.");
-        h.connect(pre_node, pre_port, new_node, 0)
-            .expect("Should only fail if ports don't exist.");
+        let new_node = h.add_node_with_parent(parent, LeafOp::Noop { ty });
+        h.connect(pre_node, pre_port, new_node, 0);
 
-        h.connect(new_node, 0, self.post_node, self.post_port)
-            .expect("Should only fail if ports don't exist.");
+        h.connect(new_node, 0, self.post_node, self.post_port);
         Ok(new_node)
     }
 

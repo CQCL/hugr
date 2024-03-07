@@ -282,12 +282,15 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMut for T {
         let dst_port = dst_port.into();
         panic_invalid_port(self, src, src_port);
         panic_invalid_port(self, dst, dst_port);
-        self.as_mut().graph.link_nodes(
-            src.pg_index(),
-            src_port.index(),
-            dst.pg_index(),
-            dst_port.index(),
-        );
+        self.as_mut()
+            .graph
+            .link_nodes(
+                src.pg_index(),
+                src_port.index(),
+                dst.pg_index(),
+                dst_port.index(),
+            )
+            .expect("The ports should exist at this point.");
     }
 
     fn disconnect(&mut self, node: Node, port: impl Into<Port>) {
@@ -637,21 +640,24 @@ pub(crate) mod sealed {
             self.hugr_mut().hierarchy.detach(node.pg_index());
             self.hugr_mut()
                 .hierarchy
-                .push_child(node.pg_index(), parent.pg_index());
+                .push_child(node.pg_index(), parent.pg_index())
+                .expect("Inserting a newly-created node into the hierarchy should never fail.");
         }
 
         fn move_after_sibling(&mut self, node: Node, after: Node) {
             self.hugr_mut().hierarchy.detach(node.pg_index());
             self.hugr_mut()
                 .hierarchy
-                .insert_after(node.pg_index(), after.pg_index());
+                .insert_after(node.pg_index(), after.pg_index())
+                .expect("Inserting a newly-created node into the hierarchy should never fail.");
         }
 
         fn move_before_sibling(&mut self, node: Node, before: Node) {
             self.hugr_mut().hierarchy.detach(node.pg_index());
             self.hugr_mut()
                 .hierarchy
-                .insert_before(node.pg_index(), before.pg_index());
+                .insert_before(node.pg_index(), before.pg_index())
+                .expect("Inserting a newly-created node into the hierarchy should never fail.");
         }
 
         fn replace_op(&mut self, node: Node, op: NodeType) -> Result<NodeType, HugrError> {
@@ -677,7 +683,7 @@ mod test {
     const NAT: Type = USIZE_T;
 
     #[test]
-    fn simple_function() {
+    fn simple_function() -> Result<(), Box<dyn std::error::Error>> {
         let mut hugr = Hugr::default();
 
         // Create the root module definition
@@ -703,6 +709,8 @@ mod test {
             hugr.connect(noop, 0, f_out, 1);
         }
 
-        hugr.update_validate(&PRELUDE_REGISTRY);
+        hugr.update_validate(&PRELUDE_REGISTRY)?;
+
+        Ok(())
     }
 }

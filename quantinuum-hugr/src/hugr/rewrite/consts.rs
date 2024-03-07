@@ -65,7 +65,7 @@ impl Rewrite for RemoveLoadConstant {
             .exactly_one()
             .ok()
             .expect("Validation should check a Const is connected to LoadConstant.");
-        h.remove_node(node)?;
+        h.remove_node(node);
 
         Ok(source)
     }
@@ -109,7 +109,7 @@ impl Rewrite for RemoveConst {
         let parent = h
             .get_parent(node)
             .expect("Const node without a parent shouldn't happen.");
-        h.remove_node(node)?;
+        h.remove_node(node);
 
         Ok(parent)
     }
@@ -189,7 +189,7 @@ mod test {
         );
 
         // remove the use
-        h.remove_node(tup_node)?;
+        h.remove_node(tup_node);
 
         // remove first load
         let reported_con_node = h.apply_rewrite(remove_1)?;

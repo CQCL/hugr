@@ -50,14 +50,14 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
             types: signature.output().clone(),
         };
         base.as_mut()
-            .add_node_with_parent(parent, NodeType::new(input, input_extensions.clone()))?;
+            .add_node_with_parent(parent, NodeType::new(input, input_extensions.clone()));
         base.as_mut().add_node_with_parent(
             parent,
             NodeType::new(
                 output,
                 input_extensions.map(|inp| inp.union(signature.extension_reqs)),
             ),
-        )?;
+        );
 
         Ok(Self {
             base,
