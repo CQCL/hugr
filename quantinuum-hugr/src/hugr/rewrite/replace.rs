@@ -235,19 +235,27 @@ impl Rewrite for Replacement {
             }
             e.check_src(h, e)?;
         }
-        self.mu_out.iter().try_for_each(|e| {
-            self.replacement.valid_non_root(e.src).map_err(|_| {
-                ReplaceError::BadEdgeSpec(Direction::Outgoing, WhichHugr::Replacement, e.clone())
+        self.mu_out
+            .iter()
+            .try_for_each(|e| match self.replacement.valid_non_root(e.src) {
+                true => e.check_src(&self.replacement, e),
+                false => Err(ReplaceError::BadEdgeSpec(
+                    Direction::Outgoing,
+                    WhichHugr::Replacement,
+                    e.clone(),
+                )),
             })?;
-            e.check_src(&self.replacement, e)
-        })?;
         // Edge targets...
-        self.mu_inp.iter().try_for_each(|e| {
-            self.replacement.valid_non_root(e.tgt).map_err(|_| {
-                ReplaceError::BadEdgeSpec(Direction::Incoming, WhichHugr::Replacement, e.clone())
+        self.mu_inp
+            .iter()
+            .try_for_each(|e| match self.replacement.valid_non_root(e.tgt) {
+                true => e.check_tgt(&self.replacement, e),
+                false => Err(ReplaceError::BadEdgeSpec(
+                    Direction::Incoming,
+                    WhichHugr::Replacement,
+                    e.clone(),
+                )),
             })?;
-            e.check_tgt(&self.replacement, e)
-        })?;
         for e in self.mu_out.iter().chain(self.mu_new.iter()) {
             if !h.contains_node(e.tgt) || removed.contains(&e.tgt) {
                 return Err(ReplaceError::BadEdgeSpec(
@@ -344,12 +352,20 @@ fn transfer_edges<'a>(
                 .map_err(|h| ReplaceError::BadEdgeSpec(Direction::Incoming, h, oe.clone()))?,
             ..oe.clone()
         };
-        h.valid_node(e.src).map_err(|_| {
-            ReplaceError::BadEdgeSpec(Direction::Outgoing, WhichHugr::Retained, oe.clone())
-        })?;
-        h.valid_node(e.tgt).map_err(|_| {
-            ReplaceError::BadEdgeSpec(Direction::Incoming, WhichHugr::Retained, oe.clone())
-        })?;
+        if !h.valid_node(e.src) {
+            return Err(ReplaceError::BadEdgeSpec(
+                Direction::Outgoing,
+                WhichHugr::Retained,
+                oe.clone(),
+            ));
+        }
+        if !h.valid_node(e.tgt) {
+            return Err(ReplaceError::BadEdgeSpec(
+                Direction::Incoming,
+                WhichHugr::Retained,
+                oe.clone(),
+            ));
+        };
         e.check_src(h, oe)?;
         e.check_tgt(h, oe)?;
         match e.kind {

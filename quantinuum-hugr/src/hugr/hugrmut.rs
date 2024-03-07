@@ -52,7 +52,9 @@ pub trait HugrMut: HugrMutInternals {
 
     /// Retrieve the complete metadata map for a node.
     fn take_node_metadata(&mut self, node: Node) -> Option<NodeMetadataMap> {
-        self.valid_node(node).ok()?;
+        if !self.valid_node(node) {
+            return None;
+        }
         self.hugr_mut().metadata.take(node.pg_index())
     }
 
@@ -464,7 +466,7 @@ fn insert_subgraph_internal(
 /// Panic if [`HugrView::valid_node`] fails.
 #[track_caller]
 fn panic_invalid_node<H: HugrView + ?Sized>(hugr: &H, node: Node) {
-    if hugr.valid_node(node).is_err() {
+    if !hugr.valid_node(node) {
         panic!(
             "Received an invalid node {node} while mutating a HUGR:\n\n {}",
             hugr.mermaid_string()
@@ -475,7 +477,7 @@ fn panic_invalid_node<H: HugrView + ?Sized>(hugr: &H, node: Node) {
 /// Panic if [`HugrView::valid_non_root`] fails.
 #[track_caller]
 fn panic_invalid_non_root<H: HugrView + ?Sized>(hugr: &H, node: Node) {
-    if hugr.valid_non_root(node).is_err() {
+    if !hugr.valid_non_root(node) {
         panic!(
             "Received an invalid non-root node {node} while mutating a HUGR:\n\n {}",
             hugr.mermaid_string()

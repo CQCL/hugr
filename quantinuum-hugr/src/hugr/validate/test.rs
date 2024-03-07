@@ -8,7 +8,7 @@ use crate::builder::{
 use crate::extension::prelude::{BOOL_T, PRELUDE, USIZE_T};
 use crate::extension::{Extension, ExtensionId, TypeDefBound, EMPTY_REG, PRELUDE_REGISTRY};
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
-use crate::hugr::{HugrError, HugrMut, NodeType};
+use crate::hugr::{HugrMut, NodeType};
 use crate::ops::dataflow::IOTrait;
 use crate::ops::{self, Const, LeafOp, OpType};
 use crate::std_extensions::logic::test::{and_op, or_op};
@@ -211,7 +211,7 @@ fn df_children_restrictions() {
 }
 
 #[test]
-fn test_ext_edge() -> Result<(), HugrError> {
+fn test_ext_edge() {
     let mut h = closed_dfg_root_hugr(FunctionType::new(
         type_row![BOOL_T, BOOL_T],
         type_row![BOOL_T],
@@ -253,11 +253,10 @@ fn test_ext_edge() -> Result<(), HugrError> {
     //Order edge. This will need metadata indicating its purpose.
     h.add_other_edge(input, sub_dfg);
     h.update_validate(&EMPTY_REG).unwrap();
-    Ok(())
 }
 
 #[test]
-fn test_local_const() -> Result<(), HugrError> {
+fn test_local_const() {
     let mut h = closed_dfg_root_hugr(FunctionType::new(type_row![BOOL_T], type_row![BOOL_T]));
     let [input, output] = h.get_io(h.root()).unwrap();
     let and = h.add_node_with_parent(h.root(), and_op());
@@ -285,11 +284,10 @@ fn test_local_const() -> Result<(), HugrError> {
     assert_eq!(h.static_source(lcst), Some(cst));
     // There is no edge from Input to LoadConstant, but that's OK:
     h.update_validate(&EMPTY_REG).unwrap();
-    Ok(())
 }
 
 #[test]
-fn dfg_with_cycles() -> Result<(), HugrError> {
+fn dfg_with_cycles() {
     let mut h = closed_dfg_root_hugr(FunctionType::new(
         type_row![BOOL_T, BOOL_T],
         type_row![BOOL_T],
@@ -305,7 +303,6 @@ fn dfg_with_cycles() -> Result<(), HugrError> {
     h.connect(not2, 0, output, 0);
     // The graph contains a cycle:
     assert_matches!(h.validate(&EMPTY_REG), Err(ValidationError::NotADag { .. }));
-    Ok(())
 }
 
 fn identity_hugr_with_type(t: Type) -> (Hugr, Node) {

@@ -195,6 +195,11 @@ where
     Root: NodeHandle,
 {
     fn try_new(hugr: &'a impl HugrView, root: Node) -> Result<Self, HugrError> {
+        assert!(
+            hugr.valid_node(root),
+            "Cannot create a sibling graph from an invalid node {}.",
+            root
+        );
         check_tag::<Root>(hugr, root)?;
         Ok(Self::new_unchecked(hugr, root))
     }
@@ -373,7 +378,7 @@ mod test {
     use crate::builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder};
     use crate::extension::PRELUDE_REGISTRY;
     use crate::hugr::NodeType;
-    use crate::ops::handle::{CfgID, DataflowParentID, DfgID, FuncID, ModuleRootID};
+    use crate::ops::handle::{CfgID, DataflowParentID, DfgID, FuncID};
     use crate::ops::{dataflow::IOTrait, Input, OpTag, Output};
     use crate::type_row;
     use crate::types::{FunctionType, Type};
@@ -426,14 +431,6 @@ mod test {
                 just_io.iter().collect_vec()
             );
         }
-
-        // But cannot create a view directly as a grandchild of another SiblingGraph
-        let root_view: SiblingGraph<'_, ModuleRootID> =
-            SiblingGraph::try_new(&h, h.root()).unwrap();
-        assert_eq!(
-            SiblingGraph::<'_, DfgID>::try_new(&root_view, sub_dfg.node()).err(),
-            Some(HugrError::InvalidNode(sub_dfg.node()))
-        );
 
         Ok(())
     }

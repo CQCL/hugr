@@ -14,7 +14,7 @@ use portgraph::{Direction, LinkError, PortView};
 
 use serde::{Deserialize, Deserializer, Serialize};
 
-use super::{HugrError, HugrMut, HugrView};
+use super::{HugrMut, HugrView};
 
 /// A wrapper over the available HUGR serialization formats.
 ///
@@ -80,9 +80,6 @@ pub enum HUGRSerializationError {
         /// The node that has the port without offset.
         node: Node,
     },
-    /// Error building HUGR.
-    #[error("HugrError: {0:?}")]
-    HugrError(#[from] HugrError),
     /// First node in node list must be the HUGR root.
     #[error("The first node in the node list has parent {0:?}, should be itself (index 0)")]
     FirstNodeNotRoot(Node),

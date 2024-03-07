@@ -2,10 +2,7 @@
 
 use std::iter;
 
-use crate::{
-    hugr::{HugrError, HugrMut},
-    HugrView, Node,
-};
+use crate::{hugr::HugrMut, HugrView, Node};
 use itertools::Itertools;
 use thiserror::Error;
 
@@ -24,9 +21,6 @@ pub enum RemoveError {
     /// Node in use.
     #[error("Node: {0:?} has non-zero outgoing connections.")]
     ValueUsed(Node),
-    /// Removal error
-    #[error("Removing node caused error: {0:?}.")]
-    RemoveFail(#[from] HugrError),
 }
 
 impl Rewrite for RemoveLoadConstant {
