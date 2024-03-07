@@ -356,10 +356,7 @@ pub trait HugrView: sealed::HugrInternals {
     ///
     /// For a more detailed representation, use the [`HugrView::dot_string`]
     /// format instead.
-    fn mermaid_string(&self) -> String
-    where
-        Self: Sized,
-    {
+    fn mermaid_string(&self) -> String {
         self.mermaid_string_with_config(RenderConfig {
             node_indices: true,
             port_offsets_in_edges: true,
@@ -374,10 +371,7 @@ pub trait HugrView: sealed::HugrInternals {
     ///
     /// For a more detailed representation, use the [`HugrView::dot_string`]
     /// format instead.
-    fn mermaid_string_with_config(&self, config: RenderConfig) -> String
-    where
-        Self: Sized,
-    {
+    fn mermaid_string_with_config(&self, config: RenderConfig) -> String {
         let hugr = self.base_hugr();
         let graph = self.portgraph();
         graph
