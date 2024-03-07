@@ -147,10 +147,12 @@ AnyType ⊃ CopyableType
 EdgeKind ::= Hierarchy | Value(Locality, AnyType) | Static(Local | Ext, CopyableType) | Order | ControlFlow
 ```
 
-Note that a port is associated with a node and zero or more dataflow edges (adjoining
-the node). Incoming ports are associated with exactly one edge. All edges associated
-with a port have the same type; thus a port has a well-defined type, matching that
-of its adjoining edges. The incoming and outgoing ports of a node are (separately) ordered.
+Note that a port is associated with a node and zero or more dataflow edges.
+Incoming ports are associated with exactly one edge, or many `ControlFlow` edges.
+All dataflow edges associated with a port have the same type; thus a port has a
+well defined type, matching that of its adjoining edges. The incoming and
+outgoing ports of a node are each ordered independently, meaning that the first
+output port will be "0" regardless of how many input ports there are.
 
 The sequences of incoming and outgoing port types (carried on `Value` edges) of a node constitute its
 *signature*.
@@ -1985,10 +1987,10 @@ including `Module`.
 | Node type      | `Value` | `Order` | `Static` | `ControlFlow` | `Hierarchy` | Children |
 | -------------- | ------- | ------- |--------- | ------------- | ----------- | -------- |
 | Root           | 0, 0    | 0, 0    | 0, 0     | 0, 0          | 0, ✱        |          |
-| `FuncDefn`          | 0, 0    | 0, 0    | 0, ✱     | 0, 0          | 1, +        | DSG      |
-| `FuncDecl`      | 0, 0    | 0, 0    | 0, ✱     | 0, 0          | 1, 0        |          |
-| `AliasDefn`     | 0, 0    | 0, 0    | 0, 0     | 0, 0          | 1, 0        |          |
-| `AliasDecl` | 0, 0    | 0, 0    | 0, 0     | 0, 0          | 1, 0        |          |
+| `FuncDefn`     | 0, 0    | 0, 0    | 0, ✱     | 0, 0          | 1, +        | DSG      |
+| `FuncDecl`     | 0, 0    | 0, 0    | 0, ✱     | 0, 0          | 1, 0        |          |
+| `AliasDefn`    | 0, 0    | 0, 0    | 0, 0     | 0, 0          | 1, 0        |          |
+| `AliasDecl`    | 0, 0    | 0, 0    | 0, 0     | 0, 0          | 1, 0        |          |
 | `Const`        | 0, 0    | 0, 0    | 0, ✱     | 0, 0          | 1, 0        |          |
 | `LoadConstant` | 0, 1    | +, ✱    | 1, 0     | 0, 0          | 1, 0        |          |
 | `Input`        | 0, ✱    | 0, ✱    | 0, 0     | 0, 0          | 1, 0        |          |
