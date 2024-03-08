@@ -23,6 +23,7 @@ pub struct CircuitBuilder<'a, T: ?Sized> {
 
 #[derive(Debug, Clone, PartialEq, Error)]
 /// Error in [`CircuitBuilder`]
+#[non_exhaustive]
 pub enum CircuitBuildError {
     /// Invalid index for stored wires.
     #[error("Invalid wire index {invalid_index} while attempting to add operation {}.", .op.as_ref().map(|o| o.name()).unwrap_or_default())]
