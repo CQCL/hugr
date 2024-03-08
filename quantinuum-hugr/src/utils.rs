@@ -86,10 +86,6 @@ pub(crate) mod test_quantum_extension {
             .unwrap();
 
         extension
-            .add_op(SmolStr::new_inline("CZ"), "CZ".into(), two_qb_func())
-            .unwrap();
-
-        extension
             .add_op(SmolStr::new_inline("CX"), "CX".into(), two_qb_func())
             .unwrap();
 
@@ -138,10 +134,6 @@ pub(crate) mod test_quantum_extension {
 
     pub(crate) fn cx_gate() -> LeafOp {
         get_gate("CX")
-    }
-
-    pub(crate) fn cz_gate() -> LeafOp {
-        get_gate("CZ")
     }
 
     pub(crate) fn measure() -> LeafOp {

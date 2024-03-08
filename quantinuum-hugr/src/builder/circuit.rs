@@ -219,9 +219,7 @@ mod test {
     use super::*;
     use cool_asserts::assert_matches;
 
-    use crate::utils::test_quantum_extension::{
-        cx_gate, cz_gate, h_gate, measure, q_alloc, q_discard,
-    };
+    use crate::utils::test_quantum_extension::{cx_gate, h_gate, measure, q_alloc, q_discard};
     use crate::{
         builder::{
             test::{build_main, NAT, QB},
@@ -314,19 +312,11 @@ mod test {
                 assert_eq!(circ.n_wires(), 2);
                 assert_eq!(circ.tracked_units_arr(), [q0, ancilla]);
 
-                circ.append(cz_gate(), [q0, ancilla])?;
+                circ.append(cx_gate(), [q0, ancilla])?;
                 let [_bit] = circ
                     .append_with_outputs(measure(), [q0])?
                     .try_into()
                     .unwrap();
-
-                // We could apply a classically controlled operation here
-                // to complete a circuit that emulates a Hadamard gate.
-                //
-                //circ.append_and_consume(
-                //    controlled_x(),
-                //    [CircuitUnit::Linear(0), CircuitUnit::Wire(bit)],
-                //)?;
 
                 let q0 = circ.untrack_wire(q0)?;
 
@@ -343,5 +333,47 @@ mod test {
         );
 
         assert_matches!(build_res, Ok(_));
+    }
+
+    #[test]
+    fn circuit_builder_errors() {
+        let _build_res = build_main(
+            FunctionType::new(type_row![QB, QB], type_row![QB, QB]).into(),
+            |mut f_build| {
+                let mut circ = f_build.as_circuit(f_build.input_wires());
+                let [q0, q1] = circ.tracked_units_arr();
+                let invalid_index = 0xff;
+
+                // Passing an invalid linear index returns an error
+                assert_matches!(
+                    circ.append(cx_gate(), [q0, invalid_index]),
+                    Err(BuildError::CircuitError(CircuitBuildError::InvalidWireIndex { op, invalid_index: idx }))
+                    if op == Some(cx_gate().into()) && idx == invalid_index,
+                );
+
+                // Untracking an invalid index returns an error
+                assert_matches!(
+                    circ.untrack_wire(invalid_index),
+                    Err(CircuitBuildError::InvalidWireIndex { op: None, invalid_index: idx })
+                    if idx == invalid_index,
+                );
+
+                // Passing a linear index to an operation without a corresponding output returns an error
+                assert_matches!(
+                    circ.append(q_discard(), [q1]),
+                    Err(BuildError::CircuitError(CircuitBuildError::MismatchedLinearInputs { op, index }))
+                    if op == q_discard().into() && index == [q1],
+                );
+
+                let outs = circ.finish();
+
+                assert_eq!(outs.len(), 2);
+
+                f_build.finish_with_outputs(outs)
+            },
+        );
+
+        // We do not test the build output, as the internal errors may have left
+        // the hugr in an invalid state.
     }
 }
