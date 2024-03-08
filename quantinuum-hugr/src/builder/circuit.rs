@@ -338,7 +338,7 @@ mod test {
     #[test]
     fn circuit_builder_errors() {
         let _build_res = build_main(
-            FunctionType::new(type_row![QB, QB], type_row![QB, QB]).into(),
+            FunctionType::new_endo(type_row![QB, QB]).into(),
             |mut f_build| {
                 let mut circ = f_build.as_circuit(f_build.input_wires());
                 let [q0, q1] = circ.tracked_units_arr();
