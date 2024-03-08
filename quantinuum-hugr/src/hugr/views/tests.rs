@@ -24,7 +24,7 @@ fn sample_hugr() -> (Hugr, BuildHandle<DataflowOpID>, BuildHandle<DataflowOpID>)
     let n1 = dfg.add_dataflow_op(cx_gate(), [q1, q2]).unwrap();
     let [q1, q2] = n1.outputs_arr();
     let n2 = dfg.add_dataflow_op(cx_gate(), [q2, q1]).unwrap();
-    dfg.add_other_wire(n1.node(), n2.node()).unwrap();
+    dfg.add_other_wire(n1.node(), n2.node());
 
     (
         dfg.finish_prelude_hugr_with_outputs(n2.outputs()).unwrap(),
@@ -131,7 +131,7 @@ fn value_types() {
     let [q, b] = dfg.input_wires_arr();
     let n1 = dfg.add_dataflow_op(h_gate(), [q]).unwrap();
     let n2 = dfg.add_dataflow_op(NotOp, [b]).unwrap();
-    dfg.add_other_wire(n1.node(), n2.node()).unwrap();
+    dfg.add_other_wire(n1.node(), n2.node());
     let h = dfg
         .finish_prelude_hugr_with_outputs([n2.out_wire(0), n1.out_wire(0)])
         .unwrap();
@@ -154,9 +154,9 @@ fn static_targets() {
     )
     .unwrap();
 
-    let c = dfg.add_constant(ConstUsize::new(1)).unwrap();
+    let c = dfg.add_constant(ConstUsize::new(1));
 
-    let load = dfg.load_const(&c).unwrap();
+    let load = dfg.load_const(&c);
 
     let h = dfg.finish_prelude_hugr_with_outputs([load]).unwrap();
 
@@ -198,7 +198,7 @@ fn test_dataflow_ports_only() {
             &PRELUDE_REGISTRY,
         )
         .unwrap();
-    dfg.add_other_wire(not.node(), call.node()).unwrap();
+    dfg.add_other_wire(not.node(), call.node());
     let h = dfg
         .finish_hugr_with_outputs(not.outputs(), &PRELUDE_REGISTRY)
         .unwrap();

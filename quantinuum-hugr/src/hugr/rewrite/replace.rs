@@ -498,7 +498,7 @@ mod test {
             FunctionType::new_endo(just_list.clone()),
         )?;
 
-        let pred_const = cfg.add_constant(ops::Const::unary_unit_sum())?;
+        let pred_const = cfg.add_constant(ops::Const::unary_unit_sum());
 
         let entry = single_node_block(&mut cfg, pop, &pred_const, true)?;
         let bb2 = single_node_block(&mut cfg, push, &pred_const, false)?;
@@ -640,7 +640,7 @@ mod test {
         };
         let op: OpType = op.into();
         let op = bb.add_dataflow_op(op, bb.input_wires())?;
-        let load_pred = bb.load_const(pred_const)?;
+        let load_pred = bb.load_const(pred_const);
         bb.finish_with_outputs(load_pred, op.outputs())
     }
 

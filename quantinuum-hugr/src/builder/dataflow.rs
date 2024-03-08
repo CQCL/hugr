@@ -410,7 +410,7 @@ pub(crate) mod test {
             let [i1] = f_build.input_wires_arr();
             let dfg = f_build.add_hugr_with_wires(dfg_hugr, [i1])?;
             let f = f_build.finish_with_outputs([dfg.out_wire(0)])?;
-            module_builder.set_child_metadata(f.node(), "x", "hi")?;
+            module_builder.set_child_metadata(f.node(), "x", "hi");
             (dfg.node(), f.node())
         };
 

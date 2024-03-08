@@ -129,7 +129,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> ConditionalBuilder<B> {
             if let Some(&sibling_node) = self.case_nodes[case + 1..].iter().flatten().next() {
                 self.hugr_mut().add_node_before(sibling_node, case_op)
             } else {
-                self.add_child_op(case_op)?
+                self.add_child_op(case_op)
             };
 
         self.case_nodes[case] = Some(case_node);
@@ -242,9 +242,9 @@ mod test {
                 "main",
                 FunctionType::new(type_row![NAT], type_row![NAT]).into(),
             )?;
-            let tru_const = fbuild.add_constant(Const::true_val())?;
+            let tru_const = fbuild.add_constant(Const::true_val());
             let _fdef = {
-                let const_wire = fbuild.load_const(&tru_const)?;
+                let const_wire = fbuild.load_const(&tru_const);
                 let [int] = fbuild.input_wires_arr();
                 let conditional_id = {
                     let other_inputs = vec![(NAT, int)];

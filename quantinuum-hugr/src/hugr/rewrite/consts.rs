@@ -130,12 +130,12 @@ mod test {
     #[test]
     fn test_const_remove() -> Result<(), Box<dyn std::error::Error>> {
         let mut build = ModuleBuilder::new();
-        let con_node = build.add_constant(ConstUsize::new(2))?;
+        let con_node = build.add_constant(ConstUsize::new(2));
 
         let mut dfg_build =
             build.define_function("main", FunctionType::new_endo(type_row![]).into())?;
-        let load_1 = dfg_build.load_const(&con_node)?;
-        let load_2 = dfg_build.load_const(&con_node)?;
+        let load_1 = dfg_build.load_const(&con_node);
+        let load_2 = dfg_build.load_const(&con_node);
         let tup = dfg_build.add_dataflow_op(
             LeafOp::MakeTuple {
                 tys: type_row![USIZE_T, USIZE_T],
