@@ -1,8 +1,10 @@
 use std::collections::HashMap;
+use std::mem;
 
+use itertools::Itertools;
 use thiserror::Error;
 
-use crate::ops::OpType;
+use crate::ops::{OpName, OpType};
 
 use super::{BuildError, Dataflow};
 use crate::{CircuitUnit, Wire};
@@ -12,32 +14,77 @@ use crate::{CircuitUnit, Wire};
 /// Allows appending operations by indexing a vector of input wires.
 #[derive(Debug, PartialEq)]
 pub struct CircuitBuilder<'a, T: ?Sized> {
-    wires: Vec<Wire>,
+    /// List of wires that are being tracked, identified by their index in the vector.
+    ///
+    /// Terminating wires may create holes in the vector, but the indices are stable.
+    wires: Vec<Option<Wire>>,
     builder: &'a mut T,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, PartialEq, Error)]
 /// Error in [`CircuitBuilder`]
+#[non_exhaustive]
 pub enum CircuitBuildError {
     /// Invalid index for stored wires.
-    #[error("Invalid wire index.")]
-    InvalidWireIndex,
+    #[error("Invalid wire index {invalid_index} while attempting to add operation {}.", .op.as_ref().map(|o| o.name()).unwrap_or_default())]
+    InvalidWireIndex {
+        /// The operation.
+        op: Option<OpType>,
+        /// The invalid indices.
+        invalid_index: usize,
+    },
+    /// Some linear inputs had no corresponding output wire.
+    #[error("The linear inputs {:?} had no corresponding output wire in operation {}.", .index.as_slice(), .op.name())]
+    MismatchedLinearInputs {
+        /// The operation.
+        op: OpType,
+        /// The index of the input that had no corresponding output wire.
+        index: Vec<usize>,
+    },
 }
 
 impl<'a, T: Dataflow + ?Sized> CircuitBuilder<'a, T> {
     /// Construct a new [`CircuitBuilder`] from a vector of incoming wires and the
-    /// builder for the graph
+    /// builder for the graph.
     pub fn new(wires: impl IntoIterator<Item = Wire>, builder: &'a mut T) -> Self {
         Self {
-            wires: wires.into_iter().collect(),
+            wires: wires.into_iter().map(Some).collect(),
             builder,
         }
     }
 
-    /// Number of wires tracked, upper bound of valid wire indices
+    /// Returns the number of wires tracked.
     #[must_use]
     pub fn n_wires(&self) -> usize {
-        self.wires.len()
+        self.wires.iter().flatten().count()
+    }
+
+    /// Returns the wire associated with the given index.
+    #[must_use]
+    pub fn tracked_wire(&self, index: usize) -> Option<Wire> {
+        self.wires.get(index).copied().flatten()
+    }
+
+    /// Returns an iterator over the tracked linear units.
+    pub fn tracked_units(&self) -> impl Iterator<Item = usize> + '_ {
+        self.wires
+            .iter()
+            .enumerate()
+            .filter_map(|(i, w)| w.map(|_| i))
+    }
+
+    /// Returns an array with the tracked linear units.
+    #[must_use]
+    pub fn tracked_units_arr<const N: usize>(&self) -> [usize; N] {
+        self.tracked_units()
+            .collect_vec()
+            .try_into()
+            .unwrap_or_else(|ws: Vec<usize>| {
+                panic!(
+                    "Incorrect number of linear units: Expected {N} but got {}",
+                    ws.len()
+                )
+            })
     }
 
     #[inline]
@@ -63,7 +110,6 @@ impl<'a, T: Dataflow + ?Sized> CircuitBuilder<'a, T> {
         inputs: impl IntoIterator<Item = A>,
     ) -> Result<&mut Self, BuildError> {
         self.append_with_outputs(op, inputs)?;
-
         Ok(self)
     }
 
@@ -83,26 +129,31 @@ impl<'a, T: Dataflow + ?Sized> CircuitBuilder<'a, T> {
     ) -> Result<Vec<Wire>, BuildError> {
         // map of linear port offset to wire vector index
         let mut linear_inputs = HashMap::new();
+        let op = op.into();
 
-        let input_wires: Option<Vec<Wire>> = inputs
+        let input_wires: Result<Vec<Wire>, usize> = inputs
             .into_iter()
             .map(Into::into)
             .enumerate()
             .map(|(input_port, a_w): (usize, CircuitUnit)| match a_w {
-                CircuitUnit::Wire(wire) => Some(wire),
+                CircuitUnit::Wire(wire) => Ok(wire),
                 CircuitUnit::Linear(wire_index) => {
                     linear_inputs.insert(input_port, wire_index);
-                    self.wires.get(wire_index).copied()
+                    self.tracked_wire(wire_index).ok_or(wire_index)
                 }
             })
             .collect();
 
-        let input_wires = input_wires.ok_or(CircuitBuildError::InvalidWireIndex)?;
+        let input_wires =
+            input_wires.map_err(|invalid_index| CircuitBuildError::InvalidWireIndex {
+                op: Some(op.clone()),
+                invalid_index,
+            })?;
 
         let output_wires = self
             .builder
             .add_dataflow_op(
-                op, // TODO: Add extension param
+                op.clone(), // TODO: Add extension param
                 input_wires,
             )?
             .outputs();
@@ -111,7 +162,7 @@ impl<'a, T: Dataflow + ?Sized> CircuitBuilder<'a, T> {
             .filter_map(|(output_port, wire)| {
                 if let Some(wire_index) = linear_inputs.remove(&output_port) {
                     // output at output_port replaces input wire from same port
-                    self.wires[wire_index] = wire;
+                    self.wires[wire_index] = Some(wire);
                     None
                 } else {
                     Some(wire)
@@ -119,14 +170,47 @@ impl<'a, T: Dataflow + ?Sized> CircuitBuilder<'a, T> {
             })
             .collect();
 
+        if !linear_inputs.is_empty() {
+            return Err(CircuitBuildError::MismatchedLinearInputs {
+                op,
+                index: linear_inputs.values().copied().collect(),
+            }
+            .into());
+        }
+
         Ok(nonlinear_outputs)
+    }
+
+    /// Add a wire to the list of tracked wires.
+    ///
+    /// Returns the new unit index.
+    pub fn track_wire(&mut self, wire: Wire) -> usize {
+        self.wires.push(Some(wire));
+        self.wires.len() - 1
+    }
+
+    /// Stops tracking a linear unit, and returns the last wire corresponding to it.
+    ///
+    /// Returns the new unit index.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`CircuitBuildError::InvalidWireIndex`] if the index is invalid.
+    pub fn untrack_wire(&mut self, index: usize) -> Result<Wire, CircuitBuildError> {
+        self.wires
+            .get_mut(index)
+            .and_then(mem::take)
+            .ok_or(CircuitBuildError::InvalidWireIndex {
+                op: None,
+                invalid_index: index,
+            })
     }
 
     #[inline]
     /// Finish building the circuit region and return the dangling wires
     /// that correspond to the initially provided wires.
     pub fn finish(self) -> Vec<Wire> {
-        self.wires
+        self.wires.into_iter().flatten().collect()
     }
 }
 
@@ -135,6 +219,7 @@ mod test {
     use super::*;
     use cool_asserts::assert_matches;
 
+    use crate::utils::test_quantum_extension::{cx_gate, h_gate, measure, q_alloc, q_discard};
     use crate::{
         builder::{
             test::{build_main, NAT, QB},
@@ -144,7 +229,6 @@ mod test {
         ops::{custom::OpaqueOp, LeafOp},
         type_row,
         types::FunctionType,
-        utils::test_quantum_extension::{cx_gate, h_gate, measure},
     };
 
     #[test]
@@ -152,7 +236,7 @@ mod test {
         let build_res = build_main(
             FunctionType::new(type_row![QB, QB], type_row![QB, QB]).into(),
             |mut f_build| {
-                let wires = f_build.input_wires().collect();
+                let wires = f_build.input_wires().map(Some).collect();
 
                 let mut linear = CircuitBuilder {
                     wires,
@@ -207,5 +291,89 @@ mod test {
         );
 
         assert_matches!(build_res, Ok(_));
+    }
+
+    #[test]
+    fn ancillae() {
+        let build_res = build_main(
+            FunctionType::new(type_row![QB], type_row![QB]).into(),
+            |mut f_build| {
+                let mut circ = f_build.as_circuit(f_build.input_wires());
+                assert_eq!(circ.n_wires(), 1);
+
+                let [q0] = circ.tracked_units_arr();
+                let [ancilla] = circ
+                    .append_with_outputs::<CircuitUnit>(q_alloc(), [])?
+                    .try_into()
+                    .expect("Expected a single ancilla wire");
+                let ancilla = circ.track_wire(ancilla);
+
+                assert_ne!(ancilla, 0);
+                assert_eq!(circ.n_wires(), 2);
+                assert_eq!(circ.tracked_units_arr(), [q0, ancilla]);
+
+                circ.append(cx_gate(), [q0, ancilla])?;
+                let [_bit] = circ
+                    .append_with_outputs(measure(), [q0])?
+                    .try_into()
+                    .unwrap();
+
+                let q0 = circ.untrack_wire(q0)?;
+
+                assert_eq!(circ.tracked_units_arr(), [ancilla]);
+
+                circ.append_and_consume(q_discard(), [q0])?;
+
+                let outs = circ.finish();
+
+                assert_eq!(outs.len(), 1);
+
+                f_build.finish_with_outputs(outs)
+            },
+        );
+
+        assert_matches!(build_res, Ok(_));
+    }
+
+    #[test]
+    fn circuit_builder_errors() {
+        let _build_res = build_main(
+            FunctionType::new_endo(type_row![QB, QB]).into(),
+            |mut f_build| {
+                let mut circ = f_build.as_circuit(f_build.input_wires());
+                let [q0, q1] = circ.tracked_units_arr();
+                let invalid_index = 0xff;
+
+                // Passing an invalid linear index returns an error
+                assert_matches!(
+                    circ.append(cx_gate(), [q0, invalid_index]),
+                    Err(BuildError::CircuitError(CircuitBuildError::InvalidWireIndex { op, invalid_index: idx }))
+                    if op == Some(cx_gate().into()) && idx == invalid_index,
+                );
+
+                // Untracking an invalid index returns an error
+                assert_matches!(
+                    circ.untrack_wire(invalid_index),
+                    Err(CircuitBuildError::InvalidWireIndex { op: None, invalid_index: idx })
+                    if idx == invalid_index,
+                );
+
+                // Passing a linear index to an operation without a corresponding output returns an error
+                assert_matches!(
+                    circ.append(q_discard(), [q1]),
+                    Err(BuildError::CircuitError(CircuitBuildError::MismatchedLinearInputs { op, index }))
+                    if op == q_discard().into() && index == [q1],
+                );
+
+                let outs = circ.finish();
+
+                assert_eq!(outs.len(), 2);
+
+                f_build.finish_with_outputs(outs)
+            },
+        );
+
+        // We do not test the build output, as the internal errors may have left
+        // the hugr in an invalid state.
     }
 }

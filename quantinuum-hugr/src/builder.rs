@@ -119,7 +119,7 @@ mod conditional;
 pub use conditional::{CaseBuilder, ConditionalBuilder};
 
 mod circuit;
-pub use circuit::CircuitBuilder;
+pub use circuit::{CircuitBuildError, CircuitBuilder};
 
 #[derive(Debug, Clone, PartialEq, Error)]
 /// Error while building the HUGR.

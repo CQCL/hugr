@@ -98,6 +98,22 @@ pub(crate) mod test_quantum_extension {
             .unwrap();
 
         extension
+            .add_op(
+                SmolStr::new_inline("QAlloc"),
+                "Allocate a new qubit.".into(),
+                FunctionType::new(type_row![], type_row![QB_T]),
+            )
+            .unwrap();
+
+        extension
+            .add_op(
+                SmolStr::new_inline("QDiscard"),
+                "Discard a qubit.".into(),
+                FunctionType::new(type_row![QB_T], type_row![]),
+            )
+            .unwrap();
+
+        extension
     }
 
     lazy_static! {
@@ -126,6 +142,14 @@ pub(crate) mod test_quantum_extension {
 
     pub(crate) fn rz_f64() -> LeafOp {
         get_gate("RzF64")
+    }
+
+    pub(crate) fn q_alloc() -> LeafOp {
+        get_gate("QAlloc")
+    }
+
+    pub(crate) fn q_discard() -> LeafOp {
+        get_gate("QDiscard")
     }
 }
 

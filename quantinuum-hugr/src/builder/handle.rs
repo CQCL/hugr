@@ -7,7 +7,7 @@ use crate::{Node, OutgoingPort, Wire};
 use itertools::Itertools;
 use std::iter::FusedIterator;
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 /// Handle to a dataflow node which has a known number of value outputs
 pub struct BuildHandle<T> {
     node_handle: T,
