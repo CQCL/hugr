@@ -2,9 +2,9 @@
 //!
 use crate::ops::handle::{BasicBlockID, CaseID, DfgID, FuncID, NodeHandle, TailLoopID};
 use crate::ops::OpTag;
+use crate::utils::collect_array;
 use crate::{Node, OutgoingPort, Wire};
 
-use itertools::Itertools;
 use std::iter::FusedIterator;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -49,10 +49,7 @@ impl<T: NodeHandle> BuildHandle<T> {
 
     /// Attempt to cast outputs in to array of Wires.
     pub fn outputs_arr<const N: usize>(&self) -> [Wire; N] {
-        self.outputs()
-            .collect_vec()
-            .try_into()
-            .expect(&format!("Incorrect number of wires: {}", N)[..])
+        collect_array(self.outputs())
     }
 
     #[inline]

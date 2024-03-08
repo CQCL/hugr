@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 use std::mem;
 
-use itertools::Itertools;
 use thiserror::Error;
 
 use crate::ops::{OpName, OpType};
+use crate::utils::collect_array;
 
 use super::{BuildError, Dataflow};
 use crate::{CircuitUnit, Wire};
@@ -74,17 +74,13 @@ impl<'a, T: Dataflow + ?Sized> CircuitBuilder<'a, T> {
     }
 
     /// Returns an array with the tracked linear units.
+    ///
+    /// # Panics
+    ///
+    /// If the number of outputs does not match `N`.
     #[must_use]
     pub fn tracked_units_arr<const N: usize>(&self) -> [usize; N] {
-        self.tracked_units()
-            .collect_vec()
-            .try_into()
-            .unwrap_or_else(|ws: Vec<usize>| {
-                panic!(
-                    "Incorrect number of linear units: Expected {N} but got {}",
-                    ws.len()
-                )
-            })
+        collect_array(self.tracked_units())
     }
 
     #[inline]
@@ -121,7 +117,7 @@ impl<'a, T: Dataflow + ?Sized> CircuitBuilder<'a, T> {
     ///
     /// # Errors
     ///
-    /// This function will return an error if an index is invalid.
+    /// Returns an error on an invalid input unit.
     pub fn append_with_outputs<A: Into<CircuitUnit>>(
         &mut self,
         op: impl Into<OpType>,
@@ -179,6 +175,28 @@ impl<'a, T: Dataflow + ?Sized> CircuitBuilder<'a, T> {
         }
 
         Ok(nonlinear_outputs)
+    }
+
+    /// Append an `op` with some inputs being the stored wires.
+    /// Any inputs of the form [`CircuitUnit::Linear`] are used to index the
+    /// stored wires.
+    /// The outputs at those indices are used to replace the stored wire.
+    /// The remaining outputs are returned as an array.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error on an invalid input unit.
+    ///
+    /// # Panics
+    ///
+    /// If the number of outputs does not match `N`.
+    pub fn append_with_output_arr<A: Into<CircuitUnit>, const N: usize>(
+        &mut self,
+        op: impl Into<OpType>,
+        inputs: impl IntoIterator<Item = A>,
+    ) -> Result<[Wire; N], BuildError> {
+        let outputs = self.append_with_outputs(op, inputs)?;
+        Ok(collect_array(outputs))
     }
 
     /// Add a wire to the list of tracked wires.
