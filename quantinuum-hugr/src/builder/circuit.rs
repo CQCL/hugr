@@ -190,7 +190,7 @@ impl<'a, T: Dataflow + ?Sized> CircuitBuilder<'a, T> {
     /// # Panics
     ///
     /// If the number of outputs does not match `N`.
-    pub fn append_with_output_arr<A: Into<CircuitUnit>, const N: usize>(
+    pub fn append_with_output_arr<const N: usize, A: Into<CircuitUnit>>(
         &mut self,
         op: impl Into<OpType>,
         inputs: impl IntoIterator<Item = A>,
@@ -320,10 +320,7 @@ mod test {
                 assert_eq!(circ.n_wires(), 1);
 
                 let [q0] = circ.tracked_units_arr();
-                let [ancilla] = circ
-                    .append_with_outputs::<CircuitUnit>(q_alloc(), [])?
-                    .try_into()
-                    .expect("Expected a single ancilla wire");
+                let [ancilla] = circ.append_with_output_arr(q_alloc(), [] as [CircuitUnit; 0])?;
                 let ancilla = circ.track_wire(ancilla);
 
                 assert_ne!(ancilla, 0);
@@ -331,10 +328,7 @@ mod test {
                 assert_eq!(circ.tracked_units_arr(), [q0, ancilla]);
 
                 circ.append(cx_gate(), [q0, ancilla])?;
-                let [_bit] = circ
-                    .append_with_outputs(measure(), [q0])?
-                    .try_into()
-                    .unwrap();
+                let [_bit] = circ.append_with_output_arr(measure(), [q0])?;
 
                 let q0 = circ.untrack_wire(q0)?;
 
