@@ -49,7 +49,7 @@ impl<T: NodeHandle> BuildHandle<T> {
 
     /// Attempt to cast outputs in to array of Wires.
     pub fn outputs_arr<const N: usize>(&self) -> [Wire; N] {
-        collect_array(self.outputs())
+        self.outputs().to_array()
     }
 
     #[inline]
@@ -108,6 +108,18 @@ impl From<BuildHandle<DfgID>> for BuildHandle<TailLoopID> {
 pub struct Outputs {
     node: Node,
     range: std::ops::Range<usize>,
+}
+
+impl Outputs {
+    #[inline]
+    /// Returns the output wires as an array.
+    ///
+    /// # Panics
+    ///
+    /// If the length of the slice is not equal to `N`.
+    pub fn to_array<const N: usize>(self) -> [Wire; N] {
+        collect_array(self)
+    }
 }
 
 impl Iterator for Outputs {
