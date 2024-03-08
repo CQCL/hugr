@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::mem;
 
+use itertools::Itertools;
 use thiserror::Error;
 
 use crate::ops::{OpName, OpType};
@@ -24,10 +25,10 @@ pub struct CircuitBuilder<'a, T: ?Sized> {
 /// Error in [`CircuitBuilder`]
 pub enum CircuitBuildError {
     /// Invalid index for stored wires.
-    #[error("Invalid wire index {invalid_index} while attempting to add operation {}.", .op.name())]
+    #[error("Invalid wire index {invalid_index} while attempting to add operation {}.", .op.as_ref().map(|o| o.name()).unwrap_or_default())]
     InvalidWireIndex {
         /// The operation.
-        op: OpType,
+        op: Option<OpType>,
         /// The invalid indices.
         invalid_index: usize,
     },
@@ -61,6 +62,28 @@ impl<'a, T: Dataflow + ?Sized> CircuitBuilder<'a, T> {
     #[must_use]
     pub fn tracked_wire(&self, index: usize) -> Option<Wire> {
         self.wires.get(index).copied().flatten()
+    }
+
+    /// Returns an iterator over the tracked linear units.
+    pub fn tracked_units(&self) -> impl Iterator<Item = usize> + '_ {
+        self.wires
+            .iter()
+            .enumerate()
+            .filter_map(|(i, w)| w.map(|_| i))
+    }
+
+    /// Returns an array with the tracked linear units.
+    #[must_use]
+    pub fn tracked_units_arr<const N: usize>(&self) -> [usize; N] {
+        self.tracked_units()
+            .collect_vec()
+            .try_into()
+            .unwrap_or_else(|ws: Vec<usize>| {
+                panic!(
+                    "Incorrect number of linear units: Expected {N} but got {}",
+                    ws.len()
+                )
+            })
     }
 
     #[inline]
@@ -122,7 +145,7 @@ impl<'a, T: Dataflow + ?Sized> CircuitBuilder<'a, T> {
 
         let input_wires =
             input_wires.map_err(|invalid_index| CircuitBuildError::InvalidWireIndex {
-                op: op.clone(),
+                op: Some(op.clone()),
                 invalid_index,
             })?;
 
@@ -157,65 +180,29 @@ impl<'a, T: Dataflow + ?Sized> CircuitBuilder<'a, T> {
         Ok(nonlinear_outputs)
     }
 
-    /// Add new tracked linear wires to the circuit, initialized via the given `op`.
+    /// Add a wire to the list of tracked wires.
     ///
-    /// Any output from the operation will be tracked as a new linear wire.
-    #[inline]
-    pub fn add_ancilla(&mut self, op: impl Into<OpType>) -> Result<Vec<usize>, BuildError> {
-        self.add_ancilla_with_inputs::<CircuitUnit>(op, [])
+    /// Returns the new unit index.
+    pub fn track_wire(&mut self, wire: Wire) -> usize {
+        self.wires.push(Some(wire));
+        self.wires.len() - 1
     }
 
-    /// Add new tracked linear wires to the circuit, initialized via the given
-    /// `op`.
+    /// Stops tracking a linear unit, and returns the last wire corresponding to it.
     ///
-    /// The operation may receive additional inputs. Any output without a
-    /// matching linear input will be tracked as a new linear wire.
-    pub fn add_ancilla_with_inputs<A: Into<CircuitUnit>>(
-        &mut self,
-        op: impl Into<OpType>,
-        inputs: impl IntoIterator<Item = A>,
-    ) -> Result<Vec<usize>, BuildError> {
-        let wires = self.append_with_outputs(op, inputs)?;
-        let mut new_indices = Vec::with_capacity(wires.len());
-        for w in wires {
-            self.wires.push(Some(w));
-            new_indices.push(self.wires.len() - 1);
-        }
-        Ok(new_indices)
-    }
-
-    /// Discards ancillae with a consuming operation.
-    #[inline]
-    pub fn discard_ancilla(
-        &mut self,
-        op: impl Into<OpType>,
-        ancilla: impl IntoIterator<Item = usize>,
-    ) -> Result<&mut Self, BuildError> {
-        self.discard_ancilla_with_outputs::<CircuitUnit>(op, ancilla)?;
-        Ok(self)
-    }
-
-    /// Discards ancillae with a consuming operation.
+    /// Returns the new unit index.
     ///
-    /// Returns the output wires of the operation.
-    pub fn discard_ancilla_with_outputs<A: Into<CircuitUnit>>(
-        &mut self,
-        op: impl Into<OpType>,
-        ancilla: impl IntoIterator<Item = usize>,
-    ) -> Result<Vec<Wire>, BuildError> {
-        let op = op.into();
-
-        // Remove the ancillae from the list of tracked wires.
-        let wires: Result<Vec<Wire>, usize> = ancilla
-            .into_iter()
-            .map(|i| self.wires.get_mut(i).and_then(mem::take).ok_or(i))
-            .collect();
-        let wires = wires.map_err(|invalid_index| CircuitBuildError::InvalidWireIndex {
-            op: op.clone(),
-            invalid_index,
-        })?;
-
-        self.append_with_outputs(op, wires)
+    /// # Errors
+    ///
+    /// Returns a [`CircuitBuildError::InvalidWireIndex`] if the index is invalid.
+    pub fn untrack_wire(&mut self, index: usize) -> Result<Wire, CircuitBuildError> {
+        self.wires
+            .get_mut(index)
+            .and_then(mem::take)
+            .ok_or(CircuitBuildError::InvalidWireIndex {
+                op: None,
+                invalid_index: index,
+            })
     }
 
     #[inline]
@@ -313,20 +300,22 @@ mod test {
             FunctionType::new(type_row![QB], type_row![QB]).into(),
             |mut f_build| {
                 let mut circ = f_build.as_circuit(f_build.input_wires());
-
                 assert_eq!(circ.n_wires(), 1);
 
+                let [q0] = circ.tracked_units_arr();
                 let [ancilla] = circ
-                    .add_ancilla(q_alloc())?
+                    .append_with_outputs::<CircuitUnit>(q_alloc(), [])?
                     .try_into()
                     .expect("Expected a single ancilla wire");
+                let ancilla = circ.track_wire(ancilla);
 
                 assert_ne!(ancilla, 0);
                 assert_eq!(circ.n_wires(), 2);
+                assert_eq!(circ.tracked_units_arr(), [q0, ancilla]);
 
-                circ.append(cz_gate(), [0, ancilla])?;
+                circ.append(cz_gate(), [q0, ancilla])?;
                 let [_bit] = circ
-                    .append_with_outputs(measure(), [0])?
+                    .append_with_outputs(measure(), [q0])?
                     .try_into()
                     .unwrap();
 
@@ -338,9 +327,11 @@ mod test {
                 //    [CircuitUnit::Linear(0), CircuitUnit::Wire(bit)],
                 //)?;
 
-                circ.discard_ancilla(q_discard(), [0])?;
+                let q0 = circ.untrack_wire(q0)?;
 
-                assert_eq!(circ.n_wires(), 1);
+                assert_eq!(circ.tracked_units_arr(), [ancilla]);
+
+                circ.append_and_consume(q_discard(), [q0])?;
 
                 let outs = circ.finish();
 
