@@ -23,8 +23,46 @@ where
 }
 
 /// Collect a vector into an array.
-pub fn collect_array<const N: usize, T: Debug>(arr: &[T]) -> [&T; N] {
-    arr.iter().collect_vec().try_into().unwrap()
+///
+/// This is useful for deconstructing a vectors content.
+///
+/// # Example
+///
+/// ```ignore
+/// let iter = 0..3;
+/// let [a, b, c] = crate::utils::collect_array(iter);
+/// assert_eq!(b, 1);
+/// ```
+///
+/// # Panics
+///
+/// If the length of the slice is not equal to `N`.
+///
+/// See also [`try_collect_array`] for a non-panicking version.
+#[inline]
+pub fn collect_array<const N: usize, T: Debug>(arr: impl IntoIterator<Item = T>) -> [T; N] {
+    try_collect_array(arr).unwrap_or_else(|v| panic!("Expected {} elements, got {:?}", N, v))
+}
+
+/// Collect a vector into an array.
+///
+/// This is useful for deconstructing a vectors content.
+///
+/// # Example
+///
+/// ```ignore
+/// let iter = 0..3;
+/// let [a, b, c] = crate::utils::try_collect_array(iter)
+///     .unwrap_or_else(|v| panic!("Expected 3 elements, got {:?}", v));
+/// assert_eq!(b, 1);
+/// ```
+///
+/// See also [`collect_array`].
+#[inline]
+pub fn try_collect_array<const N: usize, T>(
+    arr: impl IntoIterator<Item = T>,
+) -> Result<[T; N], Vec<T>> {
+    arr.into_iter().collect_vec().try_into()
 }
 
 /// Helper method to skip serialization of default values in serde.

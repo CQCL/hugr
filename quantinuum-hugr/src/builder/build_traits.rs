@@ -3,6 +3,7 @@ use crate::hugr::validate::InterGraphEdgeError;
 use crate::hugr::views::HugrView;
 use crate::hugr::{NodeMetadata, ValidationError};
 use crate::ops::{self, LeafOp, OpTag, OpTrait, OpType};
+use crate::utils::collect_array;
 use crate::{IncomingPort, Node, OutgoingPort};
 
 use std::iter;
@@ -275,10 +276,7 @@ pub trait Dataflow: Container {
     ///
     /// Panics if the number of input Wires does not match the size of the array.
     fn input_wires_arr<const N: usize>(&self) -> [Wire; N] {
-        self.input_wires()
-            .collect_vec()
-            .try_into()
-            .expect(&format!("Incorrect number of wires: {N}")[..])
+        collect_array(self.input_wires())
     }
 
     /// Return a builder for a [`crate::ops::DFG`] node, i.e. a nested dataflow subgraph.
