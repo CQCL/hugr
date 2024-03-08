@@ -150,9 +150,7 @@ impl Rewrite for OutlineCfg {
             new_block_bldr
                 .set_outputs(pred_wire, cfg.outputs())
                 .unwrap();
-            let ins_res = h
-                .insert_hugr(outer_cfg, new_block_bldr.hugr().clone())
-                .unwrap();
+            let ins_res = h.insert_hugr(outer_cfg, new_block_bldr.hugr().clone());
             (
                 ins_res.new_root,
                 *ins_res.node_map.get(&cfg.node()).unwrap(),
@@ -165,14 +163,14 @@ impl Rewrite for OutlineCfg {
             .collect();
         for (pred, br) in preds {
             if !self.blocks.contains(&pred) {
-                h.disconnect(pred, br).unwrap();
-                h.connect(pred, br, new_block, 0).unwrap();
+                h.disconnect(pred, br);
+                h.connect(pred, br, new_block, 0);
             }
         }
         if entry == outer_entry {
             // new_block must be the entry node, i.e. first child, of the enclosing CFG
             // (the current entry node will be reparented inside new_block below)
-            h.move_before_sibling(new_block, outer_entry).unwrap();
+            h.move_before_sibling(new_block, outer_entry);
         }
 
         // 4(a). Exit edges.
@@ -187,9 +185,9 @@ impl Rewrite for OutlineCfg {
             .exactly_one()
             .ok() // NodePorts does not implement Debug
             .unwrap();
-        h.disconnect(exit, exit_port).unwrap();
+        h.disconnect(exit, exit_port);
         // And connect new_block to outside instead
-        h.connect(new_block, 0, outside, 0).unwrap();
+        h.connect(new_block, 0, outside, 0);
 
         // 5. Children of new CFG.
         let inner_exit = {
@@ -198,12 +196,12 @@ impl Rewrite for OutlineCfg {
             let h = h.hugr_mut();
             let inner_exit = h.children(cfg_node).exactly_one().ok().unwrap();
             // Entry node must be first
-            h.move_before_sibling(entry, inner_exit).unwrap();
+            h.move_before_sibling(entry, inner_exit);
             // And remaining nodes
             for n in self.blocks {
                 // Do not move the entry node, as we have already
                 if n != entry {
-                    h.set_parent(n, cfg_node).unwrap();
+                    h.set_parent(n, cfg_node);
                 }
             }
             inner_exit
@@ -215,7 +213,7 @@ impl Rewrite for OutlineCfg {
             SiblingMut::try_new(h, new_block).unwrap();
         let mut in_cfg_view: SiblingMut<'_, CfgID> =
             SiblingMut::try_new(&mut in_bb_view, cfg_node).unwrap();
-        in_cfg_view.connect(exit, exit_port, inner_exit, 0).unwrap();
+        in_cfg_view.connect(exit, exit_port, inner_exit, 0);
 
         Ok((new_block, cfg_node))
     }

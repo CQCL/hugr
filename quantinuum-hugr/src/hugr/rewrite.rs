@@ -75,18 +75,19 @@ impl<R: Rewrite> Rewrite for Transactional<R> {
         }
         // Try to backup just the contents of this HugrMut.
         let mut backup = Hugr::new(h.root_type().clone());
-        backup.insert_from_view(backup.root(), h).unwrap();
+        backup.insert_from_view(backup.root(), h);
         let r = self.underlying.apply(h);
         fn first_child(h: &impl HugrView) -> Option<crate::Node> {
             h.children(h.root()).next()
         }
         if r.is_err() {
             // Try to restore backup.
-            h.replace_op(h.root(), backup.root_type().clone()).unwrap();
+            h.replace_op(h.root(), backup.root_type().clone())
+                .expect("The root replacement should always match the old root type");
             while let Some(child) = first_child(h) {
-                h.remove_node(child).unwrap();
+                h.remove_node(child);
             }
-            h.insert_from_view(h.root(), &backup).unwrap();
+            h.insert_from_view(h.root(), &backup);
         }
         r
     }

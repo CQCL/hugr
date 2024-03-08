@@ -47,12 +47,12 @@ pub trait Container {
     /// Add an [`OpType`] as the final child of the container.
     fn add_child_op(&mut self, op: impl Into<OpType>) -> Result<Node, BuildError> {
         let parent = self.container_node();
-        Ok(self.hugr_mut().add_node_with_parent(parent, op)?)
+        Ok(self.hugr_mut().add_node_with_parent(parent, op))
     }
     /// Add a [`NodeType`] as the final child of the container.
     fn add_child_node(&mut self, node: NodeType) -> Result<Node, BuildError> {
         let parent = self.container_node();
-        Ok(self.hugr_mut().add_node_with_parent(parent, node)?)
+        Ok(self.hugr_mut().add_node_with_parent(parent, node))
     }
 
     /// Adds a non-dataflow edge between two nodes. The kind is given by the operation's [`other_inputs`] or  [`other_outputs`]
@@ -60,7 +60,7 @@ pub trait Container {
     /// [`other_inputs`]: crate::ops::OpTrait::other_input
     /// [`other_outputs`]: crate::ops::OpTrait::other_output
     fn add_other_wire(&mut self, src: Node, dst: Node) -> Result<Wire, BuildError> {
-        let (src_port, _) = self.hugr_mut().add_other_edge(src, dst)?;
+        let (src_port, _) = self.hugr_mut().add_other_edge(src, dst);
         Ok(Wire::new(src, src_port))
     }
 
@@ -102,20 +102,20 @@ pub trait Container {
     /// Insert a HUGR as a child of the container.
     fn add_hugr(&mut self, child: Hugr) -> Result<InsertionResult, BuildError> {
         let parent = self.container_node();
-        Ok(self.hugr_mut().insert_hugr(parent, child)?)
+        Ok(self.hugr_mut().insert_hugr(parent, child))
     }
 
     /// Insert a copy of a HUGR as a child of the container.
     fn add_hugr_view(&mut self, child: &impl HugrView) -> Result<InsertionResult, BuildError> {
         let parent = self.container_node();
-        Ok(self.hugr_mut().insert_from_view(parent, child)?)
+        Ok(self.hugr_mut().insert_from_view(parent, child))
     }
 
     /// Add metadata to the container node.
     fn set_metadata(&mut self, key: impl AsRef<str>, meta: impl Into<NodeMetadata>) {
         let parent = self.container_node();
         // Implementor's container_node() should be a valid node
-        self.hugr_mut().set_metadata(parent, key, meta).unwrap();
+        self.hugr_mut().set_metadata(parent, key, meta);
     }
 
     /// Add metadata to a child node.
@@ -127,7 +127,7 @@ pub trait Container {
         key: impl AsRef<str>,
         meta: impl Into<NodeMetadata>,
     ) -> Result<(), BuildError> {
-        self.hugr_mut().set_metadata(child, key, meta)?;
+        self.hugr_mut().set_metadata(child, key, meta);
         Ok(())
     }
 }
@@ -604,7 +604,7 @@ pub trait Dataflow: Container {
         let src_port = self.hugr_mut().num_outputs(function.node()) - 1;
 
         self.hugr_mut()
-            .connect(function.node(), src_port, op_id.node(), const_in_port)?;
+            .connect(function.node(), src_port, op_id.node(), const_in_port);
         Ok(op_id)
     }
 
@@ -695,7 +695,7 @@ fn wire_up<T: Dataflow + ?Sized>(
                 && !OpTag::BasicBlock.is_superset(base.get_optype(src_sibling).tag())
             {
                 // Add a state order constraint unless one of the nodes is a CFG BasicBlock
-                base.add_other_edge(src, src_sibling)?;
+                base.add_other_edge(src, src_sibling);
             }
         } else if !typ.copyable() & base.linked_ports(src, src_port).next().is_some() {
             // Don't copy linear edges.
@@ -705,7 +705,7 @@ fn wire_up<T: Dataflow + ?Sized>(
 
     data_builder
         .hugr_mut()
-        .connect(src, src_port, dst, dst_port)?;
+        .connect(src, src_port, dst, dst_port);
     Ok(local_source
         && matches!(
             data_builder

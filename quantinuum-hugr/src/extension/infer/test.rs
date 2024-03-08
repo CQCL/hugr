@@ -52,8 +52,8 @@ fn from_graph() -> Result<(), Box<dyn Error>> {
     let input = ops::Input::new(type_row![NAT, NAT]);
     let output = ops::Output::new(type_row![NAT]);
 
-    let input = hugr.add_node_with_parent(hugr.root(), input)?;
-    let output = hugr.add_node_with_parent(hugr.root(), output)?;
+    let input = hugr.add_node_with_parent(hugr.root(), input);
+    let output = hugr.add_node_with_parent(hugr.root(), output);
 
     assert_matches!(hugr.get_io(hugr.root()), Some(_));
 
@@ -71,34 +71,34 @@ fn from_graph() -> Result<(), Box<dyn Error>> {
         ops::DFG {
             signature: add_a_sig,
         },
-    )?;
+    );
     let add_b = hugr.add_node_with_parent(
         hugr.root(),
         ops::DFG {
             signature: add_b_sig,
         },
-    )?;
+    );
     let add_ab = hugr.add_node_with_parent(
         hugr.root(),
         ops::DFG {
             signature: add_ab_sig,
         },
-    )?;
+    );
     let mult_c = hugr.add_node_with_parent(
         hugr.root(),
         ops::DFG {
             signature: mult_c_sig,
         },
-    )?;
+    );
 
-    hugr.connect(input, 0, add_a, 0)?;
-    hugr.connect(add_a, 0, add_b, 0)?;
-    hugr.connect(add_b, 0, mult_c, 0)?;
+    hugr.connect(input, 0, add_a, 0);
+    hugr.connect(add_a, 0, add_b, 0);
+    hugr.connect(add_b, 0, mult_c, 0);
 
-    hugr.connect(input, 1, add_ab, 0)?;
-    hugr.connect(add_ab, 0, mult_c, 1)?;
+    hugr.connect(input, 1, add_ab, 0);
+    hugr.connect(add_ab, 0, mult_c, 1);
 
-    hugr.connect(mult_c, 0, output, 0)?;
+    hugr.connect(mult_c, 0, output, 0);
 
     let (_, closure) = infer_extensions(&hugr)?;
     let empty = ExtensionSet::new();
@@ -153,7 +153,7 @@ fn plus() -> Result<(), InferExtensionError> {
 #[test]
 // This generates a solution that causes validation to fail
 // because of a missing lift node
-fn missing_lift_node() -> Result<(), Box<dyn Error>> {
+fn missing_lift_node() {
     let mut hugr = Hugr::new(NodeType::new_pure(ops::DFG {
         signature: FunctionType::new(type_row![NAT], type_row![NAT]).with_extension_delta(A),
     }));
@@ -163,16 +163,16 @@ fn missing_lift_node() -> Result<(), Box<dyn Error>> {
         NodeType::new_pure(ops::Input {
             types: type_row![NAT],
         }),
-    )?;
+    );
 
     let output = hugr.add_node_with_parent(
         hugr.root(),
         NodeType::new_pure(ops::Output {
             types: type_row![NAT],
         }),
-    )?;
+    );
 
-    hugr.connect(input, 0, output, 0)?;
+    hugr.connect(input, 0, output, 0);
 
     // Fail to catch the actual error because it's a difference between I/O
     // nodes and their parents and `report_mismatch` isn't yet smart enough
@@ -181,7 +181,6 @@ fn missing_lift_node() -> Result<(), Box<dyn Error>> {
         hugr.update_validate(&PRELUDE_REGISTRY),
         Err(ValidationError::CantInfer(_))
     );
-    Ok(())
 }
 
 #[test]
@@ -229,12 +228,12 @@ fn dangling_src() -> Result<(), Box<dyn Error>> {
         ops::DFG {
             signature: add_r_sig,
         },
-    )?;
+    );
 
     // Dangling thingy
     let src_sig = FunctionType::new(type_row![], type_row![NAT]);
 
-    let src = hugr.add_node_with_parent(hugr.root(), ops::DFG { signature: src_sig })?;
+    let src = hugr.add_node_with_parent(hugr.root(), ops::DFG { signature: src_sig });
 
     let mult_sig = FunctionType::new(type_row![NAT, NAT], type_row![NAT]);
     // Mult has open extension requirements, which we should solve to be "R"
@@ -243,12 +242,12 @@ fn dangling_src() -> Result<(), Box<dyn Error>> {
         ops::DFG {
             signature: mult_sig,
         },
-    )?;
+    );
 
-    hugr.connect(input, 0, add_r, 0)?;
-    hugr.connect(add_r, 0, mult, 0)?;
-    hugr.connect(src, 0, mult, 1)?;
-    hugr.connect(mult, 0, output, 0)?;
+    hugr.connect(input, 0, add_r, 0);
+    hugr.connect(add_r, 0, mult, 0);
+    hugr.connect(src, 0, mult, 1);
+    hugr.connect(mult, 0, output, 0);
 
     let closure = hugr.infer_extensions()?;
     assert!(closure.is_empty());
@@ -286,19 +285,19 @@ fn create_with_io(
 ) -> Result<[Node; 3], Box<dyn Error>> {
     let op: OpType = op.into();
 
-    let node = hugr.add_node_with_parent(parent, op)?;
+    let node = hugr.add_node_with_parent(parent, op);
     let input = hugr.add_node_with_parent(
         node,
         ops::Input {
             types: op_sig.input,
         },
-    )?;
+    );
     let output = hugr.add_node_with_parent(
         node,
         ops::Output {
             types: op_sig.output,
         },
-    )?;
+    );
     Ok([node, input, output])
 }
 
@@ -321,7 +320,7 @@ fn test_conditional_inference() -> Result<(), Box<dyn Error>> {
                 type_row: type_row![NAT],
                 new_extension: first_ext,
             },
-        )?;
+        );
 
         let lift2 = hugr.add_node_with_parent(
             case,
@@ -329,11 +328,11 @@ fn test_conditional_inference() -> Result<(), Box<dyn Error>> {
                 type_row: type_row![NAT],
                 new_extension: second_ext,
             },
-        )?;
+        );
 
-        hugr.connect(case_in, 0, lift1, 0)?;
-        hugr.connect(lift1, 0, lift2, 0)?;
-        hugr.connect(lift2, 0, case_out, 0)?;
+        hugr.connect(case_in, 0, lift1, 0);
+        hugr.connect(lift1, 0, lift2, 0);
+        hugr.connect(lift2, 0, case_out, 0);
 
         Ok(case)
     }
@@ -392,13 +391,13 @@ fn extension_adding_sequence() -> Result<(), Box<dyn Error>> {
         ops::Input {
             types: type_row![NAT],
         },
-    )?;
+    );
     let output = hugr.add_node_with_parent(
         root,
         ops::Output {
             types: type_row![NAT],
         },
-    )?;
+    );
 
     // Make identical dataflow nodes which add extension requirement "A" or "B"
     let df_nodes: Vec<Node> = vec![A, A, B, B, A, B]
@@ -415,18 +414,16 @@ fn extension_adding_sequence() -> Result<(), Box<dyn Error>> {
             )
             .unwrap();
 
-            let lift = hugr
-                .add_node_with_parent(
-                    node,
-                    ops::LeafOp::Lift {
-                        type_row: type_row![NAT],
-                        new_extension: ext,
-                    },
-                )
-                .unwrap();
+            let lift = hugr.add_node_with_parent(
+                node,
+                ops::LeafOp::Lift {
+                    type_row: type_row![NAT],
+                    new_extension: ext,
+                },
+            );
 
-            hugr.connect(input, 0, lift, 0).unwrap();
-            hugr.connect(lift, 0, output, 0).unwrap();
+            hugr.connect(input, 0, lift, 0);
+            hugr.connect(lift, 0, output, 0);
 
             node
         })
@@ -435,7 +432,7 @@ fn extension_adding_sequence() -> Result<(), Box<dyn Error>> {
     // Connect nodes in order (0 -> 1 -> 2 ...)
     let nodes = [vec![input], df_nodes, vec![output]].concat();
     for (src, tgt) in nodes.into_iter().tuple_windows() {
-        hugr.connect(src, 0, tgt, 0)?;
+        hugr.connect(src, 0, tgt, 0);
     }
     hugr.update_validate(&PRELUDE_REGISTRY)?;
     Ok(())
@@ -467,10 +464,10 @@ fn make_block(
 
     let [bb, bb_in, bb_out] = create_with_io(hugr, bb_parent, dfb, dfb_sig)?;
 
-    let dfg = hugr.add_node_with_parent(bb, op)?;
+    let dfg = hugr.add_node_with_parent(bb, op);
 
-    hugr.connect(bb_in, 0, dfg, 0)?;
-    hugr.connect(dfg, 0, bb_out, 0)?;
+    hugr.connect(bb_in, 0, dfg, 0);
+    hugr.connect(dfg, 0, bb_out, 0);
 
     Ok(bb)
 }
@@ -504,16 +501,16 @@ fn create_entry_exit(
         ops::ExitBlock {
             cfg_outputs: exit_types.into(),
         },
-    )?;
+    );
 
-    let entry = hugr.add_node_before(exit, dfb)?;
-    let entry_in = hugr.add_node_with_parent(entry, ops::Input { types: inputs })?;
+    let entry = hugr.add_node_before(exit, dfb);
+    let entry_in = hugr.add_node_with_parent(entry, ops::Input { types: inputs });
     let entry_out = hugr.add_node_with_parent(
         entry,
         ops::Output {
             types: vec![entry_tuple_sum].into(),
         },
-    )?;
+    );
 
     Ok(([entry, entry_in, entry_out], exit))
 }
@@ -566,11 +563,11 @@ fn infer_cfg_test() -> Result<(), Box<dyn Error>> {
             A,
             FunctionType::new(vec![NAT], twoway(NAT)).with_extension_delta(A),
         ),
-    )?;
+    );
 
     // Internal wiring for DFGs
-    hugr.connect(entry_in, 0, mkpred, 0)?;
-    hugr.connect(mkpred, 0, entry_out, 0)?;
+    hugr.connect(entry_in, 0, mkpred, 0);
+    hugr.connect(mkpred, 0, entry_out, 0);
 
     let bb0 = make_block(
         &mut hugr,
@@ -605,14 +602,14 @@ fn infer_cfg_test() -> Result<(), Box<dyn Error>> {
     )?;
 
     // CFG Wiring
-    hugr.connect(entry, 0, bb0, 0)?;
-    hugr.connect(entry, 0, bb1, 0)?;
-    hugr.connect(bb1, 0, bb10, 0)?;
-    hugr.connect(bb1, 0, bb11, 0)?;
+    hugr.connect(entry, 0, bb0, 0);
+    hugr.connect(entry, 0, bb1, 0);
+    hugr.connect(bb1, 0, bb10, 0);
+    hugr.connect(bb1, 0, bb11, 0);
 
-    hugr.connect(bb0, 0, exit, 0)?;
-    hugr.connect(bb10, 0, exit, 0)?;
-    hugr.connect(bb11, 0, exit, 0)?;
+    hugr.connect(bb0, 0, exit, 0);
+    hugr.connect(bb10, 0, exit, 0);
+    hugr.connect(bb11, 0, exit, 0);
 
     hugr.infer_extensions()?;
 
@@ -659,10 +656,10 @@ fn multi_entry() -> Result<(), Box<dyn Error>> {
     let entry_mid = hugr.add_node_with_parent(
         entry,
         make_opaque(UNKNOWN_EXTENSION, FunctionType::new(vec![NAT], twoway(NAT))),
-    )?;
+    );
 
-    hugr.connect(entry_in, 0, entry_mid, 0)?;
-    hugr.connect(entry_mid, 0, entry_out, 0)?;
+    hugr.connect(entry_in, 0, entry_mid, 0);
+    hugr.connect(entry_mid, 0, entry_out, 0);
 
     let bb0 = make_block(
         &mut hugr,
@@ -688,11 +685,11 @@ fn multi_entry() -> Result<(), Box<dyn Error>> {
         ExtensionSet::new(),
     )?;
 
-    hugr.connect(entry, 0, bb0, 0)?;
-    hugr.connect(entry, 0, bb1, 0)?;
-    hugr.connect(bb0, 0, bb2, 0)?;
-    hugr.connect(bb1, 0, bb2, 0)?;
-    hugr.connect(bb2, 0, exit, 0)?;
+    hugr.connect(entry, 0, bb0, 0);
+    hugr.connect(entry, 0, bb1, 0);
+    hugr.connect(bb0, 0, bb2, 0);
+    hugr.connect(bb1, 0, bb2, 0);
+    hugr.connect(bb2, 0, exit, 0);
 
     hugr.update_validate(&PRELUDE_REGISTRY)?;
 
@@ -751,10 +748,10 @@ fn make_looping_cfg(
             UNKNOWN_EXTENSION,
             FunctionType::new(vec![NAT], oneway(NAT)).with_extension_delta(entry_ext),
         ),
-    )?;
+    );
 
-    hugr.connect(entry_in, 0, entry_dfg, 0)?;
-    hugr.connect(entry_dfg, 0, entry_out, 0)?;
+    hugr.connect(entry_in, 0, entry_dfg, 0);
+    hugr.connect(entry_dfg, 0, entry_out, 0);
 
     let bb1 = make_block(
         &mut hugr,
@@ -772,10 +769,10 @@ fn make_looping_cfg(
         bb2_ext.clone(),
     )?;
 
-    hugr.connect(entry, 0, bb1, 0)?;
-    hugr.connect(bb1, 0, bb2, 0)?;
-    hugr.connect(bb1, 0, exit, 0)?;
-    hugr.connect(bb2, 0, entry, 0)?;
+    hugr.connect(entry, 0, bb1, 0);
+    hugr.connect(bb1, 0, bb2, 0);
+    hugr.connect(bb1, 0, exit, 0);
+    hugr.connect(bb2, 0, entry, 0);
 
     Ok(hugr)
 }
@@ -825,10 +822,10 @@ fn simple_cfg_loop() -> Result<(), Box<dyn Error>> {
     let entry_mid = hugr.add_node_with_parent(
         entry,
         make_opaque(UNKNOWN_EXTENSION, FunctionType::new(vec![NAT], oneway(NAT))),
-    )?;
+    );
 
-    hugr.connect(entry_in, 0, entry_mid, 0)?;
-    hugr.connect(entry_mid, 0, entry_out, 0)?;
+    hugr.connect(entry_in, 0, entry_mid, 0);
+    hugr.connect(entry_mid, 0, entry_out, 0);
 
     let bb = make_block(
         &mut hugr,
@@ -838,9 +835,9 @@ fn simple_cfg_loop() -> Result<(), Box<dyn Error>> {
         just_a.clone(),
     )?;
 
-    hugr.connect(entry, 0, bb, 0)?;
-    hugr.connect(bb, 0, bb, 0)?;
-    hugr.connect(bb, 0, exit, 0)?;
+    hugr.connect(entry, 0, bb, 0);
+    hugr.connect(bb, 0, bb, 0);
+    hugr.connect(bb, 0, exit, 0);
 
     hugr.update_validate(&PRELUDE_REGISTRY)?;
 

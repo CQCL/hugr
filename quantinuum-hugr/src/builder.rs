@@ -89,7 +89,7 @@
 use thiserror::Error;
 
 use crate::extension::SignatureError;
-use crate::hugr::{HugrError, ValidationError};
+use crate::hugr::ValidationError;
 use crate::ops::handle::{BasicBlockID, CfgID, ConditionalID, DfgID, FuncID, TailLoopID};
 use crate::types::ConstTypeError;
 use crate::types::Type;
@@ -136,9 +136,6 @@ pub enum BuildError {
     /// [Const]: crate::ops::constant::Const
     #[error("Constant failed typechecking: {0}")]
     BadConstant(#[from] ConstTypeError),
-    /// HUGR construction error.
-    #[error("Error when mutating HUGR: {0}.")]
-    ConstructError(#[from] HugrError),
     /// CFG can only have one entry.
     #[error("CFG entry node already built for CFG node: {0:?}.")]
     EntryBuiltError(Node),
@@ -235,15 +232,13 @@ pub(crate) mod test {
             ops::Input {
                 types: signature.input,
             },
-        )
-        .unwrap();
+        );
         hugr.add_node_with_parent(
             hugr.root(),
             ops::Output {
                 types: signature.output,
             },
-        )
-        .unwrap();
+        );
         hugr
     }
 }

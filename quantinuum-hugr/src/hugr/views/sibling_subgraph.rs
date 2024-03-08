@@ -18,7 +18,7 @@ use portgraph::{view::Subgraph, Direction, PortView};
 use thiserror::Error;
 
 use crate::builder::{Container, FunctionBuilder};
-use crate::hugr::{HugrError, HugrMut, HugrView, RootTagged};
+use crate::hugr::{HugrMut, HugrView, RootTagged};
 use crate::ops::dataflow::DataflowOpTrait;
 use crate::ops::handle::{ContainerHandle, DataflowOpID};
 use crate::ops::{OpTag, OpTrait};
@@ -405,31 +405,27 @@ impl SiblingSubgraph {
     ///
     /// The new Hugr will contain a [FuncDefn][crate::ops::FuncDefn] root
     /// with the same signature as the subgraph and the specified `name`
-    pub fn extract_subgraph(
-        &self,
-        hugr: &impl HugrView,
-        name: impl Into<String>,
-    ) -> Result<Hugr, HugrError> {
+    pub fn extract_subgraph(&self, hugr: &impl HugrView, name: impl Into<String>) -> Hugr {
         let mut builder = FunctionBuilder::new(name, self.signature(hugr).into()).unwrap();
         // Take the unfinished Hugr from the builder, to avoid unnecessary
         // validation checks that require connecting the inputs and outputs.
         let mut extracted = mem::take(builder.hugr_mut());
-        let node_map = extracted.insert_subgraph(extracted.root(), hugr, self)?;
+        let node_map = extracted.insert_subgraph(extracted.root(), hugr, self);
 
         // Connect the inserted nodes in-between the input and output nodes.
         let [inp, out] = extracted.get_io(extracted.root()).unwrap();
         for (inp_port, repl_ports) in extracted.node_outputs(inp).zip(self.inputs.iter()) {
             for (repl_node, repl_port) in repl_ports {
-                extracted.connect(inp, inp_port, node_map[repl_node], *repl_port)?;
+                extracted.connect(inp, inp_port, node_map[repl_node], *repl_port);
             }
         }
         for (out_port, (repl_node, repl_port)) in
             extracted.node_inputs(out).zip(self.outputs.iter())
         {
-            extracted.connect(node_map[repl_node], *repl_port, out, out_port)?;
+            extracted.connect(node_map[repl_node], *repl_port, out, out_port);
         }
 
-        Ok(extracted)
+        extracted
     }
 }
 
@@ -968,13 +964,12 @@ mod tests {
 
     #[test]
     fn extract_subgraph() -> Result<(), Box<dyn Error>> {
-        let (hugr, func_root) = build_hugr().unwrap();
-        let func_graph: SiblingGraph<'_, FuncID<true>> =
-            SiblingGraph::try_new(&hugr, func_root).unwrap();
-        let subgraph = SiblingSubgraph::try_new_dataflow_subgraph(&func_graph).unwrap();
-        let extracted = subgraph.extract_subgraph(&hugr, "region")?;
+        let (hugr, func_root) = build_hugr()?;
+        let func_graph: SiblingGraph<'_, FuncID<true>> = SiblingGraph::try_new(&hugr, func_root)?;
+        let subgraph = SiblingSubgraph::try_new_dataflow_subgraph(&func_graph)?;
+        let extracted = subgraph.extract_subgraph(&hugr, "region");
 
-        extracted.validate(&PRELUDE_REGISTRY).unwrap();
+        extracted.validate(&PRELUDE_REGISTRY)?;
 
         Ok(())
     }

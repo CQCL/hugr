@@ -31,7 +31,7 @@ impl Default for RenderConfig {
 }
 
 /// Formatter method to compute a node style.
-pub(super) fn node_style<H: HugrView>(
+pub(super) fn node_style<H: HugrView + ?Sized>(
     h: &H,
     config: RenderConfig,
 ) -> Box<dyn FnMut(NodeIndex) -> NodeStyle + '_> {
@@ -49,7 +49,7 @@ pub(super) fn node_style<H: HugrView>(
 }
 
 /// Formatter method to compute a port style.
-pub(super) fn port_style<H: HugrView>(
+pub(super) fn port_style<H: HugrView + ?Sized>(
     h: &H,
     _config: RenderConfig,
 ) -> Box<dyn FnMut(PortIndex) -> PortStyle + '_> {
@@ -72,7 +72,7 @@ pub(super) fn port_style<H: HugrView>(
 
 /// Formatter method to compute an edge style.
 #[allow(clippy::type_complexity)]
-pub(super) fn edge_style<H: HugrView>(
+pub(super) fn edge_style<H: HugrView + ?Sized>(
     h: &H,
     config: RenderConfig,
 ) -> Box<

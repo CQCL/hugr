@@ -332,15 +332,6 @@ impl Hugr {
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 #[non_exhaustive]
 pub enum HugrError {
-    /// An error occurred while connecting nodes.
-    #[error("An error occurred while connecting the nodes.")]
-    ConnectionError(#[from] portgraph::LinkError),
-    /// An error occurred while manipulating the hierarchy.
-    #[error("An error occurred while manipulating the hierarchy.")]
-    HierarchyError(#[from] portgraph::hierarchy::AttachError),
-    /// The node doesn't exist.
-    #[error("Invalid node {0:?}.")]
-    InvalidNode(Node),
     /// The node was not of the required [OpTag]
     /// (e.g. to conform to the [RootTagged::RootHandle] of a [HugrView])
     #[error("Invalid tag: required a tag in {required} but found {actual}")]
@@ -397,9 +388,9 @@ mod test {
                 type_row: type_row![BIT],
                 new_extension: "R".try_into().unwrap(),
             },
-        )?;
-        hugr.connect(input, 0, lift, 0)?;
-        hugr.connect(lift, 0, output, 0)?;
+        );
+        hugr.connect(input, 0, lift, 0);
+        hugr.connect(lift, 0, output, 0);
         hugr.infer_extensions()?;
 
         assert_eq!(

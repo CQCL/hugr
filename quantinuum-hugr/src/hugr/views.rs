@@ -86,33 +86,25 @@ pub trait HugrView: sealed::HugrInternals {
     fn contains_node(&self, node: Node) -> bool;
 
     /// Validates that a node is valid in the graph.
-    ///
-    /// Returns a [`HugrError::InvalidNode`] otherwise.
     #[inline]
-    fn valid_node(&self, node: Node) -> Result<(), HugrError> {
-        match self.contains_node(node) {
-            true => Ok(()),
-            false => Err(HugrError::InvalidNode(node)),
-        }
+    fn valid_node(&self, node: Node) -> bool {
+        self.contains_node(node)
     }
 
     /// Validates that a node is a valid root descendant in the graph.
     ///
     /// To include the root node use [`HugrView::valid_node`] instead.
-    ///
-    /// Returns a [`HugrError::InvalidNode`] otherwise.
     #[inline]
-    fn valid_non_root(&self, node: Node) -> Result<(), HugrError> {
-        match self.root() == node {
-            true => Err(HugrError::InvalidNode(node)),
-            false => self.valid_node(node),
-        }
+    fn valid_non_root(&self, node: Node) -> bool {
+        self.root() != node && self.valid_node(node)
     }
 
     /// Returns the parent of a node.
     #[inline]
     fn get_parent(&self, node: Node) -> Option<Node> {
-        self.valid_non_root(node).ok()?;
+        if !self.valid_non_root(node) {
+            return None;
+        };
         self.base_hugr()
             .hierarchy
             .parent(node.pg_index())
@@ -145,7 +137,9 @@ pub trait HugrView: sealed::HugrInternals {
 
     /// Retrieve the complete metadata map for a node.
     fn get_node_metadata(&self, node: Node) -> Option<&NodeMetadataMap> {
-        self.valid_node(node).ok()?;
+        if !self.valid_node(node) {
+            return None;
+        }
         self.base_hugr().metadata.get(node.pg_index()).as_ref()
     }
 
@@ -356,10 +350,7 @@ pub trait HugrView: sealed::HugrInternals {
     ///
     /// For a more detailed representation, use the [`HugrView::dot_string`]
     /// format instead.
-    fn mermaid_string(&self) -> String
-    where
-        Self: Sized,
-    {
+    fn mermaid_string(&self) -> String {
         self.mermaid_string_with_config(RenderConfig {
             node_indices: true,
             port_offsets_in_edges: true,
@@ -374,10 +365,7 @@ pub trait HugrView: sealed::HugrInternals {
     ///
     /// For a more detailed representation, use the [`HugrView::dot_string`]
     /// format instead.
-    fn mermaid_string_with_config(&self, config: RenderConfig) -> String
-    where
-        Self: Sized,
-    {
+    fn mermaid_string_with_config(&self, config: RenderConfig) -> String {
         let hugr = self.base_hugr();
         let graph = self.portgraph();
         graph
@@ -479,7 +467,6 @@ pub trait HierarchyView<'a>: RootTagged + Sized {
 }
 
 fn check_tag<Required: NodeHandle>(hugr: &impl HugrView, node: Node) -> Result<(), HugrError> {
-    hugr.valid_node(node)?;
     let actual = hugr.get_optype(node).tag();
     let required = Required::TAG;
     if !required.is_superset(actual) {

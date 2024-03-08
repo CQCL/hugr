@@ -130,6 +130,6 @@ mod test {
 
         // And it's a HugrMut:
         let nodetype = NodeType::new_pure(LeafOp::MakeTuple { tys: type_row![] });
-        bb_v.add_node_with_parent(bb_v.root(), nodetype).unwrap();
+        bb_v.add_node_with_parent(bb_v.root(), nodetype);
     }
 }

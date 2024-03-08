@@ -53,14 +53,14 @@ impl Rewrite for InlineDFG {
         let parent = h.get_parent(n).unwrap();
         let [input, output] = h.get_io(n).unwrap();
         for ch in h.children(n).skip(2).collect::<Vec<_>>().into_iter() {
-            h.set_parent(ch, parent).unwrap();
+            h.set_parent(ch, parent);
         }
         // DFG Inputs. Deal with Order inputs first
         for (src_n, src_p) in h.linked_outputs(n, oth_in).collect::<Vec<_>>() {
             // Order edge from src_n to DFG => add order edge to each successor of Input node
             debug_assert_eq!(Some(src_p), h.get_optype(src_n).other_output_port());
             for tgt_n in h.output_neighbours(input).collect::<Vec<_>>() {
-                h.add_other_edge(src_n, tgt_n).unwrap();
+                h.add_other_edge(src_n, tgt_n);
             }
         }
         // And remaining (Value) inputs
@@ -73,24 +73,24 @@ impl Rewrite for InlineDFG {
             };
             // Hugr is invalid if there is no output linked to the DFG input.
             let (src_n, src_p) = h.single_linked_output(n, inp).unwrap();
-            h.disconnect(n, inp).unwrap(); // These disconnects allow permutations to work trivially.
+            h.disconnect(n, inp); // These disconnects allow permutations to work trivially.
             let outp = OutgoingPort::from(inp.index());
             let targets = h.linked_inputs(input, outp).collect::<Vec<_>>();
-            h.disconnect(input, outp).unwrap();
+            h.disconnect(input, outp);
 
             for (tgt_n, tgt_p) in targets {
-                h.connect(src_n, src_p, tgt_n, tgt_p).unwrap();
+                h.connect(src_n, src_p, tgt_n, tgt_p);
             }
             // Ensure order-successors of Input node execute after any node producing an input
             for (tgt, _) in input_ord_succs.iter() {
-                h.add_other_edge(src_n, *tgt).unwrap();
+                h.add_other_edge(src_n, *tgt);
             }
         }
         // DFG Outputs. Deal with Order outputs first.
         for (tgt_n, tgt_p) in h.linked_inputs(n, oth_out).collect::<Vec<_>>() {
             debug_assert_eq!(Some(tgt_p), h.get_optype(tgt_n).other_input_port());
             for src_n in h.input_neighbours(output).collect::<Vec<_>>() {
-                h.add_other_edge(src_n, tgt_n).unwrap();
+                h.add_other_edge(src_n, tgt_n);
             }
         }
         // And remaining (Value) outputs
@@ -104,21 +104,21 @@ impl Rewrite for InlineDFG {
             let inpp = IncomingPort::from(outport.index());
             // Hugr is invalid if the Output node has no corresponding input
             let (src_n, src_p) = h.single_linked_output(output, inpp).unwrap();
-            h.disconnect(output, inpp).unwrap();
+            h.disconnect(output, inpp);
 
             for (tgt_n, tgt_p) in h.linked_inputs(n, outport).collect::<Vec<_>>() {
-                h.connect(src_n, src_p, tgt_n, tgt_p).unwrap();
+                h.connect(src_n, src_p, tgt_n, tgt_p);
                 // Ensure order-predecessors of Output node execute before any node consuming a DFG output
                 for (src, _) in output_ord_preds.iter() {
-                    h.add_other_edge(*src, tgt_n).unwrap();
+                    h.add_other_edge(*src, tgt_n);
                 }
             }
-            h.disconnect(n, outport).unwrap();
+            h.disconnect(n, outport);
         }
-        h.remove_node(input).unwrap();
-        h.remove_node(output).unwrap();
+        h.remove_node(input);
+        h.remove_node(output);
         assert!(h.children(n).next().is_none());
-        h.remove_node(n).unwrap();
+        h.remove_node(n);
         Ok([n, input, output])
     }
 

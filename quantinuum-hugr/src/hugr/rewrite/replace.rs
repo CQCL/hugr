@@ -235,19 +235,27 @@ impl Rewrite for Replacement {
             }
             e.check_src(h, e)?;
         }
-        self.mu_out.iter().try_for_each(|e| {
-            self.replacement.valid_non_root(e.src).map_err(|_| {
-                ReplaceError::BadEdgeSpec(Direction::Outgoing, WhichHugr::Replacement, e.clone())
+        self.mu_out
+            .iter()
+            .try_for_each(|e| match self.replacement.valid_non_root(e.src) {
+                true => e.check_src(&self.replacement, e),
+                false => Err(ReplaceError::BadEdgeSpec(
+                    Direction::Outgoing,
+                    WhichHugr::Replacement,
+                    e.clone(),
+                )),
             })?;
-            e.check_src(&self.replacement, e)
-        })?;
         // Edge targets...
-        self.mu_inp.iter().try_for_each(|e| {
-            self.replacement.valid_non_root(e.tgt).map_err(|_| {
-                ReplaceError::BadEdgeSpec(Direction::Incoming, WhichHugr::Replacement, e.clone())
+        self.mu_inp
+            .iter()
+            .try_for_each(|e| match self.replacement.valid_non_root(e.tgt) {
+                true => e.check_tgt(&self.replacement, e),
+                false => Err(ReplaceError::BadEdgeSpec(
+                    Direction::Incoming,
+                    WhichHugr::Replacement,
+                    e.clone(),
+                )),
             })?;
-            e.check_tgt(&self.replacement, e)
-        })?;
         for e in self.mu_out.iter().chain(self.mu_new.iter()) {
             if !h.contains_node(e.tgt) || removed.contains(&e.tgt) {
                 return Err(ReplaceError::BadEdgeSpec(
@@ -274,8 +282,7 @@ impl Rewrite for Replacement {
 
         // 1. Add all the new nodes. Note this includes replacement.root(), which we don't want.
         // TODO what would an error here mean? e.g. malformed self.replacement??
-        let InsertionResult { new_root, node_map } =
-            h.insert_hugr(parent, self.replacement).unwrap();
+        let InsertionResult { new_root, node_map } = h.insert_hugr(parent, self.replacement);
 
         // 2. Add new edges from existing to copied nodes according to mu_in
         let translate_idx = |n| node_map.get(&n).copied().ok_or(WhichHugr::Replacement);
@@ -298,13 +305,13 @@ impl Rewrite for Replacement {
         let mut remove_top_sibs = self.removal.iter();
         for new_node in h.children(new_root).collect::<Vec<Node>>().into_iter() {
             if let Some(top_sib) = remove_top_sibs.next() {
-                h.move_before_sibling(new_node, *top_sib).unwrap();
+                h.move_before_sibling(new_node, *top_sib);
             } else {
-                h.set_parent(new_node, parent).unwrap();
+                h.set_parent(new_node, parent);
             }
         }
         debug_assert!(h.children(new_root).next().is_none());
-        h.remove_node(new_root).unwrap();
+        h.remove_node(new_root);
 
         // 6. Transfer to keys of `transfers` children of the corresponding values.
         for (new_parent, &old_parent) in self.adoptions.iter() {
@@ -315,14 +322,12 @@ impl Rewrite for Replacement {
                     None => break,
                     Some(c) => c,
                 };
-                h.set_parent(ch, *new_parent).unwrap();
+                h.set_parent(ch, *new_parent);
             }
         }
 
         // 7. Remove remaining nodes
-        to_remove
-            .into_iter()
-            .for_each(|n| h.remove_node(n).unwrap());
+        to_remove.into_iter().for_each(|n| h.remove_node(n));
         Ok(())
     }
 
@@ -347,26 +352,34 @@ fn transfer_edges<'a>(
                 .map_err(|h| ReplaceError::BadEdgeSpec(Direction::Incoming, h, oe.clone()))?,
             ..oe.clone()
         };
-        h.valid_node(e.src).map_err(|_| {
-            ReplaceError::BadEdgeSpec(Direction::Outgoing, WhichHugr::Retained, oe.clone())
-        })?;
-        h.valid_node(e.tgt).map_err(|_| {
-            ReplaceError::BadEdgeSpec(Direction::Incoming, WhichHugr::Retained, oe.clone())
-        })?;
+        if !h.valid_node(e.src) {
+            return Err(ReplaceError::BadEdgeSpec(
+                Direction::Outgoing,
+                WhichHugr::Retained,
+                oe.clone(),
+            ));
+        }
+        if !h.valid_node(e.tgt) {
+            return Err(ReplaceError::BadEdgeSpec(
+                Direction::Incoming,
+                WhichHugr::Retained,
+                oe.clone(),
+            ));
+        };
         e.check_src(h, oe)?;
         e.check_tgt(h, oe)?;
         match e.kind {
             NewEdgeKind::Order => {
-                h.add_other_edge(e.src, e.tgt).unwrap();
+                h.add_other_edge(e.src, e.tgt);
             }
             NewEdgeKind::Value { src_pos, tgt_pos } | NewEdgeKind::Static { src_pos, tgt_pos } => {
                 if let Some(legal_src_ancestors) = legal_src_ancestors {
                     e.check_existing_edge(h, legal_src_ancestors, || oe.clone())?;
-                    h.disconnect(e.tgt, tgt_pos).unwrap();
+                    h.disconnect(e.tgt, tgt_pos);
                 }
-                h.connect(e.src, src_pos, e.tgt, tgt_pos).unwrap();
+                h.connect(e.src, src_pos, e.tgt, tgt_pos);
             }
-            NewEdgeKind::ControlFlow { src_pos } => h.connect(e.src, src_pos, e.tgt, 0).unwrap(),
+            NewEdgeKind::ControlFlow { src_pos } => h.connect(e.src, src_pos, e.tgt, 0),
         }
     }
     Ok(())
@@ -525,7 +538,7 @@ mod test {
                 // at least when https://github.com/CQCL/issues/388 is fixed
                 extension_delta: ExtensionSet::new(),
             },
-        )?;
+        );
         let r_df1 = replacement.add_node_with_parent(
             r_bb,
             DFG {
@@ -534,16 +547,16 @@ mod test {
                     simple_unary_plus(intermed.clone()),
                 ),
             },
-        )?;
+        );
         let r_df2 = replacement.add_node_with_parent(
             r_bb,
             DFG {
                 signature: FunctionType::new(intermed, simple_unary_plus(just_list.clone())),
             },
-        )?;
+        );
         [0, 1]
             .iter()
-            .try_for_each(|p| replacement.connect(r_df1, *p + 1, r_df2, *p))?;
+            .for_each(|p| replacement.connect(r_df1, *p + 1, r_df2, *p));
 
         {
             let inp = replacement.add_node_before(
@@ -551,16 +564,16 @@ mod test {
                 ops::Input {
                     types: just_list.clone(),
                 },
-            )?;
+            );
             let out = replacement.add_node_before(
                 r_df1,
                 ops::Output {
                     types: simple_unary_plus(just_list),
                 },
-            )?;
-            replacement.connect(inp, 0, r_df1, 0)?;
-            replacement.connect(r_df2, 0, out, 0)?;
-            replacement.connect(r_df2, 1, out, 1)?;
+            );
+            replacement.connect(inp, 0, r_df1, 0);
+            replacement.connect(r_df2, 0, out, 0);
+            replacement.connect(r_df2, 1, out, 1);
         }
 
         h.apply_rewrite(Replacement {
@@ -685,13 +698,13 @@ mod test {
             Case {
                 signature: utou.clone(),
             },
-        )?;
+        );
         let r2 = rep1.add_node_with_parent(
             rep1.root(),
             Case {
                 signature: utou.clone(),
             },
-        )?;
+        );
         let mut r = Replacement {
             removal: vec![case1, case2],
             replacement: rep1,
