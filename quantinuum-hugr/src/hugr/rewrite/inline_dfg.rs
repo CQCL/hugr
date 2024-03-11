@@ -192,7 +192,7 @@ mod test {
                 },
                 int_ty.clone(),
             )?;
-            let c1 = d.add_load_const(cst)?;
+            let c1 = d.add_load_const(cst);
             let [lifted] = d
                 .add_dataflow_op(
                     LeafOp::Lift {
@@ -374,8 +374,8 @@ mod test {
             h_b.outputs(),
         )?;
         let [i] = inner.input_wires_arr();
-        let f = inner.add_load_const(float_types::ConstF64::new(1.0))?;
-        inner.add_other_wire(inner.input().node(), f.node())?;
+        let f = inner.add_load_const(float_types::ConstF64::new(1.0));
+        inner.add_other_wire(inner.input().node(), f.node());
         let r = inner.add_dataflow_op(test_quantum_extension::rz_f64(), [i, f])?;
         let [m, b] = inner
             .add_dataflow_op(test_quantum_extension::measure(), r.outputs())?
@@ -390,11 +390,11 @@ mod test {
         if_n.case_builder(0)?.finish_with_outputs([])?;
         if_n.case_builder(1)?.finish_with_outputs([])?;
         let if_n = if_n.finish_sub_container()?;
-        inner.add_other_wire(if_n.node(), inner.output().node())?;
+        inner.add_other_wire(if_n.node(), inner.output().node());
         let inner = inner.finish_with_outputs([m])?;
-        outer.add_other_wire(h_a.node(), inner.node())?;
+        outer.add_other_wire(h_a.node(), inner.node());
         let h_a2 = outer.add_dataflow_op(test_quantum_extension::h_gate(), h_a.outputs())?;
-        outer.add_other_wire(inner.node(), h_a2.node())?;
+        outer.add_other_wire(inner.node(), h_a2.node());
         let cx = outer.add_dataflow_op(
             test_quantum_extension::cx_gate(),
             h_a2.outputs().chain(inner.outputs()),

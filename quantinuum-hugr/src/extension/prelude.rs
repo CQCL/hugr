@@ -287,7 +287,7 @@ mod test {
 
         let mut b = DFGBuilder::new(FunctionType::new_endo(type_row![])).unwrap();
 
-        let err = b.add_load_const(error_val).unwrap();
+        let err = b.add_load_const(error_val);
 
         let op = PRELUDE
             .instantiate_extension_op(PANIC_OP_ID, [], &PRELUDE_REGISTRY)

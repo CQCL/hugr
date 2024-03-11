@@ -86,7 +86,7 @@ fn const_graph(consts: Vec<Const>, reg: &ExtensionRegistry) -> Hugr {
 
     let outputs = consts
         .into_iter()
-        .map(|c| b.add_load_const(c).unwrap())
+        .map(|c| b.add_load_const(c))
         .collect_vec();
 
     b.finish_hugr_with_outputs(outputs, reg).unwrap()
@@ -265,9 +265,7 @@ mod test {
         let mut build =
             DFGBuilder::new(FunctionType::new(type_row![], vec![sum_type.clone()])).unwrap();
 
-        let tup = build
-            .add_load_const(Const::new_tuple([f2c(5.6), f2c(3.2)]))
-            .unwrap();
+        let tup = build.add_load_const(Const::new_tuple([f2c(5.6), f2c(3.2)]));
 
         let unpack = build
             .add_dataflow_op(
@@ -320,7 +318,7 @@ mod test {
     ) -> Result<(), Box<dyn std::error::Error>> {
         let mut build = DFGBuilder::new(FunctionType::new(type_row![], vec![BOOL_T])).unwrap();
 
-        let ins = ins.map(|b| build.add_load_const(Const::from_bool(b)).unwrap());
+        let ins = ins.map(|b| build.add_load_const(Const::from_bool(b)));
         let logic_op = build.add_dataflow_op(op.with_n_inputs(ins.len() as u64), ins)?;
 
         let reg =
@@ -350,7 +348,7 @@ mod test {
         ))
         .unwrap();
 
-        let list_wire = build.add_load_const(list.clone())?;
+        let list_wire = build.add_load_const(list.clone());
 
         let pop = build.add_dataflow_op(
             ListOp::Pop.with_type(BOOL_T).to_extension_op(&reg).unwrap(),

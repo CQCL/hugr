@@ -111,7 +111,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         let declare_n = self.add_child_node(NodeType::new_pure(ops::FuncDecl {
             signature,
             name: name.into(),
-        }))?;
+        }));
 
         Ok(declare_n.into())
     }
@@ -136,7 +136,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         let node = self.add_child_op(ops::AliasDefn {
             name: name.clone(),
             definition: typ,
-        })?;
+        });
 
         Ok(AliasID::new(node, name, bound))
     }
@@ -154,7 +154,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         let node = self.add_child_op(ops::AliasDecl {
             name: name.clone(),
             bound,
-        })?;
+        });
 
         Ok(AliasID::new(node, name, bound))
     }

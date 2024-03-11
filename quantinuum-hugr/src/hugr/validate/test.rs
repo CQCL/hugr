@@ -527,7 +527,7 @@ fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
             Type::new_var_use(0, TypeBound::Copyable),
         )),),
     };
-    let cst = def.add_load_const(Const::new(empty_list, list_of_var)?)?;
+    let cst = def.add_load_const(Const::new(empty_list, list_of_var)?);
     let res = def.finish_hugr_with_outputs([cst], &reg);
     assert_matches!(
         res.unwrap_err(),

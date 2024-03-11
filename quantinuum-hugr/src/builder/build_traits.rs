@@ -46,23 +46,23 @@ pub trait Container {
     /// Immutable reference to HUGR being built
     fn hugr(&self) -> &Hugr;
     /// Add an [`OpType`] as the final child of the container.
-    fn add_child_op(&mut self, op: impl Into<OpType>) -> Result<Node, BuildError> {
+    fn add_child_op(&mut self, op: impl Into<OpType>) -> Node {
         let parent = self.container_node();
-        Ok(self.hugr_mut().add_node_with_parent(parent, op))
+        self.hugr_mut().add_node_with_parent(parent, op)
     }
     /// Add a [`NodeType`] as the final child of the container.
-    fn add_child_node(&mut self, node: NodeType) -> Result<Node, BuildError> {
+    fn add_child_node(&mut self, node: NodeType) -> Node {
         let parent = self.container_node();
-        Ok(self.hugr_mut().add_node_with_parent(parent, node))
+        self.hugr_mut().add_node_with_parent(parent, node)
     }
 
     /// Adds a non-dataflow edge between two nodes. The kind is given by the operation's [`other_inputs`] or  [`other_outputs`]
     ///
     /// [`other_inputs`]: crate::ops::OpTrait::other_input
     /// [`other_outputs`]: crate::ops::OpTrait::other_output
-    fn add_other_wire(&mut self, src: Node, dst: Node) -> Result<Wire, BuildError> {
+    fn add_other_wire(&mut self, src: Node, dst: Node) -> Wire {
         let (src_port, _) = self.hugr_mut().add_other_edge(src, dst);
-        Ok(Wire::new(src, src_port))
+        Wire::new(src, src_port)
     }
 
     /// Add a constant value to the container and return a handle to it.
@@ -71,10 +71,9 @@ pub trait Container {
     ///
     /// This function will return an error if there is an error in adding the
     /// [`OpType::Const`] node.
-    fn add_constant(&mut self, constant: impl Into<ops::Const>) -> Result<ConstID, BuildError> {
-        let const_n = self.add_child_node(NodeType::new_pure(constant.into()))?;
-
-        Ok(const_n.into())
+    fn add_constant(&mut self, constant: impl Into<ops::Const>) -> ConstID {
+        self.add_child_node(NodeType::new_pure(constant.into()))
+            .into()
     }
 
     /// Add a [`ops::FuncDefn`] node and returns a builder to define the function
@@ -93,7 +92,7 @@ pub trait Container {
         let f_node = self.add_child_node(NodeType::new_pure(ops::FuncDefn {
             name: name.into(),
             signature,
-        }))?;
+        }));
 
         let db =
             DFGBuilder::create_with_io(self.hugr_mut(), f_node, body, Some(ExtensionSet::new()))?;
@@ -101,15 +100,15 @@ pub trait Container {
     }
 
     /// Insert a HUGR as a child of the container.
-    fn add_hugr(&mut self, child: Hugr) -> Result<InsertionResult, BuildError> {
+    fn add_hugr(&mut self, child: Hugr) -> InsertionResult {
         let parent = self.container_node();
-        Ok(self.hugr_mut().insert_hugr(parent, child))
+        self.hugr_mut().insert_hugr(parent, child)
     }
 
     /// Insert a copy of a HUGR as a child of the container.
-    fn add_hugr_view(&mut self, child: &impl HugrView) -> Result<InsertionResult, BuildError> {
+    fn add_hugr_view(&mut self, child: &impl HugrView) -> InsertionResult {
         let parent = self.container_node();
-        Ok(self.hugr_mut().insert_from_view(parent, child))
+        self.hugr_mut().insert_from_view(parent, child)
     }
 
     /// Add metadata to the container node.
@@ -127,9 +126,8 @@ pub trait Container {
         child: Node,
         key: impl AsRef<str>,
         meta: impl Into<NodeMetadata>,
-    ) -> Result<(), BuildError> {
+    ) {
         self.hugr_mut().set_metadata(child, key, meta);
-        Ok(())
     }
 }
 
@@ -228,7 +226,7 @@ pub trait Dataflow: Container {
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
         let num_outputs = hugr.get_optype(hugr.root()).value_output_count();
-        let node = self.add_hugr(hugr)?.new_root;
+        let node = self.add_hugr(hugr).new_root;
 
         let inputs = input_wires.into_iter().collect();
         wire_up_inputs(inputs, node, self)?;
@@ -248,7 +246,7 @@ pub trait Dataflow: Container {
         hugr: &impl HugrView,
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
-        let node = self.add_hugr_view(hugr)?.new_root;
+        let node = self.add_hugr_view(hugr).new_root;
         let num_outputs = hugr.get_optype(hugr.root()).value_output_count();
 
         let inputs = input_wires.into_iter().collect();
@@ -341,10 +339,7 @@ pub trait Dataflow: Container {
 
     /// Load a static constant and return the local dataflow wire for that constant.
     /// Adds a [`OpType::LoadConstant`] node.
-    /// # Errors
-    ///
-    /// This function will return an error if there is an error when adding the node.
-    fn load_const(&mut self, cid: &ConstID) -> Result<Wire, BuildError> {
+    fn load_const(&mut self, cid: &ConstID) -> Wire {
         let const_node = cid.node();
         let nodetype = self.hugr().get_nodetype(const_node);
         let op: ops::Const = nodetype
@@ -353,24 +348,23 @@ pub trait Dataflow: Container {
             .try_into()
             .expect("ConstID does not refer to Const op.");
 
-        let load_n = self.add_dataflow_op(
-            ops::LoadConstant {
-                datatype: op.const_type().clone(),
-            },
-            // Constant wire from the constant value node
-            vec![Wire::new(const_node, OutgoingPort::from(0))],
-        )?;
+        let load_n = self
+            .add_dataflow_op(
+                ops::LoadConstant {
+                    datatype: op.const_type().clone(),
+                },
+                // Constant wire from the constant value node
+                vec![Wire::new(const_node, OutgoingPort::from(0))],
+            )
+            .expect("The constant type should match the LoadConstant type.");
 
-        Ok(load_n.out_wire(0))
+        load_n.out_wire(0)
     }
 
     /// Load a static constant and return the local dataflow wire for that constant.
-    /// Adds a [`ops::LoadConstant`] node.
-    /// # Errors
-    ///
-    /// This function will return an error if there is an error when adding the node.
-    fn add_load_const(&mut self, constant: impl Into<ops::Const>) -> Result<Wire, BuildError> {
-        let cid = self.add_constant(constant)?;
+    /// Adds a [`ops::Const`] and a [`ops::LoadConstant`] node.
+    fn add_load_const(&mut self, constant: impl Into<ops::Const>) -> Wire {
+        let cid = self.add_constant(constant);
         self.load_const(&cid)
     }
 
@@ -455,14 +449,8 @@ pub trait Dataflow: Container {
 
     /// Add an order edge from `before` to `after`. Assumes any additional edges
     /// to both nodes will be Order kind.
-    fn set_order(
-        &mut self,
-        before: &impl NodeHandle,
-        after: &impl NodeHandle,
-    ) -> Result<(), BuildError> {
-        self.add_other_wire(before.node(), after.node())?;
-
-        Ok(())
+    fn set_order(&mut self, before: &impl NodeHandle, after: &impl NodeHandle) {
+        self.add_other_wire(before.node(), after.node());
     }
 
     /// Get the type of a Value [`Wire`]. If not valid port or of Value kind, returns None.
@@ -620,7 +608,7 @@ fn add_node_with_wires<T: Dataflow + ?Sized>(
 ) -> Result<(Node, usize), BuildError> {
     let nodetype: NodeType = nodetype.into();
     let num_outputs = nodetype.op().value_output_count();
-    let op_node = data_builder.add_child_node(nodetype)?;
+    let op_node = data_builder.add_child_node(nodetype);
 
     wire_up_inputs(inputs, op_node, data_builder)?;
 
