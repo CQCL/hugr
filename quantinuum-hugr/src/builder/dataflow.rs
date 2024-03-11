@@ -207,7 +207,7 @@ pub(crate) mod test {
     use serde_json::json;
 
     use crate::builder::build_traits::DataflowHugr;
-    use crate::builder::{DataflowSubContainer, ModuleBuilder};
+    use crate::builder::{BuilderWiringError, DataflowSubContainer, ModuleBuilder};
     use crate::extension::prelude::BOOL_T;
     use crate::extension::{ExtensionId, EMPTY_REG};
     use crate::hugr::validate::InterGraphEdgeError;
@@ -328,7 +328,14 @@ pub(crate) mod test {
             Ok(module_builder.finish_prelude_hugr()?)
         };
 
-        assert_eq!(builder(), Err(BuildError::NoCopyLinear(QB)));
+        assert_matches!(
+            builder(),
+            Err(BuildError::OutputWiring {
+                error: BuilderWiringError::NoCopyLinear { typ, .. },
+                ..
+            })
+            if typ == QB
+        );
     }
 
     #[test]
@@ -376,9 +383,10 @@ pub(crate) mod test {
         // but the builder catches it earlier
         assert_matches!(
             id_res.map(|bh| bh.handle().node()), // Transform into something that impl's Debug
-            Err(BuildError::InvalidHUGR(
-                ValidationError::InterGraphEdgeError(InterGraphEdgeError::NonCopyableData { .. })
-            ))
+            Err(BuildError::OperationWiring {
+                error: BuilderWiringError::NonCopyableIntergraph { .. },
+                ..
+            })
         );
 
         Ok(())
@@ -539,9 +547,10 @@ pub(crate) mod test {
 
         assert_matches!(
             res.map(|h| h.handle().node()), // map to something that implements Debug
-            Err(BuildError::InvalidHUGR(
-                ValidationError::InterGraphEdgeError(InterGraphEdgeError::NoRelation { .. })
-            ))
+            Err(BuildError::OutputWiring {
+                error: BuilderWiringError::NoRelationIntergraph { .. },
+                ..
+            })
         );
         Ok(())
     }
