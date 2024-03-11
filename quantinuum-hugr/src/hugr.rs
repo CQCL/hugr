@@ -139,6 +139,13 @@ impl NodeType {
         &self.op
     }
 
+    /// Returns the underlying [OpType] i.e. without any [input_extensions]
+    ///
+    /// [input_extensions]: NodeType::input_extensions
+    pub fn into_op(self) -> OpType {
+        self.op
+    }
+
     delegate! {
         to self.op {
             /// Tag identifying the operation.

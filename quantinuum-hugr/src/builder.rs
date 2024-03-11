@@ -91,9 +91,10 @@ use thiserror::Error;
 use crate::extension::SignatureError;
 use crate::hugr::ValidationError;
 use crate::ops::handle::{BasicBlockID, CfgID, ConditionalID, DfgID, FuncID, TailLoopID};
+use crate::ops::{OpName, OpType};
 use crate::types::ConstTypeError;
 use crate::types::Type;
-use crate::{Node, Wire};
+use crate::{Node, Port, Wire};
 
 pub mod handle;
 pub use handle::BuildHandle;
@@ -122,6 +123,7 @@ mod circuit;
 pub use circuit::{CircuitBuildError, CircuitBuilder};
 
 #[derive(Debug, Clone, PartialEq, Error)]
+#[non_exhaustive]
 /// Error while building the HUGR.
 pub enum BuildError {
     /// The constructed HUGR is invalid.
@@ -155,13 +157,58 @@ pub enum BuildError {
     #[error("Wire not found in Hugr: {0:?}.")]
     WireNotFound(Wire),
 
-    /// Can't copy a linear type
-    #[error("Can't copy linear type: {0:?}.")]
-    NoCopyLinear(Type),
-
     /// Error in CircuitBuilder
     #[error("Error in CircuitBuilder: {0}.")]
     CircuitError(#[from] circuit::CircuitBuildError),
+
+    /// Invalid wires when setting outputs
+    #[error("Found an error while setting the outputs of a {} container, {container_node}. {error}", .container_op.name())]
+    OutputWiring {
+        container_op: OpType,
+        container_node: Node,
+        #[source]
+        error: BuilderWiringError,
+    },
+
+    /// Invalid input wires to a new operation
+    ///
+    /// The internal error message already contains the node index.
+    #[error("Got an input wire while adding a {} to the circuit. {error}", .op.name())]
+    OperationWiring {
+        op: OpType,
+        #[source]
+        error: BuilderWiringError,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Error)]
+#[non_exhaustive]
+/// Error raised when wiring up a node during the build process.
+pub enum BuilderWiringError {
+    /// Tried to copy a linear type.
+    #[error("Cannot copy linear type {typ} from output {src_offset} of node {src}")]
+    NoCopyLinear {
+        typ: Type,
+        src: Node,
+        src_offset: Port,
+    },
+    /// The ancestors of an inter-graph edge are not related.
+    #[error("Cannot connect an inter-graph edge between unrelated nodes. Tried connecting {src} ({src_offset}) with {dst} ({dst_offset}).")]
+    NoRelationIntergraph {
+        src: Node,
+        src_offset: Port,
+        dst: Node,
+        dst_offset: Port,
+    },
+    /// Inter-Graph edges can only carry copyable data.
+    #[error("Inter-graph edges cannot carry non-copyable data {typ}. Tried connecting {src} ({src_offset}) with {dst} ({dst_offset}).")]
+    NonCopyableIntergraph {
+        src: Node,
+        src_offset: Port,
+        dst: Node,
+        dst_offset: Port,
+        typ: Type,
+    },
 }
 
 #[cfg(test)]

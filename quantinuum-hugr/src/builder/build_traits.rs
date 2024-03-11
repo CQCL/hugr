@@ -1,5 +1,4 @@
 use crate::hugr::hugrmut::InsertionResult;
-use crate::hugr::validate::InterGraphEdgeError;
 use crate::hugr::views::HugrView;
 use crate::hugr::{NodeMetadata, ValidationError};
 use crate::ops::{self, LeafOp, OpTag, OpTrait, OpType};
@@ -8,11 +7,11 @@ use crate::{IncomingPort, Node, OutgoingPort};
 
 use std::iter;
 
-use super::FunctionBuilder;
 use super::{
     handle::{BuildHandle, Outputs},
     CircuitBuilder,
 };
+use super::{BuilderWiringError, FunctionBuilder};
 
 use crate::{
     hugr::NodeType,
@@ -188,7 +187,7 @@ pub trait Dataflow: Container {
     ///
     /// # Errors
     ///
-    /// This function will return an error if there is an error when adding the node.
+    /// Returns a [`BuildError::OperationWiring`] error if the `input_wires` cannot be connected.
     fn add_dataflow_op(
         &mut self,
         op: impl Into<OpType>,
@@ -202,13 +201,13 @@ pub trait Dataflow: Container {
     ///
     /// # Errors
     ///
-    /// This function will return an error if there is an error when adding the node.
+    /// Returns a [`BuildError::OperationWiring`] error if the `input_wires` cannot be connected.
     fn add_dataflow_node(
         &mut self,
         nodetype: NodeType,
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
-        let outs = add_node_with_wires(self, nodetype, input_wires.into_iter().collect())?;
+        let outs = add_node_with_wires(self, nodetype, input_wires)?;
 
         Ok(outs.into())
     }
@@ -225,11 +224,12 @@ pub trait Dataflow: Container {
         hugr: Hugr,
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
-        let num_outputs = hugr.get_optype(hugr.root()).value_output_count();
+        let optype = hugr.get_optype(hugr.root()).clone();
+        let num_outputs = optype.value_output_count();
         let node = self.add_hugr(hugr).new_root;
 
-        let inputs = input_wires.into_iter().collect();
-        wire_up_inputs(inputs, node, self)?;
+        wire_up_inputs(input_wires, node, self)
+            .map_err(|error| BuildError::OperationWiring { op: optype, error })?;
 
         Ok((node, num_outputs).into())
     }
@@ -247,10 +247,11 @@ pub trait Dataflow: Container {
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
         let node = self.add_hugr_view(hugr).new_root;
-        let num_outputs = hugr.get_optype(hugr.root()).value_output_count();
+        let optype = hugr.get_optype(hugr.root()).clone();
+        let num_outputs = optype.value_output_count();
 
-        let inputs = input_wires.into_iter().collect();
-        wire_up_inputs(inputs, node, self)?;
+        wire_up_inputs(input_wires, node, self)
+            .map_err(|error| BuildError::OperationWiring { op: optype, error })?;
 
         Ok((node, num_outputs).into())
     }
@@ -265,7 +266,13 @@ pub trait Dataflow: Container {
         output_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<(), BuildError> {
         let [_, out] = self.io();
-        wire_up_inputs(output_wires.into_iter().collect_vec(), out, self)
+        wire_up_inputs(output_wires.into_iter().collect_vec(), out, self).map_err(|error| {
+            BuildError::OutputWiring {
+                container_op: self.hugr().get_optype(self.container_node()).clone(),
+                container_node: self.container_node(),
+                error,
+            }
+        })
     }
 
     /// Return an array of the input wires.
@@ -297,7 +304,7 @@ pub trait Dataflow: Container {
             signature: signature.clone(),
         };
         let nodetype = NodeType::new(op, input_extensions.clone());
-        let (dfg_n, _) = add_node_with_wires(self, nodetype, input_wires.into_iter().collect())?;
+        let (dfg_n, _) = add_node_with_wires(self, nodetype, input_wires)?;
 
         DFGBuilder::create_with_io(self.hugr_mut(), dfg_n, signature, input_extensions)
     }
@@ -601,39 +608,59 @@ pub trait Dataflow: Container {
     }
 }
 
+/// Add a node to the graph, wiring up the `inputs` to the input ports of the resulting node.
+///
+/// # Errors
+///
+/// Returns a [`BuildError::OperationWiring`] if any of the connections produces an
+/// invalid edge.
 fn add_node_with_wires<T: Dataflow + ?Sized>(
     data_builder: &mut T,
     nodetype: impl Into<NodeType>,
-    inputs: Vec<Wire>,
+    inputs: impl IntoIterator<Item = Wire>,
 ) -> Result<(Node, usize), BuildError> {
     let nodetype: NodeType = nodetype.into();
     let num_outputs = nodetype.op().value_output_count();
-    let op_node = data_builder.add_child_node(nodetype);
+    let op_node = data_builder.add_child_node(nodetype.clone());
 
-    wire_up_inputs(inputs, op_node, data_builder)?;
+    wire_up_inputs(inputs, op_node, data_builder).map_err(|error| BuildError::OperationWiring {
+        op: nodetype.into_op(),
+        error,
+    })?;
 
     Ok((op_node, num_outputs))
 }
 
+/// Connect each of the `inputs` wires sequentially to the input ports of
+/// `op_node`.
+///
+/// # Errors
+///
+/// Returns a [`BuilderWiringError`] if any of the connections produces an
+/// invalid edge.
 fn wire_up_inputs<T: Dataflow + ?Sized>(
-    inputs: Vec<Wire>,
+    inputs: impl IntoIterator<Item = Wire>,
     op_node: Node,
     data_builder: &mut T,
-) -> Result<(), BuildError> {
+) -> Result<(), BuilderWiringError> {
     for (dst_port, wire) in inputs.into_iter().enumerate() {
         wire_up(data_builder, wire.node(), wire.source(), op_node, dst_port)?;
     }
     Ok(())
 }
 
-/// Add edge from src to dst and report back if they do share a parent
+/// Add edge from src to dst.
+///
+/// # Errors
+///
+/// Returns a [`BuilderWiringError`] if the edge is invalid.
 fn wire_up<T: Dataflow + ?Sized>(
     data_builder: &mut T,
     src: Node,
     src_port: impl Into<OutgoingPort>,
     dst: Node,
     dst_port: impl Into<IncomingPort>,
-) -> Result<bool, BuildError> {
+) -> Result<bool, BuilderWiringError> {
     let src_port = src_port.into();
     let dst_port = dst_port.into();
     let base = data_builder.hugr_mut();
@@ -646,15 +673,13 @@ fn wire_up<T: Dataflow + ?Sized>(
         if !local_source {
             // Non-local value sources require a state edge to an ancestor of dst
             if !typ.copyable() {
-                let val_err: ValidationError = InterGraphEdgeError::NonCopyableData {
-                    from: src,
-                    from_offset: src_port.into(),
-                    to: dst,
-                    to_offset: dst_port.into(),
-                    ty: EdgeKind::Value(typ),
-                }
-                .into();
-                return Err(val_err.into());
+                return Err(BuilderWiringError::NonCopyableIntergraph {
+                    src,
+                    src_offset: src_port.into(),
+                    dst,
+                    dst_offset: dst_port.into(),
+                    typ,
+                });
             }
 
             let src_parent = src_parent.expect("Node has no parent");
@@ -667,14 +692,12 @@ fn wire_up<T: Dataflow + ?Sized>(
                         .then_some(ancestor)
                 })
             else {
-                let val_err: ValidationError = InterGraphEdgeError::NoRelation {
-                    from: src,
-                    from_offset: src_port.into(),
-                    to: dst,
-                    to_offset: dst_port.into(),
-                }
-                .into();
-                return Err(val_err.into());
+                return Err(BuilderWiringError::NoRelationIntergraph {
+                    src,
+                    src_offset: src_port.into(),
+                    dst,
+                    dst_offset: dst_port.into(),
+                });
             };
 
             if !OpTag::BasicBlock.is_superset(base.get_optype(src).tag())
@@ -685,7 +708,11 @@ fn wire_up<T: Dataflow + ?Sized>(
             }
         } else if !typ.copyable() & base.linked_ports(src, src_port).next().is_some() {
             // Don't copy linear edges.
-            return Err(BuildError::NoCopyLinear(typ));
+            return Err(BuilderWiringError::NoCopyLinear {
+                typ,
+                src,
+                src_offset: src_port.into(),
+            });
         }
     }
 
