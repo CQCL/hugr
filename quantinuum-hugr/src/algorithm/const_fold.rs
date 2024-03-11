@@ -348,7 +348,7 @@ mod test {
         ))
         .unwrap();
 
-        let list_wire = build.add_load_const(list.clone())?;
+        let list_wire = build.add_load_const(list.clone());
 
         let pop = build.add_dataflow_op(
             ListOp::Pop.with_type(BOOL_T).to_extension_op(&reg).unwrap(),

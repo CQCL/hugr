@@ -621,7 +621,7 @@ fn add_node_with_wires<T: Dataflow + ?Sized>(
 ) -> Result<(Node, usize), BuildError> {
     let nodetype: NodeType = nodetype.into();
     let num_outputs = nodetype.op().value_output_count();
-    let op_node = data_builder.add_child_node(nodetype.clone());
+    let op_node = data_builder.add_child_node(nodetype);
 
     wire_up_inputs(inputs, op_node, data_builder).map_err(|error| BuildError::OperationWiring {
         op: nodetype.into_op(),
