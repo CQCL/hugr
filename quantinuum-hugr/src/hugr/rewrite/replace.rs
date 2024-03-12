@@ -532,7 +532,7 @@ mod test {
             replacement.root(),
             DataflowBlock {
                 inputs: vec![listy.clone()].into(),
-                tuple_sum_rows: vec![type_row![]],
+                sum_rows: vec![type_row![]],
                 other_outputs: vec![listy.clone()].into(),
                 // This should be ExtensionSet::singleton(&collections::EXTENSION_NAME),
                 // at least when https://github.com/CQCL/issues/388 is fixed

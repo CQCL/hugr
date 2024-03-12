@@ -1,4 +1,5 @@
 //! Logic for checking values against types.
+
 use thiserror::Error;
 
 use crate::{
@@ -38,6 +39,10 @@ pub enum ConstTypeError {
     /// The length of the tuple value doesn't match the length of the tuple type
     #[error("Tuple of wrong length")]
     TupleWrongLength,
+    /// The length of the sum value doesn't match the length of the variant of
+    /// the sum type
+    #[error("Sum variant of wrong length")]
+    SumWrongLength,
     /// Tag for a sum value exceeded the number of variants
     #[error("Tag of Sum value is invalid")]
     InvalidSumTag,
@@ -60,6 +65,36 @@ fn type_sig_equal(v: &Hugr, t: &PolyFuncType) -> bool {
     } else {
         v.get_function_type()
             .is_some_and(|ft| &PolyFuncType::from(ft) == t)
+    }
+}
+
+impl super::SumType {
+    /// Check that a [`Value`] is a valid instance of this [`SumType`].
+    ///
+    ///   [`SumType`]: crate::types::SumType
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is a type check error.
+    pub fn check_type(&self, tag: usize, val: &[Box<Value>]) -> Result<(), ConstTypeError> {
+        if self
+            .get_variant(tag)
+            .ok_or(ConstTypeError::InvalidSumTag)?
+            .len()
+            != val.len()
+        {
+            Err(ConstTypeError::SumWrongLength)?
+        }
+
+        for (t, v) in itertools::zip_eq(
+            self.get_variant(tag)
+                .ok_or(ConstTypeError::InvalidSumTag)?
+                .iter(),
+            val.iter(),
+        ) {
+            t.check_type(v)?;
+        }
+        Ok(())
     }
 }
 
@@ -93,10 +128,7 @@ impl Type {
                     .try_for_each(|(elem, ty)| ty.check_type(elem))
                     .map_err(|_| ConstTypeError::ValueCheckFail(self.clone(), val.clone()))
             }
-            (TypeEnum::Sum(sum), Value::Sum { tag, value }) => sum
-                .get_variant(*tag)
-                .ok_or(ConstTypeError::InvalidSumTag)?
-                .check_type(value),
+            (TypeEnum::Sum(sum), Value::Sum { tag, values }) => sum.check_type(*tag, values),
             _ => Err(ConstTypeError::ValueCheckFail(self.clone(), val.clone())),
         }
     }

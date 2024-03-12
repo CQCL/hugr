@@ -28,7 +28,9 @@ use super::{HugrMut, HugrView};
 #[serde(tag = "version", rename_all = "lowercase")]
 enum Versioned {
     /// Version 0 of the HUGR serialization format.
-    V0(SerHugrV0),
+    V0,
+    /// Version 1 of the HUGR serialization format.
+    V1(SerHugrV1),
 
     #[serde(other)]
     Unsupported,
@@ -42,9 +44,9 @@ struct NodeSer {
     op: OpType,
 }
 
-/// Version 0 of the HUGR serialization format.
+/// Version 1 of the HUGR serialization format.
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
-struct SerHugrV0 {
+struct SerHugrV1 {
     /// For each node: (parent, node_operation)
     nodes: Vec<NodeSer>,
     /// for each edge: (src, src_offset, tgt, tgt_offset)
@@ -90,8 +92,8 @@ impl Serialize for Hugr {
     where
         S: serde::Serializer,
     {
-        let shg: SerHugrV0 = self.try_into().map_err(serde::ser::Error::custom)?;
-        let versioned = Versioned::V0(shg);
+        let shg: SerHugrV1 = self.try_into().map_err(serde::ser::Error::custom)?;
+        let versioned = Versioned::V1(shg);
         versioned.serialize(serializer)
     }
 }
@@ -103,7 +105,10 @@ impl<'de> Deserialize<'de> for Hugr {
     {
         let shg = Versioned::deserialize(deserializer)?;
         match shg {
-            Versioned::V0(shg) => shg.try_into().map_err(serde::de::Error::custom),
+            Versioned::V0 => Err(serde::de::Error::custom(
+                "Version 0 HUGR serialization format is not supported.",
+            )),
+            Versioned::V1(shg) => shg.try_into().map_err(serde::de::Error::custom),
             Versioned::Unsupported => Err(serde::de::Error::custom(
                 "Unsupported HUGR serialization format.",
             )),
@@ -111,7 +116,7 @@ impl<'de> Deserialize<'de> for Hugr {
     }
 }
 
-impl TryFrom<&Hugr> for SerHugrV0 {
+impl TryFrom<&Hugr> for SerHugrV1 {
     type Error = HUGRSerializationError;
 
     fn try_from(hugr: &Hugr) -> Result<Self, Self::Error> {
@@ -175,14 +180,14 @@ impl TryFrom<&Hugr> for SerHugrV0 {
     }
 }
 
-impl TryFrom<SerHugrV0> for Hugr {
+impl TryFrom<SerHugrV1> for Hugr {
     type Error = HUGRSerializationError;
     fn try_from(
-        SerHugrV0 {
+        SerHugrV1 {
             nodes,
             edges,
             metadata,
-        }: SerHugrV0,
+        }: SerHugrV1,
     ) -> Result<Self, Self::Error> {
         // Root must be first node
         let mut nodes = nodes.into_iter();
@@ -263,7 +268,7 @@ pub mod test {
     use crate::std_extensions::arithmetic::float_types::{ConstF64, FLOAT64_TYPE};
     use crate::std_extensions::logic::NotOp;
     use crate::types::{FunctionType, Type};
-    use crate::OutgoingPort;
+    use crate::{type_row, OutgoingPort};
     use itertools::Itertools;
     use jsonschema::{Draft, JSONSchema};
     use lazy_static::lazy_static;
@@ -278,7 +283,7 @@ pub mod test {
     lazy_static! {
         static ref SCHEMA: JSONSchema = {
             let schema_val: serde_json::Value = serde_json::from_str(include_str!(
-                "../../../specification/schema/hugr_schema_v0.json"
+                "../../../specification/schema/hugr_schema_v1.json"
             ))
             .unwrap();
             JSONSchema::options()
@@ -429,7 +434,7 @@ pub mod test {
             let mut module_builder = ModuleBuilder::new();
             module_builder.set_metadata("name", "test");
 
-            let t_row = vec![Type::new_sum(vec![NAT, QB])];
+            let t_row = vec![Type::new_sum([type_row![NAT], type_row![QB]])];
             let mut f_build = module_builder
                 .define_function("main", FunctionType::new(t_row.clone(), t_row).into())
                 .unwrap();

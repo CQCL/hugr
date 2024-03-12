@@ -556,18 +556,14 @@ mod extension_tests {
 
     const Q: Type = crate::extension::prelude::QB_T;
 
-    /// Adds an input{BOOL_T}, tag_constant(0, BOOL_T^tuple_sum_size), tag(BOOL_T^tuple_sum_size), and
-    /// output{Sum{unit^tuple_sum_size}, BOOL_T} operation to a dataflow container.
+    /// Adds an input{BOOL_T}, tag_constant(0, BOOL_T^sum_size), tag(BOOL_T^sum_size), and
+    /// output{Sum{unit^sum_size}, BOOL_T} operation to a dataflow container.
     /// Intended to be used to populate a BasicBlock node in a CFG.
     ///
     /// Returns the node indices of each of the operations.
-    fn add_block_children(
-        b: &mut Hugr,
-        parent: Node,
-        tuple_sum_size: usize,
-    ) -> (Node, Node, Node, Node) {
-        let const_op = ops::Const::unit_sum(0, tuple_sum_size as u8);
-        let tag_type = Type::new_unit_sum(tuple_sum_size as u8);
+    fn add_block_children(b: &mut Hugr, parent: Node, sum_size: usize) -> (Node, Node, Node, Node) {
+        let const_op = ops::Const::unit_sum(0, sum_size as u8);
+        let tag_type = Type::new_unit_sum(sum_size as u8);
 
         let input = b.add_node_with_parent(parent, ops::Input::new(type_row![BOOL_T]));
         let output =
@@ -616,7 +612,7 @@ mod extension_tests {
             cfg,
             ops::DataflowBlock {
                 inputs: type_row![BOOL_T],
-                tuple_sum_rows: vec![type_row![]],
+                sum_rows: vec![type_row![]],
                 other_outputs: type_row![BOOL_T],
                 extension_delta: ExtensionSet::new(),
             },
@@ -652,7 +648,7 @@ mod extension_tests {
             block,
             NodeType::new_pure(ops::DataflowBlock {
                 inputs: type_row![Q],
-                tuple_sum_rows: vec![type_row![]],
+                sum_rows: vec![type_row![]],
                 other_outputs: type_row![Q],
                 extension_delta: ExtensionSet::new(),
             }),

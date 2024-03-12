@@ -11,6 +11,7 @@ use super::Type;
 use crate::utils::display_list;
 use crate::PortIndex;
 use delegate::delegate;
+use itertools::Itertools;
 
 /// List of types, used for function signatures.
 #[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
@@ -49,6 +50,11 @@ impl TypeRow {
         self.types.to_mut().get_mut(offset.index())
     }
 
+    /// Returns a new `TypeRow` with `xs` concatenated onto `self`.
+    pub fn extend<'a>(&'a self, rest: impl IntoIterator<Item = &'a Type>) -> Self {
+        self.iter().chain(rest).cloned().collect_vec().into()
+    }
+
     delegate! {
         to self.types {
             /// Iterator over the types in the row.
@@ -82,6 +88,14 @@ where
     fn from(types: F) -> Self {
         Self {
             types: types.into(),
+        }
+    }
+}
+
+impl From<Type> for TypeRow {
+    fn from(t: Type) -> Self {
+        Self {
+            types: vec![t].into(),
         }
     }
 }

@@ -6,6 +6,7 @@
 use std::any::Any;
 
 use downcast_rs::{impl_downcast, Downcast};
+use itertools::Itertools;
 use smol_str::SmolStr;
 
 use crate::extension::ExtensionSet;
@@ -44,7 +45,7 @@ pub enum Value {
         /// The tag index of the variant
         tag: usize,
         /// The value of the variant
-        value: Box<Value>,
+        values: Vec<Box<Value>>,
     },
 }
 
@@ -63,8 +64,8 @@ impl Value {
                 let names: Vec<_> = vals.iter().map(Value::name).collect();
                 format!("const:seq:{{{}}}", names.join(", "))
             }
-            Value::Sum { tag, value: val } => {
-                format!("const:sum:{{tag:{tag}, val:{}}}", val.name())
+            Value::Sum { tag, values } => {
+                format!("const:sum:{{tag:{tag}, vals:{values:?}}}")
             }
         }
     }
@@ -81,7 +82,7 @@ impl Value {
 
     /// Constant Sum of a unit value, used to control branches.
     pub fn unit_sum(tag: usize) -> Self {
-        Self::sum(tag, Self::unit())
+        Self::sum(tag, [])
     }
 
     /// Constant Sum with just one variant of unit type
@@ -96,11 +97,12 @@ impl Value {
         }
     }
 
-    /// Sum value (could be of any compatible type - e.g., if `value` was a Tuple, a TupleSum type)
-    pub fn sum(tag: usize, value: Value) -> Self {
+    /// Sum value (could be of any compatible type - i.e. a Sum type where the
+    /// `tag`th row is equal in length and compatible elementwise with `values`)
+    pub fn sum(tag: usize, values: impl IntoIterator<Item = Value>) -> Self {
         Self::Sum {
             tag,
-            value: Box::new(value),
+            values: values.into_iter().map(Box::new).collect_vec(),
         }
     }
 
@@ -124,7 +126,9 @@ impl Value {
             Value::Extension { c } => c.0.extension_reqs().clone(),
             Value::Function { .. } => ExtensionSet::new(), // no extensions reqd to load Hugr (only to run)
             Value::Tuple { vs } => ExtensionSet::union_over(vs.iter().map(Value::extension_reqs)),
-            Value::Sum { value, .. } => value.extension_reqs(),
+            Value::Sum { values, .. } => {
+                ExtensionSet::union_over(values.iter().map(|x| x.extension_reqs()))
+            }
         }
     }
 }
@@ -234,6 +238,7 @@ pub(crate) mod test {
 
     use super::*;
     use crate::builder::test::simple_dfg_hugr;
+    use crate::ops::Const;
     use crate::std_extensions::arithmetic::float_types::{self, FLOAT64_CUSTOM_TYPE};
     use crate::type_row;
     use crate::types::{FunctionType, Type};
@@ -257,12 +262,13 @@ pub(crate) mod test {
         }
     }
 
-    pub(crate) fn serialized_float(f: f64) -> Value {
-        Value::custom(CustomSerialized {
+    pub(crate) fn serialized_float(f: f64) -> Const {
+        CustomSerialized {
             typ: FLOAT64_CUSTOM_TYPE,
             value: serde_yaml::Value::Number(f.into()),
             extensions: float_types::EXTENSION_ID.into(),
-        })
+        }
+        .into()
     }
 
     #[rstest]

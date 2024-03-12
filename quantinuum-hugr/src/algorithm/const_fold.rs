@@ -65,7 +65,7 @@ pub fn fold_leaf_op(op: &LeafOp, consts: &[(IncomingPort, Const)]) -> ConstFoldR
         }
 
         LeafOp::Tag { tag, variants } => out_row([Const::new(
-            Value::sum(*tag, consts.first()?.1.value().clone()),
+            Value::sum(*tag, consts.iter().map(|(_, konst)| konst.value().clone())),
             Type::new_sum(variants.clone()),
         )
         .unwrap()]),
@@ -300,7 +300,7 @@ mod test {
 
         let expected = Value::Sum {
             tag: 0,
-            value: Box::new(i2c(2).value().clone()),
+            values: vec![Box::new(i2c(2).value().clone())],
         };
         let expected = Const::new(expected, sum_type).unwrap();
         assert_fully_folded(&h, &expected);

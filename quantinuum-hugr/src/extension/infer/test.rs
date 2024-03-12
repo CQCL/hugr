@@ -337,14 +337,14 @@ fn test_conditional_inference() -> Result<(), Box<dyn Error>> {
         Ok(case)
     }
 
-    let tuple_sum_rows = vec![type_row![]; 2];
+    let sum_rows = vec![type_row![]; 2];
     let rs = ExtensionSet::from_iter([A, B]);
 
     let inputs = type_row![NAT];
     let outputs = type_row![NAT];
 
     let op = ops::Conditional {
-        tuple_sum_rows,
+        sum_rows,
         other_inputs: inputs.clone(),
         outputs: outputs.clone(),
         extension_delta: rs.clone(),
@@ -447,17 +447,17 @@ fn make_block(
     hugr: &mut Hugr,
     bb_parent: Node,
     inputs: TypeRow,
-    tuple_sum_rows: impl IntoIterator<Item = TypeRow>,
+    sum_rows: impl IntoIterator<Item = TypeRow>,
     extension_delta: ExtensionSet,
 ) -> Result<Node, Box<dyn Error>> {
-    let tuple_sum_rows: Vec<_> = tuple_sum_rows.into_iter().collect();
-    let tuple_sum_type = Type::new_tuple_sum(tuple_sum_rows.clone());
-    let dfb_sig = FunctionType::new(inputs.clone(), vec![tuple_sum_type])
+    let sum_rows: Vec<_> = sum_rows.into_iter().collect();
+    let sum_type = Type::new_sum(sum_rows.clone());
+    let dfb_sig = FunctionType::new(inputs.clone(), vec![sum_type])
         .with_extension_delta(extension_delta.clone());
     let dfb = ops::DataflowBlock {
         inputs,
         other_outputs: type_row![],
-        tuple_sum_rows,
+        sum_rows,
         extension_delta,
     };
     let op = make_opaque(UNKNOWN_EXTENSION, dfb_sig.clone());
@@ -473,11 +473,11 @@ fn make_block(
 }
 
 fn oneway(ty: Type) -> Vec<Type> {
-    vec![Type::new_tuple_sum([vec![ty]])]
+    vec![Type::new_sum([vec![ty].into()])]
 }
 
 fn twoway(ty: Type) -> Vec<Type> {
-    vec![Type::new_tuple_sum([vec![ty.clone()], vec![ty]])]
+    vec![Type::new_sum([vec![ty.clone()].into(), vec![ty].into()])]
 }
 
 fn create_entry_exit(
@@ -488,11 +488,11 @@ fn create_entry_exit(
     entry_extensions: ExtensionSet,
     exit_types: impl Into<TypeRow>,
 ) -> Result<([Node; 3], Node), Box<dyn Error>> {
-    let entry_tuple_sum = Type::new_tuple_sum(entry_variants.clone());
+    let entry_sum = Type::new_sum(entry_variants.clone());
     let dfb = ops::DataflowBlock {
         inputs: inputs.clone(),
         other_outputs: type_row![],
-        tuple_sum_rows: entry_variants,
+        sum_rows: entry_variants,
         extension_delta: entry_extensions,
     };
 
@@ -508,7 +508,7 @@ fn create_entry_exit(
     let entry_out = hugr.add_node_with_parent(
         entry,
         ops::Output {
-            types: vec![entry_tuple_sum].into(),
+            types: vec![entry_sum].into(),
         },
     );
 

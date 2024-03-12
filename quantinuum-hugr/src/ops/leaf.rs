@@ -43,7 +43,7 @@ pub enum LeafOp {
         /// The variant to create.
         tag: usize,
         /// The variants of the sum type.
-        variants: TypeRow,
+        variants: Vec<TypeRow>,
     },
     /// A node which adds a extension req to the types of the wires it is passed
     /// It has no effect on the values passed along the edge
@@ -178,7 +178,7 @@ impl DataflowOpTrait for LeafOp {
                 FunctionType::new(vec![Type::new_tuple(types.clone())], types.clone())
             }
             LeafOp::Tag { tag, variants } => FunctionType::new(
-                vec![variants.get(*tag).expect("Not a valid tag").clone()],
+                variants.get(*tag).expect("Not a valid tag").clone(),
                 vec![Type::new_sum(variants.clone())],
             ),
             LeafOp::Lift {

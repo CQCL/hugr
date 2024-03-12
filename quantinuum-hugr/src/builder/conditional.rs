@@ -158,20 +158,20 @@ impl HugrBuilder for ConditionalBuilder<Hugr> {
 impl ConditionalBuilder<Hugr> {
     /// Initialize a Conditional rooted HUGR builder
     pub fn new(
-        tuple_sum_rows: impl IntoIterator<Item = TypeRow>,
+        sum_rows: impl IntoIterator<Item = TypeRow>,
         other_inputs: impl Into<TypeRow>,
         outputs: impl Into<TypeRow>,
         extension_delta: ExtensionSet,
     ) -> Result<Self, BuildError> {
-        let tuple_sum_rows: Vec<_> = tuple_sum_rows.into_iter().collect();
+        let sum_rows: Vec<_> = sum_rows.into_iter().collect();
         let other_inputs = other_inputs.into();
         let outputs = outputs.into();
 
         let n_out_wires = outputs.len();
-        let n_cases = tuple_sum_rows.len();
+        let n_cases = sum_rows.len();
 
         let op = ops::Conditional {
-            tuple_sum_rows,
+            sum_rows,
             other_inputs,
             outputs,
             extension_delta,
