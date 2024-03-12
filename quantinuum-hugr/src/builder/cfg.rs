@@ -76,7 +76,7 @@ use crate::{
 ///         let left_42 =
 ///             ops::Const::new_sum(0,
 ///                                   [prelude::ConstUsize::new(42).into()],
-///                                   SumType::new(sum_variants.clone()));
+///                                   SumType::new(sum_variants.clone()))?;
 ///         let sum = entry_b.add_load_const(left_42);
 ///
 ///         entry_b.finish_with_outputs(sum, [inw])?
