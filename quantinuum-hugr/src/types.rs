@@ -221,8 +221,7 @@ impl TypeEnum {
 ///
 pub struct Type(TypeEnum, TypeBound);
 
-/// TODO
-pub fn validate_each<'a>(
+fn validate_each<'a>(
     extension_registry: &ExtensionRegistry,
     var_decls: &[TypeParam],
     mut iter: impl Iterator<Item = &'a Type>,
@@ -231,11 +230,11 @@ pub fn validate_each<'a>(
 }
 
 impl Type {
-    /// TODO
+    /// An empty `TypeRow`. Provided here for convenience
     pub const EMPTY_TYPEROW: TypeRow = type_row![];
     /// Unit type (empty tuple).
     pub const UNIT: Self = Self(TypeEnum::Tuple(Self::EMPTY_TYPEROW), TypeBound::Eq);
-    // const UNIT_REF: &'static Self = &Self::UNIT;
+
     const EMPTY_TYPEROW_REF: &'static TypeRow = &Self::EMPTY_TYPEROW;
 
     /// Initialize a new function type.

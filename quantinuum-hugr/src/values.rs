@@ -238,6 +238,7 @@ pub(crate) mod test {
 
     use super::*;
     use crate::builder::test::simple_dfg_hugr;
+    use crate::ops::Const;
     use crate::std_extensions::arithmetic::float_types::{self, FLOAT64_CUSTOM_TYPE};
     use crate::type_row;
     use crate::types::{FunctionType, Type};
@@ -261,12 +262,13 @@ pub(crate) mod test {
         }
     }
 
-    pub(crate) fn serialized_float(f: f64) -> Value {
-        Value::custom(CustomSerialized {
+    pub(crate) fn serialized_float(f: f64) -> Const {
+        CustomSerialized {
             typ: FLOAT64_CUSTOM_TYPE,
             value: serde_yaml::Value::Number(f.into()),
             extensions: float_types::EXTENSION_ID.into(),
-        })
+        }
+        .into()
     }
 
     #[rstest]

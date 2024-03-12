@@ -92,6 +92,14 @@ where
     }
 }
 
+impl From<Type> for TypeRow {
+    fn from(t: Type) -> Self {
+        Self {
+            types: vec![t].into(),
+        }
+    }
+}
+
 impl Deref for TypeRow {
     type Target = [Type];
 

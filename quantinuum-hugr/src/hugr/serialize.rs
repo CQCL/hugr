@@ -28,7 +28,8 @@ use super::{HugrMut, HugrView};
 #[serde(tag = "version", rename_all = "lowercase")]
 enum Versioned {
     /// Version 0 of the HUGR serialization format.
-    V0(SerHugrV0),
+    V0,
+    /// Version 1 of the HUGR serialization format.
     V1(SerHugrV1),
 
     #[serde(other)]
@@ -41,21 +42,6 @@ struct NodeSer {
     input_extensions: Option<ExtensionSet>,
     #[serde(flatten)]
     op: OpType,
-}
-
-/// Version 0 of the HUGR serialization format.
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-struct SerHugrV0 {
-    /// For each node: (parent, node_operation)
-    nodes: Vec<NodeSer>,
-    /// for each edge: (src, src_offset, tgt, tgt_offset)
-    edges: Vec<[(Node, Option<u16>); 2]>,
-    /// for each node: (metadata)
-    //
-    // TODO: Update to Vec<Option<Map<String,Value>>> to more closely
-    // match the internal representation.
-    #[serde(default)]
-    metadata: Vec<serde_json::Value>,
 }
 
 /// Version 1 of the HUGR serialization format.
@@ -119,7 +105,7 @@ impl<'de> Deserialize<'de> for Hugr {
     {
         let shg = Versioned::deserialize(deserializer)?;
         match shg {
-            Versioned::V0(_) => Err(serde::de::Error::custom(
+            Versioned::V0 => Err(serde::de::Error::custom(
                 "Version 0 HUGR serialization format is not supported.",
             )),
             Versioned::V1(shg) => shg.try_into().map_err(serde::de::Error::custom),

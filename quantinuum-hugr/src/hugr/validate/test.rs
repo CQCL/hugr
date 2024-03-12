@@ -608,16 +608,15 @@ mod extension_tests {
         let cfg = copy;
 
         // Construct a valid CFG, with one BasicBlock node and one exit node
-        let block = b
-            .add_node_with_parent(
-                cfg,
-                ops::DataflowBlock {
-                    inputs: type_row![BOOL_T],
-                    sum_rows: vec![type_row![]],
-                    other_outputs: type_row![BOOL_T],
-                    extension_delta: ExtensionSet::new(),
-                },
-            );
+        let block = b.add_node_with_parent(
+            cfg,
+            ops::DataflowBlock {
+                inputs: type_row![BOOL_T],
+                sum_rows: vec![type_row![]],
+                other_outputs: type_row![BOOL_T],
+                extension_delta: ExtensionSet::new(),
+            },
+        );
         add_block_children(&mut b, block, 1);
         let exit = b.add_node_with_parent(
             cfg,

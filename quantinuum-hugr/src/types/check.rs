@@ -39,7 +39,8 @@ pub enum ConstTypeError {
     /// The length of the tuple value doesn't match the length of the tuple type
     #[error("Tuple of wrong length")]
     TupleWrongLength,
-    /// TODO
+    /// The length of the sum value doesn't match the length of the variant of
+    /// the sum type
     #[error("Sum variant of wrong length")]
     SumWrongLength,
     /// Tag for a sum value exceeded the number of variants

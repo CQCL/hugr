@@ -425,7 +425,7 @@ output of each of these is a sum type, whose arity is the number of outgoing
 control edges; the remaining outputs are those that are passed to all
 succeeding nodes.
 
-The three nodes labelled "Tag 0" are simply generating a 1-variant unary Sum (i.e. a Sum one variant with empty rows) to the Output node.
+The three nodes labelled "Tag 0" are simply generating a 1-variant unary Sum (i.e. a Sum  of one variant with empty rows) to the Output node.
 
 ```mermaid
 flowchart

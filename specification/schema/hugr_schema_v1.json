@@ -370,7 +370,7 @@
                         },
                         "type": "array"
                     },
-                    "title": "Tuple Sum Rows",
+                    "title": "Sum Rows",
                     "type": "array"
                 },
                 "extension_delta": {

@@ -2,7 +2,7 @@
 
 use crate::{
     extension::ExtensionSet,
-    types::{ConstTypeError, EdgeKind, Type, TypeRow},
+    types::{ConstTypeError, EdgeKind, SumType, Type},
     values::{CustomConst, Value},
 };
 
@@ -35,15 +35,17 @@ impl Const {
         &self.typ
     }
 
-    /// Sum of Tuples, used for branching.
-    /// Tuple rows are defined in order by input rows.
-    pub fn sum(
+    /// Creates a new Const Sum.  The value determined by `items` and is
+    /// type-checked `typ`
+    pub fn new_sum(
         tag: usize,
-        values: impl IntoIterator<Item = Value>,
-        variant_rows: impl IntoIterator<Item = TypeRow>,
+        items: impl IntoIterator<Item = Const>,
+        typ: SumType,
     ) -> Result<Self, ConstTypeError> {
-        let typ = Type::new_sum(variant_rows);
-        Self::new(Value::sum(tag, values), typ)
+        Self::new(
+            Value::sum(tag, items.into_iter().map(|x| x.value().to_owned())),
+            typ.into(),
+        )
     }
 
     /// Constant Sum over units, used as branching values.
@@ -163,28 +165,31 @@ mod test {
     }
 
     #[test]
-    fn test_tuple_sum() -> Result<(), BuildError> {
+    fn test_sum() -> Result<(), BuildError> {
         use crate::builder::Container;
         let pred_rows = vec![type_row![USIZE_T, FLOAT64_TYPE], Type::EMPTY_TYPEROW];
-        let pred_ty = Type::new_sum(pred_rows.clone());
+        let pred_ty = SumType::new(pred_rows.clone());
 
         let mut b = DFGBuilder::new(FunctionType::new(
             type_row![],
-            TypeRow::from(vec![pred_ty.clone()]),
+            TypeRow::from(vec![pred_ty.clone().into()]),
         ))?;
-        let c = b.add_constant(Const::sum(
+        let c = b.add_constant(Const::new_sum(
             0,
             [
-                CustomTestValue(USIZE_CUSTOM_T).into(),
+                Into::<Const>::into(CustomTestValue(USIZE_CUSTOM_T)),
                 serialized_float(5.1),
             ],
-            pred_rows.clone(),
+            pred_ty.clone(),
         )?);
         let w = b.load_const(&c);
         b.finish_hugr_with_outputs([w], &test_registry()).unwrap();
 
-        let mut b = DFGBuilder::new(FunctionType::new(type_row![], TypeRow::from(vec![pred_ty])))?;
-        let c = b.add_constant(Const::sum(1, [], pred_rows)?);
+        let mut b = DFGBuilder::new(FunctionType::new(
+            type_row![],
+            TypeRow::from(vec![pred_ty.clone().into()]),
+        ))?;
+        let c = b.add_constant(Const::new_sum(1, [], pred_ty.clone())?);
         let w = b.load_const(&c);
         b.finish_hugr_with_outputs([w], &test_registry()).unwrap();
 
@@ -192,10 +197,10 @@ mod test {
     }
 
     #[test]
-    fn test_bad_tuple_sum() {
-        let pred_rows = [type_row![USIZE_T, FLOAT64_TYPE], Type::EMPTY_TYPEROW];
+    fn test_bad_sum() {
+        let pred_ty = SumType::new([type_row![USIZE_T, FLOAT64_TYPE], type_row![]]);
 
-        let res = Const::sum(0, [Value::tuple([])], pred_rows);
+        let res = Const::new_sum(0, [Const::new_tuple(std::iter::empty())], pred_ty);
         assert_matches!(res, Err(ConstTypeError::SumWrongLength));
     }
 
@@ -203,7 +208,9 @@ mod test {
     fn test_constant_values() {
         let int_value: Value = ConstUsize::new(257).into();
         USIZE_T.check_type(&int_value).unwrap();
-        FLOAT64_TYPE.check_type(&serialized_float(17.4)).unwrap();
+        FLOAT64_TYPE
+            .check_type(serialized_float(17.4).value())
+            .unwrap();
         assert_matches!(
             FLOAT64_TYPE.check_type(&int_value),
             Err(ConstTypeError::CustomCheckFail(
@@ -211,17 +218,20 @@ mod test {
             ))
         );
         let tuple_ty = Type::new_tuple(vec![USIZE_T, FLOAT64_TYPE]);
-        let tuple_val = Value::tuple([int_value.clone(), serialized_float(5.1)]);
+        let tuple_val = Value::tuple([int_value.clone(), serialized_float(5.1).value().to_owned()]);
         tuple_ty.check_type(&tuple_val).unwrap();
-        let tuple_val2 = Value::tuple(vec![serialized_float(6.1), int_value.clone()]);
+        let tuple_val2 = Value::tuple(vec![
+            serialized_float(6.1).value().to_owned(),
+            int_value.clone(),
+        ]);
         assert_matches!(
             tuple_ty.check_type(&tuple_val2),
             Err(ConstTypeError::ValueCheckFail(ty, tv2)) => ty == tuple_ty && tv2 == tuple_val2
         );
         let tuple_val3 = Value::tuple([
             int_value.clone(),
-            serialized_float(3.3),
-            serialized_float(2.0),
+            serialized_float(3.3).value().clone(),
+            serialized_float(2.0).value().clone(),
         ]);
         assert_eq!(
             tuple_ty.check_type(&tuple_val3),
