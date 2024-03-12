@@ -13,6 +13,9 @@ description = "Quantinuum's Hierarchical Unified Graph Representation"
 keywords = ["Quantum", "Quantinuum"]
 categories = ["compilers"]
 
+[lints]
+workspace = true
+
 [lib]
 name = "hugr"
 bench = false

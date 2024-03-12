@@ -124,6 +124,7 @@ pub use circuit::{CircuitBuildError, CircuitBuilder};
 
 #[derive(Debug, Clone, PartialEq, Error)]
 #[non_exhaustive]
+#[allow(missing_docs)]
 /// Error while building the HUGR.
 pub enum BuildError {
     /// The constructed HUGR is invalid.
@@ -183,6 +184,7 @@ pub enum BuildError {
 
 #[derive(Debug, Clone, PartialEq, Error)]
 #[non_exhaustive]
+#[allow(missing_docs)]
 /// Error raised when wiring up a node during the build process.
 pub enum BuilderWiringError {
     /// Tried to copy a linear type.
