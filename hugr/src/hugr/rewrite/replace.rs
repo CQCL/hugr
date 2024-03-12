@@ -213,7 +213,8 @@ impl Replacement {
 impl Rewrite for Replacement {
     type Error = ReplaceError;
 
-    type ApplyResult = ();
+    /// Map from Node in replacement to corresponding Node in the result Hugr
+    type ApplyResult = HashMap<Node, Node>;
 
     const UNCHANGED_ON_FAILURE: bool = false;
 
@@ -270,7 +271,7 @@ impl Rewrite for Replacement {
         Ok(())
     }
 
-    fn apply(self, h: &mut impl HugrMut) -> Result<(), Self::Error> {
+    fn apply(self, h: &mut impl HugrMut) -> Result<Self::ApplyResult, Self::Error> {
         let parent = self.check_parent(h)?;
         // Calculate removed nodes here. (Does not include transfers, so enumerates only
         // nodes we are going to remove, individually, anyway; so no *asymptotic* speed penalty)
@@ -324,7 +325,7 @@ impl Rewrite for Replacement {
 
         // 7. Remove remaining nodes
         to_remove.into_iter().for_each(|n| h.remove_node(n));
-        Ok(())
+        Ok(node_map)
     }
 
     fn invalidation_set(&self) -> impl Iterator<Item = Node> {
@@ -683,8 +684,11 @@ mod test {
         let verify_apply = |r: Replacement| {
             let verify_res = r.verify(&h);
             let apply_res = r.apply(&mut h.clone());
-            assert_eq!(verify_res, apply_res);
-            verify_res
+            match verify_res {
+                Ok(()) => assert!(apply_res.is_ok()),
+                Err(v_e) => assert_eq!(&v_e, apply_res.as_ref().unwrap_err()),
+            };
+            apply_res
         };
 
         // Note wrong root type here - we'll replace children of the *Conditional*
@@ -720,7 +724,7 @@ mod test {
             r.replacement.root(),
             NodeType::new_open(h.get_optype(cond.node()).clone()),
         )?;
-        assert_eq!(verify_apply(r.clone()), Ok(()));
+        assert!(verify_apply(r.clone()).is_ok());
 
         // And test some bad Replacements (using the same `replacement` Hugr).
         // First, removed nodes...

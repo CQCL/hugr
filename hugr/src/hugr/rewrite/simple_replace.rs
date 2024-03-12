@@ -635,6 +635,6 @@ pub(in crate::hugr::rewrite) mod test {
     }
 
     fn apply_replace(h: &mut Hugr, rw: SimpleReplacement) {
-        h.apply_rewrite(to_replace(h, rw)).unwrap()
+        h.apply_rewrite(to_replace(h, rw)).unwrap();
     }
 }
