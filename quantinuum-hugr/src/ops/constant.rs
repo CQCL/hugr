@@ -35,7 +35,7 @@ impl Const {
         &self.typ
     }
 
-    /// Creates a new Const Sum.  The value determined by `items` and is
+    /// Creates a new Const Sum.  The value is determined by `items` and is
     /// type-checked `typ`
     pub fn new_sum(
         tag: usize,
