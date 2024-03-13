@@ -157,8 +157,8 @@ impl CustomConst for ConstIntU {
         ExtensionSet::singleton(&EXTENSION_ID)
     }
 
-    fn custom_type(&self) -> CustomType {
-        int_custom_type(type_arg(self.log_width))
+    fn get_type(&self) -> Type {
+        int_type(type_arg(self.log_width))
     }
 }
 
@@ -175,8 +175,8 @@ impl CustomConst for ConstIntS {
         ExtensionSet::singleton(&EXTENSION_ID)
     }
 
-    fn custom_type(&self) -> CustomType {
-        int_custom_type(type_arg(self.log_width))
+    fn get_type(&self) -> Type {
+        int_type(type_arg(self.log_width))
     }
 }
 

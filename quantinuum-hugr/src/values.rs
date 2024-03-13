@@ -14,15 +14,14 @@ use crate::macros::impl_box_clone;
 
 use crate::{Hugr, HugrView};
 
-use crate::types::{CustomCheckFailure, CustomType};
+use crate::types::{CustomCheckFailure, Type};
 
 /// A value that can be stored as a static constant. Representing core types and
 /// extension types.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "v")]
 pub enum Value {
-    /// An extension constant value, that can check it is of a given [CustomType].
-    ///
+    /// An extension constant value.
     // Note: the extra level of tupling is to avoid https://github.com/rust-lang/rust/issues/78808
     Extension {
         #[allow(missing_docs)]
@@ -139,10 +138,12 @@ impl<T: CustomConst> From<T> for Value {
     }
 }
 
-/// Constant value for opaque [`CustomType`]s.
+/// Constant value for opaque `[CustomType]`s.
 ///
 /// When implementing this trait, include the `#[typetag::serde]` attribute to
 /// enable serialization.
+///
+/// [CustomType]: crate::types::CustomType
 #[typetag::serde(tag = "c")]
 pub trait CustomConst:
     Send + Sync + std::fmt::Debug + CustomConstBoxClone + Any + Downcast
@@ -170,7 +171,7 @@ pub trait CustomConst:
     }
 
     /// report the type
-    fn custom_type(&self) -> CustomType;
+    fn get_type(&self) -> Type;
 }
 
 /// Const equality for types that have PartialEq
@@ -191,19 +192,22 @@ impl_box_clone!(CustomConst, CustomConstBoxClone);
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 /// A value stored as a serialized blob that can report its own type.
 pub struct CustomSerialized {
-    typ: CustomType,
+    typ: Type,
     value: serde_yaml::Value,
     extensions: ExtensionSet,
 }
 
 impl CustomSerialized {
     /// Creates a new [`CustomSerialized`].
-    pub fn new(typ: CustomType, value: serde_yaml::Value, exts: impl Into<ExtensionSet>) -> Self {
-        let extensions = exts.into();
+    pub fn new(
+        typ: impl Into<Type>,
+        value: serde_yaml::Value,
+        exts: impl Into<ExtensionSet>,
+    ) -> Self {
         Self {
-            typ,
+            typ: typ.into(),
             value,
-            extensions,
+            extensions: exts.into(),
         }
     }
 
@@ -226,7 +230,7 @@ impl CustomConst for CustomSerialized {
     fn extension_reqs(&self) -> ExtensionSet {
         self.extensions.clone()
     }
-    fn custom_type(&self) -> CustomType {
+    fn get_type(&self) -> Type {
         self.typ.clone()
     }
 }
@@ -244,9 +248,9 @@ pub(crate) mod test {
     use super::*;
     use crate::builder::test::simple_dfg_hugr;
     use crate::ops::Const;
-    use crate::std_extensions::arithmetic::float_types::{self, FLOAT64_CUSTOM_TYPE};
+    use crate::std_extensions::arithmetic::float_types::{self, FLOAT64_TYPE};
     use crate::type_row;
-    use crate::types::{FunctionType, Type};
+    use crate::types::{CustomType, FunctionType, Type};
 
     #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 
@@ -262,14 +266,14 @@ pub(crate) mod test {
             ExtensionSet::singleton(self.0.extension())
         }
 
-        fn custom_type(&self) -> CustomType {
-            self.0.clone()
+        fn get_type(&self) -> Type {
+            self.0.clone().into()
         }
     }
 
     pub(crate) fn serialized_float(f: f64) -> Const {
         CustomSerialized {
-            typ: FLOAT64_CUSTOM_TYPE,
+            typ: FLOAT64_TYPE,
             value: serde_yaml::Value::Number(f.into()),
             extensions: float_types::EXTENSION_ID.into(),
         }

@@ -45,6 +45,11 @@ impl ListValue {
     pub fn new_empty(typ: Type) -> Self {
         Self(vec![], typ)
     }
+
+    /// Returns the type of the `[ListValue]` as a `[CustomType]`.`
+    pub fn custom_type(&self) -> CustomType {
+        list_custom_type(self.1.clone())
+    }
 }
 
 #[typetag::serde]
@@ -53,11 +58,8 @@ impl CustomConst for ListValue {
         SmolStr::new_inline("list")
     }
 
-    fn custom_type(&self) -> CustomType {
-        let list_type_def = EXTENSION.get_type(&LIST_TYPENAME).unwrap();
-        list_type_def
-            .instantiate(vec![Into::<TypeArg>::into(self.1.clone())])
-            .unwrap()
+    fn get_type(&self) -> Type {
+        self.custom_type().into()
     }
 
     fn validate(&self) -> Result<(), CustomCheckFailure> {
@@ -176,15 +178,18 @@ lazy_static! {
     pub static ref EXTENSION: Extension = extension();
 }
 
-/// Get the type of a list of `elem_type`
+/// Get the type of a list of `elem_type` as a `CustomType`.
+pub fn list_custom_type(elem_type: Type) -> CustomType {
+    EXTENSION
+        .get_type(&LIST_TYPENAME)
+        .unwrap()
+        .instantiate(vec![TypeArg::Type { ty: elem_type }])
+        .unwrap()
+}
+
+/// Get the `Type` of a list of `elem_type`.
 pub fn list_type(elem_type: Type) -> Type {
-    Type::new_extension(
-        EXTENSION
-            .get_type(&LIST_TYPENAME)
-            .unwrap()
-            .instantiate(vec![TypeArg::Type { ty: elem_type }])
-            .unwrap(),
-    )
+    list_custom_type(elem_type).into()
 }
 
 fn list_and_elem_type_vars(list_type_def: &TypeDef) -> (Type, Type) {
