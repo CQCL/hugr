@@ -1,3 +1,4 @@
+//! Benchmarks
 #[allow(dead_code)]
 mod benchmarks;
 

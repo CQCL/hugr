@@ -143,6 +143,7 @@ pub enum BuildError {
     EntryBuiltError(Node),
     /// Node was expected to have a certain type but was found to not.
     #[error("Node with index {node:?} does not have type {op_desc:?} as expected.")]
+    #[allow(missing_docs)]
     UnexpectedType {
         /// Index of node where error occurred.
         node: Node,
@@ -163,6 +164,7 @@ pub enum BuildError {
 
     /// Invalid wires when setting outputs
     #[error("Found an error while setting the outputs of a {} container, {container_node}. {error}", .container_op.name())]
+    #[allow(missing_docs)]
     OutputWiring {
         container_op: OpType,
         container_node: Node,
@@ -174,6 +176,7 @@ pub enum BuildError {
     ///
     /// The internal error message already contains the node index.
     #[error("Got an input wire while adding a {} to the circuit. {error}", .op.name())]
+    #[allow(missing_docs)]
     OperationWiring {
         op: OpType,
         #[source]
@@ -187,6 +190,7 @@ pub enum BuildError {
 pub enum BuilderWiringError {
     /// Tried to copy a linear type.
     #[error("Cannot copy linear type {typ} from output {src_offset} of node {src}")]
+    #[allow(missing_docs)]
     NoCopyLinear {
         typ: Type,
         src: Node,
@@ -194,6 +198,7 @@ pub enum BuilderWiringError {
     },
     /// The ancestors of an inter-graph edge are not related.
     #[error("Cannot connect an inter-graph edge between unrelated nodes. Tried connecting {src} ({src_offset}) with {dst} ({dst_offset}).")]
+    #[allow(missing_docs)]
     NoRelationIntergraph {
         src: Node,
         src_offset: Port,
@@ -202,6 +207,7 @@ pub enum BuilderWiringError {
     },
     /// Inter-Graph edges can only carry copyable data.
     #[error("Inter-graph edges cannot carry non-copyable data {typ}. Tried connecting {src} ({src_offset}) with {dst} ({dst_offset}).")]
+    #[allow(missing_docs)]
     NonCopyableIntergraph {
         src: Node,
         src_offset: Port,
