@@ -1,3 +1,4 @@
+use crate::ops::Const;
 use crate::{
     extension::{
         prelude::{sum_with_error, ConstError},
@@ -9,7 +10,7 @@ use crate::{
         int_types::{get_log_width, ConstIntS, ConstIntU, INT_TYPES},
     },
     types::ConstTypeError,
-    values::{CustomConst, Value},
+    values::CustomConst,
     IncomingPort,
 };
 
@@ -35,8 +36,8 @@ fn get_input<T: CustomConst>(consts: &[(IncomingPort, ops::Const)]) -> Option<&T
 
 fn fold_trunc(
     type_args: &[crate::types::TypeArg],
-    consts: &[(IncomingPort, ops::Const)],
-    convert: impl Fn(f64, u8) -> Result<Value, ConstTypeError>,
+    consts: &[(IncomingPort, Const)],
+    convert: impl Fn(f64, u8) -> Result<Const, ConstTypeError>,
 ) -> ConstFoldResult {
     let f: &ConstF64 = get_input(consts)?;
     let f = f.value();
@@ -51,24 +52,15 @@ fn fold_trunc(
             signal: 0,
             message: "Can't truncate non-finite float".to_string(),
         };
-        let sum_val = Value::Sum {
-            tag: 1,
-            values: [Box::new(err_val.into())].to_vec(),
-        };
-
-        ops::Const::new(sum_val, sum_type.clone()).unwrap()
+        Const::sum(1, [err_val.into()], sum_type.clone())
+            .unwrap_or_else(|e| panic!("Invalid computed sum, {}", e))
     };
     let out_const: ops::Const = if !f.is_finite() {
         err_value()
     } else {
         let cv = convert(f, log_width);
         if let Ok(cv) = cv {
-            let sum_val = Value::Sum {
-                tag: 0,
-                values: [Box::new(cv)].to_vec(),
-            };
-
-            ops::Const::new(sum_val, sum_type).unwrap()
+            Const::sum(0, [cv], sum_type).unwrap_or_else(|e| panic!("Invalid computed sum, {}", e))
         } else {
             err_value()
         }

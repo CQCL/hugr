@@ -15,7 +15,6 @@ use crate::std_extensions::logic::test::{and_op, or_op};
 use crate::std_extensions::logic::{self, NotOp};
 use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
 use crate::types::{CustomType, FunctionType, PolyFuncType, Type, TypeBound, TypeRow};
-use crate::values::Value;
 use crate::{type_row, Direction, IncomingPort, Node};
 
 const NAT: Type = crate::extension::prelude::USIZE_T;
@@ -522,12 +521,11 @@ fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
                 .with_extension_delta(collections::EXTENSION_NAME),
         ),
     )?;
-    let empty_list = Value::Extension {
-        c: (Box::new(collections::ListValue::new_empty(
-            Type::new_var_use(0, TypeBound::Copyable),
-        )),),
-    };
-    let cst = def.add_load_const(Const::new(empty_list, list_of_var)?);
+    let empty_list = Const::extension(collections::ListValue::new_empty(Type::new_var_use(
+        0,
+        TypeBound::Copyable,
+    )));
+    let cst = def.add_load_const(empty_list);
     let res = def.finish_hugr_with_outputs([cst], &reg);
     assert_matches!(
         res.unwrap_err(),
@@ -562,7 +560,8 @@ mod extension_tests {
     ///
     /// Returns the node indices of each of the operations.
     fn add_block_children(b: &mut Hugr, parent: Node, sum_size: usize) -> (Node, Node, Node, Node) {
-        let const_op = ops::Const::unit_sum(0, sum_size as u8);
+        let const_op =
+            ops::Const::unit_sum(0, sum_size as u8).expect("`sum_size` must be greater than 0");
         let tag_type = Type::new_unit_sum(sum_size as u8);
 
         let input = b.add_node_with_parent(parent, ops::Input::new(type_row![BOOL_T]));

@@ -4,6 +4,7 @@ use std::collections::{BTreeSet, HashMap};
 
 use itertools::Itertools;
 
+use crate::types::SumType;
 use crate::{
     builder::{DFGBuilder, Dataflow, DataflowHugr},
     extension::{ConstFoldResult, ExtensionRegistry},
@@ -14,8 +15,7 @@ use crate::{
     },
     ops::{Const, LeafOp},
     type_row,
-    types::{FunctionType, Type, TypeEnum},
-    values::Value,
+    types::FunctionType,
     Hugr, HugrView, IncomingPort, Node, SimpleReplacement,
 };
 
@@ -48,25 +48,20 @@ pub fn fold_leaf_op(op: &LeafOp, consts: &[(IncomingPort, Const)]) -> ConstFoldR
     match op {
         LeafOp::Noop { .. } => out_row([consts.first()?.1.clone()]),
         LeafOp::MakeTuple { .. } => {
-            out_row([Const::new_tuple(sorted_consts(consts).into_iter().cloned())])
+            out_row([Const::tuple(sorted_consts(consts).into_iter().cloned())])
         }
         LeafOp::UnpackTuple { .. } => {
             let c = &consts.first()?.1;
-
-            if let Value::Tuple { vs } = c.value() {
-                if let TypeEnum::Tuple(tys) = c.const_type().as_type_enum() {
-                    return out_row(tys.iter().zip(vs.iter()).map(|(t, v)| {
-                        Const::new(v.clone(), t.clone())
-                            .expect("types should already have been checked")
-                    }));
-                }
-            }
-            panic!("This op always takes a Tuple input.");
+            let Const::Tuple { vs } = c else {
+                panic!("This op always takes a Tuple input.");
+            };
+            out_row(vs.iter().cloned())
         }
 
-        LeafOp::Tag { tag, variants } => out_row([Const::new(
-            Value::sum(*tag, consts.iter().map(|(_, konst)| konst.value().clone())),
-            Type::new_sum(variants.clone()),
+        LeafOp::Tag { tag, variants } => out_row([Const::sum(
+            *tag,
+            consts.iter().map(|(_, konst)| konst.clone()),
+            SumType::new(variants.clone()),
         )
         .unwrap()]),
         LeafOp::CustomOp(_) => {
@@ -81,7 +76,7 @@ pub fn fold_leaf_op(op: &LeafOp, consts: &[(IncomingPort, Const)]) -> ConstFoldR
 /// Generate a graph that loads and outputs `consts` in order, validating
 /// against `reg`.
 fn const_graph(consts: Vec<Const>, reg: &ExtensionRegistry) -> Hugr {
-    let const_types = consts.iter().map(Const::const_type).cloned().collect_vec();
+    let const_types = consts.iter().map(Const::const_type).collect_vec();
     let mut b = DFGBuilder::new(FunctionType::new(type_row![], const_types)).unwrap();
 
     let outputs = consts
@@ -226,15 +221,12 @@ mod test {
     use crate::std_extensions::arithmetic::float_types::{ConstF64, FLOAT64_TYPE};
     use crate::std_extensions::arithmetic::int_types::{ConstIntU, INT_TYPES};
     use crate::std_extensions::logic::{self, NaryLogic};
+
     use rstest::rstest;
 
     /// int to constant
     fn i2c(b: u64) -> Const {
-        Const::new(
-            ConstIntU::new(5, b).unwrap().into(),
-            INT_TYPES[5].to_owned(),
-        )
-        .unwrap()
+        Const::extension(ConstIntU::new(5, b).unwrap())
     }
 
     /// float to constant
@@ -262,10 +254,13 @@ mod test {
            int(x.0 - x.1) == 2
         */
         let sum_type = sum_with_error(INT_TYPES[5].to_owned());
-        let mut build =
-            DFGBuilder::new(FunctionType::new(type_row![], vec![sum_type.clone()])).unwrap();
+        let mut build = DFGBuilder::new(FunctionType::new(
+            type_row![],
+            vec![sum_type.clone().into()],
+        ))
+        .unwrap();
 
-        let tup = build.add_load_const(Const::new_tuple([f2c(5.6), f2c(3.2)]));
+        let tup = build.add_load_const(Const::tuple([f2c(5.6), f2c(3.2)]));
 
         let unpack = build
             .add_dataflow_op(
@@ -298,11 +293,7 @@ mod test {
 
         constant_fold_pass(&mut h, &reg);
 
-        let expected = Value::Sum {
-            tag: 0,
-            values: vec![Box::new(i2c(2).value().clone())],
-        };
-        let expected = Const::new(expected, sum_type).unwrap();
+        let expected = Const::sum(0, [i2c(2).clone()], sum_type).unwrap();
         assert_fully_folded(&h, &expected);
     }
 
@@ -344,7 +335,7 @@ mod test {
             collections::EXTENSION.to_owned(),
         ])
         .unwrap();
-        let list: Const = ListValue::new(BOOL_T, vec![Value::unit_sum(1)]).into();
+        let list: Const = ListValue::new(BOOL_T, [Const::unit_sum(0, 1).unwrap()]).into();
         let mut build = DFGBuilder::new(FunctionType::new(
             type_row![],
             vec![list.const_type().clone()],

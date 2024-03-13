@@ -380,6 +380,8 @@ pub trait OpTrait {
 pub trait OpParent {
     /// The inner function type of the operation, if it has a child dataflow
     /// sibling graph.
+    ///
+    /// Non-container ops like `FuncDecl` return `None` even though they represent a function.
     fn inner_function_type(&self) -> Option<FunctionType> {
         None
     }
@@ -406,6 +408,17 @@ impl OpParent for CFG {}
 impl OpParent for Conditional {}
 impl OpParent for FuncDecl {}
 impl OpParent for ExitBlock {}
+
+/// Properties of operations that represent a function, either as a declaration
+/// or by defining a dataflow graph.kkk
+pub trait FunctionOp {
+    /// The type of .
+    ///
+    /// Non-container ops like `FuncDecl` return `None` even though they represent a function.
+    fn inner_function_type(&self) -> Option<FunctionType> {
+        None
+    }
+}
 
 #[enum_dispatch]
 /// Methods for Ops to validate themselves and children

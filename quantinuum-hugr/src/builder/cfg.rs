@@ -52,7 +52,6 @@ use crate::{
 ///   types::{FunctionType, Type, SumType},
 ///   ops,
 ///   type_row,
-///   values::Value,
 /// };
 ///
 /// const NAT: Type = prelude::USIZE_T;
@@ -73,10 +72,11 @@ use crate::{
 ///     let [inw] = entry_b.input_wires_arr();
 ///     let entry = {
 ///         // Pack the const "42" into the appropriate sum type.
-///         let left_42 =
-///             ops::Const::new_sum(0,
-///                                   [prelude::ConstUsize::new(42).into()],
-///                                   SumType::new(sum_variants.clone()))?;
+///         let left_42 = ops::Const::sum(
+///             0,
+///             [prelude::ConstUsize::new(42).into()],
+///             SumType::new(sum_variants.clone())
+///         )?;
 ///         let sum = entry_b.add_load_const(left_42);
 ///
 ///         entry_b.finish_with_outputs(sum, [inw])?
