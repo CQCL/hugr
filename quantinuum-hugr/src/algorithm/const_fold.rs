@@ -330,8 +330,11 @@ mod test {
         Ok(())
     }
 
-    #[cfg(not(feature = "extension_inference"))] // inference fails for test graph, shouldn't
     #[test]
+    #[cfg_attr(
+        feature = "extension_inference",
+        ignore = "inference fails for test graph, it shouldn't"
+    )]
     fn test_list_ops() -> Result<(), Box<dyn std::error::Error>> {
         use crate::std_extensions::collections::{self, ListOp, ListValue};
 
