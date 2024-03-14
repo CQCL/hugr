@@ -13,12 +13,12 @@ use crate::{
         ConstFold, ExtensionId, ExtensionRegistry, ExtensionSet, SignatureError, TypeDef,
         TypeDefBound,
     },
+    ops::constant::CustomConst,
     ops::{self, custom::ExtensionOp, OpName},
     types::{
         type_param::{TypeArg, TypeParam},
         CustomCheckFailure, CustomType, FunctionType, PolyFuncType, Type, TypeBound,
     },
-    values::CustomConst,
     Extension,
 };
 
@@ -92,7 +92,7 @@ impl CustomConst for ListValue {
     }
 
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
-        crate::values::downcast_equal_consts(self, other)
+        crate::ops::constant::downcast_equal_consts(self, other)
     }
 
     fn extension_reqs(&self) -> ExtensionSet {

@@ -6,13 +6,13 @@ use smol_str::SmolStr;
 use crate::types::SumType;
 use crate::{
     extension::{ExtensionId, TypeDefBound},
+    ops::constant::CustomConst,
     ops::LeafOp,
     type_row,
     types::{
         type_param::{TypeArg, TypeParam},
         CustomType, FunctionType, PolyFuncType, Type, TypeBound,
     },
-    values::CustomConst,
     Extension,
 };
 
@@ -185,7 +185,7 @@ impl CustomConst for ConstUsize {
     }
 
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
-        crate::values::downcast_equal_consts(self, other)
+        crate::ops::constant::downcast_equal_consts(self, other)
     }
 
     fn extension_reqs(&self) -> ExtensionSet {
@@ -223,7 +223,7 @@ impl CustomConst for ConstError {
     }
 
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
-        crate::values::downcast_equal_consts(self, other)
+        crate::ops::constant::downcast_equal_consts(self, other)
     }
 
     fn extension_reqs(&self) -> ExtensionSet {

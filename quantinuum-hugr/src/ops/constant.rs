@@ -1,15 +1,18 @@
 //! Constant value definitions.
 
+mod custom;
+
 use super::{OpName, OpTrait, StaticTag};
 use super::{OpTag, OpType};
 use crate::extension::ExtensionSet;
 use crate::types::{CustomType, EdgeKind, SumType, SumTypeError, Type};
-use crate::values::CustomConst;
 use crate::{Hugr, HugrView};
 
 use itertools::Itertools;
 use smol_str::SmolStr;
 use thiserror::Error;
+
+pub use custom::{downcast_equal_consts, CustomConst, CustomSerialized};
 
 /// An operation returning a constant value.
 ///
@@ -272,20 +275,46 @@ mod test {
             prelude::{ConstUsize, USIZE_CUSTOM_T, USIZE_T},
             ExtensionId, ExtensionRegistry, PRELUDE,
         },
+        ops::constant::CustomSerialized,
         std_extensions::arithmetic::float_types::{self, ConstF64, FLOAT64_TYPE},
         type_row,
         types::type_param::TypeArg,
         types::{CustomType, FunctionType, Type, TypeBound, TypeRow},
-        values::{
-            test::{serialized_float, CustomTestValue},
-            CustomSerialized,
-        },
     };
     use cool_asserts::assert_matches;
     use rstest::{fixture, rstest};
     use serde_yaml::Value as YamlValue;
 
     use super::*;
+
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    /// A custom constant value used in testing
+    pub(crate) struct CustomTestValue(pub CustomType);
+
+    #[typetag::serde]
+    impl CustomConst for CustomTestValue {
+        fn name(&self) -> SmolStr {
+            format!("CustomTestValue({:?})", self.0).into()
+        }
+
+        fn extension_reqs(&self) -> ExtensionSet {
+            ExtensionSet::singleton(self.0.extension())
+        }
+
+        fn get_type(&self) -> Type {
+            self.0.clone().into()
+        }
+    }
+
+    /// A [`CustomSerialized`] encoding a [`FLOAT64_TYPE`] float constant used in testing.
+    pub(crate) fn serialized_float(f: f64) -> Const {
+        CustomSerialized::new(
+            FLOAT64_TYPE,
+            serde_yaml::Value::Number(f.into()),
+            float_types::EXTENSION_ID,
+        )
+        .into()
+    }
 
     fn test_registry() -> ExtensionRegistry {
         ExtensionRegistry::try_new([PRELUDE.to_owned(), float_types::EXTENSION.to_owned()]).unwrap()

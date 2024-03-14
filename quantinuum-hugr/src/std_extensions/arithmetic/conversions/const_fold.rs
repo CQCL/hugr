@@ -5,12 +5,12 @@ use crate::{
         ConstFold, ConstFoldResult, OpDef,
     },
     ops,
+    ops::constant::CustomConst,
     std_extensions::arithmetic::{
         float_types::ConstF64,
         int_types::{get_log_width, ConstIntS, ConstIntU, INT_TYPES},
     },
     types::ConstTypeError,
-    values::CustomConst,
     IncomingPort,
 };
 
