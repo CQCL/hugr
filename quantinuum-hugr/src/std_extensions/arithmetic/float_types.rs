@@ -56,8 +56,8 @@ impl CustomConst for ConstF64 {
         format!("f64({})", self.value).into()
     }
 
-    fn custom_type(&self) -> CustomType {
-        FLOAT64_CUSTOM_TYPE
+    fn get_type(&self) -> Type {
+        FLOAT64_TYPE
     }
 
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {

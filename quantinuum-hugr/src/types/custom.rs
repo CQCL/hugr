@@ -5,11 +5,11 @@ use std::fmt::{self, Display};
 
 use crate::extension::{ExtensionId, ExtensionRegistry, SignatureError, TypeDef};
 
-use super::TypeName;
 use super::{
     type_param::{TypeArg, TypeParam},
     Substitution, TypeBound,
 };
+use super::{Type, TypeName};
 
 /// An opaque type element. Contains the unique identifier of its definition.
 #[derive(Debug, PartialEq, Eq, Clone, serde::Serialize, serde::Deserialize)]
@@ -129,5 +129,11 @@ impl Display for CustomType {
         } else {
             write!(f, "{}({:?})", self.id, self.args)
         }
+    }
+}
+
+impl From<CustomType> for Type {
+    fn from(value: CustomType) -> Self {
+        Self::new_extension(value)
     }
 }

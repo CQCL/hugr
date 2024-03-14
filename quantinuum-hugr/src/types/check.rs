@@ -19,7 +19,7 @@ pub enum CustomCheckFailure {
         /// The expected custom type.
         expected: CustomType,
         /// The custom type found when checking.
-        found: CustomType,
+        found: Type,
     },
     /// Any other message
     #[error("{0}")]
@@ -107,8 +107,8 @@ impl Type {
     pub fn check_type(&self, val: &Value) -> Result<(), ConstTypeError> {
         match (&self.0, val) {
             (TypeEnum::Extension(expected), Value::Extension { c: (e_val,) }) => {
-                let found = e_val.custom_type();
-                if found == *expected {
+                let found = e_val.get_type();
+                if found == expected.clone().into() {
                     Ok(e_val.validate()?)
                 } else {
                     Err(CustomCheckFailure::TypeMismatch {

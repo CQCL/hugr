@@ -129,7 +129,7 @@ where
     T: CustomConst,
 {
     fn from(value: T) -> Self {
-        let typ = Type::new_extension(value.custom_type());
+        let typ = value.get_type();
         Const {
             value: Value::custom(value),
             typ,
@@ -263,9 +263,8 @@ mod test {
         assert_matches!(classic_t.least_upper_bound(), TypeBound::Eq);
         classic_t.check_type(&val).unwrap();
 
-        let typ_qb = CustomType::new("mytype", vec![], ex_id, TypeBound::Eq);
-        let t = Type::new_extension(typ_qb.clone());
-        assert_matches!(t.check_type(&val),
+        let typ_qb: Type = CustomType::new("mytype", vec![], ex_id, TypeBound::Eq).into();
+        assert_matches!(typ_qb.check_type(&val),
             Err(ConstTypeError::CustomCheckFail(CustomCheckFailure::TypeMismatch{expected, found})) => expected == typ_int && found == typ_qb);
 
         assert_eq!(val, val);
