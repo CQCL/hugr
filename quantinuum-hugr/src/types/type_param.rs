@@ -36,6 +36,11 @@ impl UpperBound {
             _ => false,
         }
     }
+
+    /// Returns the value of the upper bound.
+    pub fn value(&self) -> &Option<NonZeroU64> {
+        &self.0
+    }
 }
 
 /// A *kind* of [TypeArg]. Thus, a parameter declared by a [PolyFuncType] (e.g. [OpDef]),
@@ -243,6 +248,13 @@ impl TypeArg {
                 v: TypeArgVariable { idx, cached_decl },
             } => t.apply_var(*idx, cached_decl),
         }
+    }
+}
+
+impl TypeArgVariable {
+    /// Return the index.
+    pub fn index(&self) -> usize {
+        self.idx
     }
 }
 

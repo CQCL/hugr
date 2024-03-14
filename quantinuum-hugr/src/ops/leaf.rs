@@ -120,6 +120,21 @@ impl TypeApplication {
             })
         }
     }
+
+    /// Returns the type of the input function.
+    pub fn input(&self) -> &PolyFuncType {
+        &self.input
+    }
+
+    /// Returns the args applied to the input function.
+    pub fn args(&self) -> &[TypeArg] {
+        &self.args
+    }
+
+    /// Returns the type of the output function.
+    pub fn output(&self) -> &PolyFuncType {
+        &self.output
+    }
 }
 
 impl Default for LeafOp {
