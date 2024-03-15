@@ -55,11 +55,11 @@ pub enum Const {
 
 /// Boxed [`CustomConst`] trait object.
 ///
-/// This is used to avoid https://github.com/rust-lang/rust/issues/78808 in
+/// Use [`Const::extension`] to create a new variant of this type.
+///
+/// This is required to avoid <https://github.com/rust-lang/rust/issues/78808> in
 /// [`Const::Extension`], while implementing a transparent encoding into a
 /// `CustomConst`.
-///
-/// Use [`Const::extension`] to create a new variant of this type.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(transparent)]
 pub struct ExtensionConst(pub(super) Box<dyn CustomConst>);

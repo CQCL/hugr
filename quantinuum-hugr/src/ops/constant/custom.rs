@@ -19,7 +19,7 @@ use crate::types::{CustomCheckFailure, Type};
 /// When implementing this trait, include the `#[typetag::serde]` attribute to
 /// enable serialization.
 ///
-/// [CustomType]: crate::types::CustomType
+/// [`CustomType`]: crate::types::CustomType
 #[typetag::serde(tag = "c")]
 pub trait CustomConst:
     Send + Sync + std::fmt::Debug + CustomConstBoxClone + Any + Downcast

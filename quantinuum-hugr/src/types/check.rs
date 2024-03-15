@@ -42,7 +42,10 @@ pub enum SumTypeError {
 }
 
 impl super::SumType {
-    /// Check that a [`Value`] is a valid instance of this [`SumType`].
+    /// Check if a sum variant is a valid instance of this [`SumType`].
+    ///
+    /// Since [`Const::Sum`] variants always contain a tuple of values,
+    /// `val` must be a slice of [`Const`]s.
     ///
     ///   [`SumType`]: crate::types::SumType
     ///
