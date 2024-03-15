@@ -24,18 +24,18 @@ pub enum Const {
     ///
     // Note: the extra level of tupling is to avoid https://github.com/rust-lang/rust/issues/78808
     Extension {
-        #[allow(missing_docs)]
-        c: (Box<dyn CustomConst>,),
+        /// The custom constant value.
+        c: ExtensionConst,
     },
     /// A higher-order function value.
     // TODO use a root parametrised hugr, e.g. Hugr<DFG>.
     Function {
-        #[allow(missing_docs)]
+        /// A Hugr defining the function.
         hugr: Box<Hugr>,
     },
     /// A tuple
     Tuple {
-        #[allow(missing_docs)]
+        /// Constant values in the tuple.
         vs: Vec<Const>,
     },
     /// A Sum variant, with a tag indicating the index of the variant and its
@@ -51,6 +51,23 @@ pub enum Const {
         #[serde(rename = "typ")]
         sum_type: SumType,
     },
+}
+
+/// Boxed [`CustomConst`] trait object.
+///
+/// This is used to avoid https://github.com/rust-lang/rust/issues/78808 in
+/// [`Const::Extension`], while implementing a transparent encoding into a
+/// `CustomConst`.
+///
+/// Use [`Const::extension`] to create a new variant of this type.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(transparent)]
+pub struct ExtensionConst(pub(super) Box<dyn CustomConst>);
+
+impl PartialEq for ExtensionConst {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.equal_consts(other.0.as_ref())
+    }
 }
 
 /// Struct for custom type check fails.
@@ -96,7 +113,7 @@ impl Const {
     /// Returns a reference to the type of this [`Const`].
     pub fn const_type(&self) -> Type {
         match self {
-            Self::Extension { c: (e,) } => e.get_type(),
+            Self::Extension { c } => c.0.get_type(),
             Self::Tuple { vs } => Type::new_tuple(vs.iter().map(Self::const_type).collect_vec()),
             Self::Sum { sum_type, .. } => sum_type.clone().into(),
             Self::Function { hugr } => {
@@ -191,14 +208,14 @@ impl Const {
     /// Returns a tuple constant of constant values.
     pub fn extension(custom_const: impl CustomConst) -> Self {
         Self::Extension {
-            c: (Box::new(custom_const),),
+            c: ExtensionConst(Box::new(custom_const)),
         }
     }
 
     /// For a Const holding a CustomConst, extract the CustomConst by downcasting.
     pub fn get_custom_value<T: CustomConst>(&self) -> Option<&T> {
-        if let Self::Extension { c: (custom,) } = self {
-            custom.downcast_ref()
+        if let Self::Extension { c } = self {
+            c.0.downcast_ref()
         } else {
             None
         }
@@ -377,6 +394,13 @@ mod test {
     #[test]
     fn test_bad_sum() {
         let pred_ty = SumType::new([type_row![USIZE_T, FLOAT64_TYPE], type_row![]]);
+
+        let good_sum = const_usize();
+        println!("{}", serde_json::to_string_pretty(&good_sum).unwrap());
+
+        let good_sum =
+            Const::sum(0, [const_usize(), serialized_float(5.1)], pred_ty.clone()).unwrap();
+        println!("{}", serde_json::to_string_pretty(&good_sum).unwrap());
 
         let res = Const::sum(0, [], pred_ty.clone());
         assert_matches!(
