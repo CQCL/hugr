@@ -48,6 +48,15 @@ pub trait Rewrite {
     /// Two `impl Rewrite`s can be composed if their invalidation sets are
     /// disjoint.
     fn invalidation_set(&self) -> Self::InvalidationSet<'_>;
+
+    /// Returns a set of nodes referenced by the rewrite. Modifying any of these
+    /// nodes will invalidate it.
+    ///
+    /// Two `impl Rewrite`s can be composed if their invalidation sets are
+    /// disjoint.
+    /// Using this way instead is to avoid associated type
+    /// but requires 1.75 and can break impl Rewrite in other repos
+    fn invalidation_set_v2(&self) -> impl Iterator<Item = Node>;
 }
 
 /// Wraps any rewrite into a transaction (i.e. that has no effect upon failure)
@@ -95,5 +104,10 @@ impl<R: Rewrite> Rewrite for Transactional<R> {
     #[inline]
     fn invalidation_set(&self) -> Self::InvalidationSet<'_> {
         self.underlying.invalidation_set()
+    }
+
+    #[inline]
+    fn invalidation_set_v2(&self) -> impl Iterator<Item = Node> {
+        self.underlying.invalidation_set_v2()
     }
 }

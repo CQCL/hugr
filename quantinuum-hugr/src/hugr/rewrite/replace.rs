@@ -334,6 +334,10 @@ impl Rewrite for Replacement {
     fn invalidation_set(&self) -> Self::InvalidationSet<'_> {
         self.removal.iter().copied()
     }
+
+    fn invalidation_set_v2(&self) -> impl Iterator<Item = Node> {
+        self.removal.iter().copied()
+    }
 }
 
 fn transfer_edges<'a>(

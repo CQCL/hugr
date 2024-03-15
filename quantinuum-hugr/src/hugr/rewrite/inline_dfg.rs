@@ -125,6 +125,10 @@ impl Rewrite for InlineDFG {
     fn invalidation_set(&self) -> Self::InvalidationSet<'_> {
         [self.0.node()].into_iter()
     }
+
+    fn invalidation_set_v2(&self) -> impl Iterator<Item = Node> {
+        [self.0.node()].into_iter()
+    }
 }
 
 #[cfg(test)]

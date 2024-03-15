@@ -220,6 +220,10 @@ impl Rewrite for OutlineCfg {
     fn invalidation_set(&self) -> Self::InvalidationSet<'_> {
         self.blocks.iter().copied()
     }
+
+    fn invalidation_set_v2(&self) -> impl Iterator<Item = Node> {
+        self.blocks.iter().copied()
+    }
 }
 
 /// Errors that can occur in expressing an OutlineCfg rewrite.

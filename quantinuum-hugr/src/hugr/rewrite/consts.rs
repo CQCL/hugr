@@ -67,6 +67,10 @@ impl Rewrite for RemoveLoadConstant {
     fn invalidation_set(&self) -> Self::InvalidationSet<'_> {
         iter::once(self.0)
     }
+
+    fn invalidation_set_v2(&self) -> impl Iterator<Item = Node> {
+        iter::once(self.0)
+    }
 }
 
 /// Remove a [`crate::ops::Const`] node with no outputs.
@@ -109,6 +113,10 @@ impl Rewrite for RemoveConst {
     }
 
     fn invalidation_set(&self) -> Self::InvalidationSet<'_> {
+        iter::once(self.0)
+    }
+
+    fn invalidation_set_v2(&self) -> impl Iterator<Item = Node> {
         iter::once(self.0)
     }
 }

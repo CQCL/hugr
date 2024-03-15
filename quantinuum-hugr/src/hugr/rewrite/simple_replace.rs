@@ -190,6 +190,12 @@ impl Rewrite for SimpleReplacement {
         let out_neighs = self.nu_out.keys().map(get_node);
         subcirc.chain(out_neighs)
     }
+
+    fn invalidation_set_v2(&self) -> impl Iterator<Item = Node> {
+        let subcirc = self.subgraph.nodes().iter().copied();
+        let out_neighs = self.nu_out.keys().map(|key| key.0);
+        subcirc.chain(out_neighs)
+    }
 }
 
 /// Error from a [`SimpleReplacement`] operation.

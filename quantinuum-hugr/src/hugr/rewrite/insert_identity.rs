@@ -93,6 +93,11 @@ impl Rewrite for IdentityInsertion {
     fn invalidation_set(&self) -> Self::InvalidationSet<'_> {
         iter::once(self.post_node)
     }
+
+    #[inline]
+    fn invalidation_set_v2(&self) -> impl Iterator<Item = Node> {
+        iter::once(self.post_node)
+    }
 }
 
 #[cfg(test)]
