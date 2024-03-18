@@ -413,15 +413,14 @@ mod test {
 
     #[rstest]
     fn function_value(simple_dfg_hugr: Hugr) {
-        let v = Const::Function {
-            hugr: Box::new(simple_dfg_hugr),
-        };
+        let v = Const::function(simple_dfg_hugr).unwrap();
 
         let correct_type = Type::new_function(FunctionType::new_endo(type_row![
             crate::extension::prelude::BOOL_T
         ]));
 
         assert_eq!(v.const_type(), correct_type);
+        assert!(v.name().starts_with("const:function:"))
     }
 
     #[fixture]
@@ -435,11 +434,21 @@ mod test {
     }
 
     #[rstest]
-    #[case(const_usize(), USIZE_T)]
-    #[case(serialized_float(17.4), FLOAT64_TYPE)]
-    #[case(const_tuple(), Type::new_tuple(type_row![USIZE_T, FLOAT64_TYPE]))]
-    fn const_type(#[case] const_value: Const, #[case] expected_type: Type) {
+    #[case(Const::unit(), Type::UNIT, "const:seq:{}")]
+    #[case(const_usize(), USIZE_T, "const:custom:ConstUsize(")]
+    #[case(serialized_float(17.4), FLOAT64_TYPE, "const:custom:yaml:Number(17.4)")]
+    #[case(const_tuple(), Type::new_tuple(type_row![USIZE_T, FLOAT64_TYPE]), "const:seq:{")]
+    fn const_type(
+        #[case] const_value: Const,
+        #[case] expected_type: Type,
+        #[case] name_prefix: &str,
+    ) {
         assert_eq!(const_value.const_type(), expected_type);
+        let name = const_value.name();
+        assert!(
+            name.starts_with(name_prefix),
+            "{name} does not start with {name_prefix}"
+        );
     }
 
     #[rstest]
