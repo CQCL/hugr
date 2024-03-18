@@ -1,4 +1,4 @@
-name: Continuous integration
+name: Continuous integration 🦀
 
 on:
   push:
@@ -7,6 +7,11 @@ on:
   pull_request:
     branches:
       - main
+    paths:
+      - 'quantinuum-hugr/**'
+      - 'specification/schema/**'
+      - 'Cargo.toml'
+      - '!**/*.md'
   merge_group:
     types: [checks_requested]
   workflow_dispatch: {}
@@ -110,6 +115,6 @@ jobs:
         uses: codecov/codecov-action@v4
         with:
           files: coverage.json
-          name: ubuntu
+          name: rust
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

@@ -28,4 +28,21 @@ then
     exit 1
 fi
 
+# Run `ruff` python formatting
+if ! poetry run ruff format --check
+then
+    echo ""
+    echo "There are some python code style issues."
+    echo "Run `ruff format` first."
+    exit 1
+fi
+
+# Run `ruff` python linting
+if ! poetry run ruff check
+then
+    echo ""
+    echo "There are some python linting issues."
+    exit 1
+fi
+
 exit 0

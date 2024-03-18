@@ -9,6 +9,7 @@ test:
 # Auto-fix all clippy warnings
 fix:
     cargo clippy --all-targets --all-features --workspace --fix --allow-staged
+    poetry run ruff check --fix
 
 # Run the pre-commit checks
 check:
@@ -23,14 +24,9 @@ format:
 coverage:
     cargo llvm-cov --lcov > lcov.info
 
-# Run pre-commit checks on the python code
-pycheck:
-    poetry run ruff format --check
-    poetry run ruff check
-
 # Load a poetry shell with the dependencies installed
 pyshell:
-    poetry install
+    poetry shell
 
 # Run the python tests
 pytest:

@@ -1,0 +1,90 @@
+name: Continuous integration 🐍
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'quantinuum-hugr-py/**'
+      - 'pyproject.toml'
+      - '!**/*.md'
+  merge_group:
+    types: [checks_requested]
+  workflow_dispatch: {}
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  RUSTFLAGS: "--cfg=ci_run"
+  MIRIFLAGS: '-Zmiri-permissive-provenance' # Required due to warnings in bitvec 1.0.1
+  CI: true # insta snapshots behave differently on ci
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: "sccache"
+
+jobs:
+  check:
+    name: check python
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: ['3.10']
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.3
+      - name: Install poetry
+        run: pipx install poetry
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "poetry"
+
+      - name: Install the project libraries
+        run: poetry install
+
+      - name: Type check with mypy
+        run: poetry run mypy guppylang
+
+      - name: Check formatting with ruff
+        run: poetry run ruff format --check
+
+      - name: Lint with ruff
+        run: poetry run ruff check
+
+      - name: Run tests
+        run: poetry run pytest
+
+  coverage:
+    if: github.event_name != 'merge_group'
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.3
+      - name: Install poetry
+        run: pipx install poetry
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v3
+        with:
+          python-version: '3.10'
+          cache: "poetry"
+
+      - name: Install the project libraries
+        run: poetry install
+
+      - name: Run python tests with coverage instrumentation
+        run: poetry run pytest --cov=./ --cov-report=xml
+
+      - name: Upload python coverage to codecov.io
+        uses: codecov/codecov-action@v3
+        with:
+          files: coverage.xml
+          name: python
+          token: ${{ secrets.CODECOV_TOKEN }}
