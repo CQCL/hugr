@@ -179,6 +179,7 @@ impl Rewrite for SimpleReplacement {
         Ok(())
     }
 
+    #[inline]
     fn invalidation_set(&self) -> impl Iterator<Item = Node> {
         let subcirc = self.subgraph.nodes().iter().copied();
         let out_neighs = self.nu_out.keys().map(|key| key.0);
