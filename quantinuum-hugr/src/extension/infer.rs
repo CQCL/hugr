@@ -55,12 +55,6 @@ pub fn infer_extensions(
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 struct Meta(u32);
 
-impl Meta {
-    fn new(m: u32) -> Self {
-        Meta(m)
-    }
-}
-
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 /// Things we know about metavariables
 enum Constraint {
@@ -206,7 +200,7 @@ impl UnificationContext {
 
     /// Create a fresh metavariable, and increment `fresh_name` for next time
     fn fresh_meta(&mut self) -> Meta {
-        let fresh = Meta::new(self.fresh_name);
+        let fresh = Meta(self.fresh_name);
         self.fresh_name += 1;
         self.constraints.insert(fresh, HashSet::new());
         fresh
