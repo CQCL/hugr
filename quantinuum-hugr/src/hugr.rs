@@ -209,14 +209,14 @@ impl Hugr {
         #[cfg(feature = "extension_inference")]
         {
             let solution = infer_extensions(self)?;
-            self.instantiate_extensions(solution);
+            self.instantiate_extensions(&solution);
         }
         Ok(())
     }
 
     #[allow(dead_code)]
     /// Add extension requirement information to the hugr in place.
-    fn instantiate_extensions(&mut self, solution: ExtensionSolution) {
+    fn instantiate_extensions(&mut self, solution: &ExtensionSolution) {
         // We only care about inferred _input_ extensions, because `NodeType`
         // uses those to infer the output extensions
         for (node, input_extensions) in solution.iter() {
