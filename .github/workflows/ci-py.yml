@@ -27,15 +27,13 @@ jobs:
       python: ${{ github.ref_name == github.event.repository.default_branch || steps.filter.outputs.python }}
     steps:
     # For pull requests it's not necessary to checkout the code
-    - if: github.ref_name != github.event.repository.default_branch
-      uses: dorny/paths-filter@v3
+    - uses: dorny/paths-filter@v3
       id: filter
       with:
         filters: |
           python:
             - 'quantinuum-hugr-py/**'
             - 'pyproject.toml'
-            - '!**/*.md'
 
   check:
     needs: changes

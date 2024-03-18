@@ -33,16 +33,14 @@ jobs:
       rust: ${{ github.ref_name == github.event.repository.default_branch || steps.filter.outputs.rust }}
     steps:
     # For pull requests it's not necessary to checkout the code
-    - if: github.ref_name != github.event.repository.default_branch
-      uses: dorny/paths-filter@v3
+    - uses: dorny/paths-filter@v3
       id: filter
       with:
         filters: |
           rust:
             - 'quantinuum-hugr/**'
-            - 'specification/schema/**'
             - 'Cargo.toml'
-            - '!**/*.md'
+            - 'specification/schema/**'
 
   check:
     needs: changes
