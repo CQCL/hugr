@@ -39,6 +39,7 @@ pub type ExtensionSolution = HashMap<Node, ExtensionSet>;
 /// concretise the extension requirements of the whole hugr.
 pub fn infer_extensions(hugr: &impl HugrView) -> Result<ExtensionSolution, InferExtensionError> {
     let mut ctx = UnificationContext::new(hugr);
+    ctx.main_loop()?;
     ctx.instantiate_variables();
     ctx.main_loop()
 }
