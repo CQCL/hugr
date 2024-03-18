@@ -18,14 +18,14 @@ pub use custom::{downcast_equal_consts, CustomConst, CustomSerialized};
 ///
 /// Represents core types and extension types.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-#[serde(tag = "v")]
+#[serde(tag = "c")]
 pub enum Const {
     /// An extension constant value, that can check it is of a given [CustomType].
     ///
     // Note: the extra level of tupling is to avoid https://github.com/rust-lang/rust/issues/78808
     Extension {
         /// The custom constant value.
-        c: ExtensionConst,
+        e: ExtensionConst,
     },
     /// A higher-order function value.
     // TODO use a root parametrised hugr, e.g. Hugr<DFG>.
@@ -46,6 +46,7 @@ pub enum Const {
         /// The value of the variant.
         ///
         /// Sum variants are always a row of values, hence the Vec.
+        #[serde(rename = "vs")]
         values: Vec<Const>,
         /// The full type of the Sum, including the other variants.
         #[serde(rename = "typ")]
@@ -113,7 +114,7 @@ impl Const {
     /// Returns a reference to the type of this [`Const`].
     pub fn const_type(&self) -> Type {
         match self {
-            Self::Extension { c } => c.0.get_type(),
+            Self::Extension { e } => e.0.get_type(),
             Self::Tuple { vs } => Type::new_tuple(vs.iter().map(Self::const_type).collect_vec()),
             Self::Sum { sum_type, .. } => sum_type.clone().into(),
             Self::Function { hugr } => {
@@ -208,14 +209,14 @@ impl Const {
     /// Returns a tuple constant of constant values.
     pub fn extension(custom_const: impl CustomConst) -> Self {
         Self::Extension {
-            c: ExtensionConst(Box::new(custom_const)),
+            e: ExtensionConst(Box::new(custom_const)),
         }
     }
 
     /// For a Const holding a CustomConst, extract the CustomConst by downcasting.
     pub fn get_custom_value<T: CustomConst>(&self) -> Option<&T> {
-        if let Self::Extension { c } = self {
-            c.0.downcast_ref()
+        if let Self::Extension { e } = self {
+            e.0.downcast_ref()
         } else {
             None
         }
@@ -225,7 +226,7 @@ impl Const {
 impl OpName for Const {
     fn name(&self) -> SmolStr {
         match self {
-            Self::Extension { c: e } => format!("const:custom:{}", e.0.name()),
+            Self::Extension { e } => format!("const:custom:{}", e.0.name()),
             Self::Function { hugr: h } => {
                 let Some(t) = get_const_function_type(h) else {
                     panic!("HUGR root node isn't a valid function parent.");
@@ -253,7 +254,7 @@ impl OpTrait for Const {
 
     fn extension_delta(&self) -> ExtensionSet {
         match self {
-            Self::Extension { c } => c.0.extension_reqs().clone(),
+            Self::Extension { e } => e.0.extension_reqs().clone(),
             Self::Function { .. } => ExtensionSet::new(), // no extensions required to load Hugr (only to run)
             Self::Tuple { vs } => ExtensionSet::union_over(vs.iter().map(Const::extension_delta)),
             Self::Sum { values, .. } => {
