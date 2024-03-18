@@ -8,7 +8,8 @@ mod signature;
 pub mod type_param;
 pub mod type_row;
 
-pub use check::{ConstTypeError, CustomCheckFailure};
+pub use crate::ops::constant::{ConstTypeError, CustomCheckFailure};
+pub use check::SumTypeError;
 pub use custom::CustomType;
 pub use poly_func::PolyFuncType;
 pub use signature::FunctionType;
@@ -135,6 +136,14 @@ impl SumType {
             SumType::Unit { size } if tag < (*size as usize) => Some(Type::EMPTY_TYPEROW_REF),
             SumType::General { rows } => rows.get(tag),
             _ => None,
+        }
+    }
+
+    /// Returns the number of variants in the sum type.
+    pub fn num_variants(&self) -> usize {
+        match self {
+            SumType::Unit { size } => *size as usize,
+            SumType::General { rows } => rows.len(),
         }
     }
 }

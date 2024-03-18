@@ -5,6 +5,7 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 
+use crate::ops::{Const, OpTrait};
 use crate::{
     algorithm::const_fold::sorted_consts,
     extension::{
@@ -12,12 +13,12 @@ use crate::{
         ConstFold, ExtensionId, ExtensionRegistry, ExtensionSet, SignatureError, TypeDef,
         TypeDefBound,
     },
+    ops::constant::CustomConst,
     ops::{self, custom::ExtensionOp, OpName},
     types::{
         type_param::{TypeArg, TypeParam},
         CustomCheckFailure, CustomType, FunctionType, PolyFuncType, Type, TypeBound,
     },
-    values::{CustomConst, Value},
     Extension,
 };
 
@@ -32,12 +33,12 @@ pub const EXTENSION_NAME: ExtensionId = ExtensionId::new_unchecked("Collections"
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 /// Dynamically sized list of values, all of the same type.
-pub struct ListValue(Vec<Value>, Type);
+pub struct ListValue(Vec<Const>, Type);
 
 impl ListValue {
     /// Create a new [CustomConst] for a list of values of type `typ`.
     /// That all values ore of type `typ` is not checked here.
-    pub fn new(typ: Type, contents: impl IntoIterator<Item = Value>) -> Self {
+    pub fn new(typ: Type, contents: impl IntoIterator<Item = Const>) -> Self {
         Self(contents.into_iter().collect_vec(), typ)
     }
 
@@ -76,23 +77,26 @@ impl CustomConst for ListValue {
             .map_err(|_| error())?;
 
         // constant can only hold classic type.
-        let [TypeArg::Type { ty: t }] = typ.args() else {
+        let [TypeArg::Type { ty }] = typ.args() else {
             return Err(error());
         };
 
         // check all values are instances of the element type
-        for val in &self.0 {
-            t.check_type(val).map_err(|_| error())?;
+        for v in &self.0 {
+            if v.const_type() != *ty {
+                return Err(error());
+            }
         }
+
         Ok(())
     }
 
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
-        crate::values::downcast_equal_consts(self, other)
+        crate::ops::constant::downcast_equal_consts(self, other)
     }
 
     fn extension_reqs(&self) -> ExtensionSet {
-        ExtensionSet::union_over(self.0.iter().map(Value::extension_reqs))
+        ExtensionSet::union_over(self.0.iter().map(Const::extension_delta))
             .union(EXTENSION_NAME.into())
     }
 }
@@ -102,17 +106,13 @@ struct PopFold;
 impl ConstFold for PopFold {
     fn fold(
         &self,
-        type_args: &[TypeArg],
+        _type_args: &[TypeArg],
         consts: &[(crate::IncomingPort, ops::Const)],
     ) -> crate::extension::ConstFoldResult {
-        let [TypeArg::Type { ty }] = type_args else {
-            return None;
-        };
         let [list]: [&ops::Const; 1] = sorted_consts(consts).try_into().ok()?;
         let list: &ListValue = list.get_custom_value().expect("Should be list value.");
         let mut list = list.clone();
         let elem = list.0.pop()?; // empty list fails to evaluate "pop"
-        let elem = ops::Const::new(elem, ty.clone()).unwrap();
 
         Some(vec![(0.into(), list.into()), (1.into(), elem)])
     }
@@ -129,7 +129,7 @@ impl ConstFold for PushFold {
         let [list, elem]: [&ops::Const; 2] = sorted_consts(consts).try_into().ok()?;
         let list: &ListValue = list.get_custom_value().expect("Should be list value.");
         let mut list = list.clone();
-        list.0.push(elem.value().clone());
+        list.0.push(elem.clone());
 
         Some(vec![(0.into(), list.into())])
     }
