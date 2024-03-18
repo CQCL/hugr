@@ -2,11 +2,7 @@
 
 use thiserror::Error;
 
-use crate::{
-    ops::{FuncDecl, FuncDefn, OpType},
-    values::Value,
-    Hugr, HugrView,
-};
+use crate::{values::Value, Hugr, HugrView};
 
 use super::{CustomType, PolyFuncType, Type, TypeEnum};
 
@@ -57,15 +53,7 @@ pub enum ConstTypeError {
 fn type_sig_equal(v: &Hugr, t: &PolyFuncType) -> bool {
     // exact signature equality, in future this may need to be
     // relaxed to be compatibility checks between the signatures.
-    let root_op = v.get_optype(v.root());
-    if let OpType::FuncDecl(FuncDecl { signature, .. })
-    | OpType::FuncDefn(FuncDefn { signature, .. }) = root_op
-    {
-        signature == t
-    } else {
-        v.get_function_type()
-            .is_some_and(|ft| &PolyFuncType::from(ft) == t)
-    }
+    v.get_function_type().is_some_and(|ft| &ft == t)
 }
 
 impl super::SumType {
