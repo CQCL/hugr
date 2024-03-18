@@ -35,3 +35,7 @@ pytest:
 # Generate a python test coverage report
 pycoverage:
     poetry run pytest --cov=./ --cov-report=html
+
+# Update the HUGR schema
+update-schema:
+    poetry run python scripts/generate_schema.py specification/schema/
