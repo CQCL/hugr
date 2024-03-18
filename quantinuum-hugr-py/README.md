@@ -34,18 +34,17 @@ TODO
 
 ## Recent Changes
 
-See [CHANGELOG][] for a list of changes. The minimum supported rust
-version will only change on major releases.
+TODO
 
 ## Development
 
-See [DEVELOPMENT.md](https://github.com/CQCL/hugr/blob/main/DEVELOPMENT.md) for instructions on setting up the development environment.
+TODO
 
 ## License
 
 This project is licensed under Apache License, Version 2.0 ([LICENSE][] or http://www.apache.org/licenses/LICENSE-2.0).
 
-  [build_status]: https://github.com/CQCL/hugr/workflows/Continuous%20integration/badge.svg?branch=main
+  [build_status]: https://github.com/CQCL/hugr/actions/workflows/ci-py.yml/badge.svg?branch=main
   [codecov]: https://img.shields.io/codecov/c/gh/CQCL/hugr?logo=codecov
   [LICENSE]: https://github.com/CQCL/hugr/blob/main/LICENCE
   [CHANGELOG]: https://github.com/CQCL/hugr/blob/main/quantinuum-hugr-py/CHANGELOG.md
