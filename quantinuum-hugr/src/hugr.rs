@@ -8,7 +8,6 @@ pub mod serialize;
 pub mod validate;
 pub mod views;
 
-
 use std::collections::VecDeque;
 use std::iter;
 
