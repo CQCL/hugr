@@ -48,9 +48,6 @@ impl Rewrite for IdentityInsertion {
     type Error = IdentityInsertionError;
     /// The inserted node.
     type ApplyResult = Node;
-    type InvalidationSet<'a> = iter::Once<Node>
-    where
-        Self: 'a;
     const UNCHANGED_ON_FAILURE: bool = true;
     fn verify(&self, _h: &impl HugrView) -> Result<(), IdentityInsertionError> {
         /*
@@ -90,12 +87,7 @@ impl Rewrite for IdentityInsertion {
     }
 
     #[inline]
-    fn invalidation_set(&self) -> Self::InvalidationSet<'_> {
-        iter::once(self.post_node)
-    }
-
-    #[inline]
-    fn invalidation_set_v2(&self) -> impl Iterator<Item = Node> {
+    fn invalidation_set(&self) -> impl Iterator<Item = Node> {
         iter::once(self.post_node)
     }
 }

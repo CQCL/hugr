@@ -1,6 +1,5 @@
 //! Rewrite for inserting a CFG-node into the hierarchy containing a subsection of an existing CFG
-use std::collections::{hash_set, HashSet};
-use std::iter;
+use std::collections::HashSet;
 
 use itertools::Itertools;
 use thiserror::Error;
@@ -101,9 +100,6 @@ impl Rewrite for OutlineCfg {
     ///
     /// [CFG]: OpType::CFG
     type ApplyResult = (Node, Node);
-    type InvalidationSet<'a> = iter::Copied<hash_set::Iter<'a, Node>>
-        where
-            Self: 'a;
 
     const UNCHANGED_ON_FAILURE: bool = true;
     fn verify(&self, h: &impl HugrView) -> Result<(), OutlineCfgError> {
@@ -216,12 +212,7 @@ impl Rewrite for OutlineCfg {
         Ok((new_block, cfg_node))
     }
 
-    #[inline]
-    fn invalidation_set(&self) -> Self::InvalidationSet<'_> {
-        self.blocks.iter().copied()
-    }
-
-    fn invalidation_set_v2(&self) -> impl Iterator<Item = Node> {
+    fn invalidation_set(&self) -> impl Iterator<Item = Node> {
         self.blocks.iter().copied()
     }
 }

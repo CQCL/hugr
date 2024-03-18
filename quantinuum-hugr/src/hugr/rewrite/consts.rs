@@ -29,8 +29,6 @@ impl Rewrite for RemoveLoadConstant {
     // The Const node the LoadConstant was connected to.
     type ApplyResult = Node;
 
-    type InvalidationSet<'a> = iter::Once<Node>;
-
     const UNCHANGED_ON_FAILURE: bool = true;
 
     fn verify(&self, h: &impl HugrView) -> Result<(), Self::Error> {
@@ -64,11 +62,7 @@ impl Rewrite for RemoveLoadConstant {
         Ok(source)
     }
 
-    fn invalidation_set(&self) -> Self::InvalidationSet<'_> {
-        iter::once(self.0)
-    }
-
-    fn invalidation_set_v2(&self) -> impl Iterator<Item = Node> {
+    fn invalidation_set(&self) -> impl Iterator<Item = Node> {
         iter::once(self.0)
     }
 }
@@ -82,8 +76,6 @@ impl Rewrite for RemoveConst {
 
     // The parent of the Const node.
     type ApplyResult = Node;
-
-    type InvalidationSet<'a> = iter::Once<Node>;
 
     const UNCHANGED_ON_FAILURE: bool = true;
 
@@ -112,11 +104,7 @@ impl Rewrite for RemoveConst {
         Ok(parent)
     }
 
-    fn invalidation_set(&self) -> Self::InvalidationSet<'_> {
-        iter::once(self.0)
-    }
-
-    fn invalidation_set_v2(&self) -> impl Iterator<Item = Node> {
+    fn invalidation_set(&self) -> impl Iterator<Item = Node> {
         iter::once(self.0)
     }
 }

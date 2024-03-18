@@ -25,8 +25,6 @@ impl Rewrite for InlineDFG {
     type ApplyResult = [Node; 3];
     type Error = InlineDFGError;
 
-    type InvalidationSet<'a> = <[Node; 1] as IntoIterator>::IntoIter;
-
     const UNCHANGED_ON_FAILURE: bool = true;
 
     fn verify(&self, h: &impl crate::HugrView) -> Result<(), Self::Error> {
@@ -122,11 +120,7 @@ impl Rewrite for InlineDFG {
         Ok([n, input, output])
     }
 
-    fn invalidation_set(&self) -> Self::InvalidationSet<'_> {
-        [self.0.node()].into_iter()
-    }
-
-    fn invalidation_set_v2(&self) -> impl Iterator<Item = Node> {
+    fn invalidation_set(&self) -> impl Iterator<Item = Node> {
         [self.0.node()].into_iter()
     }
 }
