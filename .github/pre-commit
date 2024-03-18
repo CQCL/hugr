@@ -37,6 +37,15 @@ then
     exit 1
 fi
 
+# Run `mypy` for python type checking
+if ! poetry run mypy .
+then
+    echo ""
+    echo "There are some python code style issues."
+    echo "Run `ruff format` first."
+    exit 1
+fi
+
 # Run `ruff` python linting
 if ! poetry run ruff check
 then

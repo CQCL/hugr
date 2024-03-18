@@ -1,4 +1,4 @@
-quantinuum-hugr
+quantinuum_hugr
 ===============
 
 [![build_status][]](https://github.com/CQCL/hugr/actions)
@@ -22,10 +22,10 @@ The HUGR specification is [here](https://github.com/CQCL/hugr/blob/main/specific
 
 ## Install
 
-`quantinuum-hugr` can be installed via `pip`. Requires Python >= 3.10.
+`quantinuum_hugr` can be installed via `pip`. Requires Python >= 3.10.
 
 ```sh
-pip install quantinuum-hugr
+pip install quantinuum_hugr
 ```
 
 ## Usage

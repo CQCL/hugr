@@ -20,7 +20,7 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
-    name: check python
+    name: check python (3.10)
     steps:
       - name: Do nothing
         run: echo "This is a dummy step to return a valid status check"

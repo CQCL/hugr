@@ -49,7 +49,7 @@ jobs:
         run: poetry install
 
       - name: Type check with mypy
-        run: poetry run mypy guppylang
+        run: poetry run mypy .
 
       - name: Check formatting with ruff
         run: poetry run ruff format --check
