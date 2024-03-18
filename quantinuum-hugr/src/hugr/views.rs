@@ -327,13 +327,28 @@ pub trait HugrView: sealed::HugrInternals {
         }
     }
 
+    /// Returns the function type defined by this dataflow HUGR.
+    ///
+    /// If the root of the Hugr is a
+    /// [`DataflowParent`][crate::ops::DataflowParent] operation, report the
+    /// signature corresponding to the input and output node of its sibling
+    /// graph. Otherwise, returns `None`.
+    ///
+    /// In contrast to [`get_function_type`][HugrView::get_function_type], this
+    /// method always return a concrete [`FunctionType`].
+    fn get_df_function_type(&self) -> Option<FunctionType> {
+        let op = self.get_optype(self.root());
+        op.inner_function_type()
+    }
+
     /// Returns the function type defined by this HUGR.
     ///
-    /// For HUGRs with a [`DataflowParent`][crate::ops::DataflowParent] root operation, report the
-    /// signature of the inner dataflow sibling graph.
+    /// For HUGRs with a [`DataflowParent`][crate::ops::DataflowParent] root
+    /// operation, report the signature of the inner dataflow sibling graph.
     ///
-    /// For HUGRS with a [`FuncDecl`][crate::ops::FuncDecl] or [`FuncDefn`][crate::ops::FuncDefn] root operation, report the
-    /// signature of the function.
+    /// For HUGRS with a [`FuncDecl`][crate::ops::FuncDecl] or
+    /// [`FuncDefn`][crate::ops::FuncDefn] root operation, report the signature
+    /// of the function.
     ///
     /// Otherwise, returns `None`.
     fn get_function_type(&self) -> Option<PolyFuncType> {
