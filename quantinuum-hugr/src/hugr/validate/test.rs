@@ -149,12 +149,11 @@ fn children_restrictions() {
         b.update_validate(&EMPTY_REG),
         Err(ValidationError::NonContainerWithChildren { node, .. }) => assert_eq!(node, copy)
     );
-
-    // After moving the previous definition to a valid place...
+    b.infer_extensions().unwrap();
     b.set_parent(new_def, root);
-    b.infer_extensions().unwrap(); // Do this only while the Hugr is valid!
 
-    // ...add an input node to the module subgraph
+    // After moving the previous definition to a valid place,
+    // add an input node to the module subgraph
     let new_input = b.add_node_with_parent(root, ops::Input::new(type_row![]));
     assert_matches!(
         b.validate(&EMPTY_REG),
