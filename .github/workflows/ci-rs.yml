@@ -7,11 +7,6 @@ on:
   pull_request:
     branches:
       - main
-    paths:
-      - 'quantinuum-hugr/**'
-      - 'specification/schema/**'
-      - 'Cargo.toml'
-      - '!**/*.md'
   merge_group:
     types: [checks_requested]
   workflow_dispatch: {}
@@ -26,7 +21,32 @@ env:
   RUSTC_WRAPPER: "sccache"
 
 jobs:
+  # Check if changes were made to the relevant files.
+  # Always returns true if running on the default branch, to ensure all changes are throughly checked.
+  changes:
+    runs-on: ubuntu-latest
+    # Required permissions
+    permissions:
+      pull-requests: read
+    # Set job outputs to values from filter step
+    outputs:
+      rust: ${{ github.ref_name == github.event.repository.default_branch || steps.filter.outputs.rust }}
+    steps:
+    # For pull requests it's not necessary to checkout the code
+    - if: github.ref_name != github.event.repository.default_branch
+      uses: dorny/paths-filter@v3
+      id: filter
+      with:
+        filters: |
+          rust:
+            - 'quantinuum-hugr/**'
+            - 'specification/schema/**'
+            - 'Cargo.toml'
+            - '!**/*.md'
+
   check:
+    needs: changes
+    if: ${{ needs.changes.outputs.rust == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -45,7 +65,8 @@ jobs:
           RUSTDOCFLAGS: "-Dwarnings"
 
   benches:
-    if: github.event_name != 'merge_group'
+    needs: changes
+    if: ${{ needs.changes.outputs.rust == 'true' }} && github.event_name != 'merge_group'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -58,6 +79,8 @@ jobs:
         run: cargo bench --verbose --no-run --workspace --all-features
 
   tests:
+    needs: changes
+    if: ${{ needs.changes.outputs.rust == 'true' }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -93,8 +116,8 @@ jobs:
         run: cargo test --verbose --workspace --all-features
 
   coverage:
-    if: github.event_name != 'merge_group'
-    needs: [tests, check]
+    needs: [changes, tests, check]
+    if: ${{ needs.changes.outputs.rust == 'true' }} && github.event_name != 'merge_group'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
