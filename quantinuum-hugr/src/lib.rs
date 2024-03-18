@@ -149,7 +149,6 @@ pub mod ops;
 pub mod std_extensions;
 pub mod types;
 mod utils;
-pub mod values;
 
 pub use crate::core::{
     CircuitUnit, Direction, IncomingPort, Node, NodeIndex, OutgoingPort, Port, PortIndex, Wire,

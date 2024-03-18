@@ -605,7 +605,7 @@ pub(crate) mod test {
         //               \-> right -/             \-<--<-/
         let mut cfg_builder = CFGBuilder::new(FunctionType::new(type_row![NAT], type_row![NAT]))?;
 
-        let pred_const = cfg_builder.add_constant(Const::unit_sum(0, 2));
+        let pred_const = cfg_builder.add_constant(Const::unit_sum(0, 2).expect("0 < 2"));
         let const_unit = cfg_builder.add_constant(Const::unary_unit_sum());
 
         let entry = n_identity(
@@ -887,7 +887,7 @@ pub(crate) mod test {
         separate: bool,
     ) -> Result<(Hugr, BasicBlockID, BasicBlockID), BuildError> {
         let mut cfg_builder = CFGBuilder::new(FunctionType::new(type_row![NAT], type_row![NAT]))?;
-        let pred_const = cfg_builder.add_constant(Const::unit_sum(0, 2));
+        let pred_const = cfg_builder.add_constant(Const::unit_sum(0, 2).expect("0 < 2"));
         let const_unit = cfg_builder.add_constant(Const::unary_unit_sum());
 
         let entry = n_identity(
@@ -929,7 +929,7 @@ pub(crate) mod test {
         cfg_builder: &mut CFGBuilder<T>,
         separate_headers: bool,
     ) -> Result<(BasicBlockID, BasicBlockID), BuildError> {
-        let pred_const = cfg_builder.add_constant(Const::unit_sum(0, 2));
+        let pred_const = cfg_builder.add_constant(Const::unit_sum(0, 2).expect("0 < 2"));
         let const_unit = cfg_builder.add_constant(Const::unary_unit_sum());
 
         let entry = n_identity(

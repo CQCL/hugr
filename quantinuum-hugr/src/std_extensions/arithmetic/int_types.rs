@@ -6,11 +6,11 @@ use smol_str::SmolStr;
 
 use crate::{
     extension::{ExtensionId, ExtensionSet},
+    ops::constant::CustomConst,
     types::{
         type_param::{TypeArg, TypeArgError, TypeParam},
         ConstTypeError, CustomType, Type, TypeBound,
     },
-    values::CustomConst,
     Extension,
 };
 use lazy_static::lazy_static;
@@ -150,7 +150,7 @@ impl CustomConst for ConstIntU {
         format!("u{}({})", self.log_width, self.value).into()
     }
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
-        crate::values::downcast_equal_consts(self, other)
+        crate::ops::constant::downcast_equal_consts(self, other)
     }
 
     fn extension_reqs(&self) -> ExtensionSet {
@@ -168,7 +168,7 @@ impl CustomConst for ConstIntS {
         format!("i{}({})", self.log_width, self.value).into()
     }
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
-        crate::values::downcast_equal_consts(self, other)
+        crate::ops::constant::downcast_equal_consts(self, other)
     }
 
     fn extension_reqs(&self) -> ExtensionSet {

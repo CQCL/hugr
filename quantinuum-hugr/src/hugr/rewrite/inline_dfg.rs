@@ -147,7 +147,6 @@ mod test {
     use crate::std_extensions::arithmetic::int_types::{self, ConstIntU};
     use crate::types::FunctionType;
     use crate::utils::test_quantum_extension;
-    use crate::values::Value;
     use crate::{type_row, Direction, HugrView, Node, Port};
     use crate::{Hugr, Wire};
 
@@ -186,12 +185,7 @@ mod test {
             d: &mut DFGBuilder<T>,
         ) -> Result<Wire, Box<dyn std::error::Error>> {
             let int_ty = &int_types::INT_TYPES[6];
-            let cst = Const::new(
-                Value::Extension {
-                    c: (Box::new(ConstIntU::new(6, 15)?),),
-                },
-                int_ty.clone(),
-            )?;
+            let cst = Const::extension(ConstIntU::new(6, 15)?);
             let c1 = d.add_load_const(cst);
             let [lifted] = d
                 .add_dataflow_op(
