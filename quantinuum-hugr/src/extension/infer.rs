@@ -55,12 +55,6 @@ pub fn infer_extensions(
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 struct Meta(u32);
 
-impl Meta {
-    pub fn new(m: u32) -> Self {
-        Meta(m)
-    }
-}
-
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 /// Things we know about metavariables
 enum Constraint {
@@ -190,7 +184,7 @@ struct UnificationContext {
 impl UnificationContext {
     /// Create a new unification context, and populate it with constraints from
     /// traversing the hugr which is passed in.
-    pub fn new(hugr: &impl HugrView) -> Self {
+    fn new(hugr: &impl HugrView) -> Self {
         let mut ctx = Self {
             constraints: HashMap::new(),
             extensions: HashMap::new(),
@@ -206,7 +200,7 @@ impl UnificationContext {
 
     /// Create a fresh metavariable, and increment `fresh_name` for next time
     fn fresh_meta(&mut self) -> Meta {
-        let fresh = Meta::new(self.fresh_name);
+        let fresh = Meta(self.fresh_name);
         self.fresh_name += 1;
         self.constraints.insert(fresh, HashSet::new());
         fresh
@@ -544,7 +538,7 @@ impl UnificationContext {
     /// available. When there are variables, we should leave the graph as it is,
     /// but make sure that no matter what they're instantiated to, the graph
     /// still makes sense (should pass the extension validation check)
-    pub fn results(&self) -> Result<ExtensionSolution, InferExtensionError> {
+    fn results(&self) -> Result<ExtensionSolution, InferExtensionError> {
         // Check that all of the metavariables associated with nodes of the
         // graph are solved
         let depended_upon = {
@@ -612,7 +606,7 @@ impl UnificationContext {
     /// where it was possible to infer them. If it wasn't possible to infer a
     /// *concrete* `ExtensionSet`, e.g. if the ExtensionSet relies on an open
     /// variable in the toplevel graph, don't include that location in the map
-    pub fn main_loop(&mut self) -> Result<ExtensionSolution, InferExtensionError> {
+    fn main_loop(&mut self) -> Result<ExtensionSolution, InferExtensionError> {
         let mut remaining = HashSet::<Meta>::from_iter(self.constraints.keys().cloned());
 
         // Keep going as long as we're making progress (= merging and solving nodes)
@@ -674,7 +668,7 @@ impl UnificationContext {
     ///   2 = 1 + x, ...
     /// then 1 and 2 both definitely contain X, even if we don't know what else.
     /// So instead of instantiating to the empty set, we'll instantiate to `{X}`
-    pub fn instantiate_variables(&mut self) {
+    fn instantiate_variables(&mut self) {
         // A directed graph to keep track of `Plus` constraint relationships
         let mut relations = GraphContainer::<Directed>::new();
         let mut solutions: HashMap<Meta, ExtensionSet> = HashMap::new();

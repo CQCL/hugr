@@ -107,7 +107,7 @@ impl MakeOpDef for IntOpDef {
             )
             .into(),
             inarrow_s | inarrow_u => CustomValidator::new_with_validator(
-                int_polytype(2, vec![int_tv(0)], vec![sum_with_error(int_tv(1))]),
+                int_polytype(2, vec![int_tv(0)], vec![sum_with_error(int_tv(1)).into()]),
                 IOValidator { f_ge_s: true },
             )
             .into(),
@@ -126,7 +126,7 @@ impl MakeOpDef for IntOpDef {
                 int_polytype(
                     2,
                     intpair.clone(),
-                    vec![sum_with_error(Type::new_tuple(intpair))],
+                    vec![sum_with_error(Type::new_tuple(intpair)).into()],
                 )
             }
             .into(),
@@ -139,13 +139,13 @@ impl MakeOpDef for IntOpDef {
             idiv_checked_u | idiv_checked_s => int_polytype(
                 2,
                 vec![int_tv(0), int_tv(1)],
-                vec![sum_with_error(int_tv(0))],
+                vec![sum_with_error(int_tv(0)).into()],
             )
             .into(),
             imod_checked_u | imod_checked_s => int_polytype(
                 2,
                 vec![int_tv(0), int_tv(1).clone()],
-                vec![sum_with_error(int_tv(1))],
+                vec![sum_with_error(int_tv(1)).into()],
             )
             .into(),
             imod_u | imod_s => {
@@ -372,7 +372,10 @@ mod test {
                 .to_extension_op()
                 .unwrap()
                 .signature(),
-            FunctionType::new(vec![int_type(ta(3))], vec![sum_with_error(int_type(ta(3)))],)
+            FunctionType::new(
+                vec![int_type(ta(3))],
+                vec![sum_with_error(int_type(ta(3))).into()],
+            )
         );
         assert!(
             IntOpDef::iwiden_u
@@ -388,7 +391,10 @@ mod test {
                 .to_extension_op()
                 .unwrap()
                 .signature(),
-            FunctionType::new(vec![int_type(ta(2))], vec![sum_with_error(int_type(ta(1)))],)
+            FunctionType::new(
+                vec![int_type(ta(2))],
+                vec![sum_with_error(int_type(ta(1))).into()],
+            )
         );
 
         assert!(IntOpDef::inarrow_u

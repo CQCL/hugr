@@ -209,36 +209,6 @@
             "title": "Conditional",
             "type": "object"
         },
-        "Const": {
-            "description": "A constant value definition.",
-            "properties": {
-                "parent": {
-                    "title": "Parent",
-                    "type": "integer"
-                },
-                "input_extensions": {
-                    "$ref": "#/$defs/InputExtensions"
-                },
-                "op": {
-                    "const": "Const",
-                    "default": "Const",
-                    "title": "Op"
-                },
-                "value": {
-                    "$ref": "#/$defs/Value"
-                },
-                "typ": {
-                    "$ref": "#/$defs/Type"
-                }
-            },
-            "required": [
-                "parent",
-                "value",
-                "typ"
-            ],
-            "title": "Const",
-            "type": "object"
-        },
         "CustomOp": {
             "description": "A user-defined operation that can be downcasted by the extensions that define it.",
             "properties": {
@@ -417,28 +387,37 @@
             "title": "ExitBlock",
             "type": "object"
         },
-        "ExtensionVal": {
+        "ExtensionConst": {
             "description": "An extension constant value, that can check it is of a given [CustomType].",
             "properties": {
-                "v": {
-                    "const": "Extension",
-                    "default": "Extension",
-                    "title": "V"
+                "parent": {
+                    "title": "Parent",
+                    "type": "integer"
+                },
+                "input_extensions": {
+                    "$ref": "#/$defs/InputExtensions"
+                },
+                "op": {
+                    "const": "Const",
+                    "default": "Const",
+                    "title": "Op"
                 },
                 "c": {
-                    "maxItems": 1,
-                    "minItems": 1,
-                    "prefixItems": [
-                        {}
-                    ],
-                    "title": "C",
-                    "type": "array"
+                    "const": "Extension",
+                    "default": "Extension",
+                    "title": "ConstTag"
+                },
+                "e": {
+                    "title": "CustomConst"
                 }
             },
             "required": [
-                "c"
+                "parent",
+                "op",
+                "c",
+                "e"
             ],
-            "title": "ExtensionVal",
+            "title": "ExtensionConst",
             "type": "object"
         },
         "ExtensionsArg": {
@@ -522,6 +501,39 @@
             "title": "FuncDefn",
             "type": "object"
         },
+        "FunctionConst": {
+            "description": "A higher-order function value.",
+            "properties": {
+                "parent": {
+                    "title": "Parent",
+                    "type": "integer"
+                },
+                "input_extensions": {
+                    "$ref": "#/$defs/InputExtensions"
+                },
+                "op": {
+                    "const": "Const",
+                    "default": "Const",
+                    "title": "Op"
+                },
+                "c": {
+                    "const": "Function",
+                    "default": "Function",
+                    "title": "ConstTag"
+                },
+                "hugr": {
+                    "title": "Hugr"
+                }
+            },
+            "required": [
+                "parent",
+                "op",
+                "c",
+                "hugr"
+            ],
+            "title": "FunctionConst",
+            "type": "object"
+        },
         "FunctionType": {
             "description": "A graph encoded as a value. It contains a concrete signature and a set of required resources.",
             "properties": {
@@ -552,24 +564,6 @@
                 "output"
             ],
             "title": "FunctionType",
-            "type": "object"
-        },
-        "FunctionVal": {
-            "description": "A higher-order function value.",
-            "properties": {
-                "v": {
-                    "const": "Function",
-                    "default": "Function",
-                    "title": "V"
-                },
-                "hugr": {
-                    "title": "Hugr"
-                }
-            },
-            "required": [
-                "hugr"
-            ],
-            "title": "FunctionVal",
             "type": "object"
         },
         "GeneralSum": {
@@ -828,7 +822,31 @@
                     "CallIndirect": "#/$defs/CallIndirect",
                     "Case": "#/$defs/Case",
                     "Conditional": "#/$defs/Conditional",
-                    "Const": "#/$defs/Const",
+                    "Const": {
+                        "discriminator": {
+                            "mapping": {
+                                "Extension": "#/$defs/ExtensionConst",
+                                "Function": "#/$defs/FunctionConst",
+                                "Sum": "#/$defs/Sum",
+                                "Tuple": "#/$defs/Tuple"
+                            },
+                            "propertyName": "c"
+                        },
+                        "oneOf": [
+                            {
+                                "$ref": "#/$defs/ExtensionConst"
+                            },
+                            {
+                                "$ref": "#/$defs/FunctionConst"
+                            },
+                            {
+                                "$ref": "#/$defs/Tuple"
+                            },
+                            {
+                                "$ref": "#/$defs/Sum"
+                            }
+                        ]
+                    },
                     "DFG": "#/$defs/DFG",
                     "DataflowBlock": "#/$defs/DataflowBlock",
                     "DummyOp": "#/$defs/DummyOp",
@@ -858,7 +876,29 @@
                     "$ref": "#/$defs/FuncDecl"
                 },
                 {
-                    "$ref": "#/$defs/Const"
+                    "discriminator": {
+                        "mapping": {
+                            "Extension": "#/$defs/ExtensionConst",
+                            "Function": "#/$defs/FunctionConst",
+                            "Sum": "#/$defs/Sum",
+                            "Tuple": "#/$defs/Tuple"
+                        },
+                        "propertyName": "c"
+                    },
+                    "oneOf": [
+                        {
+                            "$ref": "#/$defs/ExtensionConst"
+                        },
+                        {
+                            "$ref": "#/$defs/FunctionConst"
+                        },
+                        {
+                            "$ref": "#/$defs/Tuple"
+                        },
+                        {
+                            "$ref": "#/$defs/Sum"
+                        }
+                    ]
                 },
                 {
                     "$ref": "#/$defs/DummyOp"
@@ -1062,22 +1102,68 @@
         "Sum": {
             "description": "A Sum variant For any Sum type where this value meets the type of the variant indicated by the tag.",
             "properties": {
-                "v": {
+                "parent": {
+                    "default": 0,
+                    "title": "Parent",
+                    "type": "integer"
+                },
+                "input_extensions": {
+                    "$ref": "#/$defs/InputExtensions"
+                },
+                "op": {
+                    "const": "Const",
+                    "default": "Const",
+                    "title": "Op"
+                },
+                "c": {
                     "const": "Sum",
                     "default": "Sum",
-                    "title": "V"
+                    "title": "ConstTag"
                 },
                 "tag": {
                     "title": "Tag",
                     "type": "integer"
                 },
-                "value": {
-                    "$ref": "#/$defs/Value"
+                "typ": {
+                    "$ref": "#/$defs/Type"
+                },
+                "vs": {
+                    "items": {
+                        "discriminator": {
+                            "mapping": {
+                                "Extension": "#/$defs/ExtensionConst",
+                                "Function": "#/$defs/FunctionConst",
+                                "Sum": "#/$defs/Sum",
+                                "Tuple": "#/$defs/Tuple"
+                            },
+                            "propertyName": "c"
+                        },
+                        "oneOf": [
+                            {
+                                "$ref": "#/$defs/ExtensionConst"
+                            },
+                            {
+                                "$ref": "#/$defs/FunctionConst"
+                            },
+                            {
+                                "$ref": "#/$defs/Tuple"
+                            },
+                            {
+                                "$ref": "#/$defs/Sum"
+                            }
+                        ]
+                    },
+                    "title": "Vs",
+                    "type": "array"
                 }
             },
             "required": [
+                "parent",
+                "op",
+                "c",
                 "tag",
-                "value"
+                "typ",
+                "vs"
             ],
             "title": "Sum",
             "type": "object"
@@ -1166,22 +1252,59 @@
             "type": "object"
         },
         "Tuple": {
-            "description": "A tuple.",
+            "description": "A constant tuple value.",
             "properties": {
-                "v": {
+                "parent": {
+                    "title": "Parent",
+                    "type": "integer"
+                },
+                "input_extensions": {
+                    "$ref": "#/$defs/InputExtensions"
+                },
+                "op": {
+                    "const": "Const",
+                    "default": "Const",
+                    "title": "Op"
+                },
+                "c": {
                     "const": "Tuple",
                     "default": "Tuple",
-                    "title": "V"
+                    "title": "ConstTag"
                 },
                 "vs": {
                     "items": {
-                        "$ref": "#/$defs/Value"
+                        "discriminator": {
+                            "mapping": {
+                                "Extension": "#/$defs/ExtensionConst",
+                                "Function": "#/$defs/FunctionConst",
+                                "Sum": "#/$defs/Sum",
+                                "Tuple": "#/$defs/Tuple"
+                            },
+                            "propertyName": "c"
+                        },
+                        "oneOf": [
+                            {
+                                "$ref": "#/$defs/ExtensionConst"
+                            },
+                            {
+                                "$ref": "#/$defs/FunctionConst"
+                            },
+                            {
+                                "$ref": "#/$defs/Tuple"
+                            },
+                            {
+                                "$ref": "#/$defs/Sum"
+                            }
+                        ]
                     },
                     "title": "Vs",
                     "type": "array"
                 }
             },
             "required": [
+                "parent",
+                "op",
+                "c",
                 "vs"
             ],
             "title": "Tuple",
@@ -1502,22 +1625,6 @@
             ],
             "title": "UnpackTuple",
             "type": "object"
-        },
-        "Value": {
-            "anyOf": [
-                {
-                    "$ref": "#/$defs/ExtensionVal"
-                },
-                {
-                    "$ref": "#/$defs/FunctionVal"
-                },
-                {
-                    "$ref": "#/$defs/Tuple"
-                },
-                {
-                    "$ref": "#/$defs/Sum"
-                }
-            ]
         },
         "Variable": {
             "description": "A type variable identified by a de Bruijn index.",
