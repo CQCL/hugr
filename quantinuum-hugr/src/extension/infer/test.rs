@@ -795,6 +795,26 @@ fn test_cfg_loops() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
+#[cfg(feature = "extension_inference")]
+fn test_validate_with_closure() -> Result<(), Box<dyn Error>> {
+    let hugr = make_looping_cfg(
+        ExtensionSet::new(),
+        ExtensionSet::singleton(&A),
+        ExtensionSet::singleton(&B),
+    )?;
+    let soln = infer_extensions(&hugr)?;
+    hugr.validate_with_extension_closure(soln, &PRELUDE_REGISTRY)?;
+    let mut hugr = hugr.clone();
+    assert_matches!(
+        hugr.validate(&PRELUDE_REGISTRY),
+        Err(ValidationError::ExtensionError(_))
+    );
+    hugr.update_validate(&PRELUDE_REGISTRY)?; // Solution written in, hence:
+    hugr.validate(&PRELUDE_REGISTRY)?;
+    Ok(())
+}
+
+#[test]
 /// A control flow graph consisting of an entry node and a single block
 /// which adds a resource and links to both itself and the exit node.
 fn simple_cfg_loop() -> Result<(), Box<dyn Error>> {
