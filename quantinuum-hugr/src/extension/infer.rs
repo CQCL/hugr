@@ -37,18 +37,10 @@ pub type ExtensionSolution = HashMap<Node, ExtensionSet>;
 /// closure: a solution which would be valid if all of the variables in the graph
 /// were instantiated to an empty extension set. This is used (by validation) to
 /// concretise the extension requirements of the whole hugr.
-pub fn infer_extensions(
-    hugr: &impl HugrView,
-) -> Result<(ExtensionSolution, ExtensionSolution), InferExtensionError> {
+pub fn infer_extensions(hugr: &impl HugrView) -> Result<ExtensionSolution, InferExtensionError> {
     let mut ctx = UnificationContext::new(hugr);
-    let solution = ctx.main_loop()?;
     ctx.instantiate_variables();
-    let closed_solution = ctx.main_loop()?;
-    let closure: ExtensionSolution = closed_solution
-        .into_iter()
-        .filter(|(node, _)| !solution.contains_key(node))
-        .collect();
-    Ok((solution, closure))
+    ctx.main_loop()
 }
 
 /// Metavariables don't need much
