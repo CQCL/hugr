@@ -68,11 +68,11 @@ impl super::SumType {
             })?;
         }
 
-        for (i, (t, v)) in itertools::zip_eq(variant.iter(), val.iter()).enumerate() {
+        for (index, (t, v)) in itertools::zip_eq(variant.iter(), val.iter()).enumerate() {
             if v.const_type() != *t {
                 Err(SumTypeError::InvalidValueType {
                     tag,
-                    index: i,
+                    index,
                     expected: t.clone(),
                     found: v.clone(),
                 })?;

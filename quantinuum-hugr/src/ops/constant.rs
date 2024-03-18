@@ -21,8 +21,6 @@ pub use custom::{downcast_equal_consts, CustomConst, CustomSerialized};
 #[serde(tag = "c")]
 pub enum Const {
     /// An extension constant value, that can check it is of a given [CustomType].
-    ///
-    // Note: the extra level of tupling is to avoid https://github.com/rust-lang/rust/issues/78808
     Extension {
         /// The custom constant value.
         e: ExtensionConst,
