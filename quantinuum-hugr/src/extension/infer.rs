@@ -31,12 +31,10 @@ use thiserror::Error;
 /// been inferred for their inputs.
 pub type ExtensionSolution = HashMap<Node, ExtensionSet>;
 
-/// Infer extensions for a hugr. This is the main API exposed by this module
+/// Infer extensions for a hugr. This is the main API exposed by this module.
 ///
-/// Return a tuple of the solutions found for locations on the graph, and a
-/// closure: a solution which would be valid if all of the variables in the graph
-/// were instantiated to an empty extension set. This is used (by validation) to
-/// concretise the extension requirements of the whole hugr.
+/// Return all the solutions found for locations on the graph, these can be
+/// written in by [`Hugr::instantiate_extensions`]
 pub fn infer_extensions(hugr: &impl HugrView) -> Result<ExtensionSolution, InferExtensionError> {
     let mut ctx = UnificationContext::new(hugr);
     ctx.main_loop()?;
