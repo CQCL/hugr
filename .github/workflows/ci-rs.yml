@@ -134,7 +134,7 @@ jobs:
   required-checks:
     name: Required checks 🦀
     needs: [changes, check, tests-stable]
-    if: !cancelled()
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
       - name: Fail if required checks failed

@@ -111,7 +111,7 @@ jobs:
   required-checks:
     name: Required checks 🐍
     needs: [changes, check, serialization-schema]
-    if: !cancelled()
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
       - name: Fail if required checks failed
