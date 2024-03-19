@@ -132,7 +132,7 @@ jobs:
   # This is a meta job to mark successful completion of the required checks,
   # even if they are skipped due to no changes in the relevant files.
   required-checks:
-    name: Required checks
+    name: Required checks 🦀
     needs: [check, tests-stable]
     if: always()
     runs-on: ubuntu-latest
