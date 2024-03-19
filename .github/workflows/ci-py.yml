@@ -74,9 +74,28 @@ jobs:
       - name: Run tests
         run: poetry run pytest
 
+  # This is a meta job to mark successful completion of the required checks,
+  # even if they are skipped due to no changes in the relevant files.
+  required-checks:
+    name: Required checks
+    needs: [check]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if required checks failed
+        if: (failure() || cancelled())
+        run: |
+          echo "Required checks failed"
+          echo "Please check the logs for more information"
+          exit 1
+      - name: Pass if required checks passed
+        run: |
+          echo "All required checks passed"
+
   coverage:
     needs: [changes, check]
-    if: ${{ needs.changes.outputs.python == 'true' }} && github.event_name != 'merge_group'
+    # Run only if there are changes in the relevant files and the check job passed or was skipped
+    if: always() && !failure() && !cancelled() && needs.changes.outputs.python == 'true' && github.event_name != 'merge_group'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
