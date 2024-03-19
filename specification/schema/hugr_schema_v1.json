@@ -1278,6 +1278,7 @@
             "type": "object"
         },
         "Type": {
+            "description": "A HUGR type.",
             "discriminator": {
                 "mapping": {
                     "Array": "#/$defs/Array",
@@ -1316,7 +1317,8 @@
                 {
                     "$ref": "#/$defs/Opaque"
                 }
-            ]
+            ],
+            "title": "Type"
         },
         "TypeApplication": {
             "description": "Records details of an application of a PolyFuncType to some TypeArgs and the result (a less-, but still potentially-, polymorphic type).",
@@ -1375,6 +1377,7 @@
             "type": "object"
         },
         "TypeArg": {
+            "description": "A type argument.",
             "discriminator": {
                 "mapping": {
                     "BoundedNat": "#/$defs/BoundedNatArg",
@@ -1401,7 +1404,8 @@
                 {
                     "$ref": "#/$defs/ExtensionsArg"
                 }
-            ]
+            ],
+            "title": "TypeArg"
         },
         "TypeBound": {
             "enum": [
@@ -1413,6 +1417,7 @@
             "type": "string"
         },
         "TypeParam": {
+            "description": "A type parameter.",
             "discriminator": {
                 "mapping": {
                     "BoundedNat": "#/$defs/BoundedNatParam",
@@ -1439,7 +1444,8 @@
                 {
                     "$ref": "#/$defs/TupleParam"
                 }
-            ]
+            ],
+            "title": "TypeParam"
         },
         "TypeTypeArg": {
             "properties": {

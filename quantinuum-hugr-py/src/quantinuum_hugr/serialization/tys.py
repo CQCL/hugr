@@ -76,14 +76,13 @@ class TupleParam(BaseModel):
     params: list["TypeParam"]
 
 
-TypeParam = TypeAliasType(
-    "TypeParam",
-    Annotated[
+class TypeParam(RootModel):
+    """A type parameter."""
+
+    root: Annotated[
         TypeTypeParam | BoundedNatParam | OpaqueParam | ListParam | TupleParam,
-        Field(discriminator="tp"),
         WrapValidator(_json_custom_error_validator),
-    ],
-)
+    ] = Field(discriminator="tp")
 
 
 # ------------------------------------------
@@ -121,14 +120,13 @@ class ExtensionsArg(BaseModel):
     es: ExtensionSet
 
 
-TypeArg = TypeAliasType(
-    "TypeArg",
-    Annotated[
+class TypeArg(RootModel):
+    """A type argument."""
+
+    root: Annotated[
         TypeTypeArg | BoundedNatArg | OpaqueArg | SequenceArg | ExtensionsArg,
-        Field(discriminator="tya"),
         WrapValidator(_json_custom_error_validator),
-    ],
-)
+    ] = Field(discriminator="tya")
 
 
 # --------------------------------------------
@@ -212,7 +210,7 @@ class FunctionType(BaseModel):
 
     @classmethod
     def empty(cls) -> "FunctionType":
-        return FunctionType(input=[], output=[], extension_reqs=[])
+        return FunctionType(input=[], output=[], extension_reqs=ExtensionSet([]))
 
     class Config:
         # Need to avoid random '\n's in the pydantic description
@@ -285,14 +283,13 @@ class Qubit(BaseModel):
     t: Literal["Q"] = "Q"
 
 
-Type = TypeAliasType(
-    "Type",
-    Annotated[
+class Type(RootModel):
+    """A HUGR type."""
+
+    root: Annotated[
         Qubit | Variable | USize | PolyFuncType | Array | TupleType | SumType | Opaque,
-        Field(discriminator="t"),
         WrapValidator(_json_custom_error_validator),
-    ],
-)
+    ] = Field(discriminator="t")
 
 
 # -------------------------------------------
