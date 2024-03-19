@@ -101,4 +101,5 @@ jobs:
         with:
           files: coverage.xml
           name: python
+          flags: python
           token: ${{ secrets.CODECOV_TOKEN }}

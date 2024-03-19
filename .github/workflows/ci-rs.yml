@@ -138,5 +138,5 @@ jobs:
         with:
           files: coverage.json
           name: rust
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+          flags: rust
+          token: ${{ secrets.CODECOV_TOKEN }}
