@@ -3,7 +3,7 @@ import sys
 from abc import ABC
 from typing import Annotated, Any, Literal, cast
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, RootModel
 from typing_extensions import TypeAliasType
 
 from . import tys
@@ -80,50 +80,74 @@ class FuncDecl(BaseOp):
         self.signature = out
 
 
+class ConstBase(BaseOp):
+    """A constant operation definition."""
+
+    op: Literal["Const"] = "Const"
+
+
 CustomConst = Any  # TODO
 
 
-class ExtensionConst(BaseOp):
+class ExtensionConst(ConstBase):
     """An extension constant value, that can check it is of a given [CustomType]."""
 
-    op: Literal["Const"] = "Const"
-    c: Literal["Extension"] = "Extension"
-    e: CustomConst
+    c: Literal["Extension"] = Field("Extension", title="ConstTag")
+    e: CustomConst = Field(title="CustomConst")
+
+    class Config:
+        json_schema_extra = {
+            "required": ["parent", "op", "c", "e"],
+        }
 
 
-class FunctionConst(BaseOp):
+class FunctionConst(ConstBase):
     """A higher-order function value."""
 
-    op: Literal["Const"] = "Const"
-    c: Literal["Function"] = "Function"
+    c: Literal["Function"] = Field("Function", title="ConstTag")
     hugr: Any  # TODO
 
+    class Config:
+        json_schema_extra = {
+            "required": ["parent", "op", "c", "hugr"],
+        }
 
-class Tuple(BaseOp):
-    """A tuple."""
 
-    op: Literal["Const"] = "Const"
-    c: Literal["Tuple"] = "Tuple"
+class Tuple(ConstBase):
+    """A constant tuple value."""
+
+    c: Literal["Tuple"] = Field("Tuple", title="ConstTag")
     vs: list["Const"]
 
+    class Config:
+        json_schema_extra = {
+            "required": ["parent", "op", "c", "vs"],
+        }
 
-class Sum(BaseOp):
+
+class Sum(ConstBase):
     """A Sum variant
 
     For any Sum type where this value meets the type of the variant indicated by the tag
     """
 
-    op: Literal["Const"] = "Const"
-    c: Literal["Sum"] = "Sum"
+    c: Literal["Sum"] = Field("Sum", title="ConstTag")
     tag: int
     typ: Type
     vs: list["Const"]
 
+    class Config:
+        # Need to avoid random '\n's in the pydantic description
+        json_schema_extra = {
+            "description": "A Sum variant For any Sum type where this value meets the type of the variant indicated by the tag.",
+            "required": ["parent", "op", "c", "tag", "typ", "vs"],
+        }
 
-Const = Annotated[
-    (ExtensionConst | FunctionConst | Tuple | Sum),
-    Field(discriminator="c"),
-]
+
+class Const(RootModel):
+    """A constant operation."""
+
+    root: ExtensionConst | FunctionConst | Tuple | Sum = Field(discriminator="c")
 
 
 # -----------------------------------------------
@@ -138,7 +162,7 @@ class DataflowBlock(BaseOp):
     op: Literal["DataflowBlock"] = "DataflowBlock"
     inputs: TypeRow = Field(default_factory=list)
     other_outputs: TypeRow = Field(default_factory=list)
-    tuple_sum_rows: list[TypeRow] = Field(default_factory=list)
+    sum_rows: list[TypeRow] = Field(default_factory=list)
     extension_delta: ExtensionSet = Field(default_factory=list)
 
     def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
@@ -163,6 +187,12 @@ class DataflowBlock(BaseOp):
                 self.tuple_sum_rows.append(variant.inner)
         self.other_outputs = outputs[1:]
 
+    class Config:
+        # Need to avoid random '\n's in the pydantic description
+        json_schema_extra = {
+            "description": "A CFG basic block node. The signature is that of the internal Dataflow graph."
+        }
+
 
 class ExitBlock(BaseOp):
     """The single exit node of the CFG, has no children, stores the types of
@@ -170,6 +200,12 @@ class ExitBlock(BaseOp):
 
     op: Literal["ExitBlock"] = "ExitBlock"
     cfg_outputs: TypeRow
+
+    class Config:
+        # Need to avoid random '\n's in the pydantic description
+        json_schema_extra = {
+            "description": "The single exit node of the CFG, has no children, stores the types of the CFG node output."
+        }
 
 
 # ---------------------------------------------
@@ -182,7 +218,7 @@ class DataflowOp(BaseOp):
 
 
 class Input(DataflowOp):
-    """An input node. The outputs of this node are the inputs to the function."""
+    """An input node. The outputs of this node are the inputs to the parent node."""
 
     op: Literal["Input"] = "Input"
     types: TypeRow = Field(default_factory=list)
@@ -223,6 +259,12 @@ class Call(DataflowOp):
         assert len(fun_ty.params) == 0
         self.signature = fun_ty.body
 
+    class Config:
+        # Need to avoid random '\n's in the pydantic description
+        json_schema_extra = {
+            "description": "Operation to call a function directly. The first port is connected to the def/declare of the function being called directly, with a `Static<FunctionType>` edge. The signature of the remaining ports matches the function being called."
+        }
+
 
 class CallIndirect(DataflowOp):
     """Call a function indirectly.
@@ -243,13 +285,13 @@ class CallIndirect(DataflowOp):
 
 
 class LoadConstant(DataflowOp):
-    """Load a static constant in to the local dataflow graph."""
+    """An operation that loads a static constant in to the local dataflow graph."""
 
     op: Literal["LoadConstant"] = "LoadConstant"
     datatype: Type
 
 
-class LeafOp(DataflowOp):
+class LeafOpBase(DataflowOp):
     """Simple operation that has only value inputs+outputs and (potentially) StateOrder
     edges."""
 
@@ -277,9 +319,6 @@ class Conditional(DataflowOp):
     """Conditional operation, defined by child `Case` nodes for each branch."""
 
     op: Literal["Conditional"] = "Conditional"
-    tuple_sum_rows: list[TypeRow] = Field(
-        default_factory=list
-    )  # The possible rows of the predicate input
     other_inputs: TypeRow = Field(default_factory=list)  # Remaining input types
     outputs: TypeRow = Field(default_factory=list)  # Output types
     # Extensions used to produce the outputs
@@ -350,7 +389,7 @@ ControlFlowOp = Conditional | TailLoop | CFG
 # -----------------------------------------
 
 
-class CustomOp(LeafOp):
+class CustomOp(LeafOpBase):
     """A user-defined operation that can be downcasted by the extensions that define
     it."""
 
@@ -367,8 +406,14 @@ class CustomOp(LeafOp):
     def display_name(self) -> str:
         return self.op_name
 
+    class Config:
+        # Need to avoid random '\n's in the pydantic description
+        json_schema_extra = {
+            "description": "A user-defined operation that can be downcasted by the extensions that define it."
+        }
 
-class Noop(LeafOp):
+
+class Noop(LeafOpBase):
     """A no-op operation."""
 
     lop: Literal["Noop"] = "Noop"
@@ -381,7 +426,7 @@ class Noop(LeafOp):
         self.ty = in_types[0]
 
 
-class MakeTuple(LeafOp):
+class MakeTuple(LeafOpBase):
     """An operation that packs all its inputs into a tuple."""
 
     lop: Literal["MakeTuple"] = "MakeTuple"
@@ -394,7 +439,7 @@ class MakeTuple(LeafOp):
         self.tys = list(in_types)
 
 
-class UnpackTuple(LeafOp):
+class UnpackTuple(LeafOpBase):
     """An operation that packs all its inputs into a tuple."""
 
     lop: Literal["UnpackTuple"] = "UnpackTuple"
@@ -404,7 +449,7 @@ class UnpackTuple(LeafOp):
         self.tys = list(out_types)
 
 
-class Tag(LeafOp):
+class Tag(LeafOpBase):
     """An operation that creates a tagged sum value from one of its variants."""
 
     lop: Literal["Tag"] = "Tag"
@@ -412,8 +457,8 @@ class Tag(LeafOp):
     variants: TypeRow  # The variants of the sum type.
 
 
-class TypeApply(LeafOp):
-    """Fixes some TypeParams of a polymorphic type by providing TypeArgs"""
+class TypeApply(LeafOpBase):
+    """Fixes some TypeParams of a polymorphic type by providing TypeArgs."""
 
     lop: Literal["TypeApply"] = "TypeApply"
     ta: "TypeApplication"
@@ -431,9 +476,15 @@ class TypeApplication(BaseModel):
     args: list[tys.TypeTypeArg]
     output: PolyFuncType
 
+    class Config:
+        # Need to avoid random '\n's in the pydantic description
+        json_schema_extra = {
+            "description": "Records details of an application of a PolyFuncType to some TypeArgs and the result (a less-, but still potentially-, polymorphic type)."
+        }
 
-LeafOpUnion = TypeAliasType(
-    "LeafOpUnion",
+
+LeafOp = TypeAliasType(
+    "LeafOp",
     Annotated[
         (CustomOp | Noop | MakeTuple | UnpackTuple | Tag | TypeApply),
         Field(discriminator="lop"),
@@ -460,7 +511,7 @@ OpType = TypeAliasType(
             | Call
             | CallIndirect
             | LoadConstant
-            | LeafOpUnion
+            | LeafOp
             | DFG
         ),
         Field(discriminator="op"),

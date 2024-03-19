@@ -28,3 +28,9 @@ class SerialHugr(BaseModel):
     def get_version(cls) -> str:
         """Return the version of the schema."""
         return cls(nodes=[], edges=[]).version
+
+    class Config:
+        title = "Hugr"
+        json_schema_extra = {
+            "required": ["version", "nodes", "edges"],
+        }

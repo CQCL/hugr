@@ -1,11 +1,12 @@
 import inspect
 import sys
 from enum import Enum
-from typing import Annotated, Any, Literal, Optional
+from typing import Annotated, Any, Literal, Optional, Union
 
 from pydantic import (
     BaseModel,
     Field,
+    RootModel,
     ValidationError,
     ValidationInfo,
     ValidatorFunctionWrapHandler,
@@ -39,14 +40,10 @@ def _json_custom_error_validator(
 ExtensionId = str
 
 
-class ExtensionSet(BaseModel):
-    """A set of extensions."""
+class ExtensionSet(RootModel):
+    """A set of extensions ids."""
 
-    extensions: Optional[list[ExtensionId]]
-
-    def __init__(self, extensions: Optional[list[ExtensionId]] = None):
-        self.extensions = extensions
-        super().__init__()
+    root: Optional[list[ExtensionId]] = Field(default=None)
 
 
 # --------------------------------------------
@@ -151,14 +148,14 @@ class Array(MultiContainer):
 
 
 class TupleType(BaseModel):
-    """Product type, known-size tuple over elements of type row"""
+    """Product type, known-size tuple over elements of type row."""
 
     t: Literal["Tuple"] = "Tuple"
     inner: "TypeRow"
 
 
 class UnitSum(BaseModel):
-    """Simple predicate where all variants are empty tuples"""
+    """Simple predicate where all variants are empty tuples."""
 
     t: Literal["Sum"] = "Sum"
 
@@ -172,10 +169,19 @@ class GeneralSum(BaseModel):
     t: Literal["Sum"] = "Sum"
 
     s: Literal["General"] = "General"
-    row: "TypeRow"
+    rows: list["TypeRow"]
+
+    class Config:
+        # Need to avoid random '\n's in the pydantic description
+        json_schema_extra = {
+            "description": "General sum type that explicitly stores the types of the variants."
+        }
 
 
-Sum = Annotated[UnitSum | GeneralSum, Field(discriminator="s")]
+class SumType(RootModel):
+    root: Union[UnitSum, GeneralSum] = Field(discriminator="s")
+
+
 # ----------------------------------------------
 # --------------- ClassicType ------------------
 # ----------------------------------------------
@@ -208,6 +214,12 @@ class FunctionType(BaseModel):
     def empty(cls) -> "FunctionType":
         return FunctionType(input=[], output=[], extension_reqs=[])
 
+    class Config:
+        # Need to avoid random '\n's in the pydantic description
+        json_schema_extra = {
+            "description": "A graph encoded as a value. It contains a concrete signature and a set of required resources."
+        }
+
 
 class PolyFuncType(BaseModel):
     """A graph encoded as a value. It contains a concrete signature and a set of
@@ -227,6 +239,12 @@ class PolyFuncType(BaseModel):
     @classmethod
     def empty(cls) -> "PolyFuncType":
         return PolyFuncType(params=[], body=FunctionType.empty())
+
+    class Config:
+        # Need to avoid random '\n's in the pydantic description
+        json_schema_extra = {
+            "description": "A graph encoded as a value. It contains a concrete signature and a set of required resources."
+        }
 
 
 class TypeBound(Enum):
@@ -270,7 +288,7 @@ class Qubit(BaseModel):
 Type = TypeAliasType(
     "Type",
     Annotated[
-        Qubit | Variable | USize | PolyFuncType | Array | TupleType | Sum | Opaque,
+        Qubit | Variable | USize | PolyFuncType | Array | TupleType | SumType | Opaque,
         Field(discriminator="t"),
         WrapValidator(_json_custom_error_validator),
     ],
