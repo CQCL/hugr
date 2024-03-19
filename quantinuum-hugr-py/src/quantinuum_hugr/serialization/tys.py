@@ -169,9 +169,11 @@ class GeneralSum(BaseModel):
     rows: list["TypeRow"]
 
     class Config:
-        # Need to avoid random '\n's in the pydantic description
+        # Needed to avoid random '\n's in the pydantic description
         json_schema_extra = {
-            "description": "General sum type that explicitly stores the types of the variants."
+            "description": (
+                "General sum type that explicitly stores the types of the variants."
+            )
         }
 
 
@@ -212,9 +214,12 @@ class FunctionType(BaseModel):
         return FunctionType(input=[], output=[], extension_reqs=ExtensionSet([]))
 
     class Config:
-        # Need to avoid random '\n's in the pydantic description
+        # Needed to avoid random '\n's in the pydantic description
         json_schema_extra = {
-            "description": "A graph encoded as a value. It contains a concrete signature and a set of required resources."
+            "description": (
+                "A graph encoded as a value. It contains a concrete signature and "
+                "a set of required resources."
+            )
         }
 
 
@@ -238,9 +243,12 @@ class PolyFuncType(BaseModel):
         return PolyFuncType(params=[], body=FunctionType.empty())
 
     class Config:
-        # Need to avoid random '\n's in the pydantic description
+        # Needed to avoid random '\n's in the pydantic description
         json_schema_extra = {
-            "description": "A graph encoded as a value. It contains a concrete signature and a set of required resources."
+            "description": (
+                "A graph encoded as a value. It contains a concrete signature and "
+                "a set of required resources."
+            )
         }
 
 

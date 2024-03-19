@@ -136,9 +136,12 @@ class Sum(ConstBase):
     vs: list["Const"]
 
     class Config:
-        # Need to avoid random '\n's in the pydantic description
+        # Needed to avoid random '\n's in the pydantic description
         json_schema_extra = {
-            "description": "A Sum variant For any Sum type where this value meets the type of the variant indicated by the tag.",
+            "description": (
+                "A Sum variant For any Sum type where this value meets the type "
+                "of the variant indicated by the tag."
+            ),
             "required": ["parent", "op", "c", "tag", "typ", "vs"],
         }
 
@@ -187,7 +190,7 @@ class DataflowBlock(BaseOp):
         self.other_outputs = outputs[1:]
 
     class Config:
-        # Need to avoid random '\n's in the pydantic description
+        # Needed to avoid random '\n's in the pydantic description
         json_schema_extra = {
             "description": "A CFG basic block node. The signature is that of the internal Dataflow graph."
         }
@@ -201,7 +204,7 @@ class ExitBlock(BaseOp):
     cfg_outputs: TypeRow
 
     class Config:
-        # Need to avoid random '\n's in the pydantic description
+        # Needed to avoid random '\n's in the pydantic description
         json_schema_extra = {
             "description": "The single exit node of the CFG, has no children, stores the types of the CFG node output."
         }
@@ -259,9 +262,14 @@ class Call(DataflowOp):
         self.signature = poly_func.body
 
     class Config:
-        # Need to avoid random '\n's in the pydantic description
+        # Needed to avoid random '\n's in the pydantic description
         json_schema_extra = {
-            "description": "Operation to call a function directly. The first port is connected to the def/declare of the function being called directly, with a `Static<FunctionType>` edge. The signature of the remaining ports matches the function being called."
+            "description": (
+                "Operation to call a function directly. The first port is "
+                "connected to the def/declare of the function being called directly, "
+                "with a `Static<FunctionType>` edge. The signature of the remaining "
+                "ports matches the function being called."
+            )
         }
 
 
@@ -407,9 +415,12 @@ class CustomOp(LeafOpBase):
         return self.op_name
 
     class Config:
-        # Need to avoid random '\n's in the pydantic description
+        # Needed to avoid random '\n's in the pydantic description
         json_schema_extra = {
-            "description": "A user-defined operation that can be downcasted by the extensions that define it."
+            "description": (
+                "A user-defined operation that can be downcasted by the extensions that "
+                "define it."
+            )
         }
 
 
@@ -422,7 +433,7 @@ class Noop(LeafOpBase):
     def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
         assert len(in_types) == 1
         assert len(out_types) == 1
-        assert in_types[0] == out_types[0]  # type: ignore[operator]  # mypy doesn't understand the type union
+        assert in_types[0] == out_types[0]
         self.ty = in_types[0]
 
 
@@ -477,9 +488,12 @@ class TypeApplication(BaseModel):
     output: PolyFuncType
 
     class Config:
-        # Need to avoid random '\n's in the pydantic description
+        # Needed to avoid random '\n's in the pydantic description
         json_schema_extra = {
-            "description": "Records details of an application of a PolyFuncType to some TypeArgs and the result (a less-, but still potentially-, polymorphic type)."
+            "description": (
+                "Records details of an application of a PolyFuncType to some TypeArgs "
+                "and the result (a less-, but still potentially-, polymorphic type)."
+            )
         }
 
 
