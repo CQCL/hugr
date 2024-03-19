@@ -1,10 +1,9 @@
 import inspect
 import sys
 from abc import ABC
-from typing import Annotated, Any, Literal, cast
+from typing import Any, Literal, cast
 
 from pydantic import BaseModel, Field, RootModel
-from typing_extensions import TypeAliasType
 
 from . import tys
 from .tys import (

@@ -13,7 +13,6 @@ from pydantic import (
     WrapValidator,
 )
 from pydantic_core import PydanticCustomError
-from typing_extensions import TypeAliasType
 
 
 def _json_custom_error_validator(
