@@ -1,4 +1,4 @@
-name: Continuous integration
+name: Continuous integration 🦀
 
 on:
   push:
@@ -21,7 +21,31 @@ env:
   RUSTC_WRAPPER: "sccache"
 
 jobs:
+  # Check if changes were made to the relevant files.
+  # Always returns true if running on the default branch, to ensure all changes are throughly checked.
+  changes:
+    name: Check for changes in Rust files
+    runs-on: ubuntu-latest
+    # Required permissions
+    permissions:
+      pull-requests: read
+    # Set job outputs to values from filter step
+    outputs:
+      rust: ${{ github.ref_name == github.event.repository.default_branch || steps.filter.outputs.rust }}
+    steps:
+    # For pull requests it's not necessary to checkout the code
+    - uses: dorny/paths-filter@v3
+      id: filter
+      with:
+        filters: |
+          rust:
+            - 'quantinuum-hugr/**'
+            - 'Cargo.toml'
+            - 'specification/schema/**'
+
   check:
+    needs: changes
+    if: ${{ needs.changes.outputs.rust == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -40,7 +64,8 @@ jobs:
           RUSTDOCFLAGS: "-Dwarnings"
 
   benches:
-    if: github.event_name != 'merge_group'
+    needs: changes
+    if: ${{ needs.changes.outputs.rust == 'true' }} && github.event_name != 'merge_group'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -52,22 +77,39 @@ jobs:
       - name: Build benchmarks with all features
         run: cargo bench --verbose --no-run --workspace --all-features
 
-  tests:
+  # Run tests on Rust stable
+  tests-stable:
+    needs: changes
+    if: ${{ needs.changes.outputs.rust == 'true' }}
+    runs-on: ubuntu-latest
+    name: tests (Rust stable)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mozilla-actions/sccache-action@v0.0.4
+      - id: toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 'stable'
+      - name: Configure default rust toolchain
+        run: rustup override set ${{steps.toolchain.outputs.name}}
+      - name: Build with no features
+        run: cargo test --verbose --workspace --no-default-features --no-run
+      - name: Tests with no features
+        run: cargo test --verbose --workspace --no-default-features
+      - name: Build with all features
+        run: cargo test --verbose --workspace --all-features --no-run
+      - name: Tests with all features
+        run: cargo test --verbose --workspace --all-features
+
+  # Run tests on other toolchains
+  tests-other:
+    needs: changes
+    if: ${{ needs.changes.outputs.rust == 'true' && github.event_name != 'merge_group' }}
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: true
       matrix:
-        rust: ['1.75', stable, beta, nightly]
-        # workaround to ignore non-stable tests when running the merge queue checks
-        # see: https://github.community/t/how-to-conditionally-include-exclude-items-in-matrix-eg-based-on-branch/16853/6
-        isMerge:
-            - ${{ github.event_name == 'merge_group' }}
-        exclude:
-          - rust: '1.75'
-            isMerge: true
-          - rust: beta
-            isMerge: true
-          - rust: nightly
-            isMerge: true
+        rust: ['1.75', beta, nightly]
     name: tests (Rust ${{ matrix.rust }})
     steps:
       - uses: actions/checkout@v4
@@ -87,9 +129,28 @@ jobs:
       - name: Tests with all features
         run: cargo test --verbose --workspace --all-features
 
+  # This is a meta job to mark successful completion of the required checks,
+  # even if they are skipped due to no changes in the relevant files.
+  required-checks:
+    name: Required checks 🦀
+    needs: [check, tests-stable]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if required checks failed
+        if: (failure() || cancelled())
+        run: |
+          echo "Required checks failed"
+          echo "Please check the logs for more information"
+          exit 1
+      - name: Pass if required checks passed
+        run: |
+          echo "All required checks passed"
+
   coverage:
-    if: github.event_name != 'merge_group'
-    needs: [tests, check]
+    needs: [changes, tests-stable, tests-other, check]
+    # Run only if there are changes in the relevant files and the check job passed or was skipped
+    if: always() && !failure() && !cancelled() && needs.changes.outputs.rust == 'true' && github.event_name != 'merge_group'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -110,6 +171,6 @@ jobs:
         uses: codecov/codecov-action@v4
         with:
           files: coverage.json
-          name: ubuntu
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+          name: rust
+          flags: rust
+          token: ${{ secrets.CODECOV_TOKEN }}

@@ -1,0 +1,124 @@
+name: Continuous integration 🐍
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  merge_group:
+    types: [checks_requested]
+  workflow_dispatch: {}
+
+env:
+  SCCACHE_GHA_ENABLED: "true"
+
+jobs:
+  # Check if changes were made to the relevant files.
+  # Always returns true if running on the default branch, to ensure all changes are throughly checked.
+  changes:
+    name: Check for changes in Python files
+    runs-on: ubuntu-latest
+    # Required permissions
+    permissions:
+      pull-requests: read
+    # Set job outputs to values from filter step
+    outputs:
+      python: ${{ github.ref_name == github.event.repository.default_branch || steps.filter.outputs.python }}
+    steps:
+    # For pull requests it's not necessary to checkout the code
+    - uses: dorny/paths-filter@v3
+      id: filter
+      with:
+        filters: |
+          python:
+            - 'quantinuum-hugr-py/**'
+            - 'pyproject.toml'
+
+  check:
+    needs: changes
+    if: ${{ needs.changes.outputs.python == 'true' }}
+
+    name: check python
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: ['3.10']
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.3
+      - name: Install poetry
+        run: pipx install poetry
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "poetry"
+
+      - name: Install the project libraries
+        run: poetry install
+
+      - name: Type check with mypy
+        run: poetry run mypy .
+
+      - name: Check formatting with ruff
+        run: poetry run ruff format --check
+
+      - name: Lint with ruff
+        run: poetry run ruff check
+
+      - name: Run tests
+        run: poetry run pytest
+
+  # This is a meta job to mark successful completion of the required checks,
+  # even if they are skipped due to no changes in the relevant files.
+  required-checks:
+    name: Required checks 🐍
+    needs: [check]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if required checks failed
+        if: (failure() || cancelled())
+        run: |
+          echo "Required checks failed"
+          echo "Please check the logs for more information"
+          exit 1
+      - name: Pass if required checks passed
+        run: |
+          echo "All required checks passed"
+
+  coverage:
+    needs: [changes, check]
+    # Run only if there are changes in the relevant files and the check job passed or was skipped
+    if: always() && !failure() && !cancelled() && needs.changes.outputs.python == 'true' && github.event_name != 'merge_group'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.3
+      - name: Install poetry
+        run: pipx install poetry
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v3
+        with:
+          python-version: '3.10'
+          cache: "poetry"
+
+      - name: Install the project libraries
+        run: poetry install
+
+      - name: Run python tests with coverage instrumentation
+        run: poetry run pytest --cov=./ --cov-report=xml
+
+      - name: Upload python coverage to codecov.io
+        uses: codecov/codecov-action@v3
+        with:
+          files: coverage.xml
+          name: python
+          flags: python
+          token: ${{ secrets.CODECOV_TOKEN }}
