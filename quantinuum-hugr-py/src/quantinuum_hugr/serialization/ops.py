@@ -23,8 +23,8 @@ class BaseOp(ABC, BaseModel):
     """Base class for ops that store their node's input/output types"""
 
     # Parent node index of node the op belongs to, used only at serialization time
-    parent: NodeID = 0
-    input_extensions: ExtensionSet | None = None
+    parent: NodeID
+    input_extensions: ExtensionSet = Field(default_factory=ExtensionSet)
 
     def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
         """Hook to insert type information from the input and output ports into the
@@ -36,17 +36,6 @@ class BaseOp(ABC, BaseModel):
     def display_name(self) -> str:
         """Name of the op for visualisation"""
         return self.__class__.__name__
-
-
-class DummyOp(BaseOp):
-    """Nodes used inside dataflow containers (DFG, Conditional, TailLoop, def,
-    BasicBlock)."""
-
-    op: Literal["DummyOp"] = "DummyOp"
-    name: str
-
-    def display_name(self) -> str:
-        return f'"{self.name}"'
 
 
 # ----------------------------------------------------------
@@ -461,7 +450,6 @@ OpType = TypeAliasType(
             | FuncDefn
             | FuncDecl
             | Const
-            | DummyOp
             | DataflowBlock
             | ExitBlock
             | Conditional

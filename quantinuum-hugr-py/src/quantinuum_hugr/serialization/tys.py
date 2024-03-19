@@ -1,7 +1,7 @@
 import inspect
 import sys
 from enum import Enum
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, Optional
 
 from pydantic import (
     BaseModel,
@@ -37,9 +37,16 @@ def _json_custom_error_validator(
 
 
 ExtensionId = str
-ExtensionSet = list[  # TODO: Set not supported by MessagePack. Is list correct here?
-    ExtensionId
-]
+
+
+class ExtensionSet(BaseModel):
+    """A set of extensions."""
+
+    extensions: Optional[list[ExtensionId]]
+
+    def __init__(self, extensions: Optional[list[ExtensionId]] = None):
+        self.extensions = extensions
+        super().__init__()
 
 
 # --------------------------------------------
