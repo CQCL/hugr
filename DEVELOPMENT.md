@@ -29,6 +29,8 @@ shell by setting up [direnv](https://devenv.sh/automatic-shell-activation/).
 To setup the environment manually you will need:
 
 - Rust: https://www.rust-lang.org/tools/install
+- Just: https://just.systems/
+- Poetry: https://python-poetry.org/
 
 You can use the git hook in [`.github/pre-commit`](.github/pre-commit) to automatically run the test and check formatting before committing.
 To install it, run:
@@ -44,8 +46,10 @@ ln -s .github/pre-commit .git/hooks/pre-push
 To compile and test the rust code, run:
 
 ```bash
-cargo build
-cargo test
+# Rust tests
+just test # or `cargo test`
+# Python tests
+just pytest
 ```
 
 Run the benchmarks with:
@@ -62,6 +66,8 @@ stable available.
 cargo +nightly miri test
 ```
 
+Run `just` to see all available commands.
+
 ## 💅 Coding Style
 
 The rustfmt tool is used to enforce a consistent rust coding style. The CI will fail if the code is not formatted correctly.
@@ -70,13 +76,19 @@ To format your code, run:
 
 ```bash
 # Format rust code
-cargo fmt
+just format
 ```
 
-We also check for clippy warnings, which are a set of linting rules for rust. To run clippy, run:
+We also use various linters to catch common mistakes and enforce best practices. To run these, use:
 
 ```bash
-cargo clippy --all-targets
+just check
+```
+
+To quickly fix common issues, run:
+
+```bash
+just fix
 ```
 
 ## 📈 Code Coverage
@@ -85,9 +97,19 @@ We run coverage checks on the CI. Once you submit a PR, you can review the
 line-by-line coverage report on
 [codecov](https://app.codecov.io/gh/CQCL/hugr/commits?branch=All%20branches).
 
-To run the coverage checks locally, install `cargo-llvm-cov`, generate the report with:
+To run the coverage checks locally, first install `cargo-llvm-cov`.
+    
 ```bash
-cargo llvm-cov --lcov > lcov.info
+cargo install cargo-llvm-cov
+```
+
+Then run the tests:
+
+```bash
+# Rust test coverage
+just coverage
+# Python test 
+just pycoverage
 ```
 
 and open it with your favourite coverage viewer. In VSCode, you can use

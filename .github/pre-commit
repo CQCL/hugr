@@ -41,8 +41,8 @@ fi
 if ! poetry run mypy .
 then
     echo ""
-    echo "There are some python code style issues."
-    echo "Fix the warnings returned by `poetry run mypy .` first."
+    echo "There are some typing issues."
+    echo "Fix the warnings returned by 'poetry run mypy .' first."
     exit 1
 fi
 

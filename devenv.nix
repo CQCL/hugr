@@ -30,6 +30,14 @@ in
     export LLVM_PROFDATA="${pkgs.llvmPackages_16.libllvm}/bin/llvm-profdata"
   '';
 
+  languages.python = {
+    enable = true;
+    poetry = {
+      enable = true;
+      activate.enable = true;
+    };
+  };
+
   # https://devenv.sh/languages/
   # https://devenv.sh/reference/options/#languagesrustversion
   languages.rust = {

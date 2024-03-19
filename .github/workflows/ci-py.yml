@@ -35,6 +35,7 @@ jobs:
           python:
             - 'quantinuum-hugr-py/**'
             - 'pyproject.toml'
+            - 'specification/schema/**'
 
   check:
     needs: changes
@@ -74,16 +75,54 @@ jobs:
       - name: Run tests
         run: poetry run pytest
 
+  # Ensure that the serialization schema is up to date
+  serialization-schema:
+    needs: [changes]
+    if: ${{ needs.changes.outputs.python == 'true' }}
+    name: Check serialization schema
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.3
+      - name: Install poetry
+        run: pipx install poetry
+      - name: Set up Python
+        uses: actions/setup-python@v3
+        with:
+          python-version: "3.10"
+          cache: "poetry"
+      - name: Install the project libraries
+        run: poetry install
+      - name: Generate the updated schema
+        run: |
+          poetry run python scripts/generate_schema.py specification/schema/
+      - name: Check if the schema is up to date
+        run: |
+          git diff --exit-code --name-only specification/schema/
+          if [ $? -ne 0 ]; then
+            echo "The serialization schema is not up to date"
+            echo "Please run 'just update-schema' and commit the changes"
+            exit 1
+          fi
+
   # This is a meta job to mark successful completion of the required checks,
   # even if they are skipped due to no changes in the relevant files.
   required-checks:
     name: Required checks 🐍
-    needs: [changes, check]
-    if: always()
+    needs: [changes, check, serialization-schema]
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
       - name: Fail if required checks failed
-        if: (failure() || cancelled())
+        # This condition should simply be `if: failure() || cancelled()`,
+        # but there seems to be a bug in the github workflow runner.
+        #
+        # See https://github.com/orgs/community/discussions/80788
+        if: |
+          needs.changes.result == 'failure' || needs.changes.result == 'cancelled' ||
+          needs.check.result == 'failure' || needs.check.result == 'cancelled' ||
+          needs.serialization-schema.result == 'failure' || needs.serialization-schema.result == 'cancelled'
         run: |
           echo "Required checks failed"
           echo "Please check the logs for more information"
