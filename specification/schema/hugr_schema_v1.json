@@ -195,12 +195,24 @@
                     "title": "Outputs",
                     "type": "array"
                 },
+                "sum_rows": {
+                    "description": "The possible rows of the Sum input",
+                    "items": {
+                        "items": {
+                            "$ref": "#/$defs/Type"
+                        },
+                        "type": "array"
+                    },
+                    "title": "Sum Rows",
+                    "type": "array"
+                },
                 "extension_delta": {
                     "$ref": "#/$defs/ExtensionSet"
                 }
             },
             "required": [
-                "parent"
+                "parent",
+                "sum_rows"
             ],
             "title": "Conditional",
             "type": "object"
@@ -653,6 +665,7 @@
             "type": "object"
         },
         "LeafOp": {
+            "description": "A constant operation.",
             "discriminator": {
                 "mapping": {
                     "CustomOp": "#/$defs/CustomOp",
@@ -683,7 +696,8 @@
                 {
                     "$ref": "#/$defs/TypeApply"
                 }
-            ]
+            ],
+            "title": "LeafOp"
         },
         "ListParam": {
             "properties": {
@@ -816,6 +830,7 @@
             "type": "object"
         },
         "OpType": {
+            "description": "A constant operation.",
             "discriminator": {
                 "mapping": {
                     "CFG": "#/$defs/CFG",
@@ -890,7 +905,8 @@
                 {
                     "$ref": "#/$defs/DFG"
                 }
-            ]
+            ],
+            "title": "OpType"
         },
         "Opaque": {
             "description": "An opaque operation that can be downcasted by the extensions that define it.",
