@@ -161,20 +161,12 @@ class UnitSum(BaseModel):
 
 
 class GeneralSum(BaseModel):
-    """General sum type that explicitly stores the types of the variants"""
+    """General sum type that explicitly stores the types of the variants."""
 
     t: Literal["Sum"] = "Sum"
 
     s: Literal["General"] = "General"
     rows: list["TypeRow"]
-
-    class Config:
-        # Needed to avoid random '\n's in the pydantic description
-        json_schema_extra = {
-            "description": (
-                "General sum type that explicitly stores the types of the variants."
-            )
-        }
 
 
 class SumType(RootModel):

@@ -383,7 +383,12 @@
                 }
             },
             "required": [
-                "parent"
+                "parent",
+                "op",
+                "inputs",
+                "other_outputs",
+                "sum_rows",
+                "extension_delta"
             ],
             "title": "DataflowBlock",
             "type": "object"

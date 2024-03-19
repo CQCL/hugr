@@ -168,10 +168,6 @@ class DataflowBlock(BaseOp):
     extension_delta: ExtensionSet = Field(default_factory=list)
 
     def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
-        # The types will be all None because it's not dataflow, but we only care about
-        # the number of outputs. Note that we don't make use of the HUGR feature where
-        # the variant data is appended to successor input. Thus, `predicate_variants`
-        # will only contain empty rows.
         num_cases = len(out_types)
         self.sum_rows = [[] for _ in range(num_cases)]
 
@@ -192,7 +188,15 @@ class DataflowBlock(BaseOp):
     class Config:
         # Needed to avoid random '\n's in the pydantic description
         json_schema_extra = {
-            "description": "A CFG basic block node. The signature is that of the internal Dataflow graph."
+            "required": [
+                "parent",
+                "op",
+                "inputs",
+                "other_outputs",
+                "sum_rows",
+                "extension_delta",
+            ],
+            "description": "A CFG basic block node. The signature is that of the internal Dataflow graph.",
         }
 
 
@@ -478,9 +482,6 @@ class TypeApply(LeafOpBase):
 class TypeApplication(BaseModel):
     """Records details of an application of a PolyFuncType to some TypeArgs and the
     result (a less-, but still potentially-, polymorphic type).
-
-    Note that Guppy only generates full type applications, where the result is a
-    monomorphic type. Partial type applications are not used by Guppy.
     """
 
     input: PolyFuncType
