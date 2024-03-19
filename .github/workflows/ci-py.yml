@@ -111,11 +111,18 @@ jobs:
   required-checks:
     name: Required checks 🐍
     needs: [changes, check, serialization-schema]
-    if: always()
+    if: !cancelled()
     runs-on: ubuntu-latest
     steps:
       - name: Fail if required checks failed
-        if: (failure() || cancelled())
+        # This condition should simply be `if: failure() || cancelled()`,
+        # but there seems to be a bug in the github workflow runner.
+        #
+        # See https://github.com/orgs/community/discussions/80788
+        if: |
+          needs.changes.result == 'failure' || needs.changes.result == 'cancelled' ||
+          needs.check.result == 'failure' || needs.check.result == 'cancelled' ||
+          needs.serialization-schema.result == 'failure' || needs.serialization-schema.result == 'cancelled'
         run: |
           echo "Required checks failed"
           echo "Please check the logs for more information"
