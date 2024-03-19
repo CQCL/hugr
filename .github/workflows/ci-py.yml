@@ -27,7 +27,7 @@ jobs:
     outputs:
       python: ${{ github.ref_name == github.event.repository.default_branch || steps.filter.outputs.python }}
     steps:
-    # For pull requests it's not necessary to checkout the code
+    - uses: actions/checkout@v3
     - uses: dorny/paths-filter@v3
       id: filter
       with:
@@ -78,7 +78,7 @@ jobs:
   # even if they are skipped due to no changes in the relevant files.
   required-checks:
     name: Required checks 🐍
-    needs: [check]
+    needs: [changes, check]
     if: always()
     runs-on: ubuntu-latest
     steps:
