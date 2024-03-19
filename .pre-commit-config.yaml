@@ -48,7 +48,7 @@ repos:
         language: system
         files: \.rs$
         pass_filenames: false
-      - id: carge-test
+      - id: cargo-test
         name: cargo test
         description: Run tests with `cargo test`.
         entry: cargo test --all-features --workspace
