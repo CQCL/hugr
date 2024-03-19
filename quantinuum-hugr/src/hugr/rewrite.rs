@@ -43,8 +43,6 @@ pub trait Rewrite {
     ///
     /// Two `impl Rewrite`s can be composed if their invalidation sets are
     /// disjoint.
-    /// Using this way instead is to avoid associated type
-    /// but requires 1.75 and can break impl Rewrite in other repos
     fn invalidation_set(&self) -> impl Iterator<Item = Node>;
 }
 

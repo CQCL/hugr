@@ -53,14 +53,6 @@ impl SimpleReplacement {
     }
 }
 
-/*
-type SubgraphNodesIter<'a> = Copied<slice::Iter<'a, Node>>;
-type NuOutNodesIter<'a> = iter::Map<
-    hash_map::Keys<'a, (Node, IncomingPort), IncomingPort>,
-    fn(&'a (Node, IncomingPort)) -> Node,
->;
-*/
-
 impl Rewrite for SimpleReplacement {
     type Error = SimpleReplacementError;
     type ApplyResult = ();
