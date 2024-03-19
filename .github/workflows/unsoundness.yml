@@ -3,7 +3,7 @@ name: Unsoundness checks
 on:
   push:
     branches:
-      - main 
+      - main
   workflow_dispatch: {}
 
 concurrency:

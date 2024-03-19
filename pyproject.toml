@@ -12,6 +12,7 @@ package-mode = false
 python = "^3.10"
 
 [tool.poetry.group.dev.dependencies]
+pre-commit = "^3.6.2"
 pytest = "^8.1.1"
 pytest-cov = "^4.1.0"
 mypy = "^1.9.0"
