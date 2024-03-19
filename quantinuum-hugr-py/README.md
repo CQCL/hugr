@@ -20,12 +20,15 @@ The HUGR specification is [here](https://github.com/CQCL/hugr/blob/main/specific
   [`tket2`]: https://github.com/CQCL/tket2
 
 
-## Install
+## Installation
 
-`quantinuum_hugr` can be installed via `pip`. Requires Python >= 3.10.
+TODO
 
-```sh
-pip install quantinuum_hugr
+The package name is `quantinuum_hugr`, but it hasn't been published yet.
+The current experimental version can be installed from the source code:
+
+```bash
+pip install "quantinuum_hugr@git+https://github.com/CQCL/hugr.git@main#subdirectory=quantinuum-hugr-py"
 ```
 
 ## Usage

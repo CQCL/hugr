@@ -1,11 +1,11 @@
 [tool.poetry]
 name = "quantinuum_hugr"
 version = "0.0.0"
-description = "Quantinuum's common representation of quantum circuits and operations"
-classifiers = []                                                                      # TODO
-keywords = []                                                                         # TODO
-authors = []                                                                          # TODO
-maintainers = []                                                                      # TODO
+description = "Quantinuum's common representation for quantum programs"
+classifiers = []                                                        # TODO
+keywords = []                                                           # TODO
+authors = []                                                            # TODO
+maintainers = []                                                        # TODO
 license = "Apache-2.0"
 readme = "README.md"
 homepage = "https://github.com/CQCL/hugr"

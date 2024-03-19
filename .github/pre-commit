@@ -33,7 +33,7 @@ if ! poetry run ruff format --check
 then
     echo ""
     echo "There are some python code style issues."
-    echo "Run `ruff format` first."
+    echo "Run `poetry run ruff format` first."
     exit 1
 fi
 
@@ -42,7 +42,7 @@ if ! poetry run mypy .
 then
     echo ""
     echo "There are some python code style issues."
-    echo "Run `ruff format` first."
+    echo "Fix the warnings returned by `poetry run mypy .` first."
     exit 1
 fi
 

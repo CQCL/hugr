@@ -1,4 +1,4 @@
-"""`quantinuum-hugr` is a Python package for the Quantinuum Hugr common
+"""`quantinuum-hugr` is a Python package for the Quantinuum HUGR common
 representation.
 """
 
