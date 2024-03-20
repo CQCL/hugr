@@ -32,27 +32,24 @@ To setup the environment manually you will need:
 - Just: https://just.systems/
 - Poetry: https://python-poetry.org/
 
-You can use the git hook in [`.github/pre-commit`](.github/pre-commit) to automatically run the test and check formatting before committing.
-To install it, run:
+Once you have these installed, you can install the required python dependencies and setup pre-commit hooks with:
 
 ```bash
-ln -s .github/pre-commit .git/hooks/pre-commit
-# Or, to check before pushing instead
-ln -s .github/pre-commit .git/hooks/pre-push
+just setup
 ```
 
 ## 🏃 Running the tests
 
-To compile and test the rust code, run:
+To compile and test the code, run:
 
 ```bash
-# Rust tests
-just test # or `cargo test`
-# Python tests
-just pytest
+just test
+# or, to test only the rust code or the python code
+just test rust
+just test python
 ```
 
-Run the benchmarks with:
+Run the rust benchmarks with:
 
 ```bash
 cargo bench
@@ -75,7 +72,6 @@ The rustfmt tool is used to enforce a consistent rust coding style. The CI will 
 To format your code, run:
 
 ```bash
-# Format rust code
 just format
 ```
 
@@ -89,6 +85,9 @@ To quickly fix common issues, run:
 
 ```bash
 just fix
+# or, to fix only the rust code or the python code
+just fix rust
+just fix python
 ```
 
 ## 📈 Code Coverage
@@ -98,7 +97,6 @@ line-by-line coverage report on
 [codecov](https://app.codecov.io/gh/CQCL/hugr/commits?branch=All%20branches).
 
 To run the coverage checks locally, first install `cargo-llvm-cov`.
-    
 ```bash
 cargo install cargo-llvm-cov
 ```
@@ -106,10 +104,7 @@ cargo install cargo-llvm-cov
 Then run the tests:
 
 ```bash
-# Rust test coverage
 just coverage
-# Python test 
-just pycoverage
 ```
 
 and open it with your favourite coverage viewer. In VSCode, you can use
