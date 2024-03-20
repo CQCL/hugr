@@ -1,8 +1,6 @@
 //! Implementation of the `SimpleReplace` operation.
 
-use std::collections::{hash_map, HashMap};
-use std::iter::{self, Copied};
-use std::slice;
+use std::collections::HashMap;
 
 use crate::hugr::views::SiblingSubgraph;
 use crate::hugr::{HugrMut, HugrView, NodeMetadataMap, Rewrite};
@@ -55,19 +53,9 @@ impl SimpleReplacement {
     }
 }
 
-type SubgraphNodesIter<'a> = Copied<slice::Iter<'a, Node>>;
-type NuOutNodesIter<'a> = iter::Map<
-    hash_map::Keys<'a, (Node, IncomingPort), IncomingPort>,
-    fn(&'a (Node, IncomingPort)) -> Node,
->;
-
 impl Rewrite for SimpleReplacement {
     type Error = SimpleReplacementError;
     type ApplyResult = ();
-    type InvalidationSet<'a> = iter::Chain<SubgraphNodesIter<'a>, NuOutNodesIter<'a>>
-    where
-        Self: 'a;
-
     const UNCHANGED_ON_FAILURE: bool = true;
 
     fn verify(&self, _h: &impl HugrView) -> Result<(), SimpleReplacementError> {
@@ -184,10 +172,9 @@ impl Rewrite for SimpleReplacement {
     }
 
     #[inline]
-    fn invalidation_set(&self) -> Self::InvalidationSet<'_> {
+    fn invalidation_set(&self) -> impl Iterator<Item = Node> {
         let subcirc = self.subgraph.nodes().iter().copied();
-        let get_node: fn(&(Node, IncomingPort)) -> Node = |key| key.0;
-        let out_neighs = self.nu_out.keys().map(get_node);
+        let out_neighs = self.nu_out.keys().map(|key| key.0);
         subcirc.chain(out_neighs)
     }
 }
