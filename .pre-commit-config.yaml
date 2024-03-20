@@ -11,6 +11,7 @@ repos:
       - id: check-yaml
       - id: detect-private-key
       - id: end-of-file-fixer
+        exclude: ^specification/schema/
       - id: trailing-whitespace
       - id: fix-byte-order-marker
       - id: mixed-line-ending
