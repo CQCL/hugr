@@ -97,7 +97,6 @@ line-by-line coverage report on
 [codecov](https://app.codecov.io/gh/CQCL/hugr/commits?branch=All%20branches).
 
 To run the coverage checks locally, first install `cargo-llvm-cov`.
-
 ```bash
 cargo install cargo-llvm-cov
 ```

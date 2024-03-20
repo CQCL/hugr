@@ -74,7 +74,7 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/InputExtensions"
+                    "$ref": "#/$defs/ExtensionSet"
                 },
                 "op": {
                     "const": "CFG",
@@ -99,7 +99,7 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/InputExtensions"
+                    "$ref": "#/$defs/ExtensionSet"
                 },
                 "op": {
                     "const": "Call",
@@ -117,14 +117,14 @@
             "type": "object"
         },
         "CallIndirect": {
-            "description": "Operation to call a function indirectly. Like call, but the first input is a standard dataflow graph type.",
+            "description": "Call a function indirectly.\n\nLike call, but the first input is a standard dataflow graph type.",
             "properties": {
                 "parent": {
                     "title": "Parent",
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/InputExtensions"
+                    "$ref": "#/$defs/ExtensionSet"
                 },
                 "op": {
                     "const": "CallIndirect",
@@ -149,7 +149,7 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/InputExtensions"
+                    "$ref": "#/$defs/ExtensionSet"
                 },
                 "op": {
                     "const": "Case",
@@ -174,7 +174,7 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/InputExtensions"
+                    "$ref": "#/$defs/ExtensionSet"
                 },
                 "op": {
                     "const": "Conditional",
@@ -195,19 +195,54 @@
                     "title": "Outputs",
                     "type": "array"
                 },
-                "extension_delta": {
+                "sum_rows": {
+                    "description": "The possible rows of the Sum input",
                     "items": {
-                        "type": "string"
+                        "items": {
+                            "$ref": "#/$defs/Type"
+                        },
+                        "type": "array"
                     },
-                    "title": "Extension Delta",
+                    "title": "Sum Rows",
                     "type": "array"
+                },
+                "extension_delta": {
+                    "$ref": "#/$defs/ExtensionSet"
                 }
             },
             "required": [
-                "parent"
+                "parent",
+                "sum_rows"
             ],
             "title": "Conditional",
             "type": "object"
+        },
+        "Const": {
+            "description": "A constant operation.",
+            "discriminator": {
+                "mapping": {
+                    "Extension": "#/$defs/ExtensionConst",
+                    "Function": "#/$defs/FunctionConst",
+                    "Sum": "#/$defs/Sum",
+                    "Tuple": "#/$defs/Tuple"
+                },
+                "propertyName": "c"
+            },
+            "oneOf": [
+                {
+                    "$ref": "#/$defs/ExtensionConst"
+                },
+                {
+                    "$ref": "#/$defs/FunctionConst"
+                },
+                {
+                    "$ref": "#/$defs/Tuple"
+                },
+                {
+                    "$ref": "#/$defs/Sum"
+                }
+            ],
+            "title": "Const"
         },
         "CustomOp": {
             "description": "A user-defined operation that can be downcasted by the extensions that define it.",
@@ -217,7 +252,7 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/InputExtensions"
+                    "$ref": "#/$defs/ExtensionSet"
                 },
                 "op": {
                     "const": "LeafOp",
@@ -287,7 +322,7 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/InputExtensions"
+                    "$ref": "#/$defs/ExtensionSet"
                 },
                 "op": {
                     "const": "DFG",
@@ -312,7 +347,7 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/InputExtensions"
+                    "$ref": "#/$defs/ExtensionSet"
                 },
                 "op": {
                     "const": "DataflowBlock",
@@ -344,15 +379,16 @@
                     "type": "array"
                 },
                 "extension_delta": {
-                    "items": {
-                        "type": "string"
-                    },
-                    "title": "Extension Delta",
-                    "type": "array"
+                    "$ref": "#/$defs/ExtensionSet"
                 }
             },
             "required": [
-                "parent"
+                "parent",
+                "op",
+                "inputs",
+                "other_outputs",
+                "sum_rows",
+                "extension_delta"
             ],
             "title": "DataflowBlock",
             "type": "object"
@@ -365,7 +401,7 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/InputExtensions"
+                    "$ref": "#/$defs/ExtensionSet"
                 },
                 "op": {
                     "const": "ExitBlock",
@@ -395,7 +431,7 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/InputExtensions"
+                    "$ref": "#/$defs/ExtensionSet"
                 },
                 "op": {
                     "const": "Const",
@@ -420,6 +456,22 @@
             "title": "ExtensionConst",
             "type": "object"
         },
+        "ExtensionSet": {
+            "anyOf": [
+                {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": "array"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "default": null,
+            "description": "A set of extensions ids.",
+            "title": "ExtensionSet"
+        },
         "ExtensionsArg": {
             "properties": {
                 "tya": {
@@ -428,11 +480,7 @@
                     "title": "Tya"
                 },
                 "es": {
-                    "items": {
-                        "type": "string"
-                    },
-                    "title": "Es",
-                    "type": "array"
+                    "$ref": "#/$defs/ExtensionSet"
                 }
             },
             "required": [
@@ -449,7 +497,7 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/InputExtensions"
+                    "$ref": "#/$defs/ExtensionSet"
                 },
                 "op": {
                     "const": "FuncDecl",
@@ -479,7 +527,7 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/InputExtensions"
+                    "$ref": "#/$defs/ExtensionSet"
                 },
                 "op": {
                     "const": "FuncDefn",
@@ -509,7 +557,7 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/InputExtensions"
+                    "$ref": "#/$defs/ExtensionSet"
                 },
                 "op": {
                     "const": "Const",
@@ -552,11 +600,7 @@
                     "type": "array"
                 },
                 "extension_reqs": {
-                    "items": {
-                        "type": "string"
-                    },
-                    "title": "Extension Reqs",
-                    "type": "array"
+                    "$ref": "#/$defs/ExtensionSet"
                 }
             },
             "required": [
@@ -582,9 +626,9 @@
                 "rows": {
                     "items": {
                         "items": {
-                            "$ref": "#/$defs/Type",
-                            "type": "array"
-                        }
+                            "$ref": "#/$defs/Type"
+                        },
+                        "type": "array"
                     },
                     "title": "Rows",
                     "type": "array"
@@ -604,7 +648,7 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/InputExtensions"
+                    "$ref": "#/$defs/ExtensionSet"
                 },
                 "op": {
                     "const": "Input",
@@ -625,33 +669,8 @@
             "title": "Input",
             "type": "object"
         },
-        "InputExtensions": {
-            "anyOf": [
-                {
-                    "items": {
-                        "type": "string"
-                    },
-                    "type": "array"
-                },
-                {
-                    "type": "null"
-                }
-            ],
-            "default": null
-        },
-        "USize": {
-            "description": "Unsigned integer size type.",
-            "properties": {
-                "t": {
-                    "const": "I",
-                    "default": "I",
-                    "title": "T"
-                }
-            },
-            "title": "USize",
-            "type": "object"
-        },
         "LeafOp": {
+            "description": "A constant operation.",
             "discriminator": {
                 "mapping": {
                     "CustomOp": "#/$defs/CustomOp",
@@ -682,7 +701,8 @@
                 {
                     "$ref": "#/$defs/TypeApply"
                 }
-            ]
+            ],
+            "title": "LeafOp"
         },
         "ListParam": {
             "properties": {
@@ -709,7 +729,7 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/InputExtensions"
+                    "$ref": "#/$defs/ExtensionSet"
                 },
                 "op": {
                     "const": "LoadConstant",
@@ -735,7 +755,7 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/InputExtensions"
+                    "$ref": "#/$defs/ExtensionSet"
                 },
                 "op": {
                     "const": "LeafOp",
@@ -769,7 +789,7 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/InputExtensions"
+                    "$ref": "#/$defs/ExtensionSet"
                 },
                 "op": {
                     "const": "Module",
@@ -791,7 +811,7 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/InputExtensions"
+                    "$ref": "#/$defs/ExtensionSet"
                 },
                 "op": {
                     "const": "LeafOp",
@@ -815,6 +835,7 @@
             "type": "object"
         },
         "OpType": {
+            "description": "A constant operation.",
             "discriminator": {
                 "mapping": {
                     "CFG": "#/$defs/CFG",
@@ -822,34 +843,9 @@
                     "CallIndirect": "#/$defs/CallIndirect",
                     "Case": "#/$defs/Case",
                     "Conditional": "#/$defs/Conditional",
-                    "Const": {
-                        "discriminator": {
-                            "mapping": {
-                                "Extension": "#/$defs/ExtensionConst",
-                                "Function": "#/$defs/FunctionConst",
-                                "Sum": "#/$defs/Sum",
-                                "Tuple": "#/$defs/Tuple"
-                            },
-                            "propertyName": "c"
-                        },
-                        "oneOf": [
-                            {
-                                "$ref": "#/$defs/ExtensionConst"
-                            },
-                            {
-                                "$ref": "#/$defs/FunctionConst"
-                            },
-                            {
-                                "$ref": "#/$defs/Tuple"
-                            },
-                            {
-                                "$ref": "#/$defs/Sum"
-                            }
-                        ]
-                    },
+                    "Const": "#/$defs/Const",
                     "DFG": "#/$defs/DFG",
                     "DataflowBlock": "#/$defs/DataflowBlock",
-                    "DummyOp": "#/$defs/DummyOp",
                     "ExitBlock": "#/$defs/ExitBlock",
                     "FuncDecl": "#/$defs/FuncDecl",
                     "FuncDefn": "#/$defs/FuncDefn",
@@ -876,32 +872,7 @@
                     "$ref": "#/$defs/FuncDecl"
                 },
                 {
-                    "discriminator": {
-                        "mapping": {
-                            "Extension": "#/$defs/ExtensionConst",
-                            "Function": "#/$defs/FunctionConst",
-                            "Sum": "#/$defs/Sum",
-                            "Tuple": "#/$defs/Tuple"
-                        },
-                        "propertyName": "c"
-                    },
-                    "oneOf": [
-                        {
-                            "$ref": "#/$defs/ExtensionConst"
-                        },
-                        {
-                            "$ref": "#/$defs/FunctionConst"
-                        },
-                        {
-                            "$ref": "#/$defs/Tuple"
-                        },
-                        {
-                            "$ref": "#/$defs/Sum"
-                        }
-                    ]
-                },
-                {
-                    "$ref": "#/$defs/DummyOp"
+                    "$ref": "#/$defs/Const"
                 },
                 {
                     "$ref": "#/$defs/DataflowBlock"
@@ -939,7 +910,8 @@
                 {
                     "$ref": "#/$defs/DFG"
                 }
-            ]
+            ],
+            "title": "OpType"
         },
         "Opaque": {
             "description": "An opaque operation that can be downcasted by the extensions that define it.",
@@ -1019,7 +991,7 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/InputExtensions"
+                    "$ref": "#/$defs/ExtensionSet"
                 },
                 "op": {
                     "const": "Output",
@@ -1103,12 +1075,11 @@
             "description": "A Sum variant For any Sum type where this value meets the type of the variant indicated by the tag.",
             "properties": {
                 "parent": {
-                    "default": 0,
                     "title": "Parent",
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/InputExtensions"
+                    "$ref": "#/$defs/ExtensionSet"
                 },
                 "op": {
                     "const": "Const",
@@ -1129,29 +1100,7 @@
                 },
                 "vs": {
                     "items": {
-                        "discriminator": {
-                            "mapping": {
-                                "Extension": "#/$defs/ExtensionConst",
-                                "Function": "#/$defs/FunctionConst",
-                                "Sum": "#/$defs/Sum",
-                                "Tuple": "#/$defs/Tuple"
-                            },
-                            "propertyName": "c"
-                        },
-                        "oneOf": [
-                            {
-                                "$ref": "#/$defs/ExtensionConst"
-                            },
-                            {
-                                "$ref": "#/$defs/FunctionConst"
-                            },
-                            {
-                                "$ref": "#/$defs/Tuple"
-                            },
-                            {
-                                "$ref": "#/$defs/Sum"
-                            }
-                        ]
+                        "$ref": "#/$defs/Const"
                     },
                     "title": "Vs",
                     "type": "array"
@@ -1168,6 +1117,24 @@
             "title": "Sum",
             "type": "object"
         },
+        "SumType": {
+            "discriminator": {
+                "mapping": {
+                    "General": "#/$defs/GeneralSum",
+                    "Unit": "#/$defs/UnitSum"
+                },
+                "propertyName": "s"
+            },
+            "oneOf": [
+                {
+                    "$ref": "#/$defs/UnitSum"
+                },
+                {
+                    "$ref": "#/$defs/GeneralSum"
+                }
+            ],
+            "title": "SumType"
+        },
         "Tag": {
             "description": "An operation that creates a tagged sum value from one of its variants.",
             "properties": {
@@ -1176,7 +1143,7 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/InputExtensions"
+                    "$ref": "#/$defs/ExtensionSet"
                 },
                 "op": {
                     "const": "LeafOp",
@@ -1216,7 +1183,7 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/InputExtensions"
+                    "$ref": "#/$defs/ExtensionSet"
                 },
                 "op": {
                     "const": "TailLoop",
@@ -1259,7 +1226,7 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/InputExtensions"
+                    "$ref": "#/$defs/ExtensionSet"
                 },
                 "op": {
                     "const": "Const",
@@ -1273,29 +1240,7 @@
                 },
                 "vs": {
                     "items": {
-                        "discriminator": {
-                            "mapping": {
-                                "Extension": "#/$defs/ExtensionConst",
-                                "Function": "#/$defs/FunctionConst",
-                                "Sum": "#/$defs/Sum",
-                                "Tuple": "#/$defs/Tuple"
-                            },
-                            "propertyName": "c"
-                        },
-                        "oneOf": [
-                            {
-                                "$ref": "#/$defs/ExtensionConst"
-                            },
-                            {
-                                "$ref": "#/$defs/FunctionConst"
-                            },
-                            {
-                                "$ref": "#/$defs/Tuple"
-                            },
-                            {
-                                "$ref": "#/$defs/Sum"
-                            }
-                        ]
+                        "$ref": "#/$defs/Const"
                     },
                     "title": "Vs",
                     "type": "array"
@@ -1353,24 +1298,8 @@
             "title": "TupleType",
             "type": "object"
         },
-        "SumType": {
-            "discriminator": {
-                "mapping": {
-                    "General": "#/$defs/GeneralSum",
-                    "Unit": "#/$defs/UnitSum"
-                },
-                "propertyName": "s"
-            },
-            "oneOf": [
-                {
-                    "$ref": "#/$defs/UnitSum"
-                },
-                {
-                    "$ref": "#/$defs/GeneralSum"
-                }
-            ]
-        },
         "Type": {
+            "description": "A HUGR type.",
             "discriminator": {
                 "mapping": {
                     "Array": "#/$defs/Array",
@@ -1409,7 +1338,8 @@
                 {
                     "$ref": "#/$defs/Opaque"
                 }
-            ]
+            ],
+            "title": "Type"
         },
         "TypeApplication": {
             "description": "Records details of an application of a PolyFuncType to some TypeArgs and the result (a less-, but still potentially-, polymorphic type).",
@@ -1444,7 +1374,7 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/InputExtensions"
+                    "$ref": "#/$defs/ExtensionSet"
                 },
                 "op": {
                     "const": "LeafOp",
@@ -1468,6 +1398,7 @@
             "type": "object"
         },
         "TypeArg": {
+            "description": "A type argument.",
             "discriminator": {
                 "mapping": {
                     "BoundedNat": "#/$defs/BoundedNatArg",
@@ -1494,7 +1425,8 @@
                 {
                     "$ref": "#/$defs/ExtensionsArg"
                 }
-            ]
+            ],
+            "title": "TypeArg"
         },
         "TypeBound": {
             "enum": [
@@ -1506,6 +1438,7 @@
             "type": "string"
         },
         "TypeParam": {
+            "description": "A type parameter.",
             "discriminator": {
                 "mapping": {
                     "BoundedNat": "#/$defs/BoundedNatParam",
@@ -1532,7 +1465,8 @@
                 {
                     "$ref": "#/$defs/TupleParam"
                 }
-            ]
+            ],
+            "title": "TypeParam"
         },
         "TypeTypeArg": {
             "properties": {
@@ -1568,6 +1502,18 @@
             "title": "TypeTypeParam",
             "type": "object"
         },
+        "USize": {
+            "description": "Unsigned integer size type.",
+            "properties": {
+                "t": {
+                    "const": "I",
+                    "default": "I",
+                    "title": "T"
+                }
+            },
+            "title": "USize",
+            "type": "object"
+        },
         "UnitSum": {
             "description": "Simple predicate where all variants are empty tuples.",
             "properties": {
@@ -1600,7 +1546,7 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/InputExtensions"
+                    "$ref": "#/$defs/ExtensionSet"
                 },
                 "op": {
                     "const": "LeafOp",
@@ -1650,6 +1596,7 @@
             "type": "object"
         }
     },
+    "description": "A serializable representation of a Hugr.",
     "properties": {
         "version": {
             "const": "v1",
