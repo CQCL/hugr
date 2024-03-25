@@ -1276,28 +1276,6 @@
             "title": "TupleParam",
             "type": "object"
         },
-        "TupleType": {
-            "description": "Product type, known-size tuple over elements of type row.",
-            "properties": {
-                "t": {
-                    "const": "Tuple",
-                    "default": "Tuple",
-                    "title": "T"
-                },
-                "inner": {
-                    "items": {
-                        "$ref": "#/$defs/Type"
-                    },
-                    "title": "Inner",
-                    "type": "array"
-                }
-            },
-            "required": [
-                "inner"
-            ],
-            "title": "TupleType",
-            "type": "object"
-        },
         "Type": {
             "description": "A HUGR type.",
             "discriminator": {
@@ -1308,7 +1286,6 @@
                     "Opaque": "#/$defs/Opaque",
                     "Q": "#/$defs/Qubit",
                     "Sum": "#/$defs/SumType",
-                    "Tuple": "#/$defs/TupleType",
                     "V": "#/$defs/Variable"
                 },
                 "propertyName": "t"
@@ -1328,9 +1305,6 @@
                 },
                 {
                     "$ref": "#/$defs/Array"
-                },
-                {
-                    "$ref": "#/$defs/TupleType"
                 },
                 {
                     "$ref": "#/$defs/SumType"

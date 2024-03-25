@@ -13,9 +13,9 @@ repos:
       - id: end-of-file-fixer
         exclude: |
           (?x)^(
-            ^specification/schema/|
-            \.snap$|
-            \.snap\.new$
+            specification/schema/.*|
+            .*.snap|
+            .*.snap.new
           )$
       - id: trailing-whitespace
         exclude: |
