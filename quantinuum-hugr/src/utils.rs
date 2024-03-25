@@ -5,14 +5,28 @@ use itertools::Itertools;
 /// Write a comma separated list of of some types.
 /// Like debug_list, but using the Display instance rather than Debug,
 /// and not adding surrounding square brackets.
-pub fn display_list<T>(ts: &[T], f: &mut fmt::Formatter) -> fmt::Result
+pub fn display_list<T>(ts: impl IntoIterator<Item = T>, f: &mut fmt::Formatter) -> fmt::Result
+where
+    T: Display,
+{
+    display_list_with_separator(ts, f, ", ")
+}
+
+/// Write a separated list of of some types, using a custom separator.
+/// Like debug_list, but using the Display instance rather than Debug,
+/// and not adding surrounding square brackets.
+pub fn display_list_with_separator<T>(
+    ts: impl IntoIterator<Item = T>,
+    f: &mut fmt::Formatter,
+    sep: &str,
+) -> fmt::Result
 where
     T: Display,
 {
     let mut first = true;
-    for t in ts.iter() {
+    for t in ts.into_iter() {
         if !first {
-            f.write_str(", ")?;
+            f.write_str(sep)?;
         }
         t.fmt(f)?;
         if first {

@@ -9,6 +9,7 @@ pub mod type_param;
 pub mod type_row;
 
 pub use crate::ops::constant::{ConstTypeError, CustomCheckFailure};
+use crate::utils::display_list_with_separator;
 pub use check::SumTypeError;
 pub use custom::CustomType;
 pub use poly_func::PolyFuncType;
@@ -18,7 +19,7 @@ pub use type_param::TypeArg;
 pub use type_row::TypeRow;
 
 use itertools::FoldWhile::{Continue, Done};
-use itertools::Itertools;
+use itertools::{repeat_n, Itertools};
 use serde::{Deserialize, Serialize};
 
 use crate::extension::{ExtensionRegistry, SignatureError};
@@ -100,18 +101,38 @@ pub(crate) fn least_upper_bound(mut tags: impl Iterator<Item = TypeBound>) -> Ty
     .into_inner()
 }
 
-#[derive(Clone, PartialEq, Debug, Eq, derive_more::Display, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Debug, Eq, Serialize, Deserialize)]
 #[serde(tag = "s")]
 /// Representation of a Sum type.
 /// Either store the types of the variants, or in the special (but common) case
 /// of a UnitSum (sum over empty tuples), store only the size of the Sum.
 pub enum SumType {
+    /// Special case of a Sum over unit types.
     #[allow(missing_docs)]
-    #[display(fmt = "UnitSum({})", "size")]
     Unit { size: u8 },
+    /// General case of a Sum type.
     #[allow(missing_docs)]
-    #[display(fmt = "General({:?})", "rows")]
     General { rows: Vec<TypeRow> },
+}
+
+impl std::fmt::Display for SumType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.num_variants() == 0 {
+            return write!(f, "⊥");
+        }
+
+        match self {
+            SumType::Unit { size } => {
+                // Prints "[]+[]+...+[]"
+                display_list_with_separator(repeat_n("[]", *size as usize), f, "+")
+            }
+            SumType::General { rows } => {
+                // Prints each variant separated by "+".
+                // If a typerow contains a single type, it is printed without parentheses.
+                display_list_with_separator(rows.iter(), f, "+")
+            }
+        }
+    }
 }
 
 impl SumType {
@@ -178,7 +199,7 @@ pub enum TypeEnum {
     #[display(fmt = "Tuple({})", "_0")]
     Tuple(TypeRow),
     #[allow(missing_docs)]
-    #[display(fmt = "Sum({})", "_0")]
+    #[display(fmt = "{}", "_0")]
     Sum(SumType),
 }
 impl TypeEnum {

@@ -1,5 +1,5 @@
 ---
-source: src/hugr/views/tests.rs
+source: quantinuum-hugr/src/hugr/views/tests.rs
 expression: h.mermaid_string()
 ---
 graph LR
@@ -11,7 +11,7 @@ graph LR
             3--"0:0<br>usize"-->5
             4["(4) Output"]
             5["(5) Tag"]
-            5--"0:0<br>Sum(General([TypeRow { types: [Type(Extension(CustomType { extension: IdentList(#quot;prelude#quot;), id: #quot;usize#quot;, args: [], bound: Eq }), Eq)] }, TypeRow { types: [Type(Extension(CustomType { extension: IdentList(#quot;prelude#quot;), id: #quot;usize#quot;, args: [], bound: Eq }), Eq)] }]))"-->4
+            5--"0:0<br>[usize]+[usize]"-->4
         end
         2-."0:0".->6
         2-."1:0".->1
@@ -22,9 +22,9 @@ graph LR
             7--"0:1<br>usize"-->8
             8["(8) Output"]
             9["(9) const:sum:{tag:0, vals:[]}"]
-            9--"0:0<br>Sum(UnitSum(1))"-->10
+            9--"0:0<br>[]"-->10
             10["(10) LoadConstant"]
-            10--"0:0<br>Sum(UnitSum(1))"-->8
+            10--"0:0<br>[]"-->8
         end
         6-."0:0".->1
     end

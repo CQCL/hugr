@@ -71,7 +71,7 @@ fn node_connections(
 #[case::empty_dfg("dot_empty_dfg", crate::builder::test::simple_dfg_hugr())]
 #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
 fn dot_string(#[case] test_name: &str, #[case] h: Hugr) {
-    insta::assert_yaml_snapshot!(test_name, h.dot_string());
+    insta::assert_snapshot!(test_name, h.dot_string());
 }
 
 /// Render some hugrs into mermaid format.
