@@ -123,14 +123,9 @@ impl std::fmt::Display for SumType {
 
         match self {
             SumType::Unit { size } => {
-                // Prints "[]+[]+...+[]"
                 display_list_with_separator(repeat_n("[]", *size as usize), f, "+")
             }
-            SumType::General { rows } => {
-                // Prints each variant separated by "+".
-                // If a typerow contains a single type, it is printed without parentheses.
-                display_list_with_separator(rows.iter(), f, "+")
-            }
+            SumType::General { rows } => display_list_with_separator(rows.iter(), f, "+"),
         }
     }
 }
