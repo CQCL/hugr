@@ -33,7 +33,7 @@ jobs:
     outputs:
       rust: ${{ github.ref_name == github.event.repository.default_branch || steps.filter.outputs.rust }}
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - uses: dorny/paths-filter@v3
       id: filter
       with:
