@@ -196,9 +196,6 @@ pub enum TypeEnum {
     #[display(fmt = "Variable({})", _0)]
     Variable(usize, TypeBound),
     #[allow(missing_docs)]
-    #[display(fmt = "Tuple({})", "_0")]
-    Tuple(TypeRow),
-    #[allow(missing_docs)]
     #[display(fmt = "{}", "_0")]
     Sum(SumType),
 }
@@ -216,7 +213,6 @@ impl TypeEnum {
                     .flat_map(TypeRow::iter)
                     .map(Type::least_upper_bound),
             ),
-            TypeEnum::Tuple(ts) => least_upper_bound(ts.iter().map(Type::least_upper_bound)),
         }
     }
 }
@@ -263,7 +259,7 @@ impl Type {
     /// An empty `TypeRow`. Provided here for convenience
     pub const EMPTY_TYPEROW: TypeRow = type_row![];
     /// Unit type (empty tuple).
-    pub const UNIT: Self = Self(TypeEnum::Tuple(Self::EMPTY_TYPEROW), TypeBound::Eq);
+    pub const UNIT: Self = Self(TypeEnum::Sum(SumType::Unit { size: 1 }), TypeBound::Eq);
 
     const EMPTY_TYPEROW_REF: &'static TypeRow = &Self::EMPTY_TYPEROW;
 
@@ -275,7 +271,11 @@ impl Type {
     /// Initialize a new tuple type by providing the elements.
     #[inline(always)]
     pub fn new_tuple(types: impl Into<TypeRow>) -> Self {
-        Self::new(TypeEnum::Tuple(types.into()))
+        let row = types.into();
+        match row.len() {
+            0 => Self::UNIT,
+            _ => Self::new_sum([row]),
+        }
     }
 
     /// Initialize a new sum type by providing the possible variant types.
@@ -347,7 +347,6 @@ impl Type {
         // There is no need to check the components against the bound,
         // that is guaranteed by construction (even for deserialization)
         match &self.0 {
-            TypeEnum::Tuple(row) => validate_each(extension_registry, var_decls, row.iter()),
             TypeEnum::Sum(SumType::General { rows }) => validate_each(
                 extension_registry,
                 var_decls,
@@ -367,7 +366,6 @@ impl Type {
             TypeEnum::Variable(idx, bound) => t.apply_typevar(*idx, *bound),
             TypeEnum::Extension(cty) => Type::new_extension(cty.substitute(t)),
             TypeEnum::Function(bf) => Type::new_function(bf.substitute(t)),
-            TypeEnum::Tuple(elems) => Type::new_tuple(subst_row(elems, t)),
             TypeEnum::Sum(SumType::General { rows }) => {
                 Type::new_sum(rows.iter().map(|x| subst_row(x, t)))
             }
@@ -451,8 +449,8 @@ pub(crate) mod test {
             Type::new_alias(AliasDecl::new("my_alias", TypeBound::Eq)),
         ]);
         assert_eq!(
-            t.to_string(),
-            "Tuple([usize, Function(forall . [[]][]), my_custom, Alias(my_alias)])".to_string()
+            &t.to_string(),
+            "[usize, Function(forall . [[]][]), my_custom, Alias(my_alias)]"
         );
     }
 
