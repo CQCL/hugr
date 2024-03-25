@@ -51,7 +51,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.3
+        uses: mozilla-actions/sccache-action@v0.0.4
       - name: Install poetry
         run: pipx install poetry
       - name: Set up Python ${{ matrix.python-version }}
@@ -84,7 +84,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.3
+        uses: mozilla-actions/sccache-action@v0.0.4
       - name: Install poetry
         run: pipx install poetry
       - name: Set up Python
@@ -139,7 +139,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.3
+        uses: mozilla-actions/sccache-action@v0.0.4
       - name: Install poetry
         run: pipx install poetry
       - name: Set up Python 3.10
