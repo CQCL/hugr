@@ -144,13 +144,6 @@ class Array(MultiContainer):
     len: int
 
 
-class TupleType(BaseModel):
-    """Product type, known-size tuple over elements of type row."""
-
-    t: Literal["Tuple"] = "Tuple"
-    inner: "TypeRow"
-
-
 class UnitSum(BaseModel):
     """Simple predicate where all variants are empty tuples."""
 
@@ -286,7 +279,7 @@ class Type(RootModel):
     """A HUGR type."""
 
     root: Annotated[
-        Qubit | Variable | USize | PolyFuncType | Array | TupleType | SumType | Opaque,
+        Qubit | Variable | USize | PolyFuncType | Array | SumType | Opaque,
         WrapValidator(_json_custom_error_validator),
     ] = Field(discriminator="t")
 

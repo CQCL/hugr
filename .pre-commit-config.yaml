@@ -11,8 +11,19 @@ repos:
       - id: check-yaml
       - id: detect-private-key
       - id: end-of-file-fixer
-        exclude: ^specification/schema/
+        exclude: |
+          (?x)^(
+            specification/schema/.*|
+            .*.snap|
+            .*.snap.new
+          )$
       - id: trailing-whitespace
+        exclude: |
+          (?x)^(
+            specification/schema/.*|
+            .*.snap|
+            .*.snap.new
+          )$
       - id: fix-byte-order-marker
       - id: mixed-line-ending
       # Python-specific

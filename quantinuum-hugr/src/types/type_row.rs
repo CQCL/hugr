@@ -55,6 +55,11 @@ impl TypeRow {
         self.iter().chain(rest).cloned().collect_vec().into()
     }
 
+    /// Returns a reference to the types in the row.
+    pub fn as_slice(&self) -> &[Type] {
+        &self.types
+    }
+
     delegate! {
         to self.types {
             /// Iterator over the types in the row.
@@ -104,7 +109,7 @@ impl Deref for TypeRow {
     type Target = [Type];
 
     fn deref(&self) -> &Self::Target {
-        &self.types
+        self.as_slice()
     }
 }
 

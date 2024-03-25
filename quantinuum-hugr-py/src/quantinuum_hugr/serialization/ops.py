@@ -178,11 +178,9 @@ class DataflowBlock(BaseOp):
         if isinstance(pred, tys.UnitSum):
             self.sum_rows = [[] for _ in range(cast(tys.UnitSum, pred).size)]
         else:
-            assert isinstance(pred, tys.GeneralSum)
             self.sum_rows = []
             for variant in pred.rows:
-                assert isinstance(variant, tys.TupleType)
-                self.sum_rows.append(variant.inner)
+                self.sum_rows.append(variant)
         self.other_outputs = outputs[1:]
 
     class Config:
@@ -346,8 +344,7 @@ class Conditional(DataflowOp):
             assert isinstance(pred, tys.GeneralSum)
             self.sum_rows = []
             for ty in pred.rows:
-                assert isinstance(ty, tys.TupleType)
-                self.sum_rows.append(ty.inner)
+                self.sum_rows.append(ty)
         self.other_inputs = list(in_types[1:])
         self.outputs = list(out_types)
 

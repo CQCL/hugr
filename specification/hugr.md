@@ -794,8 +794,7 @@ The Hugr defines a number of type constructors, that can be instantiated into ty
 
 Extensions ::= (Extension)* -- a set, not a list
 
-Type ::= Tuple(#) -- fixed-arity, heterogeneous components
-       | Sum([#]) -- disjoint union of rows of other types, tagged by unsigned int
+Type ::= Sum([#]) -- disjoint union of rows of other types, tagged by unsigned int
        | Opaque(Name, [TypeArg]) -- a (instantiation of a) custom type defined by an extension
        | Function(TypeParams, #, #, Extensions) -- polymorphic with type parameters,
                                                 -- function arguments + results, and delta (see below)
@@ -804,11 +803,13 @@ Type ::= Tuple(#) -- fixed-arity, heterogeneous components
 
 (We write `[Foo]` to indicate a list of Foo's.)
 
+Tuples are represented as Sum types with a single variant. The type `(int<1>,int<2>)` is represented as `Sum([#(int<1>,int<2>)])`.
+
 The majority of types will be Opaque ones defined by extensions including the [standard library](#standard-library). However a number of types can be constructed using only the core type constructors: for example the empty tuple type, aka `unit`, with exactly one instance (so 0 bits of data); the empty sum, with no instances; the empty Function type (taking no arguments and producing no results - `void -> void`); and compositions thereof.
 
 Types representing functions are generally `CopyableType`, but not `EqType`. (It is undecidable whether two functions produce the same result for all possible inputs, or similarly whether one computation graph can be rewritten into another by semantic-preserving rewrites).
 
-Tuples and Sums are `CopyableType` (respectively, `EqType`) if all their components are; they are also fixed-size if their components are.
+Sums are `CopyableType` (respectively, `EqType`) if all their components are; they are also fixed-size if their components are.
 
 ### Polymorphism
 
