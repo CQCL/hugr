@@ -30,10 +30,10 @@ impl DataflowOpTrait for TailLoop {
         "A tail-controlled loop"
     }
 
-    fn signature(&self) -> FunctionType {
+    fn signature(&self) -> Signature {
         let [inputs, outputs] =
             [&self.just_inputs, &self.just_outputs].map(|row| row.extend(self.rest.iter()));
-        FunctionType::new(inputs, outputs)
+        Signature::new(inputs, outputs)
     }
 }
 
