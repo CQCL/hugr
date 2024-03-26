@@ -11,7 +11,7 @@ use super::{subst_row, valid_row, Substitution, Type, TypeBound, TypeRowV};
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 use crate::{Direction, IncomingPort, OutgoingPort, Port};
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 /// Describes the edges required to/from a node. This includes both the concept of "signature" in the spec,
 /// and also the target (value) of a call (static).
 pub struct FuncTypeBase<T>
@@ -25,6 +25,20 @@ where
     pub output: TypeRowBase<T>,
     /// The extension requirements which are added by the operation
     pub extension_reqs: ExtensionSet,
+}
+
+impl<T> Default for FuncTypeBase<T>
+where
+    T: 'static,
+    [T]: ToOwned<Owned = Vec<T>>,
+{
+    fn default() -> Self {
+        Self {
+            input: Default::default(),
+            output: Default::default(),
+            extension_reqs: Default::default(),
+        }
+    }
 }
 
 /// The type of a function, e.g. passing around a pointer/static ref to it.
