@@ -5,8 +5,8 @@ use itertools::Either;
 use std::fmt::{self, Display, Write};
 
 use super::type_param::TypeParam;
-use super::type_row::TypeRowV;
-use super::{subst_row, valid_row, Substitution, Type, TypeRow};
+use super::type_row::{RowVarOrType, TypeRowBase};
+use super::{subst_row, valid_row, Substitution, Type, TypeRowV};
 
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 use crate::{Direction, IncomingPort, OutgoingPort, Port};
@@ -14,22 +14,53 @@ use crate::{Direction, IncomingPort, OutgoingPort, Port};
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 /// Describes the edges required to/from a node. This includes both the concept of "signature" in the spec,
 /// and also the target (value) of a call (static).
-pub struct FunctionType {
+pub struct FuncTypeBase<T>
+where
+    T: 'static,
+    [T]: ToOwned<Owned = Vec<T>>,
+{
     /// Value inputs of the function.
-    pub input: TypeRowV,
+    pub input: TypeRowBase<T>,
     /// Value outputs of the function.
-    pub output: TypeRowV,
+    pub output: TypeRowBase<T>,
     /// The extension requirements which are added by the operation
     pub extension_reqs: ExtensionSet,
 }
 
-impl FunctionType {
+/// The type of a function, e.g. passing around a pointer/static ref to it.
+pub type FunctionType = FuncTypeBase<RowVarOrType>;
+
+/// The type of a node. Fixed/known arity of inputs + outputs.
+pub type Signature = FuncTypeBase<Type>;
+
+impl<T> FuncTypeBase<T>
+where
+    T: 'static + Clone,
+    [T]: ToOwned<Owned = Vec<T>>,
+{
     /// Builder method, add extension_reqs to an FunctionType
     pub fn with_extension_delta(mut self, rs: impl Into<ExtensionSet>) -> Self {
         self.extension_reqs = self.extension_reqs.union(rs.into());
         self
     }
 
+    /// Create a new signature with specified inputs and outputs.
+    pub fn new(input: impl Into<TypeRowBase<T>>, output: impl Into<TypeRowBase<T>>) -> Self {
+        Self {
+            input: input.into(),
+            output: output.into(),
+            extension_reqs: ExtensionSet::new(),
+        }
+    }
+    /// Create a new signature with the same input and output types (signature of an endomorphic
+    /// function).
+    pub fn new_endo(linear: impl Into<TypeRowBase<T>>) -> Self {
+        let linear = linear.into();
+        Self::new(linear.clone(), linear)
+    }
+}
+
+impl FunctionType {
     pub(crate) fn validate(
         &self,
         extension_registry: &ExtensionRegistry,
@@ -41,36 +72,31 @@ impl FunctionType {
     }
 
     pub(crate) fn substitute(&self, tr: &impl Substitution) -> Self {
-        FunctionType {
+        Self {
             input: subst_row(&self.input, tr),
             output: subst_row(&self.output, tr),
             extension_reqs: self.extension_reqs.substitute(tr),
         }
     }
+
+    #[inline]
+    /// Returns the input row
+    pub fn input(&self) -> &TypeRowV {
+        &self.input
+    }
+
+    #[inline]
+    /// Returns the output row
+    pub fn output(&self) -> &TypeRowV {
+        &self.output
+    }
 }
 
-impl FunctionType {
+impl Signature {
     /// The number of wires in the signature.
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
         self.input.is_empty() && self.output.is_empty()
-    }
-}
-
-impl FunctionType {
-    /// Create a new signature with specified inputs and outputs.
-    pub fn new(input: impl Into<TypeRowV>, output: impl Into<TypeRowV>) -> Self {
-        Self {
-            input: input.into(),
-            output: output.into(),
-            extension_reqs: ExtensionSet::new(),
-        }
-    }
-    /// Create a new signature with the same input and output types (signature of an endomorphic
-    /// function).
-    pub fn new_endo(linear: impl Into<TypeRow>) -> Self {
-        let linear = linear.into();
-        Self::new(linear.clone(), linear)
     }
 
     /// Returns the type of a value [`Port`]. Returns `None` if the port is out
@@ -165,20 +191,6 @@ impl FunctionType {
         self.types(Direction::Outgoing)
     }
 
-    #[inline]
-    /// Returns the input row
-    pub fn input(&self) -> &TypeRow {
-        &self.input
-    }
-
-    #[inline]
-    /// Returns the output row
-    pub fn output(&self) -> &TypeRow {
-        &self.output
-    }
-}
-
-impl FunctionType {
     /// Returns the `Port`s in the signature for a given direction.
     #[inline]
     pub fn ports(&self, dir: Direction) -> impl Iterator<Item = Port> {
@@ -200,7 +212,10 @@ impl FunctionType {
     }
 }
 
-impl Display for FunctionType {
+impl<T: Display> Display for FuncTypeBase<T>
+where
+    [T]: ToOwned<Owned = Vec<T>>,
+{
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if !self.input.is_empty() {
             self.input.fmt(f)?;
@@ -220,7 +235,7 @@ mod test {
     use super::*;
     #[test]
     fn test_function_type() {
-        let mut f_type = FunctionType::new(type_row![Type::UNIT], type_row![Type::UNIT]);
+        let mut f_type = Signature::new(type_row![Type::UNIT], type_row![Type::UNIT]);
         assert_eq!(f_type.input_count(), 1);
         assert_eq!(f_type.output_count(), 1);
 
