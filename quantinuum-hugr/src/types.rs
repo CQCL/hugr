@@ -280,7 +280,7 @@ impl Type {
 
     /// Initialize a new sum type by providing the possible variant types.
     #[inline(always)]
-    pub fn new_sum(variants: impl IntoIterator<Item = TypeRowV>) -> Self where {
+    pub fn new_sum<T: Into<TypeRowV>>(variants: impl IntoIterator<Item = T>) -> Self where {
         Self::new(TypeEnum::Sum(SumType::new(variants)))
     }
 
