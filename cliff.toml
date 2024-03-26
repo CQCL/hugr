@@ -5,6 +5,11 @@
 # Configuration options are organized into tables and keys.
 # See documentation for more information on available options.
 
+[remote.github]
+owner = "CQCL"
+repo = "hugr"
+token = ""
+
 [changelog]
 # changelog header
 header = """
@@ -18,12 +23,32 @@ body = """
 {% else %}\
     ## Unreleased (XXXX-XX-XX)
 {% endif %}\
+{% if github.contributors | filter(attribute="is_first_time", value=true) | length != 0 %}\
+  {% raw %}\n{% endraw -%}
+  New Contributors:
+  {% for contributor in github.contributors | filter(attribute="is_first_time", value=true) %}
+    * @{{ contributor.username }} made their first contribution
+      {%- if contributor.pr_number %} in \
+        [#{{ contributor.pr_number }}]({{ self::remote_url() }}/pull/{{ contributor.pr_number }}) \
+      {%- endif %}
+  {%- endfor -%}
+  {% raw %}\n{% endraw -%}
+{%- endif %}\
 {% for group, commits in commits | group_by(attribute="group") %}
     ### {{ group | upper_first }}
     {% for commit in commits %}
-        - {% if commit.breaking %}[**breaking**] {% endif %}{{ commit.message | upper_first }}\
-    {% endfor %}
-{% endfor %}\n
+      - {% if commit.breaking %}[**breaking**] {% endif %}\
+        {{ commit.message | split(pat="\n") | first | trim }}\
+        {% if commit.github.pr_number %} \
+          ([#{{ commit.github.pr_number }}]({{ self::remote_url() }}/pull/{{ commit.github.pr_number }})) \
+        {%- endif %}
+    {%- endfor -%}
+  {% raw %}\n{% endraw -%}
+{% endfor %}
+{% raw %}\n{% endraw -%}
+{%- macro remote_url() -%}
+  https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}
+{%- endmacro -%}
 """
 # remove the leading and trailing whitespace from the template
 trim = true
@@ -38,9 +63,7 @@ filter_unconventional = true
 # process each line of a commit as an individual commit
 split_commits = false
 # regex for preprocessing the commit messages
-commit_preprocessors = [
-  { pattern = '\((\w+\s)?#([0-9]+)\)', replace = "([#${2}](https://github.com/CQCL/portgraph/issues/${2}))"}, # replace issue numbers
-]
+commit_preprocessors = [{ pattern = '\(#[0-9]+\)', replace = "" }]
 # regex for parsing and grouping commits
 commit_parsers = [
   { message = "^feat", group = "Features" },
@@ -62,7 +85,7 @@ filter_commits = false
 # glob pattern for matching git tags
 tag_pattern = "v[0-9.]*"
 # regex for skipping tags
-skip_tags = "v0.1.0-beta.1"
+skip_tags = "beta|alpha"
 # regex for ignoring tags
 ignore_tags = ""
 # sort the tags topologically
