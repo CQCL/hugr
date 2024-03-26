@@ -11,6 +11,7 @@ use super::{Type, TypeBound};
 use crate::utils::display_list;
 use crate::PortIndex;
 use delegate::delegate;
+use itertools::Itertools;
 
 #[derive(
     Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize, derive_more::Display,
@@ -193,5 +194,16 @@ where
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.types.to_mut()
+    }
+}
+
+/// Turns a row of [Type] into an iterator of [RowVarOrType].
+/// An iterator of [Type] can be obtained by `into_owned().into_iter()`
+impl IntoIterator for TypeRow {
+    type Item = RowVarOrType;
+    type IntoIter = itertools::MapInto<<Vec<Type> as IntoIterator>::IntoIter, RowVarOrType>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.types.into_owned().into_iter().map_into()
     }
 }
