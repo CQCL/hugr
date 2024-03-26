@@ -11,6 +11,7 @@ use super::{Type, TypeBound};
 use crate::utils::display_list;
 use crate::PortIndex;
 use delegate::delegate;
+use itertools::Itertools;
 
 #[derive(
     Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize, derive_more::Display,
@@ -136,15 +137,27 @@ where
     }
 }
 
-impl<F> From<F> for TypeRow
-// impl <F> From<F> for TypeRowV where F: Into<Cow<'static, [RowVarOrType]>>
+impl<T, F> From<F> for TypeRowBase<T>
 where
-    F: Into<Cow<'static, [Type]>>,
+    [T]: ToOwned<Owned = Vec<T>>,
+    F: Into<Cow<'static, [T]>>,
 {
     fn from(types: F) -> Self {
         Self {
             types: types.into(),
         }
+    }
+}
+
+/*impl <F: Into<Cow<'static, [Type]>>> From<F> for TypeRowV {
+    fn from(value: F) -> Self {
+        todo!()
+    }
+}*/
+
+impl Into<Cow<'static, [RowVarOrType]>> for TypeRow {
+    fn into(self) -> Cow<'static, [RowVarOrType]> {
+        self.types.into_owned().into_iter().map(RowVarOrType::from).collect()
     }
 }
 
@@ -186,13 +199,15 @@ where
 
 impl<T> IntoIterator for TypeRowBase<T>
 where
+    RowVarOrType: From<T>,
     [T]: ToOwned<Owned = Vec<T>>,
 {
-    type Item = T;
+    type Item = RowVarOrType;
 
-    type IntoIter = <Vec<T> as IntoIterator>::IntoIter;
+    type IntoIter = itertools::MapInto<<Vec<T> as IntoIterator>::IntoIter, RowVarOrType>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.types.into_owned().into_iter()
+        let owned = self.types.into_owned();
+        owned.into_iter().map_into()
     }
 }
