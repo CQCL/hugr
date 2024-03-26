@@ -31,6 +31,13 @@ impl RowVarOrType {
         }
     }
 }
+
+impl From<Type> for RowVarOrType {
+    fn from(value: Type) -> Self {
+        Self::T(value)
+    }
+}
+
 /// List of types, used for function signatures.
 #[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
@@ -61,6 +68,23 @@ impl <T> TypeRowBase<T> where [T]: ToOwned<Owned = Vec<T>> {
         }
     }
 
+    #[inline(always)]
+    /// Returns the port type given an offset. Returns `None` if the offset is out of bounds.
+    pub fn get(&self, offset: impl PortIndex) -> Option<&T> {
+        self.types.get(offset.index())
+    }
+
+    #[inline(always)]
+    /// Returns the port type given an offset. Returns `None` if the offset is out of bounds.
+    pub fn get_mut(&mut self, offset: impl PortIndex) -> Option<&mut T> {
+        self.types.to_mut().get_mut(offset.index())
+    }
+
+    /// Returns a reference to the types in the row.
+    pub fn as_slice(&self) -> &[T] {
+        &self.types
+    }
+
     delegate! {
         to self.types {
             /// Iterator over the types and row variables in the row.
@@ -71,43 +95,7 @@ impl <T> TypeRowBase<T> where [T]: ToOwned<Owned = Vec<T>> {
 
             /// Allow access (consumption) of the contained elements
             pub fn into_owned(self) -> Vec<T>;
-        }
-    }
-}
-
-impl From<TypeRow> for TypeRowV {
-    fn from(value: TypeRow) -> Self {
-        Self {
-            types: value.into_owned().into_iter().map(RowVarOrType::T).collect()
-        }
-    }
-}
-
-impl TypeRow {
-    #[inline(always)]
-    /// Returns the port type given an offset. Returns `None` if the offset is out of bounds.
-    pub fn get(&self, offset: impl PortIndex) -> Option<&Type> {
-        self.types.get(offset.index())
-    }
-
-    #[inline(always)]
-    /// Returns the port type given an offset. Returns `None` if the offset is out of bounds.
-    pub fn get_mut(&mut self, offset: impl PortIndex) -> Option<&mut Type> {
-        self.types.to_mut().get_mut(offset.index())
-    }
-
-    /// Returns a new `TypeRow` with `xs` concatenated onto `self`.
-    pub fn extend<'a>(&'a self, rest: impl IntoIterator<Item = &'a Type>) -> Self {
-        self.iter().chain(rest).cloned().collect_vec().into()
-    }
-
-    /// Returns a reference to the types in the row.
-    pub fn as_slice(&self) -> &[Type] {
-        &self.types
-    }
-
-    delegate! {
-        to self.types {
+            
             /// Returns the number of types in the row.
             pub fn len(&self) -> usize;
 
@@ -117,13 +105,27 @@ impl TypeRow {
     }
 }
 
+impl <T> TypeRowBase<T> where T: Clone, [T]: ToOwned<Owned = Vec<T>> {
+    /// Returns a new `TypeRow` with `xs` concatenated onto `self`.
+    pub fn extend<'a>(&'a self, rest: impl IntoIterator<Item = &'a T>) -> Self {
+        self.iter().chain(rest).cloned().collect_vec().into()
+    }
+}
+
+impl Into<Cow<'static, [RowVarOrType]>> for TypeRow {
+    fn into(self: TypeRow) -> Cow<'static, [RowVarOrType]> {
+        self.types.into_owned().into_iter().map(RowVarOrType::from).collect()
+    }
+}
+
+
 impl <T> Default for TypeRowBase<T> where [T]: ToOwned<Owned = Vec<T>> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<T,F> From<F> for TypeRowBase<T>
+impl<T,F> From<F> for TypeRowBase<T> // impl <F> From<F> for TypeRowV where F: Into<Cow<'static, [RowVarOrType]>>
 where
     F: Into<Cow<'static, [T]>>,
     [T]: ToOwned<Owned = Vec<T>>
@@ -135,13 +137,13 @@ where
     }
 }
 
-impl <T> From<T> for TypeRowBase<T> {
+/*impl <T> From<T> for TypeRowBase<T> {
     fn from(t: Type) -> Self {
         Self {
             types: vec![t].into(),
         }
     }
-}
+}*/
 
 impl <T> Deref for TypeRowBase<T> where [T]: ToOwned<Owned=Vec<T>> {
     type Target = [T];

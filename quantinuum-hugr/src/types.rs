@@ -140,7 +140,7 @@ impl SumType {
         let rows = variants.into_iter().map(Into::into).collect_vec();
 
         let len: usize = rows.len();
-        if len <= (u8::MAX as usize) && rows.iter().all(TypeRow::is_empty) {
+        if len <= (u8::MAX as usize) && rows.iter().all(TypeRowV::is_empty) {
             Self::Unit { size: len as u8 }
         } else {
             Self::General { rows }
@@ -148,9 +148,9 @@ impl SumType {
     }
 
     /// Report the tag'th variant, if it exists.
-    pub fn get_variant(&self, tag: usize) -> Option<&TypeRow> {
+    pub fn get_variant(&self, tag: usize) -> Option<&TypeRowV> {
         match self {
-            SumType::Unit { size } if tag < (*size as usize) => Some(Type::EMPTY_TYPEROW_REF),
+            SumType::Unit { size } if tag < (*size as usize) => Some(Type::EMPTY_VL_TYPEROW_REF),
             SumType::General { rows } => rows.get(tag),
             _ => None,
         }
@@ -206,8 +206,8 @@ impl TypeEnum {
             TypeEnum::Sum(SumType::Unit { size: _ }) => TypeBound::Eq,
             TypeEnum::Sum(SumType::General { rows }) => least_upper_bound(
                 rows.iter()
-                    .flat_map(TypeRow::iter)
-                    .map(Type::least_upper_bound),
+                    .flat_map(TypeRowV::iter)
+                    .map(RowVarOrType::least_upper_bound),
             ),
         }
     }
@@ -254,10 +254,13 @@ fn validate_each<'a>(
 impl Type {
     /// An empty `TypeRow`. Provided here for convenience
     pub const EMPTY_TYPEROW: TypeRow = type_row![];
+    /// An empty `TypeRowV`. Provided here for convenience
+    pub const EMPTY_VL_TYPEROW: TypeRowV = type_row![];
     /// Unit type (empty tuple).
     pub const UNIT: Self = Self(TypeEnum::Sum(SumType::Unit { size: 1 }), TypeBound::Eq);
 
     const EMPTY_TYPEROW_REF: &'static TypeRow = &Self::EMPTY_TYPEROW;
+    const EMPTY_VL_TYPEROW_REF: &'static TypeRowV = &Self::EMPTY_VL_TYPEROW;
 
     /// Initialize a new function type.
     pub fn new_function(fun_ty: impl Into<PolyFuncType>) -> Self {
@@ -343,11 +346,10 @@ impl Type {
         // There is no need to check the components against the bound,
         // that is guaranteed by construction (even for deserialization)
         match &self.0 {
-            TypeEnum::Sum(SumType::General { rows }) => validate_each(
+            TypeEnum::Sum(SumType::General { rows }) => 
+            rows.iter().try_for_each(|row| valid_row(row,
                 extension_registry,
-                var_decls,
-                rows.iter().flat_map(|x| x.iter()),
-            ),
+                var_decls)),
             TypeEnum::Sum(SumType::Unit { .. }) => Ok(()), // No leaves there
             TypeEnum::Alias(_) => Ok(()),
             TypeEnum::Extension(custy) => custy.validate(extension_registry, var_decls),
