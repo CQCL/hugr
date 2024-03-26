@@ -12,7 +12,7 @@ use super::{
 };
 
 use crate::types::type_param::{check_type_args, TypeArg, TypeParam};
-use crate::types::{FunctionType, PolyFuncType};
+use crate::types::{FunctionType, PolyFuncType, Signature};
 use crate::Hugr;
 
 /// Trait necessary for binary computations of OpDef signature
@@ -194,6 +194,7 @@ impl From<PolyFuncType> for SignatureFunc {
 }
 
 impl From<FunctionType> for SignatureFunc {
+    // ALAN might want to be Signature?
     fn from(v: FunctionType) -> Self {
         Self::TypeScheme(CustomValidator::from_polyfunc(v))
     }
@@ -213,7 +214,7 @@ impl SignatureFunc {
         }
     }
 
-    /// Compute the concrete signature ([FunctionType]).
+    /// Compute the concrete [Signature] for a node
     ///
     /// # Panics
     ///
@@ -229,7 +230,7 @@ impl SignatureFunc {
         def: &OpDef,
         args: &[TypeArg],
         exts: &ExtensionRegistry,
-    ) -> Result<FunctionType, SignatureError> {
+    ) -> Result<Signature, SignatureError> {
         let temp: PolyFuncType;
         let (pf, args) = match &self {
             SignatureFunc::TypeScheme(custom) => {
@@ -250,7 +251,8 @@ impl SignatureFunc {
         // TODO bring this assert back once resource inference is done?
         // https://github.com/CQCL/hugr/issues/388
         // debug_assert!(res.extension_reqs.contains(def.extension()));
-        Ok(res)
+        res.try_into()
+            .map_err(|(idx, bound)| SignatureError::ContainsRowVars { idx, bound })
     }
 }
 
@@ -350,7 +352,7 @@ impl OpDef {
         &self,
         args: &[TypeArg],
         exts: &ExtensionRegistry,
-    ) -> Result<FunctionType, SignatureError> {
+    ) -> Result<Signature, SignatureError> {
         self.signature_func.compute_signature(self, args, exts)
     }
 
@@ -480,7 +482,9 @@ mod test {
     use crate::ops::LeafOp;
     use crate::std_extensions::collections::{EXTENSION, LIST_TYPENAME};
     use crate::types::Type;
-    use crate::types::{type_param::TypeParam, FunctionType, PolyFuncType, TypeArg, TypeBound};
+    use crate::types::{
+        type_param::TypeParam, FunctionType, PolyFuncType, Signature, TypeArg, TypeBound,
+    };
     use crate::Hugr;
     use crate::{const_extension_ids, Extension};
 
@@ -563,7 +567,7 @@ mod test {
         let args = [TypeArg::BoundedNat { n: 3 }, USIZE_T.into()];
         assert_eq!(
             def.compute_signature(&args, &PRELUDE_REGISTRY),
-            Ok(FunctionType::new(
+            Ok(Signature::new(
                 vec![USIZE_T; 3],
                 vec![Type::new_tuple(vec![USIZE_T; 3])]
             ))
@@ -576,7 +580,7 @@ mod test {
         let args = [TypeArg::BoundedNat { n: 3 }, tyvar.clone().into()];
         assert_eq!(
             def.compute_signature(&args, &PRELUDE_REGISTRY),
-            Ok(FunctionType::new(
+            Ok(Signature::new(
                 tyvars.clone(),
                 vec![Type::new_tuple(tyvars)]
             ))
@@ -632,7 +636,7 @@ mod test {
         def.validate_args(&args, &EMPTY_REG, &decls).unwrap();
         assert_eq!(
             def.compute_signature(&args, &EMPTY_REG),
-            Ok(FunctionType::new_endo(vec![tv]))
+            Ok(Signature::new_endo(vec![tv]))
         );
         Ok(())
     }

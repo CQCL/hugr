@@ -142,6 +142,9 @@ pub enum SignatureError {
     /// Invalid type arguments
     #[error("Invalid type arguments for operation")]
     InvalidTypeArgs,
+    /// Signature contains row variables i.e. is of unknown length
+    #[error("Signature contains variable {idx} which is a row of unknown length of {bound} types")]
+    ContainsRowVars { idx: usize, bound: TypeBound },
     /// The Extension Registry did not contain an Extension referenced by the Signature
     #[error("Extension '{0}' not found")]
     ExtensionNotFound(ExtensionId),

@@ -7,7 +7,7 @@ use thiserror::Error;
 use crate::extension::{ConstFoldResult, ExtensionId, ExtensionRegistry, OpDef, SignatureError};
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::hugr::{HugrView, NodeType};
-use crate::types::{type_param::TypeArg, FunctionType};
+use crate::types::{type_param::TypeArg, Signature};
 use crate::{ops, Hugr, IncomingPort, Node};
 
 use super::dataflow::DataflowOpTrait;
@@ -109,7 +109,7 @@ impl DataflowOpTrait for ExternalOp {
 pub struct ExtensionOp {
     def: Arc<OpDef>,
     args: Vec<TypeArg>,
-    signature: FunctionType, // Cache
+    signature: Signature, // Cache
 }
 
 impl ExtensionOp {
@@ -201,7 +201,7 @@ pub struct OpaqueOp {
     op_name: SmolStr,
     description: String, // cache in advance so description() can return &str
     args: Vec<TypeArg>,
-    signature: FunctionType,
+    signature: Signature,
 }
 
 fn qualify_name(res_id: &ExtensionId, op_name: &SmolStr) -> SmolStr {
@@ -215,7 +215,7 @@ impl OpaqueOp {
         op_name: impl Into<SmolStr>,
         description: String,
         args: impl Into<Vec<TypeArg>>,
-        signature: FunctionType,
+        signature: Signature,
     ) -> Self {
         Self {
             extension,
@@ -346,8 +346,8 @@ pub enum CustomOpError {
     SignatureMismatch {
         extension: ExtensionId,
         op: SmolStr,
-        stored: FunctionType,
-        computed: FunctionType,
+        stored: Signature,
+        computed: Signature,
     },
 }
 
@@ -360,7 +360,7 @@ mod test {
 
     #[test]
     fn new_opaque_op() {
-        let sig = FunctionType::new_endo(vec![QB_T]);
+        let sig = Signature::new_endo(vec![QB_T]);
         let op = OpaqueOp::new(
             "res".try_into().unwrap(),
             "op",
