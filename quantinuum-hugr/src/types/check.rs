@@ -2,7 +2,7 @@
 
 use thiserror::Error;
 
-use super::Type;
+use super::{Type, TypeBound, TypeRow};
 use crate::ops::Const;
 
 /// Errors that arise from typechecking constants
@@ -30,6 +30,15 @@ pub enum SumTypeError {
         expected: usize,
         /// The length of the sum variant found.
         found: usize,
+    },
+    #[error("Sum variant #{tag} contained row variable with index {idx} standing for a row of {bound} types")]
+    ContainsRowVariables {
+        /// The tag of the sum (and value)
+        tag: usize,
+        /// (DeBruijn) index of the row variable
+        idx: usize,
+        /// Bound on types which can be substituted for the variable
+        bound: TypeBound,
     },
     /// Tag for a sum value exceeded the number of variants.
     #[error("Invalid tag {tag} for sum type with {num_variants} variants")]
@@ -60,6 +69,7 @@ impl super::SumType {
                 num_variants: self.num_variants(),
             })?;
 
+        // TODO how is it possible to call len() here?
         if variant.len() != val.len() {
             Err(SumTypeError::WrongVariantLength {
                 tag,
@@ -67,6 +77,11 @@ impl super::SumType {
                 found: val.len(),
             })?;
         }
+
+        let variant: TypeRow = variant
+            .clone()
+            .try_into()
+            .map_err(|(idx, bound)| SumTypeError::ContainsRowVariables { tag, idx, bound })?;
 
         for (index, (t, v)) in itertools::zip_eq(variant.iter(), val.iter()).enumerate() {
             if v.const_type() != *t {
