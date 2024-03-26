@@ -11,7 +11,6 @@ use super::{Type, TypeBound};
 use crate::utils::display_list;
 use crate::PortIndex;
 use delegate::delegate;
-use itertools::Itertools;
 
 #[derive(
     Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize, derive_more::Display,
@@ -137,10 +136,9 @@ where
     }
 }
 
-impl<T, F> From<F> for TypeRowBase<T>
+impl<F> From<F> for TypeRow
 where
-    [T]: ToOwned<Owned = Vec<T>>,
-    F: Into<Cow<'static, [T]>>,
+    F: Into<Cow<'static, [Type]>>,
 {
     fn from(types: F) -> Self {
         Self {
@@ -149,27 +147,28 @@ where
     }
 }
 
-/*impl <F: Into<Cow<'static, [Type]>>> From<F> for TypeRowV {
-    fn from(value: F) -> Self {
-        todo!()
-    }
-}*/
-
 impl Into<Cow<'static, [RowVarOrType]>> for TypeRow {
     fn into(self) -> Cow<'static, [RowVarOrType]> {
-        self.types.into_owned().into_iter().map(RowVarOrType::from).collect()
+        self.types
+            .into_owned()
+            .into_iter()
+            .map(RowVarOrType::from)
+            .collect()
     }
 }
 
-impl<F> From<F> for TypeRowV
+impl<F, T> From<F> for TypeRowV
 where
-    F: IntoIterator<Item = Type>,
+    RowVarOrType: From<T>,
+    F: IntoIterator<Item = T>,
 {
-    // Note: I tried "where F: Into<Cow<'static, [Type]>>" but that requires
-    // types.into().into_owned().into_iter()
-    // both allow use of owned data without cloning, and use of borrowed data with clone
-    // (this one might require an explicit `.cloned()` from the caller)
-    // but I think this looks no less efficient (?)
+    // Note: I tried "where F: Into<Cow<'static, [Type]>>" but
+    // (a) that requires `types.into().into_owned().into_iter()`
+    //     - both allow use of owned data without cloning, and use of borrowed data with clone
+    //     - (this way might require an explicit `.cloned()` from the caller)
+    //     but I think this looks no less efficient (?)
+    // (b) can't then parameterize the impl over <T> because it's unconstrained
+    //     (seems F: IntoIterator<Item=T> provides a constraint but F: Into<Cow<'static, [T]>> does not)
     fn from(types: F) -> Self {
         Self {
             types: types.into_iter().map(RowVarOrType::from).collect(),
@@ -194,20 +193,5 @@ where
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.types.to_mut()
-    }
-}
-
-impl<T> IntoIterator for TypeRowBase<T>
-where
-    RowVarOrType: From<T>,
-    [T]: ToOwned<Owned = Vec<T>>,
-{
-    type Item = RowVarOrType;
-
-    type IntoIter = itertools::MapInto<<Vec<T> as IntoIterator>::IntoIter, RowVarOrType>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        let owned = self.types.into_owned();
-        owned.into_iter().map_into()
     }
 }
