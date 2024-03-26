@@ -212,6 +212,28 @@ impl Signature {
     }
 }
 
+impl From<Signature> for FunctionType {
+    fn from(sig: Signature) -> Self {
+        Self {
+            input: sig.input.into(),
+            output: sig.output.into(),
+            extension_reqs: sig.extension_reqs,
+        }
+    }
+}
+
+impl TryFrom<FunctionType> for Signature {
+    type Error = (usize, TypeBound);
+
+    fn try_from(funty: FunctionType) -> Result<Self, Self::Error> {
+        Ok(Self {
+            input: funty.input.try_into()?,
+            output: funty.output.try_into()?,
+            extension_reqs: funty.extension_reqs,
+        })
+    }
+}
+
 impl<T: Display> Display for FuncTypeBase<T>
 where
     [T]: ToOwned<Owned = Vec<T>>,

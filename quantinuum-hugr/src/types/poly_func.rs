@@ -6,8 +6,11 @@ use crate::{
 };
 use itertools::Itertools;
 
-use super::type_param::{check_type_args, TypeArg, TypeParam};
-use super::{FunctionType, Substitution, Type, TypeBound};
+use super::{
+    type_param::{check_type_args, TypeArg, TypeParam},
+    type_row::RowVarOrType,
+};
+use super::{FunctionType, Signature, Substitution, Type, TypeBound};
 
 /// A polymorphic function type, e.g. of a [Graph], or perhaps an [OpDef].
 /// (Nodes/operations in the Hugr are not polymorphic.)
@@ -40,6 +43,12 @@ impl From<FunctionType> for PolyFuncType {
             params: vec![],
             body,
         }
+    }
+}
+
+impl From<Signature> for PolyFuncType {
+    fn from(value: Signature) -> Self {
+        FunctionType::from(value).into()
     }
 }
 

@@ -207,3 +207,19 @@ impl IntoIterator for TypeRow {
         self.types.into_owned().into_iter().map_into()
     }
 }
+
+impl TryInto<TypeRow> for TypeRowV {
+    type Error = (usize, TypeBound);
+
+    fn try_into(self) -> Result<TypeRow, Self::Error> {
+        self.types
+            .into_owned()
+            .into_iter()
+            .map(|rvt| match rvt {
+                RowVarOrType::T(ty) => Ok(ty),
+                RowVarOrType::RV(idx, bound) => Err((idx, bound)),
+            })
+            .collect::<Result<Vec<Type>, _>>()
+            .map(TypeRow::from)
+    }
+}
