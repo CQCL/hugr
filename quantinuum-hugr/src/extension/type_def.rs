@@ -186,7 +186,7 @@ mod test {
         };
         let typ = Type::new_extension(
             def.instantiate(vec![TypeArg::Type {
-                ty: Type::new_function(FunctionType::new(vec![], vec![])),
+                ty: Type::new_function(FunctionType::default()),
             }])
             .unwrap(),
         );

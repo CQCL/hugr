@@ -68,7 +68,7 @@ mod test {
 
     #[test]
     fn serialize_types_roundtrip() {
-        let g: Type = Type::new_function(FunctionType::new_endo(vec![]));
+        let g: Type = Type::new_function(FunctionType::default());
 
         assert_eq!(ser_roundtrip(&g), g);
 

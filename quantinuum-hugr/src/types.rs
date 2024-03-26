@@ -236,7 +236,7 @@ impl TypeEnum {
 /// ```
 /// # use hugr::types::{Type, TypeBound, FunctionType};
 ///
-/// let func_type = Type::new_function(FunctionType::new_endo(vec![]));
+/// let func_type = Type::new_function(FunctionType::default());
 /// assert_eq!(func_type.least_upper_bound(), TypeBound::Copyable);
 ///
 /// ```
@@ -466,7 +466,7 @@ pub(crate) mod test {
     fn construct() {
         let t: Type = Type::new_tuple(vec![
             USIZE_T,
-            Type::new_function(FunctionType::new_endo(vec![])),
+            Type::new_function(FunctionType::default()),
             Type::new_extension(CustomType::new(
                 "my_custom",
                 [],
