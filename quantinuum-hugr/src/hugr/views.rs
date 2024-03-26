@@ -28,7 +28,7 @@ use super::{Hugr, HugrError, NodeMetadata, NodeMetadataMap, NodeType, DEFAULT_NO
 use crate::ops::handle::NodeHandle;
 use crate::ops::{OpParent, OpTag, OpTrait, OpType};
 
-use crate::types::{EdgeKind, FunctionType};
+use crate::types::{EdgeKind, Signature};
 use crate::types::{PolyFuncType, Type};
 use crate::{Direction, IncomingPort, Node, OutgoingPort, Port};
 
@@ -335,8 +335,8 @@ pub trait HugrView: sealed::HugrInternals {
     /// graph. Otherwise, returns `None`.
     ///
     /// In contrast to [`get_function_type`][HugrView::get_function_type], this
-    /// method always return a concrete [`FunctionType`].
-    fn get_df_function_type(&self) -> Option<FunctionType> {
+    /// method always return a concrete [`Signature`].
+    fn get_df_function_type(&self) -> Option<Signature> {
         let op = self.get_optype(self.root());
         op.inner_function_type()
     }
@@ -435,7 +435,7 @@ pub trait HugrView: sealed::HugrInternals {
 
     /// Get the "signature" (incoming and outgoing types) of a node, non-Value
     /// kind ports will be missing.
-    fn signature(&self, node: Node) -> Option<FunctionType> {
+    fn signature(&self, node: Node) -> Option<Signature> {
         self.get_optype(node).dataflow_signature()
     }
 
