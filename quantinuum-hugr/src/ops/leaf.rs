@@ -6,13 +6,9 @@ use super::custom::{ExtensionOp, ExternalOp};
 use super::dataflow::DataflowOpTrait;
 use super::{OpName, OpTag};
 
-use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
+use crate::extension::{ExtensionId, ExtensionRegistry, ExtensionSet, SignatureError};
 use crate::types::type_param::TypeArg;
-use crate::types::PolyFuncType;
-use crate::{
-    extension::ExtensionId,
-    types::{EdgeKind, FunctionType, Type, TypeRow},
-};
+use crate::types::{EdgeKind, PolyFuncType, Signature, Type, TypeRow};
 
 /// Dataflow operations with no children.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -184,24 +180,24 @@ impl DataflowOpTrait for LeafOp {
         // copy-on-write strategy, so we can avoid unnecessary allocations.
 
         match self {
-            LeafOp::Noop { ty: typ } => FunctionType::new(vec![typ.clone()], vec![typ.clone()]),
+            LeafOp::Noop { ty: typ } => Signature::new(vec![typ.clone()], vec![typ.clone()]),
             LeafOp::CustomOp(ext) => ext.signature(),
             LeafOp::MakeTuple { tys: types } => {
-                FunctionType::new(types.clone(), vec![Type::new_tuple(types.clone())])
+                Signature::new(types.clone(), vec![Type::new_tuple(types.clone())])
             }
             LeafOp::UnpackTuple { tys: types } => {
-                FunctionType::new(vec![Type::new_tuple(types.clone())], types.clone())
+                Signature::new(vec![Type::new_tuple(types.clone())], types.clone())
             }
-            LeafOp::Tag { tag, variants } => FunctionType::new(
+            LeafOp::Tag { tag, variants } => Signature::new(
                 variants.get(*tag).expect("Not a valid tag").clone(),
                 vec![Type::new_sum(variants.clone())],
             ),
             LeafOp::Lift {
                 type_row,
                 new_extension,
-            } => FunctionType::new(type_row.clone(), type_row.clone())
+            } => Signature::new(type_row.clone(), type_row.clone())
                 .with_extension_delta(ExtensionSet::singleton(new_extension)),
-            LeafOp::TypeApply { ta } => FunctionType::new(
+            LeafOp::TypeApply { ta } => Signature::new(
                 vec![Type::new_function(ta.input.clone())],
                 vec![Type::new_function(ta.output.clone())],
             ),
@@ -226,8 +222,8 @@ mod test {
     use crate::hugr::ValidationError;
     use crate::ops::handle::NodeHandle;
     use crate::std_extensions::collections::EXTENSION;
-    use crate::types::Type;
-    use crate::types::{test::nested_func, FunctionType, TypeArg};
+    use crate::types::test::nested_func;
+    use crate::types::{Signature, Type, TypeArg};
 
     use super::{LeafOp, TypeApplication};
 
@@ -238,7 +234,7 @@ mod test {
         let reg = ExtensionRegistry::try_new([PRELUDE.to_owned(), EXTENSION.to_owned()]).unwrap();
         let pf_in = nested_func();
         let pf_out = pf_in.instantiate(&[USIZE_TA], &reg)?;
-        let mut dfg = DFGBuilder::new(FunctionType::new(
+        let mut dfg = DFGBuilder::new(Signature::new(
             vec![Type::new_function(pf_in.clone())],
             vec![Type::new_function(pf_out)],
         ))?;
@@ -258,7 +254,7 @@ mod test {
         let pf = nested_func();
         let pf_usz = pf.instantiate_poly(&[USIZE_TA], &reg)?;
         let pf_bool = pf.instantiate_poly(&[TypeArg::Type { ty: BOOL_T }], &reg)?;
-        let mut dfg = DFGBuilder::new(FunctionType::new(
+        let mut dfg = DFGBuilder::new(Signature::new(
             vec![Type::new_function(pf.clone())],
             vec![Type::new_function(pf_usz.clone())],
         ))?;

@@ -238,7 +238,7 @@ impl CustomConst for ConstError {
 mod test {
     use crate::{
         builder::{DFGBuilder, Dataflow, DataflowHugr},
-        types::FunctionType,
+        types::{FunctionType, Signature},
     };
 
     use super::*;
@@ -246,7 +246,7 @@ mod test {
     #[test]
     /// Test building a HUGR involving a new_array operation.
     fn test_new_array() {
-        let mut b = DFGBuilder::new(FunctionType::new(
+        let mut b = DFGBuilder::new(Signature::new(
             vec![QB_T, QB_T],
             vec![array_type(TypeArg::BoundedNat { n: 2 }, QB_T)],
         ))
@@ -286,7 +286,7 @@ mod test {
         assert!(error_val.equal_consts(&ConstError::new(2, "my message")));
         assert!(!error_val.equal_consts(&ConstError::new(3, "my message")));
 
-        let mut b = DFGBuilder::new(FunctionType::new_endo(type_row![])).unwrap();
+        let mut b = DFGBuilder::new(Signature::new_endo(type_row![])).unwrap();
 
         let err = b.add_load_const(error_val);
 

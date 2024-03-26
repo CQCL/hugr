@@ -203,7 +203,7 @@ pub(super) mod test {
         builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
         ops::handle::NodeHandle,
         type_row,
-        types::{FunctionType, Type},
+        types::{FunctionType, Signature, Type},
         utils::test_quantum_extension::h_gate,
     };
 
@@ -231,7 +231,7 @@ pub(super) mod test {
 
             let inner_id = {
                 let inner_builder = func_builder.dfg_builder(
-                    FunctionType::new(type_row![NAT], type_row![NAT]),
+                    Signature::new(type_row![NAT], type_row![NAT]),
                     None,
                     [int],
                 )?;

@@ -22,7 +22,7 @@ use crate::hugr::{HugrMut, HugrView, RootTagged};
 use crate::ops::dataflow::DataflowOpTrait;
 use crate::ops::handle::{ContainerHandle, DataflowOpID};
 use crate::ops::{OpTag, OpTrait};
-use crate::types::{FunctionType, Type};
+use crate::types::{Signature, Type};
 use crate::{Hugr, IncomingPort, Node, OutgoingPort, Port, SimpleReplacement};
 
 /// A non-empty convex subgraph of a HUGR sibling graph.
@@ -289,7 +289,7 @@ impl SiblingSubgraph {
     }
 
     /// The signature of the subgraph.
-    pub fn signature(&self, hugr: &impl HugrView) -> FunctionType {
+    pub fn signature(&self, hugr: &impl HugrView) -> Signature {
         let input = self
             .inputs
             .iter()
@@ -307,7 +307,7 @@ impl SiblingSubgraph {
                 sig.port_type(p).cloned().expect("must be dataflow edge")
             })
             .collect_vec();
-        FunctionType::new(input, output)
+        Signature::new(input, output)
     }
 
     /// The parent of the sibling subgraph.
@@ -684,6 +684,7 @@ mod tests {
     use cool_asserts::assert_matches;
 
     use crate::extension::PRELUDE_REGISTRY;
+    use crate::types::FunctionType;
     use crate::utils::test_quantum_extension::cx_gate;
     use crate::{
         builder::{
@@ -805,7 +806,7 @@ mod tests {
         let sub = SiblingSubgraph::try_new_dataflow_subgraph(&func)?;
 
         let empty_dfg = {
-            let builder = DFGBuilder::new(FunctionType::new_endo(type_row![QB_T, QB_T])).unwrap();
+            let builder = DFGBuilder::new(Signature::new_endo(type_row![QB_T, QB_T])).unwrap();
             let inputs = builder.input_wires();
             builder.finish_prelude_hugr_with_outputs(inputs).unwrap()
         };
@@ -830,7 +831,7 @@ mod tests {
         // the first two qubits.
         assert_eq!(
             sub.signature(&func),
-            FunctionType::new_endo(type_row![QB_T, QB_T])
+            Signature::new_endo(type_row![QB_T, QB_T])
         );
         Ok(())
     }
@@ -842,7 +843,7 @@ mod tests {
         let sub = SiblingSubgraph::from_sibling_graph(&func)?;
 
         let empty_dfg = {
-            let builder = DFGBuilder::new(FunctionType::new_endo(type_row![QB_T])).unwrap();
+            let builder = DFGBuilder::new(Signature::new_endo(type_row![QB_T])).unwrap();
             let inputs = builder.input_wires();
             builder.finish_prelude_hugr_with_outputs(inputs).unwrap()
         };
@@ -981,7 +982,7 @@ mod tests {
         let two_bit = type_row![BOOL_T, BOOL_T];
 
         let mut builder =
-            DFGBuilder::new(FunctionType::new(one_bit.clone(), two_bit.clone())).unwrap();
+            DFGBuilder::new(Signature::new(one_bit.clone(), two_bit.clone())).unwrap();
         let inw = builder.input_wires().exactly_one().unwrap();
         let outw1 = builder.add_dataflow_op(NotOp, [inw]).unwrap().out_wire(0);
         let outw2 = builder

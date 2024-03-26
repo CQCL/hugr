@@ -6,18 +6,15 @@ use crate::{
     extension::prelude::QB_T,
     ops::handle::{DataflowOpID, NodeHandle},
     type_row,
-    types::FunctionType,
+    types::{FunctionType, Signature},
     utils::test_quantum_extension::cx_gate,
     Hugr, HugrView,
 };
 
 #[fixture]
 fn sample_hugr() -> (Hugr, BuildHandle<DataflowOpID>, BuildHandle<DataflowOpID>) {
-    let mut dfg = DFGBuilder::new(FunctionType::new(
-        type_row![QB_T, QB_T],
-        type_row![QB_T, QB_T],
-    ))
-    .unwrap();
+    let mut dfg =
+        DFGBuilder::new(Signature::new(type_row![QB_T, QB_T], type_row![QB_T, QB_T])).unwrap();
 
     let [q1, q2] = dfg.input_wires_arr();
 
@@ -122,7 +119,7 @@ fn value_types() {
     use crate::utils::test_quantum_extension::h_gate;
     use itertools::Itertools;
 
-    let mut dfg = DFGBuilder::new(FunctionType::new(
+    let mut dfg = DFGBuilder::new(Signature::new(
         type_row![QB_T, BOOL_T],
         type_row![BOOL_T, QB_T],
     ))
@@ -150,7 +147,7 @@ fn static_targets() {
     use crate::extension::prelude::{ConstUsize, PRELUDE_ID, USIZE_T};
     use itertools::Itertools;
     let mut dfg = DFGBuilder::new(
-        FunctionType::new(type_row![], type_row![USIZE_T]).with_extension_delta(PRELUDE_ID),
+        Signature::new(type_row![], type_row![USIZE_T]).with_extension_delta(PRELUDE_ID),
     )
     .unwrap();
 
@@ -176,7 +173,7 @@ fn test_dataflow_ports_only() {
     use crate::std_extensions::logic::NotOp;
     use itertools::Itertools;
 
-    let mut dfg = DFGBuilder::new(FunctionType::new(type_row![BOOL_T], type_row![BOOL_T])).unwrap();
+    let mut dfg = DFGBuilder::new(Signature::new(type_row![BOOL_T], type_row![BOOL_T])).unwrap();
     let local_and = {
         let local_and = dfg
             .define_function(

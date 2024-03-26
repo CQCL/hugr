@@ -515,7 +515,7 @@ mod test {
 
         let list_usize =
             Type::new_extension(list_def.instantiate(vec![TypeArg::Type { ty: USIZE_T }])?);
-        let mut dfg = DFGBuilder::new(FunctionType::new_endo(vec![list_usize]))?;
+        let mut dfg = DFGBuilder::new(Signature::new_endo(vec![list_usize]))?;
         let rev = dfg.add_dataflow_op(
             LeafOp::from(ExternalOp::Extension(
                 e.instantiate_extension_op(&OP_NAME, vec![TypeArg::Type { ty: USIZE_T }], &reg)

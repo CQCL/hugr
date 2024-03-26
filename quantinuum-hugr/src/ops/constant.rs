@@ -285,6 +285,7 @@ where
 mod test {
     use super::Const;
     use crate::builder::test::simple_dfg_hugr;
+    use crate::types::Signature;
     use crate::{
         builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
         extension::{
@@ -343,7 +344,7 @@ mod test {
         let pred_rows = vec![type_row![USIZE_T, FLOAT64_TYPE], Type::EMPTY_TYPEROW];
         let pred_ty = SumType::new(pred_rows.clone());
 
-        let mut b = DFGBuilder::new(FunctionType::new(
+        let mut b = DFGBuilder::new(Signature::new(
             type_row![],
             TypeRow::from(vec![pred_ty.clone().into()]),
         ))?;
@@ -358,7 +359,7 @@ mod test {
         let w = b.load_const(&c);
         b.finish_hugr_with_outputs([w], &test_registry()).unwrap();
 
-        let mut b = DFGBuilder::new(FunctionType::new(
+        let mut b = DFGBuilder::new(Signature::new(
             type_row![],
             TypeRow::from(vec![pred_ty.clone().into()]),
         ))?;

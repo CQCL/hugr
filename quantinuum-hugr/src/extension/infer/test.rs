@@ -20,7 +20,7 @@ use crate::{
 };
 
 use crate::type_row;
-use crate::types::{FunctionType, Type, TypeRow};
+use crate::types::{FunctionType, Signature, Type, TypeRow};
 
 use cool_asserts::assert_matches;
 use itertools::Itertools;
@@ -40,7 +40,7 @@ const_extension_ids! {
 // them.
 fn from_graph() -> Result<(), Box<dyn Error>> {
     let rs = ExtensionSet::from_iter([A, B, C]);
-    let main_sig = FunctionType::new(type_row![NAT, NAT], type_row![NAT]).with_extension_delta(rs);
+    let main_sig = Signature::new(type_row![NAT, NAT], type_row![NAT]).with_extension_delta(rs);
 
     let op = ops::DFG {
         signature: main_sig,
@@ -57,14 +57,14 @@ fn from_graph() -> Result<(), Box<dyn Error>> {
 
     assert_matches!(hugr.get_io(hugr.root()), Some(_));
 
-    let add_a_sig = FunctionType::new(type_row![NAT], type_row![NAT]).with_extension_delta(A);
+    let add_a_sig = Signature::new(type_row![NAT], type_row![NAT]).with_extension_delta(A);
 
-    let add_b_sig = FunctionType::new(type_row![NAT], type_row![NAT]).with_extension_delta(B);
+    let add_b_sig = Signature::new(type_row![NAT], type_row![NAT]).with_extension_delta(B);
 
-    let add_ab_sig = FunctionType::new(type_row![NAT], type_row![NAT])
+    let add_ab_sig = Signature::new(type_row![NAT], type_row![NAT])
         .with_extension_delta(ExtensionSet::from_iter([A, B]));
 
-    let mult_c_sig = FunctionType::new(type_row![NAT, NAT], type_row![NAT]).with_extension_delta(C);
+    let mult_c_sig = Signature::new(type_row![NAT, NAT], type_row![NAT]).with_extension_delta(C);
 
     let add_a = hugr.add_node_with_parent(
         hugr.root(),
@@ -220,8 +220,7 @@ fn dangling_src() -> Result<(), Box<dyn Error>> {
     );
 
     let [input, output] = hugr.get_io(hugr.root()).unwrap();
-    let add_r_sig =
-        FunctionType::new(type_row![NAT], type_row![NAT]).with_extension_delta(rs.clone());
+    let add_r_sig = Signature::new(type_row![NAT], type_row![NAT]).with_extension_delta(rs.clone());
 
     let add_r = hugr.add_node_with_parent(
         hugr.root(),
@@ -231,11 +230,11 @@ fn dangling_src() -> Result<(), Box<dyn Error>> {
     );
 
     // Dangling thingy
-    let src_sig = FunctionType::new(type_row![], type_row![NAT]);
+    let src_sig = Signature::new(type_row![], type_row![NAT]);
 
     let src = hugr.add_node_with_parent(hugr.root(), ops::DFG { signature: src_sig });
 
-    let mult_sig = FunctionType::new(type_row![NAT, NAT], type_row![NAT]);
+    let mult_sig = Signature::new(type_row![NAT, NAT], type_row![NAT]);
     // Mult has open extension requirements, which we should solve to be "R"
     let mult = hugr.add_node_with_parent(
         hugr.root(),
@@ -281,7 +280,7 @@ fn create_with_io(
     hugr: &mut Hugr,
     parent: Node,
     op: impl Into<OpType>,
-    op_sig: FunctionType,
+    op_sig: Signature,
 ) -> Result<[Node; 3], Box<dyn Error>> {
     let op: OpType = op.into();
 
@@ -354,7 +353,7 @@ fn test_conditional_inference() -> Result<(), Box<dyn Error>> {
     let conditional_node = hugr.root();
 
     let case_op = ops::Case {
-        signature: FunctionType::new(inputs, outputs).with_extension_delta(rs),
+        signature: Signature::new(inputs, outputs).with_extension_delta(rs),
     };
     let case0_node = build_case(&mut hugr, conditional_node, case_op.clone(), A, B)?;
 
@@ -377,7 +376,7 @@ fn test_conditional_inference() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn extension_adding_sequence() -> Result<(), Box<dyn Error>> {
-    let df_sig = FunctionType::new(type_row![NAT], type_row![NAT]);
+    let df_sig = Signature::new(type_row![NAT], type_row![NAT]);
 
     let mut hugr = Hugr::new(NodeType::new_open(ops::DFG {
         signature: df_sig
@@ -438,7 +437,7 @@ fn extension_adding_sequence() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn make_opaque(extension: impl Into<ExtensionId>, signature: FunctionType) -> ops::LeafOp {
+fn make_opaque(extension: impl Into<ExtensionId>, signature: Signature) -> ops::LeafOp {
     let opaque = ops::custom::OpaqueOp::new(extension.into(), "", "".into(), vec![], signature);
     ops::custom::ExternalOp::from(opaque).into()
 }
@@ -452,7 +451,7 @@ fn make_block(
 ) -> Result<Node, Box<dyn Error>> {
     let sum_rows: Vec<_> = sum_rows.into_iter().collect();
     let sum_type = Type::new_sum(sum_rows.clone());
-    let dfb_sig = FunctionType::new(inputs.clone(), vec![sum_type])
+    let dfb_sig = Signature::new(inputs.clone(), vec![sum_type])
         .with_extension_delta(extension_delta.clone());
     let dfb = ops::DataflowBlock {
         inputs,
@@ -543,7 +542,7 @@ fn infer_cfg_test() -> Result<(), Box<dyn Error>> {
     let bc = ExtensionSet::from_iter([B, C]);
 
     let mut hugr = Hugr::new(NodeType::new_open(ops::CFG {
-        signature: FunctionType::new(type_row![NAT], type_row![NAT]).with_extension_delta(abc),
+        signature: Signature::new(type_row![NAT], type_row![NAT]).with_extension_delta(abc),
     }));
 
     let root = hugr.root();
@@ -561,7 +560,7 @@ fn infer_cfg_test() -> Result<(), Box<dyn Error>> {
         entry,
         make_opaque(
             A,
-            FunctionType::new(vec![NAT], twoway(NAT)).with_extension_delta(A),
+            Signature::new(vec![NAT], twoway(NAT)).with_extension_delta(A),
         ),
     );
 
@@ -641,7 +640,7 @@ fn infer_cfg_test() -> Result<(), Box<dyn Error>> {
 #[test]
 fn multi_entry() -> Result<(), Box<dyn Error>> {
     let mut hugr = Hugr::new(NodeType::new_open(ops::CFG {
-        signature: FunctionType::new(type_row![NAT], type_row![NAT]), // maybe add extensions?
+        signature: Signature::new(type_row![NAT], type_row![NAT]), // maybe add extensions?
     }));
     let cfg = hugr.root();
     let ([entry, entry_in, entry_out], exit) = create_entry_exit(
@@ -655,7 +654,7 @@ fn multi_entry() -> Result<(), Box<dyn Error>> {
 
     let entry_mid = hugr.add_node_with_parent(
         entry,
-        make_opaque(UNKNOWN_EXTENSION, FunctionType::new(vec![NAT], twoway(NAT))),
+        make_opaque(UNKNOWN_EXTENSION, Signature::new(vec![NAT], twoway(NAT))),
     );
 
     hugr.connect(entry_in, 0, entry_mid, 0);
@@ -727,8 +726,7 @@ fn make_looping_cfg(
         .union(bb2_ext.clone());
 
     let mut hugr = Hugr::new(NodeType::new_open(ops::CFG {
-        signature: FunctionType::new(type_row![NAT], type_row![NAT])
-            .with_extension_delta(hugr_delta),
+        signature: Signature::new(type_row![NAT], type_row![NAT]).with_extension_delta(hugr_delta),
     }));
 
     let root = hugr.root();
@@ -746,7 +744,7 @@ fn make_looping_cfg(
         entry,
         make_opaque(
             UNKNOWN_EXTENSION,
-            FunctionType::new(vec![NAT], oneway(NAT)).with_extension_delta(entry_ext),
+            Signature::new(vec![NAT], oneway(NAT)).with_extension_delta(entry_ext),
         ),
     );
 
@@ -803,7 +801,7 @@ fn simple_cfg_loop() -> Result<(), Box<dyn Error>> {
 
     let mut hugr = Hugr::new(NodeType::new(
         ops::CFG {
-            signature: FunctionType::new(type_row![NAT], type_row![NAT]).with_extension_delta(A),
+            signature: Signature::new(type_row![NAT], type_row![NAT]).with_extension_delta(A),
         },
         Some(A.into()),
     ));
@@ -821,7 +819,7 @@ fn simple_cfg_loop() -> Result<(), Box<dyn Error>> {
 
     let entry_mid = hugr.add_node_with_parent(
         entry,
-        make_opaque(UNKNOWN_EXTENSION, FunctionType::new(vec![NAT], oneway(NAT))),
+        make_opaque(UNKNOWN_EXTENSION, Signature::new(vec![NAT], oneway(NAT))),
     );
 
     hugr.connect(entry_in, 0, entry_mid, 0);
@@ -849,7 +847,7 @@ fn simple_cfg_loop() -> Result<(), Box<dyn Error>> {
 #[test]
 fn plus_on_self() -> Result<(), Box<dyn std::error::Error>> {
     let ext = ExtensionId::new("unknown1").unwrap();
-    let ft = FunctionType::new_endo(type_row![QB_T, QB_T]).with_extension_delta(ext.clone());
+    let ft = Signature::new_endo(type_row![QB_T, QB_T]).with_extension_delta(ext.clone());
     let mut dfg = DFGBuilder::new(ft.clone())?;
 
     // While https://github.com/CQCL/hugr/issues/388 is unsolved,
@@ -863,7 +861,7 @@ fn plus_on_self() -> Result<(), Box<dyn std::error::Error>> {
         ft,
     ))
     .into();
-    let unary_sig = FunctionType::new_endo(type_row![QB_T]).with_extension_delta(ext.clone());
+    let unary_sig = Signature::new_endo(type_row![QB_T]).with_extension_delta(ext.clone());
     let unop: LeafOp = ExternalOp::Opaque(OpaqueOp::new(
         ext,
         "1qb_op",
