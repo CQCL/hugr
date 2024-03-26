@@ -1,8 +1,8 @@
 //! Implementation of the `Replace` operation.
 
-use std::collections::{HashMap, HashSet, VecDeque};
-
 use itertools::Itertools;
+use nonempty::NonEmpty;
+use std::collections::{HashMap, HashSet, VecDeque};
 use thiserror::Error;
 
 use crate::hugr::hugrmut::InsertionResult;
@@ -59,7 +59,7 @@ pub struct Replacement {
     /// These must all have a common parent (i.e. be siblings).  Called "S" in the spec.
     /// Must be non-empty - otherwise there is no parent under which to place [Self::replacement],
     /// and there would be no possible [Self::mu_inp], [Self::mu_out] or [Self::adoptions].
-    pub removal: Vec<Node>,
+    pub removal: NonEmpty<Node>,
     /// A hugr (not necessarily valid, as it may be missing edges and/or nodes), whose root
     /// is the same type as the root of [Self::replacement].  "G" in the spec.
     pub replacement: Hugr,
@@ -440,6 +440,7 @@ mod test {
 
     use cool_asserts::assert_matches;
     use itertools::Itertools;
+    use nonempty::nonempty;
 
     use crate::algorithm::nest_cfgs::test::depth;
     use crate::builder::{
@@ -571,7 +572,7 @@ mod test {
         }
 
         h.apply_rewrite(Replacement {
-            removal: vec![entry.node(), bb2.node()],
+            removal: nonempty![entry.node(), bb2.node()],
             replacement,
             adoptions: HashMap::from([(r_df1.node(), entry.node()), (r_df2.node(), bb2.node())]),
             mu_inp: vec![],
@@ -700,7 +701,7 @@ mod test {
             },
         );
         let mut r = Replacement {
-            removal: vec![case1, case2],
+            removal: nonempty![case1, case2],
             replacement: rep1,
             adoptions: HashMap::from_iter([(r1, case1), (r2, baz_dfg.node())]),
             mu_inp: vec![],
@@ -724,14 +725,14 @@ mod test {
         // First, removed nodes...
         assert_eq!(
             verify_apply(Replacement {
-                removal: vec![h.root()],
+                removal: nonempty![h.root()],
                 ..r.clone()
             }),
             Err(ReplaceError::CantReplaceRoot)
         );
         assert_eq!(
             verify_apply(Replacement {
-                removal: vec![case1, baz_dfg.node()],
+                removal: nonempty![case1, baz_dfg.node()],
                 ..r.clone()
             }),
             Err(ReplaceError::MultipleParents(vec![cond.node(), case2]))
