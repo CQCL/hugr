@@ -27,7 +27,7 @@ jobs:
     outputs:
       python: ${{ github.ref_name == github.event.repository.default_branch || steps.filter.outputs.python }}
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - uses: dorny/paths-filter@v3
       id: filter
       with:
@@ -49,7 +49,7 @@ jobs:
         python-version: ['3.10']
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.4
       - name: Install poetry
@@ -82,7 +82,7 @@ jobs:
     name: Check serialization schema
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.4
       - name: Install poetry
