@@ -254,12 +254,13 @@ fn validate_each<'a>(
 impl Type {
     /// An empty `TypeRow`. Provided here for convenience
     pub const EMPTY_TYPEROW: TypeRow = type_row![];
-    /// An empty `TypeRowV`. Provided here for convenience
-    pub const EMPTY_VL_TYPEROW: TypeRowV = type_row![];
+
     /// Unit type (empty tuple).
     pub const UNIT: Self = Self(TypeEnum::Sum(SumType::Unit { size: 1 }), TypeBound::Eq);
 
     const EMPTY_TYPEROW_REF: &'static TypeRow = &Self::EMPTY_TYPEROW;
+
+    const EMPTY_VL_TYPEROW: TypeRowV = TypeRowV::new();
     const EMPTY_VL_TYPEROW_REF: &'static TypeRowV = &Self::EMPTY_VL_TYPEROW;
 
     /// Initialize a new function type.
@@ -493,7 +494,7 @@ pub(crate) mod test {
 
     #[test]
     fn sum_construct() {
-        let pred1 = Type::new_sum([Type::EMPTY_TYPEROW, Type::EMPTY_TYPEROW]);
+        let pred1 = Type::new_sum([TypeRowV::new(), TypeRowV::new()]);
         let pred2 = Type::new_unit_sum(2);
 
         assert_eq!(pred1, pred2);
