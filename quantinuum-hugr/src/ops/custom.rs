@@ -93,7 +93,7 @@ impl DataflowOpTrait for ExternalOp {
         }
     }
 
-    fn signature(&self) -> FunctionType {
+    fn signature(&self) -> Signature {
         match self {
             Self::Opaque(op) => op.signature.clone(),
             Self::Extension(ext_op) => ext_op.signature(),
@@ -187,7 +187,7 @@ impl DataflowOpTrait for ExtensionOp {
         self.def().description()
     }
 
-    fn signature(&self) -> FunctionType {
+    fn signature(&self) -> Signature {
         self.signature.clone()
     }
 }
@@ -264,7 +264,7 @@ impl DataflowOpTrait for OpaqueOp {
         &self.description
     }
 
-    fn signature(&self) -> FunctionType {
+    fn signature(&self) -> Signature {
         self.signature.clone()
     }
 }

@@ -13,7 +13,7 @@ use crate::utils::display_list_with_separator;
 pub use check::SumTypeError;
 pub use custom::CustomType;
 pub use poly_func::PolyFuncType;
-pub use signature::FunctionType;
+pub use signature::{Signature, FunctionType};
 use smol_str::SmolStr;
 pub use type_param::TypeArg;
 pub use type_row::TypeRow;

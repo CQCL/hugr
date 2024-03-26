@@ -10,7 +10,7 @@ pub mod module;
 pub mod tag;
 pub mod validate;
 use crate::extension::ExtensionSet;
-use crate::types::{EdgeKind, FunctionType};
+use crate::types::{EdgeKind, Signature};
 use crate::{Direction, OutgoingPort, Port};
 use crate::{IncomingPort, PortIndex};
 use paste::paste;
@@ -319,7 +319,7 @@ pub trait OpTrait {
     /// The signature of the operation.
     ///
     /// Only dataflow operations have a signature, otherwise returns None.
-    fn dataflow_signature(&self) -> Option<FunctionType> {
+    fn dataflow_signature(&self) -> Option<Signature> {
         None
     }
 

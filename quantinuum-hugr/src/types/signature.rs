@@ -6,7 +6,7 @@ use std::fmt::{self, Display, Write};
 
 use super::type_param::TypeParam;
 use super::type_row::{RowVarOrType, TypeRowBase};
-use super::{subst_row, valid_row, Substitution, Type, TypeRowV};
+use super::{subst_row, valid_row, Substitution, Type, TypeBound, TypeRowV};
 
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 use crate::{Direction, IncomingPort, OutgoingPort, Port};
@@ -32,6 +32,18 @@ pub type FunctionType = FuncTypeBase<RowVarOrType>;
 
 /// The type of a node. Fixed/known arity of inputs + outputs.
 pub type Signature = FuncTypeBase<Type>;
+
+impl TryFrom<FunctionType> for Signature {
+    type Error = (usize, TypeBound);
+
+    fn try_from(value: FunctionType) -> Result<Self, Self::Error> {
+        Ok(Self {
+            input: value.input.try_into()?,
+            output: value.output.try_into()?,
+            extension_reqs: value.extension_reqs
+        })
+    }
+}
 
 impl<T> FuncTypeBase<T>
 where
