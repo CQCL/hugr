@@ -30,7 +30,7 @@ use crate::extension::infer_extensions;
 use crate::extension::{ExtensionRegistry, ExtensionSet, ExtensionSolution, InferExtensionError};
 use crate::ops::custom::resolve_extension_ops;
 use crate::ops::{OpTag, OpTrait, OpType, DEFAULT_OPTYPE};
-use crate::types::FunctionType;
+use crate::types::Signature;
 use crate::{Direction, Node};
 
 use delegate::delegate;
@@ -108,7 +108,7 @@ impl NodeType {
     }
 
     /// Get the function type from the embedded op
-    pub fn op_signature(&self) -> Option<FunctionType> {
+    pub fn op_signature(&self) -> Option<Signature> {
         self.op.dataflow_signature()
     }
 
