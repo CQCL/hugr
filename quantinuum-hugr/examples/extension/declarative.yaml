@@ -1,0 +1,36 @@
+# Optionally import other extensions. The `prelude` is always imported.
+imports: [logic]
+
+extensions:
+  - # Each extension must have a name
+    name: SimpleExt
+    types:
+      - # Types must have a name.
+        # Parameters are not currently supported.
+        name: CopyableType
+        description: A simple type with no parameters
+        # Types may have a "Eq", "Copyable", or "Any" bound.
+        # This field is optional and defaults to "Any".
+        bound: Copyable
+    operations:
+      - # Operations must have a name and a signature.
+        name: MyOperation
+        description: A simple operation with no inputs nor outputs
+        signature:
+          inputs: []
+          outputs: []
+      - name: AnotherOperation
+        description: An operation from 3 qubits to 3 qubits
+        signature:
+          # The input and outputs can be written directly as the types
+          inputs: [Q, Q, Q]
+          outputs:
+            - # Or as the type followed by a number of repetitions.
+              [Q, 1]
+            - # Or as a description, followed by the type and a number of repetitions.
+              [Control, Q, 2]
+      - name: YetAnotherOperation
+        description: An operation that uses the declared Custom type
+        signature:
+          inputs: [CopyableType]
+          outputs: [CopyableType, CopyableType]

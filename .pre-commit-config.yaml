@@ -1,0 +1,76 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0 # Use the ref you want to point at
+    hooks:
+      - id: check-added-large-files
+      - id: check-case-conflict
+      - id: check-executables-have-shebangs
+      - id: check-merge-conflict
+      - id: check-toml
+      - id: check-vcs-permalinks
+      - id: check-yaml
+      - id: detect-private-key
+      - id: end-of-file-fixer
+        exclude: |
+          (?x)^(
+            specification/schema/.*|
+            .*.snap|
+            .*.snap.new
+          )$
+      - id: trailing-whitespace
+        exclude: |
+          (?x)^(
+            specification/schema/.*|
+            .*.snap|
+            .*.snap.new
+          )$
+      - id: fix-byte-order-marker
+      - id: mixed-line-ending
+      # Python-specific
+      - id: check-ast
+      - id: check-docstring-first
+      - id: debug-statements
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.3.0
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff-format
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.9.0
+    hooks:
+      - id: mypy
+        additional_dependencies: [pydantic]
+
+  - repo: local
+    hooks:
+      - id: cargo-fmt
+        name: cargo format
+        description: Format rust code with `cargo fmt`.
+        entry: cargo fmt --all -- --check
+        language: system
+        files: \.rs$
+        pass_filenames: false
+      - id: cargo-check
+        name: cargo check
+        description: Check rust code with `cargo check`.
+        entry: cargo check --all --all-features --workspace
+        language: system
+        files: \.rs$
+        pass_filenames: false
+      - id: cargo-test
+        name: cargo test
+        description: Run tests with `cargo test`.
+        entry: cargo test --all-features --workspace
+        language: system
+        files: \.rs$
+        pass_filenames: false
+      - id: cargo-clippy
+        name: cargo clippy
+        description: Run clippy lints with `cargo clippy`.
+        entry: cargo clippy --all-features --workspace -- -D warnings
+        language: system
+        files: \.rs$
+        pass_filenames: false
