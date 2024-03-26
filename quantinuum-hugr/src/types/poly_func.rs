@@ -169,7 +169,7 @@ impl<'a> Substitution for SubstValues<'a> {
         arg.clone()
     }
 
-    fn apply_rowvar(&self, idx: usize, bound: TypeBound) -> Vec<Type> {
+    fn apply_rowvar(&self, idx: usize, bound: TypeBound) -> Vec<RowVarOrType> {
         let arg = self
             .0
             .get(idx)
@@ -181,11 +181,8 @@ impl<'a> Substitution for SubstValues<'a> {
                     TypeArg::Type { ty } => ty.clone(),
                     _ => panic!("Not a list of types - did validate() ?"),
                 })
+                .map(RowVarOrType::T)
                 .collect(),
-            TypeArg::Type { ty } => {
-                debug_assert_eq!(check_type_arg(arg, &TypeParam::Type { b: bound }), Ok(()));
-                vec![ty.clone()]
-            }
             _ => panic!("Not a type or list of types - did validate() ?"),
         }
     }
