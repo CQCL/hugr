@@ -11,11 +11,12 @@ use super::{Type, TypeBound};
 use crate::utils::display_list;
 use crate::PortIndex;
 use delegate::delegate;
-use itertools::Itertools;
 
-#[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize, derive_more::Display)]
+#[derive(
+    Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize, derive_more::Display,
+)]
 pub enum RowVarOrType {
-    #[display(fmt="{}", _0)]
+    #[display(fmt = "{}", _0)]
     T(Type),
     /// DeBruijn index, and cache of inner TypeBound - matches a [TypeParam::List] of [TypeParam::Type]
     /// of this bound (checked in validation)
@@ -43,8 +44,10 @@ impl From<Type> for RowVarOrType {
 #[non_exhaustive]
 #[serde(transparent)]
 pub struct TypeRowBase<T>
- where T: 'static,//Clone + PartialEq + Eq + std::fmt::Debug + serde::Serialize + 'static,
-   [T]: ToOwned<Owned=Vec<T>> {
+where
+    T: 'static, //Clone + PartialEq + Eq + std::fmt::Debug + serde::Serialize + 'static,
+    [T]: ToOwned<Owned = Vec<T>>,
+{
     /// The datatypes in the row.
     types: Cow<'static, [T]>,
 }
@@ -52,7 +55,10 @@ pub struct TypeRowBase<T>
 pub type TypeRow = TypeRowBase<Type>;
 pub type TypeRowV = TypeRowBase<RowVarOrType>;
 
-impl<T: Display> Display for TypeRowBase<T> where [T]: ToOwned<Owned=Vec<T>> {
+impl<T: Display> Display for TypeRowBase<T>
+where
+    [T]: ToOwned<Owned = Vec<T>>,
+{
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_char('[')?;
         display_list(self.types.as_ref(), f)?;
@@ -60,7 +66,10 @@ impl<T: Display> Display for TypeRowBase<T> where [T]: ToOwned<Owned=Vec<T>> {
     }
 }
 
-impl <T> TypeRowBase<T> where [T]: ToOwned<Owned = Vec<T>> {
+impl<T> TypeRowBase<T>
+where
+    [T]: ToOwned<Owned = Vec<T>>,
+{
     /// Create a new empty row.
     pub const fn new() -> Self {
         Self {
@@ -95,40 +104,42 @@ impl <T> TypeRowBase<T> where [T]: ToOwned<Owned = Vec<T>> {
 
             /// Allow access (consumption) of the contained elements
             pub fn into_owned(self) -> Vec<T>;
-            
+
             /// Returns the number of types in the row.
             pub fn len(&self) -> usize;
 
             /// Returns `true` if the row contains no types.
-            pub fn is_empty(&self) -> bool ;            
+            pub fn is_empty(&self) -> bool ;
         }
     }
 }
 
-impl <T> TypeRowBase<T> where T: Clone, [T]: ToOwned<Owned = Vec<T>> {
+impl<T> TypeRowBase<T>
+where
+    T: Clone,
+    [T]: ToOwned<Owned = Vec<T>>,
+{
     /// Returns a new `TypeRow` with `xs` concatenated onto `self`.
     pub fn extend<'a>(&'a self, rest: impl IntoIterator<Item = &'a T>) -> Self {
-        self.iter().chain(rest).cloned().collect_vec().into()
+        Self {
+            types: self.iter().chain(rest).cloned().collect(),
+        }
     }
 }
 
-impl Into<Cow<'static, [RowVarOrType]>> for TypeRow {
-    fn into(self: TypeRow) -> Cow<'static, [RowVarOrType]> {
-        self.types.into_owned().into_iter().map(RowVarOrType::from).collect()
-    }
-}
-
-
-impl <T> Default for TypeRowBase<T> where [T]: ToOwned<Owned = Vec<T>> {
+impl<T> Default for TypeRowBase<T>
+where
+    [T]: ToOwned<Owned = Vec<T>>,
+{
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<T,F> From<F> for TypeRowBase<T> // impl <F> From<F> for TypeRowV where F: Into<Cow<'static, [RowVarOrType]>>
+impl<F> From<F> for TypeRow
+// impl <F> From<F> for TypeRowV where F: Into<Cow<'static, [RowVarOrType]>>
 where
-    F: Into<Cow<'static, [T]>>,
-    [T]: ToOwned<Owned = Vec<T>>
+    F: Into<Cow<'static, [Type]>>,
 {
     fn from(types: F) -> Self {
         Self {
@@ -137,15 +148,26 @@ where
     }
 }
 
-/*impl <T> From<T> for TypeRowBase<T> {
-    fn from(t: Type) -> Self {
+impl<F> From<F> for TypeRowV
+where
+    F: IntoIterator<Item = Type>,
+{
+    // Note: I tried "where F: Into<Cow<'static, [Type]>>" but that requires
+    // types.into().into_owned().into_iter()
+    // both allow use of owned data without cloning, and use of borrowed data with clone
+    // (this one might require an explicit `.cloned()` from the caller)
+    // but I think this looks no less efficient (?)
+    fn from(types: F) -> Self {
         Self {
-            types: vec![t].into(),
+            types: types.into_iter().map(RowVarOrType::from).collect(),
         }
     }
-}*/
+}
 
-impl <T> Deref for TypeRowBase<T> where [T]: ToOwned<Owned=Vec<T>> {
+impl<T> Deref for TypeRowBase<T>
+where
+    [T]: ToOwned<Owned = Vec<T>>,
+{
     type Target = [T];
 
     fn deref(&self) -> &Self::Target {
@@ -153,8 +175,24 @@ impl <T> Deref for TypeRowBase<T> where [T]: ToOwned<Owned=Vec<T>> {
     }
 }
 
-impl <T> DerefMut for TypeRowBase<T> where [T]: ToOwned<Owned=Vec<T>> {
+impl<T> DerefMut for TypeRowBase<T>
+where
+    [T]: ToOwned<Owned = Vec<T>>,
+{
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.types.to_mut()
+    }
+}
+
+impl<T> IntoIterator for TypeRowBase<T>
+where
+    [T]: ToOwned<Owned = Vec<T>>,
+{
+    type Item = T;
+
+    type IntoIter = <Vec<T> as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.types.into_owned().into_iter()
     }
 }

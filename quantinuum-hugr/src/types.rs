@@ -346,10 +346,9 @@ impl Type {
         // There is no need to check the components against the bound,
         // that is guaranteed by construction (even for deserialization)
         match &self.0 {
-            TypeEnum::Sum(SumType::General { rows }) => 
-            rows.iter().try_for_each(|row| valid_row(row,
-                extension_registry,
-                var_decls)),
+            TypeEnum::Sum(SumType::General { rows }) => rows
+                .iter()
+                .try_for_each(|row| valid_row(row, extension_registry, var_decls)),
             TypeEnum::Sum(SumType::Unit { .. }) => Ok(()), // No leaves there
             TypeEnum::Alias(_) => Ok(()),
             TypeEnum::Extension(custy) => custy.validate(extension_registry, var_decls),
@@ -399,16 +398,15 @@ fn valid_row(
     exts: &ExtensionRegistry,
     var_decls: &[TypeParam],
 ) -> Result<(), SignatureError> {
-    row.iter()
-        .try_for_each(|t| match t {
-            RowVarOrType::T(t) => t.validate(exts, var_decls),
-            RowVarOrType::RV(idx, bound) => {
-                        let t = TypeParam::List {
-                            param: Box::new((*bound).into()),
-                        };
-                        check_typevar_decl(var_decls, *idx, &t)
-                },
-        })
+    row.iter().try_for_each(|t| match t {
+        RowVarOrType::T(t) => t.validate(exts, var_decls),
+        RowVarOrType::RV(idx, bound) => {
+            let t = TypeParam::List {
+                param: Box::new((*bound).into()),
+            };
+            check_typevar_decl(var_decls, *idx, &t)
+        }
+    })
 }
 
 fn subst_row(row: &TypeRowV, tr: &impl Substitution) -> TypeRowV {
