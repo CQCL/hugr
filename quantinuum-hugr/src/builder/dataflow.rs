@@ -1,4 +1,4 @@
-use super::build_traits::{HugrBuilder, SubContainer};
+use super::build_traits::{fix_sig, HugrBuilder, SubContainer};
 use super::handle::BuildHandle;
 use super::{BuildError, Container, Dataflow, DfgID, FuncID};
 
@@ -7,7 +7,7 @@ use std::marker::PhantomData;
 use crate::hugr::{HugrView, NodeType, ValidationError};
 use crate::ops;
 
-use crate::types::{FunctionType, PolyFuncType};
+use crate::types::{PolyFuncType, Signature};
 
 use crate::extension::{ExtensionRegistry, ExtensionSet};
 use crate::Node;
@@ -26,11 +26,16 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
     pub(super) fn create_with_io(
         mut base: T,
         parent: Node,
-        signature: FunctionType,
+        signature: Signature,
         input_extensions: Option<ExtensionSet>,
     ) -> Result<Self, BuildError> {
-        let num_in_wires = signature.input().len();
-        let num_out_wires = signature.output().len();
+        let Signature {
+            input,
+            output,
+            extension_reqs,
+        } = signature;
+        let num_in_wires = input.len();
+        let num_out_wires = output.len();
         /* For a given dataflow graph with extension requirements IR -> IR + dR,
          - The output node's extension requirements are IR + dR -> IR + dR
            (but we expect no output wires)
@@ -43,12 +48,8 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
            from the input wires as we normally expect, but have to infer the
            output wires and make use of the equality between the two.
         */
-        let input = ops::Input {
-            types: signature.input().clone(),
-        };
-        let output = ops::Output {
-            types: signature.output().clone(),
-        };
+        let input = ops::Input { types: input };
+        let output = ops::Output { types: output };
         base.as_mut()
             .add_node_with_parent(parent, NodeType::new(input, input_extensions.clone()));
         base.as_mut().add_node_with_parent(
@@ -75,7 +76,7 @@ impl DFGBuilder<Hugr> {
     /// # Errors
     ///
     /// Error in adding DFG child nodes.
-    pub fn new(signature: FunctionType) -> Result<DFGBuilder<Hugr>, BuildError> {
+    pub fn new(signature: Signature) -> Result<DFGBuilder<Hugr>, BuildError> {
         let dfg_op = ops::DFG {
             signature: signature.clone(),
         };
@@ -147,7 +148,7 @@ impl FunctionBuilder<Hugr> {
     ///
     /// Error in adding DFG child nodes.
     pub fn new(name: impl Into<String>, signature: PolyFuncType) -> Result<Self, BuildError> {
-        let body = signature.body().clone();
+        let body = fix_sig(signature.body().clone())?;
         let op = ops::FuncDefn {
             signature,
             name: name.into(),
@@ -214,7 +215,7 @@ pub(crate) mod test {
     use crate::ops::{handle::NodeHandle, LeafOp, OpTag};
 
     use crate::std_extensions::logic::test::and_op;
-    use crate::types::Type;
+    use crate::types::{FunctionType, Type};
     use crate::utils::test_quantum_extension::h_gate;
     use crate::{
         builder::{
@@ -243,7 +244,7 @@ pub(crate) mod test {
                 let q_out = func_builder.add_dataflow_op(h_gate(), vec![qb])?;
 
                 let inner_builder = func_builder.dfg_builder(
-                    FunctionType::new(type_row![NAT], type_row![NAT]),
+                    Signature::new(type_row![NAT], type_row![NAT]),
                     None,
                     [int],
                 )?;
@@ -351,7 +352,7 @@ pub(crate) mod test {
             let i1 = noop.out_wire(0);
 
             let mut nested =
-                f_build.dfg_builder(FunctionType::new(type_row![], type_row![BIT]), None, [])?;
+                f_build.dfg_builder(Signature::new(type_row![], type_row![BIT]), None, [])?;
 
             let id = nested.add_dataflow_op(LeafOp::Noop { ty: BIT }, [i1])?;
 
@@ -375,7 +376,7 @@ pub(crate) mod test {
         let i1 = noop.out_wire(0);
 
         let mut nested =
-            f_build.dfg_builder(FunctionType::new(type_row![], type_row![QB]), None, [])?;
+            f_build.dfg_builder(Signature::new(type_row![], type_row![QB]), None, [])?;
 
         let id_res = nested.add_dataflow_op(LeafOp::Noop { ty: QB }, [i1]);
 
@@ -401,7 +402,7 @@ pub(crate) mod test {
     #[test]
     fn insert_hugr() -> Result<(), BuildError> {
         // Create a simple DFG
-        let mut dfg_builder = DFGBuilder::new(FunctionType::new(type_row![BIT], type_row![BIT]))?;
+        let mut dfg_builder = DFGBuilder::new(Signature::new(type_row![BIT], type_row![BIT]))?;
         let [i1] = dfg_builder.input_wires_arr();
         dfg_builder.set_metadata("x", 42);
         let dfg_hugr = dfg_builder.finish_hugr_with_outputs([i1], &EMPTY_REG)?;
@@ -441,15 +442,15 @@ pub(crate) mod test {
         let abc_extensions = ab_extensions.clone().union(xc.clone().into());
 
         let parent_sig =
-            FunctionType::new(type_row![BIT], type_row![BIT]).with_extension_delta(abc_extensions);
+            Signature::new(type_row![BIT], type_row![BIT]).with_extension_delta(abc_extensions);
         let mut parent = DFGBuilder::new(parent_sig)?;
 
         let add_c_sig =
-            FunctionType::new(type_row![BIT], type_row![BIT]).with_extension_delta(xc.clone());
+            Signature::new(type_row![BIT], type_row![BIT]).with_extension_delta(xc.clone());
 
         let [w] = parent.input_wires_arr();
 
-        let add_ab_sig = FunctionType::new(type_row![BIT], type_row![BIT])
+        let add_ab_sig = Signature::new(type_row![BIT], type_row![BIT])
             .with_extension_delta(ab_extensions.clone());
 
         // A box which adds extensions A and B, via child Lift nodes
@@ -505,7 +506,7 @@ pub(crate) mod test {
 
     #[test]
     fn non_cfg_ancestor() -> Result<(), BuildError> {
-        let unit_sig = FunctionType::new(type_row![Type::UNIT], type_row![Type::UNIT]);
+        let unit_sig = Signature::new(type_row![Type::UNIT], type_row![Type::UNIT]);
         let mut b = DFGBuilder::new(unit_sig.clone())?;
         let b_child = b.dfg_builder(unit_sig.clone(), None, [b.input().out_wire(0)])?;
         let b_child_in_wire = b_child.input().out_wire(0);
@@ -529,7 +530,7 @@ pub(crate) mod test {
 
     #[test]
     fn no_relation_edge() -> Result<(), BuildError> {
-        let unit_sig = FunctionType::new(type_row![Type::UNIT], type_row![Type::UNIT]);
+        let unit_sig = Signature::new(type_row![Type::UNIT], type_row![Type::UNIT]);
         let mut b = DFGBuilder::new(unit_sig.clone())?;
         let mut b_child = b.dfg_builder(unit_sig.clone(), None, [b.input().out_wire(0)])?;
         let b_child_child =

@@ -1,7 +1,7 @@
 use crate::extension::ExtensionRegistry;
 use crate::hugr::views::HugrView;
 use crate::ops::dataflow::DataflowOpTrait;
-use crate::types::{FunctionType, TypeRow};
+use crate::types::{FunctionType, Signature, TypeRow};
 
 use crate::ops;
 use crate::ops::handle::CaseID;
@@ -121,7 +121,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> ConditionalBuilder<B> {
 
         let outputs = cond.outputs;
         let case_op = ops::Case {
-            signature: FunctionType::new(inputs.clone(), outputs.clone())
+            signature: Signature::new(inputs.clone(), outputs.clone())
                 .with_extension_delta(extension_delta.clone()),
         };
         let case_node =
@@ -137,7 +137,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> ConditionalBuilder<B> {
         let dfg_builder = DFGBuilder::create_with_io(
             self.hugr_mut(),
             case_node,
-            FunctionType::new(inputs, outputs).with_extension_delta(extension_delta),
+            Signature::new(inputs, outputs).with_extension_delta(extension_delta),
             None,
         )?;
 
@@ -191,7 +191,7 @@ impl ConditionalBuilder<Hugr> {
 
 impl CaseBuilder<Hugr> {
     /// Initialize a Case rooted HUGR
-    pub fn new(signature: FunctionType) -> Result<Self, BuildError> {
+    pub fn new(signature: Signature) -> Result<Self, BuildError> {
         let op = ops::Case {
             signature: signature.clone(),
         };

@@ -1,5 +1,5 @@
 use super::{
-    build_traits::HugrBuilder,
+    build_traits::{fix_sig, HugrBuilder},
     dataflow::{DFGBuilder, FunctionBuilder},
     BuildError, Container,
 };
@@ -84,7 +84,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
                 op_desc: "crate::ops::OpType::FuncDecl",
             })?
             .clone();
-        let body = signature.body().clone();
+        let body = fix_sig(signature.body().clone())?;
         self.hugr_mut()
             .replace_op(
                 f_node,

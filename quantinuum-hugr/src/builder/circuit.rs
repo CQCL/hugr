@@ -237,6 +237,7 @@ mod test {
     use super::*;
     use cool_asserts::assert_matches;
 
+    use crate::types::Signature;
     use crate::utils::test_quantum_extension::{cx_gate, h_gate, measure, q_alloc, q_discard};
     use crate::{
         builder::{
@@ -284,7 +285,7 @@ mod test {
                 "MyOp",
                 "unknown op".to_string(),
                 vec![],
-                FunctionType::new(vec![QB, NAT], vec![QB]),
+                Signature::new(vec![QB, NAT], vec![QB]),
             ))
             .into(),
         );

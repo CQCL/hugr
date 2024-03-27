@@ -19,8 +19,8 @@ use crate::{
     types::EdgeKind,
 };
 
-use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE_REGISTRY};
-use crate::types::{FunctionType, PolyFuncType, Type, TypeArg, TypeRow};
+use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError, PRELUDE_REGISTRY};
+use crate::types::{FunctionType, PolyFuncType, Signature, Type, TypeArg, TypeRow};
 
 use itertools::Itertools;
 
@@ -87,7 +87,7 @@ pub trait Container {
         name: impl Into<String>,
         signature: PolyFuncType,
     ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
-        let body = signature.body().clone();
+        let body = fix_sig(signature.body().clone())?;
         let f_node = self.add_child_node(NodeType::new_pure(ops::FuncDefn {
             name: name.into(),
             signature,
@@ -296,7 +296,7 @@ pub trait Dataflow: Container {
     // TODO: Should this be one function, or should there be a temporary "op" one like with the others?
     fn dfg_builder(
         &mut self,
-        signature: FunctionType,
+        signature: Signature,
         input_extensions: Option<ExtensionSet>,
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<DFGBuilder<&mut Hugr>, BuildError> {
@@ -334,7 +334,7 @@ pub trait Dataflow: Container {
             self,
             NodeType::new(
                 ops::CFG {
-                    signature: FunctionType::new(inputs.clone(), output_types.clone())
+                    signature: Signature::new(inputs.clone(), output_types.clone())
                         .with_extension_delta(extension_delta),
                 },
                 input_extensions.into(),
@@ -713,6 +713,12 @@ fn wire_up<T: Dataflow + ?Sized>(
                 .unwrap(),
             EdgeKind::Value(_)
         ))
+}
+
+pub(super) fn fix_sig(fnty: FunctionType) -> Result<Signature, BuildError> {
+    fnty.try_into().map_err(|(idx, bound)| {
+        BuildError::SignatureError(SignatureError::ContainsRowVars { idx, bound })
+    })
 }
 
 /// Trait implemented by builders of Dataflow Hugrs
