@@ -151,10 +151,10 @@ fn extension() -> Extension {
     NotOp.add_to_extension(&mut extension).unwrap();
 
     extension
-        .add_value(FALSE_NAME, ops::Const::unit_sum(0, 2))
+        .add_value(FALSE_NAME, ops::Const::false_val())
         .unwrap();
     extension
-        .add_value(TRUE_NAME, ops::Const::unit_sum(1, 2))
+        .add_value(TRUE_NAME, ops::Const::true_val())
         .unwrap();
     extension
 }
@@ -253,7 +253,7 @@ pub(crate) mod test {
 
         for v in [false_val, true_val] {
             let simpl = v.typed_value().const_type();
-            assert_eq!(simpl, &BOOL_T);
+            assert_eq!(simpl, BOOL_T);
         }
     }
 

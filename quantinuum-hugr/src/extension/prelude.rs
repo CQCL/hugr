@@ -3,15 +3,16 @@
 use lazy_static::lazy_static;
 use smol_str::SmolStr;
 
+use crate::types::SumType;
 use crate::{
     extension::{ExtensionId, TypeDefBound},
+    ops::constant::CustomConst,
     ops::LeafOp,
     type_row,
     types::{
         type_param::{TypeArg, TypeParam},
         CustomType, FunctionType, PolyFuncType, Type, TypeBound,
     },
-    values::CustomConst,
     Extension,
 };
 
@@ -157,8 +158,8 @@ pub const ERROR_TYPE: Type = Type::new_extension(ERROR_CUSTOM_TYPE);
 pub const ERROR_TYPE_NAME: SmolStr = SmolStr::new_inline("error");
 
 /// Return a Sum type with the first variant as the given type and the second an Error.
-pub fn sum_with_error(ty: Type) -> Type {
-    Type::new_sum([vec![ty].into(), vec![ERROR_TYPE].into()])
+pub fn sum_with_error(ty: Type) -> SumType {
+    SumType::new([vec![ty], vec![ERROR_TYPE]])
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -184,7 +185,7 @@ impl CustomConst for ConstUsize {
     }
 
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
-        crate::values::downcast_equal_consts(self, other)
+        crate::ops::constant::downcast_equal_consts(self, other)
     }
 
     fn extension_reqs(&self) -> ExtensionSet {
@@ -222,7 +223,7 @@ impl CustomConst for ConstError {
     }
 
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
-        crate::values::downcast_equal_consts(self, other)
+        crate::ops::constant::downcast_equal_consts(self, other)
     }
 
     fn extension_reqs(&self) -> ExtensionSet {

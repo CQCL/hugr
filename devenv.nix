@@ -4,7 +4,7 @@ let
 in
 {
   # https://devenv.sh/packages/
-  # on macos frameworks have to be explicitly specified 
+  # on macos frameworks have to be explicitly specified
   # otherwise a linker error ocurs on rust packages
   packages = [
     pkgs.just
@@ -30,6 +30,14 @@ in
     export LLVM_PROFDATA="${pkgs.llvmPackages_16.libllvm}/bin/llvm-profdata"
   '';
 
+  languages.python = {
+    enable = true;
+    poetry = {
+      enable = true;
+      activate.enable = true;
+    };
+  };
+
   # https://devenv.sh/languages/
   # https://devenv.sh/reference/options/#languagesrustversion
   languages.rust = {
@@ -37,12 +45,6 @@ in
     enable = true;
     components = [ "rustc" "cargo" "clippy" "rustfmt" "rust-analyzer" ];
   };
-
-  # https://devenv.sh/pre-commit-hooks/
-  pre-commit.hooks.clippy.enable = true;
-  pre-commit.tools.clippy = lib.mkForce config.languages.rust.toolchain.clippy;
-  pre-commit.hooks.rustfmt.enable = true;
-  pre-commit.tools.rustfmt = lib.mkForce config.languages.rust.toolchain.rustfmt;
 
   # https://devenv.sh/processes/
   # processes.ping.exec = "ping example.com";

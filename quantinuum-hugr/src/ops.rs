@@ -380,6 +380,8 @@ pub trait OpTrait {
 pub trait OpParent {
     /// The inner function type of the operation, if it has a child dataflow
     /// sibling graph.
+    ///
+    /// Non-container ops like `FuncDecl` return `None` even though they represent a function.
     fn inner_function_type(&self) -> Option<FunctionType> {
         None
     }

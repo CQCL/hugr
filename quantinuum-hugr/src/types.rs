@@ -8,7 +8,9 @@ mod signature;
 pub mod type_param;
 pub mod type_row;
 
-pub use check::{ConstTypeError, CustomCheckFailure};
+pub use crate::ops::constant::{ConstTypeError, CustomCheckFailure};
+use crate::utils::display_list_with_separator;
+pub use check::SumTypeError;
 pub use custom::CustomType;
 pub use poly_func::PolyFuncType;
 pub use signature::FunctionType;
@@ -17,7 +19,7 @@ pub use type_param::TypeArg;
 pub use type_row::TypeRow;
 
 use itertools::FoldWhile::{Continue, Done};
-use itertools::Itertools;
+use itertools::{repeat_n, Itertools};
 use serde::{Deserialize, Serialize};
 
 use crate::extension::{ExtensionRegistry, SignatureError};
@@ -99,18 +101,33 @@ pub(crate) fn least_upper_bound(mut tags: impl Iterator<Item = TypeBound>) -> Ty
     .into_inner()
 }
 
-#[derive(Clone, PartialEq, Debug, Eq, derive_more::Display, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Debug, Eq, Serialize, Deserialize)]
 #[serde(tag = "s")]
 /// Representation of a Sum type.
 /// Either store the types of the variants, or in the special (but common) case
 /// of a UnitSum (sum over empty tuples), store only the size of the Sum.
 pub enum SumType {
+    /// Special case of a Sum over unit types.
     #[allow(missing_docs)]
-    #[display(fmt = "UnitSum({})", "size")]
     Unit { size: u8 },
+    /// General case of a Sum type.
     #[allow(missing_docs)]
-    #[display(fmt = "General({:?})", "rows")]
     General { rows: Vec<TypeRow> },
+}
+
+impl std::fmt::Display for SumType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.num_variants() == 0 {
+            return write!(f, "⊥");
+        }
+
+        match self {
+            SumType::Unit { size } => {
+                display_list_with_separator(repeat_n("[]", *size as usize), f, "+")
+            }
+            SumType::General { rows } => display_list_with_separator(rows.iter(), f, "+"),
+        }
+    }
 }
 
 impl SumType {
@@ -135,6 +152,14 @@ impl SumType {
             SumType::Unit { size } if tag < (*size as usize) => Some(Type::EMPTY_TYPEROW_REF),
             SumType::General { rows } => rows.get(tag),
             _ => None,
+        }
+    }
+
+    /// Returns the number of variants in the sum type.
+    pub fn num_variants(&self) -> usize {
+        match self {
+            SumType::Unit { size } => *size as usize,
+            SumType::General { rows } => rows.len(),
         }
     }
 }
@@ -166,10 +191,7 @@ pub enum TypeEnum {
     #[display(fmt = "Variable({})", _0)]
     Variable(usize, TypeBound),
     #[allow(missing_docs)]
-    #[display(fmt = "Tuple({})", "_0")]
-    Tuple(TypeRow),
-    #[allow(missing_docs)]
-    #[display(fmt = "Sum({})", "_0")]
+    #[display(fmt = "{}", "_0")]
     Sum(SumType),
 }
 impl TypeEnum {
@@ -186,7 +208,6 @@ impl TypeEnum {
                     .flat_map(TypeRow::iter)
                     .map(Type::least_upper_bound),
             ),
-            TypeEnum::Tuple(ts) => least_upper_bound(ts.iter().map(Type::least_upper_bound)),
         }
     }
 }
@@ -233,7 +254,7 @@ impl Type {
     /// An empty `TypeRow`. Provided here for convenience
     pub const EMPTY_TYPEROW: TypeRow = type_row![];
     /// Unit type (empty tuple).
-    pub const UNIT: Self = Self(TypeEnum::Tuple(Self::EMPTY_TYPEROW), TypeBound::Eq);
+    pub const UNIT: Self = Self(TypeEnum::Sum(SumType::Unit { size: 1 }), TypeBound::Eq);
 
     const EMPTY_TYPEROW_REF: &'static TypeRow = &Self::EMPTY_TYPEROW;
 
@@ -245,7 +266,11 @@ impl Type {
     /// Initialize a new tuple type by providing the elements.
     #[inline(always)]
     pub fn new_tuple(types: impl Into<TypeRow>) -> Self {
-        Self::new(TypeEnum::Tuple(types.into()))
+        let row = types.into();
+        match row.len() {
+            0 => Self::UNIT,
+            _ => Self::new_sum([row]),
+        }
     }
 
     /// Initialize a new sum type by providing the possible variant types.
@@ -317,7 +342,6 @@ impl Type {
         // There is no need to check the components against the bound,
         // that is guaranteed by construction (even for deserialization)
         match &self.0 {
-            TypeEnum::Tuple(row) => validate_each(extension_registry, var_decls, row.iter()),
             TypeEnum::Sum(SumType::General { rows }) => validate_each(
                 extension_registry,
                 var_decls,
@@ -337,7 +361,6 @@ impl Type {
             TypeEnum::Variable(idx, bound) => t.apply_typevar(*idx, *bound),
             TypeEnum::Extension(cty) => Type::new_extension(cty.substitute(t)),
             TypeEnum::Function(bf) => Type::new_function(bf.substitute(t)),
-            TypeEnum::Tuple(elems) => Type::new_tuple(subst_row(elems, t)),
             TypeEnum::Sum(SumType::General { rows }) => {
                 Type::new_sum(rows.iter().map(|x| subst_row(x, t)))
             }
@@ -421,8 +444,8 @@ pub(crate) mod test {
             Type::new_alias(AliasDecl::new("my_alias", TypeBound::Eq)),
         ]);
         assert_eq!(
-            t.to_string(),
-            "Tuple([usize, Function(forall . [[]][]), my_custom, Alias(my_alias)])".to_string()
+            &t.to_string(),
+            "[usize, Function(forall . [[]][]), my_custom, Alias(my_alias)]"
         );
     }
 

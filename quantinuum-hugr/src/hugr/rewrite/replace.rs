@@ -1,8 +1,6 @@
 //! Implementation of the `Replace` operation.
 
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::iter::Copied;
-use std::slice::Iter;
 
 use itertools::Itertools;
 use thiserror::Error;
@@ -215,10 +213,6 @@ impl Rewrite for Replacement {
 
     type ApplyResult = ();
 
-    type InvalidationSet<'a> = Copied<Iter<'a, Node>>
-    where
-        Self: 'a;
-
     const UNCHANGED_ON_FAILURE: bool = false;
 
     fn verify(&self, h: &impl crate::HugrView) -> Result<(), Self::Error> {
@@ -331,7 +325,7 @@ impl Rewrite for Replacement {
         Ok(())
     }
 
-    fn invalidation_set(&self) -> Self::InvalidationSet<'_> {
+    fn invalidation_set(&self) -> impl Iterator<Item = Node> {
         self.removal.iter().copied()
     }
 }

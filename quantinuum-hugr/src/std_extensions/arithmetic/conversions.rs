@@ -23,7 +23,7 @@ mod const_fold;
 /// The extension identifier.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.conversions");
 
-/// Extensiop for conversions between floats and integers.
+/// Extension for conversions between floats and integers.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, EnumIter, IntoStaticStr, EnumString)]
 #[allow(missing_docs, non_camel_case_types)]
 pub enum ConvertOpDef {
@@ -43,7 +43,10 @@ impl MakeOpDef for ConvertOpDef {
         match self {
             trunc_s | trunc_u => PolyFuncType::new(
                 vec![LOG_WIDTH_TYPE_PARAM],
-                FunctionType::new(type_row![FLOAT64_TYPE], vec![sum_with_error(int_tv(0))]),
+                FunctionType::new(
+                    type_row![FLOAT64_TYPE],
+                    vec![sum_with_error(int_tv(0)).into()],
+                ),
             ),
 
             convert_s | convert_u => PolyFuncType::new(

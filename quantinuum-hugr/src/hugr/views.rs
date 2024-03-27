@@ -28,8 +28,8 @@ use super::{Hugr, HugrError, NodeMetadata, NodeMetadataMap, NodeType, DEFAULT_NO
 use crate::ops::handle::NodeHandle;
 use crate::ops::{OpParent, OpTag, OpTrait, OpType};
 
-use crate::types::Type;
 use crate::types::{EdgeKind, FunctionType};
+use crate::types::{PolyFuncType, Type};
 use crate::{Direction, IncomingPort, Node, OutgoingPort, Port};
 
 use itertools::Either;
@@ -327,11 +327,37 @@ pub trait HugrView: sealed::HugrInternals {
         }
     }
 
-    /// For HUGRs with a [`DataflowParent`][crate::ops::DataflowParent] root operation, report the
-    /// signature of the inner dataflow sibling graph. Otherwise return None.
-    fn get_function_type(&self) -> Option<FunctionType> {
-        let op = self.get_nodetype(self.root());
-        op.op.inner_function_type()
+    /// Returns the function type defined by this dataflow HUGR.
+    ///
+    /// If the root of the Hugr is a
+    /// [`DataflowParent`][crate::ops::DataflowParent] operation, report the
+    /// signature corresponding to the input and output node of its sibling
+    /// graph. Otherwise, returns `None`.
+    ///
+    /// In contrast to [`get_function_type`][HugrView::get_function_type], this
+    /// method always return a concrete [`FunctionType`].
+    fn get_df_function_type(&self) -> Option<FunctionType> {
+        let op = self.get_optype(self.root());
+        op.inner_function_type()
+    }
+
+    /// Returns the function type defined by this HUGR.
+    ///
+    /// For HUGRs with a [`DataflowParent`][crate::ops::DataflowParent] root
+    /// operation, report the signature of the inner dataflow sibling graph.
+    ///
+    /// For HUGRS with a [`FuncDecl`][crate::ops::FuncDecl] or
+    /// [`FuncDefn`][crate::ops::FuncDefn] root operation, report the signature
+    /// of the function.
+    ///
+    /// Otherwise, returns `None`.
+    fn get_function_type(&self) -> Option<PolyFuncType> {
+        let op = self.get_optype(self.root());
+        match op {
+            OpType::FuncDecl(decl) => Some(decl.signature.clone()),
+            OpType::FuncDefn(defn) => Some(defn.signature.clone()),
+            _ => op.inner_function_type().map(PolyFuncType::from),
+        }
     }
 
     /// Return a wrapper over the view that can be used in petgraph algorithms.

@@ -18,10 +18,6 @@ pub trait Rewrite {
     type Error: std::error::Error;
     /// The type returned on successful application of the rewrite.
     type ApplyResult;
-    /// The node iterator returned by [`Rewrite::invalidation_set`]
-    type InvalidationSet<'a>: Iterator<Item = Node> + 'a
-    where
-        Self: 'a;
 
     /// If `true`, [self.apply]'s of this rewrite guarantee that they do not mutate the Hugr when they return an Err.
     /// If `false`, there is no guarantee; the Hugr should be assumed invalid when Err is returned.
@@ -47,7 +43,7 @@ pub trait Rewrite {
     ///
     /// Two `impl Rewrite`s can be composed if their invalidation sets are
     /// disjoint.
-    fn invalidation_set(&self) -> Self::InvalidationSet<'_>;
+    fn invalidation_set(&self) -> impl Iterator<Item = Node>;
 }
 
 /// Wraps any rewrite into a transaction (i.e. that has no effect upon failure)
@@ -60,9 +56,6 @@ pub struct Transactional<R> {
 impl<R: Rewrite> Rewrite for Transactional<R> {
     type Error = R::Error;
     type ApplyResult = R::ApplyResult;
-    type InvalidationSet<'a> = R::InvalidationSet<'a>
-        where
-            Self: 'a;
     const UNCHANGED_ON_FAILURE: bool = true;
 
     fn verify(&self, h: &impl HugrView) -> Result<(), Self::Error> {
@@ -93,7 +86,7 @@ impl<R: Rewrite> Rewrite for Transactional<R> {
     }
 
     #[inline]
-    fn invalidation_set(&self) -> Self::InvalidationSet<'_> {
+    fn invalidation_set(&self) -> impl Iterator<Item = Node> {
         self.underlying.invalidation_set()
     }
 }

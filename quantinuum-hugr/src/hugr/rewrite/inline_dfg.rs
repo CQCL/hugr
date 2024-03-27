@@ -25,8 +25,6 @@ impl Rewrite for InlineDFG {
     type ApplyResult = [Node; 3];
     type Error = InlineDFGError;
 
-    type InvalidationSet<'a> = <[Node; 1] as IntoIterator>::IntoIter;
-
     const UNCHANGED_ON_FAILURE: bool = true;
 
     fn verify(&self, h: &impl crate::HugrView) -> Result<(), Self::Error> {
@@ -122,7 +120,7 @@ impl Rewrite for InlineDFG {
         Ok([n, input, output])
     }
 
-    fn invalidation_set(&self) -> Self::InvalidationSet<'_> {
+    fn invalidation_set(&self) -> impl Iterator<Item = Node> {
         [self.0.node()].into_iter()
     }
 }
@@ -147,7 +145,6 @@ mod test {
     use crate::std_extensions::arithmetic::int_types::{self, ConstIntU};
     use crate::types::FunctionType;
     use crate::utils::test_quantum_extension;
-    use crate::values::Value;
     use crate::{type_row, Direction, HugrView, Node, Port};
     use crate::{Hugr, Wire};
 
@@ -186,12 +183,7 @@ mod test {
             d: &mut DFGBuilder<T>,
         ) -> Result<Wire, Box<dyn std::error::Error>> {
             let int_ty = &int_types::INT_TYPES[6];
-            let cst = Const::new(
-                Value::Extension {
-                    c: (Box::new(ConstIntU::new(6, 15)?),),
-                },
-                int_ty.clone(),
-            )?;
+            let cst = Const::extension(ConstIntU::new(6, 15)?);
             let c1 = d.add_load_const(cst);
             let [lifted] = d
                 .add_dataflow_op(

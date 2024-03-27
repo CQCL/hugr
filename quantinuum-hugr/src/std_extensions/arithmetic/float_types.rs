@@ -4,8 +4,8 @@ use smol_str::SmolStr;
 
 use crate::{
     extension::{ExtensionId, ExtensionSet},
+    ops::constant::CustomConst,
     types::{CustomType, Type, TypeBound},
-    values::CustomConst,
     Extension,
 };
 use lazy_static::lazy_static;
@@ -13,7 +13,7 @@ use lazy_static::lazy_static;
 /// The extension identifier.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.float.types");
 
-/// Identfier for the 64-bit IEEE 754-2019 floating-point type.
+/// Identifier for the 64-bit IEEE 754-2019 floating-point type.
 const FLOAT_TYPE_ID: SmolStr = SmolStr::new_inline("float64");
 
 /// 64-bit IEEE 754-2019 floating-point type (as [CustomType])
@@ -61,7 +61,7 @@ impl CustomConst for ConstF64 {
     }
 
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
-        crate::values::downcast_equal_consts(self, other)
+        crate::ops::constant::downcast_equal_consts(self, other)
     }
 
     fn extension_reqs(&self) -> ExtensionSet {
