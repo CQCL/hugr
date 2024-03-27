@@ -1,3 +1,4 @@
+use super::type_row::RowVarOrType;
 use super::{PolyFuncType, SumType, Type, TypeArg, TypeBound, TypeEnum};
 
 use super::custom::CustomType;
@@ -39,20 +40,37 @@ impl From<Type> for SerSimpleType {
     }
 }
 
-impl From<SerSimpleType> for Type {
-    fn from(value: SerSimpleType) -> Type {
-        match value {
+impl From<SerSimpleType> for RowVarOrType {
+    fn from(value: SerSimpleType) -> RowVarOrType {
+        let ty = match value {
             SerSimpleType::Q => QB_T,
             SerSimpleType::I => USIZE_T,
             SerSimpleType::G(sig) => Type::new_function(*sig),
             SerSimpleType::Sum(sum) => sum.into(),
-            SerSimpleType::Array { inner, len } => {
-                array_type(TypeArg::BoundedNat { n: len }, (*inner).into())
-            }
+            SerSimpleType::Array { inner, len } => array_type(
+                TypeArg::BoundedNat { n: len },
+                (*inner)
+                    .try_into()
+                    .expect("Element type of array should not be a row"),
+            ),
             SerSimpleType::Opaque(custom) => Type::new_extension(custom),
             SerSimpleType::Alias(a) => Type::new_alias(a),
             SerSimpleType::V { i, b } => Type::new_var_use(i, b),
-            SerSimpleType::R { i, b } => Type::new_row_var(i, b),
+            SerSimpleType::R { i, b } => return RowVarOrType::RV(i, b),
+        };
+        RowVarOrType::T(ty)
+    }
+}
+
+impl TryFrom<SerSimpleType> for Type {
+    type Error = String; // TODO ALAN What should this be?
+
+    fn try_from(value: SerSimpleType) -> Result<Self, Self::Error> {
+        match value.into() {
+            RowVarOrType::T(t) => Ok(t),
+            RowVarOrType::RV(idx, bound) => Err(format!(
+                "Type contained Row Variable with DeBruijn index {idx} and bound {bound}"
+            )),
         }
     }
 }

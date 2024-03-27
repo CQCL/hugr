@@ -217,7 +217,10 @@ impl TypeEnum {
     Clone, PartialEq, Debug, Eq, derive_more::Display, serde::Serialize, serde::Deserialize,
 )]
 #[display(fmt = "{}", "_0")]
-#[serde(into = "serialize::SerSimpleType", from = "serialize::SerSimpleType")]
+#[serde(
+    into = "serialize::SerSimpleType",
+    try_from = "serialize::SerSimpleType"
+)]
 /// A HUGR type - the valid types of [EdgeKind::Value] and [EdgeKind::Static] edges.
 /// Such an edge is valid if the ports on either end agree on the [Type].
 /// Types have an optional [TypeBound] which places limits on the valid
