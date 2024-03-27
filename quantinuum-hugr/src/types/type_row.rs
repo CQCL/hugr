@@ -90,7 +90,7 @@ where
         self.types.to_mut().get_mut(offset.index())
     }
 
-    /// Returns a reference to the types in the row.
+    /// Returns a reference to the types and row variables in the row.
     pub fn as_slice(&self) -> &[T] {
         &self.types
     }
@@ -106,11 +106,19 @@ where
             /// Allow access (consumption) of the contained elements
             pub fn into_owned(self) -> Vec<T>;
 
+            /// Returns `true` if the row contains no types or row variables
+            /// (so will necessarily be empty after substitution, too).
+            pub fn is_empty(&self) -> bool ;
+
+        }
+    }
+}
+
+impl TypeRow {
+    delegate! {
+        to self.types {
             /// Returns the number of types in the row.
             pub fn len(&self) -> usize;
-
-            /// Returns `true` if the row contains no types.
-            pub fn is_empty(&self) -> bool ;
         }
     }
 }
