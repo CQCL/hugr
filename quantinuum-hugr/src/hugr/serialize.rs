@@ -267,7 +267,7 @@ pub mod test {
     use crate::std_extensions::arithmetic::float_ops::FLOAT_OPS_REGISTRY;
     use crate::std_extensions::arithmetic::float_types::{ConstF64, FLOAT64_TYPE};
     use crate::std_extensions::logic::NotOp;
-    use crate::types::{FunctionType, Type};
+    use crate::types::{FunctionType, Signature, Type};
     use crate::{type_row, OutgoingPort};
     use itertools::Itertools;
     use jsonschema::{Draft, JSONSchema};
@@ -382,7 +382,7 @@ pub mod test {
         let outputs = g.num_outputs(node);
         match (inputs == 0, outputs == 0) {
             (false, false) => DFG {
-                signature: FunctionType::new(vec![NAT; inputs - 1], vec![NAT; outputs - 1]),
+                signature: Signature::new(vec![NAT; inputs - 1], vec![NAT; outputs - 1]),
             }
             .into(),
             (true, false) => Input::new(vec![NAT; outputs - 1]).into(),
@@ -465,7 +465,7 @@ pub mod test {
     #[test]
     fn dfg_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
         let tp: Vec<Type> = vec![BOOL_T; 2];
-        let mut dfg = DFGBuilder::new(FunctionType::new(tp.clone(), tp))?;
+        let mut dfg = DFGBuilder::new(Signature::new(tp.clone(), tp))?;
         let mut params: [_; 2] = dfg.input_wires_arr();
         for p in params.iter_mut() {
             *p = dfg
@@ -482,7 +482,7 @@ pub mod test {
     #[test]
     fn opaque_ops() -> Result<(), Box<dyn std::error::Error>> {
         let tp: Vec<Type> = vec![BOOL_T; 1];
-        let mut dfg = DFGBuilder::new(FunctionType::new_endo(tp))?;
+        let mut dfg = DFGBuilder::new(Signature::new_endo(tp))?;
         let [wire] = dfg.input_wires_arr();
 
         // Add an extension operation
@@ -504,7 +504,7 @@ pub mod test {
 
     #[test]
     fn hierarchy_order() -> Result<(), Box<dyn std::error::Error>> {
-        let mut hugr = closed_dfg_root_hugr(FunctionType::new(vec![QB], vec![QB]));
+        let mut hugr = closed_dfg_root_hugr(Signature::new(vec![QB], vec![QB]));
         let [old_in, out] = hugr.get_io(hugr.root()).unwrap();
         hugr.connect(old_in, 0, out, 0);
 
@@ -527,7 +527,7 @@ pub mod test {
     // Miri doesn't run the extension registration required by `typetag` for registering `CustomConst`s.
     // https://github.com/rust-lang/miri/issues/450
     fn constants_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
-        let mut builder = DFGBuilder::new(FunctionType::new(vec![], vec![FLOAT64_TYPE])).unwrap();
+        let mut builder = DFGBuilder::new(Signature::new(vec![], vec![FLOAT64_TYPE])).unwrap();
         let w = builder.add_load_const(ConstF64::new(0.5));
         let hugr = builder.finish_hugr_with_outputs([w], &FLOAT_OPS_REGISTRY)?;
 

@@ -16,7 +16,7 @@ use crate::std_extensions::logic::test::{and_op, or_op};
 use crate::std_extensions::logic::{self, NotOp};
 use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
 use crate::types::type_row::{RowVarOrType, TypeRowV};
-use crate::types::{CustomType, FunctionType, PolyFuncType, Type, TypeBound, TypeRow};
+use crate::types::{CustomType, FunctionType, PolyFuncType, Signature, Type, TypeBound, TypeRow};
 use crate::{type_row, Direction, IncomingPort, Node};
 
 const NAT: Type = crate::extension::prelude::USIZE_T;
@@ -101,7 +101,7 @@ fn leaf_root() {
 #[test]
 fn dfg_root() {
     let dfg_op: OpType = ops::DFG {
-        signature: FunctionType::new_endo(type_row![BOOL_T]),
+        signature: Signature::new_endo(type_row![BOOL_T]),
     }
     .into();
 
@@ -213,17 +213,14 @@ fn df_children_restrictions() {
 
 #[test]
 fn test_ext_edge() {
-    let mut h = closed_dfg_root_hugr(FunctionType::new(
-        type_row![BOOL_T, BOOL_T],
-        type_row![BOOL_T],
-    ));
+    let mut h = closed_dfg_root_hugr(Signature::new(type_row![BOOL_T, BOOL_T], type_row![BOOL_T]));
     let [input, output] = h.get_io(h.root()).unwrap();
 
     // Nested DFG BOOL_T -> BOOL_T
     let sub_dfg = h.add_node_with_parent(
         h.root(),
         ops::DFG {
-            signature: FunctionType::new_endo(type_row![BOOL_T]),
+            signature: Signature::new_endo(type_row![BOOL_T]),
         },
     );
     // this Xor has its 2nd input unconnected
@@ -258,7 +255,7 @@ fn test_ext_edge() {
 
 #[test]
 fn test_local_const() {
-    let mut h = closed_dfg_root_hugr(FunctionType::new(type_row![BOOL_T], type_row![BOOL_T]));
+    let mut h = closed_dfg_root_hugr(Signature::new(type_row![BOOL_T], type_row![BOOL_T]));
     let [input, output] = h.get_io(h.root()).unwrap();
     let and = h.add_node_with_parent(h.root(), and_op());
     h.connect(input, 0, and, 0);
@@ -289,10 +286,7 @@ fn test_local_const() {
 
 #[test]
 fn dfg_with_cycles() {
-    let mut h = closed_dfg_root_hugr(FunctionType::new(
-        type_row![BOOL_T, BOOL_T],
-        type_row![BOOL_T],
-    ));
+    let mut h = closed_dfg_root_hugr(Signature::new(type_row![BOOL_T, BOOL_T], type_row![BOOL_T]));
     let [input, output] = h.get_io(h.root()).unwrap();
     let or = h.add_node_with_parent(h.root(), or_op());
     let not1 = h.add_node_with_parent(h.root(), NotOp);
