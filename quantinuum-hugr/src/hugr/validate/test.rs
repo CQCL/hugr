@@ -15,6 +15,7 @@ use crate::ops::{self, Const, LeafOp, OpType};
 use crate::std_extensions::logic::test::{and_op, or_op};
 use crate::std_extensions::logic::{self, NotOp};
 use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
+use crate::types::type_row::{RowVarOrType, TypeRowV};
 use crate::types::{CustomType, FunctionType, PolyFuncType, Type, TypeBound, TypeRow};
 use crate::{type_row, Direction, IncomingPort, Node};
 
@@ -518,7 +519,7 @@ fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
         "myfunc",
         PolyFuncType::new(
             [BOUND],
-            FunctionType::new(vec![], vec![list_of_var.clone()])
+            FunctionType::new(TypeRowV::default(), vec![list_of_var.clone()])
                 .with_extension_delta(collections::EXTENSION_NAME),
         ),
     )?;
@@ -543,7 +544,7 @@ fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn inner_row_variables() -> Result<(), Box<dyn std::error::Error>> {
-    let tv = Type::new_row_var(0, TypeBound::Any);
+    let tv = RowVarOrType::RV(0, TypeBound::Any);
     let inner_ft = Type::new_function(FunctionType::new_endo(vec![tv]));
     let mut fb = FunctionBuilder::new(
         "id",
@@ -563,7 +564,7 @@ fn inner_row_variables() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn no_outer_row_variables() -> Result<(), Box<dyn std::error::Error>> {
-    let tv = Type::new_row_var(0, TypeBound::Any);
+    let tv = RowVarOrType::RV(0, TypeBound::Any);
     let fb = FunctionBuilder::new(
         "impossible_id_of_unknown_arity",
         PolyFuncType::new(

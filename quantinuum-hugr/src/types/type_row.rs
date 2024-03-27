@@ -185,6 +185,18 @@ where
     }
 }
 
+impl<T> From<T> for TypeRowBase<T>
+where
+    T: Clone,
+    [T]: ToOwned<Owned = Vec<T>>,
+{
+    fn from(value: T) -> Self {
+        Self {
+            types: vec![value].into(),
+        }
+    }
+}
+
 impl<T> Deref for TypeRowBase<T>
 where
     [T]: ToOwned<Owned = Vec<T>>,

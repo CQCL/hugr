@@ -224,7 +224,7 @@ fn int_polytype(
 ) -> PolyFuncType {
     PolyFuncType::new(
         vec![LOG_WIDTH_TYPE_PARAM; n_vars],
-        FunctionType::new(input, output),
+        FunctionType::new(input.into(), output.into()),
     )
 }
 

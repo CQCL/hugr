@@ -10,7 +10,7 @@ use super::{
     type_param::{check_type_args, TypeArg, TypeParam},
     type_row::RowVarOrType,
 };
-use super::{FunctionType, Signature, Substitution, Type, TypeBound};
+use super::{FunctionType, Signature, Substitution, TypeBound};
 
 /// A polymorphic function type, e.g. of a [Graph], or perhaps an [OpDef].
 /// (Nodes/operations in the Hugr are not polymorphic.)
@@ -254,6 +254,7 @@ pub(crate) mod test {
     };
     use crate::std_extensions::collections::{EXTENSION, LIST_TYPENAME};
     use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
+    use crate::types::type_row::{RowVarOrType, TypeRowV};
     use crate::types::{CustomType, FunctionType, Type, TypeBound};
     use crate::Extension;
 
@@ -658,7 +659,7 @@ pub(crate) mod test {
             }],
             FunctionType::new(
                 vec![USIZE_T, Type::new_var_use(0, TypeBound::Any)],
-                vec![Type::new_sum(vec![Type::new_row_var(0, TypeBound::Any)])],
+                vec![Type::new_sum(vec![RowVarOrType::RV(0, TypeBound::Any)])],
             ),
             &PRELUDE_REGISTRY,
         )
@@ -669,8 +670,8 @@ pub(crate) mod test {
                 param: Box::new(TP),
             }],
             FunctionType::new(
-                vec![USIZE_T, Type::new_row_var(0, TypeBound::Any)],
-                vec![Type::new_sum(vec![Type::new_row_var(0, TypeBound::Any)])],
+                vec![USIZE_T.into(), RowVarOrType::RV(0, TypeBound::Any)],
+                vec![Type::new_sum(vec![RowVarOrType::RV(0, TypeBound::Any)])],
             ),
             &PRELUDE_REGISTRY,
         )
@@ -696,14 +697,14 @@ pub(crate) mod test {
             t2,
             FunctionType::new(
                 vec![USIZE_T, USIZE_T, BOOL_T],
-                vec![Type::new_sum(vec![USIZE_T, BOOL_T])]
+                vec![Type::new_sum(vec![RowVarOrType::T(USIZE_T), BOOL_T.into()])]
             )
         );
     }
 
     #[test]
     fn row_variables_inner() {
-        let inner_fty = Type::new_function(FunctionType::new_endo(vec![Type::new_row_var(
+        let inner_fty = Type::new_function(FunctionType::new_endo(vec![RowVarOrType::RV(
             0,
             TypeBound::Copyable,
         )]));

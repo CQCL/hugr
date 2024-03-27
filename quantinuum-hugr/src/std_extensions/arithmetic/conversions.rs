@@ -12,7 +12,7 @@ use crate::{
     },
     ops::{custom::ExtensionOp, OpName},
     type_row,
-    types::{FunctionType, PolyFuncType, TypeArg},
+    types::{type_row::RowVarOrType, FunctionType, PolyFuncType, TypeArg},
     Extension,
 };
 
@@ -45,7 +45,7 @@ impl MakeOpDef for ConvertOpDef {
                 vec![LOG_WIDTH_TYPE_PARAM],
                 FunctionType::new(
                     type_row![FLOAT64_TYPE],
-                    vec![sum_with_error(int_tv(0)).into()],
+                    vec![RowVarOrType::T(sum_with_error(int_tv(0)).into())],
                 ),
             ),
 

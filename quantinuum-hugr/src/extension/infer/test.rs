@@ -12,6 +12,7 @@ use crate::macros::const_extension_ids;
 use crate::ops::custom::{ExternalOp, OpaqueOp};
 use crate::ops::{self, dataflow::IOTrait};
 use crate::ops::{LeafOp, OpType};
+use crate::types::type_row::RowVarOrType;
 #[cfg(feature = "extension_inference")]
 use crate::{
     builder::test::closed_dfg_root_hugr,
@@ -472,11 +473,12 @@ fn make_block(
 }
 
 fn oneway(ty: Type) -> Vec<Type> {
-    vec![Type::new_sum([vec![ty].into()])]
+    vec![Type::new_sum([RowVarOrType::T(ty)])]
 }
 
 fn twoway(ty: Type) -> Vec<Type> {
-    vec![Type::new_sum([vec![ty.clone()].into(), vec![ty].into()])]
+    let r = RowVarOrType::T(ty);
+    vec![Type::new_sum([r.clone(), r])]
 }
 
 fn create_entry_exit(
