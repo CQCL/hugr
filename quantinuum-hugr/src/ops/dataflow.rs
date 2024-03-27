@@ -223,7 +223,11 @@ impl Call {
     }
 }
 
-/// Call a function indirectly. Like call, but the first input is a standard dataflow graph type.
+/// Call a function indirectly. Like call, but the function input is a value
+/// (runtime, not static) dataflow edge, and we assume all its binders have
+/// already been given [TypeArg]s by [TypeApply] nodes.
+///
+/// [TypeApply]: crate::ops::LeafOp::TypeApply
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct CallIndirect {
     /// Signature of function being called
