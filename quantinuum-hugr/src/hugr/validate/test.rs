@@ -4,6 +4,7 @@ use super::*;
 use crate::builder::test::closed_dfg_root_hugr;
 use crate::builder::{
     BuildError, Container, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder,
+    HugrBuilder, ModuleBuilder,
 };
 use crate::extension::prelude::{BOOL_T, PRELUDE, USIZE_T};
 use crate::extension::{Extension, ExtensionId, TypeDefBound, EMPTY_REG, PRELUDE_REGISTRY};
@@ -537,6 +538,23 @@ fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
             ..
         })
     );
+    Ok(())
+}
+
+#[test]
+fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
+    let mut m = ModuleBuilder::new();
+    let id = m.declare(
+        "id",
+        PolyFuncType::new(
+            vec![TypeBound::Any.into()],
+            FunctionType::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
+        ),
+    )?;
+    let mut f = m.define_function("main", FunctionType::new_endo(vec![USIZE_T]).into())?;
+    let c = f.call(&id, &[USIZE_T.into()], f.input_wires(), &PRELUDE_REGISTRY)?;
+    f.finish_with_outputs(c.outputs())?;
+    let _ = m.finish_prelude_hugr()?;
     Ok(())
 }
 
