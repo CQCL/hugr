@@ -802,12 +802,13 @@ fn test_validate_with_closure() -> Result<(), Box<dyn Error>> {
         ExtensionSet::singleton(&A),
         ExtensionSet::singleton(&B),
     )?;
+    let immut = hugr.clone();
+
     assert_matches!(
-        hugr.validate(&PRELUDE_REGISTRY),
+        immut.validate(&PRELUDE_REGISTRY),
         Err(ValidationError::ExtensionError(_))
     );
 
-    let immut = hugr.clone();
     let soln = infer_extensions(&immut)?;
     immut.validate_with_extension_closure(soln, &PRELUDE_REGISTRY)?;
 
