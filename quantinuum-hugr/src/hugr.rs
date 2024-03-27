@@ -8,8 +8,6 @@ pub mod serialize;
 pub mod validate;
 pub mod views;
 
-#[cfg(not(feature = "extension_inference"))]
-use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::iter;
 
@@ -198,29 +196,27 @@ impl Hugr {
         extension_registry: &ExtensionRegistry,
     ) -> Result<(), ValidationError> {
         resolve_extension_ops(self, extension_registry)?;
-        let closure = self.infer_extensions()?;
-        self.validate_with_extension_closure(closure, extension_registry)?;
+        self.infer_extensions()?;
+        self.validate(extension_registry)?;
         Ok(())
     }
 
     /// Infer extension requirements and add new information to `op_types` field
+    /// (if the "extension_inference" feature is on; otherwise, do nothing)
     ///
     /// See [`infer_extensions`] for details on the "closure" value
-    #[cfg(feature = "extension_inference")]
-    pub fn infer_extensions(&mut self) -> Result<ExtensionSolution, InferExtensionError> {
-        let (solution, extension_closure) = infer_extensions(self)?;
-        self.instantiate_extensions(solution);
-        Ok(extension_closure)
-    }
-    /// Do nothing - this functionality is gated by the feature "extension_inference"
-    #[cfg(not(feature = "extension_inference"))]
-    pub fn infer_extensions(&mut self) -> Result<ExtensionSolution, InferExtensionError> {
-        Ok(HashMap::new())
+    pub fn infer_extensions(&mut self) -> Result<(), InferExtensionError> {
+        #[cfg(feature = "extension_inference")]
+        {
+            let solution = infer_extensions(self)?;
+            self.instantiate_extensions(&solution);
+        }
+        Ok(())
     }
 
     #[allow(dead_code)]
     /// Add extension requirement information to the hugr in place.
-    fn instantiate_extensions(&mut self, solution: ExtensionSolution) {
+    fn instantiate_extensions(&mut self, solution: &ExtensionSolution) {
         // We only care about inferred _input_ extensions, because `NodeType`
         // uses those to infer the output extensions
         for (node, input_extensions) in solution.iter() {

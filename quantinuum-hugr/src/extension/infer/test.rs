@@ -100,13 +100,13 @@ fn from_graph() -> Result<(), Box<dyn Error>> {
 
     hugr.connect(mult_c, 0, output, 0);
 
-    let (_, closure) = infer_extensions(&hugr)?;
+    let solution = infer_extensions(&hugr)?;
     let empty = ExtensionSet::new();
     let ab = ExtensionSet::from_iter([A, B]);
-    assert_eq!(*closure.get(&(hugr.root())).unwrap(), empty);
-    assert_eq!(*closure.get(&(mult_c)).unwrap(), ab);
-    assert_eq!(*closure.get(&(add_ab)).unwrap(), empty);
-    assert_eq!(*closure.get(&add_b).unwrap(), ExtensionSet::singleton(&A));
+    assert_eq!(*solution.get(&(hugr.root())).unwrap(), empty);
+    assert_eq!(*solution.get(&(mult_c)).unwrap(), ab);
+    assert_eq!(*solution.get(&(add_ab)).unwrap(), empty);
+    assert_eq!(*solution.get(&add_b).unwrap(), ExtensionSet::singleton(&A));
     Ok(())
 }
 
@@ -249,8 +249,7 @@ fn dangling_src() -> Result<(), Box<dyn Error>> {
     hugr.connect(src, 0, mult, 1);
     hugr.connect(mult, 0, output, 0);
 
-    let closure = hugr.infer_extensions()?;
-    assert!(closure.is_empty());
+    hugr.infer_extensions()?;
     assert_eq!(hugr.get_nodetype(src.node()).io_extensions().unwrap().1, rs);
     assert_eq!(
         hugr.get_nodetype(mult.node()).io_extensions().unwrap(),
@@ -792,6 +791,29 @@ fn test_cfg_loops() -> Result<(), Box<dyn Error>> {
         let mut hugr = make_looping_cfg(bb0, bb1, bb2)?;
         hugr.update_validate(&PRELUDE_REGISTRY)?;
     }
+    Ok(())
+}
+
+#[test]
+#[cfg(feature = "extension_inference")]
+fn test_validate_with_closure() -> Result<(), Box<dyn Error>> {
+    let mut hugr = make_looping_cfg(
+        ExtensionSet::new(),
+        ExtensionSet::singleton(&A),
+        ExtensionSet::singleton(&B),
+    )?;
+    let immut = hugr.clone();
+
+    assert_matches!(
+        immut.validate(&PRELUDE_REGISTRY),
+        Err(ValidationError::ExtensionError(_))
+    );
+
+    let soln = infer_extensions(&immut)?;
+    immut.validate_with_extension_closure(soln, &PRELUDE_REGISTRY)?;
+
+    hugr.update_validate(&PRELUDE_REGISTRY)?; // Solution written in, hence:
+    hugr.validate(&PRELUDE_REGISTRY)?;
     Ok(())
 }
 
