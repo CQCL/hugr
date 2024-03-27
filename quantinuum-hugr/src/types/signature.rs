@@ -33,18 +33,6 @@ pub type FunctionType = FuncTypeBase<RowVarOrType>;
 /// The type of a node. Fixed/known arity of inputs + outputs.
 pub type Signature = FuncTypeBase<Type>;
 
-impl TryFrom<FunctionType> for Signature {
-    type Error = (usize, TypeBound);
-
-    fn try_from(value: FunctionType) -> Result<Self, Self::Error> {
-        Ok(Self {
-            input: value.input.try_into()?,
-            output: value.output.try_into()?,
-            extension_reqs: value.extension_reqs
-        })
-    }
-}
-
 impl<T> FuncTypeBase<T>
 where
     T: 'static + Clone,
