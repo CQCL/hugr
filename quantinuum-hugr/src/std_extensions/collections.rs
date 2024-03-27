@@ -346,8 +346,8 @@ mod test {
 
         let both_row: TypeRow = vec![list_t.clone(), QB_T].into();
         let just_list_row: TypeRow = vec![list_t].into();
-        assert_eq!(pop_sig.input(), &just_list_row);
-        assert_eq!(pop_sig.output(), &both_row);
+        assert_eq!(&pop_sig.input, &just_list_row);
+        assert_eq!(&pop_sig.output, &both_row);
 
         let push_op = ListOp::Push.with_type(FLOAT64_TYPE);
         let push_ext = push_op.clone().to_extension_op(&reg).unwrap();
@@ -359,7 +359,7 @@ mod test {
         let both_row: TypeRow = vec![list_t.clone(), FLOAT64_TYPE].into();
         let just_list_row: TypeRow = vec![list_t].into();
 
-        assert_eq!(push_sig.input(), &both_row);
-        assert_eq!(push_sig.output(), &just_list_row);
+        assert_eq!(&push_sig.input, &both_row);
+        assert_eq!(&push_sig.output, &just_list_row);
     }
 }
