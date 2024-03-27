@@ -20,7 +20,7 @@ use crate::{
 };
 
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError, PRELUDE_REGISTRY};
-use crate::types::{FunctionType, PolyFuncType, Signature, Type, TypeArg, TypeRow};
+use crate::types::{PolyFixedFunc, Signature, Type, TypeArg, TypeRow};
 
 use itertools::Itertools;
 
@@ -85,9 +85,10 @@ pub trait Container {
     fn define_function(
         &mut self,
         name: impl Into<String>,
-        signature: PolyFuncType,
+        signature: impl Into<PolyFixedFunc>,
     ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
-        let body = fix_sig(signature.body().clone())?;
+        let signature = signature.into();
+        let body = signature.body().clone();
         let f_node = self.add_child_node(NodeType::new_pure(ops::FuncDefn {
             name: name.into(),
             signature,
@@ -713,12 +714,6 @@ fn wire_up<T: Dataflow + ?Sized>(
                 .unwrap(),
             EdgeKind::Value(_)
         ))
-}
-
-pub(super) fn fix_sig(fnty: FunctionType) -> Result<Signature, BuildError> {
-    fnty.try_into().map_err(|(idx, bound)| {
-        BuildError::SignatureError(SignatureError::ContainsRowVars { idx, bound })
-    })
 }
 
 /// Trait implemented by builders of Dataflow Hugrs

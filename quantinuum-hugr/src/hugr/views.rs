@@ -28,8 +28,8 @@ use super::{Hugr, HugrError, NodeMetadata, NodeMetadataMap, NodeType, DEFAULT_NO
 use crate::ops::handle::NodeHandle;
 use crate::ops::{OpParent, OpTag, OpTrait, OpType};
 
-use crate::types::{EdgeKind, Signature};
-use crate::types::{PolyFuncType, Type};
+use crate::types::Type;
+use crate::types::{EdgeKind, PolyFixedFunc, Signature};
 use crate::{Direction, IncomingPort, Node, OutgoingPort, Port};
 
 use itertools::Either;
@@ -343,20 +343,20 @@ pub trait HugrView: sealed::HugrInternals {
 
     /// Returns the function type defined by this HUGR.
     ///
-    /// For HUGRs with a [`DataflowParent`][crate::ops::DataflowParent] root
-    /// operation, report the signature of the inner dataflow sibling graph.
-    ///
     /// For HUGRS with a [`FuncDecl`][crate::ops::FuncDecl] or
     /// [`FuncDefn`][crate::ops::FuncDefn] root operation, report the signature
     /// of the function.
     ///
+    /// For HUGRs with another [`DataflowParent`][crate::ops::DataflowParent] root
+    /// operation, report the signature of the inner dataflow sibling graph.
+    ///
     /// Otherwise, returns `None`.
-    fn get_function_type(&self) -> Option<PolyFuncType> {
+    fn get_function_type(&self) -> Option<PolyFixedFunc> {
         let op = self.get_optype(self.root());
         match op {
             OpType::FuncDecl(decl) => Some(decl.signature.clone()),
             OpType::FuncDefn(defn) => Some(defn.signature.clone()),
-            _ => op.inner_function_type().map(PolyFuncType::from),
+            _ => op.inner_function_type().map(PolyFixedFunc::from),
         }
     }
 

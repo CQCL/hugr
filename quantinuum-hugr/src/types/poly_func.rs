@@ -7,10 +7,12 @@ use crate::{
 use itertools::Itertools;
 
 use super::{
+    signature::FuncTypeBase,
     type_param::{check_type_args, TypeArg, TypeParam},
     type_row::RowVarOrType,
+    Type,
 };
-use super::{FunctionType, Signature, Substitution, TypeBound};
+use super::{FunctionType, Substitution, TypeBound};
 
 /// A polymorphic function type, e.g. of a [Graph], or perhaps an [OpDef].
 /// (Nodes/operations in the Hugr are not polymorphic.)
@@ -25,7 +27,11 @@ use super::{FunctionType, Signature, Substitution, TypeBound};
     "params.iter().map(ToString::to_string).join(\" \")",
     "body"
 )]
-pub struct PolyFuncType {
+pub struct PolyFuncBase<T>
+where
+    T: 'static,
+    [T]: ToOwned<Owned = Vec<T>>,
+{
     /// The declared type parameters, i.e., these must be instantiated with
     /// the same number of [TypeArg]s before the function can be called. Note that within
     /// the [Self::body], variable (DeBruijn) index 0 is element 0 of this array, i.e. the
@@ -34,11 +40,16 @@ pub struct PolyFuncType {
     /// [TypeArg]: super::type_param::TypeArg
     params: Vec<TypeParam>,
     /// Template for the function. May contain variables up to length of [Self::params]
-    body: FunctionType,
+    body: FuncTypeBase<T>,
 }
+pub type PolyFuncType = PolyFuncBase<RowVarOrType>;
+pub type PolyFixedFunc = PolyFuncBase<Type>;
 
-impl From<FunctionType> for PolyFuncType {
-    fn from(body: FunctionType) -> Self {
+impl<T> From<FuncTypeBase<T>> for PolyFuncBase<T>
+where
+    [T]: ToOwned<Owned = Vec<T>>,
+{
+    fn from(body: FuncTypeBase<T>) -> Self {
         Self {
             params: vec![],
             body,
@@ -46,29 +57,35 @@ impl From<FunctionType> for PolyFuncType {
     }
 }
 
-impl From<Signature> for PolyFuncType {
-    fn from(value: Signature) -> Self {
-        FunctionType::from(value).into()
+impl From<PolyFixedFunc> for PolyFuncType {
+    fn from(value: PolyFixedFunc) -> Self {
+        Self {
+            params: value.params,
+            body: value.body.into(),
+        }
     }
 }
 
-impl PolyFuncType {
+impl<T> PolyFuncBase<T>
+where
+    [T]: ToOwned<Owned = Vec<T>>,
+{
     /// The type parameters, aka binders, over which this type is polymorphic
     pub fn params(&self) -> &[TypeParam] {
         &self.params
     }
 
     /// The body of the type, a function type.
-    pub fn body(&self) -> &FunctionType {
+    pub fn body(&self) -> &FuncTypeBase<T> {
         &self.body
     }
 
-    /// Create a new PolyFuncType given the kinds of the variables it declares
+    /// Create a new PolyFuncBase given the kinds of the variables it declares
     /// and the underlying [FunctionType].
-    pub fn new(params: impl Into<Vec<TypeParam>>, body: FunctionType) -> Self {
+    pub fn new(params: impl Into<Vec<TypeParam>>, body: impl Into<FuncTypeBase<T>>) -> Self {
         Self {
             params: params.into(),
-            body,
+            body: body.into(),
         }
     }
 
@@ -98,7 +115,7 @@ impl PolyFuncType {
             // Avoid using complex code for simple Monomorphic case
             return self.body.substitute(t).into();
         }
-        PolyFuncType {
+        PolyFuncBase {
             params: self.params.clone(),
             body: self.body.substitute(&InsideBinders {
                 num_binders: self.params.len(),
@@ -107,7 +124,7 @@ impl PolyFuncType {
         }
     }
 
-    /// (Perhaps-partially) instantiates this [PolyFuncType] into another with fewer binders.
+    /// (Perhaps-partially) instantiates this [PolyFuncBase] into another with fewer binders.
     /// Note that indices into `args` correspond to the same index within [Self::params],
     /// so we instantiate the lowest-index [Self::params] first, even though these
     /// would be considered "innermost" / "closest" according to DeBruijn numbering.
@@ -137,7 +154,7 @@ impl PolyFuncType {
         })
     }
 
-    /// Instantiates an outer [PolyFuncType], i.e. with no free variables
+    /// Instantiates an outer [PolyFuncBase], i.e. with no free variables
     /// (as ensured by [Self::validate]), into a monomorphic type.
     ///
     /// # Errors
@@ -147,7 +164,7 @@ impl PolyFuncType {
         &self,
         args: &[TypeArg],
         ext_reg: &ExtensionRegistry,
-    ) -> Result<FunctionType, SignatureError> {
+    ) -> Result<FuncTypeBase<T>, SignatureError> {
         // Check that args are applicable, and that we have a value for each binder,
         // i.e. each possible free variable within the body.
         check_type_args(args, &self.params)?;
@@ -209,7 +226,7 @@ impl<'a> Substitution for Renumber<'a> {
     }
 }
 
-/// Given a [Substitution] defined outside a binder (i.e. [PolyFuncType]),
+/// Given a [Substitution] defined outside a binder (i.e. [PolyFuncBase]),
 /// applies that transformer to types inside the binder (i.e. arguments/results of said function)
 struct InsideBinders<'a> {
     /// The number of binders we have entered since (beneath where) we started to apply
@@ -253,22 +270,26 @@ pub(crate) mod test {
         ExtensionId, ExtensionRegistry, SignatureError, TypeDefBound, PRELUDE, PRELUDE_REGISTRY,
     };
     use crate::std_extensions::collections::{EXTENSION, LIST_TYPENAME};
+    use crate::types::signature::FuncTypeBase;
     use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
-    use crate::types::type_row::{RowVarOrType, TypeRowV};
-    use crate::types::{CustomType, FunctionType, Type, TypeBound};
+    use crate::types::type_row::RowVarOrType;
+    use crate::types::{CustomType, FunctionType, PolyFuncType, Type, TypeBound};
     use crate::Extension;
 
-    use super::PolyFuncType;
+    use super::PolyFuncBase;
 
     lazy_static! {
         static ref REGISTRY: ExtensionRegistry =
             ExtensionRegistry::try_new([PRELUDE.to_owned(), EXTENSION.to_owned()]).unwrap();
     }
 
-    impl PolyFuncType {
+    impl<T> PolyFuncBase<T>
+    where
+        [T]: ToOwned<Owned = Vec<T>>,
+    {
         fn new_validated(
             params: impl Into<Vec<TypeParam>>,
-            body: FunctionType,
+            body: FuncTypeBase<T>,
             extension_registry: &ExtensionRegistry,
         ) -> Result<Self, SignatureError> {
             let res = Self::new(params, body);
@@ -282,7 +303,7 @@ pub(crate) mod test {
         let list_def = EXTENSION.get_type(&LIST_TYPENAME).unwrap();
         let tyvar = TypeArg::new_var_use(0, TypeBound::Any.into());
         let list_of_var = Type::new_extension(list_def.instantiate([tyvar.clone()])?);
-        let list_len = PolyFuncType::new_validated(
+        let list_len = PolyFuncBase::new_validated(
             [TypeBound::Any.into()],
             FunctionType::new(vec![list_of_var], vec![USIZE_T]),
             &REGISTRY,
@@ -318,7 +339,7 @@ pub(crate) mod test {
         // Valid schema...
         let good_array = Type::new_extension(ar_def.instantiate([tyvar.clone(), szvar.clone()])?);
         let good_ts =
-            PolyFuncType::new_validated(typarams.clone(), id_fn(good_array), &PRELUDE_REGISTRY)?;
+            PolyFuncBase::new_validated(typarams.clone(), id_fn(good_array), &PRELUDE_REGISTRY)?;
 
         // Sanity check (good args)
         good_ts.instantiate(
@@ -357,7 +378,7 @@ pub(crate) mod test {
             TypeBound::Any,
         ));
         let bad_ts =
-            PolyFuncType::new_validated(typarams.clone(), id_fn(bad_array), &PRELUDE_REGISTRY);
+            PolyFuncBase::new_validated(typarams.clone(), id_fn(bad_array), &PRELUDE_REGISTRY);
         assert_eq!(bad_ts.err(), Some(arg_err));
 
         Ok(())
@@ -380,7 +401,7 @@ pub(crate) mod test {
             },
         ] {
             let invalid_ts =
-                PolyFuncType::new_validated([decl.clone()], body_type.clone(), &REGISTRY);
+                PolyFuncBase::new_validated([decl.clone()], body_type.clone(), &REGISTRY);
             assert_eq!(
                 invalid_ts.err(),
                 Some(SignatureError::TypeVarDoesNotMatchDeclaration {
@@ -390,7 +411,7 @@ pub(crate) mod test {
             );
         }
         // Variable not declared at all
-        let invalid_ts = PolyFuncType::new_validated([], body_type, &REGISTRY);
+        let invalid_ts = PolyFuncBase::new_validated([], body_type, &REGISTRY);
         assert_eq!(
             invalid_ts.err(),
             Some(SignatureError::FreeTypeVar {
@@ -422,7 +443,7 @@ pub(crate) mod test {
         let reg = ExtensionRegistry::try_new([e]).unwrap();
 
         let make_scheme = |tp: TypeParam| {
-            PolyFuncType::new_validated(
+            PolyFuncBase::new_validated(
                 [tp.clone()],
                 id_fn(Type::new_extension(CustomType::new(
                     TYPE_NAME,
@@ -492,7 +513,7 @@ pub(crate) mod test {
     #[test]
     fn partial_instantiate() -> Result<(), SignatureError> {
         // forall A,N.(Array<A,N> -> A)
-        let array_max = PolyFuncType::new_validated(
+        let array_max = PolyFuncBase::new_validated(
             vec![TypeBound::Any.into(), TypeParam::max_nat()],
             FunctionType::new(
                 vec![array_type(
@@ -514,7 +535,7 @@ pub(crate) mod test {
         assert_eq!(actual, concrete.into());
 
         // forall N.(Array<usize,N> -> usize)
-        let partial = PolyFuncType::new_validated(
+        let partial = PolyFuncBase::new_validated(
             vec![TypeParam::max_nat()],
             FunctionType::new(
                 vec![array_type(
@@ -544,7 +565,7 @@ pub(crate) mod test {
 
     // forall A. A -> (forall C. C -> List(Tuple(C, A))
     pub(crate) fn nested_func() -> PolyFuncType {
-        PolyFuncType::new_validated(
+        PolyFuncBase::new_validated(
             vec![TypeBound::Any.into()],
             FunctionType::new(
                 vec![Type::new_var_use(0, TypeBound::Any)],
@@ -651,7 +672,7 @@ pub(crate) mod test {
     fn row_variables() {
         const TP: TypeParam = TypeParam::Type { b: TypeBound::Any };
         // Mismatched TypeBound (Copyable vs Any)
-        PolyFuncType::new_validated(
+        PolyFuncBase::new_validated(
             [TypeParam::List {
                 param: Box::new(TypeParam::Type {
                     b: TypeBound::Copyable,
@@ -665,7 +686,7 @@ pub(crate) mod test {
         )
         .unwrap_err();
 
-        let pf = PolyFuncType::new_validated(
+        let pf = PolyFuncBase::new_validated(
             [TypeParam::List {
                 param: Box::new(TP),
             }],
@@ -708,7 +729,7 @@ pub(crate) mod test {
             0,
             TypeBound::Copyable,
         )]));
-        let pf = PolyFuncType::new_validated(
+        let pf = PolyFuncBase::new_validated(
             [TypeParam::List {
                 param: Box::new(TypeParam::Type {
                     b: TypeBound::Copyable,

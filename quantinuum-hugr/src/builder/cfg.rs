@@ -403,7 +403,6 @@ pub(crate) mod test {
 
     use crate::hugr::validate::InterGraphEdgeError;
     use crate::hugr::ValidationError;
-    use crate::types::FunctionType;
     use crate::{builder::test::NAT, type_row};
     use cool_asserts::assert_matches;
 
@@ -413,7 +412,7 @@ pub(crate) mod test {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
             let mut func_builder = module_builder
-                .define_function("main", FunctionType::new(vec![NAT], type_row![NAT]).into())?;
+                .define_function("main", Signature::new(vec![NAT], type_row![NAT]))?;
             let _f_id = {
                 let [int] = func_builder.input_wires_arr();
 

@@ -203,7 +203,7 @@ pub(super) mod test {
         builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
         ops::handle::NodeHandle,
         type_row,
-        types::{FunctionType, Signature, Type},
+        types::{Signature, Type},
         utils::test_quantum_extension::h_gate,
     };
 
@@ -222,7 +222,7 @@ pub(super) mod test {
         let (f_id, inner_id) = {
             let mut func_builder = module_builder.define_function(
                 "main",
-                FunctionType::new(type_row![NAT, QB], type_row![NAT, QB]).into(),
+                Signature::new(type_row![NAT, QB], type_row![NAT, QB]),
             )?;
 
             let [int, qb] = func_builder.input_wires_arr();
@@ -261,12 +261,12 @@ pub(super) mod test {
 
         assert_eq!(
             region.get_function_type(),
-            Some(FunctionType::new_endo(type_row![NAT, QB]).into())
+            Some(Signature::new_endo(type_row![NAT, QB]).into())
         );
         let inner_region: DescendantsGraph = DescendantsGraph::try_new(&hugr, inner)?;
         assert_eq!(
             inner_region.get_function_type(),
-            Some(FunctionType::new(type_row![NAT], type_row![NAT]).into())
+            Some(Signature::new(type_row![NAT], type_row![NAT]).into())
         );
 
         Ok(())

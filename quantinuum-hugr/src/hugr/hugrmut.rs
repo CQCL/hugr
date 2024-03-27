@@ -677,7 +677,7 @@ mod test {
         extension::PRELUDE_REGISTRY,
         macros::type_row,
         ops::{self, dataflow::IOTrait, LeafOp},
-        types::{FunctionType, Type},
+        types::{Signature, Type},
     };
 
     use super::*;
@@ -696,7 +696,7 @@ mod test {
             module,
             ops::FuncDefn {
                 name: "main".into(),
-                signature: FunctionType::new(type_row![NAT], type_row![NAT, NAT]).into(),
+                signature: Signature::new(type_row![NAT], type_row![NAT, NAT]).into(),
             },
         );
 

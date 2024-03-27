@@ -2,7 +2,7 @@
 
 use smol_str::SmolStr;
 
-use crate::types::{EdgeKind, PolyFuncType, Signature};
+use crate::types::{EdgeKind, PolyFixedFunc, Signature};
 use crate::types::{Type, TypeBound};
 
 use super::dataflow::DataflowParent;
@@ -37,7 +37,7 @@ pub struct FuncDefn {
     /// Name of function
     pub name: String,
     /// Signature of the function
-    pub signature: PolyFuncType,
+    pub signature: PolyFixedFunc,
 }
 
 impl_op_name!(FuncDefn);
@@ -71,7 +71,7 @@ pub struct FuncDecl {
     /// Name of function
     pub name: String,
     /// Signature of the function
-    pub signature: PolyFuncType,
+    pub signature: PolyFixedFunc,
 }
 
 impl_op_name!(FuncDecl);

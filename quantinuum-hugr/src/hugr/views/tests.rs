@@ -6,7 +6,7 @@ use crate::{
     extension::prelude::QB_T,
     ops::handle::{DataflowOpID, NodeHandle},
     type_row,
-    types::{FunctionType, Signature},
+    types::Signature,
     utils::test_quantum_extension::cx_gate,
     Hugr, HugrView,
 };
@@ -178,7 +178,7 @@ fn test_dataflow_ports_only() {
         let local_and = dfg
             .define_function(
                 "and",
-                FunctionType::new(type_row![BOOL_T; 2], type_row![BOOL_T]).into(),
+                Signature::new(type_row![BOOL_T; 2], type_row![BOOL_T]),
             )
             .unwrap();
         let first_input = local_and.input().out_wire(0);

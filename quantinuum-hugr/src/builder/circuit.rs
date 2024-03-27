@@ -247,13 +247,12 @@ mod test {
         extension::prelude::BOOL_T,
         ops::{custom::OpaqueOp, LeafOp},
         type_row,
-        types::FunctionType,
     };
 
     #[test]
     fn simple_linear() {
         let build_res = build_main(
-            FunctionType::new(type_row![QB, QB], type_row![QB, QB]).into(),
+            Signature::new(type_row![QB, QB], type_row![QB, QB]).into(),
             |mut f_build| {
                 let wires = f_build.input_wires().map(Some).collect();
 
@@ -290,7 +289,7 @@ mod test {
             .into(),
         );
         let build_res = build_main(
-            FunctionType::new(type_row![QB, QB, NAT], type_row![QB, QB, BOOL_T]).into(),
+            Signature::new(type_row![QB, QB, NAT], type_row![QB, QB, BOOL_T]).into(),
             |mut f_build| {
                 let [q0, q1, angle]: [Wire; 3] = f_build.input_wires_arr();
 
@@ -315,7 +314,7 @@ mod test {
     #[test]
     fn ancillae() {
         let build_res = build_main(
-            FunctionType::new(type_row![QB], type_row![QB]).into(),
+            Signature::new(type_row![QB], type_row![QB]).into(),
             |mut f_build| {
                 let mut circ = f_build.as_circuit(f_build.input_wires());
                 assert_eq!(circ.n_wires(), 1);
@@ -351,7 +350,7 @@ mod test {
     #[test]
     fn circuit_builder_errors() {
         let _build_res = build_main(
-            FunctionType::new_endo(type_row![QB, QB]).into(),
+            Signature::new_endo(type_row![QB, QB]).into(),
             |mut f_build| {
                 let mut circ = f_build.as_circuit(f_build.input_wires());
                 let [q0, q1] = circ.tracked_units_arr();

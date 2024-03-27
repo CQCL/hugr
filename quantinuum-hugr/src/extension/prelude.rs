@@ -238,7 +238,7 @@ impl CustomConst for ConstError {
 mod test {
     use crate::{
         builder::{DFGBuilder, Dataflow, DataflowHugr},
-        types::{FunctionType, Signature},
+        types::Signature,
     };
 
     use super::*;

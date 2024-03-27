@@ -15,8 +15,8 @@ use crate::ops::{self, Const, LeafOp, OpType};
 use crate::std_extensions::logic::test::{and_op, or_op};
 use crate::std_extensions::logic::{self, NotOp};
 use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
-use crate::types::type_row::{RowVarOrType, TypeRowV};
-use crate::types::{CustomType, FunctionType, PolyFuncType, Signature, Type, TypeBound, TypeRow};
+use crate::types::type_row::RowVarOrType;
+use crate::types::{CustomType, FunctionType, PolyFixedFunc, Signature, Type, TypeBound, TypeRow};
 use crate::{type_row, Direction, IncomingPort, Node};
 
 const NAT: Type = crate::extension::prelude::USIZE_T;
@@ -27,7 +27,7 @@ const NAT: Type = crate::extension::prelude::USIZE_T;
 fn make_simple_hugr(copies: usize) -> (Hugr, Node) {
     let def_op: OpType = ops::FuncDefn {
         name: "main".into(),
-        signature: FunctionType::new(type_row![BOOL_T], vec![BOOL_T; copies]).into(),
+        signature: Signature::new(type_row![BOOL_T], vec![BOOL_T; copies]).into(),
     }
     .into();
 
@@ -60,7 +60,7 @@ fn add_df_children(b: &mut Hugr, parent: Node, copies: usize) -> (Node, Node, No
 fn invalid_root() {
     let declare_op: OpType = ops::FuncDecl {
         name: "main".into(),
-        signature: Default::default(),
+        signature: Signature::default().into(),
     }
     .into();
 
@@ -130,7 +130,7 @@ fn children_restrictions() {
         .unwrap();
 
     // Add a definition without children
-    let def_sig = FunctionType::new(type_row![BOOL_T], type_row![BOOL_T, BOOL_T]);
+    let def_sig = Signature::new(type_row![BOOL_T], type_row![BOOL_T, BOOL_T]);
     let new_def = b.add_node_with_parent(
         root,
         ops::FuncDefn {
@@ -308,7 +308,7 @@ fn identity_hugr_with_type(t: Type) -> (Hugr, Node) {
         b.root(),
         ops::FuncDefn {
             name: "main".into(),
-            signature: FunctionType::new(row.clone(), row.clone()).into(),
+            signature: Signature::new(row.clone(), row.clone()).into(),
         },
     );
 
@@ -427,9 +427,9 @@ fn typevars_declared() -> Result<(), Box<dyn std::error::Error>> {
     // Base case
     let f = FunctionBuilder::new(
         "myfunc",
-        PolyFuncType::new(
+        PolyFixedFunc::new(
             [TypeBound::Any.into()],
-            FunctionType::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
+            Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
         ),
     )?;
     let [w] = f.input_wires_arr();
@@ -437,9 +437,9 @@ fn typevars_declared() -> Result<(), Box<dyn std::error::Error>> {
     // Type refers to undeclared variable
     let f = FunctionBuilder::new(
         "myfunc",
-        PolyFuncType::new(
+        PolyFixedFunc::new(
             [TypeBound::Any.into()],
-            FunctionType::new_endo(vec![Type::new_var_use(1, TypeBound::Any)]),
+            Signature::new_endo(vec![Type::new_var_use(1, TypeBound::Any)]),
         ),
     )?;
     let [w] = f.input_wires_arr();
@@ -447,9 +447,9 @@ fn typevars_declared() -> Result<(), Box<dyn std::error::Error>> {
     // Variable declaration incorrectly copied to use site
     let f = FunctionBuilder::new(
         "myfunc",
-        PolyFuncType::new(
+        PolyFixedFunc::new(
             [TypeBound::Any.into()],
-            FunctionType::new_endo(vec![Type::new_var_use(1, TypeBound::Copyable)]),
+            Signature::new_endo(vec![Type::new_var_use(1, TypeBound::Copyable)]),
         ),
     )?;
     let [w] = f.input_wires_arr();
@@ -465,14 +465,14 @@ fn nested_typevars() -> Result<(), Box<dyn std::error::Error>> {
     fn build(t: Type) -> Result<Hugr, BuildError> {
         let mut outer = FunctionBuilder::new(
             "outer",
-            PolyFuncType::new(
+            PolyFixedFunc::new(
                 [OUTER_BOUND.into()],
-                FunctionType::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
+                Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
             ),
         )?;
         let inner = outer.define_function(
             "inner",
-            PolyFuncType::new([INNER_BOUND.into()], FunctionType::new_endo(vec![t])),
+            PolyFixedFunc::new([INNER_BOUND.into()], Signature::new_endo(vec![t])),
         )?;
         let [w] = inner.input_wires_arr();
         inner.finish_with_outputs([w])?;
@@ -511,9 +511,9 @@ fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
     let reg = ExtensionRegistry::try_new([collections::EXTENSION.to_owned()]).unwrap();
     let mut def = FunctionBuilder::new(
         "myfunc",
-        PolyFuncType::new(
+        PolyFixedFunc::new(
             [BOUND],
-            FunctionType::new(TypeRowV::default(), vec![list_of_var.clone()])
+            Signature::new(type_row![], vec![list_of_var.clone()])
                 .with_extension_delta(collections::EXTENSION_NAME),
         ),
     )?;
@@ -542,11 +542,11 @@ fn inner_row_variables() -> Result<(), Box<dyn std::error::Error>> {
     let inner_ft = Type::new_function(FunctionType::new_endo(vec![tv]));
     let mut fb = FunctionBuilder::new(
         "id",
-        PolyFuncType::new(
+        PolyFixedFunc::new(
             [TypeParam::List {
                 param: Box::new(TypeParam::Type { b: TypeBound::Any }),
             }],
-            FunctionType::new_endo(vec![inner_ft.clone()]),
+            Signature::new_endo(vec![inner_ft.clone()]),
         ),
     )?;
     // All the wires here are carrying higher-order Function values
@@ -558,14 +558,14 @@ fn inner_row_variables() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn no_outer_row_variables() -> Result<(), Box<dyn std::error::Error>> {
-    let tv = RowVarOrType::RV(0, TypeBound::Any);
+    let tv = Type::new_var_use(0, TypeBound::Any);
     let fb = FunctionBuilder::new(
         "impossible_id_of_unknown_arity",
-        PolyFuncType::new(
+        PolyFixedFunc::new(
             [TypeParam::List {
                 param: Box::new(TypeParam::Type { b: TypeBound::Any }),
             }],
-            FunctionType::new_endo(vec![tv]),
+            Signature::new_endo(vec![tv]),
         ),
     )?;
     // Input and Output nodes have a Port whose type is List(Type(Any))
@@ -588,12 +588,12 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
     let mut m = ModuleBuilder::new();
     let id = m.declare(
         "id",
-        PolyFuncType::new(
+        PolyFixedFunc::new(
             vec![TypeBound::Any.into()],
-            FunctionType::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
+            Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
         ),
     )?;
-    let mut f = m.define_function("main", FunctionType::new_endo(vec![USIZE_T]).into())?;
+    let mut f = m.define_function("main", Signature::new_endo(vec![USIZE_T]))?;
     let c = f.call(&id, &[USIZE_T.into()], f.input_wires(), &PRELUDE_REGISTRY)?;
     f.finish_with_outputs(c.outputs())?;
     let _ = m.finish_prelude_hugr()?;

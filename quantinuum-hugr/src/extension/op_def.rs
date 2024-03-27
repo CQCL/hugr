@@ -17,8 +17,8 @@ use crate::Hugr;
 
 /// Trait necessary for binary computations of OpDef signature
 pub trait CustomSignatureFunc: Send + Sync {
-    /// Compute signature of node given
-    /// values for the type parameters,
+    /// Compute type scheme (perhaps polymorphic over type and/or row variables)
+    /// given values for the static type parameters,
     /// the operation definition and the extension registry.
     fn compute_signature<'o, 'a: 'o>(
         &'a self,
@@ -26,8 +26,9 @@ pub trait CustomSignatureFunc: Send + Sync {
         def: &'o OpDef,
         extension_registry: &ExtensionRegistry,
     ) -> Result<PolyFuncType, SignatureError>;
-    /// The declared type parameters which require values in order for signature to
-    /// be computed.
+    /// The declared type parameters which for which closed values
+    /// (closed == without any free variables)
+    /// which must be provided in order for signature to be computed.
     fn static_params(&self) -> &[TypeParam];
 }
 
@@ -247,12 +248,16 @@ impl SignatureFunc {
             }
         };
 
-        let res = pf.instantiate(args, exts)?;
+        // The first instantiate returns a FunctionType, i.e. expressed using 'RowVarOrType's.
+        // try_into removes possibility of containing any RowVars by expressing directly using 'Type's.
+        let res = pf
+            .instantiate(args, exts)?
+            .try_into()
+            .map_err(|(idx, bound)| SignatureError::ContainsRowVars { idx, bound })?;
         // TODO bring this assert back once resource inference is done?
         // https://github.com/CQCL/hugr/issues/388
         // debug_assert!(res.extension_reqs.contains(def.extension()));
-        res.try_into()
-            .map_err(|(idx, bound)| SignatureError::ContainsRowVars { idx, bound })
+        Ok(res)
     }
 }
 
@@ -481,10 +486,8 @@ mod test {
     use crate::ops::custom::ExternalOp;
     use crate::ops::LeafOp;
     use crate::std_extensions::collections::{EXTENSION, LIST_TYPENAME};
-    use crate::types::Type;
-    use crate::types::{
-        type_param::TypeParam, FunctionType, PolyFuncType, Signature, TypeArg, TypeBound,
-    };
+    use crate::types::{type_param::TypeParam, FunctionType, Signature, TypeArg, TypeBound};
+    use crate::types::{PolyFuncType, Type};
     use crate::Hugr;
     use crate::{const_extension_ids, Extension};
 

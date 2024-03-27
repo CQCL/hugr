@@ -938,9 +938,7 @@ fn simple_funcdefn() -> Result<(), Box<dyn Error>> {
     let mut builder = ModuleBuilder::new();
     let mut func_builder = builder.define_function(
         "F",
-        FunctionType::new(vec![NAT], vec![NAT])
-            .with_extension_delta(A)
-            .into(),
+        Signature::new(vec![NAT], vec![NAT]).with_extension_delta(A),
     )?;
 
     let [w] = func_builder.input_wires_arr();
