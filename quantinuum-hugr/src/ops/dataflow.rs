@@ -2,9 +2,9 @@
 
 use super::{impl_op_name, OpTag, OpTrait};
 
-use crate::extension::ExtensionSet;
+use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 use crate::ops::StaticTag;
-use crate::types::{EdgeKind, FunctionType, Type, TypeRow};
+use crate::types::{EdgeKind, FunctionType, PolyFuncType, Type, TypeArg, TypeRow};
 use crate::IncomingPort;
 
 pub(crate) trait DataflowOpTrait {
@@ -153,7 +153,9 @@ impl<T: DataflowOpTrait> StaticTag for T {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Call {
     /// Signature of function being called
-    pub signature: FunctionType,
+    func_sig: PolyFuncType,
+    type_args: Vec<TypeArg>,
+    instantiation: FunctionType, // Cache, so we can fail in try_new() not in signature()
 }
 impl_op_name!(Call);
 
@@ -165,7 +167,7 @@ impl DataflowOpTrait for Call {
     }
 
     fn signature(&self) -> FunctionType {
-        self.signature.clone()
+        self.instantiation.clone()
     }
 
     fn static_input(&self) -> Option<EdgeKind> {
@@ -174,10 +176,28 @@ impl DataflowOpTrait for Call {
     }
 }
 impl Call {
+    /// Try to make a new Call. Returns an error if the `type_args`` do not fit the [TypeParam]s
+    /// declared by the function.
+    ///
+    /// [TypeParam]: crate::types::type_param::TypeParam
+    pub fn try_new(
+        func_sig: PolyFuncType,
+        type_args: impl Into<Vec<TypeArg>>,
+        exts: &ExtensionRegistry,
+    ) -> Result<Self, SignatureError> {
+        let type_args = type_args.into();
+        let instantiation = func_sig.instantiate(&type_args, exts)?;
+        Ok(Self {
+            func_sig,
+            type_args,
+            instantiation,
+        })
+    }
+
     #[inline]
     /// Return the signature of the function called by this op.
-    pub fn called_function_type(&self) -> &FunctionType {
-        &self.signature
+    pub fn called_function_type(&self) -> &PolyFuncType {
+        &self.func_sig
     }
 
     /// The IncomingPort which links to the function being called.
@@ -189,8 +209,9 @@ impl Call {
     /// # use hugr::ops::OpType;
     /// # use hugr::types::FunctionType;
     /// # use hugr::extension::prelude::QB_T;
+    /// # use hugr::extension::PRELUDE_REGISTRY;
     /// let signature = FunctionType::new(vec![QB_T, QB_T], vec![QB_T, QB_T]);
-    /// let call = Call { signature };
+    /// let call = Call::try_new(signature.into(), &[], &PRELUDE_REGISTRY).unwrap();
     /// let op = OpType::Call(call.clone());
     /// assert_eq!(op.static_input_port(), Some(call.called_function_port()));
     /// ```
@@ -198,7 +219,7 @@ impl Call {
     /// [`OpType::static_input_port`]: crate::ops::OpType::static_input_port
     #[inline]
     pub fn called_function_port(&self) -> IncomingPort {
-        self.called_function_type().input_count().into()
+        self.instantiation.input_count().into()
     }
 }
 
