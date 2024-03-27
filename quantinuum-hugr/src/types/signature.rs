@@ -6,7 +6,7 @@ use std::fmt::{self, Display, Write};
 
 use super::type_param::TypeParam;
 use super::type_row::{RowVarOrType, TypeRowBase};
-use super::{subst_row, valid_row, Substitution, Type, TypeBound, TypeRowV};
+use super::{check_typevar_decl, Substitution, Type, TypeBound};
 
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 use crate::{Direction, IncomingPort, OutgoingPort, Port};
@@ -16,7 +16,7 @@ use crate::{Direction, IncomingPort, OutgoingPort, Port};
 /// and also the target (value) of a call (static).
 pub struct FuncTypeBase<T>
 where
-    T: 'static,
+    T: TypeRowElem,
     [T]: ToOwned<Owned = Vec<T>>,
 {
     /// Value inputs of the function.
@@ -27,9 +27,22 @@ where
     pub extension_reqs: ExtensionSet,
 }
 
+pub(super) trait TypeRowElem: 'static + Sized + Clone
+where
+    [Self]: ToOwned<Owned = Vec<Self>>,
+{
+    fn validate(
+        &self,
+        extension_registry: &ExtensionRegistry,
+        var_decls: &[TypeParam],
+    ) -> Result<(), SignatureError>;
+
+    fn subst_row(row: &TypeRowBase<Self>, tr: &impl Substitution) -> TypeRowBase<Self>;
+}
+
 impl<T> Default for FuncTypeBase<T>
 where
-    T: 'static,
+    T: TypeRowElem,
     [T]: ToOwned<Owned = Vec<T>>,
 {
     fn default() -> Self {
@@ -44,12 +57,57 @@ where
 /// The type of a function, e.g. passing around a pointer/static ref to it.
 pub type FunctionType = FuncTypeBase<RowVarOrType>;
 
+impl TypeRowElem for RowVarOrType {
+    fn validate(
+        &self,
+        extension_registry: &ExtensionRegistry,
+        var_decls: &[TypeParam],
+    ) -> Result<(), SignatureError> {
+        match self {
+            RowVarOrType::T(t) => t.validate(extension_registry, var_decls),
+            RowVarOrType::RV(idx, bound) => {
+                let t = TypeParam::List {
+                    param: Box::new((*bound).into()),
+                };
+                check_typevar_decl(var_decls, *idx, &t)
+            }
+        }
+    }
+
+    fn subst_row(row: &TypeRowBase<Self>, tr: &impl Substitution) -> TypeRowBase<Self> {
+        row.iter()
+            .flat_map(|ty| match ty {
+                RowVarOrType::RV(idx, bound) => tr.apply_rowvar(*idx, *bound),
+                RowVarOrType::T(t) => vec![RowVarOrType::T(t.substitute(tr))],
+            })
+            .collect::<Vec<_>>()
+            .into()
+    }
+}
+
 /// The type of a node. Fixed/known arity of inputs + outputs.
 pub type Signature = FuncTypeBase<Type>;
 
+impl TypeRowElem for Type {
+    fn validate(
+        &self,
+        extension_registry: &ExtensionRegistry,
+        var_decls: &[TypeParam],
+    ) -> Result<(), SignatureError> {
+        self.validate(extension_registry, var_decls)
+    }
+
+    fn subst_row(row: &TypeRowBase<Self>, tr: &impl Substitution) -> TypeRowBase<Self> {
+        row.iter()
+            .map(|t| t.substitute(tr))
+            .collect::<Vec<_>>()
+            .into()
+    }
+}
+
 impl<T> FuncTypeBase<T>
 where
-    T: 'static + Clone,
+    T: TypeRowElem,
     [T]: ToOwned<Owned = Vec<T>>,
 {
     /// Builder method, add extension_reqs to an FunctionType
@@ -72,36 +130,36 @@ where
         let linear = linear.into();
         Self::new(linear.clone(), linear)
     }
-}
 
-impl FunctionType {
     pub(crate) fn validate(
         &self,
         extension_registry: &ExtensionRegistry,
         var_decls: &[TypeParam],
     ) -> Result<(), SignatureError> {
-        valid_row(&self.input, extension_registry, var_decls)?;
-        valid_row(&self.output, extension_registry, var_decls)?;
+        self.input
+            .iter()
+            .chain(self.output.iter())
+            .try_for_each(|e| e.validate(extension_registry, var_decls))?;
         self.extension_reqs.validate(var_decls)
     }
 
     pub(crate) fn substitute(&self, tr: &impl Substitution) -> Self {
         Self {
-            input: subst_row(&self.input, tr),
-            output: subst_row(&self.output, tr),
+            input: TypeRowElem::subst_row(&self.input, tr),
+            output: TypeRowElem::subst_row(&self.output, tr),
             extension_reqs: self.extension_reqs.substitute(tr),
         }
     }
 
     #[inline]
     /// Returns the input row
-    pub fn input(&self) -> &TypeRowV {
+    pub fn input(&self) -> &TypeRowBase<T> {
         &self.input
     }
 
     #[inline]
     /// Returns the output row
-    pub fn output(&self) -> &TypeRowV {
+    pub fn output(&self) -> &TypeRowBase<T> {
         &self.output
     }
 }
@@ -248,7 +306,7 @@ impl TryFrom<FunctionType> for Signature {
     }
 }
 
-impl<T: Display> Display for FuncTypeBase<T>
+impl<T: Display + TypeRowElem> Display for FuncTypeBase<T>
 where
     [T]: ToOwned<Owned = Vec<T>>,
 {

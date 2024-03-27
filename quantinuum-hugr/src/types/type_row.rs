@@ -156,9 +156,9 @@ where
     }
 }
 
-impl Into<Cow<'static, [RowVarOrType]>> for TypeRow {
-    fn into(self) -> Cow<'static, [RowVarOrType]> {
-        self.types
+impl From<TypeRow> for Cow<'static, [RowVarOrType]> {
+    fn from(val: TypeRow) -> Self {
+        val.types
             .into_owned()
             .into_iter()
             .map(RowVarOrType::from)

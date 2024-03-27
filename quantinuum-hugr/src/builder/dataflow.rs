@@ -56,7 +56,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
             parent,
             NodeType::new(
                 output,
-                input_extensions.map(|inp| inp.union(signature.extension_reqs)),
+                input_extensions.map(|inp| inp.union(extension_reqs)),
             ),
         );
 

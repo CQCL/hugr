@@ -7,12 +7,12 @@ use crate::{
 use itertools::Itertools;
 
 use super::{
-    signature::FuncTypeBase,
+    signature::{FuncTypeBase, TypeRowElem},
     type_param::{check_type_args, TypeArg, TypeParam},
     type_row::RowVarOrType,
     Type,
 };
-use super::{FunctionType, Substitution, TypeBound};
+use super::{Substitution, TypeBound};
 
 /// A polymorphic function type, e.g. of a [Graph], or perhaps an [OpDef].
 /// (Nodes/operations in the Hugr are not polymorphic.)
@@ -29,7 +29,7 @@ use super::{FunctionType, Substitution, TypeBound};
 )]
 pub struct PolyFuncBase<T>
 where
-    T: 'static,
+    T: TypeRowElem,
     [T]: ToOwned<Owned = Vec<T>>,
 {
     /// The declared type parameters, i.e., these must be instantiated with
@@ -45,7 +45,7 @@ where
 pub type PolyFuncType = PolyFuncBase<RowVarOrType>;
 pub type PolyFixedFunc = PolyFuncBase<Type>;
 
-impl<T> From<FuncTypeBase<T>> for PolyFuncBase<T>
+impl<T: TypeRowElem> From<FuncTypeBase<T>> for PolyFuncBase<T>
 where
     [T]: ToOwned<Owned = Vec<T>>,
 {
@@ -66,7 +66,7 @@ impl From<PolyFixedFunc> for PolyFuncType {
     }
 }
 
-impl<T> PolyFuncBase<T>
+impl<T: TypeRowElem> PolyFuncBase<T>
 where
     [T]: ToOwned<Owned = Vec<T>>,
 {
@@ -186,7 +186,7 @@ impl<'a> Substitution for SubstValues<'a> {
         arg.clone()
     }
 
-    fn apply_rowvar(&self, idx: usize, bound: TypeBound) -> Vec<RowVarOrType> {
+    fn apply_rowvar(&self, idx: usize, _bound: TypeBound) -> Vec<RowVarOrType> {
         let arg = self
             .0
             .get(idx)
@@ -276,14 +276,14 @@ pub(crate) mod test {
     use crate::types::{CustomType, FunctionType, PolyFuncType, Type, TypeBound};
     use crate::Extension;
 
-    use super::PolyFuncBase;
+    use super::{PolyFuncBase, TypeRowElem};
 
     lazy_static! {
         static ref REGISTRY: ExtensionRegistry =
             ExtensionRegistry::try_new([PRELUDE.to_owned(), EXTENSION.to_owned()]).unwrap();
     }
 
-    impl<T> PolyFuncBase<T>
+    impl<T: TypeRowElem> PolyFuncBase<T>
     where
         [T]: ToOwned<Owned = Vec<T>>,
     {

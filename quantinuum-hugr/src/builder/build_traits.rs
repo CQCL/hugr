@@ -19,7 +19,7 @@ use crate::{
     types::EdgeKind,
 };
 
-use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError, PRELUDE_REGISTRY};
+use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE_REGISTRY};
 use crate::types::{PolyFixedFunc, Signature, Type, TypeArg, TypeRow};
 
 use itertools::Itertools;

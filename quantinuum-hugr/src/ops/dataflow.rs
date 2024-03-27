@@ -4,7 +4,7 @@ use super::{impl_op_name, OpTag, OpTrait};
 
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 use crate::ops::StaticTag;
-use crate::types::{EdgeKind, PolyFixedFunc, PolyFuncType, Signature, Type, TypeArg, TypeRow};
+use crate::types::{EdgeKind, PolyFixedFunc, Signature, Type, TypeArg, TypeRow};
 use crate::IncomingPort;
 
 pub(crate) trait DataflowOpTrait {

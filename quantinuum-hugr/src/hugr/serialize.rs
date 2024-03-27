@@ -267,7 +267,7 @@ pub mod test {
     use crate::std_extensions::arithmetic::float_ops::FLOAT_OPS_REGISTRY;
     use crate::std_extensions::arithmetic::float_types::{ConstF64, FLOAT64_TYPE};
     use crate::std_extensions::logic::NotOp;
-    use crate::types::{FunctionType, Signature, Type};
+    use crate::types::{Signature, Type};
     use crate::{type_row, OutgoingPort};
     use itertools::Itertools;
     use jsonschema::{Draft, JSONSchema};

@@ -21,7 +21,7 @@ use crate::{
 };
 
 use crate::type_row;
-use crate::types::{FunctionType, Signature, Type, TypeRow};
+use crate::types::{Signature, Type, TypeRow};
 
 use cool_asserts::assert_matches;
 use itertools::Itertools;

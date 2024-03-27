@@ -27,6 +27,7 @@ use crate::ops::AliasDecl;
 use crate::type_row;
 use std::fmt::Debug;
 
+use self::signature::TypeRowElem;
 use self::type_param::TypeParam;
 use self::type_row::{RowVarOrType, TypeRowV};
 
@@ -246,14 +247,6 @@ impl TypeEnum {
 ///
 pub struct Type(TypeEnum, TypeBound);
 
-fn validate_each<'a>(
-    extension_registry: &ExtensionRegistry,
-    var_decls: &[TypeParam],
-    mut iter: impl Iterator<Item = &'a Type>,
-) -> Result<(), SignatureError> {
-    iter.try_for_each(|t| t.validate(extension_registry, var_decls))
-}
-
 impl Type {
     /// An empty `TypeRow`. Provided here for convenience
     pub const EMPTY_TYPEROW: TypeRow = type_row![];
@@ -352,7 +345,8 @@ impl Type {
         match &self.0 {
             TypeEnum::Sum(SumType::General { rows }) => rows
                 .iter()
-                .try_for_each(|row| valid_row(row, extension_registry, var_decls)),
+                .flat_map(TypeRowV::iter)
+                .try_for_each(|rvt| rvt.validate(extension_registry, var_decls)),
             TypeEnum::Sum(SumType::Unit { .. }) => Ok(()), // No leaves there
             TypeEnum::Alias(_) => Ok(()),
             TypeEnum::Extension(custy) => custy.validate(extension_registry, var_decls),
@@ -368,7 +362,7 @@ impl Type {
             TypeEnum::Extension(cty) => Type::new_extension(cty.substitute(t)),
             TypeEnum::Function(bf) => Type::new_function(bf.substitute(t)),
             TypeEnum::Sum(SumType::General { rows }) => {
-                Type::new_sum(rows.iter().map(|x| subst_row(x, t)))
+                Type::new_sum(rows.iter().map(|x| TypeRowElem::subst_row(x, t)))
             }
         }
     }
@@ -395,34 +389,6 @@ pub(crate) trait Substitution {
     }
 
     fn extension_registry(&self) -> &ExtensionRegistry;
-}
-
-fn valid_row(
-    row: &TypeRowV,
-    exts: &ExtensionRegistry,
-    var_decls: &[TypeParam],
-) -> Result<(), SignatureError> {
-    row.iter().try_for_each(|t| match t {
-        RowVarOrType::T(t) => t.validate(exts, var_decls),
-        RowVarOrType::RV(idx, bound) => {
-            let t = TypeParam::List {
-                param: Box::new((*bound).into()),
-            };
-            check_typevar_decl(var_decls, *idx, &t)
-        }
-    })
-}
-
-fn subst_row(row: &TypeRowV, tr: &impl Substitution) -> TypeRowV {
-    let res = row
-        .iter()
-        .flat_map(|ty| match ty {
-            RowVarOrType::RV(idx, bound) => tr.apply_rowvar(*idx, *bound),
-            RowVarOrType::T(t) => vec![RowVarOrType::T(t.substitute(tr))],
-        })
-        .collect::<Vec<_>>()
-        .into();
-    res
 }
 
 pub(crate) fn check_typevar_decl(

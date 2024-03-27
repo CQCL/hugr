@@ -212,7 +212,7 @@ pub(in crate::hugr::rewrite) mod test {
     use crate::ops::{OpTrait, OpType};
     use crate::std_extensions::logic::test::and_op;
     use crate::type_row;
-    use crate::types::{FunctionType, Signature, Type};
+    use crate::types::{Signature, Type};
     use crate::utils::test_quantum_extension::{cx_gate, h_gate};
     use crate::{IncomingPort, Node};
 
