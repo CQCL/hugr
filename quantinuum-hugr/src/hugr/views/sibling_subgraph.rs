@@ -13,6 +13,7 @@ use std::collections::HashSet;
 use std::mem;
 
 use itertools::Itertools;
+use nonempty::NonEmpty;
 use portgraph::algorithms::ConvexChecker;
 use portgraph::{view::Subgraph, Direction, PortView};
 use thiserror::Error;
@@ -54,7 +55,7 @@ use crate::{Hugr, IncomingPort, Node, OutgoingPort, Port, SimpleReplacement};
 #[derive(Clone, Debug)]
 pub struct SiblingSubgraph {
     /// The nodes of the induced subgraph.
-    nodes: Vec<Node>,
+    nodes: NonEmpty<Node>,
     /// The input ports of the subgraph.
     ///
     /// Grouped by input parameter. Each port must be unique and belong to a
@@ -101,16 +102,12 @@ impl SiblingSubgraph {
         let (inputs, outputs) = get_input_output_ports(dfg_graph);
 
         validate_subgraph(dfg_graph, &nodes, &inputs, &outputs)?;
-
-        if nodes.is_empty() {
-            Err(InvalidSubgraph::EmptySubgraph)
-        } else {
-            Ok(Self {
-                nodes,
-                inputs,
-                outputs,
-            })
-        }
+        let nodes = NonEmpty::from_vec(nodes).ok_or(InvalidSubgraph::EmptySubgraph)?;
+        Ok(Self {
+            nodes,
+            inputs,
+            outputs,
+        })
     }
 
     /// Create a new convex sibling subgraph from input and output boundaries.
@@ -192,6 +189,8 @@ impl SiblingSubgraph {
             return Err(InvalidSubgraph::NotConvex);
         }
 
+        let nodes = NonEmpty::from_vec(nodes).ok_or(InvalidSubgraph::EmptySubgraph)?;
+
         Ok(Self {
             nodes,
             inputs,
@@ -269,7 +268,7 @@ impl SiblingSubgraph {
     }
 
     /// An iterator over the nodes in the subgraph.
-    pub fn nodes(&self) -> &[Node] {
+    pub fn nodes(&self) -> &NonEmpty<Node> {
         &self.nodes
     }
 
@@ -715,15 +714,12 @@ mod tests {
         fn from_sibling_graph(sibling_graph: &impl HugrView) -> Result<Self, InvalidSubgraph> {
             let root = sibling_graph.root();
             let nodes = sibling_graph.children(root).collect_vec();
-            if nodes.is_empty() {
-                Err(InvalidSubgraph::EmptySubgraph)
-            } else {
-                Ok(Self {
-                    nodes,
-                    inputs: Vec::new(),
-                    outputs: Vec::new(),
-                })
-            }
+            let nodes = NonEmpty::from_vec(nodes).ok_or(InvalidSubgraph::EmptySubgraph)?;
+            Ok(Self {
+                nodes,
+                inputs: Vec::new(),
+                outputs: Vec::new(),
+            })
         }
     }
 

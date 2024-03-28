@@ -4,6 +4,7 @@ use core::panic;
 use std::collections::HashMap;
 use std::ops::Range;
 
+use nonempty::NonEmpty;
 use portgraph::view::{NodeFilter, NodeFiltered};
 use portgraph::{LinkMut, NodeIndex, PortMut, PortView, SecondaryMap};
 
@@ -365,7 +366,7 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMut for T {
         subgraph: &SiblingSubgraph,
     ) -> HashMap<Node, Node> {
         // Create a portgraph view with the explicit list of nodes defined by the subgraph.
-        let portgraph: NodeFiltered<_, NodeFilter<&[Node]>, &[Node]> =
+        let portgraph: NodeFiltered<_, NodeFilter<&NonEmpty<Node>>, &NonEmpty<Node>> =
             NodeFiltered::new_node_filtered(
                 other.portgraph(),
                 |node, ctx| ctx.contains(&node.into()),

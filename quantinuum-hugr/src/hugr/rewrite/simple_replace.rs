@@ -196,7 +196,6 @@ pub enum SimpleReplacementError {
 #[cfg(test)]
 pub(in crate::hugr::rewrite) mod test {
     use itertools::Itertools;
-    use nonempty::NonEmpty;
     use rstest::{fixture, rstest};
     use std::collections::{HashMap, HashSet};
 
@@ -622,7 +621,7 @@ pub(in crate::hugr::rewrite) mod test {
         replacement.remove_node(in_);
         replacement.remove_node(out);
         Replacement {
-            removal: NonEmpty::from_slice(s.subgraph.nodes()).unwrap(),
+            removal: s.subgraph.nodes().clone(),
             replacement,
             adoptions: HashMap::new(),
             mu_inp,
