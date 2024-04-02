@@ -42,7 +42,10 @@ where
     /// Template for the function. May contain variables up to length of [Self::params]
     body: FuncTypeBase<T>,
 }
-pub type PolyFuncType = PolyFuncBase<RowVarOrType>;
+
+/// Type of a function polymorphic over some variables,
+/// which may include row variables.
+pub type PolyFuncVarLen = PolyFuncBase<RowVarOrType>;
 pub type PolyFixedFunc = PolyFuncBase<Type>;
 
 impl<T: TypeRowElem> From<FuncTypeBase<T>> for PolyFuncBase<T>
@@ -57,7 +60,7 @@ where
     }
 }
 
-impl From<PolyFixedFunc> for PolyFuncType {
+impl From<PolyFixedFunc> for PolyFuncVarLen {
     fn from(value: PolyFixedFunc) -> Self {
         Self {
             params: value.params,
@@ -273,7 +276,7 @@ pub(crate) mod test {
     use crate::types::signature::FuncTypeBase;
     use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
     use crate::types::type_row::RowVarOrType;
-    use crate::types::{CustomType, FuncTypeVarLen, PolyFuncType, Type, TypeBound};
+    use crate::types::{CustomType, FuncTypeVarLen, PolyFuncVarLen, Type, TypeBound};
     use crate::Extension;
 
     use super::{PolyFuncBase, TypeRowElem};
@@ -501,8 +504,8 @@ pub(crate) mod test {
         Ok(())
     }
 
-    fn new_pf1(param: TypeParam, input: Type, output: Type) -> PolyFuncType {
-        PolyFuncType {
+    fn new_pf1(param: TypeParam, input: Type, output: Type) -> PolyFuncVarLen {
+        PolyFuncVarLen {
             params: vec![param],
             body: FuncTypeVarLen::new(vec![input], vec![output]),
         }
@@ -564,7 +567,7 @@ pub(crate) mod test {
     }
 
     // forall A. A -> (forall C. C -> List(Tuple(C, A))
-    pub(crate) fn nested_func() -> PolyFuncType {
+    pub(crate) fn nested_func() -> PolyFuncVarLen {
         PolyFuncBase::new_validated(
             vec![TypeBound::Any.into()],
             FuncTypeVarLen::new(

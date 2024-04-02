@@ -12,7 +12,7 @@ use super::{
 };
 
 use crate::types::type_param::{check_type_args, TypeArg, TypeParam};
-use crate::types::{FuncTypeVarLen, FunctionType, PolyFuncType};
+use crate::types::{FuncTypeVarLen, FunctionType, PolyFuncVarLen};
 use crate::Hugr;
 
 /// Trait necessary for binary computations of OpDef signature
@@ -25,7 +25,7 @@ pub trait CustomSignatureFunc: Send + Sync {
         arg_values: &[TypeArg],
         def: &'o OpDef,
         extension_registry: &ExtensionRegistry,
-    ) -> Result<PolyFuncType, SignatureError>;
+    ) -> Result<PolyFuncVarLen, SignatureError>;
     /// The declared type parameters which for which closed values
     /// (closed == without any free variables)
     /// which must be provided in order for signature to be computed.
@@ -36,7 +36,7 @@ pub trait CustomSignatureFunc: Send + Sync {
 pub trait SignatureFromArgs: Send + Sync {
     /// Compute signature of node given
     /// values for the type parameters.
-    fn compute_signature(&self, arg_values: &[TypeArg]) -> Result<PolyFuncType, SignatureError>;
+    fn compute_signature(&self, arg_values: &[TypeArg]) -> Result<PolyFuncVarLen, SignatureError>;
     /// The declared type parameters which require values in order for signature to
     /// be computed.
     fn static_params(&self) -> &[TypeParam];
@@ -49,7 +49,7 @@ impl<T: SignatureFromArgs> CustomSignatureFunc for T {
         arg_values: &[TypeArg],
         _def: &'o OpDef,
         _extension_registry: &ExtensionRegistry,
-    ) -> Result<PolyFuncType, SignatureError> {
+    ) -> Result<PolyFuncVarLen, SignatureError> {
         SignatureFromArgs::compute_signature(self, arg_values)
     }
 
@@ -122,14 +122,14 @@ pub trait CustomLowerFunc: Send + Sync {
 #[derive(serde::Deserialize, serde::Serialize)]
 pub struct CustomValidator {
     #[serde(flatten)]
-    poly_func: PolyFuncType,
+    poly_func: PolyFuncVarLen,
     #[serde(skip)]
     validate: Box<dyn ValidateTypeArgs>,
 }
 
 impl CustomValidator {
     /// Encode a signature using a `PolyFuncType`
-    pub fn from_polyfunc(poly_func: impl Into<PolyFuncType>) -> Self {
+    pub fn from_polyfunc(poly_func: impl Into<PolyFuncVarLen>) -> Self {
         Self {
             poly_func: poly_func.into(),
             validate: Default::default(),
@@ -139,7 +139,7 @@ impl CustomValidator {
     /// Encode a signature using a `PolyFuncType`, with a custom function for
     /// validating type arguments before returning the signature.
     pub fn new_with_validator(
-        poly_func: impl Into<PolyFuncType>,
+        poly_func: impl Into<PolyFuncVarLen>,
         validate: impl ValidateTypeArgs + 'static,
     ) -> Self {
         Self {
@@ -188,8 +188,8 @@ impl<T: CustomSignatureFunc + 'static> From<T> for SignatureFunc {
     }
 }
 
-impl From<PolyFuncType> for SignatureFunc {
-    fn from(v: PolyFuncType) -> Self {
+impl From<PolyFuncVarLen> for SignatureFunc {
+    fn from(v: PolyFuncVarLen) -> Self {
         Self::TypeScheme(CustomValidator::from_polyfunc(v))
     }
 }
@@ -232,7 +232,7 @@ impl SignatureFunc {
         args: &[TypeArg],
         exts: &ExtensionRegistry,
     ) -> Result<FunctionType, SignatureError> {
-        let temp: PolyFuncType;
+        let temp: PolyFuncVarLen;
         let (pf, args) = match &self {
             SignatureFunc::TypeScheme(custom) => {
                 custom.validate.validate(args, def, exts)?;
@@ -331,7 +331,7 @@ impl OpDef {
         exts: &ExtensionRegistry,
         var_decls: &[TypeParam],
     ) -> Result<(), SignatureError> {
-        let temp: PolyFuncType; // to keep alive
+        let temp: PolyFuncVarLen; // to keep alive
         let (pf, args) = match &self.signature_func {
             SignatureFunc::TypeScheme(ts) => (&ts.poly_func, args),
             SignatureFunc::CustomFunc(custom) => {
@@ -487,7 +487,7 @@ mod test {
     use crate::ops::LeafOp;
     use crate::std_extensions::collections::{EXTENSION, LIST_TYPENAME};
     use crate::types::{type_param::TypeParam, FuncTypeVarLen, FunctionType, TypeArg, TypeBound};
-    use crate::types::{PolyFuncType, Type};
+    use crate::types::{PolyFuncVarLen, Type};
     use crate::Hugr;
     use crate::{const_extension_ids, Extension};
 
@@ -503,7 +503,8 @@ mod test {
         let list_of_var =
             Type::new_extension(list_def.instantiate(vec![TypeArg::new_var_use(0, TP)])?);
         const OP_NAME: SmolStr = SmolStr::new_inline("Reverse");
-        let type_scheme = PolyFuncType::new(vec![TP], FuncTypeVarLen::new_endo(vec![list_of_var]));
+        let type_scheme =
+            PolyFuncVarLen::new(vec![TP], FuncTypeVarLen::new_endo(vec![list_of_var]));
 
         let def = e.add_op(OP_NAME, "desc".into(), type_scheme)?;
         def.add_lower_func(LowerFunc::FixedHugr(ExtensionSet::new(), Hugr::default()));
@@ -542,7 +543,7 @@ mod test {
             fn compute_signature(
                 &self,
                 arg_values: &[TypeArg],
-            ) -> Result<PolyFuncType, SignatureError> {
+            ) -> Result<PolyFuncVarLen, SignatureError> {
                 const TP: TypeParam = TypeParam::Type { b: TypeBound::Any };
                 let [TypeArg::BoundedNat { n }] = arg_values else {
                     return Err(SignatureError::InvalidTypeArgs);
@@ -551,7 +552,7 @@ mod test {
                 let tvs: Vec<Type> = (0..n)
                     .map(|_| Type::new_var_use(0, TypeBound::Any))
                     .collect();
-                Ok(PolyFuncType::new(
+                Ok(PolyFuncVarLen::new(
                     vec![TP.to_owned()],
                     FuncTypeVarLen::new(tvs.clone(), vec![Type::new_tuple(tvs)]),
                 ))
@@ -628,7 +629,7 @@ mod test {
         let def = e.add_op(
             "SimpleOp".into(),
             "".into(),
-            PolyFuncType::new(
+            PolyFuncVarLen::new(
                 vec![TypeBound::Any.into()],
                 FuncTypeVarLen::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
             ),

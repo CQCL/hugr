@@ -1,5 +1,5 @@
 use super::type_row::RowVarOrType;
-use super::{PolyFuncType, SumType, Type, TypeArg, TypeBound, TypeEnum};
+use super::{PolyFuncVarLen, SumType, Type, TypeArg, TypeBound, TypeEnum};
 
 use super::custom::CustomType;
 
@@ -11,7 +11,7 @@ use crate::ops::AliasDecl;
 pub(super) enum SerSimpleType {
     Q,
     I,
-    G(Box<PolyFuncType>),
+    G(Box<PolyFuncVarLen>),
     Sum(SumType),
     Array { inner: Box<SerSimpleType>, len: u64 },
     Opaque(CustomType),

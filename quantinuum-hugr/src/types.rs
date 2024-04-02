@@ -12,7 +12,7 @@ pub use crate::ops::constant::{ConstTypeError, CustomCheckFailure};
 use crate::utils::display_list_with_separator;
 pub use check::SumTypeError;
 pub use custom::CustomType;
-pub use poly_func::{PolyFixedFunc, PolyFuncType};
+pub use poly_func::{PolyFixedFunc, PolyFuncVarLen};
 pub use signature::{FuncTypeVarLen, FunctionType};
 use smol_str::SmolStr;
 pub use type_param::TypeArg;
@@ -187,7 +187,7 @@ pub enum TypeEnum {
     Alias(AliasDecl),
     #[allow(missing_docs)]
     #[display(fmt = "Function({})", "_0")]
-    Function(Box<PolyFuncType>),
+    Function(Box<PolyFuncVarLen>),
     /// DeBruijn index, and cache of TypeBound of [TypeParam::Type] (checked in validation)
     #[allow(missing_docs)]
     #[display(fmt = "Variable({})", _0)]
@@ -260,7 +260,7 @@ impl Type {
     const EMPTY_VL_TYPEROW_REF: &'static TypeRowVarLen = &Self::EMPTY_VL_TYPEROW;
 
     /// Initialize a new function type.
-    pub fn new_function(fun_ty: impl Into<PolyFuncType>) -> Self {
+    pub fn new_function(fun_ty: impl Into<PolyFuncVarLen>) -> Self {
         Self::new(TypeEnum::Function(Box::new(fun_ty.into())))
     }
 

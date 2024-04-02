@@ -17,7 +17,7 @@ use crate::{
     ops::{self, custom::ExtensionOp, OpName},
     types::{
         type_param::{TypeArg, TypeParam},
-        CustomCheckFailure, CustomType, FuncTypeVarLen, PolyFuncType, Type, TypeBound,
+        CustomCheckFailure, CustomType, FuncTypeVarLen, PolyFuncVarLen, Type, TypeBound,
     },
     Extension,
 };
@@ -154,7 +154,7 @@ fn extension() -> Extension {
         .add_op(
             POP_NAME,
             "Pop from back of list".into(),
-            PolyFuncType::new(
+            PolyFuncVarLen::new(
                 vec![TP],
                 FuncTypeVarLen::new(vec![l.clone()], vec![l.clone(), e.clone()]),
             ),
@@ -165,7 +165,7 @@ fn extension() -> Extension {
         .add_op(
             PUSH_NAME,
             "Push to back of list".into(),
-            PolyFuncType::new(vec![TP], FuncTypeVarLen::new(vec![l.clone(), e], vec![l])),
+            PolyFuncVarLen::new(vec![TP], FuncTypeVarLen::new(vec![l.clone(), e], vec![l])),
         )
         .unwrap()
         .set_constant_folder(PushFold);

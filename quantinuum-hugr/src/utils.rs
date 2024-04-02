@@ -108,17 +108,17 @@ pub(crate) mod test_quantum_extension {
         ops::LeafOp,
         std_extensions::arithmetic::float_types,
         type_row,
-        types::{FuncTypeVarLen, PolyFuncType},
+        types::{FuncTypeVarLen, PolyFuncVarLen},
         Extension,
     };
 
     use lazy_static::lazy_static;
 
-    fn one_qb_func() -> PolyFuncType {
+    fn one_qb_func() -> PolyFuncVarLen {
         FuncTypeVarLen::new_endo(type_row![QB_T]).into()
     }
 
-    fn two_qb_func() -> PolyFuncType {
+    fn two_qb_func() -> PolyFuncVarLen {
         FuncTypeVarLen::new_endo(type_row![QB_T, QB_T]).into()
     }
     /// The extension identifier.

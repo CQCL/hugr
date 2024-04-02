@@ -18,7 +18,7 @@ use crate::ops::custom::{ExtensionOp, OpaqueOp};
 use crate::types::type_param::{check_type_args, TypeArgError};
 use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::{
-    check_typevar_decl, CustomType, PolyFuncType, Substitution, TypeBound, TypeName,
+    check_typevar_decl, CustomType, PolyFuncVarLen, Substitution, TypeBound, TypeName,
 };
 
 #[allow(dead_code)]
@@ -175,8 +175,8 @@ pub enum SignatureError {
     /// [LeafOp::TypeApply]: crate::ops::LeafOp::TypeApply
     #[error("Incorrect result of type application - cached {cached} but expected {expected}")]
     TypeApplyIncorrectCache {
-        cached: PolyFuncType,
-        expected: PolyFuncType,
+        cached: PolyFuncVarLen,
+        expected: PolyFuncVarLen,
     },
 }
 

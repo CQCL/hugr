@@ -11,7 +11,7 @@ use crate::{
     type_row,
     types::{
         type_param::{TypeArg, TypeParam},
-        CustomType, FuncTypeVarLen, PolyFuncType, Type, TypeBound,
+        CustomType, FuncTypeVarLen, PolyFuncVarLen, Type, TypeBound,
     },
     Extension,
 };
@@ -21,7 +21,7 @@ struct ArrayOpCustom;
 
 const MAX: &[TypeParam; 1] = &[TypeParam::max_nat()];
 impl SignatureFromArgs for ArrayOpCustom {
-    fn compute_signature(&self, arg_values: &[TypeArg]) -> Result<PolyFuncType, SignatureError> {
+    fn compute_signature(&self, arg_values: &[TypeArg]) -> Result<PolyFuncVarLen, SignatureError> {
         let [TypeArg::BoundedNat { n }] = *arg_values else {
             return Err(SignatureError::InvalidTypeArgs);
         };
@@ -30,7 +30,7 @@ impl SignatureFromArgs for ArrayOpCustom {
         let var_arg_row = vec![elem_ty_var.clone(); n as usize];
         let other_row = vec![array_type(TypeArg::BoundedNat { n }, elem_ty_var.clone())];
 
-        Ok(PolyFuncType::new(
+        Ok(PolyFuncVarLen::new(
             vec![TypeBound::Any.into()],
             FuncTypeVarLen::new(var_arg_row, other_row),
         ))

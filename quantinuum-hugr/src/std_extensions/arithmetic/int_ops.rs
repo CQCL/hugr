@@ -9,7 +9,7 @@ use crate::extension::{
 use crate::ops::custom::ExtensionOp;
 use crate::ops::OpName;
 use crate::type_row;
-use crate::types::{FuncTypeVarLen, PolyFuncType};
+use crate::types::{FuncTypeVarLen, PolyFuncVarLen};
 use crate::utils::collect_array;
 
 use crate::{
@@ -221,20 +221,20 @@ fn int_polytype(
     n_vars: usize,
     input: impl Into<TypeRow>,
     output: impl Into<TypeRow>,
-) -> PolyFuncType {
-    PolyFuncType::new(
+) -> PolyFuncVarLen {
+    PolyFuncVarLen::new(
         vec![LOG_WIDTH_TYPE_PARAM; n_vars],
         FuncTypeVarLen::new(input.into(), output.into()),
     )
 }
 
-fn ibinop_sig() -> PolyFuncType {
+fn ibinop_sig() -> PolyFuncVarLen {
     let int_type_var = int_tv(0);
 
     int_polytype(1, vec![int_type_var.clone(); 2], vec![int_type_var])
 }
 
-fn iunop_sig() -> PolyFuncType {
+fn iunop_sig() -> PolyFuncVarLen {
     let int_type_var = int_tv(0);
     int_polytype(1, vec![int_type_var.clone()], vec![int_type_var])
 }

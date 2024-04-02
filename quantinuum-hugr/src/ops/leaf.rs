@@ -8,7 +8,7 @@ use super::{OpName, OpTag};
 
 use crate::extension::{ExtensionId, ExtensionRegistry, ExtensionSet, SignatureError};
 use crate::types::type_param::TypeArg;
-use crate::types::{EdgeKind, FunctionType, PolyFuncType, Type, TypeRow};
+use crate::types::{EdgeKind, FunctionType, PolyFuncVarLen, Type, TypeRow};
 
 /// Dataflow operations with no children.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -76,9 +76,9 @@ impl LeafOp {
 /// and the result (a less-, but still potentially-, polymorphic type).
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct TypeApplication {
-    input: PolyFuncType,
+    input: PolyFuncVarLen,
     args: Vec<TypeArg>,
-    output: PolyFuncType, // cached
+    output: PolyFuncVarLen, // cached
 }
 
 impl TypeApplication {
@@ -87,7 +87,7 @@ impl TypeApplication {
     ///
     /// [TypeParam]: crate::types::type_param::TypeParam
     pub fn try_new(
-        input: PolyFuncType,
+        input: PolyFuncVarLen,
         args: impl Into<Vec<TypeArg>>,
         extension_registry: &ExtensionRegistry,
     ) -> Result<Self, SignatureError> {
@@ -118,7 +118,7 @@ impl TypeApplication {
     }
 
     /// Returns the type of the input function.
-    pub fn input(&self) -> &PolyFuncType {
+    pub fn input(&self) -> &PolyFuncVarLen {
         &self.input
     }
 
@@ -128,7 +128,7 @@ impl TypeApplication {
     }
 
     /// Returns the type of the output function.
-    pub fn output(&self) -> &PolyFuncType {
+    pub fn output(&self) -> &PolyFuncVarLen {
         &self.output
     }
 }

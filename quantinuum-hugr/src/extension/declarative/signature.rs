@@ -15,7 +15,7 @@ use crate::extension::prelude::PRELUDE_ID;
 use crate::extension::{CustomValidator, ExtensionSet, SignatureFunc, TypeDef, TypeParametrised};
 use crate::types::type_param::TypeParam;
 use crate::types::type_row::TypeRowVarLen;
-use crate::types::{CustomType, FuncTypeVarLen, PolyFuncType, Type};
+use crate::types::{CustomType, FuncTypeVarLen, PolyFuncVarLen, Type};
 use crate::Extension;
 
 use super::{DeclarationContext, ExtensionDeclarationError};
@@ -57,7 +57,7 @@ impl SignatureDeclaration {
             extension_reqs: self.extensions.clone(),
         };
 
-        let poly_func = PolyFuncType::new(op_params, body);
+        let poly_func = PolyFuncVarLen::new(op_params, body);
         Ok(SignatureFunc::TypeScheme(CustomValidator::from_polyfunc(
             poly_func,
         )))
