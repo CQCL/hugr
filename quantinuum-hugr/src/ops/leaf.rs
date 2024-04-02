@@ -6,8 +6,7 @@ use super::custom::{ExtensionOp, ExternalOp};
 use super::dataflow::DataflowOpTrait;
 use super::{OpName, OpTag};
 
-use crate::extension::{ExtensionSet};
-
+use crate::extension::ExtensionSet;
 
 use crate::{
     extension::ExtensionId,

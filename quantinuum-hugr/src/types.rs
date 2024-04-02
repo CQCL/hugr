@@ -423,8 +423,6 @@ pub(crate) fn check_typevar_decl(
 
 #[cfg(test)]
 pub(crate) mod test {
-    
-
     use super::*;
     use crate::{extension::prelude::USIZE_T, ops::AliasDecl};
 

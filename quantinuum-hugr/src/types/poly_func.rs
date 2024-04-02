@@ -98,36 +98,6 @@ impl PolyFuncType {
         }
     }
 
-    /// (Perhaps-partially) instantiates this [PolyFuncType] into another with fewer binders.
-    /// Note that indices into `args` correspond to the same index within [Self::params],
-    /// so we instantiate the lowest-index [Self::params] first, even though these
-    /// would be considered "innermost" / "closest" according to DeBruijn numbering.
-    pub(crate) fn instantiate_poly(
-        &self,
-        args: &[TypeArg],
-        exts: &ExtensionRegistry,
-    ) -> Result<Self, SignatureError> {
-        let remaining = self.params.get(args.len()..).unwrap_or_default();
-        let mut v;
-        let args = if remaining.is_empty() {
-            args // instantiate below will fail if there were too many
-        } else {
-            // Partial application - renumber remaining params (still bound) downward
-            v = args.to_vec();
-            v.extend(
-                remaining
-                    .iter()
-                    .enumerate()
-                    .map(|(i, decl)| TypeArg::new_var_use(i, decl.clone())),
-            );
-            v.as_slice()
-        };
-        Ok(Self {
-            params: remaining.to_vec(),
-            body: self.instantiate(args, exts)?,
-        })
-    }
-
     /// Instantiates an outer [PolyFuncType], i.e. with no free variables
     /// (as ensured by [Self::validate]), into a monomorphic type.
     ///
@@ -457,50 +427,6 @@ pub(crate) mod test {
             params: vec![param],
             body: FunctionType::new(vec![input], vec![output]),
         }
-    }
-
-    const USIZE_TA: TypeArg = TypeArg::Type { ty: USIZE_T };
-
-    #[test]
-    fn partial_instantiate() -> Result<(), SignatureError> {
-        // forall A,N.(Array<A,N> -> A)
-        let array_max = PolyFuncType::new_validated(
-            vec![TypeBound::Any.into(), TypeParam::max_nat()],
-            FunctionType::new(
-                vec![array_type(
-                    TypeArg::new_var_use(1, TypeParam::max_nat()),
-                    Type::new_var_use(0, TypeBound::Any),
-                )],
-                vec![Type::new_var_use(0, TypeBound::Any)],
-            ),
-            &PRELUDE_REGISTRY,
-        )?;
-
-        let concrete = FunctionType::new(
-            vec![array_type(TypeArg::BoundedNat { n: 3 }, USIZE_T)],
-            vec![USIZE_T],
-        );
-        let actual = array_max
-            .instantiate_poly(&[USIZE_TA, TypeArg::BoundedNat { n: 3 }], &PRELUDE_REGISTRY)?;
-
-        assert_eq!(actual, concrete.into());
-
-        // forall N.(Array<usize,N> -> usize)
-        let partial = PolyFuncType::new_validated(
-            vec![TypeParam::max_nat()],
-            FunctionType::new(
-                vec![array_type(
-                    TypeArg::new_var_use(0, TypeParam::max_nat()),
-                    USIZE_T,
-                )],
-                vec![USIZE_T],
-            ),
-            &PRELUDE_REGISTRY,
-        )?;
-        let res = array_max.instantiate_poly(&[USIZE_TA], &PRELUDE_REGISTRY)?;
-        assert_eq!(res, partial);
-
-        Ok(())
     }
 
     fn list_of_tup(t1: Type, t2: Type) -> Type {
