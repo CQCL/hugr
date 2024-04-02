@@ -134,23 +134,6 @@ impl<'a> Substitution for SubstValues<'a> {
     }
 }
 
-/// A [Substitution] that renumbers any type variable to another (of the same kind)
-/// with a index increased by a fixed `usize``.
-struct Renumber<'a> {
-    offset: usize,
-    exts: &'a ExtensionRegistry,
-}
-
-impl<'a> Substitution for Renumber<'a> {
-    fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg {
-        TypeArg::new_var_use(idx + self.offset, decl.clone())
-    }
-
-    fn extension_registry(&self) -> &ExtensionRegistry {
-        self.exts
-    }
-}
-
 #[cfg(test)]
 pub(crate) mod test {
     use std::num::NonZeroU64;
