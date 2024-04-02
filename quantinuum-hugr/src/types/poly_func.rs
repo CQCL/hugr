@@ -692,7 +692,7 @@ pub(crate) mod test {
             }],
             FunctionType::new(
                 vec![USIZE_T.into(), RowVarOrType::RV(0, TypeBound::Any)],
-                vec![Type::new_sum(vec![RowVarOrType::RV(0, TypeBound::Any)])],
+                vec![Type::new_tuple(RowVarOrType::RV(0, TypeBound::Any))],
             ),
             &PRELUDE_REGISTRY,
         )
@@ -718,7 +718,10 @@ pub(crate) mod test {
             t2,
             FunctionType::new(
                 vec![USIZE_T, USIZE_T, BOOL_T],
-                vec![Type::new_sum(vec![RowVarOrType::T(USIZE_T), BOOL_T.into()])]
+                vec![Type::new_tuple(vec![
+                    RowVarOrType::T(USIZE_T),
+                    BOOL_T.into()
+                ])]
             )
         );
     }
