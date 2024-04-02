@@ -573,8 +573,8 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
                     }
                 }
             }
-            OpType::LeafOp(crate::ops::LeafOp::TypeApply { ta }) => {
-                ta.validate(self.extension_registry)
+            OpType::Call(c) => {
+                c.validate(self.extension_registry)
                     .map_err(|cause| ValidationError::SignatureError { node, cause })?;
             }
             _ => (),

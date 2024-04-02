@@ -221,6 +221,25 @@ impl Call {
     pub fn called_function_port(&self) -> IncomingPort {
         self.instantiation.input_count().into()
     }
+
+    pub(crate) fn validate(
+        &self,
+        extension_registry: &ExtensionRegistry,
+    ) -> Result<(), SignatureError> {
+        let other = Self::try_new(
+            self.func_sig.clone(),
+            self.type_args.clone(),
+            extension_registry,
+        )?;
+        if other.instantiation == self.instantiation {
+            Ok(())
+        } else {
+            Err(SignatureError::CallIncorrectlyAppliesType {
+                cached: self.instantiation.clone(),
+                expected: other.instantiation.clone(),
+            })
+        }
+    }
 }
 
 /// Call a function indirectly. Like call, but the function input is a value

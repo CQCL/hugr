@@ -423,7 +423,7 @@ pub(crate) fn check_typevar_decl(
 
 #[cfg(test)]
 pub(crate) mod test {
-    pub(crate) use poly_func::test::nested_func;
+    
 
     use super::*;
     use crate::{extension::prelude::USIZE_T, ops::AliasDecl};
