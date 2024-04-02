@@ -458,7 +458,7 @@ mod test {
     use crate::ops::handle::{BasicBlockID, ConstID, NodeHandle};
     use crate::ops::{self, Case, DataflowBlock, LeafOp, OpTag, OpType, DFG};
     use crate::std_extensions::collections;
-    use crate::types::{Signature, Type, TypeArg, TypeRow};
+    use crate::types::{FunctionType, Type, TypeArg, TypeRow};
     use crate::{type_row, Direction, Hugr, HugrView, OutgoingPort};
 
     use super::{NewEdgeKind, NewEdgeSpec, ReplaceError, Replacement};
@@ -489,7 +489,7 @@ mod test {
         let mut cfg = CFGBuilder::new(
             // One might expect an extension_delta of "collections" here, but push/pop
             // have an empty delta themselves, pending https://github.com/CQCL/hugr/issues/388
-            Signature::new_endo(just_list.clone()),
+            FunctionType::new_endo(just_list.clone()),
         )?;
 
         let pred_const = cfg.add_constant(ops::Const::unary_unit_sum());
@@ -520,7 +520,7 @@ mod test {
         // Replacement: one BB with two DFGs inside.
         // Use Hugr rather than Builder because DFGs must be empty (not even Input/Output).
         let mut replacement = Hugr::new(NodeType::new_open(ops::CFG {
-            signature: Signature::new_endo(just_list.clone()),
+            signature: FunctionType::new_endo(just_list.clone()),
         }));
         let r_bb = replacement.add_node_with_parent(
             replacement.root(),
@@ -536,13 +536,16 @@ mod test {
         let r_df1 = replacement.add_node_with_parent(
             r_bb,
             DFG {
-                signature: Signature::new(vec![listy.clone()], simple_unary_plus(intermed.clone())),
+                signature: FunctionType::new(
+                    vec![listy.clone()],
+                    simple_unary_plus(intermed.clone()),
+                ),
             },
         );
         let r_df2 = replacement.add_node_with_parent(
             r_bb,
             DFG {
-                signature: Signature::new(intermed, simple_unary_plus(just_list.clone())),
+                signature: FunctionType::new(intermed, simple_unary_plus(just_list.clone())),
             },
         );
         [0, 1]
@@ -643,7 +646,7 @@ mod test {
 
     #[test]
     fn test_invalid() -> Result<(), Box<dyn std::error::Error>> {
-        let utou = Signature::new_endo(vec![USIZE_T]);
+        let utou = FunctionType::new_endo(vec![USIZE_T]);
         let mk_op = |s| {
             LeafOp::from(ExternalOp::Opaque(OpaqueOp::new(
                 ExtensionId::new("unknown_ext").unwrap(),
@@ -653,7 +656,7 @@ mod test {
                 utou.clone(),
             )))
         };
-        let mut h = DFGBuilder::new(Signature::new(
+        let mut h = DFGBuilder::new(FunctionType::new(
             type_row![USIZE_T, BOOL_T],
             type_row![USIZE_T],
         ))?;

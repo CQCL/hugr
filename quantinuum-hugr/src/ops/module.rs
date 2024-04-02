@@ -2,7 +2,7 @@
 
 use smol_str::SmolStr;
 
-use crate::types::{EdgeKind, PolyFixedFunc, Signature};
+use crate::types::{EdgeKind, FunctionType, PolyFixedFunc};
 use crate::types::{Type, TypeBound};
 
 use super::dataflow::DataflowParent;
@@ -46,7 +46,7 @@ impl StaticTag for FuncDefn {
 }
 
 impl DataflowParent for FuncDefn {
-    fn inner_signature(&self) -> Signature {
+    fn inner_signature(&self) -> FunctionType {
         self.signature.body().clone()
     }
 }

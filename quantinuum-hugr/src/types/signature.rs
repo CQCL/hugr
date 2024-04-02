@@ -86,7 +86,7 @@ impl TypeRowElem for RowVarOrType {
 }
 
 /// The type of a node. Fixed/known arity of inputs + outputs.
-pub type Signature = FuncTypeBase<Type>;
+pub type FunctionType = FuncTypeBase<Type>;
 
 impl TypeRowElem for Type {
     fn validate(
@@ -164,7 +164,7 @@ where
     }
 }
 
-impl Signature {
+impl FunctionType {
     /// The number of wires in the signature.
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
@@ -284,8 +284,8 @@ impl Signature {
     }
 }
 
-impl From<Signature> for FuncTypeVarLen {
-    fn from(sig: Signature) -> Self {
+impl From<FunctionType> for FuncTypeVarLen {
+    fn from(sig: FunctionType) -> Self {
         Self {
             input: sig.input.into(),
             output: sig.output.into(),
@@ -294,7 +294,7 @@ impl From<Signature> for FuncTypeVarLen {
     }
 }
 
-impl TryFrom<FuncTypeVarLen> for Signature {
+impl TryFrom<FuncTypeVarLen> for FunctionType {
     type Error = (usize, TypeBound);
 
     fn try_from(funty: FuncTypeVarLen) -> Result<Self, Self::Error> {
@@ -329,7 +329,7 @@ mod test {
     use super::*;
     #[test]
     fn test_function_type() {
-        let mut f_type = Signature::new(type_row![Type::UNIT], type_row![Type::UNIT]);
+        let mut f_type = FunctionType::new(type_row![Type::UNIT], type_row![Type::UNIT]);
         assert_eq!(f_type.input_count(), 1);
         assert_eq!(f_type.output_count(), 1);
 

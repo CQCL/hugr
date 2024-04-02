@@ -143,7 +143,7 @@ mod test {
     use crate::std_extensions::arithmetic::float_types;
     use crate::std_extensions::arithmetic::int_ops::{self, IntOpDef};
     use crate::std_extensions::arithmetic::int_types::{self, ConstIntU};
-    use crate::types::Signature;
+    use crate::types::FunctionType;
     use crate::utils::test_quantum_extension;
     use crate::{type_row, Direction, HugrView, Node, Port};
     use crate::{Hugr, Wire};
@@ -175,7 +175,7 @@ mod test {
         let int_ty = &int_types::INT_TYPES[6];
 
         let mut outer = DFGBuilder::new(
-            Signature::new(vec![int_ty.clone(); 2], vec![int_ty.clone()])
+            FunctionType::new(vec![int_ty.clone(); 2], vec![int_ty.clone()])
                 .with_extension_delta(delta.clone()),
         )?;
         let [a, b] = outer.input_wires_arr();
@@ -199,7 +199,7 @@ mod test {
         let c1 = nonlocal.then(|| make_const(&mut outer));
         let inner = {
             let mut inner = outer.dfg_builder(
-                Signature::new_endo(vec![int_ty.clone()]).with_extension_delta(delta),
+                FunctionType::new_endo(vec![int_ty.clone()]).with_extension_delta(delta),
                 None,
                 [a],
             )?;
@@ -252,7 +252,7 @@ mod test {
     #[test]
     fn permutation() -> Result<(), Box<dyn std::error::Error>> {
         let mut h = DFGBuilder::new(
-            Signature::new_endo(type_row![QB_T, QB_T])
+            FunctionType::new_endo(type_row![QB_T, QB_T])
                 .with_extension_delta(test_quantum_extension::EXTENSION_ID),
         )?;
         let [p, q] = h.input_wires_arr();
@@ -260,7 +260,11 @@ mod test {
             .add_dataflow_op(test_quantum_extension::h_gate(), [p])?
             .outputs_arr();
         let swap = {
-            let swap = h.dfg_builder(Signature::new_endo(type_row![QB_T, QB_T]), None, [p_h, q])?;
+            let swap = h.dfg_builder(
+                FunctionType::new_endo(type_row![QB_T, QB_T]),
+                None,
+                [p_h, q],
+            )?;
             let [a, b] = swap.input_wires_arr();
             swap.finish_with_outputs([b, a])?
         };
@@ -350,14 +354,14 @@ mod test {
         ])
         .unwrap();
         let mut outer = DFGBuilder::new(
-            Signature::new_endo(type_row![QB_T, QB_T])
+            FunctionType::new_endo(type_row![QB_T, QB_T])
                 .with_extension_delta(float_types::EXTENSION_ID),
         )?;
         let [a, b] = outer.input_wires_arr();
         let h_a = outer.add_dataflow_op(test_quantum_extension::h_gate(), [a])?;
         let h_b = outer.add_dataflow_op(test_quantum_extension::h_gate(), [b])?;
         let mut inner = outer.dfg_builder(
-            Signature::new_endo(type_row![QB_T]).with_extension_delta(float_types::EXTENSION_ID),
+            FunctionType::new_endo(type_row![QB_T]).with_extension_delta(float_types::EXTENSION_ID),
             None,
             h_b.outputs(),
         )?;

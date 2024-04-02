@@ -171,7 +171,7 @@ mod test {
         },
         extension::{EMPTY_REG, PRELUDE_REGISTRY},
         type_row,
-        types::Signature,
+        types::FunctionType,
     };
 
     use super::*;
@@ -182,7 +182,7 @@ mod test {
 
             let f_id = module_builder.declare(
                 "main",
-                Signature::new(type_row![NAT], type_row![NAT]).into(),
+                FunctionType::new(type_row![NAT], type_row![NAT]).into(),
             )?;
 
             let mut f_build = module_builder.define_declaration(&f_id)?;
@@ -205,7 +205,7 @@ mod test {
 
             let f_build = module_builder.define_function(
                 "main",
-                Signature::new(
+                FunctionType::new(
                     vec![qubit_state_type.get_alias_type()],
                     vec![qubit_state_type.get_alias_type()],
                 ),
@@ -222,10 +222,14 @@ mod test {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
 
-            let mut f_build = module_builder
-                .define_function("main", Signature::new(type_row![NAT], type_row![NAT, NAT]))?;
-            let local_build = f_build
-                .define_function("local", Signature::new(type_row![NAT], type_row![NAT, NAT]))?;
+            let mut f_build = module_builder.define_function(
+                "main",
+                FunctionType::new(type_row![NAT], type_row![NAT, NAT]),
+            )?;
+            let local_build = f_build.define_function(
+                "local",
+                FunctionType::new(type_row![NAT], type_row![NAT, NAT]),
+            )?;
             let [wire] = local_build.input_wires_arr();
             let f_id = local_build.finish_with_outputs([wire, wire])?;
 

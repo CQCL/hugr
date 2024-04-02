@@ -7,7 +7,7 @@ use super::{
 
 use crate::extension::{ExtensionRegistry, ExtensionSet};
 use crate::ops::{self, handle::NodeHandle, DataflowBlock, DataflowParent, ExitBlock, OpType};
-use crate::types::Signature;
+use crate::types::FunctionType;
 use crate::{hugr::views::HugrView, types::TypeRow};
 
 use crate::Node;
@@ -153,7 +153,7 @@ impl<H: AsMut<Hugr> + AsRef<Hugr>> SubContainer for CFGBuilder<H> {
 
 impl CFGBuilder<Hugr> {
     /// New CFG rooted HUGR builder
-    pub fn new(signature: Signature) -> Result<Self, BuildError> {
+    pub fn new(signature: FunctionType) -> Result<Self, BuildError> {
         let cfg_op = ops::CFG {
             signature: signature.clone(),
         };
@@ -251,7 +251,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
     /// This function will return an error if there is an error adding the node.
     pub fn simple_block_builder(
         &mut self,
-        signature: Signature,
+        signature: FunctionType,
         n_cases: usize,
     ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
         self.block_builder(
@@ -412,7 +412,7 @@ pub(crate) mod test {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
             let mut func_builder = module_builder
-                .define_function("main", Signature::new(vec![NAT], type_row![NAT]))?;
+                .define_function("main", FunctionType::new(vec![NAT], type_row![NAT]))?;
             let _f_id = {
                 let [int] = func_builder.input_wires_arr();
 
@@ -439,7 +439,7 @@ pub(crate) mod test {
     }
     #[test]
     fn basic_cfg_hugr() -> Result<(), BuildError> {
-        let mut cfg_builder = CFGBuilder::new(Signature::new(type_row![NAT], type_row![NAT]))?;
+        let mut cfg_builder = CFGBuilder::new(FunctionType::new(type_row![NAT], type_row![NAT]))?;
         build_basic_cfg(&mut cfg_builder)?;
         assert_matches!(cfg_builder.finish_prelude_hugr(), Ok(_));
 
@@ -458,8 +458,8 @@ pub(crate) mod test {
             let sum = entry_b.make_sum(1, sum2_variants, [inw])?;
             entry_b.finish_with_outputs(sum, [])?
         };
-        let mut middle_b =
-            cfg_builder.simple_block_builder(Signature::new(type_row![NAT], type_row![NAT]), 1)?;
+        let mut middle_b = cfg_builder
+            .simple_block_builder(FunctionType::new(type_row![NAT], type_row![NAT]), 1)?;
         let middle = {
             let c = middle_b.add_load_const(ops::Const::unary_unit_sum());
             let [inw] = middle_b.input_wires_arr();
@@ -473,7 +473,7 @@ pub(crate) mod test {
     }
     #[test]
     fn test_dom_edge() -> Result<(), BuildError> {
-        let mut cfg_builder = CFGBuilder::new(Signature::new(type_row![NAT], type_row![NAT]))?;
+        let mut cfg_builder = CFGBuilder::new(FunctionType::new(type_row![NAT], type_row![NAT]))?;
         let sum_tuple_const = cfg_builder.add_constant(ops::Const::unary_unit_sum());
         let sum_variants = vec![type_row![]];
 
@@ -486,7 +486,7 @@ pub(crate) mod test {
             entry_b.finish_with_outputs(sum, [])?
         };
         let mut middle_b =
-            cfg_builder.simple_block_builder(Signature::new(type_row![], type_row![NAT]), 1)?;
+            cfg_builder.simple_block_builder(FunctionType::new(type_row![], type_row![NAT]), 1)?;
         let middle = {
             let c = middle_b.load_const(&sum_tuple_const);
             middle_b.finish_with_outputs(c, [inw])?
@@ -501,11 +501,11 @@ pub(crate) mod test {
 
     #[test]
     fn test_non_dom_edge() -> Result<(), BuildError> {
-        let mut cfg_builder = CFGBuilder::new(Signature::new(type_row![NAT], type_row![NAT]))?;
+        let mut cfg_builder = CFGBuilder::new(FunctionType::new(type_row![NAT], type_row![NAT]))?;
         let sum_tuple_const = cfg_builder.add_constant(ops::Const::unary_unit_sum());
         let sum_variants = vec![type_row![]];
-        let mut middle_b =
-            cfg_builder.simple_block_builder(Signature::new(type_row![NAT], type_row![NAT]), 1)?;
+        let mut middle_b = cfg_builder
+            .simple_block_builder(FunctionType::new(type_row![NAT], type_row![NAT]), 1)?;
         let [inw] = middle_b.input_wires_arr();
         let middle = {
             let c = middle_b.load_const(&sum_tuple_const);

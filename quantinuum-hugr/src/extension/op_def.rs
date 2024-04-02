@@ -12,7 +12,7 @@ use super::{
 };
 
 use crate::types::type_param::{check_type_args, TypeArg, TypeParam};
-use crate::types::{FuncTypeVarLen, PolyFuncType, Signature};
+use crate::types::{FuncTypeVarLen, FunctionType, PolyFuncType};
 use crate::Hugr;
 
 /// Trait necessary for binary computations of OpDef signature
@@ -231,7 +231,7 @@ impl SignatureFunc {
         def: &OpDef,
         args: &[TypeArg],
         exts: &ExtensionRegistry,
-    ) -> Result<Signature, SignatureError> {
+    ) -> Result<FunctionType, SignatureError> {
         let temp: PolyFuncType;
         let (pf, args) = match &self {
             SignatureFunc::TypeScheme(custom) => {
@@ -357,7 +357,7 @@ impl OpDef {
         &self,
         args: &[TypeArg],
         exts: &ExtensionRegistry,
-    ) -> Result<Signature, SignatureError> {
+    ) -> Result<FunctionType, SignatureError> {
         self.signature_func.compute_signature(self, args, exts)
     }
 
@@ -486,7 +486,7 @@ mod test {
     use crate::ops::custom::ExternalOp;
     use crate::ops::LeafOp;
     use crate::std_extensions::collections::{EXTENSION, LIST_TYPENAME};
-    use crate::types::{type_param::TypeParam, FuncTypeVarLen, Signature, TypeArg, TypeBound};
+    use crate::types::{type_param::TypeParam, FuncTypeVarLen, FunctionType, TypeArg, TypeBound};
     use crate::types::{PolyFuncType, Type};
     use crate::Hugr;
     use crate::{const_extension_ids, Extension};
@@ -518,7 +518,7 @@ mod test {
 
         let list_usize =
             Type::new_extension(list_def.instantiate(vec![TypeArg::Type { ty: USIZE_T }])?);
-        let mut dfg = DFGBuilder::new(Signature::new_endo(vec![list_usize]))?;
+        let mut dfg = DFGBuilder::new(FunctionType::new_endo(vec![list_usize]))?;
         let rev = dfg.add_dataflow_op(
             LeafOp::from(ExternalOp::Extension(
                 e.instantiate_extension_op(&OP_NAME, vec![TypeArg::Type { ty: USIZE_T }], &reg)
@@ -570,7 +570,7 @@ mod test {
         let args = [TypeArg::BoundedNat { n: 3 }, USIZE_T.into()];
         assert_eq!(
             def.compute_signature(&args, &PRELUDE_REGISTRY),
-            Ok(Signature::new(
+            Ok(FunctionType::new(
                 vec![USIZE_T; 3],
                 vec![Type::new_tuple(vec![USIZE_T; 3])]
             ))
@@ -583,7 +583,7 @@ mod test {
         let args = [TypeArg::BoundedNat { n: 3 }, tyvar.clone().into()];
         assert_eq!(
             def.compute_signature(&args, &PRELUDE_REGISTRY),
-            Ok(Signature::new(
+            Ok(FunctionType::new(
                 tyvars.clone(),
                 vec![Type::new_tuple(tyvars)]
             ))
@@ -639,7 +639,7 @@ mod test {
         def.validate_args(&args, &EMPTY_REG, &decls).unwrap();
         assert_eq!(
             def.compute_signature(&args, &EMPTY_REG),
-            Ok(Signature::new_endo(vec![tv]))
+            Ok(FunctionType::new_endo(vec![tv]))
         );
         Ok(())
     }

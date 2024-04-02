@@ -4,13 +4,13 @@ use super::{impl_op_name, OpTag, OpTrait};
 
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 use crate::ops::StaticTag;
-use crate::types::{EdgeKind, PolyFixedFunc, Signature, Type, TypeArg, TypeRow};
+use crate::types::{EdgeKind, FunctionType, PolyFixedFunc, Type, TypeArg, TypeRow};
 use crate::IncomingPort;
 
 pub(crate) trait DataflowOpTrait {
     const TAG: OpTag;
     fn description(&self) -> &str;
-    fn signature(&self) -> Signature;
+    fn signature(&self) -> FunctionType;
 
     /// The edge kind for the non-dataflow or constant inputs of the operation,
     /// not described by the signature.
@@ -94,8 +94,8 @@ impl DataflowOpTrait for Input {
         None
     }
 
-    fn signature(&self) -> Signature {
-        Signature::new(TypeRow::new(), self.types.clone())
+    fn signature(&self) -> FunctionType {
+        FunctionType::new(TypeRow::new(), self.types.clone())
     }
 }
 impl DataflowOpTrait for Output {
@@ -107,8 +107,8 @@ impl DataflowOpTrait for Output {
 
     // Note: We know what the input extensions should be, so we *could* give an
     // instantiated Signature instead
-    fn signature(&self) -> Signature {
-        Signature::new(self.types.clone(), TypeRow::new())
+    fn signature(&self) -> FunctionType {
+        FunctionType::new(self.types.clone(), TypeRow::new())
     }
 
     fn other_output(&self) -> Option<EdgeKind> {
@@ -123,7 +123,7 @@ impl<T: DataflowOpTrait> OpTrait for T {
     fn tag(&self) -> OpTag {
         T::TAG
     }
-    fn dataflow_signature(&self) -> Option<Signature> {
+    fn dataflow_signature(&self) -> Option<FunctionType> {
         Some(DataflowOpTrait::signature(self))
     }
     fn extension_delta(&self) -> ExtensionSet {
@@ -155,7 +155,7 @@ pub struct Call {
     /// Signature of function being called
     func_sig: PolyFixedFunc,
     type_args: Vec<TypeArg>,
-    instantiation: Signature, // Cache, so we can fail in try_new() not in signature()
+    instantiation: FunctionType, // Cache, so we can fail in try_new() not in signature()
 }
 impl_op_name!(Call);
 
@@ -166,7 +166,7 @@ impl DataflowOpTrait for Call {
         "Call a function directly"
     }
 
-    fn signature(&self) -> Signature {
+    fn signature(&self) -> FunctionType {
         self.instantiation.clone()
     }
 
@@ -231,7 +231,7 @@ impl Call {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct CallIndirect {
     /// Signature of function being called
-    pub signature: Signature,
+    pub signature: FunctionType,
 }
 impl_op_name!(CallIndirect);
 
@@ -242,7 +242,7 @@ impl DataflowOpTrait for CallIndirect {
         "Call a function indirectly"
     }
 
-    fn signature(&self) -> Signature {
+    fn signature(&self) -> FunctionType {
         let mut s = self.signature.clone();
         s.input.to_mut().insert(
             0,
@@ -266,8 +266,8 @@ impl DataflowOpTrait for LoadConstant {
         "Load a static constant in to the local dataflow graph"
     }
 
-    fn signature(&self) -> Signature {
-        Signature::new(TypeRow::new(), vec![self.datatype.clone()])
+    fn signature(&self) -> FunctionType {
+        FunctionType::new(TypeRow::new(), vec![self.datatype.clone()])
     }
 
     fn static_input(&self) -> Option<EdgeKind> {
@@ -305,20 +305,20 @@ impl LoadConstant {
 /// Operations that is the parent of a dataflow graph.
 pub trait DataflowParent {
     /// Signature of the inner dataflow graph.
-    fn inner_signature(&self) -> Signature;
+    fn inner_signature(&self) -> FunctionType;
 }
 
 /// A simply nested dataflow graph.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct DFG {
     /// Signature of DFG node
-    pub signature: Signature,
+    pub signature: FunctionType,
 }
 
 impl_op_name!(DFG);
 
 impl DataflowParent for DFG {
-    fn inner_signature(&self) -> Signature {
+    fn inner_signature(&self) -> FunctionType {
         self.signature.clone()
     }
 }
@@ -330,7 +330,7 @@ impl DataflowOpTrait for DFG {
         "A simply nested dataflow graph"
     }
 
-    fn signature(&self) -> Signature {
+    fn signature(&self) -> FunctionType {
         self.inner_signature()
     }
 }

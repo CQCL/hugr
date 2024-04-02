@@ -22,7 +22,7 @@ use crate::hugr::{HugrMut, HugrView, RootTagged};
 use crate::ops::dataflow::DataflowOpTrait;
 use crate::ops::handle::{ContainerHandle, DataflowOpID};
 use crate::ops::{OpTag, OpTrait};
-use crate::types::{Signature, Type};
+use crate::types::{FunctionType, Type};
 use crate::{Hugr, IncomingPort, Node, OutgoingPort, Port, SimpleReplacement};
 
 /// A non-empty convex subgraph of a HUGR sibling graph.
@@ -289,7 +289,7 @@ impl SiblingSubgraph {
     }
 
     /// The signature of the subgraph.
-    pub fn signature(&self, hugr: &impl HugrView) -> Signature {
+    pub fn signature(&self, hugr: &impl HugrView) -> FunctionType {
         let input = self
             .inputs
             .iter()
@@ -307,7 +307,7 @@ impl SiblingSubgraph {
                 sig.port_type(p).cloned().expect("must be dataflow edge")
             })
             .collect_vec();
-        Signature::new(input, output)
+        FunctionType::new(input, output)
     }
 
     /// The parent of the sibling subgraph.
@@ -731,7 +731,7 @@ mod tests {
         let mut mod_builder = ModuleBuilder::new();
         let func = mod_builder.declare(
             "test",
-            Signature::new_endo(type_row![QB_T, QB_T, QB_T]).into(),
+            FunctionType::new_endo(type_row![QB_T, QB_T, QB_T]).into(),
         )?;
         let func_id = {
             let mut dfg = mod_builder.define_declaration(&func)?;
@@ -747,7 +747,7 @@ mod tests {
 
     fn build_3not_hugr() -> Result<(Hugr, Node), BuildError> {
         let mut mod_builder = ModuleBuilder::new();
-        let func = mod_builder.declare("test", Signature::new_endo(type_row![BOOL_T]).into())?;
+        let func = mod_builder.declare("test", FunctionType::new_endo(type_row![BOOL_T]).into())?;
         let func_id = {
             let mut dfg = mod_builder.define_declaration(&func)?;
             let outs1 = dfg.add_dataflow_op(NotOp, dfg.input_wires())?;
@@ -766,7 +766,7 @@ mod tests {
         let mut mod_builder = ModuleBuilder::new();
         let func = mod_builder.declare(
             "test",
-            Signature::new(type_row![BOOL_T], type_row![BOOL_T]).into(),
+            FunctionType::new(type_row![BOOL_T], type_row![BOOL_T]).into(),
         )?;
         let func_id = {
             let mut dfg = mod_builder.define_declaration(&func)?;
@@ -805,7 +805,7 @@ mod tests {
         let sub = SiblingSubgraph::try_new_dataflow_subgraph(&func)?;
 
         let empty_dfg = {
-            let builder = DFGBuilder::new(Signature::new_endo(type_row![QB_T, QB_T])).unwrap();
+            let builder = DFGBuilder::new(FunctionType::new_endo(type_row![QB_T, QB_T])).unwrap();
             let inputs = builder.input_wires();
             builder.finish_prelude_hugr_with_outputs(inputs).unwrap()
         };
@@ -830,7 +830,7 @@ mod tests {
         // the first two qubits.
         assert_eq!(
             sub.signature(&func),
-            Signature::new_endo(type_row![QB_T, QB_T])
+            FunctionType::new_endo(type_row![QB_T, QB_T])
         );
         Ok(())
     }
@@ -842,7 +842,7 @@ mod tests {
         let sub = SiblingSubgraph::from_sibling_graph(&func)?;
 
         let empty_dfg = {
-            let builder = DFGBuilder::new(Signature::new_endo(type_row![QB_T])).unwrap();
+            let builder = DFGBuilder::new(FunctionType::new_endo(type_row![QB_T])).unwrap();
             let inputs = builder.input_wires();
             builder.finish_prelude_hugr_with_outputs(inputs).unwrap()
         };
@@ -981,7 +981,7 @@ mod tests {
         let two_bit = type_row![BOOL_T, BOOL_T];
 
         let mut builder =
-            DFGBuilder::new(Signature::new(one_bit.clone(), two_bit.clone())).unwrap();
+            DFGBuilder::new(FunctionType::new(one_bit.clone(), two_bit.clone())).unwrap();
         let inw = builder.input_wires().exactly_one().unwrap();
         let outw1 = builder.add_dataflow_op(NotOp, [inw]).unwrap().out_wire(0);
         let outw2 = builder

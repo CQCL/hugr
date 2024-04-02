@@ -333,7 +333,7 @@ impl IntOpDef {
 mod test {
     use crate::{
         ops::dataflow::DataflowOpTrait, std_extensions::arithmetic::int_types::int_type,
-        types::Signature,
+        types::FunctionType,
     };
 
     use super::*;
@@ -359,7 +359,7 @@ mod test {
                 .to_extension_op()
                 .unwrap()
                 .signature(),
-            Signature::new(vec![int_type(ta(3))], vec![int_type(ta(4))],)
+            FunctionType::new(vec![int_type(ta(3))], vec![int_type(ta(4))],)
         );
         assert_eq!(
             IntOpDef::iwiden_s
@@ -367,7 +367,7 @@ mod test {
                 .to_extension_op()
                 .unwrap()
                 .signature(),
-            Signature::new(vec![int_type(ta(3))], vec![int_type(ta(3))],)
+            FunctionType::new(vec![int_type(ta(3))], vec![int_type(ta(3))],)
         );
         assert_eq!(
             IntOpDef::inarrow_s
@@ -375,7 +375,7 @@ mod test {
                 .to_extension_op()
                 .unwrap()
                 .signature(),
-            Signature::new(
+            FunctionType::new(
                 vec![int_type(ta(3))],
                 vec![sum_with_error(int_type(ta(3))).into()],
             )
@@ -394,7 +394,7 @@ mod test {
                 .to_extension_op()
                 .unwrap()
                 .signature(),
-            Signature::new(
+            FunctionType::new(
                 vec![int_type(ta(2))],
                 vec![sum_with_error(int_type(ta(1))).into()],
             )

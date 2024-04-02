@@ -258,7 +258,7 @@ mod test {
     use crate::hugr::views::sibling::SiblingMut;
     use crate::hugr::HugrMut;
     use crate::ops::handle::{BasicBlockID, CfgID, NodeHandle};
-    use crate::types::Signature;
+    use crate::types::FunctionType;
     use crate::{type_row, HugrView, Node};
     use cool_asserts::assert_matches;
     use itertools::Itertools;
@@ -351,7 +351,7 @@ mod test {
         let mut fbuild = module_builder
             .define_function(
                 "main",
-                Signature::new(type_row![USIZE_T], type_row![USIZE_T]),
+                FunctionType::new(type_row![USIZE_T], type_row![USIZE_T]),
             )
             .unwrap();
         let [i1] = fbuild.input_wires_arr();

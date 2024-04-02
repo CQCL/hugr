@@ -223,7 +223,7 @@ pub(crate) mod test {
 
     use crate::hugr::{views::HugrView, HugrMut, NodeType};
     use crate::ops;
-    use crate::types::{PolyFixedFunc, Signature, Type};
+    use crate::types::{FunctionType, PolyFixedFunc, Type};
     use crate::{type_row, Hugr};
 
     use super::handle::BuildHandle;
@@ -258,7 +258,8 @@ pub(crate) mod test {
 
     #[fixture]
     pub(crate) fn simple_dfg_hugr() -> Hugr {
-        let dfg_builder = DFGBuilder::new(Signature::new(type_row![BIT], type_row![BIT])).unwrap();
+        let dfg_builder =
+            DFGBuilder::new(FunctionType::new(type_row![BIT], type_row![BIT])).unwrap();
         let [i1] = dfg_builder.input_wires_arr();
         dfg_builder.finish_prelude_hugr_with_outputs([i1]).unwrap()
     }
@@ -266,7 +267,7 @@ pub(crate) mod test {
     #[fixture]
     pub(crate) fn simple_cfg_hugr() -> Hugr {
         let mut cfg_builder =
-            CFGBuilder::new(Signature::new(type_row![NAT], type_row![NAT])).unwrap();
+            CFGBuilder::new(FunctionType::new(type_row![NAT], type_row![NAT])).unwrap();
         super::cfg::test::build_basic_cfg(&mut cfg_builder).unwrap();
         cfg_builder.finish_prelude_hugr().unwrap()
     }
@@ -275,7 +276,7 @@ pub(crate) mod test {
     /// for tests which want to avoid having open extension variables after
     /// inference. Using DFGBuilder will default to a root node with an open
     /// extension variable
-    pub(crate) fn closed_dfg_root_hugr(signature: Signature) -> Hugr {
+    pub(crate) fn closed_dfg_root_hugr(signature: FunctionType) -> Hugr {
         let mut hugr = Hugr::new(NodeType::new_pure(ops::DFG {
             signature: signature.clone(),
         }));

@@ -4,7 +4,7 @@ use std::collections::{BTreeSet, HashMap};
 
 use itertools::Itertools;
 
-use crate::types::{Signature, SumType};
+use crate::types::{FunctionType, SumType};
 use crate::{
     builder::{DFGBuilder, Dataflow, DataflowHugr},
     extension::{ConstFoldResult, ExtensionRegistry},
@@ -75,7 +75,7 @@ pub fn fold_leaf_op(op: &LeafOp, consts: &[(IncomingPort, Const)]) -> ConstFoldR
 /// against `reg`.
 fn const_graph(consts: Vec<Const>, reg: &ExtensionRegistry) -> Hugr {
     let const_types = consts.iter().map(Const::const_type).collect_vec();
-    let mut b = DFGBuilder::new(Signature::new(type_row![], const_types)).unwrap();
+    let mut b = DFGBuilder::new(FunctionType::new(type_row![], const_types)).unwrap();
 
     let outputs = consts
         .into_iter()
@@ -219,7 +219,7 @@ mod test {
     use crate::std_extensions::arithmetic::float_types::{ConstF64, FLOAT64_TYPE};
     use crate::std_extensions::arithmetic::int_types::{ConstIntU, INT_TYPES};
     use crate::std_extensions::logic::{self, NaryLogic};
-    use crate::types::Signature;
+    use crate::types::FunctionType;
 
     use rstest::rstest;
 
@@ -253,8 +253,11 @@ mod test {
            int(x.0 - x.1) == 2
         */
         let sum_type = sum_with_error(INT_TYPES[5].to_owned());
-        let mut build =
-            DFGBuilder::new(Signature::new(type_row![], vec![sum_type.clone().into()])).unwrap();
+        let mut build = DFGBuilder::new(FunctionType::new(
+            type_row![],
+            vec![sum_type.clone().into()],
+        ))
+        .unwrap();
 
         let tup = build.add_load_const(Const::tuple([f2c(5.6), f2c(3.2)]));
 
@@ -303,7 +306,7 @@ mod test {
         #[case] ins: [bool; 3],
         #[case] out: bool,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let mut build = DFGBuilder::new(Signature::new(type_row![], vec![BOOL_T])).unwrap();
+        let mut build = DFGBuilder::new(FunctionType::new(type_row![], vec![BOOL_T])).unwrap();
 
         let ins = ins.map(|b| build.add_load_const(Const::from_bool(b)));
         let logic_op = build.add_dataflow_op(op.with_n_inputs(ins.len() as u64), ins)?;
@@ -332,8 +335,11 @@ mod test {
         ])
         .unwrap();
         let list: Const = ListValue::new(BOOL_T, [Const::unit_sum(0, 1).unwrap()]).into();
-        let mut build =
-            DFGBuilder::new(Signature::new(type_row![], vec![list.const_type().clone()])).unwrap();
+        let mut build = DFGBuilder::new(FunctionType::new(
+            type_row![],
+            vec![list.const_type().clone()],
+        ))
+        .unwrap();
 
         let list_wire = build.add_load_const(list.clone());
 
