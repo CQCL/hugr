@@ -492,7 +492,7 @@ impl ExtensionSet {
             .try_for_each(|var_idx| check_typevar_decl(params, var_idx, &TypeParam::Extensions))
     }
 
-    pub(crate) fn substitute(&self, t: &impl Substitution) -> Self {
+    pub(crate) fn substitute(&self, t: &Substitution) -> Self {
         Self::from_iter(self.0.iter().flat_map(|e| match as_typevar(e) {
             None => vec![e.clone()],
             Some(i) => match t.apply_var(i, &TypeParam::Extensions) {

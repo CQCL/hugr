@@ -9,6 +9,7 @@ pub mod type_param;
 pub mod type_row;
 
 pub use crate::ops::constant::{ConstTypeError, CustomCheckFailure};
+use crate::types::type_param::check_type_arg;
 use crate::utils::display_list_with_separator;
 pub use check::SumTypeError;
 pub use custom::CustomType;
@@ -357,10 +358,15 @@ impl Type {
         }
     }
 
-    pub(crate) fn substitute(&self, t: &impl Substitution) -> Self {
+    pub(crate) fn substitute(&self, t: &Substitution) -> Self {
         match &self.0 {
             TypeEnum::Alias(_) | TypeEnum::Sum(SumType::Unit { .. }) => self.clone(),
-            TypeEnum::Variable(idx, bound) => t.apply_typevar(*idx, *bound),
+            TypeEnum::Variable(idx, bound) => {
+                let TypeArg::Type { ty } = t.apply_var(*idx, &((*bound).into())) else {
+                    panic!("Variable was not a type - try validate() first")
+                };
+                ty
+            }
             TypeEnum::Extension(cty) => Type::new_extension(cty.substitute(t)),
             TypeEnum::Function(bf) => Type::new_function(bf.substitute(t)),
             TypeEnum::Sum(SumType::General { rows }) => {
@@ -370,26 +376,26 @@ impl Type {
     }
 }
 
-/// A function that replaces type variables with values.
-/// (The values depend upon the implementation, to allow dynamic computation;
-/// and [Substitution] deals only with type variables, other/containing types/typeargs
-/// are handled by [Type::substitute], [TypeArg::substitute] and friends.)
-pub(crate) trait Substitution {
-    /// Apply to a variable of kind [TypeParam::Type]
-    fn apply_typevar(&self, idx: usize, bound: TypeBound) -> Type {
-        let TypeArg::Type { ty } = self.apply_var(idx, &bound.into()) else {
-            panic!("Variable was not a type - try validate() first")
-        };
-        ty
+/// Details a replacement of type variables with a finite list of known values.
+/// (Variables out of the range of the list will result in a panic)
+pub(crate) struct Substitution<'a>(&'a [TypeArg], &'a ExtensionRegistry);
+
+impl<'a> Substitution<'a> {
+    pub(crate) fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg {
+        let arg = self
+            .0
+            .get(idx)
+            .expect("Undeclared type variable - call validate() ?");
+        debug_assert_eq!(check_type_arg(arg, decl), Ok(()));
+        arg.clone()
     }
 
-    /// Apply to a variable whose kind is any given [TypeParam]
-    fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg;
-
-    fn extension_registry(&self) -> &ExtensionRegistry;
+    fn extension_registry(&self) -> &ExtensionRegistry {
+        self.1
+    }
 }
 
-fn subst_row(row: &TypeRow, tr: &impl Substitution) -> TypeRow {
+fn subst_row(row: &TypeRow, tr: &Substitution) -> TypeRow {
     let res = row
         .iter()
         .map(|ty| ty.substitute(tr))

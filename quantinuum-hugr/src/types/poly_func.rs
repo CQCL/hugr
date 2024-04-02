@@ -1,9 +1,6 @@
 //! Polymorphic Function Types
 
-use crate::{
-    extension::{ExtensionRegistry, SignatureError},
-    types::type_param::check_type_arg,
-};
+use crate::extension::{ExtensionRegistry, SignatureError};
 use itertools::Itertools;
 
 use super::type_param::{check_type_args, TypeArg, TypeParam};
@@ -111,26 +108,7 @@ impl PolyFuncType {
         // Check that args are applicable, and that we have a value for each binder,
         // i.e. each possible free variable within the body.
         check_type_args(args, &self.params)?;
-        Ok(self.body.substitute(&SubstValues(args, ext_reg)))
-    }
-}
-
-/// A [Substitution] with a finite list of known values.
-/// (Variables out of the range of the list will result in a panic)
-struct SubstValues<'a>(&'a [TypeArg], &'a ExtensionRegistry);
-
-impl<'a> Substitution for SubstValues<'a> {
-    fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg {
-        let arg = self
-            .0
-            .get(idx)
-            .expect("Undeclared type variable - call validate() ?");
-        debug_assert_eq!(check_type_arg(arg, decl), Ok(()));
-        arg.clone()
-    }
-
-    fn extension_registry(&self) -> &ExtensionRegistry {
-        self.1
+        Ok(self.body.substitute(&Substitution(args, ext_reg)))
     }
 }
 

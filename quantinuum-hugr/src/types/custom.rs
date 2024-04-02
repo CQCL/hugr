@@ -88,7 +88,7 @@ impl CustomType {
             })
     }
 
-    pub(super) fn substitute(&self, tr: &impl Substitution) -> Self {
+    pub(super) fn substitute(&self, tr: &Substitution) -> Self {
         let args = self
             .args
             .iter()

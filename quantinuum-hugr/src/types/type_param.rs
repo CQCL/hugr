@@ -224,7 +224,7 @@ impl TypeArg {
         }
     }
 
-    pub(crate) fn substitute(&self, t: &impl Substitution) -> Self {
+    pub(crate) fn substitute(&self, t: &Substitution) -> Self {
         match self {
             TypeArg::Type { ty } => TypeArg::Type {
                 ty: ty.substitute(t),
