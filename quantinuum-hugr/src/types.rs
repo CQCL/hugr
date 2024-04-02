@@ -42,6 +42,8 @@ pub enum EdgeKind {
     Value(Type),
     /// A reference to a static value definition.
     Static(Type),
+    /// A (perhaps-polymorphic) function (TLD)
+    Function(PolyFuncType),
     /// Explicitly enforce an ordering between nodes in a DDG.
     StateOrder,
 }

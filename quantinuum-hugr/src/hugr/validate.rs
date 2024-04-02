@@ -20,7 +20,7 @@ use crate::ops::custom::{resolve_opaque_op, ExternalOp};
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::{FuncDefn, OpTag, OpTrait, OpType, ValidateOp};
 use crate::types::type_param::TypeParam;
-use crate::types::{EdgeKind, Type};
+use crate::types::{EdgeKind, PolyFuncType, Type};
 use crate::{Direction, Hugr, Node, Port};
 
 use super::views::{HierarchyView, HugrView, SiblingGraph};
@@ -228,6 +228,9 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
             EdgeKind::Static(ty) => ty
                 .validate(self.extension_registry, &[])
                 .map_err(|cause| ValidationError::SignatureError { node, cause })?,
+            EdgeKind::Function(ty) => ty
+                .validate(self.extension_registry, &[])
+                .map_err(|cause| ValidationError::SignatureError { node, cause })?,
             _ => (),
         }
 
@@ -419,10 +422,19 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
 
         let is_static = match from_optype.port_kind(from_offset).unwrap() {
             EdgeKind::Static(typ) => {
-                if !(OpTag::Const.is_superset(from_optype.tag())
-                    || OpTag::Function.is_superset(from_optype.tag()))
-                {
-                    return Err(InterGraphEdgeError::InvalidConstSrc {
+                if !OpTag::Const.is_superset(from_optype.tag()) {
+                    return Err(InterGraphEdgeError::InvalidStaticSrc {
+                        from,
+                        from_offset,
+                        typ,
+                    }
+                    .into());
+                }
+                true
+            }
+            EdgeKind::Function(typ) => {
+                if !OpTag::Function.is_superset(from_optype.tag()) {
+                    return Err(InterGraphEdgeError::InvalidFunctionSrc {
                         from,
                         from_offset,
                         typ,
@@ -769,12 +781,20 @@ pub enum InterGraphEdgeError {
         ancestor: Node,
     },
     #[error(
-        "Const edge comes from an invalid node type: {from:?} ({from_offset:?}). Edge type: {typ}"
+        "Static edge comes from an invalid node type: {from:?} ({from_offset:?}). Edge type: {typ}"
     )]
-    InvalidConstSrc {
+    InvalidStaticSrc {
         from: Node,
         from_offset: Port,
         typ: Type,
+    },
+    #[error(
+        "Function edge comes from an invalid node type: {from:?} ({from_offset:?}). Edge type: {typ}"
+    )]
+    InvalidFunctionSrc {
+        from: Node,
+        from_offset: Port,
+        typ: PolyFuncType,
     },
 }
 

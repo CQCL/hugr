@@ -97,7 +97,7 @@ pub(super) fn edge_style<H: HugrView + ?Sized>(
         let style = match port_kind {
             EdgeKind::StateOrder => EdgeStyle::Dotted,
             EdgeKind::ControlFlow => EdgeStyle::Dashed,
-            EdgeKind::Static(_) | EdgeKind::Value(_) => EdgeStyle::Solid,
+            EdgeKind::Static(_) | EdgeKind::Value(_) | EdgeKind::Function(_) => EdgeStyle::Solid,
         };
 
         // Compute the label for the edge, given the setting flags.

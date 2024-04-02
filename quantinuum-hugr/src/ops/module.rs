@@ -61,7 +61,7 @@ impl OpTrait for FuncDefn {
     }
 
     fn static_output(&self) -> Option<EdgeKind> {
-        Some(EdgeKind::Static(Type::new_function(self.signature.clone())))
+        Some(EdgeKind::Function(self.signature.clone()))
     }
 }
 
@@ -89,7 +89,7 @@ impl OpTrait for FuncDecl {
     }
 
     fn static_output(&self) -> Option<EdgeKind> {
-        Some(EdgeKind::Static(Type::new_function(self.signature.clone())))
+        Some(EdgeKind::Function(self.signature.clone()))
     }
 }
 

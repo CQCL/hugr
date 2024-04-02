@@ -171,8 +171,7 @@ impl DataflowOpTrait for Call {
     }
 
     fn static_input(&self) -> Option<EdgeKind> {
-        let fn_typ = Type::new_function(self.called_function_type().clone());
-        Some(EdgeKind::Static(fn_typ))
+        Some(EdgeKind::Function(self.called_function_type().clone()))
     }
 }
 impl Call {
