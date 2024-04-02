@@ -29,7 +29,7 @@ use std::fmt::Debug;
 
 use self::signature::TypeRowElem;
 use self::type_param::TypeParam;
-use self::type_row::{RowVarOrType, TypeRowV};
+use self::type_row::{RowVarOrType, TypeRowVarLen};
 
 /// A unique identifier for a type.
 pub type TypeName = SmolStr;
@@ -114,7 +114,7 @@ pub enum SumType {
     Unit { size: u8 }, // TODO what about a type variable of BoundedUSize
     /// General case of a Sum type.
     #[allow(missing_docs)]
-    General { rows: Vec<TypeRowV> },
+    General { rows: Vec<TypeRowVarLen> },
 }
 
 impl std::fmt::Display for SumType {
@@ -136,12 +136,12 @@ impl SumType {
     /// Initialize a new sum type.
     pub fn new<V>(variants: impl IntoIterator<Item = V>) -> Self
     where
-        V: Into<TypeRowV>,
+        V: Into<TypeRowVarLen>,
     {
         let rows = variants.into_iter().map(Into::into).collect_vec();
 
         let len: usize = rows.len();
-        if len <= (u8::MAX as usize) && rows.iter().all(TypeRowV::is_empty) {
+        if len <= (u8::MAX as usize) && rows.iter().all(TypeRowVarLen::is_empty) {
             Self::Unit { size: len as u8 }
         } else {
             Self::General { rows }
@@ -149,7 +149,7 @@ impl SumType {
     }
 
     /// Report the tag'th variant, if it exists.
-    pub fn get_variant(&self, tag: usize) -> Option<&TypeRowV> {
+    pub fn get_variant(&self, tag: usize) -> Option<&TypeRowVarLen> {
         match self {
             SumType::Unit { size } if tag < (*size as usize) => Some(Type::EMPTY_VL_TYPEROW_REF),
             SumType::General { rows } => rows.get(tag),
@@ -207,7 +207,7 @@ impl TypeEnum {
             TypeEnum::Sum(SumType::Unit { size: _ }) => TypeBound::Eq,
             TypeEnum::Sum(SumType::General { rows }) => least_upper_bound(
                 rows.iter()
-                    .flat_map(TypeRowV::iter)
+                    .flat_map(TypeRowVarLen::iter)
                     .map(RowVarOrType::least_upper_bound),
             ),
         }
@@ -256,8 +256,8 @@ impl Type {
 
     const EMPTY_TYPEROW_REF: &'static TypeRow = &Self::EMPTY_TYPEROW;
 
-    const EMPTY_VL_TYPEROW: TypeRowV = TypeRowV::new();
-    const EMPTY_VL_TYPEROW_REF: &'static TypeRowV = &Self::EMPTY_VL_TYPEROW;
+    const EMPTY_VL_TYPEROW: TypeRowVarLen = TypeRowVarLen::new();
+    const EMPTY_VL_TYPEROW_REF: &'static TypeRowVarLen = &Self::EMPTY_VL_TYPEROW;
 
     /// Initialize a new function type.
     pub fn new_function(fun_ty: impl Into<PolyFuncType>) -> Self {
@@ -266,7 +266,7 @@ impl Type {
 
     /// Initialize a new tuple type by providing the elements.
     #[inline(always)]
-    pub fn new_tuple(types: impl Into<TypeRowV>) -> Self {
+    pub fn new_tuple(types: impl Into<TypeRowVarLen>) -> Self {
         let row = types.into();
         match row.len() {
             0 => Self::UNIT,
@@ -276,7 +276,7 @@ impl Type {
 
     /// Initialize a new sum type by providing the possible variant types.
     #[inline(always)]
-    pub fn new_sum<T: Into<TypeRowV>>(variants: impl IntoIterator<Item = T>) -> Self where {
+    pub fn new_sum<T: Into<TypeRowVarLen>>(variants: impl IntoIterator<Item = T>) -> Self where {
         Self::new(TypeEnum::Sum(SumType::new(variants)))
     }
 
@@ -345,7 +345,7 @@ impl Type {
         match &self.0 {
             TypeEnum::Sum(SumType::General { rows }) => rows
                 .iter()
-                .flat_map(TypeRowV::iter)
+                .flat_map(TypeRowVarLen::iter)
                 .try_for_each(|rvt| rvt.validate(extension_registry, var_decls)),
             TypeEnum::Sum(SumType::Unit { .. }) => Ok(()), // No leaves there
             TypeEnum::Alias(_) => Ok(()),
@@ -463,7 +463,7 @@ pub(crate) mod test {
 
     #[test]
     fn sum_construct() {
-        let pred1 = Type::new_sum([TypeRowV::new(), TypeRowV::new()]);
+        let pred1 = Type::new_sum([TypeRowVarLen::new(), TypeRowVarLen::new()]);
         let pred2 = Type::new_unit_sum(2);
 
         assert_eq!(pred1, pred2);

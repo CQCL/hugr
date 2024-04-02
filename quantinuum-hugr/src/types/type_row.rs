@@ -54,7 +54,7 @@ where
 }
 
 pub type TypeRow = TypeRowBase<Type>;
-pub type TypeRowV = TypeRowBase<RowVarOrType>;
+pub type TypeRowVarLen = TypeRowBase<RowVarOrType>;
 
 impl<T: Display> Display for TypeRowBase<T>
 where
@@ -166,7 +166,7 @@ impl From<TypeRow> for Cow<'static, [RowVarOrType]> {
     }
 }
 
-impl<F, T> From<F> for TypeRowV
+impl<F, T> From<F> for TypeRowVarLen
 where
     RowVarOrType: From<T>,
     F: IntoIterator<Item = T>,
@@ -228,7 +228,7 @@ impl IntoIterator for TypeRow {
     }
 }
 
-impl TryInto<TypeRow> for TypeRowV {
+impl TryInto<TypeRow> for TypeRowVarLen {
     type Error = (usize, TypeBound);
 
     fn try_into(self) -> Result<TypeRow, Self::Error> {
