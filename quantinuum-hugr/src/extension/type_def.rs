@@ -169,7 +169,7 @@ mod test {
     use crate::extension::SignatureError;
     use crate::std_extensions::arithmetic::float_types::FLOAT64_TYPE;
     use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
-    use crate::types::{FunctionType, Type, TypeBound};
+    use crate::types::{FuncTypeVarLen, Type, TypeBound};
 
     use super::{TypeDef, TypeDefBound};
 
@@ -186,7 +186,7 @@ mod test {
         };
         let typ = Type::new_extension(
             def.instantiate(vec![TypeArg::Type {
-                ty: Type::new_function(FunctionType::default()),
+                ty: Type::new_function(FuncTypeVarLen::default()),
             }])
             .unwrap(),
         );

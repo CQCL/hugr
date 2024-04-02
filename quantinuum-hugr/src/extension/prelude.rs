@@ -11,7 +11,7 @@ use crate::{
     type_row,
     types::{
         type_param::{TypeArg, TypeParam},
-        CustomType, FunctionType, PolyFuncType, Type, TypeBound,
+        CustomType, FuncTypeVarLen, PolyFuncType, Type, TypeBound,
     },
     Extension,
 };
@@ -32,7 +32,7 @@ impl SignatureFromArgs for ArrayOpCustom {
 
         Ok(PolyFuncType::new(
             vec![TypeBound::Any.into()],
-            FunctionType::new(var_arg_row, other_row),
+            FuncTypeVarLen::new(var_arg_row, other_row),
         ))
     }
 
@@ -92,7 +92,7 @@ lazy_static! {
         .add_op(
             SmolStr::new_inline(PANIC_OP_ID),
             "Panic with input error".to_string(),
-            FunctionType::new(type_row![Type::new_extension(ERROR_CUSTOM_TYPE)], type_row![]),
+            FuncTypeVarLen::new(type_row![Type::new_extension(ERROR_CUSTOM_TYPE)], type_row![]),
         )
         .unwrap();
         prelude

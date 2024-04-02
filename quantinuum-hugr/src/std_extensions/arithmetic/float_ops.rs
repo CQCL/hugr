@@ -10,7 +10,7 @@ use crate::{
         ExtensionId, ExtensionRegistry, ExtensionSet, OpDef, SignatureFunc, PRELUDE,
     },
     type_row,
-    types::FunctionType,
+    types::FuncTypeVarLen,
     Extension,
 };
 use lazy_static::lazy_static;
@@ -50,12 +50,12 @@ impl MakeOpDef for FloatOps {
 
         match self {
             feq | fne | flt | fgt | fle | fge => {
-                FunctionType::new(type_row![FLOAT64_TYPE; 2], type_row![BOOL_T])
+                FuncTypeVarLen::new(type_row![FLOAT64_TYPE; 2], type_row![BOOL_T])
             }
             fmax | fmin | fadd | fsub | fmul | fdiv => {
-                FunctionType::new(type_row![FLOAT64_TYPE; 2], type_row![FLOAT64_TYPE])
+                FuncTypeVarLen::new(type_row![FLOAT64_TYPE; 2], type_row![FLOAT64_TYPE])
             }
-            fneg | fabs | ffloor | fceil => FunctionType::new_endo(type_row![FLOAT64_TYPE]),
+            fneg | fabs | ffloor | fceil => FuncTypeVarLen::new_endo(type_row![FLOAT64_TYPE]),
         }
         .into()
     }

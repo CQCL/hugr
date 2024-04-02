@@ -47,7 +47,7 @@ use crate::{
 ///   builder::{BuildError, CFGBuilder, Container, Dataflow, HugrBuilder},
 ///   Hugr,
 ///   extension::{ExtensionSet, prelude},
-///   types::{FunctionType, Type, SumType},
+///   types::{FuncTypeVarLen, Type, SumType},
 ///   ops,
 ///   type_row,
 /// };
@@ -55,7 +55,7 @@ use crate::{
 /// const NAT: Type = prelude::USIZE_T;
 ///
 /// fn make_cfg() -> Result<Hugr, BuildError> {
-///     let mut cfg_builder = CFGBuilder::new(FunctionType::new(type_row![NAT], type_row![NAT]))?;
+///     let mut cfg_builder = CFGBuilder::new(FuncTypeVarLen::new(type_row![NAT], type_row![NAT]))?;
 ///
 ///     // Outputs from basic blocks must be packed in a sum which corresponds to
 ///     // which successor to pick. We'll either choose the first branch and pass
@@ -85,7 +85,7 @@ use crate::{
 ///     // entry node's `other_outputs`.
 ///     let mut successor_builder =
 ///         cfg_builder.simple_block_builder(
-///           FunctionType::new(type_row![NAT, NAT], type_row![NAT]),
+///           FuncTypeVarLen::new(type_row![NAT, NAT], type_row![NAT]),
 ///           1 // only one successor to this block
 ///         )?;
 ///     let successor_a = {
@@ -100,7 +100,7 @@ use crate::{
 ///
 ///    // The only argument to this block is the entry node's `other_outputs`.
 ///    let mut successor_builder =
-///        cfg_builder.simple_block_builder(FunctionType::new(type_row![NAT], type_row![NAT]), 1)?;
+///        cfg_builder.simple_block_builder(FuncTypeVarLen::new(type_row![NAT], type_row![NAT]), 1)?;
 ///    let successor_b = {
 ///        let sum_unary = successor_builder.add_load_const(ops::Const::unary_unit_sum());
 ///        let [in_wire] = successor_builder.input_wires_arr();

@@ -210,7 +210,7 @@ impl Call {
     /// # use hugr::types::Signature;
     /// # use hugr::extension::prelude::QB_T;
     /// # use hugr::extension::PRELUDE_REGISTRY;
-    /// let signature = FunctionType::new(vec![QB_T, QB_T], vec![QB_T, QB_T]);
+    /// let signature = FuncTypeVarLen::new(vec![QB_T, QB_T], vec![QB_T, QB_T]);
     /// let call = Call::try_new(signature.into(), &[], &PRELUDE_REGISTRY).unwrap();
     /// let op = OpType::Call(call.clone());
     /// assert_eq!(op.static_input_port(), Some(call.called_function_port()));

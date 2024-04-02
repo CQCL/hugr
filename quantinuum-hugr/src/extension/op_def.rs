@@ -12,7 +12,7 @@ use super::{
 };
 
 use crate::types::type_param::{check_type_args, TypeArg, TypeParam};
-use crate::types::{FunctionType, PolyFuncType, Signature};
+use crate::types::{FuncTypeVarLen, PolyFuncType, Signature};
 use crate::Hugr;
 
 /// Trait necessary for binary computations of OpDef signature
@@ -194,9 +194,9 @@ impl From<PolyFuncType> for SignatureFunc {
     }
 }
 
-impl From<FunctionType> for SignatureFunc {
+impl From<FuncTypeVarLen> for SignatureFunc {
     // ALAN might want to be Signature?
-    fn from(v: FunctionType) -> Self {
+    fn from(v: FuncTypeVarLen) -> Self {
         Self::TypeScheme(CustomValidator::from_polyfunc(v))
     }
 }
@@ -248,7 +248,7 @@ impl SignatureFunc {
             }
         };
 
-        // The first instantiate returns a FunctionType, i.e. expressed using 'RowVarOrType's.
+        // The first instantiate returns a FuncTypeVarLen, i.e. expressed using 'RowVarOrType's.
         // try_into removes possibility of containing any RowVars by expressing directly using 'Type's.
         let res = pf
             .instantiate(args, exts)?
@@ -486,7 +486,7 @@ mod test {
     use crate::ops::custom::ExternalOp;
     use crate::ops::LeafOp;
     use crate::std_extensions::collections::{EXTENSION, LIST_TYPENAME};
-    use crate::types::{type_param::TypeParam, FunctionType, Signature, TypeArg, TypeBound};
+    use crate::types::{type_param::TypeParam, FuncTypeVarLen, Signature, TypeArg, TypeBound};
     use crate::types::{PolyFuncType, Type};
     use crate::Hugr;
     use crate::{const_extension_ids, Extension};
@@ -503,7 +503,7 @@ mod test {
         let list_of_var =
             Type::new_extension(list_def.instantiate(vec![TypeArg::new_var_use(0, TP)])?);
         const OP_NAME: SmolStr = SmolStr::new_inline("Reverse");
-        let type_scheme = PolyFuncType::new(vec![TP], FunctionType::new_endo(vec![list_of_var]));
+        let type_scheme = PolyFuncType::new(vec![TP], FuncTypeVarLen::new_endo(vec![list_of_var]));
 
         let def = e.add_op(OP_NAME, "desc".into(), type_scheme)?;
         def.add_lower_func(LowerFunc::FixedHugr(ExtensionSet::new(), Hugr::default()));
@@ -553,7 +553,7 @@ mod test {
                     .collect();
                 Ok(PolyFuncType::new(
                     vec![TP.to_owned()],
-                    FunctionType::new(tvs.clone(), vec![Type::new_tuple(tvs)]),
+                    FuncTypeVarLen::new(tvs.clone(), vec![Type::new_tuple(tvs)]),
                 ))
             }
 
@@ -630,7 +630,7 @@ mod test {
             "".into(),
             PolyFuncType::new(
                 vec![TypeBound::Any.into()],
-                FunctionType::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
+                FuncTypeVarLen::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
             ),
         )?;
         let tv = Type::new_var_use(1, TypeBound::Eq);

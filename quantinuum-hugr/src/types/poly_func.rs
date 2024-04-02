@@ -81,7 +81,7 @@ where
     }
 
     /// Create a new PolyFuncBase given the kinds of the variables it declares
-    /// and the underlying [FunctionType].
+    /// and the underlying [FuncTypeVarLen].
     pub fn new(params: impl Into<Vec<TypeParam>>, body: impl Into<FuncTypeBase<T>>) -> Self {
         Self {
             params: params.into(),
@@ -273,7 +273,7 @@ pub(crate) mod test {
     use crate::types::signature::FuncTypeBase;
     use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
     use crate::types::type_row::RowVarOrType;
-    use crate::types::{CustomType, FunctionType, PolyFuncType, Type, TypeBound};
+    use crate::types::{CustomType, FuncTypeVarLen, PolyFuncType, Type, TypeBound};
     use crate::Extension;
 
     use super::{PolyFuncBase, TypeRowElem};
@@ -305,14 +305,14 @@ pub(crate) mod test {
         let list_of_var = Type::new_extension(list_def.instantiate([tyvar.clone()])?);
         let list_len = PolyFuncBase::new_validated(
             [TypeBound::Any.into()],
-            FunctionType::new(vec![list_of_var], vec![USIZE_T]),
+            FuncTypeVarLen::new(vec![list_of_var], vec![USIZE_T]),
             &REGISTRY,
         )?;
 
         let t = list_len.instantiate(&[TypeArg::Type { ty: USIZE_T }], &REGISTRY)?;
         assert_eq!(
             t,
-            FunctionType::new(
+            FuncTypeVarLen::new(
                 vec![Type::new_extension(
                     list_def
                         .instantiate([TypeArg::Type { ty: USIZE_T }])
@@ -325,8 +325,8 @@ pub(crate) mod test {
         Ok(())
     }
 
-    fn id_fn(t: Type) -> FunctionType {
-        FunctionType::new(vec![t.clone()], vec![t])
+    fn id_fn(t: Type) -> FuncTypeVarLen {
+        FuncTypeVarLen::new(vec![t.clone()], vec![t])
     }
 
     #[test]
@@ -504,7 +504,7 @@ pub(crate) mod test {
     fn new_pf1(param: TypeParam, input: Type, output: Type) -> PolyFuncType {
         PolyFuncType {
             params: vec![param],
-            body: FunctionType::new(vec![input], vec![output]),
+            body: FuncTypeVarLen::new(vec![input], vec![output]),
         }
     }
 
@@ -515,7 +515,7 @@ pub(crate) mod test {
         // forall A,N.(Array<A,N> -> A)
         let array_max = PolyFuncBase::new_validated(
             vec![TypeBound::Any.into(), TypeParam::max_nat()],
-            FunctionType::new(
+            FuncTypeVarLen::new(
                 vec![array_type(
                     TypeArg::new_var_use(1, TypeParam::max_nat()),
                     Type::new_var_use(0, TypeBound::Any),
@@ -525,7 +525,7 @@ pub(crate) mod test {
             &PRELUDE_REGISTRY,
         )?;
 
-        let concrete = FunctionType::new(
+        let concrete = FuncTypeVarLen::new(
             vec![array_type(TypeArg::BoundedNat { n: 3 }, USIZE_T)],
             vec![USIZE_T],
         );
@@ -537,7 +537,7 @@ pub(crate) mod test {
         // forall N.(Array<usize,N> -> usize)
         let partial = PolyFuncBase::new_validated(
             vec![TypeParam::max_nat()],
-            FunctionType::new(
+            FuncTypeVarLen::new(
                 vec![array_type(
                     TypeArg::new_var_use(0, TypeParam::max_nat()),
                     USIZE_T,
@@ -567,7 +567,7 @@ pub(crate) mod test {
     pub(crate) fn nested_func() -> PolyFuncType {
         PolyFuncBase::new_validated(
             vec![TypeBound::Any.into()],
-            FunctionType::new(
+            FuncTypeVarLen::new(
                 vec![Type::new_var_use(0, TypeBound::Any)],
                 vec![Type::new_function(new_pf1(
                     TypeBound::Copyable.into(),
@@ -589,7 +589,7 @@ pub(crate) mod test {
 
         let arg = array_type(TypeArg::BoundedNat { n: 5 }, USIZE_T);
         // `arg` -> (forall C. C -> List(Tuple(C, `arg`)))
-        let outer_applied = FunctionType::new(
+        let outer_applied = FuncTypeVarLen::new(
             vec![arg.clone()], // This had index 0, but is replaced
             vec![Type::new_function(new_pf1(
                 TypeBound::Copyable.into(),
@@ -621,7 +621,7 @@ pub(crate) mod test {
         assert_eq!(
             res,
             // F -> forall C. (C -> List(Tuple(C, F)))
-            FunctionType::new(
+            FuncTypeVarLen::new(
                 vec![Type::new_var_use(FREE, TypeBound::Eq)],
                 vec![Type::new_function(new_pf1(
                     TypeBound::Copyable.into(),
@@ -653,7 +653,7 @@ pub(crate) mod test {
             .unwrap();
         assert_eq!(
             res,
-            FunctionType::new(
+            FuncTypeVarLen::new(
                 vec![rhs(FREE)], // Input: forall TEQ. (TEQ -> Array(TEQ, FREE))
                 // Output: forall C. C -> List(Tuple(C, Input))
                 vec![Type::new_function(new_pf1(
@@ -678,7 +678,7 @@ pub(crate) mod test {
                     b: TypeBound::Copyable,
                 }),
             }],
-            FunctionType::new(
+            FuncTypeVarLen::new(
                 vec![USIZE_T, Type::new_var_use(0, TypeBound::Any)],
                 vec![Type::new_sum(vec![RowVarOrType::RV(0, TypeBound::Any)])],
             ),
@@ -690,7 +690,7 @@ pub(crate) mod test {
             [TypeParam::List {
                 param: Box::new(TP),
             }],
-            FunctionType::new(
+            FuncTypeVarLen::new(
                 vec![USIZE_T.into(), RowVarOrType::RV(0, TypeBound::Any)],
                 vec![Type::new_tuple(RowVarOrType::RV(0, TypeBound::Any))],
             ),
@@ -716,7 +716,7 @@ pub(crate) mod test {
             .unwrap();
         assert_eq!(
             t2,
-            FunctionType::new(
+            FuncTypeVarLen::new(
                 vec![USIZE_T, USIZE_T, BOOL_T],
                 vec![Type::new_tuple(vec![
                     RowVarOrType::T(USIZE_T),
@@ -728,7 +728,7 @@ pub(crate) mod test {
 
     #[test]
     fn row_variables_inner() {
-        let inner_fty = Type::new_function(FunctionType::new_endo(vec![RowVarOrType::RV(
+        let inner_fty = Type::new_function(FuncTypeVarLen::new_endo(vec![RowVarOrType::RV(
             0,
             TypeBound::Copyable,
         )]));
@@ -738,12 +738,12 @@ pub(crate) mod test {
                     b: TypeBound::Copyable,
                 }),
             }],
-            FunctionType::new(vec![USIZE_T, inner_fty.clone()], vec![inner_fty]),
+            FuncTypeVarLen::new(vec![USIZE_T, inner_fty.clone()], vec![inner_fty]),
             &PRELUDE_REGISTRY,
         )
         .unwrap();
 
-        let inner3 = Type::new_function(FunctionType::new_endo(vec![USIZE_T, BOOL_T, USIZE_T]));
+        let inner3 = Type::new_function(FuncTypeVarLen::new_endo(vec![USIZE_T, BOOL_T, USIZE_T]));
         let t3 = pf
             .instantiate(
                 &[TypeArg::Sequence {
@@ -754,7 +754,7 @@ pub(crate) mod test {
             .unwrap();
         assert_eq!(
             t3,
-            FunctionType::new(vec![USIZE_T, inner3.clone()], vec![inner3])
+            FuncTypeVarLen::new(vec![USIZE_T, inner3.clone()], vec![inner3])
         );
     }
 }

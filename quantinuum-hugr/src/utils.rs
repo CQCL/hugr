@@ -108,18 +108,18 @@ pub(crate) mod test_quantum_extension {
         ops::LeafOp,
         std_extensions::arithmetic::float_types,
         type_row,
-        types::{FunctionType, PolyFuncType},
+        types::{FuncTypeVarLen, PolyFuncType},
         Extension,
     };
 
     use lazy_static::lazy_static;
 
     fn one_qb_func() -> PolyFuncType {
-        FunctionType::new_endo(type_row![QB_T]).into()
+        FuncTypeVarLen::new_endo(type_row![QB_T]).into()
     }
 
     fn two_qb_func() -> PolyFuncType {
-        FunctionType::new_endo(type_row![QB_T, QB_T]).into()
+        FuncTypeVarLen::new_endo(type_row![QB_T, QB_T]).into()
     }
     /// The extension identifier.
     pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("test.quantum");
@@ -133,7 +133,7 @@ pub(crate) mod test_quantum_extension {
             .add_op(
                 SmolStr::new_inline("RzF64"),
                 "Rotation specified by float".into(),
-                FunctionType::new(type_row![QB_T, float_types::FLOAT64_TYPE], type_row![QB_T]),
+                FuncTypeVarLen::new(type_row![QB_T, float_types::FLOAT64_TYPE], type_row![QB_T]),
             )
             .unwrap();
 
@@ -145,7 +145,7 @@ pub(crate) mod test_quantum_extension {
             .add_op(
                 SmolStr::new_inline("Measure"),
                 "Measure a qubit, returning the qubit and the measurement result.".into(),
-                FunctionType::new(type_row![QB_T], type_row![QB_T, BOOL_T]),
+                FuncTypeVarLen::new(type_row![QB_T], type_row![QB_T, BOOL_T]),
             )
             .unwrap();
 
@@ -153,7 +153,7 @@ pub(crate) mod test_quantum_extension {
             .add_op(
                 SmolStr::new_inline("QAlloc"),
                 "Allocate a new qubit.".into(),
-                FunctionType::new(type_row![], type_row![QB_T]),
+                FuncTypeVarLen::new(type_row![], type_row![QB_T]),
             )
             .unwrap();
 
@@ -161,7 +161,7 @@ pub(crate) mod test_quantum_extension {
             .add_op(
                 SmolStr::new_inline("QDiscard"),
                 "Discard a qubit.".into(),
-                FunctionType::new(type_row![QB_T], type_row![]),
+                FuncTypeVarLen::new(type_row![QB_T], type_row![]),
             )
             .unwrap();
 

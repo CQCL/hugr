@@ -31,7 +31,7 @@
 //! use hugr::extension::prelude::{BOOL_T, QB_T};
 //! use hugr::hugr::Hugr;
 //! use hugr::type_row;
-//! use hugr::types::FunctionType;
+//! use hugr::types::FuncTypeVarLen;
 //!
 //! // The type of qubits, `QB_T` is in the prelude but, by default, no gateset
 //! // is defined. This module provides Hadamard and CX gates.
@@ -45,18 +45,18 @@
 //!         },
 //!         ops::LeafOp,
 //!         type_row,
-//!         types::{FunctionType, PolyFuncType},
+//!         types::{FuncTypeVarLen, PolyFuncType},
 //!         Extension,
 //!     };
 //!
 //!     use lazy_static::lazy_static;
 //!
 //!     fn one_qb_func() -> PolyFuncType {
-//!         FunctionType::new_endo(type_row![QB_T]).into()
+//!         FuncTypeVarLen::new_endo(type_row![QB_T]).into()
 //!     }
 //!
 //!     fn two_qb_func() -> PolyFuncType {
-//!         FunctionType::new_endo(type_row![QB_T, QB_T]).into()
+//!         FuncTypeVarLen::new_endo(type_row![QB_T, QB_T]).into()
 //!     }
 //!     /// The extension identifier.
 //!     pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("mini.quantum");
@@ -75,7 +75,7 @@
 //!             .add_op(
 //!                 SmolStr::new_inline("Measure"),
 //!                 "Measure a qubit, returning the qubit and the measurement result.".into(),
-//!                 FunctionType::new(type_row![QB_T], type_row![QB_T, BOOL_T]),
+//!                 FuncTypeVarLen::new(type_row![QB_T], type_row![QB_T, BOOL_T]),
 //!             )
 //!             .unwrap();
 //!
@@ -117,7 +117,7 @@
 //! //      └───┘└───┘└╥┘
 //! // c:              ╚═
 //! fn make_dfg_hugr() -> Result<Hugr, BuildError> {
-//!     let mut dfg_builder = DFGBuilder::new(FunctionType::new(
+//!     let mut dfg_builder = DFGBuilder::new(FuncTypeVarLen::new(
 //!         type_row![QB_T, QB_T],
 //!         type_row![QB_T, QB_T, BOOL_T],
 //!     ))?;

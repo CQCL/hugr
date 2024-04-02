@@ -156,7 +156,7 @@ fn plus() -> Result<(), InferExtensionError> {
 // because of a missing lift node
 fn missing_lift_node() {
     let mut hugr = Hugr::new(NodeType::new_pure(ops::DFG {
-        signature: FunctionType::new(type_row![NAT], type_row![NAT]).with_extension_delta(A),
+        signature: FuncTypeVarLen::new(type_row![NAT], type_row![NAT]).with_extension_delta(A),
     }));
 
     let input = hugr.add_node_with_parent(
@@ -217,7 +217,7 @@ fn dangling_src() -> Result<(), Box<dyn Error>> {
     let rs = ExtensionSet::singleton(&"R".try_into().unwrap());
 
     let mut hugr = closed_dfg_root_hugr(
-        FunctionType::new(type_row![NAT], type_row![NAT]).with_extension_delta(rs.clone()),
+        FuncTypeVarLen::new(type_row![NAT], type_row![NAT]).with_extension_delta(rs.clone()),
     );
 
     let [input, output] = hugr.get_io(hugr.root()).unwrap();
@@ -961,7 +961,7 @@ fn funcdefn_signature_mismatch() -> Result<(), Box<dyn Error>> {
     let mut builder = ModuleBuilder::new();
     let mut func_builder = builder.define_function(
         "F",
-        FunctionType::new(vec![NAT], vec![NAT])
+        FuncTypeVarLen::new(vec![NAT], vec![NAT])
             .with_extension_delta(A)
             .into(),
     )?;
@@ -996,7 +996,7 @@ fn funcdefn_signature_mismatch2() -> Result<(), Box<dyn Error>> {
     let mut builder = ModuleBuilder::new();
     let func_builder = builder.define_function(
         "F",
-        FunctionType::new(vec![NAT], vec![NAT])
+        FuncTypeVarLen::new(vec![NAT], vec![NAT])
             .with_extension_delta(A)
             .into(),
     )?;

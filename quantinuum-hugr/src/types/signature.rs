@@ -55,7 +55,7 @@ where
 }
 
 /// The type of a function, e.g. passing around a pointer/static ref to it.
-pub type FunctionType = FuncTypeBase<RowVarOrType>;
+pub type FuncTypeVarLen = FuncTypeBase<RowVarOrType>;
 
 impl TypeRowElem for RowVarOrType {
     fn validate(
@@ -110,7 +110,7 @@ where
     T: TypeRowElem,
     [T]: ToOwned<Owned = Vec<T>>,
 {
-    /// Builder method, add extension_reqs to an FunctionType
+    /// Builder method, add extension_reqs to an FuncTypeVarLen
     pub fn with_extension_delta(mut self, rs: impl Into<ExtensionSet>) -> Self {
         self.extension_reqs = self.extension_reqs.union(rs.into());
         self
@@ -284,7 +284,7 @@ impl Signature {
     }
 }
 
-impl From<Signature> for FunctionType {
+impl From<Signature> for FuncTypeVarLen {
     fn from(sig: Signature) -> Self {
         Self {
             input: sig.input.into(),
@@ -294,10 +294,10 @@ impl From<Signature> for FunctionType {
     }
 }
 
-impl TryFrom<FunctionType> for Signature {
+impl TryFrom<FuncTypeVarLen> for Signature {
     type Error = (usize, TypeBound);
 
-    fn try_from(funty: FunctionType) -> Result<Self, Self::Error> {
+    fn try_from(funty: FuncTypeVarLen) -> Result<Self, Self::Error> {
         Ok(Self {
             input: funty.input.try_into()?,
             output: funty.output.try_into()?,

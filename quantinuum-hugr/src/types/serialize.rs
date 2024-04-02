@@ -81,12 +81,12 @@ mod test {
     use crate::hugr::serialize::test::ser_roundtrip;
     use crate::std_extensions::arithmetic::float_types::FLOAT64_TYPE;
     use crate::type_row;
-    use crate::types::FunctionType;
+    use crate::types::FuncTypeVarLen;
     use crate::types::Type;
 
     #[test]
     fn serialize_types_roundtrip() {
-        let g: Type = Type::new_function(FunctionType::default());
+        let g: Type = Type::new_function(FuncTypeVarLen::default());
 
         assert_eq!(ser_roundtrip(&g), g);
 

@@ -9,7 +9,7 @@ use crate::extension::{
 use crate::ops::custom::ExtensionOp;
 use crate::ops::OpName;
 use crate::type_row;
-use crate::types::{FunctionType, PolyFuncType};
+use crate::types::{FuncTypeVarLen, PolyFuncType};
 use crate::utils::collect_array;
 
 use crate::{
@@ -224,7 +224,7 @@ fn int_polytype(
 ) -> PolyFuncType {
     PolyFuncType::new(
         vec![LOG_WIDTH_TYPE_PARAM; n_vars],
-        FunctionType::new(input.into(), output.into()),
+        FuncTypeVarLen::new(input.into(), output.into()),
     )
 }
 

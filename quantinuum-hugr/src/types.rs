@@ -13,7 +13,7 @@ use crate::utils::display_list_with_separator;
 pub use check::SumTypeError;
 pub use custom::CustomType;
 pub use poly_func::{PolyFixedFunc, PolyFuncType};
-pub use signature::{FunctionType, Signature};
+pub use signature::{FuncTypeVarLen, Signature};
 use smol_str::SmolStr;
 pub use type_param::TypeArg;
 pub use type_row::TypeRow;
@@ -238,9 +238,9 @@ impl TypeEnum {
 /// ```
 ///
 /// ```
-/// # use hugr::types::{Type, TypeBound, FunctionType};
+/// # use hugr::types::{Type, TypeBound, FuncTypeVarLen};
 ///
-/// let func_type = Type::new_function(FunctionType::default());
+/// let func_type = Type::new_function(FuncTypeVarLen::default());
 /// assert_eq!(func_type.least_upper_bound(), TypeBound::Copyable);
 ///
 /// ```
@@ -435,7 +435,7 @@ pub(crate) mod test {
     fn construct() {
         let t: Type = Type::new_tuple(vec![
             USIZE_T,
-            Type::new_function(FunctionType::default()),
+            Type::new_function(FuncTypeVarLen::default()),
             Type::new_extension(CustomType::new(
                 "my_custom",
                 [],

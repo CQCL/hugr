@@ -13,7 +13,7 @@ use crate::{
     type_row,
     types::{
         type_param::{TypeArg, TypeParam},
-        FunctionType,
+        FuncTypeVarLen,
     },
     Extension, IncomingPort,
 };
@@ -112,7 +112,7 @@ impl MakeOpDef for NotOp {
     }
 
     fn signature(&self) -> SignatureFunc {
-        FunctionType::new_endo(type_row![BOOL_T]).into()
+        FuncTypeVarLen::new_endo(type_row![BOOL_T]).into()
     }
     fn description(&self) -> String {
         "logical 'not'".into()
@@ -135,7 +135,7 @@ fn logic_op_sig() -> impl SignatureFromArgs {
                 return Err(SignatureError::InvalidTypeArgs);
             };
             let var_arg_row = vec![BOOL_T; n as usize];
-            Ok(FunctionType::new(var_arg_row, vec![BOOL_T]).into())
+            Ok(FuncTypeVarLen::new(var_arg_row, vec![BOOL_T]).into())
         }
 
         fn static_params(&self) -> &[TypeParam] {

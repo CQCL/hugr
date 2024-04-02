@@ -15,7 +15,7 @@ use crate::extension::prelude::PRELUDE_ID;
 use crate::extension::{CustomValidator, ExtensionSet, SignatureFunc, TypeDef, TypeParametrised};
 use crate::types::type_param::TypeParam;
 use crate::types::type_row::TypeRowVarLen;
-use crate::types::{CustomType, FunctionType, PolyFuncType, Type};
+use crate::types::{CustomType, FuncTypeVarLen, PolyFuncType, Type};
 use crate::Extension;
 
 use super::{DeclarationContext, ExtensionDeclarationError};
@@ -51,7 +51,7 @@ impl SignatureDeclaration {
                 Ok(types.into())
             };
 
-        let body = FunctionType {
+        let body = FuncTypeVarLen {
             input: make_type_row(&self.inputs)?,
             output: make_type_row(&self.outputs)?,
             extension_reqs: self.extensions.clone(),
