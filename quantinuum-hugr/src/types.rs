@@ -187,7 +187,7 @@ pub enum TypeEnum {
     Alias(AliasDecl),
     #[allow(missing_docs)]
     #[display(fmt = "Function({})", "_0")]
-    Function(Box<PolyFuncType>),
+    Function(Box<FunctionType>),
     // DeBruijn index, and cache of TypeBound (checked in validation)
     #[allow(missing_docs)]
     #[display(fmt = "Variable({})", _0)]
@@ -261,7 +261,7 @@ impl Type {
     const EMPTY_TYPEROW_REF: &'static TypeRow = &Self::EMPTY_TYPEROW;
 
     /// Initialize a new function type.
-    pub fn new_function(fun_ty: impl Into<PolyFuncType>) -> Self {
+    pub fn new_function(fun_ty: impl Into<FunctionType>) -> Self {
         Self::new(TypeEnum::Function(Box::new(fun_ty.into())))
     }
 
@@ -445,7 +445,7 @@ pub(crate) mod test {
         ]);
         assert_eq!(
             &t.to_string(),
-            "[usize, Function(forall . [[]][]), my_custom, Alias(my_alias)]"
+            "[usize, Function([[]][]), my_custom, Alias(my_alias)]"
         );
     }
 
