@@ -29,7 +29,7 @@ use crate::ops::handle::NodeHandle;
 use crate::ops::{OpParent, OpTag, OpTrait, OpType};
 
 use crate::types::Type;
-use crate::types::{EdgeKind, FunctionType, PolyFixedFunc};
+use crate::types::{EdgeKind, FunctionType, PolyFuncType};
 use crate::{Direction, IncomingPort, Node, OutgoingPort, Port};
 
 use itertools::Either;
@@ -351,12 +351,12 @@ pub trait HugrView: sealed::HugrInternals {
     /// operation, report the signature of the inner dataflow sibling graph.
     ///
     /// Otherwise, returns `None`.
-    fn get_function_type(&self) -> Option<PolyFixedFunc> {
+    fn get_function_type(&self) -> Option<PolyFuncType> {
         let op = self.get_optype(self.root());
         match op {
             OpType::FuncDecl(decl) => Some(decl.signature.clone()),
             OpType::FuncDefn(defn) => Some(defn.signature.clone()),
-            _ => op.inner_function_type().map(PolyFixedFunc::from),
+            _ => op.inner_function_type().map(PolyFuncType::from),
         }
     }
 

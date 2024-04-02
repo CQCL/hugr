@@ -7,7 +7,7 @@ use std::marker::PhantomData;
 use crate::hugr::{HugrView, NodeType, ValidationError};
 use crate::ops;
 
-use crate::types::{FunctionType, PolyFixedFunc};
+use crate::types::{FunctionType, PolyFuncType};
 
 use crate::extension::{ExtensionRegistry, ExtensionSet};
 use crate::Node;
@@ -147,7 +147,7 @@ impl FunctionBuilder<Hugr> {
     /// # Errors
     ///
     /// Error in adding DFG child nodes.
-    pub fn new(name: impl Into<String>, signature: PolyFixedFunc) -> Result<Self, BuildError> {
+    pub fn new(name: impl Into<String>, signature: PolyFuncType) -> Result<Self, BuildError> {
         let body = signature.body().clone();
         let op = ops::FuncDefn {
             signature,

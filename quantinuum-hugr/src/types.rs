@@ -12,7 +12,7 @@ pub use crate::ops::constant::{ConstTypeError, CustomCheckFailure};
 use crate::utils::display_list_with_separator;
 pub use check::SumTypeError;
 pub use custom::CustomType;
-pub use poly_func::{PolyFixedFunc, PolyFuncVarLen};
+pub use poly_func::{PolyFuncType, PolyFuncVarLen};
 pub use signature::{FuncTypeVarLen, FunctionType};
 use smol_str::SmolStr;
 pub use type_param::TypeArg;

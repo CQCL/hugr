@@ -223,7 +223,7 @@ pub(crate) mod test {
 
     use crate::hugr::{views::HugrView, HugrMut, NodeType};
     use crate::ops;
-    use crate::types::{FunctionType, PolyFixedFunc, Type};
+    use crate::types::{FunctionType, PolyFuncType, Type};
     use crate::{type_row, Hugr};
 
     use super::handle::BuildHandle;
@@ -246,7 +246,7 @@ pub(crate) mod test {
     }
 
     pub(super) fn build_main(
-        signature: PolyFixedFunc,
+        signature: PolyFuncType,
         f: impl FnOnce(FunctionBuilder<&mut Hugr>) -> Result<BuildHandle<FuncID<true>>, BuildError>,
     ) -> Result<Hugr, BuildError> {
         let mut module_builder = ModuleBuilder::new();

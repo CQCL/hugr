@@ -8,7 +8,7 @@ use crate::{
     extension::ExtensionRegistry,
     hugr::{hugrmut::sealed::HugrMutInternals, views::HugrView, ValidationError},
     ops,
-    types::{PolyFixedFunc, Type, TypeBound},
+    types::{PolyFuncType, Type, TypeBound},
 };
 
 use crate::ops::handle::{AliasID, FuncID, NodeHandle};
@@ -105,7 +105,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
     pub fn declare(
         &mut self,
         name: impl Into<String>,
-        signature: PolyFixedFunc,
+        signature: PolyFuncType,
     ) -> Result<FuncID<false>, BuildError> {
         // TODO add param names to metadata
         let declare_n = self.add_child_node(NodeType::new_pure(ops::FuncDecl {

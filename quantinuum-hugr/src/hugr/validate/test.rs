@@ -17,7 +17,7 @@ use crate::std_extensions::logic::{self, NotOp};
 use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
 use crate::types::type_row::RowVarOrType;
 use crate::types::{
-    CustomType, FuncTypeVarLen, FunctionType, PolyFixedFunc, Type, TypeBound, TypeRow,
+    CustomType, FuncTypeVarLen, FunctionType, PolyFuncType, Type, TypeBound, TypeRow,
 };
 use crate::{type_row, Direction, IncomingPort, Node};
 
@@ -435,7 +435,7 @@ fn typevars_declared() -> Result<(), Box<dyn std::error::Error>> {
     // Base case
     let f = FunctionBuilder::new(
         "myfunc",
-        PolyFixedFunc::new(
+        PolyFuncType::new(
             [TypeBound::Any.into()],
             FunctionType::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
         ),
@@ -445,7 +445,7 @@ fn typevars_declared() -> Result<(), Box<dyn std::error::Error>> {
     // Type refers to undeclared variable
     let f = FunctionBuilder::new(
         "myfunc",
-        PolyFixedFunc::new(
+        PolyFuncType::new(
             [TypeBound::Any.into()],
             FunctionType::new_endo(vec![Type::new_var_use(1, TypeBound::Any)]),
         ),
@@ -455,7 +455,7 @@ fn typevars_declared() -> Result<(), Box<dyn std::error::Error>> {
     // Variable declaration incorrectly copied to use site
     let f = FunctionBuilder::new(
         "myfunc",
-        PolyFixedFunc::new(
+        PolyFuncType::new(
             [TypeBound::Any.into()],
             FunctionType::new_endo(vec![Type::new_var_use(1, TypeBound::Copyable)]),
         ),
@@ -473,14 +473,14 @@ fn nested_typevars() -> Result<(), Box<dyn std::error::Error>> {
     fn build(t: Type) -> Result<Hugr, BuildError> {
         let mut outer = FunctionBuilder::new(
             "outer",
-            PolyFixedFunc::new(
+            PolyFuncType::new(
                 [OUTER_BOUND.into()],
                 FunctionType::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
             ),
         )?;
         let inner = outer.define_function(
             "inner",
-            PolyFixedFunc::new([INNER_BOUND.into()], FunctionType::new_endo(vec![t])),
+            PolyFuncType::new([INNER_BOUND.into()], FunctionType::new_endo(vec![t])),
         )?;
         let [w] = inner.input_wires_arr();
         inner.finish_with_outputs([w])?;
@@ -519,7 +519,7 @@ fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
     let reg = ExtensionRegistry::try_new([collections::EXTENSION.to_owned()]).unwrap();
     let mut def = FunctionBuilder::new(
         "myfunc",
-        PolyFixedFunc::new(
+        PolyFuncType::new(
             [BOUND],
             FunctionType::new(type_row![], vec![list_of_var.clone()])
                 .with_extension_delta(collections::EXTENSION_NAME),
@@ -550,7 +550,7 @@ fn inner_row_variables() -> Result<(), Box<dyn std::error::Error>> {
     let inner_ft = Type::new_function(FuncTypeVarLen::new_endo(vec![tv]));
     let mut fb = FunctionBuilder::new(
         "id",
-        PolyFixedFunc::new(
+        PolyFuncType::new(
             [TypeParam::List {
                 param: Box::new(TypeParam::Type { b: TypeBound::Any }),
             }],
@@ -569,7 +569,7 @@ fn no_outer_row_variables() -> Result<(), Box<dyn std::error::Error>> {
     let tv = Type::new_var_use(0, TypeBound::Any);
     let fb = FunctionBuilder::new(
         "impossible_id_of_unknown_arity",
-        PolyFixedFunc::new(
+        PolyFuncType::new(
             [TypeParam::List {
                 param: Box::new(TypeParam::Type { b: TypeBound::Any }),
             }],
@@ -596,7 +596,7 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
     let mut m = ModuleBuilder::new();
     let id = m.declare(
         "id",
-        PolyFixedFunc::new(
+        PolyFuncType::new(
             vec![TypeBound::Any.into()],
             FunctionType::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
         ),

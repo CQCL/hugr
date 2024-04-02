@@ -46,7 +46,9 @@ where
 /// Type of a function polymorphic over some variables,
 /// which may include row variables.
 pub type PolyFuncVarLen = PolyFuncBase<RowVarOrType>;
-pub type PolyFixedFunc = PolyFuncBase<Type>;
+
+/// Type of a function polymorphic only over types; i.e. fixed arity.
+pub type PolyFuncType = PolyFuncBase<Type>;
 
 impl<T: TypeRowElem> From<FuncTypeBase<T>> for PolyFuncBase<T>
 where
@@ -60,8 +62,8 @@ where
     }
 }
 
-impl From<PolyFixedFunc> for PolyFuncVarLen {
-    fn from(value: PolyFixedFunc) -> Self {
+impl From<PolyFuncType> for PolyFuncVarLen {
+    fn from(value: PolyFuncType) -> Self {
         Self {
             params: value.params,
             body: value.body.into(),
