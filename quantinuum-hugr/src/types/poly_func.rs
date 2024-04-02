@@ -97,20 +97,6 @@ impl PolyFuncType {
         self.body.validate(reg, all_var_decls)
     }
 
-    pub(super) fn substitute(&self, t: &impl Substitution) -> Self {
-        if self.params.is_empty() {
-            // Avoid using complex code for simple Monomorphic case
-            return self.body.substitute(t).into();
-        }
-        PolyFuncType {
-            params: self.params.clone(),
-            body: self.body.substitute(&InsideBinders {
-                num_binders: self.params.len(),
-                underlying: t,
-            }),
-        }
-    }
-
     /// Instantiates an outer [PolyFuncType], i.e. with no free variables
     /// (as ensured by [Self::validate]), into a monomorphic type.
     ///
