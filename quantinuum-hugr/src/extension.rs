@@ -162,10 +162,10 @@ pub enum SignatureError {
     /// A type variable that was used has not been declared
     #[error("Type variable {idx} was not declared ({num_decls} in scope)")]
     FreeTypeVar { idx: usize, num_decls: usize },
-    /// The type stored in a [LeafOp::TypeApply] is not what we compute from the
-    /// [ExtensionRegistry].
+    /// The result of the type application stored in a [Call]
+    /// is not what we get by applying the type-args to the polymorphic function
     ///
-    /// [LeafOp::TypeApply]: crate::ops::LeafOp::TypeApply
+    /// [Call]: crate::ops::dataflow::Call
     #[error(
         "Incorrect result of type application in Call - cached {cached} but expected {expected}"
     )]
