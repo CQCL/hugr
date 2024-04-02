@@ -151,38 +151,6 @@ impl<'a> Substitution for Renumber<'a> {
     }
 }
 
-/// Given a [Substitution] defined outside a binder (i.e. [PolyFuncType]),
-/// applies that transformer to types inside the binder (i.e. arguments/results of said function)
-struct InsideBinders<'a> {
-    /// The number of binders we have entered since (beneath where) we started to apply
-    /// [Self::underlying]).
-    /// That is, the lowest `num_binders` variable indices refer to locals bound since then.
-    num_binders: usize,
-    /// Substitution that was being applied outside those binders (i.e. in outer scope)
-    underlying: &'a dyn Substitution,
-}
-
-impl<'a> Substitution for InsideBinders<'a> {
-    fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg {
-        // Convert variable index into outer scope
-        match idx.checked_sub(self.num_binders) {
-            None => TypeArg::new_var_use(idx, decl.clone()), // Bound locally, unknown to `underlying`
-            Some(idx_in_outer_scope) => {
-                let result_in_outer_scope = self.underlying.apply_var(idx_in_outer_scope, decl);
-                // Transform returned value into the current scope, i.e. avoid the variables newly bound
-                result_in_outer_scope.substitute(&Renumber {
-                    offset: self.num_binders,
-                    exts: self.extension_registry(),
-                })
-            }
-        }
-    }
-
-    fn extension_registry(&self) -> &ExtensionRegistry {
-        self.underlying.extension_registry()
-    }
-}
-
 #[cfg(test)]
 pub(crate) mod test {
     use std::num::NonZeroU64;
