@@ -1,11 +1,23 @@
 [tool.poetry]
+classifiers = [
+    "Environment :: Console",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: Microsoft :: Windows",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering",
+]
 name = "quantinuum_hugr"
-version = "0.0.0"
+version = "0.1.0a1"
 description = "Quantinuum's common representation for quantum programs"
-classifiers = []                                                        # TODO
-keywords = []                                                           # TODO
-authors = []                                                            # TODO
-maintainers = []                                                        # TODO
+#keywords = []
+authors = ["TKET development team <tket-support@cambridgequantum.com>"]
+maintainers = ["TKET development team <tket-support@cambridgequantum.com>"]
 license = "Apache-2.0"
 readme = "README.md"
 homepage = "https://github.com/CQCL/hugr"

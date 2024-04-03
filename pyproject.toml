@@ -2,10 +2,9 @@
 description = "Namespace for the python packages in the HUGR repository. See the individual packages for more information."
 name = "hugr-project"
 version = "0.0.0"
-authors = []
+authors = ["TKET development team <tket-support@cambridgequantum.com>"]
 readme = "README.md"
-packages = []
-
+packages = [{ include = "quantunuum_hugr", from = "quantunuum-hugr-py" }]
 package-mode = false
 
 [tool.poetry.group.main.dependencies]

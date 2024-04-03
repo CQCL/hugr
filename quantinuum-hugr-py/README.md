@@ -22,14 +22,12 @@ The HUGR specification is [here](https://github.com/CQCL/hugr/blob/main/specific
 
 ## Installation
 
-TODO
-
-The package name is `quantinuum_hugr`, but it hasn't been published yet.
-The current experimental version can be installed from the source code:
-
+The package name is `quantinuum_hugr`, it can be installed from PyPI:
 ```bash
-pip install "quantinuum_hugr@git+https://github.com/CQCL/hugr.git@main#subdirectory=quantinuum-hugr-py"
+pip install quantinuum_hugr"
 ```
+
+The current releases are in alpha stage, and the API is subject to change.
 
 ## Usage
 
