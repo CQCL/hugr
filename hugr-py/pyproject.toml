@@ -12,7 +12,7 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering",
 ]
-name = "quantinuum_hugr"
+name = "hugr"
 version = "0.1.0a1"
 description = "Quantinuum's common representation for quantum programs"
 #keywords = []

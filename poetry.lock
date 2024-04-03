@@ -521,7 +521,7 @@ pydantic = "^2.6.4"
 
 [package.source]
 type = "directory"
-url = "quantinuum-hugr-py"
+url = "hugr-py"
 
 [[package]]
 name = "ruff"

@@ -14,7 +14,7 @@ coverage:
 
 # Ignore tests and binaries
 ignore:
-  - "quantinuum-hugr-py/tests"
+  - "hugr-py/tests"
   - "scripts"
 
 # Coverage groups config
