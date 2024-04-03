@@ -1,5 +1,5 @@
 ---
-source: quantinuum-hugr/src/hugr/views/tests.rs
+source: hugr/views/tests.rs
 expression: h.dot_string()
 ---
 digraph {

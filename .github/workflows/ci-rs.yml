@@ -39,7 +39,7 @@ jobs:
       with:
         filters: |
           rust:
-            - 'quantinuum-hugr/**'
+            - 'hugr/**'
             - 'Cargo.toml'
             - 'specification/schema/**'
 

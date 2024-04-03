@@ -4,7 +4,7 @@ changelog_config = "cliff.toml" # use a custom git-cliff configuration
 changelog_update = false
 
 [[package]]
-name = "quantinuum-hugr"
+name = "hugr"
 # enable the changelog for this package
 changelog_update = true
 # set the path of the changelog to the root of the repository
