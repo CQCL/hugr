@@ -33,7 +33,7 @@ jobs:
       with:
         filters: |
           python:
-            - 'quantinuum-hugr-py/**'
+            - 'hugr-py/**'
             - 'pyproject.toml'
             - 'specification/schema/**'
 

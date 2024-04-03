@@ -4,7 +4,7 @@ name = "hugr-project"
 version = "0.0.0"
 authors = ["TKET development team <tket-support@cambridgequantum.com>"]
 readme = "README.md"
-packages = [{ include = "quantinuum_hugr", from = "quantinuum-hugr-py" }]
+packages = [{ include = "hugr", from = "hugr-py" }]
 package-mode = false
 
 [tool.poetry.group.main.dependencies]
@@ -17,8 +17,8 @@ pytest-cov = "^4.1.0"
 mypy = "^1.9.0"
 ruff = "^0.3.3"
 
-[tool.poetry.group.quantinuum-hugr.dependencies]
-quantinuum-hugr = { path = "quantinuum-hugr-py", develop = true }
+[tool.poetry.group.hugr.dependencies]
+hugr = { path = "hugr-py", develop = true }
 
 [build-system]
 requires = ["poetry-core"]
