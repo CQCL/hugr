@@ -124,7 +124,9 @@ carry an edge weight:
 - `Value` edges carry typed data at runtime. They have a *port* at each end, associated
   with the source and target nodes. They have an `AnyType`as an edge weight.
 - `Static` edges are similar to `Value` edges but carry static data (knowable at
-  compilation time). They have a `CopyableType` as an edge weight.
+  compilation time). These come in two subkinds with different edge weights:
+   - `Static<Value>` edges have as edge weight a `CopyableType`
+   - `Static<Function>` carry a polymorphic function type.
 - `ControlFlow` edges represent possible flows of control from one part of the
   program to another. They have no edge weight.
 - `Hierarchy` edges express the relationship between container nodes and their
@@ -134,7 +136,7 @@ carry an edge weight:
 A `Value` edge can carry data of any `AnyType`: these include the `CopyableType`s
 (which can be freely copied or discarded - i.e. ordinary classical data)
 as well as anything which cannot - e.g. quantum data.
-A `Static` edge can only carry a `CopyableType`. For
+A `Static<Value>` edge can only carry a `CopyableType`. For
 more details see the [Type System](#type-system) section.
 
 As well as the type, dataflow edges are also parametrized by a
@@ -144,7 +146,8 @@ As well as the type, dataflow edges are also parametrized by a
 ```haskell
 AnyType ⊃ CopyableType
 
-EdgeKind ::= Hierarchy | Value(Locality, AnyType) | Static(Local | Ext, CopyableType) | Order | ControlFlow
+EdgeKind ::= Value(Locality, AnyType) | Static(Local | Ext, CopyableType | PolyFuncType)
+             | Hierarchy | Order | ControlFlow
 ```
 
 Note that a port is associated with a node and zero or more dataflow edges.
@@ -194,7 +197,7 @@ source node, to an incoming port of the target node.
 
 A `Static` edge represents dataflow that is statically knowable - i.e.
 the source is a compile-time constant defined in the program. Hence, the types on these edges
-are classical, and do not include an extension specification. Only a few nodes may be
+are classical. Only a few nodes may be
 sources (`FuncDefn`, `FuncDecl` and `Const`) and targets (`Call` and `LoadConstant`) of
 these edges; see [operations](#node-operations).
 
@@ -247,7 +250,7 @@ The following operations are valid at the module level as well as in dataflow
 regions and control-flow regions:
 
 - `Const<T>` : a static constant value of type T stored in the node
-  weight. Like `FuncDecl` and `FuncDefn` this has one `Static<T>` out-edge per use.
+  weight. Like `FuncDecl` and `FuncDefn` this has one `Static<Value>` out-edge per use.
 - `FuncDefn` : a function definition. Like `FuncDecl` but with a function body.
   The function body is defined by the sibling graph formed by its children.
   At link time `FuncDecl` nodes are replaced by `FuncDefn`.
@@ -276,11 +279,6 @@ the following basic dataflow operations are available (in addition to the
   node specifies any type arguments to the function in the node weight,
   and the signature of the node (defined by its incoming and outgoing `Value` edges)
   matches the (type-instantiated) function being called.
-- `TypeApply`: has a `Value<Function>` input, whose type is polymorphic (i.e. declares some type parameters);
-  the node specifies some number of type arguments (matching those parameters) in the node weight;
-  and there is  a `Value<Function>` output (corresponding to the type instantiation of the input
-  - for a *partial* type application, i.e. with fewer arguments than declared type parameters,
-  the output type will also be polymorphic).
 - `LoadConstant<T>`: has an incoming `Static<T>` edge, where `T` is a `CopyableType`, and a
   `Value<T>` output, used to load a static constant into the local
   dataflow graph.
@@ -777,7 +775,7 @@ There are three classes of type: `AnyType` $\supset$ `CopyableType` $\supset$ `E
 - The next class is `CopyableType`, i.e. types holding ordinary classical
   data, where values can be copied (and discarded, the 0-ary copy). This
   allows multiple (or 0) outgoing edges from an outport; also these types can
-  be sent down `Static` edges. Note: dataflow inputs (`Value` and `Static`) always
+  be sent down `Static<Value>` edges. Note: dataflow inputs (`Value` and `Static`) always
   require a single connection.
 
 - The final class is `EqType`: these are copyable types with a well-defined
@@ -796,8 +794,7 @@ Extensions ::= (Extension)* -- a set, not a list
 
 Type ::= Sum([#]) -- disjoint union of rows of other types, tagged by unsigned int
        | Opaque(Name, [TypeArg]) -- a (instantiation of a) custom type defined by an extension
-       | Function(TypeParams, #, #, Extensions) -- polymorphic with type parameters,
-                                                -- function arguments + results, and delta (see below)
+       | Function(#, #, Extensions) -- monomorphic function: arguments, results, and delta (see below)
        | Variable -- refers to a TypeParam bound by the nearest enclosing FuncDefn node, or an enclosing Function Type
 ```
 
@@ -813,7 +810,8 @@ Sums are `CopyableType` (respectively, `EqType`) if all their components are; th
 
 ### Polymorphism
 
-`Function` types are polymorphic: they may declare a number of type parameters of kinds as follows:
+While function *values* passed at runtime around the graph are monomorphic, `FuncDecl` and `FuncDefn` declare functions
+with *polymorphic* types---that is, such declarations may include (bind) any number of type parameters, of kinds as follows:
 
 ```haskell
 TypeParam ::= Type(Any|Copyable|Eq)
@@ -823,34 +821,36 @@ TypeParam ::= Type(Any|Copyable|Eq)
             | Tuple([TypeParam]) -- heterogenous, fixed size
             | Opaque(Name, [TypeArg]) -- e.g. Opaque("Array", [5, Opaque("usize", [])])
 ```
+The same mechanism is also used for polymorphic OpDefs, see [Extension Implementation](#extension-implementation).
 
-For each such TypeParam, the body of the FunctionType (input, output, and extensions - see [Extension Tracking](#extension-tracking))
-may contain "type variables" referring to that TypeParam, i.e. the binder. (The type variable is typically a type, but
-not necessarily, depending upon the TypeParam.)
+Within the body of such a FuncDefn, types may contain "type variables" referring to those TypeParams. The
+ type variable is typically a type, but not necessarily, depending upon the TypeParam.)
 
-When a `FuncDefn` or `FuncDecl` with such a `Function` type is `Call`ed, the `Call` node statically provides
-TypeArgs appropriate for the TypeParams (and similarly for `TypeApply` nodes):
+When a `FuncDefn` or `FuncDecl` is `Call`ed, the `Call` node statically provides
+TypeArgs appropriate for the function's TypeParams:
 
 ```haskell
 TypeArg ::= Type(Type)
           | BoundedUSize(u64)
           | Extensions(Extensions)
-          | Sequence([TypeArg])
+          | Sequence([TypeArg]) -- fits either a List or Tuple TypeParam
           | Opaque(Value)
-          | Variable -- refers to an enclosing TypeParam (binder)
+          | Variable -- refers to an enclosing TypeParam (binder) of non-Type kind
 ```
 
+Note that both TypeArgs of kind both Type and Extensions may also include variables.
+
 A `Sequence` argument is appropriate for a parameter of kind either `List` or `Tuple`.
-For example, a Function declaring a `TypeParam::Opaque("Array", [5, TypeArg::Type(Type::Opaque("usize"))])`
+For example, a Function node declaring a `TypeParam::Opaque("Array", [5, TypeArg::Type(Type::Opaque("usize"))])`
 means that any `Call` to it must statically provide a *value* that is an array of 5 `usize`s;
-or a Function declaring a `TypeParam::BoundedUSize(5)` and a `TypeParam::Type(Any)` requires two TypeArgs,
+or a Function node declaring a `TypeParam::BoundedUSize(5)` and a `TypeParam::Type(Any)` requires two TypeArgs,
 firstly a non-negative integer less than 5, secondly a type (which might be from an extension, e.g. `usize`).
 
-Given TypeArgs, the body of the `Function` type can be converted to a monomorphic signature by substitution,
+Given TypeArgs, the body of the Function node's type can be converted to a monomorphic signature by substitution,
 i.e. replacing each type variable in the body with the corresponding TypeArg. This is guaranteed to produce
 a valid type as long as the TypeArgs match the declared TypeParams, which can be checked in advance.
 
-(Note that when within a `Function` type, type variables of kind `List`, `Tuple` or `Opaque` will only be usable
+(Note that when within a polymorphic function type, type variables of kind `Sequence` or `Opaque` will only be usable
 as arguments to Opaque types---see [Extension System](#extension-system).)
 
 ### Extension Tracking
@@ -998,18 +998,19 @@ at runtime. In many cases this is desirable.
 To strike a balance then, every extension provides declarative structs containing
 named **TypeDef**s and **OpDef**s---see [Declarative Format](#declarative-format).
 These are (potentially polymorphic) definitions of types and operations, respectively---polymorphism arises because both may
-declare any number of TypeParams (as per [Type System](#type-system)). To use a TypeDef as a type,
+declare any number of TypeParams, as per [Polymorphism](#polymorphism). To use a TypeDef as a type,
 it must be instantiated with TypeArgs appropriate for its TypeParams, and similarly
 to use an OpDef as a node operation: each `OpaqueOp` node stores a static-constant list of TypeArgs.
 
 For TypeDef's, any set of TypeArgs conforming to its TypeParams, produces a valid type.
 However, for OpDef's, greater flexibility is allowed: each OpDef *either*
 
-1. Provides a `Function` type, as per [Type System](#type-system), which may declare TypeParams; *or*
+1. Provides a polymorphic Function type, as per [Type System](#type-system), which may declare TypeParams;
+   values (TypeArgs) provided for those params will be substituted in. *Or*
 2. The extension may self-register binary code (e.g. a Rust trait) providing a function
-   `compute_signature` that fallibly computes a `Function` type given some type arguments.
+   `compute_signature` that fallibly computes a (perhaps-polymorphic) Function type given some type arguments.
    The operation declares the arguments required by the `compute_signature` function as a list
-   of TypeParams; if this successfully returns a `Function` type, then that may then require
+   of TypeParams; if this successfully returns, it may produce a Function type with
    additional TypeParams.
 
 For example, the TypeDef for `array` in the prelude declares two TypeParams: a `BoundedUSize`
@@ -1830,12 +1831,12 @@ Conversions between integers and floats:
   function exists but without giving a definition. May be the source
   of Static-edges to Call nodes and others.
 - **FuncDefn node**: child of a module node, defines a function (by being
-  parent to the function's body). May be the source of Static-edges to
-  Call nodes and others.
+  parent to the function's body). May be the source of `Static<Function>`-edges
+  to Call nodes.
 - **DFG node**: A node representing a data-flow graph. Its children
   are all data-dependency nodes.
-- **edge kind**: There are five kinds of edge: value edge, order edge,
-  control-flow edge, Static edge, and hierarchy edge.
+- **edge kind**: There are five kinds of edge: value edge, order edge, hierarchy edge,
+  control-flow edge, and Static edge (with two subkinds: value and function).
 - **edge type:** Typing information attached to a value edge or Static
   edge (representing the data type of value that the edge carries).
 - **entry node**: The distinguished node of a CFG representing the
