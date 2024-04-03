@@ -5,7 +5,7 @@ use portgraph::render::{EdgeStyle, NodeStyle, PortStyle};
 use portgraph::{LinkView, NodeIndex, PortIndex, PortView};
 
 use crate::ops::OpName;
-use crate::types::EdgeKind;
+use crate::types::{EdgeKind, StaticEdgeData};
 use crate::HugrView;
 
 /// Configuration for rendering a HUGR graph.
@@ -97,22 +97,30 @@ pub(super) fn edge_style<H: HugrView + ?Sized>(
         let style = match port_kind {
             EdgeKind::StateOrder => EdgeStyle::Dotted,
             EdgeKind::ControlFlow => EdgeStyle::Dashed,
-            EdgeKind::Static(_) | EdgeKind::Value(_) | EdgeKind::Function(_) => EdgeStyle::Solid,
+            EdgeKind::Static(_) | EdgeKind::Value(_) => EdgeStyle::Solid,
         };
 
         // Compute the label for the edge, given the setting flags.
+        fn type_label(e: EdgeKind) -> Option<String> {
+            match e {
+                EdgeKind::Static(StaticEdgeData::Value(ty)) | EdgeKind::Value(ty) => {
+                    Some(format!("{}", ty))
+                }
+                EdgeKind::Static(StaticEdgeData::Function(pf)) => Some(format!("{}", pf)),
+                _ => None,
+            }
+        }
         //
         // Only static and value edges have types to display.
         let label = match (
             config.port_offsets_in_edges,
-            config.type_labels_in_edges,
-            port_kind,
+            type_label(port_kind).filter(|_| config.type_labels_in_edges),
         ) {
-            (true, true, EdgeKind::Static(ty) | EdgeKind::Value(ty)) => {
+            (true, Some(ty)) => {
                 format!("{}:{}\n{ty}", src_offset.index(), tgt_offset.index())
             }
-            (true, _, _) => format!("{}:{}", src_offset.index(), tgt_offset.index()),
-            (false, true, EdgeKind::Static(ty) | EdgeKind::Value(ty)) => format!("{}", ty),
+            (true, _) => format!("{}:{}", src_offset.index(), tgt_offset.index()),
+            (false, Some(ty)) => ty.to_string(),
             _ => return style,
         };
         style.with_label(label)

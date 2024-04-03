@@ -4,7 +4,7 @@ use super::{impl_op_name, OpTag, OpTrait};
 
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 use crate::ops::StaticTag;
-use crate::types::{EdgeKind, FunctionType, PolyFuncType, Type, TypeArg, TypeRow};
+use crate::types::{EdgeKind, FunctionType, PolyFuncType, StaticEdgeData, Type, TypeArg, TypeRow};
 use crate::IncomingPort;
 
 pub(crate) trait DataflowOpTrait {
@@ -171,7 +171,9 @@ impl DataflowOpTrait for Call {
     }
 
     fn static_input(&self) -> Option<EdgeKind> {
-        Some(EdgeKind::Function(self.called_function_type().clone()))
+        Some(EdgeKind::Static(StaticEdgeData::Function(
+            self.called_function_type().clone(),
+        )))
     }
 }
 impl Call {
@@ -285,7 +287,9 @@ impl DataflowOpTrait for LoadConstant {
     }
 
     fn static_input(&self) -> Option<EdgeKind> {
-        Some(EdgeKind::Static(self.constant_type().clone()))
+        Some(EdgeKind::Static(StaticEdgeData::Value(
+            self.constant_type().clone(),
+        )))
     }
 }
 impl LoadConstant {
