@@ -54,6 +54,5 @@ jobs:
         if: ${{ github.event_name == 'push' && github.ref_type == 'tag' && startsWith(github.ref, format('refs/tags/{0}-v', matrix.package)) }}
         run: |
           cd ${{ matrix.package }}
-          poetry config repositories.test-pypi https://test.pypi.org/legacy/
-          poetry config pypi-token.test-pypi ${{ secrets.PYPI_PUBLISH }}
-          poetry publish -r test-pypi --dist-dir ../dist --skip-existing
+          poetry config pypi-token.pypi ${{ secrets.PYPI_PUBLISH }}
+          poetry publish --dist-dir ../dist --skip-existing
