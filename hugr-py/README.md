@@ -48,4 +48,4 @@ This project is licensed under Apache License, Version 2.0 ([LICENSE][] or http:
   [build_status]: https://github.com/CQCL/hugr/actions/workflows/ci-py.yml/badge.svg?branch=main
   [codecov]: https://img.shields.io/codecov/c/gh/CQCL/hugr?logo=codecov
   [LICENSE]: https://github.com/CQCL/hugr/blob/main/LICENCE
-  [CHANGELOG]: https://github.com/CQCL/hugr/blob/main/quantinuum-hugr-py/CHANGELOG.md
+  [CHANGELOG]: https://github.com/CQCL/hugr/blob/main/hugr-py/CHANGELOG.md

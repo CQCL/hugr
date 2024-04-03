@@ -17,8 +17,8 @@ pytest-cov = "^4.1.0"
 mypy = "^1.9.0"
 ruff = "^0.3.3"
 
-[tool.poetry.group.quantinuum-hugr.dependencies]
-quantinuum-hugr = { path = "hugr-py", develop = true }
+[tool.poetry.group.hugr.dependencies]
+hugr = { path = "hugr-py", develop = true }
 
 [build-system]
 requires = ["poetry-core"]
