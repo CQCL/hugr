@@ -1,5 +1,5 @@
 [package]
-name = "quantinuum-hugr"
+name = "hugr"
 version = "0.2.0"
 edition = { workspace = true }
 rust-version = { workspace = true }
