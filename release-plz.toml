@@ -1,11 +1,19 @@
 [workspace]
-changelog_config = "cliff.toml" # use a custom git-cliff configuration
-# disable the changelog for all packages
+# Open the release PR as a draft
+pr_draft = true
+
+# Use a custom git-cliff configuration
+changelog_config = "cliff.toml"
+
+# Disable the changelog generation by default
 changelog_update = false
+
+# Enforce adding the project name in the git tag, to avoid collisions with python.
+# (This would normally only be enabled once there are multiple packages in the workspace)
+git_tag_name = "{{ package }}-v{{ version }}"
 
 [[package]]
 name = "hugr"
-# enable the changelog for this package
+
+# Enable the changelog for this package
 changelog_update = true
-# set the path of the changelog to the root of the repository
-changelog_path = "./CHANGELOG.md"
