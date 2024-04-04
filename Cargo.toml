@@ -9,8 +9,8 @@ default-members = ["hugr"]
 [workspace.package]
 rust-version = "1.75"
 edition = "2021"
-homepage = "https://github.com/CQCL/tket2"
-repository = "https://github.com/CQCL/tket2"
+homepage = "https://github.com/CQCL/hugr"
+repository = "https://github.com/CQCL/hugr"
 license = "Apache-2.0"
 # authors
 
