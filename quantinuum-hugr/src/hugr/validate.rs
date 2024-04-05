@@ -418,22 +418,17 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
             .expect("Root nodes cannot have ports");
         let to_parent = self.hugr.get_parent(to);
         let local = Some(from_parent) == to_parent;
-
-        let is_static = match from_optype.port_kind(from_offset).unwrap() {
-            EdgeKind::Static(_) => true,
-            ty => {
-                if !local && !matches!(&ty, EdgeKind::Value(t) if t.copyable()) {
-                    return Err(InterGraphEdgeError::NonCopyableData {
-                        from,
-                        from_offset,
-                        to,
-                        to_offset,
-                        ty,
-                    }
-                    .into());
-                }
-                false
+        let edge_kind = from_optype.port_kind(from_offset).unwrap();
+        let is_static = matches!(edge_kind, EdgeKind::Static(_));
+        if !is_static && !local && !matches!(&edge_kind, EdgeKind::Value(t) if t.copyable()) {
+            return Err(InterGraphEdgeError::NonCopyableData {
+                from,
+                from_offset,
+                to,
+                to_offset,
+                ty: edge_kind,
             }
+            .into());
         };
         if local {
             return Ok(());
