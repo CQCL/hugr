@@ -412,7 +412,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         from_optype: &OpType,
         to: Node,
         to_offset: Port,
-    ) -> Result<(), ValidationError> {
+    ) -> Result<(), InterGraphEdgeError> {
         let from_parent = self
             .hugr
             .get_parent(from)
@@ -430,8 +430,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
                 to,
                 to_offset,
                 ty: edge_kind,
-            }
-            .into());
+            });
         };
 
         // To detect either external or dominator edges, we traverse the ancestors
@@ -474,8 +473,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
                         to,
                         to_offset,
                         ancestor_parent_op: ancestor_parent_op.clone(),
-                    }
-                    .into());
+                    });
                 }
 
                 // Check domination
@@ -498,8 +496,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
                         to_offset,
                         from_parent,
                         ancestor,
-                    }
-                    .into());
+                    });
                 }
 
                 return Ok(());
@@ -511,8 +508,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
             from_offset,
             to,
             to_offset,
-        }
-        .into())
+        })
     }
 
     /// Validates that TypeArgs are valid wrt the [ExtensionRegistry] and that nodes
