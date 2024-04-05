@@ -814,8 +814,9 @@ Sums are `CopyableType` (respectively, `EqType`) if all their components are; th
 
 ### Polymorphism
 
-While function *values* passed at runtime around the graph are monomorphic, `FuncDecl` and `FuncDefn` declare functions
-with *polymorphic* types---that is, such declarations may include (bind) any number of type parameters, of kinds as follows:
+While function *values* passed around the graph at runtime have types that are monomorphic,
+`FuncDecl` and `FuncDefn` nodes have not types but *type schemes* that are *polymorphic*---that is,
+such declarations may include (bind) any number of type parameters, of kinds as follows:
 
 ```haskell
 TypeParam ::= Type(Any|Copyable|Eq)
@@ -825,26 +826,25 @@ TypeParam ::= Type(Any|Copyable|Eq)
             | Tuple([TypeParam]) -- heterogenous, fixed size
             | Opaque(Name, [TypeArg]) -- e.g. Opaque("Array", [5, Opaque("usize", [])])
 ```
+
 The same mechanism is also used for polymorphic OpDefs, see [Extension Implementation](#extension-implementation).
 
-Within the body of such a FuncDefn, types may contain "type variables" referring to those TypeParams. The
- type variable is typically a type, but not necessarily, depending upon the TypeParam.)
+Within the type of the Function node, and within the body (Hugr) of a `FuncDefn`,
+types may contain "type variables" referring to those TypeParams.
+The type variable is typically a type, but not necessarily, depending upon the TypeParam.
 
 When a `FuncDefn` or `FuncDecl` is `Call`ed, the `Call` node statically provides
 TypeArgs appropriate for the function's TypeParams:
 
 ```haskell
-TypeArg ::= Type(Type)
+TypeArg ::= Type(Type) -- could be a variable of kind Type, or contain variable(s)
+          | Extensions(Extensions) -- may contain TypeArg's of kind Extensions
+          | Variable -- refers to an enclosing TypeParam (binder) of any kind below
           | BoundedUSize(u64)
-          | Extensions(Extensions)
           | Sequence([TypeArg]) -- fits either a List or Tuple TypeParam
           | Opaque(Value)
-          | Variable -- refers to an enclosing TypeParam (binder) of non-Type kind
 ```
 
-Note that both TypeArgs of kind both Type and Extensions may also include variables.
-
-A `Sequence` argument is appropriate for a parameter of kind either `List` or `Tuple`.
 For example, a Function node declaring a `TypeParam::Opaque("Array", [5, TypeArg::Type(Type::Opaque("usize"))])`
 means that any `Call` to it must statically provide a *value* that is an array of 5 `usize`s;
 or a Function node declaring a `TypeParam::BoundedUSize(5)` and a `TypeParam::Type(Any)` requires two TypeArgs,
@@ -854,7 +854,7 @@ Given TypeArgs, the body of the Function node's type can be converted to a monom
 i.e. replacing each type variable in the body with the corresponding TypeArg. This is guaranteed to produce
 a valid type as long as the TypeArgs match the declared TypeParams, which can be checked in advance.
 
-(Note that when within a polymorphic function type, type variables of kind `Sequence` or `Opaque` will only be usable
+(Note that within a polymorphic type scheme, type variables of kind `Sequence` or `Opaque` will only be usable
 as arguments to Opaque types---see [Extension System](#extension-system).)
 
 ### Extension Tracking
@@ -1009,13 +1009,13 @@ to use an OpDef as a node operation: each `OpaqueOp` node stores a static-consta
 For TypeDef's, any set of TypeArgs conforming to its TypeParams, produces a valid type.
 However, for OpDef's, greater flexibility is allowed: each OpDef *either*
 
-1. Provides a polymorphic Function type, as per [Type System](#type-system), which may declare TypeParams;
+1. Provides a polymorphic type scheme, as per [Type System](#type-system), which may declare TypeParams;
    values (TypeArgs) provided for those params will be substituted in. *Or*
 2. The extension may self-register binary code (e.g. a Rust trait) providing a function
-   `compute_signature` that fallibly computes a (perhaps-polymorphic) Function type given some type arguments.
+   `compute_signature` that fallibly computes a (perhaps-polymorphic) type scheme given some initial type arguments.
    The operation declares the arguments required by the `compute_signature` function as a list
-   of TypeParams; if this successfully returns, it may produce a Function type with
-   additional TypeParams.
+   of TypeParams; if this successfully returns a typ scheme, that may have additional TypeParams
+   for which TypeArgs must also be provided. 
 
 For example, the TypeDef for `array` in the prelude declares two TypeParams: a `BoundedUSize`
 (the array length) and a `Type`. Any valid instantiation (e.g. `array<5, usize>`) is a type.
@@ -1053,7 +1053,7 @@ either or both:
 Whether a particular OpDef provides binary code for `try_lower` is independent
 of whether it provides a binary `compute_signature`, but it will not generally
 be possible to provide a HUGR for an operation whose type cannot be expressed
-as a constant (polymorphic) `Function` type
+using a polymorphic type scheme.
 
 ### Declarative format
 
@@ -2015,11 +2015,11 @@ When an OpDef provides a binary `compute_signature` function, and an operation n
 - the node provides a list of TypeArgs, at least as many as the $n$ TypeParams declared by the OpDef
 - the first $n$ of those are passed to the binary `compute_signature`
 - if the binary function returns an error, the operation is invalid;
-- otherwise, `compute_signature` returns a `Function` type (which may itself be polymorphic)
-- any remaining TypeArgs in the node (after the first $n$) are then substituted into that returned `Function` type
+- otherwise, `compute_signature` returns a type scheme (which may itself be polymorphic)
+- any remaining TypeArgs in the node (after the first $n$) are then substituted into that returned type scheme
   (the number remaining in the node must match exactly).
   **Note** this allows the binary function to use the values (TypeArgs) passed in---e.g.
-  by looking inside `List` or `Opaque` TypeArgs---to determine the structure (and degree of polymorphism) of the returned `Function` type.
+  by looking inside `List` or `Opaque` TypeArgs---to determine the structure (and degree of polymorphism) of the returned type scheme.
 - We require that the TypeArgs to be passed to `compute_signature` (the first $n$)
   must *not* refer to any type variables (declared by ancestor nodes in the Hugr - the nearest enclosing FuncDefn);
   these first $n$ must be static constants unaffected by substitution.
