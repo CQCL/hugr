@@ -417,10 +417,12 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
             .get_parent(from)
             .expect("Root nodes cannot have ports");
         let to_parent = self.hugr.get_parent(to);
-        let local = Some(from_parent) == to_parent;
         let edge_kind = from_optype.port_kind(from_offset).unwrap();
+        if Some(from_parent) == to_parent {
+            return Ok(()); // Local edge
+        }
         let is_static = matches!(edge_kind, EdgeKind::Static(_));
-        if !is_static && !local && !matches!(&edge_kind, EdgeKind::Value(t) if t.copyable()) {
+        if !is_static && !matches!(&edge_kind, EdgeKind::Value(t) if t.copyable()) {
             return Err(InterGraphEdgeError::NonCopyableData {
                 from,
                 from_offset,
@@ -430,9 +432,6 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
             }
             .into());
         };
-        if local {
-            return Ok(());
-        }
 
         // To detect either external or dominator edges, we traverse the ancestors
         // of the target until we find either `from_parent` (in the external
