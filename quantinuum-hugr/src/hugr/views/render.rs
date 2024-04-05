@@ -5,7 +5,7 @@ use portgraph::render::{EdgeStyle, NodeStyle, PortStyle};
 use portgraph::{LinkView, NodeIndex, PortIndex, PortView};
 
 use crate::ops::OpName;
-use crate::types::{EdgeKind, StaticEdgeData};
+use crate::types::EdgeKind;
 use crate::HugrView;
 
 /// Configuration for rendering a HUGR graph.
@@ -59,8 +59,10 @@ pub(super) fn port_style<H: HugrView + ?Sized>(
         let optype = h.get_optype(node.into());
         let offset = graph.port_offset(port).unwrap();
         match optype.port_kind(offset).unwrap() {
-            EdgeKind::Static(ty) => PortStyle::new(html_escape::encode_text(&format!("{}", ty))),
-            EdgeKind::Value(ty) => PortStyle::new(html_escape::encode_text(&format!("{}", ty))),
+            EdgeKind::Function(pf) => PortStyle::new(html_escape::encode_text(&format!("{}", pf))),
+            EdgeKind::Const(ty) | EdgeKind::Value(ty) => {
+                PortStyle::new(html_escape::encode_text(&format!("{}", ty)))
+            }
             EdgeKind::StateOrder => match graph.port_links(port).count() > 0 {
                 true => PortStyle::text("", false),
                 false => PortStyle::Hidden,
@@ -97,16 +99,14 @@ pub(super) fn edge_style<H: HugrView + ?Sized>(
         let style = match port_kind {
             EdgeKind::StateOrder => EdgeStyle::Dotted,
             EdgeKind::ControlFlow => EdgeStyle::Dashed,
-            EdgeKind::Static(_) | EdgeKind::Value(_) => EdgeStyle::Solid,
+            EdgeKind::Const(_) | EdgeKind::Function(_) | EdgeKind::Value(_) => EdgeStyle::Solid,
         };
 
         // Compute the label for the edge, given the setting flags.
         fn type_label(e: EdgeKind) -> Option<String> {
             match e {
-                EdgeKind::Static(StaticEdgeData::Value(ty)) | EdgeKind::Value(ty) => {
-                    Some(format!("{}", ty))
-                }
-                EdgeKind::Static(StaticEdgeData::Function(pf)) => Some(format!("{}", pf)),
+                EdgeKind::Const(ty) | EdgeKind::Value(ty) => Some(format!("{}", ty)),
+                EdgeKind::Function(pf) => Some(format!("{}", pf)),
                 _ => None,
             }
         }

@@ -20,7 +20,7 @@ use crate::ops::custom::{resolve_opaque_op, ExternalOp};
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::{FuncDefn, OpTag, OpTrait, OpType, ValidateOp};
 use crate::types::type_param::TypeParam;
-use crate::types::{EdgeKind, StaticEdgeData};
+use crate::types::EdgeKind;
 use crate::{Direction, Hugr, Node, Port};
 
 use super::views::{HierarchyView, HugrView, SiblingGraph};
@@ -225,13 +225,14 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
                 .map_err(|cause| ValidationError::SignatureError { node, cause })?,
             // Static edges must *not* refer to type variables declared by enclosing FuncDefns
             // as these are only types at runtime.
-            EdgeKind::Static(ty) => match ty {
-                StaticEdgeData::Value(ty) => ty.validate(self.extension_registry, &[]),
-                StaticEdgeData::Function(pf) => pf.validate(self.extension_registry, &[]),
-            }
-            .map_err(|cause| ValidationError::SignatureError { node, cause })?,
+            EdgeKind::Const(ty) => ty
+                .validate(self.extension_registry, &[])
+                .map_err(|cause| ValidationError::SignatureError { node, cause })?,
+            EdgeKind::Function(pf) => pf
+                .validate(self.extension_registry, &[])
+                .map_err(|cause| ValidationError::SignatureError { node, cause })?,
             _ => (),
-        }
+        };
 
         let mut link_cnt = 0;
         for (_, link) in links {
@@ -421,7 +422,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         if Some(from_parent) == to_parent {
             return Ok(()); // Local edge
         }
-        let is_static = matches!(edge_kind, EdgeKind::Static(_));
+        let is_static = matches!(edge_kind, EdgeKind::Const(_) | EdgeKind::Function(_));
         if !is_static && !matches!(&edge_kind, EdgeKind::Value(t) if t.copyable()) {
             return Err(InterGraphEdgeError::NonCopyableData {
                 from,

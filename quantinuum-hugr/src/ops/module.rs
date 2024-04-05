@@ -2,7 +2,7 @@
 
 use smol_str::SmolStr;
 
-use crate::types::{EdgeKind, FunctionType, PolyFuncType, StaticEdgeData};
+use crate::types::{EdgeKind, FunctionType, PolyFuncType};
 use crate::types::{Type, TypeBound};
 
 use super::dataflow::DataflowParent;
@@ -61,9 +61,7 @@ impl OpTrait for FuncDefn {
     }
 
     fn static_output(&self) -> Option<EdgeKind> {
-        Some(EdgeKind::Static(StaticEdgeData::Function(
-            self.signature.clone(),
-        )))
+        Some(EdgeKind::Function(self.signature.clone()))
     }
 }
 
@@ -91,9 +89,7 @@ impl OpTrait for FuncDecl {
     }
 
     fn static_output(&self) -> Option<EdgeKind> {
-        Some(EdgeKind::Static(StaticEdgeData::Function(
-            self.signature.clone(),
-        )))
+        Some(EdgeKind::Function(self.signature.clone()))
     }
 }
 

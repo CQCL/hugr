@@ -5,9 +5,7 @@ mod custom;
 use super::{OpName, OpTrait, StaticTag};
 use super::{OpTag, OpType};
 use crate::extension::ExtensionSet;
-use crate::types::{
-    CustomType, EdgeKind, FunctionType, StaticEdgeData, SumType, SumTypeError, Type,
-};
+use crate::types::{CustomType, EdgeKind, FunctionType, SumType, SumTypeError, Type};
 use crate::{Hugr, HugrView};
 
 use itertools::Itertools;
@@ -268,7 +266,7 @@ impl OpTrait for Const {
     }
 
     fn static_output(&self) -> Option<EdgeKind> {
-        Some(EdgeKind::Static(StaticEdgeData::Value(self.const_type())))
+        Some(EdgeKind::Const(self.const_type()))
     }
 }
 

@@ -33,17 +33,6 @@ use self::type_param::TypeParam;
 /// A unique identifier for a type.
 pub type TypeName = SmolStr;
 
-/// The kinds of data that can be passed down / read from a Static edge
-#[derive(
-    Clone, PartialEq, Eq, Debug, derive_more::Display, serde::Serialize, serde::Deserialize,
-)]
-pub enum StaticEdgeData {
-    /// A constant value of a particular (monomorphic) type
-    Value(Type),
-    /// A function, with a perhaps-polymorphic type: type-args to be specified by the edge target
-    Function(PolyFuncType),
-}
-
 /// The kinds of edges in a HUGR, excluding Hierarchy.
 #[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
@@ -52,8 +41,10 @@ pub enum EdgeKind {
     ControlFlow,
     /// Data edges of a DDG region, also known as "wires".
     Value(Type),
-    /// A reference to a static value definition - Const or Function
-    Static(StaticEdgeData),
+    /// A reference to a static constant value - must be a Copyable type
+    Const(Type),
+    /// A reference to a function i.e. [FuncDecl] or [FuncDefn]
+    Function(PolyFuncType),
     /// Explicitly enforce an ordering between nodes in a DDG.
     StateOrder,
 }

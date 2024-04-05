@@ -91,7 +91,10 @@ impl NewEdgeSpec {
                 matches!(optype.port_kind(src_pos), Some(EdgeKind::Value(_)))
             }
             NewEdgeKind::Static { src_pos, .. } => {
-                matches!(optype.port_kind(src_pos), Some(EdgeKind::Static(_)))
+                matches!(
+                    optype.port_kind(src_pos),
+                    Some(EdgeKind::Const(_) | EdgeKind::Function(_))
+                )
             }
             NewEdgeKind::ControlFlow { src_pos } => {
                 matches!(optype.port_kind(src_pos), Some(EdgeKind::ControlFlow))
@@ -108,7 +111,10 @@ impl NewEdgeSpec {
                 matches!(optype.port_kind(tgt_pos), Some(EdgeKind::Value(_)))
             }
             NewEdgeKind::Static { tgt_pos, .. } => {
-                matches!(optype.port_kind(tgt_pos), Some(EdgeKind::Static(_)))
+                matches!(
+                    optype.port_kind(tgt_pos),
+                    Some(EdgeKind::Const(_) | EdgeKind::Function(_))
+                )
             }
             NewEdgeKind::ControlFlow { .. } => matches!(
                 optype.port_kind(IncomingPort::from(0)),
