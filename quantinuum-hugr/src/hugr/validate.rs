@@ -420,21 +420,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         let local = Some(from_parent) == to_parent;
 
         let is_static = match from_optype.port_kind(from_offset).unwrap() {
-            EdgeKind::Static(typ) => {
-                let reqd_optype = match typ {
-                    StaticEdgeData::Value(_) => OpTag::Const,
-                    StaticEdgeData::Function(_) => OpTag::Function,
-                };
-                if !reqd_optype.is_superset(from_optype.tag()) {
-                    return Err(InterGraphEdgeError::InvalidStaticSrc {
-                        from,
-                        from_offset,
-                        typ,
-                    }
-                    .into());
-                }
-                true
-            }
+            EdgeKind::Static(_) => true,
             ty => {
                 if !local && !matches!(&ty, EdgeKind::Value(t) if t.copyable()) {
                     return Err(InterGraphEdgeError::NonCopyableData {
@@ -771,14 +757,6 @@ pub enum InterGraphEdgeError {
         to_offset: Port,
         from_parent: Node,
         ancestor: Node,
-    },
-    #[error(
-        "Static edge comes from an invalid node type: {from:?} ({from_offset:?}). Edge type: {typ}"
-    )]
-    InvalidStaticSrc {
-        from: Node,
-        from_offset: Port,
-        typ: StaticEdgeData,
     },
 }
 
