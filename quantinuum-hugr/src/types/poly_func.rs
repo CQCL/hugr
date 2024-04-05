@@ -74,24 +74,10 @@ impl PolyFuncType {
     }
 
     /// Validates this instance, checking that the types in the body are
-    /// wellformed with respect to the registry, and that all type variables
-    /// are declared (perhaps in an enclosing scope, kinds passed in).
-    pub fn validate(
-        &self,
-        reg: &ExtensionRegistry,
-        external_var_decls: &[TypeParam],
-    ) -> Result<(), SignatureError> {
+    /// wellformed with respect to the registry, and the type variables declared.
+    pub fn validate(&self, reg: &ExtensionRegistry) -> Result<(), SignatureError> {
         // TODO https://github.com/CQCL/hugr/issues/624 validate TypeParams declared here, too
-        let mut v; // Declared here so live until end of scope
-        let all_var_decls = if self.params.is_empty() {
-            external_var_decls
-        } else {
-            // Type vars declared here go at lowest indices (as per DeBruijn)
-            v = self.params.clone();
-            v.extend_from_slice(external_var_decls);
-            v.as_slice()
-        };
-        self.body.validate(reg, all_var_decls)
+        self.body.validate(reg, &self.params)
     }
 
     /// Instantiates an outer [PolyFuncType], i.e. with no free variables
@@ -142,7 +128,7 @@ pub(crate) mod test {
             extension_registry: &ExtensionRegistry,
         ) -> Result<Self, SignatureError> {
             let res = Self::new(params, body);
-            res.validate(extension_registry, &[])?;
+            res.validate(extension_registry)?;
             Ok(res)
         }
     }

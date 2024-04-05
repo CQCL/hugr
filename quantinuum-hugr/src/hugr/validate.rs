@@ -272,7 +272,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
             // Static edges must *not* refer to type variables declared by enclosing FuncDefns
             // as these are only types at runtime.
             EdgeKind::Const(ty) => ty.validate(self.extension_registry, &[]),
-            EdgeKind::Function(pf) => pf.validate(self.extension_registry, &[]),
+            EdgeKind::Function(pf) => pf.validate(self.extension_registry),
             _ => Ok(()),
         }
     }
