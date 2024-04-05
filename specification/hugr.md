@@ -123,20 +123,23 @@ carry an edge weight:
   ordering. They have no edge weight.
 - `Value` edges carry typed data at runtime. They have a *port* at each end, associated
   with the source and target nodes. They have an `AnyType`as an edge weight.
-- `Static` edges are similar to `Value` edges but carry static data (knowable at
-  compilation time). These come in two subkinds with different edge weights:
-   - `Static<Value>` edges have as edge weight a `CopyableType`
-   - `Static<Function>` carry a polymorphic function type.
+- `Const` edges are similar to `Value` edges but carry static data (knowable at
+  compilation time). These has as edge weight a `CopyableType`.
+- `Function` edges refer to a statically-known function, but with a type scheme
+  that (unlike values) may be polymorphic---see [Polymorphism](#polymorphism).
 - `ControlFlow` edges represent possible flows of control from one part of the
   program to another. They have no edge weight.
 - `Hierarchy` edges express the relationship between container nodes and their
   children. They have no edge weight.
 
-`Value` and `Static` edges are sometimes referred to as *dataflow* edges.
+It is useful to introduce some terms for broader classes of edge:
+* *Static* edges are the union of the `Const` and `Function` edges
+* *dataflow* edges are the union of `Value` and Static (thus, `Value`, `Const` and `Function`)
+
 A `Value` edge can carry data of any `AnyType`: these include the `CopyableType`s
 (which can be freely copied or discarded - i.e. ordinary classical data)
 as well as anything which cannot - e.g. quantum data.
-A `Static<Value>` edge can only carry a `CopyableType`. For
+A `Const` edge can only carry a `CopyableType`. For
 more details see the [Type System](#type-system) section.
 
 As well as the type, dataflow edges are also parametrized by a
@@ -146,7 +149,8 @@ As well as the type, dataflow edges are also parametrized by a
 ```haskell
 AnyType ⊃ CopyableType
 
-EdgeKind ::= Value(Locality, AnyType) | Static(Local | Ext, CopyableType | PolyFuncType)
+EdgeKind ::= Value(Locality, AnyType)
+             | Const(Local | Ext, CopyableType) | Function(Local | Ext, PolyFuncType)
              | Hierarchy | Order | ControlFlow
 ```
 
@@ -193,9 +197,9 @@ source of the edge will, at runtime, produce a value that is consumed by
 the edge's target. Value edges are from an outgoing port of the
 source node, to an incoming port of the target node.
 
-#### `Static` edges
+#### Static edges (`Const` and `Function`)
 
-A `Static` edge represents dataflow that is statically knowable - i.e.
+A Static edge represents dataflow that is statically knowable - i.e.
 the source is a compile-time constant defined in the program. Hence, the types on these edges
 are classical. Only a few nodes may be
 sources (`FuncDefn`, `FuncDecl` and `Const`) and targets (`Call` and `LoadConstant`) of
@@ -234,7 +238,7 @@ edges. The following operations are *only* valid as immediate children of a
 - `FuncDecl`: an external function declaration. The name of the function,
   a list of type parameters (TypeParams, see [Type System](#type-system))
   and function attributes (relevant for compilation)
-  define the node weight. The node has an outgoing `Static<Function>`
+  define the node weight. The node has an outgoing `Function`
   edge for each use of the function. The function name is used at link time to
   look up definitions in linked
   modules (other hugr instances specified to the linker).
@@ -250,7 +254,7 @@ The following operations are valid at the module level as well as in dataflow
 regions and control-flow regions:
 
 - `Const<T>` : a static constant value of type T stored in the node
-  weight. Like `FuncDecl` and `FuncDefn` this has one `Static<Value>` out-edge per use.
+  weight. Like `FuncDecl` and `FuncDefn` this has one `Const<T>` out-edge per use.
 - `FuncDefn` : a function definition. Like `FuncDecl` but with a function body.
   The function body is defined by the sibling graph formed by its children.
   At link time `FuncDecl` nodes are replaced by `FuncDefn`.
@@ -275,11 +279,11 @@ the following basic dataflow operations are available (in addition to the
   the inputs to the function, and the inputs to `Output` are the
   outputs of the function.
 - `Call`: Call a statically defined function. There is an incoming
-  `Static<Function>` edge to specify the graph being called. The `Call`
+  `Function` edge to specify the graph being called. The `Call`
   node specifies any type arguments to the function in the node weight,
   and the signature of the node (defined by its incoming and outgoing `Value` edges)
   matches the (type-instantiated) function being called.
-- `LoadConstant<T>`: has an incoming `Static<T>` edge, where `T` is a `CopyableType`, and a
+- `LoadConstant<T>`: has an incoming `Const<T>` edge, where `T` is a `CopyableType`, and a
   `Value<T>` output, used to load a static constant into the local
   dataflow graph.
 - `identity<T>`: pass-through, no operation is performed.
@@ -499,8 +503,8 @@ has no parent).
 | Conditional               | **D**                          | `Conditional`      | **C**         | `Case`                   | No edges                                 |
 | **C:** Dataflow container | **D**                          | `TailLoop`         | **C**         |  **D**                   | First(second) is `Input`(`Output`)       |
 | **C**                     | **D**                          | `DFG`              | **C**         |  **D**                   | First(second) is `Input`(`Output`)       |
-| **C**                     | Static                         | `FuncDefn`         | **C**         |  **D**                   | First(second) is `Input`(`Output`)       |
-| **C**                     | ControlFlow                    | `DFB`              | CFG           |  **D**                   | First(second) is `Input`(`Output`)       |
+| **C**                     | `Function`                     | `FuncDefn`         | **C**         |  **D**                   | First(second) is `Input`(`Output`)       |
+| **C**                     | `ControlFlow`                  | `DFB`              | CFG           |  **D**                   | First(second) is `Input`(`Output`)       |
 | **C**                     | \-                             | `Case`             | `Conditional` |  **D**                   | First(second) is `Input`(`Output`)       |
 | Root                      | \-                             | `Module`           | none          |  **D**                   | Contains main `FuncDefn` for executable HUGR. |
 
@@ -775,7 +779,7 @@ There are three classes of type: `AnyType` $\supset$ `CopyableType` $\supset$ `E
 - The next class is `CopyableType`, i.e. types holding ordinary classical
   data, where values can be copied (and discarded, the 0-ary copy). This
   allows multiple (or 0) outgoing edges from an outport; also these types can
-  be sent down `Static<Value>` edges. Note: dataflow inputs (`Value` and `Static`) always
+  be sent down `Const` edges. Note: dataflow inputs (`Value`, `Const` and `Function`) always
   require a single connection.
 
 - The final class is `EqType`: these are copyable types with a well-defined
@@ -1310,10 +1314,10 @@ The new hugr is then derived as follows:
    the existing edges are replaced.
 3. For each $\sigma\_\mathrm{out} \in \mu\_\textrm{out}$, insert a new edge going out of the new
    copy of the `SrcNode` of $\sigma\_\mathrm{out}$ according to the specification $\sigma\_\mathrm{out}$.
-   For Value or Static edges, the target port must have an existing edge whose source is in $R$;
+   For `Value` or Static edges, the target port must have an existing edge whose source is in $R$;
    this edge is removed.
 4. For each $\sigma\_\mathrm{new} \in \mu\_\textrm{new}$, insert a new edge
-   between the existing `SrcNode` and `TgtNode` in $\Gamma$. For Value/Static edges,
+   between the existing `SrcNode` and `TgtNode` in $\Gamma$. For `Value` or Static edges,
    the target port must have an existing edge whose source is in $R$; this edge is removed.
 5. Let $N$ be the ordered list of the copies made in $\Gamma$ of the children of the root node of $G$.
    For each child $C$ of $P$ (in order), if $C \in S$, redirect the hierarchy edge $P \rightarrow C$ to
@@ -1402,7 +1406,7 @@ remove it. (If there is an non-local edge from `n0` to a descendent of
 ###### `InsertConstIgnore`
 
 Given a `Const<T>` node `c`, and optionally `P`, a parent of a DSG, add a new
-`LoadConstant<T>` node `n` as a child of `P` with a `Static<T>` edge
+`LoadConstant<T>` node `n` as a child of `P` with a `Const<T>` edge
 from `c` to `n` and no outgoing edges from `n`.  Return the ID of `n`. If `P` is
 omitted it defaults to the parent of `c` (in this case said `c` will
 have to be in a DSG or CSG rather than under the Module Root.) If `P` is
@@ -1816,7 +1820,7 @@ Conversions between integers and floats:
   node, with all the edges between them. Includes exactly one entry
   and one exit node. Nodes are basic blocks, edges point to possible
   successors.
-- **Dataflow edge** either a Value edge or a Static edge; has a type,
+- **Dataflow edge** either a `Value` edge or a Static edge; has a type,
   and runs between an output port and an input port.
 - **Dataflow Sibling Graph (DSG)**: The set of all children of a given
   Dataflow container node, with all edges between them. Includes
@@ -1829,14 +1833,14 @@ Conversions between integers and floats:
   value edges.
 - **FuncDecl node**: child of a module, indicates that an external
   function exists but without giving a definition. May be the source
-  of Static-edges to Call nodes and others.
+  of `Function`-edges to Call nodes.
 - **FuncDefn node**: child of a module node, defines a function (by being
-  parent to the function's body). May be the source of `Static<Function>`-edges
+  parent to the function's body). May be the source of `Function`-edges
   to Call nodes.
 - **DFG node**: A node representing a data-flow graph. Its children
   are all data-dependency nodes.
-- **edge kind**: There are five kinds of edge: value edge, order edge, hierarchy edge,
-  control-flow edge, and Static edge (with two subkinds: value and function).
+- **edge kind**: There are six kinds of edge: `Value` edge, order edge, hierarchy edge,
+  control-flow edge, `Const` edge and `Function` edge.
 - **edge type:** Typing information attached to a value edge or Static
   edge (representing the data type of value that the edge carries).
 - **entry node**: The distinguished node of a CFG representing the
@@ -1884,6 +1888,7 @@ Conversions between integers and floats:
   input and output signatures.
 - **simple type**: a quantum or classical type annotated with the
   Extensions required to produce the value
+- **Static edge**: either a `Const` or `Function` edge
 - **order edge**: An edge implying dependency of the target node on
   the source node.
 - **TailLoop node**: TODO
@@ -1982,26 +1987,26 @@ one". For example, "1, ✱" means "one edge in, any number out".
 The "Root" row of the table applies to whichever node is the HUGR root,
 including `Module`.
 
-| Node type      | `Value` | `Order` | `Static` | `ControlFlow` | `Hierarchy` | Children |
-| -------------- | ------- | ------- |--------- | ------------- | ----------- | -------- |
-| Root           | 0, 0    | 0, 0    | 0, 0     | 0, 0          | 0, ✱        |          |
-| `FuncDefn`     | 0, 0    | 0, 0    | 0, ✱     | 0, 0          | 1, +        | DSG      |
-| `FuncDecl`     | 0, 0    | 0, 0    | 0, ✱     | 0, 0          | 1, 0        |          |
-| `AliasDefn`    | 0, 0    | 0, 0    | 0, 0     | 0, 0          | 1, 0        |          |
-| `AliasDecl`    | 0, 0    | 0, 0    | 0, 0     | 0, 0          | 1, 0        |          |
-| `Const`        | 0, 0    | 0, 0    | 0, ✱     | 0, 0          | 1, 0        |          |
-| `LoadConstant` | 0, 1    | +, ✱    | 1, 0     | 0, 0          | 1, 0        |          |
-| `Input`        | 0, ✱    | 0, ✱    | 0, 0     | 0, 0          | 1, 0        |          |
-| `Output`       | ✱, 0    | ✱, 0    | 0, 0     | 0, 0          | 1, 0        |          |
-| `LeafOp`       | ✱, ✱    | ✱, ✱    | ✱, 0     | 0, 0          | 1, 0        |          |
-| `Call`         | ✱, ✱    | ✱, ✱    | 1, 0     | 0, 0          | 1, 0        |          |
-| `DFG`          | ✱, ✱    | ✱, ✱    | 0, 0     | 0, 0          | 1, +        | DSG      |
-| `CFG`          | ✱, ✱    | ✱, ✱    | 0, 0     | 0, 0          | 1, +        | CSG      |
-| `DFB`          | 0, 0    | 0, 0    | 0, 0     | ✱, ✱          | 1, +        | DSG      |
-| `Exit`         | 0, 0    | 0, 0    | 0, 0     | +, 0          | 1, 0        |          |
-| `TailLoop`     | ✱, ✱    | ✱, ✱    | 0, 0     | 0, 0          | 1, +        | DSG      |
-| `Conditional`  | ✱, ✱    | ✱, ✱    | 0, 0     | 0, 0          | 1, +        | `Case`   |
-| `Case`         | 0, 0    | 0, 0    | 0, 0     | 0, 0          | 1, +        | DSG      |
+| Node type      | `Value` | `Order` | `Const` | `Function` | `ControlFlow` | `Hierarchy` | Children |
+| -------------- | ------- | ------- |-------- | ---------- | ------------- | ----------- | -------- |
+| Root           | 0, 0    | 0, 0    | 0, 0    | 0, 0       | 0, 0          | 0, ✱        |          |
+| `FuncDefn`     | 0, 0    | 0, 0    | 0, 0    | 0, *       | 0, 0          | 1, +        | DSG      |
+| `FuncDecl`     | 0, 0    | 0, 0    | 0, 0    | 0, *       | 0, 0          | 1, 0        |          |
+| `AliasDefn`    | 0, 0    | 0, 0    | 0, 0    | 0, 0       | 0, 0          | 1, 0        |          |
+| `AliasDecl`    | 0, 0    | 0, 0    | 0, 0    | 0, 0       | 0, 0          | 1, 0        |          |
+| `Const`        | 0, 0    | 0, 0    | 0, ✱    | 0, 0       | 0, 0          | 1, 0        |          |
+| `LoadConstant` | 0, 1    | +, ✱    | 1, 0    | 0, 0       | 0, 0          | 1, 0        |          |
+| `Input`        | 0, ✱    | 0, ✱    | 0, 0    | 0, 0       | 0, 0          | 1, 0        |          |
+| `Output`       | ✱, 0    | ✱, 0    | 0, 0    | 0, 0       | 0, 0          | 1, 0        |          |
+| `LeafOp`       | ✱, ✱    | ✱, ✱    | ✱, 0    | *, 0       | 0, 0          | 1, 0        |          |
+| `Call`         | ✱, ✱    | ✱, ✱    | 0, 0    | 1, 0       | 0, 0          | 1, 0        |          |
+| `DFG`          | ✱, ✱    | ✱, ✱    | 0, 0    | 0, 0       | 0, 0          | 1, +        | DSG      |
+| `CFG`          | ✱, ✱    | ✱, ✱    | 0, 0    | 0, 0       | 0, 0          | 1, +        | CSG      |
+| `DFB`          | 0, 0    | 0, 0    | 0, 0    | 0, 0       | ✱, ✱          | 1, +        | DSG      |
+| `Exit`         | 0, 0    | 0, 0    | 0, 0    | 0, 0       | +, 0          | 1, 0        |          |
+| `TailLoop`     | ✱, ✱    | ✱, ✱    | 0, 0    | 0, 0       | 0, 0          | 1, +        | DSG      |
+| `Conditional`  | ✱, ✱    | ✱, ✱    | 0, 0    | 0, 0       | 0, 0          | 1, +        | `Case`   |
+| `Case`         | 0, 0    | 0, 0    | 0, 0    | 0, 0       | 0, 0          | 1, +        | DSG      |
 
 ### Appendix 3: Binary `compute_signature`
 

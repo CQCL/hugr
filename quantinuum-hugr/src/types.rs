@@ -55,7 +55,8 @@ impl EdgeKind {
         matches!(self, EdgeKind::Value(t) if !t.copyable())
     }
 
-    /// Whether this EdgeKind represents a static edge i.e. the value is statically known
+    /// Whether this EdgeKind represents a Static edge (in the spec)
+    /// - i.e. the value is statically known
     pub fn is_static(&self) -> bool {
         matches!(self, EdgeKind::Const(_) | EdgeKind::Function(_))
     }
