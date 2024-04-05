@@ -1,4 +1,4 @@
-quantinuum_hugr
+hugr
 ===============
 
 [![build_status][]](https://github.com/CQCL/hugr/actions)
@@ -22,14 +22,12 @@ The HUGR specification is [here](https://github.com/CQCL/hugr/blob/main/specific
 
 ## Installation
 
-TODO
-
-The package name is `quantinuum_hugr`, but it hasn't been published yet.
-The current experimental version can be installed from the source code:
-
+The package name is `hugr`. It can be installed from PyPI:
 ```bash
-pip install "quantinuum_hugr@git+https://github.com/CQCL/hugr.git@main#subdirectory=quantinuum-hugr-py"
+pip install hugr
 ```
+
+The current releases are in alpha stage, and the API is subject to change.
 
 ## Usage
 
@@ -50,4 +48,4 @@ This project is licensed under Apache License, Version 2.0 ([LICENSE][] or http:
   [build_status]: https://github.com/CQCL/hugr/actions/workflows/ci-py.yml/badge.svg?branch=main
   [codecov]: https://img.shields.io/codecov/c/gh/CQCL/hugr?logo=codecov
   [LICENSE]: https://github.com/CQCL/hugr/blob/main/LICENCE
-  [CHANGELOG]: https://github.com/CQCL/hugr/blob/main/quantinuum-hugr-py/CHANGELOG.md
+  [CHANGELOG]: https://github.com/CQCL/hugr/blob/main/hugr-py/CHANGELOG.md
