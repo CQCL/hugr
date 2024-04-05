@@ -332,13 +332,9 @@ impl UnificationContext {
             let sig = hugr.get_nodetype(tgt_node).op();
             // Incoming ports with an edge that should mean equal extension reqs
             for port in hugr.node_inputs(tgt_node).filter(|src_port| {
-                matches!(
-                    sig.port_kind(*src_port),
-                    Some(EdgeKind::Value(_))
-                        | Some(EdgeKind::Function(_))
-                        | Some(EdgeKind::Const(_))
-                        | Some(EdgeKind::ControlFlow)
-                )
+                let kind = sig.port_kind(*src_port);
+                kind.as_ref().is_some_and(EdgeKind::is_static)
+                    || matches!(kind, Some(EdgeKind::Value(_)) | Some(EdgeKind::ControlFlow))
             }) {
                 let m_tgt = *self
                     .extensions

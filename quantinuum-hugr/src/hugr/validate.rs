@@ -425,7 +425,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         if Some(from_parent) == to_parent {
             return Ok(()); // Local edge
         }
-        let is_static = matches!(edge_kind, EdgeKind::Const(_) | EdgeKind::Function(_));
+        let is_static = edge_kind.is_static();
         if !is_static && !matches!(&edge_kind, EdgeKind::Value(t) if t.copyable()) {
             return Err(InterGraphEdgeError::NonCopyableData {
                 from,
