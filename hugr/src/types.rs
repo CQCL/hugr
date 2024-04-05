@@ -44,7 +44,7 @@ pub enum EdgeKind {
     /// A reference to a static constant value - must be a Copyable type
     Const(Type),
     /// A reference to a function i.e. [FuncDecl] or [FuncDefn]
-    /// 
+    ///
     /// [FuncDecl]: crate::ops::FuncDecl
     /// [FuncDefn]: crate::ops::FuncDefn
     Function(PolyFuncType),
