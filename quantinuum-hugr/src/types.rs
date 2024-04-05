@@ -195,7 +195,7 @@ pub enum TypeEnum {
     #[allow(missing_docs)]
     #[display(fmt = "Function({})", "_0")]
     Function(Box<FunctionType>),
-    // DeBruijn index, and cache of TypeBound (checked in validation)
+    // Index into TypeParams, and cache of TypeBound (checked in validation)
     #[allow(missing_docs)]
     #[display(fmt = "Variable({})", _0)]
     Variable(usize, TypeBound),
@@ -311,7 +311,7 @@ impl Type {
         Self(TypeEnum::Sum(SumType::Unit { size }), TypeBound::Eq)
     }
 
-    /// New use (occurrence) of the type variable with specified DeBruijn index.
+    /// New use (occurrence) of the type variable with specified index.
     /// For use in type schemes only: `bound` must match that with which the
     /// variable was declared (i.e. as a [TypeParam::Type]`(bound)`).
     pub fn new_var_use(idx: usize, bound: TypeBound) -> Self {

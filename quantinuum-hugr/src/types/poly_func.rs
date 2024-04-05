@@ -21,11 +21,8 @@ use super::{FunctionType, Substitution};
 )]
 pub struct PolyFuncType {
     /// The declared type parameters, i.e., these must be instantiated with
-    /// the same number of [TypeArg]s before the function can be called. Note that within
-    /// the [Self::body], variable (DeBruijn) index 0 is element 0 of this array, i.e. the
-    /// variables are bound from right to left.
-    ///
-    /// [TypeArg]: super::type_param::TypeArg
+    /// the same number of [TypeArg]s before the function can be called. This
+    /// defines the indices used by variables inside the body.
     params: Vec<TypeParam>,
     /// Template for the function. May contain variables up to length of [Self::params]
     body: FunctionType,

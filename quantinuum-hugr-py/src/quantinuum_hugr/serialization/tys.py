@@ -172,7 +172,7 @@ class SumType(RootModel):
 
 
 class Variable(BaseModel):
-    """A type variable identified by a de Bruijn index."""
+    """A type variable identified by an index into the array of TypeParams."""
 
     t: Literal["V"] = "V"
     i: int
@@ -215,9 +215,8 @@ class PolyFuncType(BaseModel):
     t: Literal["G"] = "G"
 
     # The declared type parameters, i.e., these must be instantiated with the same
-    # number of TypeArgs before the function can be called. Note that within the body,
-    # variable (DeBruijn) index 0 is element 0 of this array, i.e. the variables are
-    # bound from right to left.
+    # number of TypeArgs before the function can be called. This defines the indices
+    # used for variables within the body.
     params: list[TypeParam]
 
     # Template for the function. May contain variables up to length of `params`

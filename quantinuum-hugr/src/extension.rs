@@ -419,7 +419,7 @@ impl ExtensionSet {
 
     /// Adds a type var (which must have been declared as a [TypeParam::Extensions]) to this set
     pub fn insert_type_var(&mut self, idx: usize) {
-        // Represent type vars as string representation of DeBruijn index.
+        // Represent type vars as string representation of variable index.
         // This is not a legal IdentList or ExtensionId so should not conflict.
         self.0
             .insert(ExtensionId::new_unchecked(idx.to_string().as_str()));

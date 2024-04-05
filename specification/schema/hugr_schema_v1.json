@@ -1547,7 +1547,7 @@
             "type": "object"
         },
         "Variable": {
-            "description": "A type variable identified by a de Bruijn index.",
+            "description": "A type variable identified by an index into the array of TypeParams.",
             "properties": {
                 "t": {
                     "const": "V",
