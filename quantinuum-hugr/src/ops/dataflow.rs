@@ -149,7 +149,7 @@ impl<T: DataflowOpTrait> StaticTag for T {
 ///
 /// The first ports correspond to the signature of the function being called.
 /// The port immediately following those those is connected to the def/declare
-/// block with a [`EdgeKind::Static`] edge.
+/// block with a [`EdgeKind::Function`] edge.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Call {
     /// Signature of function being called

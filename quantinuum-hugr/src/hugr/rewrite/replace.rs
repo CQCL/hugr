@@ -38,7 +38,7 @@ pub enum NewEdgeKind {
         /// The target port
         tgt_pos: IncomingPort,
     },
-    /// An [EdgeKind::Static] edge
+    /// An [EdgeKind::Const] or [EdgeKind::Function] edge
     Static {
         /// The source port
         src_pos: OutgoingPort,

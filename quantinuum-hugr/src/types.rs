@@ -44,6 +44,9 @@ pub enum EdgeKind {
     /// A reference to a static constant value - must be a Copyable type
     Const(Type),
     /// A reference to a function i.e. [FuncDecl] or [FuncDefn]
+    /// 
+    /// [FuncDecl]: crate::ops::FuncDecl
+    /// [FuncDefn]: crate::ops::FuncDefn
     Function(PolyFuncType),
     /// Explicitly enforce an ordering between nodes in a DDG.
     StateOrder,
@@ -226,7 +229,7 @@ impl TypeEnum {
 )]
 #[display(fmt = "{}", "_0")]
 #[serde(into = "serialize::SerSimpleType", from = "serialize::SerSimpleType")]
-/// A HUGR type - the valid types of [EdgeKind::Value] and [EdgeKind::Static] edges.
+/// A HUGR type - the valid types of [EdgeKind::Value] and [EdgeKind::Const] edges.
 /// Such an edge is valid if the ports on either end agree on the [Type].
 /// Types have an optional [TypeBound] which places limits on the valid
 /// operations on a type.
