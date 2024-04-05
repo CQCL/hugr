@@ -219,20 +219,8 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
             return Ok(());
         }
 
-        match &port_kind {
-            EdgeKind::Value(ty) => ty
-                .validate(self.extension_registry, var_decls)
-                .map_err(|cause| ValidationError::SignatureError { node, cause })?,
-            // Static edges must *not* refer to type variables declared by enclosing FuncDefns
-            // as these are only types at runtime.
-            EdgeKind::Const(ty) => ty
-                .validate(self.extension_registry, &[])
-                .map_err(|cause| ValidationError::SignatureError { node, cause })?,
-            EdgeKind::Function(pf) => pf
-                .validate(self.extension_registry, &[])
-                .map_err(|cause| ValidationError::SignatureError { node, cause })?,
-            _ => (),
-        };
+        self.validate_port_kind(&port_kind, var_decls)
+            .map_err(|cause| ValidationError::SignatureError { node, cause })?;
 
         let mut link_cnt = 0;
         for (_, link) in links {
@@ -272,6 +260,21 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         }
 
         Ok(())
+    }
+
+    fn validate_port_kind(
+        &self,
+        port_kind: &EdgeKind,
+        var_decls: &[TypeParam],
+    ) -> Result<(), SignatureError> {
+        match &port_kind {
+            EdgeKind::Value(ty) => ty.validate(self.extension_registry, var_decls),
+            // Static edges must *not* refer to type variables declared by enclosing FuncDefns
+            // as these are only types at runtime.
+            EdgeKind::Const(ty) => ty.validate(self.extension_registry, &[]),
+            EdgeKind::Function(pf) => pf.validate(self.extension_registry, &[]),
+            _ => Ok(()),
+        }
     }
 
     /// Check operation-specific constraints.
