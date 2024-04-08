@@ -134,7 +134,7 @@ carry an edge weight:
 
 It is useful to introduce some terms for broader classes of edge:
 * *Static* edges are the union of the `Const` and `Function` edges
-* *dataflow* edges are the union of `Value` and Static (thus, `Value`, `Const` and `Function`)
+* *Dataflow* edges are the union of `Value` and Static (thus, `Value`, `Const` and `Function`)
 
 A `Value` edge can carry data of any `AnyType`: these include the `CopyableType`s
 (which can be freely copied or discarded - i.e. ordinary classical data)
@@ -142,7 +142,7 @@ as well as anything which cannot - e.g. quantum data.
 A `Const` edge can only carry a `CopyableType`. For
 more details see the [Type System](#type-system) section.
 
-As well as the type, dataflow edges are also parametrized by a
+As well as the type, Dataflow edges are also parametrized by a
 `Locality`, which declares whether the edge crosses levels in the hierarchy. See
 [Edge Locality](#edge-locality) for details.
 
@@ -154,9 +154,9 @@ EdgeKind ::= Value(Locality, AnyType)
              | Hierarchy | Order | ControlFlow
 ```
 
-Note that a port is associated with a node and zero or more dataflow edges.
+Note that a port is associated with a node and zero or more Dataflow edges.
 Incoming ports are associated with exactly one edge, or many `ControlFlow` edges.
-All dataflow edges associated with a port have the same type; thus a port has a
+All Dataflow edges associated with a port have the same type; thus a port has a
 well defined type, matching that of its adjoining edges. The incoming and
 outgoing ports of a node are each ordered independently, meaning that the first
 output port will be "0" regardless of how many input ports there are.
@@ -327,7 +327,7 @@ flowchart
 
 In a dataflow graph, the evaluation semantics are simple: all nodes in
 the graph are necessarily evaluated, in some order (perhaps parallel)
-respecting the dataflow edges. The following operations are used to
+respecting the Dataflow edges. The following operations are used to
 express control flow, i.e. conditional or repeated evaluation.
 
 ##### `Conditional` nodes
@@ -537,7 +537,7 @@ There are three possible `CopyableType` edge localities:
 - `Ext`: Edges "in" from a dataflow ancestor.
 - `Dom`: Edges from a dominating basic block in a control-flow graph.
 
-We allow non-local dataflow edges
+We allow non-local Dataflow edges
 n<sub>1</sub>→n<sub>2</sub> where parent(n<sub>1</sub>) \!=
 parent(n<sub>2</sub>) when the edge's locality is:
 
@@ -606,7 +606,7 @@ bypassing the input/output nodes, and we expect this form to make
 rewrites easier to spot. The constraints on input/output node signatures
 remain as before.
 
-HUGRs with only local dataflow edges may still be useful for e.g. register
+HUGRs with only local Dataflow edges may still be useful for e.g. register
 allocation, as that representation makes storage explicit. For example,
 when a true/false subgraph of a Conditional-node wants a value from the
 outside, we add an outgoing port to the Input node of each subgraph, a
@@ -1456,7 +1456,7 @@ Similarly, replacement of a CFG node having a single BasicBlock child
 with a DFG node can be achieved using `Replace` (specifying the
 BasicBlock node as the surrogate parent for the new DFG's children).
 
-Arbitrary node insertion on dataflow edges can be achieved using
+Arbitrary node insertion on Dataflow edges can be achieved using
 `InsertIdentity` followed by `Replace`. Removal of a node in a DSG
 having input wires and output wires of the same type can be achieved
 using `Replace` (with a set of `identity<T>` nodes) followed by
