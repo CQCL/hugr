@@ -189,6 +189,8 @@ class FunctionType(BaseModel):
     """A graph encoded as a value. It contains a concrete signature and a set of
     required resources."""
 
+    t: Literal["G"] = "G"
+
     input: "TypeRow"  # Value inputs of the function.
     output: "TypeRow"  # Value outputs of the function.
     # The extension requirements which are added by the operation
@@ -211,8 +213,6 @@ class FunctionType(BaseModel):
 class PolyFuncType(BaseModel):
     """A graph encoded as a value. It contains a concrete signature and a set of
     required resources."""
-
-    t: Literal["G"] = "G"
 
     # The declared type parameters, i.e., these must be instantiated with the same
     # number of TypeArgs before the function can be called. This defines the indices
@@ -278,7 +278,7 @@ class Type(RootModel):
     """A HUGR type."""
 
     root: Annotated[
-        Qubit | Variable | USize | PolyFuncType | Array | SumType | Opaque,
+        Qubit | Variable | USize | FunctionType | Array | SumType | Opaque,
         WrapValidator(_json_custom_error_validator),
     ] = Field(discriminator="t")
 
