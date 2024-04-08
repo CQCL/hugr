@@ -797,73 +797,84 @@ fn test_cfg_loops() -> Result<(), Box<dyn Error>> {
 #[test]
 #[cfg(feature = "extension_inference")]
 fn test_validate_with_closure() -> Result<(), Box<dyn Error>> {
-    use crate::utils::test_quantum_extension::{EXTENSION,EXTENSION_ID, h_gate};
+    use crate::builder::BuildError;
+    use crate::builder::FunctionBuilder;
     use crate::extension::prelude::{PRELUDE, PRELUDE_ID, PRELUDE_REGISTRY};
-    use crate::hugr::hugrmut::sealed::HugrMutInternals;
     use crate::extension::ExtensionRegistry;
-    let sig = FunctionType::new_endo(type_row![QB_T]).with_extension_delta(ExtensionSet::singleton(&EXTENSION_ID));
+    use crate::hugr::hugrmut::sealed::HugrMutInternals;
+    use crate::std_extensions::arithmetic::float_types;
+    use crate::utils::test_quantum_extension::EXTENSION_ID;
+    let sig = FunctionType::new_endo(type_row![QB_T])
+        .with_extension_delta(ExtensionSet::singleton(&EXTENSION_ID));
     let inner_open = {
-        let mut h = Hugr::new(
-            ops::DFG { signature: sig.clone() }.into(),
-        );
-        let gate = h.add_node(h_gate().into());
-        let [input, output] = h.get_io(h.root()).unwrap();
-        h.connect(input,0,gate,0);
-        h.connect(gate,0,output,0);
-        h
+        let mut h = DFGBuilder::new(sig.clone())?;
+        let gate = h.add_dataflow_op(
+            LeafOp::Lift {
+                type_row: type_row![QB_T],
+                new_extension: EXTENSION_ID,
+            },
+            h.input_wires(),
+        )?;
+        h.set_outputs(gate.outputs())?;
+        // Do not run inference yet
+        h.hugr().clone()
     };
+
     assert_matches!(
         inner_open.validate(&PRELUDE_REGISTRY),
         Err(ValidationError::ExtensionError(_))
     );
+
     let soln = infer_extensions(&inner_open)?;
     inner_open.validate_with_extension_closure(soln, &PRELUDE_REGISTRY)?;
 
     // Building a Hugr around that inner DFG works, because inference on
     // the outer Hugr includes inferring solutions for the inner.
-    let build_outer = |inner: Hugr| -> Hugr {
-        let mut outer = Hugr::new(ops::DFG { signature: sig.clone() }.into());
-        let dfg_node = outer.insert_hugr(outer.root(), inner).new_root;
-        let [input, output] = outer.get_io(outer.root()).unwrap();
-        outer.connect(input, 0, dfg_node, 0);
-        outer.connect(dfg_node, 0, output, 0);
-        outer
+    let build_outer = |inner: Hugr| -> Result<Hugr, BuildError> {
+        // Using FunctionBuilder here because that forces the Input node
+        // to have empty input-extensions (unlike DFGBuilder)
+        let mut h = FunctionBuilder::new("main", sig.clone().into())?;
+        let dfg_node = h.add_hugr_with_wires(inner, h.input_wires())?;
+        h.set_outputs(dfg_node.outputs())?;
+        Ok(h.hugr().clone())
     };
-    let reg = ExtensionRegistry::try_new([PRELUDE.to_owned(), EXTENSION.to_owned()])?;
-    // Inserting uninferred version of 'inner' is OK
-    build_outer(inner_open.clone()).update_validate(&reg)?;
-    
-    // However, if we fix the solutions for the inner DFG to a 'wrong' value,
+    let reg = ExtensionRegistry::try_new([PRELUDE.to_owned(), float_types::EXTENSION.to_owned()])?;
+
+    build_outer(inner_open.clone())?.update_validate(&reg)?;
+
+    // However, if we fix the solutions for the inner DFG to a 'wrong' value
+    // (different from the actual annotation on the wire incoming to the inner DFG),
     // then we cannot infer a solution for an outer DFG containing that:
     let root = inner_open.root();
-    
-    let inner_just_prelude = {
+    let inner_bad = {
         let mut h = inner_open.clone();
-        h.replace_op(root,
+        h.replace_op(
+            root,
             NodeType::new(
                 h.get_optype(root).clone(),
-                ExtensionSet::singleton(&PRELUDE_ID) // maybe QB as well??
-            )).unwrap();
-        h.update_validate(&reg)?; // Writes 'wrong' solution into inner
+                ExtensionSet::from_iter([PRELUDE_ID, EXTENSION_ID]),
+            ),
+        )
+        .unwrap();
+        h.update_validate(&reg).unwrap(); // Writes 'wrong' solution into inner
         h
     };
-    assert_matches!(build_outer(inner_just_prelude).update_validate(&reg),
-        Err(ValidationError::CantInfer(_)));
+    assert_matches!(
+        build_outer(inner_bad)?.update_validate(&reg),
+        Err(ValidationError::CantInfer(_))
+    );
 
     // This does work if we fix the solutions to the inner DFG to the 'correct'
-    // value - but this requires knowing the input extensions before we start:
+    // value - of course this requires knowing the input extensions before we start:
     let inner_good = {
         let mut h = inner_open.clone();
-        h.replace_op(root,
-        NodeType::new(
-            h.get_optype(root).clone(),
-            ExtensionSet::from_iter([PRELUDE_ID, EXTENSION_ID]) // maybe QB as well??
-        )).unwrap();
+        h.replace_op(root, NodeType::new_pure(h.get_optype(root).clone()))
+            .unwrap();
         h.update_validate(&reg)?;
         h
     };
-    build_outer(inner_good).update_validate(&reg)?;
-    
+    build_outer(inner_good)?.update_validate(&reg)?;
+
     Ok(())
 }
 
