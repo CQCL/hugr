@@ -585,6 +585,11 @@
         "FunctionType": {
             "description": "A graph encoded as a value. It contains a concrete signature and a set of required resources.",
             "properties": {
+                "t": {
+                    "const": "G",
+                    "default": "G",
+                    "title": "T"
+                },
                 "input": {
                     "items": {
                         "$ref": "#/$defs/Type"
@@ -1015,11 +1020,6 @@
         "PolyFuncType": {
             "description": "A graph encoded as a value. It contains a concrete signature and a set of required resources.",
             "properties": {
-                "t": {
-                    "const": "G",
-                    "default": "G",
-                    "title": "T"
-                },
                 "params": {
                     "items": {
                         "$ref": "#/$defs/TypeParam"
@@ -1281,7 +1281,7 @@
             "discriminator": {
                 "mapping": {
                     "Array": "#/$defs/Array",
-                    "G": "#/$defs/PolyFuncType",
+                    "G": "#/$defs/FunctionType",
                     "I": "#/$defs/USize",
                     "Opaque": "#/$defs/Opaque",
                     "Q": "#/$defs/Qubit",
@@ -1301,7 +1301,7 @@
                     "$ref": "#/$defs/USize"
                 },
                 {
-                    "$ref": "#/$defs/PolyFuncType"
+                    "$ref": "#/$defs/FunctionType"
                 },
                 {
                     "$ref": "#/$defs/Array"
@@ -1547,7 +1547,7 @@
             "type": "object"
         },
         "Variable": {
-            "description": "A type variable identified by a de Bruijn index.",
+            "description": "A type variable identified by an index into the array of TypeParams.",
             "properties": {
                 "t": {
                     "const": "V",
