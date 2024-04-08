@@ -124,7 +124,7 @@ carry an edge weight:
 - `Value` edges carry typed data at runtime. They have a *port* at each end, associated
   with the source and target nodes. They have an `AnyType`as an edge weight.
 - `Const` edges are similar to `Value` edges but carry static data (knowable at
-  compilation time). These has as edge weight a `CopyableType`.
+  compilation time). These have as edge weight a `CopyableType`.
 - `Function` edges refer to a statically-known function, but with a type scheme
   that (unlike values) may be polymorphic---see [Polymorphism](#polymorphism).
 - `ControlFlow` edges represent possible flows of control from one part of the
