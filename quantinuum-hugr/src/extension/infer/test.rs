@@ -798,39 +798,26 @@ fn test_cfg_loops() -> Result<(), Box<dyn Error>> {
 #[test]
 #[cfg(feature = "extension_inference")]
 fn test_validate_with_closure() -> Result<(), Box<dyn Error>> {
-    const EXT_ID: ExtensionId = ExtensionId::new_unchecked("foo");
-    let sig = FunctionType::new_endo(type_row![QB_T]);
-    let inner_open = {
-        let mut h = closed_dfg_root_hugr(sig.clone());
-        h.replace_op(h.root(), NodeType::new_open(h.get_optype(h.root()).clone()))?;
+    fn dfg_hugr_with_exts(e: Option<ExtensionSet>) -> (Hugr, Node, Node) {
+        let mut h = closed_dfg_root_hugr(FunctionType::new_endo(type_row![QB_T]));
+        h.replace_op(h.root(), NodeType::new(h.get_optype(h.root()).clone(), e))
+            .unwrap();
         let [input, output] = h.get_io(h.root()).unwrap();
+        (h, input, output)
+    }
+    fn identity_hugr_with_exts(e: Option<ExtensionSet>) -> Hugr {
+        let (mut h, input, output) = dfg_hugr_with_exts(e);
         h.connect(input, 0, output, 0);
         h
-    };
+    }
 
-    let inner_prelude = {
-        let mut h = inner_open.clone();
-        h.replace_op(
-            h.root(),
-            NodeType::new(
-                h.get_optype(h.root()).clone(),
-                ExtensionSet::singleton(&PRELUDE_ID),
-            ),
-        )?;
-        h
-    };
+    const EXT_ID: ExtensionId = ExtensionId::new_unchecked("foo");
 
-    let inner_other = {
-        let mut h = inner_open.clone();
-        h.replace_op(
-            h.root(),
-            NodeType::new(
-                h.get_optype(h.root()).clone(),
-                ExtensionSet::singleton(&EXT_ID),
-            ),
-        )?;
-        h
-    };
+    let inner_open = identity_hugr_with_exts(None);
+
+    let inner_prelude = identity_hugr_with_exts(Some(ExtensionSet::singleton(&PRELUDE_ID)));
+
+    let inner_other = identity_hugr_with_exts(Some(ExtensionSet::singleton(&EXT_ID)));
 
     // All three can be inferred and validated, without writing solutions in:
     for inner in [&inner_open, &inner_prelude, &inner_other] {
@@ -845,16 +832,7 @@ fn test_validate_with_closure() -> Result<(), Box<dyn Error>> {
 
     // Helper builds a Hugr with extensions {PRELUDE_ID}, around argument
     let build_outer_prelude = |inner: Hugr| -> Hugr {
-        let mut h = closed_dfg_root_hugr(sig.clone());
-        h.replace_op(
-            h.root(),
-            NodeType::new(
-                h.get_optype(h.root()).clone(),
-                ExtensionSet::singleton(&PRELUDE_ID),
-            ),
-        )
-        .unwrap();
-        let [input, output] = h.get_io(h.root()).unwrap();
+        let (mut h, input, output) = dfg_hugr_with_exts(Some(ExtensionSet::singleton(&PRELUDE_ID)));
         let inner_node = h.insert_hugr(h.root(), inner).new_root;
         h.connect(input, 0, inner_node, 0);
         h.connect(inner_node, 0, output, 0);
@@ -869,7 +847,6 @@ fn test_validate_with_closure() -> Result<(), Box<dyn Error>> {
     }
 
     // ...but fails if the inner DFG already has the 'wrong' extensions:
-    //let reg = ExtensionRegistry::try_new([Extension::new(EXT_ID), PRELUDE.to_owned()])?;
     assert_matches!(
         build_outer_prelude(inner_other.clone()).update_validate(&PRELUDE_REGISTRY),
         Err(ValidationError::CantInfer(_))
