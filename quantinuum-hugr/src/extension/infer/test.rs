@@ -852,13 +852,13 @@ fn test_validate_with_closure() -> Result<(), Box<dyn Error>> {
         Err(ValidationError::CantInfer(_))
     );
 
-    // If we do inference on the inner Hugr first, this works if the
+    // If we do inference on the inner Hugr first, this (still) works if the
     // inner DFG already had the correct input-extensions:
-    let mut inner_prelude = inner_prelude.clone();
-    inner_prelude.update_validate(&PRELUDE_REGISTRY)?;
-    build_outer_prelude(inner_prelude).update_validate(&PRELUDE_REGISTRY)?;
+    let mut inner_prelude_inferred = inner_prelude;
+    inner_prelude_inferred.update_validate(&PRELUDE_REGISTRY)?;
+    build_outer_prelude(inner_prelude_inferred).update_validate(&PRELUDE_REGISTRY)?;
 
-    // But fails even for previously-open inner DFG as inference
+    // But fails for previously-open inner DFG as inference
     // infers an incorrect (empty) solution:
     let mut inner_inferred = inner_open;
     inner_inferred.update_validate(&PRELUDE_REGISTRY)?;
