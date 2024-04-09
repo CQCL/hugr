@@ -33,7 +33,7 @@ jobs:
       with:
         filters: |
           python:
-            - 'quantinuum-hugr-py/**'
+            - 'hugr-py/**'
             - 'pyproject.toml'
             - 'specification/schema/**'
 
@@ -41,12 +41,12 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.python == 'true' }}
 
-    name: check python
+    name: check python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
 
     strategy:
       matrix:
-        python-version: ['3.10']
+        python-version: ['3.10', '3.12']
 
     steps:
       - uses: actions/checkout@v4
