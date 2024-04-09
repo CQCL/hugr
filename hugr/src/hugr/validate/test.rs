@@ -149,14 +149,14 @@ fn children_restrictions() {
         b.update_validate(&EMPTY_REG),
         Err(ValidationError::NonContainerWithChildren { node, .. }) => assert_eq!(node, copy)
     );
-    let closure = b.infer_extensions().unwrap();
+    b.infer_extensions().unwrap();
     b.set_parent(new_def, root);
 
     // After moving the previous definition to a valid place,
     // add an input node to the module subgraph
     let new_input = b.add_node_with_parent(root, ops::Input::new(type_row![]));
     assert_matches!(
-        b.validate_with_extension_closure(closure, &EMPTY_REG),
+        b.validate(&EMPTY_REG),
         Err(ValidationError::InvalidParentOp { parent, child, .. }) => {assert_eq!(parent, root); assert_eq!(child, new_input)}
     );
 }
@@ -608,8 +608,7 @@ mod extension_tests {
             .unwrap();
         // Write Extension annotations into the Hugr while it's still well-formed
         // enough for us to compute them
-        let closure = b.infer_extensions().unwrap();
-        b.instantiate_extensions(closure);
+        b.infer_extensions().unwrap();
         b.validate(&EMPTY_REG).unwrap();
         b.replace_op(
             copy,

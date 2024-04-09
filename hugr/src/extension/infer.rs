@@ -31,24 +31,22 @@ use thiserror::Error;
 /// been inferred for their inputs.
 pub type ExtensionSolution = HashMap<Node, ExtensionSet>;
 
-/// Infer extensions for a hugr. This is the main API exposed by this module
+/// Infer extensions for a hugr. This is the main API exposed by this module.
 ///
-/// Return a tuple of the solutions found for locations on the graph, and a
-/// closure: a solution which would be valid if all of the variables in the graph
-/// were instantiated to an empty extension set. This is used (by validation) to
-/// concretise the extension requirements of the whole hugr.
-pub fn infer_extensions(
-    hugr: &impl HugrView,
-) -> Result<(ExtensionSolution, ExtensionSolution), InferExtensionError> {
+/// Return all the solutions found for locations on the graph, these can be
+/// passed to [`validate_with_extension_closure`]
+///
+/// [`validate_with_extension_closure`]: crate::Hugr::validate_with_extension_closure
+pub fn infer_extensions(hugr: &impl HugrView) -> Result<ExtensionSolution, InferExtensionError> {
     let mut ctx = UnificationContext::new(hugr);
-    let solution = ctx.main_loop()?;
+    ctx.main_loop()?;
     ctx.instantiate_variables();
-    let closed_solution = ctx.main_loop()?;
-    let closure: ExtensionSolution = closed_solution
+    let all_results = ctx.main_loop()?;
+    let new_results = all_results
         .into_iter()
-        .filter(|(node, _)| !solution.contains_key(node))
+        .filter(|(n, _sol)| hugr.get_nodetype(*n).input_extensions().is_none())
         .collect();
-    Ok((solution, closure))
+    Ok(new_results)
 }
 
 /// Metavariables don't need much
