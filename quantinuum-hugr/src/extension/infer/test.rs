@@ -14,9 +14,15 @@ use crate::ops::{self, dataflow::IOTrait};
 use crate::ops::{LeafOp, OpType};
 #[cfg(feature = "extension_inference")]
 use crate::{
-    builder::test::closed_dfg_root_hugr,
-    hugr::validate::ValidationError,
+    builder::{test::closed_dfg_root_hugr, BuildError, FunctionBuilder},
+    extension::{
+        prelude::{PRELUDE, PRELUDE_ID, PRELUDE_REGISTRY},
+        ExtensionRegistry,
+    },
+    hugr::{hugrmut::sealed::HugrMutInternals, validate::ValidationError},
     ops::{dataflow::DataflowParent, handle::NodeHandle},
+    std_extensions::arithmetic::float_types,
+    utils::test_quantum_extension::EXTENSION_ID,
 };
 
 use crate::type_row;
@@ -797,13 +803,6 @@ fn test_cfg_loops() -> Result<(), Box<dyn Error>> {
 #[test]
 #[cfg(feature = "extension_inference")]
 fn test_validate_with_closure() -> Result<(), Box<dyn Error>> {
-    use crate::builder::BuildError;
-    use crate::builder::FunctionBuilder;
-    use crate::extension::prelude::{PRELUDE, PRELUDE_ID, PRELUDE_REGISTRY};
-    use crate::extension::ExtensionRegistry;
-    use crate::hugr::hugrmut::sealed::HugrMutInternals;
-    use crate::std_extensions::arithmetic::float_types;
-    use crate::utils::test_quantum_extension::EXTENSION_ID;
     let sig = FunctionType::new_endo(type_row![QB_T])
         .with_extension_delta(ExtensionSet::singleton(&EXTENSION_ID));
     let inner_open = {
