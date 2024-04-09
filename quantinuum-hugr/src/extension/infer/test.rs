@@ -16,13 +16,12 @@ use crate::ops::{LeafOp, OpType};
 use crate::{
     builder::{test::closed_dfg_root_hugr, BuildError, FunctionBuilder},
     extension::{
-        prelude::{PRELUDE, PRELUDE_ID, PRELUDE_REGISTRY},
+        prelude::{PRELUDE, PRELUDE_ID},
         ExtensionRegistry,
     },
     hugr::{hugrmut::sealed::HugrMutInternals, validate::ValidationError},
     ops::{dataflow::DataflowParent, handle::NodeHandle},
     std_extensions::arithmetic::float_types,
-    utils::test_quantum_extension::EXTENSION_ID,
 };
 
 use crate::type_row;
@@ -803,18 +802,10 @@ fn test_cfg_loops() -> Result<(), Box<dyn Error>> {
 #[test]
 #[cfg(feature = "extension_inference")]
 fn test_validate_with_closure() -> Result<(), Box<dyn Error>> {
-    let sig = FunctionType::new_endo(type_row![QB_T])
-        .with_extension_delta(ExtensionSet::singleton(&EXTENSION_ID));
+    let sig = FunctionType::new_endo(type_row![QB_T]);
     let inner_open = {
         let mut h = DFGBuilder::new(sig.clone())?;
-        let gate = h.add_dataflow_op(
-            LeafOp::Lift {
-                type_row: type_row![QB_T],
-                new_extension: EXTENSION_ID,
-            },
-            h.input_wires(),
-        )?;
-        h.set_outputs(gate.outputs())?;
+        h.set_outputs(h.input_wires())?;
         // Do not run inference yet
         h.hugr().clone()
     };
@@ -851,11 +842,10 @@ fn test_validate_with_closure() -> Result<(), Box<dyn Error>> {
             root,
             NodeType::new(
                 h.get_optype(root).clone(),
-                ExtensionSet::from_iter([PRELUDE_ID, EXTENSION_ID]),
+                ExtensionSet::from_iter([PRELUDE_ID]),
             ),
-        )
-        .unwrap();
-        h.update_validate(&reg).unwrap(); // Writes 'wrong' solution into inner
+        )?;
+        h.update_validate(&reg)?; // Writes 'wrong' solution into inner
         h
     };
     assert_matches!(
@@ -867,8 +857,7 @@ fn test_validate_with_closure() -> Result<(), Box<dyn Error>> {
     // value - of course this requires knowing the input extensions before we start:
     let inner_good = {
         let mut h = inner_open.clone();
-        h.replace_op(root, NodeType::new_pure(h.get_optype(root).clone()))
-            .unwrap();
+        h.replace_op(root, NodeType::new_pure(h.get_optype(root).clone()))?;
         h.update_validate(&reg)?;
         h
     };
