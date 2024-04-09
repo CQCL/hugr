@@ -5,7 +5,7 @@ mod custom;
 use super::{OpName, OpTrait, StaticTag};
 use super::{OpTag, OpType};
 use crate::extension::ExtensionSet;
-use crate::types::{CustomType, EdgeKind, SumType, SumTypeError, Type};
+use crate::types::{CustomType, EdgeKind, FunctionType, SumType, SumTypeError, Type};
 use crate::{Hugr, HugrView};
 
 use itertools::Itertools;
@@ -93,11 +93,10 @@ pub enum ConstTypeError {
     SumType(#[from] SumTypeError),
     /// Function constant missing a function type.
     #[error(
-        "A function constant cannot be defined using a Hugr with root of type {}.",
-        .hugr_root_type.name()
+        "A function constant cannot be defined using a Hugr with root of type {hugr_root_type:?}. Must be a monomorphic function.",
     )]
-    FunctionTypeMissing {
-        /// The root node type of the Hugr defining the function constant.
+    NotMonomorphicFunction {
+        /// The root node type of the Hugr that (claims to) define the function constant.
         hugr_root_type: OpType,
     },
     /// A mismatch between the type expected and the value.
@@ -108,6 +107,18 @@ pub enum ConstTypeError {
     CustomCheckFail(#[from] CustomCheckFailure),
 }
 
+/// Hugrs (even functions) inside Consts must be monomorphic
+fn mono_fn_type(h: &Hugr) -> Result<FunctionType, ConstTypeError> {
+    if let Some(pf) = h.get_function_type() {
+        if let Ok(ft) = pf.try_into() {
+            return Ok(ft);
+        }
+    }
+    Err(ConstTypeError::NotMonomorphicFunction {
+        hugr_root_type: h.root_type().op().clone(),
+    })
+}
+
 impl Const {
     /// Returns a reference to the type of this [`Const`].
     pub fn const_type(&self) -> Type {
@@ -116,14 +127,7 @@ impl Const {
             Self::Tuple { vs } => Type::new_tuple(vs.iter().map(Self::const_type).collect_vec()),
             Self::Sum { sum_type, .. } => sum_type.clone().into(),
             Self::Function { hugr } => {
-                let func_type = hugr.get_function_type().unwrap_or_else(|| {
-                    panic!(
-                        "{}",
-                        ConstTypeError::FunctionTypeMissing {
-                            hugr_root_type: hugr.get_optype(hugr.root()).clone()
-                        }
-                    )
-                });
+                let func_type = mono_fn_type(hugr).unwrap_or_else(|e| panic!("{}", e));
                 Type::new_function(func_type)
             }
         }
@@ -159,11 +163,7 @@ impl Const {
     /// Returns an error if the Hugr root node does not define a function.
     pub fn function(hugr: impl Into<Hugr>) -> Result<Self, ConstTypeError> {
         let hugr = hugr.into();
-        if hugr.get_function_type().is_none() {
-            Err(ConstTypeError::FunctionTypeMissing {
-                hugr_root_type: hugr.get_optype(hugr.root()).clone(),
-            })?;
-        }
+        mono_fn_type(&hugr)?;
         Ok(Self::Function {
             hugr: Box::new(hugr),
         })
@@ -266,7 +266,7 @@ impl OpTrait for Const {
     }
 
     fn static_output(&self) -> Option<EdgeKind> {
-        Some(EdgeKind::Static(self.const_type()))
+        Some(EdgeKind::Const(self.const_type()))
     }
 }
 

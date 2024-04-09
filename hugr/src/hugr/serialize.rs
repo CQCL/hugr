@@ -503,6 +503,17 @@ pub mod test {
     }
 
     #[test]
+    fn function_type() -> Result<(), Box<dyn std::error::Error>> {
+        let fn_ty = Type::new_function(FunctionType::new_endo(type_row![BOOL_T]));
+        let mut bldr = DFGBuilder::new(FunctionType::new_endo(vec![fn_ty.clone()]))?;
+        let op = bldr.add_dataflow_op(LeafOp::Noop { ty: fn_ty }, bldr.input_wires())?;
+        let h = bldr.finish_prelude_hugr_with_outputs(op.outputs())?;
+
+        check_hugr_roundtrip(&h);
+        Ok(())
+    }
+
+    #[test]
     fn hierarchy_order() -> Result<(), Box<dyn std::error::Error>> {
         let mut hugr = closed_dfg_root_hugr(FunctionType::new(vec![QB], vec![QB]));
         let [old_in, out] = hugr.get_io(hugr.root()).unwrap();

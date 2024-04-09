@@ -149,7 +149,7 @@ impl<T: DataflowOpTrait> StaticTag for T {
 ///
 /// The first ports correspond to the signature of the function being called.
 /// The port immediately following those those is connected to the def/declare
-/// block with a [`EdgeKind::Static`] edge.
+/// block with a [`EdgeKind::Function`] edge.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Call {
     /// Signature of function being called
@@ -171,8 +171,7 @@ impl DataflowOpTrait for Call {
     }
 
     fn static_input(&self) -> Option<EdgeKind> {
-        let fn_typ = Type::new_function(self.called_function_type().clone());
-        Some(EdgeKind::Static(fn_typ))
+        Some(EdgeKind::Function(self.called_function_type().clone()))
     }
 }
 impl Call {
@@ -221,13 +220,29 @@ impl Call {
     pub fn called_function_port(&self) -> IncomingPort {
         self.instantiation.input_count().into()
     }
+
+    pub(crate) fn validate(
+        &self,
+        extension_registry: &ExtensionRegistry,
+    ) -> Result<(), SignatureError> {
+        let other = Self::try_new(
+            self.func_sig.clone(),
+            self.type_args.clone(),
+            extension_registry,
+        )?;
+        if other.instantiation == self.instantiation {
+            Ok(())
+        } else {
+            Err(SignatureError::CallIncorrectlyAppliesType {
+                cached: self.instantiation.clone(),
+                expected: other.instantiation.clone(),
+            })
+        }
+    }
 }
 
 /// Call a function indirectly. Like call, but the function input is a value
-/// (runtime, not static) dataflow edge, and we assume all its binders have
-/// already been given [TypeArg]s by [TypeApply] nodes.
-///
-/// [TypeApply]: crate::ops::LeafOp::TypeApply
+/// (runtime, not static) dataflow edge, and thus does not need any type-args.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct CallIndirect {
     /// Signature of function being called
@@ -270,7 +285,7 @@ impl DataflowOpTrait for LoadConstant {
     }
 
     fn static_input(&self) -> Option<EdgeKind> {
-        Some(EdgeKind::Static(self.constant_type().clone()))
+        Some(EdgeKind::Const(self.constant_type().clone()))
     }
 }
 impl LoadConstant {

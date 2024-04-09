@@ -20,7 +20,7 @@ use crate::ops::custom::{resolve_opaque_op, ExternalOp};
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::{FuncDefn, OpTag, OpTrait, OpType, ValidateOp};
 use crate::types::type_param::TypeParam;
-use crate::types::{EdgeKind, Type};
+use crate::types::EdgeKind;
 use crate::{Direction, Hugr, Node, Port};
 
 use super::views::{HierarchyView, HugrView, SiblingGraph};
@@ -219,17 +219,8 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
             return Ok(());
         }
 
-        match &port_kind {
-            EdgeKind::Value(ty) => ty
-                .validate(self.extension_registry, var_decls)
-                .map_err(|cause| ValidationError::SignatureError { node, cause })?,
-            // Static edges must *not* refer to type variables declared by enclosing FuncDefns
-            // as these are only types at runtime.
-            EdgeKind::Static(ty) => ty
-                .validate(self.extension_registry, &[])
-                .map_err(|cause| ValidationError::SignatureError { node, cause })?,
-            _ => (),
-        }
+        self.validate_port_kind(&port_kind, var_decls)
+            .map_err(|cause| ValidationError::SignatureError { node, cause })?;
 
         let mut link_cnt = 0;
         for (_, link) in links {
@@ -269,6 +260,21 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         }
 
         Ok(())
+    }
+
+    fn validate_port_kind(
+        &self,
+        port_kind: &EdgeKind,
+        var_decls: &[TypeParam],
+    ) -> Result<(), SignatureError> {
+        match &port_kind {
+            EdgeKind::Value(ty) => ty.validate(self.extension_registry, var_decls),
+            // Static edges must *not* refer to type variables declared by enclosing FuncDefns
+            // as these are only types at runtime.
+            EdgeKind::Const(ty) => ty.validate(self.extension_registry, &[]),
+            EdgeKind::Function(pf) => pf.validate(self.extension_registry),
+            _ => Ok(()),
+        }
     }
 
     /// Check operation-specific constraints.
@@ -409,45 +415,26 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         from_optype: &OpType,
         to: Node,
         to_offset: Port,
-    ) -> Result<(), ValidationError> {
+    ) -> Result<(), InterGraphEdgeError> {
         let from_parent = self
             .hugr
             .get_parent(from)
             .expect("Root nodes cannot have ports");
         let to_parent = self.hugr.get_parent(to);
-        let local = Some(from_parent) == to_parent;
-
-        let is_static = match from_optype.port_kind(from_offset).unwrap() {
-            EdgeKind::Static(typ) => {
-                if !(OpTag::Const.is_superset(from_optype.tag())
-                    || OpTag::Function.is_superset(from_optype.tag()))
-                {
-                    return Err(InterGraphEdgeError::InvalidConstSrc {
-                        from,
-                        from_offset,
-                        typ,
-                    }
-                    .into());
-                };
-                true
-            }
-            ty => {
-                if !local && !matches!(&ty, EdgeKind::Value(t) if t.copyable()) {
-                    return Err(InterGraphEdgeError::NonCopyableData {
-                        from,
-                        from_offset,
-                        to,
-                        to_offset,
-                        ty,
-                    }
-                    .into());
-                }
-                false
-            }
-        };
-        if local {
-            return Ok(());
+        let edge_kind = from_optype.port_kind(from_offset).unwrap();
+        if Some(from_parent) == to_parent {
+            return Ok(()); // Local edge
         }
+        let is_static = edge_kind.is_static();
+        if !is_static && !matches!(&edge_kind, EdgeKind::Value(t) if t.copyable()) {
+            return Err(InterGraphEdgeError::NonCopyableData {
+                from,
+                from_offset,
+                to,
+                to_offset,
+                ty: edge_kind,
+            });
+        };
 
         // To detect either external or dominator edges, we traverse the ancestors
         // of the target until we find either `from_parent` (in the external
@@ -489,8 +476,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
                         to,
                         to_offset,
                         ancestor_parent_op: ancestor_parent_op.clone(),
-                    }
-                    .into());
+                    });
                 }
 
                 // Check domination
@@ -513,8 +499,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
                         to_offset,
                         from_parent,
                         ancestor,
-                    }
-                    .into());
+                    });
                 }
 
                 return Ok(());
@@ -526,8 +511,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
             from_offset,
             to,
             to_offset,
-        }
-        .into())
+        })
     }
 
     /// Validates that TypeArgs are valid wrt the [ExtensionRegistry] and that nodes
@@ -573,8 +557,8 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
                     }
                 }
             }
-            OpType::LeafOp(crate::ops::LeafOp::TypeApply { ta }) => {
-                ta.validate(self.extension_registry)
+            OpType::Call(c) => {
+                c.validate(self.extension_registry)
                     .map_err(|cause| ValidationError::SignatureError { node, cause })?;
             }
             _ => (),
@@ -767,14 +751,6 @@ pub enum InterGraphEdgeError {
         to_offset: Port,
         from_parent: Node,
         ancestor: Node,
-    },
-    #[error(
-        "Const edge comes from an invalid node type: {from:?} ({from_offset:?}). Edge type: {typ}"
-    )]
-    InvalidConstSrc {
-        from: Node,
-        from_offset: Port,
-        typ: Type,
     },
 }
 

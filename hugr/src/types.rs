@@ -9,6 +9,7 @@ pub mod type_param;
 pub mod type_row;
 
 pub use crate::ops::constant::{ConstTypeError, CustomCheckFailure};
+use crate::types::type_param::check_type_arg;
 use crate::utils::display_list_with_separator;
 pub use check::SumTypeError;
 pub use custom::CustomType;
@@ -40,8 +41,13 @@ pub enum EdgeKind {
     ControlFlow,
     /// Data edges of a DDG region, also known as "wires".
     Value(Type),
-    /// A reference to a static value definition.
-    Static(Type),
+    /// A reference to a static constant value - must be a Copyable type
+    Const(Type),
+    /// A reference to a function i.e. [FuncDecl] or [FuncDefn]
+    ///
+    /// [FuncDecl]: crate::ops::FuncDecl
+    /// [FuncDefn]: crate::ops::FuncDefn
+    Function(PolyFuncType),
     /// Explicitly enforce an ordering between nodes in a DDG.
     StateOrder,
 }
@@ -50,6 +56,12 @@ impl EdgeKind {
     /// Returns whether the type might contain linear data.
     pub fn is_linear(&self) -> bool {
         matches!(self, EdgeKind::Value(t) if !t.copyable())
+    }
+
+    /// Whether this EdgeKind represents a Static edge (in the spec)
+    /// - i.e. the value is statically known
+    pub fn is_static(&self) -> bool {
+        matches!(self, EdgeKind::Const(_) | EdgeKind::Function(_))
     }
 }
 
@@ -185,8 +197,8 @@ pub enum TypeEnum {
     Alias(AliasDecl),
     #[allow(missing_docs)]
     #[display(fmt = "Function({})", "_0")]
-    Function(Box<PolyFuncType>),
-    // DeBruijn index, and cache of TypeBound (checked in validation)
+    Function(Box<FunctionType>),
+    // Index into TypeParams, and cache of TypeBound (checked in validation)
     #[allow(missing_docs)]
     #[display(fmt = "Variable({})", _0)]
     Variable(usize, TypeBound),
@@ -217,7 +229,7 @@ impl TypeEnum {
 )]
 #[display(fmt = "{}", "_0")]
 #[serde(into = "serialize::SerSimpleType", from = "serialize::SerSimpleType")]
-/// A HUGR type - the valid types of [EdgeKind::Value] and [EdgeKind::Static] edges.
+/// A HUGR type - the valid types of [EdgeKind::Value] and [EdgeKind::Const] edges.
 /// Such an edge is valid if the ports on either end agree on the [Type].
 /// Types have an optional [TypeBound] which places limits on the valid
 /// operations on a type.
@@ -259,7 +271,7 @@ impl Type {
     const EMPTY_TYPEROW_REF: &'static TypeRow = &Self::EMPTY_TYPEROW;
 
     /// Initialize a new function type.
-    pub fn new_function(fun_ty: impl Into<PolyFuncType>) -> Self {
+    pub fn new_function(fun_ty: impl Into<FunctionType>) -> Self {
         Self::new(TypeEnum::Function(Box::new(fun_ty.into())))
     }
 
@@ -302,7 +314,7 @@ impl Type {
         Self(TypeEnum::Sum(SumType::Unit { size }), TypeBound::Eq)
     }
 
-    /// New use (occurrence) of the type variable with specified DeBruijn index.
+    /// New use (occurrence) of the type variable with specified index.
     /// For use in type schemes only: `bound` must match that with which the
     /// variable was declared (i.e. as a [TypeParam::Type]`(bound)`).
     pub fn new_var_use(idx: usize, bound: TypeBound) -> Self {
@@ -355,10 +367,15 @@ impl Type {
         }
     }
 
-    pub(crate) fn substitute(&self, t: &impl Substitution) -> Self {
+    pub(crate) fn substitute(&self, t: &Substitution) -> Self {
         match &self.0 {
             TypeEnum::Alias(_) | TypeEnum::Sum(SumType::Unit { .. }) => self.clone(),
-            TypeEnum::Variable(idx, bound) => t.apply_typevar(*idx, *bound),
+            TypeEnum::Variable(idx, bound) => {
+                let TypeArg::Type { ty } = t.apply_var(*idx, &((*bound).into())) else {
+                    panic!("Variable was not a type - try validate() first")
+                };
+                ty
+            }
             TypeEnum::Extension(cty) => Type::new_extension(cty.substitute(t)),
             TypeEnum::Function(bf) => Type::new_function(bf.substitute(t)),
             TypeEnum::Sum(SumType::General { rows }) => {
@@ -368,26 +385,26 @@ impl Type {
     }
 }
 
-/// A function that replaces type variables with values.
-/// (The values depend upon the implementation, to allow dynamic computation;
-/// and [Substitution] deals only with type variables, other/containing types/typeargs
-/// are handled by [Type::substitute], [TypeArg::substitute] and friends.)
-pub(crate) trait Substitution {
-    /// Apply to a variable of kind [TypeParam::Type]
-    fn apply_typevar(&self, idx: usize, bound: TypeBound) -> Type {
-        let TypeArg::Type { ty } = self.apply_var(idx, &bound.into()) else {
-            panic!("Variable was not a type - try validate() first")
-        };
-        ty
+/// Details a replacement of type variables with a finite list of known values.
+/// (Variables out of the range of the list will result in a panic)
+pub(crate) struct Substitution<'a>(&'a [TypeArg], &'a ExtensionRegistry);
+
+impl<'a> Substitution<'a> {
+    pub(crate) fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg {
+        let arg = self
+            .0
+            .get(idx)
+            .expect("Undeclared type variable - call validate() ?");
+        debug_assert_eq!(check_type_arg(arg, decl), Ok(()));
+        arg.clone()
     }
 
-    /// Apply to a variable whose kind is any given [TypeParam]
-    fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg;
-
-    fn extension_registry(&self) -> &ExtensionRegistry;
+    fn extension_registry(&self) -> &ExtensionRegistry {
+        self.1
+    }
 }
 
-fn subst_row(row: &TypeRow, tr: &impl Substitution) -> TypeRow {
+fn subst_row(row: &TypeRow, tr: &Substitution) -> TypeRow {
     let res = row
         .iter()
         .map(|ty| ty.substitute(tr))
@@ -423,8 +440,6 @@ pub(crate) fn check_typevar_decl(
 
 #[cfg(test)]
 pub(crate) mod test {
-    pub(crate) use poly_func::test::nested_func;
-
     use super::*;
     use crate::{extension::prelude::USIZE_T, ops::AliasDecl};
 
@@ -445,7 +460,7 @@ pub(crate) mod test {
         ]);
         assert_eq!(
             &t.to_string(),
-            "[usize, Function(forall . [[]][]), my_custom, Alias(my_alias)]"
+            "[usize, Function([[]][]), my_custom, Alias(my_alias)]"
         );
     }
 

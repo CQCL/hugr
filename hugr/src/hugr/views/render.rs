@@ -59,8 +59,10 @@ pub(super) fn port_style<H: HugrView + ?Sized>(
         let optype = h.get_optype(node.into());
         let offset = graph.port_offset(port).unwrap();
         match optype.port_kind(offset).unwrap() {
-            EdgeKind::Static(ty) => PortStyle::new(html_escape::encode_text(&format!("{}", ty))),
-            EdgeKind::Value(ty) => PortStyle::new(html_escape::encode_text(&format!("{}", ty))),
+            EdgeKind::Function(pf) => PortStyle::new(html_escape::encode_text(&format!("{}", pf))),
+            EdgeKind::Const(ty) | EdgeKind::Value(ty) => {
+                PortStyle::new(html_escape::encode_text(&format!("{}", ty)))
+            }
             EdgeKind::StateOrder => match graph.port_links(port).count() > 0 {
                 true => PortStyle::text("", false),
                 false => PortStyle::Hidden,
@@ -97,22 +99,28 @@ pub(super) fn edge_style<H: HugrView + ?Sized>(
         let style = match port_kind {
             EdgeKind::StateOrder => EdgeStyle::Dotted,
             EdgeKind::ControlFlow => EdgeStyle::Dashed,
-            EdgeKind::Static(_) | EdgeKind::Value(_) => EdgeStyle::Solid,
+            EdgeKind::Const(_) | EdgeKind::Function(_) | EdgeKind::Value(_) => EdgeStyle::Solid,
         };
 
         // Compute the label for the edge, given the setting flags.
+        fn type_label(e: EdgeKind) -> Option<String> {
+            match e {
+                EdgeKind::Const(ty) | EdgeKind::Value(ty) => Some(format!("{}", ty)),
+                EdgeKind::Function(pf) => Some(format!("{}", pf)),
+                _ => None,
+            }
+        }
         //
         // Only static and value edges have types to display.
         let label = match (
             config.port_offsets_in_edges,
-            config.type_labels_in_edges,
-            port_kind,
+            type_label(port_kind).filter(|_| config.type_labels_in_edges),
         ) {
-            (true, true, EdgeKind::Static(ty) | EdgeKind::Value(ty)) => {
+            (true, Some(ty)) => {
                 format!("{}:{}\n{ty}", src_offset.index(), tgt_offset.index())
             }
-            (true, _, _) => format!("{}:{}", src_offset.index(), tgt_offset.index()),
-            (false, true, EdgeKind::Static(ty) | EdgeKind::Value(ty)) => format!("{}", ty),
+            (true, _) => format!("{}:{}", src_offset.index(), tgt_offset.index()),
+            (false, Some(ty)) => ty.to_string(),
             _ => return style,
         };
         style.with_label(label)

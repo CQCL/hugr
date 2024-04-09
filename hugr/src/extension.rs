@@ -17,9 +17,8 @@ use crate::ops;
 use crate::ops::custom::{ExtensionOp, OpaqueOp};
 use crate::types::type_param::{check_type_args, TypeArgError};
 use crate::types::type_param::{TypeArg, TypeParam};
-use crate::types::{
-    check_typevar_decl, CustomType, PolyFuncType, Substitution, TypeBound, TypeName,
-};
+use crate::types::FunctionType;
+use crate::types::{check_typevar_decl, CustomType, Substitution, TypeBound, TypeName};
 
 #[allow(dead_code)]
 mod infer;
@@ -163,14 +162,16 @@ pub enum SignatureError {
     /// A type variable that was used has not been declared
     #[error("Type variable {idx} was not declared ({num_decls} in scope)")]
     FreeTypeVar { idx: usize, num_decls: usize },
-    /// The type stored in a [LeafOp::TypeApply] is not what we compute from the
-    /// [ExtensionRegistry].
+    /// The result of the type application stored in a [Call]
+    /// is not what we get by applying the type-args to the polymorphic function
     ///
-    /// [LeafOp::TypeApply]: crate::ops::LeafOp::TypeApply
-    #[error("Incorrect result of type application - cached {cached} but expected {expected}")]
-    TypeApplyIncorrectCache {
-        cached: PolyFuncType,
-        expected: PolyFuncType,
+    /// [Call]: crate::ops::dataflow::Call
+    #[error(
+        "Incorrect result of type application in Call - cached {cached} but expected {expected}"
+    )]
+    CallIncorrectlyAppliesType {
+        cached: FunctionType,
+        expected: FunctionType,
     },
 }
 
@@ -418,7 +419,7 @@ impl ExtensionSet {
 
     /// Adds a type var (which must have been declared as a [TypeParam::Extensions]) to this set
     pub fn insert_type_var(&mut self, idx: usize) {
-        // Represent type vars as string representation of DeBruijn index.
+        // Represent type vars as string representation of variable index.
         // This is not a legal IdentList or ExtensionId so should not conflict.
         self.0
             .insert(ExtensionId::new_unchecked(idx.to_string().as_str()));
@@ -491,7 +492,7 @@ impl ExtensionSet {
             .try_for_each(|var_idx| check_typevar_decl(params, var_idx, &TypeParam::Extensions))
     }
 
-    pub(crate) fn substitute(&self, t: &impl Substitution) -> Self {
+    pub(crate) fn substitute(&self, t: &Substitution) -> Self {
         Self::from_iter(self.0.iter().flat_map(|e| match as_typevar(e) {
             None => vec![e.clone()],
             Some(i) => match t.apply_var(i, &TypeParam::Extensions) {

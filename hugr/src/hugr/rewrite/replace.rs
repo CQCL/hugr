@@ -38,7 +38,7 @@ pub enum NewEdgeKind {
         /// The target port
         tgt_pos: IncomingPort,
     },
-    /// An [EdgeKind::Static] edge
+    /// An [EdgeKind::Const] or [EdgeKind::Function] edge
     Static {
         /// The source port
         src_pos: OutgoingPort,
@@ -90,9 +90,10 @@ impl NewEdgeSpec {
             NewEdgeKind::Value { src_pos, .. } => {
                 matches!(optype.port_kind(src_pos), Some(EdgeKind::Value(_)))
             }
-            NewEdgeKind::Static { src_pos, .. } => {
-                matches!(optype.port_kind(src_pos), Some(EdgeKind::Static(_)))
-            }
+            NewEdgeKind::Static { src_pos, .. } => optype
+                .port_kind(src_pos)
+                .as_ref()
+                .is_some_and(EdgeKind::is_static),
             NewEdgeKind::ControlFlow { src_pos } => {
                 matches!(optype.port_kind(src_pos), Some(EdgeKind::ControlFlow))
             }
@@ -107,9 +108,10 @@ impl NewEdgeSpec {
             NewEdgeKind::Value { tgt_pos, .. } => {
                 matches!(optype.port_kind(tgt_pos), Some(EdgeKind::Value(_)))
             }
-            NewEdgeKind::Static { tgt_pos, .. } => {
-                matches!(optype.port_kind(tgt_pos), Some(EdgeKind::Static(_)))
-            }
+            NewEdgeKind::Static { tgt_pos, .. } => optype
+                .port_kind(tgt_pos)
+                .as_ref()
+                .is_some_and(EdgeKind::is_static),
             NewEdgeKind::ControlFlow { .. } => matches!(
                 optype.port_kind(IncomingPort::from(0)),
                 Some(EdgeKind::ControlFlow)

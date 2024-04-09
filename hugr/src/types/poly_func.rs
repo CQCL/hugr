@@ -1,18 +1,16 @@
 //! Polymorphic Function Types
 
-use crate::{
-    extension::{ExtensionRegistry, SignatureError},
-    types::type_param::check_type_arg,
-};
+use crate::extension::{ExtensionRegistry, SignatureError};
 use itertools::Itertools;
 
 use super::type_param::{check_type_args, TypeArg, TypeParam};
 use super::{FunctionType, Substitution};
 
-/// A polymorphic function type, e.g. of a [Graph], or perhaps an [OpDef].
+/// A polymorphic type scheme, i.e. of a [FuncDecl], [FuncDefn] or [OpDef].
 /// (Nodes/operations in the Hugr are not polymorphic.)
 ///
-/// [Graph]: crate::ops::constant::Const::Function
+/// [FuncDecl]: crate::ops::module::FuncDecl
+/// [FuncDefn]: crate::ops::module::FuncDefn
 /// [OpDef]: crate::extension::OpDef
 #[derive(
     Clone, PartialEq, Debug, Default, Eq, derive_more::Display, serde::Serialize, serde::Deserialize,
@@ -24,11 +22,8 @@ use super::{FunctionType, Substitution};
 )]
 pub struct PolyFuncType {
     /// The declared type parameters, i.e., these must be instantiated with
-    /// the same number of [TypeArg]s before the function can be called. Note that within
-    /// the [Self::body], variable (DeBruijn) index 0 is element 0 of this array, i.e. the
-    /// variables are bound from right to left.
-    ///
-    /// [TypeArg]: super::type_param::TypeArg
+    /// the same number of [TypeArg]s before the function can be called. This
+    /// defines the indices used by variables inside the body.
     params: Vec<TypeParam>,
     /// Template for the function. May contain variables up to length of [Self::params]
     body: FunctionType,
@@ -39,6 +34,19 @@ impl From<FunctionType> for PolyFuncType {
         Self {
             params: vec![],
             body,
+        }
+    }
+}
+
+impl TryFrom<PolyFuncType> for FunctionType {
+    /// If the PolyFuncType is not a monomorphic FunctionType, fail with the binders
+    type Error = Vec<TypeParam>;
+
+    fn try_from(value: PolyFuncType) -> Result<Self, Self::Error> {
+        if value.params.is_empty() {
+            Ok(value.body)
+        } else {
+            Err(value.params)
         }
     }
 }
@@ -64,68 +72,10 @@ impl PolyFuncType {
     }
 
     /// Validates this instance, checking that the types in the body are
-    /// wellformed with respect to the registry, and that all type variables
-    /// are declared (perhaps in an enclosing scope, kinds passed in).
-    pub fn validate(
-        &self,
-        reg: &ExtensionRegistry,
-        external_var_decls: &[TypeParam],
-    ) -> Result<(), SignatureError> {
+    /// wellformed with respect to the registry, and the type variables declared.
+    pub fn validate(&self, reg: &ExtensionRegistry) -> Result<(), SignatureError> {
         // TODO https://github.com/CQCL/hugr/issues/624 validate TypeParams declared here, too
-        let mut v; // Declared here so live until end of scope
-        let all_var_decls = if self.params.is_empty() {
-            external_var_decls
-        } else {
-            // Type vars declared here go at lowest indices (as per DeBruijn)
-            v = self.params.clone();
-            v.extend_from_slice(external_var_decls);
-            v.as_slice()
-        };
-        self.body.validate(reg, all_var_decls)
-    }
-
-    pub(super) fn substitute(&self, t: &impl Substitution) -> Self {
-        if self.params.is_empty() {
-            // Avoid using complex code for simple Monomorphic case
-            return self.body.substitute(t).into();
-        }
-        PolyFuncType {
-            params: self.params.clone(),
-            body: self.body.substitute(&InsideBinders {
-                num_binders: self.params.len(),
-                underlying: t,
-            }),
-        }
-    }
-
-    /// (Perhaps-partially) instantiates this [PolyFuncType] into another with fewer binders.
-    /// Note that indices into `args` correspond to the same index within [Self::params],
-    /// so we instantiate the lowest-index [Self::params] first, even though these
-    /// would be considered "innermost" / "closest" according to DeBruijn numbering.
-    pub(crate) fn instantiate_poly(
-        &self,
-        args: &[TypeArg],
-        exts: &ExtensionRegistry,
-    ) -> Result<Self, SignatureError> {
-        let remaining = self.params.get(args.len()..).unwrap_or_default();
-        let mut v;
-        let args = if remaining.is_empty() {
-            args // instantiate below will fail if there were too many
-        } else {
-            // Partial application - renumber remaining params (still bound) downward
-            v = args.to_vec();
-            v.extend(
-                remaining
-                    .iter()
-                    .enumerate()
-                    .map(|(i, decl)| TypeArg::new_var_use(i, decl.clone())),
-            );
-            v.as_slice()
-        };
-        Ok(Self {
-            params: remaining.to_vec(),
-            body: self.instantiate(args, exts)?,
-        })
+        self.body.validate(reg, &self.params)
     }
 
     /// Instantiates an outer [PolyFuncType], i.e. with no free variables
@@ -142,75 +92,7 @@ impl PolyFuncType {
         // Check that args are applicable, and that we have a value for each binder,
         // i.e. each possible free variable within the body.
         check_type_args(args, &self.params)?;
-        Ok(self.body.substitute(&SubstValues(args, ext_reg)))
-    }
-}
-
-/// A [Substitution] with a finite list of known values.
-/// (Variables out of the range of the list will result in a panic)
-struct SubstValues<'a>(&'a [TypeArg], &'a ExtensionRegistry);
-
-impl<'a> Substitution for SubstValues<'a> {
-    fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg {
-        let arg = self
-            .0
-            .get(idx)
-            .expect("Undeclared type variable - call validate() ?");
-        debug_assert_eq!(check_type_arg(arg, decl), Ok(()));
-        arg.clone()
-    }
-
-    fn extension_registry(&self) -> &ExtensionRegistry {
-        self.1
-    }
-}
-
-/// A [Substitution] that renumbers any type variable to another (of the same kind)
-/// with a index increased by a fixed `usize``.
-struct Renumber<'a> {
-    offset: usize,
-    exts: &'a ExtensionRegistry,
-}
-
-impl<'a> Substitution for Renumber<'a> {
-    fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg {
-        TypeArg::new_var_use(idx + self.offset, decl.clone())
-    }
-
-    fn extension_registry(&self) -> &ExtensionRegistry {
-        self.exts
-    }
-}
-
-/// Given a [Substitution] defined outside a binder (i.e. [PolyFuncType]),
-/// applies that transformer to types inside the binder (i.e. arguments/results of said function)
-struct InsideBinders<'a> {
-    /// The number of binders we have entered since (beneath where) we started to apply
-    /// [Self::underlying]).
-    /// That is, the lowest `num_binders` variable indices refer to locals bound since then.
-    num_binders: usize,
-    /// Substitution that was being applied outside those binders (i.e. in outer scope)
-    underlying: &'a dyn Substitution,
-}
-
-impl<'a> Substitution for InsideBinders<'a> {
-    fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg {
-        // Convert variable index into outer scope
-        match idx.checked_sub(self.num_binders) {
-            None => TypeArg::new_var_use(idx, decl.clone()), // Bound locally, unknown to `underlying`
-            Some(idx_in_outer_scope) => {
-                let result_in_outer_scope = self.underlying.apply_var(idx_in_outer_scope, decl);
-                // Transform returned value into the current scope, i.e. avoid the variables newly bound
-                result_in_outer_scope.substitute(&Renumber {
-                    offset: self.num_binders,
-                    exts: self.extension_registry(),
-                })
-            }
-        }
-    }
-
-    fn extension_registry(&self) -> &ExtensionRegistry {
-        self.underlying.extension_registry()
+        Ok(self.body.substitute(&Substitution(args, ext_reg)))
     }
 }
 
@@ -221,7 +103,7 @@ pub(crate) mod test {
     use lazy_static::lazy_static;
     use smol_str::SmolStr;
 
-    use crate::extension::prelude::{array_type, PRELUDE_ID, USIZE_CUSTOM_T, USIZE_T};
+    use crate::extension::prelude::{PRELUDE_ID, USIZE_CUSTOM_T, USIZE_T};
     use crate::extension::{
         ExtensionId, ExtensionRegistry, SignatureError, TypeDefBound, PRELUDE, PRELUDE_REGISTRY,
     };
@@ -244,7 +126,7 @@ pub(crate) mod test {
             extension_registry: &ExtensionRegistry,
         ) -> Result<Self, SignatureError> {
             let res = Self::new(params, body);
-            res.validate(extension_registry, &[])?;
+            res.validate(extension_registry)?;
             Ok(res)
         }
     }
@@ -450,172 +332,5 @@ pub(crate) mod test {
             &[TypeParam::max_nat()],
         )?;
         Ok(())
-    }
-
-    fn new_pf1(param: TypeParam, input: Type, output: Type) -> PolyFuncType {
-        PolyFuncType {
-            params: vec![param],
-            body: FunctionType::new(vec![input], vec![output]),
-        }
-    }
-
-    const USIZE_TA: TypeArg = TypeArg::Type { ty: USIZE_T };
-
-    #[test]
-    fn partial_instantiate() -> Result<(), SignatureError> {
-        // forall A,N.(Array<A,N> -> A)
-        let array_max = PolyFuncType::new_validated(
-            vec![TypeBound::Any.into(), TypeParam::max_nat()],
-            FunctionType::new(
-                vec![array_type(
-                    TypeArg::new_var_use(1, TypeParam::max_nat()),
-                    Type::new_var_use(0, TypeBound::Any),
-                )],
-                vec![Type::new_var_use(0, TypeBound::Any)],
-            ),
-            &PRELUDE_REGISTRY,
-        )?;
-
-        let concrete = FunctionType::new(
-            vec![array_type(TypeArg::BoundedNat { n: 3 }, USIZE_T)],
-            vec![USIZE_T],
-        );
-        let actual = array_max
-            .instantiate_poly(&[USIZE_TA, TypeArg::BoundedNat { n: 3 }], &PRELUDE_REGISTRY)?;
-
-        assert_eq!(actual, concrete.into());
-
-        // forall N.(Array<usize,N> -> usize)
-        let partial = PolyFuncType::new_validated(
-            vec![TypeParam::max_nat()],
-            FunctionType::new(
-                vec![array_type(
-                    TypeArg::new_var_use(0, TypeParam::max_nat()),
-                    USIZE_T,
-                )],
-                vec![USIZE_T],
-            ),
-            &PRELUDE_REGISTRY,
-        )?;
-        let res = array_max.instantiate_poly(&[USIZE_TA], &PRELUDE_REGISTRY)?;
-        assert_eq!(res, partial);
-
-        Ok(())
-    }
-
-    fn list_of_tup(t1: Type, t2: Type) -> Type {
-        let list_def = EXTENSION.get_type(LIST_TYPENAME.as_str()).unwrap();
-        Type::new_extension(
-            list_def
-                .instantiate([TypeArg::Type {
-                    ty: Type::new_tuple(vec![t1, t2]),
-                }])
-                .unwrap(),
-        )
-    }
-
-    // forall A. A -> (forall C. C -> List(Tuple(C, A))
-    pub(crate) fn nested_func() -> PolyFuncType {
-        PolyFuncType::new_validated(
-            vec![TypeBound::Any.into()],
-            FunctionType::new(
-                vec![Type::new_var_use(0, TypeBound::Any)],
-                vec![Type::new_function(new_pf1(
-                    TypeBound::Copyable.into(),
-                    Type::new_var_use(0, TypeBound::Copyable),
-                    list_of_tup(
-                        Type::new_var_use(0, TypeBound::Copyable),
-                        Type::new_var_use(1, TypeBound::Any), // The outer variable (renumbered)
-                    ),
-                ))],
-            ),
-            &REGISTRY,
-        )
-        .unwrap()
-    }
-
-    #[test]
-    fn test_instantiate_nested() -> Result<(), SignatureError> {
-        let outer = nested_func();
-
-        let arg = array_type(TypeArg::BoundedNat { n: 5 }, USIZE_T);
-        // `arg` -> (forall C. C -> List(Tuple(C, `arg`)))
-        let outer_applied = FunctionType::new(
-            vec![arg.clone()], // This had index 0, but is replaced
-            vec![Type::new_function(new_pf1(
-                TypeBound::Copyable.into(),
-                // We are checking that the substitution has been applied to the right var
-                // - NOT to the inner_var which has index 0 here
-                Type::new_var_use(0, TypeBound::Copyable),
-                list_of_tup(
-                    Type::new_var_use(0, TypeBound::Copyable),
-                    arg.clone(), // This had index 1, but is replaced
-                ),
-            ))],
-        );
-
-        let res = outer.instantiate(&[TypeArg::Type { ty: arg }], &REGISTRY)?;
-        assert_eq!(res, outer_applied);
-        Ok(())
-    }
-
-    #[test]
-    fn free_var_under_binder() {
-        let outer = nested_func();
-
-        // Now substitute in a free var from further outside
-        const FREE: usize = 3;
-        const TP_EQ: TypeParam = TypeParam::Type { b: TypeBound::Eq };
-        let res = outer
-            .instantiate(&[TypeArg::new_var_use(FREE, TP_EQ)], &REGISTRY)
-            .unwrap();
-        assert_eq!(
-            res,
-            // F -> forall C. (C -> List(Tuple(C, F)))
-            FunctionType::new(
-                vec![Type::new_var_use(FREE, TypeBound::Eq)],
-                vec![Type::new_function(new_pf1(
-                    TypeBound::Copyable.into(),
-                    Type::new_var_use(0, TypeBound::Copyable), // unchanged
-                    list_of_tup(
-                        Type::new_var_use(0, TypeBound::Copyable),
-                        // Next is the free variable that we substituted in (hence Eq)
-                        // - renumbered because of the intervening forall (Copyable)
-                        Type::new_var_use(FREE + 1, TypeBound::Eq)
-                    )
-                ))]
-            )
-        );
-
-        // Also try substituting in a type containing both free and bound vars
-        let rhs = |i| {
-            Type::new_function(new_pf1(
-                TP_EQ,
-                Type::new_var_use(0, TypeBound::Eq),
-                array_type(
-                    TypeArg::new_var_use(i, TypeParam::max_nat()),
-                    Type::new_var_use(0, TypeBound::Eq),
-                ),
-            ))
-        };
-
-        let res = outer
-            .instantiate(&[TypeArg::Type { ty: rhs(FREE) }], &REGISTRY)
-            .unwrap();
-        assert_eq!(
-            res,
-            FunctionType::new(
-                vec![rhs(FREE)], // Input: forall TEQ. (TEQ -> Array(TEQ, FREE))
-                // Output: forall C. C -> List(Tuple(C, Input))
-                vec![Type::new_function(new_pf1(
-                    TypeBound::Copyable.into(),
-                    Type::new_var_use(0, TypeBound::Copyable),
-                    list_of_tup(
-                        Type::new_var_use(0, TypeBound::Copyable), // not renumbered...
-                        rhs(FREE + 1)                              // renumbered
-                    )
-                ))]
-            )
-        )
     }
 }

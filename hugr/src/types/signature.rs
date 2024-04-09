@@ -11,8 +11,11 @@ use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 use crate::{Direction, IncomingPort, OutgoingPort, Port};
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-/// Describes the edges required to/from a node. This includes both the concept of "signature" in the spec,
+/// Describes the edges required to/from a node, and thus, also the type of a [Graph].
+/// This includes both the concept of "signature" in the spec,
 /// and also the target (value) of a call (static).
+///
+/// [Graph]: crate::ops::constant::Const::Function
 pub struct FunctionType {
     /// Value inputs of the function.
     pub input: TypeRow,
@@ -41,7 +44,7 @@ impl FunctionType {
         self.extension_reqs.validate(var_decls)
     }
 
-    pub(crate) fn substitute(&self, tr: &impl Substitution) -> Self {
+    pub(crate) fn substitute(&self, tr: &Substitution) -> Self {
         FunctionType {
             input: subst_row(&self.input, tr),
             output: subst_row(&self.output, tr),

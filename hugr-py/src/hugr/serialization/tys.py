@@ -172,7 +172,7 @@ class SumType(RootModel):
 
 
 class Variable(BaseModel):
-    """A type variable identified by a de Bruijn index."""
+    """A type variable identified by an index into the array of TypeParams."""
 
     t: Literal["V"] = "V"
     i: int
@@ -188,6 +188,8 @@ class USize(BaseModel):
 class FunctionType(BaseModel):
     """A graph encoded as a value. It contains a concrete signature and a set of
     required resources."""
+
+    t: Literal["G"] = "G"
 
     input: "TypeRow"  # Value inputs of the function.
     output: "TypeRow"  # Value outputs of the function.
@@ -209,15 +211,12 @@ class FunctionType(BaseModel):
 
 
 class PolyFuncType(BaseModel):
-    """A graph encoded as a value. It contains a concrete signature and a set of
-    required resources."""
-
-    t: Literal["G"] = "G"
+    """A polymorphic type scheme, i.e. of a FuncDecl, FuncDefn or OpDef.
+    (Nodes/operations in the Hugr are not polymorphic.)"""
 
     # The declared type parameters, i.e., these must be instantiated with the same
-    # number of TypeArgs before the function can be called. Note that within the body,
-    # variable (DeBruijn) index 0 is element 0 of this array, i.e. the variables are
-    # bound from right to left.
+    # number of TypeArgs before the function can be called. This defines the indices
+    # used for variables within the body.
     params: list[TypeParam]
 
     # Template for the function. May contain variables up to length of `params`
@@ -231,8 +230,8 @@ class PolyFuncType(BaseModel):
         # Needed to avoid random '\n's in the pydantic description
         json_schema_extra = {
             "description": (
-                "A graph encoded as a value. It contains a concrete signature and "
-                "a set of required resources."
+                "A polymorphic type scheme, i.e. of a FuncDecl, FuncDefn or OpDef.  "
+                "(Nodes/operations in the Hugr are not polymorphic.)"
             )
         }
 
@@ -279,7 +278,7 @@ class Type(RootModel):
     """A HUGR type."""
 
     root: Annotated[
-        Qubit | Variable | USize | PolyFuncType | Array | SumType | Opaque,
+        Qubit | Variable | USize | FunctionType | Array | SumType | Opaque,
         WrapValidator(_json_custom_error_validator),
     ] = Field(discriminator="t")
 

@@ -399,7 +399,7 @@ impl OpDef {
         // TODO https://github.com/CQCL/hugr/issues/624 validate declared TypeParams
         // for both type scheme and custom binary
         if let SignatureFunc::TypeScheme(ts) = &self.signature_func {
-            ts.poly_func.validate(exts, &[])?;
+            ts.poly_func.validate(exts)?;
         }
         Ok(())
     }
