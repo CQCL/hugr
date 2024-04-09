@@ -1015,7 +1015,7 @@ However, for OpDef's, greater flexibility is allowed: each OpDef *either*
    `compute_signature` that fallibly computes a (perhaps-polymorphic) type scheme given some initial type arguments.
    The operation declares the arguments required by the `compute_signature` function as a list
    of TypeParams; if this successfully returns a type scheme, that may have additional TypeParams
-   for which TypeArgs must also be provided. 
+   for which TypeArgs must also be provided.
 
 For example, the TypeDef for `array` in the prelude declares two TypeParams: a `BoundedUSize`
 (the array length) and a `Type`. Any valid instantiation (e.g. `array<5, usize>`) is a type.

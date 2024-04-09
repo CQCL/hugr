@@ -211,8 +211,8 @@ class FunctionType(BaseModel):
 
 
 class PolyFuncType(BaseModel):
-    """A graph encoded as a value. It contains a concrete signature and a set of
-    required resources."""
+    """A polymorphic type scheme, i.e. of a FuncDecl, FuncDefn or OpDef.
+    (Nodes/operations in the Hugr are not polymorphic.)"""
 
     # The declared type parameters, i.e., these must be instantiated with the same
     # number of TypeArgs before the function can be called. This defines the indices
@@ -230,8 +230,8 @@ class PolyFuncType(BaseModel):
         # Needed to avoid random '\n's in the pydantic description
         json_schema_extra = {
             "description": (
-                "A graph encoded as a value. It contains a concrete signature and "
-                "a set of required resources."
+                "A polymorphic type scheme, i.e. of a FuncDecl, FuncDefn or OpDef.  "
+                "(Nodes/operations in the Hugr are not polymorphic.)"
             )
         }
 

@@ -6,10 +6,11 @@ use itertools::Itertools;
 use super::type_param::{check_type_args, TypeArg, TypeParam};
 use super::{FunctionType, Substitution};
 
-/// A polymorphic function type, e.g. of a [Graph], or perhaps an [OpDef].
+/// A polymorphic type scheme, i.e. of a [FuncDecl], [FuncDefn] or [OpDef].
 /// (Nodes/operations in the Hugr are not polymorphic.)
 ///
-/// [Graph]: crate::ops::constant::Const::Function
+/// [FuncDecl]: crate::ops::module::FuncDecl
+/// [FuncDefn]: crate::ops::module::FuncDefn
 /// [OpDef]: crate::extension::OpDef
 #[derive(
     Clone, PartialEq, Debug, Default, Eq, derive_more::Display, serde::Serialize, serde::Deserialize,
