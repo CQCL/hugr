@@ -41,7 +41,12 @@ pub fn infer_extensions(hugr: &impl HugrView) -> Result<ExtensionSolution, Infer
     let mut ctx = UnificationContext::new(hugr);
     ctx.main_loop()?;
     ctx.instantiate_variables();
-    ctx.main_loop()
+    let all_results = ctx.main_loop()?;
+    let new_results = all_results
+        .into_iter()
+        .filter(|(n, _sol)| hugr.get_nodetype(*n).input_extensions().is_none())
+        .collect();
+    Ok(new_results)
 }
 
 /// Metavariables don't need much
