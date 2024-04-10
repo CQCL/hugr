@@ -215,7 +215,7 @@ impl SignatureFunc {
         }
     }
 
-    /// Compute the concrete [Signature] for a node
+    /// Compute the concrete signature ([FunctionType]) for a node
     ///
     /// # Panics
     ///
@@ -444,7 +444,7 @@ impl OpDef {
 
 impl Extension {
     /// Add an operation definition to the extension. Must be a type scheme
-    /// (defined by a [`PolyFuncType`]), a type scheme along with binary
+    /// (defined by a [`PolyFuncVarLen`]), a type scheme along with binary
     /// validation for type arguments ([`CustomValidator`]), or a custom binary
     /// function for computing the signature given type arguments (`impl [CustomSignatureFunc]`).
     pub fn add_op(

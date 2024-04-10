@@ -335,7 +335,7 @@ pub trait HugrView: sealed::HugrInternals {
     /// graph. Otherwise, returns `None`.
     ///
     /// In contrast to [`get_function_type`][HugrView::get_function_type], this
-    /// method always return a concrete [`Signature`].
+    /// method always return a concrete [`FunctionType`].
     fn get_df_function_type(&self) -> Option<FunctionType> {
         let op = self.get_optype(self.root());
         op.inner_function_type()

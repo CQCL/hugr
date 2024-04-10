@@ -17,7 +17,10 @@ use itertools::Itertools;
     Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize, derive_more::Display,
 )]
 #[serde(into="SerSimpleType", from="SerSimpleType")]
-/// Either exactly one type; or a variable that can stand for an arbitrary-length [TypeArg::List] of types
+/// Either exactly one type; or a "row variable" that can stand for
+/// an arbitrary-length [TypeArg::Sequence] of types.
+/// 
+/// [TypeArg::Sequence]: crate::types::TypeArg::Sequence
 pub enum RowVarOrType {
     #[display(fmt = "{}", _0)]
     /// A single type, fixed arity
@@ -25,6 +28,9 @@ pub enum RowVarOrType {
     /// A Row variable that can stand for any number of types.
     /// Contains index, and cache of inner TypeBound - the variable must have been declared
     /// as a [TypeParam::List] of [TypeParam::Type] of this bound (checked in validation)
+    /// 
+    /// [TypeParam::List]: crate::types::TypeParam::List
+    /// [TypeParam::Type]: crate::types::TypeParam::Type
     #[display(fmt = "RowVar({})", _0)]
     RV(usize, TypeBound),
 }
