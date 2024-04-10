@@ -23,7 +23,7 @@ use super::{RowVarOrType, Substitution, Type};
     "body"
 )]
 pub struct PolyFuncBase<T>
-where T: TypeRowElem, [T]: ToOwned<Owned = Vec<T>> {
+where T: 'static + Sized + Clone, [T]: ToOwned<Owned = Vec<T>> {
     /// The declared type parameters, i.e., these must be instantiated with
     /// the same number of [TypeArg]s before the function can be called. This
     /// defines the indices used by variables inside the body.
@@ -39,7 +39,7 @@ pub type PolyFuncVarLen = PolyFuncBase<RowVarOrType>;
 /// A type scheme that is polymorphic only over types, so fixed arity.
 pub type PolyFuncType = PolyFuncBase<Type>;
 
-impl<T: TypeRowElem> From<FuncTypeBase<T>> for PolyFuncBase<T>
+impl<T: 'static + Sized + Clone> From<FuncTypeBase<T>> for PolyFuncBase<T>
 where
     [T]: ToOwned<Owned = Vec<T>>,
 {
@@ -51,7 +51,8 @@ where
     }
 }
 
-impl<T: TypeRowElem> TryFrom<PolyFuncBase<T>> for FuncTypeBase<T> {
+impl<T: 'static + Sized + Clone> TryFrom<PolyFuncBase<T>> for FuncTypeBase<T>
+where [T]: ToOwned<Owned = Vec<T>> {
     /// If conversion fails, return the binders (which prevent conversion)
     type Error = Vec<TypeParam>;
 
@@ -70,7 +71,7 @@ impl From<PolyFuncType> for PolyFuncVarLen {
     }
 }
 
-impl<T: TypeRowElem> PolyFuncBase<T>
+impl<T: 'static + Sized + Clone> PolyFuncBase<T>
 where
     [T]: ToOwned<Owned = Vec<T>>,
 {
@@ -92,11 +93,15 @@ where
             body: body.into(),
         }
     }
+}
+
+#[allow(private_bounds)]  // TypeRowElem is pub(super) and these are pub(crate)
+impl <T: TypeRowElem + Clone> PolyFuncBase<T> {
 
     /// Validates this instance, checking that the types in the body are
     /// wellformed with respect to the registry, and that all type variables
     /// are declared (perhaps in an enclosing scope, kinds passed in).
-    pub fn validate(
+    pub(crate) fn validate(
         &self,
         reg: &ExtensionRegistry
     ) -> Result<(), SignatureError> {
@@ -121,6 +126,7 @@ where
         Ok(self.body.substitute(&Substitution(args, ext_reg)))
     }
 }
+
 #[cfg(test)]
 pub(crate) mod test {
     use std::num::NonZeroU64;

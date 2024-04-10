@@ -16,7 +16,7 @@ use crate::{Direction, IncomingPort, OutgoingPort, Port};
 /// and also the target (value) of a call (static).
 pub struct FuncTypeBase<T>
 where
-    T: TypeRowElem,
+    T: 'static + Sized,
     [T]: ToOwned<Owned = Vec<T>>,
 {
     /// Value inputs of the function.
@@ -27,8 +27,7 @@ where
     pub extension_reqs: ExtensionSet,
 }
 
-/// A thing of which we can make rows (i.e. [TypeRowBase]'s)
-pub trait TypeRowElem: 'static + Sized + Clone
+pub(super) trait TypeRowElem: Sized
 where
     [Self]: ToOwned<Owned = Vec<Self>>,
 {
@@ -43,7 +42,7 @@ where
 
 impl<T> Default for FuncTypeBase<T>
 where
-    T: TypeRowElem,
+    T: Clone,
     [T]: ToOwned<Owned = Vec<T>>,
 {
     fn default() -> Self {
@@ -111,7 +110,7 @@ impl TypeRowElem for Type {
 
 impl<T> FuncTypeBase<T>
 where
-    T: TypeRowElem,
+    T: 'static + Sized + Clone,
     [T]: ToOwned<Owned = Vec<T>>,
 {
     /// Builder method, add extension_reqs to an FuncTypeVarLen
@@ -135,26 +134,6 @@ where
         Self::new(linear.clone(), linear)
     }
 
-    pub(crate) fn validate(
-        &self,
-        extension_registry: &ExtensionRegistry,
-        var_decls: &[TypeParam],
-    ) -> Result<(), SignatureError> {
-        self.input
-            .iter()
-            .chain(self.output.iter())
-            .try_for_each(|e| e.validate(extension_registry, var_decls))?;
-        self.extension_reqs.validate(var_decls)
-    }
-
-    pub(crate) fn substitute(&self, tr: &Substitution) -> Self {
-        Self {
-            input: TypeRowElem::subst_row(&self.input, tr),
-            output: TypeRowElem::subst_row(&self.output, tr),
-            extension_reqs: self.extension_reqs.substitute(tr),
-        }
-    }
-
     #[inline]
     /// Returns the input row
     pub fn input(&self) -> &TypeRowBase<T> {
@@ -168,6 +147,34 @@ where
     }
 }
 
+#[allow(private_bounds)] // These methods and TypeRowElem are pub(crate::types)
+impl<T> FuncTypeBase<T>
+where
+    T: TypeRowElem + 'static + Sized + Clone,
+    [T]: ToOwned<Owned = Vec<T>>,
+
+{
+    pub(super) fn validate(
+        &self,
+        extension_registry: &ExtensionRegistry,
+        var_decls: &[TypeParam],
+    ) -> Result<(), SignatureError> {
+        self.input
+            .iter()
+            .chain(self.output.iter())
+            .try_for_each(|e| e.validate(extension_registry, var_decls))?;
+        self.extension_reqs.validate(var_decls)
+    }
+
+    pub(super) fn substitute(&self, tr: &Substitution) -> Self {
+        Self {
+            input: TypeRowElem::subst_row(&self.input, tr),
+            output: TypeRowElem::subst_row(&self.output, tr),
+            extension_reqs: self.extension_reqs.substitute(tr),
+        }
+    }
+
+}
 impl FunctionType {
     /// The number of wires in the signature.
     #[inline(always)]
