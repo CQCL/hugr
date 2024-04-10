@@ -230,7 +230,10 @@ impl TypeEnum {
     Clone, PartialEq, Debug, Eq, derive_more::Display, serde::Serialize, serde::Deserialize,
 )]
 #[display(fmt = "{}", "_0")]
-#[serde(into = "serialize::SerSimpleType", try_from = "serialize::SerSimpleType")]
+#[serde(
+    into = "serialize::SerSimpleType",
+    try_from = "serialize::SerSimpleType"
+)]
 /// A HUGR type - the valid types of [EdgeKind::Value] and [EdgeKind::Const] edges.
 /// Such an edge is valid if the ports on either end agree on the [Type].
 /// Types have an optional [TypeBound] which places limits on the valid
@@ -402,16 +405,26 @@ impl<'a> Substitution<'a> {
             match ta {
                 TypeArg::Type { ty } => return vec![RowVarOrType::T(ty.clone())],
                 TypeArg::Sequence { elems } => return elems.iter().flat_map(flatten).collect(),
-                TypeArg::Variable { v: TypeArgVariable { idx, cached_decl: TypeParam::List { param }} } => {
+                TypeArg::Variable {
+                    v:
+                        TypeArgVariable {
+                            idx,
+                            cached_decl: TypeParam::List { param },
+                        },
+                } => {
                     if let TypeParam::Type { b } = &**param {
-                        return vec![RowVarOrType::RV(*idx, *b)]
+                        return vec![RowVarOrType::RV(*idx, *b)];
                     }
                 }
-                _ => ()
+                _ => (),
             }
             panic!("TypeArg in a Row (List<Type>) was not a type or sequence")
         }
-        flatten(self.0.get(idx).expect("Undeclared type variable - call validate() ?"))
+        flatten(
+            self.0
+                .get(idx)
+                .expect("Undeclared type variable - call validate() ?"),
+        )
     }
 
     fn extension_registry(&self) -> &ExtensionRegistry {

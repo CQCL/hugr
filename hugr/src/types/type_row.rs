@@ -16,10 +16,10 @@ use itertools::Itertools;
 #[derive(
     Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize, derive_more::Display,
 )]
-#[serde(into="SerSimpleType", from="SerSimpleType")]
+#[serde(into = "SerSimpleType", from = "SerSimpleType")]
 /// Either exactly one type; or a "row variable" that can stand for
 /// an arbitrary-length [TypeArg::Sequence] of types.
-/// 
+///
 /// [TypeArg::Sequence]: crate::types::TypeArg::Sequence
 pub enum RowVarOrType {
     #[display(fmt = "{}", _0)]
@@ -28,7 +28,7 @@ pub enum RowVarOrType {
     /// A Row variable that can stand for any number of types.
     /// Contains index, and cache of inner TypeBound - the variable must have been declared
     /// as a [TypeParam::List] of [TypeParam::Type] of this bound (checked in validation)
-    /// 
+    ///
     /// [TypeParam::List]: crate::types::TypeParam::List
     /// [TypeParam::Type]: crate::types::TypeParam::Type
     #[display(fmt = "RowVar({})", _0)]
@@ -231,7 +231,8 @@ impl IntoIterator for TypeRow {
     type IntoIter = itertools::MapInto<<Vec<Type> as IntoIterator>::IntoIter, RowVarOrType>;
 
     fn into_iter(self) -> Self::IntoIter {
-        #[allow(clippy::unnecessary_to_owned)] // Suggestion always copies, rather than only if not already owned
+        #[allow(clippy::unnecessary_to_owned)]
+        // Suggestion always copies, rather than only if not already owned
         self.types.into_owned().into_iter().map_into()
     }
 }
@@ -240,7 +241,8 @@ impl TryInto<TypeRow> for TypeRowVarLen {
     type Error = (usize, TypeBound);
 
     fn try_into(self) -> Result<TypeRow, Self::Error> {
-        #[allow(clippy::unnecessary_to_owned)] // Suggestion always copies, rather than only if not already owned
+        #[allow(clippy::unnecessary_to_owned)]
+        // Suggestion always copies, rather than only if not already owned
         self.types
             .into_owned()
             .into_iter()

@@ -152,7 +152,6 @@ impl<T> FuncTypeBase<T>
 where
     T: TypeRowElem + 'static + Sized + Clone,
     [T]: ToOwned<Owned = Vec<T>>,
-
 {
     pub(super) fn validate(
         &self,
@@ -173,7 +172,6 @@ where
             extension_reqs: self.extension_reqs.substitute(tr),
         }
     }
-
 }
 impl FunctionType {
     /// The number of wires in the signature.

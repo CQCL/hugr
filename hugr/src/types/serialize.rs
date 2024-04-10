@@ -43,7 +43,7 @@ impl From<RowVarOrType> for SerSimpleType {
     fn from(value: RowVarOrType) -> Self {
         match value {
             RowVarOrType::T(t) => t.into(),
-            RowVarOrType::RV(i, b) => SerSimpleType::V {i, b},
+            RowVarOrType::RV(i, b) => SerSimpleType::V { i, b },
         }
     }
 }

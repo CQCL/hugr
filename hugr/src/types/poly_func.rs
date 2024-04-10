@@ -23,7 +23,10 @@ use super::{RowVarOrType, Substitution, Type};
     "body"
 )]
 pub struct PolyFuncBase<T>
-where T: 'static + Sized + Clone, [T]: ToOwned<Owned = Vec<T>> {
+where
+    T: 'static + Sized + Clone,
+    [T]: ToOwned<Owned = Vec<T>>,
+{
     /// The declared type parameters, i.e., these must be instantiated with
     /// the same number of [TypeArg]s before the function can be called. This
     /// defines the indices used by variables inside the body.
@@ -52,13 +55,18 @@ where
 }
 
 impl<T: 'static + Sized + Clone> TryFrom<PolyFuncBase<T>> for FuncTypeBase<T>
-where [T]: ToOwned<Owned = Vec<T>> {
+where
+    [T]: ToOwned<Owned = Vec<T>>,
+{
     /// If conversion fails, return the binders (which prevent conversion)
     type Error = Vec<TypeParam>;
 
     fn try_from(value: PolyFuncBase<T>) -> Result<Self, Self::Error> {
-        if value.params.is_empty() {Ok(value.body)}
-        else {Err(value.params)}
+        if value.params.is_empty() {
+            Ok(value.body)
+        } else {
+            Err(value.params)
+        }
     }
 }
 
@@ -95,16 +103,12 @@ where
     }
 }
 
-#[allow(private_bounds)]  // TypeRowElem is pub(super) and these are pub(crate)
-impl <T: TypeRowElem + Clone> PolyFuncBase<T> {
-
+#[allow(private_bounds)] // TypeRowElem is pub(super) and these are pub(crate)
+impl<T: TypeRowElem + Clone> PolyFuncBase<T> {
     /// Validates this instance, checking that the types in the body are
     /// wellformed with respect to the registry, and that all type variables
     /// are declared (perhaps in an enclosing scope, kinds passed in).
-    pub(crate) fn validate(
-        &self,
-        reg: &ExtensionRegistry
-    ) -> Result<(), SignatureError> {
+    pub(crate) fn validate(&self, reg: &ExtensionRegistry) -> Result<(), SignatureError> {
         // TODO https://github.com/CQCL/hugr/issues/624 validate TypeParams declared here, too
         self.body.validate(reg, &self.params)
     }
