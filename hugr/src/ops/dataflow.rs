@@ -206,7 +206,7 @@ impl Call {
     /// ```
     /// # use hugr::ops::dataflow::Call;
     /// # use hugr::ops::OpType;
-    /// # use hugr::types::Signature;
+    /// # use hugr::types::FunctionType;
     /// # use hugr::extension::prelude::QB_T;
     /// # use hugr::extension::PRELUDE_REGISTRY;
     /// let signature = FunctionType::new(vec![QB_T, QB_T], vec![QB_T, QB_T]);
