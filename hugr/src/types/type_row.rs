@@ -157,16 +157,6 @@ where
     }
 }
 
-impl From<TypeRow> for Cow<'static, [RowVarOrType]> {
-    fn from(val: TypeRow) -> Self {
-        val.types
-            .into_owned()
-            .into_iter()
-            .map(RowVarOrType::from)
-            .collect()
-    }
-}
-
 impl<F, T> From<F> for TypeRowVarLen
 where
     RowVarOrType: From<T>,
