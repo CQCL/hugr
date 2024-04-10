@@ -9,7 +9,7 @@ pub mod type_param;
 pub mod type_row;
 
 pub use crate::ops::constant::{ConstTypeError, CustomCheckFailure};
-use crate::types::type_param::check_type_arg;
+use crate::types::type_param::{check_type_arg, TypeArgVariable};
 use crate::utils::display_list_with_separator;
 pub use check::SumTypeError;
 pub use custom::CustomType;
@@ -199,7 +199,7 @@ pub enum TypeEnum {
     Alias(AliasDecl),
     #[allow(missing_docs)]
     #[display(fmt = "Function({})", "_0")]
-    Function(Box<FunctionType>),
+    Function(Box<FuncTypeVarLen>),
     // Index into TypeParams, and cache of TypeBound (checked in validation)
     #[allow(missing_docs)]
     #[display(fmt = "Variable({})", _0)]
@@ -230,7 +230,7 @@ impl TypeEnum {
     Clone, PartialEq, Debug, Eq, derive_more::Display, serde::Serialize, serde::Deserialize,
 )]
 #[display(fmt = "{}", "_0")]
-#[serde(into = "serialize::SerSimpleType", from = "serialize::SerSimpleType")]
+#[serde(into = "serialize::SerSimpleType", try_from = "serialize::SerSimpleType")]
 /// A HUGR type - the valid types of [EdgeKind::Value] and [EdgeKind::Const] edges.
 /// Such an edge is valid if the ports on either end agree on the [Type].
 /// Types have an optional [TypeBound] which places limits on the valid
@@ -263,13 +263,14 @@ impl Type {
     /// Unit type (empty tuple).
     pub const UNIT: Self = Self(TypeEnum::Sum(SumType::Unit { size: 1 }), TypeBound::Eq);
 
+    #[allow(unused)]
     const EMPTY_TYPEROW_REF: &'static TypeRow = &Self::EMPTY_TYPEROW;
 
     const EMPTY_VL_TYPEROW: TypeRowVarLen = TypeRowVarLen::new();
     const EMPTY_VL_TYPEROW_REF: &'static TypeRowVarLen = &Self::EMPTY_VL_TYPEROW;
 
     /// Initialize a new function type.
-    pub fn new_function(fun_ty: impl Into<FunctionType>) -> Self {
+    pub fn new_function(fun_ty: impl Into<FuncTypeVarLen>) -> Self {
         Self::new(TypeEnum::Function(Box::new(fun_ty.into())))
     }
 
@@ -396,8 +397,21 @@ impl<'a> Substitution<'a> {
         arg.clone()
     }
 
-    fn apply_rowvar(&self, idx: usize, bound: TypeBound) -> Vec<RowVarOrType> {
-        vec![RowVarOrType::T(self.apply_typevar(idx, bound))]
+    fn apply_rowvar(&self, idx: usize, _bound: TypeBound) -> Vec<RowVarOrType> {
+        fn flatten(ta: &TypeArg) -> Vec<RowVarOrType> {
+            match ta {
+                TypeArg::Type { ty } => return vec![RowVarOrType::T(ty.clone())],
+                TypeArg::Sequence { elems } => return elems.iter().flat_map(flatten).collect(),
+                TypeArg::Variable { v: TypeArgVariable { idx, cached_decl: TypeParam::List { param }} } => {
+                    if let TypeParam::Type { b } = &**param {
+                        return vec![RowVarOrType::RV(*idx, *b)]
+                    }
+                }
+                _ => ()
+            }
+            panic!("TypeArg in a Row (List<Type>) was not a type or sequence")
+        }
+        flatten(self.0.get(idx).expect("Undeclared type variable - call validate() ?"))
     }
 
     fn extension_registry(&self) -> &ExtensionRegistry {
@@ -447,7 +461,7 @@ pub(crate) mod test {
     fn construct() {
         let t: Type = Type::new_tuple(vec![
             USIZE_T,
-            Type::new_function(FuncTypeVarLen::default()),
+            Type::new_function(FunctionType::new_endo(vec![])),
             Type::new_extension(CustomType::new(
                 "my_custom",
                 [],

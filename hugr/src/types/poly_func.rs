@@ -3,14 +3,16 @@
 use crate::extension::{ExtensionRegistry, SignatureError};
 use itertools::Itertools;
 
+use super::signature::{FuncTypeBase, TypeRowElem};
 use super::type_param::{check_type_args, TypeArg, TypeParam};
-use super::{FunctionType, Substitution};
+use super::{RowVarOrType, Substitution, Type};
 
 /// A polymorphic type scheme, i.e. of a [FuncDecl], [FuncDefn] or [OpDef].
-/// (Nodes/operations in the Hugr are not polymorphic.)
+/// (Nodes/operations in the Hugr and runtime [Graph] values are monomorphic.)
 ///
 /// [FuncDecl]: crate::ops::module::FuncDecl
 /// [FuncDefn]: crate::ops::module::FuncDefn
+/// [Graph]: crate::ops::constant::Const::Function
 /// [OpDef]: crate::extension::OpDef
 #[derive(
     Clone, PartialEq, Debug, Default, Eq, derive_more::Display, serde::Serialize, serde::Deserialize,
@@ -20,17 +22,28 @@ use super::{FunctionType, Substitution};
     "params.iter().map(ToString::to_string).join(\" \")",
     "body"
 )]
-pub struct PolyFuncType {
+pub struct PolyFuncBase<T>
+where T: TypeRowElem, [T]: ToOwned<Owned = Vec<T>> {
     /// The declared type parameters, i.e., these must be instantiated with
     /// the same number of [TypeArg]s before the function can be called. This
     /// defines the indices used by variables inside the body.
     params: Vec<TypeParam>,
     /// Template for the function. May contain variables up to length of [Self::params]
-    body: FunctionType,
+    body: FuncTypeBase<T>,
 }
 
-impl From<FunctionType> for PolyFuncType {
-    fn from(body: FunctionType) -> Self {
+/// A polymorphic type scheme which may include row variables, hence the
+/// actual number of inputs/outputs may vary according to instantiation.
+pub type PolyFuncVarLen = PolyFuncBase<RowVarOrType>;
+
+/// A type scheme that is polymorphic only over types, so fixed arity.
+pub type PolyFuncType = PolyFuncBase<Type>;
+
+impl<T: TypeRowElem> From<FuncTypeBase<T>> for PolyFuncBase<T>
+where
+    [T]: ToOwned<Owned = Vec<T>>,
+{
+    fn from(body: FuncTypeBase<T>) -> Self {
         Self {
             params: vec![],
             body,
@@ -38,47 +51,60 @@ impl From<FunctionType> for PolyFuncType {
     }
 }
 
-impl TryFrom<PolyFuncType> for FunctionType {
-    /// If the PolyFuncType is not a monomorphic FunctionType, fail with the binders
+impl<T: TypeRowElem> TryFrom<PolyFuncBase<T>> for FuncTypeBase<T> {
+    /// If conversion fails, return the binders (which prevent conversion)
     type Error = Vec<TypeParam>;
 
-    fn try_from(value: PolyFuncType) -> Result<Self, Self::Error> {
-        if value.params.is_empty() {
-            Ok(value.body)
-        } else {
-            Err(value.params)
+    fn try_from(value: PolyFuncBase<T>) -> Result<Self, Self::Error> {
+        if value.params.is_empty() {Ok(value.body)}
+        else {Err(value.params)}
+    }
+}
+
+impl From<PolyFuncType> for PolyFuncVarLen {
+    fn from(value: PolyFuncType) -> Self {
+        Self {
+            params: value.params,
+            body: value.body.into(),
         }
     }
 }
 
-impl PolyFuncType {
+impl<T: TypeRowElem> PolyFuncBase<T>
+where
+    [T]: ToOwned<Owned = Vec<T>>,
+{
     /// The type parameters, aka binders, over which this type is polymorphic
     pub fn params(&self) -> &[TypeParam] {
         &self.params
     }
 
     /// The body of the type, a function type.
-    pub fn body(&self) -> &FunctionType {
+    pub fn body(&self) -> &FuncTypeBase<T> {
         &self.body
     }
 
-    /// Create a new PolyFuncType given the kinds of the variables it declares
-    /// and the underlying [FunctionType].
-    pub fn new(params: impl Into<Vec<TypeParam>>, body: FunctionType) -> Self {
+    /// Create a new PolyFuncBase given the kinds of the variables it declares
+    /// and the underlying [FuncTypeVarLen].
+    pub fn new(params: impl Into<Vec<TypeParam>>, body: impl Into<FuncTypeBase<T>>) -> Self {
         Self {
             params: params.into(),
-            body,
+            body: body.into(),
         }
     }
 
     /// Validates this instance, checking that the types in the body are
-    /// wellformed with respect to the registry, and the type variables declared.
-    pub fn validate(&self, reg: &ExtensionRegistry) -> Result<(), SignatureError> {
+    /// wellformed with respect to the registry, and that all type variables
+    /// are declared (perhaps in an enclosing scope, kinds passed in).
+    pub fn validate(
+        &self,
+        reg: &ExtensionRegistry
+    ) -> Result<(), SignatureError> {
         // TODO https://github.com/CQCL/hugr/issues/624 validate TypeParams declared here, too
         self.body.validate(reg, &self.params)
     }
 
-    /// Instantiates an outer [PolyFuncType], i.e. with no free variables
+    /// Instantiates an outer [PolyFuncBase], i.e. with no free variables
     /// (as ensured by [Self::validate]), into a monomorphic type.
     ///
     /// # Errors
@@ -88,14 +114,13 @@ impl PolyFuncType {
         &self,
         args: &[TypeArg],
         ext_reg: &ExtensionRegistry,
-    ) -> Result<FunctionType, SignatureError> {
+    ) -> Result<FuncTypeBase<T>, SignatureError> {
         // Check that args are applicable, and that we have a value for each binder,
         // i.e. each possible free variable within the body.
         check_type_args(args, &self.params)?;
         Ok(self.body.substitute(&Substitution(args, ext_reg)))
     }
 }
-
 #[cfg(test)]
 pub(crate) mod test {
     use std::num::NonZeroU64;

@@ -1,4 +1,4 @@
-use super::{FunctionType, SumType, Type, TypeArg, TypeBound, TypeEnum};
+use super::{FuncTypeVarLen, RowVarOrType, SumType, Type, TypeArg, TypeBound, TypeEnum};
 
 use super::custom::CustomType;
 
@@ -10,7 +10,7 @@ use crate::ops::AliasDecl;
 pub(super) enum SerSimpleType {
     Q,
     I,
-    G(Box<FunctionType>),
+    G(Box<FuncTypeVarLen>),
     Sum(SumType),
     Array { inner: Box<SerSimpleType>, len: u64 },
     Opaque(CustomType),
@@ -68,7 +68,7 @@ impl TryFrom<SerSimpleType> for Type {
         match value.into() {
             RowVarOrType::T(t) => Ok(t),
             RowVarOrType::RV(idx, bound) => Err(format!(
-                "Type contained Row Variable with DeBruijn index {idx} and bound {bound}"
+                "Type contained Row Variable with index {idx} and bound {bound}"
             )),
         }
     }

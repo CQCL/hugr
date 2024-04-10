@@ -17,8 +17,9 @@ use crate::ops;
 use crate::ops::custom::{ExtensionOp, OpaqueOp};
 use crate::types::type_param::{check_type_args, TypeArgError};
 use crate::types::type_param::{TypeArg, TypeParam};
+use crate::types::FunctionType;
 use crate::types::{
-    check_typevar_decl, CustomType, PolyFuncVarLen, Substitution, TypeBound, TypeName,
+    check_typevar_decl, CustomType, Substitution, TypeBound, TypeName,
 };
 
 #[allow(dead_code)]

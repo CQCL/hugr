@@ -261,7 +261,7 @@ impl DataflowOpTrait for CallIndirect {
         let mut s = self.signature.clone();
         s.input.to_mut().insert(
             0,
-            Type::new_function(PolyFuncType::from(self.signature.clone())),
+            Type::new_function(self.signature.clone()),
         );
         s
     }

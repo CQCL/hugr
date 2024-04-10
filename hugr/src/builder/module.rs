@@ -208,7 +208,8 @@ mod test {
                 FunctionType::new(
                     vec![qubit_state_type.get_alias_type()],
                     vec![qubit_state_type.get_alias_type()],
-                ),
+                )
+                .into(),
             )?;
             n_identity(f_build)?;
             module_builder.finish_hugr(&EMPTY_REG)
@@ -224,11 +225,11 @@ mod test {
 
             let mut f_build = module_builder.define_function(
                 "main",
-                FunctionType::new(type_row![NAT], type_row![NAT, NAT]),
+                FunctionType::new(type_row![NAT], type_row![NAT, NAT]).into(),
             )?;
             let local_build = f_build.define_function(
                 "local",
-                FunctionType::new(type_row![NAT], type_row![NAT, NAT]),
+                FunctionType::new(type_row![NAT], type_row![NAT, NAT]).into(),
             )?;
             let [wire] = local_build.input_wires_arr();
             let f_id = local_build.finish_with_outputs([wire, wire])?;

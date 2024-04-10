@@ -75,8 +75,7 @@ mod test {
     use crate::hugr::{HugrError, HugrMut, NodeType};
     use crate::ops::handle::{BasicBlockID, CfgID, DataflowParentID, DfgID};
     use crate::ops::{DataflowBlock, LeafOp, OpTag};
-    use crate::types::FunctionType;
-    use crate::{ops, type_row, Hugr, HugrView};
+    use crate::{ops, type_row, types::FunctionType, Hugr, HugrView};
 
     #[test]
     fn root_checked() {

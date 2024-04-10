@@ -238,8 +238,10 @@ mod test {
     fn basic_conditional_module() -> Result<(), BuildError> {
         let build_result: Result<Hugr, BuildError> = {
             let mut module_builder = ModuleBuilder::new();
-            let mut fbuild = module_builder
-                .define_function("main", FunctionType::new(type_row![NAT], type_row![NAT]))?;
+            let mut fbuild = module_builder.define_function(
+                "main",
+                FunctionType::new(type_row![NAT], type_row![NAT]).into(),
+            )?;
             let tru_const = fbuild.add_constant(Const::true_val());
             let _fdef = {
                 let const_wire = fbuild.load_const(&tru_const);

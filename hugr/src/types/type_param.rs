@@ -172,8 +172,8 @@ pub enum TypeArg {
 /// Variable in a TypeArg, that is not a [TypeArg::Type] or [TypeArg::Extensions],
 #[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 pub struct TypeArgVariable {
-    idx: usize,
-    cached_decl: TypeParam,
+    pub(super) idx: usize,
+    pub(super) cached_decl: TypeParam,
 }
 
 impl TypeArg {

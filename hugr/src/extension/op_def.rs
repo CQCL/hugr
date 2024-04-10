@@ -195,7 +195,7 @@ impl From<PolyFuncVarLen> for SignatureFunc {
 }
 
 impl From<FuncTypeVarLen> for SignatureFunc {
-    // ALAN might want to be Signature?
+    // ALAN might want to be FunctionType?
     fn from(v: FuncTypeVarLen) -> Self {
         Self::TypeScheme(CustomValidator::from_polyfunc(v))
     }

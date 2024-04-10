@@ -237,7 +237,6 @@ mod test {
     use super::*;
     use cool_asserts::assert_matches;
 
-    use crate::types::FunctionType;
     use crate::utils::test_quantum_extension::{cx_gate, h_gate, measure, q_alloc, q_discard};
     use crate::{
         builder::{
@@ -247,6 +246,7 @@ mod test {
         extension::prelude::BOOL_T,
         ops::{custom::OpaqueOp, LeafOp},
         type_row,
+        types::FunctionType,
     };
 
     #[test]

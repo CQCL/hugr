@@ -285,7 +285,6 @@ where
 mod test {
     use super::Const;
     use crate::builder::test::simple_dfg_hugr;
-    use crate::types::FunctionType;
     use crate::{
         builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
         extension::{
@@ -296,7 +295,7 @@ mod test {
         std_extensions::arithmetic::float_types::{self, ConstF64, FLOAT64_TYPE},
         type_row,
         types::type_param::TypeArg,
-        types::{CustomType, FuncTypeVarLen, Type, TypeBound, TypeRow},
+        types::{CustomType, FunctionType, Type, TypeBound, TypeRow},
     };
     use cool_asserts::assert_matches;
     use rstest::{fixture, rstest};
@@ -416,7 +415,7 @@ mod test {
     fn function_value(simple_dfg_hugr: Hugr) {
         let v = Const::function(simple_dfg_hugr).unwrap();
 
-        let correct_type = Type::new_function(FuncTypeVarLen::new_endo(type_row![
+        let correct_type = Type::new_function(FunctionType::new_endo(type_row![
             crate::extension::prelude::BOOL_T
         ]));
 

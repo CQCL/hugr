@@ -29,13 +29,8 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
         signature: FunctionType,
         input_extensions: Option<ExtensionSet>,
     ) -> Result<Self, BuildError> {
-        let FunctionType {
-            input,
-            output,
-            extension_reqs,
-        } = signature;
-        let num_in_wires = input.len();
-        let num_out_wires = output.len();
+        let num_in_wires = signature.input().len();
+        let num_out_wires = signature.output().len();
         /* For a given dataflow graph with extension requirements IR -> IR + dR,
          - The output node's extension requirements are IR + dR -> IR + dR
            (but we expect no output wires)
@@ -48,15 +43,19 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
            from the input wires as we normally expect, but have to infer the
            output wires and make use of the equality between the two.
         */
-        let input = ops::Input { types: input };
-        let output = ops::Output { types: output };
+        let input = ops::Input {
+            types: signature.input().clone(),
+        };
+        let output = ops::Output {
+            types: signature.output().clone(),
+        };
         base.as_mut()
             .add_node_with_parent(parent, NodeType::new(input, input_extensions.clone()));
         base.as_mut().add_node_with_parent(
             parent,
             NodeType::new(
                 output,
-                input_extensions.map(|inp| inp.union(extension_reqs)),
+                input_extensions.map(|inp| inp.union(signature.extension_reqs)),
             ),
         );
 
@@ -208,17 +207,23 @@ pub(crate) mod test {
     use serde_json::json;
 
     use crate::builder::build_traits::DataflowHugr;
-    use crate::builder::{BuildError, BuilderWiringError, DataflowSubContainer, ModuleBuilder};
+    use crate::builder::{BuilderWiringError, DataflowSubContainer, ModuleBuilder};
     use crate::extension::prelude::BOOL_T;
-    use crate::extension::{ExtensionId, ExtensionSet, EMPTY_REG};
+    use crate::extension::{ExtensionId, EMPTY_REG};
     use crate::hugr::validate::InterGraphEdgeError;
     use crate::ops::{handle::NodeHandle, LeafOp, OpTag};
 
-    use crate::builder::test::{n_identity, BIT, NAT, QB};
     use crate::std_extensions::logic::test::and_op;
     use crate::types::Type;
     use crate::utils::test_quantum_extension::h_gate;
-    use crate::{type_row, Wire};
+    use crate::{
+        builder::{
+            test::{n_identity, BIT, NAT, QB},
+            BuildError,
+        },
+        extension::ExtensionSet,
+        type_row, Wire,
+    };
 
     use super::super::test::simple_dfg_hugr;
     use super::*;
@@ -230,7 +235,7 @@ pub(crate) mod test {
             let _f_id = {
                 let mut func_builder = module_builder.define_function(
                     "main",
-                    FunctionType::new(type_row![NAT, QB], type_row![NAT, QB]),
+                    FunctionType::new(type_row![NAT, QB], type_row![NAT, QB]).into(),
                 )?;
 
                 let [int, qb] = func_builder.input_wires_arr();
@@ -264,7 +269,7 @@ pub(crate) mod test {
 
             let f_build = module_builder.define_function(
                 "main",
-                FunctionType::new(type_row![BOOL_T], type_row![BOOL_T, BOOL_T]),
+                FunctionType::new(type_row![BOOL_T], type_row![BOOL_T, BOOL_T]).into(),
             )?;
 
             f(f_build)?;
@@ -312,8 +317,10 @@ pub(crate) mod test {
         let builder = || {
             let mut module_builder = ModuleBuilder::new();
 
-            let f_build = module_builder
-                .define_function("main", FunctionType::new(type_row![QB], type_row![QB, QB]))?;
+            let f_build = module_builder.define_function(
+                "main",
+                FunctionType::new(type_row![QB], type_row![QB, QB]).into(),
+            )?;
 
             let [q1] = f_build.input_wires_arr();
             f_build.finish_with_outputs([q1, q1])?;
@@ -403,8 +410,10 @@ pub(crate) mod test {
         let mut module_builder = ModuleBuilder::new();
 
         let (dfg_node, f_node) = {
-            let mut f_build = module_builder
-                .define_function("main", FunctionType::new(type_row![BIT], type_row![BIT]))?;
+            let mut f_build = module_builder.define_function(
+                "main",
+                FunctionType::new(type_row![BIT], type_row![BIT]).into(),
+            )?;
 
             let [i1] = f_build.input_wires_arr();
             let dfg = f_build.add_hugr_with_wires(dfg_hugr, [i1])?;

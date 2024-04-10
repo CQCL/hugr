@@ -5,9 +5,11 @@ use super::{
     BasicBlockID, BuildError, CfgID, Container, Dataflow, HugrBuilder, Wire,
 };
 
-use crate::extension::{ExtensionRegistry, ExtensionSet};
 use crate::ops::{self, handle::NodeHandle, DataflowBlock, DataflowParent, ExitBlock, OpType};
-use crate::types::FunctionType;
+use crate::{
+    extension::{ExtensionRegistry, ExtensionSet},
+    types::FunctionType,
+};
 use crate::{hugr::views::HugrView, types::TypeRow};
 
 use crate::Node;
@@ -47,7 +49,7 @@ use crate::{
 ///   builder::{BuildError, CFGBuilder, Container, Dataflow, HugrBuilder},
 ///   Hugr,
 ///   extension::{ExtensionSet, prelude},
-///   types::{FuncTypeVarLen, Type, SumType},
+///   types::{FunctionType, Type, SumType},
 ///   ops,
 ///   type_row,
 /// };
@@ -55,7 +57,7 @@ use crate::{
 /// const NAT: Type = prelude::USIZE_T;
 ///
 /// fn make_cfg() -> Result<Hugr, BuildError> {
-///     let mut cfg_builder = CFGBuilder::new(FuncTypeVarLen::new(type_row![NAT], type_row![NAT]))?;
+///     let mut cfg_builder = CFGBuilder::new(FunctionType::new(type_row![NAT], type_row![NAT]))?;
 ///
 ///     // Outputs from basic blocks must be packed in a sum which corresponds to
 ///     // which successor to pick. We'll either choose the first branch and pass
@@ -85,7 +87,7 @@ use crate::{
 ///     // entry node's `other_outputs`.
 ///     let mut successor_builder =
 ///         cfg_builder.simple_block_builder(
-///           FuncTypeVarLen::new(type_row![NAT, NAT], type_row![NAT]),
+///           FunctionType::new(type_row![NAT, NAT], type_row![NAT]),
 ///           1 // only one successor to this block
 ///         )?;
 ///     let successor_a = {
@@ -100,7 +102,7 @@ use crate::{
 ///
 ///    // The only argument to this block is the entry node's `other_outputs`.
 ///    let mut successor_builder =
-///        cfg_builder.simple_block_builder(FuncTypeVarLen::new(type_row![NAT], type_row![NAT]), 1)?;
+///        cfg_builder.simple_block_builder(FunctionType::new(type_row![NAT], type_row![NAT]), 1)?;
 ///    let successor_b = {
 ///        let sum_unary = successor_builder.add_load_const(ops::Const::unary_unit_sum());
 ///        let [in_wire] = successor_builder.input_wires_arr();
@@ -412,7 +414,7 @@ pub(crate) mod test {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
             let mut func_builder = module_builder
-                .define_function("main", FunctionType::new(vec![NAT], type_row![NAT]))?;
+                .define_function("main", FunctionType::new(vec![NAT], type_row![NAT]).into())?;
             let _f_id = {
                 let [int] = func_builder.input_wires_arr();
 
