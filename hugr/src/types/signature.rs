@@ -27,7 +27,8 @@ where
     pub extension_reqs: ExtensionSet,
 }
 
-pub(super) trait TypeRowElem: 'static + Sized + Clone
+/// A thing of which we can make rows (i.e. [TypeRowBase]'s)
+pub trait TypeRowElem: 'static + Sized + Clone
 where
     [Self]: ToOwned<Owned = Vec<Self>>,
 {

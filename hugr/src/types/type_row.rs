@@ -17,16 +17,21 @@ use itertools::Itertools;
     Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize, derive_more::Display,
 )]
 #[serde(into="SerSimpleType", from="SerSimpleType")]
+/// Either exactly one type; or a variable that can stand for an arbitrary-length [TypeArg::List] of types
 pub enum RowVarOrType {
     #[display(fmt = "{}", _0)]
+    /// A single type, fixed arity
     T(Type),
-    /// DeBruijn index, and cache of inner TypeBound - matches a [TypeParam::List] of [TypeParam::Type]
-    /// of this bound (checked in validation)
+    /// A Row variable that can stand for any number of types.
+    /// Contains index, and cache of inner TypeBound - the variable must have been declared
+    /// as a [TypeParam::List] of [TypeParam::Type] of this bound (checked in validation)
     #[display(fmt = "RowVar({})", _0)]
     RV(usize, TypeBound),
 }
 
 impl RowVarOrType {
+    /// The smallest type bound that covers all type(s) that might
+    /// result after substituting a list in place of the row variable
     pub fn least_upper_bound(&self) -> TypeBound {
         match self {
             RowVarOrType::T(t) => t.least_upper_bound(),
@@ -54,7 +59,12 @@ where
     types: Cow<'static, [T]>,
 }
 
+/// A row of some fixed number of types, i.e. whose length cannot
+/// change as a result of substitution of values for variables
 pub type TypeRow = TypeRowBase<Type>;
+
+/// A row of types whose length may vary if values are substituted
+/// for variables. (That is, it may contain Row Variables.)
 pub type TypeRowVarLen = TypeRowBase<RowVarOrType>;
 
 impl<T: Display> Display for TypeRowBase<T>

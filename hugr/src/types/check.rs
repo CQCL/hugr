@@ -31,6 +31,7 @@ pub enum SumTypeError {
         /// The length of the sum variant found.
         found: usize,
     },
+    /// The value claims to be of a variant which contains a row variable, i.e. is not a concrete type
     #[error("Sum variant #{tag} contained row variable with index {idx} standing for a row of {bound} types")]
     ContainsRowVariables {
         /// The tag of the sum (and value)
