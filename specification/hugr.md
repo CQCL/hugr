@@ -123,33 +123,40 @@ carry an edge weight:
   ordering. They have no edge weight.
 - `Value` edges carry typed data at runtime. They have a *port* at each end, associated
   with the source and target nodes. They have an `AnyType`as an edge weight.
-- `Static` edges are similar to `Value` edges but carry static data (knowable at
-  compilation time). They have a `CopyableType` as an edge weight.
+- `Const` edges are similar to `Value` edges but carry static data (knowable at
+  compilation time). These have as edge weight a `CopyableType`.
+- `Function` edges refer to a statically-known function, but with a type scheme
+  that (unlike values) may be polymorphic---see [Polymorphism](#polymorphism).
 - `ControlFlow` edges represent possible flows of control from one part of the
   program to another. They have no edge weight.
 - `Hierarchy` edges express the relationship between container nodes and their
   children. They have no edge weight.
 
-`Value` and `Static` edges are sometimes referred to as *dataflow* edges.
+It is useful to introduce some terms for broader classes of edge:
+* *Static* edges are the union of the `Const` and `Function` edges
+* *Dataflow* edges are the union of `Value` and Static (thus, `Value`, `Const` and `Function`)
+
 A `Value` edge can carry data of any `AnyType`: these include the `CopyableType`s
 (which can be freely copied or discarded - i.e. ordinary classical data)
 as well as anything which cannot - e.g. quantum data.
-A `Static` edge can only carry a `CopyableType`. For
+A `Const` edge can only carry a `CopyableType`. For
 more details see the [Type System](#type-system) section.
 
-As well as the type, dataflow edges are also parametrized by a
+As well as the type, Dataflow edges are also parametrized by a
 `Locality`, which declares whether the edge crosses levels in the hierarchy. See
 [Edge Locality](#edge-locality) for details.
 
 ```haskell
 AnyType ⊃ CopyableType
 
-EdgeKind ::= Hierarchy | Value(Locality, AnyType) | Static(Local | Ext, CopyableType) | Order | ControlFlow
+EdgeKind ::= Value(Locality, AnyType)
+             | Const(Local | Ext, CopyableType) | Function(Local | Ext, PolyFuncType)
+             | Hierarchy | Order | ControlFlow
 ```
 
-Note that a port is associated with a node and zero or more dataflow edges.
+Note that a port is associated with a node and zero or more Dataflow edges.
 Incoming ports are associated with exactly one edge, or many `ControlFlow` edges.
-All dataflow edges associated with a port have the same type; thus a port has a
+All Dataflow edges associated with a port have the same type; thus a port has a
 well defined type, matching that of its adjoining edges. The incoming and
 outgoing ports of a node are each ordered independently, meaning that the first
 output port will be "0" regardless of how many input ports there are.
@@ -190,11 +197,11 @@ source of the edge will, at runtime, produce a value that is consumed by
 the edge's target. Value edges are from an outgoing port of the
 source node, to an incoming port of the target node.
 
-#### `Static` edges
+#### Static edges (`Const` and `Function`)
 
-A `Static` edge represents dataflow that is statically knowable - i.e.
+A Static edge represents dataflow that is statically knowable - i.e.
 the source is a compile-time constant defined in the program. Hence, the types on these edges
-are classical, and do not include an extension specification. Only a few nodes may be
+are classical. Only a few nodes may be
 sources (`FuncDefn`, `FuncDecl` and `Const`) and targets (`Call` and `LoadConstant`) of
 these edges; see [operations](#node-operations).
 
@@ -231,7 +238,7 @@ edges. The following operations are *only* valid as immediate children of a
 - `FuncDecl`: an external function declaration. The name of the function,
   a list of type parameters (TypeParams, see [Type System](#type-system))
   and function attributes (relevant for compilation)
-  define the node weight. The node has an outgoing `Static<Function>`
+  define the node weight. The node has an outgoing `Function`
   edge for each use of the function. The function name is used at link time to
   look up definitions in linked
   modules (other hugr instances specified to the linker).
@@ -247,7 +254,7 @@ The following operations are valid at the module level as well as in dataflow
 regions and control-flow regions:
 
 - `Const<T>` : a static constant value of type T stored in the node
-  weight. Like `FuncDecl` and `FuncDefn` this has one `Static<T>` out-edge per use.
+  weight. Like `FuncDecl` and `FuncDefn` this has one `Const<T>` out-edge per use.
 - `FuncDefn` : a function definition. Like `FuncDecl` but with a function body.
   The function body is defined by the sibling graph formed by its children.
   At link time `FuncDecl` nodes are replaced by `FuncDefn`.
@@ -272,16 +279,11 @@ the following basic dataflow operations are available (in addition to the
   the inputs to the function, and the inputs to `Output` are the
   outputs of the function.
 - `Call`: Call a statically defined function. There is an incoming
-  `Static<Function>` edge to specify the graph being called. The `Call`
+  `Function` edge to specify the graph being called. The `Call`
   node specifies any type arguments to the function in the node weight,
   and the signature of the node (defined by its incoming and outgoing `Value` edges)
   matches the (type-instantiated) function being called.
-- `TypeApply`: has a `Value<Function>` input, whose type is polymorphic (i.e. declares some type parameters);
-  the node specifies some number of type arguments (matching those parameters) in the node weight;
-  and there is  a `Value<Function>` output (corresponding to the type instantiation of the input
-  - for a *partial* type application, i.e. with fewer arguments than declared type parameters,
-  the output type will also be polymorphic).
-- `LoadConstant<T>`: has an incoming `Static<T>` edge, where `T` is a `CopyableType`, and a
+- `LoadConstant<T>`: has an incoming `Const<T>` edge, where `T` is a `CopyableType`, and a
   `Value<T>` output, used to load a static constant into the local
   dataflow graph.
 - `identity<T>`: pass-through, no operation is performed.
@@ -325,7 +327,7 @@ flowchart
 
 In a dataflow graph, the evaluation semantics are simple: all nodes in
 the graph are necessarily evaluated, in some order (perhaps parallel)
-respecting the dataflow edges. The following operations are used to
+respecting the Dataflow edges. The following operations are used to
 express control flow, i.e. conditional or repeated evaluation.
 
 ##### `Conditional` nodes
@@ -501,8 +503,8 @@ has no parent).
 | Conditional               | **D**                          | `Conditional`      | **C**         | `Case`                   | No edges                                 |
 | **C:** Dataflow container | **D**                          | `TailLoop`         | **C**         |  **D**                   | First(second) is `Input`(`Output`)       |
 | **C**                     | **D**                          | `DFG`              | **C**         |  **D**                   | First(second) is `Input`(`Output`)       |
-| **C**                     | Static                         | `FuncDefn`         | **C**         |  **D**                   | First(second) is `Input`(`Output`)       |
-| **C**                     | ControlFlow                    | `DFB`              | CFG           |  **D**                   | First(second) is `Input`(`Output`)       |
+| **C**                     | `Function`                     | `FuncDefn`         | **C**         |  **D**                   | First(second) is `Input`(`Output`)       |
+| **C**                     | `ControlFlow`                  | `DFB`              | CFG           |  **D**                   | First(second) is `Input`(`Output`)       |
 | **C**                     | \-                             | `Case`             | `Conditional` |  **D**                   | First(second) is `Input`(`Output`)       |
 | Root                      | \-                             | `Module`           | none          |  **D**                   | Contains main `FuncDefn` for executable HUGR. |
 
@@ -535,7 +537,7 @@ There are three possible `CopyableType` edge localities:
 - `Ext`: Edges "in" from a dataflow ancestor.
 - `Dom`: Edges from a dominating basic block in a control-flow graph.
 
-We allow non-local dataflow edges
+We allow non-local Dataflow edges
 n<sub>1</sub>→n<sub>2</sub> where parent(n<sub>1</sub>) \!=
 parent(n<sub>2</sub>) when the edge's locality is:
 
@@ -604,7 +606,7 @@ bypassing the input/output nodes, and we expect this form to make
 rewrites easier to spot. The constraints on input/output node signatures
 remain as before.
 
-HUGRs with only local dataflow edges may still be useful for e.g. register
+HUGRs with only local Dataflow edges may still be useful for e.g. register
 allocation, as that representation makes storage explicit. For example,
 when a true/false subgraph of a Conditional-node wants a value from the
 outside, we add an outgoing port to the Input node of each subgraph, a
@@ -777,7 +779,7 @@ There are three classes of type: `AnyType` $\supset$ `CopyableType` $\supset$ `E
 - The next class is `CopyableType`, i.e. types holding ordinary classical
   data, where values can be copied (and discarded, the 0-ary copy). This
   allows multiple (or 0) outgoing edges from an outport; also these types can
-  be sent down `Static` edges. Note: dataflow inputs (`Value` and `Static`) always
+  be sent down `Const` edges. Note: dataflow inputs (`Value`, `Const` and `Function`) always
   require a single connection.
 
 - The final class is `EqType`: these are copyable types with a well-defined
@@ -796,8 +798,7 @@ Extensions ::= (Extension)* -- a set, not a list
 
 Type ::= Sum([#]) -- disjoint union of rows of other types, tagged by unsigned int
        | Opaque(Name, [TypeArg]) -- a (instantiation of a) custom type defined by an extension
-       | Function(TypeParams, #, #, Extensions) -- polymorphic with type parameters,
-                                                -- function arguments + results, and delta (see below)
+       | Function(#, #, Extensions) -- monomorphic function: arguments, results, and delta (see below)
        | Variable -- refers to a TypeParam bound by the nearest enclosing FuncDefn node, or an enclosing Function Type
 ```
 
@@ -813,7 +814,9 @@ Sums are `CopyableType` (respectively, `EqType`) if all their components are; th
 
 ### Polymorphism
 
-`Function` types are polymorphic: they may declare a number of type parameters of kinds as follows:
+While function *values* passed around the graph at runtime have types that are monomorphic,
+`FuncDecl` and `FuncDefn` nodes have not types but *type schemes* that are *polymorphic*---that is,
+such declarations may include (bind) any number of type parameters, of kinds as follows:
 
 ```haskell
 TypeParam ::= Type(Any|Copyable|Eq)
@@ -824,33 +827,34 @@ TypeParam ::= Type(Any|Copyable|Eq)
             | Opaque(Name, [TypeArg]) -- e.g. Opaque("Array", [5, Opaque("usize", [])])
 ```
 
-For each such TypeParam, the body of the FunctionType (input, output, and extensions - see [Extension Tracking](#extension-tracking))
-may contain "type variables" referring to that TypeParam, i.e. the binder. (The type variable is typically a type, but
-not necessarily, depending upon the TypeParam.)
+The same mechanism is also used for polymorphic OpDefs, see [Extension Implementation](#extension-implementation).
 
-When a `FuncDefn` or `FuncDecl` with such a `Function` type is `Call`ed, the `Call` node statically provides
-TypeArgs appropriate for the TypeParams (and similarly for `TypeApply` nodes):
+Within the type of the Function node, and within the body (Hugr) of a `FuncDefn`,
+types may contain "type variables" referring to those TypeParams.
+The type variable is typically a type, but not necessarily, depending upon the TypeParam.
+
+When a `FuncDefn` or `FuncDecl` is `Call`ed, the `Call` node statically provides
+TypeArgs appropriate for the function's TypeParams:
 
 ```haskell
-TypeArg ::= Type(Type)
+TypeArg ::= Type(Type) -- could be a variable of kind Type, or contain variable(s)
+          | Extensions(Extensions) -- may contain TypeArg's of kind Extensions
+          | Variable -- refers to an enclosing TypeParam (binder) of any kind below
           | BoundedUSize(u64)
-          | Extensions(Extensions)
-          | Sequence([TypeArg])
+          | Sequence([TypeArg]) -- fits either a List or Tuple TypeParam
           | Opaque(Value)
-          | Variable -- refers to an enclosing TypeParam (binder)
 ```
 
-A `Sequence` argument is appropriate for a parameter of kind either `List` or `Tuple`.
-For example, a Function declaring a `TypeParam::Opaque("Array", [5, TypeArg::Type(Type::Opaque("usize"))])`
+For example, a Function node declaring a `TypeParam::Opaque("Array", [5, TypeArg::Type(Type::Opaque("usize"))])`
 means that any `Call` to it must statically provide a *value* that is an array of 5 `usize`s;
-or a Function declaring a `TypeParam::BoundedUSize(5)` and a `TypeParam::Type(Any)` requires two TypeArgs,
+or a Function node declaring a `TypeParam::BoundedUSize(5)` and a `TypeParam::Type(Any)` requires two TypeArgs,
 firstly a non-negative integer less than 5, secondly a type (which might be from an extension, e.g. `usize`).
 
-Given TypeArgs, the body of the `Function` type can be converted to a monomorphic signature by substitution,
+Given TypeArgs, the body of the Function node's type can be converted to a monomorphic signature by substitution,
 i.e. replacing each type variable in the body with the corresponding TypeArg. This is guaranteed to produce
 a valid type as long as the TypeArgs match the declared TypeParams, which can be checked in advance.
 
-(Note that when within a `Function` type, type variables of kind `List`, `Tuple` or `Opaque` will only be usable
+(Note that within a polymorphic type scheme, type variables of kind `Sequence` or `Opaque` will only be usable
 as arguments to Opaque types---see [Extension System](#extension-system).)
 
 ### Extension Tracking
@@ -998,19 +1002,20 @@ at runtime. In many cases this is desirable.
 To strike a balance then, every extension provides declarative structs containing
 named **TypeDef**s and **OpDef**s---see [Declarative Format](#declarative-format).
 These are (potentially polymorphic) definitions of types and operations, respectively---polymorphism arises because both may
-declare any number of TypeParams (as per [Type System](#type-system)). To use a TypeDef as a type,
+declare any number of TypeParams, as per [Polymorphism](#polymorphism). To use a TypeDef as a type,
 it must be instantiated with TypeArgs appropriate for its TypeParams, and similarly
 to use an OpDef as a node operation: each `OpaqueOp` node stores a static-constant list of TypeArgs.
 
 For TypeDef's, any set of TypeArgs conforming to its TypeParams, produces a valid type.
 However, for OpDef's, greater flexibility is allowed: each OpDef *either*
 
-1. Provides a `Function` type, as per [Type System](#type-system), which may declare TypeParams; *or*
+1. Provides a polymorphic type scheme, as per [Type System](#type-system), which may declare TypeParams;
+   values (TypeArgs) provided for those params will be substituted in. *Or*
 2. The extension may self-register binary code (e.g. a Rust trait) providing a function
-   `compute_signature` that fallibly computes a `Function` type given some type arguments.
+   `compute_signature` that fallibly computes a (perhaps-polymorphic) type scheme given some initial type arguments.
    The operation declares the arguments required by the `compute_signature` function as a list
-   of TypeParams; if this successfully returns a `Function` type, then that may then require
-   additional TypeParams.
+   of TypeParams; if this successfully returns a type scheme, that may have additional TypeParams
+   for which TypeArgs must also be provided.
 
 For example, the TypeDef for `array` in the prelude declares two TypeParams: a `BoundedUSize`
 (the array length) and a `Type`. Any valid instantiation (e.g. `array<5, usize>`) is a type.
@@ -1048,7 +1053,7 @@ either or both:
 Whether a particular OpDef provides binary code for `try_lower` is independent
 of whether it provides a binary `compute_signature`, but it will not generally
 be possible to provide a HUGR for an operation whose type cannot be expressed
-as a constant (polymorphic) `Function` type
+using a polymorphic type scheme.
 
 ### Declarative format
 
@@ -1309,10 +1314,10 @@ The new hugr is then derived as follows:
    the existing edges are replaced.
 3. For each $\sigma\_\mathrm{out} \in \mu\_\textrm{out}$, insert a new edge going out of the new
    copy of the `SrcNode` of $\sigma\_\mathrm{out}$ according to the specification $\sigma\_\mathrm{out}$.
-   For Value or Static edges, the target port must have an existing edge whose source is in $R$;
+   For `Value` or Static edges, the target port must have an existing edge whose source is in $R$;
    this edge is removed.
 4. For each $\sigma\_\mathrm{new} \in \mu\_\textrm{new}$, insert a new edge
-   between the existing `SrcNode` and `TgtNode` in $\Gamma$. For Value/Static edges,
+   between the existing `SrcNode` and `TgtNode` in $\Gamma$. For `Value` or Static edges,
    the target port must have an existing edge whose source is in $R$; this edge is removed.
 5. Let $N$ be the ordered list of the copies made in $\Gamma$ of the children of the root node of $G$.
    For each child $C$ of $P$ (in order), if $C \in S$, redirect the hierarchy edge $P \rightarrow C$ to
@@ -1401,7 +1406,7 @@ remove it. (If there is an non-local edge from `n0` to a descendent of
 ###### `InsertConstIgnore`
 
 Given a `Const<T>` node `c`, and optionally `P`, a parent of a DSG, add a new
-`LoadConstant<T>` node `n` as a child of `P` with a `Static<T>` edge
+`LoadConstant<T>` node `n` as a child of `P` with a `Const<T>` edge
 from `c` to `n` and no outgoing edges from `n`.  Return the ID of `n`. If `P` is
 omitted it defaults to the parent of `c` (in this case said `c` will
 have to be in a DSG or CSG rather than under the Module Root.) If `P` is
@@ -1451,7 +1456,7 @@ Similarly, replacement of a CFG node having a single BasicBlock child
 with a DFG node can be achieved using `Replace` (specifying the
 BasicBlock node as the surrogate parent for the new DFG's children).
 
-Arbitrary node insertion on dataflow edges can be achieved using
+Arbitrary node insertion on Dataflow edges can be achieved using
 `InsertIdentity` followed by `Replace`. Removal of a node in a DSG
 having input wires and output wires of the same type can be achieved
 using `Replace` (with a set of `identity<T>` nodes) followed by
@@ -1601,9 +1606,9 @@ list than those children, and `Input` nodes should appear before their matching
 
 ## Architecture
 
-The HUGR is implemented as a Rust crate named `quantinuum-hugr`. This
+The HUGR is implemented as a Rust crate named `hugr`. This
 crate is intended to be a common dependency for all projects, and is published
-at the [crates.io registry](https://crates.io/crates/quantinuum-hugr).
+at the [crates.io registry](https://crates.io/crates/hugr).
 
 The HUGR is represented internally using structures from the `portgraph`
 crate. A base PortGraph is composed with hierarchy (as an alternate
@@ -1815,7 +1820,7 @@ Conversions between integers and floats:
   node, with all the edges between them. Includes exactly one entry
   and one exit node. Nodes are basic blocks, edges point to possible
   successors.
-- **Dataflow edge** either a Value edge or a Static edge; has a type,
+- **Dataflow edge** either a `Value` edge or a Static edge; has a type,
   and runs between an output port and an input port.
 - **Dataflow Sibling Graph (DSG)**: The set of all children of a given
   Dataflow container node, with all edges between them. Includes
@@ -1828,14 +1833,14 @@ Conversions between integers and floats:
   value edges.
 - **FuncDecl node**: child of a module, indicates that an external
   function exists but without giving a definition. May be the source
-  of Static-edges to Call nodes and others.
+  of `Function`-edges to Call nodes.
 - **FuncDefn node**: child of a module node, defines a function (by being
-  parent to the function's body). May be the source of Static-edges to
-  Call nodes and others.
+  parent to the function's body). May be the source of `Function`-edges
+  to Call nodes.
 - **DFG node**: A node representing a data-flow graph. Its children
   are all data-dependency nodes.
-- **edge kind**: There are five kinds of edge: value edge, order edge,
-  control-flow edge, Static edge, and hierarchy edge.
+- **edge kind**: There are six kinds of edge: `Value` edge, order edge, hierarchy edge,
+  control-flow edge, `Const` edge and `Function` edge.
 - **edge type:** Typing information attached to a value edge or Static
   edge (representing the data type of value that the edge carries).
 - **entry node**: The distinguished node of a CFG representing the
@@ -1883,6 +1888,7 @@ Conversions between integers and floats:
   input and output signatures.
 - **simple type**: a quantum or classical type annotated with the
   Extensions required to produce the value
+- **Static edge**: either a `Const` or `Function` edge
 - **order edge**: An edge implying dependency of the target node on
   the source node.
 - **TailLoop node**: TODO
@@ -1981,26 +1987,26 @@ one". For example, "1, ✱" means "one edge in, any number out".
 The "Root" row of the table applies to whichever node is the HUGR root,
 including `Module`.
 
-| Node type      | `Value` | `Order` | `Static` | `ControlFlow` | `Hierarchy` | Children |
-| -------------- | ------- | ------- |--------- | ------------- | ----------- | -------- |
-| Root           | 0, 0    | 0, 0    | 0, 0     | 0, 0          | 0, ✱        |          |
-| `FuncDefn`     | 0, 0    | 0, 0    | 0, ✱     | 0, 0          | 1, +        | DSG      |
-| `FuncDecl`     | 0, 0    | 0, 0    | 0, ✱     | 0, 0          | 1, 0        |          |
-| `AliasDefn`    | 0, 0    | 0, 0    | 0, 0     | 0, 0          | 1, 0        |          |
-| `AliasDecl`    | 0, 0    | 0, 0    | 0, 0     | 0, 0          | 1, 0        |          |
-| `Const`        | 0, 0    | 0, 0    | 0, ✱     | 0, 0          | 1, 0        |          |
-| `LoadConstant` | 0, 1    | +, ✱    | 1, 0     | 0, 0          | 1, 0        |          |
-| `Input`        | 0, ✱    | 0, ✱    | 0, 0     | 0, 0          | 1, 0        |          |
-| `Output`       | ✱, 0    | ✱, 0    | 0, 0     | 0, 0          | 1, 0        |          |
-| `LeafOp`       | ✱, ✱    | ✱, ✱    | ✱, 0     | 0, 0          | 1, 0        |          |
-| `Call`         | ✱, ✱    | ✱, ✱    | 1, 0     | 0, 0          | 1, 0        |          |
-| `DFG`          | ✱, ✱    | ✱, ✱    | 0, 0     | 0, 0          | 1, +        | DSG      |
-| `CFG`          | ✱, ✱    | ✱, ✱    | 0, 0     | 0, 0          | 1, +        | CSG      |
-| `DFB`          | 0, 0    | 0, 0    | 0, 0     | ✱, ✱          | 1, +        | DSG      |
-| `Exit`         | 0, 0    | 0, 0    | 0, 0     | +, 0          | 1, 0        |          |
-| `TailLoop`     | ✱, ✱    | ✱, ✱    | 0, 0     | 0, 0          | 1, +        | DSG      |
-| `Conditional`  | ✱, ✱    | ✱, ✱    | 0, 0     | 0, 0          | 1, +        | `Case`   |
-| `Case`         | 0, 0    | 0, 0    | 0, 0     | 0, 0          | 1, +        | DSG      |
+| Node type      | `Value` | `Order` | `Const` | `Function` | `ControlFlow` | `Hierarchy` | Children |
+| -------------- | ------- | ------- |-------- | ---------- | ------------- | ----------- | -------- |
+| Root           | 0, 0    | 0, 0    | 0, 0    | 0, 0       | 0, 0          | 0, ✱        |          |
+| `FuncDefn`     | 0, 0    | 0, 0    | 0, 0    | 0, *       | 0, 0          | 1, +        | DSG      |
+| `FuncDecl`     | 0, 0    | 0, 0    | 0, 0    | 0, *       | 0, 0          | 1, 0        |          |
+| `AliasDefn`    | 0, 0    | 0, 0    | 0, 0    | 0, 0       | 0, 0          | 1, 0        |          |
+| `AliasDecl`    | 0, 0    | 0, 0    | 0, 0    | 0, 0       | 0, 0          | 1, 0        |          |
+| `Const`        | 0, 0    | 0, 0    | 0, ✱    | 0, 0       | 0, 0          | 1, 0        |          |
+| `LoadConstant` | 0, 1    | +, ✱    | 1, 0    | 0, 0       | 0, 0          | 1, 0        |          |
+| `Input`        | 0, ✱    | 0, ✱    | 0, 0    | 0, 0       | 0, 0          | 1, 0        |          |
+| `Output`       | ✱, 0    | ✱, 0    | 0, 0    | 0, 0       | 0, 0          | 1, 0        |          |
+| `LeafOp`       | ✱, ✱    | ✱, ✱    | 0, 0    | 0, 0       | 0, 0          | 1, 0        |          |
+| `Call`         | ✱, ✱    | ✱, ✱    | 0, 0    | 1, 0       | 0, 0          | 1, 0        |          |
+| `DFG`          | ✱, ✱    | ✱, ✱    | 0, 0    | 0, 0       | 0, 0          | 1, +        | DSG      |
+| `CFG`          | ✱, ✱    | ✱, ✱    | 0, 0    | 0, 0       | 0, 0          | 1, +        | CSG      |
+| `DFB`          | 0, 0    | 0, 0    | 0, 0    | 0, 0       | ✱, ✱          | 1, +        | DSG      |
+| `Exit`         | 0, 0    | 0, 0    | 0, 0    | 0, 0       | +, 0          | 1, 0        |          |
+| `TailLoop`     | ✱, ✱    | ✱, ✱    | 0, 0    | 0, 0       | 0, 0          | 1, +        | DSG      |
+| `Conditional`  | ✱, ✱    | ✱, ✱    | 0, 0    | 0, 0       | 0, 0          | 1, +        | `Case`   |
+| `Case`         | 0, 0    | 0, 0    | 0, 0    | 0, 0       | 0, 0          | 1, +        | DSG      |
 
 ### Appendix 3: Binary `compute_signature`
 
@@ -2009,11 +2015,11 @@ When an OpDef provides a binary `compute_signature` function, and an operation n
 - the node provides a list of TypeArgs, at least as many as the $n$ TypeParams declared by the OpDef
 - the first $n$ of those are passed to the binary `compute_signature`
 - if the binary function returns an error, the operation is invalid;
-- otherwise, `compute_signature` returns a `Function` type (which may itself be polymorphic)
-- any remaining TypeArgs in the node (after the first $n$) are then substituted into that returned `Function` type
+- otherwise, `compute_signature` returns a type scheme (which may itself be polymorphic)
+- any remaining TypeArgs in the node (after the first $n$) are then substituted into that returned type scheme
   (the number remaining in the node must match exactly).
   **Note** this allows the binary function to use the values (TypeArgs) passed in---e.g.
-  by looking inside `List` or `Opaque` TypeArgs---to determine the structure (and degree of polymorphism) of the returned `Function` type.
+  by looking inside `List` or `Opaque` TypeArgs---to determine the structure (and degree of polymorphism) of the returned type scheme.
 - We require that the TypeArgs to be passed to `compute_signature` (the first $n$)
   must *not* refer to any type variables (declared by ancestor nodes in the Hugr - the nearest enclosing FuncDefn);
   these first $n$ must be static constants unaffected by substitution.

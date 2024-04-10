@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Dumps the json schema for `quantinuum_hugr.serialization.SerialHugr` to a file.
+"""Dumps the json schema for `hugr.serialization.SerialHugr` to a file.
 
 The schema is written to a file named `hugr_schema_v#.json` in the specified output directory.
 If no output directory is specified, the schema is written to the current working directory.
@@ -13,7 +13,7 @@ from pathlib import Path
 
 from pydantic import TypeAdapter
 
-from quantinuum_hugr.serialization import SerialHugr
+from hugr.serialization import SerialHugr
 
 if __name__ == "__main__":
     if len(sys.argv) == 1:
