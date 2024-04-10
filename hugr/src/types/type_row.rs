@@ -7,7 +7,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use super::{Type, TypeBound};
+use super::{serialize::SerSimpleType, Type, TypeBound};
 use crate::utils::display_list;
 use crate::PortIndex;
 use delegate::delegate;
@@ -16,6 +16,7 @@ use itertools::Itertools;
 #[derive(
     Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize, derive_more::Display,
 )]
+#[serde(into="SerSimpleType", from="SerSimpleType")]
 pub enum RowVarOrType {
     #[display(fmt = "{}", _0)]
     T(Type),

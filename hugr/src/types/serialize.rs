@@ -39,6 +39,15 @@ impl From<Type> for SerSimpleType {
     }
 }
 
+impl From<RowVarOrType> for SerSimpleType {
+    fn from(value: RowVarOrType) -> Self {
+        match value {
+            RowVarOrType::T(t) => t.into(),
+            RowVarOrType::RV(i, b) => SerSimpleType::V {i, b},
+        }
+    }
+}
+
 impl From<SerSimpleType> for RowVarOrType {
     fn from(value: SerSimpleType) -> RowVarOrType {
         let ty = match value {
