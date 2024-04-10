@@ -225,6 +225,7 @@ impl IntoIterator for TypeRow {
     type IntoIter = itertools::MapInto<<Vec<Type> as IntoIterator>::IntoIter, RowVarOrType>;
 
     fn into_iter(self) -> Self::IntoIter {
+        #[allow(clippy::unnecessary_to_owned)] // Suggestion always copies, rather than only if not already owned
         self.types.into_owned().into_iter().map_into()
     }
 }
@@ -233,6 +234,7 @@ impl TryInto<TypeRow> for TypeRowVarLen {
     type Error = (usize, TypeBound);
 
     fn try_into(self) -> Result<TypeRow, Self::Error> {
+        #[allow(clippy::unnecessary_to_owned)] // Suggestion always copies, rather than only if not already owned
         self.types
             .into_owned()
             .into_iter()
