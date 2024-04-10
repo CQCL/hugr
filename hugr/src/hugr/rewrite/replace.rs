@@ -628,7 +628,7 @@ mod test {
                     OpType::CFG(c) => &c.signature.input,
                     _ => panic!(),
                 },
-                &op_sig.input
+                op_sig.input()
             );
             h.simple_entry_builder(op_sig.output, 1, op_sig.extension_reqs.clone())?
         } else {

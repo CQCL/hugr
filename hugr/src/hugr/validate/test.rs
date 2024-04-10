@@ -663,7 +663,7 @@ mod extension_tests {
         b.replace_op(
             copy,
             NodeType::new_pure(ops::CFG {
-                signature: FuncTypeVarLen::new(type_row![BOOL_T], type_row![BOOL_T]),
+                signature: FunctionType::new(type_row![BOOL_T], type_row![BOOL_T]),
             }),
         )
         .unwrap();
@@ -745,7 +745,7 @@ mod extension_tests {
         // The DFG node declares that it has an empty extension delta,
         // but it's child graph adds extension "XB", causing a mismatch.
         let mut hugr = Hugr::new(NodeType::new_pure(ops::DFG {
-            signature: FuncTypeVarLen::new(type_row![USIZE_T], type_row![USIZE_T]),
+            signature: FunctionType::new(type_row![USIZE_T], type_row![USIZE_T]),
         }));
 
         let input = hugr.add_node_with_parent(
@@ -792,12 +792,12 @@ mod extension_tests {
         let mut module_builder = ModuleBuilder::new();
         let mut main = module_builder.define_function(
             "main",
-            FuncTypeVarLen::new(type_row![NAT], type_row![NAT]).into(),
+            FunctionType::new(type_row![NAT], type_row![NAT]).into(),
         )?;
         let [main_input] = main.input_wires_arr();
 
         let f_builder = main.dfg_builder(
-            FuncTypeVarLen::new(type_row![NAT], type_row![NAT]),
+            FunctionType::new(type_row![NAT], type_row![NAT]),
             // Inner DFG has extension requirements that the wire wont satisfy
             Some(ExtensionSet::from_iter([XA, XB])),
             [main_input],
@@ -825,13 +825,12 @@ mod extension_tests {
     fn too_many_extension() -> Result<(), BuildError> {
         let mut module_builder = ModuleBuilder::new();
 
-        let main_sig = FuncTypeVarLen::new(type_row![NAT], type_row![NAT]).into();
+        let main_sig = FunctionType::new(type_row![NAT], type_row![NAT]).into();
 
         let mut main = module_builder.define_function("main", main_sig)?;
         let [main_input] = main.input_wires_arr();
 
-        let inner_sig =
-            FuncTypeVarLen::new(type_row![NAT], type_row![NAT]).with_extension_delta(XA);
+        let inner_sig = FunctionType::new(type_row![NAT], type_row![NAT]).with_extension_delta(XA);
 
         let f_builder = main.dfg_builder(inner_sig, Some(ExtensionSet::new()), [main_input])?;
         let f_inputs = f_builder.input_wires();
@@ -858,7 +857,7 @@ mod extension_tests {
 
         let all_rs = ExtensionSet::from_iter([XA, XB]);
 
-        let main_sig = FuncTypeVarLen::new(type_row![], type_row![NAT])
+        let main_sig = FunctionType::new(type_row![], type_row![NAT])
             .with_extension_delta(all_rs.clone())
             .into();
 
@@ -866,7 +865,7 @@ mod extension_tests {
 
         let [left_wire] = main
             .dfg_builder(
-                FuncTypeVarLen::new(type_row![], type_row![NAT]),
+                FunctionType::new(type_row![], type_row![NAT]),
                 Some(XA.into()),
                 [],
             )?
@@ -875,7 +874,7 @@ mod extension_tests {
 
         let [right_wire] = main
             .dfg_builder(
-                FuncTypeVarLen::new(type_row![], type_row![NAT]),
+                FunctionType::new(type_row![], type_row![NAT]),
                 Some(XB.into()),
                 [],
             )?
@@ -883,7 +882,7 @@ mod extension_tests {
             .outputs_arr();
 
         let builder = main.dfg_builder(
-            FuncTypeVarLen::new(type_row![NAT, NAT], type_row![NAT]),
+            FunctionType::new(type_row![NAT, NAT], type_row![NAT]),
             Some(all_rs),
             [left_wire, right_wire],
         )?;
@@ -904,7 +903,7 @@ mod extension_tests {
     #[test]
     fn parent_signature_mismatch() {
         let main_signature =
-            FuncTypeVarLen::new(type_row![NAT], type_row![NAT]).with_extension_delta(XA);
+            FunctionType::new(type_row![NAT], type_row![NAT]).with_extension_delta(XA);
 
         let mut hugr = Hugr::new(NodeType::new_pure(ops::DFG {
             signature: main_signature,

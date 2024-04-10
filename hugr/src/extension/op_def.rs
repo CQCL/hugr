@@ -486,8 +486,8 @@ mod test {
     use crate::ops::custom::ExternalOp;
     use crate::ops::LeafOp;
     use crate::std_extensions::collections::{EXTENSION, LIST_TYPENAME};
-    use crate::types::{type_param::TypeParam, FuncTypeVarLen, FunctionType, TypeArg, TypeBound};
-    use crate::types::{PolyFuncVarLen, Type};
+    use crate::types::type_param::TypeParam;
+    use crate::types::{FuncTypeVarLen, FunctionType, PolyFuncVarLen, Type, TypeArg, TypeBound};
     use crate::Hugr;
     use crate::{const_extension_ids, Extension};
 

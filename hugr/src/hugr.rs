@@ -376,13 +376,13 @@ mod test {
         use crate::hugr::HugrMut;
         use crate::ops::LeafOp;
         use crate::type_row;
-        use crate::types::{FuncTypeVarLen, Type};
+        use crate::types::{FunctionType, Type};
 
         const BIT: Type = crate::extension::prelude::USIZE_T;
         let r = ExtensionSet::singleton(&"R".try_into().unwrap());
 
         let mut hugr = closed_dfg_root_hugr(
-            FuncTypeVarLen::new(type_row![BIT], type_row![BIT]).with_extension_delta(r.clone()),
+            FunctionType::new(type_row![BIT], type_row![BIT]).with_extension_delta(r.clone()),
         );
         let [input, output] = hugr.get_io(hugr.root()).unwrap();
         let lift = hugr.add_node_with_parent(
