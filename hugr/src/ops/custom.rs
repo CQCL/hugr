@@ -7,39 +7,51 @@ use thiserror::Error;
 use crate::extension::{ConstFoldResult, ExtensionId, ExtensionRegistry, OpDef, SignatureError};
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::hugr::{HugrView, NodeType};
+use crate::types::EdgeKind;
 use crate::types::{type_param::TypeArg, FunctionType};
 use crate::{ops, Hugr, IncomingPort, Node};
 
 use super::dataflow::DataflowOpTrait;
 use super::tag::OpTag;
-use super::{CustomOp, OpTrait, OpType};
+use super::{OpName, OpTrait, OpType};
 
-/// An instantiation of an operation (declared by a extension) with values for the type arguments
+/// A user-defined operation that can be downcasted by the extensions that
+/// define it.
 #[derive(Clone, Debug, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(into = "OpaqueOp", from = "OpaqueOp")]
-pub enum ExternalOp {
+pub enum CustomOp {
     /// When we've found (loaded) the [Extension] definition and identified the [OpDef]
     ///
     /// [Extension]: crate::Extension
-    Extension(ExtensionOp),
+    Extension(Box<ExtensionOp>),
     /// When we either haven't tried to identify the [Extension] or failed to find it.
     ///
     /// [Extension]: crate::Extension
-    Opaque(OpaqueOp),
+    Opaque(Box<OpaqueOp>),
 }
 
-impl PartialEq for ExternalOp {
+impl PartialEq for CustomOp {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Extension(l0), Self::Extension(r0)) => l0 == r0,
             (Self::Opaque(l0), Self::Opaque(r0)) => l0 == r0,
-            (Self::Extension(l0), Self::Opaque(r0)) => &l0.make_opaque() == r0,
-            (Self::Opaque(l0), Self::Extension(r0)) => l0 == &r0.make_opaque(),
+            (Self::Extension(l0), Self::Opaque(r0)) => &l0.make_opaque() == r0.as_ref(),
+            (Self::Opaque(l0), Self::Extension(r0)) => l0.as_ref() == &r0.make_opaque(),
         }
     }
 }
 
-impl ExternalOp {
+impl CustomOp {
+    /// Create a new CustomOp from an [ExtensionOp].
+    pub fn new_extension(op: ExtensionOp) -> Self {
+        Self::Extension(Box::new(op))
+    }
+
+    /// Create a new CustomOp from an [OpaqueOp].
+    pub fn new_opaque(op: OpaqueOp) -> Self {
+        Self::Opaque(Box::new(op))
+    }
+
     /// Return the argument values for this operation.
     pub fn args(&self) -> &[TypeArg] {
         match self {
@@ -48,80 +60,85 @@ impl ExternalOp {
         }
     }
 
-    /// Name of the ExternalOp
-    pub fn name(&self) -> SmolStr {
-        let (res_id, op_name) = match self {
-            Self::Opaque(op) => (&op.extension, &op.op_name),
-            Self::Extension(ExtensionOp { def, .. }) => (def.extension(), def.name()),
-        };
-        qualify_name(res_id, op_name)
-    }
-
     /// If the operation is an instance of [ExtensionOp], return a reference to it.
     /// If the operation is opaque, return None.
     pub fn as_extension_op(&self) -> Option<&ExtensionOp> {
         match self {
-            ExternalOp::Extension(e) => Some(e),
-            ExternalOp::Opaque(_) => None,
+            Self::Extension(e) => Some(e),
+            Self::Opaque(_) => None,
         }
     }
 
-    /// Downgrades this [ExternalOp] into an OpaqueOp.
+    /// Downgrades this opaque operation into an [`OpaqueOp`].
     pub fn into_opaque(self) -> OpaqueOp {
         match self {
-            Self::Opaque(op) => op,
-            Self::Extension(op) => op.into(),
+            Self::Opaque(op) => *op,
+            Self::Extension(op) => (*op).into(),
         }
     }
 }
 
-impl From<ExternalOp> for OpaqueOp {
-    fn from(value: ExternalOp) -> Self {
-        match value {
-            ExternalOp::Opaque(op) => op,
-            ExternalOp::Extension(op) => op.into(),
-        }
+impl OpName for CustomOp {
+    /// The name of the operation.
+    fn name(&self) -> SmolStr {
+        let (res_id, op_name) = match self {
+            Self::Opaque(op) => (&op.extension, &op.op_name),
+            Self::Extension(ext) => (ext.def.extension(), ext.def.name()),
+        };
+        qualify_name(res_id, op_name)
     }
 }
 
-impl From<OpaqueOp> for ExternalOp {
-    fn from(op: OpaqueOp) -> Self {
-        Self::Opaque(op)
-    }
-}
-
-impl From<ExternalOp> for CustomOp {
-    fn from(value: ExternalOp) -> Self {
-        Self::new(value)
-    }
-}
-
-impl From<ExternalOp> for OpType {
-    fn from(value: ExternalOp) -> Self {
-        OpType::CustomOp(CustomOp::new(value))
-    }
-}
-
-impl DataflowOpTrait for ExternalOp {
+impl DataflowOpTrait for CustomOp {
     const TAG: OpTag = OpTag::Leaf;
 
+    /// A human-readable description of the operation.
     fn description(&self) -> &str {
         match self {
-            Self::Opaque(op) => DataflowOpTrait::description(op),
-            Self::Extension(ext_op) => DataflowOpTrait::description(ext_op),
+            Self::Opaque(op) => DataflowOpTrait::description(op.as_ref()),
+            Self::Extension(ext_op) => DataflowOpTrait::description(ext_op.as_ref()),
         }
     }
 
+    /// The signature of the operation.
     fn signature(&self) -> FunctionType {
         match self {
             Self::Opaque(op) => op.signature.clone(),
             Self::Extension(ext_op) => ext_op.signature(),
         }
     }
+
+    fn other_input(&self) -> Option<EdgeKind> {
+        Some(EdgeKind::StateOrder)
+    }
+
+    fn other_output(&self) -> Option<EdgeKind> {
+        Some(EdgeKind::StateOrder)
+    }
+}
+
+impl From<OpaqueOp> for CustomOp {
+    fn from(op: OpaqueOp) -> Self {
+        Self::new_opaque(op)
+    }
+}
+
+impl From<CustomOp> for OpaqueOp {
+    fn from(value: CustomOp) -> Self {
+        value.into_opaque()
+    }
+}
+
+impl From<ExtensionOp> for CustomOp {
+    fn from(op: ExtensionOp) -> Self {
+        Self::new_extension(op)
+    }
 }
 
 /// An operation defined by an [OpDef] from a loaded [Extension].
-/// Note *not* Serializable: container ([ExternalOp]) is serialized as an [OpaqueOp] instead.
+///
+/// Extension ops are not serializable. They must be downgraded into an [OpaqueOp] instead.
+/// See [ExtensionOp::make_opaque].
 ///
 /// [Extension]: crate::Extension
 #[derive(Clone, Debug)]
@@ -168,7 +185,7 @@ impl ExtensionOp {
     /// Regenerating the [`ExtensionOp`] back from the [`OpaqueOp`] requires a
     /// registry with the appropriate extension. See [`resolve_opaque_op`].
     ///
-    /// For a non-cloning version of this operation, see [`ExternalOp::from`].
+    /// For a non-cloning version of this operation, use [`OpaqueOp::from`].
     pub fn make_opaque(&self) -> OpaqueOp {
         OpaqueOp {
             extension: self.def.extension().clone(),
@@ -197,12 +214,6 @@ impl From<ExtensionOp> for OpaqueOp {
     }
 }
 
-impl From<ExtensionOp> for CustomOp {
-    fn from(value: ExtensionOp) -> Self {
-        CustomOp::new(ExternalOp::Extension(value))
-    }
-}
-
 impl From<ExtensionOp> for OpType {
     fn from(value: ExtensionOp) -> Self {
         OpType::CustomOp(value.into())
@@ -215,6 +226,8 @@ impl PartialEq for ExtensionOp {
     }
 }
 
+impl Eq for ExtensionOp {}
+
 impl DataflowOpTrait for ExtensionOp {
     const TAG: OpTag = OpTag::Leaf;
 
@@ -226,8 +239,6 @@ impl DataflowOpTrait for ExtensionOp {
         self.signature.clone()
     }
 }
-
-impl Eq for ExtensionOp {}
 
 /// An opaquely-serialized op that refers to an as-yet-unresolved [`OpDef`]
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -279,12 +290,6 @@ impl OpaqueOp {
     }
 }
 
-impl From<OpaqueOp> for CustomOp {
-    fn from(value: OpaqueOp) -> Self {
-        CustomOp::new(ExternalOp::Opaque(value))
-    }
-}
-
 impl From<OpaqueOp> for OpType {
     fn from(value: OpaqueOp) -> Self {
         OpType::CustomOp(value.into())
@@ -310,11 +315,9 @@ pub fn resolve_extension_ops(
 ) -> Result<(), CustomOpError> {
     let mut replacements = Vec::new();
     for n in h.nodes() {
-        if let OpType::CustomOp(op) = h.get_optype(n) {
-            if let ExternalOp::Opaque(opaque) = op.as_ref() {
-                if let Some(resolved) = resolve_opaque_op(n, opaque, extension_registry)? {
-                    replacements.push((n, resolved))
-                }
+        if let OpType::CustomOp(CustomOp::Opaque(opaque)) = h.get_optype(n) {
+            if let Some(resolved) = resolve_opaque_op(n, opaque, extension_registry)? {
+                replacements.push((n, resolved))
             }
         }
     }
@@ -328,14 +331,16 @@ pub fn resolve_extension_ops(
     Ok(())
 }
 
-/// Try to resolve an [`ExternalOp::Opaque`] to a [`ExternalOp::Extension`]
+/// Try to resolve a [`OpaqueOp`] to a [`ExtensionOp`] by looking the op up in
+/// the registry.
 ///
 /// # Return
-/// Some if the serialized opaque resolves to an extension-defined op and all is ok;
-/// None if the serialized opaque doesn't identify an extension
+/// Some if the serialized opaque resolves to an extension-defined op and all is
+/// ok; None if the serialized opaque doesn't identify an extension
 ///
 /// # Errors
-/// If the serialized opaque resolves to a definition that conflicts with what was serialized
+/// If the serialized opaque resolves to a definition that conflicts with what
+/// was serialized
 pub fn resolve_opaque_op(
     _n: Node,
     opaque: &OpaqueOp,
@@ -393,14 +398,14 @@ mod test {
     #[test]
     fn new_opaque_op() {
         let sig = FunctionType::new_endo(vec![QB_T]);
-        let op = OpaqueOp::new(
+        let op: CustomOp = OpaqueOp::new(
             "res".try_into().unwrap(),
             "op",
             "desc".into(),
             vec![TypeArg::Type { ty: USIZE_T }],
             sig.clone(),
-        );
-        let op: ExternalOp = op.into();
+        )
+        .into();
         assert_eq!(op.name(), "res.op");
         assert_eq!(DataflowOpTrait::description(&op), "desc");
         assert_eq!(op.args(), &[TypeArg::Type { ty: USIZE_T }]);

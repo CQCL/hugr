@@ -1,10 +1,7 @@
 //! Definition of dataflow operations no children.
 
-use smol_str::SmolStr;
-
-use super::custom::ExternalOp;
 use super::dataflow::DataflowOpTrait;
-use super::{impl_op_name, OpName, OpTag};
+use super::{impl_op_name, OpTag};
 
 use crate::extension::ExtensionSet;
 
@@ -12,24 +9,6 @@ use crate::{
     extension::ExtensionId,
     types::{EdgeKind, FunctionType, Type, TypeRow},
 };
-
-/// A user-defined operation that can be downcasted by the extensions that
-/// define it.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct CustomOp(Box<ExternalOp>);
-
-impl CustomOp {
-    /// Create a new custom operation.
-    pub fn new(op: ExternalOp) -> Self {
-        Self(Box::new(op))
-    }
-}
-
-impl AsRef<ExternalOp> for CustomOp {
-    fn as_ref(&self) -> &ExternalOp {
-        &self.0
-    }
-}
 
 /// A no-op operation.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -82,39 +61,11 @@ pub struct Lift {
     pub new_extension: ExtensionId,
 }
 
-impl OpName for CustomOp {
-    /// The name of the operation.
-    fn name(&self) -> SmolStr {
-        self.0.name()
-    }
-}
 impl_op_name!(Noop);
 impl_op_name!(MakeTuple);
 impl_op_name!(UnpackTuple);
 impl_op_name!(Tag);
 impl_op_name!(Lift);
-
-impl DataflowOpTrait for CustomOp {
-    const TAG: OpTag = OpTag::Leaf;
-
-    /// A human-readable description of the operation.
-    fn description(&self) -> &str {
-        self.0.description()
-    }
-
-    /// The signature of the operation.
-    fn signature(&self) -> FunctionType {
-        self.0.signature()
-    }
-
-    fn other_input(&self) -> Option<EdgeKind> {
-        Some(EdgeKind::StateOrder)
-    }
-
-    fn other_output(&self) -> Option<EdgeKind> {
-        Some(EdgeKind::StateOrder)
-    }
-}
 
 impl DataflowOpTrait for Noop {
     const TAG: OpTag = OpTag::Leaf;

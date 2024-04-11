@@ -65,7 +65,7 @@ pub fn fold_leaf_op(op: &OpType, consts: &[(IncomingPort, Const)]) -> ConstFoldR
         )
         .unwrap()]),
         OpType::CustomOp(op) => {
-            let ext_op = op.as_ref().as_extension_op()?;
+            let ext_op = op.as_extension_op()?;
             ext_op.constant_fold(consts)
         }
         _ => None,

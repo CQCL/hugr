@@ -94,7 +94,7 @@ pub trait MakeExtensionOp: OpName {
     where
         Self: Sized,
     {
-        let ext: &ExtensionOp = op.as_custom_op()?.as_ref().as_extension_op()?;
+        let ext: &ExtensionOp = op.as_custom_op()?.as_extension_op()?;
         Self::from_extension_op(ext).ok()
     }
 

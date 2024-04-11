@@ -22,8 +22,9 @@ use enum_dispatch::enum_dispatch;
 
 pub use constant::Const;
 pub use controlflow::{BasicBlock, Case, Conditional, DataflowBlock, ExitBlock, TailLoop, CFG};
+pub use custom::CustomOp;
 pub use dataflow::{Call, CallIndirect, DataflowParent, Input, LoadConstant, Output, DFG};
-pub use leaf::{CustomOp, Lift, MakeTuple, Noop, Tag, UnpackTuple};
+pub use leaf::{Lift, MakeTuple, Noop, Tag, UnpackTuple};
 pub use module::{AliasDecl, AliasDefn, FuncDecl, FuncDefn, Module};
 pub use tag::OpTag;
 

@@ -203,8 +203,6 @@ impl Hugr {
 
     /// Infer extension requirements and add new information to `op_types` field
     /// (if the "extension_inference" feature is on; otherwise, do nothing)
-    ///
-    /// See [`infer_extensions`] for details on the "closure" value
     pub fn infer_extensions(&mut self) -> Result<(), InferExtensionError> {
         #[cfg(feature = "extension_inference")]
         {

@@ -349,10 +349,7 @@ pub mod test {
             let old_op = h_canon.get_optype(node);
             if let OpType::CustomOp(new_op) = new_op {
                 if let OpType::CustomOp(old_op) = old_op {
-                    assert_eq!(
-                        new_op.as_ref().clone().into_opaque(),
-                        old_op.as_ref().clone().into_opaque()
-                    );
+                    assert_eq!(new_op.clone().into_opaque(), old_op.clone().into_opaque());
                 } else {
                     panic!("Expected old_op to be a custom op");
                 }

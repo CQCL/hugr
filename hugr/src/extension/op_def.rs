@@ -476,7 +476,6 @@ mod test {
     use crate::extension::prelude::USIZE_T;
     use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE};
     use crate::extension::{SignatureError, EMPTY_REG, PRELUDE_REGISTRY};
-    use crate::ops::custom::ExternalOp;
     use crate::ops::CustomOp;
     use crate::std_extensions::collections::{EXTENSION, LIST_TYPENAME};
     use crate::types::Type;
@@ -513,10 +512,10 @@ mod test {
             Type::new_extension(list_def.instantiate(vec![TypeArg::Type { ty: USIZE_T }])?);
         let mut dfg = DFGBuilder::new(FunctionType::new_endo(vec![list_usize]))?;
         let rev = dfg.add_dataflow_op(
-            CustomOp::new(ExternalOp::Extension(
+            CustomOp::new_extension(
                 e.instantiate_extension_op(&OP_NAME, vec![TypeArg::Type { ty: USIZE_T }], &reg)
                     .unwrap(),
-            )),
+            ),
             dfg.input_wires(),
         )?;
         dfg.finish_hugr_with_outputs(rev.outputs(), &reg)?;

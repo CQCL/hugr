@@ -9,7 +9,7 @@ use crate::extension::ExtensionId;
 use crate::extension::{prelude::PRELUDE_REGISTRY, ExtensionSet};
 use crate::hugr::{Hugr, HugrMut, HugrView, NodeType};
 use crate::macros::const_extension_ids;
-use crate::ops::custom::{ExternalOp, OpaqueOp};
+use crate::ops::custom::OpaqueOp;
 use crate::ops::{self, dataflow::IOTrait};
 use crate::ops::{CustomOp, Lift, OpType};
 #[cfg(feature = "extension_inference")]
@@ -439,8 +439,7 @@ fn extension_adding_sequence() -> Result<(), Box<dyn Error>> {
 }
 
 fn make_opaque(extension: impl Into<ExtensionId>, signature: FunctionType) -> CustomOp {
-    let opaque = ops::custom::OpaqueOp::new(extension.into(), "", "".into(), vec![], signature);
-    ops::custom::ExternalOp::from(opaque).into()
+    ops::custom::OpaqueOp::new(extension.into(), "", "".into(), vec![], signature).into()
 }
 
 fn make_block(
@@ -930,21 +929,21 @@ fn plus_on_self() -> Result<(), Box<dyn std::error::Error>> {
     // While https://github.com/CQCL/hugr/issues/388 is unsolved,
     // most operations have empty extension_reqs (not including their own extension).
     // Define some that do.
-    let binop = CustomOp::new(ExternalOp::Opaque(OpaqueOp::new(
+    let binop = CustomOp::new_opaque(OpaqueOp::new(
         ext.clone(),
         "2qb_op",
         String::new(),
         vec![],
         ft,
-    )));
+    ));
     let unary_sig = FunctionType::new_endo(type_row![QB_T]).with_extension_delta(ext.clone());
-    let unop = CustomOp::new(ExternalOp::Opaque(OpaqueOp::new(
+    let unop = CustomOp::new_opaque(OpaqueOp::new(
         ext,
         "1qb_op",
         String::new(),
         vec![],
         unary_sig,
-    )));
+    ));
     // Constrain q1,q2 as PLUS(ext1, inputs):
     let [q1, q2] = dfg
         .add_dataflow_op(binop.clone(), dfg.input_wires())?
