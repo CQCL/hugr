@@ -290,7 +290,7 @@ pub trait HugrView: sealed::HugrInternals {
         self.num_ports(node, Direction::Outgoing)
     }
 
-    /// Return iterator over children of node.
+    /// Return iterator over the direct children of node.
     fn children(&self, node: Node) -> Self::Children<'_>;
 
     /// Iterates over neighbour nodes in the given direction.
