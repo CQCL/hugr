@@ -133,7 +133,7 @@ mod test {
             let _fdef = {
                 let [b1] = fbuild
                     .add_dataflow_op(
-                        ops::LeafOp::Lift {
+                        ops::Lift {
                             type_row: type_row![BIT],
                             new_extension: PRELUDE_ID,
                         },
@@ -147,7 +147,7 @@ mod test {
                     let const_val = Const::true_val();
                     let const_wire = loop_b.add_load_const(Const::true_val());
                     let lift_node = loop_b.add_dataflow_op(
-                        ops::LeafOp::Lift {
+                        ops::Lift {
                             type_row: vec![const_val.const_type().clone()].into(),
                             new_extension: PRELUDE_ID,
                         },

@@ -347,8 +347,8 @@ fn validate_cfg_edge(edge: ChildrenEdgeData) -> Result<(), EdgeValidationError> 
 #[cfg(test)]
 mod test {
     use crate::extension::prelude::USIZE_T;
+    use crate::ops::dataflow::IOTrait;
     use crate::{ops, type_row};
-    use crate::{ops::dataflow::IOTrait, ops::LeafOp};
     use cool_asserts::assert_matches;
 
     use super::*;
@@ -360,7 +360,7 @@ mod test {
 
         let input_node: OpType = ops::Input::new(in_types.clone()).into();
         let output_node = ops::Output::new(out_types.clone()).into();
-        let leaf_node = LeafOp::Noop { ty: USIZE_T }.into();
+        let leaf_node = ops::Noop { ty: USIZE_T }.into();
 
         // Well-formed dataflow sibling nodes. Check the input and output node signatures.
         let children = vec![
@@ -404,7 +404,8 @@ mod test {
 }
 
 use super::{
-    AliasDecl, AliasDefn, Call, CallIndirect, Const, FuncDecl, Input, LeafOp, LoadConstant, Output,
+    AliasDecl, AliasDefn, Call, CallIndirect, Const, CustomOp, FuncDecl, Input, Lift, LoadConstant,
+    MakeTuple, Noop, Output, Tag, UnpackTuple,
 };
 impl_validate_op!(FuncDecl);
 impl_validate_op!(AliasDecl);
@@ -415,5 +416,10 @@ impl_validate_op!(Const);
 impl_validate_op!(Call);
 impl_validate_op!(LoadConstant);
 impl_validate_op!(CallIndirect);
-impl_validate_op!(LeafOp);
+impl_validate_op!(CustomOp);
+impl_validate_op!(Noop);
+impl_validate_op!(MakeTuple);
+impl_validate_op!(UnpackTuple);
+impl_validate_op!(Tag);
+impl_validate_op!(Lift);
 impl_validate_op!(ExitBlock);

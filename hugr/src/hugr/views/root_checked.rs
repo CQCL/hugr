@@ -74,7 +74,7 @@ mod test {
     use crate::hugr::hugrmut::sealed::HugrMutInternals;
     use crate::hugr::{HugrError, HugrMut, NodeType};
     use crate::ops::handle::{BasicBlockID, CfgID, DataflowParentID, DfgID};
-    use crate::ops::{DataflowBlock, LeafOp, OpTag};
+    use crate::ops::{DataflowBlock, MakeTuple, OpTag};
     use crate::{ops, type_row, types::FunctionType, Hugr, HugrView};
 
     #[test]
@@ -129,7 +129,7 @@ mod test {
         let mut bb_v = RootChecked::<_, BasicBlockID>::try_new(dfp_v).unwrap();
 
         // And it's a HugrMut:
-        let nodetype = NodeType::new_pure(LeafOp::MakeTuple { tys: type_row![] });
+        let nodetype = NodeType::new_pure(MakeTuple { tys: type_row![] });
         bb_v.add_node_with_parent(bb_v.root(), nodetype);
     }
 }

@@ -676,7 +676,7 @@ mod test {
         extension::prelude::USIZE_T,
         extension::PRELUDE_REGISTRY,
         macros::type_row,
-        ops::{self, dataflow::IOTrait, LeafOp},
+        ops::{self, dataflow::IOTrait, Noop},
         types::{FunctionType, Type},
     };
 
@@ -704,7 +704,7 @@ mod test {
             let f_in =
                 hugr.add_node_with_parent(f, NodeType::new_pure(ops::Input::new(type_row![NAT])));
             let f_out = hugr.add_node_with_parent(f, ops::Output::new(type_row![NAT, NAT]));
-            let noop = hugr.add_node_with_parent(f, LeafOp::Noop { ty: NAT });
+            let noop = hugr.add_node_with_parent(f, Noop { ty: NAT });
 
             hugr.connect(f_in, 0, noop, 0);
             hugr.connect(noop, 0, f_out, 0);

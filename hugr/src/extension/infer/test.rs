@@ -11,7 +11,7 @@ use crate::hugr::{Hugr, HugrMut, HugrView, NodeType};
 use crate::macros::const_extension_ids;
 use crate::ops::custom::{ExternalOp, OpaqueOp};
 use crate::ops::{self, dataflow::IOTrait};
-use crate::ops::{LeafOp, OpType};
+use crate::ops::{CustomOp, Lift, OpType};
 #[cfg(feature = "extension_inference")]
 use crate::{
     builder::test::closed_dfg_root_hugr,
@@ -316,7 +316,7 @@ fn test_conditional_inference() -> Result<(), Box<dyn Error>> {
 
         let lift1 = hugr.add_node_with_parent(
             case,
-            ops::LeafOp::Lift {
+            Lift {
                 type_row: type_row![NAT],
                 new_extension: first_ext,
             },
@@ -324,7 +324,7 @@ fn test_conditional_inference() -> Result<(), Box<dyn Error>> {
 
         let lift2 = hugr.add_node_with_parent(
             case,
-            ops::LeafOp::Lift {
+            Lift {
                 type_row: type_row![NAT],
                 new_extension: second_ext,
             },
@@ -416,7 +416,7 @@ fn extension_adding_sequence() -> Result<(), Box<dyn Error>> {
 
             let lift = hugr.add_node_with_parent(
                 node,
-                ops::LeafOp::Lift {
+                Lift {
                     type_row: type_row![NAT],
                     new_extension: ext,
                 },
@@ -438,7 +438,7 @@ fn extension_adding_sequence() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn make_opaque(extension: impl Into<ExtensionId>, signature: FunctionType) -> ops::LeafOp {
+fn make_opaque(extension: impl Into<ExtensionId>, signature: FunctionType) -> CustomOp {
     let opaque = ops::custom::OpaqueOp::new(extension.into(), "", "".into(), vec![], signature);
     ops::custom::ExternalOp::from(opaque).into()
 }
@@ -930,23 +930,21 @@ fn plus_on_self() -> Result<(), Box<dyn std::error::Error>> {
     // While https://github.com/CQCL/hugr/issues/388 is unsolved,
     // most operations have empty extension_reqs (not including their own extension).
     // Define some that do.
-    let binop: LeafOp = ExternalOp::Opaque(OpaqueOp::new(
+    let binop = CustomOp::new(ExternalOp::Opaque(OpaqueOp::new(
         ext.clone(),
         "2qb_op",
         String::new(),
         vec![],
         ft,
-    ))
-    .into();
+    )));
     let unary_sig = FunctionType::new_endo(type_row![QB_T]).with_extension_delta(ext.clone());
-    let unop: LeafOp = ExternalOp::Opaque(OpaqueOp::new(
+    let unop = CustomOp::new(ExternalOp::Opaque(OpaqueOp::new(
         ext,
         "1qb_op",
         String::new(),
         vec![],
         unary_sig,
-    ))
-    .into();
+    )));
     // Constrain q1,q2 as PLUS(ext1, inputs):
     let [q1, q2] = dfg
         .add_dataflow_op(binop.clone(), dfg.input_wires())?
@@ -1020,7 +1018,7 @@ fn simple_funcdefn() -> Result<(), Box<dyn Error>> {
 
     let [w] = func_builder.input_wires_arr();
     let lift = func_builder.add_dataflow_op(
-        ops::LeafOp::Lift {
+        Lift {
             type_row: type_row![NAT],
             new_extension: A,
         },
@@ -1045,7 +1043,7 @@ fn funcdefn_signature_mismatch() -> Result<(), Box<dyn Error>> {
 
     let [w] = func_builder.input_wires_arr();
     let lift = func_builder.add_dataflow_op(
-        ops::LeafOp::Lift {
+        Lift {
             type_row: type_row![NAT],
             new_extension: B,
         },

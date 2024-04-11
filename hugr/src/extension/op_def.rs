@@ -477,7 +477,7 @@ mod test {
     use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE};
     use crate::extension::{SignatureError, EMPTY_REG, PRELUDE_REGISTRY};
     use crate::ops::custom::ExternalOp;
-    use crate::ops::LeafOp;
+    use crate::ops::CustomOp;
     use crate::std_extensions::collections::{EXTENSION, LIST_TYPENAME};
     use crate::types::Type;
     use crate::types::{type_param::TypeParam, FunctionType, PolyFuncType, TypeArg, TypeBound};
@@ -513,7 +513,7 @@ mod test {
             Type::new_extension(list_def.instantiate(vec![TypeArg::Type { ty: USIZE_T }])?);
         let mut dfg = DFGBuilder::new(FunctionType::new_endo(vec![list_usize]))?;
         let rev = dfg.add_dataflow_op(
-            LeafOp::from(ExternalOp::Extension(
+            CustomOp::new(ExternalOp::Extension(
                 e.instantiate_extension_op(&OP_NAME, vec![TypeArg::Type { ty: USIZE_T }], &reg)
                     .unwrap(),
             )),

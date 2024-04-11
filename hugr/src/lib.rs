@@ -43,7 +43,7 @@
 //!             prelude::{BOOL_T, QB_T},
 //!             ExtensionId, ExtensionRegistry, PRELUDE,
 //!         },
-//!         ops::LeafOp,
+//!         ops::CustomOp,
 //!         type_row,
 //!         types::{FunctionType, PolyFuncType},
 //!         Extension,
@@ -89,21 +89,21 @@
 //!             ExtensionRegistry::try_new([EXTENSION.to_owned(), PRELUDE.to_owned()]).unwrap();
 //!
 //!     }
-//!     fn get_gate(gate_name: &str) -> LeafOp {
+//!     fn get_gate(gate_name: &str) -> CustomOp {
 //!         EXTENSION
 //!             .instantiate_extension_op(gate_name, [], &REG)
 //!             .unwrap()
 //!             .into()
 //!     }
-//!     pub fn h_gate() -> LeafOp {
+//!     pub fn h_gate() -> CustomOp {
 //!         get_gate("H")
 //!     }
 //!
-//!     pub fn cx_gate() -> LeafOp {
+//!     pub fn cx_gate() -> CustomOp {
 //!         get_gate("CX")
 //!     }
 //!
-//!     pub fn measure() -> LeafOp {
+//!     pub fn measure() -> CustomOp {
 //!         get_gate("Measure")
 //!     }
 //! }

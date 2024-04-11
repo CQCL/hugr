@@ -1,7 +1,7 @@
 use crate::hugr::hugrmut::InsertionResult;
 use crate::hugr::views::HugrView;
 use crate::hugr::{NodeMetadata, ValidationError};
-use crate::ops::{self, LeafOp, OpTag, OpTrait, OpType};
+use crate::ops::{self, MakeTuple, OpTag, OpTrait, OpType, Tag};
 use crate::utils::collect_array;
 use crate::{IncomingPort, Node, OutgoingPort};
 
@@ -471,13 +471,13 @@ pub trait Dataflow: Container {
         }
     }
 
-    /// Add a [`LeafOp::MakeTuple`] node and wire in the `values` Wires,
+    /// Add a [`MakeTuple`] node and wire in the `values` Wires,
     /// returning the Wire corresponding to the tuple.
     ///
     /// # Errors
     ///
     /// This function will return an error if there is an error adding the
-    /// [`LeafOp::MakeTuple`] node.
+    /// [`MakeTuple`] node.
     fn make_tuple(&mut self, values: impl IntoIterator<Item = Wire>) -> Result<Wire, BuildError> {
         let values = values.into_iter().collect_vec();
         let types: Result<Vec<Type>, _> = values
@@ -485,11 +485,11 @@ pub trait Dataflow: Container {
             .map(|&wire| self.get_wire_type(wire))
             .collect();
         let types = types?.into();
-        let make_op = self.add_dataflow_op(LeafOp::MakeTuple { tys: types }, values)?;
+        let make_op = self.add_dataflow_op(MakeTuple { tys: types }, values)?;
         Ok(make_op.out_wire(0))
     }
 
-    /// Add a [`LeafOp::Tag`] node and wire in the `value` Wire,
+    /// Add a [`Tag`] node and wire in the `value` Wire,
     /// to make a value with Sum type, with `tag` and possible types described
     /// by `variants`.
     /// Returns the Wire corresponding to the Sum value.
@@ -505,7 +505,7 @@ pub trait Dataflow: Container {
         values: impl IntoIterator<Item = Wire>,
     ) -> Result<Wire, BuildError> {
         let make_op = self.add_dataflow_op(
-            LeafOp::Tag {
+            Tag {
                 tag,
                 variants: variants.into_iter().map(Into::into).collect_vec(),
             },

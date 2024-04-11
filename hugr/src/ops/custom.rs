@@ -12,10 +12,10 @@ use crate::{ops, Hugr, IncomingPort, Node};
 
 use super::dataflow::DataflowOpTrait;
 use super::tag::OpTag;
-use super::{LeafOp, OpTrait, OpType};
+use super::{CustomOp, OpTrait, OpType};
 
 /// An instantiation of an operation (declared by a extension) with values for the type arguments
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(into = "OpaqueOp", from = "OpaqueOp")]
 pub enum ExternalOp {
     /// When we've found (loaded) the [Extension] definition and identified the [OpDef]
@@ -26,6 +26,17 @@ pub enum ExternalOp {
     ///
     /// [Extension]: crate::Extension
     Opaque(OpaqueOp),
+}
+
+impl PartialEq for ExternalOp {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Extension(l0), Self::Extension(r0)) => l0 == r0,
+            (Self::Opaque(l0), Self::Opaque(r0)) => l0 == r0,
+            (Self::Extension(l0), Self::Opaque(r0)) => &l0.make_opaque() == r0,
+            (Self::Opaque(l0), Self::Extension(r0)) => l0 == &r0.make_opaque(),
+        }
+    }
 }
 
 impl ExternalOp {
@@ -46,8 +57,17 @@ impl ExternalOp {
         qualify_name(res_id, op_name)
     }
 
-    /// Downgrades this ExternalOp into an OpaqueOp
-    pub fn as_opaque(self) -> OpaqueOp {
+    /// If the operation is an instance of [ExtensionOp], return a reference to it.
+    /// If the operation is opaque, return None.
+    pub fn as_extension_op(&self) -> Option<&ExtensionOp> {
+        match self {
+            ExternalOp::Extension(e) => Some(e),
+            ExternalOp::Opaque(_) => None,
+        }
+    }
+
+    /// Downgrades this [ExternalOp] into an OpaqueOp.
+    pub fn into_opaque(self) -> OpaqueOp {
         match self {
             Self::Opaque(op) => op,
             Self::Extension(op) => op.into(),
@@ -70,16 +90,15 @@ impl From<OpaqueOp> for ExternalOp {
     }
 }
 
-impl From<ExternalOp> for LeafOp {
+impl From<ExternalOp> for CustomOp {
     fn from(value: ExternalOp) -> Self {
-        LeafOp::CustomOp(Box::new(value))
+        Self::new(value)
     }
 }
 
 impl From<ExternalOp> for OpType {
     fn from(value: ExternalOp) -> Self {
-        let leaf: LeafOp = value.into();
-        leaf.into()
+        OpType::CustomOp(CustomOp::new(value))
     }
 }
 
@@ -142,6 +161,23 @@ impl ExtensionOp {
     pub fn constant_fold(&self, consts: &[(IncomingPort, ops::Const)]) -> ConstFoldResult {
         self.def().constant_fold(self.args(), consts)
     }
+
+    /// Creates a new [`OpaqueOp`] as a downgraded version of this
+    /// [`ExtensionOp`].
+    ///
+    /// Regenerating the [`ExtensionOp`] back from the [`OpaqueOp`] requires a
+    /// registry with the appropriate extension. See [`resolve_opaque_op`].
+    ///
+    /// For a non-cloning version of this operation, see [`ExternalOp::from`].
+    pub fn make_opaque(&self) -> OpaqueOp {
+        OpaqueOp {
+            extension: self.def.extension().clone(),
+            op_name: self.def.name().clone(),
+            description: self.def.description().into(),
+            args: self.args.clone(),
+            signature: self.signature.clone(),
+        }
+    }
 }
 
 impl From<ExtensionOp> for OpaqueOp {
@@ -161,16 +197,15 @@ impl From<ExtensionOp> for OpaqueOp {
     }
 }
 
-impl From<ExtensionOp> for LeafOp {
+impl From<ExtensionOp> for CustomOp {
     fn from(value: ExtensionOp) -> Self {
-        LeafOp::CustomOp(Box::new(ExternalOp::Extension(value)))
+        CustomOp::new(ExternalOp::Extension(value))
     }
 }
 
 impl From<ExtensionOp> for OpType {
     fn from(value: ExtensionOp) -> Self {
-        let leaf: LeafOp = value.into();
-        leaf.into()
+        OpType::CustomOp(value.into())
     }
 }
 
@@ -244,16 +279,15 @@ impl OpaqueOp {
     }
 }
 
-impl From<OpaqueOp> for LeafOp {
+impl From<OpaqueOp> for CustomOp {
     fn from(value: OpaqueOp) -> Self {
-        LeafOp::CustomOp(Box::new(ExternalOp::Opaque(value)))
+        CustomOp::new(ExternalOp::Opaque(value))
     }
 }
 
 impl From<OpaqueOp> for OpType {
     fn from(value: OpaqueOp) -> Self {
-        let leaf: LeafOp = value.into();
-        leaf.into()
+        OpType::CustomOp(value.into())
     }
 }
 
@@ -270,14 +304,13 @@ impl DataflowOpTrait for OpaqueOp {
 }
 
 /// Resolve serialized names of operations into concrete implementation (OpDefs) where possible
-#[allow(dead_code)]
 pub fn resolve_extension_ops(
     h: &mut Hugr,
     extension_registry: &ExtensionRegistry,
 ) -> Result<(), CustomOpError> {
     let mut replacements = Vec::new();
     for n in h.nodes() {
-        if let OpType::LeafOp(LeafOp::CustomOp(op)) = h.get_optype(n) {
+        if let OpType::CustomOp(op) = h.get_optype(n) {
             if let ExternalOp::Opaque(opaque) = op.as_ref() {
                 if let Some(resolved) = resolve_opaque_op(n, opaque, extension_registry)? {
                     replacements.push((n, resolved))
@@ -287,8 +320,7 @@ pub fn resolve_extension_ops(
     }
     // Only now can we perform the replacements as the 'for' loop was borrowing 'h' preventing use from using it mutably
     for (n, op) in replacements {
-        let leaf: LeafOp = op.into();
-        let node_type = NodeType::new(leaf, h.get_nodetype(n).input_extensions().cloned());
+        let node_type = NodeType::new(op, h.get_nodetype(n).input_extensions().cloned());
         debug_assert_eq!(h.get_optype(n).tag(), OpTag::Leaf);
         debug_assert_eq!(node_type.tag(), OpTag::Leaf);
         h.replace_op(n, node_type).unwrap();

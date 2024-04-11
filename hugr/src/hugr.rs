@@ -374,7 +374,7 @@ mod test {
         use crate::builder::test::closed_dfg_root_hugr;
         use crate::extension::ExtensionSet;
         use crate::hugr::HugrMut;
-        use crate::ops::LeafOp;
+        use crate::ops::Lift;
         use crate::type_row;
         use crate::types::{FunctionType, Type};
 
@@ -387,7 +387,7 @@ mod test {
         let [input, output] = hugr.get_io(hugr.root()).unwrap();
         let lift = hugr.add_node_with_parent(
             hugr.root(),
-            LeafOp::Lift {
+            Lift {
                 type_row: type_row![BIT],
                 new_extension: "R".try_into().unwrap(),
             },
