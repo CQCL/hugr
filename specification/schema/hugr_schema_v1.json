@@ -255,14 +255,9 @@
                     "$ref": "#/$defs/ExtensionSet"
                 },
                 "op": {
-                    "const": "LeafOp",
-                    "default": "LeafOp",
-                    "title": "Op"
-                },
-                "lop": {
                     "const": "CustomOp",
                     "default": "CustomOp",
-                    "title": "Lop"
+                    "title": "Op"
                 },
                 "extension": {
                     "title": "Extension",
@@ -674,40 +669,40 @@
             "title": "Input",
             "type": "object"
         },
-        "LeafOp": {
-            "description": "A constant operation.",
-            "discriminator": {
-                "mapping": {
-                    "CustomOp": "#/$defs/CustomOp",
-                    "MakeTuple": "#/$defs/MakeTuple",
-                    "Noop": "#/$defs/Noop",
-                    "Tag": "#/$defs/Tag",
-                    "TypeApply": "#/$defs/TypeApply",
-                    "UnpackTuple": "#/$defs/UnpackTuple"
+        "Lift": {
+            "description": "Fixes some TypeParams of a polymorphic type by providing TypeArgs.",
+            "properties": {
+                "parent": {
+                    "title": "Parent",
+                    "type": "integer"
                 },
-                "propertyName": "lop"
-            },
-            "oneOf": [
-                {
-                    "$ref": "#/$defs/CustomOp"
+                "input_extensions": {
+                    "$ref": "#/$defs/ExtensionSet"
                 },
-                {
-                    "$ref": "#/$defs/Noop"
+                "op": {
+                    "const": "Lift",
+                    "default": "Lift",
+                    "title": "Op"
                 },
-                {
-                    "$ref": "#/$defs/MakeTuple"
+                "type_row": {
+                    "items": {
+                        "$ref": "#/$defs/Type"
+                    },
+                    "title": "Type Row",
+                    "type": "array"
                 },
-                {
-                    "$ref": "#/$defs/UnpackTuple"
-                },
-                {
-                    "$ref": "#/$defs/Tag"
-                },
-                {
-                    "$ref": "#/$defs/TypeApply"
+                "new_extension": {
+                    "title": "New Extension",
+                    "type": "string"
                 }
+            },
+            "required": [
+                "parent",
+                "type_row",
+                "new_extension"
             ],
-            "title": "LeafOp"
+            "title": "Lift",
+            "type": "object"
         },
         "ListParam": {
             "properties": {
@@ -763,14 +758,9 @@
                     "$ref": "#/$defs/ExtensionSet"
                 },
                 "op": {
-                    "const": "LeafOp",
-                    "default": "LeafOp",
-                    "title": "Op"
-                },
-                "lop": {
                     "const": "MakeTuple",
                     "default": "MakeTuple",
-                    "title": "Lop"
+                    "title": "Op"
                 },
                 "tys": {
                     "items": {
@@ -819,14 +809,9 @@
                     "$ref": "#/$defs/ExtensionSet"
                 },
                 "op": {
-                    "const": "LeafOp",
-                    "default": "LeafOp",
-                    "title": "Op"
-                },
-                "lop": {
                     "const": "Noop",
                     "default": "Noop",
-                    "title": "Lop"
+                    "title": "Op"
                 },
                 "ty": {
                     "$ref": "#/$defs/Type"
@@ -849,17 +834,22 @@
                     "Case": "#/$defs/Case",
                     "Conditional": "#/$defs/Conditional",
                     "Const": "#/$defs/Const",
+                    "CustomOp": "#/$defs/CustomOp",
                     "DFG": "#/$defs/DFG",
                     "DataflowBlock": "#/$defs/DataflowBlock",
                     "ExitBlock": "#/$defs/ExitBlock",
                     "FuncDecl": "#/$defs/FuncDecl",
                     "FuncDefn": "#/$defs/FuncDefn",
                     "Input": "#/$defs/Input",
-                    "LeafOp": "#/$defs/LeafOp",
+                    "Lift": "#/$defs/Lift",
                     "LoadConstant": "#/$defs/LoadConstant",
+                    "MakeTuple": "#/$defs/MakeTuple",
                     "Module": "#/$defs/Module",
+                    "Noop": "#/$defs/Noop",
                     "Output": "#/$defs/Output",
-                    "TailLoop": "#/$defs/TailLoop"
+                    "Tag": "#/$defs/Tag",
+                    "TailLoop": "#/$defs/TailLoop",
+                    "UnpackTuple": "#/$defs/UnpackTuple"
                 },
                 "propertyName": "op"
             },
@@ -910,7 +900,22 @@
                     "$ref": "#/$defs/LoadConstant"
                 },
                 {
-                    "$ref": "#/$defs/LeafOp"
+                    "$ref": "#/$defs/CustomOp"
+                },
+                {
+                    "$ref": "#/$defs/Noop"
+                },
+                {
+                    "$ref": "#/$defs/MakeTuple"
+                },
+                {
+                    "$ref": "#/$defs/UnpackTuple"
+                },
+                {
+                    "$ref": "#/$defs/Tag"
+                },
+                {
+                    "$ref": "#/$defs/Lift"
                 },
                 {
                     "$ref": "#/$defs/DFG"
@@ -1146,14 +1151,9 @@
                     "$ref": "#/$defs/ExtensionSet"
                 },
                 "op": {
-                    "const": "LeafOp",
-                    "default": "LeafOp",
-                    "title": "Op"
-                },
-                "lop": {
                     "const": "Tag",
                     "default": "Tag",
-                    "title": "Lop"
+                    "title": "Op"
                 },
                 "tag": {
                     "title": "Tag",
@@ -1315,62 +1315,6 @@
             ],
             "title": "Type"
         },
-        "TypeApplication": {
-            "description": "Records details of an application of a PolyFuncType to some TypeArgs and the result (a less-, but still potentially-, polymorphic type).",
-            "properties": {
-                "input": {
-                    "$ref": "#/$defs/PolyFuncType"
-                },
-                "args": {
-                    "items": {
-                        "$ref": "#/$defs/TypeTypeArg"
-                    },
-                    "title": "Args",
-                    "type": "array"
-                },
-                "output": {
-                    "$ref": "#/$defs/PolyFuncType"
-                }
-            },
-            "required": [
-                "input",
-                "args",
-                "output"
-            ],
-            "title": "TypeApplication",
-            "type": "object"
-        },
-        "TypeApply": {
-            "description": "Fixes some TypeParams of a polymorphic type by providing TypeArgs.",
-            "properties": {
-                "parent": {
-                    "title": "Parent",
-                    "type": "integer"
-                },
-                "input_extensions": {
-                    "$ref": "#/$defs/ExtensionSet"
-                },
-                "op": {
-                    "const": "LeafOp",
-                    "default": "LeafOp",
-                    "title": "Op"
-                },
-                "lop": {
-                    "const": "TypeApply",
-                    "default": "TypeApply",
-                    "title": "Lop"
-                },
-                "ta": {
-                    "$ref": "#/$defs/TypeApplication"
-                }
-            },
-            "required": [
-                "parent",
-                "ta"
-            ],
-            "title": "TypeApply",
-            "type": "object"
-        },
         "TypeArg": {
             "description": "A type argument.",
             "discriminator": {
@@ -1523,14 +1467,9 @@
                     "$ref": "#/$defs/ExtensionSet"
                 },
                 "op": {
-                    "const": "LeafOp",
-                    "default": "LeafOp",
-                    "title": "Op"
-                },
-                "lop": {
                     "const": "UnpackTuple",
                     "default": "UnpackTuple",
-                    "title": "Lop"
+                    "title": "Op"
                 },
                 "tys": {
                     "items": {

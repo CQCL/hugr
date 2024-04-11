@@ -300,13 +300,6 @@ class LoadConstant(DataflowOp):
     datatype: Type
 
 
-class LeafOpBase(DataflowOp):
-    """Simple operation that has only value inputs+outputs and (potentially) StateOrder
-    edges."""
-
-    op: Literal["LeafOp"] = "LeafOp"
-
-
 class DFG(DataflowOp):
     """A simply nested dataflow graph."""
 
@@ -398,11 +391,11 @@ ControlFlowOp = Conditional | TailLoop | CFG
 # -----------------------------------------
 
 
-class CustomOp(LeafOpBase):
+class CustomOp(DataflowOp):
     """A user-defined operation that can be downcasted by the extensions that define
     it."""
 
-    lop: Literal["CustomOp"] = "CustomOp"
+    op: Literal["CustomOp"] = "CustomOp"
     extension: ExtensionId
     op_name: str
     signature: tys.FunctionType = Field(default_factory=tys.FunctionType.empty)
@@ -425,10 +418,10 @@ class CustomOp(LeafOpBase):
         }
 
 
-class Noop(LeafOpBase):
+class Noop(DataflowOp):
     """A no-op operation."""
 
-    lop: Literal["Noop"] = "Noop"
+    op: Literal["Noop"] = "Noop"
     ty: Type
 
     def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
@@ -438,10 +431,10 @@ class Noop(LeafOpBase):
         self.ty = in_types[0]
 
 
-class MakeTuple(LeafOpBase):
+class MakeTuple(DataflowOp):
     """An operation that packs all its inputs into a tuple."""
 
-    lop: Literal["MakeTuple"] = "MakeTuple"
+    op: Literal["MakeTuple"] = "MakeTuple"
     tys: TypeRow = Field(default_factory=list)
 
     def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
@@ -451,56 +444,30 @@ class MakeTuple(LeafOpBase):
         self.tys = list(in_types)
 
 
-class UnpackTuple(LeafOpBase):
+class UnpackTuple(DataflowOp):
     """An operation that packs all its inputs into a tuple."""
 
-    lop: Literal["UnpackTuple"] = "UnpackTuple"
+    op: Literal["UnpackTuple"] = "UnpackTuple"
     tys: TypeRow = Field(default_factory=list)
 
     def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
         self.tys = list(out_types)
 
 
-class Tag(LeafOpBase):
+class Tag(DataflowOp):
     """An operation that creates a tagged sum value from one of its variants."""
 
-    lop: Literal["Tag"] = "Tag"
+    op: Literal["Tag"] = "Tag"
     tag: int  # The variant to create.
     variants: TypeRow  # The variants of the sum type.
 
 
-class TypeApply(LeafOpBase):
+class Lift(DataflowOp):
     """Fixes some TypeParams of a polymorphic type by providing TypeArgs."""
 
-    lop: Literal["TypeApply"] = "TypeApply"
-    ta: "TypeApplication"
-
-
-class TypeApplication(BaseModel):
-    """Records details of an application of a PolyFuncType to some TypeArgs and the
-    result (a less-, but still potentially-, polymorphic type).
-    """
-
-    input: PolyFuncType
-    args: list[tys.TypeTypeArg]
-    output: PolyFuncType
-
-    class Config:
-        # Needed to avoid random '\n's in the pydantic description
-        json_schema_extra = {
-            "description": (
-                "Records details of an application of a PolyFuncType to some TypeArgs "
-                "and the result (a less-, but still potentially-, polymorphic type)."
-            )
-        }
-
-
-class LeafOp(RootModel):
-    """A constant operation."""
-
-    root: CustomOp | Noop | MakeTuple | UnpackTuple | Tag | TypeApply = Field(
-        discriminator="lop"
-    )
+    op: Literal["Lift"] = "Lift"
+    type_row: TypeRow
+    new_extension: ExtensionId
 
 
 class OpType(RootModel):
@@ -522,7 +489,12 @@ class OpType(RootModel):
         | Call
         | CallIndirect
         | LoadConstant
-        | LeafOp
+        | CustomOp
+        | Noop
+        | MakeTuple
+        | UnpackTuple
+        | Tag
+        | Lift
         | DFG
     ) = Field(discriminator="op")
 
