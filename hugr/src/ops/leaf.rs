@@ -1,4 +1,4 @@
-//! Definition of dataflow operations no children.
+//! Definition of dataflow operations with no children.
 
 use smol_str::SmolStr;
 
