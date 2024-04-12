@@ -347,18 +347,7 @@ pub mod test {
         for node in new_hugr.nodes() {
             let new_op = new_hugr.get_optype(node);
             let old_op = h_canon.get_optype(node);
-            if let OpType::CustomOp(new_op) = new_op {
-                if let OpType::CustomOp(old_op) = old_op {
-                    assert_eq!(
-                        new_op.as_ref().clone().into_opaque(),
-                        old_op.as_ref().clone().into_opaque()
-                    );
-                } else {
-                    panic!("Expected old_op to be a custom op");
-                }
-            } else {
-                assert_eq!(new_op, old_op);
-            }
+            assert_eq!(new_op, old_op);
         }
 
         // Check that the graphs are equivalent up to port renumbering.

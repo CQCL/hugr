@@ -455,10 +455,10 @@ mod test {
     use crate::hugr::hugrmut::sealed::HugrMutInternals;
     use crate::hugr::rewrite::replace::WhichHugr;
     use crate::hugr::{HugrMut, NodeType, Rewrite};
-    use crate::ops::custom::{ExternalOp, OpaqueOp};
+    use crate::ops::custom::{CustomOp, OpaqueOp};
     use crate::ops::dataflow::DataflowOpTrait;
     use crate::ops::handle::{BasicBlockID, ConstID, NodeHandle};
-    use crate::ops::{self, Case, CustomOp, DataflowBlock, OpTag, OpType, DFG};
+    use crate::ops::{self, Case, DataflowBlock, OpTag, OpType, DFG};
     use crate::std_extensions::collections;
     use crate::types::{FunctionType, Type, TypeArg, TypeRow};
     use crate::{type_row, Direction, Hugr, HugrView, OutgoingPort};
@@ -650,13 +650,13 @@ mod test {
     fn test_invalid() -> Result<(), Box<dyn std::error::Error>> {
         let utou = FunctionType::new_endo(vec![USIZE_T]);
         let mk_op = |s| {
-            CustomOp::new(ExternalOp::Opaque(OpaqueOp::new(
+            CustomOp::new_opaque(OpaqueOp::new(
                 ExtensionId::new("unknown_ext").unwrap(),
                 s,
                 String::new(),
                 vec![],
                 utou.clone(),
-            )))
+            ))
         };
         let mut h = DFGBuilder::new(FunctionType::new(
             type_row![USIZE_T, BOOL_T],

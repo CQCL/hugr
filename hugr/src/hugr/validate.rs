@@ -16,7 +16,7 @@ use crate::extension::{
 };
 
 use crate::ops::custom::CustomOpError;
-use crate::ops::custom::{resolve_opaque_op, ExternalOp};
+use crate::ops::custom::{resolve_opaque_op, CustomOp};
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::{FuncDefn, OpTag, OpTrait, OpType, ValidateOp};
 use crate::types::type_param::TypeParam;
@@ -525,33 +525,32 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         // The op_type must be defined only in terms of type variables defined outside the node
         // TODO consider turning this match into a trait method?
         match op_type {
-            OpType::CustomOp(b) => {
+            OpType::CustomOp(op) => {
                 // Try to resolve serialized names to actual OpDefs in Extensions.
-                let temp: ExternalOp;
-                let external = b.as_ref();
-                let resolved = match external {
-                    ExternalOp::Opaque(op) => {
+                let temp: CustomOp;
+                let resolved = match op {
+                    CustomOp::Opaque(opaque) => {
                         // If resolve_extension_ops has been called first, this would always return Ok(None)
-                        match resolve_opaque_op(node, op, self.extension_registry)? {
+                        match resolve_opaque_op(node, opaque, self.extension_registry)? {
                             Some(exten) => {
-                                temp = ExternalOp::Extension(exten);
+                                temp = CustomOp::new_extension(exten);
                                 &temp
                             }
-                            None => external,
+                            None => op,
                         }
                     }
-                    ExternalOp::Extension(_) => external,
+                    CustomOp::Extension(_) => op,
                 };
                 // Check TypeArgs are valid, and if we can, fit the declared TypeParams
                 match resolved {
-                    ExternalOp::Extension(exten) => exten
+                    CustomOp::Extension(exten) => exten
                         .def()
                         .validate_args(exten.args(), self.extension_registry, var_decls)
                         .map_err(|cause| ValidationError::SignatureError { node, cause })?,
-                    ExternalOp::Opaque(opaq) => {
+                    CustomOp::Opaque(opaque) => {
                         // Best effort. Just check TypeArgs are valid in themselves, allowing any of them
                         // to contain type vars (we don't know how many are binary params, so accept if in doubt)
-                        for arg in opaq.args() {
+                        for arg in opaque.args() {
                             arg.validate(self.extension_registry, var_decls)
                                 .map_err(|cause| ValidationError::SignatureError { node, cause })?;
                         }
@@ -699,7 +698,7 @@ pub enum ValidationError {
     /// Error in a [CustomOp] serialized as an [Opaque]
     ///
     /// [CustomOp]: crate::ops::CustomOp
-    /// [Opaque]: crate::ops::custom::ExternalOp::Opaque
+    /// [Opaque]: crate::ops::CustomOp::Opaque
     #[error(transparent)]
     CustomOpError(#[from] CustomOpError),
 }
