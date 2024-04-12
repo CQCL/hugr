@@ -1798,8 +1798,8 @@ Conversions between integers and floats:
 
 | Name           | Inputs    | Outputs                  | Meaning               |
 | -------------- | --------- | ------------------------ | --------------------- |
-| `trunc_u<N>`   | `float64` | `Sum(#(int<N>), #(ErrorType))` | float to unsigned int. Returns an error when the float is non-finite or cannot be exactly stored in N bits. |
-| `trunc_s<N>`   | `float64` | `Sum(#(int<N>), #(ErrorType))` | float to signed int. Returns an error when the float is non-finite or cannot be exactly stored in N bits. |
+| `trunc_u<N>`   | `float64` | `Sum(#(int<N>), #(ErrorType))` | float to unsigned int, rounding towards zero. Returns an error when the float is non-finite. |
+| `trunc_s<N>`   | `float64` | `Sum(#(int<N>), #(ErrorType))` | float to signed int, rounding towards zero. Returns an error when the float is non-finite. |
 | `convert_u<N>` | `int<N>`  | `float64`                | unsigned int to float |
 | `convert_s<N>` | `int<N>`  | `float64`                | signed int to float   |
 
