@@ -15,7 +15,7 @@ use super::tag::OpTag;
 use super::{CustomOp, OpTrait, OpType};
 
 /// An instantiation of an operation (declared by a extension) with values for the type arguments
-#[derive(Clone, Debug, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(into = "OpaqueOp", from = "OpaqueOp")]
 pub enum ExternalOp {
     /// When we've found (loaded) the [Extension] definition and identified the [OpDef]
@@ -26,17 +26,6 @@ pub enum ExternalOp {
     ///
     /// [Extension]: crate::Extension
     Opaque(OpaqueOp),
-}
-
-impl PartialEq for ExternalOp {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::Extension(l0), Self::Extension(r0)) => l0 == r0,
-            (Self::Opaque(l0), Self::Opaque(r0)) => l0 == r0,
-            (Self::Extension(l0), Self::Opaque(r0)) => &l0.make_opaque() == r0,
-            (Self::Opaque(l0), Self::Extension(r0)) => l0 == &r0.make_opaque(),
-        }
-    }
 }
 
 impl ExternalOp {
