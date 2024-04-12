@@ -23,7 +23,7 @@ use enum_dispatch::enum_dispatch;
 pub use constant::Const;
 pub use controlflow::{BasicBlock, Case, Conditional, DataflowBlock, ExitBlock, TailLoop, CFG};
 pub use dataflow::{Call, CallIndirect, DataflowParent, Input, LoadConstant, Output, DFG};
-pub use leaf::LeafOp;
+pub use leaf::{CustomOp, Lift, MakeTuple, Noop, Tag, UnpackTuple};
 pub use module::{AliasDecl, AliasDefn, FuncDecl, FuncDefn, Module};
 pub use tag::OpTag;
 
@@ -47,7 +47,12 @@ pub enum OpType {
     CallIndirect,
     LoadConstant,
     DFG,
-    LeafOp,
+    CustomOp,
+    Noop,
+    MakeTuple,
+    UnpackTuple,
+    Tag,
+    Lift,
     DataflowBlock,
     ExitBlock,
     TailLoop,
@@ -100,7 +105,12 @@ impl_op_ref_try_into!(Call);
 impl_op_ref_try_into!(CallIndirect);
 impl_op_ref_try_into!(LoadConstant);
 impl_op_ref_try_into!(DFG, dfg);
-impl_op_ref_try_into!(LeafOp);
+impl_op_ref_try_into!(CustomOp);
+impl_op_ref_try_into!(Noop);
+impl_op_ref_try_into!(MakeTuple);
+impl_op_ref_try_into!(UnpackTuple);
+impl_op_ref_try_into!(Tag);
+impl_op_ref_try_into!(Lift);
 impl_op_ref_try_into!(DataflowBlock);
 impl_op_ref_try_into!(ExitBlock);
 impl_op_ref_try_into!(TailLoop);
@@ -402,7 +412,12 @@ impl OpParent for Output {}
 impl OpParent for Call {}
 impl OpParent for CallIndirect {}
 impl OpParent for LoadConstant {}
-impl OpParent for LeafOp {}
+impl OpParent for CustomOp {}
+impl OpParent for Noop {}
+impl OpParent for MakeTuple {}
+impl OpParent for UnpackTuple {}
+impl OpParent for Tag {}
+impl OpParent for Lift {}
 impl OpParent for TailLoop {}
 impl OpParent for CFG {}
 impl OpParent for Conditional {}

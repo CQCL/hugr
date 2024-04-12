@@ -211,7 +211,7 @@ pub(crate) mod test {
     use crate::extension::prelude::BOOL_T;
     use crate::extension::{ExtensionId, EMPTY_REG};
     use crate::hugr::validate::InterGraphEdgeError;
-    use crate::ops::{handle::NodeHandle, LeafOp, OpTag};
+    use crate::ops::{handle::NodeHandle, Lift, Noop, OpTag};
 
     use crate::std_extensions::logic::test::and_op;
     use crate::types::Type;
@@ -347,13 +347,13 @@ pub(crate) mod test {
             )?;
 
             let [i1] = f_build.input_wires_arr();
-            let noop = f_build.add_dataflow_op(LeafOp::Noop { ty: BIT }, [i1])?;
+            let noop = f_build.add_dataflow_op(Noop { ty: BIT }, [i1])?;
             let i1 = noop.out_wire(0);
 
             let mut nested =
                 f_build.dfg_builder(FunctionType::new(type_row![], type_row![BIT]), None, [])?;
 
-            let id = nested.add_dataflow_op(LeafOp::Noop { ty: BIT }, [i1])?;
+            let id = nested.add_dataflow_op(Noop { ty: BIT }, [i1])?;
 
             let nested = nested.finish_with_outputs([id.out_wire(0)])?;
 
@@ -371,13 +371,13 @@ pub(crate) mod test {
         )?;
 
         let [i1] = f_build.input_wires_arr();
-        let noop = f_build.add_dataflow_op(LeafOp::Noop { ty: QB }, [i1])?;
+        let noop = f_build.add_dataflow_op(Noop { ty: QB }, [i1])?;
         let i1 = noop.out_wire(0);
 
         let mut nested =
             f_build.dfg_builder(FunctionType::new(type_row![], type_row![QB]), None, [])?;
 
-        let id_res = nested.add_dataflow_op(LeafOp::Noop { ty: QB }, [i1]);
+        let id_res = nested.add_dataflow_op(Noop { ty: QB }, [i1]);
 
         // The error would anyway be caught in validation when we finish the Hugr,
         // but the builder catches it earlier
@@ -457,7 +457,7 @@ pub(crate) mod test {
         let [w] = add_ab.input_wires_arr();
 
         let lift_a = add_ab.add_dataflow_op(
-            LeafOp::Lift {
+            Lift {
                 type_row: type_row![BIT],
                 new_extension: xa.clone(),
             },
@@ -467,7 +467,7 @@ pub(crate) mod test {
 
         let lift_b = add_ab.add_dataflow_node(
             NodeType::new(
-                LeafOp::Lift {
+                Lift {
                     type_row: type_row![BIT],
                     new_extension: xb,
                 },
@@ -486,7 +486,7 @@ pub(crate) mod test {
         let [w] = add_c.input_wires_arr();
         let lift_c = add_c.add_dataflow_node(
             NodeType::new(
-                LeafOp::Lift {
+                Lift {
                     type_row: type_row![BIT],
                     new_extension: xc,
                 },

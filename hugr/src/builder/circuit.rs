@@ -244,7 +244,7 @@ mod test {
             Dataflow, DataflowSubContainer, Wire,
         },
         extension::prelude::BOOL_T,
-        ops::{custom::OpaqueOp, LeafOp},
+        ops::{custom::OpaqueOp, CustomOp},
         type_row,
         types::FunctionType,
     };
@@ -278,16 +278,13 @@ mod test {
 
     #[test]
     fn with_nonlinear_and_outputs() {
-        let my_custom_op = LeafOp::CustomOp(
-            crate::ops::custom::ExternalOp::Opaque(OpaqueOp::new(
-                "MissingRsrc".try_into().unwrap(),
-                "MyOp",
-                "unknown op".to_string(),
-                vec![],
-                FunctionType::new(vec![QB, NAT], vec![QB]),
-            ))
-            .into(),
-        );
+        let my_custom_op = CustomOp::new(crate::ops::custom::ExternalOp::Opaque(OpaqueOp::new(
+            "MissingRsrc".try_into().unwrap(),
+            "MyOp",
+            "unknown op".to_string(),
+            vec![],
+            FunctionType::new(vec![QB, NAT], vec![QB]),
+        )));
         let build_res = build_main(
             FunctionType::new(type_row![QB, QB, NAT], type_row![QB, QB, BOOL_T]).into(),
             |mut f_build| {

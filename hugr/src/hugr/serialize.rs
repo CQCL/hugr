@@ -263,7 +263,7 @@ pub mod test {
     use crate::hugr::hugrmut::sealed::HugrMutInternals;
     use crate::hugr::NodeType;
     use crate::ops::custom::{ExtensionOp, OpaqueOp};
-    use crate::ops::{dataflow::IOTrait, Input, LeafOp, Module, Output, DFG};
+    use crate::ops::{dataflow::IOTrait, Input, Module, Noop, Output, DFG};
     use crate::std_extensions::arithmetic::float_ops::FLOAT_OPS_REGISTRY;
     use crate::std_extensions::arithmetic::float_types::{ConstF64, FLOAT64_TYPE};
     use crate::std_extensions::logic::NotOp;
@@ -347,9 +347,12 @@ pub mod test {
         for node in new_hugr.nodes() {
             let new_op = new_hugr.get_optype(node);
             let old_op = h_canon.get_optype(node);
-            if let OpType::LeafOp(LeafOp::CustomOp(new_ext)) = new_op {
-                if let OpType::LeafOp(LeafOp::CustomOp(old_ext)) = old_op {
-                    assert_eq!(new_ext.clone().as_opaque(), old_ext.clone().as_opaque());
+            if let OpType::CustomOp(new_op) = new_op {
+                if let OpType::CustomOp(old_op) = old_op {
+                    assert_eq!(
+                        new_op.as_ref().clone().into_opaque(),
+                        old_op.as_ref().clone().into_opaque()
+                    );
                 } else {
                     panic!("Expected old_op to be a custom op");
                 }
@@ -444,7 +447,7 @@ pub mod test {
                 .map(|in_wire| {
                     f_build
                         .add_dataflow_op(
-                            LeafOp::Noop {
+                            Noop {
                                 ty: f_build.get_wire_type(in_wire).unwrap(),
                             },
                             [in_wire],
@@ -469,7 +472,7 @@ pub mod test {
         let mut params: [_; 2] = dfg.input_wires_arr();
         for p in params.iter_mut() {
             *p = dfg
-                .add_dataflow_op(LeafOp::Noop { ty: BOOL_T }, [*p])
+                .add_dataflow_op(Noop { ty: BOOL_T }, [*p])
                 .unwrap()
                 .out_wire(0);
         }
@@ -506,7 +509,7 @@ pub mod test {
     fn function_type() -> Result<(), Box<dyn std::error::Error>> {
         let fn_ty = Type::new_function(FunctionType::new_endo(type_row![BOOL_T]));
         let mut bldr = DFGBuilder::new(FunctionType::new_endo(vec![fn_ty.clone()]))?;
-        let op = bldr.add_dataflow_op(LeafOp::Noop { ty: fn_ty }, bldr.input_wires())?;
+        let op = bldr.add_dataflow_op(Noop { ty: fn_ty }, bldr.input_wires())?;
         let h = bldr.finish_prelude_hugr_with_outputs(op.outputs())?;
 
         check_hugr_roundtrip(&h);

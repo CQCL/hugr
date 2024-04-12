@@ -139,7 +139,7 @@ mod test {
     use crate::hugr::rewrite::inline_dfg::InlineDFGError;
     use crate::hugr::HugrMut;
     use crate::ops::handle::{DfgID, NodeHandle};
-    use crate::ops::{Const, LeafOp};
+    use crate::ops::{Const, Lift, OpType};
     use crate::std_extensions::arithmetic::float_types;
     use crate::std_extensions::arithmetic::int_ops::{self, IntOpDef};
     use crate::std_extensions::arithmetic::int_types::{self, ConstIntU};
@@ -157,7 +157,7 @@ mod test {
     }
     fn extension_ops(h: &impl HugrView) -> Vec<Node> {
         h.nodes()
-            .filter(|n| matches!(h.get_optype(*n).as_leaf_op(), Some(LeafOp::CustomOp(_))))
+            .filter(|n| matches!(h.get_optype(*n), OpType::CustomOp(_)))
             .collect()
     }
 
@@ -187,7 +187,7 @@ mod test {
             let c1 = d.add_load_const(cst);
             let [lifted] = d
                 .add_dataflow_op(
-                    LeafOp::Lift {
+                    Lift {
                         type_row: vec![int_ty.clone()].into(),
                         new_extension: int_ops::EXTENSION_ID,
                     },

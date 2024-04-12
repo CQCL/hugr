@@ -105,7 +105,7 @@ pub(crate) mod test_quantum_extension {
             prelude::{BOOL_T, QB_T},
             ExtensionId, ExtensionRegistry, PRELUDE,
         },
-        ops::LeafOp,
+        ops::CustomOp,
         std_extensions::arithmetic::float_types,
         type_row,
         types::{FunctionType, PolyFuncType},
@@ -174,33 +174,33 @@ pub(crate) mod test_quantum_extension {
         static ref REG: ExtensionRegistry = ExtensionRegistry::try_new([EXTENSION.to_owned(), PRELUDE.to_owned(), float_types::EXTENSION.to_owned()]).unwrap();
 
     }
-    fn get_gate(gate_name: &str) -> LeafOp {
+    fn get_gate(gate_name: &str) -> CustomOp {
         EXTENSION
             .instantiate_extension_op(gate_name, [], &REG)
             .unwrap()
             .into()
     }
-    pub(crate) fn h_gate() -> LeafOp {
+    pub(crate) fn h_gate() -> CustomOp {
         get_gate("H")
     }
 
-    pub(crate) fn cx_gate() -> LeafOp {
+    pub(crate) fn cx_gate() -> CustomOp {
         get_gate("CX")
     }
 
-    pub(crate) fn measure() -> LeafOp {
+    pub(crate) fn measure() -> CustomOp {
         get_gate("Measure")
     }
 
-    pub(crate) fn rz_f64() -> LeafOp {
+    pub(crate) fn rz_f64() -> CustomOp {
         get_gate("RzF64")
     }
 
-    pub(crate) fn q_alloc() -> LeafOp {
+    pub(crate) fn q_alloc() -> CustomOp {
         get_gate("QAlloc")
     }
 
-    pub(crate) fn q_discard() -> LeafOp {
+    pub(crate) fn q_discard() -> CustomOp {
         get_gate("QDiscard")
     }
 }

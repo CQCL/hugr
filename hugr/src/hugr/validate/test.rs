@@ -11,7 +11,7 @@ use crate::extension::{Extension, ExtensionId, TypeDefBound, EMPTY_REG, PRELUDE_
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::hugr::{HugrMut, NodeType};
 use crate::ops::dataflow::IOTrait;
-use crate::ops::{self, Const, LeafOp, OpType};
+use crate::ops::{self, Const, Noop, OpType};
 use crate::std_extensions::logic::test::{and_op, or_op};
 use crate::std_extensions::logic::{self, NotOp};
 use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
@@ -45,7 +45,7 @@ fn make_simple_hugr(copies: usize) -> (Hugr, Node) {
 fn add_df_children(b: &mut Hugr, parent: Node, copies: usize) -> (Node, Node, Node) {
     let input = b.add_node_with_parent(parent, ops::Input::new(type_row![BOOL_T]));
     let output = b.add_node_with_parent(parent, ops::Output::new(vec![BOOL_T; copies]));
-    let copy = b.add_node_with_parent(parent, LeafOp::Noop { ty: BOOL_T });
+    let copy = b.add_node_with_parent(parent, Noop { ty: BOOL_T });
 
     b.connect(input, 0, copy, 0);
     for i in 0..copies {
@@ -91,7 +91,7 @@ fn invalid_root() {
 
 #[test]
 fn leaf_root() {
-    let leaf_op: OpType = LeafOp::Noop { ty: USIZE_T }.into();
+    let leaf_op: OpType = Noop { ty: USIZE_T }.into();
 
     let b = Hugr::new(NodeType::new_pure(leaf_op));
     assert_eq!(b.validate(&EMPTY_REG), Ok(()));
@@ -173,7 +173,7 @@ fn df_children_restrictions() {
         .unwrap();
 
     // Replace the output operation of the df subgraph with a copy
-    b.replace_op(output, NodeType::new_pure(LeafOp::Noop { ty: NAT }))
+    b.replace_op(output, NodeType::new_pure(Noop { ty: NAT }))
         .unwrap();
     assert_matches!(
         b.validate(&EMPTY_REG),
@@ -716,7 +716,7 @@ mod extension_tests {
 
         let lift = hugr.add_node_with_parent(
             hugr.root(),
-            NodeType::new_pure(ops::LeafOp::Lift {
+            NodeType::new_pure(ops::Lift {
                 type_row: type_row![USIZE_T],
                 new_extension: XB,
             }),

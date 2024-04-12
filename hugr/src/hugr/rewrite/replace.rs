@@ -458,7 +458,7 @@ mod test {
     use crate::ops::custom::{ExternalOp, OpaqueOp};
     use crate::ops::dataflow::DataflowOpTrait;
     use crate::ops::handle::{BasicBlockID, ConstID, NodeHandle};
-    use crate::ops::{self, Case, DataflowBlock, LeafOp, OpTag, OpType, DFG};
+    use crate::ops::{self, Case, CustomOp, DataflowBlock, OpTag, OpType, DFG};
     use crate::std_extensions::collections;
     use crate::types::{FunctionType, Type, TypeArg, TypeRow};
     use crate::{type_row, Direction, Hugr, HugrView, OutgoingPort};
@@ -477,11 +477,11 @@ mod test {
                 .instantiate([TypeArg::Type { ty: USIZE_T }])
                 .unwrap(),
         );
-        let pop: LeafOp = collections::EXTENSION
+        let pop: CustomOp = collections::EXTENSION
             .instantiate_extension_op("pop", [TypeArg::Type { ty: USIZE_T }], &reg)
             .unwrap()
             .into();
-        let push: LeafOp = collections::EXTENSION
+        let push: CustomOp = collections::EXTENSION
             .instantiate_extension_op("push", [TypeArg::Type { ty: USIZE_T }], &reg)
             .unwrap()
             .into();
@@ -650,7 +650,7 @@ mod test {
     fn test_invalid() -> Result<(), Box<dyn std::error::Error>> {
         let utou = FunctionType::new_endo(vec![USIZE_T]);
         let mk_op = |s| {
-            LeafOp::from(ExternalOp::Opaque(OpaqueOp::new(
+            CustomOp::new(ExternalOp::Opaque(OpaqueOp::new(
                 ExtensionId::new("unknown_ext").unwrap(),
                 s,
                 String::new(),

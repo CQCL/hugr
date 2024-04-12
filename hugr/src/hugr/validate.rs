@@ -525,10 +525,11 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         // The op_type must be defined only in terms of type variables defined outside the node
         // TODO consider turning this match into a trait method?
         match op_type {
-            OpType::LeafOp(crate::ops::LeafOp::CustomOp(b)) => {
+            OpType::CustomOp(b) => {
                 // Try to resolve serialized names to actual OpDefs in Extensions.
                 let temp: ExternalOp;
-                let resolved = match &**b {
+                let external = b.as_ref();
+                let resolved = match external {
                     ExternalOp::Opaque(op) => {
                         // If resolve_extension_ops has been called first, this would always return Ok(None)
                         match resolve_opaque_op(node, op, self.extension_registry)? {
@@ -536,10 +537,10 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
                                 temp = ExternalOp::Extension(exten);
                                 &temp
                             }
-                            None => &**b,
+                            None => external,
                         }
                     }
-                    ExternalOp::Extension(_) => &**b,
+                    ExternalOp::Extension(_) => external,
                 };
                 // Check TypeArgs are valid, and if we can, fit the declared TypeParams
                 match resolved {
@@ -697,7 +698,7 @@ pub enum ValidationError {
     SignatureError { node: Node, cause: SignatureError },
     /// Error in a [CustomOp] serialized as an [Opaque]
     ///
-    /// [CustomOp]: crate::ops::LeafOp::CustomOp
+    /// [CustomOp]: crate::ops::CustomOp
     /// [Opaque]: crate::ops::custom::ExternalOp::Opaque
     #[error(transparent)]
     CustomOpError(#[from] CustomOpError),

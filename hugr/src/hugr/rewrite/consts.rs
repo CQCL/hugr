@@ -119,7 +119,7 @@ mod test {
             PRELUDE_REGISTRY,
         },
         hugr::HugrMut,
-        ops::{handle::NodeHandle, LeafOp},
+        ops::{handle::NodeHandle, MakeTuple},
         type_row,
         types::FunctionType,
     };
@@ -133,7 +133,7 @@ mod test {
         let load_1 = dfg_build.load_const(&con_node);
         let load_2 = dfg_build.load_const(&con_node);
         let tup = dfg_build.add_dataflow_op(
-            LeafOp::MakeTuple {
+            MakeTuple {
                 tys: type_row![USIZE_T, USIZE_T],
             },
             [load_1, load_2],

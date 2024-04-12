@@ -3,11 +3,11 @@
 use lazy_static::lazy_static;
 use smol_str::SmolStr;
 
+use crate::ops::CustomOp;
 use crate::types::SumType;
 use crate::{
     extension::{ExtensionId, TypeDefBound},
     ops::constant::CustomConst,
-    ops::LeafOp,
     type_row,
     types::{
         type_param::{TypeArg, TypeParam},
@@ -134,7 +134,7 @@ pub const NEW_ARRAY_OP_ID: &str = "new_array";
 pub const PANIC_OP_ID: &str = "panic";
 
 /// Initialize a new array op of element type `element_ty` of length `size`
-pub fn new_array_op(element_ty: Type, size: u64) -> LeafOp {
+pub fn new_array_op(element_ty: Type, size: u64) -> CustomOp {
     PRELUDE
         .instantiate_extension_op(
             NEW_ARRAY_OP_ID,

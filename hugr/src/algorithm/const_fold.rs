@@ -13,7 +13,7 @@ use crate::{
         views::SiblingSubgraph,
         HugrMut,
     },
-    ops::{Const, LeafOp},
+    ops::{Const, OpType},
     type_row,
     types::FunctionType,
     Hugr, HugrView, IncomingPort, Node, SimpleReplacement,
@@ -44,13 +44,13 @@ pub(crate) fn sorted_consts(consts: &[(IncomingPort, Const)]) -> Vec<&Const> {
         .collect()
 }
 /// For a given op and consts, attempt to evaluate the op.
-pub fn fold_leaf_op(op: &LeafOp, consts: &[(IncomingPort, Const)]) -> ConstFoldResult {
+pub fn fold_leaf_op(op: &OpType, consts: &[(IncomingPort, Const)]) -> ConstFoldResult {
     match op {
-        LeafOp::Noop { .. } => out_row([consts.first()?.1.clone()]),
-        LeafOp::MakeTuple { .. } => {
+        OpType::Noop { .. } => out_row([consts.first()?.1.clone()]),
+        OpType::MakeTuple { .. } => {
             out_row([Const::tuple(sorted_consts(consts).into_iter().cloned())])
         }
-        LeafOp::UnpackTuple { .. } => {
+        OpType::UnpackTuple { .. } => {
             let c = &consts.first()?.1;
             let Const::Tuple { vs } = c else {
                 panic!("This op always takes a Tuple input.");
@@ -58,15 +58,14 @@ pub fn fold_leaf_op(op: &LeafOp, consts: &[(IncomingPort, Const)]) -> ConstFoldR
             out_row(vs.iter().cloned())
         }
 
-        LeafOp::Tag { tag, variants } => out_row([Const::sum(
-            *tag,
+        OpType::Tag(t) => out_row([Const::sum(
+            t.tag,
             consts.iter().map(|(_, konst)| konst.clone()),
-            SumType::new(variants.clone()),
+            SumType::new(t.variants.clone()),
         )
         .unwrap()]),
-        LeafOp::CustomOp(_) => {
-            let ext_op = op.as_extension_op()?;
-
+        OpType::CustomOp(op) => {
+            let ext_op = op.as_ref().as_extension_op()?;
             ext_op.constant_fold(consts)
         }
         _ => None,
@@ -132,7 +131,7 @@ fn fold_op(
     reg: &ExtensionRegistry,
 ) -> Option<(SimpleReplacement, Vec<RemoveLoadConstant>)> {
     // only support leaf folding for now.
-    let neighbour_op = hugr.get_optype(op_node).as_leaf_op()?;
+    let neighbour_op = hugr.get_optype(op_node);
     let (in_consts, removals): (Vec<_>, Vec<_>) = hugr
         .node_inputs(op_node)
         .filter_map(|in_p| {
@@ -214,7 +213,7 @@ mod test {
     use super::*;
     use crate::extension::prelude::{sum_with_error, BOOL_T};
     use crate::extension::{ExtensionRegistry, PRELUDE};
-    use crate::ops::OpType;
+    use crate::ops::{OpType, UnpackTuple};
     use crate::std_extensions::arithmetic;
     use crate::std_extensions::arithmetic::conversions::ConvertOpDef;
     use crate::std_extensions::arithmetic::float_ops::FloatOps;
@@ -242,7 +241,7 @@ mod test {
     fn test_add(#[case] a: f64, #[case] b: f64, #[case] c: f64) {
         let consts = vec![(0.into(), f2c(a)), (1.into(), f2c(b))];
         let add_op: OpType = FloatOps::fadd.into();
-        let out = fold_leaf_op(add_op.as_leaf_op().unwrap(), &consts).unwrap();
+        let out = fold_leaf_op(&add_op, &consts).unwrap();
 
         assert_eq!(&out[..], &[(0.into(), f2c(c))]);
     }
@@ -264,7 +263,7 @@ mod test {
 
         let unpack = build
             .add_dataflow_op(
-                LeafOp::UnpackTuple {
+                UnpackTuple {
                     tys: type_row![FLOAT64_TYPE, FLOAT64_TYPE],
                 },
                 [tup],
