@@ -15,9 +15,9 @@ use crate::{
 
 /// A user-defined operation defined in an extension.
 ///
-/// Any custom operation can be encoded as a serializable [`OpaqueOp`].
-/// If the operation's extension is loaded in the current context, the operation
-/// can be resolved to an executable [`ExtensionOp`].
+/// Any custom operation can be encoded as a serializable [`OpaqueOp`]. If the
+/// operation's extension is loaded in the current context, the operation can be
+/// resolved into an [`ExtensionOp`] containing a reference to its definition.
 ///
 ///   [`OpaqueOp`]: crate::ops::custom::OpaqueOp
 ///   [`ExtensionOp`]: crate::ops::custom::ExtensionOp
