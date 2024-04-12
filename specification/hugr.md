@@ -8,7 +8,7 @@ operations, that facilitates compilation and encodes complete programs,
 with subprograms that may execute on different (quantum and classical)
 targets.
 
-![](hugr_logo.svg)
+![](/specification/hugr_logo.svg)
 
 
 ## Motivation
