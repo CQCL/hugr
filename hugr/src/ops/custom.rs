@@ -82,6 +82,16 @@ impl CustomOp {
             Self::Extension(op) => (*op).into(),
         }
     }
+
+    /// Returns `true` if this operation is an instance of [`ExtensionOp`].
+    pub fn is_extension_op(&self) -> bool {
+        matches!(self, Self::Extension(_))
+    }
+
+    /// Returns `true` if this operation is an instance of [`OpaqueOp`].
+    pub fn is_opaque(&self) -> bool {
+        matches!(self, Self::Opaque(_))
+    }
 }
 
 impl OpName for CustomOp {
@@ -416,5 +426,7 @@ mod test {
         assert_eq!(DataflowOpTrait::description(&op), "desc");
         assert_eq!(op.args(), &[TypeArg::Type { ty: USIZE_T }]);
         assert_eq!(op.signature(), sig);
+        assert!(op.is_opaque());
+        assert!(!op.is_extension_op());
     }
 }
