@@ -386,11 +386,6 @@ class CFG(DataflowOp):
 ControlFlowOp = Conditional | TailLoop | CFG
 
 
-# -----------------------------------------
-# --------------- LeafOp ------------------
-# -----------------------------------------
-
-
 class CustomOp(DataflowOp):
     """A user-defined operation that can be downcasted by the extensions that define
     it."""
