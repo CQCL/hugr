@@ -15,8 +15,14 @@ use super::dataflow::DataflowOpTrait;
 use super::tag::OpTag;
 use super::{OpName, OpTrait, OpType};
 
-/// A user-defined operation that can be downcasted by the extensions that
-/// define it.
+/// A user-defined operation defined in an extension.
+///
+/// Any custom operation can be encoded as a serializable [`OpaqueOp`].
+/// If the operation's extension is loaded in the current context, the operation
+/// can be resolved to an executable [`ExtensionOp`].
+///
+///   [`OpaqueOp`]: crate::ops::custom::OpaqueOp
+///   [`ExtensionOp`]: crate::ops::custom::ExtensionOp
 #[derive(Clone, Debug, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(into = "OpaqueOp", from = "OpaqueOp")]
 pub enum CustomOp {
