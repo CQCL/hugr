@@ -3,11 +3,9 @@ name: Release-please 🐍
 
 on:
   workflow_dispatch: {}
-  # TODO: Re-enable
-  #push:
-  #  branches:
-  #    - main
-  #    - ci/python-ci
+  push:
+    branches:
+      - main
 
 permissions:
   contents: write
