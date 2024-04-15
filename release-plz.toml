@@ -1,3 +1,5 @@
+# Automatic changelog generation for rust projects
+
 [workspace]
 # Open the release PR as a draft
 pr_draft = true
