@@ -681,13 +681,11 @@ mod test {
         let case2 = case2.finish_with_outputs(baz_dfg.outputs())?.node();
         let cond = cond.finish_sub_container()?;
         let h = h.finish_hugr_with_outputs(cond.outputs(), &PRELUDE_REGISTRY)?;
-        let verify_apply = |r: Replacement| {
-            let verify_res = r.verify(&h);
-            let apply_res = r.apply(&mut h.clone());
-            match verify_res {
-                Ok(()) => assert!(apply_res.is_ok()),
-                Err(v_e) => assert_eq!(&v_e, apply_res.as_ref().unwrap_err()),
-            };
+        let check_same_errors = |r: Replacement| {
+            // Check that both `verify` and `apply` agree about success or manner of failure
+            let verify_res = r.verify(&h).unwrap_err();
+            let apply_res = r.apply(&mut h.clone()).unwrap_err();
+            assert_eq!(verify_res, apply_res);
             apply_res
         };
 
@@ -714,57 +712,61 @@ mod test {
             mu_new: vec![],
         };
         assert_eq!(
-            verify_apply(r.clone()),
-            Err(ReplaceError::WrongRootNodeTag {
+            check_same_errors(r.clone()),
+            ReplaceError::WrongRootNodeTag {
                 removed: OpTag::Conditional,
                 replacement: OpTag::Dfg
-            })
+            }
         );
         r.replacement.replace_op(
             r.replacement.root(),
             NodeType::new_open(h.get_optype(cond.node()).clone()),
         )?;
-        assert!(verify_apply(r.clone()).is_ok());
-
+        assert_eq!(h.get_parent(baz.node()), Some(baz_dfg.node()));
+        r.verify(&h).unwrap();
+        {
+            let mut target = h.clone();
+            let node_map = r.clone().apply(&mut target)?;
+            let new_case2 = *node_map.get(&r2).unwrap();
+            assert_eq!(target.get_parent(baz.node()), Some(new_case2));
+        }
         // And test some bad Replacements (using the same `replacement` Hugr).
         // First, removed nodes...
         assert_eq!(
-            verify_apply(Replacement {
+            check_same_errors(Replacement {
                 removal: vec![h.root()],
                 ..r.clone()
             }),
-            Err(ReplaceError::CantReplaceRoot)
+            ReplaceError::CantReplaceRoot
         );
         assert_eq!(
-            verify_apply(Replacement {
+            check_same_errors(Replacement {
                 removal: vec![case1, baz_dfg.node()],
                 ..r.clone()
             }),
-            Err(ReplaceError::MultipleParents(vec![cond.node(), case2]))
+            ReplaceError::MultipleParents(vec![cond.node(), case2])
         );
         // Adoptions...
         assert_eq!(
-            verify_apply(Replacement {
+            check_same_errors(Replacement {
                 adoptions: HashMap::from([(r1, case1), (r.replacement.root(), case2)]),
                 ..r.clone()
             }),
-            Err(ReplaceError::InvalidAdoptingParent(r.replacement.root()))
+            ReplaceError::InvalidAdoptingParent(r.replacement.root())
         );
         assert_eq!(
-            verify_apply(Replacement {
+            check_same_errors(Replacement {
                 adoptions: HashMap::from_iter([(r1, case1), (r2, case1)]),
                 ..r.clone()
             }),
-            Err(ReplaceError::AdopteesNotSeparateDescendants(vec![case1]))
+            ReplaceError::AdopteesNotSeparateDescendants(vec![case1])
         );
         assert_eq!(
-            verify_apply(Replacement {
+            check_same_errors(Replacement {
                 adoptions: HashMap::from_iter([(r1, case2), (r2, baz_dfg.node())]),
                 ..r.clone()
             }),
-            Err(ReplaceError::AdopteesNotSeparateDescendants(vec![
-                baz_dfg.node()
-            ]))
+            ReplaceError::AdopteesNotSeparateDescendants(vec![baz_dfg.node()])
         );
         // Edges....
         let edge_from_removed = NewEdgeSpec {
@@ -773,15 +775,11 @@ mod test {
             kind: NewEdgeKind::Order,
         };
         assert_eq!(
-            verify_apply(Replacement {
+            check_same_errors(Replacement {
                 mu_inp: vec![edge_from_removed.clone()],
                 ..r.clone()
             }),
-            Err(ReplaceError::BadEdgeSpec(
-                Direction::Outgoing,
-                WhichHugr::Retained,
-                edge_from_removed
-            ))
+            ReplaceError::BadEdgeSpec(Direction::Outgoing, WhichHugr::Retained, edge_from_removed)
         );
         let bad_out_edge = NewEdgeSpec {
             src: h.nodes().max().unwrap(), // not valid in replacement
@@ -789,15 +787,11 @@ mod test {
             kind: NewEdgeKind::Order,
         };
         assert_eq!(
-            verify_apply(Replacement {
+            check_same_errors(Replacement {
                 mu_out: vec![bad_out_edge.clone()],
                 ..r.clone()
             }),
-            Err(ReplaceError::BadEdgeSpec(
-                Direction::Outgoing,
-                WhichHugr::Replacement,
-                bad_out_edge
-            ))
+            ReplaceError::BadEdgeSpec(Direction::Outgoing, WhichHugr::Replacement, bad_out_edge)
         );
         let bad_order_edge = NewEdgeSpec {
             src: cond.node(),
@@ -805,11 +799,11 @@ mod test {
             kind: NewEdgeKind::ControlFlow { src_pos: 0.into() },
         };
         assert_matches!(
-            verify_apply(Replacement {
+            check_same_errors(Replacement {
                 mu_new: vec![bad_order_edge.clone()],
                 ..r.clone()
             }),
-            Err(ReplaceError::BadEdgeKind(_, e)) => e == bad_order_edge
+            ReplaceError::BadEdgeKind(_, e) => e == bad_order_edge
         );
         let op = OutgoingPort::from(0);
         let (tgt, ip) = h.linked_inputs(cond.node(), op).next().unwrap();
@@ -822,11 +816,11 @@ mod test {
             },
         };
         assert_eq!(
-            verify_apply(Replacement {
+            check_same_errors(Replacement {
                 mu_out: vec![new_out_edge.clone()],
                 ..r.clone()
             }),
-            Err(ReplaceError::BadEdgeKind(Direction::Outgoing, new_out_edge))
+            ReplaceError::BadEdgeKind(Direction::Outgoing, new_out_edge)
         );
         Ok(())
     }
