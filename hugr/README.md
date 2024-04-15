@@ -1,4 +1,4 @@
-![](/specification/hugr_logo.svg)
+![](/hugr/assets/hugr_logo.svg)
 
 hugr
 ===============
