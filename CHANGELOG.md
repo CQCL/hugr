@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1 (2024-04-15)
+
+> ⚠ This crate has been renamed to [`hugr`](https://crates.io/crates/hugr) ⚠
+
+Please use the new package instead.
+
 ## 0.2.0 (2024-02-20)
 
 ### Documentation

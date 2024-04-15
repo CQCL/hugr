@@ -1,8 +1,12 @@
-quantinuum-hugr
-===============
+# ⚠ This crate has been renamed to [`hugr`](https://crates.io/crates/hugr) ⚠
+
+Please use the new package instead.
+
+hugr
+====
 
 [![build_status][]](https://github.com/CQCL/hugr/actions)
-[![crates][]](https://crates.io/crates/quantinuum-hugr)
+[![crates][]](https://crates.io/crates/hugr)
 [![msrv][]](https://github.com/CQCL/hugr)
 [![codecov][]](https://codecov.io/gh/CQCL/hugr)
 
@@ -20,7 +24,7 @@ The HUGR specification is [here](https://github.com/CQCL/hugr/blob/main/specific
 Add the dependency to your project:
 
 ```bash
-cargo add quantinuum-hugr
+cargo add hugr
 ```
 
 The library crate is called `hugr`.
@@ -47,10 +51,10 @@ See [DEVELOPMENT.md](https://github.com/CQCL/hugr/blob/main/DEVELOPMENT.md) for 
 
 This project is licensed under Apache License, Version 2.0 ([LICENSE][] or http://www.apache.org/licenses/LICENSE-2.0).
 
-  [API documentation here]: https://docs.rs/quantinuum-hugr/
+  [API documentation here]: https://docs.rs/hugr/
   [build_status]: https://github.com/CQCL/hugr/workflows/Continuous%20integration/badge.svg?branch=main
   [msrv]: https://img.shields.io/badge/rust-1.75.0%2B-blue.svg
-  [crates]: https://img.shields.io/crates/v/quantinuum-hugr
+  [crates]: https://img.shields.io/crates/v/hugr
   [codecov]: https://img.shields.io/codecov/c/gh/CQCL/hugr?logo=codecov
   [LICENSE]: https://github.com/CQCL/hugr/blob/main/LICENCE
   [CHANGELOG]: https://github.com/CQCL/hugr/blob/main/CHANGELOG.md
