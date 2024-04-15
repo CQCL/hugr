@@ -3,8 +3,12 @@ name: Unsoundness checks
 on:
   push:
     branches:
-      - main 
+      - main
   workflow_dispatch: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always

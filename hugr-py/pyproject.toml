@@ -1,0 +1,32 @@
+[tool.poetry]
+classifiers = [
+    "Environment :: Console",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: Microsoft :: Windows",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering",
+]
+name = "hugr"
+version = "0.1.0a1"
+description = "Quantinuum's common representation for quantum programs"
+#keywords = []
+authors = ["TKET development team <tket-support@cambridgequantum.com>"]
+maintainers = ["TKET development team <tket-support@cambridgequantum.com>"]
+license = "Apache-2.0"
+readme = "README.md"
+homepage = "https://github.com/CQCL/hugr"
+repository = "https://github.com/CQCL/hugr"
+
+[tool.poetry.dependencies]
+python = ">=3.10"
+pydantic = "^2.6.4"
+
+[tool.pytest.ini_options]
+# Lark throws deprecation warnings for `src_parse` and `src_constants`.
+filterwarnings = "ignore::DeprecationWarning:lark.*"

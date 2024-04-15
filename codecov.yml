@@ -1,0 +1,26 @@
+# Codecov coverage report configuration
+
+# Coverage report
+# Do not fail if the coverage is not met
+coverage:
+  status:
+    patch:
+      default:
+        informational: false
+        only_pulls: true
+    project:
+      default:
+        informational: true
+
+# Ignore tests and binaries
+ignore:
+  - "hugr-py/tests"
+  - "scripts"
+
+# Coverage groups config
+flag_management:
+  default_rules: # the rules that will be followed for any flag added, generally
+    # Use previous coverage if one is not available for the current commit.
+    #
+    # (E.g. if the PR doesn't modify a subproject, we don't submit a coverage report for it.)
+    carryforward: true
