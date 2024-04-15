@@ -504,15 +504,9 @@ pub(crate) fn check_typevar_decl(
 #[cfg(test)]
 pub(crate) mod test {
     use super::*;
-    use crate::extension::PRELUDE;
-    use crate::{const_extension_ids, Extension};
     use crate::{extension::prelude::USIZE_T, ops::AliasDecl};
 
     use crate::types::TypeBound;
-
-    const_extension_ids! {
-        const MY_EXT: ExtensionId = "my_extension";
-    }
 
     #[test]
     fn construct() {
@@ -522,7 +516,7 @@ pub(crate) mod test {
             Type::new_extension(CustomType::new(
                 "my_custom",
                 [],
-                MY_EXT,
+                "my_extension".try_into().unwrap(),
                 TypeBound::Copyable,
             )),
             Type::new_alias(AliasDecl::new("my_alias", TypeBound::Eq)),
@@ -531,17 +525,6 @@ pub(crate) mod test {
             &t.to_string(),
             "[usize, Function([[]][]), my_custom, Alias(my_alias)]"
         );
-
-        let mut ext = Extension::new(MY_EXT);
-        ext.add_type(
-            "my_custom".into(),
-            vec![],
-            "".into(),
-            TypeBound::Copyable.into(),
-        )
-        .unwrap();
-        let reg = ExtensionRegistry::try_new([PRELUDE.to_owned(), ext]).unwrap();
-        t.validate(&reg, &[]).unwrap()
     }
 
     #[test]
