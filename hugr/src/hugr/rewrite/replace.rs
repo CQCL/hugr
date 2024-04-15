@@ -681,15 +681,7 @@ mod test {
         let case2 = case2.finish_with_outputs(baz_dfg.outputs())?.node();
         let cond = cond.finish_sub_container()?;
         let h = h.finish_hugr_with_outputs(cond.outputs(), &PRELUDE_REGISTRY)?;
-        let check_same_errors = |r: Replacement| {
-            // Check that both `verify` and `apply` agree about success or manner of failure
-            let verify_res = r.verify(&h).unwrap_err();
-            let apply_res = r.apply(&mut h.clone()).unwrap_err();
-            assert_eq!(verify_res, apply_res);
-            apply_res
-        };
 
-        // Note wrong root type here - we'll replace children of the *Conditional*
         let mut r_hugr = Hugr::new(NodeType::new_open(h.get_optype(cond.node()).clone()));
         let r1 = r_hugr.add_node_with_parent(
             r_hugr.root(),
@@ -721,6 +713,13 @@ mod test {
         }
 
         // Test some bad Replacements (using variations of the `replacement` Hugr).
+        let check_same_errors = |r: Replacement| {
+            let verify_res = r.verify(&h).unwrap_err();
+            let apply_res = r.apply(&mut h.clone()).unwrap_err();
+            assert_eq!(verify_res, apply_res);
+            apply_res
+        };
+        // Root node type needs to be that of common parent of the removed nodes:
         let mut rep2 = rep.clone();
         rep2.replacement
             .replace_op(rep2.replacement.root(), h.root_type().clone())?;
