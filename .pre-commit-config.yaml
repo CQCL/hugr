@@ -15,7 +15,8 @@ repos:
           (?x)^(
             specification/schema/.*|
             .*.snap|
-            .*.snap.new
+            .*.snap.new|
+            .release-please-manifest.json
           )$
       - id: trailing-whitespace
         exclude: |

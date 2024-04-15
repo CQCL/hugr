@@ -3,13 +3,15 @@
     "include-component-in-tag": true,
     "bump-minor-pre-major": true,
     "bump-patch-for-minor-pre-major": true,
-    "initial-version": "0.1.0",
+    "initial-version": "0.0.0",
     "packages": {
-        "quantinuum-hugr-py": {
+        "hugr-py": {
             "release-type": "python",
+            "component": "hugr-py",
             "package-name": "hugr",
+            "include-component-in-tag": true,
             "draft": false,
-            "prerelease": false
+            "prerelease": true
         }
     },
     "changelog-sections": [
