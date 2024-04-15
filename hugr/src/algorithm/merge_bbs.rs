@@ -22,6 +22,10 @@ pub fn merge_basic_blocks(cfg: &mut impl HugrMut<RootHandle = CfgID>) {
             continue;
         };
         assert_eq!(n, p);
+        if cfg.get_optype(succ).is_exit_block() {
+            // TODO code should move outside the CFG
+            panic!("Not yet implemented")
+        }
         let (rep, dfg1, dfg2) = mk_rep(cfg, n, succ);
         let node_map = cfg.apply_rewrite(rep).unwrap();
         for dfg_id in [dfg1, dfg2] {
@@ -93,12 +97,18 @@ fn mk_rep(
 
 #[cfg(test)]
 mod test {
+    use itertools::Itertools;
+
     use crate::builder::{CFGBuilder, Dataflow, HugrBuilder};
     use crate::extension::prelude::{QB_T, USIZE_T};
-    use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE};
-    use crate::ops::{Const, Noop};
+    use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE, PRELUDE_REGISTRY};
+    use crate::hugr::views::sibling::SiblingMut;
+    use crate::ops::handle::CfgID;
+    use crate::ops::{Const, Noop, OpType};
     use crate::types::{FunctionType, Type, TypeRow};
-    use crate::{const_extension_ids, type_row, Extension};
+    use crate::{const_extension_ids, type_row, Extension, HugrView};
+
+    use super::merge_basic_blocks;
 
     const_extension_ids! {
         const EXT_ID: ExtensionId = "TestExt";
@@ -123,8 +133,8 @@ mod test {
                 ])]),
             ),
         )?;
+        let tst_op = e.instantiate_extension_op("Test", [], &PRELUDE_REGISTRY)?;
         let reg = ExtensionRegistry::try_new([PRELUDE.to_owned(), e])?;
-        let e = reg.get(&EXT_ID.to_string()).unwrap();
         let mut h = CFGBuilder::new(FunctionType::new(loop_variants.clone(), exit_types.clone()))?;
         let mut noop_block =
             h.simple_entry_builder(loop_variants.clone(), 1, ExtensionSet::new())?;
@@ -138,17 +148,33 @@ mod test {
             type_row![],
         )?;
         let [tst] = test_block
-            .add_dataflow_op(
-                e.instantiate_extension_op("Test", [], &reg)?,
-                test_block.input_wires(),
-            )?
+            .add_dataflow_op(tst_op, test_block.input_wires())?
             .outputs_arr();
         let test_block = test_block.finish_with_outputs(tst, [])?;
         let exit_block = h.exit_block();
         h.branch(&noop_block, 0, &test_block)?;
         h.branch(&test_block, 0, &noop_block)?;
         h.branch(&test_block, 1, &exit_block)?;
-        h.finish_hugr(&reg)?;
+        let mut h = h.finish_hugr(&reg)?;
+        let r = h.root();
+        merge_basic_blocks(&mut SiblingMut::<CfgID>::try_new(&mut h, r)?);
+        assert_eq!(r, h.root());
+        assert!(matches!(h.get_optype(r), OpType::CFG(_)));
+        let [entry, exit] = h.children(r).collect::<Vec<_>>().try_into().unwrap();
+        assert_eq!(h.output_neighbours(entry).collect::<Vec<_>>(), vec![exit]);
+        let noop = h
+            .nodes()
+            .filter(|n| matches!(h.get_optype(*n), OpType::Noop(_)))
+            .exactly_one()
+            .ok()
+            .unwrap();
+        let tst = h
+            .nodes()
+            .filter(|n| matches!(h.get_optype(*n), OpType::CustomOp(_)))
+            .exactly_one()
+            .ok()
+            .unwrap();
+        assert_eq!(h.output_neighbours(noop).collect::<Vec<_>>(), vec![tst]);
         Ok(())
     }
 }
