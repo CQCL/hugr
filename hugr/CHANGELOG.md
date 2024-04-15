@@ -1,8 +1,17 @@
 # Changelog
 
-## Unreleased (xxxx-xx-xx)
+## 0.3.0 (2024-04-15)
 
-This release includes multiple breaking changes to the API, including the rename of the crate from `quantinuum_hugr` to `hugr`.
+### Main changes
+
+This release includes a long list of breaking changes to the API.
+
+- The crate was renamed from `quantinuum_hugr` to `hugr`.
+- The API has been simplified, flattening structures and reworking unnecessarily
+  fallible operations where possible.
+- Includes version `1` of the hugr serialization schema. Older pre-v1 serialized
+  hugrs are no longer supported. Starting with `v1`, backward compatibility for
+  loading older versions will be maintained.
 
 ### New Contributors
 
@@ -18,6 +27,8 @@ This release includes multiple breaking changes to the API, including the rename
 - HUGR spec copyediting ([#843](https://github.com/CQCL/hugr/pull/843))
 - Add builder module docs + example ([#853](https://github.com/CQCL/hugr/pull/853))
 - Add note on serialized hugr node order ([#849](https://github.com/CQCL/hugr/pull/849))
+- Specify direct children in `HugrView::children` ([#921](https://github.com/CQCL/hugr/pull/921))
+- Add logo svg to readme and spec ([#925](https://github.com/CQCL/hugr/pull/925))
 
 ### Features
 
@@ -37,6 +48,8 @@ This release includes multiple breaking changes to the API, including the rename
 - [**breaking**] Return the type of FuncDecl in `HugrView::get_function_type` ([#880](https://github.com/CQCL/hugr/pull/880))
 - [**breaking**] Merge `Value` into `Const` ([#881](https://github.com/CQCL/hugr/pull/881))
 - Replace `Tuple` with unary sums ([#891](https://github.com/CQCL/hugr/pull/891))
+- [**breaking**] No polymorphic closures ([#906](https://github.com/CQCL/hugr/pull/906))
+- [**breaking**] Flatten `LeafOp` ([#922](https://github.com/CQCL/hugr/pull/922))
 
 ### Performance
 
@@ -48,6 +61,8 @@ This release includes multiple breaking changes to the API, including the rename
 - Remove clone in `ExtensionSet::union` ([#859](https://github.com/CQCL/hugr/pull/859))
 - Extension Inference: make fewer things public, rm Meta::new ([#883](https://github.com/CQCL/hugr/pull/883))
 - [**breaking**] Return impl trait in Rewrite trait ([#889](https://github.com/CQCL/hugr/pull/889))
+- Combine ExtensionSolutions (no separate closure) ([#884](https://github.com/CQCL/hugr/pull/884))
+- [**breaking**] Merge `CustomOp` and `ExternalOp`. ([#923](https://github.com/CQCL/hugr/pull/923))
 
 ## 0.2.0 (2024-02-20)
 
