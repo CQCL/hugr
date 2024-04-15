@@ -6,13 +6,23 @@
 version: 2
 updates:
   - package-ecosystem: "cargo" # See documentation for possible values
-    directory: "/" # Location of package manifests
+    directory: "/hugr/" # Location of package manifests
     schedule:
       interval: "weekly"
     commit-message:
       # Use a conventional commit tag
       prefix: "chore(deps)"
+  - package-ecosystem: "pip"
+    directory: "/hugr-py/" # Location of package manifests
+    schedule:
+      interval: "weekly"
+    commit-message:
+      # Use a conventional commit tag
+      prefix: "chore(deps-py)"
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+    commit-message:
+      # Use a conventional commit tag
+      prefix: "ci(deps)"
