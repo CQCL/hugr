@@ -202,7 +202,7 @@ pub enum TypeEnum {
     #[allow(missing_docs)]
     #[display(fmt = "Variable({})", _0)]
     Variable(usize, TypeBound),
-    /// DeBruijn index, and cache of inner TypeBound - matches a [TypeParam::List] of [TypeParam::Type]
+    /// Variable index, and cache of inner TypeBound - matches a [TypeParam::List] of [TypeParam::Type]
     /// of this bound (checked in validation)
     #[display(fmt = "RowVar({})", _0)]
     RowVariable(usize, TypeBound),
@@ -317,9 +317,13 @@ impl Type {
         Self(TypeEnum::Variable(idx, bound), bound)
     }
 
-    /// New use (occurrence) of the row variable with specified DeBruijn index.
-    /// For use in type schemes only: `bound` must match that with which the
-    /// variable was declared (i.e. as a [TypeParam::List]`(`[TypeParam::Type]`(bound))`).
+    /// New use (occurrence) of the row variable with specified index.
+    /// `bound` must match that with which the variable was declared
+    /// (i.e. as a [TypeParam::List]` of a `[TypeParam::Type]` of that bound).
+    /// For use in [OpDef], not [FuncDefn], type schemes only.
+    ///
+    /// [OpDef]: crate::extension::OpDef
+    /// [FuncDefn]: crate::ops::FuncDefn
     pub const fn new_row_var(idx: usize, bound: TypeBound) -> Self {
         Self(TypeEnum::RowVariable(idx, bound), bound)
     }
