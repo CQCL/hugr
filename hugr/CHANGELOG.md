@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.3.0-alpha.2 (2024-04-15)
+
+### Documentation
+
+- Specify direct children in `HugrView::children` ([#921](https://github.com/CQCL/hugr/pull/921))
+- Add logo svg to readme and spec ([#925](https://github.com/CQCL/hugr/pull/925))
+
+### Features
+
+- [**breaking**] No polymorphic closures ([#906](https://github.com/CQCL/hugr/pull/906))
+- [**breaking**] Flatten `LeafOp` ([#922](https://github.com/CQCL/hugr/pull/922))
+
+### Refactor
+
+- Combine ExtensionSolutions (no separate closure) ([#884](https://github.com/CQCL/hugr/pull/884))
+- [**breaking**] Merge `CustomOp` and `ExternalOp`. ([#923](https://github.com/CQCL/hugr/pull/923))
+
+
 ## Unreleased (xxxx-xx-xx)
 
 This release includes multiple breaking changes to the API, including the rename of the crate from `quantinuum_hugr` to `hugr`.
