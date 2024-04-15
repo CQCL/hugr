@@ -690,81 +690,81 @@ mod test {
         };
 
         // Note wrong root type here - we'll replace children of the *Conditional*
-        let mut rep1 = Hugr::new(h.root_type().clone());
-        let r1 = rep1.add_node_with_parent(
-            rep1.root(),
+        let mut r_hugr = Hugr::new(NodeType::new_open(h.get_optype(cond.node()).clone()));
+        let r1 = r_hugr.add_node_with_parent(
+            r_hugr.root(),
             Case {
                 signature: utou.clone(),
             },
         );
-        let r2 = rep1.add_node_with_parent(
-            rep1.root(),
+        let r2 = r_hugr.add_node_with_parent(
+            r_hugr.root(),
             Case {
                 signature: utou.clone(),
             },
         );
-        let mut r = Replacement {
+        let rep: Replacement = Replacement {
             removal: vec![case1, case2],
-            replacement: rep1,
+            replacement: r_hugr,
             adoptions: HashMap::from_iter([(r1, case1), (r2, baz_dfg.node())]),
             mu_inp: vec![],
             mu_out: vec![],
             mu_new: vec![],
         };
+        assert_eq!(h.get_parent(baz.node()), Some(baz_dfg.node()));
+        rep.verify(&h).unwrap();
+        {
+            let mut target = h.clone();
+            let node_map = rep.clone().apply(&mut target)?;
+            let new_case2 = *node_map.get(&r2).unwrap();
+            assert_eq!(target.get_parent(baz.node()), Some(new_case2));
+        }
+
+        // Test some bad Replacements (using variations of the `replacement` Hugr).
+        let mut rep2 = rep.clone();
+        rep2.replacement
+            .replace_op(rep2.replacement.root(), h.root_type().clone())?;
         assert_eq!(
-            check_same_errors(r.clone()),
+            check_same_errors(rep2),
             ReplaceError::WrongRootNodeTag {
                 removed: OpTag::Conditional,
                 replacement: OpTag::Dfg
             }
         );
-        r.replacement.replace_op(
-            r.replacement.root(),
-            NodeType::new_open(h.get_optype(cond.node()).clone()),
-        )?;
-        assert_eq!(h.get_parent(baz.node()), Some(baz_dfg.node()));
-        r.verify(&h).unwrap();
-        {
-            let mut target = h.clone();
-            let node_map = r.clone().apply(&mut target)?;
-            let new_case2 = *node_map.get(&r2).unwrap();
-            assert_eq!(target.get_parent(baz.node()), Some(new_case2));
-        }
-        // And test some bad Replacements (using the same `replacement` Hugr).
-        // First, removed nodes...
+        // Removed nodes...
         assert_eq!(
             check_same_errors(Replacement {
                 removal: vec![h.root()],
-                ..r.clone()
+                ..rep.clone()
             }),
             ReplaceError::CantReplaceRoot
         );
         assert_eq!(
             check_same_errors(Replacement {
                 removal: vec![case1, baz_dfg.node()],
-                ..r.clone()
+                ..rep.clone()
             }),
             ReplaceError::MultipleParents(vec![cond.node(), case2])
         );
         // Adoptions...
         assert_eq!(
             check_same_errors(Replacement {
-                adoptions: HashMap::from([(r1, case1), (r.replacement.root(), case2)]),
-                ..r.clone()
+                adoptions: HashMap::from([(r1, case1), (rep.replacement.root(), case2)]),
+                ..rep.clone()
             }),
-            ReplaceError::InvalidAdoptingParent(r.replacement.root())
+            ReplaceError::InvalidAdoptingParent(rep.replacement.root())
         );
         assert_eq!(
             check_same_errors(Replacement {
                 adoptions: HashMap::from_iter([(r1, case1), (r2, case1)]),
-                ..r.clone()
+                ..rep.clone()
             }),
             ReplaceError::AdopteesNotSeparateDescendants(vec![case1])
         );
         assert_eq!(
             check_same_errors(Replacement {
                 adoptions: HashMap::from_iter([(r1, case2), (r2, baz_dfg.node())]),
-                ..r.clone()
+                ..rep.clone()
             }),
             ReplaceError::AdopteesNotSeparateDescendants(vec![baz_dfg.node()])
         );
@@ -777,7 +777,7 @@ mod test {
         assert_eq!(
             check_same_errors(Replacement {
                 mu_inp: vec![edge_from_removed.clone()],
-                ..r.clone()
+                ..rep.clone()
             }),
             ReplaceError::BadEdgeSpec(Direction::Outgoing, WhichHugr::Retained, edge_from_removed)
         );
@@ -789,7 +789,7 @@ mod test {
         assert_eq!(
             check_same_errors(Replacement {
                 mu_out: vec![bad_out_edge.clone()],
-                ..r.clone()
+                ..rep.clone()
             }),
             ReplaceError::BadEdgeSpec(Direction::Outgoing, WhichHugr::Replacement, bad_out_edge)
         );
@@ -801,7 +801,7 @@ mod test {
         assert_matches!(
             check_same_errors(Replacement {
                 mu_new: vec![bad_order_edge.clone()],
-                ..r.clone()
+                ..rep.clone()
             }),
             ReplaceError::BadEdgeKind(_, e) => e == bad_order_edge
         );
@@ -818,7 +818,7 @@ mod test {
         assert_eq!(
             check_same_errors(Replacement {
                 mu_out: vec![new_out_edge.clone()],
-                ..r.clone()
+                ..rep.clone()
             }),
             ReplaceError::BadEdgeKind(Direction::Outgoing, new_out_edge)
         );
