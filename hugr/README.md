@@ -1,3 +1,5 @@
+![](/hugr/assets/hugr_logo.svg)
+
 hugr
 ===============
 

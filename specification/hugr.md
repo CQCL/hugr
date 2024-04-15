@@ -8,6 +8,9 @@ operations, that facilitates compilation and encodes complete programs,
 with subprograms that may execute on different (quantum and classical)
 targets.
 
+![](/hugr/assets/hugr_logo.svg)
+
+
 ## Motivation
 
 Multiple compilers and tools in the Quantinuum stack use some graph-like
