@@ -18,6 +18,13 @@ pub struct Noop {
     pub ty: Type,
 }
 
+impl Noop {
+    /// Create a new Noop operation.
+    pub fn new(ty: Type) -> Self {
+        Self { ty }
+    }
+}
+
 impl Default for Noop {
     fn default() -> Self {
         Self { ty: Type::UNIT }
@@ -32,12 +39,26 @@ pub struct MakeTuple {
     pub tys: TypeRow,
 }
 
+impl MakeTuple {
+    /// Create a new MakeTuple operation.
+    pub fn new(tys: TypeRow) -> Self {
+        Self { tys }
+    }
+}
+
 /// An operation that unpacks a tuple into its components.
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 pub struct UnpackTuple {
     ///Tuple element types.
     pub tys: TypeRow,
+}
+
+impl UnpackTuple {
+    /// Create a new UnpackTuple operation.
+    pub fn new(tys: TypeRow) -> Self {
+        Self { tys }
+    }
 }
 
 /// An operation that creates a tagged sum value from one of its variants.
@@ -50,6 +71,13 @@ pub struct Tag {
     pub variants: Vec<TypeRow>,
 }
 
+impl Tag {
+    /// Create a new Tag operation.
+    pub fn new(tag: usize, variants: Vec<TypeRow>) -> Self {
+        Self { tag, variants }
+    }
+}
+
 /// A node which adds a extension req to the types of the wires it is passed
 /// It has no effect on the values passed along the edge
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -59,6 +87,16 @@ pub struct Lift {
     pub type_row: TypeRow,
     /// The extensions which we're adding to the inputs
     pub new_extension: ExtensionId,
+}
+
+impl Lift {
+    /// Create a new Lift operation.
+    pub fn new(type_row: TypeRow, new_extension: ExtensionId) -> Self {
+        Self {
+            type_row,
+            new_extension,
+        }
+    }
 }
 
 impl_op_name!(Noop);
