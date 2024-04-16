@@ -323,7 +323,9 @@ class Conditional(DataflowOp):
     op: Literal["Conditional"] = "Conditional"
     other_inputs: TypeRow = Field(default_factory=list)  # Remaining input types
     outputs: TypeRow = Field(default_factory=list)  # Output types
-    sum_rows: list[TypeRow] = Field(description="The possible rows of the Sum input")
+    sum_rows: list[TypeRow] = Field(
+        description="The possible rows of the Sum input", default_factory=list
+    )
     # Extensions used to produce the outputs
     extension_delta: ExtensionSet = Field(default_factory=list)
 
