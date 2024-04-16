@@ -11,7 +11,7 @@
             "package-name": "hugr",
             "include-component-in-tag": true,
             "draft": false,
-            "prerelease": true
+            "prerelease": false
         }
     },
     "changelog-sections": [
