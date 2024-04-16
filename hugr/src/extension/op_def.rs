@@ -641,22 +641,22 @@ mod test {
         use crate::extension::prelude::{BOOL_T, PRELUDE_REGISTRY};
 
         let mut e = Extension::new(EXT_ID);
-        let ext_id = e.name().clone();
 
-        let es = ExtensionSet::singleton(&ext_id);
         let params: Vec<TypeParam> = vec![TypeParam::Extensions];
-        let args = [TypeArg::Extensions { es: es.clone() }];
-        let mut db_set = ExtensionSet::new();
-        db_set.insert_type_var(0);
+        let db_set = ExtensionSet::type_var(0);
         let fun_ty = FunctionType::new_endo(vec![BOOL_T]).with_extension_delta(db_set);
-
-        let exp_fun_ty = FunctionType::new_endo(vec![BOOL_T]).with_extension_delta(es);
 
         let def = e.add_op(
             "SimpleOp".into(),
             "".into(),
             PolyFuncType::new(params.clone(), fun_ty),
         )?;
+
+        // Concrete extension set
+        let es = ExtensionSet::singleton(&EXT_ID);
+        let exp_fun_ty = FunctionType::new_endo(vec![BOOL_T]).with_extension_delta(es.clone());
+        let args = [TypeArg::Extensions { es }];
+
         def.validate_args(&args, &PRELUDE_REGISTRY, &params)
             .unwrap();
         assert_eq!(
