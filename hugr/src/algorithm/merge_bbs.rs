@@ -97,6 +97,8 @@ fn mk_rep(
 
 #[cfg(test)]
 mod test {
+    use std::collections::HashSet;
+
     use itertools::Itertools;
 
     use crate::builder::{CFGBuilder, Dataflow, HugrBuilder};
@@ -115,9 +117,10 @@ mod test {
     }
     #[test]
     fn in_loop() -> Result<(), Box<dyn std::error::Error>> {
-        /* Noop -> Test -> Exit      NoopTest -> Exit
-           |       |            =>   |    |
-           \-<---<-/                 \<-<-/
+        /* -> Noop1 -----> Test -> Exit       -> Noop1AndTest --> Exit
+               |            |            =>     /            \
+               \-<- Noop2 <-/                   \-<- Noop2 <-/
+           (Empty -> Noop cannot be merged because Noop is the entry node)
         */
         let loop_variants = type_row![QB_T];
         let exit_types = type_row![USIZE_T];
@@ -136,11 +139,10 @@ mod test {
         let tst_op = e.instantiate_extension_op("Test", [], &PRELUDE_REGISTRY)?;
         let reg = ExtensionRegistry::try_new([PRELUDE.to_owned(), e])?;
         let mut h = CFGBuilder::new(FunctionType::new(loop_variants.clone(), exit_types.clone()))?;
-        let mut noop_block =
-            h.simple_entry_builder(loop_variants.clone(), 1, ExtensionSet::new())?;
-        let n = noop_block.add_dataflow_op(Noop { ty: QB_T }, noop_block.input_wires())?;
-        let br = noop_block.add_load_const(Const::unary_unit_sum());
-        let noop_block = noop_block.finish_with_outputs(br, n.outputs())?;
+        let mut no_b1 = h.simple_entry_builder(loop_variants.clone(), 1, ExtensionSet::new())?;
+        let n = no_b1.add_dataflow_op(Noop { ty: QB_T }, no_b1.input_wires())?;
+        let br = no_b1.add_load_const(Const::unary_unit_sum());
+        let no_b1 = no_b1.finish_with_outputs(br, n.outputs())?;
         let mut test_block = h.block_builder(
             loop_variants.clone(),
             vec![loop_variants.clone(), exit_types],
@@ -151,22 +153,29 @@ mod test {
             .add_dataflow_op(tst_op, test_block.input_wires())?
             .outputs_arr();
         let test_block = test_block.finish_with_outputs(tst, [])?;
-        let exit_block = h.exit_block();
-        h.branch(&noop_block, 0, &test_block)?;
-        h.branch(&test_block, 0, &noop_block)?;
-        h.branch(&test_block, 1, &exit_block)?;
+        let mut no_b2 = h.simple_block_builder(FunctionType::new_endo(loop_variants), 1)?;
+        let n = no_b2.add_dataflow_op(Noop { ty: QB_T }, no_b2.input_wires())?;
+        let br = no_b2.add_load_const(Const::unary_unit_sum());
+        let no_b2 = no_b2.finish_with_outputs(br, n.outputs())?;
+        h.branch(&no_b1, 0, &test_block)?;
+        h.branch(&test_block, 0, &no_b2)?;
+        h.branch(&no_b2, 0, &no_b1)?;
+        h.branch(&test_block, 1, &h.exit_block())?;
         let mut h = h.finish_hugr(&reg)?;
         let r = h.root();
         merge_basic_blocks(&mut SiblingMut::<CfgID>::try_new(&mut h, r)?);
         assert_eq!(r, h.root());
         assert!(matches!(h.get_optype(r), OpType::CFG(_)));
-        let [entry, exit] = h.children(r).collect::<Vec<_>>().try_into().unwrap();
-        assert_eq!(h.output_neighbours(entry).collect::<Vec<_>>(), vec![exit]);
-        let noop = h
+        let [entry, exit, no_b2] = h.children(r).collect::<Vec<_>>().try_into().unwrap();
+        assert_eq!(
+            h.output_neighbours(entry).collect::<HashSet<_>>(),
+            HashSet::from([no_b2, exit])
+        );
+        let [n_op1, n_op2] = h
             .nodes()
             .filter(|n| matches!(h.get_optype(*n), OpType::Noop(_)))
-            .exactly_one()
-            .ok()
+            .collect::<Vec<_>>()
+            .try_into()
             .unwrap();
         let tst = h
             .nodes()
@@ -174,7 +183,18 @@ mod test {
             .exactly_one()
             .ok()
             .unwrap();
-        assert_eq!(h.output_neighbours(noop).collect::<Vec<_>>(), vec![tst]);
+        assert_eq!(h.get_parent(tst), Some(entry));
+        let (nop_entry, nop2) = if h.get_parent(n_op1) == Some(entry) {
+            (n_op1, n_op2)
+        } else {
+            assert_eq!(h.get_parent(n_op2), Some(entry));
+            (n_op2, n_op1)
+        };
+        assert_eq!(h.get_parent(nop2), Some(no_b2));
+        assert_eq!(
+            h.output_neighbours(nop_entry).collect::<Vec<_>>(),
+            vec![tst]
+        );
         Ok(())
     }
 }
