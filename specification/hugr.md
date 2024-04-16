@@ -1632,6 +1632,8 @@ so must be supported by all third-party tooling.
 
 `usize`: a positive integer size type.
 
+`string`: a string type.
+
 `array<N, T>`: a known-size (N) array of type T.
 
 `qubit`: a linear (non-copyable) qubit type.
@@ -1640,10 +1642,15 @@ so must be supported by all third-party tooling.
 
 ### Operations
 
-| Name              | Inputs    | Outputs       | Meaning                                                         |
-|-------------------|-----------|---------------|-----------------------------------------------------------------|
-| `new_array<N, T>` | `T` x N   | `array<N, T>` | Create an array from all the inputs                             |
-| `panic`           | ErrorType | -             | Immediately end execution and pass contents of error to context |
+| Name              | Inputs    | Outputs       | Meaning                                                           |
+|-------------------|-----------|---------------|------------------------------------------------------------------ |
+| `print`           | `string`  | -             | Append the string to the program's output stream[^1] (atomically) |
+| `new_array<N, T>` | `T` x N   | `array<N, T>` | Create an array from all the inputs                               |
+| `panic`           | ErrorType | -             | Immediately end execution and pass contents of error to context   |
+
+[^1] The existence of an output stream, and the processing of it either during
+or after program execution, is runtime-dependent. If no output stream exists
+then the `print` function is a no-op.
 
 ### Logic Extension
 
