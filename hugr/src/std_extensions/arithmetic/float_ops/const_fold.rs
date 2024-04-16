@@ -1,6 +1,6 @@
 use crate::{
     algorithm::const_fold::sorted_consts,
-    extension::{ConstFold, ConstFoldResult, OpDef},
+    extension::{prelude::ConstString, ConstFold, ConstFoldResult, OpDef},
     ops,
     std_extensions::arithmetic::float_types::ConstF64,
     IncomingPort,
@@ -15,6 +15,7 @@ pub(super) fn set_fold(op: &FloatOps, def: &mut OpDef) {
         fmax | fmin | fadd | fsub | fmul | fdiv => def.set_constant_folder(BinaryFold::from_op(op)),
         feq | fne | flt | fgt | fle | fge => def.set_constant_folder(CmpFold::from_op(*op)),
         fneg | fabs | ffloor | fceil => def.set_constant_folder(UnaryFold::from_op(op)),
+        ftostring => def.set_constant_folder(ToStringFold::from_op(op)),
     }
 }
 
@@ -115,6 +116,25 @@ impl ConstFold for UnaryFold {
     ) -> ConstFoldResult {
         let [f1] = get_floats(consts)?;
         let res = ConstF64::new((self.0)(f1));
+        Some(vec![(0.into(), res.into())])
+    }
+}
+
+/// Fold string-conversion operations
+struct ToStringFold(Box<dyn Fn(f64) -> String + Send + Sync>);
+impl ToStringFold {
+    fn from_op(_op: &FloatOps) -> Self {
+        Self(Box::new(|x| x.to_string()))
+    }
+}
+impl ConstFold for ToStringFold {
+    fn fold(
+        &self,
+        _type_args: &[crate::types::TypeArg],
+        consts: &[(IncomingPort, ops::Const)],
+    ) -> ConstFoldResult {
+        let [f] = get_floats(consts)?;
+        let res = ConstString::new((self.0)(f));
         Some(vec![(0.into(), res.into())])
     }
 }
