@@ -635,4 +635,34 @@ mod test {
         );
         Ok(())
     }
+
+    #[test]
+    fn instantiate_extension_delta() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::extension::prelude::{BOOL_T, PRELUDE_REGISTRY};
+
+        let mut e = Extension::new(EXT_ID);
+
+        let params: Vec<TypeParam> = vec![TypeParam::Extensions];
+        let db_set = ExtensionSet::type_var(0);
+        let fun_ty = FunctionType::new_endo(vec![BOOL_T]).with_extension_delta(db_set);
+
+        let def = e.add_op(
+            "SimpleOp".into(),
+            "".into(),
+            PolyFuncType::new(params.clone(), fun_ty),
+        )?;
+
+        // Concrete extension set
+        let es = ExtensionSet::singleton(&EXT_ID);
+        let exp_fun_ty = FunctionType::new_endo(vec![BOOL_T]).with_extension_delta(es.clone());
+        let args = [TypeArg::Extensions { es }];
+
+        def.validate_args(&args, &PRELUDE_REGISTRY, &params)
+            .unwrap();
+        assert_eq!(
+            def.compute_signature(&args, &PRELUDE_REGISTRY),
+            Ok(exp_fun_ty)
+        );
+        Ok(())
+    }
 }
