@@ -64,7 +64,7 @@ lazy_static! {
         prelude.add_op(
             SmolStr::new_inline(PRINT_OP_ID),
             "Print the string to standard output".to_string(),
-            FunctionType::new(type_row![Type::new_extension(STRING_CUSTOM_TYPE)], type_row![]),
+            FunctionType::new(type_row![STRING_TYPE], type_row![]),
             )
             .unwrap();
         prelude.add_type(
