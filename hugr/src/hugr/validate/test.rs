@@ -558,6 +558,30 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+#[test]
+fn test_polymorphic_load() -> Result<(), Box<dyn std::error::Error>> {
+    let mut m = ModuleBuilder::new();
+    let id = m.declare(
+        "id",
+        PolyFuncType::new(
+            vec![TypeBound::Any.into()],
+            FunctionType::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
+        ),
+    )?;
+    let sig = FunctionType::new(
+        vec![],
+        vec![Type::new_function(FunctionType::new_endo(vec![USIZE_T]))],
+    );
+    let mut f = m.define_function("main", sig.into())?;
+    let l = f.load_func(&id, &[USIZE_T.into()], &PRELUDE_REGISTRY)?;
+    f.finish_with_outputs([l])?;
+    let _ = m.finish_prelude_hugr()?;
+    Ok(())
+
+    // Function(PolyFuncType { params: [Type { b: Any }], body: FunctionType { input: TypeRow { types: [Type(Variable(0, Any), Any)] }, output: TypeRow { types: [Type(Variable(0, Any), Any)] }, extension_reqs: ExtensionSet({}) } })
+    // Value(Type(Extension(CustomType { extension: IdentList("prelude"), id: "usize", args: []
+}
+
 #[cfg(feature = "extension_inference")]
 mod extension_tests {
     use super::*;

@@ -405,7 +405,7 @@ mod test {
 
 use super::{
     AliasDecl, AliasDefn, Call, CallIndirect, Const, CustomOp, FuncDecl, Input, Lift, LoadConstant,
-    MakeTuple, Noop, Output, Tag, UnpackTuple,
+    LoadFunction, MakeTuple, Noop, Output, Tag, UnpackTuple,
 };
 impl_validate_op!(FuncDecl);
 impl_validate_op!(AliasDecl);
@@ -415,6 +415,7 @@ impl_validate_op!(Output);
 impl_validate_op!(Const);
 impl_validate_op!(Call);
 impl_validate_op!(LoadConstant);
+impl_validate_op!(LoadFunction);
 impl_validate_op!(CallIndirect);
 impl_validate_op!(CustomOp);
 impl_validate_op!(Noop);

@@ -54,6 +54,8 @@ pub enum OpTag {
     FnCall,
     /// A constant load operation.
     LoadConst,
+    /// A function load operation.
+    LoadFunc,
     /// A definition that could be at module level or inside a DSG.
     ScopedDefn,
     /// A tail-recursive loop.
@@ -129,6 +131,7 @@ impl OpTag {
             OpTag::StaticOutput => &[OpTag::Any],
             OpTag::FnCall => &[OpTag::StaticInput, OpTag::DataflowChild],
             OpTag::LoadConst => &[OpTag::StaticInput, OpTag::DataflowChild],
+            OpTag::LoadFunc => &[OpTag::StaticInput, OpTag::DataflowChild],
             OpTag::Leaf => &[OpTag::DataflowChild],
             OpTag::DataflowParent => &[OpTag::Any],
         }
@@ -156,10 +159,11 @@ impl OpTag {
             OpTag::Cfg => "Nested control-flow operation",
             OpTag::TailLoop => "Tail-recursive loop",
             OpTag::Conditional => "Conditional operation",
-            OpTag::StaticInput => "Node with static input (LoadConst or FnCall)",
+            OpTag::StaticInput => "Node with static input (LoadConst, LoadFunc, or FnCall)",
             OpTag::StaticOutput => "Node with static output (FuncDefn, FuncDecl, Const)",
             OpTag::FnCall => "Function call",
             OpTag::LoadConst => "Constant load operation",
+            OpTag::LoadFunc => "Function load operation",
             OpTag::Leaf => "Leaf operation",
             OpTag::ScopedDefn => "Definitions that can live at global or local scope",
             OpTag::DataflowParent => "Operation whose children form a Dataflow Sibling Graph",

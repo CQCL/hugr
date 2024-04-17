@@ -375,6 +375,40 @@ pub trait Dataflow: Container {
         self.load_const(&cid)
     }
 
+    /// Load a static function and return the local dataflow wire for that function.
+    /// Adds a [`OpType::LoadFunction`] node.
+    ///
+    /// The `DEF` const generic is used to indicate whether the function is defined
+    /// or just declared.
+    fn load_func<const DEFINED: bool>(
+        &mut self,
+        fid: &FuncID<DEFINED>,
+        type_args: &[TypeArg],
+        // Sadly required as we substituting in type_args may result in recomputing bounds of types:
+        exts: &ExtensionRegistry,
+    ) -> Result<Wire, BuildError> {
+        let func_node = fid.node();
+        let func_op = self.hugr().get_nodetype(func_node).op();
+        let func_sig = match func_op {
+            OpType::FuncDefn(ops::FuncDefn { signature, .. })
+            | OpType::FuncDecl(ops::FuncDecl { signature, .. }) => signature.clone(),
+            _ => {
+                return Err(BuildError::UnexpectedType {
+                    node: func_node,
+                    op_desc: "FuncDecl/FuncDefn",
+                })
+            }
+        };
+
+        let load_n = self.add_dataflow_op(
+            ops::LoadFunction::try_new(func_sig, type_args, exts)?,
+            // Static wire from the function node
+            vec![Wire::new(func_node, OutgoingPort::from(0))],
+        )?;
+
+        Ok(load_n.out_wire(0))
+    }
+
     /// Return a builder for a [`crate::ops::TailLoop`] node.
     /// The `inputs` must be an iterable over pairs of the type of the input and
     /// the corresponding wire.

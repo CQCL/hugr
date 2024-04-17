@@ -23,7 +23,9 @@ use enum_dispatch::enum_dispatch;
 pub use constant::Const;
 pub use controlflow::{BasicBlock, Case, Conditional, DataflowBlock, ExitBlock, TailLoop, CFG};
 pub use custom::CustomOp;
-pub use dataflow::{Call, CallIndirect, DataflowParent, Input, LoadConstant, Output, DFG};
+pub use dataflow::{
+    Call, CallIndirect, DataflowParent, Input, LoadConstant, LoadFunction, Output, DFG,
+};
 pub use leaf::{Lift, MakeTuple, Noop, Tag, UnpackTuple};
 pub use module::{AliasDecl, AliasDefn, FuncDecl, FuncDefn, Module};
 pub use tag::OpTag;
@@ -47,6 +49,7 @@ pub enum OpType {
     Call,
     CallIndirect,
     LoadConstant,
+    LoadFunction,
     DFG,
     CustomOp,
     Noop,
@@ -105,6 +108,7 @@ impl_op_ref_try_into!(Output);
 impl_op_ref_try_into!(Call);
 impl_op_ref_try_into!(CallIndirect);
 impl_op_ref_try_into!(LoadConstant);
+impl_op_ref_try_into!(LoadFunction);
 impl_op_ref_try_into!(DFG, dfg);
 impl_op_ref_try_into!(CustomOp);
 impl_op_ref_try_into!(Noop);
@@ -226,7 +230,8 @@ impl OpType {
         Some(Port::new(dir, self.value_port_count(dir)))
     }
 
-    /// If the op has a static input ([`Call`] and [`LoadConstant`]), the port of that input.
+    /// If the op has a static input ([`Call`], [`LoadConstant`], and [`LoadFunction`]), the port of
+    /// that input.
     #[inline]
     pub fn static_input_port(&self) -> Option<IncomingPort> {
         self.static_port(Direction::Incoming)
@@ -413,6 +418,7 @@ impl OpParent for Output {}
 impl OpParent for Call {}
 impl OpParent for CallIndirect {}
 impl OpParent for LoadConstant {}
+impl OpParent for LoadFunction {}
 impl OpParent for CustomOp {}
 impl OpParent for Noop {}
 impl OpParent for MakeTuple {}

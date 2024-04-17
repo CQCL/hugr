@@ -316,6 +316,86 @@ impl LoadConstant {
     }
 }
 
+/// Load a static function in to the local dataflow graph.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct LoadFunction {
+    /// Signature of the function
+    func_sig: PolyFuncType,
+    type_args: Vec<TypeArg>,
+    signature: FunctionType, // Cache, so we can fail in try_new() not in signature()
+}
+impl_op_name!(LoadFunction);
+impl DataflowOpTrait for LoadFunction {
+    const TAG: OpTag = OpTag::LoadFunc;
+
+    fn description(&self) -> &str {
+        "Load a static function in to the local dataflow graph"
+    }
+
+    fn signature(&self) -> FunctionType {
+        self.signature.clone()
+    }
+
+    fn static_input(&self) -> Option<EdgeKind> {
+        Some(EdgeKind::Function(self.func_sig.clone()))
+    }
+}
+impl LoadFunction {
+    /// Try to make a new LoadFunction op. Returns an error if the `type_args`` do not fit
+    /// the [TypeParam]s declared by the function.
+    ///
+    /// [TypeParam]: crate::types::type_param::TypeParam
+    pub fn try_new(
+        func_sig: PolyFuncType,
+        type_args: impl Into<Vec<TypeArg>>,
+        exts: &ExtensionRegistry,
+    ) -> Result<Self, SignatureError> {
+        let type_args = type_args.into();
+        let instantiation = func_sig.instantiate(&type_args, exts)?;
+        let signature = FunctionType::new(TypeRow::new(), vec![Type::new_function(instantiation)]);
+        Ok(Self {
+            func_sig,
+            type_args,
+            signature,
+        })
+    }
+
+    #[inline]
+    /// Return the type of the function loaded by this op.
+    pub fn function_type(&self) -> &PolyFuncType {
+        &self.func_sig
+    }
+
+    /// The IncomingPort which links to the loaded function.
+    ///
+    /// This matches [`OpType::static_input_port`].
+    ///
+    /// [`OpType::static_input_port`]: crate::ops::OpType::static_input_port
+    #[inline]
+    pub fn function_port(&self) -> IncomingPort {
+        0.into()
+    }
+
+    pub(crate) fn validate(
+        &self,
+        extension_registry: &ExtensionRegistry,
+    ) -> Result<(), SignatureError> {
+        let other = Self::try_new(
+            self.func_sig.clone(),
+            self.type_args.clone(),
+            extension_registry,
+        )?;
+        if other.signature == self.signature {
+            Ok(())
+        } else {
+            Err(SignatureError::LoadFunctionIncorrectlyAppliesType {
+                cached: self.signature.clone(),
+                expected: other.signature.clone(),
+            })
+        }
+    }
+}
+
 /// Operations that is the parent of a dataflow graph.
 pub trait DataflowParent {
     /// Signature of the inner dataflow graph.

@@ -194,7 +194,7 @@ class FunctionType(BaseModel):
     input: "TypeRow"  # Value inputs of the function.
     output: "TypeRow"  # Value outputs of the function.
     # The extension requirements which are added by the operation
-    extension_reqs: "ExtensionSet" = Field(default_factory=list)
+    extension_reqs: ExtensionSet = Field(default_factory=ExtensionSet)
 
     @classmethod
     def empty(cls) -> "FunctionType":
