@@ -1632,6 +1632,8 @@ so must be supported by all third-party tooling.
 
 `usize`: a positive integer size type.
 
+`string`: a string type.
+
 `array<N, T>`: a known-size (N) array of type T.
 
 `qubit`: a linear (non-copyable) qubit type.
@@ -1640,10 +1642,15 @@ so must be supported by all third-party tooling.
 
 ### Operations
 
-| Name              | Inputs    | Outputs       | Meaning                                                         |
-|-------------------|-----------|---------------|-----------------------------------------------------------------|
-| `new_array<N, T>` | `T` x N   | `array<N, T>` | Create an array from all the inputs                             |
-| `panic`           | ErrorType | -             | Immediately end execution and pass contents of error to context |
+| Name              | Inputs    | Outputs       | Meaning                                                           |
+|-------------------|-----------|---------------|------------------------------------------------------------------ |
+| `print`           | `string`  | -             | Append the string to the program's output stream[^1] (atomically) |
+| `new_array<N, T>` | `T` x N   | `array<N, T>` | Create an array from all the inputs                               |
+| `panic`           | ErrorType | -             | Immediately end execution and pass contents of error to context   |
+
+[^1] The existence of an output stream, and the processing of it either during
+or after program execution, is runtime-dependent. If no output stream exists
+then the `print` function is a no-op.
 
 ### Logic Extension
 
@@ -1763,6 +1770,8 @@ Other operations:
 | `ishr<N,M>`( \* )      | `int<N>`, `int<M>` | `int<N>`                           | shift first input right by k bits where k is unsigned interpretation of second input (rightmost bits dropped, leftmost bits set to zero)                 |
 | `irotl<N,M>`( \* )     | `int<N>`, `int<M>` | `int<N>`                           | rotate first input left by k bits where k is unsigned interpretation of second input (leftmost bits replace rightmost bits)                              |
 | `irotr<N,M>`( \* )     | `int<N>`, `int<M>` | `int<N>`                           | rotate first input right by k bits where k is unsigned interpretation of second input (rightmost bits replace leftmost bits)                             |
+| `itostring_u<N>`       | `int<N>`           | `string`                           | decimal string representation of unsigned integer                                                                                                        |
+| `itostring_s<N>`       | `int<N>`           | `string`                           | decimal string representation of signed integer                                                                                                          |
 
 #### `arithmetic.float.types`
 
@@ -1794,6 +1803,10 @@ except where stated.
 | `fdiv`            | `float64`, `float64` | `float64` | division                                                                 |
 | `ffloor`          | `float64`            | `float64` | floor                                                                    |
 | `fceil`           | `float64`            | `float64` | ceiling                                                                  |
+| `ftostring`       | `float64`            | `string`  | string representation[^1]                                                  |
+
+[^1] The exact specification of the float-to-string conversion is
+implementation-dependent.
 
 #### `arithmetic.conversions`
 

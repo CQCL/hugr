@@ -1,7 +1,7 @@
 //! Basic integer operations.
 
 use super::int_types::{get_log_width, int_tv, LOG_WIDTH_TYPE_PARAM};
-use crate::extension::prelude::{sum_with_error, BOOL_T};
+use crate::extension::prelude::{sum_with_error, BOOL_T, STRING_TYPE};
 use crate::extension::simple_op::{MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError};
 use crate::extension::{
     CustomValidator, ExtensionRegistry, OpDef, SignatureFunc, ValidateJustArgs, PRELUDE,
@@ -91,6 +91,8 @@ pub enum IntOpDef {
     ishr,
     irotl,
     irotr,
+    itostring_u,
+    itostring_s,
 }
 
 impl MakeOpDef for IntOpDef {
@@ -154,6 +156,11 @@ impl MakeOpDef for IntOpDef {
             ishl | ishr | irotl | irotr => {
                 int_polytype(2, vec![int_tv(0), int_tv(1)], vec![int_tv(0)]).into()
             }
+            itostring_u | itostring_s => PolyFuncType::new(
+                vec![LOG_WIDTH_TYPE_PARAM],
+                FunctionType::new(vec![int_tv(0)], vec![STRING_TYPE]),
+            )
+            .into(),
         }
     }
 
@@ -214,6 +221,8 @@ impl MakeOpDef for IntOpDef {
             (leftmost bits replace rightmost bits)",
             irotr => "rotate first input right by k bits where k is unsigned interpretation of second input \
             (rightmost bits replace leftmost bits)",
+            itostring_s => "convert a signed integer to its string representation",
+            itostring_u => "convert an unsigned integer to its string representation",
         }.into()
     }
 }
@@ -339,7 +348,7 @@ mod test {
     fn test_int_ops_extension() {
         assert_eq!(EXTENSION.name() as &str, "arithmetic.int");
         assert_eq!(EXTENSION.types().count(), 0);
-        assert_eq!(EXTENSION.operations().count(), 45);
+        assert_eq!(EXTENSION.operations().count(), 47);
         for (name, _) in EXTENSION.operations() {
             assert!(name.starts_with('i'));
         }
