@@ -179,8 +179,8 @@ impl ConstString {
     }
 
     /// Returns the value of the constant.
-    pub fn value(&self) -> String {
-        self.0.clone()
+    pub fn value(&self) -> &str {
+        &self.0
     }
 }
 
