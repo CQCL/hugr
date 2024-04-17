@@ -55,7 +55,7 @@ lazy_static! {
             )
             .unwrap();
         prelude.add_type(
-                SmolStr::new_inline("string"),
+                STRING_TYPE_NAME,
                 vec![],
                 "string".into(),
                 TypeDefBound::Explicit(crate::types::TypeBound::Eq),
