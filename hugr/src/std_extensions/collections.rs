@@ -204,6 +204,7 @@ fn list_and_elem_type_vars(list_type_def: &TypeDef) -> (Type, Type) {
 
 /// A list operation
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub enum ListOp {
     /// Pop from end of list
     Pop,
