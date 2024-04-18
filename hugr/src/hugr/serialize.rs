@@ -331,7 +331,10 @@ pub mod test {
     ///
     /// Returns the deserialized HUGR.
     pub fn check_hugr_roundtrip(hugr: &Hugr) -> Hugr {
-        let new_hugr: Hugr = ser_roundtrip_validate(hugr, Some(&SCHEMA));
+        check_hugr_roundtrip2(hugr, true)
+    }
+    pub fn check_hugr_roundtrip2(hugr: &Hugr, check_schema: bool ) -> Hugr {
+        let new_hugr: Hugr = ser_roundtrip_validate(hugr, check_schema.then_some(&SCHEMA));
 
         // Original HUGR, with canonicalized node indices
         //

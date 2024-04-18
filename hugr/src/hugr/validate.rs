@@ -100,7 +100,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
 
         #[cfg(test)]
         {
-            crate::hugr::serialize::test::check_hugr_roundtrip(self.hugr);
+            crate::hugr::serialize::test::check_hugr_roundtrip2(self.hugr, false);
         }
 
         Ok(())
