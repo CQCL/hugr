@@ -303,7 +303,7 @@ mod test {
 
     use super::*;
 
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
     /// A custom constant value used in testing
     pub(crate) struct CustomTestValue(pub CustomType);
 
@@ -319,6 +319,10 @@ mod test {
 
         fn get_type(&self) -> Type {
             self.0.clone().into()
+        }
+
+        fn equal_consts(&self, other: &dyn CustomConst) -> bool {
+            crate::ops::constant::downcast_equal_consts(self, other)
         }
     }
 
