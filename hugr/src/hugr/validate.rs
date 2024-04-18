@@ -98,6 +98,11 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         // Hierarchy and children. No type variables declared outside the root.
         self.validate_subtree(self.hugr.root(), &[])?;
 
+        #[cfg(test)]
+        {
+            crate::hugr::serialize::test::check_hugr_roundtrip(self.hugr);
+        }
+
         Ok(())
     }
 
