@@ -278,6 +278,7 @@ impl<H: HugrMut> CfgNester<Node> for IdentityCfgMap<H> {
 
 /// An error trying to get the blocks of a SESE (single-entry-single-exit) region
 #[derive(Clone, Debug, Error)]
+#[non_exhaustive]
 pub enum RegionBlocksError<T> {
     /// The specified exit edge did not exist in the CFG
     ExitEdgeNotPresent(T, T),

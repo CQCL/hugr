@@ -219,6 +219,7 @@ impl Rewrite for OutlineCfg {
 
 /// Errors that can occur in expressing an OutlineCfg rewrite.
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum OutlineCfgError {
     /// The set of blocks were not siblings
     #[error("The nodes did not all have the same parent")]

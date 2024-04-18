@@ -32,6 +32,7 @@ impl IdentityInsertion {
 
 /// Error from an [`IdentityInsertion`] operation.
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum IdentityInsertionError {
     /// Invalid parent node.
     #[error("Parent node is invalid.")]

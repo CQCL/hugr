@@ -26,6 +26,7 @@ pub const TRUE_NAME: &str = "TRUE";
 /// Logic extension operation definitions.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, EnumIter, IntoStaticStr, EnumString)]
 #[allow(missing_docs)]
+#[non_exhaustive]
 pub enum NaryLogic {
     And,
     Or,

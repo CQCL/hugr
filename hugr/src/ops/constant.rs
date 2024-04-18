@@ -71,6 +71,7 @@ impl PartialEq for ExtensionConst {
 
 /// Struct for custom type check fails.
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
+#[non_exhaustive]
 pub enum CustomCheckFailure {
     /// The value had a specific type that was not what was expected
     #[error("Expected type: {expected} but value was of type: {found}")]
@@ -87,6 +88,7 @@ pub enum CustomCheckFailure {
 
 /// Errors that arise from typechecking constants
 #[derive(Clone, Debug, PartialEq, Error)]
+#[non_exhaustive]
 pub enum ConstTypeError {
     /// Invalid sum type definition.
     #[error("{0}")]

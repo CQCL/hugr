@@ -340,6 +340,7 @@ pub fn check_type_args(args: &[TypeArg], params: &[TypeParam]) -> Result<(), Typ
 
 /// Errors that can occur fitting a [TypeArg] into a [TypeParam]
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
+#[non_exhaustive]
 pub enum TypeArgError {
     #[allow(missing_docs)]
     /// For now, general case of a type arg not fitting a param.

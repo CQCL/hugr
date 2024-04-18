@@ -159,6 +159,7 @@ impl ValidateOp for super::CFG {
 /// Errors that can occur while checking the children of a node.
 #[derive(Debug, Clone, PartialEq, Error)]
 #[allow(missing_docs)]
+#[non_exhaustive]
 pub enum ChildrenValidationError {
     /// An CFG graph has an exit operation as a non-second child.
     #[error("Exit basic blocks are only allowed as the second child in a CFG graph")]
@@ -208,6 +209,7 @@ impl ChildrenValidationError {
 /// Errors that can occur while checking the edges between children of a node.
 #[derive(Debug, Clone, PartialEq, Error)]
 #[allow(missing_docs)]
+#[non_exhaustive]
 pub enum EdgeValidationError {
     /// The dataflow signature of two connected basic blocks does not match.
     #[error("The dataflow signature of two connected basic blocks does not match. Output signature: {source_op:?}, input signature: {target_op:?}",

@@ -175,6 +175,7 @@ struct DeclarationContext<'a> {
 
 /// Errors that can occur while loading an extension set.
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum ExtensionDeclarationError {
     /// An error occurred while deserializing the extension set.
     #[error("Error while parsing the extension set yaml: {0}")]

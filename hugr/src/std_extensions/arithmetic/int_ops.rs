@@ -45,6 +45,7 @@ impl ValidateJustArgs for IOValidator {
 /// Integer extension operation definitions.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, EnumIter, IntoStaticStr, EnumString)]
 #[allow(missing_docs, non_camel_case_types)]
+#[non_exhaustive]
 pub enum IntOpDef {
     iwiden_u,
     iwiden_s,

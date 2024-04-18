@@ -181,6 +181,7 @@ impl Rewrite for SimpleReplacement {
 
 /// Error from a [`SimpleReplacement`] operation.
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum SimpleReplacementError {
     /// Invalid parent node.
     #[error("Parent node is invalid.")]
