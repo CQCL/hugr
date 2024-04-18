@@ -69,10 +69,12 @@ pub enum HUGRSerializationError {
     #[error("Failed to build edge when deserializing: {0:?}.")]
     LinkError(#[from] LinkError),
     /// Edges without port offsets cannot be present in operations without non-dataflow ports.
-    #[error("Cannot connect an edge without port offset to node {node:?} with operation type {op_type:?}.")]
+    #[error("Cannot connect an {dir:?} edge without port offset to node {node:?} with operation type {op_type:?}.")]
     MissingPortOffset {
         /// The node that has the port without offset.
         node: Node,
+        /// The direction of the port without an offset
+        dir: Direction,
         /// The operation type of the node.
         op_type: OpType,
     },
@@ -231,6 +233,7 @@ impl TryFrom<SerHugrV1> for Hugr {
                         .other_port(dir)
                         .ok_or(HUGRSerializationError::MissingPortOffset {
                             node,
+                            dir,
                             op_type: op_type.clone(),
                         })?
                         .index()
@@ -333,7 +336,7 @@ pub mod test {
     pub fn check_hugr_roundtrip(hugr: &Hugr) -> Hugr {
         check_hugr_roundtrip2(hugr, true)
     }
-    pub fn check_hugr_roundtrip2(hugr: &Hugr, check_schema: bool ) -> Hugr {
+    pub fn check_hugr_roundtrip2(hugr: &Hugr, check_schema: bool) -> Hugr {
         let new_hugr: Hugr = ser_roundtrip_validate(hugr, check_schema.then_some(&SCHEMA));
 
         // Original HUGR, with canonicalized node indices
