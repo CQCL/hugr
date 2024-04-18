@@ -66,6 +66,14 @@ impl CustomOp {
         }
     }
 
+    /// Returns the extension ID of this operation.
+    pub fn extension(&self) -> &ExtensionId {
+        match self {
+            Self::Opaque(op) => op.extension(),
+            Self::Extension(op) => op.def.extension(),
+        }
+    }
+
     /// If the operation is an instance of [ExtensionOp], return a reference to it.
     /// If the operation is opaque, return None.
     pub fn as_extension_op(&self) -> Option<&ExtensionOp> {
