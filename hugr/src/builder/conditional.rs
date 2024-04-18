@@ -30,6 +30,7 @@ use thiserror::Error;
 pub type CaseBuilder<B> = DFGWrapper<B, BuildHandle<CaseID>>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[non_exhaustive]
 pub enum ConditionalBuildError {
     /// Case already built.
     #[error("Case {case} of Conditional node {conditional:?} has already been built.")]

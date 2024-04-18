@@ -384,6 +384,7 @@ fn transfer_edges<'a>(
 
 /// Error in a [`Replacement`]
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
+#[non_exhaustive]
 pub enum ReplaceError {
     /// The node(s) to replace had no parent i.e. were root(s).
     // (Perhaps if there is only one node to replace we should be able to?)

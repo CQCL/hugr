@@ -11,6 +11,7 @@ pub struct InlineDFG(pub DfgID);
 
 /// Errors from an [InlineDFG] rewrite.
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
 pub enum InlineDFGError {
     /// Node to inline was not a DFG. (E.g. node has been overwritten since the DfgID originated.)
     #[error("Node {0} was not a DFG")]

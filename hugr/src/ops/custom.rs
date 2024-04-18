@@ -389,6 +389,7 @@ pub fn resolve_opaque_op(
 /// Errors that arise after loading a Hugr containing opaque ops (serialized just as their names)
 /// when trying to resolve the serialized names against a registry of known Extensions.
 #[derive(Clone, Debug, Error, PartialEq)]
+#[non_exhaustive]
 pub enum CustomOpError {
     /// The Extension was found but did not contain the expected OpDef
     #[error("Operation {0} not found in Extension {1}")]

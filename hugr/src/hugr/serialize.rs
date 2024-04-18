@@ -61,6 +61,7 @@ struct SerHugrV1 {
 
 /// Errors that can occur while serializing a HUGR.
 #[derive(Debug, Clone, PartialEq, Error)]
+#[non_exhaustive]
 pub enum HUGRSerializationError {
     /// Unexpected hierarchy error.
     #[error("Failed to attach child to parent: {0:?}.")]

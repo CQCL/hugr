@@ -14,6 +14,7 @@ pub struct RemoveLoadConstant(pub Node);
 
 /// Error from an [`RemoveConst`] or [`RemoveLoadConstant`] operation.
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum RemoveError {
     /// Invalid node.
     #[error("Node is invalid (either not in HUGR or not correct operation).")]

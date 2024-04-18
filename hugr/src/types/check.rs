@@ -7,6 +7,7 @@ use crate::ops::Const;
 
 /// Errors that arise from typechecking constants
 #[derive(Clone, Debug, PartialEq, Error)]
+#[non_exhaustive]
 pub enum SumTypeError {
     /// The type of the variant doesn't match the type of the value.
     #[error("Expected type {expected} for element {index} of variant #{tag}, but found {}", .found.const_type())]
