@@ -57,6 +57,9 @@ struct SerHugrV1 {
     // match the internal representation.
     #[serde(default)]
     metadata: Vec<serde_json::Value>,
+    /// A metadata field with the package identifier that encoded the HUGR.
+    #[serde(default)]
+    encoder: Option<String>,
 }
 
 /// Errors that can occur while serializing a HUGR.
@@ -175,10 +178,13 @@ impl TryFrom<&Hugr> for SerHugrV1 {
             })
             .collect();
 
+        let encoder = Some(format!("hugr-rs v{}", env!("CARGO_PKG_VERSION")));
+
         Ok(Self {
             nodes,
             edges,
             metadata,
+            encoder,
         })
     }
 }
@@ -190,6 +196,7 @@ impl TryFrom<SerHugrV1> for Hugr {
             nodes,
             edges,
             metadata,
+            ..
         }: SerHugrV1,
     ) -> Result<Self, Self::Error> {
         // Root must be first node
