@@ -333,10 +333,10 @@ pub mod test {
     /// Serialize and deserialize a HUGR, and check that the result is the same as the original.
     ///
     /// Returns the deserialized HUGR.
-    pub fn check_hugr_roundtrip(hugr: &Hugr) -> Hugr {
-        check_hugr_roundtrip2(hugr, true)
+    pub fn check_hugr_schema_roundtrip(hugr: &Hugr) -> Hugr {
+        check_hugr_roundtrip(hugr, true)
     }
-    pub fn check_hugr_roundtrip2(hugr: &Hugr, check_schema: bool) -> Hugr {
+    pub fn check_hugr_roundtrip(hugr: &Hugr, check_schema: bool) -> Hugr {
         let new_hugr: Hugr = ser_roundtrip_validate(hugr, check_schema.then_some(&SCHEMA));
 
         // Original HUGR, with canonicalized node indices
@@ -423,7 +423,7 @@ pub mod test {
             metadata: Default::default(),
         };
 
-        check_hugr_roundtrip(&hugr);
+        check_hugr_schema_roundtrip(&hugr);
     }
 
     #[test]
@@ -457,7 +457,7 @@ pub mod test {
             module_builder.finish_prelude_hugr().unwrap()
         };
 
-        check_hugr_roundtrip(&hugr);
+        check_hugr_schema_roundtrip(&hugr);
     }
 
     #[test]
@@ -473,7 +473,7 @@ pub mod test {
         }
         let hugr = dfg.finish_hugr_with_outputs(params, &EMPTY_REG)?;
 
-        check_hugr_roundtrip(&hugr);
+        check_hugr_schema_roundtrip(&hugr);
         Ok(())
     }
 
@@ -496,7 +496,7 @@ pub mod test {
 
         let hugr = dfg.finish_hugr_with_outputs([wire], &PRELUDE_REGISTRY)?;
 
-        check_hugr_roundtrip(&hugr);
+        check_hugr_schema_roundtrip(&hugr);
         Ok(())
     }
 
@@ -507,7 +507,7 @@ pub mod test {
         let op = bldr.add_dataflow_op(Noop { ty: fn_ty }, bldr.input_wires())?;
         let h = bldr.finish_prelude_hugr_with_outputs(op.outputs())?;
 
-        check_hugr_roundtrip(&h);
+        check_hugr_schema_roundtrip(&h);
         Ok(())
     }
 
@@ -525,7 +525,7 @@ pub mod test {
         hugr.remove_node(old_in);
         hugr.update_validate(&PRELUDE_REGISTRY)?;
 
-        let new_hugr: Hugr = check_hugr_roundtrip(&hugr);
+        let new_hugr: Hugr = check_hugr_schema_roundtrip(&hugr);
         new_hugr.validate(&EMPTY_REG).unwrap_err();
         new_hugr.validate(&PRELUDE_REGISTRY)?;
         Ok(())

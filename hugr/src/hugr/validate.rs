@@ -98,10 +98,14 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         // Hierarchy and children. No type variables declared outside the root.
         self.validate_subtree(self.hugr.root(), &[])?;
 
+        // In tests we take the opportunity to verify that the hugr
+        // serialization round-trips.
+        //
+        // TODO: We should also verify that the serialized hugr matches the
+        // in-tree schema. For now, our serialized hugr does not match the
+        // schema. When this is fixed we should pass true below.
         #[cfg(test)]
-        {
-            crate::hugr::serialize::test::check_hugr_roundtrip2(self.hugr, false);
-        }
+        crate::hugr::serialize::test::check_hugr_roundtrip(self.hugr, false);
 
         Ok(())
     }
