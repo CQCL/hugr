@@ -331,6 +331,7 @@ pub mod test {
     }
 
     /// Serialize and deserialize a HUGR, and check that the result is the same as the original.
+    /// Checks the serialized json against the in-tree schema.
     ///
     /// Returns the deserialized HUGR.
     pub fn check_hugr_schema_roundtrip(hugr: &Hugr) -> Hugr {
