@@ -1573,6 +1573,19 @@
             },
             "title": "Edges",
             "type": "array"
+        },
+        "encoder": {
+            "anyOf": [
+                {
+                    "type": "string"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "default": null,
+            "description": "The name of the encoder used to generate the Hugr.",
+            "title": "Encoder"
         }
     },
     "required": [
