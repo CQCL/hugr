@@ -70,10 +70,12 @@ pub enum HUGRSerializationError {
     #[error("Failed to build edge when deserializing: {0:?}.")]
     LinkError(#[from] LinkError),
     /// Edges without port offsets cannot be present in operations without non-dataflow ports.
-    #[error("Cannot connect an edge without port offset to node {node:?} with operation type {op_type:?}.")]
+    #[error("Cannot connect an {dir:?} edge without port offset to node {node:?} with operation type {op_type:?}.")]
     MissingPortOffset {
         /// The node that has the port without offset.
         node: Node,
+        /// The direction of the port without an offset
+        dir: Direction,
         /// The operation type of the node.
         op_type: OpType,
     },
@@ -232,6 +234,7 @@ impl TryFrom<SerHugrV1> for Hugr {
                         .other_port(dir)
                         .ok_or(HUGRSerializationError::MissingPortOffset {
                             node,
+                            dir,
                             op_type: op_type.clone(),
                         })?
                         .index()
@@ -329,10 +332,20 @@ pub mod test {
     }
 
     /// Serialize and deserialize a HUGR, and check that the result is the same as the original.
+    /// Checks the serialized json against the in-tree schema.
     ///
     /// Returns the deserialized HUGR.
-    pub fn check_hugr_roundtrip(hugr: &Hugr) -> Hugr {
-        let new_hugr: Hugr = ser_roundtrip_validate(hugr, Some(&SCHEMA));
+    pub fn check_hugr_schema_roundtrip(hugr: &Hugr) -> Hugr {
+        check_hugr_roundtrip(hugr, true)
+    }
+
+    /// Serialize and deserialize a HUGR, and check that the result is the same as the original.
+    ///
+    /// If `check_schema` is true, checks the serialized json against the in-tree schema.
+    ///
+    /// Returns the deserialized HUGR.
+    pub fn check_hugr_roundtrip(hugr: &Hugr, check_schema: bool) -> Hugr {
+        let new_hugr: Hugr = ser_roundtrip_validate(hugr, check_schema.then_some(&SCHEMA));
 
         // Original HUGR, with canonicalized node indices
         //
@@ -418,7 +431,7 @@ pub mod test {
             metadata: Default::default(),
         };
 
-        check_hugr_roundtrip(&hugr);
+        check_hugr_schema_roundtrip(&hugr);
     }
 
     #[test]
@@ -452,7 +465,7 @@ pub mod test {
             module_builder.finish_prelude_hugr().unwrap()
         };
 
-        check_hugr_roundtrip(&hugr);
+        check_hugr_schema_roundtrip(&hugr);
     }
 
     #[test]
@@ -468,7 +481,7 @@ pub mod test {
         }
         let hugr = dfg.finish_hugr_with_outputs(params, &EMPTY_REG)?;
 
-        check_hugr_roundtrip(&hugr);
+        check_hugr_schema_roundtrip(&hugr);
         Ok(())
     }
 
@@ -491,7 +504,7 @@ pub mod test {
 
         let hugr = dfg.finish_hugr_with_outputs([wire], &PRELUDE_REGISTRY)?;
 
-        check_hugr_roundtrip(&hugr);
+        check_hugr_schema_roundtrip(&hugr);
         Ok(())
     }
 
@@ -502,7 +515,7 @@ pub mod test {
         let op = bldr.add_dataflow_op(Noop { ty: fn_ty }, bldr.input_wires())?;
         let h = bldr.finish_prelude_hugr_with_outputs(op.outputs())?;
 
-        check_hugr_roundtrip(&h);
+        check_hugr_schema_roundtrip(&h);
         Ok(())
     }
 
@@ -520,7 +533,7 @@ pub mod test {
         hugr.remove_node(old_in);
         hugr.update_validate(&PRELUDE_REGISTRY)?;
 
-        let new_hugr: Hugr = check_hugr_roundtrip(&hugr);
+        let new_hugr: Hugr = check_hugr_schema_roundtrip(&hugr);
         new_hugr.validate(&EMPTY_REG).unwrap_err();
         new_hugr.validate(&PRELUDE_REGISTRY)?;
         Ok(())
