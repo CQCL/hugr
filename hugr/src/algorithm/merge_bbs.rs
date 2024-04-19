@@ -208,6 +208,7 @@ mod test {
         let mut h = h.finish_hugr(&reg)?;
         let r = h.root();
         merge_basic_blocks(&mut SiblingMut::<CfgID>::try_new(&mut h, r)?);
+        h.validate(&reg).unwrap();
         assert_eq!(r, h.root());
         assert!(matches!(h.get_optype(r), OpType::CFG(_)));
         let [entry, exit, no_b2] = h.children(r).collect::<Vec<_>>().try_into().unwrap();
