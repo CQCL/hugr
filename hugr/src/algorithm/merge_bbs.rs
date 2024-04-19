@@ -29,10 +29,12 @@ pub fn merge_basic_blocks(cfg: &mut impl HugrMut<RootHandle = CfgID>) {
             continue;
         };
         let (rep, dfg1, dfg2) = mk_rep(cfg, n, succ);
-        let node_map = cfg.apply_rewrite(rep).unwrap();
+        let node_map = cfg.hugr_mut().apply_rewrite(rep).unwrap();
         for dfg_id in [dfg1, dfg2] {
             let n_id = *node_map.get(&dfg_id).unwrap();
-            cfg.apply_rewrite(InlineDFG(n_id.into())).unwrap();
+            cfg.hugr_mut()
+                .apply_rewrite(InlineDFG(n_id.into()))
+                .unwrap();
         }
     }
 }
