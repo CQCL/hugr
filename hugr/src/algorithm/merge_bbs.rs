@@ -16,7 +16,6 @@ use crate::{Hugr, HugrView, Node};
 /// i.e. where a basic block B has a single successor B' whose only predecessor
 /// is B, B and B' can be combined.
 pub fn merge_basic_blocks(cfg: &mut impl HugrMut<RootHandle = CfgID>) {
-    let entry_exit = cfg.nodes().take(2).collect::<Vec<_>>();
     for n in cfg.nodes().collect::<Vec<_>>().into_iter() {
         let Ok(succ) = cfg.output_neighbours(n).exactly_one() else {
             continue;
@@ -24,7 +23,7 @@ pub fn merge_basic_blocks(cfg: &mut impl HugrMut<RootHandle = CfgID>) {
         if cfg.input_neighbours(succ).take(2).collect::<Vec<_>>() != vec![n] {
             continue;
         };
-        if entry_exit.contains(&succ) {
+        if cfg.nodes().take(2).contains(&succ) {
             // entry block has an additional in-edge, so cannot merge with predecessor.
             // if succ is exit block, nodes in n==p should move *outside* the CFG
             // - a separate normalization from merging BBs.
