@@ -48,6 +48,7 @@ shell:
 
 # Update the HUGR schema.
 update-schema:
+    poetry update
     poetry run python scripts/generate_schema.py specification/schema/
 
 
