@@ -2,8 +2,9 @@
 
 mod custom;
 
-use super::{OpName, OpTrait, StaticTag};
+use super::{NamedOp, OpName, OpTrait, StaticTag};
 use super::{OpTag, OpType};
+use crate::core::impl_identifier;
 use crate::extension::ExtensionSet;
 use crate::types::{CustomType, EdgeKind, FunctionType, SumType, SumTypeError, Type};
 use crate::{Hugr, HugrView};
@@ -266,7 +267,7 @@ impl Value {
         }
     }
 
-    fn name(&self) -> SmolStr {
+    fn name(&self) -> OpName {
         match self {
             Self::Extension { e } => format!("const:custom:{}", e.0.name()),
             Self::Function { hugr: h } => {
@@ -336,9 +337,32 @@ where
     }
 }
 
+/// A unique identifier for a constant value.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(transparent)]
+pub struct ValueName(SmolStr);
+
+impl_identifier!(ValueName, 0);
+
+impl ValueName {
+    /// Create a new [`ValueName`] from a string.
+    pub fn new(name: impl Into<String>) -> Self {
+        Self(SmolStr::new(name.into()))
+    }
+
+    /// Create a constant-initialized ValueName.
+    ///
+    /// # Panics
+    ///
+    /// If the string length is greater than 23.
+    pub const fn new_inline(name: &'static str) -> Self {
+        Self(SmolStr::new_inline(name))
+    }
+}
+
 #[cfg(test)]
 mod test {
-    use super::Value;
+    use super::{Value, ValueName};
     use crate::builder::test::simple_dfg_hugr;
     use crate::{
         builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
@@ -363,7 +387,7 @@ mod test {
 
     #[typetag::serde]
     impl CustomConst for CustomTestValue {
-        fn name(&self) -> SmolStr {
+        fn name(&self) -> ValueName {
             format!("CustomTestValue({:?})", self.0).into()
         }
 
@@ -478,7 +502,7 @@ mod test {
         ]));
 
         assert_eq!(v.const_type(), correct_type);
-        assert!(v.name().starts_with("const:function:"))
+        assert!(v.name().as_ref().starts_with("const:function:"))
     }
 
     #[fixture]
@@ -504,7 +528,7 @@ mod test {
         assert_eq!(const_value.const_type(), expected_type);
         let name = const_value.name();
         assert!(
-            name.starts_with(name_prefix),
+            name.as_ref().starts_with(name_prefix),
             "{name} does not start with {name_prefix}"
         );
     }

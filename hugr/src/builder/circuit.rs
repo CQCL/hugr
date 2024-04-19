@@ -3,7 +3,7 @@ use std::mem;
 
 use thiserror::Error;
 
-use crate::ops::{OpName, OpType};
+use crate::ops::{NamedOp, OpType};
 use crate::utils::collect_array;
 
 use super::{BuildError, Dataflow};

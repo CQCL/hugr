@@ -4,7 +4,7 @@
 use portgraph::render::{EdgeStyle, NodeStyle, PortStyle};
 use portgraph::{LinkView, NodeIndex, PortIndex, PortView};
 
-use crate::ops::OpName;
+use crate::ops::NamedOp;
 use crate::types::EdgeKind;
 use crate::HugrView;
 

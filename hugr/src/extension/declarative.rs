@@ -32,6 +32,7 @@ use std::fs::File;
 use std::path::Path;
 
 use crate::extension::prelude::PRELUDE_ID;
+use crate::ops::OpName;
 use crate::types::TypeName;
 use crate::Extension;
 
@@ -221,7 +222,7 @@ pub enum ExtensionDeclarationError {
         /// The extension that referenced the unsupported op parameter.
         ext: ExtensionId,
         /// The operation.
-        op: SmolStr,
+        op: OpName,
     },
     /// Operation definitions with no signature are not currently supported.
     ///
@@ -233,7 +234,7 @@ pub enum ExtensionDeclarationError {
         /// The extension containing the operation.
         ext: ExtensionId,
         /// The operation with no signature.
-        op: SmolStr,
+        op: OpName,
     },
     /// An unknown type was specified in a signature.
     #[error("Type {ty} is not in scope. In extension {ext}.")]
@@ -261,7 +262,7 @@ pub enum ExtensionDeclarationError {
         /// The extension.
         ext: crate::hugr::IdentList,
         /// The operation with the lowering definition.
-        op: SmolStr,
+        op: OpName,
     },
 }
 

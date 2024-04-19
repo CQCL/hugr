@@ -474,17 +474,17 @@ mod test {
                 .unwrap();
         let listy = Type::new_extension(
             collections::EXTENSION
-                .get_type(collections::LIST_TYPENAME.as_str())
+                .get_type(&collections::LIST_TYPENAME)
                 .unwrap()
                 .instantiate([TypeArg::Type { ty: USIZE_T }])
                 .unwrap(),
         );
         let pop: CustomOp = collections::EXTENSION
-            .instantiate_extension_op("pop", [TypeArg::Type { ty: USIZE_T }], &reg)
+            .instantiate_extension_op(&"pop".into(), [TypeArg::Type { ty: USIZE_T }], &reg)
             .unwrap()
             .into();
         let push: CustomOp = collections::EXTENSION
-            .instantiate_extension_op("push", [TypeArg::Type { ty: USIZE_T }], &reg)
+            .instantiate_extension_op(&"push".into(), [TypeArg::Type { ty: USIZE_T }], &reg)
             .unwrap()
             .into();
         let just_list = TypeRow::from(vec![listy.clone()]);

@@ -1,7 +1,7 @@
 //! Basic floating-point types
 
-use smol_str::SmolStr;
-
+use crate::ops::constant::ValueName;
+use crate::types::TypeName;
 use crate::{
     extension::{ExtensionId, ExtensionSet},
     ops::constant::CustomConst,
@@ -14,7 +14,7 @@ use lazy_static::lazy_static;
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.float.types");
 
 /// Identifier for the 64-bit IEEE 754-2019 floating-point type.
-const FLOAT_TYPE_ID: SmolStr = SmolStr::new_inline("float64");
+const FLOAT_TYPE_ID: TypeName = TypeName::new_inline("float64");
 
 /// 64-bit IEEE 754-2019 floating-point type (as [CustomType])
 pub const FLOAT64_CUSTOM_TYPE: CustomType =
@@ -52,7 +52,7 @@ impl ConstF64 {
 
 #[typetag::serde]
 impl CustomConst for ConstF64 {
-    fn name(&self) -> SmolStr {
+    fn name(&self) -> ValueName {
         format!("f64({})", self.value).into()
     }
 
@@ -105,7 +105,7 @@ mod test {
 
         assert_eq!(const_f64_1.value(), 1.0);
         assert_eq!(*const_f64_2, 2.0);
-        assert_eq!(const_f64_1.name(), "f64(1)");
+        assert_eq!(const_f64_1.name().as_ref(), "f64(1)");
         assert!(const_f64_1.equal_consts(&ConstF64::new(1.0)));
         assert_ne!(const_f64_1, const_f64_2);
         assert_eq!(const_f64_1, ConstF64::new(1.0));

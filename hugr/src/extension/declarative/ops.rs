@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 
 use crate::extension::{OpDef, SignatureFunc};
+use crate::ops::OpName;
 use crate::types::type_param::TypeParam;
 use crate::Extension;
 
@@ -25,7 +26,7 @@ use super::{DeclarationContext, ExtensionDeclarationError};
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub(super) struct OperationDeclaration {
     /// The identifier the operation.
-    name: SmolStr,
+    name: OpName,
     /// A description for the operation.
     #[serde(default)]
     #[serde(skip_serializing_if = "crate::utils::is_default")]

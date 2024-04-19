@@ -8,6 +8,7 @@ mod signature;
 pub mod type_param;
 pub mod type_row;
 
+use crate::core::impl_identifier;
 pub use crate::ops::constant::{ConstTypeError, CustomCheckFailure};
 use crate::types::type_param::check_type_arg;
 use crate::utils::display_list_with_separator;
@@ -26,12 +27,31 @@ use serde::{Deserialize, Serialize};
 use crate::extension::{ExtensionRegistry, SignatureError};
 use crate::ops::AliasDecl;
 use crate::type_row;
-use std::fmt::Debug;
 
 use self::type_param::TypeParam;
 
 /// A unique identifier for a type.
-pub type TypeName = SmolStr;
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(transparent)]
+pub struct TypeName(SmolStr);
+
+impl_identifier!(TypeName, 0);
+
+impl TypeName {
+    /// Create a new type name.
+    pub fn new(name: impl Into<SmolStr>) -> Self {
+        Self(name.into())
+    }
+
+    /// Get the name of the type.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the name is longer than 23 characters.
+    pub const fn new_inline(name: &'static str) -> Self {
+        Self(SmolStr::new_inline(name))
+    }
+}
 
 /// The kinds of edges in a HUGR, excluding Hierarchy.
 #[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]

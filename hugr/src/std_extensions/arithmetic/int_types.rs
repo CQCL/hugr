@@ -2,8 +2,8 @@
 
 use std::num::NonZeroU64;
 
-use smol_str::SmolStr;
-
+use crate::ops::constant::ValueName;
+use crate::types::TypeName;
 use crate::{
     extension::{ExtensionId, ExtensionSet},
     ops::constant::CustomConst,
@@ -18,7 +18,7 @@ use lazy_static::lazy_static;
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.int.types");
 
 /// Identifier for the integer type.
-pub const INT_TYPE_ID: SmolStr = SmolStr::new_inline("int");
+pub const INT_TYPE_ID: TypeName = TypeName::new_inline("int");
 
 pub(crate) fn int_custom_type(width_arg: TypeArg) -> CustomType {
     CustomType::new(INT_TYPE_ID, [width_arg], EXTENSION_ID, TypeBound::Eq)
@@ -158,7 +158,7 @@ impl ConstInt {
 
 #[typetag::serde]
 impl CustomConst for ConstInt {
-    fn name(&self) -> SmolStr {
+    fn name(&self) -> ValueName {
         format!("u{}({})", 1u8 << self.log_width, self.value).into()
     }
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
@@ -260,7 +260,7 @@ mod test {
         assert_eq!(const_u32_7.value_u(), 7);
         assert!(const_u32_7.validate().is_ok());
 
-        assert_eq!(const_u32_7.name(), "u32(7)");
+        assert_eq!(const_u32_7.name(), "u5(7)".into());
 
         let const_i32_2 = ConstInt::new_s(5, -2).unwrap();
         assert!(const_i32_2.equal_consts(&ConstInt::new_s(5, -2).unwrap()));

@@ -6,6 +6,7 @@ pub use itertools::Either;
 
 use derive_more::From;
 use itertools::Either::{Left, Right};
+use smol_str::SmolStr;
 
 use crate::hugr::HugrError;
 
@@ -324,3 +325,71 @@ macro_rules! impl_display_from_debug {
     };
 }
 impl_display_from_debug!(Node, Port, IncomingPort, OutgoingPort, Wire, CircuitUnit);
+
+/// A common trait for identifier strings.
+///
+/// See [`TypeName`], [`OpName`], [`ParameterName`].
+pub trait Identifier:
+    From<SmolStr>
+    + From<String>
+    + for<'a> From<&'a str>
+    + AsRef<str>
+    + std::fmt::Display
+    + std::borrow::Borrow<str>
+    + Default
+{
+}
+
+/// Implements the `Identifier` trait and related `From` and `Into` traits on a
+/// `SmolStr` wrapper.
+///
+/// First argument is the type to implement the trait for. Second argument is
+/// the attribute name for the wrapped SmolStr.
+macro_rules! impl_identifier {
+    ($t:ty, $attr:tt) => {
+        impl $crate::core::Identifier for $t {}
+
+        impl From<smol_str::SmolStr> for $t {
+            fn from(value: smol_str::SmolStr) -> Self {
+                Self {
+                    $attr: value.into(),
+                }
+            }
+        }
+
+        impl From<String> for $t {
+            fn from(value: String) -> Self {
+                Self {
+                    $attr: value.into(),
+                }
+            }
+        }
+
+        impl<'a> From<&'a str> for $t {
+            fn from(value: &'a str) -> Self {
+                Self {
+                    $attr: value.into(),
+                }
+            }
+        }
+
+        impl std::borrow::Borrow<str> for $t {
+            fn borrow(&self) -> &str {
+                self.$attr.borrow()
+            }
+        }
+
+        impl AsRef<str> for $t {
+            fn as_ref(&self) -> &str {
+                self.$attr.as_ref()
+            }
+        }
+
+        impl std::fmt::Display for $t {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                self.$attr.fmt(f)
+            }
+        }
+    };
+}
+pub(crate) use impl_identifier;

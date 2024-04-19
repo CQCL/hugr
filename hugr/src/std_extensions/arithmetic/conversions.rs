@@ -1,8 +1,8 @@
 //! Conversions between integer and floating-point values.
 
-use smol_str::SmolStr;
 use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 
+use crate::ops::OpName;
 use crate::{
     extension::{
         prelude::sum_with_error,
@@ -10,7 +10,7 @@ use crate::{
         ExtensionId, ExtensionRegistry, ExtensionSet, OpDef, SignatureError, SignatureFunc,
         PRELUDE,
     },
-    ops::{custom::ExtensionOp, OpName},
+    ops::{custom::ExtensionOp, NamedOp},
     type_row,
     types::{FunctionType, PolyFuncType, TypeArg},
     Extension,
@@ -90,8 +90,8 @@ pub struct ConvertOpType {
     log_width: u64,
 }
 
-impl OpName for ConvertOpType {
-    fn name(&self) -> SmolStr {
+impl NamedOp for ConvertOpType {
+    fn name(&self) -> OpName {
         self.def.name()
     }
 }
@@ -160,7 +160,7 @@ mod test {
         assert_eq!(r.name() as &str, "arithmetic.conversions");
         assert_eq!(r.types().count(), 0);
         for (name, _) in r.operations() {
-            assert!(name.starts_with("convert") || name.starts_with("trunc"));
+            assert!(name.as_ref().starts_with("convert") || name.as_ref().starts_with("trunc"));
         }
     }
 }

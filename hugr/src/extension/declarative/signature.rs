@@ -14,7 +14,7 @@ use smol_str::SmolStr;
 use crate::extension::prelude::PRELUDE_ID;
 use crate::extension::{CustomValidator, ExtensionSet, SignatureFunc, TypeDef, TypeParametrised};
 use crate::types::type_param::TypeParam;
-use crate::types::{CustomType, FunctionType, PolyFuncType, Type, TypeRow};
+use crate::types::{CustomType, FunctionType, PolyFuncType, Type, TypeName, TypeRow};
 use crate::Extension;
 
 use super::{DeclarationContext, ExtensionDeclarationError};
@@ -200,13 +200,15 @@ impl TypeDeclaration {
         // Some hard-coded prelude types are supported.
         let prelude = ctx.registry.get(&PRELUDE_ID).unwrap();
         match self.0.as_str() {
-            "USize" => return prelude.get_type("usize"),
-            "Q" => return prelude.get_type("qubit"),
+            "USize" => return prelude.get_type(&"usize".into()),
+            "Q" => return prelude.get_type(&"qubit".into()),
             _ => {}
         }
 
+        let type_name: TypeName = self.0.clone().into();
+
         // Try to resolve the type in the current extension.
-        if let Some(ty) = ext.get_type(self.0.as_str()) {
+        if let Some(ty) = ext.get_type(&type_name) {
             return Some(ty);
         }
 
@@ -215,7 +217,7 @@ impl TypeDeclaration {
             if let Some(ty) = ctx
                 .registry
                 .get(ext)
-                .and_then(|ext| ext.get_type(self.0.as_str()))
+                .and_then(|ext| ext.get_type(&type_name))
             {
                 return Some(ty);
             }

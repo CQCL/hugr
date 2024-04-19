@@ -9,6 +9,7 @@ pub mod leaf;
 pub mod module;
 pub mod tag;
 pub mod validate;
+use crate::core::impl_identifier;
 use crate::extension::ExtensionSet;
 use crate::types::{EdgeKind, FunctionType};
 use crate::{Direction, OutgoingPort, Port};
@@ -28,7 +29,7 @@ pub use leaf::{Lift, MakeTuple, Noop, Tag, UnpackTuple};
 pub use module::{AliasDecl, AliasDefn, FuncDecl, FuncDefn, Module};
 pub use tag::OpTag;
 
-#[enum_dispatch(OpTrait, OpName, ValidateOp, OpParent)]
+#[enum_dispatch(OpTrait, NamedOp, ValidateOp, OpParent)]
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 /// The concrete operation types for a node in the HUGR.
 // TODO: Link the NodeHandles to the OpType.
@@ -291,8 +292,8 @@ impl OpType {
 /// name to be the same as their type name
 macro_rules! impl_op_name {
     ($i: ident) => {
-        impl $crate::ops::OpName for $i {
-            fn name(&self) -> smol_str::SmolStr {
+        impl $crate::ops::NamedOp for $i {
+            fn name(&self) -> $crate::ops::OpName {
                 stringify!($i).into()
             }
         }
@@ -301,12 +302,35 @@ macro_rules! impl_op_name {
 
 use impl_op_name;
 
+/// A unique identifier for a type.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(transparent)]
+pub struct OpName(SmolStr);
+
+impl_identifier!(OpName, 0);
+
+impl OpName {
+    /// Create a new OpName from a string.
+    pub fn new(name: impl Into<String>) -> Self {
+        Self(SmolStr::new(name.into()))
+    }
+
+    /// Create a constant-initialized OpName.
+    ///
+    /// # Panics
+    ///
+    /// If the string length is greater than 23.
+    pub const fn new_inline(name: &'static str) -> Self {
+        Self(SmolStr::new_inline(name))
+    }
+}
+
 #[enum_dispatch]
 /// Trait for setting name of OpType variants.
 // Separate to OpTrait to allow simple definition via impl_op_name
-pub trait OpName {
+pub trait NamedOp {
     /// The name of the operation.
-    fn name(&self) -> SmolStr;
+    fn name(&self) -> OpName;
 }
 
 /// Trait statically querying the tag of an operation.

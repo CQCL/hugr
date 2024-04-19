@@ -2,6 +2,8 @@
 
 use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 
+use crate::ops::constant::ValueName;
+use crate::ops::OpName;
 use crate::{
     algorithm::const_fold::sorted_consts,
     extension::{
@@ -9,7 +11,7 @@ use crate::{
         simple_op::{try_from_name, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError},
         ExtensionId, ExtensionRegistry, OpDef, SignatureError, SignatureFromArgs, SignatureFunc,
     },
-    ops::{self, custom::ExtensionOp, OpName},
+    ops::{self, custom::ExtensionOp, NamedOp},
     type_row,
     types::{
         type_param::{TypeArg, TypeParam},
@@ -19,9 +21,9 @@ use crate::{
 };
 use lazy_static::lazy_static;
 /// Name of extension false value.
-pub const FALSE_NAME: &str = "FALSE";
+pub const FALSE_NAME: ValueName = ValueName::new_inline("FALSE");
 /// Name of extension true value.
-pub const TRUE_NAME: &str = "TRUE";
+pub const TRUE_NAME: ValueName = ValueName::new_inline("TRUE");
 
 /// Logic extension operation definitions.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, EnumIter, IntoStaticStr, EnumString)]
@@ -76,8 +78,8 @@ impl NaryLogic {
         ConcreteLogicOp(self, n)
     }
 }
-impl OpName for ConcreteLogicOp {
-    fn name(&self) -> smol_str::SmolStr {
+impl NamedOp for ConcreteLogicOp {
+    fn name(&self) -> OpName {
         self.0.name()
     }
 }
@@ -98,8 +100,8 @@ impl MakeExtensionOp for ConcreteLogicOp {
 /// Not operation.
 #[derive(Debug, Copy, Clone)]
 pub struct NotOp;
-impl OpName for NotOp {
-    fn name(&self) -> smol_str::SmolStr {
+impl NamedOp for NotOp {
+    fn name(&self) -> OpName {
         "Not".into()
     }
 }
@@ -215,7 +217,7 @@ pub(crate) mod test {
             prelude::BOOL_T,
             simple_op::{MakeExtensionOp, MakeOpDef, MakeRegisteredOp},
         },
-        ops::OpName,
+        ops::NamedOp,
         Extension,
     };
 
@@ -249,8 +251,8 @@ pub(crate) mod test {
     #[test]
     fn test_values() {
         let r: Extension = extension();
-        let false_val = r.get_value(FALSE_NAME).unwrap();
-        let true_val = r.get_value(TRUE_NAME).unwrap();
+        let false_val = r.get_value(&FALSE_NAME).unwrap();
+        let true_val = r.get_value(&TRUE_NAME).unwrap();
 
         for v in [false_val, true_val] {
             let simpl = v.typed_value().const_type();
