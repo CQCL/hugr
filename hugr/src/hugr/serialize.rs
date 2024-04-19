@@ -337,6 +337,12 @@ pub mod test {
     pub fn check_hugr_schema_roundtrip(hugr: &Hugr) -> Hugr {
         check_hugr_roundtrip(hugr, true)
     }
+
+    /// Serialize and deserialize a HUGR, and check that the result is the same as the original.
+    ///
+    /// If `check_schema` is true, checks the serialized json against the in-tree schema.
+    ///
+    /// Returns the deserialized HUGR.
     pub fn check_hugr_roundtrip(hugr: &Hugr, check_schema: bool) -> Hugr {
         let new_hugr: Hugr = ser_roundtrip_validate(hugr, check_schema.then_some(&SCHEMA));
 
