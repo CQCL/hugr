@@ -7,7 +7,9 @@ use itertools::Itertools;
 use crate::hugr::rewrite::inline_dfg::InlineDFG;
 use crate::hugr::rewrite::replace::{NewEdgeKind, NewEdgeSpec, Replacement};
 use crate::hugr::{HugrMut, RootTagged};
-use crate::ops::{handle::CfgID, DataflowBlock, DataflowParent, DFG};
+use crate::ops::handle::CfgID;
+use crate::ops::leaf::UnpackTuple;
+use crate::ops::{DataflowBlock, DataflowParent, Input, Output, DFG};
 use crate::{Hugr, HugrView, Node};
 
 /// Merge any basic blocks that are direct children of the specified CFG
@@ -45,30 +47,69 @@ fn mk_rep(
     succ: Node,
 ) -> (Replacement, Node, Node) {
     let pred_ty = cfg.get_optype(pred).as_dataflow_block().unwrap();
-    let succ_ty = cfg.get_optype(succ).as_dataflow_block().unwrap().clone();
-    let signature = succ_ty.inner_signature().clone();
+    let succ_ty = cfg.get_optype(succ).as_dataflow_block().unwrap();
+    let succ_sig = succ_ty.inner_signature();
     let mut replacement: Hugr = Hugr::new(cfg.root_type().clone());
-    let merged = replacement.add_node_with_parent(
-        replacement.root(),
-        DataflowBlock {
+    let merged = replacement.add_node_with_parent(replacement.root(), {
+        let mut merged_block = DataflowBlock {
             inputs: pred_ty.inputs.clone(),
-            extension_delta: pred_ty
-                .extension_delta
-                .clone()
-                .union(succ_ty.extension_delta),
-            ..succ_ty
+            ..succ_ty.clone()
+        };
+        merged_block.extension_delta = merged_block
+            .extension_delta
+            .union(pred_ty.extension_delta.clone());
+        merged_block
+    });
+    let input = replacement.add_node_with_parent(
+        merged,
+        Input {
+            types: pred_ty.inputs.clone(),
         },
     );
+    let output = replacement.add_node_with_parent(
+        merged,
+        Output {
+            types: succ_sig.output.clone(),
+        },
+    );
+
     let dfg1 = replacement.add_node_with_parent(
         merged,
         DFG {
-            signature: signature.clone(),
+            signature: pred_ty.inner_signature().clone(),
         },
     );
-    let dfg2 = replacement.add_node_with_parent(merged, DFG { signature });
-    for (i, _) in pred_ty.inner_signature().output().iter().enumerate() {
-        replacement.connect(dfg1, i, dfg2, i)
+    for (i, _) in pred_ty.inputs.iter().enumerate() {
+        replacement.connect(input, i, dfg1, i)
     }
+
+    let dfg2 = replacement.add_node_with_parent(
+        merged,
+        DFG {
+            signature: succ_sig.clone(),
+        },
+    );
+    for (i, _) in succ_sig.output.into_iter().enumerate() {
+        replacement.connect(dfg2, i, output, i)
+    }
+
+    // At the junction, must unpack the first (tuple, branch predicate) output
+    let tuple_elems = pred_ty.sum_rows.clone().into_iter().exactly_one().unwrap();
+    let unp = replacement.add_node_with_parent(
+        merged,
+        UnpackTuple {
+            tys: tuple_elems.clone(),
+        },
+    );
+    replacement.connect(dfg1, 0, unp, 0);
+    let other_start = tuple_elems.len();
+    for (i, _) in tuple_elems.into_iter().enumerate() {
+        replacement.connect(unp, i, dfg2, i)
+    }
+    for (i, _) in pred_ty.other_outputs.into_iter().enumerate() {
+        replacement.connect(dfg1, i + 1, dfg2, i + other_start)
+    }
+
     let rep = Replacement {
         removal: vec![pred, succ],
         replacement,
