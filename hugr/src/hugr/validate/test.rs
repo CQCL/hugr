@@ -11,7 +11,7 @@ use crate::extension::{Extension, ExtensionId, TypeDefBound, EMPTY_REG, PRELUDE_
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::hugr::{HugrMut, NodeType};
 use crate::ops::dataflow::IOTrait;
-use crate::ops::{self, Value, Noop, OpType};
+use crate::ops::{self, Noop, OpType, Value};
 use crate::std_extensions::logic::test::{and_op, or_op};
 use crate::std_extensions::logic::{self, NotOp};
 use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
@@ -274,7 +274,8 @@ fn test_local_const() {
         .get_value(logic::TRUE_NAME)
         .unwrap()
         .typed_value()
-        .clone().into();
+        .clone()
+        .into();
     // Second input of Xor from a constant
     let cst = h.add_node_with_parent(h.root(), const_op);
     let lcst = h.add_node_with_parent(h.root(), ops::LoadConstant { datatype: BOOL_T });
@@ -578,8 +579,9 @@ mod extension_tests {
     ///
     /// Returns the node indices of each of the operations.
     fn add_block_children(b: &mut Hugr, parent: Node, sum_size: usize) -> (Node, Node, Node, Node) {
-        let const_op =
-            ops::Value::unit_sum(0, sum_size as u8).expect("`sum_size` must be greater than 0");
+        let const_op: ops::Const = ops::Value::unit_sum(0, sum_size as u8)
+            .expect("`sum_size` must be greater than 0")
+            .into();
         let tag_type = Type::new_unit_sum(sum_size as u8);
 
         let input = b.add_node_with_parent(parent, ops::Input::new(type_row![BOOL_T]));

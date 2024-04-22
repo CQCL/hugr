@@ -5,6 +5,7 @@ version = "0.0.0"
 authors = ["TKET development team <tket-support@cambridgequantum.com>"]
 readme = "README.md"
 packages = [{ include = "hugr", from = "hugr-py" }]
+package-mode = false
 
 [tool.poetry.group.main.dependencies]
 python = "^3.10"

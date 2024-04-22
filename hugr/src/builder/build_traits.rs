@@ -375,6 +375,7 @@ pub trait Dataflow: Container {
         self.load_const(&cid)
     }
 
+    /// TODO
     fn add_load_value(&mut self, constant: impl Into<ops::Value>) -> Wire {
         self.add_load_const(constant.into())
     }

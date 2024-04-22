@@ -15,6 +15,9 @@ use thiserror::Error;
 pub use custom::{downcast_equal_consts, CustomConst, CustomSerialized};
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+/// An operation returning a constant value.
+///
+/// Represents core types and extension types.
 pub struct Const(Value);
 impl Const {
     pub(crate) fn value(&self) -> &Value {
@@ -40,11 +43,9 @@ impl AsRef<Value> for Const {
     }
 }
 
-/// An operation returning a constant value.
-///
-/// Represents core types and extension types.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "c")]
+/// TODO
 pub enum Value {
     /// An extension constant value, that can check it is of a given [CustomType].
     Extension {
@@ -248,7 +249,8 @@ impl Value {
         }
     }
 
-    fn name(&self) -> SmolStr {
+    /// TODO
+    pub fn name(&self) -> SmolStr {
         match self {
             Self::Extension { e } => format!("const:custom:{}", e.0.name()),
             Self::Function { hugr: h } => {
@@ -268,6 +270,7 @@ impl Value {
         .into()
     }
 
+    /// TODO
     pub fn extension_delta(&self) -> ExtensionSet {
         match self {
             Self::Extension { e } => e.0.extension_reqs().clone(),

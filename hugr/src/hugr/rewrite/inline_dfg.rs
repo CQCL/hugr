@@ -140,7 +140,7 @@ mod test {
     use crate::hugr::rewrite::inline_dfg::InlineDFGError;
     use crate::hugr::HugrMut;
     use crate::ops::handle::{DfgID, NodeHandle};
-    use crate::ops::{Value, Lift, OpType};
+    use crate::ops::{Lift, OpType, Value};
     use crate::std_extensions::arithmetic::float_types;
     use crate::std_extensions::arithmetic::int_ops::{self, IntOpDef};
     use crate::std_extensions::arithmetic::int_types::{self, ConstIntU};

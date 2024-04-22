@@ -4,7 +4,10 @@ use rstest::{fixture, rstest};
 use crate::{
     builder::{BuildError, BuildHandle, Container, DFGBuilder, Dataflow, DataflowHugr},
     extension::prelude::QB_T,
-    ops::{handle::{DataflowOpID, NodeHandle}, Value},
+    ops::{
+        handle::{DataflowOpID, NodeHandle},
+        Value,
+    },
     type_row,
     types::FunctionType,
     utils::test_quantum_extension::cx_gate,

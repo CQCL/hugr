@@ -14,8 +14,6 @@ use crate::macros::impl_box_clone;
 
 use crate::types::{CustomCheckFailure, Type};
 
-use super::Value;
-
 /// Constant value for opaque [`CustomType`]s.
 ///
 /// When implementing this trait, include the `#[typetag::serde]` attribute to

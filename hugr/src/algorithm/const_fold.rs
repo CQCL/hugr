@@ -13,7 +13,7 @@ use crate::{
         views::SiblingSubgraph,
         HugrMut,
     },
-    ops::{Value, OpType},
+    ops::{OpType, Value},
     type_row,
     types::FunctionType,
     Hugr, HugrView, IncomingPort, Node, SimpleReplacement,
