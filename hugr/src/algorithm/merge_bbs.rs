@@ -216,12 +216,21 @@ mod test {
             h.output_neighbours(entry).collect::<HashSet<_>>(),
             HashSet::from([no_b2, exit])
         );
+        // Check the Noop's are in the right blocks
         let [n_op1, n_op2] = h
             .nodes()
             .filter(|n| matches!(h.get_optype(*n), OpType::Noop(_)))
             .collect::<Vec<_>>()
             .try_into()
             .unwrap();
+        let (n_op1, n_op2) = if h.get_parent(n_op1) == Some(entry) {
+            (n_op1, n_op2)
+        } else {
+            (n_op2, n_op1)
+        };
+        assert_eq!(h.get_parent(n_op1), Some(entry));
+        assert_eq!(h.get_parent(n_op2), Some(no_b2));
+        // And the Noop in the entry block is consumed by the custom Test op
         let tst = h
             .nodes()
             .filter(|n| matches!(h.get_optype(*n), OpType::CustomOp(_)))
@@ -229,17 +238,7 @@ mod test {
             .ok()
             .unwrap();
         assert_eq!(h.get_parent(tst), Some(entry));
-        let (nop_entry, nop2) = if h.get_parent(n_op1) == Some(entry) {
-            (n_op1, n_op2)
-        } else {
-            assert_eq!(h.get_parent(n_op2), Some(entry));
-            (n_op2, n_op1)
-        };
-        assert_eq!(h.get_parent(nop2), Some(no_b2));
-        assert_eq!(
-            h.output_neighbours(nop_entry).collect::<Vec<_>>(),
-            vec![tst]
-        );
+        assert_eq!(h.output_neighbours(n_op1).collect::<Vec<_>>(), vec![tst]);
         Ok(())
     }
 }
