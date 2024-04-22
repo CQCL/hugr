@@ -9,7 +9,6 @@ pub mod leaf;
 pub mod module;
 pub mod tag;
 pub mod validate;
-use crate::core::impl_identifier;
 use crate::extension::ExtensionSet;
 use crate::types::{EdgeKind, FunctionType};
 use crate::{Direction, OutgoingPort, Port};
@@ -17,7 +16,6 @@ use crate::{IncomingPort, PortIndex};
 use paste::paste;
 
 use portgraph::NodeIndex;
-use smol_str::SmolStr;
 
 use enum_dispatch::enum_dispatch;
 
@@ -302,28 +300,14 @@ macro_rules! impl_op_name {
 
 use impl_op_name;
 
-/// A unique identifier for a type.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-#[serde(transparent)]
-pub struct OpName(SmolStr);
+/// Marker for the [`OpName`] wrapper.
+pub enum OpNameMarker {}
 
-impl_identifier!(OpName, 0);
+/// A unique identifier for a operation.
+pub type OpName = string_newtype::SmolStrBuf<OpNameMarker>;
 
-impl OpName {
-    /// Create a new OpName from a string.
-    pub fn new(name: impl Into<String>) -> Self {
-        Self(SmolStr::new(name.into()))
-    }
-
-    /// Create a constant-initialized OpName.
-    ///
-    /// # Panics
-    ///
-    /// If the string length is greater than 23.
-    pub const fn new_inline(name: &'static str) -> Self {
-        Self(SmolStr::new_inline(name))
-    }
-}
+/// Slice of a [`OpName`] operation identifier.
+pub type OpNameSlice = string_newtype::SmolStrRef<OpNameMarker>;
 
 #[enum_dispatch]
 /// Trait for setting name of OpType variants.

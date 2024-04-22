@@ -11,15 +11,14 @@ use std::sync::Arc;
 
 use thiserror::Error;
 
-use crate::core::Identifier;
 use crate::hugr::IdentList;
-use crate::ops::constant::ValueName;
+use crate::ops::constant::{ValueName, ValueNameSlice};
 use crate::ops::custom::{ExtensionOp, OpaqueOp};
-use crate::ops::{self, OpName};
+use crate::ops::{self, OpName, OpNameSlice};
 use crate::types::type_param::{check_type_args, TypeArgError};
 use crate::types::type_param::{TypeArg, TypeParam};
-use crate::types::FunctionType;
 use crate::types::{check_typevar_decl, CustomType, Substitution, TypeBound, TypeName};
+use crate::types::{FunctionType, TypeNameSlice};
 
 #[allow(dead_code)]
 mod infer;
@@ -178,7 +177,7 @@ pub enum SignatureError {
 
 /// Concrete instantiations of types and operations defined in extensions.
 trait CustomConcrete {
-    type Identifier: Identifier;
+    type Identifier;
     /// A generic identifier to the element.
     ///
     /// This may either refer to a [`TypeName`] or an [`OpName`].
@@ -227,7 +226,7 @@ trait TypeParametrised {
     /// The concrete object built by binding type arguments to parameters
     type Concrete: CustomConcrete;
     /// The extension-unique name.
-    fn name(&self) -> &impl Identifier;
+    fn name(&self) -> &<Self::Concrete as CustomConcrete>::Identifier;
     /// Type parameters.
     fn params(&self) -> &[TypeParam];
     /// The parent extension.
@@ -255,7 +254,7 @@ impl ExtensionValue {
 
     /// Returns a reference to the name of this [`ExtensionValue`].
     pub fn name(&self) -> &str {
-        self.name.as_ref()
+        self.name.as_str()
     }
 
     /// Returns a reference to the extension this [`ExtensionValue`] belongs to.
@@ -310,18 +309,18 @@ impl Extension {
     }
 
     /// Allows read-only access to the operations in this Extension
-    pub fn get_op(&self, op_name: &OpName) -> Option<&Arc<op_def::OpDef>> {
+    pub fn get_op(&self, op_name: &OpNameSlice) -> Option<&Arc<op_def::OpDef>> {
         self.operations.get(op_name)
     }
 
     /// Allows read-only access to the types in this Extension
-    pub fn get_type(&self, type_name: &TypeName) -> Option<&type_def::TypeDef> {
+    pub fn get_type(&self, type_name: &TypeNameSlice) -> Option<&type_def::TypeDef> {
         self.types.get(type_name)
     }
 
     /// Allows read-only access to the values in this Extension
-    pub fn get_value(&self, type_name: &ValueName) -> Option<&ExtensionValue> {
-        self.values.get(type_name)
+    pub fn get_value(&self, value_name: &ValueNameSlice) -> Option<&ExtensionValue> {
+        self.values.get(value_name)
     }
 
     /// Returns the name of the extension.
@@ -361,7 +360,7 @@ impl Extension {
     /// Instantiate an [`ExtensionOp`] which references an [`OpDef`] in this extension.
     pub fn instantiate_extension_op(
         &self,
-        op_name: &OpName,
+        op_name: &OpNameSlice,
         args: impl Into<Vec<TypeArg>>,
         ext_reg: &ExtensionRegistry,
     ) -> Result<ExtensionOp, SignatureError> {

@@ -160,7 +160,7 @@ mod test {
         assert_eq!(r.name() as &str, "arithmetic.conversions");
         assert_eq!(r.types().count(), 0);
         for (name, _) in r.operations() {
-            assert!(name.as_ref().starts_with("convert") || name.as_ref().starts_with("trunc"));
+            assert!(name.as_str().starts_with("convert") || name.as_str().starts_with("trunc"));
         }
     }
 }

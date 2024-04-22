@@ -8,7 +8,6 @@ mod signature;
 pub mod type_param;
 pub mod type_row;
 
-use crate::core::impl_identifier;
 pub use crate::ops::constant::{ConstTypeError, CustomCheckFailure};
 use crate::types::type_param::check_type_arg;
 use crate::utils::display_list_with_separator;
@@ -16,7 +15,6 @@ pub use check::SumTypeError;
 pub use custom::CustomType;
 pub use poly_func::PolyFuncType;
 pub use signature::FunctionType;
-use smol_str::SmolStr;
 pub use type_param::TypeArg;
 pub use type_row::TypeRow;
 
@@ -30,28 +28,14 @@ use crate::type_row;
 
 use self::type_param::TypeParam;
 
+/// Marker for the [`TypeName`] wrapper.
+pub enum TypeNameMarker {}
+
 /// A unique identifier for a type.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-#[serde(transparent)]
-pub struct TypeName(SmolStr);
+pub type TypeName = string_newtype::SmolStrBuf<TypeNameMarker>;
 
-impl_identifier!(TypeName, 0);
-
-impl TypeName {
-    /// Create a new type name.
-    pub fn new(name: impl Into<SmolStr>) -> Self {
-        Self(name.into())
-    }
-
-    /// Get the name of the type.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the name is longer than 23 characters.
-    pub const fn new_inline(name: &'static str) -> Self {
-        Self(SmolStr::new_inline(name))
-    }
-}
+/// Slice of a [`TypeName`] type identifier.
+pub type TypeNameSlice = string_newtype::SmolStrRef<TypeNameMarker>;
 
 /// The kinds of edges in a HUGR, excluding Hierarchy.
 #[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]

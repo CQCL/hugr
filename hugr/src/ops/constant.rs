@@ -4,13 +4,11 @@ mod custom;
 
 use super::{NamedOp, OpName, OpTrait, StaticTag};
 use super::{OpTag, OpType};
-use crate::core::impl_identifier;
 use crate::extension::ExtensionSet;
 use crate::types::{CustomType, EdgeKind, FunctionType, SumType, SumTypeError, Type};
 use crate::{Hugr, HugrView};
 
 use itertools::Itertools;
-use smol_str::SmolStr;
 use thiserror::Error;
 
 pub use custom::{downcast_equal_consts, CustomConst, CustomSerialized};
@@ -278,7 +276,10 @@ impl Value {
             }
             Self::Tuple { vs: vals } => {
                 let names: Vec<_> = vals.iter().map(Value::name).collect();
-                format!("const:seq:{{{}}}", names.join(", "))
+                format!(
+                    "const:seq:{{{}}}",
+                    names.iter().map(OpName::as_str).join(", ")
+                )
             }
             Self::Sum { tag, values, .. } => {
                 format!("const:sum:{{tag:{tag}, vals:{values:?}}}")
@@ -337,28 +338,14 @@ where
     }
 }
 
+/// Marker for the [`ValueName`] wrapper.
+pub enum ValueNameMarker {}
+
 /// A unique identifier for a constant value.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-#[serde(transparent)]
-pub struct ValueName(SmolStr);
+pub type ValueName = string_newtype::SmolStrBuf<ValueNameMarker>;
 
-impl_identifier!(ValueName, 0);
-
-impl ValueName {
-    /// Create a new [`ValueName`] from a string.
-    pub fn new(name: impl Into<String>) -> Self {
-        Self(SmolStr::new(name.into()))
-    }
-
-    /// Create a constant-initialized ValueName.
-    ///
-    /// # Panics
-    ///
-    /// If the string length is greater than 23.
-    pub const fn new_inline(name: &'static str) -> Self {
-        Self(SmolStr::new_inline(name))
-    }
-}
+/// Slice of a [`ValueName`] constant value identifier.
+pub type ValueNameSlice = string_newtype::SmolStrRef<ValueNameMarker>;
 
 #[cfg(test)]
 mod test {
@@ -502,7 +489,7 @@ mod test {
         ]));
 
         assert_eq!(v.const_type(), correct_type);
-        assert!(v.name().as_ref().starts_with("const:function:"))
+        assert!(v.name().as_str().starts_with("const:function:"))
     }
 
     #[fixture]
@@ -528,7 +515,7 @@ mod test {
         assert_eq!(const_value.const_type(), expected_type);
         let name = const_value.name();
         assert!(
-            name.as_ref().starts_with(name_prefix),
+            name.as_str().starts_with(name_prefix),
             "{name} does not start with {name_prefix}"
         );
     }

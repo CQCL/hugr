@@ -12,7 +12,7 @@ use crate::{ops, Hugr, IncomingPort, Node};
 
 use super::dataflow::DataflowOpTrait;
 use super::tag::OpTag;
-use super::{NamedOp, OpName, OpTrait, OpType};
+use super::{NamedOp, OpName, OpNameSlice, OpTrait, OpType};
 
 /// A user-defined operation defined in an extension.
 ///
@@ -273,7 +273,7 @@ pub struct OpaqueOp {
     signature: FunctionType,
 }
 
-fn qualify_name(res_id: &ExtensionId, op_name: &OpName) -> OpName {
+fn qualify_name(res_id: &ExtensionId, op_name: &OpNameSlice) -> OpName {
     format!("{}.{}", res_id, op_name).into()
 }
 

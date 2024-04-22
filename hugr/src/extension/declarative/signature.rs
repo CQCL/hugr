@@ -200,8 +200,8 @@ impl TypeDeclaration {
         // Some hard-coded prelude types are supported.
         let prelude = ctx.registry.get(&PRELUDE_ID).unwrap();
         match self.0.as_str() {
-            "USize" => return prelude.get_type(&"usize".into()),
-            "Q" => return prelude.get_type(&"qubit".into()),
+            "USize" => return prelude.get_type("usize".into()),
+            "Q" => return prelude.get_type("qubit".into()),
             _ => {}
         }
 

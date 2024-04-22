@@ -131,7 +131,7 @@ pub const BOOL_T: Type = Type::new_unit_sum(2);
 
 /// Initialize a new array of element type `element_ty` of length `size`
 pub fn array_type(size: TypeArg, element_ty: Type) -> Type {
-    let array_def = PRELUDE.get_type(&"array".into()).unwrap();
+    let array_def = PRELUDE.get_type("array".into()).unwrap();
     let custom_t = array_def
         .instantiate(vec![size, TypeArg::Type { ty: element_ty }])
         .unwrap();
@@ -333,7 +333,7 @@ mod test {
 
         let error_val = ConstError::new(2, "my message");
 
-        assert_eq!(error_val.name().as_ref(), "ConstError(2, \"my message\")");
+        assert_eq!(error_val.name().as_str(), "ConstError(2, \"my message\")");
 
         assert!(error_val.validate().is_ok());
 
@@ -368,7 +368,7 @@ mod test {
         let string_type: Type = Type::new_extension(string_custom_type);
         assert_eq!(string_type, STRING_TYPE);
         let string_const: ConstString = ConstString::new("Lorem ipsum".into());
-        assert_eq!(string_const.name().as_ref(), "ConstString(\"Lorem ipsum\")");
+        assert_eq!(string_const.name().as_str(), "ConstString(\"Lorem ipsum\")");
         assert!(string_const.validate().is_ok());
         assert_eq!(
             string_const.extension_reqs(),
