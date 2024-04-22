@@ -301,6 +301,7 @@ macro_rules! impl_op_name {
 use impl_op_name;
 
 /// Marker for the [`OpName`] wrapper.
+#[doc(hidden)]
 pub enum OpNameMarker {}
 
 /// A unique identifier for a operation.

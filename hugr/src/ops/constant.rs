@@ -339,6 +339,7 @@ where
 }
 
 /// Marker for the [`ValueName`] wrapper.
+#[doc(hidden)]
 pub enum ValueNameMarker {}
 
 /// A unique identifier for a constant value.
