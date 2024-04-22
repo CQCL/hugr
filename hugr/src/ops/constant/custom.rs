@@ -12,6 +12,9 @@ use crate::extension::ExtensionSet;
 use crate::macros::impl_box_clone;
 
 use crate::types::{CustomCheckFailure, Type};
+use crate::IncomingPort;
+
+use super::Value;
 
 use super::ValueName;
 
@@ -117,4 +120,12 @@ impl PartialEq for dyn CustomConst {
     fn eq(&self, other: &Self) -> bool {
         (*self).equal_consts(other)
     }
+}
+
+/// Given a singleton list of constant operations, return the value.
+pub fn get_single_input_value<T: CustomConst>(consts: &[(IncomingPort, Value)]) -> Option<&T> {
+    let [(_, c)] = consts else {
+        return None;
+    };
+    c.get_custom_value()
 }
