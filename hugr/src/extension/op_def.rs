@@ -429,7 +429,7 @@ impl OpDef {
     pub fn constant_fold(
         &self,
         type_args: &[TypeArg],
-        consts: &[(crate::IncomingPort, crate::ops::Const)],
+        consts: &[(crate::IncomingPort, crate::ops::Value)],
     ) -> ConstFoldResult {
         (self.constant_folder.as_ref())?.fold(type_args, consts)
     }

@@ -20,7 +20,7 @@ use smol_str::SmolStr;
 
 use enum_dispatch::enum_dispatch;
 
-pub use constant::Const;
+pub use constant::{Const, Value};
 pub use controlflow::{BasicBlock, Case, Conditional, DataflowBlock, ExitBlock, TailLoop, CFG};
 pub use custom::CustomOp;
 pub use dataflow::{Call, CallIndirect, DataflowParent, Input, LoadConstant, Output, DFG};

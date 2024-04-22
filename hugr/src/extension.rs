@@ -238,12 +238,12 @@ trait TypeParametrised {
 pub struct ExtensionValue {
     extension: ExtensionId,
     name: SmolStr,
-    typed_value: ops::Const,
+    typed_value: ops::Value,
 }
 
 impl ExtensionValue {
     /// Returns a reference to the typed value of this [`ExtensionValue`].
-    pub fn typed_value(&self) -> &ops::Const {
+    pub fn typed_value(&self) -> &ops::Value {
         &self.typed_value
     }
 
@@ -337,7 +337,7 @@ impl Extension {
     pub fn add_value(
         &mut self,
         name: impl Into<SmolStr>,
-        typed_value: ops::Const,
+        typed_value: ops::Value,
     ) -> Result<&mut ExtensionValue, ExtensionBuildError> {
         let extension_value = ExtensionValue {
             extension: self.name.clone(),

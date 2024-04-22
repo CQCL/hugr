@@ -14,12 +14,38 @@ use thiserror::Error;
 
 pub use custom::{downcast_equal_consts, CustomConst, CustomSerialized};
 
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct Const(Value);
+impl Const {
+    pub(crate) fn value(&self) -> &Value {
+        &self.0
+    }
+}
+
+impl From<Value> for Const {
+    fn from(value: Value) -> Self {
+        Self(value)
+    }
+}
+
+impl From<Const> for Value {
+    fn from(value: Const) -> Self {
+        value.0
+    }
+}
+
+impl AsRef<Value> for Const {
+    fn as_ref(&self) -> &Value {
+        &self.0
+    }
+}
+
 /// An operation returning a constant value.
 ///
 /// Represents core types and extension types.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "c")]
-pub enum Const {
+pub enum Value {
     /// An extension constant value, that can check it is of a given [CustomType].
     Extension {
         /// The custom constant value.
@@ -34,7 +60,7 @@ pub enum Const {
     /// A tuple
     Tuple {
         /// Constant values in the tuple.
-        vs: Vec<Const>,
+        vs: Vec<Value>,
     },
     /// A Sum variant, with a tag indicating the index of the variant and its
     /// value.
@@ -45,7 +71,7 @@ pub enum Const {
         ///
         /// Sum variants are always a row of values, hence the Vec.
         #[serde(rename = "vs")]
-        values: Vec<Const>,
+        values: Vec<Value>,
         /// The full type of the Sum, including the other variants.
         #[serde(rename = "typ")]
         sum_type: SumType,
@@ -103,7 +129,7 @@ pub enum ConstTypeError {
     },
     /// A mismatch between the type expected and the value.
     #[error("Value {1:?} does not match expected type {0}")]
-    ConstCheckFail(Type, Const),
+    ConstCheckFail(Type, Value),
     /// Error when checking a custom value.
     #[error("Error when checking custom type: {0:?}")]
     CustomCheckFail(#[from] CustomCheckFailure),
@@ -121,8 +147,8 @@ fn mono_fn_type(h: &Hugr) -> Result<FunctionType, ConstTypeError> {
     })
 }
 
-impl Const {
-    /// Returns a reference to the type of this [`Const`].
+impl Value {
+    /// Returns a reference to the type of this [`Value`].
     pub fn const_type(&self) -> Type {
         match self {
             Self::Extension { e } => e.0.get_type(),
@@ -139,10 +165,10 @@ impl Const {
     /// type-checked `typ`
     pub fn sum(
         tag: usize,
-        items: impl IntoIterator<Item = Const>,
+        items: impl IntoIterator<Item = Value>,
         typ: SumType,
     ) -> Result<Self, ConstTypeError> {
-        let values: Vec<Const> = items.into_iter().collect();
+        let values: Vec<Value> = items.into_iter().collect();
         typ.check_type(tag, &values)?;
         Ok(Self::Sum {
             tag,
@@ -152,7 +178,7 @@ impl Const {
     }
 
     /// Returns a tuple constant of constant values.
-    pub fn tuple(items: impl IntoIterator<Item = Const>) -> Self {
+    pub fn tuple(items: impl IntoIterator<Item = Value>) -> Self {
         Self::Tuple {
             vs: items.into_iter().collect(),
         }
@@ -221,9 +247,7 @@ impl Const {
             None
         }
     }
-}
 
-impl OpName for Const {
     fn name(&self) -> SmolStr {
         match self {
             Self::Extension { e } => format!("const:custom:{}", e.0.name()),
@@ -234,7 +258,7 @@ impl OpName for Const {
                 format!("const:function:[{}]", t)
             }
             Self::Tuple { vs: vals } => {
-                let names: Vec<_> = vals.iter().map(Self::name).collect();
+                let names: Vec<_> = vals.iter().map(Value::name).collect();
                 format!("const:seq:{{{}}}", names.join(", "))
             }
             Self::Sum { tag, values, .. } => {
@@ -242,6 +266,23 @@ impl OpName for Const {
             }
         }
         .into()
+    }
+
+    pub fn extension_delta(&self) -> ExtensionSet {
+        match self {
+            Self::Extension { e } => e.0.extension_reqs().clone(),
+            Self::Function { .. } => ExtensionSet::new(), // no extensions required to load Hugr (only to run)
+            Self::Tuple { vs } => ExtensionSet::union_over(vs.iter().map(Value::extension_delta)),
+            Self::Sum { values, .. } => {
+                ExtensionSet::union_over(values.iter().map(|x| x.extension_delta()))
+            }
+        }
+    }
+}
+
+impl OpName for Const {
+    fn name(&self) -> SmolStr {
+        self.0.name()
     }
 }
 impl StaticTag for Const {
@@ -253,14 +294,7 @@ impl OpTrait for Const {
     }
 
     fn extension_delta(&self) -> ExtensionSet {
-        match self {
-            Self::Extension { e } => e.0.extension_reqs().clone(),
-            Self::Function { .. } => ExtensionSet::new(), // no extensions required to load Hugr (only to run)
-            Self::Tuple { vs } => ExtensionSet::union_over(vs.iter().map(Const::extension_delta)),
-            Self::Sum { values, .. } => {
-                ExtensionSet::union_over(values.iter().map(|x| x.extension_delta()))
-            }
-        }
+        self.0.extension_delta()
     }
 
     fn tag(&self) -> OpTag {
@@ -268,13 +302,13 @@ impl OpTrait for Const {
     }
 
     fn static_output(&self) -> Option<EdgeKind> {
-        Some(EdgeKind::Const(self.const_type()))
+        Some(EdgeKind::Const(self.0.const_type()))
     }
 }
 
 // [KnownTypeConst] is guaranteed to be the right type, so can be constructed
 // without initial type check.
-impl<T> From<T> for Const
+impl<T> From<T> for Value
 where
     T: CustomConst,
 {
@@ -285,7 +319,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use super::Const;
+    use super::Value;
     use crate::builder::test::simple_dfg_hugr;
     use crate::{
         builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
@@ -329,7 +363,7 @@ mod test {
     }
 
     /// A [`CustomSerialized`] encoding a [`FLOAT64_TYPE`] float constant used in testing.
-    pub(crate) fn serialized_float(f: f64) -> Const {
+    pub(crate) fn serialized_float(f: f64) -> Value {
         CustomSerialized::new(
             FLOAT64_TYPE,
             serde_yaml::Value::Number(f.into()),
@@ -353,10 +387,10 @@ mod test {
             type_row![],
             TypeRow::from(vec![pred_ty.clone().into()]),
         ))?;
-        let c = b.add_constant(Const::sum(
+        let c = b.add_constant(Value::sum(
             0,
             [
-                Into::<Const>::into(CustomTestValue(USIZE_CUSTOM_T)),
+                Into::<Value>::into(CustomTestValue(USIZE_CUSTOM_T)),
                 serialized_float(5.1),
             ],
             pred_ty.clone(),
@@ -368,7 +402,7 @@ mod test {
             type_row![],
             TypeRow::from(vec![pred_ty.clone().into()]),
         ))?;
-        let c = b.add_constant(Const::sum(1, [], pred_ty.clone())?);
+        let c = b.add_constant(Value::sum(1, [], pred_ty.clone())?);
         let w = b.load_const(&c);
         b.finish_hugr_with_outputs([w], &test_registry()).unwrap();
 
@@ -383,10 +417,10 @@ mod test {
         println!("{}", serde_json::to_string_pretty(&good_sum).unwrap());
 
         let good_sum =
-            Const::sum(0, [const_usize(), serialized_float(5.1)], pred_ty.clone()).unwrap();
+            Value::sum(0, [const_usize(), serialized_float(5.1)], pred_ty.clone()).unwrap();
         println!("{}", serde_json::to_string_pretty(&good_sum).unwrap());
 
-        let res = Const::sum(0, [], pred_ty.clone());
+        let res = Value::sum(0, [], pred_ty.clone());
         assert_matches!(
             res,
             Err(ConstTypeError::SumType(SumTypeError::WrongVariantLength {
@@ -396,7 +430,7 @@ mod test {
             }))
         );
 
-        let res = Const::sum(4, [], pred_ty.clone());
+        let res = Value::sum(4, [], pred_ty.clone());
         assert_matches!(
             res,
             Err(ConstTypeError::SumType(SumTypeError::InvalidTag {
@@ -405,7 +439,7 @@ mod test {
             }))
         );
 
-        let res = Const::sum(0, [const_usize(), const_usize()], pred_ty);
+        let res = Value::sum(0, [const_usize(), const_usize()], pred_ty);
         assert_matches!(
             res,
             Err(ConstTypeError::SumType(SumTypeError::InvalidValueType {
@@ -419,7 +453,7 @@ mod test {
 
     #[rstest]
     fn function_value(simple_dfg_hugr: Hugr) {
-        let v = Const::function(simple_dfg_hugr).unwrap();
+        let v = Value::function(simple_dfg_hugr).unwrap();
 
         let correct_type = Type::new_function(FunctionType::new_endo(type_row![
             crate::extension::prelude::BOOL_T
@@ -430,22 +464,22 @@ mod test {
     }
 
     #[fixture]
-    fn const_usize() -> Const {
+    fn const_usize() -> Value {
         ConstUsize::new(257).into()
     }
 
     #[fixture]
-    fn const_tuple() -> Const {
-        Const::tuple([ConstUsize::new(257).into(), serialized_float(5.1)])
+    fn const_tuple() -> Value {
+        Value::tuple([ConstUsize::new(257).into(), serialized_float(5.1)])
     }
 
     #[rstest]
-    #[case(Const::unit(), Type::UNIT, "const:seq:{}")]
+    #[case(Value::unit(), Type::UNIT, "const:seq:{}")]
     #[case(const_usize(), USIZE_T, "const:custom:ConstUsize(")]
     #[case(serialized_float(17.4), FLOAT64_TYPE, "const:custom:yaml:Number(17.4)")]
     #[case(const_tuple(), Type::new_tuple(type_row![USIZE_T, FLOAT64_TYPE]), "const:seq:{")]
     fn const_type(
-        #[case] const_value: Const,
+        #[case] const_value: Value,
         #[case] expected_type: Type,
         #[case] name_prefix: &str,
     ) {
@@ -458,7 +492,7 @@ mod test {
     }
 
     #[rstest]
-    fn const_custom_value(const_usize: Const, const_tuple: Const) {
+    fn const_custom_value(const_usize: Value, const_tuple: Value) {
         assert_eq!(
             const_usize.get_custom_value::<ConstUsize>(),
             Some(&ConstUsize::new(257))
@@ -477,7 +511,7 @@ mod test {
             ex_id.clone(),
             TypeBound::Eq,
         );
-        let yaml_const: Const =
+        let yaml_const: Value =
             CustomSerialized::new(typ_int.clone(), YamlValue::Number(6.into()), ex_id.clone())
                 .into();
         let classic_t = Type::new_extension(typ_int.clone());

@@ -358,7 +358,7 @@ pub trait Dataflow: Container {
         let load_n = self
             .add_dataflow_op(
                 ops::LoadConstant {
-                    datatype: op.const_type().clone(),
+                    datatype: op.value().const_type().clone(),
                 },
                 // Constant wire from the constant value node
                 vec![Wire::new(const_node, OutgoingPort::from(0))],
@@ -373,6 +373,10 @@ pub trait Dataflow: Container {
     fn add_load_const(&mut self, constant: impl Into<ops::Const>) -> Wire {
         let cid = self.add_constant(constant);
         self.load_const(&cid)
+    }
+
+    fn add_load_value(&mut self, constant: impl Into<ops::Value>) -> Wire {
+        self.add_load_const(constant.into())
     }
 
     /// Return a builder for a [`crate::ops::TailLoop`] node.

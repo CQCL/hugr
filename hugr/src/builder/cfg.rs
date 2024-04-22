@@ -72,12 +72,12 @@ use crate::{
 ///     let [inw] = entry_b.input_wires_arr();
 ///     let entry = {
 ///         // Pack the const "42" into the appropriate sum type.
-///         let left_42 = ops::Const::sum(
+///         let left_42 = ops::Value::sum(
 ///             0,
 ///             [prelude::ConstUsize::new(42).into()],
 ///             SumType::new(sum_variants.clone())
 ///         )?;
-///         let sum = entry_b.add_load_const(left_42);
+///         let sum = entry_b.add_load_value(left_42);
 ///
 ///         entry_b.finish_with_outputs(sum, [inw])?
 ///     };
@@ -92,7 +92,7 @@ use crate::{
 ///         )?;
 ///     let successor_a = {
 ///         // This block has one successor. The choice is denoted by a unary sum.
-///         let sum_unary = successor_builder.add_load_const(ops::Const::unary_unit_sum());
+///         let sum_unary = successor_builder.add_load_const(ops::Value::unary_unit_sum());
 ///
 ///         // The input wires of a node start with the data embedded in the variant
 ///         // which selected this block.
@@ -104,7 +104,7 @@ use crate::{
 ///    let mut successor_builder =
 ///        cfg_builder.simple_block_builder(FunctionType::new(type_row![NAT], type_row![NAT]), 1)?;
 ///    let successor_b = {
-///        let sum_unary = successor_builder.add_load_const(ops::Const::unary_unit_sum());
+///        let sum_unary = successor_builder.add_load_value(ops::Value::unary_unit_sum());
 ///        let [in_wire] = successor_builder.input_wires_arr();
 ///        successor_builder.finish_with_outputs(sum_unary, [in_wire])?
 ///    };
@@ -463,7 +463,7 @@ pub(crate) mod test {
         let mut middle_b = cfg_builder
             .simple_block_builder(FunctionType::new(type_row![NAT], type_row![NAT]), 1)?;
         let middle = {
-            let c = middle_b.add_load_const(ops::Const::unary_unit_sum());
+            let c = middle_b.add_load_const(ops::Value::unary_unit_sum());
             let [inw] = middle_b.input_wires_arr();
             middle_b.finish_with_outputs(c, [inw])?
         };
@@ -476,7 +476,7 @@ pub(crate) mod test {
     #[test]
     fn test_dom_edge() -> Result<(), BuildError> {
         let mut cfg_builder = CFGBuilder::new(FunctionType::new(type_row![NAT], type_row![NAT]))?;
-        let sum_tuple_const = cfg_builder.add_constant(ops::Const::unary_unit_sum());
+        let sum_tuple_const = cfg_builder.add_constant(ops::Value::unary_unit_sum());
         let sum_variants = vec![type_row![]];
 
         let mut entry_b =
@@ -504,7 +504,7 @@ pub(crate) mod test {
     #[test]
     fn test_non_dom_edge() -> Result<(), BuildError> {
         let mut cfg_builder = CFGBuilder::new(FunctionType::new(type_row![NAT], type_row![NAT]))?;
-        let sum_tuple_const = cfg_builder.add_constant(ops::Const::unary_unit_sum());
+        let sum_tuple_const = cfg_builder.add_constant(ops::Value::unary_unit_sum());
         let sum_variants = vec![type_row![]];
         let mut middle_b = cfg_builder
             .simple_block_builder(FunctionType::new(type_row![NAT], type_row![NAT]), 1)?;

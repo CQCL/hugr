@@ -20,8 +20,8 @@ pub(super) fn set_fold(op: &FloatOps, def: &mut OpDef) {
 }
 
 /// Extract float values from constants in port order.
-fn get_floats<const N: usize>(consts: &[(IncomingPort, ops::Const)]) -> Option<[f64; N]> {
-    let consts: [&ops::Const; N] = sorted_consts(consts).try_into().ok()?;
+fn get_floats<const N: usize>(consts: &[(IncomingPort, ops::Value)]) -> Option<[f64; N]> {
+    let consts: [&ops::Value; N] = sorted_consts(consts).try_into().ok()?;
 
     Some(consts.map(|c| {
         let const_f64: &ConstF64 = c
@@ -51,7 +51,7 @@ impl ConstFold for BinaryFold {
     fn fold(
         &self,
         _type_args: &[crate::types::TypeArg],
-        consts: &[(IncomingPort, ops::Const)],
+        consts: &[(IncomingPort, ops::Value)],
     ) -> ConstFoldResult {
         let [f1, f2] = get_floats(consts)?;
 
@@ -83,11 +83,11 @@ impl ConstFold for CmpFold {
     fn fold(
         &self,
         _type_args: &[crate::types::TypeArg],
-        consts: &[(IncomingPort, ops::Const)],
+        consts: &[(IncomingPort, ops::Value)],
     ) -> ConstFoldResult {
         let [f1, f2] = get_floats(consts)?;
 
-        let res = ops::Const::from_bool((self.0)(f1, f2));
+        let res = ops::Value::from_bool((self.0)(f1, f2));
 
         Some(vec![(0.into(), res)])
     }
@@ -112,7 +112,7 @@ impl ConstFold for UnaryFold {
     fn fold(
         &self,
         _type_args: &[crate::types::TypeArg],
-        consts: &[(IncomingPort, ops::Const)],
+        consts: &[(IncomingPort, ops::Value)],
     ) -> ConstFoldResult {
         let [f1] = get_floats(consts)?;
         let res = ConstF64::new((self.0)(f1));
@@ -131,7 +131,7 @@ impl ConstFold for ToStringFold {
     fn fold(
         &self,
         _type_args: &[crate::types::TypeArg],
-        consts: &[(IncomingPort, ops::Const)],
+        consts: &[(IncomingPort, ops::Value)],
     ) -> ConstFoldResult {
         let [f] = get_floats(consts)?;
         let res = ConstString::new((self.0)(f));

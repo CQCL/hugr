@@ -347,7 +347,7 @@ mod test {
 
         let mut b = DFGBuilder::new(FunctionType::new_endo(type_row![])).unwrap();
 
-        let err = b.add_load_const(error_val);
+        let err = b.add_load_value(error_val);
 
         let op = PRELUDE
             .instantiate_extension_op(PANIC_OP_ID, [], &PRELUDE_REGISTRY)
@@ -384,7 +384,7 @@ mod test {
     fn test_print() {
         let mut b: DFGBuilder<Hugr> = DFGBuilder::new(FunctionType::new(vec![], vec![])).unwrap();
         let greeting: ConstString = ConstString::new("Hello, world!".into());
-        let greeting_out: Wire = b.add_load_const(greeting);
+        let greeting_out: Wire = b.add_load_value(greeting);
         let print_op = PRELUDE
             .instantiate_extension_op(PRINT_OP_ID, [], &PRELUDE_REGISTRY)
             .unwrap();
