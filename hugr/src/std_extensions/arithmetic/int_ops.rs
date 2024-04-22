@@ -21,6 +21,8 @@ use crate::{
 use lazy_static::lazy_static;
 use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 
+mod const_fold;
+
 /// The extension identifier.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.int");
 
@@ -224,6 +226,10 @@ impl MakeOpDef for IntOpDef {
             itostring_s => "convert a signed integer to its string representation",
             itostring_u => "convert an unsigned integer to its string representation",
         }.into()
+    }
+
+    fn post_opdef(&self, def: &mut OpDef) {
+        const_fold::set_fold(self, def)
     }
 }
 fn int_polytype(
