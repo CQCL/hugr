@@ -88,7 +88,7 @@ fn mk_rep(
             signature: succ_sig.clone(),
         },
     );
-    for (i, _) in succ_sig.output.into_iter().enumerate() {
+    for (i, _) in succ_sig.output.iter().enumerate() {
         replacement.connect(dfg2, i, output, i)
     }
 
@@ -102,10 +102,10 @@ fn mk_rep(
     );
     replacement.connect(dfg1, 0, unp, 0);
     let other_start = tuple_elems.len();
-    for (i, _) in tuple_elems.into_iter().enumerate() {
+    for (i, _) in tuple_elems.iter().enumerate() {
         replacement.connect(unp, i, dfg2, i)
     }
-    for (i, _) in pred_ty.other_outputs.into_iter().enumerate() {
+    for (i, _) in pred_ty.other_outputs.iter().enumerate() {
         replacement.connect(dfg1, i + 1, dfg2, i + other_start)
     }
 
