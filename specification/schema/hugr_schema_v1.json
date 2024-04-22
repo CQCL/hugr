@@ -36,7 +36,19 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/ExtensionSet"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "default": null,
+                    "title": "Input Extensions"
                 },
                 "op": {
                     "const": "AliasDecl",
@@ -71,7 +83,19 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/ExtensionSet"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "default": null,
+                    "title": "Input Extensions"
                 },
                 "op": {
                     "const": "AliasDefn",
@@ -188,7 +212,19 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/ExtensionSet"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "default": null,
+                    "title": "Input Extensions"
                 },
                 "op": {
                     "const": "CFG",
@@ -218,7 +254,19 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/ExtensionSet"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "default": null,
+                    "title": "Input Extensions"
                 },
                 "op": {
                     "const": "Call",
@@ -244,7 +292,10 @@
                 }
             },
             "required": [
-                "parent"
+                "parent",
+                "func_sig",
+                "type_args",
+                "instantiation"
             ],
             "title": "Call",
             "type": "object"
@@ -258,7 +309,19 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/ExtensionSet"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "default": null,
+                    "title": "Input Extensions"
                 },
                 "op": {
                     "const": "CallIndirect",
@@ -288,7 +351,19 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/ExtensionSet"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "default": null,
+                    "title": "Input Extensions"
                 },
                 "op": {
                     "const": "Case",
@@ -318,7 +393,19 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/ExtensionSet"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "default": null,
+                    "title": "Input Extensions"
                 },
                 "op": {
                     "const": "Conditional",
@@ -355,7 +442,11 @@
                     "type": "array"
                 },
                 "extension_delta": {
-                    "$ref": "#/$defs/ExtensionSet"
+                    "items": {
+                        "type": "string"
+                    },
+                    "title": "Extension Delta",
+                    "type": "array"
                 }
             },
             "required": [
@@ -373,7 +464,19 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/ExtensionSet"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "default": null,
+                    "title": "Input Extensions"
                 },
                 "op": {
                     "const": "Const",
@@ -404,7 +507,19 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/ExtensionSet"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "default": null,
+                    "title": "Input Extensions"
                 },
                 "op": {
                     "const": "CustomOp",
@@ -475,7 +590,19 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/ExtensionSet"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "default": null,
+                    "title": "Input Extensions"
                 },
                 "op": {
                     "const": "DFG",
@@ -505,7 +632,19 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/ExtensionSet"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "default": null,
+                    "title": "Input Extensions"
                 },
                 "op": {
                     "const": "DataflowBlock",
@@ -541,7 +680,11 @@
                     "type": "array"
                 },
                 "extension_delta": {
-                    "$ref": "#/$defs/ExtensionSet"
+                    "items": {
+                        "type": "string"
+                    },
+                    "title": "Extension Delta",
+                    "type": "array"
                 }
             },
             "required": [
@@ -559,7 +702,19 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/ExtensionSet"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "default": null,
+                    "title": "Input Extensions"
                 },
                 "op": {
                     "const": "ExitBlock",
@@ -584,22 +739,6 @@
             ],
             "title": "ExitBlock",
             "type": "object"
-        },
-        "ExtensionSet": {
-            "anyOf": [
-                {
-                    "items": {
-                        "type": "string"
-                    },
-                    "type": "array"
-                },
-                {
-                    "type": "null"
-                }
-            ],
-            "default": null,
-            "description": "A set of extensions ids.",
-            "title": "ExtensionSet"
         },
         "ExtensionValue": {
             "additionalProperties": true,
@@ -637,7 +776,11 @@
                     "type": "string"
                 },
                 "es": {
-                    "$ref": "#/$defs/ExtensionSet"
+                    "items": {
+                        "type": "string"
+                    },
+                    "title": "Es",
+                    "type": "array"
                 }
             },
             "required": [
@@ -671,7 +814,19 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/ExtensionSet"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "default": null,
+                    "title": "Input Extensions"
                 },
                 "op": {
                     "const": "FuncDecl",
@@ -692,7 +847,8 @@
             },
             "required": [
                 "parent",
-                "name"
+                "name",
+                "signature"
             ],
             "title": "FuncDecl",
             "type": "object"
@@ -706,7 +862,19 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/ExtensionSet"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "default": null,
+                    "title": "Input Extensions"
                 },
                 "op": {
                     "const": "FuncDefn",
@@ -727,7 +895,8 @@
             },
             "required": [
                 "parent",
-                "name"
+                "name",
+                "signature"
             ],
             "title": "FuncDefn",
             "type": "object"
@@ -760,7 +929,11 @@
                     "type": "array"
                 },
                 "extension_reqs": {
-                    "$ref": "#/$defs/ExtensionSet"
+                    "items": {
+                        "type": "string"
+                    },
+                    "title": "Extension Reqs",
+                    "type": "array"
                 }
             },
             "required": [
@@ -832,7 +1005,19 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/ExtensionSet"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "default": null,
+                    "title": "Input Extensions"
                 },
                 "op": {
                     "const": "Input",
@@ -866,7 +1051,19 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/ExtensionSet"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "default": null,
+                    "title": "Input Extensions"
                 },
                 "op": {
                     "const": "Lift",
@@ -928,7 +1125,19 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/ExtensionSet"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "default": null,
+                    "title": "Input Extensions"
                 },
                 "op": {
                     "const": "LoadConstant",
@@ -959,7 +1168,19 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/ExtensionSet"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "default": null,
+                    "title": "Input Extensions"
                 },
                 "op": {
                     "const": "LoadFunction",
@@ -1001,7 +1222,19 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/ExtensionSet"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "default": null,
+                    "title": "Input Extensions"
                 },
                 "op": {
                     "const": "MakeTuple",
@@ -1035,7 +1268,19 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/ExtensionSet"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "default": null,
+                    "title": "Input Extensions"
                 },
                 "op": {
                     "const": "Module",
@@ -1062,7 +1307,19 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/ExtensionSet"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "default": null,
+                    "title": "Input Extensions"
                 },
                 "op": {
                     "const": "Noop",
@@ -1289,7 +1546,19 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/ExtensionSet"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "default": null,
+                    "title": "Input Extensions"
                 },
                 "op": {
                     "const": "Output",
@@ -1442,7 +1711,19 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/ExtensionSet"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "default": null,
+                    "title": "Input Extensions"
                 },
                 "op": {
                     "const": "Tag",
@@ -1507,7 +1788,19 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/ExtensionSet"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "default": null,
+                    "title": "Input Extensions"
                 },
                 "op": {
                     "const": "TailLoop",
@@ -1811,7 +2104,19 @@
                     "type": "integer"
                 },
                 "input_extensions": {
-                    "$ref": "#/$defs/ExtensionSet"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "default": null,
+                    "title": "Input Extensions"
                 },
                 "op": {
                     "const": "UnpackTuple",

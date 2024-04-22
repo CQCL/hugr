@@ -1,7 +1,7 @@
 import inspect
 import sys
 from abc import ABC
-from typing import Any, Literal, cast
+from typing import Any, Literal
 
 from pydantic import Field, RootModel
 
@@ -28,7 +28,7 @@ class BaseOp(ABC, ConfiguredBaseModel):
 
     # Parent node index of node the op belongs to, used only at serialization time
     parent: NodeID
-    input_extensions: ExtensionSet = Field(default_factory=ExtensionSet)
+    input_extensions: ExtensionSet | None = Field(default=None)
 
     def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
         """Hook to insert type information from the input and output ports into the
@@ -59,14 +59,7 @@ class FuncDefn(BaseOp):
     op: Literal["FuncDefn"] = "FuncDefn"
 
     name: str
-    signature: PolyFuncType = Field(default_factory=PolyFuncType.empty)
-
-    def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
-        assert len(in_types) == 0
-        assert len(out_types) == 1
-        out = out_types[0]
-        assert isinstance(out, PolyFuncType)
-        self.signature = out  # TODO: Extensions
+    signature: PolyFuncType
 
 
 class FuncDecl(BaseOp):
@@ -74,14 +67,7 @@ class FuncDecl(BaseOp):
 
     op: Literal["FuncDecl"] = "FuncDecl"
     name: str
-    signature: PolyFuncType = Field(default_factory=PolyFuncType.empty)
-
-    def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
-        assert len(in_types) == 0
-        assert len(out_types) == 1
-        out = out_types[0]
-        assert isinstance(out, PolyFuncType)
-        self.signature = out
+    signature: PolyFuncType
 
 
 CustomConst = Any  # TODO
@@ -186,13 +172,13 @@ class DataflowBlock(BaseOp):
 
     def insert_child_dfg_signature(self, inputs: TypeRow, outputs: TypeRow) -> None:
         self.inputs = inputs
-        pred = outputs[0]
-        assert isinstance(pred, tys.UnitSum | tys.GeneralSum)
-        if isinstance(pred, tys.UnitSum):
-            self.sum_rows = [[] for _ in range(cast(tys.UnitSum, pred).size)]
+        pred = outputs[0].root
+        assert isinstance(pred, tys.SumType)
+        if isinstance(pred.root, tys.UnitSum):
+            self.sum_rows = [[] for _ in range(pred.root.size)]
         else:
             self.sum_rows = []
-            for variant in pred.rows:
+            for variant in pred.root.rows:
                 self.sum_rows.append(variant)
         self.other_outputs = outputs[1:]
 
@@ -266,16 +252,9 @@ class Call(DataflowOp):
     """
 
     op: Literal["Call"] = "Call"
-    func_sig: PolyFuncType = Field(default_factory=FunctionType.empty)
-    type_args: list[tys.TypeArg] = Field(default_factory=list)
-    instantiation: FunctionType = Field(default_factory=FunctionType.empty)
-
-    def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
-        fun_ty = in_types[-1]
-        assert isinstance(fun_ty, PolyFuncType)
-        poly_func = cast(PolyFuncType, fun_ty)
-        assert len(poly_func.params) == 0
-        self.signature = poly_func.body
+    func_sig: PolyFuncType
+    type_args: list[tys.TypeArg]
+    instantiation: FunctionType
 
     class Config:
         # Needed to avoid random '\n's in the pydantic description
@@ -292,19 +271,18 @@ class Call(DataflowOp):
 class CallIndirect(DataflowOp):
     """Call a function indirectly.
 
-    Like call, but the first input is a standard dataflow graph type."""
+    Like call, but the first input is a standard dataflow graph type.
+    """
 
     op: Literal["CallIndirect"] = "CallIndirect"
     signature: FunctionType = Field(default_factory=FunctionType.empty)
 
     def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
-        fun_ty = in_types[0]
-        assert isinstance(fun_ty, PolyFuncType)
-        poly_func = cast(PolyFuncType, fun_ty)
-        assert len(poly_func.params) == 0
-        assert len(poly_func.body.input) == len(in_types) - 1
-        assert len(poly_func.body.output) == len(out_types)
-        self.signature = poly_func.body
+        fun_ty = in_types[0].root
+        assert isinstance(fun_ty, FunctionType)
+        assert len(fun_ty.input) == len(in_types) - 1
+        assert len(fun_ty.output) == len(out_types)
+        self.signature = fun_ty
 
 
 class LoadConstant(DataflowOp):
@@ -359,12 +337,14 @@ class Conditional(DataflowOp):
         # First port is a predicate, i.e. a sum of tuple types. We need to unpack
         # those into a list of type rows
         pred = in_types[0]
-        if isinstance(pred, tys.UnitSum):
-            self.sum_rows = [[] for _ in range(cast(tys.UnitSum, pred).size)]
+        assert isinstance(pred.root, tys.SumType)
+        sum = pred.root.root
+        if isinstance(sum, tys.UnitSum):
+            self.sum_rows = [[] for _ in range(sum.size)]
         else:
-            assert isinstance(pred, tys.GeneralSum)
+            assert isinstance(sum, tys.GeneralSum)
             self.sum_rows = []
-            for ty in pred.rows:
+            for ty in sum.rows:
                 self.sum_rows.append(ty)
         self.other_inputs = list(in_types[1:])
         self.outputs = list(out_types)
