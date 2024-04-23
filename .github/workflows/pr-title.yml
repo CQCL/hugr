@@ -14,7 +14,7 @@ on:
     types: [checks_requested]
 
 permissions:
-  pull-requests: read
+  pull-requests: write
 
 jobs:
   main:
@@ -25,6 +25,7 @@ jobs:
     if: github.event_name == 'pull_request_target'
     steps:
       - uses: amannn/action-semantic-pull-request@v5
+        id: lint_pr_title
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -70,3 +71,36 @@ jobs:
           # event triggers in your workflow.
           ignoreLabels: |
             ignore-semantic-pull-request
+
+      - uses: marocchino/sticky-pull-request-comment@v2
+        # When the previous steps fails, the workflow would stop. By adding this
+        # condition you can continue the execution with the populated error message.
+        if: always() && (steps.lint_pr_title.outputs.error_message != null)
+        with:
+          header: pr-title-lint-error
+          message: |
+            Hey there and thank you for opening this pull request! 👋🏼
+
+            We require pull request titles to follow the [Conventional Commits specification](https://www.conventionalcommits.org/en/v1.0.0/)
+            and it looks like your proposed title needs to be adjusted.
+
+            Your title should look like this:
+            ```
+            <type>(<scope>): <description>
+            ```
+            Or like this, if it's a breaking change:
+            ```
+            <type>!: <description>
+            ```
+
+            Details:
+            ```
+            ${{ steps.lint_pr_title.outputs.error_message }}
+            ```
+
+      # Delete a previous comment when the issue has been resolved
+      - if: ${{ steps.lint_pr_title.outputs.error_message == null }}
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: pr-title-lint-error
+          delete: true
