@@ -249,31 +249,36 @@
             "type": "object"
         },
         "Const": {
-            "description": "A constant operation.",
-            "discriminator": {
-                "mapping": {
-                    "Extension": "#/$defs/ExtensionConst",
-                    "Function": "#/$defs/FunctionConst",
-                    "Sum": "#/$defs/Sum",
-                    "Tuple": "#/$defs/Tuple"
+            "description": "A Const operation definition.",
+            "properties": {
+                "parent": {
+                    "title": "Parent",
+                    "type": "integer"
                 },
-                "propertyName": "c"
-            },
-            "oneOf": [
-                {
-                    "$ref": "#/$defs/ExtensionConst"
+                "input_extensions": {
+                    "$ref": "#/$defs/ExtensionSet"
                 },
-                {
-                    "$ref": "#/$defs/FunctionConst"
+                "op": {
+                    "const": "Const",
+                    "default": "Const",
+                    "enum": [
+                        "Const"
+                    ],
+                    "title": "Op",
+                    "type": "string"
                 },
-                {
-                    "$ref": "#/$defs/Tuple"
-                },
-                {
-                    "$ref": "#/$defs/Sum"
+                "v": {
+                    "$ref": "#/$defs/Value"
                 }
+            },
+            "required": [
+                "op",
+                "parent",
+                "input_extensions",
+                "v"
             ],
-            "title": "Const"
+            "title": "Const",
+            "type": "object"
         },
         "CustomOp": {
             "description": "A user-defined operation that can be downcasted by the extensions that define it.",
@@ -465,47 +470,6 @@
             "title": "ExitBlock",
             "type": "object"
         },
-        "ExtensionConst": {
-            "description": "An extension constant value, that can check it is of a given [CustomType].",
-            "properties": {
-                "parent": {
-                    "title": "Parent",
-                    "type": "integer"
-                },
-                "input_extensions": {
-                    "$ref": "#/$defs/ExtensionSet"
-                },
-                "op": {
-                    "const": "Const",
-                    "default": "Const",
-                    "enum": [
-                        "Const"
-                    ],
-                    "title": "Op",
-                    "type": "string"
-                },
-                "c": {
-                    "const": "Extension",
-                    "default": "Extension",
-                    "enum": [
-                        "Extension"
-                    ],
-                    "title": "ConstTag",
-                    "type": "string"
-                },
-                "e": {
-                    "title": "CustomConst"
-                }
-            },
-            "required": [
-                "parent",
-                "op",
-                "c",
-                "e"
-            ],
-            "title": "ExtensionConst",
-            "type": "object"
-        },
         "ExtensionSet": {
             "anyOf": [
                 {
@@ -521,6 +485,29 @@
             "default": null,
             "description": "A set of extensions ids.",
             "title": "ExtensionSet"
+        },
+        "ExtensionValue": {
+            "description": "An extension constant value, that can check it is of a given [CustomType].",
+            "properties": {
+                "c": {
+                    "const": "Extension",
+                    "default": "Extension",
+                    "enum": [
+                        "Extension"
+                    ],
+                    "title": "ValueTag",
+                    "type": "string"
+                },
+                "e": {
+                    "title": "CustomConst"
+                }
+            },
+            "required": [
+                "c",
+                "e"
+            ],
+            "title": "ExtensionValue",
+            "type": "object"
         },
         "ExtensionsArg": {
             "properties": {
@@ -611,47 +598,6 @@
             "title": "FuncDefn",
             "type": "object"
         },
-        "FunctionConst": {
-            "description": "A higher-order function value.",
-            "properties": {
-                "parent": {
-                    "title": "Parent",
-                    "type": "integer"
-                },
-                "input_extensions": {
-                    "$ref": "#/$defs/ExtensionSet"
-                },
-                "op": {
-                    "const": "Const",
-                    "default": "Const",
-                    "enum": [
-                        "Const"
-                    ],
-                    "title": "Op",
-                    "type": "string"
-                },
-                "c": {
-                    "const": "Function",
-                    "default": "Function",
-                    "enum": [
-                        "Function"
-                    ],
-                    "title": "ConstTag",
-                    "type": "string"
-                },
-                "hugr": {
-                    "title": "Hugr"
-                }
-            },
-            "required": [
-                "parent",
-                "op",
-                "c",
-                "hugr"
-            ],
-            "title": "FunctionConst",
-            "type": "object"
-        },
         "FunctionType": {
             "description": "A graph encoded as a value. It contains a concrete signature and a set of required resources.",
             "properties": {
@@ -687,6 +633,29 @@
                 "output"
             ],
             "title": "FunctionType",
+            "type": "object"
+        },
+        "FunctionValue": {
+            "description": "A higher-order function value.",
+            "properties": {
+                "c": {
+                    "const": "Function",
+                    "default": "Function",
+                    "enum": [
+                        "Function"
+                    ],
+                    "title": "ValueTag",
+                    "type": "string"
+                },
+                "hugr": {
+                    "title": "Hugr"
+                }
+            },
+            "required": [
+                "c",
+                "hugr"
+            ],
+            "title": "FunctionValue",
             "type": "object"
         },
         "GeneralSum": {
@@ -1215,60 +1184,6 @@
             "title": "SequenceArg",
             "type": "object"
         },
-        "Sum": {
-            "description": "A Sum variant For any Sum type where this value meets the type of the variant indicated by the tag.",
-            "properties": {
-                "parent": {
-                    "title": "Parent",
-                    "type": "integer"
-                },
-                "input_extensions": {
-                    "$ref": "#/$defs/ExtensionSet"
-                },
-                "op": {
-                    "const": "Const",
-                    "default": "Const",
-                    "enum": [
-                        "Const"
-                    ],
-                    "title": "Op",
-                    "type": "string"
-                },
-                "c": {
-                    "const": "Sum",
-                    "default": "Sum",
-                    "enum": [
-                        "Sum"
-                    ],
-                    "title": "ConstTag",
-                    "type": "string"
-                },
-                "tag": {
-                    "title": "Tag",
-                    "type": "integer"
-                },
-                "typ": {
-                    "$ref": "#/$defs/Type"
-                },
-                "vs": {
-                    "items": {
-                        "$ref": "#/$defs/Const"
-                    },
-                    "title": "Vs",
-                    "type": "array"
-                }
-            },
-            "required": [
-                "parent",
-                "op",
-                "c",
-                "tag",
-                "typ",
-                "vs"
-            ],
-            "title": "Sum",
-            "type": "object"
-        },
         "SumType": {
             "discriminator": {
                 "mapping": {
@@ -1286,6 +1201,42 @@
                 }
             ],
             "title": "SumType"
+        },
+        "SumValue": {
+            "description": "A Sum variant For any Sum type where this value meets the type of the variant indicated by the tag.",
+            "properties": {
+                "c": {
+                    "const": "Sum",
+                    "default": "Sum",
+                    "enum": [
+                        "Sum"
+                    ],
+                    "title": "ValueTag",
+                    "type": "string"
+                },
+                "tag": {
+                    "title": "Tag",
+                    "type": "integer"
+                },
+                "typ": {
+                    "$ref": "#/$defs/Type"
+                },
+                "vs": {
+                    "items": {
+                        "$ref": "#/$defs/Value"
+                    },
+                    "title": "Vs",
+                    "type": "array"
+                }
+            },
+            "required": [
+                "c",
+                "tag",
+                "typ",
+                "vs"
+            ],
+            "title": "SumValue",
+            "type": "object"
         },
         "Tag": {
             "description": "An operation that creates a tagged sum value from one of its variants.",
@@ -1312,7 +1263,10 @@
                 },
                 "variants": {
                     "items": {
-                        "$ref": "#/$defs/Type"
+                        "items": {
+                            "$ref": "#/$defs/Type"
+                        },
+                        "type": "array"
                     },
                     "title": "Variants",
                     "type": "array"
@@ -1373,51 +1327,6 @@
             "title": "TailLoop",
             "type": "object"
         },
-        "Tuple": {
-            "description": "A constant tuple value.",
-            "properties": {
-                "parent": {
-                    "title": "Parent",
-                    "type": "integer"
-                },
-                "input_extensions": {
-                    "$ref": "#/$defs/ExtensionSet"
-                },
-                "op": {
-                    "const": "Const",
-                    "default": "Const",
-                    "enum": [
-                        "Const"
-                    ],
-                    "title": "Op",
-                    "type": "string"
-                },
-                "c": {
-                    "const": "Tuple",
-                    "default": "Tuple",
-                    "enum": [
-                        "Tuple"
-                    ],
-                    "title": "ConstTag",
-                    "type": "string"
-                },
-                "vs": {
-                    "items": {
-                        "$ref": "#/$defs/Const"
-                    },
-                    "title": "Vs",
-                    "type": "array"
-                }
-            },
-            "required": [
-                "parent",
-                "op",
-                "c",
-                "vs"
-            ],
-            "title": "Tuple",
-            "type": "object"
-        },
         "TupleParam": {
             "properties": {
                 "tp": {
@@ -1441,6 +1350,33 @@
                 "params"
             ],
             "title": "TupleParam",
+            "type": "object"
+        },
+        "TupleValue": {
+            "description": "A constant tuple value.",
+            "properties": {
+                "c": {
+                    "const": "Tuple",
+                    "default": "Tuple",
+                    "enum": [
+                        "Tuple"
+                    ],
+                    "title": "ValueTag",
+                    "type": "string"
+                },
+                "vs": {
+                    "items": {
+                        "$ref": "#/$defs/Value"
+                    },
+                    "title": "Vs",
+                    "type": "array"
+                }
+            },
+            "required": [
+                "c",
+                "vs"
+            ],
+            "title": "TupleValue",
             "type": "object"
         },
         "Type": {
@@ -1675,6 +1611,33 @@
             ],
             "title": "UnpackTuple",
             "type": "object"
+        },
+        "Value": {
+            "description": "A constant Value.",
+            "discriminator": {
+                "mapping": {
+                    "Extension": "#/$defs/ExtensionValue",
+                    "Function": "#/$defs/FunctionValue",
+                    "Sum": "#/$defs/SumValue",
+                    "Tuple": "#/$defs/TupleValue"
+                },
+                "propertyName": "c"
+            },
+            "oneOf": [
+                {
+                    "$ref": "#/$defs/ExtensionValue"
+                },
+                {
+                    "$ref": "#/$defs/FunctionValue"
+                },
+                {
+                    "$ref": "#/$defs/TupleValue"
+                },
+                {
+                    "$ref": "#/$defs/SumValue"
+                }
+            ],
+            "title": "Value"
         },
         "Variable": {
             "description": "A type variable identified by an index into the array of TypeParams.",

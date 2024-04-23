@@ -18,28 +18,39 @@ pub use custom::{downcast_equal_consts, CustomConst, CustomSerialized};
 /// An operation returning a constant value.
 ///
 /// Represents core types and extension types.
-pub struct Const(Value);
+#[non_exhaustive]
+pub struct Const {
+    #[serde(rename = "v")]
+    value: Value,
+}
+
 impl Const {
-    pub(crate) fn value(&self) -> &Value {
-        &self.0
+    /// Create a new [`Const`] operation.
+    pub fn new(value: Value) -> Self {
+        Self { value }
+    }
+
+    /// The inner value of the [`Const`]
+    pub fn value(&self) -> &Value {
+        &self.value
     }
 }
 
 impl From<Value> for Const {
     fn from(value: Value) -> Self {
-        Self(value)
+        Self::new(value)
     }
 }
 
 impl From<Const> for Value {
-    fn from(value: Const) -> Self {
-        value.0
+    fn from(konst: Const) -> Self {
+        konst.value
     }
 }
 
 impl AsRef<Value> for Const {
     fn as_ref(&self) -> &Value {
-        &self.0
+        self.value()
     }
 }
 
@@ -285,7 +296,7 @@ impl Value {
 
 impl OpName for Const {
     fn name(&self) -> SmolStr {
-        self.0.name()
+        self.value().name()
     }
 }
 impl StaticTag for Const {
@@ -297,7 +308,7 @@ impl OpTrait for Const {
     }
 
     fn extension_delta(&self) -> ExtensionSet {
-        self.0.extension_delta()
+        self.value().extension_delta()
     }
 
     fn tag(&self) -> OpTag {
@@ -305,7 +316,7 @@ impl OpTrait for Const {
     }
 
     fn static_output(&self) -> Option<EdgeKind> {
-        Some(EdgeKind::Const(self.0.const_type()))
+        Some(EdgeKind::Const(self.value().const_type()))
     }
 }
 
