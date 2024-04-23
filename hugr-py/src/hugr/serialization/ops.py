@@ -143,13 +143,17 @@ class SumValue(BaseModel):
 class Value(RootModel):
     """A constant Value."""
 
-    root: ExtensionValue | FunctionValue| TupleValue | SumValue = Field(discriminator="c")
+    root: ExtensionValue | FunctionValue | TupleValue | SumValue = Field(
+        discriminator="c"
+    )
+
 
 class Const(BaseOp):
     """A Const operation definition."""
 
     op: Literal["Const"] = "Const"
     v: Value = Field()
+
     class Config:
         # Needed to avoid random '\n's in the pydantic description
         json_schema_extra = {
@@ -461,7 +465,7 @@ class Tag(DataflowOp):
 
     op: Literal["Tag"] = "Tag"
     tag: int  # The variant to create.
-    variants: list[TypeRow] # The variants of the sum type.
+    variants: list[TypeRow]  # The variants of the sum type.
 
 
 class Lift(DataflowOp):
