@@ -93,10 +93,10 @@ pub enum Value {
 
 /// Boxed [`CustomConst`] trait object.
 ///
-/// Use [`Const::extension`] to create a new variant of this type.
+/// Use [`Value::extension`] to create a new variant of this type.
 ///
 /// This is required to avoid <https://github.com/rust-lang/rust/issues/78808> in
-/// [`Const::Extension`], while implementing a transparent encoding into a
+/// [`Value::Extension`], while implementing a transparent encoding into a
 /// `CustomConst`.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(transparent)]
@@ -236,7 +236,7 @@ impl Value {
     }
 
     /// Generate a constant equivalent of a boolean,
-    /// see [`Const::true_val`] and [`Const::false_val`].
+    /// see [`Value::true_val`] and [`Value::false_val`].
     pub fn from_bool(b: bool) -> Self {
         if b {
             Self::true_val()
