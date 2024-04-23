@@ -56,7 +56,8 @@ impl AsRef<Value> for Const {
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "c")]
-/// TODO
+/// A value that can be stored as a static constant. Representing core types and
+/// extension types.
 pub enum Value {
     /// An extension constant value, that can check it is of a given [CustomType].
     Extension {
@@ -260,8 +261,7 @@ impl Value {
         }
     }
 
-    /// TODO
-    pub fn name(&self) -> SmolStr {
+    fn name(&self) -> SmolStr {
         match self {
             Self::Extension { e } => format!("const:custom:{}", e.0.name()),
             Self::Function { hugr: h } => {
@@ -281,14 +281,14 @@ impl Value {
         .into()
     }
 
-    /// TODO
-    pub fn extension_delta(&self) -> ExtensionSet {
+    /// The extensions required by a [`Value`]
+    pub fn extension_reqs(&self) -> ExtensionSet {
         match self {
             Self::Extension { e } => e.0.extension_reqs().clone(),
             Self::Function { .. } => ExtensionSet::new(), // no extensions required to load Hugr (only to run)
-            Self::Tuple { vs } => ExtensionSet::union_over(vs.iter().map(Value::extension_delta)),
+            Self::Tuple { vs } => ExtensionSet::union_over(vs.iter().map(Value::extension_reqs)),
             Self::Sum { values, .. } => {
-                ExtensionSet::union_over(values.iter().map(|x| x.extension_delta()))
+                ExtensionSet::union_over(values.iter().map(|x| x.extension_reqs()))
             }
         }
     }
@@ -308,7 +308,7 @@ impl OpTrait for Const {
     }
 
     fn extension_delta(&self) -> ExtensionSet {
-        self.value().extension_delta()
+        self.value().extension_reqs()
     }
 
     fn tag(&self) -> OpTag {
@@ -404,7 +404,7 @@ mod test {
         let c = b.add_constant(Value::sum(
             0,
             [
-                Into::<Value>::into(CustomTestValue(USIZE_CUSTOM_T)),
+                CustomTestValue(USIZE_CUSTOM_T).into(),
                 serialized_float(5.1),
             ],
             pred_ty.clone(),

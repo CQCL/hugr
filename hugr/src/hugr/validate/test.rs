@@ -270,7 +270,7 @@ fn test_local_const() {
             port_kind: EdgeKind::Value(BOOL_T)
         })
     );
-    let const_op: ops::constant::Const = logic::EXTENSION
+    let const_op: ops::Const = logic::EXTENSION
         .get_value(logic::TRUE_NAME)
         .unwrap()
         .typed_value()

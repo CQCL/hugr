@@ -375,7 +375,8 @@ pub trait Dataflow: Container {
         self.load_const(&cid)
     }
 
-    /// TODO
+    /// Load a [`ops::Value`] and return the local dataflow wire for that constant.
+    /// Adds a [`ops::Const`] and a [`ops::LoadConstant`] node.
     fn add_load_value(&mut self, constant: impl Into<ops::Value>) -> Wire {
         self.add_load_const(constant.into())
     }
