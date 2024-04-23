@@ -301,11 +301,12 @@ impl Value {
     }
 }
 
-impl OpName for Const {
-    fn name(&self) -> SmolStr {
+impl NamedOp for Const {
+    fn name(&self) -> OpName {
         self.value().name()
     }
 }
+
 impl StaticTag for Const {
     const TAG: OpTag = OpTag::Const;
 }

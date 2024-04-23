@@ -5,7 +5,7 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 
 use crate::ops::constant::ValueName;
-use crate::ops::{OpName, OpTrait, Value};
+use crate::ops::{OpName, Value};
 use crate::types::TypeName;
 use crate::{
     algorithm::const_fold::sorted_consts,
