@@ -17,6 +17,7 @@ from pydantic import TypeAdapter
 from hugr.serialization import SerialHugr
 from hugr.serialization.hugrtype import HugrType
 
+
 def write_schema(out_dir: Path, name_prefix: str, schema):
     version = schema.get_version()
     filename = f"{name_prefix}_{version}.json"
@@ -24,6 +25,7 @@ def write_schema(out_dir: Path, name_prefix: str, schema):
     print(f"Writing schema to {path}")
     with path.open("w") as f:
         json.dump(TypeAdapter(schema).json_schema(), f, indent=4)
+
 
 if __name__ == "__main__":
     if len(sys.argv) == 1:

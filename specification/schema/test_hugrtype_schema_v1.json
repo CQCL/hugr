@@ -1,5 +1,32 @@
 {
     "$defs": {
+        "Alias": {
+            "description": "TODO",
+            "properties": {
+                "t": {
+                    "const": "Alias",
+                    "default": "Alias",
+                    "enum": [
+                        "Alias"
+                    ],
+                    "title": "T",
+                    "type": "string"
+                },
+                "bound": {
+                    "$ref": "#/$defs/TypeBound"
+                },
+                "name": {
+                    "title": "Name",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "bound",
+                "name"
+            ],
+            "title": "Alias",
+            "type": "object"
+        },
         "Array": {
             "description": "Known size array whose elements are of the same type.",
             "properties": {
@@ -144,15 +171,6 @@
         "GeneralSum": {
             "description": "General sum type that explicitly stores the types of the variants.",
             "properties": {
-                "t": {
-                    "const": "Sum",
-                    "default": "Sum",
-                    "enum": [
-                        "Sum"
-                    ],
-                    "title": "T",
-                    "type": "string"
-                },
                 "s": {
                     "const": "General",
                     "default": "General",
@@ -282,6 +300,27 @@
             "type": "object"
         },
         "SumType": {
+            "properties": {
+                "t": {
+                    "const": "Sum",
+                    "default": "Sum",
+                    "enum": [
+                        "Sum"
+                    ],
+                    "title": "T",
+                    "type": "string"
+                },
+                "st": {
+                    "$ref": "#/$defs/SumTypeBase"
+                }
+            },
+            "required": [
+                "st"
+            ],
+            "title": "SumType",
+            "type": "object"
+        },
+        "SumTypeBase": {
             "discriminator": {
                 "mapping": {
                     "General": "#/$defs/GeneralSum",
@@ -297,12 +336,13 @@
                     "$ref": "#/$defs/GeneralSum"
                 }
             ],
-            "title": "SumType"
+            "title": "SumTypeBase"
         },
         "Type": {
             "description": "A HUGR type.",
             "discriminator": {
                 "mapping": {
+                    "Alias": "#/$defs/Alias",
                     "Array": "#/$defs/Array",
                     "G": "#/$defs/FunctionType",
                     "I": "#/$defs/USize",
@@ -334,6 +374,9 @@
                 },
                 {
                     "$ref": "#/$defs/Opaque"
+                },
+                {
+                    "$ref": "#/$defs/Alias"
                 }
             ],
             "title": "Type"
@@ -418,15 +461,6 @@
         "UnitSum": {
             "description": "Simple predicate where all variants are empty tuples.",
             "properties": {
-                "t": {
-                    "const": "Sum",
-                    "default": "Sum",
-                    "enum": [
-                        "Sum"
-                    ],
-                    "title": "T",
-                    "type": "string"
-                },
                 "s": {
                     "const": "Unit",
                     "default": "Unit",
@@ -478,15 +512,23 @@
     "description": "A serializable representation of a Hugr Type. Intended for testing only.",
     "properties": {
         "typ": {
-            "$ref": "#/$defs/Type"
+            "anyOf": [
+                {
+                    "$ref": "#/$defs/Type"
+                },
+                {
+                    "$ref": "#/$defs/SumTypeBase"
+                }
+            ],
+            "title": "Typ"
         },
-        "v": {
+        "version": {
             "const": "v1",
             "default": "v1",
             "enum": [
                 "v1"
             ],
-            "title": "V",
+            "title": "Version",
             "type": "string"
         }
     },

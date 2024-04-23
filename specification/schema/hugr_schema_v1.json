@@ -1,5 +1,66 @@
 {
     "$defs": {
+        "Alias": {
+            "description": "TODO",
+            "properties": {
+                "t": {
+                    "const": "Alias",
+                    "default": "Alias",
+                    "enum": [
+                        "Alias"
+                    ],
+                    "title": "T",
+                    "type": "string"
+                },
+                "bound": {
+                    "$ref": "#/$defs/TypeBound"
+                },
+                "name": {
+                    "title": "Name",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "bound",
+                "name"
+            ],
+            "title": "Alias",
+            "type": "object"
+        },
+        "AliasDecl": {
+            "properties": {
+                "parent": {
+                    "title": "Parent",
+                    "type": "integer"
+                },
+                "input_extensions": {
+                    "$ref": "#/$defs/ExtensionSet"
+                },
+                "op": {
+                    "const": "AliasDecl",
+                    "default": "AliasDecl",
+                    "enum": [
+                        "AliasDecl"
+                    ],
+                    "title": "Op",
+                    "type": "string"
+                },
+                "name": {
+                    "title": "Name",
+                    "type": "string"
+                },
+                "bound": {
+                    "$ref": "#/$defs/TypeBound"
+                }
+            },
+            "required": [
+                "parent",
+                "name",
+                "bound"
+            ],
+            "title": "AliasDecl",
+            "type": "object"
+        },
         "Array": {
             "description": "Known size array whose elements are of the same type.",
             "properties": {
@@ -660,15 +721,6 @@
         "GeneralSum": {
             "description": "General sum type that explicitly stores the types of the variants.",
             "properties": {
-                "t": {
-                    "const": "Sum",
-                    "default": "Sum",
-                    "enum": [
-                        "Sum"
-                    ],
-                    "title": "T",
-                    "type": "string"
-                },
                 "s": {
                     "const": "General",
                     "default": "General",
@@ -911,6 +963,7 @@
             "description": "A constant operation.",
             "discriminator": {
                 "mapping": {
+                    "AliasDecl": "#/$defs/AliasDecl",
                     "CFG": "#/$defs/CFG",
                     "Call": "#/$defs/Call",
                     "CallIndirect": "#/$defs/CallIndirect",
@@ -1002,6 +1055,9 @@
                 },
                 {
                     "$ref": "#/$defs/DFG"
+                },
+                {
+                    "$ref": "#/$defs/AliasDecl"
                 }
             ],
             "title": "OpType"
@@ -1184,6 +1240,27 @@
             "type": "object"
         },
         "SumType": {
+            "properties": {
+                "t": {
+                    "const": "Sum",
+                    "default": "Sum",
+                    "enum": [
+                        "Sum"
+                    ],
+                    "title": "T",
+                    "type": "string"
+                },
+                "st": {
+                    "$ref": "#/$defs/SumTypeBase"
+                }
+            },
+            "required": [
+                "st"
+            ],
+            "title": "SumType",
+            "type": "object"
+        },
+        "SumTypeBase": {
             "discriminator": {
                 "mapping": {
                     "General": "#/$defs/GeneralSum",
@@ -1199,7 +1276,7 @@
                     "$ref": "#/$defs/GeneralSum"
                 }
             ],
-            "title": "SumType"
+            "title": "SumTypeBase"
         },
         "SumValue": {
             "description": "A Sum variant For any Sum type where this value meets the type of the variant indicated by the tag.",
@@ -1218,7 +1295,7 @@
                     "type": "integer"
                 },
                 "typ": {
-                    "$ref": "#/$defs/Type"
+                    "$ref": "#/$defs/SumTypeBase"
                 },
                 "vs": {
                     "items": {
@@ -1382,6 +1459,7 @@
             "description": "A HUGR type.",
             "discriminator": {
                 "mapping": {
+                    "Alias": "#/$defs/Alias",
                     "Array": "#/$defs/Array",
                     "G": "#/$defs/FunctionType",
                     "I": "#/$defs/USize",
@@ -1413,6 +1491,9 @@
                 },
                 {
                     "$ref": "#/$defs/Opaque"
+                },
+                {
+                    "$ref": "#/$defs/Alias"
                 }
             ],
             "title": "Type"
@@ -1549,15 +1630,6 @@
         "UnitSum": {
             "description": "Simple predicate where all variants are empty tuples.",
             "properties": {
-                "t": {
-                    "const": "Sum",
-                    "default": "Sum",
-                    "enum": [
-                        "Sum"
-                    ],
-                    "title": "T",
-                    "type": "string"
-                },
                 "s": {
                     "const": "Unit",
                     "default": "Unit",

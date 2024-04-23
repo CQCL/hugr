@@ -26,16 +26,21 @@ use super::{HugrMut, HugrView};
 /// will try to deserialize them in order.
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "version", rename_all = "lowercase")]
-enum Versioned {
+enum Versioned<T> {
     /// Version 0 of the HUGR serialization format.
     V0,
     /// Version 1 of the HUGR serialization format.
-    V1(SerHugrV1),
+    V1(T),
 
     #[serde(other)]
     Unsupported,
 }
 
+impl<T> Versioned<T> {
+    pub fn new(t: T) -> Self {
+        Self::V1(t)
+    }
+}
 #[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
 struct NodeSer {
     parent: Node,
@@ -99,7 +104,7 @@ impl Serialize for Hugr {
         S: serde::Serializer,
     {
         let shg: SerHugrV1 = self.try_into().map_err(serde::ser::Error::custom)?;
-        let versioned = Versioned::V1(shg);
+        let versioned = Versioned::new(shg);
         versioned.serialize(serializer)
     }
 }
@@ -109,7 +114,7 @@ impl<'de> Deserialize<'de> for Hugr {
     where
         D: Deserializer<'de>,
     {
-        let shg = Versioned::deserialize(deserializer)?;
+        let shg: Versioned<SerHugrV1> = Versioned::deserialize(deserializer)?;
         match shg {
             Versioned::V0 => Err(serde::de::Error::custom(
                 "Version 0 HUGR serialization format is not supported.",

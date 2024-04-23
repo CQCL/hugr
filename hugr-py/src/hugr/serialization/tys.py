@@ -147,8 +147,6 @@ class Array(MultiContainer):
 class UnitSum(BaseModel):
     """Simple predicate where all variants are empty tuples."""
 
-    t: Literal["Sum"] = "Sum"
-
     s: Literal["Unit"] = "Unit"
     size: int
 
@@ -156,14 +154,17 @@ class UnitSum(BaseModel):
 class GeneralSum(BaseModel):
     """General sum type that explicitly stores the types of the variants."""
 
-    t: Literal["Sum"] = "Sum"
-
     s: Literal["General"] = "General"
     rows: list["TypeRow"]
 
 
-class SumType(RootModel):
+class SumTypeBase(RootModel):
     root: Union[UnitSum, GeneralSum] = Field(discriminator="s")
+
+
+class SumType(BaseModel):
+    t: Literal["Sum"] = "Sum"
+    st: SumTypeBase
 
 
 # ----------------------------------------------
@@ -263,6 +264,14 @@ class Opaque(BaseModel):
     bound: TypeBound
 
 
+class Alias(BaseModel):
+    """TODO"""
+
+    t: Literal["Alias"] = "Alias"
+    bound: TypeBound
+    name: str
+
+
 # ----------------------------------------------
 # --------------- LinearType -------------------
 # ----------------------------------------------
@@ -278,7 +287,7 @@ class Type(RootModel):
     """A HUGR type."""
 
     root: Annotated[
-        Qubit | Variable | USize | FunctionType | Array | SumType | Opaque,
+        Qubit | Variable | USize | FunctionType | Array | SumType | Opaque | Alias,
         WrapValidator(_json_custom_error_validator),
     ] = Field(discriminator="t")
 

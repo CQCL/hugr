@@ -13,6 +13,8 @@ from .tys import (
     PolyFuncType,
     Type,
     TypeRow,
+    SumTypeBase,
+    TypeBound,
 )
 
 NodeID = int
@@ -126,7 +128,7 @@ class SumValue(BaseModel):
 
     c: Literal["Sum"] = Field("Sum", title="ValueTag")
     tag: int
-    typ: Type
+    typ: SumTypeBase
     vs: list["Value"]
 
     class Config:
@@ -475,6 +477,12 @@ class Lift(DataflowOp):
     new_extension: ExtensionId
 
 
+class AliasDecl(BaseOp):
+    op: Literal["AliasDecl"] = "AliasDecl"
+    name: str
+    bound: TypeBound
+
+
 class OpType(RootModel):
     """A constant operation."""
 
@@ -501,6 +509,7 @@ class OpType(RootModel):
         | Tag
         | Lift
         | DFG
+        | AliasDecl
     ) = Field(discriminator="op")
 
 
