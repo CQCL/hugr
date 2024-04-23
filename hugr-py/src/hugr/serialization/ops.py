@@ -456,7 +456,7 @@ class Tag(DataflowOp):
 
     op: Literal["Tag"] = "Tag"
     tag: int  # The variant to create.
-    variants: TypeRow  # The variants of the sum type.
+    variants: list[TypeRow] # The variants of the sum type.
 
 
 class Lift(DataflowOp):
