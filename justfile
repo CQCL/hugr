@@ -13,8 +13,8 @@ check:
     poetry run pre-commit run --all-files
 
 # Run all the tests.
-test language="[rust|python]": (_run_lang language \
-        "HUGR_TEST_SCHEMA=1 cargo test --all-features" \
+test language="[rust|python]" : (_run_lang language \
+        "HUGR_TEST_SCHEMA=\"1\" cargo test --all-features" \
         "poetry run pytest"
     )
 

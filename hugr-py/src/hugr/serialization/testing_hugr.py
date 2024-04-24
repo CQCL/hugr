@@ -1,13 +1,14 @@
 from typing import Any, Literal
 from pydantic import BaseModel, Field
-from .tys import Type, USize, SumTypeBase
+from .tys import Type, USize, SumType
+from .ops import Value
 
 
-class HugrType(BaseModel):
-    """A serializable representation of a Hugr Type. Intended for testing only."""
+class TestingHugr(BaseModel):
+    """A serializable representation of a Hugr Type, SumType, or Value. Intended for testing only."""
 
-    typ: Type | SumTypeBase
-    version: Literal["v1"] = "v1"
+    typ: Type | SumType | Value
+    version: Literal["v2"] = "v2"
 
     @classmethod
     def get_version(cls) -> str:
@@ -15,7 +16,7 @@ class HugrType(BaseModel):
         return cls(typ=Type(USize())).version
 
     class Config:
-        title = "HugrType"
+        title = "HugrTesting"
         json_schema_extra = {
             "required": ["typ"],
         }

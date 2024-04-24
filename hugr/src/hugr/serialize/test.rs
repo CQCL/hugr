@@ -41,7 +41,7 @@
         };
         static ref TYPE_SCHEMA: JSONSchema = {
             let schema_val: serde_json::Value = serde_json::from_str(include_str!(
-                "../../../specification/schema/test_hugrtype_schema_v1.json"
+                "../../../specification/schema/testing_hugr_schema_v1.json"
             ))
             .unwrap();
             JSONSchema::options()

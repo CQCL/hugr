@@ -1240,27 +1240,6 @@
             "type": "object"
         },
         "SumType": {
-            "properties": {
-                "t": {
-                    "const": "Sum",
-                    "default": "Sum",
-                    "enum": [
-                        "Sum"
-                    ],
-                    "title": "T",
-                    "type": "string"
-                },
-                "st": {
-                    "$ref": "#/$defs/SumTypeBase"
-                }
-            },
-            "required": [
-                "st"
-            ],
-            "title": "SumType",
-            "type": "object"
-        },
-        "SumTypeBase": {
             "discriminator": {
                 "mapping": {
                     "General": "#/$defs/GeneralSum",
@@ -1276,7 +1255,7 @@
                     "$ref": "#/$defs/GeneralSum"
                 }
             ],
-            "title": "SumTypeBase"
+            "title": "SumType"
         },
         "SumValue": {
             "description": "A Sum variant For any Sum type where this value meets the type of the variant indicated by the tag.",
@@ -1295,7 +1274,7 @@
                     "type": "integer"
                 },
                 "typ": {
-                    "$ref": "#/$defs/SumTypeBase"
+                    "$ref": "#/$defs/SumType"
                 },
                 "vs": {
                     "items": {
@@ -1354,6 +1333,27 @@
                 "variants"
             ],
             "title": "Tag",
+            "type": "object"
+        },
+        "TaggedSumType": {
+            "properties": {
+                "t": {
+                    "const": "Sum",
+                    "default": "Sum",
+                    "enum": [
+                        "Sum"
+                    ],
+                    "title": "T",
+                    "type": "string"
+                },
+                "st": {
+                    "$ref": "#/$defs/SumType"
+                }
+            },
+            "required": [
+                "st"
+            ],
+            "title": "TaggedSumType",
             "type": "object"
         },
         "TailLoop": {
@@ -1465,7 +1465,7 @@
                     "I": "#/$defs/USize",
                     "Opaque": "#/$defs/Opaque",
                     "Q": "#/$defs/Qubit",
-                    "Sum": "#/$defs/SumType",
+                    "Sum": "#/$defs/TaggedSumType",
                     "V": "#/$defs/Variable"
                 },
                 "propertyName": "t"
@@ -1487,7 +1487,7 @@
                     "$ref": "#/$defs/Array"
                 },
                 {
-                    "$ref": "#/$defs/SumType"
+                    "$ref": "#/$defs/TaggedSumType"
                 },
                 {
                     "$ref": "#/$defs/Opaque"

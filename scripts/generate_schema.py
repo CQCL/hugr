@@ -15,7 +15,7 @@ from pathlib import Path
 from pydantic import TypeAdapter
 
 from hugr.serialization import SerialHugr
-from hugr.serialization.hugrtype import HugrType
+from hugr.serialization.testing_hugr import TestingHugr
 
 
 def write_schema(out_dir: Path, name_prefix: str, schema):
@@ -37,4 +37,4 @@ if __name__ == "__main__":
         sys.exit(1)
 
     write_schema(out_dir, "hugr_schema", SerialHugr)
-    write_schema(out_dir, "test_hugrtype_schema", HugrType)
+    write_schema(out_dir, "testing_hugr_schema", TestingHugr)

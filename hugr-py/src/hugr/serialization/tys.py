@@ -158,13 +158,13 @@ class GeneralSum(BaseModel):
     rows: list["TypeRow"]
 
 
-class SumTypeBase(RootModel):
+class SumType(RootModel):
     root: Union[UnitSum, GeneralSum] = Field(discriminator="s")
 
 
-class SumType(BaseModel):
+class TaggedSumType(BaseModel):
     t: Literal["Sum"] = "Sum"
-    st: SumTypeBase
+    st: SumType
 
 
 # ----------------------------------------------
@@ -287,7 +287,7 @@ class Type(RootModel):
     """A HUGR type."""
 
     root: Annotated[
-        Qubit | Variable | USize | FunctionType | Array | SumType | Opaque | Alias,
+        Qubit | Variable | USize | FunctionType | Array | TaggedSumType | Opaque | Alias,
         WrapValidator(_json_custom_error_validator),
     ] = Field(discriminator="t")
 

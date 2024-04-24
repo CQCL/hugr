@@ -101,7 +101,8 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         // In tests we take the opportunity to verify that the hugr
         // serialization round-trips. We verify the schema of the serialisation
         // format only when an environment variable is set. This allows
-        // development while the schema is broken.
+        // a developer to modify the definition of serialised types locally
+        // without having to change the schema.
         #[cfg(all(test, not(miri)))]
         {
             let test_schema = std::env::var("HUGR_TEST_SCHEMA").is_ok_and(|x| !x.is_empty());

@@ -13,7 +13,7 @@ from .tys import (
     PolyFuncType,
     Type,
     TypeRow,
-    SumTypeBase,
+    SumType,
     TypeBound,
 )
 
@@ -128,7 +128,7 @@ class SumValue(BaseModel):
 
     c: Literal["Sum"] = Field("Sum", title="ValueTag")
     tag: int
-    typ: SumTypeBase
+    typ: SumType
     vs: list["Value"]
 
     class Config:
