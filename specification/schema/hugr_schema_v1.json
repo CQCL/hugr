@@ -274,7 +274,6 @@
             "required": [
                 "op",
                 "parent",
-                "input_extensions",
                 "v"
             ],
             "title": "Const",
