@@ -14,7 +14,7 @@ check:
 
 # Run all the tests.
 test language="[rust|python]": (_run_lang language \
-        "cargo test --all-features" \
+        "HUGR_TEST_SCHEMA=1 cargo test --all-features" \
         "poetry run pytest"
     )
 
