@@ -34,7 +34,7 @@ const QB: Type = crate::extension::prelude::QB_T;
 lazy_static! {
     static ref SCHEMA: JSONSchema = {
         let schema_val: serde_json::Value = serde_json::from_str(include_str!(
-            "../../../specification/schema/hugr_schema_v1.json"
+            "../../../../specification/schema/hugr_schema_v1.json"
         ))
         .unwrap();
         JSONSchema::options()
@@ -44,7 +44,7 @@ lazy_static! {
     };
     static ref TESTING_SCHEMA: JSONSchema = {
         let schema_val: serde_json::Value = serde_json::from_str(include_str!(
-            "../../../specification/schema/testing_hugr_schema_v1.json"
+            "../../../../specification/schema/testing_hugr_schema_v1.json"
         ))
         .unwrap();
         JSONSchema::options()
@@ -314,8 +314,12 @@ fn constants_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+
 fn check_testing_roundtrip<T: Serialize + DeserializeOwned>(t: T) {
-    ser_roundtrip_validate(&Versioned::new(t), Some(&TESTING_SCHEMA));
+    ser_roundtrip_validate(
+        &Versioned::new(t),
+        Some(&TESTING_SCHEMA),
+    );
 }
 
 #[rstest]
