@@ -67,7 +67,7 @@ pub enum Value {
     /// An extension constant value, that can check it is of a given [CustomType].
     Extension {
         /// The custom constant value.
-        e: ExtensionConst,
+        e: ExtensionValue,
     },
     /// A higher-order function value.
     // TODO use a root parametrised hugr, e.g. Hugr<DFG>.
@@ -105,9 +105,9 @@ pub enum Value {
 /// `CustomConst`.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(transparent)]
-pub struct ExtensionConst(pub(super) Box<dyn CustomConst>);
+pub struct ExtensionValue(pub(super) Box<dyn CustomConst>);
 
-impl PartialEq for ExtensionConst {
+impl PartialEq for ExtensionValue {
     fn eq(&self, other: &Self) -> bool {
         self.0.equal_consts(other.0.as_ref())
     }
@@ -253,7 +253,7 @@ impl Value {
     /// Returns a tuple constant of constant values.
     pub fn extension(custom_const: impl CustomConst) -> Self {
         Self::Extension {
-            e: ExtensionConst(Box::new(custom_const)),
+            e: ExtensionValue(Box::new(custom_const)),
         }
     }
 
