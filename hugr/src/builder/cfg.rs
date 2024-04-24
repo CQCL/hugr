@@ -400,7 +400,6 @@ impl BlockBuilder<Hugr> {
 
 #[cfg(test)]
 pub(crate) mod test {
-    use crate::builder::build_traits::HugrBuilder;
     use crate::builder::{DataflowSubContainer, ModuleBuilder};
 
     use crate::hugr::validate::InterGraphEdgeError;

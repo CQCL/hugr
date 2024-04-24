@@ -290,15 +290,14 @@ impl ListOpInst {
 
 #[cfg(test)]
 mod test {
+    use crate::ops::OpTrait;
     use crate::{
         extension::{
             prelude::{ConstUsize, QB_T, USIZE_T},
-            ExtensionRegistry, PRELUDE,
+            PRELUDE,
         },
-        ops::OpTrait,
         std_extensions::arithmetic::float_types::{self, ConstF64, FLOAT64_TYPE},
-        types::{type_param::TypeArg, TypeRow},
-        Extension,
+        types::TypeRow,
     };
 
     use super::*;

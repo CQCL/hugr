@@ -207,14 +207,13 @@ impl CaseBuilder<Hugr> {
 mod test {
     use cool_asserts::assert_matches;
 
-    use crate::builder::{DataflowSubContainer, HugrBuilder, ModuleBuilder};
+    use crate::builder::{DataflowSubContainer, ModuleBuilder};
 
     use crate::{
         builder::{
             test::{n_identity, NAT},
             Dataflow,
         },
-        extension::ExtensionSet,
         ops::Value,
         type_row,
     };

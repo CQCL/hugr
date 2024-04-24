@@ -4,10 +4,10 @@ use super::*;
 use crate::builder::{
     Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder, ModuleBuilder,
 };
+use crate::extension::prelude::PRELUDE_REGISTRY;
 use crate::extension::prelude::QB_T;
 use crate::extension::ExtensionId;
-use crate::extension::{prelude::PRELUDE_REGISTRY, ExtensionSet};
-use crate::hugr::{Hugr, HugrMut, HugrView, NodeType};
+use crate::hugr::{Hugr, HugrMut, NodeType};
 use crate::macros::const_extension_ids;
 use crate::ops::custom::OpaqueOp;
 use crate::ops::{self, dataflow::IOTrait};
