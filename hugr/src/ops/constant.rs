@@ -34,6 +34,11 @@ impl Const {
     pub fn value(&self) -> &Value {
         &self.value
     }
+    
+    /// Returns a reference to the type of this constant.
+    pub fn const_type(&self) -> Type {
+        self.value.const_type()
+    }
 }
 
 impl From<Value> for Const {
