@@ -1,5 +1,5 @@
-from typing import Any, Literal
-from pydantic import BaseModel, Field
+from typing import Literal
+from pydantic import BaseModel
 from .tys import Type, USize, SumType
 from .ops import Value
 

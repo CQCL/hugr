@@ -287,7 +287,14 @@ class Type(RootModel):
     """A HUGR type."""
 
     root: Annotated[
-        Qubit | Variable | USize | FunctionType | Array | TaggedSumType | Opaque | Alias,
+        Qubit
+        | Variable
+        | USize
+        | FunctionType
+        | Array
+        | TaggedSumType
+        | Opaque
+        | Alias,
         WrapValidator(_json_custom_error_validator),
     ] = Field(discriminator="t")
 

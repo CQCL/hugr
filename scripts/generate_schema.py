@@ -7,7 +7,6 @@ If no output directory is specified, the schema is written to the current workin
 usage: python generate_schema.py [<OUT_DIR>]
 """
 
-from typing import Any, Literal
 import json
 import sys
 from pathlib import Path
