@@ -156,7 +156,7 @@ class Const(BaseOp):
 
     class Config:
         json_schema_extra = {
-            "required": ["op", "parent", "input_extensions", "v"],
+            "required": ["op", "parent", "v"],
         }
 
 
