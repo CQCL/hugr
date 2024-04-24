@@ -647,20 +647,6 @@
     },
     "description": "A serializable representation of a Hugr Type, SumType, or Value. Intended for testing only.",
     "properties": {
-        "typ": {
-            "anyOf": [
-                {
-                    "$ref": "#/$defs/Type"
-                },
-                {
-                    "$ref": "#/$defs/SumType"
-                },
-                {
-                    "$ref": "#/$defs/Value"
-                }
-            ],
-            "title": "Typ"
-        },
         "version": {
             "const": "v1",
             "default": "v1",
@@ -669,11 +655,41 @@
             ],
             "title": "Version",
             "type": "string"
+        },
+        "typ": {
+            "anyOf": [
+                {
+                    "$ref": "#/$defs/Type"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "default": null
+        },
+        "sum_type": {
+            "anyOf": [
+                {
+                    "$ref": "#/$defs/SumType"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "default": null
+        },
+        "value": {
+            "anyOf": [
+                {
+                    "$ref": "#/$defs/Value"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "default": null
         }
     },
-    "required": [
-        "typ"
-    ],
     "title": "HugrTesting",
     "type": "object"
 }

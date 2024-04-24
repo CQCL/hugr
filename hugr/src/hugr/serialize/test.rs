@@ -10,10 +10,11 @@ use crate::extension::{EMPTY_REG, PRELUDE_REGISTRY};
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::hugr::NodeType;
 use crate::ops::custom::{ExtensionOp, OpaqueOp};
+use crate::ops::Value;
 use crate::ops::{dataflow::IOTrait, Input, Module, Noop, Output, DFG};
 use crate::std_extensions::arithmetic::float_ops::FLOAT_OPS_REGISTRY;
 use crate::std_extensions::arithmetic::float_types::{ConstF64, FLOAT64_TYPE};
-use crate::std_extensions::arithmetic::int_types;
+use crate::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
 use crate::std_extensions::logic::NotOp;
 use crate::types::{FunctionType, SumType, Type, TypeBound};
 use crate::{type_row, OutgoingPort};
@@ -25,6 +26,7 @@ use portgraph::{
     multiportgraph::MultiPortGraph, Hierarchy, LinkMut, PortMut, PortView, UnmanagedDenseMap,
 };
 use rstest::rstest;
+use serde::de::DeserializeOwned;
 
 const NAT: Type = crate::extension::prelude::USIZE_T;
 const QB: Type = crate::extension::prelude::QB_T;
@@ -40,7 +42,7 @@ lazy_static! {
             .compile(&schema_val)
             .expect("Schema is invalid.")
     };
-    static ref TYPE_SCHEMA: JSONSchema = {
+    static ref TESTING_SCHEMA: JSONSchema = {
         let schema_val: serde_json::Value = serde_json::from_str(include_str!(
             "../../../specification/schema/testing_hugr_schema_v1.json"
         ))
@@ -136,30 +138,6 @@ pub fn check_hugr_roundtrip(hugr: &Hugr, check_schema: bool) -> Hugr {
     }
 
     new_hugr
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-struct SerTestHugrTypeV1 {
-    typ: Type,
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-struct SerTestHugrSumTypeV1 {
-    typ: SumType,
-}
-
-pub fn check_hugr_type_roundtrip(typ: Type) {
-    ser_roundtrip_validate(
-        &Versioned::new(SerTestHugrTypeV1 { typ }),
-        Some(&TYPE_SCHEMA),
-    );
-}
-
-pub fn check_hugr_sumtype_roundtrip(typ: SumType) {
-    ser_roundtrip_validate(
-        &Versioned::new(SerTestHugrSumTypeV1 { typ }),
-        Some(&TYPE_SCHEMA),
-    );
 }
 
 /// Generate an optype for a node with a matching amount of inputs and outputs.
@@ -336,21 +314,53 @@ fn constants_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+fn check_testing_roundtrip<T: Serialize + DeserializeOwned>(t: T) {
+    ser_roundtrip_validate(&Versioned::new(t), Some(&TESTING_SCHEMA));
+}
+
 #[rstest]
 #[case(Type::new_unit_sum(1))]
 #[case(BOOL_T)]
 #[case(USIZE_T)]
-#[case(int_types::INT_TYPES[2].clone())]
+#[case(INT_TYPES[2].clone())]
 #[case(Type::new_alias(crate::ops::AliasDecl::new("t", TypeBound::Any)))]
 #[case(Type::new_var_use(2, TypeBound::Copyable))]
 #[case(Type::new_tuple(type_row![BOOL_T,QB_T]))]
 fn roundtrip_type(#[case] typ: Type) {
-    check_hugr_type_roundtrip(typ)
+    #[derive(Serialize, Deserialize, PartialEq, Debug)]
+    struct SerTesting {
+        typ: Type,
+    }
+    check_testing_roundtrip(SerTesting { typ })
 }
 
 #[rstest]
 #[case(SumType::new([type_row![],type_row![]]))]
 #[case(SumType::new([type_row![USIZE_T, QB_T], type_row![]]))]
-fn roundtrip_sumtype(#[case] typ: SumType) {
-    check_hugr_sumtype_roundtrip(typ)
+fn roundtrip_sumtype(#[case] sum_type: SumType) {
+    #[derive(Serialize, Deserialize, PartialEq, Debug)]
+    struct SerTesting {
+        sum_type: SumType,
+    }
+    check_testing_roundtrip(SerTesting { sum_type })
+}
+
+#[rstest]
+#[case(Value::unit())]
+#[case(Value::true_val())]
+#[case(Value::extension(ConstF64::new(-1.5)))]
+#[case(Value::extension(ConstF64::new(0.0)))]
+#[case(Value::extension(ConstF64::new(-0.0)))]
+// These cases fail
+// #[case(Value::extension(ConstF64::new(std::f64::NAN)))]
+// #[case(Value::extension(ConstF64::new(std::f64::INFINITY)))]
+// #[case(Value::extension(ConstF64::new(std::f64::NEG_INFINITY)))]
+#[case(Value::extension(ConstF64::new(std::f64::MIN_POSITIVE)))]
+#[case(Value::sum(1,[Value::extension(ConstInt::new_s(2,1).unwrap())], SumType::new([vec![], vec![INT_TYPES[2].clone()]])).unwrap())]
+fn roundtrip_value(#[case] value: Value) {
+    #[derive(Serialize, Deserialize, PartialEq, Debug)]
+    struct SerTesting {
+        value: Value,
+    }
+    check_testing_roundtrip(SerTesting { value })
 }
