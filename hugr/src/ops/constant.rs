@@ -34,7 +34,7 @@ impl Const {
     pub fn value(&self) -> &Value {
         &self.value
     }
-    
+
     /// Returns a reference to the type of this constant.
     pub fn const_type(&self) -> Type {
         self.value.const_type()
@@ -321,7 +321,7 @@ impl OpTrait for Const {
     }
 
     fn static_output(&self) -> Option<EdgeKind> {
-        Some(EdgeKind::Const(self.value().const_type()))
+        Some(EdgeKind::Const(self.const_type()))
     }
 }
 
