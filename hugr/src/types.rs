@@ -153,10 +153,15 @@ impl SumType {
 
         let len: usize = rows.len();
         if len <= (u8::MAX as usize) && rows.iter().all(TypeRow::is_empty) {
-            Self::Unit { size: len as u8 }
+            Self::new_unary(len as u8)
         } else {
             Self::General { rows }
         }
+    }
+
+    /// New UnitSum with empty Tuple variants
+    pub const fn new_unary(size: u8) -> Self {
+        Self::Unit { size }
     }
 
     /// Report the tag'th variant, if it exists.
@@ -312,13 +317,13 @@ impl Type {
     /// New UnitSum with empty Tuple variants
     pub const fn new_unit_sum(size: u8) -> Self {
         // should be the only way to avoid going through SumType::new
-        Self(TypeEnum::Sum(SumType::Unit { size }), TypeBound::Eq)
+        Self(TypeEnum::Sum(SumType::new_unary(size)), TypeBound::Eq)
     }
 
     /// New use (occurrence) of the type variable with specified index.
     /// For use in type schemes only: `bound` must match that with which the
     /// variable was declared (i.e. as a [TypeParam::Type]`(bound)`).
-    pub fn new_var_use(idx: usize, bound: TypeBound) -> Self {
+    pub const fn new_var_use(idx: usize, bound: TypeBound) -> Self {
         Self(TypeEnum::Variable(idx, bound), bound)
     }
 

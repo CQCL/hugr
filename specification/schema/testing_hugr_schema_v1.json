@@ -1,7 +1,7 @@
 {
     "$defs": {
         "Alias": {
-            "description": "TODO",
+            "description": "An Alias Type",
             "properties": {
                 "t": {
                     "const": "Alias",
@@ -74,6 +74,35 @@
                 "n"
             ],
             "title": "BoundedNatArg",
+            "type": "object"
+        },
+        "BoundedNatParam": {
+            "properties": {
+                "tp": {
+                    "const": "BoundedNat",
+                    "default": "BoundedNat",
+                    "enum": [
+                        "BoundedNat"
+                    ],
+                    "title": "Tp",
+                    "type": "string"
+                },
+                "bound": {
+                    "anyOf": [
+                        {
+                            "type": "integer"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "title": "Bound"
+                }
+            },
+            "required": [
+                "bound"
+            ],
+            "title": "BoundedNatParam",
             "type": "object"
         },
         "CustomTypeArg": {
@@ -243,8 +272,29 @@
             "title": "GeneralSum",
             "type": "object"
         },
+        "ListParam": {
+            "properties": {
+                "tp": {
+                    "const": "List",
+                    "default": "List",
+                    "enum": [
+                        "List"
+                    ],
+                    "title": "Tp",
+                    "type": "string"
+                },
+                "param": {
+                    "$ref": "#/$defs/TypeParam"
+                }
+            },
+            "required": [
+                "param"
+            ],
+            "title": "ListParam",
+            "type": "object"
+        },
         "Opaque": {
-            "description": "An opaque operation that can be downcasted by the extensions that define it.",
+            "description": "An opaque Type that can be downcasted by the extensions that define it.",
             "properties": {
                 "t": {
                     "const": "Opaque",
@@ -302,6 +352,48 @@
                 "arg"
             ],
             "title": "OpaqueArg",
+            "type": "object"
+        },
+        "OpaqueParam": {
+            "properties": {
+                "tp": {
+                    "const": "Opaque",
+                    "default": "Opaque",
+                    "enum": [
+                        "Opaque"
+                    ],
+                    "title": "Tp",
+                    "type": "string"
+                },
+                "ty": {
+                    "$ref": "#/$defs/Opaque"
+                }
+            },
+            "required": [
+                "ty"
+            ],
+            "title": "OpaqueParam",
+            "type": "object"
+        },
+        "PolyFuncType": {
+            "description": "A polymorphic type scheme, i.e. of a FuncDecl, FuncDefn or OpDef.  (Nodes/operations in the Hugr are not polymorphic.)",
+            "properties": {
+                "params": {
+                    "items": {
+                        "$ref": "#/$defs/TypeParam"
+                    },
+                    "title": "Params",
+                    "type": "array"
+                },
+                "body": {
+                    "$ref": "#/$defs/FunctionType"
+                }
+            },
+            "required": [
+                "params",
+                "body"
+            ],
+            "title": "PolyFuncType",
             "type": "object"
         },
         "Qubit": {
@@ -420,6 +512,31 @@
             "title": "TaggedSumType",
             "type": "object"
         },
+        "TupleParam": {
+            "properties": {
+                "tp": {
+                    "const": "Tuple",
+                    "default": "Tuple",
+                    "enum": [
+                        "Tuple"
+                    ],
+                    "title": "Tp",
+                    "type": "string"
+                },
+                "params": {
+                    "items": {
+                        "$ref": "#/$defs/TypeParam"
+                    },
+                    "title": "Params",
+                    "type": "array"
+                }
+            },
+            "required": [
+                "params"
+            ],
+            "title": "TupleParam",
+            "type": "object"
+        },
         "TupleValue": {
             "description": "A constant tuple value.",
             "properties": {
@@ -530,6 +647,37 @@
             "title": "TypeBound",
             "type": "string"
         },
+        "TypeParam": {
+            "description": "A type parameter.",
+            "discriminator": {
+                "mapping": {
+                    "BoundedNat": "#/$defs/BoundedNatParam",
+                    "List": "#/$defs/ListParam",
+                    "Opaque": "#/$defs/OpaqueParam",
+                    "Tuple": "#/$defs/TupleParam",
+                    "Type": "#/$defs/TypeTypeParam"
+                },
+                "propertyName": "tp"
+            },
+            "oneOf": [
+                {
+                    "$ref": "#/$defs/TypeTypeParam"
+                },
+                {
+                    "$ref": "#/$defs/BoundedNatParam"
+                },
+                {
+                    "$ref": "#/$defs/OpaqueParam"
+                },
+                {
+                    "$ref": "#/$defs/ListParam"
+                },
+                {
+                    "$ref": "#/$defs/TupleParam"
+                }
+            ],
+            "title": "TypeParam"
+        },
         "TypeTypeArg": {
             "properties": {
                 "tya": {
@@ -551,6 +699,27 @@
             "title": "TypeTypeArg",
             "type": "object"
         },
+        "TypeTypeParam": {
+            "properties": {
+                "tp": {
+                    "const": "Type",
+                    "default": "Type",
+                    "enum": [
+                        "Type"
+                    ],
+                    "title": "Tp",
+                    "type": "string"
+                },
+                "b": {
+                    "$ref": "#/$defs/TypeBound"
+                }
+            },
+            "required": [
+                "b"
+            ],
+            "title": "TypeTypeParam",
+            "type": "object"
+        },
         "USize": {
             "description": "Unsigned integer size type.",
             "properties": {
@@ -568,7 +737,7 @@
             "type": "object"
         },
         "UnitSum": {
-            "description": "Simple predicate where all variants are empty tuples.",
+            "description": "Simple sum type where all variants are empty tuples.",
             "properties": {
                 "s": {
                     "const": "Unit",
@@ -671,6 +840,17 @@
             "anyOf": [
                 {
                     "$ref": "#/$defs/SumType"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "default": null
+        },
+        "poly_func_type": {
+            "anyOf": [
+                {
+                    "$ref": "#/$defs/PolyFuncType"
                 },
                 {
                     "type": "null"

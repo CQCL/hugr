@@ -1,7 +1,7 @@
 {
     "$defs": {
         "Alias": {
-            "description": "TODO",
+            "description": "An Alias Type",
             "properties": {
                 "t": {
                     "const": "Alias",
@@ -1063,7 +1063,7 @@
             "title": "OpType"
         },
         "Opaque": {
-            "description": "An opaque operation that can be downcasted by the extensions that define it.",
+            "description": "An opaque Type that can be downcasted by the extensions that define it.",
             "properties": {
                 "t": {
                     "const": "Opaque",
@@ -1628,7 +1628,7 @@
             "type": "object"
         },
         "UnitSum": {
-            "description": "Simple predicate where all variants are empty tuples.",
+            "description": "Simple sum type where all variants are empty tuples.",
             "properties": {
                 "s": {
                     "const": "Unit",

@@ -1,6 +1,6 @@
 from typing import Literal, Optional
 from pydantic import BaseModel
-from .tys import Type, SumType
+from .tys import Type, SumType, PolyFuncType
 from .ops import Value
 
 
@@ -10,6 +10,7 @@ class TestingHugr(BaseModel):
     version: Literal["v1"] = "v1"
     typ: Optional[Type] = None
     sum_type: Optional[SumType] = None
+    poly_func_type: Optional[PolyFuncType] = None
     value: Optional[Value] = None
 
     @classmethod

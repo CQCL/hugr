@@ -145,7 +145,7 @@ class Array(MultiContainer):
 
 
 class UnitSum(BaseModel):
-    """Simple predicate where all variants are empty tuples."""
+    """Simple sum type where all variants are empty tuples."""
 
     s: Literal["Unit"] = "Unit"
     size: int
@@ -255,7 +255,7 @@ class TypeBound(Enum):
 
 
 class Opaque(BaseModel):
-    """An opaque operation that can be downcasted by the extensions that define it."""
+    """An opaque Type that can be downcasted by the extensions that define it."""
 
     t: Literal["Opaque"] = "Opaque"
     extension: ExtensionId
@@ -265,7 +265,7 @@ class Opaque(BaseModel):
 
 
 class Alias(BaseModel):
-    """TODO"""
+    """An Alias Type"""
 
     t: Literal["Alias"] = "Alias"
     bound: TypeBound
