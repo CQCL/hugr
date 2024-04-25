@@ -218,14 +218,14 @@ mod test {
     use crate::std_extensions::arithmetic::conversions::ConvertOpDef;
     use crate::std_extensions::arithmetic::float_ops::FloatOps;
     use crate::std_extensions::arithmetic::float_types::{ConstF64, FLOAT64_TYPE};
-    use crate::std_extensions::arithmetic::int_types::{ConstIntU, INT_TYPES};
+    use crate::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
     use crate::std_extensions::logic::{self, NaryLogic};
 
     use rstest::rstest;
 
     /// int to constant
     fn i2c(b: u64) -> Value {
-        Value::extension(ConstIntU::new(5, b).unwrap())
+        Value::extension(ConstInt::new_u(5, b).unwrap())
     }
 
     /// float to constant
