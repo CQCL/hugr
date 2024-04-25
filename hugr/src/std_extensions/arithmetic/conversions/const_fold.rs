@@ -8,7 +8,7 @@ use crate::{
     ops::constant::CustomConst,
     std_extensions::arithmetic::{
         float_types::ConstF64,
-        int_types::{get_log_width, ConstIntS, ConstInt, INT_TYPES},
+        int_types::{get_log_width, ConstInt, INT_TYPES},
     },
     types::ConstTypeError,
     IncomingPort,
@@ -92,7 +92,7 @@ impl ConstFold for TruncS {
         consts: &[(IncomingPort, ops::Value)],
     ) -> ConstFoldResult {
         fold_trunc(type_args, consts, |f, log_width| {
-            ConstIntS::new(log_width, f.trunc() as i64).map(Into::into)
+            ConstInt::new_s(log_width, f.trunc() as i64).map(Into::into)
         })
     }
 }
@@ -119,8 +119,8 @@ impl ConstFold for ConvertS {
         _type_args: &[crate::types::TypeArg],
         consts: &[(IncomingPort, ops::Value)],
     ) -> ConstFoldResult {
-        let u: &ConstIntS = get_input(consts)?;
-        let f = u.value() as f64;
+        let u: &ConstInt = get_input(consts)?;
+        let f = u.value_s() as f64;
         Some(vec![(0.into(), ConstF64::new(f).into())])
     }
 }
