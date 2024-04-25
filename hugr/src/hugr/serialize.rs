@@ -552,7 +552,7 @@ pub mod test {
     // https://github.com/rust-lang/miri/issues/450
     fn constants_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
         let mut builder = DFGBuilder::new(FunctionType::new(vec![], vec![FLOAT64_TYPE])).unwrap();
-        let w = builder.add_load_const(ConstF64::new(0.5));
+        let w = builder.add_load_value(ConstF64::new(0.5));
         let hugr = builder.finish_hugr_with_outputs([w], &FLOAT_OPS_REGISTRY)?;
 
         let ser = serde_json::to_string(&hugr)?;

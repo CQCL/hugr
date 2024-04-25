@@ -15,7 +15,7 @@ use crate::{Direction, IncomingPort, OutgoingPort, Port};
 /// This includes both the concept of "signature" in the spec,
 /// and also the target (value) of a call (static).
 ///
-/// [Graph]: crate::ops::constant::Const::Function
+/// [Graph]: crate::ops::constant::Value::Function
 pub struct FunctionType {
     /// Value inputs of the function.
     pub input: TypeRow,

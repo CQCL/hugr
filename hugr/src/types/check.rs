@@ -3,7 +3,7 @@
 use thiserror::Error;
 
 use super::Type;
-use crate::ops::Const;
+use crate::ops::Value;
 
 /// Errors that arise from typechecking constants
 #[derive(Clone, Debug, PartialEq, Error)]
@@ -19,7 +19,7 @@ pub enum SumTypeError {
         /// The expected type.
         expected: Type,
         /// The value that was found.
-        found: Const,
+        found: Value,
     },
     /// The length of the sum value doesn't match the length of the variant of
     /// the sum type.
@@ -45,15 +45,15 @@ pub enum SumTypeError {
 impl super::SumType {
     /// Check if a sum variant is a valid instance of this [`SumType`].
     ///
-    /// Since [`Const::Sum`] variants always contain a tuple of values,
-    /// `val` must be a slice of [`Const`]s.
+    /// Since [`Value::Sum`] variants always contain a tuple of values,
+    /// `val` must be a slice of [`Value`]s.
     ///
     ///   [`SumType`]: crate::types::SumType
     ///
     /// # Errors
     ///
     /// This function will return an error if there is a type check error.
-    pub fn check_type(&self, tag: usize, val: &[Const]) -> Result<(), SumTypeError> {
+    pub fn check_type(&self, tag: usize, val: &[Value]) -> Result<(), SumTypeError> {
         let variant = self
             .get_variant(tag)
             .ok_or_else(|| SumTypeError::InvalidTag {

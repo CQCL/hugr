@@ -79,61 +79,55 @@ class FuncDecl(BaseOp):
         self.signature = out
 
 
-class ConstBase(BaseOp):
-    """A constant operation definition."""
-
-    op: Literal["Const"] = "Const"
-
-
 CustomConst = Any  # TODO
 
 
-class ExtensionConst(ConstBase):
+class ExtensionValue(BaseModel):
     """An extension constant value, that can check it is of a given [CustomType]."""
 
-    c: Literal["Extension"] = Field("Extension", title="ConstTag")
+    c: Literal["Extension"] = Field("Extension", title="ValueTag")
     e: CustomConst = Field(title="CustomConst")
 
     class Config:
         json_schema_extra = {
-            "required": ["parent", "op", "c", "e"],
+            "required": ["c", "e"],
         }
 
 
-class FunctionConst(ConstBase):
+class FunctionValue(BaseModel):
     """A higher-order function value."""
 
-    c: Literal["Function"] = Field("Function", title="ConstTag")
+    c: Literal["Function"] = Field("Function", title="ValueTag")
     hugr: Any  # TODO
 
     class Config:
         json_schema_extra = {
-            "required": ["parent", "op", "c", "hugr"],
+            "required": ["c", "hugr"],
         }
 
 
-class Tuple(ConstBase):
+class TupleValue(BaseModel):
     """A constant tuple value."""
 
-    c: Literal["Tuple"] = Field("Tuple", title="ConstTag")
-    vs: list["Const"]
+    c: Literal["Tuple"] = Field("Tuple", title="ValueTag")
+    vs: list["Value"]
 
     class Config:
         json_schema_extra = {
-            "required": ["parent", "op", "c", "vs"],
+            "required": ["c", "vs"],
         }
 
 
-class Sum(ConstBase):
+class SumValue(BaseModel):
     """A Sum variant
 
     For any Sum type where this value meets the type of the variant indicated by the tag
     """
 
-    c: Literal["Sum"] = Field("Sum", title="ConstTag")
+    c: Literal["Sum"] = Field("Sum", title="ValueTag")
     tag: int
     typ: Type
-    vs: list["Const"]
+    vs: list["Value"]
 
     class Config:
         # Needed to avoid random '\n's in the pydantic description
@@ -142,14 +136,28 @@ class Sum(ConstBase):
                 "A Sum variant For any Sum type where this value meets the type "
                 "of the variant indicated by the tag."
             ),
-            "required": ["parent", "op", "c", "tag", "typ", "vs"],
+            "required": ["c", "tag", "typ", "vs"],
         }
 
 
-class Const(RootModel):
-    """A constant operation."""
+class Value(RootModel):
+    """A constant Value."""
 
-    root: ExtensionConst | FunctionConst | Tuple | Sum = Field(discriminator="c")
+    root: ExtensionValue | FunctionValue | TupleValue | SumValue = Field(
+        discriminator="c"
+    )
+
+
+class Const(BaseOp):
+    """A Const operation definition."""
+
+    op: Literal["Const"] = "Const"
+    v: Value = Field()
+
+    class Config:
+        json_schema_extra = {
+            "required": ["op", "parent", "v"],
+        }
 
 
 # -----------------------------------------------
@@ -456,7 +464,7 @@ class Tag(DataflowOp):
 
     op: Literal["Tag"] = "Tag"
     tag: int  # The variant to create.
-    variants: TypeRow  # The variants of the sum type.
+    variants: list[TypeRow]  # The variants of the sum type.
 
 
 class Lift(DataflowOp):
