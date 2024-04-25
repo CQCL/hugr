@@ -87,13 +87,6 @@ pub struct ConstInt {
     value: u64,
 }
 
-/// An unsigned integer
-#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct ConstIntU {
-    log_width: u8,
-    value: u64,
-}
-
 /// A signed integer
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ConstIntS {
@@ -170,35 +163,6 @@ impl ConstInt {
     }
 }
 
-impl ConstIntU {
-    /// Create a new [`ConstIntU`]
-    pub fn new(log_width: u8, value: u64) -> Result<Self, ConstTypeError> {
-        if !is_valid_log_width(log_width) {
-            return Err(ConstTypeError::CustomCheckFail(
-                crate::types::CustomCheckFailure::Message("Invalid integer width.".to_owned()),
-            ));
-        }
-        if (log_width <= 5) && (value >= (1u64 << (1u8 << log_width))) {
-            return Err(ConstTypeError::CustomCheckFail(
-                crate::types::CustomCheckFailure::Message(
-                    "Invalid unsigned integer value.".to_owned(),
-                ),
-            ));
-        }
-        Ok(Self { log_width, value })
-    }
-
-    /// Returns the value of the constant
-    pub fn value(&self) -> u64 {
-        self.value
-    }
-
-    /// Returns the number of bits of the constant
-    pub fn log_width(&self) -> u8 {
-        self.log_width
-    }
-}
-
 impl ConstIntS {
     /// Create a new [`ConstIntS`]
     pub fn new(log_width: u8, value: i64) -> Result<Self, ConstTypeError> {
@@ -231,24 +195,6 @@ impl ConstIntS {
 
 #[typetag::serde]
 impl CustomConst for ConstInt {
-    fn name(&self) -> SmolStr {
-        format!("u{}({})", self.log_width, self.value).into()
-    }
-    fn equal_consts(&self, other: &dyn CustomConst) -> bool {
-        crate::ops::constant::downcast_equal_consts(self, other)
-    }
-
-    fn extension_reqs(&self) -> ExtensionSet {
-        ExtensionSet::singleton(&EXTENSION_ID)
-    }
-
-    fn get_type(&self) -> Type {
-        int_type(type_arg(self.log_width))
-    }
-}
-
-#[typetag::serde]
-impl CustomConst for ConstIntU {
     fn name(&self) -> SmolStr {
         format!("u{}({})", self.log_width, self.value).into()
     }
@@ -342,19 +288,19 @@ mod test {
 
     #[test]
     fn test_int_consts() {
-        let const_u32_7 = ConstIntU::new(5, 7);
-        let const_u64_7 = ConstIntU::new(6, 7);
-        let const_u32_8 = ConstIntU::new(5, 8);
+        let const_u32_7 = ConstInt::new_u(5, 7);
+        let const_u64_7 = ConstInt::new_u(6, 7);
+        let const_u32_8 = ConstInt::new_u(5, 8);
         assert_ne!(const_u32_7, const_u64_7);
         assert_ne!(const_u32_7, const_u32_8);
-        assert_eq!(const_u32_7, ConstIntU::new(5, 7));
+        assert_eq!(const_u32_7, ConstInt::new_u(5, 7));
 
         assert_matches!(
-            ConstIntU::new(3, 256),
+            ConstInt::new_u(3, 256),
             Err(ConstTypeError::CustomCheckFail(_))
         );
         assert_matches!(
-            ConstIntU::new(9, 256),
+            ConstInt::new_u(9, 256),
             Err(ConstTypeError::CustomCheckFail(_))
         );
         assert_matches!(
@@ -364,9 +310,9 @@ mod test {
         assert!(ConstIntS::new(3, -128).is_ok());
 
         let const_u32_7 = const_u32_7.unwrap();
-        assert!(const_u32_7.equal_consts(&ConstIntU::new(5, 7).unwrap()));
+        assert!(const_u32_7.equal_consts(&ConstInt::new_u(5, 7).unwrap()));
         assert_eq!(const_u32_7.log_width(), 5);
-        assert_eq!(const_u32_7.value(), 7);
+        assert_eq!(const_u32_7.value_u(), 7);
         assert!(const_u32_7.validate().is_ok());
 
         assert_eq!(const_u32_7.name(), "u5(7)");
@@ -379,6 +325,6 @@ mod test {
         assert_eq!(const_i32_2.name(), "i5(-2)");
 
         ConstIntS::new(50, -2).unwrap_err();
-        ConstIntU::new(50, 2).unwrap_err();
+        ConstInt::new_u(50, 2).unwrap_err();
     }
 }
