@@ -183,6 +183,21 @@
             "title": "ExtensionsArg",
             "type": "object"
         },
+        "ExtensionsParam": {
+            "properties": {
+                "tp": {
+                    "const": "Extensions",
+                    "default": "Extensions",
+                    "enum": [
+                        "Extensions"
+                    ],
+                    "title": "Tp",
+                    "type": "string"
+                }
+            },
+            "title": "ExtensionsParam",
+            "type": "object"
+        },
         "FunctionType": {
             "description": "A graph encoded as a value. It contains a concrete signature and a set of required resources.",
             "properties": {
@@ -652,6 +667,7 @@
             "discriminator": {
                 "mapping": {
                     "BoundedNat": "#/$defs/BoundedNatParam",
+                    "Extensions": "#/$defs/ExtensionsParam",
                     "List": "#/$defs/ListParam",
                     "Opaque": "#/$defs/OpaqueParam",
                     "Tuple": "#/$defs/TupleParam",
@@ -674,6 +690,9 @@
                 },
                 {
                     "$ref": "#/$defs/TupleParam"
+                },
+                {
+                    "$ref": "#/$defs/ExtensionsParam"
                 }
             ],
             "title": "TypeParam"

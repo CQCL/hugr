@@ -75,11 +75,20 @@ class TupleParam(BaseModel):
     params: list["TypeParam"]
 
 
+class ExtensionsParam(BaseModel):
+    tp: Literal["Extensions"] = "Extensions"
+
+
 class TypeParam(RootModel):
     """A type parameter."""
 
     root: Annotated[
-        TypeTypeParam | BoundedNatParam | OpaqueParam | ListParam | TupleParam,
+        TypeTypeParam
+        | BoundedNatParam
+        | OpaqueParam
+        | ListParam
+        | TupleParam
+        | ExtensionsParam,
         WrapValidator(_json_custom_error_validator),
     ] = Field(discriminator="tp")
 

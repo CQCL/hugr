@@ -318,70 +318,75 @@
         ser_roundtrip_validate(&Versioned::new(t), Some(&TESTING_SCHEMA));
     }
 
-    #[rstest]
-    #[case(BOOL_T)]
-    #[case(USIZE_T)]
-    #[case(INT_TYPES[2].clone())]
-    #[case(Type::new_alias(crate::ops::AliasDecl::new("t", TypeBound::Any)))]
-    #[case(Type::new_var_use(2, TypeBound::Copyable))]
-    #[case(Type::new_tuple(type_row![BOOL_T,QB_T]))]
-    #[case(Type::new_sum([type_row![BOOL_T,QB_T], type_row![Type::new_unit_sum(4)]]))]
-    #[case(Type::new_function(FunctionType::new_endo(type_row![QB_T,BOOL_T,USIZE_T])))]
-    fn roundtrip_type(#[case] typ: Type) {
-        #[derive(Serialize, Deserialize, PartialEq, Debug)]
-        struct SerTesting {
-            typ: Type,
-        }
-        check_testing_roundtrip(SerTesting { typ })
-    }
+     #[rstest]
+     #[case(BOOL_T)]
+     #[case(USIZE_T)]
+     #[case(INT_TYPES[2].clone())]
+     #[case(Type::new_alias(crate::ops::AliasDecl::new("t", TypeBound::Any)))]
+     #[case(Type::new_var_use(2, TypeBound::Copyable))]
+     #[case(Type::new_tuple(type_row![BOOL_T,QB_T]))]
+     #[case(Type::new_sum([type_row![BOOL_T,QB_T], type_row![Type::new_unit_sum(4)]]))]
+     #[case(Type::new_function(FunctionType::new_endo(type_row![QB_T,BOOL_T,USIZE_T])))]
+     fn roundtrip_type(#[case] typ: Type) {
+         #[derive(Serialize, Deserialize, PartialEq, Debug)]
+         struct SerTesting {
+             typ: Type,
+         }
+         check_testing_roundtrip(SerTesting { typ })
+     }
 
-    #[rstest]
-    #[case(SumType::new_unary(2))]
-    #[case(SumType::new([type_row![USIZE_T, QB_T], type_row![]]))]
-    fn roundtrip_sumtype(#[case] sum_type: SumType) {
-        #[derive(Serialize, Deserialize, PartialEq, Debug)]
-        struct SerTesting {
-            sum_type: SumType,
-        }
-        check_testing_roundtrip(SerTesting { sum_type })
-    }
+     #[rstest]
+     #[case(SumType::new_unary(2))]
+     #[case(SumType::new([type_row![USIZE_T, QB_T], type_row![]]))]
+     fn roundtrip_sumtype(#[case] sum_type: SumType) {
+         #[derive(Serialize, Deserialize, PartialEq, Debug)]
+         struct SerTesting {
+             sum_type: SumType,
+         }
+         check_testing_roundtrip(SerTesting { sum_type })
+     }
 
-    #[rstest]
-    #[case(Value::unit())]
-    #[case(Value::true_val())]
-    #[case(Value::unit_sum(3,5).unwrap())]
-    #[case(Value::extension(ConstF64::new(-1.5)))]
-    #[case(Value::extension(ConstF64::new(0.0)))]
-    #[case(Value::extension(ConstF64::new(-0.0)))]
-    // These cases fail
-    // #[case(Value::extension(ConstF64::new(std::f64::NAN)))]
-    // #[case(Value::extension(ConstF64::new(std::f64::INFINITY)))]
-    // #[case(Value::extension(ConstF64::new(std::f64::NEG_INFINITY)))]
-    #[case(Value::extension(ConstF64::new(std::f64::MIN_POSITIVE)))]
-    #[case(Value::sum(1,[Value::extension(ConstInt::new_s(2,1).unwrap())], SumType::new([vec![], vec![INT_TYPES[2].clone()]])).unwrap())]
-    #[case(Value::tuple([Value::false_val(), Value::extension(ConstInt::new_s(2,1).unwrap())]))]
-    #[case(Value::function(crate::builder::test::simple_dfg_hugr()).unwrap())]
-    fn roundtrip_value(#[case] value: Value) {
-        #[derive(Serialize, Deserialize, PartialEq, Debug)]
-        struct SerTesting {
-            value: Value,
-        }
-        check_testing_roundtrip(SerTesting { value })
-    }
+     #[rstest]
+     #[case(Value::unit())]
+     #[case(Value::true_val())]
+     #[case(Value::unit_sum(3,5).unwrap())]
+     #[case(Value::extension(ConstF64::new(-1.5)))]
+     #[case(Value::extension(ConstF64::new(0.0)))]
+     #[case(Value::extension(ConstF64::new(-0.0)))]
+     // These cases fail
+     // #[case(Value::extension(ConstF64::new(std::f64::NAN)))]
+     // #[case(Value::extension(ConstF64::new(std::f64::INFINITY)))]
+     // #[case(Value::extension(ConstF64::new(std::f64::NEG_INFINITY)))]
+     #[case(Value::extension(ConstF64::new(std::f64::MIN_POSITIVE)))]
+     #[case(Value::sum(1,[Value::extension(ConstInt::new_u(2,1).unwrap())], SumType::new([vec![], vec![INT_TYPES[2].clone()]])).unwrap())]
+     #[case(Value::tuple([Value::false_val(), Value::extension(ConstInt::new_s(2,1).unwrap())]))]
+     #[case(Value::function(crate::builder::test::simple_dfg_hugr()).unwrap())]
+     fn roundtrip_value(#[case] value: Value) {
+         #[derive(Serialize, Deserialize, PartialEq, Debug)]
+         struct SerTesting {
+             value: Value,
+         }
+         check_testing_roundtrip(SerTesting { value })
+     }
 
-    // fn polyfunctype1() -> PolyFuncType {
-    //     let mut extension_set = ExtensionSet::new();
-    //     extension_set.insert_type_var(1);
-    //     let function_type = FunctionType::new_endo(type_row![]).with_extension_delta(extension_set);
-    //     PolyFuncType::new([TypeParam::max_nat(), TypeParam::Extensions], function_type)
-    // }
-    // #[rstest]
-    // #[case(FunctionType::new_endo(type_row![]).into())]
-    // #[case(polyfunctype1())]
-    // fn roundtrip_polyfunctype(#[case] poly_func_type: PolyFuncType) {
-    //     #[derive(Serialize, Deserialize, PartialEq, Debug)]
-    //     struct SerTesting {
-    //         poly_func_type: PolyFuncType,
-    //     }
-    //     check_testing_roundtrip(SerTesting { poly_func_type })
-    // }
+     fn polyfunctype1() -> PolyFuncType {
+         let mut extension_set = ExtensionSet::new();
+         extension_set.insert_type_var(1);
+         let function_type = FunctionType::new_endo(type_row![]).with_extension_delta(extension_set);
+         PolyFuncType::new([TypeParam::max_nat(), TypeParam::Extensions], function_type)
+     }
+
+     #[rstest]
+     #[case(FunctionType::new_endo(type_row![]).into())]
+     #[case(polyfunctype1())]
+     #[case(PolyFuncType::new([TypeParam::Opaque { ty: int_custom_type(TypeArg::BoundedNat { n: 1 }) }], FunctionType::new_endo(type_row![Type::new_var_use(0, TypeBound::Copyable)])))]
+     #[case(PolyFuncType::new([TypeBound::Eq.into()], FunctionType::new_endo(type_row![Type::new_var_use(0, TypeBound::Eq)])))]
+     #[case(PolyFuncType::new([TypeParam::List { param: Box::new(TypeBound::Any.into()) }], FunctionType::new_endo(type_row![])))]
+     #[case(PolyFuncType::new([TypeParam::Tuple { params: [TypeBound::Any.into(), TypeParam::bounded_nat(2.try_into().unwrap())].into() }], FunctionType::new_endo(type_row![])))]
+     fn roundtrip_polyfunctype(#[case] poly_func_type: PolyFuncType) {
+         #[derive(Serialize, Deserialize, PartialEq, Debug)]
+         struct SerTesting {
+             poly_func_type: PolyFuncType,
+         }
+         check_testing_roundtrip(SerTesting { poly_func_type })
+     }

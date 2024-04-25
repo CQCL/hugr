@@ -136,7 +136,6 @@ impl From<Type> for TypeArg {
     }
 }
 
-
 /// A statically-known argument value to an operation.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[non_exhaustive]
