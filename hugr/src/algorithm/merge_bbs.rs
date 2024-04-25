@@ -16,7 +16,8 @@ use crate::{Hugr, HugrView, Node};
 /// i.e. where a basic block B has a single successor B' whose only predecessor
 /// is B, B and B' can be combined.
 pub fn merge_basic_blocks(cfg: &mut impl HugrMut<RootHandle = CfgID>) {
-    for n in cfg.nodes().collect::<Vec<_>>().into_iter() {
+    let mut worklist = cfg.nodes().collect::<Vec<_>>();
+    while let Some(n) = worklist.pop() {
         let Ok(succ) = cfg.output_neighbours(n).exactly_one() else {
             continue;
         };
@@ -29,14 +30,17 @@ pub fn merge_basic_blocks(cfg: &mut impl HugrMut<RootHandle = CfgID>) {
             // - a separate normalization from merging BBs.
             continue;
         };
-        let (rep, dfg1, dfg2) = mk_rep(cfg, n, succ);
+        let (rep, merge_bb, dfgs) = mk_rep(cfg, n, succ);
         let node_map = cfg.hugr_mut().apply_rewrite(rep).unwrap();
-        for dfg_id in [dfg1, dfg2] {
+        // Children of merged BB are (Input, Output, ) 2*DFG
+        let merged_bb = *node_map.get(&merge_bb).unwrap();
+        for dfg_id in dfgs {
             let n_id = *node_map.get(&dfg_id).unwrap();
             cfg.hugr_mut()
                 .apply_rewrite(InlineDFG(n_id.into()))
                 .unwrap();
         }
+        worklist.push(merged_bb);
     }
 }
 
@@ -44,7 +48,7 @@ fn mk_rep(
     cfg: &impl RootTagged<RootHandle = CfgID>,
     pred: Node,
     succ: Node,
-) -> (Replacement, Node, Node) {
+) -> (Replacement, Node, [Node; 2]) {
     let pred_ty = cfg.get_optype(pred).as_dataflow_block().unwrap();
     let succ_ty = cfg.get_optype(succ).as_dataflow_block().unwrap();
     let succ_sig = succ_ty.inner_signature();
@@ -148,7 +152,7 @@ fn mk_rep(
             .collect(),
         mu_new: vec![],
     };
-    (rep, dfg1, dfg2)
+    (rep, merged, [dfg1, dfg2])
 }
 
 #[cfg(test)]
