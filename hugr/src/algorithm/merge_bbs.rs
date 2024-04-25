@@ -162,11 +162,14 @@ mod test {
     use crate::extension::prelude::{ConstUsize, QB_T, USIZE_T};
     use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE, PRELUDE_REGISTRY};
     use crate::hugr::views::sibling::SiblingMut;
+    use crate::hugr::HugrMut;
     use crate::ops::constant::Value;
     use crate::ops::handle::CfgID;
-    use crate::ops::{Noop, OpType};
+    use crate::ops::{
+        Const, DataflowBlock, ExitBlock, Input, LoadConstant, Noop, OpTrait, OpType, Output, CFG,
+    };
     use crate::types::{FunctionType, Type, TypeRow};
-    use crate::{const_extension_ids, type_row, Extension, HugrView};
+    use crate::{const_extension_ids, type_row, Extension, Hugr, HugrView, Node};
 
     use super::merge_basic_blocks;
 
@@ -289,6 +292,117 @@ mod test {
             h.output_neighbours(entry_nop).collect::<Vec<_>>(),
             vec![tst]
         );
+        Ok(())
+    }
+
+    #[test]
+    fn triple_with_permute() -> Result<(), Box<dyn std::error::Error>> {
+        // Blocks are just BB1 -> BB2 -> BB3 --> Exit.
+        // CFG Normalization would move everything outside the CFG and elide the CFG altogether,
+        // but this is an easy-to-construct test of merge-basic-blocks only (no CFG normalization).
+        // Also since the Builder puts all values in the branch predicate,
+        // test manual Hugr construction with values in BasicBlock "other_outputs"
+        fn add_bb(
+            h: &mut Hugr,
+            inputs: TypeRow,
+            other_outputs: TypeRow,
+            extension_delta: ExtensionSet,
+        ) -> (Node, Node, Node) {
+            let inp = Input {
+                types: inputs.clone(),
+            };
+            let outp = Output {
+                types: TypeRow::from(
+                    Some(Type::new_unit_sum(1))
+                        .into_iter()
+                        .chain(other_outputs.iter().cloned())
+                        .collect::<Vec<_>>(),
+                ),
+            };
+            let bb = h.add_node_with_parent(
+                h.root(),
+                DataflowBlock {
+                    inputs,
+                    other_outputs,
+                    sum_rows: vec![type_row![]],
+                    extension_delta,
+                },
+            );
+            let inp = h.add_node_with_parent(bb, inp);
+            let outp = h.add_node_with_parent(bb, outp);
+            let cst = h.add_node_with_parent(bb, Const::new(Value::unary_unit_sum()));
+            let load_cst = h.add_node_with_parent(
+                bb,
+                LoadConstant {
+                    datatype: Type::new_unit_sum(1),
+                },
+            );
+            h.connect(cst, 0, load_cst, 0);
+            h.connect(load_cst, 0, outp, 0);
+            (bb, inp, outp)
+        }
+        let e = extension();
+        let tst_op: OpType = e
+            .instantiate_extension_op("Test", &[], &PRELUDE_REGISTRY)?
+            .into();
+        let [res_t] = tst_op
+            .dataflow_signature()
+            .unwrap()
+            .output
+            .into_owned()
+            .try_into()
+            .unwrap();
+        let mut h = Hugr::new(
+            CFG {
+                signature: FunctionType::new(QB_T, res_t.clone()),
+            }
+            .into(),
+        );
+        let (bb1, inp, out) = add_bb(
+            &mut h,
+            QB_T.into(),
+            type_row![USIZE_T, QB_T],
+            ExtensionSet::new(),
+        );
+        let cst = h.add_node_with_parent(bb1, Const::new(ConstUsize::new(1).into()));
+        let load_cst = h.add_node_with_parent(bb1, LoadConstant { datatype: USIZE_T });
+        h.connect(cst, 0, load_cst, 0);
+        h.connect(load_cst, 0, out, 1);
+        h.connect(inp, 0, out, 2);
+
+        let exit = h.add_node_with_parent(
+            h.root(),
+            ExitBlock {
+                cfg_outputs: res_t.clone().into(),
+            },
+        );
+
+        let (bb2, inp, out) = add_bb(
+            &mut h,
+            type_row![USIZE_T, QB_T],
+            type_row![QB_T, USIZE_T],
+            ExtensionSet::new(),
+        );
+        h.connect(inp, 0, out, 2);
+        h.connect(inp, 1, out, 1);
+
+        let (bb3, inp, out) = add_bb(
+            &mut h,
+            type_row![QB_T, USIZE_T],
+            res_t.clone().into(),
+            ExtensionSet::singleton(&EXT_ID),
+        );
+        let tst = h.add_node_with_parent(bb3, tst_op);
+        h.connect(inp, 0, tst, 0);
+        h.connect(inp, 1, tst, 1);
+        h.connect(tst, 0, out, 1);
+
+        // Now add control-flow edges between basic blocks
+        h.connect(bb1, 0, bb2, 0);
+        h.connect(bb2, 0, bb3, 0);
+        h.connect(bb3, 0, exit, 0);
+        let reg = ExtensionRegistry::try_new([e, PRELUDE.to_owned()])?;
+        h.update_validate(&reg)?;
         Ok(())
     }
 }
