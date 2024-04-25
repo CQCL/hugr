@@ -108,13 +108,18 @@ fn mk_rep(
     for (i, _) in pred_ty.other_outputs.iter().enumerate() {
         replacement.connect(dfg1, i + 1, dfg2, i + other_start)
     }
-
+    // If there are edges from succ back to pred, we cannot do these via the mu_inp/out/new
+    // edge-maps as both source and target of the new edge are in the replacement Hugr
+    for (_, src_pos) in cfg.all_linked_outputs(pred).filter(|(src, _)| *src == succ) {
+        replacement.connect(merged, src_pos, merged, 0);
+    }
     let rep = Replacement {
         removal: vec![pred, succ],
         replacement,
         adoptions: HashMap::from([(dfg1, pred), (dfg2, succ)]),
         mu_inp: cfg
             .all_linked_outputs(pred)
+            .filter(|(src, _)| *src != succ)
             .map(|(src, src_pos)| NewEdgeSpec {
                 src,
                 tgt: merged,
@@ -123,15 +128,22 @@ fn mk_rep(
             .collect(),
         mu_out: cfg
             .node_outputs(succ)
-            .map(|src_pos| NewEdgeSpec {
-                src: merged,
-                tgt: cfg
+            .filter_map(|src_pos| {
+                let tgt = cfg
                     .linked_inputs(succ, src_pos)
                     .exactly_one()
                     .ok()
                     .unwrap()
-                    .0,
-                kind: NewEdgeKind::ControlFlow { src_pos },
+                    .0;
+                if tgt == pred {
+                    None
+                } else {
+                    Some(NewEdgeSpec {
+                        src: merged,
+                        tgt,
+                        kind: NewEdgeKind::ControlFlow { src_pos },
+                    })
+                }
             })
             .collect(),
         mu_new: vec![],
