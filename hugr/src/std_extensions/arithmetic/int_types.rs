@@ -147,7 +147,7 @@ impl ConstInt {
             self.value as i64
         } else {
             let width = 1u8 << self.log_width;
-            if (self.value << 1 >> width) == 0 {
+            if ((self.value << 1) >> width) == 0 {
                 self.value as i64
             } else {
                 self.value as i64 - (1i64 << width)
