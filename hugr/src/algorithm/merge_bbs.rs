@@ -23,7 +23,7 @@ pub fn merge_basic_blocks(cfg: &mut impl HugrMut<RootHandle = CfgID>) {
         if cfg.input_neighbours(succ).take(2).collect::<Vec<_>>() != vec![n] {
             continue;
         };
-        if cfg.nodes().take(2).contains(&succ) {
+        if cfg.children(cfg.root()).take(2).contains(&succ) {
             // entry block has an additional in-edge, so cannot merge with predecessor.
             // if succ is exit block, nodes in n==p should move *outside* the CFG
             // - a separate normalization from merging BBs.
@@ -403,6 +403,8 @@ mod test {
         h.connect(bb3, 0, exit, 0);
         let reg = ExtensionRegistry::try_new([e, PRELUDE.to_owned()])?;
         h.update_validate(&reg)?;
+        let root = h.root();
+        merge_basic_blocks(&mut SiblingMut::try_new(&mut h, root)?);
         Ok(())
     }
 }
