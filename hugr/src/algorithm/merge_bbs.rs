@@ -159,7 +159,7 @@ mod test {
     use rstest::rstest;
 
     use crate::builder::{CFGBuilder, Dataflow, HugrBuilder};
-    use crate::extension::prelude::{QB_T, USIZE_T};
+    use crate::extension::prelude::{ConstUsize, QB_T, USIZE_T};
     use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE, PRELUDE_REGISTRY};
     use crate::hugr::views::sibling::SiblingMut;
     use crate::ops::constant::Value;
@@ -172,6 +172,23 @@ mod test {
 
     const_extension_ids! {
         const EXT_ID: ExtensionId = "TestExt";
+    }
+
+    fn extension() -> Extension {
+        let mut e = Extension::new(EXT_ID);
+        e.add_op(
+            "Test".into(),
+            String::new(),
+            FunctionType::new(
+                type_row![QB_T, USIZE_T],
+                TypeRow::from(vec![Type::new_sum(vec![
+                    type_row![QB_T],
+                    type_row![USIZE_T],
+                ])]),
+            ),
+        )
+        .unwrap();
+        e
     }
     #[rstest]
     #[case(true)]
@@ -190,18 +207,7 @@ mod test {
         */
         let loop_variants = type_row![QB_T];
         let exit_types = type_row![USIZE_T];
-        let mut e = Extension::new(EXT_ID);
-        e.add_op(
-            "Test".into(),
-            String::new(),
-            FunctionType::new(
-                loop_variants.clone(),
-                TypeRow::from(vec![Type::new_sum(vec![
-                    loop_variants.clone(),
-                    exit_types.clone(),
-                ])]),
-            ),
-        )?;
+        let e = extension();
         let tst_op = e.instantiate_extension_op("Test", [], &PRELUDE_REGISTRY)?;
         let reg = ExtensionRegistry::try_new([PRELUDE.to_owned(), e])?;
         let mut h = CFGBuilder::new(FunctionType::new(loop_variants.clone(), exit_types.clone()))?;
@@ -215,8 +221,10 @@ mod test {
             ExtensionSet::singleton(&EXT_ID),
             type_row![],
         )?;
+        let [test_input] = test_block.input_wires_arr();
+        let usize_cst = test_block.add_load_value(ConstUsize::new(1));
         let [tst] = test_block
-            .add_dataflow_op(tst_op, test_block.input_wires())?
+            .add_dataflow_op(tst_op, [test_input, usize_cst])?
             .outputs_arr();
         let test_block = test_block.finish_with_outputs(tst, [])?;
         let loop_backedge_target = if self_loop {
