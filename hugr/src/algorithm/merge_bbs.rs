@@ -421,6 +421,20 @@ mod test {
             .ok()
             .unwrap();
         assert_eq!(h.get_parent(tst), Some(bb));
+
+        let inp = h
+            .nodes()
+            .filter(|n| matches!(h.get_optype(*n), OpType::Input(_)))
+            .exactly_one()
+            .ok()
+            .unwrap();
+        let mut tst_inputs = h.input_neighbours(tst).collect::<Vec<_>>();
+        tst_inputs.remove(tst_inputs.iter().find_position(|n| **n == inp).unwrap().0);
+        let [other_input] = tst_inputs.try_into().unwrap();
+        assert_eq!(
+            h.get_optype(other_input),
+            &(LoadConstant { datatype: USIZE_T }.into())
+        );
         Ok(())
     }
 }
