@@ -401,10 +401,22 @@ mod test {
         h.connect(bb1, 0, bb2, 0);
         h.connect(bb2, 0, bb3, 0);
         h.connect(bb3, 0, exit, 0);
+
         let reg = ExtensionRegistry::try_new([e, PRELUDE.to_owned()])?;
         h.update_validate(&reg)?;
         let root = h.root();
         merge_basic_blocks(&mut SiblingMut::try_new(&mut h, root)?);
+        h.validate(&reg)?;
+
+        // Should only be one BB left
+        let [bb, _exit] = h.children(h.root()).collect::<Vec<_>>().try_into().unwrap();
+        let tst = h
+            .nodes()
+            .filter(|n| matches!(h.get_optype(*n), OpType::CustomOp(_)))
+            .exactly_one()
+            .ok()
+            .unwrap();
+        assert_eq!(h.get_parent(tst), Some(bb));
         Ok(())
     }
 }
