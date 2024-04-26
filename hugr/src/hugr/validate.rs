@@ -104,8 +104,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         // TODO: We should also verify that the serialized hugr matches the
         // in-tree schema. For now, our serialized hugr does not match the
         // schema. When this is fixed we should pass true below.
-        #[cfg(test)]
-        #[cfg_attr(miri, ignore = "miri does not support 'life before main'")]
+        #[cfg(all(test, not(miri)))]
         crate::hugr::serialize::test::check_hugr_roundtrip(self.hugr, false);
 
         Ok(())
