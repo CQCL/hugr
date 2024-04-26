@@ -212,8 +212,8 @@ mod test {
 
     use super::*;
     use crate::extension::prelude::{sum_with_error, BOOL_T};
-    use crate::extension::PRELUDE;
-    use crate::ops::UnpackTuple;
+    use crate::extension::{ExtensionRegistry, PRELUDE};
+    use crate::ops::{OpType, UnpackTuple};
     use crate::std_extensions::arithmetic;
     use crate::std_extensions::arithmetic::conversions::ConvertOpDef;
     use crate::std_extensions::arithmetic::float_ops::FloatOps;
@@ -474,24 +474,68 @@ mod test {
     }
 
     #[test]
-    fn test_fold_int_ops() {
+    fn test_fold_itobool() {
         // pseudocode:
         //
-        // x0 := int_u<4>(3);
-        // x1 := iwiden_u<4, 5>(x0);
-        // x2 := iwiden_s<5, 6>(x1);
-        // output x2 == int_u<6>(3);
+        // x0 := int_u<0>(1);
+        // x1 := itobool(x0);
+        // output x1 == true;
+        let mut build =
+            DFGBuilder::new(FunctionType::new(type_row![], vec![BOOL_T.into()])).unwrap();
+        let x0 = build.add_load_const(Value::extension(ConstInt::new_u(0, 1).unwrap()));
+        let x1 = build
+            .add_dataflow_op(IntOpDef::itobool.without_log_width(), [x0])
+            .unwrap();
+        let reg = ExtensionRegistry::try_new([
+            PRELUDE.to_owned(),
+            arithmetic::int_types::EXTENSION.to_owned(),
+        ])
+        .unwrap();
+        let mut h = build.finish_hugr_with_outputs(x1.outputs(), &reg).unwrap();
+        constant_fold_pass(&mut h, &reg);
+        let expected = Value::true_val();
+        assert_fully_folded(&h, &expected);
+    }
+
+    #[test]
+    fn test_fold_ifrombool() {
+        // pseudocode:
+        //
+        // x0 := false
+        // x1 := ifrombool(x0);
+        // output x1 == int_u<0>(0);
         let mut build = DFGBuilder::new(FunctionType::new(
             type_row![],
-            vec![INT_TYPES[6].clone().into()],
+            vec![INT_TYPES[0].clone().into()],
         ))
         .unwrap();
-        let x0 = build.add_load_const(Value::extension(ConstInt::new_u(4, 3).unwrap()));
+        let x0 = build.add_load_const(Value::false_val());
         let x1 = build
-            .add_dataflow_op(IntOpDef::iwiden_u.with_two_log_widths(4, 5), [x0])
+            .add_dataflow_op(IntOpDef::ifrombool.without_log_width(), [x0])
             .unwrap();
+        let reg = ExtensionRegistry::try_new([
+            PRELUDE.to_owned(),
+            arithmetic::int_types::EXTENSION.to_owned(),
+        ])
+        .unwrap();
+        let mut h = build.finish_hugr_with_outputs(x1.outputs(), &reg).unwrap();
+        constant_fold_pass(&mut h, &reg);
+        let expected = Value::extension(ConstInt::new_u(0, 0).unwrap());
+        assert_fully_folded(&h, &expected);
+    }
+
+    #[test]
+    fn test_fold_ieq() {
+        // pseudocode:
+        // x0, x1 := int_s<3>(-1), int_u<3>(255)
+        // x2 := ieq(x0, x1)
+        // output x2 == true;
+        let mut build =
+            DFGBuilder::new(FunctionType::new(type_row![], vec![BOOL_T.into()])).unwrap();
+        let x0 = build.add_load_const(Value::extension(ConstInt::new_s(3, -1).unwrap()));
+        let x1 = build.add_load_const(Value::extension(ConstInt::new_u(3, 255).unwrap()));
         let x2 = build
-            .add_dataflow_op(IntOpDef::iwiden_s.with_two_log_widths(5, 6), x1.outputs())
+            .add_dataflow_op(IntOpDef::ieq.with_log_width(3), [x0, x1])
             .unwrap();
         let reg = ExtensionRegistry::try_new([
             PRELUDE.to_owned(),
@@ -500,7 +544,114 @@ mod test {
         .unwrap();
         let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
         constant_fold_pass(&mut h, &reg);
-        let expected = Value::extension(ConstInt::new_u(6, 3).unwrap());
+        let expected = Value::true_val();
+        assert_fully_folded(&h, &expected);
+    }
+
+    #[test]
+    fn test_fold_ine() {
+        // pseudocode:
+        // x0, x1 := int_u<5>(3), int_u<5>(4)
+        // x2 := ine(x0, x1)
+        // output x2 == true;
+        let mut build =
+            DFGBuilder::new(FunctionType::new(type_row![], vec![BOOL_T.into()])).unwrap();
+        let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 3).unwrap()));
+        let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 4).unwrap()));
+        let x2 = build
+            .add_dataflow_op(IntOpDef::ine.with_log_width(5), [x0, x1])
+            .unwrap();
+        let reg = ExtensionRegistry::try_new([
+            PRELUDE.to_owned(),
+            arithmetic::int_types::EXTENSION.to_owned(),
+        ])
+        .unwrap();
+        let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
+        constant_fold_pass(&mut h, &reg);
+        let expected = Value::true_val();
+        assert_fully_folded(&h, &expected);
+    }
+
+    #[test]
+    fn test_fold_ilt_u() {
+        // pseudocode:
+        // x0, x1 := int_u<5>(3), int_u<5>(4)
+        // x2 := ilt_u(x0, x1)
+        // output x2 == true;
+        let mut build =
+            DFGBuilder::new(FunctionType::new(type_row![], vec![BOOL_T.into()])).unwrap();
+        let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 3).unwrap()));
+        let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 4).unwrap()));
+        let x2 = build
+            .add_dataflow_op(IntOpDef::ilt_u.with_log_width(5), [x0, x1])
+            .unwrap();
+        let reg = ExtensionRegistry::try_new([
+            PRELUDE.to_owned(),
+            arithmetic::int_types::EXTENSION.to_owned(),
+        ])
+        .unwrap();
+        let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
+        constant_fold_pass(&mut h, &reg);
+        let expected = Value::true_val();
+        assert_fully_folded(&h, &expected);
+    }
+
+    #[test]
+    fn test_fold_and() {
+        // pseudocode:
+        // x0, x1 := bool(true), bool(true)
+        // x2 := and(x0, x1)
+        // output x2 == true;
+        let mut build =
+            DFGBuilder::new(FunctionType::new(type_row![], vec![BOOL_T.into()])).unwrap();
+        let x0 = build.add_load_const(Value::true_val());
+        let x1 = build.add_load_const(Value::true_val());
+        let x2 = build
+            .add_dataflow_op(NaryLogic::And.with_n_inputs(2), [x0, x1])
+            .unwrap();
+        let reg =
+            ExtensionRegistry::try_new([PRELUDE.to_owned(), logic::EXTENSION.to_owned()]).unwrap();
+        let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
+        constant_fold_pass(&mut h, &reg);
+        let expected = Value::true_val();
+        assert_fully_folded(&h, &expected);
+    }
+
+    #[test]
+    fn test_fold_int_ops() {
+        // pseudocode:
+        //
+        // x0 := int_u<5>(3); // 3
+        // x1 := int_u<5>(4); // 4
+        // x2 := ine(x0, x1); // true
+        // x3 := ilt_u(x0, x1); // true
+        // x4 := and(x2, x3); // true
+        // output x4
+        let mut build =
+            DFGBuilder::new(FunctionType::new(type_row![], vec![BOOL_T.into()])).unwrap();
+        let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 3).unwrap()));
+        let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 4).unwrap()));
+        let x2 = build
+            .add_dataflow_op(IntOpDef::ine.with_log_width(5), [x0, x1])
+            .unwrap();
+        let x3 = build
+            .add_dataflow_op(IntOpDef::ilt_u.with_log_width(5), [x0, x1])
+            .unwrap();
+        let x5 = build
+            .add_dataflow_op(
+                NaryLogic::And.with_n_inputs(2),
+                x2.outputs().chain(x3.outputs()),
+            )
+            .unwrap();
+        let reg = ExtensionRegistry::try_new([
+            PRELUDE.to_owned(),
+            logic::EXTENSION.to_owned(),
+            arithmetic::int_types::EXTENSION.to_owned(),
+        ])
+        .unwrap();
+        let mut h = build.finish_hugr_with_outputs(x5.outputs(), &reg).unwrap();
+        constant_fold_pass(&mut h, &reg);
+        let expected = Value::true_val();
         assert_fully_folded(&h, &expected);
     }
 
