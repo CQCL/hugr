@@ -261,6 +261,9 @@ impl TryFrom<SerHugrV1> for Hugr {
 }
 
 #[cfg(test)]
+#[cfg_attr(miri, ignore = "miri does not support 'life before main'")]
+// Miri doesn't run the extension registration required by `typetag` for
+// registering `CustomConst`s.  https://github.com/rust-lang/miri/issues/450
 pub mod test {
 
     use super::*;
@@ -547,9 +550,6 @@ pub mod test {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore = "Extension ops cannot be used with miri.")]
-    // Miri doesn't run the extension registration required by `typetag` for registering `CustomConst`s.
-    // https://github.com/rust-lang/miri/issues/450
     fn constants_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
         let mut builder = DFGBuilder::new(FunctionType::new(vec![], vec![FLOAT64_TYPE])).unwrap();
         let w = builder.add_load_value(ConstF64::new(0.5));
