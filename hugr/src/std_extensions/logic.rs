@@ -120,6 +120,17 @@ impl MakeOpDef for NotOp {
     fn description(&self) -> String {
         "logical 'not'".into()
     }
+
+    fn post_opdef(&self, def: &mut OpDef) {
+        def.set_constant_folder(|consts: &_| {
+            let inps = read_inputs(consts)?;
+            if inps.len() != 1 {
+                None
+            } else {
+                Some(vec![(0.into(), ops::Value::from_bool(inps[0]))])
+            }
+        })
+    }
 }
 /// The extension identifier.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("logic");
