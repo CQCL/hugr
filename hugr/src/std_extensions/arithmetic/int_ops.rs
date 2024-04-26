@@ -276,12 +276,11 @@ lazy_static! {
     .unwrap();
 }
 
-/// Concrete integer operation with either one or two integer widths set.
+/// Concrete integer operation with integer widths set.
 #[derive(Debug, Clone, PartialEq)]
 pub struct IntOpType {
     def: IntOpDef,
-    first_width: u64,
-    second_width: Option<u64>,
+    log_widths: Vec<u8>,
 }
 
 impl NamedOp for IntOpType {
@@ -292,23 +291,15 @@ impl NamedOp for IntOpType {
 impl MakeExtensionOp for IntOpType {
     fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError> {
         let def = IntOpDef::from_def(ext_op.def())?;
-        let (first_width, second_width) = match *ext_op.args() {
-            [TypeArg::BoundedNat { n }] => (n, None),
-            [TypeArg::BoundedNat { n }, TypeArg::BoundedNat { n: n2 }] => (n, Some(n2)),
-            _ => return Err(SignatureError::InvalidTypeArgs.into()),
-        };
-        Ok(Self {
-            def,
-            first_width,
-            second_width,
-        })
+        let args = ext_op.args();
+        let log_widths: Vec<u8> = args.iter().map(|a| get_log_width(a).unwrap()).collect();
+        Ok(Self { def, log_widths })
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
-        [Some(self.first_width), self.second_width]
+        self.log_widths
             .iter()
-            .flatten()
-            .map(|&n| TypeArg::BoundedNat { n })
+            .map(|&n| TypeArg::BoundedNat { n: n as u64 })
             .collect()
     }
 }
@@ -324,22 +315,28 @@ impl MakeRegisteredOp for IntOpType {
 }
 
 impl IntOpDef {
-    /// Initialize a concrete [IntOpType] from a [IntOpDef] which requires one
-    /// integer width set.
-    pub fn with_width(self, width: u64) -> IntOpType {
+    /// Initialize a concrete [IntOpType] from a [IntOpDef] which requires no
+    /// integer widths set.
+    pub fn without_log_width(self) -> IntOpType {
         IntOpType {
             def: self,
-            first_width: width,
-            second_width: None,
+            log_widths: vec![],
+        }
+    }
+    /// Initialize a concrete [IntOpType] from a [IntOpDef] which requires one
+    /// integer width set.
+    pub fn with_log_width(self, width: u8) -> IntOpType {
+        IntOpType {
+            def: self,
+            log_widths: vec![width],
         }
     }
     /// Initialize a concrete [IntOpType] from a [IntOpDef] which requires two
     /// integer widths set.
-    pub fn with_two_widths(self, first_width: u64, second_width: u64) -> IntOpType {
+    pub fn with_two_log_widths(self, first_width: u8, second_width: u8) -> IntOpType {
         IntOpType {
             def: self,
-            first_width,
-            second_width: Some(second_width),
+            log_widths: vec![first_width, second_width],
         }
     }
 }
@@ -367,7 +364,7 @@ mod test {
     fn test_binary_signatures() {
         assert_eq!(
             IntOpDef::iwiden_s
-                .with_two_widths(3, 4)
+                .with_two_log_widths(3, 4)
                 .to_extension_op()
                 .unwrap()
                 .signature(),
@@ -375,7 +372,7 @@ mod test {
         );
         assert_eq!(
             IntOpDef::iwiden_s
-                .with_two_widths(3, 3)
+                .with_two_log_widths(3, 3)
                 .to_extension_op()
                 .unwrap()
                 .signature(),
@@ -383,7 +380,7 @@ mod test {
         );
         assert_eq!(
             IntOpDef::inarrow_s
-                .with_two_widths(3, 3)
+                .with_two_log_widths(3, 3)
                 .to_extension_op()
                 .unwrap()
                 .signature(),
@@ -394,7 +391,7 @@ mod test {
         );
         assert!(
             IntOpDef::iwiden_u
-                .with_two_widths(4, 3)
+                .with_two_log_widths(4, 3)
                 .to_extension_op()
                 .is_none(),
             "type arguments invalid"
@@ -402,7 +399,7 @@ mod test {
 
         assert_eq!(
             IntOpDef::inarrow_s
-                .with_two_widths(2, 1)
+                .with_two_log_widths(2, 1)
                 .to_extension_op()
                 .unwrap()
                 .signature(),
@@ -413,17 +410,17 @@ mod test {
         );
 
         assert!(IntOpDef::inarrow_u
-            .with_two_widths(1, 2)
+            .with_two_log_widths(1, 2)
             .to_extension_op()
             .is_none());
     }
 
     #[test]
     fn test_conversions() {
-        let o = IntOpDef::itobool.with_width(5);
+        let o = IntOpDef::itobool.with_log_width(5);
         assert!(
             IntOpDef::itobool
-                .with_two_widths(1, 2)
+                .with_two_log_widths(1, 2)
                 .to_extension_op()
                 .is_none(),
             "type arguments invalid"

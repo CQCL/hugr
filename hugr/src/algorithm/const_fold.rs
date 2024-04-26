@@ -275,7 +275,7 @@ mod test {
             .add_dataflow_op(FloatOps::fsub, unpack.outputs())
             .unwrap();
         let to_int = build
-            .add_dataflow_op(ConvertOpDef::trunc_u.with_width(5), sub.outputs())
+            .add_dataflow_op(ConvertOpDef::trunc_u.with_log_width(5), sub.outputs())
             .unwrap();
 
         let reg = ExtensionRegistry::try_new([
@@ -377,7 +377,7 @@ mod test {
         .unwrap();
         let x0 = build.add_load_const(Value::extension(ConstInt::new_u(4, 13).unwrap()));
         let x1 = build
-            .add_dataflow_op(IntOpDef::iwiden_u.with_two_widths(4, 5), [x0])
+            .add_dataflow_op(IntOpDef::iwiden_u.with_two_log_widths(4, 5), [x0])
             .unwrap();
         let reg = ExtensionRegistry::try_new([
             PRELUDE.to_owned(),
@@ -404,7 +404,7 @@ mod test {
         .unwrap();
         let x0 = build.add_load_const(Value::extension(ConstInt::new_s(4, -3).unwrap()));
         let x1 = build
-            .add_dataflow_op(IntOpDef::iwiden_s.with_two_widths(4, 5), [x0])
+            .add_dataflow_op(IntOpDef::iwiden_s.with_two_log_widths(4, 5), [x0])
             .unwrap();
         let reg = ExtensionRegistry::try_new([
             PRELUDE.to_owned(),
@@ -432,7 +432,7 @@ mod test {
         .unwrap();
         let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 13).unwrap()));
         let x1 = build
-            .add_dataflow_op(IntOpDef::inarrow_u.with_two_widths(5, 4), [x0])
+            .add_dataflow_op(IntOpDef::inarrow_u.with_two_log_widths(5, 4), [x0])
             .unwrap();
         let reg = ExtensionRegistry::try_new([
             PRELUDE.to_owned(),
@@ -460,7 +460,7 @@ mod test {
         .unwrap();
         let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, -3).unwrap()));
         let x1 = build
-            .add_dataflow_op(IntOpDef::inarrow_s.with_two_widths(5, 4), [x0])
+            .add_dataflow_op(IntOpDef::inarrow_s.with_two_log_widths(5, 4), [x0])
             .unwrap();
         let reg = ExtensionRegistry::try_new([
             PRELUDE.to_owned(),
@@ -488,10 +488,10 @@ mod test {
         .unwrap();
         let x0 = build.add_load_const(Value::extension(ConstInt::new_u(4, 3).unwrap()));
         let x1 = build
-            .add_dataflow_op(IntOpDef::iwiden_u.with_two_widths(4, 5), [x0])
+            .add_dataflow_op(IntOpDef::iwiden_u.with_two_log_widths(4, 5), [x0])
             .unwrap();
         let x2 = build
-            .add_dataflow_op(IntOpDef::iwiden_s.with_two_widths(5, 6), x1.outputs())
+            .add_dataflow_op(IntOpDef::iwiden_s.with_two_log_widths(5, 6), x1.outputs())
             .unwrap();
         let reg = ExtensionRegistry::try_new([
             PRELUDE.to_owned(),
