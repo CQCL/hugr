@@ -302,12 +302,9 @@ mod test {
             HashSet::from([expected_backedge_target, exit])
         );
         // And the Noop in the entry block is consumed by the custom Test op
-        let tst = h
-            .nodes()
-            .filter(|n| matches!(h.get_optype(*n), OpType::CustomOp(_)))
-            .exactly_one()
-            .ok()
-            .unwrap();
+        let tst = find_unique(h.nodes(), |n| {
+            matches!(h.get_optype(*n), OpType::CustomOp(_))
+        });
         assert_eq!(h.get_parent(tst), Some(entry));
         assert_eq!(
             h.output_neighbours(entry_nop).collect::<Vec<_>>(),
@@ -380,20 +377,12 @@ mod test {
 
         // Should only be one BB left
         let [bb, _exit] = h.children(h.root()).collect::<Vec<_>>().try_into().unwrap();
-        let tst = h
-            .nodes()
-            .filter(|n| matches!(h.get_optype(*n), OpType::CustomOp(_)))
-            .exactly_one()
-            .ok()
-            .unwrap();
+        let tst = find_unique(h.nodes(), |n| {
+            matches!(h.get_optype(*n), OpType::CustomOp(_))
+        });
         assert_eq!(h.get_parent(tst), Some(bb));
 
-        let inp = h
-            .nodes()
-            .filter(|n| matches!(h.get_optype(*n), OpType::Input(_)))
-            .exactly_one()
-            .ok()
-            .unwrap();
+        let inp = find_unique(h.nodes(), |n| matches!(h.get_optype(*n), OpType::Input(_)));
         let mut tst_inputs = h.input_neighbours(tst).collect::<Vec<_>>();
         tst_inputs.remove(tst_inputs.iter().find_position(|n| **n == inp).unwrap().0);
         let [other_input] = tst_inputs.try_into().unwrap();
@@ -402,5 +391,9 @@ mod test {
             &(LoadConstant { datatype: USIZE_T }.into())
         );
         Ok(())
+    }
+
+    fn find_unique<T>(items: impl Iterator<Item = T>, pred: impl Fn(&T) -> bool) -> T {
+        items.filter(pred).exactly_one().ok().unwrap()
     }
 }
