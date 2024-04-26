@@ -166,15 +166,11 @@ mod test {
     use crate::extension::prelude::{ConstUsize, PRELUDE_ID, QB_T, USIZE_T};
     use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE, PRELUDE_REGISTRY};
     use crate::hugr::views::sibling::SiblingMut;
-    use crate::hugr::{HugrMut, NodeType};
     use crate::ops::constant::Value;
     use crate::ops::handle::CfgID;
-    use crate::ops::{
-        Const, DataflowBlock, ExitBlock, Input, Lift, LoadConstant, Noop, OpTrait, OpType, Output,
-        CFG,
-    };
+    use crate::ops::{Lift, LoadConstant, Noop, OpTrait, OpType};
     use crate::types::{FunctionType, Type, TypeRow};
-    use crate::{const_extension_ids, type_row, Extension, Hugr, HugrView, Node, Wire};
+    use crate::{const_extension_ids, type_row, Extension, Hugr, HugrView, Wire};
 
     use super::merge_basic_blocks;
 
@@ -325,48 +321,6 @@ mod test {
         // Blocks are just BB1 -> BB2 -> BB3 --> Exit.
         // CFG Normalization would move everything outside the CFG and elide the CFG altogether,
         // but this is an easy-to-construct test of merge-basic-blocks only (no CFG normalization).
-        // Also since the Builder puts all values in the branch predicate,
-        // test manual Hugr construction with values in BasicBlock "other_outputs"
-        fn add_bb(
-            h: &mut Hugr,
-            inputs: TypeRow,
-            other_outputs: TypeRow,
-            extension_delta: ExtensionSet,
-        ) -> (Node, Node, Node) {
-            let inp = Input {
-                types: inputs.clone(),
-            };
-            let outp = Output {
-                types: TypeRow::from(
-                    Some(Type::new_unit_sum(1))
-                        .into_iter()
-                        .chain(other_outputs.iter().cloned())
-                        .collect::<Vec<_>>(),
-                ),
-            };
-            let bb = h.add_node_with_parent(
-                h.root(),
-                DataflowBlock {
-                    inputs,
-                    other_outputs,
-                    sum_rows: vec![type_row![]],
-                    extension_delta,
-                },
-            );
-            let inp = h.add_node_with_parent(bb, inp);
-            let outp = h.add_node_with_parent(bb, outp);
-            let cst =
-                h.add_node_with_parent(bb, NodeType::new_open(Const::new(Value::unary_unit_sum())));
-            let load_cst = h.add_node_with_parent(
-                bb,
-                LoadConstant {
-                    datatype: Type::new_unit_sum(1),
-                },
-            );
-            h.connect(cst, 0, load_cst, 0);
-            h.connect(load_cst, 0, outp, 0);
-            (bb, inp, outp)
-        }
         let e = extension();
         let tst_op: OpType = e
             .instantiate_extension_op("Test", &[], &PRELUDE_REGISTRY)?
@@ -378,59 +332,48 @@ mod test {
             .into_owned()
             .try_into()
             .unwrap();
-        let mut h = Hugr::new(
-            CFG {
-                signature: FunctionType::new(QB_T, res_t.clone())
-                    .with_extension_delta(ExtensionSet::singleton(&PRELUDE_ID)),
-            }
-            .into(),
-        );
-        let (bb1, inp, out) = add_bb(
-            &mut h,
-            QB_T.into(),
+        let mut h = CFGBuilder::new(
+            FunctionType::new(QB_T, res_t.clone())
+                .with_extension_delta(ExtensionSet::singleton(&PRELUDE_ID)),
+        )?;
+        let mut bb1 = h.entry_builder(
+            vec![type_row![]],
             type_row![USIZE_T, QB_T],
             ExtensionSet::singleton(&PRELUDE_ID),
-        );
-        let cst = h.add_node_with_parent(bb1, Const::new(ConstUsize::new(1).into()));
-        let load_cst = h.add_node_with_parent(bb1, LoadConstant { datatype: USIZE_T });
-        h.connect(cst, 0, load_cst, 0);
-        h.connect(load_cst, 0, out, 1);
-        h.connect(inp, 0, out, 2);
+        )?;
+        let [inw] = bb1.input_wires_arr();
+        let load_cst = bb1.add_load_value(ConstUsize::new(1));
+        let pred = lifted_unary_unit_sum(&mut bb1);
+        let bb1 = bb1.finish_with_outputs(pred, [load_cst, inw])?;
 
-        let exit = h.add_node_with_parent(
-            h.root(),
-            ExitBlock {
-                cfg_outputs: res_t.clone().into(),
-            },
-        );
-
-        let (bb2, inp, out) = add_bb(
-            &mut h,
+        let mut bb2 = h.block_builder(
             type_row![USIZE_T, QB_T],
-            type_row![QB_T, USIZE_T],
+            vec![type_row![]],
             ExtensionSet::new(),
-        );
-        h.connect(inp, 0, out, 2);
-        h.connect(inp, 1, out, 1);
-
-        let (bb3, inp, out) = add_bb(
-            &mut h,
             type_row![QB_T, USIZE_T],
+        )?;
+        let [u, q] = bb2.input_wires_arr();
+        let pred = lifted_unary_unit_sum(&mut bb2);
+        let bb2 = bb2.finish_with_outputs(pred, [q, u])?;
+
+        let mut bb3 = h.block_builder(
+            type_row![QB_T, USIZE_T],
+            vec![type_row![]],
+            ExtensionSet::new(),
             res_t.clone().into(),
-            ExtensionSet::new(),
-        );
-        let tst = h.add_node_with_parent(bb3, tst_op);
-        h.connect(inp, 0, tst, 0);
-        h.connect(inp, 1, tst, 1);
-        h.connect(tst, 0, out, 1);
-
+        )?;
+        let [q, u] = bb3.input_wires_arr();
+        let tst = bb3.add_dataflow_op(tst_op, [q, u])?;
+        let pred = lifted_unary_unit_sum(&mut bb3);
+        let bb3 = bb3.finish_with_outputs(pred, tst.outputs())?;
+        println!("ALAN bb1 {bb1:?} bb2 {bb2:?} bb3 {bb3:?}");
         // Now add control-flow edges between basic blocks
-        h.connect(bb1, 0, bb2, 0);
-        h.connect(bb2, 0, bb3, 0);
-        h.connect(bb3, 0, exit, 0);
+        h.branch(&bb1, 0, &bb2)?;
+        h.branch(&bb2, 0, &bb3)?;
+        h.branch(&bb3, 0, &h.exit_block())?;
 
         let reg = ExtensionRegistry::try_new([e, PRELUDE.to_owned()])?;
-        h.update_validate(&reg)?;
+        let mut h = h.finish_hugr(&reg)?;
         let root = h.root();
         merge_basic_blocks(&mut SiblingMut::try_new(&mut h, root)?);
         h.update_validate(&reg)?;
