@@ -391,3 +391,19 @@ fn polyfunctype1() -> PolyFuncType {
 fn roundtrip_polyfunctype(#[case] poly_func_type: PolyFuncType) {
     check_testing_roundtrip(poly_func_type.into())
 }
+
+#[rstest]
+#[case(Module)]
+fn roundtrip_optype(#[case] optype: impl Into<OpType>) {
+    #[derive(Serialize, Deserialize, PartialEq, Debug)]
+    struct SerTesting {
+        optype: NodeSer,
+    }
+    check_testing_roundtrip(SerTesting {
+        optype: NodeSer {
+            parent: portgraph::NodeIndex::new(0).into(),
+            input_extensions: None,
+            op: optype.into(),
+        },
+    })
+}

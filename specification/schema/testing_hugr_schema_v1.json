@@ -27,6 +27,40 @@
             "title": "Alias",
             "type": "object"
         },
+        "AliasDecl": {
+            "properties": {
+                "parent": {
+                    "title": "Parent",
+                    "type": "integer"
+                },
+                "input_extensions": {
+                    "$ref": "#/$defs/ExtensionSet"
+                },
+                "op": {
+                    "const": "AliasDecl",
+                    "default": "AliasDecl",
+                    "enum": [
+                        "AliasDecl"
+                    ],
+                    "title": "Op",
+                    "type": "string"
+                },
+                "name": {
+                    "title": "Name",
+                    "type": "string"
+                },
+                "bound": {
+                    "$ref": "#/$defs/TypeBound"
+                }
+            },
+            "required": [
+                "parent",
+                "name",
+                "bound"
+            ],
+            "title": "AliasDecl",
+            "type": "object"
+        },
         "Array": {
             "description": "Known size array whose elements are of the same type.",
             "properties": {
@@ -105,6 +139,258 @@
             "title": "BoundedNatParam",
             "type": "object"
         },
+        "CFG": {
+            "description": "A dataflow node which is defined by a child CFG.",
+            "properties": {
+                "parent": {
+                    "title": "Parent",
+                    "type": "integer"
+                },
+                "input_extensions": {
+                    "$ref": "#/$defs/ExtensionSet"
+                },
+                "op": {
+                    "const": "CFG",
+                    "default": "CFG",
+                    "enum": [
+                        "CFG"
+                    ],
+                    "title": "Op",
+                    "type": "string"
+                },
+                "signature": {
+                    "$ref": "#/$defs/FunctionType"
+                }
+            },
+            "required": [
+                "parent"
+            ],
+            "title": "CFG",
+            "type": "object"
+        },
+        "Call": {
+            "description": "Operation to call a function directly. The first port is connected to the def/declare of the function being called directly, with a `Static<FunctionType>` edge. The signature of the remaining ports matches the function being called.",
+            "properties": {
+                "parent": {
+                    "title": "Parent",
+                    "type": "integer"
+                },
+                "input_extensions": {
+                    "$ref": "#/$defs/ExtensionSet"
+                },
+                "op": {
+                    "const": "Call",
+                    "default": "Call",
+                    "enum": [
+                        "Call"
+                    ],
+                    "title": "Op",
+                    "type": "string"
+                },
+                "signature": {
+                    "$ref": "#/$defs/FunctionType"
+                }
+            },
+            "required": [
+                "parent"
+            ],
+            "title": "Call",
+            "type": "object"
+        },
+        "CallIndirect": {
+            "description": "Call a function indirectly.\n\nLike call, but the first input is a standard dataflow graph type.",
+            "properties": {
+                "parent": {
+                    "title": "Parent",
+                    "type": "integer"
+                },
+                "input_extensions": {
+                    "$ref": "#/$defs/ExtensionSet"
+                },
+                "op": {
+                    "const": "CallIndirect",
+                    "default": "CallIndirect",
+                    "enum": [
+                        "CallIndirect"
+                    ],
+                    "title": "Op",
+                    "type": "string"
+                },
+                "signature": {
+                    "$ref": "#/$defs/FunctionType"
+                }
+            },
+            "required": [
+                "parent"
+            ],
+            "title": "CallIndirect",
+            "type": "object"
+        },
+        "Case": {
+            "description": "Case ops - nodes valid inside Conditional nodes.",
+            "properties": {
+                "parent": {
+                    "title": "Parent",
+                    "type": "integer"
+                },
+                "input_extensions": {
+                    "$ref": "#/$defs/ExtensionSet"
+                },
+                "op": {
+                    "const": "Case",
+                    "default": "Case",
+                    "enum": [
+                        "Case"
+                    ],
+                    "title": "Op",
+                    "type": "string"
+                },
+                "signature": {
+                    "$ref": "#/$defs/FunctionType"
+                }
+            },
+            "required": [
+                "parent"
+            ],
+            "title": "Case",
+            "type": "object"
+        },
+        "Conditional": {
+            "description": "Conditional operation, defined by child `Case` nodes for each branch.",
+            "properties": {
+                "parent": {
+                    "title": "Parent",
+                    "type": "integer"
+                },
+                "input_extensions": {
+                    "$ref": "#/$defs/ExtensionSet"
+                },
+                "op": {
+                    "const": "Conditional",
+                    "default": "Conditional",
+                    "enum": [
+                        "Conditional"
+                    ],
+                    "title": "Op",
+                    "type": "string"
+                },
+                "other_inputs": {
+                    "items": {
+                        "$ref": "#/$defs/Type"
+                    },
+                    "title": "Other Inputs",
+                    "type": "array"
+                },
+                "outputs": {
+                    "items": {
+                        "$ref": "#/$defs/Type"
+                    },
+                    "title": "Outputs",
+                    "type": "array"
+                },
+                "sum_rows": {
+                    "description": "The possible rows of the Sum input",
+                    "items": {
+                        "items": {
+                            "$ref": "#/$defs/Type"
+                        },
+                        "type": "array"
+                    },
+                    "title": "Sum Rows",
+                    "type": "array"
+                },
+                "extension_delta": {
+                    "$ref": "#/$defs/ExtensionSet"
+                }
+            },
+            "required": [
+                "parent"
+            ],
+            "title": "Conditional",
+            "type": "object"
+        },
+        "Const": {
+            "description": "A Const operation definition.",
+            "properties": {
+                "parent": {
+                    "title": "Parent",
+                    "type": "integer"
+                },
+                "input_extensions": {
+                    "$ref": "#/$defs/ExtensionSet"
+                },
+                "op": {
+                    "const": "Const",
+                    "default": "Const",
+                    "enum": [
+                        "Const"
+                    ],
+                    "title": "Op",
+                    "type": "string"
+                },
+                "v": {
+                    "$ref": "#/$defs/Value"
+                }
+            },
+            "required": [
+                "op",
+                "parent",
+                "v"
+            ],
+            "title": "Const",
+            "type": "object"
+        },
+        "CustomOp": {
+            "description": "A user-defined operation that can be downcasted by the extensions that define it.",
+            "properties": {
+                "parent": {
+                    "title": "Parent",
+                    "type": "integer"
+                },
+                "input_extensions": {
+                    "$ref": "#/$defs/ExtensionSet"
+                },
+                "op": {
+                    "const": "CustomOp",
+                    "default": "CustomOp",
+                    "enum": [
+                        "CustomOp"
+                    ],
+                    "title": "Op",
+                    "type": "string"
+                },
+                "extension": {
+                    "title": "Extension",
+                    "type": "string"
+                },
+                "op_name": {
+                    "title": "Op Name",
+                    "type": "string"
+                },
+                "signature": {
+                    "$ref": "#/$defs/FunctionType"
+                },
+                "description": {
+                    "default": "",
+                    "title": "Description",
+                    "type": "string"
+                },
+                "args": {
+                    "items": {
+                        "$ref": "#/$defs/TypeArg"
+                    },
+                    "title": "Args",
+                    "type": "array"
+                }
+            },
+            "required": [
+                "parent",
+                "extension",
+                "op_name"
+            ],
+            "title": "CustomOp",
+            "type": "object"
+        },
         "CustomTypeArg": {
             "properties": {
                 "typ": {
@@ -121,6 +407,127 @@
                 "value"
             ],
             "title": "CustomTypeArg",
+            "type": "object"
+        },
+        "DFG": {
+            "description": "A simply nested dataflow graph.",
+            "properties": {
+                "parent": {
+                    "title": "Parent",
+                    "type": "integer"
+                },
+                "input_extensions": {
+                    "$ref": "#/$defs/ExtensionSet"
+                },
+                "op": {
+                    "const": "DFG",
+                    "default": "DFG",
+                    "enum": [
+                        "DFG"
+                    ],
+                    "title": "Op",
+                    "type": "string"
+                },
+                "signature": {
+                    "$ref": "#/$defs/FunctionType"
+                }
+            },
+            "required": [
+                "parent"
+            ],
+            "title": "DFG",
+            "type": "object"
+        },
+        "DataflowBlock": {
+            "description": "A CFG basic block node. The signature is that of the internal Dataflow graph.",
+            "properties": {
+                "parent": {
+                    "title": "Parent",
+                    "type": "integer"
+                },
+                "input_extensions": {
+                    "$ref": "#/$defs/ExtensionSet"
+                },
+                "op": {
+                    "const": "DataflowBlock",
+                    "default": "DataflowBlock",
+                    "enum": [
+                        "DataflowBlock"
+                    ],
+                    "title": "Op",
+                    "type": "string"
+                },
+                "inputs": {
+                    "items": {
+                        "$ref": "#/$defs/Type"
+                    },
+                    "title": "Inputs",
+                    "type": "array"
+                },
+                "other_outputs": {
+                    "items": {
+                        "$ref": "#/$defs/Type"
+                    },
+                    "title": "Other Outputs",
+                    "type": "array"
+                },
+                "sum_rows": {
+                    "items": {
+                        "items": {
+                            "$ref": "#/$defs/Type"
+                        },
+                        "type": "array"
+                    },
+                    "title": "Sum Rows",
+                    "type": "array"
+                },
+                "extension_delta": {
+                    "$ref": "#/$defs/ExtensionSet"
+                }
+            },
+            "required": [
+                "parent",
+                "op",
+                "inputs",
+                "other_outputs",
+                "sum_rows",
+                "extension_delta"
+            ],
+            "title": "DataflowBlock",
+            "type": "object"
+        },
+        "ExitBlock": {
+            "description": "The single exit node of the CFG, has no children, stores the types of the CFG node output.",
+            "properties": {
+                "parent": {
+                    "title": "Parent",
+                    "type": "integer"
+                },
+                "input_extensions": {
+                    "$ref": "#/$defs/ExtensionSet"
+                },
+                "op": {
+                    "const": "ExitBlock",
+                    "default": "ExitBlock",
+                    "enum": [
+                        "ExitBlock"
+                    ],
+                    "title": "Op",
+                    "type": "string"
+                },
+                "cfg_outputs": {
+                    "items": {
+                        "$ref": "#/$defs/Type"
+                    },
+                    "title": "Cfg Outputs",
+                    "type": "array"
+                }
+            },
+            "required": [
+                "parent",
+                "cfg_outputs"
+            ],
+            "title": "ExitBlock",
             "type": "object"
         },
         "ExtensionSet": {
@@ -196,6 +603,74 @@
                 }
             },
             "title": "ExtensionsParam",
+            "type": "object"
+        },
+        "FuncDecl": {
+            "description": "External function declaration, linked at runtime.",
+            "properties": {
+                "parent": {
+                    "title": "Parent",
+                    "type": "integer"
+                },
+                "input_extensions": {
+                    "$ref": "#/$defs/ExtensionSet"
+                },
+                "op": {
+                    "const": "FuncDecl",
+                    "default": "FuncDecl",
+                    "enum": [
+                        "FuncDecl"
+                    ],
+                    "title": "Op",
+                    "type": "string"
+                },
+                "name": {
+                    "title": "Name",
+                    "type": "string"
+                },
+                "signature": {
+                    "$ref": "#/$defs/PolyFuncType"
+                }
+            },
+            "required": [
+                "parent",
+                "name"
+            ],
+            "title": "FuncDecl",
+            "type": "object"
+        },
+        "FuncDefn": {
+            "description": "A function definition. Children nodes are the body of the definition.",
+            "properties": {
+                "parent": {
+                    "title": "Parent",
+                    "type": "integer"
+                },
+                "input_extensions": {
+                    "$ref": "#/$defs/ExtensionSet"
+                },
+                "op": {
+                    "const": "FuncDefn",
+                    "default": "FuncDefn",
+                    "enum": [
+                        "FuncDefn"
+                    ],
+                    "title": "Op",
+                    "type": "string"
+                },
+                "name": {
+                    "title": "Name",
+                    "type": "string"
+                },
+                "signature": {
+                    "$ref": "#/$defs/PolyFuncType"
+                }
+            },
+            "required": [
+                "parent",
+                "name"
+            ],
+            "title": "FuncDefn",
             "type": "object"
         },
         "FunctionType": {
@@ -287,6 +762,78 @@
             "title": "GeneralSum",
             "type": "object"
         },
+        "Input": {
+            "description": "An input node. The outputs of this node are the inputs to the parent node.",
+            "properties": {
+                "parent": {
+                    "title": "Parent",
+                    "type": "integer"
+                },
+                "input_extensions": {
+                    "$ref": "#/$defs/ExtensionSet"
+                },
+                "op": {
+                    "const": "Input",
+                    "default": "Input",
+                    "enum": [
+                        "Input"
+                    ],
+                    "title": "Op",
+                    "type": "string"
+                },
+                "types": {
+                    "items": {
+                        "$ref": "#/$defs/Type"
+                    },
+                    "title": "Types",
+                    "type": "array"
+                }
+            },
+            "required": [
+                "parent"
+            ],
+            "title": "Input",
+            "type": "object"
+        },
+        "Lift": {
+            "description": "Fixes some TypeParams of a polymorphic type by providing TypeArgs.",
+            "properties": {
+                "parent": {
+                    "title": "Parent",
+                    "type": "integer"
+                },
+                "input_extensions": {
+                    "$ref": "#/$defs/ExtensionSet"
+                },
+                "op": {
+                    "const": "Lift",
+                    "default": "Lift",
+                    "enum": [
+                        "Lift"
+                    ],
+                    "title": "Op",
+                    "type": "string"
+                },
+                "type_row": {
+                    "items": {
+                        "$ref": "#/$defs/Type"
+                    },
+                    "title": "Type Row",
+                    "type": "array"
+                },
+                "new_extension": {
+                    "title": "New Extension",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "parent",
+                "type_row",
+                "new_extension"
+            ],
+            "title": "Lift",
+            "type": "object"
+        },
         "ListParam": {
             "properties": {
                 "tp": {
@@ -307,6 +854,228 @@
             ],
             "title": "ListParam",
             "type": "object"
+        },
+        "LoadConstant": {
+            "description": "An operation that loads a static constant in to the local dataflow graph.",
+            "properties": {
+                "parent": {
+                    "title": "Parent",
+                    "type": "integer"
+                },
+                "input_extensions": {
+                    "$ref": "#/$defs/ExtensionSet"
+                },
+                "op": {
+                    "const": "LoadConstant",
+                    "default": "LoadConstant",
+                    "enum": [
+                        "LoadConstant"
+                    ],
+                    "title": "Op",
+                    "type": "string"
+                },
+                "datatype": {
+                    "$ref": "#/$defs/Type"
+                }
+            },
+            "required": [
+                "parent",
+                "datatype"
+            ],
+            "title": "LoadConstant",
+            "type": "object"
+        },
+        "MakeTuple": {
+            "description": "An operation that packs all its inputs into a tuple.",
+            "properties": {
+                "parent": {
+                    "title": "Parent",
+                    "type": "integer"
+                },
+                "input_extensions": {
+                    "$ref": "#/$defs/ExtensionSet"
+                },
+                "op": {
+                    "const": "MakeTuple",
+                    "default": "MakeTuple",
+                    "enum": [
+                        "MakeTuple"
+                    ],
+                    "title": "Op",
+                    "type": "string"
+                },
+                "tys": {
+                    "items": {
+                        "$ref": "#/$defs/Type"
+                    },
+                    "title": "Tys",
+                    "type": "array"
+                }
+            },
+            "required": [
+                "parent"
+            ],
+            "title": "MakeTuple",
+            "type": "object"
+        },
+        "Module": {
+            "description": "The root of a module, parent of all other `ModuleOp`s.",
+            "properties": {
+                "parent": {
+                    "title": "Parent",
+                    "type": "integer"
+                },
+                "input_extensions": {
+                    "$ref": "#/$defs/ExtensionSet"
+                },
+                "op": {
+                    "const": "Module",
+                    "default": "Module",
+                    "enum": [
+                        "Module"
+                    ],
+                    "title": "Op",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "parent"
+            ],
+            "title": "Module",
+            "type": "object"
+        },
+        "Noop": {
+            "description": "A no-op operation.",
+            "properties": {
+                "parent": {
+                    "title": "Parent",
+                    "type": "integer"
+                },
+                "input_extensions": {
+                    "$ref": "#/$defs/ExtensionSet"
+                },
+                "op": {
+                    "const": "Noop",
+                    "default": "Noop",
+                    "enum": [
+                        "Noop"
+                    ],
+                    "title": "Op",
+                    "type": "string"
+                },
+                "ty": {
+                    "$ref": "#/$defs/Type"
+                }
+            },
+            "required": [
+                "parent",
+                "ty"
+            ],
+            "title": "Noop",
+            "type": "object"
+        },
+        "OpType": {
+            "description": "A constant operation.",
+            "discriminator": {
+                "mapping": {
+                    "AliasDecl": "#/$defs/AliasDecl",
+                    "CFG": "#/$defs/CFG",
+                    "Call": "#/$defs/Call",
+                    "CallIndirect": "#/$defs/CallIndirect",
+                    "Case": "#/$defs/Case",
+                    "Conditional": "#/$defs/Conditional",
+                    "Const": "#/$defs/Const",
+                    "CustomOp": "#/$defs/CustomOp",
+                    "DFG": "#/$defs/DFG",
+                    "DataflowBlock": "#/$defs/DataflowBlock",
+                    "ExitBlock": "#/$defs/ExitBlock",
+                    "FuncDecl": "#/$defs/FuncDecl",
+                    "FuncDefn": "#/$defs/FuncDefn",
+                    "Input": "#/$defs/Input",
+                    "Lift": "#/$defs/Lift",
+                    "LoadConstant": "#/$defs/LoadConstant",
+                    "MakeTuple": "#/$defs/MakeTuple",
+                    "Module": "#/$defs/Module",
+                    "Noop": "#/$defs/Noop",
+                    "Output": "#/$defs/Output",
+                    "Tag": "#/$defs/Tag",
+                    "TailLoop": "#/$defs/TailLoop",
+                    "UnpackTuple": "#/$defs/UnpackTuple"
+                },
+                "propertyName": "op"
+            },
+            "oneOf": [
+                {
+                    "$ref": "#/$defs/Module"
+                },
+                {
+                    "$ref": "#/$defs/Case"
+                },
+                {
+                    "$ref": "#/$defs/FuncDefn"
+                },
+                {
+                    "$ref": "#/$defs/FuncDecl"
+                },
+                {
+                    "$ref": "#/$defs/Const"
+                },
+                {
+                    "$ref": "#/$defs/DataflowBlock"
+                },
+                {
+                    "$ref": "#/$defs/ExitBlock"
+                },
+                {
+                    "$ref": "#/$defs/Conditional"
+                },
+                {
+                    "$ref": "#/$defs/TailLoop"
+                },
+                {
+                    "$ref": "#/$defs/CFG"
+                },
+                {
+                    "$ref": "#/$defs/Input"
+                },
+                {
+                    "$ref": "#/$defs/Output"
+                },
+                {
+                    "$ref": "#/$defs/Call"
+                },
+                {
+                    "$ref": "#/$defs/CallIndirect"
+                },
+                {
+                    "$ref": "#/$defs/LoadConstant"
+                },
+                {
+                    "$ref": "#/$defs/CustomOp"
+                },
+                {
+                    "$ref": "#/$defs/Noop"
+                },
+                {
+                    "$ref": "#/$defs/MakeTuple"
+                },
+                {
+                    "$ref": "#/$defs/UnpackTuple"
+                },
+                {
+                    "$ref": "#/$defs/Tag"
+                },
+                {
+                    "$ref": "#/$defs/Lift"
+                },
+                {
+                    "$ref": "#/$defs/DFG"
+                },
+                {
+                    "$ref": "#/$defs/AliasDecl"
+                }
+            ],
+            "title": "OpType"
         },
         "Opaque": {
             "description": "An opaque Type that can be downcasted by the extensions that define it.",
@@ -388,6 +1157,39 @@
                 "ty"
             ],
             "title": "OpaqueParam",
+            "type": "object"
+        },
+        "Output": {
+            "description": "An output node. The inputs are the outputs of the function.",
+            "properties": {
+                "parent": {
+                    "title": "Parent",
+                    "type": "integer"
+                },
+                "input_extensions": {
+                    "$ref": "#/$defs/ExtensionSet"
+                },
+                "op": {
+                    "const": "Output",
+                    "default": "Output",
+                    "enum": [
+                        "Output"
+                    ],
+                    "title": "Op",
+                    "type": "string"
+                },
+                "types": {
+                    "items": {
+                        "$ref": "#/$defs/Type"
+                    },
+                    "title": "Types",
+                    "type": "array"
+                }
+            },
+            "required": [
+                "parent"
+            ],
+            "title": "Output",
             "type": "object"
         },
         "PolyFuncType": {
@@ -506,6 +1308,48 @@
             "title": "SumValue",
             "type": "object"
         },
+        "Tag": {
+            "description": "An operation that creates a tagged sum value from one of its variants.",
+            "properties": {
+                "parent": {
+                    "title": "Parent",
+                    "type": "integer"
+                },
+                "input_extensions": {
+                    "$ref": "#/$defs/ExtensionSet"
+                },
+                "op": {
+                    "const": "Tag",
+                    "default": "Tag",
+                    "enum": [
+                        "Tag"
+                    ],
+                    "title": "Op",
+                    "type": "string"
+                },
+                "tag": {
+                    "title": "Tag",
+                    "type": "integer"
+                },
+                "variants": {
+                    "items": {
+                        "items": {
+                            "$ref": "#/$defs/Type"
+                        },
+                        "type": "array"
+                    },
+                    "title": "Variants",
+                    "type": "array"
+                }
+            },
+            "required": [
+                "parent",
+                "tag",
+                "variants"
+            ],
+            "title": "Tag",
+            "type": "object"
+        },
         "TaggedSumType": {
             "properties": {
                 "t": {
@@ -525,6 +1369,53 @@
                 "st"
             ],
             "title": "TaggedSumType",
+            "type": "object"
+        },
+        "TailLoop": {
+            "description": "Tail-controlled loop.",
+            "properties": {
+                "parent": {
+                    "title": "Parent",
+                    "type": "integer"
+                },
+                "input_extensions": {
+                    "$ref": "#/$defs/ExtensionSet"
+                },
+                "op": {
+                    "const": "TailLoop",
+                    "default": "TailLoop",
+                    "enum": [
+                        "TailLoop"
+                    ],
+                    "title": "Op",
+                    "type": "string"
+                },
+                "just_inputs": {
+                    "items": {
+                        "$ref": "#/$defs/Type"
+                    },
+                    "title": "Just Inputs",
+                    "type": "array"
+                },
+                "just_outputs": {
+                    "items": {
+                        "$ref": "#/$defs/Type"
+                    },
+                    "title": "Just Outputs",
+                    "type": "array"
+                },
+                "rest": {
+                    "items": {
+                        "$ref": "#/$defs/Type"
+                    },
+                    "title": "Rest",
+                    "type": "array"
+                }
+            },
+            "required": [
+                "parent"
+            ],
+            "title": "TailLoop",
             "type": "object"
         },
         "TupleParam": {
@@ -778,6 +1669,39 @@
             "title": "UnitSum",
             "type": "object"
         },
+        "UnpackTuple": {
+            "description": "An operation that packs all its inputs into a tuple.",
+            "properties": {
+                "parent": {
+                    "title": "Parent",
+                    "type": "integer"
+                },
+                "input_extensions": {
+                    "$ref": "#/$defs/ExtensionSet"
+                },
+                "op": {
+                    "const": "UnpackTuple",
+                    "default": "UnpackTuple",
+                    "enum": [
+                        "UnpackTuple"
+                    ],
+                    "title": "Op",
+                    "type": "string"
+                },
+                "tys": {
+                    "items": {
+                        "$ref": "#/$defs/Type"
+                    },
+                    "title": "Tys",
+                    "type": "array"
+                }
+            },
+            "required": [
+                "parent"
+            ],
+            "title": "UnpackTuple",
+            "type": "object"
+        },
         "Value": {
             "description": "A constant Value.",
             "discriminator": {
@@ -881,6 +1805,17 @@
             "anyOf": [
                 {
                     "$ref": "#/$defs/Value"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "default": null
+        },
+        "optype": {
+            "anyOf": [
+                {
+                    "$ref": "#/$defs/OpType"
                 },
                 {
                     "type": "null"
