@@ -162,18 +162,19 @@ mod test {
     use itertools::Itertools;
     use rstest::rstest;
 
-    use crate::builder::{CFGBuilder, Dataflow, HugrBuilder};
-    use crate::extension::prelude::{ConstUsize, QB_T, USIZE_T};
+    use crate::builder::{CFGBuilder, DFGWrapper, Dataflow, HugrBuilder};
+    use crate::extension::prelude::{ConstUsize, PRELUDE_ID, QB_T, USIZE_T};
     use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE, PRELUDE_REGISTRY};
     use crate::hugr::views::sibling::SiblingMut;
-    use crate::hugr::HugrMut;
+    use crate::hugr::{HugrMut, NodeType};
     use crate::ops::constant::Value;
     use crate::ops::handle::CfgID;
     use crate::ops::{
-        Const, DataflowBlock, ExitBlock, Input, LoadConstant, Noop, OpTrait, OpType, Output, CFG,
+        Const, DataflowBlock, ExitBlock, Input, Lift, LoadConstant, Noop, OpTrait, OpType, Output,
+        CFG,
     };
     use crate::types::{FunctionType, Type, TypeRow};
-    use crate::{const_extension_ids, type_row, Extension, Hugr, HugrView, Node};
+    use crate::{const_extension_ids, type_row, Extension, Hugr, HugrView, Node, Wire};
 
     use super::merge_basic_blocks;
 
@@ -197,6 +198,22 @@ mod test {
         .unwrap();
         e
     }
+
+    fn lifted_unary_unit_sum<B: AsMut<Hugr> + AsRef<Hugr>, T>(b: &mut DFGWrapper<B, T>) -> Wire {
+        let lc = b.add_load_value(Value::unary_unit_sum());
+        let lift = b
+            .add_dataflow_op(
+                Lift {
+                    type_row: Type::new_unit_sum(1).into(),
+                    new_extension: PRELUDE_ID,
+                },
+                [lc],
+            )
+            .unwrap();
+        let [w] = lift.outputs_arr();
+        w
+    }
+
     #[rstest]
     #[case(true)]
     #[case(false)]
@@ -217,15 +234,18 @@ mod test {
         let e = extension();
         let tst_op = e.instantiate_extension_op("Test", [], &PRELUDE_REGISTRY)?;
         let reg = ExtensionRegistry::try_new([PRELUDE.to_owned(), e])?;
-        let mut h = CFGBuilder::new(FunctionType::new(loop_variants.clone(), exit_types.clone()))?;
+        let mut h = CFGBuilder::new(
+            FunctionType::new(loop_variants.clone(), exit_types.clone())
+                .with_extension_delta(ExtensionSet::singleton(&PRELUDE_ID)),
+        )?;
         let mut no_b1 = h.simple_entry_builder(loop_variants.clone(), 1, ExtensionSet::new())?;
         let n = no_b1.add_dataflow_op(Noop { ty: QB_T }, no_b1.input_wires())?;
-        let br = no_b1.add_load_const(Value::unary_unit_sum());
+        let br = lifted_unary_unit_sum(&mut no_b1);
         let no_b1 = no_b1.finish_with_outputs(br, n.outputs())?;
         let mut test_block = h.block_builder(
             loop_variants.clone(),
             vec![loop_variants.clone(), exit_types],
-            ExtensionSet::singleton(&EXT_ID),
+            ExtensionSet::singleton(&PRELUDE_ID),
             type_row![],
         )?;
         let [test_input] = test_block.input_wires_arr();
@@ -239,7 +259,7 @@ mod test {
         } else {
             let mut no_b2 = h.simple_block_builder(FunctionType::new_endo(loop_variants), 1)?;
             let n = no_b2.add_dataflow_op(Noop { ty: QB_T }, no_b2.input_wires())?;
-            let br = no_b2.add_load_const(Value::unary_unit_sum());
+            let br = lifted_unary_unit_sum(&mut no_b2);
             let nid = no_b2.finish_with_outputs(br, n.outputs())?;
             h.branch(&nid, 0, &no_b1)?;
             nid
@@ -247,10 +267,11 @@ mod test {
         h.branch(&no_b1, 0, &test_block)?;
         h.branch(&test_block, 0, &loop_backedge_target)?;
         h.branch(&test_block, 1, &h.exit_block())?;
+
         let mut h = h.finish_hugr(&reg)?;
         let r = h.root();
         merge_basic_blocks(&mut SiblingMut::<CfgID>::try_new(&mut h, r)?);
-        h.validate(&reg).unwrap();
+        h.update_validate(&reg).unwrap();
         assert_eq!(r, h.root());
         assert!(matches!(h.get_optype(r), OpType::CFG(_)));
         let [entry, exit] = h
@@ -334,7 +355,8 @@ mod test {
             );
             let inp = h.add_node_with_parent(bb, inp);
             let outp = h.add_node_with_parent(bb, outp);
-            let cst = h.add_node_with_parent(bb, Const::new(Value::unary_unit_sum()));
+            let cst =
+                h.add_node_with_parent(bb, NodeType::new_open(Const::new(Value::unary_unit_sum())));
             let load_cst = h.add_node_with_parent(
                 bb,
                 LoadConstant {
@@ -358,7 +380,8 @@ mod test {
             .unwrap();
         let mut h = Hugr::new(
             CFG {
-                signature: FunctionType::new(QB_T, res_t.clone()),
+                signature: FunctionType::new(QB_T, res_t.clone())
+                    .with_extension_delta(ExtensionSet::singleton(&PRELUDE_ID)),
             }
             .into(),
         );
@@ -366,7 +389,7 @@ mod test {
             &mut h,
             QB_T.into(),
             type_row![USIZE_T, QB_T],
-            ExtensionSet::new(),
+            ExtensionSet::singleton(&PRELUDE_ID),
         );
         let cst = h.add_node_with_parent(bb1, Const::new(ConstUsize::new(1).into()));
         let load_cst = h.add_node_with_parent(bb1, LoadConstant { datatype: USIZE_T });
@@ -394,7 +417,7 @@ mod test {
             &mut h,
             type_row![QB_T, USIZE_T],
             res_t.clone().into(),
-            ExtensionSet::singleton(&EXT_ID),
+            ExtensionSet::new(),
         );
         let tst = h.add_node_with_parent(bb3, tst_op);
         h.connect(inp, 0, tst, 0);
@@ -410,7 +433,7 @@ mod test {
         h.update_validate(&reg)?;
         let root = h.root();
         merge_basic_blocks(&mut SiblingMut::try_new(&mut h, root)?);
-        h.validate(&reg)?;
+        h.update_validate(&reg)?;
 
         // Should only be one BB left
         let [bb, _exit] = h.children(h.root()).collect::<Vec<_>>().try_into().unwrap();
