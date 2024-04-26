@@ -260,8 +260,7 @@ impl TryFrom<SerHugrV1> for Hugr {
     }
 }
 
-#[cfg(test)]
-#[cfg_attr(miri, ignore = "miri does not support 'life before main'")]
+#[cfg(all(test, not(miri)))]
 // Miri doesn't run the extension registration required by `typetag` for
 // registering `CustomConst`s.  https://github.com/rust-lang/miri/issues/450
 pub mod test {
@@ -271,7 +270,7 @@ pub mod test {
         test::closed_dfg_root_hugr, Container, DFGBuilder, Dataflow, DataflowHugr,
         DataflowSubContainer, HugrBuilder, ModuleBuilder,
     };
-    use crate::extension::prelude::BOOL_T;
+    use crate::extension::prelude::{BOOL_T, USIZE_T};
     use crate::extension::simple_op::MakeRegisteredOp;
     use crate::extension::{EMPTY_REG, PRELUDE_REGISTRY};
     use crate::hugr::hugrmut::sealed::HugrMutInternals;
@@ -561,5 +560,23 @@ pub mod test {
         assert_eq!(hugr, deser);
 
         Ok(())
+    }
+
+    #[test]
+    fn serialize_types_roundtrip() {
+        let g: Type = Type::new_function(FunctionType::new_endo(vec![]));
+
+        assert_eq!(ser_roundtrip(&g), g);
+
+        // A Simple tuple
+        let t = Type::new_tuple(vec![USIZE_T, g]);
+        assert_eq!(ser_roundtrip(&t), t);
+
+        // A Classic sum
+        let t = Type::new_sum([type_row![USIZE_T], type_row![FLOAT64_TYPE]]);
+        assert_eq!(ser_roundtrip(&t), t);
+
+        let t = Type::new_unit_sum(4);
+        assert_eq!(ser_roundtrip(&t), t);
     }
 }
