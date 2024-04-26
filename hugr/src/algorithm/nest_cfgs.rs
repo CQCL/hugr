@@ -278,6 +278,7 @@ impl<H: HugrMut> CfgNester<Node> for IdentityCfgMap<H> {
 
 /// An error trying to get the blocks of a SESE (single-entry-single-exit) region
 #[derive(Clone, Debug, Error)]
+#[non_exhaustive]
 pub enum RegionBlocksError<T> {
     /// The specified exit edge did not exist in the CFG
     ExitEdgeNotPresent(T, T),
@@ -579,7 +580,7 @@ pub(crate) mod test {
 
     use crate::hugr::views::RootChecked;
     use crate::ops::handle::{BasicBlockID, ConstID, NodeHandle};
-    use crate::ops::Const;
+    use crate::ops::Value;
     use crate::types::{FunctionType, Type};
     use crate::{type_row, Hugr};
     const NAT: Type = USIZE_T;
@@ -605,8 +606,8 @@ pub(crate) mod test {
         //               \-> right -/             \-<--<-/
         let mut cfg_builder = CFGBuilder::new(FunctionType::new(type_row![NAT], type_row![NAT]))?;
 
-        let pred_const = cfg_builder.add_constant(Const::unit_sum(0, 2).expect("0 < 2"));
-        let const_unit = cfg_builder.add_constant(Const::unary_unit_sum());
+        let pred_const = cfg_builder.add_constant(Value::unit_sum(0, 2).expect("0 < 2"));
+        let const_unit = cfg_builder.add_constant(Value::unary_unit_sum());
 
         let entry = n_identity(
             cfg_builder.simple_entry_builder(type_row![NAT], 1, ExtensionSet::new())?,
@@ -887,8 +888,8 @@ pub(crate) mod test {
         separate: bool,
     ) -> Result<(Hugr, BasicBlockID, BasicBlockID), BuildError> {
         let mut cfg_builder = CFGBuilder::new(FunctionType::new(type_row![NAT], type_row![NAT]))?;
-        let pred_const = cfg_builder.add_constant(Const::unit_sum(0, 2).expect("0 < 2"));
-        let const_unit = cfg_builder.add_constant(Const::unary_unit_sum());
+        let pred_const = cfg_builder.add_constant(Value::unit_sum(0, 2).expect("0 < 2"));
+        let const_unit = cfg_builder.add_constant(Value::unary_unit_sum());
 
         let entry = n_identity(
             cfg_builder.simple_entry_builder(type_row![NAT], 2, ExtensionSet::new())?,
@@ -929,8 +930,8 @@ pub(crate) mod test {
         cfg_builder: &mut CFGBuilder<T>,
         separate_headers: bool,
     ) -> Result<(BasicBlockID, BasicBlockID), BuildError> {
-        let pred_const = cfg_builder.add_constant(Const::unit_sum(0, 2).expect("0 < 2"));
-        let const_unit = cfg_builder.add_constant(Const::unary_unit_sum());
+        let pred_const = cfg_builder.add_constant(Value::unit_sum(0, 2).expect("0 < 2"));
+        let const_unit = cfg_builder.add_constant(Value::unary_unit_sum());
 
         let entry = n_identity(
             cfg_builder.simple_entry_builder(type_row![NAT], 1, ExtensionSet::new())?,

@@ -139,7 +139,7 @@ impl Rewrite for OutlineCfg {
                 .cfg_builder(wires_in, input_extensions, outputs, extension_delta)
                 .unwrap();
             let cfg = cfg.finish_sub_container().unwrap();
-            let unit_sum = new_block_bldr.add_constant(ops::Const::unary_unit_sum());
+            let unit_sum = new_block_bldr.add_constant(ops::Value::unary_unit_sum());
             let pred_wire = new_block_bldr.load_const(&unit_sum);
             new_block_bldr
                 .set_outputs(pred_wire, cfg.outputs())
@@ -219,6 +219,7 @@ impl Rewrite for OutlineCfg {
 
 /// Errors that can occur in expressing an OutlineCfg rewrite.
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum OutlineCfgError {
     /// The set of blocks were not siblings
     #[error("The nodes did not all have the same parent")]

@@ -25,7 +25,7 @@ repository = "https://github.com/CQCL/hugr"
 
 [tool.poetry.dependencies]
 python = ">=3.10"
-pydantic = "^2.6.4"
+pydantic = "~2.7.0"
 
 [tool.pytest.ini_options]
 # Lark throws deprecation warnings for `src_parse` and `src_constants`.

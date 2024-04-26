@@ -28,9 +28,9 @@ shell by setting up [direnv](https://devenv.sh/automatic-shell-activation/).
 
 To setup the environment manually you will need:
 
-- Rust: https://www.rust-lang.org/tools/install
 - Just: https://just.systems/
-- Poetry: https://python-poetry.org/
+- Rust `>=1.75`: https://www.rust-lang.org/tools/install
+- Poetry `>=1.8`: https://python-poetry.org/
 
 Once you have these installed, you can install the required python dependencies and setup pre-commit hooks with:
 

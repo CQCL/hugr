@@ -20,7 +20,7 @@ use smol_str::SmolStr;
 
 use enum_dispatch::enum_dispatch;
 
-pub use constant::Const;
+pub use constant::{Const, Value};
 pub use controlflow::{BasicBlock, Case, Conditional, DataflowBlock, ExitBlock, TailLoop, CFG};
 pub use custom::CustomOp;
 pub use dataflow::{Call, CallIndirect, DataflowParent, Input, LoadConstant, Output, DFG};
@@ -189,13 +189,13 @@ impl OpType {
     ///
     /// Returns None if there is no such port, or if the operation defines multiple non-dataflow ports.
     pub fn other_port(&self, dir: Direction) -> Option<Port> {
+        let df_count = self.value_port_count(dir);
         let non_df_count = self.non_df_port_count(dir);
-        if self.other_port_kind(dir).is_some() && non_df_count == 1 {
-            // if there is a static input it comes before the non_df_ports
-            let static_input =
-                (dir == Direction::Incoming && OpTag::StaticInput.is_superset(self.tag())) as usize;
-
-            Some(Port::new(dir, self.value_port_count(dir) + static_input))
+        // if there is a static input it comes before the non_df_ports
+        let static_input =
+            (dir == Direction::Incoming && OpTag::StaticInput.is_superset(self.tag())) as usize;
+        if self.other_port_kind(dir).is_some() && non_df_count >= 1 {
+            Some(Port::new(dir, df_count + static_input))
         } else {
             None
         }

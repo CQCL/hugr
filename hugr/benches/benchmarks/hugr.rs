@@ -29,7 +29,7 @@ pub fn simple_cfg_builder<T: AsMut<Hugr> + AsRef<Hugr>>(
     let mut middle_b = cfg_builder
         .simple_block_builder(FunctionType::new(type_row![USIZE_T], type_row![USIZE_T]), 1)?;
     let middle = {
-        let c = middle_b.add_load_const(hugr::ops::Const::unary_unit_sum());
+        let c = middle_b.add_load_const(hugr::ops::Value::unary_unit_sum());
         let [inw] = middle_b.input_wires_arr();
         middle_b.finish_with_outputs(c, [inw])?
     };

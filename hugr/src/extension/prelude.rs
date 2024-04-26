@@ -54,10 +54,20 @@ lazy_static! {
                 TypeDefBound::Explicit(crate::types::TypeBound::Eq),
             )
             .unwrap();
-
-
-        prelude
-            .add_type(
+        prelude.add_type(
+                STRING_TYPE_NAME,
+                vec![],
+                "string".into(),
+                TypeDefBound::Explicit(crate::types::TypeBound::Eq),
+            )
+            .unwrap();
+        prelude.add_op(
+            SmolStr::new_inline(PRINT_OP_ID),
+            "Print the string to standard output".to_string(),
+            FunctionType::new(type_row![STRING_TYPE], type_row![]),
+            )
+            .unwrap();
+        prelude.add_type(
                 SmolStr::new_inline("array"),
                 vec![ TypeParam::max_nat(), TypeBound::Any.into()],
                 "array".into(),
@@ -147,6 +157,54 @@ pub fn new_array_op(element_ty: Type, size: u64) -> CustomOp {
         .unwrap()
         .into()
 }
+
+/// Name of the string type.
+pub const STRING_TYPE_NAME: SmolStr = SmolStr::new_inline("string");
+
+/// Custom type for strings.
+pub const STRING_CUSTOM_TYPE: CustomType =
+    CustomType::new_simple(STRING_TYPE_NAME, PRELUDE_ID, TypeBound::Eq);
+
+/// String type.
+pub const STRING_TYPE: Type = Type::new_extension(STRING_CUSTOM_TYPE);
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+/// Structure for holding constant string values.
+pub struct ConstString(String);
+
+impl ConstString {
+    /// Creates a new [`ConstString`].
+    pub fn new(value: String) -> Self {
+        Self(value)
+    }
+
+    /// Returns the value of the constant.
+    pub fn value(&self) -> &str {
+        &self.0
+    }
+}
+
+#[typetag::serde]
+impl CustomConst for ConstString {
+    fn name(&self) -> SmolStr {
+        format!("ConstString({:?})", self.0).into()
+    }
+
+    fn equal_consts(&self, other: &dyn CustomConst) -> bool {
+        crate::ops::constant::downcast_equal_consts(self, other)
+    }
+
+    fn extension_reqs(&self) -> ExtensionSet {
+        ExtensionSet::singleton(&PRELUDE_ID)
+    }
+
+    fn get_type(&self) -> Type {
+        STRING_TYPE
+    }
+}
+
+/// Name of the print operation
+pub const PRINT_OP_ID: &str = "print";
 
 /// The custom type for Errors.
 pub const ERROR_CUSTOM_TYPE: CustomType =
@@ -239,6 +297,7 @@ mod test {
     use crate::{
         builder::{DFGBuilder, Dataflow, DataflowHugr},
         types::FunctionType,
+        Hugr, Wire,
     };
 
     use super::*;
@@ -288,7 +347,7 @@ mod test {
 
         let mut b = DFGBuilder::new(FunctionType::new_endo(type_row![])).unwrap();
 
-        let err = b.add_load_const(error_val);
+        let err = b.add_load_value(error_val);
 
         let op = PRELUDE
             .instantiate_extension_op(PANIC_OP_ID, [], &PRELUDE_REGISTRY)
@@ -296,6 +355,40 @@ mod test {
 
         b.add_dataflow_op(op, [err]).unwrap();
 
+        b.finish_prelude_hugr_with_outputs([]).unwrap();
+    }
+
+    #[test]
+    /// Test string type.
+    fn test_string_type() {
+        let string_custom_type: CustomType = PRELUDE
+            .get_type(&STRING_TYPE_NAME)
+            .unwrap()
+            .instantiate([])
+            .unwrap();
+        let string_type: Type = Type::new_extension(string_custom_type);
+        assert_eq!(string_type, STRING_TYPE);
+        let string_const: ConstString = ConstString::new("Lorem ipsum".into());
+        assert_eq!(string_const.name(), "ConstString(\"Lorem ipsum\")");
+        assert!(string_const.validate().is_ok());
+        assert_eq!(
+            string_const.extension_reqs(),
+            ExtensionSet::singleton(&PRELUDE_ID)
+        );
+        assert!(string_const.equal_consts(&ConstString::new("Lorem ipsum".into())));
+        assert!(!string_const.equal_consts(&ConstString::new("Lorem ispum".into())));
+    }
+
+    #[test]
+    /// Test print operation
+    fn test_print() {
+        let mut b: DFGBuilder<Hugr> = DFGBuilder::new(FunctionType::new(vec![], vec![])).unwrap();
+        let greeting: ConstString = ConstString::new("Hello, world!".into());
+        let greeting_out: Wire = b.add_load_value(greeting);
+        let print_op = PRELUDE
+            .instantiate_extension_op(PRINT_OP_ID, [], &PRELUDE_REGISTRY)
+            .unwrap();
+        b.add_dataflow_op(print_op, [greeting_out]).unwrap();
         b.finish_prelude_hugr_with_outputs([]).unwrap();
     }
 }

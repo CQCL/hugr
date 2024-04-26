@@ -5,7 +5,7 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 
-use crate::ops::{Const, OpTrait};
+use crate::ops::Value;
 use crate::{
     algorithm::const_fold::sorted_consts,
     extension::{
@@ -33,12 +33,12 @@ pub const EXTENSION_NAME: ExtensionId = ExtensionId::new_unchecked("Collections"
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 /// Dynamically sized list of values, all of the same type.
-pub struct ListValue(Vec<Const>, Type);
+pub struct ListValue(Vec<Value>, Type);
 
 impl ListValue {
     /// Create a new [CustomConst] for a list of values of type `typ`.
     /// That all values ore of type `typ` is not checked here.
-    pub fn new(typ: Type, contents: impl IntoIterator<Item = Const>) -> Self {
+    pub fn new(typ: Type, contents: impl IntoIterator<Item = Value>) -> Self {
         Self(contents.into_iter().collect_vec(), typ)
     }
 
@@ -96,7 +96,7 @@ impl CustomConst for ListValue {
     }
 
     fn extension_reqs(&self) -> ExtensionSet {
-        ExtensionSet::union_over(self.0.iter().map(Const::extension_delta))
+        ExtensionSet::union_over(self.0.iter().map(Value::extension_reqs))
             .union(EXTENSION_NAME.into())
     }
 }
@@ -107,9 +107,9 @@ impl ConstFold for PopFold {
     fn fold(
         &self,
         _type_args: &[TypeArg],
-        consts: &[(crate::IncomingPort, ops::Const)],
+        consts: &[(crate::IncomingPort, ops::Value)],
     ) -> crate::extension::ConstFoldResult {
-        let [list]: [&ops::Const; 1] = sorted_consts(consts).try_into().ok()?;
+        let [list]: [&ops::Value; 1] = sorted_consts(consts).try_into().ok()?;
         let list: &ListValue = list.get_custom_value().expect("Should be list value.");
         let mut list = list.clone();
         let elem = list.0.pop()?; // empty list fails to evaluate "pop"
@@ -124,9 +124,9 @@ impl ConstFold for PushFold {
     fn fold(
         &self,
         _type_args: &[TypeArg],
-        consts: &[(crate::IncomingPort, ops::Const)],
+        consts: &[(crate::IncomingPort, ops::Value)],
     ) -> crate::extension::ConstFoldResult {
-        let [list, elem]: [&ops::Const; 2] = sorted_consts(consts).try_into().ok()?;
+        let [list, elem]: [&ops::Value; 2] = sorted_consts(consts).try_into().ok()?;
         let list: &ListValue = list.get_custom_value().expect("Should be list value.");
         let mut list = list.clone();
         list.0.push(elem.clone());
@@ -204,6 +204,7 @@ fn list_and_elem_type_vars(list_type_def: &TypeDef) -> (Type, Type) {
 
 /// A list operation
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub enum ListOp {
     /// Pop from end of list
     Pop,

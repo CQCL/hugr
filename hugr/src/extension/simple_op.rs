@@ -20,6 +20,7 @@ use thiserror::Error;
 #[derive(Debug, Error, PartialEq)]
 #[error("{0}")]
 #[allow(missing_docs)]
+#[non_exhaustive]
 pub enum OpLoadError {
     #[error("Op with name {0} is not a member of this set.")]
     NotMember(String),

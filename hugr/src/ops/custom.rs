@@ -66,6 +66,14 @@ impl CustomOp {
         }
     }
 
+    /// Returns the extension ID of this operation.
+    pub fn extension(&self) -> &ExtensionId {
+        match self {
+            Self::Opaque(op) => op.extension(),
+            Self::Extension(op) => op.def.extension(),
+        }
+    }
+
     /// If the operation is an instance of [ExtensionOp], return a reference to it.
     /// If the operation is opaque, return None.
     pub fn as_extension_op(&self) -> Option<&ExtensionOp> {
@@ -191,7 +199,7 @@ impl ExtensionOp {
     }
 
     /// Attempt to evaluate this operation. See [`OpDef::constant_fold`].
-    pub fn constant_fold(&self, consts: &[(IncomingPort, ops::Const)]) -> ConstFoldResult {
+    pub fn constant_fold(&self, consts: &[(IncomingPort, ops::Value)]) -> ConstFoldResult {
         self.def().constant_fold(self.args(), consts)
     }
 
@@ -389,6 +397,7 @@ pub fn resolve_opaque_op(
 /// Errors that arise after loading a Hugr containing opaque ops (serialized just as their names)
 /// when trying to resolve the serialized names against a registry of known Extensions.
 #[derive(Clone, Debug, Error, PartialEq)]
+#[non_exhaustive]
 pub enum CustomOpError {
     /// The Extension was found but did not contain the expected OpDef
     #[error("Operation {0} not found in Extension {1}")]

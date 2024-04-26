@@ -5,7 +5,7 @@ use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 use super::float_types::FLOAT64_TYPE;
 use crate::{
     extension::{
-        prelude::BOOL_T,
+        prelude::{BOOL_T, STRING_TYPE},
         simple_op::{MakeOpDef, MakeRegisteredOp, OpLoadError},
         ExtensionId, ExtensionRegistry, ExtensionSet, OpDef, SignatureFunc, PRELUDE,
     },
@@ -21,6 +21,7 @@ pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.flo
 /// Integer extension operation definitions.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, EnumIter, IntoStaticStr, EnumString)]
 #[allow(missing_docs, non_camel_case_types)]
+#[non_exhaustive]
 pub enum FloatOps {
     feq,
     fne,
@@ -38,6 +39,7 @@ pub enum FloatOps {
     fdiv,
     ffloor,
     fceil,
+    ftostring,
 }
 
 impl MakeOpDef for FloatOps {
@@ -56,6 +58,7 @@ impl MakeOpDef for FloatOps {
                 FunctionType::new(type_row![FLOAT64_TYPE; 2], type_row![FLOAT64_TYPE])
             }
             fneg | fabs | ffloor | fceil => FunctionType::new_endo(type_row![FLOAT64_TYPE]),
+            ftostring => FunctionType::new(type_row![FLOAT64_TYPE], STRING_TYPE),
         }
         .into()
     }
@@ -79,6 +82,7 @@ impl MakeOpDef for FloatOps {
             fdiv => "division",
             ffloor => "floor",
             fceil => "ceiling",
+            ftostring => "string representation",
         }
         .to_string()
     }

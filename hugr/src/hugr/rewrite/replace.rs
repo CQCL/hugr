@@ -384,6 +384,7 @@ fn transfer_edges<'a>(
 
 /// Error in a [`Replacement`]
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
+#[non_exhaustive]
 pub enum ReplaceError {
     /// The node(s) to replace had no parent i.e. were root(s).
     // (Perhaps if there is only one node to replace we should be able to?)
@@ -495,7 +496,7 @@ mod test {
             FunctionType::new_endo(just_list.clone()),
         )?;
 
-        let pred_const = cfg.add_constant(ops::Const::unary_unit_sum());
+        let pred_const = cfg.add_constant(ops::Value::unary_unit_sum());
 
         let entry = single_node_block(&mut cfg, pop, &pred_const, true)?;
         let bb2 = single_node_block(&mut cfg, push, &pred_const, false)?;

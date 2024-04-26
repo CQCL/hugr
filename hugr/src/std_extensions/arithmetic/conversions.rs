@@ -26,6 +26,7 @@ pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.con
 /// Extension for conversions between floats and integers.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, EnumIter, IntoStaticStr, EnumString)]
 #[allow(missing_docs, non_camel_case_types)]
+#[non_exhaustive]
 pub enum ConvertOpDef {
     trunc_u,
     trunc_s,

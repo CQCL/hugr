@@ -149,8 +149,9 @@ mod test {
     use crate::extension::prelude::{QB_T, USIZE_T};
     use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE, PRELUDE_REGISTRY};
     use crate::hugr::views::sibling::SiblingMut;
+    use crate::ops::constant::Value;
     use crate::ops::handle::CfgID;
-    use crate::ops::{Const, Noop, OpType};
+    use crate::ops::{Noop, OpType};
     use crate::types::{FunctionType, Type, TypeRow};
     use crate::{const_extension_ids, type_row, Extension, HugrView};
 
@@ -185,7 +186,7 @@ mod test {
         let mut h = CFGBuilder::new(FunctionType::new(loop_variants.clone(), exit_types.clone()))?;
         let mut no_b1 = h.simple_entry_builder(loop_variants.clone(), 1, ExtensionSet::new())?;
         let n = no_b1.add_dataflow_op(Noop { ty: QB_T }, no_b1.input_wires())?;
-        let br = no_b1.add_load_const(Const::unary_unit_sum());
+        let br = no_b1.add_load_const(Value::unary_unit_sum());
         let no_b1 = no_b1.finish_with_outputs(br, n.outputs())?;
         let mut test_block = h.block_builder(
             loop_variants.clone(),
@@ -199,7 +200,7 @@ mod test {
         let test_block = test_block.finish_with_outputs(tst, [])?;
         let mut no_b2 = h.simple_block_builder(FunctionType::new_endo(loop_variants), 1)?;
         let n = no_b2.add_dataflow_op(Noop { ty: QB_T }, no_b2.input_wires())?;
-        let br = no_b2.add_load_const(Const::unary_unit_sum());
+        let br = no_b2.add_load_const(Value::unary_unit_sum());
         let no_b2 = no_b2.finish_with_outputs(br, n.outputs())?;
         h.branch(&no_b1, 0, &test_block)?;
         h.branch(&test_block, 0, &no_b2)?;

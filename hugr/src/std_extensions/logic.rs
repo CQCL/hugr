@@ -26,6 +26,7 @@ pub const TRUE_NAME: &str = "TRUE";
 /// Logic extension operation definitions.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, EnumIter, IntoStaticStr, EnumString)]
 #[allow(missing_docs)]
+#[non_exhaustive]
 pub enum NaryLogic {
     And,
     Or,
@@ -53,12 +54,12 @@ impl MakeOpDef for NaryLogic {
             NaryLogic::And => |consts: &_| {
                 let inps = read_inputs(consts)?;
                 let res = inps.into_iter().all(|x| x);
-                Some(vec![(0.into(), ops::Const::from_bool(res))])
+                Some(vec![(0.into(), ops::Value::from_bool(res))])
             },
             NaryLogic::Or => |consts: &_| {
                 let inps = read_inputs(consts)?;
                 let res = inps.into_iter().any(|x| x);
-                Some(vec![(0.into(), ops::Const::from_bool(res))])
+                Some(vec![(0.into(), ops::Value::from_bool(res))])
             },
         })
     }
@@ -151,10 +152,10 @@ fn extension() -> Extension {
     NotOp.add_to_extension(&mut extension).unwrap();
 
     extension
-        .add_value(FALSE_NAME, ops::Const::false_val())
+        .add_value(FALSE_NAME, ops::Value::false_val())
         .unwrap();
     extension
-        .add_value(TRUE_NAME, ops::Const::true_val())
+        .add_value(TRUE_NAME, ops::Value::true_val())
         .unwrap();
     extension
 }
@@ -187,9 +188,9 @@ impl MakeRegisteredOp for NotOp {
     }
 }
 
-fn read_inputs(consts: &[(IncomingPort, ops::Const)]) -> Option<Vec<bool>> {
-    let true_val = ops::Const::true_val();
-    let false_val = ops::Const::false_val();
+fn read_inputs(consts: &[(IncomingPort, ops::Value)]) -> Option<Vec<bool>> {
+    let true_val = ops::Value::true_val();
+    let false_val = ops::Value::false_val();
     let inps: Option<Vec<bool>> = sorted_consts(consts)
         .into_iter()
         .map(|c| {

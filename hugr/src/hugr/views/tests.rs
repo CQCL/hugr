@@ -4,7 +4,10 @@ use rstest::{fixture, rstest};
 use crate::{
     builder::{BuildError, BuildHandle, Container, DFGBuilder, Dataflow, DataflowHugr},
     extension::prelude::QB_T,
-    ops::handle::{DataflowOpID, NodeHandle},
+    ops::{
+        handle::{DataflowOpID, NodeHandle},
+        Value,
+    },
     type_row,
     types::FunctionType,
     utils::test_quantum_extension::cx_gate,
@@ -154,7 +157,7 @@ fn static_targets() {
     )
     .unwrap();
 
-    let c = dfg.add_constant(ConstUsize::new(1));
+    let c = dfg.add_constant(Value::extension(ConstUsize::new(1)));
 
     let load = dfg.load_const(&c);
 

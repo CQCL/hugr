@@ -98,6 +98,15 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         // Hierarchy and children. No type variables declared outside the root.
         self.validate_subtree(self.hugr.root(), &[])?;
 
+        // In tests we take the opportunity to verify that the hugr
+        // serialization round-trips.
+        //
+        // TODO: We should also verify that the serialized hugr matches the
+        // in-tree schema. For now, our serialized hugr does not match the
+        // schema. When this is fixed we should pass true below.
+        #[cfg(test)]
+        crate::hugr::serialize::test::check_hugr_roundtrip(self.hugr, false);
+
         Ok(())
     }
 
@@ -591,6 +600,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
 /// Errors that can occur while validating a Hugr.
 #[derive(Debug, Clone, PartialEq, Error)]
 #[allow(missing_docs)]
+#[non_exhaustive]
 pub enum ValidationError {
     /// The root node of the Hugr is not a root in the hierarchy.
     #[error("The root node of the Hugr {node:?} is not a root in the hierarchy.")]
@@ -706,6 +716,7 @@ pub enum ValidationError {
 /// Errors related to the inter-graph edge validations.
 #[derive(Debug, Clone, PartialEq, Error)]
 #[allow(missing_docs)]
+#[non_exhaustive]
 pub enum InterGraphEdgeError {
     /// Inter-Graph edges can only carry copyable data.
     #[error("Inter-graph edges can only carry copyable data. In an inter-graph edge from {from:?} ({from_offset:?}) to {to:?} ({to_offset:?}) with type {ty:?}.")]
