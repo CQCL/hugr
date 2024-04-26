@@ -144,6 +144,7 @@ mod test {
     use std::collections::HashSet;
 
     use itertools::Itertools;
+    use rstest::rstest;
 
     use crate::builder::{CFGBuilder, Dataflow, HugrBuilder};
     use crate::extension::prelude::{QB_T, USIZE_T};
@@ -160,12 +161,20 @@ mod test {
     const_extension_ids! {
         const EXT_ID: ExtensionId = "TestExt";
     }
-    #[test]
-    fn in_loop() -> Result<(), Box<dyn std::error::Error>> {
-        /* -> Noop1 -----> Test -> Exit       -> Noop1AndTest --> Exit
+    #[rstest]
+    #[case(true)]
+    #[case(false)]
+    fn in_loop(#[case] self_loop: bool) -> Result<(), Box<dyn std::error::Error>> {
+        /* self_loop==False:
+           -> Noop1 -----> Test -> Exit       -> Noop1AndTest --> Exit
                |            |            =>     /            \
                \-<- Noop2 <-/                   \-<- Noop2 <-/
-           (Empty -> Noop cannot be merged because Noop is the entry node)
+           (Noop2 -> Noop1 cannot be merged because Noop1 is the entry node)
+
+           self_loop==True:
+           -> Noop --> Test -> Exit           -> NoopAndTest --> Exit
+               |        |                =>     /           \
+               \--<--<--/                       \--<-----<--/
         */
         let loop_variants = type_row![QB_T];
         let exit_types = type_row![USIZE_T];
@@ -198,13 +207,18 @@ mod test {
             .add_dataflow_op(tst_op, test_block.input_wires())?
             .outputs_arr();
         let test_block = test_block.finish_with_outputs(tst, [])?;
-        let mut no_b2 = h.simple_block_builder(FunctionType::new_endo(loop_variants), 1)?;
-        let n = no_b2.add_dataflow_op(Noop { ty: QB_T }, no_b2.input_wires())?;
-        let br = no_b2.add_load_const(Value::unary_unit_sum());
-        let no_b2 = no_b2.finish_with_outputs(br, n.outputs())?;
+        let loop_backedge_target = if self_loop {
+            no_b1
+        } else {
+            let mut no_b2 = h.simple_block_builder(FunctionType::new_endo(loop_variants), 1)?;
+            let n = no_b2.add_dataflow_op(Noop { ty: QB_T }, no_b2.input_wires())?;
+            let br = no_b2.add_load_const(Value::unary_unit_sum());
+            let nid = no_b2.finish_with_outputs(br, n.outputs())?;
+            h.branch(&nid, 0, &no_b1)?;
+            nid
+        };
         h.branch(&no_b1, 0, &test_block)?;
-        h.branch(&test_block, 0, &no_b2)?;
-        h.branch(&no_b2, 0, &no_b1)?;
+        h.branch(&test_block, 0, &loop_backedge_target)?;
         h.branch(&test_block, 1, &h.exit_block())?;
         let mut h = h.finish_hugr(&reg)?;
         let r = h.root();
@@ -212,25 +226,37 @@ mod test {
         h.validate(&reg).unwrap();
         assert_eq!(r, h.root());
         assert!(matches!(h.get_optype(r), OpType::CFG(_)));
-        let [entry, exit, no_b2] = h.children(r).collect::<Vec<_>>().try_into().unwrap();
-        assert_eq!(
-            h.output_neighbours(entry).collect::<HashSet<_>>(),
-            HashSet::from([no_b2, exit])
-        );
-        // Check the Noop's are in the right blocks
-        let [n_op1, n_op2] = h
-            .nodes()
-            .filter(|n| matches!(h.get_optype(*n), OpType::Noop(_)))
+        let [entry, exit] = h
+            .children(r)
+            .take(2)
             .collect::<Vec<_>>()
             .try_into()
             .unwrap();
-        let (n_op1, n_op2) = if h.get_parent(n_op1) == Some(entry) {
-            (n_op1, n_op2)
+        // Check the Noop('s) is/are in the right block(s)
+        let nops = h
+            .nodes()
+            .filter(|n| matches!(h.get_optype(*n), OpType::Noop(_)));
+        let (entry_nop, expected_backedge_target) = if self_loop {
+            assert_eq!(h.children(r).len(), 2);
+            (nops.exactly_one().ok().unwrap(), entry)
         } else {
-            (n_op2, n_op1)
+            let [_, _, no_b2] = h.children(r).collect::<Vec<_>>().try_into().unwrap();
+            let mut nops = nops.collect::<Vec<_>>();
+            let entry_nop_idx = nops
+                .iter()
+                .position(|n| h.get_parent(*n) == Some(entry))
+                .unwrap();
+            let entry_nop = nops[entry_nop_idx];
+            nops.remove(entry_nop_idx);
+            let [n_op2] = nops.try_into().unwrap();
+            assert_eq!(h.get_parent(n_op2), Some(no_b2));
+            (entry_nop, no_b2)
         };
-        assert_eq!(h.get_parent(n_op1), Some(entry));
-        assert_eq!(h.get_parent(n_op2), Some(no_b2));
+        assert_eq!(h.get_parent(entry_nop), Some(entry));
+        assert_eq!(
+            h.output_neighbours(entry).collect::<HashSet<_>>(),
+            HashSet::from([expected_backedge_target, exit])
+        );
         // And the Noop in the entry block is consumed by the custom Test op
         let tst = h
             .nodes()
@@ -239,7 +265,10 @@ mod test {
             .ok()
             .unwrap();
         assert_eq!(h.get_parent(tst), Some(entry));
-        assert_eq!(h.output_neighbours(n_op1).collect::<Vec<_>>(), vec![tst]);
+        assert_eq!(
+            h.output_neighbours(entry_nop).collect::<Vec<_>>(),
+            vec![tst]
+        );
         Ok(())
     }
 }
