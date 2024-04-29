@@ -129,3 +129,13 @@ pub fn get_single_input_value<T: CustomConst>(consts: &[(IncomingPort, Value)]) 
     };
     c.get_custom_value()
 }
+
+/// Given a list of two constant operations, return the values.
+pub fn get_pair_of_input_values<T: CustomConst>(
+    consts: &[(IncomingPort, Value)],
+) -> Option<(&T, &T)> {
+    let [(_, c0), (_, c1)] = consts else {
+        return None;
+    };
+    Some((c0.get_custom_value()?, c1.get_custom_value()?))
+}
