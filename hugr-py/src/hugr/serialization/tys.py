@@ -1,7 +1,8 @@
 import inspect
 import sys
 from enum import Enum
-from typing import Annotated, Any, Literal, Optional, Union
+from typing import Annotated, Any, Literal, Optional, Union, Tuple
+from contextlib import contextmanager
 
 from pydantic import (
     BaseModel,
@@ -11,6 +12,7 @@ from pydantic import (
     ValidationInfo,
     ValidatorFunctionWrapHandler,
     WrapValidator,
+    ConfigDict,
 )
 from pydantic_core import PydanticCustomError
 
@@ -38,6 +40,33 @@ def _json_custom_error_validator(
 
 ExtensionId = str
 
+global default_model_config
+default_model_config = ConfigDict()
+global current_model_config
+current_model_config = default_model_config
+
+
+class ConfiguredBaseModel(BaseModel):
+    model_config = default_model_config
+
+    @classmethod
+    def set_model_config(cls, config: ConfigDict):
+        cls.model_config = config
+
+
+@contextmanager
+def hugr_config(**kwargs):
+    global current_model_config
+    old_config = current_model_config
+    current_model_config = ConfigDict(default_model_config, **kwargs)
+    ConfiguredBaseModel.model_config = current_model_config
+    print(f"new model_config: {current_model_config}")
+    try:
+        yield None
+    finally:
+        current_model_config = old_config
+        ConfiguredBaseModel.model_config = old_config
+
 
 class ExtensionSet(RootModel):
     """A set of extensions ids."""
@@ -50,32 +79,32 @@ class ExtensionSet(RootModel):
 # --------------------------------------------
 
 
-class TypeTypeParam(BaseModel):
+class TypeTypeParam(ConfiguredBaseModel):
     tp: Literal["Type"] = "Type"
     b: "TypeBound"
 
 
-class BoundedNatParam(BaseModel):
+class BoundedNatParam(ConfiguredBaseModel):
     tp: Literal["BoundedNat"] = "BoundedNat"
     bound: int | None
 
 
-class OpaqueParam(BaseModel):
+class OpaqueParam(ConfiguredBaseModel):
     tp: Literal["Opaque"] = "Opaque"
     ty: "Opaque"
 
 
-class ListParam(BaseModel):
+class ListParam(ConfiguredBaseModel):
     tp: Literal["List"] = "List"
     param: "TypeParam"
 
 
-class TupleParam(BaseModel):
+class TupleParam(ConfiguredBaseModel):
     tp: Literal["Tuple"] = "Tuple"
     params: list["TypeParam"]
 
 
-class ExtensionsParam(BaseModel):
+class ExtensionsParam(ConfiguredBaseModel):
     tp: Literal["Extensions"] = "Extensions"
 
 
@@ -98,32 +127,32 @@ class TypeParam(RootModel):
 # ------------------------------------------
 
 
-class CustomTypeArg(BaseModel):
+class CustomTypeArg(ConfiguredBaseModel):
     typ: None  # TODO
     value: str
 
 
-class TypeTypeArg(BaseModel):
+class TypeTypeArg(ConfiguredBaseModel):
     tya: Literal["Type"] = "Type"
     ty: "Type"
 
 
-class BoundedNatArg(BaseModel):
+class BoundedNatArg(ConfiguredBaseModel):
     tya: Literal["BoundedNat"] = "BoundedNat"
     n: int
 
 
-class OpaqueArg(BaseModel):
+class OpaqueArg(ConfiguredBaseModel):
     tya: Literal["Opaque"] = "Opaque"
     arg: CustomTypeArg
 
 
-class SequenceArg(BaseModel):
+class SequenceArg(ConfiguredBaseModel):
     tya: Literal["Sequence"] = "Sequence"
     args: list["TypeArg"]
 
 
-class ExtensionsArg(BaseModel):
+class ExtensionsArg(ConfiguredBaseModel):
     tya: Literal["Extensions"] = "Extensions"
     es: ExtensionSet
 
@@ -142,7 +171,7 @@ class TypeArg(RootModel):
 # --------------------------------------------
 
 
-class MultiContainer(BaseModel):
+class MultiContainer(ConfiguredBaseModel):
     ty: "Type"
 
 
@@ -153,14 +182,14 @@ class Array(MultiContainer):
     len: int
 
 
-class UnitSum(BaseModel):
+class UnitSum(ConfiguredBaseModel):
     """Simple sum type where all variants are empty tuples."""
 
     s: Literal["Unit"] = "Unit"
     size: int
 
 
-class GeneralSum(BaseModel):
+class GeneralSum(ConfiguredBaseModel):
     """General sum type that explicitly stores the types of the variants."""
 
     s: Literal["General"] = "General"
@@ -171,7 +200,7 @@ class SumType(RootModel):
     root: Union[UnitSum, GeneralSum] = Field(discriminator="s")
 
 
-class TaggedSumType(BaseModel):
+class TaggedSumType(ConfiguredBaseModel):
     t: Literal["Sum"] = "Sum"
     st: SumType
 
@@ -181,7 +210,7 @@ class TaggedSumType(BaseModel):
 # ----------------------------------------------
 
 
-class Variable(BaseModel):
+class Variable(ConfiguredBaseModel):
     """A type variable identified by an index into the array of TypeParams."""
 
     t: Literal["V"] = "V"
@@ -189,13 +218,13 @@ class Variable(BaseModel):
     b: "TypeBound"
 
 
-class USize(BaseModel):
+class USize(ConfiguredBaseModel):
     """Unsigned integer size type."""
 
     t: Literal["I"] = "I"
 
 
-class FunctionType(BaseModel):
+class FunctionType(ConfiguredBaseModel):
     """A graph encoded as a value. It contains a concrete signature and a set of
     required resources."""
 
@@ -220,7 +249,7 @@ class FunctionType(BaseModel):
         }
 
 
-class PolyFuncType(BaseModel):
+class PolyFuncType(ConfiguredBaseModel):
     """A polymorphic type scheme, i.e. of a FuncDecl, FuncDefn or OpDef.
     (Nodes/operations in the Hugr are not polymorphic.)"""
 
@@ -263,7 +292,7 @@ class TypeBound(Enum):
         return res
 
 
-class Opaque(BaseModel):
+class Opaque(ConfiguredBaseModel):
     """An opaque Type that can be downcasted by the extensions that define it."""
 
     t: Literal["Opaque"] = "Opaque"
@@ -273,7 +302,7 @@ class Opaque(BaseModel):
     bound: TypeBound
 
 
-class Alias(BaseModel):
+class Alias(ConfiguredBaseModel):
     """An Alias Type"""
 
     t: Literal["Alias"] = "Alias"
@@ -286,7 +315,7 @@ class Alias(BaseModel):
 # ----------------------------------------------
 
 
-class Qubit(BaseModel):
+class Qubit(ConfiguredBaseModel):
     """A qubit."""
 
     t: Literal["Q"] = "Q"
@@ -320,7 +349,7 @@ TypeRow = list[Type]
 # -------------------------------------------
 
 
-class Signature(BaseModel):
+class Signature(ConfiguredBaseModel):
     """Describes the edges required to/from a node.
 
     This includes both the concept of "signature" in the spec, and also the target
@@ -339,6 +368,17 @@ classes = inspect.getmembers(
     sys.modules[__name__],
     lambda member: inspect.isclass(member) and member.__module__ == __name__,
 )
-for _, c in classes:
-    if issubclass(c, BaseModel):
-        c.model_rebuild()
+
+
+def _model_rebuild(
+    classes: list[Tuple[Any, type]] = classes,
+    config: ConfigDict = ConfigDict(),
+    **kwargs,
+):
+    for _, c in classes:
+        if issubclass(c, ConfiguredBaseModel):
+            c.set_model_config(config)
+            c.model_rebuild(**kwargs)
+
+
+_model_rebuild()

@@ -12,8 +12,10 @@ import sys
 from typing import Type
 from pathlib import Path
 
-from pydantic import TypeAdapter
+from pydantic import TypeAdapter, ConfigDict
 
+from hugr.serialization.ops import model_rebuild
+from hugr.serialization.tys import ConfiguredBaseModel, hugr_config
 from hugr.serialization import SerialHugr
 from hugr.serialization.testing_hugr import TestingHugr
 
@@ -26,7 +28,7 @@ def write_schema(
     path = out_dir / filename
     print(f"Writing schema to {path}")
     with path.open("w") as f:
-        json.dump(TypeAdapter(schema).json_schema(), f, indent=4)
+        json.dump(schema.model_json_schema(), f, indent=4)
 
 
 if __name__ == "__main__":
@@ -38,5 +40,11 @@ if __name__ == "__main__":
         print(__doc__)
         sys.exit(1)
 
-    write_schema(out_dir, "hugr_schema", SerialHugr)
+    model_rebuild(config=ConfigDict(strict=True, extra="forbid"), force=True)
+    write_schema(out_dir, "testing_hugr_schema_strict", TestingHugr)
+    model_rebuild(config=ConfigDict(strict=False, extra="allow"), force=True)
     write_schema(out_dir, "testing_hugr_schema", TestingHugr)
+    model_rebuild(config=ConfigDict(strict=True, extra="forbid"), force=True)
+    write_schema(out_dir, "hugr_schema_strict", TestingHugr)
+    model_rebuild(config=ConfigDict(strict=False, extra="allow"), force=True)
+    write_schema(out_dir, "hugr_schema", TestingHugr)

@@ -3,7 +3,7 @@ import sys
 from abc import ABC
 from typing import Any, Literal, cast
 
-from pydantic import BaseModel, Field, RootModel
+from pydantic import Field, RootModel, ConfigDict
 
 from . import tys
 from .tys import (
@@ -15,12 +15,15 @@ from .tys import (
     TypeRow,
     SumType,
     TypeBound,
+    ConfiguredBaseModel,
+    _model_rebuild as tys_model_rebuild,
+    classes as tys_classes,
 )
 
 NodeID = int
 
 
-class BaseOp(ABC, BaseModel):
+class BaseOp(ABC, ConfiguredBaseModel):
     """Base class for ops that store their node's input/output types"""
 
     # Parent node index of node the op belongs to, used only at serialization time
@@ -84,7 +87,7 @@ class FuncDecl(BaseOp):
 CustomConst = Any  # TODO
 
 
-class ExtensionValue(BaseModel):
+class ExtensionValue(ConfiguredBaseModel):
     """An extension constant value, that can check it is of a given [CustomType]."""
 
     c: Literal["Extension"] = Field("Extension", title="ValueTag")
@@ -96,7 +99,7 @@ class ExtensionValue(BaseModel):
         }
 
 
-class FunctionValue(BaseModel):
+class FunctionValue(ConfiguredBaseModel):
     """A higher-order function value."""
 
     c: Literal["Function"] = Field("Function", title="ValueTag")
@@ -108,7 +111,7 @@ class FunctionValue(BaseModel):
         }
 
 
-class TupleValue(BaseModel):
+class TupleValue(ConfiguredBaseModel):
     """A constant tuple value."""
 
     c: Literal["Tuple"] = Field("Tuple", title="ValueTag")
@@ -120,7 +123,7 @@ class TupleValue(BaseModel):
         }
 
 
-class SumValue(BaseModel):
+class SumValue(ConfiguredBaseModel):
     """A Sum variant
 
     For any Sum type where this value meets the type of the variant indicated by the tag
@@ -263,9 +266,15 @@ class Call(DataflowOp):
     """
 
     op: Literal["Call"] = "Call"
-    signature: FunctionType = Field(default_factory=FunctionType.empty)
+    func_sig: PolyFuncType = Field(default_factory=FunctionType.empty)
+    type_args: list[tys.TypeArg] = Field(default_factory=list)
+    instantiation: FunctionType = Field(default_factory=FunctionType.empty)
 
     def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
+        # TODO this is wrong (len(params) is not required to be 0) But it's not
+        # clear how this function is used from guppy. It's unused in present in
+        # hugr-py
+        #
         # The constE edge comes after the value inputs
         fun_ty = in_types[-1]
         assert isinstance(fun_ty, PolyFuncType)
@@ -495,6 +504,12 @@ class AliasDecl(BaseOp):
     bound: TypeBound
 
 
+class AliasDefn(BaseOp):
+    op: Literal["AliasDefn"] = "AliasDefn"
+    name: str
+    definition: Type
+
+
 class OpType(RootModel):
     """A constant operation."""
 
@@ -523,6 +538,7 @@ class OpType(RootModel):
         | Lift
         | DFG
         | AliasDecl
+        | AliasDefn
     ) = Field(discriminator="op")
 
 
@@ -551,6 +567,7 @@ classes = inspect.getmembers(
     sys.modules[__name__],
     lambda member: inspect.isclass(member) and member.__module__ == __name__,
 )
-for _, c in classes:
-    if issubclass(c, BaseModel):
-        c.model_rebuild()
+
+
+def model_rebuild(config: ConfigDict = ConfigDict(), **kwargs):
+    return tys_model_rebuild(classes + tys_classes, config, **kwargs)

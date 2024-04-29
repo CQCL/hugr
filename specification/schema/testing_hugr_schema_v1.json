@@ -1,6 +1,7 @@
 {
     "$defs": {
         "Alias": {
+            "additionalProperties": true,
             "description": "An Alias Type",
             "properties": {
                 "t": {
@@ -28,6 +29,7 @@
             "type": "object"
         },
         "AliasDecl": {
+            "additionalProperties": true,
             "properties": {
                 "parent": {
                     "title": "Parent",
@@ -61,7 +63,43 @@
             "title": "AliasDecl",
             "type": "object"
         },
+        "AliasDefn": {
+            "additionalProperties": true,
+            "properties": {
+                "parent": {
+                    "title": "Parent",
+                    "type": "integer"
+                },
+                "input_extensions": {
+                    "$ref": "#/$defs/ExtensionSet"
+                },
+                "op": {
+                    "const": "AliasDefn",
+                    "default": "AliasDefn",
+                    "enum": [
+                        "AliasDefn"
+                    ],
+                    "title": "Op",
+                    "type": "string"
+                },
+                "name": {
+                    "title": "Name",
+                    "type": "string"
+                },
+                "definition": {
+                    "$ref": "#/$defs/Type"
+                }
+            },
+            "required": [
+                "parent",
+                "name",
+                "definition"
+            ],
+            "title": "AliasDefn",
+            "type": "object"
+        },
         "Array": {
+            "additionalProperties": true,
             "description": "Known size array whose elements are of the same type.",
             "properties": {
                 "ty": {
@@ -89,6 +127,7 @@
             "type": "object"
         },
         "BoundedNatArg": {
+            "additionalProperties": true,
             "properties": {
                 "tya": {
                     "const": "BoundedNat",
@@ -111,6 +150,7 @@
             "type": "object"
         },
         "BoundedNatParam": {
+            "additionalProperties": true,
             "properties": {
                 "tp": {
                     "const": "BoundedNat",
@@ -140,6 +180,7 @@
             "type": "object"
         },
         "CFG": {
+            "additionalProperties": true,
             "description": "A dataflow node which is defined by a child CFG.",
             "properties": {
                 "parent": {
@@ -169,7 +210,8 @@
             "type": "object"
         },
         "Call": {
-            "description": "Operation to call a function directly. The first port is connected to the def/declare of the function being called directly, with a `Static<FunctionType>` edge. The signature of the remaining ports matches the function being called.",
+            "additionalProperties": true,
+            "description": "Call a function directly.\n\nThe first port is connected to the def/declare of the function being called\ndirectly, with a `ConstE<Graph>` edge. The signature of the remaining ports matches\nthe function being called.",
             "properties": {
                 "parent": {
                     "title": "Parent",
@@ -187,7 +229,17 @@
                     "title": "Op",
                     "type": "string"
                 },
-                "signature": {
+                "func_sig": {
+                    "$ref": "#/$defs/PolyFuncType"
+                },
+                "type_args": {
+                    "items": {
+                        "$ref": "#/$defs/TypeArg"
+                    },
+                    "title": "Type Args",
+                    "type": "array"
+                },
+                "instantiation": {
                     "$ref": "#/$defs/FunctionType"
                 }
             },
@@ -198,6 +250,7 @@
             "type": "object"
         },
         "CallIndirect": {
+            "additionalProperties": true,
             "description": "Call a function indirectly.\n\nLike call, but the first input is a standard dataflow graph type.",
             "properties": {
                 "parent": {
@@ -227,6 +280,7 @@
             "type": "object"
         },
         "Case": {
+            "additionalProperties": true,
             "description": "Case ops - nodes valid inside Conditional nodes.",
             "properties": {
                 "parent": {
@@ -256,6 +310,7 @@
             "type": "object"
         },
         "Conditional": {
+            "additionalProperties": true,
             "description": "Conditional operation, defined by child `Case` nodes for each branch.",
             "properties": {
                 "parent": {
@@ -310,6 +365,7 @@
             "type": "object"
         },
         "Const": {
+            "additionalProperties": true,
             "description": "A Const operation definition.",
             "properties": {
                 "parent": {
@@ -333,7 +389,6 @@
                 }
             },
             "required": [
-                "op",
                 "parent",
                 "v"
             ],
@@ -341,7 +396,8 @@
             "type": "object"
         },
         "CustomOp": {
-            "description": "A user-defined operation that can be downcasted by the extensions that define it.",
+            "additionalProperties": true,
+            "description": "A user-defined operation that can be downcasted by the extensions that define\nit.",
             "properties": {
                 "parent": {
                     "title": "Parent",
@@ -392,6 +448,7 @@
             "type": "object"
         },
         "CustomTypeArg": {
+            "additionalProperties": true,
             "properties": {
                 "typ": {
                     "title": "Typ",
@@ -410,6 +467,7 @@
             "type": "object"
         },
         "DFG": {
+            "additionalProperties": true,
             "description": "A simply nested dataflow graph.",
             "properties": {
                 "parent": {
@@ -439,7 +497,8 @@
             "type": "object"
         },
         "DataflowBlock": {
-            "description": "A CFG basic block node. The signature is that of the internal Dataflow graph.",
+            "additionalProperties": true,
+            "description": "A CFG basic block node. The signature is that of the internal Dataflow\ngraph.",
             "properties": {
                 "parent": {
                     "title": "Parent",
@@ -486,18 +545,14 @@
                 }
             },
             "required": [
-                "parent",
-                "op",
-                "inputs",
-                "other_outputs",
-                "sum_rows",
-                "extension_delta"
+                "parent"
             ],
             "title": "DataflowBlock",
             "type": "object"
         },
         "ExitBlock": {
-            "description": "The single exit node of the CFG, has no children, stores the types of the CFG node output.",
+            "additionalProperties": true,
+            "description": "The single exit node of the CFG, has no children, stores the types of\nthe CFG node output.",
             "properties": {
                 "parent": {
                     "title": "Parent",
@@ -547,6 +602,7 @@
             "title": "ExtensionSet"
         },
         "ExtensionValue": {
+            "additionalProperties": true,
             "description": "An extension constant value, that can check it is of a given [CustomType].",
             "properties": {
                 "c": {
@@ -563,13 +619,13 @@
                 }
             },
             "required": [
-                "c",
                 "e"
             ],
             "title": "ExtensionValue",
             "type": "object"
         },
         "ExtensionsArg": {
+            "additionalProperties": true,
             "properties": {
                 "tya": {
                     "const": "Extensions",
@@ -591,6 +647,7 @@
             "type": "object"
         },
         "ExtensionsParam": {
+            "additionalProperties": true,
             "properties": {
                 "tp": {
                     "const": "Extensions",
@@ -606,6 +663,7 @@
             "type": "object"
         },
         "FuncDecl": {
+            "additionalProperties": true,
             "description": "External function declaration, linked at runtime.",
             "properties": {
                 "parent": {
@@ -640,6 +698,7 @@
             "type": "object"
         },
         "FuncDefn": {
+            "additionalProperties": true,
             "description": "A function definition. Children nodes are the body of the definition.",
             "properties": {
                 "parent": {
@@ -674,7 +733,8 @@
             "type": "object"
         },
         "FunctionType": {
-            "description": "A graph encoded as a value. It contains a concrete signature and a set of required resources.",
+            "additionalProperties": true,
+            "description": "A graph encoded as a value. It contains a concrete signature and a set of\nrequired resources.",
             "properties": {
                 "t": {
                     "const": "G",
@@ -711,6 +771,7 @@
             "type": "object"
         },
         "FunctionValue": {
+            "additionalProperties": true,
             "description": "A higher-order function value.",
             "properties": {
                 "c": {
@@ -727,13 +788,13 @@
                 }
             },
             "required": [
-                "c",
                 "hugr"
             ],
             "title": "FunctionValue",
             "type": "object"
         },
         "GeneralSum": {
+            "additionalProperties": true,
             "description": "General sum type that explicitly stores the types of the variants.",
             "properties": {
                 "s": {
@@ -763,6 +824,7 @@
             "type": "object"
         },
         "Input": {
+            "additionalProperties": true,
             "description": "An input node. The outputs of this node are the inputs to the parent node.",
             "properties": {
                 "parent": {
@@ -796,6 +858,7 @@
             "type": "object"
         },
         "Lift": {
+            "additionalProperties": true,
             "description": "Fixes some TypeParams of a polymorphic type by providing TypeArgs.",
             "properties": {
                 "parent": {
@@ -835,6 +898,7 @@
             "type": "object"
         },
         "ListParam": {
+            "additionalProperties": true,
             "properties": {
                 "tp": {
                     "const": "List",
@@ -856,6 +920,7 @@
             "type": "object"
         },
         "LoadConstant": {
+            "additionalProperties": true,
             "description": "An operation that loads a static constant in to the local dataflow graph.",
             "properties": {
                 "parent": {
@@ -886,6 +951,7 @@
             "type": "object"
         },
         "MakeTuple": {
+            "additionalProperties": true,
             "description": "An operation that packs all its inputs into a tuple.",
             "properties": {
                 "parent": {
@@ -919,6 +985,7 @@
             "type": "object"
         },
         "Module": {
+            "additionalProperties": true,
             "description": "The root of a module, parent of all other `ModuleOp`s.",
             "properties": {
                 "parent": {
@@ -945,6 +1012,7 @@
             "type": "object"
         },
         "Noop": {
+            "additionalProperties": true,
             "description": "A no-op operation.",
             "properties": {
                 "parent": {
@@ -979,6 +1047,7 @@
             "discriminator": {
                 "mapping": {
                     "AliasDecl": "#/$defs/AliasDecl",
+                    "AliasDefn": "#/$defs/AliasDefn",
                     "CFG": "#/$defs/CFG",
                     "Call": "#/$defs/Call",
                     "CallIndirect": "#/$defs/CallIndirect",
@@ -1073,11 +1142,15 @@
                 },
                 {
                     "$ref": "#/$defs/AliasDecl"
+                },
+                {
+                    "$ref": "#/$defs/AliasDefn"
                 }
             ],
             "title": "OpType"
         },
         "Opaque": {
+            "additionalProperties": true,
             "description": "An opaque Type that can be downcasted by the extensions that define it.",
             "properties": {
                 "t": {
@@ -1118,6 +1191,7 @@
             "type": "object"
         },
         "OpaqueArg": {
+            "additionalProperties": true,
             "properties": {
                 "tya": {
                     "const": "Opaque",
@@ -1139,6 +1213,7 @@
             "type": "object"
         },
         "OpaqueParam": {
+            "additionalProperties": true,
             "properties": {
                 "tp": {
                     "const": "Opaque",
@@ -1160,6 +1235,7 @@
             "type": "object"
         },
         "Output": {
+            "additionalProperties": true,
             "description": "An output node. The inputs are the outputs of the function.",
             "properties": {
                 "parent": {
@@ -1193,7 +1269,8 @@
             "type": "object"
         },
         "PolyFuncType": {
-            "description": "A polymorphic type scheme, i.e. of a FuncDecl, FuncDefn or OpDef.  (Nodes/operations in the Hugr are not polymorphic.)",
+            "additionalProperties": true,
+            "description": "A polymorphic type scheme, i.e. of a FuncDecl, FuncDefn or OpDef.\n(Nodes/operations in the Hugr are not polymorphic.)",
             "properties": {
                 "params": {
                     "items": {
@@ -1214,6 +1291,7 @@
             "type": "object"
         },
         "Qubit": {
+            "additionalProperties": true,
             "description": "A qubit.",
             "properties": {
                 "t": {
@@ -1230,6 +1308,7 @@
             "type": "object"
         },
         "SequenceArg": {
+            "additionalProperties": true,
             "properties": {
                 "tya": {
                     "const": "Sequence",
@@ -1273,7 +1352,8 @@
             "title": "SumType"
         },
         "SumValue": {
-            "description": "A Sum variant For any Sum type where this value meets the type of the variant indicated by the tag.",
+            "additionalProperties": true,
+            "description": "A Sum variant\n\nFor any Sum type where this value meets the type of the variant indicated by the tag",
             "properties": {
                 "c": {
                     "const": "Sum",
@@ -1300,7 +1380,6 @@
                 }
             },
             "required": [
-                "c",
                 "tag",
                 "typ",
                 "vs"
@@ -1309,6 +1388,7 @@
             "type": "object"
         },
         "Tag": {
+            "additionalProperties": true,
             "description": "An operation that creates a tagged sum value from one of its variants.",
             "properties": {
                 "parent": {
@@ -1351,6 +1431,7 @@
             "type": "object"
         },
         "TaggedSumType": {
+            "additionalProperties": true,
             "properties": {
                 "t": {
                     "const": "Sum",
@@ -1372,6 +1453,7 @@
             "type": "object"
         },
         "TailLoop": {
+            "additionalProperties": true,
             "description": "Tail-controlled loop.",
             "properties": {
                 "parent": {
@@ -1419,6 +1501,7 @@
             "type": "object"
         },
         "TupleParam": {
+            "additionalProperties": true,
             "properties": {
                 "tp": {
                     "const": "Tuple",
@@ -1444,6 +1527,7 @@
             "type": "object"
         },
         "TupleValue": {
+            "additionalProperties": true,
             "description": "A constant tuple value.",
             "properties": {
                 "c": {
@@ -1464,7 +1548,6 @@
                 }
             },
             "required": [
-                "c",
                 "vs"
             ],
             "title": "TupleValue",
@@ -1589,6 +1672,7 @@
             "title": "TypeParam"
         },
         "TypeTypeArg": {
+            "additionalProperties": true,
             "properties": {
                 "tya": {
                     "const": "Type",
@@ -1610,6 +1694,7 @@
             "type": "object"
         },
         "TypeTypeParam": {
+            "additionalProperties": true,
             "properties": {
                 "tp": {
                     "const": "Type",
@@ -1631,6 +1716,7 @@
             "type": "object"
         },
         "USize": {
+            "additionalProperties": true,
             "description": "Unsigned integer size type.",
             "properties": {
                 "t": {
@@ -1647,6 +1733,7 @@
             "type": "object"
         },
         "UnitSum": {
+            "additionalProperties": true,
             "description": "Simple sum type where all variants are empty tuples.",
             "properties": {
                 "s": {
@@ -1670,6 +1757,7 @@
             "type": "object"
         },
         "UnpackTuple": {
+            "additionalProperties": true,
             "description": "An operation that packs all its inputs into a tuple.",
             "properties": {
                 "parent": {
@@ -1730,6 +1818,7 @@
             "title": "Value"
         },
         "Variable": {
+            "additionalProperties": true,
             "description": "A type variable identified by an index into the array of TypeParams.",
             "properties": {
                 "t": {

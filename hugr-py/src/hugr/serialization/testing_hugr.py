@@ -1,19 +1,18 @@
-from typing import Literal, Optional
-from pydantic import BaseModel
-from .tys import Type, SumType, PolyFuncType
+from typing import Literal
+from .tys import Type, SumType, PolyFuncType, ConfiguredBaseModel
 from .ops import Value, OpType
 
 
-class TestingHugr(BaseModel):
-    """A serializable representation of a Hugr Type, SumType, PolyFuncType, or
-    Value. Intended for testing only."""
+class TestingHugr(ConfiguredBaseModel):
+    """A serializable representation of a Hugr Type, SumType, PolyFuncType,
+    Value, OpType. Intended for testing only."""
 
     version: Literal["v1"] = "v1"
-    typ: Optional[Type] = None
-    sum_type: Optional[SumType] = None
-    poly_func_type: Optional[PolyFuncType] = None
-    value: Optional[Value] = None
-    optype: Optional[OpType] = None
+    typ: Type | None = None
+    sum_type: SumType | None = None
+    poly_func_type: PolyFuncType | None = None
+    value: Value | None = None
+    optype: OpType | None = None
 
     @classmethod
     def get_version(cls) -> str:

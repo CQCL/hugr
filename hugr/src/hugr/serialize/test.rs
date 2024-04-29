@@ -3,13 +3,13 @@ use crate::builder::{
     test::closed_dfg_root_hugr, Container, DFGBuilder, Dataflow, DataflowHugr,
     DataflowSubContainer, HugrBuilder, ModuleBuilder,
 };
-use crate::extension::prelude::{BOOL_T, QB_T, USIZE_T};
+use crate::extension::prelude::{BOOL_T, PRELUDE_ID, QB_T, USIZE_T};
 use crate::extension::simple_op::MakeRegisteredOp;
 use crate::extension::{EMPTY_REG, PRELUDE_REGISTRY};
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::hugr::NodeType;
 use crate::ops::custom::{ExtensionOp, OpaqueOp};
-use crate::ops::Value;
+use crate::ops::{self, Value};
 use crate::ops::{dataflow::IOTrait, Input, Module, Noop, Output, DFG};
 use crate::std_extensions::arithmetic::float_ops::FLOAT_OPS_REGISTRY;
 use crate::std_extensions::arithmetic::float_types::{ConstF64, FLOAT64_TYPE};
@@ -35,7 +35,7 @@ type TestingModel = SerTestingV1;
 lazy_static! {
     static ref SCHEMA: JSONSchema = {
         let schema_val: serde_json::Value = serde_json::from_str(include_str!(
-            "../../../../specification/schema/hugr_schema_v1.json"
+            "../../../../specification/schema/hugr_schema_strict_v1.json"
         ))
         .unwrap();
         JSONSchema::options()
@@ -45,7 +45,7 @@ lazy_static! {
     };
     static ref TESTING_SCHEMA: JSONSchema = {
         let schema_val: serde_json::Value = serde_json::from_str(include_str!(
-            "../../../../specification/schema/testing_hugr_schema_v1.json"
+            "../../../../specification/schema/testing_hugr_schema_strict_v1.json"
         ))
         .unwrap();
         JSONSchema::options()
@@ -86,7 +86,7 @@ pub fn ser_roundtrip_validate<T: Serialize + serde::de::DeserializeOwned>(
             panic!("Serialization test failed.");
         }
     }
-    serde_json::from_str(&s).unwrap()
+    serde_json::from_value(val).unwrap()
 }
 
 /// Serialize and deserialize a HUGR, and check that the result is the same as the original.
@@ -140,8 +140,8 @@ pub fn check_hugr_roundtrip(hugr: &Hugr, check_schema: bool) -> Hugr {
     new_hugr
 }
 
-fn check_testing_roundtrip(t: TestingModel) {
-    let before = Versioned::new(t);
+fn check_testing_roundtrip(t: impl Into<TestingModel>) {
+    let before = Versioned::new(t.into());
     let after = ser_roundtrip_validate(&before, Some(&TESTING_SCHEMA));
     assert_eq!(before, after);
 }
@@ -345,14 +345,14 @@ fn serialize_types_roundtrip() {
 #[case(Type::new_sum([type_row![BOOL_T,QB_T], type_row![Type::new_unit_sum(4)]]))]
 #[case(Type::new_function(FunctionType::new_endo(type_row![QB_T,BOOL_T,USIZE_T])))]
 fn roundtrip_type(#[case] typ: Type) {
-    check_testing_roundtrip(typ.into())
+    check_testing_roundtrip(typ);
 }
 
 #[rstest]
 #[case(SumType::new_unary(2))]
 #[case(SumType::new([type_row![USIZE_T, QB_T], type_row![]]))]
 fn roundtrip_sumtype(#[case] sum_type: SumType) {
-    check_testing_roundtrip(sum_type.into())
+    check_testing_roundtrip(sum_type);
 }
 
 #[rstest]
@@ -371,7 +371,7 @@ fn roundtrip_sumtype(#[case] sum_type: SumType) {
 #[case(Value::tuple([Value::false_val(), Value::extension(ConstInt::new_s(2,1).unwrap())]))]
 #[case(Value::function(crate::builder::test::simple_dfg_hugr()).unwrap())]
 fn roundtrip_value(#[case] value: Value) {
-    check_testing_roundtrip(value.into())
+    check_testing_roundtrip(value);
 }
 
 fn polyfunctype1() -> PolyFuncType {
@@ -389,21 +389,25 @@ fn polyfunctype1() -> PolyFuncType {
 #[case(PolyFuncType::new([TypeParam::List { param: Box::new(TypeBound::Any.into()) }], FunctionType::new_endo(type_row![])))]
 #[case(PolyFuncType::new([TypeParam::Tuple { params: [TypeBound::Any.into(), TypeParam::bounded_nat(2.try_into().unwrap())].into() }], FunctionType::new_endo(type_row![])))]
 fn roundtrip_polyfunctype(#[case] poly_func_type: PolyFuncType) {
-    check_testing_roundtrip(poly_func_type.into())
+    check_testing_roundtrip(poly_func_type)
 }
 
 #[rstest]
-#[case(Module)]
-fn roundtrip_optype(#[case] optype: impl Into<OpType>) {
-    #[derive(Serialize, Deserialize, PartialEq, Debug)]
-    struct SerTesting {
-        optype: NodeSer,
-    }
-    check_testing_roundtrip(SerTesting {
-        optype: NodeSer {
-            parent: portgraph::NodeIndex::new(0).into(),
-            input_extensions: None,
-            op: optype.into(),
-        },
-    })
+#[case(ops::Module)]
+#[case(ops::FuncDefn { name: "polyfunc1".into(), signature: polyfunctype1()})]
+#[case(ops::FuncDecl { name: "polyfunc2".into(), signature: polyfunctype1()})]
+#[case(ops::AliasDefn { name: "aliasdefn".into(), definition: Type::new_unit_sum(4)})]
+#[case(ops::AliasDecl { name: "aliasdecl".into(), bound: TypeBound::Any})]
+#[case(ops::Const::new(Value::false_val()))]
+#[case(ops::Const::new(Value::function(crate::builder::test::simple_dfg_hugr()).unwrap()))]
+#[case(ops::Input::new(type_row![Type::new_var_use(3,TypeBound::Eq)]))]
+#[case(ops::Output::new(vec![Type::new_function(FunctionType::new_endo(type_row![]))]))]
+#[case(ops::Call::try_new(polyfunctype1(), [TypeArg::BoundedNat{n: 1}, TypeArg::Extensions{ es: ExtensionSet::singleton(&PRELUDE_ID)} ], &EMPTY_REG).unwrap())]
+#[case(ops::CallIndirect { signature : FunctionType::new_endo(type_row![BOOL_T]) })]
+fn roundtrip_optype(#[case] optype: impl Into<OpType> + std::fmt::Debug) {
+    check_testing_roundtrip(NodeSer {
+        parent: portgraph::NodeIndex::new(0).into(),
+        input_extensions: None,
+        op: optype.into(),
+    });
 }
