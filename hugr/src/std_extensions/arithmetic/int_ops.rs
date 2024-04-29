@@ -8,6 +8,7 @@ use crate::extension::{
 };
 use crate::ops::custom::ExtensionOp;
 use crate::ops::{NamedOp, OpName};
+use crate::std_extensions::arithmetic::int_types::int_type;
 use crate::type_row;
 use crate::types::{FunctionType, PolyFuncType};
 use crate::utils::collect_array;
@@ -115,8 +116,18 @@ impl MakeOpDef for IntOpDef {
                 IOValidator { f_ge_s: true },
             )
             .into(),
-            itobool => int_polytype(1, vec![int_tv(0)], type_row![BOOL_T]).into(),
-            ifrombool => int_polytype(1, type_row![BOOL_T], vec![int_tv(0)]).into(),
+            itobool => int_polytype(
+                0,
+                vec![int_type(TypeArg::BoundedNat { n: 0 })],
+                type_row![BOOL_T],
+            )
+            .into(),
+            ifrombool => int_polytype(
+                0,
+                type_row![BOOL_T],
+                vec![int_type(TypeArg::BoundedNat { n: 0 })],
+            )
+            .into(),
             ieq | ine | ilt_u | ilt_s | igt_u | igt_s | ile_u | ile_s | ige_u | ige_s => {
                 int_polytype(1, vec![int_tv(0); 2], type_row![BOOL_T]).into()
             }
@@ -417,7 +428,7 @@ mod test {
 
     #[test]
     fn test_conversions() {
-        let o = IntOpDef::itobool.with_log_width(5);
+        let o = IntOpDef::itobool.without_log_width();
         assert!(
             IntOpDef::itobool
                 .with_two_log_widths(1, 2)
