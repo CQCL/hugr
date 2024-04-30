@@ -1,5 +1,6 @@
 //! Extensible operations.
 
+use smol_str::SmolStr;
 use std::sync::Arc;
 use thiserror::Error;
 
@@ -165,6 +166,7 @@ impl From<ExtensionOp> for CustomOp {
 ///
 /// [Extension]: crate::Extension
 #[derive(Clone, Debug)]
+// #[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 pub struct ExtensionOp {
     def: Arc<OpDef>,
     args: Vec<TypeArg>,
@@ -265,9 +267,18 @@ impl DataflowOpTrait for ExtensionOp {
 
 /// An opaquely-serialized op that refers to an as-yet-unresolved [`OpDef`]
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(all(test, feature = "proptest"), derive(proptest_derive::Arbitrary))]
 pub struct OpaqueOp {
     extension: ExtensionId,
-    op_name: OpName,
+    #[cfg_attr(
+        all(test, feature = "proptest"),
+        proptest(strategy = "crate::proptest::any_nonempty_smolstr()")
+    )]
+    op_name: SmolStr,
+    #[cfg_attr(
+        all(test, feature = "proptest"),
+        proptest(strategy = "crate::proptest::any_nonempty_string()")
+    )]
     description: String, // cache in advance so description() can return &str
     args: Vec<TypeArg>,
     signature: FunctionType,
@@ -414,7 +425,6 @@ pub enum CustomOpError {
 
 #[cfg(test)]
 mod test {
-
     use crate::extension::prelude::{QB_T, USIZE_T};
 
     use super::*;
@@ -436,5 +446,18 @@ mod test {
         assert_eq!(op.signature(), sig);
         assert!(op.is_opaque());
         assert!(!op.is_extension_op());
+    }
+
+    #[cfg(feature = "proptest")]
+    mod proptest {
+        use ::proptest::prelude::*;
+
+        impl Arbitrary for super::super::CustomOp {
+            type Parameters = ();
+            type Strategy = BoxedStrategy<Self>;
+            fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+                any::<super::super::OpaqueOp>().prop_map_into().boxed()
+            }
+        }
     }
 }

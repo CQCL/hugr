@@ -14,9 +14,12 @@ check:
 
 # Run all the tests.
 test language="[rust|python]" : (_run_lang language \
-        "HUGR_TEST_SCHEMA=\"1\" cargo test --all-features" \
+        "HUGR_TEST_SCHEMA=\"1\" cargo test --features extension_inference" \
         "poetry run pytest"
     )
+
+proptest:
+    cargo test --all-features
 
 # Run all the benchmarks.
 bench language="[rust|python]": (_run_lang language \

@@ -11,6 +11,7 @@ use super::{impl_op_name, OpTag, OpTrait};
 
 /// The root of a module, parent of all other `OpType`s.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(all(feature = "proptest", test), derive(proptest_derive::Arbitrary))]
 pub struct Module;
 
 impl_op_name!(Module);
@@ -33,8 +34,13 @@ impl OpTrait for Module {
 ///
 /// Children nodes are the body of the definition.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(all(feature = "proptest", test), derive(proptest_derive::Arbitrary))]
 pub struct FuncDefn {
     /// Name of function
+    #[cfg_attr(
+        all(feature = "proptest", test),
+        proptest(strategy = "crate::proptest::any_nonempty_string()")
+    )]
     pub name: String,
     /// Signature of the function
     pub signature: PolyFuncType,
@@ -67,8 +73,13 @@ impl OpTrait for FuncDefn {
 
 /// External function declaration, linked at runtime.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(all(feature = "proptest", test), derive(proptest_derive::Arbitrary))]
 pub struct FuncDecl {
     /// Name of function
+    #[cfg_attr(
+        all(feature = "proptest", test),
+        proptest(strategy = "crate::proptest::any_nonempty_string()")
+    )]
     pub name: String,
     /// Signature of the function
     pub signature: PolyFuncType,
@@ -95,8 +106,13 @@ impl OpTrait for FuncDecl {
 
 /// A type alias definition, used only for debug/metadata.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(all(feature = "proptest", test), derive(proptest_derive::Arbitrary))]
 pub struct AliasDefn {
     /// Alias name
+    #[cfg_attr(
+        all(feature = "proptest", test),
+        proptest(strategy = "crate::proptest::any_nonempty_smolstr()")
+    )]
     pub name: SmolStr,
     /// Aliased type
     pub definition: Type,
@@ -150,5 +166,26 @@ impl OpTrait for AliasDecl {
 
     fn tag(&self) -> OpTag {
         <Self as StaticTag>::TAG
+    }
+}
+
+#[cfg(test)]
+mod test {
+    #[cfg(feature = "proptest")]
+    mod proptest {
+        use crate::types::TypeBound;
+        use proptest::prelude::*;
+
+        impl Arbitrary for super::super::AliasDecl {
+            type Parameters = ();
+            type Strategy = BoxedStrategy<Self>;
+            fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+                use crate::proptest::any_ident_string;
+                let bound = any::<TypeBound>();
+                (any_ident_string(), bound)
+                    .prop_map(|(name, bound)| Self::new(name, bound))
+                    .boxed()
+            }
+        }
     }
 }

@@ -533,3 +533,33 @@ impl FromIterator<ExtensionId> for ExtensionSet {
         Self(BTreeSet::from_iter(iter))
     }
 }
+
+#[cfg(test)]
+mod test {
+
+    #[cfg(feature = "proptest")]
+    mod proptest {
+
+        use ::proptest::{collection::hash_set, prelude::*};
+
+        use super::super::{ExtensionId, ExtensionSet};
+
+        impl Arbitrary for ExtensionSet {
+            type Parameters = ();
+            type Strategy = BoxedStrategy<Self>;
+            fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
+                (
+                    hash_set(0..10usize, 0..3),
+                    hash_set(any::<ExtensionId>(), 0..3),
+                )
+                    .prop_map(|(vars, extensions)| {
+                        ExtensionSet::union_over(
+                            std::iter::once(extensions.into_iter().collect::<ExtensionSet>())
+                                .chain(vars.into_iter().map(ExtensionSet::type_var)),
+                        )
+                    })
+                    .boxed()
+            }
+        }
+    }
+}

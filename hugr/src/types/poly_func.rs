@@ -332,4 +332,26 @@ pub(crate) mod test {
         )?;
         Ok(())
     }
+
+    #[cfg(feature = "proptest")]
+    mod proptest {
+        use super::PolyFuncType;
+        use crate::proptest::TypeDepth;
+        use crate::types::type_param::TypeParam;
+        use crate::types::FunctionType;
+        use ::proptest::prelude::*;
+        impl Arbitrary for PolyFuncType {
+            type Parameters = TypeDepth;
+            type Strategy = BoxedStrategy<Self>;
+            fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
+                use proptest::collection::vec;
+                (
+                    vec(any_with::<TypeParam>(depth), 0..3),
+                    any_with::<FunctionType>(depth),
+                )
+                    .prop_map(|(params, body)| PolyFuncType { params, body })
+                    .boxed()
+            }
+        }
+    }
 }
