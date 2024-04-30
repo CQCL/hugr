@@ -9,6 +9,7 @@ usage: python generate_schema.py [<OUT_DIR>]
 
 import json
 import sys
+from typing import Type
 from pathlib import Path
 
 from pydantic import TypeAdapter
@@ -17,7 +18,9 @@ from hugr.serialization import SerialHugr
 from hugr.serialization.testing_hugr import TestingHugr
 
 
-def write_schema(out_dir: Path, name_prefix: str, schema):
+def write_schema(
+    out_dir: Path, name_prefix: str, schema: Type[SerialHugr] | Type[TestingHugr]
+):
     version = schema.get_version()
     filename = f"{name_prefix}_{version}.json"
     path = out_dir / filename
