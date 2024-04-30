@@ -150,7 +150,7 @@ mod test {
         type Parameters = crate::types::test::TypeDepth;
         type Strategy = BoxedStrategy<Self>;
         fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
-            use proptest::collection::{size_range, vec};
+            use proptest::collection::vec;
             let extension = any::<ExtensionId>();
             let id = prop::string::string_regex(r".+")
                 .unwrap()
@@ -161,7 +161,6 @@ mod test {
                 vec(any_with::<TypeArg>(depth.descend()), 0..3).boxed()
             };
             let bound = any::<TypeBound>();
-            dbg!("Arbitrary<CustomType>: {}", depth);
             (id, args, extension, bound)
                 .prop_map(|(id, args, extension, bound)| Self::new(id, args, extension, bound))
                 .boxed()

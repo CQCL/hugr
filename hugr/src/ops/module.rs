@@ -164,7 +164,9 @@ mod test {
         fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
             let name = proptest::string::string_regex(r".+").unwrap();
             let bound = any::<TypeBound>();
-            (name,bound).prop_map(|(name,bound)| Self::new(name,bound)).boxed()
+            (name, bound)
+                .prop_map(|(name, bound)| Self::new(name, bound))
+                .boxed()
         }
     }
 }

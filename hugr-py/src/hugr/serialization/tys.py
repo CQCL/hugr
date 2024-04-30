@@ -132,6 +132,7 @@ class ExtensionsArg(ConfiguredBaseModel):
     tya: Literal["Extensions"] = "Extensions"
     es: ExtensionSet
 
+
 class VariableArg(BaseModel):
     tya: Literal["Variable"] = "Variable"
     idx: int
@@ -142,7 +143,12 @@ class TypeArg(RootModel):
     """A type argument."""
 
     root: Annotated[
-        TypeTypeArg | BoundedNatArg | OpaqueArg | SequenceArg | ExtensionsArg | VariableArg,
+        TypeTypeArg
+        | BoundedNatArg
+        | OpaqueArg
+        | SequenceArg
+        | ExtensionsArg
+        | VariableArg,
         WrapValidator(_json_custom_error_validator),
     ] = Field(discriminator="tya")
 

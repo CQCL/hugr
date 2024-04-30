@@ -26,6 +26,7 @@ use portgraph::LinkView;
 use portgraph::{
     multiportgraph::MultiPortGraph, Hierarchy, LinkMut, PortMut, PortView, UnmanagedDenseMap,
 };
+use proptest::prelude::*;
 use rstest::rstest;
 
 const NAT: Type = crate::extension::prelude::USIZE_T;

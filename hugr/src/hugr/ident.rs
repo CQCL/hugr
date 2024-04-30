@@ -6,7 +6,7 @@ use regex::Regex;
 use smol_str::SmolStr;
 use thiserror::Error;
 
-static PATH_COMPONENT_REGEX_STR: &'static str = r"[\w--\d]\w*";
+static PATH_COMPONENT_REGEX_STR: &str = r"[\w--\d]\w*";
 lazy_static! {
     pub static ref PATH_REGEX_STR: String = format!(r"^{0}(\.{0})*$", PATH_COMPONENT_REGEX_STR);
     pub static ref PATH_REGEX: Regex = Regex::new(&self::PATH_REGEX_STR).unwrap();
@@ -102,8 +102,8 @@ mod test {
         type Parameters = ();
         type Strategy = BoxedStrategy<Self>;
         fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-            use proptest::collection::{vec, SizeRange};
-            let component_strategy = prop::string::string_regex(&PATH_COMPONENT_REGEX_STR)
+            use proptest::collection::vec;
+            let component_strategy = prop::string::string_regex(PATH_COMPONENT_REGEX_STR)
                 .unwrap()
                 .boxed();
             vec(component_strategy.clone(), 1..4)

@@ -253,7 +253,13 @@ mod test {
             let input = any_with::<TypeRow>(depth);
             let output = any_with::<TypeRow>(depth);
             let extension = any::<ExtensionSet>();
-            (input,output,extension).prop_map(|(input,output,extension_reqs)| FunctionType {input,output,extension_reqs}).boxed()
+            (input, output, extension)
+                .prop_map(|(input, output, extension_reqs)| FunctionType {
+                    input,
+                    output,
+                    extension_reqs,
+                })
+                .boxed()
         }
     }
 }

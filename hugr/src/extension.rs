@@ -564,16 +564,18 @@ mod test {
         fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
             let vars = any::<HashSet<usize>>();
             let extensions = any::<HashSet<ExtensionId>>();
-            (vars,extensions).prop_map(|(vars,extensions)| {
-                let mut r = Self::new();
-                for v in vars {
-                    r.insert_type_var(v);
-                }
-                for e in extensions {
-                    r.insert(&e)
-                }
-                r
-            }).boxed()
+            (vars, extensions)
+                .prop_map(|(vars, extensions)| {
+                    let mut r = Self::new();
+                    for v in vars {
+                        r.insert_type_var(v);
+                    }
+                    for e in extensions {
+                        r.insert(&e)
+                    }
+                    r
+                })
+                .boxed()
         }
     }
 }
