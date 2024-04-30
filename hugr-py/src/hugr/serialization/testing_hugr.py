@@ -5,7 +5,8 @@ from .ops import Value
 
 
 class TestingHugr(BaseModel):
-    """A serializable representation of a Hugr Type, SumType, or Value. Intended for testing only."""
+    """A serializable representation of a Hugr Type, SumType, PolyFuncType, or
+    Value. Intended for testing only."""
 
     version: Literal["v1"] = "v1"
     typ: Optional[Type] = None

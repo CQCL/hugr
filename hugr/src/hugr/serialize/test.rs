@@ -26,10 +26,11 @@ use portgraph::{
     multiportgraph::MultiPortGraph, Hierarchy, LinkMut, PortMut, PortView, UnmanagedDenseMap,
 };
 use rstest::rstest;
-use serde::de::DeserializeOwned;
 
 const NAT: Type = crate::extension::prelude::USIZE_T;
 const QB: Type = crate::extension::prelude::QB_T;
+
+type TestingModel = SerTestingV1;
 
 lazy_static! {
     static ref SCHEMA: JSONSchema = {
@@ -82,7 +83,6 @@ pub fn ser_roundtrip_validate<T: Serialize + serde::de::DeserializeOwned>(
                 println!("Validation error: {}", error);
                 println!("Instance path: {}", error.instance_path);
             }
-            dbg!(s);
             panic!("Serialization test failed.");
         }
     }
@@ -138,6 +138,12 @@ pub fn check_hugr_roundtrip(hugr: &Hugr, check_schema: bool) -> Hugr {
     }
 
     new_hugr
+}
+
+fn check_testing_roundtrip(t: TestingModel) {
+    let before = Versioned::new(t);
+    let after = ser_roundtrip_validate(&before, Some(&TESTING_SCHEMA));
+    assert_eq!(before, after);
 }
 
 /// Generate an optype for a node with a matching amount of inputs and outputs.
@@ -329,10 +335,6 @@ fn serialize_types_roundtrip() {
     assert_eq!(ser_roundtrip(&t), t);
 }
 
-fn check_testing_roundtrip<T: Serialize + DeserializeOwned>(t: T) {
-    ser_roundtrip_validate(&Versioned::new(t), Some(&TESTING_SCHEMA));
-}
-
 #[rstest]
 #[case(BOOL_T)]
 #[case(USIZE_T)]
@@ -343,22 +345,14 @@ fn check_testing_roundtrip<T: Serialize + DeserializeOwned>(t: T) {
 #[case(Type::new_sum([type_row![BOOL_T,QB_T], type_row![Type::new_unit_sum(4)]]))]
 #[case(Type::new_function(FunctionType::new_endo(type_row![QB_T,BOOL_T,USIZE_T])))]
 fn roundtrip_type(#[case] typ: Type) {
-    #[derive(Serialize, Deserialize, PartialEq, Debug)]
-    struct SerTesting {
-        typ: Type,
-    }
-    check_testing_roundtrip(SerTesting { typ })
+    check_testing_roundtrip(typ.into())
 }
 
 #[rstest]
 #[case(SumType::new_unary(2))]
 #[case(SumType::new([type_row![USIZE_T, QB_T], type_row![]]))]
 fn roundtrip_sumtype(#[case] sum_type: SumType) {
-    #[derive(Serialize, Deserialize, PartialEq, Debug)]
-    struct SerTesting {
-        sum_type: SumType,
-    }
-    check_testing_roundtrip(SerTesting { sum_type })
+    check_testing_roundtrip(sum_type.into())
 }
 
 #[rstest]
@@ -377,11 +371,7 @@ fn roundtrip_sumtype(#[case] sum_type: SumType) {
 #[case(Value::tuple([Value::false_val(), Value::extension(ConstInt::new_s(2,1).unwrap())]))]
 #[case(Value::function(crate::builder::test::simple_dfg_hugr()).unwrap())]
 fn roundtrip_value(#[case] value: Value) {
-    #[derive(Serialize, Deserialize, PartialEq, Debug)]
-    struct SerTesting {
-        value: Value,
-    }
-    check_testing_roundtrip(SerTesting { value })
+    check_testing_roundtrip(value.into())
 }
 
 fn polyfunctype1() -> PolyFuncType {
@@ -399,9 +389,5 @@ fn polyfunctype1() -> PolyFuncType {
 #[case(PolyFuncType::new([TypeParam::List { param: Box::new(TypeBound::Any.into()) }], FunctionType::new_endo(type_row![])))]
 #[case(PolyFuncType::new([TypeParam::Tuple { params: [TypeBound::Any.into(), TypeParam::bounded_nat(2.try_into().unwrap())].into() }], FunctionType::new_endo(type_row![])))]
 fn roundtrip_polyfunctype(#[case] poly_func_type: PolyFuncType) {
-    #[derive(Serialize, Deserialize, PartialEq, Debug)]
-    struct SerTesting {
-        poly_func_type: PolyFuncType,
-    }
-    check_testing_roundtrip(SerTesting { poly_func_type })
+    check_testing_roundtrip(poly_func_type.into())
 }
