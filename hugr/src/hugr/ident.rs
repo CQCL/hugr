@@ -6,8 +6,10 @@ use regex::Regex;
 use smol_str::SmolStr;
 use thiserror::Error;
 
+static PATH_COMPONENT_REGEX_STR: &'static str = r"[\w--\d]\w*";
+pub static PATH_REGEX_STR: String = format!(r"^{0}(\.{0})*$", PATH_COMPONENT_REGEX_STR);
 lazy_static! {
-    pub static ref PATH_REGEX: Regex = Regex::new(r"^[\w--\d]\w*(\.[\w--\d]\w*)*$").unwrap();
+    pub static ref PATH_REGEX: Regex = Regex::new(&self::PATH_REGEX_STR).unwrap();
 }
 
 #[derive(
@@ -23,6 +25,7 @@ lazy_static! {
     serde::Deserialize,
 )]
 /// A non-empty dot-separated list of valid identifiers
+
 pub struct IdentList(SmolStr);
 
 impl IdentList {
@@ -75,6 +78,9 @@ pub struct InvalidIdentifier(SmolStr);
 
 #[cfg(test)]
 mod test {
+    use proptest::prelude::*;
+    use crate::hugr::ident::PATH_COMPONENT_REGEX_STR;
+
     use super::IdentList;
 
     #[test]
@@ -91,4 +97,21 @@ mod test {
         IdentList::new("foo..bar").unwrap_err();
         IdentList::new(".foo").unwrap_err();
     }
+
+    impl Arbitrary for super::IdentList {
+        type Parameters = std::collections::HashSet<usize>;
+        type Strategy = BoxedStrategy<Self>;
+        fn arbitrary_with(args: Self::Parameters) -> Self::Strategy {
+            let component_strategy = prop::string::string_regex(PATH_COMPONENT_REGEX_STR);
+            let ident_selector = prop::collection::vec(component_strategy, 1..3);
+            prop_oneof![
+                param_selector
+            ]
+
+        }
+
+
+    }
+
+
 }

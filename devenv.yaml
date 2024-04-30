@@ -2,7 +2,7 @@ inputs:
   nixpkgs-stable:
     url: github:NixOS/nixpkgs/nixos-23.05
   fenix:
-    url: github:nix-community/fenix
+    url: github:sandydoo/fenix/patch-rust-analyzer-preview
     inputs:
       nixpkgs:
         follows: nixpkgs

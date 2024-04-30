@@ -70,6 +70,7 @@ impl EdgeKind {
 #[derive(
     Copy, Default, Clone, PartialEq, Eq, Hash, Debug, derive_more::Display, Serialize, Deserialize,
 )]
+#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 /// Bounds on the valid operations on a type in a HUGR program.
 pub enum TypeBound {
     /// The equality operation is valid on this type.

@@ -137,3 +137,15 @@ impl From<CustomType> for Type {
         Self::new_extension(value)
     }
 }
+
+#[cfg(test)]
+mod test {
+    use proptest::prelude::*;
+    impl Arbitrary for super::CustomType {
+        type Parameters = ();
+        fn arbitrary_with(args: Self::Parameters) -> Self::Strategy {
+        }
+
+    }
+
+}
