@@ -118,3 +118,22 @@ impl DerefMut for TypeRow {
         self.types.to_mut()
     }
 }
+
+#[cfg(test)]
+mod test {
+    use crate::{type_row, types::{Type, TypeEnum, TypeRow}};
+    use proptest::prelude::*;
+
+    impl Arbitrary for super::TypeRow {
+        type Parameters = crate::types::test::TypeDepth;
+        type Strategy = BoxedStrategy<Self>;
+        fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
+            use proptest::collection::{SizeRange, vec};
+            if depth.leaf() {
+                Just(type_row![]).boxed()
+            } else {
+                vec(any_with::<Type>(depth),0..4).prop_map(crate::types::test::to_typerow).boxed()
+            }
+        }
+    }
+}

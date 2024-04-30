@@ -52,7 +52,6 @@ impl UpperBound {
 #[derive(
     Clone, Debug, PartialEq, Eq, derive_more::Display, serde::Deserialize, serde::Serialize,
 )]
-#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 #[non_exhaustive]
 #[serde(tag = "tp")]
 pub enum TypeParam {
@@ -156,6 +155,7 @@ pub enum TypeArg {
     ///Instance of [TypeParam::Opaque] An opaque value, stored as serialized blob.
     Opaque {
         #[allow(missing_docs)]
+        #[serde(flatten)]
         arg: CustomTypeArg,
     },
     /// Instance of [TypeParam::List] or [TypeParam::Tuple], defined by a
@@ -173,6 +173,7 @@ pub enum TypeArg {
     /// or [TypeArg::Extensions] - see [TypeArg::new_var_use]
     Variable {
         #[allow(missing_docs)]
+        #[serde(flatten)]
         v: TypeArgVariable,
     },
 }
@@ -272,6 +273,7 @@ impl TypeArgVariable {
 pub struct CustomTypeArg {
     /// The type of the constant.
     /// (Exact matches only - the constant is exactly this type.)
+    #[serde(flatten)]
     pub typ: CustomType,
     /// Serialized representation.
     pub value: serde_yaml::Value,
@@ -372,3 +374,151 @@ pub enum TypeArgError {
     #[error("Invalid value of type argument")]
     InvalidValue(TypeArg),
 }
+
+#[cfg(test)]
+mod test {
+    use crate::extension::ExtensionSet;
+    use crate::types::{CustomType, Type, TypeBound};
+    use proptest::prelude::*;
+
+    use super::{CustomTypeArg, TypeArgVariable};
+
+    impl Arbitrary for super::CustomTypeArg {
+        type Parameters = crate::types::test::TypeDepth;
+        type Strategy = BoxedStrategy<Self>;
+        fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
+            dbg!("Arbitrary<CustomTypeArg>: {}", depth);
+            any_with::<CustomType>(depth)
+                .prop_filter_map("Type bound is not Eq", |ct| {
+                    if ct.bound() == TypeBound::Eq {
+                        Some(CustomTypeArg::new(ct, serde_yaml::Value::Null).unwrap())
+                    } else {
+                        None
+                    }
+                })
+                .boxed()
+        }
+    }
+
+    impl Arbitrary for super::TypeArgVariable {
+        type Parameters = crate::types::test::TypeDepth;
+        type Strategy = BoxedStrategy<Self>;
+        fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
+            dbg!("Arbitrary<TypeArgVariable>: {}", depth);
+            (any::<usize>(), any_with::<super::TypeParam>(depth))
+                .prop_map(|(idx, cached_decl)| Self { idx, cached_decl })
+                .boxed()
+        }
+    }
+
+    impl Arbitrary for super::TypeParam {
+        type Parameters = crate::types::test::TypeDepth;
+        type Strategy = BoxedStrategy<Self>;
+        fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
+            use proptest::collection::{vec, SizeRange};
+            dbg!("Arbitrary<TypeParam>: {}", depth);
+            // let
+            // let list_strat =
+            //     any_with::<Self>(depth.descend()).prop_map(|x| Self::List { param: Box::new(x) });
+            if depth.leaf() {
+                prop_oneof![
+                    Just(Self::Extensions),
+                    any::<TypeBound>().prop_map(|b| Self::Type {b}),
+                    any::<super::UpperBound>().prop_map(|bound| Self::BoundedNat {bound}),
+                    any_with::<CustomType>(depth).prop_map(|ty| Self::Opaque { ty}),
+                ].boxed()
+            } else {
+                let list_strat = any_with::<Self>(depth.descend()).prop_map(|x| Self::List { param: Box::new(x) });
+                let tuple_strat = vec(any_with::<Self>(depth.descend()), 0..3).prop_map(|params| Self::Tuple { params });
+
+                prop_oneof![
+                    Just(Self::Extensions),
+                    any::<TypeBound>().prop_map(|b| Self::Type {b}),
+                    any::<super::UpperBound>().prop_map(|bound| Self::BoundedNat {bound}),
+                    any_with::<CustomType>(depth).prop_map(|ty| Self::Opaque { ty}),
+                    list_strat,
+                    tuple_strat
+                ].boxed()
+            }
+        }
+    }
+
+    impl Arbitrary for super::TypeArg {
+        type Parameters = crate::types::test::TypeDepth;
+        type Strategy = BoxedStrategy<Self>;
+        fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
+            dbg!("Arbitrary<TypeArg>: {}", depth);
+            if depth.leaf() {
+                prop_oneof! [
+                    any::<u64>().prop_map(|n| Self::BoundedNat{ n }),
+                    any::<ExtensionSet>().prop_map(|es| Self::Extensions{ es }),
+                    any_with::<Type>(depth).prop_map(|ty| Self::Type{ ty }),
+                    any_with::<CustomTypeArg>(depth.descend()).prop_map(|arg| Self::Opaque{ arg }).boxed(),
+                ].boxed()
+            } else {
+                let sequence_strat = proptest::collection::vec(any_with::<Self>(depth.descend()), 0..3)
+                    .prop_map(|elems| Self::Sequence { elems });
+                prop_oneof! [
+                    any::<u64>().prop_map(|n| Self::BoundedNat{ n }),
+                    any::<ExtensionSet>().prop_map(|es| Self::Extensions{ es }),
+                    any_with::<Type>(depth).prop_map(|ty| Self::Type{ ty }),
+                    any_with::<CustomTypeArg>(depth.descend()).prop_map(|arg| Self::Opaque{ arg }).boxed(),
+                    sequence_strat
+                ].boxed()
+            }
+            // let recurse_weight = if depth.leaf() { 0 } else { 1 };
+            // prop_oneof! [
+            //     1 => any::<u64>().prop_map(|n| Self::BoundedNat{ n }),
+            //         // any::<ExtensionSet>().prop_map(|es| Self::Extensions{ es }),
+            //         // any_with::<Type>(depth).prop_map(|ty| Self::Type{ ty }),
+            //     recurse_weight => any_with::<TypeArgVariable>(depth.descend()).prop_map(|v| Self::Variable{ v }),
+            // ].boxed()
+         // else {
+         //        prop_oneof! [
+         //            any::<u64>().prop_map(|n| Self::BoundedNat{ n }),
+         //            // any_with::<TypeArgVariable>(depth.descend()).prop_map(|v| Self::Variable{ v }),
+         //            // any::<ExtensionSet>().prop_map(|es| Self::Extensions{ es }),
+         //            // any_with::<Type>(depth).prop_map(|ty| Self::Type{ ty }),
+         //            // any_with::<CustomTypeArg>(depth.descend()).prop_map(|arg| Self::Opaque{ arg }).boxed(),
+         //            // sequence_strat,
+         //        ].boxed()
+
+         //    }
+        }
+    }
+}
+
+// pub enum TypeArg {
+//     /// Where the (Type/Op)Def declares that an argument is a [TypeParam::Type]
+//     Type {
+//         #[allow(missing_docs)]
+//         ty: Type,
+//     },
+//     /// Instance of [TypeParam::BoundedNat]. 64-bit unsigned integer.
+//     BoundedNat {
+//         #[allow(missing_docs)]
+//         n: u64,
+//     },
+//     ///Instance of [TypeParam::Opaque] An opaque value, stored as serialized blob.
+//     Opaque {
+//         #[allow(missing_docs)]
+//         arg: CustomTypeArg,
+//     },
+//     /// Instance of [TypeParam::List] or [TypeParam::Tuple], defined by a
+//     /// sequence of elements.
+//     Sequence {
+//         #[allow(missing_docs)]
+//         elems: Vec<TypeArg>,
+//     },
+//     /// Instance of [TypeParam::Extensions], providing the extension ids.
+//     Extensions {
+//         #[allow(missing_docs)]
+//         es: ExtensionSet,
+//     },
+//     /// Variable (used in type schemes only), that is not a [TypeArg::Type]
+//     /// or [TypeArg::Extensions] - see [TypeArg::new_var_use]
+//     Variable {
+//         #[allow(missing_docs)]
+//         v: TypeArgVariable,
+//     },
+// }

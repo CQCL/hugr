@@ -450,7 +450,87 @@ pub(crate) fn check_typevar_decl(
 #[cfg(test)]
 pub(crate) mod test {
     use super::*;
-    use crate::extension::prelude::USIZE_T;
+    use proptest::prelude::*;
+    use crate::extension::ExtensionSet;
+    use crate::{extension::prelude::USIZE_T, ops::AliasDecl};
+
+    use crate::types::TypeBound;
+
+    #[derive(Clone,Copy,Debug)]
+    pub struct TypeDepth(usize);
+
+    impl TypeDepth {
+        pub fn descend(&self) -> Self {
+            if self.leaf() {
+                self.clone()
+            } else {
+                Self(self.0 - 1)
+            }
+        }
+
+        pub fn leaf(&self) -> bool {
+            self.0 == 0
+        }
+    }
+
+    impl Default for TypeDepth {
+        fn default() -> Self {
+            Self(3)
+        }
+    }
+
+    impl From<usize> for TypeDepth {
+        fn from(s: usize) -> Self {
+            Self(s)
+        }
+    }
+
+
+    pub fn to_typerow(type_enums: impl IntoIterator<Item=Type>) -> TypeRow {
+        type_enums.into_iter().collect_vec().into()
+
+    }
+
+    impl Arbitrary for super::TypeEnum {
+        type Parameters = TypeDepth;
+        type Strategy = BoxedStrategy<Self>;
+        fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
+            dbg!("Arbitrary<TypeEnum>: {}", depth);
+            prop_oneof! [
+                any_with::<CustomType>(depth).prop_map(Self::Extension),
+                any::<AliasDecl>().prop_map(Self::Alias),
+                any::<(usize,TypeBound)>().prop_map(|(us,tb)| Self::Variable(us,tb)),
+                any_with::<FunctionType>(depth).prop_map(|x| Self::Function(Box::new(x))),
+                any_with::<SumType>(depth).prop_map(Self::Sum),
+            ].boxed()
+        }
+    }
+
+    impl Arbitrary for super::SumType {
+        type Parameters = TypeDepth;
+        type Strategy = BoxedStrategy<Self>;
+        fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
+            use proptest::collection::{vec,SizeRange};
+            dbg!("Arbitrary<SumType>: {}", depth);
+            let unit_strat = any::<u8>().prop_map(Self::new_unary);
+            let general_strat = vec(any_with::<TypeRow>(depth), 0..3).prop_map(SumType::new);
+            let recurse_weight = if depth.leaf() { 0 } else { 1 };
+            prop_oneof![
+                1 => unit_strat,
+                recurse_weight => general_strat
+            ].boxed()
+        }
+    }
+
+    impl Arbitrary for super::Type {
+        type Parameters = TypeDepth;
+        type Strategy = BoxedStrategy<Self>;
+        fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
+            dbg!("Arbitrary<Type>: {}", depth);
+            any_with::<TypeEnum>(depth.descend()).prop_map(Self::new).boxed()
+        }
+    }
+
 
     #[test]
     fn construct() {
@@ -481,4 +561,5 @@ pub(crate) mod test {
         let pred_direct = SumType::Unit { size: 2 };
         assert_eq!(pred1, pred_direct.into())
     }
+
 }

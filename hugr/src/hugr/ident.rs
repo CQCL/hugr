@@ -7,8 +7,8 @@ use smol_str::SmolStr;
 use thiserror::Error;
 
 static PATH_COMPONENT_REGEX_STR: &'static str = r"[\w--\d]\w*";
-pub static PATH_REGEX_STR: String = format!(r"^{0}(\.{0})*$", PATH_COMPONENT_REGEX_STR);
 lazy_static! {
+    pub static ref PATH_REGEX_STR: String = format!(r"^{0}(\.{0})*$", PATH_COMPONENT_REGEX_STR);
     pub static ref PATH_REGEX: Regex = Regex::new(&self::PATH_REGEX_STR).unwrap();
 }
 
@@ -78,8 +78,8 @@ pub struct InvalidIdentifier(SmolStr);
 
 #[cfg(test)]
 mod test {
-    use proptest::prelude::*;
     use crate::hugr::ident::PATH_COMPONENT_REGEX_STR;
+    use proptest::prelude::*;
 
     use super::IdentList;
 
@@ -99,19 +99,25 @@ mod test {
     }
 
     impl Arbitrary for super::IdentList {
-        type Parameters = std::collections::HashSet<usize>;
+        type Parameters = ();
         type Strategy = BoxedStrategy<Self>;
-        fn arbitrary_with(args: Self::Parameters) -> Self::Strategy {
-            let component_strategy = prop::string::string_regex(PATH_COMPONENT_REGEX_STR);
-            let ident_selector = prop::collection::vec(component_strategy, 1..3);
-            prop_oneof![
-                param_selector
-            ]
-
+        fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+            use proptest::collection::{vec, SizeRange};
+            let component_strategy = prop::string::string_regex(&PATH_COMPONENT_REGEX_STR)
+                .unwrap()
+                .boxed();
+            vec(component_strategy.clone(), 1..4)
+                .prop_map(|vs| {
+                    IdentList::new(itertools::intersperse(vs, ".".to_string()).collect::<String>())
+                        .unwrap()
+                })
+                .boxed()
         }
-
-
     }
-
-
+    proptest! {
+        #[test]
+        fn arbitrary_identlist_valid((IdentList(ident_list)): IdentList) {
+            assert!(IdentList::new(ident_list).is_ok())
+        }
+    }
 }

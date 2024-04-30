@@ -152,3 +152,19 @@ impl OpTrait for AliasDecl {
         <Self as StaticTag>::TAG
     }
 }
+
+#[cfg(test)]
+mod test {
+    use crate::types::TypeBound;
+    use proptest::prelude::*;
+
+    impl Arbitrary for super::AliasDecl {
+        type Parameters = ();
+        type Strategy = BoxedStrategy<Self>;
+        fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+            let name = proptest::string::string_regex(r".+").unwrap();
+            let bound = any::<TypeBound>();
+            (name,bound).prop_map(|(name,bound)| Self::new(name,bound)).boxed()
+        }
+    }
+}

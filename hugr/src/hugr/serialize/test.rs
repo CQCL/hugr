@@ -3,6 +3,7 @@ use crate::builder::{
     test::closed_dfg_root_hugr, Container, DFGBuilder, Dataflow, DataflowHugr,
     DataflowSubContainer, HugrBuilder, ModuleBuilder,
 };
+use proptest::prelude::*;
 use crate::extension::prelude::{BOOL_T, PRELUDE_ID, QB_T, USIZE_T};
 use crate::extension::simple_op::MakeRegisteredOp;
 use crate::extension::{EMPTY_REG, PRELUDE_REGISTRY};
@@ -424,4 +425,11 @@ fn roundtrip_optype(#[case] optype: impl Into<OpType> + std::fmt::Debug) {
         input_extensions: None,
         op: optype.into(),
     });
+}
+
+proptest! {
+    #[test]
+    fn prop_roundtrip_type(t: Type) {
+        check_testing_roundtrip(t)
+    }
 }

@@ -11,6 +11,7 @@ use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 use crate::{Direction, IncomingPort, OutgoingPort, Port};
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+// #[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 /// Describes the edges required to/from a node, and thus, also the type of a [Graph].
 /// This includes both the concept of "signature" in the spec,
 /// and also the target (value) of a call (static).
@@ -220,6 +221,7 @@ impl Display for FunctionType {
 #[cfg(test)]
 mod test {
     use crate::{extension::prelude::USIZE_T, type_row};
+    use proptest::prelude::*;
 
     use super::*;
     #[test]
@@ -242,5 +244,16 @@ mod test {
 
         assert_eq!(f_type.input_types(), &[Type::UNIT]);
         assert_eq!(f_type.output_types(), &[USIZE_T]);
+    }
+
+    impl Arbitrary for super::FunctionType {
+        type Parameters = crate::types::test::TypeDepth;
+        type Strategy = BoxedStrategy<Self>;
+        fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
+            let input = any_with::<TypeRow>(depth);
+            let output = any_with::<TypeRow>(depth);
+            let extension = any::<ExtensionSet>();
+            (input,output,extension).prop_map(|(input,output,extension_reqs)| FunctionType {input,output,extension_reqs}).boxed()
+        }
     }
 }
