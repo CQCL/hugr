@@ -20,7 +20,7 @@ pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.int
 /// Identifier for the integer type.
 pub const INT_TYPE_ID: SmolStr = SmolStr::new_inline("int");
 
-fn int_custom_type(width_arg: TypeArg) -> CustomType {
+pub(crate) fn int_custom_type(width_arg: TypeArg) -> CustomType {
     CustomType::new(INT_TYPE_ID, [width_arg], EXTENSION_ID, TypeBound::Eq)
 }
 

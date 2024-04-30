@@ -22,18 +22,27 @@ use super::{HugrMut, HugrView};
 /// recent version of the format. We keep the `Deserialize` implementations for
 /// older versions to allow for backwards compatibility.
 ///
+/// The Generic `SerHugr` is always instantiated to the most recent version of
+/// the format outside this module.
+///
 /// Make sure to order the variants from newest to oldest, as the deserializer
 /// will try to deserialize them in order.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(tag = "version", rename_all = "lowercase")]
-enum Versioned {
+enum Versioned<SerHugr> {
     /// Version 0 of the HUGR serialization format.
     V0,
     /// Version 1 of the HUGR serialization format.
-    V1(SerHugrV1),
+    V1(SerHugr),
 
     #[serde(other)]
     Unsupported,
+}
+
+impl<T> Versioned<T> {
+    pub fn new(t: T) -> Self {
+        Self::V1(t)
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
@@ -61,6 +70,34 @@ struct SerHugrV1 {
     #[serde(default)]
     encoder: Option<String>,
 }
+
+/// Version 1 of the Testing HUGR serialisation format, see `testing_hugr.py`.
+#[cfg(test)]
+#[derive(Serialize, Deserialize, PartialEq, Debug, Default)]
+struct SerTestingV1 {
+    typ: Option<crate::types::Type>,
+    sum_type: Option<crate::types::SumType>,
+    poly_func_type: Option<crate::types::PolyFuncType>,
+    value: Option<crate::ops::Value>,
+}
+
+macro_rules! impl_sertesting_from {
+    ($typ:ty, $field:ident) => {
+        #[cfg(test)]
+        impl From<$typ> for SerTestingV1 {
+            fn from(v: $typ) -> Self {
+                let mut r: Self = Default::default();
+                r.$field = Some(v);
+                r
+            }
+        }
+    };
+}
+
+impl_sertesting_from!(crate::types::Type, typ);
+impl_sertesting_from!(crate::types::SumType, sum_type);
+impl_sertesting_from!(crate::types::PolyFuncType, poly_func_type);
+impl_sertesting_from!(crate::ops::Value, value);
 
 /// Errors that can occur while serializing a HUGR.
 #[derive(Debug, Clone, PartialEq, Error)]
@@ -99,7 +136,7 @@ impl Serialize for Hugr {
         S: serde::Serializer,
     {
         let shg: SerHugrV1 = self.try_into().map_err(serde::ser::Error::custom)?;
-        let versioned = Versioned::V1(shg);
+        let versioned = Versioned::new(shg);
         versioned.serialize(serializer)
     }
 }
@@ -109,7 +146,7 @@ impl<'de> Deserialize<'de> for Hugr {
     where
         D: Deserializer<'de>,
     {
-        let shg = Versioned::deserialize(deserializer)?;
+        let shg: Versioned<SerHugrV1> = Versioned::deserialize(deserializer)?;
         match shg {
             Versioned::V0 => Err(serde::de::Error::custom(
                 "Version 0 HUGR serialization format is not supported.",

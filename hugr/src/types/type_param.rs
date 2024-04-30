@@ -124,6 +124,12 @@ impl From<TypeBound> for TypeParam {
     }
 }
 
+impl From<UpperBound> for TypeParam {
+    fn from(bound: UpperBound) -> Self {
+        Self::BoundedNat { bound }
+    }
+}
+
 impl From<Type> for TypeArg {
     fn from(ty: Type) -> Self {
         Self::Type { ty }

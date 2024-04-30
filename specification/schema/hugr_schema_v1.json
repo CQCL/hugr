@@ -1,5 +1,66 @@
 {
     "$defs": {
+        "Alias": {
+            "description": "An Alias Type",
+            "properties": {
+                "t": {
+                    "const": "Alias",
+                    "default": "Alias",
+                    "enum": [
+                        "Alias"
+                    ],
+                    "title": "T",
+                    "type": "string"
+                },
+                "bound": {
+                    "$ref": "#/$defs/TypeBound"
+                },
+                "name": {
+                    "title": "Name",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "bound",
+                "name"
+            ],
+            "title": "Alias",
+            "type": "object"
+        },
+        "AliasDecl": {
+            "properties": {
+                "parent": {
+                    "title": "Parent",
+                    "type": "integer"
+                },
+                "input_extensions": {
+                    "$ref": "#/$defs/ExtensionSet"
+                },
+                "op": {
+                    "const": "AliasDecl",
+                    "default": "AliasDecl",
+                    "enum": [
+                        "AliasDecl"
+                    ],
+                    "title": "Op",
+                    "type": "string"
+                },
+                "name": {
+                    "title": "Name",
+                    "type": "string"
+                },
+                "bound": {
+                    "$ref": "#/$defs/TypeBound"
+                }
+            },
+            "required": [
+                "parent",
+                "name",
+                "bound"
+            ],
+            "title": "AliasDecl",
+            "type": "object"
+        },
         "Array": {
             "description": "Known size array whose elements are of the same type.",
             "properties": {
@@ -529,6 +590,21 @@
             "title": "ExtensionsArg",
             "type": "object"
         },
+        "ExtensionsParam": {
+            "properties": {
+                "tp": {
+                    "const": "Extensions",
+                    "default": "Extensions",
+                    "enum": [
+                        "Extensions"
+                    ],
+                    "title": "Tp",
+                    "type": "string"
+                }
+            },
+            "title": "ExtensionsParam",
+            "type": "object"
+        },
         "FuncDecl": {
             "description": "External function declaration, linked at runtime.",
             "properties": {
@@ -660,15 +736,6 @@
         "GeneralSum": {
             "description": "General sum type that explicitly stores the types of the variants.",
             "properties": {
-                "t": {
-                    "const": "Sum",
-                    "default": "Sum",
-                    "enum": [
-                        "Sum"
-                    ],
-                    "title": "T",
-                    "type": "string"
-                },
                 "s": {
                     "const": "General",
                     "default": "General",
@@ -911,6 +978,7 @@
             "description": "A constant operation.",
             "discriminator": {
                 "mapping": {
+                    "AliasDecl": "#/$defs/AliasDecl",
                     "CFG": "#/$defs/CFG",
                     "Call": "#/$defs/Call",
                     "CallIndirect": "#/$defs/CallIndirect",
@@ -1002,12 +1070,15 @@
                 },
                 {
                     "$ref": "#/$defs/DFG"
+                },
+                {
+                    "$ref": "#/$defs/AliasDecl"
                 }
             ],
             "title": "OpType"
         },
         "Opaque": {
-            "description": "An opaque operation that can be downcasted by the extensions that define it.",
+            "description": "An opaque Type that can be downcasted by the extensions that define it.",
             "properties": {
                 "t": {
                     "const": "Opaque",
@@ -1218,7 +1289,7 @@
                     "type": "integer"
                 },
                 "typ": {
-                    "$ref": "#/$defs/Type"
+                    "$ref": "#/$defs/SumType"
                 },
                 "vs": {
                     "items": {
@@ -1277,6 +1348,27 @@
                 "variants"
             ],
             "title": "Tag",
+            "type": "object"
+        },
+        "TaggedSumType": {
+            "properties": {
+                "t": {
+                    "const": "Sum",
+                    "default": "Sum",
+                    "enum": [
+                        "Sum"
+                    ],
+                    "title": "T",
+                    "type": "string"
+                },
+                "st": {
+                    "$ref": "#/$defs/SumType"
+                }
+            },
+            "required": [
+                "st"
+            ],
+            "title": "TaggedSumType",
             "type": "object"
         },
         "TailLoop": {
@@ -1382,12 +1474,13 @@
             "description": "A HUGR type.",
             "discriminator": {
                 "mapping": {
+                    "Alias": "#/$defs/Alias",
                     "Array": "#/$defs/Array",
                     "G": "#/$defs/FunctionType",
                     "I": "#/$defs/USize",
                     "Opaque": "#/$defs/Opaque",
                     "Q": "#/$defs/Qubit",
-                    "Sum": "#/$defs/SumType",
+                    "Sum": "#/$defs/TaggedSumType",
                     "V": "#/$defs/Variable"
                 },
                 "propertyName": "t"
@@ -1409,10 +1502,13 @@
                     "$ref": "#/$defs/Array"
                 },
                 {
-                    "$ref": "#/$defs/SumType"
+                    "$ref": "#/$defs/TaggedSumType"
                 },
                 {
                     "$ref": "#/$defs/Opaque"
+                },
+                {
+                    "$ref": "#/$defs/Alias"
                 }
             ],
             "title": "Type"
@@ -1462,6 +1558,7 @@
             "discriminator": {
                 "mapping": {
                     "BoundedNat": "#/$defs/BoundedNatParam",
+                    "Extensions": "#/$defs/ExtensionsParam",
                     "List": "#/$defs/ListParam",
                     "Opaque": "#/$defs/OpaqueParam",
                     "Tuple": "#/$defs/TupleParam",
@@ -1484,6 +1581,9 @@
                 },
                 {
                     "$ref": "#/$defs/TupleParam"
+                },
+                {
+                    "$ref": "#/$defs/ExtensionsParam"
                 }
             ],
             "title": "TypeParam"
@@ -1547,17 +1647,8 @@
             "type": "object"
         },
         "UnitSum": {
-            "description": "Simple predicate where all variants are empty tuples.",
+            "description": "Simple sum type where all variants are empty tuples.",
             "properties": {
-                "t": {
-                    "const": "Sum",
-                    "default": "Sum",
-                    "enum": [
-                        "Sum"
-                    ],
-                    "title": "T",
-                    "type": "string"
-                },
                 "s": {
                     "const": "Unit",
                     "default": "Unit",

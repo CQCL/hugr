@@ -11,7 +11,7 @@ pub(super) enum SerSimpleType {
     Q,
     I,
     G(Box<FunctionType>),
-    Sum(SumType),
+    Sum { st: SumType },
     Array { inner: Box<SerSimpleType>, len: u64 },
     Opaque(CustomType),
     Alias(AliasDecl),
@@ -33,7 +33,7 @@ impl From<Type> for SerSimpleType {
             TypeEnum::Alias(a) => SerSimpleType::Alias(a),
             TypeEnum::Function(sig) => SerSimpleType::G(sig),
             TypeEnum::Variable(i, b) => SerSimpleType::V { i, b },
-            TypeEnum::Sum(sum) => SerSimpleType::Sum(sum),
+            TypeEnum::Sum(st) => SerSimpleType::Sum { st },
         }
     }
 }
@@ -44,7 +44,7 @@ impl From<SerSimpleType> for Type {
             SerSimpleType::Q => QB_T,
             SerSimpleType::I => USIZE_T,
             SerSimpleType::G(sig) => Type::new_function(*sig),
-            SerSimpleType::Sum(sum) => sum.into(),
+            SerSimpleType::Sum { st } => st.into(),
             SerSimpleType::Array { inner, len } => {
                 array_type(TypeArg::BoundedNat { n: len }, (*inner).into())
             }
