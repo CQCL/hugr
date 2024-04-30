@@ -217,11 +217,7 @@ pub(crate) mod test {
     use crate::types::Type;
     use crate::utils::test_quantum_extension::h_gate;
     use crate::{
-        builder::{
-            test::{n_identity, BIT, NAT, QB},
-            BuildError,
-        },
-        extension::ExtensionSet,
+        builder::test::{n_identity, BIT, NAT, QB},
         type_row, Wire,
     };
 

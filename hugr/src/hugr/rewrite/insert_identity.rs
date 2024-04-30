@@ -103,7 +103,7 @@ mod tests {
         algorithm::nest_cfgs::test::build_conditional_in_loop_cfg,
         extension::{prelude::QB_T, PRELUDE_REGISTRY},
         ops::handle::NodeHandle,
-        Hugr, HugrView,
+        Hugr,
     };
 
     #[rstest]

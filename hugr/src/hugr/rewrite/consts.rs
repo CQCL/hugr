@@ -119,7 +119,6 @@ mod test {
             prelude::{ConstUsize, USIZE_T},
             PRELUDE_REGISTRY,
         },
-        hugr::HugrMut,
         ops::{handle::NodeHandle, MakeTuple, Value},
         type_row,
         types::FunctionType,

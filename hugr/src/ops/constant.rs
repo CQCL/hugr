@@ -346,11 +346,10 @@ mod test {
             prelude::{ConstUsize, USIZE_CUSTOM_T, USIZE_T},
             ExtensionId, ExtensionRegistry, PRELUDE,
         },
-        ops::constant::CustomSerialized,
         std_extensions::arithmetic::float_types::{self, ConstF64, FLOAT64_TYPE},
         type_row,
         types::type_param::TypeArg,
-        types::{CustomType, FunctionType, Type, TypeBound, TypeRow},
+        types::{Type, TypeBound, TypeRow},
     };
     use cool_asserts::assert_matches;
     use rstest::{fixture, rstest};

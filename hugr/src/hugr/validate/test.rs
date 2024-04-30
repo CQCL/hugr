@@ -9,14 +9,14 @@ use crate::builder::{
 use crate::extension::prelude::{BOOL_T, PRELUDE, USIZE_T};
 use crate::extension::{Extension, ExtensionId, TypeDefBound, EMPTY_REG, PRELUDE_REGISTRY};
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
-use crate::hugr::{HugrMut, NodeType};
+use crate::hugr::HugrMut;
 use crate::ops::dataflow::IOTrait;
-use crate::ops::{self, Noop, OpType, Value};
+use crate::ops::{self, Noop, Value};
 use crate::std_extensions::logic::test::{and_op, or_op};
 use crate::std_extensions::logic::{self, NotOp};
-use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
+use crate::types::type_param::{TypeArg, TypeArgError};
 use crate::types::{CustomType, FunctionType, PolyFuncType, Type, TypeBound, TypeRow};
-use crate::{type_row, Direction, IncomingPort, Node};
+use crate::{type_row, IncomingPort};
 
 const NAT: Type = crate::extension::prelude::USIZE_T;
 

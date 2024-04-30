@@ -579,10 +579,10 @@ pub(crate) mod test {
     use crate::extension::{prelude::USIZE_T, ExtensionSet};
 
     use crate::hugr::views::RootChecked;
-    use crate::ops::handle::{BasicBlockID, ConstID, NodeHandle};
+    use crate::ops::handle::{ConstID, NodeHandle};
     use crate::ops::Value;
+    use crate::type_row;
     use crate::types::{FunctionType, Type};
-    use crate::{type_row, Hugr};
     const NAT: Type = USIZE_T;
 
     pub fn group_by<E: Eq + Hash + Ord, V: Eq + Hash>(h: HashMap<E, V>) -> HashSet<Vec<E>> {

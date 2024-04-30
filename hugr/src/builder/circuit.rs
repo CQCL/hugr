@@ -241,7 +241,7 @@ mod test {
     use crate::{
         builder::{
             test::{build_main, NAT, QB},
-            Dataflow, DataflowSubContainer, Wire,
+            DataflowSubContainer,
         },
         extension::prelude::BOOL_T,
         ops::{custom::OpaqueOp, CustomOp},

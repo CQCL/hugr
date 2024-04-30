@@ -698,7 +698,6 @@ mod tests {
             EMPTY_REG,
         },
         hugr::views::{HierarchyView, SiblingGraph},
-        hugr::HugrMut,
         ops::handle::{DfgID, FuncID, NodeHandle},
         std_extensions::logic::{test::and_op, NotOp},
         type_row,

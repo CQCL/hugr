@@ -100,7 +100,7 @@ mod test {
         extension::ExtensionSet,
         hugr::ValidationError,
         ops::Value,
-        type_row, Hugr,
+        type_row,
     };
 
     use super::*;
