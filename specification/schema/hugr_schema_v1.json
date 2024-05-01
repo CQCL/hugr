@@ -1891,7 +1891,7 @@
             "type": "object"
         }
     },
-    "description": "A serializable representation of a Hugr Type, SumType, or Value. Intended for testing only.",
+    "description": "A serializable representation of a Hugr Type, SumType, PolyFuncType,\nValue, OpType. Intended for testing only.",
     "properties": {
         "version": {
             "const": "v1",

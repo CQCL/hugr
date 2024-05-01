@@ -32,28 +32,37 @@ const QB: Type = crate::extension::prelude::QB_T;
 
 type TestingModel = SerTestingV1;
 
-lazy_static! {
-    static ref SCHEMA: JSONSchema = {
-        let schema_val: serde_json::Value = serde_json::from_str(include_str!(
-            "../../../../specification/schema/hugr_schema_strict_v1.json"
-        ))
-        .unwrap();
-        JSONSchema::options()
-            .with_draft(Draft::Draft7)
-            .compile(&schema_val)
-            .expect("Schema is invalid.")
-    };
-    static ref TESTING_SCHEMA: JSONSchema = {
-        let schema_val: serde_json::Value = serde_json::from_str(include_str!(
-            "../../../../specification/schema/testing_hugr_schema_strict_v1.json"
-        ))
-        .unwrap();
-        JSONSchema::options()
-            .with_draft(Draft::Draft7)
-            .compile(&schema_val)
-            .expect("Schema is invalid.")
+macro_rules! include_schema {
+    ($name:ident, $path:literal) => {
+        lazy_static! {
+            static ref $name: JSONSchema = {
+                let schema_val: serde_json::Value =
+                    serde_json::from_str(include_str!($path)).unwrap();
+                JSONSchema::options()
+                    .with_draft(Draft::Draft7)
+                    .compile(&schema_val)
+                    .expect("Schema is invalid.")
+            };
+        }
     };
 }
+
+include_schema!(
+    SCHEMA,
+    "../../../../specification/schema/hugr_schema_v1.json"
+);
+include_schema!(
+    SCHEMA_STRICT,
+    "../../../../specification/schema/hugr_schema_strict_v1.json"
+);
+include_schema!(
+    TESTING_SCHEMA,
+    "../../../../specification/schema/testing_hugr_schema_v1.json"
+);
+include_schema!(
+    TESTING_SCHEMA_STRICT,
+    "../../../../specification/schema/testing_hugr_schema_strict_v1.json"
+);
 
 #[test]
 fn empty_hugr_serialize() {
@@ -104,6 +113,9 @@ pub fn check_hugr_schema_roundtrip(hugr: &Hugr) -> Hugr {
 /// Returns the deserialized HUGR.
 pub fn check_hugr_roundtrip(hugr: &Hugr, check_schema: bool) -> Hugr {
     let new_hugr: Hugr = ser_roundtrip_validate(hugr, check_schema.then_some(&SCHEMA));
+    let new_hugr_strict: Hugr =
+        ser_roundtrip_validate(hugr, check_schema.then_some(&SCHEMA_STRICT));
+    assert_eq!(new_hugr, new_hugr_strict);
 
     // Original HUGR, with canonicalized node indices
     //
@@ -142,8 +154,10 @@ pub fn check_hugr_roundtrip(hugr: &Hugr, check_schema: bool) -> Hugr {
 
 fn check_testing_roundtrip(t: impl Into<TestingModel>) {
     let before = Versioned::new(t.into());
+    let after_strict = ser_roundtrip_validate(&before, Some(&TESTING_SCHEMA_STRICT));
     let after = ser_roundtrip_validate(&before, Some(&TESTING_SCHEMA));
     assert_eq!(before, after);
+    assert_eq!(after, after_strict);
 }
 
 /// Generate an optype for a node with a matching amount of inputs and outputs.
