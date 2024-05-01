@@ -113,6 +113,13 @@ impl PartialEq for ExtensionValue {
     }
 }
 
+impl ExtensionValue {
+    /// TODO
+    pub fn new(konst: impl CustomConst) -> Self {
+        Self(Box::new(konst))
+    }
+}
+
 /// Struct for custom type check fails.
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
 #[non_exhaustive]
@@ -354,7 +361,8 @@ mod test {
             ExtensionId, ExtensionRegistry, PRELUDE,
         },
         std_extensions::arithmetic::float_types::{self, ConstF64, FLOAT64_TYPE},
-        std_extensions::arithmetic::int_types::ConstInt,
+        std_extensions::arithmetic::int_types::{ConstInt, LOG_WIDTH_MAX},
+        std_extensions::collections::ListValue,
         type_row,
         types::type_param::TypeArg,
         types::{Type, TypeBound, TypeRow},
@@ -366,29 +374,43 @@ mod test {
     use super::*;
     use proptest::prelude::*;
 
-    fn mk_extension_value<CC: CustomConst>(mb_konst: Option<CC>) -> Option<ExtensionValue> {
-        mb_konst.map(|x| ExtensionValue(Box::new(x)))
-    }
-
     impl Arbitrary for ExtensionValue {
         type Parameters = ();
         type Strategy = BoxedStrategy<Self>;
         fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-            let signed_strat = |log_width| {
+            use proptest::collection::vec;
+            let signed_strat = (..=LOG_WIDTH_MAX).prop_flat_map(|log_width| {
                 use std::i64;
-                let max_val = 2i64.pow(log_width) / 2;
-                todo!();
-
-            };
-            todo!()
-            // (0..8u8).prop_flat_map(|log_width| prop_oneof![
-            //     (-(1 << (log_width - 1))..(1i64 << (log_width - 1))).prop_filter_map("signed log_width too small",
-            //                                                              move |value| mk_extension_value(ConstInt::new_s(log_width,value).ok())
-            //     ),
-            //     (0..(1u64 << log_width)).prop_filter_map("unsigned log_width too small",
-            //                                                              move |value| mk_extension_value(ConstInt::new_u(log_width,value).ok())
-            //     ),
-            // ]).boxed()
+                let max_val = (2u64.pow(log_width as u32) / 2) as i64;
+                let min_val = -max_val - 1;
+                (min_val..=max_val).prop_map(move |v| {
+                    ExtensionValue::new(
+                        ConstInt::new_s(log_width, v).expect("guaranteed to be in bounds"),
+                    )
+                })
+            });
+            let unsigned_strat = (..=LOG_WIDTH_MAX).prop_flat_map(|log_width| {
+                (0..2u64.pow(log_width as u32)).prop_map(move |v| {
+                    ExtensionValue::new(
+                        ConstInt::new_u(log_width, v).expect("guaranteed to be in bounds"),
+                    )
+                })
+            });
+            prop_oneof![unsigned_strat, signed_strat]
+                .prop_recursive(
+                    3,  // No more than 3 branch levels deep
+                    32, // Target around 32 total elements
+                    3,  // Each collection is up to 3 elements long
+                    |element| {
+                        (any::<Type>(), vec(element.clone(), 0..3)).prop_map(|(typ, contents)| {
+                            ExtensionValue::new(ListValue::new(
+                                typ,
+                                contents.into_iter().map(|e| Value::Extension { e }),
+                            ))
+                        })
+                    },
+                )
+                .boxed()
         }
     }
 
@@ -401,9 +423,9 @@ mod test {
                 prop_oneof![any::<ExtensionValue>().prop_map(|e| Self::Extension { e }),];
             leaf_strat
                 .prop_recursive(
-                    3,  // No more than 4 branch levels deep
-                    32, // Target around 64 total elements
-                    3,  // Each collection is up to 16 elements long
+                    3,  // No more than 3 branch levels deep
+                    32, // Target around 32 total elements
+                    3,  // Each collection is up to 3 elements long
                     |element| {
                         prop_oneof![
                             vec(element.clone(), 0..3).prop_map(|vs| Self::Tuple { vs }),
