@@ -17,13 +17,14 @@ from pydantic import ConfigDict
 from hugr.serialization import SerialHugr
 from hugr.serialization.testing_hugr import TestingHugr
 
-from hugr.serialization import tys
-
 
 def write_schema(
-        out_dir: Path, name_prefix: str, schema: Type[SerialHugr] | Type[TestingHugr], config: Optional[ConfigDict] = None, **kwargs
+    out_dir: Path,
+    name_prefix: str,
+    schema: Type[SerialHugr] | Type[TestingHugr],
+    config: Optional[ConfigDict] = None,
+    **kwargs,
 ):
-
     version = schema.get_version()
     filename = f"{name_prefix}_{version}.json"
     path = out_dir / filename
@@ -45,7 +46,9 @@ if __name__ == "__main__":
 
     strict_config = ConfigDict(strict=True, extra="forbid")
     lax_config = ConfigDict(strict=False, extra="allow")
-    write_schema(out_dir, "testing_hugr_schema_strict", TestingHugr, config=strict_config)
+    write_schema(
+        out_dir, "testing_hugr_schema_strict", TestingHugr, config=strict_config
+    )
     write_schema(out_dir, "testing_hugr_schema", TestingHugr, config=lax_config)
     write_schema(out_dir, "hugr_schema_strict", SerialHugr, config=strict_config)
     write_schema(out_dir, "hugr_schema", SerialHugr, config=lax_config)

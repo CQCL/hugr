@@ -1,7 +1,7 @@
 import inspect
 import sys
 from enum import Enum
-from typing import Annotated, Any, Literal, Optional, Union, Tuple, Any
+from typing import Annotated, Any, Literal, Optional, Union
 
 from pydantic import (
     BaseModel,
@@ -354,13 +354,13 @@ classes = inspect.getmembers(
 
 
 def model_rebuild(
-    classes: list[tuple[str,Any]],
+    classes: list[tuple[str, Any]],
     config: ConfigDict = ConfigDict(),
     **kwargs,
 ):
     new_config = default_model_config.copy()
     new_config.update(config)
-    for c in {k: v for (k,v) in classes}.values():
+    for c in {k: v for (k, v) in classes}.values():
         if issubclass(c, ConfiguredBaseModel):
             c.set_model_config(new_config)
             c.model_rebuild(**kwargs)

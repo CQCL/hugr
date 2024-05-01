@@ -3,7 +3,7 @@ import sys
 from abc import ABC
 from typing import Any, Literal, cast
 
-from pydantic import Field, RootModel, ConfigDict
+from pydantic import Field, RootModel
 
 from . import tys
 from .tys import (
@@ -562,7 +562,10 @@ class OpDef(BaseOp, populate_by_name=True):
 
 # Now that all classes are defined, we need to update the ForwardRefs in all type
 # annotations. We use some inspect magic to find all classes defined in this file.
-classes = inspect.getmembers(
-    sys.modules[__name__],
-    lambda member: inspect.isclass(member) and member.__module__ == __name__,
-) + tys_classes
+classes = (
+    inspect.getmembers(
+        sys.modules[__name__],
+        lambda member: inspect.isclass(member) and member.__module__ == __name__,
+    )
+    + tys_classes
+)

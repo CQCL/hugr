@@ -39,7 +39,6 @@ class SerialHugr(BaseModel):
     def _pydantic_rebuild(cls, config: ConfigDict = ConfigDict(), **kwargs):
         model_rebuild([(cls.__name__, cls)] + classes, config=config, **kwargs)
 
-
     class Config:
         title = "Hugr"
         json_schema_extra = {
