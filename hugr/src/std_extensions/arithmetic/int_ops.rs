@@ -7,7 +7,7 @@ use crate::extension::{
     CustomValidator, ExtensionRegistry, OpDef, SignatureFunc, ValidateJustArgs, PRELUDE,
 };
 use crate::ops::custom::ExtensionOp;
-use crate::ops::OpName;
+use crate::ops::{NamedOp, OpName};
 use crate::type_row;
 use crate::types::{FunctionType, PolyFuncType};
 use crate::utils::collect_array;
@@ -19,7 +19,6 @@ use crate::{
 };
 
 use lazy_static::lazy_static;
-use smol_str::SmolStr;
 use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 
 /// The extension identifier.
@@ -279,8 +278,8 @@ pub struct IntOpType {
     second_width: Option<u64>,
 }
 
-impl OpName for IntOpType {
-    fn name(&self) -> SmolStr {
+impl NamedOp for IntOpType {
+    fn name(&self) -> OpName {
         self.def.name()
     }
 }

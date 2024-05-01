@@ -2,7 +2,7 @@
 
 mod custom;
 
-use super::{OpName, OpTrait, StaticTag};
+use super::{NamedOp, OpName, OpTrait, StaticTag};
 use super::{OpTag, OpType};
 use crate::extension::ExtensionSet;
 use crate::types::{CustomType, EdgeKind, FunctionType, SumType, SumTypeError, Type};
@@ -266,7 +266,7 @@ impl Value {
         }
     }
 
-    fn name(&self) -> SmolStr {
+    fn name(&self) -> OpName {
         match self {
             Self::Extension { e } => format!("const:custom:{}", e.0.name()),
             Self::Function { hugr: h } => {
@@ -277,7 +277,7 @@ impl Value {
             }
             Self::Tuple { vs: vals } => {
                 let names: Vec<_> = vals.iter().map(Value::name).collect();
-                format!("const:seq:{{{}}}", names.join(", "))
+                format!("const:seq:{{{}}}", names.iter().join(", "))
             }
             Self::Sum { tag, values, .. } => {
                 format!("const:sum:{{tag:{tag}, vals:{values:?}}}")
@@ -299,11 +299,12 @@ impl Value {
     }
 }
 
-impl OpName for Const {
-    fn name(&self) -> SmolStr {
+impl NamedOp for Const {
+    fn name(&self) -> OpName {
         self.value().name()
     }
 }
+
 impl StaticTag for Const {
     const TAG: OpTag = OpTag::Const;
 }
@@ -336,9 +337,15 @@ where
     }
 }
 
+/// A unique identifier for a constant value.
+pub type ValueName = SmolStr;
+
+/// Slice of a [`ValueName`] constant value identifier.
+pub type ValueNameRef = str;
+
 #[cfg(test)]
 mod test {
-    use super::Value;
+    use super::{Value, ValueName};
     use crate::builder::test::simple_dfg_hugr;
     use crate::{
         builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
@@ -363,7 +370,7 @@ mod test {
 
     #[typetag::serde]
     impl CustomConst for CustomTestValue {
-        fn name(&self) -> SmolStr {
+        fn name(&self) -> ValueName {
             format!("CustomTestValue({:?})", self.0).into()
         }
 

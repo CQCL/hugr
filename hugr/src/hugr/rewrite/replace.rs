@@ -474,7 +474,7 @@ mod test {
                 .unwrap();
         let listy = Type::new_extension(
             collections::EXTENSION
-                .get_type(collections::LIST_TYPENAME.as_str())
+                .get_type(&collections::LIST_TYPENAME)
                 .unwrap()
                 .instantiate([TypeArg::Type { ty: USIZE_T }])
                 .unwrap(),

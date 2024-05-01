@@ -91,7 +91,7 @@ use thiserror::Error;
 use crate::extension::SignatureError;
 use crate::hugr::ValidationError;
 use crate::ops::handle::{BasicBlockID, CfgID, ConditionalID, DfgID, FuncID, TailLoopID};
-use crate::ops::{OpName, OpType};
+use crate::ops::{NamedOp, OpType};
 use crate::types::ConstTypeError;
 use crate::types::Type;
 use crate::{Node, Port, Wire};

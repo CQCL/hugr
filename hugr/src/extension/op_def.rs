@@ -4,13 +4,12 @@ use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 
-use smol_str::SmolStr;
-
 use super::{
     ConstFold, ConstFoldResult, Extension, ExtensionBuildError, ExtensionId, ExtensionRegistry,
     ExtensionSet, SignatureError,
 };
 
+use crate::ops::{OpName, OpNameRef};
 use crate::types::type_param::{check_type_args, TypeArg, TypeParam};
 use crate::types::{FunctionType, PolyFuncType};
 use crate::Hugr;
@@ -108,7 +107,7 @@ pub trait CustomLowerFunc: Send + Sync {
     /// TODO: some error type to indicate Extensions required?
     fn try_lower(
         &self,
-        name: &SmolStr,
+        name: &OpNameRef,
         arg_values: &[TypeArg],
         misc: &HashMap<String, serde_yaml::Value>,
         available_extensions: &ExtensionSet,
@@ -295,7 +294,7 @@ pub struct OpDef {
     extension: ExtensionId,
     /// Unique identifier of the operation. Used to look up OpDefs in the registry
     /// when deserializing nodes (which store only the name).
-    name: SmolStr,
+    name: OpName,
     /// Human readable description of the operation.
     description: String,
     /// Miscellaneous data associated with the operation.
@@ -376,7 +375,7 @@ impl OpDef {
     }
 
     /// Returns a reference to the name of this [`OpDef`].
-    pub fn name(&self) -> &SmolStr {
+    pub fn name(&self) -> &OpName {
         &self.name
     }
 
@@ -442,7 +441,7 @@ impl Extension {
     /// function for computing the signature given type arguments (`impl [CustomSignatureFunc]`).
     pub fn add_op(
         &mut self,
-        name: SmolStr,
+        name: OpName,
         description: String,
         signature_func: impl Into<SignatureFunc>,
     ) -> Result<&mut OpDef, ExtensionBuildError> {
@@ -468,15 +467,13 @@ impl Extension {
 mod test {
     use std::num::NonZeroU64;
 
-    use smol_str::SmolStr;
-
     use super::SignatureFromArgs;
     use crate::builder::{DFGBuilder, Dataflow, DataflowHugr};
     use crate::extension::op_def::LowerFunc;
     use crate::extension::prelude::USIZE_T;
     use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE};
     use crate::extension::{SignatureError, EMPTY_REG, PRELUDE_REGISTRY};
-    use crate::ops::CustomOp;
+    use crate::ops::{CustomOp, OpName};
     use crate::std_extensions::collections::{EXTENSION, LIST_TYPENAME};
     use crate::types::Type;
     use crate::types::{type_param::TypeParam, FunctionType, PolyFuncType, TypeArg, TypeBound};
@@ -494,7 +491,7 @@ mod test {
         const TP: TypeParam = TypeParam::Type { b: TypeBound::Any };
         let list_of_var =
             Type::new_extension(list_def.instantiate(vec![TypeArg::new_var_use(0, TP)])?);
-        const OP_NAME: SmolStr = SmolStr::new_inline("Reverse");
+        const OP_NAME: OpName = OpName::new_inline("Reverse");
         let type_scheme = PolyFuncType::new(vec![TP], FunctionType::new_endo(vec![list_of_var]));
 
         let def = e.add_op(OP_NAME, "desc".into(), type_scheme)?;

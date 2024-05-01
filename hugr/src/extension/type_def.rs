@@ -157,7 +157,7 @@ impl Extension {
             bound,
         };
         match self.types.entry(ty.name.clone()) {
-            Entry::Occupied(_) => Err(ExtensionBuildError::OpDefExists(ty.name)),
+            Entry::Occupied(_) => Err(ExtensionBuildError::TypeDefExists(ty.name)),
             Entry::Vacant(ve) => Ok(ve.insert(ty)),
         }
     }

@@ -16,7 +16,6 @@ use crate::{IncomingPort, PortIndex};
 use paste::paste;
 
 use portgraph::NodeIndex;
-use smol_str::SmolStr;
 
 use enum_dispatch::enum_dispatch;
 
@@ -26,9 +25,10 @@ pub use custom::CustomOp;
 pub use dataflow::{Call, CallIndirect, DataflowParent, Input, LoadConstant, Output, DFG};
 pub use leaf::{Lift, MakeTuple, Noop, Tag, UnpackTuple};
 pub use module::{AliasDecl, AliasDefn, FuncDecl, FuncDefn, Module};
+use smol_str::SmolStr;
 pub use tag::OpTag;
 
-#[enum_dispatch(OpTrait, OpName, ValidateOp, OpParent)]
+#[enum_dispatch(OpTrait, NamedOp, ValidateOp, OpParent)]
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 /// The concrete operation types for a node in the HUGR.
 // TODO: Link the NodeHandles to the OpType.
@@ -291,8 +291,8 @@ impl OpType {
 /// name to be the same as their type name
 macro_rules! impl_op_name {
     ($i: ident) => {
-        impl $crate::ops::OpName for $i {
-            fn name(&self) -> smol_str::SmolStr {
+        impl $crate::ops::NamedOp for $i {
+            fn name(&self) -> $crate::ops::OpName {
                 stringify!($i).into()
             }
         }
@@ -301,12 +301,18 @@ macro_rules! impl_op_name {
 
 use impl_op_name;
 
+/// A unique identifier for a operation.
+pub type OpName = SmolStr;
+
+/// Slice of a [`OpName`] operation identifier.
+pub type OpNameRef = str;
+
 #[enum_dispatch]
 /// Trait for setting name of OpType variants.
 // Separate to OpTrait to allow simple definition via impl_op_name
-pub trait OpName {
+pub trait NamedOp {
     /// The name of the operation.
-    fn name(&self) -> SmolStr;
+    fn name(&self) -> OpName;
 }
 
 /// Trait statically querying the tag of an operation.

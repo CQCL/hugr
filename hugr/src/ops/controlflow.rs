@@ -1,14 +1,12 @@
 //! Control flow operations.
 
-use smol_str::SmolStr;
-
 use crate::extension::ExtensionSet;
 use crate::types::{EdgeKind, FunctionType, Type, TypeRow};
 use crate::Direction;
 
 use super::dataflow::{DataflowOpTrait, DataflowParent};
-use super::OpTag;
-use super::{impl_op_name, OpName, OpTrait, StaticTag};
+use super::{impl_op_name, NamedOp, OpTrait, StaticTag};
+use super::{OpName, OpTag};
 
 /// Tail-controlled loop.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -129,14 +127,14 @@ pub struct ExitBlock {
     pub cfg_outputs: TypeRow,
 }
 
-impl OpName for DataflowBlock {
-    fn name(&self) -> SmolStr {
+impl NamedOp for DataflowBlock {
+    fn name(&self) -> OpName {
         "DataflowBlock".into()
     }
 }
 
-impl OpName for ExitBlock {
-    fn name(&self) -> SmolStr {
+impl NamedOp for ExitBlock {
+    fn name(&self) -> OpName {
         "ExitBlock".into()
     }
 }

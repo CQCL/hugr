@@ -1,10 +1,10 @@
 //! A trait that enum for op definitions that gathers up some shared functionality.
 
-use smol_str::SmolStr;
 use strum::IntoEnumIterator;
 
+use crate::ops::{OpName, OpNameRef};
 use crate::{
-    ops::{custom::ExtensionOp, OpName, OpType},
+    ops::{custom::ExtensionOp, NamedOp, OpType},
     types::TypeArg,
     Extension,
 };
@@ -28,11 +28,11 @@ pub enum OpLoadError {
     InvalidArgs(#[from] SignatureError),
 }
 
-impl<T> OpName for T
+impl<T> NamedOp for T
 where
     for<'a> &'a T: Into<&'static str>,
 {
-    fn name(&self) -> SmolStr {
+    fn name(&self) -> OpName {
         let s = self.into();
         s.into()
     }
@@ -42,7 +42,7 @@ where
 /// [`OpDef`]s or load themselves from an [`OpDef`].
 /// Particularly useful with C-style enums that implement [strum::IntoEnumIterator],
 /// as then all definitions can be added to an extension at once.
-pub trait MakeOpDef: OpName {
+pub trait MakeOpDef: NamedOp {
     /// Try to load one of the operations of this set from an [OpDef].
     fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError>
     where
@@ -84,7 +84,7 @@ pub trait MakeOpDef: OpName {
 
 /// Traits implemented by types which can be loaded from [`ExtensionOp`]s,
 /// i.e. concrete instances of [`OpDef`]s, with defined type arguments.
-pub trait MakeExtensionOp: OpName {
+pub trait MakeExtensionOp: NamedOp {
     /// Try to load one of the operations of this set from an [OpDef].
     fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError>
     where
@@ -138,7 +138,7 @@ impl<T: MakeOpDef> MakeExtensionOp for T {
 
 /// Load an [MakeOpDef] from its name.
 /// See [strum_macros::EnumString].
-pub fn try_from_name<T>(name: &str) -> Result<T, OpLoadError>
+pub fn try_from_name<T>(name: &OpNameRef) -> Result<T, OpLoadError>
 where
     T: std::str::FromStr + MakeOpDef,
 {
@@ -181,7 +181,7 @@ impl<T: MakeExtensionOp> RegisteredOp<'_, T> {
     delegate! {
         to self.op {
             /// Name of the operation - derived from strum serialization.
-            pub fn name(&self) -> SmolStr;
+            pub fn name(&self) -> OpName;
             /// Any type args which define this operation. Default is no type arguments.
             pub fn type_args(&self) -> Vec<TypeArg>;
         }

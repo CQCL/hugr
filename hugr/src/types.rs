@@ -26,12 +26,14 @@ use serde::{Deserialize, Serialize};
 use crate::extension::{ExtensionRegistry, SignatureError};
 use crate::ops::AliasDecl;
 use crate::type_row;
-use std::fmt::Debug;
 
 use self::type_param::TypeParam;
 
 /// A unique identifier for a type.
 pub type TypeName = SmolStr;
+
+/// Slice of a [`TypeName`] type identifier.
+pub type TypeNameRef = str;
 
 /// The kinds of edges in a HUGR, excluding Hierarchy.
 #[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]

@@ -3,9 +3,10 @@
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use smol_str::SmolStr;
 
-use crate::ops::Value;
+use crate::ops::constant::ValueName;
+use crate::ops::{OpName, Value};
+use crate::types::TypeName;
 use crate::{
     algorithm::const_fold::sorted_consts,
     extension::{
@@ -14,7 +15,7 @@ use crate::{
         TypeDefBound,
     },
     ops::constant::CustomConst,
-    ops::{self, custom::ExtensionOp, OpName},
+    ops::{self, custom::ExtensionOp, NamedOp},
     types::{
         type_param::{TypeArg, TypeParam},
         CustomCheckFailure, CustomType, FunctionType, PolyFuncType, Type, TypeBound,
@@ -23,11 +24,11 @@ use crate::{
 };
 
 /// Reported unique name of the list type.
-pub const LIST_TYPENAME: SmolStr = SmolStr::new_inline("List");
+pub const LIST_TYPENAME: TypeName = TypeName::new_inline("List");
 /// Pop operation name.
-pub const POP_NAME: SmolStr = SmolStr::new_inline("pop");
+pub const POP_NAME: OpName = OpName::new_inline("pop");
 /// Push operation name.
-pub const PUSH_NAME: SmolStr = SmolStr::new_inline("push");
+pub const PUSH_NAME: OpName = OpName::new_inline("push");
 /// Reported unique name of the extension
 pub const EXTENSION_NAME: ExtensionId = ExtensionId::new_unchecked("Collections");
 
@@ -55,8 +56,8 @@ impl ListValue {
 
 #[typetag::serde]
 impl CustomConst for ListValue {
-    fn name(&self) -> SmolStr {
-        SmolStr::new_inline("list")
+    fn name(&self) -> ValueName {
+        ValueName::new_inline("list")
     }
 
     fn get_type(&self) -> Type {
@@ -229,8 +230,8 @@ pub struct ListOpInst {
     elem_type: Type,
 }
 
-impl OpName for ListOpInst {
-    fn name(&self) -> SmolStr {
+impl NamedOp for ListOpInst {
+    fn name(&self) -> OpName {
         match self.op {
             ListOp::Pop => POP_NAME,
             ListOp::Push => PUSH_NAME,

@@ -1,10 +1,10 @@
 //! Prelude extension - available in all contexts, defining common types,
 //! operations and constants.
 use lazy_static::lazy_static;
-use smol_str::SmolStr;
 
-use crate::ops::CustomOp;
-use crate::types::SumType;
+use crate::ops::constant::ValueName;
+use crate::ops::{CustomOp, OpName};
+use crate::types::{SumType, TypeName};
 use crate::{
     extension::{ExtensionId, TypeDefBound},
     ops::constant::CustomConst,
@@ -48,7 +48,7 @@ lazy_static! {
         let mut prelude = Extension::new(PRELUDE_ID);
         prelude
             .add_type(
-                SmolStr::new_inline("usize"),
+                TypeName::new_inline("usize"),
                 vec![],
                 "usize".into(),
                 TypeDefBound::Explicit(crate::types::TypeBound::Eq),
@@ -62,13 +62,13 @@ lazy_static! {
             )
             .unwrap();
         prelude.add_op(
-            SmolStr::new_inline(PRINT_OP_ID),
+            PRINT_OP_ID,
             "Print the string to standard output".to_string(),
             FunctionType::new(type_row![STRING_TYPE], type_row![]),
             )
             .unwrap();
         prelude.add_type(
-                SmolStr::new_inline("array"),
+                TypeName::new_inline("array"),
                 vec![ TypeParam::max_nat(), TypeBound::Any.into()],
                 "array".into(),
                 TypeDefBound::FromParams(vec![1]),
@@ -76,7 +76,7 @@ lazy_static! {
             .unwrap();
         prelude
             .add_op(
-                SmolStr::new_inline(NEW_ARRAY_OP_ID),
+                NEW_ARRAY_OP_ID,
                 "Create a new array from elements".to_string(),
                 ArrayOpCustom,
             )
@@ -84,7 +84,7 @@ lazy_static! {
 
         prelude
             .add_type(
-                SmolStr::new_inline("qubit"),
+                TypeName::new_inline("qubit"),
                 vec![],
                 "qubit".into(),
                 TypeDefBound::Explicit(TypeBound::Any),
@@ -100,7 +100,7 @@ lazy_static! {
         .unwrap();
         prelude
         .add_op(
-            SmolStr::new_inline(PANIC_OP_ID),
+            PANIC_OP_ID,
             "Panic with input error".to_string(),
             FunctionType::new(type_row![Type::new_extension(ERROR_CUSTOM_TYPE)], type_row![]),
         )
@@ -117,10 +117,10 @@ lazy_static! {
 }
 
 pub(crate) const USIZE_CUSTOM_T: CustomType =
-    CustomType::new_simple(SmolStr::new_inline("usize"), PRELUDE_ID, TypeBound::Eq);
+    CustomType::new_simple(TypeName::new_inline("usize"), PRELUDE_ID, TypeBound::Eq);
 
 pub(crate) const QB_CUSTOM_T: CustomType =
-    CustomType::new_simple(SmolStr::new_inline("qubit"), PRELUDE_ID, TypeBound::Any);
+    CustomType::new_simple(TypeName::new_inline("qubit"), PRELUDE_ID, TypeBound::Any);
 
 /// Qubit type.
 pub const QB_T: Type = Type::new_extension(QB_CUSTOM_T);
@@ -139,15 +139,15 @@ pub fn array_type(size: TypeArg, element_ty: Type) -> Type {
 }
 
 /// Name of the operation in the prelude for creating new arrays.
-pub const NEW_ARRAY_OP_ID: &str = "new_array";
+pub const NEW_ARRAY_OP_ID: OpName = OpName::new_inline("new_array");
 /// Name of the prelude panic operation.
-pub const PANIC_OP_ID: &str = "panic";
+pub const PANIC_OP_ID: OpName = OpName::new_inline("panic");
 
 /// Initialize a new array op of element type `element_ty` of length `size`
 pub fn new_array_op(element_ty: Type, size: u64) -> CustomOp {
     PRELUDE
         .instantiate_extension_op(
-            NEW_ARRAY_OP_ID,
+            &NEW_ARRAY_OP_ID,
             vec![
                 TypeArg::BoundedNat { n: size },
                 TypeArg::Type { ty: element_ty },
@@ -159,7 +159,7 @@ pub fn new_array_op(element_ty: Type, size: u64) -> CustomOp {
 }
 
 /// Name of the string type.
-pub const STRING_TYPE_NAME: SmolStr = SmolStr::new_inline("string");
+pub const STRING_TYPE_NAME: TypeName = TypeName::new_inline("string");
 
 /// Custom type for strings.
 pub const STRING_CUSTOM_TYPE: CustomType =
@@ -186,7 +186,7 @@ impl ConstString {
 
 #[typetag::serde]
 impl CustomConst for ConstString {
-    fn name(&self) -> SmolStr {
+    fn name(&self) -> ValueName {
         format!("ConstString({:?})", self.0).into()
     }
 
@@ -204,7 +204,7 @@ impl CustomConst for ConstString {
 }
 
 /// Name of the print operation
-pub const PRINT_OP_ID: &str = "print";
+pub const PRINT_OP_ID: OpName = OpName::new_inline("print");
 
 /// The custom type for Errors.
 pub const ERROR_CUSTOM_TYPE: CustomType =
@@ -213,7 +213,7 @@ pub const ERROR_CUSTOM_TYPE: CustomType =
 pub const ERROR_TYPE: Type = Type::new_extension(ERROR_CUSTOM_TYPE);
 
 /// The string name of the error type.
-pub const ERROR_TYPE_NAME: SmolStr = SmolStr::new_inline("error");
+pub const ERROR_TYPE_NAME: TypeName = TypeName::new_inline("error");
 
 /// Return a Sum type with the first variant as the given type and the second an Error.
 pub fn sum_with_error(ty: Type) -> SumType {
@@ -238,7 +238,7 @@ impl ConstUsize {
 
 #[typetag::serde]
 impl CustomConst for ConstUsize {
-    fn name(&self) -> SmolStr {
+    fn name(&self) -> ValueName {
         format!("ConstUsize({:?})", self.0).into()
     }
 
@@ -276,7 +276,7 @@ impl ConstError {
 
 #[typetag::serde]
 impl CustomConst for ConstError {
-    fn name(&self) -> SmolStr {
+    fn name(&self) -> ValueName {
         format!("ConstError({:?}, {:?})", self.signal, self.message).into()
     }
 
@@ -349,7 +349,7 @@ mod test {
         let err = b.add_load_value(error_val);
 
         let op = PRELUDE
-            .instantiate_extension_op(PANIC_OP_ID, [], &PRELUDE_REGISTRY)
+            .instantiate_extension_op(&PANIC_OP_ID, [], &PRELUDE_REGISTRY)
             .unwrap();
 
         b.add_dataflow_op(op, [err]).unwrap();
@@ -385,7 +385,7 @@ mod test {
         let greeting: ConstString = ConstString::new("Hello, world!".into());
         let greeting_out: Wire = b.add_load_value(greeting);
         let print_op = PRELUDE
-            .instantiate_extension_op(PRINT_OP_ID, [], &PRELUDE_REGISTRY)
+            .instantiate_extension_op(&PRINT_OP_ID, [], &PRELUDE_REGISTRY)
             .unwrap();
         b.add_dataflow_op(print_op, [greeting_out]).unwrap();
         b.finish_prelude_hugr_with_outputs([]).unwrap();
