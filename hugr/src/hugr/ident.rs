@@ -102,10 +102,13 @@ mod test {
         type Parameters = ();
         type Strategy = BoxedStrategy<Self>;
         fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+            use prop::string::string_regex;
             use proptest::collection::vec;
-            let component_strategy = prop::string::string_regex(PATH_COMPONENT_REGEX_STR)
-                .unwrap()
-                .boxed();
+            // we shrink to more readable (i.e. :alpha:) names
+            let component_strategy = prop_oneof![
+                string_regex(r"[[:alpha:]]+").unwrap(),
+                string_regex(PATH_COMPONENT_REGEX_STR).unwrap()
+            ];
             vec(component_strategy.clone(), 1..4)
                 .prop_map(|vs| {
                     IdentList::new(itertools::intersperse(vs, ".".to_string()).collect::<String>())

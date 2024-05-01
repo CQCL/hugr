@@ -3,7 +3,6 @@ use crate::builder::{
     test::closed_dfg_root_hugr, Container, DFGBuilder, Dataflow, DataflowHugr,
     DataflowSubContainer, HugrBuilder, ModuleBuilder,
 };
-use proptest::prelude::*;
 use crate::extension::prelude::{BOOL_T, PRELUDE_ID, QB_T, USIZE_T};
 use crate::extension::simple_op::MakeRegisteredOp;
 use crate::extension::{EMPTY_REG, PRELUDE_REGISTRY};
@@ -14,10 +13,10 @@ use crate::ops::{self, Value};
 use crate::ops::{dataflow::IOTrait, Input, Module, Noop, Output, DFG};
 use crate::std_extensions::arithmetic::float_ops::FLOAT_OPS_REGISTRY;
 use crate::std_extensions::arithmetic::float_types::{ConstF64, FLOAT64_TYPE};
-use crate::std_extensions::arithmetic::int_types::{int_custom_type, ConstInt, INT_TYPES};
+use crate::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
 use crate::std_extensions::logic::NotOp;
-use crate::types::type_param::{TypeArg, TypeParam};
-use crate::types::{FunctionType, PolyFuncType, SumType, Type, TypeBound};
+
+use crate::types::{FunctionType, PolyFuncType, SumType, Type};
 use crate::{type_row, OutgoingPort};
 use itertools::Itertools;
 use jsonschema::{Draft, JSONSchema};
@@ -369,7 +368,6 @@ fn serialize_types_roundtrip() {
 fn roundtrip_value(#[case] value: Value) {
     check_testing_roundtrip(value);
 }
-
 
 proptest! {
     #[test]

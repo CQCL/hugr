@@ -150,11 +150,14 @@ mod test {
         type Parameters = crate::types::test::TypeDepth;
         type Strategy = BoxedStrategy<Self>;
         fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
+            use prop::string::string_regex;
             use proptest::collection::vec;
             let extension = any::<ExtensionId>();
-            let id = prop::string::string_regex(r".+")
-                .unwrap()
-                .prop_map(Into::<TypeName>::into);
+            let id = prop_oneof![
+                string_regex(r"[[:alpha:]]+").unwrap(),
+                string_regex(r".+").unwrap()
+            ]
+            .prop_map(Into::<TypeName>::into);
             let args = if depth.leaf() {
                 Just(vec![]).boxed()
             } else {
