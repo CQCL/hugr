@@ -2,7 +2,6 @@ import inspect
 import sys
 from enum import Enum
 from typing import Annotated, Any, Literal, Optional, Union, Tuple
-from contextlib import contextmanager
 
 from pydantic import (
     BaseModel,
@@ -40,10 +39,7 @@ def _json_custom_error_validator(
 
 ExtensionId = str
 
-global default_model_config
 default_model_config = ConfigDict()
-global current_model_config
-current_model_config = default_model_config
 
 
 class ConfiguredBaseModel(BaseModel):
@@ -52,20 +48,6 @@ class ConfiguredBaseModel(BaseModel):
     @classmethod
     def set_model_config(cls, config: ConfigDict):
         cls.model_config = config
-
-
-@contextmanager
-def hugr_config(**kwargs):
-    global current_model_config
-    old_config = current_model_config
-    current_model_config = ConfigDict(default_model_config, **kwargs)
-    ConfiguredBaseModel.model_config = current_model_config
-    print(f"new model_config: {current_model_config}")
-    try:
-        yield None
-    finally:
-        current_model_config = old_config
-        ConfiguredBaseModel.model_config = old_config
 
 
 class ExtensionSet(RootModel):
@@ -363,7 +345,8 @@ class Signature(ConfiguredBaseModel):
 
 
 # Now that all classes are defined, we need to update the ForwardRefs in all type
-# annotations. We use some inspect magic to find all classes defined in this file.
+# annotations. We use some inspect magic to find all classes defined in this file
+# and call _model_rebuild()
 classes = inspect.getmembers(
     sys.modules[__name__],
     lambda member: inspect.isclass(member) and member.__module__ == __name__,
@@ -371,13 +354,14 @@ classes = inspect.getmembers(
 
 
 def _model_rebuild(
-    classes: list[Tuple[Any, type]] = classes,
+    classes: list[Tuple[str, type]] = classes,
     config: ConfigDict = ConfigDict(),
     **kwargs,
 ):
+    new_config = ConfigDict(default_model_config, **config)
     for _, c in classes:
         if issubclass(c, ConfiguredBaseModel):
-            c.set_model_config(config)
+            c.set_model_config(new_config)
             c.model_rebuild(**kwargs)
 
 
