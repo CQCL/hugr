@@ -2,7 +2,7 @@
 
 use strum::IntoEnumIterator;
 
-use crate::ops::{OpName, OpNameSlice};
+use crate::ops::{OpName, OpNameRef};
 use crate::{
     ops::{custom::ExtensionOp, NamedOp, OpType},
     types::TypeArg,
@@ -138,11 +138,11 @@ impl<T: MakeOpDef> MakeExtensionOp for T {
 
 /// Load an [MakeOpDef] from its name.
 /// See [strum_macros::EnumString].
-pub fn try_from_name<T>(name: &OpNameSlice) -> Result<T, OpLoadError>
+pub fn try_from_name<T>(name: &OpNameRef) -> Result<T, OpLoadError>
 where
     T: std::str::FromStr + MakeOpDef,
 {
-    T::from_str(name.into()).map_err(|_| OpLoadError::NotMember(name.to_string()))
+    T::from_str(name).map_err(|_| OpLoadError::NotMember(name.to_string()))
 }
 
 /// Wrap an [MakeExtensionOp] with an extension registry to allow type computation.

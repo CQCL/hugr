@@ -163,7 +163,7 @@ pub(crate) mod test {
 
     #[test]
     fn test_mismatched_args() -> Result<(), SignatureError> {
-        let ar_def = PRELUDE.get_type("array".into()).unwrap();
+        let ar_def = PRELUDE.get_type("array").unwrap();
         let typarams = [TypeParam::max_nat(), TypeBound::Any.into()];
         let [tyvar, szvar] =
             [0, 1].map(|i| TypeArg::new_var_use(i, typarams.get(i).unwrap().clone()));

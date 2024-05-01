@@ -15,6 +15,7 @@ pub use check::SumTypeError;
 pub use custom::CustomType;
 pub use poly_func::PolyFuncType;
 pub use signature::FunctionType;
+use smol_str::SmolStr;
 pub use type_param::TypeArg;
 pub use type_row::TypeRow;
 
@@ -33,10 +34,10 @@ use self::type_param::TypeParam;
 pub enum TypeNameMarker {}
 
 /// A unique identifier for a type.
-pub type TypeName = string_newtype::SmolStrBuf<TypeNameMarker>;
+pub type TypeName = SmolStr;
 
 /// Slice of a [`TypeName`] type identifier.
-pub type TypeNameSlice = string_newtype::SmolStrRef<TypeNameMarker>;
+pub type TypeNameRef = str;
 
 /// The kinds of edges in a HUGR, excluding Hierarchy.
 #[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]

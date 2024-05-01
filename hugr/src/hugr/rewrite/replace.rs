@@ -480,11 +480,11 @@ mod test {
                 .unwrap(),
         );
         let pop: CustomOp = collections::EXTENSION
-            .instantiate_extension_op("pop".into(), [TypeArg::Type { ty: USIZE_T }], &reg)
+            .instantiate_extension_op("pop", [TypeArg::Type { ty: USIZE_T }], &reg)
             .unwrap()
             .into();
         let push: CustomOp = collections::EXTENSION
-            .instantiate_extension_op("push".into(), [TypeArg::Type { ty: USIZE_T }], &reg)
+            .instantiate_extension_op("push", [TypeArg::Type { ty: USIZE_T }], &reg)
             .unwrap()
             .into();
         let just_list = TypeRow::from(vec![listy.clone()]);

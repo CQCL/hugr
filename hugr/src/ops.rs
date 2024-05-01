@@ -25,6 +25,7 @@ pub use custom::CustomOp;
 pub use dataflow::{Call, CallIndirect, DataflowParent, Input, LoadConstant, Output, DFG};
 pub use leaf::{Lift, MakeTuple, Noop, Tag, UnpackTuple};
 pub use module::{AliasDecl, AliasDefn, FuncDecl, FuncDefn, Module};
+use smol_str::SmolStr;
 pub use tag::OpTag;
 
 #[enum_dispatch(OpTrait, NamedOp, ValidateOp, OpParent)]
@@ -305,10 +306,10 @@ use impl_op_name;
 pub enum OpNameMarker {}
 
 /// A unique identifier for a operation.
-pub type OpName = string_newtype::SmolStrBuf<OpNameMarker>;
+pub type OpName = SmolStr;
 
 /// Slice of a [`OpName`] operation identifier.
-pub type OpNameSlice = string_newtype::SmolStrRef<OpNameMarker>;
+pub type OpNameRef = str;
 
 #[enum_dispatch]
 /// Trait for setting name of OpType variants.

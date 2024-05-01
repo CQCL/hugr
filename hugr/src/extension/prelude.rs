@@ -131,7 +131,7 @@ pub const BOOL_T: Type = Type::new_unit_sum(2);
 
 /// Initialize a new array of element type `element_ty` of length `size`
 pub fn array_type(size: TypeArg, element_ty: Type) -> Type {
-    let array_def = PRELUDE.get_type("array".into()).unwrap();
+    let array_def = PRELUDE.get_type("array").unwrap();
     let custom_t = array_def
         .instantiate(vec![size, TypeArg::Type { ty: element_ty }])
         .unwrap();

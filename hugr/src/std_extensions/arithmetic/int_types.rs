@@ -260,7 +260,7 @@ mod test {
         assert_eq!(const_u32_7.value_u(), 7);
         assert!(const_u32_7.validate().is_ok());
 
-        assert_eq!(const_u32_7.name(), "u32(7)".into());
+        assert_eq!(const_u32_7.name(), "u32(7)");
 
         let const_i32_2 = ConstInt::new_s(5, -2).unwrap();
         assert!(const_i32_2.equal_consts(&ConstInt::new_s(5, -2).unwrap()));

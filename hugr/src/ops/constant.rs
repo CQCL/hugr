@@ -9,6 +9,7 @@ use crate::types::{CustomType, EdgeKind, FunctionType, SumType, SumTypeError, Ty
 use crate::{Hugr, HugrView};
 
 use itertools::Itertools;
+use smol_str::SmolStr;
 use thiserror::Error;
 
 pub use custom::{downcast_equal_consts, CustomConst, CustomSerialized};
@@ -344,10 +345,10 @@ where
 pub enum ValueNameMarker {}
 
 /// A unique identifier for a constant value.
-pub type ValueName = string_newtype::SmolStrBuf<ValueNameMarker>;
+pub type ValueName = SmolStr;
 
 /// Slice of a [`ValueName`] constant value identifier.
-pub type ValueNameSlice = string_newtype::SmolStrRef<ValueNameMarker>;
+pub type ValueNameRef = str;
 
 #[cfg(test)]
 mod test {

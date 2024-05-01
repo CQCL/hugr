@@ -9,7 +9,7 @@ use super::{
     ExtensionSet, SignatureError,
 };
 
-use crate::ops::{OpName, OpNameSlice};
+use crate::ops::{OpName, OpNameRef};
 use crate::types::type_param::{check_type_args, TypeArg, TypeParam};
 use crate::types::{FunctionType, PolyFuncType};
 use crate::Hugr;
@@ -107,7 +107,7 @@ pub trait CustomLowerFunc: Send + Sync {
     /// TODO: some error type to indicate Extensions required?
     fn try_lower(
         &self,
-        name: &OpNameSlice,
+        name: &OpNameRef,
         arg_values: &[TypeArg],
         misc: &HashMap<String, serde_yaml::Value>,
         available_extensions: &ExtensionSet,

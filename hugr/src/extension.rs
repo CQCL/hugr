@@ -12,13 +12,13 @@ use std::sync::Arc;
 use thiserror::Error;
 
 use crate::hugr::IdentList;
-use crate::ops::constant::{ValueName, ValueNameSlice};
+use crate::ops::constant::{ValueName, ValueNameRef};
 use crate::ops::custom::{ExtensionOp, OpaqueOp};
-use crate::ops::{self, OpName, OpNameSlice};
+use crate::ops::{self, OpName, OpNameRef};
 use crate::types::type_param::{check_type_args, TypeArgError};
 use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::{check_typevar_decl, CustomType, Substitution, TypeBound, TypeName};
-use crate::types::{FunctionType, TypeNameSlice};
+use crate::types::{FunctionType, TypeNameRef};
 
 #[allow(dead_code)]
 mod infer;
@@ -309,17 +309,17 @@ impl Extension {
     }
 
     /// Allows read-only access to the operations in this Extension
-    pub fn get_op(&self, op_name: &OpNameSlice) -> Option<&Arc<op_def::OpDef>> {
+    pub fn get_op(&self, op_name: &OpNameRef) -> Option<&Arc<op_def::OpDef>> {
         self.operations.get(op_name)
     }
 
     /// Allows read-only access to the types in this Extension
-    pub fn get_type(&self, type_name: &TypeNameSlice) -> Option<&type_def::TypeDef> {
+    pub fn get_type(&self, type_name: &TypeNameRef) -> Option<&type_def::TypeDef> {
         self.types.get(type_name)
     }
 
     /// Allows read-only access to the values in this Extension
-    pub fn get_value(&self, value_name: &ValueNameSlice) -> Option<&ExtensionValue> {
+    pub fn get_value(&self, value_name: &ValueNameRef) -> Option<&ExtensionValue> {
         self.values.get(value_name)
     }
 
@@ -360,7 +360,7 @@ impl Extension {
     /// Instantiate an [`ExtensionOp`] which references an [`OpDef`] in this extension.
     pub fn instantiate_extension_op(
         &self,
-        op_name: &OpNameSlice,
+        op_name: &OpNameRef,
         args: impl Into<Vec<TypeArg>>,
         ext_reg: &ExtensionRegistry,
     ) -> Result<ExtensionOp, SignatureError> {
