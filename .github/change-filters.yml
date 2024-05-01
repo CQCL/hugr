@@ -1,0 +1,13 @@
+# Filters used by [dorny/path-filters](https://github.com/dorny/paths-filter)
+# to detect changes in each subproject, and only run the corresponding jobs.
+
+rust:
+  - "hugr/**"
+  - "Cargo.toml"
+  - "specification/schema/**"
+
+python:
+  - "hugr-py/**"
+  - "pyproject.toml"
+  - "poetry.lock"
+  - "specification/schema/**"
