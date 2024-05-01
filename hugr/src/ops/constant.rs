@@ -277,10 +277,7 @@ impl Value {
             }
             Self::Tuple { vs: vals } => {
                 let names: Vec<_> = vals.iter().map(Value::name).collect();
-                format!(
-                    "const:seq:{{{}}}",
-                    names.iter().map(OpName::as_str).join(", ")
-                )
+                format!("const:seq:{{{}}}", names.iter().join(", "))
             }
             Self::Sum { tag, values, .. } => {
                 format!("const:sum:{{tag:{tag}, vals:{values:?}}}")
@@ -339,10 +336,6 @@ where
         Self::extension(value)
     }
 }
-
-/// Marker for the [`ValueName`] wrapper.
-#[doc(hidden)]
-pub enum ValueNameMarker {}
 
 /// A unique identifier for a constant value.
 pub type ValueName = SmolStr;
@@ -492,7 +485,7 @@ mod test {
         ]));
 
         assert_eq!(v.const_type(), correct_type);
-        assert!(v.name().as_str().starts_with("const:function:"))
+        assert!(v.name().starts_with("const:function:"))
     }
 
     #[fixture]
@@ -518,7 +511,7 @@ mod test {
         assert_eq!(const_value.const_type(), expected_type);
         let name = const_value.name();
         assert!(
-            name.as_str().starts_with(name_prefix),
+            name.starts_with(name_prefix),
             "{name} does not start with {name_prefix}"
         );
     }

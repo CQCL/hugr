@@ -29,10 +29,6 @@ use crate::type_row;
 
 use self::type_param::TypeParam;
 
-/// Marker for the [`TypeName`] wrapper.
-#[doc(hidden)]
-pub enum TypeNameMarker {}
-
 /// A unique identifier for a type.
 pub type TypeName = SmolStr;
 

@@ -98,7 +98,7 @@ pub(crate) fn is_default<T: Default + PartialEq>(t: &T) -> bool {
 
 #[cfg(test)]
 pub(crate) mod test_quantum_extension {
-    use crate::ops::OpName;
+    use crate::ops::{OpName, OpNameRef};
     use crate::{
         extension::{
             prelude::{BOOL_T, QB_T},
@@ -174,9 +174,9 @@ pub(crate) mod test_quantum_extension {
 
     }
 
-    fn get_gate(gate_name: impl Into<OpName>) -> CustomOp {
+    fn get_gate(gate_name: &OpNameRef) -> CustomOp {
         EXTENSION
-            .instantiate_extension_op(&gate_name.into(), [], &REG)
+            .instantiate_extension_op(gate_name, [], &REG)
             .unwrap()
             .into()
     }

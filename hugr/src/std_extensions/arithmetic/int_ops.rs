@@ -350,7 +350,7 @@ mod test {
         assert_eq!(EXTENSION.types().count(), 0);
         assert_eq!(EXTENSION.operations().count(), 47);
         for (name, _) in EXTENSION.operations() {
-            assert!(name.as_str().starts_with('i'));
+            assert!(name.starts_with('i'));
         }
     }
 

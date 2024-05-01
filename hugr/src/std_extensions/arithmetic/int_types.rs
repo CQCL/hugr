@@ -267,7 +267,7 @@ mod test {
         assert_eq!(const_i32_2.log_width(), 5);
         assert_eq!(const_i32_2.value_s(), -2);
         assert!(const_i32_2.validate().is_ok());
-        assert_eq!(const_i32_2.name().as_str(), "u32(4294967294)");
+        assert_eq!(const_i32_2.name(), "u32(4294967294)");
 
         ConstInt::new_s(50, -2).unwrap_err();
         ConstInt::new_u(50, 2).unwrap_err();

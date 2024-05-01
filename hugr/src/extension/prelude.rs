@@ -333,7 +333,7 @@ mod test {
 
         let error_val = ConstError::new(2, "my message");
 
-        assert_eq!(error_val.name().as_str(), "ConstError(2, \"my message\")");
+        assert_eq!(error_val.name(), "ConstError(2, \"my message\")");
 
         assert!(error_val.validate().is_ok());
 
@@ -368,7 +368,7 @@ mod test {
         let string_type: Type = Type::new_extension(string_custom_type);
         assert_eq!(string_type, STRING_TYPE);
         let string_const: ConstString = ConstString::new("Lorem ipsum".into());
-        assert_eq!(string_const.name().as_str(), "ConstString(\"Lorem ipsum\")");
+        assert_eq!(string_const.name(), "ConstString(\"Lorem ipsum\")");
         assert!(string_const.validate().is_ok());
         assert_eq!(
             string_const.extension_reqs(),

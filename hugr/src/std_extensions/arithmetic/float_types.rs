@@ -105,7 +105,7 @@ mod test {
 
         assert_eq!(const_f64_1.value(), 1.0);
         assert_eq!(*const_f64_2, 2.0);
-        assert_eq!(const_f64_1.name().as_str(), "f64(1)");
+        assert_eq!(const_f64_1.name(), "f64(1)");
         assert!(const_f64_1.equal_consts(&ConstF64::new(1.0)));
         assert_ne!(const_f64_1, const_f64_2);
         assert_eq!(const_f64_1, ConstF64::new(1.0));

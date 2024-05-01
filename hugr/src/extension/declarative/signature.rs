@@ -14,7 +14,7 @@ use smol_str::SmolStr;
 use crate::extension::prelude::PRELUDE_ID;
 use crate::extension::{CustomValidator, ExtensionSet, SignatureFunc, TypeDef, TypeParametrised};
 use crate::types::type_param::TypeParam;
-use crate::types::{CustomType, FunctionType, PolyFuncType, Type, TypeName, TypeRow};
+use crate::types::{CustomType, FunctionType, PolyFuncType, Type, TypeRow};
 use crate::Extension;
 
 use super::{DeclarationContext, ExtensionDeclarationError};
@@ -205,20 +205,14 @@ impl TypeDeclaration {
             _ => {}
         }
 
-        let type_name: TypeName = self.0.clone().into();
-
         // Try to resolve the type in the current extension.
-        if let Some(ty) = ext.get_type(&type_name) {
+        if let Some(ty) = ext.get_type(&self.0) {
             return Some(ty);
         }
 
         // Try to resolve the type in the other extensions in scope.
         for ext in ctx.scope.iter() {
-            if let Some(ty) = ctx
-                .registry
-                .get(ext)
-                .and_then(|ext| ext.get_type(&type_name))
-            {
+            if let Some(ty) = ctx.registry.get(ext).and_then(|ext| ext.get_type(&self.0)) {
                 return Some(ty);
             }
         }
