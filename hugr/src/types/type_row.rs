@@ -133,7 +133,7 @@ mod test {
                 Just(type_row![]).boxed()
             } else {
                 vec(any_with::<Type>(depth), 0..4)
-                    .prop_map(crate::types::test::to_typerow)
+                    .prop_map(|ts| ts.to_vec().into())
                     .boxed()
             }
         }

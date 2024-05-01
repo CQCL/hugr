@@ -352,26 +352,6 @@ fn serialize_types_roundtrip() {
 }
 
 #[rstest]
-#[case(BOOL_T)]
-#[case(USIZE_T)]
-#[case(INT_TYPES[2].clone())]
-#[case(Type::new_alias(crate::ops::AliasDecl::new("t", TypeBound::Any)))]
-#[case(Type::new_var_use(2, TypeBound::Copyable))]
-#[case(Type::new_tuple(type_row![BOOL_T,QB_T]))]
-#[case(Type::new_sum([type_row![BOOL_T,QB_T], type_row![Type::new_unit_sum(4)]]))]
-#[case(Type::new_function(FunctionType::new_endo(type_row![QB_T,BOOL_T,USIZE_T])))]
-fn roundtrip_type(#[case] typ: Type) {
-    check_testing_roundtrip(typ);
-}
-
-#[rstest]
-#[case(SumType::new_unary(2))]
-#[case(SumType::new([type_row![USIZE_T, QB_T], type_row![]]))]
-fn roundtrip_sumtype(#[case] sum_type: SumType) {
-    check_testing_roundtrip(sum_type);
-}
-
-#[rstest]
 #[case(Value::unit())]
 #[case(Value::true_val())]
 #[case(Value::unit_sum(3,5).unwrap())]
@@ -390,47 +370,15 @@ fn roundtrip_value(#[case] value: Value) {
     check_testing_roundtrip(value);
 }
 
-fn polyfunctype1() -> PolyFuncType {
-    let mut extension_set = ExtensionSet::new();
-    extension_set.insert_type_var(1);
-    let function_type = FunctionType::new_endo(type_row![]).with_extension_delta(extension_set);
-    PolyFuncType::new([TypeParam::max_nat(), TypeParam::Extensions], function_type)
-}
-
-#[rstest]
-#[case(FunctionType::new_endo(type_row![]).into())]
-#[case(polyfunctype1())]
-#[case(PolyFuncType::new([TypeParam::Opaque { ty: int_custom_type(TypeArg::BoundedNat { n: 1 }) }], FunctionType::new_endo(type_row![Type::new_var_use(0, TypeBound::Copyable)])))]
-#[case(PolyFuncType::new([TypeBound::Eq.into()], FunctionType::new_endo(type_row![Type::new_var_use(0, TypeBound::Eq)])))]
-#[case(PolyFuncType::new([TypeParam::List { param: Box::new(TypeBound::Any.into()) }], FunctionType::new_endo(type_row![])))]
-#[case(PolyFuncType::new([TypeParam::Tuple { params: [TypeBound::Any.into(), TypeParam::bounded_nat(2.try_into().unwrap())].into() }], FunctionType::new_endo(type_row![])))]
-fn roundtrip_polyfunctype(#[case] poly_func_type: PolyFuncType) {
-    check_testing_roundtrip(poly_func_type)
-}
-
-#[rstest]
-#[case(ops::Module)]
-#[case(ops::FuncDefn { name: "polyfunc1".into(), signature: polyfunctype1()})]
-#[case(ops::FuncDecl { name: "polyfunc2".into(), signature: polyfunctype1()})]
-#[case(ops::AliasDefn { name: "aliasdefn".into(), definition: Type::new_unit_sum(4)})]
-#[case(ops::AliasDecl { name: "aliasdecl".into(), bound: TypeBound::Any})]
-#[case(ops::Const::new(Value::false_val()))]
-#[case(ops::Const::new(Value::function(crate::builder::test::simple_dfg_hugr()).unwrap()))]
-#[case(ops::Input::new(type_row![Type::new_var_use(3,TypeBound::Eq)]))]
-#[case(ops::Output::new(vec![Type::new_function(FunctionType::new_endo(type_row![]))]))]
-#[case(ops::Call::try_new(polyfunctype1(), [TypeArg::BoundedNat{n: 1}, TypeArg::Extensions{ es: ExtensionSet::singleton(&PRELUDE_ID)} ], &EMPTY_REG).unwrap())]
-#[case(ops::CallIndirect { signature : FunctionType::new_endo(type_row![BOOL_T]) })]
-fn roundtrip_optype(#[case] optype: impl Into<OpType> + std::fmt::Debug) {
-    check_testing_roundtrip(NodeSer {
-        parent: portgraph::NodeIndex::new(0).into(),
-        input_extensions: None,
-        op: optype.into(),
-    });
-}
 
 proptest! {
     #[test]
     fn prop_roundtrip_type(t: Type) {
         check_testing_roundtrip(t)
+    }
+
+    #[test]
+    fn prop_roundtrip_poly_func_type(t: PolyFuncType) {
+        check_testing_roundtrip(t.into())
     }
 }

@@ -485,10 +485,6 @@ pub(crate) mod test {
         }
     }
 
-    pub fn to_typerow(type_enums: impl IntoIterator<Item = Type>) -> TypeRow {
-        type_enums.into_iter().collect_vec().into()
-    }
-
     impl Arbitrary for super::TypeEnum {
         type Parameters = TypeDepth;
         type Strategy = BoxedStrategy<Self>;
