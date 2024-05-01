@@ -177,6 +177,7 @@ pub enum SignatureError {
 
 /// Concrete instantiations of types and operations defined in extensions.
 trait CustomConcrete {
+    /// The identifier type for the concrete object.
     type Identifier;
     /// A generic identifier to the element.
     ///
@@ -191,7 +192,7 @@ trait CustomConcrete {
 impl CustomConcrete for OpaqueOp {
     type Identifier = OpName;
 
-    fn def_name(&self) -> &Self::Identifier {
+    fn def_name(&self) -> &OpName {
         self.name()
     }
 
@@ -207,7 +208,7 @@ impl CustomConcrete for OpaqueOp {
 impl CustomConcrete for CustomType {
     type Identifier = TypeName;
 
-    fn def_name(&self) -> &Self::Identifier {
+    fn def_name(&self) -> &TypeName {
         // Casts the `TypeName` to a generic string.
         self.name()
     }
