@@ -354,6 +354,7 @@ mod test {
             ExtensionId, ExtensionRegistry, PRELUDE,
         },
         std_extensions::arithmetic::float_types::{self, ConstF64, FLOAT64_TYPE},
+        std_extensions::arithmetic::int_types::ConstInt,
         type_row,
         types::type_param::TypeArg,
         types::{Type, TypeBound, TypeRow},
@@ -363,6 +364,67 @@ mod test {
     use serde_yaml::Value as YamlValue;
 
     use super::*;
+    use proptest::prelude::*;
+
+    fn mk_extension_value<CC: CustomConst>(mb_konst: Option<CC>) -> Option<ExtensionValue> {
+        mb_konst.map(|x| ExtensionValue(Box::new(x)))
+    }
+
+    impl Arbitrary for ExtensionValue {
+        type Parameters = ();
+        type Strategy = BoxedStrategy<Self>;
+        fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+            let signed_strat = |log_width| {
+                use std::i64;
+                let max_val = 2i64.pow(log_width) / 2;
+                todo!();
+
+            };
+            todo!()
+            // (0..8u8).prop_flat_map(|log_width| prop_oneof![
+            //     (-(1 << (log_width - 1))..(1i64 << (log_width - 1))).prop_filter_map("signed log_width too small",
+            //                                                              move |value| mk_extension_value(ConstInt::new_s(log_width,value).ok())
+            //     ),
+            //     (0..(1u64 << log_width)).prop_filter_map("unsigned log_width too small",
+            //                                                              move |value| mk_extension_value(ConstInt::new_u(log_width,value).ok())
+            //     ),
+            // ]).boxed()
+        }
+    }
+
+    impl Arbitrary for Value {
+        type Parameters = ();
+        type Strategy = BoxedStrategy<Self>;
+        fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+            use proptest::collection::vec;
+            let leaf_strat =
+                prop_oneof![any::<ExtensionValue>().prop_map(|e| Self::Extension { e }),];
+            leaf_strat
+                .prop_recursive(
+                    3,  // No more than 4 branch levels deep
+                    32, // Target around 64 total elements
+                    3,  // Each collection is up to 16 elements long
+                    |element| {
+                        prop_oneof![
+                            vec(element.clone(), 0..3).prop_map(|vs| Self::Tuple { vs }),
+                            (
+                                any::<usize>(),
+                                vec(element.clone(), 0..3),
+                                any_with::<SumType>(1.into())
+                            )
+                                .prop_map(|(tag, values, sum_type)| {
+                                    Self::Sum {
+                                        tag,
+                                        values,
+                                        sum_type,
+                                    }
+                                }),
+                        ]
+                    },
+                )
+                .boxed()
+        }
+    }
 
     #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
     /// A custom constant value used in testing

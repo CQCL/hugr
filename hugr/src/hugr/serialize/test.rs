@@ -13,10 +13,10 @@ use crate::ops::{self, Value};
 use crate::ops::{dataflow::IOTrait, Input, Module, Noop, Output, DFG};
 use crate::std_extensions::arithmetic::float_ops::FLOAT_OPS_REGISTRY;
 use crate::std_extensions::arithmetic::float_types::{ConstF64, FLOAT64_TYPE};
-use crate::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
+
 use crate::std_extensions::logic::NotOp;
 
-use crate::types::{FunctionType, PolyFuncType, SumType, Type};
+use crate::types::{FunctionType, PolyFuncType, Type};
 use crate::{type_row, OutgoingPort};
 use itertools::Itertools;
 use jsonschema::{Draft, JSONSchema};
@@ -26,7 +26,7 @@ use portgraph::{
     multiportgraph::MultiPortGraph, Hierarchy, LinkMut, PortMut, PortView, UnmanagedDenseMap,
 };
 use proptest::prelude::*;
-use rstest::rstest;
+
 
 const NAT: Type = crate::extension::prelude::USIZE_T;
 const QB: Type = crate::extension::prelude::QB_T;
@@ -350,25 +350,6 @@ fn serialize_types_roundtrip() {
     assert_eq!(ser_roundtrip(&t), t);
 }
 
-#[rstest]
-#[case(Value::unit())]
-#[case(Value::true_val())]
-#[case(Value::unit_sum(3,5).unwrap())]
-#[case(Value::extension(ConstF64::new(-1.5)))]
-#[case(Value::extension(ConstF64::new(0.0)))]
-#[case(Value::extension(ConstF64::new(-0.0)))]
-// These cases fail
-// #[case(Value::extension(ConstF64::new(std::f64::NAN)))]
-// #[case(Value::extension(ConstF64::new(std::f64::INFINITY)))]
-// #[case(Value::extension(ConstF64::new(std::f64::NEG_INFINITY)))]
-#[case(Value::extension(ConstF64::new(std::f64::MIN_POSITIVE)))]
-#[case(Value::sum(1,[Value::extension(ConstInt::new_u(2,1).unwrap())], SumType::new([vec![], vec![INT_TYPES[2].clone()]])).unwrap())]
-#[case(Value::tuple([Value::false_val(), Value::extension(ConstInt::new_s(2,1).unwrap())]))]
-#[case(Value::function(crate::builder::test::simple_dfg_hugr()).unwrap())]
-fn roundtrip_value(#[case] value: Value) {
-    check_testing_roundtrip(value);
-}
-
 proptest! {
     #[test]
     fn prop_roundtrip_type(t: Type) {
@@ -377,6 +358,11 @@ proptest! {
 
     #[test]
     fn prop_roundtrip_poly_func_type(t: PolyFuncType) {
+        check_testing_roundtrip(t.into())
+    }
+
+    #[test]
+    fn prop_roundtrip_value(t: Value) {
         check_testing_roundtrip(t.into())
     }
 }

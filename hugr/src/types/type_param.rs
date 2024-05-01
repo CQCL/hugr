@@ -378,6 +378,7 @@ pub enum TypeArgError {
 #[cfg(test)]
 mod test {
     use crate::extension::ExtensionSet;
+    use crate::types::type_param::TypeArgVariable;
     use crate::types::{CustomType, Type, TypeBound};
     use proptest::prelude::*;
 
@@ -456,6 +457,8 @@ mod test {
                 any_with::<CustomTypeArg>(depth)
                     .prop_map(|arg| Self::Opaque { arg })
                     .boxed(),
+                any_with::<TypeArgVariable>(depth)
+                    .prop_map(|v| Self::Variable { v }).boxed()
             ]);
             if !depth.leaf() {
                 strat = strat.or(vec(any_with::<Self>(depth.descend()), 0..3)
