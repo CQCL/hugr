@@ -44,6 +44,6 @@ if __name__ == "__main__":
     model_rebuild(config=ConfigDict(strict=False, extra="allow"), force=True)
     write_schema(out_dir, "testing_hugr_schema", TestingHugr)
     model_rebuild(config=ConfigDict(strict=True, extra="forbid"), force=True)
-    write_schema(out_dir, "hugr_schema_strict", TestingHugr)
+    write_schema(out_dir, "hugr_schema_strict", SerialHugr)
     model_rebuild(config=ConfigDict(strict=False, extra="allow"), force=True)
-    write_schema(out_dir, "hugr_schema", TestingHugr)
+    write_schema(out_dir, "hugr_schema", SerialHugr)

@@ -1891,7 +1891,7 @@
             "type": "object"
         }
     },
-    "description": "A serializable representation of a Hugr Type, SumType, PolyFuncType,\nValue, OpType. Intended for testing only.",
+    "description": "A serializable representation of a Hugr.",
     "properties": {
         "version": {
             "const": "v1",
@@ -1902,62 +1902,83 @@
             "title": "Version",
             "type": "string"
         },
-        "typ": {
-            "anyOf": [
-                {
-                    "$ref": "#/$defs/Type"
-                },
-                {
-                    "type": "null"
-                }
-            ],
-            "default": null
+        "nodes": {
+            "items": {
+                "$ref": "#/$defs/OpType"
+            },
+            "title": "Nodes",
+            "type": "array"
         },
-        "sum_type": {
-            "anyOf": [
-                {
-                    "$ref": "#/$defs/SumType"
-                },
-                {
-                    "type": "null"
-                }
-            ],
-            "default": null
+        "edges": {
+            "items": {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                    {
+                        "maxItems": 2,
+                        "minItems": 2,
+                        "prefixItems": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "anyOf": [
+                                    {
+                                        "type": "integer"
+                                    },
+                                    {
+                                        "type": "null"
+                                    }
+                                ]
+                            }
+                        ],
+                        "type": "array"
+                    },
+                    {
+                        "maxItems": 2,
+                        "minItems": 2,
+                        "prefixItems": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "anyOf": [
+                                    {
+                                        "type": "integer"
+                                    },
+                                    {
+                                        "type": "null"
+                                    }
+                                ]
+                            }
+                        ],
+                        "type": "array"
+                    }
+                ],
+                "type": "array"
+            },
+            "title": "Edges",
+            "type": "array"
         },
-        "poly_func_type": {
+        "encoder": {
             "anyOf": [
                 {
-                    "$ref": "#/$defs/PolyFuncType"
+                    "type": "string"
                 },
                 {
                     "type": "null"
                 }
             ],
-            "default": null
-        },
-        "value": {
-            "anyOf": [
-                {
-                    "$ref": "#/$defs/Value"
-                },
-                {
-                    "type": "null"
-                }
-            ],
-            "default": null
-        },
-        "optype": {
-            "anyOf": [
-                {
-                    "$ref": "#/$defs/OpType"
-                },
-                {
-                    "type": "null"
-                }
-            ],
-            "default": null
+            "default": null,
+            "description": "The name of the encoder used to generate the Hugr.",
+            "title": "Encoder"
         }
     },
-    "title": "HugrTesting",
+    "required": [
+        "version",
+        "nodes",
+        "edges"
+    ],
+    "title": "Hugr",
     "type": "object"
 }
