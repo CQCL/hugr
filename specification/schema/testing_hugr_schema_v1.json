@@ -1846,6 +1846,7 @@
             "type": "object"
         }
     },
+    "additionalProperties": true,
     "description": "A serializable representation of a Hugr Type, SumType, PolyFuncType,\nValue, OpType. Intended for testing only.",
     "properties": {
         "version": {
@@ -1913,6 +1914,6 @@
             "default": null
         }
     },
-    "title": "HugrTesting",
+    "title": "TestingHugr",
     "type": "object"
 }

@@ -1,8 +1,9 @@
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
-from .ops import NodeID, OpType
+from .ops import NodeID, OpType, classes
+from .tys import model_rebuild
 import hugr
 
 Port = tuple[NodeID, int | None]  # (node, offset)
@@ -33,6 +34,11 @@ class SerialHugr(BaseModel):
     def get_version(cls) -> str:
         """Return the version of the schema."""
         return cls(nodes=[], edges=[]).version
+
+    @classmethod
+    def _pydantic_rebuild(cls, config: ConfigDict = ConfigDict(), **kwargs):
+        model_rebuild([(cls.__name__, cls)] + classes, config=config, **kwargs)
+
 
     class Config:
         title = "Hugr"

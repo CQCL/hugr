@@ -1,7 +1,7 @@
 import inspect
 import sys
 from enum import Enum
-from typing import Annotated, Any, Literal, Optional, Union, Tuple
+from typing import Annotated, Any, Literal, Optional, Union, Tuple, Any
 
 from pydantic import (
     BaseModel,
@@ -346,23 +346,24 @@ class Signature(ConfiguredBaseModel):
 
 # Now that all classes are defined, we need to update the ForwardRefs in all type
 # annotations. We use some inspect magic to find all classes defined in this file
-# and call _model_rebuild()
+# and call model_rebuild()
 classes = inspect.getmembers(
     sys.modules[__name__],
     lambda member: inspect.isclass(member) and member.__module__ == __name__,
 )
 
 
-def _model_rebuild(
-    classes: list[Tuple[str, type]] = classes,
+def model_rebuild(
+    classes: list[tuple[str,Any]],
     config: ConfigDict = ConfigDict(),
     **kwargs,
 ):
-    new_config = ConfigDict(default_model_config, **config)
-    for _, c in classes:
+    new_config = default_model_config.copy()
+    new_config.update(config)
+    for c in {k: v for (k,v) in classes}.values():
         if issubclass(c, ConfiguredBaseModel):
             c.set_model_config(new_config)
             c.model_rebuild(**kwargs)
 
 
-_model_rebuild()
+model_rebuild(classes)

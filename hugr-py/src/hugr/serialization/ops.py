@@ -16,7 +16,6 @@ from .tys import (
     SumType,
     TypeBound,
     ConfiguredBaseModel,
-    _model_rebuild as tys_model_rebuild,
     classes as tys_classes,
 )
 
@@ -566,8 +565,4 @@ class OpDef(BaseOp, populate_by_name=True):
 classes = inspect.getmembers(
     sys.modules[__name__],
     lambda member: inspect.isclass(member) and member.__module__ == __name__,
-)
-
-
-def model_rebuild(config: ConfigDict = ConfigDict(), **kwargs):
-    return tys_model_rebuild(classes + tys_classes, config, **kwargs)
+) + tys_classes
