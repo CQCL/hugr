@@ -12,10 +12,9 @@ import sys
 from typing import Type
 from pathlib import Path
 
-from pydantic import TypeAdapter, ConfigDict
+from pydantic import ConfigDict
 
 from hugr.serialization.ops import model_rebuild
-from hugr.serialization.tys import ConfiguredBaseModel, hugr_config
 from hugr.serialization import SerialHugr
 from hugr.serialization.testing_hugr import TestingHugr
 
