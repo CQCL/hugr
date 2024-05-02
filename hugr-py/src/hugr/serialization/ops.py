@@ -173,12 +173,12 @@ class DataflowBlock(BaseOp):
     def insert_child_dfg_signature(self, inputs: TypeRow, outputs: TypeRow) -> None:
         self.inputs = inputs
         pred = outputs[0].root
-        assert isinstance(pred, tys.SumType)
-        if isinstance(pred.root, tys.UnitSum):
-            self.sum_rows = [[] for _ in range(pred.root.size)]
+        assert isinstance(pred, tys.TaggedSumType)
+        if isinstance(pred.st.root, tys.UnitSum):
+            self.sum_rows = [[] for _ in range(pred.st.root.size)]
         else:
             self.sum_rows = []
-            for variant in pred.root.rows:
+            for variant in pred.st.root.rows:
                 self.sum_rows.append(variant)
         self.other_outputs = outputs[1:]
 
@@ -337,8 +337,8 @@ class Conditional(DataflowOp):
         # First port is a predicate, i.e. a sum of tuple types. We need to unpack
         # those into a list of type rows
         pred = in_types[0]
-        assert isinstance(pred.root, tys.SumType)
-        sum = pred.root.root
+        assert isinstance(pred.root, tys.TaggedSumType)
+        sum = pred.root.st.root
         if isinstance(sum, tys.UnitSum):
             self.sum_rows = [[] for _ in range(sum.size)]
         else:
