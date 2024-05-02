@@ -344,10 +344,63 @@ pub enum HugrError {
 }
 
 #[cfg(test)]
-mod test {
+pub(crate) mod test {
     use super::{Hugr, HugrView};
     #[cfg(feature = "extension_inference")]
     use std::error::Error;
+
+    pub(crate) mod proptest {
+        use lazy_static::lazy_static;
+        use proptest::strategy::Strategy;
+        
+        
+        use proptest::prelude::*;
+
+
+        pub enum ArbStringKind {
+            NonEmpty,
+            Ident,
+        }
+
+        lazy_static! {
+            static ref ARBSTRING_IDENT_STRAT: SBoxedStrategy<String> = {
+                use proptest::string::string_regex;
+                prop_oneof![
+                    string_regex(crate::hugr::ident::PATH_COMPONENT_NICE_REGEX_STR).unwrap(),
+                    string_regex(crate::hugr::ident::PATH_COMPONENT_REGEX_STR).unwrap(),
+                ].sboxed()
+            };
+
+            static ref ARBSTRING_NONEMPTY_STRAT: SBoxedStrategy<String> = {
+                use proptest::string::string_regex;
+                prop_oneof![
+                    string_regex(r".+").unwrap(),
+                    string_regex(r"[[:alpha:]]+").unwrap(),
+                ].sboxed()
+            };
+        }
+
+        impl Default for ArbStringKind {
+            fn default() -> Self {
+                Self::Ident
+            }
+        }
+
+        impl ArbStringKind {
+            pub fn non_empty() -> impl Strategy<Value = String> {
+                Self::NonEmpty.strategy()
+            }
+            pub fn ident() -> impl Strategy<Value = String> {
+                Self::Ident.strategy()
+            }
+            pub fn strategy(&self) -> &'static SBoxedStrategy<String> {
+                match self {
+                    Self::Ident => &ARBSTRING_IDENT_STRAT,
+                    Self::NonEmpty => &ARBSTRING_NONEMPTY_STRAT,
+                }
+            }
+        }
+    }
 
     #[test]
     fn impls_send_and_sync() {

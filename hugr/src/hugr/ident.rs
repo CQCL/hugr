@@ -6,10 +6,11 @@ use regex::Regex;
 use smol_str::SmolStr;
 use thiserror::Error;
 
-static PATH_COMPONENT_REGEX_STR: &str = r"[\w--\d]\w*";
+pub static PATH_COMPONENT_REGEX_STR: &str = r"[\w--\d]\w*";
+#[cfg(test)]
+pub static PATH_COMPONENT_NICE_REGEX_STR: &str = r"[[:alpha:]][[[:alpha:]]0-9]*";
 lazy_static! {
-    pub static ref PATH_REGEX_STR: String = format!(r"^{0}(\.{0})*$", PATH_COMPONENT_REGEX_STR);
-    pub static ref PATH_REGEX: Regex = Regex::new(&self::PATH_REGEX_STR).unwrap();
+    pub static ref PATH_REGEX: Regex = Regex::new(&format!(r"^{0}(\.{0})*$", PATH_COMPONENT_REGEX_STR)).unwrap();
 }
 
 #[derive(
@@ -78,7 +79,6 @@ pub struct InvalidIdentifier(SmolStr);
 
 #[cfg(test)]
 mod test {
-    use crate::hugr::ident::PATH_COMPONENT_REGEX_STR;
     use proptest::prelude::*;
 
     use super::IdentList;
@@ -102,16 +102,12 @@ mod test {
         type Parameters = ();
         type Strategy = BoxedStrategy<Self>;
         fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-            use prop::string::string_regex;
+            use crate::hugr::test::proptest::ArbStringKind;
             use proptest::collection::vec;
             // we shrink to more readable (i.e. :alpha:) names
-            let component_strategy = prop_oneof![
-                string_regex(r"[[:alpha:]]+").unwrap(),
-                string_regex(PATH_COMPONENT_REGEX_STR).unwrap()
-            ];
-            vec(component_strategy.clone(), 1..4)
+            vec(ArbStringKind::ident(), 1..2)
                 .prop_map(|vs| {
-                    IdentList::new(itertools::intersperse(vs, ".".to_string()).collect::<String>())
+                    IdentList::new(itertools::intersperse(vs.into_iter().map(Into::<String>::into), ".".into()).collect::<String>())
                         .unwrap()
                 })
                 .boxed()

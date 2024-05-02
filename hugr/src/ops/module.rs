@@ -162,7 +162,8 @@ mod test {
         type Parameters = ();
         type Strategy = BoxedStrategy<Self>;
         fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-            let name = proptest::string::string_regex(r".+").unwrap();
+            use crate::hugr::test::proptest::ArbStringKind;
+            let name = ArbStringKind::non_empty();
             let bound = any::<TypeBound>();
             (name, bound)
                 .prop_map(|(name, bound)| Self::new(name, bound))

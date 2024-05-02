@@ -140,24 +140,27 @@ impl From<CustomType> for Type {
 
 #[cfg(test)]
 mod test {
+    use lazy_static::lazy_static;
     use proptest::prelude::*;
 
     use crate::{
         extension::ExtensionId,
         types::{TypeArg, TypeBound, TypeName},
     };
+
+    lazy_static! {
+        static ref NICE_ID_REGEX: regex_syntax::hir::Hir =
+            regex_syntax::parse(r"[[:alpha:]]+").unwrap();
+        static ref ID_REGEX: regex_syntax::hir::Hir = regex_syntax::parse(r".+").unwrap();
+    }
     impl Arbitrary for super::CustomType {
         type Parameters = crate::types::test::TypeDepth;
         type Strategy = BoxedStrategy<Self>;
         fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
-            use prop::string::string_regex;
+            use crate::hugr::test::proptest::ArbStringKind;
             use proptest::collection::vec;
             let extension = any::<ExtensionId>();
-            let id = prop_oneof![
-                string_regex(r"[[:alpha:]]+").unwrap(),
-                string_regex(r".+").unwrap()
-            ]
-            .prop_map(Into::<TypeName>::into);
+            let id = ArbStringKind::non_empty().prop_map(Into::<TypeName>::into);
             let args = if depth.leaf() {
                 Just(vec![]).boxed()
             } else {

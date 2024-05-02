@@ -63,6 +63,7 @@ insta = { workspace = true, features = ["yaml"] }
 jsonschema = "0.17.1"
 proptest = "1.4.0"
 proptest-derive = "0.4.0"
+regex-syntax = "0.8.3"
 
 [[bench]]
 name = "bench_main"

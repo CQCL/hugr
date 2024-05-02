@@ -420,7 +420,13 @@ mod test {
         fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
             use proptest::collection::vec;
             let leaf_strat =
-                prop_oneof![any::<ExtensionValue>().prop_map(|e| Self::Extension { e }),];
+                prop_oneof![
+                    any::<ExtensionValue>().prop_map(|e| Self::Extension { e }),
+                    prop_oneof![
+                        // TODO we need an example of each legal root, in particular FuncDe{fn,cl}
+                        Just(crate::builder::test::simple_dfg_hugr()),
+                    ].prop_map(|x| Value::function(x).unwrap())
+                ];
             leaf_strat
                 .prop_recursive(
                     3,  // No more than 3 branch levels deep
