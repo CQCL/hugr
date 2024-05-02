@@ -378,6 +378,8 @@ pub enum TypeArgError {
 #[cfg(test)]
 mod test {
     use crate::extension::ExtensionSet;
+    use crate::hugr::test::proptest::any_serde_yaml_value;
+    use crate::types::custom::test::CustomTypeArbitraryParameters;
     use crate::types::type_param::TypeArgVariable;
     use crate::types::{CustomType, Type, TypeBound};
     use proptest::prelude::*;
@@ -388,14 +390,13 @@ mod test {
         type Parameters = crate::types::test::TypeDepth;
         type Strategy = BoxedStrategy<Self>;
         fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
-            any_with::<CustomType>(depth)
-                .prop_filter_map("Type bound is not Eq", |ct| {
-                    if ct.bound() == TypeBound::Eq {
-                        Some(CustomTypeArg::new(ct, serde_yaml::Value::Null).unwrap())
-                    } else {
-                        None
-                    }
-                })
+            (
+                any_with::<CustomType>(
+                    CustomTypeArbitraryParameters::new(depth).with_bound(TypeBound::Eq),
+                ),
+                any_serde_yaml_value(),
+            )
+                .prop_map(|(ct, value)| CustomTypeArg::new(ct, value.clone()).unwrap())
                 .boxed()
         }
     }
@@ -422,7 +423,7 @@ mod test {
                 any::<super::UpperBound>()
                     .prop_map(|bound| Self::BoundedNat { bound })
                     .boxed(),
-                any_with::<CustomType>(depth)
+                any_with::<CustomType>(depth.into())
                     .prop_map(|ty| Self::Opaque { ty })
                     .boxed(),
             ]);

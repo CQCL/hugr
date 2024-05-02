@@ -553,17 +553,16 @@ impl FromIterator<ExtensionId> for ExtensionSet {
 
 #[cfg(test)]
 mod test {
-    use std::collections::HashSet;
 
-    use proptest::prelude::*;
+    use proptest::{collection::hash_set, prelude::*};
 
     use crate::extension::ExtensionId;
     impl Arbitrary for super::ExtensionSet {
         type Parameters = ();
         type Strategy = BoxedStrategy<Self>;
         fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-            let vars = any::<HashSet<usize>>();
-            let extensions = any::<HashSet<ExtensionId>>();
+            let vars = hash_set(0..10usize, 0..3);
+            let extensions = hash_set(any::<ExtensionId>(), 0..3);
             (vars, extensions)
                 .prop_map(|(vars, extensions)| {
                     let mut r = Self::new();

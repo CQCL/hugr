@@ -47,3 +47,6 @@ venv/
 
 *.DS_Store
 *.egg-info
+
+# Local overrides for devenv shell
+./devenv.local.nix

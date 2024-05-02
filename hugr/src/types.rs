@@ -449,6 +449,8 @@ pub(crate) fn check_typevar_decl(
 
 #[cfg(test)]
 pub(crate) mod test {
+    use self::custom::test::CustomTypeArbitraryParameters;
+
     use super::*;
     use proptest::prelude::*;
 
@@ -490,11 +492,12 @@ pub(crate) mod test {
         type Strategy = BoxedStrategy<Self>;
         fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
             prop_oneof![
-                any_with::<CustomType>(depth).prop_map(Self::Extension),
-                any::<AliasDecl>().prop_map(Self::Alias),
                 any::<(usize, TypeBound)>().prop_map(|(us, tb)| Self::Variable(us, tb)),
-                any_with::<FunctionType>(depth).prop_map(|x| Self::Function(Box::new(x))),
+                any::<AliasDecl>().prop_map(Self::Alias),
                 any_with::<SumType>(depth).prop_map(Self::Sum),
+                any_with::<CustomType>(CustomTypeArbitraryParameters::new(depth))
+                    .prop_map(Self::Extension),
+                any_with::<FunctionType>(depth).prop_map(|x| Self::Function(Box::new(x))),
             ]
             .boxed()
         }
