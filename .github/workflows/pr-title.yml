@@ -23,8 +23,14 @@ jobs:
     # The action does not support running on merge_group events,
     # but if the check succeeds in the PR there is no need to check it again.
     if: github.event_name == 'pull_request_target'
+    outputs:
+      # Whether the PR title indicates a breaking change.
+      breaking: ${{ steps.breaking.outputs.breaking }}
+      # Whether the PR body contains a "BREAKING CHANGE:" footer describing the breaking change.
+      has_breaking_footer: ${{ steps.breaking.outputs.has_breaking_footer }}
     steps:
-      - uses: amannn/action-semantic-pull-request@v5
+      - name: Validate the PR title format
+        uses: amannn/action-semantic-pull-request@v5
         id: lint_pr_title
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -72,7 +78,49 @@ jobs:
           ignoreLabels: |
             ignore-semantic-pull-request
 
-      - uses: marocchino/sticky-pull-request-comment@v2
+      # `action-semantic-pull-request` does not parse the title, so it cannot
+      # detect if it is marked as a breaking change.
+      #
+      # Since at this point we know the PR title is a valid conventional commit,
+      # we can use a simple regex that looks for a '!:' sequence. It could be
+      # more complex, but we don't care about false positives.
+      - name: Check for breaking change flag
+        id: breaking
+        run: |
+          if [[ "${{ github.event.pull_request.title }}" =~ ^.*\!:.*$ ]]; then
+            echo "breaking=true" >> $GITHUB_OUTPUT
+          else
+            echo "breaking=false" >> $GITHUB_OUTPUT
+          fi
+
+          # Check if the PR comment has a "BREAKING CHANGE:" footer describing
+          # the breaking change.
+          if [[ "${{ github.event.pull_request.body }}" != *"BREAKING CHANGE:"* ]]; then
+            echo "has_breaking_footer=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_breaking_footer=true" >> $GITHUB_OUTPUT
+          fi
+
+      # Post a help comment if the PR title indicates a breaking change but does
+      # not contain a "BREAKING CHANGE:" footer.
+      - name: Require "BREAKING CHANGE:" footer for breaking changes
+        id: breaking-comment
+        if: ${{ steps.breaking.outputs.breaking == 'true' && steps.breaking.outputs.has_breaking_footer == 'false' }}
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: pr-title-lint-error
+          message: |
+            Hey there and thank you for opening this pull request! 👋🏼
+
+            It looks like your proposed title indicates a breaking change. If that's the case,
+            please make sure to include a "BREAKING CHANGE:" footer in the body of the pull request
+            describing the breaking change and any migration instructions.
+      - name: Fail if the footer is required but missing
+        if: ${{ steps.breaking.outputs.breaking == 'true' && steps.breaking.outputs.has_breaking_footer == 'false' }}
+        run: exit 1
+
+      - name: Post a comment if the PR badly formatted
+        uses: marocchino/sticky-pull-request-comment@v2
         # When the previous steps fails, the workflow would stop. By adding this
         # condition you can continue the execution with the populated error message.
         if: always() && (steps.lint_pr_title.outputs.error_message != null)
@@ -84,22 +132,25 @@ jobs:
             We require pull request titles to follow the [Conventional Commits specification](https://www.conventionalcommits.org/en/v1.0.0/)
             and it looks like your proposed title needs to be adjusted.
 
-            Your title should look like this:
+            Your title should look like this. The scope field is optional.
             ```
             <type>(<scope>): <description>
             ```
-            Or like this, if it's a breaking change:
+
+            If the PR includes a breaking change, mark it with an exclamation mark:
             ```
             <type>!: <description>
             ```
+            and include a "BREAKING CHANGE:" footer in the body of the pull request.
 
             Details:
             ```
             ${{ steps.lint_pr_title.outputs.error_message }}
             ```
 
-      # Delete a previous comment when the issue has been resolved
-      - if: ${{ steps.lint_pr_title.outputs.error_message == null }}
+      # Delete previous comments when the issues have been resolved
+      # This step doesn't run if any of the previous checks fails.
+      - name: Delete previous comments
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           header: pr-title-lint-error
