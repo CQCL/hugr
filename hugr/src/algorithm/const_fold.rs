@@ -626,7 +626,10 @@ mod test {
         // x2 := ine(x0, x1); // true
         // x3 := ilt_u(x0, x1); // true
         // x4 := and(x2, x3); // true
-        // output x4
+        // x5 := int_s<5>(-10) // -10
+        // x6 := ilt_s(x0, x5) // false
+        // x7 := or(x4, x6) // true
+        // output x7
         let mut build =
             DFGBuilder::new(FunctionType::new(type_row![], vec![BOOL_T.into()])).unwrap();
         let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 3).unwrap()));
@@ -637,10 +640,20 @@ mod test {
         let x3 = build
             .add_dataflow_op(IntOpDef::ilt_u.with_log_width(5), [x0, x1])
             .unwrap();
-        let x5 = build
+        let x4 = build
             .add_dataflow_op(
                 NaryLogic::And.with_n_inputs(2),
                 x2.outputs().chain(x3.outputs()),
+            )
+            .unwrap();
+        let x5 = build.add_load_const(Value::extension(ConstInt::new_s(5, -10).unwrap()));
+        let x6 = build
+            .add_dataflow_op(IntOpDef::ilt_s.with_log_width(5), [x0, x5])
+            .unwrap();
+        let x7 = build
+            .add_dataflow_op(
+                NaryLogic::Or.with_n_inputs(2),
+                x4.outputs().chain(x6.outputs()),
             )
             .unwrap();
         let reg = ExtensionRegistry::try_new([
@@ -649,7 +662,7 @@ mod test {
             arithmetic::int_types::EXTENSION.to_owned(),
         ])
         .unwrap();
-        let mut h = build.finish_hugr_with_outputs(x5.outputs(), &reg).unwrap();
+        let mut h = build.finish_hugr_with_outputs(x7.outputs(), &reg).unwrap();
         constant_fold_pass(&mut h, &reg);
         let expected = Value::true_val();
         assert_fully_folded(&h, &expected);
