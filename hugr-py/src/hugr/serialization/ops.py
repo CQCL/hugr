@@ -298,10 +298,7 @@ class LoadFunction(DataflowOp):
     op: Literal["LoadFunction"] = "LoadFunction"
     func_sig: PolyFuncType
     type_args: list[tys.TypeArg]
-    signature: FunctionType = Field(default_factory=FunctionType.empty)
-
-    def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
-        self.signature = FunctionType(input=list(in_types), output=list(out_types))
+    signature: FunctionType
 
 
 class DFG(DataflowOp):

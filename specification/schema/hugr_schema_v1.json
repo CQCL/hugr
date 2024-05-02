@@ -1208,7 +1208,8 @@
             "required": [
                 "parent",
                 "func_sig",
-                "type_args"
+                "type_args",
+                "signature"
             ],
             "title": "LoadFunction",
             "type": "object"
