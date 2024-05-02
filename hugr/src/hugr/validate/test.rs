@@ -578,7 +578,6 @@ fn test_polymorphic_load() -> Result<(), Box<dyn std::error::Error>> {
     f.finish_with_outputs([l])?;
     let _ = m.finish_prelude_hugr()?;
     Ok(())
-
 }
 
 #[cfg(feature = "extension_inference")]

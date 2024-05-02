@@ -409,7 +409,7 @@ pub trait Dataflow: Container {
         let load_n = self.add_dataflow_op(
             ops::LoadFunction::try_new(func_sig, type_args, exts)?,
             // Static wire from the function node
-            vec![Wire::new(func_node, OutgoingPort::from(0))],
+            vec![Wire::new(func_node, func_op.static_output_port().unwrap())],
         )?;
 
         Ok(load_n.out_wire(0))
