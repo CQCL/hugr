@@ -87,7 +87,7 @@ jobs:
       - name: Check for breaking change flag
         id: breaking
         run: |
-          if [[ "${{ github.event.pull_request.title }}" =~ ^.*\!:.*$ ]]; then
+          if [[ "${PR_TITLE}" =~ ^.*\!:.*$ ]]; then
             echo "breaking=true" >> $GITHUB_OUTPUT
           else
             echo "breaking=false" >> $GITHUB_OUTPUT
@@ -95,11 +95,14 @@ jobs:
 
           # Check if the PR comment has a "BREAKING CHANGE:" footer describing
           # the breaking change.
-          if [[ "${{ github.event.pull_request.body }}" != *"BREAKING CHANGE:"* ]]; then
+          if [[ "${PR_BODY}" != *"BREAKING CHANGE:"* ]]; then
             echo "has_breaking_footer=false" >> $GITHUB_OUTPUT
           else
             echo "has_breaking_footer=true" >> $GITHUB_OUTPUT
           fi
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
 
       # Post a help comment if the PR title indicates a breaking change but does
       # not contain a "BREAKING CHANGE:" footer.
