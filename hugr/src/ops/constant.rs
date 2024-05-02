@@ -19,6 +19,7 @@ pub use custom::{downcast_equal_consts, CustomConst, CustomSerialized};
 ///
 /// Represents core types and extension types.
 #[non_exhaustive]
+#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 pub struct Const {
     #[serde(rename = "v")]
     value: Value,

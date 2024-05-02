@@ -363,7 +363,7 @@ pub(crate) mod test {
         }
 
         lazy_static! {
-            static ref ARBSTRING_IDENT_STRAT: SBoxedStrategy<String> = {
+            pub static ref ANY_IDENT_STRING_STRAT: SBoxedStrategy<String> = {
                 use proptest::string::string_regex;
                 prop_oneof![
                     string_regex(crate::hugr::ident::PATH_COMPONENT_NICE_REGEX_STR).unwrap(),
@@ -371,34 +371,44 @@ pub(crate) mod test {
                 ].sboxed()
             };
 
-            static ref ARBSTRING_NONEMPTY_STRAT: SBoxedStrategy<String> = {
+            pub static ref ANY_NONEMPTY_STRING_STRAT: SBoxedStrategy<String> = {
                 use proptest::string::string_regex;
                 prop_oneof![
                     string_regex(r".+").unwrap(),
                     string_regex(r"[[:alpha:]]+").unwrap(),
                 ].sboxed()
             };
-        }
 
-        impl Default for ArbStringKind {
-            fn default() -> Self {
-                Self::Ident
-            }
-        }
+            pub static ref ANY_STRING_STRAT: SBoxedStrategy<String> = {
+                use proptest::string::string_regex;
+                prop_oneof![
+                    string_regex(r"[[:alpha:]]*").unwrap(),
+                    string_regex(r".*").unwrap(),
+                ].sboxed()
+            };
 
-        impl ArbStringKind {
-            pub fn non_empty() -> impl Strategy<Value = String> {
-                Self::NonEmpty.strategy()
-            }
-            pub fn ident() -> impl Strategy<Value = String> {
-                Self::Ident.strategy()
-            }
-            pub fn strategy(&self) -> &'static SBoxedStrategy<String> {
-                match self {
-                    Self::Ident => &ARBSTRING_IDENT_STRAT,
-                    Self::NonEmpty => &ARBSTRING_NONEMPTY_STRAT,
-                }
-            }
+            pub static ref ANY_SERDE_YAML_VALUE: SBoxedStrategy<serde_yaml::Value> = {
+                use serde_yaml::value::{Tag, TaggedValue, Value};
+                proptest::collection::vec;
+                prop_oneof![
+                    Just(Value::Null),
+                    any::<bool>().prop_map_into(),
+                    any::<u64>().prop_map_into(),
+                    any::<i64>().prop_map_into(),
+                    any::<f64>().prop_map_into(),
+                    Just(Value::Number(3.into())),
+                    ANY_STRING_STRAT.clone().prop_map_into(),
+                ].prop_recursive(
+                    3,  // No more than 3 branch levels deep
+                    32, // Target around 32 total elements
+                    3,  // Each collection is up to 3 elements long
+                    |element| prop_oneof![
+                        (ANY_STRING_STRAT.clone().prop_map(serde_yaml::value::Tag::new), element.clone()).prop_map(|(tag, value)| Value::TaggedValue { tag, value }),
+                        proptest::collection::vec(element.clone(), 0..3).prop_map_into(),
+                    ]
+
+                ).sboxed()
+            };
         }
     }
 

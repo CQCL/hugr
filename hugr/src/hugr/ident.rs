@@ -102,10 +102,10 @@ mod test {
         type Parameters = ();
         type Strategy = BoxedStrategy<Self>;
         fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-            use crate::hugr::test::proptest::ArbStringKind;
+            use crate::hugr::test::proptest;
             use proptest::collection::vec;
             // we shrink to more readable (i.e. :alpha:) names
-            vec(ArbStringKind::ident(), 1..2)
+            vec(proptest::ANY_IDENT_STRING_STRAT, 1..2)
                 .prop_map(|vs| {
                     IdentList::new(itertools::intersperse(vs.into_iter().map(Into::<String>::into), ".".into()).collect::<String>())
                         .unwrap()

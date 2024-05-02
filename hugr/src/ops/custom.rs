@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 use thiserror::Error;
+use smol_str::SmolStr;
 
 use crate::extension::{ConstFoldResult, ExtensionId, ExtensionRegistry, OpDef, SignatureError};
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
@@ -23,6 +24,7 @@ use super::{NamedOp, OpName, OpNameRef, OpTrait, OpType};
 ///   [`OpaqueOp`]: crate::ops::custom::OpaqueOp
 ///   [`ExtensionOp`]: crate::ops::custom::ExtensionOp
 #[derive(Clone, Debug, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 #[serde(into = "OpaqueOp", from = "OpaqueOp")]
 pub enum CustomOp {
     /// When we've found (loaded) the [Extension] definition and identified the [OpDef]
@@ -165,6 +167,7 @@ impl From<ExtensionOp> for CustomOp {
 ///
 /// [Extension]: crate::Extension
 #[derive(Clone, Debug)]
+#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 pub struct ExtensionOp {
     def: Arc<OpDef>,
     args: Vec<TypeArg>,
@@ -265,9 +268,12 @@ impl DataflowOpTrait for ExtensionOp {
 
 /// An opaquely-serialized op that refers to an as-yet-unresolved [`OpDef`]
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 pub struct OpaqueOp {
     extension: ExtensionId,
-    op_name: OpName,
+    #[cfg_attr(test, proptest(strategy = "crate::hugr::test::proptest::ANY_NONEMPTY_STRING_STRAT.prop_map_into()"))]
+    op_name: SmolStr,
+    #[cfg_attr(test, proptest(strategy = "crate::hugr::test::proptest::ArbStringKind::non_empty()"))]
     description: String, // cache in advance so description() can return &str
     args: Vec<TypeArg>,
     signature: FunctionType,

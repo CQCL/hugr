@@ -11,6 +11,7 @@ use super::{impl_op_name, OpTag, OpTrait};
 
 /// The root of a module, parent of all other `OpType`s.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 pub struct Module;
 
 impl_op_name!(Module);
@@ -33,8 +34,10 @@ impl OpTrait for Module {
 ///
 /// Children nodes are the body of the definition.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 pub struct FuncDefn {
     /// Name of function
+    #[cfg_attr(test, proptest(strategy = "crate::hugr::test::proptest::ANY_NONEMPTY_STRING_STRAT.prop_map_into()"))]
     pub name: String,
     /// Signature of the function
     pub signature: PolyFuncType,
@@ -67,8 +70,10 @@ impl OpTrait for FuncDefn {
 
 /// External function declaration, linked at runtime.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 pub struct FuncDecl {
     /// Name of function
+    #[cfg_attr(test, proptest(strategy = "crate::hugr::test::proptest::ArbStringKind::non_empty()"))]
     pub name: String,
     /// Signature of the function
     pub signature: PolyFuncType,
@@ -95,8 +100,10 @@ impl OpTrait for FuncDecl {
 
 /// A type alias definition, used only for debug/metadata.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 pub struct AliasDefn {
     /// Alias name
+    #[cfg_attr(test, proptest(strategy = "crate::hugr::test::proptest::ArbStringKind::non_empty().prop_map_into()"))]
     pub name: SmolStr,
     /// Aliased type
     pub definition: Type,
