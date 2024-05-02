@@ -465,13 +465,10 @@ impl Extension {
 
 #[cfg(test)]
 mod test {
-    
-    
+
     use std::num::NonZeroU64;
 
-    
-
-    use super::{SignatureFromArgs};
+    use super::SignatureFromArgs;
     use crate::builder::{DFGBuilder, Dataflow, DataflowHugr};
     use crate::extension::op_def::LowerFunc;
     use crate::extension::prelude::USIZE_T;

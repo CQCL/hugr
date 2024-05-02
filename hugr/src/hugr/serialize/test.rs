@@ -9,7 +9,7 @@ use crate::extension::{EMPTY_REG, PRELUDE_REGISTRY};
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::hugr::NodeType;
 use crate::ops::custom::{ExtensionOp, OpaqueOp};
-use crate::ops::{Value};
+use crate::ops::Value;
 use crate::ops::{dataflow::IOTrait, Input, Module, Noop, Output, DFG};
 use crate::std_extensions::arithmetic::float_ops::FLOAT_OPS_REGISTRY;
 use crate::std_extensions::arithmetic::float_types::{ConstF64, FLOAT64_TYPE};
@@ -370,7 +370,7 @@ fn serialize_types_roundtrip() {
 
 proptest! {
     #[test]
-    fn prop_roundtrip_type(t: Type) {
+    fn prop_roundtrip_type(t:  Type) {
         check_testing_roundtrip(t)
     }
 
@@ -382,5 +382,10 @@ proptest! {
     #[test]
     fn prop_roundtrip_value(t: Value) {
         check_testing_roundtrip(t)
+    }
+
+    #[test]
+    fn prop_roundtrip_optype(op in ((0..(std::u32::MAX / 2) as usize).prop_map(|x| portgraph::NodeIndex::new(x).into()), any::<Option<ExtensionSet>>(), any::<OpType>()).prop_map(|(parent, input_extensions, op)| NodeSer { parent, input_extensions, op })) {
+        check_testing_roundtrip(op)
     }
 }
