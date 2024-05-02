@@ -2,7 +2,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, ConfigDict
 
-from .ops import NodeID, OpType, classes
+from .ops import NodeID, OpType, classes as ops_classes
 from .tys import model_rebuild
 import hugr
 
@@ -37,7 +37,9 @@ class SerialHugr(BaseModel):
 
     @classmethod
     def _pydantic_rebuild(cls, config: ConfigDict = ConfigDict(), **kwargs):
-        model_rebuild([(cls.__name__, cls)] + classes, config=config, **kwargs)
+        my_classes = dict(ops_classes)
+        my_classes[cls.__name__] = cls
+        model_rebuild(my_classes, config=config, **kwargs)
 
     class Config:
         title = "Hugr"
