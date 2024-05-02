@@ -1,4 +1,4 @@
-{ pkgs, lib, config, inputs, ... }:
+{ pkgs, lib, inputs, ... }:
 let
   pkgs-stable = import inputs.nixpkgs-stable { system = pkgs.stdenv.system; };
 in
@@ -28,6 +28,8 @@ in
     cargo --version
     export LLVM_COV="${pkgs.llvmPackages_16.libllvm}/bin/llvm-cov"
     export LLVM_PROFDATA="${pkgs.llvmPackages_16.libllvm}/bin/llvm-profdata"
+
+    just setup
   '';
 
   languages.python = {
@@ -45,9 +47,6 @@ in
     enable = true;
     components = [ "rustc" "cargo" "clippy" "rustfmt" "rust-analyzer" ];
   };
-
-  # https://devenv.sh/processes/
-  # processes.ping.exec = "ping example.com";
 
   # See full reference at https://devenv.sh/reference/options/
 }
