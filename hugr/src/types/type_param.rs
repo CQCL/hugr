@@ -458,7 +458,8 @@ mod test {
                     .prop_map(|arg| Self::Opaque { arg })
                     .boxed(),
                 any_with::<TypeArgVariable>(depth)
-                    .prop_map(|v| Self::Variable { v }).boxed()
+                    .prop_map(|v| Self::Variable { v })
+                    .boxed(),
             ]);
             if !depth.leaf() {
                 strat = strat.or(vec(any_with::<Self>(depth.descend()), 0..3)

@@ -37,7 +37,10 @@ impl OpTrait for Module {
 #[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 pub struct FuncDefn {
     /// Name of function
-    #[cfg_attr(test, proptest(strategy = "crate::hugr::test::proptest::ANY_NONEMPTY_STRING_STRAT.prop_map_into()"))]
+    #[cfg_attr(
+        test,
+        proptest(strategy = "crate::hugr::test::proptest::any_nonempty_string()")
+    )]
     pub name: String,
     /// Signature of the function
     pub signature: PolyFuncType,
@@ -73,7 +76,10 @@ impl OpTrait for FuncDefn {
 #[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 pub struct FuncDecl {
     /// Name of function
-    #[cfg_attr(test, proptest(strategy = "crate::hugr::test::proptest::ArbStringKind::non_empty()"))]
+    #[cfg_attr(
+        test,
+        proptest(strategy = "crate::hugr::test::proptest::any_nonempty_string()")
+    )]
     pub name: String,
     /// Signature of the function
     pub signature: PolyFuncType,
@@ -103,7 +109,10 @@ impl OpTrait for FuncDecl {
 #[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 pub struct AliasDefn {
     /// Alias name
-    #[cfg_attr(test, proptest(strategy = "crate::hugr::test::proptest::ArbStringKind::non_empty().prop_map_into()"))]
+    #[cfg_attr(
+        test,
+        proptest(strategy = "crate::hugr::test::proptest::any_nonempty_smolstr()")
+    )]
     pub name: SmolStr,
     /// Aliased type
     pub definition: Type,
@@ -169,10 +178,9 @@ mod test {
         type Parameters = ();
         type Strategy = BoxedStrategy<Self>;
         fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-            use crate::hugr::test::proptest::ArbStringKind;
-            let name = ArbStringKind::non_empty();
+            use crate::hugr::test::proptest::any_ident_string;
             let bound = any::<TypeBound>();
-            (name, bound)
+            (any_ident_string(), bound)
                 .prop_map(|(name, bound)| Self::new(name, bound))
                 .boxed()
         }

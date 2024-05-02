@@ -466,7 +466,7 @@ impl Extension {
 #[cfg(test)]
 mod test {
     use proptest::prelude::*;
-    use std::collections::HashMap;
+    use std::collections::{HashMap, HashSet};
     use std::num::NonZeroU64;
 
     use smol_str::SmolStr;
@@ -488,38 +488,19 @@ mod test {
         const EXT_ID: ExtensionId = "MyExt";
     }
 
-    impl Arbitrary for OpDef {
-        type Parameters = ();
-        type Strategy = BoxedStrategy<Self>;
-        fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-            use proptest::collection::vec;
-    // /// The unique Extension owning this OpDef (of which this OpDef is a member)
-    // extension: ExtensionId,
-    // /// Unique identifier of the operation. Used to look up OpDefs in the registry
-    // /// when deserializing nodes (which store only the name).
-    // name: SmolStr,
-    // /// Human readable description of the operation.
-    // description: String,
-    // /// Miscellaneous data associated with the operation.
-    // #[serde(default, skip_serializing_if = "HashMap::is_empty")]
-    // misc: HashMap<String, serde_yaml::Value>,
+    // impl Arbitrary for OpDef {
+    //     type Parameters = ();
+    //     type Strategy = BoxedStrategy<Self>;
+    //     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+    //         use proptest::collection::{vec, hash_map};
+    //         use crate::hugr::test::proptest::{any_string,any_serde_yaml_value};
+    //         let signature_func: BoxedStrategy<SignatureFunc> = todo!();
+    //         let lower_funcs: BoxedStrategy<LowerFunc> = todo!();
+    //         let misc = hash_map(any_string(), any_serde_yaml_value(), 0..3);
+    //         (any::<ExtensionId>(), any_string(), any_string(), misc, signature_func, vec(lower_funcs, 0..2)).prop_map(|(extension, name, description, misc, signature_func, lower_funcs)| OpDef { extension, name, description, misc, signature_func, lower_funcs, constant_folder: None} )
+    //     }
 
-    // #[serde(flatten)]
-    // signature_func: SignatureFunc,
-    // // Some operations cannot lower themselves and tools that do not understand them
-    // // can only treat them as opaque/black-box ops.
-    // #[serde(flatten)]
-    // lower_funcs: Vec<LowerFunc>,
-
-    // /// Operations can optionally implement [`ConstFold`] to implement constant folding.
-    // #[serde(skip)]
-    // constant_folder: Option<Box<dyn ConstFold>>,
-            let signature_func: BoxedStrategy<SignatureFunc> = todo!();
-            (signature_func, vec(todo!(), 0..2)).prop_flat_map(|(signature_func, lower_funcs)|
-                (any::<ExtensionId>(), crate::hugr::test::proptest::ArbStringKind::non_empty(), any::<HashMap<String,serde_yaml::Value>>).prop_map(|(extension,name, description, misc)| OpDef { extension, name, description, misc, signature_func, lower_funcs, constant_folder: None} ))
-        }
-
-    }
+    // }
 
     #[test]
     fn op_def_with_type_scheme() -> Result<(), Box<dyn std::error::Error>> {

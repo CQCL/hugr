@@ -104,6 +104,7 @@ class TypeParam(RootModel):
 # --------------- TypeArg ------------------
 # ------------------------------------------
 
+
 class TypeTypeArg(ConfiguredBaseModel):
     tya: Literal["Type"] = "Type"
     ty: "Type"

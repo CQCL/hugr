@@ -10,7 +10,8 @@ pub static PATH_COMPONENT_REGEX_STR: &str = r"[\w--\d]\w*";
 #[cfg(test)]
 pub static PATH_COMPONENT_NICE_REGEX_STR: &str = r"[[:alpha:]][[[:alpha:]]0-9]*";
 lazy_static! {
-    pub static ref PATH_REGEX: Regex = Regex::new(&format!(r"^{0}(\.{0})*$", PATH_COMPONENT_REGEX_STR)).unwrap();
+    pub static ref PATH_REGEX: Regex =
+        Regex::new(&format!(r"^{0}(\.{0})*$", PATH_COMPONENT_REGEX_STR)).unwrap();
 }
 
 #[derive(
@@ -102,13 +103,19 @@ mod test {
         type Parameters = ();
         type Strategy = BoxedStrategy<Self>;
         fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-            use crate::hugr::test::proptest;
+            use crate::hugr::test::proptest::any_ident_string;
             use proptest::collection::vec;
             // we shrink to more readable (i.e. :alpha:) names
-            vec(proptest::ANY_IDENT_STRING_STRAT, 1..2)
+            vec(any_ident_string(), 1..2)
                 .prop_map(|vs| {
-                    IdentList::new(itertools::intersperse(vs.into_iter().map(Into::<String>::into), ".".into()).collect::<String>())
-                        .unwrap()
+                    IdentList::new(
+                        itertools::intersperse(
+                            vs.into_iter().map(Into::<String>::into),
+                            ".".into(),
+                        )
+                        .collect::<String>(),
+                    )
+                    .unwrap()
                 })
                 .boxed()
         }

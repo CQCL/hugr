@@ -157,17 +157,16 @@ mod test {
         type Parameters = crate::types::test::TypeDepth;
         type Strategy = BoxedStrategy<Self>;
         fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
-            use crate::hugr::test::proptest::ArbStringKind;
+            use crate::hugr::test::proptest::any_nonempty_string;
             use proptest::collection::vec;
             let extension = any::<ExtensionId>();
-            let id = ArbStringKind::non_empty().prop_map(Into::<TypeName>::into);
             let args = if depth.leaf() {
                 Just(vec![]).boxed()
             } else {
                 vec(any_with::<TypeArg>(depth.descend()), 0..3).boxed()
             };
             let bound = any::<TypeBound>();
-            (id, args, extension, bound)
+            (any_nonempty_string(), args, extension, bound)
                 .prop_map(|(id, args, extension, bound)| Self::new(id, args, extension, bound))
                 .boxed()
         }

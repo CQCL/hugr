@@ -27,7 +27,6 @@ use portgraph::{
 };
 use proptest::prelude::*;
 
-
 const NAT: Type = crate::extension::prelude::USIZE_T;
 const QB: Type = crate::extension::prelude::QB_T;
 
