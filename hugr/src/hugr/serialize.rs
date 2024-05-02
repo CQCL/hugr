@@ -79,6 +79,7 @@ struct SerTestingV1 {
     sum_type: Option<crate::types::SumType>,
     poly_func_type: Option<crate::types::PolyFuncType>,
     value: Option<crate::ops::Value>,
+    optype: Option<NodeSer>,
 }
 
 macro_rules! impl_sertesting_from {
@@ -98,6 +99,7 @@ impl_sertesting_from!(crate::types::Type, typ);
 impl_sertesting_from!(crate::types::SumType, sum_type);
 impl_sertesting_from!(crate::types::PolyFuncType, poly_func_type);
 impl_sertesting_from!(crate::ops::Value, value);
+impl_sertesting_from!(NodeSer, optype);
 
 /// Errors that can occur while serializing a HUGR.
 #[derive(Debug, Clone, PartialEq, Error)]
