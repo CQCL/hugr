@@ -323,6 +323,7 @@ impl LoadConstant {
 
 /// Load a static function in to the local dataflow graph.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 pub struct LoadFunction {
     /// Signature of the function
     func_sig: PolyFuncType,

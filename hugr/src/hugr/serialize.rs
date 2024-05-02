@@ -82,25 +82,6 @@ struct SerTestingV1 {
     optype: Option<NodeSer>,
 }
 
-macro_rules! impl_sertesting_from {
-    ($typ:ty, $field:ident) => {
-        #[cfg(test)]
-        impl From<$typ> for SerTestingV1 {
-            fn from(v: $typ) -> Self {
-                let mut r: Self = Default::default();
-                r.$field = Some(v);
-                r
-            }
-        }
-    };
-}
-
-impl_sertesting_from!(crate::types::Type, typ);
-impl_sertesting_from!(crate::types::SumType, sum_type);
-impl_sertesting_from!(crate::types::PolyFuncType, poly_func_type);
-impl_sertesting_from!(crate::ops::Value, value);
-impl_sertesting_from!(NodeSer, optype);
-
 /// Errors that can occur while serializing a HUGR.
 #[derive(Debug, Clone, PartialEq, Error)]
 #[non_exhaustive]

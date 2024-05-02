@@ -465,17 +465,17 @@ impl Extension {
 
 #[cfg(test)]
 mod test {
-    use proptest::prelude::*;
-    use std::collections::{HashMap, HashSet};
+    
+    
     use std::num::NonZeroU64;
 
-    use smol_str::SmolStr;
+    
 
-    use super::{OpDef, SignatureFromArgs};
+    use super::{SignatureFromArgs};
     use crate::builder::{DFGBuilder, Dataflow, DataflowHugr};
     use crate::extension::op_def::LowerFunc;
     use crate::extension::prelude::USIZE_T;
-    use crate::extension::{ExtensionId, ExtensionRegistry, ExtensionSet, SignatureFunc, PRELUDE};
+    use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE};
     use crate::extension::{SignatureError, EMPTY_REG, PRELUDE_REGISTRY};
     use crate::ops::{CustomOp, OpName};
     use crate::std_extensions::collections::{EXTENSION, LIST_TYPENAME};

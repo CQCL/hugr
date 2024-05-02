@@ -3,13 +3,13 @@ use crate::builder::{
     test::closed_dfg_root_hugr, Container, DFGBuilder, Dataflow, DataflowHugr,
     DataflowSubContainer, HugrBuilder, ModuleBuilder,
 };
-use crate::extension::prelude::{BOOL_T, PRELUDE_ID, QB_T, USIZE_T};
+use crate::extension::prelude::{BOOL_T, USIZE_T};
 use crate::extension::simple_op::MakeRegisteredOp;
 use crate::extension::{EMPTY_REG, PRELUDE_REGISTRY};
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::hugr::NodeType;
 use crate::ops::custom::{ExtensionOp, OpaqueOp};
-use crate::ops::{self, Value};
+use crate::ops::{Value};
 use crate::ops::{dataflow::IOTrait, Input, Module, Noop, Output, DFG};
 use crate::std_extensions::arithmetic::float_ops::FLOAT_OPS_REGISTRY;
 use crate::std_extensions::arithmetic::float_types::{ConstF64, FLOAT64_TYPE};
@@ -63,6 +63,25 @@ include_schema!(
     TESTING_SCHEMA_STRICT,
     "../../../../specification/schema/testing_hugr_schema_strict_v1.json"
 );
+
+macro_rules! impl_sertesting_from {
+    ($typ:ty, $field:ident) => {
+        #[cfg(test)]
+        impl From<$typ> for TestingModel {
+            fn from(v: $typ) -> Self {
+                let mut r: Self = Default::default();
+                r.$field = Some(v);
+                r
+            }
+        }
+    };
+}
+
+impl_sertesting_from!(crate::types::Type, typ);
+impl_sertesting_from!(crate::types::SumType, sum_type);
+impl_sertesting_from!(crate::types::PolyFuncType, poly_func_type);
+impl_sertesting_from!(crate::ops::Value, value);
+impl_sertesting_from!(NodeSer, optype);
 
 #[test]
 fn empty_hugr_serialize() {
@@ -357,11 +376,11 @@ proptest! {
 
     #[test]
     fn prop_roundtrip_poly_func_type(t: PolyFuncType) {
-        check_testing_roundtrip(t.into())
+        check_testing_roundtrip(t)
     }
 
     #[test]
     fn prop_roundtrip_value(t: Value) {
-        check_testing_roundtrip(t.into())
+        check_testing_roundtrip(t)
     }
 }

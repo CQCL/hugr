@@ -356,11 +356,6 @@ pub(crate) mod test {
         use proptest::prelude::*;
         use smol_str::SmolStr;
 
-        pub enum ArbStringKind {
-            NonEmpty,
-            Ident,
-        }
-
         lazy_static! {
             static ref ANY_IDENT_STRING: SBoxedStrategy<String> = {
                 use proptest::string::string_regex;
@@ -386,48 +381,48 @@ pub(crate) mod test {
                 ].sboxed()
             };
 
-            static ref ANY_SERDE_YAML_VALUE: SBoxedStrategy<serde_yaml::Value> = {
-                use serde_yaml::value::{Tag, TaggedValue, Value};
-                proptest::collection::vec;
-                prop_oneof![
-                    Just(Value::Null),
-                    any::<bool>().prop_map_into(),
-                    any::<u64>().prop_map_into(),
-                    any::<i64>().prop_map_into(),
-                    any::<f64>().prop_map_into(),
-                    Just(Value::Number(3.into())),
-                    ANY_STRING.clone().prop_map_into(),
-                ].prop_recursive(
-                    3,  // No more than 3 branch levels deep
-                    32, // Target around 32 total elements
-                    3,  // Each collection is up to 3 elements long
-                    |element| prop_oneof![
-                        (ANY_STRING.clone().prop_map(Tag::new), element.clone()).prop_map(|(tag, value)| Value::Tagged(Box::new(TaggedValue { tag, value }))),
-                        proptest::collection::vec(element.clone(), 0..3).prop_map_into(),
-                    ]
-                ).sboxed()
-            };
+            // static ref ANY_SERDE_YAML_VALUE: SBoxedStrategy<serde_yaml::Value> = {
+            //     use serde_yaml::value::{Tag, TaggedValue, Value};
+            //     proptest::collection::vec;
+            //     prop_oneof![
+            //         Just(Value::Null),
+            //         any::<bool>().prop_map_into(),
+            //         any::<u64>().prop_map_into(),
+            //         any::<i64>().prop_map_into(),
+            //         any::<f64>().prop_map_into(),
+            //         Just(Value::Number(3.into())),
+            //         any_string().prop_map_into(),
+            //     ].sboxed().prop_recursive(
+            //         3,  // No more than 3 branch levels deep
+            //         32, // Target around 32 total elements
+            //         3,  // Each collection is up to 3 elements long
+            //         |element| prop_oneof![
+            //             (any_string().prop_map(Tag::new), element.clone()).prop_map(|(tag, value)| Value::Tagged(Box::new(TaggedValue { tag, value }))),
+            //             proptest::collection::vec(element.clone(), 0..3).prop_map_into(),
+            //         ]
+            //     ).sboxed()
+            // };
         }
 
-        pub fn any_nonempty_string() -> impl Strategy<Value = String> + Sync {
+        pub fn any_nonempty_string() -> SBoxedStrategy<String> {
             ANY_NONEMPTY_STRING.clone()
         }
 
-        pub fn any_nonempty_smolstr() -> impl Strategy<Value = SmolStr> + Sync {
-            ANY_NONEMPTY_STRING.clone().prop_map_into()
+        pub fn any_nonempty_smolstr() -> SBoxedStrategy<SmolStr> {
+            ANY_NONEMPTY_STRING.clone().prop_map_into().sboxed()
         }
 
-        pub fn any_ident_string() -> impl Strategy<Value = String> + Sync {
+        pub fn any_ident_string() -> SBoxedStrategy<String> {
             ANY_IDENT_STRING.clone()
         }
 
-        pub fn any_string() -> impl Strategy<Value = String> + Sync {
-            ANY_STRING.clone()
-        }
+        // pub fn any_string() -> SBoxedStrategy<String> {
+        //     ANY_STRING.clone()
+        // }
 
-        pub fn any_serde_yaml_value() -> impl Strategy<Value = serde_yaml::Value> {
-            ANY_SERDE_YAML_VALUE.clone()
-        }
+        // pub fn any_serde_yaml_value() -> SBoxedStrategy<serde_yaml::Value> {
+        //     ANY_SERDE_YAML_VALUE.clone()
+        // }
     }
 
     #[test]

@@ -145,7 +145,7 @@ mod test {
 
     use crate::{
         extension::ExtensionId,
-        types::{TypeArg, TypeBound, TypeName},
+        types::{TypeArg, TypeBound},
     };
 
     lazy_static! {
