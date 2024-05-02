@@ -1,7 +1,7 @@
 import inspect
 import sys
 from enum import Enum
-from typing import Annotated, Any, Literal, Optional, Union, Mapping
+from typing import Annotated, Any, Literal, Union, Mapping
 
 from pydantic import (
     BaseModel,
@@ -28,6 +28,7 @@ def _json_custom_error_validator(
 
     Used to define named recursive alias types.
     """
+    return handler(value)
     try:
         return handler(value)
     except ValidationError as err:
@@ -38,6 +39,7 @@ def _json_custom_error_validator(
 
 
 ExtensionId = str
+ExtensionSet = list[ExtensionId]
 
 default_model_config = ConfigDict()
 
@@ -48,12 +50,6 @@ class ConfiguredBaseModel(BaseModel):
     @classmethod
     def set_model_config(cls, config: ConfigDict):
         cls.model_config = config
-
-
-class ExtensionSet(RootModel):
-    """A set of extensions ids."""
-
-    root: Optional[list[ExtensionId]] = Field(default=None)
 
 
 # --------------------------------------------
@@ -219,7 +215,7 @@ class FunctionType(ConfiguredBaseModel):
 
     @classmethod
     def empty(cls) -> "FunctionType":
-        return FunctionType(input=[], output=[], extension_reqs=ExtensionSet([]))
+        return FunctionType(input=[], output=[], extension_reqs=[])
 
     class Config:
         # Needed to avoid random '\n's in the pydantic description
