@@ -154,3 +154,6 @@ pub use crate::core::{
 };
 pub use crate::extension::Extension;
 pub use crate::hugr::{Hugr, HugrView, SimpleReplacement};
+
+#[cfg(all(feature = "proptest", test))]
+pub mod proptest;

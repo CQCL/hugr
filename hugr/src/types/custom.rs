@@ -140,58 +140,53 @@ impl From<CustomType> for Type {
 
 #[cfg(test)]
 pub mod test {
-    use lazy_static::lazy_static;
-    use proptest::prelude::*;
 
-    use crate::{
-        extension::ExtensionId,
-        types::{test::TypeDepth, TypeArg, TypeBound},
-    };
+    #[cfg(feature = "proptest")]
+    pub mod proptest {
+        use crate::extension::ExtensionId;
+        use crate::proptest::TypeDepth;
+        use crate::types::type_param::TypeArg;
+        use crate::types::{CustomType, TypeBound};
+        use ::proptest::prelude::*;
 
-    lazy_static! {
-        static ref NICE_ID_REGEX: regex_syntax::hir::Hir =
-            regex_syntax::parse(r"[[:alpha:]]+").unwrap();
-        static ref ID_REGEX: regex_syntax::hir::Hir = regex_syntax::parse(r".+").unwrap();
-    }
+        #[derive(Default)]
+        pub struct CustomTypeArbitraryParameters(TypeDepth, Option<TypeBound>);
 
-    #[derive(Default)]
-    pub struct CustomTypeArbitraryParameters(TypeDepth, Option<TypeBound>);
-
-    impl From<TypeDepth> for CustomTypeArbitraryParameters {
-        fn from(v: TypeDepth) -> Self {
-            Self::new(v)
-        }
-    }
-
-    impl CustomTypeArbitraryParameters {
-        pub fn with_bound(mut self, bound: TypeBound) -> Self {
-            self.1 = Some(bound);
-            self
+        impl From<TypeDepth> for CustomTypeArbitraryParameters {
+            fn from(v: TypeDepth) -> Self {
+                Self::new(v)
+            }
         }
 
-        pub fn new(depth: TypeDepth) -> Self {
-            Self(depth, None)
-        }
-    }
+        impl CustomTypeArbitraryParameters {
+            pub fn with_bound(mut self, bound: TypeBound) -> Self {
+                self.1 = Some(bound);
+                self
+            }
 
-    impl Arbitrary for super::CustomType {
-        type Parameters = CustomTypeArbitraryParameters;
-        type Strategy = BoxedStrategy<Self>;
-        fn arbitrary_with(
-            CustomTypeArbitraryParameters(depth, mb_bound): Self::Parameters,
-        ) -> Self::Strategy {
-            use crate::hugr::test::proptest::any_nonempty_string;
-            use proptest::collection::vec;
-            let extension = any::<ExtensionId>();
-            let bound = mb_bound.map_or(any::<TypeBound>().boxed(), |x| Just(x).boxed());
-            let args = if depth.leaf() {
-                Just(vec![]).boxed()
-            } else {
-                vec(any_with::<TypeArg>(depth.descend()), 0..3).boxed()
-            };
-            (any_nonempty_string(), args, extension, bound)
-                .prop_map(|(id, args, extension, bound)| Self::new(id, args, extension, bound))
-                .boxed()
+            pub fn new(depth: TypeDepth) -> Self {
+                Self(depth, None)
+            }
+        }
+        impl Arbitrary for CustomType {
+            type Parameters = CustomTypeArbitraryParameters;
+            type Strategy = BoxedStrategy<Self>;
+            fn arbitrary_with(
+                CustomTypeArbitraryParameters(depth, mb_bound): Self::Parameters,
+            ) -> Self::Strategy {
+                use crate::proptest::any_nonempty_string;
+                use proptest::collection::vec;
+                let extension = any::<ExtensionId>();
+                let bound = mb_bound.map_or(any::<TypeBound>().boxed(), |x| Just(x).boxed());
+                let args = if depth.leaf() {
+                    Just(vec![]).boxed()
+                } else {
+                    vec(any_with::<TypeArg>(depth.descend()), 0..3).boxed()
+                };
+                (any_nonempty_string(), args, extension, bound)
+                    .prop_map(|(id, args, extension, bound)| Self::new(id, args, extension, bound))
+                    .boxed()
+            }
         }
     }
 }

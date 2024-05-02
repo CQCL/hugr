@@ -554,27 +554,31 @@ impl FromIterator<ExtensionId> for ExtensionSet {
 #[cfg(test)]
 mod test {
 
-    use proptest::{collection::hash_set, prelude::*};
+    #[cfg(feature = "proptest")]
+    mod proptest {
 
-    use crate::extension::ExtensionId;
-    impl Arbitrary for super::ExtensionSet {
-        type Parameters = ();
-        type Strategy = BoxedStrategy<Self>;
-        fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-            let vars = hash_set(0..10usize, 0..3);
-            let extensions = hash_set(any::<ExtensionId>(), 0..3);
-            (vars, extensions)
-                .prop_map(|(vars, extensions)| {
-                    let mut r = Self::new();
-                    for v in vars {
-                        r.insert_type_var(v);
-                    }
-                    for e in extensions {
-                        r.insert(&e)
-                    }
-                    r
-                })
-                .boxed()
+        use ::proptest::{collection::hash_set, prelude::*};
+
+        use super::super::{ExtensionId, ExtensionSet};
+        impl Arbitrary for ExtensionSet {
+            type Parameters = ();
+            type Strategy = BoxedStrategy<Self>;
+            fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+                let vars = hash_set(0..10usize, 0..3);
+                let extensions = hash_set(any::<ExtensionId>(), 0..3);
+                (vars, extensions)
+                    .prop_map(|(vars, extensions)| {
+                        let mut r = Self::new();
+                        for v in vars {
+                            r.insert_type_var(v);
+                        }
+                        for e in extensions {
+                            r.insert(&e)
+                        }
+                        r
+                    })
+                    .boxed()
+            }
         }
     }
 }

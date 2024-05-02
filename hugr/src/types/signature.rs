@@ -221,7 +221,6 @@ impl Display for FunctionType {
 #[cfg(test)]
 mod test {
     use crate::{extension::prelude::USIZE_T, type_row};
-    use proptest::prelude::*;
 
     use super::*;
     #[test]
@@ -246,20 +245,27 @@ mod test {
         assert_eq!(f_type.output_types(), &[USIZE_T]);
     }
 
-    impl Arbitrary for super::FunctionType {
-        type Parameters = crate::types::test::TypeDepth;
-        type Strategy = BoxedStrategy<Self>;
-        fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
-            let input = any_with::<TypeRow>(depth);
-            let output = any_with::<TypeRow>(depth);
-            let extension = any::<ExtensionSet>();
-            (input, output, extension)
-                .prop_map(|(input, output, extension_reqs)| FunctionType {
-                    input,
-                    output,
-                    extension_reqs,
-                })
-                .boxed()
+    #[cfg(feature = "proptest")]
+    mod proptest {
+        use crate::extension::ExtensionSet;
+        use crate::proptest::TypeDepth;
+        use crate::types::{FunctionType, TypeRow};
+        use ::proptest::prelude::*;
+        impl Arbitrary for super::FunctionType {
+            type Parameters = TypeDepth;
+            type Strategy = BoxedStrategy<Self>;
+            fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
+                let input = any_with::<TypeRow>(depth);
+                let output = any_with::<TypeRow>(depth);
+                let extension = any::<ExtensionSet>();
+                (input, output, extension)
+                    .prop_map(|(input, output, extension_reqs)| FunctionType {
+                        input,
+                        output,
+                        extension_reqs,
+                    })
+                    .boxed()
+            }
         }
     }
 }

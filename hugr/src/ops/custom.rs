@@ -267,17 +267,17 @@ impl DataflowOpTrait for ExtensionOp {
 
 /// An opaquely-serialized op that refers to an as-yet-unresolved [`OpDef`]
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
+#[cfg_attr(all(test, feature = "proptest"), derive(proptest_derive::Arbitrary))]
 pub struct OpaqueOp {
     extension: ExtensionId,
     #[cfg_attr(
-        test,
-        proptest(strategy = "crate::hugr::test::proptest::any_nonempty_smolstr()")
+        all(test, feature = "proptest"),
+        proptest(strategy = "crate::proptest::any_nonempty_smolstr()")
     )]
     op_name: SmolStr,
     #[cfg_attr(
-        test,
-        proptest(strategy = "crate::hugr::test::proptest::any_nonempty_string()")
+        all(test, feature = "proptest"),
+        proptest(strategy = "crate::proptest::any_nonempty_string()")
     )]
     description: String, // cache in advance so description() can return &str
     args: Vec<TypeArg>,
@@ -428,15 +428,6 @@ mod test {
     use crate::extension::prelude::{QB_T, USIZE_T};
 
     use super::*;
-    use proptest::prelude::*;
-
-    impl Arbitrary for CustomOp {
-        type Parameters = ();
-        type Strategy = BoxedStrategy<Self>;
-        fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-            any::<OpaqueOp>().prop_map_into().boxed()
-        }
-    }
 
     #[test]
     fn new_opaque_op() {
@@ -455,5 +446,18 @@ mod test {
         assert_eq!(op.signature(), sig);
         assert!(op.is_opaque());
         assert!(!op.is_extension_op());
+    }
+
+    #[cfg(feature = "proptest")]
+    mod proptest {
+        use ::proptest::prelude::*;
+
+        impl Arbitrary for super::super::CustomOp {
+            type Parameters = ();
+            type Strategy = BoxedStrategy<Self>;
+            fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+                any::<super::super::OpaqueOp>().prop_map_into().boxed()
+            }
+        }
     }
 }

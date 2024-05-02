@@ -10,7 +10,7 @@ use super::{OpName, OpTag};
 
 /// Tail-controlled loop.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
+#[cfg_attr(all(test, feature = "proptest"), derive(proptest_derive::Arbitrary))]
 pub struct TailLoop {
     /// Types that are only input
     pub just_inputs: TypeRow,
@@ -53,7 +53,7 @@ impl TailLoop {
 
 /// Conditional operation, defined by child `Case` nodes for each branch.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
+#[cfg_attr(all(test, feature = "proptest"), derive(proptest_derive::Arbitrary))]
 pub struct Conditional {
     /// The possible rows of the Sum input
     pub sum_rows: Vec<TypeRow>,
@@ -93,7 +93,7 @@ impl Conditional {
 /// A dataflow node which is defined by a child CFG.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[allow(missing_docs)]
-#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
+#[cfg_attr(all(test, feature = "proptest"), derive(proptest_derive::Arbitrary))]
 pub struct CFG {
     pub signature: FunctionType,
 }
@@ -113,7 +113,7 @@ impl DataflowOpTrait for CFG {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
+#[cfg_attr(all(test, feature = "proptest"), derive(proptest_derive::Arbitrary))]
 /// A CFG basic block node. The signature is that of the internal Dataflow graph.
 #[allow(missing_docs)]
 pub struct DataflowBlock {
@@ -124,7 +124,7 @@ pub struct DataflowBlock {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
+#[cfg_attr(all(test, feature = "proptest"), derive(proptest_derive::Arbitrary))]
 /// The single exit node of the CFG. Has no children,
 /// stores the types of the CFG node output.
 pub struct ExitBlock {
@@ -246,7 +246,7 @@ impl BasicBlock for ExitBlock {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
+#[cfg_attr(all(test, feature = "proptest"), derive(proptest_derive::Arbitrary))]
 /// Case ops - nodes valid inside Conditional nodes.
 pub struct Case {
     /// The signature of the contained dataflow graph.

@@ -9,14 +9,13 @@ use crate::extension::{EMPTY_REG, PRELUDE_REGISTRY};
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::hugr::NodeType;
 use crate::ops::custom::{ExtensionOp, OpaqueOp};
-use crate::ops::Value;
 use crate::ops::{dataflow::IOTrait, Input, Module, Noop, Output, DFG};
 use crate::std_extensions::arithmetic::float_ops::FLOAT_OPS_REGISTRY;
 use crate::std_extensions::arithmetic::float_types::{ConstF64, FLOAT64_TYPE};
 
 use crate::std_extensions::logic::NotOp;
 
-use crate::types::{FunctionType, PolyFuncType, Type};
+use crate::types::{FunctionType, Type};
 use crate::{type_row, OutgoingPort};
 use itertools::Itertools;
 use jsonschema::{Draft, JSONSchema};
@@ -25,7 +24,6 @@ use portgraph::LinkView;
 use portgraph::{
     multiportgraph::MultiPortGraph, Hierarchy, LinkMut, PortMut, PortView, UnmanagedDenseMap,
 };
-use proptest::prelude::*;
 
 const NAT: Type = crate::extension::prelude::USIZE_T;
 const QB: Type = crate::extension::prelude::QB_T;
@@ -171,6 +169,7 @@ pub fn check_hugr_roundtrip(hugr: &Hugr, check_schema: bool) -> Hugr {
     new_hugr
 }
 
+#[allow(unused)]
 fn check_testing_roundtrip(t: impl Into<TestingModel>) {
     let before = Versioned::new(t.into());
     let after_strict = ser_roundtrip_validate(&before, Some(&TESTING_SCHEMA_STRICT));
@@ -368,24 +367,34 @@ fn serialize_types_roundtrip() {
     assert_eq!(ser_roundtrip(&t), t);
 }
 
-proptest! {
-    #[test]
-    fn prop_roundtrip_type(t:  Type) {
-        check_testing_roundtrip(t)
-    }
+#[cfg(feature = "proptest")]
+mod proptest {
+    use super::super::NodeSer;
+    use super::check_testing_roundtrip;
+    use crate::extension::ExtensionSet;
+    use crate::ops::{OpType, Value};
+    use crate::types::{PolyFuncType, Type};
+    use proptest::prelude::*;
 
-    #[test]
-    fn prop_roundtrip_poly_func_type(t: PolyFuncType) {
-        check_testing_roundtrip(t)
-    }
+    proptest! {
+        #[test]
+        fn prop_roundtrip_type(t:  Type) {
+            check_testing_roundtrip(t)
+        }
 
-    #[test]
-    fn prop_roundtrip_value(t: Value) {
-        check_testing_roundtrip(t)
-    }
+        #[test]
+        fn prop_roundtrip_poly_func_type(t: PolyFuncType) {
+            check_testing_roundtrip(t)
+        }
 
-    #[test]
-    fn prop_roundtrip_optype(op in ((0..(std::u32::MAX / 2) as usize).prop_map(|x| portgraph::NodeIndex::new(x).into()), any::<Option<ExtensionSet>>(), any::<OpType>()).prop_map(|(parent, input_extensions, op)| NodeSer { parent, input_extensions, op })) {
-        check_testing_roundtrip(op)
+        #[test]
+        fn prop_roundtrip_value(t: Value) {
+            check_testing_roundtrip(t)
+        }
+
+        #[test]
+        fn prop_roundtrip_optype(op in ((0..(std::u32::MAX / 2) as usize). prop_map(|x| portgraph::NodeIndex::new(x).into()), any::<Option<ExtensionSet>>(), any::<OpType>()).prop_map(|(parent, input_extensions, op)| NodeSer { parent, input_extensions, op })) {
+            check_testing_roundtrip(op)
+        }
     }
 }

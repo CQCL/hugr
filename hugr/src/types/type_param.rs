@@ -20,7 +20,7 @@ use super::{check_typevar_decl, CustomType, Substitution, Type, TypeBound};
     Clone, Debug, PartialEq, Eq, derive_more::Display, serde::Deserialize, serde::Serialize,
 )]
 #[display(fmt = "{}", "_0.map(|i|i.to_string()).unwrap_or(\"-\".to_string())")]
-#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
+#[cfg_attr(all(test, feature = "proptest"), derive(proptest_derive::Arbitrary))]
 pub struct UpperBound(Option<NonZeroU64>);
 impl UpperBound {
     fn valid_value(&self, val: u64) -> bool {
@@ -377,97 +377,100 @@ pub enum TypeArgError {
 
 #[cfg(test)]
 mod test {
-    use crate::extension::ExtensionSet;
-    use crate::hugr::test::proptest::any_serde_yaml_value;
-    use crate::types::custom::test::CustomTypeArbitraryParameters;
-    use crate::types::type_param::TypeArgVariable;
-    use crate::types::{CustomType, Type, TypeBound};
-    use proptest::prelude::*;
 
-    use super::CustomTypeArg;
+    #[cfg(feature = "proptest")]
+    mod proptest {
 
-    impl Arbitrary for super::CustomTypeArg {
-        type Parameters = crate::types::test::TypeDepth;
-        type Strategy = BoxedStrategy<Self>;
-        fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
-            (
-                any_with::<CustomType>(
-                    CustomTypeArbitraryParameters::new(depth).with_bound(TypeBound::Eq),
-                ),
-                any_serde_yaml_value(),
-            )
-                .prop_map(|(ct, value)| CustomTypeArg::new(ct, value.clone()).unwrap())
-                .boxed()
-        }
-    }
+        use proptest::prelude::*;
 
-    impl Arbitrary for super::TypeArgVariable {
-        type Parameters = crate::types::test::TypeDepth;
-        type Strategy = BoxedStrategy<Self>;
-        fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
-            (any::<usize>(), any_with::<super::TypeParam>(depth))
-                .prop_map(|(idx, cached_decl)| Self { idx, cached_decl })
-                .boxed()
-        }
-    }
+        use super::super::{CustomTypeArg, TypeArg, TypeArgVariable, TypeParam, UpperBound};
+        use crate::extension::ExtensionSet;
+        use crate::proptest::{any_serde_yaml_value, TypeDepth};
+        use crate::types::{CustomType, Type, TypeBound};
 
-    impl Arbitrary for super::TypeParam {
-        type Parameters = crate::types::test::TypeDepth;
-        type Strategy = BoxedStrategy<Self>;
-        fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
-            use proptest::collection::vec;
-            use proptest::strategy::Union;
-            let mut strat = Union::new([
-                Just(Self::Extensions).boxed(),
-                any::<TypeBound>().prop_map(|b| Self::Type { b }).boxed(),
-                any::<super::UpperBound>()
-                    .prop_map(|bound| Self::BoundedNat { bound })
-                    .boxed(),
-                any_with::<CustomType>(depth.into())
-                    .prop_map(|ty| Self::Opaque { ty })
-                    .boxed(),
-            ]);
-            if !depth.leaf() {
-                strat = strat
-                    .or(any_with::<Self>(depth.descend())
-                        .prop_map(|x| Self::List { param: Box::new(x) })
-                        .boxed())
-                    .or(vec(any_with::<Self>(depth.descend()), 0..3)
-                        .prop_map(|params| Self::Tuple { params })
-                        .boxed())
+        impl Arbitrary for CustomTypeArg {
+            type Parameters = TypeDepth;
+            type Strategy = BoxedStrategy<Self>;
+            fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
+                (
+                    any_with::<CustomType>(
+                        <CustomType as Arbitrary>::Parameters::new(depth).with_bound(TypeBound::Eq),
+                    ),
+                    any_serde_yaml_value(),
+                )
+                    .prop_map(|(ct, value)| CustomTypeArg::new(ct, value.clone()).unwrap())
+                    .boxed()
             }
-
-            strat.boxed()
         }
-    }
 
-    impl Arbitrary for super::TypeArg {
-        type Parameters = crate::types::test::TypeDepth;
-        type Strategy = BoxedStrategy<Self>;
-        fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
-            use proptest::collection::vec;
-            use proptest::strategy::Union;
-            let mut strat = Union::new([
-                any::<u64>().prop_map(|n| Self::BoundedNat { n }).boxed(),
-                any::<ExtensionSet>()
-                    .prop_map(|es| Self::Extensions { es })
-                    .boxed(),
-                any_with::<Type>(depth)
-                    .prop_map(|ty| Self::Type { ty })
-                    .boxed(),
-                any_with::<CustomTypeArg>(depth)
-                    .prop_map(|arg| Self::Opaque { arg })
-                    .boxed(),
-                any_with::<TypeArgVariable>(depth)
-                    .prop_map(|v| Self::Variable { v })
-                    .boxed(),
-            ]);
-            if !depth.leaf() {
-                strat = strat.or(vec(any_with::<Self>(depth.descend()), 0..3)
-                    .prop_map(|elems| Self::Sequence { elems })
-                    .boxed());
+        impl Arbitrary for TypeArgVariable {
+            type Parameters = TypeDepth;
+            type Strategy = BoxedStrategy<Self>;
+            fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
+                (any::<usize>(), any_with::<TypeParam>(depth))
+                    .prop_map(|(idx, cached_decl)| Self { idx, cached_decl })
+                    .boxed()
             }
-            strat.boxed()
+        }
+
+        impl Arbitrary for TypeParam {
+            type Parameters = TypeDepth;
+            type Strategy = BoxedStrategy<Self>;
+            fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
+                use proptest::collection::vec;
+                use proptest::strategy::Union;
+                let mut strat = Union::new([
+                    Just(Self::Extensions).boxed(),
+                    any::<TypeBound>().prop_map(|b| Self::Type { b }).boxed(),
+                    any::<UpperBound>()
+                        .prop_map(|bound| Self::BoundedNat { bound })
+                        .boxed(),
+                    any_with::<CustomType>(depth.into())
+                        .prop_map(|ty| Self::Opaque { ty })
+                        .boxed(),
+                ]);
+                if !depth.leaf() {
+                    strat = strat
+                        .or(any_with::<Self>(depth.descend())
+                            .prop_map(|x| Self::List { param: Box::new(x) })
+                            .boxed())
+                        .or(vec(any_with::<Self>(depth.descend()), 0..3)
+                            .prop_map(|params| Self::Tuple { params })
+                            .boxed())
+                }
+
+                strat.boxed()
+            }
+        }
+
+        impl Arbitrary for TypeArg {
+            type Parameters = TypeDepth;
+            type Strategy = BoxedStrategy<Self>;
+            fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
+                use proptest::collection::vec;
+                use proptest::strategy::Union;
+                let mut strat = Union::new([
+                    any::<u64>().prop_map(|n| Self::BoundedNat { n }).boxed(),
+                    any::<ExtensionSet>()
+                        .prop_map(|es| Self::Extensions { es })
+                        .boxed(),
+                    any_with::<Type>(depth)
+                        .prop_map(|ty| Self::Type { ty })
+                        .boxed(),
+                    any_with::<CustomTypeArg>(depth)
+                        .prop_map(|arg| Self::Opaque { arg })
+                        .boxed(),
+                    any_with::<TypeArgVariable>(depth)
+                        .prop_map(|v| Self::Variable { v })
+                        .boxed(),
+                ]);
+                if !depth.leaf() {
+                    strat = strat.or(vec(any_with::<Self>(depth.descend()), 0..3)
+                        .prop_map(|elems| Self::Sequence { elems })
+                        .boxed());
+                }
+                strat.boxed()
+            }
         }
     }
 }

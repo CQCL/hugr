@@ -11,7 +11,7 @@ use super::{impl_op_name, OpTag, OpTrait};
 
 /// The root of a module, parent of all other `OpType`s.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
+#[cfg_attr(all(feature = "proptest", test), derive(proptest_derive::Arbitrary))]
 pub struct Module;
 
 impl_op_name!(Module);
@@ -34,12 +34,12 @@ impl OpTrait for Module {
 ///
 /// Children nodes are the body of the definition.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
+#[cfg_attr(all(feature = "proptest", test), derive(proptest_derive::Arbitrary))]
 pub struct FuncDefn {
     /// Name of function
     #[cfg_attr(
-        test,
-        proptest(strategy = "crate::hugr::test::proptest::any_nonempty_string()")
+        all(feature = "proptest", test),
+        proptest(strategy = "crate::proptest::any_nonempty_string()")
     )]
     pub name: String,
     /// Signature of the function
@@ -73,12 +73,12 @@ impl OpTrait for FuncDefn {
 
 /// External function declaration, linked at runtime.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
+#[cfg_attr(all(feature = "proptest", test), derive(proptest_derive::Arbitrary))]
 pub struct FuncDecl {
     /// Name of function
     #[cfg_attr(
-        test,
-        proptest(strategy = "crate::hugr::test::proptest::any_nonempty_string()")
+        all(feature = "proptest", test),
+        proptest(strategy = "crate::proptest::any_nonempty_string()")
     )]
     pub name: String,
     /// Signature of the function
@@ -106,12 +106,12 @@ impl OpTrait for FuncDecl {
 
 /// A type alias definition, used only for debug/metadata.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
+#[cfg_attr(all(feature = "proptest", test), derive(proptest_derive::Arbitrary))]
 pub struct AliasDefn {
     /// Alias name
     #[cfg_attr(
-        test,
-        proptest(strategy = "crate::hugr::test::proptest::any_nonempty_smolstr()")
+        all(feature = "proptest", test),
+        proptest(strategy = "crate::proptest::any_nonempty_smolstr()")
     )]
     pub name: SmolStr,
     /// Aliased type
@@ -171,18 +171,21 @@ impl OpTrait for AliasDecl {
 
 #[cfg(test)]
 mod test {
-    use crate::types::TypeBound;
-    use proptest::prelude::*;
+    #[cfg(feature = "proptest")]
+    mod proptest {
+        use crate::types::TypeBound;
+        use proptest::prelude::*;
 
-    impl Arbitrary for super::AliasDecl {
-        type Parameters = ();
-        type Strategy = BoxedStrategy<Self>;
-        fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-            use crate::hugr::test::proptest::any_ident_string;
-            let bound = any::<TypeBound>();
-            (any_ident_string(), bound)
-                .prop_map(|(name, bound)| Self::new(name, bound))
-                .boxed()
+        impl Arbitrary for super::super::AliasDecl {
+            type Parameters = ();
+            type Strategy = BoxedStrategy<Self>;
+            fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+                use crate::proptest::any_ident_string;
+                let bound = any::<TypeBound>();
+                (any_ident_string(), bound)
+                    .prop_map(|(name, bound)| Self::new(name, bound))
+                    .boxed()
+            }
         }
     }
 }

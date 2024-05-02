@@ -13,7 +13,7 @@ use crate::{
 /// A no-op operation.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
-#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
+#[cfg_attr(all(test, feature = "proptest"), derive(proptest_derive::Arbitrary))]
 pub struct Noop {
     /// The type of edges connecting the Noop.
     pub ty: Type,
@@ -34,7 +34,7 @@ impl Default for Noop {
 
 /// An operation that packs all its inputs into a tuple.
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
+#[cfg_attr(all(test, feature = "proptest"), derive(proptest_derive::Arbitrary))]
 #[non_exhaustive]
 pub struct MakeTuple {
     ///Tuple element types.
@@ -50,7 +50,7 @@ impl MakeTuple {
 
 /// An operation that unpacks a tuple into its components.
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
+#[cfg_attr(all(test, feature = "proptest"), derive(proptest_derive::Arbitrary))]
 #[non_exhaustive]
 pub struct UnpackTuple {
     ///Tuple element types.
@@ -67,7 +67,7 @@ impl UnpackTuple {
 /// An operation that creates a tagged sum value from one of its variants.
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
-#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
+#[cfg_attr(all(test, feature = "proptest"), derive(proptest_derive::Arbitrary))]
 pub struct Tag {
     /// The variant to create.
     pub tag: usize,
@@ -85,7 +85,7 @@ impl Tag {
 /// A node which adds a extension req to the types of the wires it is passed
 /// It has no effect on the values passed along the edge
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
+#[cfg_attr(all(test, feature = "proptest"), derive(proptest_derive::Arbitrary))]
 #[non_exhaustive]
 pub struct Lift {
     /// The types of the edges
