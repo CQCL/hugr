@@ -579,8 +579,6 @@ fn test_polymorphic_load() -> Result<(), Box<dyn std::error::Error>> {
     let _ = m.finish_prelude_hugr()?;
     Ok(())
 
-    // Function(PolyFuncType { params: [Type { b: Any }], body: FunctionType { input: TypeRow { types: [Type(Variable(0, Any), Any)] }, output: TypeRow { types: [Type(Variable(0, Any), Any)] }, extension_reqs: ExtensionSet({}) } })
-    // Value(Type(Extension(CustomType { extension: IdentList("prelude"), id: "usize", args: []
 }
 
 #[cfg(feature = "extension_inference")]
