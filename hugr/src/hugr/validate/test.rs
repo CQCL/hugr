@@ -9,14 +9,14 @@ use crate::builder::{
 use crate::extension::prelude::{BOOL_T, PRELUDE, USIZE_T};
 use crate::extension::{Extension, ExtensionId, TypeDefBound, EMPTY_REG, PRELUDE_REGISTRY};
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
-use crate::hugr::{HugrMut, NodeType};
+use crate::hugr::HugrMut;
 use crate::ops::dataflow::IOTrait;
-use crate::ops::{self, Const, Noop, OpType};
+use crate::ops::{self, Noop, Value};
 use crate::std_extensions::logic::test::{and_op, or_op};
 use crate::std_extensions::logic::{self, NotOp};
-use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
+use crate::types::type_param::{TypeArg, TypeArgError};
 use crate::types::{CustomType, FunctionType, PolyFuncType, Type, TypeBound, TypeRow};
-use crate::{type_row, Direction, IncomingPort, Node};
+use crate::{type_row, IncomingPort};
 
 const NAT: Type = crate::extension::prelude::USIZE_T;
 
@@ -271,10 +271,11 @@ fn test_local_const() {
         })
     );
     let const_op: ops::Const = logic::EXTENSION
-        .get_value(logic::TRUE_NAME)
+        .get_value(&logic::TRUE_NAME)
         .unwrap()
         .typed_value()
-        .clone();
+        .clone()
+        .into();
     // Second input of Xor from a constant
     let cst = h.add_node_with_parent(h.root(), const_op);
     let lcst = h.add_node_with_parent(h.root(), ops::LoadConstant { datatype: BOOL_T });
@@ -522,7 +523,7 @@ fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
                 .with_extension_delta(collections::EXTENSION_NAME),
         ),
     )?;
-    let empty_list = Const::extension(collections::ListValue::new_empty(Type::new_var_use(
+    let empty_list = Value::extension(collections::ListValue::new_empty(Type::new_var_use(
         0,
         TypeBound::Copyable,
     )));
@@ -602,8 +603,9 @@ mod extension_tests {
     ///
     /// Returns the node indices of each of the operations.
     fn add_block_children(b: &mut Hugr, parent: Node, sum_size: usize) -> (Node, Node, Node, Node) {
-        let const_op =
-            ops::Const::unit_sum(0, sum_size as u8).expect("`sum_size` must be greater than 0");
+        let const_op: ops::Const = ops::Value::unit_sum(0, sum_size as u8)
+            .expect("`sum_size` must be greater than 0")
+            .into();
         let tag_type = Type::new_unit_sum(sum_size as u8);
 
         let input = b.add_node_with_parent(parent, ops::Input::new(type_row![BOOL_T]));

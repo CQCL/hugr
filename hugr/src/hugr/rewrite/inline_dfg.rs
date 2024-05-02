@@ -11,6 +11,7 @@ pub struct InlineDFG(pub DfgID);
 
 /// Errors from an [InlineDFG] rewrite.
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
 pub enum InlineDFGError {
     /// Node to inline was not a DFG. (E.g. node has been overwritten since the DfgID originated.)
     #[error("Node {0} was not a DFG")]
@@ -139,10 +140,10 @@ mod test {
     use crate::hugr::rewrite::inline_dfg::InlineDFGError;
     use crate::hugr::HugrMut;
     use crate::ops::handle::{DfgID, NodeHandle};
-    use crate::ops::{Const, Lift, OpType};
+    use crate::ops::{Lift, OpType, Value};
     use crate::std_extensions::arithmetic::float_types;
     use crate::std_extensions::arithmetic::int_ops::{self, IntOpDef};
-    use crate::std_extensions::arithmetic::int_types::{self, ConstIntU};
+    use crate::std_extensions::arithmetic::int_types::{self, ConstInt};
     use crate::types::FunctionType;
     use crate::utils::test_quantum_extension;
     use crate::{type_row, Direction, HugrView, Node, Port};
@@ -183,7 +184,7 @@ mod test {
             d: &mut DFGBuilder<T>,
         ) -> Result<Wire, Box<dyn std::error::Error>> {
             let int_ty = &int_types::INT_TYPES[6];
-            let cst = Const::extension(ConstIntU::new(6, 15)?);
+            let cst = Value::extension(ConstInt::new_u(6, 15)?);
             let c1 = d.add_load_const(cst);
             let [lifted] = d
                 .add_dataflow_op(
@@ -366,7 +367,7 @@ mod test {
             h_b.outputs(),
         )?;
         let [i] = inner.input_wires_arr();
-        let f = inner.add_load_const(float_types::ConstF64::new(1.0));
+        let f = inner.add_load_value(float_types::ConstF64::new(1.0));
         inner.add_other_wire(inner.input().node(), f.node());
         let r = inner.add_dataflow_op(test_quantum_extension::rz_f64(), [i, f])?;
         let [m, b] = inner

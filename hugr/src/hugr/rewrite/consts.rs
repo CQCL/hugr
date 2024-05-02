@@ -14,6 +14,7 @@ pub struct RemoveLoadConstant(pub Node);
 
 /// Error from an [`RemoveConst`] or [`RemoveLoadConstant`] operation.
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum RemoveError {
     /// Invalid node.
     #[error("Node is invalid (either not in HUGR or not correct operation).")]
@@ -118,15 +119,14 @@ mod test {
             prelude::{ConstUsize, USIZE_T},
             PRELUDE_REGISTRY,
         },
-        hugr::HugrMut,
-        ops::{handle::NodeHandle, MakeTuple},
+        ops::{handle::NodeHandle, MakeTuple, Value},
         type_row,
         types::FunctionType,
     };
     #[test]
     fn test_const_remove() -> Result<(), Box<dyn std::error::Error>> {
         let mut build = ModuleBuilder::new();
-        let con_node = build.add_constant(ConstUsize::new(2));
+        let con_node = build.add_constant(Value::extension(ConstUsize::new(2)));
 
         let mut dfg_build =
             build.define_function("main", FunctionType::new_endo(type_row![]).into())?;

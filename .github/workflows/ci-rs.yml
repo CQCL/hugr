@@ -19,6 +19,7 @@ env:
   CI: true # insta snapshots behave differently on ci
   SCCACHE_GHA_ENABLED: "true"
   RUSTC_WRAPPER: "sccache"
+  HUGR_TEST_SCHEMA: "1"
 
 jobs:
   # Check if changes were made to the relevant files.
@@ -37,11 +38,7 @@ jobs:
     - uses: dorny/paths-filter@v3
       id: filter
       with:
-        filters: |
-          rust:
-            - 'hugr/**'
-            - 'Cargo.toml'
-            - 'specification/schema/**'
+        filters: .github/change-filters.yml
 
   check:
     needs: changes

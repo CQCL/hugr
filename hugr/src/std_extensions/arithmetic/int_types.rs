@@ -2,8 +2,8 @@
 
 use std::num::NonZeroU64;
 
-use smol_str::SmolStr;
-
+use crate::ops::constant::ValueName;
+use crate::types::TypeName;
 use crate::{
     extension::{ExtensionId, ExtensionSet},
     ops::constant::CustomConst,
@@ -18,9 +18,9 @@ use lazy_static::lazy_static;
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.int.types");
 
 /// Identifier for the integer type.
-pub const INT_TYPE_ID: SmolStr = SmolStr::new_inline("int");
+pub const INT_TYPE_ID: TypeName = TypeName::new_inline("int");
 
-fn int_custom_type(width_arg: TypeArg) -> CustomType {
+pub(crate) fn int_custom_type(width_arg: TypeArg) -> CustomType {
     CustomType::new(INT_TYPE_ID, [width_arg], EXTENSION_ID, TypeBound::Eq)
 }
 
@@ -44,8 +44,11 @@ const fn is_valid_log_width(n: u8) -> bool {
     n < LOG_WIDTH_BOUND
 }
 
+/// The maximum allowed log width.
+pub const LOG_WIDTH_MAX: u8 = 6;
+
 /// The smallest forbidden log width.
-pub const LOG_WIDTH_BOUND: u8 = 7;
+pub const LOG_WIDTH_BOUND: u8 = LOG_WIDTH_MAX + 1;
 
 /// Type parameter for the log width of the integer.
 #[allow(clippy::assertions_on_constants)]
@@ -71,23 +74,22 @@ const fn type_arg(log_width: u8) -> TypeArg {
         n: log_width as u64,
     }
 }
-/// An unsigned integer
+
+/// An integer (either signed or unsigned)
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct ConstIntU {
+pub struct ConstInt {
     log_width: u8,
+    // We always use a u64 for the value. The interpretation is:
+    // - as an unsigned integer, (value mod 2^N);
+    // - as a signed integer, (value mod 2^(N-1) - 2^(N-1)*a)
+    // where N = 2^log_width and a is the (N-1)th bit of x (counting from
+    // 0 = least significant bit).
     value: u64,
 }
 
-/// A signed integer
-#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct ConstIntS {
-    log_width: u8,
-    value: i64,
-}
-
-impl ConstIntU {
-    /// Create a new [`ConstIntU`]
-    pub fn new(log_width: u8, value: u64) -> Result<Self, ConstTypeError> {
+impl ConstInt {
+    /// Create a new [`ConstInt`] with a given width and unsigned value
+    pub fn new_u(log_width: u8, value: u64) -> Result<Self, ConstTypeError> {
         if !is_valid_log_width(log_width) {
             return Err(ConstTypeError::CustomCheckFail(
                 crate::types::CustomCheckFailure::Message("Invalid integer width.".to_owned()),
@@ -103,20 +105,8 @@ impl ConstIntU {
         Ok(Self { log_width, value })
     }
 
-    /// Returns the value of the constant
-    pub fn value(&self) -> u64 {
-        self.value
-    }
-
-    /// Returns the number of bits of the constant
-    pub fn log_width(&self) -> u8 {
-        self.log_width
-    }
-}
-
-impl ConstIntS {
-    /// Create a new [`ConstIntS`]
-    pub fn new(log_width: u8, value: i64) -> Result<Self, ConstTypeError> {
+    /// Create a new [`ConstInt`] with a given width and signed value
+    pub fn new_s(log_width: u8, value: i64) -> Result<Self, ConstTypeError> {
         if !is_valid_log_width(log_width) {
             return Err(ConstTypeError::CustomCheckFail(
                 crate::types::CustomCheckFailure::Message("Invalid integer width.".to_owned()),
@@ -130,42 +120,46 @@ impl ConstIntS {
                 ),
             ));
         }
-        Ok(Self { log_width, value })
-    }
 
-    /// Returns the value of the constant
-    pub fn value(&self) -> i64 {
-        self.value
+        Ok(Self {
+            log_width,
+            value: (if value >= 0 || log_width == LOG_WIDTH_MAX {
+                value
+            } else {
+                value + (1i64 << width)
+            }) as u64,
+        })
     }
 
     /// Returns the number of bits of the constant
     pub fn log_width(&self) -> u8 {
         self.log_width
     }
+
+    /// Returns the value of the constant as an unsigned integer
+    pub fn value_u(&self) -> u64 {
+        self.value
+    }
+
+    /// Returns the value of the constant as a signed integer
+    pub fn value_s(&self) -> i64 {
+        if self.log_width == LOG_WIDTH_MAX {
+            self.value as i64
+        } else {
+            let width = 1u8 << self.log_width;
+            if ((self.value << 1) >> width) == 0 {
+                self.value as i64
+            } else {
+                self.value as i64 - (1i64 << width)
+            }
+        }
+    }
 }
 
 #[typetag::serde]
-impl CustomConst for ConstIntU {
-    fn name(&self) -> SmolStr {
-        format!("u{}({})", self.log_width, self.value).into()
-    }
-    fn equal_consts(&self, other: &dyn CustomConst) -> bool {
-        crate::ops::constant::downcast_equal_consts(self, other)
-    }
-
-    fn extension_reqs(&self) -> ExtensionSet {
-        ExtensionSet::singleton(&EXTENSION_ID)
-    }
-
-    fn get_type(&self) -> Type {
-        int_type(type_arg(self.log_width))
-    }
-}
-
-#[typetag::serde]
-impl CustomConst for ConstIntS {
-    fn name(&self) -> SmolStr {
-        format!("i{}({})", self.log_width, self.value).into()
+impl CustomConst for ConstInt {
+    fn name(&self) -> ValueName {
+        format!("u{}({})", 1u8 << self.log_width, self.value).into()
     }
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
         crate::ops::constant::downcast_equal_consts(self, other)
@@ -239,43 +233,43 @@ mod test {
 
     #[test]
     fn test_int_consts() {
-        let const_u32_7 = ConstIntU::new(5, 7);
-        let const_u64_7 = ConstIntU::new(6, 7);
-        let const_u32_8 = ConstIntU::new(5, 8);
+        let const_u32_7 = ConstInt::new_u(5, 7);
+        let const_u64_7 = ConstInt::new_u(6, 7);
+        let const_u32_8 = ConstInt::new_u(5, 8);
         assert_ne!(const_u32_7, const_u64_7);
         assert_ne!(const_u32_7, const_u32_8);
-        assert_eq!(const_u32_7, ConstIntU::new(5, 7));
+        assert_eq!(const_u32_7, ConstInt::new_u(5, 7));
 
         assert_matches!(
-            ConstIntU::new(3, 256),
+            ConstInt::new_u(3, 256),
             Err(ConstTypeError::CustomCheckFail(_))
         );
         assert_matches!(
-            ConstIntU::new(9, 256),
+            ConstInt::new_u(9, 256),
             Err(ConstTypeError::CustomCheckFail(_))
         );
         assert_matches!(
-            ConstIntS::new(3, 128),
+            ConstInt::new_s(3, 128),
             Err(ConstTypeError::CustomCheckFail(_))
         );
-        assert!(ConstIntS::new(3, -128).is_ok());
+        assert!(ConstInt::new_s(3, -128).is_ok());
 
         let const_u32_7 = const_u32_7.unwrap();
-        assert!(const_u32_7.equal_consts(&ConstIntU::new(5, 7).unwrap()));
+        assert!(const_u32_7.equal_consts(&ConstInt::new_u(5, 7).unwrap()));
         assert_eq!(const_u32_7.log_width(), 5);
-        assert_eq!(const_u32_7.value(), 7);
+        assert_eq!(const_u32_7.value_u(), 7);
         assert!(const_u32_7.validate().is_ok());
 
-        assert_eq!(const_u32_7.name(), "u5(7)");
+        assert_eq!(const_u32_7.name(), "u32(7)");
 
-        let const_i32_2 = ConstIntS::new(5, -2).unwrap();
-        assert!(const_i32_2.equal_consts(&ConstIntS::new(5, -2).unwrap()));
+        let const_i32_2 = ConstInt::new_s(5, -2).unwrap();
+        assert!(const_i32_2.equal_consts(&ConstInt::new_s(5, -2).unwrap()));
         assert_eq!(const_i32_2.log_width(), 5);
-        assert_eq!(const_i32_2.value(), -2);
+        assert_eq!(const_i32_2.value_s(), -2);
         assert!(const_i32_2.validate().is_ok());
-        assert_eq!(const_i32_2.name(), "i5(-2)");
+        assert_eq!(const_i32_2.name(), "u32(4294967294)");
 
-        ConstIntS::new(50, -2).unwrap_err();
-        ConstIntU::new(50, 2).unwrap_err();
+        ConstInt::new_s(50, -2).unwrap_err();
+        ConstInt::new_u(50, 2).unwrap_err();
     }
 }

@@ -3,7 +3,7 @@ use std::mem;
 
 use thiserror::Error;
 
-use crate::ops::{OpName, OpType};
+use crate::ops::{NamedOp, OpType};
 use crate::utils::collect_array;
 
 use super::{BuildError, Dataflow};
@@ -241,7 +241,7 @@ mod test {
     use crate::{
         builder::{
             test::{build_main, NAT, QB},
-            Dataflow, DataflowSubContainer, Wire,
+            DataflowSubContainer,
         },
         extension::prelude::BOOL_T,
         ops::{custom::OpaqueOp, CustomOp},

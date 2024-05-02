@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.1 (2024-04-23)
+
+### Features
+
+- `new` methods for leaf ops ([#940](https://github.com/CQCL/hugr/pull/940))
+- `CustomOp::extension` utility function ([#951](https://github.com/CQCL/hugr/pull/951))
+- Encoder metadata in serialized hugr ([#955](https://github.com/CQCL/hugr/pull/955))
+
+### Testing
+
+- Add a test of instantiating an extension set ([#939](https://github.com/CQCL/hugr/pull/939))
+
+
 ## 0.3.0 (2024-04-15)
 
 ### Main changes

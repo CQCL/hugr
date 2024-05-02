@@ -98,8 +98,7 @@ pub(crate) fn is_default<T: Default + PartialEq>(t: &T) -> bool {
 
 #[cfg(test)]
 pub(crate) mod test_quantum_extension {
-    use smol_str::SmolStr;
-
+    use crate::ops::{OpName, OpNameRef};
     use crate::{
         extension::{
             prelude::{BOOL_T, QB_T},
@@ -127,23 +126,23 @@ pub(crate) mod test_quantum_extension {
         let mut extension = Extension::new(EXTENSION_ID);
 
         extension
-            .add_op(SmolStr::new_inline("H"), "Hadamard".into(), one_qb_func())
+            .add_op(OpName::new_inline("H"), "Hadamard".into(), one_qb_func())
             .unwrap();
         extension
             .add_op(
-                SmolStr::new_inline("RzF64"),
+                OpName::new_inline("RzF64"),
                 "Rotation specified by float".into(),
                 FunctionType::new(type_row![QB_T, float_types::FLOAT64_TYPE], type_row![QB_T]),
             )
             .unwrap();
 
         extension
-            .add_op(SmolStr::new_inline("CX"), "CX".into(), two_qb_func())
+            .add_op(OpName::new_inline("CX"), "CX".into(), two_qb_func())
             .unwrap();
 
         extension
             .add_op(
-                SmolStr::new_inline("Measure"),
+                OpName::new_inline("Measure"),
                 "Measure a qubit, returning the qubit and the measurement result.".into(),
                 FunctionType::new(type_row![QB_T], type_row![QB_T, BOOL_T]),
             )
@@ -151,7 +150,7 @@ pub(crate) mod test_quantum_extension {
 
         extension
             .add_op(
-                SmolStr::new_inline("QAlloc"),
+                OpName::new_inline("QAlloc"),
                 "Allocate a new qubit.".into(),
                 FunctionType::new(type_row![], type_row![QB_T]),
             )
@@ -159,7 +158,7 @@ pub(crate) mod test_quantum_extension {
 
         extension
             .add_op(
-                SmolStr::new_inline("QDiscard"),
+                OpName::new_inline("QDiscard"),
                 "Discard a qubit.".into(),
                 FunctionType::new(type_row![QB_T], type_row![]),
             )
@@ -174,7 +173,8 @@ pub(crate) mod test_quantum_extension {
         static ref REG: ExtensionRegistry = ExtensionRegistry::try_new([EXTENSION.to_owned(), PRELUDE.to_owned(), float_types::EXTENSION.to_owned()]).unwrap();
 
     }
-    fn get_gate(gate_name: &str) -> CustomOp {
+
+    fn get_gate(gate_name: &OpNameRef) -> CustomOp {
         EXTENSION
             .instantiate_extension_op(gate_name, [], &REG)
             .unwrap()

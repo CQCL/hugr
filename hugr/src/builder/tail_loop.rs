@@ -99,8 +99,8 @@ mod test {
         extension::prelude::{ConstUsize, PRELUDE_ID, USIZE_T},
         extension::ExtensionSet,
         hugr::ValidationError,
-        ops::Const,
-        type_row, Hugr,
+        ops::Value,
+        type_row,
     };
 
     use super::*;
@@ -109,7 +109,7 @@ mod test {
         let build_result: Result<Hugr, ValidationError> = {
             let mut loop_b = TailLoopBuilder::new(vec![], vec![BIT], vec![USIZE_T])?;
             let [i1] = loop_b.input_wires_arr();
-            let const_wire = loop_b.add_load_const(ConstUsize::new(1));
+            let const_wire = loop_b.add_load_value(ConstUsize::new(1));
 
             let break_wire = loop_b.make_break(loop_b.loop_signature()?.clone(), [const_wire])?;
             loop_b.set_outputs(break_wire, [i1])?;
@@ -144,8 +144,8 @@ mod test {
                     let mut loop_b =
                         fbuild.tail_loop_builder(vec![(BIT, b1)], vec![], type_row![NAT])?;
                     let signature = loop_b.loop_signature()?.clone();
-                    let const_val = Const::true_val();
-                    let const_wire = loop_b.add_load_const(Const::true_val());
+                    let const_val = Value::true_val();
+                    let const_wire = loop_b.add_load_const(Value::true_val());
                     let lift_node = loop_b.add_dataflow_op(
                         ops::Lift {
                             type_row: vec![const_val.const_type().clone()].into(),
@@ -173,7 +173,7 @@ mod test {
                         let mut branch_1 = conditional_b.case_builder(1)?;
                         let [_b1] = branch_1.input_wires_arr();
 
-                        let wire = branch_1.add_load_const(ConstUsize::new(2));
+                        let wire = branch_1.add_load_value(ConstUsize::new(2));
                         let break_wire = branch_1.make_break(signature, [wire])?;
                         branch_1.finish_with_outputs([break_wire])?;
 

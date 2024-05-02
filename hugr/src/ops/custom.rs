@@ -1,6 +1,5 @@
 //! Extensible operations.
 
-use smol_str::SmolStr;
 use std::sync::Arc;
 use thiserror::Error;
 
@@ -13,7 +12,7 @@ use crate::{ops, Hugr, IncomingPort, Node};
 
 use super::dataflow::DataflowOpTrait;
 use super::tag::OpTag;
-use super::{OpName, OpTrait, OpType};
+use super::{NamedOp, OpName, OpNameRef, OpTrait, OpType};
 
 /// A user-defined operation defined in an extension.
 ///
@@ -66,6 +65,14 @@ impl CustomOp {
         }
     }
 
+    /// Returns the extension ID of this operation.
+    pub fn extension(&self) -> &ExtensionId {
+        match self {
+            Self::Opaque(op) => op.extension(),
+            Self::Extension(op) => op.def.extension(),
+        }
+    }
+
     /// If the operation is an instance of [ExtensionOp], return a reference to it.
     /// If the operation is opaque, return None.
     pub fn as_extension_op(&self) -> Option<&ExtensionOp> {
@@ -94,9 +101,9 @@ impl CustomOp {
     }
 }
 
-impl OpName for CustomOp {
+impl NamedOp for CustomOp {
     /// The name of the operation.
-    fn name(&self) -> SmolStr {
+    fn name(&self) -> OpName {
         let (res_id, op_name) = match self {
             Self::Opaque(op) => (&op.extension, &op.op_name),
             Self::Extension(ext) => (ext.def.extension(), ext.def.name()),
@@ -191,7 +198,7 @@ impl ExtensionOp {
     }
 
     /// Attempt to evaluate this operation. See [`OpDef::constant_fold`].
-    pub fn constant_fold(&self, consts: &[(IncomingPort, ops::Const)]) -> ConstFoldResult {
+    pub fn constant_fold(&self, consts: &[(IncomingPort, ops::Value)]) -> ConstFoldResult {
         self.def().constant_fold(self.args(), consts)
     }
 
@@ -260,13 +267,13 @@ impl DataflowOpTrait for ExtensionOp {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct OpaqueOp {
     extension: ExtensionId,
-    op_name: SmolStr,
+    op_name: OpName,
     description: String, // cache in advance so description() can return &str
     args: Vec<TypeArg>,
     signature: FunctionType,
 }
 
-fn qualify_name(res_id: &ExtensionId, op_name: &SmolStr) -> SmolStr {
+fn qualify_name(res_id: &ExtensionId, op_name: &OpNameRef) -> OpName {
     format!("{}.{}", res_id, op_name).into()
 }
 
@@ -274,7 +281,7 @@ impl OpaqueOp {
     /// Creates a new OpaqueOp from all the fields we'd expect to serialize.
     pub fn new(
         extension: ExtensionId,
-        op_name: impl Into<SmolStr>,
+        op_name: impl Into<OpName>,
         description: String,
         args: impl Into<Vec<TypeArg>>,
         signature: FunctionType,
@@ -291,7 +298,7 @@ impl OpaqueOp {
 
 impl OpaqueOp {
     /// Unique name of the operation.
-    pub fn name(&self) -> &SmolStr {
+    pub fn name(&self) -> &OpName {
         &self.op_name
     }
 
@@ -389,16 +396,17 @@ pub fn resolve_opaque_op(
 /// Errors that arise after loading a Hugr containing opaque ops (serialized just as their names)
 /// when trying to resolve the serialized names against a registry of known Extensions.
 #[derive(Clone, Debug, Error, PartialEq)]
+#[non_exhaustive]
 pub enum CustomOpError {
     /// The Extension was found but did not contain the expected OpDef
     #[error("Operation {0} not found in Extension {1}")]
-    OpNotFoundInExtension(SmolStr, ExtensionId),
+    OpNotFoundInExtension(OpName, ExtensionId),
     /// Extension and OpDef found, but computed signature did not match stored
     #[error("Conflicting signature: resolved {op} in extension {extension} to a concrete implementation which computed {computed} but stored signature was {stored}")]
     #[allow(missing_docs)]
     SignatureMismatch {
         extension: ExtensionId,
-        op: SmolStr,
+        op: OpName,
         stored: FunctionType,
         computed: FunctionType,
     },

@@ -75,11 +75,20 @@ class TupleParam(BaseModel):
     params: list["TypeParam"]
 
 
+class ExtensionsParam(BaseModel):
+    tp: Literal["Extensions"] = "Extensions"
+
+
 class TypeParam(RootModel):
     """A type parameter."""
 
     root: Annotated[
-        TypeTypeParam | BoundedNatParam | OpaqueParam | ListParam | TupleParam,
+        TypeTypeParam
+        | BoundedNatParam
+        | OpaqueParam
+        | ListParam
+        | TupleParam
+        | ExtensionsParam,
         WrapValidator(_json_custom_error_validator),
     ] = Field(discriminator="tp")
 
@@ -145,9 +154,7 @@ class Array(MultiContainer):
 
 
 class UnitSum(BaseModel):
-    """Simple predicate where all variants are empty tuples."""
-
-    t: Literal["Sum"] = "Sum"
+    """Simple sum type where all variants are empty tuples."""
 
     s: Literal["Unit"] = "Unit"
     size: int
@@ -156,14 +163,17 @@ class UnitSum(BaseModel):
 class GeneralSum(BaseModel):
     """General sum type that explicitly stores the types of the variants."""
 
-    t: Literal["Sum"] = "Sum"
-
     s: Literal["General"] = "General"
     rows: list["TypeRow"]
 
 
 class SumType(RootModel):
     root: Union[UnitSum, GeneralSum] = Field(discriminator="s")
+
+
+class TaggedSumType(BaseModel):
+    t: Literal["Sum"] = "Sum"
+    st: SumType
 
 
 # ----------------------------------------------
@@ -254,13 +264,21 @@ class TypeBound(Enum):
 
 
 class Opaque(BaseModel):
-    """An opaque operation that can be downcasted by the extensions that define it."""
+    """An opaque Type that can be downcasted by the extensions that define it."""
 
     t: Literal["Opaque"] = "Opaque"
     extension: ExtensionId
     id: str  # Unique identifier of the opaque type.
     args: list[TypeArg]
     bound: TypeBound
+
+
+class Alias(BaseModel):
+    """An Alias Type"""
+
+    t: Literal["Alias"] = "Alias"
+    bound: TypeBound
+    name: str
 
 
 # ----------------------------------------------
@@ -278,7 +296,14 @@ class Type(RootModel):
     """A HUGR type."""
 
     root: Annotated[
-        Qubit | Variable | USize | FunctionType | Array | SumType | Opaque,
+        Qubit
+        | Variable
+        | USize
+        | FunctionType
+        | Array
+        | TaggedSumType
+        | Opaque
+        | Alias,
         WrapValidator(_json_custom_error_validator),
     ] = Field(discriminator="t")
 

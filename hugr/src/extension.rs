@@ -9,16 +9,16 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
 
-use smol_str::SmolStr;
 use thiserror::Error;
 
 use crate::hugr::IdentList;
-use crate::ops;
+use crate::ops::constant::{ValueName, ValueNameRef};
 use crate::ops::custom::{ExtensionOp, OpaqueOp};
+use crate::ops::{self, OpName, OpNameRef};
 use crate::types::type_param::{check_type_args, TypeArgError};
 use crate::types::type_param::{TypeArg, TypeParam};
-use crate::types::FunctionType;
 use crate::types::{check_typevar_decl, CustomType, Substitution, TypeBound, TypeName};
+use crate::types::{FunctionType, TypeNameRef};
 
 #[allow(dead_code)]
 mod infer;
@@ -188,10 +188,12 @@ pub enum SignatureError {
 
 /// Concrete instantiations of types and operations defined in extensions.
 trait CustomConcrete {
+    /// The identifier type for the concrete object.
+    type Identifier;
     /// A generic identifier to the element.
     ///
     /// This may either refer to a [`TypeName`] or an [`OpName`].
-    fn def_name(&self) -> &SmolStr;
+    fn def_name(&self) -> &Self::Identifier;
     /// The concrete type arguments for the instantiation.
     fn type_args(&self) -> &[TypeArg];
     /// Extension required by the instantiation.
@@ -199,7 +201,9 @@ trait CustomConcrete {
 }
 
 impl CustomConcrete for OpaqueOp {
-    fn def_name(&self) -> &SmolStr {
+    type Identifier = OpName;
+
+    fn def_name(&self) -> &OpName {
         self.name()
     }
 
@@ -213,7 +217,9 @@ impl CustomConcrete for OpaqueOp {
 }
 
 impl CustomConcrete for CustomType {
-    fn def_name(&self) -> &SmolStr {
+    type Identifier = TypeName;
+
+    fn def_name(&self) -> &TypeName {
         // Casts the `TypeName` to a generic string.
         self.name()
     }
@@ -232,7 +238,7 @@ trait TypeParametrised {
     /// The concrete object built by binding type arguments to parameters
     type Concrete: CustomConcrete;
     /// The extension-unique name.
-    fn name(&self) -> &SmolStr;
+    fn name(&self) -> &<Self::Concrete as CustomConcrete>::Identifier;
     /// Type parameters.
     fn params(&self) -> &[TypeParam];
     /// The parent extension.
@@ -248,19 +254,19 @@ trait TypeParametrised {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct ExtensionValue {
     extension: ExtensionId,
-    name: SmolStr,
-    typed_value: ops::Const,
+    name: ValueName,
+    typed_value: ops::Value,
 }
 
 impl ExtensionValue {
     /// Returns a reference to the typed value of this [`ExtensionValue`].
-    pub fn typed_value(&self) -> &ops::Const {
+    pub fn typed_value(&self) -> &ops::Value {
         &self.typed_value
     }
 
     /// Returns a reference to the name of this [`ExtensionValue`].
     pub fn name(&self) -> &str {
-        self.name.as_ref()
+        self.name.as_str()
     }
 
     /// Returns a reference to the extension this [`ExtensionValue`] belongs to.
@@ -287,14 +293,14 @@ pub struct Extension {
     /// Types defined by this extension.
     types: HashMap<TypeName, TypeDef>,
     /// Static values defined by this extension.
-    values: HashMap<SmolStr, ExtensionValue>,
+    values: HashMap<ValueName, ExtensionValue>,
     /// Operation declarations with serializable definitions.
     // Note: serde will serialize this because we configure with `features=["rc"]`.
     // That will clone anything that has multiple references, but each
     // OpDef should appear exactly once in this map (keyed by its name),
     // and the other references to the OpDef are from ExternalOp's in the Hugr
     // (which are serialized as OpaqueOp's i.e. Strings).
-    operations: HashMap<SmolStr, Arc<op_def::OpDef>>,
+    operations: HashMap<OpName, Arc<op_def::OpDef>>,
 }
 
 impl Extension {
@@ -315,18 +321,18 @@ impl Extension {
     }
 
     /// Allows read-only access to the operations in this Extension
-    pub fn get_op(&self, op_name: &str) -> Option<&Arc<op_def::OpDef>> {
+    pub fn get_op(&self, op_name: &OpNameRef) -> Option<&Arc<op_def::OpDef>> {
         self.operations.get(op_name)
     }
 
     /// Allows read-only access to the types in this Extension
-    pub fn get_type(&self, type_name: &str) -> Option<&type_def::TypeDef> {
+    pub fn get_type(&self, type_name: &TypeNameRef) -> Option<&type_def::TypeDef> {
         self.types.get(type_name)
     }
 
     /// Allows read-only access to the values in this Extension
-    pub fn get_value(&self, type_name: &str) -> Option<&ExtensionValue> {
-        self.values.get(type_name)
+    pub fn get_value(&self, value_name: &ValueNameRef) -> Option<&ExtensionValue> {
+        self.values.get(value_name)
     }
 
     /// Returns the name of the extension.
@@ -335,7 +341,7 @@ impl Extension {
     }
 
     /// Iterator over the operations of this [`Extension`].
-    pub fn operations(&self) -> impl Iterator<Item = (&SmolStr, &Arc<OpDef>)> {
+    pub fn operations(&self) -> impl Iterator<Item = (&OpName, &Arc<OpDef>)> {
         self.operations.iter()
     }
 
@@ -347,8 +353,8 @@ impl Extension {
     /// Add a named static value to the extension.
     pub fn add_value(
         &mut self,
-        name: impl Into<SmolStr>,
-        typed_value: ops::Const,
+        name: impl Into<ValueName>,
+        typed_value: ops::Value,
     ) -> Result<&mut ExtensionValue, ExtensionBuildError> {
         let extension_value = ExtensionValue {
             extension: self.name.clone(),
@@ -357,7 +363,7 @@ impl Extension {
         };
         match self.values.entry(extension_value.name.clone()) {
             hash_map::Entry::Occupied(_) => {
-                Err(ExtensionBuildError::OpDefExists(extension_value.name))
+                Err(ExtensionBuildError::ValueExists(extension_value.name))
             }
             hash_map::Entry::Vacant(ve) => Ok(ve.insert(extension_value)),
         }
@@ -366,7 +372,7 @@ impl Extension {
     /// Instantiate an [`ExtensionOp`] which references an [`OpDef`] in this extension.
     pub fn instantiate_extension_op(
         &self,
-        op_name: &str,
+        op_name: &OpNameRef,
         args: impl Into<Vec<TypeArg>>,
         ext_reg: &ExtensionRegistry,
     ) -> Result<ExtensionOp, SignatureError> {
@@ -407,10 +413,13 @@ pub enum ExtensionRegistryError {
 pub enum ExtensionBuildError {
     /// Existing [`OpDef`]
     #[error("Extension already has an op called {0}.")]
-    OpDefExists(SmolStr),
+    OpDefExists(OpName),
     /// Existing [`TypeDef`]
     #[error("Extension already has an type called {0}.")]
-    TypeDefExists(SmolStr),
+    TypeDefExists(TypeName),
+    /// Existing [`ExtensionValue`]
+    #[error("Extension already has an extension value called {0}.")]
+    ValueExists(ValueName),
 }
 
 /// A set of extensions identified by their unique [`ExtensionId`].

@@ -11,7 +11,7 @@ use crate::ops;
 /// Output of constant folding an operation, None indicates folding was either
 /// not possible or unsuccessful. An empty vector indicates folding was
 /// successful and no values are output.
-pub type ConstFoldResult = Option<Vec<(OutgoingPort, ops::Const)>>;
+pub type ConstFoldResult = Option<Vec<(OutgoingPort, ops::Value)>>;
 
 /// Trait implemented by extension operations that can perform constant folding.
 pub trait ConstFold: Send + Sync {
@@ -21,7 +21,7 @@ pub trait ConstFold: Send + Sync {
     fn fold(
         &self,
         type_args: &[TypeArg],
-        consts: &[(crate::IncomingPort, crate::ops::Const)],
+        consts: &[(crate::IncomingPort, crate::ops::Value)],
     ) -> ConstFoldResult;
 }
 
@@ -35,12 +35,12 @@ impl Debug for Box<dyn ConstFold> {
 /// evaluate - type arguments are not relevant.
 impl<T> ConstFold for T
 where
-    T: Fn(&[(crate::IncomingPort, crate::ops::Const)]) -> ConstFoldResult + Send + Sync,
+    T: Fn(&[(crate::IncomingPort, crate::ops::Value)]) -> ConstFoldResult + Send + Sync,
 {
     fn fold(
         &self,
         _type_args: &[TypeArg],
-        consts: &[(crate::IncomingPort, crate::ops::Const)],
+        consts: &[(crate::IncomingPort, crate::ops::Value)],
     ) -> ConstFoldResult {
         self(consts)
     }

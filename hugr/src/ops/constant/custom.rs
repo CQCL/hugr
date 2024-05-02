@@ -7,12 +7,13 @@
 use std::any::Any;
 
 use downcast_rs::{impl_downcast, Downcast};
-use smol_str::SmolStr;
 
 use crate::extension::ExtensionSet;
 use crate::macros::impl_box_clone;
 
 use crate::types::{CustomCheckFailure, Type};
+
+use super::ValueName;
 
 /// Constant value for opaque [`CustomType`]s.
 ///
@@ -25,7 +26,7 @@ pub trait CustomConst:
     Send + Sync + std::fmt::Debug + CustomConstBoxClone + Any + Downcast
 {
     /// An identifier for the constant.
-    fn name(&self) -> SmolStr;
+    fn name(&self) -> ValueName;
 
     /// The extension(s) defining the custom constant
     /// (a set to allow, say, a [List] of [USize])
@@ -96,7 +97,7 @@ impl CustomSerialized {
 
 #[typetag::serde]
 impl CustomConst for CustomSerialized {
-    fn name(&self) -> SmolStr {
+    fn name(&self) -> ValueName {
         format!("yaml:{:?}", self.value).into()
     }
 
