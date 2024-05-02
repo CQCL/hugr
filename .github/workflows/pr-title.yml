@@ -149,7 +149,7 @@ jobs:
             ```
 
       # Delete previous comments when the issues have been resolved
-      # This step doesn't runs if any of the previous checks fails.
+      # This step doesn't run if any of the previous checks fails.
       - name: Delete previous comments
         uses: marocchino/sticky-pull-request-comment@v2
         with:
