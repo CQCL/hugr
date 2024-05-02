@@ -885,6 +885,47 @@
             "title": "LoadConstant",
             "type": "object"
         },
+        "LoadFunction": {
+            "description": "Load a static function in to the local dataflow graph.",
+            "properties": {
+                "parent": {
+                    "title": "Parent",
+                    "type": "integer"
+                },
+                "input_extensions": {
+                    "$ref": "#/$defs/ExtensionSet"
+                },
+                "op": {
+                    "const": "LoadFunction",
+                    "default": "LoadFunction",
+                    "enum": [
+                        "LoadFunction"
+                    ],
+                    "title": "Op",
+                    "type": "string"
+                },
+                "func_sig": {
+                    "$ref": "#/$defs/PolyFuncType"
+                },
+                "type_args": {
+                    "items": {
+                        "$ref": "#/$defs/TypeArg"
+                    },
+                    "title": "Type Args",
+                    "type": "array"
+                },
+                "signature": {
+                    "$ref": "#/$defs/FunctionType"
+                }
+            },
+            "required": [
+                "parent",
+                "func_sig",
+                "type_args"
+            ],
+            "title": "LoadFunction",
+            "type": "object"
+        },
         "MakeTuple": {
             "description": "An operation that packs all its inputs into a tuple.",
             "properties": {
@@ -994,6 +1035,7 @@
                     "Input": "#/$defs/Input",
                     "Lift": "#/$defs/Lift",
                     "LoadConstant": "#/$defs/LoadConstant",
+                    "LoadFunction": "#/$defs/LoadFunction",
                     "MakeTuple": "#/$defs/MakeTuple",
                     "Module": "#/$defs/Module",
                     "Noop": "#/$defs/Noop",
@@ -1049,6 +1091,9 @@
                 },
                 {
                     "$ref": "#/$defs/LoadConstant"
+                },
+                {
+                    "$ref": "#/$defs/LoadFunction"
                 },
                 {
                     "$ref": "#/$defs/CustomOp"

@@ -310,6 +310,18 @@ class LoadConstant(DataflowOp):
     datatype: Type
 
 
+class LoadFunction(DataflowOp):
+    """Load a static function in to the local dataflow graph."""
+
+    op: Literal["LoadFunction"] = "LoadFunction"
+    func_sig: PolyFuncType
+    type_args: list[tys.TypeArg]
+    signature: FunctionType = Field(default_factory=FunctionType.empty)
+
+    def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
+        self.signature = FunctionType(input=list(in_types), output=list(out_types))
+
+
 class DFG(DataflowOp):
     """A simply nested dataflow graph."""
 
@@ -502,6 +514,7 @@ class OpType(RootModel):
         | Call
         | CallIndirect
         | LoadConstant
+        | LoadFunction
         | CustomOp
         | Noop
         | MakeTuple

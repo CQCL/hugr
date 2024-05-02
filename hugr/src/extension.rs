@@ -173,6 +173,17 @@ pub enum SignatureError {
         cached: FunctionType,
         expected: FunctionType,
     },
+    /// The result of the type application stored in a [LoadFunction]
+    /// is not what we get by applying the type-args to the polymorphic function
+    ///
+    /// [LoadFunction]: crate::ops::dataflow::LoadFunction
+    #[error(
+        "Incorrect result of type application in LoadFunction - cached {cached} but expected {expected}"
+    )]
+    LoadFunctionIncorrectlyAppliesType {
+        cached: FunctionType,
+        expected: FunctionType,
+    },
 }
 
 /// Concrete instantiations of types and operations defined in extensions.

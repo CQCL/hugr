@@ -572,6 +572,10 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
                 c.validate(self.extension_registry)
                     .map_err(|cause| ValidationError::SignatureError { node, cause })?;
             }
+            OpType::LoadFunction(c) => {
+                c.validate(self.extension_registry)
+                    .map_err(|cause| ValidationError::SignatureError { node, cause })?;
+            }
             _ => (),
         }
 
