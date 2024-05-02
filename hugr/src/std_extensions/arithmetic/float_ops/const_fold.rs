@@ -68,7 +68,7 @@ impl CmpFold {
         Self(Box::new(move |x, y| {
             (match op {
                 feq => f64::eq,
-                fne => f64::lt,
+                fne => f64::ne,
                 flt => f64::lt,
                 fgt => f64::gt,
                 fle => f64::le,
