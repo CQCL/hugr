@@ -17,6 +17,7 @@ from .tys import (
     TypeBound,
     ConfiguredBaseModel,
     classes as tys_classes,
+    model_rebuild as tys_model_rebuild,
 )
 
 NodeID = int
@@ -270,11 +271,6 @@ class Call(DataflowOp):
     instantiation: FunctionType = Field(default_factory=FunctionType.empty)
 
     def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
-        # TODO this is wrong (len(params) is not required to be 0) But it's not
-        # clear how this function is used from guppy. It's unused in present in
-        # hugr-py
-        #
-        # The constE edge comes after the value inputs
         fun_ty = in_types[-1]
         assert isinstance(fun_ty, PolyFuncType)
         poly_func = cast(PolyFuncType, fun_ty)
@@ -569,3 +565,5 @@ classes = (
     )
     + tys_classes
 )
+
+tys_model_rebuild(dict(classes))

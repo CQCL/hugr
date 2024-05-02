@@ -951,6 +951,7 @@
             "type": "object"
         },
         "LoadFunction": {
+            "additionalProperties": true,
             "description": "Load a static function in to the local dataflow graph.",
             "properties": {
                 "parent": {
