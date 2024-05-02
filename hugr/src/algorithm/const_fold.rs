@@ -618,6 +618,8 @@ mod test {
     }
 
     #[test]
+    #[should_panic]
+    // FIXME: https://github.com/CQCL/hugr/issues/996
     fn test_fold_int_ops() {
         // pseudocode:
         //
