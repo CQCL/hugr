@@ -680,12 +680,9 @@ pub(crate) mod test {
 
     #[test]
     fn test_cond_then_loop_combined() -> Result<(), BuildError> {
-        //      /-> left --\
-        // entry            > merge -> tail -> exit
-        //      \-> right -/     \-<--<-/
         // Here we would like two consecutive regions, but there is no *edge* between
         // the conditional and the loop to indicate the boundary, so we cannot separate them.
-        let (h, merge, tail) = build_cond_then_loop_cfg(false)?;
+        let (h, merge, tail) = build_cond_then_loop_cfg()?;
         let (merge, tail) = (merge.node(), tail.node());
         let [entry, exit]: [Node; 2] = h
             .children(h.root())
@@ -864,10 +861,11 @@ pub(crate) mod test {
         Ok(merge)
     }
 
-    // Result is merge and tail; loop header is (merge, if separate==true; unique successor of merge, if separate==false)
-    fn build_cond_then_loop_cfg(
-        separate: bool,
-    ) -> Result<(Hugr, BasicBlockID, BasicBlockID), BuildError> {
+    //      /-> left --\
+    // entry            > merge -> tail -> exit
+    //      \-> right -/     \-<--<-/
+    // Result is Hugr plus merge and tail blocks
+    fn build_cond_then_loop_cfg() -> Result<(Hugr, BasicBlockID, BasicBlockID), BuildError> {
         let mut cfg_builder = CFGBuilder::new(FunctionType::new(type_row![NAT], type_row![NAT]))?;
         let pred_const = cfg_builder.add_constant(Value::unit_sum(0, 2).expect("0 < 2"));
         let const_unit = cfg_builder.add_constant(Value::unary_unit_sum());
@@ -877,23 +875,13 @@ pub(crate) mod test {
             &pred_const,
         )?;
         let merge = build_then_else_merge_from_if(&mut cfg_builder, &const_unit, entry)?;
-        let head = if separate {
-            let h = n_identity(
-                cfg_builder
-                    .simple_block_builder(FunctionType::new(type_row![NAT], type_row![NAT]), 1)?,
-                &const_unit,
-            )?;
-            cfg_builder.branch(&merge, 0, &h)?;
-            h
-        } else {
-            merge
-        };
+        // The merge block is also the loop header (so it merges three incoming control-flow edges)
         let tail = n_identity(
             cfg_builder.simple_block_builder(FunctionType::new_endo(NAT), 2)?,
             &pred_const,
         )?;
-        cfg_builder.branch(&tail, 1, &head)?;
-        cfg_builder.branch(&head, 0, &tail)?; // trivial "loop body"
+        cfg_builder.branch(&tail, 1, &merge)?;
+        cfg_builder.branch(&merge, 0, &tail)?; // trivial "loop body"
         let exit = cfg_builder.exit_block();
         cfg_builder.branch(&tail, 0, &exit)?;
 
