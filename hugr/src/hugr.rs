@@ -345,9 +345,16 @@ pub enum HugrError {
 
 #[cfg(test)]
 mod test {
+    use cool_asserts::assert_matches;
+
     use super::{Hugr, HugrView};
     #[cfg(feature = "extension_inference")]
     use std::error::Error;
+
+    #[test]
+    fn test_assert_matches() {
+        assert_matches!(Some(5), Some(x) => x == 6);
+    }
 
     #[test]
     fn impls_send_and_sync() {
