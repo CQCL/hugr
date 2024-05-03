@@ -249,22 +249,78 @@ mod test {
     use std::collections::HashSet;
 
     use crate::algorithm::nest_cfgs::test::{
-        build_cond_then_loop_cfg, build_conditional_in_loop, build_conditional_in_loop_cfg, depth,
+        build_conditional_in_loop, build_conditional_in_loop_cfg, depth,
     };
     use crate::builder::{
-        Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder, SubContainer,
+        BlockBuilder, BuildError, CFGBuilder, Container, Dataflow, DataflowSubContainer,
+        HugrBuilder, ModuleBuilder, SubContainer,
     };
     use crate::extension::prelude::USIZE_T;
-    use crate::extension::PRELUDE_REGISTRY;
+    use crate::extension::{ExtensionSet, PRELUDE_REGISTRY};
     use crate::hugr::views::sibling::SiblingMut;
     use crate::hugr::HugrMut;
-    use crate::ops::handle::{BasicBlockID, CfgID, NodeHandle};
+    use crate::ops::constant::Value;
+    use crate::ops::handle::{BasicBlockID, CfgID, ConstID, NodeHandle};
     use crate::types::FunctionType;
-    use crate::{type_row, HugrView, Node};
+    use crate::{type_row, Hugr, HugrView, Node};
     use cool_asserts::assert_matches;
     use itertools::Itertools;
 
     use super::{OutlineCfg, OutlineCfgError};
+
+    // Result is merge and tail; loop header is (merge, if separate==true; unique successor of merge, if separate==false)
+    fn build_cond_then_loop_cfg(
+        separate: bool,
+    ) -> Result<(Hugr, BasicBlockID, BasicBlockID), BuildError> {
+        let block_ty = FunctionType::new_endo(USIZE_T);
+        let mut cfg_builder = CFGBuilder::new(block_ty.clone())?;
+        let pred_const = cfg_builder.add_constant(Value::unit_sum(0, 2).expect("0 < 2"));
+        let const_unit = cfg_builder.add_constant(Value::unary_unit_sum());
+        fn n_identity(
+            mut bbldr: BlockBuilder<&mut Hugr>,
+            cst: &ConstID,
+        ) -> Result<BasicBlockID, BuildError> {
+            let pred = bbldr.load_const(cst);
+            let vals = bbldr.input_wires();
+            bbldr.finish_with_outputs(pred, vals)
+        }
+        let id_block = |c: &mut CFGBuilder<_>| {
+            n_identity(c.simple_block_builder(block_ty.clone(), 1)?, &const_unit)
+        };
+
+        let entry = n_identity(
+            cfg_builder.simple_entry_builder(USIZE_T.into(), 2, ExtensionSet::new())?,
+            &pred_const,
+        )?;
+        let merge = {
+            let merge = id_block(&mut cfg_builder)?;
+            let left = id_block(&mut cfg_builder)?;
+            let right = id_block(&mut cfg_builder)?;
+            cfg_builder.branch(&entry, 0, &left)?;
+            cfg_builder.branch(&entry, 1, &right)?;
+            cfg_builder.branch(&left, 0, &merge)?;
+            cfg_builder.branch(&right, 0, &merge)?;
+            merge
+        };
+        let head = if separate {
+            let h = id_block(&mut cfg_builder)?;
+            cfg_builder.branch(&merge, 0, &h)?;
+            h
+        } else {
+            merge
+        };
+        let tail = n_identity(
+            cfg_builder.simple_block_builder(FunctionType::new_endo(USIZE_T), 2)?,
+            &pred_const,
+        )?;
+        cfg_builder.branch(&tail, 1, &head)?;
+        cfg_builder.branch(&head, 0, &tail)?; // trivial "loop body"
+        let exit = cfg_builder.exit_block();
+        cfg_builder.branch(&tail, 0, &exit)?;
+
+        let h = cfg_builder.finish_prelude_hugr()?;
+        Ok((h, merge, tail))
+    }
 
     #[test]
     fn test_outline_cfg_errors() {

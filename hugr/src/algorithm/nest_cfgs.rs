@@ -865,7 +865,7 @@ pub(crate) mod test {
     }
 
     // Result is merge and tail; loop header is (merge, if separate==true; unique successor of merge, if separate==false)
-    pub fn build_cond_then_loop_cfg(
+    fn build_cond_then_loop_cfg(
         separate: bool,
     ) -> Result<(Hugr, BasicBlockID, BasicBlockID), BuildError> {
         let mut cfg_builder = CFGBuilder::new(FunctionType::new(type_row![NAT], type_row![NAT]))?;
