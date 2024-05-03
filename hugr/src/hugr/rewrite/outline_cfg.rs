@@ -248,12 +248,10 @@ pub enum OutlineCfgError {
 mod test {
     use std::collections::HashSet;
 
-    use crate::algorithm::nest_cfgs::test::{
-        build_conditional_in_loop, build_conditional_in_loop_cfg, depth,
-    };
+    use crate::algorithm::nest_cfgs::test::{build_conditional_in_loop_cfg, depth};
     use crate::builder::{
         BlockBuilder, BuildError, CFGBuilder, Container, Dataflow, DataflowSubContainer,
-        HugrBuilder, ModuleBuilder, SubContainer,
+        HugrBuilder, ModuleBuilder,
     };
     use crate::extension::prelude::USIZE_T;
     use crate::extension::{ExtensionSet, PRELUDE_REGISTRY};
@@ -347,55 +345,49 @@ mod test {
 
     #[test]
     fn test_outline_cfg() {
-        let (mut h, head, tail) = build_conditional_in_loop_cfg(false).unwrap();
+        // Outline the loop:
+        //     /-> left -->\                                        /-> left -->\
+        // entry            merge -> head -> tail -> exit  ==>  entry            merge -> newblock -> exit
+        //     \-> right ->/           \-<--<-/                     \-> right ->/
+
+        let (mut h, merge, tail) = build_cond_then_loop_cfg().unwrap();
+        let (merge, tail) = (merge.node(), tail.node());
+        let exit = h.children(h.root()).skip(1).next().unwrap();
+        // Outline the loop
+        let head = h.input_neighbours(tail).exactly_one().unwrap();
+        assert_eq!(h.output_neighbours(merge.node()).collect_vec(), vec![head]);
         h.update_validate(&PRELUDE_REGISTRY).unwrap();
-        do_outline_cfg_test(&mut h, head, tail, 1);
-        h.update_validate(&PRELUDE_REGISTRY).unwrap();
+        let root = h.root();
+        let (new_block, new_cfg) = outline_cfg_check_parents(&mut h, root, vec![head, tail]);
+        assert_eq!(h.output_neighbours(merge).collect_vec(), vec![new_block]);
+        assert_eq!(h.input_neighbours(exit).collect_vec(), vec![new_block]);
+        let mut tail_outs = h.output_neighbours(tail).collect::<HashSet<Node>>();
+        assert!(tail_outs.remove(&head));
+        let new_exit = tail_outs.into_iter().exactly_one().unwrap();
+        assert_eq!(h.get_parent(new_exit), Some(new_cfg)); // no, new cfg
+        assert!(h.get_optype(new_exit).is_exit_block());
     }
 
-    fn do_outline_cfg_test(
+    fn outline_cfg_check_parents(
         h: &mut impl HugrMut,
-        head: BasicBlockID,
-        tail: BasicBlockID,
-        expected_depth: u32,
-    ) {
-        let head = head.node();
-        let tail = tail.node();
-        let parent = h.get_parent(head).unwrap();
-        let [entry, exit]: [Node; 2] = h.children(parent).take(2).collect_vec().try_into().unwrap();
-        //               /-> left --\
-        //  entry -> head            > merge -> tail -> exit
-        //            |  \-> right -/             |
-        //             \---<---<---<---<---<--<---/
-        // merge is unique predecessor of tail
-        let merge = h.input_neighbours(tail).exactly_one().ok().unwrap();
-        let [left, right]: [Node; 2] = h.output_neighbours(head).collect_vec().try_into().unwrap();
-        for n in [head, tail, merge] {
-            assert_eq!(depth(h.base_hugr(), n), expected_depth);
-        }
-        let blocks = [head, left, right, merge];
-        let (new_block, new_cfg) = h.apply_rewrite(OutlineCfg::new(blocks)).unwrap();
+        cfg: Node,
+        blocks: Vec<Node>,
+    ) -> (Node, Node) {
+        let mut other_blocks = h.children(cfg).collect::<HashSet<_>>();
+        assert!(blocks.iter().all(|b| other_blocks.remove(b)));
+        let (new_block, new_cfg) = h.apply_rewrite(OutlineCfg::new(blocks.clone())).unwrap();
+        // The .base_hugr() here in the asserts is to cope with `h`` potentially being a SiblingMut
         for n in blocks {
-            assert_eq!(depth(h.base_hugr(), n), expected_depth + 2);
+            assert_eq!(h.base_hugr().get_parent(n), Some(new_cfg));
         }
-        assert_eq!(
-            new_block,
-            h.output_neighbours(entry).exactly_one().ok().unwrap()
-        );
-        for n in [entry, exit, tail, new_block] {
-            assert_eq!(depth(h.base_hugr(), n), expected_depth);
-        }
-        assert_eq!(
-            h.input_neighbours(tail).exactly_one().ok().unwrap(),
-            new_block
-        );
-        assert_eq!(
-            h.output_neighbours(tail).take(2).collect::<HashSet<Node>>(),
-            HashSet::from([exit, new_block])
-        );
-        assert!(h.get_optype(new_block).is_dataflow_block());
         assert_eq!(h.base_hugr().get_parent(new_cfg), Some(new_block));
+        assert_eq!(h.get_parent(new_block), Some(cfg));
+        for n in other_blocks {
+            assert_eq!(h.get_parent(n), Some(cfg))
+        }
+        assert!(h.get_optype(new_block).is_dataflow_block());
         assert!(h.base_hugr().get_optype(new_cfg).is_cfg());
+        (new_block, new_cfg)
     }
 
     #[test]
@@ -408,24 +400,26 @@ mod test {
             )
             .unwrap();
         let [i1] = fbuild.input_wires_arr();
-        let mut cfg_builder = fbuild
-            .cfg_builder(
-                [(USIZE_T, i1)],
-                None,
-                type_row![USIZE_T],
-                Default::default(),
-            )
-            .unwrap();
-        let (head, tail) = build_conditional_in_loop(&mut cfg_builder, false).unwrap();
-        let cfg = cfg_builder.finish_sub_container().unwrap();
+        let (h, _, _) = build_cond_then_loop_cfg().unwrap();
+        let cfg = fbuild.add_hugr_with_wires(h, [i1]).unwrap();
         fbuild.finish_with_outputs(cfg.outputs()).unwrap();
         let mut h = module_builder.finish_prelude_hugr().unwrap();
-        do_outline_cfg_test(
-            &mut SiblingMut::<'_, CfgID>::try_new(&mut h, cfg.node()).unwrap(),
-            head,
-            tail,
-            3,
+        let cfg = cfg.node();
+        let exit_node = h.children(cfg).skip(1).next().unwrap();
+        let tail = h.input_neighbours(exit_node).exactly_one().unwrap();
+        let head = h.input_neighbours(tail).exactly_one().unwrap();
+        // Just sanity-check we have the correct nodes
+        assert!(h.get_optype(exit_node).is_exit_block());
+        assert_eq!(
+            h.output_neighbours(tail).collect::<HashSet<_>>(),
+            HashSet::from([head, exit_node])
         );
+        outline_cfg_check_parents(
+            &mut SiblingMut::<'_, CfgID>::try_new(&mut h, cfg).unwrap(),
+            cfg,
+            vec![head, tail],
+        );
+        h.update_validate(&PRELUDE_REGISTRY).unwrap();
     }
 
     #[test]
