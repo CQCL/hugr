@@ -615,7 +615,12 @@ pub(crate) mod test {
         )?;
         let (split, merge) = build_if_then_else_merge(&mut cfg_builder, &pred_const, &const_unit)?;
         cfg_builder.branch(&entry, 0, &split)?;
-        let (head, tail) = build_loop(&mut cfg_builder, &pred_const, &const_unit)?;
+        let head = n_identity(
+            cfg_builder
+                .simple_block_builder(FunctionType::new(type_row![NAT], type_row![NAT]), 1)?,
+            &const_unit,
+        )?;
+        let tail = build_loop_from_header(&mut cfg_builder, &pred_const, head)?;
         cfg_builder.branch(&head, 0, &tail)?; // trivial "loop body"
         cfg_builder.branch(&merge, 0, &head)?;
         let exit = cfg_builder.exit_block();
@@ -869,20 +874,6 @@ pub(crate) mod test {
         Ok(tail)
     }
 
-    // Result is header and tail. Caller must provide 0th successor of header (linking to tail), and 0th successor of tail.
-    fn build_loop<T: AsMut<Hugr> + AsRef<Hugr>>(
-        cfg: &mut CFGBuilder<T>,
-        const_pred: &ConstID,
-        unit_const: &ConstID,
-    ) -> Result<(BasicBlockID, BasicBlockID), BuildError> {
-        let header = n_identity(
-            cfg.simple_block_builder(FunctionType::new(type_row![NAT], type_row![NAT]), 1)?,
-            unit_const,
-        )?;
-        let tail = build_loop_from_header(cfg, const_pred, header)?;
-        Ok((header, tail))
-    }
-
     // Result is merge and tail; loop header is (merge, if separate==true; unique successor of merge, if separate==false)
     pub fn build_cond_then_loop_cfg(
         separate: bool,
@@ -940,7 +931,12 @@ pub(crate) mod test {
         let (split, merge) = build_if_then_else_merge(cfg_builder, &pred_const, &const_unit)?;
 
         let (head, tail) = if separate_headers {
-            let (head, tail) = build_loop(cfg_builder, &pred_const, &const_unit)?;
+            let head = n_identity(
+                cfg_builder
+                    .simple_block_builder(FunctionType::new(type_row![NAT], type_row![NAT]), 1)?,
+                &const_unit,
+            )?;
+            let tail = build_loop_from_header(cfg_builder, &pred_const, head)?;
             cfg_builder.branch(&head, 0, &split)?;
             (head, tail)
         } else {
