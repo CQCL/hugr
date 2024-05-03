@@ -268,10 +268,11 @@ mod test {
 
     use super::{OutlineCfg, OutlineCfgError};
 
-    // Result is merge and tail; loop header is (merge, if separate==true; unique successor of merge, if separate==false)
-    fn build_cond_then_loop_cfg(
-        separate: bool,
-    ) -> Result<(Hugr, BasicBlockID, BasicBlockID), BuildError> {
+    //      /-> left --\
+    // entry            > merge -> head -> tail -> exit
+    //      \-> right -/             \-<--<-/
+    // Result is Hugr plus merge and tail blocks
+    fn build_cond_then_loop_cfg() -> Result<(Hugr, BasicBlockID, BasicBlockID), BuildError> {
         let block_ty = FunctionType::new_endo(USIZE_T);
         let mut cfg_builder = CFGBuilder::new(block_ty.clone())?;
         let pred_const = cfg_builder.add_constant(Value::unit_sum(0, 2).expect("0 < 2"));
@@ -302,13 +303,8 @@ mod test {
             cfg_builder.branch(&right, 0, &merge)?;
             merge
         };
-        let head = if separate {
-            let h = id_block(&mut cfg_builder)?;
-            cfg_builder.branch(&merge, 0, &h)?;
-            h
-        } else {
-            merge
-        };
+        let head = id_block(&mut cfg_builder)?;
+        cfg_builder.branch(&merge, 0, &head)?;
         let tail = n_identity(
             cfg_builder.simple_block_builder(FunctionType::new_endo(USIZE_T), 2)?,
             &pred_const,
@@ -434,10 +430,7 @@ mod test {
 
     #[test]
     fn test_outline_cfg_move_entry() {
-        //      /-> left --\
-        // entry            > merge -> head -> tail -> exit
-        //      \-> right -/             \-<--<-/
-        let (mut h, merge, tail) = build_cond_then_loop_cfg(true).unwrap();
+        let (mut h, merge, tail) = build_cond_then_loop_cfg().unwrap();
 
         let (entry, exit) = h.children(h.root()).take(2).collect_tuple().unwrap();
         let (left, right) = h.output_neighbours(entry).take(2).collect_tuple().unwrap();
