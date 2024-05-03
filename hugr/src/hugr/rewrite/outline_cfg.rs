@@ -248,7 +248,6 @@ pub enum OutlineCfgError {
 mod test {
     use std::collections::HashSet;
 
-    use crate::algorithm::nest_cfgs::test::depth;
     use crate::builder::{
         BlockBuilder, BuildError, CFGBuilder, Container, Dataflow, DataflowSubContainer,
         HugrBuilder, ModuleBuilder,
@@ -364,36 +363,38 @@ mod test {
         assert_eq!(h.output_neighbours(merge.node()).collect_vec(), vec![head]);
         h.update_validate(&PRELUDE_REGISTRY).unwrap();
         let root = h.root();
-        let (new_block, new_cfg) = outline_cfg_check_parents(&mut h, root, vec![head, tail]);
+        let (new_block, _, exit_block) = outline_cfg_check_parents(&mut h, root, vec![head, tail]);
         assert_eq!(h.output_neighbours(merge).collect_vec(), vec![new_block]);
         assert_eq!(h.input_neighbours(exit).collect_vec(), vec![new_block]);
-        let mut tail_outs = h.output_neighbours(tail).collect::<HashSet<Node>>();
-        assert!(tail_outs.remove(&head));
-        let new_exit = tail_outs.into_iter().exactly_one().unwrap();
-        assert_eq!(h.get_parent(new_exit), Some(new_cfg)); // no, new cfg
-        assert!(h.get_optype(new_exit).is_exit_block());
+        assert_eq!(
+            h.output_neighbours(tail).collect::<HashSet<Node>>(),
+            HashSet::from([head, exit_block])
+        );
     }
 
     fn outline_cfg_check_parents(
         h: &mut impl HugrMut,
         cfg: Node,
         blocks: Vec<Node>,
-    ) -> (Node, Node) {
+    ) -> (Node, Node, Node) {
         let mut other_blocks = h.children(cfg).collect::<HashSet<_>>();
         assert!(blocks.iter().all(|b| other_blocks.remove(b)));
         let (new_block, new_cfg) = h.apply_rewrite(OutlineCfg::new(blocks.clone())).unwrap();
-        // The .base_hugr() here in the asserts is to cope with `h`` potentially being a SiblingMut
-        for n in blocks {
-            assert_eq!(h.base_hugr().get_parent(n), Some(new_cfg));
-        }
-        assert_eq!(h.base_hugr().get_parent(new_cfg), Some(new_block));
-        assert_eq!(h.get_parent(new_block), Some(cfg));
+
         for n in other_blocks {
             assert_eq!(h.get_parent(n), Some(cfg))
         }
+        assert_eq!(h.get_parent(new_block), Some(cfg));
         assert!(h.get_optype(new_block).is_dataflow_block());
-        assert!(h.base_hugr().get_optype(new_cfg).is_cfg());
-        (new_block, new_cfg)
+        let b = h.base_hugr(); // To cope with `h`` potentially being a SiblingMut
+        assert_eq!(b.get_parent(new_cfg), Some(new_block));
+        for n in blocks {
+            assert_eq!(b.get_parent(n), Some(new_cfg));
+        }
+        assert!(b.get_optype(new_cfg).is_cfg());
+        let exit_block = b.children(new_cfg).skip(1).next().unwrap();
+        assert!(b.get_optype(exit_block).is_exit_block());
+        (new_block, new_cfg, exit_block)
     }
 
     #[test]
@@ -432,30 +433,17 @@ mod test {
     fn test_outline_cfg_move_entry() {
         let (mut h, merge, tail) = build_cond_then_loop_cfg().unwrap();
 
-        let (entry, exit) = h.children(h.root()).take(2).collect_tuple().unwrap();
+        let (entry, _) = h.children(h.root()).take(2).collect_tuple().unwrap();
         let (left, right) = h.output_neighbours(entry).take(2).collect_tuple().unwrap();
-        let (merge, tail) = (merge.node(), tail.node());
+        let (merge, _) = (merge.node(), tail.node());
         let head = h.output_neighbours(merge).exactly_one().unwrap();
 
         h.validate(&PRELUDE_REGISTRY).unwrap();
-        let blocks_to_move = [entry, left, right, merge];
-        let other_blocks = [head, tail, exit];
-        for &n in blocks_to_move.iter().chain(other_blocks.iter()) {
-            assert_eq!(depth(&h, n), 1);
-        }
-        let (new_block, new_cfg) = h
-            .apply_rewrite(OutlineCfg::new(blocks_to_move.iter().copied()))
-            .unwrap();
+        let root = h.root();
+        let (new_block, _, _) =
+            outline_cfg_check_parents(&mut h, root, vec![entry, left, right, merge]);
         h.update_validate(&PRELUDE_REGISTRY).unwrap();
         assert_eq!(new_block, h.children(h.root()).next().unwrap());
-        assert!(h.get_optype(new_block).is_dataflow_block());
-        assert_eq!(h.get_parent(new_cfg), Some(new_block));
-        assert!(h.get_optype(new_cfg).is_cfg());
-        for n in other_blocks {
-            assert_eq!(depth(&h, n), 1);
-        }
-        for n in blocks_to_move {
-            assert_eq!(h.get_parent(n).unwrap(), new_cfg);
-        }
+        assert_eq!(h.output_neighbours(new_block).collect_vec(), [head]);
     }
 }
