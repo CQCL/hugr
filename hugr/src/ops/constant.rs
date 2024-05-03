@@ -113,6 +113,13 @@ impl PartialEq for ExtensionValue {
     }
 }
 
+impl ExtensionValue {
+    /// TODO
+    pub fn new(konst: impl CustomConst) -> Self {
+        Self(Box::new(konst))
+    }
+}
+
 /// Struct for custom type check fails.
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
 #[non_exhaustive]

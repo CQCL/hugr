@@ -562,25 +562,6 @@
             "title": "CustomOp",
             "type": "object"
         },
-        "CustomTypeArg": {
-            "additionalProperties": true,
-            "properties": {
-                "typ": {
-                    "title": "Typ",
-                    "type": "null"
-                },
-                "value": {
-                    "title": "Value",
-                    "type": "string"
-                }
-            },
-            "required": [
-                "typ",
-                "value"
-            ],
-            "title": "CustomTypeArg",
-            "type": "object"
-        },
         "DFG": {
             "additionalProperties": true,
             "description": "A simply nested dataflow graph.",
@@ -1505,12 +1486,34 @@
                     "title": "Tya",
                     "type": "string"
                 },
-                "arg": {
-                    "$ref": "#/$defs/CustomTypeArg"
+                "extension": {
+                    "title": "Extension",
+                    "type": "string"
+                },
+                "id": {
+                    "title": "Id",
+                    "type": "string"
+                },
+                "args": {
+                    "items": {
+                        "$ref": "#/$defs/TypeArg"
+                    },
+                    "title": "Args",
+                    "type": "array"
+                },
+                "bound": {
+                    "$ref": "#/$defs/TypeBound"
+                },
+                "value": {
+                    "title": "Value"
                 }
             },
             "required": [
-                "arg"
+                "extension",
+                "id",
+                "args",
+                "bound",
+                "value"
             ],
             "title": "OpaqueArg",
             "type": "object"
@@ -1634,16 +1637,16 @@
                     "title": "Tya",
                     "type": "string"
                 },
-                "args": {
+                "elems": {
                     "items": {
                         "$ref": "#/$defs/TypeArg"
                     },
-                    "title": "Args",
+                    "title": "Elems",
                     "type": "array"
                 }
             },
             "required": [
-                "args"
+                "elems"
             ],
             "title": "SequenceArg",
             "type": "object"
@@ -1943,7 +1946,8 @@
                     "Extensions": "#/$defs/ExtensionsArg",
                     "Opaque": "#/$defs/OpaqueArg",
                     "Sequence": "#/$defs/SequenceArg",
-                    "Type": "#/$defs/TypeTypeArg"
+                    "Type": "#/$defs/TypeTypeArg",
+                    "Variable": "#/$defs/VariableArg"
                 },
                 "propertyName": "tya"
             },
@@ -1962,6 +1966,9 @@
                 },
                 {
                     "$ref": "#/$defs/ExtensionsArg"
+                },
+                {
+                    "$ref": "#/$defs/VariableArg"
                 }
             ],
             "title": "TypeArg"
@@ -2194,6 +2201,32 @@
                 "b"
             ],
             "title": "Variable",
+            "type": "object"
+        },
+        "VariableArg": {
+            "properties": {
+                "tya": {
+                    "const": "Variable",
+                    "default": "Variable",
+                    "enum": [
+                        "Variable"
+                    ],
+                    "title": "Tya",
+                    "type": "string"
+                },
+                "idx": {
+                    "title": "Idx",
+                    "type": "integer"
+                },
+                "cached_decl": {
+                    "$ref": "#/$defs/TypeParam"
+                }
+            },
+            "required": [
+                "idx",
+                "cached_decl"
+            ],
+            "title": "VariableArg",
             "type": "object"
         }
     },
