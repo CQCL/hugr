@@ -620,7 +620,11 @@ pub(crate) mod test {
                 .simple_block_builder(FunctionType::new(type_row![NAT], type_row![NAT]), 1)?,
             &const_unit,
         )?;
-        let tail = build_loop_from_header(&mut cfg_builder, &pred_const, head)?;
+        let tail = n_identity(
+            cfg_builder.simple_block_builder(FunctionType::new_endo(NAT), 2)?,
+            &pred_const,
+        )?;
+        cfg_builder.branch(&tail, 1, &head)?;
         cfg_builder.branch(&head, 0, &tail)?; // trivial "loop body"
         cfg_builder.branch(&merge, 0, &head)?;
         let exit = cfg_builder.exit_block();
@@ -860,20 +864,6 @@ pub(crate) mod test {
         Ok(merge)
     }
 
-    // Returns loop tail - caller must link header to tail, and provide 0th successor of tail
-    fn build_loop_from_header<T: AsMut<Hugr> + AsRef<Hugr>>(
-        cfg: &mut CFGBuilder<T>,
-        const_pred: &ConstID,
-        header: BasicBlockID,
-    ) -> Result<BasicBlockID, BuildError> {
-        let tail = n_identity(
-            cfg.simple_block_builder(FunctionType::new(type_row![NAT], type_row![NAT]), 2)?,
-            const_pred,
-        )?;
-        cfg.branch(&tail, 1, &header)?;
-        Ok(tail)
-    }
-
     // Result is merge and tail; loop header is (merge, if separate==true; unique successor of merge, if separate==false)
     pub fn build_cond_then_loop_cfg(
         separate: bool,
@@ -898,7 +888,11 @@ pub(crate) mod test {
         } else {
             merge
         };
-        let tail = build_loop_from_header(&mut cfg_builder, &pred_const, head)?;
+        let tail = n_identity(
+            cfg_builder.simple_block_builder(FunctionType::new_endo(NAT), 2)?,
+            &pred_const,
+        )?;
+        cfg_builder.branch(&tail, 1, &head)?;
         cfg_builder.branch(&head, 0, &tail)?; // trivial "loop body"
         let exit = cfg_builder.exit_block();
         cfg_builder.branch(&tail, 0, &exit)?;
@@ -942,7 +936,11 @@ pub(crate) mod test {
             // Combine loop header with split.
             split
         };
-        let tail = build_loop_from_header(cfg_builder, &pred_const, head)?;
+        let tail = n_identity(
+            cfg_builder.simple_block_builder(FunctionType::new_endo(NAT), 2)?,
+            &pred_const,
+        )?;
+        cfg_builder.branch(&tail, 1, &head)?;
         cfg_builder.branch(&merge, 0, &tail)?;
 
         let exit = cfg_builder.exit_block();
