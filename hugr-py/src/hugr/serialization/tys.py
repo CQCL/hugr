@@ -117,10 +117,7 @@ class BoundedNatArg(ConfiguredBaseModel):
 
 class OpaqueArg(ConfiguredBaseModel):
     tya: Literal["Opaque"] = "Opaque"
-    extension: ExtensionId
-    id: str  # Unique identifier of the opaque type.
-    args: list["TypeArg"]
-    bound: "TypeBound"
+    typ: "Opaque"
     value: Any
 
 
@@ -283,11 +280,15 @@ class TypeBound(Enum):
 class Opaque(ConfiguredBaseModel):
     """An opaque Type that can be downcasted by the extensions that define it."""
 
-    t: Literal["Opaque"] = "Opaque"
     extension: ExtensionId
     id: str  # Unique identifier of the opaque type.
     args: list[TypeArg]
     bound: TypeBound
+
+
+class TaggedOpaque(ConfiguredBaseModel):
+    t: Literal["Opaque"] = "Opaque"
+    o: Opaque
 
 
 class Alias(ConfiguredBaseModel):
@@ -319,7 +320,7 @@ class Type(RootModel):
         | FunctionType
         | Array
         | TaggedSumType
-        | Opaque
+        | TaggedOpaque
         | Alias,
         WrapValidator(_json_custom_error_validator),
     ] = Field(discriminator="t")

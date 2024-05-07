@@ -1438,15 +1438,6 @@
             "additionalProperties": false,
             "description": "An opaque Type that can be downcasted by the extensions that define it.",
             "properties": {
-                "t": {
-                    "const": "Opaque",
-                    "default": "Opaque",
-                    "enum": [
-                        "Opaque"
-                    ],
-                    "title": "T",
-                    "type": "string"
-                },
                 "extension": {
                     "title": "Extension",
                     "type": "string"
@@ -1487,33 +1478,15 @@
                     "title": "Tya",
                     "type": "string"
                 },
-                "extension": {
-                    "title": "Extension",
-                    "type": "string"
-                },
-                "id": {
-                    "title": "Id",
-                    "type": "string"
-                },
-                "args": {
-                    "items": {
-                        "$ref": "#/$defs/TypeArg"
-                    },
-                    "title": "Args",
-                    "type": "array"
-                },
-                "bound": {
-                    "$ref": "#/$defs/TypeBound"
+                "typ": {
+                    "$ref": "#/$defs/Opaque"
                 },
                 "value": {
                     "title": "Value"
                 }
             },
             "required": [
-                "extension",
-                "id",
-                "args",
-                "bound",
+                "typ",
                 "value"
             ],
             "title": "OpaqueArg",
@@ -1761,6 +1734,28 @@
             "title": "Tag",
             "type": "object"
         },
+        "TaggedOpaque": {
+            "additionalProperties": false,
+            "properties": {
+                "t": {
+                    "const": "Opaque",
+                    "default": "Opaque",
+                    "enum": [
+                        "Opaque"
+                    ],
+                    "title": "T",
+                    "type": "string"
+                },
+                "o": {
+                    "$ref": "#/$defs/Opaque"
+                }
+            },
+            "required": [
+                "o"
+            ],
+            "title": "TaggedOpaque",
+            "type": "object"
+        },
         "TaggedSumType": {
             "additionalProperties": false,
             "properties": {
@@ -1904,7 +1899,7 @@
                     "Array": "#/$defs/Array",
                     "G": "#/$defs/FunctionType",
                     "I": "#/$defs/USize",
-                    "Opaque": "#/$defs/Opaque",
+                    "Opaque": "#/$defs/TaggedOpaque",
                     "Q": "#/$defs/Qubit",
                     "Sum": "#/$defs/TaggedSumType",
                     "V": "#/$defs/Variable"
@@ -1931,7 +1926,7 @@
                     "$ref": "#/$defs/TaggedSumType"
                 },
                 {
-                    "$ref": "#/$defs/Opaque"
+                    "$ref": "#/$defs/TaggedOpaque"
                 },
                 {
                     "$ref": "#/$defs/Alias"
