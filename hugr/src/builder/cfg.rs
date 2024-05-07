@@ -405,7 +405,6 @@ pub(crate) mod test {
     use crate::hugr::validate::InterGraphEdgeError;
     use crate::hugr::ValidationError;
     use crate::{builder::test::NAT, type_row};
-    use cool_asserts::assert_matches;
 
     use super::*;
     #[test]
@@ -442,7 +441,7 @@ pub(crate) mod test {
     fn basic_cfg_hugr() -> Result<(), BuildError> {
         let mut cfg_builder = CFGBuilder::new(FunctionType::new(type_row![NAT], type_row![NAT]))?;
         build_basic_cfg(&mut cfg_builder)?;
-        assert_matches!(cfg_builder.finish_prelude_hugr(), Ok(_));
+        assert!(cfg_builder.finish_prelude_hugr().is_ok());
 
         Ok(())
     }
@@ -495,7 +494,7 @@ pub(crate) mod test {
         let exit = cfg_builder.exit_block();
         cfg_builder.branch(&entry, 0, &middle)?;
         cfg_builder.branch(&middle, 0, &exit)?;
-        assert_matches!(cfg_builder.finish_prelude_hugr(), Ok(_));
+        assert!(cfg_builder.finish_prelude_hugr().is_ok());
 
         Ok(())
     }
@@ -524,12 +523,12 @@ pub(crate) mod test {
         let exit = cfg_builder.exit_block();
         cfg_builder.branch(&entry, 0, &middle)?;
         cfg_builder.branch(&middle, 0, &exit)?;
-        assert_matches!(
+        assert!(matches!(
             cfg_builder.finish_prelude_hugr(),
             Err(ValidationError::InterGraphEdgeError(
                 InterGraphEdgeError::NonDominatedAncestor { .. }
             ))
-        );
+        ));
 
         Ok(())
     }

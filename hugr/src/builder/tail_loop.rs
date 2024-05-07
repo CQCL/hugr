@@ -89,7 +89,6 @@ impl TailLoopBuilder<Hugr> {
 
 #[cfg(test)]
 mod test {
-    use cool_asserts::assert_matches;
 
     use crate::{
         builder::{
@@ -116,7 +115,7 @@ mod test {
             loop_b.finish_prelude_hugr()
         };
 
-        assert_matches!(build_result, Ok(_));
+        assert!(build_result.is_ok());
         Ok(())
     }
 
@@ -186,7 +185,7 @@ mod test {
             module_builder.finish_prelude_hugr()
         };
 
-        assert_matches!(build_result, Ok(_));
+        assert!(build_result.is_ok());
 
         Ok(())
     }

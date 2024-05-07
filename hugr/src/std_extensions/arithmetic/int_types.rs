@@ -207,7 +207,6 @@ pub(super) fn int_tv(var_id: usize) -> Type {
 }
 #[cfg(test)]
 mod test {
-    use cool_asserts::assert_matches;
 
     use super::*;
 
@@ -222,13 +221,13 @@ mod test {
     #[test]
     fn test_int_widths() {
         let type_arg_32 = TypeArg::BoundedNat { n: 5 };
-        assert_matches!(get_log_width(&type_arg_32), Ok(5));
+        assert!(matches!(get_log_width(&type_arg_32), Ok(5)));
 
         let type_arg_128 = TypeArg::BoundedNat { n: 7 };
-        assert_matches!(
+        assert!(matches!(
             get_log_width(&type_arg_128),
             Err(TypeArgError::TypeMismatch { .. })
-        );
+        ));
     }
 
     #[test]
@@ -240,18 +239,18 @@ mod test {
         assert_ne!(const_u32_7, const_u32_8);
         assert_eq!(const_u32_7, ConstInt::new_u(5, 7));
 
-        assert_matches!(
+        assert!(matches!(
             ConstInt::new_u(3, 256),
             Err(ConstTypeError::CustomCheckFail(_))
-        );
-        assert_matches!(
+        ));
+        assert!(matches!(
             ConstInt::new_u(9, 256),
             Err(ConstTypeError::CustomCheckFail(_))
-        );
-        assert_matches!(
+        ));
+        assert!(matches!(
             ConstInt::new_s(3, 128),
             Err(ConstTypeError::CustomCheckFail(_))
-        );
+        ));
         assert!(ConstInt::new_s(3, -128).is_ok());
 
         let const_u32_7 = const_u32_7.unwrap();

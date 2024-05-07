@@ -23,7 +23,6 @@ use crate::{
 use crate::type_row;
 use crate::types::{FunctionType, Type, TypeRow};
 
-use cool_asserts::assert_matches;
 use itertools::Itertools;
 use portgraph::NodeIndex;
 
@@ -56,7 +55,7 @@ fn from_graph() -> Result<(), Box<dyn Error>> {
     let input = hugr.add_node_with_parent(hugr.root(), input);
     let output = hugr.add_node_with_parent(hugr.root(), output);
 
-    assert_matches!(hugr.get_io(hugr.root()), Some(_));
+    assert!(hugr.get_io(hugr.root()).is_some());
 
     let add_a_sig = FunctionType::new(type_row![NAT], type_row![NAT]).with_extension_delta(A);
 
@@ -178,10 +177,10 @@ fn missing_lift_node() {
     // Fail to catch the actual error because it's a difference between I/O
     // nodes and their parents and `report_mismatch` isn't yet smart enough
     // to handle that.
-    assert_matches!(
+    assert!(matches!(
         hugr.update_validate(&PRELUDE_REGISTRY),
         Err(ValidationError::CantInfer(_))
-    );
+    ));
 }
 
 #[test]
@@ -820,10 +819,10 @@ fn test_validate_with_closure() -> Result<(), Box<dyn Error>> {
 
     // All three can be inferred and validated, without writing solutions in:
     for inner in [&inner_open, &inner_prelude, &inner_other] {
-        assert_matches!(
+        assert!(matches!(
             inner.validate(&PRELUDE_REGISTRY),
             Err(ValidationError::ExtensionError(_))
-        );
+        ));
 
         let soln = infer_extensions(inner)?;
         inner.validate_with_extension_closure(soln, &PRELUDE_REGISTRY)?;
@@ -846,10 +845,10 @@ fn test_validate_with_closure() -> Result<(), Box<dyn Error>> {
     }
 
     // ...but fails if the inner DFG already has the 'wrong' extensions:
-    assert_matches!(
+    assert!(matches!(
         build_outer_prelude(inner_other.clone()).update_validate(&PRELUDE_REGISTRY),
         Err(ValidationError::CantInfer(_))
-    );
+    ));
 
     // If we do inference on the inner Hugr first, this (still) works if the
     // inner DFG already had the correct input-extensions:
@@ -861,10 +860,10 @@ fn test_validate_with_closure() -> Result<(), Box<dyn Error>> {
     // infers an incorrect (empty) solution:
     let mut inner_inferred = inner_open;
     inner_inferred.update_validate(&PRELUDE_REGISTRY)?;
-    assert_matches!(
+    assert!(matches!(
         build_outer_prelude(inner_inferred).update_validate(&PRELUDE_REGISTRY),
         Err(ValidationError::CantInfer(_))
-    );
+    ));
 
     Ok(())
 }
@@ -1051,12 +1050,12 @@ fn funcdefn_signature_mismatch() -> Result<(), Box<dyn Error>> {
     let [w] = lift.outputs_arr();
     func_builder.finish_with_outputs([w])?;
     let result = builder.finish_prelude_hugr();
-    assert_matches!(
+    assert!(matches!(
         result,
         Err(ValidationError::CantInfer(
             InferExtensionError::MismatchedConcreteWithLocations { .. }
         ))
-    );
+    ));
     Ok(())
 }
 
@@ -1078,6 +1077,6 @@ fn funcdefn_signature_mismatch2() -> Result<(), Box<dyn Error>> {
     let [w] = func_builder.input_wires_arr();
     func_builder.finish_with_outputs([w])?;
     let result = builder.finish_prelude_hugr();
-    assert_matches!(result, Err(ValidationError::CantInfer(..)));
+    assert!(matches!(result, Err(ValidationError::CantInfer(..))));
     Ok(())
 }

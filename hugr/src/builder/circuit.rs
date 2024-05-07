@@ -235,7 +235,6 @@ impl<'a, T: Dataflow + ?Sized> CircuitBuilder<'a, T> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use cool_asserts::assert_matches;
 
     use crate::utils::test_quantum_extension::{cx_gate, h_gate, measure, q_alloc, q_discard};
     use crate::{
@@ -273,7 +272,7 @@ mod test {
             },
         );
 
-        assert_matches!(build_res, Ok(_));
+        assert!(build_res.is_ok());
     }
 
     #[test]
@@ -305,7 +304,7 @@ mod test {
             },
         );
 
-        assert_matches!(build_res, Ok(_));
+        assert!(build_res.is_ok());
     }
 
     #[test]
@@ -341,7 +340,7 @@ mod test {
             },
         );
 
-        assert_matches!(build_res, Ok(_));
+        assert!(build_res.is_ok());
     }
 
     #[test]
@@ -354,25 +353,25 @@ mod test {
                 let invalid_index = 0xff;
 
                 // Passing an invalid linear index returns an error
-                assert_matches!(
+                assert!(matches!(
                     circ.append(cx_gate(), [q0, invalid_index]),
                     Err(BuildError::CircuitError(CircuitBuildError::InvalidWireIndex { op, invalid_index: idx }))
                     if op == Some(cx_gate().into()) && idx == invalid_index,
-                );
+                ));
 
                 // Untracking an invalid index returns an error
-                assert_matches!(
+                assert!(matches!(
                     circ.untrack_wire(invalid_index),
                     Err(CircuitBuildError::InvalidWireIndex { op: None, invalid_index: idx })
                     if idx == invalid_index,
-                );
+                ));
 
                 // Passing a linear index to an operation without a corresponding output returns an error
-                assert_matches!(
+                assert!(matches!(
                     circ.append(q_discard(), [q1]),
                     Err(BuildError::CircuitError(CircuitBuildError::MismatchedLinearInputs { op, index }))
                     if op == q_discard().into() && index == [q1],
-                );
+                ));
 
                 let outs = circ.finish();
 

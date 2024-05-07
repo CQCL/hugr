@@ -446,23 +446,23 @@ mod test {
         println!("{}", serde_json::to_string_pretty(&good_sum).unwrap());
 
         let res = Value::sum(0, [], pred_ty.clone());
-        assert_matches!(
+        assert!(matches!(
             res,
             Err(ConstTypeError::SumType(SumTypeError::WrongVariantLength {
                 tag: 0,
                 expected: 2,
                 found: 0
             }))
-        );
+        ));
 
         let res = Value::sum(4, [], pred_ty.clone());
-        assert_matches!(
+        assert!(matches!(
             res,
             Err(ConstTypeError::SumType(SumTypeError::InvalidTag {
                 tag: 4,
                 num_variants: 2
             }))
-        );
+        ));
 
         let res = Value::sum(0, [const_usize(), const_usize()], pred_ty);
         assert_matches!(
