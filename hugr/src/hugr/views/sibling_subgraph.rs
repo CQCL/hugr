@@ -684,8 +684,6 @@ pub enum InvalidSubgraphBoundary {
 mod tests {
     use std::error::Error;
 
-    use cool_asserts::assert_matches;
-
     use crate::extension::PRELUDE_REGISTRY;
     use crate::utils::test_quantum_extension::cx_gate;
     use crate::{
@@ -897,7 +895,7 @@ mod tests {
         let [inp, _] = hugr.get_io(func_root).unwrap();
         let first_cx_edge = hugr.node_outputs(inp).next().unwrap();
         // All graph but one edge
-        assert_matches!(
+        assert!(matches!(
             SiblingSubgraph::try_new(
                 vec![hugr
                     .linked_ports(inp, first_cx_edge)
@@ -909,7 +907,7 @@ mod tests {
             Err(InvalidSubgraph::InvalidBoundary(
                 InvalidSubgraphBoundary::DisconnectedBoundaryPort(_, _)
             ))
-        );
+        ));
     }
 
     #[test]
@@ -924,13 +922,14 @@ mod tests {
         let not1_out = hugr.node_outputs(not1).next().unwrap();
         let not3_inp = hugr.node_inputs(not3).next().unwrap();
         let not3_out = hugr.node_outputs(not3).next().unwrap();
-        assert_matches!(
+        assert_eq!(
             SiblingSubgraph::try_new(
                 vec![vec![(not1, not1_inp)], vec![(not3, not3_inp)]],
                 vec![(not1, not1_out), (not3, not3_out)],
                 &func
-            ),
-            Err(InvalidSubgraph::NotConvex)
+            )
+            .unwrap_err(),
+            InvalidSubgraph::NotConvex
         );
     }
 
@@ -942,7 +941,7 @@ mod tests {
         let cx_edges_in = hugr.node_outputs(inp);
         let cx_edges_out = hugr.node_inputs(out);
         // All graph but the CX
-        assert_matches!(
+        assert!(matches!(
             SiblingSubgraph::try_new(
                 cx_edges_out.map(|p| vec![(out, p)]).collect(),
                 cx_edges_in.map(|p| (inp, p)).collect(),
@@ -951,7 +950,7 @@ mod tests {
             Err(InvalidSubgraph::InvalidBoundary(
                 InvalidSubgraphBoundary::DisconnectedBoundaryPort(_, _)
             ))
-        );
+        ));
     }
 
     #[test]

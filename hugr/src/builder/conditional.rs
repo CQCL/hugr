@@ -205,7 +205,6 @@ impl CaseBuilder<Hugr> {
 }
 #[cfg(test)]
 mod test {
-    use cool_asserts::assert_matches;
 
     use crate::builder::{DataflowSubContainer, ModuleBuilder};
 
@@ -267,7 +266,7 @@ mod test {
             Ok(module_builder.finish_prelude_hugr()?)
         };
 
-        assert_matches!(build_result, Ok(_));
+        assert!(build_result.is_ok());
 
         Ok(())
     }
@@ -281,12 +280,12 @@ mod test {
             ExtensionSet::new(),
         )?;
         n_identity(builder.case_builder(0)?)?;
-        assert_matches!(
+        assert!(matches!(
             builder.finish_sub_container().map(|_| ()),
             Err(BuildError::ConditionalError(
                 ConditionalBuildError::NotAllCasesBuilt { .. }
             ))
-        );
+        ));
         Ok(())
     }
 
@@ -299,12 +298,12 @@ mod test {
             ExtensionSet::new(),
         )?;
         n_identity(builder.case_builder(0)?)?;
-        assert_matches!(
+        assert!(matches!(
             builder.case_builder(0).map(|_| ()),
             Err(BuildError::ConditionalError(
                 ConditionalBuildError::CaseBuilt { .. }
             ))
-        );
+        ));
         Ok(())
     }
 }

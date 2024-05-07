@@ -238,18 +238,18 @@ fn test_ext_edge() {
     h.connect(input, 0, sub_dfg, 0);
     h.connect(sub_dfg, 0, output, 0);
 
-    assert_matches!(
+    assert!(matches!(
         h.update_validate(&EMPTY_REG),
         Err(ValidationError::UnconnectedPort { .. })
-    );
+    ));
 
     h.connect(input, 1, sub_op, 1);
-    assert_matches!(
+    assert!(matches!(
         h.update_validate(&EMPTY_REG),
         Err(ValidationError::InterGraphEdgeError(
             InterGraphEdgeError::MissingOrderEdge { .. }
         ))
-    );
+    ));
     //Order edge. This will need metadata indicating its purpose.
     h.add_other_edge(input, sub_dfg);
     h.update_validate(&EMPTY_REG).unwrap();
@@ -303,7 +303,10 @@ fn dfg_with_cycles() {
     h.connect(input, 1, not2, 0);
     h.connect(not2, 0, output, 0);
     // The graph contains a cycle:
-    assert_matches!(h.validate(&EMPTY_REG), Err(ValidationError::NotADag { .. }));
+    assert!(matches!(
+        h.validate(&EMPTY_REG),
+        Err(ValidationError::NotADag { .. })
+    ));
 }
 
 fn identity_hugr_with_type(t: Type) -> (Hugr, Node) {
@@ -486,7 +489,7 @@ fn nested_typevars() -> Result<(), Box<dyn std::error::Error>> {
         outer.finish_prelude_hugr_with_outputs([w])
     }
     assert!(build(Type::new_var_use(0, INNER_BOUND)).is_ok());
-    assert_matches!(
+    assert!(matches!(
         build(Type::new_var_use(1, OUTER_BOUND)).unwrap_err(),
         BuildError::InvalidHUGR(ValidationError::SignatureError {
             cause: SignatureError::FreeTypeVar {
@@ -495,7 +498,7 @@ fn nested_typevars() -> Result<(), Box<dyn std::error::Error>> {
             },
             ..
         })
-    );
+    ));
     assert_matches!(build(Type::new_var_use(0, OUTER_BOUND)).unwrap_err(),
         BuildError::InvalidHUGR(ValidationError::SignatureError { cause: SignatureError::TypeVarDoesNotMatchDeclaration { actual, cached }, .. }) =>
         {assert_eq!(actual, INNER_BOUND.into()); assert_eq!(cached, OUTER_BOUND.into())});
@@ -529,7 +532,7 @@ fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
     )));
     let cst = def.add_load_const(empty_list);
     let res = def.finish_hugr_with_outputs([cst], &reg);
-    assert_matches!(
+    assert!(matches!(
         res.unwrap_err(),
         BuildError::InvalidHUGR(ValidationError::SignatureError {
             cause: SignatureError::FreeTypeVar {
@@ -538,7 +541,7 @@ fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
             },
             ..
         })
-    );
+    ));
     Ok(())
 }
 
@@ -639,10 +642,10 @@ mod extension_tests {
             }),
         )
         .unwrap();
-        assert_matches!(
+        assert!(matches!(
             b.validate(&EMPTY_REG),
             Err(ValidationError::ContainerWithoutChildren { .. })
-        );
+        ));
         let cfg = copy;
 
         // Construct a valid CFG, with one BasicBlock node and one exit node
@@ -748,12 +751,12 @@ mod extension_tests {
         hugr.connect(lift, 0, output, 0);
 
         let result = hugr.validate(&PRELUDE_REGISTRY);
-        assert_matches!(
+        assert!(matches!(
             result,
             Err(ValidationError::ExtensionError(
                 ExtensionError::ParentIOExtensionMismatch { .. }
             ))
-        );
+        ));
     }
 
     #[test]
@@ -780,12 +783,12 @@ mod extension_tests {
         main.finish_with_outputs([f_output])?;
         let handle = module_builder.hugr().validate(&PRELUDE_REGISTRY);
 
-        assert_matches!(
+        assert!(matches!(
             handle,
             Err(ValidationError::ExtensionError(
                 ExtensionError::TgtExceedsSrcExtensionsAtPort { .. }
             ))
-        );
+        ));
         Ok(())
     }
 
@@ -810,12 +813,12 @@ mod extension_tests {
         let [f_output] = f_handle.outputs_arr();
         main.finish_with_outputs([f_output])?;
         let handle = module_builder.hugr().validate(&PRELUDE_REGISTRY);
-        assert_matches!(
+        assert!(matches!(
             handle,
             Err(ValidationError::ExtensionError(
                 ExtensionError::SrcExceedsTgtExtensionsAtPort { .. }
             ))
-        );
+        ));
         Ok(())
     }
 
@@ -863,12 +866,12 @@ mod extension_tests {
 
         main.finish_with_outputs([output])?;
         let handle = module_builder.hugr().validate(&PRELUDE_REGISTRY);
-        assert_matches!(
+        assert!(matches!(
             handle,
             Err(ValidationError::ExtensionError(
                 ExtensionError::TgtExceedsSrcExtensionsAtPort { .. }
             ))
-        );
+        ));
         Ok(())
     }
 
@@ -897,11 +900,11 @@ mod extension_tests {
         );
         hugr.connect(input, 0, output, 0);
 
-        assert_matches!(
+        assert!(matches!(
             hugr.validate(&PRELUDE_REGISTRY),
             Err(ValidationError::ExtensionError(
                 ExtensionError::TgtExceedsSrcExtensionsAtPort { .. }
             ))
-        );
+        ));
     }
 }

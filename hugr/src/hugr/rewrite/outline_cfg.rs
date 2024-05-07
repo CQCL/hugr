@@ -280,7 +280,7 @@ mod test {
         h.validate(&PRELUDE_REGISTRY).unwrap();
         let backup = h.clone();
         let r = h.apply_rewrite(OutlineCfg::new([merge, tail]));
-        assert_matches!(r, Err(OutlineCfgError::MultipleExitEdges(_, _)));
+        assert!(matches!(r, Err(OutlineCfgError::MultipleExitEdges(_, _))));
         assert_eq!(h, backup);
 
         let [left, right]: [Node; 2] = h.output_neighbours(head).collect_vec().try_into().unwrap();

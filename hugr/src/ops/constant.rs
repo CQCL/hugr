@@ -446,23 +446,23 @@ mod test {
         println!("{}", serde_json::to_string_pretty(&good_sum).unwrap());
 
         let res = Value::sum(0, [], pred_ty.clone());
-        assert_matches!(
+        assert!(matches!(
             res,
             Err(ConstTypeError::SumType(SumTypeError::WrongVariantLength {
                 tag: 0,
                 expected: 2,
                 found: 0
             }))
-        );
+        ));
 
         let res = Value::sum(4, [], pred_ty.clone());
-        assert_matches!(
+        assert!(matches!(
             res,
             Err(ConstTypeError::SumType(SumTypeError::InvalidTag {
                 tag: 4,
                 num_variants: 2
             }))
-        );
+        ));
 
         let res = Value::sum(0, [const_usize(), const_usize()], pred_ty);
         assert_matches!(
@@ -472,7 +472,7 @@ mod test {
                 index: 1,
                 expected,
                 found,
-            })) if expected == FLOAT64_TYPE && found == const_usize()
+            })) => {assert_eq!(expected, FLOAT64_TYPE); assert_eq!(found, const_usize())}
         );
     }
 
@@ -540,7 +540,7 @@ mod test {
             CustomSerialized::new(typ_int.clone(), YamlValue::Number(6.into()), ex_id.clone())
                 .into();
         let classic_t = Type::new_extension(typ_int.clone());
-        assert_matches!(classic_t.least_upper_bound(), TypeBound::Eq);
+        assert_eq!(classic_t.least_upper_bound(), TypeBound::Eq);
         assert_eq!(yaml_const.const_type(), classic_t);
 
         let typ_qb = CustomType::new("my_type", vec![], ex_id, TypeBound::Eq);

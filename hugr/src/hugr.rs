@@ -361,10 +361,9 @@ mod test {
     #[test]
     fn io_node() {
         use crate::builder::test::simple_dfg_hugr;
-        use cool_asserts::assert_matches;
 
         let hugr = simple_dfg_hugr();
-        assert_matches!(hugr.get_io(hugr.root()), Some(_));
+        assert!(hugr.get_io(hugr.root()).is_some());
     }
 
     #[cfg(feature = "extension_inference")]

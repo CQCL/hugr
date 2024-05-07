@@ -202,6 +202,7 @@ impl<T> HugrBuilder for DFGWrapper<Hugr, T> {
 
 #[cfg(test)]
 pub(crate) mod test {
+
     use cool_asserts::assert_matches;
     use rstest::rstest;
     use serde_json::json;
@@ -272,7 +273,7 @@ pub(crate) mod test {
 
             module_builder.finish_hugr(&EMPTY_REG)
         };
-        assert_matches!(build_result, Ok(_), "Failed on example: {}", msg);
+        assert!(build_result.is_ok(), "Failed on example: {}", msg);
 
         Ok(())
     }
@@ -329,8 +330,7 @@ pub(crate) mod test {
             Err(BuildError::OutputWiring {
                 error: BuilderWiringError::NoCopyLinear { typ, .. },
                 ..
-            })
-            if typ == QB
+            }) => assert_eq!(typ, QB)
         );
     }
 
@@ -356,7 +356,7 @@ pub(crate) mod test {
             f_build.finish_hugr_with_outputs([nested.out_wire(0)], &EMPTY_REG)
         };
 
-        assert_matches!(builder(), Ok(_));
+        assert!(builder().is_ok());
     }
 
     #[test]
@@ -377,13 +377,13 @@ pub(crate) mod test {
 
         // The error would anyway be caught in validation when we finish the Hugr,
         // but the builder catches it earlier
-        assert_matches!(
+        assert!(matches!(
             id_res.map(|bh| bh.handle().node()), // Transform into something that impl's Debug
             Err(BuildError::OperationWiring {
                 error: BuilderWiringError::NonCopyableIntergraph { .. },
                 ..
             })
-        );
+        ));
 
         Ok(())
     }
@@ -391,7 +391,7 @@ pub(crate) mod test {
     #[rstest]
     fn dfg_hugr(simple_dfg_hugr: Hugr) {
         assert_eq!(simple_dfg_hugr.node_count(), 3);
-        assert_matches!(simple_dfg_hugr.root_type().tag(), OpTag::Dfg);
+        assert_eq!(simple_dfg_hugr.root_type().tag(), OpTag::Dfg);
     }
 
     #[test]
@@ -514,12 +514,12 @@ pub(crate) mod test {
 
         let res = b.finish_prelude_hugr_with_outputs([b_child_2_handle.out_wire(0)]);
 
-        assert_matches!(
+        assert!(matches!(
             res,
             Err(BuildError::InvalidHUGR(
                 ValidationError::InterGraphEdgeError(InterGraphEdgeError::NonCFGAncestor { .. })
             ))
-        );
+        ));
         Ok(())
     }
 
@@ -541,13 +541,13 @@ pub(crate) mod test {
 
         let res = b_child_2_child.finish_with_outputs([b_child_child_in_wire]);
 
-        assert_matches!(
+        assert!(matches!(
             res.map(|h| h.handle().node()), // map to something that implements Debug
             Err(BuildError::OutputWiring {
                 error: BuilderWiringError::NoRelationIntergraph { .. },
                 ..
             })
-        );
+        ));
         Ok(())
     }
 }

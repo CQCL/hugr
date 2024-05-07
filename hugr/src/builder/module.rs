@@ -162,7 +162,6 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
 
 #[cfg(test)]
 mod test {
-    use cool_asserts::assert_matches;
 
     use crate::{
         builder::{
@@ -191,7 +190,7 @@ mod test {
             f_build.finish_with_outputs(call.outputs())?;
             module_builder.finish_prelude_hugr()
         };
-        assert_matches!(build_result, Ok(_));
+        assert!(build_result.is_ok());
         Ok(())
     }
 
@@ -214,7 +213,7 @@ mod test {
             n_identity(f_build)?;
             module_builder.finish_hugr(&EMPTY_REG)
         };
-        assert_matches!(build_result, Ok(_));
+        assert!(build_result.is_ok());
         Ok(())
     }
 
@@ -240,7 +239,7 @@ mod test {
             f_build.finish_with_outputs(call.outputs())?;
             module_builder.finish_prelude_hugr()
         };
-        assert_matches!(build_result, Ok(_));
+        assert!(build_result.is_ok());
         Ok(())
     }
 }
