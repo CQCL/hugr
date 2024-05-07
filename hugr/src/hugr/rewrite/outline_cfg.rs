@@ -349,7 +349,7 @@ mod test {
 
         let (mut h, merge, tail) = build_cond_then_loop_cfg().unwrap();
         let (merge, tail) = (merge.node(), tail.node());
-        let exit = h.children(h.root()).skip(1).next().unwrap();
+        let exit = h.children(h.root()).nth(1).unwrap();
         let head = h.input_neighbours(tail).exactly_one().unwrap();
         assert_eq!(h.output_neighbours(merge.node()).collect_vec(), vec![head]);
 
@@ -383,7 +383,7 @@ mod test {
             assert_eq!(b.get_parent(n), Some(new_cfg));
         }
         assert!(b.get_optype(new_cfg).is_cfg());
-        let exit_block = b.children(new_cfg).skip(1).next().unwrap();
+        let exit_block = b.children(new_cfg).nth(1).unwrap();
         assert!(b.get_optype(exit_block).is_exit_block());
         (new_block, new_cfg, exit_block)
     }
@@ -405,7 +405,7 @@ mod test {
         fbuild.finish_with_outputs(cfg.outputs()).unwrap();
         let mut h = module_builder.finish_prelude_hugr().unwrap();
         let cfg = cfg.node();
-        let exit_node = h.children(cfg).skip(1).next().unwrap();
+        let exit_node = h.children(cfg).nth(1).unwrap();
         let tail = h.input_neighbours(exit_node).exactly_one().unwrap();
         let head = h.input_neighbours(tail).exactly_one().unwrap();
         // Just sanity-check we have the correct nodes
