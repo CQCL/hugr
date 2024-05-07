@@ -7,7 +7,7 @@ use crate::builder::{
     HugrBuilder, ModuleBuilder,
 };
 use crate::extension::prelude::{BOOL_T, PRELUDE, USIZE_T};
-use crate::extension::{Extension, ExtensionId, TypeDefBound, EMPTY_REG, PRELUDE_REGISTRY};
+use crate::extension::{Extension, TypeDefBound, EMPTY_REG, PRELUDE_REGISTRY};
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::hugr::HugrMut;
 use crate::ops::dataflow::IOTrait;
@@ -16,7 +16,7 @@ use crate::std_extensions::logic::test::{and_op, or_op};
 use crate::std_extensions::logic::{self, NotOp};
 use crate::types::type_param::{TypeArg, TypeArgError};
 use crate::types::{CustomType, FunctionType, PolyFuncType, Type, TypeBound, TypeRow};
-use crate::{type_row, IncomingPort};
+use crate::{const_extension_ids, type_row, Direction, IncomingPort, Node};
 
 const NAT: Type = crate::extension::prelude::USIZE_T;
 
@@ -336,10 +336,12 @@ fn unregistered_extension() {
     h.update_validate(&PRELUDE_REGISTRY).unwrap();
 }
 
+const_extension_ids! {
+    const EXT_ID: ExtensionId = "MyExt";
+}
 #[test]
 fn invalid_types() {
-    let name: ExtensionId = "MyExt".try_into().unwrap();
-    let mut e = Extension::new(name.clone());
+    let mut e = Extension::new(EXT_ID);
     e.add_type(
         "MyContainer".into(),
         vec![TypeBound::Copyable.into()],
@@ -360,7 +362,7 @@ fn invalid_types() {
     let valid = Type::new_extension(CustomType::new(
         "MyContainer",
         vec![TypeArg::Type { ty: USIZE_T }],
-        name.clone(),
+        EXT_ID,
         TypeBound::Any,
     ));
     assert_eq!(
@@ -374,7 +376,7 @@ fn invalid_types() {
     let element_outside_bound = CustomType::new(
         "MyContainer",
         vec![TypeArg::Type { ty: valid.clone() }],
-        name.clone(),
+        EXT_ID,
         TypeBound::Any,
     );
     assert_eq!(
@@ -388,7 +390,7 @@ fn invalid_types() {
     let bad_bound = CustomType::new(
         "MyContainer",
         vec![TypeArg::Type { ty: USIZE_T }],
-        name.clone(),
+        EXT_ID,
         TypeBound::Copyable,
     );
     assert_eq!(
@@ -405,7 +407,7 @@ fn invalid_types() {
         vec![TypeArg::Type {
             ty: Type::new_extension(bad_bound),
         }],
-        name.clone(),
+        EXT_ID,
         TypeBound::Any,
     );
     assert_eq!(
@@ -419,7 +421,7 @@ fn invalid_types() {
     let too_many_type_args = CustomType::new(
         "MyContainer",
         vec![TypeArg::Type { ty: USIZE_T }, TypeArg::BoundedNat { n: 3 }],
-        name.clone(),
+        EXT_ID,
         TypeBound::Any,
     );
     assert_eq!(
