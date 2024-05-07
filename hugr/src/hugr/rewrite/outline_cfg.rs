@@ -285,11 +285,11 @@ mod test {
 
         let [left, right]: [Node; 2] = h.output_neighbours(head).collect_vec().try_into().unwrap();
         let r = h.apply_rewrite(OutlineCfg::new([left, right, head]));
-        assert_matches!(r, Err(OutlineCfgError::MultipleExitNodes(a,b)) => HashSet::from([a,b]) == HashSet::from_iter([left, right, head]));
+        assert_matches!(r, Err(OutlineCfgError::MultipleExitNodes(a,b)) => assert_eq!(HashSet::from([a,b]), HashSet::from_iter([left, right])));
         assert_eq!(h, backup);
 
         let r = h.apply_rewrite(OutlineCfg::new([left, right, merge]));
-        assert_matches!(r, Err(OutlineCfgError::MultipleEntryNodes(a,b)) => HashSet::from([a,b]) == HashSet::from([left, right]));
+        assert_matches!(r, Err(OutlineCfgError::MultipleEntryNodes(a,b)) => assert_eq!(HashSet::from([a,b]), HashSet::from([left, right])));
         assert_eq!(h, backup);
     }
 

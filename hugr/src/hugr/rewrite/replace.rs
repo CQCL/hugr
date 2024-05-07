@@ -803,7 +803,7 @@ mod test {
                 mu_new: vec![bad_order_edge.clone()],
                 ..rep.clone()
             }),
-            ReplaceError::BadEdgeKind(_, e) => e == bad_order_edge
+            ReplaceError::BadEdgeKind(_, e) => assert_eq!(e, bad_order_edge)
         );
         let op = OutgoingPort::from(0);
         let (tgt, ip) = h.linked_inputs(cond.node(), op).next().unwrap();
