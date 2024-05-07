@@ -377,11 +377,11 @@ mod test {
         );
         assert_matches!(
             validate_io_nodes(&out_types, &out_types, "test", make_iter(&children)),
-            Err(ChildrenValidationError::IOSignatureMismatch { child, .. }) if child.index() == 0
+            Err(ChildrenValidationError::IOSignatureMismatch { child, .. }) => assert_eq!(child.index(), 0)
         );
         assert_matches!(
             validate_io_nodes(&in_types, &in_types, "test", make_iter(&children)),
-            Err(ChildrenValidationError::IOSignatureMismatch { child, .. }) if child.index() == 1
+            Err(ChildrenValidationError::IOSignatureMismatch { child, .. }) => assert_eq!(child.index(), 1)
         );
 
         // Internal I/O nodes
@@ -394,7 +394,7 @@ mod test {
         ];
         assert_matches!(
             validate_io_nodes(&in_types, &out_types, "test", make_iter(&children)),
-            Err(ChildrenValidationError::InternalIOChildren { child, .. }) if child.index() == 3
+            Err(ChildrenValidationError::InternalIOChildren { child, .. }) => assert_eq!(child.index(), 3)
         );
     }
 

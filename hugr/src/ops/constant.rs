@@ -472,7 +472,7 @@ mod test {
                 index: 1,
                 expected,
                 found,
-            })) if expected == FLOAT64_TYPE && found == const_usize()
+            })) => {assert_eq!(expected, FLOAT64_TYPE); assert_eq!(found, const_usize())}
         );
     }
 

@@ -330,8 +330,7 @@ pub(crate) mod test {
             Err(BuildError::OutputWiring {
                 error: BuilderWiringError::NoCopyLinear { typ, .. },
                 ..
-            })
-            if typ == QB
+            }) => assert_eq!(typ, QB)
         );
     }
 
