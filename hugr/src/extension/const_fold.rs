@@ -2,8 +2,10 @@ use std::fmt::Formatter;
 
 use std::fmt::Debug;
 
+use crate::ops::Value;
 use crate::types::TypeArg;
 
+use crate::IncomingPort;
 use crate::OutgoingPort;
 
 use crate::ops;
@@ -43,5 +45,19 @@ where
         consts: &[(crate::IncomingPort, crate::ops::Value)],
     ) -> ConstFoldResult {
         self(consts)
+    }
+}
+
+type FoldFn = dyn Fn(&[TypeArg], &[(IncomingPort, Value)]) -> ConstFoldResult + Send + Sync;
+
+/// Type holding a boxed const-folding function.
+pub struct Folder {
+    /// Const-folding function.
+    pub folder: Box<FoldFn>,
+}
+
+impl ConstFold for Folder {
+    fn fold(&self, type_args: &[TypeArg], consts: &[(IncomingPort, Value)]) -> ConstFoldResult {
+        (self.folder)(type_args, consts)
     }
 }

@@ -3,7 +3,7 @@ use std::cmp::{max, min};
 use crate::{
     extension::{
         prelude::{sum_with_error, ConstError, ConstString},
-        ConstFold, ConstFoldResult, OpDef,
+        ConstFoldResult, Folder, OpDef,
     },
     ops::{
         constant::{get_pair_of_input_values, get_single_input_value},
@@ -15,18 +15,6 @@ use crate::{
 };
 
 use super::IntOpDef;
-
-type FoldFn = dyn Fn(&[TypeArg], &[(IncomingPort, Value)]) -> ConstFoldResult + Send + Sync;
-
-struct Folder {
-    folder: Box<FoldFn>,
-}
-
-impl ConstFold for Folder {
-    fn fold(&self, type_args: &[TypeArg], consts: &[(IncomingPort, Value)]) -> ConstFoldResult {
-        (self.folder)(type_args, consts)
-    }
-}
 
 fn bitmask_from_width(width: u64) -> u64 {
     debug_assert!(width <= 64);
