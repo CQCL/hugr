@@ -498,7 +498,7 @@ fn nested_typevars() -> Result<(), Box<dyn std::error::Error>> {
     );
     assert_matches!(build(Type::new_var_use(0, OUTER_BOUND)).unwrap_err(),
         BuildError::InvalidHUGR(ValidationError::SignatureError { cause: SignatureError::TypeVarDoesNotMatchDeclaration { actual, cached }, .. }) =>
-        actual == INNER_BOUND.into() && cached == OUTER_BOUND.into());
+        {assert_eq!(actual, INNER_BOUND.into()); assert_eq!(cached, OUTER_BOUND.into())});
     Ok(())
 }
 
