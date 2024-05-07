@@ -562,7 +562,8 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
         )
         .with_extension_delta(ExtensionSet::type_var(1)),
     );
-
+    // The higher-order "eval" operation - takes a function and its argument.
+    // Note the extension-delta of the eval node includes that of the input function.
     e.add_op(
         "eval".into(),
         "".into(),
@@ -581,6 +582,7 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let int_pair = Type::new_tuple(type_row![USIZE_T; 2]);
+    // Root DFG: applies a function int--PRELUDE-->int to each element of a pair of two ints
     let mut d = DFGBuilder::new(
         FunctionType::new(
             vec![utou(PRELUDE_ID), int_pair.clone()],
@@ -588,6 +590,7 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
         )
         .with_extension_delta(PRELUDE_ID),
     )?;
+    // ....by calling a function parametrized<extensions E> (int--e-->int, int_pair) -> int_pair
     let f = {
         let es = ExtensionSet::type_var(0);
         let mut f = d.define_function(
@@ -627,7 +630,7 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
 
     let reg = ExtensionRegistry::try_new([e, PRELUDE.to_owned()])?;
     let [func, tup] = d.input_wires_arr();
-    let r = d.call(
+    let call = d.call(
         &f.handle(),
         &[TypeArg::Extensions {
             es: ExtensionSet::singleton(&PRELUDE_ID),
@@ -635,8 +638,8 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
         [func, tup],
         &reg,
     )?;
-    let h = d.finish_hugr_with_outputs(r.outputs(), &reg)?;
-    let call_ty = h.get_optype(r.node()).dataflow_signature().unwrap();
+    let h = d.finish_hugr_with_outputs(call.outputs(), &reg)?;
+    let call_ty = h.get_optype(call.node()).dataflow_signature().unwrap();
     let exp_fun_ty = FunctionType::new(vec![utou(PRELUDE_ID), int_pair.clone()], int_pair)
         .with_extension_delta(PRELUDE_ID);
     assert_eq!(call_ty, exp_fun_ty);
