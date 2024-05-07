@@ -363,29 +363,32 @@ mod test {
         );
     }
 
-    fn outline_cfg_check_parents(
-        h: &mut impl HugrMut,
-        cfg: Node,
-        blocks: Vec<Node>,
-    ) -> (Node, Node, Node) {
-        let mut other_blocks = h.children(cfg).collect::<HashSet<_>>();
-        assert!(blocks.iter().all(|b| other_blocks.remove(b)));
-        let (new_block, new_cfg) = h.apply_rewrite(OutlineCfg::new(blocks.clone())).unwrap();
+    #[test]
+    fn test_outline_cfg_multiple_in_edges() {
+        // Outline merge, head and tail, producing
+        //     /-> left -->\
+        // entry            newblock -> exit
+        //     \-> right ->/
+        let (mut h, merge, tail) = build_cond_then_loop_cfg().unwrap();
+        let (merge, tail) = (merge.node(), tail.node());
+        let exit = h.children(h.root()).nth(1).unwrap();
+        let left_and_right = h.input_neighbours(merge).collect::<HashSet<_>>();
+        assert_eq!(left_and_right.len(), 2);
+        let head = h.input_neighbours(tail).exactly_one().unwrap();
+        assert_eq!(h.output_neighbours(merge.node()).collect_vec(), vec![head]);
 
-        for n in other_blocks {
-            assert_eq!(h.get_parent(n), Some(cfg))
-        }
-        assert_eq!(h.get_parent(new_block), Some(cfg));
-        assert!(h.get_optype(new_block).is_dataflow_block());
-        let b = h.base_hugr(); // To cope with `h`` potentially being a SiblingMut
-        assert_eq!(b.get_parent(new_cfg), Some(new_block));
-        for n in blocks {
-            assert_eq!(b.get_parent(n), Some(new_cfg));
-        }
-        assert!(b.get_optype(new_cfg).is_cfg());
-        let exit_block = b.children(new_cfg).nth(1).unwrap();
-        assert!(b.get_optype(exit_block).is_exit_block());
-        (new_block, new_cfg, exit_block)
+        let root = h.root();
+        let (new_block, _, inner_exit) =
+            outline_cfg_check_parents(&mut h, root, vec![merge, head, tail]);
+        assert_eq!(h.input_neighbours(exit).collect_vec(), vec![new_block]);
+        assert_eq!(
+            h.input_neighbours(new_block).collect::<HashSet<_>>(),
+            left_and_right
+        );
+        assert_eq!(
+            h.output_neighbours(tail).collect::<HashSet<Node>>(),
+            HashSet::from([head, inner_exit])
+        );
     }
 
     #[test]
@@ -442,5 +445,30 @@ mod test {
         h.update_validate(&PRELUDE_REGISTRY).unwrap();
         assert_eq!(new_block, h.children(h.root()).next().unwrap());
         assert_eq!(h.output_neighbours(new_block).collect_vec(), [head]);
+    }
+
+    fn outline_cfg_check_parents(
+        h: &mut impl HugrMut,
+        cfg: Node,
+        blocks: Vec<Node>,
+    ) -> (Node, Node, Node) {
+        let mut other_blocks = h.children(cfg).collect::<HashSet<_>>();
+        assert!(blocks.iter().all(|b| other_blocks.remove(b)));
+        let (new_block, new_cfg) = h.apply_rewrite(OutlineCfg::new(blocks.clone())).unwrap();
+
+        for n in other_blocks {
+            assert_eq!(h.get_parent(n), Some(cfg))
+        }
+        assert_eq!(h.get_parent(new_block), Some(cfg));
+        assert!(h.get_optype(new_block).is_dataflow_block());
+        let b = h.base_hugr(); // To cope with `h`` potentially being a SiblingMut
+        assert_eq!(b.get_parent(new_cfg), Some(new_block));
+        for n in blocks {
+            assert_eq!(b.get_parent(n), Some(new_cfg));
+        }
+        assert!(b.get_optype(new_cfg).is_cfg());
+        let exit_block = b.children(new_cfg).nth(1).unwrap();
+        assert!(b.get_optype(exit_block).is_exit_block());
+        (new_block, new_cfg, exit_block)
     }
 }
