@@ -631,7 +631,7 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
     let reg = ExtensionRegistry::try_new([e, PRELUDE.to_owned()])?;
     let [func, tup] = d.input_wires_arr();
     let call = d.call(
-        &f.handle(),
+        f.handle(),
         &[TypeArg::Extensions {
             es: ExtensionSet::singleton(&PRELUDE_ID),
         }],
