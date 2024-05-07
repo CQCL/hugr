@@ -230,7 +230,8 @@ pub enum OutlineCfgError {
     /// Multiple blocks had incoming edges
     #[error("Multiple blocks had predecessors outside the set - at least {0:?} and {1:?}")]
     MultipleEntryNodes(Node, Node),
-    /// Multiple blocks had outgoing edegs
+    /// Multiple blocks had outgoing edges
+    // Note possible TODO: straightforward if all outgoing edges target the same BB
     #[error("Multiple blocks had edges leaving the set - at least {0:?} and {1:?}")]
     MultipleExitNodes(Node, Node),
     /// One block had multiple outgoing edges
@@ -239,7 +240,7 @@ pub enum OutlineCfgError {
     /// No block was identified as an entry block
     #[error("No block had predecessors outside the set")]
     NoEntryNode,
-    /// No block was identified as an exit block
+    /// No block was found with an edge leaving the set (so, must be an infinite loop)
     #[error("No block had a successor outside the set")]
     NoExitNode,
 }
@@ -319,9 +320,6 @@ mod test {
     fn test_outline_cfg_errors() {
         let (mut h, merge, tail) = build_cond_then_loop_cfg().unwrap();
         let (merge, tail) = (merge.node(), tail.node());
-        //       /-> left -->\
-        //  entry             merge -> head -> tail -> exit
-        //       \-> right ->/            \<--</
         let head = h.input_neighbours(tail).exactly_one().unwrap();
         assert_eq!(h.output_neighbours(merge).collect_vec(), vec![head]);
         let entry = h.children(h.root()).next().unwrap();
@@ -344,18 +342,17 @@ mod test {
 
     #[test]
     fn test_outline_cfg() {
-        // Outline the loop:
-        //     /-> left -->\                                        /-> left -->\
-        // entry            merge -> head -> tail -> exit  ==>  entry            merge -> newblock -> exit
-        //     \-> right ->/           \-<--<-/                     \-> right ->/
+        // Outline the loop, producing:
+        //     /-> left -->\
+        // entry            merge -> newblock -> exit
+        //     \-> right ->/
 
         let (mut h, merge, tail) = build_cond_then_loop_cfg().unwrap();
         let (merge, tail) = (merge.node(), tail.node());
         let exit = h.children(h.root()).skip(1).next().unwrap();
-        // Outline the loop
         let head = h.input_neighbours(tail).exactly_one().unwrap();
         assert_eq!(h.output_neighbours(merge.node()).collect_vec(), vec![head]);
-        h.update_validate(&PRELUDE_REGISTRY).unwrap();
+
         let root = h.root();
         let (new_block, _, exit_block) = outline_cfg_check_parents(&mut h, root, vec![head, tail]);
         assert_eq!(h.output_neighbours(merge).collect_vec(), vec![new_block]);
@@ -393,6 +390,8 @@ mod test {
 
     #[test]
     fn test_outline_cfg_subregion() {
+        // Outline the loop, as above, but with the CFG inside a Function + Module,
+        // operating via a SiblingMut
         let mut module_builder = ModuleBuilder::new();
         let mut fbuild = module_builder
             .define_function(
@@ -425,14 +424,18 @@ mod test {
 
     #[test]
     fn test_outline_cfg_move_entry() {
-        let (mut h, merge, tail) = build_cond_then_loop_cfg().unwrap();
+        // Outline the conditional, producing
+        //
+        //  newblock -> head -> tail -> exit
+        //                 \<--</
+        // (where the new block becomes the entry block)
 
+        let (mut h, merge, tail) = build_cond_then_loop_cfg().unwrap();
         let (entry, _) = h.children(h.root()).take(2).collect_tuple().unwrap();
         let (left, right) = h.output_neighbours(entry).take(2).collect_tuple().unwrap();
         let (merge, _) = (merge.node(), tail.node());
         let head = h.output_neighbours(merge).exactly_one().unwrap();
 
-        h.validate(&PRELUDE_REGISTRY).unwrap();
         let root = h.root();
         let (new_block, _, _) =
             outline_cfg_check_parents(&mut h, root, vec![entry, left, right, merge]);
