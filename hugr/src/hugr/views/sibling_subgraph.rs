@@ -684,8 +684,6 @@ pub enum InvalidSubgraphBoundary {
 mod tests {
     use std::error::Error;
 
-    use cool_asserts::assert_matches;
-
     use crate::extension::PRELUDE_REGISTRY;
     use crate::utils::test_quantum_extension::cx_gate;
     use crate::{
@@ -924,13 +922,14 @@ mod tests {
         let not1_out = hugr.node_outputs(not1).next().unwrap();
         let not3_inp = hugr.node_inputs(not3).next().unwrap();
         let not3_out = hugr.node_outputs(not3).next().unwrap();
-        assert_matches!(
+        assert_eq!(
             SiblingSubgraph::try_new(
                 vec![vec![(not1, not1_inp)], vec![(not3, not3_inp)]],
                 vec![(not1, not1_out), (not3, not3_out)],
                 &func
-            ),
-            Err(InvalidSubgraph::NotConvex)
+            )
+            .unwrap_err(),
+            InvalidSubgraph::NotConvex
         );
     }
 
