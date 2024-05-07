@@ -248,7 +248,7 @@ pub enum OutlineCfgError {
 mod test {
     use std::collections::HashSet;
 
-    use crate::algorithm::nest_cfgs::test::{build_conditional_in_loop_cfg, depth};
+    use crate::algorithm::nest_cfgs::test::depth;
     use crate::builder::{
         BlockBuilder, BuildError, CFGBuilder, Container, Dataflow, DataflowSubContainer,
         HugrBuilder, ModuleBuilder,
@@ -318,23 +318,23 @@ mod test {
 
     #[test]
     fn test_outline_cfg_errors() {
-        let (mut h, head, tail) = build_conditional_in_loop_cfg(false).unwrap();
-        let head = head.node();
-        let tail = tail.node();
-        //               /-> left --\
-        //  entry -> head            > merge -> tail -> exit
-        //            |  \-> right -/             |
-        //             \---<---<---<---<---<--<---/
-        // merge is unique predecessor of tail
-        let merge = h.input_neighbours(tail).exactly_one().unwrap();
-        h.validate(&PRELUDE_REGISTRY).unwrap();
+        let (mut h, merge, tail) = build_cond_then_loop_cfg().unwrap();
+        let (merge, tail) = (merge.node(), tail.node());
+        //       /-> left -->\
+        //  entry             merge -> head -> tail -> exit
+        //       \-> right ->/            \<--</
+        let head = h.input_neighbours(tail).exactly_one().unwrap();
+        assert_eq!(h.output_neighbours(merge).collect_vec(), vec![head]);
+        let entry = h.children(h.root()).next().unwrap();
+
         let backup = h.clone();
-        let r = h.apply_rewrite(OutlineCfg::new([merge, tail]));
+
+        let r = h.apply_rewrite(OutlineCfg::new([tail]));
         assert_matches!(r, Err(OutlineCfgError::MultipleExitEdges(_, _)));
         assert_eq!(h, backup);
 
-        let [left, right]: [Node; 2] = h.output_neighbours(head).collect_vec().try_into().unwrap();
-        let r = h.apply_rewrite(OutlineCfg::new([left, right, head]));
+        let [left, right]: [Node; 2] = h.output_neighbours(entry).collect_vec().try_into().unwrap();
+        let r = h.apply_rewrite(OutlineCfg::new([entry, left, right]));
         assert_matches!(r, Err(OutlineCfgError::MultipleExitNodes(a,b)) => assert_eq!(HashSet::from([a,b]), HashSet::from_iter([left, right])));
         assert_eq!(h, backup);
 
