@@ -540,7 +540,7 @@ mod test {
             CustomSerialized::new(typ_int.clone(), YamlValue::Number(6.into()), ex_id.clone())
                 .into();
         let classic_t = Type::new_extension(typ_int.clone());
-        assert_matches!(classic_t.least_upper_bound(), TypeBound::Eq);
+        assert_eq!(classic_t.least_upper_bound(), TypeBound::Eq);
         assert_eq!(yaml_const.const_type(), classic_t);
 
         let typ_qb = CustomType::new("my_type", vec![], ex_id, TypeBound::Eq);

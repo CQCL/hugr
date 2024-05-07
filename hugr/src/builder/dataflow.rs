@@ -202,6 +202,7 @@ impl<T> HugrBuilder for DFGWrapper<Hugr, T> {
 
 #[cfg(test)]
 pub(crate) mod test {
+
     use cool_asserts::assert_matches;
     use rstest::rstest;
     use serde_json::json;
@@ -391,7 +392,7 @@ pub(crate) mod test {
     #[rstest]
     fn dfg_hugr(simple_dfg_hugr: Hugr) {
         assert_eq!(simple_dfg_hugr.node_count(), 3);
-        assert_matches!(simple_dfg_hugr.root_type().tag(), OpTag::Dfg);
+        assert_eq!(simple_dfg_hugr.root_type().tag(), OpTag::Dfg);
     }
 
     #[test]
