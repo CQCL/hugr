@@ -535,7 +535,8 @@ impl FromIterator<ExtensionId> for ExtensionSet {
 }
 
 #[cfg(test)]
-mod test {
+pub mod test {
+    pub use super::op_def::test::SimpleOpDef;
 
     mod proptest {
 

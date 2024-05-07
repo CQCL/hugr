@@ -476,4 +476,38 @@ mod test {
             serde_yaml::from_value(serde_yaml::to_value(&ev).unwrap()).unwrap()
         );
     }
+
+    #[cfg(feature = "proptest")]
+    mod proptest {
+        use ::proptest::prelude::*;
+
+        use crate::{
+            extension::ExtensionSet,
+            ops::constant::CustomSerialized,
+            proptest::{any_serde_yaml_value, any_string},
+            types::Type,
+        };
+
+        impl Arbitrary for CustomSerialized {
+            type Parameters = ();
+            type Strategy = BoxedStrategy<Self>;
+            fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+                let typ = any::<Type>();
+                let extensions = any::<ExtensionSet>();
+                let value = (any_serde_yaml_value(), any_string()).prop_map(|(value, c)| {
+                    [("c".into(), c.into()), ("v".into(), value)]
+                        .into_iter()
+                        .collect::<serde_yaml::Mapping>()
+                        .into()
+                });
+                (typ, value, extensions)
+                    .prop_map(|(typ, value, extensions)| CustomSerialized {
+                        typ,
+                        value,
+                        extensions,
+                    })
+                    .boxed()
+            }
+        }
+    }
 }
