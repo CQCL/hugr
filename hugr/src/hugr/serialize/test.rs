@@ -7,7 +7,6 @@ use crate::extension::prelude::{BOOL_T, PRELUDE_ID, QB_T, USIZE_T};
 use crate::extension::simple_op::MakeRegisteredOp;
 use crate::extension::{EMPTY_REG, PRELUDE_REGISTRY};
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
-use crate::hugr::NodeType;
 use crate::ops::custom::{ExtensionOp, OpaqueOp};
 use crate::ops::{self, Value};
 use crate::ops::{dataflow::IOTrait, Input, Module, Noop, Output, DFG};
@@ -22,9 +21,7 @@ use itertools::Itertools;
 use jsonschema::{Draft, JSONSchema};
 use lazy_static::lazy_static;
 use portgraph::LinkView;
-use portgraph::{
-    multiportgraph::MultiPortGraph, Hierarchy, LinkMut, PortMut, PortView, UnmanagedDenseMap,
-};
+use portgraph::{multiportgraph::MultiPortGraph, Hierarchy, LinkMut, PortMut, UnmanagedDenseMap};
 use rstest::rstest;
 
 const NAT: Type = crate::extension::prelude::USIZE_T;

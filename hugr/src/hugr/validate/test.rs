@@ -583,7 +583,6 @@ fn test_polymorphic_load() -> Result<(), Box<dyn std::error::Error>> {
 #[cfg(feature = "extension_inference")]
 mod extension_tests {
     use super::*;
-    use crate::builder::ModuleBuilder;
     use crate::extension::ExtensionSet;
     use crate::macros::const_extension_ids;
 

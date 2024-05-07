@@ -345,7 +345,7 @@ pub type ValueNameRef = str;
 
 #[cfg(test)]
 mod test {
-    use super::{Value, ValueName};
+    use super::Value;
     use crate::builder::test::simple_dfg_hugr;
     use crate::{
         builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},

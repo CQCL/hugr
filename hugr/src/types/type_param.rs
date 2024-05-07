@@ -154,6 +154,7 @@ pub enum TypeArg {
     ///Instance of [TypeParam::Opaque] An opaque value, stored as serialized blob.
     Opaque {
         #[allow(missing_docs)]
+        #[serde(flatten)]
         arg: CustomTypeArg,
     },
     /// Instance of [TypeParam::List] or [TypeParam::Tuple], defined by a
@@ -171,6 +172,7 @@ pub enum TypeArg {
     /// or [TypeArg::Extensions] - see [TypeArg::new_var_use]
     Variable {
         #[allow(missing_docs)]
+        #[serde(flatten)]
         v: TypeArgVariable,
     },
 }

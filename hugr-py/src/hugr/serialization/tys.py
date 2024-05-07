@@ -105,11 +105,6 @@ class TypeParam(RootModel):
 # ------------------------------------------
 
 
-class CustomTypeArg(ConfiguredBaseModel):
-    typ: None  # TODO
-    value: str
-
-
 class TypeTypeArg(ConfiguredBaseModel):
     tya: Literal["Type"] = "Type"
     ty: "Type"
@@ -122,12 +117,13 @@ class BoundedNatArg(ConfiguredBaseModel):
 
 class OpaqueArg(ConfiguredBaseModel):
     tya: Literal["Opaque"] = "Opaque"
-    arg: CustomTypeArg
+    typ: "Opaque"
+    value: Any
 
 
 class SequenceArg(ConfiguredBaseModel):
     tya: Literal["Sequence"] = "Sequence"
-    args: list["TypeArg"]
+    elems: list["TypeArg"]
 
 
 class ExtensionsArg(ConfiguredBaseModel):
@@ -135,11 +131,22 @@ class ExtensionsArg(ConfiguredBaseModel):
     es: ExtensionSet
 
 
+class VariableArg(BaseModel):
+    tya: Literal["Variable"] = "Variable"
+    idx: int
+    cached_decl: TypeParam
+
+
 class TypeArg(RootModel):
     """A type argument."""
 
     root: Annotated[
-        TypeTypeArg | BoundedNatArg | OpaqueArg | SequenceArg | ExtensionsArg,
+        TypeTypeArg
+        | BoundedNatArg
+        | OpaqueArg
+        | SequenceArg
+        | ExtensionsArg
+        | VariableArg,
         WrapValidator(_json_custom_error_validator),
     ] = Field(discriminator="tya")
 
@@ -273,11 +280,15 @@ class TypeBound(Enum):
 class Opaque(ConfiguredBaseModel):
     """An opaque Type that can be downcasted by the extensions that define it."""
 
-    t: Literal["Opaque"] = "Opaque"
     extension: ExtensionId
     id: str  # Unique identifier of the opaque type.
     args: list[TypeArg]
     bound: TypeBound
+
+
+class TaggedOpaque(ConfiguredBaseModel):
+    t: Literal["Opaque"] = "Opaque"
+    o: Opaque
 
 
 class Alias(ConfiguredBaseModel):
@@ -309,7 +320,7 @@ class Type(RootModel):
         | FunctionType
         | Array
         | TaggedSumType
-        | Opaque
+        | TaggedOpaque
         | Alias,
         WrapValidator(_json_custom_error_validator),
     ] = Field(discriminator="t")
