@@ -1052,7 +1052,13 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                     } else {
                         Some(vec![(
                             0.into(),
-                            Value::extension(ConstInt::new_u(logwidth, !n0.value_u()).unwrap()),
+                            Value::extension(
+                                ConstInt::new_u(
+                                    logwidth,
+                                    bitmask_from_logwidth(logwidth) & !n0.value_u(),
+                                )
+                                .unwrap(),
+                            ),
                         )])
                     }
                 },
