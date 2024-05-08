@@ -75,7 +75,10 @@ impl Hugr {
 
             for src_port in self.node_outputs(src_node) {
                 for (tgt_node, tgt_port) in self.linked_inputs(src_node, src_port) {
-                    validator.check_extensions_compatible(&(src_node, src_port.into()), &(tgt_node, tgt_port.into()))?;
+                    validator.check_extensions_compatible(
+                        &(src_node, src_port.into()),
+                        &(tgt_node, tgt_port.into()),
+                    )?;
                 }
             }
         }
@@ -102,10 +105,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
     // Allow unused "extension_closure" variable for when
     // the "extension_inference" feature is disabled.
     #[allow(unused_variables)]
-    pub fn new(
-        hugr: &'a Hugr,
-        extension_registry: &'b ExtensionRegistry,
-    ) -> Self {
+    pub fn new(hugr: &'a Hugr, extension_registry: &'b ExtensionRegistry) -> Self {
         Self {
             hugr,
             dominators: HashMap::new(),
