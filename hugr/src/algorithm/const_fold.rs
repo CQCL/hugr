@@ -222,6 +222,7 @@ mod test {
     use crate::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
     use crate::std_extensions::logic::{self, NaryLogic, NotOp};
     use crate::types::{Type, TypeRow};
+    use crate::utils::test::assert_fully_folded;
 
     use rstest::rstest;
 
@@ -1695,21 +1696,5 @@ mod test {
         constant_fold_pass(&mut h, &reg);
         let expected = Value::true_val();
         assert_fully_folded(&h, &expected);
-    }
-
-    fn assert_fully_folded(h: &Hugr, expected_value: &Value) {
-        // check the hugr just loads and returns a single const
-        let mut node_count = 0;
-
-        for node in h.children(h.root()) {
-            let op = h.get_optype(node);
-            match op {
-                OpType::Input(_) | OpType::Output(_) | OpType::LoadConstant(_) => node_count += 1,
-                OpType::Const(c) if c.value() == expected_value => node_count += 1,
-                _ => panic!("unexpected op: {:?}", op),
-            }
-        }
-
-        assert_eq!(node_count, 4);
     }
 }
