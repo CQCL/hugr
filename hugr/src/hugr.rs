@@ -8,8 +8,6 @@ pub mod serialize;
 pub mod validate;
 pub mod views;
 
-#[cfg(feature = "extension_inference")]
-use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::iter;
 
