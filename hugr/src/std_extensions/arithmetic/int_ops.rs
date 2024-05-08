@@ -336,10 +336,10 @@ impl IntOpDef {
     }
     /// Initialize a concrete [IntOpType] from a [IntOpDef] which requires one
     /// integer width set.
-    pub fn with_log_width(self, width: u8) -> IntOpType {
+    pub fn with_log_width(self, log_width: u8) -> IntOpType {
         IntOpType {
             def: self,
-            log_widths: vec![width],
+            log_widths: vec![log_width],
         }
     }
     /// Initialize a concrete [IntOpType] from a [IntOpDef] which requires two
