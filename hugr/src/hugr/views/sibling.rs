@@ -462,7 +462,7 @@ mod test {
 
         // In contrast, performing this on the Hugr (where the allowed root type is 'Any') is only detected by validation
         simple_dfg_hugr.replace_op(root, bad_nodetype).unwrap();
-        assert!(simple_dfg_hugr.validate(&PRELUDE_REGISTRY).is_err());
+        assert!(simple_dfg_hugr.validate(&PRELUDE_REGISTRY, false).is_err());
     }
 
     #[rstest]

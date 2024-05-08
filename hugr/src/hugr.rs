@@ -196,8 +196,9 @@ impl Hugr {
         extension_registry: &ExtensionRegistry,
     ) -> Result<(), ValidationError> {
         resolve_extension_ops(self, extension_registry)?;
+        self.validate(extension_registry, false)?;
         self.infer_extensions()?;
-        self.validate(extension_registry)?;
+        self.validate(extension_registry, true)?;
         Ok(())
     }
 

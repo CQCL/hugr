@@ -198,7 +198,7 @@ mod test {
         assert_eq!(h.apply_rewrite(remove_con)?, h.root());
 
         assert_eq!(h.node_count(), 4);
-        assert!(h.validate(&PRELUDE_REGISTRY).is_ok());
+        assert!(h.validate(&PRELUDE_REGISTRY, true).is_ok());
         Ok(())
     }
 }

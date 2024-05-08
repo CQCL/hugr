@@ -37,7 +37,7 @@ struct ValidationContext<'a, 'b> {
     dominators: HashMap<Node, Dominators<Node>>,
     /// Context for the extension validation.
     #[allow(dead_code)]
-    extension_validator: ExtensionValidator,
+    extension_validator: Option<ExtensionValidator>,
     /// Registry of available Extensions
     extension_registry: &'b ExtensionRegistry,
 }
@@ -47,8 +47,16 @@ impl Hugr {
     /// variables.
     /// TODO: Add a version of validation which allows for open extension
     /// variables (see github issue #457)
-    pub fn validate(&self, extension_registry: &ExtensionRegistry) -> Result<(), ValidationError> {
-        self.validate_with_extension_closure(HashMap::new(), extension_registry)
+    pub fn validate(
+        &self,
+        extension_registry: &ExtensionRegistry,
+        validate_extensions: bool,
+    ) -> Result<(), ValidationError> {
+        self.validate_with_extension_closure(
+            HashMap::new(),
+            extension_registry,
+            validate_extensions,
+        )
     }
 
     /// Check the validity of a hugr, taking an argument of a closure for the
@@ -57,8 +65,10 @@ impl Hugr {
         &self,
         closure: ExtensionSolution,
         extension_registry: &ExtensionRegistry,
+        validate_extensions: bool,
     ) -> Result<(), ValidationError> {
-        let mut validator = ValidationContext::new(self, closure, extension_registry);
+        let mut validator =
+            ValidationContext::new(self, closure, extension_registry, validate_extensions);
         validator.validate()
     }
 }
@@ -72,11 +82,16 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         hugr: &'a Hugr,
         extension_closure: ExtensionSolution,
         extension_registry: &'b ExtensionRegistry,
+        validate_extensions: bool,
     ) -> Self {
         Self {
             hugr,
             dominators: HashMap::new(),
-            extension_validator: ExtensionValidator::new(hugr, extension_closure),
+            extension_validator: if validate_extensions {
+                Some(ExtensionValidator::new(hugr, extension_closure))
+            } else {
+                None
+            },
             extension_registry,
         }
     }
@@ -183,8 +198,9 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
             // If this is a container with I/O nodes, check that the extension they
             // define match the extensions of the container.
             if let Some([input, output]) = self.hugr.get_io(node) {
-                self.extension_validator
-                    .validate_io_extensions(node, input, output)?;
+                if let Some(validator) = &self.extension_validator {
+                    validator.validate_io_extensions(node, input, output)?;
+                }
             }
         }
 
@@ -248,8 +264,10 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
             let other_offset = self.hugr.graph.port_offset(link).unwrap().into();
 
             #[cfg(feature = "extension_inference")]
-            self.extension_validator
-                .check_extensions_compatible(&(node, port), &(other_node, other_offset))?;
+            if let Some(validator) = &self.extension_validator {
+                validator
+                    .check_extensions_compatible(&(node, port), &(other_node, other_offset))?;
+            }
 
             let other_op = self.hugr.get_optype(other_node);
             let Some(other_kind) = other_op.port_kind(other_offset) else {
