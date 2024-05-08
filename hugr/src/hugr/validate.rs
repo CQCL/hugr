@@ -44,15 +44,12 @@ impl Hugr {
     /// variables.
     /// TODO: Add a version of validation which allows for open extension
     /// variables (see github issue #457)
-    #[cfg(feature = "extension_inference")]
     pub fn validate(&self, extension_registry: &ExtensionRegistry) -> Result<(), ValidationError> {
-        self.validate_with_extension_closure(HashMap::new(), extension_registry)
-    }
-
-    /// Check the validity of the HUGR, disregarding extension requirements.
-    #[cfg(not(feature = "extension_inference"))]
-    pub fn validate(&self, extension_registry: &ExtensionRegistry) -> Result<(), ValidationError> {
-        self.validate_no_extensions(extension_registry)
+        #[cfg(feature = "extension_inference")]
+        self.validate_with_extension_closure(HashMap::new(), extension_registry)?;
+        #[cfg(not(feature = "extension_inference"))]
+        self.validate_no_extensions(extension_registry)?;
+        Ok(())
     }
 
     /// Check the validity of the HUGR, but don't check consistency of extension
