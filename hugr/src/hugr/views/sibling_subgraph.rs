@@ -971,7 +971,7 @@ mod tests {
         let subgraph = SiblingSubgraph::try_new_dataflow_subgraph(&func_graph)?;
         let extracted = subgraph.extract_subgraph(&hugr, "region");
 
-        extracted.validate(&PRELUDE_REGISTRY, true)?;
+        extracted.validate(&PRELUDE_REGISTRY)?;
 
         Ok(())
     }

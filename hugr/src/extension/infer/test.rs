@@ -821,12 +821,12 @@ fn test_validate_with_closure() -> Result<(), Box<dyn Error>> {
     // All three can be inferred and validated, without writing solutions in:
     for inner in [&inner_open, &inner_prelude, &inner_other] {
         assert_matches!(
-            inner.validate(&PRELUDE_REGISTRY, true),
+            inner.validate(&PRELUDE_REGISTRY),
             Err(ValidationError::ExtensionError(_))
         );
 
         let soln = infer_extensions(inner)?;
-        inner.validate_with_extension_closure(soln, &PRELUDE_REGISTRY, true)?;
+        inner.validate_with_extension_closure(soln, &PRELUDE_REGISTRY)?;
     }
 
     // Helper builds a Hugr with extensions {PRELUDE_ID}, around argument

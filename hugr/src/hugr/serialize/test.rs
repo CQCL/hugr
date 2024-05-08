@@ -309,8 +309,8 @@ fn hierarchy_order() -> Result<(), Box<dyn std::error::Error>> {
     hugr.update_validate(&PRELUDE_REGISTRY)?;
 
     let new_hugr: Hugr = check_hugr_schema_roundtrip(&hugr);
-    new_hugr.validate(&EMPTY_REG, true).unwrap_err();
-    new_hugr.validate(&PRELUDE_REGISTRY, true)?;
+    new_hugr.validate(&EMPTY_REG).unwrap_err();
+    new_hugr.validate(&PRELUDE_REGISTRY)?;
     Ok(())
 }
 

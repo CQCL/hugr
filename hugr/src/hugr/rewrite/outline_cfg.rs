@@ -277,7 +277,7 @@ mod test {
         //             \---<---<---<---<---<--<---/
         // merge is unique predecessor of tail
         let merge = h.input_neighbours(tail).exactly_one().unwrap();
-        h.validate(&PRELUDE_REGISTRY, true).unwrap();
+        h.validate(&PRELUDE_REGISTRY).unwrap();
         let backup = h.clone();
         let r = h.apply_rewrite(OutlineCfg::new([merge, tail]));
         assert_matches!(r, Err(OutlineCfgError::MultipleExitEdges(_, _)));
@@ -388,7 +388,7 @@ mod test {
         let (merge, tail) = (merge.node(), tail.node());
         let head = h.output_neighbours(merge).exactly_one().unwrap();
 
-        h.validate(&PRELUDE_REGISTRY, true).unwrap();
+        h.validate(&PRELUDE_REGISTRY).unwrap();
         let blocks_to_move = [entry, left, right, merge];
         let other_blocks = [head, tail, exit];
         for &n in blocks_to_move.iter().chain(other_blocks.iter()) {

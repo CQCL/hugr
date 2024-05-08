@@ -47,16 +47,18 @@ impl Hugr {
     /// variables.
     /// TODO: Add a version of validation which allows for open extension
     /// variables (see github issue #457)
-    pub fn validate(
+    pub fn validate(&self, extension_registry: &ExtensionRegistry) -> Result<(), ValidationError> {
+        self.validate_with_extension_closure(HashMap::new(), extension_registry)
+    }
+
+    /// Check the validity of the HUGR, but don't check consistency of extension
+    /// requirements between connected nodes or between parents and children.
+    pub fn validate_no_extensions(
         &self,
         extension_registry: &ExtensionRegistry,
-        validate_extensions: bool,
     ) -> Result<(), ValidationError> {
-        self.validate_with_extension_closure(
-            HashMap::new(),
-            extension_registry,
-            validate_extensions,
-        )
+        let mut validator = ValidationContext::new(self, HashMap::new(), extension_registry, false);
+        validator.validate()
     }
 
     /// Check the validity of a hugr, taking an argument of a closure for the
@@ -65,10 +67,8 @@ impl Hugr {
         &self,
         closure: ExtensionSolution,
         extension_registry: &ExtensionRegistry,
-        validate_extensions: bool,
     ) -> Result<(), ValidationError> {
-        let mut validator =
-            ValidationContext::new(self, closure, extension_registry, validate_extensions);
+        let mut validator = ValidationContext::new(self, closure, extension_registry, true);
         validator.validate()
     }
 }

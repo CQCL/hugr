@@ -65,25 +65,25 @@ fn invalid_root() {
 
     let mut b = Hugr::default();
     let root = b.root();
-    assert_eq!(b.validate(&EMPTY_REG, true), Ok(()));
+    assert_eq!(b.validate(&EMPTY_REG), Ok(()));
 
     // Add another hierarchy root
     let other = b.add_node(ops::Module.into());
     assert_matches!(
-        b.validate(&EMPTY_REG, false),
+        b.validate(&EMPTY_REG),
         Err(ValidationError::NoParent { node }) => assert_eq!(node, other)
     );
     b.set_parent(other, root);
     b.replace_op(other, NodeType::new_pure(declare_op)).unwrap();
     b.add_ports(other, Direction::Outgoing, 1);
-    assert_eq!(b.validate(&EMPTY_REG, true), Ok(()));
+    assert_eq!(b.validate(&EMPTY_REG), Ok(()));
 
     // Make the hugr root not a hierarchy root
     {
         let mut hugr = b.clone();
         hugr.root = other.pg_index();
         assert_matches!(
-            hugr.validate(&EMPTY_REG, false),
+            hugr.validate(&EMPTY_REG),
             Err(ValidationError::RootNotRoot { node }) => assert_eq!(node, other)
         );
     }
@@ -94,7 +94,7 @@ fn leaf_root() {
     let leaf_op: OpType = Noop { ty: USIZE_T }.into();
 
     let b = Hugr::new(NodeType::new_pure(leaf_op));
-    assert_eq!(b.validate(&EMPTY_REG, true), Ok(()));
+    assert_eq!(b.validate(&EMPTY_REG), Ok(()));
 }
 
 #[test]
@@ -156,7 +156,7 @@ fn children_restrictions() {
     // add an input node to the module subgraph
     let new_input = b.add_node_with_parent(root, ops::Input::new(type_row![]));
     assert_matches!(
-        b.validate(&EMPTY_REG, false),
+        b.validate(&EMPTY_REG),
         Err(ValidationError::InvalidParentOp { parent, child, .. }) => {assert_eq!(parent, root); assert_eq!(child, new_input)}
     );
 }
@@ -176,7 +176,7 @@ fn df_children_restrictions() {
     b.replace_op(output, NodeType::new_pure(Noop { ty: NAT }))
         .unwrap();
     assert_matches!(
-        b.validate(&EMPTY_REG, false),
+        b.validate(&EMPTY_REG),
         Err(ValidationError::InvalidInitialChild { parent, .. }) => assert_eq!(parent, def)
     );
 
@@ -187,7 +187,7 @@ fn df_children_restrictions() {
     )
     .unwrap();
     assert_matches!(
-        b.validate(&EMPTY_REG, false),
+        b.validate(&EMPTY_REG),
         Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::IOSignatureMismatch { child, .. }, .. })
             => {assert_eq!(parent, def); assert_eq!(child, output.pg_index())}
     );
@@ -204,7 +204,7 @@ fn df_children_restrictions() {
     )
     .unwrap();
     assert_matches!(
-        b.validate(&EMPTY_REG, false),
+        b.validate(&EMPTY_REG),
         Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::InternalIOChildren { child, .. }, .. })
             => {assert_eq!(parent, def); assert_eq!(child, copy.pg_index())}
     );
@@ -303,10 +303,7 @@ fn dfg_with_cycles() {
     h.connect(input, 1, not2, 0);
     h.connect(not2, 0, output, 0);
     // The graph contains a cycle:
-    assert_matches!(
-        h.validate(&EMPTY_REG, false),
-        Err(ValidationError::NotADag { .. })
-    );
+    assert_matches!(h.validate(&EMPTY_REG), Err(ValidationError::NotADag { .. }));
 }
 
 fn identity_hugr_with_type(t: Type) -> (Hugr, Node) {
@@ -330,7 +327,7 @@ fn identity_hugr_with_type(t: Type) -> (Hugr, Node) {
 fn unregistered_extension() {
     let (mut h, def) = identity_hugr_with_type(USIZE_T);
     assert_eq!(
-        h.validate(&EMPTY_REG, false),
+        h.validate(&EMPTY_REG),
         Err(ValidationError::SignatureError {
             node: def,
             cause: SignatureError::ExtensionNotFound(PRELUDE.name.clone())
@@ -354,7 +351,7 @@ fn invalid_types() {
 
     let validate_to_sig_error = |t: CustomType| {
         let (h, def) = identity_hugr_with_type(Type::new_extension(t));
-        match h.validate(&reg, false) {
+        match h.validate(&reg) {
             Err(ValidationError::SignatureError { node, cause }) if node == def => cause,
             e => panic!("Expected SignatureError at def node, got {:?}", e),
         }
@@ -634,7 +631,7 @@ mod extension_tests {
         // Write Extension annotations into the Hugr while it's still well-formed
         // enough for us to compute them
         b.infer_extensions().unwrap();
-        b.validate(&EMPTY_REG, true).unwrap();
+        b.validate(&EMPTY_REG).unwrap();
         b.replace_op(
             copy,
             NodeType::new_pure(ops::CFG {
@@ -643,7 +640,7 @@ mod extension_tests {
         )
         .unwrap();
         assert_matches!(
-            b.validate(&EMPTY_REG, true),
+            b.validate(&EMPTY_REG),
             Err(ValidationError::ContainerWithoutChildren { .. })
         );
         let cfg = copy;
@@ -678,7 +675,7 @@ mod extension_tests {
             },
         );
         assert_matches!(
-            b.validate(&EMPTY_REG, true),
+            b.validate(&EMPTY_REG),
             Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::InternalExitChildren { child, .. }, .. })
                 => {assert_eq!(parent, cfg); assert_eq!(child, exit2.pg_index())}
         );
@@ -709,7 +706,7 @@ mod extension_tests {
         )
         .unwrap();
         assert_matches!(
-            b.validate(&EMPTY_REG, true),
+            b.validate(&EMPTY_REG),
             Err(ValidationError::InvalidEdges { parent, source: EdgeValidationError::CFGEdgeSignatureMismatch { .. }, .. })
                 => assert_eq!(parent, cfg)
         );
@@ -750,7 +747,7 @@ mod extension_tests {
         hugr.connect(input, 0, lift, 0);
         hugr.connect(lift, 0, output, 0);
 
-        let result = hugr.validate(&PRELUDE_REGISTRY, true);
+        let result = hugr.validate(&PRELUDE_REGISTRY);
         assert_matches!(
             result,
             Err(ValidationError::ExtensionError(
@@ -781,7 +778,7 @@ mod extension_tests {
         let f_handle = f_builder.finish_with_outputs(f_inputs)?;
         let [f_output] = f_handle.outputs_arr();
         main.finish_with_outputs([f_output])?;
-        let handle = module_builder.hugr().validate(&PRELUDE_REGISTRY, true);
+        let handle = module_builder.hugr().validate(&PRELUDE_REGISTRY);
 
         assert_matches!(
             handle,
@@ -812,7 +809,7 @@ mod extension_tests {
         let f_handle = f_builder.finish_with_outputs(f_inputs)?;
         let [f_output] = f_handle.outputs_arr();
         main.finish_with_outputs([f_output])?;
-        let handle = module_builder.hugr().validate(&PRELUDE_REGISTRY, true);
+        let handle = module_builder.hugr().validate(&PRELUDE_REGISTRY);
         assert_matches!(
             handle,
             Err(ValidationError::ExtensionError(
@@ -865,7 +862,7 @@ mod extension_tests {
         let [output] = builder.finish_with_outputs([])?.outputs_arr();
 
         main.finish_with_outputs([output])?;
-        let handle = module_builder.hugr().validate(&PRELUDE_REGISTRY, true);
+        let handle = module_builder.hugr().validate(&PRELUDE_REGISTRY);
         assert_matches!(
             handle,
             Err(ValidationError::ExtensionError(
@@ -901,7 +898,7 @@ mod extension_tests {
         hugr.connect(input, 0, output, 0);
 
         assert_matches!(
-            hugr.validate(&PRELUDE_REGISTRY, true),
+            hugr.validate(&PRELUDE_REGISTRY),
             Err(ValidationError::ExtensionError(
                 ExtensionError::TgtExceedsSrcExtensionsAtPort { .. }
             ))

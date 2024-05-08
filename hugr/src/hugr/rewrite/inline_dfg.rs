@@ -237,7 +237,7 @@ mod test {
         }
 
         outer.apply_rewrite(InlineDFG(*inner.handle()))?;
-        outer.validate(&reg, true)?;
+        outer.validate(&reg)?;
         assert_eq!(outer.nodes().len(), 8);
         assert_eq!(find_dfgs(&outer), vec![outer.root()]);
         let [add, sub] = extension_ops(&outer).try_into().unwrap();
@@ -395,7 +395,7 @@ mod test {
         let mut outer = outer.finish_hugr_with_outputs(cx.outputs(), &reg)?;
 
         outer.apply_rewrite(InlineDFG(*inner.handle()))?;
-        outer.validate(&reg, true)?;
+        outer.validate(&reg)?;
         let order_neighbours = |n, d| {
             let p = outer.get_optype(n).other_port(d).unwrap();
             outer

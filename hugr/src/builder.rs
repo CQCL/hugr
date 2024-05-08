@@ -78,7 +78,7 @@
 //! }?;
 //!
 //! // The built HUGR is always valid.
-//! hugr.validate(&LOGIC_REG, true).unwrap_or_else(|e| {
+//! hugr.validate(&LOGIC_REG).unwrap_or_else(|e| {
 //!     panic!("HUGR validation failed: {e}");
 //! });
 //! # Ok(())
