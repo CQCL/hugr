@@ -916,11 +916,13 @@ mod extension_tests {
 
         let all_rs = ExtensionSet::from_iter([XA, XB]);
 
-        let main_sig = FunctionType::new(type_row![], type_row![NAT])
+        let main_sig = FunctionType::new(type_row![NAT], type_row![NAT])
             .with_extension_delta(all_rs.clone())
             .into();
 
         let mut main = module_builder.define_function("main", main_sig)?;
+
+        let [inp_wire] = main.input_wires_arr();
 
         let [left_wire] = main
             .dfg_builder(
@@ -928,7 +930,7 @@ mod extension_tests {
                 Some(XA.into()),
                 [],
             )?
-            .finish_with_outputs([])?
+            .finish_with_outputs([inp_wire])?
             .outputs_arr();
 
         let [right_wire] = main
@@ -937,7 +939,7 @@ mod extension_tests {
                 Some(XB.into()),
                 [],
             )?
-            .finish_with_outputs([])?
+            .finish_with_outputs([inp_wire])?
             .outputs_arr();
 
         let builder = main.dfg_builder(
@@ -945,8 +947,8 @@ mod extension_tests {
             Some(all_rs),
             [left_wire, right_wire],
         )?;
-        let [_left, _right] = builder.input_wires_arr();
-        let [output] = builder.finish_with_outputs([])?.outputs_arr();
+        let [left, _] = builder.input_wires_arr();
+        let [output] = builder.finish_with_outputs([left])?.outputs_arr();
 
         main.finish_with_outputs([output])?;
         let handle = module_builder.hugr().validate(&PRELUDE_REGISTRY);
