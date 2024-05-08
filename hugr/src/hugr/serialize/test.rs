@@ -377,7 +377,7 @@ fn roundtrip_sumtype(#[case] sum_type: SumType) {
 // #[case(Value::extension(ConstF64::new(std::f64::NAN)))]
 // #[case(Value::extension(ConstF64::new(std::f64::INFINITY)))]
 // #[case(Value::extension(ConstF64::new(std::f64::NEG_INFINITY)))]
-#[case(Value::extension(ConstF64::new(std::f64::MIN_POSITIVE)))]
+#[case(Value::extension(ConstF64::new(f64::MIN_POSITIVE)))]
 #[case(Value::sum(1,[Value::extension(ConstInt::new_u(2,1).unwrap())], SumType::new([vec![], vec![INT_TYPES[2].clone()]])).unwrap())]
 #[case(Value::tuple([Value::false_val(), Value::extension(ConstInt::new_s(2,1).unwrap())]))]
 #[case(Value::function(crate::builder::test::simple_dfg_hugr()).unwrap())]
