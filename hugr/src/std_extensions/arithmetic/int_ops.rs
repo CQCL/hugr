@@ -134,7 +134,7 @@ impl MakeOpDef for IntOpDef {
             .into(),
             idivmod_u | idivmod_s => {
                 let intpair: TypeRow = vec![int_tv(0), int_tv(1)].into();
-                int_polytype(2, intpair.clone(), vec![Type::new_tuple(intpair)])
+                int_polytype(2, intpair.clone(), intpair.clone())
             }
             .into(),
             idiv_u | idiv_s => int_polytype(2, vec![int_tv(0), int_tv(1)], vec![int_tv(0)]).into(),
