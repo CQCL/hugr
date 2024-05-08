@@ -220,7 +220,7 @@ mod test {
     use crate::std_extensions::arithmetic::float_types::{ConstF64, FLOAT64_TYPE};
     use crate::std_extensions::arithmetic::int_ops::IntOpDef;
     use crate::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
-    use crate::std_extensions::logic::{self, NaryLogic};
+    use crate::std_extensions::logic::{self, NaryLogic, NotOp};
     use crate::types::{Type, TypeRow};
 
     use rstest::rstest;
@@ -1625,6 +1625,23 @@ mod test {
         let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
         constant_fold_pass(&mut h, &reg);
         let expected = Value::true_val();
+        assert_fully_folded(&h, &expected);
+    }
+
+    #[test]
+    fn test_fold_not() {
+        // pseudocode:
+        // x0 := bool(true)
+        // x1 := not(x0)
+        // output x1 == false;
+        let mut build = DFGBuilder::new(FunctionType::new(type_row![], vec![BOOL_T])).unwrap();
+        let x0 = build.add_load_const(Value::true_val());
+        let x1 = build.add_dataflow_op(NotOp, [x0]).unwrap();
+        let reg =
+            ExtensionRegistry::try_new([PRELUDE.to_owned(), logic::EXTENSION.to_owned()]).unwrap();
+        let mut h = build.finish_hugr_with_outputs(x1.outputs(), &reg).unwrap();
+        constant_fold_pass(&mut h, &reg);
+        let expected = Value::false_val();
         assert_fully_folded(&h, &expected);
     }
 
