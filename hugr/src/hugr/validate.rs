@@ -44,8 +44,15 @@ impl Hugr {
     /// variables.
     /// TODO: Add a version of validation which allows for open extension
     /// variables (see github issue #457)
+    #[cfg(feature = "extension_inference")]
     pub fn validate(&self, extension_registry: &ExtensionRegistry) -> Result<(), ValidationError> {
         self.validate_with_extension_closure(HashMap::new(), extension_registry)
+    }
+
+    /// Check the validity of the HUGR, disregarding extension requirements.
+    #[cfg(not(feature = "extension_inference"))]
+    pub fn validate(&self, extension_registry: &ExtensionRegistry) -> Result<(), ValidationError> {
+        self.validate_no_extensions(extension_registry)
     }
 
     /// Check the validity of the HUGR, but don't check consistency of extension
@@ -58,6 +65,9 @@ impl Hugr {
         validator.validate()
     }
 
+    /// Validate extensions on the input and output edges of nodes. Check that
+    /// the target ends of edges require the extensions from the sources, and
+    /// check extension deltas from parent nodes are reflected in their children
     pub fn validate_extensions(&self, closure: ExtensionSolution) -> Result<(), ValidationError> {
         let validator = ExtensionValidator::new(self, closure);
         for src_node in self.nodes() {
@@ -94,7 +104,6 @@ impl Hugr {
     ) -> Result<(), ValidationError> {
         let mut validator = ValidationContext::new(self, extension_registry);
         validator.validate()?;
-        #[cfg(feature = "extension_inference")]
         self.validate_extensions(closure)?;
         Ok(())
     }
