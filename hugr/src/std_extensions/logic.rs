@@ -127,7 +127,7 @@ impl MakeOpDef for NotOp {
             if inps.len() != 1 {
                 None
             } else {
-                Some(vec![(0.into(), ops::Value::from_bool(inps[0]))])
+                Some(vec![(0.into(), ops::Value::from_bool(!inps[0]))])
             }
         })
     }
