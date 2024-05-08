@@ -35,7 +35,7 @@ pub trait CustomConst:
     /// [USize]: crate::extension::prelude::USIZE_T
     fn extension_reqs(&self) -> ExtensionSet;
 
-    /// Check the value is a valid instance of the provided type.
+    /// Check the value.
     fn validate(&self) -> Result<(), CustomCheckFailure> {
         Ok(())
     }
@@ -48,8 +48,14 @@ pub trait CustomConst:
         false
     }
 
-    /// report the type
+    /// Report the type.
     fn get_type(&self) -> Type;
+}
+
+impl PartialEq for dyn CustomConst {
+    fn eq(&self, other: &Self) -> bool {
+        (*self).equal_consts(other)
+    }
 }
 
 /// Const equality for types that have PartialEq
@@ -110,11 +116,5 @@ impl CustomConst for CustomSerialized {
     }
     fn get_type(&self) -> Type {
         self.typ.clone()
-    }
-}
-
-impl PartialEq for dyn CustomConst {
-    fn eq(&self, other: &Self) -> bool {
-        (*self).equal_consts(other)
     }
 }

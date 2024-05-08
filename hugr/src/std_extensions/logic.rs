@@ -255,7 +255,7 @@ pub(crate) mod test {
         let true_val = r.get_value(&TRUE_NAME).unwrap();
 
         for v in [false_val, true_val] {
-            let simpl = v.typed_value().const_type();
+            let simpl = v.typed_value().get_type();
             assert_eq!(simpl, BOOL_T);
         }
     }

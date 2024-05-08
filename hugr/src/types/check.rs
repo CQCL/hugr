@@ -10,7 +10,7 @@ use crate::ops::Value;
 #[non_exhaustive]
 pub enum SumTypeError {
     /// The type of the variant doesn't match the type of the value.
-    #[error("Expected type {expected} for element {index} of variant #{tag}, but found {}", .found.const_type())]
+    #[error("Expected type {expected} for element {index} of variant #{tag}, but found {}", .found.get_type())]
     InvalidValueType {
         /// Tag of the variant.
         tag: usize,
@@ -70,7 +70,7 @@ impl super::SumType {
         }
 
         for (index, (t, v)) in itertools::zip_eq(variant.iter(), val.iter()).enumerate() {
-            if v.const_type() != *t {
+            if v.get_type() != *t {
                 Err(SumTypeError::InvalidValueType {
                     tag,
                     index,

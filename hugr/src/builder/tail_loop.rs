@@ -148,7 +148,7 @@ mod test {
                     let const_wire = loop_b.add_load_const(Value::true_val());
                     let lift_node = loop_b.add_dataflow_op(
                         ops::Lift {
-                            type_row: vec![const_val.const_type().clone()].into(),
+                            type_row: vec![const_val.get_type().clone()].into(),
                             new_extension: PRELUDE_ID,
                         },
                         [const_wire],

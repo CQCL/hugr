@@ -358,7 +358,7 @@ pub trait Dataflow: Container {
         let load_n = self
             .add_dataflow_op(
                 ops::LoadConstant {
-                    datatype: op.const_type().clone(),
+                    datatype: op.get_type().clone(),
                 },
                 // Constant wire from the constant value node
                 vec![Wire::new(const_node, OutgoingPort::from(0))],

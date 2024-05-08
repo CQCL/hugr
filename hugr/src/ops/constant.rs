@@ -8,6 +8,7 @@ use crate::extension::ExtensionSet;
 use crate::types::{CustomType, EdgeKind, FunctionType, SumType, SumTypeError, Type};
 use crate::{Hugr, HugrView};
 
+use delegate::delegate;
 use itertools::Itertools;
 use smol_str::SmolStr;
 use thiserror::Error;
@@ -35,15 +36,45 @@ impl Const {
         &self.value
     }
 
-    /// Returns a reference to the type of this constant.
-    pub fn const_type(&self) -> Type {
-        self.value.const_type()
+    delegate! {
+        to self.value {
+            /// Returns the type of this constant.
+            pub fn get_type(&self) -> Type;
+        }
     }
 }
 
 impl From<Value> for Const {
     fn from(value: Value) -> Self {
         Self::new(value)
+    }
+}
+
+impl NamedOp for Const {
+    fn name(&self) -> OpName {
+        self.value().name()
+    }
+}
+
+impl StaticTag for Const {
+    const TAG: OpTag = OpTag::Const;
+}
+
+impl OpTrait for Const {
+    fn description(&self) -> &str {
+        "Constant value"
+    }
+
+    fn extension_delta(&self) -> ExtensionSet {
+        self.value().extension_reqs()
+    }
+
+    fn tag(&self) -> OpTag {
+        <Self as StaticTag>::TAG
+    }
+
+    fn static_output(&self) -> Option<EdgeKind> {
+        Some(EdgeKind::Const(self.get_type()))
     }
 }
 
@@ -96,16 +127,36 @@ pub enum Value {
     },
 }
 
-/// Boxed [`CustomConst`] trait object.
+/// An opaque newtype awround a `Box<dyn CustomConst>`.
 ///
-/// Use [`Value::extension`] to create a new variant of this type.
-///
-/// This is required to avoid <https://github.com/rust-lang/rust/issues/78808> in
-/// [`Value::Extension`], while implementing a transparent encoding into a
-/// `CustomConst`.
+/// This will be the serialisation barrier that ensures all implementors of
+/// [`CustomConst`] are serialised through [`CustomSerialized`].
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(transparent)]
-pub struct ExtensionValue(pub(super) Box<dyn CustomConst>);
+pub struct ExtensionValue(Box<dyn CustomConst>);
+
+impl ExtensionValue {
+    /// Create a new [`ExtensionValue`] from any [`CustomConst`].
+    pub fn new(cc: impl CustomConst) -> Self {
+        Self(Box::new(cc))
+    }
+
+    /// Returns a reference to the internal [`CustomConst`].
+    pub fn value(&self) -> &dyn CustomConst {
+        self.0.as_ref()
+    }
+
+    delegate! {
+        to self.0 {
+            /// Returns the type of the internal [`CustomConst`].
+            pub fn get_type(&self) -> Type;
+            /// An identifier of the internal [`CustomConst`].
+            pub fn name(&self) -> ValueName;
+            /// The extension(s) defining the internal [`CustomConst`].
+            pub fn extension_reqs(&self) -> ExtensionSet;
+        }
+    }
+}
 
 impl PartialEq for ExtensionValue {
     fn eq(&self, other: &Self) -> bool {
@@ -166,11 +217,11 @@ fn mono_fn_type(h: &Hugr) -> Result<FunctionType, ConstTypeError> {
 }
 
 impl Value {
-    /// Returns a reference to the type of this [`Value`].
-    pub fn const_type(&self) -> Type {
+    /// Returns the type of this [`Value`].
+    pub fn get_type(&self) -> Type {
         match self {
-            Self::Extension { e } => e.0.get_type(),
-            Self::Tuple { vs } => Type::new_tuple(vs.iter().map(Self::const_type).collect_vec()),
+            Self::Extension { e } => e.get_type(),
+            Self::Tuple { vs } => Type::new_tuple(vs.iter().map(Self::get_type).collect_vec()),
             Self::Sum { sum_type, .. } => sum_type.clone().into(),
             Self::Function { hugr } => {
                 let func_type = mono_fn_type(hugr).unwrap_or_else(|e| panic!("{}", e));
@@ -268,7 +319,7 @@ impl Value {
 
     fn name(&self) -> OpName {
         match self {
-            Self::Extension { e } => format!("const:custom:{}", e.0.name()),
+            Self::Extension { e } => format!("const:custom:{}", e.name()),
             Self::Function { hugr: h } => {
                 let Some(t) = h.get_function_type() else {
                     panic!("HUGR root node isn't a valid function parent.");
@@ -289,7 +340,7 @@ impl Value {
     /// The extensions required by a [`Value`]
     pub fn extension_reqs(&self) -> ExtensionSet {
         match self {
-            Self::Extension { e } => e.0.extension_reqs().clone(),
+            Self::Extension { e } => e.extension_reqs().clone(),
             Self::Function { .. } => ExtensionSet::new(), // no extensions required to load Hugr (only to run)
             Self::Tuple { vs } => ExtensionSet::union_over(vs.iter().map(Value::extension_reqs)),
             Self::Sum { values, .. } => {
@@ -299,35 +350,6 @@ impl Value {
     }
 }
 
-impl NamedOp for Const {
-    fn name(&self) -> OpName {
-        self.value().name()
-    }
-}
-
-impl StaticTag for Const {
-    const TAG: OpTag = OpTag::Const;
-}
-impl OpTrait for Const {
-    fn description(&self) -> &str {
-        "Constant value"
-    }
-
-    fn extension_delta(&self) -> ExtensionSet {
-        self.value().extension_reqs()
-    }
-
-    fn tag(&self) -> OpTag {
-        <Self as StaticTag>::TAG
-    }
-
-    fn static_output(&self) -> Option<EdgeKind> {
-        Some(EdgeKind::Const(self.const_type()))
-    }
-}
-
-// [KnownTypeConst] is guaranteed to be the right type, so can be constructed
-// without initial type check.
 impl<T> From<T> for Value
 where
     T: CustomConst,
@@ -484,7 +506,7 @@ mod test {
             crate::extension::prelude::BOOL_T
         ]));
 
-        assert_eq!(v.const_type(), correct_type);
+        assert_eq!(v.get_type(), correct_type);
         assert!(v.name().starts_with("const:function:"))
     }
 
@@ -508,7 +530,7 @@ mod test {
         #[case] expected_type: Type,
         #[case] name_prefix: &str,
     ) {
-        assert_eq!(const_value.const_type(), expected_type);
+        assert_eq!(const_value.get_type(), expected_type);
         let name = const_value.name();
         assert!(
             name.starts_with(name_prefix),
@@ -541,10 +563,10 @@ mod test {
                 .into();
         let classic_t = Type::new_extension(typ_int.clone());
         assert_matches!(classic_t.least_upper_bound(), TypeBound::Eq);
-        assert_eq!(yaml_const.const_type(), classic_t);
+        assert_eq!(yaml_const.get_type(), classic_t);
 
         let typ_qb = CustomType::new("my_type", vec![], ex_id, TypeBound::Eq);
         let t = Type::new_extension(typ_qb.clone());
-        assert_ne!(yaml_const.const_type(), t);
+        assert_ne!(yaml_const.get_type(), t);
     }
 }
