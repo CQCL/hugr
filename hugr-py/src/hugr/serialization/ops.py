@@ -70,43 +70,32 @@ class FuncDecl(BaseOp):
     signature: PolyFuncType
 
 
-CustomConst = Any  # TODO
+class CustomConst(ConfiguredBaseModel):
+    c: str
+    v: Any
 
 
 class ExtensionValue(ConfiguredBaseModel):
     """An extension constant value, that can check it is of a given [CustomType]."""
 
-    c: Literal["Extension"] = Field("Extension", title="ValueTag")
-    e: CustomConst = Field(title="CustomConst")
-
-    class Config:
-        json_schema_extra = {
-            "required": ["c", "e"],
-        }
+    v: Literal["Extension"] = Field("Extension", title="ValueTag")
+    extensions: ExtensionSet
+    typ: Type
+    value: CustomConst
 
 
 class FunctionValue(ConfiguredBaseModel):
     """A higher-order function value."""
 
-    c: Literal["Function"] = Field("Function", title="ValueTag")
+    v: Literal["Function"] = Field("Function", title="ValueTag")
     hugr: Any  # TODO
-
-    class Config:
-        json_schema_extra = {
-            "required": ["c", "hugr"],
-        }
 
 
 class TupleValue(ConfiguredBaseModel):
     """A constant tuple value."""
 
-    c: Literal["Tuple"] = Field("Tuple", title="ValueTag")
+    v: Literal["Tuple"] = Field("Tuple", title="ValueTag")
     vs: list["Value"]
-
-    class Config:
-        json_schema_extra = {
-            "required": ["c", "vs"],
-        }
 
 
 class SumValue(ConfiguredBaseModel):
@@ -115,7 +104,7 @@ class SumValue(ConfiguredBaseModel):
     For any Sum type where this value meets the type of the variant indicated by the tag
     """
 
-    c: Literal["Sum"] = Field("Sum", title="ValueTag")
+    v: Literal["Sum"] = Field("Sum", title="ValueTag")
     tag: int
     typ: SumType
     vs: list["Value"]
@@ -127,7 +116,6 @@ class SumValue(ConfiguredBaseModel):
                 "A Sum variant For any Sum type where this value meets the type "
                 "of the variant indicated by the tag."
             ),
-            "required": ["c", "tag", "typ", "vs"],
         }
 
 
@@ -135,7 +123,7 @@ class Value(RootModel):
     """A constant Value."""
 
     root: ExtensionValue | FunctionValue | TupleValue | SumValue = Field(
-        discriminator="c"
+        discriminator="v"
     )
 
 

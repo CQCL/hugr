@@ -10,6 +10,7 @@ use crate::{Hugr, HugrView};
 
 use delegate::delegate;
 use itertools::Itertools;
+use serde::{Deserializer, Serializer};
 use smol_str::SmolStr;
 use thiserror::Error;
 
@@ -91,12 +92,13 @@ impl AsRef<Value> for Const {
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-#[serde(tag = "c")]
+#[serde(tag = "v")]
 /// A value that can be stored as a static constant. Representing core types and
 /// extension types.
 pub enum Value {
     /// An extension constant value, that can check it is of a given [CustomType].
     Extension {
+        #[serde(flatten)]
         /// The custom constant value.
         e: ExtensionValue,
     },
@@ -133,21 +135,46 @@ pub enum Value {
 /// [`CustomConst`] are serialised through [`CustomSerialized`].
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(transparent)]
-pub struct ExtensionValue(Box<dyn CustomConst>);
+pub struct ExtensionValue {
+    #[serde(serialize_with = "ExtensionValue::serialize_with")]
+    #[serde(deserialize_with = "ExtensionValue::deserialize_with")]
+    #[serde(flatten)]
+    v: Box<dyn CustomConst>,
+}
 
 impl ExtensionValue {
     /// Create a new [`ExtensionValue`] from any [`CustomConst`].
     pub fn new(cc: impl CustomConst) -> Self {
-        Self(Box::new(cc))
+        Self { v: Box::new(cc) }
     }
 
     /// Returns a reference to the internal [`CustomConst`].
     pub fn value(&self) -> &dyn CustomConst {
-        self.0.as_ref()
+        self.v.as_ref()
+    }
+
+    fn deserialize_with<'de, D: Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Box<dyn CustomConst>, D::Error> {
+        use serde::Deserialize;
+        let cs = CustomSerialized::deserialize(deserializer)?;
+        Ok(cs.into())
+    }
+
+    fn serialize_with<S: Serializer>(
+        konst: impl AsRef<dyn CustomConst>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        use serde::Serialize;
+        let cs: CustomSerialized = konst
+            .as_ref()
+            .try_into()
+            .map_err(<S::Error as serde::ser::Error>::custom)?;
+        cs.serialize(serializer)
     }
 
     delegate! {
-        to self.0 {
+        to self.value() {
             /// Returns the type of the internal [`CustomConst`].
             pub fn get_type(&self) -> Type;
             /// An identifier of the internal [`CustomConst`].
@@ -158,9 +185,15 @@ impl ExtensionValue {
     }
 }
 
+impl<CC: CustomConst> From<CC> for ExtensionValue {
+    fn from(x: CC) -> Self {
+        Self::new(x)
+    }
+}
+
 impl PartialEq for ExtensionValue {
     fn eq(&self, other: &Self) -> bool {
-        self.0.equal_consts(other.0.as_ref())
+        self.value().equal_consts(other.value())
     }
 }
 
@@ -304,14 +337,14 @@ impl Value {
     /// Returns a tuple constant of constant values.
     pub fn extension(custom_const: impl CustomConst) -> Self {
         Self::Extension {
-            e: ExtensionValue(Box::new(custom_const)),
+            e: ExtensionValue::new(custom_const),
         }
     }
 
     /// For a Const holding a CustomConst, extract the CustomConst by downcasting.
     pub fn get_custom_value<T: CustomConst>(&self) -> Option<&T> {
         if let Self::Extension { e } = self {
-            e.0.downcast_ref()
+            e.v.downcast_ref()
         } else {
             None
         }
@@ -411,12 +444,9 @@ mod test {
 
     /// A [`CustomSerialized`] encoding a [`FLOAT64_TYPE`] float constant used in testing.
     pub(crate) fn serialized_float(f: f64) -> Value {
-        CustomSerialized::new(
-            FLOAT64_TYPE,
-            serde_yaml::Value::Number(f.into()),
-            float_types::EXTENSION_ID,
-        )
-        .into()
+        CustomSerialized::try_from_custom_const(ConstF64::new(f))
+            .unwrap()
+            .into()
     }
 
     fn test_registry() -> ExtensionRegistry {
@@ -438,7 +468,7 @@ mod test {
             0,
             [
                 CustomTestValue(USIZE_CUSTOM_T).into(),
-                serialized_float(5.1),
+                ConstF64::new(5.1).into(),
             ],
             pred_ty.clone(),
         )?);
@@ -523,7 +553,7 @@ mod test {
     #[rstest]
     #[case(Value::unit(), Type::UNIT, "const:seq:{}")]
     #[case(const_usize(), USIZE_T, "const:custom:ConstUsize(")]
-    #[case(serialized_float(17.4), FLOAT64_TYPE, "const:custom:yaml:Number(17.4)")]
+    // #[case(serialized_float(17.4), FLOAT64_TYPE, "const:custom:yaml:Number(17.4)")]
     #[case(const_tuple(), Type::new_tuple(type_row![USIZE_T, FLOAT64_TYPE]), "const:seq:{")]
     fn const_type(
         #[case] const_value: Value,

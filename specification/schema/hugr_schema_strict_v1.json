@@ -498,6 +498,24 @@
             "title": "Const",
             "type": "object"
         },
+        "CustomConst": {
+            "additionalProperties": false,
+            "properties": {
+                "c": {
+                    "title": "C",
+                    "type": "string"
+                },
+                "v": {
+                    "title": "V"
+                }
+            },
+            "required": [
+                "c",
+                "v"
+            ],
+            "title": "CustomConst",
+            "type": "object"
+        },
         "CustomOp": {
             "additionalProperties": false,
             "description": "A user-defined operation that can be downcasted by the extensions that define\nit.",
@@ -725,7 +743,7 @@
             "additionalProperties": false,
             "description": "An extension constant value, that can check it is of a given [CustomType].",
             "properties": {
-                "c": {
+                "v": {
                     "const": "Extension",
                     "default": "Extension",
                     "enum": [
@@ -734,12 +752,24 @@
                     "title": "ValueTag",
                     "type": "string"
                 },
-                "e": {
-                    "title": "CustomConst"
+                "extensions": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "title": "Extensions",
+                    "type": "array"
+                },
+                "typ": {
+                    "$ref": "#/$defs/Type"
+                },
+                "value": {
+                    "$ref": "#/$defs/CustomConst"
                 }
             },
             "required": [
-                "e"
+                "extensions",
+                "typ",
+                "value"
             ],
             "title": "ExtensionValue",
             "type": "object"
@@ -928,7 +958,7 @@
             "additionalProperties": false,
             "description": "A higher-order function value.",
             "properties": {
-                "c": {
+                "v": {
                     "const": "Function",
                     "default": "Function",
                     "enum": [
@@ -1647,7 +1677,7 @@
             "additionalProperties": false,
             "description": "A Sum variant\n\nFor any Sum type where this value meets the type of the variant indicated by the tag",
             "properties": {
-                "c": {
+                "v": {
                     "const": "Sum",
                     "default": "Sum",
                     "enum": [
@@ -1868,7 +1898,7 @@
             "additionalProperties": false,
             "description": "A constant tuple value.",
             "properties": {
-                "c": {
+                "v": {
                     "const": "Tuple",
                     "default": "Tuple",
                     "enum": [
@@ -2153,7 +2183,7 @@
                     "Sum": "#/$defs/SumValue",
                     "Tuple": "#/$defs/TupleValue"
                 },
-                "propertyName": "c"
+                "propertyName": "v"
             },
             "oneOf": [
                 {
