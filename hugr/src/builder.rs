@@ -85,7 +85,6 @@
 //! # }
 //! # doctest().unwrap();
 //! ```
-//!
 use thiserror::Error;
 
 use crate::extension::SignatureError;

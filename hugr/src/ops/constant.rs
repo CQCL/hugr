@@ -10,7 +10,7 @@ use crate::{Hugr, HugrView};
 
 use delegate::delegate;
 use itertools::Itertools;
-use serde::{Deserializer, Serializer};
+use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 use thiserror::Error;
 
@@ -129,16 +129,57 @@ pub enum Value {
     },
 }
 
-/// An opaque newtype awround a `Box<dyn CustomConst>`.
+/// An opaque newtype awround a [`Box<dyn CustomConst>`](CustomConst).
 ///
-/// This will be the serialisation barrier that ensures all implementors of
-/// [`CustomConst`] are serialised through [`CustomSerialized`].
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+/// This type has special serialization behaviour in order to support
+/// serialisation and deserialisation of unknown impls of [CustomConst].
+///
+/// During serialization we first serialize the internal [`dyn` CustomConst](CustomConst)
+/// into a [serde_yaml::Value]. We then create a [CustomSerialized] wrapping
+/// that value.  That [CustomSerialized] is then serialized in place of the
+/// [ExtensionValue].
+///
+/// During deserialization, first we deserialize a [CustomSerialized]. We
+/// attempt to deserialize the internal [serde_yaml::Value] using the [`Box<dyn
+/// CustomConst>`](CustomConst) impl. This will fail if the appropriate `impl CustomConst`
+/// is not linked into the running program, in which case we coerce the
+/// [CustomSerialized] into a [`Box<dyn CustomConst>`](CustomConst). The [ExtensionValue] is
+/// then produced from the [`Box<dyn [CustomConst]>`](CustomConst).
+///
+/// In the case where the internal serialised value of a an `CustomSerialized`
+/// is another `CustomSerialized` we do not attempt to recurse. This behaviour
+/// may change in future.
+///
+///
+/// ```rust
+/// use serde::{Serialize,Deserialize};
+/// use hugr::{types::Type,ops::constant::{ExtensionValue, ValueName, CustomConst}, extension::ExtensionSet, std_extensions::arithmetic::int_types};
+/// use serde_json::json;
+///
+/// #[derive(std::fmt::Debug, Clone, Serialize,Deserialize)]
+/// struct CC(i64);
+///
+/// #[typetag::serde]
+/// impl CustomConst for CC {
+///   fn name(&self) -> ValueName { "CC".into() }
+///   fn extension_reqs(&self) -> ExtensionSet { ExtensionSet::singleton(&int_types::EXTENSION_ID) }
+///   fn get_type(&self) -> Type { int_types::INT_TYPES[5].clone() }
+/// }
+///
+/// assert_eq!(serde_json::to_value(CC(2)).unwrap(), json!(2));
+///
+/// assert_eq!(serde_json::to_value(&CC(2) as &dyn CustomConst).unwrap(), json!({"c": "CC", "v": 2}));
+/// let ev = ExtensionValue::new(CC(2));
+/// assert_eq!(serde_json::to_value(&ev).unwrap(), json!({
+///     "extensions": ev.extension_reqs(),
+///     "typ": ev.get_type(),
+///     "value": {'c': "CC", 'v': 2}
+/// }))
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct ExtensionValue {
-    #[serde(serialize_with = "ExtensionValue::serialize_with")]
-    #[serde(deserialize_with = "ExtensionValue::deserialize_with")]
-    #[serde(flatten)]
+    #[serde(flatten, with = "self::custom::serde_extension_value")]
     v: Box<dyn CustomConst>,
 }
 
@@ -151,26 +192,6 @@ impl ExtensionValue {
     /// Returns a reference to the internal [`CustomConst`].
     pub fn value(&self) -> &dyn CustomConst {
         self.v.as_ref()
-    }
-
-    fn deserialize_with<'de, D: Deserializer<'de>>(
-        deserializer: D,
-    ) -> Result<Box<dyn CustomConst>, D::Error> {
-        use serde::Deserialize;
-        let cs = CustomSerialized::deserialize(deserializer)?;
-        Ok(cs.into())
-    }
-
-    fn serialize_with<S: Serializer>(
-        konst: impl AsRef<dyn CustomConst>,
-        serializer: S,
-    ) -> Result<S::Ok, S::Error> {
-        use serde::Serialize;
-        let cs: CustomSerialized = konst
-            .as_ref()
-            .try_into()
-            .map_err(<S::Error as serde::ser::Error>::custom)?;
-        cs.serialize(serializer)
     }
 
     delegate! {

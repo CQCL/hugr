@@ -13,7 +13,6 @@
 //! ```
 //!
 //! The definition can be loaded into a registry using the [`load_extensions`] or [`load_extensions_file`] functions.
-//!
 //! ```rust
 //! # const DECLARATIVE_YAML: &str = include_str!("../../examples/extension/declarative.yaml");
 //! # use hugr::extension::declarative::load_extensions;

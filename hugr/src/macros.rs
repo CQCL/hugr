@@ -87,12 +87,12 @@ pub use type_row;
 /// ```rust
 /// # mod test {
 /// # use hugr::macros::const_extension_ids;
-///   const_extension_ids! {
-///     pub const EXT_A: ExtensionId = "A";
-///     /// A doc comment
-///     #[cfg(foobar)] pub (super) const EXT_A_B: ExtensionId = "A.B";
-///     const EXT_BAD: ExtensionId = "..55"; // this will generate a failing #[test] fn ....
-///   }
+/// const_extension_ids! {
+///   pub const EXT_A: ExtensionId = "A";
+///   /// A doc comment
+///   #[cfg(foobar)] pub (super) const EXT_A_B: ExtensionId = "A.B";
+///   const EXT_BAD: ExtensionId = "..55"; // this will generate a failing #[test] fn ....
+/// }
 /// # }
 /// ```
 #[macro_export]

@@ -16,12 +16,10 @@ use crate::types::{CustomCheckFailure, Type};
 
 use super::ValueName;
 
-/// Constant value for opaque [`CustomType`]s.
+/// Extensible constant values.
 ///
-/// When implementing this trait, include the `#[typetag::serde]` attribute to
+/// When implementing this trait, include the [`#[typetag::serde]`](typetag) attribute to
 /// enable serialization.
-///
-/// [`CustomType`]: crate::types::CustomType
 #[typetag::serde(tag = "c", content = "v")]
 pub trait CustomConst:
     Send + Sync + std::fmt::Debug + CustomConstBoxClone + Any + Downcast
@@ -72,12 +70,12 @@ pub fn downcast_equal_consts<T: CustomConst + PartialEq>(
 }
 
 /// Serialize any CustomConst using the `impl Serialize for &dyn CustomConst`.
-/// In particular this works on `&dyn CustomConst` and `Box<dyn CustomConst>::Target`.
-/// See tests below
 fn serialize_custom_const(cc: &dyn CustomConst) -> Result<serde_yaml::Value, serde_yaml::Error> {
     serde_yaml::to_value(cc)
 }
 
+/// Deserialize a `Box<&dyn CustomConst>` and attempt to downcast it to `CC`;
+/// propagating failure.
 fn deserialize_custom_const<CC: CustomConst>(
     value: serde_yaml::Value,
 ) -> Result<CC, serde_yaml::Error> {
@@ -91,6 +89,7 @@ fn deserialize_custom_const<CC: CustomConst>(
     }
 }
 
+/// Deserialize a `Box<&dyn CustomConst>`.
 fn deserialize_dyn_custom_const(
     value: serde_yaml::Value,
 ) -> Result<Box<dyn CustomConst>, serde_yaml::Error> {
@@ -109,29 +108,19 @@ pub struct CustomSerialized {
 }
 
 #[derive(Debug, Error)]
-pub enum CustomSerializedError {
-    #[error("Error serializing value into CustomSerialised: err: {err}, value: {payload:?}")]
-    SerializePayloadError {
-        #[source]
-        err: serde_yaml::Error,
-        payload: Box<dyn CustomConst>,
-    },
-    #[error("Error serializing value into CustomSerialised: err: {err}, value: {payload:?}")]
-    DeserializePayloadError {
-        #[source]
-        err: serde_yaml::Error,
-        payload: serde_yaml::Value,
-    },
+#[error("Error serializing value into CustomSerialised: err: {err}, value: {payload:?}")]
+pub struct SerializeError {
+    #[source]
+    err: serde_yaml::Error,
+    payload: Box<dyn CustomConst>,
 }
 
-impl CustomSerializedError {
-    fn new_ser(err: serde_yaml::Error, payload: Box<dyn CustomConst>) -> Self {
-        Self::SerializePayloadError { err, payload }
-    }
-
-    fn new_de(err: serde_yaml::Error, payload: serde_yaml::Value) -> Self {
-        Self::DeserializePayloadError { err, payload }
-    }
+#[derive(Debug, Error)]
+#[error("Error deserialising value from CustomSerialised: err: {err}, value: {payload:?}")]
+pub struct DeserializeError {
+    #[source]
+    err: serde_yaml::Error,
+    payload: serde_yaml::Value,
 }
 
 impl CustomSerialized {
@@ -153,59 +142,75 @@ impl CustomSerialized {
         &self.value
     }
 
-    /// TODO
-    pub fn try_from_custom_const_ref(
-        cc: &(impl CustomConst + ?Sized),
-    ) -> Result<Self, CustomSerializedError> {
-        Self::try_from_custom_const_box(cc.clone_box())
+    /// If `cc` is a [Self], returns a clone of `cc` coerced to [Self].
+    /// Otherwise, returns a [Self] with `cc` serialised in it's value.
+    pub fn try_from_custom_const_ref(cc: &impl CustomConst) -> Result<Self, SerializeError> {
+        Self::try_from_dyn_custom_const(cc)
     }
 
-    /// TODO
-    pub fn try_from_custom_const(cc: impl CustomConst) -> Result<Self, CustomSerializedError> {
+    /// If `cc` is a [Self], returns a clone of `cc` coerced to [Self].
+    /// Otherwise, returns a [Self] with `cc` serialised in it's value.
+    pub fn try_from_dyn_custom_const(cc: &dyn CustomConst) -> Result<Self, SerializeError> {
+        Ok(match cc.as_any().downcast_ref::<Self>() {
+            Some(cs) => cs.clone(),
+            None => Self::new(
+                cc.get_type(),
+                serialize_custom_const(cc).map_err(|err| SerializeError {
+                    err,
+                    payload: cc.clone_box(),
+                })?,
+                cc.extension_reqs(),
+            ),
+        })
+    }
+
+    /// If `cc` is a [Self], return `cc` coerced to [Self]. Otherwise,
+    /// returns a [Self] with `cc` serialized in it's value.
+    /// Never clones `cc` outside of error paths.
+    pub fn try_from_custom_const(cc: impl CustomConst) -> Result<Self, SerializeError> {
         Self::try_from_custom_const_box(Box::new(cc))
     }
 
-    /// TODO
-    pub fn try_from_custom_const_box(
-        cc: Box<dyn CustomConst>,
-    ) -> Result<Self, CustomSerializedError> {
+    /// If `cc` is a [Self], return `cc` coerced to [Self]. Otherwise,
+    /// returns a [Self] with `cc` serialized in it's value.
+    /// Never clones `cc` outside of error paths.
+    pub fn try_from_custom_const_box(cc: Box<dyn CustomConst>) -> Result<Self, SerializeError> {
         match cc.downcast::<Self>() {
             Ok(x) => Ok(*x),
             Err(cc) => {
                 let (typ, extension_reqs) = (cc.get_type(), cc.extension_reqs());
                 let value = serialize_custom_const(cc.as_ref())
-                    .map_err(|err| CustomSerializedError::new_ser(err, cc))?;
+                    .map_err(|err| SerializeError { err, payload: cc })?;
                 Ok(Self::new(typ, value, extension_reqs))
             }
         }
     }
 
-    /// TODO
+    /// Attempts to desrialize the value in self into a `Box<dyn CustomConst>`.
+    /// This can fail, in particular when the `impl CustomConst` for the trait
+    /// is not linked into the running executable.
+    /// If deserialisation fails, returns self in a box.
+    ///
+    /// Note that if the inner value is a [Self] we do not recursively
+    /// deserialize it.
     pub fn into_custom_const_box(self) -> Box<dyn CustomConst> {
-        let (typ, extensions) = (self.get_type().clone(), self.extension_reqs());
         // ideally we would not have to clone, but serde_json does not allow us
         // to recover the value from the error
-        let cc_box =
-            deserialize_dyn_custom_const(self.value.clone()).unwrap_or_else(|_| Box::new(self));
-        assert_eq!(cc_box.get_type(), typ);
-        assert_eq!(cc_box.extension_reqs(), extensions);
-        cc_box
+        deserialize_dyn_custom_const(self.value.clone()).unwrap_or_else(|_| Box::new(self))
     }
 
-    /// TODO
-    pub fn try_into_custom_const<CC: CustomConst>(self) -> Result<CC, CustomSerializedError> {
-        let CustomSerialized {
-            typ,
-            value,
-            extensions,
-        } = self;
-        // ideally we would not have to clone, but serde_json does not allow us
+    /// Attempts to desrialize the value in self into a `CC`. Propagates failure.
+    ///
+    /// Note that if the inner value is a [Self] we do not recursively
+    /// deserialize it. In particular if that inner value were a [Self] whose
+    /// inner value were a `CC`, then we would still fail.
+    pub fn try_into_custom_const<CC: CustomConst>(self) -> Result<CC, DeserializeError> {
+        // ideally we would not have to clone, but serde_yaml does not allow us
         // to recover the value from the error
-        let cc: CC = deserialize_custom_const(value.clone())
-            .map_err(|err| CustomSerializedError::new_de(err, value))?;
-        assert_eq!(cc.get_type(), typ);
-        assert_eq!(cc.extension_reqs(), extensions);
-        Ok(cc)
+        deserialize_custom_const(self.value.clone()).map_err(|err| DeserializeError {
+            err,
+            payload: self.value,
+        })
     }
 }
 
@@ -227,23 +232,33 @@ impl CustomConst for CustomSerialized {
     }
 }
 
-impl TryFrom<&dyn CustomConst> for CustomSerialized {
-    type Error = CustomSerializedError;
-    fn try_from(value: &dyn CustomConst) -> Result<Self, Self::Error> {
-        Self::try_from_custom_const_ref(value)
-    }
-}
+/// This module is used by the serde annotations on `super::ExtensionValue`
+pub(super) mod serde_extension_value {
+    use serde::{Deserializer, Serializer};
 
-impl TryFrom<Box<dyn CustomConst>> for CustomSerialized {
-    type Error = CustomSerializedError;
-    fn try_from(value: Box<dyn CustomConst>) -> Result<Self, Self::Error> {
-        Self::try_from_custom_const_box(value)
-    }
-}
+    use super::{CustomConst, CustomSerialized};
 
-impl From<CustomSerialized> for Box<dyn CustomConst> {
-    fn from(cs: CustomSerialized) -> Self {
-        cs.into_custom_const_box()
+    pub fn deserialize<'de, D: Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Box<dyn CustomConst>, D::Error> {
+        use serde::Deserialize;
+        // We deserialize a CustomSerialized, i.e. not a dyn CustomConst.
+        let cs = CustomSerialized::deserialize(deserializer)?;
+        // We return the inner serialised CustomConst if we can, otherwise the
+        // CustomSerialized itself.
+        Ok(cs.into_custom_const_box())
+    }
+
+    pub fn serialize<S: Serializer>(
+        konst: impl AsRef<dyn CustomConst>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        use serde::Serialize;
+        // we create a CustomSerialized, then serialize it. Note we do not
+        // serialize it as a dyn CustomConst.
+        let cs = CustomSerialized::try_from_dyn_custom_const(konst.as_ref())
+            .map_err(<S::Error as serde::ser::Error>::custom)?;
+        cs.serialize(serializer)
     }
 }
 
@@ -253,18 +268,12 @@ mod test {
     use rstest::rstest;
 
     use crate::{
-        extension::{
-            prelude::{ConstUsize, USIZE_T},
-            ExtensionSet,
-        },
-        ops::{
-            constant::custom::{deserialize_dyn_custom_const, serialize_custom_const},
-            Value,
-        },
-        std_extensions::{arithmetic::int_types::ConstInt, collections::ListValue},
+        extension::prelude::{ConstUsize, USIZE_T},
+        ops::{constant::custom::serialize_custom_const, Value},
+        std_extensions::collections::ListValue,
     };
 
-    use super::{CustomConst, CustomConstBoxClone, CustomSerialized};
+    use super::{super::ExtensionValue, CustomConst, CustomConstBoxClone, CustomSerialized};
 
     struct SerializeCustomConstExample<CC: CustomConst + serde::Serialize + 'static> {
         cc: CC,
@@ -279,118 +288,138 @@ mod test {
         }
     }
 
-    fn ser_cc_ex1() -> SerializeCustomConstExample<ConstUsize> {
+    fn scce_usize() -> SerializeCustomConstExample<ConstUsize> {
         SerializeCustomConstExample::new(ConstUsize::new(12), "ConstUsize")
     }
 
-    fn ser_cc_ex2() -> SerializeCustomConstExample<ListValue> {
-        SerializeCustomConstExample::new(
-            ListValue::new(
-                USIZE_T,
-                [ConstUsize::new(1), ConstUsize::new(2)]
-                    .into_iter()
-                    .map(Value::extension),
-            ),
-            "ListValue",
+    fn scce_list() -> SerializeCustomConstExample<ListValue> {
+        let cc = ListValue::new(
+            USIZE_T,
+            [ConstUsize::new(1), ConstUsize::new(2)]
+                .into_iter()
+                .map(Value::extension),
+        );
+        SerializeCustomConstExample::new(cc, "ListValue")
+    }
+
+    #[rstest]
+    #[case(scce_usize())]
+    #[case(scce_list())]
+    fn test_custom_serialized_try_from<
+        CC: CustomConst + serde::Serialize + Clone + PartialEq + 'static + Sized,
+    >(
+        #[case] example: SerializeCustomConstExample<CC>,
+    ) {
+        assert_eq!(example.yaml, serde_yaml::to_value(&example.cc).unwrap()); // sanity check
+        let expected_yaml: serde_yaml::Value = [
+            ("c".into(), example.tag.into()),
+            ("v".into(), example.yaml.clone()),
+        ]
+        .into_iter()
+        .collect::<serde_yaml::Mapping>()
+        .into();
+
+        // check serialize_custom_const
+        assert_eq!(expected_yaml, serialize_custom_const(&example.cc).unwrap());
+
+        let expected_custom_serialized = CustomSerialized::new(
+            example.cc.get_type(),
+            expected_yaml,
+            example.cc.extension_reqs(),
+        );
+
+        // check all the try_from/try_into/into variations
+        assert_eq!(
+            &expected_custom_serialized,
+            &CustomSerialized::try_from_custom_const(example.cc.clone()).unwrap()
+        );
+        assert_eq!(
+            &expected_custom_serialized,
+            &CustomSerialized::try_from_custom_const_ref(&example.cc).unwrap()
+        );
+        assert_eq!(
+            &expected_custom_serialized,
+            &CustomSerialized::try_from_custom_const_box(example.cc.clone_box()).unwrap()
+        );
+        assert_eq!(
+            &expected_custom_serialized,
+            &CustomSerialized::try_from_dyn_custom_const(example.cc.clone_box().as_ref()).unwrap()
+        );
+        assert_eq!(
+            &example.cc.clone_box(),
+            &expected_custom_serialized.clone().into_custom_const_box()
+        );
+        assert_eq!(
+            &example.cc,
+            &expected_custom_serialized
+                .clone()
+                .try_into_custom_const()
+                .unwrap()
+        );
+
+        // check ExtensionValue serializes/deserializes as a CustomSerialized
+        let ev: ExtensionValue = example.cc.clone().into();
+        let ev_val = serde_yaml::to_value(&ev).unwrap();
+        assert_eq!(
+            &ev_val,
+            &serde_yaml::to_value(&expected_custom_serialized).unwrap()
+        );
+        assert_eq!(ev, serde_yaml::from_value(ev_val).unwrap());
+    }
+
+    fn example_custom_serialized() -> (ConstUsize, CustomSerialized) {
+        let inner = scce_usize().cc;
+        (
+            inner.clone(),
+            CustomSerialized::try_from_custom_const(inner).unwrap(),
         )
     }
 
-    fn ser_cc_ex3() -> SerializeCustomConstExample<CustomSerialized> {
-        SerializeCustomConstExample::new(
-            CustomSerialized::new(USIZE_T, serde_yaml::Value::Null, ExtensionSet::default()),
-            "CustomSerialized",
+    fn example_nested_custom_serialized() -> (CustomSerialized, CustomSerialized) {
+        let inner = example_custom_serialized().1;
+        (
+            inner.clone(),
+            CustomSerialized::new(
+                inner.get_type(),
+                serialize_custom_const(&inner).unwrap(),
+                inner.extension_reqs(),
+            ),
         )
     }
 
     #[rstest]
-    #[case(ser_cc_ex1())]
-    #[case(ser_cc_ex2())]
-    #[case(ser_cc_ex3())]
-    fn test_serialize_custom_const<CC: CustomConst + serde::Serialize + 'static + Sized>(
-        #[case] example: SerializeCustomConstExample<CC>,
+    #[case(example_custom_serialized())]
+    #[case(example_nested_custom_serialized())]
+    fn test_try_from_custom_serialized_recursive<CC: CustomConst + PartialEq>(
+        #[case] example: (CC, CustomSerialized),
     ) {
-        let expected_yaml: serde_yaml::Value =
-            [("c".into(), example.tag.into()), ("v".into(), example.yaml)]
-                .into_iter()
-                .collect::<serde_yaml::Mapping>()
-                .into();
+        let (inner, cs) = example;
+        // check all the try_from/try_into/into variations
 
-        let yaml_by_ref = serialize_custom_const(&example.cc as &CC).unwrap();
-        assert_eq!(expected_yaml, yaml_by_ref);
-
-        let yaml_by_dyn_ref = serialize_custom_const(&example.cc as &dyn CustomConst).unwrap();
-        assert_eq!(expected_yaml, yaml_by_dyn_ref);
-    }
-
-    #[test]
-    fn custom_serialized_from_into_custom_const() {
-        let const_int = ConstInt::new_s(4, 1).unwrap();
-
-        let cs: CustomSerialized = CustomSerialized::try_from_custom_const_ref(&const_int).unwrap();
-
-        assert_eq!(const_int.get_type(), cs.get_type());
-        assert_eq!(const_int.extension_reqs(), cs.extension_reqs());
-        assert_eq!(&serialize_custom_const(&const_int).unwrap(), cs.value());
-
-        let deser_const_int: ConstInt = cs.try_into_custom_const().unwrap();
-
-        assert_eq!(const_int, deser_const_int);
-    }
-
-    #[test]
-    fn custom_serialized_from_into_custom_serialised() {
-        let const_int = ConstInt::new_s(4, 1).unwrap();
-        let cs0: CustomSerialized =
-            CustomSerialized::try_from_custom_const_ref(&const_int).unwrap();
-
-        let cs1 = CustomSerialized::try_from_custom_const_ref(&cs0).unwrap();
-        assert_eq!(&cs0, &cs1);
-
-        let deser_const_int: ConstInt = cs0.try_into_custom_const().unwrap();
-        assert_eq!(&const_int, &deser_const_int);
-    }
-
-    #[test]
-    fn custom_serialized_try_from_dyn_custom_const() {
-        let const_int = ConstInt::new_s(4, 1).unwrap();
-        let cs: CustomSerialized = const_int.clone_box().try_into().unwrap();
-        assert_eq!(const_int.get_type(), cs.get_type());
-        assert_eq!(const_int.extension_reqs(), cs.extension_reqs());
-        assert_eq!(&serialize_custom_const(&const_int).unwrap(), cs.value());
-
-        let deser_const_int: ConstInt = {
-            let dyn_box: Box<dyn CustomConst> = cs.into();
-            *dyn_box.downcast().unwrap()
-        };
-        assert_eq!(const_int, deser_const_int)
-    }
-
-    #[test]
-    fn nested_custom_serialized() {
-        let const_int = ConstInt::new_s(4, 1).unwrap();
-        let cs_inner: CustomSerialized =
-            CustomSerialized::try_from_custom_const_ref(&const_int).unwrap();
-
-        let cs_inner_ser = serialize_custom_const(&cs_inner).unwrap();
-
-        // cs_outer is a CustomSerialized of a CustomSerialized of a ConstInt
-        let cs_outer = CustomSerialized::new(
-            cs_inner.get_type(),
-            cs_inner_ser.clone(),
-            cs_inner.extension_reqs(),
-        );
-        // TODO should this be &const_int == cs_outer.value() ???
-        assert_eq!(&cs_inner_ser, cs_outer.value());
-
-        assert_eq!(const_int.get_type(), cs_outer.get_type());
-        assert_eq!(const_int.extension_reqs(), cs_outer.extension_reqs());
-
-        // TODO should this be &const_int = cs_outer.value() ???
-        let inner_deser: Box<dyn CustomConst> =
-            deserialize_dyn_custom_const(cs_outer.value().clone()).unwrap();
         assert_eq!(
-            &cs_inner,
-            inner_deser.downcast_ref::<CustomSerialized>().unwrap()
+            &cs,
+            &CustomSerialized::try_from_custom_const(cs.clone()).unwrap()
+        );
+        assert_eq!(
+            &cs,
+            &CustomSerialized::try_from_custom_const_ref(&cs).unwrap()
+        );
+        assert_eq!(
+            &cs,
+            &CustomSerialized::try_from_custom_const_box(cs.clone_box()).unwrap()
+        );
+        assert_eq!(
+            &cs,
+            &CustomSerialized::try_from_dyn_custom_const(cs.clone_box().as_ref()).unwrap()
+        );
+        assert_eq!(&inner.clone_box(), &cs.clone().into_custom_const_box());
+        assert_eq!(&inner, &cs.clone().try_into_custom_const().unwrap());
+
+        let ev: ExtensionValue = cs.clone().into();
+        // A serialisation round-trip results in an ExtensionValue with the value of inner
+        assert_eq!(
+            ExtensionValue::new(inner),
+            serde_yaml::from_value(serde_yaml::to_value(&ev).unwrap()).unwrap()
         );
     }
 }
