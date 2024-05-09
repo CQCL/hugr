@@ -2,6 +2,7 @@
 mod test {
 
     use crate::algorithm::const_fold::constant_fold_pass;
+    use crate::builder::handle::Outputs;
     use crate::builder::{DFGBuilder, Dataflow, DataflowHugr};
     use crate::extension::prelude::{sum_with_error, ConstError, ConstString, BOOL_T, STRING_TYPE};
     use crate::extension::{ExtensionRegistry, PRELUDE};
@@ -10,11 +11,33 @@ mod test {
     use crate::std_extensions::arithmetic::int_ops::IntOpDef;
     use crate::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
     use crate::std_extensions::logic::{self, NaryLogic};
-    use crate::type_row;
     use crate::types::{FunctionType, Type, TypeRow};
     use crate::utils::test::assert_fully_folded;
+    use crate::{type_row, Hugr};
 
+    use lazy_static::lazy_static;
     use rstest::rstest;
+
+    lazy_static! {
+        static ref TEST_REG: ExtensionRegistry = ExtensionRegistry::try_new([
+            PRELUDE.to_owned(),
+            arithmetic::int_types::EXTENSION.to_owned(),
+        ])
+        .unwrap();
+    }
+
+    fn const_fold_test(
+        expected_value: impl Into<Value>,
+        reg: &ExtensionRegistry,
+        f: impl FnOnce(&mut DFGBuilder<Hugr>) -> Outputs,
+    ) {
+        let mut build =
+            DFGBuilder::new(FunctionType::new(type_row![], vec![INT_TYPES[5].clone()])).unwrap();
+        let out_wires = f(&mut build);
+        let mut h = build.finish_hugr_with_outputs(out_wires, reg).unwrap();
+        constant_fold_pass(&mut h, reg);
+        assert_fully_folded(&h, &expected_value.into());
+    }
 
     #[test]
     fn test_fold_iwiden_u() {
@@ -23,21 +46,13 @@ mod test {
         // x0 := int_u<4>(13);
         // x1 := iwiden_u<4, 5>(x0);
         // output x1 == int_u<5>(13);
-        let mut build =
-            DFGBuilder::new(FunctionType::new(type_row![], vec![INT_TYPES[5].clone()])).unwrap();
-        let x0 = build.add_load_const(Value::extension(ConstInt::new_u(4, 13).unwrap()));
-        let x1 = build
-            .add_dataflow_op(IntOpDef::iwiden_u.with_two_log_widths(4, 5), [x0])
-            .unwrap();
-        let reg = ExtensionRegistry::try_new([
-            PRELUDE.to_owned(),
-            arithmetic::int_types::EXTENSION.to_owned(),
-        ])
-        .unwrap();
-        let mut h = build.finish_hugr_with_outputs(x1.outputs(), &reg).unwrap();
-        constant_fold_pass(&mut h, &reg);
-        let expected = Value::extension(ConstInt::new_u(5, 13).unwrap());
-        assert_fully_folded(&h, &expected);
+        const_fold_test(ConstInt::new_u(5, 13).unwrap(), &TEST_REG, |build| {
+            let x0 = build.add_load_const(Value::extension(ConstInt::new_u(4, 13).unwrap()));
+            let x1 = build
+                .add_dataflow_op(IntOpDef::iwiden_u.with_two_log_widths(4, 5), [x0])
+                .unwrap();
+            x1.outputs()
+        })
     }
 
     #[test]
