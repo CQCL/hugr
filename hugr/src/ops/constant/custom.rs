@@ -22,7 +22,7 @@ use super::ValueName;
 /// Extensible constant values.
 ///
 /// We use [typetag] to provide an `impl Serialize for dyn CustomConst`, and
-/// similarly [Deserialize]. When implementing this trait, include the
+/// similarly [serde::Deserialize]. When implementing this trait, include the
 /// [`#[typetag::serde]`](typetag) attribute to enable serialization.
 ///
 /// Note that when serializing through the [`dyn CustomConst`] a dictionary will
@@ -294,6 +294,24 @@ pub(super) mod serde_extension_value {
     }
 }
 
+/// Given a singleton list of constant operations, return the value.
+pub fn get_single_input_value<T: CustomConst>(consts: &[(IncomingPort, Value)]) -> Option<&T> {
+    let [(_, c)] = consts else {
+        return None;
+    };
+    c.get_custom_value()
+}
+
+/// Given a list of two constant operations, return the values.
+pub fn get_pair_of_input_values<T: CustomConst>(
+    consts: &[(IncomingPort, Value)],
+) -> Option<(&T, &T)> {
+    let [(_, c0), (_, c1)] = consts else {
+        return None;
+    };
+    Some((c0.get_custom_value()?, c1.get_custom_value()?))
+}
+
 #[cfg(test)]
 mod test {
 
@@ -454,22 +472,4 @@ mod test {
             serde_yaml::from_value(serde_yaml::to_value(&ev).unwrap()).unwrap()
         );
     }
-}
-
-/// Given a singleton list of constant operations, return the value.
-pub fn get_single_input_value<T: CustomConst>(consts: &[(IncomingPort, Value)]) -> Option<&T> {
-    let [(_, c)] = consts else {
-        return None;
-    };
-    c.get_custom_value()
-}
-
-/// Given a list of two constant operations, return the values.
-pub fn get_pair_of_input_values<T: CustomConst>(
-    consts: &[(IncomingPort, Value)],
-) -> Option<(&T, &T)> {
-    let [(_, c0), (_, c1)] = consts else {
-        return None;
-    };
-    Some((c0.get_custom_value()?, c1.get_custom_value()?))
 }
