@@ -150,31 +150,32 @@ pub enum Value {
 /// is another `CustomSerialized` we do not attempt to recurse. This behaviour
 /// may change in future.
 ///
-///
 /// ```rust
 /// use serde::{Serialize,Deserialize};
-/// use hugr::{types::Type,ops::constant::{ExtensionValue, ValueName, CustomConst}, extension::ExtensionSet, std_extensions::arithmetic::int_types};
+/// use hugr::{
+///   types::Type,ops::constant::{ExtensionValue, ValueName, CustomConst, CustomSerialized},
+///   extension::{ExtensionSet, prelude::{USIZE_T, ConstUsize}},
+///   std_extensions::arithmetic::int_types};
 /// use serde_json::json;
 ///
-/// #[derive(std::fmt::Debug, Clone, Serialize,Deserialize)]
-/// struct CC(i64);
+/// let expected_json = json!({
+///     "extensions": ["prelude"],
+///     "typ": USIZE_T,
+///     "value": {'c': "ConstUsize", 'v': 1}
+/// });
+/// let ev = ExtensionValue::new(ConstUsize::new(1));
+/// assert_eq!(&serde_json::to_value(&ev).unwrap(), &expected_json);
+/// assert_eq!(ev, serde_json::from_value(expected_json).unwrap());
 ///
-/// #[typetag::serde]
-/// impl CustomConst for CC {
-///   fn name(&self) -> ValueName { "CC".into() }
-///   fn extension_reqs(&self) -> ExtensionSet { ExtensionSet::singleton(&int_types::EXTENSION_ID) }
-///   fn get_type(&self) -> Type { int_types::INT_TYPES[5].clone() }
-/// }
+/// let ev = ExtensionValue::new(CustomSerialized::new(USIZE_T.clone(), serde_yaml::Value::Null, ExtensionSet::default()));
+/// let expected_json = json!({
+///     "extensions": [],
+///     "typ": USIZE_T,
+///     "value": null
+/// });
 ///
-/// assert_eq!(serde_json::to_value(CC(2)).unwrap(), json!(2));
-///
-/// assert_eq!(serde_json::to_value(&CC(2) as &dyn CustomConst).unwrap(), json!({"c": "CC", "v": 2}));
-/// let ev = ExtensionValue::new(CC(2));
-/// assert_eq!(serde_json::to_value(&ev).unwrap(), json!({
-///     "extensions": ev.extension_reqs(),
-///     "typ": ev.get_type(),
-///     "value": {'c': "CC", 'v': 2}
-/// }))
+/// assert_eq!(&serde_json::to_value(ev.clone()).unwrap(), &expected_json);
+/// assert_eq!(ev, serde_json::from_value(expected_json).unwrap());
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(transparent)]

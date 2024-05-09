@@ -18,8 +18,37 @@ use super::ValueName;
 
 /// Extensible constant values.
 ///
-/// When implementing this trait, include the [`#[typetag::serde]`](typetag) attribute to
-/// enable serialization.
+/// We use [typetag] to provide an `impl Serialize for dyn CustomConst`, and
+/// similarly [Deserialize]. When implementing this trait, include the
+/// [`#[typetag::serde]`](typetag) attribute to enable serialization.
+///
+/// Note that when serializing through the [`dyn CustomConst`] a dictionary will
+/// be serialized with two attributes, `"c"`  the tag and `"v"` the
+/// `CustomConst`:
+///
+/// ```rust
+/// use serde::{Serialize,Deserialize};
+/// use hugr::{
+///   types::Type,ops::constant::{ExtensionValue, ValueName, CustomConst},
+///   extension::ExtensionSet, std_extensions::arithmetic::int_types};
+/// use serde_json::json;
+///
+/// #[derive(std::fmt::Debug, Clone, Serialize,Deserialize)]
+/// struct CC(i64);
+///
+/// #[typetag::serde]
+/// impl CustomConst for CC {
+///   fn name(&self) -> ValueName { "CC".into() }
+///   fn extension_reqs(&self) -> ExtensionSet { ExtensionSet::singleton(&int_types::EXTENSION_ID) }
+///   fn get_type(&self) -> Type { int_types::INT_TYPES[5].clone() }
+/// }
+///
+/// assert_eq!(serde_json::to_value(CC(2)).unwrap(), json!(2));
+/// assert_eq!(serde_json::to_value(&CC(2) as &dyn CustomConst).unwrap(), json!({
+///   "c": "CC",
+///   "v": 2
+/// }));
+/// ````
 #[typetag::serde(tag = "c", content = "v")]
 pub trait CustomConst:
     Send + Sync + std::fmt::Debug + CustomConstBoxClone + Any + Downcast
