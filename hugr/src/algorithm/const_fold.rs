@@ -13,14 +13,14 @@ use crate::{
         views::SiblingSubgraph,
         HugrMut,
     },
-    ops::{Const, OpType},
+    ops::{OpType, Value},
     type_row,
     types::FunctionType,
     Hugr, HugrView, IncomingPort, Node, SimpleReplacement,
 };
 
 /// Tag some output constants with [`OutgoingPort`] inferred from the ordering.
-fn out_row(consts: impl IntoIterator<Item = Const>) -> ConstFoldResult {
+fn out_row(consts: impl IntoIterator<Item = Value>) -> ConstFoldResult {
     let vec = consts
         .into_iter()
         .enumerate()
@@ -30,35 +30,35 @@ fn out_row(consts: impl IntoIterator<Item = Const>) -> ConstFoldResult {
 }
 
 /// Sort folding inputs with [`IncomingPort`] as key
-fn sort_by_in_port(consts: &[(IncomingPort, Const)]) -> Vec<&(IncomingPort, Const)> {
+fn sort_by_in_port(consts: &[(IncomingPort, Value)]) -> Vec<&(IncomingPort, Value)> {
     let mut v: Vec<_> = consts.iter().collect();
     v.sort_by_key(|(i, _)| i);
     v
 }
 
 /// Sort some input constants by port and just return the constants.
-pub(crate) fn sorted_consts(consts: &[(IncomingPort, Const)]) -> Vec<&Const> {
+pub(crate) fn sorted_consts(consts: &[(IncomingPort, Value)]) -> Vec<&Value> {
     sort_by_in_port(consts)
         .into_iter()
         .map(|(_, c)| c)
         .collect()
 }
 /// For a given op and consts, attempt to evaluate the op.
-pub fn fold_leaf_op(op: &OpType, consts: &[(IncomingPort, Const)]) -> ConstFoldResult {
+pub fn fold_leaf_op(op: &OpType, consts: &[(IncomingPort, Value)]) -> ConstFoldResult {
     match op {
         OpType::Noop { .. } => out_row([consts.first()?.1.clone()]),
         OpType::MakeTuple { .. } => {
-            out_row([Const::tuple(sorted_consts(consts).into_iter().cloned())])
+            out_row([Value::tuple(sorted_consts(consts).into_iter().cloned())])
         }
         OpType::UnpackTuple { .. } => {
             let c = &consts.first()?.1;
-            let Const::Tuple { vs } = c else {
+            let Value::Tuple { vs } = c else {
                 panic!("This op always takes a Tuple input.");
             };
             out_row(vs.iter().cloned())
         }
 
-        OpType::Tag(t) => out_row([Const::sum(
+        OpType::Tag(t) => out_row([Value::sum(
             t.tag,
             consts.iter().map(|(_, konst)| konst.clone()),
             SumType::new(t.variants.clone()),
@@ -74,8 +74,8 @@ pub fn fold_leaf_op(op: &OpType, consts: &[(IncomingPort, Const)]) -> ConstFoldR
 
 /// Generate a graph that loads and outputs `consts` in order, validating
 /// against `reg`.
-fn const_graph(consts: Vec<Const>, reg: &ExtensionRegistry) -> Hugr {
-    let const_types = consts.iter().map(Const::const_type).collect_vec();
+fn const_graph(consts: Vec<Value>, reg: &ExtensionRegistry) -> Hugr {
+    let const_types = consts.iter().map(Value::get_type).collect_vec();
     let mut b = DFGBuilder::new(FunctionType::new(type_row![], const_types)).unwrap();
 
     let outputs = consts
@@ -168,7 +168,7 @@ fn fold_op(
 
 /// If `op_node` is connected to a LoadConstant at `in_p`, return the constant
 /// and the LoadConstant node
-fn get_const(hugr: &impl HugrView, op_node: Node, in_p: IncomingPort) -> Option<(Const, Node)> {
+fn get_const(hugr: &impl HugrView, op_node: Node, in_p: IncomingPort) -> Option<(Value, Node)> {
     let (load_n, _) = hugr.single_linked_output(op_node, in_p)?;
     let load_op = hugr.get_optype(load_n).as_load_constant()?;
     let const_node = hugr
@@ -180,7 +180,7 @@ fn get_const(hugr: &impl HugrView, op_node: Node, in_p: IncomingPort) -> Option<
     let const_op = hugr.get_optype(const_node).as_const()?;
 
     // TODO avoid const clone here
-    Some((const_op.clone(), load_n))
+    Some((const_op.as_ref().clone(), load_n))
 }
 
 /// Exhaustively apply constant folding to a HUGR.
@@ -218,18 +218,19 @@ mod test {
     use crate::std_extensions::arithmetic::conversions::ConvertOpDef;
     use crate::std_extensions::arithmetic::float_ops::FloatOps;
     use crate::std_extensions::arithmetic::float_types::{ConstF64, FLOAT64_TYPE};
-    use crate::std_extensions::arithmetic::int_types::{ConstIntU, INT_TYPES};
-    use crate::std_extensions::logic::{self, NaryLogic};
+    use crate::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
+    use crate::std_extensions::logic::{self, NaryLogic, NotOp};
+    use crate::utils::test::assert_fully_folded;
 
     use rstest::rstest;
 
     /// int to constant
-    fn i2c(b: u64) -> Const {
-        Const::extension(ConstIntU::new(5, b).unwrap())
+    fn i2c(b: u64) -> Value {
+        Value::extension(ConstInt::new_u(5, b).unwrap())
     }
 
     /// float to constant
-    fn f2c(f: f64) -> Const {
+    fn f2c(f: f64) -> Value {
         ConstF64::new(f).into()
     }
 
@@ -259,7 +260,7 @@ mod test {
         ))
         .unwrap();
 
-        let tup = build.add_load_const(Const::tuple([f2c(5.6), f2c(3.2)]));
+        let tup = build.add_load_const(Value::tuple([f2c(5.6), f2c(3.2)]));
 
         let unpack = build
             .add_dataflow_op(
@@ -274,7 +275,7 @@ mod test {
             .add_dataflow_op(FloatOps::fsub, unpack.outputs())
             .unwrap();
         let to_int = build
-            .add_dataflow_op(ConvertOpDef::trunc_u.with_width(5), sub.outputs())
+            .add_dataflow_op(ConvertOpDef::trunc_u.with_log_width(5), sub.outputs())
             .unwrap();
 
         let reg = ExtensionRegistry::try_new([
@@ -292,7 +293,7 @@ mod test {
 
         constant_fold_pass(&mut h, &reg);
 
-        let expected = Const::sum(0, [i2c(2).clone()], sum_type).unwrap();
+        let expected = Value::sum(0, [i2c(2).clone()], sum_type).unwrap();
         assert_fully_folded(&h, &expected);
     }
 
@@ -308,7 +309,7 @@ mod test {
     ) -> Result<(), Box<dyn std::error::Error>> {
         let mut build = DFGBuilder::new(FunctionType::new(type_row![], vec![BOOL_T])).unwrap();
 
-        let ins = ins.map(|b| build.add_load_const(Const::from_bool(b)));
+        let ins = ins.map(|b| build.add_load_const(Value::from_bool(b)));
         let logic_op = build.add_dataflow_op(op.with_n_inputs(ins.len() as u64), ins)?;
 
         let reg =
@@ -316,7 +317,7 @@ mod test {
         let mut h = build.finish_hugr_with_outputs(logic_op.outputs(), &reg)?;
         constant_fold_pass(&mut h, &reg);
 
-        assert_fully_folded(&h, &Const::from_bool(out));
+        assert_fully_folded(&h, &Value::from_bool(out));
         Ok(())
     }
 
@@ -334,10 +335,10 @@ mod test {
             collections::EXTENSION.to_owned(),
         ])
         .unwrap();
-        let list: Const = ListValue::new(BOOL_T, [Const::unit_sum(0, 1).unwrap()]).into();
+        let list: Value = ListValue::new(BOOL_T, [Value::unit_sum(0, 1).unwrap()]).into();
         let mut build = DFGBuilder::new(FunctionType::new(
             type_row![],
-            vec![list.const_type().clone()],
+            vec![list.get_type().clone()],
         ))
         .unwrap();
 
@@ -362,19 +363,60 @@ mod test {
         Ok(())
     }
 
-    fn assert_fully_folded(h: &Hugr, expected_const: &Const) {
-        // check the hugr just loads and returns a single const
-        let mut node_count = 0;
+    #[test]
+    fn test_fold_and() {
+        // pseudocode:
+        // x0, x1 := bool(true), bool(true)
+        // x2 := and(x0, x1)
+        // output x2 == true;
+        let mut build = DFGBuilder::new(FunctionType::new(type_row![], vec![BOOL_T])).unwrap();
+        let x0 = build.add_load_const(Value::true_val());
+        let x1 = build.add_load_const(Value::true_val());
+        let x2 = build
+            .add_dataflow_op(NaryLogic::And.with_n_inputs(2), [x0, x1])
+            .unwrap();
+        let reg =
+            ExtensionRegistry::try_new([PRELUDE.to_owned(), logic::EXTENSION.to_owned()]).unwrap();
+        let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
+        constant_fold_pass(&mut h, &reg);
+        let expected = Value::true_val();
+        assert_fully_folded(&h, &expected);
+    }
 
-        for node in h.children(h.root()) {
-            let op = h.get_optype(node);
-            match op {
-                OpType::Input(_) | OpType::Output(_) | OpType::LoadConstant(_) => node_count += 1,
-                OpType::Const(c) if c == expected_const => node_count += 1,
-                _ => panic!("unexpected op: {:?}", op),
-            }
-        }
+    #[test]
+    fn test_fold_or() {
+        // pseudocode:
+        // x0, x1 := bool(true), bool(false)
+        // x2 := or(x0, x1)
+        // output x2 == true;
+        let mut build = DFGBuilder::new(FunctionType::new(type_row![], vec![BOOL_T])).unwrap();
+        let x0 = build.add_load_const(Value::true_val());
+        let x1 = build.add_load_const(Value::false_val());
+        let x2 = build
+            .add_dataflow_op(NaryLogic::Or.with_n_inputs(2), [x0, x1])
+            .unwrap();
+        let reg =
+            ExtensionRegistry::try_new([PRELUDE.to_owned(), logic::EXTENSION.to_owned()]).unwrap();
+        let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
+        constant_fold_pass(&mut h, &reg);
+        let expected = Value::true_val();
+        assert_fully_folded(&h, &expected);
+    }
 
-        assert_eq!(node_count, 4);
+    #[test]
+    fn test_fold_not() {
+        // pseudocode:
+        // x0 := bool(true)
+        // x1 := not(x0)
+        // output x1 == false;
+        let mut build = DFGBuilder::new(FunctionType::new(type_row![], vec![BOOL_T])).unwrap();
+        let x0 = build.add_load_const(Value::true_val());
+        let x1 = build.add_dataflow_op(NotOp, [x0]).unwrap();
+        let reg =
+            ExtensionRegistry::try_new([PRELUDE.to_owned(), logic::EXTENSION.to_owned()]).unwrap();
+        let mut h = build.finish_hugr_with_outputs(x1.outputs(), &reg).unwrap();
+        constant_fold_pass(&mut h, &reg);
+        let expected = Value::false_val();
+        assert_fully_folded(&h, &expected);
     }
 }

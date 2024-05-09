@@ -206,17 +206,13 @@ impl TypeDeclaration {
         }
 
         // Try to resolve the type in the current extension.
-        if let Some(ty) = ext.get_type(self.0.as_str()) {
+        if let Some(ty) = ext.get_type(&self.0) {
             return Some(ty);
         }
 
         // Try to resolve the type in the other extensions in scope.
         for ext in ctx.scope.iter() {
-            if let Some(ty) = ctx
-                .registry
-                .get(ext)
-                .and_then(|ext| ext.get_type(self.0.as_str()))
-            {
+            if let Some(ty) = ctx.registry.get(ext).and_then(|ext| ext.get_type(&self.0)) {
                 return Some(ty);
             }
         }

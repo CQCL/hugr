@@ -16,19 +16,21 @@ use crate::{IncomingPort, PortIndex};
 use paste::paste;
 
 use portgraph::NodeIndex;
-use smol_str::SmolStr;
 
 use enum_dispatch::enum_dispatch;
 
-pub use constant::Const;
+pub use constant::{Const, Value};
 pub use controlflow::{BasicBlock, Case, Conditional, DataflowBlock, ExitBlock, TailLoop, CFG};
 pub use custom::CustomOp;
-pub use dataflow::{Call, CallIndirect, DataflowParent, Input, LoadConstant, Output, DFG};
+pub use dataflow::{
+    Call, CallIndirect, DataflowParent, Input, LoadConstant, LoadFunction, Output, DFG,
+};
 pub use leaf::{Lift, MakeTuple, Noop, Tag, UnpackTuple};
 pub use module::{AliasDecl, AliasDefn, FuncDecl, FuncDefn, Module};
+use smol_str::SmolStr;
 pub use tag::OpTag;
 
-#[enum_dispatch(OpTrait, OpName, ValidateOp, OpParent)]
+#[enum_dispatch(OpTrait, NamedOp, ValidateOp, OpParent)]
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 /// The concrete operation types for a node in the HUGR.
 // TODO: Link the NodeHandles to the OpType.
@@ -47,6 +49,7 @@ pub enum OpType {
     Call,
     CallIndirect,
     LoadConstant,
+    LoadFunction,
     DFG,
     CustomOp,
     Noop,
@@ -105,6 +108,7 @@ impl_op_ref_try_into!(Output);
 impl_op_ref_try_into!(Call);
 impl_op_ref_try_into!(CallIndirect);
 impl_op_ref_try_into!(LoadConstant);
+impl_op_ref_try_into!(LoadFunction);
 impl_op_ref_try_into!(DFG, dfg);
 impl_op_ref_try_into!(CustomOp);
 impl_op_ref_try_into!(Noop);
@@ -189,13 +193,13 @@ impl OpType {
     ///
     /// Returns None if there is no such port, or if the operation defines multiple non-dataflow ports.
     pub fn other_port(&self, dir: Direction) -> Option<Port> {
+        let df_count = self.value_port_count(dir);
         let non_df_count = self.non_df_port_count(dir);
-        if self.other_port_kind(dir).is_some() && non_df_count == 1 {
-            // if there is a static input it comes before the non_df_ports
-            let static_input =
-                (dir == Direction::Incoming && OpTag::StaticInput.is_superset(self.tag())) as usize;
-
-            Some(Port::new(dir, self.value_port_count(dir) + static_input))
+        // if there is a static input it comes before the non_df_ports
+        let static_input =
+            (dir == Direction::Incoming && OpTag::StaticInput.is_superset(self.tag())) as usize;
+        if self.other_port_kind(dir).is_some() && non_df_count >= 1 {
+            Some(Port::new(dir, df_count + static_input))
         } else {
             None
         }
@@ -226,7 +230,8 @@ impl OpType {
         Some(Port::new(dir, self.value_port_count(dir)))
     }
 
-    /// If the op has a static input ([`Call`] and [`LoadConstant`]), the port of that input.
+    /// If the op has a static input ([`Call`], [`LoadConstant`], and [`LoadFunction`]), the port of
+    /// that input.
     #[inline]
     pub fn static_input_port(&self) -> Option<IncomingPort> {
         self.static_port(Direction::Incoming)
@@ -291,8 +296,8 @@ impl OpType {
 /// name to be the same as their type name
 macro_rules! impl_op_name {
     ($i: ident) => {
-        impl $crate::ops::OpName for $i {
-            fn name(&self) -> smol_str::SmolStr {
+        impl $crate::ops::NamedOp for $i {
+            fn name(&self) -> $crate::ops::OpName {
                 stringify!($i).into()
             }
         }
@@ -301,12 +306,18 @@ macro_rules! impl_op_name {
 
 use impl_op_name;
 
+/// A unique identifier for a operation.
+pub type OpName = SmolStr;
+
+/// Slice of a [`OpName`] operation identifier.
+pub type OpNameRef = str;
+
 #[enum_dispatch]
 /// Trait for setting name of OpType variants.
 // Separate to OpTrait to allow simple definition via impl_op_name
-pub trait OpName {
+pub trait NamedOp {
     /// The name of the operation.
-    fn name(&self) -> SmolStr;
+    fn name(&self) -> OpName;
 }
 
 /// Trait statically querying the tag of an operation.
@@ -413,6 +424,7 @@ impl OpParent for Output {}
 impl OpParent for Call {}
 impl OpParent for CallIndirect {}
 impl OpParent for LoadConstant {}
+impl OpParent for LoadFunction {}
 impl OpParent for CustomOp {}
 impl OpParent for Noop {}
 impl OpParent for MakeTuple {}

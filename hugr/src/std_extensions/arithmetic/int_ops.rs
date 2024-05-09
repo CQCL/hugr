@@ -1,13 +1,14 @@
 //! Basic integer operations.
 
 use super::int_types::{get_log_width, int_tv, LOG_WIDTH_TYPE_PARAM};
-use crate::extension::prelude::{sum_with_error, BOOL_T};
+use crate::extension::prelude::{sum_with_error, BOOL_T, STRING_TYPE};
 use crate::extension::simple_op::{MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError};
 use crate::extension::{
     CustomValidator, ExtensionRegistry, OpDef, SignatureFunc, ValidateJustArgs, PRELUDE,
 };
 use crate::ops::custom::ExtensionOp;
-use crate::ops::OpName;
+use crate::ops::{NamedOp, OpName};
+use crate::std_extensions::arithmetic::int_types::int_type;
 use crate::type_row;
 use crate::types::{FunctionType, PolyFuncType};
 use crate::utils::collect_array;
@@ -19,8 +20,9 @@ use crate::{
 };
 
 use lazy_static::lazy_static;
-use smol_str::SmolStr;
 use strum_macros::{EnumIter, EnumString, IntoStaticStr};
+
+mod const_fold;
 
 /// The extension identifier.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.int");
@@ -45,6 +47,7 @@ impl ValidateJustArgs for IOValidator {
 /// Integer extension operation definitions.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, EnumIter, IntoStaticStr, EnumString)]
 #[allow(missing_docs, non_camel_case_types)]
+#[non_exhaustive]
 pub enum IntOpDef {
     iwiden_u,
     iwiden_s,
@@ -91,6 +94,8 @@ pub enum IntOpDef {
     ishr,
     irotl,
     irotr,
+    itostring_u,
+    itostring_s,
 }
 
 impl MakeOpDef for IntOpDef {
@@ -111,8 +116,8 @@ impl MakeOpDef for IntOpDef {
                 IOValidator { f_ge_s: true },
             )
             .into(),
-            itobool => int_polytype(1, vec![int_tv(0)], type_row![BOOL_T]).into(),
-            ifrombool => int_polytype(1, type_row![BOOL_T], vec![int_tv(0)]).into(),
+            itobool => int_polytype(0, vec![int_type(0)], type_row![BOOL_T]).into(),
+            ifrombool => int_polytype(0, type_row![BOOL_T], vec![int_type(0)]).into(),
             ieq | ine | ilt_u | ilt_s | igt_u | igt_s | ile_u | ile_s | ige_u | ige_s => {
                 int_polytype(1, vec![int_tv(0); 2], type_row![BOOL_T]).into()
             }
@@ -132,7 +137,7 @@ impl MakeOpDef for IntOpDef {
             .into(),
             idivmod_u | idivmod_s => {
                 let intpair: TypeRow = vec![int_tv(0), int_tv(1)].into();
-                int_polytype(2, intpair.clone(), vec![Type::new_tuple(intpair)])
+                int_polytype(2, intpair.clone(), intpair.clone())
             }
             .into(),
             idiv_u | idiv_s => int_polytype(2, vec![int_tv(0), int_tv(1)], vec![int_tv(0)]).into(),
@@ -154,6 +159,11 @@ impl MakeOpDef for IntOpDef {
             ishl | ishr | irotl | irotr => {
                 int_polytype(2, vec![int_tv(0), int_tv(1)], vec![int_tv(0)]).into()
             }
+            itostring_u | itostring_s => PolyFuncType::new(
+                vec![LOG_WIDTH_TYPE_PARAM],
+                FunctionType::new(vec![int_tv(0)], vec![STRING_TYPE]),
+            )
+            .into(),
         }
     }
 
@@ -214,7 +224,13 @@ impl MakeOpDef for IntOpDef {
             (leftmost bits replace rightmost bits)",
             irotr => "rotate first input right by k bits where k is unsigned interpretation of second input \
             (rightmost bits replace leftmost bits)",
+            itostring_s => "convert a signed integer to its string representation",
+            itostring_u => "convert an unsigned integer to its string representation",
         }.into()
+    }
+
+    fn post_opdef(&self, def: &mut OpDef) {
+        const_fold::set_fold(self, def)
     }
 }
 fn int_polytype(
@@ -261,40 +277,31 @@ lazy_static! {
     .unwrap();
 }
 
-/// Concrete integer operation with either one or two integer widths set.
+/// Concrete integer operation with integer widths set.
 #[derive(Debug, Clone, PartialEq)]
 pub struct IntOpType {
     def: IntOpDef,
-    first_width: u64,
-    second_width: Option<u64>,
+    log_widths: Vec<u8>,
 }
 
-impl OpName for IntOpType {
-    fn name(&self) -> SmolStr {
+impl NamedOp for IntOpType {
+    fn name(&self) -> OpName {
         self.def.name()
     }
 }
 impl MakeExtensionOp for IntOpType {
     fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError> {
         let def = IntOpDef::from_def(ext_op.def())?;
-        let (first_width, second_width) = match *ext_op.args() {
-            [TypeArg::BoundedNat { n }] => (n, None),
-            [TypeArg::BoundedNat { n }, TypeArg::BoundedNat { n: n2 }] => (n, Some(n2)),
-            _ => return Err(SignatureError::InvalidTypeArgs.into()),
-        };
-        Ok(Self {
-            def,
-            first_width,
-            second_width,
-        })
+        let args = ext_op.args();
+        let log_widths: Vec<u8> = args
+            .iter()
+            .map(|a| get_log_width(a).map_err(|_| SignatureError::InvalidTypeArgs))
+            .collect::<Result<_, _>>()?;
+        Ok(Self { def, log_widths })
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
-        [Some(self.first_width), self.second_width]
-            .iter()
-            .flatten()
-            .map(|&n| TypeArg::BoundedNat { n })
-            .collect()
+        self.log_widths.iter().map(|&n| (n as u64).into()).collect()
     }
 }
 
@@ -309,22 +316,28 @@ impl MakeRegisteredOp for IntOpType {
 }
 
 impl IntOpDef {
-    /// Initialize a concrete [IntOpType] from a [IntOpDef] which requires one
-    /// integer width set.
-    pub fn with_width(self, width: u64) -> IntOpType {
+    /// Initialize a concrete [IntOpType] from a [IntOpDef] which requires no
+    /// integer widths set.
+    pub fn without_log_width(self) -> IntOpType {
         IntOpType {
             def: self,
-            first_width: width,
-            second_width: None,
+            log_widths: vec![],
+        }
+    }
+    /// Initialize a concrete [IntOpType] from a [IntOpDef] which requires one
+    /// integer width set.
+    pub fn with_log_width(self, log_width: u8) -> IntOpType {
+        IntOpType {
+            def: self,
+            log_widths: vec![log_width],
         }
     }
     /// Initialize a concrete [IntOpType] from a [IntOpDef] which requires two
     /// integer widths set.
-    pub fn with_two_widths(self, first_width: u64, second_width: u64) -> IntOpType {
+    pub fn with_two_log_widths(self, first_log_width: u8, second_log_width: u8) -> IntOpType {
         IntOpType {
             def: self,
-            first_width,
-            second_width: Some(second_width),
+            log_widths: vec![first_log_width, second_log_width],
         }
     }
 }
@@ -339,47 +352,41 @@ mod test {
     fn test_int_ops_extension() {
         assert_eq!(EXTENSION.name() as &str, "arithmetic.int");
         assert_eq!(EXTENSION.types().count(), 0);
-        assert_eq!(EXTENSION.operations().count(), 45);
+        assert_eq!(EXTENSION.operations().count(), 47);
         for (name, _) in EXTENSION.operations() {
             assert!(name.starts_with('i'));
         }
     }
 
-    const fn ta(n: u64) -> TypeArg {
-        TypeArg::BoundedNat { n }
-    }
     #[test]
     fn test_binary_signatures() {
         assert_eq!(
             IntOpDef::iwiden_s
-                .with_two_widths(3, 4)
+                .with_two_log_widths(3, 4)
                 .to_extension_op()
                 .unwrap()
                 .signature(),
-            FunctionType::new(vec![int_type(ta(3))], vec![int_type(ta(4))],)
+            FunctionType::new(vec![int_type(3)], vec![int_type(4)],)
         );
         assert_eq!(
             IntOpDef::iwiden_s
-                .with_two_widths(3, 3)
+                .with_two_log_widths(3, 3)
                 .to_extension_op()
                 .unwrap()
                 .signature(),
-            FunctionType::new(vec![int_type(ta(3))], vec![int_type(ta(3))],)
+            FunctionType::new(vec![int_type(3)], vec![int_type(3)],)
         );
         assert_eq!(
             IntOpDef::inarrow_s
-                .with_two_widths(3, 3)
+                .with_two_log_widths(3, 3)
                 .to_extension_op()
                 .unwrap()
                 .signature(),
-            FunctionType::new(
-                vec![int_type(ta(3))],
-                vec![sum_with_error(int_type(ta(3))).into()],
-            )
+            FunctionType::new(vec![int_type(3)], vec![sum_with_error(int_type(3)).into()],)
         );
         assert!(
             IntOpDef::iwiden_u
-                .with_two_widths(4, 3)
+                .with_two_log_widths(4, 3)
                 .to_extension_op()
                 .is_none(),
             "type arguments invalid"
@@ -387,28 +394,25 @@ mod test {
 
         assert_eq!(
             IntOpDef::inarrow_s
-                .with_two_widths(2, 1)
+                .with_two_log_widths(2, 1)
                 .to_extension_op()
                 .unwrap()
                 .signature(),
-            FunctionType::new(
-                vec![int_type(ta(2))],
-                vec![sum_with_error(int_type(ta(1))).into()],
-            )
+            FunctionType::new(vec![int_type(2)], vec![sum_with_error(int_type(1)).into()],)
         );
 
         assert!(IntOpDef::inarrow_u
-            .with_two_widths(1, 2)
+            .with_two_log_widths(1, 2)
             .to_extension_op()
             .is_none());
     }
 
     #[test]
     fn test_conversions() {
-        let o = IntOpDef::itobool.with_width(5);
+        let o = IntOpDef::itobool.without_log_width();
         assert!(
             IntOpDef::itobool
-                .with_two_widths(1, 2)
+                .with_two_log_widths(1, 2)
                 .to_extension_op()
                 .is_none(),
             "type arguments invalid"

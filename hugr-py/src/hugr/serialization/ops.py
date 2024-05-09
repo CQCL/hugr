@@ -1,9 +1,9 @@
 import inspect
 import sys
 from abc import ABC
-from typing import Any, Literal, cast
+from typing import Any, Literal
 
-from pydantic import BaseModel, Field, RootModel
+from pydantic import Field, RootModel
 
 from . import tys
 from .tys import (
@@ -13,17 +13,22 @@ from .tys import (
     PolyFuncType,
     Type,
     TypeRow,
+    SumType,
+    TypeBound,
+    ConfiguredBaseModel,
+    classes as tys_classes,
+    model_rebuild as tys_model_rebuild,
 )
 
 NodeID = int
 
 
-class BaseOp(ABC, BaseModel):
+class BaseOp(ABC, ConfiguredBaseModel):
     """Base class for ops that store their node's input/output types"""
 
     # Parent node index of node the op belongs to, used only at serialization time
     parent: NodeID
-    input_extensions: ExtensionSet = Field(default_factory=ExtensionSet)
+    input_extensions: ExtensionSet | None = Field(default=None)
 
     def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
         """Hook to insert type information from the input and output ports into the
@@ -54,14 +59,7 @@ class FuncDefn(BaseOp):
     op: Literal["FuncDefn"] = "FuncDefn"
 
     name: str
-    signature: PolyFuncType = Field(default_factory=PolyFuncType.empty)
-
-    def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
-        assert len(in_types) == 0
-        assert len(out_types) == 1
-        out = out_types[0]
-        assert isinstance(out, PolyFuncType)
-        self.signature = out  # TODO: Extensions
+    signature: PolyFuncType
 
 
 class FuncDecl(BaseOp):
@@ -69,71 +67,47 @@ class FuncDecl(BaseOp):
 
     op: Literal["FuncDecl"] = "FuncDecl"
     name: str
-    signature: PolyFuncType = Field(default_factory=PolyFuncType.empty)
-
-    def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
-        assert len(in_types) == 0
-        assert len(out_types) == 1
-        out = out_types[0]
-        assert isinstance(out, PolyFuncType)
-        self.signature = out
+    signature: PolyFuncType
 
 
-class ConstBase(BaseOp):
-    """A constant operation definition."""
-
-    op: Literal["Const"] = "Const"
-
-
-CustomConst = Any  # TODO
+class CustomConst(ConfiguredBaseModel):
+    c: str
+    v: Any
 
 
-class ExtensionConst(ConstBase):
+class ExtensionValue(ConfiguredBaseModel):
     """An extension constant value, that can check it is of a given [CustomType]."""
 
-    c: Literal["Extension"] = Field("Extension", title="ConstTag")
-    e: CustomConst = Field(title="CustomConst")
-
-    class Config:
-        json_schema_extra = {
-            "required": ["parent", "op", "c", "e"],
-        }
+    v: Literal["Extension"] = Field("Extension", title="ValueTag")
+    extensions: ExtensionSet
+    typ: Type
+    value: CustomConst
 
 
-class FunctionConst(ConstBase):
+class FunctionValue(ConfiguredBaseModel):
     """A higher-order function value."""
 
-    c: Literal["Function"] = Field("Function", title="ConstTag")
+    v: Literal["Function"] = Field("Function", title="ValueTag")
     hugr: Any  # TODO
 
-    class Config:
-        json_schema_extra = {
-            "required": ["parent", "op", "c", "hugr"],
-        }
 
-
-class Tuple(ConstBase):
+class TupleValue(ConfiguredBaseModel):
     """A constant tuple value."""
 
-    c: Literal["Tuple"] = Field("Tuple", title="ConstTag")
-    vs: list["Const"]
-
-    class Config:
-        json_schema_extra = {
-            "required": ["parent", "op", "c", "vs"],
-        }
+    v: Literal["Tuple"] = Field("Tuple", title="ValueTag")
+    vs: list["Value"]
 
 
-class Sum(ConstBase):
+class SumValue(ConfiguredBaseModel):
     """A Sum variant
 
     For any Sum type where this value meets the type of the variant indicated by the tag
     """
 
-    c: Literal["Sum"] = Field("Sum", title="ConstTag")
+    v: Literal["Sum"] = Field("Sum", title="ValueTag")
     tag: int
-    typ: Type
-    vs: list["Const"]
+    typ: SumType
+    vs: list["Value"]
 
     class Config:
         # Needed to avoid random '\n's in the pydantic description
@@ -142,14 +116,25 @@ class Sum(ConstBase):
                 "A Sum variant For any Sum type where this value meets the type "
                 "of the variant indicated by the tag."
             ),
-            "required": ["parent", "op", "c", "tag", "typ", "vs"],
         }
 
 
-class Const(RootModel):
-    """A constant operation."""
+class Value(RootModel):
+    """A constant Value."""
 
-    root: ExtensionConst | FunctionConst | Tuple | Sum = Field(discriminator="c")
+    root: ExtensionValue | FunctionValue | TupleValue | SumValue = Field(
+        discriminator="v"
+    )
+
+    class Config:
+        json_schema_extra = {"required": ["v"]}
+
+
+class Const(BaseOp):
+    """A Const operation definition."""
+
+    op: Literal["Const"] = "Const"
+    v: Value = Field()
 
 
 # -----------------------------------------------
@@ -164,7 +149,7 @@ class DataflowBlock(BaseOp):
     op: Literal["DataflowBlock"] = "DataflowBlock"
     inputs: TypeRow = Field(default_factory=list)
     other_outputs: TypeRow = Field(default_factory=list)
-    sum_rows: list[TypeRow] = Field(default_factory=list)
+    sum_rows: list[TypeRow]
     extension_delta: ExtensionSet = Field(default_factory=list)
 
     def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
@@ -173,27 +158,19 @@ class DataflowBlock(BaseOp):
 
     def insert_child_dfg_signature(self, inputs: TypeRow, outputs: TypeRow) -> None:
         self.inputs = inputs
-        pred = outputs[0]
-        assert isinstance(pred, tys.UnitSum | tys.GeneralSum)
-        if isinstance(pred, tys.UnitSum):
-            self.sum_rows = [[] for _ in range(cast(tys.UnitSum, pred).size)]
+        pred = outputs[0].root
+        assert isinstance(pred, tys.SumType)
+        if isinstance(pred.root, tys.UnitSum):
+            self.sum_rows = [[] for _ in range(pred.root.size)]
         else:
             self.sum_rows = []
-            for variant in pred.rows:
+            for variant in pred.root.rows:
                 self.sum_rows.append(variant)
         self.other_outputs = outputs[1:]
 
     class Config:
         # Needed to avoid random '\n's in the pydantic description
         json_schema_extra = {
-            "required": [
-                "parent",
-                "op",
-                "inputs",
-                "other_outputs",
-                "sum_rows",
-                "extension_delta",
-            ],
             "description": "A CFG basic block node. The signature is that of the internal Dataflow graph.",
         }
 
@@ -206,9 +183,9 @@ class ExitBlock(BaseOp):
     cfg_outputs: TypeRow
 
     class Config:
-        # Needed to avoid random '\n's in the pydantic description
         json_schema_extra = {
-            "description": "The single exit node of the CFG, has no children, stores the types of the CFG node output."
+            # Needed to avoid random '\n's in the pydantic description
+            "description": "The single exit node of the CFG, has no children, stores the types of the CFG node output.",
         }
 
 
@@ -253,15 +230,9 @@ class Call(DataflowOp):
     """
 
     op: Literal["Call"] = "Call"
-    signature: FunctionType = Field(default_factory=FunctionType.empty)
-
-    def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
-        # The constE edge comes after the value inputs
-        fun_ty = in_types[-1]
-        assert isinstance(fun_ty, PolyFuncType)
-        poly_func = cast(PolyFuncType, fun_ty)
-        assert len(poly_func.params) == 0
-        self.signature = poly_func.body
+    func_sig: PolyFuncType
+    type_args: list[tys.TypeArg]
+    instantiation: FunctionType
 
     class Config:
         # Needed to avoid random '\n's in the pydantic description
@@ -278,19 +249,18 @@ class Call(DataflowOp):
 class CallIndirect(DataflowOp):
     """Call a function indirectly.
 
-    Like call, but the first input is a standard dataflow graph type."""
+    Like call, but the first input is a standard dataflow graph type.
+    """
 
     op: Literal["CallIndirect"] = "CallIndirect"
     signature: FunctionType = Field(default_factory=FunctionType.empty)
 
     def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
-        fun_ty = in_types[0]
-        assert isinstance(fun_ty, PolyFuncType)
-        poly_func = cast(PolyFuncType, fun_ty)
-        assert len(poly_func.params) == 0
-        assert len(poly_func.body.input) == len(in_types) - 1
-        assert len(poly_func.body.output) == len(out_types)
-        self.signature = poly_func.body
+        fun_ty = in_types[0].root
+        assert isinstance(fun_ty, FunctionType)
+        assert len(fun_ty.input) == len(in_types) - 1
+        assert len(fun_ty.output) == len(out_types)
+        self.signature = fun_ty
 
 
 class LoadConstant(DataflowOp):
@@ -298,6 +268,15 @@ class LoadConstant(DataflowOp):
 
     op: Literal["LoadConstant"] = "LoadConstant"
     datatype: Type
+
+
+class LoadFunction(DataflowOp):
+    """Load a static function in to the local dataflow graph."""
+
+    op: Literal["LoadFunction"] = "LoadFunction"
+    func_sig: PolyFuncType
+    type_args: list[tys.TypeArg]
+    signature: FunctionType
 
 
 class DFG(DataflowOp):
@@ -323,7 +302,9 @@ class Conditional(DataflowOp):
     op: Literal["Conditional"] = "Conditional"
     other_inputs: TypeRow = Field(default_factory=list)  # Remaining input types
     outputs: TypeRow = Field(default_factory=list)  # Output types
-    sum_rows: list[TypeRow] = Field(description="The possible rows of the Sum input")
+    sum_rows: list[TypeRow] = Field(
+        description="The possible rows of the Sum input", default_factory=list
+    )
     # Extensions used to produce the outputs
     extension_delta: ExtensionSet = Field(default_factory=list)
 
@@ -331,12 +312,14 @@ class Conditional(DataflowOp):
         # First port is a predicate, i.e. a sum of tuple types. We need to unpack
         # those into a list of type rows
         pred = in_types[0]
-        if isinstance(pred, tys.UnitSum):
-            self.sum_rows = [[] for _ in range(cast(tys.UnitSum, pred).size)]
+        assert isinstance(pred.root, tys.SumType)
+        sum = pred.root.root
+        if isinstance(sum, tys.UnitSum):
+            self.sum_rows = [[] for _ in range(sum.size)]
         else:
-            assert isinstance(pred, tys.GeneralSum)
+            assert isinstance(sum, tys.GeneralSum)
             self.sum_rows = []
-            for ty in pred.rows:
+            for ty in sum.rows:
                 self.sum_rows.append(ty)
         self.other_inputs = list(in_types[1:])
         self.outputs = list(out_types)
@@ -454,7 +437,7 @@ class Tag(DataflowOp):
 
     op: Literal["Tag"] = "Tag"
     tag: int  # The variant to create.
-    variants: TypeRow  # The variants of the sum type.
+    variants: list[TypeRow]  # The variants of the sum type.
 
 
 class Lift(DataflowOp):
@@ -463,6 +446,18 @@ class Lift(DataflowOp):
     op: Literal["Lift"] = "Lift"
     type_row: TypeRow
     new_extension: ExtensionId
+
+
+class AliasDecl(BaseOp):
+    op: Literal["AliasDecl"] = "AliasDecl"
+    name: str
+    bound: TypeBound
+
+
+class AliasDefn(BaseOp):
+    op: Literal["AliasDefn"] = "AliasDefn"
+    name: str
+    definition: Type
 
 
 class OpType(RootModel):
@@ -484,6 +479,7 @@ class OpType(RootModel):
         | Call
         | CallIndirect
         | LoadConstant
+        | LoadFunction
         | CustomOp
         | Noop
         | MakeTuple
@@ -491,7 +487,12 @@ class OpType(RootModel):
         | Tag
         | Lift
         | DFG
+        | AliasDecl
+        | AliasDefn
     ) = Field(discriminator="op")
+
+    class Config:
+        json_schema_extra = {"required": ["parent", "op"]}
 
 
 # --------------------------------------
@@ -515,10 +516,12 @@ class OpDef(BaseOp, populate_by_name=True):
 
 # Now that all classes are defined, we need to update the ForwardRefs in all type
 # annotations. We use some inspect magic to find all classes defined in this file.
-classes = inspect.getmembers(
-    sys.modules[__name__],
-    lambda member: inspect.isclass(member) and member.__module__ == __name__,
+classes = (
+    inspect.getmembers(
+        sys.modules[__name__],
+        lambda member: inspect.isclass(member) and member.__module__ == __name__,
+    )
+    + tys_classes
 )
-for _, c in classes:
-    if issubclass(c, BaseModel):
-        c.model_rebuild()
+
+tys_model_rebuild(dict(classes))

@@ -1,14 +1,15 @@
-use crate::ops::Const;
+use crate::ops::constant::get_single_input_value;
+use crate::ops::Value;
+use crate::std_extensions::arithmetic::int_types::INT_TYPES;
 use crate::{
     extension::{
         prelude::{sum_with_error, ConstError},
         ConstFold, ConstFoldResult, OpDef,
     },
     ops,
-    ops::constant::CustomConst,
     std_extensions::arithmetic::{
         float_types::ConstF64,
-        int_types::{get_log_width, ConstIntS, ConstIntU, INT_TYPES},
+        int_types::{get_log_width, ConstInt},
     },
     types::ConstTypeError,
     IncomingPort,
@@ -27,19 +28,12 @@ pub(super) fn set_fold(op: &ConvertOpDef, def: &mut OpDef) {
     }
 }
 
-fn get_input<T: CustomConst>(consts: &[(IncomingPort, ops::Const)]) -> Option<&T> {
-    let [(_, c)] = consts else {
-        return None;
-    };
-    c.get_custom_value()
-}
-
 fn fold_trunc(
     type_args: &[crate::types::TypeArg],
-    consts: &[(IncomingPort, Const)],
-    convert: impl Fn(f64, u8) -> Result<Const, ConstTypeError>,
+    consts: &[(IncomingPort, Value)],
+    convert: impl Fn(f64, u8) -> Result<Value, ConstTypeError>,
 ) -> ConstFoldResult {
-    let f: &ConstF64 = get_input(consts)?;
+    let f: &ConstF64 = get_single_input_value(consts)?;
     let f = f.value();
     let [arg] = type_args else {
         return None;
@@ -52,15 +46,15 @@ fn fold_trunc(
             signal: 0,
             message: "Can't truncate non-finite float".to_string(),
         };
-        Const::sum(1, [err_val.into()], sum_type.clone())
+        Value::sum(1, [err_val.into()], sum_type.clone())
             .unwrap_or_else(|e| panic!("Invalid computed sum, {}", e))
     };
-    let out_const: ops::Const = if !f.is_finite() {
+    let out_const: ops::Value = if !f.is_finite() {
         err_value()
     } else {
         let cv = convert(f, log_width);
         if let Ok(cv) = cv {
-            Const::sum(0, [cv], sum_type).unwrap_or_else(|e| panic!("Invalid computed sum, {}", e))
+            Value::sum(0, [cv], sum_type).unwrap_or_else(|e| panic!("Invalid computed sum, {}", e))
         } else {
             err_value()
         }
@@ -75,10 +69,10 @@ impl ConstFold for TruncU {
     fn fold(
         &self,
         type_args: &[crate::types::TypeArg],
-        consts: &[(IncomingPort, ops::Const)],
+        consts: &[(IncomingPort, ops::Value)],
     ) -> ConstFoldResult {
         fold_trunc(type_args, consts, |f, log_width| {
-            ConstIntU::new(log_width, f.trunc() as u64).map(Into::into)
+            ConstInt::new_u(log_width, f.trunc() as u64).map(Into::into)
         })
     }
 }
@@ -89,10 +83,10 @@ impl ConstFold for TruncS {
     fn fold(
         &self,
         type_args: &[crate::types::TypeArg],
-        consts: &[(IncomingPort, ops::Const)],
+        consts: &[(IncomingPort, ops::Value)],
     ) -> ConstFoldResult {
         fold_trunc(type_args, consts, |f, log_width| {
-            ConstIntS::new(log_width, f.trunc() as i64).map(Into::into)
+            ConstInt::new_s(log_width, f.trunc() as i64).map(Into::into)
         })
     }
 }
@@ -103,10 +97,10 @@ impl ConstFold for ConvertU {
     fn fold(
         &self,
         _type_args: &[crate::types::TypeArg],
-        consts: &[(IncomingPort, ops::Const)],
+        consts: &[(IncomingPort, ops::Value)],
     ) -> ConstFoldResult {
-        let u: &ConstIntU = get_input(consts)?;
-        let f = u.value() as f64;
+        let u: &ConstInt = crate::ops::constant::get_single_input_value(consts)?;
+        let f = u.value_u() as f64;
         Some(vec![(0.into(), ConstF64::new(f).into())])
     }
 }
@@ -117,10 +111,10 @@ impl ConstFold for ConvertS {
     fn fold(
         &self,
         _type_args: &[crate::types::TypeArg],
-        consts: &[(IncomingPort, ops::Const)],
+        consts: &[(IncomingPort, ops::Value)],
     ) -> ConstFoldResult {
-        let u: &ConstIntS = get_input(consts)?;
-        let f = u.value() as f64;
+        let u: &ConstInt = get_single_input_value(consts)?;
+        let f = u.value_s() as f64;
         Some(vec![(0.into(), ConstF64::new(f).into())])
     }
 }

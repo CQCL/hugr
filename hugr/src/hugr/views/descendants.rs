@@ -201,7 +201,6 @@ where
 pub(super) mod test {
     use crate::{
         builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
-        ops::handle::NodeHandle,
         type_row,
         types::{FunctionType, Type},
         utils::test_quantum_extension::h_gate,

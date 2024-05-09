@@ -101,7 +101,6 @@ pub(crate) mod test {
     use std::num::NonZeroU64;
 
     use lazy_static::lazy_static;
-    use smol_str::SmolStr;
 
     use crate::extension::prelude::{BOOL_T, PRELUDE_ID, USIZE_CUSTOM_T, USIZE_T};
     use crate::extension::{
@@ -109,7 +108,7 @@ pub(crate) mod test {
     };
     use crate::std_extensions::collections::{EXTENSION, LIST_TYPENAME};
     use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
-    use crate::types::{CustomType, FunctionType, Type, TypeBound};
+    use crate::types::{CustomType, FunctionType, Type, TypeBound, TypeName};
     use crate::Extension;
 
     use super::PolyFuncType;
@@ -262,7 +261,7 @@ pub(crate) mod test {
         rejected: &[TypeParam],
     ) -> Result<(), SignatureError> {
         const EXT_ID: ExtensionId = ExtensionId::new_unchecked("my_ext");
-        const TYPE_NAME: SmolStr = SmolStr::new_inline("MyType");
+        const TYPE_NAME: TypeName = TypeName::new_inline("MyType");
 
         let mut e = Extension::new(EXT_ID);
         e.add_type(

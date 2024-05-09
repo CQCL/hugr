@@ -1,8 +1,8 @@
 //! Conversions between integer and floating-point values.
 
-use smol_str::SmolStr;
 use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 
+use crate::ops::OpName;
 use crate::{
     extension::{
         prelude::sum_with_error,
@@ -10,7 +10,7 @@ use crate::{
         ExtensionId, ExtensionRegistry, ExtensionSet, OpDef, SignatureError, SignatureFunc,
         PRELUDE,
     },
-    ops::{custom::ExtensionOp, OpName},
+    ops::{custom::ExtensionOp, NamedOp},
     type_row,
     types::{FunctionType, PolyFuncType, TypeArg},
     Extension,
@@ -26,6 +26,7 @@ pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.con
 /// Extension for conversions between floats and integers.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, EnumIter, IntoStaticStr, EnumString)]
 #[allow(missing_docs, non_camel_case_types)]
+#[non_exhaustive]
 pub enum ConvertOpDef {
     trunc_u,
     trunc_s,
@@ -75,22 +76,22 @@ impl MakeOpDef for ConvertOpDef {
 
 impl ConvertOpDef {
     /// Initialise a conversion op with an integer log width type argument.
-    pub fn with_width(self, log_width: u8) -> ConvertOpType {
+    pub fn with_log_width(self, log_width: u8) -> ConvertOpType {
         ConvertOpType {
             def: self,
-            log_width: log_width as u64,
+            log_width,
         }
     }
 }
-/// Concrete convert operation with integer width set.
+/// Concrete convert operation with integer log width set.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ConvertOpType {
     def: ConvertOpDef,
-    log_width: u64,
+    log_width: u8,
 }
 
-impl OpName for ConvertOpType {
-    fn name(&self) -> SmolStr {
+impl NamedOp for ConvertOpType {
+    fn name(&self) -> OpName {
         self.def.name()
     }
 }
@@ -98,18 +99,20 @@ impl OpName for ConvertOpType {
 impl MakeExtensionOp for ConvertOpType {
     fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError> {
         let def = ConvertOpDef::from_def(ext_op.def())?;
-        let width = match *ext_op.args() {
+        let log_width: u64 = match *ext_op.args() {
             [TypeArg::BoundedNat { n }] => n,
             _ => return Err(SignatureError::InvalidTypeArgs.into()),
         };
         Ok(Self {
             def,
-            log_width: width,
+            log_width: u8::try_from(log_width).unwrap(),
         })
     }
 
     fn type_args(&self) -> Vec<crate::types::TypeArg> {
-        vec![TypeArg::BoundedNat { n: self.log_width }]
+        vec![TypeArg::BoundedNat {
+            n: self.log_width as u64,
+        }]
     }
 }
 
@@ -159,7 +162,7 @@ mod test {
         assert_eq!(r.name() as &str, "arithmetic.conversions");
         assert_eq!(r.types().count(), 0);
         for (name, _) in r.operations() {
-            assert!(name.starts_with("convert") || name.starts_with("trunc"));
+            assert!(name.as_str().starts_with("convert") || name.as_str().starts_with("trunc"));
         }
     }
 }

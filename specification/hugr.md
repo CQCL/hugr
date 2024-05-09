@@ -202,11 +202,11 @@ source node, to an incoming port of the target node.
 
 #### Static edges (`Const` and `Function`)
 
-A Static edge represents dataflow that is statically knowable - i.e.
-the source is a compile-time constant defined in the program. Hence, the types on these edges
-are classical. Only a few nodes may be
-sources (`FuncDefn`, `FuncDecl` and `Const`) and targets (`Call` and `LoadConstant`) of
-these edges; see [operations](#node-operations).
+A Static edge represents dataflow that is statically knowable - i.e.  the source
+is a compile-time constant defined in the program. Hence, the types on these
+edges are classical. Only a few nodes may be sources (`FuncDefn`, `FuncDecl` and
+`Const`) and targets (`Call`, `LoadConstant`, and `LoadFunction`) of these
+edges; see [operations](#node-operations).
 
 #### `Order` edges
 
@@ -289,6 +289,10 @@ the following basic dataflow operations are available (in addition to the
 - `LoadConstant<T>`: has an incoming `Const<T>` edge, where `T` is a `CopyableType`, and a
   `Value<T>` output, used to load a static constant into the local
   dataflow graph.
+- `LoadFunction`: has an incoming `Function` edge and a `Value<FunctionType>`
+  output. The `LoadFunction` node specifies any type arguments to the function
+  in the node weight, and the `FunctionType` in the output edge matches the
+  (type-instantiated) function in the incoming `Function` edge.
 - `identity<T>`: pass-through, no operation is performed.
 - `DFG`: A nested dataflow graph.
   These nodes are parents in the hierarchy.
@@ -1632,6 +1636,8 @@ so must be supported by all third-party tooling.
 
 `usize`: a positive integer size type.
 
+`string`: a string type.
+
 `array<N, T>`: a known-size (N) array of type T.
 
 `qubit`: a linear (non-copyable) qubit type.
@@ -1640,10 +1646,15 @@ so must be supported by all third-party tooling.
 
 ### Operations
 
-| Name              | Inputs    | Outputs       | Meaning                                                         |
-|-------------------|-----------|---------------|-----------------------------------------------------------------|
-| `new_array<N, T>` | `T` x N   | `array<N, T>` | Create an array from all the inputs                             |
-| `panic`           | ErrorType | -             | Immediately end execution and pass contents of error to context |
+| Name              | Inputs    | Outputs       | Meaning                                                           |
+|-------------------|-----------|---------------|------------------------------------------------------------------ |
+| `print`           | `string`  | -             | Append the string to the program's output stream[^1] (atomically) |
+| `new_array<N, T>` | `T` x N   | `array<N, T>` | Create an array from all the inputs                               |
+| `panic`           | ErrorType | -             | Immediately end execution and pass contents of error to context   |
+
+[^1] The existence of an output stream, and the processing of it either during
+or after program execution, is runtime-dependent. If no output stream exists
+then the `print` function is a no-op.
 
 ### Logic Extension
 
@@ -1763,6 +1774,8 @@ Other operations:
 | `ishr<N,M>`( \* )      | `int<N>`, `int<M>` | `int<N>`                           | shift first input right by k bits where k is unsigned interpretation of second input (rightmost bits dropped, leftmost bits set to zero)                 |
 | `irotl<N,M>`( \* )     | `int<N>`, `int<M>` | `int<N>`                           | rotate first input left by k bits where k is unsigned interpretation of second input (leftmost bits replace rightmost bits)                              |
 | `irotr<N,M>`( \* )     | `int<N>`, `int<M>` | `int<N>`                           | rotate first input right by k bits where k is unsigned interpretation of second input (rightmost bits replace leftmost bits)                             |
+| `itostring_u<N>`       | `int<N>`           | `string`                           | decimal string representation of unsigned integer                                                                                                        |
+| `itostring_s<N>`       | `int<N>`           | `string`                           | decimal string representation of signed integer                                                                                                          |
 
 #### `arithmetic.float.types`
 
@@ -1794,6 +1807,10 @@ except where stated.
 | `fdiv`            | `float64`, `float64` | `float64` | division                                                                 |
 | `ffloor`          | `float64`            | `float64` | floor                                                                    |
 | `fceil`           | `float64`            | `float64` | ceiling                                                                  |
+| `ftostring`       | `float64`            | `string`  | string representation[^1]                                                  |
+
+[^1] The exact specification of the float-to-string conversion is
+implementation-dependent.
 
 #### `arithmetic.conversions`
 
@@ -1993,12 +2010,13 @@ including `Module`.
 | Node type      | `Value` | `Order` | `Const` | `Function` | `ControlFlow` | `Hierarchy` | Children |
 |----------------|---------|---------|---------|------------|---------------|-------------|----------|
 | Root           | 0, 0    | 0, 0    | 0, 0    | 0, 0       | 0, 0          | 0, ✱        |          |
-| `FuncDefn`     | 0, 0    | 0, 0    | 0, 0    | 0, *       | 0, 0          | 1, +        | DSG      |
-| `FuncDecl`     | 0, 0    | 0, 0    | 0, 0    | 0, *       | 0, 0          | 1, 0        |          |
+| `FuncDefn`     | 0, 0    | 0, 0    | 0, 0    | 0, ✱       | 0, 0          | 1, +        | DSG      |
+| `FuncDecl`     | 0, 0    | 0, 0    | 0, 0    | 0, ✱       | 0, 0          | 1, 0        |          |
 | `AliasDefn`    | 0, 0    | 0, 0    | 0, 0    | 0, 0       | 0, 0          | 1, 0        |          |
 | `AliasDecl`    | 0, 0    | 0, 0    | 0, 0    | 0, 0       | 0, 0          | 1, 0        |          |
 | `Const`        | 0, 0    | 0, 0    | 0, ✱    | 0, 0       | 0, 0          | 1, 0        |          |
-| `LoadConstant` | 0, 1    | +, ✱    | 1, 0    | 0, 0       | 0, 0          | 1, 0        |          |
+| `LoadConstant` | 0, 1    | ✱, ✱    | 1, 0    | 0, 0       | 0, 0          | 1, 0        |          |
+| `LoadFunction` | 0, 1    | ✱, ✱    | 0, 0    | 1, 0       | 0, 0          | 1, 0        |          |
 | `Input`        | 0, ✱    | 0, ✱    | 0, 0    | 0, 0       | 0, 0          | 1, 0        |          |
 | `Output`       | ✱, 0    | ✱, 0    | 0, 0    | 0, 0       | 0, 0          | 1, 0        |          |
 | `Call`         | ✱, ✱    | ✱, ✱    | 0, 0    | 1, 0       | 0, 0          | 1, 0        |          |

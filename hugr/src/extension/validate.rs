@@ -159,6 +159,7 @@ impl ExtensionValidator {
 /// Errors that can occur while validating a Hugr.
 #[derive(Debug, Clone, PartialEq, Error)]
 #[allow(missing_docs)]
+#[non_exhaustive]
 pub enum ExtensionError {
     /// Missing lift node
     #[error("Extensions at target node {to:?} ({to_extensions}) exceed those at source {from:?} ({from_extensions})")]

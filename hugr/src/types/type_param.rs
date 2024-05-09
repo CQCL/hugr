@@ -124,9 +124,9 @@ impl From<TypeBound> for TypeParam {
     }
 }
 
-impl From<Type> for TypeArg {
-    fn from(ty: Type) -> Self {
-        Self::Type { ty }
+impl From<UpperBound> for TypeParam {
+    fn from(bound: UpperBound) -> Self {
+        Self::BoundedNat { bound }
     }
 }
 
@@ -148,6 +148,7 @@ pub enum TypeArg {
     ///Instance of [TypeParam::Opaque] An opaque value, stored as serialized blob.
     Opaque {
         #[allow(missing_docs)]
+        #[serde(flatten)]
         arg: CustomTypeArg,
     },
     /// Instance of [TypeParam::List] or [TypeParam::Tuple], defined by a
@@ -165,8 +166,39 @@ pub enum TypeArg {
     /// or [TypeArg::Extensions] - see [TypeArg::new_var_use]
     Variable {
         #[allow(missing_docs)]
+        #[serde(flatten)]
         v: TypeArgVariable,
     },
+}
+
+impl From<Type> for TypeArg {
+    fn from(ty: Type) -> Self {
+        Self::Type { ty }
+    }
+}
+
+impl From<u64> for TypeArg {
+    fn from(n: u64) -> Self {
+        Self::BoundedNat { n }
+    }
+}
+
+impl From<CustomTypeArg> for TypeArg {
+    fn from(arg: CustomTypeArg) -> Self {
+        Self::Opaque { arg }
+    }
+}
+
+impl From<Vec<TypeArg>> for TypeArg {
+    fn from(elems: Vec<TypeArg>) -> Self {
+        Self::Sequence { elems }
+    }
+}
+
+impl From<ExtensionSet> for TypeArg {
+    fn from(es: ExtensionSet) -> Self {
+        Self::Extensions { es }
+    }
 }
 
 /// Variable in a TypeArg, that is not a [TypeArg::Type] or [TypeArg::Extensions],
@@ -340,6 +372,7 @@ pub fn check_type_args(args: &[TypeArg], params: &[TypeParam]) -> Result<(), Typ
 
 /// Errors that can occur fitting a [TypeArg] into a [TypeParam]
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
+#[non_exhaustive]
 pub enum TypeArgError {
     #[allow(missing_docs)]
     /// For now, general case of a type arg not fitting a param.

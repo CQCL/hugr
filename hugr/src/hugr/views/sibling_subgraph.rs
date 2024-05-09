@@ -625,6 +625,7 @@ fn has_other_edge<H: HugrView>(hugr: &H, node: Node, dir: Direction) -> bool {
 
 /// Errors that can occur while constructing a [`SimpleReplacement`].
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[non_exhaustive]
 pub enum InvalidReplacement {
     /// No DataflowParent root in replacement graph.
     #[error("No DataflowParent root in replacement graph.")]
@@ -642,6 +643,7 @@ pub enum InvalidReplacement {
 
 /// Errors that can occur while constructing a [`SiblingSubgraph`].
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[non_exhaustive]
 pub enum InvalidSubgraph {
     /// The subgraph is not convex.
     #[error("The subgraph is not convex.")]
@@ -659,6 +661,7 @@ pub enum InvalidSubgraph {
 
 /// Errors that can occur while constructing a [`SiblingSubgraph`].
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[non_exhaustive]
 pub enum InvalidSubgraphBoundary {
     /// A boundary port's node is not in the set of nodes.
     #[error("(node {0:?}, port {1:?}) is in the boundary, but node {0:?} is not in the set.")]
@@ -695,7 +698,6 @@ mod tests {
             EMPTY_REG,
         },
         hugr::views::{HierarchyView, SiblingGraph},
-        hugr::HugrMut,
         ops::handle::{DfgID, FuncID, NodeHandle},
         std_extensions::logic::{test::and_op, NotOp},
         type_row,

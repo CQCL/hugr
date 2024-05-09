@@ -26,12 +26,14 @@ use serde::{Deserialize, Serialize};
 use crate::extension::{ExtensionRegistry, SignatureError};
 use crate::ops::AliasDecl;
 use crate::type_row;
-use std::fmt::Debug;
 
 use self::type_param::TypeParam;
 
 /// A unique identifier for a type.
 pub type TypeName = SmolStr;
+
+/// Slice of a [`TypeName`] type identifier.
+pub type TypeNameRef = str;
 
 /// The kinds of edges in a HUGR, excluding Hierarchy.
 #[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
@@ -115,6 +117,7 @@ pub(crate) fn least_upper_bound(mut tags: impl Iterator<Item = TypeBound>) -> Ty
 
 #[derive(Clone, PartialEq, Debug, Eq, Serialize, Deserialize)]
 #[serde(tag = "s")]
+#[non_exhaustive]
 /// Representation of a Sum type.
 /// Either store the types of the variants, or in the special (but common) case
 /// of a UnitSum (sum over empty tuples), store only the size of the Sum.
@@ -152,10 +155,15 @@ impl SumType {
 
         let len: usize = rows.len();
         if len <= (u8::MAX as usize) && rows.iter().all(TypeRow::is_empty) {
-            Self::Unit { size: len as u8 }
+            Self::new_unary(len as u8)
         } else {
             Self::General { rows }
         }
+    }
+
+    /// New UnitSum with empty Tuple variants
+    pub const fn new_unary(size: u8) -> Self {
+        Self::Unit { size }
     }
 
     /// Report the tag'th variant, if it exists.
@@ -245,7 +253,6 @@ impl TypeEnum {
 ///
 /// let sum = Type::new_sum([type_row![], type_row![]]);
 /// assert_eq!(sum.least_upper_bound(), TypeBound::Eq);
-///
 /// ```
 ///
 /// ```
@@ -253,9 +260,7 @@ impl TypeEnum {
 ///
 /// let func_type = Type::new_function(FunctionType::new_endo(vec![]));
 /// assert_eq!(func_type.least_upper_bound(), TypeBound::Copyable);
-///
 /// ```
-///
 pub struct Type(TypeEnum, TypeBound);
 
 impl Type {
@@ -307,7 +312,7 @@ impl Type {
     /// New UnitSum with empty Tuple variants
     pub const fn new_unit_sum(size: u8) -> Self {
         // should be the only way to avoid going through SumType::new
-        Self(TypeEnum::Sum(SumType::Unit { size }), TypeBound::Eq)
+        Self(TypeEnum::Sum(SumType::new_unary(size)), TypeBound::Eq)
     }
 
     /// New use (occurrence) of the type variable with specified index.
@@ -504,9 +509,7 @@ pub(crate) fn check_typevar_decl(
 #[cfg(test)]
 pub(crate) mod test {
     use super::*;
-    use crate::{extension::prelude::USIZE_T, ops::AliasDecl};
-
-    use crate::types::TypeBound;
+    use crate::extension::prelude::USIZE_T;
 
     #[test]
     fn construct() {

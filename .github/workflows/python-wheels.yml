@@ -6,7 +6,7 @@ on:
     branches:
       - main
     tags:
-        - '*'
+        - '**'
 
 jobs:
   build-publish:
@@ -45,6 +45,11 @@ jobs:
       - name: Publish to test instance of PyPI (dry-run)
         if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref_type == 'branch' ) }}
         run: |
+          echo "Doing a dry-run publish to test-pypi..."
+          echo "Based on the following workflow variables, this is not a hugr-py version tag push:"
+          echo "  - event_name: ${{ github.event_name }}"
+          echo "  - ref_type: ${{ github.ref_type }}"
+          echo "  - ref: ${{ github.ref }}"
           cd ${{ matrix.package }}
           poetry config repositories.test-pypi https://test.pypi.org/legacy/
           poetry config pypi-token.test-pypi ${{ secrets.PYPI_TEST_PUBLISH }}

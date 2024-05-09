@@ -1,5 +1,4 @@
 //! Handles to nodes in HUGR.
-//!
 use crate::types::{Type, TypeBound};
 use crate::Node;
 

@@ -13,7 +13,6 @@
 //! ```
 //!
 //! The definition can be loaded into a registry using the [`load_extensions`] or [`load_extensions_file`] functions.
-//!
 //! ```rust
 //! # const DECLARATIVE_YAML: &str = include_str!("../../examples/extension/declarative.yaml");
 //! # use hugr::extension::declarative::load_extensions;
@@ -32,6 +31,7 @@ use std::fs::File;
 use std::path::Path;
 
 use crate::extension::prelude::PRELUDE_ID;
+use crate::ops::OpName;
 use crate::types::TypeName;
 use crate::Extension;
 
@@ -175,6 +175,7 @@ struct DeclarationContext<'a> {
 
 /// Errors that can occur while loading an extension set.
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum ExtensionDeclarationError {
     /// An error occurred while deserializing the extension set.
     #[error("Error while parsing the extension set yaml: {0}")]
@@ -220,7 +221,7 @@ pub enum ExtensionDeclarationError {
         /// The extension that referenced the unsupported op parameter.
         ext: ExtensionId,
         /// The operation.
-        op: SmolStr,
+        op: OpName,
     },
     /// Operation definitions with no signature are not currently supported.
     ///
@@ -232,7 +233,7 @@ pub enum ExtensionDeclarationError {
         /// The extension containing the operation.
         ext: ExtensionId,
         /// The operation with no signature.
-        op: SmolStr,
+        op: OpName,
     },
     /// An unknown type was specified in a signature.
     #[error("Type {ty} is not in scope. In extension {ext}.")]
@@ -260,7 +261,7 @@ pub enum ExtensionDeclarationError {
         /// The extension.
         ext: crate::hugr::IdentList,
         /// The operation with the lowering definition.
-        op: SmolStr,
+        op: OpName,
     },
 }
 

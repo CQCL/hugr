@@ -15,7 +15,8 @@ repos:
           (?x)^(
             specification/schema/.*|
             .*.snap|
-            .*.snap.new
+            .*.snap.new|
+            .release-please-manifest.json
           )$
       - id: trailing-whitespace
         exclude: |
@@ -71,6 +72,13 @@ repos:
         name: cargo clippy
         description: Run clippy lints with `cargo clippy`.
         entry: cargo clippy --all-features --workspace -- -D warnings
+        language: system
+        files: \.rs$
+        pass_filenames: false
+      - id: cargo-doc
+        name: cargo doc
+        description: Generate documentation with `cargo doc`.
+        entry: cargo doc --no-deps --all-features --workspace
         language: system
         files: \.rs$
         pass_filenames: false

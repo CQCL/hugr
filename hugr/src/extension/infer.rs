@@ -63,6 +63,7 @@ enum Constraint {
 }
 
 #[derive(Debug, Clone, PartialEq, Error)]
+#[non_exhaustive]
 /// Errors which arise during unification
 pub enum InferExtensionError {
     #[error("Mismatched extension sets {expected} and {actual}")]

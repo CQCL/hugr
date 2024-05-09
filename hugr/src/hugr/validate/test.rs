@@ -3,20 +3,22 @@ use cool_asserts::assert_matches;
 use super::*;
 use crate::builder::test::closed_dfg_root_hugr;
 use crate::builder::{
-    BuildError, Container, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder,
-    HugrBuilder, ModuleBuilder,
+    BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
+    FunctionBuilder, HugrBuilder, ModuleBuilder, SubContainer,
 };
-use crate::extension::prelude::{BOOL_T, PRELUDE, USIZE_T};
-use crate::extension::{Extension, ExtensionId, TypeDefBound, EMPTY_REG, PRELUDE_REGISTRY};
+use crate::extension::prelude::{BOOL_T, PRELUDE, PRELUDE_ID, USIZE_T};
+use crate::extension::{Extension, ExtensionSet, TypeDefBound, EMPTY_REG, PRELUDE_REGISTRY};
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
-use crate::hugr::{HugrMut, NodeType};
+use crate::hugr::HugrMut;
 use crate::ops::dataflow::IOTrait;
-use crate::ops::{self, Const, Noop, OpType};
+use crate::ops::handle::NodeHandle;
+use crate::ops::leaf::MakeTuple;
+use crate::ops::{self, Noop, OpType, Value};
 use crate::std_extensions::logic::test::{and_op, or_op};
 use crate::std_extensions::logic::{self, NotOp};
-use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
+use crate::types::type_param::{TypeArg, TypeArgError};
 use crate::types::{CustomType, FunctionType, PolyFuncType, Type, TypeBound, TypeRow};
-use crate::{type_row, Direction, IncomingPort, Node};
+use crate::{const_extension_ids, type_row, Direction, IncomingPort, Node};
 
 const NAT: Type = crate::extension::prelude::USIZE_T;
 
@@ -271,10 +273,11 @@ fn test_local_const() {
         })
     );
     let const_op: ops::Const = logic::EXTENSION
-        .get_value(logic::TRUE_NAME)
+        .get_value(&logic::TRUE_NAME)
         .unwrap()
         .typed_value()
-        .clone();
+        .clone()
+        .into();
     // Second input of Xor from a constant
     let cst = h.add_node_with_parent(h.root(), const_op);
     let lcst = h.add_node_with_parent(h.root(), ops::LoadConstant { datatype: BOOL_T });
@@ -335,10 +338,12 @@ fn unregistered_extension() {
     h.update_validate(&PRELUDE_REGISTRY).unwrap();
 }
 
+const_extension_ids! {
+    const EXT_ID: ExtensionId = "MyExt";
+}
 #[test]
 fn invalid_types() {
-    let name: ExtensionId = "MyExt".try_into().unwrap();
-    let mut e = Extension::new(name.clone());
+    let mut e = Extension::new(EXT_ID);
     e.add_type(
         "MyContainer".into(),
         vec![TypeBound::Copyable.into()],
@@ -359,7 +364,7 @@ fn invalid_types() {
     let valid = Type::new_extension(CustomType::new(
         "MyContainer",
         vec![TypeArg::Type { ty: USIZE_T }],
-        name.clone(),
+        EXT_ID,
         TypeBound::Any,
     ));
     assert_eq!(
@@ -373,7 +378,7 @@ fn invalid_types() {
     let element_outside_bound = CustomType::new(
         "MyContainer",
         vec![TypeArg::Type { ty: valid.clone() }],
-        name.clone(),
+        EXT_ID,
         TypeBound::Any,
     );
     assert_eq!(
@@ -387,7 +392,7 @@ fn invalid_types() {
     let bad_bound = CustomType::new(
         "MyContainer",
         vec![TypeArg::Type { ty: USIZE_T }],
-        name.clone(),
+        EXT_ID,
         TypeBound::Copyable,
     );
     assert_eq!(
@@ -404,7 +409,7 @@ fn invalid_types() {
         vec![TypeArg::Type {
             ty: Type::new_extension(bad_bound),
         }],
-        name.clone(),
+        EXT_ID,
         TypeBound::Any,
     );
     assert_eq!(
@@ -418,7 +423,7 @@ fn invalid_types() {
     let too_many_type_args = CustomType::new(
         "MyContainer",
         vec![TypeArg::Type { ty: USIZE_T }, TypeArg::BoundedNat { n: 3 }],
-        name.clone(),
+        EXT_ID,
         TypeBound::Any,
     );
     assert_eq!(
@@ -497,7 +502,7 @@ fn nested_typevars() -> Result<(), Box<dyn std::error::Error>> {
     );
     assert_matches!(build(Type::new_var_use(0, OUTER_BOUND)).unwrap_err(),
         BuildError::InvalidHUGR(ValidationError::SignatureError { cause: SignatureError::TypeVarDoesNotMatchDeclaration { actual, cached }, .. }) =>
-        actual == INNER_BOUND.into() && cached == OUTER_BOUND.into());
+        {assert_eq!(actual, INNER_BOUND.into()); assert_eq!(cached, OUTER_BOUND.into())});
     Ok(())
 }
 
@@ -522,7 +527,7 @@ fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
                 .with_extension_delta(collections::EXTENSION_NAME),
         ),
     )?;
-    let empty_list = Const::extension(collections::ListValue::new_empty(Type::new_var_use(
+    let empty_list = Value::extension(collections::ListValue::new_empty(Type::new_var_use(
         0,
         TypeBound::Copyable,
     )));
@@ -590,6 +595,106 @@ fn no_outer_row_variables() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
+    let mut e = Extension::new(EXT_ID);
+
+    let params: Vec<TypeParam> = vec![
+        TypeBound::Any.into(),
+        TypeParam::Extensions,
+        TypeBound::Any.into(),
+    ];
+    let evaled_fn = Type::new_function(
+        FunctionType::new(
+            Type::new_var_use(0, TypeBound::Any),
+            Type::new_var_use(2, TypeBound::Any),
+        )
+        .with_extension_delta(ExtensionSet::type_var(1)),
+    );
+    // The higher-order "eval" operation - takes a function and its argument.
+    // Note the extension-delta of the eval node includes that of the input function.
+    e.add_op(
+        "eval".into(),
+        "".into(),
+        PolyFuncType::new(
+            params.clone(),
+            FunctionType::new(
+                vec![evaled_fn, Type::new_var_use(0, TypeBound::Any)],
+                Type::new_var_use(2, TypeBound::Any),
+            )
+            .with_extension_delta(ExtensionSet::type_var(1)),
+        ),
+    )?;
+
+    fn utou(e: impl Into<ExtensionSet>) -> Type {
+        Type::new_function(FunctionType::new_endo(USIZE_T).with_extension_delta(e.into()))
+    }
+
+    let int_pair = Type::new_tuple(type_row![USIZE_T; 2]);
+    // Root DFG: applies a function int--PRELUDE-->int to each element of a pair of two ints
+    let mut d = DFGBuilder::new(
+        FunctionType::new(
+            vec![utou(PRELUDE_ID), int_pair.clone()],
+            vec![int_pair.clone()],
+        )
+        .with_extension_delta(PRELUDE_ID),
+    )?;
+    // ....by calling a function parametrized<extensions E> (int--e-->int, int_pair) -> int_pair
+    let f = {
+        let es = ExtensionSet::type_var(0);
+        let mut f = d.define_function(
+            "two_ints",
+            PolyFuncType::new(
+                vec![TypeParam::Extensions],
+                FunctionType::new(vec![utou(es.clone()), int_pair.clone()], int_pair.clone())
+                    .with_extension_delta(es.clone()),
+            ),
+        )?;
+        let [func, tup] = f.input_wires_arr();
+        let mut c = f.conditional_builder(
+            (vec![type_row![USIZE_T; 2]], tup),
+            vec![],
+            type_row![USIZE_T;2],
+            es.clone(),
+        )?;
+        let mut cc = c.case_builder(0)?;
+        let [i1, i2] = cc.input_wires_arr();
+        let op = e.instantiate_extension_op(
+            "eval",
+            vec![USIZE_T.into(), TypeArg::Extensions { es }, USIZE_T.into()],
+            &PRELUDE_REGISTRY,
+        )?;
+        let [f1] = cc.add_dataflow_op(op.clone(), [func, i1])?.outputs_arr();
+        let [f2] = cc.add_dataflow_op(op, [func, i2])?.outputs_arr();
+        cc.finish_with_outputs([f1, f2])?;
+        let res = c.finish_sub_container()?.outputs();
+        let tup = f.add_dataflow_op(
+            MakeTuple {
+                tys: type_row![USIZE_T; 2],
+            },
+            res,
+        )?;
+        f.finish_with_outputs(tup.outputs())?
+    };
+
+    let reg = ExtensionRegistry::try_new([e, PRELUDE.to_owned()])?;
+    let [func, tup] = d.input_wires_arr();
+    let call = d.call(
+        f.handle(),
+        &[TypeArg::Extensions {
+            es: ExtensionSet::singleton(&PRELUDE_ID),
+        }],
+        [func, tup],
+        &reg,
+    )?;
+    let h = d.finish_hugr_with_outputs(call.outputs(), &reg)?;
+    let call_ty = h.get_optype(call.node()).dataflow_signature().unwrap();
+    let exp_fun_ty = FunctionType::new(vec![utou(PRELUDE_ID), int_pair.clone()], int_pair)
+        .with_extension_delta(PRELUDE_ID);
+    assert_eq!(call_ty, exp_fun_ty);
+    Ok(())
+}
+
+#[test]
+fn test_polymorphic_load() -> Result<(), Box<dyn std::error::Error>> {
     let mut m = ModuleBuilder::new();
     let id = m.declare(
         "id",
@@ -598,9 +703,13 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
             FunctionType::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
         ),
     )?;
-    let mut f = m.define_function("main", FunctionType::new_endo(vec![USIZE_T]).into())?;
-    let c = f.call(&id, &[USIZE_T.into()], f.input_wires(), &PRELUDE_REGISTRY)?;
-    f.finish_with_outputs(c.outputs())?;
+    let sig = FunctionType::new(
+        vec![],
+        vec![Type::new_function(FunctionType::new_endo(vec![USIZE_T]))],
+    );
+    let mut f = m.define_function("main", sig.into())?;
+    let l = f.load_func(&id, &[USIZE_T.into()], &PRELUDE_REGISTRY)?;
+    f.finish_with_outputs([l])?;
     let _ = m.finish_prelude_hugr()?;
     Ok(())
 }
@@ -608,7 +717,6 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
 #[cfg(feature = "extension_inference")]
 mod extension_tests {
     use super::*;
-    use crate::builder::ModuleBuilder;
     use crate::extension::ExtensionSet;
     use crate::macros::const_extension_ids;
 
@@ -625,8 +733,9 @@ mod extension_tests {
     ///
     /// Returns the node indices of each of the operations.
     fn add_block_children(b: &mut Hugr, parent: Node, sum_size: usize) -> (Node, Node, Node, Node) {
-        let const_op =
-            ops::Const::unit_sum(0, sum_size as u8).expect("`sum_size` must be greater than 0");
+        let const_op: ops::Const = ops::Value::unit_sum(0, sum_size as u8)
+            .expect("`sum_size` must be greater than 0")
+            .into();
         let tag_type = Type::new_unit_sum(sum_size as u8);
 
         let input = b.add_node_with_parent(parent, ops::Input::new(type_row![BOOL_T]));
@@ -854,11 +963,13 @@ mod extension_tests {
 
         let all_rs = ExtensionSet::from_iter([XA, XB]);
 
-        let main_sig = FunctionType::new(type_row![], type_row![NAT])
+        let main_sig = FunctionType::new(type_row![NAT], type_row![NAT])
             .with_extension_delta(all_rs.clone())
             .into();
 
         let mut main = module_builder.define_function("main", main_sig)?;
+
+        let [inp_wire] = main.input_wires_arr();
 
         let [left_wire] = main
             .dfg_builder(
@@ -866,7 +977,7 @@ mod extension_tests {
                 Some(XA.into()),
                 [],
             )?
-            .finish_with_outputs([])?
+            .finish_with_outputs([inp_wire])?
             .outputs_arr();
 
         let [right_wire] = main
@@ -875,7 +986,7 @@ mod extension_tests {
                 Some(XB.into()),
                 [],
             )?
-            .finish_with_outputs([])?
+            .finish_with_outputs([inp_wire])?
             .outputs_arr();
 
         let builder = main.dfg_builder(
@@ -883,8 +994,8 @@ mod extension_tests {
             Some(all_rs),
             [left_wire, right_wire],
         )?;
-        let [_left, _right] = builder.input_wires_arr();
-        let [output] = builder.finish_with_outputs([])?.outputs_arr();
+        let [left, _] = builder.input_wires_arr();
+        let [output] = builder.finish_with_outputs([left])?.outputs_arr();
 
         main.finish_with_outputs([output])?;
         let handle = module_builder.hugr().validate(&PRELUDE_REGISTRY);

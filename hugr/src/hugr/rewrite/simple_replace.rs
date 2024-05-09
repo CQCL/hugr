@@ -181,6 +181,7 @@ impl Rewrite for SimpleReplacement {
 
 /// Error from a [`SimpleReplacement`] operation.
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum SimpleReplacementError {
     /// Invalid parent node.
     #[error("Parent node is invalid.")]
@@ -635,6 +636,6 @@ pub(in crate::hugr::rewrite) mod test {
     }
 
     fn apply_replace(h: &mut Hugr, rw: SimpleReplacement) {
-        h.apply_rewrite(to_replace(h, rw)).unwrap()
+        h.apply_rewrite(to_replace(h, rw)).unwrap();
     }
 }

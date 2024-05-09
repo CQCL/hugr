@@ -1,4 +1,5 @@
-name: Release-plz
+# Automatic changelog, version bumping, and semver-checks with release-plz for rust projects
+name: Release-plz 🦀
 
 permissions:
   pull-requests: write

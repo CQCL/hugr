@@ -2,6 +2,8 @@
 
 use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 
+use crate::ops::constant::ValueName;
+use crate::ops::OpName;
 use crate::{
     algorithm::const_fold::sorted_consts,
     extension::{
@@ -9,7 +11,7 @@ use crate::{
         simple_op::{try_from_name, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError},
         ExtensionId, ExtensionRegistry, OpDef, SignatureError, SignatureFromArgs, SignatureFunc,
     },
-    ops::{self, custom::ExtensionOp, OpName},
+    ops::{self, custom::ExtensionOp, NamedOp},
     type_row,
     types::{
         type_param::{TypeArg, TypeParam},
@@ -19,13 +21,14 @@ use crate::{
 };
 use lazy_static::lazy_static;
 /// Name of extension false value.
-pub const FALSE_NAME: &str = "FALSE";
+pub const FALSE_NAME: ValueName = ValueName::new_inline("FALSE");
 /// Name of extension true value.
-pub const TRUE_NAME: &str = "TRUE";
+pub const TRUE_NAME: ValueName = ValueName::new_inline("TRUE");
 
 /// Logic extension operation definitions.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, EnumIter, IntoStaticStr, EnumString)]
 #[allow(missing_docs)]
+#[non_exhaustive]
 pub enum NaryLogic {
     And,
     Or,
@@ -53,12 +56,12 @@ impl MakeOpDef for NaryLogic {
             NaryLogic::And => |consts: &_| {
                 let inps = read_inputs(consts)?;
                 let res = inps.into_iter().all(|x| x);
-                Some(vec![(0.into(), ops::Const::from_bool(res))])
+                Some(vec![(0.into(), ops::Value::from_bool(res))])
             },
             NaryLogic::Or => |consts: &_| {
                 let inps = read_inputs(consts)?;
                 let res = inps.into_iter().any(|x| x);
-                Some(vec![(0.into(), ops::Const::from_bool(res))])
+                Some(vec![(0.into(), ops::Value::from_bool(res))])
             },
         })
     }
@@ -75,8 +78,8 @@ impl NaryLogic {
         ConcreteLogicOp(self, n)
     }
 }
-impl OpName for ConcreteLogicOp {
-    fn name(&self) -> smol_str::SmolStr {
+impl NamedOp for ConcreteLogicOp {
+    fn name(&self) -> OpName {
         self.0.name()
     }
 }
@@ -97,8 +100,8 @@ impl MakeExtensionOp for ConcreteLogicOp {
 /// Not operation.
 #[derive(Debug, Copy, Clone)]
 pub struct NotOp;
-impl OpName for NotOp {
-    fn name(&self) -> smol_str::SmolStr {
+impl NamedOp for NotOp {
+    fn name(&self) -> OpName {
         "Not".into()
     }
 }
@@ -116,6 +119,17 @@ impl MakeOpDef for NotOp {
     }
     fn description(&self) -> String {
         "logical 'not'".into()
+    }
+
+    fn post_opdef(&self, def: &mut OpDef) {
+        def.set_constant_folder(|consts: &_| {
+            let inps = read_inputs(consts)?;
+            if inps.len() != 1 {
+                None
+            } else {
+                Some(vec![(0.into(), ops::Value::from_bool(!inps[0]))])
+            }
+        })
     }
 }
 /// The extension identifier.
@@ -151,10 +165,10 @@ fn extension() -> Extension {
     NotOp.add_to_extension(&mut extension).unwrap();
 
     extension
-        .add_value(FALSE_NAME, ops::Const::false_val())
+        .add_value(FALSE_NAME, ops::Value::false_val())
         .unwrap();
     extension
-        .add_value(TRUE_NAME, ops::Const::true_val())
+        .add_value(TRUE_NAME, ops::Value::true_val())
         .unwrap();
     extension
 }
@@ -187,9 +201,9 @@ impl MakeRegisteredOp for NotOp {
     }
 }
 
-fn read_inputs(consts: &[(IncomingPort, ops::Const)]) -> Option<Vec<bool>> {
-    let true_val = ops::Const::true_val();
-    let false_val = ops::Const::false_val();
+fn read_inputs(consts: &[(IncomingPort, ops::Value)]) -> Option<Vec<bool>> {
+    let true_val = ops::Value::true_val();
+    let false_val = ops::Value::false_val();
     let inps: Option<Vec<bool>> = sorted_consts(consts)
         .into_iter()
         .map(|c| {
@@ -214,7 +228,7 @@ pub(crate) mod test {
             prelude::BOOL_T,
             simple_op::{MakeExtensionOp, MakeOpDef, MakeRegisteredOp},
         },
-        ops::OpName,
+        ops::NamedOp,
         Extension,
     };
 
@@ -248,11 +262,11 @@ pub(crate) mod test {
     #[test]
     fn test_values() {
         let r: Extension = extension();
-        let false_val = r.get_value(FALSE_NAME).unwrap();
-        let true_val = r.get_value(TRUE_NAME).unwrap();
+        let false_val = r.get_value(&FALSE_NAME).unwrap();
+        let true_val = r.get_value(&TRUE_NAME).unwrap();
 
         for v in [false_val, true_val] {
-            let simpl = v.typed_value().const_type();
+            let simpl = v.typed_value().get_type();
             assert_eq!(simpl, BOOL_T);
         }
     }

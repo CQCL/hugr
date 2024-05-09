@@ -1,7 +1,7 @@
 import inspect
 import sys
 from enum import Enum
-from typing import Annotated, Any, Literal, Optional, Union
+from typing import Annotated, Any, Literal, Union, Mapping
 
 from pydantic import (
     BaseModel,
@@ -11,6 +11,7 @@ from pydantic import (
     ValidationInfo,
     ValidatorFunctionWrapHandler,
     WrapValidator,
+    ConfigDict,
 )
 from pydantic_core import PydanticCustomError
 
@@ -27,6 +28,7 @@ def _json_custom_error_validator(
 
     Used to define named recursive alias types.
     """
+    return handler(value)
     try:
         return handler(value)
     except ValidationError as err:
@@ -37,12 +39,17 @@ def _json_custom_error_validator(
 
 
 ExtensionId = str
+ExtensionSet = list[ExtensionId]
+
+default_model_config = ConfigDict()
 
 
-class ExtensionSet(RootModel):
-    """A set of extensions ids."""
+class ConfiguredBaseModel(BaseModel):
+    model_config = default_model_config
 
-    root: Optional[list[ExtensionId]] = Field(default=None)
+    @classmethod
+    def update_model_config(cls, config: ConfigDict):
+        cls.model_config.update(config)
 
 
 # --------------------------------------------
@@ -50,38 +57,50 @@ class ExtensionSet(RootModel):
 # --------------------------------------------
 
 
-class TypeTypeParam(BaseModel):
+class TypeTypeParam(ConfiguredBaseModel):
     tp: Literal["Type"] = "Type"
     b: "TypeBound"
 
 
-class BoundedNatParam(BaseModel):
+class BoundedNatParam(ConfiguredBaseModel):
     tp: Literal["BoundedNat"] = "BoundedNat"
     bound: int | None
 
 
-class OpaqueParam(BaseModel):
+class OpaqueParam(ConfiguredBaseModel):
     tp: Literal["Opaque"] = "Opaque"
     ty: "Opaque"
 
 
-class ListParam(BaseModel):
+class ListParam(ConfiguredBaseModel):
     tp: Literal["List"] = "List"
     param: "TypeParam"
 
 
-class TupleParam(BaseModel):
+class TupleParam(ConfiguredBaseModel):
     tp: Literal["Tuple"] = "Tuple"
     params: list["TypeParam"]
+
+
+class ExtensionsParam(ConfiguredBaseModel):
+    tp: Literal["Extensions"] = "Extensions"
 
 
 class TypeParam(RootModel):
     """A type parameter."""
 
     root: Annotated[
-        TypeTypeParam | BoundedNatParam | OpaqueParam | ListParam | TupleParam,
+        TypeTypeParam
+        | BoundedNatParam
+        | OpaqueParam
+        | ListParam
+        | TupleParam
+        | ExtensionsParam,
         WrapValidator(_json_custom_error_validator),
     ] = Field(discriminator="tp")
+
+    class Config:
+        json_schema_extra = {"required": ["tp"]}
 
 
 # ------------------------------------------
@@ -89,43 +108,53 @@ class TypeParam(RootModel):
 # ------------------------------------------
 
 
-class CustomTypeArg(BaseModel):
-    typ: None  # TODO
-    value: str
-
-
-class TypeTypeArg(BaseModel):
+class TypeTypeArg(ConfiguredBaseModel):
     tya: Literal["Type"] = "Type"
     ty: "Type"
 
 
-class BoundedNatArg(BaseModel):
+class BoundedNatArg(ConfiguredBaseModel):
     tya: Literal["BoundedNat"] = "BoundedNat"
     n: int
 
 
-class OpaqueArg(BaseModel):
+class OpaqueArg(ConfiguredBaseModel):
     tya: Literal["Opaque"] = "Opaque"
-    arg: CustomTypeArg
+    typ: "Opaque"
+    value: Any
 
 
-class SequenceArg(BaseModel):
+class SequenceArg(ConfiguredBaseModel):
     tya: Literal["Sequence"] = "Sequence"
-    args: list["TypeArg"]
+    elems: list["TypeArg"]
 
 
-class ExtensionsArg(BaseModel):
+class ExtensionsArg(ConfiguredBaseModel):
     tya: Literal["Extensions"] = "Extensions"
     es: ExtensionSet
+
+
+class VariableArg(BaseModel):
+    tya: Literal["Variable"] = "Variable"
+    idx: int
+    cached_decl: TypeParam
 
 
 class TypeArg(RootModel):
     """A type argument."""
 
     root: Annotated[
-        TypeTypeArg | BoundedNatArg | OpaqueArg | SequenceArg | ExtensionsArg,
+        TypeTypeArg
+        | BoundedNatArg
+        | OpaqueArg
+        | SequenceArg
+        | ExtensionsArg
+        | VariableArg,
         WrapValidator(_json_custom_error_validator),
     ] = Field(discriminator="tya")
+
+    class Config:
+        json_schema_extra = {"required": ["tya"]}
 
 
 # --------------------------------------------
@@ -133,7 +162,7 @@ class TypeArg(RootModel):
 # --------------------------------------------
 
 
-class MultiContainer(BaseModel):
+class MultiContainer(ConfiguredBaseModel):
     ty: "Type"
 
 
@@ -144,26 +173,32 @@ class Array(MultiContainer):
     len: int
 
 
-class UnitSum(BaseModel):
-    """Simple predicate where all variants are empty tuples."""
+class UnitSum(ConfiguredBaseModel):
+    """Simple sum type where all variants are empty tuples."""
 
     t: Literal["Sum"] = "Sum"
-
     s: Literal["Unit"] = "Unit"
     size: int
 
 
-class GeneralSum(BaseModel):
+class GeneralSum(ConfiguredBaseModel):
     """General sum type that explicitly stores the types of the variants."""
 
     t: Literal["Sum"] = "Sum"
-
     s: Literal["General"] = "General"
     rows: list["TypeRow"]
 
 
 class SumType(RootModel):
-    root: Union[UnitSum, GeneralSum] = Field(discriminator="s")
+    root: Annotated[Union[UnitSum, GeneralSum], Field(discriminator="s")]
+
+    # This seems to be required for nested discriminated unions to work
+    @property
+    def t(self) -> str:
+        return self.root.t
+
+    class Config:
+        json_schema_extra = {"required": ["s"]}
 
 
 # ----------------------------------------------
@@ -171,7 +206,7 @@ class SumType(RootModel):
 # ----------------------------------------------
 
 
-class Variable(BaseModel):
+class Variable(ConfiguredBaseModel):
     """A type variable identified by an index into the array of TypeParams."""
 
     t: Literal["V"] = "V"
@@ -179,13 +214,13 @@ class Variable(BaseModel):
     b: "TypeBound"
 
 
-class USize(BaseModel):
+class USize(ConfiguredBaseModel):
     """Unsigned integer size type."""
 
     t: Literal["I"] = "I"
 
 
-class FunctionType(BaseModel):
+class FunctionType(ConfiguredBaseModel):
     """A graph encoded as a value. It contains a concrete signature and a set of
     required resources."""
 
@@ -194,11 +229,11 @@ class FunctionType(BaseModel):
     input: "TypeRow"  # Value inputs of the function.
     output: "TypeRow"  # Value outputs of the function.
     # The extension requirements which are added by the operation
-    extension_reqs: "ExtensionSet" = Field(default_factory=list)
+    extension_reqs: ExtensionSet = Field(default_factory=ExtensionSet)
 
     @classmethod
     def empty(cls) -> "FunctionType":
-        return FunctionType(input=[], output=[], extension_reqs=ExtensionSet([]))
+        return FunctionType(input=[], output=[], extension_reqs=[])
 
     class Config:
         # Needed to avoid random '\n's in the pydantic description
@@ -210,7 +245,7 @@ class FunctionType(BaseModel):
         }
 
 
-class PolyFuncType(BaseModel):
+class PolyFuncType(ConfiguredBaseModel):
     """A polymorphic type scheme, i.e. of a FuncDecl, FuncDefn or OpDef.
     (Nodes/operations in the Hugr are not polymorphic.)"""
 
@@ -253,8 +288,8 @@ class TypeBound(Enum):
         return res
 
 
-class Opaque(BaseModel):
-    """An opaque operation that can be downcasted by the extensions that define it."""
+class Opaque(ConfiguredBaseModel):
+    """An opaque Type that can be downcasted by the extensions that define it."""
 
     t: Literal["Opaque"] = "Opaque"
     extension: ExtensionId
@@ -263,12 +298,20 @@ class Opaque(BaseModel):
     bound: TypeBound
 
 
+class Alias(ConfiguredBaseModel):
+    """An Alias Type"""
+
+    t: Literal["Alias"] = "Alias"
+    bound: TypeBound
+    name: str
+
+
 # ----------------------------------------------
 # --------------- LinearType -------------------
 # ----------------------------------------------
 
 
-class Qubit(BaseModel):
+class Qubit(ConfiguredBaseModel):
     """A qubit."""
 
     t: Literal["Q"] = "Q"
@@ -278,9 +321,13 @@ class Type(RootModel):
     """A HUGR type."""
 
     root: Annotated[
-        Qubit | Variable | USize | FunctionType | Array | SumType | Opaque,
+        Qubit | Variable | USize | FunctionType | Array | SumType | Opaque | Alias,
         WrapValidator(_json_custom_error_validator),
-    ] = Field(discriminator="t")
+        Field(discriminator="t"),
+    ]
+
+    class Config:
+        json_schema_extra = {"required": ["t"]}
 
 
 # -------------------------------------------
@@ -295,7 +342,7 @@ TypeRow = list[Type]
 # -------------------------------------------
 
 
-class Signature(BaseModel):
+class Signature(ConfiguredBaseModel):
     """Describes the edges required to/from a node.
 
     This includes both the concept of "signature" in the spec, and also the target
@@ -309,11 +356,23 @@ class Signature(BaseModel):
 
 
 # Now that all classes are defined, we need to update the ForwardRefs in all type
-# annotations. We use some inspect magic to find all classes defined in this file.
+# annotations. We use some inspect magic to find all classes defined in this file
+# and call model_rebuild()
 classes = inspect.getmembers(
     sys.modules[__name__],
     lambda member: inspect.isclass(member) and member.__module__ == __name__,
 )
-for _, c in classes:
-    if issubclass(c, BaseModel):
-        c.model_rebuild()
+
+
+def model_rebuild(
+    classes: Mapping[str, type],
+    config: ConfigDict = ConfigDict(),
+    **kwargs,
+):
+    for c in classes.values():
+        if issubclass(c, ConfiguredBaseModel):
+            c.update_model_config(config)
+            c.model_rebuild(**kwargs)
+
+
+model_rebuild(dict(classes))

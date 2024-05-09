@@ -30,6 +30,7 @@ use thiserror::Error;
 pub type CaseBuilder<B> = DFGWrapper<B, BuildHandle<CaseID>>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[non_exhaustive]
 pub enum ConditionalBuildError {
     /// Case already built.
     #[error("Case {case} of Conditional node {conditional:?} has already been built.")]
@@ -206,15 +207,14 @@ impl CaseBuilder<Hugr> {
 mod test {
     use cool_asserts::assert_matches;
 
-    use crate::builder::{DataflowSubContainer, HugrBuilder, ModuleBuilder};
+    use crate::builder::{DataflowSubContainer, ModuleBuilder};
 
     use crate::{
         builder::{
             test::{n_identity, NAT},
             Dataflow,
         },
-        extension::ExtensionSet,
-        ops::Const,
+        ops::Value,
         type_row,
     };
 
@@ -242,7 +242,7 @@ mod test {
                 "main",
                 FunctionType::new(type_row![NAT], type_row![NAT]).into(),
             )?;
-            let tru_const = fbuild.add_constant(Const::true_val());
+            let tru_const = fbuild.add_constant(Value::true_val());
             let _fdef = {
                 let const_wire = fbuild.load_const(&tru_const);
                 let [int] = fbuild.input_wires_arr();
