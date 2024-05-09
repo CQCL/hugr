@@ -351,13 +351,15 @@ impl Type {
         TypeBound::Copyable.contains(self.least_upper_bound())
     }
 
-    /// Checks all variables used in the type are in the provided list
-    /// of bound variables, and that for each [CustomType] the corresponding
+    /// Checks that this [Type] represents a single Type, not a row variable,
+    /// that all variables used within are in the provided list of bound variables,
+    /// and that for each [CustomType], the corresponding
     /// [TypeDef] is in the [ExtensionRegistry] and the type arguments
     /// [validate] and fit into the def's declared parameters.
     ///
     /// [validate]: crate::types::type_param::TypeArg::validate
     /// [TypeDef]: crate::extension::TypeDef
+    // ALAN TODO rename - validate_type, validate1type ?
     pub(crate) fn validate(
         &self,
         extension_registry: &ExtensionRegistry,
@@ -380,6 +382,7 @@ impl Type {
         }
     }
 
+    // ALAN TODO rename to validate_var_len (?)
     fn validate_in_row(
         &self,
         extension_registry: &ExtensionRegistry,
@@ -395,30 +398,30 @@ impl Type {
         }
     }
 
-    pub(crate) fn substitute(&self, t: &Substitution) -> Self {
+    // ALAN TODO 2. FunctionType.validate_fixed_len, validate_var_len
+    // ALAN TODO 4. subst_row / valid_row => TypeRow::substitute, TypeRow::validate_var_len
+
+    /// Applies a substitution to a type.
+    /// This may result in a row of types, if this [Type] is not really a single type but actually a row variable
+    /// Invariants may be confirmed by validation:
+    /// * If [Type::validate] returns successfully, this method will return a Vec containing exactly one type
+    /// * If [Type::validate] fails, but [Type::validate_in_row] succeeds, this method may (depending on structure of self)
+    ///   return a Vec containing any number of [Type]s. These may (or not) pass [Type::validate]
+    fn substitute(&self, t: &Substitution) -> Vec<Self> {
         match &self.0 {
-            TypeEnum::Alias(_) | TypeEnum::Sum(SumType::Unit { .. }) => self.clone(),
+            TypeEnum::RowVariable(idx, bound) => t.apply_rowvar(*idx, *bound),
+            TypeEnum::Alias(_) | TypeEnum::Sum(SumType::Unit { .. }) => vec![self.clone()],
             TypeEnum::Variable(idx, bound) => {
                 let TypeArg::Type { ty } = t.apply_var(*idx, &((*bound).into())) else {
                     panic!("Variable was not a type - try validate() first")
                 };
-                ty
+                vec![ty]
             }
-            TypeEnum::RowVariable(_, _) => {
-                panic!("Row Variable found outside of row - should have been detected in validate")
-            }
-            TypeEnum::Extension(cty) => Type::new_extension(cty.substitute(t)),
-            TypeEnum::Function(bf) => Type::new_function(bf.substitute(t)),
+            TypeEnum::Extension(cty) => vec![Type::new_extension(cty.substitute(t))],
+            TypeEnum::Function(bf) => vec![Type::new_function(bf.substitute(t))],
             TypeEnum::Sum(SumType::General { rows }) => {
-                Type::new_sum(rows.iter().map(|x| subst_row(x, t)))
+                vec![Type::new_sum(rows.iter().map(|x| subst_row(x, t)))]
             }
-        }
-    }
-
-    fn substitute_in_row(&self, t: &Substitution) -> Vec<Self> {
-        match &self.0 {
-            TypeEnum::RowVariable(idx, bound) => t.apply_rowvar(*idx, *bound),
-            _ => vec![self.substitute(t)],
         }
     }
 }
@@ -475,7 +478,7 @@ fn valid_row(
 fn subst_row(row: &TypeRow, tr: &Substitution) -> TypeRow {
     let res = row
         .iter()
-        .flat_map(|ty| ty.substitute_in_row(tr))
+        .flat_map(|ty| ty.substitute(tr))
         .collect::<Vec<_>>()
         .into();
     res

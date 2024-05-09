@@ -258,9 +258,19 @@ impl TypeArg {
 
     pub(crate) fn substitute(&self, t: &Substitution) -> Self {
         match self {
-            TypeArg::Type { ty } => TypeArg::Type {
-                ty: ty.substitute(t),
-            },
+            TypeArg::Type { ty } => {
+                // A row variable standing for many types is represented as a single type
+                // ALAN TODO: add test that would fail if we didn't handle this
+                let tys = ty
+                    .substitute(t)
+                    .into_iter()
+                    .map(|ty| TypeArg::Type { ty })
+                    .collect::<Vec<_>>();
+                match <Vec<TypeArg> as TryInto<[TypeArg; 1]>>::try_into(tys) {
+                    Ok([ty]) => ty,
+                    Err(elems) => TypeArg::Sequence { elems },
+                }
+            }
             TypeArg::BoundedNat { .. } => self.clone(), // We do not allow variables as bounds on BoundedNat's
             TypeArg::Opaque {
                 arg: CustomTypeArg { typ, .. },
