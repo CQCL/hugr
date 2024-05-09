@@ -374,7 +374,8 @@ impl Type {
             TypeEnum::Sum(SumType::Unit { .. }) => Ok(()), // No leaves there
             TypeEnum::Alias(_) => Ok(()),
             TypeEnum::Extension(custy) => custy.validate(extension_registry, var_decls),
-            TypeEnum::Function(ft) => ft.validate(extension_registry, var_decls),
+            // FunctionTypes used as types of values may have unknown arity (e.g. if they are not called)
+            TypeEnum::Function(ft) => ft.validate_varargs(extension_registry, var_decls),
             TypeEnum::Variable(idx, bound) => check_typevar_decl(var_decls, *idx, &(*bound).into()),
             TypeEnum::RowVariable(idx, _) => {
                 Err(SignatureError::RowTypeVarOutsideRow { idx: *idx })
@@ -398,7 +399,6 @@ impl Type {
         }
     }
 
-    // ALAN TODO 2. FunctionType.validate_fixed_len, validate_var_len
     // ALAN TODO 4. subst_row / valid_row => TypeRow::substitute, TypeRow::validate_var_len
 
     /// Applies a substitution to a type.

@@ -32,7 +32,7 @@ impl FunctionType {
         self
     }
 
-    pub(crate) fn validate(
+    pub(super) fn validate_varargs(
         &self,
         extension_registry: &ExtensionRegistry,
         var_decls: &[TypeParam],
