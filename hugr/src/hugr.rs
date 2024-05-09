@@ -8,6 +8,8 @@ pub mod serialize;
 pub mod validate;
 pub mod views;
 
+#[cfg(feature = "extension_inference")]
+use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::iter;
 
@@ -196,8 +198,12 @@ impl Hugr {
         extension_registry: &ExtensionRegistry,
     ) -> Result<(), ValidationError> {
         resolve_extension_ops(self, extension_registry)?;
-        self.infer_extensions()?;
-        self.validate(extension_registry)?;
+        self.validate_no_extensions(extension_registry)?;
+        #[cfg(feature = "extension_inference")]
+        {
+            self.infer_extensions()?;
+            self.validate_extensions(HashMap::new())?;
+        }
         Ok(())
     }
 

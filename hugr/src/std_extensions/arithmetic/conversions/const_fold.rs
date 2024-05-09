@@ -1,14 +1,15 @@
+use crate::ops::constant::get_single_input_value;
 use crate::ops::Value;
+use crate::std_extensions::arithmetic::int_types::INT_TYPES;
 use crate::{
     extension::{
         prelude::{sum_with_error, ConstError},
         ConstFold, ConstFoldResult, OpDef,
     },
     ops,
-    ops::constant::CustomConst,
     std_extensions::arithmetic::{
         float_types::ConstF64,
-        int_types::{get_log_width, ConstInt, INT_TYPES},
+        int_types::{get_log_width, ConstInt},
     },
     types::ConstTypeError,
     IncomingPort,
@@ -27,19 +28,12 @@ pub(super) fn set_fold(op: &ConvertOpDef, def: &mut OpDef) {
     }
 }
 
-fn get_input<T: CustomConst>(consts: &[(IncomingPort, ops::Value)]) -> Option<&T> {
-    let [(_, c)] = consts else {
-        return None;
-    };
-    c.get_custom_value()
-}
-
 fn fold_trunc(
     type_args: &[crate::types::TypeArg],
     consts: &[(IncomingPort, Value)],
     convert: impl Fn(f64, u8) -> Result<Value, ConstTypeError>,
 ) -> ConstFoldResult {
-    let f: &ConstF64 = get_input(consts)?;
+    let f: &ConstF64 = get_single_input_value(consts)?;
     let f = f.value();
     let [arg] = type_args else {
         return None;
@@ -105,7 +99,7 @@ impl ConstFold for ConvertU {
         _type_args: &[crate::types::TypeArg],
         consts: &[(IncomingPort, ops::Value)],
     ) -> ConstFoldResult {
-        let u: &ConstInt = get_input(consts)?;
+        let u: &ConstInt = crate::ops::constant::get_single_input_value(consts)?;
         let f = u.value_u() as f64;
         Some(vec![(0.into(), ConstF64::new(f).into())])
     }
@@ -119,7 +113,7 @@ impl ConstFold for ConvertS {
         _type_args: &[crate::types::TypeArg],
         consts: &[(IncomingPort, ops::Value)],
     ) -> ConstFoldResult {
-        let u: &ConstInt = get_input(consts)?;
+        let u: &ConstInt = get_single_input_value(consts)?;
         let f = u.value_s() as f64;
         Some(vec![(0.into(), ConstF64::new(f).into())])
     }

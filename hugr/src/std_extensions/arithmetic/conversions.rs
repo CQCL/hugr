@@ -76,18 +76,18 @@ impl MakeOpDef for ConvertOpDef {
 
 impl ConvertOpDef {
     /// Initialise a conversion op with an integer log width type argument.
-    pub fn with_width(self, log_width: u8) -> ConvertOpType {
+    pub fn with_log_width(self, log_width: u8) -> ConvertOpType {
         ConvertOpType {
             def: self,
-            log_width: log_width as u64,
+            log_width,
         }
     }
 }
-/// Concrete convert operation with integer width set.
+/// Concrete convert operation with integer log width set.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ConvertOpType {
     def: ConvertOpDef,
-    log_width: u64,
+    log_width: u8,
 }
 
 impl NamedOp for ConvertOpType {
@@ -99,18 +99,20 @@ impl NamedOp for ConvertOpType {
 impl MakeExtensionOp for ConvertOpType {
     fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError> {
         let def = ConvertOpDef::from_def(ext_op.def())?;
-        let width = match *ext_op.args() {
+        let log_width: u64 = match *ext_op.args() {
             [TypeArg::BoundedNat { n }] => n,
             _ => return Err(SignatureError::InvalidTypeArgs.into()),
         };
         Ok(Self {
             def,
-            log_width: width,
+            log_width: u8::try_from(log_width).unwrap(),
         })
     }
 
     fn type_args(&self) -> Vec<crate::types::TypeArg> {
-        vec![TypeArg::BoundedNat { n: self.log_width }]
+        vec![TypeArg::BoundedNat {
+            n: self.log_width as u64,
+        }]
     }
 }
 

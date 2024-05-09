@@ -13,6 +13,9 @@ use crate::extension::ExtensionSet;
 use crate::macros::impl_box_clone;
 
 use crate::types::{CustomCheckFailure, Type};
+use crate::IncomingPort;
+
+use super::Value;
 
 use super::ValueName;
 
@@ -451,4 +454,22 @@ mod test {
             serde_yaml::from_value(serde_yaml::to_value(&ev).unwrap()).unwrap()
         );
     }
+}
+
+/// Given a singleton list of constant operations, return the value.
+pub fn get_single_input_value<T: CustomConst>(consts: &[(IncomingPort, Value)]) -> Option<&T> {
+    let [(_, c)] = consts else {
+        return None;
+    };
+    c.get_custom_value()
+}
+
+/// Given a list of two constant operations, return the values.
+pub fn get_pair_of_input_values<T: CustomConst>(
+    consts: &[(IncomingPort, Value)],
+) -> Option<(&T, &T)> {
+    let [(_, c0), (_, c1)] = consts else {
+        return None;
+    };
+    Some((c0.get_custom_value()?, c1.get_custom_value()?))
 }

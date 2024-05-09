@@ -206,12 +206,12 @@ mod test {
             )?;
             let [a] = inner.input_wires_arr();
             let c1 = c1.unwrap_or_else(|| make_const(&mut inner))?;
-            let a1 = inner.add_dataflow_op(IntOpDef::iadd.with_width(6), [a, c1])?;
+            let a1 = inner.add_dataflow_op(IntOpDef::iadd.with_log_width(6), [a, c1])?;
             inner.finish_with_outputs(a1.outputs())?
         };
         let [a1] = inner.outputs_arr();
 
-        let a1_sub_b = outer.add_dataflow_op(IntOpDef::isub.with_width(6), [a1, b])?;
+        let a1_sub_b = outer.add_dataflow_op(IntOpDef::isub.with_log_width(6), [a1, b])?;
         let mut outer = outer.finish_hugr_with_outputs(a1_sub_b.outputs(), &reg)?;
 
         // Sanity checks

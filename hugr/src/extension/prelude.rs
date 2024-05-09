@@ -130,10 +130,10 @@ pub const USIZE_T: Type = Type::new_extension(USIZE_CUSTOM_T);
 pub const BOOL_T: Type = Type::new_unit_sum(2);
 
 /// Initialize a new array of element type `element_ty` of length `size`
-pub fn array_type(size: TypeArg, element_ty: Type) -> Type {
+pub fn array_type(size: impl Into<TypeArg>, element_ty: Type) -> Type {
     let array_def = PRELUDE.get_type("array").unwrap();
     let custom_t = array_def
-        .instantiate(vec![size, TypeArg::Type { ty: element_ty }])
+        .instantiate(vec![size.into(), element_ty.into()])
         .unwrap();
     Type::new_extension(custom_t)
 }
