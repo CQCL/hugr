@@ -127,7 +127,6 @@ class Value(RootModel):
     )
 
     class Config:
-        # Needed to avoid random '\n's in the pydantic description
         json_schema_extra = {"required": ["v"]}
 
 
