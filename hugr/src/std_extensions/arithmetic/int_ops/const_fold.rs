@@ -1201,4 +1201,4 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
 }
 
 #[cfg(test)]
-mod tests;
+mod test;
