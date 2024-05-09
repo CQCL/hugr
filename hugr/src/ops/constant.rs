@@ -149,7 +149,7 @@ pub enum Value {
 /// [CustomSerialized] into a [`Box<dyn CustomConst>`](CustomConst). The [ExtensionValue] is
 /// then produced from the [`Box<dyn [CustomConst]>`](CustomConst).
 ///
-/// In the case where the internal serialised value of a an `CustomSerialized`
+/// In the case where the internal serialised value of a `CustomSerialized`
 /// is another `CustomSerialized` we do not attempt to recurse. This behaviour
 /// may change in future.
 ///
