@@ -211,6 +211,10 @@ pub(crate) mod test_quantum_extension {
 pub(crate) mod test {
     #[allow(unused_imports)]
     use crate::HugrView;
+    use crate::{
+        ops::{OpType, Value},
+        Hugr,
+    };
 
     /// Open a browser page to render a dot string graph.
     ///
@@ -226,5 +230,21 @@ pub(crate) mod test {
     #[cfg(not(ci_run))]
     pub(crate) fn viz_hugr(hugr: &impl HugrView) {
         viz_dotstr(hugr.dot_string());
+    }
+
+    /// Check that a hugr just loads and returns a single expected constant.
+    pub(crate) fn assert_fully_folded(h: &Hugr, expected_value: &Value) {
+        let mut node_count = 0;
+
+        for node in h.children(h.root()) {
+            let op = h.get_optype(node);
+            match op {
+                OpType::Input(_) | OpType::Output(_) | OpType::LoadConstant(_) => node_count += 1,
+                OpType::Const(c) if c.value() == expected_value => node_count += 1,
+                _ => panic!("unexpected op: {:?}", op),
+            }
+        }
+
+        assert_eq!(node_count, 4);
     }
 }

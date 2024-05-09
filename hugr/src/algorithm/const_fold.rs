@@ -212,14 +212,15 @@ mod test {
 
     use super::*;
     use crate::extension::prelude::{sum_with_error, BOOL_T};
-    use crate::extension::PRELUDE;
-    use crate::ops::UnpackTuple;
+    use crate::extension::{ExtensionRegistry, PRELUDE};
+    use crate::ops::{OpType, UnpackTuple};
     use crate::std_extensions::arithmetic;
     use crate::std_extensions::arithmetic::conversions::ConvertOpDef;
     use crate::std_extensions::arithmetic::float_ops::FloatOps;
     use crate::std_extensions::arithmetic::float_types::{ConstF64, FLOAT64_TYPE};
     use crate::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
-    use crate::std_extensions::logic::{self, NaryLogic};
+    use crate::std_extensions::logic::{self, NaryLogic, NotOp};
+    use crate::utils::test::assert_fully_folded;
 
     use rstest::rstest;
 
@@ -274,7 +275,7 @@ mod test {
             .add_dataflow_op(FloatOps::fsub, unpack.outputs())
             .unwrap();
         let to_int = build
-            .add_dataflow_op(ConvertOpDef::trunc_u.with_width(5), sub.outputs())
+            .add_dataflow_op(ConvertOpDef::trunc_u.with_log_width(5), sub.outputs())
             .unwrap();
 
         let reg = ExtensionRegistry::try_new([
@@ -362,19 +363,60 @@ mod test {
         Ok(())
     }
 
-    fn assert_fully_folded(h: &Hugr, expected_value: &Value) {
-        // check the hugr just loads and returns a single const
-        let mut node_count = 0;
+    #[test]
+    fn test_fold_and() {
+        // pseudocode:
+        // x0, x1 := bool(true), bool(true)
+        // x2 := and(x0, x1)
+        // output x2 == true;
+        let mut build = DFGBuilder::new(FunctionType::new(type_row![], vec![BOOL_T])).unwrap();
+        let x0 = build.add_load_const(Value::true_val());
+        let x1 = build.add_load_const(Value::true_val());
+        let x2 = build
+            .add_dataflow_op(NaryLogic::And.with_n_inputs(2), [x0, x1])
+            .unwrap();
+        let reg =
+            ExtensionRegistry::try_new([PRELUDE.to_owned(), logic::EXTENSION.to_owned()]).unwrap();
+        let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
+        constant_fold_pass(&mut h, &reg);
+        let expected = Value::true_val();
+        assert_fully_folded(&h, &expected);
+    }
 
-        for node in h.children(h.root()) {
-            let op = h.get_optype(node);
-            match op {
-                OpType::Input(_) | OpType::Output(_) | OpType::LoadConstant(_) => node_count += 1,
-                OpType::Const(c) if c.value() == expected_value => node_count += 1,
-                _ => panic!("unexpected op: {:?}", op),
-            }
-        }
+    #[test]
+    fn test_fold_or() {
+        // pseudocode:
+        // x0, x1 := bool(true), bool(false)
+        // x2 := or(x0, x1)
+        // output x2 == true;
+        let mut build = DFGBuilder::new(FunctionType::new(type_row![], vec![BOOL_T])).unwrap();
+        let x0 = build.add_load_const(Value::true_val());
+        let x1 = build.add_load_const(Value::false_val());
+        let x2 = build
+            .add_dataflow_op(NaryLogic::Or.with_n_inputs(2), [x0, x1])
+            .unwrap();
+        let reg =
+            ExtensionRegistry::try_new([PRELUDE.to_owned(), logic::EXTENSION.to_owned()]).unwrap();
+        let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
+        constant_fold_pass(&mut h, &reg);
+        let expected = Value::true_val();
+        assert_fully_folded(&h, &expected);
+    }
 
-        assert_eq!(node_count, 4);
+    #[test]
+    fn test_fold_not() {
+        // pseudocode:
+        // x0 := bool(true)
+        // x1 := not(x0)
+        // output x1 == false;
+        let mut build = DFGBuilder::new(FunctionType::new(type_row![], vec![BOOL_T])).unwrap();
+        let x0 = build.add_load_const(Value::true_val());
+        let x1 = build.add_dataflow_op(NotOp, [x0]).unwrap();
+        let reg =
+            ExtensionRegistry::try_new([PRELUDE.to_owned(), logic::EXTENSION.to_owned()]).unwrap();
+        let mut h = build.finish_hugr_with_outputs(x1.outputs(), &reg).unwrap();
+        constant_fold_pass(&mut h, &reg);
+        let expected = Value::false_val();
+        assert_fully_folded(&h, &expected);
     }
 }

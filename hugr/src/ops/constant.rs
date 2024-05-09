@@ -12,7 +12,10 @@ use itertools::Itertools;
 use smol_str::SmolStr;
 use thiserror::Error;
 
-pub use custom::{downcast_equal_consts, CustomConst, CustomSerialized};
+pub use custom::{
+    downcast_equal_consts, get_pair_of_input_values, get_single_input_value, CustomConst,
+    CustomSerialized,
+};
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 /// An operation returning a constant value.
