@@ -231,7 +231,7 @@ impl CustomSerialized {
         deserialize_dyn_custom_const(self.value.clone()).unwrap_or_else(|_| Box::new(self))
     }
 
-    /// Attempts to desrialize the value in self into a `CC`. Propagates failure.
+    /// Attempts to deserialize the value in self into a `CC`. Propagates failure.
     ///
     /// Note that if the inner value is a [Self] we do not recursively
     /// deserialize it. In particular if that inner value were a [Self] whose
