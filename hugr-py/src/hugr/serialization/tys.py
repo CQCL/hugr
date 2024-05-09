@@ -190,7 +190,11 @@ class GeneralSum(ConfiguredBaseModel):
 
 
 class SumType(RootModel):
-    root: Union[UnitSum, GeneralSum] = Field(discriminator="s")
+    root: Annotated[Union[UnitSum, GeneralSum],Field(discriminator="s")]
+
+    @property
+    def t(self) -> str:
+        return self.root.t
 
     class Config:
         json_schema_extra = {"required": ["s"]}
@@ -317,8 +321,7 @@ class Type(RootModel):
 
     root: Annotated[
         Qubit | Variable | USize | FunctionType | Array | SumType | Opaque | Alias,
-        WrapValidator(_json_custom_error_validator),
-    ] = Field(discriminator="t")
+        WrapValidator(_json_custom_error_validator),Field(discriminator="t")]
 
     class Config:
         json_schema_extra = {"required": ["t"]}
