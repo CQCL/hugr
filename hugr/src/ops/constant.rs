@@ -132,7 +132,7 @@ pub enum Value {
     },
 }
 
-/// An opaque newtype awround a [`Box<dyn CustomConst>`](CustomConst).
+/// An opaque newtype around a [`Box<dyn CustomConst>`](CustomConst).
 ///
 /// This type has special serialization behaviour in order to support
 /// serialisation and deserialisation of unknown impls of [CustomConst].
