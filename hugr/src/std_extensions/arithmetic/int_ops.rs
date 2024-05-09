@@ -116,18 +116,8 @@ impl MakeOpDef for IntOpDef {
                 IOValidator { f_ge_s: true },
             )
             .into(),
-            itobool => int_polytype(
-                0,
-                vec![int_type(TypeArg::BoundedNat { n: 0 })],
-                type_row![BOOL_T],
-            )
-            .into(),
-            ifrombool => int_polytype(
-                0,
-                type_row![BOOL_T],
-                vec![int_type(TypeArg::BoundedNat { n: 0 })],
-            )
-            .into(),
+            itobool => int_polytype(0, vec![int_type(0)], type_row![BOOL_T]).into(),
+            ifrombool => int_polytype(0, type_row![BOOL_T], vec![int_type(0)]).into(),
             ieq | ine | ilt_u | ilt_s | igt_u | igt_s | ile_u | ile_s | ige_u | ige_s => {
                 int_polytype(1, vec![int_tv(0); 2], type_row![BOOL_T]).into()
             }
@@ -303,15 +293,15 @@ impl MakeExtensionOp for IntOpType {
     fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError> {
         let def = IntOpDef::from_def(ext_op.def())?;
         let args = ext_op.args();
-        let log_widths: Vec<u8> = args.iter().map(|a| get_log_width(a).unwrap()).collect();
+        let log_widths: Vec<u8> = args
+            .iter()
+            .map(|a| get_log_width(a).map_err(|_| SignatureError::InvalidTypeArgs))
+            .collect::<Result<_, _>>()?;
         Ok(Self { def, log_widths })
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
-        self.log_widths
-            .iter()
-            .map(|&n| TypeArg::BoundedNat { n: n as u64 })
-            .collect()
+        self.log_widths.iter().map(|&n| (n as u64).into()).collect()
     }
 }
 
@@ -368,9 +358,6 @@ mod test {
         }
     }
 
-    const fn ta(n: u64) -> TypeArg {
-        TypeArg::BoundedNat { n }
-    }
     #[test]
     fn test_binary_signatures() {
         assert_eq!(
@@ -379,7 +366,7 @@ mod test {
                 .to_extension_op()
                 .unwrap()
                 .signature(),
-            FunctionType::new(vec![int_type(ta(3))], vec![int_type(ta(4))],)
+            FunctionType::new(vec![int_type(3)], vec![int_type(4)],)
         );
         assert_eq!(
             IntOpDef::iwiden_s
@@ -387,7 +374,7 @@ mod test {
                 .to_extension_op()
                 .unwrap()
                 .signature(),
-            FunctionType::new(vec![int_type(ta(3))], vec![int_type(ta(3))],)
+            FunctionType::new(vec![int_type(3)], vec![int_type(3)],)
         );
         assert_eq!(
             IntOpDef::inarrow_s
@@ -395,10 +382,7 @@ mod test {
                 .to_extension_op()
                 .unwrap()
                 .signature(),
-            FunctionType::new(
-                vec![int_type(ta(3))],
-                vec![sum_with_error(int_type(ta(3))).into()],
-            )
+            FunctionType::new(vec![int_type(3)], vec![sum_with_error(int_type(3)).into()],)
         );
         assert!(
             IntOpDef::iwiden_u
@@ -414,10 +398,7 @@ mod test {
                 .to_extension_op()
                 .unwrap()
                 .signature(),
-            FunctionType::new(
-                vec![int_type(ta(2))],
-                vec![sum_with_error(int_type(ta(1))).into()],
-            )
+            FunctionType::new(vec![int_type(2)], vec![sum_with_error(int_type(1)).into()],)
         );
 
         assert!(IntOpDef::inarrow_u
