@@ -202,11 +202,11 @@ source node, to an incoming port of the target node.
 
 #### Static edges (`Const` and `Function`)
 
-A Static edge represents dataflow that is statically knowable - i.e.
-the source is a compile-time constant defined in the program. Hence, the types on these edges
-are classical. Only a few nodes may be
-sources (`FuncDefn`, `FuncDecl` and `Const`) and targets (`Call` and `LoadConstant`) of
-these edges; see [operations](#node-operations).
+A Static edge represents dataflow that is statically knowable - i.e.  the source
+is a compile-time constant defined in the program. Hence, the types on these
+edges are classical. Only a few nodes may be sources (`FuncDefn`, `FuncDecl` and
+`Const`) and targets (`Call`, `LoadConstant`, and `LoadFunction`) of these
+edges; see [operations](#node-operations).
 
 #### `Order` edges
 
@@ -289,6 +289,10 @@ the following basic dataflow operations are available (in addition to the
 - `LoadConstant<T>`: has an incoming `Const<T>` edge, where `T` is a `CopyableType`, and a
   `Value<T>` output, used to load a static constant into the local
   dataflow graph.
+- `LoadFunction`: has an incoming `Function` edge and a `Value<FunctionType>`
+  output. The `LoadFunction` node specifies any type arguments to the function
+  in the node weight, and the `FunctionType` in the output edge matches the
+  (type-instantiated) function in the incoming `Function` edge.
 - `identity<T>`: pass-through, no operation is performed.
 - `DFG`: A nested dataflow graph.
   These nodes are parents in the hierarchy.
@@ -2006,12 +2010,13 @@ including `Module`.
 | Node type      | `Value` | `Order` | `Const` | `Function` | `ControlFlow` | `Hierarchy` | Children |
 |----------------|---------|---------|---------|------------|---------------|-------------|----------|
 | Root           | 0, 0    | 0, 0    | 0, 0    | 0, 0       | 0, 0          | 0, ✱        |          |
-| `FuncDefn`     | 0, 0    | 0, 0    | 0, 0    | 0, *       | 0, 0          | 1, +        | DSG      |
-| `FuncDecl`     | 0, 0    | 0, 0    | 0, 0    | 0, *       | 0, 0          | 1, 0        |          |
+| `FuncDefn`     | 0, 0    | 0, 0    | 0, 0    | 0, ✱       | 0, 0          | 1, +        | DSG      |
+| `FuncDecl`     | 0, 0    | 0, 0    | 0, 0    | 0, ✱       | 0, 0          | 1, 0        |          |
 | `AliasDefn`    | 0, 0    | 0, 0    | 0, 0    | 0, 0       | 0, 0          | 1, 0        |          |
 | `AliasDecl`    | 0, 0    | 0, 0    | 0, 0    | 0, 0       | 0, 0          | 1, 0        |          |
 | `Const`        | 0, 0    | 0, 0    | 0, ✱    | 0, 0       | 0, 0          | 1, 0        |          |
-| `LoadConstant` | 0, 1    | +, ✱    | 1, 0    | 0, 0       | 0, 0          | 1, 0        |          |
+| `LoadConstant` | 0, 1    | ✱, ✱    | 1, 0    | 0, 0       | 0, 0          | 1, 0        |          |
+| `LoadFunction` | 0, 1    | ✱, ✱    | 0, 0    | 1, 0       | 0, 0          | 1, 0        |          |
 | `Input`        | 0, ✱    | 0, ✱    | 0, 0    | 0, 0       | 0, 0          | 1, 0        |          |
 | `Output`       | ✱, 0    | ✱, 0    | 0, 0    | 0, 0       | 0, 0          | 1, 0        |          |
 | `Call`         | ✱, ✱    | ✱, ✱    | 0, 0    | 1, 0       | 0, 0          | 1, 0        |          |
