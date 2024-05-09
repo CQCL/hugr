@@ -11,9 +11,9 @@ pub(super) enum SerSimpleType {
     Q,
     I,
     G(Box<FunctionType>),
-    Sum { st: SumType },
+    Sum(SumType),
     Array { inner: Box<SerSimpleType>, len: u64 },
-    Opaque { o: CustomType },
+    Opaque(CustomType),
     Alias(AliasDecl),
     V { i: usize, b: TypeBound },
 }
@@ -29,11 +29,11 @@ impl From<Type> for SerSimpleType {
         // TODO short circuiting for array.
         let Type(value, _) = value;
         match value {
-            TypeEnum::Extension(o) => SerSimpleType::Opaque { o },
+            TypeEnum::Extension(o) => SerSimpleType::Opaque(o),
             TypeEnum::Alias(a) => SerSimpleType::Alias(a),
             TypeEnum::Function(sig) => SerSimpleType::G(sig),
             TypeEnum::Variable(i, b) => SerSimpleType::V { i, b },
-            TypeEnum::Sum(st) => SerSimpleType::Sum { st },
+            TypeEnum::Sum(st) => SerSimpleType::Sum(st),
         }
     }
 }
@@ -44,11 +44,11 @@ impl From<SerSimpleType> for Type {
             SerSimpleType::Q => QB_T,
             SerSimpleType::I => USIZE_T,
             SerSimpleType::G(sig) => Type::new_function(*sig),
-            SerSimpleType::Sum { st } => st.into(),
+            SerSimpleType::Sum(st) => st.into(),
             SerSimpleType::Array { inner, len } => {
                 array_type(TypeArg::BoundedNat { n: len }, (*inner).into())
             }
-            SerSimpleType::Opaque { o } => Type::new_extension(o),
+            SerSimpleType::Opaque(o) => Type::new_extension(o),
             SerSimpleType::Alias(a) => Type::new_alias(a),
             SerSimpleType::V { i, b } => Type::new_var_use(i, b),
         }

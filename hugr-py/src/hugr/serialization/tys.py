@@ -48,8 +48,8 @@ class ConfiguredBaseModel(BaseModel):
     model_config = default_model_config
 
     @classmethod
-    def set_model_config(cls, config: ConfigDict):
-        cls.model_config = config
+    def update_model_config(cls, config: ConfigDict):
+        cls.model_config.update(config)
 
 
 # --------------------------------------------
@@ -98,6 +98,9 @@ class TypeParam(RootModel):
         | ExtensionsParam,
         WrapValidator(_json_custom_error_validator),
     ] = Field(discriminator="tp")
+
+    class Config:
+        json_schema_extra = {"required": ["tp"]}
 
 
 # ------------------------------------------
@@ -150,6 +153,9 @@ class TypeArg(RootModel):
         WrapValidator(_json_custom_error_validator),
     ] = Field(discriminator="tya")
 
+    class Config:
+        json_schema_extra = {"required": ["tya"]}
+
 
 # --------------------------------------------
 # --------------- Container ------------------
@@ -170,6 +176,7 @@ class Array(MultiContainer):
 class UnitSum(ConfiguredBaseModel):
     """Simple sum type where all variants are empty tuples."""
 
+    t: Literal["Sum"] = "Sum"
     s: Literal["Unit"] = "Unit"
     size: int
 
@@ -177,17 +184,21 @@ class UnitSum(ConfiguredBaseModel):
 class GeneralSum(ConfiguredBaseModel):
     """General sum type that explicitly stores the types of the variants."""
 
+    t: Literal["Sum"] = "Sum"
     s: Literal["General"] = "General"
     rows: list["TypeRow"]
 
 
 class SumType(RootModel):
-    root: Union[UnitSum, GeneralSum] = Field(discriminator="s")
+    root: Annotated[Union[UnitSum, GeneralSum], Field(discriminator="s")]
 
+    # This seems to be required for nested discriminated unions to work
+    @property
+    def t(self) -> str:
+        return self.root.t
 
-class TaggedSumType(ConfiguredBaseModel):
-    t: Literal["Sum"] = "Sum"
-    st: SumType
+    class Config:
+        json_schema_extra = {"required": ["s"]}
 
 
 # ----------------------------------------------
@@ -280,15 +291,11 @@ class TypeBound(Enum):
 class Opaque(ConfiguredBaseModel):
     """An opaque Type that can be downcasted by the extensions that define it."""
 
+    t: Literal["Opaque"] = "Opaque"
     extension: ExtensionId
     id: str  # Unique identifier of the opaque type.
     args: list[TypeArg]
     bound: TypeBound
-
-
-class TaggedOpaque(ConfiguredBaseModel):
-    t: Literal["Opaque"] = "Opaque"
-    o: Opaque
 
 
 class Alias(ConfiguredBaseModel):
@@ -314,16 +321,13 @@ class Type(RootModel):
     """A HUGR type."""
 
     root: Annotated[
-        Qubit
-        | Variable
-        | USize
-        | FunctionType
-        | Array
-        | TaggedSumType
-        | TaggedOpaque
-        | Alias,
+        Qubit | Variable | USize | FunctionType | Array | SumType | Opaque | Alias,
         WrapValidator(_json_custom_error_validator),
-    ] = Field(discriminator="t")
+        Field(discriminator="t"),
+    ]
+
+    class Config:
+        json_schema_extra = {"required": ["t"]}
 
 
 # -------------------------------------------
@@ -365,11 +369,9 @@ def model_rebuild(
     config: ConfigDict = ConfigDict(),
     **kwargs,
 ):
-    new_config = default_model_config.copy()
-    new_config.update(config)
     for c in classes.values():
         if issubclass(c, ConfiguredBaseModel):
-            c.set_model_config(new_config)
+            c.update_model_config(config)
             c.model_rebuild(**kwargs)
 
 

@@ -75,7 +75,7 @@ pub fn fold_leaf_op(op: &OpType, consts: &[(IncomingPort, Value)]) -> ConstFoldR
 /// Generate a graph that loads and outputs `consts` in order, validating
 /// against `reg`.
 fn const_graph(consts: Vec<Value>, reg: &ExtensionRegistry) -> Hugr {
-    let const_types = consts.iter().map(Value::const_type).collect_vec();
+    let const_types = consts.iter().map(Value::get_type).collect_vec();
     let mut b = DFGBuilder::new(FunctionType::new(type_row![], const_types)).unwrap();
 
     let outputs = consts
@@ -338,7 +338,7 @@ mod test {
         let list: Value = ListValue::new(BOOL_T, [Value::unit_sum(0, 1).unwrap()]).into();
         let mut build = DFGBuilder::new(FunctionType::new(
             type_row![],
-            vec![list.const_type().clone()],
+            vec![list.get_type().clone()],
         ))
         .unwrap();
 

@@ -70,43 +70,32 @@ class FuncDecl(BaseOp):
     signature: PolyFuncType
 
 
-CustomConst = Any  # TODO
+class CustomConst(ConfiguredBaseModel):
+    c: str
+    v: Any
 
 
 class ExtensionValue(ConfiguredBaseModel):
     """An extension constant value, that can check it is of a given [CustomType]."""
 
-    c: Literal["Extension"] = Field("Extension", title="ValueTag")
-    e: CustomConst = Field(title="CustomConst")
-
-    class Config:
-        json_schema_extra = {
-            "required": ["c", "e"],
-        }
+    v: Literal["Extension"] = Field("Extension", title="ValueTag")
+    extensions: ExtensionSet
+    typ: Type
+    value: CustomConst
 
 
 class FunctionValue(ConfiguredBaseModel):
     """A higher-order function value."""
 
-    c: Literal["Function"] = Field("Function", title="ValueTag")
+    v: Literal["Function"] = Field("Function", title="ValueTag")
     hugr: Any  # TODO
-
-    class Config:
-        json_schema_extra = {
-            "required": ["c", "hugr"],
-        }
 
 
 class TupleValue(ConfiguredBaseModel):
     """A constant tuple value."""
 
-    c: Literal["Tuple"] = Field("Tuple", title="ValueTag")
+    v: Literal["Tuple"] = Field("Tuple", title="ValueTag")
     vs: list["Value"]
-
-    class Config:
-        json_schema_extra = {
-            "required": ["c", "vs"],
-        }
 
 
 class SumValue(ConfiguredBaseModel):
@@ -115,7 +104,7 @@ class SumValue(ConfiguredBaseModel):
     For any Sum type where this value meets the type of the variant indicated by the tag
     """
 
-    c: Literal["Sum"] = Field("Sum", title="ValueTag")
+    v: Literal["Sum"] = Field("Sum", title="ValueTag")
     tag: int
     typ: SumType
     vs: list["Value"]
@@ -127,7 +116,6 @@ class SumValue(ConfiguredBaseModel):
                 "A Sum variant For any Sum type where this value meets the type "
                 "of the variant indicated by the tag."
             ),
-            "required": ["c", "tag", "typ", "vs"],
         }
 
 
@@ -135,8 +123,11 @@ class Value(RootModel):
     """A constant Value."""
 
     root: ExtensionValue | FunctionValue | TupleValue | SumValue = Field(
-        discriminator="c"
+        discriminator="v"
     )
+
+    class Config:
+        json_schema_extra = {"required": ["v"]}
 
 
 class Const(BaseOp):
@@ -144,11 +135,6 @@ class Const(BaseOp):
 
     op: Literal["Const"] = "Const"
     v: Value = Field()
-
-    class Config:
-        json_schema_extra = {
-            "required": ["op", "parent", "v"],
-        }
 
 
 # -----------------------------------------------
@@ -163,7 +149,7 @@ class DataflowBlock(BaseOp):
     op: Literal["DataflowBlock"] = "DataflowBlock"
     inputs: TypeRow = Field(default_factory=list)
     other_outputs: TypeRow = Field(default_factory=list)
-    sum_rows: list[TypeRow] = Field(default_factory=list)
+    sum_rows: list[TypeRow]
     extension_delta: ExtensionSet = Field(default_factory=list)
 
     def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
@@ -173,26 +159,18 @@ class DataflowBlock(BaseOp):
     def insert_child_dfg_signature(self, inputs: TypeRow, outputs: TypeRow) -> None:
         self.inputs = inputs
         pred = outputs[0].root
-        assert isinstance(pred, tys.TaggedSumType)
-        if isinstance(pred.st.root, tys.UnitSum):
-            self.sum_rows = [[] for _ in range(pred.st.root.size)]
+        assert isinstance(pred, tys.SumType)
+        if isinstance(pred.root, tys.UnitSum):
+            self.sum_rows = [[] for _ in range(pred.root.size)]
         else:
             self.sum_rows = []
-            for variant in pred.st.root.rows:
+            for variant in pred.root.rows:
                 self.sum_rows.append(variant)
         self.other_outputs = outputs[1:]
 
     class Config:
         # Needed to avoid random '\n's in the pydantic description
         json_schema_extra = {
-            "required": [
-                "parent",
-                "op",
-                "inputs",
-                "other_outputs",
-                "sum_rows",
-                "extension_delta",
-            ],
             "description": "A CFG basic block node. The signature is that of the internal Dataflow graph.",
         }
 
@@ -205,9 +183,9 @@ class ExitBlock(BaseOp):
     cfg_outputs: TypeRow
 
     class Config:
-        # Needed to avoid random '\n's in the pydantic description
         json_schema_extra = {
-            "description": "The single exit node of the CFG, has no children, stores the types of the CFG node output."
+            # Needed to avoid random '\n's in the pydantic description
+            "description": "The single exit node of the CFG, has no children, stores the types of the CFG node output.",
         }
 
 
@@ -334,8 +312,8 @@ class Conditional(DataflowOp):
         # First port is a predicate, i.e. a sum of tuple types. We need to unpack
         # those into a list of type rows
         pred = in_types[0]
-        assert isinstance(pred.root, tys.TaggedSumType)
-        sum = pred.root.st.root
+        assert isinstance(pred.root, tys.SumType)
+        sum = pred.root.root
         if isinstance(sum, tys.UnitSum):
             self.sum_rows = [[] for _ in range(sum.size)]
         else:
@@ -512,6 +490,9 @@ class OpType(RootModel):
         | AliasDecl
         | AliasDefn
     ) = Field(discriminator="op")
+
+    class Config:
+        json_schema_extra = {"required": ["parent", "op"]}
 
 
 # --------------------------------------

@@ -25,6 +25,3 @@ class TestingHugr(ConfiguredBaseModel):
         my_classes = dict(ops_classes)
         my_classes[cls.__name__] = cls
         model_rebuild(my_classes, config=config, **kwargs)
-
-    class Config:
-        title = "HugrTesting"

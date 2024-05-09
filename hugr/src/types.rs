@@ -249,7 +249,6 @@ impl TypeEnum {
 ///
 /// let sum = Type::new_sum([type_row![], type_row![]]);
 /// assert_eq!(sum.least_upper_bound(), TypeBound::Eq);
-///
 /// ```
 ///
 /// ```
@@ -257,9 +256,7 @@ impl TypeEnum {
 ///
 /// let func_type = Type::new_function(FunctionType::new_endo(vec![]));
 /// assert_eq!(func_type.least_upper_bound(), TypeBound::Copyable);
-///
 /// ```
-///
 pub struct Type(TypeEnum, TypeBound);
 
 fn validate_each<'a>(

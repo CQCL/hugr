@@ -84,7 +84,7 @@ impl CustomConst for ListValue {
 
         // check all values are instances of the element type
         for v in &self.0 {
-            if v.const_type() != *ty {
+            if v.get_type() != *ty {
                 return Err(error());
             }
         }

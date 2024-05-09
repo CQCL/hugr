@@ -131,7 +131,6 @@
 //! let serialized = serde_json::to_string(&h).unwrap();
 //! println!("{}", serialized);
 //! ```
-//!
 
 // Unstable check, may cause false positives.
 // https://github.com/rust-lang/rust-clippy/issues/5112

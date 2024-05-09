@@ -247,7 +247,7 @@
         },
         "Call": {
             "additionalProperties": true,
-            "description": "Call a function directly.\n\nThe first port is connected to the def/declare of the function being called\ndirectly, with a `ConstE<Graph>` edge. The signature of the remaining ports matches\nthe function being called.",
+            "description": "Operation to call a function directly. The first port is connected to the def/declare of the function being called directly, with a `Static<FunctionType>` edge. The signature of the remaining ports matches the function being called.",
             "properties": {
                 "parent": {
                     "title": "Parent",
@@ -498,9 +498,27 @@
             "title": "Const",
             "type": "object"
         },
+        "CustomConst": {
+            "additionalProperties": true,
+            "properties": {
+                "c": {
+                    "title": "C",
+                    "type": "string"
+                },
+                "v": {
+                    "title": "V"
+                }
+            },
+            "required": [
+                "c",
+                "v"
+            ],
+            "title": "CustomConst",
+            "type": "object"
+        },
         "CustomOp": {
             "additionalProperties": true,
-            "description": "A user-defined operation that can be downcasted by the extensions that define\nit.",
+            "description": "A user-defined operation that can be downcasted by the extensions that define it.",
             "properties": {
                 "parent": {
                     "title": "Parent",
@@ -606,7 +624,7 @@
         },
         "DataflowBlock": {
             "additionalProperties": true,
-            "description": "A CFG basic block node. The signature is that of the internal Dataflow\ngraph.",
+            "description": "A CFG basic block node. The signature is that of the internal Dataflow graph.",
             "properties": {
                 "parent": {
                     "title": "Parent",
@@ -669,14 +687,15 @@
                 }
             },
             "required": [
-                "parent"
+                "parent",
+                "sum_rows"
             ],
             "title": "DataflowBlock",
             "type": "object"
         },
         "ExitBlock": {
             "additionalProperties": true,
-            "description": "The single exit node of the CFG, has no children, stores the types of\nthe CFG node output.",
+            "description": "The single exit node of the CFG, has no children, stores the types of the CFG node output.",
             "properties": {
                 "parent": {
                     "title": "Parent",
@@ -725,7 +744,7 @@
             "additionalProperties": true,
             "description": "An extension constant value, that can check it is of a given [CustomType].",
             "properties": {
-                "c": {
+                "v": {
                     "const": "Extension",
                     "default": "Extension",
                     "enum": [
@@ -734,12 +753,24 @@
                     "title": "ValueTag",
                     "type": "string"
                 },
-                "e": {
-                    "title": "CustomConst"
+                "extensions": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "title": "Extensions",
+                    "type": "array"
+                },
+                "typ": {
+                    "$ref": "#/$defs/Type"
+                },
+                "value": {
+                    "$ref": "#/$defs/CustomConst"
                 }
             },
             "required": [
-                "e"
+                "extensions",
+                "typ",
+                "value"
             ],
             "title": "ExtensionValue",
             "type": "object"
@@ -884,7 +915,7 @@
         },
         "FunctionType": {
             "additionalProperties": true,
-            "description": "A graph encoded as a value. It contains a concrete signature and a set of\nrequired resources.",
+            "description": "A graph encoded as a value. It contains a concrete signature and a set of required resources.",
             "properties": {
                 "t": {
                     "const": "G",
@@ -928,7 +959,7 @@
             "additionalProperties": true,
             "description": "A higher-order function value.",
             "properties": {
-                "c": {
+                "v": {
                     "const": "Function",
                     "default": "Function",
                     "enum": [
@@ -951,6 +982,15 @@
             "additionalProperties": true,
             "description": "General sum type that explicitly stores the types of the variants.",
             "properties": {
+                "t": {
+                    "const": "Sum",
+                    "default": "Sum",
+                    "enum": [
+                        "Sum"
+                    ],
+                    "title": "T",
+                    "type": "string"
+                },
                 "s": {
                     "const": "General",
                     "default": "General",
@@ -1432,12 +1472,25 @@
                     "$ref": "#/$defs/AliasDefn"
                 }
             ],
+            "required": [
+                "parent",
+                "op"
+            ],
             "title": "OpType"
         },
         "Opaque": {
             "additionalProperties": true,
             "description": "An opaque Type that can be downcasted by the extensions that define it.",
             "properties": {
+                "t": {
+                    "const": "Opaque",
+                    "default": "Opaque",
+                    "enum": [
+                        "Opaque"
+                    ],
+                    "title": "T",
+                    "type": "string"
+                },
                 "extension": {
                     "title": "Extension",
                     "type": "string"
@@ -1562,7 +1615,7 @@
         },
         "PolyFuncType": {
             "additionalProperties": true,
-            "description": "A polymorphic type scheme, i.e. of a FuncDecl, FuncDefn or OpDef.\n(Nodes/operations in the Hugr are not polymorphic.)",
+            "description": "A polymorphic type scheme, i.e. of a FuncDecl, FuncDefn or OpDef.  (Nodes/operations in the Hugr are not polymorphic.)",
             "properties": {
                 "params": {
                     "items": {
@@ -1641,13 +1694,16 @@
                     "$ref": "#/$defs/GeneralSum"
                 }
             ],
+            "required": [
+                "s"
+            ],
             "title": "SumType"
         },
         "SumValue": {
             "additionalProperties": true,
-            "description": "A Sum variant\n\nFor any Sum type where this value meets the type of the variant indicated by the tag",
+            "description": "A Sum variant For any Sum type where this value meets the type of the variant indicated by the tag.",
             "properties": {
-                "c": {
+                "v": {
                     "const": "Sum",
                     "default": "Sum",
                     "enum": [
@@ -1732,50 +1788,6 @@
                 "variants"
             ],
             "title": "Tag",
-            "type": "object"
-        },
-        "TaggedOpaque": {
-            "additionalProperties": true,
-            "properties": {
-                "t": {
-                    "const": "Opaque",
-                    "default": "Opaque",
-                    "enum": [
-                        "Opaque"
-                    ],
-                    "title": "T",
-                    "type": "string"
-                },
-                "o": {
-                    "$ref": "#/$defs/Opaque"
-                }
-            },
-            "required": [
-                "o"
-            ],
-            "title": "TaggedOpaque",
-            "type": "object"
-        },
-        "TaggedSumType": {
-            "additionalProperties": true,
-            "properties": {
-                "t": {
-                    "const": "Sum",
-                    "default": "Sum",
-                    "enum": [
-                        "Sum"
-                    ],
-                    "title": "T",
-                    "type": "string"
-                },
-                "st": {
-                    "$ref": "#/$defs/SumType"
-                }
-            },
-            "required": [
-                "st"
-            ],
-            "title": "TaggedSumType",
             "type": "object"
         },
         "TailLoop": {
@@ -1868,7 +1880,7 @@
             "additionalProperties": true,
             "description": "A constant tuple value.",
             "properties": {
-                "c": {
+                "v": {
                     "const": "Tuple",
                     "default": "Tuple",
                     "enum": [
@@ -1899,9 +1911,9 @@
                     "Array": "#/$defs/Array",
                     "G": "#/$defs/FunctionType",
                     "I": "#/$defs/USize",
-                    "Opaque": "#/$defs/TaggedOpaque",
+                    "Opaque": "#/$defs/Opaque",
                     "Q": "#/$defs/Qubit",
-                    "Sum": "#/$defs/TaggedSumType",
+                    "Sum": "#/$defs/SumType",
                     "V": "#/$defs/Variable"
                 },
                 "propertyName": "t"
@@ -1923,14 +1935,17 @@
                     "$ref": "#/$defs/Array"
                 },
                 {
-                    "$ref": "#/$defs/TaggedSumType"
+                    "$ref": "#/$defs/SumType"
                 },
                 {
-                    "$ref": "#/$defs/TaggedOpaque"
+                    "$ref": "#/$defs/Opaque"
                 },
                 {
                     "$ref": "#/$defs/Alias"
                 }
+            ],
+            "required": [
+                "t"
             ],
             "title": "Type"
         },
@@ -1966,6 +1981,9 @@
                 {
                     "$ref": "#/$defs/VariableArg"
                 }
+            ],
+            "required": [
+                "tya"
             ],
             "title": "TypeArg"
         },
@@ -2010,6 +2028,9 @@
                 {
                     "$ref": "#/$defs/ExtensionsParam"
                 }
+            ],
+            "required": [
+                "tp"
             ],
             "title": "TypeParam"
         },
@@ -2078,6 +2099,15 @@
             "additionalProperties": true,
             "description": "Simple sum type where all variants are empty tuples.",
             "properties": {
+                "t": {
+                    "const": "Sum",
+                    "default": "Sum",
+                    "enum": [
+                        "Sum"
+                    ],
+                    "title": "T",
+                    "type": "string"
+                },
                 "s": {
                     "const": "Unit",
                     "default": "Unit",
@@ -2153,7 +2183,7 @@
                     "Sum": "#/$defs/SumValue",
                     "Tuple": "#/$defs/TupleValue"
                 },
-                "propertyName": "c"
+                "propertyName": "v"
             },
             "oneOf": [
                 {
@@ -2168,6 +2198,9 @@
                 {
                     "$ref": "#/$defs/SumValue"
                 }
+            ],
+            "required": [
+                "v"
             ],
             "title": "Value"
         },

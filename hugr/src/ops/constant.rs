@@ -8,7 +8,9 @@ use crate::extension::ExtensionSet;
 use crate::types::{CustomType, EdgeKind, FunctionType, SumType, SumTypeError, Type};
 use crate::{Hugr, HugrView};
 
+use delegate::delegate;
 use itertools::Itertools;
+use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 use thiserror::Error;
 
@@ -38,15 +40,45 @@ impl Const {
         &self.value
     }
 
-    /// Returns a reference to the type of this constant.
-    pub fn const_type(&self) -> Type {
-        self.value.const_type()
+    delegate! {
+        to self.value {
+            /// Returns the type of this constant.
+            pub fn get_type(&self) -> Type;
+        }
     }
 }
 
 impl From<Value> for Const {
     fn from(value: Value) -> Self {
         Self::new(value)
+    }
+}
+
+impl NamedOp for Const {
+    fn name(&self) -> OpName {
+        self.value().name()
+    }
+}
+
+impl StaticTag for Const {
+    const TAG: OpTag = OpTag::Const;
+}
+
+impl OpTrait for Const {
+    fn description(&self) -> &str {
+        "Constant value"
+    }
+
+    fn extension_delta(&self) -> ExtensionSet {
+        self.value().extension_reqs()
+    }
+
+    fn tag(&self) -> OpTag {
+        <Self as StaticTag>::TAG
+    }
+
+    fn static_output(&self) -> Option<EdgeKind> {
+        Some(EdgeKind::Const(self.get_type()))
     }
 }
 
@@ -63,12 +95,13 @@ impl AsRef<Value> for Const {
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-#[serde(tag = "c")]
+#[serde(tag = "v")]
 /// A value that can be stored as a static constant. Representing core types and
 /// extension types.
 pub enum Value {
     /// An extension constant value, that can check it is of a given [CustomType].
     Extension {
+        #[serde(flatten)]
         /// The custom constant value.
         e: ExtensionValue,
     },
@@ -99,20 +132,92 @@ pub enum Value {
     },
 }
 
-/// Boxed [`CustomConst`] trait object.
+/// An opaque newtype around a [`Box<dyn CustomConst>`](CustomConst).
 ///
-/// Use [`Value::extension`] to create a new variant of this type.
+/// This type has special serialization behaviour in order to support
+/// serialisation and deserialisation of unknown impls of [CustomConst].
 ///
-/// This is required to avoid <https://github.com/rust-lang/rust/issues/78808> in
-/// [`Value::Extension`], while implementing a transparent encoding into a
-/// `CustomConst`.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[serde(transparent)]
-pub struct ExtensionValue(pub(super) Box<dyn CustomConst>);
+/// During serialization we first serialize the internal [`dyn` CustomConst](CustomConst)
+/// into a [serde_yaml::Value]. We then create a [CustomSerialized] wrapping
+/// that value.  That [CustomSerialized] is then serialized in place of the
+/// [ExtensionValue].
+///
+/// During deserialization, first we deserialize a [CustomSerialized]. We
+/// attempt to deserialize the internal [serde_yaml::Value] using the [`Box<dyn
+/// CustomConst>`](CustomConst) impl. This will fail if the appropriate `impl CustomConst`
+/// is not linked into the running program, in which case we coerce the
+/// [CustomSerialized] into a [`Box<dyn CustomConst>`](CustomConst). The [ExtensionValue] is
+/// then produced from the [`Box<dyn [CustomConst]>`](CustomConst).
+///
+/// In the case where the internal serialised value of a `CustomSerialized`
+/// is another `CustomSerialized` we do not attempt to recurse. This behaviour
+/// may change in future.
+///
+/// ```rust
+/// use serde::{Serialize,Deserialize};
+/// use hugr::{
+///   types::Type,ops::constant::{ExtensionValue, ValueName, CustomConst, CustomSerialized},
+///   extension::{ExtensionSet, prelude::{USIZE_T, ConstUsize}},
+///   std_extensions::arithmetic::int_types};
+/// use serde_json::json;
+///
+/// let expected_json = json!({
+///     "extensions": ["prelude"],
+///     "typ": USIZE_T,
+///     "value": {'c': "ConstUsize", 'v': 1}
+/// });
+/// let ev = ExtensionValue::new(ConstUsize::new(1));
+/// assert_eq!(&serde_json::to_value(&ev).unwrap(), &expected_json);
+/// assert_eq!(ev, serde_json::from_value(expected_json).unwrap());
+///
+/// let ev = ExtensionValue::new(CustomSerialized::new(USIZE_T.clone(), serde_yaml::Value::Null, ExtensionSet::default()));
+/// let expected_json = json!({
+///     "extensions": [],
+///     "typ": USIZE_T,
+///     "value": null
+/// });
+///
+/// assert_eq!(&serde_json::to_value(ev.clone()).unwrap(), &expected_json);
+/// assert_eq!(ev, serde_json::from_value(expected_json).unwrap());
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExtensionValue {
+    #[serde(flatten, with = "self::custom::serde_extension_value")]
+    v: Box<dyn CustomConst>,
+}
+
+impl ExtensionValue {
+    /// Create a new [`ExtensionValue`] from any [`CustomConst`].
+    pub fn new(cc: impl CustomConst) -> Self {
+        Self { v: Box::new(cc) }
+    }
+
+    /// Returns a reference to the internal [`CustomConst`].
+    pub fn value(&self) -> &dyn CustomConst {
+        self.v.as_ref()
+    }
+
+    delegate! {
+        to self.value() {
+            /// Returns the type of the internal [`CustomConst`].
+            pub fn get_type(&self) -> Type;
+            /// An identifier of the internal [`CustomConst`].
+            pub fn name(&self) -> ValueName;
+            /// The extension(s) defining the internal [`CustomConst`].
+            pub fn extension_reqs(&self) -> ExtensionSet;
+        }
+    }
+}
+
+impl<CC: CustomConst> From<CC> for ExtensionValue {
+    fn from(x: CC) -> Self {
+        Self::new(x)
+    }
+}
 
 impl PartialEq for ExtensionValue {
     fn eq(&self, other: &Self) -> bool {
-        self.0.equal_consts(other.0.as_ref())
+        self.value().equal_consts(other.value())
     }
 }
 
@@ -169,11 +274,11 @@ fn mono_fn_type(h: &Hugr) -> Result<FunctionType, ConstTypeError> {
 }
 
 impl Value {
-    /// Returns a reference to the type of this [`Value`].
-    pub fn const_type(&self) -> Type {
+    /// Returns the type of this [`Value`].
+    pub fn get_type(&self) -> Type {
         match self {
-            Self::Extension { e } => e.0.get_type(),
-            Self::Tuple { vs } => Type::new_tuple(vs.iter().map(Self::const_type).collect_vec()),
+            Self::Extension { e } => e.get_type(),
+            Self::Tuple { vs } => Type::new_tuple(vs.iter().map(Self::get_type).collect_vec()),
             Self::Sum { sum_type, .. } => sum_type.clone().into(),
             Self::Function { hugr } => {
                 let func_type = mono_fn_type(hugr).unwrap_or_else(|e| panic!("{}", e));
@@ -256,14 +361,14 @@ impl Value {
     /// Returns a tuple constant of constant values.
     pub fn extension(custom_const: impl CustomConst) -> Self {
         Self::Extension {
-            e: ExtensionValue(Box::new(custom_const)),
+            e: ExtensionValue::new(custom_const),
         }
     }
 
     /// For a Const holding a CustomConst, extract the CustomConst by downcasting.
     pub fn get_custom_value<T: CustomConst>(&self) -> Option<&T> {
         if let Self::Extension { e } = self {
-            e.0.downcast_ref()
+            e.v.downcast_ref()
         } else {
             None
         }
@@ -271,7 +376,7 @@ impl Value {
 
     fn name(&self) -> OpName {
         match self {
-            Self::Extension { e } => format!("const:custom:{}", e.0.name()),
+            Self::Extension { e } => format!("const:custom:{}", e.name()),
             Self::Function { hugr: h } => {
                 let Some(t) = h.get_function_type() else {
                     panic!("HUGR root node isn't a valid function parent.");
@@ -292,7 +397,7 @@ impl Value {
     /// The extensions required by a [`Value`]
     pub fn extension_reqs(&self) -> ExtensionSet {
         match self {
-            Self::Extension { e } => e.0.extension_reqs().clone(),
+            Self::Extension { e } => e.extension_reqs().clone(),
             Self::Function { .. } => ExtensionSet::new(), // no extensions required to load Hugr (only to run)
             Self::Tuple { vs } => ExtensionSet::union_over(vs.iter().map(Value::extension_reqs)),
             Self::Sum { values, .. } => {
@@ -302,35 +407,6 @@ impl Value {
     }
 }
 
-impl NamedOp for Const {
-    fn name(&self) -> OpName {
-        self.value().name()
-    }
-}
-
-impl StaticTag for Const {
-    const TAG: OpTag = OpTag::Const;
-}
-impl OpTrait for Const {
-    fn description(&self) -> &str {
-        "Constant value"
-    }
-
-    fn extension_delta(&self) -> ExtensionSet {
-        self.value().extension_reqs()
-    }
-
-    fn tag(&self) -> OpTag {
-        <Self as StaticTag>::TAG
-    }
-
-    fn static_output(&self) -> Option<EdgeKind> {
-        Some(EdgeKind::Const(self.const_type()))
-    }
-}
-
-// [KnownTypeConst] is guaranteed to be the right type, so can be constructed
-// without initial type check.
 impl<T> From<T> for Value
 where
     T: CustomConst,
@@ -392,12 +468,9 @@ mod test {
 
     /// A [`CustomSerialized`] encoding a [`FLOAT64_TYPE`] float constant used in testing.
     pub(crate) fn serialized_float(f: f64) -> Value {
-        CustomSerialized::new(
-            FLOAT64_TYPE,
-            serde_yaml::Value::Number(f.into()),
-            float_types::EXTENSION_ID,
-        )
-        .into()
+        CustomSerialized::try_from_custom_const(ConstF64::new(f))
+            .unwrap()
+            .into()
     }
 
     fn test_registry() -> ExtensionRegistry {
@@ -419,7 +492,7 @@ mod test {
             0,
             [
                 CustomTestValue(USIZE_CUSTOM_T).into(),
-                serialized_float(5.1),
+                ConstF64::new(5.1).into(),
             ],
             pred_ty.clone(),
         )?);
@@ -487,7 +560,7 @@ mod test {
             crate::extension::prelude::BOOL_T
         ]));
 
-        assert_eq!(v.const_type(), correct_type);
+        assert_eq!(v.get_type(), correct_type);
         assert!(v.name().starts_with("const:function:"))
     }
 
@@ -504,14 +577,14 @@ mod test {
     #[rstest]
     #[case(Value::unit(), Type::UNIT, "const:seq:{}")]
     #[case(const_usize(), USIZE_T, "const:custom:ConstUsize(")]
-    #[case(serialized_float(17.4), FLOAT64_TYPE, "const:custom:yaml:Number(17.4)")]
+    #[case(serialized_float(17.4), FLOAT64_TYPE, "const:custom:yaml:Mapping")]
     #[case(const_tuple(), Type::new_tuple(type_row![USIZE_T, FLOAT64_TYPE]), "const:seq:{")]
     fn const_type(
         #[case] const_value: Value,
         #[case] expected_type: Type,
         #[case] name_prefix: &str,
     ) {
-        assert_eq!(const_value.const_type(), expected_type);
+        assert_eq!(const_value.get_type(), expected_type);
         let name = const_value.name();
         assert!(
             name.starts_with(name_prefix),
@@ -544,10 +617,10 @@ mod test {
                 .into();
         let classic_t = Type::new_extension(typ_int.clone());
         assert_matches!(classic_t.least_upper_bound(), TypeBound::Eq);
-        assert_eq!(yaml_const.const_type(), classic_t);
+        assert_eq!(yaml_const.get_type(), classic_t);
 
         let typ_qb = CustomType::new("my_type", vec![], ex_id, TypeBound::Eq);
         let t = Type::new_extension(typ_qb.clone());
-        assert_ne!(yaml_const.const_type(), t);
+        assert_ne!(yaml_const.get_type(), t);
     }
 }
