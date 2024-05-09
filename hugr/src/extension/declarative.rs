@@ -11,7 +11,7 @@
 //! ```yaml
 #![doc = include_str!("../../examples/extension/declarative.yaml")]
 //! ```
-//! 
+//!
 //! The definition can be loaded into a registry using the [`load_extensions`] or [`load_extensions_file`] functions.
 //! ```rust
 //! # const DECLARATIVE_YAML: &str = include_str!("../../examples/extension/declarative.yaml");
@@ -20,7 +20,7 @@
 //! let mut reg = hugr::std_extensions::logic::LOGIC_REG.clone();
 //! load_extensions(DECLARATIVE_YAML, &mut reg).unwrap();
 //! ```
-//! 
+//!
 //! [specification]: https://github.com/CQCL/hugr/blob/main/specification/hugr.md#declarative-format
 
 mod ops;
