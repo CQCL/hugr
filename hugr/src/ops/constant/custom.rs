@@ -218,7 +218,7 @@ impl CustomSerialized {
         }
     }
 
-    /// Attempts to desrialize the value in self into a `Box<dyn CustomConst>`.
+    /// Attempts to deserialize the value in self into a `Box<dyn CustomConst>`.
     /// This can fail, in particular when the `impl CustomConst` for the trait
     /// is not linked into the running executable.
     /// If deserialisation fails, returns self in a box.
