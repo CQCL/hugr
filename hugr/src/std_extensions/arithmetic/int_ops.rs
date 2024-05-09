@@ -344,7 +344,7 @@ impl IntOpDef {
 
 #[cfg(test)]
 mod test {
-    use crate::{ops::dataflow::DataflowOpTrait, std_extensions::arithmetic::int_types::int_type};
+    use crate::ops::dataflow::DataflowOpTrait;
 
     use super::*;
 

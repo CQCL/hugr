@@ -212,8 +212,8 @@ mod test {
 
     use super::*;
     use crate::extension::prelude::{sum_with_error, BOOL_T};
-    use crate::extension::{ExtensionRegistry, PRELUDE};
-    use crate::ops::{OpType, UnpackTuple};
+    use crate::extension::PRELUDE;
+    use crate::ops::UnpackTuple;
     use crate::std_extensions::arithmetic;
     use crate::std_extensions::arithmetic::conversions::ConvertOpDef;
     use crate::std_extensions::arithmetic::float_ops::FloatOps;
