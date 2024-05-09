@@ -41,6 +41,49 @@ impl SignatureFromArgs for ArrayOpCustom {
     }
 }
 
+fn list_of_type() -> TypeParam {
+    TypeParam::List {
+        param: Box::new(TypeParam::Type { b: TypeBound::Any }),
+    }
+}
+
+struct GenericOpCustom;
+impl SignatureFromArgs for GenericOpCustom {
+    fn compute_signature(&self, arg_values: &[TypeArg]) -> Result<PolyFuncType, SignatureError> {
+        let [arg0, arg1] = arg_values else {
+            return Err(SignatureError::InvalidTypeArgs);
+        };
+        let TypeArg::Sequence { elems: inp_args } = arg0 else {
+            return Err(SignatureError::InvalidTypeArgs);
+        };
+        let TypeArg::Sequence { elems: out_args } = arg1 else {
+            return Err(SignatureError::InvalidTypeArgs);
+        };
+        let mut inps: Vec<Type> = vec![Type::new_extension(ERROR_CUSTOM_TYPE)];
+        for inp_arg in inp_args.iter() {
+            let TypeArg::Type { ty } = inp_arg else {
+                return Err(SignatureError::InvalidTypeArgs);
+            };
+            inps.push(ty.clone());
+        }
+        let mut outs: Vec<Type> = vec![];
+        for out_arg in out_args.iter() {
+            let TypeArg::Type { ty } = out_arg else {
+                return Err(SignatureError::InvalidTypeArgs);
+            };
+            outs.push(ty.clone());
+        }
+        Ok(PolyFuncType::new(vec![], FunctionType::new(inps, outs)))
+    }
+
+    fn static_params(&self) -> &[TypeParam] {
+        lazy_static! {
+            static ref PARAMS: [TypeParam; 2] = [list_of_type(), list_of_type()];
+        }
+        PARAMS.as_slice()
+    }
+}
+
 /// Name of prelude extension.
 pub const PRELUDE_ID: ExtensionId = ExtensionId::new_unchecked("prelude");
 lazy_static! {
@@ -102,7 +145,7 @@ lazy_static! {
         .add_op(
             PANIC_OP_ID,
             "Panic with input error".to_string(),
-            FunctionType::new(type_row![Type::new_extension(ERROR_CUSTOM_TYPE)], type_row![]),
+            GenericOpCustom,
         )
         .unwrap();
         prelude
@@ -348,8 +391,13 @@ mod test {
 
         let err = b.add_load_value(error_val);
 
+        const TYPE_ARG_NONE: TypeArg = TypeArg::Sequence { elems: vec![] };
         let op = PRELUDE
-            .instantiate_extension_op(&PANIC_OP_ID, [], &PRELUDE_REGISTRY)
+            .instantiate_extension_op(
+                &PANIC_OP_ID,
+                [TYPE_ARG_NONE, TYPE_ARG_NONE],
+                &PRELUDE_REGISTRY,
+            )
             .unwrap();
 
         b.add_dataflow_op(op, [err]).unwrap();
