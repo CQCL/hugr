@@ -33,6 +33,7 @@ pub struct OpValidityFlags {
     /// Whether the children must form a DAG (no cycles).
     pub requires_dag: bool,
     /// A validation check for edges between children
+    ///
     // Enclosed in an `Option` to avoid iterating over the edges if not needed.
     pub edge_check: Option<fn(ChildrenEdgeData) -> Result<(), EdgeValidationError>>,
 }
