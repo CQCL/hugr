@@ -130,12 +130,6 @@ impl From<UpperBound> for TypeParam {
     }
 }
 
-impl From<Type> for TypeArg {
-    fn from(ty: Type) -> Self {
-        Self::Type { ty }
-    }
-}
-
 /// A statically-known argument value to an operation.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[non_exhaustive]
@@ -175,6 +169,36 @@ pub enum TypeArg {
         #[serde(flatten)]
         v: TypeArgVariable,
     },
+}
+
+impl From<Type> for TypeArg {
+    fn from(ty: Type) -> Self {
+        Self::Type { ty }
+    }
+}
+
+impl From<u64> for TypeArg {
+    fn from(n: u64) -> Self {
+        Self::BoundedNat { n }
+    }
+}
+
+impl From<CustomTypeArg> for TypeArg {
+    fn from(arg: CustomTypeArg) -> Self {
+        Self::Opaque { arg }
+    }
+}
+
+impl From<Vec<TypeArg>> for TypeArg {
+    fn from(elems: Vec<TypeArg>) -> Self {
+        Self::Sequence { elems }
+    }
+}
+
+impl From<ExtensionSet> for TypeArg {
+    fn from(es: ExtensionSet) -> Self {
+        Self::Extensions { es }
+    }
 }
 
 /// Variable in a TypeArg, that is not a [TypeArg::Type] or [TypeArg::Extensions],

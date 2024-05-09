@@ -20,15 +20,15 @@ pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.int
 /// Identifier for the integer type.
 pub const INT_TYPE_ID: TypeName = TypeName::new_inline("int");
 
-pub(crate) fn int_custom_type(width_arg: TypeArg) -> CustomType {
-    CustomType::new(INT_TYPE_ID, [width_arg], EXTENSION_ID, TypeBound::Eq)
+pub(crate) fn int_custom_type(width_arg: impl Into<TypeArg>) -> CustomType {
+    CustomType::new(INT_TYPE_ID, [width_arg.into()], EXTENSION_ID, TypeBound::Eq)
 }
 
 /// Integer type of a given bit width (specified by the TypeArg).
 /// Depending on the operation, the semantic interpretation may be unsigned integer, signed integer
 /// or bit string.
-pub(super) fn int_type(width_arg: TypeArg) -> Type {
-    Type::new_extension(int_custom_type(width_arg))
+pub(super) fn int_type(width_arg: impl Into<TypeArg>) -> Type {
+    Type::new_extension(int_custom_type(width_arg.into()))
 }
 
 lazy_static! {
