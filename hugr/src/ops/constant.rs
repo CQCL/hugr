@@ -181,7 +181,6 @@ pub enum Value {
 /// assert_eq!(ev, serde_json::from_value(expected_json).unwrap());
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(transparent)]
 pub struct ExtensionValue {
     #[serde(flatten, with = "self::custom::serde_extension_value")]
     v: Box<dyn CustomConst>,
@@ -578,7 +577,7 @@ mod test {
     #[rstest]
     #[case(Value::unit(), Type::UNIT, "const:seq:{}")]
     #[case(const_usize(), USIZE_T, "const:custom:ConstUsize(")]
-    // #[case(serialized_float(17.4), FLOAT64_TYPE, "const:custom:yaml:Number(17.4)")]
+    #[case(serialized_float(17.4), FLOAT64_TYPE, "const:custom:yaml:Mapping")]
     #[case(const_tuple(), Type::new_tuple(type_row![USIZE_T, FLOAT64_TYPE]), "const:seq:{")]
     fn const_type(
         #[case] const_value: Value,
