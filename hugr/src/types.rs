@@ -369,7 +369,7 @@ impl Type {
         match &self.0 {
             TypeEnum::Sum(SumType::General { rows }) => rows
                 .iter()
-                .try_for_each(|row| valid_row(row, extension_registry, var_decls)),
+                .try_for_each(|row| row.validate_var_len(extension_registry, var_decls)),
             TypeEnum::Sum(SumType::Unit { .. }) => Ok(()), // No leaves there
             TypeEnum::Alias(_) => Ok(()),
             TypeEnum::Extension(custy) => custy.validate(extension_registry, var_decls),
@@ -399,8 +399,6 @@ impl Type {
         }
     }
 
-    // ALAN TODO 4. subst_row / valid_row => TypeRow::substitute, TypeRow::validate_var_len
-
     /// Applies a substitution to a type.
     /// This may result in a row of types, if this [Type] is not really a single type but actually a row variable
     /// Invariants may be confirmed by validation:
@@ -420,7 +418,7 @@ impl Type {
             TypeEnum::Extension(cty) => vec![Type::new_extension(cty.substitute(t))],
             TypeEnum::Function(bf) => vec![Type::new_function(bf.substitute(t))],
             TypeEnum::Sum(SumType::General { rows }) => {
-                vec![Type::new_sum(rows.iter().map(|x| subst_row(x, t)))]
+                vec![Type::new_sum(rows.iter().map(|r| r.substitute(t)))]
             }
         }
     }
@@ -464,24 +462,6 @@ impl<'a> Substitution<'a> {
     fn extension_registry(&self) -> &ExtensionRegistry {
         self.1
     }
-}
-
-fn valid_row(
-    row: &TypeRow,
-    exts: &ExtensionRegistry,
-    var_decls: &[TypeParam],
-) -> Result<(), SignatureError> {
-    row.iter()
-        .try_for_each(|t| t.validate_in_row(exts, var_decls))
-}
-
-fn subst_row(row: &TypeRow, tr: &Substitution) -> TypeRow {
-    let res = row
-        .iter()
-        .flat_map(|ty| ty.substitute(tr))
-        .collect::<Vec<_>>()
-        .into();
-    res
 }
 
 pub(crate) fn check_typevar_decl(

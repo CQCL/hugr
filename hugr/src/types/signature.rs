@@ -5,7 +5,7 @@ use itertools::Either;
 use std::fmt::{self, Display, Write};
 
 use super::type_param::TypeParam;
-use super::{subst_row, valid_row, Substitution, Type, TypeRow};
+use super::{Substitution, Type, TypeRow};
 
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 use crate::{Direction, IncomingPort, OutgoingPort, Port};
@@ -37,15 +37,16 @@ impl FunctionType {
         extension_registry: &ExtensionRegistry,
         var_decls: &[TypeParam],
     ) -> Result<(), SignatureError> {
-        valid_row(&self.input, extension_registry, var_decls)?;
-        valid_row(&self.output, extension_registry, var_decls)?;
+        self.input.validate_var_len(extension_registry, var_decls)?;
+        self.output
+            .validate_var_len(extension_registry, var_decls)?;
         self.extension_reqs.validate(var_decls)
     }
 
     pub(crate) fn substitute(&self, tr: &Substitution) -> Self {
         FunctionType {
-            input: subst_row(&self.input, tr),
-            output: subst_row(&self.output, tr),
+            input: self.input.substitute(tr),
+            output: self.output.substitute(tr),
             extension_reqs: self.extension_reqs.substitute(tr),
         }
     }

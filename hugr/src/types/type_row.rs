@@ -7,9 +7,12 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use super::Type;
-use crate::utils::display_list;
+use super::{type_param::TypeParam, Substitution, Type};
 use crate::PortIndex;
+use crate::{
+    extension::{ExtensionRegistry, SignatureError},
+    utils::display_list,
+};
 use delegate::delegate;
 use itertools::Itertools;
 
@@ -40,6 +43,8 @@ impl TypeRow {
 
     #[inline(always)]
     /// Returns the port type given an offset. Returns `None` if the offset is out of bounds.
+    // Note/TODO: it might be good to disable this if we are indexing over (past) a Row Variable,
+    // as substitution could change where in the row the offset refers.
     pub fn get(&self, offset: impl PortIndex) -> Option<&Type> {
         self.types.get(offset.index())
     }
@@ -77,6 +82,28 @@ impl TypeRow {
             /// Returns `true` if the row contains no types.
             pub fn is_empty(&self) -> bool ;
         }
+    }
+
+    /// Applies a substitution to the row. Note this may change the length
+    /// if-and-only-if the row contains any [RowVariable]
+    ///
+    /// [RowVariable]: [crate::types::TypeEnum::RowVariable]
+    pub(super) fn substitute(&self, tr: &Substitution) -> TypeRow {
+        let res = self
+            .iter()
+            .flat_map(|ty| ty.substitute(tr))
+            .collect::<Vec<_>>()
+            .into();
+        res
+    }
+
+    pub(super) fn validate_var_len(
+        &self,
+        exts: &ExtensionRegistry,
+        var_decls: &[TypeParam],
+    ) -> Result<(), SignatureError> {
+        self.iter()
+            .try_for_each(|t| t.validate_in_row(exts, var_decls))
     }
 }
 
