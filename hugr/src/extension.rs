@@ -232,18 +232,6 @@ impl CustomConcrete for CustomType {
     }
 }
 
-/// Type-parametrised functionality shared between [`TypeDef`] and [`OpDef`].
-trait TypeParametrised {
-    /// The concrete object built by binding type arguments to parameters
-    type Concrete: CustomConcrete;
-    /// The extension-unique name.
-    fn name(&self) -> &<Self::Concrete as CustomConcrete>::Identifier;
-    /// Type parameters.
-    fn params(&self) -> &[TypeParam];
-    /// The parent extension.
-    fn extension(&self) -> &ExtensionId;
-}
-
 /// A constant value provided by a extension.
 /// Must be an instance of a type available to the extension.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]

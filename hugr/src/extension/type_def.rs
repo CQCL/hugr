@@ -1,7 +1,7 @@
 use std::collections::hash_map::Entry;
 
 use super::{CustomConcrete, ExtensionBuildError};
-use super::{Extension, ExtensionId, SignatureError, TypeParametrised};
+use super::{Extension, ExtensionId, SignatureError};
 
 use crate::types::{least_upper_bound, CustomType, TypeName};
 
@@ -122,12 +122,10 @@ impl TypeDef {
             }
         }
     }
-}
 
-impl TypeParametrised for TypeDef {
-    type Concrete = CustomType;
-
-    fn params(&self) -> &[TypeParam] {
+    /// The static parameters to the TypeDef; a [TypeArg] appropriate for each
+    /// must be provided to produce an actual type.
+    pub fn params(&self) -> &[TypeParam] {
         &self.params
     }
 

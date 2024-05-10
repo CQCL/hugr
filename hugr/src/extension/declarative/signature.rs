@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 
 use crate::extension::prelude::PRELUDE_ID;
-use crate::extension::{CustomValidator, ExtensionSet, SignatureFunc, TypeDef, TypeParametrised};
+use crate::extension::{CustomValidator, ExtensionSet, SignatureFunc, TypeDef};
 use crate::types::type_param::TypeParam;
 use crate::types::{CustomType, FunctionType, PolyFuncType, Type, TypeRow};
 use crate::Extension;
