@@ -427,6 +427,10 @@ impl SiblingSubgraph {
 
         extracted
     }
+
+    pub fn validate(&self, h: &impl HugrView) -> Result<(), InvalidSubgraph> {
+        validate_subgraph(h, &self.nodes, &self.inputs, &self.outputs)
+    }
 }
 
 fn combine_in_out<'a>(

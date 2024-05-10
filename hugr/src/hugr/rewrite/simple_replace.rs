@@ -1,11 +1,14 @@
 //! Implementation of the `SimpleReplace` operation.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
+use crate::hugr::views::sealed::HugrInternals;
+use crate::hugr::views::sibling_subgraph::InvalidSubgraph;
 use crate::hugr::views::SiblingSubgraph;
 use crate::hugr::{HugrMut, HugrView, NodeMetadataMap, Rewrite};
 use crate::ops::{OpTag, OpTrait, OpType};
-use crate::{Hugr, IncomingPort, Node};
+use crate::{Hugr, IncomingPort, Node, Port};
+use portgraph::PortView;
 use thiserror::Error;
 
 /// Specification of a simple replacement operation.
@@ -51,6 +54,55 @@ impl SimpleReplacement {
     pub fn subgraph(&self) -> &SiblingSubgraph {
         &self.subgraph
     }
+
+    pub fn validate(&self, h: &impl HugrView) -> Result<(), SimpleReplacementError> {
+        self.subgraph.validate(h)?;
+
+        let parent = self.subgraph.get_parent(h);
+
+        // 1. Check the parent node exists and is a DataflowParent.
+        if !OpTag::DataflowParent.is_superset(h.get_optype(parent).tag()) {
+            return Err(SimpleReplacementError::InvalidParentNode());
+        }
+
+        // 2. Check that all the to-be-removed nodes are children of it and are leaves.
+        for node in self.subgraph.nodes() {
+            if h.get_parent(*node) != Some(parent) || h.children(*node).next().is_some() {
+                return Err(SimpleReplacementError::InvalidRemovedNode());
+            }
+        }
+
+        let self_output_node = h.children(parent).nth(1).unwrap();
+        assert!(h.get_optype(self_output_node).is_output());
+        let replacement_output_node = self.replacement.children(self.replacement.root()).nth(1).unwrap();
+        assert!(self.replacement.get_optype(replacement_output_node).is_output());
+
+        let problem_unless = |is_good: bool, err: SimpleReplacementError| is_good.then_some(()).ok_or(err);
+
+        for ((rep_inp_node, rep_inp_port), (rem_inp_node, rem_inp_port)) in &self.nu_inp {
+            use SimpleReplacementError::*;
+
+            // (rem_inp_node,rem_inp_port) should exist in h
+            problem_unless(h.valid_non_root(*rem_inp_node), InvalidRemovedNode())?;
+            problem_unless(h.portgraph().port_index(rem_inp_node.pg_index(), Into::<Port>::into(*rem_inp_port).pg_offset()).is_some(), InvalidRemovedNode())?;
+
+            // (rep_inp_node, rep_inp_port) should exist in replacement
+            problem_unless(self.replacement.valid_non_root(*rep_inp_node), InvalidReplacementNode())?;
+            problem_unless(self.replacement.portgraph().port_index(rep_inp_node.pg_index(), Into::<Port>::into(*rep_inp_port).pg_offset()).is_some(), InvalidReplacementNode())?;
+        }
+
+        for ((rem_out_node, rem_out_port), rep_out_port) in &self.nu_out {
+            use SimpleReplacementError::*;
+            // (rem_out_node, rem_out_port) should exist in h
+            problem_unless(h.valid_non_root(*rem_out_node), InvalidRemovedNode())?;
+            problem_unless(h.portgraph().port_index(rem_out_node.pg_index(), Into::<Port>::into(*rem_out_port).pg_offset()).is_some(), InvalidRemovedNode())?;
+
+            // rep_out_port must be valid on replacement_output_node
+            problem_unless(self.replacement.portgraph().port_index(replacement_output_node.pg_index(), Into::<Port>::into(*rep_out_port).pg_offset()).is_some(), InvalidReplacementNode())?;
+        }
+        Ok(())
+
+    }
 }
 
 impl Rewrite for SimpleReplacement {
@@ -63,17 +115,8 @@ impl Rewrite for SimpleReplacement {
     }
 
     fn apply(mut self, h: &mut impl HugrMut) -> Result<(), SimpleReplacementError> {
+        self.validate(h)?;
         let parent = self.subgraph.get_parent(h);
-        // 1. Check the parent node exists and is a DataflowParent.
-        if !OpTag::DataflowParent.is_superset(h.get_optype(parent).tag()) {
-            return Err(SimpleReplacementError::InvalidParentNode());
-        }
-        // 2. Check that all the to-be-removed nodes are children of it and are leaves.
-        for node in self.subgraph.nodes() {
-            if h.get_parent(*node) != Some(parent) || h.children(*node).next().is_some() {
-                return Err(SimpleReplacementError::InvalidRemovedNode());
-            }
-        }
         // 3. Do the replacement.
         // 3.1. Add copies of all replacement nodes and edges to h. Exclude Input/Output nodes.
         // Create map from old NodeIndex (in self.replacement) to new NodeIndex (in self).
@@ -192,7 +235,10 @@ pub enum SimpleReplacementError {
     /// Node in replacement graph is invalid.
     #[error("A node in the replacement graph is invalid.")]
     InvalidReplacementNode(),
+    #[error(transparent)]
+    InvalidSubgraph(#[from] InvalidSubgraph),
 }
+
 
 #[cfg(test)]
 pub(in crate::hugr::rewrite) mod test {

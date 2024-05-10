@@ -485,9 +485,10 @@ fn panic_invalid_non_root<H: HugrView + ?Sized>(hugr: &H, node: Node) {
     }
 }
 
-/// Panic if [`HugrView::valid_node`] fails.
+/// [`panic_invalid_non_root`] or panic if port is invalid for node.
 #[track_caller]
 fn panic_invalid_port<H: HugrView + ?Sized>(hugr: &H, node: Node, port: impl Into<Port>) {
+    panic_invalid_non_root(hugr, node);
     let port = port.into();
     if hugr
         .portgraph()
