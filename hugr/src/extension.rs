@@ -15,8 +15,7 @@ use crate::hugr::IdentList;
 use crate::ops::constant::{ValueName, ValueNameRef};
 use crate::ops::custom::{ExtensionOp, OpaqueOp};
 use crate::ops::{self, OpName, OpNameRef};
-use crate::types::type_param::{check_type_args, TypeArgError};
-use crate::types::type_param::{TypeArg, TypeParam};
+use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
 use crate::types::{check_typevar_decl, CustomType, Substitution, TypeBound, TypeName};
 use crate::types::{FunctionType, TypeNameRef};
 
@@ -243,10 +242,6 @@ trait TypeParametrised {
     fn params(&self) -> &[TypeParam];
     /// The parent extension.
     fn extension(&self) -> &ExtensionId;
-    /// Check provided type arguments are valid against parameters.
-    fn check_args_impl(&self, args: &[TypeArg]) -> Result<(), SignatureError> {
-        check_type_args(args, self.params()).map_err(SignatureError::TypeArgMismatch)
-    }
 }
 
 /// A constant value provided by a extension.

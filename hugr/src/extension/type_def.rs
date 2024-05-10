@@ -5,7 +5,7 @@ use super::{Extension, ExtensionId, SignatureError, TypeParametrised};
 
 use crate::types::{least_upper_bound, CustomType, TypeName};
 
-use crate::types::type_param::TypeArg;
+use crate::types::type_param::{check_type_args, TypeArg};
 
 use crate::types::type_param::TypeParam;
 
@@ -49,7 +49,7 @@ pub struct TypeDef {
 impl TypeDef {
     /// Check provided type arguments are valid against parameters.
     pub fn check_args(&self, args: &[TypeArg]) -> Result<(), SignatureError> {
-        self.check_args_impl(args)
+        check_type_args(args, &self.params).map_err(SignatureError::TypeArgMismatch)
     }
 
     /// Check [`CustomType`] is a valid instantiation of this definition.
@@ -72,7 +72,7 @@ impl TypeDef {
             ));
         }
 
-        self.check_args_impl(custom.type_args())?;
+        check_type_args(custom.type_args(), &self.params)?;
 
         let calc_bound = self.bound(custom.args());
         if calc_bound == custom.bound() {
@@ -93,7 +93,7 @@ impl TypeDef {
     /// valid instances of the type parameters.
     pub fn instantiate(&self, args: impl Into<Vec<TypeArg>>) -> Result<CustomType, SignatureError> {
         let args = args.into();
-        self.check_args_impl(&args)?;
+        check_type_args(&args, &self.params)?;
         let bound = self.bound(&args);
         Ok(CustomType::new(
             self.name().clone(),
