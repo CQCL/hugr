@@ -478,6 +478,7 @@ mod test {
     use crate::extension::{SignatureError, EMPTY_REG, PRELUDE_REGISTRY};
     use crate::ops::{CustomOp, OpName};
     use crate::std_extensions::collections::{EXTENSION, LIST_TYPENAME};
+    use crate::types::type_param::TypeArgError;
     use crate::types::Type;
     use crate::types::{type_param::TypeParam, FunctionType, PolyFuncType, TypeArg, TypeBound};
     use crate::Hugr;
@@ -632,6 +633,19 @@ mod test {
         assert_eq!(
             def.compute_signature(&args, &EMPTY_REG),
             Ok(FunctionType::new_endo(vec![tv]))
+        );
+        // But not with an external row variable
+        let arg = TypeArg::Type {
+            ty: Type::new_row_var(0, TypeBound::Eq),
+        };
+        assert_eq!(
+            def.compute_signature(&[arg.clone()], &EMPTY_REG),
+            Err(SignatureError::TypeArgMismatch(
+                TypeArgError::TypeMismatch {
+                    param: TypeBound::Any.into(),
+                    arg
+                }
+            ))
         );
         Ok(())
     }

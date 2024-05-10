@@ -103,11 +103,13 @@ impl PolyFuncType {
 pub(crate) mod test {
     use std::num::NonZeroU64;
 
+    use cool_asserts::assert_matches;
     use lazy_static::lazy_static;
 
     use crate::extension::prelude::{BOOL_T, PRELUDE_ID, USIZE_CUSTOM_T, USIZE_T};
     use crate::extension::{
-        ExtensionId, ExtensionRegistry, SignatureError, TypeDefBound, PRELUDE, PRELUDE_REGISTRY,
+        ExtensionId, ExtensionRegistry, SignatureError, TypeDefBound, EMPTY_REG, PRELUDE,
+        PRELUDE_REGISTRY,
     };
     use crate::std_extensions::collections::{EXTENSION, LIST_TYPENAME};
     use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
@@ -336,27 +338,44 @@ pub(crate) mod test {
         Ok(())
     }
 
+    const TP_ANY: TypeParam = TypeParam::Type { b: TypeBound::Any };
     #[test]
-    fn row_variables() {
-        const TP: TypeParam = TypeParam::Type { b: TypeBound::Any };
+    fn row_variables_bad_schema() {
         // Mismatched TypeBound (Copyable vs Any)
-        PolyFuncType::new_validated(
-            [TypeParam::List {
-                param: Box::new(TypeParam::Type {
-                    b: TypeBound::Copyable,
-                }),
-            }],
+        let decl = TypeParam::List {
+            param: Box::new(TP_ANY),
+        };
+        let e = PolyFuncType::new_validated(
+            [decl.clone()],
             FunctionType::new(
-                vec![USIZE_T, Type::new_var_use(0, TypeBound::Any)],
-                vec![Type::new_tuple(vec![Type::new_row_var(0, TypeBound::Any)])],
+                vec![USIZE_T],
+                vec![Type::new_row_var(0, TypeBound::Copyable)],
             ),
             &PRELUDE_REGISTRY,
         )
         .unwrap_err();
+        assert_matches!(e, SignatureError::TypeVarDoesNotMatchDeclaration { actual, cached } => {
+            assert_eq!(actual, decl);
+            assert_eq!(cached, TypeParam::List {param: Box::new(TypeParam::Type {b: TypeBound::Copyable})});
+        });
+        // Declared as row variable, used as type variable
+        let e = PolyFuncType::new_validated(
+            [decl.clone()],
+            FunctionType::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
+            &EMPTY_REG,
+        )
+        .unwrap_err();
+        assert_matches!(e, SignatureError::TypeVarDoesNotMatchDeclaration { actual, cached } => {
+            assert_eq!(actual, decl);
+            assert_eq!(cached, TP_ANY);
+        });
+    }
 
+    #[test]
+    fn row_variables() {
         let pf = PolyFuncType::new_validated(
             [TypeParam::List {
-                param: Box::new(TP),
+                param: Box::new(TP_ANY),
             }],
             FunctionType::new(
                 vec![USIZE_T, Type::new_row_var(0, TypeBound::Any)],
