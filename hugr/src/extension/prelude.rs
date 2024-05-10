@@ -339,6 +339,7 @@ impl CustomConst for ConstError {
 mod test {
     use crate::{
         builder::{DFGBuilder, Dataflow, DataflowHugr},
+        utils::test_quantum_extension::cx_gate,
         Hugr, Wire,
     };
 
@@ -403,6 +404,36 @@ mod test {
         b.add_dataflow_op(op, [err]).unwrap();
 
         b.finish_prelude_hugr_with_outputs([]).unwrap();
+    }
+
+    #[test]
+    /// test the panic operation with input and output wires
+    fn test_panic_with_io() {
+        let error_val = ConstError::new(42, "PANIC");
+        const TYPE_ARG_Q: TypeArg = TypeArg::Type { ty: QB_T };
+        let type_arg_2q: TypeArg = TypeArg::Sequence {
+            elems: vec![TYPE_ARG_Q, TYPE_ARG_Q],
+        };
+        let panic_op = PRELUDE
+            .instantiate_extension_op(
+                &PANIC_OP_ID,
+                [type_arg_2q.clone(), type_arg_2q.clone()],
+                &PRELUDE_REGISTRY,
+            )
+            .unwrap();
+
+        let mut b = DFGBuilder::new(FunctionType::new_endo(type_row![QB_T, QB_T])).unwrap();
+        let [q0, q1] = b.input_wires_arr();
+        let [q0, q1] = b
+            .add_dataflow_op(cx_gate(), [q0, q1])
+            .unwrap()
+            .outputs_arr();
+        let err = b.add_load_value(error_val);
+        let [q0, q1] = b
+            .add_dataflow_op(panic_op, [err, q0, q1])
+            .unwrap()
+            .outputs_arr();
+        b.finish_prelude_hugr_with_outputs([q0, q1]).unwrap();
     }
 
     #[test]
