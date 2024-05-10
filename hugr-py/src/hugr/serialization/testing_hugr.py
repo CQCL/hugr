@@ -1,7 +1,7 @@
 from pydantic import ConfigDict
 from typing import Literal
 from .tys import Type, SumType, PolyFuncType, ConfiguredBaseModel, model_rebuild
-from .ops import Value, OpType, classes as ops_classes
+from .ops import Value, OpType, OpDef, classes as ops_classes
 
 
 class TestingHugr(ConfiguredBaseModel):
@@ -14,6 +14,7 @@ class TestingHugr(ConfiguredBaseModel):
     poly_func_type: PolyFuncType | None = None
     value: Value | None = None
     optype: OpType | None = None
+    op_def: OpDef | None = None
 
     @classmethod
     def get_version(cls) -> str:

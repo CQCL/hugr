@@ -122,7 +122,7 @@ pub struct CustomValidator {
     #[serde(flatten)]
     poly_func: PolyFuncType,
     #[serde(skip)]
-    validate: Box<dyn ValidateTypeArgs>,
+    pub(crate) validate: Box<dyn ValidateTypeArgs>,
 }
 
 impl CustomValidator {
@@ -265,11 +265,19 @@ impl Debug for SignatureFunc {
 /// Different ways that an [OpDef] can lower operation nodes i.e. provide a Hugr
 /// that implements the operation using a set of other extensions.
 #[derive(serde::Deserialize, serde::Serialize)]
+#[serde(untagged)]
 pub enum LowerFunc {
     /// Lowering to a fixed Hugr. Since this cannot depend upon the [TypeArg]s,
     /// this will generally only be applicable if the [OpDef] has no [TypeParam]s.
-    #[serde(rename = "hugr")]
-    FixedHugr(ExtensionSet, Hugr),
+    FixedHugr {
+        /// The extensions required by the [`Hugr`]
+        extensions: ExtensionSet,
+        /// The [`Hugr`] to be used to replace [CustomOp]s matching the parent
+        /// [OpDef]
+        ///
+        /// [CustomOp]: crate::ops::CustomOp
+        hugr: Hugr,
+    },
     /// Custom binary function that can (fallibly) compute a Hugr
     /// for the particular instance and set of available extensions.
     #[serde(skip)]
@@ -279,7 +287,7 @@ pub enum LowerFunc {
 impl Debug for LowerFunc {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::FixedHugr(_, _) => write!(f, "FixedHugr"),
+            Self::FixedHugr { .. } => write!(f, "FixedHugr"),
             Self::CustomFunc(_) => write!(f, "<custom lower>"),
         }
     }
@@ -305,8 +313,7 @@ pub struct OpDef {
     signature_func: SignatureFunc,
     // Some operations cannot lower themselves and tools that do not understand them
     // can only treat them as opaque/black-box ops.
-    #[serde(flatten)]
-    lower_funcs: Vec<LowerFunc>,
+    pub(crate) lower_funcs: Vec<LowerFunc>,
 
     /// Operations can optionally implement [`ConstFold`] to implement constant folding.
     #[serde(skip)]
@@ -360,9 +367,9 @@ impl OpDef {
         self.lower_funcs
             .iter()
             .flat_map(|f| match f {
-                LowerFunc::FixedHugr(req_res, h) => {
-                    if available_extensions.is_superset(req_res) {
-                        Some(h.clone())
+                LowerFunc::FixedHugr { extensions, hugr } => {
+                    if available_extensions.is_superset(extensions) {
+                        Some(hugr.clone())
                     } else {
                         None
                     }
@@ -477,7 +484,6 @@ mod test {
     use crate::std_extensions::collections::{EXTENSION, LIST_TYPENAME};
     use crate::types::Type;
     use crate::types::{type_param::TypeParam, FunctionType, PolyFuncType, TypeArg, TypeBound};
-    use crate::Hugr;
     use crate::{const_extension_ids, Extension};
 
     const_extension_ids! {
@@ -495,7 +501,10 @@ mod test {
         let type_scheme = PolyFuncType::new(vec![TP], FunctionType::new_endo(vec![list_of_var]));
 
         let def = e.add_op(OP_NAME, "desc".into(), type_scheme)?;
-        def.add_lower_func(LowerFunc::FixedHugr(ExtensionSet::new(), Hugr::default()));
+        def.add_lower_func(LowerFunc::FixedHugr {
+            extensions: ExtensionSet::new(),
+            hugr: crate::builder::test::simple_dfg_hugr(), // this is nonsense, but we are not testing the actual lowering here
+        });
         def.add_misc("key", Default::default());
         assert_eq!(def.description(), "desc");
         assert_eq!(def.lower_funcs.len(), 1);

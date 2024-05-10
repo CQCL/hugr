@@ -28,7 +28,7 @@ pub use infer::{ExtensionSolution, InferExtensionError};
 
 mod op_def;
 pub use op_def::{
-    CustomSignatureFunc, CustomValidator, OpDef, SignatureFromArgs, SignatureFunc,
+    CustomSignatureFunc, CustomValidator, LowerFunc, OpDef, SignatureFromArgs, SignatureFunc,
     ValidateJustArgs, ValidateTypeArgs,
 };
 mod type_def;

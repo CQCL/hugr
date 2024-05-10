@@ -817,6 +817,27 @@
             "title": "ExtensionsParam",
             "type": "object"
         },
+        "FixedHugr": {
+            "additionalProperties": false,
+            "properties": {
+                "extensions": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "title": "Extensions",
+                    "type": "array"
+                },
+                "hugr": {
+                    "title": "Hugr"
+                }
+            },
+            "required": [
+                "extensions",
+                "hugr"
+            ],
+            "title": "FixedHugr",
+            "type": "object"
+        },
         "FuncDecl": {
             "additionalProperties": false,
             "description": "External function declaration, linked at runtime.",
@@ -1361,6 +1382,62 @@
                 "ty"
             ],
             "title": "Noop",
+            "type": "object"
+        },
+        "OpDef": {
+            "additionalProperties": false,
+            "description": "Serializable definition for dynamically loaded operations.",
+            "properties": {
+                "extension": {
+                    "title": "Extension",
+                    "type": "string"
+                },
+                "name": {
+                    "title": "Name",
+                    "type": "string"
+                },
+                "description": {
+                    "title": "Description",
+                    "type": "string"
+                },
+                "misc": {
+                    "anyOf": [
+                        {
+                            "type": "object"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "default": null,
+                    "title": "Misc"
+                },
+                "signature": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/PolyFuncType"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "default": null
+                },
+                "lower_funcs": {
+                    "items": {
+                        "$ref": "#/$defs/FixedHugr"
+                    },
+                    "title": "Lower Funcs",
+                    "type": "array"
+                }
+            },
+            "required": [
+                "extension",
+                "name",
+                "description",
+                "lower_funcs"
+            ],
+            "title": "OpDef",
             "type": "object"
         },
         "OpType": {
@@ -2319,6 +2396,17 @@
             "anyOf": [
                 {
                     "$ref": "#/$defs/OpType"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "default": null
+        },
+        "op_def": {
+            "anyOf": [
+                {
+                    "$ref": "#/$defs/OpDef"
                 },
                 {
                     "type": "null"
