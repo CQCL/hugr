@@ -183,7 +183,16 @@ pub fn array_type(size: impl Into<TypeArg>, element_ty: Type) -> Type {
 
 /// Name of the operation in the prelude for creating new arrays.
 pub const NEW_ARRAY_OP_ID: OpName = OpName::new_inline("new_array");
+
 /// Name of the prelude panic operation.
+///
+/// This operation can have any input and any output wires; it is instantiated
+/// with two [TypeArg::Sequence]s representing these. The first input to the
+/// operation is always an error type; the remaining inputs correspond to the
+/// first sequence of types in its instantiation; the outputs correspond to the
+/// second sequence of types in its instantiation. Note that the inputs and
+/// outputs only exist so that structural constraints such as linearity can be
+/// satisfied.
 pub const PANIC_OP_ID: OpName = OpName::new_inline("panic");
 
 /// Initialize a new array op of element type `element_ty` of length `size`
