@@ -18,21 +18,21 @@ use crate::{Hugr, HugrView, Node};
 pub fn merge_basic_blocks(cfg: &mut impl HugrMut<RootHandle = CfgID>) {
     let mut worklist = cfg.nodes().collect::<Vec<_>>();
     while let Some(n) = worklist.pop() {
+        // Consider merging n with its successor
         let Ok(succ) = cfg.output_neighbours(n).exactly_one() else {
             continue;
         };
-        if cfg.input_neighbours(succ).take(2).collect::<Vec<_>>() != vec![n] {
+        if cfg.input_neighbours(succ).count() != 1 {
             continue;
         };
         if cfg.children(cfg.root()).take(2).contains(&succ) {
-            // entry block has an additional in-edge, so cannot merge with predecessor.
-            // if succ is exit block, nodes in n==p should move *outside* the CFG
-            // - a separate normalization from merging BBs.
+            // If succ is...
+            //   - the entry block, that has an implicit extra in-edge, so cannot merge with n.
+            //   - the exit block, nodes in n should move *outside* the CFG - a separate pass.
             continue;
         };
         let (rep, merge_bb, dfgs) = mk_rep(cfg, n, succ);
         let node_map = cfg.hugr_mut().apply_rewrite(rep).unwrap();
-        // Children of merged BB are (Input, Output, ) 2*DFG
         let merged_bb = *node_map.get(&merge_bb).unwrap();
         for dfg_id in dfgs {
             let n_id = *node_map.get(&dfg_id).unwrap();
