@@ -484,7 +484,6 @@ mod test {
     use crate::std_extensions::collections::{EXTENSION, LIST_TYPENAME};
     use crate::types::Type;
     use crate::types::{type_param::TypeParam, FunctionType, PolyFuncType, TypeArg, TypeBound};
-    use crate::Hugr;
     use crate::{const_extension_ids, Extension};
 
     const_extension_ids! {
@@ -504,7 +503,7 @@ mod test {
         let def = e.add_op(OP_NAME, "desc".into(), type_scheme)?;
         def.add_lower_func(LowerFunc::FixedHugr {
             extensions: ExtensionSet::new(),
-            hugr: Hugr::default(),
+            hugr: crate::builder::test::simple_dfg_hugr(), // this is nonsense, but we are not testing the actual lowering here
         });
         def.add_misc("key", Default::default());
         assert_eq!(def.description(), "desc");
