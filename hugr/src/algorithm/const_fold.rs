@@ -97,7 +97,7 @@ pub fn find_consts<'a, 'r: 'a>(
     hugr: &'a impl HugrView,
     candidate_nodes: impl IntoIterator<Item = Node> + 'a,
     reg: &'r ExtensionRegistry,
-) -> impl Iterator<Item = (SimpleReplacement, Vec<RemoveLoadConstant>)> + 'a {
+) -> impl Iterator<Item = (Option<SimpleReplacement>, Vec<RemoveLoadConstant>)> + 'a {
     // track nodes for operations that have already been considered for folding
     let mut used_neighbours = BTreeSet::new();
 
@@ -113,13 +113,22 @@ pub fn find_consts<'a, 'r: 'a>(
                 .filter(|(n, _)| used_neighbours.insert(*n))
                 .collect_vec();
             if neighbours.is_empty() {
-                // no uses of LoadConstant that haven't already been considered.
-                return None;
+                if hugr.linked_inputs(n, out_p).next().is_none() {
+                    // LoadConstant with no out neighbours
+                    Some(itertools::Either::Left(std::iter::once((
+                        None,
+                        vec![RemoveLoadConstant(n)],
+                    ))))
+                } else {
+                    // No uses of LoadConstant that haven't already been considered.
+                    None
+                }
+            } else {
+                let fold_iter = neighbours
+                    .into_iter()
+                    .filter_map(|(neighbour, _)| fold_op(hugr, neighbour, reg));
+                Some(itertools::Either::Right(fold_iter))
             }
-            let fold_iter = neighbours
-                .into_iter()
-                .filter_map(|(neighbour, _)| fold_op(hugr, neighbour, reg));
-            Some(fold_iter)
         })
         .flatten()
 }
@@ -129,7 +138,7 @@ fn fold_op(
     hugr: &impl HugrView,
     op_node: Node,
     reg: &ExtensionRegistry,
-) -> Option<(SimpleReplacement, Vec<RemoveLoadConstant>)> {
+) -> Option<(Option<SimpleReplacement>, Vec<RemoveLoadConstant>)> {
     // only support leaf folding for now.
     let neighbour_op = hugr.get_optype(op_node);
     let (in_consts, removals): (Vec<_>, Vec<_>) = hugr
@@ -163,7 +172,7 @@ fn fold_op(
         HashMap::new(),
         nu_out,
     );
-    Some((simple_replace, removals))
+    Some((Some(simple_replace), removals))
 }
 
 /// If `op_node` is connected to a LoadConstant at `in_p`, return the constant
@@ -192,8 +201,8 @@ pub fn constant_fold_pass(h: &mut impl HugrMut, reg: &ExtensionRegistry) {
         if rewrites.is_empty() {
             break;
         }
-        for (replace, removes) in rewrites {
-            h.apply_rewrite(replace).unwrap();
+        for (mb_replace, removes) in rewrites {
+            let _ = mb_replace.and_then(|x| h.apply_rewrite(x).ok());
             for rem in removes {
                 if let Ok(const_node) = h.apply_rewrite(rem) {
                     // if the LoadConst was removed, try removing the Const too.

@@ -241,7 +241,7 @@ pub(crate) mod test {
             match op {
                 OpType::Input(_) | OpType::Output(_) | OpType::LoadConstant(_) => node_count += 1,
                 OpType::Const(c) if c.value() == expected_value => node_count += 1,
-                _ => panic!("unexpected op: {:?}", op),
+                _ => panic!("unexpected op: {:?}\n\n{}", op, h.mermaid_string()),
             }
         }
 

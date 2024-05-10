@@ -1,6 +1,6 @@
 //! Implementation of the `SimpleReplace` operation.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap};
 
 use crate::hugr::views::sealed::HugrInternals;
 use crate::hugr::views::sibling_subgraph::InvalidSubgraph;
@@ -74,34 +74,78 @@ impl SimpleReplacement {
 
         let self_output_node = h.children(parent).nth(1).unwrap();
         assert!(h.get_optype(self_output_node).is_output());
-        let replacement_output_node = self.replacement.children(self.replacement.root()).nth(1).unwrap();
-        assert!(self.replacement.get_optype(replacement_output_node).is_output());
+        let replacement_output_node = self
+            .replacement
+            .children(self.replacement.root())
+            .nth(1)
+            .unwrap();
+        assert!(self
+            .replacement
+            .get_optype(replacement_output_node)
+            .is_output());
 
-        let problem_unless = |is_good: bool, err: SimpleReplacementError| is_good.then_some(()).ok_or(err);
+        let problem_unless =
+            |is_good: bool, err: SimpleReplacementError| is_good.then_some(()).ok_or(err);
 
         for ((rep_inp_node, rep_inp_port), (rem_inp_node, rem_inp_port)) in &self.nu_inp {
             use SimpleReplacementError::*;
 
             // (rem_inp_node,rem_inp_port) should exist in h
             problem_unless(h.valid_non_root(*rem_inp_node), InvalidRemovedNode())?;
-            problem_unless(h.portgraph().port_index(rem_inp_node.pg_index(), Into::<Port>::into(*rem_inp_port).pg_offset()).is_some(), InvalidRemovedNode())?;
+            problem_unless(
+                h.portgraph()
+                    .port_index(
+                        rem_inp_node.pg_index(),
+                        Into::<Port>::into(*rem_inp_port).pg_offset(),
+                    )
+                    .is_some(),
+                InvalidRemovedNode(),
+            )?;
 
             // (rep_inp_node, rep_inp_port) should exist in replacement
-            problem_unless(self.replacement.valid_non_root(*rep_inp_node), InvalidReplacementNode())?;
-            problem_unless(self.replacement.portgraph().port_index(rep_inp_node.pg_index(), Into::<Port>::into(*rep_inp_port).pg_offset()).is_some(), InvalidReplacementNode())?;
+            problem_unless(
+                self.replacement.valid_non_root(*rep_inp_node),
+                InvalidReplacementNode(),
+            )?;
+            problem_unless(
+                self.replacement
+                    .portgraph()
+                    .port_index(
+                        rep_inp_node.pg_index(),
+                        Into::<Port>::into(*rep_inp_port).pg_offset(),
+                    )
+                    .is_some(),
+                InvalidReplacementNode(),
+            )?;
         }
 
         for ((rem_out_node, rem_out_port), rep_out_port) in &self.nu_out {
             use SimpleReplacementError::*;
             // (rem_out_node, rem_out_port) should exist in h
             problem_unless(h.valid_non_root(*rem_out_node), InvalidRemovedNode())?;
-            problem_unless(h.portgraph().port_index(rem_out_node.pg_index(), Into::<Port>::into(*rem_out_port).pg_offset()).is_some(), InvalidRemovedNode())?;
+            problem_unless(
+                h.portgraph()
+                    .port_index(
+                        rem_out_node.pg_index(),
+                        Into::<Port>::into(*rem_out_port).pg_offset(),
+                    )
+                    .is_some(),
+                InvalidRemovedNode(),
+            )?;
 
             // rep_out_port must be valid on replacement_output_node
-            problem_unless(self.replacement.portgraph().port_index(replacement_output_node.pg_index(), Into::<Port>::into(*rep_out_port).pg_offset()).is_some(), InvalidReplacementNode())?;
+            problem_unless(
+                self.replacement
+                    .portgraph()
+                    .port_index(
+                        replacement_output_node.pg_index(),
+                        Into::<Port>::into(*rep_out_port).pg_offset(),
+                    )
+                    .is_some(),
+                InvalidReplacementNode(),
+            )?;
         }
         Ok(())
-
     }
 }
 
@@ -238,7 +282,6 @@ pub enum SimpleReplacementError {
     #[error(transparent)]
     InvalidSubgraph(#[from] InvalidSubgraph),
 }
-
 
 #[cfg(test)]
 pub(in crate::hugr::rewrite) mod test {
