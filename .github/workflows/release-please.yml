@@ -6,6 +6,7 @@ on:
   push:
     branches:
       - main
+      - 'release/hugr-py-0.2.0-pre*'
 
 permissions:
   contents: write
@@ -20,3 +21,5 @@ jobs:
         with:
             token: ${{ secrets.GITHUB_TOKEN }}
             config-file: release-please-config.json
+            # https://stackoverflow.com/a/71158878
+            target-branch: ${{ github.head_ref || github.ref_name }}
