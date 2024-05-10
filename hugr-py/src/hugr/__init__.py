@@ -2,7 +2,7 @@
 representation.
 """
 
-__version__ = "0.2.0-pre"
+__version__ = "0.2.0-pre.1"
 
 
 def it_works() -> str:
