@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0-pre.1](https://github.com/CQCL/hugr/compare/hugr-py-v0.2.0-pre...hugr-py-v0.2.0-pre.1) (2024-05-10)
+
+
+### Bug Fixes
+
+* set `[build-system]` in `hugr-py/pyproject.toml` ([870453d](https://github.com/CQCL/hugr/commit/870453d4fab07c1b5b2706435f4e62a0cc564671))
+
 ## [0.2.0-pre](https://github.com/CQCL/hugr/compare/hugr-py-v0.1.0...hugr-py-v0.2.0-pre) (2024-05-10)
 
 
