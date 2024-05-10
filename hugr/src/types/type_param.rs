@@ -12,6 +12,7 @@ use crate::extension::ExtensionRegistry;
 use crate::extension::ExtensionSet;
 use crate::extension::SignatureError;
 
+use super::TypeEnum;
 use super::{check_typevar_decl, CustomType, Substitution, Type, TypeBound};
 
 /// The upper non-inclusive bound of a [`TypeParam::BoundedNat`]
@@ -217,6 +218,12 @@ impl TypeArg {
             TypeParam::Type { b } => TypeArg::Type {
                 ty: Type::new_var_use(idx, b),
             },
+            TypeParam::List { param: bx } if matches!(*bx, TypeParam::Type { .. }) => {
+                let TypeParam::Type { b } = *bx else { panic!() };
+                TypeArg::Type {
+                    ty: Type::new_row_var(idx, b),
+                }
+            }
             TypeParam::Extensions => TypeArg::Extensions {
                 es: ExtensionSet::type_var(idx),
             },
@@ -326,6 +333,23 @@ impl CustomTypeArg {
 
 /// Checks a [TypeArg] is as expected for a [TypeParam]
 pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgError> {
+    check_type_arg_rv(arg, param, false)
+}
+
+fn check_type_arg_rv(
+    arg: &TypeArg,
+    param: &TypeParam,
+    allow_rowvars: bool,
+) -> Result<(), TypeArgError> {
+    // allow_row_vars only applies if we are checking against values allowed inside a list
+    // (where the row variable could stand for *several* elements)
+    debug_assert!(!allow_rowvars || matches!(param, TypeParam::Type { .. }));
+    fn rowvar_in_list(ty: &Type, list_elem: &TypeParam) -> bool {
+        let TypeParam::Type { b } = list_elem else {
+            return false;
+        };
+        matches!(ty.0, TypeEnum::RowVariable(_, _)) && b.contains(ty.least_upper_bound())
+    }
     match (arg, param) {
         (
             TypeArg::Variable {
@@ -334,13 +358,21 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
             _,
         ) if param.contains(cached_decl) => Ok(()),
         (TypeArg::Type { ty }, TypeParam::Type { b: bound })
-            if bound.contains(ty.least_upper_bound()) =>
+            if bound.contains(ty.least_upper_bound())
+                && (allow_rowvars || !matches!(ty.0, TypeEnum::RowVariable(_, _))) =>
         {
             Ok(())
         }
         (TypeArg::Sequence { elems }, TypeParam::List { param }) => {
-            elems.iter().try_for_each(|arg| check_type_arg(arg, param))
+            let allow_rvs = matches!(&**param, TypeParam::Type { .. });
+            elems
+                .iter()
+                .try_for_each(|arg| check_type_arg_rv(arg, param, allow_rvs))
         }
+        // Also allow a single "Type" to be used for a List *only* if the Type is a row variable
+        // (i.e., it's not really a Type, it's multiple Types)
+        (TypeArg::Type { ty }, TypeParam::List { param }) if rowvar_in_list(ty, &**param) => Ok(()),
+
         (TypeArg::Sequence { elems: items }, TypeParam::Tuple { params: types }) => {
             if items.len() != types.len() {
                 Err(TypeArgError::WrongNumberTuple(items.len(), types.len()))
