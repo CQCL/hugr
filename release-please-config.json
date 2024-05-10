@@ -4,6 +4,7 @@
     "bump-minor-pre-major": true,
     "bump-patch-for-minor-pre-major": true,
     "initial-version": "0.0.0",
+    "prerelease-type": "pre",
     "packages": {
         "hugr-py": {
             "release-type": "python",
@@ -11,7 +12,9 @@
             "package-name": "hugr",
             "include-component-in-tag": true,
             "draft": false,
-            "prerelease": true
+            "prerelease": true,
+            "versioning": "prerelease"
+
         }
     },
     "changelog-sections": [
