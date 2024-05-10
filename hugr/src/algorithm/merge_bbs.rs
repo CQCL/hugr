@@ -363,7 +363,6 @@ mod test {
         let tst = bb3.add_dataflow_op(tst_op, [q, u])?;
         let pred = lifted_unary_unit_sum(&mut bb3);
         let bb3 = bb3.finish_with_outputs(pred, tst.outputs())?;
-        println!("ALAN bb1 {bb1:?} bb2 {bb2:?} bb3 {bb3:?}");
         // Now add control-flow edges between basic blocks
         h.branch(&bb1, 0, &bb2)?;
         h.branch(&bb2, 0, &bb3)?;
