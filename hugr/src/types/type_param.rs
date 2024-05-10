@@ -219,6 +219,11 @@ impl TypeArg {
                 ty: Type::new_var_use(idx, b),
             },
             TypeParam::List { param: bx } if matches!(*bx, TypeParam::Type { .. }) => {
+                // There are two reasonable schemes for representing row variables:
+                // 1. TypeArg::Variable(idx, TypeParam::List(TypeParam::Type(typebound)))
+                // 2. TypeArg::Type(Type::new_row_var(idx, typebound))
+                // Here we prefer the latter for canonicalization, although we cannot really
+                // prevent both if users construct the TypeArg variants directly (doing so will break Eq)
                 let TypeParam::Type { b } = *bx else { panic!() };
                 TypeArg::Type {
                     ty: Type::new_row_var(idx, b),
@@ -268,7 +273,9 @@ impl TypeArg {
         match self {
             TypeArg::Type { ty } => {
                 // A row variable standing for many types is represented as a single type
-                // ALAN TODO: add test that would fail if we didn't handle this
+                // TODO: this case can't happen until we start substituting across Hugrs
+                // (rather than just their types) - e.g. instantiating the *body* (not just type)
+                // of a FuncDefn, polymorphic over a row variable, with multiple types
                 let tys = ty
                     .substitute(t)
                     .into_iter()
