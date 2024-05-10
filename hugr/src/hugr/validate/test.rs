@@ -7,10 +7,10 @@ use crate::builder::{
     FunctionBuilder, HugrBuilder, ModuleBuilder, SubContainer,
 };
 use crate::extension::prelude::{BOOL_T, PRELUDE, PRELUDE_ID, USIZE_T};
-use crate::extension::{Extension, ExtensionSet, TypeDefBound, EMPTY_REG, PRELUDE_REGISTRY};
+use crate::extension::{Extension, ExtensionSet, OpDef, TypeDefBound, EMPTY_REG, PRELUDE_REGISTRY};
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::hugr::HugrMut;
-use crate::ops::dataflow::IOTrait;
+use crate::ops::dataflow::{IOTrait, LoadFunction};
 use crate::ops::handle::NodeHandle;
 use crate::ops::leaf::MakeTuple;
 use crate::ops::{self, Noop, OpType, Value};
@@ -546,23 +546,125 @@ fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+fn rowparam() -> TypeParam {
+    TypeParam::List {
+        param: Box::new(TypeBound::Any.into()),
+    }
+}
+
+fn add_eval_op(e: &mut Extension) -> &mut OpDef {
+    let inputs = Type::new_row_var(0, TypeBound::Any);
+    let outputs = Type::new_row_var(1, TypeBound::Any);
+    let evaled_fn = Type::new_function(FunctionType::new(inputs.clone(), outputs.clone()));
+    let pf = PolyFuncType::new(
+        [rowparam(), rowparam()],
+        FunctionType::new(vec![evaled_fn, inputs], outputs),
+    );
+    e.add_op("eval".into(), "".into(), pf).unwrap()
+}
+
+fn add_parallel_op(e: &mut Extension) -> &mut OpDef {
+    let rv = |idx| Type::new_row_var(idx, TypeBound::Any);
+    let pf = PolyFuncType::new(
+        [rowparam(), rowparam(), rowparam(), rowparam()],
+        FunctionType::new(
+            vec![
+                Type::new_function(FunctionType::new(rv(0), rv(2))),
+                Type::new_function(FunctionType::new(rv(1), rv(3))),
+            ],
+            Type::new_function(FunctionType::new(vec![rv(0), rv(1)], vec![rv(2), rv(3)])),
+        ),
+    );
+    e.add_op("parallel".into(), "".into(), pf).unwrap()
+}
+
+#[test]
+fn instantiate_row_variables() -> Result<(), Box<dyn std::error::Error>> {
+    fn uint_seq(i: usize) -> TypeArg {
+        TypeArg::Sequence {
+            elems: vec![TypeArg::Type { ty: USIZE_T }; i],
+        }
+    }
+    let mut e = Extension::new(EXT_ID);
+    add_eval_op(&mut e);
+    add_parallel_op(&mut e);
+    let mut dfb = DFGBuilder::new(FunctionType::new(
+        vec![
+            Type::new_function(FunctionType::new(USIZE_T, vec![USIZE_T, USIZE_T])),
+            USIZE_T,
+        ], // function + argument
+        vec![USIZE_T; 4], // results (twice each)
+    ))?;
+    let [func, int] = dfb.input_wires_arr();
+    let eval =
+        e.instantiate_extension_op("eval".into(), [uint_seq(1), uint_seq(2)], &PRELUDE_REGISTRY)?;
+    let [a, b] = dfb.add_dataflow_op(eval, [func, int])?.outputs_arr();
+    let par = e.instantiate_extension_op(
+        "parallel".into(),
+        [uint_seq(1), uint_seq(1), uint_seq(2), uint_seq(2)],
+        &PRELUDE_REGISTRY,
+    )?;
+    let [par_func] = dfb.add_dataflow_op(par, [func, func])?.outputs_arr();
+    let eval2 =
+        e.instantiate_extension_op("eval".into(), [uint_seq(2), uint_seq(4)], &PRELUDE_REGISTRY)?;
+    let eval2 = dfb.add_dataflow_op(eval2, [par_func, a, b])?;
+    dfb.finish_hugr_with_outputs(
+        eval2.outputs(),
+        &ExtensionRegistry::try_new([PRELUDE.to_owned(), e]).unwrap(),
+    )?;
+    Ok(())
+}
+
 #[test]
 fn inner_row_variables() -> Result<(), Box<dyn std::error::Error>> {
+    let mut e = Extension::new(EXT_ID);
+    add_parallel_op(&mut e);
+    fn to_seq(t: Type) -> TypeArg {
+        TypeArg::Sequence {
+            elems: vec![t.into()],
+        }
+    }
     let tv = Type::new_row_var(0, TypeBound::Any);
-    let inner_ft = Type::new_function(FunctionType::new_endo(vec![tv]));
+    let inner_ft = Type::new_function(FunctionType::new_endo(tv.clone()));
+    let ft_usz = Type::new_function(FunctionType::new_endo(vec![tv.clone(), USIZE_T]));
     let mut fb = FunctionBuilder::new(
         "id",
         PolyFuncType::new(
             [TypeParam::List {
                 param: Box::new(TypeParam::Type { b: TypeBound::Any }),
             }],
-            FunctionType::new_endo(vec![inner_ft.clone()]),
+            FunctionType::new(inner_ft.clone(), ft_usz),
         ),
     )?;
     // All the wires here are carrying higher-order Function values
-    // (the Functions themselves have variable arity, but that's fine as we are not calling them)
-    let id = fb.add_dataflow_op(Noop { ty: inner_ft }, fb.input_wires())?;
-    fb.finish_hugr_with_outputs(id.outputs(), &EMPTY_REG)?;
+    let [func_arg] = fb.input_wires_arr();
+    let [id_usz] = {
+        let bldr = fb.define_function("id_usz", FunctionType::new_endo(USIZE_T).into())?;
+        let vals = bldr.input_wires();
+        let [inner_def] = bldr.finish_with_outputs(vals)?.outputs_arr();
+        let loadf = LoadFunction::try_new(
+            FunctionType::new_endo(USIZE_T).into(),
+            [],
+            &PRELUDE_REGISTRY,
+        )
+        .unwrap();
+        fb.add_dataflow_op(loadf, [inner_def])?.outputs_arr()
+    };
+    let par = e.instantiate_extension_op(
+        "parallel".into(),
+        [
+            to_seq(tv.clone()),
+            to_seq(USIZE_T),
+            to_seq(tv.clone()),
+            to_seq(USIZE_T),
+        ],
+        &PRELUDE_REGISTRY,
+    )?;
+    let par_func = fb.add_dataflow_op(par, [func_arg, id_usz])?;
+    fb.finish_hugr_with_outputs(
+        par_func.outputs(),
+        &ExtensionRegistry::try_new([PRELUDE.to_owned(), e]).unwrap(),
+    )?;
     Ok(())
 }
 
