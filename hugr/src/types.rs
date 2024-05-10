@@ -359,8 +359,7 @@ impl Type {
     ///
     /// [validate]: crate::types::type_param::TypeArg::validate
     /// [TypeDef]: crate::extension::TypeDef
-    // ALAN TODO rename - validate_type, validate1type ?
-    pub(crate) fn validate(
+    pub(crate) fn validate_1type(
         &self,
         extension_registry: &ExtensionRegistry,
         var_decls: &[TypeParam],
@@ -383,7 +382,8 @@ impl Type {
         }
     }
 
-    // ALAN TODO rename to validate_var_len (?)
+    /// Checks that this [Type] is valid (as per [Type::validate_1type]), but also
+    /// allows row variables that may become multiple types
     fn validate_in_row(
         &self,
         extension_registry: &ExtensionRegistry,
@@ -395,7 +395,7 @@ impl Type {
             };
             check_typevar_decl(var_decls, idx, &t)
         } else {
-            self.validate(extension_registry, var_decls)
+            self.validate_1type(extension_registry, var_decls)
         }
     }
 

@@ -237,7 +237,8 @@ impl TypeArg {
         var_decls: &[TypeParam],
     ) -> Result<(), SignatureError> {
         match self {
-            TypeArg::Type { ty } => ty.validate(extension_registry, var_decls),
+            // Row variables are represented as Types, even inside TypeArgs
+            TypeArg::Type { ty } => ty.validate_in_row(extension_registry, var_decls),
             TypeArg::BoundedNat { .. } => Ok(()),
             TypeArg::Opaque { arg: custarg } => {
                 // We could also add a facility to Extension to validate that the constant *value*
