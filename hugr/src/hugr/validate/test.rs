@@ -1,4 +1,5 @@
 use cool_asserts::assert_matches;
+use rstest::rstest;
 
 use super::*;
 use crate::builder::test::closed_dfg_root_hugr;
@@ -615,15 +616,16 @@ fn instantiate_row_variables() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+fn single_type_seq(t: Type) -> TypeArg {
+    TypeArg::Sequence {
+        elems: vec![t.into()],
+    }
+}
+
 #[test]
 fn inner_row_variables() -> Result<(), Box<dyn std::error::Error>> {
     let mut e = Extension::new(EXT_ID);
     add_parallel_op(&mut e);
-    fn to_seq(t: Type) -> TypeArg {
-        TypeArg::Sequence {
-            elems: vec![t.into()],
-        }
-    }
     let tv = Type::new_row_var(0, TypeBound::Any);
     let inner_ft = Type::new_function(FunctionType::new_endo(tv.clone()));
     let ft_usz = Type::new_function(FunctionType::new_endo(vec![tv.clone(), USIZE_T]));
@@ -652,12 +654,7 @@ fn inner_row_variables() -> Result<(), Box<dyn std::error::Error>> {
     };
     let par = e.instantiate_extension_op(
         "parallel".into(),
-        [
-            to_seq(tv.clone()),
-            to_seq(USIZE_T),
-            to_seq(tv.clone()),
-            to_seq(USIZE_T),
-        ],
+        [tv.clone(), USIZE_T, tv.clone(), USIZE_T].map(single_type_seq),
         &PRELUDE_REGISTRY,
     )?;
     let par_func = fb.add_dataflow_op(par, [func_arg, id_usz])?;
@@ -668,30 +665,46 @@ fn inner_row_variables() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-#[test]
-fn no_outer_row_variables() -> Result<(), Box<dyn std::error::Error>> {
-    let tv = Type::new_row_var(0, TypeBound::Any);
-    let fb = FunctionBuilder::new(
-        "impossible_id_of_unknown_arity",
+#[rstest]
+#[case(false)]
+#[case(true)]
+fn no_outer_row_variables(#[case] connect: bool) -> Result<(), Box<dyn std::error::Error>> {
+    let mut e = Extension::new(EXT_ID);
+    add_eval_op(&mut e);
+    let tv = Type::new_row_var(0, TypeBound::Copyable);
+    let mut fb = FunctionBuilder::new(
+        "bad_eval",
         PolyFuncType::new(
             [TypeParam::List {
-                param: Box::new(TypeParam::Type { b: TypeBound::Any }),
+                param: Box::new(TypeParam::Type {
+                    b: TypeBound::Copyable,
+                }),
             }],
-            FunctionType::new_endo(vec![tv]),
+            FunctionType::new(
+                Type::new_function(FunctionType::new(USIZE_T, tv.clone())),
+                if connect { vec![tv.clone()] } else { vec![] },
+            ),
         ),
     )?;
-    // Input and Output nodes have a Port whose type is List(Type(Any))
-    // - so this is illegal because the wire between them is not a type:
-    let err = fb
-        .clone()
-        .finish_hugr_with_outputs(fb.input_wires(), &EMPTY_REG)
-        .unwrap_err();
-    assert_matches!(
-        err,
-        BuildError::InvalidHUGR(ValidationError::SignatureError { .. })
+    let [func_arg] = fb.input_wires_arr();
+    let i = fb.add_load_value(crate::extension::prelude::ConstUsize::new(5));
+    let ev = e.instantiate_extension_op(
+        "eval".into(),
+        [single_type_seq(USIZE_T.into()), single_type_seq(tv)],
+        &PRELUDE_REGISTRY,
+    )?;
+    let ev = fb.add_dataflow_op(ev, [func_arg, i])?;
+    let reg = ExtensionRegistry::try_new([PRELUDE.to_owned(), e]).unwrap();
+    if connect {
+        fb.set_outputs(ev.outputs())?;
+    }
+    assert_eq!(
+        fb.finish_hugr(&reg).unwrap_err(),
+        ValidationError::SignatureError {
+            node: ev.node(),
+            cause: SignatureError::RowTypeVarOutsideRow { idx: 0 }
+        }
     );
-    // Also try leaving no inputs/outputs - so this should be illegal because the ports are unconnected
-    fb.finish_hugr(&EMPTY_REG).unwrap_err();
     Ok(())
 }
 
