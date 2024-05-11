@@ -615,7 +615,7 @@ fn instantiate_row_variables() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn single_type_seq(t: Type) -> TypeArg {
+fn seq1ty(t: Type) -> TypeArg {
     TypeArg::Sequence {
         elems: vec![t.into()],
     }
@@ -653,7 +653,7 @@ fn inner_row_variables() -> Result<(), Box<dyn std::error::Error>> {
     };
     let par = e.instantiate_extension_op(
         "parallel",
-        [tv.clone(), USIZE_T, tv.clone(), USIZE_T].map(single_type_seq),
+        [tv.clone(), USIZE_T, tv.clone(), USIZE_T].map(seq1ty),
         &PRELUDE_REGISTRY,
     )?;
     let par_func = fb.add_dataflow_op(par, [func_arg, id_usz])?;
@@ -687,11 +687,8 @@ fn no_outer_row_variables(#[case] connect: bool) -> Result<(), Box<dyn std::erro
     )?;
     let [func_arg] = fb.input_wires_arr();
     let i = fb.add_load_value(crate::extension::prelude::ConstUsize::new(5));
-    let ev = e.instantiate_extension_op(
-        "eval",
-        [single_type_seq(USIZE_T), single_type_seq(tv)],
-        &PRELUDE_REGISTRY,
-    )?;
+    let ev =
+        e.instantiate_extension_op("eval", [seq1ty(USIZE_T), seq1ty(tv)], &PRELUDE_REGISTRY)?;
     let ev = fb.add_dataflow_op(ev, [func_arg, i])?;
     let reg = ExtensionRegistry::try_new([PRELUDE.to_owned(), e]).unwrap();
     if connect {
