@@ -597,17 +597,16 @@ fn instantiate_row_variables() -> Result<(), Box<dyn std::error::Error>> {
         vec![USIZE_T; 4], // results (twice each)
     ))?;
     let [func, int] = dfb.input_wires_arr();
-    let eval =
-        e.instantiate_extension_op("eval".into(), [uint_seq(1), uint_seq(2)], &PRELUDE_REGISTRY)?;
+    let eval = e.instantiate_extension_op("eval", [uint_seq(1), uint_seq(2)], &PRELUDE_REGISTRY)?;
     let [a, b] = dfb.add_dataflow_op(eval, [func, int])?.outputs_arr();
     let par = e.instantiate_extension_op(
-        "parallel".into(),
+        "parallel",
         [uint_seq(1), uint_seq(1), uint_seq(2), uint_seq(2)],
         &PRELUDE_REGISTRY,
     )?;
     let [par_func] = dfb.add_dataflow_op(par, [func, func])?.outputs_arr();
     let eval2 =
-        e.instantiate_extension_op("eval".into(), [uint_seq(2), uint_seq(4)], &PRELUDE_REGISTRY)?;
+        e.instantiate_extension_op("eval", [uint_seq(2), uint_seq(4)], &PRELUDE_REGISTRY)?;
     let eval2 = dfb.add_dataflow_op(eval2, [par_func, a, b])?;
     dfb.finish_hugr_with_outputs(
         eval2.outputs(),
@@ -653,7 +652,7 @@ fn inner_row_variables() -> Result<(), Box<dyn std::error::Error>> {
         fb.add_dataflow_op(loadf, [inner_def])?.outputs_arr()
     };
     let par = e.instantiate_extension_op(
-        "parallel".into(),
+        "parallel",
         [tv.clone(), USIZE_T, tv.clone(), USIZE_T].map(single_type_seq),
         &PRELUDE_REGISTRY,
     )?;
@@ -689,8 +688,8 @@ fn no_outer_row_variables(#[case] connect: bool) -> Result<(), Box<dyn std::erro
     let [func_arg] = fb.input_wires_arr();
     let i = fb.add_load_value(crate::extension::prelude::ConstUsize::new(5));
     let ev = e.instantiate_extension_op(
-        "eval".into(),
-        [single_type_seq(USIZE_T.into()), single_type_seq(tv)],
+        "eval",
+        [single_type_seq(USIZE_T), single_type_seq(tv)],
         &PRELUDE_REGISTRY,
     )?;
     let ev = fb.add_dataflow_op(ev, [func_arg, i])?;

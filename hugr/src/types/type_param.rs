@@ -378,7 +378,7 @@ fn check_type_arg_rv(
         }
         // Also allow a single "Type" to be used for a List *only* if the Type is a row variable
         // (i.e., it's not really a Type, it's multiple Types)
-        (TypeArg::Type { ty }, TypeParam::List { param }) if rowvar_in_list(ty, &**param) => Ok(()),
+        (TypeArg::Type { ty }, TypeParam::List { param }) if rowvar_in_list(ty, param) => Ok(()),
 
         (TypeArg::Sequence { elems: items }, TypeParam::Tuple { params: types }) => {
             if items.len() != types.len() {
