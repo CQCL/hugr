@@ -342,9 +342,10 @@ mod test {
         assert_eq!(h, backup);
 
         // The entry node implicitly has an extra incoming edge
-        let r = h.apply_rewrite(OutlineCfg::new([entry, left, merge]));
+        let r = h.apply_rewrite(OutlineCfg::new([entry, left, right, merge, head]));
         assert_matches!(r, Err(OutlineCfgError::MultipleEntryNodes(a,b))
-            => assert_eq!(HashSet::from([a,b]), HashSet::from([entry, merge])));
+            => assert_eq!(HashSet::from([a,b]), HashSet::from([entry, head])));
+        assert_eq!(h, backup);
     }
 
     #[test]
