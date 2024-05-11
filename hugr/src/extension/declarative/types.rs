@@ -7,7 +7,7 @@
 //! [specification]: https://github.com/CQCL/hugr/blob/main/specification/hugr.md#declarative-format
 //! [`ExtensionSetDeclaration`]: super::ExtensionSetDeclaration
 
-use crate::extension::{TypeDef, TypeDefBound, TypeParametrised};
+use crate::extension::{TypeDef, TypeDefBound};
 use crate::types::type_param::TypeParam;
 use crate::types::{CustomType, TypeBound, TypeName};
 use crate::Extension;

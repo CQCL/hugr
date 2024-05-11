@@ -15,8 +15,7 @@ use crate::hugr::IdentList;
 use crate::ops::constant::{ValueName, ValueNameRef};
 use crate::ops::custom::{ExtensionOp, OpaqueOp};
 use crate::ops::{self, OpName, OpNameRef};
-use crate::types::type_param::{check_type_args, TypeArgError};
-use crate::types::type_param::{TypeArg, TypeParam};
+use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
 use crate::types::{check_typevar_decl, CustomType, Substitution, TypeBound, TypeName};
 use crate::types::{FunctionType, TypeNameRef};
 
@@ -28,7 +27,7 @@ pub use infer::{ExtensionSolution, InferExtensionError};
 
 mod op_def;
 pub use op_def::{
-    CustomSignatureFunc, CustomValidator, OpDef, SignatureFromArgs, SignatureFunc,
+    CustomSignatureFunc, CustomValidator, LowerFunc, OpDef, SignatureFromArgs, SignatureFunc,
     ValidateJustArgs, ValidateTypeArgs,
 };
 mod type_def;
@@ -233,22 +232,6 @@ impl CustomConcrete for CustomType {
 
     fn parent_extension(&self) -> &ExtensionId {
         self.extension()
-    }
-}
-
-/// Type-parametrised functionality shared between [`TypeDef`] and [`OpDef`].
-trait TypeParametrised {
-    /// The concrete object built by binding type arguments to parameters
-    type Concrete: CustomConcrete;
-    /// The extension-unique name.
-    fn name(&self) -> &<Self::Concrete as CustomConcrete>::Identifier;
-    /// Type parameters.
-    fn params(&self) -> &[TypeParam];
-    /// The parent extension.
-    fn extension(&self) -> &ExtensionId;
-    /// Check provided type arguments are valid against parameters.
-    fn check_args_impl(&self, args: &[TypeArg]) -> Result<(), SignatureError> {
-        check_type_args(args, self.params()).map_err(SignatureError::TypeArgMismatch)
     }
 }
 

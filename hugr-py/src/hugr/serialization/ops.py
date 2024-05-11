@@ -500,18 +500,20 @@ class OpType(RootModel):
 # --------------------------------------
 
 
-class OpDef(BaseOp, populate_by_name=True):
+class FixedHugr(ConfiguredBaseModel):
+    extensions: ExtensionSet
+    hugr: Any
+
+
+class OpDef(ConfiguredBaseModel, populate_by_name=True):
     """Serializable definition for dynamically loaded operations."""
 
+    extension: ExtensionId
     name: str  # Unique identifier of the operation.
     description: str  # Human readable description of the operation.
-    inputs: list[tuple[str | None, Type]]
-    outputs: list[tuple[str | None, Type]]
-    misc: dict[str, Any]  # Miscellaneous data associated with the operation.
-    def_: str | None = Field(
-        ..., alias="def"
-    )  # (YAML?)-encoded definition of the operation.
-    extension_reqs: ExtensionSet  # Resources required to execute this operation.
+    misc: dict[str, Any] | None = None
+    signature: PolyFuncType | None = None
+    lower_funcs: list[FixedHugr]
 
 
 # Now that all classes are defined, we need to update the ForwardRefs in all type
