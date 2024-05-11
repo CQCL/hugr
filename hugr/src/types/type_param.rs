@@ -132,7 +132,7 @@ impl From<UpperBound> for TypeParam {
 }
 
 /// A statically-known argument value to an operation.
-#[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
 #[non_exhaustive]
 #[serde(tag = "tya")]
 pub enum TypeArg {
@@ -218,17 +218,6 @@ impl TypeArg {
             TypeParam::Type { b } => TypeArg::Type {
                 ty: Type::new_var_use(idx, b),
             },
-            TypeParam::List { param: bx } if matches!(*bx, TypeParam::Type { .. }) => {
-                // There are two reasonable schemes for representing row variables:
-                // 1. TypeArg::Variable(idx, TypeParam::List(TypeParam::Type(typebound)))
-                // 2. TypeArg::Type(Type::new_row_var(idx, typebound))
-                // Here we prefer the latter for canonicalization, although we cannot really
-                // prevent both if users construct the TypeArg variants directly (doing so will break Eq)
-                let TypeParam::Type { b } = *bx else { panic!() };
-                TypeArg::Type {
-                    ty: Type::new_row_var(idx, b),
-                }
-            }
             TypeParam::Extensions => TypeArg::Extensions {
                 es: ExtensionSet::type_var(idx),
             },
@@ -272,19 +261,7 @@ impl TypeArg {
     pub(crate) fn substitute(&self, t: &Substitution) -> Self {
         match self {
             TypeArg::Type { ty } => {
-                // A row variable standing for many types is represented as a single type
-                // TODO: this case can't happen until we start substituting across Hugrs
-                // (rather than just their types) - e.g. instantiating the *body* (not just type)
-                // of a FuncDefn, polymorphic over a row variable, with multiple types
-                let tys = ty
-                    .substitute(t)
-                    .into_iter()
-                    .map(|ty| TypeArg::Type { ty })
-                    .collect::<Vec<_>>();
-                match <Vec<TypeArg> as TryInto<[TypeArg; 1]>>::try_into(tys) {
-                    Ok([ty]) => ty,
-                    Err(elems) => TypeArg::Sequence { elems },
-                }
+                TypeArg::Type { ty: ty.substitute(t) }
             }
             TypeArg::BoundedNat { .. } => self.clone(), // We do not allow variables as bounds on BoundedNat's
             TypeArg::Opaque {

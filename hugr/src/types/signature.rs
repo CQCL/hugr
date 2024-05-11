@@ -16,33 +16,38 @@ use crate::{Direction, IncomingPort, OutgoingPort, Port};
 /// and also the target (value) of a call (static).
 ///
 /// [Graph]: crate::ops::constant::Value::Function
-pub struct FunctionType {
+pub struct FunctionType<const ROWVARS:bool = false> {
     /// Value inputs of the function.
-    pub input: TypeRow,
+    pub input: TypeRow<ROWVARS>,
     /// Value outputs of the function.
-    pub output: TypeRow,
+    pub output: TypeRow<ROWVARS>,
     /// The extension requirements which are added by the operation
     pub extension_reqs: ExtensionSet,
 }
 
-impl FunctionType {
+impl <const RV:bool> FunctionType<RV> {
     /// Builder method, add extension_reqs to an FunctionType
     pub fn with_extension_delta(mut self, rs: impl Into<ExtensionSet>) -> Self {
         self.extension_reqs = self.extension_reqs.union(rs.into());
         self
     }
+}
 
-    pub(super) fn validate_varargs(
+impl FunctionType<true> {
+    pub(super) fn validate(
         &self,
         extension_registry: &ExtensionRegistry,
         var_decls: &[TypeParam],
     ) -> Result<(), SignatureError> {
-        self.input.validate_var_len(extension_registry, var_decls)?;
+        self.input.validate(extension_registry, var_decls)?;
         self.output
-            .validate_var_len(extension_registry, var_decls)?;
+            .validate(extension_registry, var_decls)?;
         self.extension_reqs.validate(var_decls)
     }
+}
 
+impl <const RV:bool> FunctionType<RV>
+{
     pub(crate) fn substitute(&self, tr: &Substitution) -> Self {
         FunctionType {
             input: self.input.substitute(tr),
@@ -50,19 +55,15 @@ impl FunctionType {
             extension_reqs: self.extension_reqs.substitute(tr),
         }
     }
-}
 
-impl FunctionType {
     /// The number of wires in the signature.
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
         self.input.is_empty() && self.output.is_empty()
     }
-}
 
-impl FunctionType {
     /// Create a new signature with specified inputs and outputs.
-    pub fn new(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Self {
+    pub fn new(input: impl Into<TypeRow<RV>>, output: impl Into<TypeRow<RV>>) -> Self {
         Self {
             input: input.into(),
             output: output.into(),
@@ -71,11 +72,13 @@ impl FunctionType {
     }
     /// Create a new signature with the same input and output types (signature of an endomorphic
     /// function).
-    pub fn new_endo(linear: impl Into<TypeRow>) -> Self {
+    pub fn new_endo(linear: impl Into<TypeRow<RV>>) -> Self {
         let linear = linear.into();
         Self::new(linear.clone(), linear)
     }
+}
 
+impl FunctionType<false> {
     /// Returns the type of a value [`Port`]. Returns `None` if the port is out
     /// of bounds.
     #[inline]
@@ -146,10 +149,12 @@ impl FunctionType {
     pub fn output_count(&self) -> usize {
         self.port_count(Direction::Outgoing)
     }
+}
 
+impl <const RV:bool> FunctionType<RV> {
     /// Returns a slice of the types for the given direction.
     #[inline]
-    pub fn types(&self, dir: Direction) -> &[Type] {
+    pub fn types(&self, dir: Direction) -> &[Type<RV>] {
         match dir {
             Direction::Incoming => &self.input,
             Direction::Outgoing => &self.output,
@@ -158,30 +163,30 @@ impl FunctionType {
 
     /// Returns a slice of the input types.
     #[inline]
-    pub fn input_types(&self) -> &[Type] {
+    pub fn input_types(&self) -> &[Type<RV>] {
         self.types(Direction::Incoming)
     }
 
     /// Returns a slice of the output types.
     #[inline]
-    pub fn output_types(&self) -> &[Type] {
+    pub fn output_types(&self) -> &[Type<RV>] {
         self.types(Direction::Outgoing)
     }
 
     #[inline]
     /// Returns the input row
-    pub fn input(&self) -> &TypeRow {
+    pub fn input(&self) -> &TypeRow<RV> {
         &self.input
     }
 
     #[inline]
     /// Returns the output row
-    pub fn output(&self) -> &TypeRow {
+    pub fn output(&self) -> &TypeRow<RV> {
         &self.output
     }
 }
 
-impl FunctionType {
+impl FunctionType<false> {
     /// Returns the `Port`s in the signature for a given direction.
     #[inline]
     pub fn ports(&self, dir: Direction) -> impl Iterator<Item = Port> {
@@ -203,7 +208,29 @@ impl FunctionType {
     }
 }
 
-impl Display for FunctionType {
+impl From<FunctionType<false>> for FunctionType<true> {
+    fn from(value: FunctionType<false>) -> Self {
+        Self {
+            input: value.input.into(),
+            output: value.input.into(),
+            extension_reqs: value.extension_reqs
+        }
+    }
+}
+
+impl TryFrom<FunctionType<true>> for FunctionType {
+    type Error;
+
+    fn try_from(value: FunctionType<true>) -> Result<Self, Self::Error> {
+        Ok(Self {
+            input: value.input.try_into()?,
+            output: value.output.try_into()?,
+            extension_reqs: value.extension_reqs
+        })
+    }
+}
+
+impl <const RV:bool> Display for FunctionType<RV> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if !self.input.is_empty() {
             self.input.fmt(f)?;

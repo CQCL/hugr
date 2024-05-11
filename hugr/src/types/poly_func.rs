@@ -25,12 +25,13 @@ pub struct PolyFuncType {
     /// the same number of [TypeArg]s before the function can be called. This
     /// defines the indices used by variables inside the body.
     params: Vec<TypeParam>,
-    /// Template for the function. May contain variables up to length of [Self::params]
-    body: FunctionType,
+    /// Template for the function.
+    /// May contain variables up to length of [Self::params], including row variables.
+    body: FunctionType<true>,
 }
 
-impl From<FunctionType> for PolyFuncType {
-    fn from(body: FunctionType) -> Self {
+impl From<FunctionType<true>> for PolyFuncType {
+    fn from(body: FunctionType<true>) -> Self {
         Self {
             params: vec![],
             body,
@@ -38,7 +39,7 @@ impl From<FunctionType> for PolyFuncType {
     }
 }
 
-impl TryFrom<PolyFuncType> for FunctionType {
+impl TryFrom<PolyFuncType> for FunctionType<true> {
     /// If the PolyFuncType is not a monomorphic FunctionType, fail with the binders
     type Error = Vec<TypeParam>;
 
@@ -58,13 +59,13 @@ impl PolyFuncType {
     }
 
     /// The body of the type, a function type.
-    pub fn body(&self) -> &FunctionType {
+    pub fn body(&self) -> &FunctionType<true> {
         &self.body
     }
 
     /// Create a new PolyFuncType given the kinds of the variables it declares
     /// and the underlying [FunctionType].
-    pub fn new(params: impl Into<Vec<TypeParam>>, body: FunctionType) -> Self {
+    pub fn new(params: impl Into<Vec<TypeParam>>, body: FunctionType<true>) -> Self {
         Self {
             params: params.into(),
             body,
@@ -76,9 +77,9 @@ impl PolyFuncType {
     /// Allows both inputs and outputs to contain [RowVariable]s
     ///
     /// [RowVariable]: [crate::types::TypeEnum::RowVariable]
-    pub fn validate_varargs(&self, reg: &ExtensionRegistry) -> Result<(), SignatureError> {
+    pub fn validate(&self, reg: &ExtensionRegistry) -> Result<(), SignatureError> {
         // TODO https://github.com/CQCL/hugr/issues/624 validate TypeParams declared here, too
-        self.body.validate_varargs(reg, &self.params)
+        self.body.validate(reg, &self.params)
     }
 
     /// Instantiates an outer [PolyFuncType], i.e. with no free variables
@@ -91,7 +92,7 @@ impl PolyFuncType {
         &self,
         args: &[TypeArg],
         ext_reg: &ExtensionRegistry,
-    ) -> Result<FunctionType, SignatureError> {
+    ) -> Result<FunctionType<true>, SignatureError> {
         // Check that args are applicable, and that we have a value for each binder,
         // i.e. each possible free variable within the body.
         check_type_args(args, &self.params)?;
@@ -126,11 +127,11 @@ pub(crate) mod test {
     impl PolyFuncType {
         fn new_validated(
             params: impl Into<Vec<TypeParam>>,
-            body: FunctionType,
+            body: impl Into<FunctionType<true>>,
             extension_registry: &ExtensionRegistry,
         ) -> Result<Self, SignatureError> {
-            let res = Self::new(params, body);
-            res.validate_varargs(extension_registry)?;
+            let res = Self::new(params, body.into());
+            res.validate(extension_registry)?;
             Ok(res)
         }
     }
