@@ -510,7 +510,7 @@ mod test {
         }
         assert_eq!(h.get_parent(new_block), Some(cfg));
         assert!(h.get_optype(new_block).is_dataflow_block());
-        let b = h.base_hugr(); // To cope with `h`` potentially being a SiblingMut
+        let b = h.base_hugr(); // To cope with `h` potentially being a SiblingMut
         assert_eq!(b.get_parent(new_cfg), Some(new_block));
         for n in blocks {
             assert_eq!(b.get_parent(n), Some(new_cfg));
