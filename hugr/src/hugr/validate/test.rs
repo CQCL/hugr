@@ -8,7 +8,7 @@ use crate::builder::{
     FunctionBuilder, HugrBuilder, ModuleBuilder, SubContainer,
 };
 use crate::extension::prelude::{BOOL_T, PRELUDE, PRELUDE_ID, USIZE_T};
-use crate::extension::{Extension, ExtensionSet, OpDef, TypeDefBound, EMPTY_REG, PRELUDE_REGISTRY};
+use crate::extension::{Extension, ExtensionSet, TypeDefBound, EMPTY_REG, PRELUDE_REGISTRY};
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::hugr::HugrMut;
 use crate::ops::dataflow::{IOTrait, LoadFunction};
@@ -547,13 +547,14 @@ fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn rowparam() -> TypeParam {
-    TypeParam::List {
-        param: Box::new(TypeBound::Any.into()),
+fn extension_with_eval_parallel() -> Extension {
+    fn rowparam() -> TypeParam {
+        TypeParam::List {
+            param: Box::new(TypeBound::Any.into()),
+        }
     }
-}
+    let mut e = Extension::new(EXT_ID);
 
-fn add_eval_op(e: &mut Extension) -> &mut OpDef {
     let inputs = Type::new_row_var(0, TypeBound::Any);
     let outputs = Type::new_row_var(1, TypeBound::Any);
     let evaled_fn = Type::new_function(FunctionType::new(inputs.clone(), outputs.clone()));
@@ -561,10 +562,8 @@ fn add_eval_op(e: &mut Extension) -> &mut OpDef {
         [rowparam(), rowparam()],
         FunctionType::new(vec![evaled_fn, inputs], outputs),
     );
-    e.add_op("eval".into(), "".into(), pf).unwrap()
-}
+    e.add_op("eval".into(), "".into(), pf).unwrap();
 
-fn add_parallel_op(e: &mut Extension) -> &mut OpDef {
     let rv = |idx| Type::new_row_var(idx, TypeBound::Any);
     let pf = PolyFuncType::new(
         [rowparam(), rowparam(), rowparam(), rowparam()],
@@ -576,7 +575,9 @@ fn add_parallel_op(e: &mut Extension) -> &mut OpDef {
             Type::new_function(FunctionType::new(vec![rv(0), rv(1)], vec![rv(2), rv(3)])),
         ),
     );
-    e.add_op("parallel".into(), "".into(), pf).unwrap()
+    e.add_op("parallel".into(), "".into(), pf).unwrap();
+
+    e
 }
 
 #[test]
@@ -586,9 +587,7 @@ fn instantiate_row_variables() -> Result<(), Box<dyn std::error::Error>> {
             elems: vec![TypeArg::Type { ty: USIZE_T }; i],
         }
     }
-    let mut e = Extension::new(EXT_ID);
-    add_eval_op(&mut e);
-    add_parallel_op(&mut e);
+    let e = extension_with_eval_parallel();
     let mut dfb = DFGBuilder::new(FunctionType::new(
         vec![
             Type::new_function(FunctionType::new(USIZE_T, vec![USIZE_T, USIZE_T])),
@@ -623,8 +622,7 @@ fn seq1ty(t: Type) -> TypeArg {
 
 #[test]
 fn inner_row_variables() -> Result<(), Box<dyn std::error::Error>> {
-    let mut e = Extension::new(EXT_ID);
-    add_parallel_op(&mut e);
+    let e = extension_with_eval_parallel();
     let tv = Type::new_row_var(0, TypeBound::Any);
     let inner_ft = Type::new_function(FunctionType::new_endo(tv.clone()));
     let ft_usz = Type::new_function(FunctionType::new_endo(vec![tv.clone(), USIZE_T]));
@@ -668,8 +666,7 @@ fn inner_row_variables() -> Result<(), Box<dyn std::error::Error>> {
 #[case(false)]
 #[case(true)]
 fn no_outer_row_variables(#[case] connect: bool) -> Result<(), Box<dyn std::error::Error>> {
-    let mut e = Extension::new(EXT_ID);
-    add_eval_op(&mut e);
+    let e = extension_with_eval_parallel();
     let tv = Type::new_row_var(0, TypeBound::Copyable);
     let mut fb = FunctionBuilder::new(
         "bad_eval",
@@ -720,7 +717,7 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
         )
         .with_extension_delta(ExtensionSet::type_var(1)),
     );
-    // The higher-order "eval" operation - takes a function and its argument.
+    // Single-input/output version of the higher-order "eval" operation, with extension param.
     // Note the extension-delta of the eval node includes that of the input function.
     e.add_op(
         "eval".into(),
