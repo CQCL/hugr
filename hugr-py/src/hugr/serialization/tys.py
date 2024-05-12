@@ -214,6 +214,15 @@ class Variable(ConfiguredBaseModel):
     b: "TypeBound"
 
 
+class RowVar(ConfiguredBaseModel):
+    """A variable standing for a row of some (unknown) number of types.
+    May occur only within a row; not a node input/output."""
+
+    t: Literal["R"] = "R"
+    i: int
+    b: "TypeBound"
+
+
 class USize(ConfiguredBaseModel):
     """Unsigned integer size type."""
 
@@ -321,7 +330,15 @@ class Type(RootModel):
     """A HUGR type."""
 
     root: Annotated[
-        Qubit | Variable | USize | FunctionType | Array | SumType | Opaque | Alias,
+        Qubit
+        | Variable
+        | RowVar
+        | USize
+        | FunctionType
+        | Array
+        | SumType
+        | Opaque
+        | Alias,
         WrapValidator(_json_custom_error_validator),
         Field(discriminator="t"),
     ]
