@@ -7,11 +7,7 @@
                 "t": {
                     "const": "Alias",
                     "default": "Alias",
-                    "enum": [
-                        "Alias"
-                    ],
-                    "title": "T",
-                    "type": "string"
+                    "title": "T"
                 },
                 "bound": {
                     "$ref": "#/$defs/TypeBound"
@@ -53,11 +49,7 @@
                 "op": {
                     "const": "AliasDecl",
                     "default": "AliasDecl",
-                    "enum": [
-                        "AliasDecl"
-                    ],
-                    "title": "Op",
-                    "type": "string"
+                    "title": "Op"
                 },
                 "name": {
                     "title": "Name",
@@ -100,11 +92,7 @@
                 "op": {
                     "const": "AliasDefn",
                     "default": "AliasDefn",
-                    "enum": [
-                        "AliasDefn"
-                    ],
-                    "title": "Op",
-                    "type": "string"
+                    "title": "Op"
                 },
                 "name": {
                     "title": "Name",
@@ -132,11 +120,7 @@
                 "t": {
                     "const": "Array",
                     "default": "Array",
-                    "enum": [
-                        "Array"
-                    ],
-                    "title": "T",
-                    "type": "string"
+                    "title": "T"
                 },
                 "len": {
                     "title": "Len",
@@ -156,11 +140,7 @@
                 "tya": {
                     "const": "BoundedNat",
                     "default": "BoundedNat",
-                    "enum": [
-                        "BoundedNat"
-                    ],
-                    "title": "Tya",
-                    "type": "string"
+                    "title": "Tya"
                 },
                 "n": {
                     "title": "N",
@@ -179,11 +159,7 @@
                 "tp": {
                     "const": "BoundedNat",
                     "default": "BoundedNat",
-                    "enum": [
-                        "BoundedNat"
-                    ],
-                    "title": "Tp",
-                    "type": "string"
+                    "title": "Tp"
                 },
                 "bound": {
                     "anyOf": [
@@ -229,11 +205,7 @@
                 "op": {
                     "const": "CFG",
                     "default": "CFG",
-                    "enum": [
-                        "CFG"
-                    ],
-                    "title": "Op",
-                    "type": "string"
+                    "title": "Op"
                 },
                 "signature": {
                     "$ref": "#/$defs/FunctionType"
@@ -271,11 +243,7 @@
                 "op": {
                     "const": "Call",
                     "default": "Call",
-                    "enum": [
-                        "Call"
-                    ],
-                    "title": "Op",
-                    "type": "string"
+                    "title": "Op"
                 },
                 "func_sig": {
                     "$ref": "#/$defs/PolyFuncType"
@@ -326,11 +294,7 @@
                 "op": {
                     "const": "CallIndirect",
                     "default": "CallIndirect",
-                    "enum": [
-                        "CallIndirect"
-                    ],
-                    "title": "Op",
-                    "type": "string"
+                    "title": "Op"
                 },
                 "signature": {
                     "$ref": "#/$defs/FunctionType"
@@ -368,11 +332,7 @@
                 "op": {
                     "const": "Case",
                     "default": "Case",
-                    "enum": [
-                        "Case"
-                    ],
-                    "title": "Op",
-                    "type": "string"
+                    "title": "Op"
                 },
                 "signature": {
                     "$ref": "#/$defs/FunctionType"
@@ -410,11 +370,7 @@
                 "op": {
                     "const": "Conditional",
                     "default": "Conditional",
-                    "enum": [
-                        "Conditional"
-                    ],
-                    "title": "Op",
-                    "type": "string"
+                    "title": "Op"
                 },
                 "other_inputs": {
                     "items": {
@@ -481,11 +437,7 @@
                 "op": {
                     "const": "Const",
                     "default": "Const",
-                    "enum": [
-                        "Const"
-                    ],
-                    "title": "Op",
-                    "type": "string"
+                    "title": "Op"
                 },
                 "v": {
                     "$ref": "#/$defs/Value"
@@ -542,11 +494,7 @@
                 "op": {
                     "const": "CustomOp",
                     "default": "CustomOp",
-                    "enum": [
-                        "CustomOp"
-                    ],
-                    "title": "Op",
-                    "type": "string"
+                    "title": "Op"
                 },
                 "extension": {
                     "title": "Extension",
@@ -606,11 +554,7 @@
                 "op": {
                     "const": "DFG",
                     "default": "DFG",
-                    "enum": [
-                        "DFG"
-                    ],
-                    "title": "Op",
-                    "type": "string"
+                    "title": "Op"
                 },
                 "signature": {
                     "$ref": "#/$defs/FunctionType"
@@ -648,11 +592,7 @@
                 "op": {
                     "const": "DataflowBlock",
                     "default": "DataflowBlock",
-                    "enum": [
-                        "DataflowBlock"
-                    ],
-                    "title": "Op",
-                    "type": "string"
+                    "title": "Op"
                 },
                 "inputs": {
                     "items": {
@@ -719,11 +659,7 @@
                 "op": {
                     "const": "ExitBlock",
                     "default": "ExitBlock",
-                    "enum": [
-                        "ExitBlock"
-                    ],
-                    "title": "Op",
-                    "type": "string"
+                    "title": "Op"
                 },
                 "cfg_outputs": {
                     "items": {
@@ -747,11 +683,7 @@
                 "v": {
                     "const": "Extension",
                     "default": "Extension",
-                    "enum": [
-                        "Extension"
-                    ],
-                    "title": "ValueTag",
-                    "type": "string"
+                    "title": "ValueTag"
                 },
                 "extensions": {
                     "items": {
@@ -781,11 +713,7 @@
                 "tya": {
                     "const": "Extensions",
                     "default": "Extensions",
-                    "enum": [
-                        "Extensions"
-                    ],
-                    "title": "Tya",
-                    "type": "string"
+                    "title": "Tya"
                 },
                 "es": {
                     "items": {
@@ -807,11 +735,7 @@
                 "tp": {
                     "const": "Extensions",
                     "default": "Extensions",
-                    "enum": [
-                        "Extensions"
-                    ],
-                    "title": "Tp",
-                    "type": "string"
+                    "title": "Tp"
                 }
             },
             "title": "ExtensionsParam",
@@ -864,11 +788,7 @@
                 "op": {
                     "const": "FuncDecl",
                     "default": "FuncDecl",
-                    "enum": [
-                        "FuncDecl"
-                    ],
-                    "title": "Op",
-                    "type": "string"
+                    "title": "Op"
                 },
                 "name": {
                     "title": "Name",
@@ -912,11 +832,7 @@
                 "op": {
                     "const": "FuncDefn",
                     "default": "FuncDefn",
-                    "enum": [
-                        "FuncDefn"
-                    ],
-                    "title": "Op",
-                    "type": "string"
+                    "title": "Op"
                 },
                 "name": {
                     "title": "Name",
@@ -941,11 +857,7 @@
                 "t": {
                     "const": "G",
                     "default": "G",
-                    "enum": [
-                        "G"
-                    ],
-                    "title": "T",
-                    "type": "string"
+                    "title": "T"
                 },
                 "input": {
                     "items": {
@@ -983,11 +895,7 @@
                 "v": {
                     "const": "Function",
                     "default": "Function",
-                    "enum": [
-                        "Function"
-                    ],
-                    "title": "ValueTag",
-                    "type": "string"
+                    "title": "ValueTag"
                 },
                 "hugr": {
                     "title": "Hugr"
@@ -1006,20 +914,12 @@
                 "t": {
                     "const": "Sum",
                     "default": "Sum",
-                    "enum": [
-                        "Sum"
-                    ],
-                    "title": "T",
-                    "type": "string"
+                    "title": "T"
                 },
                 "s": {
                     "const": "General",
                     "default": "General",
-                    "enum": [
-                        "General"
-                    ],
-                    "title": "S",
-                    "type": "string"
+                    "title": "S"
                 },
                 "rows": {
                     "items": {
@@ -1064,11 +964,7 @@
                 "op": {
                     "const": "Input",
                     "default": "Input",
-                    "enum": [
-                        "Input"
-                    ],
-                    "title": "Op",
-                    "type": "string"
+                    "title": "Op"
                 },
                 "types": {
                     "items": {
@@ -1110,11 +1006,7 @@
                 "op": {
                     "const": "Lift",
                     "default": "Lift",
-                    "enum": [
-                        "Lift"
-                    ],
-                    "title": "Op",
-                    "type": "string"
+                    "title": "Op"
                 },
                 "type_row": {
                     "items": {
@@ -1142,11 +1034,7 @@
                 "tp": {
                     "const": "List",
                     "default": "List",
-                    "enum": [
-                        "List"
-                    ],
-                    "title": "Tp",
-                    "type": "string"
+                    "title": "Tp"
                 },
                 "param": {
                     "$ref": "#/$defs/TypeParam"
@@ -1184,11 +1072,7 @@
                 "op": {
                     "const": "LoadConstant",
                     "default": "LoadConstant",
-                    "enum": [
-                        "LoadConstant"
-                    ],
-                    "title": "Op",
-                    "type": "string"
+                    "title": "Op"
                 },
                 "datatype": {
                     "$ref": "#/$defs/Type"
@@ -1227,11 +1111,7 @@
                 "op": {
                     "const": "LoadFunction",
                     "default": "LoadFunction",
-                    "enum": [
-                        "LoadFunction"
-                    ],
-                    "title": "Op",
-                    "type": "string"
+                    "title": "Op"
                 },
                 "func_sig": {
                     "$ref": "#/$defs/PolyFuncType"
@@ -1282,11 +1162,7 @@
                 "op": {
                     "const": "MakeTuple",
                     "default": "MakeTuple",
-                    "enum": [
-                        "MakeTuple"
-                    ],
-                    "title": "Op",
-                    "type": "string"
+                    "title": "Op"
                 },
                 "tys": {
                     "items": {
@@ -1328,11 +1204,7 @@
                 "op": {
                     "const": "Module",
                     "default": "Module",
-                    "enum": [
-                        "Module"
-                    ],
-                    "title": "Op",
-                    "type": "string"
+                    "title": "Op"
                 }
             },
             "required": [
@@ -1367,11 +1239,7 @@
                 "op": {
                     "const": "Noop",
                     "default": "Noop",
-                    "enum": [
-                        "Noop"
-                    ],
-                    "title": "Op",
-                    "type": "string"
+                    "title": "Op"
                 },
                 "ty": {
                     "$ref": "#/$defs/Type"
@@ -1562,11 +1430,7 @@
                 "t": {
                     "const": "Opaque",
                     "default": "Opaque",
-                    "enum": [
-                        "Opaque"
-                    ],
-                    "title": "T",
-                    "type": "string"
+                    "title": "T"
                 },
                 "extension": {
                     "title": "Extension",
@@ -1602,11 +1466,7 @@
                 "tya": {
                     "const": "Opaque",
                     "default": "Opaque",
-                    "enum": [
-                        "Opaque"
-                    ],
-                    "title": "Tya",
-                    "type": "string"
+                    "title": "Tya"
                 },
                 "typ": {
                     "$ref": "#/$defs/Opaque"
@@ -1628,11 +1488,7 @@
                 "tp": {
                     "const": "Opaque",
                     "default": "Opaque",
-                    "enum": [
-                        "Opaque"
-                    ],
-                    "title": "Tp",
-                    "type": "string"
+                    "title": "Tp"
                 },
                 "ty": {
                     "$ref": "#/$defs/Opaque"
@@ -1670,11 +1526,7 @@
                 "op": {
                     "const": "Output",
                     "default": "Output",
-                    "enum": [
-                        "Output"
-                    ],
-                    "title": "Op",
-                    "type": "string"
+                    "title": "Op"
                 },
                 "types": {
                     "items": {
@@ -1719,14 +1571,34 @@
                 "t": {
                     "const": "Q",
                     "default": "Q",
-                    "enum": [
-                        "Q"
-                    ],
-                    "title": "T",
-                    "type": "string"
+                    "title": "T"
                 }
             },
             "title": "Qubit",
+            "type": "object"
+        },
+        "RowVar": {
+            "additionalProperties": false,
+            "description": "A variable standing for a row of some (unknown) number of types.\nMay occur only within a row; not a node input/output.",
+            "properties": {
+                "t": {
+                    "const": "R",
+                    "default": "R",
+                    "title": "T"
+                },
+                "i": {
+                    "title": "I",
+                    "type": "integer"
+                },
+                "b": {
+                    "$ref": "#/$defs/TypeBound"
+                }
+            },
+            "required": [
+                "i",
+                "b"
+            ],
+            "title": "RowVar",
             "type": "object"
         },
         "SequenceArg": {
@@ -1735,11 +1607,7 @@
                 "tya": {
                     "const": "Sequence",
                     "default": "Sequence",
-                    "enum": [
-                        "Sequence"
-                    ],
-                    "title": "Tya",
-                    "type": "string"
+                    "title": "Tya"
                 },
                 "elems": {
                     "items": {
@@ -1783,11 +1651,7 @@
                 "v": {
                     "const": "Sum",
                     "default": "Sum",
-                    "enum": [
-                        "Sum"
-                    ],
-                    "title": "ValueTag",
-                    "type": "string"
+                    "title": "ValueTag"
                 },
                 "tag": {
                     "title": "Tag",
@@ -1838,11 +1702,7 @@
                 "op": {
                     "const": "Tag",
                     "default": "Tag",
-                    "enum": [
-                        "Tag"
-                    ],
-                    "title": "Op",
-                    "type": "string"
+                    "title": "Op"
                 },
                 "tag": {
                     "title": "Tag",
@@ -1893,11 +1753,7 @@
                 "op": {
                     "const": "TailLoop",
                     "default": "TailLoop",
-                    "enum": [
-                        "TailLoop"
-                    ],
-                    "title": "Op",
-                    "type": "string"
+                    "title": "Op"
                 },
                 "just_inputs": {
                     "items": {
@@ -1933,11 +1789,7 @@
                 "tp": {
                     "const": "Tuple",
                     "default": "Tuple",
-                    "enum": [
-                        "Tuple"
-                    ],
-                    "title": "Tp",
-                    "type": "string"
+                    "title": "Tp"
                 },
                 "params": {
                     "items": {
@@ -1960,11 +1812,7 @@
                 "v": {
                     "const": "Tuple",
                     "default": "Tuple",
-                    "enum": [
-                        "Tuple"
-                    ],
-                    "title": "ValueTag",
-                    "type": "string"
+                    "title": "ValueTag"
                 },
                 "vs": {
                     "items": {
@@ -1990,6 +1838,7 @@
                     "I": "#/$defs/USize",
                     "Opaque": "#/$defs/Opaque",
                     "Q": "#/$defs/Qubit",
+                    "R": "#/$defs/RowVar",
                     "Sum": "#/$defs/SumType",
                     "V": "#/$defs/Variable"
                 },
@@ -2001,6 +1850,9 @@
                 },
                 {
                     "$ref": "#/$defs/Variable"
+                },
+                {
+                    "$ref": "#/$defs/RowVar"
                 },
                 {
                     "$ref": "#/$defs/USize"
@@ -2117,11 +1969,7 @@
                 "tya": {
                     "const": "Type",
                     "default": "Type",
-                    "enum": [
-                        "Type"
-                    ],
-                    "title": "Tya",
-                    "type": "string"
+                    "title": "Tya"
                 },
                 "ty": {
                     "$ref": "#/$defs/Type"
@@ -2139,11 +1987,7 @@
                 "tp": {
                     "const": "Type",
                     "default": "Type",
-                    "enum": [
-                        "Type"
-                    ],
-                    "title": "Tp",
-                    "type": "string"
+                    "title": "Tp"
                 },
                 "b": {
                     "$ref": "#/$defs/TypeBound"
@@ -2162,11 +2006,7 @@
                 "t": {
                     "const": "I",
                     "default": "I",
-                    "enum": [
-                        "I"
-                    ],
-                    "title": "T",
-                    "type": "string"
+                    "title": "T"
                 }
             },
             "title": "USize",
@@ -2179,20 +2019,12 @@
                 "t": {
                     "const": "Sum",
                     "default": "Sum",
-                    "enum": [
-                        "Sum"
-                    ],
-                    "title": "T",
-                    "type": "string"
+                    "title": "T"
                 },
                 "s": {
                     "const": "Unit",
                     "default": "Unit",
-                    "enum": [
-                        "Unit"
-                    ],
-                    "title": "S",
-                    "type": "string"
+                    "title": "S"
                 },
                 "size": {
                     "title": "Size",
@@ -2231,11 +2063,7 @@
                 "op": {
                     "const": "UnpackTuple",
                     "default": "UnpackTuple",
-                    "enum": [
-                        "UnpackTuple"
-                    ],
-                    "title": "Op",
-                    "type": "string"
+                    "title": "Op"
                 },
                 "tys": {
                     "items": {
@@ -2288,11 +2116,7 @@
                 "t": {
                     "const": "V",
                     "default": "V",
-                    "enum": [
-                        "V"
-                    ],
-                    "title": "T",
-                    "type": "string"
+                    "title": "T"
                 },
                 "i": {
                     "title": "I",
@@ -2314,11 +2138,7 @@
                 "tya": {
                     "const": "Variable",
                     "default": "Variable",
-                    "enum": [
-                        "Variable"
-                    ],
-                    "title": "Tya",
-                    "type": "string"
+                    "title": "Tya"
                 },
                 "idx": {
                     "title": "Idx",
@@ -2342,11 +2162,7 @@
         "version": {
             "const": "v1",
             "default": "v1",
-            "enum": [
-                "v1"
-            ],
-            "title": "Version",
-            "type": "string"
+            "title": "Version"
         },
         "typ": {
             "anyOf": [
