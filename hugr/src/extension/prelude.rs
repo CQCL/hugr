@@ -41,12 +41,6 @@ impl SignatureFromArgs for ArrayOpCustom {
     }
 }
 
-fn list_of_type() -> TypeParam {
-    TypeParam::List {
-        param: Box::new(TypeParam::Type { b: TypeBound::Any }),
-    }
-}
-
 struct GenericOpCustom;
 impl SignatureFromArgs for GenericOpCustom {
     fn compute_signature(&self, arg_values: &[TypeArg]) -> Result<PolyFuncType, SignatureError> {
@@ -77,6 +71,11 @@ impl SignatureFromArgs for GenericOpCustom {
     }
 
     fn static_params(&self) -> &[TypeParam] {
+        fn list_of_type() -> TypeParam {
+            TypeParam::List {
+                param: Box::new(TypeParam::Type { b: TypeBound::Any }),
+            }
+        }
         lazy_static! {
             static ref PARAMS: [TypeParam; 2] = [list_of_type(), list_of_type()];
         }
