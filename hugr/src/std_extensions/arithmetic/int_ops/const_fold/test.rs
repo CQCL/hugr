@@ -76,11 +76,19 @@ fn test_fold_inarrow<I: Copy, C: Into<Value>, E: std::fmt::Debug>(
     #[case] val: I,
     #[case] succeeds: bool,
 ) {
-    // pseudocode:
+    // For the first case, pseudocode:
     //
     // x0 := int_s<5>(-3);
     // x1 := inarrow_s<5, 4>(x0);
-    // output x1 == int_s<4>(-3);
+    // output x1 == sum<tag=0,[int_s<4>(-3)]>;
+    //
+    // Other cases vary by:
+    // (mk_const, op_def) => create signed or unsigned constants, create
+    //   inarrow_s or inarrow_u ops;
+    // (from_log_width, to_log_width) => the args to use to create the op;
+    // val => the value to pass to the op
+    // succeeds => whether to expect a int<to_log_width> variant or an error
+    //   variant.
     let sum_type = sum_with_error(INT_TYPES[to_log_width as usize].to_owned());
     let mut build = DFGBuilder::new(FunctionType::new(
         type_row![],
