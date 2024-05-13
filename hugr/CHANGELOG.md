@@ -1,5 +1,51 @@
 # Changelog
 
+## 0.4.0 (2024-05-13)
+
+### Bug Fixes
+
+- Serialization round-trips ([#948](https://github.com/CQCL/hugr/pull/948))
+- [**breaking**] Combine `ConstIntU` and `ConstIntS` ([#974](https://github.com/CQCL/hugr/pull/974))
+- Disable serialisation tests when miri is active ([#977](https://github.com/CQCL/hugr/pull/977))
+- [**breaking**] Serialisation schema ([#968](https://github.com/CQCL/hugr/pull/968))
+- Correct constant fold for `fne`. ([#995](https://github.com/CQCL/hugr/pull/995))
+- [**breaking**] Serialisation fixes ([#997](https://github.com/CQCL/hugr/pull/997))
+- [**breaking**] OpDef serialisation ([#1013](https://github.com/CQCL/hugr/pull/1013))
+- NaryLogicOp constant folding ([#1026](https://github.com/CQCL/hugr/pull/1026))
+
+### Features
+
+- 'Replace' rewrite returns node map ([#929](https://github.com/CQCL/hugr/pull/929))
+- `new` methods for leaf ops ([#940](https://github.com/CQCL/hugr/pull/940))
+- Add `string` type and `print` function to `prelude` ([#942](https://github.com/CQCL/hugr/pull/942))
+- `CustomOp::extension` utility function ([#951](https://github.com/CQCL/hugr/pull/951))
+- [**breaking**] Add `non_exhaustive` to various enums ([#952](https://github.com/CQCL/hugr/pull/952))
+- Encoder metadata in serialized hugr ([#955](https://github.com/CQCL/hugr/pull/955))
+- [**breaking**] Bring back Value ([#967](https://github.com/CQCL/hugr/pull/967))
+- Add LoadFunction node ([#947](https://github.com/CQCL/hugr/pull/947))
+- Add From impls for TypeArg ([#1002](https://github.com/CQCL/hugr/pull/1002))
+- Constant-folding of integer and logic operations ([#1009](https://github.com/CQCL/hugr/pull/1009))
+- [**breaking**] Update serialisation schema, implement `CustomConst` serialisation ([#1005](https://github.com/CQCL/hugr/pull/1005))
+- Merge basic blocks algorithm ([#956](https://github.com/CQCL/hugr/pull/956))
+- [**breaking**] Allow panic operation to have any input and output wires ([#1024](https://github.com/CQCL/hugr/pull/1024))
+
+### Refactor
+
+- Outline hugr::serialize::test ([#976](https://github.com/CQCL/hugr/pull/976))
+- [**breaking**] Replace SmolStr identifiers with wrapper types. ([#959](https://github.com/CQCL/hugr/pull/959))
+- Separate extension validation from the rest ([#1011](https://github.com/CQCL/hugr/pull/1011))
+- Remove "trait TypeParametrised" ([#1019](https://github.com/CQCL/hugr/pull/1019))
+
+### Testing
+
+- Add a test of instantiating an extension set ([#939](https://github.com/CQCL/hugr/pull/939))
+- Ignore serialisation tests when using miri ([#975](https://github.com/CQCL/hugr/pull/975))
+- [**breaking**] Test roundtrip serialisation against strict + lax schema ([#982](https://github.com/CQCL/hugr/pull/982))
+- Fix some bad assert_matches ([#1006](https://github.com/CQCL/hugr/pull/1006))
+- Expand test of instantiating extension sets ([#1003](https://github.com/CQCL/hugr/pull/1003))
+- Fix unconnected ports in extension test ([#1010](https://github.com/CQCL/hugr/pull/1010))
+
+
 ## 0.3.1 (2024-04-23)
 
 ### Features
