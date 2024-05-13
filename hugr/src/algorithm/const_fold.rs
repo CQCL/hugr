@@ -297,30 +297,6 @@ mod test {
         assert_fully_folded(&h, &expected);
     }
 
-    #[rstest]
-    #[case(NaryLogic::And, [true, true, true], true)]
-    #[case(NaryLogic::And, [true, false, true], false)]
-    #[case(NaryLogic::Or, [false, false, true], true)]
-    #[case(NaryLogic::Or, [false, false, false], false)]
-    fn test_logic_and(
-        #[case] op: NaryLogic,
-        #[case] ins: [bool; 3],
-        #[case] out: bool,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let mut build = DFGBuilder::new(FunctionType::new(type_row![], vec![BOOL_T])).unwrap();
-
-        let ins = ins.map(|b| build.add_load_const(Value::from_bool(b)));
-        let logic_op = build.add_dataflow_op(op.with_n_inputs(ins.len() as u64), ins)?;
-
-        let reg =
-            ExtensionRegistry::try_new([PRELUDE.to_owned(), logic::EXTENSION.to_owned()]).unwrap();
-        let mut h = build.finish_hugr_with_outputs(logic_op.outputs(), &reg)?;
-        constant_fold_pass(&mut h, &reg);
-
-        assert_fully_folded(&h, &Value::from_bool(out));
-        Ok(())
-    }
-
     #[test]
     #[cfg_attr(
         feature = "extension_inference",

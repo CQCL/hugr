@@ -2,8 +2,9 @@
 
 use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 
+use crate::extension::{ConstFold, ConstFoldResult};
 use crate::ops::constant::ValueName;
-use crate::ops::OpName;
+use crate::ops::{OpName, Value};
 use crate::{
     algorithm::const_fold::sorted_consts,
     extension::{
@@ -25,6 +26,29 @@ pub const FALSE_NAME: ValueName = ValueName::new_inline("FALSE");
 /// Name of extension true value.
 pub const TRUE_NAME: ValueName = ValueName::new_inline("TRUE");
 
+impl ConstFold for NaryLogic {
+    fn fold(&self, type_args: &[TypeArg], consts: &[(IncomingPort, Value)]) -> ConstFoldResult {
+        let [TypeArg::BoundedNat { n: num_args }] = *type_args else {
+            panic!("impossible by validation");
+        };
+        match self {
+            Self::And => {
+                let inps = read_inputs(consts)?;
+                let res = inps.iter().all(|x| *x);
+                // We can only fold to true if we have a const for all our inputs.
+                (!res || inps.len() as u64 == num_args)
+                    .then_some(vec![(0.into(), ops::Value::from_bool(res))])
+            }
+            Self::Or => {
+                let inps = read_inputs(consts)?;
+                let res = inps.iter().any(|x| *x);
+                // We can only fold to false if we have a const for all our inputs
+                (res || inps.len() as u64 == num_args)
+                    .then_some(vec![(0.into(), ops::Value::from_bool(res))])
+            }
+        }
+    }
+}
 /// Logic extension operation definitions.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, EnumIter, IntoStaticStr, EnumString)]
 #[allow(missing_docs)]
@@ -52,18 +76,7 @@ impl MakeOpDef for NaryLogic {
     }
 
     fn post_opdef(&self, def: &mut OpDef) {
-        def.set_constant_folder(match self {
-            NaryLogic::And => |consts: &_| {
-                let inps = read_inputs(consts)?;
-                let res = inps.into_iter().all(|x| x);
-                Some(vec![(0.into(), ops::Value::from_bool(res))])
-            },
-            NaryLogic::Or => |consts: &_| {
-                let inps = read_inputs(consts)?;
-                let res = inps.into_iter().any(|x| x);
-                Some(vec![(0.into(), ops::Value::from_bool(res))])
-            },
-        })
+        def.set_constant_folder(*self);
     }
 }
 
@@ -228,10 +241,12 @@ pub(crate) mod test {
             prelude::BOOL_T,
             simple_op::{MakeExtensionOp, MakeOpDef, MakeRegisteredOp},
         },
-        ops::NamedOp,
+        ops::{NamedOp, Value},
         Extension,
     };
 
+    
+    use rstest::rstest;
     use strum::IntoEnumIterator;
 
     #[test]
@@ -279,5 +294,56 @@ pub(crate) mod test {
     /// Generate a logic extension "or" operation over [`crate::prelude::BOOL_T`]
     pub(crate) fn or_op() -> ConcreteLogicOp {
         NaryLogic::Or.with_n_inputs(2)
+    }
+
+    #[rstest]
+    #[case(NaryLogic::And, [], true)]
+    #[case(NaryLogic::And, [true, true, true], true)]
+    #[case(NaryLogic::And, [true, false, true], false)]
+    #[case(NaryLogic::Or, [], false)]
+    #[case(NaryLogic::Or, [false, false, true], true)]
+    #[case(NaryLogic::Or, [false, false, false], false)]
+    fn nary_const_fold(
+        #[case] op: NaryLogic,
+        #[case] ins: impl IntoIterator<Item = bool>,
+        #[case] out: bool,
+    ) {
+        use itertools::Itertools;
+
+        use crate::extension::ConstFold;
+        let in_vals = ins
+            .into_iter()
+            .enumerate()
+            .map(|(i, b)| (i.into(), Value::from_bool(b)))
+            .collect_vec();
+        assert_eq!(
+            Some(vec![(0.into(), Value::from_bool(out))]),
+            op.fold(&[(in_vals.len() as u64).into()], &in_vals)
+        );
+    }
+
+    #[rstest]
+    #[case(NaryLogic::And, [Some(true), None], None)]
+    #[case(NaryLogic::And, [Some(false), None], Some(false))]
+    #[case(NaryLogic::Or, [None, Some(false)], None)]
+    #[case(NaryLogic::Or, [None, Some(true)], Some(true))]
+    fn nary_partial_const_fold(
+        #[case] op: NaryLogic,
+        #[case] ins: impl IntoIterator<Item = Option<bool>>,
+        #[case] mb_out: Option<bool>,
+    ) {
+        use itertools::Itertools;
+
+        use crate::extension::ConstFold;
+        let in_vals0 = ins.into_iter().enumerate().collect_vec();
+        let num_args = in_vals0.len() as u64;
+        let in_vals = in_vals0
+            .into_iter()
+            .filter_map(|(i, mb_b)| mb_b.map(|b| (i.into(), Value::from_bool(b))))
+            .collect_vec();
+        assert_eq!(
+            mb_out.map(|out| vec![(0.into(), Value::from_bool(out))]),
+            op.fold(&[num_args.into()], &in_vals)
+        );
     }
 }
