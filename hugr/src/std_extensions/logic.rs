@@ -245,7 +245,6 @@ pub(crate) mod test {
         Extension,
     };
 
-    
     use rstest::rstest;
     use strum::IntoEnumIterator;
 
