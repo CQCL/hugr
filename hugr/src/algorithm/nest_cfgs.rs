@@ -604,7 +604,7 @@ pub(crate) mod test {
         //               /-> left --\
         // entry -> split            > merge -> head -> tail -> exit
         //               \-> right -/             \-<--<-/
-        let mut cfg_builder = CFGBuilder::new(FunctionType::new(type_row![NAT], type_row![NAT]))?;
+        let mut cfg_builder = CFGBuilder::new(FunctionType::new_endo(NAT))?;
 
         let pred_const = cfg_builder.add_constant(Value::unit_sum(0, 2).expect("0 < 2"));
         let const_unit = cfg_builder.add_constant(Value::unary_unit_sum());
@@ -615,7 +615,15 @@ pub(crate) mod test {
         )?;
         let (split, merge) = build_if_then_else_merge(&mut cfg_builder, &pred_const, &const_unit)?;
         cfg_builder.branch(&entry, 0, &split)?;
-        let (head, tail) = build_loop(&mut cfg_builder, &pred_const, &const_unit)?;
+        let head = n_identity(
+            cfg_builder.simple_block_builder(FunctionType::new_endo(NAT), 1)?,
+            &const_unit,
+        )?;
+        let tail = n_identity(
+            cfg_builder.simple_block_builder(FunctionType::new_endo(NAT), 2)?,
+            &pred_const,
+        )?;
+        cfg_builder.branch(&tail, 1, &head)?;
         cfg_builder.branch(&head, 0, &tail)?; // trivial "loop body"
         cfg_builder.branch(&merge, 0, &head)?;
         let exit = cfg_builder.exit_block();
@@ -671,12 +679,9 @@ pub(crate) mod test {
 
     #[test]
     fn test_cond_then_loop_combined() -> Result<(), BuildError> {
-        //      /-> left --\
-        // entry            > merge -> tail -> exit
-        //      \-> right -/     \-<--<-/
         // Here we would like two consecutive regions, but there is no *edge* between
         // the conditional and the loop to indicate the boundary, so we cannot separate them.
-        let (h, merge, tail) = build_cond_then_loop_cfg(false)?;
+        let (h, merge, tail) = build_cond_then_loop_cfg()?;
         let (merge, tail) = (merge.node(), tail.node());
         let [entry, exit]: [Node; 2] = h
             .children(h.root())
@@ -824,7 +829,7 @@ pub(crate) mod test {
         unit_const: &ConstID,
     ) -> Result<(BasicBlockID, BasicBlockID), BuildError> {
         let split = n_identity(
-            cfg.simple_block_builder(FunctionType::new(type_row![NAT], type_row![NAT]), 2)?,
+            cfg.simple_block_builder(FunctionType::new_endo(NAT), 2)?,
             const_pred,
         )?;
         let merge = build_then_else_merge_from_if(cfg, unit_const, split)?;
@@ -837,15 +842,15 @@ pub(crate) mod test {
         split: BasicBlockID,
     ) -> Result<BasicBlockID, BuildError> {
         let merge = n_identity(
-            cfg.simple_block_builder(FunctionType::new(type_row![NAT], type_row![NAT]), 1)?,
+            cfg.simple_block_builder(FunctionType::new_endo(NAT), 1)?,
             unit_const,
         )?;
         let left = n_identity(
-            cfg.simple_block_builder(FunctionType::new(type_row![NAT], type_row![NAT]), 1)?,
+            cfg.simple_block_builder(FunctionType::new_endo(NAT), 1)?,
             unit_const,
         )?;
         let right = n_identity(
-            cfg.simple_block_builder(FunctionType::new(type_row![NAT], type_row![NAT]), 1)?,
+            cfg.simple_block_builder(FunctionType::new_endo(NAT), 1)?,
             unit_const,
         )?;
         cfg.branch(&split, 0, &left)?;
@@ -855,39 +860,12 @@ pub(crate) mod test {
         Ok(merge)
     }
 
-    // Returns loop tail - caller must link header to tail, and provide 0th successor of tail
-    fn build_loop_from_header<T: AsMut<Hugr> + AsRef<Hugr>>(
-        cfg: &mut CFGBuilder<T>,
-        const_pred: &ConstID,
-        header: BasicBlockID,
-    ) -> Result<BasicBlockID, BuildError> {
-        let tail = n_identity(
-            cfg.simple_block_builder(FunctionType::new(type_row![NAT], type_row![NAT]), 2)?,
-            const_pred,
-        )?;
-        cfg.branch(&tail, 1, &header)?;
-        Ok(tail)
-    }
-
-    // Result is header and tail. Caller must provide 0th successor of header (linking to tail), and 0th successor of tail.
-    fn build_loop<T: AsMut<Hugr> + AsRef<Hugr>>(
-        cfg: &mut CFGBuilder<T>,
-        const_pred: &ConstID,
-        unit_const: &ConstID,
-    ) -> Result<(BasicBlockID, BasicBlockID), BuildError> {
-        let header = n_identity(
-            cfg.simple_block_builder(FunctionType::new(type_row![NAT], type_row![NAT]), 1)?,
-            unit_const,
-        )?;
-        let tail = build_loop_from_header(cfg, const_pred, header)?;
-        Ok((header, tail))
-    }
-
-    // Result is merge and tail; loop header is (merge, if separate==true; unique successor of merge, if separate==false)
-    pub fn build_cond_then_loop_cfg(
-        separate: bool,
-    ) -> Result<(Hugr, BasicBlockID, BasicBlockID), BuildError> {
-        let mut cfg_builder = CFGBuilder::new(FunctionType::new(type_row![NAT], type_row![NAT]))?;
+    //      /-> left --\
+    // entry            > merge -> tail -> exit
+    //      \-> right -/     \-<--<-/
+    // Result is Hugr plus merge and tail blocks
+    fn build_cond_then_loop_cfg() -> Result<(Hugr, BasicBlockID, BasicBlockID), BuildError> {
+        let mut cfg_builder = CFGBuilder::new(FunctionType::new_endo(NAT))?;
         let pred_const = cfg_builder.add_constant(Value::unit_sum(0, 2).expect("0 < 2"));
         let const_unit = cfg_builder.add_constant(Value::unary_unit_sum());
 
@@ -896,19 +874,13 @@ pub(crate) mod test {
             &pred_const,
         )?;
         let merge = build_then_else_merge_from_if(&mut cfg_builder, &const_unit, entry)?;
-        let head = if separate {
-            let h = n_identity(
-                cfg_builder
-                    .simple_block_builder(FunctionType::new(type_row![NAT], type_row![NAT]), 1)?,
-                &const_unit,
-            )?;
-            cfg_builder.branch(&merge, 0, &h)?;
-            h
-        } else {
-            merge
-        };
-        let tail = build_loop_from_header(&mut cfg_builder, &pred_const, head)?;
-        cfg_builder.branch(&head, 0, &tail)?; // trivial "loop body"
+        // The merge block is also the loop header (so it merges three incoming control-flow edges)
+        let tail = n_identity(
+            cfg_builder.simple_block_builder(FunctionType::new_endo(NAT), 2)?,
+            &pred_const,
+        )?;
+        cfg_builder.branch(&tail, 1, &merge)?;
+        cfg_builder.branch(&merge, 0, &tail)?; // trivial "loop body"
         let exit = cfg_builder.exit_block();
         cfg_builder.branch(&tail, 0, &exit)?;
 
@@ -920,7 +892,7 @@ pub(crate) mod test {
     pub(crate) fn build_conditional_in_loop_cfg(
         separate_headers: bool,
     ) -> Result<(Hugr, BasicBlockID, BasicBlockID), BuildError> {
-        let mut cfg_builder = CFGBuilder::new(FunctionType::new(type_row![NAT], type_row![NAT]))?;
+        let mut cfg_builder = CFGBuilder::new(FunctionType::new_endo(NAT))?;
         let (head, tail) = build_conditional_in_loop(&mut cfg_builder, separate_headers)?;
         let h = cfg_builder.finish_prelude_hugr()?;
         Ok((h, head, tail))
@@ -939,15 +911,22 @@ pub(crate) mod test {
         )?;
         let (split, merge) = build_if_then_else_merge(cfg_builder, &pred_const, &const_unit)?;
 
-        let (head, tail) = if separate_headers {
-            let (head, tail) = build_loop(cfg_builder, &pred_const, &const_unit)?;
+        let head = if separate_headers {
+            let head = n_identity(
+                cfg_builder.simple_block_builder(FunctionType::new_endo(NAT), 1)?,
+                &const_unit,
+            )?;
             cfg_builder.branch(&head, 0, &split)?;
-            (head, tail)
+            head
         } else {
             // Combine loop header with split.
-            let tail = build_loop_from_header(cfg_builder, &pred_const, split)?;
-            (split, tail)
+            split
         };
+        let tail = n_identity(
+            cfg_builder.simple_block_builder(FunctionType::new_endo(NAT), 2)?,
+            &pred_const,
+        )?;
+        cfg_builder.branch(&tail, 1, &head)?;
         cfg_builder.branch(&merge, 0, &tail)?;
 
         let exit = cfg_builder.exit_block();
