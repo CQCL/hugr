@@ -53,12 +53,12 @@ pub struct ConstFoldConfig {
 }
 
 impl ConstFoldConfig {
-    /// TODO
+    /// Create a new `ConstFoldConfig` with default configuration.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// TODO
+    /// Build a `ConstFoldConfig` with the given [VerifyLevel].
     pub fn with_verify(mut self, verify: VerifyLevel) -> Self {
         self.verify = verify;
         self
@@ -78,26 +78,27 @@ impl ConstFoldConfig {
         .map_err(|err| ConstFoldError::verify_err(label, err))
     }
 
-    /// TODO
+    /// Run the Constant Folding pass.
     pub fn run(&self, h: &mut impl HugrMut, reg: &ExtensionRegistry) -> Result<(), ConstFoldError> {
         self.verify_impl("input", h, reg)?;
         loop {
-            // would be preferable if the candidates were updated to be just the
-            // neighbouring nodes of those added.
-            let rewrites = find_consts(h, h.nodes(), reg).collect_vec();
-            if rewrites.is_empty() {
+            // We can only safely apply a single replacement. Applying a
+            // replacement removes nodes and edges which may be referenced by
+            // further replacements returned by find_consts. Even worse, if we
+            // attempted to apply those replacements, expecting them to fail if
+            // the nodes and edges they reference had been deleted,  they may
+            // succeed because new nodes and edges reused the ids.
+            //
+            // We could be a lot smarter here, keeping track of `LoadConstant`
+            // nodes and only looking at their out neighbours.
+            let Some((replace, removes)) = find_consts(h, h.nodes(), reg).next() else {
                 break;
-            }
-            for (replace, removes) in rewrites {
-                h.apply_rewrite(replace)?;
-                for rem in removes {
-                    if let Ok(const_node) = h.apply_rewrite(rem) {
-                        // if the LoadConst was removed, try removing the Const too.
-                        if h.apply_rewrite(RemoveConst(const_node)).is_err() {
-                            // const cannot be removed - no problem
-                            continue;
-                        }
-                    }
+            };
+            h.apply_rewrite(replace)?;
+            for rem in removes {
+                if let Ok(const_node) = h.apply_rewrite(rem) {
+                    // if the LoadConst was removed, try removing the Const too.
+                    let _ = h.apply_rewrite(RemoveConst(const_node));
                 }
             }
         }
@@ -230,18 +231,16 @@ fn fold_op(
         })
         .unzip();
     // attempt to evaluate op
-    let folded = fold_leaf_op(neighbour_op, &in_consts)?;
-    let (op_outs, consts): (Vec<_>, Vec<_>) = folded.into_iter().unzip();
-    let nu_out = op_outs
+    let (nu_out, consts): (HashMap<_, _>, Vec<_>) = fold_leaf_op(neighbour_op, &in_consts)?
         .into_iter()
         .enumerate()
-        .filter_map(|(i, out)| {
-            // map from the ports the op was linked to, to the output ports of
-            // the replacement.
-            hugr.single_linked_input(op_node, out)
-                .map(|np| (np, i.into()))
+        .filter_map(|(i, (op_out, konst))| {
+            // for each used port of the op give the nu_out entry and the
+            // corresponding Value
+            hugr.single_linked_input(op_node, op_out)
+                .map(|np| ((np, i.into()), konst))
         })
-        .collect();
+        .unzip();
     let replacement = const_graph(consts, reg);
     let sibling_graph = SiblingSubgraph::try_from_nodes([op_node], hugr)
         .expect("Operation should form valid subgraph.");
@@ -262,11 +261,8 @@ fn get_const(hugr: &impl HugrView, op_node: Node, in_p: IncomingPort) -> Option<
     let (load_n, _) = hugr.single_linked_output(op_node, in_p)?;
     let load_op = hugr.get_optype(load_n).as_load_constant()?;
     let const_node = hugr
-        .linked_outputs(load_n, load_op.constant_port())
-        .exactly_one()
-        .ok()?
+        .single_linked_output(load_n, load_op.constant_port())?
         .0;
-
     let const_op = hugr.get_optype(const_node).as_const()?;
 
     // TODO avoid const clone here
@@ -468,7 +464,6 @@ mod test {
     }
 
     #[test]
-    #[should_panic]
     fn orphan_output() {
         // pseudocode:
         // x0 := bool(true)
