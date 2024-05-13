@@ -3,8 +3,11 @@
 use std::collections::{BTreeSet, HashMap};
 
 use itertools::Itertools;
+use thiserror::Error;
 
+use crate::hugr::{SimpleReplacementError, ValidationError};
 use crate::types::SumType;
+use crate::Direction;
 use crate::{
     builder::{DFGBuilder, Dataflow, DataflowHugr},
     extension::{ConstFoldResult, ExtensionRegistry},
@@ -18,6 +21,89 @@ use crate::{
     types::FunctionType,
     Hugr, HugrView, IncomingPort, Node, SimpleReplacement,
 };
+
+use super::VerifyLevel;
+
+#[derive(Error, Debug)]
+#[allow(missing_docs)]
+pub enum ConstFoldError {
+    #[error("Failed to verify {label} HUGR: {err}")]
+    VerifyError {
+        label: String,
+        #[source]
+        err: ValidationError,
+    },
+    #[error(transparent)]
+    SimpleReplaceError(#[from] SimpleReplacementError),
+}
+
+impl ConstFoldError {
+    fn verify_err(label: impl Into<String>, err: ValidationError) -> Self {
+        Self::VerifyError {
+            label: label.into(),
+            err,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+/// TODO
+pub struct ConstFoldConfig {
+    verify: VerifyLevel,
+}
+
+impl ConstFoldConfig {
+    /// TODO
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// TODO
+    pub fn with_verify(mut self, verify: VerifyLevel) -> Self {
+        self.verify = verify;
+        self
+    }
+
+    fn verify_impl(
+        &self,
+        label: &str,
+        h: &impl HugrView,
+        reg: &ExtensionRegistry,
+    ) -> Result<(), ConstFoldError> {
+        match self.verify {
+            VerifyLevel::None => Ok(()),
+            VerifyLevel::WithoutExtensions => h.validate_no_extensions(reg),
+            VerifyLevel::WithExtensions => h.validate(reg),
+        }
+        .map_err(|err| ConstFoldError::verify_err(label, err))
+    }
+
+    /// TODO
+    pub fn run(&self, h: &mut impl HugrMut, reg: &ExtensionRegistry) -> Result<(), ConstFoldError> {
+        self.verify_impl("input", h, reg)?;
+        loop {
+            // would be preferable if the candidates were updated to be just the
+            // neighbouring nodes of those added.
+            let rewrites = find_consts(h, h.nodes(), reg).collect_vec();
+            if rewrites.is_empty() {
+                break;
+            }
+            for (replace, removes) in rewrites {
+                h.apply_rewrite(replace)?;
+                for rem in removes {
+                    if let Ok(const_node) = h.apply_rewrite(rem) {
+                        // if the LoadConst was removed, try removing the Const too.
+                        if h.apply_rewrite(RemoveConst(const_node)).is_err() {
+                            // const cannot be removed - no problem
+                            continue;
+                        }
+                    }
+                }
+            }
+        }
+        self.verify_impl("output", h, reg)
+    }
+}
 
 /// Tag some output constants with [`OutgoingPort`] inferred from the ordering.
 fn out_row(consts: impl IntoIterator<Item = Value>) -> ConstFoldResult {
@@ -43,9 +129,10 @@ pub(crate) fn sorted_consts(consts: &[(IncomingPort, Value)]) -> Vec<&Value> {
         .map(|(_, c)| c)
         .collect()
 }
+
 /// For a given op and consts, attempt to evaluate the op.
 pub fn fold_leaf_op(op: &OpType, consts: &[(IncomingPort, Value)]) -> ConstFoldResult {
-    match op {
+    let fold_result = match op {
         OpType::Noop { .. } => out_row([consts.first()?.1.clone()]),
         OpType::MakeTuple { .. } => {
             out_row([Value::tuple(sorted_consts(consts).into_iter().cloned())])
@@ -69,7 +156,10 @@ pub fn fold_leaf_op(op: &OpType, consts: &[(IncomingPort, Value)]) -> ConstFoldR
             ext_op.constant_fold(consts)
         }
         _ => None,
-    }
+    };
+    assert!(fold_result.as_ref().map_or(true, |x| x.len()
+        == op.value_port_count(Direction::Outgoing)));
+    fold_result
 }
 
 /// Generate a graph that loads and outputs `consts` in order, validating
@@ -184,27 +274,8 @@ fn get_const(hugr: &impl HugrView, op_node: Node, in_p: IncomingPort) -> Option<
 }
 
 /// Exhaustively apply constant folding to a HUGR.
-pub fn constant_fold_pass(h: &mut impl HugrMut, reg: &ExtensionRegistry) {
-    loop {
-        // would be preferable if the candidates were updated to be just the
-        // neighbouring nodes of those added.
-        let rewrites = find_consts(h, h.nodes(), reg).collect_vec();
-        if rewrites.is_empty() {
-            break;
-        }
-        for (replace, removes) in rewrites {
-            h.apply_rewrite(replace).unwrap();
-            for rem in removes {
-                if let Ok(const_node) = h.apply_rewrite(rem) {
-                    // if the LoadConst was removed, try removing the Const too.
-                    if h.apply_rewrite(RemoveConst(const_node)).is_err() {
-                        // const cannot be removed - no problem
-                        continue;
-                    }
-                }
-            }
-        }
-    }
+pub fn constant_fold_pass<H: HugrMut>(h: &mut H, reg: &ExtensionRegistry) {
+    ConstFoldConfig::default().run(h, reg).unwrap()
 }
 
 #[cfg(test)]
@@ -394,5 +465,46 @@ mod test {
         constant_fold_pass(&mut h, &reg);
         let expected = Value::false_val();
         assert_fully_folded(&h, &expected);
+    }
+
+    #[test]
+    #[should_panic]
+    fn orphan_output() {
+        // pseudocode:
+        // x0 := bool(true)
+        // x1 := not(x0)
+        // x2 := or(x0,x1)
+        // output x2 == true;
+        //
+        // We arange things so that the `or` folds away first, leaving the not
+        // with no outputs.
+        use crate::hugr::NodeType;
+        use crate::ops::handle::NodeHandle;
+
+        let mut build = DFGBuilder::new(FunctionType::new(type_row![], vec![BOOL_T])).unwrap();
+        let true_wire = build.add_load_value(Value::true_val());
+        // this Not will be manually replaced
+        let orig_not = build.add_dataflow_op(NotOp, [true_wire]).unwrap();
+        let r = build
+            .add_dataflow_op(
+                NaryLogic::Or.with_n_inputs(2),
+                [true_wire, orig_not.out_wire(0)],
+            )
+            .unwrap();
+        let or_node = r.node();
+        let parent = build.dfg_node;
+        let reg =
+            ExtensionRegistry::try_new([PRELUDE.to_owned(), logic::EXTENSION.to_owned()]).unwrap();
+        let mut h = build.finish_hugr_with_outputs(r.outputs(), &reg).unwrap();
+
+        // we delete the original Not and create a new One. This means it will be
+        // traversed by `constant_fold_pass` after the Or.
+        let new_not = h.add_node_with_parent(parent, NodeType::new_auto(NotOp));
+        h.connect(true_wire.node(), true_wire.source(), new_not, 0);
+        h.disconnect(or_node, IncomingPort::from(1));
+        h.connect(new_not, 0, or_node, 1);
+        h.remove_node(orig_not.node());
+        constant_fold_pass(&mut h, &reg);
+        assert_fully_folded(&h, &Value::true_val())
     }
 }

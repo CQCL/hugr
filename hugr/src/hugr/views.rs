@@ -24,7 +24,9 @@ use itertools::{Itertools, MapInto};
 use portgraph::render::{DotFormat, MermaidFormat};
 use portgraph::{multiportgraph, LinkView, MultiPortGraph, PortView};
 
-use super::{Hugr, HugrError, NodeMetadata, NodeMetadataMap, NodeType, ValidationError, DEFAULT_NODETYPE};
+use super::{
+    Hugr, HugrError, NodeMetadata, NodeMetadataMap, NodeType, ValidationError, DEFAULT_NODETYPE,
+};
 use crate::extension::ExtensionRegistry;
 use crate::ops::handle::NodeHandle;
 use crate::ops::{OpParent, OpTag, OpTrait, OpType};

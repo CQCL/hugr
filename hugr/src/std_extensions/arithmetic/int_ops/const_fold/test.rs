@@ -62,6 +62,7 @@ fn test_fold_iwiden_s() {
 }
 
 #[test]
+#[should_panic]
 fn test_fold_inarrow_u() {
     // pseudocode:
     //
@@ -90,6 +91,7 @@ fn test_fold_inarrow_u() {
 }
 
 #[test]
+#[should_panic]
 fn test_fold_inarrow_s() {
     // pseudocode:
     //
