@@ -44,6 +44,9 @@ impl Const {
         to self.value {
             /// Returns the type of this constant.
             pub fn get_type(&self) -> Type;
+            /// For a Const holding a CustomConst, extract the CustomConst by
+            /// downcasting.
+            pub fn get_custom_value<T: CustomConst>(&self) -> Option<&T>;
         }
     }
 }
@@ -287,8 +290,9 @@ impl Value {
         }
     }
 
-    /// Creates a new Const Sum.  The value is determined by `items` and is
-    /// type-checked `typ`
+    /// Returns a Sum constant. The value is determined by `items` and is
+    /// type-checked `typ`. The `tag`th variant of `typ` should match the types
+    /// of `items`.
     pub fn sum(
         tag: usize,
         items: impl IntoIterator<Item = Value>,
@@ -323,17 +327,17 @@ impl Value {
         })
     }
 
-    /// Constant unit type (empty Tuple).
+    /// Returns a constant unit type (empty Tuple).
     pub const fn unit() -> Self {
         Self::Tuple { vs: vec![] }
     }
 
-    /// Constant Sum over units, used as branching values.
+    /// Returns a constant Sum over units. Used as branching values.
     pub fn unit_sum(tag: usize, size: u8) -> Result<Self, ConstTypeError> {
         Self::sum(tag, [], SumType::Unit { size })
     }
 
-    /// Constant Sum over units, with only one variant.
+    /// Returns a constant Sum over units, with only one variant.
     pub fn unary_unit_sum() -> Self {
         Self::unit_sum(0, 1).expect("0 < 1")
     }
@@ -348,7 +352,8 @@ impl Value {
         Self::unit_sum(0, 2).expect("0 < 2")
     }
 
-    /// Generate a constant equivalent of a boolean,
+    /// Returns a constant `bool` value.
+    ///
     /// see [`Value::true_val`] and [`Value::false_val`].
     pub fn from_bool(b: bool) -> Self {
         if b {
@@ -358,14 +363,14 @@ impl Value {
         }
     }
 
-    /// Returns a tuple constant of constant values.
+    /// Returns a [Value::Extension] holding `custom_const`.
     pub fn extension(custom_const: impl CustomConst) -> Self {
         Self::Extension {
             e: OpaqueValue::new(custom_const),
         }
     }
 
-    /// For a Const holding a CustomConst, extract the CustomConst by downcasting.
+    /// For a [Value] holding a [CustomConst], extract the CustomConst by downcasting.
     pub fn get_custom_value<T: CustomConst>(&self) -> Option<&T> {
         if let Self::Extension { e } = self {
             e.v.downcast_ref()
