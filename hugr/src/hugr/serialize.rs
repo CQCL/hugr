@@ -257,13 +257,11 @@ impl TryFrom<SerHugrV1> for Hugr {
         }
 
         if let Some(metadata) = metadata {
-            for (node, metadata) in metadata
-                .into_iter()
-                .enumerate()
-                .filter_map(|(i, mb_metadata)| mb_metadata.map(|metadata| (i, metadata)))
-            {
-                let node = portgraph::NodeIndex::new(node);
-                hugr.metadata[node] = Some(metadata);
+            for (node, metadata) in metadata.into_iter().enumerate() {
+                if let Some(metadata) = metadata {
+                    let node = portgraph::NodeIndex::new(node);
+                    hugr.metadata[node] = Some(metadata);
+                }
             }
         }
 
