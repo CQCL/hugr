@@ -272,4 +272,30 @@ mod test {
         ConstInt::new_s(50, -2).unwrap_err();
         ConstInt::new_u(50, 2).unwrap_err();
     }
+
+    #[cfg(feature = "proptest")]
+    mod proptest {
+        use super::{ConstInt, LOG_WIDTH_MAX};
+        use ::proptest::prelude::*;
+        impl Arbitrary for ConstInt {
+            type Parameters = ();
+            type Strategy = BoxedStrategy<Self>;
+            fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+                let signed_strat = (..=LOG_WIDTH_MAX).prop_flat_map(|log_width| {
+                    use i64;
+                    let max_val = (2u64.pow(log_width as u32) / 2) as i64;
+                    let min_val = -max_val - 1;
+                    (min_val..=max_val).prop_map(move |v| {
+                        Self::new_s(log_width, v).expect("guaranteed to be in bounds")
+                    })
+                });
+                let unsigned_strat = (..=LOG_WIDTH_MAX).prop_flat_map(|log_width| {
+                    (0..2u64.pow(log_width as u32)).prop_map(move |v| {
+                        ConstInt::new_u(log_width, v).expect("guaranteed to be in bounds")
+                    })
+                });
+                prop_oneof![unsigned_strat, signed_strat].boxed()
+            }
+        }
+    }
 }
