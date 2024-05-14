@@ -583,17 +583,15 @@ fn extension_with_eval_parallel() -> Extension {
 #[test]
 fn instantiate_row_variables() -> Result<(), Box<dyn std::error::Error>> {
     fn uint_seq(i: usize) -> TypeArg {
-        TypeArg::Sequence {
-            elems: vec![TypeArg::Type { ty: USIZE_T }; i],
-        }
+        vec![TypeArg::Type { ty: USIZE_T }; i].into()
     }
     let e = extension_with_eval_parallel();
     let mut dfb = DFGBuilder::new(FunctionType::new(
         vec![
             Type::new_function(FunctionType::new(USIZE_T, vec![USIZE_T, USIZE_T])),
             USIZE_T,
-        ], // function + argument
-        vec![USIZE_T; 4], // results (twice each)
+        ], // inputs: function + its argument
+        vec![USIZE_T; 4], // outputs (*2^2, three calls)
     ))?;
     let [func, int] = dfb.input_wires_arr();
     let eval = e.instantiate_extension_op("eval", [uint_seq(1), uint_seq(2)], &PRELUDE_REGISTRY)?;
