@@ -22,8 +22,6 @@ use crate::{
     Hugr, HugrView, IncomingPort, Node, SimpleReplacement,
 };
 
-use super::VerifyLevel;
-
 #[derive(Error, Debug)]
 #[allow(missing_docs)]
 pub enum ConstFoldError {
@@ -35,79 +33,6 @@ pub enum ConstFoldError {
     },
     #[error(transparent)]
     SimpleReplaceError(#[from] SimpleReplacementError),
-}
-
-impl ConstFoldError {
-    fn verify_err(label: impl Into<String>, err: ValidationError) -> Self {
-        Self::VerifyError {
-            label: label.into(),
-            err,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, Default)]
-/// A configuration for the Constant Folding pass.
-pub struct ConstFoldConfig {
-    verify: VerifyLevel,
-}
-
-impl ConstFoldConfig {
-    /// Create a new `ConstFoldConfig` with default configuration.
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Build a `ConstFoldConfig` with the given [VerifyLevel].
-    pub fn with_verify(mut self, verify: VerifyLevel) -> Self {
-        self.verify = verify;
-        self
-    }
-
-    fn verify_impl(
-        &self,
-        label: &str,
-        h: &impl HugrView,
-        reg: &ExtensionRegistry,
-    ) -> Result<(), ConstFoldError> {
-        match self.verify {
-            VerifyLevel::None => Ok(()),
-            VerifyLevel::WithoutExtensions => h.validate_no_extensions(reg),
-            VerifyLevel::WithExtensions => h.validate(reg),
-        }
-        .map_err(|err| ConstFoldError::verify_err(label, err))
-    }
-
-    /// Run the Constant Folding pass.
-    pub fn run(&self, h: &mut impl HugrMut, reg: &ExtensionRegistry) -> Result<(), ConstFoldError> {
-        self.verify_impl("input", h, reg)?;
-        loop {
-            // We can only safely apply a single replacement. Applying a
-            // replacement removes nodes and edges which may be referenced by
-            // further replacements returned by find_consts. Even worse, if we
-            // attempted to apply those replacements, expecting them to fail if
-            // the nodes and edges they reference had been deleted,  they may
-            // succeed because new nodes and edges reused the ids.
-            //
-            // We could be a lot smarter here, keeping track of `LoadConstant`
-            // nodes and only looking at their out neighbours.
-            let Some((replace, removes)) = find_consts(h, h.nodes(), reg).next() else {
-                break;
-            };
-            h.apply_rewrite(replace)?;
-            for rem in removes {
-                // We are optimistically applying these [RemoveLoadConstant] and
-                // [RemoveConst] rewrites without checking whether the nodes
-                // they attempt to remove have remaining uses. If they do, then
-                // the rewrite fails and we move on.
-                if let Ok(const_node) = h.apply_rewrite(rem) {
-                    // if the LoadConst was removed, try removing the Const too.
-                    let _ = h.apply_rewrite(RemoveConst(const_node));
-                }
-            }
-        }
-        self.verify_impl("output", h, reg)
-    }
 }
 
 /// Tag some output constants with [`OutgoingPort`] inferred from the ordering.
@@ -162,7 +87,7 @@ pub fn fold_leaf_op(op: &OpType, consts: &[(IncomingPort, Value)]) -> ConstFoldR
         }
         _ => None,
     };
-    assert!(fold_result.as_ref().map_or(true, |x| x.len()
+    debug_assert!(fold_result.as_ref().map_or(true, |x| x.len()
         == op.value_port_count(Direction::Outgoing)));
     fold_result
 }
@@ -275,7 +200,44 @@ fn get_const(hugr: &impl HugrView, op_node: Node, in_p: IncomingPort) -> Option<
 
 /// Exhaustively apply constant folding to a HUGR.
 pub fn constant_fold_pass<H: HugrMut>(h: &mut H, reg: &ExtensionRegistry) {
-    ConstFoldConfig::default().run(h, reg).unwrap()
+    #[cfg(test)]
+    let verify = |label, h: &H| {
+        h.validate_no_extensions(reg).unwrap_or_else(|err| {
+            panic!(
+                "constant_fold_pass: failed to verify {label} HUGR: {err}\n{}",
+                h.mermaid_string()
+            )
+        })
+    };
+    #[cfg(test)]
+    verify("input", h);
+    loop {
+        // We can only safely apply a single replacement. Applying a
+        // replacement removes nodes and edges which may be referenced by
+        // further replacements returned by find_consts. Even worse, if we
+        // attempted to apply those replacements, expecting them to fail if
+        // the nodes and edges they reference had been deleted,  they may
+        // succeed because new nodes and edges reused the ids.
+        //
+        // We could be a lot smarter here, keeping track of `LoadConstant`
+        // nodes and only looking at their out neighbours.
+        let Some((replace, removes)) = find_consts(h, h.nodes(), reg).next() else {
+            break;
+        };
+        h.apply_rewrite(replace).unwrap();
+        for rem in removes {
+            // We are optimistically applying these [RemoveLoadConstant] and
+            // [RemoveConst] rewrites without checking whether the nodes
+            // they attempt to remove have remaining uses. If they do, then
+            // the rewrite fails and we move on.
+            if let Ok(const_node) = h.apply_rewrite(rem) {
+                // if the LoadConst was removed, try removing the Const too.
+                let _ = h.apply_rewrite(RemoveConst(const_node));
+            }
+        }
+    }
+    #[cfg(test)]
+    verify("output", h);
 }
 
 #[cfg(test)]
