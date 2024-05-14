@@ -442,26 +442,82 @@ pub enum TypeArgError {
 
 #[cfg(test)]
 mod test {
-    use rstest::rstest;
-    use crate::types::Type;
-    use super::{TypeArg, TypeParam};
-    use crate::{extension::prelude::USIZE_T, types::TypeBound};
+    use itertools::Itertools;
 
-    #[rstest]
-    #[case(USIZE_T, TypeBound::Eq, true)]
-    #[case(USIZE_T, TypeParam::new_list(TypeBound::Eq), false)]
-    #[case(vec![USIZE_T.into()], TypeBound::Any, false)]
-    #[case(vec![USIZE_T.into()], TypeParam::new_list(TypeBound::Eq), true)]
-    #[case(Type::new_row_var_use(0, TypeBound::Eq), TypeParam::new_list(TypeBound::Eq), true)]
-    #[case(vec![], TypeParam::new_list(TypeBound::Eq), true)]
-    #[case(vec![Type::new_row_var_use(0, TypeBound::Eq).into()], TypeParam::new_list(TypeBound::Eq), true)]
-    #[case(vec![Type::new_row_var_use(1, TypeBound::Any).into(), USIZE_T.into(), Type::new_row_var_use(0, TypeBound::Eq).into()], TypeParam::new_list(TypeBound::Any), true)]
-    #[case(vec![Type::new_row_var_use(1, TypeBound::Any).into(), USIZE_T.into(), Type::new_row_var_use(0, TypeBound::Eq).into()], TypeParam::new_list(TypeBound::Eq), false)]
-    #[case(5, TypeParam::max_nat(), true)]
-    #[case(vec![5.into()], TypeParam::max_nat(), false)]
-    #[case(vec![5.into()], TypeParam::new_list(TypeParam::max_nat()), true)]
-    fn check_type_arg(#[case] arg: impl Into<TypeArg>, #[case] param: impl Into<TypeParam>, #[case] ok: bool) {
-        let r = super::check_type_arg(&arg.into(), &param.into());
-        assert!(if ok {r.is_ok()} else {r.is_err()})
+    use super::{check_type_arg, TypeArg, TypeParam};
+    use crate::extension::prelude::USIZE_T;
+    use crate::types::{type_param::TypeArgError, Type, TypeBound};
+
+    #[test]
+    fn type_arg_fits_param() {
+        fn check(arg: impl Into<TypeArg>, parm: &TypeParam) -> Result<(), TypeArgError> {
+            check_type_arg(&arg.into(), parm)
+        }
+        fn check_seq<T: Clone + Into<TypeArg>>(
+            args: &[T],
+            parm: &TypeParam,
+        ) -> Result<(), TypeArgError> {
+            let arg = args.iter().cloned().map_into().collect_vec().into();
+            check_type_arg(&arg, parm)
+        }
+        // Simple cases: a TypeArg::Type is a TypeParam::Type but singleton sequences are lists
+        check(USIZE_T, &TypeBound::Eq.into()).unwrap();
+        let p = TypeParam::new_list(TypeBound::Eq);
+        check(USIZE_T, &p).unwrap_err();
+        check_seq(&[USIZE_T], &TypeBound::Any.into()).unwrap_err();
+
+        // Into a list of type, we can fit a single row var
+        check(Type::new_row_var_use(0, TypeBound::Eq), &p).unwrap();
+        // or a list of (types or row vars)
+        check(vec![], &p).unwrap();
+        check_seq(&[Type::new_row_var_use(0, TypeBound::Eq)], &p).unwrap();
+        check_seq(
+            &[
+                Type::new_row_var_use(1, TypeBound::Any),
+                USIZE_T,
+                Type::new_row_var_use(0, TypeBound::Eq),
+            ],
+            &TypeParam::new_list(TypeBound::Any),
+        )
+        .unwrap();
+        // Next one fails because a list of Eq is required
+        check_seq(
+            &[
+                Type::new_row_var_use(1, TypeBound::Any),
+                USIZE_T,
+                Type::new_row_var_use(0, TypeBound::Eq),
+            ],
+            &p,
+        )
+        .unwrap_err();
+        // seq of seq of types is not allowed
+        check(vec![USIZE_T.into(), vec![USIZE_T.into()].into()], &p).unwrap_err();
+
+        // Similar for nats (but no equivalent of fancy row vars)
+        check(5, &TypeParam::max_nat()).unwrap();
+        check_seq(&[5], &TypeParam::max_nat()).unwrap_err();
+        let list_of_nat = TypeParam::new_list(TypeParam::max_nat());
+        check(5, &list_of_nat).unwrap_err();
+        check_seq(&[5], &list_of_nat).unwrap();
+        check(TypeArg::new_var_use(0, list_of_nat.clone()), &list_of_nat).unwrap();
+        // But no equivalent of row vars - can't append a nat onto a list-in-a-var:
+        check(
+            vec![5.into(), TypeArg::new_var_use(0, list_of_nat.clone())],
+            &list_of_nat,
+        )
+        .unwrap_err();
+
+        // TypeParam::Tuples require a TypeArg::Seq of the same number of elems
+        let usize_and_ty = TypeParam::Tuple {
+            params: vec![TypeParam::max_nat(), TypeBound::Eq.into()],
+        };
+        check(vec![5.into(), USIZE_T.into()], &usize_and_ty).unwrap();
+        check(vec![USIZE_T.into(), 5.into()], &usize_and_ty).unwrap_err(); // Wrong way around
+        let two_types = TypeParam::Tuple {
+            params: vec![TypeBound::Any.into(), TypeBound::Any.into()],
+        };
+        check(TypeArg::new_var_use(0, two_types.clone()), &two_types).unwrap();
+        // not a Row Var which could have any number of elems
+        check(TypeArg::new_var_use(0, p), &two_types).unwrap_err();
     }
 }
