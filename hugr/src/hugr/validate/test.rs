@@ -548,23 +548,21 @@ fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn extension_with_eval_parallel() -> Extension {
-    fn rowparam() -> TypeParam {
-        TypeParam::new_list(TypeBound::Any.into())
-    }
+    let rowp = TypeParam::new_list(TypeBound::Any.into());
     let mut e = Extension::new(EXT_ID);
 
     let inputs = Type::new_row_var(0, TypeBound::Any);
     let outputs = Type::new_row_var(1, TypeBound::Any);
     let evaled_fn = Type::new_function(FunctionType::new(inputs.clone(), outputs.clone()));
     let pf = PolyFuncType::new(
-        [rowparam(), rowparam()],
+        [rowp.clone(), rowp.clone()],
         FunctionType::new(vec![evaled_fn, inputs], outputs),
     );
     e.add_op("eval".into(), "".into(), pf).unwrap();
 
     let rv = |idx| Type::new_row_var(idx, TypeBound::Any);
     let pf = PolyFuncType::new(
-        [rowparam(), rowparam(), rowparam(), rowparam()],
+        [rowp.clone(), rowp.clone(), rowp.clone(), rowp.clone()],
         FunctionType::new(
             vec![
                 Type::new_function(FunctionType::new(rv(0), rv(2))),
