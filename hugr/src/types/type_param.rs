@@ -439,3 +439,29 @@ pub enum TypeArgError {
     #[error("Invalid value of type argument")]
     InvalidValue(TypeArg),
 }
+
+#[cfg(test)]
+mod test {
+    use rstest::rstest;
+    use crate::types::Type;
+    use super::{TypeArg, TypeParam};
+    use crate::{extension::prelude::USIZE_T, types::TypeBound};
+
+    #[rstest]
+    #[case(USIZE_T, TypeBound::Eq, true)]
+    #[case(USIZE_T, TypeParam::new_list(TypeBound::Eq), false)]
+    #[case(vec![USIZE_T.into()], TypeBound::Any, false)]
+    #[case(vec![USIZE_T.into()], TypeParam::new_list(TypeBound::Eq), true)]
+    #[case(Type::new_row_var_use(0, TypeBound::Eq), TypeParam::new_list(TypeBound::Eq), true)]
+    #[case(vec![], TypeParam::new_list(TypeBound::Eq), true)]
+    #[case(vec![Type::new_row_var_use(0, TypeBound::Eq).into()], TypeParam::new_list(TypeBound::Eq), true)]
+    #[case(vec![Type::new_row_var_use(1, TypeBound::Any).into(), USIZE_T.into(), Type::new_row_var_use(0, TypeBound::Eq).into()], TypeParam::new_list(TypeBound::Any), true)]
+    #[case(vec![Type::new_row_var_use(1, TypeBound::Any).into(), USIZE_T.into(), Type::new_row_var_use(0, TypeBound::Eq).into()], TypeParam::new_list(TypeBound::Eq), false)]
+    #[case(5, TypeParam::max_nat(), true)]
+    #[case(vec![5.into()], TypeParam::max_nat(), false)]
+    #[case(vec![5.into()], TypeParam::new_list(TypeParam::max_nat()), true)]
+    fn check_type_arg(#[case] arg: impl Into<TypeArg>, #[case] param: impl Into<TypeParam>, #[case] ok: bool) {
+        let r = super::check_type_arg(&arg.into(), &param.into());
+        assert!(if ok {r.is_ok()} else {r.is_err()})
+    }
+}
