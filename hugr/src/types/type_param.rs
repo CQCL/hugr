@@ -103,10 +103,10 @@ impl TypeParam {
         }
     }
 
-    /// Make a new `TypeParam::List` (an arbitrary-length homogenous) the
-    pub fn new_list(elem: TypeParam) -> Self {
+    /// Make a new `TypeParam::List` (an arbitrary-length homogenous list)
+    pub fn new_list(elem: impl Into<TypeParam>) -> Self {
         Self::List {
-            param: Box::new(elem),
+            param: Box::new(elem.into()),
         }
     }
 
