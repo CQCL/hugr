@@ -222,9 +222,7 @@ impl TypeArg {
     /// `bound` must match that with which the variable was declared.
     pub fn new_var_use(idx: usize, decl: TypeParam) -> Self {
         match decl {
-            TypeParam::Type { b } => TypeArg::Type {
-                ty: Type::new_var_use(idx, b),
-            },
+            TypeParam::Type { b } => Type::new_var_use(idx, b).into(),
             TypeParam::List { param: bx } if matches!(*bx, TypeParam::Type { .. }) => {
                 // There are two reasonable schemes for representing row variables:
                 // 1. TypeArg::Variable(idx, TypeParam::List(TypeParam::Type(typebound)))
@@ -281,11 +279,7 @@ impl TypeArg {
                 // TODO: this case can't happen until we start substituting across Hugrs
                 // (rather than just their types) - e.g. instantiating the *body* (not just type)
                 // of a FuncDefn, polymorphic over a row variable, with multiple types
-                let tys = ty
-                    .substitute(t)
-                    .into_iter()
-                    .map(|ty| TypeArg::Type { ty })
-                    .collect::<Vec<_>>();
+                let tys = ty.substitute(t).into_iter().map_into().collect::<Vec<_>>();
                 match <Vec<TypeArg> as TryInto<[TypeArg; 1]>>::try_into(tys) {
                     Ok([ty]) => ty,
                     Err(elems) => TypeArg::Sequence { elems },
