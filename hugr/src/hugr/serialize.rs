@@ -14,7 +14,7 @@ use portgraph::{Direction, LinkError, PortView};
 
 use serde::{Deserialize, Deserializer, Serialize};
 
-use super::{HugrMut, HugrView};
+use super::{HugrMut, HugrView, NodeMetadataMap};
 
 /// A wrapper over the available HUGR serialization formats.
 ///
@@ -61,11 +61,8 @@ struct SerHugrV1 {
     /// for each edge: (src, src_offset, tgt, tgt_offset)
     edges: Vec<[(Node, Option<u16>); 2]>,
     /// for each node: (metadata)
-    //
-    // TODO: Update to Vec<Option<Map<String,Value>>> to more closely
-    // match the internal representation.
     #[serde(default)]
-    metadata: Vec<serde_json::Value>,
+    metadata: Option<Vec<Option<NodeMetadataMap>>>,
     /// A metadata field with the package identifier that encoded the HUGR.
     #[serde(default)]
     encoder: Option<String>,
@@ -173,7 +170,7 @@ impl TryFrom<&Hugr> for SerHugrV1 {
         }
 
         let mut nodes = vec![None; hugr.node_count()];
-        let mut metadata = vec![serde_json::Value::Null; hugr.node_count()];
+        let mut metadata = vec![None; hugr.node_count()];
         for n in hugr.nodes() {
             let parent = node_rekey[&hugr.get_parent(n).unwrap_or(n)];
             let opt = hugr.get_nodetype(n);
@@ -183,11 +180,7 @@ impl TryFrom<&Hugr> for SerHugrV1 {
                 input_extensions: opt.input_extensions.clone(),
                 op: opt.op.clone(),
             });
-            let node_metadata = hugr.metadata.get(n.pg_index()).clone();
-            metadata[new_node] = match node_metadata {
-                Some(m) => serde_json::Value::Object(m.clone()),
-                None => serde_json::Value::Null,
-            };
+            metadata[new_node].clone_from(hugr.metadata.get(n.pg_index()));
         }
         let nodes = nodes
             .into_iter()
@@ -222,7 +215,7 @@ impl TryFrom<&Hugr> for SerHugrV1 {
         Ok(Self {
             nodes,
             edges,
-            metadata,
+            metadata: Some(metadata),
             encoder,
         })
     }
@@ -263,9 +256,15 @@ impl TryFrom<SerHugrV1> for Hugr {
             );
         }
 
-        for (node, metadata) in metadata.into_iter().enumerate() {
-            let node = portgraph::NodeIndex::new(node);
-            hugr.metadata[node] = metadata.as_object().cloned();
+        if let Some(metadata) = metadata {
+            for (node, metadata) in metadata
+                .into_iter()
+                .enumerate()
+                .filter_map(|(i, mb_metadata)| mb_metadata.map(|metadata| (i, metadata)))
+            {
+                let node = portgraph::NodeIndex::new(node);
+                hugr.metadata[node] = Some(metadata);
+            }
         }
 
         let unwrap_offset = |node: Node, offset, dir, hugr: &Hugr| -> Result<usize, Self::Error> {

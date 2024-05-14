@@ -2259,6 +2259,7 @@
             "type": "object"
         }
     },
+    "additionalProperties": false,
     "description": "A serializable representation of a Hugr.",
     "properties": {
         "version": {
@@ -2327,6 +2328,28 @@
             },
             "title": "Edges",
             "type": "array"
+        },
+        "metadata": {
+            "anyOf": [
+                {
+                    "items": {
+                        "anyOf": [
+                            {
+                                "type": "object"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "default": null,
+            "title": "Metadata"
         },
         "encoder": {
             "anyOf": [
