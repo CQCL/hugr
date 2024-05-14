@@ -103,7 +103,7 @@ pub enum Value {
     Extension {
         #[serde(flatten)]
         /// The custom constant value.
-        e: ExtensionValue,
+        e: OpaqueValue,
     },
     /// A higher-order function value.
     // TODO use a root parametrised hugr, e.g. Hugr<DFG>.
@@ -140,13 +140,13 @@ pub enum Value {
 /// During serialization we first serialize the internal [`dyn` CustomConst](CustomConst)
 /// into a [serde_yaml::Value]. We then create a [CustomSerialized] wrapping
 /// that value.  That [CustomSerialized] is then serialized in place of the
-/// [ExtensionValue].
+/// [OpaqueValue].
 ///
 /// During deserialization, first we deserialize a [CustomSerialized]. We
 /// attempt to deserialize the internal [serde_yaml::Value] using the [`Box<dyn
 /// CustomConst>`](CustomConst) impl. This will fail if the appropriate `impl CustomConst`
 /// is not linked into the running program, in which case we coerce the
-/// [CustomSerialized] into a [`Box<dyn CustomConst>`](CustomConst). The [ExtensionValue] is
+/// [CustomSerialized] into a [`Box<dyn CustomConst>`](CustomConst). The [OpaqueValue] is
 /// then produced from the [`Box<dyn [CustomConst]>`](CustomConst).
 ///
 /// In the case where the internal serialised value of a `CustomSerialized`
@@ -156,7 +156,7 @@ pub enum Value {
 /// ```rust
 /// use serde::{Serialize,Deserialize};
 /// use hugr::{
-///   types::Type,ops::constant::{ExtensionValue, ValueName, CustomConst, CustomSerialized},
+///   types::Type,ops::constant::{OpaqueValue, ValueName, CustomConst, CustomSerialized},
 ///   extension::{ExtensionSet, prelude::{USIZE_T, ConstUsize}},
 ///   std_extensions::arithmetic::int_types};
 /// use serde_json::json;
@@ -166,11 +166,11 @@ pub enum Value {
 ///     "typ": USIZE_T,
 ///     "value": {'c': "ConstUsize", 'v': 1}
 /// });
-/// let ev = ExtensionValue::new(ConstUsize::new(1));
+/// let ev = OpaqueValue::new(ConstUsize::new(1));
 /// assert_eq!(&serde_json::to_value(&ev).unwrap(), &expected_json);
 /// assert_eq!(ev, serde_json::from_value(expected_json).unwrap());
 ///
-/// let ev = ExtensionValue::new(CustomSerialized::new(USIZE_T.clone(), serde_yaml::Value::Null, ExtensionSet::default()));
+/// let ev = OpaqueValue::new(CustomSerialized::new(USIZE_T.clone(), serde_yaml::Value::Null, ExtensionSet::default()));
 /// let expected_json = json!({
 ///     "extensions": [],
 ///     "typ": USIZE_T,
@@ -181,13 +181,13 @@ pub enum Value {
 /// assert_eq!(ev, serde_json::from_value(expected_json).unwrap());
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExtensionValue {
+pub struct OpaqueValue {
     #[serde(flatten, with = "self::custom::serde_extension_value")]
     v: Box<dyn CustomConst>,
 }
 
-impl ExtensionValue {
-    /// Create a new [`ExtensionValue`] from any [`CustomConst`].
+impl OpaqueValue {
+    /// Create a new [`OpaqueValue`] from any [`CustomConst`].
     pub fn new(cc: impl CustomConst) -> Self {
         Self { v: Box::new(cc) }
     }
@@ -209,13 +209,13 @@ impl ExtensionValue {
     }
 }
 
-impl<CC: CustomConst> From<CC> for ExtensionValue {
+impl<CC: CustomConst> From<CC> for OpaqueValue {
     fn from(x: CC) -> Self {
         Self::new(x)
     }
 }
 
-impl PartialEq for ExtensionValue {
+impl PartialEq for OpaqueValue {
     fn eq(&self, other: &Self) -> bool {
         self.value().equal_consts(other.value())
     }
@@ -361,7 +361,7 @@ impl Value {
     /// Returns a tuple constant of constant values.
     pub fn extension(custom_const: impl CustomConst) -> Self {
         Self::Extension {
-            e: ExtensionValue::new(custom_const),
+            e: OpaqueValue::new(custom_const),
         }
     }
 
