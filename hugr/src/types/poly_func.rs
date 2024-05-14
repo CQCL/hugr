@@ -349,7 +349,7 @@ pub(crate) mod test {
             [decl.clone()],
             FunctionType::new(
                 vec![USIZE_T],
-                vec![Type::new_row_var(0, TypeBound::Copyable)],
+                vec![Type::new_row_var_use(0, TypeBound::Copyable)],
             ),
             &PRELUDE_REGISTRY,
         )
@@ -373,14 +373,10 @@ pub(crate) mod test {
 
     #[test]
     fn row_variables() {
+        let rty = Type::new_row_var_use(0, TypeBound::Any);
         let pf = PolyFuncType::new_validated(
-            [TypeParam::List {
-                param: Box::new(TP_ANY),
-            }],
-            FunctionType::new(
-                vec![USIZE_T, Type::new_row_var(0, TypeBound::Any)],
-                vec![Type::new_tuple(vec![Type::new_row_var(0, TypeBound::Any)])],
-            ),
+            [TypeParam::new_list(TP_ANY)],
+            FunctionType::new(vec![USIZE_T, rty.clone()], vec![Type::new_tuple(rty)]),
             &PRELUDE_REGISTRY,
         )
         .unwrap();
@@ -412,7 +408,7 @@ pub(crate) mod test {
 
     #[test]
     fn row_variables_inner() {
-        let inner_fty = Type::new_function(FunctionType::new_endo(vec![Type::new_row_var(
+        let inner_fty = Type::new_function(FunctionType::new_endo(vec![Type::new_row_var_use(
             0,
             TypeBound::Copyable,
         )]));

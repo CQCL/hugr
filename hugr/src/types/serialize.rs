@@ -53,7 +53,7 @@ impl From<SerSimpleType> for Type {
             SerSimpleType::Opaque(o) => Type::new_extension(o),
             SerSimpleType::Alias(a) => Type::new_alias(a),
             SerSimpleType::V { i, b } => Type::new_var_use(i, b),
-            SerSimpleType::R { i, b } => Type::new_row_var(i, b),
+            SerSimpleType::R { i, b } => Type::new_row_var_use(i, b),
         }
     }
 }

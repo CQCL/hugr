@@ -644,9 +644,7 @@ mod test {
             Ok(FunctionType::new_endo(vec![tv]))
         );
         // But not with an external row variable
-        let arg = TypeArg::Type {
-            ty: Type::new_row_var(0, TypeBound::Eq),
-        };
+        let arg: TypeArg = Type::new_row_var_use(0, TypeBound::Eq).into();
         assert_eq!(
             def.compute_signature(&[arg.clone()], &EMPTY_REG),
             Err(SignatureError::TypeArgMismatch(

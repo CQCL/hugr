@@ -551,8 +551,8 @@ fn extension_with_eval_parallel() -> Extension {
     let rowp = TypeParam::new_list(TypeBound::Any.into());
     let mut e = Extension::new(EXT_ID);
 
-    let inputs = Type::new_row_var(0, TypeBound::Any);
-    let outputs = Type::new_row_var(1, TypeBound::Any);
+    let inputs = Type::new_row_var_use(0, TypeBound::Any);
+    let outputs = Type::new_row_var_use(1, TypeBound::Any);
     let evaled_fn = Type::new_function(FunctionType::new(inputs.clone(), outputs.clone()));
     let pf = PolyFuncType::new(
         [rowp.clone(), rowp.clone()],
@@ -560,7 +560,7 @@ fn extension_with_eval_parallel() -> Extension {
     );
     e.add_op("eval".into(), "".into(), pf).unwrap();
 
-    let rv = |idx| Type::new_row_var(idx, TypeBound::Any);
+    let rv = |idx| Type::new_row_var_use(idx, TypeBound::Any);
     let pf = PolyFuncType::new(
         [rowp.clone(), rowp.clone(), rowp.clone(), rowp.clone()],
         FunctionType::new(
@@ -617,7 +617,7 @@ fn seq1ty(t: Type) -> TypeArg {
 #[test]
 fn inner_row_variables() -> Result<(), Box<dyn std::error::Error>> {
     let e = extension_with_eval_parallel();
-    let tv = Type::new_row_var(0, TypeBound::Any);
+    let tv = Type::new_row_var_use(0, TypeBound::Any);
     let inner_ft = Type::new_function(FunctionType::new_endo(tv.clone()));
     let ft_usz = Type::new_function(FunctionType::new_endo(vec![tv.clone(), USIZE_T]));
     let mut fb = FunctionBuilder::new(
@@ -659,7 +659,7 @@ fn inner_row_variables() -> Result<(), Box<dyn std::error::Error>> {
 #[case(true)]
 fn no_outer_row_variables(#[case] connect: bool) -> Result<(), Box<dyn std::error::Error>> {
     let e = extension_with_eval_parallel();
-    let tv = Type::new_row_var(0, TypeBound::Copyable);
+    let tv = Type::new_row_var_use(0, TypeBound::Copyable);
     let mut fb = FunctionBuilder::new(
         "bad_eval",
         PolyFuncType::new(

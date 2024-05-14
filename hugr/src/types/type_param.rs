@@ -229,13 +229,11 @@ impl TypeArg {
             TypeParam::List { param: bx } if matches!(*bx, TypeParam::Type { .. }) => {
                 // There are two reasonable schemes for representing row variables:
                 // 1. TypeArg::Variable(idx, TypeParam::List(TypeParam::Type(typebound)))
-                // 2. TypeArg::Type(Type::new_row_var(idx, typebound))
+                // 2. TypeArg::Type(Type::new_row_var_use(idx, typebound))
                 // Here we prefer the latter for canonicalization, although we cannot really
                 // prevent both if users construct the TypeArg variants directly (doing so will break Eq)
                 let TypeParam::Type { b } = *bx else { panic!() };
-                TypeArg::Type {
-                    ty: Type::new_row_var(idx, b),
-                }
+                Type::new_row_var_use(idx, b).into()
             }
             TypeParam::Extensions => TypeArg::Extensions {
                 es: ExtensionSet::type_var(idx),

@@ -329,7 +329,7 @@ impl Type {
     ///
     /// [OpDef]: crate::extension::OpDef
     /// [FuncDefn]: crate::ops::FuncDefn
-    pub const fn new_row_var(idx: usize, bound: TypeBound) -> Self {
+    pub const fn new_row_var_use(idx: usize, bound: TypeBound) -> Self {
         Self(TypeEnum::RowVariable(idx, bound), bound)
     }
 
