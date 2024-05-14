@@ -255,7 +255,7 @@ impl TypeArg {
         var_decls: &[TypeParam],
     ) -> Result<(), SignatureError> {
         match self {
-            // Row variables are represented as Types, even inside TypeArgs
+            // Row variables are represented as 'TypeArg::Type's (see TypeArg::new_row_var_use)
             TypeArg::Type { ty } => ty.validate_in_row(extension_registry, var_decls),
             TypeArg::BoundedNat { .. } => Ok(()),
             TypeArg::Opaque { arg: custarg } => {

@@ -443,16 +443,18 @@ impl<'a> Substitution<'a> {
             .0
             .get(idx)
             .expect("Undeclared type variable - call validate() ?");
+        debug_assert_eq!(check_type_arg(arg, &TypeParam::new_list(bound)), Ok(()));
         match arg {
+            // Row variables are represented as 'TypeArg::Type's (see TypeArg::new_row_var_use)
             TypeArg::Sequence { elems } => elems
                 .iter()
                 .map(|ta| match ta {
                     TypeArg::Type { ty } => ty.clone(),
-                    _ => panic!("Not a list of types - did validate() ?"),
+                    _ => panic!("Not a list of types - call validate() ?"),
                 })
                 .collect(),
-            TypeArg::Type { ty } => {
-                debug_assert_eq!(check_type_arg(arg, &TypeParam::Type { b: bound }), Ok(()));
+            TypeArg::Type { ty } if matches!(ty.0, TypeEnum::RowVariable(_, _)) => {
+                // Standalone "Type" can be used iff its actually a Row Variable not an actual (single) Type
                 vec![ty.clone()]
             }
             _ => panic!("Not a type or list of types - did validate() ?"),
