@@ -18,8 +18,9 @@ test language="[rust|python]" : (_run_lang language \
         "poetry run pytest"
     )
 
+# Run all proptests
 proptest:
-    cargo test --all-features
+    cargo test --feature proptest '::proptest'
 
 # Run all the benchmarks.
 bench language="[rust|python]": (_run_lang language \

@@ -7,8 +7,6 @@ use smol_str::SmolStr;
 use thiserror::Error;
 
 pub static PATH_COMPONENT_REGEX_STR: &str = r"[\w--\d]\w*";
-#[cfg(all(test, feature = "proptest"))]
-pub static PATH_COMPONENT_NICE_REGEX_STR: &str = r"[[:alpha:]][[[:alpha:]]0-9]*";
 lazy_static! {
     pub static ref PATH_REGEX: Regex =
         Regex::new(&format!(r"^{0}(\.{0})*$", PATH_COMPONENT_REGEX_STR)).unwrap();
@@ -26,8 +24,8 @@ lazy_static! {
     serde::Serialize,
     serde::Deserialize,
 )]
-/// A non-empty dot-separated list of valid identifiers
 
+/// A non-empty dot-separated list of valid identifiers
 pub struct IdentList(SmolStr);
 
 impl IdentList {
@@ -91,7 +89,6 @@ mod test {
             fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
                 use crate::proptest::any_ident_string;
                 use proptest::collection::vec;
-                // we shrink to more readable (i.e. :alpha:) names
                 vec(any_ident_string(), 1..2)
                     .prop_map(|vs| {
                         IdentList::new(

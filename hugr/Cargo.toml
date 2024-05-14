@@ -22,7 +22,7 @@ bench = false
 path = "src/lib.rs"
 
 [features]
-default = []
+default = ["proptest"]
 extension_inference = []
 proptest = ["dep:proptest","dep:proptest-derive","dep:regex-syntax"]
 

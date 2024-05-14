@@ -10,7 +10,15 @@ use super::{subst_row, Substitution, Type, TypeRow};
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 use crate::{Direction, IncomingPort, OutgoingPort, Port};
 
+#[cfg(all(test, feature = "proptest"))]
+use {crate::proptest::RecursionDepth, ::proptest::prelude::*};
+
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(
+    all(test, feature = "proptest"),
+    derive(proptest_derive::Arbitrary),
+    proptest(params = "RecursionDepth")
+)]
 /// Describes the edges required to/from a node, and thus, also the type of a [Graph].
 /// This includes both the concept of "signature" in the spec,
 /// and also the target (value) of a call (static).
@@ -18,8 +26,16 @@ use crate::{Direction, IncomingPort, OutgoingPort, Port};
 /// [Graph]: crate::ops::constant::Value::Function
 pub struct FunctionType {
     /// Value inputs of the function.
+    #[cfg_attr(
+        all(test, feature = "proptest"),
+        proptest(strategy = "any_with::<TypeRow>(params)")
+    )]
     pub input: TypeRow,
     /// Value outputs of the function.
+    #[cfg_attr(
+        all(test, feature = "proptest"),
+        proptest(strategy = "any_with::<TypeRow>(params)")
+    )]
     pub output: TypeRow,
     /// The extension requirements which are added by the operation
     pub extension_reqs: ExtensionSet,
@@ -242,29 +258,5 @@ mod test {
 
         assert_eq!(f_type.input_types(), &[Type::UNIT]);
         assert_eq!(f_type.output_types(), &[USIZE_T]);
-    }
-
-    #[cfg(feature = "proptest")]
-    mod proptest {
-        use crate::extension::ExtensionSet;
-        use crate::proptest::TypeDepth;
-        use crate::types::{FunctionType, TypeRow};
-        use ::proptest::prelude::*;
-        impl Arbitrary for super::FunctionType {
-            type Parameters = TypeDepth;
-            type Strategy = BoxedStrategy<Self>;
-            fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
-                let input = any_with::<TypeRow>(depth);
-                let output = any_with::<TypeRow>(depth);
-                let extension = any::<ExtensionSet>();
-                (input, output, extension)
-                    .prop_map(|(input, output, extension_reqs)| FunctionType {
-                        input,
-                        output,
-                        extension_reqs,
-                    })
-                    .boxed()
-            }
-        }
     }
 }

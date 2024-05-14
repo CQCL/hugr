@@ -408,11 +408,11 @@ mod test {
 
         use super::super::{CustomTypeArg, TypeArg, TypeArgVariable, TypeParam, UpperBound};
         use crate::extension::ExtensionSet;
-        use crate::proptest::{any_serde_yaml_value, TypeDepth};
+        use crate::proptest::{any_serde_yaml_value, RecursionDepth};
         use crate::types::{CustomType, Type, TypeBound};
 
         impl Arbitrary for CustomTypeArg {
-            type Parameters = TypeDepth;
+            type Parameters = RecursionDepth;
             type Strategy = BoxedStrategy<Self>;
             fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
                 (
@@ -427,7 +427,7 @@ mod test {
         }
 
         impl Arbitrary for TypeArgVariable {
-            type Parameters = TypeDepth;
+            type Parameters = RecursionDepth;
             type Strategy = BoxedStrategy<Self>;
             fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
                 (any::<usize>(), any_with::<TypeParam>(depth))
@@ -437,7 +437,7 @@ mod test {
         }
 
         impl Arbitrary for TypeParam {
-            type Parameters = TypeDepth;
+            type Parameters = RecursionDepth;
             type Strategy = BoxedStrategy<Self>;
             fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
                 use proptest::collection::vec;
@@ -453,6 +453,7 @@ mod test {
                         .boxed(),
                 ]);
                 if !depth.leaf() {
+                    // we descend here because we these constructors contain TypeParams
                     strat = strat
                         .or(any_with::<Self>(depth.descend())
                             .prop_map(|x| Self::List { param: Box::new(x) })
@@ -467,7 +468,7 @@ mod test {
         }
 
         impl Arbitrary for TypeArg {
-            type Parameters = TypeDepth;
+            type Parameters = RecursionDepth;
             type Strategy = BoxedStrategy<Self>;
             fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
                 use proptest::collection::vec;
@@ -483,11 +484,16 @@ mod test {
                     any_with::<CustomTypeArg>(depth)
                         .prop_map(|arg| Self::Opaque { arg })
                         .boxed(),
+                    // TODO this is a bit dodgy, TypeArgVariables are supposed
+                    // to be constructed from TypeArg::new_var_use. We are only
+                    // using this instance for serialisation now, but if we want
+                    // to generate valid TypeArgs this will need to change.
                     any_with::<TypeArgVariable>(depth)
                         .prop_map(|v| Self::Variable { v })
                         .boxed(),
                 ]);
                 if !depth.leaf() {
+                    // We descend here because this constructor contains TypeArg>
                     strat = strat.or(vec(any_with::<Self>(depth.descend()), 0..3)
                         .prop_map(|elems| Self::Sequence { elems })
                         .boxed());

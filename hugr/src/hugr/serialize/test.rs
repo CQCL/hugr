@@ -177,7 +177,9 @@ pub fn check_hugr_roundtrip(hugr: &Hugr, check_schema: bool) -> Hugr {
     new_hugr
 }
 
-#[allow(unused)]
+// for now this is only used in property testing, so otherwise configured out to
+// avoid unused warnings.
+#[cfg(feature = "proptest")]
 fn check_testing_roundtrip(t: impl Into<TestingModel>) {
     let before = Versioned::new(t.into());
     let after_strict = ser_roundtrip_validate(&before, Some(&TESTING_SCHEMA_STRICT));
@@ -389,7 +391,7 @@ mod proptest {
         type Strategy = BoxedStrategy<Self>;
         fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
             (
-                (0..(std::u32::MAX / 2) as usize).prop_map(|x| portgraph::NodeIndex::new(x).into()),
+                (0..i32::MAX as usize).prop_map(|x| portgraph::NodeIndex::new(x).into()),
                 any::<Option<ExtensionSet>>(),
                 any::<OpType>(),
             )

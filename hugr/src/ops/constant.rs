@@ -647,7 +647,7 @@ mod test {
             fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
                 use proptest::collection::vec;
                 let signed_strat = (..=LOG_WIDTH_MAX).prop_flat_map(|log_width| {
-                    use std::i64;
+                    use i64;
                     let max_val = (2u64.pow(log_width as u32) / 2) as i64;
                     let min_val = -max_val - 1;
                     (min_val..=max_val).prop_map(move |v| {
@@ -690,11 +690,7 @@ mod test {
                 use ::proptest::collection::vec;
                 let leaf_strat = prop_oneof![
                     any::<ExtensionValue>().prop_map(|e| Self::Extension { e }),
-                    prop_oneof![
-                        // TODO we need an example of each legal root, in particular FuncDe{fn,cl}
-                        Just(crate::builder::test::simple_dfg_hugr()),
-                    ]
-                    .prop_map(|x| Value::function(x).unwrap())
+                    crate::proptest::any_hugr().prop_map(|x| Value::function(x).unwrap())
                 ];
                 leaf_strat
                     .prop_recursive(
@@ -707,7 +703,7 @@ mod test {
                                 (
                                     any::<usize>(),
                                     vec(element.clone(), 0..3),
-                                    any_with::<SumType>(1.into())
+                                    any_with::<SumType>(1.into()) // for speed: don't generate large sum types for now
                                 )
                                     .prop_map(
                                         |(tag, values, sum_type)| {

@@ -135,11 +135,10 @@
 // Unstable check, may cause false positives.
 // https://github.com/rust-lang/rust-clippy/issues/5112
 #![warn(clippy::debug_assert_with_mut_call)]
-
 // proptest-derive generates many of these warnings.
 // https://github.com/rust-lang/rust/issues/120363
 // https://github.com/proptest-rs/proptest/issues/447
-#![cfg_attr(all(test,feature = "proptest"), allow(non_local_definitions))]
+#![cfg_attr(all(test, feature = "proptest"), allow(non_local_definitions))]
 
 pub mod algorithm;
 pub mod builder;

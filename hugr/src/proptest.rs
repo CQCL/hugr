@@ -3,10 +3,34 @@ use ::proptest::prelude::*;
 use lazy_static::lazy_static;
 use smol_str::SmolStr;
 
-#[derive(Clone, Copy, Debug)]
-pub struct TypeDepth(usize);
+use crate::Hugr;
 
-impl TypeDepth {
+#[derive(Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq)]
+/// The types [Type], [TypeEnum], [SumType], [FunctionType], [TypeArg],
+/// [TypeParam], as well as several others, form a mutually recursive heirarchy.
+///
+/// The proptest [proptest::strategy::Strategy::prop_recursive] is inadequate to generate values for
+/// these types.  Instead, ther Arbitrary instances take a `RecursionDepth` as
+/// their (or part of their) [proptest::arbitrary::Arbitrary::Parameters]. We then use that parameter
+/// to generate children of that value. Usually we forward it unchanged, but in
+/// crucial locations(grep for `descend`) we instead forward the `descend` of it.
+///
+/// Consider the tree of values generated. Each node is labelled with a
+/// [RecursionDepth].
+///
+/// Consider a path between two different nodes of the same type(e.g. two [Type]s, or two
+/// [FunctionType]s).  The path must be non-increasing in [RecursionDepth] because
+/// each child's [RecursionDepth] is derived from it's parents.
+///
+/// We must maintain the invariant that the [RecursionDepth] of the start of the
+/// path is strictly greater than the [RecursionDepth] of the end of the path.
+///
+/// With this invariant in place we are guaranteed to generate a finite tree
+/// because there are only finitely many different types a node can take.
+pub struct RecursionDepth(usize);
+
+impl RecursionDepth {
+    const DEFAULT_RECURSION_DEPTH: usize = 4;
     pub fn descend(&self) -> Self {
         if self.leaf() {
             *self
@@ -18,17 +42,24 @@ impl TypeDepth {
     pub fn leaf(&self) -> bool {
         self.0 == 0
     }
-}
 
-impl Default for TypeDepth {
-    fn default() -> Self {
-        Self(3)
+    pub fn new() -> Self {
+        Self(Self::DEFAULT_RECURSION_DEPTH)
     }
 }
 
-impl From<usize> for TypeDepth {
-    fn from(s: usize) -> Self {
-        Self(s)
+impl Default for RecursionDepth {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<I: TryInto<usize>> From<I> for RecursionDepth
+where
+    <I as TryInto<usize>>::Error: std::fmt::Debug,
+{
+    fn from(s: I) -> Self {
+        Self(s.try_into().unwrap())
     }
 }
 
@@ -36,8 +67,8 @@ lazy_static! {
     static ref ANY_IDENT_STRING: SBoxedStrategy<String> = {
         use proptest::string::string_regex;
         prop_oneof![
-            string_regex(r"[[:alpha:]]{1,3}").unwrap(),
-            string_regex(crate::hugr::ident::PATH_COMPONENT_NICE_REGEX_STR).unwrap(),
+            // we shrink to more readable (i.e. :alpha:) names
+            string_regex(r"[[:alpha:]]+").unwrap(),
             string_regex(crate::hugr::ident::PATH_COMPONENT_REGEX_STR).unwrap(),
         ].sboxed()
     };
@@ -45,7 +76,7 @@ lazy_static! {
     static ref ANY_NONEMPTY_STRING: SBoxedStrategy<String> = {
         use proptest::string::string_regex;
         prop_oneof![
-            string_regex(r"[[:alpha:]]{1,3}").unwrap(),
+            // we shrink to more readable (i.e. :alpha:) names
             string_regex(r"[[:alpha:]]+").unwrap(),
             string_regex(r".+").unwrap(),
         ].sboxed()
@@ -54,7 +85,7 @@ lazy_static! {
     static ref ANY_STRING: SBoxedStrategy<String> = {
         use proptest::string::string_regex;
         prop_oneof![
-            string_regex(r"[[:alpha:]]{0,3}").unwrap(),
+            // we shrink to more readable (i.e. :alpha:) names
             string_regex(r"[[:alpha:]]*").unwrap(),
             string_regex(r".*").unwrap(),
         ].sboxed()
@@ -67,9 +98,20 @@ lazy_static! {
             any::<bool>().prop_map_into(),
             any::<u64>().prop_map_into(),
             any::<i64>().prop_map_into(),
+            // floats don't round trip !?!
             // any::<f64>().prop_map_into(),
             Just(Value::Number(3.into())),
             any_string().prop_map_into(),
+        ].sboxed()
+    };
+
+    static ref ANY_HUGR: SBoxedStrategy<Hugr>= {
+        // TODO we need more examples
+        // This is currently used for Value::Function
+        // With more uses we may need variants that return more constrained
+        // HUGRs.
+        prop_oneof![
+            Just(crate::builder::test::simple_dfg_hugr()),
         ].sboxed()
     };
 }
@@ -100,7 +142,7 @@ pub fn any_serde_yaml_value() -> impl Strategy<Value = serde_yaml::Value> {
             3,  // Each collection is up to 3 elements long
             |element| {
                 prop_oneof![
-                    // TaggedValue doesn't roundtrip through JSON
+                    // TODO TaggedValue doesn't roundtrip through JSON
                     // (any_nonempty_string().prop_map(Tag::new), element.clone()).prop_map(|(tag, value)| Value::Tagged(Box::new(TaggedValue { tag, value }))),
                     proptest::collection::vec(element.clone(), 0..3).prop_map_into(),
                     vec((any_string().prop_map_into(), element.clone()), 0..3)
@@ -109,4 +151,8 @@ pub fn any_serde_yaml_value() -> impl Strategy<Value = serde_yaml::Value> {
             },
         )
         .boxed()
+}
+
+pub fn any_hugr() -> SBoxedStrategy<Hugr> {
+    ANY_HUGR.clone()
 }

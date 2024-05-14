@@ -2,6 +2,11 @@
 
 use crate::extension::{ExtensionRegistry, SignatureError};
 use itertools::Itertools;
+#[cfg(all(test, feature = "proptest"))]
+use {
+    crate::proptest::RecursionDepth,
+    ::proptest::{collection::vec, prelude::*},
+};
 
 use super::type_param::{check_type_args, TypeArg, TypeParam};
 use super::{FunctionType, Substitution};
@@ -15,6 +20,11 @@ use super::{FunctionType, Substitution};
 #[derive(
     Clone, PartialEq, Debug, Default, Eq, derive_more::Display, serde::Serialize, serde::Deserialize,
 )]
+#[cfg_attr(
+    all(test, feature = "proptest"),
+    derive(proptest_derive::Arbitrary),
+    proptest(params = "RecursionDepth")
+)]
 #[display(
     fmt = "forall {}. {}",
     "params.iter().map(ToString::to_string).join(\" \")",
@@ -24,8 +34,16 @@ pub struct PolyFuncType {
     /// The declared type parameters, i.e., these must be instantiated with
     /// the same number of [TypeArg]s before the function can be called. This
     /// defines the indices used by variables inside the body.
+    #[cfg_attr(
+        all(test, feature = "proptest"),
+        proptest(strategy = "vec(any_with::<TypeParam>(params), 0..3)")
+    )]
     params: Vec<TypeParam>,
     /// Template for the function. May contain variables up to length of [Self::params]
+    #[cfg_attr(
+        all(test, feature = "proptest"),
+        proptest(strategy = "any_with::<FunctionType>(params)")
+    )]
     body: FunctionType,
 }
 
@@ -331,27 +349,5 @@ pub(crate) mod test {
             &[TypeParam::max_nat()],
         )?;
         Ok(())
-    }
-
-    #[cfg(feature = "proptest")]
-    mod proptest {
-        use super::PolyFuncType;
-        use crate::proptest::TypeDepth;
-        use crate::types::type_param::TypeParam;
-        use crate::types::FunctionType;
-        use ::proptest::prelude::*;
-        impl Arbitrary for PolyFuncType {
-            type Parameters = TypeDepth;
-            type Strategy = BoxedStrategy<Self>;
-            fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
-                use proptest::collection::vec;
-                (
-                    vec(any_with::<TypeParam>(depth), 0..3),
-                    any_with::<FunctionType>(depth),
-                )
-                    .prop_map(|(params, body)| PolyFuncType { params, body })
-                    .boxed()
-            }
-        }
     }
 }

@@ -123,12 +123,12 @@ impl DerefMut for TypeRow {
 mod test {
     #[cfg(feature = "proptest")]
     mod proptest {
-        use crate::proptest::TypeDepth;
+        use crate::proptest::RecursionDepth;
         use crate::{type_row, types::Type};
         use ::proptest::prelude::*;
 
         impl Arbitrary for super::super::TypeRow {
-            type Parameters = TypeDepth;
+            type Parameters = RecursionDepth;
             type Strategy = BoxedStrategy<Self>;
             fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
                 use proptest::collection::vec;
