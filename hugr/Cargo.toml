@@ -60,7 +60,7 @@ webbrowser = "1.0.0"
 urlencoding = "2.1.2"
 cool_asserts = "2.0.3"
 insta = { workspace = true, features = ["yaml"] }
-jsonschema = "0.17.1"
+jsonschema = "0.18.0"
 
 [[bench]]
 name = "bench_main"
