@@ -549,9 +549,7 @@ fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
 
 fn extension_with_eval_parallel() -> Extension {
     fn rowparam() -> TypeParam {
-        TypeParam::List {
-            param: Box::new(TypeBound::Any.into()),
-        }
+        TypeParam::new_list(TypeBound::Any.into())
     }
     let mut e = Extension::new(EXT_ID);
 
@@ -627,9 +625,7 @@ fn inner_row_variables() -> Result<(), Box<dyn std::error::Error>> {
     let mut fb = FunctionBuilder::new(
         "id",
         PolyFuncType::new(
-            [TypeParam::List {
-                param: Box::new(TypeParam::Type { b: TypeBound::Any }),
-            }],
+            [TypeParam::new_list(TypeBound::Any.into())],
             FunctionType::new(inner_ft.clone(), ft_usz),
         ),
     )?;
@@ -669,11 +665,7 @@ fn no_outer_row_variables(#[case] connect: bool) -> Result<(), Box<dyn std::erro
     let mut fb = FunctionBuilder::new(
         "bad_eval",
         PolyFuncType::new(
-            [TypeParam::List {
-                param: Box::new(TypeParam::Type {
-                    b: TypeBound::Copyable,
-                }),
-            }],
+            [TypeParam::new_list(TypeBound::Copyable.into())],
             FunctionType::new(
                 Type::new_function(FunctionType::new(USIZE_T, tv.clone())),
                 if connect { vec![tv.clone()] } else { vec![] },

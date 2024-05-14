@@ -70,9 +70,10 @@ pub enum TypeParam {
         /// The [CustomType] defining the parameter.
         ty: CustomType,
     },
-    /// Argument is a [TypeArg::Sequence]. A list of indeterminate size containing parameters.
+    /// Argument is a [TypeArg::Sequence]. A list of indeterminate size containing
+    /// parameters all of the (same) specified element type.
     List {
-        /// The [TypeParam] contained in the list.
+        /// The [TypeParam] describing each element of the list.
         param: Box<TypeParam>,
     },
     /// Argument is a [TypeArg::Sequence]. A tuple of parameters.
@@ -99,6 +100,13 @@ impl TypeParam {
     pub const fn bounded_nat(upper_bound: NonZeroU64) -> Self {
         Self::BoundedNat {
             bound: UpperBound(Some(upper_bound)),
+        }
+    }
+
+    /// Make a new `TypeParam::List` (an arbitrary-length homogenous) the
+    pub fn new_list(elem: TypeParam) -> Self {
+        Self::List {
+            param: Box::new(elem),
         }
     }
 
