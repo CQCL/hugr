@@ -357,12 +357,6 @@ fn check_type_arg_rv(
     allow_rowvars: bool,
 ) -> Result<(), TypeArgError> {
     debug_assert!(!allow_rowvars || matches!(param, TypeParam::Type { .. }));
-    fn rowvar_in_list(ty: &Type, list_elem: &TypeParam) -> bool {
-        let TypeParam::Type { b } = list_elem else {
-            return false;
-        };
-        matches!(ty.0, TypeEnum::RowVariable(_, _)) && b.contains(ty.least_upper_bound())
-    }
     match (arg, param) {
         (
             TypeArg::Variable {
@@ -384,7 +378,12 @@ fn check_type_arg_rv(
         }
         // Also allow a single "Type" to be used for a List *only* if the Type is a row variable
         // (i.e., it's not really a Type, it's multiple Types)
-        (TypeArg::Type { ty }, TypeParam::List { param }) if rowvar_in_list(ty, param) => Ok(()),
+        (
+            TypeArg::Type {
+                ty: Type(TypeEnum::RowVariable(_, b), _),
+            },
+            TypeParam::List { param },
+        ) if param.contains(&(*b).into()) => Ok(()),
 
         (TypeArg::Sequence { elems: items }, TypeParam::Tuple { params: types }) => {
             if items.len() != types.len() {
