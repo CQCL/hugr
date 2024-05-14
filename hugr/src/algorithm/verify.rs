@@ -12,8 +12,8 @@ use crate::{
 #[derive(Debug, Clone, Copy, Ord, Eq, PartialOrd, PartialEq)]
 /// A type for running [HugrMut] algorithms with verification.
 ///
-/// Provides [VerifyLevel::run_verified_pass] to invoke a closure with pre and
-/// post verification.
+/// Provides [VerifyLevel::run_verified_pass] to invoke a closure with pre and post
+/// verification.
 ///
 /// The default level is `None` because verification can be expensive.
 pub enum VerifyLevel {
@@ -66,7 +66,7 @@ impl VerifyLevel {
         &self,
         hugr: &mut H,
         reg: &ExtensionRegistry,
-        pass: impl FnOnce(&mut H) -> Result<T, E>,
+        pass: impl FnOnce(&mut H, &Self) -> Result<T, E>,
     ) -> Result<T, E>
     where
         VerifyError: Into<E>,
@@ -75,7 +75,7 @@ impl VerifyLevel {
             err,
             pretty_hugr,
         })?;
-        let result = pass(hugr)?;
+        let result = pass(hugr, self)?;
         self.verify_impl(hugr, reg, |err, pretty_hugr| VerifyError::OutputError {
             err,
             pretty_hugr,

@@ -56,7 +56,7 @@ impl ConstantFoldPass {
         hugr: &mut H,
         reg: &ExtensionRegistry,
     ) -> Result<(), ConstFoldError> {
-        self.verify.run_verified_pass(hugr, reg, |hugr: &mut H| {
+        self.verify.run_verified_pass(hugr, reg, |hugr: &mut H, _| {
             loop {
                 // We can only safely apply a single replacement. Applying a
                 // replacement removes nodes and edges which may be referenced by
