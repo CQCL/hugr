@@ -170,8 +170,9 @@ pub enum TypeArg {
         #[allow(missing_docs)]
         es: ExtensionSet,
     },
-    /// Variable (used in type schemes only), that is not a [TypeArg::Type]
-    /// or [TypeArg::Extensions] - see [TypeArg::new_var_use]
+    /// Variable (used in type schemes or inside polymorphic functions),
+    /// but not a [TypeArg::Type] (not even a row variable i.e. [TypeParam::List] of type)
+    /// nor [TypeArg::Extensions] - see [TypeArg::new_var_use]
     Variable {
         #[allow(missing_docs)]
         #[serde(flatten)]
