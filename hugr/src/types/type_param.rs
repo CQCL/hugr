@@ -352,10 +352,10 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
 fn check_type_arg_rv(
     arg: &TypeArg,
     param: &TypeParam,
+    // true to allow row-variables returning *multiple* values of the specified param
+    // (false => must be guaranteed to be a single value of kind `param`, so no rowvars)
     allow_rowvars: bool,
 ) -> Result<(), TypeArgError> {
-    // allow_row_vars only applies if we are checking against values allowed inside a list
-    // (where the row variable could stand for *several* elements)
     debug_assert!(!allow_rowvars || matches!(param, TypeParam::Type { .. }));
     fn rowvar_in_list(ty: &Type, list_elem: &TypeParam) -> bool {
         let TypeParam::Type { b } = list_elem else {
