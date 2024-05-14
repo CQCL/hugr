@@ -12,7 +12,6 @@ use crate::extension::ExtensionRegistry;
 use crate::extension::ExtensionSet;
 use crate::extension::SignatureError;
 
-use super::TypeEnum;
 use super::{check_typevar_decl, CustomType, Substitution, Type, TypeBound};
 
 /// The upper non-inclusive bound of a [`TypeParam::BoundedNat`]
@@ -366,7 +365,7 @@ fn check_type_arg_rv(
         ) if param.contains(cached_decl) => Ok(()),
         (TypeArg::Type { ty }, TypeParam::Type { b: bound })
             if bound.contains(ty.least_upper_bound())
-                && (allow_rowvars || !matches!(ty.0, TypeEnum::RowVariable(_, _))) =>
+                && (allow_rowvars || ty.row_var_bound().is_none()) =>
         {
             Ok(())
         }
@@ -378,12 +377,13 @@ fn check_type_arg_rv(
         }
         // Also allow a single "Type" to be used for a List *only* if the Type is a row variable
         // (i.e., it's not really a Type, it's multiple Types)
-        (
-            TypeArg::Type {
-                ty: Type(TypeEnum::RowVariable(_, b), _),
-            },
-            TypeParam::List { param },
-        ) if param.contains(&(*b).into()) => Ok(()),
+        (TypeArg::Type { ty }, TypeParam::List { param })
+            if ty
+                .row_var_bound()
+                .is_some_and(|b| param.contains(&b.into())) =>
+        {
+            Ok(())
+        }
 
         (TypeArg::Sequence { elems: items }, TypeParam::Tuple { params: types }) => {
             if items.len() != types.len() {

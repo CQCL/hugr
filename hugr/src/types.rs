@@ -351,6 +351,14 @@ impl Type {
         TypeBound::Copyable.contains(self.least_upper_bound())
     }
 
+    /// If this Type is a row variable, return its bound, otherwise None
+    pub fn row_var_bound(&self) -> Option<TypeBound> {
+        match self.0 {
+            TypeEnum::RowVariable(_, b) => Some(b),
+            _ => None,
+        }
+    }
+
     /// Checks that this [Type] represents a single Type, not a row variable,
     /// that all variables used within are in the provided list of bound variables,
     /// and that for each [CustomType], the corresponding
