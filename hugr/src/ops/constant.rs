@@ -633,7 +633,7 @@ mod test {
 
     #[cfg(feature = "proptest")]
     mod proptest {
-        use super::super::ExtensionValue;
+        use super::super::OpaqueValue;
         use crate::{
             ops::Value,
             std_extensions::arithmetic::int_types::{ConstInt, LOG_WIDTH_MAX},
@@ -641,7 +641,7 @@ mod test {
             types::{SumType, Type},
         };
         use ::proptest::prelude::*;
-        impl Arbitrary for ExtensionValue {
+        impl Arbitrary for OpaqueValue {
             type Parameters = ();
             type Strategy = BoxedStrategy<Self>;
             fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
@@ -651,14 +651,14 @@ mod test {
                     let max_val = (2u64.pow(log_width as u32) / 2) as i64;
                     let min_val = -max_val - 1;
                     (min_val..=max_val).prop_map(move |v| {
-                        ExtensionValue::new(
+                        OpaqueValue::new(
                             ConstInt::new_s(log_width, v).expect("guaranteed to be in bounds"),
                         )
                     })
                 });
                 let unsigned_strat = (..=LOG_WIDTH_MAX).prop_flat_map(|log_width| {
                     (0..2u64.pow(log_width as u32)).prop_map(move |v| {
-                        ExtensionValue::new(
+                        OpaqueValue::new(
                             ConstInt::new_u(log_width, v).expect("guaranteed to be in bounds"),
                         )
                     })
@@ -671,7 +671,7 @@ mod test {
                         |element| {
                             (any::<Type>(), vec(element.clone(), 0..3)).prop_map(
                                 |(typ, contents)| {
-                                    ExtensionValue::new(ListValue::new(
+                                    OpaqueValue::new(ListValue::new(
                                         typ,
                                         contents.into_iter().map(|e| Value::Extension { e }),
                                     ))
@@ -689,7 +689,7 @@ mod test {
             fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
                 use ::proptest::collection::vec;
                 let leaf_strat = prop_oneof![
-                    any::<ExtensionValue>().prop_map(|e| Self::Extension { e }),
+                    any::<OpaqueValue>().prop_map(|e| Self::Extension { e }),
                     crate::proptest::any_hugr().prop_map(|x| Value::function(x).unwrap())
                 ];
                 leaf_strat
