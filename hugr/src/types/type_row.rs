@@ -85,7 +85,7 @@ impl TypeRow {
     }
 
     /// Applies a substitution to the row. Note this may change the length
-    /// if-and-only-if the row contains any [RowVariable]
+    /// if-and-only-if the row contains any [RowVariable]s.
     ///
     /// [RowVariable]: [crate::types::TypeEnum::RowVariable]
     pub(super) fn substitute(&self, tr: &Substitution) -> TypeRow {
