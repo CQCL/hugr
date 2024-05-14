@@ -27,6 +27,10 @@ use crate::Hugr;
 ///
 /// With this invariant in place we are guaranteed to generate a finite tree
 /// because there are only finitely many different types a node can take.
+///
+/// We could instead use the `proptest-recurse` crate to implement [Arbitrary]
+/// impls for these mutually recursive types. We did try, but it wasn't simple
+/// enough to be obviously better, so this will do for now.
 pub struct RecursionDepth(usize);
 
 impl RecursionDepth {
