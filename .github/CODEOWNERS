@@ -1,0 +1,6 @@
+# for syntax see https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners#codeowners-syntax
+
+# lower the rule, higher the precedence
+
+# base rule, hugrverse team is codeowner for whole repo
+* @CQCL/hugrverse
