@@ -345,17 +345,6 @@ impl CustomTypeArg {
 
 /// Checks a [TypeArg] is as expected for a [TypeParam]
 pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgError> {
-    check_type_arg_rv(arg, param, false)
-}
-
-fn check_type_arg_rv(
-    arg: &TypeArg,
-    param: &TypeParam,
-    // true to allow row-variables returning *multiple* values of the specified param
-    // (false => must be guaranteed to be a single value of kind `param`, so no rowvars)
-    allow_rowvars: bool,
-) -> Result<(), TypeArgError> {
-    debug_assert!(!allow_rowvars || matches!(param, TypeParam::Type { .. }));
     match (arg, param) {
         (
             TypeArg::Variable {
@@ -364,16 +353,20 @@ fn check_type_arg_rv(
             _,
         ) if param.contains(cached_decl) => Ok(()),
         (TypeArg::Type { ty }, TypeParam::Type { b: bound })
-            if bound.contains(ty.least_upper_bound())
-                && (allow_rowvars || ty.row_var_bound().is_none()) =>
+            if bound.contains(ty.least_upper_bound()) && ty.row_var_bound().is_none() =>
         {
             Ok(())
         }
         (TypeArg::Sequence { elems }, TypeParam::List { param }) => {
-            let allow_rvs = matches!(&**param, TypeParam::Type { .. });
-            elems
-                .iter()
-                .try_for_each(|arg| check_type_arg_rv(arg, param, allow_rvs))
+            elems.iter().try_for_each(|arg| {
+                // Also allow elements that are RowVars if fitting into a List of Types
+                if let (TypeArg::Type { ty }, TypeParam::Type { b }) = (arg, &**param) {
+                    if ty.row_var_bound().is_some_and(|arg_b| b.contains(arg_b)) {
+                        return Ok(());
+                    }
+                }
+                check_type_arg(arg, param)
+            })
         }
         // Also allow a single "Type" to be used for a List *only* if the Type is a row variable
         // (i.e., it's not really a Type, it's multiple Types)
