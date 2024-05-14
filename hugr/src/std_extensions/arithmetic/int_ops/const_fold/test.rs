@@ -61,50 +61,46 @@ fn test_fold_iwiden_s() {
     assert_fully_folded(&h, &expected);
 }
 
-#[test]
-fn test_fold_inarrow_u() {
-    // pseudocode:
-    //
-    // x0 := int_u<5>(13);
-    // x1 := inarrow_u<5, 4>(x0);
-    // output x1 == int_u<4>(13);
-    let sum_type = sum_with_error(INT_TYPES[4].to_owned());
-    let mut build = DFGBuilder::new(FunctionType::new(
-        type_row![],
-        vec![sum_type.clone().into()],
-    ))
-    .unwrap();
-    let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 13).unwrap()));
-    let x1 = build
-        .add_dataflow_op(IntOpDef::inarrow_u.with_two_log_widths(5, 4), [x0])
-        .unwrap();
-    let reg = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        arithmetic::int_types::EXTENSION.to_owned(),
-    ])
-    .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x1.outputs(), &reg).unwrap();
-    constant_fold_pass(&mut h, &reg);
-    let expected = Value::extension(ConstInt::new_u(4, 13).unwrap());
-    assert_fully_folded(&h, &expected);
-}
-
-#[test]
-fn test_fold_inarrow_s() {
-    // pseudocode:
+#[rstest]
+#[case(ConstInt::new_s, IntOpDef::inarrow_s, 5, 4, -3, true)]
+#[case(ConstInt::new_s, IntOpDef::inarrow_s, 5, 5, -3, true)]
+#[case(ConstInt::new_s, IntOpDef::inarrow_s, 5, 1, -3, false)]
+#[case(ConstInt::new_u, IntOpDef::inarrow_u, 5, 4, 13, true)]
+#[case(ConstInt::new_u, IntOpDef::inarrow_u, 5, 5, 13, true)]
+#[case(ConstInt::new_u, IntOpDef::inarrow_u, 5, 0, 3, false)]
+fn test_fold_inarrow<I: Copy, C: Into<Value>, E: std::fmt::Debug>(
+    #[case] mk_const: impl Fn(u8, I) -> Result<C, E>,
+    #[case] op_def: IntOpDef,
+    #[case] from_log_width: u8,
+    #[case] to_log_width: u8,
+    #[case] val: I,
+    #[case] succeeds: bool,
+) {
+    // For the first case, pseudocode:
     //
     // x0 := int_s<5>(-3);
     // x1 := inarrow_s<5, 4>(x0);
-    // output x1 == int_s<4>(-3);
-    let sum_type = sum_with_error(INT_TYPES[4].to_owned());
+    // output x1 == sum<tag=0,[int_s<4>(-3)]>;
+    //
+    // Other cases vary by:
+    // (mk_const, op_def) => create signed or unsigned constants, create
+    //   inarrow_s or inarrow_u ops;
+    // (from_log_width, to_log_width) => the args to use to create the op;
+    // val => the value to pass to the op
+    // succeeds => whether to expect a int<to_log_width> variant or an error
+    //   variant.
+    let sum_type = sum_with_error(INT_TYPES[to_log_width as usize].to_owned());
     let mut build = DFGBuilder::new(FunctionType::new(
         type_row![],
         vec![sum_type.clone().into()],
     ))
     .unwrap();
-    let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, -3).unwrap()));
+    let x0 = build.add_load_const(mk_const(from_log_width, val).unwrap().into());
     let x1 = build
-        .add_dataflow_op(IntOpDef::inarrow_s.with_two_log_widths(5, 4), [x0])
+        .add_dataflow_op(
+            op_def.with_two_log_widths(from_log_width, to_log_width),
+            [x0],
+        )
         .unwrap();
     let reg = ExtensionRegistry::try_new([
         PRELUDE.to_owned(),
@@ -113,7 +109,11 @@ fn test_fold_inarrow_s() {
     .unwrap();
     let mut h = build.finish_hugr_with_outputs(x1.outputs(), &reg).unwrap();
     constant_fold_pass(&mut h, &reg);
-    let expected = Value::extension(ConstInt::new_s(4, -3).unwrap());
+    let expected = if succeeds {
+        Value::sum(0, [mk_const(to_log_width, val).unwrap().into()], sum_type).unwrap()
+    } else {
+        Value::sum(1, [super::INARROW_ERROR_VALUE.clone()], sum_type).unwrap()
+    };
     assert_fully_folded(&h, &expected);
 }
 

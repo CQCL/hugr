@@ -24,7 +24,10 @@ use itertools::{Itertools, MapInto};
 use portgraph::render::{DotFormat, MermaidFormat};
 use portgraph::{multiportgraph, LinkView, MultiPortGraph, PortView};
 
-use super::{Hugr, HugrError, NodeMetadata, NodeMetadataMap, NodeType, DEFAULT_NODETYPE};
+use super::{
+    Hugr, HugrError, NodeMetadata, NodeMetadataMap, NodeType, ValidationError, DEFAULT_NODETYPE,
+};
+use crate::extension::ExtensionRegistry;
 use crate::ops::handle::NodeHandle;
 use crate::ops::{OpParent, OpTag, OpTrait, OpType};
 
@@ -459,6 +462,18 @@ pub trait HugrView: sealed::HugrInternals {
     fn out_value_types(&self, node: Node) -> impl Iterator<Item = (OutgoingPort, Type)> {
         self.value_types(node, Direction::Outgoing)
             .map(|(p, t)| (p.as_outgoing().unwrap(), t))
+    }
+
+    /// Check the validity of the underlying HUGR.
+    fn validate(&self, reg: &ExtensionRegistry) -> Result<(), ValidationError> {
+        self.base_hugr().validate(reg)
+    }
+
+    /// Check the validity of the underlying HUGR, but don't check consistency
+    /// of extension requirements between connected nodes or between parents and
+    /// children.
+    fn validate_no_extensions(&self, reg: &ExtensionRegistry) -> Result<(), ValidationError> {
+        self.base_hugr().validate_no_extensions(reg)
     }
 }
 
