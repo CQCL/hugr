@@ -228,11 +228,12 @@ impl TypeArg {
                 // There are two reasonable schemes for representing row variables:
                 // 1. TypeArg::Variable(idx, TypeParam::List(TypeParam::Type(typebound)))
                 // 2. TypeArg::Type(Type::new_row_var_use(idx, typebound))
-                // Here we prefer the latter for canonicalization, although we cannot really
-                // prevent both if users construct the TypeArg variants directly (doing so will break Eq)
+                // Here we prefer the latter for canonicalization: TypeArgVariable's fields are non-pub
+                // so this pevents constructing malformed cases like the former.
                 let TypeParam::Type { b } = *bx else { panic!() };
                 Type::new_row_var_use(idx, b).into()
             }
+            // Similarly, prevent TypeArg::Variable(idx, TypeParam::Extensions)
             TypeParam::Extensions => TypeArg::Extensions {
                 es: ExtensionSet::type_var(idx),
             },
