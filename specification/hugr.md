@@ -554,8 +554,11 @@ parent(n<sub>2</sub>) when the edge's locality is:
 Each of these localities have additional constraints as follows:
 
 1. For Ext edges, we require parent(n<sub>1</sub>) ==
-   parent<sup>i</sup>(n<sub>2</sub>) for some i\>1, *and* for Value edges only there must be a order edge from n<sub>1</sub> to
-   parent<sup>i-1</sup>(n<sub>2</sub>).
+   parent<sup>i</sup>(n<sub>2</sub>) for some i\>1, *and* for Value edges only:
+     * there must be a order edge from n<sub>1</sub> to
+       parent<sup>i-1</sup>(n<sub>2</sub>).
+     * None of the parent<sup>j</sup>(n<sub>2</sub>), for 1\>=j\>i,
+       may be a FuncDefn node
 
    The order edge records the
    ordering requirement that results, i.e. it must be possible to
@@ -567,6 +570,9 @@ Each of these localities have additional constraints as follows:
 
    For Static edges this order edge is not required since the source is
    guaranteed to causally precede the target.
+
+   The FuncDefn restriction means that FuncDefn really are static,
+   and do not capture runtime values from their environment.
 
 2. For Dom edges, we must have that parent<sup>2</sup>(n<sub>1</sub>)
    == parent<sup>i</sup>(n<sub>2</sub>) is a CFG-node, for some i\>1,
