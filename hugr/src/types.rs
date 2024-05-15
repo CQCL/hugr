@@ -336,7 +336,7 @@ impl Type {
         Self(TypeEnum::RowVariable(idx, bound), bound)
     }
 
-    /// Report the least upper TypeBound, if there is one.
+    /// Report the least upper [TypeBound]
     #[inline(always)]
     pub const fn least_upper_bound(&self) -> TypeBound {
         self.1
@@ -451,9 +451,9 @@ impl<'a> Substitution<'a> {
             .0
             .get(idx)
             .expect("Undeclared type variable - call validate() ?");
-        debug_assert_eq!(check_type_arg(arg, &TypeParam::new_list(bound)), Ok(()));
+        debug_assert!(check_type_arg(arg, &TypeParam::new_list(bound)).is_ok());
         match arg {
-            // Row variables are represented as 'TypeArg::Type's (see TypeArg::new_row_var_use)
+            // Row variables are represented as 'TypeArg::Type's (see TypeArg::new_var_use)
             TypeArg::Sequence { elems } => elems
                 .iter()
                 .map(|ta| match ta {
@@ -465,7 +465,7 @@ impl<'a> Substitution<'a> {
                 // Standalone "Type" can be used iff its actually a Row Variable not an actual (single) Type
                 vec![ty.clone()]
             }
-            _ => panic!("Not a type or list of types - did validate() ?"),
+            _ => panic!("Not a type or list of types - call validate() ?"),
         }
     }
 
