@@ -646,6 +646,8 @@ mod test {
             fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
                 prop_oneof![
                     any::<ConstInt>().prop_map_into(),
+                    // any::<ConstFloat>()>.prop_map_into()
+
                     any::<CustomSerialized>().prop_map_into()
                 ]
                 .prop_recursive(

@@ -518,8 +518,9 @@ pub mod test {
 
             let get_sig = |sf: &_| match sf {
                 // if SignatureFunc or CustomValidator are changed we should get
-                // an error here, update do validate the parts of the heirarchy that
-                // are changed.
+                // an error here. To fix: modify the fields matched on here,
+                // maintaining the lack of `..` and, for each part that is
+                // serializable, ensure we are checking it for equality below.
                 SignatureFunc::TypeScheme(CustomValidator {
                     poly_func,
                     validate: _,
@@ -530,7 +531,7 @@ pub mod test {
             let get_lower_funcs = |lfs: &Vec<LowerFunc>| {
                 lfs.iter()
                     .map(|lf| match lf {
-                        // as with get_sig above, this should break if the heirarchy
+                        // as with get_sig above, this should break if the hierarchy
                         // is changed, update similarly.
                         LowerFunc::FixedHugr { extensions, hugr } => {
                             Some((extensions.clone(), hugr.clone()))
