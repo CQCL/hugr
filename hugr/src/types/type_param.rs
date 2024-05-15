@@ -269,7 +269,20 @@ impl TypeArg {
             TypeArg::Extensions { es: _ } => Ok(()),
             TypeArg::Variable {
                 v: TypeArgVariable { idx, cached_decl },
-            } => check_typevar_decl(var_decls, *idx, cached_decl),
+            } => {
+                assert!(
+                    match cached_decl {
+                        TypeParam::Type { .. } => false,
+                        TypeParam::List { param } if matches!(**param, TypeParam::Type { .. }) =>
+                            false,
+                        _ => true,
+                    },
+                    "Malformed TypeArg::Variable {} - should be inconstructible",
+                    cached_decl
+                );
+
+                check_typevar_decl(var_decls, *idx, cached_decl)
+            }
         }
     }
 
