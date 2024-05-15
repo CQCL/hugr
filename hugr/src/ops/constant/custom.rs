@@ -312,7 +312,8 @@ pub fn get_pair_of_input_values<T: CustomConst>(
     Some((c0.get_custom_value()?, c1.get_custom_value()?))
 }
 
-#[cfg(test)]
+// these tests depend on the `typetag` crate.
+#[cfg(all(test, not(miri)))]
 mod test {
 
     use rstest::rstest;
