@@ -351,12 +351,9 @@ impl Type {
         TypeBound::Copyable.contains(self.least_upper_bound())
     }
 
-    /// If this Type is a row variable, return its bound, otherwise None
-    pub fn row_var_bound(&self) -> Option<TypeBound> {
-        match self.0 {
-            TypeEnum::RowVariable(_, b) => Some(b),
-            _ => None,
-        }
+    /// Tells if this Type is a row variable, i.e. could stand for any number >=0 of Types
+    pub fn is_row_var(&self) -> bool {
+        matches!(self.0, TypeEnum::RowVariable(_, _))
     }
 
     /// Checks that this [Type] represents a single Type, not a row variable,

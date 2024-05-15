@@ -362,7 +362,7 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
             _,
         ) if param.contains(cached_decl) => Ok(()),
         (TypeArg::Type { ty }, TypeParam::Type { b: bound })
-            if bound.contains(ty.least_upper_bound()) && ty.row_var_bound().is_none() =>
+            if bound.contains(ty.least_upper_bound()) && !ty.is_row_var() =>
         {
             Ok(())
         }
@@ -370,7 +370,7 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
             elems.iter().try_for_each(|arg| {
                 // Also allow elements that are RowVars if fitting into a List of Types
                 if let (TypeArg::Type { ty }, TypeParam::Type { b }) = (arg, &**param) {
-                    if ty.row_var_bound().is_some_and(|arg_b| b.contains(arg_b)) {
+                    if ty.is_row_var() && b.contains(ty.least_upper_bound()) {
                         return Ok(());
                     }
                 }
@@ -380,9 +380,7 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
         // Also allow a single "Type" to be used for a List *only* if the Type is a row variable
         // (i.e., it's not really a Type, it's multiple Types)
         (TypeArg::Type { ty }, TypeParam::List { param })
-            if ty
-                .row_var_bound()
-                .is_some_and(|b| param.contains(&b.into())) =>
+            if ty.is_row_var() && param.contains(&ty.least_upper_bound().into()) =>
         {
             Ok(())
         }
