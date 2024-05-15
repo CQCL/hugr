@@ -474,15 +474,15 @@ mod test {
         }
         // Simple cases: a TypeArg::Type is a TypeParam::Type but singleton sequences are lists
         check(USIZE_T, &TypeBound::Eq.into()).unwrap();
-        let p = TypeParam::new_list(TypeBound::Eq);
-        check(USIZE_T, &p).unwrap_err();
+        let seq_param = TypeParam::new_list(TypeBound::Eq);
+        check(USIZE_T, &seq_param).unwrap_err();
         check_seq(&[USIZE_T], &TypeBound::Any.into()).unwrap_err();
 
         // Into a list of type, we can fit a single row var
-        check(Type::new_row_var_use(0, TypeBound::Eq), &p).unwrap();
+        check(Type::new_row_var_use(0, TypeBound::Eq), &seq_param).unwrap();
         // or a list of (types or row vars)
-        check(vec![], &p).unwrap();
-        check_seq(&[Type::new_row_var_use(0, TypeBound::Eq)], &p).unwrap();
+        check(vec![], &seq_param).unwrap();
+        check_seq(&[Type::new_row_var_use(0, TypeBound::Eq)], &seq_param).unwrap();
         check_seq(
             &[
                 Type::new_row_var_use(1, TypeBound::Any),
@@ -499,11 +499,15 @@ mod test {
                 USIZE_T,
                 Type::new_row_var_use(0, TypeBound::Eq),
             ],
-            &p,
+            &seq_param,
         )
         .unwrap_err();
         // seq of seq of types is not allowed
-        check(vec![USIZE_T.into(), vec![USIZE_T.into()].into()], &p).unwrap_err();
+        check(
+            vec![USIZE_T.into(), vec![USIZE_T.into()].into()],
+            &seq_param,
+        )
+        .unwrap_err();
 
         // Similar for nats (but no equivalent of fancy row vars)
         check(5, &TypeParam::max_nat()).unwrap();
@@ -530,6 +534,6 @@ mod test {
         };
         check(TypeArg::new_var_use(0, two_types.clone()), &two_types).unwrap();
         // not a Row Var which could have any number of elems
-        check(TypeArg::new_var_use(0, p), &two_types).unwrap_err();
+        check(TypeArg::new_var_use(0, seq_param), &two_types).unwrap_err();
     }
 }
