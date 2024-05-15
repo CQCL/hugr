@@ -258,6 +258,27 @@ fn test_ext_edge() {
 }
 
 #[test]
+fn no_ext_edge_into_func() -> Result<(), Box<dyn std::error::Error>> {
+    let b2b = FunctionType::new_endo(BOOL_T);
+    let mut h = DFGBuilder::new(FunctionType::new(BOOL_T, Type::new_function(b2b.clone())))?;
+    let [input] = h.input_wires_arr();
+
+    let mut dfg = h.dfg_builder(
+        FunctionType::new(vec![], Type::new_function(b2b.clone())),
+        None,
+        [],
+    )?;
+    let mut func = dfg.define_function("AndWithOuter", b2b.clone().into())?;
+    let [fn_input] = func.input_wires_arr();
+    let and_op = func.add_dataflow_op(and_op(), [fn_input, input])?; // 'ext' edge
+    let func = func.finish_with_outputs(and_op.outputs())?;
+    let loadfn = dfg.load_func(func.handle(), &[], &EMPTY_REG)?;
+    let dfg = dfg.finish_with_outputs([loadfn])?;
+    h.finish_hugr_with_outputs(dfg.outputs(), &EMPTY_REG)?;
+    Ok(())
+}
+
+#[test]
 fn test_local_const() {
     let mut h = closed_dfg_root_hugr(FunctionType::new(type_row![BOOL_T], type_row![BOOL_T]));
     let [input, output] = h.get_io(h.root()).unwrap();
