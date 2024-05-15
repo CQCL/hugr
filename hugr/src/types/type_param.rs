@@ -290,13 +290,12 @@ impl TypeArg {
     pub(crate) fn substitute(&self, t: &Substitution) -> Self {
         match self {
             TypeArg::Type { ty } => {
-                // A row variable standing for many types is represented as a single type
-                // TODO: this case can't happen until we start substituting across Hugrs
-                // (rather than just their types) - e.g. instantiating the *body* (not just type)
-                // of a FuncDefn, polymorphic over a row variable, with multiple types
                 let tys = ty.substitute(t).into_iter().map_into().collect::<Vec<_>>();
                 match <Vec<TypeArg> as TryInto<[TypeArg; 1]>>::try_into(tys) {
                     Ok([ty]) => ty,
+                    // Multiple elements can only have come from a row variable.
+                    // So, we must be either in a TypeArg::Sequence; or a single Row Variable
+                    // - fitting into a hole declared as a TypeParam::List (as per check_type_arg).
                     Err(elems) => TypeArg::Sequence { elems },
                 }
             }
@@ -309,9 +308,28 @@ impl TypeArg {
                 debug_assert_eq!(&typ.substitute(t), typ);
                 self.clone()
             }
-            TypeArg::Sequence { elems } => TypeArg::Sequence {
-                elems: elems.iter().map(|ta| ta.substitute(t)).collect(),
-            },
+            TypeArg::Sequence { elems } => {
+                let mut are_types = elems.iter().map(|e| matches!(e, TypeArg::Type { .. }));
+                let elems = match are_types.next() {
+                    Some(true) => {
+                        assert!(are_types.all(|b| b)); // If one is a Type, so must the rest be
+                                                       // So, anything that doesn't produce a Type, was a row variable => multiple Types
+                        elems
+                            .iter()
+                            .flat_map(|ta| match ta.substitute(t) {
+                                ty @ TypeArg::Type { .. } => vec![ty],
+                                TypeArg::Sequence { elems } => elems,
+                                _ => panic!("Expected Type or row of Types"),
+                            })
+                            .collect()
+                    }
+                    _ => {
+                        // not types, no need to flatten (and mustn't, in case of nested Sequences)
+                        elems.iter().map(|ta| ta.substitute(t)).collect()
+                    }
+                };
+                TypeArg::Sequence { elems }
+            }
             TypeArg::Extensions { es } => TypeArg::Extensions {
                 es: es.substitute(t),
             },
@@ -456,8 +474,8 @@ pub enum TypeArgError {
 mod test {
     use itertools::Itertools;
 
-    use super::{check_type_arg, TypeArg, TypeParam};
-    use crate::extension::prelude::USIZE_T;
+    use super::{check_type_arg, Substitution, TypeArg, TypeParam};
+    use crate::extension::prelude::{BOOL_T, PRELUDE_REGISTRY, USIZE_T};
     use crate::types::{type_param::TypeArgError, Type, TypeBound};
 
     #[test]
@@ -528,5 +546,36 @@ mod test {
         check(TypeArg::new_var_use(0, two_types.clone()), &two_types).unwrap();
         // not a Row Var which could have any number of elems
         check(TypeArg::new_var_use(0, seq_param), &two_types).unwrap_err();
+    }
+
+    #[test]
+    fn type_arg_subst_row() {
+        let row_param = TypeParam::new_list(TypeBound::Copyable);
+        let row_arg = TypeArg::Sequence {
+            elems: vec![BOOL_T.into(), Type::UNIT.into()],
+        };
+        check_type_arg(&row_arg, &row_param).unwrap();
+
+        // Now say a row variable referring to *that* row was used
+        // to instantiate an outer "row parameter" (list of type).
+        let outer_param = TypeParam::new_list(TypeBound::Any);
+        let outer_arg = TypeArg::Sequence {
+            elems: vec![
+                Type::new_row_var_use(0, TypeBound::Copyable).into(),
+                USIZE_T.into(),
+            ],
+        };
+        check_type_arg(&outer_arg, &outer_param).unwrap();
+
+        let outer_arg2 = outer_arg.substitute(&Substitution(&[row_arg], &PRELUDE_REGISTRY));
+        assert_eq!(
+            outer_arg2,
+            TypeArg::Sequence {
+                elems: vec![BOOL_T.into(), Type::UNIT.into(), USIZE_T.into()]
+            }
+        );
+
+        // Of course this is still valid (as substitution is guaranteed to preserve validity)
+        check_type_arg(&outer_arg2, &outer_param).unwrap();
     }
 }
