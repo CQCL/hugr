@@ -557,7 +557,7 @@ Each of these localities have additional constraints as follows:
    parent<sup>i</sup>(n<sub>2</sub>) for some i\>1, *and* for Value edges only:
      * there must be a order edge from n<sub>1</sub> to
        parent<sup>i-1</sup>(n<sub>2</sub>).
-     * None of the parent<sup>j</sup>(n<sub>2</sub>), for 1\>=j\>i,
+     * None of the parent<sup>j</sup>(n<sub>2</sub>), for i\>j\>=1,
        may be a FuncDefn node
 
    The order edge records the
@@ -581,6 +581,8 @@ Each of these localities have additional constraints as follows:
    parent(n<sub>1</sub>) \!= parent<sup>i-1</sup>(n<sub>2</sub>). (The
    i\>1 allows the node to target an arbitrarily-deep descendant of the
    dominated block, similar to an Ext edge.)
+
+   The same FuncDefn restriction also applies here, on the parent(<sup>j</sup>)(n<sub>2</sub>) for i\>j\>=1 (of course j=i is the CFG and j=i-1 is the basic block).
 
 Specifically, these rules allow for edges where in a given execution of
 the HUGR the source of the edge executes once, but the target may
