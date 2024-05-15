@@ -219,8 +219,8 @@ pub struct TypeArgVariable {
 
 impl TypeArg {
     /// Makes a TypeArg representing a use (occurrence) of the type variable
-    /// with the specified index. For use within type schemes only:
-    /// `bound` must match that with which the variable was declared.
+    /// with the specified index.
+    /// `decl` must be exactly that with which the variable was declared.
     pub fn new_var_use(idx: usize, decl: TypeParam) -> Self {
         match decl {
             TypeParam::Type { b } => Type::new_var_use(idx, b).into(),

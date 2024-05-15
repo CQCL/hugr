@@ -381,7 +381,8 @@ impl Type {
             TypeEnum::Sum(SumType::Unit { .. }) => Ok(()), // No leaves there
             TypeEnum::Alias(_) => Ok(()),
             TypeEnum::Extension(custy) => custy.validate(extension_registry, var_decls),
-            // FunctionTypes used as types of values may have unknown arity (e.g. if they are not called)
+            // Function values may be passed around without knowing their arity
+            // (i.e. with row vars) as long as they are not called:
             TypeEnum::Function(ft) => ft.validate_varargs(extension_registry, var_decls),
             TypeEnum::Variable(idx, bound) => check_typevar_decl(var_decls, *idx, &(*bound).into()),
             TypeEnum::RowVariable(idx, _) => {
