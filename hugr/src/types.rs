@@ -316,16 +316,19 @@ impl Type {
     }
 
     /// New use (occurrence) of the type variable with specified index.
-    /// For use in type schemes only: `bound` must match that with which the
-    /// variable was declared (i.e. as a [TypeParam::Type]`(bound)`).
+    /// `bound` must be exactly that with which the variable was declared
+    /// (i.e. as a [TypeParam::Type]`(bound)`), which may be narrower
+    /// than required for the use.
     pub const fn new_var_use(idx: usize, bound: TypeBound) -> Self {
         Self(TypeEnum::Variable(idx, bound), bound)
     }
 
     /// New use (occurrence) of the row variable with specified index.
-    /// `bound` must match that with which the variable was declared
-    /// (i.e. as a [TypeParam::List]` of a `[TypeParam::Type]` of that bound).
-    /// For use in [OpDef], not [FuncDefn], type schemes only.
+    /// `bound` must be exactly that with which the variable was declared
+    /// (i.e. as a [TypeParam::List]` of a `[TypeParam::Type]` of that bound),
+    /// which may be narrower than required for the use.
+    /// For use in [OpDef] type schemes, or function types, only,
+    /// not [FuncDefn] type schemes or as a Hugr port type.
     ///
     /// [OpDef]: crate::extension::OpDef
     /// [FuncDefn]: crate::ops::FuncDefn
