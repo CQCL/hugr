@@ -14,6 +14,8 @@ on:
 
 env:
   SCCACHE_GHA_ENABLED: "true"
+  HUGR_BIN_DIR: ${{ github.workspace }}/target/debug
+  HUGR_BIN: ${{ github.workspace }}/target/debug/hugr
 
 jobs:
   # Check if changes were made to the relevant files.
@@ -69,8 +71,59 @@ jobs:
       - name: Lint with ruff
         run: poetry run ruff check
 
+  build_binary:
+    needs: changes
+    if: ${{ needs.changes.outputs.python == 'true' }}
+
+    name: Build HUGR binary
+    runs-on: ubuntu-latest
+    env:
+      SCCACHE_GHA_ENABLED: "true"
+      RUSTC_WRAPPER: "sccache"
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mozilla-actions/sccache-action@v0.0.4
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Build HUGR binary
+        run: cargo build -p hugr-cli
+      - name: Upload the binary to the artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: hugr_binary
+          path: target/debug/hugr
+  test:
+    needs: [changes, check, build_binary]
+    if: ${{ needs.changes.outputs.python == 'true' }}
+    name: check python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install poetry
+        run: pipx install poetry
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "poetry"
+
+      - name: Install the project libraries
+        run: poetry install
+      - name: Download the hugr binary
+        uses: actions/download-artifact@v4
+        with:
+          name: hugr_binary
+          path: ${{env.HUGR_BIN_DIR}}
+
       - name: Run tests
-        run: poetry run pytest
+        run: |
+          chmod +x $HUGR_BIN
+          poetry run pytest
 
   # Ensure that the serialization schema is up to date
   serialization-schema:
@@ -107,7 +160,7 @@ jobs:
   # even if they are skipped due to no changes in the relevant files.
   required-checks:
     name: Required checks 🐍
-    needs: [changes, check, serialization-schema]
+    needs: [changes, check, test, serialization-schema]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
@@ -129,7 +182,7 @@ jobs:
           echo "All required checks passed"
 
   coverage:
-    needs: [changes, check]
+    needs: [changes, test]
     # Run only if there are changes in the relevant files and the check job passed or was skipped
     if: always() && !failure() && !cancelled() && needs.changes.outputs.python == 'true' && github.event_name != 'merge_group'
     runs-on: ubuntu-latest
@@ -147,9 +200,17 @@ jobs:
 
       - name: Install the project libraries
         run: poetry install
+      - name: Download the hugr binary
+        uses: actions/download-artifact@v4
+        with:
+          name: hugr_binary
+          path: ${{env.HUGR_BIN_DIR}}
+
 
       - name: Run python tests with coverage instrumentation
-        run: poetry run pytest --cov=./ --cov-report=xml
+        run: |
+          chmod +x $HUGR_BIN
+          poetry run pytest --cov=./ --cov-report=xml
 
       - name: Upload python coverage to codecov.io
         uses: codecov/codecov-action@v4
