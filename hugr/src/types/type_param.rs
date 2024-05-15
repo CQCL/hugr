@@ -462,6 +462,7 @@ mod test {
 
     #[test]
     fn type_arg_fits_param() {
+        let rowvar = Type::new_row_var_use;
         fn check(arg: impl Into<TypeArg>, parm: &TypeParam) -> Result<(), TypeArgError> {
             check_type_arg(&arg.into(), parm)
         }
@@ -479,26 +480,18 @@ mod test {
         check_seq(&[USIZE_T], &TypeBound::Any.into()).unwrap_err();
 
         // Into a list of type, we can fit a single row var
-        check(Type::new_row_var_use(0, TypeBound::Eq), &seq_param).unwrap();
+        check(rowvar(0, TypeBound::Eq), &seq_param).unwrap();
         // or a list of (types or row vars)
         check(vec![], &seq_param).unwrap();
-        check_seq(&[Type::new_row_var_use(0, TypeBound::Eq)], &seq_param).unwrap();
+        check_seq(&[rowvar(0, TypeBound::Eq)], &seq_param).unwrap();
         check_seq(
-            &[
-                Type::new_row_var_use(1, TypeBound::Any),
-                USIZE_T,
-                Type::new_row_var_use(0, TypeBound::Eq),
-            ],
+            &[rowvar(1, TypeBound::Any), USIZE_T, rowvar(0, TypeBound::Eq)],
             &TypeParam::new_list(TypeBound::Any),
         )
         .unwrap();
         // Next one fails because a list of Eq is required
         check_seq(
-            &[
-                Type::new_row_var_use(1, TypeBound::Any),
-                USIZE_T,
-                Type::new_row_var_use(0, TypeBound::Eq),
-            ],
+            &[rowvar(1, TypeBound::Any), USIZE_T, rowvar(0, TypeBound::Eq)],
             &seq_param,
         )
         .unwrap_err();
