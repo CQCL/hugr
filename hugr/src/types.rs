@@ -399,10 +399,7 @@ impl Type {
         var_decls: &[TypeParam],
     ) -> Result<(), SignatureError> {
         if let TypeEnum::RowVariable(idx, bound) = self.0 {
-            let t = TypeParam::List {
-                param: Box::new(bound.into()),
-            };
-            check_typevar_decl(var_decls, idx, &t)
+            check_typevar_decl(var_decls, idx, &TypeParam::new_list(bound))
         } else {
             self.validate_1type(extension_registry, var_decls)
         }
