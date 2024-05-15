@@ -6,8 +6,7 @@ help:
 # setting up the pre-commit hooks.
 setup:
     poetry install
-    # setup git hooks unless environment variable HUGR_JUST_INHIBIT_GIT_HOOKS is non-empty
-    [[ -z $HUGR_JUST_INHIBIT_GIT_HOOKS ]] && poetry run pre-commit install -t pre-commit || true
+    [[ -n "${HUGR_JUST_INHIBIT_GIT_HOOKS:-}" ]] || poetry run pre-commit install -t pre-commit
 
 # Run the pre-commit checks.
 check:
