@@ -274,7 +274,20 @@ fn no_ext_edge_into_func() -> Result<(), Box<dyn std::error::Error>> {
     let func = func.finish_with_outputs(and_op.outputs())?;
     let loadfn = dfg.load_func(func.handle(), &[], &EMPTY_REG)?;
     let dfg = dfg.finish_with_outputs([loadfn])?;
-    h.finish_hugr_with_outputs(dfg.outputs(), &EMPTY_REG)?;
+    let res = h.finish_hugr_with_outputs(dfg.outputs(), &EMPTY_REG);
+    assert_eq!(
+        res,
+        Err(BuildError::InvalidHUGR(
+            ValidationError::InterGraphEdgeError(InterGraphEdgeError::ValueEdgeIntoFunc {
+                from: input.node(),
+                from_offset: input.source().into(),
+                to: and_op.node(),
+                to_offset: IncomingPort::from(1).into(),
+                //to_offset: Port::new(Direction::Incoming, 1),
+                func: func.node()
+            })
+        ))
+    );
     Ok(())
 }
 
