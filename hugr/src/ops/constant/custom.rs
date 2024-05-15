@@ -353,6 +353,7 @@ mod test {
     }
 
     #[rstest]
+    #[cfg_attr(miri, ignore = "miri is incompatible with the typetag crate")]
     #[case(scce_usize())]
     #[case(scce_list())]
     fn test_custom_serialized_try_from<
@@ -438,6 +439,7 @@ mod test {
     }
 
     #[rstest]
+    #[cfg_attr(miri, ignore = "miri is incompatible with the typetag crate")]
     #[case(example_custom_serialized())]
     #[case(example_nested_custom_serialized())]
     fn test_try_from_custom_serialized_recursive<CC: CustomConst + PartialEq>(
