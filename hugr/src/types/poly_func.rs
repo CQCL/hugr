@@ -2,7 +2,7 @@
 
 use crate::extension::{ExtensionRegistry, SignatureError};
 use itertools::Itertools;
-#[cfg(all(test, feature = "proptest"))]
+#[cfg(test)]
 use {
     crate::proptest::RecursionDepth,
     ::proptest::{collection::vec, prelude::*},
@@ -21,7 +21,7 @@ use super::{FunctionType, Substitution};
     Clone, PartialEq, Debug, Default, Eq, derive_more::Display, serde::Serialize, serde::Deserialize,
 )]
 #[cfg_attr(
-    all(test, feature = "proptest"),
+    test,
     derive(proptest_derive::Arbitrary),
     proptest(params = "RecursionDepth")
 )]
@@ -35,13 +35,13 @@ pub struct PolyFuncType {
     /// the same number of [TypeArg]s before the function can be called. This
     /// defines the indices used by variables inside the body.
     #[cfg_attr(
-        all(test, feature = "proptest"),
+        test,
         proptest(strategy = "vec(any_with::<TypeParam>(params), 0..3)")
     )]
     params: Vec<TypeParam>,
     /// Template for the function. May contain variables up to length of [Self::params]
     #[cfg_attr(
-        all(test, feature = "proptest"),
+        test,
         proptest(strategy = "any_with::<FunctionType>(params)")
     )]
     body: FunctionType,

@@ -179,7 +179,6 @@ pub fn check_hugr_roundtrip(hugr: &Hugr, check_schema: bool) -> Hugr {
 
 // for now this is only used in property testing, so otherwise configured out to
 // avoid unused warnings.
-#[cfg(feature = "proptest")]
 fn check_testing_roundtrip(t: impl Into<TestingModel>) {
     let before = Versioned::new(t.into());
     let after_strict = ser_roundtrip_validate(&before, Some(&TESTING_SCHEMA_STRICT));
@@ -377,7 +376,6 @@ fn serialize_types_roundtrip() {
     assert_eq!(ser_roundtrip(&t), t);
 }
 
-#[cfg(feature = "proptest")]
 mod proptest {
     use super::super::NodeSer;
     use super::check_testing_roundtrip;

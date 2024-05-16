@@ -10,12 +10,12 @@ use super::{subst_row, Substitution, Type, TypeRow};
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 use crate::{Direction, IncomingPort, OutgoingPort, Port};
 
-#[cfg(all(test, feature = "proptest"))]
+#[cfg(test)]
 use {crate::proptest::RecursionDepth, ::proptest::prelude::*};
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(
-    all(test, feature = "proptest"),
+    test,
     derive(proptest_derive::Arbitrary),
     proptest(params = "RecursionDepth")
 )]
@@ -27,13 +27,13 @@ use {crate::proptest::RecursionDepth, ::proptest::prelude::*};
 pub struct FunctionType {
     /// Value inputs of the function.
     #[cfg_attr(
-        all(test, feature = "proptest"),
+        test,
         proptest(strategy = "any_with::<TypeRow>(params)")
     )]
     pub input: TypeRow,
     /// Value outputs of the function.
     #[cfg_attr(
-        all(test, feature = "proptest"),
+        test,
         proptest(strategy = "any_with::<TypeRow>(params)")
     )]
     pub output: TypeRow,

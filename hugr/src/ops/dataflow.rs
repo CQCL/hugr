@@ -51,7 +51,7 @@ pub trait IOTrait {
 /// An input node.
 /// The outputs of this node are the inputs to the function.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(all(test, feature = "proptest"), derive(proptest_derive::Arbitrary))]
+#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 pub struct Input {
     /// Input value types
     pub types: TypeRow,
@@ -69,7 +69,7 @@ impl IOTrait for Input {
 
 /// An output node. The inputs are the outputs of the function.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(all(test, feature = "proptest"), derive(proptest_derive::Arbitrary))]
+#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 pub struct Output {
     /// Output value types
     pub types: TypeRow,
@@ -153,7 +153,7 @@ impl<T: DataflowOpTrait> StaticTag for T {
 /// The port immediately following those those is connected to the def/declare
 /// block with a [`EdgeKind::Function`] edge.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(all(feature = "proptest", test), derive(proptest_derive::Arbitrary))]
+#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 pub struct Call {
     /// Signature of function being called
     func_sig: PolyFuncType,
@@ -247,7 +247,7 @@ impl Call {
 /// Call a function indirectly. Like call, but the function input is a value
 /// (runtime, not static) dataflow edge, and thus does not need any type-args.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(all(feature = "proptest", test), derive(proptest_derive::Arbitrary))]
+#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 pub struct CallIndirect {
     /// Signature of function being called
     pub signature: FunctionType,
@@ -272,7 +272,7 @@ impl DataflowOpTrait for CallIndirect {
 
 /// Load a static constant in to the local dataflow graph.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(all(test, feature = "proptest"), derive(proptest_derive::Arbitrary))]
+#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 pub struct LoadConstant {
     /// Constant type
     pub datatype: Type,
@@ -323,7 +323,7 @@ impl LoadConstant {
 
 /// Load a static function in to the local dataflow graph.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(all(test, feature = "proptest"), derive(proptest_derive::Arbitrary))]
+#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 pub struct LoadFunction {
     /// Signature of the function
     func_sig: PolyFuncType,
@@ -410,7 +410,7 @@ pub trait DataflowParent {
 
 /// A simply nested dataflow graph.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(all(test, feature = "proptest"), derive(proptest_derive::Arbitrary))]
+#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 pub struct DFG {
     /// Signature of DFG node
     pub signature: FunctionType,

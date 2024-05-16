@@ -32,7 +32,7 @@ pub use tag::OpTag;
 
 #[enum_dispatch(OpTrait, NamedOp, ValidateOp, OpParent)]
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(all(test, feature = "proptest"), derive(proptest_derive::Arbitrary))]
+#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 /// The concrete operation types for a node in the HUGR.
 // TODO: Link the NodeHandles to the OpType.
 #[non_exhaustive]

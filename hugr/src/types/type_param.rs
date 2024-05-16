@@ -20,7 +20,7 @@ use super::{check_typevar_decl, CustomType, Substitution, Type, TypeBound};
     Clone, Debug, PartialEq, Eq, derive_more::Display, serde::Deserialize, serde::Serialize,
 )]
 #[display(fmt = "{}", "_0.map(|i|i.to_string()).unwrap_or(\"-\".to_string())")]
-#[cfg_attr(all(test, feature = "proptest"), derive(proptest_derive::Arbitrary))]
+#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 pub struct UpperBound(Option<NonZeroU64>);
 impl UpperBound {
     fn valid_value(&self, val: u64) -> bool {
@@ -401,7 +401,6 @@ pub enum TypeArgError {
 #[cfg(test)]
 mod test {
 
-    #[cfg(feature = "proptest")]
     mod proptest {
 
         use proptest::prelude::*;

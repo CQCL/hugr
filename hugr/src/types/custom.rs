@@ -141,7 +141,6 @@ impl From<CustomType> for Type {
 #[cfg(test)]
 pub mod test {
 
-    #[cfg(feature = "proptest")]
     pub mod proptest {
         use crate::extension::ExtensionId;
         use crate::proptest::any_nonempty_string;

@@ -79,7 +79,6 @@ pub struct InvalidIdentifier(SmolStr);
 #[cfg(test)]
 mod test {
 
-    #[cfg(feature = "proptest")]
     mod proptest {
         use crate::hugr::ident::IdentList;
         use ::proptest::prelude::*;

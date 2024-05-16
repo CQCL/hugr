@@ -22,7 +22,7 @@ pub use type_row::TypeRow;
 use itertools::FoldWhile::{Continue, Done};
 use itertools::{repeat_n, Itertools};
 use serde::{Deserialize, Serialize};
-#[cfg(all(test, feature = "proptest"))]
+#[cfg(test)]
 use {crate::proptest::RecursionDepth, ::proptest::prelude::*};
 
 use crate::extension::{ExtensionRegistry, SignatureError};
@@ -72,7 +72,7 @@ impl EdgeKind {
 #[derive(
     Copy, Default, Clone, PartialEq, Eq, Hash, Debug, derive_more::Display, Serialize, Deserialize,
 )]
-#[cfg_attr(all(test, feature = "proptest"), derive(proptest_derive::Arbitrary))]
+#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 /// Bounds on the valid operations on a type in a HUGR program.
 pub enum TypeBound {
     /// The equality operation is valid on this type.
@@ -198,7 +198,7 @@ impl From<SumType> for Type {
 
 #[derive(Clone, PartialEq, Debug, Eq, derive_more::Display)]
 #[cfg_attr(
-    all(test, feature = "proptest"),
+    test,
     derive(proptest_derive::Arbitrary),
     proptest(params = "RecursionDepth")
 )]
@@ -209,7 +209,7 @@ pub enum TypeEnum {
     #[allow(missing_docs)]
     Extension(
         #[cfg_attr(
-            all(test, feature = "proptest"),
+            test,
             proptest(strategy = "any_with::<CustomType>(params.into())")
         )]
         CustomType,
@@ -221,7 +221,7 @@ pub enum TypeEnum {
     #[display(fmt = "Function({})", "_0")]
     Function(
         #[cfg_attr(
-            all(test, feature = "proptest"),
+            test,
             proptest(strategy = "any_with::<FunctionType>(params).prop_map(Box::new)")
         )]
         Box<FunctionType>,
@@ -234,7 +234,7 @@ pub enum TypeEnum {
     #[display(fmt = "{}", "_0")]
     Sum(
         #[cfg_attr(
-            all(test, feature = "proptest"),
+            test,
             proptest(strategy = "any_with::<SumType>(params)")
         )]
         SumType,
@@ -506,7 +506,6 @@ pub(crate) mod test {
         assert_eq!(pred1, pred_direct.into())
     }
 
-    #[cfg(feature = "proptest")]
     mod proptest {
 
         use crate::proptest::RecursionDepth;

@@ -24,7 +24,7 @@ pub use custom::{
 ///
 /// Represents core types and extension types.
 #[non_exhaustive]
-#[cfg_attr(all(test, feature = "proptest"), derive(proptest_derive::Arbitrary))]
+#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 pub struct Const {
     #[serde(rename = "v")]
     value: Value,
@@ -631,7 +631,6 @@ mod test {
         assert_ne!(yaml_const.get_type(), t);
     }
 
-    #[cfg(feature = "proptest")]
     mod proptest {
         use super::super::OpaqueValue;
         use crate::{

@@ -537,7 +537,6 @@ impl FromIterator<ExtensionId> for ExtensionSet {
 #[cfg(test)]
 mod test {
 
-    #[cfg(feature = "proptest")]
     mod proptest {
 
         use ::proptest::{collection::hash_set, prelude::*};

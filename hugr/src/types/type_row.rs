@@ -121,7 +121,6 @@ impl DerefMut for TypeRow {
 
 #[cfg(test)]
 mod test {
-    #[cfg(feature = "proptest")]
     mod proptest {
         use crate::proptest::RecursionDepth;
         use crate::{type_row, types::Type};

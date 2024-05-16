@@ -268,16 +268,16 @@ impl DataflowOpTrait for ExtensionOp {
 
 /// An opaquely-serialized op that refers to an as-yet-unresolved [`OpDef`]
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(all(test, feature = "proptest"), derive(proptest_derive::Arbitrary))]
+#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 pub struct OpaqueOp {
     extension: ExtensionId,
     #[cfg_attr(
-        all(test, feature = "proptest"),
+        test,
         proptest(strategy = "crate::proptest::any_nonempty_smolstr()")
     )]
     op_name: SmolStr,
     #[cfg_attr(
-        all(test, feature = "proptest"),
+        test,
         proptest(strategy = "crate::proptest::any_nonempty_string()")
     )]
     description: String, // cache in advance so description() can return &str
@@ -449,7 +449,6 @@ mod test {
         assert!(!op.is_extension_op());
     }
 
-    #[cfg(feature = "proptest")]
     mod proptest {
         use ::proptest::prelude::*;
 

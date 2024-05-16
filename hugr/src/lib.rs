@@ -138,7 +138,7 @@
 // proptest-derive generates many of these warnings.
 // https://github.com/rust-lang/rust/issues/120363
 // https://github.com/proptest-rs/proptest/issues/447
-#![cfg_attr(all(test, feature = "proptest"), allow(non_local_definitions))]
+#![cfg_attr(test, allow(non_local_definitions))]
 
 pub mod algorithm;
 pub mod builder;
@@ -157,5 +157,5 @@ pub use crate::core::{
 pub use crate::extension::Extension;
 pub use crate::hugr::{Hugr, HugrView, SimpleReplacement};
 
-#[cfg(all(feature = "proptest", test))]
+#[cfg(test)]
 pub mod proptest;
