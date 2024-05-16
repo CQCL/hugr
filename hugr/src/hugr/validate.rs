@@ -480,24 +480,23 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         // any such, then that is an error, but we report that only if the dom/ext
         // relation was otherwise ok (an error about an edge "entering" some ancestor
         // node could be misleading if the source isn't where it's expected)
-        let mut func_entered = None;
-        let found = |func_entered| match func_entered {
-            None => Ok(()),
-            Some(func) => Err(InterGraphEdgeError::ValueEdgeIntoFunc {
-                to,
-                to_offset,
-                from,
-                from_offset,
-                func,
-            }),
-        };
-
+        let mut err_entered_func = None;
         let from_parent_parent = self.hugr.get_parent(from_parent);
         for (ancestor, ancestor_parent) in
             iter::successors(to_parent, |&p| self.hugr.get_parent(p)).tuple_windows()
         {
+            if !is_static && self.hugr.get_optype(ancestor).is_func_defn() {
+                err_entered_func.get_or_insert(InterGraphEdgeError::ValueEdgeIntoFunc {
+                    to,
+                    to_offset,
+                    from,
+                    from_offset,
+                    func: ancestor,
+                });
+            }
             if ancestor_parent == from_parent {
                 // External edge.
+                err_entered_func.map_or(Ok(()), Err)?;
                 if !is_static {
                     // Must have an order edge.
                     self.hugr
@@ -515,9 +514,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
                             to_ancestor: ancestor,
                         })?;
                 }
-                return found(func_entered);
-            } else if !is_static && self.hugr.get_optype(ancestor).is_func_defn() {
-                func_entered.get_or_insert(ancestor);
+                return Ok(());
             } else if Some(ancestor_parent) == from_parent_parent && !is_static {
                 // Dominator edge
                 let ancestor_parent_op = self.hugr.get_optype(ancestor_parent);
@@ -530,7 +527,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
                         ancestor_parent_op: ancestor_parent_op.clone(),
                     });
                 }
-
+                err_entered_func.map_or(Ok(()), Err)?;
                 // Check domination
                 let dominator_tree = match self.dominators.get(&ancestor_parent) {
                     Some(tree) => tree,
@@ -554,7 +551,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
                     });
                 }
 
-                return found(func_entered);
+                return Ok(());
             }
         }
 
