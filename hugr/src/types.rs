@@ -23,7 +23,7 @@ use itertools::FoldWhile::{Continue, Done};
 use itertools::{repeat_n, Itertools};
 use serde::{Deserialize, Serialize};
 #[cfg(test)]
-use {crate::proptest::RecursionDepth, ::proptest::prelude::*};
+use {crate::proptest::RecursionDepth, ::proptest::prelude::*, proptest_derive::Arbitrary};
 
 use crate::extension::{ExtensionRegistry, SignatureError};
 use crate::ops::AliasDecl;
@@ -72,7 +72,7 @@ impl EdgeKind {
 #[derive(
     Copy, Default, Clone, PartialEq, Eq, Hash, Debug, derive_more::Display, Serialize, Deserialize,
 )]
-#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
+#[cfg_attr(test, derive(Arbitrary))]
 /// Bounds on the valid operations on a type in a HUGR program.
 pub enum TypeBound {
     /// The equality operation is valid on this type.
@@ -197,11 +197,7 @@ impl From<SumType> for Type {
 }
 
 #[derive(Clone, PartialEq, Debug, Eq, derive_more::Display)]
-#[cfg_attr(
-    test,
-    derive(proptest_derive::Arbitrary),
-    proptest(params = "RecursionDepth")
-)]
+#[cfg_attr(test, derive(Arbitrary), proptest(params = "RecursionDepth"))]
 /// Core types
 pub enum TypeEnum {
     // TODO optimise with Box<CustomType> ?

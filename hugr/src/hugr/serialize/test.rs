@@ -180,8 +180,6 @@ pub fn check_hugr_roundtrip(hugr: &Hugr, check_schema: bool) -> Hugr {
     new_hugr
 }
 
-// for now this is only used in property testing, so otherwise configured out to
-// avoid unused warnings.
 fn check_testing_roundtrip(t: impl Into<TestingModel>) {
     let before = Versioned::new(t.into());
     let after_strict = ser_roundtrip_validate(&before, Some(&TESTING_SCHEMA_STRICT));

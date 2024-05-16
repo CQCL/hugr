@@ -6,6 +6,7 @@ use itertools::Itertools;
 use {
     crate::proptest::RecursionDepth,
     ::proptest::{collection::vec, prelude::*},
+    proptest_derive::Arbitrary,
 };
 
 use super::type_param::{check_type_args, TypeArg, TypeParam};
@@ -20,11 +21,7 @@ use super::{FunctionType, Substitution};
 #[derive(
     Clone, PartialEq, Debug, Default, Eq, derive_more::Display, serde::Serialize, serde::Deserialize,
 )]
-#[cfg_attr(
-    test,
-    derive(proptest_derive::Arbitrary),
-    proptest(params = "RecursionDepth")
-)]
+#[cfg_attr(test, derive(Arbitrary), proptest(params = "RecursionDepth"))]
 #[display(
     fmt = "forall {}. {}",
     "params.iter().map(ToString::to_string).join(\" \")",

@@ -11,14 +11,10 @@ use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 use crate::{Direction, IncomingPort, OutgoingPort, Port};
 
 #[cfg(test)]
-use {crate::proptest::RecursionDepth, ::proptest::prelude::*};
+use {crate::proptest::RecursionDepth, ::proptest::prelude::*, proptest_derive::Arbitrary};
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(
-    test,
-    derive(proptest_derive::Arbitrary),
-    proptest(params = "RecursionDepth")
-)]
+#[cfg_attr(test, derive(Arbitrary), proptest(params = "RecursionDepth"))]
 /// Describes the edges required to/from a node, and thus, also the type of a [Graph].
 /// This includes both the concept of "signature" in the spec,
 /// and also the target (value) of a call (static).

@@ -1,8 +1,12 @@
 //! Extensible operations.
 
-use smol_str::SmolStr;
 use std::sync::Arc;
 use thiserror::Error;
+#[cfg(test)]
+use {
+    crate::proptest::{any_nonempty_smolstr, any_nonempty_string},
+    ::proptest_derive::Arbitrary,
+};
 
 use crate::extension::{ConstFoldResult, ExtensionId, ExtensionRegistry, OpDef, SignatureError};
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
@@ -268,12 +272,12 @@ impl DataflowOpTrait for ExtensionOp {
 
 /// An opaquely-serialized op that refers to an as-yet-unresolved [`OpDef`]
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
+#[cfg_attr(test, derive(Arbitrary))]
 pub struct OpaqueOp {
     extension: ExtensionId,
-    #[cfg_attr(test, proptest(strategy = "crate::proptest::any_nonempty_smolstr()"))]
-    op_name: SmolStr,
-    #[cfg_attr(test, proptest(strategy = "crate::proptest::any_nonempty_string()"))]
+    #[cfg_attr(test, proptest(strategy = "any_nonempty_smolstr()"))]
+    op_name: OpName,
+    #[cfg_attr(test, proptest(strategy = "any_nonempty_string()"))]
     description: String, // cache in advance so description() can return &str
     args: Vec<TypeArg>,
     signature: FunctionType,

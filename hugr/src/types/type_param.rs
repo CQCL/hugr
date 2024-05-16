@@ -5,6 +5,8 @@
 //! [`TypeDef`]: crate::extension::TypeDef
 
 use itertools::Itertools;
+#[cfg(test)]
+use proptest_derive::Arbitrary;
 use std::num::NonZeroU64;
 use thiserror::Error;
 
@@ -20,7 +22,7 @@ use super::{check_typevar_decl, CustomType, Substitution, Type, TypeBound};
     Clone, Debug, PartialEq, Eq, derive_more::Display, serde::Deserialize, serde::Serialize,
 )]
 #[display(fmt = "{}", "_0.map(|i|i.to_string()).unwrap_or(\"-\".to_string())")]
-#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
+#[cfg_attr(test, derive(Arbitrary))]
 pub struct UpperBound(Option<NonZeroU64>);
 impl UpperBound {
     fn valid_value(&self, val: u64) -> bool {
@@ -439,8 +441,8 @@ mod test {
             type Parameters = RecursionDepth;
             type Strategy = BoxedStrategy<Self>;
             fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
-                use proptest::collection::vec;
-                use proptest::strategy::Union;
+                use prop::collection::vec;
+                use prop::strategy::Union;
                 let mut strat = Union::new([
                     Just(Self::Extensions).boxed(),
                     any::<TypeBound>().prop_map(|b| Self::Type { b }).boxed(),
@@ -470,8 +472,8 @@ mod test {
             type Parameters = RecursionDepth;
             type Strategy = BoxedStrategy<Self>;
             fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
-                use proptest::collection::vec;
-                use proptest::strategy::Union;
+                use prop::collection::vec;
+                use prop::strategy::Union;
                 let mut strat = Union::new([
                     any::<u64>().prop_map(|n| Self::BoundedNat { n }).boxed(),
                     any::<ExtensionSet>()
