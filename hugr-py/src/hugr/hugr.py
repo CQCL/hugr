@@ -4,7 +4,7 @@ from collections.abc import Collection, ItemsView, MutableMapping, Hashable, Map
 from typing import Iterable, Sequence, Protocol, Generic, TypeVar
 
 from hugr.serialization.serial_hugr import SerialHugr
-from hugr.serialization.ops import OpType as Op
+from hugr.serialization.ops import NodeID, OpType as SerialOp, Module
 from hugr.serialization.tys import Type, Qubit
 
 
@@ -93,9 +93,22 @@ class Node(ToPort):
         return OutPort(self, offset)
 
 
+class Op(Protocol):
+    def to_serial(self, parent: NodeID) -> SerialOp: ...
+
+
+@dataclass(init=False)
+class DummyOp(Op):
+    input_extensions: set[str] | None = None
+
+    def to_serial(self, parent: NodeID) -> SerialOp:
+        return SerialOp(root=Module(parent=-1))
+
+
 @dataclass()
 class NodeData:
-    weight: Op
+    op: Op
+    parent: Node | None
     _in_ports: set[int]
     _out_ports: set[int]
 
@@ -122,9 +135,10 @@ class Hugr(Mapping):
     def __len__(self) -> int:
         return len(self.nodes) - len(self._free_nodes)
 
-    def add_node(self, op: Op) -> Node:
+    def add_node(self, op: Op, parent: Node | None = None) -> Node:
+        parent = parent or self.root
         # TODO add in_ports and out_ports
-        node_data = NodeData(op, set(), set())
+        node_data = NodeData(op, parent, set(), set())
 
         if self._free_nodes:
             node = self._free_nodes.pop()
@@ -157,7 +171,7 @@ class Hugr(Mapping):
         mapping: dict[Node, Node] = {}
         for idx, node_data in enumerate(self.nodes):
             if node_data is not None:
-                mapping[Node(idx)] = self.add_node(node_data.weight)
+                mapping[Node(idx)] = self.add_node(node_data.op)
         for src, dst in hugr._links.items():
             self.add_link(
                 mapping[src.node].out(src.offset), mapping[dst.node].inp(dst.offset)
@@ -165,10 +179,14 @@ class Hugr(Mapping):
         return mapping
 
     def to_serial(self) -> SerialHugr:
+        node_it = (node for node in self.nodes if node is not None)
         return SerialHugr(
             version="v1",
             # non contiguous indices will be erased
-            nodes=[node.weight for node in self.nodes if node is not None],
+            nodes=[
+                node.op.to_serial(node.parent.idx if node.parent else idx)
+                for idx, node in enumerate(node_it)
+            ],
             edges=[
                 ((src.node.idx, src.offset), (dst.node.idx, dst.offset))
                 for src, dst in self._links.items()
