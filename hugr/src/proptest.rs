@@ -7,20 +7,23 @@ use crate::Hugr;
 
 #[derive(Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq)]
 /// The types [Type], [TypeEnum], [SumType], [FunctionType], [TypeArg],
-/// [TypeParam], as well as several others, form a mutually recursive heirarchy.
+/// [TypeParam], as well as several others, form a mutually recursive hierarchy.
 ///
-/// The proptest [proptest::strategy::Strategy::prop_recursive] is inadequate to generate values for
-/// these types.  Instead, ther Arbitrary instances take a `RecursionDepth` as
-/// their (or part of their) [proptest::arbitrary::Arbitrary::Parameters]. We then use that parameter
-/// to generate children of that value. Usually we forward it unchanged, but in
-/// crucial locations(grep for `descend`) we instead forward the `descend` of it.
+/// The proptest [proptest::strategy::Strategy::prop_recursive] is inadequate to
+/// generate values for these types.  Instead, ther Arbitrary instances take a
+/// `RecursionDepth` as their (or part of their)
+/// [proptest::arbitrary::Arbitrary::Parameters]. We then use that parameter to
+/// generate children of that value. Usually we forward it unchanged, but in
+/// crucial locations(grep for `descend`) we instead forward the `descend` of
+/// it.
 ///
 /// Consider the tree of values generated. Each node is labelled with a
 /// [RecursionDepth].
 ///
-/// Consider a path between two different nodes of the same type(e.g. two [Type]s, or two
-/// [FunctionType]s).  The path must be non-increasing in [RecursionDepth] because
-/// each child's [RecursionDepth] is derived from it's parents.
+/// Consider a path between two different nodes of the same kind(e.g. two
+/// [Type]s, or two [FunctionType]s).  The path must be non-increasing in
+/// [RecursionDepth] because each child's [RecursionDepth] is derived from it's
+/// parents.
 ///
 /// We must maintain the invariant that the [RecursionDepth] of the start of the
 /// path is strictly greater than the [RecursionDepth] of the end of the path.
@@ -68,6 +71,8 @@ where
 }
 
 lazy_static! {
+    /// A strategy for a [String] suitable for an [IdentList].
+    /// Shrinks to contain only ASCII letters.
     static ref ANY_IDENT_STRING: SBoxedStrategy<String> = {
         use proptest::string::string_regex;
         prop_oneof![
@@ -77,6 +82,8 @@ lazy_static! {
         ].sboxed()
     };
 
+    /// A strategy for an arbitrary nonempty [String].
+    /// Shrinks to contain only ASCII letters.
     static ref ANY_NONEMPTY_STRING: SBoxedStrategy<String> = {
         use proptest::string::string_regex;
         prop_oneof![
@@ -86,6 +93,8 @@ lazy_static! {
         ].sboxed()
     };
 
+    /// A strategy for an arbitrary [String].
+    /// Shrinks to contain only ASCII letters.
     static ref ANY_STRING: SBoxedStrategy<String> = {
         use proptest::string::string_regex;
         prop_oneof![
@@ -95,6 +104,11 @@ lazy_static! {
         ].sboxed()
     };
 
+    /// A strategy for an arbitrary non-recursive [serde_yaml::Value].
+    /// In particular, no `Mapping`, `Sequence`, or `Tagged`.
+    ///
+    /// This is used as the base strategy for the general
+    /// [recursive](Strategy::prop_recursive) strategy.
     static ref ANY_SERDE_YAML_VALUE_LEAF: SBoxedStrategy<serde_yaml::Value> = {
         use serde_yaml::value::Value;
         prop_oneof![
@@ -109,6 +123,7 @@ lazy_static! {
         ].sboxed()
     };
 
+    /// A strategy that returns one of a fixed number of example [Hugr]s.
     static ref ANY_HUGR: SBoxedStrategy<Hugr>= {
         // TODO we need more examples
         // This is currently used for Value::Function
@@ -121,19 +136,19 @@ lazy_static! {
 }
 
 pub fn any_nonempty_string() -> SBoxedStrategy<String> {
-    ANY_NONEMPTY_STRING.clone()
+    ANY_NONEMPTY_STRING.to_owned()
 }
 
 pub fn any_nonempty_smolstr() -> SBoxedStrategy<SmolStr> {
-    ANY_NONEMPTY_STRING.clone().prop_map_into().sboxed()
+    ANY_NONEMPTY_STRING.to_owned().prop_map_into().sboxed()
 }
 
 pub fn any_ident_string() -> SBoxedStrategy<String> {
-    ANY_IDENT_STRING.clone()
+    ANY_IDENT_STRING.to_owned()
 }
 
 pub fn any_string() -> SBoxedStrategy<String> {
-    ANY_STRING.clone()
+    ANY_STRING.to_owned()
 }
 
 pub fn any_serde_yaml_value() -> impl Strategy<Value = serde_yaml::Value> {
@@ -158,5 +173,5 @@ pub fn any_serde_yaml_value() -> impl Strategy<Value = serde_yaml::Value> {
 }
 
 pub fn any_hugr() -> SBoxedStrategy<Hugr> {
-    ANY_HUGR.clone()
+    ANY_HUGR.to_owned()
 }

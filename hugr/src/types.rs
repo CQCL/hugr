@@ -519,12 +519,10 @@ pub(crate) mod test {
             type Strategy = BoxedStrategy<Self>;
             fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
                 use proptest::collection::vec;
-                let unit_strat = any::<u8>().prop_map(Self::new_unary);
-                let general_strat = vec(any_with::<TypeRow>(depth), 0..3).prop_map(SumType::new);
                 if depth.leaf() {
-                    unit_strat.boxed()
+                    any::<u8>().prop_map(Self::new_unary).boxed()
                 } else {
-                    general_strat.boxed()
+                    vec(any_with::<TypeRow>(depth), 0..3).prop_map(SumType::new).boxed()
                 }
             }
         }

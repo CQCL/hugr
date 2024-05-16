@@ -166,6 +166,7 @@ impl From<ExtensionOp> for CustomOp {
 ///
 /// [Extension]: crate::Extension
 #[derive(Clone, Debug)]
+// TODO when we can geneerate `OpDef`s enable this
 // #[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 pub struct ExtensionOp {
     def: Arc<OpDef>,
@@ -456,6 +457,7 @@ mod test {
             type Parameters = ();
             type Strategy = BoxedStrategy<Self>;
             fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+                // TODO when we can geneerate `OpDef`s add an `ExtensionOp` case here
                 any::<super::super::OpaqueOp>().prop_map_into().boxed()
             }
         }
