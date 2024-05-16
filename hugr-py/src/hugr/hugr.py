@@ -55,8 +55,25 @@ class BiMap(MutableMapping, Generic[L, R]):
         del self.bck[key]
 
 
+@dataclass(frozen=True, eq=True, order=True)
+class Port:
+    node: "Node"
+    offset: int
+
+
+@dataclass(frozen=True, eq=True, order=True)
+class InPort(Port):
+    pass
+
+
 class ToPort(Protocol):
     def to_port(self) -> "OutPort": ...
+
+
+@dataclass(frozen=True, eq=True, order=True)
+class OutPort(Port, ToPort):
+    def to_port(self) -> "OutPort":
+        return self
 
 
 @dataclass(frozen=True, eq=True, order=True)
@@ -66,29 +83,18 @@ class Node(ToPort):
     def to_port(self) -> "OutPort":
         return OutPort(self, 0)
 
+    def in_port(self, offset: int) -> InPort:
+        return InPort(self, offset)
 
-@dataclass(frozen=True, eq=True, order=True)
-class Port:
-    node: Node
-    offset: int
-
-
-@dataclass(frozen=True, eq=True, order=True)
-class InPort(Port):
-    pass
-
-
-@dataclass(frozen=True, eq=True, order=True)
-class OutPort(Port, ToPort):
-    def to_port(self) -> "OutPort":
-        return self
+    def out_port(self, offset: int) -> OutPort:
+        return OutPort(self, offset)
 
 
 @dataclass()
 class NodeData:
     weight: Op
-    in_ports: set[InPort]
-    out_ports: set[OutPort]
+    _in_ports: set[int]
+    _out_ports: set[int]
 
 
 @dataclass(init=False)
@@ -126,23 +132,23 @@ class Hugr(Mapping):
         return node
 
     def delete_node(self, node: Node) -> None:
-        for in_port in self[node].in_ports:
-            self.links.delete_right(in_port)
-        for out_port in self[node].out_ports:
-            self.links.delete_left(out_port)
+        for offset in self[node]._in_ports:
+            self.links.delete_right(node.in_port(offset))
+        for offset in self[node]._out_ports:
+            self.links.delete_left(node.out_port(offset))
         self.nodes[node.idx] = None
         self._free_nodes.append(node)
 
     def add_link(self, src: OutPort, dst: InPort) -> None:
         self.links.insert_left(src, dst)
-        self[dst.node].in_ports.add(dst)
-        self[src.node].out_ports.add(src)
+        self[dst.node]._in_ports.add(dst.offset)
+        self[src.node]._out_ports.add(src.offset)
 
     def in_ports(self, node: Node) -> Collection[InPort]:
-        return self[node].in_ports
+        return [node.in_port(o) for o in self[node]._in_ports]
 
     def out_ports(self, node: Node) -> Collection[OutPort]:
-        return self[node].out_ports
+        return [node.out_port(o) for o in self[node]._out_ports]
 
     def to_serial(self) -> SerialHugr:
         return SerialHugr(
