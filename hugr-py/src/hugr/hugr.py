@@ -1,10 +1,10 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
-from collections.abc import Collection, MutableMapping, Hashable
+from collections.abc import Collection, MutableMapping, Hashable, Mapping
 from typing import Iterable, Sequence, Protocol, Generic, TypeVar
 
 from hugr.serialization.serial_hugr import SerialHugr
-from hugr.serialization.ops import OpType as Op, DataflowOp
+from hugr.serialization.ops import OpType as Op
 from hugr.serialization.tys import Type, Qubit
 
 
@@ -92,32 +92,63 @@ class NodeData:
 
 
 @dataclass(init=False)
-class Hugr:
+class Hugr(Mapping):
     root: Node
-    nodes: dict[Node, NodeData]
+    nodes: list[NodeData | None]
     links: BiMap[OutPort, InPort]
+    _free_nodes: list[Node] = field(default_factory=list)
+
+    def __getitem__(self, key: Node) -> NodeData:
+        try:
+            n = self.nodes[key.idx]
+        except IndexError:
+            n = None
+        if n is None:
+            raise KeyError(key)
+        return n
+
+    def __iter__(self):
+        return iter(self.nodes)
+
+    def __len__(self) -> int:
+        return len(self.nodes) - len(self._free_nodes)
 
     def add_node(self, op: Op) -> Node:
-        node = Node(len(self.nodes))
-        self.nodes[node] = NodeData(op, set(), set())
+        # TODO add in_ports and out_ports
+        node_data = NodeData(op, set(), set())
+
+        if self._free_nodes:
+            node = self._free_nodes.pop()
+            self.nodes[node.idx] = node_data
+        else:
+            node = Node(len(self.nodes))
+            self.nodes.append(node_data)
         return node
+
+    def delete_node(self, node: Node) -> None:
+        for in_port in self[node].in_ports:
+            self.links.delete_right(in_port)
+        for out_port in self[node].out_ports:
+            self.links.delete_left(out_port)
+        self.nodes[node.idx] = None
+        self._free_nodes.append(node)
 
     def add_link(self, src: OutPort, dst: InPort) -> None:
         self.links.insert_left(src, dst)
-        self.nodes[dst.node].in_ports.add(dst)
-        self.nodes[src.node].out_ports.add(src)
+        self[dst.node].in_ports.add(dst)
+        self[src.node].out_ports.add(src)
 
     def in_ports(self, node: Node) -> Collection[InPort]:
-        return self.nodes[node].in_ports
+        return self[node].in_ports
 
     def out_ports(self, node: Node) -> Collection[OutPort]:
-        return self.nodes[node].out_ports
+        return self[node].out_ports
 
     def to_serial(self) -> SerialHugr:
         return SerialHugr(
             version="v1",
             # non contiguous indices will be erased
-            nodes=[node.weight for _, node in sorted(self.nodes.items())],
+            nodes=[node.weight for node in self.nodes if node is not None],
             edges=[
                 ((src.node, src.offset), (dst.node, dst.offset))
                 for src, dst in self.links.items()
@@ -130,7 +161,8 @@ class Hugr:
 
 
 @dataclass()
-class Dfg(Hugr):
+class Dfg:
+    hugr: Hugr
     input_node: Node
     output_node: Node
 
@@ -140,10 +172,9 @@ class Dfg(Hugr):
     def inputs(self) -> list[OutPort]:
         return []
 
-    def add_op(self, op: DataflowOp, ports: Iterable[ToPort]) -> Node:
-        node = Node(len(self.nodes))
-        # self.nodes[node] = NodeData(op, list(in_ports), [])
-        return node
+    def add_op(self, op: Op, ports: Iterable[ToPort]) -> Node:
+        # TODO wire up ports
+        return self.hugr.add_node(op)
 
     def set_outputs(self, ports: Iterable[ToPort]) -> None:
         pass
