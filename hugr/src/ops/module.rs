@@ -47,7 +47,8 @@ impl StaticTag for FuncDefn {
 
 impl DataflowParent for FuncDefn {
     fn inner_signature(&self) -> FunctionType {
-        self.signature.body().clone()
+        // ok by validation
+        self.signature.body_norowvars().unwrap().clone()
     }
 }
 

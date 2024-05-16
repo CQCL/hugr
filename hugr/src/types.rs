@@ -14,7 +14,7 @@ use crate::utils::display_list_with_separator;
 pub use check::SumTypeError;
 pub use custom::CustomType;
 pub use poly_func::PolyFuncType;
-pub use signature::FunctionType;
+pub use signature::{FunctionType, FunctionTypeVarArgs};
 use smol_str::SmolStr;
 pub use type_param::TypeArg;
 pub use type_row::TypeRow;
@@ -205,7 +205,7 @@ pub enum TypeEnum {
     Alias(AliasDecl),
     #[allow(missing_docs)]
     #[display(fmt = "Function({})", "_0")]
-    Function(Box<FunctionType>),
+    Function(Box<FunctionTypeVarArgs>),
     // Index into TypeParams, and cache of TypeBound (checked in validation)
     #[allow(missing_docs)]
     #[display(fmt = "Variable({})", _0)]
@@ -272,7 +272,7 @@ impl Type {
     const EMPTY_TYPEROW_REF: &'static TypeRow = &Self::EMPTY_TYPEROW;
 
     /// Initialize a new function type.
-    pub fn new_function(fun_ty: impl Into<FunctionType>) -> Self {
+    pub fn new_function(fun_ty: impl Into<FunctionTypeVarArgs>) -> Self {
         Self::new(TypeEnum::Function(Box::new(fun_ty.into())))
     }
 
@@ -359,6 +359,11 @@ impl Type {
         }
     }
 
+    /// TODO docs
+    pub fn is_row_var(&self) -> bool {
+        matches!(self.0, TypeEnum::RowVariable(_, _))
+    }
+
     /// Checks that this [Type] represents a single Type, not a row variable,
     /// that all variables used within are in the provided list of bound variables,
     /// and that for each [CustomType], the corresponding
@@ -434,7 +439,7 @@ impl Type {
 
 /// Details a replacement of type variables with a finite list of known values.
 /// (Variables out of the range of the list will result in a panic)
-pub(crate) struct Substitution<'a>(&'a [TypeArg], &'a ExtensionRegistry);
+pub(crate) struct Substitution<'a>(pub(crate) &'a [TypeArg], pub(crate) &'a ExtensionRegistry);
 
 impl<'a> Substitution<'a> {
     pub(crate) fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg {

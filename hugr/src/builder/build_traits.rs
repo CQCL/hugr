@@ -19,7 +19,7 @@ use crate::{
     types::EdgeKind,
 };
 
-use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE_REGISTRY};
+use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError, PRELUDE_REGISTRY};
 use crate::types::{FunctionType, PolyFuncType, Type, TypeArg, TypeRow};
 
 use itertools::Itertools;
@@ -87,7 +87,7 @@ pub trait Container {
         name: impl Into<String>,
         signature: PolyFuncType,
     ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
-        let body = signature.body().clone();
+        let body = signature.body_norowvars()?.clone();
         let f_node = self.add_child_node(NodeType::new_pure(ops::FuncDefn {
             name: name.into(),
             signature,

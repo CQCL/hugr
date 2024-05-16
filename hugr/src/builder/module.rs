@@ -84,7 +84,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
                 op_desc: "crate::ops::OpType::FuncDecl",
             })?
             .clone();
-        let body = signature.body().clone();
+        let body = signature.body_norowvars()?.clone();
         self.hugr_mut()
             .replace_op(
                 f_node,

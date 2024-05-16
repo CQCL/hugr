@@ -5,7 +5,7 @@ use itertools::Either;
 use std::fmt::{self, Display, Write};
 
 use super::type_param::TypeParam;
-use super::{Substitution, Type, TypeRow};
+use super::{Substitution, Type, TypeEnum, TypeRow};
 
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 use crate::{Direction, IncomingPort, OutgoingPort, Port};
@@ -25,11 +25,27 @@ pub struct FunctionType {
     pub extension_reqs: ExtensionSet,
 }
 
-impl FunctionType {
-    /// Builder method, add extension_reqs to an FunctionType
-    pub fn with_extension_delta(mut self, rs: impl Into<ExtensionSet>) -> Self {
-        self.extension_reqs = self.extension_reqs.union(rs.into());
-        self
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct FunctionTypeVarArgs(FunctionType);
+
+impl FunctionTypeVarArgs {
+    pub fn any_rowvars(&self) -> bool {
+        self.rowvar().is_some()
+    }
+
+    pub fn rowvar(&self) -> Option<usize> {
+        self.0.input.iter().chain(self.0.output.iter()).filter_map(|x| match x.as_type_enum() {
+            TypeEnum::RowVariable(i,_) => Some(*i),
+            _ => None
+        }).next()
+    }
+
+    pub fn try_as_ref(&self) -> Result<&FunctionType,SignatureError> {
+        if let Some(idx) = self.rowvar() {
+            Err(SignatureError::RowTypeVarOutsideRow { idx })
+        } else {
+            Ok(&self.0)
+        }
     }
 
     pub(super) fn validate_varargs(
@@ -37,13 +53,67 @@ impl FunctionType {
         extension_registry: &ExtensionRegistry,
         var_decls: &[TypeParam],
     ) -> Result<(), SignatureError> {
-        self.input.validate_var_len(extension_registry, var_decls)?;
-        self.output
+        self.0.input.validate_var_len(extension_registry, var_decls)?;
+        self.0.output
             .validate_var_len(extension_registry, var_decls)?;
-        self.extension_reqs.validate(var_decls)
+        self.0.extension_reqs.validate(var_decls)
     }
 
     pub(crate) fn substitute(&self, tr: &Substitution) -> Self {
+        Self(FunctionType {
+            input: self.0.input.substitute(tr),
+            output: self.0.output.substitute(tr),
+            extension_reqs: self.0.extension_reqs.substitute(tr),
+        })
+    }
+}
+
+impl PartialEq<FunctionType> for FunctionTypeVarArgs {
+    fn eq(&self, other: &FunctionType) -> bool {
+        &self.0 == other
+    }
+}
+
+impl PartialEq<FunctionTypeVarArgs> for FunctionType {
+    fn eq(&self, other: &FunctionTypeVarArgs) -> bool {
+        self == &other.0
+    }
+}
+
+impl Display for FunctionTypeVarArgs {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl TryFrom<FunctionTypeVarArgs> for FunctionType {
+    type Error = SignatureError;
+    fn try_from(value: FunctionTypeVarArgs) -> Result<Self, Self::Error> {
+        if let Some(idx) = value.rowvar() {
+            Err(SignatureError::RowTypeVarOutsideRow { idx })
+        } else {
+            Ok(value.0)
+        }
+    }
+}
+
+impl From<FunctionType> for FunctionTypeVarArgs {
+    fn from(value: FunctionType) -> Self {
+        Self(value)
+    }
+}
+
+
+impl FunctionType {
+    /// Builder method, add extension_reqs to an FunctionType
+    pub fn with_extension_delta(mut self, rs: impl Into<ExtensionSet>) -> Self {
+        self.extension_reqs = self.extension_reqs.union(rs.into());
+        self
+    }
+
+
+    pub(crate) fn substitute(&self, tr: &Substitution) -> Self {
+        // TODO assert no row vars in result
         FunctionType {
             input: self.input.substitute(tr),
             output: self.output.substitute(tr),

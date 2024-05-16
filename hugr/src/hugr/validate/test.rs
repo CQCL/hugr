@@ -657,7 +657,7 @@ fn inner_row_variables() -> Result<(), Box<dyn std::error::Error>> {
 #[rstest]
 #[case(false)]
 #[case(true)]
-fn no_outer_row_variables(#[case] connect: bool) -> Result<(), Box<dyn std::error::Error>> {
+fn no_outer_row_variables(#[case] connect: bool) {
     let e = extension_with_eval_parallel();
     let tv = Type::new_row_var_use(0, TypeBound::Copyable);
     let mut fb = FunctionBuilder::new(
@@ -669,15 +669,15 @@ fn no_outer_row_variables(#[case] connect: bool) -> Result<(), Box<dyn std::erro
                 if connect { vec![tv.clone()] } else { vec![] },
             ),
         ),
-    )?;
+    ).unwrap();
     let [func_arg] = fb.input_wires_arr();
     let i = fb.add_load_value(crate::extension::prelude::ConstUsize::new(5));
     let ev =
-        e.instantiate_extension_op("eval", [seq1ty(USIZE_T), seq1ty(tv)], &PRELUDE_REGISTRY)?;
-    let ev = fb.add_dataflow_op(ev, [func_arg, i])?;
+        e.instantiate_extension_op("eval", [seq1ty(USIZE_T), seq1ty(tv)], &PRELUDE_REGISTRY).unwrap();
+    let ev = fb.add_dataflow_op(ev, [func_arg, i]).unwrap();
     let reg = ExtensionRegistry::try_new([PRELUDE.to_owned(), e]).unwrap();
     if connect {
-        fb.set_outputs(ev.outputs())?;
+        fb.set_outputs(ev.outputs()).unwrap();
     }
     assert_eq!(
         fb.finish_hugr(&reg).unwrap_err(),
@@ -686,7 +686,6 @@ fn no_outer_row_variables(#[case] connect: bool) -> Result<(), Box<dyn std::erro
             cause: SignatureError::RowTypeVarOutsideRow { idx: 0 }
         }
     );
-    Ok(())
 }
 
 #[test]

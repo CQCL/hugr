@@ -11,7 +11,7 @@ use super::{
 
 use crate::ops::{OpName, OpNameRef};
 use crate::types::type_param::{check_type_args, TypeArg, TypeParam};
-use crate::types::{FunctionType, PolyFuncType};
+use crate::types::{FunctionType, FunctionTypeVarArgs, PolyFuncType, Substitution};
 use crate::Hugr;
 
 /// Trait necessary for binary computations of OpDef signature

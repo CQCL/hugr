@@ -4,7 +4,7 @@ use crate::extension::{ExtensionRegistry, SignatureError};
 use itertools::Itertools;
 
 use super::type_param::{check_type_args, TypeArg, TypeParam};
-use super::{FunctionType, Substitution};
+use super::{FunctionType, FunctionTypeVarArgs, Substitution};
 
 /// A polymorphic type scheme, i.e. of a [FuncDecl], [FuncDefn] or [OpDef].
 /// (Nodes/operations in the Hugr are not polymorphic.)
@@ -20,17 +20,18 @@ use super::{FunctionType, Substitution};
     "params.iter().map(ToString::to_string).join(\" \")",
     "body"
 )]
+
 pub struct PolyFuncType {
     /// The declared type parameters, i.e., these must be instantiated with
     /// the same number of [TypeArg]s before the function can be called. This
     /// defines the indices used by variables inside the body.
     params: Vec<TypeParam>,
     /// Template for the function. May contain variables up to length of [Self::params]
-    body: FunctionType,
+    body: FunctionTypeVarArgs,
 }
 
-impl From<FunctionType> for PolyFuncType {
-    fn from(body: FunctionType) -> Self {
+impl From<FunctionTypeVarArgs> for PolyFuncType {
+    fn from(body: FunctionTypeVarArgs) -> Self {
         Self {
             params: vec![],
             body,
@@ -38,7 +39,13 @@ impl From<FunctionType> for PolyFuncType {
     }
 }
 
-impl TryFrom<PolyFuncType> for FunctionType {
+impl From<FunctionType> for PolyFuncType {
+    fn from(body: FunctionType) -> Self {
+        Into::<FunctionTypeVarArgs>::into(body).into()
+    }
+}
+
+impl TryFrom<PolyFuncType> for FunctionTypeVarArgs {
     /// If the PolyFuncType is not a monomorphic FunctionType, fail with the binders
     type Error = Vec<TypeParam>;
 
@@ -51,6 +58,19 @@ impl TryFrom<PolyFuncType> for FunctionType {
     }
 }
 
+impl TryFrom<PolyFuncType> for FunctionType {
+    /// If the PolyFuncType is not a monomorphic FunctionType, fail with the binders
+    type Error = PolyFuncType;
+
+    fn try_from(value: PolyFuncType) -> Result<Self, Self::Error> {
+        if let Ok(ftva) = TryInto::<FunctionTypeVarArgs>::try_into(value.clone()){
+            ftva.try_into().map_err(|_| value)
+        } else {
+            Err(value)
+        }
+    }
+}
+
 impl PolyFuncType {
     /// The type parameters, aka binders, over which this type is polymorphic
     pub fn params(&self) -> &[TypeParam] {
@@ -58,16 +78,21 @@ impl PolyFuncType {
     }
 
     /// The body of the type, a function type.
-    pub fn body(&self) -> &FunctionType {
+    pub fn body(&self) -> &FunctionTypeVarArgs {
         &self.body
+    }
+
+    /// The body of the type, a function type.
+    pub fn body_norowvars(&self) -> Result<&FunctionType,SignatureError> {
+        self.body.try_as_ref()
     }
 
     /// Create a new PolyFuncType given the kinds of the variables it declares
     /// and the underlying [FunctionType].
-    pub fn new(params: impl Into<Vec<TypeParam>>, body: FunctionType) -> Self {
+    pub fn new(params: impl Into<Vec<TypeParam>>, body: impl Into<FunctionTypeVarArgs>) -> Self {
         Self {
             params: params.into(),
-            body,
+            body: body.into(),
         }
     }
 
@@ -92,6 +117,14 @@ impl PolyFuncType {
         args: &[TypeArg],
         ext_reg: &ExtensionRegistry,
     ) -> Result<FunctionType, SignatureError> {
+        self.instantiate_varargs(args,ext_reg).and_then(TryInto::try_into)
+    }
+
+    pub(crate) fn instantiate_varargs(
+        &self,
+        args: &[TypeArg],
+        ext_reg: &ExtensionRegistry,
+    ) -> Result<FunctionTypeVarArgs, SignatureError> {
         // Check that args are applicable, and that we have a value for each binder,
         // i.e. each possible free variable within the body.
         check_type_args(args, &self.params)?;

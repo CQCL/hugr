@@ -1,4 +1,4 @@
-use super::{FunctionType, SumType, Type, TypeArg, TypeBound, TypeEnum};
+use super::{FunctionType, FunctionTypeVarArgs, SumType, Type, TypeArg, TypeBound, TypeEnum};
 
 use super::custom::CustomType;
 
@@ -10,7 +10,7 @@ use crate::ops::AliasDecl;
 pub(super) enum SerSimpleType {
     Q,
     I,
-    G(Box<FunctionType>),
+    G(Box<FunctionTypeVarArgs>),
     Sum(SumType),
     Array { inner: Box<SerSimpleType>, len: u64 },
     Opaque(CustomType),
