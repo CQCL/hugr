@@ -156,7 +156,8 @@ pub enum Value {
 /// is another `CustomSerialized` we do not attempt to recurse. This behaviour
 /// may change in future.
 ///
-/// ```rust
+#[cfg_attr(not(miri), doc = "```")] // this doctest depends on typetag, so fails with miri
+#[cfg_attr(miri, doc = "```ignore")]
 /// use serde::{Serialize,Deserialize};
 /// use hugr::{
 ///   types::Type,ops::constant::{OpaqueValue, ValueName, CustomConst, CustomSerialized},

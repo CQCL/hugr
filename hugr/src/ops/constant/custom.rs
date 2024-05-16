@@ -29,7 +29,8 @@ use super::ValueName;
 /// be serialized with two attributes, `"c"`  the tag and `"v"` the
 /// `CustomConst`:
 ///
-/// ```rust
+#[cfg_attr(not(miri), doc = "```")] // this doctest depends on typetag, so fails with miri
+#[cfg_attr(miri, doc = "```ignore")]
 /// use serde::{Serialize,Deserialize};
 /// use hugr::{
 ///   types::Type,ops::constant::{OpaqueValue, ValueName, CustomConst},
@@ -51,7 +52,7 @@ use super::ValueName;
 ///   "c": "CC",
 ///   "v": 2
 /// }));
-/// ````
+/// ```
 #[typetag::serde(tag = "c", content = "v")]
 pub trait CustomConst:
     Send + Sync + std::fmt::Debug + CustomConstBoxClone + Any + Downcast
@@ -312,7 +313,8 @@ pub fn get_pair_of_input_values<T: CustomConst>(
     Some((c0.get_custom_value()?, c1.get_custom_value()?))
 }
 
-#[cfg(test)]
+// these tests depend on the `typetag` crate.
+#[cfg(all(test, not(miri)))]
 mod test {
 
     use rstest::rstest;
