@@ -2,6 +2,11 @@
 
 use std::sync::Arc;
 use thiserror::Error;
+#[cfg(test)]
+use {
+    crate::proptest::{any_nonempty_smolstr, any_nonempty_string},
+    ::proptest_derive::Arbitrary,
+};
 
 use crate::extension::{ConstFoldResult, ExtensionId, ExtensionRegistry, OpDef, SignatureError};
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
@@ -165,6 +170,8 @@ impl From<ExtensionOp> for CustomOp {
 ///
 /// [Extension]: crate::Extension
 #[derive(Clone, Debug)]
+// TODO when we can geneerate `OpDef`s enable this
+// #[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 pub struct ExtensionOp {
     def: Arc<OpDef>,
     args: Vec<TypeArg>,
@@ -265,9 +272,12 @@ impl DataflowOpTrait for ExtensionOp {
 
 /// An opaquely-serialized op that refers to an as-yet-unresolved [`OpDef`]
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(test, derive(Arbitrary))]
 pub struct OpaqueOp {
     extension: ExtensionId,
+    #[cfg_attr(test, proptest(strategy = "any_nonempty_smolstr()"))]
     op_name: OpName,
+    #[cfg_attr(test, proptest(strategy = "any_nonempty_string()"))]
     description: String, // cache in advance so description() can return &str
     args: Vec<TypeArg>,
     signature: FunctionType,
@@ -414,7 +424,6 @@ pub enum CustomOpError {
 
 #[cfg(test)]
 mod test {
-
     use crate::extension::prelude::{QB_T, USIZE_T};
 
     use super::*;
@@ -436,5 +445,18 @@ mod test {
         assert_eq!(op.signature(), sig);
         assert!(op.is_opaque());
         assert!(!op.is_extension_op());
+    }
+
+    mod proptest {
+        use ::proptest::prelude::*;
+
+        impl Arbitrary for super::super::CustomOp {
+            type Parameters = ();
+            type Strategy = BoxedStrategy<Self>;
+            fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+                // TODO when we can geneerate `OpDef`s add an `ExtensionOp` case here
+                any::<super::super::OpaqueOp>().prop_map_into().boxed()
+            }
+        }
     }
 }

@@ -10,7 +10,11 @@ use super::{subst_row, Substitution, Type, TypeRow};
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 use crate::{Direction, IncomingPort, OutgoingPort, Port};
 
+#[cfg(test)]
+use {crate::proptest::RecursionDepth, ::proptest::prelude::*, proptest_derive::Arbitrary};
+
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(test, derive(Arbitrary), proptest(params = "RecursionDepth"))]
 /// Describes the edges required to/from a node, and thus, also the type of a [Graph].
 /// This includes both the concept of "signature" in the spec,
 /// and also the target (value) of a call (static).
@@ -18,8 +22,10 @@ use crate::{Direction, IncomingPort, OutgoingPort, Port};
 /// [Graph]: crate::ops::constant::Value::Function
 pub struct FunctionType {
     /// Value inputs of the function.
+    #[cfg_attr(test, proptest(strategy = "any_with::<TypeRow>(params)"))]
     pub input: TypeRow,
     /// Value outputs of the function.
+    #[cfg_attr(test, proptest(strategy = "any_with::<TypeRow>(params)"))]
     pub output: TypeRow,
     /// The extension requirements which are added by the operation
     pub extension_reqs: ExtensionSet,

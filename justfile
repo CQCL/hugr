@@ -10,11 +10,11 @@ setup:
 
 # Run the pre-commit checks.
 check:
-    poetry run pre-commit run --all-files
+    HUGR_TEST_SCHEMA=1 poetry run pre-commit run --all-files
 
 # Run all the tests.
 test language="[rust|python]" : (_run_lang language \
-        "HUGR_TEST_SCHEMA=\"1\" cargo test --all-features" \
+        "HUGR_TEST_SCHEMA=1 cargo test --all-features" \
         "poetry run pytest"
     )
 

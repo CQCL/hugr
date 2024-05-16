@@ -24,6 +24,7 @@ pub use custom::{
 ///
 /// Represents core types and extension types.
 #[non_exhaustive]
+#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 pub struct Const {
     #[serde(rename = "v")]
     value: Value,
@@ -628,5 +629,95 @@ mod test {
         let typ_qb = CustomType::new("my_type", vec![], ex_id, TypeBound::Eq);
         let t = Type::new_extension(typ_qb.clone());
         assert_ne!(yaml_const.get_type(), t);
+    }
+
+    mod proptest {
+        use super::super::OpaqueValue;
+        use crate::{
+            ops::Value,
+            std_extensions::arithmetic::int_types::{ConstInt, LOG_WIDTH_MAX},
+            std_extensions::collections::ListValue,
+            types::{SumType, Type},
+        };
+        use ::proptest::prelude::*;
+        impl Arbitrary for OpaqueValue {
+            type Parameters = ();
+            type Strategy = BoxedStrategy<Self>;
+            fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+                use proptest::collection::vec;
+                let signed_strat = (..=LOG_WIDTH_MAX).prop_flat_map(|log_width| {
+                    use i64;
+                    let max_val = (2u64.pow(log_width as u32) / 2) as i64;
+                    let min_val = -max_val - 1;
+                    (min_val..=max_val).prop_map(move |v| {
+                        OpaqueValue::new(
+                            ConstInt::new_s(log_width, v).expect("guaranteed to be in bounds"),
+                        )
+                    })
+                });
+                let unsigned_strat = (..=LOG_WIDTH_MAX).prop_flat_map(|log_width| {
+                    (0..2u64.pow(log_width as u32)).prop_map(move |v| {
+                        OpaqueValue::new(
+                            ConstInt::new_u(log_width, v).expect("guaranteed to be in bounds"),
+                        )
+                    })
+                });
+                prop_oneof![unsigned_strat, signed_strat]
+                    .prop_recursive(
+                        3,  // No more than 3 branch levels deep
+                        32, // Target around 32 total elements
+                        3,  // Each collection is up to 3 elements long
+                        |element| {
+                            (any::<Type>(), vec(element.clone(), 0..3)).prop_map(
+                                |(typ, contents)| {
+                                    OpaqueValue::new(ListValue::new(
+                                        typ,
+                                        contents.into_iter().map(|e| Value::Extension { e }),
+                                    ))
+                                },
+                            )
+                        },
+                    )
+                    .boxed()
+            }
+        }
+
+        impl Arbitrary for Value {
+            type Parameters = ();
+            type Strategy = BoxedStrategy<Self>;
+            fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+                use ::proptest::collection::vec;
+                let leaf_strat = prop_oneof![
+                    any::<OpaqueValue>().prop_map(|e| Self::Extension { e }),
+                    crate::proptest::any_hugr().prop_map(|x| Value::function(x).unwrap())
+                ];
+                leaf_strat
+                    .prop_recursive(
+                        3,  // No more than 3 branch levels deep
+                        32, // Target around 32 total elements
+                        3,  // Each collection is up to 3 elements long
+                        |element| {
+                            prop_oneof![
+                                vec(element.clone(), 0..3).prop_map(|vs| Self::Tuple { vs }),
+                                (
+                                    any::<usize>(),
+                                    vec(element.clone(), 0..3),
+                                    any_with::<SumType>(1.into()) // for speed: don't generate large sum types for now
+                                )
+                                    .prop_map(
+                                        |(tag, values, sum_type)| {
+                                            Self::Sum {
+                                                tag,
+                                                values,
+                                                sum_type,
+                                            }
+                                        }
+                                    ),
+                            ]
+                        },
+                    )
+                    .boxed()
+            }
+        }
     }
 }

@@ -61,6 +61,9 @@ urlencoding = "2.1.2"
 cool_asserts = "2.0.3"
 insta = { workspace = true, features = ["yaml"] }
 jsonschema = "0.18.0"
+proptest = { version =  "1.4.0" }
+proptest-derive = { version =  "0.4.0"}
+regex-syntax = { version =  "0.8.3"}
 
 [[bench]]
 name = "bench_main"

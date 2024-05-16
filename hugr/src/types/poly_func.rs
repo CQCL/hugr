@@ -2,6 +2,12 @@
 
 use crate::extension::{ExtensionRegistry, SignatureError};
 use itertools::Itertools;
+#[cfg(test)]
+use {
+    crate::proptest::RecursionDepth,
+    ::proptest::{collection::vec, prelude::*},
+    proptest_derive::Arbitrary,
+};
 
 use super::type_param::{check_type_args, TypeArg, TypeParam};
 use super::{FunctionType, Substitution};
@@ -15,6 +21,7 @@ use super::{FunctionType, Substitution};
 #[derive(
     Clone, PartialEq, Debug, Default, Eq, derive_more::Display, serde::Serialize, serde::Deserialize,
 )]
+#[cfg_attr(test, derive(Arbitrary), proptest(params = "RecursionDepth"))]
 #[display(
     fmt = "forall {}. {}",
     "params.iter().map(ToString::to_string).join(\" \")",
@@ -24,8 +31,10 @@ pub struct PolyFuncType {
     /// The declared type parameters, i.e., these must be instantiated with
     /// the same number of [TypeArg]s before the function can be called. This
     /// defines the indices used by variables inside the body.
+    #[cfg_attr(test, proptest(strategy = "vec(any_with::<TypeParam>(params), 0..3)"))]
     params: Vec<TypeParam>,
     /// Template for the function. May contain variables up to length of [Self::params]
+    #[cfg_attr(test, proptest(strategy = "any_with::<FunctionType>(params)"))]
     body: FunctionType,
 }
 

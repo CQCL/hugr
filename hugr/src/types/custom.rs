@@ -137,3 +137,56 @@ impl From<CustomType> for Type {
         Self::new_extension(value)
     }
 }
+
+#[cfg(test)]
+pub mod test {
+
+    pub mod proptest {
+        use crate::extension::ExtensionId;
+        use crate::proptest::any_nonempty_string;
+        use crate::proptest::RecursionDepth;
+        use crate::types::type_param::TypeArg;
+        use crate::types::{CustomType, TypeBound};
+        use ::proptest::collection::vec;
+        use ::proptest::prelude::*;
+
+        #[derive(Default)]
+        pub struct CustomTypeArbitraryParameters(RecursionDepth, Option<TypeBound>);
+
+        impl From<RecursionDepth> for CustomTypeArbitraryParameters {
+            fn from(v: RecursionDepth) -> Self {
+                Self::new(v)
+            }
+        }
+
+        impl CustomTypeArbitraryParameters {
+            pub fn new(depth: RecursionDepth) -> Self {
+                Self(depth, None)
+            }
+
+            pub fn with_bound(mut self, bound: TypeBound) -> Self {
+                self.1 = Some(bound);
+                self
+            }
+        }
+
+        impl Arbitrary for CustomType {
+            type Parameters = CustomTypeArbitraryParameters;
+            type Strategy = BoxedStrategy<Self>;
+            fn arbitrary_with(
+                CustomTypeArbitraryParameters(depth, mb_bound): Self::Parameters,
+            ) -> Self::Strategy {
+                let bound = mb_bound.map_or(any::<TypeBound>().boxed(), |x| Just(x).boxed());
+                let args = if depth.leaf() {
+                    Just(vec![]).boxed()
+                } else {
+                    // a TypeArg may contain a CustomType, so we descend here
+                    vec(any_with::<TypeArg>(depth.descend()), 0..3).boxed()
+                };
+                (any_nonempty_string(), args, any::<ExtensionId>(), bound)
+                    .prop_map(|(id, args, extension, bound)| Self::new(id, args, extension, bound))
+                    .boxed()
+            }
+        }
+    }
+}
