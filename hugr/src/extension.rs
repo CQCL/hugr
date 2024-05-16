@@ -547,6 +547,7 @@ pub mod test {
         impl Arbitrary for ExtensionSet {
             type Parameters = ();
             type Strategy = BoxedStrategy<Self>;
+
             fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
                 (
                     hash_set(0..10usize, 0..3),

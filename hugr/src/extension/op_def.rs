@@ -495,6 +495,12 @@ pub mod test {
     #[derive(serde::Serialize, serde::Deserialize, Debug)]
     pub struct SimpleOpDef(OpDef);
 
+    impl From<SimpleOpDef> for OpDef {
+        fn from(value: SimpleOpDef) -> Self {
+            value.0
+        }
+    }
+
     impl PartialEq for SimpleOpDef {
         fn eq(&self, other: &Self) -> bool {
             let OpDef {
@@ -547,6 +553,7 @@ pub mod test {
                 && misc == other_misc
                 && get_sig(signature_func) == get_sig(other_signature_func)
                 && get_lower_funcs(lower_funcs) == get_lower_funcs(other_lower_funcs)
+                // If either constant folder not none, then we are not equal
                 && constant_folder.is_none()
                 && other_constant_folder.is_none()
         }
@@ -734,7 +741,6 @@ pub mod test {
         Ok(())
     }
 
-    #[cfg(feature = "proptest")]
     mod proptest {
         use super::SimpleOpDef;
         use ::proptest::prelude::*;

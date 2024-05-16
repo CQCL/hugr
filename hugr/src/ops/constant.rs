@@ -644,10 +644,10 @@ mod test {
             type Parameters = ();
             type Strategy = BoxedStrategy<Self>;
             fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+                // We intentionally do not include `ConstF4` because it does not
+                // roundtrip serialise
                 prop_oneof![
                     any::<ConstInt>().prop_map_into(),
-                    // any::<ConstFloat>()>.prop_map_into()
-
                     any::<CustomSerialized>().prop_map_into()
                 ]
                 .prop_recursive(

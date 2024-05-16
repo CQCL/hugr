@@ -4,7 +4,9 @@ use std::sync::Arc;
 use thiserror::Error;
 #[cfg(test)]
 use {
+    crate::extension::test::SimpleOpDef,
     crate::proptest::{any_nonempty_smolstr, any_nonempty_string},
+    ::proptest::prelude::*,
     ::proptest_derive::Arbitrary,
 };
 
@@ -28,6 +30,7 @@ use super::{NamedOp, OpName, OpNameRef, OpTrait, OpType};
 ///   [`OpaqueOp`]: crate::ops::custom::OpaqueOp
 ///   [`ExtensionOp`]: crate::ops::custom::ExtensionOp
 #[derive(Clone, Debug, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(test, derive(Arbitrary))]
 #[serde(into = "OpaqueOp", from = "OpaqueOp")]
 pub enum CustomOp {
     /// When we've found (loaded) the [Extension] definition and identified the [OpDef]
@@ -170,9 +173,12 @@ impl From<ExtensionOp> for CustomOp {
 ///
 /// [Extension]: crate::Extension
 #[derive(Clone, Debug)]
-// TODO when we can geneerate `OpDef`s enable this
-// #[cfg_attr(test, derive(proptest_derive::Arbitrary))]
+#[cfg_attr(test, derive(Arbitrary))]
 pub struct ExtensionOp {
+    #[cfg_attr(
+        test,
+        proptest(strategy = "any::<SimpleOpDef>().prop_map(|x| Arc::new(x.into()))")
+    )]
     def: Arc<OpDef>,
     args: Vec<TypeArg>,
     signature: FunctionType, // Cache
@@ -445,18 +451,5 @@ mod test {
         assert_eq!(op.signature(), sig);
         assert!(op.is_opaque());
         assert!(!op.is_extension_op());
-    }
-
-    mod proptest {
-        use ::proptest::prelude::*;
-
-        impl Arbitrary for super::super::CustomOp {
-            type Parameters = ();
-            type Strategy = BoxedStrategy<Self>;
-            fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-                // TODO when we can geneerate `OpDef`s add an `ExtensionOp` case here
-                any::<super::super::OpaqueOp>().prop_map_into().boxed()
-            }
-        }
     }
 }

@@ -273,7 +273,6 @@ mod test {
         ConstInt::new_u(50, 2).unwrap_err();
     }
 
-    #[cfg(feature = "proptest")]
     mod proptest {
         use super::{ConstInt, LOG_WIDTH_MAX};
         use ::proptest::prelude::*;
