@@ -283,7 +283,6 @@ fn no_ext_edge_into_func() -> Result<(), Box<dyn std::error::Error>> {
                 from_offset: input.source().into(),
                 to: and_op.node(),
                 to_offset: IncomingPort::from(1).into(),
-                //to_offset: Port::new(Direction::Incoming, 1),
                 func: func.node()
             })
         ))
