@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 
-from collections.abc import Collection, MutableMapping, Hashable, Mapping
+from collections.abc import Collection, ItemsView, MutableMapping, Hashable, Mapping
 from typing import Iterable, Sequence, Protocol, Generic, TypeVar
 
 from hugr.serialization.serial_hugr import SerialHugr
@@ -31,6 +31,9 @@ class BiMap(MutableMapping, Generic[L, R]):
 
     def __len__(self) -> int:
         return len(self.fwd)
+
+    def items(self) -> ItemsView[L, R]:
+        return self.fwd.items()
 
     def get_left(self, key: R) -> L | None:
         return self.bck.get(key)
@@ -83,10 +86,10 @@ class Node(ToPort):
     def to_port(self) -> "OutPort":
         return OutPort(self, 0)
 
-    def in_port(self, offset: int) -> InPort:
+    def inp(self, offset: int) -> InPort:
         return InPort(self, offset)
 
-    def out_port(self, offset: int) -> OutPort:
+    def out(self, offset: int) -> OutPort:
         return OutPort(self, offset)
 
 
@@ -101,7 +104,7 @@ class NodeData:
 class Hugr(Mapping):
     root: Node
     nodes: list[NodeData | None]
-    links: BiMap[OutPort, InPort]
+    _links: BiMap[OutPort, InPort]
     _free_nodes: list[Node] = field(default_factory=list)
 
     def __getitem__(self, key: Node) -> NodeData:
@@ -133,22 +136,33 @@ class Hugr(Mapping):
 
     def delete_node(self, node: Node) -> None:
         for offset in self[node]._in_ports:
-            self.links.delete_right(node.in_port(offset))
+            self._links.delete_right(node.inp(offset))
         for offset in self[node]._out_ports:
-            self.links.delete_left(node.out_port(offset))
+            self._links.delete_left(node.out(offset))
         self.nodes[node.idx] = None
         self._free_nodes.append(node)
 
     def add_link(self, src: OutPort, dst: InPort) -> None:
-        self.links.insert_left(src, dst)
+        self._links.insert_left(src, dst)
         self[dst.node]._in_ports.add(dst.offset)
         self[src.node]._out_ports.add(src.offset)
 
     def in_ports(self, node: Node) -> Collection[InPort]:
-        return [node.in_port(o) for o in self[node]._in_ports]
+        return [node.inp(o) for o in self[node]._in_ports]
 
     def out_ports(self, node: Node) -> Collection[OutPort]:
-        return [node.out_port(o) for o in self[node]._out_ports]
+        return [node.out(o) for o in self[node]._out_ports]
+
+    def insert_hugr(self, hugr: "Hugr") -> dict[Node, Node]:
+        mapping: dict[Node, Node] = {}
+        for idx, node_data in enumerate(self.nodes):
+            if node_data is not None:
+                mapping[Node(idx)] = self.add_node(node_data.weight)
+        for src, dst in hugr._links.items():
+            self.add_link(
+                mapping[src.node].out(src.offset), mapping[dst.node].inp(dst.offset)
+            )
+        return mapping
 
     def to_serial(self) -> SerialHugr:
         return SerialHugr(
@@ -156,8 +170,8 @@ class Hugr(Mapping):
             # non contiguous indices will be erased
             nodes=[node.weight for node in self.nodes if node is not None],
             edges=[
-                ((src.node, src.offset), (dst.node, dst.offset))
-                for src, dst in self.links.items()
+                ((src.node.idx, src.offset), (dst.node.idx, dst.offset))
+                for src, dst in self._links.items()
             ],
         )
 
