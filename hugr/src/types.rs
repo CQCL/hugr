@@ -208,11 +208,7 @@ pub enum TypeEnum {
     // or some static version of this?
     #[allow(missing_docs)]
     Extension(
-        #[cfg_attr(
-            test,
-            proptest(strategy = "any_with::<CustomType>(params.into())")
-        )]
-        CustomType,
+        #[cfg_attr(test, proptest(strategy = "any_with::<CustomType>(params.into())"))] CustomType,
     ),
     #[allow(missing_docs)]
     #[display(fmt = "Alias({})", "_0.name()")]
@@ -232,13 +228,7 @@ pub enum TypeEnum {
     Variable(usize, TypeBound),
     #[allow(missing_docs)]
     #[display(fmt = "{}", "_0")]
-    Sum(
-        #[cfg_attr(
-            test,
-            proptest(strategy = "any_with::<SumType>(params)")
-        )]
-        SumType,
-    ),
+    Sum(#[cfg_attr(test, proptest(strategy = "any_with::<SumType>(params)"))] SumType),
 }
 impl TypeEnum {
     /// The smallest type bound that covers the whole type.
@@ -521,7 +511,9 @@ pub(crate) mod test {
                 if depth.leaf() {
                     any::<u8>().prop_map(Self::new_unary).boxed()
                 } else {
-                    vec(any_with::<TypeRow>(depth), 0..3).prop_map(SumType::new).boxed()
+                    vec(any_with::<TypeRow>(depth), 0..3)
+                        .prop_map(SumType::new)
+                        .boxed()
                 }
             }
         }

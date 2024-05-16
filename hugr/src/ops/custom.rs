@@ -271,15 +271,9 @@ impl DataflowOpTrait for ExtensionOp {
 #[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 pub struct OpaqueOp {
     extension: ExtensionId,
-    #[cfg_attr(
-        test,
-        proptest(strategy = "crate::proptest::any_nonempty_smolstr()")
-    )]
+    #[cfg_attr(test, proptest(strategy = "crate::proptest::any_nonempty_smolstr()"))]
     op_name: SmolStr,
-    #[cfg_attr(
-        test,
-        proptest(strategy = "crate::proptest::any_nonempty_string()")
-    )]
+    #[cfg_attr(test, proptest(strategy = "crate::proptest::any_nonempty_string()"))]
     description: String, // cache in advance so description() can return &str
     args: Vec<TypeArg>,
     signature: FunctionType,

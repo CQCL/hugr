@@ -26,16 +26,10 @@ use {crate::proptest::RecursionDepth, ::proptest::prelude::*};
 /// [Graph]: crate::ops::constant::Value::Function
 pub struct FunctionType {
     /// Value inputs of the function.
-    #[cfg_attr(
-        test,
-        proptest(strategy = "any_with::<TypeRow>(params)")
-    )]
+    #[cfg_attr(test, proptest(strategy = "any_with::<TypeRow>(params)"))]
     pub input: TypeRow,
     /// Value outputs of the function.
-    #[cfg_attr(
-        test,
-        proptest(strategy = "any_with::<TypeRow>(params)")
-    )]
+    #[cfg_attr(test, proptest(strategy = "any_with::<TypeRow>(params)"))]
     pub output: TypeRow,
     /// The extension requirements which are added by the operation
     pub extension_reqs: ExtensionSet,

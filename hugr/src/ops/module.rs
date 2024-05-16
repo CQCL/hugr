@@ -37,10 +37,7 @@ impl OpTrait for Module {
 #[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 pub struct FuncDefn {
     /// Name of function
-    #[cfg_attr(
-        test,
-        proptest(strategy = "crate::proptest::any_nonempty_string()")
-    )]
+    #[cfg_attr(test, proptest(strategy = "crate::proptest::any_nonempty_string()"))]
     pub name: String,
     /// Signature of the function
     pub signature: PolyFuncType,
@@ -76,10 +73,7 @@ impl OpTrait for FuncDefn {
 #[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 pub struct FuncDecl {
     /// Name of function
-    #[cfg_attr(
-        test,
-        proptest(strategy = "crate::proptest::any_nonempty_string()")
-    )]
+    #[cfg_attr(test, proptest(strategy = "crate::proptest::any_nonempty_string()"))]
     pub name: String,
     /// Signature of the function
     pub signature: PolyFuncType,
@@ -109,10 +103,7 @@ impl OpTrait for FuncDecl {
 #[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 pub struct AliasDefn {
     /// Alias name
-    #[cfg_attr(
-        test,
-        proptest(strategy = "crate::proptest::any_nonempty_smolstr()")
-    )]
+    #[cfg_attr(test, proptest(strategy = "crate::proptest::any_nonempty_smolstr()"))]
     pub name: SmolStr,
     /// Aliased type
     pub definition: Type,
@@ -136,10 +127,7 @@ impl OpTrait for AliasDefn {
 #[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 pub struct AliasDecl {
     /// Alias name
-    #[cfg_attr(
-        test,
-        proptest(strategy = "crate::proptest::any_nonempty_smolstr()")
-    )]
+    #[cfg_attr(test, proptest(strategy = "crate::proptest::any_nonempty_smolstr()"))]
     pub name: SmolStr,
     /// Flag to signify type is classical
     pub bound: TypeBound,
