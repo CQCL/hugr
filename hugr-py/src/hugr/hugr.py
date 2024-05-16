@@ -167,11 +167,11 @@ class Hugr(Mapping):
     def out_ports(self, node: Node) -> Collection[OutPort]:
         return [node.out(o) for o in self[node]._out_ports]
 
-    def insert_hugr(self, hugr: "Hugr") -> dict[Node, Node]:
+    def insert_hugr(self, hugr: "Hugr", parent: Node | None = None) -> dict[Node, Node]:
         mapping: dict[Node, Node] = {}
         for idx, node_data in enumerate(self.nodes):
             if node_data is not None:
-                mapping[Node(idx)] = self.add_node(node_data.op)
+                mapping[Node(idx)] = self.add_node(node_data.op, parent)
         for src, dst in hugr._links.items():
             self.add_link(
                 mapping[src.node].out(src.offset), mapping[dst.node].inp(dst.offset)
@@ -214,9 +214,28 @@ class Dfg:
         # TODO wire up ports
         return self.hugr.add_node(op)
 
+    def insert_nested(self, dfg: "Dfg", ports: Iterable[ToPort]) -> Node:
+        mapping = self.hugr.insert_hugr(dfg.hugr, self.hugr.root)
+        # TODO wire up ports
+        return mapping[dfg.hugr.root]
+
+    def add_nested(self, ports: Iterable[ToPort]) -> "Dfg":
+        dfg = Dfg.__new__(Dfg)
+        dfg.hugr = self.hugr
+        # I/O nodes
+
+        return dfg
+
     def set_outputs(self, ports: Iterable[ToPort]) -> None:
         pass
 
 
 if __name__ == "__main__":
     h = Dfg([Type(Qubit())] * 2)
+
+    a, b = h.inputs()
+    x = h.add_op(DummyOp(), [a, b])
+
+    y = h.add_op(DummyOp(), [x, x])
+
+    h.set_outputs([y])
