@@ -515,17 +515,18 @@ mod test {
 
     #[test]
     fn test_const_fold_to_nonfinite() {
+        let reg = ExtensionRegistry::try_new([
+            PRELUDE.to_owned(),
+            arithmetic::float_types::EXTENSION.to_owned(),
+        ])
+        .unwrap();
+
         // HUGR computing 1.0 / 1.0
         let mut build =
             DFGBuilder::new(FunctionType::new(type_row![], vec![FLOAT64_TYPE])).unwrap();
         let x0 = build.add_load_const(Value::extension(ConstF64::new(1.0)));
         let x1 = build.add_load_const(Value::extension(ConstF64::new(1.0)));
         let x2 = build.add_dataflow_op(FloatOps::fdiv, [x0, x1]).unwrap();
-        let reg = ExtensionRegistry::try_new([
-            PRELUDE.to_owned(),
-            arithmetic::float_types::EXTENSION.to_owned(),
-        ])
-        .unwrap();
         let mut h0 = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
         constant_fold_pass(&mut h0, &reg);
         let expected = Value::extension(ConstF64::new(1.0));
@@ -538,11 +539,6 @@ mod test {
         let x0 = build.add_load_const(Value::extension(ConstF64::new(1.0)));
         let x1 = build.add_load_const(Value::extension(ConstF64::new(0.0)));
         let x2 = build.add_dataflow_op(FloatOps::fdiv, [x0, x1]).unwrap();
-        let reg = ExtensionRegistry::try_new([
-            PRELUDE.to_owned(),
-            arithmetic::float_types::EXTENSION.to_owned(),
-        ])
-        .unwrap();
         let mut h1 = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
         constant_fold_pass(&mut h1, &reg);
         assert_eq!(h1.node_count(), 8);
