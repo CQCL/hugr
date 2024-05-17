@@ -1782,6 +1782,9 @@ Other operations:
 The `float64` type represents IEEE 754-2019 floating-point data of 64
 bits.
 
+Non-finite `float64` values (i.e. NaN and ±infinity) are not allowed in `Const`
+nodes.
+
 #### `arithmetic.float`
 
 Floating-point operations are defined as follows. All operations below
