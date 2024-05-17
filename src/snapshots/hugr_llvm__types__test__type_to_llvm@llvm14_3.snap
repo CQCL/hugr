@@ -1,0 +1,5 @@
+---
+source: src/types.rs
+expression: "int([BoundedNat { n: 5 }])"
+---
+"i32"

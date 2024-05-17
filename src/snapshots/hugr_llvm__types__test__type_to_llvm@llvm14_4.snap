@@ -1,0 +1,5 @@
+---
+source: src/types.rs
+expression: "int([BoundedNat { n: 6 }])"
+---
+"i64"
