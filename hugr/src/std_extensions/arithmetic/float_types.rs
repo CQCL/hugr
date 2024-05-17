@@ -40,7 +40,11 @@ impl std::ops::Deref for ConstF64 {
 
 impl ConstF64 {
     /// Create a new [`ConstF64`]
-    pub const fn new(value: f64) -> Self {
+    pub fn new(value: f64) -> Self {
+        // This function can't be `const` because `is_finite()` is not yet stable as a const function.
+        if !value.is_finite() {
+            panic!("ConstF64 must have a finite value.");
+        }
         Self { value }
     }
 
