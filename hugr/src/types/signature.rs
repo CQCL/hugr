@@ -281,6 +281,12 @@ impl From<Signature> for FunctionType {
     }
 }
 
+impl PartialEq<FunctionType> for Signature {
+    fn eq(&self, other: &FunctionType) -> bool {
+        self.input == other.input && self.output == other.output && self.extension_reqs == other.extension_reqs
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::extension::prelude::USIZE_T;
