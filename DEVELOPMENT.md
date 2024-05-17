@@ -136,3 +136,56 @@ We accept the following contribution types:
 - ci: CI related changes. These changes are not published in the changelog.
 - chore: Updating build tasks, package manager configs, etc. These changes are not published in the changelog.
 - revert: Reverting previous commits.
+
+## :shipit: Releasing new versions
+
+We use automation to bump the version number and generate changelog entries
+based on the conventional commits labels. Release PRs get created automatically
+for each lib when new changes are merged into the `main` branch. Once the PR is
+approved by someone in the release team and it gets merged, the new library
+version will be published to PyPI or crates.io.
+
+The changelog can be manually edited before merging the release PR. Note however
+that modifying the diff before other changes are merged will cause the
+automation to close the release PR and create a new one to avoid conflicts.
+
+### Rust crate release
+
+Rust releases are managed by `release-plz`. This tool will automatically detect
+breaking changes, even if they are not marked as such in the commit message, and
+bump the version accordingly.
+
+To modify the version getting released, just update the `Cargo.toml` and
+changelog diff with the desired value.
+Rust pre-release versions are formatted as `0.1.0-alpha.1` (or `-beta`, or `-rc`).
+
+### Python package release
+
+Python releases are managed by `release-please`. This tool always bumps the
+minor version (or the pre-release version if the previous version was a
+pre-release).
+
+To override the version getting released, you must merge a PR to main containing
+```
+Release-As: 0.1.0
+```
+in the description.
+Python pre-release versions are formatted as `0.1.0a1` (or `b1`, `rc1`).
+
+Release-please lets you modify the changelog entries by updating the related PR.
+See the [release-please documentation](https://github.com/googleapis/release-please?tab=readme-ov-file#how-can-i-fix-release-notes) for more information.
+
+### Patch releases
+
+Sometimes we need to release a patch version to fix a critical bug, but we don't want
+to include all the changes that have been merged into the main branch. In this case,
+you can create a new branch from the latest release tag and cherry-pick the commits
+you want to include in the patch release.
+
+You will need to modify the version and changelog manually in this case. Check
+the existing release PRs for examples on how to do this. Once the branch is
+ready, create a [github release](https://github.com/CQCL/hugr/releases/new).
+The tag should follow the format used in the previous releases, e.g. `hugr-py-v0.1.1`.
+
+For rust crates, you will need someone from the release team to manually
+publish the new version to crates.io using `cargo release`.
