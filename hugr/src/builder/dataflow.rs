@@ -9,7 +9,7 @@ use crate::ops;
 
 use crate::types::{FunctionType, PolyFuncType, Signature};
 
-use crate::extension::{ExtensionRegistry, ExtensionSet};
+use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 use crate::Node;
 use crate::{hugr::HugrMut, Hugr};
 
@@ -23,12 +23,15 @@ pub struct DFGBuilder<T> {
 }
 
 impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
-    pub(super) fn create_with_io(
+    pub(super) fn create_with_io<S: TryInto<Signature>>(
         mut base: T,
         parent: Node,
-        signature: Signature,
+        signature: S,
         input_extensions: Option<ExtensionSet>,
-    ) -> Result<Self, BuildError> {
+    ) -> Result<Self, BuildError>
+    where BuildError: From<<S as TryInto<Signature>>::Error>
+     {
+        let signature = signature.try_into()?;
         let num_in_wires = signature.input().len();
         let num_out_wires = signature.output().len();
         /* For a given dataflow graph with extension requirements IR -> IR + dR,
@@ -75,13 +78,15 @@ impl DFGBuilder<Hugr> {
     /// # Errors
     ///
     /// Error in adding DFG child nodes.
-    pub fn new(signature: Signature) -> Result<DFGBuilder<Hugr>, BuildError> {
+    pub fn new<S: TryInto<Signature>>(signature: S) -> Result<DFGBuilder<Hugr>, BuildError>
+    where BuildError: From<<S as TryInto<Signature>>::Error> {
+        let signature = signature.try_into()?;
         let dfg_op = ops::DFG {
             signature: signature.clone(),
         };
         let base = Hugr::new(NodeType::new_open(dfg_op));
         let root = base.root();
-        DFGBuilder::create_with_io(base, root, signature, None)
+        DFGBuilder::create_with_io::<Signature>(base, root, signature, None)
     }
 }
 

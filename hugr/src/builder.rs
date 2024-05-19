@@ -85,6 +85,8 @@
 //! # }
 //! # doctest().unwrap();
 //! ```
+use std::convert::Infallible;
+
 use thiserror::Error;
 
 use crate::extension::SignatureError;
@@ -181,6 +183,13 @@ pub enum BuildError {
         #[source]
         error: BuilderWiringError,
     },
+}
+
+impl From<Infallible> for BuildError {
+    fn from(value: Infallible) -> Self {
+        match value {
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Error)]
