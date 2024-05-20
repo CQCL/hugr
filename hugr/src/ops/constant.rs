@@ -668,7 +668,7 @@ mod test {
                         32, // Target around 32 total elements
                         3,  // Each collection is up to 3 elements long
                         |element| {
-                            (any::<Type>(), vec(element.clone(), 0..3)).prop_map(
+                            (Type::any_non_row_var(), vec(element.clone(), 0..3)).prop_map(
                                 |(typ, contents)| {
                                     OpaqueValue::new(ListValue::new(
                                         typ,

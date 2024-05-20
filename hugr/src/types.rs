@@ -578,5 +578,13 @@ pub(crate) mod test {
                     .boxed()
             }
         }
+
+        impl super::Type {
+            pub fn any_non_row_var() -> BoxedStrategy<Self> {
+                any::<Self>()
+                    .prop_filter("Cannot be a Row Variable", |t| !t.is_row_var())
+                    .boxed()
+            }
+        }
     }
 }
