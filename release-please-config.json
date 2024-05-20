@@ -12,7 +12,11 @@
             "package-name": "hugr",
             "include-component-in-tag": true,
             "draft": false,
-            "prerelease": false
+            "prerelease": false,
+            "extra-files": [{
+                "type": "generic",
+                "path": "hugr-py/src/hugr/__init__.py"
+            }]
         }
     },
     "changelog-sections": [
