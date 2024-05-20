@@ -1,4 +1,6 @@
 from hugr.serialization import SerialHugr
+from hugr.hugr import Dfg, Type, Hugr
+from hugr.serialization.tys import Qubit
 
 
 def test_empty():
@@ -10,3 +12,24 @@ def test_empty():
         "metadata": None,
         "encoder": None,
     }
+
+
+def _validate(h: Hugr):
+    import subprocess
+    import tempfile
+
+    with tempfile.NamedTemporaryFile("w") as f:
+        f.write(h.to_serial().to_json())
+        f.flush()
+        # TODO point to built hugr binary
+        subprocess.run(["cargo", "run", f.name], check=True)
+
+
+def test_simple_id():
+    h = Dfg([Type(Qubit())] * 2)
+
+    a, b = h.inputs()
+
+    h.set_outputs([a, b])
+
+    _validate(h.hugr)
