@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.4.0-alpha.2 (2024-05-20)
+
+### Bug Fixes
+
+- Disallow non-finite values for `ConstF64` ([#1075](https://github.com/CQCL/hugr/pull/1075))
+
+### Features
+
+- Add verification to constant folding ([#1030](https://github.com/CQCL/hugr/pull/1030))
+- Add `Const::get_custom_value` ([#1037](https://github.com/CQCL/hugr/pull/1037))
+- Add serialization schema for metadata ([#1038](https://github.com/CQCL/hugr/pull/1038))
+
+### Refactor
+
+- [**breaking**] Rename `crate::ops::constant::ExtensionValue` => `OpaqueValue` ([#1036](https://github.com/CQCL/hugr/pull/1036))
+
+### Testing
+
+- Reorg OutlineCfg/nest_cfgs tests so hugr doesn't depend on algorithm ([#1007](https://github.com/CQCL/hugr/pull/1007))
+- Ignore tests which depend on typetag when cfg(miri) ([#1051](https://github.com/CQCL/hugr/pull/1051))
+- Really ignore tests which depend on typetag when cfg(miri) ([#1058](https://github.com/CQCL/hugr/pull/1058))
+- Proptests for round trip serialisation of `Type`s and `Op`s. ([#981](https://github.com/CQCL/hugr/pull/981))
+
+
 ## 0.4.0-alpha.1 (2024-05-13)
 
 ### Bug Fixes
