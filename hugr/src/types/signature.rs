@@ -7,6 +7,7 @@ use std::fmt::{self, Display, Write};
 use super::type_param::TypeParam;
 use super::{subst_row, Substitution, Type, TypeRow};
 
+use crate::core::PortIndex;
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 use crate::{Direction, IncomingPort, OutgoingPort, Port};
 
@@ -98,28 +99,28 @@ impl FunctionType {
     /// of bounds.
     #[inline]
     pub fn in_port_type(&self, port: impl Into<IncomingPort>) -> Option<&Type> {
-        self.input.get(port.into())
+        self.input.get(port.into().index())
     }
 
     /// Returns the type of a value output [`Port`]. Returns `None` if the port is out
     /// of bounds.
     #[inline]
     pub fn out_port_type(&self, port: impl Into<OutgoingPort>) -> Option<&Type> {
-        self.output.get(port.into())
+        self.output.get(port.into().index())
     }
 
     /// Returns a mutable reference to the type of a value input [`Port`]. Returns `None` if the port is out
     /// of bounds.
     #[inline]
     pub fn in_port_type_mut(&mut self, port: impl Into<IncomingPort>) -> Option<&mut Type> {
-        self.input.get_mut(port.into())
+        self.input.get_mut(port.into().index())
     }
 
     /// Returns the type of a value output [`Port`]. Returns `None` if the port is out
     /// of bounds.
     #[inline]
     pub fn out_port_type_mut(&mut self, port: impl Into<OutgoingPort>) -> Option<&mut Type> {
-        self.output.get_mut(port.into())
+        self.output.get_mut(port.into().index())
     }
 
     /// Returns a mutable reference to the type of a value [`Port`].

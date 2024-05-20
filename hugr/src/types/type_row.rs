@@ -9,7 +9,6 @@ use std::{
 
 use super::Type;
 use crate::utils::display_list;
-use crate::PortIndex;
 use delegate::delegate;
 use itertools::Itertools;
 
@@ -39,15 +38,15 @@ impl TypeRow {
     }
 
     #[inline(always)]
-    /// Returns the port type given an offset. Returns `None` if the offset is out of bounds.
-    pub fn get(&self, offset: impl PortIndex) -> Option<&Type> {
-        self.types.get(offset.index())
+    /// Returns the type at the specified index. Returns `None` if out of bounds.
+    pub fn get(&self, offset: usize) -> Option<&Type> {
+        self.types.get(offset)
     }
 
     #[inline(always)]
-    /// Returns the port type given an offset. Returns `None` if the offset is out of bounds.
-    pub fn get_mut(&mut self, offset: impl PortIndex) -> Option<&mut Type> {
-        self.types.to_mut().get_mut(offset.index())
+    /// Returns the type at the specified index. Returns `None` if out of bounds.
+    pub fn get_mut(&mut self, offset: usize) -> Option<&mut Type> {
+        self.types.to_mut().get_mut(offset)
     }
 
     /// Returns a new `TypeRow` with `xs` concatenated onto `self`.
