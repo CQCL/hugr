@@ -1,21 +1,21 @@
 from hugr.utils import BiMap
 
 
-def test_insert_left():
+def test_insert_left() -> None:
     bimap: BiMap[str, int] = BiMap()
     bimap.insert_left("a", 1)
     assert bimap["a"] == 1
     assert bimap.get_left(1) == "a"
 
 
-def test_insert_right():
+def test_insert_right() -> None:
     bimap: BiMap[str, int] = BiMap()
     bimap.insert_right(1, "a")
     assert bimap["a"] == 1
     assert bimap.get_left(1) == "a"
 
 
-def test_delete_left():
+def test_delete_left() -> None:
     bimap: BiMap[str, int] = BiMap()
     bimap.insert_left("a", 1)
     del bimap["a"]
@@ -23,7 +23,7 @@ def test_delete_left():
     assert bimap.get_left(1) is None
 
 
-def test_delete_right():
+def test_delete_right() -> None:
     bimap: BiMap[str, int] = BiMap()
     bimap.insert_right(1, "a")
     bimap.delete_right(1)
@@ -31,7 +31,7 @@ def test_delete_right():
     assert bimap.get_left(1) is None
 
 
-def test_iter():
+def test_iter() -> None:
     bimap: BiMap[str, int] = BiMap()
     bimap.insert_left("a", 1)
     bimap.insert_left("b", 2)
@@ -40,7 +40,7 @@ def test_iter():
     assert list(bimap.items()) == [("a", 1), ("b", 2), ("c", 3)]
 
 
-def test_len():
+def test_len() -> None:
     bimap: BiMap[str, int] = BiMap()
     assert len(bimap) == 0
     bimap.insert_left("a", 1)
