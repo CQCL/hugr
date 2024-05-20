@@ -1,6 +1,11 @@
 //! Module-level operations
 
 use smol_str::SmolStr;
+#[cfg(test)]
+use {
+    crate::proptest::{any_nonempty_smolstr, any_nonempty_string},
+    ::proptest_derive::Arbitrary,
+};
 
 use crate::types::{EdgeKind, FunctionType, PolyFuncType};
 use crate::types::{Type, TypeBound};
@@ -11,6 +16,7 @@ use super::{impl_op_name, OpTag, OpTrait};
 
 /// The root of a module, parent of all other `OpType`s.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(test, derive(Arbitrary))]
 pub struct Module;
 
 impl_op_name!(Module);
@@ -33,8 +39,10 @@ impl OpTrait for Module {
 ///
 /// Children nodes are the body of the definition.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(test, derive(Arbitrary))]
 pub struct FuncDefn {
     /// Name of function
+    #[cfg_attr(test, proptest(strategy = "any_nonempty_string()"))]
     pub name: String,
     /// Signature of the function
     pub signature: PolyFuncType,
@@ -67,8 +75,10 @@ impl OpTrait for FuncDefn {
 
 /// External function declaration, linked at runtime.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(test, derive(Arbitrary))]
 pub struct FuncDecl {
     /// Name of function
+    #[cfg_attr(test, proptest(strategy = "any_nonempty_string()"))]
     pub name: String,
     /// Signature of the function
     pub signature: PolyFuncType,
@@ -95,8 +105,10 @@ impl OpTrait for FuncDecl {
 
 /// A type alias definition, used only for debug/metadata.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(test, derive(Arbitrary))]
 pub struct AliasDefn {
     /// Alias name
+    #[cfg_attr(test, proptest(strategy = "any_nonempty_smolstr()"))]
     pub name: SmolStr,
     /// Aliased type
     pub definition: Type,
@@ -117,8 +129,10 @@ impl OpTrait for AliasDefn {
 
 /// A type alias declaration. Resolved at link time.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 pub struct AliasDecl {
     /// Alias name
+    #[cfg_attr(test, proptest(strategy = "any_nonempty_smolstr()"))]
     pub name: SmolStr,
     /// Flag to signify type is classical
     pub bound: TypeBound,

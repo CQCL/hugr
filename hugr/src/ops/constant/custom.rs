@@ -29,10 +29,11 @@ use super::ValueName;
 /// be serialized with two attributes, `"c"`  the tag and `"v"` the
 /// `CustomConst`:
 ///
-/// ```rust
+#[cfg_attr(not(miri), doc = "```")] // this doctest depends on typetag, so fails with miri
+#[cfg_attr(miri, doc = "```ignore")]
 /// use serde::{Serialize,Deserialize};
 /// use hugr::{
-///   types::Type,ops::constant::{ExtensionValue, ValueName, CustomConst},
+///   types::Type,ops::constant::{OpaqueValue, ValueName, CustomConst},
 ///   extension::ExtensionSet, std_extensions::arithmetic::int_types};
 /// use serde_json::json;
 ///
@@ -51,7 +52,7 @@ use super::ValueName;
 ///   "c": "CC",
 ///   "v": 2
 /// }));
-/// ````
+/// ```
 #[typetag::serde(tag = "c", content = "v")]
 pub trait CustomConst:
     Send + Sync + std::fmt::Debug + CustomConstBoxClone + Any + Downcast
@@ -264,7 +265,7 @@ impl CustomConst for CustomSerialized {
     }
 }
 
-/// This module is used by the serde annotations on `super::ExtensionValue`
+/// This module is used by the serde annotations on `super::OpaqueValue`
 pub(super) mod serde_extension_value {
     use serde::{Deserializer, Serializer};
 
@@ -312,7 +313,8 @@ pub fn get_pair_of_input_values<T: CustomConst>(
     Some((c0.get_custom_value()?, c1.get_custom_value()?))
 }
 
-#[cfg(test)]
+// these tests depend on the `typetag` crate.
+#[cfg(all(test, not(miri)))]
 mod test {
 
     use rstest::rstest;
@@ -323,7 +325,7 @@ mod test {
         std_extensions::collections::ListValue,
     };
 
-    use super::{super::ExtensionValue, CustomConst, CustomConstBoxClone, CustomSerialized};
+    use super::{super::OpaqueValue, CustomConst, CustomConstBoxClone, CustomSerialized};
 
     struct SerializeCustomConstExample<CC: CustomConst + serde::Serialize + 'static> {
         cc: CC,
@@ -353,6 +355,7 @@ mod test {
     }
 
     #[rstest]
+    #[cfg_attr(miri, ignore = "miri is incompatible with the typetag crate")]
     #[case(scce_usize())]
     #[case(scce_list())]
     fn test_custom_serialized_try_from<
@@ -407,8 +410,8 @@ mod test {
                 .unwrap()
         );
 
-        // check ExtensionValue serializes/deserializes as a CustomSerialized
-        let ev: ExtensionValue = example.cc.clone().into();
+        // check OpaqueValue serializes/deserializes as a CustomSerialized
+        let ev: OpaqueValue = example.cc.clone().into();
         let ev_val = serde_yaml::to_value(&ev).unwrap();
         assert_eq!(
             &ev_val,
@@ -438,6 +441,7 @@ mod test {
     }
 
     #[rstest]
+    #[cfg_attr(miri, ignore = "miri is incompatible with the typetag crate")]
     #[case(example_custom_serialized())]
     #[case(example_nested_custom_serialized())]
     fn test_try_from_custom_serialized_recursive<CC: CustomConst + PartialEq>(
@@ -465,10 +469,10 @@ mod test {
         assert_eq!(&inner.clone_box(), &cs.clone().into_custom_const_box());
         assert_eq!(&inner, &cs.clone().try_into_custom_const().unwrap());
 
-        let ev: ExtensionValue = cs.clone().into();
-        // A serialisation round-trip results in an ExtensionValue with the value of inner
+        let ev: OpaqueValue = cs.clone().into();
+        // A serialisation round-trip results in an OpaqueValue with the value of inner
         assert_eq!(
-            ExtensionValue::new(inner),
+            OpaqueValue::new(inner),
             serde_yaml::from_value(serde_yaml::to_value(&ev).unwrap()).unwrap()
         );
     }

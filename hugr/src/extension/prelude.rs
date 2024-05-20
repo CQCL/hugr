@@ -41,6 +41,48 @@ impl SignatureFromArgs for ArrayOpCustom {
     }
 }
 
+struct GenericOpCustom;
+impl SignatureFromArgs for GenericOpCustom {
+    fn compute_signature(&self, arg_values: &[TypeArg]) -> Result<PolyFuncType, SignatureError> {
+        let [arg0, arg1] = arg_values else {
+            return Err(SignatureError::InvalidTypeArgs);
+        };
+        let TypeArg::Sequence { elems: inp_args } = arg0 else {
+            return Err(SignatureError::InvalidTypeArgs);
+        };
+        let TypeArg::Sequence { elems: out_args } = arg1 else {
+            return Err(SignatureError::InvalidTypeArgs);
+        };
+        let mut inps: Vec<Type> = vec![Type::new_extension(ERROR_CUSTOM_TYPE)];
+        for inp_arg in inp_args.iter() {
+            let TypeArg::Type { ty } = inp_arg else {
+                return Err(SignatureError::InvalidTypeArgs);
+            };
+            inps.push(ty.clone());
+        }
+        let mut outs: Vec<Type> = vec![];
+        for out_arg in out_args.iter() {
+            let TypeArg::Type { ty } = out_arg else {
+                return Err(SignatureError::InvalidTypeArgs);
+            };
+            outs.push(ty.clone());
+        }
+        Ok(PolyFuncType::new(vec![], FunctionType::new(inps, outs)))
+    }
+
+    fn static_params(&self) -> &[TypeParam] {
+        fn list_of_type() -> TypeParam {
+            TypeParam::List {
+                param: Box::new(TypeParam::Type { b: TypeBound::Any }),
+            }
+        }
+        lazy_static! {
+            static ref PARAMS: [TypeParam; 2] = [list_of_type(), list_of_type()];
+        }
+        PARAMS.as_slice()
+    }
+}
+
 /// Name of prelude extension.
 pub const PRELUDE_ID: ExtensionId = ExtensionId::new_unchecked("prelude");
 lazy_static! {
@@ -102,7 +144,7 @@ lazy_static! {
         .add_op(
             PANIC_OP_ID,
             "Panic with input error".to_string(),
-            FunctionType::new(type_row![Type::new_extension(ERROR_CUSTOM_TYPE)], type_row![]),
+            GenericOpCustom,
         )
         .unwrap();
         prelude
@@ -140,7 +182,16 @@ pub fn array_type(size: impl Into<TypeArg>, element_ty: Type) -> Type {
 
 /// Name of the operation in the prelude for creating new arrays.
 pub const NEW_ARRAY_OP_ID: OpName = OpName::new_inline("new_array");
+
 /// Name of the prelude panic operation.
+///
+/// This operation can have any input and any output wires; it is instantiated
+/// with two [TypeArg::Sequence]s representing these. The first input to the
+/// operation is always an error type; the remaining inputs correspond to the
+/// first sequence of types in its instantiation; the outputs correspond to the
+/// second sequence of types in its instantiation. Note that the inputs and
+/// outputs only exist so that structural constraints such as linearity can be
+/// satisfied.
 pub const PANIC_OP_ID: OpName = OpName::new_inline("panic");
 
 /// Initialize a new array op of element type `element_ty` of length `size`
@@ -296,6 +347,7 @@ impl CustomConst for ConstError {
 mod test {
     use crate::{
         builder::{DFGBuilder, Dataflow, DataflowHugr},
+        utils::test_quantum_extension::cx_gate,
         Hugr, Wire,
     };
 
@@ -348,13 +400,48 @@ mod test {
 
         let err = b.add_load_value(error_val);
 
+        const TYPE_ARG_NONE: TypeArg = TypeArg::Sequence { elems: vec![] };
         let op = PRELUDE
-            .instantiate_extension_op(&PANIC_OP_ID, [], &PRELUDE_REGISTRY)
+            .instantiate_extension_op(
+                &PANIC_OP_ID,
+                [TYPE_ARG_NONE, TYPE_ARG_NONE],
+                &PRELUDE_REGISTRY,
+            )
             .unwrap();
 
         b.add_dataflow_op(op, [err]).unwrap();
 
         b.finish_prelude_hugr_with_outputs([]).unwrap();
+    }
+
+    #[test]
+    /// test the panic operation with input and output wires
+    fn test_panic_with_io() {
+        let error_val = ConstError::new(42, "PANIC");
+        const TYPE_ARG_Q: TypeArg = TypeArg::Type { ty: QB_T };
+        let type_arg_2q: TypeArg = TypeArg::Sequence {
+            elems: vec![TYPE_ARG_Q, TYPE_ARG_Q],
+        };
+        let panic_op = PRELUDE
+            .instantiate_extension_op(
+                &PANIC_OP_ID,
+                [type_arg_2q.clone(), type_arg_2q.clone()],
+                &PRELUDE_REGISTRY,
+            )
+            .unwrap();
+
+        let mut b = DFGBuilder::new(FunctionType::new_endo(type_row![QB_T, QB_T])).unwrap();
+        let [q0, q1] = b.input_wires_arr();
+        let [q0, q1] = b
+            .add_dataflow_op(cx_gate(), [q0, q1])
+            .unwrap()
+            .outputs_arr();
+        let err = b.add_load_value(error_val);
+        let [q0, q1] = b
+            .add_dataflow_op(panic_op, [err, q0, q1])
+            .unwrap()
+            .outputs_arr();
+        b.finish_prelude_hugr_with_outputs([q0, q1]).unwrap();
     }
 
     #[test]

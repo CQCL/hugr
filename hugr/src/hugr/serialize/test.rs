@@ -8,15 +8,16 @@ use crate::extension::simple_op::MakeRegisteredOp;
 use crate::extension::{EMPTY_REG, PRELUDE_REGISTRY};
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::ops::custom::{ExtensionOp, OpaqueOp};
-use crate::ops::{self, Value};
-use crate::ops::{dataflow::IOTrait, Input, Module, Noop, Output, DFG};
+use crate::ops::{self, dataflow::IOTrait, Input, Module, Noop, Output, Value, DFG};
 use crate::std_extensions::arithmetic::float_ops::FLOAT_OPS_REGISTRY;
 use crate::std_extensions::arithmetic::float_types::{ConstF64, FLOAT64_TYPE};
 use crate::std_extensions::arithmetic::int_types::{int_custom_type, ConstInt, INT_TYPES};
 use crate::std_extensions::logic::NotOp;
-use crate::types::type_param::{TypeArg, TypeParam};
-use crate::types::{FunctionType, PolyFuncType, SumType, Type, TypeBound};
+use crate::types::{
+    type_param::TypeParam, FunctionType, PolyFuncType, SumType, Type, TypeArg, TypeBound,
+};
 use crate::{type_row, OutgoingPort};
+
 use itertools::Itertools;
 use jsonschema::{Draft, JSONSchema};
 use lazy_static::lazy_static;
@@ -26,6 +27,17 @@ use rstest::rstest;
 
 const NAT: Type = crate::extension::prelude::USIZE_T;
 const QB: Type = crate::extension::prelude::QB_T;
+
+/// Version 1 of the Testing HUGR serialisation format, see `testing_hugr.py`.
+#[cfg(test)]
+#[derive(Serialize, Deserialize, PartialEq, Debug, Default)]
+struct SerTestingV1 {
+    typ: Option<crate::types::Type>,
+    sum_type: Option<crate::types::SumType>,
+    poly_func_type: Option<crate::types::PolyFuncType>,
+    value: Option<crate::ops::Value>,
+    optype: Option<NodeSer>,
+}
 
 type TestingModel = SerTestingV1;
 
@@ -60,6 +72,25 @@ include_schema!(
     TESTING_SCHEMA_STRICT,
     "../../../../specification/schema/testing_hugr_schema_strict_v1.json"
 );
+
+macro_rules! impl_sertesting_from {
+    ($typ:ty, $field:ident) => {
+        #[cfg(test)]
+        impl From<$typ> for TestingModel {
+            fn from(v: $typ) -> Self {
+                let mut r: Self = Default::default();
+                r.$field = Some(v);
+                r
+            }
+        }
+    };
+}
+
+impl_sertesting_from!(crate::types::Type, typ);
+impl_sertesting_from!(crate::types::SumType, sum_type);
+impl_sertesting_from!(crate::types::PolyFuncType, poly_func_type);
+impl_sertesting_from!(crate::ops::Value, value);
+impl_sertesting_from!(NodeSer, optype);
 
 #[test]
 fn empty_hugr_serialize() {
@@ -373,10 +404,6 @@ fn roundtrip_sumtype(#[case] sum_type: SumType) {
 #[case(Value::extension(ConstF64::new(-1.5)))]
 #[case(Value::extension(ConstF64::new(0.0)))]
 #[case(Value::extension(ConstF64::new(-0.0)))]
-// These cases fail
-// #[case(Value::extension(ConstF64::new(std::f64::NAN)))]
-// #[case(Value::extension(ConstF64::new(std::f64::INFINITY)))]
-// #[case(Value::extension(ConstF64::new(std::f64::NEG_INFINITY)))]
 #[case(Value::extension(ConstF64::new(f64::MIN_POSITIVE)))]
 #[case(Value::sum(1,[Value::extension(ConstInt::new_u(2,1).unwrap())], SumType::new([vec![], vec![INT_TYPES[2].clone()]])).unwrap())]
 #[case(Value::tuple([Value::false_val(), Value::extension(ConstInt::new_s(2,1).unwrap())]))]
@@ -440,4 +467,53 @@ fn roundtrip_optype(#[case] optype: impl Into<OpType> + std::fmt::Debug) {
         input_extensions: None,
         op: optype.into(),
     });
+}
+
+mod proptest {
+    use super::super::NodeSer;
+    use super::check_testing_roundtrip;
+    use crate::extension::ExtensionSet;
+    use crate::ops::{OpType, Value};
+    use crate::types::{PolyFuncType, Type};
+    use proptest::prelude::*;
+
+    impl Arbitrary for NodeSer {
+        type Parameters = ();
+        type Strategy = BoxedStrategy<Self>;
+        fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+            (
+                (0..i32::MAX as usize).prop_map(|x| portgraph::NodeIndex::new(x).into()),
+                any::<Option<ExtensionSet>>(),
+                any::<OpType>(),
+            )
+                .prop_map(|(parent, input_extensions, op)| NodeSer {
+                    parent,
+                    input_extensions,
+                    op,
+                })
+                .boxed()
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn prop_roundtrip_type(t:  Type) {
+            check_testing_roundtrip(t)
+        }
+
+        #[test]
+        fn prop_roundtrip_poly_func_type(t: PolyFuncType) {
+            check_testing_roundtrip(t)
+        }
+
+        #[test]
+        fn prop_roundtrip_value(t: Value) {
+            check_testing_roundtrip(t)
+        }
+
+        #[test]
+        fn prop_roundtrip_optype(ns: NodeSer) {
+            check_testing_roundtrip(ns)
+        }
+    }
 }

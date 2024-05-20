@@ -16,6 +16,16 @@ use crate::{
 
 use super::IntOpDef;
 
+use lazy_static::lazy_static;
+
+lazy_static! {
+    static ref INARROW_ERROR_VALUE: Value = ConstError {
+        signal: 0,
+        message: "Integer too large to narrow".to_string(),
+    }
+    .into();
+}
+
 fn bitmask_from_width(width: u64) -> u64 {
     debug_assert!(width <= 64);
     if width == 64 {
@@ -111,28 +121,22 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                     let logwidth0: u8 = get_log_width(arg0).ok()?;
                     let logwidth1: u8 = get_log_width(arg1).ok()?;
                     let n0: &ConstInt = get_single_input_value(consts)?;
+                    (logwidth0 >= logwidth1 && n0.log_width() == logwidth0).then_some(())?;
 
                     let int_out_type = INT_TYPES[logwidth1 as usize].to_owned();
                     let sum_type = sum_with_error(int_out_type.clone());
-                    let err_value = || {
-                        let err_val = ConstError {
-                            signal: 0,
-                            message: "Integer too large to narrow".to_string(),
-                        };
-                        Value::sum(1, [err_val.into()], sum_type.clone())
+
+                    let mk_out_const = |i, mb_v: Result<Value, _>| {
+                        mb_v.and_then(|v| Value::sum(i, [v], sum_type))
                             .unwrap_or_else(|e| panic!("Invalid computed sum, {}", e))
                     };
                     let n0val: u64 = n0.value_u();
                     let out_const: Value = if n0val >> (1 << logwidth1) != 0 {
-                        err_value()
+                        mk_out_const(1, Ok(INARROW_ERROR_VALUE.clone()))
                     } else {
-                        Value::extension(ConstInt::new_u(logwidth1, n0val).unwrap())
+                        mk_out_const(0, ConstInt::new_u(logwidth1, n0val).map(Into::into))
                     };
-                    if logwidth0 < logwidth1 || n0.log_width() != logwidth0 {
-                        None
-                    } else {
-                        Some(vec![(0.into(), out_const)])
-                    }
+                    Some(vec![(0.into(), out_const)])
                 },
             ),
         },
@@ -145,29 +149,22 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                     let logwidth0: u8 = get_log_width(arg0).ok()?;
                     let logwidth1: u8 = get_log_width(arg1).ok()?;
                     let n0: &ConstInt = get_single_input_value(consts)?;
+                    (logwidth0 >= logwidth1 && n0.log_width() == logwidth0).then_some(())?;
 
                     let int_out_type = INT_TYPES[logwidth1 as usize].to_owned();
                     let sum_type = sum_with_error(int_out_type.clone());
-                    let err_value = || {
-                        let err_val = ConstError {
-                            signal: 0,
-                            message: "Integer too large to narrow".to_string(),
-                        };
-                        Value::sum(1, [err_val.into()], sum_type.clone())
+                    let mk_out_const = |i, mb_v: Result<Value, _>| {
+                        mb_v.and_then(|v| Value::sum(i, [v], sum_type))
                             .unwrap_or_else(|e| panic!("Invalid computed sum, {}", e))
                     };
                     let n0val: i64 = n0.value_s();
                     let ub = 1i64 << ((1 << logwidth1) - 1);
                     let out_const: Value = if n0val >= ub || n0val < -ub {
-                        err_value()
+                        mk_out_const(1, Ok(INARROW_ERROR_VALUE.clone()))
                     } else {
-                        Value::extension(ConstInt::new_s(logwidth1, n0val).unwrap())
+                        mk_out_const(0, ConstInt::new_s(logwidth1, n0val).map(Into::into))
                     };
-                    if logwidth0 < logwidth1 || n0.log_width() != logwidth0 {
-                        None
-                    } else {
-                        Some(vec![(0.into(), out_const)])
-                    }
+                    Some(vec![(0.into(), out_const)])
                 },
             ),
         },

@@ -24,6 +24,7 @@ pub use custom::{
 ///
 /// Represents core types and extension types.
 #[non_exhaustive]
+#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 pub struct Const {
     #[serde(rename = "v")]
     value: Value,
@@ -44,6 +45,9 @@ impl Const {
         to self.value {
             /// Returns the type of this constant.
             pub fn get_type(&self) -> Type;
+            /// For a Const holding a CustomConst, extract the CustomConst by
+            /// downcasting.
+            pub fn get_custom_value<T: CustomConst>(&self) -> Option<&T>;
         }
     }
 }
@@ -103,7 +107,7 @@ pub enum Value {
     Extension {
         #[serde(flatten)]
         /// The custom constant value.
-        e: ExtensionValue,
+        e: OpaqueValue,
     },
     /// A higher-order function value.
     // TODO use a root parametrised hugr, e.g. Hugr<DFG>.
@@ -140,23 +144,24 @@ pub enum Value {
 /// During serialization we first serialize the internal [`dyn` CustomConst](CustomConst)
 /// into a [serde_yaml::Value]. We then create a [CustomSerialized] wrapping
 /// that value.  That [CustomSerialized] is then serialized in place of the
-/// [ExtensionValue].
+/// [OpaqueValue].
 ///
 /// During deserialization, first we deserialize a [CustomSerialized]. We
 /// attempt to deserialize the internal [serde_yaml::Value] using the [`Box<dyn
 /// CustomConst>`](CustomConst) impl. This will fail if the appropriate `impl CustomConst`
 /// is not linked into the running program, in which case we coerce the
-/// [CustomSerialized] into a [`Box<dyn CustomConst>`](CustomConst). The [ExtensionValue] is
+/// [CustomSerialized] into a [`Box<dyn CustomConst>`](CustomConst). The [OpaqueValue] is
 /// then produced from the [`Box<dyn [CustomConst]>`](CustomConst).
 ///
 /// In the case where the internal serialised value of a `CustomSerialized`
 /// is another `CustomSerialized` we do not attempt to recurse. This behaviour
 /// may change in future.
 ///
-/// ```rust
+#[cfg_attr(not(miri), doc = "```")] // this doctest depends on typetag, so fails with miri
+#[cfg_attr(miri, doc = "```ignore")]
 /// use serde::{Serialize,Deserialize};
 /// use hugr::{
-///   types::Type,ops::constant::{ExtensionValue, ValueName, CustomConst, CustomSerialized},
+///   types::Type,ops::constant::{OpaqueValue, ValueName, CustomConst, CustomSerialized},
 ///   extension::{ExtensionSet, prelude::{USIZE_T, ConstUsize}},
 ///   std_extensions::arithmetic::int_types};
 /// use serde_json::json;
@@ -166,11 +171,11 @@ pub enum Value {
 ///     "typ": USIZE_T,
 ///     "value": {'c': "ConstUsize", 'v': 1}
 /// });
-/// let ev = ExtensionValue::new(ConstUsize::new(1));
+/// let ev = OpaqueValue::new(ConstUsize::new(1));
 /// assert_eq!(&serde_json::to_value(&ev).unwrap(), &expected_json);
 /// assert_eq!(ev, serde_json::from_value(expected_json).unwrap());
 ///
-/// let ev = ExtensionValue::new(CustomSerialized::new(USIZE_T.clone(), serde_yaml::Value::Null, ExtensionSet::default()));
+/// let ev = OpaqueValue::new(CustomSerialized::new(USIZE_T.clone(), serde_yaml::Value::Null, ExtensionSet::default()));
 /// let expected_json = json!({
 ///     "extensions": [],
 ///     "typ": USIZE_T,
@@ -181,13 +186,13 @@ pub enum Value {
 /// assert_eq!(ev, serde_json::from_value(expected_json).unwrap());
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExtensionValue {
+pub struct OpaqueValue {
     #[serde(flatten, with = "self::custom::serde_extension_value")]
     v: Box<dyn CustomConst>,
 }
 
-impl ExtensionValue {
-    /// Create a new [`ExtensionValue`] from any [`CustomConst`].
+impl OpaqueValue {
+    /// Create a new [`OpaqueValue`] from any [`CustomConst`].
     pub fn new(cc: impl CustomConst) -> Self {
         Self { v: Box::new(cc) }
     }
@@ -209,13 +214,13 @@ impl ExtensionValue {
     }
 }
 
-impl<CC: CustomConst> From<CC> for ExtensionValue {
+impl<CC: CustomConst> From<CC> for OpaqueValue {
     fn from(x: CC) -> Self {
         Self::new(x)
     }
 }
 
-impl PartialEq for ExtensionValue {
+impl PartialEq for OpaqueValue {
     fn eq(&self, other: &Self) -> bool {
         self.value().equal_consts(other.value())
     }
@@ -287,8 +292,9 @@ impl Value {
         }
     }
 
-    /// Creates a new Const Sum.  The value is determined by `items` and is
-    /// type-checked `typ`
+    /// Returns a Sum constant. The value is determined by `items` and is
+    /// type-checked `typ`. The `tag`th variant of `typ` should match the types
+    /// of `items`.
     pub fn sum(
         tag: usize,
         items: impl IntoIterator<Item = Value>,
@@ -323,17 +329,17 @@ impl Value {
         })
     }
 
-    /// Constant unit type (empty Tuple).
+    /// Returns a constant unit type (empty Tuple).
     pub const fn unit() -> Self {
         Self::Tuple { vs: vec![] }
     }
 
-    /// Constant Sum over units, used as branching values.
+    /// Returns a constant Sum over units. Used as branching values.
     pub fn unit_sum(tag: usize, size: u8) -> Result<Self, ConstTypeError> {
         Self::sum(tag, [], SumType::Unit { size })
     }
 
-    /// Constant Sum over units, with only one variant.
+    /// Returns a constant Sum over units, with only one variant.
     pub fn unary_unit_sum() -> Self {
         Self::unit_sum(0, 1).expect("0 < 1")
     }
@@ -348,7 +354,8 @@ impl Value {
         Self::unit_sum(0, 2).expect("0 < 2")
     }
 
-    /// Generate a constant equivalent of a boolean,
+    /// Returns a constant `bool` value.
+    ///
     /// see [`Value::true_val`] and [`Value::false_val`].
     pub fn from_bool(b: bool) -> Self {
         if b {
@@ -358,14 +365,14 @@ impl Value {
         }
     }
 
-    /// Returns a tuple constant of constant values.
+    /// Returns a [Value::Extension] holding `custom_const`.
     pub fn extension(custom_const: impl CustomConst) -> Self {
         Self::Extension {
-            e: ExtensionValue::new(custom_const),
+            e: OpaqueValue::new(custom_const),
         }
     }
 
-    /// For a Const holding a CustomConst, extract the CustomConst by downcasting.
+    /// For a [Value] holding a [CustomConst], extract the CustomConst by downcasting.
     pub fn get_custom_value<T: CustomConst>(&self) -> Option<&T> {
         if let Self::Extension { e } = self {
             e.v.downcast_ref()
@@ -622,5 +629,95 @@ mod test {
         let typ_qb = CustomType::new("my_type", vec![], ex_id, TypeBound::Eq);
         let t = Type::new_extension(typ_qb.clone());
         assert_ne!(yaml_const.get_type(), t);
+    }
+
+    mod proptest {
+        use super::super::OpaqueValue;
+        use crate::{
+            ops::Value,
+            std_extensions::arithmetic::int_types::{ConstInt, LOG_WIDTH_MAX},
+            std_extensions::collections::ListValue,
+            types::{SumType, Type},
+        };
+        use ::proptest::prelude::*;
+        impl Arbitrary for OpaqueValue {
+            type Parameters = ();
+            type Strategy = BoxedStrategy<Self>;
+            fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+                use proptest::collection::vec;
+                let signed_strat = (..=LOG_WIDTH_MAX).prop_flat_map(|log_width| {
+                    use i64;
+                    let max_val = (2u64.pow(log_width as u32) / 2) as i64;
+                    let min_val = -max_val - 1;
+                    (min_val..=max_val).prop_map(move |v| {
+                        OpaqueValue::new(
+                            ConstInt::new_s(log_width, v).expect("guaranteed to be in bounds"),
+                        )
+                    })
+                });
+                let unsigned_strat = (..=LOG_WIDTH_MAX).prop_flat_map(|log_width| {
+                    (0..2u64.pow(log_width as u32)).prop_map(move |v| {
+                        OpaqueValue::new(
+                            ConstInt::new_u(log_width, v).expect("guaranteed to be in bounds"),
+                        )
+                    })
+                });
+                prop_oneof![unsigned_strat, signed_strat]
+                    .prop_recursive(
+                        3,  // No more than 3 branch levels deep
+                        32, // Target around 32 total elements
+                        3,  // Each collection is up to 3 elements long
+                        |element| {
+                            (any::<Type>(), vec(element.clone(), 0..3)).prop_map(
+                                |(typ, contents)| {
+                                    OpaqueValue::new(ListValue::new(
+                                        typ,
+                                        contents.into_iter().map(|e| Value::Extension { e }),
+                                    ))
+                                },
+                            )
+                        },
+                    )
+                    .boxed()
+            }
+        }
+
+        impl Arbitrary for Value {
+            type Parameters = ();
+            type Strategy = BoxedStrategy<Self>;
+            fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+                use ::proptest::collection::vec;
+                let leaf_strat = prop_oneof![
+                    any::<OpaqueValue>().prop_map(|e| Self::Extension { e }),
+                    crate::proptest::any_hugr().prop_map(|x| Value::function(x).unwrap())
+                ];
+                leaf_strat
+                    .prop_recursive(
+                        3,  // No more than 3 branch levels deep
+                        32, // Target around 32 total elements
+                        3,  // Each collection is up to 3 elements long
+                        |element| {
+                            prop_oneof![
+                                vec(element.clone(), 0..3).prop_map(|vs| Self::Tuple { vs }),
+                                (
+                                    any::<usize>(),
+                                    vec(element.clone(), 0..3),
+                                    any_with::<SumType>(1.into()) // for speed: don't generate large sum types for now
+                                )
+                                    .prop_map(
+                                        |(tag, values, sum_type)| {
+                                            Self::Sum {
+                                                tag,
+                                                values,
+                                                sum_type,
+                                            }
+                                        }
+                                    ),
+                            ]
+                        },
+                    )
+                    .boxed()
+            }
+        }
     }
 }

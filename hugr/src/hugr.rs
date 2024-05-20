@@ -2,7 +2,7 @@
 
 pub mod hugrmut;
 
-mod ident;
+pub(crate) mod ident;
 pub mod rewrite;
 pub mod serialize;
 pub mod validate;

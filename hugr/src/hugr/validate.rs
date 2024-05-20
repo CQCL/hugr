@@ -64,7 +64,7 @@ impl Hugr {
 
     /// Validate extensions on the input and output edges of nodes. Check that
     /// the target ends of edges require the extensions from the sources, and
-    /// check extension deltas from parent nodes are reflected in their children
+    /// check extension deltas from parent nodes are reflected in their children.
     pub fn validate_extensions(&self, closure: ExtensionSolution) -> Result<(), ValidationError> {
         let validator = ExtensionValidator::new(self, closure);
         for src_node in self.nodes() {

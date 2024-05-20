@@ -22,6 +22,8 @@ pub use type_row::TypeRow;
 use itertools::FoldWhile::{Continue, Done};
 use itertools::{repeat_n, Itertools};
 use serde::{Deserialize, Serialize};
+#[cfg(test)]
+use {crate::proptest::RecursionDepth, ::proptest::prelude::*, proptest_derive::Arbitrary};
 
 use crate::extension::{ExtensionRegistry, SignatureError};
 use crate::ops::AliasDecl;
@@ -70,6 +72,7 @@ impl EdgeKind {
 #[derive(
     Copy, Default, Clone, PartialEq, Eq, Hash, Debug, derive_more::Display, Serialize, Deserialize,
 )]
+#[cfg_attr(test, derive(Arbitrary))]
 /// Bounds on the valid operations on a type in a HUGR program.
 pub enum TypeBound {
     /// The equality operation is valid on this type.
@@ -194,18 +197,27 @@ impl From<SumType> for Type {
 }
 
 #[derive(Clone, PartialEq, Debug, Eq, derive_more::Display)]
+#[cfg_attr(test, derive(Arbitrary), proptest(params = "RecursionDepth"))]
 /// Core types
 pub enum TypeEnum {
     // TODO optimise with Box<CustomType> ?
     // or some static version of this?
     #[allow(missing_docs)]
-    Extension(CustomType),
+    Extension(
+        #[cfg_attr(test, proptest(strategy = "any_with::<CustomType>(params.into())"))] CustomType,
+    ),
     #[allow(missing_docs)]
     #[display(fmt = "Alias({})", "_0.name()")]
     Alias(AliasDecl),
     #[allow(missing_docs)]
     #[display(fmt = "Function({})", "_0")]
-    Function(Box<FunctionType>),
+    Function(
+        #[cfg_attr(
+            test,
+            proptest(strategy = "any_with::<FunctionType>(params).prop_map(Box::new)")
+        )]
+        Box<FunctionType>,
+    ),
     // Index into TypeParams, and cache of TypeBound (checked in validation)
     #[allow(missing_docs)]
     #[display(fmt = "Variable({})", _0)]
@@ -216,7 +228,7 @@ pub enum TypeEnum {
     RowVariable(usize, TypeBound),
     #[allow(missing_docs)]
     #[display(fmt = "{}", "_0")]
-    Sum(SumType),
+    Sum(#[cfg_attr(test, proptest(strategy = "any_with::<SumType>(params)"))] SumType),
 }
 impl TypeEnum {
     /// The smallest type bound that covers the whole type.
@@ -499,7 +511,9 @@ pub(crate) fn check_typevar_decl(
 
 #[cfg(test)]
 pub(crate) mod test {
+
     use super::*;
+
     use crate::extension::prelude::USIZE_T;
 
     #[test]
@@ -530,5 +544,39 @@ pub(crate) mod test {
 
         let pred_direct = SumType::Unit { size: 2 };
         assert_eq!(pred1, pred_direct.into())
+    }
+
+    mod proptest {
+
+        use crate::proptest::RecursionDepth;
+
+        use crate::types::{SumType, TypeEnum, TypeRow};
+        use ::proptest::prelude::*;
+
+        impl Arbitrary for super::SumType {
+            type Parameters = RecursionDepth;
+            type Strategy = BoxedStrategy<Self>;
+            fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
+                use proptest::collection::vec;
+                if depth.leaf() {
+                    any::<u8>().prop_map(Self::new_unary).boxed()
+                } else {
+                    vec(any_with::<TypeRow>(depth), 0..3)
+                        .prop_map(SumType::new)
+                        .boxed()
+                }
+            }
+        }
+
+        impl Arbitrary for super::Type {
+            type Parameters = RecursionDepth;
+            type Strategy = BoxedStrategy<Self>;
+            fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
+                // We descend here, because a TypeEnum may contain a Type
+                any_with::<TypeEnum>(depth.descend())
+                    .prop_map(Self::new)
+                    .boxed()
+            }
+        }
     }
 }

@@ -82,3 +82,10 @@ repos:
         language: system
         files: \.rs$
         pass_filenames: false
+      - id: py-test
+        name: pytest
+        description: Run python tests
+        entry: sh -c "poetry install && poetry run pytest"
+        language: system
+        files: \.py$
+        pass_filenames: false

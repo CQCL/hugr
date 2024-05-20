@@ -54,8 +54,11 @@ impl ConstFold for BinaryFold {
         consts: &[(IncomingPort, ops::Value)],
     ) -> ConstFoldResult {
         let [f1, f2] = get_floats(consts)?;
-
-        let res = ConstF64::new((self.0)(f1, f2));
+        let x: f64 = (self.0)(f1, f2);
+        if !x.is_finite() {
+            return None;
+        }
+        let res = ConstF64::new(x);
         Some(vec![(0.into(), res.into())])
     }
 }
@@ -115,7 +118,11 @@ impl ConstFold for UnaryFold {
         consts: &[(IncomingPort, ops::Value)],
     ) -> ConstFoldResult {
         let [f1] = get_floats(consts)?;
-        let res = ConstF64::new((self.0)(f1));
+        let x: f64 = (self.0)(f1);
+        if !x.is_finite() {
+            return None;
+        }
+        let res = ConstF64::new(x);
         Some(vec![(0.into(), res.into())])
     }
 }

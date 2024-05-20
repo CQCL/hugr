@@ -1,21 +1,22 @@
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import Field, ConfigDict
 
 from .ops import NodeID, OpType, classes as ops_classes
-from .tys import model_rebuild
+from .tys import model_rebuild, ConfiguredBaseModel
 import hugr
 
 Port = tuple[NodeID, int | None]  # (node, offset)
 Edge = tuple[Port, Port]
 
 
-class SerialHugr(BaseModel):
+class SerialHugr(ConfiguredBaseModel):
     """A serializable representation of a Hugr."""
 
     version: Literal["v1"] = "v1"
     nodes: list[OpType]
     edges: list[Edge]
+    metadata: list[dict[str, Any] | None] | None = None
     encoder: str | None = Field(
         default=None, description="The name of the encoder used to generate the Hugr."
     )

@@ -1,6 +1,6 @@
 [package]
 name = "hugr"
-version = "0.3.1"
+version = "0.4.0-alpha.1"
 edition = { workspace = true }
 rust-version = { workspace = true }
 
@@ -60,7 +60,10 @@ webbrowser = "1.0.0"
 urlencoding = "2.1.2"
 cool_asserts = "2.0.3"
 insta = { workspace = true, features = ["yaml"] }
-jsonschema = "0.17.1"
+jsonschema = "0.18.0"
+proptest = { version =  "1.4.0" }
+proptest-derive = { version =  "0.4.0"}
+regex-syntax = { version =  "0.8.3"}
 
 [[bench]]
 name = "bench_main"
