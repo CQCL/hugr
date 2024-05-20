@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/CQCL/hugr/compare/hugr-py-v0.2.0...hugr-py-v0.2.1) (2024-05-20)
+
+
+### Features
+
+* Add serialization schema for metadata ([#1038](https://github.com/CQCL/hugr/issues/1038)) ([19bac62](https://github.com/CQCL/hugr/commit/19bac6210aa8c495679bd7c783751e9cde744c61))
+
 ## [0.2.0a1](https://github.com/CQCL/hugr/compare/hugr-py-v0.1.0...hugr-py-v0.2.0a1) (2024-05-13)
 
 
