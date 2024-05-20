@@ -39,12 +39,6 @@ impl TypeRow {
 
     #[inline(always)]
     /// Returns the type at the specified index. Returns `None` if out of bounds.
-    pub fn get(&self, offset: usize) -> Option<&Type> {
-        self.types.get(offset)
-    }
-
-    #[inline(always)]
-    /// Returns the type at the specified index. Returns `None` if out of bounds.
     pub fn get_mut(&mut self, offset: usize) -> Option<&mut Type> {
         self.types.to_mut().get_mut(offset)
     }
@@ -75,6 +69,10 @@ impl TypeRow {
 
             /// Returns `true` if the row contains no types.
             pub fn is_empty(&self) -> bool ;
+
+            #[inline(always)]
+            /// Returns the type at the specified index. Returns `None` if out of bounds.
+            pub fn get(&self, offset: usize) -> Option<&Type>;
         }
     }
 }
