@@ -430,7 +430,7 @@ fn polyfunctype2() -> PolyFuncType {
     let res = PolyFuncType::new(params, FunctionType::new(inputs, tv1));
     // Just check we've got the arguments the right way round
     // (not that it really matters for the serialization schema we have)
-    res.validate_varargs(&EMPTY_REG).unwrap();
+    res.validate_var_len(&EMPTY_REG).unwrap();
     res
 }
 

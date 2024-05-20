@@ -408,7 +408,7 @@ impl OpDef {
             // The type scheme may contain row variables so be of variable length;
             // these will have to be substituted to fixed-length concrete types when
             // the OpDef is instantiated into an actual OpType.
-            ts.poly_func.validate_varargs(exts)?;
+            ts.poly_func.validate_var_len(exts)?;
         }
         Ok(())
     }

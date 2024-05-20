@@ -397,7 +397,7 @@ impl Type {
             TypeEnum::Extension(custy) => custy.validate(extension_registry, var_decls),
             // Function values may be passed around without knowing their arity
             // (i.e. with row vars) as long as they are not called:
-            TypeEnum::Function(ft) => ft.validate_varargs(extension_registry, var_decls),
+            TypeEnum::Function(ft) => ft.validate_var_len(extension_registry, var_decls),
             TypeEnum::Variable(idx, bound) => check_typevar_decl(var_decls, *idx, &(*bound).into()),
             TypeEnum::RowVariable(idx, bound) => {
                 if allow_row_vars {

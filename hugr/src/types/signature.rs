@@ -39,7 +39,7 @@ impl FunctionType {
         self
     }
 
-    pub(super) fn validate_varargs(
+    pub(super) fn validate_var_len(
         &self,
         extension_registry: &ExtensionRegistry,
         var_decls: &[TypeParam],

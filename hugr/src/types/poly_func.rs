@@ -85,9 +85,9 @@ impl PolyFuncType {
     /// Allows both inputs and outputs to contain [RowVariable]s
     ///
     /// [RowVariable]: [crate::types::TypeEnum::RowVariable]
-    pub fn validate_varargs(&self, reg: &ExtensionRegistry) -> Result<(), SignatureError> {
+    pub fn validate_var_len(&self, reg: &ExtensionRegistry) -> Result<(), SignatureError> {
         // TODO https://github.com/CQCL/hugr/issues/624 validate TypeParams declared here, too
-        self.body.validate_varargs(reg, &self.params)
+        self.body.validate_var_len(reg, &self.params)
     }
 
     /// Instantiates an outer [PolyFuncType], i.e. with no free variables
@@ -139,7 +139,7 @@ pub(crate) mod test {
             extension_registry: &ExtensionRegistry,
         ) -> Result<Self, SignatureError> {
             let res = Self::new(params, body);
-            res.validate_varargs(extension_registry)?;
+            res.validate_var_len(extension_registry)?;
             Ok(res)
         }
     }
