@@ -4,18 +4,19 @@ from collections.abc import Collection, ItemsView, MutableMapping, Hashable, Map
 from typing import Iterable, Sequence, Protocol, Generic, TypeVar
 
 from hugr.serialization.serial_hugr import SerialHugr
-from hugr.serialization.ops import NodeID, OpType as SerialOp, Module
-from hugr.serialization.tys import Type, Qubit
+from hugr.serialization.ops import BaseOp, NodeID, OpType as SerialOp
+import hugr.serialization.ops as sops
+from hugr.serialization.tys import Type
 
 
 L = TypeVar("L", bound=Hashable)
 R = TypeVar("R", bound=Hashable)
 
 
-@dataclass(init=False)
+@dataclass()
 class BiMap(MutableMapping, Generic[L, R]):
-    fwd: dict[L, R]
-    bck: dict[R, L]
+    fwd: dict[L, R] = field(default_factory=dict)
+    bck: dict[R, L] = field(default_factory=dict)
 
     def __getitem__(self, key: L) -> R:
         return self.fwd[key]
@@ -97,12 +98,16 @@ class Op(Protocol):
     def to_serial(self, parent: NodeID) -> SerialOp: ...
 
 
-@dataclass(init=False)
-class DummyOp(Op):
-    input_extensions: set[str] | None = None
+T = TypeVar("T", bound=BaseOp)
+
+
+@dataclass()
+class DummyOp(Op, Generic[T]):
+    _serial_op: T
 
     def to_serial(self, parent: NodeID) -> SerialOp:
-        return SerialOp(root=Module(parent=-1))
+        self._serial_op.parent = parent
+        return SerialOp(root=self._serial_op)  # type: ignore
 
 
 @dataclass()
@@ -113,16 +118,21 @@ class NodeData:
     _out_ports: set[int]
 
 
-@dataclass(init=False)
 class Hugr(Mapping):
     root: Node
-    nodes: list[NodeData | None]
+    _nodes: list[NodeData | None]
     _links: BiMap[OutPort, InPort]
-    _free_nodes: list[Node] = field(default_factory=list)
+    _free_nodes: list[Node]
+
+    def __init__(self, root_op: Op) -> None:
+        self.root = Node(0)
+        self._nodes = [NodeData(root_op, None, set(), set())]
+        self._links = BiMap()
+        self._free_nodes = []
 
     def __getitem__(self, key: Node) -> NodeData:
         try:
-            n = self.nodes[key.idx]
+            n = self._nodes[key.idx]
         except IndexError:
             n = None
         if n is None:
@@ -130,10 +140,10 @@ class Hugr(Mapping):
         return n
 
     def __iter__(self):
-        return iter(self.nodes)
+        return iter(self._nodes)
 
     def __len__(self) -> int:
-        return len(self.nodes) - len(self._free_nodes)
+        return len(self._nodes) - len(self._free_nodes)
 
     def add_node(self, op: Op, parent: Node | None = None) -> Node:
         parent = parent or self.root
@@ -142,10 +152,10 @@ class Hugr(Mapping):
 
         if self._free_nodes:
             node = self._free_nodes.pop()
-            self.nodes[node.idx] = node_data
+            self._nodes[node.idx] = node_data
         else:
-            node = Node(len(self.nodes))
-            self.nodes.append(node_data)
+            node = Node(len(self._nodes))
+            self._nodes.append(node_data)
         return node
 
     def delete_node(self, node: Node) -> None:
@@ -153,7 +163,7 @@ class Hugr(Mapping):
             self._links.delete_right(node.inp(offset))
         for offset in self[node]._out_ports:
             self._links.delete_left(node.out(offset))
-        self.nodes[node.idx] = None
+        self._nodes[node.idx] = None
         self._free_nodes.append(node)
 
     def add_link(self, src: OutPort, dst: InPort) -> None:
@@ -174,7 +184,7 @@ class Hugr(Mapping):
 
     def insert_hugr(self, hugr: "Hugr", parent: Node | None = None) -> dict[Node, Node]:
         mapping: dict[Node, Node] = {}
-        for idx, node_data in enumerate(self.nodes):
+        for idx, node_data in enumerate(self._nodes):
             if node_data is not None:
                 mapping[Node(idx)] = self.add_node(node_data.op, parent)
         for src, dst in hugr._links.items():
@@ -184,7 +194,7 @@ class Hugr(Mapping):
         return mapping
 
     def to_serial(self) -> SerialHugr:
-        node_it = (node for node in self.nodes if node is not None)
+        node_it = (node for node in self._nodes if node is not None)
         return SerialHugr(
             version="v1",
             # non contiguous indices will be erased
@@ -208,12 +218,25 @@ class Dfg:
     hugr: Hugr
     input_node: Node
     output_node: Node
+    _n_input: int
 
     def __init__(self, input_types: Sequence[Type]) -> None:
-        self.root = Node(0)
+        self._n_input = len(input_types)
+        input_types = list(input_types)
+        root_op = DummyOp(sops.DFG(parent=-1))
+        root_op._serial_op.signature.input = input_types
+        # TODO don't assume endo output
+        root_op._serial_op.signature.output = input_types
+        self.hugr = Hugr(root_op)
+        self.input_node = self.hugr.add_node(
+            DummyOp(sops.Input(parent=0, types=input_types))
+        )
+        self.output_node = self.hugr.add_node(
+            DummyOp(sops.Output(parent=0, types=input_types))
+        )
 
     def inputs(self) -> list[OutPort]:
-        return []
+        return [self.input_node.out(i) for i in range(self._n_input)]
 
     def add_op(self, op: Op, ports: Iterable[ToPort]) -> Node:
         # TODO wire up ports
@@ -232,15 +255,5 @@ class Dfg:
         return dfg
 
     def set_outputs(self, ports: Iterable[ToPort]) -> None:
-        pass
-
-
-if __name__ == "__main__":
-    h = Dfg([Type(Qubit())] * 2)
-
-    a, b = h.inputs()
-    x = h.add_op(DummyOp(), [a, b])
-
-    y = h.add_op(DummyOp(), [x, x])
-
-    h.set_outputs([y])
+        for i, p in enumerate(ports):
+            self.hugr.add_link(p.to_port(), self.output_node.inp(i))
