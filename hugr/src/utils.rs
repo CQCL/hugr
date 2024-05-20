@@ -234,13 +234,22 @@ pub(crate) mod test {
 
     /// Check that a hugr just loads and returns a single expected constant.
     pub(crate) fn assert_fully_folded(h: &Hugr, expected_value: &Value) {
+        assert_fully_folded_with(h, |v| v == expected_value)
+    }
+
+    /// Check that a hugr just loads and returns a single constant, and validate
+    /// that constant using `check_value`.
+    ///
+    /// [CustomConst::equals_const] is not required to be implemented. Use this
+    /// function for Values containing such a `CustomConst`.
+    pub(crate) fn assert_fully_folded_with(h: &Hugr, check_value: impl Fn(&Value) -> bool) {
         let mut node_count = 0;
 
         for node in h.children(h.root()) {
             let op = h.get_optype(node);
             match op {
                 OpType::Input(_) | OpType::Output(_) | OpType::LoadConstant(_) => node_count += 1,
-                OpType::Const(c) if c.value() == expected_value => node_count += 1,
+                OpType::Const(c) if check_value(c.value()) => node_count += 1,
                 _ => panic!("unexpected op: {:?}\n{}", op, h.mermaid_string()),
             }
         }

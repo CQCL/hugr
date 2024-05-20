@@ -23,7 +23,7 @@ pub const FLOAT64_CUSTOM_TYPE: CustomType =
 /// 64-bit IEEE 754-2019 floating-point type (as [Type])
 pub const FLOAT64_TYPE: Type = Type::new_extension(FLOAT64_CUSTOM_TYPE);
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 /// A floating-point value.
 pub struct ConstF64 {
     /// The value.
@@ -64,8 +64,8 @@ impl CustomConst for ConstF64 {
         FLOAT64_TYPE
     }
 
-    fn equal_consts(&self, other: &dyn CustomConst) -> bool {
-        crate::ops::constant::downcast_equal_consts(self, other)
+    fn equal_consts(&self, _: &dyn CustomConst) -> bool {
+        false
     }
 
     fn extension_reqs(&self) -> ExtensionSet {
@@ -110,8 +110,5 @@ mod test {
         assert_eq!(const_f64_1.value(), 1.0);
         assert_eq!(*const_f64_2, 2.0);
         assert_eq!(const_f64_1.name(), "f64(1)");
-        assert!(const_f64_1.equal_consts(&ConstF64::new(1.0)));
-        assert_ne!(const_f64_1, const_f64_2);
-        assert_eq!(const_f64_1, ConstF64::new(1.0));
     }
 }
