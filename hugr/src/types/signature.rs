@@ -98,28 +98,32 @@ impl FunctionType {
     /// of bounds.
     #[inline]
     pub fn in_port_type(&self, port: impl Into<IncomingPort>) -> Option<&Type> {
-        self.input.get(port.into().index())
+        let idx = check_no_rowvars(&self.input, port.into());
+        self.input.get(idx)
     }
 
     /// Returns the type of a value output [`Port`]. Returns `None` if the port is out
     /// of bounds.
     #[inline]
     pub fn out_port_type(&self, port: impl Into<OutgoingPort>) -> Option<&Type> {
-        self.output.get(port.into().index())
+        let idx = check_no_rowvars(&self.output, port.into());
+        self.output.get(idx)
     }
 
     /// Returns a mutable reference to the type of a value input [`Port`]. Returns `None` if the port is out
     /// of bounds.
     #[inline]
     pub fn in_port_type_mut(&mut self, port: impl Into<IncomingPort>) -> Option<&mut Type> {
-        self.input.get_mut(port.into().index())
+        let idx = check_no_rowvars(&self.input, port.into());
+        self.input.get_mut(idx)
     }
 
     /// Returns the type of a value output [`Port`]. Returns `None` if the port is out
     /// of bounds.
     #[inline]
     pub fn out_port_type_mut(&mut self, port: impl Into<OutgoingPort>) -> Option<&mut Type> {
-        self.output.get_mut(port.into().index())
+        let idx = check_no_rowvars(&self.output, port.into());
+        self.output.get_mut(idx)
     }
 
     /// Returns a mutable reference to the type of a value [`Port`].
@@ -208,6 +212,15 @@ impl FunctionType {
         self.ports(Direction::Outgoing)
             .map(|p| p.as_outgoing().unwrap())
     }
+}
+
+fn check_no_rowvars(row: &TypeRow, port: impl PortIndex) -> usize {
+    let idx = port.index();
+    if idx > 0 {
+        // Check we have not skipped over / indexed past any row variables
+        assert!(!row.iter().take(idx - 1).any(Type::is_row_var));
+    }
+    idx
 }
 
 impl Display for FunctionType {
