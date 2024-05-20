@@ -12,6 +12,5 @@ def test_versions_are_in_sync():
     pyproject_version = pyproject["tool"]["poetry"]["version"]
 
     package_init_version = hugr.__version__
-    # very important change
 
     assert package_init_version == pyproject_version
