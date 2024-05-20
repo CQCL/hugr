@@ -161,6 +161,11 @@ class Hugr(Mapping):
         self[dst.node]._in_ports.add(dst.offset)
         self[src.node]._out_ports.add(src.offset)
 
+    def delete_link(self, src: OutPort, dst: InPort) -> None:
+        self._links.delete_left(src)
+        self[dst.node]._in_ports.remove(dst.offset)
+        self[src.node]._out_ports.remove(src.offset)
+
     def in_ports(self, node: Node) -> Collection[InPort]:
         return [node.inp(o) for o in self[node]._in_ports]
 
