@@ -578,4 +578,63 @@ mod test {
         // Of course this is still valid (as substitution is guaranteed to preserve validity)
         check_type_arg(&outer_arg2, &outer_param).unwrap();
     }
+
+    #[test]
+    fn subst_list_list() {
+        let outer_param = TypeParam::new_list(TypeParam::new_list(TypeBound::Any));
+        let row_var_decl = TypeParam::new_list(TypeBound::Copyable);
+        let good_arg = TypeArg::Sequence {
+            elems: vec![
+                // The row variables here refer to `row_var_decl` above
+                TypeArg::Sequence {
+                    elems: vec![USIZE_T.into()],
+                },
+                TypeArg::new_var_use(0, row_var_decl.clone()),
+                TypeArg::Sequence {
+                    elems: vec![
+                        TypeArg::new_var_use(0, row_var_decl.clone()),
+                        USIZE_T.into(),
+                    ],
+                },
+            ],
+        };
+        check_type_arg(&good_arg, &outer_param).unwrap();
+
+        // Outer list cannot include single types:
+        let TypeArg::Sequence { mut elems } = good_arg.clone() else {
+            panic!()
+        };
+        elems.push(USIZE_T.into());
+        assert_eq!(
+            check_type_arg(&TypeArg::Sequence { elems }, &outer_param),
+            Err(TypeArgError::TypeMismatch {
+                arg: USIZE_T.into(),
+                // The error reports the type expected for each element of the list:
+                param: TypeParam::new_list(TypeBound::Any)
+            })
+        );
+
+        // Now substitute a list of two types for that row-variable
+        let row_var_arg = TypeArg::Sequence {
+            elems: vec![USIZE_T.into(), BOOL_T.into()],
+        };
+        check_type_arg(&row_var_arg, &row_var_decl).unwrap();
+        let subst_arg =
+            good_arg.substitute(&Substitution(&[row_var_arg.clone()], &PRELUDE_REGISTRY));
+        check_type_arg(&subst_arg, &outer_param).unwrap(); // invariance of substitution
+        assert_eq!(
+            subst_arg,
+            TypeArg::Sequence {
+                elems: vec![
+                    TypeArg::Sequence {
+                        elems: vec![USIZE_T.into()]
+                    },
+                    row_var_arg,
+                    TypeArg::Sequence {
+                        elems: vec![USIZE_T.into(), BOOL_T.into(), USIZE_T.into()]
+                    }
+                ]
+            }
+        );
+    }
 }
