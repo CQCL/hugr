@@ -142,7 +142,7 @@ We accept the following contribution types:
 We use automation to bump the version number and generate changelog entries
 based on the [conventional commits](https://www.conventionalcommits.org/en/v1.0.0/) labels. Release PRs are created automatically
 for each package when new changes are merged into the `main` branch. Once the PR is
-approved by someone in the release team and is merged, the new package
+approved by someone in the [release team](.github/CODEOWNERS) and is merged, the new package
 is published on PyPI or crates.io as appropriate.
 
 The changelog can be manually edited before merging the release PR. Note however
@@ -168,9 +168,6 @@ pre-release).
 To override the version getting released, you must merge a PR to `main` containing
 `Release-As: 0.1.0` in the description.
 Python pre-release versions should be formatted as `0.1.0a1` (or `b1`, `rc1`).
-
-Release-please lets you modify the changelog entries by updating the related PR.
-See the [release-please documentation](https://github.com/googleapis/release-please?tab=readme-ov-file#how-can-i-fix-release-notes) for more information.
 
 ### Patch releases
 
