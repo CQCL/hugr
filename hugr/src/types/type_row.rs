@@ -37,12 +37,6 @@ impl TypeRow {
         }
     }
 
-    #[inline(always)]
-    /// Returns the type at the specified index. Returns `None` if out of bounds.
-    pub fn get_mut(&mut self, offset: usize) -> Option<&mut Type> {
-        self.types.to_mut().get_mut(offset)
-    }
-
     /// Returns a new `TypeRow` with `xs` concatenated onto `self`.
     pub fn extend<'a>(&'a self, rest: impl IntoIterator<Item = &'a Type>) -> Self {
         self.iter().chain(rest).cloned().collect_vec().into()
@@ -73,6 +67,12 @@ impl TypeRow {
             #[inline(always)]
             /// Returns the type at the specified index. Returns `None` if out of bounds.
             pub fn get(&self, offset: usize) -> Option<&Type>;
+        }
+
+        to self.types.to_mut() {
+            #[inline(always)]
+            /// Returns the type at the specified index. Returns `None` if out of bounds.
+            pub fn get_mut(&mut self, offset: usize) -> Option<&mut Type>;
         }
     }
 }
