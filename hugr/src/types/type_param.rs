@@ -551,9 +551,7 @@ mod test {
     #[test]
     fn type_arg_subst_row() {
         let row_param = TypeParam::new_list(TypeBound::Copyable);
-        let row_arg = TypeArg::Sequence {
-            elems: vec![BOOL_T.into(), Type::UNIT.into()],
-        };
+        let row_arg: TypeArg = vec![BOOL_T.into(), Type::UNIT.into()].into();
         check_type_arg(&row_arg, &row_param).unwrap();
 
         // Now say a row variable referring to *that* row was used
@@ -570,9 +568,7 @@ mod test {
         let outer_arg2 = outer_arg.substitute(&Substitution(&[row_arg], &PRELUDE_REGISTRY));
         assert_eq!(
             outer_arg2,
-            TypeArg::Sequence {
-                elems: vec![BOOL_T.into(), Type::UNIT.into(), USIZE_T.into()]
-            }
+            vec![BOOL_T.into(), Type::UNIT.into(), USIZE_T.into()].into()
         );
 
         // Of course this is still valid (as substitution is guaranteed to preserve validity)
@@ -583,19 +579,13 @@ mod test {
     fn subst_list_list() {
         let outer_param = TypeParam::new_list(TypeParam::new_list(TypeBound::Any));
         let row_var_decl = TypeParam::new_list(TypeBound::Copyable);
+        let row_var_use = TypeArg::new_var_use(0, row_var_decl.clone());
         let good_arg = TypeArg::Sequence {
             elems: vec![
                 // The row variables here refer to `row_var_decl` above
-                TypeArg::Sequence {
-                    elems: vec![USIZE_T.into()],
-                },
-                TypeArg::new_var_use(0, row_var_decl.clone()),
-                TypeArg::Sequence {
-                    elems: vec![
-                        TypeArg::new_var_use(0, row_var_decl.clone()),
-                        USIZE_T.into(),
-                    ],
-                },
+                vec![USIZE_T.into()].into(),
+                row_var_use.clone(),
+                vec![row_var_use, USIZE_T.into()].into(),
             ],
         };
         check_type_arg(&good_arg, &outer_param).unwrap();
@@ -615,9 +605,7 @@ mod test {
         );
 
         // Now substitute a list of two types for that row-variable
-        let row_var_arg = TypeArg::Sequence {
-            elems: vec![USIZE_T.into(), BOOL_T.into()],
-        };
+        let row_var_arg = vec![USIZE_T.into(), BOOL_T.into()].into();
         check_type_arg(&row_var_arg, &row_var_decl).unwrap();
         let subst_arg =
             good_arg.substitute(&Substitution(&[row_var_arg.clone()], &PRELUDE_REGISTRY));
@@ -626,13 +614,9 @@ mod test {
             subst_arg,
             TypeArg::Sequence {
                 elems: vec![
-                    TypeArg::Sequence {
-                        elems: vec![USIZE_T.into()]
-                    },
+                    vec![USIZE_T.into()].into(),
                     row_var_arg,
-                    TypeArg::Sequence {
-                        elems: vec![USIZE_T.into(), BOOL_T.into(), USIZE_T.into()]
-                    }
+                    vec![USIZE_T.into(), BOOL_T.into(), USIZE_T.into()].into()
                 ]
             }
         );
