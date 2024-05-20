@@ -98,7 +98,7 @@ impl TypeRow {
         var_decls: &[TypeParam],
     ) -> Result<(), SignatureError> {
         self.iter()
-            .try_for_each(|t| t.validate_in_row(exts, var_decls))
+            .try_for_each(|t| t.validate(true, exts, var_decls))
     }
 }
 

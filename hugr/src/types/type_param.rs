@@ -258,7 +258,7 @@ impl TypeArg {
     ) -> Result<(), SignatureError> {
         match self {
             // Row variables are represented as 'TypeArg::Type's (see TypeArg::new_var_use)
-            TypeArg::Type { ty } => ty.validate_in_row(extension_registry, var_decls),
+            TypeArg::Type { ty } => ty.validate(true, extension_registry, var_decls),
             TypeArg::BoundedNat { .. } => Ok(()),
             TypeArg::Opaque { arg: custarg } => {
                 // We could also add a facility to Extension to validate that the constant *value*

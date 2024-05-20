@@ -371,16 +371,18 @@ impl Type {
         matches!(self.0, TypeEnum::RowVariable(_, _))
     }
 
-    /// Checks that this [Type] represents a single Type, not a row variable,
-    /// that all variables used within are in the provided list of bound variables,
-    /// and that for each [CustomType], the corresponding
+    /// Checks all variables used in the type are in the provided list
+    /// of bound variables, rejecting any [RowVariable]s if `allow_row_vars` is False;
+    /// and that for each [CustomType] the corresponding
     /// [TypeDef] is in the [ExtensionRegistry] and the type arguments
     /// [validate] and fit into the def's declared parameters.
     ///
+    /// [RowVariable]: TypeEnum::RowVariable
     /// [validate]: crate::types::type_param::TypeArg::validate
     /// [TypeDef]: crate::extension::TypeDef
-    pub(crate) fn validate_1type(
+    pub(crate) fn validate(
         &self,
+        allow_row_vars: bool,
         extension_registry: &ExtensionRegistry,
         var_decls: &[TypeParam],
     ) -> Result<(), SignatureError> {
@@ -397,31 +399,21 @@ impl Type {
             // (i.e. with row vars) as long as they are not called:
             TypeEnum::Function(ft) => ft.validate_varargs(extension_registry, var_decls),
             TypeEnum::Variable(idx, bound) => check_typevar_decl(var_decls, *idx, &(*bound).into()),
-            TypeEnum::RowVariable(idx, _) => {
-                Err(SignatureError::RowTypeVarOutsideRow { idx: *idx })
+            TypeEnum::RowVariable(idx, bound) => {
+                if allow_row_vars {
+                    check_typevar_decl(var_decls, *idx, &TypeParam::new_list(*bound))
+                } else {
+                    Err(SignatureError::RowTypeVarOutsideRow { idx: *idx })
+                }
             }
-        }
-    }
-
-    /// Checks that this [Type] is valid (as per [Type::validate_1type]), but also
-    /// allows row variables that may become multiple types
-    fn validate_in_row(
-        &self,
-        extension_registry: &ExtensionRegistry,
-        var_decls: &[TypeParam],
-    ) -> Result<(), SignatureError> {
-        if let TypeEnum::RowVariable(idx, bound) = self.0 {
-            check_typevar_decl(var_decls, idx, &TypeParam::new_list(bound))
-        } else {
-            self.validate_1type(extension_registry, var_decls)
         }
     }
 
     /// Applies a substitution to a type.
     /// This may result in a row of types, if this [Type] is not really a single type but actually a row variable
     /// Invariants may be confirmed by validation:
-    /// * If [Type::validate] returns successfully, this method will return a Vec containing exactly one type
-    /// * If [Type::validate] fails, but [Type::validate_in_row] succeeds, this method may (depending on structure of self)
+    /// * If [Type::validate]`(false)` returns successfully, this method will return a Vec containing exactly one type
+    /// * If [Type::validate]`(false)` fails, but `(true)` succeeds, this method may (depending on structure of self)
     ///   return a Vec containing any number of [Type]s. These may (or not) pass [Type::validate]
     fn substitute(&self, t: &Substitution) -> Vec<Self> {
         match &self.0 {
