@@ -99,8 +99,7 @@ class TypeParam(RootModel):
         WrapValidator(_json_custom_error_validator),
     ] = Field(discriminator="tp")
 
-    class Config:
-        json_schema_extra = {"required": ["tp"]}
+    model_config = ConfigDict(json_schema_extra={"required": ["tp"]})
 
 
 # ------------------------------------------
@@ -153,8 +152,7 @@ class TypeArg(RootModel):
         WrapValidator(_json_custom_error_validator),
     ] = Field(discriminator="tya")
 
-    class Config:
-        json_schema_extra = {"required": ["tya"]}
+    model_config = ConfigDict(json_schema_extra={"required": ["tya"]})
 
 
 # --------------------------------------------
@@ -197,8 +195,7 @@ class SumType(RootModel):
     def t(self) -> str:
         return self.root.t
 
-    class Config:
-        json_schema_extra = {"required": ["s"]}
+    model_config = ConfigDict(json_schema_extra={"required": ["s"]})
 
 
 # ----------------------------------------------
@@ -235,14 +232,15 @@ class FunctionType(ConfiguredBaseModel):
     def empty(cls) -> "FunctionType":
         return FunctionType(input=[], output=[], extension_reqs=[])
 
-    class Config:
+    model_config = ConfigDict(
         # Needed to avoid random '\n's in the pydantic description
-        json_schema_extra = {
+        json_schema_extra={
             "description": (
                 "A graph encoded as a value. It contains a concrete signature and "
                 "a set of required resources."
             )
         }
+    )
 
 
 class PolyFuncType(ConfiguredBaseModel):
@@ -261,14 +259,15 @@ class PolyFuncType(ConfiguredBaseModel):
     def empty(cls) -> "PolyFuncType":
         return PolyFuncType(params=[], body=FunctionType.empty())
 
-    class Config:
+    model_config = ConfigDict(
         # Needed to avoid random '\n's in the pydantic description
-        json_schema_extra = {
+        json_schema_extra={
             "description": (
                 "A polymorphic type scheme, i.e. of a FuncDecl, FuncDefn or OpDef.  "
                 "(Nodes/operations in the Hugr are not polymorphic.)"
             )
         }
+    )
 
 
 class TypeBound(Enum):
@@ -326,8 +325,7 @@ class Type(RootModel):
         Field(discriminator="t"),
     ]
 
-    class Config:
-        json_schema_extra = {"required": ["t"]}
+    model_config = ConfigDict(json_schema_extra={"required": ["t"]})
 
 
 # -------------------------------------------
