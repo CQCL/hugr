@@ -140,10 +140,10 @@ We accept the following contribution types:
 ## :shipit: Releasing new versions
 
 We use automation to bump the version number and generate changelog entries
-based on the conventional commits labels. Release PRs get created automatically
-for each lib when new changes are merged into the `main` branch. Once the PR is
-approved by someone in the release team and it gets merged, the new library
-version gets published in PyPI or crates.io.
+based on the [conventional commits](https://www.conventionalcommits.org/en/v1.0.0/) labels. Release PRs are created automatically
+for each package when new changes are merged into the `main` branch. Once the PR is
+approved by someone in the release team and is merged, the new package
+is published on PyPI or crates.io as appropriate.
 
 The changelog can be manually edited before merging the release PR. Note however
 that modifying the diff before other changes are merged will cause the
@@ -155,8 +155,8 @@ Rust releases are managed by `release-plz`. This tool will automatically detect
 breaking changes even when they are not marked as such in the commit message,
 and bump the version accordingly.
 
-To modify the version getting released, just update the `Cargo.toml` and
-changelog in the release PR with the desired value.
+To modify the version being released, update the `Cargo.toml`,
+CHANGELOG.md, PR name, and PR description in the release PR with the desired version. You may also have to update the dates.
 Rust pre-release versions should be formatted as `0.1.0-alpha.1` (or `-beta`, or `-rc`).
 
 ### Python package release
