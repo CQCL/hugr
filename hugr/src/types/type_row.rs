@@ -43,26 +43,14 @@ impl TypeRow {
 
     #[inline(always)]
     /// Returns the port type given an offset. Returns `None` if the offset is out of bounds.
-    // Note/TODO: it might be good to disable this if we are indexing over (past) a Row Variable,
-    // as substitution could change where in the row the offset refers.
     pub fn get(&self, offset: impl PortIndex) -> Option<&Type> {
-        let idx = offset.index();
-        if idx > 0 {
-            // Check we have not skipped over / indexed past any row variables
-            debug_assert!(!self.iter().take(idx - 1).any(Type::is_row_var));
-        }
-        self.types.get(idx)
+        self.types.get(offset.index())
     }
 
     #[inline(always)]
     /// Returns the port type given an offset. Returns `None` if the offset is out of bounds.
     pub fn get_mut(&mut self, offset: impl PortIndex) -> Option<&mut Type> {
-        let idx = offset.index();
-        if idx > 0 {
-            // Check we have not skipped over / indexed past any row variables
-            debug_assert!(!self.iter().take(idx - 1).any(Type::is_row_var));
-        }
-        self.types.to_mut().get_mut(idx)
+        self.types.to_mut().get_mut(offset.index())
     }
 
     /// Returns a new `TypeRow` with `xs` concatenated onto `self`.
