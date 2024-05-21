@@ -88,30 +88,13 @@ class DummyOp(Op, Generic[T]):
 class NodeData:
     op: Op
     parent: Node | None
-    _n_in_ports: int = 0
-    _n_out_ports: int = 0
     # TODO children field?
 
     def to_serial(self, node: Node, hugr: "Hugr") -> SerialOp:
         o = self.op.to_serial(node, hugr)
         o.root.parent = self.parent.idx if self.parent else node.idx
-        # if all_not_none(self._in_ports) and all_not_none(self._out_ports):
-        #     o.root.insert_port_types(self._in_ports, self._out_ports)
 
         return o
-
-
-L = TypeVar("L")
-
-
-def _insert_or_extend(lst: list[L | None], idx: int, value: L | None) -> None:
-    if idx >= len(lst):
-        lst.extend([None] * (idx - len(lst) + 1))
-    lst[idx] = value
-
-
-def _all_not_none(lst: list[L | None]) -> bool:
-    return all(i is not None for i in lst)
 
 
 P = TypeVar("P", InPort, OutPort)
@@ -161,12 +144,9 @@ class Hugr(Mapping[Node, NodeData]):
         self,
         op: Op,
         parent: Node | None = None,
-        n_inputs: int | None = None,
-        n_outputs: int | None = None,
     ) -> Node:
         parent = parent or self.root
-        # TODO add in_ports and out_ports
-        node_data = NodeData(op, parent, n_inputs or 0, n_outputs or 0)
+        node_data = NodeData(op, parent)
 
         if self._free_nodes:
             node = self._free_nodes.pop()
@@ -190,29 +170,23 @@ class Hugr(Mapping[Node, NodeData]):
         if self._links.get_left(dst) is not None:
             dst = replace(dst, sub_offset=dst.sub_offset + 1)
         self._links.insert_left(src, dst)
-        self[src.node]._n_out_ports = max(self[src.node]._n_out_ports, src.offset + 1)
-        self[dst.node]._n_in_ports = max(self[dst.node]._n_in_ports, dst.offset + 1)
-        # if ty is None:
-        #     ty = self.port_type(src)
-        # if ty is None:
-        #     ty = self.port_type(dst)
-        # _insert_or_extend(self[dst.node]._in_ports, dst.offset, ty)
-        # _insert_or_extend(self[src.node]._out_ports, src.offset, ty)
 
     def delete_link(self, src: OutPort, dst: InPort) -> None:
         self._links.delete_left(src)
 
     def num_in_ports(self, node: Node) -> int:
-        return self[node]._n_in_ports
+        return len(self.in_ports(node))
 
     def num_out_ports(self, node: Node) -> int:
-        return self[node]._n_out_ports
+        return len(self.out_ports(node))
 
     def in_ports(self, node: Node) -> Collection[InPort]:
-        return [node.inp(o) for o in range(self.num_in_ports(node))]
+        # can be optimised by caching number of ports
+        # or by guaranteeing that all ports are contiguous
+        return [p for p in self._links.bck if p.node == node]
 
     def out_ports(self, node: Node) -> Collection[OutPort]:
-        return [node.out(o) for o in range(self.num_out_ports(node))]
+        return [p for p in self._links.fwd if p.node == node]
 
     def insert_hugr(self, hugr: "Hugr", parent: Node | None = None) -> dict[Node, Node]:
         mapping: dict[Node, Node] = {}
