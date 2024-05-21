@@ -1,6 +1,6 @@
 import pytest
 from hugr.serialization import SerialHugr
-from hugr.hugr import Dfg, Hugr, DummyOp
+from hugr.hugr import Dfg, Hugr, DummyOp, Node
 import hugr.serialization.tys as stys
 import hugr.serialization.ops as sops
 
@@ -121,5 +121,32 @@ def test_multi_out():
     a, b = h.inputs()
     a, b = h.add_op(DIV_OP, [a, b])[:2]
     h.set_outputs([a, b])
+
+    _validate(h.hugr)
+
+
+def test_insert():
+    h1 = Dfg.endo([BOOL_T])
+    (a1,) = h1.inputs()
+    nt = h1.add_op(NOT_OP, [a1])
+    h1.set_outputs([nt])
+
+    assert len(h1.hugr) == 4
+
+    new_h = Hugr(DummyOp(sops.DFG(parent=-1)))
+    mapping = h1.hugr.insert_hugr(new_h, h1.hugr.root)
+    assert mapping == {new_h.root: Node(4)}
+
+
+def test_nested():
+    h1 = Dfg.endo([BOOL_T])
+    (a1,) = h1.inputs()
+    nt = h1.add_op(NOT_OP, [a1])
+    h1.set_outputs([nt])
+
+    h = Dfg.endo([BOOL_T])
+    (a,) = h.inputs()
+    nested = h.insert_nested(h1, [a])
+    h.set_outputs([nested])
 
     _validate(h.hugr)

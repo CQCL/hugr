@@ -120,10 +120,10 @@ class Hugr(Mapping[Node, NodeData]):
     _free_nodes: list[Node]
 
     def __init__(self, root_op: Op) -> None:
-        self.root = Node(0)
-        self._nodes = [NodeData(root_op, None)]
-        self._links = BiMap()
         self._free_nodes = []
+        self._links = BiMap()
+        self._nodes = []
+        self.root = self.add_node(root_op)
 
     def __getitem__(self, key: Node) -> NodeData:
         try:
@@ -145,7 +145,6 @@ class Hugr(Mapping[Node, NodeData]):
         op: Op,
         parent: Node | None = None,
     ) -> Node:
-        parent = parent or self.root
         node_data = NodeData(op, parent)
 
         if self._free_nodes:
@@ -190,9 +189,16 @@ class Hugr(Mapping[Node, NodeData]):
 
     def insert_hugr(self, hugr: "Hugr", parent: Node | None = None) -> dict[Node, Node]:
         mapping: dict[Node, Node] = {}
-        for idx, node_data in enumerate(self._nodes):
+
+        for idx, node_data in enumerate(hugr._nodes):
             if node_data is not None:
-                mapping[Node(idx)] = self.add_node(node_data.op, parent)
+                mapping[Node(idx)] = self.add_node(node_data.op, node_data.parent)
+
+        for new_node in mapping.values():
+            # update mapped parent
+            node_data = self[new_node]
+            node_data.parent = mapping[node_data.parent] if node_data.parent else parent
+
         for src, dst in hugr._links.items():
             self.add_link(
                 mapping[src.node].out(src.offset), mapping[dst.node].inp(dst.offset)
@@ -232,10 +238,10 @@ class Dfg:
         root_op._serial_op.signature.output = output_types
         self.hugr = Hugr(root_op)
         self.input_node = self.hugr.add_node(
-            DummyOp(sops.Input(parent=0, types=input_types))
+            DummyOp(sops.Input(parent=0, types=input_types)), self.hugr.root
         )
         self.output_node = self.hugr.add_node(
-            DummyOp(sops.Output(parent=0, types=output_types))
+            DummyOp(sops.Output(parent=0, types=output_types)), self.hugr.root
         )
 
     @classmethod
@@ -255,7 +261,7 @@ class Dfg:
         ]
 
     def add_op(self, op: Op, ports: Iterable[ToPort]) -> Node:
-        new_n = self.hugr.add_node(op)
+        new_n = self.hugr.add_node(op, self.hugr.root)
         self._wire_up(new_n, ports)
         return new_n
 
