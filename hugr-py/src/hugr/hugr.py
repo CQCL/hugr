@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from collections.abc import Collection, Mapping
 from typing import Iterable, Sequence, Protocol, Generic, TypeVar
@@ -7,6 +7,7 @@ from hugr.serialization.serial_hugr import SerialHugr
 from hugr.serialization.ops import BaseOp, OpType as SerialOp
 import hugr.serialization.ops as sops
 from hugr.serialization.tys import Type
+import hugr.serialization.tys as stys
 from hugr.utils import BiMap
 
 
@@ -14,6 +15,7 @@ from hugr.utils import BiMap
 class Port:
     node: "Node"
     offset: int
+    sub_offset: int = 0
 
 
 @dataclass(frozen=True, eq=True, order=True)
@@ -90,6 +92,21 @@ def _all_not_none(lst: list[L | None]) -> bool:
     return all(i is not None for i in lst)
 
 
+P = TypeVar("P", InPort, OutPort)
+
+
+def _unused_sub_offset(port: P, links: BiMap[OutPort, InPort]) -> P:
+    d: dict[OutPort, InPort] | dict[InPort, OutPort]
+    match port:
+        case OutPort(_):
+            d = links.fwd
+        case InPort(_):
+            d = links.bck
+    while port in d:
+        port = replace(port, sub_offset=port.sub_offset + 1)
+    return port
+
+
 class Hugr(Mapping):
     root: Node
     _nodes: list[NodeData | None]
@@ -145,6 +162,10 @@ class Hugr(Mapping):
         self._free_nodes.append(node)
 
     def add_link(self, src: OutPort, dst: InPort, ty: Type | None = None) -> None:
+        src = _unused_sub_offset(src, self._links)
+        dst = _unused_sub_offset(dst, self._links)
+        if self._links.get_left(dst) is not None:
+            dst = replace(dst, sub_offset=dst.sub_offset + 1)
         self._links.insert_left(src, dst)
         self[src.node]._n_out_ports = max(self[src.node]._n_out_ports, src.offset + 1)
         self[dst.node]._n_in_ports = max(self[dst.node]._n_in_ports, dst.offset + 1)
@@ -256,3 +277,11 @@ class Dfg:
         for i, p in enumerate(ports):
             src = p.to_port()
             self.hugr.add_link(src, self.output_node.inp(i))
+
+
+# ----------------------------------------------
+# --------------- Type -------------------------
+# ----------------------------------------------
+
+BOOL_T = Type(stys.SumType(stys.UnitSum(size=2)))
+QB_T = Type(stys.Qubit())

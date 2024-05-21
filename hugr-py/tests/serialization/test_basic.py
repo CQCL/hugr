@@ -1,6 +1,5 @@
 from hugr.serialization import SerialHugr
-from hugr.hugr import Dfg, Type, Hugr
-from hugr.serialization.tys import Qubit
+from hugr.hugr import Dfg, Hugr, QB_T, BOOL_T
 
 
 def test_empty():
@@ -26,11 +25,20 @@ def _validate(h: Hugr):
 
 
 def test_simple_id():
-    qb_row = [Type(Qubit())] * 2
-    h = Dfg.endo(qb_row)
+    h = Dfg.endo([QB_T] * 2)
 
     a, b = h.inputs()
 
     h.set_outputs([a, b])
+
+    _validate(h.hugr)
+
+
+def test_multiport():
+    h = Dfg([BOOL_T], [BOOL_T] * 2)
+
+    (a,) = h.inputs()
+
+    h.set_outputs([a, a])
 
     _validate(h.hugr)
