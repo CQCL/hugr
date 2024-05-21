@@ -20,7 +20,7 @@ use crate::ops::custom::{resolve_opaque_op, CustomOp};
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::{FuncDefn, OpTag, OpTrait, OpType, ValidateOp};
 use crate::types::type_param::TypeParam;
-use crate::types::EdgeKind;
+use crate::types::{EdgeKind, FunctionType};
 use crate::{Direction, Hugr, Node, Port};
 
 use super::views::{HierarchyView, HugrView, SiblingGraph};
@@ -211,7 +211,20 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
             }
         }
 
-        // Secondly that the node has correct children
+        // Secondly, check that the node signature does not contain any row variables.
+        // (We do this here so it's before we try indexing into the ports of any nodes).
+        op_type
+            .dataflow_signature()
+            .as_ref()
+            .and_then(FunctionType::find_rowvar)
+            .map_or(Ok(()), |(idx, _)| {
+                Err(ValidationError::SignatureError {
+                    node,
+                    cause: SignatureError::RowVarWhereTypeExpected { idx },
+                })
+            })?;
+
+        // Thirdly that the node has correct children
         self.validate_children(node, node_type)?;
 
         Ok(())
