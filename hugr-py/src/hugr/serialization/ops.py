@@ -3,7 +3,7 @@ import sys
 from abc import ABC
 from typing import Any, Literal
 
-from pydantic import Field, RootModel
+from pydantic import Field, RootModel, ConfigDict
 
 from . import tys
 from .tys import (
@@ -108,15 +108,14 @@ class SumValue(ConfiguredBaseModel):
     tag: int
     typ: SumType
     vs: list["Value"]
-
-    class Config:
-        # Needed to avoid random '\n's in the pydantic description
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "description": (
                 "A Sum variant For any Sum type where this value meets the type "
                 "of the variant indicated by the tag."
             ),
         }
+    )
 
 
 class Value(RootModel):
@@ -126,8 +125,7 @@ class Value(RootModel):
         discriminator="v"
     )
 
-    class Config:
-        json_schema_extra = {"required": ["v"]}
+    model_config = ConfigDict(json_schema_extra={"required": ["v"]})
 
 
 class Const(BaseOp):
@@ -168,11 +166,13 @@ class DataflowBlock(BaseOp):
                 self.sum_rows.append(variant)
         self.other_outputs = outputs[1:]
 
-    class Config:
         # Needed to avoid random '\n's in the pydantic description
-        json_schema_extra = {
+
+    model_config = ConfigDict(
+        json_schema_extra={
             "description": "A CFG basic block node. The signature is that of the internal Dataflow graph.",
         }
+    )
 
 
 class ExitBlock(BaseOp):
@@ -182,11 +182,12 @@ class ExitBlock(BaseOp):
     op: Literal["ExitBlock"] = "ExitBlock"
     cfg_outputs: TypeRow
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             # Needed to avoid random '\n's in the pydantic description
             "description": "The single exit node of the CFG, has no children, stores the types of the CFG node output.",
         }
+    )
 
 
 # ---------------------------------------------
@@ -234,9 +235,9 @@ class Call(DataflowOp):
     type_args: list[tys.TypeArg]
     instantiation: FunctionType
 
-    class Config:
+    model_config = ConfigDict(
         # Needed to avoid random '\n's in the pydantic description
-        json_schema_extra = {
+        json_schema_extra={
             "description": (
                 "Operation to call a function directly. The first port is "
                 "connected to the def/declare of the function being called directly, "
@@ -244,6 +245,7 @@ class Call(DataflowOp):
                 "ports matches the function being called."
             )
         }
+    )
 
 
 class CallIndirect(DataflowOp):
@@ -386,14 +388,15 @@ class CustomOp(DataflowOp):
     def display_name(self) -> str:
         return self.op_name
 
-    class Config:
+    model_config = ConfigDict(
         # Needed to avoid random '\n's in the pydantic description
-        json_schema_extra = {
+        json_schema_extra={
             "description": (
                 "A user-defined operation that can be downcasted by the extensions that "
                 "define it."
             )
         }
+    )
 
 
 class Noop(DataflowOp):
@@ -491,8 +494,7 @@ class OpType(RootModel):
         | AliasDefn
     ) = Field(discriminator="op")
 
-    class Config:
-        json_schema_extra = {"required": ["parent", "op"]}
+    model_config = ConfigDict(json_schema_extra={"required": ["parent", "op"]})
 
 
 # --------------------------------------
