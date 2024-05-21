@@ -107,6 +107,14 @@ def test_tuple():
 
     _validate(h.hugr)
 
+    h1 = Dfg.endo(row)
+    a, b = h1.inputs()
+    mt = h1.add_op(DummyOp(sops.MakeTuple(parent=-1, tys=row)), [a, b])
+    a, b = h1.add_op(DummyOp(sops.UnpackTuple(parent=-1, tys=row)), [mt])[0, 1]
+    h1.set_outputs([a, b])
+
+    assert h.hugr.to_serial() == h1.hugr.to_serial()
+
 
 def test_multi_out():
     h = Dfg([INT_T] * 2, [INT_T] * 2)
