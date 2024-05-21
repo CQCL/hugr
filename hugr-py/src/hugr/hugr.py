@@ -7,7 +7,6 @@ from hugr.serialization.serial_hugr import SerialHugr
 from hugr.serialization.ops import BaseOp, OpType as SerialOp
 import hugr.serialization.ops as sops
 from hugr.serialization.tys import Type
-import hugr.serialization.tys as stys
 from hugr.utils import BiMap
 
 
@@ -258,12 +257,13 @@ class Dfg:
         ]
 
     def add_op(self, op: Op, ports: Iterable[ToPort]) -> Node:
-        # TODO wire up ports
-        return self.hugr.add_node(op)
+        new_n = self.hugr.add_node(op)
+        self._wire_up(new_n, ports)
+        return new_n
 
     def insert_nested(self, dfg: "Dfg", ports: Iterable[ToPort]) -> Node:
         mapping = self.hugr.insert_hugr(dfg.hugr, self.hugr.root)
-        # TODO wire up ports
+        self._wire_up(mapping[dfg.hugr.root], ports)
         return mapping[dfg.hugr.root]
 
     def add_nested(self, ports: Iterable[ToPort]) -> "Dfg":
@@ -274,14 +274,9 @@ class Dfg:
         return dfg
 
     def set_outputs(self, ports: Iterable[ToPort]) -> None:
+        self._wire_up(self.output_node, ports)
+
+    def _wire_up(self, node: Node, ports: Iterable[ToPort]):
         for i, p in enumerate(ports):
             src = p.to_port()
-            self.hugr.add_link(src, self.output_node.inp(i))
-
-
-# ----------------------------------------------
-# --------------- Type -------------------------
-# ----------------------------------------------
-
-BOOL_T = Type(stys.SumType(stys.UnitSum(size=2)))
-QB_T = Type(stys.Qubit())
+            self.hugr.add_link(src, node.inp(i))
