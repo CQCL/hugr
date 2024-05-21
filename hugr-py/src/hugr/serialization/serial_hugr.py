@@ -4,16 +4,18 @@ from pydantic import Field, ConfigDict
 
 from .ops import NodeID, OpType, classes as ops_classes
 from .tys import model_rebuild, ConfiguredBaseModel
+from .. import get_serialisation_version
 import hugr
 
 Port = tuple[NodeID, int | None]  # (node, offset)
 Edge = tuple[Port, Port]
 
+VersionField = Field(default_factory=get_serialisation_version, title="Version", description="Serialisation Schema Version", frozen=True)
 
 class SerialHugr(ConfiguredBaseModel):
     """A serializable representation of a Hugr."""
 
-    version: Literal["v1"] = "v1"
+    version: str = VersionField
     nodes: list[OpType]
     edges: list[Edge]
     metadata: list[dict[str, Any] | None] | None = None

@@ -110,6 +110,13 @@ just coverage
 and open it with your favourite coverage viewer. In VSCode, you can use
 [`coverage-gutters`](https://marketplace.visualstudio.com/items?itemName=ryanluker.vscode-coverage-gutters).
 
+
+## Serialisation
+
+- update `get_serialisation_version` in `hugr-py/src/hugr/__init__.py`
+- rename last `V_` constructor to match. (e.g. `V12` -> `V13`)
+- create new `V_` constructor holding a `serde_json::Value`. (e.g. `V12(serde_json::Value)`)
+
 ## 🌐 Contributing to HUGR
 
 We welcome contributions to HUGR! Please open [an issue](https://github.com/CQCL/hugr/issues/new) or [pull request](https://github.com/CQCL/hugr/compare) if you have any questions or suggestions.

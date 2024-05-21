@@ -27,22 +27,40 @@ use super::{HugrMut, HugrView, NodeMetadataMap};
 ///
 /// Make sure to order the variants from newest to oldest, as the deserializer
 /// will try to deserialize them in order.
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize)]
 #[serde(tag = "version", rename_all = "lowercase")]
-enum Versioned<SerHugr> {
+enum Versioned<SerHugr =SerHugrLatest> {
+    #[serde(skip_serializing)]
     /// Version 0 of the HUGR serialization format.
     V0,
-    /// Version 1 of the HUGR serialization format.
-    V1(SerHugr),
 
+    #[serde(skip_serializing,deserialize_with = "deserialize_v1")]
+    V1(Box<dyn FnOnce() -> SerHugr>),
+
+    /// Version 1 of the HUGR serialization format.
+    V2(SerHugr),
+
+    #[serde(skip_serializing)]
     #[serde(other)]
     Unsupported,
 }
 
 impl<T> Versioned<T> {
-    pub fn new(t: T) -> Self {
-        Self::V1(t)
+    pub fn new_latest(t: T) -> Self {
+        Self::V2(t.into())
     }
+
+    fn get_latest(self)  -> T {
+        let Self::V2(t) = self else {
+            panic!("Versioned::get_latest: Not the latest")
+        };
+        t
+    }
+}
+
+fn deserialize_v1<'de, SerHugr, D>(d: D) -> Result<Box<dyn FnOnce() -> SerHugr>, D::Error> where D: Deserializer<'de> {
+    todo!()
+
 }
 
 #[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
@@ -54,8 +72,8 @@ struct NodeSer {
 }
 
 /// Version 1 of the HUGR serialization format.
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-struct SerHugrV1 {
+#[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
+struct SerHugrLatest {
     /// For each node: (parent, node_operation)
     nodes: Vec<NodeSer>,
     /// for each edge: (src, src_offset, tgt, tgt_offset)
@@ -104,8 +122,8 @@ impl Serialize for Hugr {
     where
         S: serde::Serializer,
     {
-        let shg: SerHugrV1 = self.try_into().map_err(serde::ser::Error::custom)?;
-        let versioned = Versioned::new(shg);
+        let shg: SerHugrLatest = self.try_into().map_err(serde::ser::Error::custom)?;
+        let versioned = Versioned::new_latest(shg);
         versioned.serialize(serializer)
     }
 }
@@ -115,7 +133,7 @@ impl<'de> Deserialize<'de> for Hugr {
     where
         D: Deserializer<'de>,
     {
-        let shg: Versioned<SerHugrV1> = Versioned::deserialize(deserializer)?;
+        let shg: Versioned<SerHugrLatest<>> = Versioned::deserialize(deserializer)?;
         match shg {
             Versioned::V0 => Err(serde::de::Error::custom(
                 "Version 0 HUGR serialization format is not supported.",
@@ -128,7 +146,7 @@ impl<'de> Deserialize<'de> for Hugr {
     }
 }
 
-impl TryFrom<&Hugr> for SerHugrV1 {
+impl TryFrom<&Hugr> for SerHugrLatest {
     type Error = HUGRSerializationError;
 
     fn try_from(hugr: &Hugr) -> Result<Self, Self::Error> {
@@ -191,15 +209,15 @@ impl TryFrom<&Hugr> for SerHugrV1 {
     }
 }
 
-impl TryFrom<SerHugrV1> for Hugr {
+impl TryFrom<SerHugrLatest> for Hugr {
     type Error = HUGRSerializationError;
     fn try_from(
-        SerHugrV1 {
+        SerHugrLatest {
             nodes,
             edges,
             metadata,
             ..
-        }: SerHugrV1,
+        }: SerHugrLatest
     ) -> Result<Self, Self::Error> {
         // Root must be first node
         let mut nodes = nodes.into_iter();

@@ -31,15 +31,13 @@ const QB: Type = crate::extension::prelude::QB_T;
 /// Version 1 of the Testing HUGR serialisation format, see `testing_hugr.py`.
 #[cfg(test)]
 #[derive(Serialize, Deserialize, PartialEq, Debug, Default)]
-struct SerTestingV1 {
+struct SerTestingLatest {
     typ: Option<crate::types::Type>,
     sum_type: Option<crate::types::SumType>,
     poly_func_type: Option<crate::types::PolyFuncType>,
     value: Option<crate::ops::Value>,
     optype: Option<NodeSer>,
 }
-
-type TestingModel = SerTestingV1;
 
 macro_rules! include_schema {
     ($name:ident, $path:literal) => {
@@ -76,7 +74,7 @@ include_schema!(
 macro_rules! impl_sertesting_from {
     ($typ:ty, $field:ident) => {
         #[cfg(test)]
-        impl From<$typ> for TestingModel {
+        impl From<$typ> for SerTestingLatest {
             fn from(v: $typ) -> Self {
                 let mut r: Self = Default::default();
                 r.$field = Some(v);
@@ -178,16 +176,11 @@ pub fn check_hugr_roundtrip(hugr: &Hugr, check_schema: bool) -> Hugr {
     new_hugr
 }
 
-fn check_testing_roundtrip(t: impl Into<TestingModel>) {
-    let before = Versioned::new(t.into());
-    let after_strict = serde_json::from_value(ser_serialize_check_schema(
-        &before,
-        Some(&TESTING_SCHEMA_STRICT),
-    ))
-    .unwrap();
-    let after =
-        serde_json::from_value(ser_serialize_check_schema(&before, Some(&TESTING_SCHEMA))).unwrap();
-    assert_eq!(before, after);
+fn check_testing_roundtrip(t: impl Into<SerTestingLatest>) {
+    let before = Versioned::new_latest(t.into());
+    let after_strict = ser_roundtrip_validate(&before, Some(&TESTING_SCHEMA_STRICT)).get_latest();
+    let after = ser_roundtrip_validate(&before, Some(&TESTING_SCHEMA)).get_latest();
+    assert_eq!(before.get_latest(), after);
     assert_eq!(after, after_strict);
 }
 
