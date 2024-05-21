@@ -1,5 +1,5 @@
 # from https://github.com/python-poetry/poetry/issues/144#issuecomment-877835259
-import toml
+import toml  # type: ignore[import-untyped]
 from pathlib import Path
 import hugr
 
