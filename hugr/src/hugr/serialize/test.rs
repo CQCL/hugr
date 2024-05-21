@@ -9,8 +9,8 @@ use crate::extension::{test::SimpleOpDef, EMPTY_REG, PRELUDE_REGISTRY};
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::ops::custom::{ExtensionOp, OpaqueOp};
 use crate::ops::{self, dataflow::IOTrait, Input, Module, Noop, Output, Value, DFG};
-use crate::std_extensions::arithmetic::float_ops::FLOAT_OPS_REGISTRY;
-use crate::std_extensions::arithmetic::float_types::{ConstF64, FLOAT64_TYPE};
+use crate::std_extensions::arithmetic::float_types::FLOAT64_TYPE;
+use crate::std_extensions::arithmetic::int_ops::INT_OPS_REGISTRY;
 use crate::std_extensions::arithmetic::int_types::{int_custom_type, ConstInt, INT_TYPES};
 use crate::std_extensions::logic::NotOp;
 use crate::types::{
@@ -95,20 +95,14 @@ impl_sertesting_from!(SimpleOpDef, op_def);
 
 #[test]
 fn empty_hugr_serialize() {
-    let hg = Hugr::default();
-    assert_eq!(ser_roundtrip(&hg), hg);
-}
-
-/// Serialize and deserialize a value.
-pub fn ser_roundtrip<T: Serialize + serde::de::DeserializeOwned>(g: &T) -> T {
-    ser_roundtrip_validate(g, None)
+    check_hugr_roundtrip(&Hugr::default(), true);
 }
 
 /// Serialize and deserialize a value, optionally validating against a schema.
-pub fn ser_roundtrip_validate<T: Serialize + serde::de::DeserializeOwned>(
+pub fn ser_serialize_check_schema<T: Serialize + serde::de::DeserializeOwned>(
     g: &T,
     schema: Option<&JSONSchema>,
-) -> T {
+) -> serde_json::Value {
     let s = serde_json::to_string(g).unwrap();
     let val: serde_json::Value = serde_json::from_str(&s).unwrap();
 
@@ -124,7 +118,7 @@ pub fn ser_roundtrip_validate<T: Serialize + serde::de::DeserializeOwned>(
             panic!("Serialization test failed.");
         }
     }
-    serde_json::from_value(val).unwrap()
+    val
 }
 
 /// Serialize and deserialize a HUGR, and check that the result is the same as the original.
@@ -139,13 +133,15 @@ pub fn check_hugr_schema_roundtrip(hugr: &Hugr) -> Hugr {
 ///
 /// If `check_schema` is true, checks the serialized json against the in-tree schema.
 ///
+/// Note that we do not literally compare the before and after `Hugr`s for
+/// equality, because impls of `CustomConst` are not required to implement
+/// equality checking.
+///
 /// Returns the deserialized HUGR.
 pub fn check_hugr_roundtrip(hugr: &Hugr, check_schema: bool) -> Hugr {
-    let new_hugr: Hugr = ser_roundtrip_validate(hugr, check_schema.then_some(&SCHEMA));
-    let new_hugr_strict: Hugr =
-        ser_roundtrip_validate(hugr, check_schema.then_some(&SCHEMA_STRICT));
-    assert_eq!(new_hugr, new_hugr_strict);
-
+    let hugr_ser = ser_serialize_check_schema(hugr, check_schema.then_some(&SCHEMA));
+    let _ = ser_serialize_check_schema(hugr, check_schema.then_some(&SCHEMA_STRICT));
+    let new_hugr: Hugr = serde_json::from_value(hugr_ser).unwrap();
     // Original HUGR, with canonicalized node indices
     //
     // The internal port indices may still be different.
@@ -160,7 +156,9 @@ pub fn check_hugr_roundtrip(hugr: &Hugr, check_schema: bool) -> Hugr {
     for node in new_hugr.nodes() {
         let new_op = new_hugr.get_optype(node);
         let old_op = h_canon.get_optype(node);
-        assert_eq!(new_op, old_op);
+        if !new_op.is_const() {
+            assert_eq!(new_op, old_op);
+        }
     }
 
     // Check that the graphs are equivalent up to port renumbering.
@@ -183,8 +181,13 @@ pub fn check_hugr_roundtrip(hugr: &Hugr, check_schema: bool) -> Hugr {
 
 fn check_testing_roundtrip(t: impl Into<TestingModel>) {
     let before = Versioned::new(t.into());
-    let after_strict = ser_roundtrip_validate(&before, Some(&TESTING_SCHEMA_STRICT));
-    let after = ser_roundtrip_validate(&before, Some(&TESTING_SCHEMA));
+    let after_strict = serde_json::from_value(ser_serialize_check_schema(
+        &before,
+        Some(&TESTING_SCHEMA_STRICT),
+    ))
+    .unwrap();
+    let after =
+        serde_json::from_value(ser_serialize_check_schema(&before, Some(&TESTING_SCHEMA))).unwrap();
     assert_eq!(before, after);
     assert_eq!(after, after_strict);
 }
@@ -348,9 +351,10 @@ fn hierarchy_order() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn constants_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
-    let mut builder = DFGBuilder::new(FunctionType::new(vec![], vec![FLOAT64_TYPE])).unwrap();
-    let w = builder.add_load_value(ConstF64::new(0.5));
-    let hugr = builder.finish_hugr_with_outputs([w], &FLOAT_OPS_REGISTRY)?;
+    let mut builder =
+        DFGBuilder::new(FunctionType::new(vec![], vec![INT_TYPES[4].clone()])).unwrap();
+    let w = builder.add_load_value(ConstInt::new_s(4, -2).unwrap());
+    let hugr = builder.finish_hugr_with_outputs([w], &INT_OPS_REGISTRY)?;
 
     let ser = serde_json::to_string(&hugr)?;
     let deser = serde_json::from_str(&ser)?;
@@ -364,18 +368,18 @@ fn constants_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
 fn serialize_types_roundtrip() {
     let g: Type = Type::new_function(FunctionType::new_endo(vec![]));
 
-    assert_eq!(ser_roundtrip(&g), g);
+    check_testing_roundtrip(g.clone());
 
     // A Simple tuple
     let t = Type::new_tuple(vec![USIZE_T, g]);
-    assert_eq!(ser_roundtrip(&t), t);
+    check_testing_roundtrip(t);
 
     // A Classic sum
     let t = Type::new_sum([type_row![USIZE_T], type_row![FLOAT64_TYPE]]);
-    assert_eq!(ser_roundtrip(&t), t);
+    check_testing_roundtrip(t);
 
     let t = Type::new_unit_sum(4);
-    assert_eq!(ser_roundtrip(&t), t);
+    check_testing_roundtrip(t);
 }
 
 #[rstest]
@@ -402,10 +406,7 @@ fn roundtrip_sumtype(#[case] sum_type: SumType) {
 #[case(Value::unit())]
 #[case(Value::true_val())]
 #[case(Value::unit_sum(3,5).unwrap())]
-#[case(Value::extension(ConstF64::new(-1.5)))]
-#[case(Value::extension(ConstF64::new(0.0)))]
-#[case(Value::extension(ConstF64::new(-0.0)))]
-#[case(Value::extension(ConstF64::new(f64::MIN_POSITIVE)))]
+#[case(Value::extension(ConstInt::new_u(2,1).unwrap()))]
 #[case(Value::sum(1,[Value::extension(ConstInt::new_u(2,1).unwrap())], SumType::new([vec![], vec![INT_TYPES[2].clone()]])).unwrap())]
 #[case(Value::tuple([Value::false_val(), Value::extension(ConstInt::new_s(2,1).unwrap())]))]
 #[case(Value::function(crate::builder::test::simple_dfg_hugr()).unwrap())]

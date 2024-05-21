@@ -433,6 +433,7 @@ pub type ValueNameRef = str;
 mod test {
     use super::Value;
     use crate::builder::test::simple_dfg_hugr;
+    use crate::std_extensions::arithmetic::int_types::ConstInt;
     use crate::{
         builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
         extension::{
@@ -605,9 +606,9 @@ mod test {
             const_usize.get_custom_value::<ConstUsize>(),
             Some(&ConstUsize::new(257))
         );
-        assert_eq!(const_usize.get_custom_value::<ConstF64>(), None);
+        assert_eq!(const_usize.get_custom_value::<ConstInt>(), None);
         assert_eq!(const_tuple.get_custom_value::<ConstUsize>(), None);
-        assert_eq!(const_tuple.get_custom_value::<ConstF64>(), None);
+        assert_eq!(const_tuple.get_custom_value::<ConstInt>(), None);
     }
 
     #[test]

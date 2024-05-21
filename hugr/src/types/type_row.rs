@@ -9,7 +9,6 @@ use std::{
 
 use super::Type;
 use crate::utils::display_list;
-use crate::PortIndex;
 use delegate::delegate;
 use itertools::Itertools;
 
@@ -38,18 +37,6 @@ impl TypeRow {
         }
     }
 
-    #[inline(always)]
-    /// Returns the port type given an offset. Returns `None` if the offset is out of bounds.
-    pub fn get(&self, offset: impl PortIndex) -> Option<&Type> {
-        self.types.get(offset.index())
-    }
-
-    #[inline(always)]
-    /// Returns the port type given an offset. Returns `None` if the offset is out of bounds.
-    pub fn get_mut(&mut self, offset: impl PortIndex) -> Option<&mut Type> {
-        self.types.to_mut().get_mut(offset.index())
-    }
-
     /// Returns a new `TypeRow` with `xs` concatenated onto `self`.
     pub fn extend<'a>(&'a self, rest: impl IntoIterator<Item = &'a Type>) -> Self {
         self.iter().chain(rest).cloned().collect_vec().into()
@@ -76,6 +63,16 @@ impl TypeRow {
 
             /// Returns `true` if the row contains no types.
             pub fn is_empty(&self) -> bool ;
+
+            #[inline(always)]
+            /// Returns the type at the specified index. Returns `None` if out of bounds.
+            pub fn get(&self, offset: usize) -> Option<&Type>;
+        }
+
+        to self.types.to_mut() {
+            #[inline(always)]
+            /// Returns the type at the specified index. Returns `None` if out of bounds.
+            pub fn get_mut(&mut self, offset: usize) -> Option<&mut Type>;
         }
     }
 }
