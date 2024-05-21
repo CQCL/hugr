@@ -3,7 +3,6 @@
     "include-component-in-tag": true,
     "bump-minor-pre-major": true,
     "bump-patch-for-minor-pre-major": true,
-    "draft-pull-request": true,
     "initial-version": "0.0.0",
     "packages": {
         "hugr-py": {
@@ -12,7 +11,8 @@
             "package-name": "hugr",
             "include-component-in-tag": true,
             "draft": false,
-            "prerelease": false
+            "prerelease": false,
+            "draft-pull-request": true
         }
     },
     "changelog-sections": [
