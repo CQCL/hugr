@@ -1,7 +1,7 @@
 from dataclasses import dataclass, replace
 
 from collections.abc import Collection, Mapping
-from typing import Iterable, Sequence, Protocol, Generic, TypeVar
+from typing import Iterable, Sequence, Protocol, Generic, TypeVar, overload
 
 from hugr.serialization.serial_hugr import SerialHugr
 from hugr.serialization.ops import BaseOp, OpType as SerialOp
@@ -35,6 +35,29 @@ class OutPort(Port, ToPort):
 @dataclass(frozen=True, eq=True, order=True)
 class Node(ToPort):
     idx: int
+
+    @overload
+    def __getitem__(self, index: int) -> OutPort: ...
+    @overload
+    def __getitem__(self, index: slice) -> Iterable[OutPort]: ...
+    @overload
+    def __getitem__(self, index: tuple[int, ...]) -> list[OutPort]: ...
+
+    def __getitem__(
+        self, index: int | slice | tuple[int, ...]
+    ) -> OutPort | Iterable[OutPort]:
+        match index:
+            case int(index):
+                return self.out(index)
+            case slice():
+                start = index.start or 0
+                stop = index.stop
+                if stop is None:
+                    raise ValueError("Stop must be specified")
+                step = index.step or 1
+                return (self[i] for i in range(start, stop, step))
+            case tuple(xs):
+                return [self[i] for i in xs]
 
     def to_port(self) -> "OutPort":
         return OutPort(self, 0)
@@ -106,7 +129,7 @@ def _unused_sub_offset(port: P, links: BiMap[OutPort, InPort]) -> P:
     return port
 
 
-class Hugr(Mapping):
+class Hugr(Mapping[Node, NodeData]):
     root: Node
     _nodes: list[NodeData | None]
     _links: BiMap[OutPort, InPort]
