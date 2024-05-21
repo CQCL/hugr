@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from collections.abc import Collection, Mapping
 from typing import Iterable, Sequence, Protocol, Generic, TypeVar
@@ -64,15 +64,15 @@ class DummyOp(Op, Generic[T]):
 class NodeData:
     op: Op
     parent: Node | None
-    _in_ports: list[Type | None] = field(default_factory=list)
-    _out_ports: list[Type | None] = field(default_factory=list)
+    _n_in_ports: int = 0
+    _n_out_ports: int = 0
     # TODO children field?
 
     def to_serial(self, node: Node, hugr: "Hugr") -> SerialOp:
         o = self.op.to_serial(node, hugr)
         o.root.parent = self.parent.idx if self.parent else node.idx
-        if all_not_none(self._in_ports) and all_not_none(self._out_ports):
-            o.root.insert_port_types(self._in_ports, self._out_ports)
+        # if all_not_none(self._in_ports) and all_not_none(self._out_ports):
+        #     o.root.insert_port_types(self._in_ports, self._out_ports)
 
         return o
 
@@ -86,7 +86,7 @@ def _insert_or_extend(lst: list[L | None], idx: int, value: L | None) -> None:
     lst[idx] = value
 
 
-def all_not_none(lst: list[L | None]) -> bool:
+def _all_not_none(lst: list[L | None]) -> bool:
     return all(i is not None for i in lst)
 
 
@@ -121,14 +121,12 @@ class Hugr(Mapping):
         self,
         op: Op,
         parent: Node | None = None,
-        input_types: Sequence[Type | None] | None = None,
-        output_types: Sequence[Type | None] | None = None,
+        n_inputs: int | None = None,
+        n_outputs: int | None = None,
     ) -> Node:
-        _input_types = list(input_types or [])
-        _output_types = list(output_types or [])
         parent = parent or self.root
         # TODO add in_ports and out_ports
-        node_data = NodeData(op, parent, _input_types, _output_types)
+        node_data = NodeData(op, parent, n_inputs or 0, n_outputs or 0)
 
         if self._free_nodes:
             node = self._free_nodes.pop()
@@ -148,34 +146,29 @@ class Hugr(Mapping):
 
     def add_link(self, src: OutPort, dst: InPort, ty: Type | None = None) -> None:
         self._links.insert_left(src, dst)
-        if ty is None:
-            ty = self.port_type(src)
-        if ty is None:
-            ty = self.port_type(dst)
-        _insert_or_extend(self[dst.node]._in_ports, dst.offset, ty)
-        _insert_or_extend(self[src.node]._out_ports, src.offset, ty)
+        self[src.node]._n_out_ports = max(self[src.node]._n_out_ports, src.offset + 1)
+        self[dst.node]._n_in_ports = max(self[dst.node]._n_in_ports, dst.offset + 1)
+        # if ty is None:
+        #     ty = self.port_type(src)
+        # if ty is None:
+        #     ty = self.port_type(dst)
+        # _insert_or_extend(self[dst.node]._in_ports, dst.offset, ty)
+        # _insert_or_extend(self[src.node]._out_ports, src.offset, ty)
 
     def delete_link(self, src: OutPort, dst: InPort) -> None:
         self._links.delete_left(src)
 
     def num_in_ports(self, node: Node) -> int:
-        return len(self[node]._in_ports)
+        return self[node]._n_in_ports
 
     def num_out_ports(self, node: Node) -> int:
-        return len(self[node]._out_ports)
+        return self[node]._n_out_ports
 
     def in_ports(self, node: Node) -> Collection[InPort]:
         return [node.inp(o) for o in range(self.num_in_ports(node))]
 
     def out_ports(self, node: Node) -> Collection[OutPort]:
         return [node.out(o) for o in range(self.num_out_ports(node))]
-
-    def port_type(self, port: InPort | OutPort) -> Type | None:
-        match port:
-            case InPort(node, offset):
-                return self[node]._in_ports[offset]
-            case OutPort(node, offset):
-                return self[node]._out_ports[offset]
 
     def insert_hugr(self, hugr: "Hugr", parent: Node | None = None) -> dict[Node, Node]:
         mapping: dict[Node, Node] = {}
@@ -211,22 +204,36 @@ class Dfg:
     input_node: Node
     output_node: Node
 
-    def __init__(self, input_types: Sequence[Type]) -> None:
-        self._n_input = len(input_types)
+    def __init__(
+        self, input_types: Sequence[Type], output_types: Sequence[Type]
+    ) -> None:
         input_types = list(input_types)
+        output_types = list(output_types)
         root_op = DummyOp(sops.DFG(parent=-1))
         root_op._serial_op.signature.input = input_types
-        # TODO don't assume endo output
+        root_op._serial_op.signature.output = output_types
         self.hugr = Hugr(root_op)
         self.input_node = self.hugr.add_node(
-            DummyOp(sops.Input(parent=0)), output_types=input_types
+            DummyOp(sops.Input(parent=0, types=input_types))
         )
-        self.output_node = self.hugr.add_node(DummyOp(sops.Output(parent=0, types=[])))
+        self.output_node = self.hugr.add_node(
+            DummyOp(sops.Output(parent=0, types=output_types))
+        )
+
+    @classmethod
+    def endo(cls, types: Sequence[Type]) -> "Dfg":
+        return Dfg(types, types)
+
+    def _input_op(self) -> DummyOp[sops.Input]:
+        dop = self.hugr[self.input_node].op
+        assert isinstance(dop, DummyOp)
+        assert isinstance(dop._serial_op, sops.Input)
+        return dop
 
     def inputs(self) -> list[OutPort]:
         return [
             self.input_node.out(i)
-            for i in range(self.hugr.num_out_ports(self.input_node))
+            for i in range(len(self._input_op()._serial_op.types))
         ]
 
     def add_op(self, op: Op, ports: Iterable[ToPort]) -> Node:
@@ -249,6 +256,3 @@ class Dfg:
         for i, p in enumerate(ports):
             src = p.to_port()
             self.hugr.add_link(src, self.output_node.inp(i))
-            ty = self.hugr.port_type(src)
-            _insert_or_extend(self.hugr[self.output_node]._in_ports, i, ty)
-            _insert_or_extend(self.hugr[self.hugr.root]._out_ports, i, ty)
