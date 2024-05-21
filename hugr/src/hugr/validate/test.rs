@@ -547,7 +547,7 @@ fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn extension_with_eval_parallel() -> Extension {
+pub(crate) fn extension_with_eval_parallel() -> Extension {
     let rowp = TypeParam::new_list(TypeBound::Any);
     let mut e = Extension::new(EXT_ID);
 
@@ -660,31 +660,53 @@ fn inner_row_variables() -> Result<(), Box<dyn std::error::Error>> {
 fn no_outer_row_variables(#[case] connect: bool) -> Result<(), Box<dyn std::error::Error>> {
     let e = extension_with_eval_parallel();
     let tv = Type::new_row_var_use(0, TypeBound::Copyable);
-    let mut fb = FunctionBuilder::new(
-        "bad_eval",
-        PolyFuncType::new(
-            [TypeParam::new_list(TypeBound::Copyable)],
-            FunctionType::new(
-                Type::new_function(FunctionType::new(USIZE_T, tv.clone())),
-                if connect { vec![tv.clone()] } else { vec![] },
+    let fun_ty = Type::new_function(FunctionType::new(USIZE_T, tv.clone()));
+    let results = if connect { vec![tv.clone()] } else { vec![] };
+    let mut fb = Hugr::new(
+        FuncDefn {
+            name: "bad_eval".to_string(),
+            signature: PolyFuncType::new(
+                [TypeParam::new_list(TypeBound::Copyable)],
+                FunctionType::new(fun_ty.clone(), results.clone()),
             ),
-        ),
-    )?;
-    let [func_arg] = fb.input_wires_arr();
-    let i = fb.add_load_value(crate::extension::prelude::ConstUsize::new(5));
-    let ev =
-        e.instantiate_extension_op("eval", [seq1ty(USIZE_T), seq1ty(tv)], &PRELUDE_REGISTRY)?;
-    let ev = fb.add_dataflow_op(ev, [func_arg, i])?;
-    let reg = ExtensionRegistry::try_new([PRELUDE.to_owned(), e]).unwrap();
-    if connect {
-        fb.set_outputs(ev.outputs())?;
-    }
-    assert_eq!(
-        fb.finish_hugr(&reg).unwrap_err(),
-        ValidationError::SignatureError {
-            node: ev.node(),
-            cause: SignatureError::RowVarWhereTypeExpected { idx: 0 }
         }
+        .into(),
+    );
+    let inp = fb.add_node_with_parent(
+        fb.root(),
+        ops::Input {
+            types: fun_ty.into(),
+        },
+    );
+    let out = fb.add_node_with_parent(
+        fb.root(),
+        ops::Output {
+            types: results.into(),
+        },
+    );
+    let cst = fb.add_node_with_parent(
+        fb.root(),
+        ops::Const::new(crate::extension::prelude::ConstUsize::new(5).into()),
+    );
+    let i = fb.add_node_with_parent(fb.root(), ops::LoadConstant { datatype: USIZE_T });
+    fb.connect(cst, 0, i, 0);
+
+    let ev = fb.add_node_with_parent(
+        fb.root(),
+        e.instantiate_extension_op("eval", [seq1ty(USIZE_T), seq1ty(tv)], &PRELUDE_REGISTRY)?,
+    );
+    fb.connect(inp, 0, ev, 0);
+    fb.connect(i, 0, ev, 1);
+    if connect {
+        fb.connect(ev, 0, out, 0);
+    }
+    let reg = ExtensionRegistry::try_new([PRELUDE.to_owned(), e]).unwrap();
+    assert_matches!(
+        fb.validate(&reg).unwrap_err(),
+        ValidationError::SignatureError {
+            node,
+            cause: SignatureError::RowVarWhereTypeExpected { idx: 0 }
+        } => assert!([ev, out].contains(&node))
     );
     Ok(())
 }

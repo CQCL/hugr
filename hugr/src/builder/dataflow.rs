@@ -208,13 +208,14 @@ pub(crate) mod test {
 
     use crate::builder::build_traits::DataflowHugr;
     use crate::builder::{BuilderWiringError, DataflowSubContainer, ModuleBuilder};
-    use crate::extension::prelude::BOOL_T;
-    use crate::extension::{ExtensionId, EMPTY_REG};
+    use crate::extension::prelude::{BOOL_T, USIZE_T};
+    use crate::extension::{ExtensionId, SignatureError, EMPTY_REG, PRELUDE_REGISTRY};
     use crate::hugr::validate::InterGraphEdgeError;
     use crate::ops::{handle::NodeHandle, Lift, Noop, OpTag};
 
     use crate::std_extensions::logic::test::and_op;
-    use crate::types::Type;
+    use crate::types::type_param::TypeParam;
+    use crate::types::{Type, TypeBound};
     use crate::utils::test_quantum_extension::h_gate;
     use crate::{
         builder::test::{n_identity, BIT, NAT, QB},
@@ -547,6 +548,37 @@ pub(crate) mod test {
                 error: BuilderWiringError::NoRelationIntergraph { .. },
                 ..
             })
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn no_outer_row_variables() -> Result<(), BuildError> {
+        let e = crate::hugr::validate::test::extension_with_eval_parallel();
+        let tv = Type::new_row_var_use(0, TypeBound::Copyable);
+        let mut fb = FunctionBuilder::new(
+            "bad_eval",
+            PolyFuncType::new(
+                [TypeParam::new_list(TypeBound::Copyable)],
+                FunctionType::new(
+                    Type::new_function(FunctionType::new(USIZE_T, tv.clone())),
+                    vec![],
+                ),
+            ),
+        )?;
+
+        let [func_arg] = fb.input_wires_arr();
+        let i = fb.add_load_value(crate::extension::prelude::ConstUsize::new(5));
+        let ev = e.instantiate_extension_op(
+            "eval",
+            [vec![USIZE_T.into()].into(), vec![tv.into()].into()],
+            &PRELUDE_REGISTRY,
+        )?;
+        let r = fb.add_dataflow_op(ev, [func_arg, i]);
+        // This error would be caught in validation, but the builder detects it much earlier
+        assert_eq!(
+            r.unwrap_err(),
+            BuildError::SignatureError(SignatureError::RowVarWhereTypeExpected { idx: 0 })
         );
         Ok(())
     }

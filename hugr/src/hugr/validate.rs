@@ -810,4 +810,4 @@ pub enum InterGraphEdgeError {
 }
 
 #[cfg(test)]
-mod test;
+pub(crate) mod test;
