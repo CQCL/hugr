@@ -253,7 +253,7 @@ mod test {
     use crate::std_extensions::arithmetic::float_types::{ConstF64, FLOAT64_TYPE};
     use crate::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
     use crate::std_extensions::logic::{self, NaryLogic, NotOp};
-    use crate::utils::test::assert_fully_folded;
+    use crate::utils::test::{assert_fully_folded, assert_fully_folded_with};
 
     use rstest::rstest;
 
@@ -275,9 +275,13 @@ mod test {
     fn test_add(#[case] a: f64, #[case] b: f64, #[case] c: f64) {
         let consts = vec![(0.into(), f2c(a)), (1.into(), f2c(b))];
         let add_op: OpType = FloatOps::fadd.into();
-        let out = fold_leaf_op(&add_op, &consts).unwrap();
+        let outs = fold_leaf_op(&add_op, &consts)
+            .unwrap()
+            .into_iter()
+            .map(|(p, v)| (p, v.get_custom_value::<ConstF64>().unwrap().value()))
+            .collect_vec();
 
-        assert_eq!(&out[..], &[(0.into(), f2c(c))]);
+        assert_eq!(outs.as_slice(), &[(0.into(), c)]);
     }
     #[test]
     fn test_big() {
@@ -529,8 +533,9 @@ mod test {
         let x2 = build.add_dataflow_op(FloatOps::fdiv, [x0, x1]).unwrap();
         let mut h0 = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
         constant_fold_pass(&mut h0, &reg);
-        let expected = Value::extension(ConstF64::new(1.0));
-        assert_fully_folded(&h0, &expected);
+        assert_fully_folded_with(&h0, |v| {
+            v.get_custom_value::<ConstF64>().unwrap().value() == 1.0
+        });
         assert_eq!(h0.node_count(), 5);
 
         // HUGR computing 1.0 / 0.0
