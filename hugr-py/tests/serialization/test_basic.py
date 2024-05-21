@@ -1,3 +1,4 @@
+import pytest
 from hugr.serialization import SerialHugr
 from hugr.hugr import Dfg, Hugr, DummyOp
 import hugr.serialization.tys as stys
@@ -47,11 +48,20 @@ def test_empty():
     }
 
 
-def _validate(h: Hugr, mermaid: bool = False):
-    import subprocess
-    import tempfile
+VALIDATE_DIR = None
 
-    with tempfile.NamedTemporaryFile("w") as f:
+
+@pytest.fixture(scope="session", autouse=True)
+def validate_dir(tmp_path_factory: pytest.TempPathFactory) -> None:
+    global VALIDATE_DIR
+    VALIDATE_DIR = tmp_path_factory.mktemp("hugrs")
+
+
+def _validate(h: Hugr, mermaid: bool = False, filename: str = "dump.hugr"):
+    import subprocess
+
+    assert VALIDATE_DIR is not None
+    with open(VALIDATE_DIR / filename, "w") as f:
         f.write(h.to_serial().to_json())
         f.flush()
         # TODO point to built hugr binary
@@ -104,4 +114,4 @@ def test_multi_out():
     a, b = h.add_op(DIV_OP, [a, b])[:2]
     h.set_outputs([a, b])
 
-    _validate(h.hugr, True)
+    _validate(h.hugr)
