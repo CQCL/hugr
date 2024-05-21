@@ -42,8 +42,9 @@ class SerialHugr(ConfiguredBaseModel):
         my_classes[cls.__name__] = cls
         model_rebuild(my_classes, config=config, **kwargs)
 
-    class Config:
-        title = "Hugr"
-        json_schema_extra = {
+    model_config = ConfigDict(
+        title="Hugr",
+        json_schema_extra={
             "required": ["version", "nodes", "edges"],
-        }
+        },
+    )
