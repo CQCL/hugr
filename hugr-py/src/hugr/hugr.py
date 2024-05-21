@@ -129,6 +129,7 @@ def _unused_sub_offset(port: P, links: BiMap[OutPort, InPort]) -> P:
     return port
 
 
+@dataclass()
 class Hugr(Mapping[Node, NodeData]):
     root: Node
     _nodes: list[NodeData | None]
@@ -302,11 +303,11 @@ class Dfg:
     def make_tuple(self, ports: Iterable[ToPort], tys: Sequence[Type]) -> Node:
         ports = list(ports)
         assert len(tys) == len(ports), "Number of types must match number of ports"
-        return self.add_op(DummyOp(sops.MakeTuple(parent=-1, tys=list(tys))), ports)
+        return self.add_op(DummyOp(sops.MakeTuple(parent=0, tys=list(tys))), ports)
 
     def split_tuple(self, port: ToPort, tys: Sequence[Type]) -> list[OutPort]:
         tys = list(tys)
-        n = self.add_op(DummyOp(sops.UnpackTuple(parent=-1, tys=tys)), [port])
+        n = self.add_op(DummyOp(sops.UnpackTuple(parent=0, tys=tys)), [port])
 
         return [n.out(i) for i in range(len(tys))]
 
