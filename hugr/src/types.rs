@@ -403,7 +403,7 @@ impl Type {
                 if allow_row_vars {
                     check_typevar_decl(var_decls, *idx, &TypeParam::new_list(*bound))
                 } else {
-                    Err(SignatureError::RowTypeVarOutsideRow { idx: *idx })
+                    Err(SignatureError::RowVarWhereTypeExpected { idx: *idx })
                 }
             }
         }

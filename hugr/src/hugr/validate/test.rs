@@ -683,7 +683,7 @@ fn no_outer_row_variables(#[case] connect: bool) -> Result<(), Box<dyn std::erro
         fb.finish_hugr(&reg).unwrap_err(),
         ValidationError::SignatureError {
             node: ev.node(),
-            cause: SignatureError::RowTypeVarOutsideRow { idx: 0 }
+            cause: SignatureError::RowVarWhereTypeExpected { idx: 0 }
         }
     );
     Ok(())

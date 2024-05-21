@@ -162,8 +162,8 @@ pub enum SignatureError {
     #[error("Type variable {idx} was not declared ({num_decls} in scope)")]
     FreeTypeVar { idx: usize, num_decls: usize },
     /// A row variable was found outside of a variable-length row
-    #[error("Row variable {idx} was found outside of a type row")]
-    RowTypeVarOutsideRow { idx: usize },
+    #[error("Expected a single type, but found row variable {idx}")]
+    RowVarWhereTypeExpected { idx: usize },
     /// The result of the type application stored in a [Call]
     /// is not what we get by applying the type-args to the polymorphic function
     ///
