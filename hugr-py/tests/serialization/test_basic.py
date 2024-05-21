@@ -8,12 +8,22 @@ QB_T = stys.Type(stys.Qubit())
 
 
 NOT_OP = DummyOp(
-    # TODO get from YAML
     sops.CustomOp(
         parent=-1,
         extension="logic",
         op_name="Not",
         signature=stys.FunctionType(input=[BOOL_T], output=[BOOL_T]),
+    )
+)
+
+AND_OP = DummyOp(
+    # TODO get from YAML
+    sops.CustomOp(
+        parent=-1,
+        extension="logic",
+        op_name="And",
+        signature=stys.FunctionType(input=[BOOL_T] * 2, output=[BOOL_T]),
+        args=[stys.TypeArg(stys.BoundedNatArg(n=2))],
     )
 )
 
@@ -65,5 +75,16 @@ def test_add_op():
     (a,) = h.inputs()
     nt = h.add_op(NOT_OP, [a])
     h.set_outputs([nt])
+
+    _validate(h.hugr)
+
+
+def test_tuple():
+    row = [BOOL_T, QB_T]
+    h = Dfg.endo(row)
+    a, b = h.inputs()
+    t = h.make_tuple([a, b], row)
+    a, b = h.split_tuple(t, row)
+    h.set_outputs([a, b])
 
     _validate(h.hugr)
