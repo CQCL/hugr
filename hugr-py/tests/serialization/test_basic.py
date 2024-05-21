@@ -26,7 +26,8 @@ def _validate(h: Hugr):
 
 
 def test_simple_id():
-    h = Dfg([Type(Qubit())] * 2)
+    qb_row = [Type(Qubit())] * 2
+    h = Dfg.endo(qb_row)
 
     a, b = h.inputs()
 
