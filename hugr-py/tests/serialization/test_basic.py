@@ -5,9 +5,18 @@ import hugr.serialization.ops as sops
 
 BOOL_T = stys.Type(stys.SumType(stys.UnitSum(size=2)))
 QB_T = stys.Type(stys.Qubit())
-
+ARG_5 = stys.TypeArg(stys.BoundedNatArg(n=5))
+INT_T = stys.Type(
+    stys.Opaque(
+        extension="arithmetic.int.types",
+        id="int",
+        args=[ARG_5],
+        bound=stys.TypeBound.Eq,
+    )
+)
 
 NOT_OP = DummyOp(
+    # TODO get from YAML
     sops.CustomOp(
         parent=-1,
         extension="logic",
@@ -16,14 +25,13 @@ NOT_OP = DummyOp(
     )
 )
 
-AND_OP = DummyOp(
-    # TODO get from YAML
+DIV_OP = DummyOp(
     sops.CustomOp(
         parent=-1,
-        extension="logic",
-        op_name="And",
-        signature=stys.FunctionType(input=[BOOL_T] * 2, output=[BOOL_T]),
-        args=[stys.TypeArg(stys.BoundedNatArg(n=2))],
+        extension="arithmetic.int",
+        op_name="idivmod_u",
+        signature=stys.FunctionType(input=[INT_T] * 2, output=[INT_T] * 2),
+        args=[ARG_5, ARG_5],
     )
 )
 
@@ -88,3 +96,12 @@ def test_tuple():
     h.set_outputs([a, b])
 
     _validate(h.hugr)
+
+
+def test_multi_out():
+    h = Dfg([INT_T] * 2, [INT_T] * 2)
+    a, b = h.inputs()
+    a, b = h.add_op(DIV_OP, [a, b])[:2]
+    h.set_outputs([a, b])
+
+    _validate(h.hugr, True)
