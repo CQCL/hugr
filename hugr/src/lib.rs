@@ -157,5 +157,8 @@ pub use crate::core::{
 pub use crate::extension::Extension;
 pub use crate::hugr::{Hugr, HugrView, SimpleReplacement};
 
+#[cfg(feature = "cli")]
+pub mod cli;
+
 #[cfg(test)]
 pub mod proptest;
