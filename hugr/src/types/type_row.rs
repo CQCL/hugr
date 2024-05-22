@@ -7,8 +7,11 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use super::Type;
-use crate::utils::display_list;
+use super::{type_param::TypeParam, Substitution, Type};
+use crate::{
+    extension::{ExtensionRegistry, SignatureError},
+    utils::display_list,
+};
 use delegate::delegate;
 use itertools::Itertools;
 
@@ -74,6 +77,28 @@ impl TypeRow {
             /// Returns the type at the specified index. Returns `None` if out of bounds.
             pub fn get_mut(&mut self, offset: usize) -> Option<&mut Type>;
         }
+    }
+
+    /// Applies a substitution to the row. Note this may change the length
+    /// if-and-only-if the row contains any [RowVariable]s.
+    ///
+    /// [RowVariable]: [crate::types::TypeEnum::RowVariable]
+    pub(super) fn substitute(&self, tr: &Substitution) -> TypeRow {
+        let res = self
+            .iter()
+            .flat_map(|ty| ty.substitute(tr))
+            .collect::<Vec<_>>()
+            .into();
+        res
+    }
+
+    pub(super) fn validate_var_len(
+        &self,
+        exts: &ExtensionRegistry,
+        var_decls: &[TypeParam],
+    ) -> Result<(), SignatureError> {
+        self.iter()
+            .try_for_each(|t| t.validate(true, exts, var_decls))
     }
 }
 

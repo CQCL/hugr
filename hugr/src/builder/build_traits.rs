@@ -19,7 +19,7 @@ use crate::{
     types::EdgeKind,
 };
 
-use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE_REGISTRY};
+use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError, PRELUDE_REGISTRY};
 use crate::types::{FunctionType, PolyFuncType, Type, TypeArg, TypeRow};
 
 use itertools::Itertools;
@@ -645,6 +645,15 @@ fn add_node_with_wires<T: Dataflow + ?Sized>(
     inputs: impl IntoIterator<Item = Wire>,
 ) -> Result<(Node, usize), BuildError> {
     let nodetype: NodeType = nodetype.into();
+    // Check there are no row variables, as that would prevent us
+    // from indexing into the node's ports in order to wire up
+    nodetype
+        .op_signature()
+        .as_ref()
+        .and_then(FunctionType::find_rowvar)
+        .map_or(Ok(()), |(idx, _)| {
+            Err(SignatureError::RowVarWhereTypeExpected { idx })
+        })?;
     let num_outputs = nodetype.op().value_output_count();
     let op_node = data_builder.add_child_node(nodetype.clone());
 

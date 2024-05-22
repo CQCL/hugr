@@ -82,9 +82,12 @@ impl PolyFuncType {
 
     /// Validates this instance, checking that the types in the body are
     /// wellformed with respect to the registry, and the type variables declared.
-    pub fn validate(&self, reg: &ExtensionRegistry) -> Result<(), SignatureError> {
+    /// Allows both inputs and outputs to contain [RowVariable]s
+    ///
+    /// [RowVariable]: [crate::types::TypeEnum::RowVariable]
+    pub fn validate_var_len(&self, reg: &ExtensionRegistry) -> Result<(), SignatureError> {
         // TODO https://github.com/CQCL/hugr/issues/624 validate TypeParams declared here, too
-        self.body.validate(reg, &self.params)
+        self.body.validate_var_len(reg, &self.params)
     }
 
     /// Instantiates an outer [PolyFuncType], i.e. with no free variables
@@ -109,11 +112,13 @@ impl PolyFuncType {
 pub(crate) mod test {
     use std::num::NonZeroU64;
 
+    use cool_asserts::assert_matches;
     use lazy_static::lazy_static;
 
-    use crate::extension::prelude::{PRELUDE_ID, USIZE_CUSTOM_T, USIZE_T};
+    use crate::extension::prelude::{BOOL_T, PRELUDE_ID, USIZE_CUSTOM_T, USIZE_T};
     use crate::extension::{
-        ExtensionId, ExtensionRegistry, SignatureError, TypeDefBound, PRELUDE, PRELUDE_REGISTRY,
+        ExtensionId, ExtensionRegistry, SignatureError, TypeDefBound, EMPTY_REG, PRELUDE,
+        PRELUDE_REGISTRY,
     };
     use crate::std_extensions::collections::{EXTENSION, LIST_TYPENAME};
     use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
@@ -134,7 +139,7 @@ pub(crate) mod test {
             extension_registry: &ExtensionRegistry,
         ) -> Result<Self, SignatureError> {
             let res = Self::new(params, body);
-            res.validate(extension_registry)?;
+            res.validate_var_len(extension_registry)?;
             Ok(res)
         }
     }
@@ -340,5 +345,105 @@ pub(crate) mod test {
             &[TypeParam::max_nat()],
         )?;
         Ok(())
+    }
+
+    const TP_ANY: TypeParam = TypeParam::Type { b: TypeBound::Any };
+    #[test]
+    fn row_variables_bad_schema() {
+        // Mismatched TypeBound (Copyable vs Any)
+        let decl = TypeParam::List {
+            param: Box::new(TP_ANY),
+        };
+        let e = PolyFuncType::new_validated(
+            [decl.clone()],
+            FunctionType::new(
+                vec![USIZE_T],
+                vec![Type::new_row_var_use(0, TypeBound::Copyable)],
+            ),
+            &PRELUDE_REGISTRY,
+        )
+        .unwrap_err();
+        assert_matches!(e, SignatureError::TypeVarDoesNotMatchDeclaration { actual, cached } => {
+            assert_eq!(actual, decl);
+            assert_eq!(cached, TypeParam::List {param: Box::new(TypeParam::Type {b: TypeBound::Copyable})});
+        });
+        // Declared as row variable, used as type variable
+        let e = PolyFuncType::new_validated(
+            [decl.clone()],
+            FunctionType::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
+            &EMPTY_REG,
+        )
+        .unwrap_err();
+        assert_matches!(e, SignatureError::TypeVarDoesNotMatchDeclaration { actual, cached } => {
+            assert_eq!(actual, decl);
+            assert_eq!(cached, TP_ANY);
+        });
+    }
+
+    #[test]
+    fn row_variables() {
+        let rty = Type::new_row_var_use(0, TypeBound::Any);
+        let pf = PolyFuncType::new_validated(
+            [TypeParam::new_list(TP_ANY)],
+            FunctionType::new(vec![USIZE_T, rty.clone()], vec![Type::new_tuple(rty)]),
+            &PRELUDE_REGISTRY,
+        )
+        .unwrap();
+
+        fn seq2() -> Vec<TypeArg> {
+            vec![USIZE_T.into(), BOOL_T.into()]
+        }
+        pf.instantiate(&[TypeArg::Type { ty: USIZE_T }], &PRELUDE_REGISTRY)
+            .unwrap_err();
+        pf.instantiate(
+            &[TypeArg::Sequence {
+                elems: vec![USIZE_T.into(), TypeArg::Sequence { elems: seq2() }],
+            }],
+            &PRELUDE_REGISTRY,
+        )
+        .unwrap_err();
+
+        let t2 = pf
+            .instantiate(&[TypeArg::Sequence { elems: seq2() }], &PRELUDE_REGISTRY)
+            .unwrap();
+        assert_eq!(
+            t2,
+            FunctionType::new(
+                vec![USIZE_T, USIZE_T, BOOL_T],
+                vec![Type::new_tuple(vec![USIZE_T, BOOL_T])]
+            )
+        );
+    }
+
+    #[test]
+    fn row_variables_inner() {
+        let inner_fty = Type::new_function(FunctionType::new_endo(vec![Type::new_row_var_use(
+            0,
+            TypeBound::Copyable,
+        )]));
+        let pf = PolyFuncType::new_validated(
+            [TypeParam::List {
+                param: Box::new(TypeParam::Type {
+                    b: TypeBound::Copyable,
+                }),
+            }],
+            FunctionType::new(vec![USIZE_T, inner_fty.clone()], vec![inner_fty]),
+            &PRELUDE_REGISTRY,
+        )
+        .unwrap();
+
+        let inner3 = Type::new_function(FunctionType::new_endo(vec![USIZE_T, BOOL_T, USIZE_T]));
+        let t3 = pf
+            .instantiate(
+                &[TypeArg::Sequence {
+                    elems: vec![USIZE_T.into(), BOOL_T.into(), USIZE_T.into()],
+                }],
+                &PRELUDE_REGISTRY,
+            )
+            .unwrap();
+        assert_eq!(
+            t3,
+            FunctionType::new(vec![USIZE_T, inner3.clone()], vec![inner3])
+        );
     }
 }

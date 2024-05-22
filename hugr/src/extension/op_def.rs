@@ -405,7 +405,10 @@ impl OpDef {
         // TODO https://github.com/CQCL/hugr/issues/624 validate declared TypeParams
         // for both type scheme and custom binary
         if let SignatureFunc::TypeScheme(ts) = &self.signature_func {
-            ts.poly_func.validate(exts)?;
+            // The type scheme may contain row variables so be of variable length;
+            // these will have to be substituted to fixed-length concrete types when
+            // the OpDef is instantiated into an actual OpType.
+            ts.poly_func.validate_var_len(exts)?;
         }
         Ok(())
     }
@@ -482,6 +485,7 @@ mod test {
     use crate::extension::{SignatureError, EMPTY_REG, PRELUDE_REGISTRY};
     use crate::ops::{CustomOp, OpName};
     use crate::std_extensions::collections::{EXTENSION, LIST_TYPENAME};
+    use crate::types::type_param::TypeArgError;
     use crate::types::Type;
     use crate::types::{type_param::TypeParam, FunctionType, PolyFuncType, TypeArg, TypeBound};
     use crate::{const_extension_ids, Extension};
@@ -638,6 +642,17 @@ mod test {
         assert_eq!(
             def.compute_signature(&args, &EMPTY_REG),
             Ok(FunctionType::new_endo(vec![tv]))
+        );
+        // But not with an external row variable
+        let arg: TypeArg = Type::new_row_var_use(0, TypeBound::Eq).into();
+        assert_eq!(
+            def.compute_signature(&[arg.clone()], &EMPTY_REG),
+            Err(SignatureError::TypeArgMismatch(
+                TypeArgError::TypeMismatch {
+                    param: TypeBound::Any.into(),
+                    arg
+                }
+            ))
         );
         Ok(())
     }

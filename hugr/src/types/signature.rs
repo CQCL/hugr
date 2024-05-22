@@ -5,7 +5,7 @@ use itertools::Either;
 use std::fmt::{self, Display, Write};
 
 use super::type_param::TypeParam;
-use super::{subst_row, Substitution, Type, TypeRow};
+use super::{Substitution, Type, TypeBound, TypeEnum, TypeRow};
 
 use crate::core::PortIndex;
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
@@ -39,22 +39,21 @@ impl FunctionType {
         self
     }
 
-    pub(crate) fn validate(
+    pub(super) fn validate_var_len(
         &self,
         extension_registry: &ExtensionRegistry,
         var_decls: &[TypeParam],
     ) -> Result<(), SignatureError> {
-        self.input
-            .iter()
-            .chain(self.output.iter())
-            .try_for_each(|t| t.validate(extension_registry, var_decls))?;
+        self.input.validate_var_len(extension_registry, var_decls)?;
+        self.output
+            .validate_var_len(extension_registry, var_decls)?;
         self.extension_reqs.validate(var_decls)
     }
 
     pub(crate) fn substitute(&self, tr: &Substitution) -> Self {
         FunctionType {
-            input: subst_row(&self.input, tr),
-            output: subst_row(&self.output, tr),
+            input: self.input.substitute(tr),
+            output: self.output.substitute(tr),
             extension_reqs: self.extension_reqs.substitute(tr),
         }
     }
@@ -99,6 +98,7 @@ impl FunctionType {
     /// of bounds.
     #[inline]
     pub fn in_port_type(&self, port: impl Into<IncomingPort>) -> Option<&Type> {
+        debug_assert!(self.find_rowvar().is_none());
         self.input.get(port.into().index())
     }
 
@@ -106,6 +106,7 @@ impl FunctionType {
     /// of bounds.
     #[inline]
     pub fn out_port_type(&self, port: impl Into<OutgoingPort>) -> Option<&Type> {
+        debug_assert!(self.find_rowvar().is_none());
         self.output.get(port.into().index())
     }
 
@@ -113,6 +114,7 @@ impl FunctionType {
     /// of bounds.
     #[inline]
     pub fn in_port_type_mut(&mut self, port: impl Into<IncomingPort>) -> Option<&mut Type> {
+        debug_assert!(self.find_rowvar().is_none());
         self.input.get_mut(port.into().index())
     }
 
@@ -120,6 +122,7 @@ impl FunctionType {
     /// of bounds.
     #[inline]
     pub fn out_port_type_mut(&mut self, port: impl Into<OutgoingPort>) -> Option<&mut Type> {
+        debug_assert!(self.find_rowvar().is_none());
         self.output.get_mut(port.into().index())
     }
 
@@ -190,6 +193,17 @@ impl FunctionType {
 }
 
 impl FunctionType {
+    /// If this FunctionType contains any row variables, return one.
+    pub fn find_rowvar(&self) -> Option<(usize, TypeBound)> {
+        self.input
+            .iter()
+            .chain(self.output.iter())
+            .find_map(|t| match t.0 {
+                TypeEnum::RowVariable(idx, bound) => Some((idx, bound)),
+                _ => None,
+            })
+    }
+
     /// Returns the `Port`s in the signature for a given direction.
     #[inline]
     pub fn ports(&self, dir: Direction) -> impl Iterator<Item = Port> {
