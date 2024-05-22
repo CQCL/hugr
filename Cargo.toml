@@ -3,7 +3,7 @@ lto = "thin"
 
 [workspace]
 resolver = "2"
-members = ["hugr"]
+members = ["hugr", "hugr-passes"]
 default-members = ["hugr"]
 
 [workspace.package]
