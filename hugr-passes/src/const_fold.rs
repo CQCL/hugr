@@ -5,16 +5,16 @@ use std::collections::{BTreeSet, HashMap};
 use itertools::Itertools;
 use thiserror::Error;
 
-use crate::hugr::{SimpleReplacementError, ValidationError};
-use crate::types::SumType;
-use crate::Direction;
-use crate::{
+use hugr::hugr::{SimpleReplacementError, ValidationError};
+use hugr::types::SumType;
+use hugr::Direction;
+use hugr::{
     builder::{DFGBuilder, Dataflow, DataflowHugr},
     extension::{ConstFoldResult, ExtensionRegistry},
     hugr::{
+        hugrmut::HugrMut,
         rewrite::consts::{RemoveConst, RemoveLoadConstant},
         views::SiblingSubgraph,
-        HugrMut,
     },
     ops::{OpType, Value},
     type_row,
@@ -244,18 +244,43 @@ pub fn constant_fold_pass<H: HugrMut>(h: &mut H, reg: &ExtensionRegistry) {
 mod test {
 
     use super::*;
-    use crate::extension::prelude::{sum_with_error, BOOL_T};
-    use crate::extension::{ExtensionRegistry, PRELUDE};
-    use crate::ops::{OpType, UnpackTuple};
-    use crate::std_extensions::arithmetic;
-    use crate::std_extensions::arithmetic::conversions::ConvertOpDef;
-    use crate::std_extensions::arithmetic::float_ops::FloatOps;
-    use crate::std_extensions::arithmetic::float_types::{ConstF64, FLOAT64_TYPE};
-    use crate::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
-    use crate::std_extensions::logic::{self, NaryLogic, NotOp};
-    use crate::utils::test::{assert_fully_folded, assert_fully_folded_with};
+    use hugr::builder::Container;
+    use hugr::extension::prelude::{sum_with_error, BOOL_T};
+    use hugr::extension::{ExtensionRegistry, PRELUDE};
+    use hugr::ops::{OpType, UnpackTuple};
+    use hugr::std_extensions::arithmetic;
+    use hugr::std_extensions::arithmetic::conversions::ConvertOpDef;
+    use hugr::std_extensions::arithmetic::float_ops::FloatOps;
+    use hugr::std_extensions::arithmetic::float_types::{ConstF64, FLOAT64_TYPE};
+    use hugr::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
+    use hugr::std_extensions::logic::{self, NaryLogic, NotOp};
 
     use rstest::rstest;
+
+    /// Check that a hugr just loads and returns a single expected constant.
+    fn assert_fully_folded(h: &Hugr, expected_value: &Value) {
+        assert_fully_folded_with(h, |v| v == expected_value)
+    }
+
+    /// Check that a hugr just loads and returns a single constant, and validate
+    /// that constant using `check_value`.
+    ///
+    /// [CustomConst::equals_const] is not required to be implemented. Use this
+    /// function for Values containing such a `CustomConst`.
+    fn assert_fully_folded_with(h: &Hugr, check_value: impl Fn(&Value) -> bool) {
+        let mut node_count = 0;
+
+        for node in h.children(h.root()) {
+            let op = h.get_optype(node);
+            match op {
+                OpType::Input(_) | OpType::Output(_) | OpType::LoadConstant(_) => node_count += 1,
+                OpType::Const(c) if check_value(c.value()) => node_count += 1,
+                _ => panic!("unexpected op: {:?}\n{}", op, h.mermaid_string()),
+            }
+        }
+
+        assert_eq!(node_count, 4);
+    }
 
     /// int to constant
     fn i2c(b: u64) -> Value {
@@ -301,9 +326,7 @@ mod test {
 
         let unpack = build
             .add_dataflow_op(
-                UnpackTuple {
-                    tys: type_row![FLOAT64_TYPE, FLOAT64_TYPE],
-                },
+                UnpackTuple::new(type_row![FLOAT64_TYPE, FLOAT64_TYPE]),
                 [tup],
             )
             .unwrap();
@@ -340,7 +363,7 @@ mod test {
         ignore = "inference fails for test graph, it shouldn't"
     )]
     fn test_list_ops() -> Result<(), Box<dyn std::error::Error>> {
-        use crate::std_extensions::collections::{self, ListOp, ListValue};
+        use hugr::std_extensions::collections::{self, ListOp, ListValue};
 
         let reg = ExtensionRegistry::try_new([
             PRELUDE.to_owned(),
@@ -443,8 +466,8 @@ mod test {
         //
         // We arange things so that the `or` folds away first, leaving the not
         // with no outputs.
-        use crate::hugr::NodeType;
-        use crate::ops::handle::NodeHandle;
+        use hugr::hugr::NodeType;
+        use hugr::ops::handle::NodeHandle;
 
         let mut build = DFGBuilder::new(FunctionType::new(type_row![], vec![BOOL_T])).unwrap();
         let true_wire = build.add_load_value(Value::true_val());
@@ -457,7 +480,7 @@ mod test {
             )
             .unwrap();
         let or_node = r.node();
-        let parent = build.dfg_node;
+        let parent = build.container_node();
         let reg =
             ExtensionRegistry::try_new([PRELUDE.to_owned(), logic::EXTENSION.to_owned()]).unwrap();
         let mut h = build.finish_hugr_with_outputs(r.outputs(), &reg).unwrap();

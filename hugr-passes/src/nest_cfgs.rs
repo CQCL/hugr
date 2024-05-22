@@ -44,14 +44,14 @@ use std::hash::Hash;
 use itertools::Itertools;
 use thiserror::Error;
 
-use crate::hugr::rewrite::outline_cfg::OutlineCfg;
-use crate::hugr::views::sibling::SiblingMut;
-use crate::hugr::views::{HierarchyView, HugrView, SiblingGraph};
-use crate::hugr::{HugrMut, Rewrite, RootTagged};
-use crate::ops::handle::{BasicBlockID, CfgID};
-use crate::ops::OpTag;
-use crate::ops::OpTrait;
-use crate::{Direction, Hugr, Node};
+use hugr::hugr::rewrite::outline_cfg::OutlineCfg;
+use hugr::hugr::views::sibling::SiblingMut;
+use hugr::hugr::views::{HierarchyView, HugrView, SiblingGraph};
+use hugr::hugr::{hugrmut::HugrMut, Rewrite, RootTagged};
+use hugr::ops::handle::{BasicBlockID, CfgID};
+use hugr::ops::OpTag;
+use hugr::ops::OpTrait;
+use hugr::{Direction, Hugr, Node};
 
 /// A "view" of a CFG in a Hugr which allows basic blocks in the underlying CFG to be split into
 /// multiple blocks in the view (or merged together).
@@ -574,15 +574,15 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> EdgeClassifier<T> {
 #[cfg(test)]
 pub(crate) mod test {
     use super::*;
-    use crate::builder::{BuildError, CFGBuilder, Container, DataflowSubContainer, HugrBuilder};
-    use crate::extension::PRELUDE_REGISTRY;
-    use crate::extension::{prelude::USIZE_T, ExtensionSet};
+    use hugr::builder::{BuildError, CFGBuilder, Container, DataflowSubContainer, HugrBuilder};
+    use hugr::extension::PRELUDE_REGISTRY;
+    use hugr::extension::{prelude::USIZE_T, ExtensionSet};
 
-    use crate::hugr::views::RootChecked;
-    use crate::ops::handle::{ConstID, NodeHandle};
-    use crate::ops::Value;
-    use crate::type_row;
-    use crate::types::{FunctionType, Type};
+    use hugr::hugr::views::RootChecked;
+    use hugr::ops::handle::{ConstID, NodeHandle};
+    use hugr::ops::Value;
+    use hugr::type_row;
+    use hugr::types::{FunctionType, Type};
     const NAT: Type = USIZE_T;
 
     pub fn group_by<E: Eq + Hash + Ord, V: Eq + Hash>(h: HashMap<E, V>) -> HashSet<Vec<E>> {

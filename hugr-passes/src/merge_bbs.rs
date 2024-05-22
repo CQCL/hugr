@@ -2,15 +2,17 @@
 //! and the target BB has no other predecessors.
 use std::collections::HashMap;
 
+use hugr::builder::{CFGBuilder, HugrBuilder};
+use hugr::hugr::hugrmut::HugrMut;
 use itertools::Itertools;
 
-use crate::hugr::rewrite::inline_dfg::InlineDFG;
-use crate::hugr::rewrite::replace::{NewEdgeKind, NewEdgeSpec, Replacement};
-use crate::hugr::{HugrMut, RootTagged};
-use crate::ops::handle::CfgID;
-use crate::ops::leaf::UnpackTuple;
-use crate::ops::{DataflowBlock, DataflowParent, Input, Output, DFG};
-use crate::{Hugr, HugrView, Node};
+use hugr::hugr::rewrite::inline_dfg::InlineDFG;
+use hugr::hugr::rewrite::replace::{NewEdgeKind, NewEdgeSpec, Replacement};
+use hugr::hugr::RootTagged;
+use hugr::ops::handle::CfgID;
+use hugr::ops::leaf::UnpackTuple;
+use hugr::ops::{DataflowBlock, DataflowParent, Input, Output, DFG};
+use hugr::{Hugr, HugrView, Node};
 
 /// Merge any basic blocks that are direct children of the specified CFG
 /// i.e. where a basic block B has a single successor B' whose only predecessor
@@ -52,7 +54,14 @@ fn mk_rep(
     let pred_ty = cfg.get_optype(pred).as_dataflow_block().unwrap();
     let succ_ty = cfg.get_optype(succ).as_dataflow_block().unwrap();
     let succ_sig = succ_ty.inner_signature();
-    let mut replacement: Hugr = Hugr::new(cfg.root_type().clone());
+
+    // Make a Hugr with just a single CFG root node having the same signature.
+    let mut replacement: Hugr = CFGBuilder::new(cfg.root_type().op_signature().unwrap())
+        .unwrap()
+        .finish_prelude_hugr()
+        .unwrap();
+    replacement.remove_node(replacement.children(replacement.root()).next().unwrap());
+
     let merged = replacement.add_node_with_parent(replacement.root(), {
         let mut merged_block = DataflowBlock {
             inputs: pred_ty.inputs.clone(),
@@ -98,12 +107,7 @@ fn mk_rep(
 
     // At the junction, must unpack the first (tuple, branch predicate) output
     let tuple_elems = pred_ty.sum_rows.clone().into_iter().exactly_one().unwrap();
-    let unp = replacement.add_node_with_parent(
-        merged,
-        UnpackTuple {
-            tys: tuple_elems.clone(),
-        },
-    );
+    let unp = replacement.add_node_with_parent(merged, UnpackTuple::new(tuple_elems.clone()));
     replacement.connect(dfg1, 0, unp, 0);
     let other_start = tuple_elems.len();
     for (i, _) in tuple_elems.iter().enumerate() {
@@ -162,15 +166,15 @@ mod test {
     use itertools::Itertools;
     use rstest::rstest;
 
-    use crate::builder::{CFGBuilder, DFGWrapper, Dataflow, HugrBuilder};
-    use crate::extension::prelude::{ConstUsize, PRELUDE_ID, QB_T, USIZE_T};
-    use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE, PRELUDE_REGISTRY};
-    use crate::hugr::views::sibling::SiblingMut;
-    use crate::ops::constant::Value;
-    use crate::ops::handle::CfgID;
-    use crate::ops::{Lift, LoadConstant, Noop, OpTrait, OpType};
-    use crate::types::{FunctionType, Type, TypeRow};
-    use crate::{const_extension_ids, type_row, Extension, Hugr, HugrView, Wire};
+    use hugr::builder::{CFGBuilder, DFGWrapper, Dataflow, HugrBuilder};
+    use hugr::extension::prelude::{ConstUsize, PRELUDE_ID, QB_T, USIZE_T};
+    use hugr::extension::{ExtensionRegistry, ExtensionSet, PRELUDE, PRELUDE_REGISTRY};
+    use hugr::hugr::views::sibling::SiblingMut;
+    use hugr::ops::constant::Value;
+    use hugr::ops::handle::CfgID;
+    use hugr::ops::{Lift, LoadConstant, Noop, OpTrait, OpType};
+    use hugr::types::{FunctionType, Type, TypeRow};
+    use hugr::{const_extension_ids, type_row, Extension, Hugr, HugrView, Wire};
 
     use super::merge_basic_blocks;
 
@@ -198,13 +202,7 @@ mod test {
     fn lifted_unary_unit_sum<B: AsMut<Hugr> + AsRef<Hugr>, T>(b: &mut DFGWrapper<B, T>) -> Wire {
         let lc = b.add_load_value(Value::unary_unit_sum());
         let lift = b
-            .add_dataflow_op(
-                Lift {
-                    type_row: Type::new_unit_sum(1).into(),
-                    new_extension: PRELUDE_ID,
-                },
-                [lc],
-            )
+            .add_dataflow_op(Lift::new(Type::new_unit_sum(1).into(), PRELUDE_ID), [lc])
             .unwrap();
         let [w] = lift.outputs_arr();
         w
@@ -235,7 +233,7 @@ mod test {
                 .with_extension_delta(ExtensionSet::singleton(&PRELUDE_ID)),
         )?;
         let mut no_b1 = h.simple_entry_builder(loop_variants.clone(), 1, ExtensionSet::new())?;
-        let n = no_b1.add_dataflow_op(Noop { ty: QB_T }, no_b1.input_wires())?;
+        let n = no_b1.add_dataflow_op(Noop::new(QB_T), no_b1.input_wires())?;
         let br = lifted_unary_unit_sum(&mut no_b1);
         let no_b1 = no_b1.finish_with_outputs(br, n.outputs())?;
         let mut test_block = h.block_builder(
@@ -254,7 +252,7 @@ mod test {
             no_b1
         } else {
             let mut no_b2 = h.simple_block_builder(FunctionType::new_endo(loop_variants), 1)?;
-            let n = no_b2.add_dataflow_op(Noop { ty: QB_T }, no_b2.input_wires())?;
+            let n = no_b2.add_dataflow_op(Noop::new(QB_T), no_b2.input_wires())?;
             let br = lifted_unary_unit_sum(&mut no_b2);
             let nid = no_b2.finish_with_outputs(br, n.outputs())?;
             h.branch(&nid, 0, &no_b1)?;
