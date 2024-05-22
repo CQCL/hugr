@@ -83,7 +83,7 @@ def test_stable_indices():
 def test_simple_id():
     h = Dfg.endo([QB_T] * 2)
     a, b = h.inputs()
-    h.set_outputs([a, b])
+    h.set_outputs(a, b)
 
     _validate(h.hugr)
 
@@ -91,7 +91,7 @@ def test_simple_id():
 def test_multiport():
     h = Dfg([BOOL_T], [BOOL_T] * 2)
     (a,) = h.inputs()
-    h.set_outputs([a, a])
+    h.set_outputs(a, a)
 
     _validate(h.hugr)
 
@@ -99,8 +99,8 @@ def test_multiport():
 def test_add_op():
     h = Dfg.endo([BOOL_T])
     (a,) = h.inputs()
-    nt = h.add_op(NOT_OP, [a])
-    h.set_outputs([nt])
+    nt = h.add_op(NOT_OP, a)
+    h.set_outputs(nt)
 
     _validate(h.hugr)
 
@@ -109,17 +109,17 @@ def test_tuple():
     row = [BOOL_T, QB_T]
     h = Dfg.endo(row)
     a, b = h.inputs()
-    t = h.make_tuple([a, b], row)
-    a, b = h.split_tuple(t, row)
-    h.set_outputs([a, b])
+    t = h.make_tuple(row, a, b)
+    a, b = h.split_tuple(row, t)
+    h.set_outputs(a, b)
 
     _validate(h.hugr)
 
     h1 = Dfg.endo(row)
     a, b = h1.inputs()
-    mt = h1.add_op(DummyOp(sops.MakeTuple(parent=-1, tys=row)), [a, b])
-    a, b = h1.add_op(DummyOp(sops.UnpackTuple(parent=-1, tys=row)), [mt])[0, 1]
-    h1.set_outputs([a, b])
+    mt = h1.add_op(DummyOp(sops.MakeTuple(parent=-1, tys=row)), a, b)
+    a, b = h1.add_op(DummyOp(sops.UnpackTuple(parent=-1, tys=row)), mt)[0, 1]
+    h1.set_outputs(a, b)
 
     assert h.hugr.to_serial() == h1.hugr.to_serial()
 
@@ -127,8 +127,8 @@ def test_tuple():
 def test_multi_out():
     h = Dfg([INT_T] * 2, [INT_T] * 2)
     a, b = h.inputs()
-    a, b = h.add_op(DIV_OP, [a, b])[:2]
-    h.set_outputs([a, b])
+    a, b = h.add_op(DIV_OP, a, b)[:2]
+    h.set_outputs(a, b)
 
     _validate(h.hugr)
 
@@ -136,8 +136,8 @@ def test_multi_out():
 def test_insert():
     h1 = Dfg.endo([BOOL_T])
     (a1,) = h1.inputs()
-    nt = h1.add_op(NOT_OP, [a1])
-    h1.set_outputs([nt])
+    nt = h1.add_op(NOT_OP, a1)
+    h1.set_outputs(nt)
 
     assert len(h1.hugr) == 4
 
@@ -149,13 +149,13 @@ def test_insert():
 def test_insert_nested():
     h1 = Dfg.endo([BOOL_T])
     (a1,) = h1.inputs()
-    nt = h1.add_op(NOT_OP, [a1])
-    h1.set_outputs([nt])
+    nt = h1.add_op(NOT_OP, a1)
+    h1.set_outputs(nt)
 
     h = Dfg.endo([BOOL_T])
     (a,) = h.inputs()
-    nested = h.insert_nested(h1, [a])
-    h.set_outputs([nested])
+    nested = h.insert_nested(h1, a)
+    h.set_outputs(nested)
 
     _validate(h.hugr)
 
@@ -163,8 +163,8 @@ def test_insert_nested():
 def test_build_nested():
     def _nested_nop(dfg: Dfg):
         (a1,) = dfg.inputs()
-        nt = dfg.add_op(NOT_OP, [a1])
-        dfg.set_outputs([nt])
+        nt = dfg.add_op(NOT_OP, a1)
+        dfg.set_outputs(nt)
 
     h = Dfg.endo([BOOL_T])
     (a,) = h.inputs()
@@ -172,6 +172,6 @@ def test_build_nested():
 
     _nested_nop(nested)
 
-    h.set_outputs([nested.root])
+    h.set_outputs(nested.root)
 
     _validate(h.hugr)
