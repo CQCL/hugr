@@ -20,6 +20,9 @@ struct CmdLineArgs {
     // TODO YAML extensions
 }
 
+/// String to print when validation is successful.
+pub const VALID_PRINT: &str = "HUGR valid!";
+
 /// Run the HUGR cli and validate against an extension registry.
 pub fn run(registry: &ExtensionRegistry) -> Result<(), Box<dyn std::error::Error>> {
     let opts = CmdLineArgs::parse();
@@ -32,7 +35,7 @@ pub fn run(registry: &ExtensionRegistry) -> Result<(), Box<dyn std::error::Error
     if !opts.no_validate {
         hugr.update_validate(registry)?;
 
-        println!("HUGR valid!");
+        println!("{}", VALID_PRINT);
     }
     Ok(())
 }
