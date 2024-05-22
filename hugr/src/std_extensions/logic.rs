@@ -6,7 +6,6 @@ use crate::extension::{ConstFold, ConstFoldResult};
 use crate::ops::constant::ValueName;
 use crate::ops::{OpName, Value};
 use crate::{
-    algorithm::const_fold::sorted_consts,
     extension::{
         prelude::BOOL_T,
         simple_op::{try_from_name, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError},
@@ -18,6 +17,7 @@ use crate::{
         type_param::{TypeArg, TypeParam},
         FunctionType,
     },
+    utils::sorted_consts,
     Extension, IncomingPort,
 };
 use lazy_static::lazy_static;

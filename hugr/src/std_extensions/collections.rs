@@ -8,7 +8,6 @@ use crate::ops::constant::ValueName;
 use crate::ops::{OpName, Value};
 use crate::types::TypeName;
 use crate::{
-    algorithm::const_fold::sorted_consts,
     extension::{
         simple_op::{MakeExtensionOp, OpLoadError},
         ConstFold, ExtensionId, ExtensionRegistry, ExtensionSet, SignatureError, TypeDef,
@@ -20,6 +19,7 @@ use crate::{
         type_param::{TypeArg, TypeParam},
         CustomCheckFailure, CustomType, FunctionType, PolyFuncType, Type, TypeBound,
     },
+    utils::sorted_consts,
     Extension,
 };
 

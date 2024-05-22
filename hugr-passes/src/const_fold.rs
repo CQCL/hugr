@@ -19,6 +19,7 @@ use hugr::{
     ops::{OpType, Value},
     type_row,
     types::FunctionType,
+    utils::sorted_consts,
     Hugr, HugrView, IncomingPort, Node, SimpleReplacement,
 };
 
@@ -43,21 +44,6 @@ fn out_row(consts: impl IntoIterator<Item = Value>) -> ConstFoldResult {
         .map(|(i, c)| (i.into(), c))
         .collect();
     Some(vec)
-}
-
-/// Sort folding inputs with [`IncomingPort`] as key
-fn sort_by_in_port(consts: &[(IncomingPort, Value)]) -> Vec<&(IncomingPort, Value)> {
-    let mut v: Vec<_> = consts.iter().collect();
-    v.sort_by_key(|(i, _)| i);
-    v
-}
-
-/// Sort some input constants by port and just return the constants.
-pub(crate) fn sorted_consts(consts: &[(IncomingPort, Value)]) -> Vec<&Value> {
-    sort_by_in_port(consts)
-        .into_iter()
-        .map(|(_, c)| c)
-        .collect()
 }
 
 /// For a given op and consts, attempt to evaluate the op.
