@@ -126,7 +126,7 @@ def test_insert():
     assert mapping == {new_h.root: Node(4)}
 
 
-def test_nested():
+def test_insert_nested():
     h1 = Dfg.endo([BOOL_T])
     (a1,) = h1.inputs()
     nt = h1.add_op(NOT_OP, [a1])
@@ -136,5 +136,22 @@ def test_nested():
     (a,) = h.inputs()
     nested = h.insert_nested(h1, [a])
     h.set_outputs([nested])
+
+    _validate(h.hugr)
+
+
+def test_build_nested():
+    def _nested_nop(dfg: Dfg):
+        (a1,) = dfg.inputs()
+        nt = dfg.add_op(NOT_OP, [a1])
+        dfg.set_outputs([nt])
+
+    h = Dfg.endo([BOOL_T])
+    (a,) = h.inputs()
+    nested = h.add_nested([BOOL_T], [BOOL_T], [a])
+
+    _nested_nop(nested)
+
+    h.set_outputs([nested.root])
 
     _validate(h.hugr)
