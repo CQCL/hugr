@@ -3,6 +3,7 @@ import subprocess
 from hugr.hugr import Dfg, Hugr, DummyOp, Node
 import hugr.serialization.tys as stys
 import hugr.serialization.ops as sops
+import pytest
 
 BOOL_T = stys.Type(stys.SumType(stys.UnitSum(size=2)))
 QB_T = stys.Type(stys.Qubit())
@@ -38,13 +39,45 @@ DIV_OP = DummyOp(
 
 
 def _validate(h: Hugr, mermaid: bool = False):
-    # TODO point to built hugr binary
     # cmd = ["cargo", "run", "--features", "cli", "--"]
     cmd = ["./target/debug/hugr"]
 
     if mermaid:
         cmd.append("--mermaid")
     subprocess.run(cmd + ["-"], check=True, input=h.to_serial().to_json().encode())
+
+
+def test_stable_indices():
+    h = Hugr(DummyOp(sops.DFG(parent=-1)))
+
+    nodes = [h.add_node(NOT_OP) for _ in range(3)]
+    assert len(h) == 4
+
+    h.add_link(nodes[0].out(0), nodes[1].inp(0))
+
+    assert h.num_out_ports(nodes[0]) == 1
+    assert h.num_in_ports(nodes[1]) == 1
+
+    assert h.delete_node(nodes[1]) is not None
+    assert h._nodes[nodes[1].idx] is None
+
+    assert len(h) == 3
+    assert len(h._nodes) == 4
+    assert h._free_nodes == [nodes[1]]
+
+    assert h.num_out_ports(nodes[0]) == 0
+    assert h.num_in_ports(nodes[1]) == 0
+
+    with pytest.raises(KeyError):
+        _ = h[nodes[1]]
+    with pytest.raises(KeyError):
+        _ = h[Node(46)]
+
+    new_n = h.add_node(NOT_OP)
+    assert new_n == nodes[1]
+
+    assert len(h) == 4
+    assert h._free_nodes == []
 
 
 def test_simple_id():
