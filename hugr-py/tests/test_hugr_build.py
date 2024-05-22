@@ -39,7 +39,8 @@ DIV_OP = DummyOp(
 
 def _validate(h: Hugr, mermaid: bool = False):
     # TODO point to built hugr binary
-    cmd = ["cargo", "run", "--features", "cli", "--"]
+    # cmd = ["cargo", "run", "--features", "cli", "--"]
+    cmd = ["./target/debug/hugr"]
 
     if mermaid:
         cmd.append("--mermaid")
