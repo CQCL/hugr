@@ -138,7 +138,7 @@ class Hugr(Mapping[Node, NodeData]):
         return iter(self._nodes)
 
     def __len__(self) -> int:
-        return len(self._nodes) - len(self._free_nodes)
+        return self.num_nodes()
 
     def add_node(
         self,
@@ -155,15 +155,17 @@ class Hugr(Mapping[Node, NodeData]):
             self._nodes.append(node_data)
         return node
 
-    def delete_node(self, node: Node) -> None:
+    def delete_node(self, node: Node) -> NodeData | None:
         for offset in range(self.num_in_ports(node)):
             self._links.delete_right(node.inp(offset))
         for offset in range(self.num_out_ports(node)):
             self._links.delete_left(node.out(offset))
-        self._nodes[node.idx] = None
-        self._free_nodes.append(node)
 
-    def add_link(self, src: OutPort, dst: InPort, ty: Type | None = None) -> None:
+        weight, self._nodes[node.idx] = self._nodes[node.idx], None
+        self._free_nodes.append(node)
+        return weight
+
+    def add_link(self, src: OutPort, dst: InPort) -> None:
         src = _unused_sub_offset(src, self._links)
         dst = _unused_sub_offset(dst, self._links)
         if self._links.get_left(dst) is not None:
@@ -172,6 +174,9 @@ class Hugr(Mapping[Node, NodeData]):
 
     def delete_link(self, src: OutPort, dst: InPort) -> None:
         self._links.delete_left(src)
+
+    def num_nodes(self) -> int:
+        return len(self._nodes) - len(self._free_nodes)
 
     def num_in_ports(self, node: Node) -> int:
         return len(self.in_ports(node))
