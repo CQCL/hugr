@@ -1,6 +1,7 @@
+from dataclasses import dataclass
 import subprocess
 
-from hugr.hugr import Dfg, Hugr, DummyOp, Node
+from hugr.hugr import Dfg, Hugr, DummyOp, Node, Command, ToPort, Op
 import hugr.serialization.tys as stys
 import hugr.serialization.ops as sops
 import pytest
@@ -27,15 +28,42 @@ NOT_OP = DummyOp(
     )
 )
 
-DIV_OP = DummyOp(
-    sops.CustomOp(
-        parent=-1,
-        extension="arithmetic.int",
-        op_name="idivmod_u",
-        signature=stys.FunctionType(input=[INT_T] * 2, output=[INT_T] * 2),
-        args=[ARG_5, ARG_5],
-    )
-)
+
+@dataclass
+class Not(Command):
+    a: ToPort
+
+    def incoming(self) -> list[ToPort]:
+        return [self.a]
+
+    def num_out(self) -> int | None:
+        return 1
+
+    def op(self) -> Op:
+        return NOT_OP
+
+
+@dataclass
+class DivMod(Command):
+    a: ToPort
+    b: ToPort
+
+    def incoming(self) -> list[ToPort]:
+        return [self.a, self.b]
+
+    def num_out(self) -> int | None:
+        return 2
+
+    def op(self) -> Op:
+        return DummyOp(
+            sops.CustomOp(
+                parent=-1,
+                extension="arithmetic.int",
+                op_name="idivmod_u",
+                signature=stys.FunctionType(input=[INT_T] * 2, output=[INT_T] * 2),
+                args=[ARG_5, ARG_5],
+            )
+        )
 
 
 def _validate(h: Hugr, mermaid: bool = False):
@@ -127,7 +155,7 @@ def test_tuple():
 def test_multi_out():
     h = Dfg([INT_T] * 2, [INT_T] * 2)
     a, b = h.inputs()
-    a, b = h.add_op(DIV_OP, a, b)[:2]
+    a, b = h.add(DivMod(a, b))
     h.set_outputs(a, b)
 
     _validate(h.hugr)
@@ -136,7 +164,7 @@ def test_multi_out():
 def test_insert():
     h1 = Dfg.endo([BOOL_T])
     (a1,) = h1.inputs()
-    nt = h1.add_op(NOT_OP, a1)
+    nt = h1.add(Not(a1))
     h1.set_outputs(nt)
 
     assert len(h1.hugr) == 4
@@ -149,7 +177,7 @@ def test_insert():
 def test_insert_nested():
     h1 = Dfg.endo([BOOL_T])
     (a1,) = h1.inputs()
-    nt = h1.add_op(NOT_OP, a1)
+    nt = h1.add(Not(a1))
     h1.set_outputs(nt)
 
     h = Dfg.endo([BOOL_T])
@@ -163,7 +191,7 @@ def test_insert_nested():
 def test_build_nested():
     def _nested_nop(dfg: Dfg):
         (a1,) = dfg.inputs()
-        nt = dfg.add_op(NOT_OP, a1)
+        nt = dfg.add(Not(a1))
         dfg.set_outputs(nt)
 
     h = Dfg.endo([BOOL_T])
