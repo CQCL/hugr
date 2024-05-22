@@ -1,4 +1,4 @@
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 
 from collections.abc import Collection, Mapping
 from typing import Iterable, Sequence, Protocol, Generic, TypeVar, overload
@@ -35,6 +35,7 @@ class OutPort(Port, ToPort):
 @dataclass(frozen=True, eq=True, order=True)
 class Node(ToPort):
     idx: int
+    _num_out_ports: int | None = field(default=None, compare=False)
 
     @overload
     def __getitem__(self, index: int) -> OutPort: ...
@@ -48,12 +49,17 @@ class Node(ToPort):
     ) -> OutPort | Iterable[OutPort]:
         match index:
             case int(index):
+                if self._num_out_ports is not None:
+                    if index >= self._num_out_ports:
+                        raise IndexError("Index out of range")
                 return self.out(index)
             case slice():
                 start = index.start or 0
-                stop = index.stop
+                stop = index.stop or self._num_out_ports
                 if stop is None:
-                    raise ValueError("Stop must be specified")
+                    raise ValueError(
+                        "Stop must be specified when number of outputs unknown"
+                    )
                 step = index.step or 1
                 return (self[i] for i in range(start, stop, step))
             case tuple(xs):
@@ -82,6 +88,13 @@ class DummyOp(Op, Generic[T]):
 
     def to_serial(self, node: Node, hugr: "Hugr") -> SerialOp:
         return SerialOp(root=self._serial_op)  # type: ignore
+
+
+class Command(Protocol):
+    def op(self) -> Op: ...
+    def incoming(self) -> Iterable[ToPort]: ...
+    def num_out(self) -> int | None:
+        return None
 
 
 @dataclass()
@@ -144,6 +157,7 @@ class Hugr(Mapping[Node, NodeData]):
         self,
         op: Op,
         parent: Node | None = None,
+        num_outs: int | None = None,
     ) -> Node:
         node_data = NodeData(op, parent)
 
@@ -153,7 +167,7 @@ class Hugr(Mapping[Node, NodeData]):
         else:
             node = Node(len(self._nodes))
             self._nodes.append(node_data)
-        return node
+        return replace(node, _num_out_ports=num_outs)
 
     def delete_node(self, node: Node) -> NodeData | None:
         for offset in range(self.num_in_ports(node)):
@@ -245,7 +259,9 @@ class Dfg:
         self.hugr = Hugr(root_op)
         self.root = self.hugr.root
         self.input_node = self.hugr.add_node(
-            DummyOp(sops.Input(parent=0, types=input_types)), self.root
+            DummyOp(sops.Input(parent=0, types=input_types)),
+            self.root,
+            len(input_types),
         )
         self.output_node = self.hugr.add_node(
             DummyOp(sops.Output(parent=0, types=output_types)), self.root
@@ -267,10 +283,13 @@ class Dfg:
             for i in range(len(self._input_op()._serial_op.types))
         ]
 
-    def add_op(self, op: Op, /, *args: ToPort) -> Node:
-        new_n = self.hugr.add_node(op, self.root)
+    def add_op(self, op: Op, /, *args: ToPort, num_outs: int | None = None) -> Node:
+        new_n = self.hugr.add_node(op, self.root, num_outs=num_outs)
         self._wire_up(new_n, args)
         return new_n
+
+    def add(self, com: Command) -> Node:
+        return self.add_op(com.op(), *com.incoming(), num_outs=com.num_out())
 
     def insert_nested(self, dfg: "Dfg", *args: ToPort) -> Node:
         mapping = self.hugr.insert_hugr(dfg.hugr, self.root)
