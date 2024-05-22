@@ -225,6 +225,7 @@ class Hugr(Mapping[Node, NodeData]):
 @dataclass()
 class Dfg:
     hugr: Hugr
+    root: Node
     input_node: Node
     output_node: Node
 
@@ -237,11 +238,12 @@ class Dfg:
         root_op._serial_op.signature.input = input_types
         root_op._serial_op.signature.output = output_types
         self.hugr = Hugr(root_op)
+        self.root = self.hugr.root
         self.input_node = self.hugr.add_node(
-            DummyOp(sops.Input(parent=0, types=input_types)), self.hugr.root
+            DummyOp(sops.Input(parent=0, types=input_types)), self.root
         )
         self.output_node = self.hugr.add_node(
-            DummyOp(sops.Output(parent=0, types=output_types)), self.hugr.root
+            DummyOp(sops.Output(parent=0, types=output_types)), self.root
         )
 
     @classmethod
@@ -261,19 +263,28 @@ class Dfg:
         ]
 
     def add_op(self, op: Op, ports: Iterable[ToPort]) -> Node:
-        new_n = self.hugr.add_node(op, self.hugr.root)
+        new_n = self.hugr.add_node(op, self.root)
         self._wire_up(new_n, ports)
         return new_n
 
     def insert_nested(self, dfg: "Dfg", ports: Iterable[ToPort]) -> Node:
-        mapping = self.hugr.insert_hugr(dfg.hugr, self.hugr.root)
-        self._wire_up(mapping[dfg.hugr.root], ports)
-        return mapping[dfg.hugr.root]
+        mapping = self.hugr.insert_hugr(dfg.hugr, self.root)
+        self._wire_up(mapping[dfg.root], ports)
+        return mapping[dfg.root]
 
-    def add_nested(self, ports: Iterable[ToPort]) -> "Dfg":
-        dfg = Dfg.__new__(Dfg)
+    def add_nested(
+        self,
+        input_types: Sequence[Type],
+        output_types: Sequence[Type],
+        ports: Iterable[ToPort],
+    ) -> "Dfg":
+        dfg = Dfg(input_types, output_types)
+        mapping = self.hugr.insert_hugr(dfg.hugr, self.root)
+        self._wire_up(mapping[dfg.root], ports)
         dfg.hugr = self.hugr
-        # I/O nodes
+        dfg.input_node = mapping[dfg.input_node]
+        dfg.output_node = mapping[dfg.output_node]
+        dfg.root = mapping[dfg.root]
 
         return dfg
 
