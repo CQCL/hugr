@@ -9,9 +9,12 @@ use hugr::std_extensions::logic::EXTENSION as LOGICS_EXTENSION;
 
 use hugr::extension::{ExtensionRegistry, PRELUDE};
 
-use hugr::cli::run;
+use clap::Parser;
+use hugr::cli::CmdLineArgs;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let opts = CmdLineArgs::parse();
+
     // validate with all std extensions
     let reg = ExtensionRegistry::try_new([
         PRELUDE.to_owned(),
@@ -24,5 +27,5 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ])
     .unwrap();
 
-    run(&reg)
+    opts.run(&reg)
 }

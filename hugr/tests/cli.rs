@@ -34,7 +34,6 @@ fn test_hugr_string(test_hugr: Hugr) -> String {
 
 #[fixture]
 fn test_hugr_file(test_hugr_string: String) -> NamedTempFile {
-    // TODO use proptests?
     let file = assert_fs::NamedTempFile::new("sample.hugr").unwrap();
     file.write_str(&test_hugr_string).unwrap();
     file
