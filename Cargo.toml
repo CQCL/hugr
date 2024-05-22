@@ -4,7 +4,7 @@ lto = "thin"
 [workspace]
 resolver = "2"
 members = ["hugr", "hugr-passes"]
-default-members = ["hugr"]
+default-members = ["hugr", "hugr-passes"]
 
 [workspace.package]
 rust-version = "1.75"
