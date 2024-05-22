@@ -1,4 +1,5 @@
-import pytest
+import subprocess
+
 from hugr.hugr import Dfg, Hugr, DummyOp, Node
 import hugr.serialization.tys as stys
 import hugr.serialization.ops as sops
@@ -36,28 +37,13 @@ DIV_OP = DummyOp(
 )
 
 
-VALIDATE_DIR = None
+def _validate(h: Hugr, mermaid: bool = False):
+    # TODO point to built hugr binary
+    cmd = ["cargo", "run", "--features", "cli", "--"]
 
-
-@pytest.fixture(scope="session", autouse=True)
-def validate_dir(tmp_path_factory: pytest.TempPathFactory) -> None:
-    global VALIDATE_DIR
-    VALIDATE_DIR = tmp_path_factory.mktemp("hugrs")
-
-
-def _validate(h: Hugr, mermaid: bool = False, filename: str = "dump.hugr"):
-    import subprocess
-
-    assert VALIDATE_DIR is not None
-    with open(VALIDATE_DIR / filename, "w") as f:
-        f.write(h.to_serial().to_json())
-        f.flush()
-        # TODO point to built hugr binary
-        cmd = ["cargo", "run", "--"]
-
-        if mermaid:
-            cmd.append("--mermaid")
-        subprocess.run(cmd + [f.name], check=True)
+    if mermaid:
+        cmd.append("--mermaid")
+    subprocess.run(cmd + ["-"], check=True, input=h.to_serial().to_json().encode())
 
 
 def test_simple_id():
