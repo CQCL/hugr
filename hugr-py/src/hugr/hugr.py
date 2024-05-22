@@ -267,14 +267,14 @@ class Dfg:
             for i in range(len(self._input_op()._serial_op.types))
         ]
 
-    def add_op(self, op: Op, ports: Iterable[ToPort]) -> Node:
+    def add_op(self, op: Op, /, *args: ToPort) -> Node:
         new_n = self.hugr.add_node(op, self.root)
-        self._wire_up(new_n, ports)
+        self._wire_up(new_n, args)
         return new_n
 
-    def insert_nested(self, dfg: "Dfg", ports: Iterable[ToPort]) -> Node:
+    def insert_nested(self, dfg: "Dfg", *args: ToPort) -> Node:
         mapping = self.hugr.insert_hugr(dfg.hugr, self.root)
-        self._wire_up(mapping[dfg.root], ports)
+        self._wire_up(mapping[dfg.root], args)
         return mapping[dfg.root]
 
     def add_nested(
@@ -293,17 +293,17 @@ class Dfg:
 
         return dfg
 
-    def set_outputs(self, ports: Iterable[ToPort]) -> None:
-        self._wire_up(self.output_node, ports)
+    def set_outputs(self, *args: ToPort) -> None:
+        self._wire_up(self.output_node, args)
 
-    def make_tuple(self, ports: Iterable[ToPort], tys: Sequence[Type]) -> Node:
-        ports = list(ports)
+    def make_tuple(self, tys: Sequence[Type], *args: ToPort) -> Node:
+        ports = list(args)
         assert len(tys) == len(ports), "Number of types must match number of ports"
-        return self.add_op(DummyOp(sops.MakeTuple(parent=0, tys=list(tys))), ports)
+        return self.add_op(DummyOp(sops.MakeTuple(parent=0, tys=list(tys))), *args)
 
-    def split_tuple(self, port: ToPort, tys: Sequence[Type]) -> list[OutPort]:
+    def split_tuple(self, tys: Sequence[Type], port: ToPort) -> list[OutPort]:
         tys = list(tys)
-        n = self.add_op(DummyOp(sops.UnpackTuple(parent=0, tys=tys)), [port])
+        n = self.add_op(DummyOp(sops.UnpackTuple(parent=0, tys=tys)), port)
 
         return [n.out(i) for i in range(len(tys))]
 
