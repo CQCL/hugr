@@ -2,6 +2,7 @@
 //! [`Hugr`]: crate::hugr::Hugr
 
 use std::collections::HashMap;
+use serde::de::DeserializeOwned;
 use thiserror::Error;
 
 use crate::core::NodeIndex;
@@ -14,7 +15,11 @@ use portgraph::{Direction, LinkError, PortView};
 
 use serde::{Deserialize, Deserializer, Serialize};
 
+use self::upgrade::UpgradeError;
+
 use super::{HugrMut, HugrView, NodeMetadataMap};
+
+mod upgrade;
 
 /// A wrapper over the available HUGR serialization formats.
 ///
@@ -34,11 +39,11 @@ enum Versioned<SerHugr =SerHugrLatest> {
     /// Version 0 of the HUGR serialization format.
     V0,
 
-    #[serde(skip_serializing,deserialize_with = "deserialize_v1")]
-    V1(Box<dyn FnOnce() -> SerHugr>),
+    V1(serde_json::Value),
+    V2(serde_json::Value),
 
     /// Version 1 of the HUGR serialization format.
-    V2(SerHugr),
+    V3(SerHugr),
 
     #[serde(skip_serializing)]
     #[serde(other)]
@@ -47,20 +52,36 @@ enum Versioned<SerHugr =SerHugrLatest> {
 
 impl<T> Versioned<T> {
     pub fn new_latest(t: T) -> Self {
-        Self::V2(t.into())
+        Self::V3(t.into())
     }
 
-    fn get_latest(self)  -> T {
-        let Self::V2(t) = self else {
+    fn get_latest(self) -> T {
+        let Self::V3(t) = self else {
             panic!("Versioned::get_latest: Not the latest")
         };
         t
     }
 }
 
-fn deserialize_v1<'de, SerHugr, D>(d: D) -> Result<Box<dyn FnOnce() -> SerHugr>, D::Error> where D: Deserializer<'de> {
-    todo!()
 
+fn go<D: serde::de::DeserializeOwned>(v: serde_json::Value) -> Result<D,UpgradeError> {
+    serde_json::from_value(v).map_err(Into::into)
+}
+
+
+impl<T: DeserializeOwned> Versioned<T> {
+    fn upgrade(mut self) -> Result<T,UpgradeError> {
+        loop {
+            match self {
+                Self::V0 => Err(UpgradeError::KnownVersionUnsupported("0".into()))?,
+                // the upgrade lines remain unchanged when adding a new constructor
+                Self::V1(json) => self = Self::V2(upgrade::upgrade_v1_to_v2(json).and_then(go)?),
+                Self::V2(json) => self = Self::V3(upgrade::upgrade_v2_to_v3(json).and_then(go)?),
+                Self::V3(ser_hugr) => return Ok(ser_hugr),
+                Versioned::Unsupported => Err(UpgradeError::UnknownVersionUnsupported)?
+            }
+        }
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
@@ -133,16 +154,9 @@ impl<'de> Deserialize<'de> for Hugr {
     where
         D: Deserializer<'de>,
     {
-        let shg: Versioned<SerHugrLatest<>> = Versioned::deserialize(deserializer)?;
-        match shg {
-            Versioned::V0 => Err(serde::de::Error::custom(
-                "Version 0 HUGR serialization format is not supported.",
-            )),
-            Versioned::V1(shg) => shg.try_into().map_err(serde::de::Error::custom),
-            Versioned::Unsupported => Err(serde::de::Error::custom(
-                "Unsupported HUGR serialization format.",
-            )),
-        }
+        let versioned = Versioned::deserialize(deserializer)?;
+        let shl: SerHugrLatest = versioned.upgrade().map_err(serde::de::Error::custom)?;
+        shl.try_into().map_err(serde::de::Error::custom)
     }
 }
 
