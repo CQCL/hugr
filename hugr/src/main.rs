@@ -12,7 +12,7 @@ use hugr::extension::{ExtensionRegistry, PRELUDE};
 use clap::Parser;
 use hugr::cli::CmdLineArgs;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() {
     let opts = CmdLineArgs::parse();
 
     // validate with all std extensions
@@ -27,5 +27,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ])
     .unwrap();
 
-    opts.run(&reg)
+    if let Err(e) = opts.run(&reg) {
+        eprintln!("{}", e);
+        std::process::exit(1);
+    }
 }

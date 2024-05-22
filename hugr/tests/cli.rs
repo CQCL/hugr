@@ -1,17 +1,17 @@
 #![cfg(feature = "cli")]
-
 use assert_cmd::Command;
 use assert_fs::{fixture::FileWriteStr, NamedTempFile};
 use hugr::{
-    builder::{Dataflow, DataflowHugr},
-    extension::prelude::BOOL_T,
+    builder::{Container, Dataflow, DataflowHugr},
+    extension::prelude::{BOOL_T, QB_T},
     type_row,
     types::FunctionType,
     Hugr,
 };
-use predicates::prelude::*;
+use predicates::{prelude::*, str::contains};
 use rstest::{fixture, rstest};
 
+use hugr::builder::DFGBuilder;
 use hugr::cli::VALID_PRINT;
 #[fixture]
 fn cmd() -> Command {
@@ -20,8 +20,6 @@ fn cmd() -> Command {
 
 #[fixture]
 fn test_hugr() -> Hugr {
-    use hugr::builder::DFGBuilder;
-
     let df = DFGBuilder::new(FunctionType::new_endo(type_row![BOOL_T])).unwrap();
     let [i] = df.input_wires_arr();
     df.finish_prelude_hugr_with_outputs([i]).unwrap()
@@ -40,55 +38,56 @@ fn test_hugr_file(test_hugr_string: String) -> NamedTempFile {
 }
 
 #[rstest]
-fn test_doesnt_exist(mut cmd: Command) -> Result<(), Box<dyn std::error::Error>> {
+fn test_doesnt_exist(mut cmd: Command) {
     cmd.arg("foobar");
     cmd.assert()
         .failure()
-        .stderr(predicate::str::contains("No such file or directory"));
-
-    Ok(())
+        .stderr(contains("No such file or directory").and(contains("Error reading input")));
 }
 
 #[rstest]
-fn test_validate(
-    test_hugr_file: NamedTempFile,
-    mut cmd: Command,
-) -> Result<(), Box<dyn std::error::Error>> {
+fn test_validate(test_hugr_file: NamedTempFile, mut cmd: Command) {
     cmd.arg(test_hugr_file.path());
-    cmd.assert()
-        .success()
-        .stdout(predicate::str::contains(VALID_PRINT));
-
-    Ok(())
+    cmd.assert().success().stdout(contains(VALID_PRINT));
 }
 
 #[rstest]
-fn test_stdin(
-    test_hugr_string: String,
-    mut cmd: Command,
-) -> Result<(), Box<dyn std::error::Error>> {
+fn test_stdin(test_hugr_string: String, mut cmd: Command) {
     cmd.write_stdin(test_hugr_string);
     cmd.arg("-");
 
-    cmd.assert()
-        .success()
-        .stdout(predicate::str::contains(VALID_PRINT));
-
-    Ok(())
+    cmd.assert().success().stdout(contains(VALID_PRINT));
 }
 
 #[rstest]
-fn test_mermaid(
-    test_hugr_file: NamedTempFile,
-    mut cmd: Command,
-) -> Result<(), Box<dyn std::error::Error>> {
+fn test_mermaid(test_hugr_file: NamedTempFile, mut cmd: Command) {
     const MERMAID: &str = "graph LR\n    subgraph 0 [\"(0) DFG\"]";
     cmd.arg(test_hugr_file.path());
     cmd.arg("--mermaid");
     cmd.arg("--no-validate");
-    cmd.assert()
-        .success()
-        .stdout(predicate::str::contains(MERMAID));
+    cmd.assert().success().stdout(contains(MERMAID));
+}
 
-    Ok(())
+#[rstest]
+fn test_bad_hugr(mut cmd: Command) {
+    let df = DFGBuilder::new(FunctionType::new_endo(type_row![QB_T])).unwrap();
+    let bad_hugr = df.hugr().clone();
+
+    let bad_hugr_string = serde_json::to_string(&bad_hugr).unwrap();
+    cmd.write_stdin(bad_hugr_string);
+    cmd.arg("-");
+
+    cmd.assert()
+        .failure()
+        .stderr(contains("Error validating HUGR").and(contains("unconnected port")));
+}
+
+#[rstest]
+fn test_bad_json(mut cmd: Command) {
+    cmd.write_stdin(r#"{"foo": "bar"}"#);
+    cmd.arg("-");
+
+    cmd.assert()
+        .failure()
+        .stderr(contains("Error parsing input"));
 }
