@@ -4,7 +4,7 @@ use std::fmt::{self, Debug, Display};
 
 use itertools::Itertools;
 
-use crate::{ops::Value, IncomingPort};
+use crate::{ops::Value, Hugr, HugrView, IncomingPort, Node};
 
 /// Write a comma separated list of of some types.
 /// Like debug_list, but using the Display instance rather than Debug,
@@ -222,6 +222,14 @@ pub fn sorted_consts(consts: &[(IncomingPort, Value)]) -> Vec<&Value> {
         .into_iter()
         .map(|(_, c)| c)
         .collect()
+}
+
+/// Calculate the depth of a node in the hierarchy.
+pub fn depth(h: &Hugr, n: Node) -> u32 {
+    match h.get_parent(n) {
+        Some(p) => 1 + depth(h, p),
+        None => 0,
+    }
 }
 
 #[allow(dead_code)]

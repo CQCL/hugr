@@ -578,11 +578,13 @@ pub(crate) mod test {
     use hugr::extension::PRELUDE_REGISTRY;
     use hugr::extension::{prelude::USIZE_T, ExtensionSet};
 
+    use hugr::hugr::rewrite::insert_identity::{IdentityInsertion, IdentityInsertionError};
     use hugr::hugr::views::RootChecked;
     use hugr::ops::handle::{ConstID, NodeHandle};
     use hugr::ops::Value;
     use hugr::type_row;
-    use hugr::types::{FunctionType, Type};
+    use hugr::types::{EdgeKind, FunctionType, Type};
+    use hugr::utils::depth;
     const NAT: Type = USIZE_T;
 
     pub fn group_by<E: Eq + Hash + Ord, V: Eq + Hash>(h: HashMap<E, V>) -> HashSet<Vec<E>> {
@@ -814,6 +816,25 @@ pub(crate) mod test {
         Ok(())
     }
 
+    #[test]
+    fn incorrect_insertion() {
+        let (mut h, _, tail) = build_conditional_in_loop_cfg(false).unwrap();
+
+        let final_node = tail.node();
+
+        let final_node_input = h.node_inputs(final_node).next().unwrap();
+
+        let rw = IdentityInsertion::new(final_node, final_node_input);
+
+        let apply_result = h.apply_rewrite(rw);
+        assert_eq!(
+            apply_result,
+            Err(IdentityInsertionError::InvalidPortKind(Some(
+                EdgeKind::ControlFlow
+            )))
+        );
+    }
+
     fn n_identity<T: DataflowSubContainer>(
         mut dataflow_builder: T,
         pred_const: &ConstID,
@@ -935,12 +956,5 @@ pub(crate) mod test {
         cfg_builder.branch(&tail, 0, &exit)?;
 
         Ok((head, tail))
-    }
-
-    pub fn depth(h: &Hugr, n: Node) -> u32 {
-        match h.get_parent(n) {
-            Some(p) => 1 + depth(h, p),
-            None => 0,
-        }
     }
 }
