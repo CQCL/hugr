@@ -244,7 +244,7 @@ mod test {
     use rstest::rstest;
 
     /// Check that a hugr just loads and returns a single expected constant.
-    fn assert_fully_folded(h: &Hugr, expected_value: &Value) {
+    pub fn assert_fully_folded(h: &Hugr, expected_value: &Value) {
         assert_fully_folded_with(h, |v| v == expected_value)
     }
 

@@ -1,17 +1,20 @@
-use crate::algorithm::const_fold::constant_fold_pass;
-use crate::builder::{DFGBuilder, Dataflow, DataflowHugr};
-use crate::extension::prelude::{sum_with_error, ConstError, ConstString, BOOL_T, STRING_TYPE};
-use crate::extension::{ExtensionRegistry, PRELUDE};
-use crate::ops::Value;
-use crate::std_extensions::arithmetic;
-use crate::std_extensions::arithmetic::int_ops::IntOpDef;
-use crate::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
-use crate::std_extensions::logic::{self, NaryLogic};
-use crate::type_row;
-use crate::types::{FunctionType, Type, TypeRow};
-use crate::utils::test::assert_fully_folded;
+use crate::const_fold::constant_fold_pass;
+use hugr::builder::{DFGBuilder, Dataflow, DataflowHugr};
+use hugr::extension::prelude::{sum_with_error, ConstError, ConstString, BOOL_T, STRING_TYPE};
+use hugr::extension::{ExtensionRegistry, PRELUDE};
+use hugr::ops::Value;
+use hugr::std_extensions::arithmetic;
+use hugr::std_extensions::arithmetic::int_ops::IntOpDef;
+use hugr::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
+use hugr::std_extensions::logic::{self, NaryLogic};
+use hugr::type_row;
+use hugr::types::{FunctionType, Type, TypeRow};
 
 use rstest::rstest;
+
+use super::test::assert_fully_folded;
+
+use lazy_static::lazy_static;
 
 #[test]
 fn test_fold_iwiden_u() {
@@ -109,10 +112,17 @@ fn test_fold_inarrow<I: Copy, C: Into<Value>, E: std::fmt::Debug>(
     .unwrap();
     let mut h = build.finish_hugr_with_outputs(x1.outputs(), &reg).unwrap();
     constant_fold_pass(&mut h, &reg);
+    lazy_static! {
+        static ref INARROW_ERROR_VALUE: Value = ConstError {
+            signal: 0,
+            message: "Integer too large to narrow".to_string(),
+        }
+        .into();
+    }
     let expected = if succeeds {
         Value::sum(0, [mk_const(to_log_width, val).unwrap().into()], sum_type).unwrap()
     } else {
-        Value::sum(1, [super::INARROW_ERROR_VALUE.clone()], sum_type).unwrap()
+        Value::sum(1, [INARROW_ERROR_VALUE.clone()], sum_type).unwrap()
     };
     assert_fully_folded(&h, &expected);
 }
