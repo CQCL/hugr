@@ -1,8 +1,8 @@
 use crate::{
-    algorithm::const_fold::sorted_consts,
     extension::{prelude::ConstString, ConstFold, ConstFoldResult, OpDef},
     ops,
     std_extensions::arithmetic::float_types::ConstF64,
+    utils::sorted_consts,
     IncomingPort,
 };
 
