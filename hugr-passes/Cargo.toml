@@ -5,10 +5,10 @@ edition = "2021"
 
 [dependencies]
 hugr = { path = "../hugr" }
-itertools = "0.12.0"
-lazy_static = "1.4.0"
-paste = "1.0"
-thiserror = "1.0.28"
+itertools = { workspace = true }
+lazy_static = { workspace = true }
+paste = { workspace = true }
+thiserror = { workspace = true }
 
 [features]
 extension_inference = ["hugr/extension_inference"]
