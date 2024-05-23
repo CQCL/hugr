@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.5.0 (2024-05-23)
+
+### Features
+
+- [**breaking**] Remove `PartialEq` impl for `ConstF64` ([#1079](https://github.com/CQCL/hugr/pull/1079))
+- [**breaking**] Allow "Row Variables" declared as List<Type> ([#804](https://github.com/CQCL/hugr/pull/804))
+- Hugr binary cli tool ([#1096](https://github.com/CQCL/hugr/pull/1096))
+- [**breaking**] Move passes from `algorithms` into a separate crate ([#1100](https://github.com/CQCL/hugr/pull/1100))
+
+### Refactor
+
+- [**breaking**] No Ports in TypeRow ([#1087](https://github.com/CQCL/hugr/pull/1087))
+
+
 ## 0.4.0 (2024-05-20)
 
 ### Bug Fixes
