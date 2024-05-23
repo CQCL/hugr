@@ -100,9 +100,7 @@ mod tests {
     use super::super::simple_replace::test::dfg_hugr;
     use super::*;
     use crate::{
-        algorithm::nest_cfgs::test::build_conditional_in_loop_cfg,
         extension::{prelude::QB_T, PRELUDE_REGISTRY},
-        ops::handle::NodeHandle,
         Hugr,
     };
 
@@ -130,24 +128,5 @@ mod tests {
         assert_eq!(noop, Noop { ty: QB_T });
 
         h.update_validate(&PRELUDE_REGISTRY).unwrap();
-    }
-
-    #[test]
-    fn incorrect_insertion() {
-        let (mut h, _, tail) = build_conditional_in_loop_cfg(false).unwrap();
-
-        let final_node = tail.node();
-
-        let final_node_input = h.node_inputs(final_node).next().unwrap();
-
-        let rw = IdentityInsertion::new(final_node, final_node_input);
-
-        let apply_result = h.apply_rewrite(rw);
-        assert_eq!(
-            apply_result,
-            Err(IdentityInsertionError::InvalidPortKind(Some(
-                EdgeKind::ControlFlow
-            )))
-        );
     }
 }

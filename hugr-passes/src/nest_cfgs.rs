@@ -44,14 +44,14 @@ use std::hash::Hash;
 use itertools::Itertools;
 use thiserror::Error;
 
-use crate::hugr::rewrite::outline_cfg::OutlineCfg;
-use crate::hugr::views::sibling::SiblingMut;
-use crate::hugr::views::{HierarchyView, HugrView, SiblingGraph};
-use crate::hugr::{HugrMut, Rewrite, RootTagged};
-use crate::ops::handle::{BasicBlockID, CfgID};
-use crate::ops::OpTag;
-use crate::ops::OpTrait;
-use crate::{Direction, Hugr, Node};
+use hugr::hugr::rewrite::outline_cfg::OutlineCfg;
+use hugr::hugr::views::sibling::SiblingMut;
+use hugr::hugr::views::{HierarchyView, HugrView, SiblingGraph};
+use hugr::hugr::{hugrmut::HugrMut, Rewrite, RootTagged};
+use hugr::ops::handle::{BasicBlockID, CfgID};
+use hugr::ops::OpTag;
+use hugr::ops::OpTrait;
+use hugr::{Direction, Hugr, Node};
 
 /// A "view" of a CFG in a Hugr which allows basic blocks in the underlying CFG to be split into
 /// multiple blocks in the view (or merged together).
@@ -574,15 +574,17 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> EdgeClassifier<T> {
 #[cfg(test)]
 pub(crate) mod test {
     use super::*;
-    use crate::builder::{BuildError, CFGBuilder, Container, DataflowSubContainer, HugrBuilder};
-    use crate::extension::PRELUDE_REGISTRY;
-    use crate::extension::{prelude::USIZE_T, ExtensionSet};
+    use hugr::builder::{BuildError, CFGBuilder, Container, DataflowSubContainer, HugrBuilder};
+    use hugr::extension::PRELUDE_REGISTRY;
+    use hugr::extension::{prelude::USIZE_T, ExtensionSet};
 
-    use crate::hugr::views::RootChecked;
-    use crate::ops::handle::{ConstID, NodeHandle};
-    use crate::ops::Value;
-    use crate::type_row;
-    use crate::types::{FunctionType, Type};
+    use hugr::hugr::rewrite::insert_identity::{IdentityInsertion, IdentityInsertionError};
+    use hugr::hugr::views::RootChecked;
+    use hugr::ops::handle::{ConstID, NodeHandle};
+    use hugr::ops::Value;
+    use hugr::type_row;
+    use hugr::types::{EdgeKind, FunctionType, Type};
+    use hugr::utils::depth;
     const NAT: Type = USIZE_T;
 
     pub fn group_by<E: Eq + Hash + Ord, V: Eq + Hash>(h: HashMap<E, V>) -> HashSet<Vec<E>> {
@@ -814,6 +816,25 @@ pub(crate) mod test {
         Ok(())
     }
 
+    #[test]
+    fn incorrect_insertion() {
+        let (mut h, _, tail) = build_conditional_in_loop_cfg(false).unwrap();
+
+        let final_node = tail.node();
+
+        let final_node_input = h.node_inputs(final_node).next().unwrap();
+
+        let rw = IdentityInsertion::new(final_node, final_node_input);
+
+        let apply_result = h.apply_rewrite(rw);
+        assert_eq!(
+            apply_result,
+            Err(IdentityInsertionError::InvalidPortKind(Some(
+                EdgeKind::ControlFlow
+            )))
+        );
+    }
+
     fn n_identity<T: DataflowSubContainer>(
         mut dataflow_builder: T,
         pred_const: &ConstID,
@@ -935,12 +956,5 @@ pub(crate) mod test {
         cfg_builder.branch(&tail, 0, &exit)?;
 
         Ok((head, tail))
-    }
-
-    pub fn depth(h: &Hugr, n: Node) -> u32 {
-        match h.get_parent(n) {
-            Some(p) => 1 + depth(h, p),
-            None => 0,
-        }
     }
 }

@@ -445,7 +445,6 @@ mod test {
     use cool_asserts::assert_matches;
     use itertools::Itertools;
 
-    use crate::algorithm::nest_cfgs::test::depth;
     use crate::builder::{
         BuildError, CFGBuilder, Container, DFGBuilder, Dataflow, DataflowHugr,
         DataflowSubContainer, HugrBuilder, SubContainer,
@@ -463,6 +462,7 @@ mod test {
     use crate::ops::{self, Case, DataflowBlock, OpTag, OpType, DFG};
     use crate::std_extensions::collections;
     use crate::types::{FunctionType, Type, TypeArg, TypeRow};
+    use crate::utils::depth;
     use crate::{type_row, Direction, Hugr, HugrView, OutgoingPort};
 
     use super::{NewEdgeKind, NewEdgeSpec, ReplaceError, Replacement};

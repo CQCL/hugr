@@ -14,8 +14,16 @@ changelog_update = false
 # (This would normally only be enabled once there are multiple packages in the workspace)
 git_tag_name = "{{ package }}-v{{ version }}"
 
+git_release_name = "{{ package }}: v{{ version }}"
+
 [[package]]
 name = "hugr"
+
+# Enable the changelog for this package
+changelog_update = true
+
+[[package]]
+name = "hugr-passes"
 
 # Enable the changelog for this package
 changelog_update = true

@@ -1,6 +1,10 @@
+//! General utilities.
+
 use std::fmt::{self, Debug, Display};
 
 use itertools::Itertools;
+
+use crate::{ops::Value, Hugr, HugrView, IncomingPort, Node};
 
 /// Write a comma separated list of of some types.
 /// Like debug_list, but using the Display instance rather than Debug,
@@ -202,6 +206,29 @@ pub(crate) mod test_quantum_extension {
 
     pub(crate) fn q_discard() -> CustomOp {
         get_gate("QDiscard")
+    }
+}
+
+/// Sort folding inputs with [`IncomingPort`] as key
+fn sort_by_in_port(consts: &[(IncomingPort, Value)]) -> Vec<&(IncomingPort, Value)> {
+    let mut v: Vec<_> = consts.iter().collect();
+    v.sort_by_key(|(i, _)| i);
+    v
+}
+
+/// Sort some input constants by port and just return the constants.
+pub fn sorted_consts(consts: &[(IncomingPort, Value)]) -> Vec<&Value> {
+    sort_by_in_port(consts)
+        .into_iter()
+        .map(|(_, c)| c)
+        .collect()
+}
+
+/// Calculate the depth of a node in the hierarchy.
+pub fn depth(h: &Hugr, n: Node) -> u32 {
+    match h.get_parent(n) {
+        Some(p) => 1 + depth(h, p),
+        None => 0,
     }
 }
 

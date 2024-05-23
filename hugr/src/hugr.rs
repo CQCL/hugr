@@ -192,6 +192,11 @@ pub type NodeMetadataMap = serde_json::Map<String, NodeMetadata>;
 
 /// Public API for HUGRs.
 impl Hugr {
+    /// Create a new Hugr, with a single root node.
+    pub fn new(root_node: NodeType) -> Self {
+        Self::with_capacity(root_node, 0, 0)
+    }
+
     /// Resolve extension ops, infer extensions used, and pass the closure into validation
     pub fn update_validate(
         &mut self,
@@ -237,11 +242,6 @@ impl Hugr {
 
 /// Internal API for HUGRs, not intended for use by users.
 impl Hugr {
-    /// Create a new Hugr, with a single root node.
-    pub(crate) fn new(root_node: NodeType) -> Self {
-        Self::with_capacity(root_node, 0, 0)
-    }
-
     /// Create a new Hugr, with a single root node and preallocated capacity.
     // TODO: Make this take a NodeType
     pub(crate) fn with_capacity(root_node: NodeType, nodes: usize, ports: usize) -> Self {

@@ -1,10 +1,10 @@
 ![](/hugr/assets/hugr_logo.svg)
 
-hugr
+hugr-passes
 ===============
 
 [![build_status][]](https://github.com/CQCL/hugr/actions)
-[![crates][]](https://crates.io/crates/hugr)
+[![crates][]](https://crates.io/crates/hugr-passes)
 [![msrv][]](https://github.com/CQCL/hugr)
 [![codecov][]](https://codecov.io/gh/CQCL/hugr)
 
@@ -17,12 +17,14 @@ compilation and encodes runnable programs.
 
 The HUGR specification is [here](https://github.com/CQCL/hugr/blob/main/specification/hugr.md).
 
+This crate provides compilation passes that act on HUGR programs.
+
 ## Usage
 
 Add the dependency to your project:
 
 ```bash
-cargo add hugr
+cargo add hugr-passes
 ```
 
 Please read the [API documentation here][].
@@ -47,10 +49,10 @@ See [DEVELOPMENT.md](https://github.com/CQCL/hugr/blob/main/DEVELOPMENT.md) for 
 
 This project is licensed under Apache License, Version 2.0 ([LICENSE][] or http://www.apache.org/licenses/LICENSE-2.0).
 
-  [API documentation here]: https://docs.rs/hugr/
+  [API documentation here]: https://docs.rs/hugr-passes/
   [build_status]: https://github.com/CQCL/hugr/actions/workflows/ci-rs.yml/badge.svg?branch=main
   [msrv]: https://img.shields.io/badge/rust-1.75.0%2B-blue.svg
-  [crates]: https://img.shields.io/crates/v/hugr
+  [crates]: https://img.shields.io/crates/v/hugr-passes
   [codecov]: https://img.shields.io/codecov/c/gh/CQCL/hugr?logo=codecov
   [LICENSE]: https://github.com/CQCL/hugr/blob/main/LICENCE
-  [CHANGELOG]: https://github.com/CQCL/hugr/blob/main/hugr/CHANGELOG.md
+  [CHANGELOG]: https://github.com/CQCL/hugr/blob/main/hugr-passes/CHANGELOG.md
