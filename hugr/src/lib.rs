@@ -140,7 +140,6 @@
 // https://github.com/proptest-rs/proptest/issues/447
 #![cfg_attr(test, allow(non_local_definitions))]
 
-pub mod algorithm;
 pub mod builder;
 pub mod core;
 pub mod extension;
