@@ -2,7 +2,6 @@
 //! and the target BB has no other predecessors.
 use std::collections::HashMap;
 
-use hugr::builder::{CFGBuilder, HugrBuilder};
 use hugr::hugr::hugrmut::HugrMut;
 use itertools::Itertools;
 
@@ -56,11 +55,7 @@ fn mk_rep(
     let succ_sig = succ_ty.inner_signature();
 
     // Make a Hugr with just a single CFG root node having the same signature.
-    let mut replacement: Hugr = CFGBuilder::new(cfg.root_type().op_signature().unwrap())
-        .unwrap()
-        .finish_prelude_hugr()
-        .unwrap();
-    replacement.remove_node(replacement.children(replacement.root()).next().unwrap());
+    let mut replacement: Hugr = Hugr::new(cfg.root_type().clone());
 
     let merged = replacement.add_node_with_parent(replacement.root(), {
         let mut merged_block = DataflowBlock {
