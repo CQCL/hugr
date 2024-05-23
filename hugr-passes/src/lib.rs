@@ -1,4 +1,4 @@
-//! Algorithms using the Hugr.
+//! Compilation passes acting on the HUGR program representation.
 
 pub mod const_fold;
 mod half_node;
