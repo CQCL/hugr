@@ -558,3 +558,6 @@ mod test {
         assert_eq!(h1.node_count(), 8);
     }
 }
+
+#[cfg(test)]
+mod int_ops_const_fold_test;
