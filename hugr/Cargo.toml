@@ -32,6 +32,7 @@ regex = { workspace = true }
 cgmath = { workspace = true, features = ["serde"] }
 num-rational = { workspace = true, features = ["serde"] }
 downcast-rs = { workspace = true }
+# Rc used here for Extension, but unfortunately we must turn the feature on globally
 serde = { workspace = true, features = ["derive", "rc"] }
 serde_yaml = { workspace = true }
 typetag = { workspace = true }
