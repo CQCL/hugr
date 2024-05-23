@@ -19,3 +19,9 @@ name = "hugr"
 
 # Enable the changelog for this package
 changelog_update = true
+
+[[package]]
+name = "hugr-passes"
+
+# Enable the changelog for this package
+changelog_update = true
