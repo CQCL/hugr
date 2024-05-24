@@ -86,8 +86,8 @@ def test_stable_indices():
 
     h.add_link(nodes[0].out(0), nodes[1].inp(0))
 
-    assert h.num_out_ports(nodes[0]) == 1
-    assert h.num_in_ports(nodes[1]) == 1
+    assert h.num_outgoing(nodes[0]) == 1
+    assert h.num_incoming(nodes[1]) == 1
 
     assert h.delete_node(nodes[1]) is not None
     assert h._nodes[nodes[1].idx] is None
@@ -96,8 +96,8 @@ def test_stable_indices():
     assert len(h._nodes) == 4
     assert h._free_nodes == [nodes[1]]
 
-    assert h.num_out_ports(nodes[0]) == 0
-    assert h.num_in_ports(nodes[1]) == 0
+    assert h.num_outgoing(nodes[0]) == 0
+    assert h.num_incoming(nodes[1]) == 0
 
     with pytest.raises(KeyError):
         _ = h[nodes[1]]
@@ -123,7 +123,15 @@ def test_multiport():
     h = Dfg([BOOL_T], [BOOL_T] * 2)
     (a,) = h.inputs()
     h.set_outputs(a, a)
+    in_n, ou_n = h.input_node, h.output_node
+    assert list(h.hugr.outgoing_links(in_n)) == [
+        (in_n.out(0), [ou_n.inp(0), ou_n.inp(1)]),
+    ]
 
+    assert list(h.hugr.incoming_links(ou_n)) == [
+        (ou_n.inp(0), [in_n.out(0)]),
+        (ou_n.inp(1), [in_n.out(0)]),
+    ]
     _validate(h.hugr)
 
 
@@ -160,7 +168,6 @@ def test_multi_out():
     a, b = h.inputs()
     a, b = h.add(DivMod(a, b))
     h.set_outputs(a, b)
-
     _validate(h.hugr)
 
 
