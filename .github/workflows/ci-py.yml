@@ -206,6 +206,7 @@ jobs:
           path: ${{env.HUGR_BIN}}
 
 
+
       - name: Run python tests with coverage instrumentation
         run: |
           chmod +x $HUGR_BIN
