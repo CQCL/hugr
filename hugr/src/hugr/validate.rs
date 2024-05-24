@@ -491,12 +491,28 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         //
         // This search could be sped-up with a pre-computed LCA structure, but
         // for valid Hugrs this search should be very short.
+        //
+        // For Value edges only, we record any FuncDefn we went through; if there is
+        // any such, then that is an error, but we report that only if the dom/ext
+        // relation was otherwise ok (an error about an edge "entering" some ancestor
+        // node could be misleading if the source isn't where it's expected)
+        let mut err_entered_func = None;
         let from_parent_parent = self.hugr.get_parent(from_parent);
         for (ancestor, ancestor_parent) in
             iter::successors(to_parent, |&p| self.hugr.get_parent(p)).tuple_windows()
         {
+            if !is_static && self.hugr.get_optype(ancestor).is_func_defn() {
+                err_entered_func.get_or_insert(InterGraphEdgeError::ValueEdgeIntoFunc {
+                    to,
+                    to_offset,
+                    from,
+                    from_offset,
+                    func: ancestor,
+                });
+            }
             if ancestor_parent == from_parent {
                 // External edge.
+                err_entered_func.map_or(Ok(()), Err)?;
                 if !is_static {
                     // Must have an order edge.
                     self.hugr
@@ -527,7 +543,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
                         ancestor_parent_op: ancestor_parent_op.clone(),
                     });
                 }
-
+                err_entered_func.map_or(Ok(()), Err)?;
                 // Check domination
                 let dominator_tree = match self.dominators.get(&ancestor_parent) {
                     Some(tree) => tree,
@@ -770,6 +786,15 @@ pub enum InterGraphEdgeError {
         to: Node,
         to_offset: Port,
         ty: EdgeKind,
+    },
+    /// Inter-Graph edges may not enter into FuncDefns unless they are static
+    #[error("Inter-graph Value edges cannot enter into FuncDefns. Inter-graph edge from {from:?} ({from_offset:?}) to {to:?} ({to_offset:?} enters FuncDefn {func:?}")]
+    ValueEdgeIntoFunc {
+        from: Node,
+        from_offset: Port,
+        to: Node,
+        to_offset: Port,
+        func: Node,
     },
     /// The grandparent of a dominator inter-graph edge must be a CFG container.
     #[error("The grandparent of a dominator inter-graph edge must be a CFG container. Found operation {ancestor_parent_op:?}. In a dominator inter-graph edge from {from:?} ({from_offset:?}) to {to:?} ({to_offset:?}).")]
