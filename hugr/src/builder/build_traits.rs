@@ -85,7 +85,7 @@ pub trait Container {
     fn define_function(
         &mut self,
         name: impl Into<String>,
-        signature: PolyFuncType,
+        signature: PolyFuncType<false>,
     ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
         let body = signature.body().clone();
         let f_node = self.add_child_node(NodeType::new_pure(ops::FuncDefn {
@@ -296,7 +296,7 @@ pub trait Dataflow: Container {
     // TODO: Should this be one function, or should there be a temporary "op" one like with the others?
     fn dfg_builder(
         &mut self,
-        signature: FunctionType,
+        signature: Signature,
         input_extensions: Option<ExtensionSet>,
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<DFGBuilder<&mut Hugr>, BuildError> {

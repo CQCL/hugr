@@ -119,7 +119,7 @@ impl DataflowOpTrait for Noop {
     }
 
     /// The signature of the operation.
-    fn signature(&self) -> FunctionType {
+    fn signature(&self) -> Signature {
         FunctionType::new(vec![self.ty.clone()], vec![self.ty.clone()])
     }
 
@@ -141,7 +141,7 @@ impl DataflowOpTrait for MakeTuple {
     }
 
     /// The signature of the operation.
-    fn signature(&self) -> FunctionType {
+    fn signature(&self) -> Signature {
         FunctionType::new(self.tys.clone(), vec![Type::new_tuple(self.tys.clone())])
     }
 
@@ -163,7 +163,7 @@ impl DataflowOpTrait for UnpackTuple {
     }
 
     /// The signature of the operation.
-    fn signature(&self) -> FunctionType {
+    fn signature(&self) -> Signature {
         FunctionType::new(vec![Type::new_tuple(self.tys.clone())], self.tys.clone())
     }
 
@@ -185,7 +185,7 @@ impl DataflowOpTrait for Tag {
     }
 
     /// The signature of the operation.
-    fn signature(&self) -> FunctionType {
+    fn signature(&self) -> Signature {
         FunctionType::new(
             self.variants
                 .get(self.tag)
@@ -213,7 +213,7 @@ impl DataflowOpTrait for Lift {
     }
 
     /// The signature of the operation.
-    fn signature(&self) -> FunctionType {
+    fn signature(&self) -> Signature {
         FunctionType::new(self.type_row.clone(), self.type_row.clone())
             .with_extension_delta(ExtensionSet::singleton(&self.new_extension))
     }

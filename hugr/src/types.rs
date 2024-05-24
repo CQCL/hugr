@@ -14,7 +14,7 @@ use crate::utils::display_list_with_separator;
 pub use check::SumTypeError;
 pub use custom::CustomType;
 pub use poly_func::PolyFuncType;
-pub use signature::FunctionType;
+pub use signature::{FunctionType, Signature};
 use smol_str::SmolStr;
 pub use type_param::TypeArg;
 pub use type_row::TypeRow;
@@ -51,7 +51,7 @@ pub enum EdgeKind {
     ///
     /// [FuncDecl]: crate::ops::FuncDecl
     /// [FuncDefn]: crate::ops::FuncDefn
-    Function(PolyFuncType),
+    Function(PolyFuncType<false>),
     /// Explicitly enforce an ordering between nodes in a DDG.
     StateOrder,
 }
@@ -395,9 +395,7 @@ impl Type {
             TypeEnum::Sum(SumType::Unit { .. }) => Ok(()), // No leaves there
             TypeEnum::Alias(_) => Ok(()),
             TypeEnum::Extension(custy) => custy.validate(extension_registry, var_decls),
-            // Function values may be passed around without knowing their arity
-            // (i.e. with row vars) as long as they are not called:
-            TypeEnum::Function(ft) => ft.validate_var_len(extension_registry, var_decls),
+            TypeEnum::Function(ft) => ft.validate(extension_registry, var_decls),
             TypeEnum::Variable(idx, bound) => check_typevar_decl(var_decls, *idx, &(*bound).into()),
             TypeEnum::RowVariable(idx, bound) => {
                 if allow_row_vars {

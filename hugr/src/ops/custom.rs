@@ -11,8 +11,8 @@ use {
 use crate::extension::{ConstFoldResult, ExtensionId, ExtensionRegistry, OpDef, SignatureError};
 use crate::hugr::hugrmut::sealed::HugrMutInternals;
 use crate::hugr::{HugrView, NodeType};
-use crate::types::EdgeKind;
 use crate::types::{type_param::TypeArg, FunctionType};
+use crate::types::{EdgeKind, Signature};
 use crate::{ops, Hugr, IncomingPort, Node};
 
 use super::dataflow::DataflowOpTrait;
@@ -129,7 +129,7 @@ impl DataflowOpTrait for CustomOp {
     }
 
     /// The signature of the operation.
-    fn signature(&self) -> FunctionType {
+    fn signature(&self) -> Signature {
         match self {
             Self::Opaque(op) => op.signature.clone(),
             Self::Extension(ext_op) => ext_op.signature(),
@@ -175,7 +175,7 @@ impl From<ExtensionOp> for CustomOp {
 pub struct ExtensionOp {
     def: Arc<OpDef>,
     args: Vec<TypeArg>,
-    signature: FunctionType, // Cache
+    signature: Signature, // Cache
 }
 
 impl ExtensionOp {
@@ -265,7 +265,7 @@ impl DataflowOpTrait for ExtensionOp {
         self.def().description()
     }
 
-    fn signature(&self) -> FunctionType {
+    fn signature(&self) -> Signature {
         self.signature.clone()
     }
 }
@@ -280,7 +280,7 @@ pub struct OpaqueOp {
     #[cfg_attr(test, proptest(strategy = "any_nonempty_string()"))]
     description: String, // cache in advance so description() can return &str
     args: Vec<TypeArg>,
-    signature: FunctionType,
+    signature: Signature,
 }
 
 fn qualify_name(res_id: &ExtensionId, op_name: &OpNameRef) -> OpName {
@@ -294,7 +294,7 @@ impl OpaqueOp {
         op_name: impl Into<OpName>,
         description: String,
         args: impl Into<Vec<TypeArg>>,
-        signature: FunctionType,
+        signature: Signature,
     ) -> Self {
         Self {
             extension,
@@ -336,7 +336,7 @@ impl DataflowOpTrait for OpaqueOp {
         &self.description
     }
 
-    fn signature(&self) -> FunctionType {
+    fn signature(&self) -> Signature {
         self.signature.clone()
     }
 }
@@ -417,8 +417,8 @@ pub enum CustomOpError {
     SignatureMismatch {
         extension: ExtensionId,
         op: OpName,
-        stored: FunctionType,
-        computed: FunctionType,
+        stored: Signature,
+        computed: Signature,
     },
 }
 

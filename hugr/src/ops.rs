@@ -10,7 +10,7 @@ pub mod module;
 pub mod tag;
 pub mod validate;
 use crate::extension::ExtensionSet;
-use crate::types::{EdgeKind, FunctionType};
+use crate::types::{EdgeKind, FunctionType, Signature};
 use crate::{Direction, OutgoingPort, Port};
 use crate::{IncomingPort, PortIndex};
 use paste::paste;
@@ -342,7 +342,7 @@ pub trait OpTrait {
     /// The signature of the operation.
     ///
     /// Only dataflow operations have a signature, otherwise returns None.
-    fn dataflow_signature(&self) -> Option<FunctionType> {
+    fn dataflow_signature(&self) -> Option<Signature> {
         None
     }
 
@@ -411,7 +411,7 @@ pub trait OpParent {
 }
 
 impl<T: DataflowParent> OpParent for T {
-    fn inner_function_type(&self) -> Option<FunctionType> {
+    fn inner_function_type(&self) -> Option<Signature> {
         Some(DataflowParent::inner_signature(self))
     }
 }
