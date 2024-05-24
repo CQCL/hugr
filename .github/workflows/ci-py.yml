@@ -69,7 +69,12 @@ jobs:
         run: poetry run ruff check
 
       - name: Run tests
-        run: poetry run pytest
+        env:
+          HUGR_BIN: ${{ github.workspace }}/target/debug/hugr
+          # have to build hugr binary for validation tests
+        run: |
+          cargo build --features cli --bin hugr
+          poetry run pytest
 
   # Ensure that the serialization schema is up to date
   serialization-schema:
