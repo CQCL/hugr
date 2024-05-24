@@ -8,6 +8,8 @@ hugr-core
 [![msrv][]](https://github.com/CQCL/hugr)
 [![codecov][]](https://codecov.io/gh/CQCL/hugr)
 
+Internal core definitions for the `hugr` package.
+
 The Hierarchical Unified Graph Representation (HUGR, pronounced _hugger_) is the
 common representation of quantum circuits and operations in the Quantinuum
 ecosystem.
