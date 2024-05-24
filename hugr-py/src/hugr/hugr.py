@@ -252,7 +252,7 @@ class Hugr(Mapping[Node, NodeData]):
         try:
             direction = next(iter(links.keys())).direction
         except StopIteration:
-            return iter(())
+            return
         # iterate over known offsets
         for offset in range(self.num_ports(node, direction)):
             port = cast(P, node.port(offset, direction))
