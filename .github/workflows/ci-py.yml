@@ -13,7 +13,8 @@ on:
 
 env:
   SCCACHE_GHA_ENABLED: "true"
-  HUGR_BIN: ${{ github.workspace }}/bin/hugr
+  HUGR_BIN_DIR: ${{ github.workspace }}/target/release
+  HUGR_BIN: ${{ github.workspace }}/target/release/hugr
 
 jobs:
   # Check if changes were made to the relevant files.
@@ -116,7 +117,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: hugr_binary
-          path: bin
+          path: ${{env.HUGR_BIN_DIR}}
 
       - name: Run tests
         run: poetry run pytest
@@ -200,7 +201,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: hugr_binary
-          path: bin
+          path: ${{env.HUGR_BIN_DIR}}
 
 
       - name: Run python tests with coverage instrumentation
