@@ -6,7 +6,7 @@ name: Notify coverage changes
 
 on:
   schedule:
-    # 04:00 daily
+    # 04:00 every Monday
     - cron: '0 4 * * 1'
   workflow_dispatch: {}
 
