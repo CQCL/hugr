@@ -45,7 +45,7 @@ use crate::{
 ///            |    Exit    |
 ///            +------------+
 /// */
-/// use hugr::{
+/// use hugr_core::{
 ///     builder::{BuildError, CFGBuilder, Container, Dataflow, HugrBuilder},
 ///     extension::{prelude, ExtensionSet},
 ///     ops, type_row,

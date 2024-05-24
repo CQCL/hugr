@@ -27,16 +27,16 @@
 //! To build a HUGR for a simple quantum circuit and then serialize it to a buffer, we can define
 //! a simple quantum extension and then use the [[builder::DFGBuilder]] as follows:
 //! ```
-//! use hugr::builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr};
-//! use hugr::extension::prelude::{BOOL_T, QB_T};
-//! use hugr::hugr::Hugr;
-//! use hugr::type_row;
-//! use hugr::types::FunctionType;
+//! use hugr_core::builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr};
+//! use hugr_core::extension::prelude::{BOOL_T, QB_T};
+//! use hugr_core::hugr::Hugr;
+//! use hugr_core::type_row;
+//! use hugr_core::types::FunctionType;
 //!
 //! // The type of qubits, `QB_T` is in the prelude but, by default, no gateset
 //! // is defined. This module provides Hadamard and CX gates.
 //! mod mini_quantum_extension {
-//!     use hugr::{
+//!     use hugr_core::{
 //!         extension::{
 //!             prelude::{BOOL_T, QB_T},
 //!             ExtensionId, ExtensionRegistry, PRELUDE,
@@ -140,15 +140,24 @@
 // https://github.com/proptest-rs/proptest/issues/447
 #![cfg_attr(test, allow(non_local_definitions))]
 
-// These modules are re-exported as-is. If more control is needed, define a new module in this crate with the desired exports.
-pub use hugr_core::{builder, core, extension, hugr, ops, std_extensions, types, utils};
-pub use hugr_passes as algorithms;
+pub mod builder;
+pub mod core;
+pub mod extension;
+pub mod hugr;
+pub mod macros;
+pub mod ops;
+pub mod std_extensions;
+pub mod types;
+pub mod utils;
 
-// Top-level re-exports for convenience.
-pub use hugr_core::core::{
+pub use crate::core::{
     CircuitUnit, Direction, IncomingPort, Node, NodeIndex, OutgoingPort, Port, PortIndex, Wire,
 };
-pub use hugr_core::extension::Extension;
-pub use hugr_core::hugr::{Hugr, HugrView, SimpleReplacement};
+pub use crate::extension::Extension;
+pub use crate::hugr::{Hugr, HugrView, SimpleReplacement};
 
-pub use hugr_core::macros::{const_extension_ids, type_row};
+#[cfg(feature = "cli")]
+pub mod cli;
+
+#[cfg(test)]
+pub mod proptest;

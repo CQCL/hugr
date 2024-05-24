@@ -26,11 +26,11 @@
 //! `CircuitBuilder`.
 //!
 //! ```rust
-//! # use hugr::Hugr;
-//! # use hugr::builder::{BuildError, BuildHandle, Container, DFGBuilder, Dataflow, DataflowHugr, ModuleBuilder, DataflowSubContainer, HugrBuilder};
-//! use hugr::extension::prelude::BOOL_T;
-//! use hugr::std_extensions::logic::{NotOp, LOGIC_REG};
-//! use hugr::types::FunctionType;
+//! # use hugr_core::Hugr;
+//! # use hugr_core::builder::{BuildError, BuildHandle, Container, DFGBuilder, Dataflow, DataflowHugr, ModuleBuilder, DataflowSubContainer, HugrBuilder};
+//! use hugr_core::extension::prelude::BOOL_T;
+//! use hugr_core::std_extensions::logic::{NotOp, LOGIC_REG};
+//! use hugr_core::types::FunctionType;
 //!
 //! # fn doctest() -> Result<(), BuildError> {
 //! let hugr = {

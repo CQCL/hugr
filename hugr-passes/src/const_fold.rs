@@ -5,10 +5,10 @@ use std::collections::{BTreeSet, HashMap};
 use itertools::Itertools;
 use thiserror::Error;
 
-use hugr::hugr::{SimpleReplacementError, ValidationError};
-use hugr::types::SumType;
-use hugr::Direction;
-use hugr::{
+use hugr_core::hugr::{SimpleReplacementError, ValidationError};
+use hugr_core::types::SumType;
+use hugr_core::Direction;
+use hugr_core::{
     builder::{DFGBuilder, Dataflow, DataflowHugr},
     extension::{ConstFoldResult, ExtensionRegistry},
     hugr::{

@@ -160,7 +160,7 @@ pub enum Value {
 #[cfg_attr(not(miri), doc = "```")] // this doctest depends on typetag, so fails with miri
 #[cfg_attr(miri, doc = "```ignore")]
 /// use serde::{Serialize,Deserialize};
-/// use hugr::{
+/// use hugr_core::{
 ///   types::Type,ops::constant::{OpaqueValue, ValueName, CustomConst, CustomSerialized},
 ///   extension::{ExtensionSet, prelude::{USIZE_T, ConstUsize}},
 ///   std_extensions::arithmetic::int_types};

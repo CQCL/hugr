@@ -42,8 +42,8 @@ pub(crate) use impl_box_clone;
 ///
 /// Example:
 /// ```
-/// # use hugr::macros::type_row;
-/// # use hugr::types::{FunctionType, Type, TypeRow};
+/// # use hugr_core::macros::type_row;
+/// # use hugr_core::types::{FunctionType, Type, TypeRow};
 /// const U: Type = Type::UNIT;
 /// let static_row: TypeRow = type_row![U, U];
 /// let dynamic_row: TypeRow = vec![U, U, U].into();
@@ -86,7 +86,7 @@ pub use type_row;
 /// of a test module only. Example:
 /// ```rust
 /// # mod test {
-/// # use hugr::macros::const_extension_ids;
+/// # use hugr_core::macros::const_extension_ids;
 /// const_extension_ids! {
 ///   pub const EXT_A: ExtensionId = "A";
 ///   /// A doc comment
