@@ -68,13 +68,19 @@ jobs:
       - name: Lint with ruff
         run: poetry run ruff check
 
+      - name: Build HUGR binary
+        # have to build hugr binary for validation tests
+        run: cargo build --features cli --bin hugr
       - name: Run tests
         env:
           HUGR_BIN: ${{ github.workspace }}/target/debug/hugr
-          # have to build hugr binary for validation tests
-        run: |
-          cargo build --features cli --bin hugr
-          poetry run pytest
+        run: poetry run pytest
+
+      - name: Upload the binary to the artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: hugr-binary
+          path: target/debug/hugr
 
   # Ensure that the serialization schema is up to date
   serialization-schema:
@@ -151,8 +157,14 @@ jobs:
 
       - name: Install the project libraries
         run: poetry install
+      - name: Download the hugr binary
+        uses: actions/download-artifact@v4
+        with:
+          name: hugr-binary
 
       - name: Run python tests with coverage instrumentation
+        env:
+          HUGR_BIN: ${{ github.workspace }}/target/debug/hugr
         run: poetry run pytest --cov=./ --cov-report=xml
 
       - name: Upload python coverage to codecov.io
