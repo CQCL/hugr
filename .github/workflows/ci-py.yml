@@ -14,6 +14,7 @@ on:
 
 env:
   SCCACHE_GHA_ENABLED: "true"
+  HUGR_BIN_DIR: ${{ github.workspace }}/target/release
   HUGR_BIN: ${{ github.workspace }}/target/release/hugr
 
 jobs:
@@ -117,7 +118,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: hugr_binary
-          path: ${{env.HUGR_BIN}}
+          path: ${{env.HUGR_BIN_DIR}}
 
       - name: Run tests
         run: |
@@ -203,7 +204,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: hugr_binary
-          path: ${{env.HUGR_BIN}}
+          path: ${{env.HUGR_BIN_DIR}}
 
 
 
