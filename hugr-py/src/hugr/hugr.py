@@ -4,7 +4,6 @@ from collections.abc import Mapping
 from enum import Enum
 from typing import (
     Iterable,
-    Self,
     Sequence,
     Protocol,
     Generic,
@@ -13,6 +12,8 @@ from typing import (
     overload,
     ClassVar,
 )
+
+from typing_extensions import Self
 
 from hugr.serialization.serial_hugr import SerialHugr
 from hugr.serialization.ops import BaseOp, OpType as SerialOp
