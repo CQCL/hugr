@@ -627,12 +627,12 @@ mod test {
         let mut bb = if entry {
             assert_eq!(
                 match h.hugr().get_optype(h.container_node()) {
-                    OpType::CFG(c) => &c.signature.input,
+                    OpType::CFG(c) => c.signature.input(),
                     _ => panic!(),
                 },
                 op_sig.input()
             );
-            h.simple_entry_builder(op_sig.output, 1, op_sig.extension_reqs.clone())?
+            h.simple_entry_builder(op_sig.output().clone(), 1, op_sig.extension_reqs.clone())?
         } else {
             h.simple_block_builder(op_sig, 1)?
         };

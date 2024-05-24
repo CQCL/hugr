@@ -265,11 +265,12 @@ impl DataflowOpTrait for CallIndirect {
     }
 
     fn signature(&self) -> FunctionType {
-        let mut s = self.signature.clone();
-        s.input
+        let mut input = self.signature.input().clone();
+        input
             .to_mut()
             .insert(0, Type::new_function(self.signature.clone()));
-        s
+        FunctionType::new(input, self.signature.output().clone())
+            .with_extension_delta(self.signature.extension_reqs.clone())
     }
 }
 

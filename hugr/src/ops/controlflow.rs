@@ -282,11 +282,11 @@ impl OpTrait for Case {
 impl Case {
     /// The input signature of the contained dataflow graph.
     pub fn dataflow_input(&self) -> &TypeRow {
-        &self.signature.input
+        self.signature.input()
     }
 
     /// The output signature of the contained dataflow graph.
     pub fn dataflow_output(&self) -> &TypeRow {
-        &self.signature.output
+        self.signature.output()
     }
 }

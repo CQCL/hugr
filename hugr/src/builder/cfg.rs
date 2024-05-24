@@ -154,13 +154,13 @@ impl<H: AsMut<Hugr> + AsRef<Hugr>> SubContainer for CFGBuilder<H> {
 impl CFGBuilder<Hugr> {
     /// New CFG rooted HUGR builder
     pub fn new(signature: FunctionType) -> Result<Self, BuildError> {
-        let cfg_op = ops::CFG {
-            signature: signature.clone(),
-        };
+        let input = signature.input().clone();
+        let output = signature.output().clone();
+        let cfg_op = ops::CFG { signature };
 
         let base = Hugr::new(NodeType::new_open(cfg_op));
         let cfg_node = base.root();
-        CFGBuilder::create(base, cfg_node, signature.input, signature.output)
+        CFGBuilder::create(base, cfg_node, input, output)
     }
 }
 
@@ -254,12 +254,8 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         signature: FunctionType,
         n_cases: usize,
     ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
-        self.block_builder(
-            signature.input,
-            vec![type_row![]; n_cases],
-            signature.extension_reqs,
-            signature.output,
-        )
+        let (input, extension_reqs, output) = signature.into_tuple();
+        self.block_builder(input, vec![type_row![]; n_cases], extension_reqs, output)
     }
 
     /// Return a builder for the entry [`DataflowBlock`] child graph with `inputs`

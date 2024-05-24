@@ -286,18 +286,9 @@ fn create_with_io(
     let op: OpType = op.into();
 
     let node = hugr.add_node_with_parent(parent, op);
-    let input = hugr.add_node_with_parent(
-        node,
-        ops::Input {
-            types: op_sig.input,
-        },
-    );
-    let output = hugr.add_node_with_parent(
-        node,
-        ops::Output {
-            types: op_sig.output,
-        },
-    );
+    let (in_types, _, out_types) = op_sig.into_tuple();
+    let input = hugr.add_node_with_parent(node, ops::Input { types: in_types });
+    let output = hugr.add_node_with_parent(node, ops::Output { types: out_types });
     Ok([node, input, output])
 }
 

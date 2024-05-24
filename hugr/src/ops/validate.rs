@@ -94,7 +94,7 @@ impl ValidateOp for super::Conditional {
                 .as_case()
                 .expect("Child check should have already checked valid ops.");
             let sig = &case_op.inner_signature();
-            if sig.input != self.case_input_row(i).unwrap() || sig.output != self.outputs {
+            if sig.input() != &self.case_input_row(i).unwrap() || sig.output() != &self.outputs {
                 return Err(ChildrenValidationError::ConditionalCaseSignature {
                     child,
                     optype: optype.clone(),
@@ -264,7 +264,7 @@ impl<T: DataflowParent> ValidateOp for T {
         children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
     ) -> Result<(), ChildrenValidationError> {
         let sig = self.inner_signature();
-        validate_io_nodes(&sig.input, &sig.output, "DataflowParent", children)
+        validate_io_nodes(sig.input(), sig.output(), "DataflowParent", children)
     }
 }
 
@@ -282,10 +282,10 @@ fn validate_io_nodes<'a>(
     let (second, second_optype) = children.next().unwrap();
 
     let first_sig = first_optype.dataflow_signature().unwrap_or_default();
-    if &first_sig.output != expected_input {
+    if first_sig.output() != expected_input {
         return Err(ChildrenValidationError::IOSignatureMismatch {
             child: first,
-            actual: first_sig.output,
+            actual: first_sig.output().clone(),
             expected: expected_input.clone(),
             node_desc: "Input",
             container_desc,
@@ -293,10 +293,10 @@ fn validate_io_nodes<'a>(
     }
     let second_sig = second_optype.dataflow_signature().unwrap_or_default();
 
-    if &second_sig.input != expected_output {
+    if second_sig.input() != expected_output {
         return Err(ChildrenValidationError::IOSignatureMismatch {
             child: second,
-            actual: second_sig.input,
+            actual: second_sig.input().clone(),
             expected: expected_output.clone(),
             node_desc: "Output",
             container_desc,

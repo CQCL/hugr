@@ -276,21 +276,11 @@ pub(crate) mod test {
     /// inference. Using DFGBuilder will default to a root node with an open
     /// extension variable
     pub(crate) fn closed_dfg_root_hugr(signature: FunctionType) -> Hugr {
-        let mut hugr = Hugr::new(NodeType::new_pure(ops::DFG {
-            signature: signature.clone(),
-        }));
-        hugr.add_node_with_parent(
-            hugr.root(),
-            ops::Input {
-                types: signature.input,
-            },
-        );
-        hugr.add_node_with_parent(
-            hugr.root(),
-            ops::Output {
-                types: signature.output,
-            },
-        );
+        let in_types = signature.input().clone();
+        let out_types = signature.output().clone();
+        let mut hugr = Hugr::new(NodeType::new_pure(ops::DFG { signature }));
+        hugr.add_node_with_parent(hugr.root(), ops::Input { types: in_types });
+        hugr.add_node_with_parent(hugr.root(), ops::Output { types: out_types });
         hugr
     }
 }

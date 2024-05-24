@@ -50,11 +50,8 @@ impl SignatureDeclaration {
                 Ok(types.into())
             };
 
-        let body = FunctionType {
-            input: make_type_row(&self.inputs)?,
-            output: make_type_row(&self.outputs)?,
-            extension_reqs: self.extensions.clone(),
-        };
+        let body = FunctionType::new(make_type_row(&self.inputs)?, make_type_row(&self.outputs)?)
+            .with_extension_delta(self.extensions.clone());
 
         let poly_func = PolyFuncType::new(op_params, body);
         Ok(SignatureFunc::TypeScheme(CustomValidator::from_polyfunc(

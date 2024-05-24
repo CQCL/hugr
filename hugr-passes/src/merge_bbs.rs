@@ -76,7 +76,7 @@ fn mk_rep(
     let output = replacement.add_node_with_parent(
         merged,
         Output {
-            types: succ_sig.output.clone(),
+            types: succ_sig.output().clone(),
         },
     );
 
@@ -96,7 +96,7 @@ fn mk_rep(
             signature: succ_sig.clone(),
         },
     );
-    for (i, _) in succ_sig.output.iter().enumerate() {
+    for i in 0..succ_sig.output_count() {
         replacement.connect(dfg2, i, output, i)
     }
 
@@ -318,8 +318,8 @@ mod test {
         let [res_t] = tst_op
             .dataflow_signature()
             .unwrap()
-            .output
-            .into_owned()
+            .output()
+            .to_vec()
             .try_into()
             .unwrap();
         let mut h = CFGBuilder::new(

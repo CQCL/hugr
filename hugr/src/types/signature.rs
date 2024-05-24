@@ -22,12 +22,10 @@ use {crate::proptest::RecursionDepth, ::proptest::prelude::*, proptest_derive::A
 ///
 /// [Graph]: crate::ops::constant::Value::Function
 pub struct FunctionType {
-    /// Value inputs of the function.
     #[cfg_attr(test, proptest(strategy = "any_with::<TypeRow>(params)"))]
-    pub input: TypeRow,
-    /// Value outputs of the function.
+    input: TypeRow,
     #[cfg_attr(test, proptest(strategy = "any_with::<TypeRow>(params)"))]
-    pub output: TypeRow,
+    output: TypeRow,
     /// The extension requirements which are added by the operation
     pub extension_reqs: ExtensionSet,
 }
@@ -180,15 +178,20 @@ impl FunctionType {
     }
 
     #[inline]
-    /// Returns the input row
+    /// Returns a row of the value inputs of the function.
     pub fn input(&self) -> &TypeRow {
         &self.input
     }
 
     #[inline]
-    /// Returns the output row
+    /// Returns a row of the value outputs of the function.
     pub fn output(&self) -> &TypeRow {
         &self.output
+    }
+
+    /// Converts to a tuple of the value inputs, extension delta, and value outputs
+    pub fn into_tuple(self) -> (TypeRow, ExtensionSet, TypeRow) {
+        (self.input, self.extension_reqs, self.output)
     }
 }
 
