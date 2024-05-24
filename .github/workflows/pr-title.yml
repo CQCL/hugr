@@ -118,6 +118,7 @@ jobs:
             It looks like your proposed title indicates a breaking change. If that's the case,
             please make sure to include a "BREAKING CHANGE:" footer in the body of the pull request
             describing the breaking change and any migration instructions.
+          GITHUB_TOKEN: ${{ secrets.HUGRBOT_PAT }}
       - name: Fail if the footer is required but missing
         if: ${{ steps.breaking.outputs.breaking == 'true' && steps.breaking.outputs.has_breaking_footer == 'false' }}
         run: exit 1
@@ -150,6 +151,7 @@ jobs:
             ```
             ${{ steps.lint_pr_title.outputs.error_message }}
             ```
+          GITHUB_TOKEN: ${{ secrets.HUGRBOT_PAT }}
 
       # Delete previous comments when the issues have been resolved
       # This step doesn't run if any of the previous checks fails.
@@ -158,3 +160,4 @@ jobs:
         with:
           header: pr-title-lint-error
           delete: true
+          GITHUB_TOKEN: ${{ secrets.HUGRBOT_PAT }}
