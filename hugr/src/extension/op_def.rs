@@ -24,7 +24,7 @@ pub trait CustomSignatureFunc: Send + Sync {
         arg_values: &[TypeArg],
         def: &'o OpDef,
         extension_registry: &ExtensionRegistry,
-    ) -> Result<PolyFuncType<true>, SignatureError>;
+    ) -> Result<PolyFuncType, SignatureError>;
     /// The declared type parameters which require values in order for signature to
     /// be computed.
     fn static_params(&self) -> &[TypeParam];
@@ -37,7 +37,7 @@ pub trait SignatureFromArgs: Send + Sync {
     fn compute_signature(
         &self,
         arg_values: &[TypeArg],
-    ) -> Result<PolyFuncType<true>, SignatureError>;
+    ) -> Result<PolyFuncType, SignatureError>;
     /// The declared type parameters which require values in order for signature to
     /// be computed.
     fn static_params(&self) -> &[TypeParam];
@@ -50,7 +50,7 @@ impl<T: SignatureFromArgs> CustomSignatureFunc for T {
         arg_values: &[TypeArg],
         _def: &'o OpDef,
         _extension_registry: &ExtensionRegistry,
-    ) -> Result<PolyFuncType<true>, SignatureError> {
+    ) -> Result<PolyFuncType, SignatureError> {
         SignatureFromArgs::compute_signature(self, arg_values)
     }
 
@@ -123,14 +123,14 @@ pub trait CustomLowerFunc: Send + Sync {
 #[derive(serde::Deserialize, serde::Serialize)]
 pub struct CustomValidator {
     #[serde(flatten)]
-    poly_func: PolyFuncType<true>,
+    poly_func: PolyFuncType,
     #[serde(skip)]
     pub(crate) validate: Box<dyn ValidateTypeArgs>,
 }
 
 impl CustomValidator {
     /// Encode a signature using a `PolyFuncType`
-    pub fn from_polyfunc(poly_func: impl Into<PolyFuncType<true>>) -> Self {
+    pub fn from_polyfunc(poly_func: impl Into<PolyFuncType>) -> Self {
         Self {
             poly_func: poly_func.into(),
             validate: Default::default(),
@@ -140,7 +140,7 @@ impl CustomValidator {
     /// Encode a signature using a `PolyFuncType`, with a custom function for
     /// validating type arguments before returning the signature.
     pub fn new_with_validator(
-        poly_func: impl Into<PolyFuncType<true>>,
+        poly_func: impl Into<PolyFuncType>,
         validate: impl ValidateTypeArgs + 'static,
     ) -> Self {
         Self {
@@ -189,8 +189,8 @@ impl<T: CustomSignatureFunc + 'static> From<T> for SignatureFunc {
     }
 }
 
-impl From<PolyFuncType<true>> for SignatureFunc {
-    fn from(v: PolyFuncType<true>) -> Self {
+impl From<PolyFuncType> for SignatureFunc {
+    fn from(v: PolyFuncType) -> Self {
         Self::TypeScheme(CustomValidator::from_polyfunc(v))
     }
 }
@@ -232,7 +232,7 @@ impl SignatureFunc {
         args: &[TypeArg],
         exts: &ExtensionRegistry,
     ) -> Result<Signature, SignatureError> {
-        let temp: PolyFuncType<true>;
+        let temp: PolyFuncType;
         let (pf, args) = match &self {
             SignatureFunc::TypeScheme(custom) => {
                 custom.validate.validate(args, def, exts)?;
@@ -335,7 +335,7 @@ impl OpDef {
         exts: &ExtensionRegistry,
         var_decls: &[TypeParam],
     ) -> Result<(), SignatureError> {
-        let temp: PolyFuncType<true>; // to keep alive
+        let temp: PolyFuncType; // to keep alive
         let (pf, args) = match &self.signature_func {
             SignatureFunc::TypeScheme(ts) => (&ts.poly_func, args),
             SignatureFunc::CustomFunc(custom) => {
@@ -549,7 +549,7 @@ mod test {
             fn compute_signature(
                 &self,
                 arg_values: &[TypeArg],
-            ) -> Result<PolyFuncType<true>, SignatureError> {
+            ) -> Result<PolyFuncType, SignatureError> {
                 const TP: TypeParam = TypeParam::Type { b: TypeBound::Any };
                 let [TypeArg::BoundedNat { n }] = arg_values else {
                     return Err(SignatureError::InvalidTypeArgs);

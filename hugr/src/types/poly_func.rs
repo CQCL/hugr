@@ -28,7 +28,7 @@ use super::Substitution;
     "params.iter().map(ToString::to_string).join(\" \")",
     "body"
 )]
-pub struct PolyFuncType<const ROWVARS: bool> {
+pub struct PolyFuncType<const ROWVARS: bool = true> {
     /// The declared type parameters, i.e., these must be instantiated with
     /// the same number of [TypeArg]s before the function can be called. This
     /// defines the indices used by variables inside the body.
@@ -99,7 +99,7 @@ impl<const RV: bool> PolyFuncType<RV> {
     }
 }
 
-impl PolyFuncType<true> {
+impl PolyFuncType {
     /// Validates this instance, checking that the types in the body are
     /// wellformed with respect to the registry, and the type variables declared.
     /// Allows both inputs and outputs to contain [RowVariable]s
@@ -135,7 +135,7 @@ pub(crate) mod test {
             ExtensionRegistry::try_new([PRELUDE.to_owned(), EXTENSION.to_owned()]).unwrap();
     }
 
-    impl PolyFuncType<true> {
+    impl PolyFuncType {
         fn new_validated(
             params: impl Into<Vec<TypeParam>>,
             body: FunctionType,
