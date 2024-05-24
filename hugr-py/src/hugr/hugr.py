@@ -1,7 +1,8 @@
 from dataclasses import dataclass, field, replace
 
 from collections.abc import Collection, Mapping
-from typing import Iterable, Sequence, Protocol, Generic, TypeVar, overload
+from enum import Enum
+from typing import Iterable, Sequence, Protocol, Generic, TypeVar, overload, ClassVar
 
 from hugr.serialization.serial_hugr import SerialHugr
 from hugr.serialization.ops import BaseOp, OpType as SerialOp
@@ -10,16 +11,17 @@ from hugr.serialization.tys import Type
 from hugr.utils import BiMap
 
 
+class Direction(Enum):
+    INCOMING = 0
+    OUTGOING = 1
+
+
 @dataclass(frozen=True, eq=True, order=True)
-class Port:
+class InPort:
     node: "Node"
     offset: int
     sub_offset: int = 0
-
-
-@dataclass(frozen=True, eq=True, order=True)
-class InPort(Port):
-    pass
+    direction: ClassVar[Direction] = Direction.INCOMING
 
 
 class ToPort(Protocol):
@@ -27,7 +29,12 @@ class ToPort(Protocol):
 
 
 @dataclass(frozen=True, eq=True, order=True)
-class OutPort(Port, ToPort):
+class OutPort(ToPort):
+    node: "Node"
+    offset: int
+    sub_offset: int = 0
+    direction: ClassVar[Direction] = Direction.OUTGOING
+
     def to_port(self) -> "OutPort":
         return self
 
@@ -197,6 +204,15 @@ class Hugr(Mapping[Node, NodeData]):
 
     def num_out_ports(self, node: Node) -> int:
         return len(self.out_ports(node))
+
+    def node_ports(
+        self, node: Node, direction: Direction
+    ) -> Collection[InPort] | Collection[OutPort]:
+        return (
+            self.in_ports(node)
+            if direction == Direction.INCOMING
+            else self.out_ports(node)
+        )
 
     def in_ports(self, node: Node) -> Collection[InPort]:
         # can be optimised by caching number of ports
