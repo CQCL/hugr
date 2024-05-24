@@ -120,7 +120,9 @@ jobs:
           path: ${{env.HUGR_BIN_DIR}}
 
       - name: Run tests
-        run: poetry run pytest
+        run: |
+          chmod +x $HUGR_BIN
+          poetry run pytest
 
   # Ensure that the serialization schema is up to date
   serialization-schema:
@@ -205,7 +207,9 @@ jobs:
 
 
       - name: Run python tests with coverage instrumentation
-        run: poetry run pytest --cov=./ --cov-report=xml
+        run: |
+          chmod +x $HUGR_BIN
+          poetry run pytest --cov=./ --cov-report=xml
 
       - name: Upload python coverage to codecov.io
         uses: codecov/codecov-action@v4
