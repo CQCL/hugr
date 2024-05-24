@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 import subprocess
-
+import os
+import pathlib
 from hugr.hugr import Dfg, Hugr, DummyOp, Node, Command, ToPort, Op
 import hugr.serialization.tys as stys
 import hugr.serialization.ops as sops
@@ -67,12 +68,14 @@ class DivMod(Command):
 
 
 def _validate(h: Hugr, mermaid: bool = False):
-    # cmd = ["cargo", "run", "--features", "cli", "--"]
-    cmd = ["./target/debug/hugr"]
+    workspace_dir = pathlib.Path(__file__).parent.parent.parent
+    # use the HUGR_BIN environment variable if set, otherwise use the debug build
+    bin_loc = os.environ.get("HUGR_BIN", str(workspace_dir / "target/debug/hugr"))
+    cmd = [bin_loc, "-"]
 
     if mermaid:
         cmd.append("--mermaid")
-    subprocess.run(cmd + ["-"], check=True, input=h.to_serial().to_json().encode())
+    subprocess.run(cmd, check=True, input=h.to_serial().to_json().encode())
 
 
 def test_stable_indices():
