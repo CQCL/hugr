@@ -1,8 +1,18 @@
 from dataclasses import dataclass, field, replace
 
-from collections.abc import Collection, Mapping
+from collections.abc import Mapping
 from enum import Enum
-from typing import Iterable, Sequence, Protocol, Generic, TypeVar, overload, ClassVar
+from typing import (
+    Iterable,
+    Self,
+    Sequence,
+    Protocol,
+    Generic,
+    TypeVar,
+    cast,
+    overload,
+    ClassVar,
+)
 
 from hugr.serialization.serial_hugr import SerialHugr
 from hugr.serialization.ops import BaseOp, OpType as SerialOp
@@ -17,10 +27,17 @@ class Direction(Enum):
 
 
 @dataclass(frozen=True, eq=True, order=True)
-class InPort:
+class _Port:
     node: "Node"
     offset: int
-    sub_offset: int = 0
+    _sub_offset: int = 0
+
+    def next_sub_offset(self) -> Self:
+        return replace(self, _sub_offset=self._sub_offset + 1)
+
+
+@dataclass(frozen=True, eq=True, order=True)
+class InPort(_Port):
     direction: ClassVar[Direction] = Direction.INCOMING
 
 
@@ -29,10 +46,7 @@ class ToPort(Protocol):
 
 
 @dataclass(frozen=True, eq=True, order=True)
-class OutPort(ToPort):
-    node: "Node"
-    offset: int
-    sub_offset: int = 0
+class OutPort(_Port, ToPort):
     direction: ClassVar[Direction] = Direction.OUTGOING
 
     def to_port(self) -> "OutPort":
@@ -81,6 +95,12 @@ class Node(ToPort):
     def out(self, offset: int) -> OutPort:
         return OutPort(self, offset)
 
+    def port(self, offset: int, direction: Direction) -> InPort | OutPort:
+        if direction == Direction.INCOMING:
+            return self.inp(offset)
+        else:
+            return self.out(offset)
+
 
 class Op(Protocol):
     def to_serial(self, node: Node, hugr: "Hugr") -> SerialOp: ...
@@ -108,6 +128,8 @@ class Command(Protocol):
 class NodeData:
     op: Op
     parent: Node | None
+    _num_inps: int = 0
+    _num_outs: int = 0
     # TODO children field?
 
     def to_serial(self, node: Node, hugr: "Hugr") -> SerialOp:
@@ -118,6 +140,7 @@ class NodeData:
 
 
 P = TypeVar("P", InPort, OutPort)
+K = TypeVar("K", InPort, OutPort)
 
 
 def _unused_sub_offset(port: P, links: BiMap[OutPort, InPort]) -> P:
@@ -128,7 +151,7 @@ def _unused_sub_offset(port: P, links: BiMap[OutPort, InPort]) -> P:
         case InPort(_):
             d = links.bck
     while port in d:
-        port = replace(port, sub_offset=port.sub_offset + 1)
+        port = port.next_sub_offset()
     return port
 
 
@@ -190,8 +213,11 @@ class Hugr(Mapping[Node, NodeData]):
         src = _unused_sub_offset(src, self._links)
         dst = _unused_sub_offset(dst, self._links)
         if self._links.get_left(dst) is not None:
-            dst = replace(dst, sub_offset=dst.sub_offset + 1)
+            dst = replace(dst, _sub_offset=dst._sub_offset + 1)
         self._links.insert_left(src, dst)
+
+        self[src.node]._num_outs = max(self[src.node]._num_outs, src.offset + 1)
+        self[dst.node]._num_inps = max(self[dst.node]._num_inps, dst.offset + 1)
 
     def delete_link(self, src: OutPort, dst: InPort) -> None:
         self._links.delete_left(src)
@@ -199,28 +225,54 @@ class Hugr(Mapping[Node, NodeData]):
     def num_nodes(self) -> int:
         return len(self._nodes) - len(self._free_nodes)
 
-    def num_in_ports(self, node: Node) -> int:
-        return len(self.in_ports(node))
-
-    def num_out_ports(self, node: Node) -> int:
-        return len(self.out_ports(node))
-
-    def node_ports(
-        self, node: Node, direction: Direction
-    ) -> Collection[InPort] | Collection[OutPort]:
+    def num_ports(self, node: Node, direction: Direction) -> int:
         return (
-            self.in_ports(node)
+            self.num_in_ports(node)
             if direction == Direction.INCOMING
-            else self.out_ports(node)
+            else self.num_out_ports(node)
         )
 
-    def in_ports(self, node: Node) -> Collection[InPort]:
-        # can be optimised by caching number of ports
-        # or by guaranteeing that all ports are contiguous
-        return [p for p in self._links.bck if p.node == node]
+    def num_in_ports(self, node: Node) -> int:
+        return self[node]._num_inps
 
-    def out_ports(self, node: Node) -> Collection[OutPort]:
-        return [p for p in self._links.fwd if p.node == node]
+    def num_out_ports(self, node: Node) -> int:
+        return self[node]._num_outs
+
+    def _linked_ports(self, port: P, links: dict[P, K]) -> Iterable[K]:
+        port = replace(port, _sub_offset=0)
+        while port in links:
+            # sub offset not used in API
+            yield replace(links[port], _sub_offset=0)
+            port = port.next_sub_offset()
+
+    # TODO: single linked port
+
+    def _node_links(self, node: Node, links: dict[P, K]) -> Iterable[tuple[P, list[K]]]:
+        try:
+            direction = next(iter(links.keys())).direction
+        except StopIteration:
+            return iter(())
+        # iterate over known offsets
+        for offset in range(self.num_ports(node, direction)):
+            port = cast(P, node.port(offset, direction))
+            # if the 0 sub-offset is linked
+            yield port, list(self._linked_ports(port, links))
+
+    def outgoing_links(self, node: Node) -> Iterable[tuple[OutPort, list[InPort]]]:
+        return self._node_links(node, self._links.fwd)
+
+    def incoming_links(self, node: Node) -> Iterable[tuple[InPort, list[OutPort]]]:
+        return self._node_links(node, self._links.bck)
+
+    def num_incoming(self, node: Node) -> int:
+        # connecetd links
+        return sum(1 for _ in self.incoming_links(node))
+
+    def num_outgoing(self, node: Node) -> int:
+        # connecetd links
+        return sum(1 for _ in self.outgoing_links(node))
+
+    # TODO: num_links and _linked_ports
 
     def insert_hugr(self, hugr: "Hugr", parent: Node | None = None) -> dict[Node, Node]:
         mapping: dict[Node, Node] = {}
