@@ -211,19 +211,6 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
             }
         }
 
-        // Secondly, check that the node signature does not contain any row variables.
-        // (We do this here so it's before we try indexing into the ports of any nodes).
-        op_type
-            .dataflow_signature()
-            .as_ref()
-            .and_then(FunctionType::find_rowvar)
-            .map_or(Ok(()), |(idx, _)| {
-                Err(ValidationError::SignatureError {
-                    node,
-                    cause: SignatureError::RowVarWhereTypeExpected { idx },
-                })
-            })?;
-
         // Thirdly that the node has correct children
         self.validate_children(node, node_type)?;
 
