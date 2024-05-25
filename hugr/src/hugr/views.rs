@@ -339,7 +339,7 @@ pub trait HugrView: sealed::HugrInternals {
     ///
     /// In contrast to [`get_function_type`][HugrView::get_function_type], this
     /// method always return a concrete [`FunctionType`].
-    fn get_df_function_type(&self) -> Option<FunctionType> {
+    fn get_df_function_type(&self) -> Option<FunctionType<false>> {
         let op = self.get_optype(self.root());
         op.inner_function_type()
     }
@@ -354,7 +354,7 @@ pub trait HugrView: sealed::HugrInternals {
     /// of the function.
     ///
     /// Otherwise, returns `None`.
-    fn get_function_type(&self) -> Option<PolyFuncType> {
+    fn get_function_type(&self) -> Option<PolyFuncType<false>> {
         let op = self.get_optype(self.root());
         match op {
             OpType::FuncDecl(decl) => Some(decl.signature.clone()),
@@ -438,7 +438,7 @@ pub trait HugrView: sealed::HugrInternals {
 
     /// Get the "signature" (incoming and outgoing types) of a node, non-Value
     /// kind ports will be missing.
-    fn signature(&self, node: Node) -> Option<FunctionType> {
+    fn signature(&self, node: Node) -> Option<Signature> {
         self.get_optype(node).dataflow_signature()
     }
 

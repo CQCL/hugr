@@ -108,7 +108,7 @@ impl NodeType {
     }
 
     /// Get the function type from the embedded op
-    pub fn op_signature(&self) -> Option<FunctionType> {
+    pub fn op_signature(&self) -> Option<Signature> {
         self.op.dataflow_signature()
     }
 
