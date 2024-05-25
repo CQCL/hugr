@@ -19,8 +19,8 @@ use crate::{
     types::EdgeKind,
 };
 
-use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError, PRELUDE_REGISTRY};
-use crate::types::{FunctionType, PolyFuncType, Type, TypeArg, TypeRow};
+use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE_REGISTRY};
+use crate::types::{FunctionType, PolyFuncType, Signature, Type, TypeArg, TypeRow};
 
 use itertools::Itertools;
 
@@ -294,19 +294,21 @@ pub trait Dataflow: Container {
     /// This function will return an error if there is an error when building
     /// the DFG node.
     // TODO: Should this be one function, or should there be a temporary "op" one like with the others?
-    fn dfg_builder(
+    fn dfg_builder<S: TryInto<Signature>>(
         &mut self,
-        signature: Signature,
+        signature: S,
         input_extensions: Option<ExtensionSet>,
         input_wires: impl IntoIterator<Item = Wire>,
-    ) -> Result<DFGBuilder<&mut Hugr>, BuildError> {
+    ) -> Result<DFGBuilder<&mut Hugr>, BuildError> 
+    where BuildError: From<<S as TryInto<Signature>>::Error> {
+        let signature = signature.try_into()?;
         let op = ops::DFG {
             signature: signature.clone(),
         };
         let nodetype = NodeType::new(op, input_extensions.clone());
         let (dfg_n, _) = add_node_with_wires(self, nodetype, input_wires)?;
 
-        DFGBuilder::create_with_io(self.hugr_mut(), dfg_n, signature, input_extensions)
+        DFGBuilder::create_with_io::<Signature>(self.hugr_mut(), dfg_n, signature, input_extensions)
     }
 
     /// Return a builder for a [`crate::ops::CFG`] node,
