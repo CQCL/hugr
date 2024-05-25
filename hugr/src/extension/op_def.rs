@@ -11,7 +11,7 @@ use super::{
 
 use crate::ops::{OpName, OpNameRef};
 use crate::types::type_param::{check_type_args, TypeArg, TypeParam};
-use crate::types::{FunctionType, PolyFuncType};
+use crate::types::{FunctionType, PolyFuncType, Signature};
 use crate::Hugr;
 
 /// Trait necessary for binary computations of OpDef signature
@@ -490,9 +490,8 @@ mod test {
     use crate::extension::{SignatureError, EMPTY_REG, PRELUDE_REGISTRY};
     use crate::ops::{CustomOp, OpName};
     use crate::std_extensions::collections::{EXTENSION, LIST_TYPENAME};
-    use crate::types::type_param::TypeArgError;
-    use crate::types::{type_param::TypeParam, FunctionType, PolyFuncType, TypeArg, TypeBound};
-    use crate::types::{FunctionType, Type};
+    use crate::types::type_param::{TypeArgError, TypeParam};
+    use crate::types::{FunctionType, PolyFuncType, TypeArg, TypeBound, Type};
     use crate::{const_extension_ids, Extension};
 
     const_extension_ids! {
