@@ -372,7 +372,7 @@ impl LoadFunction {
 
     #[inline]
     /// Return the type of the function loaded by this op.
-    pub fn function_type(&self) -> &PolyFuncType {
+    pub fn function_type(&self) -> &PolyFuncType<false> {
         &self.func_sig
     }
 

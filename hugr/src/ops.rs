@@ -405,7 +405,7 @@ pub trait OpParent {
     /// sibling graph.
     ///
     /// Non-container ops like `FuncDecl` return `None` even though they represent a function.
-    fn inner_function_type(&self) -> Option<FunctionType> {
+    fn inner_function_type(&self) -> Option<Signature> {
         None
     }
 }

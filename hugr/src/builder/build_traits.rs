@@ -336,7 +336,7 @@ pub trait Dataflow: Container {
             self,
             NodeType::new(
                 ops::CFG {
-                    signature: FunctionType::new(inputs.clone(), output_types.clone())
+                    signature: Signature::try_new(inputs.clone(), output_types.clone())?
                         .with_extension_delta(extension_delta),
                 },
                 input_extensions.into(),
