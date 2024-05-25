@@ -201,7 +201,7 @@ impl Call {
 
     #[inline]
     /// Return the signature of the function called by this op.
-    pub fn called_function_type(&self) -> &PolyFuncType {
+    pub fn called_function_type(&self) -> &PolyFuncType<false> {
         &self.func_sig
     }
 

@@ -321,7 +321,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
             // Allow function "value" to have unknown arity. A Call node will have to provide
             // TypeArgs that produce a known arity, but a LoadFunction might pass the function
             // value ("function pointer") around without knowing how to call it.
-            EdgeKind::Function(pf) => pf.validate_var_len(self.extension_registry),
+            EdgeKind::Function(pf) => pf.validate(self.extension_registry),
             _ => Ok(()),
         }
     }
