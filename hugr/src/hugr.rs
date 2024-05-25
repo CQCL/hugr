@@ -30,7 +30,7 @@ use crate::extension::infer_extensions;
 use crate::extension::{ExtensionRegistry, ExtensionSet, ExtensionSolution, InferExtensionError};
 use crate::ops::custom::resolve_extension_ops;
 use crate::ops::{OpTag, OpTrait, OpType, DEFAULT_OPTYPE};
-use crate::types::FunctionType;
+use crate::types::{FunctionType, Signature};
 use crate::{Direction, Node};
 
 use delegate::delegate;

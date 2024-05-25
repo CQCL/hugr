@@ -31,7 +31,7 @@ use crate::extension::ExtensionRegistry;
 use crate::ops::handle::NodeHandle;
 use crate::ops::{OpParent, OpTag, OpTrait, OpType};
 
-use crate::types::{EdgeKind, FunctionType};
+use crate::types::{EdgeKind, FunctionType, Signature};
 use crate::types::{PolyFuncType, Type};
 use crate::{Direction, IncomingPort, Node, OutgoingPort, Port};
 

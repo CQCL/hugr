@@ -1,7 +1,7 @@
 use crate::ops;
 
 use crate::hugr::{views::HugrView, NodeType};
-use crate::types::{FunctionType, TypeRow};
+use crate::types::{FunctionType, Signature, TypeRow};
 use crate::{Hugr, Node};
 
 use super::build_traits::SubContainer;

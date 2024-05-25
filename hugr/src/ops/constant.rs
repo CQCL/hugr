@@ -434,6 +434,7 @@ mod test {
     use super::Value;
     use crate::builder::test::simple_dfg_hugr;
     use crate::std_extensions::arithmetic::int_types::ConstInt;
+    use crate::types::FunctionType;
     use crate::{
         builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
         extension::{

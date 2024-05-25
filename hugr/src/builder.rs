@@ -222,7 +222,7 @@ pub(crate) mod test {
 
     use crate::hugr::{views::HugrView, HugrMut, NodeType};
     use crate::ops;
-    use crate::types::{FunctionType, PolyFuncType, Type};
+    use crate::types::{FunctionType, PolyFuncType, Signature, Type};
     use crate::{type_row, Hugr};
 
     use super::handle::BuildHandle;

@@ -5,6 +5,7 @@ use super::{impl_op_name, OpTag};
 
 use crate::extension::ExtensionSet;
 
+use crate::types::Signature;
 use crate::{
     extension::ExtensionId,
     types::{EdgeKind, FunctionType, Type, TypeRow},
