@@ -11,6 +11,7 @@ use super::{OpName, OpTag};
 /// Tail-controlled loop.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(test, derive(proptest_derive::Arbitrary))]
+// ALAN hide fields and add try_new to rule out RowVars ?
 pub struct TailLoop {
     /// Types that are only input
     pub just_inputs: TypeRow,
@@ -32,6 +33,7 @@ impl DataflowOpTrait for TailLoop {
     fn signature(&self) -> Signature {
         let [inputs, outputs] =
             [&self.just_inputs, &self.just_outputs].map(|row| row.extend(self.rest.iter()));
+        // ALAN looks like a new_unchecked if we hide all the field and check no-RVs in try_new
         FunctionType::new(inputs, outputs)
     }
 }
@@ -54,6 +56,7 @@ impl TailLoop {
 /// Conditional operation, defined by child `Case` nodes for each branch.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(test, derive(proptest_derive::Arbitrary))]
+// ALAN should we hide fields and enforce no-RowVars via a `try_new`?
 pub struct Conditional {
     /// The possible rows of the Sum input
     pub sum_rows: Vec<TypeRow>,
@@ -78,6 +81,7 @@ impl DataflowOpTrait for Conditional {
         inputs
             .to_mut()
             .insert(0, Type::new_sum(self.sum_rows.clone()));
+        // ALAN looks like a Signature::new_unchecked, with fields hidden
         FunctionType::new(inputs, self.outputs.clone())
             .with_extension_delta(self.extension_delta.clone())
     }
@@ -116,6 +120,7 @@ impl DataflowOpTrait for CFG {
 #[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 /// A CFG basic block node. The signature is that of the internal Dataflow graph.
 #[allow(missing_docs)]
+// ALAN yet another hide-fields-add-try_new to check no RowVars?
 pub struct DataflowBlock {
     pub inputs: TypeRow,
     pub other_outputs: TypeRow,
@@ -158,6 +163,7 @@ impl DataflowParent for DataflowBlock {
         let sum_type = Type::new_sum(self.sum_rows.clone());
         let mut node_outputs = vec![sum_type];
         node_outputs.extend_from_slice(&self.other_outputs);
+        // ALAN this would be a new_unchecked if we knew other_outputs were not RVs
         FunctionType::new(self.inputs.clone(), TypeRow::from(node_outputs))
     }
 }

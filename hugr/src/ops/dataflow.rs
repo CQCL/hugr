@@ -362,7 +362,8 @@ impl LoadFunction {
     ) -> Result<Self, SignatureError> {
         let type_args = type_args.into();
         let instantiation = func_sig.instantiate(&type_args, exts)?;
-        let signature = FunctionType::new(TypeRow::new(), vec![Type::new_function(instantiation)]);
+        // ALAN No possibility of error here - consider new_unchecked:
+        let signature = Signature::try_new(TypeRow::new(), vec![Type::new_function(instantiation)])?;
         Ok(Self {
             func_sig,
             type_args,

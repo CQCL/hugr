@@ -308,6 +308,7 @@ impl SiblingSubgraph {
                 sig.port_type(p).cloned().expect("must be dataflow edge")
             })
             .collect_vec();
+        // ALAN could be a new_unchecked, all the input/output types come from a Signature
         FunctionType::new(input, output)
     }
 
