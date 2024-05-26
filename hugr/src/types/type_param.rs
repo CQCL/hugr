@@ -213,7 +213,9 @@ impl From<ExtensionSet> for TypeArg {
     }
 }
 
-/// Variable in a TypeArg, that is not a [TypeArg::Type] or [TypeArg::Extensions],
+/// Variable in a TypeArg, that is neither a [TypeArg::Extensions]
+/// nor a single [TypeArg::Type] (i.e. not a [Type::new_var_use]
+/// - it might be a [Type::new_row_var_use]).
 #[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 pub struct TypeArgVariable {
     idx: usize,
@@ -226,17 +228,11 @@ impl TypeArg {
     /// `decl` must be exactly that with which the variable was declared.
     pub fn new_var_use(idx: usize, decl: TypeParam) -> Self {
         match decl {
+            // Note a TypeParam::List of TypeParam::Type *cannot* be represented
+            // as a TypeArg::Type because the latter stores a Type<false> i.e. only a single type,
+            // not a RowVariable.
             TypeParam::Type { b } => Type::new_var_use(idx, b).into(),
-            TypeParam::List { param: bx } if matches!(*bx, TypeParam::Type { .. }) => {
-                // There are two reasonable schemes for representing row variables:
-                // 1. TypeArg::Variable(idx, TypeParam::List(TypeParam::Type(typebound)))
-                // 2. TypeArg::Type(Type::new_row_var_use(idx, typebound))
-                // Here we prefer the latter for canonicalization: TypeArgVariable's fields are non-pub
-                // so this pevents constructing malformed cases like the former.
-                let TypeParam::Type { b } = *bx else { panic!() };
-                Type::new_row_var_use(idx, b).into()
-            }
-            // Similarly, prevent TypeArg::Variable(idx, TypeParam::Extensions)
+            // Prevent TypeArg::Variable(idx, TypeParam::Extensions)
             TypeParam::Extensions => TypeArg::Extensions {
                 es: ExtensionSet::type_var(idx),
             },
@@ -257,8 +253,7 @@ impl TypeArg {
         var_decls: &[TypeParam],
     ) -> Result<(), SignatureError> {
         match self {
-            // Row variables are represented as 'TypeArg::Type's (see TypeArg::new_var_use)
-            TypeArg::Type { ty } => ty.validate(true, extension_registry, var_decls),
+            TypeArg::Type { ty } => ty.validate(extension_registry, var_decls),
             TypeArg::BoundedNat { .. } => Ok(()),
             TypeArg::Opaque { arg: custarg } => {
                 // We could also add a facility to Extension to validate that the constant *value*
@@ -274,13 +269,7 @@ impl TypeArg {
             TypeArg::Variable {
                 v: TypeArgVariable { idx, cached_decl },
             } => {
-                assert!(
-                    match cached_decl {
-                        TypeParam::Type { .. } => false,
-                        TypeParam::List { param } if matches!(**param, TypeParam::Type { .. }) =>
-                            false,
-                        _ => true,
-                    },
+                assert!(!matches!(cached_decl, TypeParam::Type {..}),
                     "Malformed TypeArg::Variable {} - should be inconstructible",
                     cached_decl
                 );
@@ -293,14 +282,8 @@ impl TypeArg {
     pub(crate) fn substitute(&self, t: &Substitution) -> Self {
         match self {
             TypeArg::Type { ty } => {
-                let tys = ty.substitute(t).into_iter().map_into().collect::<Vec<_>>();
-                match <Vec<TypeArg> as TryInto<[TypeArg; 1]>>::try_into(tys) {
-                    Ok([ty]) => ty,
-                    // Multiple elements can only have come from a row variable.
-                    // So, we must be either in a TypeArg::Sequence; or a single Row Variable
-                    // - fitting into a hole declared as a TypeParam::List (as per check_type_arg).
-                    Err(elems) => TypeArg::Sequence { elems },
-                }
+                // RowVariables are represented as TypeArg::Variable
+                ty.substitute(t).into()
             }
             TypeArg::BoundedNat { .. } => self.clone(), // We do not allow variables as bounds on BoundedNat's
             TypeArg::Opaque {
@@ -383,28 +366,23 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
             _,
         ) if param.contains(cached_decl) => Ok(()),
         (TypeArg::Type { ty }, TypeParam::Type { b: bound })
-            if bound.contains(ty.least_upper_bound()) && !ty.is_row_var() =>
+            if bound.contains(ty.least_upper_bound()) =>
         {
             Ok(())
         }
         (TypeArg::Sequence { elems }, TypeParam::List { param }) => {
             elems.iter().try_for_each(|arg| {
-                // Also allow elements that are RowVars if fitting into a List of Types
-                if let (TypeArg::Type { ty }, TypeParam::Type { b }) = (arg, &**param) {
-                    if ty.is_row_var() && b.contains(ty.least_upper_bound()) {
-                        return Ok(());
-                    }
-                }
                 check_type_arg(arg, param)
             })
         }
         // Also allow a single "Type" to be used for a List *only* if the Type is a row variable
         // (i.e., it's not really a Type, it's multiple Types)
-        (TypeArg::Type { ty }, TypeParam::List { param })
+        /* ALAN this is impossible, but what's it look like now?
+          (TypeArg::Type { ty }, TypeParam::List { param })
             if ty.is_row_var() && param.contains(&ty.least_upper_bound().into()) =>
         {
             Ok(())
-        }
+        }*/
 
         (TypeArg::Sequence { elems: items }, TypeParam::Tuple { params: types }) => {
             if items.len() != types.len() {

@@ -19,12 +19,12 @@ use itertools::Itertools;
 #[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 #[serde(transparent)]
-pub struct TypeRow {
+pub struct TypeRow<const ROWVARS:bool = false> {
     /// The datatypes in the row.
-    types: Cow<'static, [Type]>,
+    types: Cow<'static, [Type<ROWVARS>]>,
 }
 
-impl Display for TypeRow {
+impl <const RV:bool> Display for TypeRow<RV> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_char('[')?;
         display_list(self.types.as_ref(), f)?;
@@ -32,7 +32,7 @@ impl Display for TypeRow {
     }
 }
 
-impl TypeRow {
+impl <const RV:bool> TypeRow<RV> {
     /// Create a new empty row.
     pub const fn new() -> Self {
         Self {
@@ -41,31 +41,48 @@ impl TypeRow {
     }
 
     /// Returns a new `TypeRow` with `xs` concatenated onto `self`.
-    pub fn extend<'a>(&'a self, rest: impl IntoIterator<Item = &'a Type>) -> Self {
+    pub fn extend<'a>(&'a self, rest: impl IntoIterator<Item = &'a Type<RV>>) -> Self {
         self.iter().chain(rest).cloned().collect_vec().into()
     }
 
     /// Returns a reference to the types in the row.
-    pub fn as_slice(&self) -> &[Type] {
+    pub fn as_slice(&self) -> &[Type<RV>] {
         &self.types
+    }
+
+    /// Applies a substitution to the row.
+    /// For `TypeRow<true>`, note this may change the length of the row.
+    /// For `TypeRow<false>`, guaranteed not to change the length of the row.
+    pub(super) fn substitute(&self, s: &Substitution) -> Self {
+        self
+            .iter()
+            .flat_map(|ty| ty.subst_vec(s))
+            .collect::<Vec<_>>()
+            .into()
     }
 
     delegate! {
         to self.types {
             /// Iterator over the types in the row.
-            pub fn iter(&self) -> impl Iterator<Item = &Type>;
-
-            /// Returns the number of types in the row.
-            pub fn len(&self) -> usize;
+            pub fn iter(&self) -> impl Iterator<Item = &Type<RV>>;
 
             /// Mutable vector of the types in the row.
-            pub fn to_mut(&mut self) -> &mut Vec<Type>;
+            pub fn to_mut(&mut self) -> &mut Vec<Type<RV>>;
 
             /// Allow access (consumption) of the contained elements
-            pub fn into_owned(self) -> Vec<Type>;
+            pub fn into_owned(self) -> Vec<Type<RV>>;
 
             /// Returns `true` if the row contains no types.
             pub fn is_empty(&self) -> bool ;
+        }
+    }
+}
+
+impl TypeRow<false> {
+    delegate! {
+        to self.types {
+            /// Returns the number of types in the row.
+            pub fn len(&self) -> usize;
 
             #[inline(always)]
             /// Returns the type at the specified index. Returns `None` if out of bounds.
@@ -78,39 +95,42 @@ impl TypeRow {
             pub fn get_mut(&mut self, offset: usize) -> Option<&mut Type>;
         }
     }
+}
 
-    /// Applies a substitution to the row. Note this may change the length
-    /// if-and-only-if the row contains any [RowVariable]s.
-    ///
-    /// [RowVariable]: [crate::types::TypeEnum::RowVariable]
-    pub(super) fn substitute(&self, tr: &Substitution) -> TypeRow {
-        let res = self
-            .iter()
-            .flat_map(|ty| ty.substitute(tr))
-            .collect::<Vec<_>>()
-            .into();
-        res
-    }
-
-    pub(super) fn validate_var_len(
+impl TypeRow<true> {
+    pub(super) fn validate(
         &self,
         exts: &ExtensionRegistry,
         var_decls: &[TypeParam],
     ) -> Result<(), SignatureError> {
         self.iter()
-            .try_for_each(|t| t.validate(true, exts, var_decls))
+            .try_for_each(|t| t.validate(exts, var_decls))
     }
 }
 
-impl Default for TypeRow {
+impl From<TypeRow> for TypeRow<true> {
+    fn from(value: TypeRow) -> Self {
+        Self::from(value.into_owned().into_iter().map_into().collect::<Vec<Type<true>>>())
+    }
+}
+
+impl TryFrom<TypeRow<true>> for TypeRow {
+    type Error = SignatureError;
+
+    fn try_from(value: TypeRow<true>) -> Result<Self, Self::Error> {
+        Ok(Self::from(value.into_owned().into_iter().map(|t| t.try_into()).collect::<Result<Vec<_>,_>>()?))
+    }
+}
+
+impl <const RV:bool> Default for TypeRow<RV> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<F> From<F> for TypeRow
+impl<F, const RV:bool> From<F> for TypeRow<RV>
 where
-    F: Into<Cow<'static, [Type]>>,
+    F: Into<Cow<'static, [Type<RV>]>>,
 {
     fn from(types: F) -> Self {
         Self {
@@ -119,23 +139,23 @@ where
     }
 }
 
-impl From<Type> for TypeRow {
-    fn from(t: Type) -> Self {
+impl <const RV:bool> From<Type<RV>> for TypeRow<RV> {
+    fn from(t: Type<RV>) -> Self {
         Self {
             types: vec![t].into(),
         }
     }
 }
 
-impl Deref for TypeRow {
-    type Target = [Type];
+impl <const RV:bool> Deref for TypeRow<RV> {
+    type Target = [Type<RV>];
 
     fn deref(&self) -> &Self::Target {
         self.as_slice()
     }
 }
 
-impl DerefMut for TypeRow {
+impl <const RV:bool> DerefMut for TypeRow<RV> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.types.to_mut()
     }

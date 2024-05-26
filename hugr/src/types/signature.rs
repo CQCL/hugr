@@ -26,17 +26,17 @@ use {crate::proptest::RecursionDepth, ::proptest::prelude::*, proptest_derive::A
 pub struct FunctionType<const ROWVARS: bool = true> {
     /// Value inputs of the function.
     #[cfg_attr(test, proptest(strategy = "any_with::<TypeRow>(params)"))]
-    pub input: TypeRow,
+    pub input: TypeRow<ROWVARS>,
     /// Value outputs of the function.
     #[cfg_attr(test, proptest(strategy = "any_with::<TypeRow>(params)"))]
-    pub output: TypeRow,
+    pub output: TypeRow<ROWVARS>,
     /// The extension requirements which are added by the operation
     pub extension_reqs: ExtensionSet,
 }
 
 /// The concept of "signature" in the spec - the edges required to/from a node or graph
 /// and also the target (value) of a call (static).
-pub type Signature = FunctionType<false>; // TODO: rename to "Signature"
+pub type Signature = FunctionType<false>;
 
 impl<const RV: bool> FunctionType<RV> {
     /// Builder method, add extension_reqs to an FunctionType
@@ -52,20 +52,8 @@ impl<const RV: bool> FunctionType<RV> {
             extension_reqs: self.extension_reqs.substitute(tr),
         }
     }
-}
 
-impl FunctionType {
-    pub(super) fn validate(
-        &self,
-        extension_registry: &ExtensionRegistry,
-        var_decls: &[TypeParam],
-    ) -> Result<(), SignatureError> {
-        self.input.validate_var_len(extension_registry, var_decls)?;
-        self.output
-            .validate_var_len(extension_registry, var_decls)?;
-        self.extension_reqs.validate(var_decls)
-    }
-    pub fn new(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Self {
+    pub fn new(input: impl Into<TypeRow<RV>>, output: impl Into<TypeRow<RV>>) -> Self {
         Self {
             input: input.into(),
             output: output.into(),
@@ -73,9 +61,41 @@ impl FunctionType {
         }
     }
 
-    pub fn new_endo(row: impl Into<TypeRow>) -> Self {
+    pub fn new_endo(row: impl Into<TypeRow<RV>>) -> Self {
         let row = row.into();
         Self::new(row.clone(), row)
+    }
+
+    /// True if both inputs and outputs are necessarily empty.
+    /// (For [FunctionType], even after any possible substitution of row variables)
+    #[inline(always)]
+    pub fn is_empty(&self) -> bool {
+        self.input.is_empty() && self.output.is_empty()
+    }
+
+    #[inline]
+    /// Returns a row of the value inputs of the function.
+    pub fn input(&self) -> &TypeRow<RV> {
+        &self.input
+    }
+
+    #[inline]
+    /// Returns a row of the value outputs of the function.
+    pub fn output(&self) -> &TypeRow<RV> {
+        &self.output
+    }
+}
+
+impl FunctionType<true> {
+    pub(super) fn validate(
+        &self,
+        extension_registry: &ExtensionRegistry,
+        var_decls: &[TypeParam],
+    ) -> Result<(), SignatureError> {
+        self.input.validate(extension_registry, var_decls)?;
+        self.output
+            .validate(extension_registry, var_decls)?;
+        self.extension_reqs.validate(var_decls)
     }
 
     /// If this FunctionType contains any row variables, return one.
@@ -90,59 +110,7 @@ impl FunctionType {
     }    
 }
 
-impl<const RV: bool> FunctionType<RV> {
-    /// True if both inputs and outputs are necessarily empty.
-    /// (For [FunctionType], even after any possible substitution of row variables)
-    #[inline(always)]
-    pub fn is_empty(&self) -> bool {
-        self.input.is_empty() && self.output.is_empty()
-    }
-
-    #[inline]
-    /// Returns the input row
-    pub fn input(&self) -> &TypeRow {
-        &self.input
-    }
-
-    #[inline]
-    /// Returns the output row
-    pub fn output(&self) -> &TypeRow {
-        &self.output
-    }
-
-    /// Converts to a tuple of the value inputs, extension delta, and value outputs
-    pub fn into_tuple(self) -> (TypeRow, ExtensionSet, TypeRow) {
-        (self.input, self.extension_reqs, self.output)
-    }    
-}
-
 impl Signature {
-    /// Create a new signature with specified inputs and outputs.
-    pub fn try_new(
-        input: impl Into<TypeRow>,
-        output: impl Into<TypeRow>,
-    ) -> Result<Self, SignatureError> {
-        let input = input.into();
-        let output = output.into();
-        for t in input.iter().chain(output.iter()) {
-            if let TypeEnum::RowVariable(idx, _) = t.0 {
-                return Err(SignatureError::RowVarWhereTypeExpected { idx });
-            }
-        }
-        let extension_reqs = ExtensionSet::default();
-        Ok(Self {
-            input,
-            output,
-            extension_reqs,
-        })
-    }
-    /// Create a new signature with the same input and output types (signature of an endomorphic
-    /// function).
-    pub fn try_new_endo(linear: impl Into<TypeRow>) -> Result<Self, SignatureError> {
-        let linear = linear.into();
-        Self::try_new(linear.clone(), linear)
-    }
-
     /// Returns the type of a value [`Port`]. Returns `None` if the port is out
     /// of bounds.
     #[inline]
@@ -273,7 +241,9 @@ impl TryFrom<FunctionType> for Signature {
     type Error = SignatureError;
 
     fn try_from(value: FunctionType) -> Result<Self, Self::Error> {
-        Ok(Self::try_new(value.input, value.output)?.with_extension_delta(value.extension_reqs))
+        let input: TypeRow<false> = value.input.try_into()?;
+        let output: TypeRow<false> = value.output.try_into()?;
+        Ok(Self::new(input, output).with_extension_delta(value.extension_reqs))
     }
 }
 

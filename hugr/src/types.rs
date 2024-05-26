@@ -38,7 +38,7 @@ pub type TypeName = SmolStr;
 pub type TypeNameRef = str;
 
 /// The kinds of edges in a HUGR, excluding Hierarchy.
-#[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 pub enum EdgeKind {
     /// Control edges of a CFG region.
@@ -130,7 +130,7 @@ pub enum SumType {
     Unit { size: u8 },
     /// General case of a Sum type.
     #[allow(missing_docs)]
-    General { rows: Vec<TypeRow> },
+    General { rows: Vec<TypeRow<true>> },
 }
 
 impl std::fmt::Display for SumType {
@@ -152,7 +152,7 @@ impl SumType {
     /// Initialize a new sum type.
     pub fn new<V>(variants: impl IntoIterator<Item = V>) -> Self
     where
-        V: Into<TypeRow>,
+        V: Into<TypeRow<true>>,
     {
         let rows = variants.into_iter().map(Into::into).collect_vec();
 
@@ -170,7 +170,7 @@ impl SumType {
     }
 
     /// Report the tag'th variant, if it exists.
-    pub fn get_variant(&self, tag: usize) -> Option<&TypeRow> {
+    pub fn get_variant(&self, tag: usize) -> Option<&TypeRow<true>> {
         match self {
             SumType::Unit { size } if tag < (*size as usize) => Some(Type::EMPTY_TYPEROW_REF),
             SumType::General { rows } => rows.get(tag),
@@ -187,8 +187,8 @@ impl SumType {
     }
 }
 
-impl From<SumType> for Type {
-    fn from(sum: SumType) -> Type {
+impl <const RV:bool> From<SumType> for Type<RV> {
+    fn from(sum: SumType) -> Self {
         match sum {
             SumType::Unit { size } => Type::new_unit_sum(size),
             SumType::General { rows } => Type::new_sum(rows),
@@ -223,13 +223,14 @@ pub enum TypeEnum {
     #[display(fmt = "Variable({})", _0)]
     Variable(usize, TypeBound),
     /// Variable index, and cache of inner TypeBound - matches a [TypeParam::List] of [TypeParam::Type]
-    /// of this bound (checked in validation)
+    /// of this bound (checked in validation). Should only exist for `Type<true>`.
     #[display(fmt = "RowVar({})", _0)]
     RowVariable(usize, TypeBound),
     #[allow(missing_docs)]
     #[display(fmt = "{}", "_0")]
     Sum(#[cfg_attr(test, proptest(strategy = "any_with::<SumType>(params)"))] SumType),
 }
+
 impl TypeEnum {
     /// The smallest type bound that covers the whole type.
     fn least_upper_bound(&self) -> TypeBound {
@@ -249,10 +250,10 @@ impl TypeEnum {
 }
 
 #[derive(
-    Clone, PartialEq, Debug, Eq, derive_more::Display, serde::Serialize, serde::Deserialize,
+    Clone, Debug, Eq, derive_more::Display, serde::Serialize, serde::Deserialize,
 )]
 #[display(fmt = "{}", "_0")]
-#[serde(into = "serialize::SerSimpleType", from = "serialize::SerSimpleType")]
+#[serde(into = "serialize::SerSimpleType", try_from = "serialize::SerSimpleType")]
 /// A HUGR type - the valid types of [EdgeKind::Value] and [EdgeKind::Const] edges.
 /// Such an edge is valid if the ports on either end agree on the [Type].
 /// Types have an optional [TypeBound] which places limits on the valid
@@ -273,24 +274,30 @@ impl TypeEnum {
 /// let func_type = Type::new_function(FunctionType::new_endo(vec![]));
 /// assert_eq!(func_type.least_upper_bound(), TypeBound::Copyable);
 /// ```
-pub struct Type(TypeEnum, TypeBound);
+pub struct Type<const ROWVARS:bool=false>(TypeEnum, TypeBound);
 
-impl Type {
+impl<const RV1:bool, const RV2:bool> PartialEq<Type<RV1>> for Type<RV2> {
+    fn eq(&self, other: &Type<RV1>) -> bool {
+        self.0 == other.0 && self.1 == other.1
+    }
+}
+
+impl<const RV:bool> Type<RV> {
     /// An empty `TypeRow`. Provided here for convenience
-    pub const EMPTY_TYPEROW: TypeRow = type_row![];
+    pub const EMPTY_TYPEROW: TypeRow<RV> = type_row![];
     /// Unit type (empty tuple).
     pub const UNIT: Self = Self(TypeEnum::Sum(SumType::Unit { size: 1 }), TypeBound::Eq);
 
-    const EMPTY_TYPEROW_REF: &'static TypeRow = &Self::EMPTY_TYPEROW;
+    const EMPTY_TYPEROW_REF: &'static TypeRow<RV> = &Self::EMPTY_TYPEROW;
 
     /// Initialize a new function type.
-    pub fn new_function(fun_ty: impl Into<FunctionType>) -> Self {
+    pub fn new_function(fun_ty: impl Into<FunctionType<true>>) -> Self {
         Self::new(TypeEnum::Function(Box::new(fun_ty.into())))
     }
 
     /// Initialize a new tuple type by providing the elements.
     #[inline(always)]
-    pub fn new_tuple(types: impl Into<TypeRow>) -> Self {
+    pub fn new_tuple(types: impl Into<TypeRow<true>>) -> Self {
         let row = types.into();
         match row.len() {
             0 => Self::UNIT,
@@ -300,7 +307,7 @@ impl Type {
 
     /// Initialize a new sum type by providing the possible variant types.
     #[inline(always)]
-    pub fn new_sum(variants: impl IntoIterator<Item = TypeRow>) -> Self where {
+    pub fn new_sum(variants: impl IntoIterator<Item = TypeRow<true>>) -> Self where {
         Self::new(TypeEnum::Sum(SumType::new(variants)))
     }
 
@@ -317,6 +324,8 @@ impl Type {
     }
 
     fn new(type_e: TypeEnum) -> Self {
+        // private method - so we can be sure of this:
+        debug_assert!(RV || !matches!(type_e, TypeEnum::RowVariable(_, _)));
         let bound = type_e.least_upper_bound();
         Self(type_e, bound)
     }
@@ -333,19 +342,6 @@ impl Type {
     /// than required for the use.
     pub const fn new_var_use(idx: usize, bound: TypeBound) -> Self {
         Self(TypeEnum::Variable(idx, bound), bound)
-    }
-
-    /// New use (occurrence) of the row variable with specified index.
-    /// `bound` must be exactly that with which the variable was declared
-    /// (i.e. as a [TypeParam::List]` of a `[TypeParam::Type]` of that bound),
-    /// which may be narrower than required for the use.
-    /// For use in [OpDef] type schemes, or function types, only,
-    /// not [FuncDefn] type schemes or as a Hugr port type.
-    ///
-    /// [OpDef]: crate::extension::OpDef
-    /// [FuncDefn]: crate::ops::FuncDefn
-    pub const fn new_row_var_use(idx: usize, bound: TypeBound) -> Self {
-        Self(TypeEnum::RowVariable(idx, bound), bound)
     }
 
     /// Report the least upper [TypeBound]
@@ -366,11 +362,6 @@ impl Type {
         TypeBound::Copyable.contains(self.least_upper_bound())
     }
 
-    /// Tells if this Type is a row variable, i.e. could stand for any number >=0 of Types
-    pub fn is_row_var(&self) -> bool {
-        matches!(self.0, TypeEnum::RowVariable(_, _))
-    }
-
     /// Checks all variables used in the type are in the provided list
     /// of bound variables, rejecting any [RowVariable]s if `allow_row_vars` is False;
     /// and that for each [CustomType] the corresponding
@@ -382,7 +373,6 @@ impl Type {
     /// [TypeDef]: crate::extension::TypeDef
     pub(crate) fn validate(
         &self,
-        allow_row_vars: bool,
         extension_registry: &ExtensionRegistry,
         var_decls: &[TypeParam],
     ) -> Result<(), SignatureError> {
@@ -391,14 +381,16 @@ impl Type {
         match &self.0 {
             TypeEnum::Sum(SumType::General { rows }) => rows
                 .iter()
-                .try_for_each(|row| row.validate_var_len(extension_registry, var_decls)),
+                .try_for_each(|row| row.validate(extension_registry, var_decls)),
             TypeEnum::Sum(SumType::Unit { .. }) => Ok(()), // No leaves there
             TypeEnum::Alias(_) => Ok(()),
             TypeEnum::Extension(custy) => custy.validate(extension_registry, var_decls),
+            // Function values may be passed around without knowing their arity
+            // (i.e. with row vars) as long as they are not called:
             TypeEnum::Function(ft) => ft.validate(extension_registry, var_decls),
             TypeEnum::Variable(idx, bound) => check_typevar_decl(var_decls, *idx, &(*bound).into()),
             TypeEnum::RowVariable(idx, bound) => {
-                if allow_row_vars {
+                if RV {
                     check_typevar_decl(var_decls, *idx, &TypeParam::new_list(*bound))
                 } else {
                     Err(SignatureError::RowVarWhereTypeExpected { idx: *idx })
@@ -413,15 +405,20 @@ impl Type {
     /// * If [Type::validate]`(false)` returns successfully, this method will return a Vec containing exactly one type
     /// * If [Type::validate]`(false)` fails, but `(true)` succeeds, this method may (depending on structure of self)
     ///   return a Vec containing any number of [Type]s. These may (or not) pass [Type::validate]
-    fn substitute(&self, t: &Substitution) -> Vec<Self> {
+    fn subst_vec(&self, t: &Substitution) -> Vec<Self> {
         match &self.0 {
-            TypeEnum::RowVariable(idx, bound) => t.apply_rowvar(*idx, *bound),
+            TypeEnum::RowVariable(idx, bound) => {
+                assert!(RV);
+                let res = t.apply_rowvar(*idx, *bound); // these are Type<true>'s
+                // We need Type<RV>s, so use try_into_(). Since we know RV==true, this cannot fail.
+                res.into_iter().map(|t| t.try_into_().unwrap()).collect()
+            }
             TypeEnum::Alias(_) | TypeEnum::Sum(SumType::Unit { .. }) => vec![self.clone()],
             TypeEnum::Variable(idx, bound) => {
                 let TypeArg::Type { ty } = t.apply_var(*idx, &((*bound).into())) else {
                     panic!("Variable was not a type - try validate() first")
                 };
-                vec![ty]
+                vec![ty.into_()]
             }
             TypeEnum::Extension(cty) => vec![Type::new_extension(cty.substitute(t))],
             TypeEnum::Function(bf) => vec![Type::new_function(bf.substitute(t))],
@@ -431,6 +428,82 @@ impl Type {
         }
     }
 }
+
+impl Type<false> {
+    fn substitute(&self, s: &Substitution) -> Self {
+        let v = self.subst_vec(s);
+        let [r] = v.try_into().unwrap(); // No row vars, so every Type<false> produces exactly one
+        r
+    }
+}
+
+impl Type<true> {
+    /// Tells if this Type is a row variable, i.e. could stand for any number >=0 of Types
+    pub fn is_row_var(&self) -> bool {
+        matches!(self.0, TypeEnum::RowVariable(_, _))
+    }
+    
+    /// New use (occurrence) of the row variable with specified index.
+    /// `bound` must match that with which the variable was declared
+    /// (i.e. as a [TypeParam::List]` of a `[TypeParam::Type]` of that bound).
+    /// For use in [OpDef], not [FuncDefn], type schemes only.
+    ///
+    /// [OpDef]: crate::extension::OpDef
+    /// [FuncDefn]: crate::ops::FuncDefn
+    pub const fn new_row_var_use(idx: usize, bound: TypeBound) -> Self {
+        Self(TypeEnum::RowVariable(idx, bound), bound)
+    }
+
+    fn substitute(&self, s: &Substitution) -> Vec<Self> {
+        self.subst_vec(s)
+    }
+}
+
+// ====== Conversions ======
+impl Type<false> {
+    fn into_<const RV:bool>(self) -> Type<RV> {
+        Type(self.0, self.1)
+    }
+}
+
+impl Type<true> {
+    fn try_into_<const RV:bool>(self) -> Result<Type<RV>, SignatureError> {
+        if !RV {
+            if let TypeEnum::RowVariable(idx, _) = self.0 {
+                return Err(SignatureError::RowVarWhereTypeExpected { idx });
+            }
+        }
+        Ok(Type(self.0, self.1))
+    }
+}
+
+impl <const RV:bool> Type<RV> {
+    fn try_into_no_rv(self) -> Result<Type<false>, SignatureError> {
+        if let TypeEnum::RowVariable(idx, _) = self.0 {
+            assert!(RV);
+            return Err(SignatureError::RowVarWhereTypeExpected { idx })
+        }
+        Ok(Type(self.0, self.1))
+    }
+
+    fn into_rv(self) -> Type<true> {
+        Type(self.0, self.1)
+    }
+}
+
+impl From<Type<false>> for Type<true> {
+    fn from(value: Type<false>) -> Self {
+        value.into_() // .into_rv also fine
+    }
+}
+
+impl TryFrom<Type<true>> for Type<false> {
+    type Error = SignatureError;
+    fn try_from(value: Type<true>) -> Result<Self, Self::Error> {
+        value.try_into_() // .try_into_no_rv() also fine
+    }
+}
+
 
 /// Details a replacement of type variables with a finite list of known values.
 /// (Variables out of the range of the list will result in a panic)
@@ -446,7 +519,7 @@ impl<'a> Substitution<'a> {
         arg.clone()
     }
 
-    fn apply_rowvar(&self, idx: usize, bound: TypeBound) -> Vec<Type> {
+    fn apply_rowvar(&self, idx: usize, bound: TypeBound) -> Vec<Type<true>> {
         let arg = self
             .0
             .get(idx)
@@ -457,13 +530,13 @@ impl<'a> Substitution<'a> {
             TypeArg::Sequence { elems } => elems
                 .iter()
                 .map(|ta| match ta {
-                    TypeArg::Type { ty } => ty.clone(),
+                    TypeArg::Type { ty } => ty.clone().into(),
                     _ => panic!("Not a list of types - call validate() ?"),
                 })
                 .collect(),
             TypeArg::Type { ty } if matches!(ty.0, TypeEnum::RowVariable(_, _)) => {
                 // Standalone "Type" can be used iff its actually a Row Variable not an actual (single) Type
-                vec![ty.clone()]
+                vec![ty.clone().into()]
             }
             _ => panic!("Not a type or list of types - call validate() ?"),
         }
@@ -509,7 +582,7 @@ pub(crate) mod test {
     #[test]
     fn construct() {
         let t: Type = Type::new_tuple(vec![
-            USIZE_T,
+            USIZE_T.into(),
             Type::new_function(FunctionType::new_endo(vec![])),
             Type::new_extension(CustomType::new(
                 "my_custom",
@@ -525,8 +598,8 @@ pub(crate) mod test {
         );
     }
 
-    #[test]
-    fn sum_construct() {
+    #[rstest::rstest]
+    fn sum_construct<const RV:bool>() {
         let pred1 = Type::new_sum([Type::EMPTY_TYPEROW, Type::EMPTY_TYPEROW]);
         let pred2 = Type::new_unit_sum(2);
 
