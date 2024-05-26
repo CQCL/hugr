@@ -153,7 +153,7 @@ impl<H: AsMut<Hugr> + AsRef<Hugr>> SubContainer for CFGBuilder<H> {
 
 impl CFGBuilder<Hugr> {
     /// New CFG rooted HUGR builder
-    pub fn new(signature: FunctionType) -> Result<Self, BuildError> {
+    pub fn new(signature: Signature) -> Result<Self, BuildError> {
         let cfg_op = ops::CFG {
             signature: signature.clone(),
         };
@@ -251,7 +251,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
     /// This function will return an error if there is an error adding the node.
     pub fn simple_block_builder(
         &mut self,
-        signature: FunctionType,
+        signature: Signature,
         n_cases: usize,
     ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
         self.block_builder(

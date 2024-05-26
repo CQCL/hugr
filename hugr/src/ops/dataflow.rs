@@ -4,7 +4,7 @@ use super::{impl_op_name, OpTag, OpTrait};
 
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 use crate::ops::StaticTag;
-use crate::types::{EdgeKind, FunctionType, PolyFuncType, Type, TypeArg, TypeRow};
+use crate::types::{EdgeKind, FunctionType, PolyFuncType, Signature, Type, TypeArg, TypeRow};
 use crate::IncomingPort;
 
 #[cfg(test)]
@@ -13,7 +13,7 @@ use ::proptest_derive::Arbitrary;
 pub(crate) trait DataflowOpTrait {
     const TAG: OpTag;
     fn description(&self) -> &str;
-    fn signature(&self) -> FunctionType;
+    fn signature(&self) -> Signature;
 
     /// The edge kind for the non-dataflow or constant inputs of the operation,
     /// not described by the signature.
@@ -99,7 +99,7 @@ impl DataflowOpTrait for Input {
         None
     }
 
-    fn signature(&self) -> FunctionType {
+    fn signature(&self) -> Signature {
         FunctionType::new(TypeRow::new(), self.types.clone())
     }
 }
@@ -112,7 +112,7 @@ impl DataflowOpTrait for Output {
 
     // Note: We know what the input extensions should be, so we *could* give an
     // instantiated Signature instead
-    fn signature(&self) -> FunctionType {
+    fn signature(&self) -> Signature {
         FunctionType::new(self.types.clone(), TypeRow::new())
     }
 
@@ -128,7 +128,7 @@ impl<T: DataflowOpTrait> OpTrait for T {
     fn tag(&self) -> OpTag {
         T::TAG
     }
-    fn dataflow_signature(&self) -> Option<FunctionType> {
+    fn dataflow_signature(&self) -> Option<Signature> {
         Some(DataflowOpTrait::signature(self))
     }
     fn extension_delta(&self) -> ExtensionSet {
@@ -159,9 +159,9 @@ impl<T: DataflowOpTrait> StaticTag for T {
 #[cfg_attr(test, derive(Arbitrary))]
 pub struct Call {
     /// Signature of function being called
-    func_sig: PolyFuncType,
+    func_sig: PolyFuncType<false>,
     type_args: Vec<TypeArg>,
-    instantiation: FunctionType, // Cache, so we can fail in try_new() not in signature()
+    instantiation: Signature, // Cache, so we can fail in try_new() not in signature()
 }
 impl_op_name!(Call);
 
@@ -172,7 +172,7 @@ impl DataflowOpTrait for Call {
         "Call a function directly"
     }
 
-    fn signature(&self) -> FunctionType {
+    fn signature(&self) -> Signature {
         self.instantiation.clone()
     }
 
@@ -186,7 +186,7 @@ impl Call {
     ///
     /// [TypeParam]: crate::types::type_param::TypeParam
     pub fn try_new(
-        func_sig: PolyFuncType,
+        func_sig: PolyFuncType<false>,
         type_args: impl Into<Vec<TypeArg>>,
         exts: &ExtensionRegistry,
     ) -> Result<Self, SignatureError> {
@@ -253,7 +253,7 @@ impl Call {
 #[cfg_attr(test, derive(Arbitrary))]
 pub struct CallIndirect {
     /// Signature of function being called
-    pub signature: FunctionType,
+    pub signature: Signature,
 }
 impl_op_name!(CallIndirect);
 
@@ -264,7 +264,7 @@ impl DataflowOpTrait for CallIndirect {
         "Call a function indirectly"
     }
 
-    fn signature(&self) -> FunctionType {
+    fn signature(&self) -> Signature {
         let mut s = self.signature.clone();
         s.input
             .to_mut()
@@ -288,7 +288,7 @@ impl DataflowOpTrait for LoadConstant {
         "Load a static constant in to the local dataflow graph"
     }
 
-    fn signature(&self) -> FunctionType {
+    fn signature(&self) -> Signature {
         FunctionType::new(TypeRow::new(), vec![self.datatype.clone()])
     }
 
@@ -329,9 +329,9 @@ impl LoadConstant {
 #[cfg_attr(test, derive(Arbitrary))]
 pub struct LoadFunction {
     /// Signature of the function
-    func_sig: PolyFuncType,
+    func_sig: PolyFuncType<false>,
     type_args: Vec<TypeArg>,
-    signature: FunctionType, // Cache, so we can fail in try_new() not in signature()
+    signature: Signature, // Cache, so we can fail in try_new() not in signature()
 }
 impl_op_name!(LoadFunction);
 impl DataflowOpTrait for LoadFunction {
@@ -341,7 +341,7 @@ impl DataflowOpTrait for LoadFunction {
         "Load a static function in to the local dataflow graph"
     }
 
-    fn signature(&self) -> FunctionType {
+    fn signature(&self) -> Signature {
         self.signature.clone()
     }
 
@@ -355,7 +355,7 @@ impl LoadFunction {
     ///
     /// [TypeParam]: crate::types::type_param::TypeParam
     pub fn try_new(
-        func_sig: PolyFuncType,
+        func_sig: PolyFuncType<false>,
         type_args: impl Into<Vec<TypeArg>>,
         exts: &ExtensionRegistry,
     ) -> Result<Self, SignatureError> {
@@ -408,7 +408,7 @@ impl LoadFunction {
 /// Operations that is the parent of a dataflow graph.
 pub trait DataflowParent {
     /// Signature of the inner dataflow graph.
-    fn inner_signature(&self) -> FunctionType;
+    fn inner_signature(&self) -> Signature;
 }
 
 /// A simply nested dataflow graph.
@@ -416,13 +416,13 @@ pub trait DataflowParent {
 #[cfg_attr(test, derive(Arbitrary))]
 pub struct DFG {
     /// Signature of DFG node
-    pub signature: FunctionType,
+    pub signature: Signature,
 }
 
 impl_op_name!(DFG);
 
 impl DataflowParent for DFG {
-    fn inner_signature(&self) -> FunctionType {
+    fn inner_signature(&self) -> Signature {
         self.signature.clone()
     }
 }
@@ -434,7 +434,7 @@ impl DataflowOpTrait for DFG {
         "A simply nested dataflow graph"
     }
 
-    fn signature(&self) -> FunctionType {
+    fn signature(&self) -> Signature {
         self.inner_signature()
     }
 }

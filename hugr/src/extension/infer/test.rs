@@ -21,7 +21,7 @@ use crate::{
 };
 
 use crate::type_row;
-use crate::types::{FunctionType, Type, TypeRow};
+use crate::types::{FunctionType, Signature, Type, TypeRow};
 
 use cool_asserts::assert_matches;
 use itertools::Itertools;
@@ -281,7 +281,7 @@ fn create_with_io(
     hugr: &mut Hugr,
     parent: Node,
     op: impl Into<OpType>,
-    op_sig: FunctionType,
+    op_sig: Signature,
 ) -> Result<[Node; 3], Box<dyn Error>> {
     let op: OpType = op.into();
 
@@ -438,7 +438,7 @@ fn extension_adding_sequence() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn make_opaque(extension: impl Into<ExtensionId>, signature: FunctionType) -> CustomOp {
+fn make_opaque(extension: impl Into<ExtensionId>, signature: Signature) -> CustomOp {
     ops::custom::OpaqueOp::new(extension.into(), "", "".into(), vec![], signature).into()
 }
 

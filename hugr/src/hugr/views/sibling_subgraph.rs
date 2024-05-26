@@ -18,11 +18,12 @@ use portgraph::{view::Subgraph, Direction, PortView};
 use thiserror::Error;
 
 use crate::builder::{Container, FunctionBuilder};
+use crate::extension::SignatureError;
 use crate::hugr::{HugrMut, HugrView, RootTagged};
 use crate::ops::dataflow::DataflowOpTrait;
 use crate::ops::handle::{ContainerHandle, DataflowOpID};
 use crate::ops::{OpTag, OpTrait};
-use crate::types::{FunctionType, Type};
+use crate::types::{FunctionType, Signature, Type};
 use crate::{Hugr, IncomingPort, Node, OutgoingPort, Port, SimpleReplacement};
 
 /// A non-empty convex subgraph of a HUGR sibling graph.
@@ -289,7 +290,7 @@ impl SiblingSubgraph {
     }
 
     /// The signature of the subgraph.
-    pub fn signature(&self, hugr: &impl HugrView) -> FunctionType {
+    pub fn signature(&self, hugr: &impl HugrView) -> Signature {
         let input = self
             .inputs
             .iter()

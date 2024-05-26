@@ -9,8 +9,9 @@ use {
     proptest_derive::Arbitrary,
 };
 
+use super::signature::FunctionType;
 use super::type_param::{check_type_args, TypeArg, TypeParam};
-use super::{FunctionType, Substitution};
+use super::Substitution;
 
 /// A polymorphic type scheme, i.e. of a [FuncDecl], [FuncDefn] or [OpDef].
 /// (Nodes/operations in the Hugr are not polymorphic.)
@@ -27,7 +28,7 @@ use super::{FunctionType, Substitution};
     "params.iter().map(ToString::to_string).join(\" \")",
     "body"
 )]
-pub struct PolyFuncType {
+pub struct PolyFuncType<const ROWVARS: bool> {
     /// The declared type parameters, i.e., these must be instantiated with
     /// the same number of [TypeArg]s before the function can be called. This
     /// defines the indices used by variables inside the body.
@@ -35,11 +36,11 @@ pub struct PolyFuncType {
     params: Vec<TypeParam>,
     /// Template for the function. May contain variables up to length of [Self::params]
     #[cfg_attr(test, proptest(strategy = "any_with::<FunctionType>(params)"))]
-    body: FunctionType,
+    body: FunctionType<ROWVARS>,
 }
 
-impl From<FunctionType> for PolyFuncType {
-    fn from(body: FunctionType) -> Self {
+impl<const RV: bool> From<FunctionType<RV>> for PolyFuncType<RV> {
+    fn from(body: FunctionType<RV>) -> Self {
         Self {
             params: vec![],
             body,
@@ -47,11 +48,11 @@ impl From<FunctionType> for PolyFuncType {
     }
 }
 
-impl TryFrom<PolyFuncType> for FunctionType {
-    /// If the PolyFuncType is not a monomorphic FunctionType, fail with the binders
+impl<const RV: bool> TryFrom<PolyFuncType<RV>> for FunctionType<RV> {
+    /// If the PolyFuncType is not monomorphic, fail with its binders
     type Error = Vec<TypeParam>;
 
-    fn try_from(value: PolyFuncType) -> Result<Self, Self::Error> {
+    fn try_from(value: PolyFuncType<RV>) -> Result<Self, Self::Error> {
         if value.params.is_empty() {
             Ok(value.body)
         } else {
@@ -60,34 +61,24 @@ impl TryFrom<PolyFuncType> for FunctionType {
     }
 }
 
-impl PolyFuncType {
+impl<const RV: bool> PolyFuncType<RV> {
     /// The type parameters, aka binders, over which this type is polymorphic
     pub fn params(&self) -> &[TypeParam] {
         &self.params
     }
 
     /// The body of the type, a function type.
-    pub fn body(&self) -> &FunctionType {
+    pub fn body(&self) -> &FunctionType<RV> {
         &self.body
     }
 
     /// Create a new PolyFuncType given the kinds of the variables it declares
-    /// and the underlying [FunctionType].
-    pub fn new(params: impl Into<Vec<TypeParam>>, body: FunctionType) -> Self {
+    /// and the underlying function type.
+    pub fn new(params: impl Into<Vec<TypeParam>>, body: impl Into<FunctionType<RV>>) -> Self {
         Self {
             params: params.into(),
-            body,
+            body: body.into(),
         }
-    }
-
-    /// Validates this instance, checking that the types in the body are
-    /// wellformed with respect to the registry, and the type variables declared.
-    /// Allows both inputs and outputs to contain [RowVariable]s
-    ///
-    /// [RowVariable]: [crate::types::TypeEnum::RowVariable]
-    pub fn validate_var_len(&self, reg: &ExtensionRegistry) -> Result<(), SignatureError> {
-        // TODO https://github.com/CQCL/hugr/issues/624 validate TypeParams declared here, too
-        self.body.validate_var_len(reg, &self.params)
     }
 
     /// Instantiates an outer [PolyFuncType], i.e. with no free variables
@@ -100,11 +91,23 @@ impl PolyFuncType {
         &self,
         args: &[TypeArg],
         ext_reg: &ExtensionRegistry,
-    ) -> Result<FunctionType, SignatureError> {
+    ) -> Result<FunctionType<RV>, SignatureError> {
         // Check that args are applicable, and that we have a value for each binder,
         // i.e. each possible free variable within the body.
         check_type_args(args, &self.params)?;
         Ok(self.body.substitute(&Substitution(args, ext_reg)))
+    }
+}
+
+impl PolyFuncType<true> {
+    /// Validates this instance, checking that the types in the body are
+    /// wellformed with respect to the registry, and the type variables declared.
+    /// Allows both inputs and outputs to contain [RowVariable]s
+    ///
+    /// [RowVariable]: [crate::types::TypeEnum::RowVariable]
+    pub fn validate(&self, reg: &ExtensionRegistry) -> Result<(), SignatureError> {
+        // TODO https://github.com/CQCL/hugr/issues/624 validate TypeParams declared here, too
+        self.body.validate(reg, &self.params)
     }
 }
 
@@ -132,14 +135,14 @@ pub(crate) mod test {
             ExtensionRegistry::try_new([PRELUDE.to_owned(), EXTENSION.to_owned()]).unwrap();
     }
 
-    impl PolyFuncType {
+    impl PolyFuncType<true> {
         fn new_validated(
             params: impl Into<Vec<TypeParam>>,
             body: FunctionType,
             extension_registry: &ExtensionRegistry,
         ) -> Result<Self, SignatureError> {
             let res = Self::new(params, body);
-            res.validate_var_len(extension_registry)?;
+            res.validate(extension_registry)?;
             Ok(res)
         }
     }
@@ -171,10 +174,6 @@ pub(crate) mod test {
         Ok(())
     }
 
-    fn id_fn(t: Type) -> FunctionType {
-        FunctionType::new(vec![t.clone()], vec![t])
-    }
-
     #[test]
     fn test_mismatched_args() -> Result<(), SignatureError> {
         let ar_def = PRELUDE.get_type("array").unwrap();
@@ -184,8 +183,11 @@ pub(crate) mod test {
 
         // Valid schema...
         let good_array = Type::new_extension(ar_def.instantiate([tyvar.clone(), szvar.clone()])?);
-        let good_ts =
-            PolyFuncType::new_validated(typarams.clone(), id_fn(good_array), &PRELUDE_REGISTRY)?;
+        let good_ts = PolyFuncType::new_validated(
+            typarams.clone(),
+            FunctionType::new_endo(good_array),
+            &PRELUDE_REGISTRY,
+        )?;
 
         // Sanity check (good args)
         good_ts.instantiate(
@@ -223,8 +225,11 @@ pub(crate) mod test {
             PRELUDE_ID,
             TypeBound::Any,
         ));
-        let bad_ts =
-            PolyFuncType::new_validated(typarams.clone(), id_fn(bad_array), &PRELUDE_REGISTRY);
+        let bad_ts = PolyFuncType::new_validated(
+            typarams.clone(),
+            FunctionType::new_endo(bad_array),
+            &PRELUDE_REGISTRY,
+        );
         assert_eq!(bad_ts.err(), Some(arg_err));
 
         Ok(())
@@ -235,7 +240,7 @@ pub(crate) mod test {
         // Variables in args have different bounds from variable declaration
         let tv = TypeArg::new_var_use(0, TypeBound::Copyable.into());
         let list_def = EXTENSION.get_type(&LIST_TYPENAME).unwrap();
-        let body_type = id_fn(Type::new_extension(list_def.instantiate([tv])?));
+        let body_type = FunctionType::new_endo(Type::new_extension(list_def.instantiate([tv])?));
         for decl in [
             TypeParam::Extensions,
             TypeParam::List {
@@ -291,7 +296,7 @@ pub(crate) mod test {
         let make_scheme = |tp: TypeParam| {
             PolyFuncType::new_validated(
                 [tp.clone()],
-                id_fn(Type::new_extension(CustomType::new(
+                FunctionType::new_endo(Type::new_extension(CustomType::new(
                     TYPE_NAME,
                     [TypeArg::new_var_use(0, tp)],
                     EXT_ID,

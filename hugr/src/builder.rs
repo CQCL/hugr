@@ -245,7 +245,7 @@ pub(crate) mod test {
     }
 
     pub(super) fn build_main(
-        signature: PolyFuncType,
+        signature: PolyFuncType<false>,
         f: impl FnOnce(FunctionBuilder<&mut Hugr>) -> Result<BuildHandle<FuncID<true>>, BuildError>,
     ) -> Result<Hugr, BuildError> {
         let mut module_builder = ModuleBuilder::new();
@@ -275,7 +275,7 @@ pub(crate) mod test {
     /// for tests which want to avoid having open extension variables after
     /// inference. Using DFGBuilder will default to a root node with an open
     /// extension variable
-    pub(crate) fn closed_dfg_root_hugr(signature: FunctionType) -> Hugr {
+    pub(crate) fn closed_dfg_root_hugr(signature: Signature) -> Hugr {
         let mut hugr = Hugr::new(NodeType::new_pure(ops::DFG {
             signature: signature.clone(),
         }));

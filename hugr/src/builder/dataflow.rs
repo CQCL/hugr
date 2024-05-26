@@ -7,7 +7,7 @@ use std::marker::PhantomData;
 use crate::hugr::{HugrView, NodeType, ValidationError};
 use crate::ops;
 
-use crate::types::{FunctionType, PolyFuncType};
+use crate::types::{FunctionType, PolyFuncType, Signature};
 
 use crate::extension::{ExtensionRegistry, ExtensionSet};
 use crate::Node;
@@ -26,7 +26,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
     pub(super) fn create_with_io(
         mut base: T,
         parent: Node,
-        signature: FunctionType,
+        signature: Signature,
         input_extensions: Option<ExtensionSet>,
     ) -> Result<Self, BuildError> {
         let num_in_wires = signature.input().len();
@@ -75,7 +75,7 @@ impl DFGBuilder<Hugr> {
     /// # Errors
     ///
     /// Error in adding DFG child nodes.
-    pub fn new(signature: FunctionType) -> Result<DFGBuilder<Hugr>, BuildError> {
+    pub fn new(signature: Signature) -> Result<DFGBuilder<Hugr>, BuildError> {
         let dfg_op = ops::DFG {
             signature: signature.clone(),
         };
@@ -146,7 +146,10 @@ impl FunctionBuilder<Hugr> {
     /// # Errors
     ///
     /// Error in adding DFG child nodes.
-    pub fn new(name: impl Into<String>, signature: PolyFuncType) -> Result<Self, BuildError> {
+    pub fn new(
+        name: impl Into<String>,
+        signature: PolyFuncType<false>,
+    ) -> Result<Self, BuildError> {
         let body = signature.body().clone();
         let op = ops::FuncDefn {
             signature,
