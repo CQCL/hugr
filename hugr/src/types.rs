@@ -297,7 +297,7 @@ impl<const RV:bool> Type<RV> {
 
     /// Initialize a new tuple type by providing the elements.
     #[inline(always)]
-    pub fn new_tuple(types: impl Into<TypeRow<true>>) -> Self {
+    pub fn new_tuple<const RV2:bool>(types: impl Into<TypeRow<RV2>>) -> Self {
         let row = types.into();
         match row.len() {
             0 => Self::UNIT,
@@ -307,7 +307,10 @@ impl<const RV:bool> Type<RV> {
 
     /// Initialize a new sum type by providing the possible variant types.
     #[inline(always)]
-    pub fn new_sum(variants: impl IntoIterator<Item = TypeRow<true>>) -> Self where {
+    pub fn new_sum<const RV2:bool>(variants: impl IntoIterator<Item = TypeRow<RV2>>) -> Self where {
+        let variants: Vec<Vec<Type<true>>> = variants.into_iter().map(
+            |t| t.into_owned().into_iter().map(Type::into_rv).collect()
+        ).collect();
         Self::new(TypeEnum::Sum(SumType::new(variants)))
     }
 
