@@ -73,6 +73,8 @@ pub struct Tag {
     /// The variant to create.
     pub tag: usize,
     /// The variants of the sum type.
+    /// TODO this allows *none* of the variants to contain row variables, but
+    /// we could allow variants *other than the tagged one* to contain rowvars.
     pub variants: Vec<TypeRow>,
 }
 
