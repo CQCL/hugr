@@ -38,7 +38,7 @@ pub type TypeName = SmolStr;
 pub type TypeNameRef = str;
 
 /// The kinds of edges in a HUGR, excluding Hierarchy.
-#[derive(Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 pub enum EdgeKind {
     /// Control edges of a CFG region.
