@@ -284,7 +284,7 @@ impl<const RV1:bool, const RV2:bool> PartialEq<Type<RV1>> for Type<RV2> {
 
 impl<const RV:bool> Type<RV> {
     /// An empty `TypeRow`. Provided here for convenience
-    pub const EMPTY_TYPEROW: TypeRow<RV> = type_row![];
+    pub const EMPTY_TYPEROW: TypeRow<RV> = TypeRow::<RV>::new();
     /// Unit type (empty tuple).
     pub const UNIT: Self = Self(TypeEnum::Sum(SumType::Unit { size: 1 }), TypeBound::Eq);
 
