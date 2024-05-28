@@ -1,4 +1,4 @@
-#![cfg(feature = "cli")]
+#![cfg(feature = "_cli")]
 use assert_cmd::Command;
 use assert_fs::{fixture::FileWriteStr, NamedTempFile};
 use hugr::builder::DFGBuilder;
