@@ -1,5 +1,5 @@
 ---
-source: hugr/src/hugr/views/tests.rs
+source: hugr-core/src/hugr/views/tests.rs
 expression: h.mermaid_string()
 ---
 graph LR

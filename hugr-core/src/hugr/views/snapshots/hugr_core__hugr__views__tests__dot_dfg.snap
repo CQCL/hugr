@@ -1,5 +1,5 @@
 ---
-source: hugr/views/tests.rs
+source: hugr-core/views/tests.rs
 expression: h.dot_string()
 ---
 digraph {
