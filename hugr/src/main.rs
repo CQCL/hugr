@@ -9,7 +9,7 @@ use hugr::std_extensions::logic::EXTENSION as LOGICS_EXTENSION;
 
 use hugr::extension::{ExtensionRegistry, PRELUDE};
 
-use hugr_cli::{CmdLineArgs, Parser};
+use hugr_cli::{CmdLineArgs, Parser, Level};
 
 fn main() {
     let opts = CmdLineArgs::parse();
@@ -27,7 +27,9 @@ fn main() {
     .unwrap();
 
     if let Err(e) = opts.run(&reg) {
-        eprintln!("{}", e);
+        if opts.verbosity(Level::Error) {
+            eprintln!("{}", e);
+        }
         std::process::exit(1);
     }
 }
