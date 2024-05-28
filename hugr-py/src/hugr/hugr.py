@@ -1,5 +1,5 @@
+from __future__ import annotations
 from dataclasses import dataclass, field, replace
-
 from collections.abc import Mapping
 from enum import Enum
 from typing import (
@@ -29,7 +29,7 @@ class Direction(Enum):
 
 @dataclass(frozen=True, eq=True, order=True)
 class _Port:
-    node: "Node"
+    node: Node
     offset: int
 
 
@@ -38,20 +38,20 @@ class InPort(_Port):
     direction: ClassVar[Direction] = Direction.INCOMING
 
 
-class ToPort(Protocol):
-    def to_port(self) -> "OutPort": ...
+class Wire(Protocol):
+    def out_port(self) -> OutPort: ...
 
 
 @dataclass(frozen=True, eq=True, order=True)
-class OutPort(_Port, ToPort):
+class OutPort(_Port, Wire):
     direction: ClassVar[Direction] = Direction.OUTGOING
 
-    def to_port(self) -> "OutPort":
+    def out_port(self) -> OutPort:
         return self
 
 
 @dataclass(frozen=True, eq=True, order=True)
-class Node(ToPort):
+class Node(Wire):
     idx: int
     _num_out_ports: int | None = field(default=None, compare=False)
 
@@ -83,7 +83,7 @@ class Node(ToPort):
             case tuple(xs):
                 return [self[i] for i in xs]
 
-    def to_port(self) -> "OutPort":
+    def out_port(self) -> "OutPort":
         return OutPort(self, 0)
 
     def inp(self, offset: int) -> InPort:
@@ -100,7 +100,7 @@ class Node(ToPort):
 
 
 class Op(Protocol):
-    def to_serial(self, node: Node, hugr: "Hugr") -> SerialOp: ...
+    def to_serial(self, node: Node, hugr: Hugr) -> SerialOp: ...
 
 
 T = TypeVar("T", bound=BaseOp)
@@ -110,13 +110,13 @@ T = TypeVar("T", bound=BaseOp)
 class DummyOp(Op, Generic[T]):
     _serial_op: T
 
-    def to_serial(self, node: Node, hugr: "Hugr") -> SerialOp:
+    def to_serial(self, node: Node, hugr: Hugr) -> SerialOp:
         return SerialOp(root=self._serial_op)  # type: ignore
 
 
 class Command(Protocol):
     def op(self) -> Op: ...
-    def incoming(self) -> Iterable[ToPort]: ...
+    def incoming(self) -> Iterable[Wire]: ...
     def num_out(self) -> int | None:
         return None
 
@@ -129,7 +129,7 @@ class NodeData:
     _num_outs: int = 0
     # TODO children field?
 
-    def to_serial(self, node: Node, hugr: "Hugr") -> SerialOp:
+    def to_serial(self, node: Node, hugr: Hugr) -> SerialOp:
         o = self.op.to_serial(node, hugr)
         o.root.parent = self.parent.idx if self.parent else node.idx
 
@@ -305,7 +305,7 @@ class Hugr(Mapping[Node, NodeData]):
 
     # TODO: num_links and _linked_ports
 
-    def insert_hugr(self, hugr: "Hugr", parent: Node | None = None) -> dict[Node, Node]:
+    def insert_hugr(self, hugr: Hugr, parent: Node | None = None) -> dict[Node, Node]:
         mapping: dict[Node, Node] = {}
 
         for idx, node_data in enumerate(hugr._nodes):
@@ -340,7 +340,7 @@ class Hugr(Mapping[Node, NodeData]):
         )
 
     @classmethod
-    def from_serial(cls, serial: SerialHugr) -> "Hugr":
+    def from_serial(cls, serial: SerialHugr) -> Hugr:
         raise NotImplementedError
 
 
@@ -371,7 +371,7 @@ class Dfg:
         )
 
     @classmethod
-    def endo(cls, types: Sequence[Type]) -> "Dfg":
+    def endo(cls, types: Sequence[Type]) -> Dfg:
         return Dfg(types, types)
 
     def _input_op(self) -> DummyOp[sops.Input]:
@@ -386,7 +386,7 @@ class Dfg:
             for i in range(len(self._input_op()._serial_op.types))
         ]
 
-    def add_op(self, op: Op, /, *args: ToPort, num_outs: int | None = None) -> Node:
+    def add_op(self, op: Op, /, *args: Wire, num_outs: int | None = None) -> Node:
         new_n = self.hugr.add_node(op, self.root, num_outs=num_outs)
         self._wire_up(new_n, args)
         return new_n
@@ -394,7 +394,7 @@ class Dfg:
     def add(self, com: Command) -> Node:
         return self.add_op(com.op(), *com.incoming(), num_outs=com.num_out())
 
-    def insert_nested(self, dfg: "Dfg", *args: ToPort) -> Node:
+    def insert_nested(self, dfg: Dfg, *args: Wire) -> Node:
         mapping = self.hugr.insert_hugr(dfg.hugr, self.root)
         self._wire_up(mapping[dfg.root], args)
         return mapping[dfg.root]
@@ -403,8 +403,8 @@ class Dfg:
         self,
         input_types: Sequence[Type],
         output_types: Sequence[Type],
-        ports: Iterable[ToPort],
-    ) -> "Dfg":
+        ports: Iterable[Wire],
+    ) -> Dfg:
         dfg = Dfg(input_types, output_types)
         mapping = self.hugr.insert_hugr(dfg.hugr, self.root)
         self._wire_up(mapping[dfg.root], ports)
@@ -415,21 +415,21 @@ class Dfg:
 
         return dfg
 
-    def set_outputs(self, *args: ToPort) -> None:
+    def set_outputs(self, *args: Wire) -> None:
         self._wire_up(self.output_node, args)
 
-    def make_tuple(self, tys: Sequence[Type], *args: ToPort) -> Node:
+    def make_tuple(self, tys: Sequence[Type], *args: Wire) -> Node:
         ports = list(args)
         assert len(tys) == len(ports), "Number of types must match number of ports"
         return self.add_op(DummyOp(sops.MakeTuple(parent=0, tys=list(tys))), *args)
 
-    def split_tuple(self, tys: Sequence[Type], port: ToPort) -> list[OutPort]:
+    def split_tuple(self, tys: Sequence[Type], port: Wire) -> list[OutPort]:
         tys = list(tys)
         n = self.add_op(DummyOp(sops.UnpackTuple(parent=0, tys=tys)), port)
 
         return [n.out(i) for i in range(len(tys))]
 
-    def _wire_up(self, node: Node, ports: Iterable[ToPort]):
+    def _wire_up(self, node: Node, ports: Iterable[Wire]):
         for i, p in enumerate(ports):
-            src = p.to_port()
+            src = p.out_port()
             self.hugr.add_link(src, node.inp(i))
