@@ -16,7 +16,7 @@ categories = ["compilers"]
 [dependencies]
 clap = {workspace = true, features = ["derive"]}
 clap-stdin = "0.4.0"
-hugr-core = { path = "../hugr-core" }
+hugr-core = { path = "../hugr-core", version = "0.0.0" }
 serde_json.workspace = true
 thiserror.workspace = true
 
