@@ -50,3 +50,14 @@ def test_len() -> None:
 
     bimap.delete_left("a")
     assert len(bimap) == 1
+
+
+def test_existing_key() -> None:
+    bimap: BiMap[str, int] = BiMap()
+    bimap.insert_left("a", 1)
+    bimap.insert_left("b", 1)
+
+    assert bimap.get_right("b") == 1
+    assert bimap.get_left(1) == "b"
+
+    assert bimap.get_right("a") is None
