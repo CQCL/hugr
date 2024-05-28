@@ -324,6 +324,15 @@ class Hugr(Mapping[Node, NodeData]):
             )
         return mapping
 
+    def add_dfg(self, input_types: Sequence[Type], output_types: Sequence[Type]) -> Dfg:
+        dfg = Dfg(input_types, output_types)
+        mapping = self.insert_hugr(dfg.hugr, self.root)
+        dfg.hugr = self
+        dfg.input_node = mapping[dfg.input_node]
+        dfg.output_node = mapping[dfg.output_node]
+        dfg.root = mapping[dfg.root]
+        return dfg
+
     def to_serial(self) -> SerialHugr:
         node_it = (node for node in self._nodes if node is not None)
         return SerialHugr(
@@ -405,14 +414,8 @@ class Dfg:
         output_types: Sequence[Type],
         *args: Wire,
     ) -> Dfg:
-        dfg = Dfg(input_types, output_types)
-        mapping = self.hugr.insert_hugr(dfg.hugr, self.root)
-        self._wire_up(mapping[dfg.root], args)
-        dfg.hugr = self.hugr
-        dfg.input_node = mapping[dfg.input_node]
-        dfg.output_node = mapping[dfg.output_node]
-        dfg.root = mapping[dfg.root]
-
+        dfg = self.hugr.add_dfg(input_types, output_types)
+        self._wire_up(dfg.root, args)
         return dfg
 
     def set_outputs(self, *args: Wire) -> None:
