@@ -321,7 +321,7 @@ impl MakeRegisteredOp for ConcreteIntOp {
 }
 
 impl IntOpDef {
-    /// Initialize a concrete [IntOpType] from a [IntOpDef] which requires no
+    /// Initialize a [ConcreteIntOp] from a [IntOpDef] which requires no
     /// integer widths set.
     pub fn without_log_width(self) -> ConcreteIntOp {
         ConcreteIntOp {
@@ -329,7 +329,7 @@ impl IntOpDef {
             log_widths: vec![],
         }
     }
-    /// Initialize a concrete [IntOpType] from a [IntOpDef] which requires one
+    /// Initialize a [ConcreteIntOp] from a [IntOpDef] which requires one
     /// integer width set.
     pub fn with_log_width(self, log_width: u8) -> ConcreteIntOp {
         ConcreteIntOp {
@@ -337,7 +337,7 @@ impl IntOpDef {
             log_widths: vec![log_width],
         }
     }
-    /// Initialize a concrete [IntOpType] from a [IntOpDef] which requires two
+    /// Initialize a [ConcreteIntOp] from a [IntOpDef] which requires two
     /// integer widths set.
     pub fn with_two_log_widths(self, first_log_width: u8, second_log_width: u8) -> ConcreteIntOp {
         ConcreteIntOp {
