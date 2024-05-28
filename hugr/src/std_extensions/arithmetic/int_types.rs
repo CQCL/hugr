@@ -20,14 +20,17 @@ pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.int
 /// Identifier for the integer type.
 pub const INT_TYPE_ID: TypeName = TypeName::new_inline("int");
 
-pub(crate) fn int_custom_type(width_arg: impl Into<TypeArg>) -> CustomType {
+/// Integer type of a given bit width (specified by the TypeArg).  Depending on
+/// the operation, the semantic interpretation may be unsigned integer, signed
+/// integer or bit string.
+pub fn int_custom_type(width_arg: impl Into<TypeArg>) -> CustomType {
     CustomType::new(INT_TYPE_ID, [width_arg.into()], EXTENSION_ID, TypeBound::Eq)
 }
 
 /// Integer type of a given bit width (specified by the TypeArg).
-/// Depending on the operation, the semantic interpretation may be unsigned integer, signed integer
-/// or bit string.
-pub(super) fn int_type(width_arg: impl Into<TypeArg>) -> Type {
+///
+/// Constructed from [int_custom_type].
+pub fn int_type(width_arg: impl Into<TypeArg>) -> Type {
     Type::new_extension(int_custom_type(width_arg.into()))
 }
 
@@ -40,7 +43,8 @@ lazy_static! {
         .unwrap();
 }
 
-const fn is_valid_log_width(n: u8) -> bool {
+/// Returns whether `n` is a valid `log_width` for an [int_type].
+pub const fn is_valid_log_width(n: u8) -> bool {
     n < LOG_WIDTH_BOUND
 }
 

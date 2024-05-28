@@ -279,17 +279,22 @@ lazy_static! {
 
 /// Concrete integer operation with integer widths set.
 #[derive(Debug, Clone, PartialEq)]
-pub struct IntOpType {
-    def: IntOpDef,
-    log_widths: Vec<u8>,
+#[non_exhaustive]
+pub struct ConcreteIntOp {
+    /// The kind of int op.
+    pub def: IntOpDef,
+    /// The width parameters of the int op. These are interpreted differently,
+    /// depending on `def`. The types of inputs and outputs of the op will have
+    /// [int_type]s of these widths.
+    pub log_widths: Vec<u8>,
 }
 
-impl NamedOp for IntOpType {
+impl NamedOp for ConcreteIntOp {
     fn name(&self) -> OpName {
         self.def.name()
     }
 }
-impl MakeExtensionOp for IntOpType {
+impl MakeExtensionOp for ConcreteIntOp {
     fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError> {
         let def = IntOpDef::from_def(ext_op.def())?;
         let args = ext_op.args();
@@ -305,7 +310,7 @@ impl MakeExtensionOp for IntOpType {
     }
 }
 
-impl MakeRegisteredOp for IntOpType {
+impl MakeRegisteredOp for ConcreteIntOp {
     fn extension_id(&self) -> ExtensionId {
         EXTENSION_ID.to_owned()
     }
@@ -318,24 +323,24 @@ impl MakeRegisteredOp for IntOpType {
 impl IntOpDef {
     /// Initialize a concrete [IntOpType] from a [IntOpDef] which requires no
     /// integer widths set.
-    pub fn without_log_width(self) -> IntOpType {
-        IntOpType {
+    pub fn without_log_width(self) -> ConcreteIntOp {
+        ConcreteIntOp {
             def: self,
             log_widths: vec![],
         }
     }
     /// Initialize a concrete [IntOpType] from a [IntOpDef] which requires one
     /// integer width set.
-    pub fn with_log_width(self, log_width: u8) -> IntOpType {
-        IntOpType {
+    pub fn with_log_width(self, log_width: u8) -> ConcreteIntOp {
+        ConcreteIntOp {
             def: self,
             log_widths: vec![log_width],
         }
     }
     /// Initialize a concrete [IntOpType] from a [IntOpDef] which requires two
     /// integer widths set.
-    pub fn with_two_log_widths(self, first_log_width: u8, second_log_width: u8) -> IntOpType {
-        IntOpType {
+    pub fn with_two_log_widths(self, first_log_width: u8, second_log_width: u8) -> ConcreteIntOp {
+        ConcreteIntOp {
             def: self,
             log_widths: vec![first_log_width, second_log_width],
         }
@@ -419,6 +424,6 @@ mod test {
         );
         let ext_op = o.clone().to_extension_op().unwrap();
 
-        assert_eq!(IntOpType::from_extension_op(&ext_op).unwrap(), o);
+        assert_eq!(ConcreteIntOp::from_extension_op(&ext_op).unwrap(), o);
     }
 }
