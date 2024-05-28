@@ -2,7 +2,7 @@ from dataclasses import dataclass
 import subprocess
 import os
 import pathlib
-from hugr.hugr import Dfg, Hugr, DummyOp, Node, Command, ToPort, Op
+from hugr.hugr import Dfg, Hugr, DummyOp, Node, Command, Wire, Op
 import hugr.serialization.tys as stys
 import hugr.serialization.ops as sops
 import pytest
@@ -32,9 +32,9 @@ NOT_OP = DummyOp(
 
 @dataclass
 class Not(Command):
-    a: ToPort
+    a: Wire
 
-    def incoming(self) -> list[ToPort]:
+    def incoming(self) -> list[Wire]:
         return [self.a]
 
     def num_out(self) -> int | None:
@@ -46,10 +46,10 @@ class Not(Command):
 
 @dataclass
 class DivMod(Command):
-    a: ToPort
-    b: ToPort
+    a: Wire
+    b: Wire
 
-    def incoming(self) -> list[ToPort]:
+    def incoming(self) -> list[Wire]:
         return [self.a, self.b]
 
     def num_out(self) -> int | None:
