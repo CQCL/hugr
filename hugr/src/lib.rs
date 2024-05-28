@@ -132,14 +132,6 @@
 //! println!("{}", serialized);
 //! ```
 
-// Unstable check, may cause false positives.
-// https://github.com/rust-lang/rust-clippy/issues/5112
-#![warn(clippy::debug_assert_with_mut_call)]
-// proptest-derive generates many of these warnings.
-// https://github.com/rust-lang/rust/issues/120363
-// https://github.com/proptest-rs/proptest/issues/447
-#![cfg_attr(test, allow(non_local_definitions))]
-
 // These modules are re-exported as-is. If more control is needed, define a new module in this crate with the desired exports.
 // The doc inline directive is necessary for renamed modules to appear as if they were defined in this crate.
 pub use hugr_core::{builder, core, extension, hugr, ops, std_extensions, types, utils};
