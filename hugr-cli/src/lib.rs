@@ -1,6 +1,6 @@
 //! Standard command line tools, used by the hugr binary.
 
-use clap::Parser;
+pub use clap::Parser;
 use clap_stdin::FileOrStdin;
 use hugr_core::{extension::ExtensionRegistry, Hugr, HugrView};
 use thiserror::Error;
