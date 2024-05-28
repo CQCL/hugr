@@ -31,10 +31,6 @@ class Direction(Enum):
 class _Port:
     node: "Node"
     offset: int
-    _sub_offset: int = 0
-
-    def next_sub_offset(self) -> Self:
-        return replace(self, _sub_offset=self._sub_offset + 1)
 
 
 @dataclass(frozen=True, eq=True, order=True)
@@ -144,23 +140,36 @@ P = TypeVar("P", InPort, OutPort)
 K = TypeVar("K", InPort, OutPort)
 
 
-def _unused_sub_offset(port: P, links: BiMap[OutPort, InPort]) -> P:
-    d: dict[OutPort, InPort] | dict[InPort, OutPort]
-    match port:
+@dataclass(frozen=True, eq=True, order=True)
+class _SubPort(Generic[P]):
+    port: P
+    sub_offset: int = 0
+
+    def next_sub_offset(self) -> Self:
+        return replace(self, sub_offset=self.sub_offset + 1)
+
+
+_SO = _SubPort[OutPort]
+_SI = _SubPort[InPort]
+
+
+def _unused_sub_offset(sub_port: _SubPort[P], links: BiMap[_SO, _SI]) -> _SubPort[P]:
+    d: dict[_SO, _SI] | dict[_SI, _SO]
+    match sub_port.port:
         case OutPort(_):
             d = links.fwd
         case InPort(_):
             d = links.bck
-    while port in d:
-        port = port.next_sub_offset()
-    return port
+    while sub_port in d:
+        sub_port = sub_port.next_sub_offset()
+    return sub_port
 
 
 @dataclass()
 class Hugr(Mapping[Node, NodeData]):
     root: Node
     _nodes: list[NodeData | None]
-    _links: BiMap[OutPort, InPort]
+    _links: BiMap[_SO, _SI]
     _free_nodes: list[Node]
 
     def __init__(self, root_op: Op) -> None:
@@ -202,27 +211,33 @@ class Hugr(Mapping[Node, NodeData]):
 
     def delete_node(self, node: Node) -> NodeData | None:
         for offset in range(self.num_in_ports(node)):
-            self._links.delete_right(node.inp(offset))
+            self._links.delete_right(_SubPort(node.inp(offset)))
         for offset in range(self.num_out_ports(node)):
-            self._links.delete_left(node.out(offset))
+            self._links.delete_left(_SubPort(node.out(offset)))
 
         weight, self._nodes[node.idx] = self._nodes[node.idx], None
         self._free_nodes.append(node)
         return weight
 
     def add_link(self, src: OutPort, dst: InPort) -> None:
-        src = _unused_sub_offset(src, self._links)
-        dst = _unused_sub_offset(dst, self._links)
-        if self._links.get_left(dst) is not None:
-            dst = replace(dst, _sub_offset=dst._sub_offset + 1)
-        self._links.insert_left(src, dst)
+        src_sub = _unused_sub_offset(_SubPort(src), self._links)
+        dst_sub = _unused_sub_offset(_SubPort(dst), self._links)
+        # if self._links.get_left(dst_sub) is not None:
+        #     dst = replace(dst, _sub_offset=dst._sub_offset + 1)
+        self._links.insert_left(src_sub, dst_sub)
 
         self[src.node]._num_outs = max(self[src.node]._num_outs, src.offset + 1)
         self[dst.node]._num_inps = max(self[dst.node]._num_inps, dst.offset + 1)
 
     def delete_link(self, src: OutPort, dst: InPort) -> None:
+        try:
+            sub_offset = next(
+                i for i, inp in enumerate(self.linked_ports(src)) if inp == dst
+            )
+            self._links.delete_left(_SubPort(src, sub_offset))
+        except StopIteration:
+            return
         # TODO make sure sub-offset is handled correctly
-        self._links.delete_left(src)
 
     def num_nodes(self) -> int:
         return len(self._nodes) - len(self._free_nodes)
@@ -240,18 +255,33 @@ class Hugr(Mapping[Node, NodeData]):
     def num_out_ports(self, node: Node) -> int:
         return self[node]._num_outs
 
-    def _linked_ports(self, port: P, links: dict[P, K]) -> Iterable[K]:
-        port = replace(port, _sub_offset=0)
-        while port in links:
+    def _linked_ports(
+        self, port: P, links: dict[_SubPort[P], _SubPort[K]]
+    ) -> Iterable[K]:
+        sub_port = _SubPort(port)
+        while sub_port in links:
             # sub offset not used in API
-            yield replace(links[port], _sub_offset=0)
-            port = port.next_sub_offset()
+            yield links[sub_port].port
+            sub_port = sub_port.next_sub_offset()
+
+    @overload
+    def linked_ports(self, port: OutPort) -> Iterable[InPort]: ...
+    @overload
+    def linked_ports(self, port: InPort) -> Iterable[OutPort]: ...
+    def linked_ports(self, port: OutPort | InPort):
+        match port:
+            case OutPort(_):
+                return self._linked_ports(port, self._links.fwd)
+            case InPort(_):
+                return self._linked_ports(port, self._links.bck)
 
     # TODO: single linked port
 
-    def _node_links(self, node: Node, links: dict[P, K]) -> Iterable[tuple[P, list[K]]]:
+    def _node_links(
+        self, node: Node, links: dict[_SubPort[P], _SubPort[K]]
+    ) -> Iterable[tuple[P, list[K]]]:
         try:
-            direction = next(iter(links.keys())).direction
+            direction = next(iter(links.keys())).port.direction
         except StopIteration:
             return
         # iterate over known offsets
@@ -289,7 +319,8 @@ class Hugr(Mapping[Node, NodeData]):
 
         for src, dst in hugr._links.items():
             self.add_link(
-                mapping[src.node].out(src.offset), mapping[dst.node].inp(dst.offset)
+                mapping[src.port.node].out(src.port.offset),
+                mapping[dst.port.node].inp(dst.port.offset),
             )
         return mapping
 
@@ -300,7 +331,10 @@ class Hugr(Mapping[Node, NodeData]):
             # non contiguous indices will be erased
             nodes=[node.to_serial(Node(idx), self) for idx, node in enumerate(node_it)],
             edges=[
-                ((src.node.idx, src.offset), (dst.node.idx, dst.offset))
+                (
+                    (src.port.node.idx, src.port.offset),
+                    (dst.port.node.idx, dst.port.offset),
+                )
                 for src, dst in self._links.items()
             ],
         )

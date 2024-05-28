@@ -132,6 +132,13 @@ def test_multiport():
         (ou_n.inp(0), [in_n.out(0)]),
         (ou_n.inp(1), [in_n.out(0)]),
     ]
+
+    assert list(h.hugr.linked_ports(in_n.out(0))) == [
+        ou_n.inp(0),
+        ou_n.inp(1),
+    ]
+
+    assert list(h.hugr.linked_ports(ou_n.inp(0))) == [in_n.out(0)]
     _validate(h.hugr)
 
 
