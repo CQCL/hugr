@@ -9,8 +9,7 @@ use hugr::std_extensions::logic::EXTENSION as LOGICS_EXTENSION;
 
 use hugr::extension::{ExtensionRegistry, PRELUDE};
 
-use clap::Parser;
-use hugr_core::cli::CmdLineArgs;
+use hugr_cli::{CmdLineArgs, Parser};
 
 fn main() {
     let opts = CmdLineArgs::parse();

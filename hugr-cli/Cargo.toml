@@ -1,5 +1,5 @@
 [package]
-name = "hugr-passes"
+name = "hugr-cli"
 version = "0.1.0"
 edition = { workspace = true }
 rust-version = { workspace = true }
@@ -12,15 +12,19 @@ description = "Compiler passes for Quantinuum's HUGR"
 keywords = ["Quantum", "Quantinuum"]
 categories = ["compilers"]
 
-[dependencies]
-hugr-core = { path = "../hugr-core", version = "0.0.0" }
-itertools = { workspace = true }
-lazy_static = { workspace = true }
-paste = { workspace = true }
-thiserror = { workspace = true }
 
-[features]
-extension_inference = ["hugr-core/extension_inference"]
+[dependencies]
+clap = {workspace = true, features = ["derive"]}
+clap-stdin = { workspace = true }
+hugr-core = { path = "../hugr-core", version = "0.0.0" }
+serde_json.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true
 
 [dev-dependencies]
-rstest = { workspace = true }
+assert_cmd = { workspace = true }
+assert_fs = { workspace = true }
+predicates = { workspace = true }
+rstest.workspace = true
