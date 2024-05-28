@@ -61,3 +61,6 @@ regex-syntax = { workspace = true }
 assert_cmd = { workspace = true }
 predicates = { workspace = true }
 assert_fs = { workspace = true }
+
+# Required for documentation examples
+hugr = { path = "../hugr" }
