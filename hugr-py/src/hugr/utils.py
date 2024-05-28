@@ -37,12 +37,15 @@ class BiMap(MutableMapping, Generic[L, R]):
         return self.fwd.get(key)
 
     def insert_left(self, key: L, value: R) -> None:
+        if (existing_key := self.bck.get(value)) is not None:
+            del self.fwd[existing_key]
+        if (existing_value := self.fwd.get(key)) is not None:
+            del self.bck[existing_value]
         self.fwd[key] = value
         self.bck[value] = key
 
     def insert_right(self, key: R, value: L) -> None:
-        self.bck[key] = value
-        self.fwd[value] = key
+        self.insert_left(value, key)
 
     def delete_left(self, key: L) -> None:
         del self.bck[self.fwd[key]]
