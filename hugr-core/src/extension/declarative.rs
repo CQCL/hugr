@@ -15,9 +15,9 @@
 //! The definition can be loaded into a registry using the [`load_extensions`] or [`load_extensions_file`] functions.
 //! ```rust
 //! # const DECLARATIVE_YAML: &str = include_str!("../../../hugr/examples/extension/declarative.yaml");
-//! # use hugr_core::extension::declarative::load_extensions;
+//! # use hugr::extension::declarative::load_extensions;
 //! // Required extensions must already be present in the registry.
-//! let mut reg = hugr_core::std_extensions::logic::LOGIC_REG.clone();
+//! let mut reg = hugr::std_extensions::logic::LOGIC_REG.clone();
 //! load_extensions(DECLARATIVE_YAML, &mut reg).unwrap();
 //! ```
 //!

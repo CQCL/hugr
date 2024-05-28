@@ -210,11 +210,11 @@ impl Call {
     /// This matches [`OpType::static_input_port`].
     ///
     /// ```
-    /// # use hugr_core::ops::dataflow::Call;
-    /// # use hugr_core::ops::OpType;
-    /// # use hugr_core::types::FunctionType;
-    /// # use hugr_core::extension::prelude::QB_T;
-    /// # use hugr_core::extension::PRELUDE_REGISTRY;
+    /// # use hugr::ops::dataflow::Call;
+    /// # use hugr::ops::OpType;
+    /// # use hugr::types::FunctionType;
+    /// # use hugr::extension::prelude::QB_T;
+    /// # use hugr::extension::PRELUDE_REGISTRY;
     /// let signature = FunctionType::new(vec![QB_T, QB_T], vec![QB_T, QB_T]);
     /// let call = Call::try_new(signature.into(), &[], &PRELUDE_REGISTRY).unwrap();
     /// let op = OpType::Call(call.clone());
@@ -308,9 +308,9 @@ impl LoadConstant {
     /// This matches [`OpType::static_input_port`].
     ///
     /// ```
-    /// # use hugr_core::ops::dataflow::LoadConstant;
-    /// # use hugr_core::ops::OpType;
-    /// # use hugr_core::types::Type;
+    /// # use hugr::ops::dataflow::LoadConstant;
+    /// # use hugr::ops::OpType;
+    /// # use hugr::types::Type;
     /// let datatype = Type::UNIT;
     /// let load_constant = LoadConstant { datatype };
     /// let op = OpType::LoadConstant(load_constant.clone());
