@@ -221,6 +221,7 @@ class Hugr(Mapping[Node, NodeData]):
         self[dst.node]._num_inps = max(self[dst.node]._num_inps, dst.offset + 1)
 
     def delete_link(self, src: OutPort, dst: InPort) -> None:
+        # TODO make sure sub-offset is handled correctly
         self._links.delete_left(src)
 
     def num_nodes(self) -> int:
@@ -256,7 +257,6 @@ class Hugr(Mapping[Node, NodeData]):
         # iterate over known offsets
         for offset in range(self.num_ports(node, direction)):
             port = cast(P, node.port(offset, direction))
-            # if the 0 sub-offset is linked
             yield port, list(self._linked_ports(port, links))
 
     def outgoing_links(self, node: Node) -> Iterable[tuple[OutPort, list[InPort]]]:
