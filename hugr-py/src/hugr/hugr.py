@@ -153,18 +153,6 @@ _SO = _SubPort[OutPort]
 _SI = _SubPort[InPort]
 
 
-def _unused_sub_offset(sub_port: _SubPort[P], links: BiMap[_SO, _SI]) -> _SubPort[P]:
-    d: dict[_SO, _SI] | dict[_SI, _SO]
-    match sub_port.port:
-        case OutPort(_):
-            d = links.fwd
-        case InPort(_):
-            d = links.bck
-    while sub_port in d:
-        sub_port = sub_port.next_sub_offset()
-    return sub_port
-
-
 @dataclass()
 class Hugr(Mapping[Node, NodeData]):
     root: Node
@@ -219,9 +207,21 @@ class Hugr(Mapping[Node, NodeData]):
         self._free_nodes.append(node)
         return weight
 
+    def _unused_sub_offset(self, port: P) -> _SubPort[P]:
+        d: dict[_SO, _SI] | dict[_SI, _SO]
+        match port:
+            case OutPort(_):
+                d = self._links.fwd
+            case InPort(_):
+                d = self._links.bck
+        sub_port = _SubPort(port)
+        while sub_port in d:
+            sub_port = sub_port.next_sub_offset()
+        return sub_port
+
     def add_link(self, src: OutPort, dst: InPort) -> None:
-        src_sub = _unused_sub_offset(_SubPort(src), self._links)
-        dst_sub = _unused_sub_offset(_SubPort(dst), self._links)
+        src_sub = self._unused_sub_offset(src)
+        dst_sub = self._unused_sub_offset(dst)
         # if self._links.get_left(dst_sub) is not None:
         #     dst = replace(dst, _sub_offset=dst._sub_offset + 1)
         self._links.insert_left(src_sub, dst_sub)
@@ -403,11 +403,11 @@ class Dfg:
         self,
         input_types: Sequence[Type],
         output_types: Sequence[Type],
-        ports: Iterable[Wire],
+        *args: Wire,
     ) -> Dfg:
         dfg = Dfg(input_types, output_types)
         mapping = self.hugr.insert_hugr(dfg.hugr, self.root)
-        self._wire_up(mapping[dfg.root], ports)
+        self._wire_up(mapping[dfg.root], args)
         dfg.hugr = self.hugr
         dfg.input_node = mapping[dfg.input_node]
         dfg.output_node = mapping[dfg.output_node]
@@ -428,6 +428,13 @@ class Dfg:
         n = self.add_op(DummyOp(sops.UnpackTuple(parent=0, tys=tys)), port)
 
         return [n.out(i) for i in range(len(tys))]
+
+    def add_state_order(self, src: Node, dst: Node) -> None:
+        # adds edge to the right of all existing edges
+        # breaks if further edges are added
+        self.hugr.add_link(
+            src.out(self.hugr.num_outgoing(src)), dst.inp(self.hugr.num_incoming(dst))
+        )
 
     def _wire_up(self, node: Node, ports: Iterable[Wire]):
         for i, p in enumerate(ports):
