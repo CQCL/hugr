@@ -422,17 +422,6 @@ class Dfg:
     def set_outputs(self, *args: Wire) -> None:
         self._wire_up(self.output_node, args)
 
-    def make_tuple(self, tys: Sequence[Type], *args: Wire) -> Node:
-        ports = list(args)
-        assert len(tys) == len(ports), "Number of types must match number of ports"
-        return self.add_op(DummyOp(sops.MakeTuple(parent=0, tys=list(tys))), *args)
-
-    def split_tuple(self, tys: Sequence[Type], port: Wire) -> list[OutPort]:
-        tys = list(tys)
-        n = self.add_op(DummyOp(sops.UnpackTuple(parent=0, tys=tys)), port)
-
-        return [n.out(i) for i in range(len(tys))]
-
     def add_state_order(self, src: Node, dst: Node) -> None:
         # adds edge to the right of all existing edges
         # breaks if further edges are added
