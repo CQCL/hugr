@@ -493,6 +493,10 @@ mod test {
             fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
                 let typ = any::<Type>();
                 let extensions = any::<ExtensionSet>();
+                // here we manually construct a serialized `dyn CustomConst`.
+                // The "c" and "v" come from the `typetag::serde` annotation on
+                // `trait CustomConst`. This is not ideal, if we were to randomly
+                // generate "ConstInt" things will go wrong.
                 let value = (any_serde_yaml_value(), any_string()).prop_map(|(value, c)| {
                     [("c".into(), c.into()), ("v".into(), value)]
                         .into_iter()
