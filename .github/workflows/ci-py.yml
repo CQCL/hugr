@@ -13,8 +13,8 @@ on:
 
 env:
   SCCACHE_GHA_ENABLED: "true"
-  HUGR_BIN_DIR: ${{ github.workspace }}/target/release
-  HUGR_BIN: ${{ github.workspace }}/target/release/hugr
+  HUGR_BIN_DIR: ${{ github.workspace }}/target/debug
+  HUGR_BIN: ${{ github.workspace }}/target/debug/hugr
 
 jobs:
   # Check if changes were made to the relevant files.
@@ -86,7 +86,7 @@ jobs:
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: Build HUGR binary
-        run: cargo build --release --features cli --bin hugr
+        run: cargo build --features _cli --bin hugr
       - name: Upload the binary to the artifacts
         uses: actions/upload-artifact@v4
         with:
