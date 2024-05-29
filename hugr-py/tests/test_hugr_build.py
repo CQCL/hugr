@@ -4,9 +4,11 @@ import subprocess
 import os
 import pathlib
 from hugr.hugr import Dfg, Hugr, DummyOp, Node, Command, Wire, Op
+from hugr.serialization import SerialHugr
 import hugr.serialization.tys as stys
 import hugr.serialization.ops as sops
 import pytest
+import json
 
 BOOL_T = stys.Type(stys.SumType(stys.UnitSum(size=2)))
 QB_T = stys.Type(stys.Qubit())
@@ -98,7 +100,7 @@ class UnpackTuple(Command):
         return DummyOp(sops.UnpackTuple(parent=-1, tys=self.types))
 
 
-def _validate(h: Hugr, mermaid: bool = False):
+def _validate(h: Hugr, mermaid: bool = False, roundtrip: bool = True):
     workspace_dir = pathlib.Path(__file__).parent.parent.parent
     # use the HUGR_BIN environment variable if set, otherwise use the debug build
     bin_loc = os.environ.get("HUGR_BIN", str(workspace_dir / "target/debug/hugr"))
@@ -106,7 +108,12 @@ def _validate(h: Hugr, mermaid: bool = False):
 
     if mermaid:
         cmd.append("--mermaid")
-    subprocess.run(cmd, check=True, input=h.to_serial().to_json().encode())
+    serial = h.to_serial().to_json()
+    subprocess.run(cmd, check=True, input=serial.encode())
+
+    if roundtrip:
+        h2 = Hugr.from_serial(SerialHugr.load_json(json.loads(serial)))
+        assert serial == h2.to_serial().to_json()
 
 
 def test_stable_indices():
