@@ -366,7 +366,7 @@ impl UnificationContext {
             for m in metas.iter() {
                 self.merged_cycles.insert(*m, combined_meta);
                 for s in self.constraints.take_successors(*m).collect::<Vec<_>>() {
-                    if !metas.contains(m) {
+                    if !metas.contains(&s) {
                         self.must_include(combined_meta, s);
                     }
                 }
@@ -376,7 +376,8 @@ impl UnificationContext {
         Ok(())
     }
 
-    fn solve(&mut self, m: Meta) -> Result<&ExtensionSet, InferExtensionError> {
+    fn solve(&mut self, m_in: Meta) -> Result<&ExtensionSet, InferExtensionError> {
+        let m = self.resolve(m_in);
         let mut min_sol = ExtensionSet::new();
         for s in self.constraints.take_successors(m).collect::<Vec<_>>() {
             min_sol = min_sol.union(self.solve(s)?.clone());
