@@ -9,12 +9,12 @@
 //! ### Example
 //!
 //! ```yaml
-#![doc = include_str!("../../../hugr/examples/extension/declarative.yaml")]
+#![doc = include_str!("../../examples/extension/declarative.yaml")]
 //! ```
 //!
 //! The definition can be loaded into a registry using the [`load_extensions`] or [`load_extensions_file`] functions.
 //! ```rust
-//! # const DECLARATIVE_YAML: &str = include_str!("../../../hugr/examples/extension/declarative.yaml");
+//! # const DECLARATIVE_YAML: &str = include_str!("../../examples/extension/declarative.yaml");
 //! # use hugr::extension::declarative::load_extensions;
 //! // Required extensions must already be present in the registry.
 //! let mut reg = hugr::std_extensions::logic::LOGIC_REG.clone();
@@ -327,7 +327,7 @@ extensions:
 "#;
 
     /// The yaml used in the module documentation.
-    const EXAMPLE_YAML_FILE: &str = "../hugr/examples/extension/declarative.yaml";
+    const EXAMPLE_YAML_FILE: &str = "examples/extension/declarative.yaml";
 
     #[rstest]
     #[case(EMPTY_YAML, 1, 0, 0, &PRELUDE_REGISTRY)]
