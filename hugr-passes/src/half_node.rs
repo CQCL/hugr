@@ -2,12 +2,12 @@ use std::hash::Hash;
 
 use super::nest_cfgs::CfgNodeMap;
 
-use hugr::hugr::RootTagged;
+use hugr_core::hugr::RootTagged;
 
-use hugr::ops::handle::CfgID;
-use hugr::ops::{OpTag, OpTrait};
+use hugr_core::ops::handle::CfgID;
+use hugr_core::ops::{OpTag, OpTrait};
 
-use hugr::{Direction, Node};
+use hugr_core::{Direction, Node};
 
 /// We provide a view of a cfg where every node has at most one of
 /// (multiple predecessors, multiple successors).
@@ -97,9 +97,9 @@ impl<H: RootTagged<RootHandle = CfgID>> CfgNodeMap<HalfNode> for HalfNodeView<H>
 mod test {
     use super::super::nest_cfgs::{test::*, EdgeClassifier};
     use super::{HalfNode, HalfNodeView};
-    use hugr::builder::BuildError;
-    use hugr::hugr::views::RootChecked;
-    use hugr::ops::handle::NodeHandle;
+    use hugr_core::builder::BuildError;
+    use hugr_core::hugr::views::RootChecked;
+    use hugr_core::ops::handle::NodeHandle;
 
     use itertools::Itertools;
     use std::collections::HashSet;

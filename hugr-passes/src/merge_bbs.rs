@@ -2,16 +2,16 @@
 //! and the target BB has no other predecessors.
 use std::collections::HashMap;
 
-use hugr::hugr::hugrmut::HugrMut;
+use hugr_core::hugr::hugrmut::HugrMut;
 use itertools::Itertools;
 
-use hugr::hugr::rewrite::inline_dfg::InlineDFG;
-use hugr::hugr::rewrite::replace::{NewEdgeKind, NewEdgeSpec, Replacement};
-use hugr::hugr::RootTagged;
-use hugr::ops::handle::CfgID;
-use hugr::ops::leaf::UnpackTuple;
-use hugr::ops::{DataflowBlock, DataflowParent, Input, Output, DFG};
-use hugr::{Hugr, HugrView, Node};
+use hugr_core::hugr::rewrite::inline_dfg::InlineDFG;
+use hugr_core::hugr::rewrite::replace::{NewEdgeKind, NewEdgeSpec, Replacement};
+use hugr_core::hugr::RootTagged;
+use hugr_core::ops::handle::CfgID;
+use hugr_core::ops::leaf::UnpackTuple;
+use hugr_core::ops::{DataflowBlock, DataflowParent, Input, Output, DFG};
+use hugr_core::{Hugr, HugrView, Node};
 
 /// Merge any basic blocks that are direct children of the specified CFG
 /// i.e. where a basic block B has a single successor B' whose only predecessor
@@ -161,15 +161,15 @@ mod test {
     use itertools::Itertools;
     use rstest::rstest;
 
-    use hugr::builder::{CFGBuilder, DFGWrapper, Dataflow, HugrBuilder};
-    use hugr::extension::prelude::{ConstUsize, PRELUDE_ID, QB_T, USIZE_T};
-    use hugr::extension::{ExtensionRegistry, ExtensionSet, PRELUDE, PRELUDE_REGISTRY};
-    use hugr::hugr::views::sibling::SiblingMut;
-    use hugr::ops::constant::Value;
-    use hugr::ops::handle::CfgID;
-    use hugr::ops::{Lift, LoadConstant, Noop, OpTrait, OpType};
-    use hugr::types::{FunctionType, Type, TypeRow};
-    use hugr::{const_extension_ids, type_row, Extension, Hugr, HugrView, Wire};
+    use hugr_core::builder::{CFGBuilder, DFGWrapper, Dataflow, HugrBuilder};
+    use hugr_core::extension::prelude::{ConstUsize, PRELUDE_ID, QB_T, USIZE_T};
+    use hugr_core::extension::{ExtensionRegistry, ExtensionSet, PRELUDE, PRELUDE_REGISTRY};
+    use hugr_core::hugr::views::sibling::SiblingMut;
+    use hugr_core::ops::constant::Value;
+    use hugr_core::ops::handle::CfgID;
+    use hugr_core::ops::{Lift, LoadConstant, Noop, OpTrait, OpType};
+    use hugr_core::types::{FunctionType, Type, TypeRow};
+    use hugr_core::{const_extension_ids, type_row, Extension, Hugr, HugrView, Wire};
 
     use super::merge_basic_blocks;
 

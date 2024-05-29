@@ -1,7 +1,9 @@
-#![cfg(feature = "cli")]
+#![cfg(feature = "_cli")]
 use assert_cmd::Command;
 use assert_fs::{fixture::FileWriteStr, NamedTempFile};
-use hugr::{
+use hugr_cli::VALID_PRINT;
+use hugr_core::builder::DFGBuilder;
+use hugr_core::{
     builder::{Container, Dataflow, DataflowHugr},
     extension::prelude::{BOOL_T, QB_T},
     type_row,
@@ -11,8 +13,6 @@ use hugr::{
 use predicates::{prelude::*, str::contains};
 use rstest::{fixture, rstest};
 
-use hugr::builder::DFGBuilder;
-use hugr::cli::VALID_PRINT;
 #[fixture]
 fn cmd() -> Command {
     Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap()
