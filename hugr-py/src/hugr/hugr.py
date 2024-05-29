@@ -112,7 +112,7 @@ class DummyOp(Op, Generic[T]):
     _serial_op: T
 
     def to_serial(self, node: Node, hugr: Hugr) -> SerialOp:
-        return SerialOp(root=self._serial_op)  # type: ignore
+        return SerialOp(root=self._serial_op.model_copy())  # type: ignore
 
 
 class Command(Protocol):
