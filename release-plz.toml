@@ -26,6 +26,7 @@ release = true
 # Disabled until the first version is manually published
 publish = false
 git_tag_enable = false
+git_release_enable = false
 
 [[package]]
 name = "hugr-passes"
@@ -34,6 +35,7 @@ release = true
 # Disabled until the first version is manually published
 publish = false
 git_tag_enable = false
+git_release_enable = false
 
 [[package]]
 name = "hugr-cli"
@@ -42,3 +44,4 @@ release = true
 # Disabled until the first version is manually published
 publish = false
 git_tag_enable = false
+git_release_enable = false
