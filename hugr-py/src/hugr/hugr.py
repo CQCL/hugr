@@ -103,6 +103,9 @@ class Node(Wire):
 class Op(Protocol):
     def to_serial(self, node: Node, hugr: Hugr) -> SerialOp: ...
 
+    @classmethod
+    def from_serial(cls, serial: SerialOp) -> Self: ...
+
 
 T = TypeVar("T", bound=BaseOp)
 
@@ -113,6 +116,10 @@ class DummyOp(Op, Generic[T]):
 
     def to_serial(self, node: Node, hugr: Hugr) -> SerialOp:
         return SerialOp(root=self._serial_op.model_copy())  # type: ignore
+
+    @classmethod
+    def from_serial(cls, serial: SerialOp) -> DummyOp:
+        return DummyOp(serial.root)
 
 
 class Command(Protocol):
@@ -351,7 +358,29 @@ class Hugr(Mapping[Node, NodeData]):
 
     @classmethod
     def from_serial(cls, serial: SerialHugr) -> Hugr:
-        raise NotImplementedError
+        assert serial.nodes, "Empty Hugr is invalid"
+
+        hugr = Hugr.__new__(Hugr)
+        hugr._nodes = []
+        hugr._links = BiMap()
+        hugr._free_nodes = []
+        hugr.root = Node(0)
+        for idx, serial_node in enumerate(serial.nodes):
+            parent: Node | None = Node(serial_node.root.parent)
+            if serial_node.root.parent == idx:
+                hugr.root = Node(idx)
+                parent = None
+            serial_node.root.parent = -1
+            hugr._nodes.append(NodeData(DummyOp.from_serial(serial_node), parent))
+
+        for (src_node, src_offset), (dst_node, dst_offset) in serial.edges:
+            if src_offset is None or dst_offset is None:
+                continue
+            hugr.add_link(
+                Node(src_node).out(src_offset), Node(dst_node).inp(dst_offset)
+            )
+
+        return hugr
 
 
 @dataclass()
