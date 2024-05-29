@@ -453,7 +453,7 @@ mod test {
     use crate::extension::{
         ExtensionId, ExtensionRegistry, ExtensionSet, PRELUDE, PRELUDE_REGISTRY,
     };
-    use crate::hugr::hugrmut::sealed::HugrMutInternals;
+    use crate::hugr::internal::HugrMutInternals;
     use crate::hugr::rewrite::replace::WhichHugr;
     use crate::hugr::{HugrMut, NodeType, Rewrite};
     use crate::ops::custom::{CustomOp, OpaqueOp};
