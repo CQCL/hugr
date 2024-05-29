@@ -11,7 +11,12 @@
 //! will succeed regardless of what the variable is instantiated to.
 
 use super::ExtensionSet;
-use crate::{hugr::views::HugrView, ops::OpTrait, types::EdgeKind, Direction, Node};
+use crate::{
+    hugr::views::HugrView,
+    ops::{OpParent, OpTrait},
+    types::EdgeKind,
+    Direction, Node,
+};
 
 use super::validate::ExtensionError;
 
@@ -231,7 +236,17 @@ impl UnificationContext {
                 // (This leaves the input free, but assuming it's connected to the output,
                 //  will also be less than the delta; and we prefer minimal solutions).
                 let m_output = self.make_or_get_meta(output, Direction::Outgoing);
-                self.must_include(m_delta, m_output);
+                // TODO memoize as above
+                let internal_delta = &node_type.op().inner_function_type().unwrap().extension_reqs;
+                let m_int = if Some(internal_delta) == self.solved.get(&m_delta) {
+                    m_delta
+                } else {
+                    let m_int = self.fresh_meta();
+                    self.add_solution(m_int, internal_delta.clone());
+                    m_int
+                };
+
+                self.must_include(m_int, m_output);
             }
 
             // For Conditional/Case, and CFG/BB, validation checks that the delta of the parent
