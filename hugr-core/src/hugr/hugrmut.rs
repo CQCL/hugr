@@ -222,7 +222,7 @@ pub trait HugrMut: HugrMutInternals {
 }
 
 /// Records the result of inserting a Hugr or view
-/// via [HugrMut::insert_hugr] or [HugrMut::insert_from_view]
+/// via [HugrMut::insert_hugr] or [HugrMut::insert_from_view].
 pub struct InsertionResult {
     /// The node, after insertion, that was the root of the inserted Hugr.
     ///
