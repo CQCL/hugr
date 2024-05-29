@@ -11,8 +11,8 @@ use hugr::ops::{Module, Tag, UnpackTuple, Value};
 use hugr::std_extensions::arithmetic::int_ops::{self, INT_OPS_REGISTRY};
 use hugr::std_extensions::arithmetic::int_types::ConstInt;
 use hugr::types::{Type, TypeRow};
-use hugr::Hugr;
 use hugr::{builder::DataflowSubContainer, types::FunctionType};
+use hugr::{type_row, Hugr};
 use inkwell::passes::PassManager;
 use insta::assert_snapshot;
 use itertools::Itertools;
@@ -224,6 +224,27 @@ fn emit_hugr_load_constant(#[with(-1, add_int_extensions)] llvm_ctx: TestContext
             let konst = builder.add_load_value(v);
             builder.finish_with_outputs([konst]).unwrap()
         });
+    check_emission!(hugr, llvm_ctx);
+}
+
+#[rstest]
+fn emit_hugr_call(llvm_ctx: TestContext) {
+    fn build_recursive(mod_b: &mut ModuleBuilder<Hugr>, name: &str, io: TypeRow) {
+        let f_id = mod_b
+            .declare(name, FunctionType::new_endo(io).into())
+            .unwrap();
+        let mut func_b = mod_b.define_declaration(&f_id).unwrap();
+        let call = func_b
+            .call(&f_id, &[], func_b.input_wires(), &EMPTY_REG)
+            .unwrap();
+        func_b.finish_with_outputs(call.outputs()).unwrap();
+    }
+
+    let mut mod_b = ModuleBuilder::new();
+    build_recursive(&mut mod_b, "main_void", type_row![]);
+    build_recursive(&mut mod_b, "main_unary", type_row![BOOL_T]);
+    build_recursive(&mut mod_b, "main_binary", type_row![BOOL_T, BOOL_T]);
+    let hugr = mod_b.finish_hugr(&EMPTY_REG).unwrap();
     check_emission!(hugr, llvm_ctx);
 }
 
