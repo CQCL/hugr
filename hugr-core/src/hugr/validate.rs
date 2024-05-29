@@ -9,16 +9,13 @@ use petgraph::visit::{Topo, Walker};
 use portgraph::{LinkView, PortView};
 use thiserror::Error;
 
-use crate::extension::validate::ExtensionValidator;
-use crate::extension::SignatureError;
-use crate::extension::{
-    validate::ExtensionError, ExtensionRegistry, ExtensionSolution, InferExtensionError,
-};
+use crate::extension::validate::ExtensionError;
+use crate::extension::{ExtensionRegistry, ExtensionSolution, InferExtensionError, SignatureError};
 
 use crate::ops::custom::CustomOpError;
 use crate::ops::custom::{resolve_opaque_op, CustomOp};
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
-use crate::ops::{FuncDefn, OpTag, OpTrait, OpType, ValidateOp};
+use crate::ops::{FuncDefn, OpParent, OpTag, OpTrait, OpType, ValidateOp};
 use crate::types::type_param::TypeParam;
 use crate::types::{EdgeKind, FunctionType};
 use crate::{Direction, Hugr, Node, Port};
@@ -66,26 +63,69 @@ impl Hugr {
     /// the target ends of edges require the extensions from the sources, and
     /// check extension deltas from parent nodes are reflected in their children.
     pub fn validate_extensions(&self, closure: ExtensionSolution) -> Result<(), ValidationError> {
-        let validator = ExtensionValidator::new(self, closure);
+        let cc = |node| match (
+            closure.get(&node).cloned(),
+            self.get_nodetype(node).input_extensions.clone(),
+        ) {
+            (None, None) => Err(ValidationError::ExtensionError(
+                ExtensionError::MissingInputExtensions(node),
+            )),
+            (Some(e), None) => Ok(e.clone()),
+            (None, Some(e)) => Ok(e),
+            (Some(_), Some(_)) => {
+                panic!("Closure contained values for node with input-extensions set in Hugr")
+            }
+        };
         for src_node in self.nodes() {
             let node_type = self.get_nodetype(src_node);
-
-            // FuncDefns have no resources since they're static nodes, but the
-            // functions they define can have any extension delta.
-            if node_type.tag() != OpTag::FuncDefn {
-                // If this is a container with I/O nodes, check that the extension they
-                // define match the extensions of the container.
-                if let Some([input, output]) = self.get_io(src_node) {
-                    validator.validate_io_extensions(src_node, input, output)?;
-                }
-            }
+            let src_exts = cc(src_node)?.union(node_type.op().extension_delta());
 
             for src_port in self.node_outputs(src_node) {
                 for (tgt_node, tgt_port) in self.linked_inputs(src_node, src_port) {
-                    validator.check_extensions_compatible(
-                        &(src_node, src_port.into()),
-                        &(tgt_node, tgt_port.into()),
-                    )?;
+                    let tgt_exts = cc(tgt_node)?;
+                    if !tgt_exts.is_superset(&src_exts) {
+                        return Err(ExtensionError::SrcExceedsTgtExtensionsAtPort {
+                            from: src_node,
+                            from_offset: src_port.into(),
+                            from_extensions: src_exts,
+                            to: tgt_node,
+                            to_offset: tgt_port.into(),
+                            to_extensions: tgt_exts.clone(),
+                        }
+                        .into());
+                    }
+                }
+            }
+            if let Some([_, output]) = self.get_io(src_node) {
+                let parent_extensions =
+                    node_type.op().inner_function_type().unwrap().extension_reqs;
+                let child_extensions = cc(output)?;
+                if !child_extensions.is_subset(&parent_extensions) {
+                    return Err(ExtensionError::ParentIOExtensionMismatch {
+                        parent: src_node,
+                        parent_extensions,
+                        child: output,
+                        child_extensions,
+                    }
+                    .into());
+                }
+            } else if matches!(
+                self.get_optype(src_node).tag(),
+                OpTag::Conditional | OpTag::Cfg
+            ) {
+                let parent_extensions = node_type.op().extension_delta();
+                for child in self.children(src_node) {
+                    let child_extensions = self.get_optype(child).extension_delta();
+                    if !child_extensions.is_subset(&parent_extensions) {
+                        // TODO this is just ParentExtensionMismatch without the IO - make it
+                        return Err(ExtensionError::ParentIOExtensionMismatch {
+                            parent: src_node,
+                            parent_extensions,
+                            child,
+                            child_extensions,
+                        }
+                        .into());
+                    }
                 }
             }
         }
