@@ -528,7 +528,7 @@ pub mod test {
 
             let get_sig = |sf: &_| match sf {
                 // if SignatureFunc or CustomValidator are changed we should get
-                // an error here. To fix: modify the fields matched on here,
+                // a compile error here. To fix: modify the fields matched on here,
                 // maintaining the lack of `..` and, for each part that is
                 // serializable, ensure we are checking it for equality below.
                 SignatureFunc::TypeScheme(CustomValidator {
