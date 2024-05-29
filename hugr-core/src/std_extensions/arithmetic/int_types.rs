@@ -278,14 +278,13 @@ mod test {
     }
 
     mod proptest {
-        use super::{ConstInt, LOG_WIDTH_MAX};
+        use super::{is_valid_log_width, ConstInt, LOG_WIDTH_MAX};
         use ::proptest::prelude::*;
         impl Arbitrary for ConstInt {
             type Parameters = ();
             type Strategy = BoxedStrategy<Self>;
             fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-                // write a test case for this:
-                Let signed_strat = (..=LOG_WIDTH_MAX).prop_flat_map(|log_width| {
+                let signed_strat = (..=LOG_WIDTH_MAX).prop_flat_map(|log_width| {
                     use i64;
                     let width = 2u64.pow(log_width as u32);
                     let max_val = ((1u64 << (width - 1)) - 1u64) as i64;
@@ -299,7 +298,43 @@ mod test {
                         ConstInt::new_u(log_width, v).expect("guaranteed to be in bounds")
                     })
                 });
+
                 prop_oneof![unsigned_strat, signed_strat].boxed()
+            }
+        }
+
+        fn any_signed_int_with_log_width() -> impl Strategy<Value=(u8, i128)> {
+            (..=LOG_WIDTH_MAX).prop_flat_map(|log_width| {
+                use i64;
+                let width = 2u64.pow(log_width as u32);
+                let max_val = ((1u64 << (width - 1)) - 1u64) as i64;
+                let min_val = -max_val - 1;
+                prop_oneof![
+                    (min_val..=max_val),
+                    Just(min_val),
+                    Just(max_val)
+                ].prop_map(move |x| (log_width,x as i128))
+            })
+        }
+
+        proptest! {
+            #[test]
+            fn valid_signed_int((log_width, x) in any_signed_int_with_log_width()) {
+                let (min,max): (i128,i128) = match log_width {
+                    0 => (-1, 0),
+                    1 => (-2, 1),
+                    2 => (-8, 7),
+                    3 => (i8::MIN as i128, i8::MAX as i128),
+                    4 => (i16::MIN as i128, i16::MAX as i128),
+                    5 => (i32::MIN as i128, i32::MAX as i128),
+                    6 => (i64::MIN as i128, i64::MAX as i128),
+                    _ => unreachable!(),
+                };
+                let width = (2i128.pow(log_width as u32));
+                prop_assert_eq!(max - min + 1, 1 << width);
+                prop_assert!(x >= min);
+                prop_assert!(x <= max);
+                prop_assert!(ConstInt::new_s(log_width, x as i64).is_ok())
             }
         }
     }
