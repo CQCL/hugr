@@ -1,8 +1,8 @@
 //! Standard command line tools, used by the hugr binary.
 
-use crate::{extension::ExtensionRegistry, Hugr, HugrView};
-use clap::Parser;
+pub use clap::Parser;
 use clap_stdin::FileOrStdin;
+use hugr_core::{extension::ExtensionRegistry, Hugr, HugrView};
 use thiserror::Error;
 /// Validate and visualise a HUGR file.
 #[derive(Parser, Debug)]
@@ -30,7 +30,7 @@ pub enum CliError {
     Parse(#[from] serde_json::Error),
     /// Error validating HUGR.
     #[error("Error validating HUGR: {0}")]
-    Validate(#[from] crate::hugr::ValidationError),
+    Validate(#[from] hugr_core::hugr::ValidationError),
 }
 
 /// String to print when validation is successful.
