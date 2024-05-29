@@ -180,12 +180,12 @@ jobs:
       - uses: mozilla-actions/sccache-action@v0.0.4
       - uses: dtolnay/rust-toolchain
         with:
-          components: llvm-tools-preview
           # Nightly is required to count doctests coverage
           #
           # Pinned nightly version until this gets resolved
           # https://github.com/rust-lang/rust/issues/125474
           toolchain: 'nightly-2024-05-22'
+          components: llvm-tools-preview
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
       - name: Run tests with coverage instrumentation
