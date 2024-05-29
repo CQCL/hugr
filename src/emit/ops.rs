@@ -350,27 +350,24 @@ fn emit_call<'c, H: HugrView>(
         _ => Err(anyhow!("emit_call: Not a Decl or Defn")),
     };
     let inputs: Vec<_> = args.inputs.iter().map(|&x| x.into()).collect();
-    let call = context
-        .builder()
+    let builder = context.builder();
+    let call = builder
         .build_call(func?, inputs.as_slice(), "")?
         .try_as_basic_value();
-    let rets = match args.outputs.len() {
+    let rets = match args.outputs.len() as u32 {
         0 => {
             call.expect_right("void");
             vec![]
         }
         1 => vec![call.expect_left("non-void")],
-        n => call
-            .expect_left("non-void")
-            .into_struct_value()
-            .get_fields()
-            // For some reason `get_fields()` returns an extra field at the end with the type of
-            // a pointer to the struct??? Just take the first n fields until we figure out what's
-            // going on...
-            .take(n)
-            .collect(),
+        n => {
+            let return_struct = call.expect_left("non-void").into_struct_value();
+            (0..n)
+                .map(|i| builder.build_extract_value(return_struct, i, ""))
+                .collect::<Result<Vec<_>, _>>()?
+        }
     };
-    args.outputs.finish(context.builder(), rets)
+    args.outputs.finish(builder, rets)
 }
 
 fn emit_optype<'c, H: HugrView>(

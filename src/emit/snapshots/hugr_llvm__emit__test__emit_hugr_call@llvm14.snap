@@ -29,7 +29,9 @@ alloca_block:
 
 entry_block:                                      ; preds = %alloca_block
   %2 = call { { {}, {} }, { {}, {} } } @_hl.main_binary.9({ {}, {} } %0, { {}, {} } %1)
-  %mrv = insertvalue { { {}, {} }, { {}, {} } } undef, { {}, {} } %0, 0
-  %mrv7 = insertvalue { { {}, {} }, { {}, {} } } %mrv, { {}, {} } %1, 1
+  %3 = extractvalue { { {}, {} }, { {}, {} } } %2, 0
+  %4 = extractvalue { { {}, {} }, { {}, {} } } %2, 1
+  %mrv = insertvalue { { {}, {} }, { {}, {} } } undef, { {}, {} } %3, 0
+  %mrv7 = insertvalue { { {}, {} }, { {}, {} } } %mrv, { {}, {} } %4, 1
   ret { { {}, {} }, { {}, {} } } %mrv7
 }
