@@ -14,7 +14,6 @@ use super::{HugrError, NodeType, RootTagged};
 ///
 /// Specifically, this trait provides access to the underlying portgraph
 /// view.
-#[doc(hidden)]
 pub trait HugrInternals {
     /// The underlying portgraph view type.
     type Portgraph<'p>: LinkView + Clone + 'p
@@ -54,7 +53,6 @@ impl<T: AsRef<Hugr>> HugrInternals for T {
 ///
 /// Specifically, this trait lets you apply arbitrary modifications that may
 /// invalidate the HUGR.
-#[doc(hidden)]
 pub trait HugrMutInternals: RootTagged {
     /// Returns the Hugr at the base of a chain of views.
     fn hugr_mut(&mut self) -> &mut Hugr;
@@ -135,7 +133,7 @@ pub trait HugrMutInternals: RootTagged {
     /// # Errors
     ///
     /// Returns a [`HugrError::InvalidTag`] if this would break the bound
-    /// ([`Self::RootHandle`]) on the root node's [OpTag].
+    /// (`Self::RootHandle`) on the root node's OpTag.
     ///
     /// # Panics
     ///
