@@ -28,7 +28,7 @@ extension_inference = []
 _cli = ["dep:hugr-cli"]
 
 [dependencies]
-hugr-core = { path = "../hugr-core", version = "0.0.0" }
+hugr-core = { path = "../hugr-core", version = "0.1.0" }
 hugr-passes = { path = "../hugr-passes", version = "0.1.0" }
 hugr-cli = { path = "../hugr-cli", version = "0.1.0", optional = true }
 
