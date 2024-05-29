@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from enum import Enum
 from typing import (
     Iterable,
+    Iterator,
     Sequence,
     Protocol,
     Generic,
@@ -58,13 +59,13 @@ class Node(Wire):
     @overload
     def __getitem__(self, index: int) -> OutPort: ...
     @overload
-    def __getitem__(self, index: slice) -> Iterable[OutPort]: ...
+    def __getitem__(self, index: slice) -> Iterator[OutPort]: ...
     @overload
-    def __getitem__(self, index: tuple[int, ...]) -> list[OutPort]: ...
+    def __getitem__(self, index: tuple[int, ...]) -> Iterator[OutPort]: ...
 
     def __getitem__(
         self, index: int | slice | tuple[int, ...]
-    ) -> OutPort | Iterable[OutPort]:
+    ) -> OutPort | Iterator[OutPort]:
         match index:
             case int(index):
                 if self._num_out_ports is not None:
@@ -81,7 +82,7 @@ class Node(Wire):
                 step = index.step or 1
                 return (self[i] for i in range(start, stop, step))
             case tuple(xs):
-                return [self[i] for i in xs]
+                return (self[i] for i in xs)
 
     def out_port(self) -> "OutPort":
         return OutPort(self, 0)
