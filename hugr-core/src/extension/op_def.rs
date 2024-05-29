@@ -802,16 +802,14 @@ pub mod test {
             fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
                 use crate::proptest::{any_serde_yaml_value, any_smolstr, any_string};
                 use proptest::collection::{hash_map, vec};
-                let signature_func: BoxedStrategy<SignatureFunc> = any::<SignatureFunc>();
-                let lower_funcs: BoxedStrategy<LowerFunc> = any::<LowerFunc>();
                 let misc = hash_map(any_string(), any_serde_yaml_value(), 0..3);
                 (
                     any::<ExtensionId>(),
                     any_smolstr(),
                     any_string(),
                     misc,
-                    signature_func,
-                    vec(lower_funcs, 0..2),
+                    any::<SignatureFunc>(),
+                    vec(any::<LowerFunc>(), 0..2),
                 )
                     .prop_map(
                         |(extension, name, description, misc, signature_func, lower_funcs)| {

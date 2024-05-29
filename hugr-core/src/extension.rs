@@ -539,6 +539,7 @@ impl FromIterator<ExtensionId> for ExtensionSet {
 
 #[cfg(test)]
 pub mod test {
+    // We re-export this here because mod op_def is private.
     pub use super::op_def::test::SimpleOpDef;
 
     mod proptest {

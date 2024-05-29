@@ -655,12 +655,12 @@ mod test {
                     3,  // No more than 3 branch levels deep
                     32, // Target around 32 total elements
                     3,  // Each collection is up to 3 elements long
-                    |element| {
-                        (Type::any_non_row_var(), vec(element.clone(), 0..3)).prop_map(
-                            |(typ, contents)| {
+                    |child_strat| {
+                        (Type::any_non_row_var(), vec(child_strat, 0..3)).prop_map(
+                            |(typ, children)| {
                                 Self::new(ListValue::new(
                                     typ,
-                                    contents.into_iter().map(|e| Value::Extension { e }),
+                                    children.into_iter().map(|e| Value::Extension { e }),
                                 ))
                             },
                         )

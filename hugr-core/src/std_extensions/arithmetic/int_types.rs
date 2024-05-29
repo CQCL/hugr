@@ -284,9 +284,11 @@ mod test {
             type Parameters = ();
             type Strategy = BoxedStrategy<Self>;
             fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-                let signed_strat = (..=LOG_WIDTH_MAX).prop_flat_map(|log_width| {
+                // write a test case for this:
+                Let signed_strat = (..=LOG_WIDTH_MAX).prop_flat_map(|log_width| {
                     use i64;
-                    let max_val = (2u64.pow(log_width as u32) / 2) as i64;
+                    let width = 2u64.pow(log_width as u32);
+                    let max_val = ((1u64 << (width - 1)) - 1u64) as i64;
                     let min_val = -max_val - 1;
                     (min_val..=max_val).prop_map(move |v| {
                         Self::new_s(log_width, v).expect("guaranteed to be in bounds")
