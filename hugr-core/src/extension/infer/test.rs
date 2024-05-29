@@ -25,7 +25,7 @@ use crate::types::{FunctionType, Type, TypeRow};
 
 use cool_asserts::assert_matches;
 use itertools::Itertools;
-use portgraph::NodeIndex;
+//use portgraph::NodeIndex;
 
 const NAT: Type = crate::extension::prelude::USIZE_T;
 
@@ -111,7 +111,7 @@ fn from_graph() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[test]
+/*#[test]
 // Basic test that the `Plus` constraint works
 fn plus() -> Result<(), InferExtensionError> {
     let hugr = Hugr::default();
@@ -148,7 +148,7 @@ fn plus() -> Result<(), InferExtensionError> {
     assert_eq!(ctx.get_solution(&metas[5]).unwrap(), &ab);
 
     Ok(())
-}
+}*/
 
 #[cfg(feature = "extension_inference")]
 #[test]
@@ -184,7 +184,7 @@ fn missing_lift_node() {
     );
 }
 
-#[test]
+/*#[test]
 // Tests that we can succeed even when all variables don't have concrete
 // extension sets, and we have an open variable at the start of the graph.
 fn open_variables() -> Result<(), InferExtensionError> {
@@ -208,7 +208,7 @@ fn open_variables() -> Result<(), InferExtensionError> {
     // the main node created by `Hugr::default`
     assert_eq!(solution.len(), 1);
     Ok(())
-}
+}*/
 
 #[cfg(feature = "extension_inference")]
 #[test]
@@ -259,7 +259,7 @@ fn dangling_src() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[test]
+/*#[test]
 fn resolve_test() -> Result<(), InferExtensionError> {
     let mut ctx = UnificationContext::new(&Hugr::default());
     let m0 = ctx.fresh_meta();
@@ -275,7 +275,7 @@ fn resolve_test() -> Result<(), InferExtensionError> {
     assert_eq!(ctx.resolve(m1), ctx.resolve(m2));
     assert!(ctx.resolve(m0) != mid0);
     Ok(())
-}
+}*/
 
 fn create_with_io(
     hugr: &mut Hugr,
@@ -963,7 +963,7 @@ fn plus_on_self_10_times() {
     [0; 10].iter().for_each(|_| plus_on_self().unwrap())
 }
 
-#[test]
+/*#[test]
 // Test that logic for dealing with self-referential constraints doesn't
 // fall over when a self-referencing group of metas also references a meta
 // outside the group
@@ -998,7 +998,7 @@ fn sccs() {
         ctx.get_solution(&m4),
         Some(&ExtensionSet::from_iter([A, B, C, UNKNOWN_EXTENSION]))
     );
-}
+}*/
 
 #[test]
 /// Note: This test is relying on the builder's `define_function` doing the

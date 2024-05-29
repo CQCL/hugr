@@ -11,19 +11,14 @@
 //! will succeed regardless of what the variable is instantiated to.
 
 use super::ExtensionSet;
-use crate::{
-    hugr::views::HugrView,
-    ops::{OpTag, OpTrait},
-    types::EdgeKind,
-    Direction, Node,
-};
+use crate::{hugr::views::HugrView, types::EdgeKind, Direction, Node};
 
 use super::validate::ExtensionError;
 
-use petgraph::graph as pg;
-use petgraph::{Directed, EdgeType, Undirected};
+use itertools::Itertools;
+use petgraph::{graph as pg, visit::EdgeRef, Directed, EdgeDirection};
 
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{hash_map::Entry, HashMap, HashSet};
 
 use thiserror::Error;
 
@@ -38,10 +33,10 @@ pub type ExtensionSolution = HashMap<Node, ExtensionSet>;
 ///
 /// [`validate_with_extension_closure`]: crate::Hugr::validate_with_extension_closure
 pub fn infer_extensions(hugr: &impl HugrView) -> Result<ExtensionSolution, InferExtensionError> {
-    let mut ctx = UnificationContext::new(hugr);
-    ctx.main_loop()?;
-    ctx.instantiate_variables();
-    let all_results = ctx.main_loop()?;
+    let mut ctx = UnificationContext::default();
+    ctx.gen_constraints(hugr);
+    ctx.merge_equal_metas()?;
+    let all_results = ctx.solve_all()?;
     let new_results = all_results
         .into_iter()
         .filter(|(n, _sol)| hugr.get_nodetype(*n).input_extensions().is_none())
@@ -52,15 +47,6 @@ pub fn infer_extensions(hugr: &impl HugrView) -> Result<ExtensionSolution, Infer
 /// Metavariables don't need much
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 struct Meta(u32);
-
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
-/// Things we know about metavariables
-enum Constraint {
-    /// A variable has the same value as another variable
-    Equal(Meta),
-    /// Variable extends the value of another by a set of extensions
-    Plus(ExtensionSet, Meta),
-}
 
 #[derive(Debug, Clone, PartialEq, Error)]
 #[non_exhaustive]
@@ -103,12 +89,13 @@ pub enum InferExtensionError {
 /// A graph of metavariables connected by constraints.
 /// The edges represent `Equal` constraints in the undirected graph and `Plus`
 /// constraints in the directed case.
-struct GraphContainer<Dir: EdgeType> {
-    graph: pg::Graph<Meta, (), Dir>,
+#[derive(Default)]
+struct DirectedGraph {
+    graph: pg::Graph<Meta, (), Directed>,
     node_map: HashMap<Meta, pg::NodeIndex>,
 }
 
-impl<T: EdgeType> GraphContainer<T> {
+impl DirectedGraph {
     /// Add a metavariable to the graph as a node and return the `NodeIndex`.
     /// If it's already there, just return the existing `NodeIndex`
     fn add_or_retrieve(&mut self, m: Meta) -> pg::NodeIndex {
@@ -127,7 +114,7 @@ impl<T: EdgeType> GraphContainer<T> {
     }
 
     /// Return the strongly connected components of the graph in terms of
-    /// metavariables. In the undirected case, return the connected components
+    /// metavariables.
     fn sccs(&self) -> Vec<Vec<Meta>> {
         petgraph::algo::tarjan_scc(&self.graph)
             .into_iter()
@@ -138,76 +125,55 @@ impl<T: EdgeType> GraphContainer<T> {
             })
             .collect()
     }
-}
 
-impl GraphContainer<Undirected> {
-    fn new() -> Self {
-        GraphContainer {
-            graph: pg::Graph::new_undirected(),
-            node_map: HashMap::new(),
+    fn take_successors(&mut self, m: Meta) -> impl Iterator<Item = Meta> + '_ {
+        // If not in nodemap, return empty? Note neighbours_directed returns empty for unknown index.
+        let index = *self.node_map.get(&m).unwrap();
+        let mut out_edges = Vec::new();
+        for e in self.graph.edges_directed(index, EdgeDirection::Outgoing) {
+            out_edges.push((*self.graph.node_weight(e.target()).unwrap(), e.id()));
         }
+        for (_, e_id) in out_edges.iter() {
+            self.graph.remove_edge(*e_id);
+        }
+        out_edges.into_iter().map(|(tgt, _)| tgt)
     }
 }
-
-impl GraphContainer<Directed> {
-    fn new() -> Self {
-        GraphContainer {
-            graph: pg::Graph::new(),
-            node_map: HashMap::new(),
-        }
-    }
-}
-
-type EqGraph = GraphContainer<Undirected>;
 
 /// Our current knowledge about the extensions of the graph
+#[derive(Default)]
 struct UnificationContext {
-    /// A list of constraints for each metavariable
-    constraints: HashMap<Meta, HashSet<Constraint>>,
-    /// A map which says which nodes correspond to which metavariables
+    /// A graph where each Meta is a node, with edges to other metas it must include
+    constraints: DirectedGraph,
+    /// A map which says which nodes correspond to which metavariables.
+    /// TODO ideally this would be bijective, or something...
+    /// (But, some Meta's may be Deltas or Cycles instead of node inputs/outputs.)
     extensions: HashMap<(Node, Direction), Meta>,
-    /// Solutions to metavariables
+    /// Solutions to metavariables, including those fixed by the Hugr
+    /// (Node deltas, and user-provided annotations)
     solved: HashMap<Meta, ExtensionSet>,
-    /// A graph which says which metavariables should be equal
-    eq_graph: EqGraph,
-    /// A mapping from metavariables which have been merged, to the meta they've
-    // been merged to
-    shunted: HashMap<Meta, Meta>,
-    /// Variables we're allowed to include in solutionss
-    variables: HashSet<Meta>,
-    /// A name for the next metavariable we create
+    /// A mapping from metavariables which (were in cycles and hence) have been merged,
+    /// to the meta (representing the whole cycle) they've been merged into
+    merged_cycles: HashMap<Meta, Meta>,
+    /// A name for the next metavariable we create.
+    /// TODO: use constraints.num_nodes()
     fresh_name: u32,
 }
 
 /// Invariant: Constraint::Plus always points to a fresh metavariable
 impl UnificationContext {
-    /// Create a new unification context, and populate it with constraints from
-    /// traversing the hugr which is passed in.
-    fn new(hugr: &impl HugrView) -> Self {
-        let mut ctx = Self {
-            constraints: HashMap::new(),
-            extensions: HashMap::new(),
-            solved: HashMap::new(),
-            eq_graph: EqGraph::new(),
-            shunted: HashMap::new(),
-            variables: HashSet::new(),
-            fresh_name: 0,
-        };
-        ctx.gen_constraints(hugr);
-        ctx
-    }
-
     /// Create a fresh metavariable, and increment `fresh_name` for next time
+    /// TODO can we just let the graph assign indices?
     fn fresh_meta(&mut self) -> Meta {
         let fresh = Meta(self.fresh_name);
         self.fresh_name += 1;
-        self.constraints.insert(fresh, HashSet::new());
+        self.constraints.add_or_retrieve(fresh);
         fresh
     }
 
-    /// Declare a constraint on the metavariable
-    fn add_constraint(&mut self, m: Meta, c: Constraint) {
-        self.constraints.entry(m).or_default().insert(c);
+    /// Declare that `m1` must include `m2`
+    fn must_include(&mut self, m1: Meta, m2: Meta) {
+        self.constraints.add_edge(m1, m2)
     }
 
     /// Declare that a meta has been solved
@@ -218,28 +184,21 @@ impl UnificationContext {
 
     /// If a metavariable has been merged, return the new meta, otherwise return
     /// the same meta.
-    ///
-    /// This could loop if there were a cycle in the `shunted` list, but there
-    /// shouldn't be, because we only ever shunt to *new* metas.
     fn resolve(&self, m: Meta) -> Meta {
-        self.shunted.get(&m).cloned().map_or(m, |m| self.resolve(m))
-    }
-
-    /// Get the relevant constraints for a metavariable. If it's been merged,
-    /// get the constraints for the merged metavariable
-    fn get_constraints(&self, m: &Meta) -> Option<&HashSet<Constraint>> {
-        self.constraints.get(&self.resolve(*m))
-    }
-
-    /// Get the relevant solution for a metavariable. If it's been merged, get
-    /// the solution for the merged metavariable
-    fn get_solution(&self, m: &Meta) -> Option<&ExtensionSet> {
-        self.solved.get(&self.resolve(*m))
+        match self.merged_cycles.get(&m) {
+            None => m,
+            Some(tgt) => {
+                // Cycles are all merged in one pass as SCCs, there are no cycles of cycles
+                debug_assert!(!self.merged_cycles.contains_key(tgt));
+                *tgt
+            }
+        }
     }
 
     /// Return the metavariable corresponding to the given location on the
     /// graph, either by making a new meta, or looking it up
     fn make_or_get_meta(&mut self, node: Node, dir: Direction) -> Meta {
+        // TODO can't call fresh_meta while holding an Entry, but maybe can when fresh_meta defers to graph?
         if let Some(m) = self.extensions.get(&(node, dir)) {
             *m
         } else {
@@ -254,77 +213,42 @@ impl UnificationContext {
     where
         T: HugrView,
     {
-        if hugr.root_type().input_extensions().is_none() {
-            let m_input = self.make_or_get_meta(hugr.root(), Direction::Incoming);
-            self.variables.insert(m_input);
-        }
-
         for node in hugr.nodes() {
             let m_input = self.make_or_get_meta(node, Direction::Incoming);
             let m_output = self.make_or_get_meta(node, Direction::Outgoing);
 
             let node_type = hugr.get_nodetype(node);
+            let m_delta = self.fresh_meta();
+            // For e.g. FuncDefn, which has no op_signature, this will compute empty delta,
+            // regardless of the function body. This is correct: FuncDefn merely *defines* the
+            // function, the extensions are what's required to *execute* it.
+            // TODO memoize this as a map from ExtensionSet to Meta.
+            self.add_solution(
+                m_delta,
+                node_type
+                    .op_signature()
+                    .map_or_else(ExtensionSet::new, |ft| ft.extension_reqs.clone()),
+            );
 
-            // Add constraints for the inputs and outputs of dataflow nodes according
-            // to the signature of the parent node
-            if let Some([input, output]) = hugr.get_io(node) {
-                for dir in Direction::BOTH {
-                    let m_input_node = self.make_or_get_meta(input, dir);
-                    self.add_constraint(m_input_node, Constraint::Equal(m_input));
-                    let m_output_node = self.make_or_get_meta(output, dir);
-                    // If the parent node is a FuncDefn, it will have no
-                    // op_signature, so the Incoming and Outgoing ports will
-                    // have equal extension requirements.
-                    // The function that it contains, however, may have an
-                    // extension delta, so its output shouldn't be equal to the
-                    // FuncDefn's output.
-                    //
-                    // TODO: Add a constraint that the extensions of the output
-                    // node of a FuncDefn should be those of the input node plus
-                    // the extension delta specified in the function signature.
-                    if node_type.tag() != OpTag::FuncDefn {
-                        self.add_constraint(m_output_node, Constraint::Equal(m_output));
-                    }
-                }
+            self.must_include(m_output, m_input);
+            self.must_include(m_output, m_delta);
+
+            if let Some([_, output]) = hugr.get_io(node) {
+                // Parent node. Constrain the *Output* child to be less than the Delta.
+                // (This leaves the input free, but assuming it's connected to the output,
+                //  will also be less than the delta; and we prefer minimal solutions).
+                let m_output = self.make_or_get_meta(output, Direction::Outgoing);
+                self.must_include(m_delta, m_output);
             }
 
-            if hugr.get_optype(node).tag() == OpTag::Conditional {
-                for case in hugr.children(node) {
-                    let m_case_in = self.make_or_get_meta(case, Direction::Incoming);
-                    let m_case_out = self.make_or_get_meta(case, Direction::Outgoing);
-                    self.add_constraint(m_case_in, Constraint::Equal(m_input));
-                    self.add_constraint(m_case_out, Constraint::Equal(m_output));
-                }
-            }
+            // For Conditional/Case, and CFG/BB, validation checks that the delta of the parent
+            // contains that of every child, so nothing to do here.
 
-            if node_type.tag() == OpTag::Cfg {
-                let mut children = hugr.children(node);
-                let entry = children.next().unwrap();
-                let exit = children.next().unwrap();
-                let m_entry = self.make_or_get_meta(entry, Direction::Incoming);
-                let m_exit = self.make_or_get_meta(exit, Direction::Outgoing);
-                self.add_constraint(m_input, Constraint::Equal(m_entry));
-                self.add_constraint(m_output, Constraint::Equal(m_exit));
-            }
-
-            match node_type.io_extensions() {
-                // Input extensions are open
-                None => {
-                    let delta = node_type.op().extension_delta();
-                    let c = if delta.is_empty() {
-                        Constraint::Equal(m_input)
-                    } else {
-                        Constraint::Plus(delta, m_input)
-                    };
-                    self.add_constraint(m_output, c);
-                }
-                // We have a solution for everything!
-                Some((input_exts, output_exts)) => {
-                    self.add_solution(m_input, input_exts.clone());
-                    self.add_solution(m_output, output_exts);
-                }
+            if let Some(annotation) = node_type.input_extensions() {
+                self.add_solution(m_input, annotation.clone());
             }
         }
+
         // Separate loop so that we can assume that a metavariable has been
         // added for every (Node, Direction) in the graph already.
         for tgt_node in hugr.nodes() {
@@ -344,7 +268,7 @@ impl UnificationContext {
                         .extensions
                         .get(&(src_node, Direction::Outgoing))
                         .unwrap();
-                    self.add_constraint(*m_src, Constraint::Equal(m_tgt));
+                    self.must_include(m_tgt, *m_src);
                 }
             }
         }
@@ -425,307 +349,67 @@ impl UnificationContext {
     ///
     /// Returns the set of new metas created and the set of metas that were
     /// merged.
-    fn merge_equal_metas(&mut self) -> Result<(HashSet<Meta>, HashSet<Meta>), InferExtensionError> {
-        let mut merged: HashSet<Meta> = HashSet::new();
-        let mut new_metas: HashSet<Meta> = HashSet::new();
-        for cc in self.eq_graph.sccs().into_iter() {
-            // Within a connected component everything is equal
+    fn merge_equal_metas(&mut self) -> Result<(), InferExtensionError> {
+        for scc in self.constraints.sccs() {
             let combined_meta = self.fresh_meta();
-            for m in cc.iter() {
-                // The same meta shouldn't be shunted twice directly. Only
-                // transitively, as we still process the meta it was shunted to
-                if self.shunted.contains_key(m) {
-                    continue;
+            let solutions = scc.iter().flat_map(|m| self.solved.get(m).map(|s| (m, s)));
+            match solutions.at_most_one() {
+                Err(e) => {
+                    // TODO The "actual" and "expected" labels here are totally bogus
+                    let [(m1, rs1), (m2, rs2)] = e.take(2).collect::<Vec<_>>().try_into().unwrap();
+                    return Err(self.report_mismatch(*m1, *m2, rs1.clone(), rs2.clone()));
                 }
-
-                if let Some(cs) = self.constraints.remove(m) {
-                    for c in cs
-                        .iter()
-                        .filter(|c| !matches!(c, Constraint::Equal(_)))
-                        .cloned()
-                        .collect::<Vec<_>>()
-                        .into_iter()
-                    {
-                        self.add_constraint(combined_meta, c.clone());
-                    }
-                    merged.insert(*m);
-                    // Record a new meta the first time that we use it; don't
-                    // bother recording a new meta if we don't add any
-                    // constraints. It should be safe to call this multiple times
-                    new_metas.insert(combined_meta);
-                }
-                // Here, solved.get is equivalent to get_solution, because if
-                // `m` had already been shunted, we wouldn't skipped it
-                if let Some(solution) = self.solved.get(m) {
-                    match self.solved.get(&combined_meta) {
-                        Some(existing_solution) => {
-                            if solution != existing_solution {
-                                return Err(self.report_mismatch(
-                                    *m,
-                                    combined_meta,
-                                    solution.clone(),
-                                    existing_solution.clone(),
-                                ));
-                            }
-                        }
-                        None => {
-                            self.solved.insert(combined_meta, solution.clone());
-                        }
+                Ok(Some((_, s))) => self.solved.insert(combined_meta, s.clone()),
+                Ok(None) => None,
+            };
+            let metas = scc.into_iter().collect::<HashSet<_>>();
+            for m in metas.iter() {
+                self.merged_cycles.insert(*m, combined_meta);
+                for s in self.constraints.take_successors(*m).collect::<Vec<_>>() {
+                    if !metas.contains(m) {
+                        self.must_include(combined_meta, s);
                     }
                 }
-                if self.variables.contains(m) {
-                    self.variables.insert(combined_meta);
-                    self.variables.remove(m);
-                }
-                self.shunted.insert(*m, combined_meta);
+                //self.constraints.remove(m); // no need
             }
         }
-        Ok((new_metas, merged))
+        Ok(())
     }
 
-    /// Inspect the constraints of a given metavariable and try to find a
-    /// solution based on those.
-    /// Returns whether a solution was found
-    fn solve_meta(&mut self, meta: Meta) -> Result<bool, InferExtensionError> {
-        let mut solved = false;
-        for c in self.get_constraints(&meta).unwrap().clone().iter() {
-            match c {
-                // Just register the equality in the EqGraph, we'll process it later
-                Constraint::Equal(other_meta) => {
-                    self.eq_graph.add_edge(meta, *other_meta);
-                }
-                // N.B. If `meta` is already solved, we can't use that
-                // information to solve `other_meta`. This is because the Plus
-                // constraint only signifies a preorder.
-                // I.e. if meta = other_meta + 'R', it's still possible that the
-                // solution is meta = other_meta because we could be adding 'R'
-                // to a set which already contained it.
-                Constraint::Plus(r, other_meta) => {
-                    if let Some(rs) = self.get_solution(other_meta) {
-                        let rrs = rs.clone().union(r.clone());
-                        match self.get_solution(&meta) {
-                            // Let's check that this is right?
-                            Some(rs) => {
-                                if rs != &rrs {
-                                    return Err(self.report_mismatch(
-                                        meta,
-                                        *other_meta,
-                                        rs.clone(),
-                                        rrs,
-                                    ));
-                                }
-                            }
-                            None => {
-                                self.add_solution(meta, rrs);
-                                solved = true;
-                            }
-                        };
-                    };
-                }
-            }
+    fn solve(&mut self, m: Meta) -> Result<&ExtensionSet, InferExtensionError> {
+        let mut min_sol = ExtensionSet::new();
+        for s in self.constraints.take_successors(m).collect::<Vec<_>>() {
+            min_sol = min_sol.union(self.solve(s)?.clone());
         }
-        Ok(solved)
+        // The first time we come here, the below will check the computed solution above is
+        // less than any prior solution (and then return it). To avoid the above computation
+        // on every call...
+        Ok(match self.solved.entry(m) {
+            Entry::Vacant(ve) => ve.insert(min_sol),
+            Entry::Occupied(oc) => {
+                if !oc.get().is_superset(&min_sol) {
+                    // TODO include location of `m`
+                    return Err(InferExtensionError::MismatchedConcrete {
+                        expected: min_sol,
+                        actual: oc.get().clone(),
+                    });
+                }
+                oc.into_mut()
+            }
+        })
     }
 
-    /// Tries to return concrete extensions for each node in the graph. This only
-    /// works when there are no variables in the graph!
-    ///
-    /// What we really want is to give the concrete extensions where they're
-    /// available. When there are variables, we should leave the graph as it is,
-    /// but make sure that no matter what they're instantiated to, the graph
-    /// still makes sense (should pass the extension validation check)
-    fn results(&self) -> Result<ExtensionSolution, InferExtensionError> {
-        // Check that all of the metavariables associated with nodes of the
-        // graph are solved
-        let depended_upon = {
-            let mut h: HashMap<Meta, Vec<Meta>> = HashMap::new();
-            for (m, m2) in self.constraints.iter().flat_map(|(m, cs)| {
-                cs.iter().flat_map(|c| match c {
-                    Constraint::Plus(_, m2) => Some((*m, self.resolve(*m2))),
-                    _ => None,
-                })
-            }) {
-                h.entry(m2).or_default().push(m);
-            }
-            h
-        };
-        // Calculate everything dependent upon a variable.
-        // Note it would be better to find metas ALL of whose dependencies were (transitively)
-        // on variables, but this is more complex, and hard to define if there are cycles
-        // of PLUS constraints, so leaving that as a TODO until we've handled such cycles.
-        let mut depends_on_var = HashSet::new();
-        let mut queue = VecDeque::from_iter(self.variables.iter());
-        while let Some(m) = queue.pop_front() {
-            if depends_on_var.insert(m) {
-                if let Some(d) = depended_upon.get(m) {
-                    queue.extend(d.iter())
-                }
-            }
+    fn solve_all(&mut self) -> Result<ExtensionSolution, InferExtensionError> {
+        let required_metas = self
+            .extensions
+            .iter()
+            .filter_map(|((n, d), m)| (d == &Direction::Incoming).then_some((*m, *n)))
+            .collect::<HashMap<_, _>>();
+        let mut all_solns = HashMap::new();
+        for (m, n) in required_metas.iter() {
+            all_solns.insert(*n, self.solve(*m)?.clone());
         }
-
-        let mut results: ExtensionSolution = HashMap::new();
-        for (loc, meta) in self.extensions.iter() {
-            if let Some(rs) = self.get_solution(meta) {
-                if loc.1 == Direction::Incoming {
-                    results.insert(loc.0, rs.clone());
-                }
-            } else {
-                // Unsolved nodes must be unsolved because they depend on graph variables.
-                if !depends_on_var.contains(&self.resolve(*meta)) {
-                    return Err(InferExtensionError::Unsolved { location: *loc });
-                }
-            }
-        }
-        Ok(results)
-    }
-
-    /// Iterates over a set of metas (the argument) and tries to solve
-    /// them.
-    /// Returns the metas that we solved
-    fn solve_constraints(
-        &mut self,
-        vars: &HashSet<Meta>,
-    ) -> Result<HashSet<Meta>, InferExtensionError> {
-        let mut solved = HashSet::new();
-        for m in vars.iter() {
-            if self.solve_meta(*m)? {
-                solved.insert(*m);
-            }
-        }
-        Ok(solved)
-    }
-
-    /// Once the unification context is set up, attempt to infer ExtensionSets
-    /// for all of the metavariables in the `UnificationContext`.
-    ///
-    /// Return a mapping from locations in the graph to concrete `ExtensionSets`
-    /// where it was possible to infer them. If it wasn't possible to infer a
-    /// *concrete* `ExtensionSet`, e.g. if the ExtensionSet relies on an open
-    /// variable in the toplevel graph, don't include that location in the map
-    fn main_loop(&mut self) -> Result<ExtensionSolution, InferExtensionError> {
-        let mut remaining = HashSet::<Meta>::from_iter(self.constraints.keys().cloned());
-
-        // Keep going as long as we're making progress (= merging and solving nodes)
-        loop {
-            // Try to solve metas with the information we have now. This may
-            // register new equalities on the EqGraph
-            let to_delete = self.solve_constraints(&remaining)?;
-            // Merge metas based on the equalities we just registered
-            let (new, merged) = self.merge_equal_metas()?;
-            // All of the metas for which we've made progress
-            let delta: HashSet<Meta> = HashSet::from_iter(to_delete.union(&merged).cloned());
-
-            // Clean up dangling constraints on solved metavariables
-            to_delete.iter().for_each(|m| {
-                self.constraints.remove(m);
-            });
-            // Remove solved and merged metas from remaining "to solve" list
-            delta.iter().for_each(|m| {
-                remaining.remove(m);
-            });
-
-            // If we made no progress, we're done!
-            if delta.is_empty() && new.is_empty() {
-                break;
-            }
-            remaining.extend(new)
-        }
-        self.results()
-    }
-
-    /// Gather all the transitive dependencies (induced by constraints) of the
-    /// variables in the context.
-    fn search_variable_deps(&self) -> HashSet<Meta> {
-        let mut seen = HashSet::new();
-        let mut new_variables: HashSet<Meta> = self.variables.clone();
-        while !new_variables.is_empty() {
-            new_variables = new_variables
-                .into_iter()
-                .filter(|m| seen.insert(*m))
-                .flat_map(|m| self.get_constraints(&m))
-                .flatten()
-                .map(|c| match c {
-                    Constraint::Plus(_, other) => self.resolve(*other),
-                    Constraint::Equal(other) => self.resolve(*other),
-                })
-                .collect();
-        }
-        seen
-    }
-
-    /// Instantiate all variables in the graph with the empty extension set, or
-    /// the smallest solution possible given their constraints.
-    /// This is done to solve metas which depend on variables, which allows
-    /// us to come up with a fully concrete solution to pass into validation.
-    ///
-    /// Nodes which loop into themselves must be considered as a "minimum" set
-    /// of requirements. If we have
-    ///   1 = 2 + X, ...
-    ///   2 = 1 + x, ...
-    /// then 1 and 2 both definitely contain X, even if we don't know what else.
-    /// So instead of instantiating to the empty set, we'll instantiate to `{X}`
-    fn instantiate_variables(&mut self) {
-        // A directed graph to keep track of `Plus` constraint relationships
-        let mut relations = GraphContainer::<Directed>::new();
-        let mut solutions: HashMap<Meta, ExtensionSet> = HashMap::new();
-
-        let variable_scope = self.search_variable_deps();
-        for m in variable_scope.into_iter() {
-            // If `m` has been merged, [`self.variables`] entry
-            // will have already been updated to the merged
-            // value by [`self.merge_equal_metas`] so we don't
-            // need to worry about resolving it.
-            if !self.solved.contains_key(&m) {
-                // Handle the case where the constraints for `m` contain a self
-                // reference, i.e. "m = Plus(E, m)", in which case the variable
-                // should be instantiated to E rather than the empty set.
-                let plus_constraints =
-                    self.get_constraints(&m)
-                        .unwrap()
-                        .iter()
-                        .cloned()
-                        .flat_map(|c| match c {
-                            Constraint::Plus(r, other_m) => Some((r, self.resolve(other_m))),
-                            _ => None,
-                        });
-
-                let (rs, other_ms): (Vec<_>, Vec<_>) = plus_constraints.unzip();
-                let solution = ExtensionSet::union_over(rs);
-                let unresolved_metas = other_ms
-                    .into_iter()
-                    .filter(|other_m| m != *other_m)
-                    .collect::<Vec<_>>();
-
-                // If `m` doesn't depend on any other metas then we have all the
-                // information we need to come up with a solution for it.
-                relations.add_or_retrieve(m);
-                unresolved_metas
-                    .iter()
-                    .for_each(|other_m| relations.add_edge(m, *other_m));
-                solutions.insert(m, solution);
-            }
-        }
-
-        // Process the strongly-connected components. petgraph/sccs() returns these
-        // depended-upon before dependant, as we need.
-        for cc in relations.sccs() {
-            // Strongly connected components are looping constraint dependencies.
-            // This means that each metavariable in the CC has the same solution.
-            let combined_solution = cc
-                .iter()
-                .flat_map(|m| self.get_constraints(m).unwrap())
-                .filter_map(|c| match c {
-                    Constraint::Plus(_, other_m) => solutions.get(&self.resolve(*other_m)).cloned(),
-                    Constraint::Equal(_) => None,
-                })
-                .fold(ExtensionSet::new(), ExtensionSet::union);
-
-            for m in cc.iter() {
-                self.add_solution(*m, combined_solution.clone());
-                solutions.insert(*m, combined_solution.clone());
-            }
-        }
-        self.variables = HashSet::new();
+        Ok(all_solns)
     }
 }
 
