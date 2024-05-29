@@ -499,6 +499,21 @@ pub mod test {
     #[derive(serde::Serialize, serde::Deserialize, Debug)]
     pub struct SimpleOpDef(OpDef);
 
+    impl SimpleOpDef {
+        pub fn new(op_def: OpDef) -> Self {
+            assert!(op_def.constant_folder.is_none());
+            assert!(matches!(
+                op_def.signature_func,
+                SignatureFunc::TypeScheme(_)
+            ));
+            assert!(op_def
+                .lower_funcs
+                .iter()
+                .all(|lf| matches!(lf, LowerFunc::FixedHugr { .. })));
+            Self(op_def)
+        }
+    }
+
     impl From<SimpleOpDef> for OpDef {
         fn from(value: SimpleOpDef) -> Self {
             value.0
@@ -514,7 +529,7 @@ pub mod test {
                 misc,
                 signature_func,
                 lower_funcs,
-                constant_folder,
+                constant_folder: _,
             } = &self.0;
             let OpDef {
                 extension: other_extension,
@@ -523,7 +538,7 @@ pub mod test {
                 misc: other_misc,
                 signature_func: other_signature_func,
                 lower_funcs: other_lower_funcs,
-                constant_folder: other_constant_folder,
+                constant_folder: _,
             } = &other.0;
 
             let get_sig = |sf: &_| match sf {
@@ -535,6 +550,7 @@ pub mod test {
                     poly_func,
                     validate: _,
                 }) => Some(poly_func.clone()),
+                // This is ruled out by `new()` but leave it here for later.
                 SignatureFunc::CustomFunc(_) => None,
             };
 
@@ -546,6 +562,7 @@ pub mod test {
                         LowerFunc::FixedHugr { extensions, hugr } => {
                             Some((extensions.clone(), hugr.clone()))
                         }
+                        // This is ruled out by `new()` but leave it here for later.
                         LowerFunc::CustomFunc(_) => None,
                     })
                     .collect_vec()
@@ -557,9 +574,6 @@ pub mod test {
                 && misc == other_misc
                 && get_sig(signature_func) == get_sig(other_signature_func)
                 && get_lower_funcs(lower_funcs) == get_lower_funcs(other_lower_funcs)
-                // If either constant folder not none, then we are not equal
-                && constant_folder.is_none()
-                && other_constant_folder.is_none()
         }
     }
 
@@ -813,7 +827,7 @@ pub mod test {
                 )
                     .prop_map(
                         |(extension, name, description, misc, signature_func, lower_funcs)| {
-                            Self(OpDef {
+                            Self::new(OpDef {
                                 extension,
                                 name,
                                 description,

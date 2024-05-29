@@ -278,7 +278,7 @@ mod test {
     }
 
     mod proptest {
-        use super::{is_valid_log_width, ConstInt, LOG_WIDTH_MAX};
+        use super::{ConstInt, LOG_WIDTH_MAX};
         use ::proptest::prelude::*;
         impl Arbitrary for ConstInt {
             type Parameters = ();
@@ -303,17 +303,14 @@ mod test {
             }
         }
 
-        fn any_signed_int_with_log_width() -> impl Strategy<Value=(u8, i128)> {
+        fn any_signed_int_with_log_width() -> impl Strategy<Value = (u8, i128)> {
             (..=LOG_WIDTH_MAX).prop_flat_map(|log_width| {
                 use i64;
                 let width = 2u64.pow(log_width as u32);
                 let max_val = ((1u64 << (width - 1)) - 1u64) as i64;
                 let min_val = -max_val - 1;
-                prop_oneof![
-                    (min_val..=max_val),
-                    Just(min_val),
-                    Just(max_val)
-                ].prop_map(move |x| (log_width,x as i128))
+                prop_oneof![(min_val..=max_val), Just(min_val), Just(max_val)]
+                    .prop_map(move |x| (log_width, x as i128))
             })
         }
 
@@ -330,7 +327,7 @@ mod test {
                     6 => (i64::MIN as i128, i64::MAX as i128),
                     _ => unreachable!(),
                 };
-                let width = (2i128.pow(log_width as u32));
+                let width = 2i128.pow(log_width as u32);
                 prop_assert_eq!(max - min + 1, 1 << width);
                 prop_assert!(x >= min);
                 prop_assert!(x <= max);
