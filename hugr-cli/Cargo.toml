@@ -29,3 +29,7 @@ assert_cmd = { workspace = true }
 assert_fs = { workspace = true }
 predicates = { workspace = true }
 rstest.workspace = true
+
+[[bin]]
+name = "hugr"
+path = "src/main.rs"
