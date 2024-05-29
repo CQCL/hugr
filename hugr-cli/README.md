@@ -8,12 +8,40 @@ hugr-cli
 [![msrv][]](https://github.com/CQCL/hugr)
 [![codecov][]](https://codecov.io/gh/CQCL/hugr)
 
-This crate provides tooling used by the `hugr` CLI tool.
-Refer to the [main crate](http://crates.io/crates/hugr) for more information.
+`hugr` CLI tool for common tasks on serialised HUGR (e.g. validation,
+visualisation).
+
+Refer to the [main HUGR crate](http://crates.io/crates/hugr) for more information.
 
 ## Usage
 
-Add the dependency to your project:
+Install using `cargo`:
+
+```bash
+cargo install hugr-cli
+```
+
+This will install the `hugr` binary. Running `hugr --help` shows:
+
+```
+Validate a HUGR.
+
+Usage: hugr [OPTIONS] <INPUT>
+
+Arguments:
+  <INPUT>
+
+Options:
+  -m, --mermaid      Visualise with mermaid.
+  -n, --no-validate  Skip validation.
+  -v, --verbose...   Increase logging verbosity
+  -q, --quiet...     Decrease logging verbosity
+  -h, --help         Print help
+  -V, --version      Print version
+```
+
+
+To extend the CLI you can also add the project as a library dependency:
 
 ```bash
 cargo add hugr-cli
