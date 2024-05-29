@@ -350,12 +350,17 @@ fn emit_call<'c, H: HugrView>(
         _ => Err(anyhow!("emit_call: Not a Decl or Defn")),
     };
     let inputs: Vec<_> = args.inputs.iter().map(|&x| x.into()).collect();
-    let call = context.builder().build_call(func?, inputs.as_slice(), "")?;
+    let call = context
+        .builder()
+        .build_call(func?, inputs.as_slice(), "")?
+        .try_as_basic_value();
     let rets = match args.outputs.len() {
-        0 => vec![],
-        1 => vec![call.try_as_basic_value().expect_left("non-void")],
+        0 => {
+            call.expect_right("void");
+            vec![]
+        }
+        1 => vec![call.expect_left("non-void")],
         n => call
-            .try_as_basic_value()
             .expect_left("non-void")
             .into_struct_value()
             .get_fields()
