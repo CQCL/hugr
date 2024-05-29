@@ -48,14 +48,13 @@ fn test_doesnt_exist(mut cmd: Command) {
 #[rstest]
 fn test_validate(test_hugr_file: NamedTempFile, mut cmd: Command) {
     cmd.arg(test_hugr_file.path());
-    cmd.arg("-vv");
     cmd.assert().success().stderr(contains(VALID_PRINT));
 }
 
 #[rstest]
 fn test_stdin(test_hugr_string: String, mut cmd: Command) {
     cmd.write_stdin(test_hugr_string);
-    cmd.args(["-", "-vv"]);
+    cmd.arg("-");
 
     cmd.assert().success().stderr(contains(VALID_PRINT));
 }
