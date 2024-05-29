@@ -1,0 +1,30 @@
+---
+source: hugr-core/src/hugr/views/tests.rs
+expression: h.mermaid_string()
+---
+graph LR
+    subgraph 0 ["(0) CFG"]
+        direction LR
+        subgraph 2 ["(2) DataflowBlock"]
+            direction LR
+            3["(3) Input"]
+            3--"0:0<br>usize"-->5
+            4["(4) Output"]
+            5["(5) Tag"]
+            5--"0:0<br>[usize]+[usize]"-->4
+        end
+        2-."0:0".->6
+        2-."1:0".->1
+        1["(1) ExitBlock"]
+        subgraph 6 ["(6) DataflowBlock"]
+            direction LR
+            7["(7) Input"]
+            7--"0:1<br>usize"-->8
+            8["(8) Output"]
+            9["(9) const:sum:{tag:0, vals:[]}"]
+            9--"0:0<br>[]"-->10
+            10["(10) LoadConstant"]
+            10--"0:0<br>[]"-->8
+        end
+        6-."0:0".->1
+    end

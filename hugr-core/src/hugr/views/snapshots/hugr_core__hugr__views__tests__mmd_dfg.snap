@@ -1,0 +1,19 @@
+---
+source: hugr-core/src/hugr/views/tests.rs
+expression: h.mermaid_string()
+---
+graph LR
+    subgraph 0 ["(0) DFG"]
+        direction LR
+        1["(1) Input"]
+        1--"0:0<br>qubit"-->3
+        1--"1:1<br>qubit"-->3
+        2["(2) Output"]
+        3["(3) test.quantum.CX"]
+        3--"0:1<br>qubit"-->4
+        3--"1:0<br>qubit"-->4
+        3-."2:2".->4
+        4["(4) test.quantum.CX"]
+        4--"0:0<br>qubit"-->2
+        4--"1:1<br>qubit"-->2
+    end
