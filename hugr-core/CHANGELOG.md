@@ -15,6 +15,3 @@
 ### Refactor
 
 - Add a `hugr-core` crate ([#1108](https://github.com/CQCL/hugr/pull/1108))
-
-
-# Changelog

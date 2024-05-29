@@ -2,6 +2,8 @@
 
 ## 0.1.0 (2024-05-29)
 
+Initial release, with functions ported from the `hugr::algorithms` module.
+
 ### Bug Fixes
 
 - Set initial version of hugr-core to 0.1.0 ([#1129](https://github.com/CQCL/hugr/pull/1129))
@@ -14,8 +16,3 @@
 ### Refactor
 
 - Add a `hugr-core` crate ([#1108](https://github.com/CQCL/hugr/pull/1108))
-
-
-## 0.1.0 (2024-05-23)
-
-Initial release, with functions ported from the `hugr::algorithms` module.
