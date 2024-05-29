@@ -1,3 +1,4 @@
+from __future__ import annotations
 from dataclasses import dataclass
 import subprocess
 import os
@@ -65,6 +66,36 @@ class DivMod(Command):
                 args=[ARG_5, ARG_5],
             )
         )
+
+
+@dataclass
+class MakeTuple(Command):
+    types: list[stys.Type]
+    wires: list[Wire]
+
+    def incoming(self) -> list[Wire]:
+        return self.wires
+
+    def num_out(self) -> int | None:
+        return 1
+
+    def op(self) -> Op:
+        return DummyOp(sops.MakeTuple(parent=-1, tys=self.types))
+
+
+@dataclass
+class UnpackTuple(Command):
+    types: list[stys.Type]
+    wire: Wire
+
+    def incoming(self) -> list[Wire]:
+        return [self.wire]
+
+    def num_out(self) -> int | None:
+        return len(self.types)
+
+    def op(self) -> Op:
+        return DummyOp(sops.UnpackTuple(parent=-1, tys=self.types))
 
 
 def _validate(h: Hugr, mermaid: bool = False):
@@ -155,8 +186,8 @@ def test_tuple():
     row = [BOOL_T, QB_T]
     h = Dfg.endo(row)
     a, b = h.inputs()
-    t = h.make_tuple(row, a, b)
-    a, b = h.split_tuple(row, t)
+    t = h.add(MakeTuple(row, [a, b]))
+    a, b = h.add(UnpackTuple(row, t))
     h.set_outputs(a, b)
 
     _validate(h.hugr)
