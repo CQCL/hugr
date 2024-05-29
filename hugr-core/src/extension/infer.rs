@@ -11,7 +11,7 @@
 //! will succeed regardless of what the variable is instantiated to.
 
 use super::ExtensionSet;
-use crate::{hugr::views::HugrView, types::EdgeKind, Direction, Node};
+use crate::{hugr::views::HugrView, ops::OpTrait, types::EdgeKind, Direction, Node};
 
 use super::validate::ExtensionError;
 
@@ -219,16 +219,9 @@ impl UnificationContext {
 
             let node_type = hugr.get_nodetype(node);
             let m_delta = self.fresh_meta();
-            // For e.g. FuncDefn, which has no op_signature, this will compute empty delta,
-            // regardless of the function body. This is correct: FuncDefn merely *defines* the
-            // function, the extensions are what's required to *execute* it.
+
             // TODO memoize this as a map from ExtensionSet to Meta.
-            self.add_solution(
-                m_delta,
-                node_type
-                    .op_signature()
-                    .map_or_else(ExtensionSet::new, |ft| ft.extension_reqs.clone()),
-            );
+            self.add_solution(m_delta, node_type.op().extension_delta());
 
             self.must_include(m_output, m_input);
             self.must_include(m_output, m_delta);
