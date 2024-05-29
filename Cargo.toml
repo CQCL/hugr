@@ -2,6 +2,8 @@
 name = "hugr-llvm"
 version = "0.1.0"
 edition = "2021"
+readme = "README.md"
+license = "Apache-2.0"
 
 [features]
 default = ["llvm14"]
@@ -26,6 +28,3 @@ rstest = "0.19.0"
 insta.opt-level = 3
 similar.opt-level = 3
 
-[patch."crates-io"]
-# for copyable ContextRef
-inkwell = { git = "https://github.com/TheDan64/inkwell", branch = "master" }
