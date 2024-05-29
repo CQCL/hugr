@@ -124,7 +124,7 @@ jobs:
       matrix:
         # Pinned nightly version until this gets resolved:
         # https://github.com/rust-lang/rust/issues/125474
-        rust: ['1.75', beta, 'nightly-2024-05-22']
+        rust: ['1.75', beta]
     name: tests (Rust ${{ matrix.rust }})
     steps:
       - uses: actions/checkout@v4
