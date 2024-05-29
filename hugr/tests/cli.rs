@@ -48,7 +48,7 @@ fn test_doesnt_exist(mut cmd: Command) {
 #[rstest]
 fn test_validate(test_hugr_file: NamedTempFile, mut cmd: Command) {
     cmd.arg(test_hugr_file.path());
-    cmd.assert().success().stdout(contains(VALID_PRINT));
+    cmd.assert().success().stderr(contains(VALID_PRINT));
 }
 
 #[rstest]
@@ -56,7 +56,15 @@ fn test_stdin(test_hugr_string: String, mut cmd: Command) {
     cmd.write_stdin(test_hugr_string);
     cmd.arg("-");
 
-    cmd.assert().success().stdout(contains(VALID_PRINT));
+    cmd.assert().success().stderr(contains(VALID_PRINT));
+}
+
+#[rstest]
+fn test_stdin_silent(test_hugr_string: String, mut cmd: Command) {
+    cmd.args(["-", "-q"]);
+    cmd.write_stdin(test_hugr_string);
+
+    cmd.assert().success().stderr(contains(VALID_PRINT).not());
 }
 
 #[rstest]
@@ -90,4 +98,14 @@ fn test_bad_json(mut cmd: Command) {
     cmd.assert()
         .failure()
         .stderr(contains("Error parsing input"));
+}
+
+#[rstest]
+fn test_bad_json_silent(mut cmd: Command) {
+    cmd.write_stdin(r#"{"foo": "bar"}"#);
+    cmd.args(["-", "-qqq"]);
+
+    cmd.assert()
+        .failure()
+        .stderr(contains("Error parsing input").not());
 }
