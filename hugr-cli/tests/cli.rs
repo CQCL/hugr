@@ -1,4 +1,3 @@
-#![cfg(feature = "_cli")]
 use assert_cmd::Command;
 use assert_fs::{fixture::FileWriteStr, NamedTempFile};
 use hugr_cli::VALID_PRINT;
@@ -15,7 +14,7 @@ use rstest::{fixture, rstest};
 
 #[fixture]
 fn cmd() -> Command {
-    Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap()
+    Command::cargo_bin("hugr").unwrap()
 }
 
 #[fixture]
