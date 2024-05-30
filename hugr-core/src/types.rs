@@ -410,7 +410,7 @@ impl<const RV: bool> Type<RV> {
     /// * If [Type::validate]`(false)` returns successfully, this method will return a Vec containing exactly one type
     /// * If [Type::validate]`(false)` fails, but `(true)` succeeds, this method may (depending on structure of self)
     ///   return a Vec containing any number of [Type]s. These may (or not) pass [Type::validate]
-    fn subst_vec(&self, t: &Substitution) -> Vec<Self> {
+    fn substitute(&self, t: &Substitution) -> Vec<Self> {
         match &self.0 {
             TypeEnum::RowVariable(idx, bound) => {
                 assert!(RV);
@@ -435,8 +435,8 @@ impl<const RV: bool> Type<RV> {
 }
 
 impl Type<false> {
-    fn substitute(&self, s: &Substitution) -> Self {
-        let v = self.subst_vec(s);
+    fn substitute1(&self, s: &Substitution) -> Self {
+        let v = self.substitute(s);
         let [r] = v.try_into().unwrap(); // No row vars, so every Type<false> produces exactly one
         r
     }
@@ -457,10 +457,6 @@ impl Type<true> {
     /// [FuncDefn]: crate::ops::FuncDefn
     pub const fn new_row_var_use(idx: usize, bound: TypeBound) -> Self {
         Self(TypeEnum::RowVariable(idx, bound), bound)
-    }
-
-    fn substitute(&self, s: &Substitution) -> Vec<Self> {
-        self.subst_vec(s)
     }
 }
 

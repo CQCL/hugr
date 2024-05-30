@@ -66,7 +66,7 @@ impl<const RV: bool> TypeRow<RV> {
     /// For `TypeRow<false>`, guaranteed not to change the length of the row.
     pub(super) fn substitute(&self, s: &Substitution) -> Self {
         self.iter()
-            .flat_map(|ty| ty.subst_vec(s))
+            .flat_map(|ty| ty.substitute(s))
             .collect::<Vec<_>>()
             .into()
     }

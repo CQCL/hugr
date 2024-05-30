@@ -284,7 +284,7 @@ impl TypeArg {
         match self {
             TypeArg::Type { ty } => {
                 // RowVariables are represented as TypeArg::Variable
-                ty.substitute(t).into()
+                ty.substitute1(t).into()
             }
             TypeArg::BoundedNat { .. } => self.clone(), // We do not allow variables as bounds on BoundedNat's
             TypeArg::Opaque {
