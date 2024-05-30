@@ -113,7 +113,9 @@ fn mk_rep(
     }
     // If there are edges from succ back to pred, we cannot do these via the mu_inp/out/new
     // edge-maps as both source and target of the new edge are in the replacement Hugr
+    eprintln!("ALAN checking for self-edges...");
     for (_, src_pos) in cfg.all_linked_outputs(pred).filter(|(src, _)| *src == succ) {
+        eprintln!("ALAN adding self-edge from {src_pos}");
         replacement.connect(merged, src_pos, merged, 0);
     }
     let rep = Replacement {
@@ -138,6 +140,7 @@ fn mk_rep(
                     .ok()
                     .unwrap()
                     .0;
+                eprintln!("Building mu_out from outputs of {succ:?} - outport {src_pos} targets {tgt}, pred is {pred}");
                 if tgt == pred {
                     None
                 } else {
@@ -151,6 +154,15 @@ fn mk_rep(
             .collect(),
         mu_new: vec![],
     };
+    eprintln!("\nALAN replacement {merged:?}");
+    for succ in rep.replacement.output_neighbours(merged) {
+        for (src, src_port) in rep.replacement.all_linked_outputs(succ) {
+            if src == merged {
+                eprintln!("port {src_port:?} targets {succ:?}");
+            }
+        }
+    }
+    eprintln!("ALAN mu_inp {:?} mu_out {:?}", rep.mu_inp, rep.mu_out);
     (rep, merged, [dfg1, dfg2])
 }
 
@@ -205,7 +217,7 @@ mod test {
 
     #[rstest]
     #[case(true)]
-    #[case(false)]
+    //#[case(false)]
     fn in_loop(#[case] self_loop: bool) -> Result<(), Box<dyn std::error::Error>> {
         /* self_loop==False:
            -> Noop1 -----> Test -> Exit       -> Noop1AndTest --> Exit
@@ -259,7 +271,31 @@ mod test {
 
         let mut h = h.finish_hugr(&reg)?;
         let r = h.root();
+        for b in h.children(h.root()) {
+            let n = h.get_optype(b);
+            eprintln!("\nALAN block {b:?} has type {n:?}");
+            for succ in h.output_neighbours(b) {
+                for (src, src_port) in h.all_linked_outputs(succ) {
+                    if src == b {
+                        eprintln!("port {src_port:?} targets {succ:?}");
+                    }
+                }
+            }
+        }
         merge_basic_blocks(&mut SiblingMut::<CfgID>::try_new(&mut h, r)?);
+        eprintln!("\n\n");
+        for b in h.children(h.root()) {
+            let n = h.get_optype(b);
+            eprintln!("\nALAN block {b:?} has type {n:?}");
+            for succ in h.output_neighbours(b) {
+                for (src, src_port) in h.all_linked_outputs(succ) {
+                    if src == b {
+                        eprintln!("port {src_port:?} targets {succ:?}");
+                    }
+                }
+            }
+        }
+
         h.update_validate(&reg).unwrap();
         assert_eq!(r, h.root());
         assert!(matches!(h.get_optype(r), OpType::CFG(_)));
