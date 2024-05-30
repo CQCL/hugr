@@ -18,8 +18,6 @@ use crate::{
     Direction, Node,
 };
 
-use super::validate::ExtensionError;
-
 use petgraph::graph as pg;
 use petgraph::{Directed, EdgeType, Undirected};
 
@@ -88,11 +86,24 @@ pub enum InferExtensionError {
         /// The location on the hugr that's associated to the unsolved meta
         location: (Node, Direction),
     },
-    /// An extension mismatch between two nodes which are connected by an edge.
-    /// This should mirror (or reuse) `ValidationError`'s SrcExceedsTgtExtensions
-    /// and TgtExceedsSrcExtensions
-    #[error("Edge mismatch: {0}")]
-    EdgeMismatch(#[from] ExtensionError),
+    /// Too many extension requirements coming from src
+    #[error("Extensions at source node {from:?} ({from_extensions}) exceed those at target {to:?} ({to_extensions})")]
+    #[allow(missing_docs)]
+    SrcExceedsTgtExtensions {
+        from: Node,
+        from_extensions: ExtensionSet,
+        to: Node,
+        to_extensions: ExtensionSet,
+    },
+    /// Missing lift node
+    #[error("Extensions at target node {to:?} ({to_extensions}) exceed those at source {from:?} ({from_extensions})")]
+    #[allow(missing_docs)]
+    TgtExceedsSrcExtensions {
+        from: Node,
+        from_extensions: ExtensionSet,
+        to: Node,
+        to_extensions: ExtensionSet,
+    },
 }
 
 /// A graph of metavariables connected by constraints.
@@ -384,21 +395,21 @@ impl UnificationContext {
                     [(node2, rs2.clone()), (node1, rs1.clone())]
                 };
 
-                return InferExtensionError::EdgeMismatch(if src_rs.is_subset(&tgt_rs) {
-                    ExtensionError::TgtExceedsSrcExtensions {
+                return if src_rs.is_subset(&tgt_rs) {
+                    InferExtensionError::TgtExceedsSrcExtensions {
                         from: *src,
                         from_extensions: src_rs,
                         to: *tgt,
                         to_extensions: tgt_rs,
                     }
                 } else {
-                    ExtensionError::SrcExceedsTgtExtensions {
+                    InferExtensionError::SrcExceedsTgtExtensions {
                         from: *src,
                         from_extensions: src_rs,
                         to: *tgt,
                         to_extensions: tgt_rs,
                     }
-                });
+                };
             }
         }
         if let (Some(loc1), Some(loc2)) = (loc1, loc2) {

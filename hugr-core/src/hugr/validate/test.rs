@@ -872,7 +872,6 @@ mod extension_tests {
     use crate::macros::const_extension_ids;
 
     const_extension_ids! {
-        const XA: ExtensionId = "A";
         const XB: ExtensionId = "BOOL_EXT";
     }
 
@@ -998,6 +997,7 @@ mod extension_tests {
     }
 
     #[test]
+    // ALAN TODO parametrize this by some different OpTypes e.g. DFG, Function
     fn parent_io_mismatch() {
         // The DFG node declares that it has an empty extension delta,
         // but it's child graph adds extension "XB", causing a mismatch.
@@ -1033,162 +1033,14 @@ mod extension_tests {
         hugr.connect(lift, 0, output, 0);
 
         let result = hugr.validate(&PRELUDE_REGISTRY);
-        assert_matches!(
+        assert_eq!(
             result,
-            Err(ValidationError::ExtensionError(
-                ExtensionError::ParentIOExtensionMismatch { .. }
-            ))
-        );
-    }
-
-    #[test]
-    /// A wire with no extension requirements is wired into a node which has
-    /// [A,BOOL_T] extensions required on its inputs and outputs. This could be fixed
-    /// by adding a lift node, but for validation this is an error.
-    fn missing_lift_node() -> Result<(), BuildError> {
-        let mut module_builder = ModuleBuilder::new();
-        let mut main = module_builder.define_function(
-            "main",
-            FunctionType::new(type_row![NAT], type_row![NAT]).into(),
-        )?;
-        let [main_input] = main.input_wires_arr();
-
-        let f_builder = main.dfg_builder(
-            FunctionType::new(type_row![NAT], type_row![NAT]),
-            // Inner DFG has extension requirements that the wire wont satisfy
-            Some(ExtensionSet::from_iter([XA, XB])),
-            [main_input],
-        )?;
-        let f_inputs = f_builder.input_wires();
-        let f_handle = f_builder.finish_with_outputs(f_inputs)?;
-        let [f_output] = f_handle.outputs_arr();
-        main.finish_with_outputs([f_output])?;
-        let handle = module_builder.hugr().validate(&PRELUDE_REGISTRY);
-
-        assert_matches!(
-            handle,
-            Err(ValidationError::ExtensionError(
-                ExtensionError::TgtExceedsSrcExtensionsAtPort { .. }
-            ))
-        );
-        Ok(())
-    }
-
-    #[test]
-    /// A wire with extension requirement `[A]` is wired into a an output with no
-    /// extension req. In the validation extension typechecking, we don't do any
-    /// unification, so don't allow open extension variables on the function
-    /// signature, so this fails.
-    fn too_many_extension() -> Result<(), BuildError> {
-        let mut module_builder = ModuleBuilder::new();
-
-        let main_sig = FunctionType::new(type_row![NAT], type_row![NAT]).into();
-
-        let mut main = module_builder.define_function("main", main_sig)?;
-        let [main_input] = main.input_wires_arr();
-
-        let inner_sig = FunctionType::new(type_row![NAT], type_row![NAT]).with_extension_delta(XA);
-
-        let f_builder = main.dfg_builder(inner_sig, Some(ExtensionSet::new()), [main_input])?;
-        let f_inputs = f_builder.input_wires();
-        let f_handle = f_builder.finish_with_outputs(f_inputs)?;
-        let [f_output] = f_handle.outputs_arr();
-        main.finish_with_outputs([f_output])?;
-        let handle = module_builder.hugr().validate(&PRELUDE_REGISTRY);
-        assert_matches!(
-            handle,
-            Err(ValidationError::ExtensionError(
-                ExtensionError::SrcExceedsTgtExtensionsAtPort { .. }
-            ))
-        );
-        Ok(())
-    }
-
-    #[test]
-    /// A wire with extension requirements `[A]` and another with requirements
-    /// `[BOOL_T]` are both wired into a node which requires its inputs to have
-    /// requirements `[A,BOOL_T]`. A slightly more complex test of the error from
-    /// `missing_lift_node`.
-    fn extensions_mismatch() -> Result<(), BuildError> {
-        let mut module_builder = ModuleBuilder::new();
-
-        let all_rs = ExtensionSet::from_iter([XA, XB]);
-
-        let main_sig = FunctionType::new(type_row![NAT], type_row![NAT])
-            .with_extension_delta(all_rs.clone())
-            .into();
-
-        let mut main = module_builder.define_function("main", main_sig)?;
-
-        let [inp_wire] = main.input_wires_arr();
-
-        let [left_wire] = main
-            .dfg_builder(
-                FunctionType::new(type_row![], type_row![NAT]),
-                Some(XA.into()),
-                [],
-            )?
-            .finish_with_outputs([inp_wire])?
-            .outputs_arr();
-
-        let [right_wire] = main
-            .dfg_builder(
-                FunctionType::new(type_row![], type_row![NAT]),
-                Some(XB.into()),
-                [],
-            )?
-            .finish_with_outputs([inp_wire])?
-            .outputs_arr();
-
-        let builder = main.dfg_builder(
-            FunctionType::new(type_row![NAT, NAT], type_row![NAT]),
-            Some(all_rs),
-            [left_wire, right_wire],
-        )?;
-        let [left, _] = builder.input_wires_arr();
-        let [output] = builder.finish_with_outputs([left])?.outputs_arr();
-
-        main.finish_with_outputs([output])?;
-        let handle = module_builder.hugr().validate(&PRELUDE_REGISTRY);
-        assert_matches!(
-            handle,
-            Err(ValidationError::ExtensionError(
-                ExtensionError::TgtExceedsSrcExtensionsAtPort { .. }
-            ))
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn parent_signature_mismatch() {
-        let main_signature =
-            FunctionType::new(type_row![NAT], type_row![NAT]).with_extension_delta(XA);
-
-        let mut hugr = Hugr::new(NodeType::new_pure(ops::DFG {
-            signature: main_signature,
-        }));
-        let input = hugr.add_node_with_parent(
-            hugr.root(),
-            NodeType::new_pure(ops::Input {
-                types: type_row![NAT],
-            }),
-        );
-        let output = hugr.add_node_with_parent(
-            hugr.root(),
-            NodeType::new(
-                ops::Output {
-                    types: type_row![NAT],
-                },
-                Some(XA.into()),
-            ),
-        );
-        hugr.connect(input, 0, output, 0);
-
-        assert_matches!(
-            hugr.validate(&PRELUDE_REGISTRY),
-            Err(ValidationError::ExtensionError(
-                ExtensionError::TgtExceedsSrcExtensionsAtPort { .. }
-            ))
+            Err(ValidationError::ExtensionError {
+                parent: hugr.root(),
+                parent_extensions: ExtensionSet::new(),
+                child: lift,
+                child_extensions: XB.into()
+            })
         );
     }
 }

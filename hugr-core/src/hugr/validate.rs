@@ -9,14 +9,11 @@ use petgraph::visit::{Topo, Walker};
 use portgraph::{LinkView, PortView};
 use thiserror::Error;
 
-use crate::extension::validate::ExtensionValidator;
-use crate::extension::SignatureError;
-use crate::extension::{validate::ExtensionError, ExtensionRegistry, InferExtensionError};
+use crate::extension::{ExtensionRegistry, ExtensionSet, InferExtensionError, SignatureError};
 
-use crate::ops::custom::CustomOpError;
-use crate::ops::custom::{resolve_opaque_op, CustomOp};
+use crate::ops::custom::{resolve_opaque_op, CustomOp, CustomOpError};
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
-use crate::ops::{FuncDefn, OpTag, OpTrait, OpType, ValidateOp};
+use crate::ops::{FuncDefn, OpParent, OpTag, OpTrait, OpType, ValidateOp};
 use crate::types::type_param::TypeParam;
 use crate::types::{EdgeKind, FunctionType};
 use crate::{Direction, Hugr, Node, Port};
@@ -59,30 +56,33 @@ impl Hugr {
         validator.validate()
     }
 
-    /// Validate extensions on the input and output edges of nodes. Check that
-    /// the target ends of edges require the extensions from the sources, and
-    /// check extension deltas from parent nodes are reflected in their children.
+    /// Validate extensions, i.e. that extension deltas from parent nodes are reflected in their children.
     pub fn validate_extensions(&self) -> Result<(), ValidationError> {
-        let validator = ExtensionValidator::new(self, HashMap::new());
-        for src_node in self.nodes() {
-            let node_type = self.get_nodetype(src_node);
-
-            // FuncDefns have no resources since they're static nodes, but the
-            // functions they define can have any extension delta.
-            if node_type.tag() != OpTag::FuncDefn {
-                // If this is a container with I/O nodes, check that the extension they
-                // define match the extensions of the container.
-                if let Some([input, output]) = self.get_io(src_node) {
-                    validator.validate_io_extensions(src_node, input, output)?;
+        for parent in self.nodes() {
+            let parent_op = self.get_optype(parent);
+            let parent_extensions = match parent_op.inner_function_type() {
+                Some(FunctionType { extension_reqs, .. }) => extension_reqs,
+                None => {
+                    if matches!(parent_op.tag(), OpTag::Cfg | OpTag::Conditional) {
+                        parent_op.extension_delta()
+                    } else {
+                        assert!(
+                            parent_op.tag() == OpTag::ModuleRoot
+                                || self.children(parent).next().is_none()
+                        );
+                        continue;
+                    }
                 }
-            }
-
-            for src_port in self.node_outputs(src_node) {
-                for (tgt_node, tgt_port) in self.linked_inputs(src_node, src_port) {
-                    validator.check_extensions_compatible(
-                        &(src_node, src_port.into()),
-                        &(tgt_node, tgt_port.into()),
-                    )?;
+            };
+            for child in self.children(parent) {
+                let child_extensions = self.get_optype(child).extension_delta();
+                if !parent_extensions.is_superset(&child_extensions) {
+                    return Err(ValidationError::ExtensionError {
+                        parent,
+                        parent_extensions,
+                        child,
+                        child_extensions,
+                    });
                 }
             }
         }
@@ -741,9 +741,14 @@ pub enum ValidationError {
     /// There are invalid inter-graph edges.
     #[error(transparent)]
     InterGraphEdgeError(#[from] InterGraphEdgeError),
+    #[error("Extensions of child node ({child}) {child_extensions} are not a subset of the parent node ({parent}): {parent_extensions}")]
     /// There are errors in the extension declarations.
-    #[error(transparent)]
-    ExtensionError(#[from] ExtensionError),
+    ExtensionError {
+        parent: Node,
+        parent_extensions: ExtensionSet,
+        child: Node,
+        child_extensions: ExtensionSet,
+    },
     #[error(transparent)]
     CantInfer(#[from] InferExtensionError),
     /// Error in a node signature
