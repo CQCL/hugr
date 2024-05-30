@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import subprocess
 import os
 import pathlib
-from hugr.hugr import Dfg, Hugr, DummyOp, Node, Command, Wire, Op
+from hugr._hugr import Dfg, Hugr, DummyOp, Node, Command, Wire, Op
 from hugr.serialization import SerialHugr
 import hugr.serialization.tys as stys
 import hugr.serialization.ops as sops
