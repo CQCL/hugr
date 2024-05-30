@@ -187,7 +187,7 @@ impl SumType {
     }
 }
 
-impl <const RV:bool> From<SumType> for Type<RV> {
+impl<const RV: bool> From<SumType> for Type<RV> {
     fn from(sum: SumType) -> Self {
         match sum {
             SumType::Unit { size } => Type::new_unit_sum(size),
@@ -249,11 +249,12 @@ impl TypeEnum {
     }
 }
 
-#[derive(
-    Clone, Debug, Eq, derive_more::Display, serde::Serialize, serde::Deserialize,
-)]
+#[derive(Clone, Debug, Eq, derive_more::Display, serde::Serialize, serde::Deserialize)]
 #[display(fmt = "{}", "_0")]
-#[serde(into = "serialize::SerSimpleType", try_from = "serialize::SerSimpleType")]
+#[serde(
+    into = "serialize::SerSimpleType",
+    try_from = "serialize::SerSimpleType"
+)]
 /// A HUGR type - the valid types of [EdgeKind::Value] and [EdgeKind::Const] edges.
 /// Such an edge is valid if the ports on either end agree on the [Type].
 /// Types have an optional [TypeBound] which places limits on the valid
@@ -274,15 +275,15 @@ impl TypeEnum {
 /// let func_type = Type::new_function(FunctionType::new_endo(vec![]));
 /// assert_eq!(func_type.least_upper_bound(), TypeBound::Copyable);
 /// ```
-pub struct Type<const ROWVARS:bool=false>(TypeEnum, TypeBound);
+pub struct Type<const ROWVARS: bool = false>(TypeEnum, TypeBound);
 
-impl<const RV1:bool, const RV2:bool> PartialEq<Type<RV1>> for Type<RV2> {
+impl<const RV1: bool, const RV2: bool> PartialEq<Type<RV1>> for Type<RV2> {
     fn eq(&self, other: &Type<RV1>) -> bool {
         self.0 == other.0 && self.1 == other.1
     }
 }
 
-impl<const RV:bool> Type<RV> {
+impl<const RV: bool> Type<RV> {
     /// An empty `TypeRow`. Provided here for convenience
     pub const EMPTY_TYPEROW: TypeRow<RV> = TypeRow::<RV>::new();
     /// Unit type (empty tuple).
@@ -297,7 +298,7 @@ impl<const RV:bool> Type<RV> {
 
     /// Initialize a new tuple type by providing the elements.
     #[inline(always)]
-    pub fn new_tuple<const RV2:bool>(types: impl Into<TypeRow<RV2>>) -> Self {
+    pub fn new_tuple<const RV2: bool>(types: impl Into<TypeRow<RV2>>) -> Self {
         let row = types.into();
         match row.len() {
             0 => Self::UNIT,
@@ -307,10 +308,12 @@ impl<const RV:bool> Type<RV> {
 
     /// Initialize a new sum type by providing the possible variant types.
     #[inline(always)]
-    pub fn new_sum<const RV2:bool>(variants: impl IntoIterator<Item = TypeRow<RV2>>) -> Self where {
-        let variants: Vec<Vec<Type<true>>> = variants.into_iter().map(
-            |t| t.into_owned().into_iter().map(Type::into_rv).collect()
-        ).collect();
+    pub fn new_sum<const RV2: bool>(variants: impl IntoIterator<Item = TypeRow<RV2>>) -> Self where
+    {
+        let variants: Vec<Vec<Type<true>>> = variants
+            .into_iter()
+            .map(|t| t.into_owned().into_iter().map(Type::into_rv).collect())
+            .collect();
         Self::new(TypeEnum::Sum(SumType::new(variants)))
     }
 
@@ -413,7 +416,7 @@ impl<const RV:bool> Type<RV> {
             TypeEnum::RowVariable(idx, bound) => {
                 assert!(RV);
                 let res = t.apply_rowvar(*idx, *bound); // these are Type<true>'s
-                // We need Type<RV>s, so use try_into_(). Since we know RV==true, this cannot fail.
+                                                        // We need Type<RV>s, so use try_into_(). Since we know RV==true, this cannot fail.
                 res.into_iter().map(|t| t.try_into_().unwrap()).collect()
             }
             TypeEnum::Alias(_) | TypeEnum::Sum(SumType::Unit { .. }) => vec![self.clone()],
@@ -445,7 +448,7 @@ impl Type<true> {
     pub fn is_row_var(&self) -> bool {
         matches!(self.0, TypeEnum::RowVariable(_, _))
     }
-    
+
     /// New use (occurrence) of the row variable with specified index.
     /// `bound` must match that with which the variable was declared
     /// (i.e. as a [TypeParam::List]` of a `[TypeParam::Type]` of that bound).
@@ -464,13 +467,13 @@ impl Type<true> {
 
 // ====== Conversions ======
 impl Type<false> {
-    fn into_<const RV:bool>(self) -> Type<RV> {
+    fn into_<const RV: bool>(self) -> Type<RV> {
         Type(self.0, self.1)
     }
 }
 
 impl Type<true> {
-    fn try_into_<const RV:bool>(self) -> Result<Type<RV>, SignatureError> {
+    fn try_into_<const RV: bool>(self) -> Result<Type<RV>, SignatureError> {
         if !RV {
             if let TypeEnum::RowVariable(idx, _) = self.0 {
                 return Err(SignatureError::RowVarWhereTypeExpected { idx });
@@ -480,11 +483,11 @@ impl Type<true> {
     }
 }
 
-impl <const RV:bool> Type<RV> {
+impl<const RV: bool> Type<RV> {
     fn try_into_no_rv(self) -> Result<Type<false>, SignatureError> {
         if let TypeEnum::RowVariable(idx, _) = self.0 {
             assert!(RV);
-            return Err(SignatureError::RowVarWhereTypeExpected { idx })
+            return Err(SignatureError::RowVarWhereTypeExpected { idx });
         }
         Ok(Type(self.0, self.1))
     }
@@ -506,7 +509,6 @@ impl TryFrom<Type<true>> for Type<false> {
         value.try_into_() // .try_into_no_rv() also fine
     }
 }
-
 
 /// Details a replacement of type variables with a finite list of known values.
 /// (Variables out of the range of the list will result in a panic)
@@ -602,7 +604,7 @@ pub(crate) mod test {
     }
 
     #[rstest::rstest]
-    fn sum_construct<const RV:bool>() {
+    fn sum_construct<const RV: bool>() {
         let pred1 = Type::new_sum([Type::EMPTY_TYPEROW, Type::EMPTY_TYPEROW]);
         let pred2 = Type::new_unit_sum(2);
 

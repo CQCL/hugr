@@ -91,8 +91,7 @@ impl<const RV: bool> FunctionType<RV> {
         var_decls: &[TypeParam],
     ) -> Result<(), SignatureError> {
         self.input.validate(extension_registry, var_decls)?;
-        self.output
-            .validate(extension_registry, var_decls)?;
+        self.output.validate(extension_registry, var_decls)?;
         self.extension_reqs.validate(var_decls)
     }
 }
@@ -107,7 +106,7 @@ impl FunctionType<true> {
                 TypeEnum::RowVariable(idx, bound) => Some((idx, bound)),
                 _ => None,
             })
-    }    
+    }
 }
 
 impl Signature {
@@ -249,13 +248,16 @@ impl TryFrom<FunctionType> for Signature {
 
 impl From<Signature> for FunctionType {
     fn from(value: Signature) -> Self {
-        Self::new(value.input.into_rv(), value.output.into_rv()).with_extension_delta(value.extension_reqs)
+        Self::new(value.input.into_rv(), value.output.into_rv())
+            .with_extension_delta(value.extension_reqs)
     }
 }
 
 impl PartialEq<FunctionType> for Signature {
     fn eq(&self, other: &FunctionType) -> bool {
-        self.input == other.input && self.output == other.output && self.extension_reqs == other.extension_reqs
+        self.input == other.input
+            && self.output == other.output
+            && self.extension_reqs == other.extension_reqs
     }
 }
 

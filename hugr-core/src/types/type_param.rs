@@ -269,7 +269,8 @@ impl TypeArg {
             TypeArg::Variable {
                 v: TypeArgVariable { idx, cached_decl },
             } => {
-                assert!(!matches!(cached_decl, TypeParam::Type {..}),
+                assert!(
+                    !matches!(cached_decl, TypeParam::Type { .. }),
                     "Malformed TypeArg::Variable {} - should be inconstructible",
                     cached_decl
                 );
@@ -371,9 +372,7 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
             Ok(())
         }
         (TypeArg::Sequence { elems }, TypeParam::List { param }) => {
-            elems.iter().try_for_each(|arg| {
-                check_type_arg(arg, param)
-            })
+            elems.iter().try_for_each(|arg| check_type_arg(arg, param))
         }
         // Also allow a single "Type" to be used for a List *only* if the Type is a row variable
         // (i.e., it's not really a Type, it's multiple Types)
@@ -383,7 +382,6 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
         {
             Ok(())
         }*/
-
         (TypeArg::Sequence { elems: items }, TypeParam::Tuple { params: types }) => {
             if items.len() != types.len() {
                 Err(TypeArgError::WrongNumberTuple(items.len(), types.len()))

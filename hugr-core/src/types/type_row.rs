@@ -19,19 +19,23 @@ use itertools::Itertools;
 #[derive(Clone, Eq, Debug, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 #[serde(transparent)]
-pub struct TypeRow<const ROWVARS:bool = false> {
+pub struct TypeRow<const ROWVARS: bool = false> {
     /// The datatypes in the row.
     types: Cow<'static, [Type<ROWVARS>]>,
 }
 
-impl <const RV1:bool, const RV2: bool> PartialEq<TypeRow<RV1>> for TypeRow<RV2> {
+impl<const RV1: bool, const RV2: bool> PartialEq<TypeRow<RV1>> for TypeRow<RV2> {
     fn eq(&self, other: &TypeRow<RV1>) -> bool {
-        self.types.len() == other.types.len() &&
-            self.types.iter().zip(other.types.iter()).all(|(s,o)| s==o)
+        self.types.len() == other.types.len()
+            && self
+                .types
+                .iter()
+                .zip(other.types.iter())
+                .all(|(s, o)| s == o)
     }
 }
 
-impl <const RV:bool> Display for TypeRow<RV> {
+impl<const RV: bool> Display for TypeRow<RV> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_char('[')?;
         display_list(self.types.as_ref(), f)?;
@@ -39,7 +43,7 @@ impl <const RV:bool> Display for TypeRow<RV> {
     }
 }
 
-impl <const RV:bool> TypeRow<RV> {
+impl<const RV: bool> TypeRow<RV> {
     /// Create a new empty row.
     pub const fn new() -> Self {
         Self {
@@ -61,8 +65,7 @@ impl <const RV:bool> TypeRow<RV> {
     /// For `TypeRow<true>`, note this may change the length of the row.
     /// For `TypeRow<false>`, guaranteed not to change the length of the row.
     pub(super) fn substitute(&self, s: &Substitution) -> Self {
-        self
-            .iter()
+        self.iter()
             .flat_map(|ty| ty.subst_vec(s))
             .collect::<Vec<_>>()
             .into()
@@ -89,12 +92,17 @@ impl <const RV:bool> TypeRow<RV> {
         exts: &ExtensionRegistry,
         var_decls: &[TypeParam],
     ) -> Result<(), SignatureError> {
-        self.iter()
-            .try_for_each(|t| t.validate(exts, var_decls))
+        self.iter().try_for_each(|t| t.validate(exts, var_decls))
     }
 
     pub fn into_rv(self) -> TypeRow<true> {
-        TypeRow::from(self.types.into_iter().cloned().map(Type::into_rv).collect::<Vec<_>>())
+        TypeRow::from(
+            self.types
+                .into_iter()
+                .cloned()
+                .map(Type::into_rv)
+                .collect::<Vec<_>>(),
+        )
     }
 }
 
@@ -134,17 +142,23 @@ impl TryFrom<TypeRow<true>> for TypeRow {
     type Error = SignatureError;
 
     fn try_from(value: TypeRow<true>) -> Result<Self, Self::Error> {
-        Ok(Self::from(value.into_owned().into_iter().map(|t| t.try_into()).collect::<Result<Vec<_>,_>>()?))
+        Ok(Self::from(
+            value
+                .into_owned()
+                .into_iter()
+                .map(|t| t.try_into())
+                .collect::<Result<Vec<_>, _>>()?,
+        ))
     }
 }
 
-impl <const RV:bool> Default for TypeRow<RV> {
+impl<const RV: bool> Default for TypeRow<RV> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<F, const RV:bool> From<F> for TypeRow<RV>
+impl<F, const RV: bool> From<F> for TypeRow<RV>
 where
     F: Into<Cow<'static, [Type<RV>]>>,
 {
@@ -155,7 +169,7 @@ where
     }
 }
 
-impl <const RV:bool> From<Type<RV>> for TypeRow<RV> {
+impl<const RV: bool> From<Type<RV>> for TypeRow<RV> {
     fn from(t: Type<RV>) -> Self {
         Self {
             types: vec![t].into(),
@@ -163,7 +177,7 @@ impl <const RV:bool> From<Type<RV>> for TypeRow<RV> {
     }
 }
 
-impl <const RV:bool> Deref for TypeRow<RV> {
+impl<const RV: bool> Deref for TypeRow<RV> {
     type Target = [Type<RV>];
 
     fn deref(&self) -> &Self::Target {
@@ -171,7 +185,7 @@ impl <const RV:bool> Deref for TypeRow<RV> {
     }
 }
 
-impl <const RV:bool> DerefMut for TypeRow<RV> {
+impl<const RV: bool> DerefMut for TypeRow<RV> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.types.to_mut()
     }

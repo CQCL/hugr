@@ -34,10 +34,7 @@ pub trait CustomSignatureFunc: Send + Sync {
 pub trait SignatureFromArgs: Send + Sync {
     /// Compute signature of node given
     /// values for the type parameters.
-    fn compute_signature(
-        &self,
-        arg_values: &[TypeArg],
-    ) -> Result<PolyFuncType, SignatureError>;
+    fn compute_signature(&self, arg_values: &[TypeArg]) -> Result<PolyFuncType, SignatureError>;
     /// The declared type parameters which require values in order for signature to
     /// be computed.
     fn static_params(&self) -> &[TypeParam];
@@ -500,7 +497,7 @@ pub(super) mod test {
     use crate::ops::{CustomOp, OpName};
     use crate::std_extensions::collections::{EXTENSION, LIST_TYPENAME};
     use crate::types::type_param::{TypeArgError, TypeParam};
-    use crate::types::{FunctionType, PolyFuncType, TypeArg, TypeBound, Type};
+    use crate::types::{FunctionType, PolyFuncType, Type, TypeArg, TypeBound};
     use crate::{const_extension_ids, Extension};
 
     const_extension_ids! {

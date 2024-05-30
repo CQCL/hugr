@@ -20,10 +20,14 @@ pub(super) enum SerSimpleType {
     R { i: usize, b: TypeBound },
 }
 
-impl <const RV:bool> From<Type<RV>> for SerSimpleType {
+impl<const RV: bool> From<Type<RV>> for SerSimpleType {
     fn from(value: Type<RV>) -> Self {
-        if value == QB_T { return SerSimpleType::Q };
-        if value == USIZE_T { return SerSimpleType::I };
+        if value == QB_T {
+            return SerSimpleType::Q;
+        };
+        if value == USIZE_T {
+            return SerSimpleType::I;
+        };
         match value.0 {
             TypeEnum::Extension(o) => SerSimpleType::Opaque(o),
             TypeEnum::Alias(a) => SerSimpleType::Alias(a),
@@ -35,7 +39,7 @@ impl <const RV:bool> From<Type<RV>> for SerSimpleType {
     }
 }
 
-impl <const RV:bool> TryFrom<SerSimpleType> for Type<RV> {
+impl<const RV: bool> TryFrom<SerSimpleType> for Type<RV> {
     type Error = SignatureError;
     fn try_from(value: SerSimpleType) -> Result<Self, Self::Error> {
         Ok(match value {
@@ -50,7 +54,9 @@ impl <const RV:bool> TryFrom<SerSimpleType> for Type<RV> {
             SerSimpleType::Alias(a) => Type::new_alias(a),
             SerSimpleType::V { i, b } => Type::new_var_use(i, b),
             // We can't use new_row_var because that returns Type<true> not Type<RV>.
-            value@SerSimpleType::R { i, b } => Type::new(TypeEnum::RowVariable(i, b)).try_into_()?
+            value @ SerSimpleType::R { i, b } => {
+                Type::new(TypeEnum::RowVariable(i, b)).try_into_()?
+            }
         })
     }
 }

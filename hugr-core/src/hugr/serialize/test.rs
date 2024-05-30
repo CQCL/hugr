@@ -447,7 +447,7 @@ fn polyfunctype2() -> PolyFuncType {
     [TypeParam::new_list(TypeBound::Any)],
     FunctionType::new_endo(Type::new_tuple(Type::new_row_var_use(0, TypeBound::Any)))))]
 #[case(polyfunctype2())]
-fn roundtrip_polyfunctype<const RV:bool>(#[case] poly_func_type: PolyFuncType<RV>) {
+fn roundtrip_polyfunctype<const RV: bool>(#[case] poly_func_type: PolyFuncType<RV>) {
     check_testing_roundtrip(poly_func_type)
 }
 

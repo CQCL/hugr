@@ -68,9 +68,12 @@ impl super::SumType {
                 tag,
                 num_variants: self.num_variants(),
             })?;
-        let variant: TypeRow = variant.clone().try_into().map_err(|e| 
-            {let SignatureError::RowVarWhereTypeExpected {idx} = e else {panic!("Unexpected error")};
-             SumTypeError::VariantNotConcrete { tag, varidx: idx }})?;
+        let variant: TypeRow = variant.clone().try_into().map_err(|e| {
+            let SignatureError::RowVarWhereTypeExpected { idx } = e else {
+                panic!("Unexpected error")
+            };
+            SumTypeError::VariantNotConcrete { tag, varidx: idx }
+        })?;
 
         if variant.len() != val.len() {
             Err(SumTypeError::WrongVariantLength {
