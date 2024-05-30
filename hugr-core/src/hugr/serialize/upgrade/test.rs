@@ -50,6 +50,8 @@ impl TestCase {
         }
 
         let val = serde_json::from_reader(std::fs::File::open(&path).unwrap()).unwrap();
+        // we do not expect `val` to satisfy any schemas, it is a non-latest
+        // version.
         check_hugr_deserialize(&self.hugr, val, false);
     }
 }
