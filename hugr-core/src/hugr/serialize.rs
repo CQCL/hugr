@@ -54,7 +54,6 @@ impl<T> Versioned<T> {
     }
 }
 
-
 impl<T: DeserializeOwned> Versioned<T> {
     fn upgrade(mut self) -> Result<T, UpgradeError> {
         // go is polymorphic in D. When we are upgrading to the latest version
