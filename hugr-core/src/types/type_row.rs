@@ -16,12 +16,19 @@ use delegate::delegate;
 use itertools::Itertools;
 
 /// List of types, used for function signatures.
-#[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Eq, Debug, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 #[serde(transparent)]
 pub struct TypeRow<const ROWVARS:bool = false> {
     /// The datatypes in the row.
     types: Cow<'static, [Type<ROWVARS>]>,
+}
+
+impl <const RV1:bool, const RV2: bool> PartialEq<TypeRow<RV1>> for TypeRow<RV2> {
+    fn eq(&self, other: &TypeRow<RV1>) -> bool {
+        self.types.len() == other.types.len() &&
+            self.types.iter().zip(other.types.iter()).all(|(s,o)| s==o)
+    }
 }
 
 impl <const RV:bool> Display for TypeRow<RV> {
