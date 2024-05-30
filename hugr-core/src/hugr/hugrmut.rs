@@ -341,8 +341,8 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMut for T {
         let (new_root, node_map) = insert_hugr_internal(self.as_mut(), root, other);
         // Update the optypes and metadata, copying them from the other graph.
         for (&node, &new_node) in node_map.iter() {
-            let nodetype = other.get_nodetype(node.into());
-            self.as_mut().op_types.set(new_node, nodetype.clone());
+            let optype = other.get_optype(node.into());
+            self.as_mut().op_types.set(new_node, optype.clone());
             let meta = other.base_hugr().metadata.get(node);
             self.as_mut().metadata.set(new_node, meta.clone());
         }
@@ -372,8 +372,8 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMut for T {
         let node_map = insert_subgraph_internal(self.as_mut(), root, other, &portgraph);
         // Update the optypes and metadata, copying them from the other graph.
         for (&node, &new_node) in node_map.iter() {
-            let nodetype = other.get_nodetype(node.into());
-            self.as_mut().op_types.set(new_node, nodetype.clone());
+            let optype = other.get_optype(node.into());
+            self.as_mut().op_types.set(new_node, optype.clone());
             let meta = other.base_hugr().metadata.get(node);
             self.as_mut().metadata.set(new_node, meta.clone());
         }
