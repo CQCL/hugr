@@ -159,6 +159,7 @@ impl DataflowParent for DataflowBlock {
         let mut node_outputs = vec![sum_type];
         node_outputs.extend_from_slice(&self.other_outputs);
         FunctionType::new(self.inputs.clone(), TypeRow::from(node_outputs))
+            .with_extension_delta(self.extension_delta.clone())
     }
 }
 
