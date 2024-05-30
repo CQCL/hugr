@@ -2,6 +2,7 @@
 
 use std::collections::{BTreeSet, HashMap};
 
+use hugr_core::extension::ExtensionSet;
 use itertools::Itertools;
 use thiserror::Error;
 
@@ -82,7 +83,10 @@ pub fn fold_leaf_op(op: &OpType, consts: &[(IncomingPort, Value)]) -> ConstFoldR
 /// against `reg`.
 fn const_graph(consts: Vec<Value>, reg: &ExtensionRegistry) -> Hugr {
     let const_types = consts.iter().map(Value::get_type).collect_vec();
-    let mut b = DFGBuilder::new(FunctionType::new(type_row![], const_types)).unwrap();
+    let exts = ExtensionSet::union_over(consts.iter().map(Value::extension_reqs));
+    let mut b =
+        DFGBuilder::new(FunctionType::new(type_row![], const_types).with_extension_delta(exts))
+            .unwrap();
 
     let outputs = consts
         .into_iter()
