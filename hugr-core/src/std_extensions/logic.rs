@@ -5,6 +5,7 @@ use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 use crate::extension::{ConstFold, ConstFoldResult};
 use crate::ops::constant::ValueName;
 use crate::ops::{OpName, Value};
+use crate::types::TypeRow;
 use crate::{
     extension::{
         prelude::BOOL_T,
@@ -161,8 +162,8 @@ fn logic_op_sig() -> impl SignatureFromArgs {
             let [TypeArg::BoundedNat { n }] = *arg_values else {
                 return Err(SignatureError::InvalidTypeArgs);
             };
-            let var_arg_row = vec![BOOL_T; n as usize];
-            Ok(FunctionType::new(var_arg_row, vec![BOOL_T]).into())
+            let var_arg_row = TypeRow::from(vec![BOOL_T; n as usize]);
+            Ok(FunctionType::new(var_arg_row.into_rv(), vec![BOOL_T.into()]).into())
         }
 
         fn static_params(&self) -> &[TypeParam] {
