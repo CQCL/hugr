@@ -15,3 +15,6 @@ pub enum UpgradeError {
 pub fn v1_to_v2(_: serde_json::Value) -> Result<serde_json::Value, UpgradeError> {
     todo!()
 }
+
+#[cfg(test)]
+mod test;
