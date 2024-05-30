@@ -97,9 +97,7 @@ impl<const RV: bool> PolyFuncType<RV> {
         check_type_args(args, &self.params)?;
         Ok(self.body.substitute(&Substitution(args, ext_reg)))
     }
-}
 
-impl PolyFuncType {
     /// Validates this instance, checking that the types in the body are
     /// wellformed with respect to the registry, and the type variables declared.
     /// Allows both inputs and outputs to contain [RowVariable]s

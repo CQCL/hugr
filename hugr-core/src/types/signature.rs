@@ -84,9 +84,7 @@ impl<const RV: bool> FunctionType<RV> {
     pub fn output(&self) -> &TypeRow<RV> {
         &self.output
     }
-}
 
-impl FunctionType<true> {
     pub(super) fn validate(
         &self,
         extension_registry: &ExtensionRegistry,
@@ -97,7 +95,9 @@ impl FunctionType<true> {
             .validate(extension_registry, var_decls)?;
         self.extension_reqs.validate(var_decls)
     }
+}
 
+impl FunctionType<true> {
     /// If this FunctionType contains any row variables, return one.
     pub fn find_rowvar(&self) -> Option<(usize, TypeBound)> {
         self.input

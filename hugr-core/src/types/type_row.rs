@@ -83,6 +83,15 @@ impl <const RV:bool> TypeRow<RV> {
             pub fn is_empty(&self) -> bool ;
         }
     }
+
+    pub(super) fn validate(
+        &self,
+        exts: &ExtensionRegistry,
+        var_decls: &[TypeParam],
+    ) -> Result<(), SignatureError> {
+        self.iter()
+            .try_for_each(|t| t.validate(exts, var_decls))
+    }
 }
 
 impl TypeRow<false> {
@@ -101,17 +110,6 @@ impl TypeRow<false> {
             /// Returns the type at the specified index. Returns `None` if out of bounds.
             pub fn get_mut(&mut self, offset: usize) -> Option<&mut Type>;
         }
-    }
-}
-
-impl TypeRow<true> {
-    pub(super) fn validate(
-        &self,
-        exts: &ExtensionRegistry,
-        var_decls: &[TypeParam],
-    ) -> Result<(), SignatureError> {
-        self.iter()
-            .try_for_each(|t| t.validate(exts, var_decls))
     }
 }
 
