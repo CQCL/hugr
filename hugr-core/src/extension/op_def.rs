@@ -474,7 +474,7 @@ impl Extension {
 }
 
 #[cfg(test)]
-pub mod test {
+pub(super) mod test {
     use std::num::NonZeroU64;
 
     use itertools::Itertools;

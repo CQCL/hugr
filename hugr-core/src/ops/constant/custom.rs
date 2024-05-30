@@ -496,9 +496,10 @@ mod test {
                 // here we manually construct a serialized `dyn CustomConst`.
                 // The "c" and "v" come from the `typetag::serde` annotation on
                 // `trait CustomConst`.
-                // TODO This is not ideal, if we were to randomly
-                // generate a valid tag(e.g. "c" = "ConstInt") then things will
-                // go wrong.
+                // TODO This is not ideal, if we were to accidentally
+                // generate a valid tag(e.g. "ConstInt") then things will
+                // go wrong: the serde::Deserialize impl for that type will
+                // interpret "v" and fail.
                 let value = (any_serde_yaml_value(), any_string()).prop_map(|(content, tag)| {
                     [("c".into(), tag.into()), ("v".into(), content)]
                         .into_iter()
