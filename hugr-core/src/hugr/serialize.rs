@@ -32,7 +32,7 @@ mod upgrade;
 ///
 /// Make sure to order the variants from newest to oldest, as the deserializer
 /// will try to deserialize them in order.
-#[derive(Serialize, Deserialize)]
+#[derive(Debug,Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "version", rename_all = "lowercase")]
 enum Versioned<SerHugr =SerHugrLatest> {
     #[serde(skip_serializing)]
@@ -40,10 +40,7 @@ enum Versioned<SerHugr =SerHugrLatest> {
     V0,
 
     V1(serde_json::Value),
-    V2(serde_json::Value),
-
-    /// Version 1 of the HUGR serialization format.
-    V3(SerHugr),
+    V2(SerHugr),
 
     #[serde(skip_serializing)]
     #[serde(other)]
@@ -52,11 +49,11 @@ enum Versioned<SerHugr =SerHugrLatest> {
 
 impl<T> Versioned<T> {
     pub fn new_latest(t: T) -> Self {
-        Self::V3(t.into())
+        Self::V2(t.into())
     }
 
     fn get_latest(self) -> T {
-        let Self::V3(t) = self else {
+        let Self::V2(t) = self else {
             panic!("Versioned::get_latest: Not the latest")
         };
         t
@@ -75,9 +72,8 @@ impl<T: DeserializeOwned> Versioned<T> {
             match self {
                 Self::V0 => Err(UpgradeError::KnownVersionUnsupported("0".into()))?,
                 // the upgrade lines remain unchanged when adding a new constructor
-                Self::V1(json) => self = Self::V2(upgrade::upgrade_v1_to_v2(json).and_then(go)?),
-                Self::V2(json) => self = Self::V3(upgrade::upgrade_v2_to_v3(json).and_then(go)?),
-                Self::V3(ser_hugr) => return Ok(ser_hugr),
+                Self::V1(json) => self = Self::V2(upgrade::v1_to_v2(json).and_then(go)?),
+                Self::V2(ser_hugr) => return Ok(ser_hugr),
                 Versioned::Unsupported => Err(UpgradeError::UnknownVersionUnsupported)?
             }
         }

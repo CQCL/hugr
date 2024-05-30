@@ -7,7 +7,7 @@ representation.
 __version__ = "0.2.1"
 
 def get_serialisation_version() -> str:
-    return "v3"
+    return "v2"
 
 def it_works() -> str:
     """Return a string to confirm that the package is installed and working."""
