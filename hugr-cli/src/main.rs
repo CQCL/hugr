@@ -1,15 +1,18 @@
 //! Validate serialized HUGR on the command line
 
-use hugr::std_extensions::arithmetic::{
+use hugr_core::std_extensions::arithmetic::{
     conversions::EXTENSION as CONVERSIONS_EXTENSION, float_ops::EXTENSION as FLOAT_OPS_EXTENSION,
     float_types::EXTENSION as FLOAT_TYPES_EXTENSION, int_ops::EXTENSION as INT_OPS_EXTENSION,
     int_types::EXTENSION as INT_TYPES_EXTENSION,
 };
-use hugr::std_extensions::logic::EXTENSION as LOGICS_EXTENSION;
+use hugr_core::std_extensions::logic::EXTENSION as LOGICS_EXTENSION;
 
-use hugr::extension::{ExtensionRegistry, PRELUDE};
+use hugr_core::extension::{ExtensionRegistry, PRELUDE};
 
-use hugr_cli::{CmdLineArgs, Parser};
+use hugr_cli::CmdLineArgs;
+
+use clap::Parser;
+use clap_verbosity_flag::Level;
 
 fn main() {
     let opts = CmdLineArgs::parse();
@@ -27,7 +30,9 @@ fn main() {
     .unwrap();
 
     if let Err(e) = opts.run(&reg) {
-        eprintln!("{}", e);
+        if opts.verbosity(Level::Error) {
+            eprintln!("{}", e);
+        }
         std::process::exit(1);
     }
 }

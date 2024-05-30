@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use crate::hugr::hugrmut::sealed::HugrMutInternals;
+use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::{HugrError, HugrMut};
 use crate::ops::handle::NodeHandle;
 use crate::{Hugr, Node};
@@ -71,7 +71,7 @@ impl<H: HugrMutInternals + AsRef<Hugr>, Root: NodeHandle> HugrMut for RootChecke
 mod test {
     use super::RootChecked;
     use crate::extension::ExtensionSet;
-    use crate::hugr::hugrmut::sealed::HugrMutInternals;
+    use crate::hugr::internal::HugrMutInternals;
     use crate::hugr::{HugrError, HugrMut, NodeType};
     use crate::ops::handle::{BasicBlockID, CfgID, DataflowParentID, DfgID};
     use crate::ops::{DataflowBlock, MakeTuple, OpTag};

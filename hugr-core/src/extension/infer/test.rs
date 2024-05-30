@@ -16,7 +16,7 @@ use crate::ops::{CustomOp, Lift, OpType};
 use crate::{
     builder::test::closed_dfg_root_hugr,
     extension::prelude::PRELUDE_ID,
-    hugr::{hugrmut::sealed::HugrMutInternals, validate::ValidationError},
+    hugr::{internal::HugrMutInternals, validate::ValidationError},
     ops::{dataflow::DataflowParent, handle::NodeHandle},
 };
 

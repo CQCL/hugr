@@ -6,7 +6,7 @@ use crate::builder::{
 use crate::extension::prelude::{BOOL_T, PRELUDE_ID, QB_T, USIZE_T};
 use crate::extension::simple_op::MakeRegisteredOp;
 use crate::extension::{test::SimpleOpDef, EMPTY_REG, PRELUDE_REGISTRY};
-use crate::hugr::hugrmut::sealed::HugrMutInternals;
+use crate::hugr::internal::HugrMutInternals;
 use crate::ops::custom::{ExtensionOp, OpaqueOp};
 use crate::ops::{self, dataflow::IOTrait, Input, Module, Noop, Output, Value, DFG};
 use crate::std_extensions::arithmetic::float_types::FLOAT64_TYPE;

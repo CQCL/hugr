@@ -1,6 +1,6 @@
 [package]
 name = "hugr"
-version = "0.4.0"
+version = "0.5.0"
 edition = { workspace = true }
 rust-version = { workspace = true }
 
@@ -24,28 +24,16 @@ path = "src/lib.rs"
 [features]
 extension_inference = []
 
-# Definitions used by the `hugr` binary
-_cli = ["dep:hugr-cli"]
-
 [dependencies]
-hugr-core = { path = "../hugr-core", version = "0.0.0" }
+hugr-core = { path = "../hugr-core", version = "0.1.0" }
 hugr-passes = { path = "../hugr-passes", version = "0.1.0" }
-hugr-cli = { path = "../hugr-cli", version = "0.1.0", optional = true }
 
 [dev-dependencies]
 rstest = { workspace = true }
 lazy_static = { workspace = true }
 criterion = { workspace = true, features = ["html_reports"] }
 serde_json = { workspace = true }
-assert_cmd = { workspace = true }
-assert_fs = { workspace = true }
-predicates = { workspace = true }
 
 [[bench]]
 name = "bench_main"
 harness = false
-
-
-[[bin]]
-name = "hugr"
-required-features = ["_cli"]

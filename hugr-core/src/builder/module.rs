@@ -4,12 +4,12 @@ use super::{
     BuildError, Container,
 };
 
-use crate::{
-    extension::ExtensionRegistry,
-    hugr::{hugrmut::sealed::HugrMutInternals, views::HugrView, ValidationError},
-    ops,
-    types::{PolyFuncType, Type, TypeBound},
-};
+use crate::extension::ExtensionRegistry;
+use crate::hugr::internal::HugrMutInternals;
+use crate::hugr::views::HugrView;
+use crate::hugr::ValidationError;
+use crate::ops;
+use crate::types::{PolyFuncType, Type, TypeBound};
 
 use crate::ops::handle::{AliasID, FuncID, NodeHandle};
 

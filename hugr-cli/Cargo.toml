@@ -15,8 +15,9 @@ categories = ["compilers"]
 
 [dependencies]
 clap = {workspace = true, features = ["derive"]}
-clap-stdin = { workspace = true }
-hugr-core = { path = "../hugr-core", version = "0.0.0" }
+clap-stdin.workspace = true
+clap-verbosity-flag.workspace = true
+hugr-core = { path = "../hugr-core", version = "0.1.0" }
 serde_json.workspace = true
 thiserror.workspace = true
 
@@ -28,3 +29,7 @@ assert_cmd = { workspace = true }
 assert_fs = { workspace = true }
 predicates = { workspace = true }
 rstest.workspace = true
+
+[[bin]]
+name = "hugr"
+path = "src/main.rs"

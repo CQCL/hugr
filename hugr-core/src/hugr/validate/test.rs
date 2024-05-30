@@ -9,7 +9,7 @@ use crate::builder::{
 };
 use crate::extension::prelude::{BOOL_T, PRELUDE, PRELUDE_ID, USIZE_T};
 use crate::extension::{Extension, ExtensionSet, TypeDefBound, EMPTY_REG, PRELUDE_REGISTRY};
-use crate::hugr::hugrmut::sealed::HugrMutInternals;
+use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::HugrMut;
 use crate::ops::dataflow::{IOTrait, LoadFunction};
 use crate::ops::handle::NodeHandle;

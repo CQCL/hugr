@@ -22,8 +22,9 @@ pub use sibling_subgraph::SiblingSubgraph;
 use context_iterators::{ContextIterator, IntoContextIterator, MapWithCtx};
 use itertools::{Itertools, MapInto};
 use portgraph::render::{DotFormat, MermaidFormat};
-use portgraph::{multiportgraph, LinkView, MultiPortGraph, PortView};
+use portgraph::{multiportgraph, LinkView, PortView};
 
+use super::internal::HugrInternals;
 use super::{
     Hugr, HugrError, NodeMetadata, NodeMetadataMap, NodeType, ValidationError, DEFAULT_NODETYPE,
 };
@@ -39,7 +40,7 @@ use itertools::Either;
 
 /// A trait for inspecting HUGRs.
 /// For end users we intend this to be superseded by region-specific APIs.
-pub trait HugrView: sealed::HugrInternals {
+pub trait HugrView: HugrInternals {
     /// An Iterator over the nodes in a Hugr(View)
     type Nodes<'a>: Iterator<Item = Node>
     where
@@ -668,47 +669,4 @@ where
     I: Iterator<Item = (Node, P)>,
     P: Into<Port> + Copy,
 {
-}
-
-pub(crate) mod sealed {
-    use super::*;
-
-    /// Trait for accessing the internals of a Hugr(View).
-    ///
-    /// Specifically, this trait provides access to the underlying portgraph
-    /// view.
-    pub trait HugrInternals {
-        /// The underlying portgraph view type.
-        type Portgraph<'p>: LinkView + Clone + 'p
-        where
-            Self: 'p;
-
-        /// Returns a reference to the underlying portgraph.
-        fn portgraph(&self) -> Self::Portgraph<'_>;
-
-        /// Returns the Hugr at the base of a chain of views.
-        fn base_hugr(&self) -> &Hugr;
-
-        /// Return the root node of this view.
-        fn root_node(&self) -> Node;
-    }
-
-    impl<T: AsRef<Hugr>> HugrInternals for T {
-        type Portgraph<'p> = &'p MultiPortGraph where Self: 'p;
-
-        #[inline]
-        fn portgraph(&self) -> Self::Portgraph<'_> {
-            &self.as_ref().graph
-        }
-
-        #[inline]
-        fn base_hugr(&self) -> &Hugr {
-            self.as_ref()
-        }
-
-        #[inline]
-        fn root_node(&self) -> Node {
-            self.as_ref().root.into()
-        }
-    }
 }

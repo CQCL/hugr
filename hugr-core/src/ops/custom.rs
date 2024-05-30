@@ -11,7 +11,7 @@ use {
 };
 
 use crate::extension::{ConstFoldResult, ExtensionId, ExtensionRegistry, OpDef, SignatureError};
-use crate::hugr::hugrmut::sealed::HugrMutInternals;
+use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::{HugrView, NodeType};
 use crate::types::EdgeKind;
 use crate::types::{type_param::TypeArg, FunctionType};

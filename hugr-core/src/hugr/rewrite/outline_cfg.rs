@@ -6,7 +6,7 @@ use thiserror::Error;
 
 use crate::builder::{BlockBuilder, Container, Dataflow, SubContainer};
 use crate::extension::ExtensionSet;
-use crate::hugr::hugrmut::sealed::HugrMutInternals;
+use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::rewrite::Rewrite;
 use crate::hugr::views::sibling::SiblingMut;
 use crate::hugr::{HugrMut, HugrView};
