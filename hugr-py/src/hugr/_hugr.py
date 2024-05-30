@@ -17,9 +17,9 @@ from typing import (
 from typing_extensions import Self
 
 from hugr.serialization.serial_hugr import SerialHugr
-from hugr.serialization.ops import BaseOp, OpType as SerialOp
-import hugr.serialization.ops as sops
-from hugr.serialization.tys import Type
+from hugr.serialization.ops import OpType as SerialOp
+from hugr.serialization.tys import Type, FunctionType
+from hugr._ops import Op, Input, Output, DFG
 from hugr.utils import BiMap
 
 
@@ -42,6 +42,13 @@ class InPort(_Port):
 
 class Wire(Protocol):
     def out_port(self) -> OutPort: ...
+
+
+class Command(Protocol):
+    def op(self) -> Op: ...
+    def incoming(self) -> Iterable[Wire]: ...
+    def num_out(self) -> int | None:
+        return None
 
 
 @dataclass(frozen=True, eq=True, order=True)
@@ -101,35 +108,6 @@ class Node(Wire):
             return self.out(offset)
 
 
-class Op(Protocol):
-    def to_serial(self, node: Node, hugr: Hugr) -> SerialOp: ...
-
-    @classmethod
-    def from_serial(cls, serial: SerialOp) -> Self: ...
-
-
-T = TypeVar("T", bound=BaseOp)
-
-
-@dataclass()
-class DummyOp(Op, Generic[T]):
-    _serial_op: T
-
-    def to_serial(self, node: Node, hugr: Hugr) -> SerialOp:
-        return SerialOp(root=self._serial_op.model_copy())  # type: ignore
-
-    @classmethod
-    def from_serial(cls, serial: SerialOp) -> DummyOp:
-        return DummyOp(serial.root)
-
-
-class Command(Protocol):
-    def op(self) -> Op: ...
-    def incoming(self) -> Iterable[Wire]: ...
-    def num_out(self) -> int | None:
-        return None
-
-
 @dataclass()
 class NodeData:
     op: Op
@@ -139,10 +117,9 @@ class NodeData:
     # TODO children field?
 
     def to_serial(self, node: Node, hugr: Hugr) -> SerialOp:
-        o = self.op.to_serial(node, hugr)
-        o.root.parent = self.parent.idx if self.parent else node.idx
+        o = self.op.to_serial(node, self.parent if self.parent else node, hugr)
 
-        return o
+        return SerialOp(root=o)  # type: ignore
 
 
 P = TypeVar("P", InPort, OutPort)
@@ -372,7 +349,7 @@ class Hugr(Mapping[Node, NodeData]):
                 hugr.root = Node(idx)
                 parent = None
             serial_node.root.parent = -1
-            hugr._nodes.append(NodeData(DummyOp.from_serial(serial_node), parent))
+            hugr._nodes.append(NodeData(serial_node.root.deserialize(), parent))
 
         for (src_node, src_offset), (dst_node, dst_offset) in serial.edges:
             if src_offset is None or dst_offset is None:
@@ -396,35 +373,25 @@ class Dfg:
     ) -> None:
         input_types = list(input_types)
         output_types = list(output_types)
-        root_op = DummyOp(sops.DFG(parent=-1))
-        root_op._serial_op.signature.input = input_types
-        root_op._serial_op.signature.output = output_types
+        root_op = DFG(FunctionType(input=input_types, output=output_types))
         self.hugr = Hugr(root_op)
         self.root = self.hugr.root
         self.input_node = self.hugr.add_node(
-            DummyOp(sops.Input(parent=0, types=input_types)),
-            self.root,
-            len(input_types),
+            Input(input_types), self.root, len(input_types)
         )
-        self.output_node = self.hugr.add_node(
-            DummyOp(sops.Output(parent=0, types=output_types)), self.root
-        )
+        self.output_node = self.hugr.add_node(Output(output_types), self.root)
 
     @classmethod
     def endo(cls, types: Sequence[Type]) -> Dfg:
         return Dfg(types, types)
 
-    def _input_op(self) -> DummyOp[sops.Input]:
+    def _input_op(self) -> Input:
         dop = self.hugr[self.input_node].op
-        assert isinstance(dop, DummyOp)
-        assert isinstance(dop._serial_op, sops.Input)
+        assert isinstance(dop, Input)
         return dop
 
     def inputs(self) -> list[OutPort]:
-        return [
-            self.input_node.out(i)
-            for i in range(len(self._input_op()._serial_op.types))
-        ]
+        return [self.input_node.out(i) for i in range(len(self._input_op().types))]
 
     def add_op(self, op: Op, /, *args: Wire, num_outs: int | None = None) -> Node:
         new_n = self.hugr.add_node(op, self.root, num_outs=num_outs)

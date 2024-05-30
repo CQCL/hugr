@@ -1,0 +1,96 @@
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Generic, Protocol, TypeVar, TYPE_CHECKING
+from hugr.serialization.ops import BaseOp
+import hugr.serialization.ops as sops
+import hugr.serialization.tys as tys
+
+if TYPE_CHECKING:
+    from hugr._hugr import Hugr, Node
+
+
+class Op(Protocol):
+    def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> BaseOp: ...
+
+
+T = TypeVar("T", bound=BaseOp)
+
+
+@dataclass()
+class SerWrap(Op, Generic[T]):
+    # catch all for serial ops that don't have a corresponding Op class
+    _serial_op: T
+
+    def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> T:
+        root = self._serial_op.model_copy()
+        root.parent = parent.idx
+        return root
+
+
+@dataclass()
+class Input(Op):
+    types: list[tys.Type]
+
+    def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.Input:
+        return sops.Input(parent=parent.idx, types=self.types)
+
+
+@dataclass()
+class Output(Op):
+    types: list[tys.Type]
+
+    def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.Output:
+        return sops.Output(parent=parent.idx, types=self.types)
+
+
+@dataclass()
+class Custom(Op):
+    extension: tys.ExtensionId
+    op_name: str
+    signature: tys.FunctionType = field(default_factory=tys.FunctionType.empty)
+    description: str = ""
+    args: list[tys.TypeArg] = field(default_factory=list)
+
+    def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.CustomOp:
+        return sops.CustomOp(
+            parent=parent.idx,
+            extension=self.extension,
+            op_name=self.op_name,
+            signature=self.signature,
+            description=self.description,
+            args=self.args,
+        )
+
+
+@dataclass()
+class MakeTuple(Op):
+    types: list[tys.Type]
+
+    def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.MakeTuple:
+        return sops.MakeTuple(
+            parent=parent.idx,
+            tys=self.types,
+        )
+
+
+@dataclass()
+class UnpackTuple(Op):
+    types: list[tys.Type]
+
+    def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.UnpackTuple:
+        return sops.UnpackTuple(
+            parent=parent.idx,
+            tys=self.types,
+        )
+
+
+@dataclass()
+class DFG(Op):
+    signature: tys.FunctionType = field(default_factory=tys.FunctionType.empty)
+
+    def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.DFG:
+        return sops.DFG(
+            parent=parent.idx,
+            signature=self.signature,
+        )

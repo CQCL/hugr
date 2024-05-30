@@ -3,10 +3,11 @@ from dataclasses import dataclass
 import subprocess
 import os
 import pathlib
-from hugr._hugr import Dfg, Hugr, DummyOp, Node, Command, Wire, Op
+from hugr._hugr import Dfg, Hugr, Node, Command, Wire
+from hugr._ops import Op, Custom
+import hugr._ops as ops
 from hugr.serialization import SerialHugr
 import hugr.serialization.tys as stys
-import hugr.serialization.ops as sops
 import pytest
 import json
 
@@ -22,14 +23,11 @@ INT_T = stys.Type(
     )
 )
 
-NOT_OP = DummyOp(
-    # TODO get from YAML
-    sops.CustomOp(
-        parent=-1,
-        extension="logic",
-        op_name="Not",
-        signature=stys.FunctionType(input=[BOOL_T], output=[BOOL_T]),
-    )
+# TODO get from YAML
+NOT_OP = Custom(
+    extension="logic",
+    op_name="Not",
+    signature=stys.FunctionType(input=[BOOL_T], output=[BOOL_T]),
 )
 
 
@@ -59,14 +57,11 @@ class DivMod(Command):
         return 2
 
     def op(self) -> Op:
-        return DummyOp(
-            sops.CustomOp(
-                parent=-1,
-                extension="arithmetic.int",
-                op_name="idivmod_u",
-                signature=stys.FunctionType(input=[INT_T] * 2, output=[INT_T] * 2),
-                args=[ARG_5, ARG_5],
-            )
+        return Custom(
+            extension="arithmetic.int",
+            op_name="idivmod_u",
+            signature=stys.FunctionType(input=[INT_T] * 2, output=[INT_T] * 2),
+            args=[ARG_5, ARG_5],
         )
 
 
@@ -82,7 +77,7 @@ class MakeTuple(Command):
         return 1
 
     def op(self) -> Op:
-        return DummyOp(sops.MakeTuple(parent=-1, tys=self.types))
+        return ops.MakeTuple(self.types)
 
 
 @dataclass
@@ -97,7 +92,7 @@ class UnpackTuple(Command):
         return len(self.types)
 
     def op(self) -> Op:
-        return DummyOp(sops.UnpackTuple(parent=-1, tys=self.types))
+        return ops.UnpackTuple(self.types)
 
 
 def _validate(h: Hugr, mermaid: bool = False, roundtrip: bool = True):
@@ -117,7 +112,7 @@ def _validate(h: Hugr, mermaid: bool = False, roundtrip: bool = True):
 
 
 def test_stable_indices():
-    h = Hugr(DummyOp(sops.DFG(parent=-1)))
+    h = Hugr(ops.DFG())
 
     nodes = [h.add_node(NOT_OP) for _ in range(3)]
     assert len(h) == 4
@@ -201,8 +196,8 @@ def test_tuple():
 
     h1 = Dfg.endo(row)
     a, b = h1.inputs()
-    mt = h1.add_op(DummyOp(sops.MakeTuple(parent=-1, tys=row)), a, b)
-    a, b = h1.add_op(DummyOp(sops.UnpackTuple(parent=-1, tys=row)), mt)[0, 1]
+    mt = h1.add_op(ops.MakeTuple(row), a, b)
+    a, b = h1.add_op(ops.UnpackTuple(row), mt)[0, 1]
     h1.set_outputs(a, b)
 
     assert h.hugr.to_serial() == h1.hugr.to_serial()
@@ -224,7 +219,7 @@ def test_insert():
 
     assert len(h1.hugr) == 4
 
-    new_h = Hugr(DummyOp(sops.DFG(parent=-1)))
+    new_h = Hugr(ops.DFG())
     mapping = h1.hugr.insert_hugr(new_h, h1.hugr.root)
     assert mapping == {new_h.root: Node(4)}
 
