@@ -1,0 +1,64 @@
+---
+source: src/emit/test.rs
+expression: module.to_string()
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define void @_hl.main_void.1() {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  call void @_hl.main_void.1()
+  ret void
+}
+
+define { {}, {} } @_hl.main_unary.5({ {}, {} } %0) {
+alloca_block:
+  %"0" = alloca { {}, {} }, align 8
+  %"6_0" = alloca { {}, {} }, align 8
+  %"8_0" = alloca { {}, {} }, align 8
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  store { {}, {} } %0, { {}, {} }* %"6_0", align 1
+  %"6_01" = load { {}, {} }, { {}, {} }* %"6_0", align 1
+  %1 = call { {}, {} } @_hl.main_unary.5({ {}, {} } %"6_01")
+  store { {}, {} } %1, { {}, {} }* %"8_0", align 1
+  %"8_02" = load { {}, {} }, { {}, {} }* %"8_0", align 1
+  store { {}, {} } %"8_02", { {}, {} }* %"0", align 1
+  %"03" = load { {}, {} }, { {}, {} }* %"0", align 1
+  ret { {}, {} } %"03"
+}
+
+define { { {}, {} }, { {}, {} } } @_hl.main_binary.9({ {}, {} } %0, { {}, {} } %1) {
+alloca_block:
+  %"0" = alloca { {}, {} }, align 8
+  %"1" = alloca { {}, {} }, align 8
+  %"10_0" = alloca { {}, {} }, align 8
+  %"10_1" = alloca { {}, {} }, align 8
+  %"12_0" = alloca { {}, {} }, align 8
+  %"12_1" = alloca { {}, {} }, align 8
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  store { {}, {} } %0, { {}, {} }* %"10_0", align 1
+  store { {}, {} } %1, { {}, {} }* %"10_1", align 1
+  %"10_01" = load { {}, {} }, { {}, {} }* %"10_0", align 1
+  %"10_12" = load { {}, {} }, { {}, {} }* %"10_1", align 1
+  %2 = call { { {}, {} }, { {}, {} } } @_hl.main_binary.9({ {}, {} } %"10_01", { {}, {} } %"10_12")
+  %3 = extractvalue { { {}, {} }, { {}, {} } } %2, 0
+  %4 = extractvalue { { {}, {} }, { {}, {} } } %2, 1
+  store { {}, {} } %3, { {}, {} }* %"12_0", align 1
+  store { {}, {} } %4, { {}, {} }* %"12_1", align 1
+  %"12_03" = load { {}, {} }, { {}, {} }* %"12_0", align 1
+  %"12_14" = load { {}, {} }, { {}, {} }* %"12_1", align 1
+  store { {}, {} } %"12_03", { {}, {} }* %"0", align 1
+  store { {}, {} } %"12_14", { {}, {} }* %"1", align 1
+  %"05" = load { {}, {} }, { {}, {} }* %"0", align 1
+  %"16" = load { {}, {} }, { {}, {} }* %"1", align 1
+  %mrv = insertvalue { { {}, {} }, { {}, {} } } undef, { {}, {} } %"05", 0
+  %mrv7 = insertvalue { { {}, {} }, { {}, {} } } %mrv, { {}, {} } %"16", 1
+  ret { { {}, {} }, { {}, {} } } %mrv7
+}

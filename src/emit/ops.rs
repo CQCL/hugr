@@ -2,8 +2,8 @@ use anyhow::{anyhow, Result};
 use hugr::{
     hugr::views::SiblingGraph,
     ops::{
-        Case, Conditional, Const, Input, LoadConstant, MakeTuple, NamedOp, OpTag, OpTrait, OpType,
-        Output, Tag, UnpackTuple, Value,
+        Call, Case, Conditional, Const, Input, LoadConstant, MakeTuple, NamedOp, OpTag, OpTrait,
+        OpType, Output, Tag, UnpackTuple, Value,
     },
     types::{SumType, Type, TypeEnum},
     HugrView, NodeIndex,
@@ -158,7 +158,7 @@ where
                 let o = self.take_output()?;
                 o.finish(self.builder(), args.inputs)
             }
-            _ => emit_optype(self.context, args)
+            _ => emit_optype(self.context, args),
         }
     }
 }
@@ -246,7 +246,10 @@ fn get_exactly_one_sum_type(ts: impl IntoIterator<Item = Type>) -> Result<SumTyp
     Ok(sum_type)
 }
 
-fn emit_value<'c, H: HugrView>(context: &mut EmitFuncContext<'c, H>, v: &Value) -> Result<BasicValueEnum<'c>> {
+fn emit_value<'c, H: HugrView>(
+    context: &mut EmitFuncContext<'c, H>,
+    v: &Value,
+) -> Result<BasicValueEnum<'c>> {
     match v {
         Value::Extension { e } => {
             let exts = context.extensions();
@@ -330,6 +333,43 @@ fn emit_load_constant<'c, H: HugrView>(
     args.outputs.finish(context.builder(), [r])
 }
 
+fn emit_call<'c, H: HugrView>(
+    context: &mut EmitFuncContext<'c, H>,
+    args: EmitOpArgs<'c, Call, H>,
+) -> Result<()> {
+    if !args.node.called_function_type().params().is_empty() {
+        todo!("Call of generic function");
+    }
+    let (func_node, _) = args
+        .node
+        .single_linked_output(args.node.called_function_port())
+        .unwrap();
+    let func = match func_node.get() {
+        OpType::FuncDecl(_) => context.get_func_decl(func_node.try_into_ot().unwrap()),
+        OpType::FuncDefn(_) => context.get_func_defn(func_node.try_into_ot().unwrap()),
+        _ => Err(anyhow!("emit_call: Not a Decl or Defn")),
+    };
+    let inputs: args.inputs.into_iter().map_into().collect_vec();
+    let builder = context.builder();
+    let call = builder
+        .build_call(func?, inputs.as_slice(), "")?
+        .try_as_basic_value();
+    let rets = match args.outputs.len() as u32 {
+        0 => {
+            call.expect_right("void");
+            vec![]
+        }
+        1 => vec![call.expect_left("non-void")],
+        n => {
+            let return_struct = call.expect_left("non-void").into_struct_value();
+            (0..n)
+                .map(|i| builder.build_extract_value(return_struct, i, ""))
+                .collect::<Result<Vec<_>, _>>()?
+        }
+    };
+    args.outputs.finish(builder, rets)
+}
+
 fn emit_optype<'c, H: HugrView>(
     context: &mut EmitFuncContext<'c, H>,
     args: EmitOpArgs<'c, OpType, H>,
@@ -348,10 +388,10 @@ fn emit_optype<'c, H: HugrView>(
         }
         OpType::Const(_) => Ok(()),
         OpType::LoadConstant(ref lc) => emit_load_constant(context, args.into_ot(lc)),
+        OpType::Call(ref cl) => emit_call(context, args.into_ot(cl)),
         OpType::Conditional(ref co) => emit_conditional(context, args.into_ot(co)),
 
         // OpType::FuncDefn(fd) => self.emit(ot.into_ot(fd), context, inputs, outputs),
         _ => todo!("Unimplemented OpTypeEmitter: {}", args.node().name()),
     }
 }
-
