@@ -151,6 +151,10 @@ pub fn any_string() -> SBoxedStrategy<String> {
     ANY_STRING.to_owned()
 }
 
+pub fn any_smolstr() -> SBoxedStrategy<SmolStr> {
+    ANY_STRING.clone().prop_map_into().sboxed()
+}
+
 pub fn any_serde_yaml_value() -> impl Strategy<Value = serde_yaml::Value> {
     // use serde_yaml::value::{Tag, TaggedValue, Value};
     ANY_SERDE_YAML_VALUE_LEAF

@@ -474,12 +474,14 @@ impl Extension {
 }
 
 #[cfg(test)]
-mod test {
+pub(super) mod test {
     use std::num::NonZeroU64;
+
+    use itertools::Itertools;
 
     use super::SignatureFromArgs;
     use crate::builder::{DFGBuilder, Dataflow, DataflowHugr};
-    use crate::extension::op_def::LowerFunc;
+    use crate::extension::op_def::{CustomValidator, LowerFunc, OpDef, SignatureFunc};
     use crate::extension::prelude::USIZE_T;
     use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE};
     use crate::extension::{SignatureError, EMPTY_REG, PRELUDE_REGISTRY};
@@ -492,6 +494,87 @@ mod test {
 
     const_extension_ids! {
         const EXT_ID: ExtensionId = "MyExt";
+    }
+
+    #[derive(serde::Serialize, serde::Deserialize, Debug)]
+    pub struct SimpleOpDef(OpDef);
+
+    impl SimpleOpDef {
+        pub fn new(op_def: OpDef) -> Self {
+            assert!(op_def.constant_folder.is_none());
+            assert!(matches!(
+                op_def.signature_func,
+                SignatureFunc::TypeScheme(_)
+            ));
+            assert!(op_def
+                .lower_funcs
+                .iter()
+                .all(|lf| matches!(lf, LowerFunc::FixedHugr { .. })));
+            Self(op_def)
+        }
+    }
+
+    impl From<SimpleOpDef> for OpDef {
+        fn from(value: SimpleOpDef) -> Self {
+            value.0
+        }
+    }
+
+    impl PartialEq for SimpleOpDef {
+        fn eq(&self, other: &Self) -> bool {
+            let OpDef {
+                extension,
+                name,
+                description,
+                misc,
+                signature_func,
+                lower_funcs,
+                constant_folder: _,
+            } = &self.0;
+            let OpDef {
+                extension: other_extension,
+                name: other_name,
+                description: other_description,
+                misc: other_misc,
+                signature_func: other_signature_func,
+                lower_funcs: other_lower_funcs,
+                constant_folder: _,
+            } = &other.0;
+
+            let get_sig = |sf: &_| match sf {
+                // if SignatureFunc or CustomValidator are changed we should get
+                // a compile error here. To fix: modify the fields matched on here,
+                // maintaining the lack of `..` and, for each part that is
+                // serializable, ensure we are checking it for equality below.
+                SignatureFunc::TypeScheme(CustomValidator {
+                    poly_func,
+                    validate: _,
+                }) => Some(poly_func.clone()),
+                // This is ruled out by `new()` but leave it here for later.
+                SignatureFunc::CustomFunc(_) => None,
+            };
+
+            let get_lower_funcs = |lfs: &Vec<LowerFunc>| {
+                lfs.iter()
+                    .map(|lf| match lf {
+                        // as with get_sig above, this should break if the hierarchy
+                        // is changed, update similarly.
+                        LowerFunc::FixedHugr { extensions, hugr } => {
+                            Some((extensions.clone(), hugr.clone()))
+                        }
+                        // This is ruled out by `new()` but leave it here for later.
+                        LowerFunc::CustomFunc(_) => None,
+                    })
+                    .collect_vec()
+            };
+
+            extension == other_extension
+                && name == other_name
+                && description == other_description
+                && misc == other_misc
+                && get_sig(signature_func) == get_sig(other_signature_func)
+                && get_lower_funcs(lower_funcs) == get_lower_funcs(other_lower_funcs)
+        }
     }
 
     #[test]
@@ -685,5 +768,80 @@ mod test {
             Ok(exp_fun_ty)
         );
         Ok(())
+    }
+
+    mod proptest {
+        use super::SimpleOpDef;
+        use ::proptest::prelude::*;
+
+        use crate::{
+            builder::test::simple_dfg_hugr,
+            extension::{
+                op_def::LowerFunc, CustomValidator, ExtensionId, ExtensionSet, OpDef, SignatureFunc,
+            },
+            types::PolyFuncType,
+        };
+
+        impl Arbitrary for SignatureFunc {
+            type Parameters = ();
+            type Strategy = BoxedStrategy<Self>;
+            fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+                // TODO there is also  SignatureFunc::CustomFunc, but for now
+                // this is not serialised. When it is, we should generate
+                // examples here .
+                any::<PolyFuncType>()
+                    .prop_map(|x| SignatureFunc::TypeScheme(CustomValidator::from_polyfunc(x)))
+                    .boxed()
+            }
+        }
+
+        impl Arbitrary for LowerFunc {
+            type Parameters = ();
+            type Strategy = BoxedStrategy<Self>;
+            fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+                // TODO There is also LowerFunc::CustomFunc, but for now this is
+                // not serialised. When it is, we should generate examples here.
+                any::<ExtensionSet>()
+                    .prop_map(|extensions| LowerFunc::FixedHugr {
+                        extensions,
+                        hugr: simple_dfg_hugr(),
+                    })
+                    .boxed()
+            }
+        }
+
+        impl Arbitrary for SimpleOpDef {
+            type Parameters = ();
+            type Strategy = BoxedStrategy<Self>;
+            fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+                use crate::proptest::{any_serde_yaml_value, any_smolstr, any_string};
+                use proptest::collection::{hash_map, vec};
+                let misc = hash_map(any_string(), any_serde_yaml_value(), 0..3);
+                (
+                    any::<ExtensionId>(),
+                    any_smolstr(),
+                    any_string(),
+                    misc,
+                    any::<SignatureFunc>(),
+                    vec(any::<LowerFunc>(), 0..2),
+                )
+                    .prop_map(
+                        |(extension, name, description, misc, signature_func, lower_funcs)| {
+                            Self::new(OpDef {
+                                extension,
+                                name,
+                                description,
+                                misc,
+                                signature_func,
+                                lower_funcs,
+                                // TODO ``constant_folder` is not serialised, we should
+                                // generate examples once it is.
+                                constant_folder: None,
+                            })
+                        },
+                    )
+                    .boxed()
+            }
+        }
     }
 }

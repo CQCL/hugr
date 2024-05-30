@@ -5,7 +5,7 @@ use crate::builder::{
 };
 use crate::extension::prelude::{BOOL_T, PRELUDE_ID, QB_T, USIZE_T};
 use crate::extension::simple_op::MakeRegisteredOp;
-use crate::extension::{EMPTY_REG, PRELUDE_REGISTRY};
+use crate::extension::{test::SimpleOpDef, EMPTY_REG, PRELUDE_REGISTRY};
 use crate::hugr::internal::HugrMutInternals;
 use crate::ops::custom::{ExtensionOp, OpaqueOp};
 use crate::ops::{self, dataflow::IOTrait, Input, Module, Noop, Output, Value, DFG};
@@ -29,7 +29,6 @@ const NAT: Type = crate::extension::prelude::USIZE_T;
 const QB: Type = crate::extension::prelude::QB_T;
 
 /// Version 1 of the Testing HUGR serialisation format, see `testing_hugr.py`.
-#[cfg(test)]
 #[derive(Serialize, Deserialize, PartialEq, Debug, Default)]
 struct SerTestingV1 {
     typ: Option<crate::types::Type>,
@@ -37,6 +36,7 @@ struct SerTestingV1 {
     poly_func_type: Option<crate::types::PolyFuncType>,
     value: Option<crate::ops::Value>,
     optype: Option<NodeSer>,
+    op_def: Option<SimpleOpDef>,
 }
 
 type TestingModel = SerTestingV1;
@@ -91,6 +91,7 @@ impl_sertesting_from!(crate::types::SumType, sum_type);
 impl_sertesting_from!(crate::types::PolyFuncType, poly_func_type);
 impl_sertesting_from!(crate::ops::Value, value);
 impl_sertesting_from!(NodeSer, optype);
+impl_sertesting_from!(SimpleOpDef, op_def);
 
 #[test]
 fn empty_hugr_serialize() {
@@ -471,8 +472,8 @@ fn roundtrip_optype(#[case] optype: impl Into<OpType> + std::fmt::Debug) {
 }
 
 mod proptest {
-    use super::super::NodeSer;
     use super::check_testing_roundtrip;
+    use super::{NodeSer, SimpleOpDef};
     use crate::extension::ExtensionSet;
     use crate::ops::{OpType, Value};
     use crate::types::{PolyFuncType, Type};
@@ -513,8 +514,13 @@ mod proptest {
         }
 
         #[test]
-        fn prop_roundtrip_optype(ns: NodeSer) {
-            check_testing_roundtrip(ns)
+        fn prop_roundtrip_optype(op: NodeSer ) {
+            check_testing_roundtrip(op)
+        }
+
+        #[test]
+        fn prop_roundtrip_opdef(opdef: SimpleOpDef) {
+            check_testing_roundtrip(opdef)
         }
     }
 }

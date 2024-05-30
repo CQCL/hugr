@@ -635,51 +635,38 @@ mod test {
     mod proptest {
         use super::super::OpaqueValue;
         use crate::{
-            ops::Value,
-            std_extensions::arithmetic::int_types::{ConstInt, LOG_WIDTH_MAX},
+            ops::{constant::CustomSerialized, Value},
+            std_extensions::arithmetic::int_types::ConstInt,
             std_extensions::collections::ListValue,
             types::{SumType, Type},
         };
-        use ::proptest::prelude::*;
+        use ::proptest::{collection::vec, prelude::*};
         impl Arbitrary for OpaqueValue {
             type Parameters = ();
             type Strategy = BoxedStrategy<Self>;
             fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-                use proptest::collection::vec;
-                let signed_strat = (..=LOG_WIDTH_MAX).prop_flat_map(|log_width| {
-                    use i64;
-                    let max_val = (2u64.pow(log_width as u32) / 2) as i64;
-                    let min_val = -max_val - 1;
-                    (min_val..=max_val).prop_map(move |v| {
-                        OpaqueValue::new(
-                            ConstInt::new_s(log_width, v).expect("guaranteed to be in bounds"),
+                // We intentionally do not include `ConstF64` because it does not
+                // roundtrip serialise
+                prop_oneof![
+                    any::<ConstInt>().prop_map_into(),
+                    any::<CustomSerialized>().prop_map_into()
+                ]
+                .prop_recursive(
+                    3,  // No more than 3 branch levels deep
+                    32, // Target around 32 total elements
+                    3,  // Each collection is up to 3 elements long
+                    |child_strat| {
+                        (Type::any_non_row_var(), vec(child_strat, 0..3)).prop_map(
+                            |(typ, children)| {
+                                Self::new(ListValue::new(
+                                    typ,
+                                    children.into_iter().map(|e| Value::Extension { e }),
+                                ))
+                            },
                         )
-                    })
-                });
-                let unsigned_strat = (..=LOG_WIDTH_MAX).prop_flat_map(|log_width| {
-                    (0..2u64.pow(log_width as u32)).prop_map(move |v| {
-                        OpaqueValue::new(
-                            ConstInt::new_u(log_width, v).expect("guaranteed to be in bounds"),
-                        )
-                    })
-                });
-                prop_oneof![unsigned_strat, signed_strat]
-                    .prop_recursive(
-                        3,  // No more than 3 branch levels deep
-                        32, // Target around 32 total elements
-                        3,  // Each collection is up to 3 elements long
-                        |element| {
-                            (Type::any_non_row_var(), vec(element.clone(), 0..3)).prop_map(
-                                |(typ, contents)| {
-                                    OpaqueValue::new(ListValue::new(
-                                        typ,
-                                        contents.into_iter().map(|e| Value::Extension { e }),
-                                    ))
-                                },
-                            )
-                        },
-                    )
-                    .boxed()
+                    },
+                )
+                .boxed()
             }
         }
 

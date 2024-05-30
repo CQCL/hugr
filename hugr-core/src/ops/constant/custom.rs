@@ -476,4 +476,44 @@ mod test {
             serde_yaml::from_value(serde_yaml::to_value(&ev).unwrap()).unwrap()
         );
     }
+
+    mod proptest {
+        use ::proptest::prelude::*;
+
+        use crate::{
+            extension::ExtensionSet,
+            ops::constant::CustomSerialized,
+            proptest::{any_serde_yaml_value, any_string},
+            types::Type,
+        };
+
+        impl Arbitrary for CustomSerialized {
+            type Parameters = ();
+            type Strategy = BoxedStrategy<Self>;
+            fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+                let typ = any::<Type>();
+                let extensions = any::<ExtensionSet>();
+                // here we manually construct a serialized `dyn CustomConst`.
+                // The "c" and "v" come from the `typetag::serde` annotation on
+                // `trait CustomConst`.
+                // TODO This is not ideal, if we were to accidentally
+                // generate a valid tag(e.g. "ConstInt") then things will
+                // go wrong: the serde::Deserialize impl for that type will
+                // interpret "v" and fail.
+                let value = (any_serde_yaml_value(), any_string()).prop_map(|(content, tag)| {
+                    [("c".into(), tag.into()), ("v".into(), content)]
+                        .into_iter()
+                        .collect::<serde_yaml::Mapping>()
+                        .into()
+                });
+                (typ, value, extensions)
+                    .prop_map(|(typ, value, extensions)| CustomSerialized {
+                        typ,
+                        value,
+                        extensions,
+                    })
+                    .boxed()
+            }
+        }
+    }
 }

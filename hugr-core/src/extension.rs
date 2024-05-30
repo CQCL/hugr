@@ -538,7 +538,9 @@ impl FromIterator<ExtensionId> for ExtensionSet {
 }
 
 #[cfg(test)]
-mod test {
+pub mod test {
+    // We re-export this here because mod op_def is private.
+    pub use super::op_def::test::SimpleOpDef;
 
     mod proptest {
 
@@ -549,6 +551,7 @@ mod test {
         impl Arbitrary for ExtensionSet {
             type Parameters = ();
             type Strategy = BoxedStrategy<Self>;
+
             fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
                 (
                     hash_set(0..10usize, 0..3),
