@@ -348,8 +348,9 @@ pub trait Dataflow: Container {
     /// Adds a [`OpType::LoadConstant`] node.
     fn load_const(&mut self, cid: &ConstID) -> Wire {
         let const_node = cid.node();
-        let optype = self.hugr().get_optype(const_node);
-        let op: ops::Const = optype
+        let nodetype = self.hugr().get_nodetype(const_node);
+        let op: ops::Const = nodetype
+            .op()
             .clone()
             .try_into()
             .expect("ConstID does not refer to Const op.");

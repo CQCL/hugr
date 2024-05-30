@@ -79,8 +79,8 @@ pub trait HugrView: HugrInternals {
 
     /// Return the type of the HUGR root node.
     #[inline]
-    fn root_type(&self) -> &OpType {
-        let op_type = self.get_optype(self.root());
+    fn root_type(&self) -> &NodeType {
+        let node_type = self.get_nodetype(self.root());
         // Sadly no way to do this at present
         // debug_assert!(Self::RootHandle::can_hold(node_type.tag()));
         node_type

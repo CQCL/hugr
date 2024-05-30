@@ -48,6 +48,7 @@ impl<T> Versioned<T> {
 #[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
 struct NodeSer {
     parent: Node,
+    input_extensions: Option<ExtensionSet>,
     #[serde(flatten)]
     op: OpType,
 }
@@ -142,11 +143,12 @@ impl TryFrom<&Hugr> for SerHugrV1 {
         let mut metadata = vec![None; hugr.node_count()];
         for n in hugr.nodes() {
             let parent = node_rekey[&hugr.get_parent(n).unwrap_or(n)];
-            let opt = hugr.get_optype(n);
+            let opt = hugr.get_nodetype(n);
             let new_node = node_rekey[&n].index();
             nodes[new_node] = Some(NodeSer {
                 parent,
-                op: opt.clone(),
+                input_extensions: opt.input_extensions.clone(),
+                op: opt.op.clone(),
             });
             metadata[new_node].clone_from(hugr.metadata.get(n.pg_index()));
         }

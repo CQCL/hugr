@@ -49,7 +49,7 @@ pub struct Hugr {
     root: portgraph::NodeIndex,
 
     /// Operation types for each node.
-    op_types: UnmanagedDenseMap<portgraph::NodeIndex, OpType>,
+    op_types: UnmanagedDenseMap<portgraph::NodeIndex, NodeType>,
 
     /// Node metadata
     metadata: UnmanagedDenseMap<portgraph::NodeIndex, Option<NodeMetadataMap>>,
@@ -402,12 +402,11 @@ mod test {
         hugr.connect(lift, 0, output, 0);
         hugr.infer_extensions()?;
 
-// ALAN do something here? Check it doesn't work if we don't express the correct delta for the function?
-//      assert_eq!(
-//          hugr.get_nodetype(lift).input_extensions().unwrap(),
-//          &ExtensionSet::new()
-//      );
-//      assert_eq!(hugr.get_nodetype(output).input_extensions().unwrap(), &r);
-//      Ok(())
+        assert_eq!(
+            hugr.get_nodetype(lift).input_extensions().unwrap(),
+            &ExtensionSet::new()
+        );
+        assert_eq!(hugr.get_nodetype(output).input_extensions().unwrap(), &r);
+        Ok(())
     }
 }
