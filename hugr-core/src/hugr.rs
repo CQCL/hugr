@@ -9,8 +9,6 @@ pub mod serialize;
 pub mod validate;
 pub mod views;
 
-#[cfg(feature = "extension_inference")]
-use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::iter;
 
@@ -208,7 +206,7 @@ impl Hugr {
         #[cfg(feature = "extension_inference")]
         {
             self.infer_extensions()?;
-            self.validate_extensions(HashMap::new())?;
+            self.validate_extensions()?;
         }
         Ok(())
     }

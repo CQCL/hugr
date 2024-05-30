@@ -32,11 +32,6 @@ use thiserror::Error;
 pub type ExtensionSolution = HashMap<Node, ExtensionSet>;
 
 /// Infer extensions for a hugr. This is the main API exposed by this module.
-///
-/// Return all the solutions found for locations on the graph, these can be
-/// passed to [`validate_with_extension_closure`]
-///
-/// [`validate_with_extension_closure`]: crate::Hugr::validate_with_extension_closure
 pub fn infer_extensions(hugr: &impl HugrView) -> Result<ExtensionSolution, InferExtensionError> {
     let mut ctx = UnificationContext::new(hugr);
     ctx.main_loop()?;

@@ -15,8 +15,7 @@ use crate::ops::{CustomOp, Lift, OpType};
 #[cfg(feature = "extension_inference")]
 use crate::{
     builder::test::closed_dfg_root_hugr,
-    extension::prelude::PRELUDE_ID,
-    hugr::{internal::HugrMutInternals, validate::ValidationError},
+    hugr::validate::ValidationError,
     ops::{dataflow::DataflowParent, handle::NodeHandle},
 };
 
@@ -791,81 +790,6 @@ fn test_cfg_loops() -> Result<(), Box<dyn Error>> {
         let mut hugr = make_looping_cfg(bb0, bb1, bb2)?;
         hugr.update_validate(&PRELUDE_REGISTRY)?;
     }
-    Ok(())
-}
-
-#[test]
-#[cfg(feature = "extension_inference")]
-fn test_validate_with_closure() -> Result<(), Box<dyn Error>> {
-    fn dfg_hugr_with_exts(e: Option<ExtensionSet>) -> (Hugr, Node, Node) {
-        let mut h = closed_dfg_root_hugr(FunctionType::new_endo(type_row![QB_T]));
-        h.replace_op(h.root(), NodeType::new(h.get_optype(h.root()).clone(), e))
-            .unwrap();
-        let [input, output] = h.get_io(h.root()).unwrap();
-        (h, input, output)
-    }
-    fn identity_hugr_with_exts(e: Option<ExtensionSet>) -> Hugr {
-        let (mut h, input, output) = dfg_hugr_with_exts(e);
-        h.connect(input, 0, output, 0);
-        h
-    }
-
-    const EXT_ID: ExtensionId = ExtensionId::new_unchecked("foo");
-
-    let inner_open = identity_hugr_with_exts(None);
-
-    let inner_prelude = identity_hugr_with_exts(Some(ExtensionSet::singleton(&PRELUDE_ID)));
-
-    let inner_other = identity_hugr_with_exts(Some(ExtensionSet::singleton(&EXT_ID)));
-
-    // All three can be inferred and validated, without writing solutions in:
-    for inner in [&inner_open, &inner_prelude, &inner_other] {
-        assert_matches!(
-            inner.validate(&PRELUDE_REGISTRY),
-            Err(ValidationError::ExtensionError(_))
-        );
-
-        let soln = infer_extensions(inner)?;
-        inner.validate_with_extension_closure(soln, &PRELUDE_REGISTRY)?;
-    }
-
-    // Helper builds a Hugr with extensions {PRELUDE_ID}, around argument
-    let build_outer_prelude = |inner: Hugr| -> Hugr {
-        let (mut h, input, output) = dfg_hugr_with_exts(Some(ExtensionSet::singleton(&PRELUDE_ID)));
-        let inner_node = h.insert_hugr(h.root(), inner).new_root;
-        h.connect(input, 0, inner_node, 0);
-        h.connect(inner_node, 0, output, 0);
-        h
-    };
-
-    // Building a Hugr around the inner DFG works if the inner DFG is open,
-    // or has the correct (prelude) extensions:
-    for inner in [&inner_open, &inner_prelude] {
-        let mut h = build_outer_prelude(inner.clone());
-        h.update_validate(&PRELUDE_REGISTRY)?;
-    }
-
-    // ...but fails if the inner DFG already has the 'wrong' extensions:
-    assert_matches!(
-        build_outer_prelude(inner_other.clone()).update_validate(&PRELUDE_REGISTRY),
-        Err(ValidationError::CantInfer(_))
-    );
-
-    // If we do inference on the inner Hugr first, this (still) works if the
-    // inner DFG already had the correct input-extensions:
-    let mut inner_prelude_inferred = inner_prelude;
-    inner_prelude_inferred.update_validate(&PRELUDE_REGISTRY)?;
-    build_outer_prelude(inner_prelude_inferred).update_validate(&PRELUDE_REGISTRY)?;
-
-    // But fails for previously-open inner DFG as inference
-    // infers an incorrect (empty) solution:
-    let mut inner_inferred = inner_open;
-    inner_inferred.update_validate(&PRELUDE_REGISTRY)?;
-    assert_matches!(
-        build_outer_prelude(inner_inferred).update_validate(&PRELUDE_REGISTRY),
-        Err(ValidationError::CantInfer(_))
-    );
-
     Ok(())
 }
 

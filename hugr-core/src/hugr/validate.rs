@@ -11,9 +11,7 @@ use thiserror::Error;
 
 use crate::extension::validate::ExtensionValidator;
 use crate::extension::SignatureError;
-use crate::extension::{
-    validate::ExtensionError, ExtensionRegistry, ExtensionSolution, InferExtensionError,
-};
+use crate::extension::{validate::ExtensionError, ExtensionRegistry, InferExtensionError};
 
 use crate::ops::custom::CustomOpError;
 use crate::ops::custom::{resolve_opaque_op, CustomOp};
@@ -45,10 +43,9 @@ impl Hugr {
     /// TODO: Add a version of validation which allows for open extension
     /// variables (see github issue #457)
     pub fn validate(&self, extension_registry: &ExtensionRegistry) -> Result<(), ValidationError> {
-        #[cfg(feature = "extension_inference")]
-        self.validate_with_extension_closure(HashMap::new(), extension_registry)?;
-        #[cfg(not(feature = "extension_inference"))]
         self.validate_no_extensions(extension_registry)?;
+        #[cfg(feature = "extension_inference")]
+        self.validate_extensions()?;
         Ok(())
     }
 
@@ -65,8 +62,8 @@ impl Hugr {
     /// Validate extensions on the input and output edges of nodes. Check that
     /// the target ends of edges require the extensions from the sources, and
     /// check extension deltas from parent nodes are reflected in their children.
-    pub fn validate_extensions(&self, closure: ExtensionSolution) -> Result<(), ValidationError> {
-        let validator = ExtensionValidator::new(self, closure);
+    pub fn validate_extensions(&self) -> Result<(), ValidationError> {
+        let validator = ExtensionValidator::new(self, HashMap::new());
         for src_node in self.nodes() {
             let node_type = self.get_nodetype(src_node);
 
@@ -89,19 +86,6 @@ impl Hugr {
                 }
             }
         }
-        Ok(())
-    }
-
-    /// Check the validity of a hugr, taking an argument of a closure for the
-    /// free extension variables
-    pub fn validate_with_extension_closure(
-        &self,
-        closure: ExtensionSolution,
-        extension_registry: &ExtensionRegistry,
-    ) -> Result<(), ValidationError> {
-        let mut validator = ValidationContext::new(self, extension_registry);
-        validator.validate()?;
-        self.validate_extensions(closure)?;
         Ok(())
     }
 }
