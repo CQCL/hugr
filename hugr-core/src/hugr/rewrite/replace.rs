@@ -280,13 +280,23 @@ impl Rewrite for Replacement {
         // 1. Add all the new nodes. Note this includes replacement.root(), which we don't want.
         // TODO what would an error here mean? e.g. malformed self.replacement??
         let InsertionResult { new_root, node_map } = h.insert_hugr(parent, self.replacement);
-
+        // This is specific to the merge_bbs "in_loop" test:
+        let merged = Node::from( portgraph::NodeIndex::new(16));
+        assert_eq!(node_map.get(&Node::from(portgraph::NodeIndex::new(1))), Some(&merged));
         // 2. Add new edges from existing to copied nodes according to mu_in
         let translate_idx = |n| node_map.get(&n).copied().ok_or(WhichHugr::Replacement);
         let kept = |n| {
             let keep = !to_remove.contains(&n);
             keep.then_some(n).ok_or(WhichHugr::Retained)
         };
+        // (In merge_bbs "in_loop" test) this prints out four edges - there should only be one ???
+        for succ in h.output_neighbours(merged) {
+            for (src, src_port) in h.all_linked_outputs(succ) {
+                if src == merged {
+                    eprintln!("merged port {src_port:?} targets {succ:?}");
+                }
+            }
+        }
         transfer_edges(h, self.mu_inp.iter(), kept, translate_idx, None)?;
 
         // 3. Add new edges from copied to existing nodes according to mu_out,
