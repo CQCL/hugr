@@ -18,6 +18,8 @@ pub struct TailLoop {
     pub just_outputs: TypeRow,
     /// Types that are appended to both input and output
     pub rest: TypeRow,
+    /// Extension requirements to execute the body
+    pub extension_delta: ExtensionSet,
 }
 
 impl_op_name!(TailLoop);
@@ -32,7 +34,7 @@ impl DataflowOpTrait for TailLoop {
     fn signature(&self) -> FunctionType {
         let [inputs, outputs] =
             [&self.just_inputs, &self.just_outputs].map(|row| row.extend(self.rest.iter()));
-        FunctionType::new(inputs, outputs)
+        FunctionType::new(inputs, outputs).with_extension_delta(self.extension_delta.clone())
     }
 }
 
@@ -48,6 +50,13 @@ impl TailLoop {
     /// Build the input TypeRow of the child graph of a TailLoop node.
     pub(crate) fn body_input_row(&self) -> TypeRow {
         self.just_inputs.extend(self.rest.iter())
+    }
+}
+
+impl DataflowParent for TailLoop {
+    fn inner_signature(&self) -> FunctionType {
+        FunctionType::new(self.body_input_row(), self.body_output_row())
+            .with_extension_delta(self.extension_delta.clone())
     }
 }
 

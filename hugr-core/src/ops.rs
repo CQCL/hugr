@@ -432,7 +432,6 @@ impl OpParent for MakeTuple {}
 impl OpParent for UnpackTuple {}
 impl OpParent for Tag {}
 impl OpParent for Lift {}
-impl OpParent for TailLoop {}
 impl OpParent for CFG {}
 impl OpParent for Conditional {}
 impl OpParent for FuncDecl {}
