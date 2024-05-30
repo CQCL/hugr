@@ -132,30 +132,21 @@
 //! println!("{}", serialized);
 //! ```
 
-// Unstable check, may cause false positives.
-// https://github.com/rust-lang/rust-clippy/issues/5112
-#![warn(clippy::debug_assert_with_mut_call)]
-// proptest-derive generates many of these warnings.
-// https://github.com/rust-lang/rust/issues/120363
-// https://github.com/proptest-rs/proptest/issues/447
-#![cfg_attr(test, allow(non_local_definitions))]
+// These modules are re-exported as-is. If more control is needed, define a new module in this crate with the desired exports.
+// The doc inline directive is necessary for renamed modules to appear as if they were defined in this crate.
+pub use hugr_core::{builder, core, extension, ops, std_extensions, types, utils};
+#[doc(inline)]
+pub use hugr_passes as algorithms;
 
-pub mod algorithm;
-pub mod builder;
-pub mod core;
-pub mod extension;
+// Modules with hand-picked re-exports.
 pub mod hugr;
-pub mod macros;
-pub mod ops;
-pub mod std_extensions;
-pub mod types;
-mod utils;
 
-pub use crate::core::{
+// Top-level re-exports for convenience.
+pub use hugr_core::core::{
     CircuitUnit, Direction, IncomingPort, Node, NodeIndex, OutgoingPort, Port, PortIndex, Wire,
 };
-pub use crate::extension::Extension;
-pub use crate::hugr::{Hugr, HugrView, SimpleReplacement};
+pub use hugr_core::extension::Extension;
+pub use hugr_core::hugr::{Hugr, HugrView, SimpleReplacement};
 
-#[cfg(test)]
-pub mod proptest;
+// Re-export macros.
+pub use hugr_core::macros::{const_extension_ids, type_row};

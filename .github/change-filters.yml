@@ -3,6 +3,7 @@
 
 rust:
   - "hugr/**"
+  - "hugr-*/**"
   - "Cargo.toml"
   - "specification/schema/**"
 

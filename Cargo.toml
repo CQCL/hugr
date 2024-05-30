@@ -3,8 +3,7 @@ lto = "thin"
 
 [workspace]
 resolver = "2"
-members = ["hugr"]
-default-members = ["hugr"]
+members = ["hugr", "hugr-core", "hugr-passes", "hugr-cli"]
 
 [workspace.package]
 rust-version = "1.75"
@@ -17,9 +16,51 @@ license = "Apache-2.0"
 [workspace.lints.rust]
 missing_docs = "warn"
 
+[workspace.lints.clippy]
+# Unstable check, may cause false positives.
+# https://github.com/rust-lang/rust-clippy/issues/5112
+debug_assert_with_mut_call = "warn"
+
 [workspace.dependencies]
 portgraph = { version = "0.12.0" }
 insta = { version = "1.34.0" }
+bitvec = "1.0.1"
+cgmath = "0.18.0"
+context-iterators = "0.2.0"
+cool_asserts = "2.0.3"
+criterion = "0.5.1"
+delegate = "0.12.0"
+derive_more = "0.99.17"
+downcast-rs = "1.2.0"
+enum_dispatch = "0.3.11"
+html-escape = "0.2.13"
+itertools = "0.13.0"
+jsonschema = "0.18.0"
+lazy_static = "1.4.0"
+num-rational = "0.4.1"
+paste = "1.0"
+petgraph = { version = "0.6.3", default-features = false }
+proptest = "1.4.0"
+proptest-derive = "0.4.0"
+regex = "1.9.5"
+regex-syntax = "0.8.3"
+rstest = "0.19.0"
+serde = "1.0"
+serde_json = "1.0.97"
+serde_yaml = "0.9.19"
+smol_str = "0.2.0"
+strum = "0.26.1"
+strum_macros = "0.26.1"
+thiserror = "1.0.28"
+typetag = "0.2.7"
+urlencoding = "2.1.2"
+webbrowser = "1.0.0"
+clap = { version = "4.5.4"}
+clap-stdin = "0.4.0"
+clap-verbosity-flag = "2.2.0"
+assert_cmd = "2.0.14"
+assert_fs = "1.1.1"
+predicates = "3.1.0"
 
 [profile.dev.package]
 insta.opt-level = 3

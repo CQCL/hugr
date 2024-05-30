@@ -61,8 +61,9 @@ jobs:
           RUSTDOCFLAGS: "-Dwarnings"
 
   benches:
+    name: Build benchmarks 🏋️
     needs: changes
-    if: ${{ needs.changes.outputs.rust == 'true' }} && github.event_name != 'merge_group'
+    if: ${{ needs.changes.outputs.rust == 'true' && github.event_name != 'merge_group' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -122,7 +123,9 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        rust: ['1.75', beta, nightly]
+        # Pinned nightly version until this gets resolved:
+        # https://github.com/rust-lang/rust/issues/125474
+        rust: ['1.75', beta, 'nightly-2024-05-22']
     name: tests (Rust ${{ matrix.rust }})
     steps:
       - uses: actions/checkout@v4
@@ -176,8 +179,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: mozilla-actions/sccache-action@v0.0.4
-      - uses: dtolnay/rust-toolchain@nightly
+      - uses: dtolnay/rust-toolchain@master
         with:
+          # Nightly is required to count doctests coverage
+          #
+          # Pinned nightly version until this gets resolved
+          # https://github.com/rust-lang/rust/issues/125474
+          toolchain: 'nightly-2024-05-22'
           components: llvm-tools-preview
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov

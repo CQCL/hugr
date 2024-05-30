@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.5.0 (2024-05-29)
+
+### Bug Fixes
+
+- Missing re-exports in `hugr::hugr` ([#1127](https://github.com/CQCL/hugr/pull/1127))
+- Set initial version of hugr-core to 0.1.0 ([#1129](https://github.com/CQCL/hugr/pull/1129))
+
+### Features
+
+- [**breaking**] Remove `PartialEq` impl for `ConstF64` ([#1079](https://github.com/CQCL/hugr/pull/1079))
+- [**breaking**] Allow "Row Variables" declared as List<Type> ([#804](https://github.com/CQCL/hugr/pull/804))
+- Hugr binary cli tool ([#1096](https://github.com/CQCL/hugr/pull/1096))
+- [**breaking**] Move passes from `algorithms` into a separate crate ([#1100](https://github.com/CQCL/hugr/pull/1100))
+- [**breaking**] Disallow nonlocal value edges into FuncDefn's ([#1061](https://github.com/CQCL/hugr/pull/1061))
+- [**breaking**] Move cli in to hugr-cli sub-crate ([#1107](https://github.com/CQCL/hugr/pull/1107))
+- Add verbosity, return `Hugr` from `run`. ([#1116](https://github.com/CQCL/hugr/pull/1116))
+- Unseal and make public the traits `HugrInternals` and `HugrMutInternals` ([#1122](https://github.com/CQCL/hugr/pull/1122))
+
+### Refactor
+
+- [**breaking**] No Ports in TypeRow ([#1087](https://github.com/CQCL/hugr/pull/1087))
+- Add a `hugr-core` crate ([#1108](https://github.com/CQCL/hugr/pull/1108))
+
+
 ## 0.4.0 (2024-05-20)
 
 ### Bug Fixes
