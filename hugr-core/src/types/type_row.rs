@@ -92,6 +92,10 @@ impl <const RV:bool> TypeRow<RV> {
         self.iter()
             .try_for_each(|t| t.validate(exts, var_decls))
     }
+
+    pub fn into_rv(self) -> TypeRow<true> {
+        TypeRow::from(self.types.into_iter().cloned().map(Type::into_rv).collect::<Vec<_>>())
+    }
 }
 
 impl TypeRow<false> {
@@ -113,11 +117,18 @@ impl TypeRow<false> {
     }
 }
 
-impl From<TypeRow> for TypeRow<true> {
+/*impl From<TypeRow> for TypeRow<true> {
     fn from(value: TypeRow) -> Self {
         Self::from(value.into_owned().into_iter().map_into().collect::<Vec<Type<true>>>())
     }
-}
+}*/
+
+/*impl Into<Cow<'static, [Type<true>]>> for TypeRow<false> {
+    fn into(self) -> Cow<'static, [Type<true>]> {
+        let tr = self.types.into_iter().cloned().map(|t| t.into()).collect();
+        Cow::Owned(tr)
+    }
+}*/
 
 impl TryFrom<TypeRow<true>> for TypeRow {
     type Error = SignatureError;
