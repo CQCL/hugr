@@ -44,14 +44,14 @@ use std::hash::Hash;
 use itertools::Itertools;
 use thiserror::Error;
 
-use hugr::hugr::rewrite::outline_cfg::OutlineCfg;
-use hugr::hugr::views::sibling::SiblingMut;
-use hugr::hugr::views::{HierarchyView, HugrView, SiblingGraph};
-use hugr::hugr::{hugrmut::HugrMut, Rewrite, RootTagged};
-use hugr::ops::handle::{BasicBlockID, CfgID};
-use hugr::ops::OpTag;
-use hugr::ops::OpTrait;
-use hugr::{Direction, Hugr, Node};
+use hugr_core::hugr::rewrite::outline_cfg::OutlineCfg;
+use hugr_core::hugr::views::sibling::SiblingMut;
+use hugr_core::hugr::views::{HierarchyView, HugrView, SiblingGraph};
+use hugr_core::hugr::{hugrmut::HugrMut, Rewrite, RootTagged};
+use hugr_core::ops::handle::{BasicBlockID, CfgID};
+use hugr_core::ops::OpTag;
+use hugr_core::ops::OpTrait;
+use hugr_core::{Direction, Hugr, Node};
 
 /// A "view" of a CFG in a Hugr which allows basic blocks in the underlying CFG to be split into
 /// multiple blocks in the view (or merged together).
@@ -574,17 +574,19 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> EdgeClassifier<T> {
 #[cfg(test)]
 pub(crate) mod test {
     use super::*;
-    use hugr::builder::{BuildError, CFGBuilder, Container, DataflowSubContainer, HugrBuilder};
-    use hugr::extension::PRELUDE_REGISTRY;
-    use hugr::extension::{prelude::USIZE_T, ExtensionSet};
+    use hugr_core::builder::{
+        BuildError, CFGBuilder, Container, DataflowSubContainer, HugrBuilder,
+    };
+    use hugr_core::extension::PRELUDE_REGISTRY;
+    use hugr_core::extension::{prelude::USIZE_T, ExtensionSet};
 
-    use hugr::hugr::rewrite::insert_identity::{IdentityInsertion, IdentityInsertionError};
-    use hugr::hugr::views::RootChecked;
-    use hugr::ops::handle::{ConstID, NodeHandle};
-    use hugr::ops::Value;
-    use hugr::type_row;
-    use hugr::types::{EdgeKind, FunctionType, Type};
-    use hugr::utils::depth;
+    use hugr_core::hugr::rewrite::insert_identity::{IdentityInsertion, IdentityInsertionError};
+    use hugr_core::hugr::views::RootChecked;
+    use hugr_core::ops::handle::{ConstID, NodeHandle};
+    use hugr_core::ops::Value;
+    use hugr_core::type_row;
+    use hugr_core::types::{EdgeKind, FunctionType, Type};
+    use hugr_core::utils::depth;
     const NAT: Type = USIZE_T;
 
     pub fn group_by<E: Eq + Hash + Ord, V: Eq + Hash>(h: HashMap<E, V>) -> HashSet<Vec<E>> {

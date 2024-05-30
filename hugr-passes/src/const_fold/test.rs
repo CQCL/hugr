@@ -1,25 +1,25 @@
 use crate::const_fold::constant_fold_pass;
-use hugr::builder::{DFGBuilder, Dataflow, DataflowHugr};
-use hugr::extension::prelude::{sum_with_error, ConstError, ConstString, BOOL_T, STRING_TYPE};
-use hugr::extension::{ExtensionRegistry, PRELUDE};
-use hugr::ops::Value;
-use hugr::std_extensions::arithmetic;
-use hugr::std_extensions::arithmetic::int_ops::IntOpDef;
-use hugr::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
-use hugr::std_extensions::logic::{self, NaryLogic, NotOp};
-use hugr::type_row;
-use hugr::types::{FunctionType, Type, TypeRow};
+use hugr_core::builder::{DFGBuilder, Dataflow, DataflowHugr};
+use hugr_core::extension::prelude::{sum_with_error, ConstError, ConstString, BOOL_T, STRING_TYPE};
+use hugr_core::extension::{ExtensionRegistry, PRELUDE};
+use hugr_core::ops::Value;
+use hugr_core::std_extensions::arithmetic;
+use hugr_core::std_extensions::arithmetic::int_ops::IntOpDef;
+use hugr_core::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
+use hugr_core::std_extensions::logic::{self, NaryLogic, NotOp};
+use hugr_core::type_row;
+use hugr_core::types::{FunctionType, Type, TypeRow};
 
 use rstest::rstest;
 
 use lazy_static::lazy_static;
 
 use super::*;
-use hugr::builder::Container;
-use hugr::ops::{OpType, UnpackTuple};
-use hugr::std_extensions::arithmetic::conversions::ConvertOpDef;
-use hugr::std_extensions::arithmetic::float_ops::FloatOps;
-use hugr::std_extensions::arithmetic::float_types::{ConstF64, FLOAT64_TYPE};
+use hugr_core::builder::Container;
+use hugr_core::ops::{OpType, UnpackTuple};
+use hugr_core::std_extensions::arithmetic::conversions::ConvertOpDef;
+use hugr_core::std_extensions::arithmetic::float_ops::FloatOps;
+use hugr_core::std_extensions::arithmetic::float_types::{ConstF64, FLOAT64_TYPE};
 
 /// Check that a hugr just loads and returns a single expected constant.
 pub fn assert_fully_folded(h: &Hugr, expected_value: &Value) {
@@ -127,7 +127,7 @@ fn test_big() {
     ignore = "inference fails for test graph, it shouldn't"
 )]
 fn test_list_ops() -> Result<(), Box<dyn std::error::Error>> {
-    use hugr::std_extensions::collections::{self, ListOp, ListValue};
+    use hugr_core::std_extensions::collections::{self, ListOp, ListValue};
 
     let reg = ExtensionRegistry::try_new([
         PRELUDE.to_owned(),
@@ -230,8 +230,8 @@ fn orphan_output() {
     //
     // We arange things so that the `or` folds away first, leaving the not
     // with no outputs.
-    use hugr::hugr::NodeType;
-    use hugr::ops::handle::NodeHandle;
+    use hugr_core::hugr::NodeType;
+    use hugr_core::ops::handle::NodeHandle;
 
     let mut build = DFGBuilder::new(FunctionType::new(type_row![], vec![BOOL_T])).unwrap();
     let true_wire = build.add_load_value(Value::true_val());

@@ -13,14 +13,14 @@ keywords = ["Quantum", "Quantinuum"]
 categories = ["compilers"]
 
 [dependencies]
-hugr = { path = "../hugr", version = "0.4.0" }
+hugr-core = { path = "../hugr-core", version = "0.1.0" }
 itertools = { workspace = true }
 lazy_static = { workspace = true }
 paste = { workspace = true }
 thiserror = { workspace = true }
 
 [features]
-extension_inference = ["hugr/extension_inference"]
+extension_inference = ["hugr-core/extension_inference"]
 
 [dev-dependencies]
-rstest = "0.19.0"
+rstest = { workspace = true }

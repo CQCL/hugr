@@ -1,6 +1,6 @@
 [package]
 name = "hugr"
-version = "0.4.0"
+version = "0.5.0"
 edition = { workspace = true }
 rust-version = { workspace = true }
 
@@ -23,56 +23,17 @@ path = "src/lib.rs"
 
 [features]
 extension_inference = []
-cli = ["dep:clap", "dep:clap-stdin"]
 
 [dependencies]
-portgraph = { workspace = true, features = ["serde", "petgraph"] }
-thiserror = { workspace = true }
-regex = { workspace = true }
-cgmath = { workspace = true, features = ["serde"] }
-num-rational = { workspace = true, features = ["serde"] }
-downcast-rs = { workspace = true }
-# Rc used here for Extension, but unfortunately we must turn the feature on globally
-serde = { workspace = true, features = ["derive", "rc"] }
-serde_yaml = { workspace = true }
-typetag = { workspace = true }
-smol_str = { workspace = true, features = ["serde"] }
-derive_more = { workspace = true }
-itertools = { workspace = true }
-html-escape = { workspace = true }
-bitvec = { workspace = true, features = ["serde"] }
-enum_dispatch = { workspace = true }
-lazy_static = { workspace = true }
-petgraph = { workspace = true }
-context-iterators = { workspace = true }
-serde_json = { workspace = true }
-delegate = { workspace = true }
-paste = { workspace = true }
-strum = { workspace = true }
-strum_macros = { workspace = true }
-clap = { workspace = true, features = ["derive"], optional = true }
-clap-stdin = { workspace = true, optional = true }
+hugr-core = { path = "../hugr-core", version = "0.1.0" }
+hugr-passes = { path = "../hugr-passes", version = "0.1.0" }
 
 [dev-dependencies]
-criterion = { workspace = true, features = ["html_reports"] }
 rstest = { workspace = true }
-webbrowser = { workspace = true }
-urlencoding = { workspace = true }
-cool_asserts = { workspace = true }
-insta = { workspace = true, features = ["yaml"] }
-jsonschema = { workspace = true }
-proptest = { workspace = true }
-proptest-derive = { workspace = true }
-regex-syntax = { workspace = true }
-assert_cmd = { workspace = true }
-predicates = { workspace = true }
-assert_fs = { workspace = true }
+lazy_static = { workspace = true }
+criterion = { workspace = true, features = ["html_reports"] }
+serde_json = { workspace = true }
 
 [[bench]]
 name = "bench_main"
 harness = false
-
-
-[[bin]]
-name = "hugr"
-required-features = ["cli"]
