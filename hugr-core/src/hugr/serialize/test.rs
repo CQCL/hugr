@@ -501,7 +501,6 @@ fn roundtrip_polyfunctype(#[case] poly_func_type: PolyFuncType) {
 #[case(ops::CallIndirect { signature : FunctionType::new_endo(type_row![BOOL_T]) })]
 fn roundtrip_optype(#[case] optype: impl Into<OpType> + std::fmt::Debug) {
     check_testing_roundtrip(NodeSer {
-        parent: portgraph::NodeIndex::new(0).into(),
         input_extensions: None,
         op: optype.into(),
     });
@@ -520,12 +519,10 @@ mod proptest {
         type Strategy = BoxedStrategy<Self>;
         fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
             (
-                (0..i32::MAX as usize).prop_map(|x| portgraph::NodeIndex::new(x).into()),
                 any::<Option<ExtensionSet>>(),
                 any::<OpType>(),
             )
-                .prop_map(|(parent, input_extensions, op)| NodeSer {
-                    parent,
+                .prop_map(|(input_extensions, op)| NodeSer {
                     input_extensions,
                     op,
                 })

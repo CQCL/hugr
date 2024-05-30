@@ -2,6 +2,7 @@
 //! [`Hugr`]: crate::hugr::Hugr
 
 use std::collections::HashMap;
+use itertools::zip_eq;
 use serde::de::DeserializeOwned;
 use thiserror::Error;
 
@@ -10,13 +11,14 @@ use crate::extension::ExtensionSet;
 use crate::hugr::{Hugr, NodeType};
 use crate::ops::OpType;
 use crate::{Node, PortIndex};
-use portgraph::hierarchy::AttachError;
+use portgraph::hierarchy::{self, AttachError};
 use portgraph::{Direction, LinkError, PortView};
 
 use serde::{Deserialize, Deserializer, Serialize};
 
 use self::upgrade::UpgradeError;
 
+use super::internal::HugrMutInternals;
 use super::{HugrMut, HugrView, NodeMetadataMap};
 
 mod upgrade;
@@ -82,7 +84,6 @@ impl<T: DeserializeOwned> Versioned<T> {
 
 #[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
 struct NodeSer {
-    parent: Node,
     input_extensions: Option<ExtensionSet>,
     #[serde(flatten)]
     op: OpType,
@@ -95,6 +96,9 @@ struct SerHugrLatest {
     nodes: Vec<NodeSer>,
     /// for each edge: (src, src_offset, tgt, tgt_offset)
     edges: Vec<[(Node, Option<u16>); 2]>,
+    /// for each edge: (src, src_offset, tgt, tgt_offset)
+    hierarchy: Vec<Node>,
+
     /// for each node: (metadata)
     #[serde(default)]
     metadata: Option<Vec<Option<NodeMetadataMap>>>,
@@ -169,21 +173,28 @@ impl TryFrom<&Hugr> for SerHugrLatest {
 
         let mut nodes = vec![None; hugr.node_count()];
         let mut metadata = vec![None; hugr.node_count()];
+        let mut hierarchy = vec![None; hugr.node_count()];
         for n in hugr.nodes() {
             let parent = node_rekey[&hugr.get_parent(n).unwrap_or(n)];
             let opt = hugr.get_nodetype(n);
             let new_node = node_rekey[&n].index();
             nodes[new_node] = Some(NodeSer {
-                parent,
                 input_extensions: opt.input_extensions.clone(),
                 op: opt.op.clone(),
             });
+
+            hierarchy[new_node] = Some(parent);
             metadata[new_node].clone_from(hugr.metadata.get(n.pg_index()));
         }
         let nodes = nodes
             .into_iter()
             .collect::<Option<Vec<_>>>()
             .expect("Could not reach one of the nodes");
+
+        let hierarchy = hierarchy
+            .into_iter()
+            .collect::<Option<Vec<_>>>()
+            .expect("One of the nodes is missing a parent");
 
         let find_offset = |node: Node, offset: usize, dir: Direction, hugr: &Hugr| {
             let op = hugr.get_optype(node);
@@ -213,6 +224,7 @@ impl TryFrom<&Hugr> for SerHugrLatest {
         Ok(Self {
             nodes,
             edges,
+            hierarchy,
             metadata: Some(metadata),
             encoder,
         })
@@ -226,30 +238,30 @@ impl TryFrom<SerHugrLatest> for Hugr {
             nodes,
             edges,
             metadata,
-            ..
+            hierarchy,
+            encoder: _,
         }: SerHugrLatest
     ) -> Result<Self, Self::Error> {
         // Root must be first node
-        let mut nodes = nodes.into_iter();
-        let NodeSer {
-            parent: root_parent,
+        let mut nodes_hierarchy = zip_eq(nodes, hierarchy);
+        let (NodeSer {
             input_extensions,
             op: root_type,
-        } = nodes.next().unwrap();
-        if root_parent.index() != 0 {
-            return Err(HUGRSerializationError::FirstNodeNotRoot(root_parent));
+        }, parent) = nodes_hierarchy.next().unwrap();
+        if parent.index() != 0 {
+            return Err(HUGRSerializationError::FirstNodeNotRoot(parent));
         }
         // if there are any unconnected ports or copy nodes the capacity will be
         // an underestimate
         let mut hugr = Hugr::with_capacity(
             NodeType::new(root_type, input_extensions),
-            nodes.len(),
+            nodes_hierarchy.len(),
             edges.len() * 2,
         );
 
-        for node_ser in nodes {
+        for (node_ser, parent) in nodes_hierarchy {
             hugr.add_node_with_parent(
-                node_ser.parent,
+                parent,
                 NodeType::new(node_ser.op, node_ser.input_extensions),
             );
         }

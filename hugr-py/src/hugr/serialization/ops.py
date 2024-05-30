@@ -26,8 +26,6 @@ NodeID = int
 class BaseOp(ABC, ConfiguredBaseModel):
     """Base class for ops that store their node's input/output types"""
 
-    # Parent node index of node the op belongs to, used only at serialization time
-    parent: NodeID
     input_extensions: ExtensionSet | None = Field(default=None)
 
     def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
@@ -494,7 +492,7 @@ class OpType(RootModel):
         | AliasDefn
     ) = Field(discriminator="op")
 
-    model_config = ConfigDict(json_schema_extra={"required": ["parent", "op"]})
+    model_config = ConfigDict(json_schema_extra={"required": ["op"]})
 
 
 # --------------------------------------

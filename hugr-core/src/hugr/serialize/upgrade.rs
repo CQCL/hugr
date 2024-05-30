@@ -12,8 +12,8 @@ pub enum UpgradeError {
     UnknownVersionUnsupported,
 }
 
-pub fn v1_to_v2(_: serde_json::Value) -> Result<serde_json::Value, UpgradeError> {
-    todo!()
+pub fn v1_to_v2(input: serde_json::Value) -> Result<serde_json::Value, UpgradeError> {
+    Ok(input)
 }
 
 #[cfg(test)]

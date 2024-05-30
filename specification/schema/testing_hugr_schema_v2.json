@@ -31,10 +31,6 @@
         "AliasDecl": {
             "additionalProperties": true,
             "properties": {
-                "parent": {
-                    "title": "Parent",
-                    "type": "integer"
-                },
                 "input_extensions": {
                     "anyOf": [
                         {
@@ -68,7 +64,6 @@
                 }
             },
             "required": [
-                "parent",
                 "name",
                 "bound"
             ],
@@ -78,10 +73,6 @@
         "AliasDefn": {
             "additionalProperties": true,
             "properties": {
-                "parent": {
-                    "title": "Parent",
-                    "type": "integer"
-                },
                 "input_extensions": {
                     "anyOf": [
                         {
@@ -115,7 +106,6 @@
                 }
             },
             "required": [
-                "parent",
                 "name",
                 "definition"
             ],
@@ -207,10 +197,6 @@
             "additionalProperties": true,
             "description": "A dataflow node which is defined by a child CFG.",
             "properties": {
-                "parent": {
-                    "title": "Parent",
-                    "type": "integer"
-                },
                 "input_extensions": {
                     "anyOf": [
                         {
@@ -239,9 +225,6 @@
                     "$ref": "#/$defs/FunctionType"
                 }
             },
-            "required": [
-                "parent"
-            ],
             "title": "CFG",
             "type": "object"
         },
@@ -249,10 +232,6 @@
             "additionalProperties": true,
             "description": "Operation to call a function directly. The first port is connected to the def/declare of the function being called directly, with a `Static<FunctionType>` edge. The signature of the remaining ports matches the function being called.",
             "properties": {
-                "parent": {
-                    "title": "Parent",
-                    "type": "integer"
-                },
                 "input_extensions": {
                     "anyOf": [
                         {
@@ -292,7 +271,6 @@
                 }
             },
             "required": [
-                "parent",
                 "func_sig",
                 "type_args",
                 "instantiation"
@@ -304,10 +282,6 @@
             "additionalProperties": true,
             "description": "Call a function indirectly.\n\nLike call, but the first input is a standard dataflow graph type.",
             "properties": {
-                "parent": {
-                    "title": "Parent",
-                    "type": "integer"
-                },
                 "input_extensions": {
                     "anyOf": [
                         {
@@ -336,9 +310,6 @@
                     "$ref": "#/$defs/FunctionType"
                 }
             },
-            "required": [
-                "parent"
-            ],
             "title": "CallIndirect",
             "type": "object"
         },
@@ -346,10 +317,6 @@
             "additionalProperties": true,
             "description": "Case ops - nodes valid inside Conditional nodes.",
             "properties": {
-                "parent": {
-                    "title": "Parent",
-                    "type": "integer"
-                },
                 "input_extensions": {
                     "anyOf": [
                         {
@@ -378,9 +345,6 @@
                     "$ref": "#/$defs/FunctionType"
                 }
             },
-            "required": [
-                "parent"
-            ],
             "title": "Case",
             "type": "object"
         },
@@ -388,10 +352,6 @@
             "additionalProperties": true,
             "description": "Conditional operation, defined by child `Case` nodes for each branch.",
             "properties": {
-                "parent": {
-                    "title": "Parent",
-                    "type": "integer"
-                },
                 "input_extensions": {
                     "anyOf": [
                         {
@@ -449,9 +409,6 @@
                     "type": "array"
                 }
             },
-            "required": [
-                "parent"
-            ],
             "title": "Conditional",
             "type": "object"
         },
@@ -459,10 +416,6 @@
             "additionalProperties": true,
             "description": "A Const operation definition.",
             "properties": {
-                "parent": {
-                    "title": "Parent",
-                    "type": "integer"
-                },
                 "input_extensions": {
                     "anyOf": [
                         {
@@ -492,7 +445,6 @@
                 }
             },
             "required": [
-                "parent",
                 "v"
             ],
             "title": "Const",
@@ -520,10 +472,6 @@
             "additionalProperties": true,
             "description": "A user-defined operation that can be downcasted by the extensions that define it.",
             "properties": {
-                "parent": {
-                    "title": "Parent",
-                    "type": "integer"
-                },
                 "input_extensions": {
                     "anyOf": [
                         {
@@ -573,7 +521,6 @@
                 }
             },
             "required": [
-                "parent",
                 "extension",
                 "op_name"
             ],
@@ -584,10 +531,6 @@
             "additionalProperties": true,
             "description": "A simply nested dataflow graph.",
             "properties": {
-                "parent": {
-                    "title": "Parent",
-                    "type": "integer"
-                },
                 "input_extensions": {
                     "anyOf": [
                         {
@@ -616,9 +559,6 @@
                     "$ref": "#/$defs/FunctionType"
                 }
             },
-            "required": [
-                "parent"
-            ],
             "title": "DFG",
             "type": "object"
         },
@@ -626,10 +566,6 @@
             "additionalProperties": true,
             "description": "A CFG basic block node. The signature is that of the internal Dataflow graph.",
             "properties": {
-                "parent": {
-                    "title": "Parent",
-                    "type": "integer"
-                },
                 "input_extensions": {
                     "anyOf": [
                         {
@@ -687,7 +623,6 @@
                 }
             },
             "required": [
-                "parent",
                 "sum_rows"
             ],
             "title": "DataflowBlock",
@@ -697,10 +632,6 @@
             "additionalProperties": true,
             "description": "The single exit node of the CFG, has no children, stores the types of the CFG node output.",
             "properties": {
-                "parent": {
-                    "title": "Parent",
-                    "type": "integer"
-                },
                 "input_extensions": {
                     "anyOf": [
                         {
@@ -734,7 +665,6 @@
                 }
             },
             "required": [
-                "parent",
                 "cfg_outputs"
             ],
             "title": "ExitBlock",
@@ -842,10 +772,6 @@
             "additionalProperties": true,
             "description": "External function declaration, linked at runtime.",
             "properties": {
-                "parent": {
-                    "title": "Parent",
-                    "type": "integer"
-                },
                 "input_extensions": {
                     "anyOf": [
                         {
@@ -879,7 +805,6 @@
                 }
             },
             "required": [
-                "parent",
                 "name",
                 "signature"
             ],
@@ -890,10 +815,6 @@
             "additionalProperties": true,
             "description": "A function definition. Children nodes are the body of the definition.",
             "properties": {
-                "parent": {
-                    "title": "Parent",
-                    "type": "integer"
-                },
                 "input_extensions": {
                     "anyOf": [
                         {
@@ -927,7 +848,6 @@
                 }
             },
             "required": [
-                "parent",
                 "name",
                 "signature"
             ],
@@ -1042,10 +962,6 @@
             "additionalProperties": true,
             "description": "An input node. The outputs of this node are the inputs to the parent node.",
             "properties": {
-                "parent": {
-                    "title": "Parent",
-                    "type": "integer"
-                },
                 "input_extensions": {
                     "anyOf": [
                         {
@@ -1078,9 +994,6 @@
                     "type": "array"
                 }
             },
-            "required": [
-                "parent"
-            ],
             "title": "Input",
             "type": "object"
         },
@@ -1088,10 +1001,6 @@
             "additionalProperties": true,
             "description": "Fixes some TypeParams of a polymorphic type by providing TypeArgs.",
             "properties": {
-                "parent": {
-                    "title": "Parent",
-                    "type": "integer"
-                },
                 "input_extensions": {
                     "anyOf": [
                         {
@@ -1129,7 +1038,6 @@
                 }
             },
             "required": [
-                "parent",
                 "type_row",
                 "new_extension"
             ],
@@ -1162,10 +1070,6 @@
             "additionalProperties": true,
             "description": "An operation that loads a static constant in to the local dataflow graph.",
             "properties": {
-                "parent": {
-                    "title": "Parent",
-                    "type": "integer"
-                },
                 "input_extensions": {
                     "anyOf": [
                         {
@@ -1195,7 +1099,6 @@
                 }
             },
             "required": [
-                "parent",
                 "datatype"
             ],
             "title": "LoadConstant",
@@ -1205,10 +1108,6 @@
             "additionalProperties": true,
             "description": "Load a static function in to the local dataflow graph.",
             "properties": {
-                "parent": {
-                    "title": "Parent",
-                    "type": "integer"
-                },
                 "input_extensions": {
                     "anyOf": [
                         {
@@ -1248,7 +1147,6 @@
                 }
             },
             "required": [
-                "parent",
                 "func_sig",
                 "type_args",
                 "signature"
@@ -1260,10 +1158,6 @@
             "additionalProperties": true,
             "description": "An operation that packs all its inputs into a tuple.",
             "properties": {
-                "parent": {
-                    "title": "Parent",
-                    "type": "integer"
-                },
                 "input_extensions": {
                     "anyOf": [
                         {
@@ -1296,9 +1190,6 @@
                     "type": "array"
                 }
             },
-            "required": [
-                "parent"
-            ],
             "title": "MakeTuple",
             "type": "object"
         },
@@ -1306,10 +1197,6 @@
             "additionalProperties": true,
             "description": "The root of a module, parent of all other `ModuleOp`s.",
             "properties": {
-                "parent": {
-                    "title": "Parent",
-                    "type": "integer"
-                },
                 "input_extensions": {
                     "anyOf": [
                         {
@@ -1335,9 +1222,6 @@
                     "type": "string"
                 }
             },
-            "required": [
-                "parent"
-            ],
             "title": "Module",
             "type": "object"
         },
@@ -1345,10 +1229,6 @@
             "additionalProperties": true,
             "description": "A no-op operation.",
             "properties": {
-                "parent": {
-                    "title": "Parent",
-                    "type": "integer"
-                },
                 "input_extensions": {
                     "anyOf": [
                         {
@@ -1378,7 +1258,6 @@
                 }
             },
             "required": [
-                "parent",
                 "ty"
             ],
             "title": "Noop",
@@ -1550,7 +1429,6 @@
                 }
             ],
             "required": [
-                "parent",
                 "op"
             ],
             "title": "OpType"
@@ -1648,10 +1526,6 @@
             "additionalProperties": true,
             "description": "An output node. The inputs are the outputs of the function.",
             "properties": {
-                "parent": {
-                    "title": "Parent",
-                    "type": "integer"
-                },
                 "input_extensions": {
                     "anyOf": [
                         {
@@ -1684,9 +1558,6 @@
                     "type": "array"
                 }
             },
-            "required": [
-                "parent"
-            ],
             "title": "Output",
             "type": "object"
         },
@@ -1844,10 +1715,6 @@
             "additionalProperties": true,
             "description": "An operation that creates a tagged sum value from one of its variants.",
             "properties": {
-                "parent": {
-                    "title": "Parent",
-                    "type": "integer"
-                },
                 "input_extensions": {
                     "anyOf": [
                         {
@@ -1888,7 +1755,6 @@
                 }
             },
             "required": [
-                "parent",
                 "tag",
                 "variants"
             ],
@@ -1899,10 +1765,6 @@
             "additionalProperties": true,
             "description": "Tail-controlled loop.",
             "properties": {
-                "parent": {
-                    "title": "Parent",
-                    "type": "integer"
-                },
                 "input_extensions": {
                     "anyOf": [
                         {
@@ -1949,9 +1811,6 @@
                     "type": "array"
                 }
             },
-            "required": [
-                "parent"
-            ],
             "title": "TailLoop",
             "type": "object"
         },
@@ -2241,10 +2100,6 @@
             "additionalProperties": true,
             "description": "An operation that packs all its inputs into a tuple.",
             "properties": {
-                "parent": {
-                    "title": "Parent",
-                    "type": "integer"
-                },
                 "input_extensions": {
                     "anyOf": [
                         {
@@ -2277,9 +2132,6 @@
                     "type": "array"
                 }
             },
-            "required": [
-                "parent"
-            ],
             "title": "UnpackTuple",
             "type": "object"
         },

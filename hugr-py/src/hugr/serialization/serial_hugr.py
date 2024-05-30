@@ -18,6 +18,7 @@ class SerialHugr(ConfiguredBaseModel):
     version: str = VersionField
     nodes: list[OpType]
     edges: list[Edge]
+    hierarchy: list[NodeID]
     metadata: list[dict[str, Any] | None] | None = None
     encoder: str | None = Field(
         default=None, description="The name of the encoder used to generate the Hugr."
@@ -36,7 +37,7 @@ class SerialHugr(ConfiguredBaseModel):
     @classmethod
     def get_version(cls) -> str:
         """Return the version of the schema."""
-        return cls(nodes=[], edges=[]).version
+        return cls(nodes=[], edges=[], hierarchy=[]).version
 
     @classmethod
     def _pydantic_rebuild(cls, config: ConfigDict = ConfigDict(), **kwargs):
