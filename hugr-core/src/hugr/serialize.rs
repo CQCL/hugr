@@ -1,9 +1,9 @@
 //! Serialization definition for [`Hugr`]
 //! [`Hugr`]: crate::hugr::Hugr
 
-use std::collections::HashMap;
 use itertools::zip_eq;
 use serde::de::DeserializeOwned;
+use std::collections::HashMap;
 use thiserror::Error;
 
 use crate::core::NodeIndex;
@@ -11,14 +11,13 @@ use crate::extension::ExtensionSet;
 use crate::hugr::{Hugr, NodeType};
 use crate::ops::OpType;
 use crate::{Node, PortIndex};
-use portgraph::hierarchy::{self, AttachError};
+use portgraph::hierarchy::AttachError;
 use portgraph::{Direction, LinkError, PortView};
 
 use serde::{Deserialize, Deserializer, Serialize};
 
 use self::upgrade::UpgradeError;
 
-use super::internal::HugrMutInternals;
 use super::{HugrMut, HugrView, NodeMetadataMap};
 
 mod upgrade;
@@ -34,9 +33,9 @@ mod upgrade;
 ///
 /// Make sure to order the variants from newest to oldest, as the deserializer
 /// will try to deserialize them in order.
-#[derive(Debug,Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "version", rename_all = "lowercase")]
-enum Versioned<SerHugr =SerHugrLatest> {
+enum Versioned<SerHugr = SerHugrLatest> {
     #[serde(skip_serializing)]
     /// Version 0 of the HUGR serialization format.
     V0,
@@ -51,32 +50,26 @@ enum Versioned<SerHugr =SerHugrLatest> {
 
 impl<T> Versioned<T> {
     pub fn new_latest(t: T) -> Self {
-        Self::V2(t.into())
+        Self::V2(t)
     }
-
-    fn get_latest(self) -> T {
-        let Self::V2(t) = self else {
-            panic!("Versioned::get_latest: Not the latest")
-        };
-        t
-    }
-}
-
-
-fn go<D: serde::de::DeserializeOwned>(v: serde_json::Value) -> Result<D,UpgradeError> {
-    serde_json::from_value(v).map_err(Into::into)
 }
 
 
 impl<T: DeserializeOwned> Versioned<T> {
-    fn upgrade(mut self) -> Result<T,UpgradeError> {
+    fn upgrade(mut self) -> Result<T, UpgradeError> {
+        // go is polymorphic in D. When we are upgrading to the latest version
+        // D is T. When we are upgrading to a version which is not the latest D
+        // is serde_json::Value.
+        fn go<D: serde::de::DeserializeOwned>(v: serde_json::Value) -> Result<D, UpgradeError> {
+            serde_json::from_value(v).map_err(Into::into)
+        }
         loop {
             match self {
                 Self::V0 => Err(UpgradeError::KnownVersionUnsupported("0".into()))?,
                 // the upgrade lines remain unchanged when adding a new constructor
                 Self::V1(json) => self = Self::V2(upgrade::v1_to_v2(json).and_then(go)?),
                 Self::V2(ser_hugr) => return Ok(ser_hugr),
-                Versioned::Unsupported => Err(UpgradeError::UnknownVersionUnsupported)?
+                Versioned::Unsupported => Err(UpgradeError::UnknownVersionUnsupported)?,
             }
         }
     }
@@ -96,7 +89,7 @@ struct SerHugrLatest {
     nodes: Vec<NodeSer>,
     /// for each edge: (src, src_offset, tgt, tgt_offset)
     edges: Vec<[(Node, Option<u16>); 2]>,
-    /// for each edge: (src, src_offset, tgt, tgt_offset)
+    /// for each node: it's parent node. The root node has itself as a parent.
     hierarchy: Vec<Node>,
 
     /// for each node: (metadata)
@@ -240,14 +233,18 @@ impl TryFrom<SerHugrLatest> for Hugr {
             metadata,
             hierarchy,
             encoder: _,
-        }: SerHugrLatest
+        }: SerHugrLatest,
     ) -> Result<Self, Self::Error> {
+        let nodes_len = nodes.len();
         // Root must be first node
-        let mut nodes_hierarchy = zip_eq(nodes, hierarchy);
-        let (NodeSer {
-            input_extensions,
-            op: root_type,
-        }, parent) = nodes_hierarchy.next().unwrap();
+        let mut nodes_parent = zip_eq(nodes, hierarchy);
+        let (
+            NodeSer {
+                input_extensions,
+                op: root_type,
+            },
+            parent,
+        ) = nodes_parent.next().unwrap();
         if parent.index() != 0 {
             return Err(HUGRSerializationError::FirstNodeNotRoot(parent));
         }
@@ -255,11 +252,11 @@ impl TryFrom<SerHugrLatest> for Hugr {
         // an underestimate
         let mut hugr = Hugr::with_capacity(
             NodeType::new(root_type, input_extensions),
-            nodes_hierarchy.len(),
+            nodes_len,
             edges.len() * 2,
         );
 
-        for (node_ser, parent) in nodes_hierarchy {
+        for (node_ser, parent) in nodes_parent {
             hugr.add_node_with_parent(
                 parent,
                 NodeType::new(node_ser.op, node_ser.input_extensions),

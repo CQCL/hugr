@@ -1,4 +1,4 @@
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import Field, ConfigDict
 
@@ -10,7 +10,13 @@ import hugr
 Port = tuple[NodeID, int | None]  # (node, offset)
 Edge = tuple[Port, Port]
 
-VersionField = Field(default_factory=get_serialisation_version, title="Version", description="Serialisation Schema Version", frozen=True)
+VersionField = Field(
+    default_factory=get_serialisation_version,
+    title="Version",
+    description="Serialisation Schema Version",
+    frozen=True,
+)
+
 
 class SerialHugr(ConfiguredBaseModel):
     """A serializable representation of a Hugr."""

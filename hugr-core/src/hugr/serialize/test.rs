@@ -41,7 +41,7 @@ struct SerTestingLatest {
 
 struct NamedSchema {
     name: &'static str,
-    schema: JSONSchema
+    schema: JSONSchema,
 }
 
 impl NamedSchema {
@@ -61,7 +61,10 @@ impl NamedSchema {
         }
     }
 
-    pub fn check_schemas(val: &serde_json::Value, schemas: impl IntoIterator<Item=&'static Self>) {
+    pub fn check_schemas(
+        val: &serde_json::Value,
+        schemas: impl IntoIterator<Item = &'static Self>,
+    ) {
         for schema in schemas {
             schema.check(val);
         }
@@ -71,8 +74,12 @@ impl NamedSchema {
 macro_rules! include_schema {
     ($name:ident, $path:literal) => {
         lazy_static! {
-            static ref $name: NamedSchema = NamedSchema::new("$name", {
-                    let schema_val: serde_json::Value = serde_json::from_str(include_str!(concat!("../../../../specification/schema/",$path,"_v2.json"))).unwrap();
+            static ref $name: NamedSchema =
+                NamedSchema::new("$name", {
+                    let schema_val: serde_json::Value = serde_json::from_str(include_str!(
+                        concat!("../../../../specification/schema/", $path, "_v2.json")
+                    ))
+                    .unwrap();
                     JSONSchema::options()
                         .with_draft(Draft::Draft7)
                         .compile(&schema_val)
@@ -82,30 +89,18 @@ macro_rules! include_schema {
     };
 }
 
-include_schema!(
-    SCHEMA,
-    "hugr_schema"
-);
-include_schema!(
-    SCHEMA_STRICT,
-    "hugr_schema_strict"
-);
-include_schema!(
-    TESTING_SCHEMA,
-    "testing_hugr_schema"
-);
-include_schema!(
-    TESTING_SCHEMA_STRICT,
-    "testing_hugr_schema_strict"
-);
+include_schema!(SCHEMA, "hugr_schema");
+include_schema!(SCHEMA_STRICT, "hugr_schema_strict");
+include_schema!(TESTING_SCHEMA, "testing_hugr_schema");
+include_schema!(TESTING_SCHEMA_STRICT, "testing_hugr_schema_strict");
 
-fn get_schemas(b: bool) -> impl IntoIterator<Item=&'static NamedSchema> {
-    let schemas: Vec<&'static NamedSchema> = vec![&SCHEMA,&SCHEMA_STRICT];
+fn get_schemas(b: bool) -> impl IntoIterator<Item = &'static NamedSchema> {
+    let schemas: Vec<&'static NamedSchema> = vec![&SCHEMA, &SCHEMA_STRICT];
     b.then_some(schemas.into_iter()).into_iter().flatten()
 }
 
-fn get_testing_schemas(b: bool) -> impl IntoIterator<Item=&'static NamedSchema> {
-    let schemas: Vec<&'static NamedSchema> = vec![&TESTING_SCHEMA,&TESTING_SCHEMA_STRICT];
+fn get_testing_schemas(b: bool) -> impl IntoIterator<Item = &'static NamedSchema> {
+    let schemas: Vec<&'static NamedSchema> = vec![&TESTING_SCHEMA, &TESTING_SCHEMA_STRICT];
     b.then_some(schemas.into_iter()).into_iter().flatten()
 }
 
@@ -134,18 +129,19 @@ fn empty_hugr_serialize() {
     check_hugr_roundtrip(&Hugr::default(), true);
 }
 
-
-
 /// Serialize and deserialize a value, optionally validating against a schema.
 fn ser_serialize_check_schema<T: Serialize>(
     g: &T,
-    schemas: impl IntoIterator<Item=&'static NamedSchema>) -> serde_json::Value {
+    schemas: impl IntoIterator<Item = &'static NamedSchema>,
+) -> serde_json::Value {
     let val = serde_json::to_value(g).unwrap();
     NamedSchema::check_schemas(&val, schemas);
     val
 }
 
-fn ser_deserialize_check_schema<T: serde::de::DeserializeOwned>(val: serde_json::Value, schemas: impl IntoIterator<Item=&'static NamedSchema>,
+fn ser_deserialize_check_schema<T: serde::de::DeserializeOwned>(
+    val: serde_json::Value,
+    schemas: impl IntoIterator<Item = &'static NamedSchema>,
 ) -> T {
     NamedSchema::check_schemas(&val, schemas);
     serde_json::from_value(val).unwrap()
@@ -154,7 +150,7 @@ fn ser_deserialize_check_schema<T: serde::de::DeserializeOwned>(val: serde_json:
 /// Serialize and deserialize a value, optionally validating against a schema.
 fn ser_roundtrip_check_schema<T: Serialize + serde::de::DeserializeOwned>(
     g: &T,
-    schemas: impl IntoIterator<Item=&'static NamedSchema>
+    schemas: impl IntoIterator<Item = &'static NamedSchema>,
 ) -> T {
     let val = serde_json::to_value(g).unwrap();
     NamedSchema::check_schemas(&val, schemas);
@@ -219,8 +215,6 @@ pub fn check_hugr(lhs: &Hugr, rhs: &Hugr) {
         );
     }
 }
-
-
 
 fn check_testing_roundtrip(t: impl Into<SerTestingLatest>) {
     let before = Versioned::new_latest(t.into());
@@ -518,10 +512,7 @@ mod proptest {
         type Parameters = ();
         type Strategy = BoxedStrategy<Self>;
         fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-            (
-                any::<Option<ExtensionSet>>(),
-                any::<OpType>(),
-            )
+            (any::<Option<ExtensionSet>>(), any::<OpType>())
                 .prop_map(|(input_extensions, op)| NodeSer {
                     input_extensions,
                     op,

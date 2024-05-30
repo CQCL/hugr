@@ -1,5 +1,4 @@
 from pydantic import ConfigDict
-from typing import Literal
 from .tys import Type, SumType, PolyFuncType, ConfiguredBaseModel, model_rebuild
 from .ops import Value, OpType, OpDef, classes as ops_classes
 from .serial_hugr import VersionField
