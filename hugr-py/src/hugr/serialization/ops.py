@@ -348,6 +348,7 @@ class TailLoop(DataflowOp):
     just_outputs: TypeRow = Field(default_factory=list)  # Types that are only output
     # Types that are appended to both input and output:
     rest: TypeRow = Field(default_factory=list)
+    extension_delta: ExtensionSet = Field(default_factory=list)
 
     def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
         assert in_types == out_types
