@@ -2,7 +2,7 @@
 
 use thiserror::Error;
 
-use super::{type_param::TypeParam, Type, TypeRow};
+use super::{Type, TypeRow};
 use crate::{extension::SignatureError, ops::Value};
 
 /// Errors that arise from typechecking constants

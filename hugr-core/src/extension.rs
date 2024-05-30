@@ -17,8 +17,8 @@ use crate::ops::custom::{ExtensionOp, OpaqueOp};
 use crate::ops::{self, OpName, OpNameRef};
 use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
 use crate::types::Signature;
+use crate::types::TypeNameRef;
 use crate::types::{check_typevar_decl, CustomType, Substitution, TypeBound, TypeName};
-use crate::types::{FunctionType, TypeNameRef};
 
 #[allow(dead_code)]
 mod infer;

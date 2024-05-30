@@ -5,10 +5,7 @@ use super::{
     BasicBlockID, BuildError, CfgID, Container, Dataflow, HugrBuilder, Wire,
 };
 
-use crate::{
-    extension::{ExtensionRegistry, ExtensionSet},
-    types::FunctionType,
-};
+use crate::extension::{ExtensionRegistry, ExtensionSet};
 use crate::{hugr::views::HugrView, types::TypeRow};
 use crate::{
     ops::{self, handle::NodeHandle, DataflowBlock, DataflowParent, ExitBlock, OpType},

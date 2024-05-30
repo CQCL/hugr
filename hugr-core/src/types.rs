@@ -27,7 +27,6 @@ use {crate::proptest::RecursionDepth, ::proptest::prelude::*, proptest_derive::A
 
 use crate::extension::{ExtensionRegistry, SignatureError};
 use crate::ops::AliasDecl;
-use crate::type_row;
 
 use self::type_param::TypeParam;
 

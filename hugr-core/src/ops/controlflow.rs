@@ -39,10 +39,7 @@ impl DataflowOpTrait for TailLoop {
 impl TailLoop {
     /// Build the output TypeRow of the child graph of a TailLoop node.
     pub(crate) fn body_output_row(&self) -> TypeRow {
-        let sum_type = Type::new_sum([
-            self.just_inputs.clone().into(),
-            self.just_outputs.clone().into(),
-        ]);
+        let sum_type = Type::new_sum([self.just_inputs.clone(), self.just_outputs.clone()]);
         let mut outputs = vec![sum_type];
         outputs.extend_from_slice(&self.rest);
         outputs.into()
@@ -78,10 +75,9 @@ impl DataflowOpTrait for Conditional {
 
     fn signature(&self) -> Signature {
         let mut inputs = self.other_inputs.clone();
-        inputs.to_mut().insert(
-            0,
-            Type::new_sum(self.sum_rows.iter().map(|r| r.clone().into())),
-        );
+        inputs
+            .to_mut()
+            .insert(0, Type::new_sum(self.sum_rows.iter().cloned()));
         FunctionType::new(inputs, self.outputs.clone())
             .with_extension_delta(self.extension_delta.clone())
     }
@@ -159,7 +155,7 @@ impl StaticTag for ExitBlock {
 impl DataflowParent for DataflowBlock {
     fn inner_signature(&self) -> Signature {
         // The node outputs a Sum before the data outputs of the block node
-        let sum_type = Type::new_sum(self.sum_rows.iter().map(|r| r.clone().into()));
+        let sum_type = Type::new_sum(self.sum_rows.iter().cloned());
         let mut node_outputs = vec![sum_type];
         node_outputs.extend_from_slice(&self.other_outputs);
         FunctionType::new(self.inputs.clone(), TypeRow::from(node_outputs))

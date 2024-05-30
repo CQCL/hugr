@@ -7,7 +7,7 @@ use {
     ::proptest_derive::Arbitrary,
 };
 
-use crate::types::{EdgeKind, FunctionType, PolyFuncType, Signature};
+use crate::types::{EdgeKind, PolyFuncType, Signature};
 use crate::types::{Type, TypeBound};
 
 use super::dataflow::DataflowParent;

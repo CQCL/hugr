@@ -98,7 +98,7 @@ impl<const RV: bool> TypeRow<RV> {
     pub fn into_rv(self) -> TypeRow<true> {
         TypeRow::from(
             self.types
-                .into_iter()
+                .iter()
                 .cloned()
                 .map(Type::into_rv)
                 .collect::<Vec<_>>(),

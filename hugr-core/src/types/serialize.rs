@@ -54,9 +54,7 @@ impl<const RV: bool> TryFrom<SerSimpleType> for Type<RV> {
             SerSimpleType::Alias(a) => Type::new_alias(a),
             SerSimpleType::V { i, b } => Type::new_var_use(i, b),
             // We can't use new_row_var because that returns Type<true> not Type<RV>.
-            value @ SerSimpleType::R { i, b } => {
-                Type::new(TypeEnum::RowVariable(i, b)).try_into_()?
-            }
+            SerSimpleType::R { i, b } => Type::new(TypeEnum::RowVariable(i, b)).try_into_()?,
         })
     }
 }

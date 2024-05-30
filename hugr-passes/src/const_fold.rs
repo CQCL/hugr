@@ -6,7 +6,7 @@ use itertools::Itertools;
 use thiserror::Error;
 
 use hugr_core::hugr::{SimpleReplacementError, ValidationError};
-use hugr_core::types::SumType;
+use hugr_core::types::{SumType, TypeRow};
 use hugr_core::Direction;
 use hugr_core::{
     builder::{DFGBuilder, Dataflow, DataflowHugr},
@@ -64,7 +64,7 @@ pub fn fold_leaf_op(op: &OpType, consts: &[(IncomingPort, Value)]) -> ConstFoldR
         OpType::Tag(t) => out_row([Value::sum(
             t.tag,
             consts.iter().map(|(_, konst)| konst.clone()),
-            SumType::new(t.variants.clone()),
+            SumType::new(t.variants.iter().cloned().map(TypeRow::into_rv)),
         )
         .unwrap()]),
         OpType::CustomOp(op) => {
