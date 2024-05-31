@@ -2,5 +2,5 @@
 # to detect changes in each subproject, and only run the corresponding jobs.
 
 rust:
-  - "hugr-llvm/**"
+  - "src/**"
   - "Cargo.*"
