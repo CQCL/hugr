@@ -867,6 +867,7 @@ fn test_polymorphic_load() -> Result<(), Box<dyn std::error::Error>> {
 #[cfg(feature = "extension_inference")]
 mod extension_tests {
     use super::*;
+    use crate::builder::{BlockBuilder, CFGBuilder};
     use crate::extension::ExtensionSet;
     use crate::macros::const_extension_ids;
 
@@ -999,8 +1000,8 @@ mod extension_tests {
     #[case::d1(|signature| ops::DFG {signature}.into())]
     #[case::f1(|ft: FunctionType| ops::FuncDefn {name: "foo".to_string(), signature: ft.into()}.into())]
     #[case::c1(|signature| ops::Case {signature}.into())]
-    // ALAN TODO TailLoop/BasicBlock a bit harder, need a tag op inside
-    fn parent_io_mismatch(
+    // ALAN TODO TailLoop/Conditional versions too
+    fn parent_extension_mismatch(
         #[case] parent_f: impl Fn(FunctionType) -> OpType,
         #[values(ExtensionSet::new(), XA.into())] parent_extensions: ExtensionSet,
     ) {
@@ -1041,12 +1042,90 @@ mod extension_tests {
         let result = hugr.validate(&PRELUDE_REGISTRY);
         assert_eq!(
             result,
-            Err(ValidationError::ExtensionError {
+            Err(ValidationError::ExtensionError(ExtensionError {
                 parent: hugr.root(),
                 parent_extensions,
                 child: lift,
                 child_extensions: XB.into()
-            })
+            }))
         );
+    }
+
+    #[rstest]
+    #[case(XA.into(), false)]
+    #[case(ExtensionSet::new(), false)]
+    #[case(ExtensionSet::from_iter([XA, XB]), true)]
+    fn cfg_extension_mismatch(
+        #[case] parent_extensions: ExtensionSet,
+        #[case] success: bool,
+    ) -> Result<(), BuildError> {
+        let mut cfg = CFGBuilder::new(
+            FunctionType::new_endo(USIZE_T).with_extension_delta(parent_extensions.clone()),
+        )?;
+        let mut bb = cfg.simple_entry_builder(USIZE_T.into(), 1, XB.into())?;
+        let pred = bb.add_load_value(Value::unary_unit_sum());
+        let inputs = bb.input_wires();
+        let blk = bb.finish_with_outputs(pred, inputs)?;
+        let exit = cfg.exit_block();
+        cfg.branch(&blk, 0, &exit)?;
+        let root = cfg.hugr().root();
+        let res = cfg.finish_prelude_hugr();
+        if success {
+            assert!(res.is_ok())
+        } else {
+            assert_eq!(
+                res,
+                Err(ValidationError::ExtensionError(ExtensionError {
+                    parent: root,
+                    parent_extensions,
+                    child: blk.node(),
+                    child_extensions: XB.into()
+                }))
+            );
+        }
+        Ok(())
+    }
+
+    #[rstest]
+    #[case(XA.into(), false)]
+    #[case(ExtensionSet::new(), false)]
+    #[case(ExtensionSet::from_iter([XA, XB]), true)]
+    fn bb_extension_mismatch(
+        #[case] parent_extensions: ExtensionSet,
+        #[case] success: bool,
+    ) -> Result<(), BuildError> {
+        let mut bb = BlockBuilder::new(
+            USIZE_T,
+            None,
+            vec![USIZE_T.into()],
+            type_row![],
+            parent_extensions.clone(),
+        )?;
+        let lift = bb.add_dataflow_op(
+            ops::Lift {
+                type_row: USIZE_T.into(),
+                new_extension: XB,
+            },
+            bb.input_wires(),
+        )?;
+        let pred = bb.make_tuple(lift.outputs())?;
+        let root = bb.hugr().root();
+        let res = bb.finish_prelude_hugr_with_outputs([pred]);
+        if success {
+            assert!(res.is_ok())
+        } else {
+            assert_eq!(
+                res,
+                Err(BuildError::InvalidHUGR(ValidationError::ExtensionError(
+                    ExtensionError {
+                        parent: root,
+                        parent_extensions,
+                        child: lift.node(),
+                        child_extensions: XB.into()
+                    }
+                )))
+            );
+        }
+        Ok(())
     }
 }
