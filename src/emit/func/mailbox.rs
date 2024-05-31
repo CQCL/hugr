@@ -103,7 +103,7 @@ impl<'c> RowMailBox<'c> {
         )
     }
 
-    /// Returns a [RowPromise] that when [RowPromis::finish]ed will write to this `RowMailBox`.
+    /// Returns a [RowPromise] that when [RowPromise::finish]ed will write to this `RowMailBox`.
     pub fn promise(&self) -> RowPromise<'c> {
         RowPromise(self.clone())
     }

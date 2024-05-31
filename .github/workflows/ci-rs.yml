@@ -1,0 +1,221 @@
+name: Continuous integration 🦀
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  merge_group:
+    types: [checks_requested]
+  workflow_dispatch: {}
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  RUSTFLAGS: "--cfg=ci_run"
+  MIRIFLAGS: '-Zmiri-permissive-provenance' # Required due to warnings in bitvec 1.0.1
+  CI: true # insta snapshots behave differently on ci
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: "sccache"
+  HUGR_TEST_SCHEMA: "1"
+
+jobs:
+  # Check if changes were made to the relevant files.
+  # Always returns true if running on the default branch, to ensure all changes are throughly checked.
+  changes:
+    name: Check for changes in Rust files
+    runs-on: ubuntu-latest
+    # Required permissions
+    permissions:
+      pull-requests: read
+    # Set job outputs to values from filter step
+    outputs:
+      rust: ${{ github.ref_name == github.event.repository.default_branch || steps.filter.outputs.rust }}
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dorny/paths-filter@v3
+      id: filter
+      with:
+        filters: .github/change-filters.yml
+
+  check:
+    needs: changes
+    if: ${{ needs.changes.outputs.rust == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mozilla-actions/sccache-action@v0.0.4
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: install-llvm
+        run: "sudo apt-get update && sudo apt-get install -y llvm-14"
+      - name: Check formatting
+        run: cargo fmt -- --check
+      - name: Run clippy
+        run: cargo clippy --all-targets --workspace -- -D warnings
+      - name: Build docs
+        run: cargo doc --no-deps --workspace
+        env:
+          RUSTDOCFLAGS: "-Dwarnings"
+
+
+  benches:
+    name: Build benchmarks 🏋️
+    needs: changes
+    # if: ${{ needs.changes.outputs.rust == 'true' && github.event_name != 'merge_group' }}
+    if: false # TODO
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mozilla-actions/sccache-action@v0.0.4
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+      # - name: Build benchmarks with no features
+      #   run: cargo bench --verbose --no-run --workspace --no-default-features
+      - name: Build benchmarks with all features
+        run: cargo bench --verbose --no-run --workspace
+
+  # # Run tests on Rust stable
+  # tests-stable-no-features:
+  #   needs: changes
+  #   if: ${{ needs.changes.outputs.rust == 'true' }}
+  #   runs-on: ubuntu-latest
+  #   name: tests (Rust stable, no features)
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: mozilla-actions/sccache-action@v0.0.4
+  #     - name: install-llvm
+  #       run: "sudo apt-get update && sudo apt-get install -y llvm-14"
+  #     - id: toolchain
+  #       uses: dtolnay/rust-toolchain@master
+  #       with:
+  #         toolchain: 'stable'
+  #     - name: Configure default rust toolchain
+  #       run: rustup override set ${{steps.toolchain.outputs.name}}
+  #     - name: Build with no features
+  #       run: cargo test --verbose --workspace --no-default-features --no-run
+  #     - name: Tests with no features
+  #       run: cargo test --verbose --workspace --no-default-features
+
+  # Run tests on Rust stable
+  tests-stable-all-features:
+    needs: changes
+    if: ${{ needs.changes.outputs.rust == 'true' }}
+    runs-on: ubuntu-latest
+    name: tests (Rust stable, all features)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mozilla-actions/sccache-action@v0.0.4
+      - name: install-llvm
+        run: "sudo apt-get update && sudo apt-get install -y llvm-14"
+      - id: toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 'stable'
+      - name: Configure default rust toolchain
+        run: rustup override set ${{steps.toolchain.outputs.name}}
+      - name: Build with all features
+        run: cargo test --verbose --workspace --no-run
+      - name: Tests with all features
+        run: cargo test --verbose --workspace
+
+  # Run tests on other toolchains
+  tests-other:
+    needs: changes
+    if: ${{ needs.changes.outputs.rust == 'true' && github.event_name != 'merge_group' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        # Pinned nightly version until this gets resolved:
+        # https://github.com/rust-lang/rust/issues/125474
+        rust: ['1.75', beta, 'nightly-2024-05-22']
+    name: tests (Rust ${{ matrix.rust }})
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mozilla-actions/sccache-action@v0.0.4
+      - name: install-llvm
+        run: "sudo apt-get update && sudo apt-get install -y llvm-14"
+      - id: toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust }}
+      - name: Configure default rust toolchain
+        run: rustup override set ${{steps.toolchain.outputs.name}}
+      # - name: Build with no features
+      #   run: cargo test --verbose --workspace --no-default-features --no-run
+      # - name: Tests with no features
+      #   run: cargo test --verbose --workspace --no-default-features
+      - name: Build with all features
+        run: cargo test --verbose --workspace --no-run
+      - name: Tests with all features
+        run: cargo test --verbose --workspace
+
+  # This is a meta job to mark successful completion of the required checks,
+  # even if they are skipped due to no changes in the relevant files.
+  required-checks:
+    name: Required checks 🦀
+    needs: [changes, check,
+      # tests-stable-no-features,
+      tests-stable-all-features]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if required checks failed
+        # This condition should simply be `if: failure() || cancelled()`,
+        # but there seems to be a bug in the github workflow runner.
+        #
+        # See https://github.com/orgs/community/discussions/80788
+
+        # needs.tests-stable-no-features.result == 'failure' || needs.tests-stable-no-features.result == 'cancelled' ||
+        if: |
+          needs.changes.result == 'failure' || needs.changes.result == 'cancelled' ||
+          needs.check.result == 'failure' || needs.check.result == 'cancelled' ||
+          needs.tests-stable-all-features.result == 'failure' || needs.tests-stable-all-features.result == 'cancelled'
+        run: |
+          echo "Required checks failed"
+          echo "Please check the logs for more information"
+          exit 1
+      - name: Pass if required checks passed
+        run: |
+          echo "All required checks passed"
+
+  coverage:
+    needs: [changes,
+      # tests-stable-no-features,
+      tests-stable-all-features, tests-other, check]
+    # Run only if there are changes in the relevant files and the check job passed or was skipped
+    # if: always() && !failure() && !cancelled() && needs.changes.outputs.rust == 'true' && github.event_name != 'merge_group'
+    if: false # todo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mozilla-actions/sccache-action@v0.0.4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          # Nightly is required to count doctests coverage
+          #
+          # Pinned nightly version until this gets resolved
+          # https://github.com/rust-lang/rust/issues/125474
+          toolchain: 'nightly-2024-05-22'
+          components: llvm-tools-preview
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+      - name: Run tests with coverage instrumentation
+        run: |
+            cargo llvm-cov clean --workspace
+            # cargo llvm-cov --no-report --workspace --no-default-features --doctests
+            cargo llvm-cov --no-report --workspace --doctests
+      - name: Generate coverage report
+        run: cargo llvm-cov report --codecov --output-path coverage.json
+      - name: Upload coverage to codecov.io
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage.json
+          name: rust
+          flags: rust
+          token: ${{ secrets.CODECOV_TOKEN }}
