@@ -13,6 +13,7 @@ use std::collections::VecDeque;
 use std::iter;
 
 pub(crate) use self::hugrmut::HugrMut;
+use self::validate::ExtensionError;
 pub use self::validate::ValidationError;
 
 pub use ident::{IdentList, InvalidIdentifier};
@@ -193,8 +194,15 @@ impl Hugr {
         self.validate_no_extensions(extension_registry)?;
         #[cfg(feature = "extension_inference")]
         {
+            self.infer_extensions()?;
             self.validate_extensions()?;
         }
+        Ok(())
+    }
+
+    /// Leaving this here as in the future we plan for it to infer deltas
+    /// of container nodes e.g. [DFG]. For the moment it does nothing.
+    pub fn infer_extensions(&mut self) -> Result<(), ExtensionError> {
         Ok(())
     }
 }
