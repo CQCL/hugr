@@ -685,7 +685,7 @@ fn multi_entry() -> Result<(), Box<dyn Error>> {
     )?;
 
     hugr.connect(entry, 0, bb0, 0);
-    hugr.connect(entry, 0, bb1, 0);
+    hugr.connect(entry, 1, bb1, 0);
     hugr.connect(bb0, 0, bb2, 0);
     hugr.connect(bb1, 0, bb2, 0);
     hugr.connect(bb2, 0, exit, 0);
@@ -770,7 +770,7 @@ fn make_looping_cfg(
 
     hugr.connect(entry, 0, bb1, 0);
     hugr.connect(bb1, 0, bb2, 0);
-    hugr.connect(bb1, 0, exit, 0);
+    hugr.connect(bb1, 1, exit, 0);
     hugr.connect(bb2, 0, entry, 0);
 
     Ok(hugr)
@@ -911,7 +911,7 @@ fn simple_cfg_loop() -> Result<(), Box<dyn Error>> {
 
     hugr.connect(entry, 0, bb, 0);
     hugr.connect(bb, 0, bb, 0);
-    hugr.connect(bb, 0, exit, 0);
+    hugr.connect(bb, 1, exit, 0);
 
     hugr.update_validate(&PRELUDE_REGISTRY)?;
 
