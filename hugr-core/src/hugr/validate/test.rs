@@ -872,6 +872,7 @@ mod extension_tests {
     use crate::macros::const_extension_ids;
 
     const_extension_ids! {
+        const XA: ExtensionId = "A";
         const XB: ExtensionId = "BOOL_EXT";
     }
 
@@ -996,14 +997,21 @@ mod extension_tests {
         );
     }
 
-    #[test]
-    // ALAN TODO parametrize this by some different OpTypes e.g. DFG, Function
-    fn parent_io_mismatch() {
-        // The DFG node declares that it has an empty extension delta,
-        // but it's child graph adds extension "XB", causing a mismatch.
-        let mut hugr = Hugr::new(NodeType::new_pure(ops::DFG {
-            signature: FunctionType::new(type_row![USIZE_T], type_row![USIZE_T]),
-        }));
+    #[rstest]
+    #[case::d1(|signature| ops::DFG {signature}.into())]
+    #[case::f1(|ft: FunctionType| ops::FuncDefn {name: "foo".to_string(), signature: ft.into()}.into())]
+    #[case::c1(|signature| ops::Case {signature}.into())]
+    // ALAN TODO TailLoop/BasicBlock a bit harder, need a tag op inside
+    fn parent_io_mismatch(
+        #[case] parent_f: impl Fn(FunctionType) -> OpType,
+        #[values(ExtensionSet::new(), XA.into())] parent_extensions: ExtensionSet,
+    ) {
+        // Child graph adds extension "XB", but the parent (in all cases)
+        // declares a different delta, causing a mismatch.
+        let parent = parent_f(
+            FunctionType::new_endo(USIZE_T).with_extension_delta(parent_extensions.clone()),
+        );
+        let mut hugr = Hugr::new(NodeType::new_pure(parent));
 
         let input = hugr.add_node_with_parent(
             hugr.root(),
@@ -1037,7 +1045,7 @@ mod extension_tests {
             result,
             Err(ValidationError::ExtensionError {
                 parent: hugr.root(),
-                parent_extensions: ExtensionSet::new(),
+                parent_extensions,
                 child: lift,
                 child_extensions: XB.into()
             })
