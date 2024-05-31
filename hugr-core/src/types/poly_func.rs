@@ -48,6 +48,15 @@ impl<const RV: bool> From<FunctionType<RV>> for PolyFuncType<RV> {
     }
 }
 
+impl From<PolyFuncType<false>> for PolyFuncType {
+    fn from(value: PolyFuncType<false>) -> Self {
+        Self {
+            params: value.params,
+            body: value.body.into(),
+        }
+    }
+}
+
 impl<const RV: bool> TryFrom<PolyFuncType<RV>> for FunctionType<RV> {
     /// If the PolyFuncType is not monomorphic, fail with its binders
     type Error = Vec<TypeParam>;
@@ -74,7 +83,7 @@ impl<const RV: bool> PolyFuncType<RV> {
 
     /// Create a new PolyFuncType given the kinds of the variables it declares
     /// and the underlying function type.
-    pub fn new(params: impl Into<Vec<TypeParam>>, body: impl Into<FunctionType<RV>>) -> Self {
+    pub fn new(params: impl Into<Vec<TypeParam>>, body: FunctionType<RV>) -> Self {
         Self {
             params: params.into(),
             body: body.into(),

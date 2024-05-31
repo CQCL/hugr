@@ -237,20 +237,20 @@ fn int_polytype(
     n_vars: usize,
     input: impl Into<TypeRow>,
     output: impl Into<TypeRow>,
-) -> PolyFuncType {
+) -> PolyFuncType<false> {
     PolyFuncType::new(
         vec![LOG_WIDTH_TYPE_PARAM; n_vars],
         FunctionType::new(input, output),
     )
 }
 
-fn ibinop_sig() -> PolyFuncType {
+fn ibinop_sig() -> PolyFuncType<false> {
     let int_type_var = int_tv(0);
 
     int_polytype(1, vec![int_type_var.clone(); 2], vec![int_type_var])
 }
 
-fn iunop_sig() -> PolyFuncType {
+fn iunop_sig() -> PolyFuncType<false> {
     let int_type_var = int_tv(0);
     int_polytype(1, vec![int_type_var.clone()], vec![int_type_var])
 }

@@ -151,6 +151,7 @@ fn extension() -> Extension {
     let list_type_def = extension.get_type(&LIST_TYPENAME).unwrap();
 
     let (l, e) = list_and_elem_type_vars(list_type_def);
+    let (l, e): (Type<true>, Type<true>) = (l.into(), e.into());
     extension
         .add_op(
             POP_NAME,
