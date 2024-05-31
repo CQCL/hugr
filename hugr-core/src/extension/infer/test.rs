@@ -12,12 +12,6 @@ use crate::macros::const_extension_ids;
 use crate::ops::custom::OpaqueOp;
 use crate::ops::{self, dataflow::IOTrait};
 use crate::ops::{CustomOp, Lift, OpType};
-#[cfg(feature = "extension_inference")]
-use crate::{
-    builder::test::closed_dfg_root_hugr,
-    hugr::validate::ValidationError,
-    ops::{dataflow::DataflowParent, handle::NodeHandle},
-};
 
 use crate::type_row;
 use crate::types::{FunctionType, Type, TypeRow};
@@ -149,40 +143,6 @@ fn plus() -> Result<(), InferExtensionError> {
     Ok(())
 }
 
-#[cfg(feature = "extension_inference")]
-#[test]
-// This generates a solution that causes validation to fail
-// because of a missing lift node
-fn missing_lift_node() {
-    let mut hugr = Hugr::new(NodeType::new_pure(ops::DFG {
-        signature: FunctionType::new(type_row![NAT], type_row![NAT]).with_extension_delta(A),
-    }));
-
-    let input = hugr.add_node_with_parent(
-        hugr.root(),
-        NodeType::new_pure(ops::Input {
-            types: type_row![NAT],
-        }),
-    );
-
-    let output = hugr.add_node_with_parent(
-        hugr.root(),
-        NodeType::new_pure(ops::Output {
-            types: type_row![NAT],
-        }),
-    );
-
-    hugr.connect(input, 0, output, 0);
-
-    // Fail to catch the actual error because it's a difference between I/O
-    // nodes and their parents and `report_mismatch` isn't yet smart enough
-    // to handle that.
-    assert_matches!(
-        hugr.update_validate(&PRELUDE_REGISTRY),
-        Err(ValidationError::CantInfer(_))
-    );
-}
-
 #[test]
 // Tests that we can succeed even when all variables don't have concrete
 // extension sets, and we have an open variable at the start of the graph.
@@ -206,55 +166,6 @@ fn open_variables() -> Result<(), InferExtensionError> {
     // We'll only find concrete solutions for the Incoming extension reqs of
     // the main node created by `Hugr::default`
     assert_eq!(solution.len(), 1);
-    Ok(())
-}
-
-#[cfg(feature = "extension_inference")]
-#[test]
-// Infer the extensions on a child node with no inputs
-fn dangling_src() -> Result<(), Box<dyn Error>> {
-    let rs = ExtensionSet::singleton(&"R".try_into().unwrap());
-
-    let mut hugr = closed_dfg_root_hugr(
-        FunctionType::new(type_row![NAT], type_row![NAT]).with_extension_delta(rs.clone()),
-    );
-
-    let [input, output] = hugr.get_io(hugr.root()).unwrap();
-    let add_r_sig =
-        FunctionType::new(type_row![NAT], type_row![NAT]).with_extension_delta(rs.clone());
-
-    let add_r = hugr.add_node_with_parent(
-        hugr.root(),
-        ops::DFG {
-            signature: add_r_sig,
-        },
-    );
-
-    // Dangling thingy
-    let src_sig = FunctionType::new(type_row![], type_row![NAT]);
-
-    let src = hugr.add_node_with_parent(hugr.root(), ops::DFG { signature: src_sig });
-
-    let mult_sig = FunctionType::new(type_row![NAT, NAT], type_row![NAT]);
-    // Mult has open extension requirements, which we should solve to be "R"
-    let mult = hugr.add_node_with_parent(
-        hugr.root(),
-        ops::DFG {
-            signature: mult_sig,
-        },
-    );
-
-    hugr.connect(input, 0, add_r, 0);
-    hugr.connect(add_r, 0, mult, 0);
-    hugr.connect(src, 0, mult, 1);
-    hugr.connect(mult, 0, output, 0);
-
-    hugr.infer_extensions()?;
-    assert_eq!(hugr.get_nodetype(src.node()).io_extensions().unwrap().1, rs);
-    assert_eq!(
-        hugr.get_nodetype(mult.node()).io_extensions().unwrap(),
-        (rs.clone(), rs)
-    );
     Ok(())
 }
 
@@ -298,80 +209,6 @@ fn create_with_io(
         },
     );
     Ok([node, input, output])
-}
-
-#[cfg(feature = "extension_inference")]
-#[test]
-fn test_conditional_inference() -> Result<(), Box<dyn Error>> {
-    fn build_case(
-        hugr: &mut Hugr,
-        conditional_node: Node,
-        op: ops::Case,
-        first_ext: ExtensionId,
-        second_ext: ExtensionId,
-    ) -> Result<Node, Box<dyn Error>> {
-        let [case, case_in, case_out] =
-            create_with_io(hugr, conditional_node, op.clone(), op.inner_signature())?;
-
-        let lift1 = hugr.add_node_with_parent(
-            case,
-            Lift {
-                type_row: type_row![NAT],
-                new_extension: first_ext,
-            },
-        );
-
-        let lift2 = hugr.add_node_with_parent(
-            case,
-            Lift {
-                type_row: type_row![NAT],
-                new_extension: second_ext,
-            },
-        );
-
-        hugr.connect(case_in, 0, lift1, 0);
-        hugr.connect(lift1, 0, lift2, 0);
-        hugr.connect(lift2, 0, case_out, 0);
-
-        Ok(case)
-    }
-
-    let sum_rows = vec![type_row![]; 2];
-    let rs = ExtensionSet::from_iter([A, B]);
-
-    let inputs = type_row![NAT];
-    let outputs = type_row![NAT];
-
-    let op = ops::Conditional {
-        sum_rows,
-        other_inputs: inputs.clone(),
-        outputs: outputs.clone(),
-        extension_delta: rs.clone(),
-    };
-
-    let mut hugr = Hugr::new(NodeType::new_pure(op));
-    let conditional_node = hugr.root();
-
-    let case_op = ops::Case {
-        signature: FunctionType::new(inputs, outputs).with_extension_delta(rs),
-    };
-    let case0_node = build_case(&mut hugr, conditional_node, case_op.clone(), A, B)?;
-
-    let case1_node = build_case(&mut hugr, conditional_node, case_op, B, A)?;
-
-    hugr.infer_extensions()?;
-
-    for node in [case0_node, case1_node, conditional_node] {
-        assert_eq!(
-            hugr.get_nodetype(node).io_extensions().unwrap().0,
-            ExtensionSet::new()
-        );
-        assert_eq!(
-            hugr.get_nodetype(node).io_extensions().unwrap().0,
-            ExtensionSet::new()
-        );
-    }
-    Ok(())
 }
 
 #[test]
