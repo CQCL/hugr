@@ -77,12 +77,13 @@ impl Hugr {
             for child in self.children(parent) {
                 let child_extensions = self.get_optype(child).extension_delta();
                 if !parent_extensions.is_superset(&child_extensions) {
-                    return Err(ValidationError::ExtensionError {
+                    return Err(ExtensionError {
                         parent,
                         parent_extensions,
                         child,
                         child_extensions,
-                    });
+                    }
+                    .into());
                 }
             }
         }
@@ -741,14 +742,9 @@ pub enum ValidationError {
     /// There are invalid inter-graph edges.
     #[error(transparent)]
     InterGraphEdgeError(#[from] InterGraphEdgeError),
-    #[error("Extensions of child node ({child}) {child_extensions} are not a subset of the parent node ({parent}): {parent_extensions}")]
-    /// There are errors in the extension declarations.
-    ExtensionError {
-        parent: Node,
-        parent_extensions: ExtensionSet,
-        child: Node,
-        child_extensions: ExtensionSet,
-    },
+    /// There are errors in the extension deltas.
+    #[error(transparent)]
+    ExtensionError(#[from] ExtensionError),
     /// Error in a node signature
     #[error("Error in signature of node {node:?}: {cause}")]
     SignatureError { node: Node, cause: SignatureError },
@@ -819,6 +815,16 @@ pub enum InterGraphEdgeError {
         from_parent: Node,
         ancestor: Node,
     },
+}
+
+#[derive(Debug, Clone, PartialEq, Error)]
+#[error("Extensions of child node ({child}) {child_extensions} are not a subset of the parent node ({parent}): {parent_extensions}")]
+/// An error in the extension deltas.
+pub struct ExtensionError {
+    parent: Node,
+    parent_extensions: ExtensionSet,
+    child: Node,
+    child_extensions: ExtensionSet,
 }
 
 #[cfg(test)]
