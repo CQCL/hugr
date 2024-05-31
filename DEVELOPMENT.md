@@ -124,7 +124,7 @@ and open it with your favourite coverage viewer. In VSCode, you can use
 - rename last `V` constructor to match. (e.g. `V12` -> `V13`)
 - create new `V` constructor holding a `serde_json::Value`. (e.g. `V12(serde_json::Value)`)
 - add a stub implement `v12_to_13` in `hugr::serialize::upgrade`
-- add a line to the pattern matchi in `Versioned::Upgrade` e.g.  `Self::V12(json) => self = Self::V13(upgrade::v12_to_v13(json).and_then(go)?)`,
+- add a line to the pattern match in `Versioned::Upgrade` e.g.  `Self::V12(json) => self = Self::V13(upgrade::v12_to_v13(json).and_then(go)?)`,
 - Ensure all non-upgrade tests are passing.
 - implement `v12_to_13` in `hugr::serialize::upgrade`
 - Ensure all tests are passing
