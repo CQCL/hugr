@@ -349,7 +349,7 @@ fn emit_call<'c, H: HugrView>(
         OpType::FuncDefn(_) => context.get_func_defn(func_node.try_into_ot().unwrap()),
         _ => Err(anyhow!("emit_call: Not a Decl or Defn")),
     };
-    let inputs: args.inputs.into_iter().map_into().collect_vec();
+    let inputs = args.inputs.into_iter().map_into().collect_vec();
     let builder = context.builder();
     let call = builder
         .build_call(func?, inputs.as_slice(), "")?
