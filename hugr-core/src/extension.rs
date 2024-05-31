@@ -19,12 +19,6 @@ use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
 use crate::types::{check_typevar_decl, CustomType, Substitution, TypeBound, TypeName};
 use crate::types::{FunctionType, TypeNameRef};
 
-#[allow(dead_code)]
-mod infer;
-#[cfg(feature = "extension_inference")]
-pub use infer::infer_extensions;
-pub use infer::{ExtensionSolution, InferExtensionError};
-
 mod op_def;
 pub use op_def::{
     CustomSignatureFunc, CustomValidator, LowerFunc, OpDef, SignatureFromArgs, SignatureFunc,

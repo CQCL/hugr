@@ -24,7 +24,7 @@ use thiserror::Error;
 
 pub use self::views::{HugrView, RootTagged};
 use crate::core::NodeIndex;
-use crate::extension::{ExtensionRegistry, ExtensionSet, ExtensionSolution, InferExtensionError};
+use crate::extension::{ExtensionRegistry, ExtensionSet};
 use crate::ops::custom::resolve_extension_ops;
 use crate::ops::{OpTag, OpTrait, OpType, DEFAULT_OPTYPE};
 use crate::types::FunctionType;
@@ -206,28 +206,6 @@ impl Hugr {
             self.validate_extensions()?;
         }
         Ok(())
-    }
-
-    /// Infer extension requirements and add new information to `op_types` field
-    /// (if the "extension_inference" feature is on; otherwise, do nothing)
-    pub fn infer_extensions(&mut self) -> Result<(), InferExtensionError> {
-        Ok(())
-    }
-
-    #[allow(dead_code)]
-    /// Add extension requirement information to the hugr in place.
-    fn instantiate_extensions(&mut self, solution: &ExtensionSolution) {
-        // We only care about inferred _input_ extensions, because `NodeType`
-        // uses those to infer the output extensions
-        for (node, input_extensions) in solution.iter() {
-            let nodetype = self.op_types.try_get_mut(node.pg_index()).unwrap();
-            match &nodetype.input_extensions {
-                None => nodetype.input_extensions = Some(input_extensions.clone()),
-                Some(existing_ext_reqs) => {
-                    debug_assert_eq!(existing_ext_reqs, input_extensions)
-                }
-            }
-        }
     }
 }
 

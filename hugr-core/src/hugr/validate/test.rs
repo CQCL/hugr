@@ -152,7 +152,6 @@ fn children_restrictions() {
         b.update_validate(&EMPTY_REG),
         Err(ValidationError::NonContainerWithChildren { node, .. }) => assert_eq!(node, copy)
     );
-    b.infer_extensions().unwrap();
     b.set_parent(new_def, root);
 
     // After moving the previous definition to a valid place,
@@ -915,7 +914,6 @@ mod extension_tests {
             .unwrap();
         // Write Extension annotations into the Hugr while it's still well-formed
         // enough for us to compute them
-        b.infer_extensions().unwrap();
         b.validate(&EMPTY_REG).unwrap();
         b.replace_op(
             copy,

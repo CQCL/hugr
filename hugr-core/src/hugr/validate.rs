@@ -9,7 +9,7 @@ use petgraph::visit::{Topo, Walker};
 use portgraph::{LinkView, PortView};
 use thiserror::Error;
 
-use crate::extension::{ExtensionRegistry, ExtensionSet, InferExtensionError, SignatureError};
+use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 
 use crate::ops::custom::{resolve_opaque_op, CustomOp, CustomOpError};
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
@@ -749,8 +749,6 @@ pub enum ValidationError {
         child: Node,
         child_extensions: ExtensionSet,
     },
-    #[error(transparent)]
-    CantInfer(#[from] InferExtensionError),
     /// Error in a node signature
     #[error("Error in signature of node {node:?}: {cause}")]
     SignatureError { node: Node, cause: SignatureError },
