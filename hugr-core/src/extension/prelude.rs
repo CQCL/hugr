@@ -27,8 +27,8 @@ impl SignatureFromArgs for ArrayOpCustom {
         };
         let elem_ty_var = Type::new_var_use(0, TypeBound::Any);
 
-        let var_arg_row = vec![elem_ty_var.clone().into(); n as usize];
-        let other_row = vec![array_type(TypeArg::BoundedNat { n }, elem_ty_var.clone()).into()];
+        let var_arg_row = vec![elem_ty_var.clone(); n as usize];
+        let other_row = vec![array_type(TypeArg::BoundedNat { n }, elem_ty_var.clone())];
 
         Ok(PolyFuncType::new(
             vec![TypeBound::Any.into()],
@@ -67,7 +67,7 @@ impl SignatureFromArgs for GenericOpCustom {
             };
             outs.push(ty.clone());
         }
-        Ok(PolyFuncType::new(vec![], FunctionType::new(inps, outs)).into())
+        Ok(PolyFuncType::new(vec![], FunctionType::new(inps, outs)))
     }
 
     fn static_params(&self) -> &[TypeParam] {
@@ -380,9 +380,7 @@ mod test {
             .instantiate([])
             .unwrap();
 
-        let ext_type = Type::<true>::new_extension(ext_def);
-        assert_eq!(ext_type, ERROR_TYPE);
-        let ext_type = Type::<false>::new_extension(ext_def);
+        let ext_type = Type::new_extension(ext_def);
         assert_eq!(ext_type, ERROR_TYPE);
 
         let error_val = ConstError::new(2, "my message");
