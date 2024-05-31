@@ -32,6 +32,7 @@ class Direction(Enum):
 class _Port:
     node: Node
     offset: int
+    direction: ClassVar[Direction]
 
 
 @dataclass(frozen=True, eq=True, order=True)
