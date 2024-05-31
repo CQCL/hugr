@@ -1,10 +1,10 @@
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import subprocess
 import os
 import pathlib
-from hugr._hugr import Dfg, Hugr, Node, Command, Wire
-from hugr._ops import Op, Custom
+from hugr._hugr import Dfg, Hugr, Node, Wire
+from hugr._ops import Custom, Command
 import hugr._ops as ops
 from hugr.serialization import SerialHugr
 import hugr.serialization.tys as stys
@@ -23,76 +23,45 @@ INT_T = stys.Type(
     )
 )
 
+
+@dataclass
+class LogicOps(Custom):
+    extension: stys.ExtensionId = "logic"
+
+
 # TODO get from YAML
-NOT_OP = Custom(
-    extension="logic",
-    op_name="Not",
-    signature=stys.FunctionType(input=[BOOL_T], output=[BOOL_T]),
-)
+@dataclass
+class NotDef(LogicOps):
+    num_out: int | None = 1
+    op_name: str = "Not"
+    signature: stys.FunctionType = field(
+        default_factory=lambda: stys.FunctionType(input=[BOOL_T], output=[BOOL_T])
+    )
+
+    def __call__(self, a: Wire) -> Command:
+        return super().__call__(a)
+
+
+Not = NotDef()
 
 
 @dataclass
-class Not(Command):
-    a: Wire
-
-    def incoming(self) -> list[Wire]:
-        return [self.a]
-
-    def num_out(self) -> int | None:
-        return 1
-
-    def op(self) -> Op:
-        return NOT_OP
+class IntOps(Custom):
+    extension: stys.ExtensionId = "arithmetic.int"
 
 
 @dataclass
-class DivMod(Command):
-    a: Wire
-    b: Wire
-
-    def incoming(self) -> list[Wire]:
-        return [self.a, self.b]
-
-    def num_out(self) -> int | None:
-        return 2
-
-    def op(self) -> Op:
-        return Custom(
-            extension="arithmetic.int",
-            op_name="idivmod_u",
-            signature=stys.FunctionType(input=[INT_T] * 2, output=[INT_T] * 2),
-            args=[ARG_5, ARG_5],
-        )
+class DivModDef(IntOps):
+    num_out: int | None = 2
+    extension: stys.ExtensionId = "arithmetic.int"
+    op_name: str = "idivmod_u"
+    signature: stys.FunctionType = field(
+        default_factory=lambda: stys.FunctionType(input=[INT_T] * 2, output=[INT_T] * 2)
+    )
+    args: list[stys.TypeArg] = field(default_factory=lambda: [ARG_5, ARG_5])
 
 
-@dataclass
-class MakeTuple(Command):
-    types: list[stys.Type]
-    wires: list[Wire]
-
-    def incoming(self) -> list[Wire]:
-        return self.wires
-
-    def num_out(self) -> int | None:
-        return 1
-
-    def op(self) -> Op:
-        return ops.MakeTuple(self.types)
-
-
-@dataclass
-class UnpackTuple(Command):
-    types: list[stys.Type]
-    wire: Wire
-
-    def incoming(self) -> list[Wire]:
-        return [self.wire]
-
-    def num_out(self) -> int | None:
-        return len(self.types)
-
-    def op(self) -> Op:
-        return ops.UnpackTuple(self.types)
+DivMod = DivModDef()
 
 
 def _validate(h: Hugr, mermaid: bool = False, roundtrip: bool = True):
@@ -114,7 +83,7 @@ def _validate(h: Hugr, mermaid: bool = False, roundtrip: bool = True):
 def test_stable_indices():
     h = Hugr(ops.DFG())
 
-    nodes = [h.add_node(NOT_OP) for _ in range(3)]
+    nodes = [h.add_node(Not) for _ in range(3)]
     assert len(h) == 4
 
     h.add_link(nodes[0].out(0), nodes[1].inp(0))
@@ -137,7 +106,7 @@ def test_stable_indices():
     with pytest.raises(KeyError):
         _ = h[Node(46)]
 
-    new_n = h.add_node(NOT_OP)
+    new_n = h.add_node(Not)
     assert new_n == nodes[1]
 
     assert len(h) == 4
@@ -178,7 +147,7 @@ def test_multiport():
 def test_add_op():
     h = Dfg.endo([BOOL_T])
     (a,) = h.inputs()
-    nt = h.add_op(NOT_OP, a)
+    nt = h.add_op(Not, a)
     h.set_outputs(nt)
 
     _validate(h.hugr)
@@ -188,8 +157,8 @@ def test_tuple():
     row = [BOOL_T, QB_T]
     h = Dfg.endo(row)
     a, b = h.inputs()
-    t = h.add(MakeTuple(row, [a, b]))
-    a, b = h.add(UnpackTuple(row, t))
+    t = h.add(ops.MakeTuple(row)(a, b))
+    a, b = h.add(ops.UnpackTuple(row)(t))
     h.set_outputs(a, b)
 
     _validate(h.hugr)

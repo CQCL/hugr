@@ -19,7 +19,7 @@ from typing_extensions import Self
 from hugr.serialization.serial_hugr import SerialHugr
 from hugr.serialization.ops import OpType as SerialOp
 from hugr.serialization.tys import Type, FunctionType
-from hugr._ops import Op, Input, Output, DFG
+from hugr._ops import Op, Input, Output, DFG, Command
 from hugr.utils import BiMap
 
 
@@ -42,13 +42,6 @@ class InPort(_Port):
 
 class Wire(Protocol):
     def out_port(self) -> OutPort: ...
-
-
-class Command(Protocol):
-    def op(self) -> Op: ...
-    def incoming(self) -> Iterable[Wire]: ...
-    def num_out(self) -> int | None:
-        return None
 
 
 @dataclass(frozen=True, eq=True, order=True)
@@ -119,7 +112,7 @@ class NodeData:
     def to_serial(self, node: Node, hugr: Hugr) -> SerialOp:
         o = self.op.to_serial(node, self.parent if self.parent else node, hugr)
 
-        return SerialOp(root=o)  # type: ignore
+        return SerialOp(root=o)  # type: ignore[arg-type]
 
 
 P = TypeVar("P", InPort, OutPort)
@@ -399,7 +392,7 @@ class Dfg:
         return new_n
 
     def add(self, com: Command) -> Node:
-        return self.add_op(com.op(), *com.incoming(), num_outs=com.num_out())
+        return self.add_op(com.op, *com.incoming, num_outs=com.op.num_out)
 
     def insert_nested(self, dfg: Dfg, *args: Wire) -> Node:
         mapping = self.hugr.insert_hugr(dfg.hugr, self.root)
