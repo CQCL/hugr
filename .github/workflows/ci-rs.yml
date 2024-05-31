@@ -189,8 +189,7 @@ jobs:
       # tests-stable-no-features,
       tests-stable-all-features, tests-other, check]
     # Run only if there are changes in the relevant files and the check job passed or was skipped
-    # if: always() && !failure() && !cancelled() && needs.changes.outputs.rust == 'true' && github.event_name != 'merge_group'
-    if: false # todo
+    if: always() && !failure() && !cancelled() && needs.changes.outputs.rust == 'true' && github.event_name != 'merge_group'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
