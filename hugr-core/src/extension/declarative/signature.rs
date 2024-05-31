@@ -57,9 +57,7 @@ impl SignatureDeclaration {
         };
 
         let poly_func = PolyFuncType::new(op_params, body);
-        Ok(SignatureFunc::TypeScheme(CustomValidator::from_polyfunc(
-            poly_func,
-        )))
+        Ok(poly_func.into())
     }
 }
 

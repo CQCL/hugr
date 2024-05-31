@@ -48,6 +48,15 @@ impl<const RV: bool> From<FunctionType<RV>> for PolyFuncType<RV> {
     }
 }
 
+impl From<PolyFuncType<false>> for PolyFuncType<true> {
+    fn from(value: PolyFuncType<false>) -> Self {
+        Self {
+            params: value.params,
+            body: value.body.into()
+        }
+    }
+}
+
 impl<const RV: bool> TryFrom<PolyFuncType<RV>> for FunctionType<RV> {
     /// If the PolyFuncType is not monomorphic, fail with its binders
     type Error = Vec<TypeParam>;
