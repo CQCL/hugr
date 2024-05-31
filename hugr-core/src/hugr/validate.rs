@@ -62,17 +62,15 @@ impl Hugr {
             let parent_op = self.get_optype(parent);
             let parent_extensions = match parent_op.inner_function_type() {
                 Some(FunctionType { extension_reqs, .. }) => extension_reqs,
-                None => {
-                    if matches!(parent_op.tag(), OpTag::Cfg | OpTag::Conditional) {
-                        parent_op.extension_delta()
-                    } else {
-                        assert!(
-                            parent_op.tag() == OpTag::ModuleRoot
-                                || self.children(parent).next().is_none()
-                        );
+                None => match parent_op.tag() {
+                    OpTag::Cfg | OpTag::Conditional => parent_op.extension_delta(),
+                    // ModuleRoot holds but does not execute its children, so allow any extensions
+                    OpTag::ModuleRoot => continue,
+                    _ => {
+                        assert!(self.children(parent).next().is_none());
                         continue;
                     }
-                }
+                },
             };
             for child in self.children(parent) {
                 let child_extensions = self.get_optype(child).extension_delta();
