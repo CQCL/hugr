@@ -126,11 +126,11 @@ impl TypeRow<false> {
     }
 }
 
-/*impl From<TypeRow> for TypeRow<true> {
+impl From<TypeRow> for TypeRow<true> {
     fn from(value: TypeRow) -> Self {
         Self::from(value.into_owned().into_iter().map_into().collect::<Vec<Type<true>>>())
     }
-}*/
+}
 
 /*impl Into<Cow<'static, [Type<true>]>> for TypeRow<false> {
     fn into(self) -> Cow<'static, [Type<true>]> {
@@ -159,21 +159,36 @@ impl<const RV: bool> Default for TypeRow<RV> {
     }
 }
 
-impl<F, const RV: bool> From<F> for TypeRow<RV>
-where
-    F: Into<Cow<'static, [Type<RV>]>>,
-{
-    fn from(types: F) -> Self {
+impl<const RV: bool> From<Vec<Type<RV>>> for TypeRow<RV> {
+    fn from(types: Vec<Type<RV>>) -> Self {
         Self {
-            types: types.into(),
+            types: types.into()
         }
     }
 }
 
-impl<const RV: bool> From<Type<RV>> for TypeRow<RV> {
-    fn from(t: Type<RV>) -> Self {
+impl From<Vec<Type>> for TypeRow<true> {
+    fn from(types: Vec<Type>) -> Self {
         Self {
-            types: vec![t].into(),
+            types: types.into_iter().map(Type::into_).collect()
+        }
+    }
+}
+
+
+impl<const RV: bool> From<&'static [Type<RV>]> for TypeRow<RV> {
+    fn from(types: &'static [Type<RV>]) -> Self {
+        Self {
+            types: types.into()
+        }
+    }
+}
+
+impl<const RV1: bool, const RV2:bool> From<Type<RV1>> for TypeRow<RV2> {
+    fn from(t: Type<RV1>) -> Self {
+        let _ = Implies::<RV1, RV2>::A_IMPLIES_B;
+        Self {
+            types: vec![t.into_()].into(),
         }
     }
 }
