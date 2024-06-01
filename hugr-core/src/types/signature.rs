@@ -94,6 +94,14 @@ impl<const RV: bool> FunctionType<RV> {
         self.output.validate(extension_registry, var_decls)?;
         self.extension_reqs.validate(var_decls)
     }
+
+    pub(crate) fn into_rv(self) -> FunctionType<true> {
+        FunctionType {
+            input: self.input.into_rv(),
+            output: self.output.into_rv(),
+            extension_reqs: self.extension_reqs
+        }
+    }
 }
 
 impl FunctionType<true> {

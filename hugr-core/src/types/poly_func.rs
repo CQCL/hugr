@@ -39,11 +39,20 @@ pub struct PolyFuncType<const ROWVARS: bool = true> {
     body: FunctionType<ROWVARS>,
 }
 
-impl<const RV: bool> From<FunctionType<RV>> for PolyFuncType<RV> {
+impl<const RV: bool> From<FunctionType<RV>> for PolyFuncType<true> {
     fn from(body: FunctionType<RV>) -> Self {
         Self {
             params: vec![],
-            body,
+            body: body.into_rv(),
+        }
+    }
+}
+
+impl From<FunctionType<false>> for PolyFuncType<false> {
+    fn from(body: FunctionType<false>) -> Self {
+        Self {
+            params: vec![],
+            body
         }
     }
 }
