@@ -611,7 +611,7 @@ pub(super) mod test {
 
         let list_usize =
             Type::new_extension(list_def.instantiate(vec![TypeArg::Type { ty: USIZE_T }])?);
-        let mut dfg = DFGBuilder::new(FunctionType::try_new_endo(vec![list_usize])?)?;
+        let mut dfg = DFGBuilder::new(FunctionType::new_endo(vec![list_usize]))?;
         let rev = dfg.add_dataflow_op(
             CustomOp::new_extension(
                 e.instantiate_extension_op(&OP_NAME, vec![TypeArg::Type { ty: USIZE_T }], &reg)
@@ -663,10 +663,10 @@ pub(super) mod test {
         let args = [TypeArg::BoundedNat { n: 3 }, USIZE_T.into()];
         assert_eq!(
             def.compute_signature(&args, &PRELUDE_REGISTRY),
-            Ok(FunctionType::try_new(
+            Ok(FunctionType::new(
                 vec![USIZE_T; 3],
                 vec![Type::new_tuple(vec![USIZE_T; 3])]
-            )?)
+            ))
         );
         assert_eq!(def.validate_args(&args, &PRELUDE_REGISTRY, &[]), Ok(()));
 
@@ -676,10 +676,10 @@ pub(super) mod test {
         let args = [TypeArg::BoundedNat { n: 3 }, tyvar.clone().into()];
         assert_eq!(
             def.compute_signature(&args, &PRELUDE_REGISTRY),
-            Ok(FunctionType::try_new(
+            Ok(FunctionType::new(
                 tyvars.clone(),
                 vec![Type::new_tuple(tyvars)]
-            )?)
+            ))
         );
         def.validate_args(&args, &PRELUDE_REGISTRY, &[TypeBound::Eq.into()])
             .unwrap();
@@ -732,7 +732,7 @@ pub(super) mod test {
         def.validate_args(&args, &EMPTY_REG, &decls).unwrap();
         assert_eq!(
             def.compute_signature(&args, &EMPTY_REG),
-            Ok(FunctionType::try_new_endo(tv)?)
+            Ok(FunctionType::new_endo(tv))
         );
         // But not with an external row variable
         let arg: TypeArg = Type::new_row_var_use(0, TypeBound::Eq).into();
@@ -766,7 +766,7 @@ pub(super) mod test {
 
         // Concrete extension set
         let es = ExtensionSet::singleton(&EXT_ID);
-        let exp_fun_ty = FunctionType::try_new_endo(BOOL_T)?.with_extension_delta(es.clone());
+        let exp_fun_ty = FunctionType::new_endo(BOOL_T).with_extension_delta(es.clone());
         let args = [TypeArg::Extensions { es }];
 
         def.validate_args(&args, &PRELUDE_REGISTRY, &params)

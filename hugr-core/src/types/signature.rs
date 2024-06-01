@@ -276,7 +276,7 @@ mod test {
     use super::*;
     #[test]
     fn test_function_type() {
-        let mut f_type = FunctionType::try_new(Type::UNIT, Type::UNIT).unwrap();
+        let mut f_type = FunctionType::new(Type::UNIT, Type::UNIT);
         assert_eq!(f_type.input_count(), 1);
         assert_eq!(f_type.output_count(), 1);
 
