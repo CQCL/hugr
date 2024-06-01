@@ -268,7 +268,7 @@ pub const ERROR_TYPE_NAME: TypeName = TypeName::new_inline("error");
 
 /// Return a Sum type with the first variant as the given type and the second an Error.
 pub fn sum_with_error(ty: Type) -> SumType {
-    SumType::new([vec![ty.into()], vec![ERROR_TYPE.into()]])
+    SumType::new([ty, ERROR_TYPE])
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]

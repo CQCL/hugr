@@ -257,7 +257,7 @@ impl TryFrom<FunctionType> for Signature {
 
 impl From<Signature> for FunctionType {
     fn from(value: Signature) -> Self {
-        Self::new(value.input.into_(), value.output.into_())
+        Self::new(value.input, value.output)
             .with_extension_delta(value.extension_reqs)
     }
 }

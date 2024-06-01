@@ -41,7 +41,7 @@ impl SignatureDeclaration {
         op_params: &[TypeParam],
     ) -> Result<SignatureFunc, ExtensionDeclarationError> {
         let make_type_row =
-            |v: &[SignaturePortDeclaration]| -> Result<TypeRow, ExtensionDeclarationError> {
+            |v: &[SignaturePortDeclaration]| -> Result<TypeRow<true>, ExtensionDeclarationError> {
                 let types = v
                     .iter()
                     .map(|port_decl| port_decl.make_types(ext, ctx, op_params))

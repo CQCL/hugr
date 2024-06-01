@@ -112,7 +112,7 @@ impl MakeOpDef for IntOpDef {
             )
             .into(),
             inarrow_s | inarrow_u => CustomValidator::new_with_validator(
-                int_polytype(2, vec![int_tv(0)], vec![sum_with_error(int_tv(1)).into()]),
+                int_polytype(2, int_tv(0), sum_with_error(int_tv(1)).into()),
                 IOValidator { f_ge_s: true },
             )
             .into(),
@@ -131,7 +131,7 @@ impl MakeOpDef for IntOpDef {
                 int_polytype(
                     2,
                     intpair.clone(),
-                    vec![sum_with_error(Type::new_tuple(intpair)).into()],
+                    sum_with_error(Type::new_tuple(intpair)).into(),
                 )
             }
             .into(),
@@ -144,13 +144,13 @@ impl MakeOpDef for IntOpDef {
             idiv_checked_u | idiv_checked_s => int_polytype(
                 2,
                 vec![int_tv(0), int_tv(1)],
-                vec![sum_with_error(int_tv(0)).into()],
+                sum_with_error(int_tv(0)).into(),
             )
             .into(),
             imod_checked_u | imod_checked_s => int_polytype(
                 2,
                 vec![int_tv(0), int_tv(1).clone()],
-                vec![sum_with_error(int_tv(1)).into()],
+                sum_with_error(int_tv(1)).into(),
             )
             .into(),
             imod_u | imod_s => {
@@ -235,8 +235,8 @@ impl MakeOpDef for IntOpDef {
 }
 fn int_polytype(
     n_vars: usize,
-    input: impl Into<TypeRow>,
-    output: impl Into<TypeRow>,
+    input: impl Into<TypeRow<true>>,
+    output: impl Into<TypeRow<true>>,
 ) -> PolyFuncType {
     PolyFuncType::new(
         vec![LOG_WIDTH_TYPE_PARAM; n_vars],
