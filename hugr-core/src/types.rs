@@ -304,7 +304,7 @@ impl<const RV: bool> Type<RV> {
 
     /// Initialize a new tuple type by providing the elements.
     #[inline(always)]
-    pub fn new_tuple<const RV2: bool>(types: impl Into<TypeRow<RV2>>) -> Self {
+    pub fn new_tuple(types: impl Into<TypeRow<true>>) -> Self {
         let row = types.into();
         match row.len() {
             0 => Self::UNIT,
