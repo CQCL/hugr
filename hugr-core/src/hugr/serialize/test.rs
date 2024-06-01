@@ -31,7 +31,7 @@ const QB: Type = crate::extension::prelude::QB_T;
 /// Version 1 of the Testing HUGR serialisation format, see `testing_hugr.py`.
 #[derive(Serialize, Deserialize, PartialEq, Debug, Default)]
 struct SerTestingV1 {
-    typ: Option<crate::types::Type>,
+    typ: Option<crate::types::Type<true>>,
     sum_type: Option<crate::types::SumType>,
     poly_func_type: Option<crate::types::PolyFuncType>,
     value: Option<crate::ops::Value>,
@@ -86,12 +86,31 @@ macro_rules! impl_sertesting_from {
     };
 }
 
-impl_sertesting_from!(crate::types::Type, typ);
+impl_sertesting_from!(crate::types::Type<true>, typ);
 impl_sertesting_from!(crate::types::SumType, sum_type);
 impl_sertesting_from!(crate::types::PolyFuncType, poly_func_type);
 impl_sertesting_from!(crate::ops::Value, value);
 impl_sertesting_from!(NodeSer, optype);
 impl_sertesting_from!(SimpleOpDef, op_def);
+
+#[cfg(test)]
+impl From<PolyFuncType<false>> for TestingModel {
+    fn from(v: PolyFuncType<false>) -> Self {
+        let mut r: Self = Default::default();
+        r.poly_func_type = Some(v.into());
+        r
+    }
+}
+
+
+#[cfg(test)]
+impl From<Type<false>> for TestingModel {
+    fn from(v: Type<false>) -> Self {
+        let mut r: Self = Default::default();
+        r.typ = Some(v.into());
+        r
+    }
+}
 
 #[test]
 fn empty_hugr_serialize() {
@@ -366,12 +385,12 @@ fn constants_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn serialize_types_roundtrip() {
-    let g: Type = Type::new_function(FunctionType::new_endo(vec![]));
+    let g: Type<true> = Type::new_function(FunctionType::new_endo(vec![]));
 
     check_testing_roundtrip(g.clone());
 
     // A Simple tuple
-    let t = Type::new_tuple(vec![USIZE_T, g]);
+    let t = Type::new_tuple(vec![USIZE_T.into(), g]);
     check_testing_roundtrip(t);
 
     // A Classic sum
@@ -407,14 +426,14 @@ fn roundtrip_sumtype(#[case] sum_type: SumType) {
 #[case(Value::true_val())]
 #[case(Value::unit_sum(3,5).unwrap())]
 #[case(Value::extension(ConstInt::new_u(2,1).unwrap()))]
-#[case(Value::sum(1,[Value::extension(ConstInt::new_u(2,1).unwrap())], SumType::new([vec![], vec![INT_TYPES[2].clone()]])).unwrap())]
+#[case(Value::sum(1,[Value::extension(ConstInt::new_u(2,1).unwrap())], SumType::new([vec![], vec![INT_TYPES[2].clone().into()]])).unwrap())]
 #[case(Value::tuple([Value::false_val(), Value::extension(ConstInt::new_s(2,1).unwrap())]))]
 #[case(Value::function(crate::builder::test::simple_dfg_hugr()).unwrap())]
 fn roundtrip_value(#[case] value: Value) {
     check_testing_roundtrip(value);
 }
 
-fn polyfunctype1() -> PolyFuncType {
+fn polyfunctype1() -> PolyFuncType<false> {
     let mut extension_set = ExtensionSet::new();
     extension_set.insert_type_var(1);
     let function_type = FunctionType::new_endo(type_row![]).with_extension_delta(extension_set);
@@ -432,7 +451,7 @@ fn polyfunctype2() -> PolyFuncType {
     let res = PolyFuncType::new(params, FunctionType::new(inputs, tv1));
     // Just check we've got the arguments the right way round
     // (not that it really matters for the serialization schema we have)
-    res.validate_var_len(&EMPTY_REG).unwrap();
+    res.validate(&EMPTY_REG).unwrap();
     res
 }
 
@@ -447,7 +466,22 @@ fn polyfunctype2() -> PolyFuncType {
     [TypeParam::new_list(TypeBound::Any)],
     FunctionType::new_endo(Type::new_tuple(Type::new_row_var_use(0, TypeBound::Any)))))]
 #[case(polyfunctype2())]
-fn roundtrip_polyfunctype<const RV: bool>(#[case] poly_func_type: PolyFuncType<RV>) {
+fn roundtrip_polyfunctype_fixedlen(#[case] poly_func_type: PolyFuncType<false>) {
+    check_testing_roundtrip(poly_func_type)
+}
+
+#[rstest]
+#[case(FunctionType::new_endo(type_row![]).into())]
+#[case(polyfunctype1())]
+#[case(PolyFuncType::new([TypeParam::Opaque { ty: int_custom_type(TypeArg::BoundedNat { n: 1 }) }], FunctionType::new_endo(type_row![Type::new_var_use(0, TypeBound::Copyable)])))]
+#[case(PolyFuncType::new([TypeBound::Eq.into()], FunctionType::new_endo(type_row![Type::new_var_use(0, TypeBound::Eq)])))]
+#[case(PolyFuncType::new([TypeParam::new_list(TypeBound::Any)], FunctionType::new_endo(type_row![])))]
+#[case(PolyFuncType::new([TypeParam::Tuple { params: [TypeBound::Any.into(), TypeParam::bounded_nat(2.try_into().unwrap())].into() }], FunctionType::new_endo(type_row![])))]
+#[case(PolyFuncType::new(
+    [TypeParam::new_list(TypeBound::Any)],
+    FunctionType::new_endo(Type::new_row_var_use(0, TypeBound::Any))))]
+#[case(polyfunctype2())]
+fn roundtrip_polyfunctype_varlen(#[case] poly_func_type: PolyFuncType<true>) {
     check_testing_roundtrip(poly_func_type)
 }
 
