@@ -112,7 +112,7 @@ impl MakeOpDef for IntOpDef {
             )
             .into(),
             inarrow_s | inarrow_u => CustomValidator::new_with_validator(
-                int_polytype(2, int_tv(0), sum_with_error(int_tv(1)).into()),
+                int_polytype(2, int_tv(0), sum_ty_with_err(int_tv(1))),
                 IOValidator { f_ge_s: true },
             )
             .into(),
@@ -131,7 +131,7 @@ impl MakeOpDef for IntOpDef {
                 int_polytype(
                     2,
                     intpair.clone(),
-                    sum_with_error(Type::new_tuple(intpair)).into(),
+                    sum_ty_with_err(Type::new_tuple(intpair)),
                 )
             }
             .into(),
@@ -144,13 +144,13 @@ impl MakeOpDef for IntOpDef {
             idiv_checked_u | idiv_checked_s => int_polytype(
                 2,
                 vec![int_tv(0), int_tv(1)],
-                sum_with_error(int_tv(0)).into(),
+                sum_ty_with_err(int_tv(0)),
             )
             .into(),
             imod_checked_u | imod_checked_s => int_polytype(
                 2,
                 vec![int_tv(0), int_tv(1).clone()],
-                sum_with_error(int_tv(1)).into(),
+                sum_ty_with_err(int_tv(1)),
             )
             .into(),
             imod_u | imod_s => {
@@ -347,6 +347,10 @@ impl IntOpDef {
     }
 }
 
+fn sum_ty_with_err(t: Type) -> Type {
+    sum_with_error(t).into()
+}
+
 #[cfg(test)]
 mod test {
     use crate::{ops::dataflow::DataflowOpTrait, std_extensions::arithmetic::int_types::int_type};
@@ -387,7 +391,7 @@ mod test {
                 .to_extension_op()
                 .unwrap()
                 .signature(),
-            FunctionType::new(vec![int_type(3)], vec![sum_with_error(int_type(3)).into()],)
+            FunctionType::new(vec![int_type(3)], vec![sum_ty_with_err(int_type(3))],)
         );
         assert!(
             IntOpDef::iwiden_u
@@ -403,7 +407,7 @@ mod test {
                 .to_extension_op()
                 .unwrap()
                 .signature(),
-            FunctionType::new(vec![int_type(2)], vec![sum_with_error(int_type(1)).into()],)
+            FunctionType::new(vec![int_type(2)], vec![sum_ty_with_err(int_type(1))],)
         );
 
         assert!(IntOpDef::inarrow_u
