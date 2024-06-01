@@ -436,7 +436,7 @@ mod test {
 
     #[test]
     fn new_opaque_op() {
-        let sig = FunctionType::new_endo(vec![QB_T]);
+        let sig = Signature::new_endo(vec![QB_T]);
         let op: CustomOp = OpaqueOp::new(
             "res".try_into().unwrap(),
             "op",
