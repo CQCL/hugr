@@ -5,7 +5,7 @@ use itertools::Either;
 use std::fmt::{self, Display, Write};
 
 use super::type_param::TypeParam;
-use super::{Substitution, Type, TypeBound, TypeEnum, TypeRow};
+use super::{Implies, Substitution, Type, TypeBound, TypeEnum, TypeRow};
 
 use crate::core::PortIndex;
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
@@ -95,10 +95,11 @@ impl<const RV: bool> FunctionType<RV> {
         self.extension_reqs.validate(var_decls)
     }
 
-    pub(crate) fn into_rv(self) -> FunctionType<true> {
+    pub(crate) fn into_<const RV2:bool>(self) -> FunctionType<RV2> {
+        let _ = Implies::<RV, RV2>::A_IMPLIES_B;
         FunctionType {
-            input: self.input.into_rv(),
-            output: self.output.into_rv(),
+            input: self.input.into_(),
+            output: self.output.into_(),
             extension_reqs: self.extension_reqs
         }
     }
@@ -256,7 +257,7 @@ impl TryFrom<FunctionType> for Signature {
 
 impl From<Signature> for FunctionType {
     fn from(value: Signature) -> Self {
-        Self::new(value.input.into_rv(), value.output.into_rv())
+        Self::new(value.input.into_(), value.output.into_())
             .with_extension_delta(value.extension_reqs)
     }
 }

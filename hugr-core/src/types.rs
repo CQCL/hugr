@@ -8,6 +8,8 @@ mod signature;
 pub mod type_param;
 pub mod type_row;
 
+use std::marker::PhantomData;
+
 pub use crate::ops::constant::{ConstTypeError, CustomCheckFailure};
 use crate::types::type_param::check_type_arg;
 use crate::utils::display_list_with_separator;
@@ -248,6 +250,11 @@ impl TypeEnum {
     }
 }
 
+struct Implies<const A:bool, const B:bool>(PhantomData<Type<A>>, PhantomData<Type<B>>);
+impl<const A:bool, const B:bool> Implies<A,B> {
+    const A_IMPLIES_B: () = assert!(B || !A);
+}
+
 #[derive(Clone, Debug, Eq, derive_more::Display, serde::Serialize, serde::Deserialize)]
 #[display(fmt = "{}", "_0")]
 #[serde(
@@ -311,7 +318,7 @@ impl<const RV: bool> Type<RV> {
     {
         let variants: Vec<Vec<Type<true>>> = variants
             .into_iter()
-            .map(|t| t.into_owned().into_iter().map(Type::into_rv).collect())
+            .map(|t| t.into_owned().into_iter().map(Type::into_).collect())
             .collect();
         Self::new(TypeEnum::Sum(SumType::new(variants)))
     }
@@ -461,12 +468,6 @@ impl Type<true> {
 }
 
 // ====== Conversions ======
-impl Type<false> {
-    fn into_<const RV: bool>(self) -> Type<RV> {
-        Type(self.0, self.1)
-    }
-}
-
 impl Type<true> {
     fn try_into_<const RV: bool>(self) -> Result<Type<RV>, SignatureError> {
         if !RV {
@@ -487,14 +488,15 @@ impl<const RV: bool> Type<RV> {
         Ok(Type(self.0, self.1))
     }
 
-    fn into_rv(self) -> Type<true> {
+    pub fn into_<const RV2:bool>(self) -> Type<RV2> {
+        let _ = Implies::<RV,RV2>::A_IMPLIES_B;
         Type(self.0, self.1)
     }
 }
 
 impl From<Type<false>> for Type<true> {
     fn from(value: Type<false>) -> Self {
-        value.into_() // .into_rv also fine
+        value.into_()
     }
 }
 

@@ -163,7 +163,7 @@ fn logic_op_sig() -> impl SignatureFromArgs {
                 return Err(SignatureError::InvalidTypeArgs);
             };
             let var_arg_row = TypeRow::from(vec![BOOL_T; n as usize]);
-            Ok(FunctionType::new(var_arg_row.into_rv(), vec![BOOL_T.into()]).into())
+            Ok(FunctionType::new(var_arg_row, vec![BOOL_T.into_()]).into())
         }
 
         fn static_params(&self) -> &[TypeParam] {
