@@ -479,10 +479,10 @@ impl Type<true> {
 }
 
 impl<const RV: bool> Type<RV> {
-    fn try_into_no_rv(self) -> Result<Type<false>, SignatureError> {
-        if let TypeEnum::RowVariable(idx, _) = self.0 {
+    fn try_into_no_rv(self) -> Result<Type<false>, (usize, TypeBound)> {
+        if let TypeEnum::RowVariable(idx, bound) = self.0 {
             assert!(RV);
-            return Err(SignatureError::RowVarWhereTypeExpected { idx });
+            return Err((idx, bound));
         }
         Ok(Type(self.0, self.1))
     }

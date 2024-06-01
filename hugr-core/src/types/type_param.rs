@@ -183,9 +183,12 @@ pub enum TypeArg {
     },
 }
 
-impl From<Type> for TypeArg {
-    fn from(ty: Type) -> Self {
-        Self::Type { ty }
+impl <const RV:bool> From<Type<RV>> for TypeArg {
+    fn from(ty: Type<RV>) -> Self {
+        match ty.try_into_no_rv() {
+            Ok(ty) => Self::Type { ty },
+            Err((idx, bound)) => TypeArg::new_var_use(idx, TypeParam::new_list(bound))
+        }
     }
 }
 
@@ -231,7 +234,7 @@ impl TypeArg {
             // Note a TypeParam::List of TypeParam::Type *cannot* be represented
             // as a TypeArg::Type because the latter stores a Type<false> i.e. only a single type,
             // not a RowVariable.
-            TypeParam::Type { b } => Type::new_var_use(idx, b).into(),
+            TypeParam::Type { b } => Type::<false>::new_var_use(idx, b).into(),
             // Prevent TypeArg::Variable(idx, TypeParam::Extensions)
             TypeParam::Extensions => TypeArg::Extensions {
                 es: ExtensionSet::type_var(idx),
