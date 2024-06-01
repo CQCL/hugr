@@ -84,10 +84,10 @@ impl<const RV: bool> PolyFuncType<RV> {
 
     /// Create a new PolyFuncType given the kinds of the variables it declares
     /// and the underlying function type.
-    pub fn new(params: impl Into<Vec<TypeParam>>, body: impl Into<FunctionType<RV>>) -> Self {
+    pub fn new(params: impl Into<Vec<TypeParam>>, body: FunctionType<RV>) -> Self {
         Self {
             params: params.into(),
-            body: body.into(),
+            body
         }
     }
 

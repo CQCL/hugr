@@ -192,8 +192,8 @@ impl From<PolyFuncType> for SignatureFunc {
     }
 }
 
-impl <const RV:bool> From<FunctionType<RV>> for SignatureFunc {
-    fn from(v: FunctionType<RV>) -> Self {
+impl From<FunctionType> for SignatureFunc {
+    fn from(v: FunctionType) -> Self {
         Self::TypeScheme(CustomValidator::from_polyfunc(v))
     }
 }
