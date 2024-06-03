@@ -204,7 +204,7 @@ mod test {
     }
 
     #[rstest]
-    //#[case(true)] // This currently failing, https://github.com/CQCL/hugr/issues/1143
+    #[case(true)]
     #[case(false)]
     fn in_loop(#[case] self_loop: bool) -> Result<(), Box<dyn std::error::Error>> {
         /* self_loop==False:

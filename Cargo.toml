@@ -22,7 +22,7 @@ missing_docs = "warn"
 debug_assert_with_mut_call = "warn"
 
 [workspace.dependencies]
-portgraph = { version = "0.12.0" }
+portgraph = { version = "0.12.1" }
 insta = { version = "1.34.0" }
 bitvec = "1.0.1"
 cgmath = "0.18.0"
@@ -55,7 +55,7 @@ thiserror = "1.0.28"
 typetag = "0.2.7"
 urlencoding = "2.1.2"
 webbrowser = "1.0.0"
-clap = { version = "4.5.4"}
+clap = { version = "4.5.4" }
 clap-stdin = "0.4.0"
 clap-verbosity-flag = "2.2.0"
 assert_cmd = "2.0.14"
