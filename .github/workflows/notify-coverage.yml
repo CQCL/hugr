@@ -18,7 +18,7 @@ jobs:
       should_notify: ${{ steps.get_coverage.outputs.should_notify }}
     steps:
       - name: Download commit sha of the most recent successful run
-        uses: dawidd6/action-download-artifact@v3
+        uses: dawidd6/action-download-artifact@v4
         with:
           # Downloads the artifact from the most recent successful run
           workflow: 'notify-coverage.yml'
