@@ -45,6 +45,10 @@ class SerWrap(Op, Generic[T]):
 class Input(Op):
     types: list[tys.Type]
 
+    @property
+    def num_out(self) -> int | None:
+        return len(self.types)
+
     def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.Input:
         return sops.Input(parent=parent.idx, types=self.types)
 
@@ -67,6 +71,10 @@ class Custom(Op):
     description: str = ""
     extension: tys.ExtensionId = ""
     args: list[tys.TypeArg] = field(default_factory=list)
+
+    @property
+    def num_out(self) -> int | None:
+        return len(self.signature.output)
 
     def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.CustomOp:
         return sops.CustomOp(
@@ -115,6 +123,10 @@ class UnpackTuple(Op):
 @dataclass()
 class DFG(Op):
     signature: tys.FunctionType = field(default_factory=tys.FunctionType.empty)
+
+    @property
+    def num_out(self) -> int | None:
+        return len(self.signature.output)
 
     def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.DFG:
         return sops.DFG(
