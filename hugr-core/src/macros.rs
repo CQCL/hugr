@@ -111,3 +111,89 @@ macro_rules! const_extension_ids {
 }
 
 pub use const_extension_ids;
+
+/// Implement downcasting methods for a trait that extends `Any`.
+macro_rules! impl_casts {
+    ($name:tt) => {
+        impl dyn $name {
+            /// Returns `true` if the inner value is of type `T`.
+            #[inline]
+            pub fn is<T: $name>(&self) -> bool {
+                TypeId::of::<T>() == self.type_id()
+            }
+
+            /// Attempt to downcast the box to a concrete type.
+            #[inline]
+            pub fn downcast<T: $name>(self: Box<Self>) -> Result<Box<T>, Box<Self>> {
+                if self.is::<T>() {
+                    // SAFETY: We have checked that the inner value is of type `T`.
+                    Ok(unsafe { self.downcast_unchecked() })
+                } else {
+                    Err(self)
+                }
+            }
+
+            /// Downcasts the box to a concrete type.
+            ///
+            /// For a safe alternative see [`Self::downcast`].
+            ///
+            /// # Safety
+            ///
+            /// The inner value must be of type `T`.
+            /// Calling this method with the incorrect type is *undefined behaviour*.
+            #[inline]
+            pub unsafe fn downcast_unchecked<T: $name>(self: Box<Self>) -> Box<T> {
+                // SAFETY: The caller guarantees that the contained type is `T`.
+                Box::from_raw(Box::into_raw(self) as *mut T)
+            }
+
+            /// Returns a reference to the inner value if it is of type `T`,
+            /// or `None` if it is not.
+            #[inline]
+            pub fn downcast_ref<T: $name>(&self) -> Option<&T> {
+                if self.is::<T>() {
+                    // SAFETY: We have checked that the inner value is of type `T`.
+                    Some(unsafe { self.downcast_ref_unchecked() })
+                } else {
+                    None
+                }
+            }
+
+            /// Returns a reference to the inner value.
+            ///
+            /// # Safety
+            ///
+            /// The inner value must be of type `T`.
+            /// Calling this method with the incorrect type is *undefined behaviour*.
+            #[inline]
+            pub unsafe fn downcast_ref_unchecked<T: $name>(&self) -> &T {
+                &*(self as *const Self as *const T)
+            }
+
+            /// Returns a mutable reference to the inner value if it is of type `T`,
+            /// or `None` if it is not.
+            #[inline]
+            pub fn downcast_mut<T: $name>(&mut self) -> Option<&mut T> {
+                if self.is::<T>() {
+                    // SAFETY: We have checked that the inner value is of type `T`.
+                    Some(unsafe { self.downcast_mut_unchecked() })
+                } else {
+                    None
+                }
+            }
+
+            /// Returns a mutable reference to the inner value.
+            ///
+            /// # Safety
+            ///
+            /// The contained value must be of type `T`.
+            /// Calling this method with the incorrect type is *undefined behaviour*.
+            #[inline]
+            pub unsafe fn downcast_mut_unchecked<T: $name>(&mut self) -> &mut T {
+                &mut *(self as *mut Self as *mut T)
+            }
+        }
+    };
+}
+
+pub(super) use impl_casts;

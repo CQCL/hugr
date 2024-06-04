@@ -2,6 +2,7 @@
 
 pub mod hugrmut;
 
+pub mod attributes;
 pub(crate) mod ident;
 pub mod internal;
 pub mod rewrite;
