@@ -3,15 +3,22 @@ use crate::macros::impl_casts;
 use crate::Node;
 use serde::Serialize;
 use std::any::{Any, TypeId};
+use std::cell::{Ref, RefCell, RefMut};
 use std::collections::HashMap;
 use std::fmt::Debug;
+use std::ops::{Deref, DerefMut};
 
 /// Group of attribute stores.
 pub struct AttrGroup {
-    stores: HashMap<TypeId, Box<dyn AttrStoreDyn>>,
+    // TODO: Replace RefCell with AtomicRefCell
+    stores: HashMap<TypeId, RefCell<Box<dyn AttrStoreDyn>>>,
 }
 
 impl AttrGroup {
+    // PERFORMANCE: We know that the downcasts in each method must always
+    // succeed and therefore would not need to perform the check. If the
+    // checks turn out to be slow, we can use the unsafe downcast.
+
     /// Creates an empty [`AttrGroup`].
     pub fn new() -> Self {
         Self {
@@ -20,32 +27,51 @@ impl AttrGroup {
     }
 
     /// Returns an immutable reference to the store for an attribute.
-    pub fn get<T: Attr>(&self) -> Option<&T::Store> {
-        self.stores
-            .get(&TypeId::of::<T>())
-            .map(|store| store.downcast_ref().unwrap())
+    ///
+    /// # Panics
+    ///
+    /// Panics when the attribute is already mutably borrowed.
+    pub fn borrow<T: Attr>(&self) -> Option<AttrRef<T>> {
+        self.stores.get(&TypeId::of::<T>()).map(|cell| {
+            AttrRef(Ref::map(cell.borrow(), |store| {
+                store.downcast_ref().unwrap()
+            }))
+        })
+    }
+
+    /// Returns a mutable reference to the store for an attribute.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the attribute is already mutably borrowed.
+    pub fn borrow_mut<T: Attr>(&self) -> Option<AttrRefMut<T>> {
+        self.stores.get(&TypeId::of::<T>()).map(|cell| {
+            AttrRefMut(RefMut::map(cell.borrow_mut(), |store| {
+                store.downcast_mut().unwrap()
+            }))
+        })
     }
 
     /// Returns a mutable reference to the store for an attribute.
     pub fn get_mut<T: Attr>(&mut self) -> Option<&mut T::Store> {
         self.stores
             .get_mut(&TypeId::of::<T>())
-            .map(|store| store.downcast_mut().unwrap())
+            .map(|cell| cell.get_mut().downcast_mut().unwrap())
     }
 
     /// Removes an attribute store from the group and returns it.
     pub fn take<T: Attr>(&mut self) -> Option<T::Store> {
         self.stores
             .remove(&TypeId::of::<T>())
-            .map(|store| *store.downcast().ok().unwrap())
+            .map(|cell| *cell.into_inner().downcast().ok().unwrap())
     }
 
     /// Inserts an attribute store into the group.
     /// Returns the old store for that attribute type, or `None` if there was none.
     pub fn insert<T: Attr>(&mut self, store: T::Store) -> Option<T::Store> {
         self.stores
-            .insert(TypeId::of::<T>(), Box::new(store))
-            .map(|store| *store.downcast().ok().unwrap())
+            .insert(TypeId::of::<T>(), RefCell::new(Box::new(store)))
+            .map(|store| *store.into_inner().downcast().ok().unwrap())
     }
 
     /// Returns a mutable reference to the store for an attribute.
@@ -54,7 +80,8 @@ impl AttrGroup {
     pub fn get_or_insert<T: Attr>(&mut self) -> &mut T::Store {
         self.stores
             .entry(TypeId::of::<T>())
-            .or_insert_with(|| Box::<<T as Attr>::Store>::default())
+            .or_insert_with(|| RefCell::new(Box::<<T as Attr>::Store>::default()))
+            .get_mut()
             .downcast_mut()
             .unwrap()
     }
@@ -62,7 +89,7 @@ impl AttrGroup {
     /// Removes a node from all attribute stores in the group.
     pub fn remove_node(&mut self, node: Node) {
         for store in self.stores.values_mut() {
-            store.remove(node);
+            store.get_mut().remove(node);
         }
     }
 }
@@ -82,10 +109,57 @@ impl Serialize for AttrGroup {
         let mut map = serializer.serialize_map(Some(self.stores.len()))?;
 
         for store in self.stores.values() {
-            map.serialize_entry(store.name(), &store.to_json())?;
+            map.serialize_entry(store.borrow().name(), &store.borrow().to_json())?;
         }
 
         map.end()
+    }
+}
+
+/// Immutable borrow of an attribute store.
+///
+/// As long as this borrow is alive, the attribute can not be mutably borrowed.
+pub struct AttrRef<'a, T>(Ref<'a, T::Store>)
+where
+    T: Attr;
+
+impl<'a, T> Deref for AttrRef<'a, T>
+where
+    T: Attr,
+{
+    type Target = T::Store;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+/// Mutable borrow of an attribute store.
+///
+/// As long as this borrow is alive, it provides exclusive access to the attribute.
+/// Any attempt to borrow the attribute again (mutably or immutably) before
+/// this reference is dropped will result in a panic.
+pub struct AttrRefMut<'a, T>(RefMut<'a, T::Store>)
+where
+    T: Attr;
+
+impl<'a, T> Deref for AttrRefMut<'a, T>
+where
+    T: Attr,
+{
+    type Target = T::Store;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<'a, T> DerefMut for AttrRefMut<'a, T>
+where
+    T: Attr,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 
@@ -167,6 +241,7 @@ pub trait AttrStore: Debug + Clone + Default {
 
 /// Attribute store that sparsely stores the attributes in a hashmap.
 #[derive(Debug, Clone, Serialize)]
+#[serde(transparent)]
 pub struct Sparse<T> {
     data: HashMap<Node, T>,
 }

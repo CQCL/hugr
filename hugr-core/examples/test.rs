@@ -1,48 +1,42 @@
 //! bar
-use std::sync::Arc;
-
-use hugr::builder::HugrBuilder;
-use hugr::extension::ExtensionRegistry;
-use hugr::types::{FunctionType, PolyFuncType, TypeRow};
-use hugr_core::builder::ModuleBuilder;
-use hugr_core::hugr::attributes::{Attr, AttrGroup, Sparse};
-use hugr_core::{impl_attr_sparse, Hugr};
+use hugr::Node;
+use hugr_core::hugr::attributes::{Attr, AttrGroup, AttrStore};
+use hugr_core::impl_attr_sparse;
+use portgraph::{PortGraph, PortMut};
 use serde::{Deserialize, Serialize};
+use smol_str::SmolStr;
 
 pub fn main() {
-    let mut group = AttrGroup::new();
+    let mut graph = PortGraph::new();
+    let mut attrs = AttrGroup::new();
 
-    let docs = group.get_or_insert::<DocString>();
+    let node0 = graph.add_node(0, 0).into();
+    let node1 = graph.add_node(0, 0).into();
 
-    group.get::<DocString>().unwrap();
+    {
+        let docs = attrs.get_or_insert::<DocString>();
+        docs.insert(node0, DocString("Lorem ipsum".into()));
+        docs.insert(node1, DocString("dolor sit".into()));
 
-    println!("{}", serde_json::to_string_pretty(&group).unwrap());
+        let funcs = attrs.get_or_insert::<FuncRef>();
+        funcs.insert(node1, FuncRef(node0));
+    }
+
+    {
+        let docs0 = attrs.borrow::<DocString>().unwrap();
+        let docs1 = attrs.borrow::<DocString>().unwrap();
+        let func_ref = attrs.borrow_mut::<FuncRef>().unwrap();
+    }
+
+    println!("{}", serde_json::to_string_pretty(&attrs).unwrap());
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DocString(pub Arc<str>);
-
-impl Default for DocString {
-    fn default() -> Self {
-        Self("".into())
-    }
-}
+pub struct DocString(pub SmolStr);
 
 impl_attr_sparse!(DocString, "core/doc");
 
-// foo
-// pub fn main() {
-//     let extension_registry = ExtensionRegistry::try_new([]).unwrap();
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FuncRef(pub Node);
 
-//     let mut module = ModuleBuilder::new();
-
-//     let ft = PolyFuncType::new([], FunctionType::new(TypeRow::new(), TypeRow::new()));
-//     let f = module.declare("foo", ft);
-
-//     let hugr = module.finish_hugr(&extension_registry).unwrap();
-
-//     // println!("{:#?}");
-//     println!("{}", serde_json::to_string_pretty(&hugr).unwrap());
-
-//     // println!("Hello world");
-// }
+impl_attr_sparse!(FuncRef, "core/func-ref");
