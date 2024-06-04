@@ -42,9 +42,9 @@ class BaseOp(ABC, ConfiguredBaseModel):
         """Name of the op for visualisation"""
         return self.__class__.__name__
 
-    def deserialize(self) -> ops.Op:
+    def deserialize(self) -> _ops.Op:
         """Deserializes the model into the corresponding Op."""
-        return ops.SerWrap(self)
+        return _ops.SerWrap(self)
 
 
 # ----------------------------------------------------------
@@ -214,8 +214,8 @@ class Input(DataflowOp):
         assert len(in_types) == 0
         self.types = list(out_types)
 
-    def deserialize(self) -> ops.Input:
-        return ops.Input(types=self.types)
+    def deserialize(self) -> _ops.Input:
+        return _ops.Input(types=self.types)
 
 
 class Output(DataflowOp):
@@ -228,8 +228,8 @@ class Output(DataflowOp):
         assert len(out_types) == 0
         self.types = list(in_types)
 
-    def deserialize(self) -> ops.Output:
-        return ops.Output(types=self.types)
+    def deserialize(self) -> _ops.Output:
+        return _ops.Output(types=self.types)
 
 
 class Call(DataflowOp):
@@ -303,8 +303,8 @@ class DFG(DataflowOp):
             input=list(inputs), output=list(outputs), extension_reqs=ExtensionSet([])
         )
 
-    def deserialize(self) -> ops.DFG:
-        return ops.DFG(self.signature)
+    def deserialize(self) -> _ops.DFG:
+        return _ops.DFG(self.signature)
 
 
 # ------------------------------------------------
@@ -402,8 +402,8 @@ class CustomOp(DataflowOp):
     def display_name(self) -> str:
         return self.op_name
 
-    def deserialize(self) -> ops.Custom:
-        return ops.Custom(
+    def deserialize(self) -> _ops.Custom:
+        return _ops.Custom(
             extension=self.extension,
             op_name=self.op_name,
             signature=self.signature,
@@ -446,8 +446,8 @@ class MakeTuple(DataflowOp):
             in_types = []
         self.tys = list(in_types)
 
-    def deserialize(self) -> ops.MakeTuple:
-        return ops.MakeTuple(self.tys)
+    def deserialize(self) -> _ops.MakeTuple:
+        return _ops.MakeTuple(self.tys)
 
 
 class UnpackTuple(DataflowOp):
@@ -459,8 +459,8 @@ class UnpackTuple(DataflowOp):
     def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
         self.tys = list(out_types)
 
-    def deserialize(self) -> ops.UnpackTuple:
-        return ops.UnpackTuple(self.tys)
+    def deserialize(self) -> _ops.UnpackTuple:
+        return _ops.UnpackTuple(self.tys)
 
 
 class Tag(DataflowOp):
@@ -558,5 +558,4 @@ classes = (
 
 tys_model_rebuild(dict(classes))
 
-#
-import hugr._ops as ops  # noqa: E402  # needed to avoid circular imports
+from hugr import _ops  # noqa: E402  # needed to avoid circular imports
