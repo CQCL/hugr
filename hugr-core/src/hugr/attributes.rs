@@ -6,11 +6,15 @@ use std::any::{Any, TypeId};
 use std::cell::{Ref, RefCell, RefMut};
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::ops::{Deref, DerefMut};
+use std::ops::{Deref, DerefMut, Index, IndexMut};
+
+// TODO: Parameterise attributes over the key type (currently hardcoded to `Node`).
 
 /// Group of attribute stores.
+#[derive(Clone)]
 pub struct AttrGroup {
-    // TODO: Replace RefCell with AtomicRefCell
+    // TODO: Replace RefCell with an AtomicRefCell to allow concurrent
+    // borrowing of attributes.
     stores: HashMap<TypeId, RefCell<Box<dyn AttrStoreDyn>>>,
 }
 
@@ -30,8 +34,20 @@ impl AttrGroup {
     ///
     /// # Panics
     ///
-    /// Panics when the attribute is already mutably borrowed.
-    pub fn borrow<T: Attr>(&self) -> Option<AttrRef<T>> {
+    /// - When the attribute is already mutably borrowed.
+    /// - When the attribute type is not present in the group.
+    #[inline]
+    pub fn borrow<T: Attr>(&self) -> AttrRef<T> {
+        self.try_borrow().expect("unknown attribute type")
+    }
+
+    /// Returns an immutable reference to the store for an attribute,
+    /// or `None` when the attribute is not present in the group.
+    ///
+    /// # Panics
+    ///
+    /// - When the attribute is already mutably borrowed.
+    pub fn try_borrow<T: Attr>(&self) -> Option<AttrRef<T>> {
         self.stores.get(&TypeId::of::<T>()).map(|cell| {
             AttrRef(Ref::map(cell.borrow(), |store| {
                 store.downcast_ref().unwrap()
@@ -43,8 +59,19 @@ impl AttrGroup {
     ///
     /// # Panics
     ///
-    /// Panics when the attribute is already mutably borrowed.
-    pub fn borrow_mut<T: Attr>(&self) -> Option<AttrRefMut<T>> {
+    /// - When the attribute is already mutably borrowed.
+    /// - When the attribute type is not present in the group.
+    #[inline]
+    pub fn borrow_mut<T: Attr>(&self) -> AttrRefMut<T> {
+        self.try_borrow_mut().expect("unknown attribute type")
+    }
+
+    /// Returns a mutable reference to the store for an attribute.
+    ///
+    /// # Panics
+    ///
+    /// - When the attribute is already mutably borrowed.
+    pub fn try_borrow_mut<T: Attr>(&self) -> Option<AttrRefMut<T>> {
         self.stores.get(&TypeId::of::<T>()).map(|cell| {
             AttrRefMut(RefMut::map(cell.borrow_mut(), |store| {
                 store.downcast_mut().unwrap()
@@ -74,10 +101,10 @@ impl AttrGroup {
             .map(|store| *store.into_inner().downcast().ok().unwrap())
     }
 
-    /// Returns a mutable reference to the store for an attribute.
-    /// If the store does not already exist,
-    /// an empty store for the attribute will be created and inserted first.
-    pub fn get_or_insert<T: Attr>(&mut self) -> &mut T::Store {
+    /// Registers an attribute type in this group.
+    /// If the store for the attribute does not already exist,
+    /// an empty store for the attribute will be created.
+    pub fn register<T: Attr>(&mut self) -> &mut T::Store {
         self.stores
             .entry(TypeId::of::<T>())
             .or_insert_with(|| RefCell::new(Box::<<T as Attr>::Store>::default()))
@@ -109,10 +136,24 @@ impl Serialize for AttrGroup {
         let mut map = serializer.serialize_map(Some(self.stores.len()))?;
 
         for store in self.stores.values() {
-            map.serialize_entry(store.borrow().name(), &store.borrow().to_json())?;
+            let store_ref = store.borrow();
+            map.serialize_entry(store_ref.name(), &store_ref.to_json())?;
         }
 
         map.end()
+    }
+}
+
+impl Debug for AttrGroup {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut map = f.debug_map();
+
+        for store in self.stores.values() {
+            let store_ref = store.borrow();
+            map.entry(&store_ref.name(), &store_ref);
+        }
+
+        map.finish()
     }
 }
 
@@ -179,7 +220,7 @@ pub trait Attr: 'static + Debug + Clone {
 /// so that they can be stored within an [`AttrGroup`].
 /// The methods in this trait allow the [`AttrGroup`] to perform
 /// operations on the store without knowing the type of the attribute.
-trait AttrStoreDyn: Any + 'static {
+trait AttrStoreDyn: Any + Debug + 'static {
     /// Clones the attribute store and returns a trait object for the clone.
     /// This is necessary since the `Clone` trait itself is not object safe.
     fn clone_to_box(&self) -> Box<dyn AttrStoreDyn>;
@@ -233,6 +274,12 @@ pub trait AttrStore: Debug + Clone + Default {
     /// Returns the previous value of the attribute if it already existed.
     fn insert(&mut self, node: Node, attr: Self::Attr) -> Option<Self::Attr>;
 
+    /// Returns an immutable reference to the value of an attribute for a node.
+    fn get(&self, node: Node) -> Option<&Self::Attr>;
+
+    /// Returns a mutable reference to the value of an attribute for a node.
+    fn get_mut(&mut self, node: Node) -> Option<&mut Self::Attr>;
+
     /// Converts the attribute store to a JSON value.
     fn to_json(&self) -> serde_json::Value;
 
@@ -262,6 +309,7 @@ impl<T> Default for Sparse<T>
 where
     T: Attr<Store = Self>,
 {
+    #[inline]
     fn default() -> Self {
         Self::new()
     }
@@ -273,16 +321,51 @@ where
 {
     type Attr = T;
 
+    #[inline]
     fn remove(&mut self, node: Node) -> Option<Self::Attr> {
         self.data.remove(&node)
     }
 
+    #[inline]
     fn insert(&mut self, node: Node, attr: Self::Attr) -> Option<Self::Attr> {
         self.data.insert(node, attr)
     }
 
+    #[inline]
     fn to_json(&self) -> serde_json::Value {
         serde_json::to_value(self).unwrap()
+    }
+
+    #[inline]
+    fn get(&self, node: Node) -> Option<&Self::Attr> {
+        self.data.get(&node)
+    }
+
+    #[inline]
+    fn get_mut(&mut self, node: Node) -> Option<&mut Self::Attr> {
+        self.data.get_mut(&node)
+    }
+}
+
+impl<T> Index<Node> for Sparse<T>
+where
+    T: Attr<Store = Self>,
+{
+    type Output = T;
+
+    #[inline]
+    fn index(&self, index: Node) -> &Self::Output {
+        &self.data[&index]
+    }
+}
+
+impl<T> IndexMut<Node> for Sparse<T>
+where
+    T: Attr<Store = Self>,
+{
+    #[inline]
+    fn index_mut(&mut self, index: Node) -> &mut Self::Output {
+        self.data.get_mut(&index).unwrap()
     }
 }
 
@@ -293,6 +376,7 @@ macro_rules! impl_attr_sparse {
         impl Attr for $type {
             type Store = ::hugr_core::hugr::attributes::Sparse<$type>;
 
+            #[inline]
             fn name() -> &'static str {
                 $name
             }
