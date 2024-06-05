@@ -16,7 +16,7 @@ use delegate::delegate;
 use itertools::Itertools;
 
 /// List of types, used for function signatures.
-#[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug, Hash, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 #[serde(transparent)]
 pub struct TypeRow {
