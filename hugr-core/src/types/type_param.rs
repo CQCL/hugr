@@ -19,7 +19,7 @@ use super::{check_typevar_decl, CustomType, Substitution, Type, TypeBound};
 /// The upper non-inclusive bound of a [`TypeParam::BoundedNat`]
 // A None inner value implies the maximum bound: u64::MAX + 1 (all u64 values valid)
 #[derive(
-    Clone, Debug, PartialEq, Eq, derive_more::Display, serde::Deserialize, serde::Serialize,
+    Clone, Debug, PartialEq, Eq, Hash, derive_more::Display, serde::Deserialize, serde::Serialize,
 )]
 #[display(fmt = "{}", "_0.map(|i|i.to_string()).unwrap_or(\"-\".to_string())")]
 #[cfg_attr(test, derive(Arbitrary))]
@@ -52,7 +52,7 @@ impl UpperBound {
 /// [PolyFuncType]: super::PolyFuncType
 /// [OpDef]: crate::extension::OpDef
 #[derive(
-    Clone, Debug, PartialEq, Eq, derive_more::Display, serde::Deserialize, serde::Serialize,
+    Clone, Debug, PartialEq, Eq, Hash, derive_more::Display, serde::Deserialize, serde::Serialize,
 )]
 #[non_exhaustive]
 #[serde(tag = "tp")]
@@ -142,7 +142,7 @@ impl From<UpperBound> for TypeParam {
 }
 
 /// A statically-known argument value to an operation.
-#[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize)]
 #[non_exhaustive]
 #[serde(tag = "tya")]
 pub enum TypeArg {
@@ -214,7 +214,7 @@ impl From<ExtensionSet> for TypeArg {
 }
 
 /// Variable in a TypeArg, that is not a [TypeArg::Type] or [TypeArg::Extensions],
-#[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize)]
 pub struct TypeArgVariable {
     idx: usize,
     cached_decl: TypeParam,
@@ -352,7 +352,7 @@ impl TypeArgVariable {
 
 /// A serialized representation of a value of a [CustomType]
 /// restricted to equatable types.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct CustomTypeArg {
     /// The type of the constant.
     /// (Exact matches only - the constant is exactly this type.)

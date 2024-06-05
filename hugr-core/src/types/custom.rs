@@ -12,7 +12,7 @@ use super::{
 use super::{Type, TypeName};
 
 /// An opaque type element. Contains the unique identifier of its definition.
-#[derive(Debug, PartialEq, Eq, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash, serde::Serialize, serde::Deserialize)]
 pub struct CustomType {
     extension: ExtensionId,
     /// Unique identifier of the opaque type.

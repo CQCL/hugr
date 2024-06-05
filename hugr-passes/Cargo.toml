@@ -18,6 +18,7 @@ itertools = { workspace = true }
 lazy_static = { workspace = true }
 paste = { workspace = true }
 thiserror = { workspace = true }
+ascent = "0.6.0"
 
 [features]
 extension_inference = ["hugr-core/extension_inference"]
