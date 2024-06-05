@@ -269,6 +269,7 @@ class Hugr(Mapping[Node, NodeData]):
             return
         # iterate over known offsets
         for offset in range(self.num_ports(node, direction)):
+            # TODO should this also look for -1 state order edges?
             port = cast(P, node.port(offset, direction))
             yield port, list(self._linked_ports(port, links))
 

@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 import subprocess
 import os
 import pathlib
-from hugr._hugr import Hugr, Node, Wire
+from hugr._hugr import Hugr, Node, Wire, _SubPort
 from hugr._dfg import Dfg, _ancestral_sibling
 from hugr._ops import Custom, Command
 import hugr._ops as ops
@@ -232,11 +232,11 @@ def test_build_inter_graph():
 
     nt = nested.add(Not(a))
     nested.set_outputs(nt)
-    # TODO a context manager could add this state order edge on
-    # exit by tracking parents of source nodes
-    h.add_state_order(h.input_node, nested.root)
+
     h.set_outputs(nested.root, b)
 
+    assert _SubPort(h.input_node.out(-1)) in h.hugr._links
+    assert h.hugr.num_outgoing(h.input_node) == 2  # doesn't count state order
     _validate(h.hugr, True)
 
 
