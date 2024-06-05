@@ -9,3 +9,7 @@ class NoSiblingAncestor(Exception):
     @property
     def msg(self):
         return f"Source {self.src} has no sibling ancestor of target {self.tgt}, so cannot wire up."
+
+
+class ParentBeforeChild(Exception):
+    msg: str = "Parent node must be added before child node."
