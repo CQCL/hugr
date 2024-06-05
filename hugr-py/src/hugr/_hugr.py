@@ -320,18 +320,34 @@ class Hugr(Mapping[Node, NodeData]):
 
     def to_serial(self) -> SerialHugr:
         node_it = (node for node in self._nodes if node is not None)
+
+        def _serialise_link(
+            link: tuple[_SO, _SI],
+        ) -> tuple[tuple[int, int], tuple[int, int]]:
+            src, dst = link
+            s, d = self._constrain_offset(src.port), self._constrain_offset(dst.port)
+            return (src.port.node.idx, s), (dst.port.node.idx, d)
+
         return SerialHugr(
             version="v1",
             # non contiguous indices will be erased
             nodes=[node.to_serial(Node(idx), self) for idx, node in enumerate(node_it)],
-            edges=[
-                (
-                    (src.port.node.idx, src.port.offset),
-                    (dst.port.node.idx, dst.port.offset),
-                )
-                for src, dst in self._links.items()
-            ],
+            edges=[_serialise_link(link) for link in self._links.items()],
         )
+
+    def _constrain_offset(self, p: P) -> int:
+        # negative offsets are used to refer to the last port
+        if p.offset < 0:
+            match p.direction:
+                case Direction.INCOMING:
+                    current = self.num_incoming(p.node)
+                case Direction.OUTGOING:
+                    current = self.num_outgoing(p.node)
+            offset = current + p.offset + 1
+        else:
+            offset = p.offset
+
+        return offset
 
     @classmethod
     def from_serial(cls, serial: SerialHugr) -> Hugr:

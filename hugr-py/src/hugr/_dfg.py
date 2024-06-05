@@ -67,10 +67,7 @@ class Dfg:
 
     def add_state_order(self, src: Node, dst: Node) -> None:
         # adds edge to the right of all existing edges
-        # breaks if further edges are added
-        self.hugr.add_link(
-            src.out(self.hugr.num_outgoing(src)), dst.inp(self.hugr.num_incoming(dst))
-        )
+        self.hugr.add_link(src.out(-1), dst.inp(-1))
 
     def _wire_up(self, node: Node, ports: Iterable[Wire]):
         for i, p in enumerate(ports):

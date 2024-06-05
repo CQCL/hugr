@@ -226,8 +226,8 @@ def test_build_nested():
 
 
 def test_build_inter_graph():
-    h = Dfg.endo([BOOL_T])
-    (a,) = h.inputs()
+    h = Dfg.endo([BOOL_T, BOOL_T])
+    (a, b) = h.inputs()
     nested = h.add_nested([], [BOOL_T])
 
     nt = nested.add(Not(a))
@@ -235,9 +235,9 @@ def test_build_inter_graph():
     # TODO a context manager could add this state order edge on
     # exit by tracking parents of source nodes
     h.add_state_order(h.input_node, nested.root)
-    h.set_outputs(nested.root)
+    h.set_outputs(nested.root, b)
 
-    _validate(h.hugr)
+    _validate(h.hugr, True)
 
 
 def test_ancestral_sibling():
