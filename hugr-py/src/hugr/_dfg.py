@@ -76,3 +76,14 @@ class Dfg:
         for i, p in enumerate(ports):
             src = p.out_port()
             self.hugr.add_link(src, node.inp(i))
+
+
+def _ancestral_sibling(h: Hugr, src: Node, tgt: Node) -> Node | None:
+    src_parent = h[src].parent
+
+    while (tgt_parent := h[tgt].parent) is not None:
+        if tgt_parent == src_parent:
+            return tgt
+        tgt = tgt_parent
+
+    return None

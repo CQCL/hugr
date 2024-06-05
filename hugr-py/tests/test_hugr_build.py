@@ -4,7 +4,7 @@ import subprocess
 import os
 import pathlib
 from hugr._hugr import Hugr, Node, Wire
-from hugr._dfg import Dfg
+from hugr._dfg import Dfg, _ancestral_sibling
 from hugr._ops import Custom, Command
 import hugr._ops as ops
 from hugr.serialization import SerialHugr
@@ -238,3 +238,13 @@ def test_build_inter_graph():
     h.set_outputs(nested.root)
 
     _validate(h.hugr)
+
+
+def test_ancestral_sibling():
+    h = Dfg.endo([BOOL_T])
+    (a,) = h.inputs()
+    nested = h.add_nested([], [BOOL_T])
+
+    nt = nested.add(Not(a))
+
+    assert _ancestral_sibling(h.hugr, h.input_node, nt) == nested.root
