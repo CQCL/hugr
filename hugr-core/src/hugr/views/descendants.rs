@@ -9,7 +9,7 @@ use crate::hugr::HugrError;
 use crate::ops::handle::NodeHandle;
 use crate::{Direction, Hugr, Node, Port};
 
-use super::{check_tag, HierarchyView, HugrInternals, HugrView, RootTagged};
+use super::{check_tag, ExtractHugr, HierarchyView, HugrInternals, HugrView, RootTagged};
 
 type RegionGraph<'g> = portgraph::view::Region<'g, &'g MultiPortGraph>;
 
@@ -174,6 +174,8 @@ where
         })
     }
 }
+
+impl<'g, Root: NodeHandle> ExtractHugr for DescendantsGraph<'g, Root> {}
 
 impl<'g, Root> super::HugrInternals for DescendantsGraph<'g, Root>
 where

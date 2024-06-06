@@ -263,6 +263,12 @@ impl Hugr {
         }
     }
 
+    /// Set the root node of the hugr.
+    pub(crate) fn set_root(&mut self, root: Node) {
+        self.hierarchy.detach(self.root);
+        self.root = root.pg_index();
+    }
+
     /// Add a node to the graph.
     pub(crate) fn add_node(&mut self, nodetype: NodeType) -> Node {
         let node = self
