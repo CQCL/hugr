@@ -18,48 +18,60 @@ impl<K: Hash + std::cmp::Eq, V: Hash> Hash for HashableHashMap<K, V> {
     }
 }
 
+struct ValueCache(HashMap<Node,Value>);
+
+impl ValueCache {
+    fn new() -> Self {
+        Self(HashMap::new())
+    }
+
+    fn get(&mut self, node: Node, value: &Value) -> ValueHandle {
+        self.0.entry(node).or_insert_with(|| value.clone());
+        ValueHandle(node)
+    }
+}
+
+#[derive(PartialEq,Eq,Clone,Hash)]
+struct ValueHandle(Node);
+
+impl ValueHandle {
+    fn new(node: Node) -> Self {
+        Self(node)
+    }
+}
+
 #[derive(PartialEq, Clone, Eq, Hash)]
 enum PartialValue {
-    Bottom(Type),
-    Value(Node, Type),
-    PartialSum(HashableHashMap<usize, Vec<PartialValue>>, SumType),
-    Top(Type),
+    Bottom,
+    Value(ValueHandle),
+    PartialSum(HashableHashMap<usize, Vec<PartialValue>>),
+    Top,
 }
 
 impl PartialValue {
-    fn get_type(&self) -> Type {
-        match self {
-            PartialValue::Bottom(t) => t.clone(),
-            PartialValue::Value(_, t) => t.clone(),
-            PartialValue::PartialSum(_, t) => t.clone().into(),
-            PartialValue::Top(t) => t.clone(),
-        }
-    }
-
-    fn top_from_hugr(hugr: &impl HugrView, node: Node, port: OutgoingPort) -> Self {
-        Self::Top(
-            hugr.signature(node)
-                .unwrap()
-                .out_port_type(port)
-                .unwrap()
-                .clone(),
-        )
-    }
-
-    fn from_load_constant(hugr: &impl HugrView, node: Node) -> Self {
+    const BOTTOM: Self = Self::Bottom;
+    const BOTTOM_REF: &'static Self = &Self::BOTTOM;
+    fn from_load_constant(cache: &mut ValueCache, hugr: &impl HugrView, node: Node) -> Self {
         let load_op = hugr.get_optype(node).as_load_constant().unwrap();
         let const_node = hugr
             .single_linked_output(node, load_op.constant_port())
             .unwrap()
             .0;
         let const_op = hugr.get_optype(const_node).as_const().unwrap();
-        Self::Value(const_node, const_op.get_type())
+        Self::Value(cache.get(const_node, const_op.value()))
     }
 
     fn tuple_from_value_row(r: &ValueRow) -> Self {
-        unimplemented!()
+        if !r.initialised() {
+            return Self::Top
+        }
+        match r {
+           ValueRow::Bottom  => Self::Bottom,
+           ValueRow::Values(vs) => {
+            PartialValue::PartialSum(HashableHashMap([(0usize, vs.clone())].into_iter().collect()))
+           }
+        }
     }
-
 }
 
 impl PartialOrd for PartialValue {
@@ -81,42 +93,37 @@ impl Lattice for PartialValue {
     }
 
     fn join_mut(&mut self, other: Self) -> bool {
-        debug_assert_eq!(self.get_type(), other.get_type());
         match (self, other) {
-            (Self::Bottom(_), _) => false,
-            (s, rhs @ Self::Bottom(_)) => {
-                *s = rhs;
+            (Self::Bottom, _) => false,
+            (s, Self::Bottom) => {
+                *s = Self::Bottom;
                 true
             }
-            (_, Self::Top(_)) => false,
-            (s @ Self::Top(_), x) => {
-                *s = x;
+            (_, Self::Top) => false,
+            (s @ Self::Top, x) => {
+                *s = Self::Top;
                 true
             }
-            (Self::Value(n1, t), Self::Value(n2, _)) if n1 == &n2 => false,
+            (Self::Value(h1), Self::Value(h2)) if h1 == &h2 => false,
             (
-                Self::PartialSum(HashableHashMap(hm1), t),
-                Self::PartialSum(HashableHashMap(hm2), _),
+                Self::PartialSum(HashableHashMap(hm1)),
+                Self::PartialSum(HashableHashMap(hm2))
             ) => {
                 let mut changed = false;
                 for (k, v) in hm2 {
-                    let row = hm1.entry(k).or_insert_with(|| {
+                    if let Some(row) = hm1.get_mut(&k) {
+                        for (lhs, rhs) in zip_eq(row.iter_mut(), v.into_iter()) {
+                            changed |= lhs.join_mut(rhs);
+                        }
+                    } else {
+                        hm1.insert(k, v);
                         changed = true;
-                        t.get_variant(k)
-                            .unwrap()
-                            .iter()
-                            .cloned()
-                            .map(Self::Top)
-                            .collect_vec()
-                    });
-                    for (lhs, rhs) in zip_eq(row.iter_mut(), v.into_iter()) {
-                        changed |= lhs.join_mut(rhs);
                     }
                 }
                 changed
             }
             (s, _) => {
-                *s = Self::Bottom(s.get_type());
+                *s = Self::Bottom;
                 true
             }
         }
@@ -133,25 +140,48 @@ enum ValueRow {
     Bottom,
 }
 
+
 impl ValueRow {
     fn into_partial_value(self) -> PartialValue {
         todo!()
     }
 
-    fn new(tr: &TypeRow) -> Self {
-        Self::Values(tr.iter().cloned().map(PartialValue::Top).collect_vec())
+    fn new(len: usize) -> Self {
+        Self::Values(vec![PartialValue::Top; len])
     }
 
-    fn singleton(tr: &TypeRow, idx: usize, v: PartialValue) -> Self {
-        let mut r = Self::new(tr);
+    fn singleton(len: usize, idx: usize, v: PartialValue) -> Self {
+        assert!(idx < len);
+        let mut r = Self::new(len);
         if let Self::Values(vec) = &mut r {
             vec[idx] = v;
         }
         r
     }
 
-    fn iter(&self) -> impl Iterator<Item=(IncomingPort,PartialValue)> {
-        std::iter::empty()
+    fn singleton_from_row(r: &TypeRow, idx: usize, v: PartialValue) -> Self {
+        Self::singleton(r.len(),idx,v)
+    }
+
+    fn top_from_row(r: &TypeRow) -> Self {
+        Self::new(r.len())
+    }
+
+    fn iter<'a>(&'a self, h: &'a impl HugrView, n: Node) -> impl Iterator<Item=(IncomingPort,&PartialValue)> + 'a {
+        match self {
+            Self::Values(v) => {
+                either::Either::Left(zip_eq(h.node_inputs(n), v.iter()))
+            }
+            Self::Bottom => either::Either::Right(h.node_inputs(n).map(|x| (x,PartialValue::BOTTOM_REF)))
+        }
+    }
+
+    fn initialised(&self) -> bool {
+        if let Self::Values(v) = self {
+            v.iter().all(|x| x != &PartialValue::Top)
+        } else {
+            true
+        }
     }
 }
 
@@ -201,9 +231,18 @@ fn node_in_value_row<'a>(
     std::iter::empty()
 }
 
-fn tc(hugr: &impl HugrView, node: Node) {
+fn tc(hugr: &impl HugrView, node: Node) -> Vec<(Node, OutgoingPort, PartialValue)> {
     assert!(OpTag::DataflowParent.is_superset(hugr.get_optype(node).tag()));
     let d = DescendantsGraph::<'_, Node>::try_new(hugr, node).unwrap();
+    let mut cache = ValueCache::new();
+
+    let singleton_in_row = |n: &Node, ip: &IncomingPort, v: &PartialValue| -> ValueRow {
+        ValueRow::singleton_from_row(&hugr.signature(*n).unwrap().input, ip.index(), v.clone())
+    };
+
+    let top_row = |n: &Node| -> ValueRow {
+        ValueRow::top_from_row(&hugr.signature(*n).unwrap().input)
+    };
     ascent_run! {
         relation node(Node) = d.nodes().map(|x| (x,)).collect_vec();
 
@@ -213,25 +252,29 @@ fn tc(hugr: &impl HugrView, node: Node) {
         relation out_wire(Node, OutgoingPort);
         out_wire(n,p) <-- node(n), for p in d.node_outputs(*n);
 
-        lattice node_in_value_row(Node, ValueRow);
-        node_in_value_row(n, ValueRow::new(&hugr.signature(*n).unwrap().input)) <-- node(n);
-
         lattice out_wire_value(Node, OutgoingPort, PartialValue);
-        out_wire_value(n,p, PartialValue::top_from_hugr(hugr,*n,*p)) <-- out_wire(n,p);
+        out_wire_value(n,p, PartialValue::Top) <-- out_wire(n,p);
 
-        node_in_value_row(n,ValueRow::singleton(&hugr.signature(*n).unwrap().input, ip.index(), v.clone())) <-- in_wire(n, ip),
-            if let Some((m,op)) = hugr.single_linked_output(*n, *ip), out_wire_value(m, op, ?v);
+        lattice node_in_value_row(Node, ValueRow);
+        node_in_value_row(n, top_row(n)) <-- node(n);
+        node_in_value_row(n, singleton_in_row(n,ip,v)) <-- in_wire(n, ip),
+            if let Some((m,op)) = hugr.single_linked_output(*n, *ip),
+            out_wire_value(m, op, v);
 
         lattice in_wire_value(Node, IncomingPort, PartialValue);
-        in_wire_value(n,p,v) <-- node_in_value_row(n, ?vr), for (p,v) in vr.iter();
+        in_wire_value(n,p,v) <-- node_in_value_row(n, vr), for (p,v) in vr.iter(hugr,*n);
 
         relation load_constant_node(Node);
         load_constant_node(n) <-- node(n), if hugr.get_optype(*n).is_load_constant();
-        out_wire_value(n, 0.into(), PartialValue::from_load_constant(hugr, *n)) <-- load_constant_node(n);
+
+        out_wire_value(n, 0.into(), PartialValue::from_load_constant(&mut cache, hugr, *n)) <--
+            load_constant_node(n);
 
         relation make_tuple_node(Node);
         make_tuple_node(n) <-- node(n), if hugr.get_optype(*n).is_make_tuple();
 
-        out_wire_value(n,0.into(), PartialValue::tuple_from_value_row(vs)) <-- make_tuple_node(n), node_in_value_row(n, ?vs);
-    };
+        out_wire_value(n,0.into(), PartialValue::tuple_from_value_row(vs)) <--
+            make_tuple_node(n), node_in_value_row(n, vs);
+
+    }.out_wire_value
 }
