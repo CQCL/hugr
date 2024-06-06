@@ -23,7 +23,7 @@ use hugr_core::{
     Hugr, HugrView, IncomingPort, Node, SimpleReplacement,
 };
 
-use crate::verify::{VerifyError, VerifyLevel};
+use crate::validation::{ValidatePassError, ValidationLevel};
 
 #[derive(Error, Debug)]
 #[allow(missing_docs)]
@@ -31,13 +31,13 @@ pub enum ConstFoldError {
     #[error(transparent)]
     SimpleReplacementError(#[from] SimpleReplacementError),
     #[error(transparent)]
-    VerifyError(#[from] VerifyError),
+    ValidationError(#[from] ValidatePassError),
 }
 
 #[derive(Debug, Clone, Copy, Default)]
 /// A configuration for the Constant Folding pass.
 pub struct ConstantFoldPass {
-    verify: VerifyLevel,
+    validation: ValidationLevel,
 }
 
 impl ConstantFoldPass {
@@ -46,9 +46,9 @@ impl ConstantFoldPass {
         Self::default()
     }
 
-    /// Build a `ConstFoldConfig` with the given [VerifyLevel].
-    pub fn verify_level(mut self, verify: VerifyLevel) -> Self {
-        self.verify = verify;
+    /// Build a `ConstFoldConfig` with the given [ValidationLevel].
+    pub fn validation_level(mut self, level: ValidationLevel) -> Self {
+        self.validation = level;
         self
     }
 
@@ -58,33 +58,35 @@ impl ConstantFoldPass {
         hugr: &mut H,
         reg: &ExtensionRegistry,
     ) -> Result<(), ConstFoldError> {
-        self.verify.run_verified_pass(hugr, reg, |hugr: &mut H, _| {
-            loop {
-                // We can only safely apply a single replacement. Applying a
-                // replacement removes nodes and edges which may be referenced by
-                // further replacements returned by find_consts. Even worse, if we
-                // attempted to apply those replacements, expecting them to fail if
-                // the nodes and edges they reference had been deleted,  they may
-                // succeed because new nodes and edges reused the ids.
-                //
-                // We could be a lot smarter here, keeping track of `LoadConstant`
-                // nodes and only looking at their out neighbours.
-                let Some((replace, removes)) = find_consts(hugr, hugr.nodes(), reg).next() else {
-                    break Ok(());
-                };
-                hugr.apply_rewrite(replace)?;
-                for rem in removes {
-                    // We are optimistically applying these [RemoveLoadConstant] and
-                    // [RemoveConst] rewrites without checking whether the nodes
-                    // they attempt to remove have remaining uses. If they do, then
-                    // the rewrite fails and we move on.
-                    if let Ok(const_node) = hugr.apply_rewrite(rem) {
-                        // if the LoadConst was removed, try removing the Const too.
-                        let _ = hugr.apply_rewrite(RemoveConst(const_node));
+        self.validation
+            .run_validated_pass(hugr, reg, |hugr: &mut H, _| {
+                loop {
+                    // We can only safely apply a single replacement. Applying a
+                    // replacement removes nodes and edges which may be referenced by
+                    // further replacements returned by find_consts. Even worse, if we
+                    // attempted to apply those replacements, expecting them to fail if
+                    // the nodes and edges they reference had been deleted,  they may
+                    // succeed because new nodes and edges reused the ids.
+                    //
+                    // We could be a lot smarter here, keeping track of `LoadConstant`
+                    // nodes and only looking at their out neighbours.
+                    let Some((replace, removes)) = find_consts(hugr, hugr.nodes(), reg).next()
+                    else {
+                        break Ok(());
+                    };
+                    hugr.apply_rewrite(replace)?;
+                    for rem in removes {
+                        // We are optimistically applying these [RemoveLoadConstant] and
+                        // [RemoveConst] rewrites without checking whether the nodes
+                        // they attempt to remove have remaining uses. If they do, then
+                        // the rewrite fails and we move on.
+                        if let Ok(const_node) = hugr.apply_rewrite(rem) {
+                            // if the LoadConst was removed, try removing the Const too.
+                            let _ = hugr.apply_rewrite(RemoveConst(const_node));
+                        }
                     }
                 }
-            }
-        })
+            })
     }
 }
 
