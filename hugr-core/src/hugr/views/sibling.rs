@@ -11,7 +11,7 @@ use crate::hugr::{HugrError, HugrMut};
 use crate::ops::handle::NodeHandle;
 use crate::{Direction, Hugr, Node, Port};
 
-use super::{check_tag, HierarchyView, HugrInternals, HugrView, RootTagged};
+use super::{check_tag, ExtractHugr, HierarchyView, HugrInternals, HugrView, RootTagged};
 
 type FlatRegionGraph<'g> = portgraph::view::FlatRegion<'g, &'g MultiPortGraph>;
 
@@ -205,6 +205,8 @@ where
     }
 }
 
+impl<'g, Root: NodeHandle> ExtractHugr for SiblingGraph<'g, Root> {}
+
 impl<'g, Root> HugrInternals for SiblingGraph<'g, Root>
 where
     Root: NodeHandle,
@@ -267,6 +269,8 @@ impl<'g, Root: NodeHandle> SiblingMut<'g, Root> {
         })
     }
 }
+
+impl<'g, Root: NodeHandle> ExtractHugr for SiblingMut<'g, Root> {}
 
 impl<'g, Root: NodeHandle> HugrInternals for SiblingMut<'g, Root> {
     type Portgraph<'p> = FlatRegionGraph<'p> where 'g: 'p, Root: 'p;
@@ -483,5 +487,20 @@ mod test {
 
         let nested_sib_mut = SiblingMut::<DataflowParentID>::try_new(&mut sib_mut, root);
         assert!(nested_sib_mut.is_err());
+    }
+
+    #[rstest]
+    fn extract_hugr() -> Result<(), Box<dyn std::error::Error>> {
+        let (hugr, def, _inner) = make_module_hgr()?;
+
+        let region: SiblingGraph = SiblingGraph::try_new(&hugr, def)?;
+        let extracted = region.extract_hugr();
+
+        let region: SiblingGraph = SiblingGraph::try_new(&hugr, def)?;
+
+        assert_eq!(region.node_count(), extracted.node_count());
+        assert_eq!(region.root_type(), extracted.root_type());
+
+        Ok(())
     }
 }
