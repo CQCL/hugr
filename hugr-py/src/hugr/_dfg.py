@@ -4,6 +4,7 @@ from typing import Sequence, Iterable
 from ._hugr import Hugr, Node, Wire, OutPort
 
 from ._ops import Op, Command, Input, Output, DFG
+from ._exceptions import NoSiblingAncestor
 from hugr.serialization.tys import FunctionType, Type
 
 
@@ -67,12 +68,25 @@ class Dfg:
 
     def add_state_order(self, src: Node, dst: Node) -> None:
         # adds edge to the right of all existing edges
-        # breaks if further edges are added
-        self.hugr.add_link(
-            src.out(self.hugr.num_outgoing(src)), dst.inp(self.hugr.num_incoming(dst))
-        )
+        self.hugr.add_link(src.out(-1), dst.inp(-1))
 
     def _wire_up(self, node: Node, ports: Iterable[Wire]):
         for i, p in enumerate(ports):
             src = p.out_port()
+            node_ancestor = _ancestral_sibling(self.hugr, src.node, node)
+            if node_ancestor is None:
+                raise NoSiblingAncestor(src.node.idx, node.idx)
+            if node_ancestor != node:
+                self.add_state_order(src.node, node_ancestor)
             self.hugr.add_link(src, node.inp(i))
+
+
+def _ancestral_sibling(h: Hugr, src: Node, tgt: Node) -> Node | None:
+    src_parent = h[src].parent
+
+    while (tgt_parent := h[tgt].parent) is not None:
+        if tgt_parent == src_parent:
+            return tgt
+        tgt = tgt_parent
+
+    return None

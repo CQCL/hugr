@@ -3,8 +3,8 @@ from dataclasses import dataclass, field
 import subprocess
 import os
 import pathlib
-from hugr._hugr import Hugr, Node, Wire
-from hugr._dfg import Dfg
+from hugr._hugr import Hugr, Node, Wire, _SubPort
+from hugr._dfg import Dfg, _ancestral_sibling
 from hugr._ops import Custom, Command
 import hugr._ops as ops
 from hugr.serialization import SerialHugr
@@ -226,15 +226,29 @@ def test_build_nested():
 
 
 def test_build_inter_graph():
+    h = Dfg.endo([BOOL_T, BOOL_T])
+    (a, b) = h.inputs()
+    nested = h.add_nested([], [BOOL_T])
+
+    nt = nested.add(Not(a))
+    nested.set_outputs(nt)
+
+    h.set_outputs(nested.root, b)
+
+    _validate(h.hugr, True)
+
+    assert _SubPort(h.input_node.out(-1)) in h.hugr._links
+    assert h.hugr.num_outgoing(h.input_node) == 2  # doesn't count state order
+    assert len(list(h.hugr.outgoing_order_links(h.input_node))) == 1
+    assert len(list(h.hugr.incoming_order_links(nested.root))) == 1
+    assert len(list(h.hugr.incoming_order_links(h.output_node))) == 0
+
+
+def test_ancestral_sibling():
     h = Dfg.endo([BOOL_T])
     (a,) = h.inputs()
     nested = h.add_nested([], [BOOL_T])
 
     nt = nested.add(Not(a))
-    nested.set_outputs(nt)
-    # TODO a context manager could add this state order edge on
-    # exit by tracking parents of source nodes
-    h.add_state_order(h.input_node, nested.root)
-    h.set_outputs(nested.root)
 
-    _validate(h.hugr)
+    assert _ancestral_sibling(h.hugr, h.input_node, nt) == nested.root
