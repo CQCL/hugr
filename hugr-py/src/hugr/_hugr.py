@@ -260,6 +260,12 @@ class Hugr(Mapping[Node, NodeData]):
 
     # TODO: single linked port
 
+    def outgoing_order_links(self, node: Node) -> Iterable[Node]:
+        return (p.node for p in self.linked_ports(node.out(-1)))
+
+    def incoming_order_links(self, node: Node) -> Iterable[Node]:
+        return (p.node for p in self.linked_ports(node.inp(-1)))
+
     def _node_links(
         self, node: Node, links: dict[_SubPort[P], _SubPort[K]]
     ) -> Iterable[tuple[P, list[K]]]:
@@ -269,7 +275,6 @@ class Hugr(Mapping[Node, NodeData]):
             return
         # iterate over known offsets
         for offset in range(self.num_ports(node, direction)):
-            # TODO should this also look for -1 state order edges?
             port = cast(P, node.port(offset, direction))
             yield port, list(self._linked_ports(port, links))
 

@@ -235,9 +235,13 @@ def test_build_inter_graph():
 
     h.set_outputs(nested.root, b)
 
+    _validate(h.hugr, True)
+
     assert _SubPort(h.input_node.out(-1)) in h.hugr._links
     assert h.hugr.num_outgoing(h.input_node) == 2  # doesn't count state order
-    _validate(h.hugr, True)
+    assert len(list(h.hugr.outgoing_order_links(h.input_node))) == 1
+    assert len(list(h.hugr.incoming_order_links(nested.root))) == 1
+    assert len(list(h.hugr.incoming_order_links(h.output_node))) == 0
 
 
 def test_ancestral_sibling():
