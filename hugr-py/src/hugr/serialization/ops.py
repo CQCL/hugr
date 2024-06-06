@@ -1,9 +1,10 @@
+from __future__ import annotations
 import inspect
 import sys
 from abc import ABC
 from typing import Any, Literal
 
-from pydantic import Field, RootModel
+from pydantic import Field, RootModel, ConfigDict
 
 from . import tys
 from .tys import (
@@ -40,6 +41,10 @@ class BaseOp(ABC, ConfiguredBaseModel):
     def display_name(self) -> str:
         """Name of the op for visualisation"""
         return self.__class__.__name__
+
+    def deserialize(self) -> _ops.Op:
+        """Deserializes the model into the corresponding Op."""
+        return _ops.SerWrap(self)
 
 
 # ----------------------------------------------------------
@@ -108,15 +113,14 @@ class SumValue(ConfiguredBaseModel):
     tag: int
     typ: SumType
     vs: list["Value"]
-
-    class Config:
-        # Needed to avoid random '\n's in the pydantic description
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "description": (
                 "A Sum variant For any Sum type where this value meets the type "
                 "of the variant indicated by the tag."
             ),
         }
+    )
 
 
 class Value(RootModel):
@@ -126,8 +130,7 @@ class Value(RootModel):
         discriminator="v"
     )
 
-    class Config:
-        json_schema_extra = {"required": ["v"]}
+    model_config = ConfigDict(json_schema_extra={"required": ["v"]})
 
 
 class Const(BaseOp):
@@ -168,11 +171,13 @@ class DataflowBlock(BaseOp):
                 self.sum_rows.append(variant)
         self.other_outputs = outputs[1:]
 
-    class Config:
         # Needed to avoid random '\n's in the pydantic description
-        json_schema_extra = {
+
+    model_config = ConfigDict(
+        json_schema_extra={
             "description": "A CFG basic block node. The signature is that of the internal Dataflow graph.",
         }
+    )
 
 
 class ExitBlock(BaseOp):
@@ -182,11 +187,12 @@ class ExitBlock(BaseOp):
     op: Literal["ExitBlock"] = "ExitBlock"
     cfg_outputs: TypeRow
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             # Needed to avoid random '\n's in the pydantic description
             "description": "The single exit node of the CFG, has no children, stores the types of the CFG node output.",
         }
+    )
 
 
 # ---------------------------------------------
@@ -208,6 +214,9 @@ class Input(DataflowOp):
         assert len(in_types) == 0
         self.types = list(out_types)
 
+    def deserialize(self) -> _ops.Input:
+        return _ops.Input(types=self.types)
+
 
 class Output(DataflowOp):
     """An output node. The inputs are the outputs of the function."""
@@ -218,6 +227,9 @@ class Output(DataflowOp):
     def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
         assert len(out_types) == 0
         self.types = list(in_types)
+
+    def deserialize(self) -> _ops.Output:
+        return _ops.Output(types=self.types)
 
 
 class Call(DataflowOp):
@@ -234,9 +246,9 @@ class Call(DataflowOp):
     type_args: list[tys.TypeArg]
     instantiation: FunctionType
 
-    class Config:
+    model_config = ConfigDict(
         # Needed to avoid random '\n's in the pydantic description
-        json_schema_extra = {
+        json_schema_extra={
             "description": (
                 "Operation to call a function directly. The first port is "
                 "connected to the def/declare of the function being called directly, "
@@ -244,6 +256,7 @@ class Call(DataflowOp):
                 "ports matches the function being called."
             )
         }
+    )
 
 
 class CallIndirect(DataflowOp):
@@ -289,6 +302,9 @@ class DFG(DataflowOp):
         self.signature = FunctionType(
             input=list(inputs), output=list(outputs), extension_reqs=ExtensionSet([])
         )
+
+    def deserialize(self) -> _ops.DFG:
+        return _ops.DFG(self.signature)
 
 
 # ------------------------------------------------
@@ -386,14 +402,23 @@ class CustomOp(DataflowOp):
     def display_name(self) -> str:
         return self.op_name
 
-    class Config:
+    def deserialize(self) -> _ops.Custom:
+        return _ops.Custom(
+            extension=self.extension,
+            op_name=self.op_name,
+            signature=self.signature,
+            args=self.args,
+        )
+
+    model_config = ConfigDict(
         # Needed to avoid random '\n's in the pydantic description
-        json_schema_extra = {
+        json_schema_extra={
             "description": (
                 "A user-defined operation that can be downcasted by the extensions that "
                 "define it."
             )
         }
+    )
 
 
 class Noop(DataflowOp):
@@ -421,6 +446,9 @@ class MakeTuple(DataflowOp):
             in_types = []
         self.tys = list(in_types)
 
+    def deserialize(self) -> _ops.MakeTuple:
+        return _ops.MakeTuple(self.tys)
+
 
 class UnpackTuple(DataflowOp):
     """An operation that packs all its inputs into a tuple."""
@@ -430,6 +458,9 @@ class UnpackTuple(DataflowOp):
 
     def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
         self.tys = list(out_types)
+
+    def deserialize(self) -> _ops.UnpackTuple:
+        return _ops.UnpackTuple(self.tys)
 
 
 class Tag(DataflowOp):
@@ -491,8 +522,7 @@ class OpType(RootModel):
         | AliasDefn
     ) = Field(discriminator="op")
 
-    class Config:
-        json_schema_extra = {"required": ["parent", "op"]}
+    model_config = ConfigDict(json_schema_extra={"required": ["parent", "op"]})
 
 
 # --------------------------------------
@@ -527,3 +557,5 @@ classes = (
 )
 
 tys_model_rebuild(dict(classes))
+
+from hugr import _ops  # noqa: E402  # needed to avoid circular imports

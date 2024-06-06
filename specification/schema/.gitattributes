@@ -1,1 +1,2 @@
+# Treat schema json files as binary in diffs
 *schema*.json -diff

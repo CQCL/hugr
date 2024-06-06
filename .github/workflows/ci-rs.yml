@@ -61,8 +61,9 @@ jobs:
           RUSTDOCFLAGS: "-Dwarnings"
 
   benches:
+    name: Build benchmarks 🏋️
     needs: changes
-    if: ${{ needs.changes.outputs.rust == 'true' }} && github.event_name != 'merge_group'
+    if: ${{ needs.changes.outputs.rust == 'true' && github.event_name != 'merge_group' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -75,11 +76,11 @@ jobs:
         run: cargo bench --verbose --no-run --workspace --all-features
 
   # Run tests on Rust stable
-  tests-stable:
+  tests-stable-no-features:
     needs: changes
     if: ${{ needs.changes.outputs.rust == 'true' }}
     runs-on: ubuntu-latest
-    name: tests (Rust stable)
+    name: tests (Rust stable, no features)
     steps:
       - uses: actions/checkout@v4
       - uses: mozilla-actions/sccache-action@v0.0.4
@@ -93,6 +94,22 @@ jobs:
         run: cargo test --verbose --workspace --no-default-features --no-run
       - name: Tests with no features
         run: cargo test --verbose --workspace --no-default-features
+
+  # Run tests on Rust stable
+  tests-stable-all-features:
+    needs: changes
+    if: ${{ needs.changes.outputs.rust == 'true' }}
+    runs-on: ubuntu-latest
+    name: tests (Rust stable, all features)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mozilla-actions/sccache-action@v0.0.4
+      - id: toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 'stable'
+      - name: Configure default rust toolchain
+        run: rustup override set ${{steps.toolchain.outputs.name}}
       - name: Build with all features
         run: cargo test --verbose --workspace --all-features --no-run
       - name: Tests with all features
@@ -106,7 +123,9 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        rust: ['1.75', beta, nightly]
+        # Pinned nightly version until this gets resolved:
+        # https://github.com/rust-lang/rust/issues/125474
+        rust: ['1.75', beta, 'nightly-2024-05-22']
     name: tests (Rust ${{ matrix.rust }})
     steps:
       - uses: actions/checkout@v4
@@ -130,7 +149,7 @@ jobs:
   # even if they are skipped due to no changes in the relevant files.
   required-checks:
     name: Required checks 🦀
-    needs: [changes, check, tests-stable]
+    needs: [changes, check, tests-stable-no-features, tests-stable-all-features]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
@@ -142,7 +161,8 @@ jobs:
         if: |
           needs.changes.result == 'failure' || needs.changes.result == 'cancelled' ||
           needs.check.result == 'failure' || needs.check.result == 'cancelled' ||
-          needs.tests-stable.result == 'failure' || needs.tests-stable.result == 'cancelled'
+          needs.tests-stable-no-features.result == 'failure' || needs.tests-stable-no-features.result == 'cancelled' ||
+          needs.tests-stable-all-features.result == 'failure' || needs.tests-stable-all-features.result == 'cancelled'
         run: |
           echo "Required checks failed"
           echo "Please check the logs for more information"
@@ -152,15 +172,20 @@ jobs:
           echo "All required checks passed"
 
   coverage:
-    needs: [changes, tests-stable, tests-other, check]
+    needs: [changes, tests-stable-no-features, tests-stable-all-features, tests-other, check]
     # Run only if there are changes in the relevant files and the check job passed or was skipped
     if: always() && !failure() && !cancelled() && needs.changes.outputs.rust == 'true' && github.event_name != 'merge_group'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: mozilla-actions/sccache-action@v0.0.4
-      - uses: dtolnay/rust-toolchain@nightly
+      - uses: dtolnay/rust-toolchain@master
         with:
+          # Nightly is required to count doctests coverage
+          #
+          # Pinned nightly version until this gets resolved
+          # https://github.com/rust-lang/rust/issues/125474
+          toolchain: 'nightly-2024-05-22'
           components: llvm-tools-preview
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov

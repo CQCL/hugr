@@ -53,4 +53,4 @@ This project is licensed under Apache License, Version 2.0 ([LICENSE][] or http:
   [crates]: https://img.shields.io/crates/v/hugr
   [codecov]: https://img.shields.io/codecov/c/gh/CQCL/hugr?logo=codecov
   [LICENSE]: https://github.com/CQCL/hugr/blob/main/LICENCE
-  [CHANGELOG]: https://github.com/CQCL/hugr/blob/main/CHANGELOG.md
+  [CHANGELOG]: https://github.com/CQCL/hugr/blob/main/hugr/CHANGELOG.md

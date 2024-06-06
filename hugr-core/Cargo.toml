@@ -1,0 +1,61 @@
+[package]
+name = "hugr-core"
+version = "0.1.0"
+edition = { workspace = true }
+rust-version = { workspace = true }
+
+license = { workspace = true }
+readme = "README.md"
+documentation = "https://docs.rs/hugr/"
+homepage = { workspace = true }
+repository = { workspace = true }
+description = "Quantinuum's Hierarchical Unified Graph Representation"
+keywords = ["Quantum", "Quantinuum"]
+categories = ["compilers"]
+
+[lints]
+workspace = true
+
+[features]
+extension_inference = []
+
+[dependencies]
+portgraph = { workspace = true, features = ["serde", "petgraph"] }
+thiserror = { workspace = true }
+regex = { workspace = true }
+cgmath = { workspace = true, features = ["serde"] }
+num-rational = { workspace = true, features = ["serde"] }
+downcast-rs = { workspace = true }
+# Rc used here for Extension, but unfortunately we must turn the feature on globally
+serde = { workspace = true, features = ["derive", "rc"] }
+serde_yaml = { workspace = true }
+typetag = { workspace = true }
+smol_str = { workspace = true, features = ["serde"] }
+derive_more = { workspace = true }
+itertools = { workspace = true }
+html-escape = { workspace = true }
+bitvec = { workspace = true, features = ["serde"] }
+enum_dispatch = { workspace = true }
+lazy_static = { workspace = true }
+petgraph = { workspace = true }
+context-iterators = { workspace = true }
+serde_json = { workspace = true }
+delegate = { workspace = true }
+paste = { workspace = true }
+strum = { workspace = true }
+strum_macros = { workspace = true }
+
+[dev-dependencies]
+rstest = { workspace = true }
+webbrowser = { workspace = true }
+urlencoding = { workspace = true }
+cool_asserts = { workspace = true }
+insta = { workspace = true, features = ["yaml"] }
+jsonschema = { workspace = true }
+proptest = { workspace = true }
+proptest-derive = { workspace = true }
+regex-syntax = { workspace = true }
+
+
+# Required for documentation examples
+hugr = { path = "../hugr" }

@@ -99,8 +99,7 @@ class TypeParam(RootModel):
         WrapValidator(_json_custom_error_validator),
     ] = Field(discriminator="tp")
 
-    class Config:
-        json_schema_extra = {"required": ["tp"]}
+    model_config = ConfigDict(json_schema_extra={"required": ["tp"]})
 
 
 # ------------------------------------------
@@ -153,8 +152,7 @@ class TypeArg(RootModel):
         WrapValidator(_json_custom_error_validator),
     ] = Field(discriminator="tya")
 
-    class Config:
-        json_schema_extra = {"required": ["tya"]}
+    model_config = ConfigDict(json_schema_extra={"required": ["tya"]})
 
 
 # --------------------------------------------
@@ -197,8 +195,7 @@ class SumType(RootModel):
     def t(self) -> str:
         return self.root.t
 
-    class Config:
-        json_schema_extra = {"required": ["s"]}
+    model_config = ConfigDict(json_schema_extra={"required": ["s"]})
 
 
 # ----------------------------------------------
@@ -210,6 +207,15 @@ class Variable(ConfiguredBaseModel):
     """A type variable identified by an index into the array of TypeParams."""
 
     t: Literal["V"] = "V"
+    i: int
+    b: "TypeBound"
+
+
+class RowVar(ConfiguredBaseModel):
+    """A variable standing for a row of some (unknown) number of types.
+    May occur only within a row; not a node input/output."""
+
+    t: Literal["R"] = "R"
     i: int
     b: "TypeBound"
 
@@ -235,14 +241,15 @@ class FunctionType(ConfiguredBaseModel):
     def empty(cls) -> "FunctionType":
         return FunctionType(input=[], output=[], extension_reqs=[])
 
-    class Config:
+    model_config = ConfigDict(
         # Needed to avoid random '\n's in the pydantic description
-        json_schema_extra = {
+        json_schema_extra={
             "description": (
                 "A graph encoded as a value. It contains a concrete signature and "
                 "a set of required resources."
             )
         }
+    )
 
 
 class PolyFuncType(ConfiguredBaseModel):
@@ -261,14 +268,15 @@ class PolyFuncType(ConfiguredBaseModel):
     def empty(cls) -> "PolyFuncType":
         return PolyFuncType(params=[], body=FunctionType.empty())
 
-    class Config:
+    model_config = ConfigDict(
         # Needed to avoid random '\n's in the pydantic description
-        json_schema_extra = {
+        json_schema_extra={
             "description": (
                 "A polymorphic type scheme, i.e. of a FuncDecl, FuncDefn or OpDef.  "
                 "(Nodes/operations in the Hugr are not polymorphic.)"
             )
         }
+    )
 
 
 class TypeBound(Enum):
@@ -321,13 +329,20 @@ class Type(RootModel):
     """A HUGR type."""
 
     root: Annotated[
-        Qubit | Variable | USize | FunctionType | Array | SumType | Opaque | Alias,
+        Qubit
+        | Variable
+        | RowVar
+        | USize
+        | FunctionType
+        | Array
+        | SumType
+        | Opaque
+        | Alias,
         WrapValidator(_json_custom_error_validator),
         Field(discriminator="t"),
     ]
 
-    class Config:
-        json_schema_extra = {"required": ["t"]}
+    model_config = ConfigDict(json_schema_extra={"required": ["t"]})
 
 
 # -------------------------------------------

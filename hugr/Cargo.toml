@@ -1,6 +1,6 @@
 [package]
 name = "hugr"
-version = "0.4.0-alpha.1"
+version = "0.5.0"
 edition = { workspace = true }
 rust-version = { workspace = true }
 
@@ -25,42 +25,14 @@ path = "src/lib.rs"
 extension_inference = []
 
 [dependencies]
-portgraph = { workspace = true, features = ["serde", "petgraph"] }
-thiserror = "1.0.28"
-regex = "1.9.5"
-cgmath = { version = "0.18.0", features = ["serde"] }
-num-rational = { version = "0.4.1", features = ["serde"] }
-downcast-rs = "1.2.0"
-serde = { version = "1.0", features = [
-    # Rc used here for Extension, but unfortunately we must turn the feature on globally
-    "derive",
-    "rc",
-] }
-serde_yaml = "0.9.19"
-typetag = "0.2.7"
-smol_str = { version = "0.2.0", features = ["serde"] }
-derive_more = "0.99.17"
-itertools = "0.12.0"
-html-escape = "0.2.13"
-bitvec = { version = "1.0.1", features = ["serde"] }
-enum_dispatch = "0.3.11"
-lazy_static = "1.4.0"
-petgraph = { version = "0.6.3", default-features = false }
-context-iterators = "0.2.0"
-serde_json = "1.0.97"
-delegate = "0.12.0"
-paste = "1.0"
-strum = "0.26.1"
-strum_macros = "0.26.1"
+hugr-core = { path = "../hugr-core", version = "0.1.0" }
+hugr-passes = { path = "../hugr-passes", version = "0.1.0" }
 
 [dev-dependencies]
-criterion = { version = "0.5.1", features = ["html_reports"] }
-rstest = "0.19.0"
-webbrowser = "1.0.0"
-urlencoding = "2.1.2"
-cool_asserts = "2.0.3"
-insta = { workspace = true, features = ["yaml"] }
-jsonschema = "0.18.0"
+rstest = { workspace = true }
+lazy_static = { workspace = true }
+criterion = { workspace = true, features = ["html_reports"] }
+serde_json = { workspace = true }
 
 [[bench]]
 name = "bench_main"

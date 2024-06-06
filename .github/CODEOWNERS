@@ -1,0 +1,11 @@
+# for syntax see https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners#codeowners-syntax
+
+# base rule, hugrverse team is codeowner for whole repo
+* @CQCL/hugrverse
+
+# Add specific rules below.
+# Lower the rule, higher the precedence
+
+# The release PRs that trigger publication to crates.io or PyPI always modify the changelog.
+# We require those PRs to be approved by someone with release permissions.
+**/CHANGELOG.md @aborgna-q @cqc-alec @ss2165

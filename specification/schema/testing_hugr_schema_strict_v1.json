@@ -1729,6 +1729,34 @@
             "title": "Qubit",
             "type": "object"
         },
+        "RowVar": {
+            "additionalProperties": false,
+            "description": "A variable standing for a row of some (unknown) number of types.\nMay occur only within a row; not a node input/output.",
+            "properties": {
+                "t": {
+                    "const": "R",
+                    "default": "R",
+                    "enum": [
+                        "R"
+                    ],
+                    "title": "T",
+                    "type": "string"
+                },
+                "i": {
+                    "title": "I",
+                    "type": "integer"
+                },
+                "b": {
+                    "$ref": "#/$defs/TypeBound"
+                }
+            },
+            "required": [
+                "i",
+                "b"
+            ],
+            "title": "RowVar",
+            "type": "object"
+        },
         "SequenceArg": {
             "additionalProperties": false,
             "properties": {
@@ -1990,6 +2018,7 @@
                     "I": "#/$defs/USize",
                     "Opaque": "#/$defs/Opaque",
                     "Q": "#/$defs/Qubit",
+                    "R": "#/$defs/RowVar",
                     "Sum": "#/$defs/SumType",
                     "V": "#/$defs/Variable"
                 },
@@ -2001,6 +2030,9 @@
                 },
                 {
                     "$ref": "#/$defs/Variable"
+                },
+                {
+                    "$ref": "#/$defs/RowVar"
                 },
                 {
                     "$ref": "#/$defs/USize"

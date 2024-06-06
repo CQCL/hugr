@@ -554,8 +554,11 @@ parent(n<sub>2</sub>) when the edge's locality is:
 Each of these localities have additional constraints as follows:
 
 1. For Ext edges, we require parent(n<sub>1</sub>) ==
-   parent<sup>i</sup>(n<sub>2</sub>) for some i\>1, *and* for Value edges only there must be a order edge from n<sub>1</sub> to
-   parent<sup>i-1</sup>(n<sub>2</sub>).
+   parent<sup>i</sup>(n<sub>2</sub>) for some i\>1, *and* for Value edges only:
+     * there must be a order edge from n<sub>1</sub> to
+       parent<sup>i-1</sup>(n<sub>2</sub>).
+     * None of the parent<sup>j</sup>(n<sub>2</sub>), for i\>j\>=1,
+       may be a FuncDefn node
 
    The order edge records the
    ordering requirement that results, i.e. it must be possible to
@@ -568,6 +571,9 @@ Each of these localities have additional constraints as follows:
    For Static edges this order edge is not required since the source is
    guaranteed to causally precede the target.
 
+   The FuncDefn restriction means that FuncDefn really are static,
+   and do not capture runtime values from their environment.
+
 2. For Dom edges, we must have that parent<sup>2</sup>(n<sub>1</sub>)
    == parent<sup>i</sup>(n<sub>2</sub>) is a CFG-node, for some i\>1,
    **and** parent(n<sub>1</sub>) strictly dominates
@@ -575,6 +581,8 @@ Each of these localities have additional constraints as follows:
    parent(n<sub>1</sub>) \!= parent<sup>i-1</sup>(n<sub>2</sub>). (The
    i\>1 allows the node to target an arbitrarily-deep descendant of the
    dominated block, similar to an Ext edge.)
+
+   The same FuncDefn restriction also applies here, on the parent(<sup>j</sup>)(n<sub>2</sub>) for i\>j\>=1 (of course j=i is the CFG and j=i-1 is the basic block).
 
 Specifically, these rules allow for edges where in a given execution of
 the HUGR the source of the edge executes once, but the target may
@@ -1646,11 +1654,11 @@ so must be supported by all third-party tooling.
 
 ### Operations
 
-| Name              | Inputs    | Outputs       | Meaning                                                           |
-|-------------------|-----------|---------------|------------------------------------------------------------------ |
-| `print`           | `string`  | -             | Append the string to the program's output stream[^1] (atomically) |
-| `new_array<N, T>` | `T` x N   | `array<N, T>` | Create an array from all the inputs                               |
-| `panic`           | ErrorType | -             | Immediately end execution and pass contents of error to context   |
+| Name              | Inputs           | Outputs       | Meaning                                                           |
+|-------------------|------------------|---------------|------------------------------------------------------------------ |
+| `print`           | `string`         | -             | Append the string to the program's output stream[^1] (atomically) |
+| `new_array<N, T>` | `T` x N          | `array<N, T>` | Create an array from all the inputs                               |
+| `panic`           | `ErrorType`, ... | ...           | Immediately end execution and pass contents of error to context. Inputs following the `ErrorType`, and all outputs, are arbitrary; these only exist so that structural constraints such as linearity can be satisfied. |
 
 [^1] The existence of an output stream, and the processing of it either during
 or after program execution, is runtime-dependent. If no output stream exists
@@ -1781,6 +1789,9 @@ Other operations:
 
 The `float64` type represents IEEE 754-2019 floating-point data of 64
 bits.
+
+Non-finite `float64` values (i.e. NaN and ±infinity) are not allowed in `Const`
+nodes.
 
 #### `arithmetic.float`
 

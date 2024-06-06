@@ -6,8 +6,8 @@ name: Notify coverage changes
 
 on:
   schedule:
-    # 04:00 daily
-    - cron: '0 4 * * *'
+    # 04:00 every Monday
+    - cron: '0 4 * * 1'
   workflow_dispatch: {}
 
 jobs:
@@ -18,13 +18,13 @@ jobs:
       should_notify: ${{ steps.get_coverage.outputs.should_notify }}
     steps:
       - name: Download commit sha of the most recent successful run
-        uses: dawidd6/action-download-artifact@v3
+        uses: dawidd6/action-download-artifact@v4
         with:
           # Downloads the artifact from the most recent successful run
           workflow: 'notify-coverage.yml'
           name: head-sha.txt
           if_no_artifact_found: ignore
-      - name: Get today's and yesterday's coverage trends from codecov
+      - name: Get today's and last run's coverage trends from codecov
         id: get_coverage
         # API reference: https://docs.codecov.com/reference/repos_totals_retrieve
         run: |

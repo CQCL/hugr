@@ -3,6 +3,9 @@
 
 rust:
   - "hugr/**"
+  - "hugr-cli/**"
+  - "hugr-core/**"
+  - "hugr-passes/**"
   - "Cargo.toml"
   - "specification/schema/**"
 
