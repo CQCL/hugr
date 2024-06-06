@@ -1,21 +1,30 @@
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import Field, ConfigDict
 
 from .ops import NodeID, OpType, classes as ops_classes
 from .tys import model_rebuild, ConfiguredBaseModel
+from .. import get_serialisation_version
 import hugr
 
 Port = tuple[NodeID, int | None]  # (node, offset)
 Edge = tuple[Port, Port]
 
+VersionField = Field(
+    default_factory=get_serialisation_version,
+    title="Version",
+    description="Serialisation Schema Version",
+    frozen=True,
+)
+
 
 class SerialHugr(ConfiguredBaseModel):
     """A serializable representation of a Hugr."""
 
-    version: Literal["v1"] = "v1"
+    version: str = VersionField
     nodes: list[OpType]
     edges: list[Edge]
+    hierarchy: list[NodeID]
     metadata: list[dict[str, Any] | None] | None = None
     encoder: str | None = Field(
         default=None, description="The name of the encoder used to generate the Hugr."
@@ -34,7 +43,7 @@ class SerialHugr(ConfiguredBaseModel):
     @classmethod
     def get_version(cls) -> str:
         """Return the version of the schema."""
-        return cls(nodes=[], edges=[]).version
+        return cls(nodes=[], edges=[], hierarchy=[]).version
 
     @classmethod
     def _pydantic_rebuild(cls, config: ConfigDict = ConfigDict(), **kwargs):

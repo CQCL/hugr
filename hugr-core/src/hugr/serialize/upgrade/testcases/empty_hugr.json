@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "nodes": [
+    {
+      "parent": 0,
+      "input_extensions": [],
+      "op": "Module"
+    }
+  ],
+  "edges": [],
+  "metadata": [
+    null
+  ],
+  "encoder": "hugr-rs v0.1.0"
+}
