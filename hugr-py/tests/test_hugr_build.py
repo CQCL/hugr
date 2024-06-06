@@ -88,12 +88,14 @@ def test_stable_indices():
     assert len(h) == 4
 
     h.add_link(nodes[0].out(0), nodes[1].inp(0))
+    assert h.children() == nodes
 
     assert h.num_outgoing(nodes[0]) == 1
     assert h.num_incoming(nodes[1]) == 1
 
     assert h.delete_node(nodes[1]) is not None
     assert h._nodes[nodes[1].idx] is None
+    assert nodes[1] not in h.children(h.root)
 
     assert len(h) == 3
     assert len(h._nodes) == 4
@@ -204,7 +206,7 @@ def test_insert_nested():
     (a,) = h.inputs()
     nested = h.insert_nested(h1, a)
     h.set_outputs(nested)
-
+    assert len(h.hugr.children(nested)) == 3
     _validate(h.hugr)
 
 
@@ -219,7 +221,7 @@ def test_build_nested():
     nested = h.add_nested([BOOL_T], [BOOL_T], a)
 
     _nested_nop(nested)
-
+    assert len(h.hugr.children(nested.root)) == 3
     h.set_outputs(nested.root)
 
     _validate(h.hugr)

@@ -1,27 +1,30 @@
 from __future__ import annotations
-from dataclasses import dataclass, field, replace
+
 from collections.abc import Mapping
+from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import (
+    TYPE_CHECKING,
+    ClassVar,
+    Generic,
     Iterable,
     Iterator,
-    Sequence,
     Protocol,
-    Generic,
+    Sequence,
     TypeVar,
     cast,
     overload,
-    ClassVar,
-    TYPE_CHECKING,
 )
 
 from typing_extensions import Self
 
-from hugr.serialization.serial_hugr import SerialHugr
-from hugr.serialization.ops import OpType as SerialOp
-from hugr.serialization.tys import Type
 from hugr._ops import Op
+from hugr.serialization.ops import OpType as SerialOp
+from hugr.serialization.serial_hugr import SerialHugr
+from hugr.serialization.tys import Type
 from hugr.utils import BiMap
+
+from ._exceptions import ParentBeforeChild
 
 if TYPE_CHECKING:
     from ._dfg import Dfg
@@ -111,7 +114,7 @@ class NodeData:
     parent: Node | None
     _num_inps: int = 0
     _num_outs: int = 0
-    # TODO children field?
+    children: list[Node] = field(default_factory=list)
 
     def to_serial(self, node: Node, hugr: Hugr) -> SerialOp:
         o = self.op.to_serial(node, self.parent if self.parent else node, hugr)
@@ -147,7 +150,7 @@ class Hugr(Mapping[Node, NodeData]):
         self._free_nodes = []
         self._links = BiMap()
         self._nodes = []
-        self.root = self.add_node(root_op)
+        self.root = self._add_node(root_op, None, 0)
 
     def __getitem__(self, key: Node) -> NodeData:
         try:
@@ -164,7 +167,11 @@ class Hugr(Mapping[Node, NodeData]):
     def __len__(self) -> int:
         return self.num_nodes()
 
-    def add_node(
+    def children(self, node: Node | None = None) -> list[Node]:
+        node = node or self.root
+        return self[node].children
+
+    def _add_node(
         self,
         op: Op,
         parent: Node | None = None,
@@ -178,9 +185,24 @@ class Hugr(Mapping[Node, NodeData]):
         else:
             node = Node(len(self._nodes))
             self._nodes.append(node_data)
-        return replace(node, _num_out_ports=num_outs)
+        node = replace(node, _num_out_ports=num_outs)
+        if parent:
+            self[parent].children.append(node)
+        return node
+
+    def add_node(
+        self,
+        op: Op,
+        parent: Node | None = None,
+        num_outs: int | None = None,
+    ) -> Node:
+        parent = parent or self.root
+        return self._add_node(op, parent, num_outs)
 
     def delete_node(self, node: Node) -> NodeData | None:
+        parent = self[node].parent
+        if parent:
+            self[parent].children.remove(node)
         for offset in range(self.num_in_ports(node)):
             self._links.delete_right(_SubPort(node.inp(offset)))
         for offset in range(self.num_out_ports(node)):
@@ -299,12 +321,14 @@ class Hugr(Mapping[Node, NodeData]):
 
         for idx, node_data in enumerate(hugr._nodes):
             if node_data is not None:
-                mapping[Node(idx)] = self.add_node(node_data.op, node_data.parent)
-
-        for new_node in mapping.values():
-            # update mapped parent
-            node_data = self[new_node]
-            node_data.parent = mapping[node_data.parent] if node_data.parent else parent
+                # relies on parents being inserted before any children
+                try:
+                    node_parent = (
+                        mapping[node_data.parent] if node_data.parent else parent
+                    )
+                except KeyError as e:
+                    raise ParentBeforeChild() from e
+                mapping[Node(idx)] = self.add_node(node_data.op, node_parent)
 
         for src, dst in hugr._links.items():
             self.add_link(
