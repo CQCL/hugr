@@ -19,9 +19,9 @@ from typing import (
 from typing_extensions import Self
 
 from hugr._ops import Op
+from hugr._tys import Type
 from hugr.serialization.ops import OpType as SerialOp
 from hugr.serialization.serial_hugr import SerialHugr
-from hugr.serialization.tys import Type
 from hugr.utils import BiMap
 
 from ._exceptions import ParentBeforeChild

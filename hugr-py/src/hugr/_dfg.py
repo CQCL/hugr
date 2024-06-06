@@ -5,7 +5,7 @@ from ._hugr import Hugr, Node, Wire, OutPort
 
 from ._ops import Op, Command, Input, Output, DFG
 from ._exceptions import NoSiblingAncestor
-from hugr.serialization.tys import FunctionType, Type
+from hugr._tys import FunctionType, Type
 
 
 @dataclass()
