@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0 (2024-06-07)
+
+### Features
+
+- Add `ValidationLevel` tooling and apply to `constant_fold_pass` ([#1035](https://github.com/CQCL/hugr/pull/1035))
+
+
 ## 0.1.0 (2024-05-29)
 
 Initial release, with functions ported from the `hugr::algorithms` module.
