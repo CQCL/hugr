@@ -865,7 +865,7 @@ fn test_polymorphic_load() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[test]
-/// Validation errors in a dataflow subgraph.
+/// Validation errors in a controlflow subgraph.
 fn cfg_children_restrictions() {
     let (mut b, def) = make_simple_hugr(1);
     let (_input, _output, copy) = b
@@ -968,6 +968,42 @@ fn cfg_children_restrictions() {
         Err(ValidationError::InvalidEdges { parent, source: EdgeValidationError::CFGEdgeSignatureMismatch { .. }, .. })
             => assert_eq!(parent, cfg)
     );
+}
+
+#[test]
+//          /->->\
+//          |    |
+// Entry -> Middle -> Exit
+fn cfg_connections() -> Result<(), Box<dyn std::error::Error>> {
+    use crate::builder::CFGBuilder;
+
+    let mut hugr = CFGBuilder::new(FunctionType::new_endo(USIZE_T))?;
+    let unary_pred = hugr.add_constant(Value::unary_unit_sum());
+    let mut entry = hugr.simple_entry_builder(type_row![USIZE_T], 1, ExtensionSet::new())?;
+    let p = entry.load_const(&unary_pred);
+    let ins = entry.input_wires();
+    let entry = entry.finish_with_outputs(p, ins)?;
+
+    let mut middle = hugr.simple_block_builder(FunctionType::new_endo(USIZE_T), 1)?;
+    let p = middle.load_const(&unary_pred);
+    let ins = middle.input_wires();
+    let middle = middle.finish_with_outputs(p, ins)?;
+
+    let exit = hugr.exit_block();
+    hugr.branch(&entry, 0, &middle)?;
+    hugr.branch(&middle, 0, &exit)?;
+    let mut h = hugr.finish_hugr(&PRELUDE_REGISTRY)?;
+
+    h.connect(middle.node(), 0, middle.node(), 0);
+    assert_eq!(
+        h.validate(&PRELUDE_REGISTRY),
+        Err(ValidationError::TooManyConnections {
+            node: middle.node(),
+            port: Port::new(Direction::Outgoing, 0),
+            port_kind: EdgeKind::ControlFlow
+        })
+    );
+    Ok(())
 }
 
 #[cfg(feature = "extension_inference")]
