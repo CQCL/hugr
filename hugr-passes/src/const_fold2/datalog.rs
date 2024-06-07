@@ -6,7 +6,6 @@ use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
 use either::Either;
-use hugr_core::hugr::views::{DescendantsGraph, HierarchyView};
 use hugr_core::ops::{OpTag, OpTrait, Value};
 use hugr_core::partial_value::{PartialValue, ValueHandle};
 use hugr_core::types::{FunctionType, SumType, Type, TypeEnum, TypeRow};
