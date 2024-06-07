@@ -20,6 +20,7 @@ paste = { workspace = true }
 thiserror = { workspace = true }
 ascent = "0.6.0"
 either = "*"
+delegate = "*"
 
 [features]
 extension_inference = ["hugr-core/extension_inference"]

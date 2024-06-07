@@ -1,262 +1,79 @@
+use ascent::lattice::BoundedLattice;
+use delegate::delegate;
+use itertools::{zip_eq, Itertools};
+use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
+use std::sync::Arc;
 
 use ascent::{ascent_run, Lattice};
 use either::Either;
+use hugr_core::extension::{HashableHashMap, PartialValue, ValueHandle};
 use hugr_core::hugr::views::{DescendantsGraph, HierarchyView};
 use hugr_core::ops::{OpTag, OpTrait, Value};
 use hugr_core::types::{FunctionType, SumType, Type, TypeEnum, TypeRow};
 use hugr_core::{Hugr, HugrView, IncomingPort, Node, OutgoingPort, PortIndex as _, Wire};
-use itertools::{zip_eq, Itertools};
-use std::collections::HashMap;
-use std::sync::Arc;
 
 mod context;
 
 use context::DataflowContext;
 
-use self::context::ValueHandle;
+#[derive(PartialEq, Eq, Hash, PartialOrd, Clone, Debug)]
+struct PV(PartialValue);
 
-#[derive(PartialEq, Clone, Eq, Debug)]
-struct HashableHashMap<K: Hash + std::cmp::Eq, V>(HashMap<K, V>);
-
-impl<K: Hash + std::cmp::Eq, V: Hash> Hash for HashableHashMap<K, V> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.0.keys().for_each(|k| k.hash(state));
-        self.0.values().for_each(|v| v.hash(state));
+impl From<PartialValue> for PV {
+    fn from(inner: PartialValue) -> Self {
+        Self(inner)
     }
 }
 
-#[derive(PartialEq, Clone, Eq, Hash, Debug)]
-enum PartialValue {
-    Bottom,
-    Value(context::ValueHandle),
-    PartialSum(HashableHashMap<usize, Vec<PartialValue>>),
-    Top,
-}
-
-impl From<ValueHandle> for PartialValue {
-    fn from(v: ValueHandle) -> Self {
-        match v.value() {
-            Value::Tuple { vs } => {
-                let vec = (0..vs.len()).map(|i| PartialValue::from(v.index(i)).into()).collect();
-                Self::PartialSum(HashableHashMap([(0, vec)].into_iter().collect()))
-            }
-            Value::Sum { tag, values, .. } => {
-                let vec = (0..values.len()).map(|i| PartialValue::from(v.index(i)).into()).collect();
-                Self::PartialSum(HashableHashMap([(*tag, vec)].into_iter().collect()))
-            }
-            _ => Self::Value(v)
-        }
-    }
-}
-
-impl PartialValue {
-    const BOTTOM: Self = Self::Bottom;
-    const BOTTOM_REF: &'static Self = &Self::BOTTOM;
-
-    fn initialised(&self) -> bool {
-        !self.is_top()
-    }
-
-    fn is_top(&self) -> bool { self == &PartialValue::Top }
-
-    fn from_load_constant<'a, H: HugrView>(
-        context: &context::DataflowContext<'a, H>,
-        node: Node,
-    ) -> Self {
-        let load_op = context.hugr().get_optype(node).as_load_constant().unwrap();
-        let const_node = context
-            .hugr()
-            .single_linked_output(node, load_op.constant_port())
-            .unwrap()
-            .0;
-        let const_op = context.hugr().get_optype(const_node).as_const().unwrap();
-        context.value_handle(const_node, const_op.value()).into()
-    }
-
-    fn tuple_from_value_row(r: &ValueRow) -> Self {
-        // if !r.initialised() {
-        //     return Self::Top;
-        // }
-        PartialValue::PartialSum(HashableHashMap([(0usize, r.0.clone())].into_iter().collect()))
-    }
-
+impl PV {
     fn tuple_field_value(&self, idx: usize) -> Self {
-        match self {
-            Self::Top => Self::Top,
-            Self::PartialSum(HashableHashMap(hm)) => {
-                if let Ok((0, row)) = hm.iter().exactly_one() {
-                    assert!(row.len() > idx);
-                    row[idx].clone()
-                } else {
-                    Self::Bottom
-                }
-            },
-            Self::Value(v) => Self::Value(v.index(idx)),
-            _ => Self::Bottom
-        }
+        self.0.tuple_field_value(idx).into()
     }
 
+    /// TODO the arguments here are not  pretty, two usizes, better not mix them
+    /// up!!!
     fn variant_field_value(&self, variant: usize, idx: usize) -> Self {
-        match self {
-            Self::Bottom => Self::Bottom,
-            Self::PartialSum(HashableHashMap(hm)) => {
-                if let Some(row) = hm.get(&variant) {
-                    assert!(row.len() > idx);
-                    row[idx].clone()
-                } else {
-                    // We must return top. if self were to gain this variant, we would return the element of that variant.
-                    // We must ensure that the value return now is <= that future value
-                    Self::Top
-                }
-            },
-            Self::Value(v) if v.tag() == variant => {
-                Self::Value(v.index(idx))
-            },
-            _ => Self::Top
-        }
-    }
-
-    pub fn try_into_value(self, typ: &Type) -> Result<Value,Self> {
-        let r = match self {
-            Self::Value(v) => v.value().clone(),
-            Self::PartialSum(HashableHashMap(hm)) => {
-                let err = |hm| Err(Self::PartialSum(HashableHashMap(hm)));
-                let Ok((k,v)) = hm.iter().exactly_one() else {
-                    return err(hm);
-                };
-                let TypeEnum::Sum(st) = typ.as_type_enum() else {
-                    return err(hm);
-                };
-                let Some(r) = st.get_variant(*k) else {
-                    return err(hm);
-                };
-                if v.len() != r.len() {
-                    return err(hm);
-                }
-
-                let Ok(vs) = zip_eq(v.into_iter(), r.into_iter()).map(|(v,t)| v.clone().try_into_value(t)).collect::<Result<Vec<_>, _>>() else {
-                    return err(hm);
-                };
-
-                Value::sum(*k, vs, st.clone()).map_err(|_| Self::PartialSum(HashableHashMap(hm)))?
-            },
-            x => Err(x)?
-
-        };
-        assert_eq!(typ, &r.get_type());
-        Ok(r)
-    }
-
-    fn join_value_handle(&mut self, vh: ValueHandle) -> bool {
-        let mut new_self = self;
-        match &mut new_self {
-            Self::Bottom => {
-                false
-            },
-            s@Self::Value(_) => {
-                let Self::Value(v) = *s else { unreachable!() };
-                if v == &vh {
-                    false
-                } else {
-                    **s = Self::Bottom;
-                    true
-                }
-            },
-            s@Self::PartialSum(_) => {
-                match vh.into() {
-                    Self::Value(_) => {
-                        **s = Self::Bottom;
-                        true
-                    }
-                    other => s.join_mut(other)
-                }
-            },
-            s@Self::Top => {
-                **s = vh.into();
-                true
-            }
-        }
+        self.0.variant_field_value(variant, idx).into()
     }
 }
 
-impl PartialOrd for PartialValue {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        // TODO we can do better
-        (self == other).then_some(std::cmp::Ordering::Equal)
+impl From<ValueHandle> for PV {
+    fn from(inner: ValueHandle) -> Self {
+        Self(inner.into())
     }
 }
 
-impl Lattice for PartialValue {
-    fn meet(self, _other: Self) -> Self {
-        // should not be required
-        todo!()
+impl Lattice for PV {
+    fn meet(self, other: Self) -> Self {
+        self.0.meet(other.0).into()
     }
 
-    fn join(mut self, other: Self) -> Self {
-        self.join_mut(other);
-        self
+    fn meet_mut(&mut self, other: Self) -> bool {
+        self.0.meet_mut(other.0)
+    }
+
+    fn join(self, other: Self) -> Self {
+        self.0.join(other.0).into()
     }
 
     fn join_mut(&mut self, other: Self) -> bool {
-        // println!("join {self:?}\n{:?}", &other);
-        let mut s = self;
-        let changed = match (&mut s, other) {
-            (Self::Bottom, _) => false,
-            (s, other@Self::Bottom) => {
-                **s = other;
-                true
-            },
-            (_, Self::Top) => false,
-            (s@Self::Top, other) => {
-                **s = other;
-                true
-            }
-            (Self::Value(h1), Self::Value(h2)) if h1 == &h2 || h1.value() == h2.value() => {
-                false
-            }
-            (s@Self::PartialSum(_), Self::PartialSum(HashableHashMap(hm2))) => {
-                let mut changed = false;
-                let Self::PartialSum(HashableHashMap(hm1)) = *s else { unreachable!() };
-                for (k, v) in hm2 {
-                    if let Some(row) = hm1.get_mut(&k) {
-                        for (lhs, rhs) in zip_eq(row.iter_mut(), v.into_iter()) {
-                            changed |= lhs.join_mut(rhs);
-                        }
-                    } else {
-                        hm1.insert(k, v);
-                        changed = true;
-                    }
-                }
-                changed
-            }
-            (s@Self::Value(_), other@Self::PartialSum(_)) => {
-                let mut old_self = other;
-                std::mem::swap(*s, &mut old_self);
-                let Self::Value(h) = old_self else { unreachable!() };
-                s.join_value_handle(h)
-            }
-            (s@Self::PartialSum(_), Self::Value(h)) => {
-                s.join_value_handle(h)
-            }
-            (s,_) => {
-                **s = Self::Bottom;
-                false
-            }
-        };
-        // if changed {
-            // println!("join new self: {:?}", s);
-        // }
-        changed
+        self.0.join_mut(other.0)
     }
 }
 
-// fn input_row<'a>(inp: impl Iterator<Item = (&'a Wire, &'a PartialValue)>) -> impl Iterator<Item=ValueRow> {
-//     todo!()
-// }
+impl BoundedLattice for PV {
+    fn bottom() -> Self {
+        PartialValue::bottom().into()
+    }
+
+    fn top() -> Self {
+        PartialValue::top().into()
+    }
+}
 
 #[derive(PartialEq, Clone, Eq, Hash, PartialOrd)]
-struct ValueRow(Vec<PartialValue>);
+struct ValueRow(Vec<PV>);
 
 impl ValueRow {
     // fn into_partial_value(self) -> PartialValue {
@@ -264,17 +81,17 @@ impl ValueRow {
     // }
 
     fn new(len: usize) -> Self {
-        Self(vec![PartialValue::Top; len])
+        Self(vec![PV::top(); len])
     }
 
-    fn singleton(len: usize, idx: usize, v: PartialValue) -> Self {
+    fn singleton(len: usize, idx: usize, v: PV) -> Self {
         assert!(idx < len);
         let mut r = Self::new(len);
         r.0[idx] = v;
         r
     }
 
-    fn singleton_from_row(r: &TypeRow, idx: usize, v: PartialValue) -> Self {
+    fn singleton_from_row(r: &TypeRow, idx: usize, v: PV) -> Self {
         Self::singleton(r.len(), idx, v)
     }
 
@@ -284,14 +101,14 @@ impl ValueRow {
 
     fn iter<'b, 'a, H: HugrView>(
         &'b self,
-        context: &'b Ctx<'a,H>,
+        context: &'b Ctx<'a, H>,
         n: Node,
-    ) -> impl Iterator<Item = (IncomingPort, &PartialValue)> + 'b {
+    ) -> impl Iterator<Item = (IncomingPort, &PV)> + 'b {
         zip_eq(value_inputs(context, n), self.0.iter())
     }
 
     fn initialised(&self) -> bool {
-        self.0.iter().all(|x| x != &PartialValue::Top)
+        self.0.iter().all(|x| x != &PV::top())
     }
 }
 
@@ -315,9 +132,18 @@ impl Lattice for ValueRow {
     }
 }
 
+impl IntoIterator for ValueRow {
+    type Item = PV;
 
-type ArcCtx<'a, H: HugrView> = Arc<DataflowContext<'a,H>>;
-type Ctx<'a, H: HugrView> = DataflowContext<'a,H>;
+    type IntoIter = <Vec<PV> as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+type ArcCtx<'a, H: HugrView> = Arc<DataflowContext<'a, H>>;
+type Ctx<'a, H: HugrView> = DataflowContext<'a, H>;
 
 fn top_row<'a, H: HugrView>(context: &Ctx<'a, H>, n: Node) -> ValueRow {
     if let Some(sig) = context.hugr().signature(n) {
@@ -331,33 +157,68 @@ fn singleton_in_row<'a, H: HugrView>(
     context: &Ctx<'a, H>,
     n: &Node,
     ip: &IncomingPort,
-    v: &PartialValue,
+    v: PV,
 ) -> ValueRow {
     let Some(sig) = context.hugr().signature(*n) else {
         panic!("dougrulz");
     };
     if sig.input_count() <= ip.index() {
-        panic!("bad port index: {} >= {}: {}", ip.index(), sig.input_count(), context.hugr().get_optype(*n).description());
+        panic!(
+            "bad port index: {} >= {}: {}",
+            ip.index(),
+            sig.input_count(),
+            context.hugr().get_optype(*n).description()
+        );
     }
-    ValueRow::singleton_from_row(
-        &context.hugr().signature(*n).unwrap().input,
-        ip.index(),
-        v.clone(),
-    )
+    ValueRow::singleton_from_row(&context.hugr().signature(*n).unwrap().input, ip.index(), v)
 }
 
-#[derive(Debug,Clone,Copy,PartialEq,Eq,Hash)]
-enum IO { Input, Output }
+fn partial_value_from_load_constant<'a, H: HugrView>(
+    context: &context::DataflowContext<'a, H>,
+    node: Node,
+) -> PV {
+    let load_op = context.hugr().get_optype(node).as_load_constant().unwrap();
+    let const_node = context
+        .hugr()
+        .single_linked_output(node, load_op.constant_port())
+        .unwrap()
+        .0;
+    let const_op = context.hugr().get_optype(const_node).as_const().unwrap();
+    context.value_handle(const_node, const_op.value()).into()
+}
 
-fn value_inputs<'a,H: HugrView>(context: &Ctx<'a, H>, n: Node) -> impl Iterator<Item = IncomingPort> + 'a {
+fn partial_value_tuple_from_value_row(r: ValueRow) -> PV {
+    PartialValue::variant(0, r.into_iter().map(|x| x.0)).into()
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum IO {
+    Input,
+    Output,
+}
+
+fn value_inputs<'a, H: HugrView>(
+    context: &Ctx<'a, H>,
+    n: Node,
+) -> impl Iterator<Item = IncomingPort> + 'a {
     context.hugr().in_value_types(n).map(|x| x.0)
 }
 
-fn value_outputs<'a,H: HugrView>(context: &Ctx<'a, H>, n: Node) -> impl Iterator<Item = OutgoingPort> + 'a {
+fn value_outputs<'a, H: HugrView>(
+    context: &Ctx<'a, H>,
+    n: Node,
+) -> impl Iterator<Item = OutgoingPort> + 'a {
     context.hugr().out_value_types(n).map(|x| x.0)
 }
 
-fn tail_loop_worker<'b, 'a,H: HugrView>(context: &Ctx<'a, H>, n: Node, output_p: IncomingPort, control_variant: usize, v: &'b PartialValue) -> impl Iterator<Item = (OutgoingPort, PartialValue)> + 'b {
+// todo this should work for dataflowblocks too
+fn tail_loop_worker<'b, 'a, H: HugrView>(
+    context: &Ctx<'a, H>,
+    n: Node,
+    output_p: IncomingPort,
+    control_variant: usize,
+    v: &'b PV,
+) -> impl Iterator<Item = (OutgoingPort, PV)> + 'b {
     let tail_loop_op = context.get_optype(n).as_tail_loop().unwrap();
     let num_variant_vals = if control_variant == 0 {
         tail_loop_op.just_inputs.len()
@@ -365,9 +226,15 @@ fn tail_loop_worker<'b, 'a,H: HugrView>(context: &Ctx<'a, H>, n: Node, output_p:
         tail_loop_op.just_outputs.len()
     };
     if output_p.index() == 0 {
-        Either::Left((0..num_variant_vals).map(move |i| (i.into(), v.variant_field_value(control_variant, i))))
+        Either::Left(
+            (0..num_variant_vals)
+                .map(move |i| (i.into(), v.variant_field_value(control_variant, i))),
+        )
     } else {
-        Either::Right(std::iter::once(((num_variant_vals + output_p.index()).into(), v.clone())))
+        Either::Right(std::iter::once((
+            (num_variant_vals + output_p.index()).into(),
+            v.clone(),
+        )))
     }
 }
 
@@ -377,9 +244,9 @@ ascent::ascent! {
     relation node(ArcCtx<'a, H>, Node);
     relation in_wire(ArcCtx<'a,H>, Node, IncomingPort);
     relation out_wire(ArcCtx<'a,H>, Node, OutgoingPort);
-    lattice out_wire_value(ArcCtx<'a,H>, Node, OutgoingPort, PartialValue);
+    lattice out_wire_value(ArcCtx<'a,H>, Node, OutgoingPort, PV);
     lattice node_in_value_row(ArcCtx<'a,H>, Node, ValueRow);
-    lattice in_wire_value(ArcCtx<'a,H>, Node, IncomingPort, PartialValue);
+    lattice in_wire_value(ArcCtx<'a,H>, Node, IncomingPort, PV);
 
     node(c, n) <-- context(c), for n in c.nodes();
 
@@ -389,7 +256,7 @@ ascent::ascent! {
 
     // All out wire values are initialised to Top. If any value is Top after
     // running we can infer that execution never reaches that value.
-    out_wire_value(c, n,p, PartialValue::Top) <-- out_wire(c, n,p);
+    out_wire_value(c, n,p, PV::top()) <-- out_wire(c, n,p);
 
     in_wire_value(c, n, ip, v) <-- in_wire(c, n, ip),
         if let Some((m,op)) = c.single_linked_output(*n, *ip),
@@ -397,20 +264,20 @@ ascent::ascent! {
 
 
     node_in_value_row(c, n, top_row(c, *n)) <-- node(c, n);
-    node_in_value_row(c, n, singleton_in_row(c, n, p, v)) <-- in_wire_value(c, n, p, v);
+    node_in_value_row(c, n, singleton_in_row(c, n, p, v.clone())) <-- in_wire_value(c, n, p, v);
 
     // LoadConstant
     relation load_constant_node(ArcCtx<'a, H>, Node);
     load_constant_node(c, n) <-- node(c, n), if c.get_optype(*n).is_load_constant();
 
-    out_wire_value(c, n, 0.into(), PartialValue::from_load_constant(c, *n)) <--
+    out_wire_value(c, n, 0.into(), partial_value_from_load_constant(c, *n)) <--
         load_constant_node(c, n);
 
     // MakeTuple
     relation make_tuple_node(ArcCtx<'a,H>, Node);
     make_tuple_node(c, n) <-- node(c, n), if c.get_optype(*n).is_make_tuple();
 
-    out_wire_value(c, n, 0.into(), PartialValue::tuple_from_value_row(vs)) <--
+    out_wire_value(c, n, 0.into(), partial_value_tuple_from_value_row(vs.clone())) <--
         make_tuple_node(c, n), node_in_value_row(c, n, vs);
 
     // UnpackTuple
@@ -464,39 +331,54 @@ impl<'a, H: HugrView> Dataflow<'a, H> {
         Self::default()
     }
 
-    pub fn run_hugr(&mut self, hugr: &'a H) -> ArcCtx<'a,H> {
+    pub fn run_hugr(&mut self, hugr: &'a H) -> ArcCtx<'a, H> {
         let context = context::DataflowContext::new(hugr);
         self.context.push((context.clone(),));
         self.run();
         context
     }
 
-    pub fn read_out_wire_partial_value(&self, context: &Ctx<'a,H>, w: Wire) -> Option<PartialValue> {
-        self.out_wire_value.iter().find_map(|(c,n,p,v)| (c.as_ref() == context && &w.node() == n && &w.source() == p).then_some(v.clone()))
+    pub fn read_out_wire_partial_value(
+        &self,
+        context: &Ctx<'a, H>,
+        w: Wire,
+    ) -> Option<PartialValue> {
+        self.out_wire_value.iter().find_map(|(c, n, p, v)| {
+            (c.as_ref() == context && &w.node() == n && &w.source() == p).then(|| v.clone().0)
+        })
     }
 
-    pub fn read_out_wire_value(&self, context: &Ctx<'a,H>, w: Wire) -> Option<Value> {
+    pub fn read_out_wire_value(&self, context: &Ctx<'a, H>, w: Wire) -> Option<Value> {
         // dbg!(&w);
         let pv = self.read_out_wire_partial_value(context, w)?;
         // dbg!(&pv);
-        let (_, typ) = context.hugr().out_value_types(w.node()).find(|(p,_)| *p == w.source()).unwrap();
+        let (_, typ) = context
+            .hugr()
+            .out_value_types(w.node())
+            .find(|(p, _)| *p == w.source())
+            .unwrap();
         pv.try_into_value(&typ).ok()
     }
 }
 
 #[cfg(test)]
 mod test {
-    use hugr_core::{builder::{DFGBuilder, Dataflow, HugrBuilder, SubContainer}, extension::{prelude::BOOL_T, EMPTY_REG}, ops::{UnpackTuple, Value}, type_row, types::{FunctionType, SumType}};
+    use hugr_core::{
+        builder::{DFGBuilder, Dataflow, HugrBuilder, SubContainer},
+        extension::{prelude::BOOL_T, EMPTY_REG},
+        ops::{UnpackTuple, Value},
+        type_row,
+        types::{FunctionType, SumType},
+    };
 
-    use crate::const_fold2::datalog::PartialValue;
-
+    use hugr_core::extension::PartialValue;
 
     #[test]
     fn test_make_tuple() {
         let mut builder = DFGBuilder::new(FunctionType::new_endo(&[])).unwrap();
         let v1 = builder.add_load_value(Value::false_val());
         let v2 = builder.add_load_value(Value::true_val());
-        let v3 = builder.make_tuple([v1,v2]).unwrap();
+        let v3 = builder.make_tuple([v1, v2]).unwrap();
         let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
         let mut machine = super::Dataflow::new();
@@ -511,8 +393,11 @@ mod test {
         let mut builder = DFGBuilder::new(FunctionType::new_endo(&[])).unwrap();
         let v1 = builder.add_load_value(Value::false_val());
         let v2 = builder.add_load_value(Value::true_val());
-        let v3 = builder.make_tuple([v1,v2]).unwrap();
-        let [o1,o2] = builder.add_dataflow_op(UnpackTuple::new(type_row![BOOL_T,BOOL_T]), [v3]).unwrap().outputs_arr();
+        let v3 = builder.make_tuple([v1, v2]).unwrap();
+        let [o1, o2] = builder
+            .add_dataflow_op(UnpackTuple::new(type_row![BOOL_T, BOOL_T]), [v3])
+            .unwrap()
+            .outputs_arr();
         let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
         let mut machine = super::Dataflow::new();
@@ -528,7 +413,10 @@ mod test {
     fn test_unpack_const() {
         let mut builder = DFGBuilder::new(FunctionType::new_endo(&[])).unwrap();
         let v1 = builder.add_load_value(Value::tuple([Value::true_val()]));
-        let [o] = builder.add_dataflow_op(UnpackTuple::new(type_row![BOOL_T]), [v1]).unwrap().outputs_arr();
+        let [o] = builder
+            .add_dataflow_op(UnpackTuple::new(type_row![BOOL_T]), [v1])
+            .unwrap()
+            .outputs_arr();
         let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
         let mut machine = super::Dataflow::new();
@@ -541,9 +429,18 @@ mod test {
     #[test]
     fn test_tail_loop_never_iterates() {
         let mut builder = DFGBuilder::new(FunctionType::new_endo(&[])).unwrap();
-        let r_v = Value::unit_sum(3,6).unwrap();
-        let r_w = builder.add_load_value(Value::sum(1, [r_v.clone()], SumType::new([type_row![], r_v.get_type().into()])).unwrap());
-        let tlb = builder.tail_loop_builder([], [], vec![r_v.get_type()].into()).unwrap();
+        let r_v = Value::unit_sum(3, 6).unwrap();
+        let r_w = builder.add_load_value(
+            Value::sum(
+                1,
+                [r_v.clone()],
+                SumType::new([type_row![], r_v.get_type().into()]),
+            )
+            .unwrap(),
+        );
+        let tlb = builder
+            .tail_loop_builder([], [], vec![r_v.get_type()].into())
+            .unwrap();
         let [tl_o] = tlb.finish_with_outputs(r_w, []).unwrap().outputs_arr();
         let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
@@ -559,8 +456,11 @@ mod test {
     #[test]
     fn test_tail_loop_always_iterates() {
         let mut builder = DFGBuilder::new(FunctionType::new_endo(&[])).unwrap();
-        let r_w = builder.add_load_value(Value::sum(0, [], SumType::new([type_row![], BOOL_T.into()])).unwrap());
-        let tlb = builder.tail_loop_builder([], [], vec![BOOL_T].into()).unwrap();
+        let r_w = builder
+            .add_load_value(Value::sum(0, [], SumType::new([type_row![], BOOL_T.into()])).unwrap());
+        let tlb = builder
+            .tail_loop_builder([], [], vec![BOOL_T].into())
+            .unwrap();
         let [tl_o] = tlb.finish_with_outputs(r_w, []).unwrap().outputs_arr();
         let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
