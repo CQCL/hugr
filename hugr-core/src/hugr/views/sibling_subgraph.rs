@@ -323,8 +323,6 @@ impl SiblingSubgraph {
     /// May return one of the following five errors
     ///  - [`InvalidReplacement::InvalidDataflowGraph`]: the replacement
     ///    graph is not a [`crate::ops::OpTag::DataflowParent`]-rooted graph,
-    ///  - [`InvalidReplacement::InvalidDataflowParent`]: the replacement does
-    ///    not have an input and output node,
     ///  - [`InvalidReplacement::InvalidSignature`]: the signature of the
     ///    replacement DFG does not match the subgraph signature, or
     ///  - [`InvalidReplacement::NonConvexSubgraph`]: the sibling subgraph is not
@@ -345,12 +343,9 @@ impl SiblingSubgraph {
                 op: dfg_optype.clone(),
             });
         }
-        let Some([rep_input, rep_output]) = replacement.get_io(rep_root) else {
-            return Err(InvalidReplacement::InvalidDataflowParent {
-                node: rep_root,
-                op: dfg_optype.clone(),
-            });
-        };
+        let [rep_input, rep_output] = replacement
+            .get_io(rep_root)
+            .expect("DFG root in the replacement does not have input and output nodes.");
         if dfg_optype.dataflow_signature() != Some(self.signature(hugr)) {
             return Err(InvalidReplacement::InvalidSignature {
                 expected: self.signature(hugr),
@@ -657,17 +652,9 @@ pub enum InvalidReplacement {
         /// The op type of the root node.
         op: OpType,
     },
-    /// Malformed DataflowParent in replacement graph.
-    #[error("The root of the replacement {node} is malformed. It is a {} but does not contain I/O nodes.", op.name())]
-    InvalidDataflowParent {
-        /// The node ID of the root node.
-        node: Node,
-        /// The op type of the root node.
-        op: OpType,
-    },
-    /// Replacement graph boundary size mismatch.
+    /// Replacement graph type mismatch.
     #[error(
-        "Replacement graph boundary size mismatch. Expected {expected}, got {}.",
+        "Replacement graph type mismatch. Expected {expected}, got {}.",
         actual.clone().map_or("none".to_string(), |t| t.to_string()))
     ]
     InvalidSignature {
@@ -690,7 +677,7 @@ pub enum InvalidSubgraph {
     NotConvex,
     /// Not all nodes have the same parent.
     #[error(
-        "Invalid sibling subgraph. {first_node} has parent {}, but {other_node} has parent {}.",
+        "Not a sibling subgraph. {first_node} has parent {}, but {other_node} has parent {}.",
         first_parent.map_or("None".to_string(), |n| n.to_string()),
         other_parent.map_or("None".to_string(), |n| n.to_string())
     )]
