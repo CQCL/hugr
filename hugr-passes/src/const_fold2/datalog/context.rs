@@ -5,12 +5,10 @@ use std::ops::Deref;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 
-use ascent::Lattice;
 
-use either::Either;
-use hugr_core::ops::{OpTag, OpTrait, Value};
+use hugr_core::ops::Value;
 use hugr_core::partial_value::{ValueHandle, ValueKey};
-use hugr_core::{Hugr, HugrView, IncomingPort, Node, OutgoingPort, PortIndex as _, Wire};
+use hugr_core::Node;
 
 #[derive(Clone)]
 pub struct ValueCache(HashMap<ValueKey, Arc<Value>>);

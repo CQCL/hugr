@@ -80,7 +80,7 @@ const fn type_arg(log_width: u8) -> TypeArg {
 }
 
 /// An integer (either signed or unsigned)
-#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct ConstInt {
     log_width: u8,
     // We always use a u64 for the value. The interpretation is:
