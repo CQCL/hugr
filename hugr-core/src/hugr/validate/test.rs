@@ -864,30 +864,6 @@ fn test_polymorphic_load() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Adds an input{BOOL_T}, tag_constant(0, BOOL_T^sum_size), tag(BOOL_T^sum_size), and
-/// output{Sum{unit^sum_size}, BOOL_T} operation to a dataflow container.
-/// Intended to be used to populate a BasicBlock node in a CFG.
-///
-/// Returns the node indices of each of the operations.
-fn add_block_children(b: &mut Hugr, parent: Node, sum_size: usize) -> (Node, Node, Node, Node) {
-    let const_op: ops::Const = ops::Value::unit_sum(0, sum_size as u8)
-        .expect("`sum_size` must be greater than 0")
-        .into();
-    let tag_type = Type::new_unit_sum(sum_size as u8);
-
-    let input = b.add_node_with_parent(parent, ops::Input::new(type_row![BOOL_T]));
-    let output = b.add_node_with_parent(parent, ops::Output::new(vec![tag_type.clone(), BOOL_T]));
-    let tag_def = b.add_node_with_parent(b.root(), const_op);
-    let tag = b.add_node_with_parent(parent, ops::LoadConstant { datatype: tag_type });
-
-    b.connect(tag_def, 0, tag, 0);
-    b.add_other_edge(input, tag);
-    b.connect(tag, 0, output, 0);
-    b.connect(input, 0, output, 1);
-
-    (input, tag_def, tag, output)
-}
-
 #[test]
 /// Validation errors in a dataflow subgraph.
 fn cfg_children_restrictions() {
@@ -924,7 +900,20 @@ fn cfg_children_restrictions() {
             extension_delta: ExtensionSet::new(),
         },
     );
-    add_block_children(&mut b, block, 1);
+    let const_op: ops::Const = ops::Value::unit_sum(0, 1).unwrap().into();
+    let tag_type = Type::new_unit_sum(1);
+    {
+        let input = b.add_node_with_parent(block, ops::Input::new(type_row![BOOL_T]));
+        let output =
+            b.add_node_with_parent(block, ops::Output::new(vec![tag_type.clone(), BOOL_T]));
+        let tag_def = b.add_node_with_parent(b.root(), const_op);
+        let tag = b.add_node_with_parent(block, ops::LoadConstant { datatype: tag_type });
+
+        b.connect(tag_def, 0, tag, 0);
+        b.add_other_edge(input, tag);
+        b.connect(tag, 0, output, 0);
+        b.connect(input, 0, output, 1);
+    }
     let exit = b.add_node_with_parent(
         cfg,
         ops::ExitBlock {
