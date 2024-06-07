@@ -123,9 +123,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        # Pinned nightly version until this gets resolved:
-        # https://github.com/rust-lang/rust/issues/125474
-        rust: ['1.75', beta, 'nightly-2024-05-22']
+        rust: ['1.75', beta, 'nightly']
     name: tests (Rust ${{ matrix.rust }})
     steps:
       - uses: actions/checkout@v4
@@ -182,10 +180,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           # Nightly is required to count doctests coverage
-          #
-          # Pinned nightly version until this gets resolved
-          # https://github.com/rust-lang/rust/issues/125474
-          toolchain: 'nightly-2024-05-22'
+          toolchain: 'nightly'
           components: llvm-tools-preview
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
