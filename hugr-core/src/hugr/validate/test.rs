@@ -867,7 +867,7 @@ fn test_polymorphic_load() -> Result<(), Box<dyn std::error::Error>> {
 #[cfg(feature = "extension_inference")]
 mod extension_tests {
     use super::*;
-    use crate::builder::{BlockBuilder, CFGBuilder};
+    use crate::builder::{BlockBuilder, CFGBuilder, TailLoopBuilder};
     use crate::extension::ExtensionSet;
     use crate::macros::const_extension_ids;
 
@@ -1000,7 +1000,6 @@ mod extension_tests {
     #[case::d1(|signature| ops::DFG {signature}.into())]
     #[case::f1(|ft: FunctionType| ops::FuncDefn {name: "foo".to_string(), signature: ft.into()}.into())]
     #[case::c1(|signature| ops::Case {signature}.into())]
-    // ALAN TODO TailLoop version too
     fn parent_extension_mismatch(
         #[case] parent_f: impl Fn(FunctionType) -> OpType,
         #[values(ExtensionSet::new(), XA.into())] parent_extensions: ExtensionSet,
@@ -1187,6 +1186,48 @@ mod extension_tests {
         let pred = bb.make_tuple(lift.outputs())?;
         let root = bb.hugr().root();
         let res = bb.finish_prelude_hugr_with_outputs([pred]);
+        if success {
+            assert!(res.is_ok())
+        } else {
+            assert_eq!(
+                res,
+                Err(BuildError::InvalidHUGR(ValidationError::ExtensionError(
+                    ExtensionError {
+                        parent: root,
+                        parent_extensions,
+                        child: lift.node(),
+                        child_extensions: XB.into()
+                    }
+                )))
+            );
+        }
+        Ok(())
+    }
+
+    #[rstest]
+    #[case(XA.into(), false)]
+    #[case(ExtensionSet::new(), false)]
+    #[case(ExtensionSet::from_iter([XA, XB]), true)]
+    fn tailloop_extension_mismatch(
+        #[case] parent_extensions: ExtensionSet,
+        #[case] success: bool,
+    ) -> Result<(), BuildError> {
+        let mut tl = TailLoopBuilder::new(
+            type_row![USIZE_T],
+            &[],
+            type_row![USIZE_T],
+            parent_extensions.clone(),
+        )?;
+        let lift = tl.add_dataflow_op(
+            ops::Lift {
+                type_row: USIZE_T.into(),
+                new_extension: XB,
+            },
+            tl.input_wires(),
+        )?;
+        let pred = tl.make_break(tl.loop_signature()?.clone(), lift.outputs())?;
+        let root = tl.hugr().root();
+        let res = tl.finish_prelude_hugr_with_outputs([pred]);
         if success {
             assert!(res.is_ok())
         } else {
