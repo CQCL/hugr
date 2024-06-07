@@ -201,7 +201,7 @@ impl Hugr {
     }
 
     /// Leaving this here as in the future we plan for it to infer deltas
-    /// of container nodes e.g. [DFG]. For the moment it does nothing.
+    /// of container nodes e.g. [OpType::DFG]. For the moment it does nothing.
     pub fn infer_extensions(&mut self) -> Result<(), ExtensionError> {
         Ok(())
     }
