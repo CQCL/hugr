@@ -21,7 +21,7 @@ use crate::builder::{Container, FunctionBuilder};
 use crate::hugr::{HugrMut, HugrView, RootTagged};
 use crate::ops::dataflow::DataflowOpTrait;
 use crate::ops::handle::{ContainerHandle, DataflowOpID};
-use crate::ops::{OpTag, OpTrait};
+use crate::ops::{NamedOp, OpTag, OpTrait, OpType};
 use crate::types::{FunctionType, Type};
 use crate::{Hugr, IncomingPort, Node, OutgoingPort, Port, SimpleReplacement};
 
@@ -323,8 +323,6 @@ impl SiblingSubgraph {
     /// May return one of the following five errors
     ///  - [`InvalidReplacement::InvalidDataflowGraph`]: the replacement
     ///    graph is not a [`crate::ops::OpTag::DataflowParent`]-rooted graph,
-    ///  - [`InvalidReplacement::InvalidDataflowParent`]: the replacement does
-    ///    not have an input and output node,
     ///  - [`InvalidReplacement::InvalidSignature`]: the signature of the
     ///    replacement DFG does not match the subgraph signature, or
     ///  - [`InvalidReplacement::NonConvexSubgraph`]: the sibling subgraph is not
@@ -340,18 +338,24 @@ impl SiblingSubgraph {
         let rep_root = replacement.root();
         let dfg_optype = replacement.get_optype(rep_root);
         if !OpTag::Dfg.is_superset(dfg_optype.tag()) {
-            return Err(InvalidReplacement::InvalidDataflowGraph);
+            return Err(InvalidReplacement::InvalidDataflowGraph {
+                node: rep_root,
+                op: dfg_optype.clone(),
+            });
         }
-        let Some([rep_input, rep_output]) = replacement.get_io(rep_root) else {
-            return Err(InvalidReplacement::InvalidDataflowParent);
-        };
+        let [rep_input, rep_output] = replacement
+            .get_io(rep_root)
+            .expect("DFG root in the replacement does not have input and output nodes.");
 
         let current_signature = self.signature(hugr);
         let new_signature = dfg_optype.dataflow_signature();
         if new_signature.as_ref().map(|s| &s.input) != Some(&current_signature.input)
             || new_signature.as_ref().map(|s| &s.output) != Some(&current_signature.output)
         {
-            return Err(InvalidReplacement::InvalidSignature);
+            return Err(InvalidReplacement::InvalidSignature {
+                expected: self.signature(hugr),
+                actual: dfg_optype.dataflow_signature(),
+            });
         }
 
         // TODO: handle state order edges. For now panic if any are present.
@@ -508,7 +512,20 @@ fn validate_subgraph<H: HugrView>(
     }
     // Check all nodes share parent
     if !nodes.iter().map(|&n| hugr.get_parent(n)).all_equal() {
-        return Err(InvalidSubgraph::NoSharedParent);
+        let first_node = nodes[0];
+        let first_parent = hugr.get_parent(first_node);
+        let other_node = *nodes
+            .iter()
+            .skip(1)
+            .find(|&&n| hugr.get_parent(n) != first_parent)
+            .unwrap();
+        let other_parent = hugr.get_parent(other_node);
+        return Err(InvalidSubgraph::NoSharedParent {
+            first_node,
+            first_parent,
+            other_node,
+            other_parent,
+        });
     }
 
     // Check there are no linked "other" ports
@@ -629,18 +646,28 @@ fn has_other_edge<H: HugrView>(hugr: &H, node: Node, dir: Direction) -> bool {
 }
 
 /// Errors that can occur while constructing a [`SimpleReplacement`].
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, PartialEq, Error)]
 #[non_exhaustive]
 pub enum InvalidReplacement {
     /// No DataflowParent root in replacement graph.
-    #[error("No DataflowParent root in replacement graph.")]
-    InvalidDataflowGraph,
-    /// Malformed DataflowParent in replacement graph.
-    #[error("Malformed DataflowParent in replacement graph.")]
-    InvalidDataflowParent,
-    /// Replacement graph boundary size mismatch.
-    #[error("Replacement graph boundary size mismatch.")]
-    InvalidSignature,
+    #[error("The root of the replacement {node} is a {}, but only OpType::DFGs are supported.", op.name())]
+    InvalidDataflowGraph {
+        /// The node ID of the root node.
+        node: Node,
+        /// The op type of the root node.
+        op: OpType,
+    },
+    /// Replacement graph type mismatch.
+    #[error(
+        "Replacement graph type mismatch. Expected {expected}, got {}.",
+        actual.clone().map_or("none".to_string(), |t| t.to_string()))
+    ]
+    InvalidSignature {
+        /// The expected signature.
+        expected: FunctionType,
+        /// The actual signature.
+        actual: Option<FunctionType>,
+    },
     /// SiblingSubgraph is not convex.
     #[error("SiblingSubgraph is not convex.")]
     NonConvexSubgraph,
@@ -654,8 +681,21 @@ pub enum InvalidSubgraph {
     #[error("The subgraph is not convex.")]
     NotConvex,
     /// Not all nodes have the same parent.
-    #[error("Not a sibling subgraph.")]
-    NoSharedParent,
+    #[error(
+        "Not a sibling subgraph. {first_node} has parent {}, but {other_node} has parent {}.",
+        first_parent.map_or("None".to_string(), |n| n.to_string()),
+        other_parent.map_or("None".to_string(), |n| n.to_string())
+    )]
+    NoSharedParent {
+        /// The first node.
+        first_node: Node,
+        /// The parent of the first node.
+        first_parent: Option<Node>,
+        /// The other node.
+        other_node: Node,
+        /// The parent of the other node.
+        other_parent: Option<Node>,
+    },
     /// Empty subgraphs are not supported.
     #[error("Empty subgraphs are not supported.")]
     EmptySubgraph,
@@ -854,9 +894,9 @@ mod tests {
             builder.finish_prelude_hugr_with_outputs(inputs).unwrap()
         };
 
-        assert_eq!(
+        assert_matches!(
             sub.create_simple_replacement(&func, empty_dfg).unwrap_err(),
-            InvalidReplacement::InvalidSignature
+            InvalidReplacement::InvalidSignature { .. }
         );
         Ok(())
     }
