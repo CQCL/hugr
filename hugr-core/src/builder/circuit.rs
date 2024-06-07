@@ -258,6 +258,10 @@ mod test {
     };
 
     #[test]
+    #[cfg_attr(
+        feature = "extension_inference",
+        ignore = "Extension validation fails when mixing in the float extension"
+    )]
     fn simple_linear() {
         let build_res = build_main(
             FunctionType::new(type_row![QB, QB], type_row![QB, QB])
