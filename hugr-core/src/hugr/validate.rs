@@ -230,6 +230,8 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         let dir = port.direction();
 
         let mut links = self.hugr.graph.port_links(port_index).peekable();
+        // Linear dataflow values must be used, and control must have somewhere to flow.
+        let outgoing_is_linear = port_kind.is_linear() || port_kind == EdgeKind::ControlFlow;
         let must_be_connected = match dir {
             // Incoming ports must be connected, except for state order ports, branch case nodes,
             // and CFG nodes.
@@ -238,8 +240,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
                     && port_kind != EdgeKind::ControlFlow
                     && op_type.tag() != OpTag::Case
             }
-            // Linear dataflow values must be connected.
-            Direction::Outgoing => port_kind.is_linear(),
+            Direction::Outgoing => outgoing_is_linear,
         };
         if must_be_connected && links.peek().is_none() {
             return Err(ValidationError::UnconnectedPort {
@@ -260,7 +261,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         let mut link_cnt = 0;
         for (_, link) in links {
             link_cnt += 1;
-            if port_kind.is_linear() && link_cnt > 1 {
+            if outgoing_is_linear && link_cnt > 1 {
                 return Err(ValidationError::TooManyConnections {
                     node,
                     port,

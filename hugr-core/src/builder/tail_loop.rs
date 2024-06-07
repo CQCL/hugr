@@ -27,7 +27,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> TailLoopBuilder<B> {
         Ok(TailLoopBuilder::from_dfg_builder(dfg_build))
     }
     /// Set the outputs of the [`ops::TailLoop`], with `out_variant` as the value of the
-    /// termination Sum, and `rest` being the remaining outputs
+    /// termination Sum, and `rest` being the remaining outputs.
     pub fn set_outputs(
         &mut self,
         out_variant: Wire,

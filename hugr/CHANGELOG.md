@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.5.1 (2024-06-07)
+
+### Bug Fixes
+
+- Validate that control-flow outputs have exactly one successor ([#1144](https://github.com/CQCL/hugr/pull/1144))
+- Do not require matching extension_reqs when creating a replacement ([#1177](https://github.com/CQCL/hugr/pull/1177))
+
+### Features
+
+- Add `ConstExternalSymbol` to prelude ([#1123](https://github.com/CQCL/hugr/pull/1123))
+- `HugrView::extract_hugr` to extract regions into owned hugrs. ([#1173](https://github.com/CQCL/hugr/pull/1173))
+
+### Testing
+
+- Serialisation round trip testing for `OpDef` ([#999](https://github.com/CQCL/hugr/pull/999))
+
+### Refactor
+
+- Move binary to hugr-cli ([#1134](https://github.com/CQCL/hugr/pull/1134))
+
+
 ## 0.5.0 (2024-05-29)
 
 ### Bug Fixes
