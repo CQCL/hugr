@@ -10,8 +10,6 @@ use crate::OutgoingPort;
 
 use crate::ops;
 
-mod partial_value;
-pub use partial_value::{PartialValue, ValueHandle, HashableHashMap};
 /// Output of constant folding an operation, None indicates folding was either
 /// not possible or unsuccessful. An empty vector indicates folding was
 /// successful and no values are output.

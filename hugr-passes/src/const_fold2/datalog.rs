@@ -1,15 +1,14 @@
-use ascent::lattice::BoundedLattice;
+use ascent::lattice::{BoundedLattice, Dual, Lattice};
 use delegate::delegate;
 use itertools::{zip_eq, Itertools};
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
-use ascent::{ascent_run, Lattice};
 use either::Either;
-use hugr_core::extension::{HashableHashMap, PartialValue, ValueHandle};
 use hugr_core::hugr::views::{DescendantsGraph, HierarchyView};
 use hugr_core::ops::{OpTag, OpTrait, Value};
+use hugr_core::partial_value::{PartialValue, ValueHandle};
 use hugr_core::types::{FunctionType, SumType, Type, TypeEnum, TypeRow};
 use hugr_core::{Hugr, HugrView, IncomingPort, Node, OutgoingPort, PortIndex as _, Wire};
 
@@ -76,12 +75,8 @@ impl BoundedLattice for PV {
 struct ValueRow(Vec<PV>);
 
 impl ValueRow {
-    // fn into_partial_value(self) -> PartialValue {
-    //     todo!()
-    // }
-
     fn new(len: usize) -> Self {
-        Self(vec![PV::top(); len])
+        Self(vec![PV::bottom(); len])
     }
 
     fn singleton(len: usize, idx: usize, v: PV) -> Self {
@@ -113,8 +108,9 @@ impl ValueRow {
 }
 
 impl Lattice for ValueRow {
-    fn meet(self, _other: Self) -> Self {
-        todo!()
+    fn meet(mut self, other: Self) -> Self {
+        self.meet_mut(other);
+        self
     }
 
     fn join(mut self, other: Self) -> Self {
@@ -130,6 +126,15 @@ impl Lattice for ValueRow {
         }
         changed
     }
+
+    fn meet_mut(&mut self, other: Self) -> bool {
+        assert_eq!(self.0.len(), other.0.len());
+        let mut changed = false;
+        for (v1, v2) in zip_eq(self.0.iter_mut(), other.0.into_iter()) {
+            changed |= v1.meet_mut(v2);
+        }
+        changed
+    }
 }
 
 impl IntoIterator for ValueRow {
@@ -142,8 +147,8 @@ impl IntoIterator for ValueRow {
     }
 }
 
-type ArcCtx<'a, H: HugrView> = Arc<DataflowContext<'a, H>>;
-type Ctx<'a, H: HugrView> = DataflowContext<'a, H>;
+type Ctx<'a, H> = DataflowContext<'a, H>;
+type ArcCtx<'a, H> = Arc<Ctx<'a, H>>;
 
 fn top_row<'a, H: HugrView>(context: &Ctx<'a, H>, n: Node) -> ValueRow {
     if let Some(sig) = context.hugr().signature(n) {
@@ -184,7 +189,9 @@ fn partial_value_from_load_constant<'a, H: HugrView>(
         .unwrap()
         .0;
     let const_op = context.hugr().get_optype(const_node).as_const().unwrap();
-    context.value_handle(const_node, const_op.value()).into()
+    context
+        .node_value_handle(const_node, const_op.value())
+        .into()
 }
 
 fn partial_value_tuple_from_value_row(r: ValueRow) -> PV {
@@ -238,6 +245,67 @@ fn tail_loop_worker<'b, 'a, H: HugrView>(
     }
 }
 
+#[derive(PartialEq, Eq, PartialOrd, Hash, Debug, Clone)]
+pub enum TailLoopTermination {
+    SingleIteration,
+    Unknown,
+    NeverTerminates,
+}
+
+impl Lattice for TailLoopTermination {
+    fn meet_mut(&mut self, other: Self) -> bool {
+        match (self, other) {
+            (Self::SingleIteration, _) => false,
+            (s, o @ Self::SingleIteration) => {
+                *s = o;
+                true
+            }
+            (Self::Unknown, _) => false,
+            (s, o @ Self::Unknown) => {
+                *s = o;
+                true
+            }
+            _ => false,
+        }
+    }
+
+    fn join_mut(&mut self, other: Self) -> bool {
+        match (self, other) {
+            (Self::NeverTerminates, _) => false,
+            (s, o @ Self::NeverTerminates) => {
+                *s = o;
+                true
+            }
+            (Self::Unknown, _) => false,
+            (s, o @ Self::Unknown) => {
+                *s = o;
+                true
+            }
+            _ => false,
+        }
+    }
+
+    fn join(mut self, other: Self) -> Self {
+        self.join_mut(other);
+        self
+    }
+
+    fn meet(mut self, other: Self) -> Self {
+        self.meet_mut(other);
+        self
+    }
+}
+
+impl BoundedLattice for TailLoopTermination {
+    fn bottom() -> Self {
+        Self::NeverTerminates
+    }
+
+    fn top() -> Self {
+        Self::SingleIteration
+    }
+}
+
 ascent::ascent! {
     struct Dataflow<'a, H: HugrView>;
     relation context(ArcCtx<'a, H>);
@@ -254,9 +322,9 @@ ascent::ascent! {
 
     out_wire(c, n,p) <-- node(c, n), for p in value_outputs(c, *n);
 
-    // All out wire values are initialised to Top. If any value is Top after
+    // All out wire values are initialised to Bottom. If any value is Bottom after
     // running we can infer that execution never reaches that value.
-    out_wire_value(c, n,p, PV::top()) <-- out_wire(c, n,p);
+    out_wire_value(c, n,p, PV::bottom()) <-- out_wire(c, n,p);
 
     in_wire_value(c, n, ip, v) <-- in_wire(c, n, ip),
         if let Some((m,op)) = c.single_linked_output(*n, *ip),
@@ -307,6 +375,9 @@ ascent::ascent! {
     tail_loop_io_node(c,tl,n, io) <-- tail_loop_node(c,tl),
         if let Some([i,o]) = c.get_io(*tl),
         for (n,io) in [(i,IO::Input), (o, IO::Output)];
+    lattice tail_loop_termination(ArcCtx<'a,H>,Node,Dual<TailLoopTermination>);
+    tail_loop_termination(c,n,Dual::top()) <-- tail_loop_node(c,n);
+
 
     // inputs of tail loop propagate to Input node of child region
     out_wire_value(c, i, OutgoingPort::from(p.index()), v) <--
@@ -322,7 +393,6 @@ ascent::ascent! {
         tail_loop_io_node(c,tl,o, IO::Output),
         in_wire_value(c, o, output_p, output_v),
         for (p, v) in tail_loop_worker(c, *tl, *output_p, 1, output_v);
-
 
 }
 
@@ -371,7 +441,7 @@ mod test {
         types::{FunctionType, SumType},
     };
 
-    use hugr_core::extension::PartialValue;
+    use hugr_core::partial_value::PartialValue;
 
     #[test]
     fn test_make_tuple() {

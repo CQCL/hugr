@@ -9,25 +9,26 @@ use ascent::Lattice;
 
 use either::Either;
 use hugr_core::ops::{OpTag, OpTrait, Value};
+use hugr_core::partial_value::{ValueHandle, ValueKey};
 use hugr_core::{Hugr, HugrView, IncomingPort, Node, OutgoingPort, PortIndex as _, Wire};
-use hugr_core::extension::ValueHandle;
-
-
 
 #[derive(Clone)]
-pub struct ValueCache(HashMap<Node, Arc<Value>>);
+pub struct ValueCache(HashMap<ValueKey, Arc<Value>>);
 
 impl ValueCache {
     fn new() -> Self {
         Self(HashMap::new())
     }
 
-    fn get(&mut self, node: Node, value: &Value) -> ValueHandle {
-        let v = self.0.entry(node).or_insert_with(|| value.clone().into()).clone();
-        ValueHandle::new(node, v)
+    fn get(&mut self, key: ValueKey, value: &Value) -> ValueHandle {
+        let v = self
+            .0
+            .entry(key.clone())
+            .or_insert_with(|| value.clone().into())
+            .clone();
+        ValueHandle::new(key, v)
     }
 }
-
 
 static mut CONTEXT_ID: AtomicUsize = AtomicUsize::new(0);
 
@@ -50,8 +51,8 @@ impl<'a, H> DataflowContext<'a, H> {
         })
     }
 
-    pub fn value_handle(&self, node: Node, value: &Value) -> ValueHandle {
-        self.cache.borrow_mut().get(node, value)
+    pub fn node_value_handle(&self, node: Node, value: &Value) -> ValueHandle {
+        self.cache.borrow_mut().get(node.into(), value)
     }
 
     pub fn hugr(&self) -> &'a H {
@@ -95,7 +96,7 @@ impl<H> PartialOrd for DataflowContext<'_, H> {
     }
 }
 
-impl<'a,H> Deref for DataflowContext<'a,H> {
+impl<'a, H> Deref for DataflowContext<'a, H> {
     type Target = H;
 
     fn deref(&self) -> &Self::Target {
