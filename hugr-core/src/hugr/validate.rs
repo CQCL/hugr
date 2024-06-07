@@ -816,7 +816,7 @@ pub enum InterGraphEdgeError {
 }
 
 #[derive(Debug, Clone, PartialEq, Error)]
-#[error("Extensions of child node ({child}) {child_extensions} are not a subset of the parent node ({parent}): {parent_extensions}")]
+#[error("Parent node {parent} has extensions {parent_extensions} that are too restrictive for child node {child}, they must include child extensions {child_extensions}")]
 /// An error in the extension deltas.
 pub struct ExtensionError {
     parent: Node,
