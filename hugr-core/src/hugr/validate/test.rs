@@ -7,7 +7,7 @@ use crate::builder::{
     BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
     FunctionBuilder, HugrBuilder, ModuleBuilder, SubContainer,
 };
-use crate::extension::prelude::{BOOL_T, PRELUDE, PRELUDE_ID, USIZE_T};
+use crate::extension::prelude::{BOOL_T, PRELUDE, PRELUDE_ID, QB_T, USIZE_T};
 use crate::extension::{Extension, ExtensionSet, TypeDefBound, EMPTY_REG, PRELUDE_REGISTRY};
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::HugrMut;
@@ -864,6 +864,123 @@ fn test_polymorphic_load() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+/// Adds an input{BOOL_T}, tag_constant(0, BOOL_T^sum_size), tag(BOOL_T^sum_size), and
+/// output{Sum{unit^sum_size}, BOOL_T} operation to a dataflow container.
+/// Intended to be used to populate a BasicBlock node in a CFG.
+///
+/// Returns the node indices of each of the operations.
+fn add_block_children(b: &mut Hugr, parent: Node, sum_size: usize) -> (Node, Node, Node, Node) {
+    let const_op: ops::Const = ops::Value::unit_sum(0, sum_size as u8)
+        .expect("`sum_size` must be greater than 0")
+        .into();
+    let tag_type = Type::new_unit_sum(sum_size as u8);
+
+    let input = b.add_node_with_parent(parent, ops::Input::new(type_row![BOOL_T]));
+    let output = b.add_node_with_parent(parent, ops::Output::new(vec![tag_type.clone(), BOOL_T]));
+    let tag_def = b.add_node_with_parent(b.root(), const_op);
+    let tag = b.add_node_with_parent(parent, ops::LoadConstant { datatype: tag_type });
+
+    b.connect(tag_def, 0, tag, 0);
+    b.add_other_edge(input, tag);
+    b.connect(tag, 0, output, 0);
+    b.connect(input, 0, output, 1);
+
+    (input, tag_def, tag, output)
+}
+
+#[test]
+/// Validation errors in a dataflow subgraph.
+fn cfg_children_restrictions() {
+    let (mut b, def) = make_simple_hugr(1);
+    let (_input, _output, copy) = b
+        .hierarchy
+        .children(def.pg_index())
+        .map_into()
+        .collect_tuple()
+        .unwrap();
+    // Write Extension annotations into the Hugr while it's still well-formed
+    // enough for us to compute them
+    b.validate(&EMPTY_REG).unwrap();
+    b.replace_op(
+        copy,
+        NodeType::new_pure(ops::CFG {
+            signature: FunctionType::new(type_row![BOOL_T], type_row![BOOL_T]),
+        }),
+    )
+    .unwrap();
+    assert_matches!(
+        b.validate(&EMPTY_REG),
+        Err(ValidationError::ContainerWithoutChildren { .. })
+    );
+    let cfg = copy;
+
+    // Construct a valid CFG, with one BasicBlock node and one exit node
+    let block = b.add_node_with_parent(
+        cfg,
+        ops::DataflowBlock {
+            inputs: type_row![BOOL_T],
+            sum_rows: vec![type_row![]],
+            other_outputs: type_row![BOOL_T],
+            extension_delta: ExtensionSet::new(),
+        },
+    );
+    add_block_children(&mut b, block, 1);
+    let exit = b.add_node_with_parent(
+        cfg,
+        ops::ExitBlock {
+            cfg_outputs: type_row![BOOL_T],
+        },
+    );
+    b.add_other_edge(block, exit);
+    assert_eq!(b.update_validate(&EMPTY_REG), Ok(()));
+
+    // Test malformed errors
+
+    // Add an internal exit node
+    let exit2 = b.add_node_after(
+        exit,
+        ops::ExitBlock {
+            cfg_outputs: type_row![BOOL_T],
+        },
+    );
+    assert_matches!(
+        b.validate(&EMPTY_REG),
+        Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::InternalExitChildren { child, .. }, .. })
+            => {assert_eq!(parent, cfg); assert_eq!(child, exit2.pg_index())}
+    );
+    b.remove_node(exit2);
+
+    // Change the types in the BasicBlock node to work on qubits instead of bits
+    b.replace_op(
+        block,
+        NodeType::new_pure(ops::DataflowBlock {
+            inputs: type_row![QB_T],
+            sum_rows: vec![type_row![]],
+            other_outputs: type_row![QB_T],
+            extension_delta: ExtensionSet::new(),
+        }),
+    )
+    .unwrap();
+    let mut block_children = b.hierarchy.children(block.pg_index());
+    let block_input = block_children.next().unwrap().into();
+    let block_output = block_children.next_back().unwrap().into();
+    b.replace_op(
+        block_input,
+        NodeType::new_pure(ops::Input::new(type_row![QB_T])),
+    )
+    .unwrap();
+    b.replace_op(
+        block_output,
+        NodeType::new_pure(ops::Output::new(type_row![Type::new_unit_sum(1), QB_T])),
+    )
+    .unwrap();
+    assert_matches!(
+        b.validate(&EMPTY_REG),
+        Err(ValidationError::InvalidEdges { parent, source: EdgeValidationError::CFGEdgeSignatureMismatch { .. }, .. })
+            => assert_eq!(parent, cfg)
+    );
+}
+
 #[cfg(feature = "extension_inference")]
 mod extension_tests {
     use self::ops::handle::{BasicBlockID, TailLoopID};
@@ -881,124 +998,6 @@ mod extension_tests {
     }
 
     const Q: Type = crate::extension::prelude::QB_T;
-
-    /// Adds an input{BOOL_T}, tag_constant(0, BOOL_T^sum_size), tag(BOOL_T^sum_size), and
-    /// output{Sum{unit^sum_size}, BOOL_T} operation to a dataflow container.
-    /// Intended to be used to populate a BasicBlock node in a CFG.
-    ///
-    /// Returns the node indices of each of the operations.
-    fn add_block_children(b: &mut Hugr, parent: Node, sum_size: usize) -> (Node, Node, Node, Node) {
-        let const_op: ops::Const = ops::Value::unit_sum(0, sum_size as u8)
-            .expect("`sum_size` must be greater than 0")
-            .into();
-        let tag_type = Type::new_unit_sum(sum_size as u8);
-
-        let input = b.add_node_with_parent(parent, ops::Input::new(type_row![BOOL_T]));
-        let output =
-            b.add_node_with_parent(parent, ops::Output::new(vec![tag_type.clone(), BOOL_T]));
-        let tag_def = b.add_node_with_parent(b.root(), const_op);
-        let tag = b.add_node_with_parent(parent, ops::LoadConstant { datatype: tag_type });
-
-        b.connect(tag_def, 0, tag, 0);
-        b.add_other_edge(input, tag);
-        b.connect(tag, 0, output, 0);
-        b.connect(input, 0, output, 1);
-
-        (input, tag_def, tag, output)
-    }
-
-    #[test]
-    /// Validation errors in a dataflow subgraph.
-    fn cfg_children_restrictions() {
-        let (mut b, def) = make_simple_hugr(1);
-        let (_input, _output, copy) = b
-            .hierarchy
-            .children(def.pg_index())
-            .map_into()
-            .collect_tuple()
-            .unwrap();
-        // Write Extension annotations into the Hugr while it's still well-formed
-        // enough for us to compute them
-        b.validate(&EMPTY_REG).unwrap();
-        b.replace_op(
-            copy,
-            NodeType::new_pure(ops::CFG {
-                signature: FunctionType::new(type_row![BOOL_T], type_row![BOOL_T]),
-            }),
-        )
-        .unwrap();
-        assert_matches!(
-            b.validate(&EMPTY_REG),
-            Err(ValidationError::ContainerWithoutChildren { .. })
-        );
-        let cfg = copy;
-
-        // Construct a valid CFG, with one BasicBlock node and one exit node
-        let block = b.add_node_with_parent(
-            cfg,
-            ops::DataflowBlock {
-                inputs: type_row![BOOL_T],
-                sum_rows: vec![type_row![]],
-                other_outputs: type_row![BOOL_T],
-                extension_delta: ExtensionSet::new(),
-            },
-        );
-        add_block_children(&mut b, block, 1);
-        let exit = b.add_node_with_parent(
-            cfg,
-            ops::ExitBlock {
-                cfg_outputs: type_row![BOOL_T],
-            },
-        );
-        b.add_other_edge(block, exit);
-        assert_eq!(b.update_validate(&EMPTY_REG), Ok(()));
-
-        // Test malformed errors
-
-        // Add an internal exit node
-        let exit2 = b.add_node_after(
-            exit,
-            ops::ExitBlock {
-                cfg_outputs: type_row![BOOL_T],
-            },
-        );
-        assert_matches!(
-            b.validate(&EMPTY_REG),
-            Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::InternalExitChildren { child, .. }, .. })
-                => {assert_eq!(parent, cfg); assert_eq!(child, exit2.pg_index())}
-        );
-        b.remove_node(exit2);
-
-        // Change the types in the BasicBlock node to work on qubits instead of bits
-        b.replace_op(
-            block,
-            NodeType::new_pure(ops::DataflowBlock {
-                inputs: type_row![Q],
-                sum_rows: vec![type_row![]],
-                other_outputs: type_row![Q],
-                extension_delta: ExtensionSet::new(),
-            }),
-        )
-        .unwrap();
-        let mut block_children = b.hierarchy.children(block.pg_index());
-        let block_input = block_children.next().unwrap().into();
-        let block_output = block_children.next_back().unwrap().into();
-        b.replace_op(
-            block_input,
-            NodeType::new_pure(ops::Input::new(type_row![Q])),
-        )
-        .unwrap();
-        b.replace_op(
-            block_output,
-            NodeType::new_pure(ops::Output::new(type_row![Type::new_unit_sum(1), Q])),
-        )
-        .unwrap();
-        assert_matches!(
-            b.validate(&EMPTY_REG),
-            Err(ValidationError::InvalidEdges { parent, source: EdgeValidationError::CFGEdgeSignatureMismatch { .. }, .. })
-                => assert_eq!(parent, cfg)
-        );
-    }
 
     #[rstest]
     #[case::d1(|signature| ops::DFG {signature}.into())]
