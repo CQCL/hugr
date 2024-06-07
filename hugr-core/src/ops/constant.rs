@@ -98,7 +98,7 @@ impl AsRef<Value> for Const {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "v")]
 /// A value that can be stored as a static constant. Representing core types and
 /// extension types.
@@ -134,6 +134,25 @@ pub enum Value {
         #[serde(rename = "typ")]
         sum_type: SumType,
     },
+}
+
+impl PartialEq for Value {
+    fn eq(&self, other: &Self) -> bool {
+        let cmp_tuple_sum = |tuple_values: &[Value], tag: usize, sum_values: &[Value], sum_type: &SumType| {
+            tag == 0 && sum_type.num_variants() == 1 && tuple_values == sum_values
+        };
+        match (self, other) {
+            (Self::Extension { e: e1 }, Self::Extension { e: e2 }) => e1 == e2,
+            (Self::Function { hugr: h1 }, Self::Function { hugr: h2 }) => h1 == h2,
+            (Self::Tuple { vs: v1 }, Self::Tuple { vs: v2 }) => v1 == v2,
+            (Self::Sum { tag: t1, values: v1, sum_type: s1 }, Self::Sum { tag: t2, values: v2, sum_type: s2 }) => {
+                t1 == t2 && v1 == v2 && s1 == s2
+            }
+            (Self::Tuple { vs  }, Self::Sum {tag, values, sum_type}) |
+            (Self::Sum {tag, values, sum_type}, Self::Tuple { vs  }) => cmp_tuple_sum(vs, *tag, values, sum_type),
+            _ => false,
+        }
+    }
 }
 
 /// An opaque newtype around a [`Box<dyn CustomConst>`](CustomConst).
