@@ -1022,8 +1022,6 @@ mod extension_tests {
         const XB: ExtensionId = "BOOL_EXT";
     }
 
-    const Q: Type = crate::extension::prelude::QB_T;
-
     #[rstest]
     #[case::d1(|signature| ops::DFG {signature}.into())]
     #[case::f1(|ft: FunctionType| ops::FuncDefn {name: "foo".to_string(), signature: ft.into()}.into())]
