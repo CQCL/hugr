@@ -866,10 +866,14 @@ fn test_polymorphic_load() -> Result<(), Box<dyn std::error::Error>> {
 
 #[cfg(feature = "extension_inference")]
 mod extension_tests {
+    use self::ops::handle::{BasicBlockID, TailLoopID};
+
     use super::*;
-    use crate::builder::{BlockBuilder, CFGBuilder, TailLoopBuilder};
+    use crate::builder::handle::Outputs;
+    use crate::builder::{BlockBuilder, BuildHandle, CFGBuilder, DFGWrapper, TailLoopBuilder};
     use crate::extension::ExtensionSet;
     use crate::macros::const_extension_ids;
+    use crate::Wire;
 
     const_extension_ids! {
         const XA: ExtensionId = "A";
@@ -1162,30 +1166,26 @@ mod extension_tests {
     }
 
     #[rstest]
-    #[case(XA.into(), false)]
-    #[case(ExtensionSet::new(), false)]
-    #[case(ExtensionSet::from_iter([XA, XB]), true)]
-    fn bb_extension_mismatch(
-        #[case] parent_extensions: ExtensionSet,
-        #[case] success: bool,
+    #[case(make_bb, |bb: &mut DFGWrapper<_,_>, outs| bb.make_tuple(outs))]
+    #[case(make_tailloop, |tl: &mut DFGWrapper<_,_>, outs| tl.make_break(tl.loop_signature().unwrap().clone(), outs))]
+    fn bb_extension_mismatch<T>(
+        #[case] dfg_fn: impl Fn(Type, ExtensionSet) -> DFGWrapper<Hugr, T>,
+        #[case] make_pred: impl Fn(&mut DFGWrapper<Hugr, T>, Outputs) -> Result<Wire, BuildError>,
+        #[values((XA.into(), false), (ExtensionSet::new(), false), (ExtensionSet::from_iter([XA,XB]), true))]
+        parent_exts_success: (ExtensionSet, bool),
     ) -> Result<(), BuildError> {
-        let mut bb = BlockBuilder::new(
-            USIZE_T,
-            None,
-            vec![USIZE_T.into()],
-            type_row![],
-            parent_extensions.clone(),
-        )?;
-        let lift = bb.add_dataflow_op(
+        let (parent_extensions, success) = parent_exts_success;
+        let mut dfg = dfg_fn(USIZE_T, parent_extensions.clone());
+        let lift = dfg.add_dataflow_op(
             ops::Lift {
                 type_row: USIZE_T.into(),
                 new_extension: XB,
             },
-            bb.input_wires(),
+            dfg.input_wires(),
         )?;
-        let pred = bb.make_tuple(lift.outputs())?;
-        let root = bb.hugr().root();
-        let res = bb.finish_prelude_hugr_with_outputs([pred]);
+        let pred = make_pred(&mut dfg, lift.outputs())?;
+        let root = dfg.hugr().root();
+        let res = dfg.finish_prelude_hugr_with_outputs([pred]);
         if success {
             assert!(res.is_ok())
         } else {
@@ -1204,45 +1204,12 @@ mod extension_tests {
         Ok(())
     }
 
-    #[rstest]
-    #[case(XA.into(), false)]
-    #[case(ExtensionSet::new(), false)]
-    #[case(ExtensionSet::from_iter([XA, XB]), true)]
-    fn tailloop_extension_mismatch(
-        #[case] parent_extensions: ExtensionSet,
-        #[case] success: bool,
-    ) -> Result<(), BuildError> {
-        let mut tl = TailLoopBuilder::new(
-            type_row![USIZE_T],
-            &[],
-            type_row![USIZE_T],
-            parent_extensions.clone(),
-        )?;
-        let lift = tl.add_dataflow_op(
-            ops::Lift {
-                type_row: USIZE_T.into(),
-                new_extension: XB,
-            },
-            tl.input_wires(),
-        )?;
-        let pred = tl.make_break(tl.loop_signature()?.clone(), lift.outputs())?;
-        let root = tl.hugr().root();
-        let res = tl.finish_prelude_hugr_with_outputs([pred]);
-        if success {
-            assert!(res.is_ok())
-        } else {
-            assert_eq!(
-                res,
-                Err(BuildError::InvalidHUGR(ValidationError::ExtensionError(
-                    ExtensionError {
-                        parent: root,
-                        parent_extensions,
-                        child: lift.node(),
-                        child_extensions: XB.into()
-                    }
-                )))
-            );
-        }
-        Ok(())
+    fn make_bb(t: Type, es: ExtensionSet) -> DFGWrapper<Hugr, BasicBlockID> {
+        BlockBuilder::new(t.clone(), None, vec![t.into()], type_row![], es).unwrap()
+    }
+
+    fn make_tailloop(t: Type, es: ExtensionSet) -> DFGWrapper<Hugr, BuildHandle<TailLoopID>> {
+        let row = TypeRow::from(t);
+        TailLoopBuilder::new(row.clone(), &[], row, es).unwrap()
     }
 }
