@@ -1000,7 +1000,7 @@ mod extension_tests {
     #[case::d1(|signature| ops::DFG {signature}.into())]
     #[case::f1(|ft: FunctionType| ops::FuncDefn {name: "foo".to_string(), signature: ft.into()}.into())]
     #[case::c1(|signature| ops::Case {signature}.into())]
-    // ALAN TODO TailLoop/Conditional versions too
+    // ALAN TODO TailLoop version too
     fn parent_extension_mismatch(
         #[case] parent_f: impl Fn(FunctionType) -> OpType,
         #[values(ExtensionSet::new(), XA.into())] parent_extensions: ExtensionSet,
@@ -1084,6 +1084,82 @@ mod extension_tests {
             );
         }
         Ok(())
+    }
+
+    #[rstest]
+    #[case(XA.into(), false)]
+    #[case(ExtensionSet::new(), false)]
+    #[case(ExtensionSet::from_iter([XA, XB]), true)]
+    fn conditional_extension_mismatch(
+        #[case] parent_extensions: ExtensionSet,
+        #[case] success: bool,
+    ) {
+        // Child graph adds extension "XB", but the parent
+        // declares a different delta, in same cases causing a mismatch.
+        let parent = ops::Conditional {
+            sum_rows: vec![type_row![], type_row![]],
+            other_inputs: type_row![USIZE_T],
+            outputs: type_row![USIZE_T],
+            extension_delta: parent_extensions.clone(),
+        };
+        let mut hugr = Hugr::new(NodeType::new_pure(parent));
+
+        // First case with no delta should be ok in all cases. Second one may not be.
+        let [_, child] = [None, Some(XB)].map(|case_ext| {
+            let case_exts = ExtensionSet::from_iter(case_ext.clone());
+            let case = hugr.add_node_with_parent(
+                hugr.root(),
+                ops::Case {
+                    signature: FunctionType::new_endo(USIZE_T)
+                        .with_extension_delta(case_exts.clone()),
+                },
+            );
+
+            let input = hugr.add_node_with_parent(
+                case,
+                NodeType::new_pure(ops::Input {
+                    types: type_row![USIZE_T],
+                }),
+            );
+            let output = hugr.add_node_with_parent(
+                case,
+                NodeType::new(
+                    ops::Output {
+                        types: type_row![USIZE_T],
+                    },
+                    Some(case_exts),
+                ),
+            );
+            let res = match case_ext {
+                None => input,
+                Some(new_ext) => {
+                    let lift = hugr.add_node_with_parent(
+                        case,
+                        NodeType::new_pure(ops::Lift {
+                            type_row: type_row![USIZE_T],
+                            new_extension: new_ext,
+                        }),
+                    );
+                    hugr.connect(input, 0, lift, 0);
+                    lift
+                }
+            };
+            hugr.connect(res, 0, output, 0);
+            case
+        });
+        // case is the last-assigned child, i.e. the one that requires 'XB'
+        let result = hugr.validate(&PRELUDE_REGISTRY);
+        let expected = if success {
+            Ok(())
+        } else {
+            Err(ValidationError::ExtensionError(ExtensionError {
+                parent: hugr.root(),
+                parent_extensions,
+                child,
+                child_extensions: XB.into(),
+            }))
+        };
+        assert_eq!(result, expected);
     }
 
     #[rstest]
