@@ -36,7 +36,7 @@ mod const_fold;
 pub mod prelude;
 pub mod simple_op;
 pub mod validate;
-pub use const_fold::{ConstFold, ConstFoldResult, Folder, PartialValue, ValueHandle, HashableHashMap};
+pub use const_fold::{ConstFold, ConstFoldResult, Folder};
 pub use prelude::{PRELUDE, PRELUDE_REGISTRY};
 
 pub mod declarative;
