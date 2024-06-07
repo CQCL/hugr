@@ -346,7 +346,12 @@ impl SiblingSubgraph {
         let [rep_input, rep_output] = replacement
             .get_io(rep_root)
             .expect("DFG root in the replacement does not have input and output nodes.");
-        if dfg_optype.dataflow_signature() != Some(self.signature(hugr)) {
+
+        let current_signature = self.signature(hugr);
+        let new_signature = dfg_optype.dataflow_signature();
+        if new_signature.as_ref().map(|s| &s.input) != Some(&current_signature.input)
+            || new_signature.as_ref().map(|s| &s.output) != Some(&current_signature.output)
+        {
             return Err(InvalidReplacement::InvalidSignature {
                 expected: self.signature(hugr),
                 actual: dfg_optype.dataflow_signature(),
