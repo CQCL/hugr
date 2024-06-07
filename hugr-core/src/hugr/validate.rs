@@ -67,7 +67,9 @@ impl Hugr {
                     // ModuleRoot holds but does not execute its children, so allow any extensions
                     OpTag::ModuleRoot => continue,
                     _ => {
-                        assert!(self.children(parent).next().is_none());
+                        assert!(self.children(parent).next().is_none(),
+                            "Unknown parent node type {:?} - not a DataflowParent, Module, Cfg or Conditional",
+                            parent_op);
                         continue;
                     }
                 },
