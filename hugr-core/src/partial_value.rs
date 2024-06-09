@@ -39,9 +39,7 @@ impl PartialSum {
             assert!(row.len() > idx);
             row[idx].clone()
         } else {
-            // We must return top. if self were to gain this variant, we would return the element of that variant.
-            // We must ensure that the value return now is <= that future value
-            PartialValue::top()
+            PartialValue::bottom()
         }
     }
 
@@ -109,6 +107,10 @@ impl PartialSum {
             changed = true;
         }
         changed
+    }
+
+    pub fn supports_tag(&self, tag: usize) -> bool {
+        self.0.contains_key(&tag)
     }
 }
 
@@ -206,16 +208,16 @@ impl From<PartialSum> for PartialValue {
 
 
 impl PartialValue {
-    const BOTTOM: Self = Self::Bottom;
-    const BOTTOM_REF: &'static Self = &Self::BOTTOM;
+    // const BOTTOM: Self = Self::Bottom;
+    // const BOTTOM_REF: &'static Self = &Self::BOTTOM;
 
-    fn initialised(&self) -> bool {
-        !self.is_top()
-    }
+    // fn initialised(&self) -> bool {
+    //     !self.is_top()
+    // }
 
-    fn is_top(&self) -> bool {
-        self == &PartialValue::Top
-    }
+    // fn is_top(&self) -> bool {
+    //     self == &PartialValue::Top
+    // }
 
     fn assert_invariants(&self) {
         match self {
@@ -229,23 +231,6 @@ impl PartialValue {
         }
     }
 
-    /// TODO docs
-    /// just delegate to variant_field_value
-    pub fn tuple_field_value(&self, idx: usize) -> Self {
-        self.variant_field_value(0, idx)
-    }
-
-    /// TODO docs
-    pub fn variant_field_value(&self, variant: usize, idx: usize) -> Self {
-        match self {
-            Self::Bottom => Self::Bottom,
-            Self::PartialSum(ps) => {
-                ps.variant_field_value(variant, idx)
-            }
-            Self::Value(v) if v.tag() == variant => Self::Value(v.index(idx)),
-            _ => Self::Top,
-        }
-    }
 
     pub fn try_into_value(self, typ: &Type) -> Result<Value, Self> {
         let r = match self {
@@ -445,6 +430,39 @@ impl PartialValue {
 
     pub fn unit() -> Self {
         Self::variant(0, [])
+    }
+
+    pub fn supports_tag(&self, tag: usize) -> bool {
+        match self {
+            PartialValue::Bottom => false,
+            PartialValue::Value(v) => v.tag() == tag, // can never be a sum or tuple
+            PartialValue::PartialSum(ps) => ps.supports_tag(tag),
+            PartialValue::Top => true,
+        }
+    }
+
+    /// TODO docs
+    /// just delegate to variant_field_value
+    pub fn tuple_field_value(&self, idx: usize) -> Self {
+        self.variant_field_value(0, idx)
+    }
+
+    /// TODO docs
+    pub fn variant_field_value(&self, variant: usize, idx: usize) -> Self {
+        match self {
+            Self::Bottom => Self::Bottom,
+            Self::PartialSum(ps) => {
+                ps.variant_field_value(variant, idx)
+            }
+            Self::Value(v) => {
+                if v.tag() == variant {
+                    Self::Value(v.index(idx))
+                } else {
+                    Self::Bottom
+                }
+            },
+            Self::Top => Self::Top,
+        }
     }
 }
 
