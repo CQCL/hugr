@@ -1,4 +1,4 @@
-use ascent::lattice::{BoundedLattice, Dual, Lattice};
+use ascent::lattice::{BoundedLattice, Dual, Lattice, ord_lattice::OrdLattice};
 use delegate::delegate;
 use itertools::{zip_eq, Itertools};
 use std::collections::HashMap;
@@ -8,7 +8,7 @@ use std::sync::Arc;
 use either::Either;
 use hugr_core::ops::{OpTag, OpTrait, Value};
 use hugr_core::partial_value::{PartialValue, ValueHandle};
-use hugr_core::types::{FunctionType, SumType, Type, TypeEnum, TypeRow};
+use hugr_core::types::{EdgeKind, FunctionType, SumType, Type, TypeEnum, TypeRow};
 use hugr_core::{Hugr, HugrView, IncomingPort, Node, OutgoingPort, PortIndex as _, Wire};
 
 mod context;
@@ -33,6 +33,10 @@ impl PV {
     /// up!!!
     fn variant_field_value(&self, variant: usize, idx: usize) -> Self {
         self.0.variant_field_value(variant, idx).into()
+    }
+
+    fn supports_tag(&self, tag: usize) -> bool {
+        self.0.supports_tag(tag)
     }
 }
 
@@ -89,7 +93,7 @@ impl ValueRow {
         Self::singleton(r.len(), idx, v)
     }
 
-    fn top_from_row(r: &TypeRow) -> Self {
+    fn bottom_from_row(r: &TypeRow) -> Self {
         Self::new(r.len())
     }
 
@@ -101,9 +105,9 @@ impl ValueRow {
         zip_eq(value_inputs(context, n), self.0.iter())
     }
 
-    fn initialised(&self) -> bool {
-        self.0.iter().all(|x| x != &PV::top())
-    }
+    // fn initialised(&self) -> bool {
+    //     self.0.iter().all(|x| x != &PV::top())
+    // }
 }
 
 impl Lattice for ValueRow {
@@ -149,7 +153,7 @@ impl IntoIterator for ValueRow {
 type Ctx<'a, H> = DataflowContext<'a, H>;
 type ArcCtx<'a, H> = Arc<Ctx<'a, H>>;
 
-fn top_row<'a, H: HugrView>(context: &Ctx<'a, H>, n: Node) -> ValueRow {
+fn bottom_row<'a, H: HugrView>(context: &Ctx<'a, H>, n: Node) -> ValueRow {
     if let Some(sig) = context.hugr().signature(n) {
         ValueRow::new(sig.input_count())
     } else {
@@ -224,84 +228,51 @@ fn tail_loop_worker<'b, 'a, H: HugrView>(
     output_p: IncomingPort,
     control_variant: usize,
     v: &'b PV,
-) -> impl Iterator<Item = (OutgoingPort, PV)> + 'b {
+) -> impl Iterator<Item = (OutgoingPort, PV)> + 'b where 'a: 'b {
     let tail_loop_op = context.get_optype(n).as_tail_loop().unwrap();
     let num_variant_vals = if control_variant == 0 {
         tail_loop_op.just_inputs.len()
     } else {
         tail_loop_op.just_outputs.len()
     };
+    let hugr = context.hugr();
     if output_p.index() == 0 {
         Either::Left(
             (0..num_variant_vals)
                 .map(move |i| (i.into(), v.variant_field_value(control_variant, i))),
         )
     } else {
-        Either::Right(std::iter::once((
-            (num_variant_vals + output_p.index()).into(),
-            v.clone(),
-        )))
-    }
+        let v = if v.supports_tag(control_variant) {
+            v.clone()
+        } else {
+            PV::bottom()
+        };
+        Either::Right(std::iter::once(((num_variant_vals + output_p.index() - 1).into(), v)))
+    }.inspect(move |x| assert!(matches!(hugr.get_optype(n).port_kind(x.0), Some(EdgeKind::Value(_)))))
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Hash, Debug, Clone)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone)]
 pub enum TailLoopTermination {
-    SingleIteration,
-    Unknown,
     NeverTerminates,
+    SingleIteration,
+    Terminates,
 }
 
-impl Lattice for TailLoopTermination {
-    fn meet_mut(&mut self, other: Self) -> bool {
-        match (self, other) {
-            (Self::SingleIteration, _) => false,
-            (s, o @ Self::SingleIteration) => {
-                *s = o;
-                true
-            }
-            (Self::Unknown, _) => false,
-            (s, o @ Self::Unknown) => {
-                *s = o;
-                true
-            }
-            _ => false,
+impl TailLoopTermination {
+    fn from_control_value(v: &PV) -> Self {
+        if v.supports_tag(1) && !v.supports_tag(0) {
+            Self::SingleIteration
+        } else if v.supports_tag(1) {
+            Self::Terminates
+        } else {
+            Self::NeverTerminates
         }
-    }
-
-    fn join_mut(&mut self, other: Self) -> bool {
-        match (self, other) {
-            (Self::NeverTerminates, _) => false,
-            (s, o @ Self::NeverTerminates) => {
-                *s = o;
-                true
-            }
-            (Self::Unknown, _) => false,
-            (s, o @ Self::Unknown) => {
-                *s = o;
-                true
-            }
-            _ => false,
-        }
-    }
-
-    fn join(mut self, other: Self) -> Self {
-        self.join_mut(other);
-        self
-    }
-
-    fn meet(mut self, other: Self) -> Self {
-        self.meet_mut(other);
-        self
     }
 }
 
-impl BoundedLattice for TailLoopTermination {
-    fn bottom() -> Self {
-        Self::NeverTerminates
-    }
-
-    fn top() -> Self {
-        Self::SingleIteration
+impl From<TailLoopTermination> for OrdLattice<TailLoopTermination> {
+    fn from(value: TailLoopTermination) -> Self {
+        Self(value)
     }
 }
 
@@ -330,7 +301,7 @@ ascent::ascent! {
         out_wire_value(c, m, op, v);
 
 
-    node_in_value_row(c, n, top_row(c, *n)) <-- node(c, n);
+    node_in_value_row(c, n, bottom_row(c, *n)) <-- node(c, n);
     node_in_value_row(c, n, singleton_in_row(c, n, p, v.clone())) <-- in_wire_value(c, n, p, v);
 
     // LoadConstant
@@ -374,13 +345,13 @@ ascent::ascent! {
     tail_loop_io_node(c,tl,n, io) <-- tail_loop_node(c,tl),
         if let Some([i,o]) = c.get_io(*tl),
         for (n,io) in [(i,IO::Input), (o, IO::Output)];
-    lattice tail_loop_termination(ArcCtx<'a,H>,Node,Dual<TailLoopTermination>);
-    tail_loop_termination(c,n,Dual::top()) <-- tail_loop_node(c,n);
 
 
     // inputs of tail loop propagate to Input node of child region
     out_wire_value(c, i, OutgoingPort::from(p.index()), v) <--
         tail_loop_io_node(c,tl,i, IO::Input), in_wire_value(c, tl, p, v);
+
+
     // Output node of child region propagate to Input node of child region
     out_wire_value(c, i, input_p, v) <--
         tail_loop_io_node(c,tl,i, IO::Input),
@@ -393,6 +364,11 @@ ascent::ascent! {
         in_wire_value(c, o, output_p, output_v),
         for (p, v) in tail_loop_worker(c, *tl, *output_p, 1, output_v);
 
+    lattice tail_loop_termination(ArcCtx<'a,H>,Node,OrdLattice<TailLoopTermination>);
+    tail_loop_termination(c,tl,TailLoopTermination::NeverTerminates.into()) <-- tail_loop_node(c,tl);
+    tail_loop_termination(c,tl,TailLoopTermination::from_control_value(v).into()) <-- tail_loop_node(c,tl),
+        tail_loop_io_node(c,tl,o, IO::Output),
+        in_wire_value(c, o, Into::<IncomingPort>::into(0usize), v);
 }
 
 impl<'a, H: HugrView> Dataflow<'a, H> {
@@ -428,19 +404,23 @@ impl<'a, H: HugrView> Dataflow<'a, H> {
             .unwrap();
         pv.try_into_value(&typ).ok()
     }
+
+    pub fn tail_loop_terminates(&self, context: &Ctx<'a, H>, node: Node) -> TailLoopTermination {
+        assert!(context.get_optype(node).is_tail_loop());
+        self.tail_loop_termination.iter().find_map(|(c,n,v)| (c.as_ref() == context && n == &node).then_some(v.0.clone())).unwrap()
+    }
 }
 
 #[cfg(test)]
 mod test {
     use hugr_core::{
-        builder::{DFGBuilder, Dataflow, HugrBuilder, SubContainer},
-        extension::{prelude::BOOL_T, EMPTY_REG},
-        ops::{UnpackTuple, Value},
-        type_row,
-        types::{FunctionType, SumType},
+        builder::{Container, DFGBuilder, Dataflow, HugrBuilder, SubContainer}, extension::{prelude::BOOL_T, EMPTY_REG}, ops::{handle::NodeHandle, OpTrait, UnpackTuple, Value}, type_row, types::{FunctionType, SumType}, HugrView, OutgoingPort, Wire
     };
 
     use hugr_core::partial_value::PartialValue;
+    use itertools::Itertools;
+
+    use crate::const_fold2::datalog::TailLoopTermination;
 
     #[test]
     fn test_make_tuple() {
@@ -510,7 +490,8 @@ mod test {
         let tlb = builder
             .tail_loop_builder([], [], vec![r_v.get_type()].into())
             .unwrap();
-        let [tl_o] = tlb.finish_with_outputs(r_w, []).unwrap().outputs_arr();
+        let tail_loop = tlb.finish_with_outputs(r_w, []).unwrap();
+        let [tl_o] = tail_loop.outputs_arr();
         let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
         let mut machine = super::Dataflow::new();
@@ -520,6 +501,7 @@ mod test {
 
         let o_r = machine.read_out_wire_value(&c, tl_o).unwrap();
         assert_eq!(o_r, r_v);
+        assert_eq!(TailLoopTermination::SingleIteration, machine.tail_loop_terminates(&c, tail_loop.node()))
     }
 
     #[test]
@@ -530,7 +512,8 @@ mod test {
         let tlb = builder
             .tail_loop_builder([], [], vec![BOOL_T].into())
             .unwrap();
-        let [tl_o] = tlb.finish_with_outputs(r_w, []).unwrap().outputs_arr();
+        let tail_loop = tlb.finish_with_outputs(r_w, []).unwrap();
+        let [tl_o] = tail_loop.outputs_arr();
         let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
         let mut machine = super::Dataflow::new();
@@ -539,54 +522,50 @@ mod test {
         // dbg!(&machine.out_wire_value);
 
         let o_r = machine.read_out_wire_partial_value(&c, tl_o).unwrap();
-        assert_eq!(o_r, PartialValue::Top);
+        assert_eq!(o_r, PartialValue::Bottom);
+        assert_eq!(TailLoopTermination::NeverTerminates, machine.tail_loop_terminates(&c, tail_loop.node()))
+    }
+
+    #[test]
+    fn test_tail_loop_iterates_twice() {
+        let mut builder = DFGBuilder::new(FunctionType::new_endo(&[])).unwrap();
+        // let var_type = Type::new_sum([type_row![BOOL_T,BOOL_T], type_row![BOOL_T,BOOL_T]]);
+
+        let true_w = builder.add_load_value(Value::true_val());
+        let false_w = builder.add_load_value(Value::false_val());
+
+        // let r_w = builder
+        //     .add_load_value(Value::sum(0, [], SumType::new([type_row![], BOOL_T.into()])).unwrap());
+        let tlb = builder
+            .tail_loop_builder([], [(BOOL_T,false_w), (BOOL_T,true_w)], vec![].into())
+            .unwrap();
+        assert_eq!(tlb.loop_signature().unwrap().dataflow_signature().unwrap(), FunctionType::new_endo(type_row![BOOL_T,BOOL_T]));
+        let [in_w1,in_w2] = tlb.input_wires_arr();
+        let tail_loop = tlb.finish_with_outputs(in_w1, [in_w2, in_w1]).unwrap();
+
+        // let optype = builder.hugr().get_optype(tail_loop.node());
+        // for p in builder.hugr().node_outputs(tail_loop.node()) {
+        //     use hugr_core::ops::OpType;
+        //     println!("{:?}, {:?}", p, optype.port_kind(p));
+
+        // }
+
+        let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
+        // TODO once we can do conditionals put these wires inside `just_outputs` and
+        // we should be able to propagate their values
+        // let [o_w1, o_w2, _] = tail_loop.outputs_arr();
+
+        let mut machine = super::Dataflow::new();
+        let c = machine.run_hugr(&hugr);
+        dbg!(&machine.tail_loop_io_node);
+        dbg!(&machine.out_wire_value);
+
+        // TODO these hould be the propagated values
+        // let o_r1 = machine.read_out_wire_value(&c, o_w1).unwrap();
+        // assert_eq!(o_r1, Value::false_val());
+        // let o_r2 = machine.read_out_wire_value(&c, o_w2).unwrap();
+        // assert_eq!(o_r2, Value::true_val());
+        assert_eq!(TailLoopTermination::Terminates, machine.tail_loop_terminates(&c, tail_loop.node()))
     }
 }
 
-// fn tc(hugr: &impl HugrView, node: Node) -> Vec<(Node, OutgoingPort, PartialValue)> {
-//     assert!(OpTag::DataflowParent.is_superset(hugr.get_optype(node).tag()));
-//     let d = DescendantsGraph::<'_, Node>::try_new(hugr, node).unwrap();
-//     let mut cache = ValueCache::new();
-
-//     let singleton_in_row = |n: &Node, ip: &IncomingPort, v: &PartialValue| -> ValueRow {
-//         ValueRow::singleton_from_row(&hugr.signature(*n).unwrap().input, ip.index(), v.clone())
-//     };
-
-//     let top_row = |n: &Node| -> ValueRow {
-//         ValueRow::top_from_row(&hugr.signature(*n).unwrap().input)
-//     };
-//     // ascent! {
-//     //     relation node(Node) = d.nodes().map(|x| (x,)).collect_vec();
-
-//     //     relation in_wire(Node, IncomingPort);
-//     //     in_wire(n,p) <-- node(n), for p in d.node_inputs(*n);
-
-//     //     relation out_wire(Node, OutgoingPort);
-//     //     out_wire(n,p) <-- node(n), for p in d.node_outputs(*n);
-
-//     //     lattice out_wire_value(Node, OutgoingPort, PartialValue);
-//     //     out_wire_value(n,p, PartialValue::Top) <-- out_wire(n,p);
-
-//     //     lattice node_in_value_row(Node, ValueRow);
-//     //     node_in_value_row(n, top_row(n)) <-- node(n);
-//     //     node_in_value_row(n, singleton_in_row(n,ip,v)) <-- in_wire(n, ip),
-//     //         if let Some((m,op)) = hugr.single_linked_output(*n, *ip),
-//     //         out_wire_value(m, op, v);
-
-//     //     lattice in_wire_value(Node, IncomingPort, PartialValue);
-//     //     in_wire_value(n,p,v) <-- node_in_value_row(n, vr), for (p,v) in vr.iter(hugr,*n);
-
-//     //     relation load_constant_node(Node);
-//     //     load_constant_node(n) <-- node(n), if hugr.get_optype(*n).is_load_constant();
-
-//     //     out_wire_value(n, 0.into(), PartialValue::from_load_constant(&mut cache, hugr, *n)) <--
-//     //         load_constant_node(n);
-
-//     //     relation make_tuple_node(Node);
-//     //     make_tuple_node(n) <-- node(n), if hugr.get_optype(*n).is_make_tuple();
-
-//     //     out_wire_value(n,0.into(), PartialValue::tuple_from_value_row(vs)) <--
-//     //         make_tuple_node(n), node_in_value_row(n, vs);
-
-//     // }.out_wire_value
-// }
