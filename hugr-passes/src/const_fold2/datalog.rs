@@ -24,6 +24,7 @@ ascent::ascent! {
     relation in_wire(C, Node, IncomingPort);
     relation out_wire(C, Node, OutgoingPort);
     relation parent_of_node(C, Node, Node);
+    relation out_wire_value_proto(Node, OutgoingPort, PV);
     lattice out_wire_value(C, Node, OutgoingPort, PV);
     lattice node_in_value_row(C, Node, ValueRow);
     lattice in_wire_value(C, Node, IncomingPort, PV);
@@ -40,6 +41,8 @@ ascent::ascent! {
     // All out wire values are initialised to Bottom. If any value is Bottom after
     // running we can infer that execution never reaches that value.
     out_wire_value(c, n,p, PV::bottom()) <-- out_wire(c, n,p);
+    out_wire_value(c, n, p, v) <-- out_wire(c,n,p) , out_wire_value_proto(n, p, v);
+
 
     in_wire_value(c, n, ip, v) <-- in_wire(c, n, ip),
         if let Some((m,op)) = c.hugr().single_linked_output(*n, *ip),
@@ -67,7 +70,10 @@ ascent::ascent! {
     relation unpack_tuple_node(C, Node);
     unpack_tuple_node(c,n) <-- node(c, n), if c.hugr().get_optype(*n).is_unpack_tuple();
 
-    out_wire_value(c, n, p, v.tuple_field_value(p.index())) <-- unpack_tuple_node(c, n), in_wire_value(c, n, IncomingPort::from(0), v), out_wire(c, n, p);
+    out_wire_value(c, n, p, v.tuple_field_value(p.index())) <--
+        unpack_tuple_node(c, n),
+        in_wire_value(c, n, IncomingPort::from(0), v),
+        out_wire(c, n, p);
 
     // DFG
     relation dfg_node(C, Node);
@@ -101,18 +107,59 @@ ascent::ascent! {
         tail_loop_io_node(c,tl,i, IO::Input),
         tail_loop_io_node(c,tl,o, IO::Output),
         in_wire_value(c, o, output_p, output_v),
-        for (input_p, v) in utils::tail_loop_worker(c, *tl, *output_p, 0, output_v);
+        if let Some(tailloop) = c.hugr().get_optype(*tl).as_tail_loop(),
+        let variant_len = tailloop.just_inputs.len(),
+        for (input_p, v) in utils::tail_loop_worker(*output_p, 0, variant_len, output_v);
+
     // Output node of child region propagate to outputs of tail loop
     out_wire_value(c, tl, p, v) <--
         tail_loop_io_node(c,tl,o, IO::Output),
         in_wire_value(c, o, output_p, output_v),
-        for (p, v) in utils::tail_loop_worker(c, *tl, *output_p, 1, output_v);
+        if let Some(tailloop) = c.hugr().get_optype(*tl).as_tail_loop(),
+        let variant_len = tailloop.just_outputs.len(),
+        for (p, v) in utils::tail_loop_worker(*output_p, 1, variant_len, output_v);
 
     lattice tail_loop_termination(C,Node,OrdLattice<TailLoopTermination>);
-    tail_loop_termination(c,tl,TailLoopTermination::NeverTerminates.into()) <-- tail_loop_node(c,tl);
-    tail_loop_termination(c,tl,TailLoopTermination::from_control_value(v).into()) <-- tail_loop_node(c,tl),
+    tail_loop_termination(c,tl,TailLoopTermination::NeverTerminates.into()) <--
+        tail_loop_node(c,tl);
+    tail_loop_termination(c,tl,TailLoopTermination::from_control_value(v).into()) <--
+        tail_loop_node(c,tl),
         tail_loop_io_node(c,tl,o, IO::Output),
         in_wire_value(c, o, Into::<IncomingPort>::into(0usize), v);
+
+    // Conditional
+    relation conditional_node(C, Node);
+    relation case_node(C,Node,usize, Node);
+    relation case_io_node(C, Node, Node, IO);
+
+    conditional_node (c,n)<-- node(c, n), if c.hugr().get_optype(*n).is_conditional();
+    case_node(c,cond,i, case) <-- conditional_node(c,cond),
+      for (i, case) in c.hugr().children(*cond).enumerate(),
+      if c.hugr().get_optype(case).is_case();
+    case_io_node(c,case, n, io) <-- case_node(c, _, _, case),
+        if let Some([i,o]) = c.hugr().get_io(*case),
+        for (n,io) in [(i,IO::Input), (o, IO::Output)];
+
+    // inputs of conditional propagate into case nodes
+    out_wire_value(c, i_node, i_p, v) <--
+      case_node(c, cond, case_index, case),
+      case_io_node(c, case, i_node, IO::Input),
+      in_wire_value(c, cond, cond_in_p, cond_in_v),
+      if let Some(conditional) = c.hugr().get_optype(*cond).as_conditional(),
+      let variant_len = conditional.sum_rows[*case_index].len(),
+      for (i_p, v) in utils::tail_loop_worker(*cond_in_p, *case_index, variant_len, cond_in_v);
+
+    // outputs of case nodes propagate to outputs of conditional
+    out_wire_value(c, cond, OutgoingPort::from(o_p.index()), v) <--
+      case_node(c, cond, _, case),
+      case_io_node(c, case, o, IO::Output),
+      in_wire_value(c, o, o_p, v);
+
+    lattice case_reachable(C, Node, Node, bool);
+    case_reachable(c, cond, case, reachable) <-- case_node(c,cond,i,case),
+        in_wire_value(c, cond, IncomingPort::from(0), v),
+        let reachable = v.supports_tag(*i);
+
 }
 
 struct Machine<'a, H: HugrView> {
@@ -126,6 +173,10 @@ impl<'a, H: HugrView> Machine<'a, H> {
             program: Default::default(),
             cache: ValueCache::new(),
         }
+    }
+
+    pub fn propolutate_out_wires(&mut self, wires: impl IntoIterator<Item=(Wire,PartialValue)>) {
+        self.program.out_wire_value_proto.extend(wires.into_iter().map(|(w,v)| (w.node(), w.source(), v.into())));
     }
 
     pub fn run_hugr(&mut self, hugr: &'a H) -> ArcDataflowContext<'a, H> {
@@ -172,6 +223,15 @@ impl<'a, H: HugrView> Machine<'a, H> {
             .iter()
             .find_map(|(c, n, v)| (c == context && n == &node).then_some(v.0.clone()))
             .unwrap()
+    }
+
+    pub fn case_reachable(&self,
+        context: &ArcDataflowContext<'a, H>,
+        case: Node,) -> bool {
+        assert!(context.get_optype(case).is_case());
+        let cond = context.hugr().get_parent(case).unwrap();
+        assert!(context.get_optype(cond).is_conditional());
+        self.program.case_reachable.iter().find_map(|(c,cond2,case2,i)| (c == context && &cond == cond2 && &case == case2).then_some(*i)).unwrap()
     }
 }
 

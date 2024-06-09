@@ -1,14 +1,8 @@
 use hugr_core::{
-    builder::{Container, DFGBuilder, Dataflow, HugrBuilder, SubContainer},
-    extension::{prelude::BOOL_T, EMPTY_REG},
-    ops::{handle::NodeHandle, OpTrait, UnpackTuple, Value},
-    type_row,
-    types::{FunctionType, SumType},
-    HugrView, OutgoingPort, Wire,
+    builder::{DFGBuilder, Dataflow, DataflowSubContainer, HugrBuilder, SubContainer}, extension::{prelude::BOOL_T, ExtensionSet, EMPTY_REG}, ops::{handle::NodeHandle, OpTrait, UnpackTuple, Value}, partial_value::PartialSum, type_row, types::{FunctionType, SumType}, Extension
 };
 
 use hugr_core::partial_value::PartialValue;
-use itertools::Itertools;
 
 use super::*;
 
@@ -168,4 +162,47 @@ fn test_tail_loop_iterates_twice() {
         TailLoopTermination::Terminates,
         machine.tail_loop_terminates(&c, tail_loop.node())
     )
+}
+
+#[test]
+fn conditional() {
+    let variants = vec![type_row![], type_row![], type_row![BOOL_T]];
+    let cond_t = Type::new_sum(variants.clone());
+    let mut builder = DFGBuilder::new(FunctionType::new(Into::<TypeRow>::into(cond_t),type_row![])).unwrap();
+    let [arg_w] = builder.input_wires_arr();
+
+    let true_w = builder.add_load_value(Value::true_val());
+    let false_w = builder.add_load_value(Value::false_val());
+
+    let mut cond_builder = builder.conditional_builder((variants, arg_w), [(BOOL_T,true_w)], type_row!(BOOL_T,BOOL_T), ExtensionSet::default()).unwrap();
+    // will be unreachable
+    let case1_b = cond_builder.case_builder(0).unwrap();
+    let case1 = case1_b.finish_with_outputs([false_w,false_w]).unwrap();
+
+    let case2_b = cond_builder.case_builder(1).unwrap();
+    let [c2a] = case2_b.input_wires_arr();
+    let case2 = case2_b.finish_with_outputs([false_w,c2a]).unwrap();
+
+    let case3_b = cond_builder.case_builder(2).unwrap();
+    let [c3_1,c3_2] = case3_b.input_wires_arr();
+    let case3 = case3_b.finish_with_outputs([c3_1,false_w]).unwrap();
+
+    let cond = cond_builder.finish_sub_container().unwrap();
+
+    let [cond_o1,cond_o2] = cond.outputs_arr();
+
+    let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
+
+    let mut machine = Machine::new();
+    let arg_pv = PartialValue::variant(1, []).join(PartialValue::variant(2,[PartialValue::variant(0,[])]));
+    machine.propolutate_out_wires([(arg_w, arg_pv)]);
+    let c = machine.run_hugr(&hugr);
+
+    let cond_r1 = machine.read_out_wire_value(&c, cond_o1).unwrap();
+    assert_eq!(cond_r1, Value::false_val());
+    assert!(machine.read_out_wire_value(&c, cond_o2).is_none());
+
+    assert!(!machine.case_reachable(&c, case1.node()));
+    assert!(machine.case_reachable(&c, case2.node()));
+    assert!(machine.case_reachable(&c, case3.node()));
 }
