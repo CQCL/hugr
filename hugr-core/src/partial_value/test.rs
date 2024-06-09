@@ -5,7 +5,11 @@ use lazy_static::lazy_static;
 use proptest::prelude::*;
 
 use crate::{
-    ops::Value, std_extensions::arithmetic::int_types::{self, get_log_width, ConstInt, INT_TYPES, LOG_WIDTH_BOUND}, types::{CustomType, Type, TypeEnum}
+    ops::Value,
+    std_extensions::arithmetic::int_types::{
+        self, get_log_width, ConstInt, INT_TYPES, LOG_WIDTH_BOUND,
+    },
+    types::{CustomType, Type, TypeEnum},
 };
 
 use super::{PartialSum, PartialValue, ValueHandle, ValueKey};
@@ -37,7 +41,7 @@ impl TestSumLeafType {
                     panic!("Expected int type, got {:#?}", t);
                 }
             }
-            _ => ()
+            _ => (),
         }
     }
 
@@ -64,13 +68,17 @@ impl TestSumLeafType {
     fn partial_value_strategy(self) -> impl Strategy<Value = PartialValue> {
         match self {
             Self::Int(t) => {
-                let TypeEnum::Extension(ct) = t.as_type_enum() else { unreachable!() };
+                let TypeEnum::Extension(ct) = t.as_type_enum() else {
+                    unreachable!()
+                };
                 let lw = get_log_width(&ct.args()[0]).unwrap();
-                (0u64..(1 << (2u64.pow(lw as u32) - 1))).prop_map(move |x| {
-                    let ki = ConstInt::new_u(lw, x).unwrap();
-                    ValueHandle::new(ValueKey::new(ki.clone()), Arc::new(ki.into())).into()
-                }).boxed()
-            },
+                (0u64..(1 << (2u64.pow(lw as u32) - 1)))
+                    .prop_map(move |x| {
+                        let ki = ConstInt::new_u(lw, x).unwrap();
+                        ValueHandle::new(ValueKey::new(ki.clone()), Arc::new(ki.into())).into()
+                    })
+                    .boxed()
+            }
             Self::Unit => Just(PartialSum::unit().into()).boxed(),
         }
     }
@@ -106,7 +114,7 @@ impl TestSumType {
             .map(|x| x.depth() + 1)
             .max()
             .unwrap_or(0);
-        Self::Branch(depth, vec.into()).into()
+        Self::Branch(depth, vec)
     }
 
     fn depth(&self) -> usize {
@@ -136,7 +144,7 @@ impl TestSumType {
         }
     }
 
-    fn select(self) -> impl Strategy<Value = Either<TestSumLeafType,(usize, Vec<Arc<Self>>)>> {
+    fn select(self) -> impl Strategy<Value = Either<TestSumLeafType, (usize, Vec<Arc<Self>>)>> {
         match self {
             TestSumType::Branch(_, sop) => any::<prop::sample::Index>()
                 .prop_map(move |i| {
@@ -171,13 +179,13 @@ impl TestSumType {
                     if prod.len() != v.len() {
                         return false;
                     }
-                    if !zip_eq(prod, v).all(|(lhs, rhs)| lhs.type_check(&rhs)) {
+                    if !zip_eq(prod, v).all(|(lhs, rhs)| lhs.type_check(rhs)) {
                         return false;
                     }
                 }
                 true
             }
-            (Self::Leaf(l), PartialValue::PartialSum(ps)) => l.type_check(&ps),
+            (Self::Leaf(l), PartialValue::PartialSum(ps)) => l.type_check(ps),
         }
     }
 }
@@ -252,7 +260,11 @@ fn any_partial_value_of_type(ust: TestSumType) -> impl Strategy<Value = PartialV
         Either::Right((index, usts)) => {
             let pvs = usts
                 .into_iter()
-                .map(|x| any_partial_value_of_type(Arc::<TestSumType>::unwrap_or_clone(x)))
+                .map(|x| {
+                    any_partial_value_of_type(
+                        Arc::<TestSumType>::try_unwrap(x).unwrap_or_else(|x| x.as_ref().clone()),
+                    )
+                })
                 .collect_vec();
             pvs.prop_map(move |pvs| PartialValue::variant(index, pvs))
                 .boxed()
@@ -304,25 +316,27 @@ proptest! {
 
     #[test]
     fn bounded_lattice(v in any_partial_value()) {
-        prop_assert!(&v <= &PartialValue::Top);
-        prop_assert!(&v >= &PartialValue::Bottom);
+        prop_assert!(v <= PartialValue::Top);
+        prop_assert!(v >= PartialValue::Bottom);
     }
 
     #[test]
-    fn lattice_changed(v1 in any_partial_value()) {
+    fn meet_join_self_noop(v1 in any_partial_value()) {
         let mut subject = v1.clone();
         assert!(!subject.join_mut(v1.clone()));
+        assert_eq!(subject, v1);
         assert!(!subject.meet_mut(v1.clone()));
+        assert_eq!(subject, v1);
     }
 
     #[test]
     fn lattice([v1,v2] in any_partial_values()) {
         let meet = v1.clone().meet(v2.clone());
-        prop_assert!(&meet <= &v1, "meet not less <=: {:#?}", &meet);
-        prop_assert!(&meet <= &v2, "meet not less <=: {:#?}", &meet);
+        prop_assert!(meet <= v1, "meet not less <=: {:#?}", &meet);
+        prop_assert!(meet <= v2, "meet not less <=: {:#?}", &meet);
 
         let join = v1.clone().join(v2.clone());
-        prop_assert!(&join >= &v1, "join not >=: {:#?}", &join);
-        prop_assert!(&join >= &v2, "join not >=: {:#?}", &join);
+        prop_assert!(join >= v1, "join not >=: {:#?}", &join);
+        prop_assert!(join >= v2, "join not >=: {:#?}", &join);
     }
 }
