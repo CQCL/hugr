@@ -216,43 +216,30 @@ pub(super) fn value_outputs(
     context.hugr().out_value_types(n).map(|x| x.0)
 }
 
+// TODO rename, this is about expanding input variants into output rows
 // todo this should work for dataflowblocks too
 pub(super) fn tail_loop_worker<'a>(
-    context: &'a impl DFContext,
-    n: Node,
     output_p: IncomingPort,
-    control_variant: usize,
+    variant_tag: usize,
+    variant_len: usize,
     v: &'a PV,
 ) -> impl Iterator<Item = (OutgoingPort, PV)> + 'a {
-    let tail_loop_op = context.hugr().get_optype(n).as_tail_loop().unwrap();
-    let num_variant_vals = if control_variant == 0 {
-        tail_loop_op.just_inputs.len()
-    } else {
-        tail_loop_op.just_outputs.len()
-    };
-    let hugr = context.hugr();
     if output_p.index() == 0 {
         Either::Left(
-            (0..num_variant_vals)
-                .map(move |i| (i.into(), v.variant_field_value(control_variant, i))),
+            (0..variant_len)
+                .map(move |i| (i.into(), v.variant_field_value(variant_tag, i))),
         )
     } else {
-        let v = if v.supports_tag(control_variant) {
+        let v = if v.supports_tag(variant_tag) {
             v.clone()
         } else {
             PV::bottom()
         };
         Either::Right(std::iter::once((
-            (num_variant_vals + output_p.index() - 1).into(),
+            (variant_len + output_p.index() - 1).into(),
             v,
         )))
     }
-    .inspect(move |x| {
-        assert!(matches!(
-            hugr.get_optype(n).port_kind(x.0),
-            Some(EdgeKind::Value(_))
-        ))
-    })
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone)]
