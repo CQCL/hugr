@@ -1,7 +1,7 @@
 use std::any::Any;
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::ops::Deref;
 use std::sync::Arc;
-use std::hash::{DefaultHasher, Hash, Hasher};
 
 use downcast_rs::Downcast;
 use itertools::Either;
@@ -69,8 +69,8 @@ impl Hash for ValueKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.0.hash(state);
         match &self.1 {
-            Either::Left(n) => (0,n).hash(state),
-            Either::Right(v) => (1,v.hash()).hash(state),
+            Either::Left(n) => (0, n).hash(state),
+            Either::Right(v) => (1, v.hash()).hash(state),
         }
     }
 }
@@ -82,7 +82,7 @@ impl From<Node> for ValueKey {
 }
 
 impl ValueKey {
-    pub fn new(k: impl ValueName) -> Self{
+    pub fn new(k: impl ValueName) -> Self {
         Self(vec![], Either::Right(Arc::new(k)))
     }
 
@@ -113,16 +113,24 @@ impl ValueHandle {
     }
 
     pub fn num_fields(&self) -> usize {
-        assert!(self.is_compound(), "ValueHandle::num_fields called on non-Sum, non-Tuple value: {:#?}", self);
+        assert!(
+            self.is_compound(),
+            "ValueHandle::num_fields called on non-Sum, non-Tuple value: {:#?}",
+            self
+        );
         match self.value() {
             Value::Sum { values, .. } => values.len(),
-            | Value::Tuple { vs } => vs.len(),
+            Value::Tuple { vs } => vs.len(),
             _ => unreachable!(),
         }
     }
 
     pub fn tag(&self) -> usize {
-        assert!(self.is_compound(), "ValueHandle::tag called on non-Sum, non-Tuple value: {:#?}", self);
+        assert!(
+            self.is_compound(),
+            "ValueHandle::tag called on non-Sum, non-Tuple value: {:#?}",
+            self
+        );
         match self.value() {
             Value::Sum { tag, .. } => *tag,
             Value::Tuple { .. } => 0,
@@ -131,11 +139,16 @@ impl ValueHandle {
     }
 
     pub fn index(self: &ValueHandle, i: usize) -> ValueHandle {
-        assert!(i < self.num_fields(), "ValueHandle::index called with out-of-bounds index {}: {:#?}", i, &self);
+        assert!(
+            i < self.num_fields(),
+            "ValueHandle::index called with out-of-bounds index {}: {:#?}",
+            i,
+            &self
+        );
         let vs = match self.value() {
             Value::Sum { values, .. } => values,
             Value::Tuple { vs, .. } => vs,
-            _ => unreachable!()
+            _ => unreachable!(),
         };
         let v = vs[i].clone().into();
         Self(self.0.clone().index(i), v)
@@ -196,23 +209,30 @@ mod test {
         let k5 = From::<Node>::from(portgraph::NodeIndex::new(1).into());
         let k6 = From::<Node>::from(portgraph::NodeIndex::new(2).into());
 
-        assert_eq!(&k4,&k5);
-        assert_ne!(&k4,&k6);
+        assert_eq!(&k4, &k5);
+        assert_ne!(&k4, &k6);
 
         let k7 = k5.clone().index(3);
         let k4 = k4.index(3);
 
-        assert_eq!(&k4,&k7);
+        assert_eq!(&k4, &k7);
 
         let k5 = k5.index(2);
 
-        assert_ne!(&k5,&k7);
+        assert_ne!(&k5, &k7);
     }
 
     #[test]
     fn value_handle_eq() {
-        let k_i = ConstInt::new_u(4,2).unwrap();
-        let subject_val = Arc::new(Value::sum(0, [k_i.clone().into()], SumType::new([vec![k_i.get_type()], vec![]])).unwrap());
+        let k_i = ConstInt::new_u(4, 2).unwrap();
+        let subject_val = Arc::new(
+            Value::sum(
+                0,
+                [k_i.clone().into()],
+                SumType::new([vec![k_i.get_type()], vec![]]),
+            )
+            .unwrap(),
+        );
 
         let k1 = ValueKey::new("foo".to_string());
         let v1 = ValueHandle::new(k1.clone(), subject_val.clone());

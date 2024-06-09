@@ -10,15 +10,16 @@ use crate::types::{Type, TypeEnum};
 
 mod value_handle;
 
-pub use value_handle::{ValueKey, ValueHandle};
-
+pub use value_handle::{ValueHandle, ValueKey};
 
 /// TODO shouldn't be pub
 #[derive(PartialEq, Clone, Eq)]
 pub struct PartialSum(HashMap<usize, Vec<PartialValue>>);
 
 impl PartialSum {
-    pub fn unit() -> Self { Self::variant(0,[]) }
+    pub fn unit() -> Self {
+        Self::variant(0, [])
+    }
     pub fn variant(tag: usize, values: impl IntoIterator<Item = PartialValue>) -> Self {
         Self([(tag, values.into_iter().collect())].into_iter().collect())
     }
@@ -55,15 +56,14 @@ impl PartialSum {
             Err(self)?
         };
         if v.len() != r.len() {
-            return Err(self)
+            return Err(self);
         }
         match zip_eq(v.into_iter(), r.into_iter())
             .map(|(v, t)| v.clone().try_into_value(t))
-            .collect::<Result<Vec<_>,_>>() {
-            Ok(vs) => {
-                Value::sum(*k, vs, st.clone()).map_err(|_| self)
-            }
-            Err(_) => Err(self)
+            .collect::<Result<Vec<_>, _>>()
+        {
+            Ok(vs) => Value::sum(*k, vs, st.clone()).map_err(|_| self),
+            Err(_) => Err(self),
         }
     }
 
@@ -180,7 +180,7 @@ impl TryFrom<ValueHandle> for PartialSum {
                     .collect();
                 return Ok(Self([(*tag, vec)].into_iter().collect()));
             }
-            _ => ()
+            _ => (),
         };
         Err(value)
     }
@@ -206,7 +206,6 @@ impl From<PartialSum> for PartialValue {
     }
 }
 
-
 impl PartialValue {
     // const BOTTOM: Self = Self::Bottom;
     // const BOTTOM_REF: &'static Self = &Self::BOTTOM;
@@ -230,7 +229,6 @@ impl PartialValue {
             _ => {}
         }
     }
-
 
     pub fn try_into_value(self, typ: &Type) -> Result<Value, Self> {
         let r = match self {
@@ -303,11 +301,13 @@ impl PartialValue {
     }
 
     fn value_handles_equal(&self, rhs: &ValueHandle) -> bool {
-        let Self::Value(lhs) = self else { unreachable!() };
+        let Self::Value(lhs) = self else {
+            unreachable!()
+        };
         lhs == rhs
-            // The following is a good idea if ValueHandle gains an Eq
-            // instance and so does not do this check:
-            // || lhs.value() == rhs.value()
+        // The following is a good idea if ValueHandle gains an Eq
+        // instance and so does not do this check:
+        // || lhs.value() == rhs.value()
     }
 
     pub fn join(mut self, other: Self) -> Self {
@@ -451,16 +451,14 @@ impl PartialValue {
     pub fn variant_field_value(&self, variant: usize, idx: usize) -> Self {
         match self {
             Self::Bottom => Self::Bottom,
-            Self::PartialSum(ps) => {
-                ps.variant_field_value(variant, idx)
-            }
+            Self::PartialSum(ps) => ps.variant_field_value(variant, idx),
             Self::Value(v) => {
                 if v.tag() == variant {
                     Self::Value(v.index(idx))
                 } else {
                     Self::Bottom
                 }
-            },
+            }
             Self::Top => Self::Top,
         }
     }
@@ -476,7 +474,9 @@ impl PartialOrd for PartialValue {
             (_, Self::Bottom) => Some(Ordering::Greater),
             (Self::Top, _) => Some(Ordering::Greater),
             (_, Self::Top) => Some(Ordering::Less),
-            (Self::Value(_), Self::Value(v2)) => self.value_handles_equal(v2).then_some(Ordering::Equal),
+            (Self::Value(_), Self::Value(v2)) => {
+                self.value_handles_equal(v2).then_some(Ordering::Equal)
+            }
             (Self::PartialSum(ps1), Self::PartialSum(ps2)) => ps1.partial_cmp(ps2),
             _ => None,
         }
