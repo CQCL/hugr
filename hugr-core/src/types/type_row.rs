@@ -184,11 +184,18 @@ impl<const RV: bool> From<&'static [Type<RV>]> for TypeRow<RV> {
     }
 }
 
-impl<const RV1: bool, const RV2:bool> From<Type<RV1>> for TypeRow<RV2> {
+impl<const RV1: bool> From<Type<RV1>> for TypeRow<true> {
     fn from(t: Type<RV1>) -> Self {
-        let _ = Implies::<RV1, RV2>::A_IMPLIES_B;
         Self {
             types: vec![t.into_()].into(),
+        }
+    }
+}
+
+impl From<Type> for TypeRow {
+    fn from(t: Type) -> Self {
+        Self {
+            types: vec![t].into()
         }
     }
 }
