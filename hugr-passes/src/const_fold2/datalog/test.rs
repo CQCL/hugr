@@ -86,7 +86,7 @@ fn test_tail_loop_never_iterates() {
     let o_r = machine.read_out_wire_value(&c, tl_o).unwrap();
     assert_eq!(o_r, r_v);
     assert_eq!(
-        TailLoopTermination::SingleIteration,
+        TailLoopTermination::ExactlyZeroContinues,
         machine.tail_loop_terminates(&c, tail_loop.node())
     )
 }
@@ -96,22 +96,29 @@ fn test_tail_loop_always_iterates() {
     let mut builder = DFGBuilder::new(FunctionType::new_endo(&[])).unwrap();
     let r_w = builder
         .add_load_value(Value::sum(0, [], SumType::new([type_row![], BOOL_T.into()])).unwrap());
+    let true_w = builder.add_load_value(Value::true_val());
+
     let tlb = builder
-        .tail_loop_builder([], [], vec![BOOL_T].into())
+        .tail_loop_builder([], [(BOOL_T,true_w)], vec![BOOL_T].into())
         .unwrap();
-    let tail_loop = tlb.finish_with_outputs(r_w, []).unwrap();
-    let [tl_o] = tail_loop.outputs_arr();
+
+    // r_w has tag 0, so we always continue;
+    // we put true in our "other_output", but we should not propagate this to
+    // output because r_w never supports 1.
+    let tail_loop = tlb.finish_with_outputs(r_w, [true_w]).unwrap();
+
+    let [tl_o1, tl_o2] = tail_loop.outputs_arr();
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
     let mut machine = Machine::new();
     let c = machine.run_hugr(&hugr);
-    // dbg!(&machine.tail_loop_io_node);
-    // dbg!(&machine.out_wire_value);
 
-    let o_r = machine.read_out_wire_partial_value(&c, tl_o).unwrap();
-    assert_eq!(o_r, PartialValue::Bottom);
+    let o_r1 = machine.read_out_wire_partial_value(&c, tl_o1).unwrap();
+    assert_eq!(o_r1, PartialValue::bottom());
+    let o_r2 = machine.read_out_wire_partial_value(&c, tl_o2).unwrap();
+    assert_eq!(o_r2, PartialValue::bottom());
     assert_eq!(
-        TailLoopTermination::NeverTerminates,
+        TailLoopTermination::bottom(),
         machine.tail_loop_terminates(&c, tail_loop.node())
     )
 }
@@ -146,20 +153,20 @@ fn test_tail_loop_iterates_twice() {
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
     // TODO once we can do conditionals put these wires inside `just_outputs` and
     // we should be able to propagate their values
-    // let [o_w1, o_w2, _] = tail_loop.outputs_arr();
+    let [o_w1, o_w2, _] = tail_loop.outputs_arr();
 
     let mut machine = Machine::new();
     let c = machine.run_hugr(&hugr);
     // dbg!(&machine.tail_loop_io_node);
     // dbg!(&machine.out_wire_value);
 
-    // TODO these hould be the propagated values
-    // let o_r1 = machine.read_out_wire_value(&c, o_w1).unwrap();
-    // assert_eq!(o_r1, Value::false_val());
-    // let o_r2 = machine.read_out_wire_value(&c, o_w2).unwrap();
+    // TODO these hould be the propagated values for now they will bt join(true,false)
+    let o_r1 = machine.read_out_wire_partial_value(&c, o_w1).unwrap();
+    // assert_eq!(o_r1, PartialValue::top());
+    let o_r2 = machine.read_out_wire_partial_value(&c, o_w2).unwrap();
     // assert_eq!(o_r2, Value::true_val());
     assert_eq!(
-        TailLoopTermination::Terminates,
+        TailLoopTermination::Top,
         machine.tail_loop_terminates(&c, tail_loop.node())
     )
 }

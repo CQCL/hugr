@@ -316,15 +316,19 @@ proptest! {
 
     #[test]
     fn bounded_lattice(v in any_partial_value()) {
-        prop_assert!(v <= PartialValue::Top);
-        prop_assert!(v >= PartialValue::Bottom);
+        prop_assert!(v <= PartialValue::top());
+        prop_assert!(v >= PartialValue::bottom());
     }
 
     #[test]
     fn meet_join_self_noop(v1 in any_partial_value()) {
         let mut subject = v1.clone();
+
+        assert_eq!(v1.clone(), v1.clone().join(v1.clone()));
         assert!(!subject.join_mut(v1.clone()));
         assert_eq!(subject, v1);
+
+        assert_eq!(v1.clone(), v1.clone().meet(v1.clone()));
         assert!(!subject.meet_mut(v1.clone()));
         assert_eq!(subject, v1);
     }
