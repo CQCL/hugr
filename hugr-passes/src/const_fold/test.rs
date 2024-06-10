@@ -231,7 +231,6 @@ fn orphan_output() {
     //
     // We arange things so that the `or` folds away first, leaving the not
     // with no outputs.
-    use hugr_core::hugr::NodeType;
     use hugr_core::ops::handle::NodeHandle;
 
     let mut build = DFGBuilder::new(FunctionType::new(type_row![], vec![BOOL_T])).unwrap();
@@ -252,7 +251,7 @@ fn orphan_output() {
 
     // we delete the original Not and create a new One. This means it will be
     // traversed by `constant_fold_pass` after the Or.
-    let new_not = h.add_node_with_parent(parent, NodeType::new_auto(NotOp));
+    let new_not = h.add_node_with_parent(parent, NotOp);
     h.connect(true_wire.node(), true_wire.source(), new_not, 0);
     h.disconnect(or_node, IncomingPort::from(1));
     h.connect(new_not, 0, or_node, 1);

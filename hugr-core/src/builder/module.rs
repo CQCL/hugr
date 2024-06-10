@@ -13,10 +13,8 @@ use crate::types::{PolyFuncType, Type, TypeBound};
 
 use crate::ops::handle::{AliasID, FuncID, NodeHandle};
 
-use crate::Node;
+use crate::{Hugr, Node};
 use smol_str::SmolStr;
-
-use crate::{hugr::NodeType, Hugr};
 
 /// Builder for a HUGR module.
 #[derive(Debug, Clone, PartialEq)]
@@ -86,13 +84,10 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
             .clone();
         let body = signature.body().clone();
         self.hugr_mut()
-            .replace_op(
-                f_node,
-                NodeType::new_pure(ops::FuncDefn { name, signature }),
-            )
+            .replace_op(f_node, ops::FuncDefn { name, signature })
             .expect("Replacing a FuncDecl node with a FuncDefn should always be valid");
 
-        let db = DFGBuilder::create_with_io(self.hugr_mut(), f_node, body, None)?;
+        let db = DFGBuilder::create_with_io(self.hugr_mut(), f_node, body)?;
         Ok(FunctionBuilder::from_dfg_builder(db))
     }
 
@@ -108,10 +103,10 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         signature: PolyFuncType,
     ) -> Result<FuncID<false>, BuildError> {
         // TODO add param names to metadata
-        let declare_n = self.add_child_node(NodeType::new_pure(ops::FuncDecl {
+        let declare_n = self.add_child_node(ops::FuncDecl {
             signature,
             name: name.into(),
-        }));
+        });
 
         Ok(declare_n.into())
     }

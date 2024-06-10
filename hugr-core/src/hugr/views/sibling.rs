@@ -381,9 +381,9 @@ mod test {
     use crate::builder::test::simple_dfg_hugr;
     use crate::builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder};
     use crate::extension::PRELUDE_REGISTRY;
-    use crate::hugr::NodeType;
     use crate::ops::handle::{CfgID, DataflowParentID, DfgID, FuncID};
     use crate::ops::{dataflow::IOTrait, Input, OpTag, Output};
+    use crate::ops::{OpTrait, OpType};
     use crate::type_row;
     use crate::types::{FunctionType, Type};
 
@@ -411,7 +411,7 @@ mod test {
         let mut module_builder = ModuleBuilder::new();
         let fty = FunctionType::new(type_row![NAT], type_row![NAT]);
         let mut fbuild = module_builder.define_function("main", fty.clone().into())?;
-        let dfg = fbuild.dfg_builder(fty, None, fbuild.input_wires())?;
+        let dfg = fbuild.dfg_builder(fty, fbuild.input_wires())?;
         let ins = dfg.input_wires();
         let sub_dfg = dfg.finish_with_outputs(ins)?;
         let fun = fbuild.finish_with_outputs(sub_dfg.outputs())?;
@@ -455,7 +455,7 @@ mod test {
         );
 
         let mut sib_mut = SiblingMut::<DfgID>::try_new(&mut simple_dfg_hugr, root).unwrap();
-        let bad_nodetype = NodeType::new_open(crate::ops::CFG { signature });
+        let bad_nodetype: OpType = crate::ops::CFG { signature }.into();
         assert_eq!(
             sib_mut.replace_op(sib_mut.root(), bad_nodetype.clone()),
             Err(HugrError::InvalidTag {
@@ -472,13 +472,13 @@ mod test {
     #[rstest]
     fn sibling_mut_covariance(mut simple_dfg_hugr: Hugr) {
         let root = simple_dfg_hugr.root();
-        let case_nodetype = NodeType::new_open(crate::ops::Case {
-            signature: simple_dfg_hugr.root_type().op_signature().unwrap(),
-        });
+        let case_nodetype = crate::ops::Case {
+            signature: simple_dfg_hugr.root_type().dataflow_signature().unwrap(),
+        };
         let mut sib_mut = SiblingMut::<DfgID>::try_new(&mut simple_dfg_hugr, root).unwrap();
         // As expected, we cannot replace the root with a Case
         assert_eq!(
-            sib_mut.replace_op(root, case_nodetype.clone()),
+            sib_mut.replace_op(root, case_nodetype),
             Err(HugrError::InvalidTag {
                 required: OpTag::Dfg,
                 actual: OpTag::Case

@@ -274,7 +274,7 @@ fn mono_fn_type(h: &Hugr) -> Result<FunctionType, ConstTypeError> {
         }
     }
     Err(ConstTypeError::NotMonomorphicFunction {
-        hugr_root_type: h.root_type().op().clone(),
+        hugr_root_type: h.root_type().clone(),
     })
 }
 

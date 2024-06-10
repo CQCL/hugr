@@ -5,7 +5,7 @@ use crate::builder::{
 };
 use crate::extension::prelude::{BOOL_T, PRELUDE_ID, QB_T, USIZE_T};
 use crate::extension::simple_op::MakeRegisteredOp;
-use crate::extension::{test::SimpleOpDef, EMPTY_REG, PRELUDE_REGISTRY};
+use crate::extension::{test::SimpleOpDef, ExtensionSet, EMPTY_REG, PRELUDE_REGISTRY};
 use crate::hugr::internal::HugrMutInternals;
 use crate::ops::custom::{ExtensionOp, OpaqueOp};
 use crate::ops::{self, dataflow::IOTrait, Input, Module, Noop, Output, Value, DFG};
@@ -226,11 +226,11 @@ fn simpleser() {
     let mut h = Hierarchy::new();
     let mut op_types = UnmanagedDenseMap::new();
 
-    op_types[root] = NodeType::new_open(gen_optype(&g, root));
+    op_types[root] = gen_optype(&g, root);
 
     for n in [a, b, c] {
         h.push_child(n, root).unwrap();
-        op_types[n] = NodeType::new_pure(gen_optype(&g, n));
+        op_types[n] = gen_optype(&g, n);
     }
 
     let hugr = Hugr {
@@ -469,7 +469,6 @@ fn roundtrip_polyfunctype(#[case] poly_func_type: PolyFuncType) {
 fn roundtrip_optype(#[case] optype: impl Into<OpType> + std::fmt::Debug) {
     check_testing_roundtrip(NodeSer {
         parent: portgraph::NodeIndex::new(0).into(),
-        input_extensions: None,
         op: optype.into(),
     });
 }
@@ -477,7 +476,6 @@ fn roundtrip_optype(#[case] optype: impl Into<OpType> + std::fmt::Debug) {
 mod proptest {
     use super::check_testing_roundtrip;
     use super::{NodeSer, SimpleOpDef};
-    use crate::extension::ExtensionSet;
     use crate::ops::{OpType, Value};
     use crate::types::{PolyFuncType, Type};
     use proptest::prelude::*;
@@ -488,14 +486,9 @@ mod proptest {
         fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
             (
                 (0..i32::MAX as usize).prop_map(|x| portgraph::NodeIndex::new(x).into()),
-                any::<Option<ExtensionSet>>(),
                 any::<OpType>(),
             )
-                .prop_map(|(parent, input_extensions, op)| NodeSer {
-                    parent,
-                    input_extensions,
-                    op,
-                })
+                .prop_map(|(parent, op)| NodeSer { parent, op })
                 .boxed()
         }
     }

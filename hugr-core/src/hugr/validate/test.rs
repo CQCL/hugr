@@ -77,7 +77,7 @@ fn invalid_root() {
         Err(ValidationError::NoParent { node }) => assert_eq!(node, other)
     );
     b.set_parent(other, root);
-    b.replace_op(other, NodeType::new_pure(declare_op)).unwrap();
+    b.replace_op(other, declare_op).unwrap();
     b.add_ports(other, Direction::Outgoing, 1);
     assert_eq!(b.validate(&EMPTY_REG), Ok(()));
 
@@ -96,7 +96,7 @@ fn invalid_root() {
 fn leaf_root() {
     let leaf_op: OpType = Noop { ty: USIZE_T }.into();
 
-    let b = Hugr::new(NodeType::new_pure(leaf_op));
+    let b = Hugr::new(leaf_op);
     assert_eq!(b.validate(&EMPTY_REG), Ok(()));
 }
 
@@ -107,7 +107,7 @@ fn dfg_root() {
     }
     .into();
 
-    let mut b = Hugr::new(NodeType::new_pure(dfg_op));
+    let mut b = Hugr::new(dfg_op);
     let root = b.root();
     add_df_children(&mut b, root, 1);
     assert_eq!(b.update_validate(&EMPTY_REG), Ok(()));
@@ -175,36 +175,26 @@ fn df_children_restrictions() {
         .unwrap();
 
     // Replace the output operation of the df subgraph with a copy
-    b.replace_op(output, NodeType::new_pure(Noop { ty: NAT }))
-        .unwrap();
+    b.replace_op(output, Noop { ty: NAT }).unwrap();
     assert_matches!(
         b.validate(&EMPTY_REG),
         Err(ValidationError::InvalidInitialChild { parent, .. }) => assert_eq!(parent, def)
     );
 
     // Revert it back to an output, but with the wrong number of ports
-    b.replace_op(
-        output,
-        NodeType::new_pure(ops::Output::new(type_row![BOOL_T])),
-    )
-    .unwrap();
+    b.replace_op(output, ops::Output::new(type_row![BOOL_T]))
+        .unwrap();
     assert_matches!(
         b.validate(&EMPTY_REG),
         Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::IOSignatureMismatch { child, .. }, .. })
             => {assert_eq!(parent, def); assert_eq!(child, output.pg_index())}
     );
-    b.replace_op(
-        output,
-        NodeType::new_pure(ops::Output::new(type_row![BOOL_T, BOOL_T])),
-    )
-    .unwrap();
+    b.replace_op(output, ops::Output::new(type_row![BOOL_T, BOOL_T]))
+        .unwrap();
 
     // After fixing the output back, replace the copy with an output op
-    b.replace_op(
-        copy,
-        NodeType::new_pure(ops::Output::new(type_row![BOOL_T, BOOL_T])),
-    )
-    .unwrap();
+    b.replace_op(copy, ops::Output::new(type_row![BOOL_T, BOOL_T]))
+        .unwrap();
     assert_matches!(
         b.validate(&EMPTY_REG),
         Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::InternalIOChildren { child, .. }, .. })
@@ -265,7 +255,6 @@ fn no_ext_edge_into_func() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut dfg = h.dfg_builder(
         FunctionType::new(vec![], Type::new_function(b2b.clone())),
-        None,
         [],
     )?;
     let mut func = dfg.define_function("AndWithOuter", b2b.clone().into())?;
@@ -879,9 +868,9 @@ fn cfg_children_restrictions() {
     b.validate(&EMPTY_REG).unwrap();
     b.replace_op(
         copy,
-        NodeType::new_pure(ops::CFG {
+        ops::CFG {
             signature: FunctionType::new(type_row![BOOL_T], type_row![BOOL_T]),
-        }),
+        },
     )
     .unwrap();
     assert_matches!(
@@ -942,25 +931,22 @@ fn cfg_children_restrictions() {
     // Change the types in the BasicBlock node to work on qubits instead of bits
     b.replace_op(
         block,
-        NodeType::new_pure(ops::DataflowBlock {
+        ops::DataflowBlock {
             inputs: type_row![QB_T],
             sum_rows: vec![type_row![]],
             other_outputs: type_row![QB_T],
             extension_delta: ExtensionSet::new(),
-        }),
+        },
     )
     .unwrap();
     let mut block_children = b.hierarchy.children(block.pg_index());
     let block_input = block_children.next().unwrap().into();
     let block_output = block_children.next_back().unwrap().into();
-    b.replace_op(
-        block_input,
-        NodeType::new_pure(ops::Input::new(type_row![QB_T])),
-    )
-    .unwrap();
+    b.replace_op(block_input, ops::Input::new(type_row![QB_T]))
+        .unwrap();
     b.replace_op(
         block_output,
-        NodeType::new_pure(ops::Output::new(type_row![Type::new_unit_sum(1), QB_T])),
+        ops::Output::new(type_row![Type::new_unit_sum(1), QB_T]),
     )
     .unwrap();
     assert_matches!(
@@ -1035,30 +1021,27 @@ mod extension_tests {
         let parent = parent_f(
             FunctionType::new_endo(USIZE_T).with_extension_delta(parent_extensions.clone()),
         );
-        let mut hugr = Hugr::new(NodeType::new_pure(parent));
+        let mut hugr = Hugr::new(parent);
 
         let input = hugr.add_node_with_parent(
             hugr.root(),
-            NodeType::new_pure(ops::Input {
+            ops::Input {
                 types: type_row![USIZE_T],
-            }),
+            },
         );
         let output = hugr.add_node_with_parent(
             hugr.root(),
-            NodeType::new(
-                ops::Output {
-                    types: type_row![USIZE_T],
-                },
-                Some(XB.into()),
-            ),
+            ops::Output {
+                types: type_row![USIZE_T],
+            },
         );
 
         let lift = hugr.add_node_with_parent(
             hugr.root(),
-            NodeType::new_pure(ops::Lift {
+            ops::Lift {
                 type_row: type_row![USIZE_T],
                 new_extension: XB,
-            }),
+            },
         );
 
         hugr.connect(input, 0, lift, 0);
@@ -1127,7 +1110,7 @@ mod extension_tests {
             outputs: type_row![USIZE_T],
             extension_delta: parent_extensions.clone(),
         };
-        let mut hugr = Hugr::new(NodeType::new_pure(parent));
+        let mut hugr = Hugr::new(parent.into());
 
         // First case with no delta should be ok in all cases. Second one may not be.
         let [_, child] = [None, Some(XB)].map(|case_ext| {
@@ -1142,28 +1125,25 @@ mod extension_tests {
 
             let input = hugr.add_node_with_parent(
                 case,
-                NodeType::new_pure(ops::Input {
+                ops::Input {
                     types: type_row![USIZE_T],
-                }),
+                },
             );
             let output = hugr.add_node_with_parent(
                 case,
-                NodeType::new(
-                    ops::Output {
-                        types: type_row![USIZE_T],
-                    },
-                    Some(case_exts),
-                ),
+                ops::Output {
+                    types: type_row![USIZE_T],
+                },
             );
             let res = match case_ext {
                 None => input,
                 Some(new_ext) => {
                     let lift = hugr.add_node_with_parent(
                         case,
-                        NodeType::new_pure(ops::Lift {
+                        ops::Lift {
                             type_row: type_row![USIZE_T],
                             new_extension: new_ext,
-                        }),
+                        },
                     );
                     hugr.connect(input, 0, lift, 0);
                     lift
@@ -1227,7 +1207,7 @@ mod extension_tests {
     }
 
     fn make_bb(t: Type, es: ExtensionSet) -> DFGWrapper<Hugr, BasicBlockID> {
-        BlockBuilder::new(t.clone(), None, vec![t.into()], type_row![], es).unwrap()
+        BlockBuilder::new(t.clone(), vec![t.into()], type_row![], es).unwrap()
     }
 
     fn make_tailloop(t: Type, es: ExtensionSet) -> DFGWrapper<Hugr, BuildHandle<TailLoopID>> {

@@ -16,11 +16,7 @@ use super::{
 };
 
 use crate::Node;
-use crate::{
-    extension::ExtensionSet,
-    hugr::{HugrMut, NodeType},
-    Hugr,
-};
+use crate::{extension::ExtensionSet, hugr::HugrMut, Hugr};
 
 use std::collections::HashSet;
 
@@ -139,7 +135,6 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> ConditionalBuilder<B> {
             self.hugr_mut(),
             case_node,
             FunctionType::new(inputs, outputs).with_extension_delta(extension_delta),
-            None,
         )?;
 
         Ok(CaseBuilder::from_dfg_builder(dfg_builder))
@@ -177,8 +172,7 @@ impl ConditionalBuilder<Hugr> {
             outputs,
             extension_delta,
         };
-        // TODO: Allow input extensions to be specified
-        let base = Hugr::new(NodeType::new_open(op));
+        let base = Hugr::new(op.into());
         let conditional_node = base.root();
 
         Ok(ConditionalBuilder {
@@ -196,9 +190,9 @@ impl CaseBuilder<Hugr> {
         let op = ops::Case {
             signature: signature.clone(),
         };
-        let base = Hugr::new(NodeType::new_open(op));
+        let base = Hugr::new(op.into());
         let root = base.root();
-        let dfg_builder = DFGBuilder::create_with_io(base, root, signature, None)?;
+        let dfg_builder = DFGBuilder::create_with_io(base, root, signature)?;
 
         Ok(CaseBuilder::from_dfg_builder(dfg_builder))
     }

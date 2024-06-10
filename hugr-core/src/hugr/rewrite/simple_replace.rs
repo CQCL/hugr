@@ -244,7 +244,6 @@ pub(in crate::hugr::rewrite) mod test {
 
             let mut inner_builder = func_builder.dfg_builder(
                 FunctionType::new(type_row![QB, QB], type_row![QB, QB]),
-                None,
                 [qb0, qb1],
             )?;
             let inner_graph = {

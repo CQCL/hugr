@@ -7,7 +7,7 @@ use portgraph::view::{NodeFilter, NodeFiltered};
 use portgraph::{LinkMut, NodeIndex, PortMut, PortView, SecondaryMap};
 
 use crate::hugr::views::SiblingSubgraph;
-use crate::hugr::{HugrView, Node, NodeType, RootTagged};
+use crate::hugr::{HugrView, Node, OpType, RootTagged};
 use crate::hugr::{NodeMetadata, Rewrite};
 use crate::{Hugr, IncomingPort, OutgoingPort, Port, PortIndex};
 
@@ -74,7 +74,7 @@ pub trait HugrMut: HugrMutInternals {
     ///
     /// If the parent is not in the graph.
     #[inline]
-    fn add_node_with_parent(&mut self, parent: Node, op: impl Into<NodeType>) -> Node {
+    fn add_node_with_parent(&mut self, parent: Node, op: impl Into<OpType>) -> Node {
         panic_invalid_node(self, parent);
         self.hugr_mut().add_node_with_parent(parent, op)
     }
@@ -87,7 +87,7 @@ pub trait HugrMut: HugrMutInternals {
     ///
     /// If the sibling is not in the graph, or if the sibling is the root node.
     #[inline]
-    fn add_node_before(&mut self, sibling: Node, nodetype: impl Into<NodeType>) -> Node {
+    fn add_node_before(&mut self, sibling: Node, nodetype: impl Into<OpType>) -> Node {
         panic_invalid_non_root(self, sibling);
         self.hugr_mut().add_node_before(sibling, nodetype)
     }
@@ -100,7 +100,7 @@ pub trait HugrMut: HugrMutInternals {
     ///
     /// If the sibling is not in the graph, or if the sibling is the root node.
     #[inline]
-    fn add_node_after(&mut self, sibling: Node, op: impl Into<NodeType>) -> Node {
+    fn add_node_after(&mut self, sibling: Node, op: impl Into<OpType>) -> Node {
         panic_invalid_non_root(self, sibling);
         self.hugr_mut().add_node_after(sibling, op)
     }
@@ -237,7 +237,7 @@ fn translate_indices(node_map: HashMap<NodeIndex, NodeIndex>) -> HashMap<Node, N
 
 /// Impl for non-wrapped Hugrs. Overwrites the recursive default-impls to directly use the hugr.
 impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMut for T {
-    fn add_node_with_parent(&mut self, parent: Node, node: impl Into<NodeType>) -> Node {
+    fn add_node_with_parent(&mut self, parent: Node, node: impl Into<OpType>) -> Node {
         let node = self.as_mut().add_node(node.into());
         self.as_mut()
             .hierarchy
@@ -246,7 +246,7 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMut for T {
         node
     }
 
-    fn add_node_before(&mut self, sibling: Node, nodetype: impl Into<NodeType>) -> Node {
+    fn add_node_before(&mut self, sibling: Node, nodetype: impl Into<OpType>) -> Node {
         let node = self.as_mut().add_node(nodetype.into());
         self.as_mut()
             .hierarchy
@@ -255,7 +255,7 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMut for T {
         node
     }
 
-    fn add_node_after(&mut self, sibling: Node, op: impl Into<NodeType>) -> Node {
+    fn add_node_after(&mut self, sibling: Node, op: impl Into<OpType>) -> Node {
         let node = self.as_mut().add_node(op.into());
         self.as_mut()
             .hierarchy
@@ -341,7 +341,7 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMut for T {
         let (new_root, node_map) = insert_hugr_internal(self.as_mut(), root, other);
         // Update the optypes and metadata, copying them from the other graph.
         for (&node, &new_node) in node_map.iter() {
-            let nodetype = other.get_nodetype(node.into());
+            let nodetype = other.get_optype(node.into());
             self.as_mut().op_types.set(new_node, nodetype.clone());
             let meta = other.base_hugr().metadata.get(node);
             self.as_mut().metadata.set(new_node, meta.clone());
@@ -372,7 +372,7 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMut for T {
         let node_map = insert_subgraph_internal(self.as_mut(), root, other, &portgraph);
         // Update the optypes and metadata, copying them from the other graph.
         for (&node, &new_node) in node_map.iter() {
-            let nodetype = other.get_nodetype(node.into());
+            let nodetype = other.get_optype(node.into());
             self.as_mut().op_types.set(new_node, nodetype.clone());
             let meta = other.base_hugr().metadata.get(node);
             self.as_mut().metadata.set(new_node, meta.clone());
@@ -534,8 +534,7 @@ mod test {
         );
 
         {
-            let f_in =
-                hugr.add_node_with_parent(f, NodeType::new_pure(ops::Input::new(type_row![NAT])));
+            let f_in = hugr.add_node_with_parent(f, ops::Input::new(type_row![NAT]));
             let f_out = hugr.add_node_with_parent(f, ops::Output::new(type_row![NAT, NAT]));
             let noop = hugr.add_node_with_parent(f, Noop { ty: NAT });
 

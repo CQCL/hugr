@@ -455,7 +455,7 @@ mod test {
     };
     use crate::hugr::internal::HugrMutInternals;
     use crate::hugr::rewrite::replace::WhichHugr;
-    use crate::hugr::{HugrMut, NodeType, Rewrite};
+    use crate::hugr::{HugrMut, Rewrite};
     use crate::ops::custom::{CustomOp, OpaqueOp};
     use crate::ops::dataflow::DataflowOpTrait;
     use crate::ops::handle::{BasicBlockID, ConstID, NodeHandle};
@@ -523,9 +523,12 @@ mod test {
 
         // Replacement: one BB with two DFGs inside.
         // Use Hugr rather than Builder because DFGs must be empty (not even Input/Output).
-        let mut replacement = Hugr::new(NodeType::new_open(ops::CFG {
-            signature: FunctionType::new_endo(just_list.clone()),
-        }));
+        let mut replacement = Hugr::new(
+            ops::CFG {
+                signature: FunctionType::new_endo(just_list.clone()),
+            }
+            .into(),
+        );
         let r_bb = replacement.add_node_with_parent(
             replacement.root(),
             DataflowBlock {
@@ -676,14 +679,14 @@ mod test {
         let case1 = case1.finish_with_outputs(foo.outputs())?.node();
         let mut case2 = cond.case_builder(1)?;
         let bar = case2.add_dataflow_op(mk_op("bar"), case2.input_wires())?;
-        let mut baz_dfg = case2.dfg_builder(utou.clone(), None, bar.outputs())?;
+        let mut baz_dfg = case2.dfg_builder(utou.clone(), bar.outputs())?;
         let baz = baz_dfg.add_dataflow_op(mk_op("baz"), baz_dfg.input_wires())?;
         let baz_dfg = baz_dfg.finish_with_outputs(baz.outputs())?;
         let case2 = case2.finish_with_outputs(baz_dfg.outputs())?.node();
         let cond = cond.finish_sub_container()?;
         let h = h.finish_hugr_with_outputs(cond.outputs(), &PRELUDE_REGISTRY)?;
 
-        let mut r_hugr = Hugr::new(NodeType::new_open(h.get_optype(cond.node()).clone()));
+        let mut r_hugr = Hugr::new(h.get_optype(cond.node()).clone());
         let r1 = r_hugr.add_node_with_parent(
             r_hugr.root(),
             Case {

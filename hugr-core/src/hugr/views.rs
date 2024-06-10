@@ -26,8 +26,7 @@ use portgraph::{multiportgraph, LinkView, PortView};
 
 use super::internal::HugrInternals;
 use super::{
-    Hugr, HugrError, HugrMut, NodeMetadata, NodeMetadataMap, NodeType, ValidationError,
-    DEFAULT_NODETYPE,
+    Hugr, HugrError, HugrMut, NodeMetadata, NodeMetadataMap, ValidationError, DEFAULT_OPTYPE,
 };
 use crate::extension::ExtensionRegistry;
 use crate::ops::handle::NodeHandle;
@@ -80,8 +79,8 @@ pub trait HugrView: HugrInternals {
 
     /// Return the type of the HUGR root node.
     #[inline]
-    fn root_type(&self) -> &NodeType {
-        let node_type = self.get_nodetype(self.root());
+    fn root_type(&self) -> &OpType {
+        let node_type = self.get_optype(self.root());
         // Sadly no way to do this at present
         // debug_assert!(Self::RootHandle::can_hold(node_type.tag()));
         node_type
@@ -119,15 +118,9 @@ pub trait HugrView: HugrInternals {
     /// Returns the operation type of a node.
     #[inline]
     fn get_optype(&self, node: Node) -> &OpType {
-        &self.get_nodetype(node).op
-    }
-
-    /// Returns the type of a node.
-    #[inline]
-    fn get_nodetype(&self, node: Node) -> &NodeType {
         match self.contains_node(node) {
             true => self.base_hugr().op_types.get(node.pg_index()),
-            false => &DEFAULT_NODETYPE,
+            false => &DEFAULT_OPTYPE,
         }
     }
 
@@ -323,8 +316,8 @@ pub trait HugrView: HugrInternals {
     /// If the node isn't a dataflow parent, then return None
     #[inline]
     fn get_io(&self, node: Node) -> Option<[Node; 2]> {
-        let op = self.get_nodetype(node);
-        // Nodes outside the view have no children (and a non-DataflowParent NodeType::default())
+        let op = self.get_optype(node);
+        // Nodes outside the view have no children (and a non-DataflowParent OpType::default())
         if OpTag::DataflowParent.is_superset(op.tag()) {
             self.children(node).take(2).collect_vec().try_into().ok()
         } else {

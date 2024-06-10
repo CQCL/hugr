@@ -12,7 +12,7 @@ use {
 
 use crate::extension::{ConstFoldResult, ExtensionId, ExtensionRegistry, OpDef, SignatureError};
 use crate::hugr::internal::HugrMutInternals;
-use crate::hugr::{HugrView, NodeType};
+use crate::hugr::HugrView;
 use crate::types::EdgeKind;
 use crate::types::{type_param::TypeArg, FunctionType};
 use crate::{ops, Hugr, IncomingPort, Node};
@@ -362,10 +362,9 @@ pub fn resolve_extension_ops(
     }
     // Only now can we perform the replacements as the 'for' loop was borrowing 'h' preventing use from using it mutably
     for (n, op) in replacements {
-        let node_type = NodeType::new(op, h.get_nodetype(n).input_extensions().cloned());
         debug_assert_eq!(h.get_optype(n).tag(), OpTag::Leaf);
-        debug_assert_eq!(node_type.tag(), OpTag::Leaf);
-        h.replace_op(n, node_type).unwrap();
+        debug_assert_eq!(op.tag(), OpTag::Leaf);
+        h.replace_op(n, op).unwrap();
     }
     Ok(())
 }
