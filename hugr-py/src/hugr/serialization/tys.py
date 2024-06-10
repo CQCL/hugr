@@ -368,6 +368,7 @@ class Signature(ConfiguredBaseModel):
 
     # ALAN is it worth keeping this now/still? (Also, surprised this is "Poly"...??)
 
+
 # Now that all classes are defined, we need to update the ForwardRefs in all type
 # annotations. We use some inspect magic to find all classes defined in this file
 # and call model_rebuild()
