@@ -255,13 +255,6 @@ impl TryFrom<FunctionType> for Signature {
     }
 }
 
-impl From<Signature> for FunctionType {
-    fn from(value: Signature) -> Self {
-        Self::new(value.input.into_(), value.output.into_())
-            .with_extension_delta(value.extension_reqs)
-    }
-}
-
 impl PartialEq<FunctionType> for Signature {
     fn eq(&self, other: &FunctionType) -> bool {
         self.input == other.input

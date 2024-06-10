@@ -53,7 +53,7 @@ impl From<PolyFuncType<false>> for PolyFuncType<true> {
     fn from(value: PolyFuncType<false>) -> Self {
         Self {
             params: value.params,
-            body: value.body.into()
+            body: value.body.into_()
         }
     }
 }

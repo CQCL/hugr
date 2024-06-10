@@ -268,7 +268,7 @@ impl DataflowOpTrait for CallIndirect {
         let mut s = self.signature.clone();
         s.input
             .to_mut()
-            .insert(0, Type::new_function(self.signature.clone()));
+            .insert(0, Type::new_function(self.signature.clone().into_()));
         s
     }
 }
@@ -360,7 +360,7 @@ impl LoadFunction {
         exts: &ExtensionRegistry,
     ) -> Result<Self, SignatureError> {
         let type_args = type_args.into();
-        let instantiation = func_sig.instantiate(&type_args, exts)?;
+        let instantiation = func_sig.instantiate(&type_args, exts)?.into_();
         let signature = FunctionType::new(TypeRow::new(), vec![Type::new_function(instantiation)]);
         Ok(Self {
             func_sig,

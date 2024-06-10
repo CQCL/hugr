@@ -287,7 +287,7 @@ impl Value {
             Self::Sum { sum_type, .. } => sum_type.clone().into(),
             Self::Function { hugr } => {
                 let func_type = mono_fn_type(hugr).unwrap_or_else(|e| panic!("{}", e));
-                Type::new_function(func_type)
+                Type::new_function(func_type.into_())
             }
         }
     }
