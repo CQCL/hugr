@@ -58,6 +58,10 @@ ascent::ascent! {
     node_in_value_row(c, n, utils::singleton_in_row(c, n, p, v.clone())) <-- in_wire_value(c, n, p, v);
 
 
+    // Per node-type rules
+    // TODO do all leaf ops with a rule
+    // define `fn propagate_leaf_op(Context, Node, ValueRow) -> ValueRow
+
     // LoadConstant
     relation load_constant_node(C, Node);
     load_constant_node(c, n) <-- node(c, n), if c.hugr().get_optype(*n).is_load_constant();
@@ -104,29 +108,35 @@ ascent::ascent! {
         io_node(c,tl,i, IO::Input), in_wire_value(c, tl, p, v);
 
     // Output node of child region propagate to Input node of child region
-    out_wire_value(c, i, input_p, v) <-- tail_loop_node(c, tl),
-        io_node(c,tl,i, IO::Input),
-        io_node(c,tl,o, IO::Output),
-        in_wire_value(c, o, output_p, output_v),
-        if let Some(tailloop) = c.hugr().get_optype(*tl).as_tail_loop(),
+    out_wire_value(c, in_n, out_p, v) <-- tail_loop_node(c, tl_n),
+        io_node(c,tl_n,in_n, IO::Input),
+        io_node(c,tl_n,out_n, IO::Output),
+        node_in_value_row(c, out_n, out_in_row), // get the whole input row for the output node
+        if out_in_row[0].supports_tag(0), // if it is possible for tag to be 0
+        if let Some(tailloop) = c.hugr().get_optype(*tl_n).as_tail_loop(),
         let variant_len = tailloop.just_inputs.len(),
-        for (input_p, v) in utils::tail_loop_worker(*output_p, 0, variant_len, output_v);
+        for (out_p, v) in out_in_row.iter(c, *out_n).flat_map(
+            |(input_p, v)| utils::outputs_for_variant(input_p, 0, variant_len, v)
+        );
 
     // Output node of child region propagate to outputs of tail loop
-    out_wire_value(c, tl, p, v) <-- tail_loop_node(c, tl),
-        io_node(c,tl,o, IO::Output),
-        in_wire_value(c, o, output_p, output_v),
-        if let Some(tailloop) = c.hugr().get_optype(*tl).as_tail_loop(),
+    out_wire_value(c, tl_n, out_p, v) <-- tail_loop_node(c, tl_n),
+        io_node(c,tl_n,out_n, IO::Output),
+        node_in_value_row(c, out_n, out_in_row), // get the whole input row for the output node
+        if out_in_row[0].supports_tag(1), // if it is possible for the tag to be 1
+        if let Some(tailloop) = c.hugr().get_optype(*tl_n).as_tail_loop(),
         let variant_len = tailloop.just_outputs.len(),
-        for (p, v) in utils::tail_loop_worker(*output_p, 1, variant_len, output_v);
+        for (out_p, v) in out_in_row.iter(c, *out_n).flat_map(
+            |(input_p, v)| utils::outputs_for_variant(input_p, 1, variant_len, v)
+        );
 
-    lattice tail_loop_termination(C,Node,OrdLattice<TailLoopTermination>);
-    tail_loop_termination(c,tl,TailLoopTermination::NeverTerminates.into()) <--
-        tail_loop_node(c,tl);
-    tail_loop_termination(c,tl,TailLoopTermination::from_control_value(v).into()) <--
-        tail_loop_node(c,tl),
-        io_node(c,tl,o, IO::Output),
-        in_wire_value(c, o, Into::<IncomingPort>::into(0usize), v);
+    lattice tail_loop_termination(C,Node,TailLoopTermination);
+    tail_loop_termination(c,tl_n,TailLoopTermination::bottom()) <--
+        tail_loop_node(c,tl_n);
+    tail_loop_termination(c,tl_n,TailLoopTermination::from_control_value(v)) <--
+        tail_loop_node(c,tl_n),
+        io_node(c,tl,out_n, IO::Output),
+        in_wire_value(c, out_n, IncomingPort::from(0), v);
 
 
     // Conditional
@@ -145,7 +155,7 @@ ascent::ascent! {
       in_wire_value(c, cond, cond_in_p, cond_in_v),
       if let Some(conditional) = c.hugr().get_optype(*cond).as_conditional(),
       let variant_len = conditional.sum_rows[*case_index].len(),
-      for (i_p, v) in utils::tail_loop_worker(*cond_in_p, *case_index, variant_len, cond_in_v);
+      for (i_p, v) in utils::outputs_for_variant(*cond_in_p, *case_index, variant_len, cond_in_v);
 
     // outputs of case nodes propagate to outputs of conditional
     out_wire_value(c, cond, OutgoingPort::from(o_p.index()), v) <--
@@ -219,7 +229,7 @@ impl<'a, H: HugrView> Machine<'a, H> {
         self.program
             .tail_loop_termination
             .iter()
-            .find_map(|(c, n, v)| (c == context && n == &node).then_some(v.0.clone()))
+            .find_map(|(c, n, v)| (c == context && n == &node).then_some(*v))
             .unwrap()
     }
 
