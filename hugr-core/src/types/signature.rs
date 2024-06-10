@@ -257,7 +257,7 @@ impl TryFrom<FunctionType> for Signature {
 
 impl From<Signature> for FunctionType {
     fn from(value: Signature) -> Self {
-        Self::new(value.input, value.output)
+        Self::new(value.input.into_(), value.output.into_())
             .with_extension_delta(value.extension_reqs)
     }
 }
@@ -277,11 +277,11 @@ mod test {
     use super::*;
     #[test]
     fn test_function_type() {
-        let mut f_type = FunctionType::new(Type::UNIT, Type::UNIT);
+        let mut f_type = FunctionType::new(Type::<false>::UNIT, Type::<false>::UNIT);
         assert_eq!(f_type.input_count(), 1);
         assert_eq!(f_type.output_count(), 1);
 
-        assert_eq!(f_type.input_types(), &[Type::UNIT]);
+        assert_eq!(f_type.input_types(), &[Type::<false>::UNIT]);
 
         assert_eq!(
             f_type.port_type(Port::new(Direction::Incoming, 0)),
@@ -293,7 +293,7 @@ mod test {
 
         assert_eq!(f_type.port_type(out), Some(&USIZE_T));
 
-        assert_eq!(f_type.input_types(), &[Type::UNIT]);
+        assert_eq!(f_type.input_types(), &[Type::<false>::UNIT]);
         assert_eq!(f_type.output_types(), &[USIZE_T]);
     }
 }

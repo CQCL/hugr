@@ -198,6 +198,12 @@ impl From<FunctionType> for SignatureFunc {
     }
 }
 
+impl From<Signature> for SignatureFunc {
+    fn from(v: Signature) -> Self {
+        Self::TypeScheme(CustomValidator::from_polyfunc(FunctionType::<true>::from(v)))
+    }
+}
+
 impl From<CustomValidator> for SignatureFunc {
     fn from(v: CustomValidator) -> Self {
         Self::TypeScheme(v)

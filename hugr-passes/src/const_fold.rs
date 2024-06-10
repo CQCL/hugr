@@ -64,7 +64,7 @@ pub fn fold_leaf_op(op: &OpType, consts: &[(IncomingPort, Value)]) -> ConstFoldR
         OpType::Tag(t) => out_row([Value::sum(
             t.tag,
             consts.iter().map(|(_, konst)| konst.clone()),
-            SumType::new(t.variants.clone()),
+            SumType::new(t.variants.clone().into_iter().map(TypeRow::into_)),
         )
         .unwrap()]),
         OpType::CustomOp(op) => {

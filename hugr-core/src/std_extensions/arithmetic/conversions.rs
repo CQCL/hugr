@@ -47,11 +47,11 @@ impl MakeOpDef for ConvertOpDef {
         match self {
             trunc_s | trunc_u =>
                 FunctionType::new(
-                    type_row![FLOAT64_TYPE],
+                    type_row![FLOAT64_TYPE].into_(),
                     Type::<true>::from(sum_with_error(int_tv(0)))
                 ),
             convert_s | convert_u => 
-                FunctionType::new(vec![int_tv(0)], type_row![FLOAT64_TYPE])
+                FunctionType::new(vec![int_tv(0)], type_row![FLOAT64_TYPE].into_())
             }).into()
     }
 
