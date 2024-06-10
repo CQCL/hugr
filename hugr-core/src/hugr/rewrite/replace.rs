@@ -523,12 +523,9 @@ mod test {
 
         // Replacement: one BB with two DFGs inside.
         // Use Hugr rather than Builder because DFGs must be empty (not even Input/Output).
-        let mut replacement = Hugr::new(
-            ops::CFG {
-                signature: FunctionType::new_endo(just_list.clone()),
-            }
-            .into(),
-        );
+        let mut replacement = Hugr::new(ops::CFG {
+            signature: FunctionType::new_endo(just_list.clone()),
+        });
         let r_bb = replacement.add_node_with_parent(
             replacement.root(),
             DataflowBlock {

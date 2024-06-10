@@ -155,7 +155,7 @@ impl CFGBuilder<Hugr> {
             signature: signature.clone(),
         };
 
-        let base = Hugr::new(cfg_op.into());
+        let base = Hugr::new(cfg_op);
         let cfg_node = base.root();
         CFGBuilder::create(base, cfg_node, signature.input, signature.output)
     }
@@ -369,7 +369,7 @@ impl BlockBuilder<Hugr> {
             extension_delta,
         };
 
-        let base = Hugr::new(op.into());
+        let base = Hugr::new(op);
         let root = base.root();
         Self::create(base, root)
     }

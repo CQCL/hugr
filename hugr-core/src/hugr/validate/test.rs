@@ -683,16 +683,13 @@ fn no_outer_row_variables(#[case] connect: bool) -> Result<(), Box<dyn std::erro
     let tv = Type::new_row_var_use(0, TypeBound::Copyable);
     let fun_ty = Type::new_function(FunctionType::new(USIZE_T, tv.clone()));
     let results = if connect { vec![tv.clone()] } else { vec![] };
-    let mut fb = Hugr::new(
-        FuncDefn {
-            name: "bad_eval".to_string(),
-            signature: PolyFuncType::new(
-                [TypeParam::new_list(TypeBound::Copyable)],
-                FunctionType::new(fun_ty.clone(), results.clone()),
-            ),
-        }
-        .into(),
-    );
+    let mut fb = Hugr::new(FuncDefn {
+        name: "bad_eval".to_string(),
+        signature: PolyFuncType::new(
+            [TypeParam::new_list(TypeBound::Copyable)],
+            FunctionType::new(fun_ty.clone(), results.clone()),
+        ),
+    });
     let inp = fb.add_node_with_parent(
         fb.root(),
         ops::Input {
@@ -1110,7 +1107,7 @@ mod extension_tests {
             outputs: type_row![USIZE_T],
             extension_delta: parent_extensions.clone(),
         };
-        let mut hugr = Hugr::new(parent.into());
+        let mut hugr = Hugr::new(parent);
 
         // First case with no delta should be ok in all cases. Second one may not be.
         let [_, child] = [None, Some(XB)].map(|case_ext| {

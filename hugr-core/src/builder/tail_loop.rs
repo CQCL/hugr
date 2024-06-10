@@ -83,7 +83,7 @@ impl TailLoopBuilder<Hugr> {
             rest: inputs_outputs.into(),
             extension_delta,
         };
-        let base = Hugr::new(tail_loop.clone().into());
+        let base = Hugr::new(tail_loop.clone());
         let root = base.root();
         Self::create_with_io(base, root, &tail_loop)
     }

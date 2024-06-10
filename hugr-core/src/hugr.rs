@@ -52,7 +52,7 @@ pub struct Hugr {
 
 impl Default for Hugr {
     fn default() -> Self {
-        Self::new(crate::ops::Module.into())
+        Self::new(crate::ops::Module)
     }
 }
 
@@ -79,8 +79,8 @@ pub type NodeMetadataMap = serde_json::Map<String, NodeMetadata>;
 /// Public API for HUGRs.
 impl Hugr {
     /// Create a new Hugr, with a single root node.
-    pub fn new(root_node: OpType) -> Self {
-        Self::with_capacity(root_node, 0, 0)
+    pub fn new(root_node: impl Into<OpType>) -> Self {
+        Self::with_capacity(root_node.into(), 0, 0)
     }
 
     /// Resolve extension ops, infer extensions used, and pass the closure into validation

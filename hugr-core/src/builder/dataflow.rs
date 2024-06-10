@@ -71,7 +71,7 @@ impl DFGBuilder<Hugr> {
         let dfg_op = ops::DFG {
             signature: signature.clone(),
         };
-        let base = Hugr::new(dfg_op.into());
+        let base = Hugr::new(dfg_op);
         let root = base.root();
         DFGBuilder::create_with_io(base, root, signature)
     }
@@ -145,7 +145,7 @@ impl FunctionBuilder<Hugr> {
             name: name.into(),
         };
 
-        let base = Hugr::new(op.into());
+        let base = Hugr::new(op);
         let root = base.root();
 
         let db = DFGBuilder::create_with_io(base, root, body)?;
