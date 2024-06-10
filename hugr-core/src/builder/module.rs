@@ -128,7 +128,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         // every 0-input node.
         let name: SmolStr = name.into();
         let bound = typ.least_upper_bound();
-        let node = self.add_child_op(ops::AliasDefn {
+        let node = self.add_child_node(ops::AliasDefn {
             name: name.clone(),
             definition: typ,
         });
@@ -146,7 +146,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         bound: TypeBound,
     ) -> Result<AliasID<false>, BuildError> {
         let name: SmolStr = name.into();
-        let node = self.add_child_op(ops::AliasDecl {
+        let node = self.add_child_node(ops::AliasDecl {
             name: name.clone(),
             bound,
         });
