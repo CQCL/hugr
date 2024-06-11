@@ -14,7 +14,7 @@ use crate::{Direction, IncomingPort, OutgoingPort, Port};
 #[cfg(test)]
 use {crate::proptest::RecursionDepth, ::proptest::prelude::*, proptest_derive::Arbitrary};
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Default, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(test, derive(Arbitrary), proptest(params = "RecursionDepth"))]
 /// Describes the edges required to/from a node (when ROWVARS=false);
 /// or (when ROWVARS=true) the type of a [Graph] or the inputs/outputs from an OpDef
@@ -268,8 +268,8 @@ impl From<FunctionType> for FunTypeVarArgs {
     }
 }
 
-impl PartialEq<FunTypeVarArgs> for FunctionType {
-    fn eq(&self, other: &FunTypeVarArgs) -> bool {
+impl<const RV1:bool, const RV2:bool> PartialEq<FuncTypeBase<RV1>> for FuncTypeBase<RV2> {
+    fn eq(&self, other: &FuncTypeBase<RV1>) -> bool {
         self.input == other.input
             && self.output == other.output
             && self.extension_reqs == other.extension_reqs

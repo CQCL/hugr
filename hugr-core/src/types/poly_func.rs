@@ -131,8 +131,9 @@ pub(crate) mod test {
         PRELUDE_REGISTRY,
     };
     use crate::std_extensions::collections::{EXTENSION, LIST_TYPENAME};
+    use crate::types::signature::FuncTypeBase;
     use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
-    use crate::types::{CustomType, FunctionType, Type, TypeBound, TypeName};
+    use crate::types::{CustomType, FunTypeVarArgs, FunctionType, Type, TypeBound, TypeName};
     use crate::Extension;
 
     use super::PolyFuncType;
@@ -142,10 +143,10 @@ pub(crate) mod test {
             ExtensionRegistry::try_new([PRELUDE.to_owned(), EXTENSION.to_owned()]).unwrap();
     }
 
-    impl PolyFuncType {
+    impl<const RV:bool> PolyFuncType<RV> {
         fn new_validated(
             params: impl Into<Vec<TypeParam>>,
-            body: FunctionType,
+            body: FuncTypeBase<RV>,
             extension_registry: &ExtensionRegistry,
         ) -> Result<Self, SignatureError> {
             let res = Self::new(params, body);
@@ -368,7 +369,7 @@ pub(crate) mod test {
         };
         let e = PolyFuncType::new_validated(
             [decl.clone()],
-            FunctionType::new(
+            FunTypeVarArgs::new(
                 vec![USIZE_T],
                 vec![Type::new_row_var_use(0, TypeBound::Copyable)],
             ),
@@ -397,7 +398,7 @@ pub(crate) mod test {
         let rty = Type::new_row_var_use(0, TypeBound::Any);
         let pf = PolyFuncType::new_validated(
             [TypeParam::new_list(TP_ANY)],
-            FunctionType::new(vec![USIZE_T, rty.clone()], vec![Type::new_tuple(rty)]),
+            FunTypeVarArgs::new(vec![USIZE_T.into(), rty.clone()], vec![Type::new_tuple(rty)]),
             &PRELUDE_REGISTRY,
         )
         .unwrap();
