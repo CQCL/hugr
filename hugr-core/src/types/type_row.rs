@@ -7,7 +7,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use super::{type_param::TypeParam, Implies, Substitution, Type};
+use super::{type_param::TypeParam, Substitution, Type};
 use crate::{
     extension::{ExtensionRegistry, SignatureError},
     utils::display_list,
@@ -93,17 +93,6 @@ impl<const RV: bool> TypeRow<RV> {
         var_decls: &[TypeParam],
     ) -> Result<(), SignatureError> {
         self.iter().try_for_each(|t| t.validate(exts, var_decls))
-    }
-
-    pub fn into_<const RV2: bool>(self) -> TypeRow<RV2> {
-        let _ = Implies::<RV, RV2>::A_IMPLIES_B;
-        TypeRow::from(
-            self.types
-                .iter()
-                .cloned()
-                .map(Type::into_)
-                .collect::<Vec<_>>(),
-        )
     }
 }
 
