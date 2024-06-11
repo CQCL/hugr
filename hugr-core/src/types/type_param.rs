@@ -343,6 +343,8 @@ impl TypeArgVariable {
         self.idx
     }
 
+    /// Determines whether this represents a row variable; if so, returns
+    /// the [TypeBound] of the individual types it might stand for.
     pub fn bound_if_row_var(&self) -> Option<TypeBound> {
         if let TypeParam::List {param} = &self.cached_decl {
             if let TypeParam::Type {b} = **param {

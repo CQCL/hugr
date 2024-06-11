@@ -483,7 +483,11 @@ impl<const RV: bool> Type<RV> {
         Ok(Type(self.0, self.1))
     }
 
-    pub fn into_<const RV2:bool>(self) -> Type<RV2> {
+    /// A swiss-army-knife for any safe conversion of the const-bool "type" argument
+    /// to/from true/false/variable. Any unsafe conversion (that might create
+    /// a [Type]`<false>` of a [TypeEnum::RowVariable] will fail statically with an assert.
+    fn into_<const RV2:bool>(self) -> Type<RV2> {
+        #[allow(clippy::let_unit_value)]
         let _ = Implies::<RV,RV2>::A_IMPLIES_B;
         Type(self.0, self.1)
     }
