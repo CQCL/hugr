@@ -118,11 +118,12 @@ pub(crate) mod test_quantum_extension {
     use lazy_static::lazy_static;
 
     fn one_qb_func() -> PolyFuncType {
-        FunctionType::new_endo(type_row![QB_T]).into()
+        PolyFuncType::new(vec![], FunctionType::new_endo(QB_T))
     }
 
     fn two_qb_func() -> PolyFuncType {
-        FunctionType::new_endo(type_row![QB_T, QB_T]).into()
+        // ALAN this and prev would be easier with TypeRow<false> -> TypeRow<true>
+        PolyFuncType::new(vec![], FunctionType::new_endo(type_row![QB_T, QB_T]))
     }
     /// The extension identifier.
     pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("test.quantum");
