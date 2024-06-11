@@ -193,7 +193,7 @@ impl DataflowOpTrait for Tag {
                 .get(self.tag)
                 .expect("Not a valid tag")
                 .clone(),
-            vec![Type::new_sum(self.variants.iter().cloned().map(TypeRow::into_))],
+            vec![Type::new_sum(self.variants.clone())],
         )
     }
 
