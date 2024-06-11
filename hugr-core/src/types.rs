@@ -271,14 +271,14 @@ impl<const A:bool, const B:bool> Implies<A,B> {
 /// # use hugr::types::{Type, TypeBound};
 /// # use hugr::type_row;
 ///
-/// let sum = Type::new_sum([type_row![], type_row![]]);
+/// let sum: Type = Type::new_sum([type_row![], type_row![]]);
 /// assert_eq!(sum.least_upper_bound(), TypeBound::Eq);
 /// ```
 ///
 /// ```
 /// # use hugr::types::{Type, TypeBound, FunctionType};
 ///
-/// let func_type = Type::new_function(FunctionType::new_endo(vec![]));
+/// let func_type: Type = Type::new_function(FunctionType::new_endo(vec![]));
 /// assert_eq!(func_type.least_upper_bound(), TypeBound::Copyable);
 /// ```
 pub struct Type<const ROWVARS: bool = false>(TypeEnum, TypeBound);
