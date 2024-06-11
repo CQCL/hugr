@@ -5,7 +5,7 @@ use itertools::Either;
 use std::fmt::{self, Display, Write};
 
 use super::type_param::TypeParam;
-use super::{Implies, Substitution, Type, TypeBound, TypeEnum, TypeRow};
+use super::{Substitution, Type, TypeBound, TypeEnum, TypeRow};
 
 use crate::core::PortIndex;
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
@@ -94,15 +94,6 @@ impl<const RV: bool> FunctionType<RV> {
         self.output.validate(extension_registry, var_decls)?;
         self.extension_reqs.validate(var_decls)
     }
-
-    pub(crate) fn into_<const RV2:bool>(self) -> FunctionType<RV2> {
-        let _ = Implies::<RV, RV2>::A_IMPLIES_B;
-        FunctionType {
-            input: self.input.into_(),
-            output: self.output.into_(),
-            extension_reqs: self.extension_reqs
-        }
-    }
 }
 
 impl FunctionType<true> {
@@ -119,6 +110,14 @@ impl FunctionType<true> {
 }
 
 impl Signature {
+    pub(crate) fn into_(self) -> FunctionType<true> {
+        FunctionType {
+            input: self.input.into_(),
+            output: self.output.into_(),
+            extension_reqs: self.extension_reqs
+        }
+    }
+
     /// Returns the type of a value [`Port`]. Returns `None` if the port is out
     /// of bounds.
     #[inline]
