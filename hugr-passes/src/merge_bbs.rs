@@ -227,14 +227,14 @@ mod test {
             FunctionType::new(loop_variants.clone(), exit_types.clone())
                 .with_extension_delta(ExtensionSet::singleton(&PRELUDE_ID)),
         )?;
-        let mut no_b1 = h.simple_entry_builder(loop_variants.clone(), 1, ExtensionSet::new())?;
+        let mut no_b1 = h.simple_entry_builder(loop_variants.clone(), 1, PRELUDE_ID.into())?;
         let n = no_b1.add_dataflow_op(Noop::new(QB_T), no_b1.input_wires())?;
         let br = lifted_unary_unit_sum(&mut no_b1);
         let no_b1 = no_b1.finish_with_outputs(br, n.outputs())?;
         let mut test_block = h.block_builder(
             loop_variants.clone(),
             vec![loop_variants.clone(), exit_types],
-            ExtensionSet::singleton(&PRELUDE_ID),
+            PRELUDE_ID.into(),
             type_row![],
         )?;
         let [test_input] = test_block.input_wires_arr();
@@ -246,7 +246,10 @@ mod test {
         let loop_backedge_target = if self_loop {
             no_b1
         } else {
-            let mut no_b2 = h.simple_block_builder(FunctionType::new_endo(loop_variants), 1)?;
+            let mut no_b2 = h.simple_block_builder(
+                FunctionType::new_endo(loop_variants).with_extension_delta(PRELUDE_ID),
+                1,
+            )?;
             let n = no_b2.add_dataflow_op(Noop::new(QB_T), no_b2.input_wires())?;
             let br = lifted_unary_unit_sum(&mut no_b2);
             let nid = no_b2.finish_with_outputs(br, n.outputs())?;
@@ -339,7 +342,7 @@ mod test {
         let mut bb2 = h.block_builder(
             type_row![USIZE_T, QB_T],
             vec![type_row![]],
-            ExtensionSet::new(),
+            PRELUDE_ID.into(),
             type_row![QB_T, USIZE_T],
         )?;
         let [u, q] = bb2.input_wires_arr();
@@ -349,7 +352,7 @@ mod test {
         let mut bb3 = h.block_builder(
             type_row![QB_T, USIZE_T],
             vec![type_row![]],
-            ExtensionSet::new(),
+            PRELUDE_ID.into(),
             res_t.clone().into(),
         )?;
         let [q, u] = bb3.input_wires_arr();

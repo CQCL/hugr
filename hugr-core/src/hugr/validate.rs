@@ -9,16 +9,11 @@ use petgraph::visit::{Topo, Walker};
 use portgraph::{LinkView, PortView};
 use thiserror::Error;
 
-use crate::extension::validate::ExtensionValidator;
-use crate::extension::SignatureError;
-use crate::extension::{
-    validate::ExtensionError, ExtensionRegistry, ExtensionSolution, InferExtensionError,
-};
+use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 
-use crate::ops::custom::CustomOpError;
-use crate::ops::custom::{resolve_opaque_op, CustomOp};
+use crate::ops::custom::{resolve_opaque_op, CustomOp, CustomOpError};
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
-use crate::ops::{FuncDefn, OpTag, OpTrait, OpType, ValidateOp};
+use crate::ops::{FuncDefn, OpParent, OpTag, OpTrait, OpType, ValidateOp};
 use crate::types::type_param::TypeParam;
 use crate::types::{EdgeKind, FunctionType};
 use crate::{Direction, Hugr, Node, Port};
@@ -45,10 +40,9 @@ impl Hugr {
     /// TODO: Add a version of validation which allows for open extension
     /// variables (see github issue #457)
     pub fn validate(&self, extension_registry: &ExtensionRegistry) -> Result<(), ValidationError> {
-        #[cfg(feature = "extension_inference")]
-        self.validate_with_extension_closure(HashMap::new(), extension_registry)?;
-        #[cfg(not(feature = "extension_inference"))]
         self.validate_no_extensions(extension_registry)?;
+        #[cfg(feature = "extension_inference")]
+        self.validate_extensions()?;
         Ok(())
     }
 
@@ -62,46 +56,37 @@ impl Hugr {
         validator.validate()
     }
 
-    /// Validate extensions on the input and output edges of nodes. Check that
-    /// the target ends of edges require the extensions from the sources, and
-    /// check extension deltas from parent nodes are reflected in their children.
-    pub fn validate_extensions(&self, closure: ExtensionSolution) -> Result<(), ValidationError> {
-        let validator = ExtensionValidator::new(self, closure);
-        for src_node in self.nodes() {
-            let node_type = self.get_nodetype(src_node);
-
-            // FuncDefns have no resources since they're static nodes, but the
-            // functions they define can have any extension delta.
-            if node_type.tag() != OpTag::FuncDefn {
-                // If this is a container with I/O nodes, check that the extension they
-                // define match the extensions of the container.
-                if let Some([input, output]) = self.get_io(src_node) {
-                    validator.validate_io_extensions(src_node, input, output)?;
-                }
-            }
-
-            for src_port in self.node_outputs(src_node) {
-                for (tgt_node, tgt_port) in self.linked_inputs(src_node, src_port) {
-                    validator.check_extensions_compatible(
-                        &(src_node, src_port.into()),
-                        &(tgt_node, tgt_port.into()),
-                    )?;
+    /// Validate extensions, i.e. that extension deltas from parent nodes are reflected in their children.
+    pub fn validate_extensions(&self) -> Result<(), ValidationError> {
+        for parent in self.nodes() {
+            let parent_op = self.get_optype(parent);
+            let parent_extensions = match parent_op.inner_function_type() {
+                Some(FunctionType { extension_reqs, .. }) => extension_reqs,
+                None => match parent_op.tag() {
+                    OpTag::Cfg | OpTag::Conditional => parent_op.extension_delta(),
+                    // ModuleRoot holds but does not execute its children, so allow any extensions
+                    OpTag::ModuleRoot => continue,
+                    _ => {
+                        assert!(self.children(parent).next().is_none(),
+                            "Unknown parent node type {:?} - not a DataflowParent, Module, Cfg or Conditional",
+                            parent_op);
+                        continue;
+                    }
+                },
+            };
+            for child in self.children(parent) {
+                let child_extensions = self.get_optype(child).extension_delta();
+                if !parent_extensions.is_superset(&child_extensions) {
+                    return Err(ExtensionError {
+                        parent,
+                        parent_extensions,
+                        child,
+                        child_extensions,
+                    }
+                    .into());
                 }
             }
         }
-        Ok(())
-    }
-
-    /// Check the validity of a hugr, taking an argument of a closure for the
-    /// free extension variables
-    pub fn validate_with_extension_closure(
-        &self,
-        closure: ExtensionSolution,
-        extension_registry: &ExtensionRegistry,
-    ) -> Result<(), ValidationError> {
-        let mut validator = ValidationContext::new(self, extension_registry);
-        validator.validate()?;
-        self.validate_extensions(closure)?;
         Ok(())
     }
 }
@@ -758,11 +743,9 @@ pub enum ValidationError {
     /// There are invalid inter-graph edges.
     #[error(transparent)]
     InterGraphEdgeError(#[from] InterGraphEdgeError),
-    /// There are errors in the extension declarations.
+    /// There are errors in the extension deltas.
     #[error(transparent)]
     ExtensionError(#[from] ExtensionError),
-    #[error(transparent)]
-    CantInfer(#[from] InferExtensionError),
     /// Error in a node signature
     #[error("Error in signature of node {node:?}: {cause}")]
     SignatureError { node: Node, cause: SignatureError },
@@ -833,6 +816,16 @@ pub enum InterGraphEdgeError {
         from_parent: Node,
         ancestor: Node,
     },
+}
+
+#[derive(Debug, Clone, PartialEq, Error)]
+#[error("Parent node {parent} has extensions {parent_extensions} that are too restrictive for child node {child}, they must include child extensions {child_extensions}")]
+/// An error in the extension deltas.
+pub struct ExtensionError {
+    parent: Node,
+    parent_extensions: ExtensionSet,
+    child: Node,
+    child_extensions: ExtensionSet,
 }
 
 #[cfg(test)]

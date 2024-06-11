@@ -1870,6 +1870,13 @@
                     },
                     "title": "Rest",
                     "type": "array"
+                },
+                "extension_delta": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "title": "Extension Delta",
+                    "type": "array"
                 }
             },
             "required": [

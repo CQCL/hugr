@@ -9,12 +9,11 @@ pub mod serialize;
 pub mod validate;
 pub mod views;
 
-#[cfg(feature = "extension_inference")]
-use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::iter;
 
 pub(crate) use self::hugrmut::HugrMut;
+use self::validate::ExtensionError;
 pub use self::validate::ValidationError;
 
 pub use ident::{IdentList, InvalidIdentifier};
@@ -26,9 +25,7 @@ use thiserror::Error;
 
 pub use self::views::{HugrView, RootTagged};
 use crate::core::NodeIndex;
-#[cfg(feature = "extension_inference")]
-use crate::extension::infer_extensions;
-use crate::extension::{ExtensionRegistry, ExtensionSet, ExtensionSolution, InferExtensionError};
+use crate::extension::{ExtensionRegistry, ExtensionSet};
 use crate::ops::custom::resolve_extension_ops;
 use crate::ops::{OpTag, OpTrait, OpType, DEFAULT_OPTYPE};
 use crate::types::FunctionType;
@@ -123,16 +120,6 @@ impl NodeType {
         self.input_extensions.as_ref()
     }
 
-    /// The input and output extensions for this node, if set.
-    ///
-    /// `None`` if the [Self::input_extensions] is `None`.
-    /// Otherwise, will return Some, with the output extensions computed from the node's delta
-    pub fn io_extensions(&self) -> Option<(ExtensionSet, ExtensionSet)> {
-        self.input_extensions
-            .clone()
-            .map(|e| (e.clone(), self.op.extension_delta().union(e)))
-    }
-
     /// Gets the underlying [OpType] i.e. without any [input_extensions]
     ///
     /// [input_extensions]: NodeType::input_extensions
@@ -208,36 +195,15 @@ impl Hugr {
         #[cfg(feature = "extension_inference")]
         {
             self.infer_extensions()?;
-            self.validate_extensions(HashMap::new())?;
+            self.validate_extensions()?;
         }
         Ok(())
     }
 
-    /// Infer extension requirements and add new information to `op_types` field
-    /// (if the "extension_inference" feature is on; otherwise, do nothing)
-    pub fn infer_extensions(&mut self) -> Result<(), InferExtensionError> {
-        #[cfg(feature = "extension_inference")]
-        {
-            let solution = infer_extensions(self)?;
-            self.instantiate_extensions(&solution);
-        }
+    /// Leaving this here as in the future we plan for it to infer deltas
+    /// of container nodes e.g. [OpType::DFG]. For the moment it does nothing.
+    pub fn infer_extensions(&mut self) -> Result<(), ExtensionError> {
         Ok(())
-    }
-
-    #[allow(dead_code)]
-    /// Add extension requirement information to the hugr in place.
-    fn instantiate_extensions(&mut self, solution: &ExtensionSolution) {
-        // We only care about inferred _input_ extensions, because `NodeType`
-        // uses those to infer the output extensions
-        for (node, input_extensions) in solution.iter() {
-            let nodetype = self.op_types.try_get_mut(node.pg_index()).unwrap();
-            match &nodetype.input_extensions {
-                None => nodetype.input_extensions = Some(input_extensions.clone()),
-                Some(existing_ext_reqs) => {
-                    debug_assert_eq!(existing_ext_reqs, input_extensions)
-                }
-            }
-        }
     }
 }
 
@@ -359,8 +325,6 @@ pub enum HugrError {
 #[cfg(test)]
 mod test {
     use super::{Hugr, HugrView};
-    #[cfg(feature = "extension_inference")]
-    use std::error::Error;
 
     #[test]
     fn impls_send_and_sync() {
@@ -378,41 +342,5 @@ mod test {
 
         let hugr = simple_dfg_hugr();
         assert_matches!(hugr.get_io(hugr.root()), Some(_));
-    }
-
-    #[cfg(feature = "extension_inference")]
-    #[test]
-    fn extension_instantiation() -> Result<(), Box<dyn Error>> {
-        use crate::builder::test::closed_dfg_root_hugr;
-        use crate::extension::ExtensionSet;
-        use crate::hugr::HugrMut;
-        use crate::ops::Lift;
-        use crate::type_row;
-        use crate::types::{FunctionType, Type};
-
-        const BIT: Type = crate::extension::prelude::USIZE_T;
-        let r = ExtensionSet::singleton(&"R".try_into().unwrap());
-
-        let mut hugr = closed_dfg_root_hugr(
-            FunctionType::new(type_row![BIT], type_row![BIT]).with_extension_delta(r.clone()),
-        );
-        let [input, output] = hugr.get_io(hugr.root()).unwrap();
-        let lift = hugr.add_node_with_parent(
-            hugr.root(),
-            Lift {
-                type_row: type_row![BIT],
-                new_extension: "R".try_into().unwrap(),
-            },
-        );
-        hugr.connect(input, 0, lift, 0);
-        hugr.connect(lift, 0, output, 0);
-        hugr.infer_extensions()?;
-
-        assert_eq!(
-            hugr.get_nodetype(lift).input_extensions().unwrap(),
-            &ExtensionSet::new()
-        );
-        assert_eq!(hugr.get_nodetype(output).input_extensions().unwrap(), &r);
-        Ok(())
     }
 }
