@@ -314,12 +314,7 @@ impl<const RV: bool> Type<RV> {
 
     /// Initialize a new sum type by providing the possible variant types.
     #[inline(always)]
-    pub fn new_sum<const RV2: bool>(variants: impl IntoIterator<Item = TypeRow<RV2>>) -> Self where
-    {
-        let variants: Vec<Vec<Type<true>>> = variants
-            .into_iter()
-            .map(|t| t.into_owned().into_iter().map(Type::into_).collect())
-            .collect();
+    pub fn new_sum<R>(variants: impl IntoIterator<Item = R>) -> Self where R: Into<TypeRow<true>> {
         Self::new(TypeEnum::Sum(SumType::new(variants)))
     }
 
