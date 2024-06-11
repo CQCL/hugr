@@ -178,7 +178,7 @@ impl From<Vec<Type>> for TypeRow<true> {
 impl From<TypeRow> for TypeRow<true> {
     fn from(value: TypeRow) -> Self {
         Self {
-            types: value.into_iter().cloned().map(Type::into_).collect()
+            types: value.iter().cloned().map(Type::into_).collect()
         }
     }
 }

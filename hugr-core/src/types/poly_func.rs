@@ -9,7 +9,7 @@ use {
     proptest_derive::Arbitrary,
 };
 
-use super::signature::{FuncTypeBase, FunctionType};
+use super::signature::{FuncTypeBase};
 use super::type_param::{check_type_args, TypeArg, TypeParam};
 use super::Substitution;
 

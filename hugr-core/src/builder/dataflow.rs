@@ -212,7 +212,7 @@ pub(crate) mod test {
     use crate::builder::build_traits::DataflowHugr;
     use crate::builder::{BuilderWiringError, DataflowSubContainer, ModuleBuilder};
     use crate::extension::prelude::{BOOL_T, USIZE_T};
-    use crate::extension::{ExtensionId, SignatureError, EMPTY_REG, PRELUDE_REGISTRY};
+    use crate::extension::{ExtensionId, EMPTY_REG, PRELUDE_REGISTRY};
     use crate::hugr::validate::InterGraphEdgeError;
     use crate::ops::{handle::NodeHandle, Lift, Noop, OpTag};
 
@@ -560,7 +560,7 @@ pub(crate) mod test {
         let e = crate::hugr::validate::test::extension_with_eval_parallel();
         let tv = Type::new_row_var_use(0, TypeBound::Copyable);
         // Can *declare* a function that takes a function-value of unknown #args
-        let fb = FunctionBuilder::new(
+        FunctionBuilder::new(
             "bad_eval",
             PolyFuncType::new(
                 [TypeParam::new_list(TypeBound::Copyable)],

@@ -10,7 +10,7 @@ use crate::ops::custom::ExtensionOp;
 use crate::ops::{NamedOp, OpName};
 use crate::std_extensions::arithmetic::int_types::int_type;
 use crate::type_row;
-use crate::types::{FunTypeVarArgs, FunctionType, PolyFuncType};
+use crate::types::{FunTypeVarArgs, PolyFuncType};
 use crate::utils::collect_array;
 
 use crate::{
@@ -353,7 +353,7 @@ fn sum_ty_with_err(t: Type) -> Type {
 
 #[cfg(test)]
 mod test {
-    use crate::{ops::dataflow::DataflowOpTrait, std_extensions::arithmetic::int_types::int_type};
+    use crate::{ops::dataflow::DataflowOpTrait, std_extensions::arithmetic::int_types::int_type, types::FunctionType};
 
     use super::*;
 
