@@ -18,7 +18,7 @@ use crate::ops::{self, Noop, OpType, Value};
 use crate::std_extensions::logic::test::{and_op, or_op};
 use crate::std_extensions::logic::{self, NotOp};
 use crate::types::type_param::{TypeArg, TypeArgError};
-use crate::types::{CustomType, FunctionType, PolyFuncType, Type, TypeBound, TypeRow};
+use crate::types::{CustomType, FunTypeVarArgs, FunctionType, PolyFuncType, Type, TypeBound, TypeRow};
 use crate::{const_extension_ids, type_row, Direction, IncomingPort, Node};
 
 const NAT: Type = crate::extension::prelude::USIZE_T;
@@ -586,10 +586,10 @@ pub(crate) fn extension_with_eval_parallel() -> Extension {
 
     let inputs = Type::new_row_var_use(0, TypeBound::Any);
     let outputs = Type::new_row_var_use(1, TypeBound::Any);
-    let evaled_fn = Type::new_function(FunctionType::new(inputs.clone(), outputs.clone()));
+    let evaled_fn = Type::new_function(FunTypeVarArgs::new(inputs.clone(), outputs.clone()));
     let pf = PolyFuncType::new(
         [rowp.clone(), rowp.clone()],
-        FunctionType::new(vec![evaled_fn, inputs], outputs),
+        FunTypeVarArgs::new(vec![evaled_fn, inputs], outputs),
     );
     e.add_op("eval".into(), "".into(), pf).unwrap();
 
@@ -598,10 +598,10 @@ pub(crate) fn extension_with_eval_parallel() -> Extension {
         [rowp.clone(), rowp.clone(), rowp.clone(), rowp.clone()],
         FunctionType::new(
             vec![
-                Type::new_function(FunctionType::new(rv(0), rv(2))),
-                Type::new_function(FunctionType::new(rv(1), rv(3))),
+                Type::new_function(FunTypeVarArgs::new(rv(0), rv(2))),
+                Type::new_function(FunTypeVarArgs::new(rv(1), rv(3))),
             ],
-            Type::new_function(FunctionType::new(vec![rv(0), rv(1)], vec![rv(2), rv(3)])),
+            Type::new_function(FunTypeVarArgs::new(vec![rv(0), rv(1)], vec![rv(2), rv(3)])),
         ),
     );
     e.add_op("parallel".into(), "".into(), pf).unwrap();
@@ -641,18 +641,18 @@ fn instantiate_row_variables() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn seq1ty(t: Type) -> TypeArg {
+fn seq1ty(t: Type<true>) -> TypeArg {
     TypeArg::Sequence {
         elems: vec![t.into()],
     }
 }
 
 #[test]
-fn inner_row_variables() -> Result<(), Box<dyn std::error::Error>> {
+fn row_variables() -> Result<(), Box<dyn std::error::Error>> {
     let e = extension_with_eval_parallel();
     let tv = Type::new_row_var_use(0, TypeBound::Any);
-    let inner_ft = Type::new_function(FunctionType::new_endo(tv.clone()));
-    let ft_usz = Type::new_function(FunctionType::new_endo(vec![tv.clone(), USIZE_T]));
+    let inner_ft = Type::new_function(FunTypeVarArgs::new_endo(tv.clone()));
+    let ft_usz = Type::new_function(FunTypeVarArgs::new_endo(vec![tv.clone(), USIZE_T.into()]));
     let mut fb = FunctionBuilder::new(
         "id",
         PolyFuncType::new(
@@ -676,7 +676,7 @@ fn inner_row_variables() -> Result<(), Box<dyn std::error::Error>> {
     };
     let par = e.instantiate_extension_op(
         "parallel",
-        [tv.clone(), USIZE_T, tv.clone(), USIZE_T].map(seq1ty),
+        [tv.clone(), USIZE_T.into(), tv.clone(), USIZE_T.into()].map(seq1ty),
         &PRELUDE_REGISTRY,
     )?;
     let par_func = fb.add_dataflow_op(par, [func_arg, id_usz])?;
@@ -684,63 +684,6 @@ fn inner_row_variables() -> Result<(), Box<dyn std::error::Error>> {
         par_func.outputs(),
         &ExtensionRegistry::try_new([PRELUDE.to_owned(), e]).unwrap(),
     )?;
-    Ok(())
-}
-
-#[rstest]
-#[case(false)]
-#[case(true)]
-fn no_outer_row_variables(#[case] connect: bool) -> Result<(), Box<dyn std::error::Error>> {
-    let e = extension_with_eval_parallel();
-    let tv = Type::new_row_var_use(0, TypeBound::Copyable);
-    let fun_ty = Type::new_function(FunctionType::new(USIZE_T, tv.clone()));
-    let results = if connect { vec![tv.clone()] } else { vec![] };
-    let mut fb = Hugr::new(
-        FuncDefn {
-            name: "bad_eval".to_string(),
-            signature: PolyFuncType::new(
-                [TypeParam::new_list(TypeBound::Copyable)],
-                FunctionType::new(fun_ty.clone(), results.clone()),
-            ),
-        }
-        .into(),
-    );
-    let inp = fb.add_node_with_parent(
-        fb.root(),
-        ops::Input {
-            types: fun_ty.into(),
-        },
-    );
-    let out = fb.add_node_with_parent(
-        fb.root(),
-        ops::Output {
-            types: results.into(),
-        },
-    );
-    let cst = fb.add_node_with_parent(
-        fb.root(),
-        ops::Const::new(crate::extension::prelude::ConstUsize::new(5).into()),
-    );
-    let i = fb.add_node_with_parent(fb.root(), ops::LoadConstant { datatype: USIZE_T });
-    fb.connect(cst, 0, i, 0);
-
-    let ev = fb.add_node_with_parent(
-        fb.root(),
-        e.instantiate_extension_op("eval", [seq1ty(USIZE_T), seq1ty(tv)], &PRELUDE_REGISTRY)?,
-    );
-    fb.connect(inp, 0, ev, 0);
-    fb.connect(i, 0, ev, 1);
-    if connect {
-        fb.connect(ev, 0, out, 0);
-    }
-    let reg = ExtensionRegistry::try_new([PRELUDE.to_owned(), e]).unwrap();
-    assert_matches!(
-        fb.validate(&reg).unwrap_err(),
-        ValidationError::SignatureError {
-            node,
-            cause: SignatureError::RowVarWhereTypeExpected { idx: 0 }
-        } => assert!([ev, out].contains(&node))
-    );
     Ok(())
 }
 

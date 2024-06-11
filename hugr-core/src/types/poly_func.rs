@@ -429,10 +429,10 @@ pub(crate) mod test {
 
     #[test]
     fn row_variables_inner() {
-        let inner_fty = Type::new_function(FunctionType::new_endo(vec![Type::new_row_var_use(
+        let inner_fty = Type::new_function(FunTypeVarArgs::new_endo(Type::new_row_var_use(
             0,
             TypeBound::Copyable,
-        )]));
+        )));
         let pf = PolyFuncType::new_validated(
             [TypeParam::List {
                 param: Box::new(TypeParam::Type {
