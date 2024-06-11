@@ -26,7 +26,8 @@ use portgraph::{multiportgraph, LinkView, PortView};
 
 use super::internal::HugrInternals;
 use super::{
-    Hugr, HugrError, NodeMetadata, NodeMetadataMap, NodeType, ValidationError, DEFAULT_NODETYPE,
+    Hugr, HugrError, HugrMut, NodeMetadata, NodeMetadataMap, NodeType, ValidationError,
+    DEFAULT_NODETYPE,
 };
 use crate::extension::ExtensionRegistry;
 use crate::ops::handle::NodeHandle;
@@ -508,6 +509,21 @@ pub trait HierarchyView<'a>: RootTagged + Sized {
     fn try_new(hugr: &'a impl HugrView, root: Node) -> Result<Self, HugrError>;
 }
 
+/// A trait for [`HugrView`]s that can be extracted into a valid HUGR containing
+/// only the nodes and edges of the view.
+pub trait ExtractHugr: HugrView + Sized {
+    /// Extracts the view into an owned HUGR, rooted at the view's root node
+    /// and containing only the nodes and edges of the view.
+    fn extract_hugr(self) -> Hugr {
+        let mut hugr = Hugr::default();
+        let old_root = hugr.root();
+        let new_root = hugr.insert_from_view(old_root, &self).new_root;
+        hugr.set_root(new_root);
+        hugr.remove_node(old_root);
+        hugr
+    }
+}
+
 fn check_tag<Required: NodeHandle>(hugr: &impl HugrView, node: Node) -> Result<(), HugrError> {
     let actual = hugr.get_optype(node).tag();
     let required = Required::TAG;
@@ -527,6 +543,25 @@ impl RootTagged for &Hugr {
 
 impl RootTagged for &mut Hugr {
     type RootHandle = Node;
+}
+
+// Explicit implementation to avoid cloning the Hugr.
+impl ExtractHugr for Hugr {
+    fn extract_hugr(self) -> Hugr {
+        self
+    }
+}
+
+impl ExtractHugr for &Hugr {
+    fn extract_hugr(self) -> Hugr {
+        self.clone()
+    }
+}
+
+impl ExtractHugr for &mut Hugr {
+    fn extract_hugr(self) -> Hugr {
+        self.clone()
+    }
 }
 
 impl<T: AsRef<Hugr>> HugrView for T {

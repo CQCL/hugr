@@ -1,10 +1,10 @@
 //! Standard command line tools, used by the hugr binary.
 
-use clap::Parser;
 use clap_stdin::FileOrStdin;
-use clap_verbosity_flag::Level;
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 use thiserror::Error;
+/// We reexport some clap types that are used in the public API.
+pub use {clap::Parser, clap_verbosity_flag::Level};
 
 use hugr_core::{extension::ExtensionRegistry, Hugr, HugrView};
 

@@ -429,6 +429,7 @@ pub trait Dataflow: Container {
         just_inputs: impl IntoIterator<Item = (Type, Wire)>,
         inputs_outputs: impl IntoIterator<Item = (Type, Wire)>,
         just_out_types: TypeRow,
+        extension_delta: ExtensionSet,
     ) -> Result<TailLoopBuilder<&mut Hugr>, BuildError> {
         let (input_types, mut input_wires): (Vec<Type>, Vec<Wire>) =
             just_inputs.into_iter().unzip();
@@ -440,6 +441,7 @@ pub trait Dataflow: Container {
             just_inputs: input_types.into(),
             just_outputs: just_out_types,
             rest: rest_types.into(),
+            extension_delta,
         };
         // TODO: Make input extensions a parameter
         let (loop_node, _) = add_node_with_wires(self, tail_loop.clone(), input_wires)?;

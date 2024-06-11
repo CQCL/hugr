@@ -106,31 +106,6 @@ impl ValidateOp for super::Conditional {
     }
 }
 
-impl ValidateOp for super::TailLoop {
-    fn validity_flags(&self) -> OpValidityFlags {
-        OpValidityFlags {
-            allowed_children: OpTag::DataflowChild,
-            allowed_first_child: OpTag::Input,
-            allowed_second_child: OpTag::Output,
-            requires_children: true,
-            requires_dag: true,
-            ..Default::default()
-        }
-    }
-
-    fn validate_op_children<'a>(
-        &self,
-        children: impl DoubleEndedIterator<Item = (NodeIndex, &'a OpType)>,
-    ) -> Result<(), ChildrenValidationError> {
-        validate_io_nodes(
-            &self.body_input_row(),
-            &self.body_output_row(),
-            "tail-controlled loop graph",
-            children,
-        )
-    }
-}
-
 impl ValidateOp for super::CFG {
     fn validity_flags(&self) -> OpValidityFlags {
         OpValidityFlags {

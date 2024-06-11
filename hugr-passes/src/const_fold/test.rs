@@ -3,9 +3,9 @@ use hugr_core::builder::{DFGBuilder, Dataflow, DataflowHugr};
 use hugr_core::extension::prelude::{sum_with_error, ConstError, ConstString, BOOL_T, STRING_TYPE};
 use hugr_core::extension::{ExtensionRegistry, PRELUDE};
 use hugr_core::ops::Value;
-use hugr_core::std_extensions::arithmetic;
 use hugr_core::std_extensions::arithmetic::int_ops::IntOpDef;
 use hugr_core::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
+use hugr_core::std_extensions::arithmetic::{self, float_types, int_types};
 use hugr_core::std_extensions::logic::{self, NaryLogic, NotOp};
 use hugr_core::type_row;
 use hugr_core::types::{FunctionType, Type, TypeRow};
@@ -72,6 +72,11 @@ fn test_add(#[case] a: f64, #[case] b: f64, #[case] c: f64) {
 
     assert_eq!(outs.as_slice(), &[(0.into(), c)]);
 }
+
+fn float_fn(outputs: impl Into<TypeRow>) -> FunctionType {
+    FunctionType::new(type_row![], outputs).with_extension_delta(float_types::EXTENSION_ID)
+}
+
 #[test]
 fn test_big() {
     /*
@@ -80,11 +85,7 @@ fn test_big() {
        int(x.0 - x.1) == 2
     */
     let sum_type = sum_with_error(INT_TYPES[5].to_owned());
-    let mut build = DFGBuilder::new(FunctionType::new(
-        type_row![],
-        vec![sum_type.clone().into()],
-    ))
-    .unwrap();
+    let mut build = DFGBuilder::new(float_fn(vec![sum_type.clone().into()])).unwrap();
 
     let tup = build.add_load_const(Value::tuple([f2c(5.6), f2c(3.2)]));
 
@@ -273,7 +274,7 @@ fn test_folding_pass_issue_996() {
     // x6 := flt(x0, x5) // false
     // x7 := or(x4, x6) // true
     // output x7
-    let mut build = DFGBuilder::new(FunctionType::new(type_row![], vec![BOOL_T])).unwrap();
+    let mut build = DFGBuilder::new(float_fn(vec![BOOL_T])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstF64::new(3.0)));
     let x1 = build.add_load_const(Value::extension(ConstF64::new(4.0)));
     let x2 = build.add_dataflow_op(FloatOps::fne, [x0, x1]).unwrap();
@@ -313,7 +314,7 @@ fn test_const_fold_to_nonfinite() {
     .unwrap();
 
     // HUGR computing 1.0 / 1.0
-    let mut build = DFGBuilder::new(FunctionType::new(type_row![], vec![FLOAT64_TYPE])).unwrap();
+    let mut build = DFGBuilder::new(float_fn(vec![FLOAT64_TYPE])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstF64::new(1.0)));
     let x1 = build.add_load_const(Value::extension(ConstF64::new(1.0)));
     let x2 = build.add_dataflow_op(FloatOps::fdiv, [x0, x1]).unwrap();
@@ -325,13 +326,17 @@ fn test_const_fold_to_nonfinite() {
     assert_eq!(h0.node_count(), 5);
 
     // HUGR computing 1.0 / 0.0
-    let mut build = DFGBuilder::new(FunctionType::new(type_row![], vec![FLOAT64_TYPE])).unwrap();
+    let mut build = DFGBuilder::new(float_fn(vec![FLOAT64_TYPE])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstF64::new(1.0)));
     let x1 = build.add_load_const(Value::extension(ConstF64::new(0.0)));
     let x2 = build.add_dataflow_op(FloatOps::fdiv, [x0, x1]).unwrap();
     let mut h1 = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
     constant_fold_pass(&mut h1, &reg);
     assert_eq!(h1.node_count(), 8);
+}
+
+fn int_fn(outputs: impl Into<TypeRow>) -> FunctionType {
+    FunctionType::new(type_row![], outputs).with_extension_delta(int_types::EXTENSION_ID)
 }
 
 #[test]
@@ -341,8 +346,7 @@ fn test_fold_iwiden_u() {
     // x0 := int_u<4>(13);
     // x1 := iwiden_u<4, 5>(x0);
     // output x1 == int_u<5>(13);
-    let mut build =
-        DFGBuilder::new(FunctionType::new(type_row![], vec![INT_TYPES[5].clone()])).unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![INT_TYPES[5].clone()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(4, 13).unwrap()));
     let x1 = build
         .add_dataflow_op(IntOpDef::iwiden_u.with_two_log_widths(4, 5), [x0])
@@ -365,8 +369,7 @@ fn test_fold_iwiden_s() {
     // x0 := int_u<4>(-3);
     // x1 := iwiden_u<4, 5>(x0);
     // output x1 == int_s<5>(-3);
-    let mut build =
-        DFGBuilder::new(FunctionType::new(type_row![], vec![INT_TYPES[5].clone()])).unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![INT_TYPES[5].clone()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(4, -3).unwrap()));
     let x1 = build
         .add_dataflow_op(IntOpDef::iwiden_s.with_two_log_widths(4, 5), [x0])
@@ -411,11 +414,7 @@ fn test_fold_inarrow<I: Copy, C: Into<Value>, E: std::fmt::Debug>(
     // succeeds => whether to expect a int<to_log_width> variant or an error
     //   variant.
     let sum_type = sum_with_error(INT_TYPES[to_log_width as usize].to_owned());
-    let mut build = DFGBuilder::new(FunctionType::new(
-        type_row![],
-        vec![sum_type.clone().into()],
-    ))
-    .unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![sum_type.clone().into()])).unwrap();
     let x0 = build.add_load_const(mk_const(from_log_width, val).unwrap().into());
     let x1 = build
         .add_dataflow_op(
@@ -452,7 +451,7 @@ fn test_fold_itobool() {
     // x0 := int_u<0>(1);
     // x1 := itobool(x0);
     // output x1 == true;
-    let mut build = DFGBuilder::new(FunctionType::new(type_row![], vec![BOOL_T])).unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![BOOL_T])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(0, 1).unwrap()));
     let x1 = build
         .add_dataflow_op(IntOpDef::itobool.without_log_width(), [x0])
@@ -498,7 +497,7 @@ fn test_fold_ieq() {
     // x0, x1 := int_s<3>(-1), int_u<3>(255)
     // x2 := ieq(x0, x1)
     // output x2 == true;
-    let mut build = DFGBuilder::new(FunctionType::new(type_row![], vec![BOOL_T])).unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![BOOL_T])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(3, -1).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(3, 255).unwrap()));
     let x2 = build
@@ -521,7 +520,7 @@ fn test_fold_ine() {
     // x0, x1 := int_u<5>(3), int_u<5>(4)
     // x2 := ine(x0, x1)
     // output x2 == true;
-    let mut build = DFGBuilder::new(FunctionType::new(type_row![], vec![BOOL_T])).unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![BOOL_T])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 3).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 4).unwrap()));
     let x2 = build
@@ -544,7 +543,7 @@ fn test_fold_ilt_u() {
     // x0, x1 := int_u<5>(3), int_u<5>(4)
     // x2 := ilt_u(x0, x1)
     // output x2 == true;
-    let mut build = DFGBuilder::new(FunctionType::new(type_row![], vec![BOOL_T])).unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![BOOL_T])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 3).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 4).unwrap()));
     let x2 = build
@@ -567,7 +566,7 @@ fn test_fold_ilt_s() {
     // x0, x1 := int_s<5>(3), int_s<5>(-4)
     // x2 := ilt_s(x0, x1)
     // output x2 == false;
-    let mut build = DFGBuilder::new(FunctionType::new(type_row![], vec![BOOL_T])).unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![BOOL_T])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, 3).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_s(5, -4).unwrap()));
     let x2 = build
@@ -590,7 +589,7 @@ fn test_fold_igt_u() {
     // x0, x1 := int_u<5>(3), int_u<5>(4)
     // x2 := ilt_u(x0, x1)
     // output x2 == false;
-    let mut build = DFGBuilder::new(FunctionType::new(type_row![], vec![BOOL_T])).unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![BOOL_T])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 3).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 4).unwrap()));
     let x2 = build
@@ -613,7 +612,7 @@ fn test_fold_igt_s() {
     // x0, x1 := int_s<5>(3), int_s<5>(-4)
     // x2 := ilt_s(x0, x1)
     // output x2 == true;
-    let mut build = DFGBuilder::new(FunctionType::new(type_row![], vec![BOOL_T])).unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![BOOL_T])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, 3).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_s(5, -4).unwrap()));
     let x2 = build
@@ -636,7 +635,7 @@ fn test_fold_ile_u() {
     // x0, x1 := int_u<5>(3), int_u<5>(3)
     // x2 := ile_u(x0, x1)
     // output x2 == true;
-    let mut build = DFGBuilder::new(FunctionType::new(type_row![], vec![BOOL_T])).unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![BOOL_T])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 3).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 3).unwrap()));
     let x2 = build
@@ -659,7 +658,7 @@ fn test_fold_ile_s() {
     // x0, x1 := int_s<5>(-4), int_s<5>(-4)
     // x2 := ile_s(x0, x1)
     // output x2 == true;
-    let mut build = DFGBuilder::new(FunctionType::new(type_row![], vec![BOOL_T])).unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![BOOL_T])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, -4).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_s(5, -4).unwrap()));
     let x2 = build
@@ -682,7 +681,7 @@ fn test_fold_ige_u() {
     // x0, x1 := int_u<5>(3), int_u<5>(4)
     // x2 := ilt_u(x0, x1)
     // output x2 == false;
-    let mut build = DFGBuilder::new(FunctionType::new(type_row![], vec![BOOL_T])).unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![BOOL_T])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 3).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 4).unwrap()));
     let x2 = build
@@ -705,7 +704,7 @@ fn test_fold_ige_s() {
     // x0, x1 := int_s<5>(3), int_s<5>(-4)
     // x2 := ilt_s(x0, x1)
     // output x2 == true;
-    let mut build = DFGBuilder::new(FunctionType::new(type_row![], vec![BOOL_T])).unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![BOOL_T])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, 3).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_s(5, -4).unwrap()));
     let x2 = build
@@ -728,8 +727,7 @@ fn test_fold_imax_u() {
     // x0, x1 := int_u<5>(7), int_u<5>(11);
     // x2 := imax_u(x0, x1);
     // output x2 == int_u<5>(11);
-    let mut build =
-        DFGBuilder::new(FunctionType::new(type_row![], vec![INT_TYPES[5].clone()])).unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![INT_TYPES[5].clone()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 7).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 11).unwrap()));
     let x2 = build
@@ -752,8 +750,7 @@ fn test_fold_imax_s() {
     // x0, x1 := int_s<5>(-2), int_s<5>(1);
     // x2 := imax_u(x0, x1);
     // output x2 == int_s<5>(1);
-    let mut build =
-        DFGBuilder::new(FunctionType::new(type_row![], vec![INT_TYPES[5].clone()])).unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![INT_TYPES[5].clone()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, -2).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_s(5, 1).unwrap()));
     let x2 = build
@@ -776,8 +773,7 @@ fn test_fold_imin_u() {
     // x0, x1 := int_u<5>(7), int_u<5>(11);
     // x2 := imin_u(x0, x1);
     // output x2 == int_u<5>(7);
-    let mut build =
-        DFGBuilder::new(FunctionType::new(type_row![], vec![INT_TYPES[5].clone()])).unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![INT_TYPES[5].clone()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 7).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 11).unwrap()));
     let x2 = build
@@ -800,8 +796,7 @@ fn test_fold_imin_s() {
     // x0, x1 := int_s<5>(-2), int_s<5>(1);
     // x2 := imin_u(x0, x1);
     // output x2 == int_s<5>(-2);
-    let mut build =
-        DFGBuilder::new(FunctionType::new(type_row![], vec![INT_TYPES[5].clone()])).unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![INT_TYPES[5].clone()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, -2).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_s(5, 1).unwrap()));
     let x2 = build
@@ -824,8 +819,7 @@ fn test_fold_iadd() {
     // x0, x1 := int_s<5>(-2), int_s<5>(1);
     // x2 := iadd(x0, x1);
     // output x2 == int_s<5>(-1);
-    let mut build =
-        DFGBuilder::new(FunctionType::new(type_row![], vec![INT_TYPES[5].clone()])).unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![INT_TYPES[5].clone()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, -2).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_s(5, 1).unwrap()));
     let x2 = build
@@ -848,8 +842,7 @@ fn test_fold_isub() {
     // x0, x1 := int_s<5>(-2), int_s<5>(1);
     // x2 := isub(x0, x1);
     // output x2 == int_s<5>(-3);
-    let mut build =
-        DFGBuilder::new(FunctionType::new(type_row![], vec![INT_TYPES[5].clone()])).unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![INT_TYPES[5].clone()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, -2).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_s(5, 1).unwrap()));
     let x2 = build
@@ -872,8 +865,7 @@ fn test_fold_ineg() {
     // x0 := int_s<5>(-2);
     // x1 := ineg(x0);
     // output x1 == int_s<5>(2);
-    let mut build =
-        DFGBuilder::new(FunctionType::new(type_row![], vec![INT_TYPES[5].clone()])).unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![INT_TYPES[5].clone()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, -2).unwrap()));
     let x2 = build
         .add_dataflow_op(IntOpDef::ineg.with_log_width(5), [x0])
@@ -895,8 +887,7 @@ fn test_fold_imul() {
     // x0, x1 := int_s<5>(-2), int_s<5>(7);
     // x2 := imul(x0, x1);
     // output x2 == int_s<5>(-14);
-    let mut build =
-        DFGBuilder::new(FunctionType::new(type_row![], vec![INT_TYPES[5].clone()])).unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![INT_TYPES[5].clone()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, -2).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_s(5, 7).unwrap()));
     let x2 = build
@@ -921,11 +912,7 @@ fn test_fold_idivmod_checked_u() {
     // output x2 == error
     let intpair: TypeRow<true> = vec![INT_TYPES[5].clone(), INT_TYPES[3].clone()].into();
     let sum_type = sum_with_error(Type::new_tuple(intpair));
-    let mut build = DFGBuilder::new(FunctionType::new(
-        type_row![],
-        vec![sum_type.clone().into()],
-    ))
-    .unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![sum_type.clone().into()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 20).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(3, 0).unwrap()));
     let x2 = build
@@ -962,8 +949,7 @@ fn test_fold_idivmod_u() {
     // x4 := iwiden_u<3,5>(x3); // 2
     // x5 := iadd<5>(x2, x4); // 8
     // output x5 == int_u<5>(8);
-    let mut build =
-        DFGBuilder::new(FunctionType::new(type_row![], vec![INT_TYPES[5].clone()])).unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![INT_TYPES[5].clone()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 20).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(3, 3).unwrap()));
     let [x2, x3] = build
@@ -996,11 +982,7 @@ fn test_fold_idivmod_checked_s() {
     // output x2 == error
     let intpair: TypeRow<true> = vec![INT_TYPES[5].clone(), INT_TYPES[3].clone()].into();
     let sum_type = sum_with_error(Type::new_tuple(intpair));
-    let mut build = DFGBuilder::new(FunctionType::new(
-        type_row![],
-        vec![sum_type.clone().into()],
-    ))
-    .unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![sum_type.clone().into()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, -20).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(3, 0).unwrap()));
     let x2 = build
@@ -1038,8 +1020,7 @@ fn test_fold_idivmod_checked_s() {
 #[case(i64::MIN, 1u64 << 63, -1)]
 // c = a/b + a%b
 fn test_fold_idivmod_s(#[case] a: i64, #[case] b: u64, #[case] c: i64) {
-    let mut build =
-        DFGBuilder::new(FunctionType::new(type_row![], vec![INT_TYPES[6].clone()])).unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![INT_TYPES[6].clone()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(6, a).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(6, b).unwrap()));
     let [x2, x3] = build
@@ -1067,11 +1048,7 @@ fn test_fold_idiv_checked_u() {
     // x2 := idiv_checked_u(x0, x1)
     // output x2 == error
     let sum_type = sum_with_error(INT_TYPES[5].to_owned());
-    let mut build = DFGBuilder::new(FunctionType::new(
-        type_row![],
-        vec![sum_type.clone().into()],
-    ))
-    .unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![sum_type.clone().into()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 20).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(3, 0).unwrap()));
     let x2 = build
@@ -1103,8 +1080,7 @@ fn test_fold_idiv_u() {
     // x0, x1 := int_u<5>(20), int_u<3>(3);
     // x2 := idiv_u(x0, x1);
     // output x2 == int_u<5>(6);
-    let mut build =
-        DFGBuilder::new(FunctionType::new(type_row![], vec![INT_TYPES[5].clone()])).unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![INT_TYPES[5].clone()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 20).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(3, 3).unwrap()));
     let x2 = build
@@ -1128,11 +1104,7 @@ fn test_fold_imod_checked_u() {
     // x2 := imod_checked_u(x0, x1)
     // output x2 == error
     let sum_type = sum_with_error(INT_TYPES[3].to_owned());
-    let mut build = DFGBuilder::new(FunctionType::new(
-        type_row![],
-        vec![sum_type.clone().into()],
-    ))
-    .unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![sum_type.clone().into()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 20).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(3, 0).unwrap()));
     let x2 = build
@@ -1164,8 +1136,7 @@ fn test_fold_imod_u() {
     // x0, x1 := int_u<5>(20), int_u<3>(3);
     // x2 := imod_u(x0, x1);
     // output x2 == int_u<3>(2);
-    let mut build =
-        DFGBuilder::new(FunctionType::new(type_row![], vec![INT_TYPES[3].clone()])).unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![INT_TYPES[3].clone()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 20).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(3, 3).unwrap()));
     let x2 = build
@@ -1189,11 +1160,7 @@ fn test_fold_idiv_checked_s() {
     // x2 := idiv_checked_s(x0, x1)
     // output x2 == error
     let sum_type = sum_with_error(INT_TYPES[5].to_owned());
-    let mut build = DFGBuilder::new(FunctionType::new(
-        type_row![],
-        vec![sum_type.clone().into()],
-    ))
-    .unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![sum_type.clone().into()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, -20).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(3, 0).unwrap()));
     let x2 = build
@@ -1225,8 +1192,7 @@ fn test_fold_idiv_s() {
     // x0, x1 := int_s<5>(-20), int_u<3>(3);
     // x2 := idiv_s(x0, x1);
     // output x2 == int_s<5>(-7);
-    let mut build =
-        DFGBuilder::new(FunctionType::new(type_row![], vec![INT_TYPES[5].clone()])).unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![INT_TYPES[5].clone()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, -20).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(3, 3).unwrap()));
     let x2 = build
@@ -1250,11 +1216,7 @@ fn test_fold_imod_checked_s() {
     // x2 := imod_checked_u(x0, x1)
     // output x2 == error
     let sum_type = sum_with_error(INT_TYPES[3].to_owned());
-    let mut build = DFGBuilder::new(FunctionType::new(
-        type_row![],
-        vec![sum_type.clone().into()],
-    ))
-    .unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![sum_type.clone().into()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, -20).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(3, 0).unwrap()));
     let x2 = build
@@ -1286,8 +1248,7 @@ fn test_fold_imod_s() {
     // x0, x1 := int_s<5>(-20), int_u<3>(3);
     // x2 := imod_s(x0, x1);
     // output x2 == int_u<3>(1);
-    let mut build =
-        DFGBuilder::new(FunctionType::new(type_row![], vec![INT_TYPES[3].clone()])).unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![INT_TYPES[3].clone()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, -20).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(3, 3).unwrap()));
     let x2 = build
@@ -1310,8 +1271,7 @@ fn test_fold_iabs() {
     // x0 := int_s<5>(-2);
     // x1 := iabs(x0);
     // output x1 == int_s<5>(2);
-    let mut build =
-        DFGBuilder::new(FunctionType::new(type_row![], vec![INT_TYPES[5].clone()])).unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![INT_TYPES[5].clone()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, -2).unwrap()));
     let x2 = build
         .add_dataflow_op(IntOpDef::iabs.with_log_width(5), [x0])
@@ -1333,8 +1293,7 @@ fn test_fold_iand() {
     // x0, x1 := int_u<5>(14), int_u<5>(20);
     // x2 := iand(x0, x1);
     // output x2 == int_u<5>(4);
-    let mut build =
-        DFGBuilder::new(FunctionType::new(type_row![], vec![INT_TYPES[5].clone()])).unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![INT_TYPES[5].clone()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 14).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 20).unwrap()));
     let x2 = build
@@ -1357,8 +1316,7 @@ fn test_fold_ior() {
     // x0, x1 := int_u<5>(14), int_u<5>(20);
     // x2 := ior(x0, x1);
     // output x2 == int_u<5>(30);
-    let mut build =
-        DFGBuilder::new(FunctionType::new(type_row![], vec![INT_TYPES[5].clone()])).unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![INT_TYPES[5].clone()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 14).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 20).unwrap()));
     let x2 = build
@@ -1381,8 +1339,7 @@ fn test_fold_ixor() {
     // x0, x1 := int_u<5>(14), int_u<5>(20);
     // x2 := ixor(x0, x1);
     // output x2 == int_u<5>(26);
-    let mut build =
-        DFGBuilder::new(FunctionType::new(type_row![], vec![INT_TYPES[5].clone()])).unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![INT_TYPES[5].clone()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 14).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 20).unwrap()));
     let x2 = build
@@ -1405,8 +1362,7 @@ fn test_fold_inot() {
     // x0 := int_u<5>(14);
     // x1 := inot(x0);
     // output x1 == int_u<5>(17);
-    let mut build =
-        DFGBuilder::new(FunctionType::new(type_row![], vec![INT_TYPES[5].clone()])).unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![INT_TYPES[5].clone()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 14).unwrap()));
     let x2 = build
         .add_dataflow_op(IntOpDef::inot.with_log_width(5), [x0])
@@ -1428,8 +1384,7 @@ fn test_fold_ishl() {
     // x0, x1 := int_u<5>(14), int_u<3>(3);
     // x2 := ishl(x0, x1);
     // output x2 == int_u<5>(112);
-    let mut build =
-        DFGBuilder::new(FunctionType::new(type_row![], vec![INT_TYPES[5].clone()])).unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![INT_TYPES[5].clone()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, 14).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(3, 3).unwrap()));
     let x2 = build
@@ -1452,8 +1407,7 @@ fn test_fold_ishr() {
     // x0, x1 := int_u<5>(14), int_u<3>(3);
     // x2 := ishr(x0, x1);
     // output x2 == int_u<5>(1);
-    let mut build =
-        DFGBuilder::new(FunctionType::new(type_row![], vec![INT_TYPES[5].clone()])).unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![INT_TYPES[5].clone()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, 14).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(3, 3).unwrap()));
     let x2 = build
@@ -1476,8 +1430,7 @@ fn test_fold_irotl() {
     // x0, x1 := int_u<5>(14), int_u<3>(61);
     // x2 := irotl(x0, x1);
     // output x2 == int_u<5>(2^30 + 2^31 + 1);
-    let mut build =
-        DFGBuilder::new(FunctionType::new(type_row![], vec![INT_TYPES[5].clone()])).unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![INT_TYPES[5].clone()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, 14).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(3, 61).unwrap()));
     let x2 = build
@@ -1500,8 +1453,7 @@ fn test_fold_irotr() {
     // x0, x1 := int_u<5>(14), int_u<3>(3);
     // x2 := irotr(x0, x1);
     // output x2 == int_u<5>(2^30 + 2^31 + 1);
-    let mut build =
-        DFGBuilder::new(FunctionType::new(type_row![], vec![INT_TYPES[5].clone()])).unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![INT_TYPES[5].clone()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, 14).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(3, 3).unwrap()));
     let x2 = build
@@ -1524,7 +1476,7 @@ fn test_fold_itostring_u() {
     // x0 := int_u<5>(17);
     // x1 := itostring_u(x0);
     // output x2 := "17";
-    let mut build = DFGBuilder::new(FunctionType::new(type_row![], vec![STRING_TYPE])).unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![STRING_TYPE])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 17).unwrap()));
     let x1 = build
         .add_dataflow_op(IntOpDef::itostring_u.with_log_width(5), [x0])
@@ -1546,7 +1498,7 @@ fn test_fold_itostring_s() {
     // x0 := int_s<5>(-17);
     // x1 := itostring_s(x0);
     // output x2 := "-17";
-    let mut build = DFGBuilder::new(FunctionType::new(type_row![], vec![STRING_TYPE])).unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![STRING_TYPE])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, -17).unwrap()));
     let x1 = build
         .add_dataflow_op(IntOpDef::itostring_s.with_log_width(5), [x0])
@@ -1575,7 +1527,7 @@ fn test_fold_int_ops() {
     // x6 := ilt_s(x0, x5) // false
     // x7 := or(x4, x6) // true
     // output x7
-    let mut build = DFGBuilder::new(FunctionType::new(type_row![], vec![BOOL_T])).unwrap();
+    let mut build = DFGBuilder::new(int_fn(vec![BOOL_T])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 3).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 4).unwrap()));
     let x2 = build

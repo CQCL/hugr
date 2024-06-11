@@ -222,6 +222,7 @@ pub(crate) mod test {
 
     use crate::hugr::{views::HugrView, HugrMut, NodeType};
     use crate::ops;
+    use crate::std_extensions::arithmetic::float_ops::FLOAT_OPS_REGISTRY;
     use crate::types::{FunctionType, PolyFuncType, Type};
     use crate::{type_row, Hugr};
 
@@ -252,7 +253,8 @@ pub(crate) mod test {
         let f_builder = module_builder.define_function("main", signature)?;
 
         f(f_builder)?;
-        Ok(module_builder.finish_prelude_hugr()?)
+
+        Ok(module_builder.finish_hugr(&FLOAT_OPS_REGISTRY)?)
     }
 
     #[fixture]

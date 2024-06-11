@@ -1,3 +1,4 @@
+use crate::extension::ExtensionSet;
 use crate::ops;
 
 use crate::hugr::{views::HugrView, NodeType};
@@ -26,7 +27,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> TailLoopBuilder<B> {
         Ok(TailLoopBuilder::from_dfg_builder(dfg_build))
     }
     /// Set the outputs of the [`ops::TailLoop`], with `out_variant` as the value of the
-    /// termination Sum, and `rest` being the remaining outputs
+    /// termination Sum, and `rest` being the remaining outputs.
     pub fn set_outputs(
         &mut self,
         out_variant: Wire,
@@ -74,11 +75,13 @@ impl TailLoopBuilder<Hugr> {
         just_inputs: impl Into<TypeRow>,
         inputs_outputs: impl Into<TypeRow>,
         just_outputs: impl Into<TypeRow>,
+        extension_delta: ExtensionSet,
     ) -> Result<Self, BuildError> {
         let tail_loop = ops::TailLoop {
             just_inputs: just_inputs.into(),
             just_outputs: just_outputs.into(),
             rest: inputs_outputs.into(),
+            extension_delta,
         };
         // TODO: Allow input extensions to be specified
         let base = Hugr::new(NodeType::new_open(tail_loop.clone()));
@@ -97,7 +100,6 @@ mod test {
             DataflowSubContainer, HugrBuilder, ModuleBuilder,
         },
         extension::prelude::{ConstUsize, PRELUDE_ID, USIZE_T},
-        extension::ExtensionSet,
         hugr::ValidationError,
         ops::Value,
         type_row,
@@ -108,7 +110,8 @@ mod test {
     #[test]
     fn basic_loop() -> Result<(), BuildError> {
         let build_result: Result<Hugr, ValidationError> = {
-            let mut loop_b = TailLoopBuilder::new(vec![], vec![BIT], vec![USIZE_T])?;
+            let mut loop_b =
+                TailLoopBuilder::new(vec![], vec![BIT], vec![USIZE_T], PRELUDE_ID.into())?;
             let [i1] = loop_b.input_wires_arr();
             let const_wire = loop_b.add_load_value(ConstUsize::new(1));
 
@@ -142,8 +145,12 @@ mod test {
                     )?
                     .outputs_arr();
                 let loop_id = {
-                    let mut loop_b =
-                        fbuild.tail_loop_builder(vec![(BIT, b1)], vec![], type_row![NAT])?;
+                    let mut loop_b = fbuild.tail_loop_builder(
+                        vec![(BIT, b1)],
+                        vec![],
+                        type_row![NAT],
+                        PRELUDE_ID.into(),
+                    )?;
                     let signature = loop_b.loop_signature()?.clone();
                     let const_val = Value::true_val();
                     let const_wire = loop_b.add_load_const(Value::true_val());
@@ -162,7 +169,7 @@ mod test {
                             ([type_row![], type_row![]], const_wire),
                             vec![(BIT, b1)],
                             output_row,
-                            ExtensionSet::new(),
+                            PRELUDE_ID.into(),
                         )?;
 
                         let mut branch_0 = conditional_b.case_builder(0)?;

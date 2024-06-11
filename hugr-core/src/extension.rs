@@ -20,12 +20,6 @@ use crate::types::FunctionType;
 use crate::types::TypeNameRef;
 use crate::types::{check_typevar_decl, CustomType, Substitution, TypeBound, TypeName};
 
-#[allow(dead_code)]
-mod infer;
-#[cfg(feature = "extension_inference")]
-pub use infer::infer_extensions;
-pub use infer::{ExtensionSolution, InferExtensionError};
-
 mod op_def;
 pub use op_def::{
     CustomSignatureFunc, CustomValidator, LowerFunc, OpDef, SignatureFromArgs, SignatureFunc,
@@ -36,7 +30,6 @@ pub use type_def::{TypeDef, TypeDefBound};
 mod const_fold;
 pub mod prelude;
 pub mod simple_op;
-pub mod validate;
 pub use const_fold::{ConstFold, ConstFoldResult, Folder};
 pub use prelude::{PRELUDE, PRELUDE_REGISTRY};
 
