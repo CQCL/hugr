@@ -14,7 +14,7 @@ use smol_str::SmolStr;
 use crate::extension::prelude::PRELUDE_ID;
 use crate::extension::{CustomValidator, ExtensionSet, SignatureFunc, TypeDef};
 use crate::types::type_param::TypeParam;
-use crate::types::{CustomType, FunctionType, PolyFuncType, Type, TypeRow};
+use crate::types::{CustomType, FunTypeVarArgs, PolyFuncType, Type, TypeRow};
 use crate::Extension;
 
 use super::{DeclarationContext, ExtensionDeclarationError};
@@ -50,7 +50,7 @@ impl SignatureDeclaration {
                 Ok(types.into())
             };
 
-        let body = FunctionType {
+        let body = FunTypeVarArgs {
             input: make_type_row(&self.inputs)?,
             output: make_type_row(&self.outputs)?,
             extension_reqs: self.extensions.clone(),

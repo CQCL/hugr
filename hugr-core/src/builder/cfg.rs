@@ -9,7 +9,7 @@ use crate::extension::{ExtensionRegistry, ExtensionSet};
 use crate::{hugr::views::HugrView, types::TypeRow};
 use crate::{
     ops::{self, handle::NodeHandle, DataflowBlock, DataflowParent, ExitBlock, OpType},
-    types::Signature,
+    types::FunctionType,
 };
 
 use crate::Node;
@@ -153,7 +153,7 @@ impl<H: AsMut<Hugr> + AsRef<Hugr>> SubContainer for CFGBuilder<H> {
 
 impl CFGBuilder<Hugr> {
     /// New CFG rooted HUGR builder
-    pub fn new(signature: Signature) -> Result<Self, BuildError> {
+    pub fn new(signature: FunctionType) -> Result<Self, BuildError> {
         let cfg_op = ops::CFG {
             signature: signature.clone(),
         };
@@ -251,7 +251,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
     /// This function will return an error if there is an error adding the node.
     pub fn simple_block_builder(
         &mut self,
-        signature: Signature,
+        signature: FunctionType,
         n_cases: usize,
     ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
         self.block_builder(

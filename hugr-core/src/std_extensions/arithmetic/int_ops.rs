@@ -10,7 +10,7 @@ use crate::ops::custom::ExtensionOp;
 use crate::ops::{NamedOp, OpName};
 use crate::std_extensions::arithmetic::int_types::int_type;
 use crate::type_row;
-use crate::types::{FunctionType, PolyFuncType};
+use crate::types::{FunTypeVarArgs, FunctionType, PolyFuncType};
 use crate::utils::collect_array;
 
 use crate::{
@@ -161,7 +161,7 @@ impl MakeOpDef for IntOpDef {
             }
             itostring_u | itostring_s => PolyFuncType::new(
                 vec![LOG_WIDTH_TYPE_PARAM],
-                FunctionType::new(vec![int_tv(0)], vec![STRING_TYPE]),
+                FunTypeVarArgs::new(vec![int_tv(0)], vec![STRING_TYPE]),
             )
             .into(),
         }
@@ -240,7 +240,7 @@ fn int_polytype(
 ) -> PolyFuncType {
     PolyFuncType::new(
         vec![LOG_WIDTH_TYPE_PARAM; n_vars],
-        FunctionType::new(input, output),
+        FunTypeVarArgs::new(input, output),
     )
 }
 

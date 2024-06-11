@@ -10,7 +10,7 @@ pub mod module;
 pub mod tag;
 pub mod validate;
 use crate::extension::ExtensionSet;
-use crate::types::{EdgeKind, Signature};
+use crate::types::{EdgeKind, FunctionType};
 use crate::{Direction, OutgoingPort, Port};
 use crate::{IncomingPort, PortIndex};
 use paste::paste;
@@ -342,7 +342,7 @@ pub trait OpTrait {
     /// The signature of the operation.
     ///
     /// Only dataflow operations have a signature, otherwise returns None.
-    fn dataflow_signature(&self) -> Option<Signature> {
+    fn dataflow_signature(&self) -> Option<FunctionType> {
         None
     }
 
@@ -405,13 +405,13 @@ pub trait OpParent {
     /// sibling graph.
     ///
     /// Non-container ops like `FuncDecl` return `None` even though they represent a function.
-    fn inner_function_type(&self) -> Option<Signature> {
+    fn inner_function_type(&self) -> Option<FunctionType> {
         None
     }
 }
 
 impl<T: DataflowParent> OpParent for T {
-    fn inner_function_type(&self) -> Option<Signature> {
+    fn inner_function_type(&self) -> Option<FunctionType> {
         Some(DataflowParent::inner_signature(self))
     }
 }

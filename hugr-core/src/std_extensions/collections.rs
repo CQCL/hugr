@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::ops::constant::ValueName;
 use crate::ops::{OpName, Value};
-use crate::types::TypeName;
+use crate::types::{FunTypeVarArgs, TypeName};
 use crate::{
     extension::{
         simple_op::{MakeExtensionOp, OpLoadError},
@@ -17,7 +17,7 @@ use crate::{
     ops::{self, custom::ExtensionOp, NamedOp},
     types::{
         type_param::{TypeArg, TypeParam},
-        CustomCheckFailure, CustomType, FunctionType, PolyFuncType, Type, TypeBound,
+        CustomCheckFailure, CustomType, PolyFuncType, Type, TypeBound,
     },
     utils::sorted_consts,
     Extension,
@@ -157,7 +157,7 @@ fn extension() -> Extension {
             "Pop from back of list".into(),
             PolyFuncType::new(
                 vec![TP],
-                FunctionType::new(vec![l.clone()], vec![l.clone(), e.clone()]),
+                FunTypeVarArgs::new(vec![l.clone()], vec![l.clone(), e.clone()]),
             ),
         )
         .unwrap()
@@ -166,7 +166,7 @@ fn extension() -> Extension {
         .add_op(
             PUSH_NAME,
             "Push to back of list".into(),
-            PolyFuncType::new(vec![TP], FunctionType::new(vec![l.clone(), e], vec![l])),
+            PolyFuncType::new(vec![TP], FunTypeVarArgs::new(vec![l.clone(), e], vec![l])),
         )
         .unwrap()
         .set_constant_folder(PushFold);

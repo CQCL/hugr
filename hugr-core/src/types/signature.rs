@@ -1,4 +1,4 @@
-//! Abstract and concrete Signature types.
+//! Abstract and concrete FunctionType types.
 
 use itertools::Either;
 
@@ -36,9 +36,11 @@ pub struct FuncTypeBase<const ROWVARS: bool> {
 
 /// The concept of "signature" in the spec - the edges required to/from a node or graph
 /// and also the target (value) of a call (static).
-pub type Signature = FuncTypeBase<false>;
+pub type FunctionType = FuncTypeBase<false>;
 
-pub type FunctionType = FuncTypeBase<true>;
+/// A function of potentially-unknown arity; passable as a value round a Hugr
+/// (see [Type::new_function]) but not a valid node type.
+pub type FunTypeVarArgs = FuncTypeBase<true>;
 
 impl<const RV: bool> FuncTypeBase<RV> {
     /// Builder method, add extension_reqs to an FunctionType
@@ -98,7 +100,7 @@ impl<const RV: bool> FuncTypeBase<RV> {
     }
 }
 
-impl FunctionType {
+impl FunTypeVarArgs {
     /// If this FunctionType contains any row variables, return one.
     pub fn find_rowvar(&self) -> Option<(usize, TypeBound)> {
         self.input
@@ -111,9 +113,9 @@ impl FunctionType {
     }
 }
 
-impl Signature {
-    pub(crate) fn into_(self) -> FunctionType {
-        FunctionType {
+impl FunctionType {
+    pub(crate) fn into_(self) -> FunTypeVarArgs {
+        FunTypeVarArgs {
             input: self.input.into_(),
             output: self.output.into_(),
             extension_reqs: self.extension_reqs
@@ -246,18 +248,18 @@ impl<const RV: bool> Display for FuncTypeBase<RV> {
     }
 }
 
-impl TryFrom<FunctionType> for Signature {
+impl TryFrom<FunTypeVarArgs> for FunctionType {
     type Error = SignatureError;
 
-    fn try_from(value: FunctionType) -> Result<Self, Self::Error> {
+    fn try_from(value: FunTypeVarArgs) -> Result<Self, Self::Error> {
         let input: TypeRow<false> = value.input.try_into()?;
         let output: TypeRow<false> = value.output.try_into()?;
         Ok(Self::new(input, output).with_extension_delta(value.extension_reqs))
     }
 }
 
-impl PartialEq<FunctionType> for Signature {
-    fn eq(&self, other: &FunctionType) -> bool {
+impl PartialEq<FunTypeVarArgs> for FunctionType {
+    fn eq(&self, other: &FunTypeVarArgs) -> bool {
         self.input == other.input
             && self.output == other.output
             && self.extension_reqs == other.extension_reqs

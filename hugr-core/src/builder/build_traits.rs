@@ -20,7 +20,7 @@ use crate::{
 };
 
 use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE_REGISTRY};
-use crate::types::{PolyFuncType, Signature, Type, TypeArg, TypeRow};
+use crate::types::{PolyFuncType, FunctionType, Type, TypeArg, TypeRow};
 
 use itertools::Itertools;
 
@@ -296,7 +296,7 @@ pub trait Dataflow: Container {
     // TODO: Should this be one function, or should there be a temporary "op" one like with the others?
     fn dfg_builder(
         &mut self,
-        signature: Signature,
+        signature: FunctionType,
         input_extensions: Option<ExtensionSet>,
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<DFGBuilder<&mut Hugr>, BuildError> {
@@ -334,7 +334,7 @@ pub trait Dataflow: Container {
             self,
             NodeType::new(
                 ops::CFG {
-                    signature: Signature::new(inputs.clone(), output_types.clone())
+                    signature: FunctionType::new(inputs.clone(), output_types.clone())
                         .with_extension_delta(extension_delta),
                 },
                 input_extensions.into(),

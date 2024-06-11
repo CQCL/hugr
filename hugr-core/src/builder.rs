@@ -222,7 +222,7 @@ pub(crate) mod test {
 
     use crate::hugr::{views::HugrView, HugrMut, NodeType};
     use crate::ops;
-    use crate::types::{FunctionType, PolyFuncType, Signature, Type};
+    use crate::types::{FunctionType, PolyFuncType, Type};
     use crate::{type_row, Hugr};
 
     use super::handle::BuildHandle;
@@ -275,7 +275,7 @@ pub(crate) mod test {
     /// for tests which want to avoid having open extension variables after
     /// inference. Using DFGBuilder will default to a root node with an open
     /// extension variable
-    pub(crate) fn closed_dfg_root_hugr(signature: Signature) -> Hugr {
+    pub(crate) fn closed_dfg_root_hugr(signature: FunctionType) -> Hugr {
         let mut hugr = Hugr::new(NodeType::new_pure(ops::DFG {
             signature: signature.clone(),
         }));

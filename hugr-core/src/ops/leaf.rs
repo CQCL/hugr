@@ -5,7 +5,6 @@ use super::{impl_op_name, OpTag};
 
 use crate::extension::ExtensionSet;
 
-use crate::types::Signature;
 use crate::{
     extension::ExtensionId,
     types::{EdgeKind, FunctionType, Type, TypeRow},
@@ -122,7 +121,7 @@ impl DataflowOpTrait for Noop {
     }
 
     /// The signature of the operation.
-    fn signature(&self) -> Signature {
+    fn signature(&self) -> FunctionType {
         FunctionType::new(vec![self.ty.clone()], vec![self.ty.clone()])
     }
 
@@ -144,7 +143,7 @@ impl DataflowOpTrait for MakeTuple {
     }
 
     /// The signature of the operation.
-    fn signature(&self) -> Signature {
+    fn signature(&self) -> FunctionType {
         FunctionType::new(self.tys.clone(), vec![Type::new_tuple(self.tys.clone().into_())])
     }
 
@@ -166,7 +165,7 @@ impl DataflowOpTrait for UnpackTuple {
     }
 
     /// The signature of the operation.
-    fn signature(&self) -> Signature {
+    fn signature(&self) -> FunctionType {
         FunctionType::new(vec![Type::new_tuple(self.tys.clone().into_())], self.tys.clone())
     }
 
@@ -188,7 +187,7 @@ impl DataflowOpTrait for Tag {
     }
 
     /// The signature of the operation.
-    fn signature(&self) -> Signature {
+    fn signature(&self) -> FunctionType {
         FunctionType::new(
             self.variants
                 .get(self.tag)
@@ -216,7 +215,7 @@ impl DataflowOpTrait for Lift {
     }
 
     /// The signature of the operation.
-    fn signature(&self) -> Signature {
+    fn signature(&self) -> FunctionType {
         FunctionType::new(self.type_row.clone(), self.type_row.clone())
             .with_extension_delta(ExtensionSet::singleton(&self.new_extension))
     }

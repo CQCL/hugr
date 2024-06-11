@@ -16,7 +16,7 @@ use crate::utils::display_list_with_separator;
 pub use check::SumTypeError;
 pub use custom::CustomType;
 pub use poly_func::PolyFuncType;
-pub use signature::{FunctionType, Signature};
+pub use signature::{FunctionType, FunTypeVarArgs};
 use smol_str::SmolStr;
 pub use type_param::TypeArg;
 pub use type_row::TypeRow;
@@ -217,7 +217,7 @@ pub enum TypeEnum {
             test,
             proptest(strategy = "any_with::<FunctionType>(params).prop_map(Box::new)")
         )]
-        Box<FunctionType>,
+        Box<FunTypeVarArgs>,
     ),
     // Index into TypeParams, and cache of TypeBound (checked in validation)
     #[allow(missing_docs)]
@@ -298,7 +298,7 @@ impl<const RV: bool> Type<RV> {
     const EMPTY_TYPEROW_REF: &'static TypeRow<RV> = &Self::EMPTY_TYPEROW;
 
     /// Initialize a new function type.
-    pub fn new_function(fun_ty: impl Into<FunctionType>) -> Self {
+    pub fn new_function(fun_ty: impl Into<FunTypeVarArgs>) -> Self {
         Self::new(TypeEnum::Function(Box::new(fun_ty.into())))
     }
 

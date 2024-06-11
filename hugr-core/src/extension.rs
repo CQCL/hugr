@@ -16,7 +16,7 @@ use crate::ops::constant::{ValueName, ValueNameRef};
 use crate::ops::custom::{ExtensionOp, OpaqueOp};
 use crate::ops::{self, OpName, OpNameRef};
 use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
-use crate::types::Signature;
+use crate::types::FunctionType;
 use crate::types::TypeNameRef;
 use crate::types::{check_typevar_decl, CustomType, Substitution, TypeBound, TypeName};
 
@@ -141,10 +141,10 @@ pub enum SignatureError {
     /// Invalid type arguments
     #[error("Invalid type arguments for operation")]
     InvalidTypeArgs,
-    /// The Extension Registry did not contain an Extension referenced by the Signature
+    /// The Extension Registry did not contain an Extension referenced by the FunctionType
     #[error("Extension '{0}' not found")]
     ExtensionNotFound(ExtensionId),
-    /// The Extension was found in the registry, but did not contain the Type(Def) referenced in the Signature
+    /// The Extension was found in the registry, but did not contain the Type(Def) referenced in the FunctionType
     #[error("Extension '{exn}' did not contain expected TypeDef '{typ}'")]
     ExtensionTypeNotFound { exn: ExtensionId, typ: TypeName },
     /// The bound recorded for a CustomType doesn't match what the TypeDef would compute
@@ -173,8 +173,8 @@ pub enum SignatureError {
         "Incorrect result of type application in Call - cached {cached} but expected {expected}"
     )]
     CallIncorrectlyAppliesType {
-        cached: Signature,
-        expected: Signature,
+        cached: FunctionType,
+        expected: FunctionType,
     },
     /// The result of the type application stored in a [LoadFunction]
     /// is not what we get by applying the type-args to the polymorphic function
@@ -184,8 +184,8 @@ pub enum SignatureError {
         "Incorrect result of type application in LoadFunction - cached {cached} but expected {expected}"
     )]
     LoadFunctionIncorrectlyAppliesType {
-        cached: Signature,
-        expected: Signature,
+        cached: FunctionType,
+        expected: FunctionType,
     },
 }
 

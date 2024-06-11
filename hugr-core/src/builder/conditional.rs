@@ -1,7 +1,7 @@
 use crate::extension::ExtensionRegistry;
 use crate::hugr::views::HugrView;
 use crate::ops::dataflow::DataflowOpTrait;
-use crate::types::{FunctionType, Signature, TypeRow};
+use crate::types::{FunctionType, TypeRow};
 
 use crate::ops;
 use crate::ops::handle::CaseID;
@@ -192,7 +192,7 @@ impl ConditionalBuilder<Hugr> {
 
 impl CaseBuilder<Hugr> {
     /// Initialize a Case rooted HUGR
-    pub fn new(signature: Signature) -> Result<Self, BuildError> {
+    pub fn new(signature: FunctionType) -> Result<Self, BuildError> {
         let op = ops::Case {
             signature: signature.clone(),
         };

@@ -5,7 +5,7 @@ mod custom;
 use super::{NamedOp, OpName, OpTrait, StaticTag};
 use super::{OpTag, OpType};
 use crate::extension::ExtensionSet;
-use crate::types::{CustomType, EdgeKind, Signature, SumType, SumTypeError, Type};
+use crate::types::{CustomType, EdgeKind, FunctionType, SumType, SumTypeError, Type};
 use crate::{Hugr, HugrView};
 
 use delegate::delegate;
@@ -267,7 +267,7 @@ pub enum ConstTypeError {
 }
 
 /// Hugrs (even functions) inside Consts must be monomorphic
-fn mono_fn_type(h: &Hugr) -> Result<Signature, ConstTypeError> {
+fn mono_fn_type(h: &Hugr) -> Result<FunctionType, ConstTypeError> {
     if let Some(pf) = h.get_function_type() {
         if let Ok(ft) = pf.try_into() {
             return Ok(ft);

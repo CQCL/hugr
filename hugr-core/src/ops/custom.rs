@@ -14,7 +14,7 @@ use crate::extension::{ConstFoldResult, ExtensionId, ExtensionRegistry, OpDef, S
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::{HugrView, NodeType};
 use crate::types::type_param::TypeArg;
-use crate::types::{EdgeKind, Signature};
+use crate::types::{EdgeKind, FunctionType};
 use crate::{ops, Hugr, IncomingPort, Node};
 
 use super::dataflow::DataflowOpTrait;
@@ -132,7 +132,7 @@ impl DataflowOpTrait for CustomOp {
     }
 
     /// The signature of the operation.
-    fn signature(&self) -> Signature {
+    fn signature(&self) -> FunctionType {
         match self {
             Self::Opaque(op) => op.signature.clone(),
             Self::Extension(ext_op) => ext_op.signature(),
@@ -181,7 +181,7 @@ pub struct ExtensionOp {
     )]
     def: Arc<OpDef>,
     args: Vec<TypeArg>,
-    signature: Signature, // Cache
+    signature: FunctionType, // Cache
 }
 
 impl ExtensionOp {
@@ -271,7 +271,7 @@ impl DataflowOpTrait for ExtensionOp {
         self.def().description()
     }
 
-    fn signature(&self) -> Signature {
+    fn signature(&self) -> FunctionType {
         self.signature.clone()
     }
 }
@@ -286,7 +286,7 @@ pub struct OpaqueOp {
     #[cfg_attr(test, proptest(strategy = "any_nonempty_string()"))]
     description: String, // cache in advance so description() can return &str
     args: Vec<TypeArg>,
-    signature: Signature,
+    signature: FunctionType,
 }
 
 fn qualify_name(res_id: &ExtensionId, op_name: &OpNameRef) -> OpName {
@@ -300,7 +300,7 @@ impl OpaqueOp {
         op_name: impl Into<OpName>,
         description: String,
         args: impl Into<Vec<TypeArg>>,
-        signature: Signature,
+        signature: FunctionType,
     ) -> Self {
         Self {
             extension,
@@ -342,7 +342,7 @@ impl DataflowOpTrait for OpaqueOp {
         &self.description
     }
 
-    fn signature(&self) -> Signature {
+    fn signature(&self) -> FunctionType {
         self.signature.clone()
     }
 }
@@ -423,8 +423,8 @@ pub enum CustomOpError {
     SignatureMismatch {
         extension: ExtensionId,
         op: OpName,
-        stored: Signature,
-        computed: Signature,
+        stored: FunctionType,
+        computed: FunctionType,
     },
 }
 
@@ -436,7 +436,7 @@ mod test {
 
     #[test]
     fn new_opaque_op() {
-        let sig = Signature::new_endo(vec![QB_T]);
+        let sig = FunctionType::new_endo(vec![QB_T]);
         let op: CustomOp = OpaqueOp::new(
             "res".try_into().unwrap(),
             "op",

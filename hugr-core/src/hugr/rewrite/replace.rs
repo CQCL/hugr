@@ -161,7 +161,7 @@ impl Replacement {
             .ok_or(ReplaceError::CantReplaceRoot)?; // If no parent
 
         // Check replacement parent is of same tag. Note we do not require exact equality
-        // of OpType/Signature, e.g. to ease changing of Input/Output node signatures too.
+        // of OpType/FunctionType, e.g. to ease changing of Input/Output node signatures too.
         let removed = h.get_optype(parent).tag();
         let replacement = self.replacement.root_type().tag();
         if removed != replacement {

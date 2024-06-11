@@ -1,7 +1,7 @@
 //! Control flow operations.
 
 use crate::extension::ExtensionSet;
-use crate::types::{EdgeKind, FunctionType, Signature, Type, TypeRow};
+use crate::types::{EdgeKind, FunctionType, Type, TypeRow};
 use crate::Direction;
 
 use super::dataflow::{DataflowOpTrait, DataflowParent};
@@ -29,7 +29,7 @@ impl DataflowOpTrait for TailLoop {
         "A tail-controlled loop"
     }
 
-    fn signature(&self) -> Signature {
+    fn signature(&self) -> FunctionType {
         let [inputs, outputs] =
             [&self.just_inputs, &self.just_outputs].map(|row| row.extend(self.rest.iter()));
         FunctionType::new(inputs, outputs)
@@ -73,7 +73,7 @@ impl DataflowOpTrait for Conditional {
         "HUGR conditional operation"
     }
 
-    fn signature(&self) -> Signature {
+    fn signature(&self) -> FunctionType {
         let mut inputs = self.other_inputs.clone();
         inputs
             .to_mut()
@@ -95,7 +95,7 @@ impl Conditional {
 #[allow(missing_docs)]
 #[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 pub struct CFG {
-    pub signature: Signature,
+    pub signature: FunctionType,
 }
 
 impl_op_name!(CFG);
@@ -107,7 +107,7 @@ impl DataflowOpTrait for CFG {
         "A dataflow node defined by a child CFG"
     }
 
-    fn signature(&self) -> Signature {
+    fn signature(&self) -> FunctionType {
         self.signature.clone()
     }
 }
@@ -153,7 +153,7 @@ impl StaticTag for ExitBlock {
 }
 
 impl DataflowParent for DataflowBlock {
-    fn inner_signature(&self) -> Signature {
+    fn inner_signature(&self) -> FunctionType {
         // The node outputs a Sum before the data outputs of the block node
         let sum_type = Type::new_sum(self.sum_rows.iter().cloned());
         let mut node_outputs = vec![sum_type];
@@ -250,7 +250,7 @@ impl BasicBlock for ExitBlock {
 /// Case ops - nodes valid inside Conditional nodes.
 pub struct Case {
     /// The signature of the contained dataflow graph.
-    pub signature: Signature,
+    pub signature: FunctionType,
 }
 
 impl_op_name!(Case);
@@ -260,7 +260,7 @@ impl StaticTag for Case {
 }
 
 impl DataflowParent for Case {
-    fn inner_signature(&self) -> Signature {
+    fn inner_signature(&self) -> FunctionType {
         self.signature.clone()
     }
 }

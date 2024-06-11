@@ -11,7 +11,7 @@ use super::{
 
 use crate::ops::{OpName, OpNameRef};
 use crate::types::type_param::{check_type_args, TypeArg, TypeParam};
-use crate::types::{FunctionType, PolyFuncType, Signature};
+use crate::types::{FunTypeVarArgs, FunctionType, PolyFuncType};
 use crate::Hugr;
 
 /// Trait necessary for binary computations of OpDef signature
@@ -147,7 +147,7 @@ impl CustomValidator {
     }
 }
 
-/// The two ways in which an OpDef may compute the Signature of each operation node.
+/// The two ways in which an OpDef may compute the FunctionType of each operation node.
 #[derive(serde::Deserialize, serde::Serialize)]
 pub enum SignatureFunc {
     // Note: except for serialization, we could have type schemes just implement the same
@@ -192,14 +192,14 @@ impl From<PolyFuncType> for SignatureFunc {
     }
 }
 
-impl From<FunctionType> for SignatureFunc {
-    fn from(v: FunctionType) -> Self {
+impl From<FunTypeVarArgs> for SignatureFunc {
+    fn from(v: FunTypeVarArgs) -> Self {
         Self::TypeScheme(CustomValidator::from_polyfunc(v))
     }
 }
 
-impl From<Signature> for SignatureFunc {
-    fn from(v: Signature) -> Self {
+impl From<FunctionType> for SignatureFunc {
+    fn from(v: FunctionType) -> Self {
         Self::TypeScheme(CustomValidator::from_polyfunc(v.into_()))
     }
 }
@@ -234,7 +234,7 @@ impl SignatureFunc {
         def: &OpDef,
         args: &[TypeArg],
         exts: &ExtensionRegistry,
-    ) -> Result<Signature, SignatureError> {
+    ) -> Result<FunctionType, SignatureError> {
         let temp: PolyFuncType;
         let (pf, args) = match &self {
             SignatureFunc::TypeScheme(custom) => {
@@ -364,7 +364,7 @@ impl OpDef {
         &self,
         args: &[TypeArg],
         exts: &ExtensionRegistry,
-    ) -> Result<Signature, SignatureError> {
+    ) -> Result<FunctionType, SignatureError> {
         self.signature_func.compute_signature(self, args, exts)
     }
 

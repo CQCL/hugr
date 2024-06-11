@@ -3,7 +3,7 @@
 use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 
 use crate::ops::OpName;
-use crate::types::Type;
+use crate::types::{FunTypeVarArgs, Type};
 use crate::{
     extension::{
         prelude::sum_with_error,
@@ -13,7 +13,7 @@ use crate::{
     },
     ops::{custom::ExtensionOp, NamedOp},
     type_row,
-    types::{FunctionType, PolyFuncType, TypeArg},
+    types::{PolyFuncType, TypeArg},
     Extension,
 };
 
@@ -46,12 +46,12 @@ impl MakeOpDef for ConvertOpDef {
             vec![LOG_WIDTH_TYPE_PARAM],
         match self {
             trunc_s | trunc_u =>
-                FunctionType::new(
+                FunTypeVarArgs::new(
                     type_row![FLOAT64_TYPE].into_(),
                     Type::<true>::from(sum_with_error(int_tv(0)))
                 ),
             convert_s | convert_u => 
-                FunctionType::new(vec![int_tv(0)], type_row![FLOAT64_TYPE].into_())
+                FunTypeVarArgs::new(vec![int_tv(0)], type_row![FLOAT64_TYPE].into_())
             }).into()
     }
 
