@@ -415,9 +415,9 @@ impl<const RV: bool> Type<RV> {
     fn substitute(&self, t: &Substitution) -> Vec<Self> {
         match &self.0 {
             TypeEnum::RowVariable(idx, bound) => {
-                assert!(RV);
                 let res = t.apply_rowvar(*idx, *bound); // these are Type<true>'s
-                                                        // We need Type<RV>s, so use try_into_(). Since we know RV==true, this cannot fail.
+                assert!(RV);
+                // We need Type<RV>s, so use try_into_(). Since we know RV==true, this cannot fail.
                 res.into_iter().map(|t| t.try_into_().unwrap()).collect()
             }
             TypeEnum::Alias(_) | TypeEnum::Sum(SumType::Unit { .. }) => vec![self.clone()],
@@ -523,12 +523,19 @@ impl<'a> Substitution<'a> {
             .expect("Undeclared type variable - call validate() ?");
         debug_assert!(check_type_arg(arg, &TypeParam::new_list(bound)).is_ok());
         match arg {
-            // Row variables are represented as 'TypeArg::Type's (see TypeArg::new_var_use)
             TypeArg::Sequence { elems } => elems
                 .iter()
-                .map(|ta| match ta {
-                    TypeArg::Type { ty } => ty.clone().into(),
-                    _ => panic!("Not a list of types - call validate() ?"),
+                .map(|ta| {
+                    match ta {
+                        TypeArg::Type { ty } => return ty.clone().into(),
+                        TypeArg::Variable { v } => {
+                            if let Some(b) = v.bound_if_row_var() {
+                                return Type::new_row_var_use(v.index(), b)
+                            }
+                        }
+                        _ => ()
+                    }
+                    panic!("Not a list of types - call validate() ?")
                 })
                 .collect(),
             TypeArg::Type { ty } if matches!(ty.0, TypeEnum::RowVariable(_, _)) => {

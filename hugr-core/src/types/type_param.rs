@@ -302,7 +302,11 @@ impl TypeArg {
                 self.clone()
             }
             TypeArg::Sequence { elems } => {
-                let mut are_types = elems.iter().map(|e| matches!(e, TypeArg::Type { .. }));
+                let mut are_types = elems.iter().map(|ta| match ta {
+                    TypeArg::Type {..} => true,
+                    TypeArg::Variable { v } => v.bound_if_row_var().is_some(),
+                    _ => false
+                });
                 let elems = match are_types.next() {
                     Some(true) => {
                         assert!(are_types.all(|b| b)); // If one is a Type, so must the rest be
@@ -338,6 +342,16 @@ impl TypeArgVariable {
     pub fn index(&self) -> usize {
         self.idx
     }
+
+    pub fn bound_if_row_var(&self) -> Option<TypeBound> {
+        if let TypeParam::List {param} = &self.cached_decl {
+            if let TypeParam::Type {b} = **param {
+                return Some(b)
+            }
+        }
+        None
+    }
+
 }
 
 /// A serialized representation of a value of a [CustomType]
@@ -378,16 +392,18 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
             Ok(())
         }
         (TypeArg::Sequence { elems }, TypeParam::List { param }) => {
-            elems.iter().try_for_each(|arg| check_type_arg(arg, param))
+            elems.iter().try_for_each(|arg| {
+                // Also allow elements that are RowVars if fitting into a List of Types
+                if let (TypeArg::Variable { v: TypeArgVariable { idx: _, cached_decl: TypeParam::List { param: arg_var} }  }, TypeParam::Type { b: param_bound }) = (arg, &**param) {
+                    if let TypeParam::Type {b: var_bound} = **arg_var {
+                        if param_bound.contains(var_bound) {
+                            return Ok(());
+                        }
+                    }
+                }
+                check_type_arg(arg, param)
+            })
         }
-        // Also allow a single "Type" to be used for a List *only* if the Type is a row variable
-        // (i.e., it's not really a Type, it's multiple Types)
-        /* ALAN this is impossible, but what's it look like now?
-          (TypeArg::Type { ty }, TypeParam::List { param })
-            if ty.is_row_var() && param.contains(&ty.least_upper_bound().into()) =>
-        {
-            Ok(())
-        }*/
         (TypeArg::Sequence { elems: items }, TypeParam::Tuple { params: types }) => {
             if items.len() != types.len() {
                 Err(TypeArgError::WrongNumberTuple(items.len(), types.len()))
