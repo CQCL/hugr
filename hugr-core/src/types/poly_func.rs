@@ -9,7 +9,7 @@ use {
     proptest_derive::Arbitrary,
 };
 
-use super::{signature::FunctionType};
+use super::signature::{FuncTypeBase, FunctionType};
 use super::type_param::{check_type_args, TypeArg, TypeParam};
 use super::Substitution;
 
@@ -36,11 +36,11 @@ pub struct PolyFuncType<const ROWVARS: bool = true> {
     params: Vec<TypeParam>,
     /// Template for the function. May contain variables up to length of [Self::params]
     #[cfg_attr(test, proptest(strategy = "any_with::<FunctionType>(params)"))]
-    body: FunctionType<ROWVARS>,
+    body: FuncTypeBase<ROWVARS>,
 }
 
-impl<const RV: bool> From<FunctionType<RV>> for PolyFuncType<RV> {
-    fn from(body: FunctionType<RV>) -> Self {
+impl<const RV: bool> From<FuncTypeBase<RV>> for PolyFuncType<RV> {
+    fn from(body: FuncTypeBase<RV>) -> Self {
         Self {
             params: vec![],
             body
@@ -57,7 +57,7 @@ impl From<PolyFuncType<false>> for PolyFuncType<true> {
     }
 }
 
-impl<const RV: bool> TryFrom<PolyFuncType<RV>> for FunctionType<RV> {
+impl<const RV: bool> TryFrom<PolyFuncType<RV>> for FuncTypeBase<RV> {
     /// If the PolyFuncType is not monomorphic, fail with its binders
     type Error = Vec<TypeParam>;
 
@@ -77,13 +77,13 @@ impl<const RV: bool> PolyFuncType<RV> {
     }
 
     /// The body of the type, a function type.
-    pub fn body(&self) -> &FunctionType<RV> {
+    pub fn body(&self) -> &FuncTypeBase<RV> {
         &self.body
     }
 
     /// Create a new PolyFuncType given the kinds of the variables it declares
     /// and the underlying function type.
-    pub fn new(params: impl Into<Vec<TypeParam>>, body: FunctionType<RV>) -> Self {
+    pub fn new(params: impl Into<Vec<TypeParam>>, body: FuncTypeBase<RV>) -> Self {
         Self {
             params: params.into(),
             body
@@ -100,7 +100,7 @@ impl<const RV: bool> PolyFuncType<RV> {
         &self,
         args: &[TypeArg],
         ext_reg: &ExtensionRegistry,
-    ) -> Result<FunctionType<RV>, SignatureError> {
+    ) -> Result<FuncTypeBase<RV>, SignatureError> {
         // Check that args are applicable, and that we have a value for each binder,
         // i.e. each possible free variable within the body.
         check_type_args(args, &self.params)?;

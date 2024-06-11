@@ -23,7 +23,7 @@ use {crate::proptest::RecursionDepth, ::proptest::prelude::*, proptest_derive::A
 ///
 /// [Graph]: crate::ops::constant::Value::Function
 /// [RowVariable]: crate::types::TypeEnum::RowVariable
-pub struct FunctionType<const ROWVARS: bool = true> {
+pub struct FuncTypeBase<const ROWVARS: bool> {
     /// Value inputs of the function.
     #[cfg_attr(test, proptest(strategy = "any_with::<TypeRow>(params)"))]
     pub input: TypeRow<ROWVARS>,
@@ -36,9 +36,11 @@ pub struct FunctionType<const ROWVARS: bool = true> {
 
 /// The concept of "signature" in the spec - the edges required to/from a node or graph
 /// and also the target (value) of a call (static).
-pub type Signature = FunctionType<false>;
+pub type Signature = FuncTypeBase<false>;
 
-impl<const RV: bool> FunctionType<RV> {
+pub type FunctionType = FuncTypeBase<true>;
+
+impl<const RV: bool> FuncTypeBase<RV> {
     /// Builder method, add extension_reqs to an FunctionType
     pub fn with_extension_delta(mut self, rs: impl Into<ExtensionSet>) -> Self {
         self.extension_reqs = self.extension_reqs.union(rs.into());
@@ -96,7 +98,7 @@ impl<const RV: bool> FunctionType<RV> {
     }
 }
 
-impl FunctionType<true> {
+impl FunctionType {
     /// If this FunctionType contains any row variables, return one.
     pub fn find_rowvar(&self) -> Option<(usize, TypeBound)> {
         self.input
@@ -110,7 +112,7 @@ impl FunctionType<true> {
 }
 
 impl Signature {
-    pub(crate) fn into_(self) -> FunctionType<true> {
+    pub(crate) fn into_(self) -> FunctionType {
         FunctionType {
             input: self.input.into_(),
             output: self.output.into_(),
@@ -231,7 +233,7 @@ impl Signature {
     }
 }
 
-impl<const RV: bool> Display for FunctionType<RV> {
+impl<const RV: bool> Display for FuncTypeBase<RV> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if !self.input.is_empty() {
             self.input.fmt(f)?;

@@ -340,7 +340,7 @@ pub trait HugrView: HugrInternals {
     ///
     /// In contrast to [`get_function_type`][HugrView::get_function_type], this
     /// method always return a concrete [`FunctionType`].
-    fn get_df_function_type(&self) -> Option<FunctionType<false>> {
+    fn get_df_function_type(&self) -> Option<Signature> {
         let op = self.get_optype(self.root());
         op.inner_function_type()
     }

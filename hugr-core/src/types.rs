@@ -298,7 +298,7 @@ impl<const RV: bool> Type<RV> {
     const EMPTY_TYPEROW_REF: &'static TypeRow<RV> = &Self::EMPTY_TYPEROW;
 
     /// Initialize a new function type.
-    pub fn new_function(fun_ty: impl Into<FunctionType<true>>) -> Self {
+    pub fn new_function(fun_ty: impl Into<FunctionType>) -> Self {
         Self::new(TypeEnum::Function(Box::new(fun_ty.into())))
     }
 

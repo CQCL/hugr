@@ -11,7 +11,7 @@ use crate::ops::AliasDecl;
 pub(super) enum SerSimpleType {
     Q,
     I,
-    G(Box<FunctionType<true>>),
+    G(Box<FunctionType>),
     Sum(SumType),
     Array { inner: Box<SerSimpleType>, len: u64 },
     Opaque(CustomType),
