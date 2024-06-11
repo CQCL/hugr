@@ -565,7 +565,7 @@ mod test {
     fn function_value(simple_dfg_hugr: Hugr) {
         let v = Value::function(simple_dfg_hugr).unwrap();
 
-        let correct_type = Type::new_function(FunctionType::new_endo(type_row![
+        let correct_type: Type = Type::new_function(FunctionType::new_endo(type_row![
             crate::extension::prelude::BOOL_T
         ]));
 
@@ -624,12 +624,12 @@ mod test {
         let yaml_const: Value =
             CustomSerialized::new(typ_int.clone(), YamlValue::Number(6.into()), ex_id.clone())
                 .into();
-        let classic_t = Type::new_extension(typ_int.clone());
+        let classic_t: Type = Type::new_extension(typ_int.clone());
         assert_matches!(classic_t.least_upper_bound(), TypeBound::Eq);
         assert_eq!(yaml_const.get_type(), classic_t);
 
         let typ_qb = CustomType::new("my_type", vec![], ex_id, TypeBound::Eq);
-        let t = Type::new_extension(typ_qb.clone());
+        let t: Type = Type::new_extension(typ_qb.clone());
         assert_ne!(yaml_const.get_type(), t);
     }
 

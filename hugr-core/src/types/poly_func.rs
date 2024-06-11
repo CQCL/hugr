@@ -398,7 +398,7 @@ pub(crate) mod test {
         let rty = Type::new_row_var_use(0, TypeBound::Any);
         let pf = PolyFuncType::new_validated(
             [TypeParam::new_list(TP_ANY)],
-            FunTypeVarArgs::new(vec![USIZE_T.into(), rty.clone()], vec![Type::new_tuple(rty)]),
+            FunTypeVarArgs::new(vec![USIZE_T.into(), rty.clone()], vec![Type::<true>::new_tuple(rty)]),
             &PRELUDE_REGISTRY,
         )
         .unwrap();

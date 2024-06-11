@@ -390,14 +390,14 @@ fn serialize_types_roundtrip() {
     check_testing_roundtrip(g.clone());
 
     // A Simple tuple
-    let t = Type::new_tuple(vec![USIZE_T.into(), g]);
+    let t: Type = Type::new_tuple(vec![USIZE_T.into(), g]);
     check_testing_roundtrip(t);
 
     // A Classic sum
-    let t = Type::new_sum([type_row![USIZE_T], type_row![FLOAT64_TYPE]]);
+    let t: Type<true> = Type::new_sum([type_row![USIZE_T], type_row![FLOAT64_TYPE]]);
     check_testing_roundtrip(t);
 
-    let t = Type::new_unit_sum(4);
+    let t: Type = Type::new_unit_sum(4);
     check_testing_roundtrip(t);
 }
 

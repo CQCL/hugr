@@ -602,8 +602,8 @@ pub(crate) mod test {
 
     #[rstest::rstest]
     fn sum_construct<const RV: bool>() {
-        let pred1 = Type::new_sum([Type::EMPTY_TYPEROW, Type::EMPTY_TYPEROW]);
-        let pred2 = Type::new_unit_sum(2);
+        let pred1: Type = Type::new_sum([Type::EMPTY_TYPEROW, Type::EMPTY_TYPEROW]);
+        let pred2: Type<true> = Type::new_unit_sum(2);
 
         assert_eq!(pred1, pred2);
 
