@@ -197,7 +197,10 @@ mod test {
     fn lifted_unary_unit_sum<B: AsMut<Hugr> + AsRef<Hugr>, T>(b: &mut DFGWrapper<B, T>) -> Wire {
         let lc = b.add_load_value(Value::unary_unit_sum());
         let lift = b
-            .add_dataflow_op(Lift::new(type_row![Type::new_unit_sum(1)], PRELUDE_ID), [lc])
+            .add_dataflow_op(
+                Lift::new(type_row![Type::new_unit_sum(1)], PRELUDE_ID),
+                [lc],
+            )
             .unwrap();
         let [w] = lift.outputs_arr();
         w

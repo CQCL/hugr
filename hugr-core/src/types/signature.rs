@@ -255,12 +255,12 @@ impl From<FunctionType> for FunTypeVarArgs {
         Self {
             input: value.input.into(),
             output: value.output.into(),
-            extension_reqs: value.extension_reqs
+            extension_reqs: value.extension_reqs,
         }
     }
 }
 
-impl<const RV1:bool, const RV2:bool> PartialEq<FuncTypeBase<RV1>> for FuncTypeBase<RV2> {
+impl<const RV1: bool, const RV2: bool> PartialEq<FuncTypeBase<RV1>> for FuncTypeBase<RV2> {
     fn eq(&self, other: &FuncTypeBase<RV1>) -> bool {
         self.input == other.input
             && self.output == other.output

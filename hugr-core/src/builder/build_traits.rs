@@ -20,7 +20,7 @@ use crate::{
 };
 
 use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE_REGISTRY};
-use crate::types::{PolyFuncType, FunctionType, Type, TypeArg, TypeRow};
+use crate::types::{FunctionType, PolyFuncType, Type, TypeArg, TypeRow};
 
 use itertools::Itertools;
 

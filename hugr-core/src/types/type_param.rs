@@ -183,11 +183,11 @@ pub enum TypeArg {
     },
 }
 
-impl <const RV:bool> From<Type<RV>> for TypeArg {
+impl<const RV: bool> From<Type<RV>> for TypeArg {
     fn from(ty: Type<RV>) -> Self {
         match ty.try_into_no_rv() {
             Ok(ty) => Self::Type { ty },
-            Err((idx, bound)) => TypeArg::new_var_use(idx, TypeParam::new_list(bound))
+            Err((idx, bound)) => TypeArg::new_var_use(idx, TypeParam::new_list(bound)),
         }
     }
 }
@@ -227,7 +227,7 @@ pub struct TypeArgVariable {
 
 impl TypeArg {
     /// [Type::UNIT] as a [TypeArg::Type]
-    pub const UNIT: Self = Self::Type {ty: Type::UNIT};
+    pub const UNIT: Self = Self::Type { ty: Type::UNIT };
 
     /// Makes a TypeArg representing a use (occurrence) of the type variable
     /// with the specified index.
@@ -303,9 +303,9 @@ impl TypeArg {
             }
             TypeArg::Sequence { elems } => {
                 let mut are_types = elems.iter().map(|ta| match ta {
-                    TypeArg::Type {..} => true,
+                    TypeArg::Type { .. } => true,
                     TypeArg::Variable { v } => v.bound_if_row_var().is_some(),
-                    _ => false
+                    _ => false,
                 });
                 let elems = match are_types.next() {
                     Some(true) => {
@@ -346,14 +346,13 @@ impl TypeArgVariable {
     /// Determines whether this represents a row variable; if so, returns
     /// the [TypeBound] of the individual types it might stand for.
     pub fn bound_if_row_var(&self) -> Option<TypeBound> {
-        if let TypeParam::List {param} = &self.cached_decl {
-            if let TypeParam::Type {b} = **param {
-                return Some(b)
+        if let TypeParam::List { param } = &self.cached_decl {
+            if let TypeParam::Type { b } = **param {
+                return Some(b);
             }
         }
         None
     }
-
 }
 
 /// A serialized representation of a value of a [CustomType]
@@ -396,8 +395,18 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
         (TypeArg::Sequence { elems }, TypeParam::List { param }) => {
             elems.iter().try_for_each(|arg| {
                 // Also allow elements that are RowVars if fitting into a List of Types
-                if let (TypeArg::Variable { v: TypeArgVariable { idx: _, cached_decl: TypeParam::List { param: arg_var} }  }, TypeParam::Type { b: param_bound }) = (arg, &**param) {
-                    if let TypeParam::Type {b: var_bound} = **arg_var {
+                if let (
+                    TypeArg::Variable {
+                        v:
+                            TypeArgVariable {
+                                idx: _,
+                                cached_decl: TypeParam::List { param: arg_var },
+                            },
+                    },
+                    TypeParam::Type { b: param_bound },
+                ) = (arg, &**param)
+                {
+                    if let TypeParam::Type { b: var_bound } = **arg_var {
                         if param_bound.contains(var_bound) {
                             return Ok(());
                         }
@@ -506,13 +515,21 @@ mod test {
         check(vec![], &seq_param).unwrap();
         check_seq(&[rowvar(0, TypeBound::Eq)], &seq_param).unwrap();
         check_seq(
-            &[rowvar(1, TypeBound::Any), USIZE_T.into(), rowvar(0, TypeBound::Eq)],
+            &[
+                rowvar(1, TypeBound::Any),
+                USIZE_T.into(),
+                rowvar(0, TypeBound::Eq),
+            ],
             &TypeParam::new_list(TypeBound::Any),
         )
         .unwrap();
         // Next one fails because a list of Eq is required
         check_seq(
-            &[rowvar(1, TypeBound::Any), USIZE_T.into(), rowvar(0, TypeBound::Eq)],
+            &[
+                rowvar(1, TypeBound::Any),
+                USIZE_T.into(),
+                rowvar(0, TypeBound::Eq),
+            ],
             &seq_param,
         )
         .unwrap_err();

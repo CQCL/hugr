@@ -16,7 +16,7 @@ use crate::utils::display_list_with_separator;
 pub use check::SumTypeError;
 pub use custom::CustomType;
 pub use poly_func::PolyFuncType;
-pub use signature::{FunctionType, FunTypeVarArgs};
+pub use signature::{FunTypeVarArgs, FunctionType};
 use smol_str::SmolStr;
 pub use type_param::TypeArg;
 pub use type_row::TypeRow;
@@ -250,8 +250,8 @@ impl TypeEnum {
     }
 }
 
-struct Implies<const A:bool, const B:bool>(PhantomData<Type<A>>, PhantomData<Type<B>>);
-impl<const A:bool, const B:bool> Implies<A,B> {
+struct Implies<const A: bool, const B: bool>(PhantomData<Type<A>>, PhantomData<Type<B>>);
+impl<const A: bool, const B: bool> Implies<A, B> {
     const A_IMPLIES_B: () = assert!(B || !A);
 }
 
@@ -314,7 +314,10 @@ impl<const RV: bool> Type<RV> {
 
     /// Initialize a new sum type by providing the possible variant types.
     #[inline(always)]
-    pub fn new_sum<R>(variants: impl IntoIterator<Item = R>) -> Self where R: Into<TypeRow<true>> {
+    pub fn new_sum<R>(variants: impl IntoIterator<Item = R>) -> Self
+    where
+        R: Into<TypeRow<true>>,
+    {
         Self::new(TypeEnum::Sum(SumType::new(variants)))
     }
 
@@ -486,9 +489,9 @@ impl<const RV: bool> Type<RV> {
     /// A swiss-army-knife for any safe conversion of the const-bool "type" argument
     /// to/from true/false/variable. Any unsafe conversion (that might create
     /// a [Type]`<false>` of a [TypeEnum::RowVariable] will fail statically with an assert.
-    fn into_<const RV2:bool>(self) -> Type<RV2> {
+    fn into_<const RV2: bool>(self) -> Type<RV2> {
         #[allow(clippy::let_unit_value)]
-        let _ = Implies::<RV,RV2>::A_IMPLIES_B;
+        let _ = Implies::<RV, RV2>::A_IMPLIES_B;
         Type(self.0, self.1)
     }
 }
@@ -534,10 +537,10 @@ impl<'a> Substitution<'a> {
                         TypeArg::Type { ty } => return ty.clone().into(),
                         TypeArg::Variable { v } => {
                             if let Some(b) = v.bound_if_row_var() {
-                                return Type::new_row_var_use(v.index(), b)
+                                return Type::new_row_var_use(v.index(), b);
                             }
                         }
-                        _ => ()
+                        _ => (),
                     }
                     panic!("Not a list of types - call validate() ?")
                 })
@@ -584,8 +587,8 @@ pub(crate) fn check_typevar_decl(
 pub(crate) mod test {
 
     use super::*;
-    use crate::type_row;
     use crate::extension::prelude::USIZE_T;
+    use crate::type_row;
 
     #[test]
     fn construct() {
@@ -640,13 +643,15 @@ pub(crate) mod test {
             }
         }
 
-        impl <const RV:bool> Arbitrary for super::Type<RV> {
+        impl<const RV: bool> Arbitrary for super::Type<RV> {
             type Parameters = RecursionDepth;
             type Strategy = BoxedStrategy<Self>;
             fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
                 // We descend here, because a TypeEnum may contain a Type
                 any_with::<TypeEnum>(depth.descend())
-                    .prop_filter("Type<false> cannot be a Row Variable", |t| RV || !matches!(t, TypeEnum::RowVariable(_,_)))
+                    .prop_filter("Type<false> cannot be a Row Variable", |t| {
+                        RV || !matches!(t, TypeEnum::RowVariable(_, _))
+                    })
                     .prop_map(Self::new)
                     .boxed()
             }

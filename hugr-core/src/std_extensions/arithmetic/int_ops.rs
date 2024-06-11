@@ -141,12 +141,9 @@ impl MakeOpDef for IntOpDef {
             }
             .into(),
             idiv_u | idiv_s => int_polytype(2, vec![int_tv(0), int_tv(1)], vec![int_tv(0)]).into(),
-            idiv_checked_u | idiv_checked_s => int_polytype(
-                2,
-                vec![int_tv(0), int_tv(1)],
-                sum_ty_with_err(int_tv(0)),
-            )
-            .into(),
+            idiv_checked_u | idiv_checked_s => {
+                int_polytype(2, vec![int_tv(0), int_tv(1)], sum_ty_with_err(int_tv(0))).into()
+            }
             imod_checked_u | imod_checked_s => int_polytype(
                 2,
                 vec![int_tv(0), int_tv(1).clone()],
@@ -353,7 +350,10 @@ fn sum_ty_with_err(t: Type) -> Type {
 
 #[cfg(test)]
 mod test {
-    use crate::{ops::dataflow::DataflowOpTrait, std_extensions::arithmetic::int_types::int_type, types::FunctionType};
+    use crate::{
+        ops::dataflow::DataflowOpTrait, std_extensions::arithmetic::int_types::int_type,
+        types::FunctionType,
+    };
 
     use super::*;
 

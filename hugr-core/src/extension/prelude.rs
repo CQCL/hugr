@@ -544,7 +544,7 @@ mod test {
     #[test]
     fn test_external_symbol() {
         let subject = ConstExternalSymbol::new("foo", Type::UNIT, false);
-        assert_eq!(subject.get_type(), Type::UNIT);
+        assert_eq!(subject.get_type(), Type::<false>::UNIT);
         assert_eq!(subject.name(), "@foo");
         assert!(subject.validate().is_ok());
         assert_eq!(

@@ -17,7 +17,9 @@ use crate::ops::{self, Noop, OpType, Value};
 use crate::std_extensions::logic::test::{and_op, or_op};
 use crate::std_extensions::logic::{self, NotOp};
 use crate::types::type_param::{TypeArg, TypeArgError};
-use crate::types::{CustomType, FunTypeVarArgs, FunctionType, PolyFuncType, Type, TypeBound, TypeRow};
+use crate::types::{
+    CustomType, FunTypeVarArgs, FunctionType, PolyFuncType, Type, TypeBound, TypeRow,
+};
 use crate::{const_extension_ids, type_row, Direction, IncomingPort, Node};
 
 const NAT: Type = crate::extension::prelude::USIZE_T;

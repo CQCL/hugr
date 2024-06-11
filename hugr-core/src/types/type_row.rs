@@ -151,7 +151,7 @@ impl<const RV: bool> Default for TypeRow<RV> {
 impl<const RV: bool> From<Vec<Type<RV>>> for TypeRow<RV> {
     fn from(types: Vec<Type<RV>>) -> Self {
         Self {
-            types: types.into()
+            types: types.into(),
         }
     }
 }
@@ -159,7 +159,7 @@ impl<const RV: bool> From<Vec<Type<RV>>> for TypeRow<RV> {
 impl From<Vec<Type>> for TypeRow<true> {
     fn from(types: Vec<Type>) -> Self {
         Self {
-            types: types.into_iter().map(Type::into_).collect()
+            types: types.into_iter().map(Type::into_).collect(),
         }
     }
 }
@@ -167,7 +167,7 @@ impl From<Vec<Type>> for TypeRow<true> {
 impl From<TypeRow> for TypeRow<true> {
     fn from(value: TypeRow) -> Self {
         Self {
-            types: value.iter().cloned().map(Type::into_).collect()
+            types: value.iter().cloned().map(Type::into_).collect(),
         }
     }
 }
@@ -175,7 +175,7 @@ impl From<TypeRow> for TypeRow<true> {
 impl<const RV: bool> From<&'static [Type<RV>]> for TypeRow<RV> {
     fn from(types: &'static [Type<RV>]) -> Self {
         Self {
-            types: types.into()
+            types: types.into(),
         }
     }
 }
@@ -191,7 +191,7 @@ impl<const RV1: bool> From<Type<RV1>> for TypeRow<true> {
 impl From<Type> for TypeRow {
     fn from(t: Type) -> Self {
         Self {
-            types: vec![t].into()
+            types: vec![t].into(),
         }
     }
 }
@@ -214,10 +214,10 @@ impl<const RV: bool> DerefMut for TypeRow<RV> {
 mod test {
     mod proptest {
         use crate::proptest::RecursionDepth;
-        use crate::types::{TypeRow, Type};
+        use crate::types::{Type, TypeRow};
         use ::proptest::prelude::*;
 
-        impl<const RV:bool> Arbitrary for super::super::TypeRow<RV> {
+        impl<const RV: bool> Arbitrary for super::super::TypeRow<RV> {
             type Parameters = RecursionDepth;
             type Strategy = BoxedStrategy<Self>;
             fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {

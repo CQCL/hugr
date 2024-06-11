@@ -9,7 +9,7 @@ use {
     proptest_derive::Arbitrary,
 };
 
-use super::signature::{FuncTypeBase};
+use super::signature::FuncTypeBase;
 use super::type_param::{check_type_args, TypeArg, TypeParam};
 use super::Substitution;
 
@@ -43,7 +43,7 @@ impl<const RV: bool> From<FuncTypeBase<RV>> for PolyFuncType<RV> {
     fn from(body: FuncTypeBase<RV>) -> Self {
         Self {
             params: vec![],
-            body
+            body,
         }
     }
 }
@@ -52,7 +52,7 @@ impl From<PolyFuncType<false>> for PolyFuncType<true> {
     fn from(value: PolyFuncType<false>) -> Self {
         Self {
             params: value.params,
-            body: value.body.into()
+            body: value.body.into(),
         }
     }
 }
@@ -86,7 +86,7 @@ impl<const RV: bool> PolyFuncType<RV> {
     pub fn new(params: impl Into<Vec<TypeParam>>, body: impl Into<FuncTypeBase<RV>>) -> Self {
         Self {
             params: params.into(),
-            body: body.into()
+            body: body.into(),
         }
     }
 
@@ -143,7 +143,7 @@ pub(crate) mod test {
             ExtensionRegistry::try_new([PRELUDE.to_owned(), EXTENSION.to_owned()]).unwrap();
     }
 
-    impl<const RV:bool> PolyFuncType<RV> {
+    impl<const RV: bool> PolyFuncType<RV> {
         fn new_validated(
             params: impl Into<Vec<TypeParam>>,
             body: FuncTypeBase<RV>,
@@ -398,7 +398,10 @@ pub(crate) mod test {
         let rty = Type::new_row_var_use(0, TypeBound::Any);
         let pf = PolyFuncType::new_validated(
             [TypeParam::new_list(TP_ANY)],
-            FunTypeVarArgs::new(vec![USIZE_T.into(), rty.clone()], vec![Type::<true>::new_tuple(rty)]),
+            FunTypeVarArgs::new(
+                vec![USIZE_T.into(), rty.clone()],
+                vec![Type::<true>::new_tuple(rty)],
+            ),
             &PRELUDE_REGISTRY,
         )
         .unwrap();

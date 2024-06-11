@@ -7,7 +7,7 @@ use std::marker::PhantomData;
 use crate::hugr::{HugrView, NodeType, ValidationError};
 use crate::ops;
 
-use crate::types::{PolyFuncType, FunctionType};
+use crate::types::{FunctionType, PolyFuncType};
 
 use crate::extension::{ExtensionRegistry, ExtensionSet};
 use crate::Node;

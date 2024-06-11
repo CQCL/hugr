@@ -44,15 +44,17 @@ impl MakeOpDef for ConvertOpDef {
         use ConvertOpDef::*;
         PolyFuncType::new(
             vec![LOG_WIDTH_TYPE_PARAM],
-        match self {
-            trunc_s | trunc_u =>
-                FunTypeVarArgs::new(
+            match self {
+                trunc_s | trunc_u => FunTypeVarArgs::new(
                     type_row![FLOAT64_TYPE],
-                    Type::<true>::from(sum_with_error(int_tv(0)))
+                    Type::<true>::from(sum_with_error(int_tv(0))),
                 ),
-            convert_s | convert_u => 
-                FunTypeVarArgs::new(vec![int_tv(0)], type_row![FLOAT64_TYPE])
-            }).into()
+                convert_s | convert_u => {
+                    FunTypeVarArgs::new(vec![int_tv(0)], type_row![FLOAT64_TYPE])
+                }
+            },
+        )
+        .into()
     }
 
     fn description(&self) -> String {

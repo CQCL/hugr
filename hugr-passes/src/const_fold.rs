@@ -6,7 +6,7 @@ use hugr_core::extension::ExtensionSet;
 use itertools::Itertools;
 use thiserror::Error;
 
-use hugr_core::hugr::{SimpleReplacementError, ValidationError};
+use hugr_core::hugr::SimpleReplacementError;
 use hugr_core::types::SumType;
 use hugr_core::Direction;
 use hugr_core::{
