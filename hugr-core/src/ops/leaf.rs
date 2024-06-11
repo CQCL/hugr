@@ -144,7 +144,7 @@ impl DataflowOpTrait for MakeTuple {
 
     /// The signature of the operation.
     fn signature(&self) -> FunctionType {
-        FunctionType::new(self.tys.clone(), vec![Type::new_tuple(self.tys.clone().into_())])
+        FunctionType::new(self.tys.clone(), vec![Type::new_tuple(self.tys.clone())])
     }
 
     fn other_input(&self) -> Option<EdgeKind> {
@@ -166,7 +166,7 @@ impl DataflowOpTrait for UnpackTuple {
 
     /// The signature of the operation.
     fn signature(&self) -> FunctionType {
-        FunctionType::new(vec![Type::new_tuple(self.tys.clone().into_())], self.tys.clone())
+        FunctionType::new(vec![Type::new_tuple(self.tys.clone())], self.tys.clone())
     }
 
     fn other_input(&self) -> Option<EdgeKind> {

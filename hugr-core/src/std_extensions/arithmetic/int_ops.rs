@@ -116,10 +116,10 @@ impl MakeOpDef for IntOpDef {
                 IOValidator { f_ge_s: true },
             )
             .into(),
-            itobool => int_polytype(0, vec![int_type(0)], type_row![BOOL_T].into_()).into(),
-            ifrombool => int_polytype(0, type_row![BOOL_T].into_(), vec![int_type(0)]).into(),
+            itobool => int_polytype(0, vec![int_type(0)], type_row![BOOL_T]).into(),
+            ifrombool => int_polytype(0, type_row![BOOL_T], vec![int_type(0)]).into(),
             ieq | ine | ilt_u | ilt_s | igt_u | igt_s | ile_u | ile_s | ige_u | ige_s => {
-                int_polytype(1, vec![int_tv(0); 2], type_row![BOOL_T].into_()).into()
+                int_polytype(1, vec![int_tv(0); 2], type_row![BOOL_T]).into()
             }
             imax_u | imax_s | imin_u | imin_s | iadd | isub | imul | iand | ior | ixor => {
                 ibinop_sig().into()

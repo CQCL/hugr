@@ -426,7 +426,7 @@ fn roundtrip_sumtype(#[case] sum_type: SumType) {
 #[case(Value::true_val())]
 #[case(Value::unit_sum(3,5).unwrap())]
 #[case(Value::extension(ConstInt::new_u(2,1).unwrap()))]
-#[case(Value::sum(1,[Value::extension(ConstInt::new_u(2,1).unwrap())], SumType::new([vec![], vec![INT_TYPES[2].clone().into()]])).unwrap())]
+#[case(Value::sum(1,[Value::extension(ConstInt::new_u(2,1).unwrap())], SumType::new([vec![], vec![INT_TYPES[2].clone()]])).unwrap())]
 #[case(Value::tuple([Value::false_val(), Value::extension(ConstInt::new_s(2,1).unwrap())]))]
 #[case(Value::function(crate::builder::test::simple_dfg_hugr()).unwrap())]
 fn roundtrip_value(#[case] value: Value) {

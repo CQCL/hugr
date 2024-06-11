@@ -226,6 +226,9 @@ pub struct TypeArgVariable {
 }
 
 impl TypeArg {
+    /// [Type::UNIT] as a [TypeArg::Type]
+    pub const UNIT: Self = Self::Type {ty: Type::UNIT};
+
     /// Makes a TypeArg representing a use (occurrence) of the type variable
     /// with the specified index.
     /// `decl` must be exactly that with which the variable was declared.
@@ -533,7 +536,8 @@ mod test {
     #[test]
     fn type_arg_subst_row() {
         let row_param = TypeParam::new_list(TypeBound::Copyable);
-        let row_arg: TypeArg = vec![BOOL_T.into(), Type::UNIT.into()].into();
+        // The <false> here is arbitrary but we have to specify it:
+        let row_arg: TypeArg = vec![BOOL_T.into(), TypeArg::UNIT].into();
         check_type_arg(&row_arg, &row_param).unwrap();
 
         // Now say a row variable referring to *that* row was used
@@ -550,7 +554,7 @@ mod test {
         let outer_arg2 = outer_arg.substitute(&Substitution(&[row_arg], &PRELUDE_REGISTRY));
         assert_eq!(
             outer_arg2,
-            vec![BOOL_T.into(), Type::UNIT.into(), USIZE_T.into()].into()
+            vec![BOOL_T.into(), TypeArg::UNIT, USIZE_T.into()].into()
         );
 
         // Of course this is still valid (as substitution is guaranteed to preserve validity)

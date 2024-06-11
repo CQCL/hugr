@@ -175,6 +175,13 @@ impl From<Vec<Type>> for TypeRow<true> {
     }
 }
 
+impl From<TypeRow> for TypeRow<true> {
+    fn from(value: TypeRow) -> Self {
+        Self {
+            types: value.into_iter().cloned().map(Type::into_).collect()
+        }
+    }
+}
 
 impl<const RV: bool> From<&'static [Type<RV>]> for TypeRow<RV> {
     fn from(types: &'static [Type<RV>]) -> Self {

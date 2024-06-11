@@ -472,11 +472,11 @@ fn make_block(
 }
 
 fn oneway(ty: Type) -> Vec<Type> {
-    vec![Type::new_sum([vec![ty].into()])]
+    vec![Type::new_sum([vec![ty]])]
 }
 
 fn twoway(ty: Type) -> Vec<Type> {
-    vec![Type::new_sum([vec![ty.clone()].into(), vec![ty].into()])]
+    vec![Type::new_sum([vec![ty.clone()], vec![ty]])]
 }
 
 fn create_entry_exit(

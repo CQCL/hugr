@@ -573,13 +573,13 @@ pub(crate) fn check_typevar_decl(
 pub(crate) mod test {
 
     use super::*;
-
+    use crate::type_row;
     use crate::extension::prelude::USIZE_T;
 
     #[test]
     fn construct() {
         let t: Type = Type::new_tuple(vec![
-            USIZE_T.into(),
+            USIZE_T,
             Type::new_function(FunctionType::new_endo(vec![])),
             Type::new_extension(CustomType::new(
                 "my_custom",
@@ -596,14 +596,15 @@ pub(crate) mod test {
     }
 
     #[rstest::rstest]
-    fn sum_construct<const RV: bool>() {
-        let pred1: Type = Type::new_sum([Type::EMPTY_TYPEROW, Type::EMPTY_TYPEROW]);
+    fn sum_construct() {
+        let pred1: Type = Type::new_sum([type_row![], type_row![]]);
         let pred2: Type<true> = Type::new_unit_sum(2);
 
         assert_eq!(pred1, pred2);
 
         let pred_direct = SumType::Unit { size: 2 };
-        assert_eq!(pred1, pred_direct.into())
+        // Pick <false> arbitrarily
+        assert_eq!(pred1, Type::<false>::from(pred_direct));
     }
 
     mod proptest {
