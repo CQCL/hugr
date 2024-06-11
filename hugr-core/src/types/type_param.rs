@@ -485,13 +485,13 @@ mod test {
         check(vec![], &seq_param).unwrap();
         check_seq(&[rowvar(0, TypeBound::Eq)], &seq_param).unwrap();
         check_seq(
-            &[rowvar(1, TypeBound::Any), USIZE_T, rowvar(0, TypeBound::Eq)],
+            &[rowvar(1, TypeBound::Any), USIZE_T.into(), rowvar(0, TypeBound::Eq)],
             &TypeParam::new_list(TypeBound::Any),
         )
         .unwrap();
         // Next one fails because a list of Eq is required
         check_seq(
-            &[rowvar(1, TypeBound::Any), USIZE_T, rowvar(0, TypeBound::Eq)],
+            &[rowvar(1, TypeBound::Any), USIZE_T.into(), rowvar(0, TypeBound::Eq)],
             &seq_param,
         )
         .unwrap_err();
