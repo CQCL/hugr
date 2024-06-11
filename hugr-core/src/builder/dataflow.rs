@@ -559,7 +559,8 @@ pub(crate) mod test {
     fn no_outer_row_variables() -> Result<(), BuildError> {
         let e = crate::hugr::validate::test::extension_with_eval_parallel();
         let tv = Type::new_row_var_use(0, TypeBound::Copyable);
-        let mut fb = FunctionBuilder::new(
+        // Can *declare* a function that takes a function-value of unknown #args
+        let fb = FunctionBuilder::new(
             "bad_eval",
             PolyFuncType::new(
                 [TypeParam::new_list(TypeBound::Copyable)],
@@ -570,19 +571,13 @@ pub(crate) mod test {
             ),
         )?;
 
-        let [func_arg] = fb.input_wires_arr();
-        let i = fb.add_load_value(crate::extension::prelude::ConstUsize::new(5));
+        // But cannot eval it...
         let ev = e.instantiate_extension_op(
             "eval",
             [vec![USIZE_T.into()].into(), vec![tv.into()].into()],
             &PRELUDE_REGISTRY,
-        )?;
-        let r = fb.add_dataflow_op(ev, [func_arg, i]);
-        // This error would be caught in validation, but the builder detects it much earlier
-        assert_eq!(
-            r.unwrap_err(),
-            BuildError::SignatureError(SignatureError::RowVarWhereTypeExpected { idx: 0 })
         );
+        assert!(ev.is_err());
         Ok(())
     }
 }
