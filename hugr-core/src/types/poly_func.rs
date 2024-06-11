@@ -9,7 +9,7 @@ use {
     proptest_derive::Arbitrary,
 };
 
-use super::{signature::FunctionType, Implies};
+use super::{signature::FunctionType};
 use super::type_param::{check_type_args, TypeArg, TypeParam};
 use super::Substitution;
 
@@ -39,12 +39,11 @@ pub struct PolyFuncType<const ROWVARS: bool = true> {
     body: FunctionType<ROWVARS>,
 }
 
-impl<const RV1: bool, const RV2: bool> From<FunctionType<RV1>> for PolyFuncType<RV2> {
-    fn from(body: FunctionType<RV1>) -> Self {
-        let _ = Implies::<RV1, RV2>::A_IMPLIES_B;
+impl<const RV: bool> From<FunctionType<RV>> for PolyFuncType<RV> {
+    fn from(body: FunctionType<RV>) -> Self {
         Self {
             params: vec![],
-            body: body.into_(),
+            body
         }
     }
 }
