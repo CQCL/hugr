@@ -258,6 +258,16 @@ impl TryFrom<FunTypeVarArgs> for FunctionType {
     }
 }
 
+impl From<FunctionType> for FunTypeVarArgs {
+    fn from(value: FunctionType) -> Self {
+        Self {
+            input: value.input.into_(),
+            output: value.output.into_(),
+            extension_reqs: value.extension_reqs
+        }
+    }
+}
+
 impl PartialEq<FunTypeVarArgs> for FunctionType {
     fn eq(&self, other: &FunTypeVarArgs) -> bool {
         self.input == other.input
