@@ -114,14 +114,6 @@ impl FunTypeVarArgs {
 }
 
 impl FunctionType {
-    pub(crate) fn into_(self) -> FunTypeVarArgs {
-        FunTypeVarArgs {
-            input: self.input.into_(),
-            output: self.output.into_(),
-            extension_reqs: self.extension_reqs
-        }
-    }
-
     /// Returns the type of a value [`Port`]. Returns `None` if the port is out
     /// of bounds.
     #[inline]

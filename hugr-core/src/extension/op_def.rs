@@ -200,7 +200,7 @@ impl From<FunTypeVarArgs> for SignatureFunc {
 
 impl From<FunctionType> for SignatureFunc {
     fn from(v: FunctionType) -> Self {
-        Self::TypeScheme(CustomValidator::from_polyfunc(v.into_()))
+        Self::TypeScheme(CustomValidator::from_polyfunc(FunTypeVarArgs::from(v)))
     }
 }
 
