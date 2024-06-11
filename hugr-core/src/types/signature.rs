@@ -25,10 +25,10 @@ use {crate::proptest::RecursionDepth, ::proptest::prelude::*, proptest_derive::A
 /// [RowVariable]: crate::types::TypeEnum::RowVariable
 pub struct FuncTypeBase<const ROWVARS: bool> {
     /// Value inputs of the function.
-    #[cfg_attr(test, proptest(strategy = "any_with::<TypeRow>(params)"))]
+    #[cfg_attr(test, proptest(strategy = "any_with::<TypeRow<ROWVARS>>(params)"))]
     pub input: TypeRow<ROWVARS>,
     /// Value outputs of the function.
-    #[cfg_attr(test, proptest(strategy = "any_with::<TypeRow>(params)"))]
+    #[cfg_attr(test, proptest(strategy = "any_with::<TypeRow<ROWVARS>>(params)"))]
     pub output: TypeRow<ROWVARS>,
     /// The extension requirements which are added by the operation
     pub extension_reqs: ExtensionSet,

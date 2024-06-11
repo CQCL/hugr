@@ -35,7 +35,7 @@ pub struct PolyFuncType<const ROWVARS: bool = true> {
     #[cfg_attr(test, proptest(strategy = "vec(any_with::<TypeParam>(params), 0..3)"))]
     params: Vec<TypeParam>,
     /// Template for the function. May contain variables up to length of [Self::params]
-    #[cfg_attr(test, proptest(strategy = "any_with::<FunctionType>(params)"))]
+    #[cfg_attr(test, proptest(strategy = "any_with::<FuncTypeBase<ROWVARS>>(params)"))]
     body: FuncTypeBase<ROWVARS>,
 }
 

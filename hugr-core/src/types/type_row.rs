@@ -225,18 +225,18 @@ impl<const RV: bool> DerefMut for TypeRow<RV> {
 mod test {
     mod proptest {
         use crate::proptest::RecursionDepth;
-        use crate::{type_row, types::Type};
+        use crate::types::{TypeRow, Type};
         use ::proptest::prelude::*;
 
-        impl Arbitrary for super::super::TypeRow {
+        impl<const RV:bool> Arbitrary for super::super::TypeRow<RV> {
             type Parameters = RecursionDepth;
             type Strategy = BoxedStrategy<Self>;
             fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
                 use proptest::collection::vec;
                 if depth.leaf() {
-                    Just(type_row![]).boxed()
+                    Just(TypeRow::new()).boxed()
                 } else {
-                    vec(any_with::<Type>(depth), 0..4)
+                    vec(any_with::<Type<RV>>(depth), 0..4)
                         .prop_map(|ts| ts.to_vec().into())
                         .boxed()
                 }

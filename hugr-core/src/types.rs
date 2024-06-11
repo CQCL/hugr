@@ -215,7 +215,7 @@ pub enum TypeEnum {
     Function(
         #[cfg_attr(
             test,
-            proptest(strategy = "any_with::<FunctionType>(params).prop_map(Box::new)")
+            proptest(strategy = "any_with::<FunTypeVarArgs>(params).prop_map(Box::new)")
         )]
         Box<FunTypeVarArgs>,
     ),
@@ -629,12 +629,13 @@ pub(crate) mod test {
             }
         }
 
-        impl Arbitrary for super::Type {
+        impl <const RV:bool> Arbitrary for super::Type<RV> {
             type Parameters = RecursionDepth;
             type Strategy = BoxedStrategy<Self>;
             fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
                 // We descend here, because a TypeEnum may contain a Type
                 any_with::<TypeEnum>(depth.descend())
+                    .prop_filter("Type<false> cannot be a Row Variable", |t| RV || !matches!(t, TypeEnum::RowVariable(_,_)))
                     .prop_map(Self::new)
                     .boxed()
             }
