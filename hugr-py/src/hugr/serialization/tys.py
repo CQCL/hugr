@@ -353,11 +353,11 @@ TypeRow = list[Type]
 
 
 # -------------------------------------------
-# --------------- FunctionType -----------------
+# --------------- Signature -----------------
 # -------------------------------------------
 
 
-class FunctionType(ConfiguredBaseModel):
+class Signature(ConfiguredBaseModel):
     """Describes the edges required to/from a node.
 
     This includes both the concept of "signature" in the spec, and also the target
