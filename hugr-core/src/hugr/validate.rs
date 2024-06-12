@@ -9,7 +9,7 @@ use petgraph::visit::{Topo, Walker};
 use portgraph::{LinkView, PortView};
 use thiserror::Error;
 
-use crate::extension::{ExtensionRegistry, SignatureError};
+use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 
 use crate::ops::custom::{resolve_opaque_op, CustomOp, CustomOpError};
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
@@ -60,6 +60,12 @@ impl Hugr {
     pub fn validate_extensions(&self) -> Result<(), ValidationError> {
         for parent in self.nodes() {
             let parent_op = self.get_optype(parent);
+            if parent_op
+                .extension_delta()
+                .contains(&ExtensionSet::TO_BE_INFERRED)
+            {
+                return Err(ValidationError::ExtensionsNotInferred { node: parent });
+            }
             let parent_extensions = match parent_op.inner_function_type() {
                 Some(FunctionType { extension_reqs, .. }) => extension_reqs,
                 None => match parent_op.tag() {
@@ -744,6 +750,9 @@ pub enum ValidationError {
     /// There are errors in the extension deltas.
     #[error(transparent)]
     ExtensionError(#[from] ExtensionError),
+    /// A node claims to still be awaiting extension inference. Perhaps it is not acted upon by inference...
+    #[error("Node {node:?} needs a concrete ExtensionSet - inference will provide this for TailLoop/Conditional/CFG/DFG/BasicBlock only")]
+    ExtensionsNotInferred { node: Node },
     /// Error in a node signature
     #[error("Error in signature of node {node:?}: {cause}")]
     SignatureError { node: Node, cause: SignatureError },

@@ -406,6 +406,8 @@ pub enum ExtensionBuildError {
 pub struct ExtensionSet(BTreeSet<ExtensionId>);
 
 impl ExtensionSet {
+    pub const TO_BE_INFERRED: ExtensionId = ExtensionId::new_unchecked("TO_BE_INFERRED");
+
     /// Creates a new empty extension set.
     pub const fn new() -> Self {
         Self(BTreeSet::new())
