@@ -274,6 +274,7 @@ impl<const RV1: bool, const RV2: bool> PartialEq<FuncTypeBase<RV1>> for FuncType
 #[cfg(test)]
 mod test {
     use crate::{extension::prelude::USIZE_T, type_row};
+
     use super::*;
     #[test]
     fn test_function_type() {
