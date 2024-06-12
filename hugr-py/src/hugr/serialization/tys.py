@@ -364,7 +364,7 @@ class Signature(ConfiguredBaseModel):
     (value) of a call (constant).
     """
 
-    signature: "PolyFuncType"  # The underlying signature
+    signature: "FunctionType"  # The underlying signature
 
     # The extensions which are associated with all the inputs and carried through
     input_extensions: ExtensionSet
