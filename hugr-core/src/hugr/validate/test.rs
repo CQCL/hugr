@@ -953,6 +953,7 @@ fn cfg_connections() -> Result<(), Box<dyn std::error::Error>> {
 #[cfg(feature = "extension_inference")]
 mod extension_tests {
     use self::ops::handle::{BasicBlockID, TailLoopID};
+    use rstest::rstest;
 
     use super::*;
     use crate::builder::handle::Outputs;
