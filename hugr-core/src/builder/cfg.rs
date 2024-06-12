@@ -5,12 +5,12 @@ use super::{
     BasicBlockID, BuildError, CfgID, Container, Dataflow, HugrBuilder, Wire,
 };
 
-use crate::extension::{ExtensionRegistry, ExtensionSet};
-use crate::{hugr::views::HugrView, types::TypeRow};
+use crate::ops::{self, handle::NodeHandle, DataflowBlock, DataflowParent, ExitBlock, OpType};
 use crate::{
-    ops::{self, handle::NodeHandle, DataflowBlock, DataflowParent, ExitBlock, OpType},
+    extension::{ExtensionRegistry, ExtensionSet},
     types::FunctionType,
 };
+use crate::{hugr::views::HugrView, types::TypeRow};
 
 use crate::Node;
 use crate::{
@@ -402,7 +402,6 @@ pub(crate) mod test {
 
     use crate::hugr::validate::InterGraphEdgeError;
     use crate::hugr::ValidationError;
-    use crate::types::FunctionType;
     use crate::{builder::test::NAT, type_row};
     use cool_asserts::assert_matches;
 

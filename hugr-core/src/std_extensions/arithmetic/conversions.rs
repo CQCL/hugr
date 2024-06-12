@@ -3,7 +3,6 @@
 use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 
 use crate::ops::OpName;
-use crate::types::{FunTypeVarArgs, Type};
 use crate::{
     extension::{
         prelude::sum_with_error,
@@ -13,7 +12,7 @@ use crate::{
     },
     ops::{custom::ExtensionOp, NamedOp},
     type_row,
-    types::{PolyFuncType, TypeArg},
+    types::{FunTypeVarArgs, PolyFuncType, Type, TypeArg},
     Extension,
 };
 

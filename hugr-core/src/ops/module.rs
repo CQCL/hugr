@@ -44,7 +44,7 @@ pub struct FuncDefn {
     /// Name of function
     #[cfg_attr(test, proptest(strategy = "any_nonempty_string()"))]
     pub name: String,
-    /// FunctionType of the function
+    /// Signature of the function
     pub signature: PolyFuncType<false>,
 }
 
@@ -80,7 +80,7 @@ pub struct FuncDecl {
     /// Name of function
     #[cfg_attr(test, proptest(strategy = "any_nonempty_string()"))]
     pub name: String,
-    /// FunctionType of the function
+    /// Signature of the function
     pub signature: PolyFuncType<false>,
 }
 

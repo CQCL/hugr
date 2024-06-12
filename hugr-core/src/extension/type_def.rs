@@ -189,8 +189,7 @@ mod test {
             .unwrap(),
         );
         assert_eq!(typ.least_upper_bound(), TypeBound::Copyable);
-        let typ2: Type =
-            Type::new_extension(def.instantiate([TypeArg::Type { ty: USIZE_T }]).unwrap());
+        let typ2: Type = Type::new_extension(def.instantiate([USIZE_T.into()]).unwrap());
         assert_eq!(typ2.least_upper_bound(), TypeBound::Eq);
 
         // And some bad arguments...firstly, wrong kind of TypeArg:

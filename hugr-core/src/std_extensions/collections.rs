@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::ops::constant::ValueName;
 use crate::ops::{OpName, Value};
-use crate::types::{FunTypeVarArgs, TypeName};
+use crate::types::TypeName;
 use crate::{
     extension::{
         simple_op::{MakeExtensionOp, OpLoadError},
@@ -17,7 +17,7 @@ use crate::{
     ops::{self, custom::ExtensionOp, NamedOp},
     types::{
         type_param::{TypeArg, TypeParam},
-        CustomCheckFailure, CustomType, PolyFuncType, Type, TypeBound,
+        CustomCheckFailure, CustomType, FunTypeVarArgs, PolyFuncType, Type, TypeBound,
     },
     utils::sorted_consts,
     Extension,

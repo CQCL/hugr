@@ -13,8 +13,8 @@ use {
 use crate::extension::{ConstFoldResult, ExtensionId, ExtensionRegistry, OpDef, SignatureError};
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::{HugrView, NodeType};
-use crate::types::type_param::TypeArg;
-use crate::types::{EdgeKind, FunctionType};
+use crate::types::EdgeKind;
+use crate::types::{type_param::TypeArg, FunctionType};
 use crate::{ops, Hugr, IncomingPort, Node};
 
 use super::dataflow::DataflowOpTrait;

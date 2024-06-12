@@ -147,7 +147,7 @@ impl CustomValidator {
     }
 }
 
-/// The two ways in which an OpDef may compute the FunctionType of each operation node.
+/// The two ways in which an OpDef may compute the Signature of each operation node.
 #[derive(serde::Deserialize, serde::Serialize)]
 pub enum SignatureFunc {
     // Note: except for serialization, we could have type schemes just implement the same

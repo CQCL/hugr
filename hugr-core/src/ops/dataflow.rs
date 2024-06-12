@@ -111,7 +111,7 @@ impl DataflowOpTrait for Output {
     }
 
     // Note: We know what the input extensions should be, so we *could* give an
-    // instantiated FunctionType instead
+    // instantiated Signature instead
     fn signature(&self) -> FunctionType {
         FunctionType::new(self.types.clone(), TypeRow::new())
     }
@@ -158,7 +158,7 @@ impl<T: DataflowOpTrait> StaticTag for T {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(test, derive(Arbitrary))]
 pub struct Call {
-    /// FunctionType of function being called
+    /// Signature of function being called
     func_sig: PolyFuncType<false>,
     type_args: Vec<TypeArg>,
     instantiation: FunctionType, // Cache, so we can fail in try_new() not in signature()
@@ -252,7 +252,7 @@ impl Call {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(test, derive(Arbitrary))]
 pub struct CallIndirect {
-    /// FunctionType of function being called
+    /// Signature of function being called
     pub signature: FunctionType,
 }
 impl_op_name!(CallIndirect);
@@ -328,7 +328,7 @@ impl LoadConstant {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(test, derive(Arbitrary))]
 pub struct LoadFunction {
-    /// FunctionType of the function
+    /// Signature of the function
     func_sig: PolyFuncType<false>,
     type_args: Vec<TypeArg>,
     signature: FunctionType, // Cache, so we can fail in try_new() not in signature()
@@ -407,7 +407,7 @@ impl LoadFunction {
 
 /// Operations that is the parent of a dataflow graph.
 pub trait DataflowParent {
-    /// FunctionType of the inner dataflow graph.
+    /// Signature of the inner dataflow graph.
     fn inner_signature(&self) -> FunctionType;
 }
 
@@ -415,7 +415,7 @@ pub trait DataflowParent {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(test, derive(Arbitrary))]
 pub struct DFG {
-    /// FunctionType of DFG node
+    /// Signature of DFG node
     pub signature: FunctionType,
 }
 

@@ -1,4 +1,4 @@
-//! Abstract and concrete FunctionType types.
+//! Abstract and concrete Signature types.
 
 use itertools::Either;
 

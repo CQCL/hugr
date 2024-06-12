@@ -86,7 +86,7 @@ impl DataflowOpTrait for Conditional {
         let mut inputs = self.other_inputs.clone();
         inputs
             .to_mut()
-            .insert(0, Type::new_sum(self.sum_rows.iter().cloned()));
+            .insert(0, Type::new_sum(self.sum_rows.clone()));
         FunctionType::new(inputs, self.outputs.clone())
             .with_extension_delta(self.extension_delta.clone())
     }
@@ -164,7 +164,7 @@ impl StaticTag for ExitBlock {
 impl DataflowParent for DataflowBlock {
     fn inner_signature(&self) -> FunctionType {
         // The node outputs a Sum before the data outputs of the block node
-        let sum_type = Type::new_sum(self.sum_rows.iter().cloned());
+        let sum_type = Type::new_sum(self.sum_rows.clone());
         let mut node_outputs = vec![sum_type];
         node_outputs.extend_from_slice(&self.other_outputs);
         FunctionType::new(self.inputs.clone(), TypeRow::from(node_outputs))

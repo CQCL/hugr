@@ -16,9 +16,8 @@ use crate::ops::constant::{ValueName, ValueNameRef};
 use crate::ops::custom::{ExtensionOp, OpaqueOp};
 use crate::ops::{self, OpName, OpNameRef};
 use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
-use crate::types::FunctionType;
-use crate::types::TypeNameRef;
 use crate::types::{check_typevar_decl, CustomType, Substitution, TypeBound, TypeName};
+use crate::types::{FunctionType, TypeNameRef};
 
 mod op_def;
 pub use op_def::{
@@ -134,10 +133,10 @@ pub enum SignatureError {
     /// Invalid type arguments
     #[error("Invalid type arguments for operation")]
     InvalidTypeArgs,
-    /// The Extension Registry did not contain an Extension referenced by the FunctionType
+    /// The Extension Registry did not contain an Extension referenced by the Signature
     #[error("Extension '{0}' not found")]
     ExtensionNotFound(ExtensionId),
-    /// The Extension was found in the registry, but did not contain the Type(Def) referenced in the FunctionType
+    /// The Extension was found in the registry, but did not contain the Type(Def) referenced in the Signature
     #[error("Extension '{exn}' did not contain expected TypeDef '{typ}'")]
     ExtensionTypeNotFound { exn: ExtensionId, typ: TypeName },
     /// The bound recorded for a CustomType doesn't match what the TypeDef would compute

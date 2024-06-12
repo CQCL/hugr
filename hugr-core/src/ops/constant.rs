@@ -435,7 +435,6 @@ mod test {
     use crate::builder::test::simple_dfg_hugr;
     use crate::extension::prelude::PRELUDE_ID;
     use crate::std_extensions::arithmetic::int_types::ConstInt;
-    use crate::types::FunctionType;
     use crate::{
         builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
         extension::{
