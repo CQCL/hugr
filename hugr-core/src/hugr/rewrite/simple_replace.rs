@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use crate::hugr::views::SiblingSubgraph;
 use crate::hugr::{HugrMut, HugrView, NodeMetadataMap, Rewrite};
 use crate::ops::{OpTag, OpTrait, OpType};
-use crate::{Hugr, IncomingPort, Node};
+use crate::{Hugr, IncomingPort, Node, OutgoingPort};
 use thiserror::Error;
 
 /// Specification of a simple replacement operation.
@@ -147,6 +147,8 @@ impl Rewrite for SimpleReplacement {
         }
         // 3.4. For each q = self.nu_out[p1], p0 = self.nu_inp[q], add an edge from the predecessor of p0
         // to p1.
+        let mut disconnects: Vec<(Node, IncomingPort)> = Vec::new();
+        let mut connect: Vec<(Node, OutgoingPort, Node, IncomingPort)> = Vec::new();
         for ((rem_out_node, rem_out_port), &rep_out_port) in &self.nu_out {
             let rem_inp_nodeport = self.nu_inp.get(&(replacement_output_node, rep_out_port));
             if let Some((rem_inp_node, rem_inp_port)) = rem_inp_nodeport {
@@ -154,16 +156,27 @@ impl Rewrite for SimpleReplacement {
                 let (rem_inp_pred_node, rem_inp_pred_port) = h
                     .single_linked_output(*rem_inp_node, *rem_inp_port)
                     .unwrap();
-                h.disconnect(*rem_inp_node, *rem_inp_port);
-                h.disconnect(*rem_out_node, *rem_out_port);
-                h.connect(
+                // Delay connecting/disconnecting the nodes until after
+                // processing all nu_out entries.
+                disconnects.push((*rem_out_node, *rem_out_port));
+                disconnects.push((*rem_out_node, *rem_out_port));
+                connect.push((
                     rem_inp_pred_node,
                     rem_inp_pred_port,
                     *rem_out_node,
                     *rem_out_port,
-                );
+                ));
             }
         }
+        disconnects.into_iter().for_each(|(node, port)| {
+            h.disconnect(node, port);
+        });
+        connect
+            .into_iter()
+            .for_each(|(src_node, src_port, tgt_node, tgt_port)| {
+                h.connect(src_node, src_port, tgt_node, tgt_port);
+            });
+
         // 3.5. Remove all nodes in self.removal and edges between them.
         for &node in self.subgraph.nodes() {
             h.remove_node(node);
@@ -618,8 +631,6 @@ pub(in crate::hugr::rewrite) mod test {
         let (mut hugr, nodes) = dfg_hugr_copy_bools;
         let (input_not, output_not_0, output_not_1) = nodes.into_iter().collect_tuple().unwrap();
 
-        println!("{}", hugr.mermaid_string());
-
         let [_input, output] = hugr.get_io(hugr.root()).unwrap();
 
         let replacement = {
@@ -643,7 +654,7 @@ pub(in crate::hugr::rewrite) mod test {
             ),
             (
                 (repl_output, IncomingPort::from(1)),
-                (input_not, IncomingPort::from(1)),
+                (input_not, IncomingPort::from(0)),
             ),
         ]
         .into_iter()
