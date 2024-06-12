@@ -26,7 +26,7 @@ pub use self::views::{HugrView, RootTagged};
 use crate::core::NodeIndex;
 use crate::extension::{ExtensionRegistry, ExtensionSet};
 use crate::ops::custom::resolve_extension_ops;
-use crate::ops::OpTag;
+use crate::ops::{OpTag, OpTrait};
 pub use crate::ops::{OpType, DEFAULT_OPTYPE};
 use crate::{Direction, Node};
 
@@ -91,7 +91,7 @@ impl Hugr {
         self.validate_no_extensions(extension_registry)?;
         #[cfg(feature = "extension_inference")]
         {
-            self.infer_extensions()?;
+            self.infer_extensions(false)?;
             self.validate_extensions()?;
         }
         Ok(())
@@ -99,9 +99,64 @@ impl Hugr {
 
     /// Leaving this here as in the future we plan for it to infer deltas
     /// of container nodes e.g. [OpType::DFG]. For the moment it does nothing.
-    pub fn infer_extensions(&mut self) -> Result<(), ExtensionError> {
+    pub fn infer_extensions(&mut self, remove: bool) -> Result<(), ExtensionError> {
+        fn delta_mut(optype: &mut OpType) -> Option<&mut ExtensionSet> {
+            match optype {
+                OpType::DFG(dfg) => Some(&mut dfg.signature.extension_reqs),
+                OpType::DataflowBlock(dfb) => Some(&mut dfb.extension_delta),
+                OpType::TailLoop(tl) => Some(&mut tl.extension_delta),
+                OpType::CFG(cfg) => Some(&mut cfg.signature.extension_reqs),
+                OpType::Conditional(c) => Some(&mut c.extension_delta),
+                OpType::Case(c) => Some(&mut c.signature.extension_reqs),
+                //OpType::Lift(_) // Not ATM: only a single element, and we expect Lift to be removed
+                //OpType::FuncDefn(_) // Not at present due to the possibility of recursion
+                _ => None,
+            }
+        }
+        fn infer(h: &mut Hugr, node: Node, remove: bool) -> Result<ExtensionSet, ExtensionError> {
+            let child_sets = h
+                .children(node)
+                .collect::<Vec<_>>() // Avoid borrowing h over recursive call
+                .into_iter()
+                .map(|ch| Ok((ch, infer(h, ch, remove)?)))
+                .collect::<Result<Vec<_>, _>>()?;
+
+            let Some(es) = delta_mut(h.op_types.get_mut(node.pg_index())) else {
+                return Ok(h.get_optype(node).extension_delta());
+            };
+            if !es.contains(&ExtensionSet::TO_BE_INFERRED) {
+                // Can't add any new extensions...
+                if !remove {
+                    return Ok(es.clone()); // Can't remove either, so nothing to do
+                }
+                child_sets.iter().try_for_each(|(ch, ch_exts)| {
+                    if !es.is_superset(ch_exts) {
+                        return Err(ExtensionError {
+                            parent: node,
+                            parent_extensions: es.clone(),
+                            child: *ch,
+                            child_extensions: ch_exts.clone(),
+                        });
+                    }
+                    Ok(())
+                })?;
+            };
+            let ch_d = ExtensionSet::union_over(child_sets.into_iter().map(|(_, e)| e));
+            let merged = if remove { ch_d } else { ch_d.union(es.clone()) };
+            *es = ExtensionSet::singleton(&ExtensionSet::TO_BE_INFERRED).missing_from(&merged);
+
+            Ok(es.clone())
+        }
+        infer(self, self.root(), remove)?;
         Ok(())
     }
+
+    // Note: tests
+    // * all combinations of (remove or not, TO_BE_INFERRED present or absent, success(inferred-set) or failure (possible only if no TO_BE_INFERRED) )
+    // * parent - child - grandchild tests:
+    //   X - Y + INFER - X (ok with remove, but fails w/out remove)
+    //   X - Y + INFER - Y or X - INFER - Y (mid fails against parent with just Y, regardless of remove)
+    //   X - INFER - X (ok with-or-without remove)
 }
 
 /// Internal API for HUGRs, not intended for use by users.
