@@ -97,18 +97,16 @@ impl_sertesting_from!(SimpleOpDef, op_def);
 #[cfg(test)]
 impl From<PolyFuncType<false>> for TestingModel {
     fn from(v: PolyFuncType<false>) -> Self {
-        let mut r: Self = Default::default();
-        r.poly_func_type = Some(v.into());
-        r
+        let v: PolyFuncType<true> = v.into();
+        v.into()
     }
 }
 
 #[cfg(test)]
 impl From<Type<false>> for TestingModel {
     fn from(v: Type<false>) -> Self {
-        let mut r: Self = Default::default();
-        r.typ = Some(v.into());
-        r
+        let t: Type<true> = v.into();
+        t.into()
     }
 }
 
