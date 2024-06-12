@@ -395,21 +395,13 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
         (TypeArg::Sequence { elems }, TypeParam::List { param }) => {
             elems.iter().try_for_each(|arg| {
                 // Also allow elements that are RowVars if fitting into a List of Types
-                if let (
-                    TypeArg::Variable {
-                        v:
-                            TypeArgVariable {
-                                idx: _,
-                                cached_decl: TypeParam::List { param: arg_var },
-                            },
-                    },
-                    TypeParam::Type { b: param_bound },
-                ) = (arg, &**param)
+                if let (TypeArg::Variable { v }, TypeParam::Type { b: param_bound }) =
+                    (arg, &**param)
                 {
-                    if let TypeParam::Type { b: var_bound } = **arg_var {
-                        if param_bound.contains(var_bound) {
-                            return Ok(());
-                        }
+                    if v.bound_if_row_var()
+                        .is_some_and(|arg_bound| param_bound.contains(arg_bound))
+                    {
+                        return Ok(());
                     }
                 }
                 check_type_arg(arg, param)
