@@ -9,7 +9,7 @@ use petgraph::visit::{Topo, Walker};
 use portgraph::{LinkView, PortView};
 use thiserror::Error;
 
-use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
+use crate::extension::{ExtensionRegistry, SignatureError};
 
 use crate::ops::custom::{resolve_opaque_op, CustomOp, CustomOpError};
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
@@ -19,6 +19,7 @@ use crate::types::{EdgeKind, FunctionType};
 use crate::{Direction, Hugr, Node, Port};
 
 use super::views::{HierarchyView, HugrView, SiblingGraph};
+use super::ExtensionError;
 
 /// Structure keeping track of pre-computed information used in the validation
 /// process.
@@ -813,16 +814,6 @@ pub enum InterGraphEdgeError {
         from_parent: Node,
         ancestor: Node,
     },
-}
-
-#[derive(Debug, Clone, PartialEq, Error)]
-#[error("Parent node {parent} has extensions {parent_extensions} that are too restrictive for child node {child}, they must include child extensions {child_extensions}")]
-/// An error in the extension deltas.
-pub struct ExtensionError {
-    parent: Node,
-    parent_extensions: ExtensionSet,
-    child: Node,
-    child_extensions: ExtensionSet,
 }
 
 #[cfg(test)]

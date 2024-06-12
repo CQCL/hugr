@@ -13,7 +13,6 @@ use std::collections::VecDeque;
 use std::iter;
 
 pub(crate) use self::hugrmut::HugrMut;
-use self::validate::ExtensionError;
 pub use self::validate::ValidationError;
 
 pub use ident::{IdentList, InvalidIdentifier};
@@ -25,7 +24,7 @@ use thiserror::Error;
 
 pub use self::views::{HugrView, RootTagged};
 use crate::core::NodeIndex;
-use crate::extension::ExtensionRegistry;
+use crate::extension::{ExtensionRegistry, ExtensionSet};
 use crate::ops::custom::resolve_extension_ops;
 use crate::ops::OpTag;
 pub use crate::ops::{OpType, DEFAULT_OPTYPE};
@@ -201,6 +200,16 @@ impl Hugr {
         // This step is not strictly necessary.
         self.graph.compact_nodes(|_, _| {});
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Error)]
+#[error("Parent node {parent} has extensions {parent_extensions} that are too restrictive for child node {child}, they must include child extensions {child_extensions}")]
+/// An error in the extension deltas.
+pub struct ExtensionError {
+    parent: Node,
+    parent_extensions: ExtensionSet,
+    child: Node,
+    child_extensions: ExtensionSet,
 }
 
 /// Errors that can occur while manipulating a Hugr.
