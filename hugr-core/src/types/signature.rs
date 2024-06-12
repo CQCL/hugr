@@ -74,7 +74,7 @@ impl<const RV: bool> FuncTypeBase<RV> {
     }
 
     /// True if both inputs and outputs are necessarily empty.
-    /// (For [FunctionType], even after any possible substitution of row variables)
+    /// (For [FunTypeVarArgs], even after any possible substitution of row variables)
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
         self.input.is_empty() && self.output.is_empty()
