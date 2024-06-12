@@ -53,9 +53,7 @@ jobs:
             dist/*.whl
 
       - name: Publish to test instance of PyPI (dry-run)
-        if: |
-          ${{ github.event_name == 'push' && github.ref_type == 'branch' }} ||
-          ${{ github.event_name == 'workflow_dispatch' && github.ref_type == 'branch'}}
+        if: ${{ (github.event_name == 'push' && github.ref_type == 'branch') || (github.event_name == 'workflow_dispatch' && github.ref_type == 'branch' ) }}
         run: |
           echo "Doing a dry-run publish to test-pypi..."
           echo "Based on the following workflow variables, this is not a hugr-py version tag push:"
@@ -68,9 +66,7 @@ jobs:
           poetry publish -r test-pypi --dist-dir ../dist --skip-existing --dry-run
 
       - name: Publish to PyPI
-        if: |
-          ${{ (github.event_name == 'release' && github.ref_type == 'tag' && startsWith(github.ref, format('refs/tags/{0}-v', matrix.package)))}} ||
-          ${{ (github.event_name == 'workflow_dispatch' && github.ref_type == 'tag' && startsWith(github.ref, format('refs/tags/{0}-v', matrix.package)))}} ||
+        if: ${{ (github.event_name == 'release' && github.ref_type == 'tag' && startsWith(github.ref, format('refs/tags/{0}-v', matrix.package)) ) || (github.event_name == 'workflow_dispatch' && github.ref_type == 'tag' && startsWith(github.ref, format('refs/tags/{0}-v', matrix.package)) ) }}
         run: |
           cd ${{ matrix.package }}
           poetry config pypi-token.pypi ${{ secrets.PYPI_PUBLISH }}
