@@ -57,6 +57,7 @@ impl<const RV: bool> FuncTypeBase<RV> {
         }
     }
 
+    /// Create a new signature with specified inputs and outputs.
     pub fn new(input: impl Into<TypeRow<RV>>, output: impl Into<TypeRow<RV>>) -> Self {
         Self {
             input: input.into(),
@@ -65,6 +66,8 @@ impl<const RV: bool> FuncTypeBase<RV> {
         }
     }
 
+    /// Create a new signature with the same input and output types (signature of an endomorphic
+    /// function).
     pub fn new_endo(row: impl Into<TypeRow<RV>>) -> Self {
         let row = row.into();
         Self::new(row.clone(), row)
