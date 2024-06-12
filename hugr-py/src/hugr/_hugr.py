@@ -10,7 +10,6 @@ from typing import (
     Iterable,
     Iterator,
     Protocol,
-    Sequence,
     TypeVar,
     cast,
     overload,
@@ -19,7 +18,6 @@ from typing import (
 from typing_extensions import Self
 
 from hugr._ops import Op
-from hugr._tys import Type
 from hugr.serialization.ops import OpType as SerialOp
 from hugr.serialization.serial_hugr import SerialHugr
 from hugr.utils import BiMap
@@ -27,7 +25,7 @@ from hugr.utils import BiMap
 from ._exceptions import ParentBeforeChild
 
 if TYPE_CHECKING:
-    from ._dfg import Dfg
+    from ._dfg import DfBase, DP
 
 
 class Direction(Enum):
@@ -337,10 +335,10 @@ class Hugr(Mapping[Node, NodeData]):
             )
         return mapping
 
-    def add_dfg(self, input_types: Sequence[Type], output_types: Sequence[Type]) -> Dfg:
-        from ._dfg import Dfg
+    def add_dfg(self, root_op: DP) -> DfBase[DP]:
+        from ._dfg import DfBase
 
-        dfg = Dfg(input_types, output_types)
+        dfg = DfBase(root_op)
         mapping = self.insert_hugr(dfg.hugr, self.root)
         dfg.hugr = self
         dfg.input_node = mapping[dfg.input_node]
