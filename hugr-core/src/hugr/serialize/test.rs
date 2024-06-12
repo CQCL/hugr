@@ -13,10 +13,8 @@ use crate::std_extensions::arithmetic::float_types::FLOAT64_TYPE;
 use crate::std_extensions::arithmetic::int_ops::INT_OPS_REGISTRY;
 use crate::std_extensions::arithmetic::int_types::{self, int_custom_type, ConstInt, INT_TYPES};
 use crate::std_extensions::logic::NotOp;
-use crate::types::{
-    type_param::TypeParam, FunTypeVarArgs, FunctionType, PolyFuncType, SumType, Type, TypeArg,
-    TypeBound,
-};
+use crate::types::type_param::TypeParam;
+use crate::types::{FunTypeVarArgs, FunctionType, PolyFuncType, SumType, Type, TypeArg, TypeBound};
 use crate::{type_row, OutgoingPort};
 
 use itertools::Itertools;
