@@ -273,12 +273,11 @@ impl<const RV1: bool, const RV2: bool> PartialEq<FuncTypeBase<RV1>> for FuncType
 
 #[cfg(test)]
 mod test {
-    use crate::extension::prelude::USIZE_T;
-
+    use crate::{extension::prelude::USIZE_T, type_row};
     use super::*;
     #[test]
     fn test_function_type() {
-        let mut f_type = FunctionType::new(Type::<false>::UNIT, Type::<false>::UNIT);
+        let mut f_type = FunctionType::new(type_row![Type::UNIT], type_row![Type::UNIT]);
         assert_eq!(f_type.input_count(), 1);
         assert_eq!(f_type.output_count(), 1);
 
