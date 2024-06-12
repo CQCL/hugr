@@ -352,23 +352,6 @@ class Type(RootModel):
 TypeRow = list[Type]
 
 
-# -------------------------------------------
-# --------------- Signature -----------------
-# -------------------------------------------
-
-
-class Signature(ConfiguredBaseModel):
-    """Describes the edges required to/from a node.
-
-    This includes both the concept of "signature" in the spec, and also the target
-    (value) of a call (constant).
-    """
-
-    signature: "PolyFuncType"  # The underlying signature
-
-    # ALAN is it worth keeping this now/still? (Also, surprised this is "Poly"...??)
-
-
 # Now that all classes are defined, we need to update the ForwardRefs in all type
 # annotations. We use some inspect magic to find all classes defined in this file
 # and call model_rebuild()
