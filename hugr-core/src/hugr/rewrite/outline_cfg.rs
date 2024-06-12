@@ -125,10 +125,8 @@ impl Rewrite for OutlineCfg {
 
         // 2. new_block contains input node, sub-cfg, exit node all connected
         let (new_block, cfg_node) = {
-            let input_extensions = h.get_nodetype(entry).input_extensions().cloned();
             let mut new_block_bldr = BlockBuilder::new(
                 inputs.clone(),
-                input_extensions.clone(),
                 vec![type_row![]],
                 outputs.clone(),
                 extension_delta.clone(),
@@ -136,7 +134,7 @@ impl Rewrite for OutlineCfg {
             .unwrap();
             let wires_in = inputs.iter().cloned().zip(new_block_bldr.input_wires());
             let cfg = new_block_bldr
-                .cfg_builder(wires_in, input_extensions, outputs, extension_delta)
+                .cfg_builder(wires_in, outputs, extension_delta)
                 .unwrap();
             let cfg = cfg.finish_sub_container().unwrap();
             let unit_sum = new_block_bldr.add_constant(ops::Value::unary_unit_sum());

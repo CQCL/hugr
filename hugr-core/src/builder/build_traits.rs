@@ -14,7 +14,6 @@ use super::{
 use super::{BuilderWiringError, FunctionBuilder};
 
 use crate::{
-    hugr::NodeType,
     ops::handle::{ConstID, DataflowOpID, FuncID, NodeHandle},
     types::EdgeKind,
 };
@@ -45,12 +44,7 @@ pub trait Container {
     /// Immutable reference to HUGR being built
     fn hugr(&self) -> &Hugr;
     /// Add an [`OpType`] as the final child of the container.
-    fn add_child_op(&mut self, op: impl Into<OpType>) -> Node {
-        let parent = self.container_node();
-        self.hugr_mut().add_node_with_parent(parent, op)
-    }
-    /// Add a [`NodeType`] as the final child of the container.
-    fn add_child_node(&mut self, node: NodeType) -> Node {
+    fn add_child_node(&mut self, node: impl Into<OpType>) -> Node {
         let parent = self.container_node();
         self.hugr_mut().add_node_with_parent(parent, node)
     }
@@ -71,8 +65,7 @@ pub trait Container {
     /// This function will return an error if there is an error in adding the
     /// [`OpType::Const`] node.
     fn add_constant(&mut self, constant: impl Into<ops::Const>) -> ConstID {
-        self.add_child_node(NodeType::new_pure(constant.into()))
-            .into()
+        self.add_child_node(constant.into()).into()
     }
 
     /// Add a [`ops::FuncDefn`] node and returns a builder to define the function
@@ -88,13 +81,12 @@ pub trait Container {
         signature: PolyFuncType,
     ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
         let body = signature.body().clone();
-        let f_node = self.add_child_node(NodeType::new_pure(ops::FuncDefn {
+        let f_node = self.add_child_node(ops::FuncDefn {
             name: name.into(),
             signature,
-        }));
+        });
 
-        let db =
-            DFGBuilder::create_with_io(self.hugr_mut(), f_node, body, Some(ExtensionSet::new()))?;
+        let db = DFGBuilder::create_with_io(self.hugr_mut(), f_node, body)?;
         Ok(FunctionBuilder::from_dfg_builder(db))
     }
 
@@ -182,7 +174,7 @@ pub trait Dataflow: Container {
     fn input_wires(&self) -> Outputs {
         self.input().outputs()
     }
-    /// Add a dataflow op to the sibling graph, wiring up the `input_wires` to the
+    /// Add a dataflow [`OpType`] to the sibling graph, wiring up the `input_wires` to the
     /// incoming ports of the resulting node.
     ///
     /// # Errors
@@ -190,21 +182,7 @@ pub trait Dataflow: Container {
     /// Returns a [`BuildError::OperationWiring`] error if the `input_wires` cannot be connected.
     fn add_dataflow_op(
         &mut self,
-        op: impl Into<OpType>,
-        input_wires: impl IntoIterator<Item = Wire>,
-    ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
-        self.add_dataflow_node(NodeType::new_auto(op), input_wires)
-    }
-
-    /// Add a dataflow [`NodeType`] to the sibling graph, wiring up the `input_wires` to the
-    /// incoming ports of the resulting node.
-    ///
-    /// # Errors
-    ///
-    /// Returns a [`BuildError::OperationWiring`] error if the `input_wires` cannot be connected.
-    fn add_dataflow_node(
-        &mut self,
-        nodetype: NodeType,
+        nodetype: impl Into<OpType>,
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
         let outs = add_node_with_wires(self, nodetype, input_wires)?;
@@ -297,16 +275,14 @@ pub trait Dataflow: Container {
     fn dfg_builder(
         &mut self,
         signature: FunctionType,
-        input_extensions: Option<ExtensionSet>,
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<DFGBuilder<&mut Hugr>, BuildError> {
         let op = ops::DFG {
             signature: signature.clone(),
         };
-        let nodetype = NodeType::new(op, input_extensions.clone());
-        let (dfg_n, _) = add_node_with_wires(self, nodetype, input_wires)?;
+        let (dfg_n, _) = add_node_with_wires(self, op, input_wires)?;
 
-        DFGBuilder::create_with_io(self.hugr_mut(), dfg_n, signature, input_extensions)
+        DFGBuilder::create_with_io(self.hugr_mut(), dfg_n, signature)
     }
 
     /// Return a builder for a [`crate::ops::CFG`] node,
@@ -322,7 +298,6 @@ pub trait Dataflow: Container {
     fn cfg_builder(
         &mut self,
         inputs: impl IntoIterator<Item = (Type, Wire)>,
-        input_extensions: impl Into<Option<ExtensionSet>>,
         output_types: TypeRow,
         extension_delta: ExtensionSet,
     ) -> Result<CFGBuilder<&mut Hugr>, BuildError> {
@@ -332,13 +307,10 @@ pub trait Dataflow: Container {
 
         let (cfg_node, _) = add_node_with_wires(
             self,
-            NodeType::new(
-                ops::CFG {
-                    signature: FunctionType::new(inputs.clone(), output_types.clone())
-                        .with_extension_delta(extension_delta),
-                },
-                input_extensions.into(),
-            ),
+            ops::CFG {
+                signature: FunctionType::new(inputs.clone(), output_types.clone())
+                    .with_extension_delta(extension_delta),
+            },
             input_wires,
         )?;
         CFGBuilder::create(self.hugr_mut(), cfg_node, inputs, output_types)
@@ -348,9 +320,8 @@ pub trait Dataflow: Container {
     /// Adds a [`OpType::LoadConstant`] node.
     fn load_const(&mut self, cid: &ConstID) -> Wire {
         let const_node = cid.node();
-        let nodetype = self.hugr().get_nodetype(const_node);
+        let nodetype = self.hugr().get_optype(const_node);
         let op: ops::Const = nodetype
-            .op()
             .clone()
             .try_into()
             .expect("ConstID does not refer to Const op.");
@@ -394,7 +365,7 @@ pub trait Dataflow: Container {
         exts: &ExtensionRegistry,
     ) -> Result<Wire, BuildError> {
         let func_node = fid.node();
-        let func_op = self.hugr().get_nodetype(func_node).op();
+        let func_op = self.hugr().get_optype(func_node);
         let func_sig = match func_op {
             OpType::FuncDefn(ops::FuncDefn { signature, .. })
             | OpType::FuncDecl(ops::FuncDecl { signature, .. }) => signature.clone(),
@@ -643,26 +614,23 @@ pub trait Dataflow: Container {
 /// invalid edge.
 fn add_node_with_wires<T: Dataflow + ?Sized>(
     data_builder: &mut T,
-    nodetype: impl Into<NodeType>,
+    nodetype: impl Into<OpType>,
     inputs: impl IntoIterator<Item = Wire>,
 ) -> Result<(Node, usize), BuildError> {
-    let nodetype: NodeType = nodetype.into();
+    let op = nodetype.into();
     // Check there are no row variables, as that would prevent us
     // from indexing into the node's ports in order to wire up
-    nodetype
-        .op_signature()
+    op.dataflow_signature()
         .as_ref()
         .and_then(FunctionType::find_rowvar)
         .map_or(Ok(()), |(idx, _)| {
             Err(SignatureError::RowVarWhereTypeExpected { idx })
         })?;
-    let num_outputs = nodetype.op().value_output_count();
-    let op_node = data_builder.add_child_node(nodetype.clone());
+    let num_outputs = op.value_output_count();
+    let op_node = data_builder.add_child_node(op.clone());
 
-    wire_up_inputs(inputs, op_node, data_builder).map_err(|error| BuildError::OperationWiring {
-        op: nodetype.into_op(),
-        error,
-    })?;
+    wire_up_inputs(inputs, op_node, data_builder)
+        .map_err(|error| BuildError::OperationWiring { op, error })?;
 
     Ok((op_node, num_outputs))
 }

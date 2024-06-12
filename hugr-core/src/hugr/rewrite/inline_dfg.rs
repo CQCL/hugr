@@ -201,7 +201,6 @@ mod test {
         let inner = {
             let mut inner = outer.dfg_builder(
                 FunctionType::new_endo(vec![int_ty.clone()]).with_extension_delta(delta),
-                None,
                 [a],
             )?;
             let [a] = inner.input_wires_arr();
@@ -261,11 +260,7 @@ mod test {
             .add_dataflow_op(test_quantum_extension::h_gate(), [p])?
             .outputs_arr();
         let swap = {
-            let swap = h.dfg_builder(
-                FunctionType::new_endo(type_row![QB_T, QB_T]),
-                None,
-                [p_h, q],
-            )?;
+            let swap = h.dfg_builder(FunctionType::new_endo(type_row![QB_T, QB_T]), [p_h, q])?;
             let [a, b] = swap.input_wires_arr();
             swap.finish_with_outputs([b, a])?
         };
@@ -363,7 +358,6 @@ mod test {
         let h_b = outer.add_dataflow_op(test_quantum_extension::h_gate(), [b])?;
         let mut inner = outer.dfg_builder(
             FunctionType::new_endo(type_row![QB_T]).with_extension_delta(float_types::EXTENSION_ID),
-            None,
             h_b.outputs(),
         )?;
         let [i] = inner.input_wires_arr();

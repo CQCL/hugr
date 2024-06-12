@@ -13,10 +13,7 @@ use crate::{
 use crate::{hugr::views::HugrView, types::TypeRow};
 
 use crate::Node;
-use crate::{
-    hugr::{HugrMut, NodeType},
-    type_row, Hugr,
-};
+use crate::{hugr::HugrMut, type_row, Hugr};
 
 /// Builder for a [`crate::ops::CFG`] child control
 /// flow graph.
@@ -158,7 +155,7 @@ impl CFGBuilder<Hugr> {
             signature: signature.clone(),
         };
 
-        let base = Hugr::new(NodeType::new_open(cfg_op));
+        let base = Hugr::new(cfg_op);
         let cfg_node = base.root();
         CFGBuilder::create(base, cfg_node, signature.input, signature.output)
     }
@@ -336,12 +333,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
     fn create(base: B, block_n: Node) -> Result<Self, BuildError> {
         let block_op = base.get_optype(block_n).as_dataflow_block().unwrap();
         let signature = block_op.inner_signature();
-        let inp_ex = base
-            .as_ref()
-            .get_nodetype(block_n)
-            .input_extensions()
-            .cloned();
-        let db = DFGBuilder::create_with_io(base, block_n, signature, inp_ex)?;
+        let db = DFGBuilder::create_with_io(base, block_n, signature)?;
         Ok(BlockBuilder::from_dfg_builder(db))
     }
 
@@ -363,7 +355,6 @@ impl BlockBuilder<Hugr> {
     /// Initialize a [`DataflowBlock`] rooted HUGR builder
     pub fn new(
         inputs: impl Into<TypeRow>,
-        input_extensions: impl Into<Option<ExtensionSet>>,
         sum_rows: impl IntoIterator<Item = TypeRow>,
         other_outputs: impl Into<TypeRow>,
         extension_delta: ExtensionSet,
@@ -378,7 +369,7 @@ impl BlockBuilder<Hugr> {
             extension_delta,
         };
 
-        let base = Hugr::new(NodeType::new(op, input_extensions));
+        let base = Hugr::new(op);
         let root = base.root();
         Self::create(base, root)
     }
@@ -418,7 +409,6 @@ pub(crate) mod test {
                 let cfg_id = {
                     let mut cfg_builder = func_builder.cfg_builder(
                         vec![(NAT, int)],
-                        None,
                         type_row![NAT],
                         ExtensionSet::new(),
                     )?;

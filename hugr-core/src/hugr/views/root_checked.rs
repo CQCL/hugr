@@ -72,16 +72,17 @@ mod test {
     use super::RootChecked;
     use crate::extension::ExtensionSet;
     use crate::hugr::internal::HugrMutInternals;
-    use crate::hugr::{HugrError, HugrMut, NodeType};
+    use crate::hugr::{HugrError, HugrMut};
     use crate::ops::handle::{BasicBlockID, CfgID, DataflowParentID, DfgID};
-    use crate::ops::{DataflowBlock, MakeTuple, OpTag};
+    use crate::ops::{DataflowBlock, MakeTuple, OpTag, OpType};
     use crate::{ops, type_row, types::FunctionType, Hugr, HugrView};
 
     #[test]
     fn root_checked() {
-        let root_type = NodeType::new_pure(ops::DFG {
+        let root_type: OpType = ops::DFG {
             signature: FunctionType::new(vec![], vec![]),
-        });
+        }
+        .into();
         let mut h = Hugr::new(root_type.clone());
         let cfg_v = RootChecked::<&Hugr, CfgID>::try_new(&h);
         assert_eq!(
@@ -94,12 +95,13 @@ mod test {
         let mut dfg_v = RootChecked::<&mut Hugr, DfgID>::try_new(&mut h).unwrap();
         // That is a HugrMutInternal, so we can try:
         let root = dfg_v.root();
-        let bb = NodeType::new_pure(DataflowBlock {
+        let bb: OpType = DataflowBlock {
             inputs: type_row![],
             other_outputs: type_row![],
             sum_rows: vec![type_row![]],
             extension_delta: ExtensionSet::new(),
-        });
+        }
+        .into();
         let r = dfg_v.replace_op(root, bb.clone());
         assert_eq!(
             r,
@@ -109,7 +111,7 @@ mod test {
             })
         );
         // That didn't do anything:
-        assert_eq!(dfg_v.get_nodetype(root), &root_type);
+        assert_eq!(dfg_v.get_optype(root), &root_type);
 
         // Make a RootChecked that allows any DataflowParent
         // We won't be able to do this by widening the bound:
@@ -124,12 +126,12 @@ mod test {
         let mut dfp_v = RootChecked::<&mut Hugr, DataflowParentID>::try_new(&mut h).unwrap();
         let r = dfp_v.replace_op(root, bb.clone());
         assert_eq!(r, Ok(root_type));
-        assert_eq!(dfp_v.get_nodetype(root), &bb);
+        assert_eq!(dfp_v.get_optype(root), &bb);
         // Just check we can create a nested instance (narrowing the bound)
         let mut bb_v = RootChecked::<_, BasicBlockID>::try_new(dfp_v).unwrap();
 
         // And it's a HugrMut:
-        let nodetype = NodeType::new_pure(MakeTuple { tys: type_row![] });
+        let nodetype = MakeTuple { tys: type_row![] };
         bb_v.add_node_with_parent(bb_v.root(), nodetype);
     }
 }

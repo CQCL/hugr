@@ -19,7 +19,6 @@ use crate::types::{EdgeKind, FunctionType};
 use crate::{Direction, Hugr, Node, Port};
 
 use super::views::{HierarchyView, HugrView, SiblingGraph};
-use super::NodeType;
 
 /// Structure keeping track of pre-computed information used in the validation
 /// process.
@@ -152,8 +151,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
     /// - Matching the number of ports with the signature
     /// - Dataflow ports are correct. See `validate_df_port`
     fn validate_node(&self, node: Node) -> Result<(), ValidationError> {
-        let node_type = self.hugr.get_nodetype(node);
-        let op_type = &node_type.op;
+        let op_type = self.hugr.get_optype(node);
 
         // The Hugr can have only one root node.
         if node == self.hugr.root() {
@@ -210,7 +208,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
             })?;
 
         // Thirdly that the node has correct children
-        self.validate_children(node, node_type)?;
+        self.validate_children(node, op_type)?;
 
         Ok(())
     }
@@ -315,8 +313,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
     /// Check operation-specific constraints.
     ///
     /// These are flags defined for each operation type as an [`OpValidityFlags`] object.
-    fn validate_children(&self, node: Node, node_type: &NodeType) -> Result<(), ValidationError> {
-        let op_type = &node_type.op;
+    fn validate_children(&self, node: Node, op_type: &OpType) -> Result<(), ValidationError> {
         let flags = op_type.validity_flags();
 
         if self.hugr.hierarchy.child_count(node.pg_index()) > 0 {

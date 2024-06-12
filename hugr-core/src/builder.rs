@@ -220,7 +220,7 @@ pub enum BuilderWiringError {
 pub(crate) mod test {
     use rstest::fixture;
 
-    use crate::hugr::{views::HugrView, HugrMut, NodeType};
+    use crate::hugr::{views::HugrView, HugrMut};
     use crate::ops;
     use crate::std_extensions::arithmetic::float_ops::FLOAT_OPS_REGISTRY;
     use crate::types::{FunctionType, PolyFuncType, Type};
@@ -278,9 +278,9 @@ pub(crate) mod test {
     /// inference. Using DFGBuilder will default to a root node with an open
     /// extension variable
     pub(crate) fn closed_dfg_root_hugr(signature: FunctionType) -> Hugr {
-        let mut hugr = Hugr::new(NodeType::new_pure(ops::DFG {
+        let mut hugr = Hugr::new(ops::DFG {
             signature: signature.clone(),
-        }));
+        });
         hugr.add_node_with_parent(
             hugr.root(),
             ops::Input {

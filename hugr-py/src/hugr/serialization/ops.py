@@ -29,7 +29,6 @@ class BaseOp(ABC, ConfiguredBaseModel):
 
     # Parent node index of node the op belongs to, used only at serialization time
     parent: NodeID
-    input_extensions: ExtensionSet | None = Field(default=None)
 
     def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
         """Hook to insert type information from the input and output ports into the

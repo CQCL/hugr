@@ -1,7 +1,7 @@
 use crate::extension::ExtensionSet;
 use crate::ops;
 
-use crate::hugr::{views::HugrView, NodeType};
+use crate::hugr::views::HugrView;
 use crate::types::{FunctionType, TypeRow};
 use crate::{Hugr, Node};
 
@@ -22,7 +22,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> TailLoopBuilder<B> {
         tail_loop: &ops::TailLoop,
     ) -> Result<Self, BuildError> {
         let signature = FunctionType::new(tail_loop.body_input_row(), tail_loop.body_output_row());
-        let dfg_build = DFGBuilder::create_with_io(base, loop_node, signature, None)?;
+        let dfg_build = DFGBuilder::create_with_io(base, loop_node, signature)?;
 
         Ok(TailLoopBuilder::from_dfg_builder(dfg_build))
     }
@@ -83,8 +83,7 @@ impl TailLoopBuilder<Hugr> {
             rest: inputs_outputs.into(),
             extension_delta,
         };
-        // TODO: Allow input extensions to be specified
-        let base = Hugr::new(NodeType::new_open(tail_loop.clone()));
+        let base = Hugr::new(tail_loop.clone());
         let root = base.root();
         Self::create_with_io(base, root, &tail_loop)
     }

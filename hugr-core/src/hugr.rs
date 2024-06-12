@@ -25,13 +25,11 @@ use thiserror::Error;
 
 pub use self::views::{HugrView, RootTagged};
 use crate::core::NodeIndex;
-use crate::extension::{ExtensionRegistry, ExtensionSet};
+use crate::extension::ExtensionRegistry;
 use crate::ops::custom::resolve_extension_ops;
-use crate::ops::{OpTag, OpTrait, OpType, DEFAULT_OPTYPE};
-use crate::types::FunctionType;
+use crate::ops::OpTag;
+pub use crate::ops::{OpType, DEFAULT_OPTYPE};
 use crate::{Direction, Node};
-
-use delegate::delegate;
 
 /// The Hugr data structure.
 #[derive(Clone, Debug, PartialEq)]
@@ -46,115 +44,15 @@ pub struct Hugr {
     root: portgraph::NodeIndex,
 
     /// Operation types for each node.
-    op_types: UnmanagedDenseMap<portgraph::NodeIndex, NodeType>,
+    op_types: UnmanagedDenseMap<portgraph::NodeIndex, OpType>,
 
     /// Node metadata
     metadata: UnmanagedDenseMap<portgraph::NodeIndex, Option<NodeMetadataMap>>,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
-/// The type of a node on a graph. In addition to the [`OpType`], it also
-/// describes the extensions inferred to be used by the node.
-pub struct NodeType {
-    /// The underlying OpType
-    op: OpType,
-    /// The extensions that the signature has been specialised to
-    input_extensions: Option<ExtensionSet>,
-}
-
-/// The default NodeType, with open extensions
-pub const DEFAULT_NODETYPE: NodeType = NodeType {
-    op: DEFAULT_OPTYPE,
-    input_extensions: None, // Default for any Option
-};
-
-impl NodeType {
-    /// Create a new optype with some ExtensionSet
-    pub fn new(op: impl Into<OpType>, input_extensions: impl Into<Option<ExtensionSet>>) -> Self {
-        NodeType {
-            op: op.into(),
-            input_extensions: input_extensions.into(),
-        }
-    }
-
-    /// Instantiate an OpType with no input extensions
-    pub fn new_pure(op: impl Into<OpType>) -> Self {
-        NodeType {
-            op: op.into(),
-            input_extensions: Some(ExtensionSet::new()),
-        }
-    }
-
-    /// Instantiate an OpType with an unknown set of input extensions
-    /// (to be inferred later)
-    pub fn new_open(op: impl Into<OpType>) -> Self {
-        NodeType {
-            op: op.into(),
-            input_extensions: None,
-        }
-    }
-
-    /// Instantiate an [OpType] with the default set of input extensions
-    /// for that OpType.
-    pub fn new_auto(op: impl Into<OpType>) -> Self {
-        let op = op.into();
-        if OpTag::ModuleOp.is_superset(op.tag()) {
-            Self::new_pure(op)
-        } else {
-            Self::new_open(op)
-        }
-    }
-
-    /// Get the function type from the embedded op
-    pub fn op_signature(&self) -> Option<FunctionType> {
-        self.op.dataflow_signature()
-    }
-
-    /// The input extensions defined for this node.
-    ///
-    /// The output extensions will correspond to the input extensions plus any
-    /// extension delta defined by the operation type.
-    ///
-    /// If the input extensions are not known, this will return None.
-    pub fn input_extensions(&self) -> Option<&ExtensionSet> {
-        self.input_extensions.as_ref()
-    }
-
-    /// Gets the underlying [OpType] i.e. without any [input_extensions]
-    ///
-    /// [input_extensions]: NodeType::input_extensions
-    pub fn op(&self) -> &OpType {
-        &self.op
-    }
-
-    /// Returns the underlying [OpType] i.e. without any [input_extensions]
-    ///
-    /// [input_extensions]: NodeType::input_extensions
-    pub fn into_op(self) -> OpType {
-        self.op
-    }
-
-    delegate! {
-        to self.op {
-            /// Tag identifying the operation.
-            pub fn tag(&self) -> OpTag;
-            /// Returns the number of inputs ports for the operation.
-            pub fn input_count(&self) -> usize;
-            /// Returns the number of outputs ports for the operation.
-            pub fn output_count(&self) -> usize;
-        }
-    }
-}
-
-impl<T: Into<OpType>> From<T> for NodeType {
-    fn from(value: T) -> Self {
-        NodeType::new_auto(value.into())
-    }
-}
-
 impl Default for Hugr {
     fn default() -> Self {
-        Self::new(NodeType::new_pure(crate::ops::Module))
+        Self::new(crate::ops::Module)
     }
 }
 
@@ -181,8 +79,8 @@ pub type NodeMetadataMap = serde_json::Map<String, NodeMetadata>;
 /// Public API for HUGRs.
 impl Hugr {
     /// Create a new Hugr, with a single root node.
-    pub fn new(root_node: NodeType) -> Self {
-        Self::with_capacity(root_node, 0, 0)
+    pub fn new(root_node: impl Into<OpType>) -> Self {
+        Self::with_capacity(root_node.into(), 0, 0)
     }
 
     /// Resolve extension ops, infer extensions used, and pass the closure into validation
@@ -210,8 +108,7 @@ impl Hugr {
 /// Internal API for HUGRs, not intended for use by users.
 impl Hugr {
     /// Create a new Hugr, with a single root node and preallocated capacity.
-    // TODO: Make this take a NodeType
-    pub(crate) fn with_capacity(root_node: NodeType, nodes: usize, ports: usize) -> Self {
+    pub(crate) fn with_capacity(root_node: OpType, nodes: usize, ports: usize) -> Self {
         let mut graph = MultiPortGraph::with_capacity(nodes, ports);
         let hierarchy = Hierarchy::new();
         let mut op_types = UnmanagedDenseMap::with_capacity(nodes);
@@ -236,7 +133,7 @@ impl Hugr {
     }
 
     /// Add a node to the graph.
-    pub(crate) fn add_node(&mut self, nodetype: NodeType) -> Node {
+    pub(crate) fn add_node(&mut self, nodetype: OpType) -> Node {
         let node = self
             .graph
             .add_node(nodetype.input_count(), nodetype.output_count());
