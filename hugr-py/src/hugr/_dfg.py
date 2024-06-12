@@ -73,6 +73,16 @@ class DfBase(Generic[DP]):
         self._wire_up(dfg.root, args)
         return _from_base(Dfg, dfg)
 
+    def add_cfg(
+        self,
+        input_types: Sequence[Type],
+        output_types: Sequence[Type],
+        *args: Wire,
+    ) -> Cfg:
+        cfg = self.hugr.add_cfg(input_types, output_types)
+        self._wire_up(cfg.root, args)
+        return cfg
+
     def insert_cfg(self, cfg: Cfg, *args: Wire) -> Node:
         mapping = self.hugr.insert_hugr(cfg.hugr, self.root)
         self._wire_up(mapping[cfg.root], args)
