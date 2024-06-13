@@ -12,6 +12,7 @@ from typing import (
     TypeVar,
     cast,
     overload,
+    Type as PyType,
 )
 
 from typing_extensions import Self
@@ -131,6 +132,7 @@ class NodeData:
 
 P = TypeVar("P", InPort, OutPort)
 K = TypeVar("K", InPort, OutPort)
+OpVar = TypeVar("OpVar", bound=Op)
 
 
 @dataclass(frozen=True, eq=True, order=True)
@@ -182,6 +184,11 @@ class Hugr(Mapping[Node, NodeData]):
 
     def __len__(self) -> int:
         return self.num_nodes()
+
+    def _get_typed_op(self, node: ToNode, cl: PyType[OpVar]) -> OpVar:
+        op = self[node].op
+        assert isinstance(op, cl)
+        return op
 
     def children(self, node: ToNode | None = None) -> list[Node]:
         node = node or self.root

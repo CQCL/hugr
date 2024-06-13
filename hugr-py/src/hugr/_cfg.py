@@ -84,9 +84,10 @@ class Cfg(ParentBuilder):
         return self._entry_block.root
 
     def _entry_op(self) -> ops.DataflowBlock:
-        dop = self.hugr[self.entry].op
-        assert isinstance(dop, ops.DataflowBlock)
-        return dop
+        return self.hugr._get_typed_op(self.entry, ops.DataflowBlock)
+
+    def _exit_op(self) -> ops.ExitBlock:
+        return self.hugr._get_typed_op(self.exit, ops.ExitBlock)
 
     def add_entry(self, sum_rows: Sequence[TypeRow], other_outputs: TypeRow) -> Block:
         # update entry block types

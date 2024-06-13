@@ -55,14 +55,10 @@ class _DfBase(ParentBuilder, Generic[DP]):
         return new
 
     def _input_op(self) -> ops.Input:
-        dop = self.hugr[self.input_node].op
-        assert isinstance(dop, ops.Input)
-        return dop
+        return self.hugr._get_typed_op(self.input_node, ops.Input)
 
     def _output_op(self) -> ops.Output:
-        dop = self.hugr[self.output_node].op
-        assert isinstance(dop, ops.Output)
-        return dop
+        return self.hugr._get_typed_op(self.output_node, ops.Output)
 
     def root_op(self) -> DP:
         return cast(DP, self.hugr[self.root].op)
