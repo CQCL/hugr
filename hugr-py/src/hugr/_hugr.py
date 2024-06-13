@@ -151,11 +151,14 @@ _SO = _SubPort[OutPort]
 _SI = _SubPort[InPort]
 
 
-class ParentBuilder(ToNode):
+class ParentBuilder(ToNode, Protocol):
+    hugr: Hugr
     root: Node
 
     def to_node(self) -> Node:
         return self.root
+
+    def _replace_hugr(self, mapping: Mapping[Node, Node], new_hugr: Hugr) -> None: ...
 
 
 @dataclass()
@@ -364,10 +367,7 @@ class Hugr(Mapping[Node, NodeData]):
 
         dfg = DfBase(root_op)
         mapping = self.insert_hugr(dfg.hugr, self.root)
-        dfg.hugr = self
-        dfg.input_node = mapping[dfg.input_node]
-        dfg.output_node = mapping[dfg.output_node]
-        dfg.root = mapping[dfg.root]
+        dfg._replace_hugr(mapping, self)
         return dfg
 
     def add_cfg(self, input_types: TypeRow, output_types: TypeRow) -> Cfg:
@@ -375,14 +375,7 @@ class Hugr(Mapping[Node, NodeData]):
 
         cfg = Cfg(input_types, output_types)
         mapping = self.insert_hugr(cfg.hugr, self.root)
-        cfg.hugr = self
-        cfg._entry_block.root = mapping[cfg.entry]
-        cfg._entry_block.input_node = mapping[cfg._entry_block.input_node]
-        cfg._entry_block.output_node = mapping[cfg._entry_block.output_node]
-        cfg._entry_block.hugr = self
-        cfg.exit = mapping[cfg.exit]
-        cfg.root = mapping[cfg.root]
-        # TODO this is horrible
+        cfg._replace_hugr(mapping, self)
         return cfg
 
     def to_serial(self) -> SerialHugr:

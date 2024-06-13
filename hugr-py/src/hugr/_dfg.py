@@ -1,12 +1,14 @@
 from __future__ import annotations
-from dataclasses import dataclass
-from typing import Iterable, TYPE_CHECKING, Generic, TypeVar, cast
+
 import typing
-from ._hugr import Hugr, Node, Wire, OutPort, ParentBuilder
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Generic, Iterable, Mapping, TypeVar, cast
 
 import hugr._ops as ops
-from ._exceptions import NoSiblingAncestor
 from hugr._tys import FunctionType, TypeRow
+
+from ._exceptions import NoSiblingAncestor
+from ._hugr import Hugr, Node, OutPort, ParentBuilder, Wire
 
 if TYPE_CHECKING:
     from ._cfg import Cfg
@@ -107,6 +109,13 @@ class DfBase(ParentBuilder, Generic[DP]):
         if node_ancestor != node:
             self.add_state_order(src.node, node_ancestor)
         self.hugr.add_link(src, node.inp(offset))
+
+    def _replace_hugr(self, mapping: Mapping[Node, Node], new_hugr: Hugr) -> None:
+        self.hugr = new_hugr
+        self.root = mapping[self.root]
+
+        self.input_node = mapping[self.input_node]
+        self.output_node = mapping[self.output_node]
 
 
 C = TypeVar("C", bound=DfBase)

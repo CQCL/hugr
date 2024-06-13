@@ -1,12 +1,14 @@
 from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import Iterable, Sequence
-from ._hugr import Hugr, Node, ToNode, Wire
-from ._hugr import ParentBuilder
-from ._dfg import DfBase, _from_base
-from ._tys import FunctionType, TypeRow, Sum
-from ._exceptions import NoSiblingAncestor, NotInSameCfg
+from typing import Iterable, Mapping, Sequence
+
 import hugr._ops as ops
+
+from ._dfg import DfBase, _from_base
+from ._exceptions import NoSiblingAncestor, NotInSameCfg
+from ._hugr import Hugr, Node, ParentBuilder, ToNode, Wire
+from ._tys import FunctionType, Sum, TypeRow
 
 
 class Block(DfBase[ops.DataflowBlock]):
@@ -89,3 +91,10 @@ class Cfg(ParentBuilder):
 
     def branch(self, src: Wire, dst: ToNode) -> None:
         self.hugr.add_link(src.out_port(), dst.inp(0))
+
+    def _replace_hugr(self, mapping: Mapping[Node, Node], new_hugr: Hugr) -> None:
+        self.hugr = new_hugr
+        self.root = mapping[self.root]
+
+        self.exit = mapping[self.exit]
+        self._entry_block._replace_hugr(mapping, new_hugr)
