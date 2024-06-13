@@ -114,7 +114,7 @@ impl Hugr {
             }
         }
         fn infer(h: &mut Hugr, node: Node, remove: bool) -> Result<ExtensionSet, ExtensionError> {
-            let child_sets = h
+            let mut child_sets = h
                 .children(node)
                 .collect::<Vec<_>>() // Avoid borrowing h over recursive call
                 .into_iter()
@@ -124,11 +124,10 @@ impl Hugr {
             let Some(es) = delta_mut(h.op_types.get_mut(node.pg_index())) else {
                 return Ok(h.get_optype(node).extension_delta());
             };
-            if !es.contains(&ExtensionSet::TO_BE_INFERRED) {
-                // Can't add any new extensions...
-                if !remove {
-                    return Ok(es.clone()); // Can't remove either, so nothing to do
-                }
+            if es.contains(&ExtensionSet::TO_BE_INFERRED) {
+                // Do not remove anything from current delta - any other elements are a lower bound
+                child_sets.push((node, es.clone())); // "child_sets" now misnamed but we discard fst
+            } else if remove {
                 child_sets.iter().try_for_each(|(ch, ch_exts)| {
                     if !es.is_superset(ch_exts) {
                         return Err(ExtensionError {
@@ -140,9 +139,10 @@ impl Hugr {
                     }
                     Ok(())
                 })?;
-            };
-            let ch_d = ExtensionSet::union_over(child_sets.into_iter().map(|(_, e)| e));
-            let merged = if remove { ch_d } else { ch_d.union(es.clone()) };
+            } else {
+                return Ok(es.clone()); // Can't neither add nor remove, so nothing to do
+            }
+            let merged = ExtensionSet::union_over(child_sets.into_iter().map(|(_, e)| e));
             *es = ExtensionSet::singleton(&ExtensionSet::TO_BE_INFERRED).missing_from(&merged);
 
             Ok(es.clone())
