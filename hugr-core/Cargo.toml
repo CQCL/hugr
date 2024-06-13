@@ -20,6 +20,7 @@ workspace = true
 extension_inference = []
 
 [dependencies]
+hugr-sexpr = { path = "../hugr-sexpr", version = "0.1.0", features = ["derive"] }
 portgraph = { workspace = true, features = ["serde", "petgraph"] }
 thiserror = { workspace = true }
 regex = { workspace = true }

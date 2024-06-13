@@ -1,0 +1,22 @@
+[package]
+name = "hugr-sexpr"
+version = "0.1.0"
+rust-version.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+hugr-sexpr-derive = { path = "../hugr-sexpr-derive", optional = true }
+logos = "0.14.0"
+pretty = "0.12.3"
+smol_str.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+default = ["derive"]
+derive = ["hugr-sexpr-derive"]

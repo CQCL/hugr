@@ -1,9 +1,9 @@
-[profile.release]
+# [profile.release]
 lto = "thin"
 
 [workspace]
 resolver = "2"
-members = ["hugr", "hugr-core", "hugr-passes", "hugr-cli"]
+members = ["hugr", "hugr-core", "hugr-passes", "hugr-cli", "hugr-sexpr", "hugr-sexpr-derive"]
 
 [workspace.package]
 rust-version = "1.75"
