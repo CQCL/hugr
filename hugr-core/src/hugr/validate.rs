@@ -9,7 +9,7 @@ use petgraph::visit::{Topo, Walker};
 use portgraph::{LinkView, PortView};
 use thiserror::Error;
 
-use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
+use crate::extension::{ExtensionRegistry, SignatureError, TO_BE_INFERRED};
 
 use crate::ops::custom::{resolve_opaque_op, CustomOp, CustomOpError};
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
@@ -60,10 +60,7 @@ impl Hugr {
     pub fn validate_extensions(&self) -> Result<(), ValidationError> {
         for parent in self.nodes() {
             let parent_op = self.get_optype(parent);
-            if parent_op
-                .extension_delta()
-                .contains(&ExtensionSet::TO_BE_INFERRED)
-            {
+            if parent_op.extension_delta().contains(&TO_BE_INFERRED) {
                 return Err(ValidationError::ExtensionsNotInferred { node: parent });
             }
             let parent_extensions = match parent_op.inner_function_type() {

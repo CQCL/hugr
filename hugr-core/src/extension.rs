@@ -405,9 +405,20 @@ pub enum ExtensionBuildError {
 #[derive(Clone, Debug, Default, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ExtensionSet(BTreeSet<ExtensionId>);
 
-impl ExtensionSet {
-    pub const TO_BE_INFERRED: ExtensionId = ExtensionId::new_unchecked("TO_BE_INFERRED");
+/// A special ExtensionId which indicates that the delta of a non-Function
+/// container node should be computed by extension inference.
+/// Usable only in non-Function container nodes
+/// ([Case], [CFG], [Conditional], [DataflowBlock], [DFG], [TailLoop])
+///
+/// [Case]: crate::ops::Case
+/// [CFG]: crate::ops::CFG
+/// [Conditional]: crate::ops::Conditional
+/// [DataflowBlock]: crate::ops::DataflowBlock
+/// [DFG]: crate::ops::DFG
+/// [TailLoop]: crate::ops::TailLoop
+pub const TO_BE_INFERRED: ExtensionId = ExtensionId::new_unchecked("TO_BE_INFERRED");
 
+impl ExtensionSet {
     /// Creates a new empty extension set.
     pub const fn new() -> Self {
         Self(BTreeSet::new())

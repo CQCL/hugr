@@ -24,7 +24,7 @@ use thiserror::Error;
 
 pub use self::views::{HugrView, RootTagged};
 use crate::core::NodeIndex;
-use crate::extension::{ExtensionRegistry, ExtensionSet};
+use crate::extension::{ExtensionRegistry, ExtensionSet, TO_BE_INFERRED};
 use crate::ops::custom::resolve_extension_ops;
 use crate::ops::{OpTag, OpTrait};
 pub use crate::ops::{OpType, DEFAULT_OPTYPE};
@@ -124,7 +124,7 @@ impl Hugr {
             let Some(es) = delta_mut(h.op_types.get_mut(node.pg_index())) else {
                 return Ok(h.get_optype(node).extension_delta());
             };
-            if es.contains(&ExtensionSet::TO_BE_INFERRED) {
+            if es.contains(&TO_BE_INFERRED) {
                 // Do not remove anything from current delta - any other elements are a lower bound
                 child_sets.push((node, es.clone())); // "child_sets" now misnamed but we discard fst
             } else if remove {
@@ -143,7 +143,7 @@ impl Hugr {
                 return Ok(es.clone()); // Can't neither add nor remove, so nothing to do
             }
             let merged = ExtensionSet::union_over(child_sets.into_iter().map(|(_, e)| e));
-            *es = ExtensionSet::singleton(&ExtensionSet::TO_BE_INFERRED).missing_from(&merged);
+            *es = ExtensionSet::singleton(&TO_BE_INFERRED).missing_from(&merged);
 
             Ok(es.clone())
         }
