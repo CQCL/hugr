@@ -1,6 +1,6 @@
 //! Implementation of the `SimpleReplace` operation.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::hugr::views::SiblingSubgraph;
 use crate::hugr::{HugrMut, HugrView, NodeMetadataMap, Rewrite};
@@ -147,8 +147,10 @@ impl Rewrite for SimpleReplacement {
         }
         // 3.4. For each q = self.nu_out[p1], p0 = self.nu_inp[q], add an edge from the predecessor of p0
         // to p1.
-        let mut disconnects: Vec<(Node, IncomingPort)> = Vec::new();
-        let mut connect: Vec<(Node, OutgoingPort, Node, IncomingPort)> = Vec::new();
+        //
+        // i.e. the replacement graph has direct edges between the input and output nodes.
+        let mut disconnect: HashSet<(Node, IncomingPort)> = HashSet::new();
+        let mut connect: HashSet<(Node, OutgoingPort, Node, IncomingPort)> = HashSet::new();
         for ((rem_out_node, rem_out_port), &rep_out_port) in &self.nu_out {
             let rem_inp_nodeport = self.nu_inp.get(&(replacement_output_node, rep_out_port));
             if let Some((rem_inp_node, rem_inp_port)) = rem_inp_nodeport {
@@ -158,9 +160,9 @@ impl Rewrite for SimpleReplacement {
                     .unwrap();
                 // Delay connecting/disconnecting the nodes until after
                 // processing all nu_out entries.
-                disconnects.push((*rem_out_node, *rem_out_port));
-                disconnects.push((*rem_out_node, *rem_out_port));
-                connect.push((
+                disconnect.insert((*rem_out_node, *rem_out_port));
+                disconnect.insert((*rem_out_node, *rem_out_port));
+                connect.insert((
                     rem_inp_pred_node,
                     rem_inp_pred_port,
                     *rem_out_node,
@@ -168,7 +170,7 @@ impl Rewrite for SimpleReplacement {
                 ));
             }
         }
-        disconnects.into_iter().for_each(|(node, port)| {
+        disconnect.into_iter().for_each(|(node, port)| {
             h.disconnect(node, port);
         });
         connect
