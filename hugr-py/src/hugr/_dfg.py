@@ -29,12 +29,12 @@ class _DfBase(ParentBuilder, Generic[DP]):
         self._init_io_nodes(root_op)
 
     def _init_io_nodes(self, root_op: DP):
-        input_types = root_op.input_types()
-        output_types = root_op.output_types()
+        inner_sig = root_op.inner_signature()
+
         self.input_node = self.hugr.add_node(
-            ops.Input(input_types), self.root, len(input_types)
+            ops.Input(inner_sig.input), self.root, len(inner_sig.input)
         )
-        self.output_node = self.hugr.add_node(ops.Output(output_types), self.root)
+        self.output_node = self.hugr.add_node(ops.Output(inner_sig.output), self.root)
 
     @classmethod
     def new_nested(cls, root_op: DP, hugr: Hugr, parent: ToNode | None = None) -> Self:
@@ -61,7 +61,9 @@ class _DfBase(ParentBuilder, Generic[DP]):
     def inputs(self) -> list[OutPort]:
         return [self.input_node.out(i) for i in range(len(self._input_op().types))]
 
-    def add_op(self, op: ops.Op, /, *args: Wire, num_outs: int | None = None) -> Node:
+    def add_op(
+        self, op: ops.DataflowOp, /, *args: Wire, num_outs: int | None = None
+    ) -> Node:
         new_n = self.hugr.add_node(op, self.root, num_outs=num_outs)
         self._wire_up(new_n, args)
         return new_n

@@ -1,16 +1,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Generic, Protocol, TypeVar, TYPE_CHECKING
+from typing import Generic, Protocol, TypeVar, TYPE_CHECKING, runtime_checkable
 from hugr.serialization.ops import BaseOp
 import hugr.serialization.ops as sops
 from hugr.utils import ser_it
 import hugr._tys as tys
 
 if TYPE_CHECKING:
-    from hugr._hugr import Hugr, Node, Wire
+    from hugr._hugr import Hugr, Node, Wire, _Port
 
 
+@runtime_checkable
 class Op(Protocol):
     @property
     def num_out(self) -> int | None:
@@ -18,13 +19,33 @@ class Op(Protocol):
 
     def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> BaseOp: ...
 
+    def port_kind(self, port: _Port) -> tys.Kind: ...
+
+
+@runtime_checkable
+class DataflowOp(Op, Protocol):
+    def outer_signature(self) -> tys.FunctionType: ...
+
+    def port_kind(self, port: _Port) -> tys.Kind:
+        if port.offset == -1:
+            return tys.OrderKind()
+        return tys.ValueKind(self.port_type(port))
+
+    def port_type(self, port: _Port) -> tys.Type:
+        from hugr._hugr import Direction
+
+        sig = self.outer_signature()
+        if port.direction == Direction.INCOMING:
+            return sig.input[port.offset]
+        return sig.output[port.offset]
+
     def __call__(self, *args) -> Command:
         return Command(self, list(args))
 
 
 @dataclass(frozen=True)
 class Command:
-    op: Op
+    op: DataflowOp
     incoming: list[Wire]
 
 
@@ -41,9 +62,12 @@ class SerWrap(Op, Generic[T]):
         root.parent = parent.idx
         return root
 
+    def port_kind(self, port: _Port) -> tys.Kind:
+        raise NotImplementedError
+
 
 @dataclass()
-class Input(Op):
+class Input(DataflowOp):
     types: tys.TypeRow
 
     @property
@@ -53,20 +77,26 @@ class Input(Op):
     def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.Input:
         return sops.Input(parent=parent.idx, types=ser_it(self.types))
 
+    def outer_signature(self) -> tys.FunctionType:
+        return tys.FunctionType(input=[], output=self.types)
+
     def __call__(self) -> Command:
         return super().__call__()
 
 
 @dataclass()
-class Output(Op):
+class Output(DataflowOp):
     types: tys.TypeRow
 
     def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.Output:
         return sops.Output(parent=parent.idx, types=ser_it(self.types))
 
+    def outer_signature(self) -> tys.FunctionType:
+        return tys.FunctionType(input=self.types, output=[])
+
 
 @dataclass()
-class Custom(Op):
+class Custom(DataflowOp):
     op_name: str
     signature: tys.FunctionType = field(default_factory=tys.FunctionType.empty)
     description: str = ""
@@ -87,9 +117,12 @@ class Custom(Op):
             args=ser_it(self.args),
         )
 
+    def outer_signature(self) -> tys.FunctionType:
+        return self.signature
+
 
 @dataclass()
-class MakeTuple(Op):
+class MakeTuple(DataflowOp):
     types: tys.TypeRow
     num_out: int | None = 1
 
@@ -102,9 +135,12 @@ class MakeTuple(Op):
     def __call__(self, *elements: Wire) -> Command:
         return super().__call__(*elements)
 
+    def outer_signature(self) -> tys.FunctionType:
+        return tys.FunctionType(input=self.types, output=[tys.Tuple(*self.types)])
+
 
 @dataclass()
-class UnpackTuple(Op):
+class UnpackTuple(DataflowOp):
     types: tys.TypeRow
 
     @property
@@ -120,14 +156,16 @@ class UnpackTuple(Op):
     def __call__(self, tuple_: Wire) -> Command:
         return super().__call__(tuple_)
 
+    def outer_signature(self) -> tys.FunctionType:
+        return MakeTuple(self.types).outer_signature().flip()
+
 
 class DfParentOp(Op, Protocol):
-    def input_types(self) -> tys.TypeRow: ...
-    def output_types(self) -> tys.TypeRow: ...
+    def inner_signature(self) -> tys.FunctionType: ...
 
 
 @dataclass()
-class DFG(DfParentOp):
+class DFG(DfParentOp, DataflowOp):
     signature: tys.FunctionType = field(default_factory=tys.FunctionType.empty)
 
     @property
@@ -140,15 +178,15 @@ class DFG(DfParentOp):
             signature=self.signature.to_serial(),
         )
 
-    def input_types(self) -> tys.TypeRow:
-        return self.signature.input
+    def inner_signature(self) -> tys.FunctionType:
+        return self.signature
 
-    def output_types(self) -> tys.TypeRow:
-        return self.signature.output
+    def outer_signature(self) -> tys.FunctionType:
+        return self.signature
 
 
 @dataclass()
-class CFG(Op):
+class CFG(DataflowOp):
     signature: tys.FunctionType = field(default_factory=tys.FunctionType.empty)
 
     @property
@@ -160,6 +198,9 @@ class CFG(Op):
             parent=parent.idx,
             signature=self.signature.to_serial(),
         )
+
+    def outer_signature(self) -> tys.FunctionType:
+        return self.signature
 
 
 @dataclass
@@ -182,11 +223,13 @@ class DataflowBlock(DfParentOp):
             extension_delta=self.extension_delta,
         )
 
-    def input_types(self) -> tys.TypeRow:
-        return self.inputs
+    def inner_signature(self) -> tys.FunctionType:
+        return tys.FunctionType(
+            input=self.inputs, output=[tys.Sum(self.sum_rows), *self.other_outputs]
+        )
 
-    def output_types(self) -> tys.TypeRow:
-        return [tys.Sum(self.sum_rows), *self.other_outputs]
+    def port_kind(self, port: _Port) -> tys.Kind:
+        return tys.CFKind()
 
 
 @dataclass
@@ -199,3 +242,6 @@ class ExitBlock(Op):
             parent=parent.idx,
             cfg_outputs=ser_it(self.cfg_outputs),
         )
+
+    def port_kind(self, port: _Port) -> tys.Kind:
+        return tys.CFKind()

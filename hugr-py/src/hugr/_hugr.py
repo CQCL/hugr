@@ -16,7 +16,8 @@ from typing import (
 
 from typing_extensions import Self
 
-from hugr._ops import Op
+from hugr._ops import Op, DataflowOp
+from hugr._tys import Type, Kind
 from hugr.serialization.ops import OpType as SerialOp
 from hugr.serialization.serial_hugr import SerialHugr
 from hugr.utils import BiMap
@@ -332,6 +333,15 @@ class Hugr(Mapping[Node, NodeData]):
         return sum(1 for _ in self.outgoing_links(node))
 
     # TODO: num_links and _linked_ports
+
+    def port_kind(self, port: InPort | OutPort) -> Kind:
+        return self[port.node].op.port_kind(port)
+
+    def port_type(self, port: InPort | OutPort) -> Type | None:
+        op = self[port.node].op
+        if isinstance(op, DataflowOp):
+            return op.port_type(port)
+        return None
 
     def insert_hugr(self, hugr: Hugr, parent: ToNode | None = None) -> dict[Node, Node]:
         mapping: dict[Node, Node] = {}

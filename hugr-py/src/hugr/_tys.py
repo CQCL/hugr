@@ -233,6 +233,9 @@ class FunctionType(Type):
     def empty(cls) -> FunctionType:
         return cls(input=[], output=[])
 
+    def flip(self) -> FunctionType:
+        return FunctionType(input=self.output, output=self.input)
+
 
 @dataclass(frozen=True)
 class PolyFuncType(Type):
@@ -270,3 +273,29 @@ class QubitDef(Type):
 Qubit = QubitDef()
 Bool = UnitSum(size=2)
 Unit = UnitSum(size=1)
+
+
+@dataclass(frozen=True)
+class ValueKind:
+    ty: Type
+
+
+@dataclass(frozen=True)
+class ConstKind:
+    ty: Type
+
+
+@dataclass(frozen=True)
+class FunctionKind:
+    ty: PolyFuncType
+
+
+@dataclass(frozen=True)
+class CFKind: ...
+
+
+@dataclass(frozen=True)
+class OrderKind: ...
+
+
+Kind = ValueKind | ConstKind | FunctionKind | CFKind | OrderKind
