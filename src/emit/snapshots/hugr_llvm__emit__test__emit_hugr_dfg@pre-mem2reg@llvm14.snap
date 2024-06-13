@@ -5,22 +5,22 @@ expression: module.to_string()
 ; ModuleID = 'test_context'
 source_filename = "test_context"
 
-define { i32, {} } @_hl.main.1({ i32, {} } %0) {
+define { {} } @_hl.main.1({ {} } %0) {
 alloca_block:
-  %"0" = alloca { i32, {} }, align 8
-  %"2_0" = alloca { i32, {} }, align 8
-  %"4_0" = alloca { i32, {} }, align 8
-  %"5_0" = alloca { i32, {} }, align 8
+  %"0" = alloca { {} }, align 8
+  %"2_0" = alloca { {} }, align 8
+  %"4_0" = alloca { {} }, align 8
+  %"5_0" = alloca { {} }, align 8
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  store { i32, {} } %0, { i32, {} }* %"2_0", align 4
-  %"2_01" = load { i32, {} }, { i32, {} }* %"2_0", align 4
-  store { i32, {} } %"2_01", { i32, {} }* %"5_0", align 4
-  %"5_02" = load { i32, {} }, { i32, {} }* %"5_0", align 4
-  store { i32, {} } %"5_02", { i32, {} }* %"4_0", align 4
-  %"4_03" = load { i32, {} }, { i32, {} }* %"4_0", align 4
-  store { i32, {} } %"4_03", { i32, {} }* %"0", align 4
-  %"04" = load { i32, {} }, { i32, {} }* %"0", align 4
-  ret { i32, {} } %"04"
+  store { {} } %0, { {} }* %"2_0", align 1
+  %"2_01" = load { {} }, { {} }* %"2_0", align 1
+  store { {} } %"2_01", { {} }* %"5_0", align 1
+  %"5_02" = load { {} }, { {} }* %"5_0", align 1
+  store { {} } %"5_02", { {} }* %"4_0", align 1
+  %"4_03" = load { {} }, { {} }* %"4_0", align 1
+  store { {} } %"4_03", { {} }* %"0", align 1
+  %"04" = load { {} }, { {} }* %"0", align 1
+  ret { {} } %"04"
 }

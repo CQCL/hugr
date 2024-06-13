@@ -5,10 +5,10 @@ expression: module.to_string()
 ; ModuleID = 'test_context'
 source_filename = "test_context"
 
-define { i32, {} } @_hl.main.1({ i32, {} } %0) {
+define { {} } @_hl.main.1({ {} } %0) {
 alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  ret { i32, {} } %0
+  ret { {} } %0
 }

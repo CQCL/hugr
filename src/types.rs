@@ -290,7 +290,7 @@ impl<'c> LLVMSumType<'c> {
     }
 
     fn sum_type_has_tag_field(st: &SumType) -> bool {
-        st.num_variants() < 2
+        st.num_variants() >= 2
     }
 
     fn has_tag_field(&self) -> bool {
