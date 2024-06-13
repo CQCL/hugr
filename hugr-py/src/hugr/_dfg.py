@@ -2,7 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable, TYPE_CHECKING, Generic, TypeVar, cast
 import typing
-from ._hugr import Hugr, Node, Wire, OutPort
+from ._hugr import Hugr, Node, Wire, OutPort, ParentBuilder
 
 import hugr._ops as ops
 from ._exceptions import NoSiblingAncestor
@@ -16,7 +16,7 @@ DP = TypeVar("DP", bound=ops.DfParentOp)
 
 
 @dataclass()
-class DfBase(Generic[DP]):
+class DfBase(ParentBuilder, Generic[DP]):
     hugr: Hugr
     root: Node
     input_node: Node
