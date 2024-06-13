@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Generic, Protocol, TypeVar, TYPE_CHECKING, runtime_checkable
 from hugr.serialization.ops import BaseOp
 import hugr.serialization.ops as sops
@@ -38,6 +38,9 @@ class DataflowOp(Op, Protocol):
         if port.direction == Direction.INCOMING:
             return sig.input[port.offset]
         return sig.output[port.offset]
+
+    def _set_in_types(self, types: tys.TypeRow) -> None:
+        return
 
     def __call__(self, *args) -> Command:
         return Command(self, list(args))
@@ -86,13 +89,16 @@ class Input(DataflowOp):
 
 @dataclass()
 class Output(DataflowOp):
-    types: tys.TypeRow
+    types: tys.TypeRow = field(default_factory=list)
 
     def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.Output:
         return sops.Output(parent=parent.idx, types=ser_it(self.types))
 
     def outer_signature(self) -> tys.FunctionType:
         return tys.FunctionType(input=self.types, output=[])
+
+    def _set_in_types(self, types: tys.TypeRow) -> None:
+        self.types = types
 
 
 @dataclass()
@@ -122,8 +128,8 @@ class Custom(DataflowOp):
 
 
 @dataclass()
-class MakeTuple(DataflowOp):
-    types: tys.TypeRow
+class MakeTupleDef(DataflowOp):
+    types: tys.TypeRow = field(default_factory=list)
     num_out: int | None = 1
 
     def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.MakeTuple:
@@ -138,10 +144,16 @@ class MakeTuple(DataflowOp):
     def outer_signature(self) -> tys.FunctionType:
         return tys.FunctionType(input=self.types, output=[tys.Tuple(*self.types)])
 
+    def _set_in_types(self, types: tys.TypeRow) -> None:
+        self.types = types
+
+
+MakeTuple = MakeTupleDef()
+
 
 @dataclass()
-class UnpackTuple(DataflowOp):
-    types: tys.TypeRow
+class UnpackTupleDef(DataflowOp):
+    types: tys.TypeRow = field(default_factory=list)
 
     @property
     def num_out(self) -> int | None:
@@ -157,11 +169,24 @@ class UnpackTuple(DataflowOp):
         return super().__call__(tuple_)
 
     def outer_signature(self) -> tys.FunctionType:
-        return MakeTuple(self.types).outer_signature().flip()
+        return MakeTupleDef(self.types).outer_signature().flip()
+
+    def _set_in_types(self, types: tys.TypeRow) -> None:
+        (t,) = types
+        assert isinstance(t, tys.Sum), f"Expected unary Sum, got {t}"
+        (row,) = t.variant_rows
+        self.types = row
+        print(row)
+
+
+UnpackTuple = UnpackTupleDef()
 
 
 class DfParentOp(Op, Protocol):
     def inner_signature(self) -> tys.FunctionType: ...
+
+    def _set_out_types(self, types: tys.TypeRow) -> None:
+        return
 
 
 @dataclass()
@@ -183,6 +208,9 @@ class DFG(DfParentOp, DataflowOp):
 
     def outer_signature(self) -> tys.FunctionType:
         return self.signature
+
+    def _set_out_types(self, types: tys.TypeRow) -> None:
+        self.signature = replace(self.signature, output=types)
 
 
 @dataclass()
