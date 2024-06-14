@@ -5,15 +5,15 @@ expression: module.to_string()
 ; ModuleID = 'test_context'
 source_filename = "test_context"
 
-define { { {}, {} }, { {}, {} } } @_hl.main.1({ i32, { { {}, {} }, { {}, {} } } } %0) {
+define { { i32, {}, {} }, { i32, {}, {} } } @_hl.main.1({ { { i32, {}, {} }, { i32, {}, {} } } } %0) {
 alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  %1 = extractvalue { i32, { { {}, {} }, { {}, {} } } } %0, 1
-  %2 = extractvalue { { {}, {} }, { {}, {} } } %1, 0
-  %3 = extractvalue { { {}, {} }, { {}, {} } } %1, 1
-  %mrv = insertvalue { { {}, {} }, { {}, {} } } undef, { {}, {} } %2, 0
-  %mrv6 = insertvalue { { {}, {} }, { {}, {} } } %mrv, { {}, {} } %3, 1
-  ret { { {}, {} }, { {}, {} } } %mrv6
+  %1 = extractvalue { { { i32, {}, {} }, { i32, {}, {} } } } %0, 0
+  %2 = extractvalue { { i32, {}, {} }, { i32, {}, {} } } %1, 0
+  %3 = extractvalue { { i32, {}, {} }, { i32, {}, {} } } %1, 1
+  %mrv = insertvalue { { i32, {}, {} }, { i32, {}, {} } } undef, { i32, {}, {} } %2, 0
+  %mrv6 = insertvalue { { i32, {}, {} }, { i32, {}, {} } } %mrv, { i32, {}, {} } %3, 1
+  ret { { i32, {}, {} }, { i32, {}, {} } } %mrv6
 }

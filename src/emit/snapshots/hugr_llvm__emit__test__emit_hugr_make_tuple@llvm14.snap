@@ -5,13 +5,13 @@ expression: module.to_string()
 ; ModuleID = 'test_context'
 source_filename = "test_context"
 
-define { i32, { { {}, {} }, { {}, {} } } } @_hl.main.1({ {}, {} } %0, { {}, {} } %1) {
+define { { { i32, {}, {} }, { i32, {}, {} } } } @_hl.main.1({ i32, {}, {} } %0, { i32, {}, {} } %1) {
 alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  %2 = insertvalue { { {}, {} }, { {}, {} } } undef, { {}, {} } %0, 0
-  %3 = insertvalue { { {}, {} }, { {}, {} } } %2, { {}, {} } %1, 1
-  %4 = insertvalue { i32, { { {}, {} }, { {}, {} } } } { i32 0, { { {}, {} }, { {}, {} } } poison }, { { {}, {} }, { {}, {} } } %3, 1
-  ret { i32, { { {}, {} }, { {}, {} } } } %4
+  %2 = insertvalue { { i32, {}, {} }, { i32, {}, {} } } undef, { i32, {}, {} } %0, 0
+  %3 = insertvalue { { i32, {}, {} }, { i32, {}, {} } } %2, { i32, {}, {} } %1, 1
+  %4 = insertvalue { { { i32, {}, {} }, { i32, {}, {} } } } poison, { { i32, {}, {} }, { i32, {}, {} } } %3, 0
+  ret { { { i32, {}, {} }, { i32, {}, {} } } } %4
 }

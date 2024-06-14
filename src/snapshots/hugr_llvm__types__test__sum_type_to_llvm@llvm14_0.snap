@@ -2,4 +2,4 @@
 source: src/types.rs
 expression: ⊥
 ---
-"{ i32 }"
+"{}"
