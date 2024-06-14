@@ -20,6 +20,7 @@ from .tys import (
     classes as tys_classes,
     model_rebuild as tys_model_rebuild,
 )
+from hugr.utils import deser_it
 
 NodeID = int
 
@@ -214,7 +215,7 @@ class Input(DataflowOp):
         self.types = list(out_types)
 
     def deserialize(self) -> _ops.Input:
-        return _ops.Input(types=self.types)
+        return _ops.Input(types=[t.deserialize() for t in self.types])
 
 
 class Output(DataflowOp):
@@ -228,7 +229,7 @@ class Output(DataflowOp):
         self.types = list(in_types)
 
     def deserialize(self) -> _ops.Output:
-        return _ops.Output(types=self.types)
+        return _ops.Output(types=deser_it(self.types))
 
 
 class Call(DataflowOp):
@@ -303,7 +304,7 @@ class DFG(DataflowOp):
         )
 
     def deserialize(self) -> _ops.DFG:
-        return _ops.DFG(self.signature)
+        return _ops.DFG(self.signature.deserialize())
 
 
 # ------------------------------------------------
@@ -406,8 +407,8 @@ class CustomOp(DataflowOp):
         return _ops.Custom(
             extension=self.extension,
             op_name=self.op_name,
-            signature=self.signature,
-            args=self.args,
+            signature=self.signature.deserialize(),
+            args=deser_it(self.args),
         )
 
     model_config = ConfigDict(
@@ -447,7 +448,7 @@ class MakeTuple(DataflowOp):
         self.tys = list(in_types)
 
     def deserialize(self) -> _ops.MakeTuple:
-        return _ops.MakeTuple(self.tys)
+        return _ops.MakeTuple(deser_it(self.tys))
 
 
 class UnpackTuple(DataflowOp):
@@ -460,7 +461,7 @@ class UnpackTuple(DataflowOp):
         self.tys = list(out_types)
 
     def deserialize(self) -> _ops.UnpackTuple:
-        return _ops.UnpackTuple(self.tys)
+        return _ops.UnpackTuple(deser_it(self.tys))
 
 
 class Tag(DataflowOp):

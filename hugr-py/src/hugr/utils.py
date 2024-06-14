@@ -1,6 +1,6 @@
 from collections.abc import Hashable, ItemsView, MutableMapping
 from dataclasses import dataclass, field
-from typing import Generic, TypeVar
+from typing import Generic, Iterable, Protocol, TypeVar
 
 
 L = TypeVar("L", bound=Hashable)
@@ -54,3 +54,22 @@ class BiMap(MutableMapping, Generic[L, R]):
     def delete_right(self, key: R) -> None:
         del self.fwd[self.bck[key]]
         del self.bck[key]
+
+
+S = TypeVar("S", covariant=True)
+
+
+class SerCollection(Protocol[S]):
+    def to_serial_root(self) -> S: ...
+
+
+class DeserCollection(Protocol[S]):
+    def deserialize(self) -> S: ...
+
+
+def ser_it(it: Iterable[SerCollection[S]]) -> list[S]:
+    return [v.to_serial_root() for v in it]
+
+
+def deser_it(it: Iterable[DeserCollection[S]]) -> list[S]:
+    return [v.deserialize() for v in it]

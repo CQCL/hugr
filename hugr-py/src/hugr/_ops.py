@@ -4,7 +4,8 @@ from dataclasses import dataclass, field
 from typing import Generic, Protocol, TypeVar, TYPE_CHECKING
 from hugr.serialization.ops import BaseOp
 import hugr.serialization.ops as sops
-import hugr.serialization.tys as tys
+from hugr.utils import ser_it
+import hugr._tys as tys
 
 if TYPE_CHECKING:
     from hugr._hugr import Hugr, Node, Wire
@@ -43,14 +44,14 @@ class SerWrap(Op, Generic[T]):
 
 @dataclass()
 class Input(Op):
-    types: list[tys.Type]
+    types: tys.TypeRow
 
     @property
     def num_out(self) -> int | None:
         return len(self.types)
 
     def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.Input:
-        return sops.Input(parent=parent.idx, types=self.types)
+        return sops.Input(parent=parent.idx, types=ser_it(self.types))
 
     def __call__(self) -> Command:
         return super().__call__()
@@ -58,10 +59,10 @@ class Input(Op):
 
 @dataclass()
 class Output(Op):
-    types: list[tys.Type]
+    types: tys.TypeRow
 
     def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.Output:
-        return sops.Output(parent=parent.idx, types=self.types)
+        return sops.Output(parent=parent.idx, types=ser_it(self.types))
 
 
 @dataclass()
@@ -81,21 +82,21 @@ class Custom(Op):
             parent=parent.idx,
             extension=self.extension,
             op_name=self.op_name,
-            signature=self.signature,
+            signature=self.signature.to_serial(),
             description=self.description,
-            args=self.args,
+            args=ser_it(self.args),
         )
 
 
 @dataclass()
 class MakeTuple(Op):
-    types: list[tys.Type]
+    types: tys.TypeRow
     num_out: int | None = 1
 
     def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.MakeTuple:
         return sops.MakeTuple(
             parent=parent.idx,
-            tys=self.types,
+            tys=ser_it(self.types),
         )
 
     def __call__(self, *elements: Wire) -> Command:
@@ -104,7 +105,7 @@ class MakeTuple(Op):
 
 @dataclass()
 class UnpackTuple(Op):
-    types: list[tys.Type]
+    types: tys.TypeRow
 
     @property
     def num_out(self) -> int | None:
@@ -113,7 +114,7 @@ class UnpackTuple(Op):
     def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.UnpackTuple:
         return sops.UnpackTuple(
             parent=parent.idx,
-            tys=self.types,
+            tys=ser_it(self.types),
         )
 
     def __call__(self, tuple_: Wire) -> Command:
@@ -131,5 +132,5 @@ class DFG(Op):
     def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.DFG:
         return sops.DFG(
             parent=parent.idx,
-            signature=self.signature,
+            signature=self.signature.to_serial(),
         )

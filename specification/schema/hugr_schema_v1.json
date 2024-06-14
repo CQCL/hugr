@@ -1897,6 +1897,7 @@
             "type": "object"
         },
         "VariableArg": {
+            "additionalProperties": true,
             "properties": {
                 "tya": {
                     "const": "Variable",

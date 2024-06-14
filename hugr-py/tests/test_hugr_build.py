@@ -8,26 +8,26 @@ from hugr._dfg import Dfg, _ancestral_sibling
 from hugr._ops import Custom, Command
 import hugr._ops as ops
 from hugr.serialization import SerialHugr
-import hugr.serialization.tys as stys
+import hugr._tys as tys
 import pytest
 import json
 
-BOOL_T = stys.Type(stys.SumType(stys.UnitSum(size=2)))
-QB_T = stys.Type(stys.Qubit())
-ARG_5 = stys.TypeArg(stys.BoundedNatArg(n=5))
-INT_T = stys.Type(
-    stys.Opaque(
+
+def int_t(width: int) -> tys.Opaque:
+    return tys.Opaque(
         extension="arithmetic.int.types",
         id="int",
-        args=[ARG_5],
-        bound=stys.TypeBound.Eq,
+        args=[tys.BoundedNatArg(n=width)],
+        bound=tys.TypeBound.Eq,
     )
-)
+
+
+INT_T = int_t(5)
 
 
 @dataclass
 class LogicOps(Custom):
-    extension: stys.ExtensionId = "logic"
+    extension: tys.ExtensionId = "logic"
 
 
 # TODO get from YAML
@@ -35,8 +35,8 @@ class LogicOps(Custom):
 class NotDef(LogicOps):
     num_out: int | None = 1
     op_name: str = "Not"
-    signature: stys.FunctionType = field(
-        default_factory=lambda: stys.FunctionType(input=[BOOL_T], output=[BOOL_T])
+    signature: tys.FunctionType = field(
+        default_factory=lambda: tys.FunctionType(input=[tys.Bool], output=[tys.Bool])
     )
 
     def __call__(self, a: Wire) -> Command:
@@ -48,18 +48,21 @@ Not = NotDef()
 
 @dataclass
 class IntOps(Custom):
-    extension: stys.ExtensionId = "arithmetic.int"
+    extension: tys.ExtensionId = "arithmetic.int"
+
+
+ARG_5 = tys.BoundedNatArg(n=5)
 
 
 @dataclass
 class DivModDef(IntOps):
     num_out: int | None = 2
-    extension: stys.ExtensionId = "arithmetic.int"
+    extension: tys.ExtensionId = "arithmetic.int"
     op_name: str = "idivmod_u"
-    signature: stys.FunctionType = field(
-        default_factory=lambda: stys.FunctionType(input=[INT_T] * 2, output=[INT_T] * 2)
+    signature: tys.FunctionType = field(
+        default_factory=lambda: tys.FunctionType(input=[INT_T] * 2, output=[INT_T] * 2)
     )
-    args: list[stys.TypeArg] = field(default_factory=lambda: [ARG_5, ARG_5])
+    args: list[tys.TypeArg] = field(default_factory=lambda: [ARG_5, ARG_5])
 
 
 DivMod = DivModDef()
@@ -117,7 +120,7 @@ def test_stable_indices():
 
 
 def test_simple_id():
-    h = Dfg.endo([QB_T] * 2)
+    h = Dfg.endo([tys.Qubit] * 2)
     a, b = h.inputs()
     h.set_outputs(a, b)
 
@@ -125,7 +128,7 @@ def test_simple_id():
 
 
 def test_multiport():
-    h = Dfg([BOOL_T], [BOOL_T] * 2)
+    h = Dfg([tys.Bool], [tys.Bool] * 2)
     (a,) = h.inputs()
     h.set_outputs(a, a)
     in_n, ou_n = h.input_node, h.output_node
@@ -148,7 +151,7 @@ def test_multiport():
 
 
 def test_add_op():
-    h = Dfg.endo([BOOL_T])
+    h = Dfg.endo([tys.Bool])
     (a,) = h.inputs()
     nt = h.add_op(Not, a)
     h.set_outputs(nt)
@@ -157,7 +160,7 @@ def test_add_op():
 
 
 def test_tuple():
-    row = [BOOL_T, QB_T]
+    row = [tys.Bool, tys.Qubit]
     h = Dfg.endo(row)
     a, b = h.inputs()
     t = h.add(ops.MakeTuple(row)(a, b))
@@ -184,7 +187,7 @@ def test_multi_out():
 
 
 def test_insert():
-    h1 = Dfg.endo([BOOL_T])
+    h1 = Dfg.endo([tys.Bool])
     (a1,) = h1.inputs()
     nt = h1.add(Not(a1))
     h1.set_outputs(nt)
@@ -197,12 +200,12 @@ def test_insert():
 
 
 def test_insert_nested():
-    h1 = Dfg.endo([BOOL_T])
+    h1 = Dfg.endo([tys.Bool])
     (a1,) = h1.inputs()
     nt = h1.add(Not(a1))
     h1.set_outputs(nt)
 
-    h = Dfg.endo([BOOL_T])
+    h = Dfg.endo([tys.Bool])
     (a,) = h.inputs()
     nested = h.insert_nested(h1, a)
     h.set_outputs(nested)
@@ -216,9 +219,9 @@ def test_build_nested():
         nt = dfg.add(Not(a1))
         dfg.set_outputs(nt)
 
-    h = Dfg.endo([BOOL_T])
+    h = Dfg.endo([tys.Bool])
     (a,) = h.inputs()
-    nested = h.add_nested([BOOL_T], [BOOL_T], a)
+    nested = h.add_nested([tys.Bool], [tys.Bool], a)
 
     _nested_nop(nested)
     assert len(h.hugr.children(nested.root)) == 3
@@ -228,9 +231,9 @@ def test_build_nested():
 
 
 def test_build_inter_graph():
-    h = Dfg.endo([BOOL_T, BOOL_T])
+    h = Dfg.endo([tys.Bool, tys.Bool])
     (a, b) = h.inputs()
-    nested = h.add_nested([], [BOOL_T])
+    nested = h.add_nested([], [tys.Bool])
 
     nt = nested.add(Not(a))
     nested.set_outputs(nt)
@@ -247,9 +250,9 @@ def test_build_inter_graph():
 
 
 def test_ancestral_sibling():
-    h = Dfg.endo([BOOL_T])
+    h = Dfg.endo([tys.Bool])
     (a,) = h.inputs()
-    nested = h.add_nested([], [BOOL_T])
+    nested = h.add_nested([], [tys.Bool])
 
     nt = nested.add(Not(a))
 

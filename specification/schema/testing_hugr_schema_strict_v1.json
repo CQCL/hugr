@@ -1974,6 +1974,7 @@
             "type": "object"
         },
         "VariableArg": {
+            "additionalProperties": false,
             "properties": {
                 "tya": {
                     "const": "Variable",
