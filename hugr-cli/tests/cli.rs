@@ -1,3 +1,9 @@
+//! Tests for the CLI
+//!
+//! Miri is globally disabled for these tests because they mostly involve
+//! calling the CLI binary, which Miri doesn't support.
+#![cfg(all(test, not(miri)))]
+
 use assert_cmd::Command;
 use assert_fs::{fixture::FileWriteStr, NamedTempFile};
 use hugr_cli::VALID_PRINT;

@@ -42,6 +42,10 @@ coverage language="[rust|python]": (_run_lang language \
         "poetry run pytest --cov=./ --cov-report=html"
     )
 
+# Run unsoundness checks using miri
+miri:
+    PROPTEST_DISABLE_FAILURE_PERSISTENCE=true MIRIFLAGS='-Zmiri-env-forward=PROPTEST_DISABLE_FAILURE_PERSISTENCE' cargo +nightly miri test
+
 # Load a shell with all the dependencies installed
 shell:
     poetry shell
