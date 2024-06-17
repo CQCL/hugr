@@ -269,3 +269,4 @@ class QubitDef(Type):
 
 Qubit = QubitDef()
 Bool = UnitSum(size=2)
+Unit = UnitSum(size=1)

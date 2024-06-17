@@ -240,7 +240,7 @@ def test_build_inter_graph():
 
     h.set_outputs(nested.root, b)
 
-    _validate(h.hugr, True)
+    _validate(h.hugr)
 
     assert _SubPort(h.input_node.out(-1)) in h.hugr._links
     assert h.hugr.num_outgoing(h.input_node) == 2  # doesn't count state order

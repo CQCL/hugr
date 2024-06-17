@@ -121,8 +121,13 @@ class UnpackTuple(Op):
         return super().__call__(tuple_)
 
 
+class DfParentOp(Op, Protocol):
+    def input_types(self) -> tys.TypeRow: ...
+    def output_types(self) -> tys.TypeRow: ...
+
+
 @dataclass()
-class DFG(Op):
+class DFG(DfParentOp):
     signature: tys.FunctionType = field(default_factory=tys.FunctionType.empty)
 
     @property
@@ -133,4 +138,64 @@ class DFG(Op):
         return sops.DFG(
             parent=parent.idx,
             signature=self.signature.to_serial(),
+        )
+
+    def input_types(self) -> tys.TypeRow:
+        return self.signature.input
+
+    def output_types(self) -> tys.TypeRow:
+        return self.signature.output
+
+
+@dataclass()
+class CFG(Op):
+    signature: tys.FunctionType = field(default_factory=tys.FunctionType.empty)
+
+    @property
+    def num_out(self) -> int | None:
+        return len(self.signature.output)
+
+    def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.CFG:
+        return sops.CFG(
+            parent=parent.idx,
+            signature=self.signature.to_serial(),
+        )
+
+
+@dataclass
+class DataflowBlock(DfParentOp):
+    inputs: tys.TypeRow
+    sum_rows: list[tys.TypeRow]
+    other_outputs: tys.TypeRow = field(default_factory=list)
+    extension_delta: tys.ExtensionSet = field(default_factory=list)
+
+    @property
+    def num_out(self) -> int | None:
+        return len(self.sum_rows)
+
+    def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.DataflowBlock:
+        return sops.DataflowBlock(
+            parent=parent.idx,
+            inputs=ser_it(self.inputs),
+            sum_rows=list(map(ser_it, self.sum_rows)),
+            other_outputs=ser_it(self.other_outputs),
+            extension_delta=self.extension_delta,
+        )
+
+    def input_types(self) -> tys.TypeRow:
+        return self.inputs
+
+    def output_types(self) -> tys.TypeRow:
+        return [tys.Sum(self.sum_rows), *self.other_outputs]
+
+
+@dataclass
+class ExitBlock(Op):
+    cfg_outputs: tys.TypeRow
+    num_out: int | None = 0
+
+    def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.ExitBlock:
+        return sops.ExitBlock(
+            parent=parent.idx,
+            cfg_outputs=ser_it(self.cfg_outputs),
         )

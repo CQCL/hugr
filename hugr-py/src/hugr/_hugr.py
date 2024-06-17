@@ -10,7 +10,6 @@ from typing import (
     Iterable,
     Iterator,
     Protocol,
-    Sequence,
     TypeVar,
     cast,
     overload,
@@ -19,7 +18,7 @@ from typing import (
 from typing_extensions import Self
 
 from hugr._ops import Op
-from hugr._tys import Type
+from hugr._tys import TypeRow
 from hugr.serialization.ops import OpType as SerialOp
 from hugr.serialization.serial_hugr import SerialHugr
 from hugr.utils import BiMap
@@ -27,7 +26,8 @@ from hugr.utils import BiMap
 from ._exceptions import ParentBeforeChild
 
 if TYPE_CHECKING:
-    from ._dfg import Dfg
+    from ._dfg import DfBase, DP
+    from ._cfg import Cfg
 
 
 class Direction(Enum):
@@ -337,16 +337,31 @@ class Hugr(Mapping[Node, NodeData]):
             )
         return mapping
 
-    def add_dfg(self, input_types: Sequence[Type], output_types: Sequence[Type]) -> Dfg:
-        from ._dfg import Dfg
+    def add_dfg(self, root_op: DP) -> DfBase[DP]:
+        from ._dfg import DfBase
 
-        dfg = Dfg(input_types, output_types)
+        dfg = DfBase(root_op)
         mapping = self.insert_hugr(dfg.hugr, self.root)
         dfg.hugr = self
         dfg.input_node = mapping[dfg.input_node]
         dfg.output_node = mapping[dfg.output_node]
         dfg.root = mapping[dfg.root]
         return dfg
+
+    def add_cfg(self, input_types: TypeRow, output_types: TypeRow) -> Cfg:
+        from ._cfg import Cfg
+
+        cfg = Cfg(input_types, output_types)
+        mapping = self.insert_hugr(cfg.hugr, self.root)
+        cfg.hugr = self
+        cfg._entry_block.root = mapping[cfg.entry]
+        cfg._entry_block.input_node = mapping[cfg._entry_block.input_node]
+        cfg._entry_block.output_node = mapping[cfg._entry_block.output_node]
+        cfg._entry_block.hugr = self
+        cfg.exit = mapping[cfg.exit]
+        cfg.root = mapping[cfg.root]
+        # TODO this is horrible
+        return cfg
 
     def to_serial(self) -> SerialHugr:
         node_it = (node for node in self._nodes if node is not None)
