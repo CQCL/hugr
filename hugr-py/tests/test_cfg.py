@@ -47,3 +47,25 @@ def test_nested_cfg() -> None:
     dfg.set_outputs(cfg.root)
 
     _validate(dfg.hugr)
+
+
+def test_dom_edge() -> None:
+    cfg = Cfg([tys.Bool, tys.Unit, INT_T], [INT_T])
+    entry = cfg.simple_entry(2, [INT_T])
+    b, u, i = entry.inputs()
+    entry.set_block_outputs(b, i)
+
+    # entry dominates both middles so Unit type can be used as inter-graph
+    # value between basic blocks
+    middle_1 = cfg.simple_block([INT_T], 1, [INT_T])
+    middle_1.set_block_outputs(u, *middle_1.inputs())
+    middle_2 = cfg.simple_block([INT_T], 1, [INT_T])
+    middle_2.set_block_outputs(u, *middle_2.inputs())
+
+    cfg.branch(entry.root.out(0), middle_1.root)
+    cfg.branch(entry.root.out(1), middle_2.root)
+
+    cfg.branch(middle_1.root.out(0), cfg.exit)
+    cfg.branch(middle_2.root.out(0), cfg.exit)
+
+    _validate(cfg.hugr)

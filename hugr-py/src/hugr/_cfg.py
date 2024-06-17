@@ -1,9 +1,10 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Sequence
+from typing import Iterable, Sequence
 from ._hugr import Hugr, Node, Wire
 from ._dfg import DfBase, _from_base
 from ._tys import FunctionType, TypeRow, Sum
+from ._exceptions import NoSiblingAncestor, NotInSameCfg
 import hugr._ops as ops
 
 
@@ -14,6 +15,25 @@ class Block(DfBase[ops.DataflowBlock]):
     def single_successor_outputs(self, *outputs: Wire) -> None:
         # TODO requires constants
         raise NotImplementedError
+
+    def _wire_up(self, node: Node, ports: Iterable[Wire]):
+        for i, p in enumerate(ports):
+            src = p.out_port()
+            cfg_node = self.hugr[self.root].parent
+            assert cfg_node is not None
+            src_parent = self.hugr[src.node].parent
+            try:
+                self._wire_up_port(node, i, p)
+            except NoSiblingAncestor:
+                # note this just checks if there is a common CFG ancestor
+                # it does not check for valid dominance between basic blocks
+                # that is deferred to full HUGR validation.
+                while cfg_node != src_parent:
+                    if src_parent is None or src_parent == self.hugr.root:
+                        raise NotInSameCfg(src.node.idx, node.idx)
+                    src_parent = self.hugr[src_parent].parent
+
+                self.hugr.add_link(src, node.inp(i))
 
 
 @dataclass

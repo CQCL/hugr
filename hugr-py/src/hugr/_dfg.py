@@ -97,13 +97,16 @@ class DfBase(Generic[DP]):
 
     def _wire_up(self, node: Node, ports: Iterable[Wire]):
         for i, p in enumerate(ports):
-            src = p.out_port()
-            node_ancestor = _ancestral_sibling(self.hugr, src.node, node)
-            if node_ancestor is None:
-                raise NoSiblingAncestor(src.node.idx, node.idx)
-            if node_ancestor != node:
-                self.add_state_order(src.node, node_ancestor)
-            self.hugr.add_link(src, node.inp(i))
+            self._wire_up_port(node, i, p)
+
+    def _wire_up_port(self, node: Node, offset: int, p: Wire):
+        src = p.out_port()
+        node_ancestor = _ancestral_sibling(self.hugr, src.node, node)
+        if node_ancestor is None:
+            raise NoSiblingAncestor(src.node.idx, node.idx)
+        if node_ancestor != node:
+            self.add_state_order(src.node, node_ancestor)
+        self.hugr.add_link(src, node.inp(offset))
 
 
 C = TypeVar("C", bound=DfBase)
