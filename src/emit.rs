@@ -348,7 +348,7 @@ impl<'c, H: HugrView> EmitHugr<'c, H> {
     /// It is safe to emit the same node multiple times, it will be detected and
     /// omitted.
     ///
-    /// If any LLVM IR declaration which is to emitted already exists in the
+    /// If any LLVM IR declaration which is to be emitted already exists in the
     /// [Module] and it differs from what would be emitted, then we fail.
     pub fn emit_global(mut self, node: impl Into<Emission<'c, H>>) -> Result<Self> {
         let mut worklist: EmissionSet<'c, H> = [node.into()].into_iter().collect();

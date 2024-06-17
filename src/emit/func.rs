@@ -29,7 +29,7 @@ use super::{Emission, EmissionSet, EmitModuleContext};
 mod mailbox;
 pub use mailbox::{RowMailBox, RowPromise};
 
-/// A context for the emitting an LLVM function.
+/// A context for emitting an LLVM function.
 ///
 /// One of the primary interfaces that impls of
 /// [crate::custom::CodegenExtension] and [super::EmitOp] will interface with,
