@@ -97,7 +97,7 @@ class _DfBase(ParentBuilder[DP]):
     ) -> Cfg:
         from ._cfg import Cfg
 
-        cfg = Cfg.new_nested(input_types, output_types, self.hugr, self.parent_node)
+        cfg = Cfg.new_nested(input_types, self.hugr, self.parent_node)
         self._wire_up(cfg.parent_node, args)
         return cfg
 

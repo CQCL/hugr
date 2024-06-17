@@ -159,14 +159,6 @@ class Array(Type):
         return stys.Array(ty=self.ty.to_serial_root(), len=self.size)
 
 
-@dataclass(frozen=True)
-class UnitSum(Type):
-    size: int
-
-    def to_serial(self) -> stys.UnitSum:
-        return stys.UnitSum(size=self.size)
-
-
 @dataclass()
 class Sum(Type):
     variant_rows: list[TypeRow]
@@ -179,6 +171,18 @@ class Sum(Type):
             len(self.variant_rows) == 1
         ), "Sum type must have exactly one row to be converted to a Tuple"
         return Tuple(*self.variant_rows[0])
+
+
+@dataclass()
+class UnitSum(Sum):
+    size: int
+
+    def __init__(self, size: int):
+        self.size = size
+        super().__init__(variant_rows=[[]] * size)
+
+    def to_serial(self) -> stys.UnitSum:  # type: ignore[override]
+        return stys.UnitSum(size=self.size)
 
 
 @dataclass()

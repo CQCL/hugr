@@ -176,10 +176,28 @@ class UnpackTupleDef(DataflowOp):
         assert isinstance(t, tys.Sum), f"Expected unary Sum, got {t}"
         (row,) = t.variant_rows
         self.types = row
-        print(row)
 
 
 UnpackTuple = UnpackTupleDef()
+
+
+@dataclass()
+class Tag(DataflowOp):
+    tag: int
+    variants: list[tys.TypeRow]
+    num_out: int | None = 1
+
+    def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.Tag:
+        return sops.Tag(
+            parent=parent.idx,
+            tag=self.tag,
+            variants=[ser_it(r) for r in self.variants],
+        )
+
+    def outer_signature(self) -> tys.FunctionType:
+        return tys.FunctionType(
+            input=self.variants[self.tag], output=[tys.Sum(self.variants)]
+        )
 
 
 class DfParentOp(Op, Protocol):
@@ -258,6 +276,12 @@ class DataflowBlock(DfParentOp):
 
     def port_kind(self, port: _Port) -> tys.Kind:
         return tys.CFKind()
+
+    def _set_out_types(self, types: tys.TypeRow) -> None:
+        (sum_, *other) = types
+        assert isinstance(sum_, tys.Sum), f"Expected Sum, got {sum_}"
+        self.sum_rows = sum_.variant_rows
+        self.other_outputs = other
 
 
 @dataclass

@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Sequence
+from dataclasses import dataclass, replace
 
 import hugr._ops as ops
 
 from ._dfg import _DfBase
-from ._exceptions import NoSiblingAncestor, NotInSameCfg
+from ._exceptions import NoSiblingAncestor, NotInSameCfg, MismatchedExit
 from ._hugr import Hugr, Node, ParentBuilder, ToNode, Wire
-from ._tys import FunctionType, Sum, TypeRow, Type
+from ._tys import FunctionType, TypeRow, Type
 
 
 class Block(_DfBase[ops.DataflowBlock]):
@@ -46,14 +45,12 @@ class Cfg(ParentBuilder[ops.CFG]):
     _entry_block: Block
     exit: Node
 
-    def __init__(self, input_types: TypeRow, output_types: TypeRow) -> None:
-        root_op = ops.CFG(FunctionType(input=input_types, output=output_types))
+    def __init__(self, input_types: TypeRow) -> None:
+        root_op = ops.CFG(FunctionType(input=input_types, output=[]))
         hugr = Hugr(root_op)
-        self._init_impl(hugr, hugr.root, input_types, output_types)
+        self._init_impl(hugr, hugr.root, input_types)
 
-    def _init_impl(
-        self: Cfg, hugr: Hugr, root: Node, input_types: TypeRow, output_types: TypeRow
-    ) -> None:
+    def _init_impl(self: Cfg, hugr: Hugr, root: Node, input_types: TypeRow) -> None:
         self.hugr = hugr
         self.parent_node = root
         # to ensure entry is first child, add a dummy entry at the start
@@ -61,22 +58,21 @@ class Cfg(ParentBuilder[ops.CFG]):
             ops.DataflowBlock(input_types, []), hugr, root
         )
 
-        self.exit = self.hugr.add_node(ops.ExitBlock(output_types), self.parent_node)
+        self.exit = self.hugr.add_node(ops.ExitBlock([]), self.parent_node)
 
     @classmethod
     def new_nested(
         cls,
         input_types: TypeRow,
-        output_types: TypeRow,
         hugr: Hugr,
         parent: ToNode | None = None,
     ) -> Cfg:
         new = cls.__new__(cls)
         root = hugr.add_node(
-            ops.CFG(FunctionType(input=input_types, output=output_types)),
+            ops.CFG(FunctionType(input=input_types, output=[])),
             parent or hugr.root,
         )
-        new._init_impl(hugr, root, input_types, output_types)
+        new._init_impl(hugr, root, input_types)
         return new
 
     @property
@@ -89,30 +85,29 @@ class Cfg(ParentBuilder[ops.CFG]):
     def _exit_op(self) -> ops.ExitBlock:
         return self.hugr._get_typed_op(self.exit, ops.ExitBlock)
 
-    def add_entry(self, sum_rows: Sequence[TypeRow], other_outputs: TypeRow) -> Block:
-        # update entry block types
-        self._entry_op().sum_rows = list(sum_rows)
-        self._entry_op().other_outputs = other_outputs
-        self._entry_block._output_op().types = [Sum(list(sum_rows)), *other_outputs]
+    def add_entry(self) -> Block:
         return self._entry_block
 
-    def simple_entry(self, n_branches: int, other_outputs: TypeRow) -> Block:
-        return self.add_entry([[]] * n_branches, other_outputs)
-
-    def add_block(
-        self, input_types: TypeRow, sum_rows: Sequence[TypeRow], other_outputs: TypeRow
-    ) -> Block:
+    def add_block(self, input_types: TypeRow) -> Block:
         new_block = Block.new_nested(
-            ops.DataflowBlock(input_types, list(sum_rows), other_outputs),
+            ops.DataflowBlock(input_types, [], []),
             self.hugr,
             self.parent_node,
         )
         return new_block
 
-    def simple_block(
-        self, input_types: TypeRow, n_branches: int, other_outputs: TypeRow
-    ) -> Block:
-        return self.add_block(input_types, [[]] * n_branches, other_outputs)
-
     def branch(self, src: Wire, dst: ToNode) -> None:
-        self.hugr.add_link(src.out_port(), dst.inp(0))
+        src = src.out_port()
+        self.hugr.add_link(src, dst.inp(0))
+
+        if dst == self.exit:
+            src_block = self.hugr._get_typed_op(src.node, ops.DataflowBlock)
+            out_types = [*src_block.sum_rows[src.offset], *src_block.other_outputs]
+            if self._exit_op().cfg_outputs:
+                if self._exit_op().cfg_outputs != out_types:
+                    raise MismatchedExit(src.node.idx)
+            else:
+                self._exit_op().cfg_outputs = out_types
+                self.parent_op().signature = replace(
+                    self.parent_op().signature, output=out_types
+                )
