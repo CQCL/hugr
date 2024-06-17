@@ -1,7 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import (
-    Iterator,
     Iterable,
     TYPE_CHECKING,
     Generic,
@@ -86,7 +85,7 @@ class _DfBase(ParentBuilder, Generic[DP]):
     ) -> Dfg:
         from ._dfg import Dfg
 
-        _, input_types = zip(*self._get_dataflow_types(args)) if args else ([], [])
+        input_types = [self._get_dataflow_type(w) for w in args]
 
         root_op = ops.DFG(FunctionType(input=list(input_types), output=[]))
         dfg = Dfg.new_nested(root_op, self.hugr, self.root)
@@ -119,22 +118,18 @@ class _DfBase(ParentBuilder, Generic[DP]):
         self.hugr.add_link(src.out(-1), dst.inp(-1))
 
     def _wire_up(self, node: Node, ports: Iterable[Wire]):
-        tys = []
-        for i, (p, ty) in enumerate(self._get_dataflow_types(ports)):
-            tys.append(ty)
-            self._wire_up_port(node, i, p)
+        tys = [self._wire_up_port(node, i, p) for i, p in enumerate(ports)]
         if isinstance(op := self.hugr[node].op, ops.DataflowOp):
             op._set_in_types(tys)
 
-    def _get_dataflow_types(self, wires: Iterable[Wire]) -> Iterator[tuple[Wire, Type]]:
-        for w in wires:
-            port = w.out_port()
-            ty = self.hugr.port_type(port)
-            if ty is None:
-                raise ValueError(f"Port {port} is not a dataflow port.")
-            yield w, ty
+    def _get_dataflow_type(self, wire: Wire) -> Type:
+        port = wire.out_port()
+        ty = self.hugr.port_type(port)
+        if ty is None:
+            raise ValueError(f"Port {port} is not a dataflow port.")
+        return ty
 
-    def _wire_up_port(self, node: Node, offset: int, p: Wire):
+    def _wire_up_port(self, node: Node, offset: int, p: Wire) -> Type:
         src = p.out_port()
         node_ancestor = _ancestral_sibling(self.hugr, src.node, node)
         if node_ancestor is None:
@@ -142,6 +137,7 @@ class _DfBase(ParentBuilder, Generic[DP]):
         if node_ancestor != node:
             self.add_state_order(src.node, node_ancestor)
         self.hugr.add_link(src, node.inp(offset))
+        return self._get_dataflow_type(src)
 
 
 class Dfg(_DfBase[ops.DFG]):
