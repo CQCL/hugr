@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-import typing
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Generic, Iterable, Mapping, TypeVar, cast
-
+from typing import TYPE_CHECKING, Generic, Iterable, TypeVar, cast
+from typing_extensions import Self
 import hugr._ops as ops
 from hugr._tys import FunctionType, TypeRow
 
 from ._exceptions import NoSiblingAncestor
-from ._hugr import Hugr, Node, OutPort, ParentBuilder, Wire
+from ._hugr import Hugr, Node, OutPort, ParentBuilder, Wire, ToNode
 
 if TYPE_CHECKING:
     from ._cfg import Cfg
@@ -18,21 +17,33 @@ DP = TypeVar("DP", bound=ops.DfParentOp)
 
 
 @dataclass()
-class DfBase(ParentBuilder, Generic[DP]):
+class _DfBase(ParentBuilder, Generic[DP]):
     hugr: Hugr
     root: Node
     input_node: Node
     output_node: Node
 
     def __init__(self, root_op: DP) -> None:
-        input_types = root_op.input_types()
-        output_types = root_op.output_types()
         self.hugr = Hugr(root_op)
         self.root = self.hugr.root
+        self._init_io_nodes(root_op)
+
+    def _init_io_nodes(self, root_op: DP):
+        input_types = root_op.input_types()
+        output_types = root_op.output_types()
         self.input_node = self.hugr.add_node(
             ops.Input(input_types), self.root, len(input_types)
         )
         self.output_node = self.hugr.add_node(ops.Output(output_types), self.root)
+
+    @classmethod
+    def new_nested(cls, root_op: DP, hugr: Hugr, parent: ToNode | None = None) -> Self:
+        new = cls.__new__(cls)
+
+        new.hugr = hugr
+        new.root = hugr.add_node(root_op, parent or hugr.root)
+        new._init_io_nodes(root_op)
+        return new
 
     def _input_op(self) -> ops.Input:
         dop = self.hugr[self.input_node].op
@@ -69,11 +80,12 @@ class DfBase(ParentBuilder, Generic[DP]):
         output_types: TypeRow,
         *args: Wire,
     ) -> Dfg:
-        dfg = self.hugr.add_dfg(
-            ops.DFG(FunctionType(input=input_types, output=output_types))
-        )
+        from ._dfg import Dfg
+
+        root_op = ops.DFG(FunctionType(input=input_types, output=output_types))
+        dfg = Dfg.new_nested(root_op, self.hugr, self.root)
         self._wire_up(dfg.root, args)
-        return _from_base(Dfg, dfg)
+        return dfg
 
     def add_cfg(
         self,
@@ -81,7 +93,9 @@ class DfBase(ParentBuilder, Generic[DP]):
         output_types: TypeRow,
         *args: Wire,
     ) -> Cfg:
-        cfg = self.hugr.add_cfg(input_types, output_types)
+        from ._cfg import Cfg
+
+        cfg = Cfg.new_nested(input_types, output_types, self.hugr, self.root)
         self._wire_up(cfg.root, args)
         return cfg
 
@@ -110,27 +124,8 @@ class DfBase(ParentBuilder, Generic[DP]):
             self.add_state_order(src.node, node_ancestor)
         self.hugr.add_link(src, node.inp(offset))
 
-    def _replace_hugr(self, mapping: Mapping[Node, Node], new_hugr: Hugr) -> None:
-        self.hugr = new_hugr
-        self.root = mapping[self.root]
 
-        self.input_node = mapping[self.input_node]
-        self.output_node = mapping[self.output_node]
-
-
-C = TypeVar("C", bound=DfBase)
-
-
-def _from_base(cls: typing.Type[C], base: DfBase[DP]) -> C:
-    new = cls.__new__(cls)
-    new.hugr = base.hugr
-    new.root = base.root
-    new.input_node = base.input_node
-    new.output_node = base.output_node
-    return new
-
-
-class Dfg(DfBase[ops.DFG]):
+class Dfg(_DfBase[ops.DFG]):
     def __init__(self, input_types: TypeRow, output_types: TypeRow) -> None:
         root_op = ops.DFG(FunctionType(input=input_types, output=output_types))
         super().__init__(root_op)

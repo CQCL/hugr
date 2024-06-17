@@ -4,7 +4,6 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import (
-    TYPE_CHECKING,
     ClassVar,
     Generic,
     Iterable,
@@ -18,16 +17,11 @@ from typing import (
 from typing_extensions import Self
 
 from hugr._ops import Op
-from hugr._tys import TypeRow
 from hugr.serialization.ops import OpType as SerialOp
 from hugr.serialization.serial_hugr import SerialHugr
 from hugr.utils import BiMap
 
 from ._exceptions import ParentBeforeChild
-
-if TYPE_CHECKING:
-    from ._dfg import DfBase, DP
-    from ._cfg import Cfg
 
 
 class Direction(Enum):
@@ -157,8 +151,6 @@ class ParentBuilder(ToNode, Protocol):
 
     def to_node(self) -> Node:
         return self.root
-
-    def _replace_hugr(self, mapping: Mapping[Node, Node], new_hugr: Hugr) -> None: ...
 
 
 @dataclass()
@@ -361,22 +353,6 @@ class Hugr(Mapping[Node, NodeData]):
                 mapping[dst.port.node].inp(dst.port.offset),
             )
         return mapping
-
-    def add_dfg(self, root_op: DP) -> DfBase[DP]:
-        from ._dfg import DfBase
-
-        dfg = DfBase(root_op)
-        mapping = self.insert_hugr(dfg.hugr, self.root)
-        dfg._replace_hugr(mapping, self)
-        return dfg
-
-    def add_cfg(self, input_types: TypeRow, output_types: TypeRow) -> Cfg:
-        from ._cfg import Cfg
-
-        cfg = Cfg(input_types, output_types)
-        mapping = self.insert_hugr(cfg.hugr, self.root)
-        cfg._replace_hugr(mapping, self)
-        return cfg
 
     def to_serial(self) -> SerialHugr:
         node_it = (node for node in self._nodes if node is not None)
