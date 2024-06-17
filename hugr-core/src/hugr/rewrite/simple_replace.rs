@@ -160,7 +160,10 @@ impl Rewrite for SimpleReplacement {
                     .unwrap();
                 // Delay connecting/disconnecting the nodes until after
                 // processing all nu_out entries.
-                disconnect.insert((*rem_out_node, *rem_out_port));
+                //
+                // Otherwise, we might disconnect other wires in `rem_inp_node`
+                // that are needed for the following iterations.
+                disconnect.insert((*rem_inp_node, *rem_inp_port));
                 disconnect.insert((*rem_out_node, *rem_out_port));
                 connect.insert((
                     rem_inp_pred_node,
