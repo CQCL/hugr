@@ -12,7 +12,7 @@ class Block(DfBase[ops.DataflowBlock]):
     def set_block_outputs(self, branching: Wire, *other_outputs: Wire) -> None:
         self.set_outputs(branching, *other_outputs)
 
-    def single_successor_outputs(self, *outputs: Wire) -> None:
+    def set_single_successor_outputs(self, *outputs: Wire) -> None:
         # TODO requires constants
         raise NotImplementedError
 
