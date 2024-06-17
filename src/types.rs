@@ -9,6 +9,7 @@ use hugr::{types::TypeRow, HugrView};
 use inkwell::builder::Builder;
 use inkwell::types::{self as iw, AnyType, AsTypeRef, IntType};
 use inkwell::values::{BasicValue, BasicValueEnum, StructValue};
+use inkwell::AddressSpace;
 use inkwell::{
     context::Context,
     types::{BasicMetadataTypeEnum, BasicType, BasicTypeEnum, StructType},
@@ -52,13 +53,14 @@ impl<'c, H: HugrView> TypingSession<'c, H> {
         use hugr::types::TypeEnum;
         match hugr_type.as_type_enum() {
             TypeEnum::Extension(ref custom_type) => self.extensions.llvm_type(self, custom_type),
-            TypeEnum::Alias(ref alias) => Err(anyhow!("Invalid type: {:?}", alias)),
-
-            // TODO Function Types are fine
-            TypeEnum::Function(ref func_ty) => Err(anyhow!("Invalid type: {:?}", func_ty)),
-
-            x @ TypeEnum::Variable(_, _) => Err(anyhow!("Invalid type: {:?}", x)),
             TypeEnum::Sum(sum) => self.llvm_sum_type(sum.clone()).map(Into::into),
+            TypeEnum::Function(ref func_ty) => Ok(self
+                .llvm_func_type(func_ty)?
+                .ptr_type(AddressSpace::default()) // Note: deprecated in LLVM >= 15
+                .into()),
+
+            TypeEnum::Alias(ref alias) => Err(anyhow!("Invalid type: {:?}", alias)),
+            x @ TypeEnum::Variable(_, _) => Err(anyhow!("Invalid type: {:?}", x)),
         }
     }
 
@@ -383,6 +385,7 @@ pub mod test {
     #[case(4, INT_TYPES[6].clone())]
     #[case(5, Type::new_sum([vec![INT_TYPES[2].clone()].into()]))]
     #[case(6, Type::new_sum([vec![INT_TYPES[6].clone(),Type::new_unit_sum(1)].into(), vec![Type::new_unit_sum(2), INT_TYPES[2].clone()].into()]))]
+    #[case(7, Type::new_function(FunctionType::new(type_row!(Type::new_unit_sum(2)), Type::new_unit_sum(3))))]
     fn ext_types(
         #[case] _id: i32,
         #[with(_id, add_int_extensions)] llvm_ctx: TestContext,
