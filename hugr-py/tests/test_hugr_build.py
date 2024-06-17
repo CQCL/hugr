@@ -224,8 +224,8 @@ def test_build_nested():
     nested = h.add_nested([tys.Bool], [tys.Bool], a)
 
     _nested_nop(nested)
-    assert len(h.hugr.children(nested.root)) == 3
-    h.set_outputs(nested.root)
+    assert len(h.hugr.children(nested)) == 3
+    h.set_outputs(nested)
 
     _validate(h.hugr)
 
@@ -238,14 +238,14 @@ def test_build_inter_graph():
     nt = nested.add(Not(a))
     nested.set_outputs(nt)
 
-    h.set_outputs(nested.root, b)
+    h.set_outputs(nested, b)
 
     _validate(h.hugr)
 
     assert _SubPort(h.input_node.out(-1)) in h.hugr._links
     assert h.hugr.num_outgoing(h.input_node) == 2  # doesn't count state order
     assert len(list(h.hugr.outgoing_order_links(h.input_node))) == 1
-    assert len(list(h.hugr.incoming_order_links(nested.root))) == 1
+    assert len(list(h.hugr.incoming_order_links(nested))) == 1
     assert len(list(h.hugr.incoming_order_links(h.output_node))) == 0
 
 

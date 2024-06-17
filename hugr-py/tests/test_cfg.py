@@ -8,7 +8,7 @@ def build_basic_cfg(cfg: Cfg) -> None:
     entry = cfg.simple_entry(1, [tys.Bool])
 
     entry.set_block_outputs(*entry.inputs())
-    cfg.branch(entry.root.out(0), cfg.exit)
+    cfg.branch(entry[0], cfg.exit)
 
 
 def test_basic_cfg() -> None:
@@ -29,11 +29,11 @@ def test_branch() -> None:
     n = middle_2.add(DivMod(i, i))
     middle_2.set_block_outputs(u, n[0])
 
-    cfg.branch(entry.root.out(0), middle_1.root)
-    cfg.branch(entry.root.out(1), middle_2.root)
+    cfg.branch(entry[0], middle_1)
+    cfg.branch(entry[1], middle_2)
 
-    cfg.branch(middle_1.root.out(0), cfg.exit)
-    cfg.branch(middle_2.root.out(0), cfg.exit)
+    cfg.branch(middle_1[0], cfg.exit)
+    cfg.branch(middle_2[0], cfg.exit)
 
     _validate(cfg.hugr)
 
@@ -44,7 +44,7 @@ def test_nested_cfg() -> None:
     cfg = dfg.add_cfg([tys.Unit, tys.Bool], [tys.Bool], *dfg.inputs())
 
     build_basic_cfg(cfg)
-    dfg.set_outputs(cfg.root)
+    dfg.set_outputs(cfg)
 
     _validate(dfg.hugr)
 
@@ -62,10 +62,10 @@ def test_dom_edge() -> None:
     middle_2 = cfg.simple_block([INT_T], 1, [INT_T])
     middle_2.set_block_outputs(u, *middle_2.inputs())
 
-    cfg.branch(entry.root.out(0), middle_1.root)
-    cfg.branch(entry.root.out(1), middle_2.root)
+    cfg.branch(entry[0], middle_1)
+    cfg.branch(entry[1], middle_2)
 
-    cfg.branch(middle_1.root.out(0), cfg.exit)
-    cfg.branch(middle_2.root.out(0), cfg.exit)
+    cfg.branch(middle_1[0], cfg.exit)
+    cfg.branch(middle_2[0], cfg.exit)
 
     _validate(cfg.hugr)

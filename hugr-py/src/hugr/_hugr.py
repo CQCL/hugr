@@ -59,10 +59,8 @@ class OutPort(_Port, Wire):
         return self
 
 
-@dataclass(frozen=True, eq=True, order=True)
-class Node(Wire):
-    idx: int
-    _num_out_ports: int | None = field(default=None, compare=False)
+class ToNode(Wire, Protocol):
+    def to_node(self) -> Node: ...
 
     @overload
     def __getitem__(self, index: int) -> OutPort: ...
@@ -72,6 +70,32 @@ class Node(Wire):
     def __getitem__(self, index: tuple[int, ...]) -> Iterator[OutPort]: ...
 
     def __getitem__(
+        self, index: int | slice | tuple[int, ...]
+    ) -> OutPort | Iterator[OutPort]:
+        return self.to_node()._index(index)
+
+    def out_port(self) -> "OutPort":
+        return OutPort(self.to_node(), 0)
+
+    def inp(self, offset: int) -> InPort:
+        return InPort(self.to_node(), offset)
+
+    def out(self, offset: int) -> OutPort:
+        return OutPort(self.to_node(), offset)
+
+    def port(self, offset: int, direction: Direction) -> InPort | OutPort:
+        if direction == Direction.INCOMING:
+            return self.inp(offset)
+        else:
+            return self.out(offset)
+
+
+@dataclass(frozen=True, eq=True, order=True)
+class Node(ToNode):
+    idx: int
+    _num_out_ports: int | None = field(default=None, compare=False)
+
+    def _index(
         self, index: int | slice | tuple[int, ...]
     ) -> OutPort | Iterator[OutPort]:
         match index:
@@ -92,20 +116,8 @@ class Node(Wire):
             case tuple(xs):
                 return (self[i] for i in xs)
 
-    def out_port(self) -> "OutPort":
-        return OutPort(self, 0)
-
-    def inp(self, offset: int) -> InPort:
-        return InPort(self, offset)
-
-    def out(self, offset: int) -> OutPort:
-        return OutPort(self, offset)
-
-    def port(self, offset: int, direction: Direction) -> InPort | OutPort:
-        if direction == Direction.INCOMING:
-            return self.inp(offset)
-        else:
-            return self.out(offset)
+    def to_node(self) -> Node:
+        return self
 
 
 @dataclass()
@@ -139,6 +151,13 @@ _SO = _SubPort[OutPort]
 _SI = _SubPort[InPort]
 
 
+class ParentBuilder(ToNode):
+    root: Node
+
+    def to_node(self) -> Node:
+        return self.root
+
+
 @dataclass()
 class Hugr(Mapping[Node, NodeData]):
     root: Node
@@ -152,7 +171,8 @@ class Hugr(Mapping[Node, NodeData]):
         self._nodes = []
         self.root = self._add_node(root_op, None, 0)
 
-    def __getitem__(self, key: Node) -> NodeData:
+    def __getitem__(self, key: ToNode) -> NodeData:
+        key = key.to_node()
         try:
             n = self._nodes[key.idx]
         except IndexError:
@@ -167,16 +187,17 @@ class Hugr(Mapping[Node, NodeData]):
     def __len__(self) -> int:
         return self.num_nodes()
 
-    def children(self, node: Node | None = None) -> list[Node]:
+    def children(self, node: ToNode | None = None) -> list[Node]:
         node = node or self.root
         return self[node].children
 
     def _add_node(
         self,
         op: Op,
-        parent: Node | None = None,
+        parent: ToNode | None = None,
         num_outs: int | None = None,
     ) -> Node:
+        parent = parent.to_node() if parent else None
         node_data = NodeData(op, parent)
 
         if self._free_nodes:
@@ -193,13 +214,14 @@ class Hugr(Mapping[Node, NodeData]):
     def add_node(
         self,
         op: Op,
-        parent: Node | None = None,
+        parent: ToNode | None = None,
         num_outs: int | None = None,
     ) -> Node:
         parent = parent or self.root
         return self._add_node(op, parent, num_outs)
 
-    def delete_node(self, node: Node) -> NodeData | None:
+    def delete_node(self, node: ToNode) -> NodeData | None:
+        node = node.to_node()
         parent = self[node].parent
         if parent:
             self[parent].children.remove(node)
@@ -247,17 +269,17 @@ class Hugr(Mapping[Node, NodeData]):
     def num_nodes(self) -> int:
         return len(self._nodes) - len(self._free_nodes)
 
-    def num_ports(self, node: Node, direction: Direction) -> int:
+    def num_ports(self, node: ToNode, direction: Direction) -> int:
         return (
             self.num_in_ports(node)
             if direction == Direction.INCOMING
             else self.num_out_ports(node)
         )
 
-    def num_in_ports(self, node: Node) -> int:
+    def num_in_ports(self, node: ToNode) -> int:
         return self[node]._num_inps
 
-    def num_out_ports(self, node: Node) -> int:
+    def num_out_ports(self, node: ToNode) -> int:
         return self[node]._num_outs
 
     def _linked_ports(
@@ -282,14 +304,14 @@ class Hugr(Mapping[Node, NodeData]):
 
     # TODO: single linked port
 
-    def outgoing_order_links(self, node: Node) -> Iterable[Node]:
+    def outgoing_order_links(self, node: ToNode) -> Iterable[Node]:
         return (p.node for p in self.linked_ports(node.out(-1)))
 
-    def incoming_order_links(self, node: Node) -> Iterable[Node]:
+    def incoming_order_links(self, node: ToNode) -> Iterable[Node]:
         return (p.node for p in self.linked_ports(node.inp(-1)))
 
     def _node_links(
-        self, node: Node, links: dict[_SubPort[P], _SubPort[K]]
+        self, node: ToNode, links: dict[_SubPort[P], _SubPort[K]]
     ) -> Iterable[tuple[P, list[K]]]:
         try:
             direction = next(iter(links.keys())).port.direction
@@ -300,23 +322,23 @@ class Hugr(Mapping[Node, NodeData]):
             port = cast(P, node.port(offset, direction))
             yield port, list(self._linked_ports(port, links))
 
-    def outgoing_links(self, node: Node) -> Iterable[tuple[OutPort, list[InPort]]]:
+    def outgoing_links(self, node: ToNode) -> Iterable[tuple[OutPort, list[InPort]]]:
         return self._node_links(node, self._links.fwd)
 
-    def incoming_links(self, node: Node) -> Iterable[tuple[InPort, list[OutPort]]]:
+    def incoming_links(self, node: ToNode) -> Iterable[tuple[InPort, list[OutPort]]]:
         return self._node_links(node, self._links.bck)
 
     def num_incoming(self, node: Node) -> int:
         # connecetd links
         return sum(1 for _ in self.incoming_links(node))
 
-    def num_outgoing(self, node: Node) -> int:
+    def num_outgoing(self, node: ToNode) -> int:
         # connecetd links
         return sum(1 for _ in self.outgoing_links(node))
 
     # TODO: num_links and _linked_ports
 
-    def insert_hugr(self, hugr: Hugr, parent: Node | None = None) -> dict[Node, Node]:
+    def insert_hugr(self, hugr: Hugr, parent: ToNode | None = None) -> dict[Node, Node]:
         mapping: dict[Node, Node] = {}
 
         for idx, node_data in enumerate(hugr._nodes):

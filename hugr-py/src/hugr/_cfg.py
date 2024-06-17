@@ -1,7 +1,8 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable, Sequence
-from ._hugr import Hugr, Node, Wire
+from ._hugr import Hugr, Node, ToNode, Wire
+from ._hugr import ParentBuilder
 from ._dfg import DfBase, _from_base
 from ._tys import FunctionType, TypeRow, Sum
 from ._exceptions import NoSiblingAncestor, NotInSameCfg
@@ -37,7 +38,7 @@ class Block(DfBase[ops.DataflowBlock]):
 
 
 @dataclass
-class Cfg:
+class Cfg(ParentBuilder):
     hugr: Hugr
     root: Node
     _entry_block: Block
@@ -86,5 +87,5 @@ class Cfg:
     ) -> Block:
         return self.add_block(input_types, [[]] * n_branches, other_outputs)
 
-    def branch(self, src: Wire, dst: Node) -> None:
+    def branch(self, src: Wire, dst: ToNode) -> None:
         self.hugr.add_link(src.out_port(), dst.inp(0))
