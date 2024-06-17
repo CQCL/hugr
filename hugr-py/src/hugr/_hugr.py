@@ -13,13 +13,12 @@ from typing import (
     TypeVar,
     cast,
     overload,
-    Sequence,
 )
 
 from typing_extensions import Self
 
 from hugr._ops import Op
-from hugr._tys import Type
+from hugr._tys import TypeRow
 from hugr.serialization.ops import OpType as SerialOp
 from hugr.serialization.serial_hugr import SerialHugr
 from hugr.utils import BiMap
@@ -349,7 +348,7 @@ class Hugr(Mapping[Node, NodeData]):
         dfg.root = mapping[dfg.root]
         return dfg
 
-    def add_cfg(self, input_types: Sequence[Type], output_types: Sequence[Type]) -> Cfg:
+    def add_cfg(self, input_types: TypeRow, output_types: TypeRow) -> Cfg:
         from ._cfg import Cfg
 
         cfg = Cfg(input_types, output_types)

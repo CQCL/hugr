@@ -1,12 +1,12 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Sequence, Iterable, TYPE_CHECKING, Generic, TypeVar, cast
+from typing import Iterable, TYPE_CHECKING, Generic, TypeVar, cast
 import typing
 from ._hugr import Hugr, Node, Wire, OutPort
 
 import hugr._ops as ops
 from ._exceptions import NoSiblingAncestor
-from hugr._tys import FunctionType, Type, TypeRow
+from hugr._tys import FunctionType, TypeRow
 
 if TYPE_CHECKING:
     from ._cfg import Cfg
@@ -75,8 +75,8 @@ class DfBase(Generic[DP]):
 
     def add_cfg(
         self,
-        input_types: Sequence[Type],
-        output_types: Sequence[Type],
+        input_types: TypeRow,
+        output_types: TypeRow,
         *args: Wire,
     ) -> Cfg:
         cfg = self.hugr.add_cfg(input_types, output_types)
@@ -119,16 +119,12 @@ def _from_base(cls: typing.Type[C], base: DfBase[DP]) -> C:
 
 
 class Dfg(DfBase[ops.DFG]):
-    def __init__(
-        self, input_types: Sequence[Type], output_types: Sequence[Type]
-    ) -> None:
-        input_types = list(input_types)
-        output_types = list(output_types)
+    def __init__(self, input_types: TypeRow, output_types: TypeRow) -> None:
         root_op = ops.DFG(FunctionType(input=input_types, output=output_types))
         super().__init__(root_op)
 
     @classmethod
-    def endo(cls, types: Sequence[Type]) -> Dfg:
+    def endo(cls, types: TypeRow) -> Dfg:
         return cls(types, types)
 
 

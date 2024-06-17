@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Sequence
 from ._hugr import Hugr, Node, Wire
 from ._dfg import DfBase, _from_base
-from ._tys import Type, FunctionType, TypeRow, Sum
+from ._tys import FunctionType, TypeRow, Sum
 import hugr._ops as ops
 
 
@@ -23,11 +23,7 @@ class Cfg:
     _entry_block: Block
     exit: Node
 
-    def __init__(
-        self, input_types: Sequence[Type], output_types: Sequence[Type]
-    ) -> None:
-        input_types = list(input_types)
-        output_types = list(output_types)
+    def __init__(self, input_types: TypeRow, output_types: TypeRow) -> None:
         root_op = ops.CFG(FunctionType(input=input_types, output=output_types))
         self.hugr = Hugr(root_op)
         self.root = self.hugr.root
