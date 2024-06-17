@@ -1,15 +1,17 @@
 from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import Iterable, Sequence
-from ._hugr import Hugr, Node, ToNode, Wire
-from ._hugr import ParentBuilder
-from ._dfg import DfBase, _from_base
-from ._tys import FunctionType, TypeRow, Sum
-from ._exceptions import NoSiblingAncestor, NotInSameCfg
+
 import hugr._ops as ops
 
+from ._dfg import _DfBase
+from ._exceptions import NoSiblingAncestor, NotInSameCfg
+from ._hugr import Hugr, Node, ParentBuilder, ToNode, Wire
+from ._tys import FunctionType, Sum, TypeRow
 
-class Block(DfBase[ops.DataflowBlock]):
+
+class Block(_DfBase[ops.DataflowBlock]):
     def set_block_outputs(self, branching: Wire, *other_outputs: Wire) -> None:
         self.set_outputs(branching, *other_outputs)
 
@@ -46,14 +48,36 @@ class Cfg(ParentBuilder):
 
     def __init__(self, input_types: TypeRow, output_types: TypeRow) -> None:
         root_op = ops.CFG(FunctionType(input=input_types, output=output_types))
-        self.hugr = Hugr(root_op)
-        self.root = self.hugr.root
+        hugr = Hugr(root_op)
+        self._init_impl(hugr, hugr.root, input_types, output_types)
+
+    def _init_impl(
+        self: Cfg, hugr: Hugr, root: Node, input_types: TypeRow, output_types: TypeRow
+    ) -> None:
+        self.hugr = hugr
+        self.root = root
         # to ensure entry is first child, add a dummy entry at the start
-        self._entry_block = _from_base(
-            Block, self.hugr.add_dfg(ops.DataflowBlock(input_types, []))
+        self._entry_block = Block.new_nested(
+            ops.DataflowBlock(input_types, []), hugr, root
         )
 
         self.exit = self.hugr.add_node(ops.ExitBlock(output_types), self.root)
+
+    @classmethod
+    def new_nested(
+        cls,
+        input_types: TypeRow,
+        output_types: TypeRow,
+        hugr: Hugr,
+        parent: ToNode | None = None,
+    ) -> Cfg:
+        new = cls.__new__(cls)
+        root = hugr.add_node(
+            ops.CFG(FunctionType(input=input_types, output=output_types)),
+            parent or hugr.root,
+        )
+        new._init_impl(hugr, root, input_types, output_types)
+        return new
 
     @property
     def entry(self) -> Node:
@@ -77,10 +101,12 @@ class Cfg(ParentBuilder):
     def add_block(
         self, input_types: TypeRow, sum_rows: Sequence[TypeRow], other_outputs: TypeRow
     ) -> Block:
-        new_block = self.hugr.add_dfg(
-            ops.DataflowBlock(input_types, list(sum_rows), other_outputs)
+        new_block = Block.new_nested(
+            ops.DataflowBlock(input_types, list(sum_rows), other_outputs),
+            self.hugr,
+            self.root,
         )
-        return _from_base(Block, new_block)
+        return new_block
 
     def simple_block(
         self, input_types: TypeRow, n_branches: int, other_outputs: TypeRow
