@@ -3,9 +3,7 @@ from dataclasses import dataclass, replace
 from typing import (
     Iterable,
     TYPE_CHECKING,
-    Generic,
     TypeVar,
-    cast,
 )
 from ._hugr import Hugr, Node, Wire, OutPort, ParentBuilder
 
@@ -25,31 +23,33 @@ DP = TypeVar("DP", bound=ops.DfParentOp)
 
 
 @dataclass()
-class _DfBase(ParentBuilder, Generic[DP]):
+class _DfBase(ParentBuilder[DP]):
     hugr: Hugr
-    root: Node
+    parent_node: Node
     input_node: Node
     output_node: Node
 
     def __init__(self, root_op: DP) -> None:
         self.hugr = Hugr(root_op)
-        self.root = self.hugr.root
+        self.parent_node = self.hugr.root
         self._init_io_nodes(root_op)
 
     def _init_io_nodes(self, root_op: DP):
         inner_sig = root_op.inner_signature()
 
         self.input_node = self.hugr.add_node(
-            ops.Input(inner_sig.input), self.root, len(inner_sig.input)
+            ops.Input(inner_sig.input), self.parent_node, len(inner_sig.input)
         )
-        self.output_node = self.hugr.add_node(ops.Output(inner_sig.output), self.root)
+        self.output_node = self.hugr.add_node(
+            ops.Output(inner_sig.output), self.parent_node
+        )
 
     @classmethod
     def new_nested(cls, root_op: DP, hugr: Hugr, parent: ToNode | None = None) -> Self:
         new = cls.__new__(cls)
 
         new.hugr = hugr
-        new.root = hugr.add_node(root_op, parent or hugr.root)
+        new.parent_node = hugr.add_node(root_op, parent or hugr.root)
         new._init_io_nodes(root_op)
         return new
 
@@ -59,14 +59,11 @@ class _DfBase(ParentBuilder, Generic[DP]):
     def _output_op(self) -> ops.Output:
         return self.hugr._get_typed_op(self.output_node, ops.Output)
 
-    def root_op(self) -> DP:
-        return cast(DP, self.hugr[self.root].op)
-
     def inputs(self) -> list[OutPort]:
         return [self.input_node.out(i) for i in range(len(self._input_op().types))]
 
     def add_op(self, op: ops.DataflowOp, /, *args: Wire) -> Node:
-        new_n = self.hugr.add_node(op, self.root)
+        new_n = self.hugr.add_node(op, self.parent_node)
         self._wire_up(new_n, args)
 
         return replace(new_n, _num_out_ports=op.num_out)
@@ -75,9 +72,9 @@ class _DfBase(ParentBuilder, Generic[DP]):
         return self.add_op(com.op, *com.incoming)
 
     def insert_nested(self, dfg: Dfg, *args: Wire) -> Node:
-        mapping = self.hugr.insert_hugr(dfg.hugr, self.root)
-        self._wire_up(mapping[dfg.root], args)
-        return mapping[dfg.root]
+        mapping = self.hugr.insert_hugr(dfg.hugr, self.parent_node)
+        self._wire_up(mapping[dfg.parent_node], args)
+        return mapping[dfg.parent_node]
 
     def add_nested(
         self,
@@ -88,8 +85,8 @@ class _DfBase(ParentBuilder, Generic[DP]):
         input_types = [self._get_dataflow_type(w) for w in args]
 
         root_op = ops.DFG(FunctionType(input=list(input_types), output=[]))
-        dfg = Dfg.new_nested(root_op, self.hugr, self.root)
-        self._wire_up(dfg.root, args)
+        dfg = Dfg.new_nested(root_op, self.hugr, self.parent_node)
+        self._wire_up(dfg.parent_node, args)
         return dfg
 
     def add_cfg(
@@ -100,18 +97,18 @@ class _DfBase(ParentBuilder, Generic[DP]):
     ) -> Cfg:
         from ._cfg import Cfg
 
-        cfg = Cfg.new_nested(input_types, output_types, self.hugr, self.root)
-        self._wire_up(cfg.root, args)
+        cfg = Cfg.new_nested(input_types, output_types, self.hugr, self.parent_node)
+        self._wire_up(cfg.parent_node, args)
         return cfg
 
     def insert_cfg(self, cfg: Cfg, *args: Wire) -> Node:
-        mapping = self.hugr.insert_hugr(cfg.hugr, self.root)
-        self._wire_up(mapping[cfg.root], args)
-        return mapping[cfg.root]
+        mapping = self.hugr.insert_hugr(cfg.hugr, self.parent_node)
+        self._wire_up(mapping[cfg.parent_node], args)
+        return mapping[cfg.parent_node]
 
     def set_outputs(self, *args: Wire) -> None:
         self._wire_up(self.output_node, args)
-        self.root_op()._set_out_types(self._output_op().types)
+        self.parent_op()._set_out_types(self._output_op().types)
 
     def add_state_order(self, src: Node, dst: Node) -> None:
         # adds edge to the right of all existing edges

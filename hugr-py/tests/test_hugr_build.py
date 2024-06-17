@@ -256,4 +256,4 @@ def test_ancestral_sibling():
 
     nt = nested.add(Not(a))
 
-    assert _ancestral_sibling(h.hugr, h.input_node, nt) == nested.root
+    assert _ancestral_sibling(h.hugr, h.input_node, nt) == nested.parent_node

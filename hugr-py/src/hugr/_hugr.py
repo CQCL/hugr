@@ -148,22 +148,25 @@ _SO = _SubPort[OutPort]
 _SI = _SubPort[InPort]
 
 
-class ParentBuilder(ToNode, Protocol):
-    hugr: Hugr
-    root: Node
+class ParentBuilder(ToNode, Protocol[OpVar]):
+    hugr: Hugr[OpVar]
+    parent_node: Node
 
     def to_node(self) -> Node:
-        return self.root
+        return self.parent_node
+
+    def parent_op(self) -> OpVar:
+        return cast(OpVar, self.hugr[self.parent_node].op)
 
 
 @dataclass()
-class Hugr(Mapping[Node, NodeData]):
+class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
     root: Node
     _nodes: list[NodeData | None]
     _links: BiMap[_SO, _SI]
     _free_nodes: list[Node]
 
-    def __init__(self, root_op: Op) -> None:
+    def __init__(self, root_op: OpVar) -> None:
         self._free_nodes = []
         self._links = BiMap()
         self._nodes = []
@@ -268,6 +271,9 @@ class Hugr(Mapping[Node, NodeData]):
         except StopIteration:
             return
         # TODO make sure sub-offset is handled correctly
+
+    def root_op(self) -> OpVar:
+        return cast(OpVar, self[self.root].op)
 
     def num_nodes(self) -> int:
         return len(self._nodes) - len(self._free_nodes)

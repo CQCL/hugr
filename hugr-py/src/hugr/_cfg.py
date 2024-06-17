@@ -21,7 +21,7 @@ class Block(_DfBase[ops.DataflowBlock]):
 
     def _wire_up_port(self, node: Node, offset: int, p: Wire) -> Type:
         src = p.out_port()
-        cfg_node = self.hugr[self.root].parent
+        cfg_node = self.hugr[self.parent_node].parent
         assert cfg_node is not None
         src_parent = self.hugr[src.node].parent
         try:
@@ -40,9 +40,9 @@ class Block(_DfBase[ops.DataflowBlock]):
 
 
 @dataclass
-class Cfg(ParentBuilder):
+class Cfg(ParentBuilder[ops.CFG]):
     hugr: Hugr
-    root: Node
+    parent_node: Node
     _entry_block: Block
     exit: Node
 
@@ -55,13 +55,13 @@ class Cfg(ParentBuilder):
         self: Cfg, hugr: Hugr, root: Node, input_types: TypeRow, output_types: TypeRow
     ) -> None:
         self.hugr = hugr
-        self.root = root
+        self.parent_node = root
         # to ensure entry is first child, add a dummy entry at the start
         self._entry_block = Block.new_nested(
             ops.DataflowBlock(input_types, []), hugr, root
         )
 
-        self.exit = self.hugr.add_node(ops.ExitBlock(output_types), self.root)
+        self.exit = self.hugr.add_node(ops.ExitBlock(output_types), self.parent_node)
 
     @classmethod
     def new_nested(
@@ -81,7 +81,7 @@ class Cfg(ParentBuilder):
 
     @property
     def entry(self) -> Node:
-        return self._entry_block.root
+        return self._entry_block.parent_node
 
     def _entry_op(self) -> ops.DataflowBlock:
         return self.hugr._get_typed_op(self.entry, ops.DataflowBlock)
@@ -105,7 +105,7 @@ class Cfg(ParentBuilder):
         new_block = Block.new_nested(
             ops.DataflowBlock(input_types, list(sum_rows), other_outputs),
             self.hugr,
-            self.root,
+            self.parent_node,
         )
         return new_block
 
