@@ -8,7 +8,7 @@ import hugr._ops as ops
 
 
 class Block(DfBase[ops.DataflowBlock]):
-    def block_outputs(self, branching: Wire, *other_outputs: Wire) -> None:
+    def set_block_outputs(self, branching: Wire, *other_outputs: Wire) -> None:
         self.set_outputs(branching, *other_outputs)
 
     def single_successor_outputs(self, *outputs: Wire) -> None:
