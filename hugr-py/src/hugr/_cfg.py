@@ -116,9 +116,7 @@ class Cfg(ParentBuilder[ops.CFG]):
         src = src.out_port()
         self.hugr.add_link(src, self.exit.inp(0))
 
-        src_block: ops.DataflowBlock = self.hugr._get_typed_op(
-            src.node, ops.DataflowBlock
-        )
+        src_block = self.hugr._get_typed_op(src.node, ops.DataflowBlock)
         out_types = src_block.nth_outputs(src.offset)
         if self._exit_op._cfg_outputs is not None:
             if self._exit_op._cfg_outputs != out_types:

@@ -133,6 +133,7 @@ class NodeData:
 P = TypeVar("P", InPort, OutPort)
 K = TypeVar("K", InPort, OutPort)
 OpVar = TypeVar("OpVar", bound=Op)
+OpVar2 = TypeVar("OpVar2", bound=Op)
 
 
 @dataclass(frozen=True, eq=True, order=True)
@@ -189,7 +190,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
     def __len__(self) -> int:
         return self.num_nodes()
 
-    def _get_typed_op(self, node: ToNode, cl: PyType[OpVar]) -> OpVar:
+    def _get_typed_op(self, node: ToNode, cl: PyType[OpVar2]) -> OpVar2:
         op = self[node].op
         assert isinstance(op, cl)
         return op
