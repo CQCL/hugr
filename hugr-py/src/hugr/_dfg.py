@@ -1,13 +1,19 @@
 from __future__ import annotations
+from dataclasses import dataclass, replace
+from typing import (
+    Iterable,
+    TYPE_CHECKING,
+    TypeVar,
+)
+from ._hugr import Hugr, Node, Wire, OutPort, ParentBuilder
 
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Generic, Iterable, TypeVar, cast
 from typing_extensions import Self
 import hugr._ops as ops
-from hugr._tys import FunctionType, TypeRow
+from hugr._tys import TypeRow
 
 from ._exceptions import NoSiblingAncestor
-from ._hugr import Hugr, Node, OutPort, ParentBuilder, Wire, ToNode
+from ._hugr import ToNode
+from hugr._tys import Type
 
 if TYPE_CHECKING:
     from ._cfg import Cfg
@@ -17,105 +23,109 @@ DP = TypeVar("DP", bound=ops.DfParentOp)
 
 
 @dataclass()
-class _DfBase(ParentBuilder, Generic[DP]):
+class _DfBase(ParentBuilder[DP]):
     hugr: Hugr
-    root: Node
+    parent_node: Node
     input_node: Node
     output_node: Node
 
-    def __init__(self, root_op: DP) -> None:
-        self.hugr = Hugr(root_op)
-        self.root = self.hugr.root
-        self._init_io_nodes(root_op)
+    def __init__(self, parent_op: DP) -> None:
+        self.hugr = Hugr(parent_op)
+        self.parent_node = self.hugr.root
+        self._init_io_nodes(parent_op)
 
-    def _init_io_nodes(self, root_op: DP):
-        input_types = root_op.input_types()
-        output_types = root_op.output_types()
+    def _init_io_nodes(self, parent_op: DP):
+        inputs = parent_op._inputs()
+
         self.input_node = self.hugr.add_node(
-            ops.Input(input_types), self.root, len(input_types)
+            ops.Input(inputs), self.parent_node, len(inputs)
         )
-        self.output_node = self.hugr.add_node(ops.Output(output_types), self.root)
+        self.output_node = self.hugr.add_node(ops.Output(), self.parent_node)
 
     @classmethod
-    def new_nested(cls, root_op: DP, hugr: Hugr, parent: ToNode | None = None) -> Self:
+    def new_nested(
+        cls, parent_op: DP, hugr: Hugr, parent: ToNode | None = None
+    ) -> Self:
         new = cls.__new__(cls)
 
         new.hugr = hugr
-        new.root = hugr.add_node(root_op, parent or hugr.root)
-        new._init_io_nodes(root_op)
+        new.parent_node = hugr.add_node(parent_op, parent or hugr.root)
+        new._init_io_nodes(parent_op)
         return new
 
     def _input_op(self) -> ops.Input:
-        dop = self.hugr[self.input_node].op
-        assert isinstance(dop, ops.Input)
-        return dop
+        return self.hugr._get_typed_op(self.input_node, ops.Input)
 
     def _output_op(self) -> ops.Output:
-        dop = self.hugr[self.output_node].op
-        assert isinstance(dop, ops.Output)
-        return dop
-
-    def root_op(self) -> DP:
-        return cast(DP, self.hugr[self.root].op)
+        return self.hugr._get_typed_op(self.output_node, ops.Output)
 
     def inputs(self) -> list[OutPort]:
         return [self.input_node.out(i) for i in range(len(self._input_op().types))]
 
-    def add_op(self, op: ops.Op, /, *args: Wire, num_outs: int | None = None) -> Node:
-        new_n = self.hugr.add_node(op, self.root, num_outs=num_outs)
+    def add_op(self, op: ops.DataflowOp, /, *args: Wire) -> Node:
+        new_n = self.hugr.add_node(op, self.parent_node)
         self._wire_up(new_n, args)
-        return new_n
+
+        return replace(new_n, _num_out_ports=op.num_out)
 
     def add(self, com: ops.Command) -> Node:
-        return self.add_op(com.op, *com.incoming, num_outs=com.op.num_out)
+        return self.add_op(com.op, *com.incoming)
 
     def insert_nested(self, dfg: Dfg, *args: Wire) -> Node:
-        mapping = self.hugr.insert_hugr(dfg.hugr, self.root)
-        self._wire_up(mapping[dfg.root], args)
-        return mapping[dfg.root]
+        mapping = self.hugr.insert_hugr(dfg.hugr, self.parent_node)
+        self._wire_up(mapping[dfg.parent_node], args)
+        return mapping[dfg.parent_node]
 
     def add_nested(
         self,
-        input_types: TypeRow,
-        output_types: TypeRow,
         *args: Wire,
     ) -> Dfg:
         from ._dfg import Dfg
 
-        root_op = ops.DFG(FunctionType(input=input_types, output=output_types))
-        dfg = Dfg.new_nested(root_op, self.hugr, self.root)
-        self._wire_up(dfg.root, args)
+        input_types = [self._get_dataflow_type(w) for w in args]
+
+        parent_op = ops.DFG(list(input_types))
+        dfg = Dfg.new_nested(parent_op, self.hugr, self.parent_node)
+        self._wire_up(dfg.parent_node, args)
         return dfg
 
     def add_cfg(
         self,
         input_types: TypeRow,
-        output_types: TypeRow,
         *args: Wire,
     ) -> Cfg:
         from ._cfg import Cfg
 
-        cfg = Cfg.new_nested(input_types, output_types, self.hugr, self.root)
-        self._wire_up(cfg.root, args)
+        cfg = Cfg.new_nested(input_types, self.hugr, self.parent_node)
+        self._wire_up(cfg.parent_node, args)
         return cfg
 
     def insert_cfg(self, cfg: Cfg, *args: Wire) -> Node:
-        mapping = self.hugr.insert_hugr(cfg.hugr, self.root)
-        self._wire_up(mapping[cfg.root], args)
-        return mapping[cfg.root]
+        mapping = self.hugr.insert_hugr(cfg.hugr, self.parent_node)
+        self._wire_up(mapping[cfg.parent_node], args)
+        return mapping[cfg.parent_node]
 
     def set_outputs(self, *args: Wire) -> None:
         self._wire_up(self.output_node, args)
+        self.parent_op._set_out_types(self._output_op().types)
 
     def add_state_order(self, src: Node, dst: Node) -> None:
         # adds edge to the right of all existing edges
         self.hugr.add_link(src.out(-1), dst.inp(-1))
 
     def _wire_up(self, node: Node, ports: Iterable[Wire]):
-        for i, p in enumerate(ports):
-            self._wire_up_port(node, i, p)
+        tys = [self._wire_up_port(node, i, p) for i, p in enumerate(ports)]
+        if isinstance(op := self.hugr[node].op, ops.PartialOp):
+            op.set_in_types(tys)
 
-    def _wire_up_port(self, node: Node, offset: int, p: Wire):
+    def _get_dataflow_type(self, wire: Wire) -> Type:
+        port = wire.out_port()
+        ty = self.hugr.port_type(port)
+        if ty is None:
+            raise ValueError(f"Port {port} is not a dataflow port.")
+        return ty
+
+    def _wire_up_port(self, node: Node, offset: int, p: Wire) -> Type:
         src = p.out_port()
         node_ancestor = _ancestral_sibling(self.hugr, src.node, node)
         if node_ancestor is None:
@@ -123,16 +133,13 @@ class _DfBase(ParentBuilder, Generic[DP]):
         if node_ancestor != node:
             self.add_state_order(src.node, node_ancestor)
         self.hugr.add_link(src, node.inp(offset))
+        return self._get_dataflow_type(src)
 
 
 class Dfg(_DfBase[ops.DFG]):
-    def __init__(self, input_types: TypeRow, output_types: TypeRow) -> None:
-        root_op = ops.DFG(FunctionType(input=input_types, output=output_types))
-        super().__init__(root_op)
-
-    @classmethod
-    def endo(cls, types: TypeRow) -> Dfg:
-        return cls(types, types)
+    def __init__(self, *input_types: Type) -> None:
+        parent_op = ops.DFG(list(input_types))
+        super().__init__(parent_op)
 
 
 def _ancestral_sibling(h: Hugr, src: Node, tgt: Node) -> Node | None:

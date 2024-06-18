@@ -229,7 +229,7 @@ class Output(DataflowOp):
         self.types = list(in_types)
 
     def deserialize(self) -> _ops.Output:
-        return _ops.Output(types=deser_it(self.types))
+        return _ops.Output(deser_it(self.types))
 
 
 class Call(DataflowOp):
@@ -447,8 +447,8 @@ class MakeTuple(DataflowOp):
             in_types = []
         self.tys = list(in_types)
 
-    def deserialize(self) -> _ops.MakeTuple:
-        return _ops.MakeTuple(deser_it(self.tys))
+    def deserialize(self) -> _ops.MakeTupleDef:
+        return _ops.MakeTupleDef(deser_it(self.tys))
 
 
 class UnpackTuple(DataflowOp):
@@ -460,8 +460,8 @@ class UnpackTuple(DataflowOp):
     def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
         self.tys = list(out_types)
 
-    def deserialize(self) -> _ops.UnpackTuple:
-        return _ops.UnpackTuple(deser_it(self.tys))
+    def deserialize(self) -> _ops.UnpackTupleDef:
+        return _ops.UnpackTupleDef(deser_it(self.tys))
 
 
 class Tag(DataflowOp):

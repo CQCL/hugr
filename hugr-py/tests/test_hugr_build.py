@@ -85,7 +85,7 @@ def _validate(h: Hugr, mermaid: bool = False, roundtrip: bool = True):
 
 
 def test_stable_indices():
-    h = Hugr(ops.DFG())
+    h = Hugr(ops.DFG([]))
 
     nodes = [h.add_node(Not) for _ in range(3)]
     assert len(h) == 4
@@ -120,7 +120,7 @@ def test_stable_indices():
 
 
 def test_simple_id():
-    h = Dfg.endo([tys.Qubit] * 2)
+    h = Dfg(tys.Qubit, tys.Qubit)
     a, b = h.inputs()
     h.set_outputs(a, b)
 
@@ -128,7 +128,7 @@ def test_simple_id():
 
 
 def test_multiport():
-    h = Dfg([tys.Bool], [tys.Bool] * 2)
+    h = Dfg(tys.Bool)
     (a,) = h.inputs()
     h.set_outputs(a, a)
     in_n, ou_n = h.input_node, h.output_node
@@ -151,7 +151,7 @@ def test_multiport():
 
 
 def test_add_op():
-    h = Dfg.endo([tys.Bool])
+    h = Dfg(tys.Bool)
     (a,) = h.inputs()
     nt = h.add_op(Not, a)
     h.set_outputs(nt)
@@ -161,25 +161,25 @@ def test_add_op():
 
 def test_tuple():
     row = [tys.Bool, tys.Qubit]
-    h = Dfg.endo(row)
+    h = Dfg(*row)
     a, b = h.inputs()
-    t = h.add(ops.MakeTuple(row)(a, b))
-    a, b = h.add(ops.UnpackTuple(row)(t))
+    t = h.add(ops.MakeTuple(a, b))
+    a, b = h.add(ops.UnpackTuple(t))
     h.set_outputs(a, b)
 
     _validate(h.hugr)
 
-    h1 = Dfg.endo(row)
+    h1 = Dfg(*row)
     a, b = h1.inputs()
-    mt = h1.add_op(ops.MakeTuple(row), a, b)
-    a, b = h1.add_op(ops.UnpackTuple(row), mt)[0, 1]
+    mt = h1.add_op(ops.MakeTuple, a, b)
+    a, b = h1.add_op(ops.UnpackTuple, mt)[0, 1]
     h1.set_outputs(a, b)
 
     assert h.hugr.to_serial() == h1.hugr.to_serial()
 
 
 def test_multi_out():
-    h = Dfg([INT_T] * 2, [INT_T] * 2)
+    h = Dfg(INT_T, INT_T)
     a, b = h.inputs()
     a, b = h.add(DivMod(a, b))
     h.set_outputs(a, b)
@@ -187,25 +187,25 @@ def test_multi_out():
 
 
 def test_insert():
-    h1 = Dfg.endo([tys.Bool])
+    h1 = Dfg(tys.Bool)
     (a1,) = h1.inputs()
     nt = h1.add(Not(a1))
     h1.set_outputs(nt)
 
     assert len(h1.hugr) == 4
 
-    new_h = Hugr(ops.DFG())
+    new_h = Hugr(ops.DFG([]))
     mapping = h1.hugr.insert_hugr(new_h, h1.hugr.root)
     assert mapping == {new_h.root: Node(4)}
 
 
 def test_insert_nested():
-    h1 = Dfg.endo([tys.Bool])
+    h1 = Dfg(tys.Bool)
     (a1,) = h1.inputs()
     nt = h1.add(Not(a1))
     h1.set_outputs(nt)
 
-    h = Dfg.endo([tys.Bool])
+    h = Dfg(tys.Bool)
     (a,) = h.inputs()
     nested = h.insert_nested(h1, a)
     h.set_outputs(nested)
@@ -219,9 +219,9 @@ def test_build_nested():
         nt = dfg.add(Not(a1))
         dfg.set_outputs(nt)
 
-    h = Dfg.endo([tys.Bool])
+    h = Dfg(tys.Bool)
     (a,) = h.inputs()
-    nested = h.add_nested([tys.Bool], [tys.Bool], a)
+    nested = h.add_nested(a)
 
     _nested_nop(nested)
     assert len(h.hugr.children(nested)) == 3
@@ -231,9 +231,9 @@ def test_build_nested():
 
 
 def test_build_inter_graph():
-    h = Dfg.endo([tys.Bool, tys.Bool])
+    h = Dfg(tys.Bool, tys.Bool)
     (a, b) = h.inputs()
-    nested = h.add_nested([], [tys.Bool])
+    nested = h.add_nested()
 
     nt = nested.add(Not(a))
     nested.set_outputs(nt)
@@ -250,10 +250,10 @@ def test_build_inter_graph():
 
 
 def test_ancestral_sibling():
-    h = Dfg.endo([tys.Bool])
+    h = Dfg(tys.Bool)
     (a,) = h.inputs()
-    nested = h.add_nested([], [tys.Bool])
+    nested = h.add_nested()
 
     nt = nested.add(Not(a))
 
-    assert _ancestral_sibling(h.hugr, h.input_node, nt) == nested.root
+    assert _ancestral_sibling(h.hugr, h.input_node, nt) == nested.parent_node

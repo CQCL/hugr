@@ -12,11 +12,13 @@ from typing import (
     TypeVar,
     cast,
     overload,
+    Type as PyType,
 )
 
 from typing_extensions import Self
 
-from hugr._ops import Op
+from hugr._ops import Op, DataflowOp
+from hugr._tys import Type, Kind
 from hugr.serialization.ops import OpType as SerialOp
 from hugr.serialization.serial_hugr import SerialHugr
 from hugr.utils import BiMap
@@ -130,6 +132,8 @@ class NodeData:
 
 P = TypeVar("P", InPort, OutPort)
 K = TypeVar("K", InPort, OutPort)
+OpVar = TypeVar("OpVar", bound=Op)
+OpVar2 = TypeVar("OpVar2", bound=Op)
 
 
 @dataclass(frozen=True, eq=True, order=True)
@@ -145,22 +149,26 @@ _SO = _SubPort[OutPort]
 _SI = _SubPort[InPort]
 
 
-class ParentBuilder(ToNode, Protocol):
-    hugr: Hugr
-    root: Node
+class ParentBuilder(ToNode, Protocol[OpVar]):
+    hugr: Hugr[OpVar]
+    parent_node: Node
 
     def to_node(self) -> Node:
-        return self.root
+        return self.parent_node
+
+    @property
+    def parent_op(self) -> OpVar:
+        return cast(OpVar, self.hugr[self.parent_node].op)
 
 
 @dataclass()
-class Hugr(Mapping[Node, NodeData]):
+class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
     root: Node
     _nodes: list[NodeData | None]
     _links: BiMap[_SO, _SI]
     _free_nodes: list[Node]
 
-    def __init__(self, root_op: Op) -> None:
+    def __init__(self, root_op: OpVar) -> None:
         self._free_nodes = []
         self._links = BiMap()
         self._nodes = []
@@ -181,6 +189,11 @@ class Hugr(Mapping[Node, NodeData]):
 
     def __len__(self) -> int:
         return self.num_nodes()
+
+    def _get_typed_op(self, node: ToNode, cl: PyType[OpVar2]) -> OpVar2:
+        op = self[node].op
+        assert isinstance(op, cl)
+        return op
 
     def children(self, node: ToNode | None = None) -> list[Node]:
         node = node or self.root
@@ -261,6 +274,9 @@ class Hugr(Mapping[Node, NodeData]):
             return
         # TODO make sure sub-offset is handled correctly
 
+    def root_op(self) -> OpVar:
+        return cast(OpVar, self[self.root].op)
+
     def num_nodes(self) -> int:
         return len(self._nodes) - len(self._free_nodes)
 
@@ -332,6 +348,15 @@ class Hugr(Mapping[Node, NodeData]):
         return sum(1 for _ in self.outgoing_links(node))
 
     # TODO: num_links and _linked_ports
+
+    def port_kind(self, port: InPort | OutPort) -> Kind:
+        return self[port.node].op.port_kind(port)
+
+    def port_type(self, port: InPort | OutPort) -> Type | None:
+        op = self[port.node].op
+        if isinstance(op, DataflowOp):
+            return op.port_type(port)
+        return None
 
     def insert_hugr(self, hugr: Hugr, parent: ToNode | None = None) -> dict[Node, Node]:
         mapping: dict[Node, Node] = {}
