@@ -9,7 +9,7 @@ import hugr._tys as tys
 from ._exceptions import IncompleteOp
 
 if TYPE_CHECKING:
-    from hugr._hugr import Hugr, Node, Wire, _Port
+    from hugr._hugr import Hugr, Node, Wire, InPort, OutPort
 
 
 @runtime_checkable
@@ -20,19 +20,19 @@ class Op(Protocol):
 
     def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> BaseOp: ...
 
-    def port_kind(self, port: _Port) -> tys.Kind: ...
+    def port_kind(self, port: InPort | OutPort) -> tys.Kind: ...
 
 
 @runtime_checkable
 class DataflowOp(Op, Protocol):
     def outer_signature(self) -> tys.FunctionType: ...
 
-    def port_kind(self, port: _Port) -> tys.Kind:
+    def port_kind(self, port: InPort | OutPort) -> tys.Kind:
         if port.offset == -1:
             return tys.OrderKind()
         return tys.ValueKind(self.port_type(port))
 
-    def port_type(self, port: _Port) -> tys.Type:
+    def port_type(self, port: InPort | OutPort) -> tys.Type:
         from hugr._hugr import Direction
 
         sig = self.outer_signature()
@@ -68,7 +68,7 @@ class SerWrap(Op, Generic[T]):
         root.parent = parent.idx
         return root
 
-    def port_kind(self, port: _Port) -> tys.Kind:
+    def port_kind(self, port: InPort | OutPort) -> tys.Kind:
         raise NotImplementedError
 
 
@@ -322,7 +322,7 @@ class DataflowBlock(DfParentOp):
             input=self.inputs, output=[tys.Sum(self.sum_rows), *self.other_outputs]
         )
 
-    def port_kind(self, port: _Port) -> tys.Kind:
+    def port_kind(self, port: InPort | OutPort) -> tys.Kind:
         return tys.CFKind()
 
     def _set_out_types(self, types: tys.TypeRow) -> None:
@@ -352,5 +352,5 @@ class ExitBlock(Op):
             cfg_outputs=ser_it(self.cfg_outputs),
         )
 
-    def port_kind(self, port: _Port) -> tys.Kind:
+    def port_kind(self, port: InPort | OutPort) -> tys.Kind:
         return tys.CFKind()
