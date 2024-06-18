@@ -90,15 +90,22 @@ class Input(DataflowOp):
         return super().__call__()
 
 
+V = TypeVar("V")
+
+
+def _check_complete(v: V | None) -> V:
+    if v is None:
+        raise IncompleteOp()
+    return v
+
+
 @dataclass()
 class Output(DataflowOp, PartialOp):
     _types: tys.TypeRow | None = None
 
     @property
     def types(self) -> tys.TypeRow:
-        if self._types is None:
-            raise IncompleteOp()
-        return self._types
+        return _check_complete(self._types)
 
     def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.Output:
         return sops.Output(parent=parent.idx, types=ser_it(self.types))
@@ -143,9 +150,7 @@ class MakeTupleDef(DataflowOp, PartialOp):
 
     @property
     def types(self) -> tys.TypeRow:
-        if self._types is None:
-            raise IncompleteOp()
-        return self._types
+        return _check_complete(self._types)
 
     def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.MakeTuple:
         return sops.MakeTuple(
@@ -172,9 +177,7 @@ class UnpackTupleDef(DataflowOp, PartialOp):
 
     @property
     def types(self) -> tys.TypeRow:
-        if self._types is None:
-            raise IncompleteOp()
-        return self._types
+        return _check_complete(self._types)
 
     @property
     def num_out(self) -> int | None:
@@ -297,9 +300,7 @@ class DataflowBlock(DfParentOp):
 
     @property
     def sum_rows(self) -> list[tys.TypeRow]:
-        if self._sum_rows is None:
-            raise IncompleteOp()
-        return self._sum_rows
+        return _check_complete(self._sum_rows)
 
     @property
     def other_outputs(self) -> tys.TypeRow:
@@ -348,9 +349,7 @@ class ExitBlock(Op):
 
     @property
     def cfg_outputs(self) -> tys.TypeRow:
-        if self._cfg_outputs is None:
-            raise IncompleteOp()
-        return self._cfg_outputs
+        return _check_complete(self._cfg_outputs)
 
     def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.ExitBlock:
         return sops.ExitBlock(
