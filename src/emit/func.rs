@@ -59,6 +59,7 @@ pub struct EmitFuncContext<'c, H: HugrView> {
 impl<'c, H: HugrView> EmitFuncContext<'c, H> {
     delegate! {
         to self.emit_context {
+            /// Returns the inkwell [Context].
             fn iw_context(&self) ->  &'c Context;
             /// Returns the internal [CodegenExtsMap] .
             pub fn extensions(&self) ->  Rc<CodegenExtsMap<'c,H>>;
@@ -78,6 +79,18 @@ impl<'c, H: HugrView> EmitFuncContext<'c, H> {
             ///
             /// The name of the result may have been mangled.
             pub fn get_func_decl(&self, node: FatNode<'c, FuncDecl, H>) -> Result<FunctionValue<'c>>;
+            /// Adds or get the [FunctionValue] in the [inkwell::module::Module] with the given symbol
+            /// and function type.
+            ///
+            /// The name undergoes no mangling. The [FunctionValue] will have
+            /// [inkwell::module::Linkage::External].
+            ///
+            /// If this function is called multiple times with the same arguments it
+            /// will return the same [FunctionValue].
+            ///
+            /// If a function with the given name exists but the type does not match
+            /// then an Error is returned.
+            pub fn get_extern_func(&self, symbol: impl AsRef<str>, typ: FunctionType<'c>,) -> Result<FunctionValue<'c>>;
         }
     }
 

@@ -2,11 +2,12 @@ use anyhow::{anyhow, Result};
 use delegate::delegate;
 use hugr::{
     ops::{FuncDecl, FuncDefn, NamedOp as _, OpType},
+    types::PolyFuncType,
     HugrView, Node, NodeIndex,
 };
 use inkwell::{
     context::Context,
-    module::Module,
+    module::{Linkage, Module},
     types::{BasicTypeEnum, FunctionType},
     values::{BasicValueEnum, FunctionValue},
 };
@@ -205,39 +206,68 @@ impl<'c, H: HugrView> EmitModuleContext<'c, H> {
     fn get_func_impl(
         &self,
         name: impl AsRef<str>,
-        node: Node,
-        func_ty: &hugr::types::PolyFuncType,
+        func_ty: FunctionType<'c>,
+        linkage: Option<Linkage>,
     ) -> Result<FunctionValue<'c>> {
-        let sig = (func_ty.params().is_empty())
-            .then_some(func_ty.body())
-            .ok_or(anyhow!("function has type params"))?;
-        let llvm_func_ty = self.llvm_func_type(sig)?;
-        let name = self.name_func(name, node);
         let func = self
             .module()
-            .get_function(&name)
-            .unwrap_or_else(|| self.module.add_function(&name, llvm_func_ty, None));
-        if func.get_type() != llvm_func_ty {
+            .get_function(name.as_ref())
+            .unwrap_or_else(|| self.module.add_function(name.as_ref(), func_ty, linkage));
+        if func.get_type() != func_ty {
             Err(anyhow!(
-                "Function '{name}' has wrong type: hugr: {func_ty} expected: {llvm_func_ty} actual: {}",
+                "Function '{}' has wrong type: expected: {func_ty} actual: {}",
+                name.as_ref(),
                 func.get_type()
             ))?
         }
         Ok(func)
     }
 
+    fn get_hugr_func_impl(
+        &self,
+        name: impl AsRef<str>,
+        node: Node,
+        func_ty: &PolyFuncType,
+    ) -> Result<FunctionValue<'c>> {
+        let func_ty = (func_ty.params().is_empty())
+            .then_some(func_ty.body())
+            .ok_or(anyhow!("function has type params"))?;
+        let llvm_func_ty = self.llvm_func_type(func_ty)?;
+        let name = self.name_func(name, node);
+        self.get_func_impl(name, llvm_func_ty, None)
+    }
+
     /// Adds or gets the [FunctionValue] in the [Module] corresponding to the given [FuncDefn].
     ///
     /// The name of the result is mangled by [EmitModuleContext::name_func].
     pub fn get_func_defn(&self, node: FatNode<'c, FuncDefn, H>) -> Result<FunctionValue<'c>> {
-        self.get_func_impl(&node.name, node.node(), &node.signature)
+        self.get_hugr_func_impl(&node.name, node.node(), &node.signature)
     }
 
     /// Adds or gets the [FunctionValue] in the [Module] corresponding to the given [FuncDecl].
     ///
     /// The name of the result is mangled by [EmitModuleContext::name_func].
     pub fn get_func_decl(&self, node: FatNode<'c, FuncDecl, H>) -> Result<FunctionValue<'c>> {
-        self.get_func_impl(&node.name, node.node(), &node.signature)
+        self.get_hugr_func_impl(&node.name, node.node(), &node.signature)
+    }
+
+    /// Adds or get the [FunctionValue] in the [Module] with the given symbol
+    /// and function type.
+    ///
+    /// The name undergoes no mangling. The [FunctionValue] will have
+    /// [Linkage::External].
+    ///
+    /// If this function is called multiple times with the same arguments it
+    /// will return the same [FunctionValue].
+    ///
+    /// If a function with the given name exists but the type does not match
+    /// then an Error is returned.
+    pub fn get_extern_func(
+        &self,
+        symbol: impl AsRef<str>,
+        typ: FunctionType<'c>,
+    ) -> Result<FunctionValue<'c>> {
+        self.get_func_impl(symbol, typ, Some(Linkage::External))
     }
 
     /// Consumes the `EmitModuleContext` and returns the internal [Module].

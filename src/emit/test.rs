@@ -267,3 +267,16 @@ fn emit_hugr_custom_op(#[with(-1, add_int_extensions)] llvm_ctx: TestContext) {
         });
     check_emission!(hugr, llvm_ctx);
 }
+
+#[rstest]
+fn get_external_func(llvm_ctx: TestContext) {
+    llvm_ctx.with_emit_module_context(|emc| {
+        let func_type1 = emc.iw_context().i32_type().fn_type(&[], false);
+        let func_type2 = emc.iw_context().f64_type().fn_type(&[], false);
+        let foo1 = emc.get_extern_func("foo", func_type1).unwrap();
+        assert_eq!(foo1.get_name().to_str().unwrap(), "foo");
+        let foo2 = emc.get_extern_func("foo", func_type1).unwrap();
+        assert_eq!(foo1, foo2);
+        assert!(emc.get_extern_func("foo", func_type2).is_err());
+    });
+}

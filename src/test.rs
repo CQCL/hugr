@@ -11,7 +11,7 @@ use rstest::fixture;
 
 use crate::{
     custom::CodegenExtsMap,
-    emit::EmitHugr,
+    emit::{EmitHugr, EmitModuleContext, Namer},
     types::{TypeConverter, TypingSession},
 };
 
@@ -118,6 +118,21 @@ impl TestContext {
             let exts = self.extensions();
             let (r, ectx) = f(EmitHugr::new(ctx, m, exts));
             (r, ectx.finish())
+        })
+    }
+
+    pub fn with_emit_module_context<'c, T>(
+        &'c self,
+        f: impl FnOnce(EmitModuleContext<'c, THugrView>) -> T,
+    ) -> T {
+        self.with_context(|ctx| {
+            let m = ctx.create_module("test_module");
+            f(EmitModuleContext::new(
+                m,
+                Namer::default().into(),
+                self.extensions(),
+                TypeConverter::new(ctx),
+            ))
         })
     }
 }
