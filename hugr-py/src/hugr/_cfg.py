@@ -8,15 +8,16 @@ from ._dfg import _DfBase
 from ._exceptions import NoSiblingAncestor, NotInSameCfg, MismatchedExit
 from ._hugr import Hugr, Node, ParentBuilder, ToNode, Wire
 from ._tys import FunctionType, TypeRow, Type
+import hugr._val as val
 
 
 class Block(_DfBase[ops.DataflowBlock]):
     def set_block_outputs(self, branching: Wire, *other_outputs: Wire) -> None:
         self.set_outputs(branching, *other_outputs)
 
-    def set_single_successor_outputs(self, *outputs: Wire) -> None:
-        # TODO requires constants
-        raise NotImplementedError
+    def set_single_succ_outputs(self, *outputs: Wire) -> None:
+        u = self.add_load_const(val.Unit)
+        self.set_outputs(u, *outputs)
 
     def _wire_up_port(self, node: Node, offset: int, p: Wire) -> Type:
         src = p.out_port()

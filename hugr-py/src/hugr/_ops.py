@@ -6,6 +6,7 @@ from hugr.serialization.ops import BaseOp
 import hugr.serialization.ops as sops
 from hugr.utils import ser_it
 import hugr._tys as tys
+import hugr._val as val
 from ._exceptions import IncompleteOp
 
 if TYPE_CHECKING:
@@ -359,3 +360,37 @@ class ExitBlock(Op):
 
     def port_kind(self, port: InPort | OutPort) -> tys.Kind:
         return tys.CFKind()
+
+
+@dataclass
+class Const(Op):
+    val: val.Value
+    num_out: int | None = 1
+
+    def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.Const:
+        return sops.Const(
+            parent=parent.idx,
+            v=self.val.to_serial_root(),
+        )
+
+    def port_kind(self, port: InPort | OutPort) -> tys.Kind:
+        return tys.ConstKind(self.val.type_())
+
+
+@dataclass
+class LoadConst(DataflowOp):
+    typ: tys.Type | None = None
+
+    def type_(self) -> tys.Type:
+        if self.typ is None:
+            raise IncompleteOp()
+        return self.typ
+
+    def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.LoadConstant:
+        return sops.LoadConstant(
+            parent=parent.idx,
+            datatype=self.type_().to_serial_root(),
+        )
+
+    def outer_signature(self) -> tys.FunctionType:
+        return tys.FunctionType(input=[], output=[self.type_()])

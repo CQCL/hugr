@@ -9,6 +9,7 @@ from hugr._ops import Custom, Command
 import hugr._ops as ops
 from hugr.serialization import SerialHugr
 import hugr._tys as tys
+import hugr._val as val
 import pytest
 import json
 
@@ -23,6 +24,14 @@ def int_t(width: int) -> tys.Opaque:
 
 
 INT_T = int_t(5)
+
+
+@dataclass
+class IntVal(val.ExtensionValue):
+    v: int
+
+    def to_value(self) -> val.Extension:
+        return val.Extension("int", INT_T, self.v)
 
 
 @dataclass

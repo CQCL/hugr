@@ -1,7 +1,7 @@
 from __future__ import annotations
 import inspect
 import sys
-from abc import ABC
+from abc import ABC, abstractmethod
 from typing import Any, Literal
 
 from pydantic import Field, RootModel, ConfigDict
@@ -80,36 +80,50 @@ class CustomConst(ConfiguredBaseModel):
     v: Any
 
 
-class ExtensionValue(ConfiguredBaseModel):
+class BaseValue(ABC, ConfiguredBaseModel):
+    @abstractmethod
+    def deserialize(self) -> _val.Value: ...
+
+
+class ExtensionValue(BaseValue):
     """An extension constant value, that can check it is of a given [CustomType]."""
 
-    v: Literal["Extension"] = Field("Extension", title="ValueTag")
+    v: Literal["Extension"] = Field(default="Extension", title="ValueTag")
     extensions: ExtensionSet
     typ: Type
     value: CustomConst
 
+    def deserialize(self) -> _val.Value:
+        return _val.Extension(self.value.c, self.typ.deserialize(), self.value)
 
-class FunctionValue(ConfiguredBaseModel):
+
+class FunctionValue(BaseValue):
     """A higher-order function value."""
 
-    v: Literal["Function"] = Field("Function", title="ValueTag")
+    v: Literal["Function"] = Field(default="Function", title="ValueTag")
     hugr: Any  # TODO
 
+    def deserialize(self) -> _val.Value:
+        return _val.Function(self.hugr)
 
-class TupleValue(ConfiguredBaseModel):
+
+class TupleValue(BaseValue):
     """A constant tuple value."""
 
-    v: Literal["Tuple"] = Field("Tuple", title="ValueTag")
+    v: Literal["Tuple"] = Field(default="Tuple", title="ValueTag")
     vs: list["Value"]
 
+    def deserialize(self) -> _val.Value:
+        return _val.Tuple(deser_it((v.root for v in self.vs)))
 
-class SumValue(ConfiguredBaseModel):
+
+class SumValue(BaseValue):
     """A Sum variant
 
     For any Sum type where this value meets the type of the variant indicated by the tag
     """
 
-    v: Literal["Sum"] = Field("Sum", title="ValueTag")
+    v: Literal["Sum"] = Field(default="Sum", title="ValueTag")
     tag: int
     typ: SumType
     vs: list["Value"]
@@ -121,6 +135,11 @@ class SumValue(ConfiguredBaseModel):
             ),
         }
     )
+
+    def deserialize(self) -> _val.Value:
+        return _val.Sum(
+            self.tag, self.typ.deserialize(), deser_it((v.root for v in self.vs))
+        )
 
 
 class Value(RootModel):
@@ -281,6 +300,9 @@ class LoadConstant(DataflowOp):
 
     op: Literal["LoadConstant"] = "LoadConstant"
     datatype: Type
+
+    def deserialize(self) -> _ops.LoadConst:
+        return _ops.LoadConst(self.datatype.deserialize())
 
 
 class LoadFunction(DataflowOp):
@@ -560,3 +582,4 @@ classes = (
 tys_model_rebuild(dict(classes))
 
 from hugr import _ops  # noqa: E402  # needed to avoid circular imports
+from hugr import _val  # noqa: E402  # needed to avoid circular imports
