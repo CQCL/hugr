@@ -226,8 +226,8 @@ class Alias(Type):
 
 @dataclass(frozen=True)
 class FunctionType(Type):
-    input: list[Type]
-    output: list[Type]
+    input: TypeRow
+    output: TypeRow
     extension_reqs: ExtensionSet = field(default_factory=ExtensionSet)
 
     def to_serial(self) -> stys.FunctionType:
