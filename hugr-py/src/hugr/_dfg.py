@@ -105,7 +105,7 @@ class _DfBase(ParentBuilder[DP]):
 
     def set_outputs(self, *args: Wire) -> None:
         self._wire_up(self.output_node, args)
-        self.parent_op()._set_out_types(self._output_op().types)
+        self.parent_op._set_out_types(self._output_op().types)
 
     def add_state_order(self, src: Node, dst: Node) -> None:
         # adds edge to the right of all existing edges

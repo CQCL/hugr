@@ -45,7 +45,7 @@ class DataflowOp(Op, Protocol):
 
 
 @runtime_checkable
-class PartialOp(DataflowOp, Protocol):
+class PartialOp(Protocol):
     def set_in_types(self, types: tys.TypeRow) -> None: ...
 
 
@@ -91,7 +91,7 @@ class Input(DataflowOp):
 
 
 @dataclass()
-class Output(PartialOp):
+class Output(DataflowOp, PartialOp):
     _types: tys.TypeRow | None = None
 
     @property
@@ -137,7 +137,7 @@ class Custom(DataflowOp):
 
 
 @dataclass()
-class MakeTupleDef(PartialOp):
+class MakeTupleDef(DataflowOp, PartialOp):
     _types: tys.TypeRow | None = None
     num_out: int | None = 1
 
@@ -167,7 +167,7 @@ MakeTuple = MakeTupleDef()
 
 
 @dataclass()
-class UnpackTupleDef(PartialOp):
+class UnpackTupleDef(DataflowOp, PartialOp):
     _types: tys.TypeRow = field(default_factory=list)
 
     @property

@@ -77,9 +77,11 @@ class Cfg(ParentBuilder[ops.CFG]):
     def entry(self) -> Node:
         return self._entry_block.parent_node
 
+    @property
     def _entry_op(self) -> ops.DataflowBlock:
         return self.hugr._get_typed_op(self.entry, ops.DataflowBlock)
 
+    @property
     def _exit_op(self) -> ops.ExitBlock:
         return self.hugr._get_typed_op(self.exit, ops.ExitBlock)
 
@@ -101,11 +103,11 @@ class Cfg(ParentBuilder[ops.CFG]):
         if dst == self.exit:
             src_block = self.hugr._get_typed_op(src.node, ops.DataflowBlock)
             out_types = [*src_block.sum_rows[src.offset], *src_block.other_outputs]
-            if self._exit_op()._cfg_outputs is not None:
-                if self._exit_op()._cfg_outputs != out_types:
+            if self._exit_op._cfg_outputs is not None:
+                if self._exit_op._cfg_outputs != out_types:
                     raise MismatchedExit(src.node.idx)
             else:
-                self._exit_op()._cfg_outputs = out_types
-                self.parent_op().signature = replace(
-                    self.parent_op().signature, output=out_types
+                self._exit_op._cfg_outputs = out_types
+                self.parent_op.signature = replace(
+                    self.parent_op.signature, output=out_types
                 )

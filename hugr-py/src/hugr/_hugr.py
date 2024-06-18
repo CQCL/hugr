@@ -155,6 +155,7 @@ class ParentBuilder(ToNode, Protocol[OpVar]):
     def to_node(self) -> Node:
         return self.parent_node
 
+    @property
     def parent_op(self) -> OpVar:
         return cast(OpVar, self.hugr[self.parent_node].op)
 
