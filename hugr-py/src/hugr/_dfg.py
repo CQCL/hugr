@@ -108,7 +108,7 @@ class _DfBase(ParentBuilder[DP]):
 
     def set_outputs(self, *args: Wire) -> None:
         self._wire_up(self.output_node, args)
-        self.parent_op()._set_out_types(self._output_op().types)
+        self.parent_op()._set_out_types(self._output_op()._types())
 
     def add_state_order(self, src: Node, dst: Node) -> None:
         # adds edge to the right of all existing edges
@@ -116,8 +116,8 @@ class _DfBase(ParentBuilder[DP]):
 
     def _wire_up(self, node: Node, ports: Iterable[Wire]):
         tys = [self._wire_up_port(node, i, p) for i, p in enumerate(ports)]
-        if isinstance(op := self.hugr[node].op, ops.DataflowOp):
-            op._set_in_types(tys)
+        if isinstance(op := self.hugr[node].op, ops.PartialOp):
+            op.set_in_types(tys)
 
     def _get_dataflow_type(self, wire: Wire) -> Type:
         port = wire.out_port()
