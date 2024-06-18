@@ -13,8 +13,8 @@ use inkwell::{
     basic_block::BasicBlock,
     builder::Builder,
     context::Context,
-    types::{BasicTypeEnum, FunctionType},
-    values::FunctionValue,
+    types::{BasicType, BasicTypeEnum, FunctionType},
+    values::{FunctionValue, GlobalValue},
 };
 use itertools::zip_eq;
 
@@ -91,6 +91,14 @@ impl<'c, H: HugrView> EmitFuncContext<'c, H> {
             /// If a function with the given name exists but the type does not match
             /// then an Error is returned.
             pub fn get_extern_func(&self, symbol: impl AsRef<str>, typ: FunctionType<'c>,) -> Result<FunctionValue<'c>>;
+            /// Adds or gets the [GlobalValue] in the [inkwell::module::Module] corresponding to the
+            /// given symbol and LLVM type.
+            ///
+            /// The name will not be mangled.
+            ///
+            /// If a global with the given name exists but the type or constant-ness
+            /// does not match then an error will be returned.
+            pub fn get_global(&self, symbol: impl AsRef<str>, typ: impl BasicType<'c>, constant: bool) -> Result<GlobalValue<'c>>;
         }
     }
 

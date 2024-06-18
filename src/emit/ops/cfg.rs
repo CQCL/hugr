@@ -234,7 +234,8 @@ mod test {
     use crate::check_emission;
 
     #[rstest]
-    fn diverse_outputs(#[with(-1, add_int_extensions)] llvm_ctx: TestContext) {
+    fn diverse_outputs(mut llvm_ctx: TestContext) {
+        llvm_ctx.add_extensions(add_int_extensions);
         let t1 = INT_TYPES[0].clone();
         let t2 = INT_TYPES[1].clone();
         let es = ExtensionSet::singleton(&int_types::EXTENSION_ID);

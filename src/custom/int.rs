@@ -86,7 +86,9 @@ impl<'c, H: HugrView> CodegenExtension<'c, H> for IntOpsCodegenExtension {
             .llvm_type(&k.get_type())?
             .try_into()
             .map_err(|_| anyhow!("Failed to get ConstInt as IntType"))?;
-        // TODO we don't know whether this is signed or unsigned
+        // k.value_u() is in two's complement representation of the exactly
+        // correct bit width, so we are safe to unconditionally retrieve the
+        // unsigned value and do no sign extension.
         Ok(Some(ty.const_int(k.value_u(), false).into()))
     }
 }

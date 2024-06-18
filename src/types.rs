@@ -354,13 +354,11 @@ pub mod test {
     #[case(1, FunctionType::new(Type::new_unit_sum(1), Type::new_unit_sum(3)))]
     #[case(2,FunctionType::new(vec![], vec![Type::new_unit_sum(1), Type::new_unit_sum(1)]))]
     fn func_types(#[case] _id: i32, #[with(_id)] llvm_ctx: TestContext, #[case] ft: FunctionType) {
-        llvm_ctx.with_tsesh(|tsesh| {
-            assert_snapshot!(
-                "func_type_to_llvm",
-                tsesh.llvm_func_type(&ft).unwrap(),
-                &ft.to_string()
-            )
-        })
+        assert_snapshot!(
+            "func_type_to_llvm",
+            llvm_ctx.get_typing_session().llvm_func_type(&ft).unwrap(),
+            &ft.to_string()
+        )
     }
 
     #[rstest]
@@ -369,13 +367,14 @@ pub mod test {
     #[case(2,SumType::new([vec![Type::new_unit_sum(0), Type::new_unit_sum(1)], vec![Type::new_unit_sum(2), Type::new_unit_sum(3)]]))]
     #[case(3, SumType::new_unary(2))]
     fn sum_types(#[case] _id: i32, #[with(_id)] llvm_ctx: TestContext, #[case] st: SumType) {
-        llvm_ctx.with_tsesh(|tsesh| {
-            assert_snapshot!(
-                "sum_type_to_llvm",
-                tsesh.llvm_sum_type(st.clone()).unwrap(),
-                &st.to_string()
-            );
-        })
+        assert_snapshot!(
+            "sum_type_to_llvm",
+            llvm_ctx
+                .get_typing_session()
+                .llvm_sum_type(st.clone())
+                .unwrap(),
+            &st.to_string()
+        )
     }
 
     #[rstest]
@@ -387,13 +386,12 @@ pub mod test {
     #[case(5, Type::new_sum([vec![INT_TYPES[2].clone()].into()]))]
     #[case(6, Type::new_sum([vec![INT_TYPES[6].clone(),Type::new_unit_sum(1)].into(), vec![Type::new_unit_sum(2), INT_TYPES[2].clone()].into()]))]
     #[case(7, Type::new_function(FunctionType::new(type_row!(Type::new_unit_sum(2)), Type::new_unit_sum(3))))]
-    fn ext_types(
-        #[case] _id: i32,
-        #[with(_id, add_int_extensions)] llvm_ctx: TestContext,
-        #[case] t: Type,
-    ) {
-        llvm_ctx.with_tsesh(|tsesh| {
-            assert_snapshot!("type_to_llvm", tsesh.llvm_type(&t).unwrap(), &t.to_string());
-        })
+    fn ext_types(#[case] _id: i32, #[with(_id)] mut llvm_ctx: TestContext, #[case] t: Type) {
+        llvm_ctx.add_extensions(add_int_extensions);
+        assert_snapshot!(
+            "type_to_llvm",
+            llvm_ctx.get_typing_session().llvm_type(&t).unwrap(),
+            &t.to_string()
+        );
     }
 }

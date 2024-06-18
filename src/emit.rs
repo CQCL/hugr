@@ -8,8 +8,8 @@ use hugr::{
 use inkwell::{
     context::Context,
     module::{Linkage, Module},
-    types::{BasicTypeEnum, FunctionType},
-    values::{BasicValueEnum, FunctionValue},
+    types::{AnyType, BasicType, BasicTypeEnum, FunctionType},
+    values::{BasicValueEnum, FunctionValue, GlobalValue},
 };
 use std::{collections::HashSet, hash::Hash, rc::Rc};
 
@@ -269,6 +269,53 @@ impl<'c, H: HugrView> EmitModuleContext<'c, H> {
         self.get_func_impl(symbol, typ, Some(Linkage::External))
     }
 
+    /// Adds or gets the [GlobalValue] in the [Module] corresponding to the
+    /// given symbol and LLVM type.
+    ///
+    /// The name will not be mangled.
+    ///
+    /// If a global with the given name exists but the type or constant-ness
+    /// does not match then an error will be returned.
+    pub fn get_global(
+        &self,
+        symbol: impl AsRef<str>,
+        typ: impl BasicType<'c>,
+        constant: bool,
+    ) -> Result<GlobalValue<'c>> {
+        let symbol = symbol.as_ref();
+        let typ = typ.as_basic_type_enum();
+        if let Some(global) = self.module().get_global(symbol) {
+            let global_type = {
+                // TODO This is exposed as `get_value_type` on the master branch
+                // of inkwell, will be in the next release. When it's released
+                // use `get_value_type`.
+                use inkwell::types::AnyTypeEnum;
+                use inkwell::values::AsValueRef;
+                unsafe {
+                    AnyTypeEnum::new(llvm_sys_140::core::LLVMGlobalGetValueType(
+                        global.as_value_ref(),
+                    ))
+                }
+            };
+            if global_type != typ.as_any_type_enum() {
+                Err(anyhow!(
+                    "Global '{symbol}' has wrong type: expected: {typ} actual: {global_type}"
+                ))?
+            }
+            if global.is_constant() != constant {
+                Err(anyhow!(
+                    "Global '{symbol}' has wrong constant-ness: expected: {constant} actual: {}",
+                    global.is_constant()
+                ))?
+            }
+            Ok(global)
+        } else {
+            let global = self.module().add_global(typ, None, symbol.as_ref());
+            global.set_constant(constant);
+            Ok(global)
+        }
+    }
+
     /// Consumes the `EmitModuleContext` and returns the internal [Module].
     pub fn finish(self) -> Module<'c> {
         self.module
@@ -454,4 +501,4 @@ impl<'c, H: HugrView> EmitHugr<'c, H> {
 }
 
 #[cfg(test)]
-mod test;
+pub mod test;

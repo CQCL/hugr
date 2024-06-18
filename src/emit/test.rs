@@ -72,11 +72,21 @@ impl SimpleHugrConfig {
     }
 }
 
+impl Default for SimpleHugrConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[macro_export]
 macro_rules! check_emission {
     ($hugr: ident, $test_ctx:ident) => {
         let root = $crate::fat::FatExt::fat_root::<hugr::ops::Module>(&$hugr).unwrap();
-        let (_, module) = $test_ctx.with_emit_context(|ec| ((), ec.emit_module(root).unwrap()));
+        let module = $test_ctx
+            .get_emit_hugr()
+            .emit_module(root)
+            .unwrap()
+            .finish();
 
         let mut settings = insta::Settings::clone_current();
         let new_suffix = settings
@@ -209,7 +219,8 @@ fn emit_hugr_conditional(llvm_ctx: TestContext) {
 }
 
 #[rstest]
-fn emit_hugr_load_constant(#[with(-1, add_int_extensions)] llvm_ctx: TestContext) {
+fn emit_hugr_load_constant(mut llvm_ctx: TestContext) {
+    llvm_ctx.add_extensions(add_int_extensions);
     let v = Value::tuple([
         Value::unit_sum(2, 4).unwrap(),
         ConstInt::new_s(4, -24).unwrap().into(),
@@ -247,7 +258,8 @@ fn emit_hugr_call(llvm_ctx: TestContext) {
 }
 
 #[rstest]
-fn emit_hugr_custom_op(#[with(-1, add_int_extensions)] llvm_ctx: TestContext) {
+fn emit_hugr_custom_op(mut llvm_ctx: TestContext) {
+    llvm_ctx.add_extensions(add_int_extensions);
     let v1 = ConstInt::new_s(4, -24).unwrap();
     let v2 = ConstInt::new_s(4, 24).unwrap();
 
@@ -268,13 +280,12 @@ fn emit_hugr_custom_op(#[with(-1, add_int_extensions)] llvm_ctx: TestContext) {
 
 #[rstest]
 fn get_external_func(llvm_ctx: TestContext) {
-    llvm_ctx.with_emit_module_context(|emc| {
-        let func_type1 = emc.iw_context().i32_type().fn_type(&[], false);
-        let func_type2 = emc.iw_context().f64_type().fn_type(&[], false);
-        let foo1 = emc.get_extern_func("foo", func_type1).unwrap();
-        assert_eq!(foo1.get_name().to_str().unwrap(), "foo");
-        let foo2 = emc.get_extern_func("foo", func_type1).unwrap();
-        assert_eq!(foo1, foo2);
-        assert!(emc.get_extern_func("foo", func_type2).is_err());
-    });
+    let emc = llvm_ctx.get_emit_module_context();
+    let func_type1 = emc.iw_context().i32_type().fn_type(&[], false);
+    let func_type2 = emc.iw_context().f64_type().fn_type(&[], false);
+    let foo1 = emc.get_extern_func("foo", func_type1).unwrap();
+    assert_eq!(foo1.get_name().to_str().unwrap(), "foo");
+    let foo2 = emc.get_extern_func("foo", func_type1).unwrap();
+    assert_eq!(foo1, foo2);
+    assert!(emc.get_extern_func("foo", func_type2).is_err());
 }
