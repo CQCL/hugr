@@ -42,8 +42,8 @@ where
     /// Panics if the node is not valid in the `Hugr` or if it's `get_optype` is
     /// not an `OT`.
     ///
-    /// Note that while we do check that the type of the node's `get_optype`, we
-    /// do not verify it is actually equal to `ot`.
+    /// Note that while we do check the type of the node's `get_optype`, we
+    /// do not verify that it is actually equal to `ot`.
     pub fn new(hugr: &'c H, node: Node, #[allow(unused)] ot: &OT) -> Self {
         assert!(hugr.valid_node(node));
         assert!(TryInto::<&'c OT>::try_into(hugr.get_optype(node)).is_ok());
@@ -108,8 +108,8 @@ impl<'c, H: HugrView + ?Sized> FatNode<'c, OpType, H> {
     /// Panics if the node is not valid in the `Hugr` or if its `get_optype` is
     /// not an `OT`.
     ///
-    /// Note that while we do check that the type of the node's `get_optype`, we
-    /// do not verify it is actually equal to `ot`.
+    /// Note that while we do check the type of the node's `get_optype`, we
+    /// do not verify that it is actually equal to `ot`.
     pub fn into_ot<OT: PartialEq + 'c>(self, ot: &OT) -> FatNode<'c, OT, H>
     where
         for<'a> &'a OpType: TryInto<&'a OT>,
