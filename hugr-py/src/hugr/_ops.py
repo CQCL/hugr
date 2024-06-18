@@ -168,7 +168,7 @@ MakeTuple = MakeTupleDef()
 
 @dataclass()
 class UnpackTupleDef(DataflowOp, PartialOp):
-    _types: tys.TypeRow = field(default_factory=list)
+    _types: tys.TypeRow | None = None
 
     @property
     def types(self) -> tys.TypeRow:
