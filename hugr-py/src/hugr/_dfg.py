@@ -29,13 +29,13 @@ class _DfBase(ParentBuilder[DP]):
     input_node: Node
     output_node: Node
 
-    def __init__(self, root_op: DP) -> None:
-        self.hugr = Hugr(root_op)
+    def __init__(self, parent_op: DP) -> None:
+        self.hugr = Hugr(parent_op)
         self.parent_node = self.hugr.root
-        self._init_io_nodes(root_op)
+        self._init_io_nodes(parent_op)
 
-    def _init_io_nodes(self, root_op: DP):
-        inputs = root_op._inputs()
+    def _init_io_nodes(self, parent_op: DP):
+        inputs = parent_op._inputs()
 
         self.input_node = self.hugr.add_node(
             ops.Input(inputs), self.parent_node, len(inputs)
@@ -43,12 +43,14 @@ class _DfBase(ParentBuilder[DP]):
         self.output_node = self.hugr.add_node(ops.Output(), self.parent_node)
 
     @classmethod
-    def new_nested(cls, root_op: DP, hugr: Hugr, parent: ToNode | None = None) -> Self:
+    def new_nested(
+        cls, parent_op: DP, hugr: Hugr, parent: ToNode | None = None
+    ) -> Self:
         new = cls.__new__(cls)
 
         new.hugr = hugr
-        new.parent_node = hugr.add_node(root_op, parent or hugr.root)
-        new._init_io_nodes(root_op)
+        new.parent_node = hugr.add_node(parent_op, parent or hugr.root)
+        new._init_io_nodes(parent_op)
         return new
 
     def _input_op(self) -> ops.Input:
@@ -82,8 +84,8 @@ class _DfBase(ParentBuilder[DP]):
 
         input_types = [self._get_dataflow_type(w) for w in args]
 
-        root_op = ops.DFG(list(input_types))
-        dfg = Dfg.new_nested(root_op, self.hugr, self.parent_node)
+        parent_op = ops.DFG(list(input_types))
+        dfg = Dfg.new_nested(parent_op, self.hugr, self.parent_node)
         self._wire_up(dfg.parent_node, args)
         return dfg
 
@@ -136,8 +138,8 @@ class _DfBase(ParentBuilder[DP]):
 
 class Dfg(_DfBase[ops.DFG]):
     def __init__(self, *input_types: Type) -> None:
-        root_op = ops.DFG(list(input_types))
-        super().__init__(root_op)
+        parent_op = ops.DFG(list(input_types))
+        super().__init__(parent_op)
 
 
 def _ancestral_sibling(h: Hugr, src: Node, tgt: Node) -> Node | None:
