@@ -23,18 +23,15 @@ def test_branch() -> None:
     entry = cfg.add_entry()
     entry.set_block_outputs(*entry.inputs())
 
-    middle_1 = cfg.add_block([tys.Unit, INT_T])
+    middle_1 = cfg.add_successor(entry[0])
     middle_1.set_block_outputs(*middle_1.inputs())
-    middle_2 = cfg.add_block([tys.Unit, INT_T])
+    middle_2 = cfg.add_successor(entry[1])
     u, i = middle_2.inputs()
     n = middle_2.add(DivMod(i, i))
     middle_2.set_block_outputs(u, n[0])
 
-    cfg.branch(entry[0], middle_1)
-    cfg.branch(entry[1], middle_2)
-
-    cfg.branch(middle_1[0], cfg.exit)
-    cfg.branch(middle_2[0], cfg.exit)
+    cfg.branch_exit(middle_1[0])
+    cfg.branch_exit(middle_2[0])
 
     _validate(cfg.hugr)
 
@@ -58,16 +55,13 @@ def test_dom_edge() -> None:
 
     # entry dominates both middles so Unit type can be used as inter-graph
     # value between basic blocks
-    middle_1 = cfg.add_block([INT_T])
+    middle_1 = cfg.add_successor(entry[0])
     middle_1.set_block_outputs(u, *middle_1.inputs())
-    middle_2 = cfg.add_block([INT_T])
+    middle_2 = cfg.add_successor(entry[1])
     middle_2.set_block_outputs(u, *middle_2.inputs())
 
-    cfg.branch(entry[0], middle_1)
-    cfg.branch(entry[1], middle_2)
-
-    cfg.branch(middle_1[0], cfg.exit)
-    cfg.branch(middle_2[0], cfg.exit)
+    cfg.branch_exit(middle_1[0])
+    cfg.branch_exit(middle_2[0])
 
     _validate(cfg.hugr)
 
@@ -81,13 +75,15 @@ def test_asymm_types() -> None:
     tagged_int = entry.add(ops.Tag(0, [[INT_T], [tys.Bool]])(i))
     entry.set_block_outputs(tagged_int)
 
-    middle = cfg.add_block([INT_T])
+    middle = cfg.add_successor(entry[0])
     # discard the int and return the bool from entry
     middle.set_block_outputs(u, b)
 
     # middle expects an int and exit expects a bool
-    cfg.branch(entry[0], middle)
-    cfg.branch(entry[1], cfg.exit)
-    cfg.branch(middle[0], cfg.exit)
+    cfg.branch_exit(entry[1])
+    cfg.branch_exit(middle[0])
 
     _validate(cfg.hugr)
+
+
+# TODO loop

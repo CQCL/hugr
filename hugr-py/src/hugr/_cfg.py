@@ -96,18 +96,35 @@ class Cfg(ParentBuilder[ops.CFG]):
         )
         return new_block
 
+    def add_successor(self, pred: Wire) -> Block:
+        pred = pred.out_port()
+        block = self.hugr._get_typed_op(pred.node, ops.DataflowBlock)
+        inputs = block.nth_outputs(pred.offset)
+        b = self.add_block(inputs)
+
+        self.branch(pred, b)
+        return b
+
     def branch(self, src: Wire, dst: ToNode) -> None:
+        # TODO check for existing link/type compatibility
+        if dst.to_node() == self.exit:
+            return self.branch_exit(src)
         src = src.out_port()
         self.hugr.add_link(src, dst.inp(0))
 
-        if dst == self.exit:
-            src_block = self.hugr._get_typed_op(src.node, ops.DataflowBlock)
-            out_types = [*src_block.sum_rows[src.offset], *src_block.other_outputs]
-            if self._exit_op._cfg_outputs is not None:
-                if self._exit_op._cfg_outputs != out_types:
-                    raise MismatchedExit(src.node.idx)
-            else:
-                self._exit_op._cfg_outputs = out_types
-                self.parent_op.signature = replace(
-                    self.parent_op.signature, output=out_types
-                )
+    def branch_exit(self, src: Wire) -> None:
+        src = src.out_port()
+        self.hugr.add_link(src, self.exit.inp(0))
+
+        src_block: ops.DataflowBlock = self.hugr._get_typed_op(
+            src.node, ops.DataflowBlock
+        )
+        out_types = src_block.nth_outputs(src.offset)
+        if self._exit_op._cfg_outputs is not None:
+            if self._exit_op._cfg_outputs != out_types:
+                raise MismatchedExit(src.node.idx)
+        else:
+            self._exit_op._cfg_outputs = out_types
+            self.parent_op.signature = replace(
+                self.parent_op.signature, output=out_types
+            )

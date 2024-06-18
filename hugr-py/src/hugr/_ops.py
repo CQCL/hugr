@@ -337,6 +337,9 @@ class DataflowBlock(DfParentOp):
     def _inputs(self) -> tys.TypeRow:
         return self.inputs
 
+    def nth_outputs(self, n: int) -> tys.TypeRow:
+        return [*self.sum_rows[n], *self.other_outputs]
+
 
 @dataclass
 class ExitBlock(Op):
