@@ -238,7 +238,7 @@ class FunctionType(Type):
         return cls(input=[], output=[])
 
     def flip(self) -> FunctionType:
-        return FunctionType(input=self.output, output=self.input)
+        return FunctionType(input=list(self.output), output=list(self.input))
 
 
 @dataclass(frozen=True)

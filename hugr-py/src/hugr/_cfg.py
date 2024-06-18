@@ -97,13 +97,15 @@ class Cfg(ParentBuilder[ops.CFG]):
         return new_block
 
     def add_successor(self, pred: Wire) -> Block:
-        pred = pred.out_port()
-        block = self.hugr._get_typed_op(pred.node, ops.DataflowBlock)
-        inputs = block.nth_outputs(pred.offset)
-        b = self.add_block(inputs)
+        b = self.add_block(self._nth_outputs(pred))
 
         self.branch(pred, b)
         return b
+
+    def _nth_outputs(self, wire: Wire) -> TypeRow:
+        port = wire.out_port()
+        block = self.hugr._get_typed_op(port.node, ops.DataflowBlock)
+        return block.nth_outputs(port.offset)
 
     def branch(self, src: Wire, dst: ToNode) -> None:
         # TODO check for existing link/type compatibility
@@ -116,8 +118,7 @@ class Cfg(ParentBuilder[ops.CFG]):
         src = src.out_port()
         self.hugr.add_link(src, self.exit.inp(0))
 
-        src_block = self.hugr._get_typed_op(src.node, ops.DataflowBlock)
-        out_types = src_block.nth_outputs(src.offset)
+        out_types = self._nth_outputs(src)
         if self._exit_op._cfg_outputs is not None:
             if self._exit_op._cfg_outputs != out_types:
                 raise MismatchedExit(src.node.idx)
