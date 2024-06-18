@@ -229,7 +229,7 @@ class Output(DataflowOp):
         self.types = list(in_types)
 
     def deserialize(self) -> _ops.Output:
-        return _ops.Output(types=deser_it(self.types))
+        return _ops.Output(deser_it(self.types))
 
 
 class Call(DataflowOp):

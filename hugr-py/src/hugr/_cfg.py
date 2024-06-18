@@ -54,11 +54,9 @@ class Cfg(ParentBuilder[ops.CFG]):
         self.hugr = hugr
         self.parent_node = root
         # to ensure entry is first child, add a dummy entry at the start
-        self._entry_block = Block.new_nested(
-            ops.DataflowBlock(input_types, []), hugr, root
-        )
+        self._entry_block = Block.new_nested(ops.DataflowBlock(input_types), hugr, root)
 
-        self.exit = self.hugr.add_node(ops.ExitBlock([]), self.parent_node)
+        self.exit = self.hugr.add_node(ops.ExitBlock(), self.parent_node)
 
     @classmethod
     def new_nested(
@@ -90,7 +88,7 @@ class Cfg(ParentBuilder[ops.CFG]):
 
     def add_block(self, input_types: TypeRow) -> Block:
         new_block = Block.new_nested(
-            ops.DataflowBlock(input_types, [], []),
+            ops.DataflowBlock(input_types),
             self.hugr,
             self.parent_node,
         )
@@ -103,11 +101,11 @@ class Cfg(ParentBuilder[ops.CFG]):
         if dst == self.exit:
             src_block = self.hugr._get_typed_op(src.node, ops.DataflowBlock)
             out_types = [*src_block.sum_rows[src.offset], *src_block.other_outputs]
-            if self._exit_op().cfg_outputs:
-                if self._exit_op().cfg_outputs != out_types:
+            if self._exit_op()._cfg_outputs is not None:
+                if self._exit_op()._cfg_outputs != out_types:
                     raise MismatchedExit(src.node.idx)
             else:
-                self._exit_op().cfg_outputs = out_types
+                self._exit_op()._cfg_outputs = out_types
                 self.parent_op().signature = replace(
                     self.parent_op().signature, output=out_types
                 )

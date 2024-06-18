@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from typing import Generic, Protocol, TypeVar, TYPE_CHECKING, runtime_checkable
 from hugr.serialization.ops import BaseOp
 import hugr.serialization.ops as sops
@@ -92,21 +92,22 @@ class Input(DataflowOp):
 
 @dataclass()
 class Output(PartialOp):
-    types: tys.TypeRow | None = None
+    _types: tys.TypeRow | None = None
 
-    def _types(self) -> tys.TypeRow:
-        if self.types is None:
+    @property
+    def types(self) -> tys.TypeRow:
+        if self._types is None:
             raise IncompleteOp()
-        return self.types
+        return self._types
 
     def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.Output:
-        return sops.Output(parent=parent.idx, types=ser_it(self._types()))
+        return sops.Output(parent=parent.idx, types=ser_it(self.types))
 
     def outer_signature(self) -> tys.FunctionType:
-        return tys.FunctionType(input=self._types(), output=[])
+        return tys.FunctionType(input=self.types, output=[])
 
     def set_in_types(self, types: tys.TypeRow) -> None:
-        self.types = types
+        self._types = types
 
 
 @dataclass()
@@ -137,28 +138,29 @@ class Custom(DataflowOp):
 
 @dataclass()
 class MakeTupleDef(PartialOp):
-    types: tys.TypeRow | None = None
+    _types: tys.TypeRow | None = None
     num_out: int | None = 1
 
-    def _types(self) -> tys.TypeRow:
-        if self.types is None:
+    @property
+    def types(self) -> tys.TypeRow:
+        if self._types is None:
             raise IncompleteOp()
-        return self.types
+        return self._types
 
     def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.MakeTuple:
         return sops.MakeTuple(
             parent=parent.idx,
-            tys=ser_it(self._types()),
+            tys=ser_it(self.types),
         )
 
     def __call__(self, *elements: Wire) -> Command:
         return super().__call__(*elements)
 
     def outer_signature(self) -> tys.FunctionType:
-        return tys.FunctionType(input=self._types(), output=[tys.Tuple(*self._types())])
+        return tys.FunctionType(input=self.types, output=[tys.Tuple(*self.types)])
 
     def set_in_types(self, types: tys.TypeRow) -> None:
-        self.types = types
+        self._types = types
 
 
 MakeTuple = MakeTupleDef()
@@ -166,12 +168,13 @@ MakeTuple = MakeTupleDef()
 
 @dataclass()
 class UnpackTupleDef(PartialOp):
-    types: tys.TypeRow = field(default_factory=list)
+    _types: tys.TypeRow = field(default_factory=list)
 
-    def _types(self) -> tys.TypeRow:
-        if self.types is None:
+    @property
+    def types(self) -> tys.TypeRow:
+        if self._types is None:
             raise IncompleteOp()
-        return self.types
+        return self._types
 
     @property
     def num_out(self) -> int | None:
@@ -193,7 +196,7 @@ class UnpackTupleDef(PartialOp):
         (t,) = types
         assert isinstance(t, tys.Sum), f"Expected unary Sum, got {t}"
         (row,) = t.variant_rows
-        self.types = row
+        self._types = row
 
 
 UnpackTuple = UnpackTupleDef()
@@ -223,10 +226,18 @@ class DfParentOp(Op, Protocol):
 
     def _set_out_types(self, types: tys.TypeRow) -> None: ...
 
+    def _inputs(self) -> tys.TypeRow: ...
+
 
 @dataclass()
 class DFG(DfParentOp, DataflowOp):
-    signature: tys.FunctionType = field(default_factory=tys.FunctionType.empty)
+    _signature: tys.TypeRow | tys.FunctionType
+
+    @property
+    def signature(self) -> tys.FunctionType:
+        if isinstance(self._signature, tys.FunctionType):
+            return self._signature
+        raise IncompleteOp()
 
     @property
     def num_out(self) -> int | None:
@@ -245,7 +256,15 @@ class DFG(DfParentOp, DataflowOp):
         return self.signature
 
     def _set_out_types(self, types: tys.TypeRow) -> None:
-        self.signature = replace(self.signature, output=types)
+        assert isinstance(self._signature, list), "Signature has already been set."
+        self._signature = tys.FunctionType(self._signature, types)
+
+    def _inputs(self) -> tys.TypeRow:
+        match self._signature:
+            case tys.FunctionType(input, _):
+                return input
+            case list(_):
+                return self._signature
 
 
 @dataclass()
@@ -269,9 +288,21 @@ class CFG(DataflowOp):
 @dataclass
 class DataflowBlock(DfParentOp):
     inputs: tys.TypeRow
-    sum_rows: list[tys.TypeRow]
-    other_outputs: tys.TypeRow = field(default_factory=list)
+    _sum_rows: list[tys.TypeRow] | None = None
+    _other_outputs: tys.TypeRow | None = None
     extension_delta: tys.ExtensionSet = field(default_factory=list)
+
+    @property
+    def sum_rows(self) -> list[tys.TypeRow]:
+        if self._sum_rows is None:
+            raise IncompleteOp()
+        return self._sum_rows
+
+    @property
+    def other_outputs(self) -> tys.TypeRow:
+        if self._other_outputs is None:
+            raise IncompleteOp()
+        return self._other_outputs
 
     @property
     def num_out(self) -> int | None:
@@ -297,14 +328,23 @@ class DataflowBlock(DfParentOp):
     def _set_out_types(self, types: tys.TypeRow) -> None:
         (sum_, *other) = types
         assert isinstance(sum_, tys.Sum), f"Expected Sum, got {sum_}"
-        self.sum_rows = sum_.variant_rows
-        self.other_outputs = other
+        self._sum_rows = sum_.variant_rows
+        self._other_outputs = other
+
+    def _inputs(self) -> tys.TypeRow:
+        return self.inputs
 
 
 @dataclass
 class ExitBlock(Op):
-    cfg_outputs: tys.TypeRow
+    _cfg_outputs: tys.TypeRow | None = None
     num_out: int | None = 0
+
+    @property
+    def cfg_outputs(self) -> tys.TypeRow:
+        if self._cfg_outputs is None:
+            raise IncompleteOp()
+        return self._cfg_outputs
 
     def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.ExitBlock:
         return sops.ExitBlock(

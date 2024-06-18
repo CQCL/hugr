@@ -9,7 +9,7 @@ from ._hugr import Hugr, Node, Wire, OutPort, ParentBuilder
 
 from typing_extensions import Self
 import hugr._ops as ops
-from hugr._tys import FunctionType, TypeRow
+from hugr._tys import TypeRow
 
 from ._exceptions import NoSiblingAncestor
 from ._hugr import ToNode
@@ -35,14 +35,12 @@ class _DfBase(ParentBuilder[DP]):
         self._init_io_nodes(root_op)
 
     def _init_io_nodes(self, root_op: DP):
-        inner_sig = root_op.inner_signature()
+        inputs = root_op._inputs()
 
         self.input_node = self.hugr.add_node(
-            ops.Input(inner_sig.input), self.parent_node, len(inner_sig.input)
+            ops.Input(inputs), self.parent_node, len(inputs)
         )
-        self.output_node = self.hugr.add_node(
-            ops.Output(inner_sig.output), self.parent_node
-        )
+        self.output_node = self.hugr.add_node(ops.Output(), self.parent_node)
 
     @classmethod
     def new_nested(cls, root_op: DP, hugr: Hugr, parent: ToNode | None = None) -> Self:
@@ -84,7 +82,7 @@ class _DfBase(ParentBuilder[DP]):
 
         input_types = [self._get_dataflow_type(w) for w in args]
 
-        root_op = ops.DFG(FunctionType(input=list(input_types), output=[]))
+        root_op = ops.DFG(list(input_types))
         dfg = Dfg.new_nested(root_op, self.hugr, self.parent_node)
         self._wire_up(dfg.parent_node, args)
         return dfg
@@ -92,7 +90,6 @@ class _DfBase(ParentBuilder[DP]):
     def add_cfg(
         self,
         input_types: TypeRow,
-        output_types: TypeRow,
         *args: Wire,
     ) -> Cfg:
         from ._cfg import Cfg
@@ -108,7 +105,7 @@ class _DfBase(ParentBuilder[DP]):
 
     def set_outputs(self, *args: Wire) -> None:
         self._wire_up(self.output_node, args)
-        self.parent_op()._set_out_types(self._output_op()._types())
+        self.parent_op()._set_out_types(self._output_op().types)
 
     def add_state_order(self, src: Node, dst: Node) -> None:
         # adds edge to the right of all existing edges
@@ -139,7 +136,7 @@ class _DfBase(ParentBuilder[DP]):
 
 class Dfg(_DfBase[ops.DFG]):
     def __init__(self, *input_types: Type) -> None:
-        root_op = ops.DFG(FunctionType(input=list(input_types), output=[]))
+        root_op = ops.DFG(list(input_types))
         super().__init__(root_op)
 
 

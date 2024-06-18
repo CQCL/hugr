@@ -42,7 +42,7 @@ def test_branch() -> None:
 def test_nested_cfg() -> None:
     dfg = Dfg(tys.Unit, tys.Bool)
 
-    cfg = dfg.add_cfg([tys.Unit, tys.Bool], [tys.Bool], *dfg.inputs())
+    cfg = dfg.add_cfg([tys.Unit, tys.Bool], *dfg.inputs())
 
     build_basic_cfg(cfg)
     dfg.set_outputs(cfg)

@@ -85,7 +85,7 @@ def _validate(h: Hugr, mermaid: bool = False, roundtrip: bool = True):
 
 
 def test_stable_indices():
-    h = Hugr(ops.DFG())
+    h = Hugr(ops.DFG([]))
 
     nodes = [h.add_node(Not) for _ in range(3)]
     assert len(h) == 4
@@ -194,7 +194,7 @@ def test_insert():
 
     assert len(h1.hugr) == 4
 
-    new_h = Hugr(ops.DFG())
+    new_h = Hugr(ops.DFG([]))
     mapping = h1.hugr.insert_hugr(new_h, h1.hugr.root)
     assert mapping == {new_h.root: Node(4)}
 
