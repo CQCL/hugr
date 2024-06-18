@@ -351,6 +351,7 @@ dependencies = [
  "lazy_static",
  "llvm-sys",
  "petgraph",
+ "portgraph",
  "rstest",
 ]
 

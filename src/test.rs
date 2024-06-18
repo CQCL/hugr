@@ -130,8 +130,9 @@ impl TestContext {
     pub fn get_emit_hugr(&'_ self) -> EmitHugr<'_, THugrView> {
         let ctx = self.iw_context();
         let m = ctx.create_module("test_context");
+        let namer = Namer::default().into();
         let exts = self.extensions();
-        EmitHugr::new(ctx, m, exts)
+        EmitHugr::new(ctx, m, namer, exts)
     }
 
     pub fn get_emit_module_context(&'_ self) -> EmitModuleContext<'_, THugrView> {

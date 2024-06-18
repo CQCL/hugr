@@ -3,13 +3,13 @@ use delegate::delegate;
 use hugr::{
     ops::{FuncDecl, FuncDefn, NamedOp as _, OpType},
     types::PolyFuncType,
-    HugrView, Node, NodeIndex,
+    HugrView, Node,
 };
 use inkwell::{
     context::Context,
     module::{Linkage, Module},
     types::{AnyType, BasicType, BasicTypeEnum, FunctionType},
-    values::{BasicValueEnum, FunctionValue, GlobalValue},
+    values::{FunctionValue, GlobalValue},
 };
 use std::{collections::HashSet, hash::Hash, rc::Rc};
 
@@ -21,72 +21,15 @@ use crate::{
     types::{LLVMSumType, TypeConverter},
 };
 
-use self::func::{EmitFuncContext, RowPromise};
+pub use self::func::{EmitFuncContext, RowPromise};
 
+pub mod args;
 pub mod func;
+pub mod namer;
 mod ops;
 
-/// A type used whenever emission is delegated to a function
-pub struct EmitOpArgs<'c, OT, H> {
-    /// This [HugrView] and [Node] we are emitting
-    pub node: FatNode<'c, OT, H>,
-    /// The values that should be used for all Value input ports of the node
-    pub inputs: Vec<BasicValueEnum<'c>>,
-    /// The results of the node should be put here
-    pub outputs: RowPromise<'c>,
-}
-
-impl<'c, OT, H> EmitOpArgs<'c, OT, H> {
-    /// Get the internal [FatNode]
-    pub fn node(&self) -> FatNode<'c, OT, H> {
-        self.node.clone()
-    }
-}
-
-impl<'c, H: HugrView> EmitOpArgs<'c, OpType, H> {
-    /// Attempt to specialise the internal [FatNode].
-    pub fn try_into_ot<OT: 'c>(self) -> Result<EmitOpArgs<'c, OT, H>, Self>
-    where
-        &'c OpType: TryInto<&'c OT>,
-    {
-        let EmitOpArgs {
-            node,
-            inputs,
-            outputs,
-        } = self;
-        match node.try_into_ot() {
-            Some(new_node) => Ok(EmitOpArgs {
-                node: new_node,
-                inputs,
-                outputs,
-            }),
-            None => Err(EmitOpArgs {
-                node,
-                inputs,
-                outputs,
-            }),
-        }
-    }
-
-    /// Specialise the internal [FatNode].
-    ///
-    /// Panics if `OT` is not the `get_optype` of the internal [Node].
-    pub fn into_ot<'b, OTInto: PartialEq + 'c>(self, ot: &'b OTInto) -> EmitOpArgs<'c, OTInto, H>
-    where
-        for<'a> &'a OpType: TryInto<&'a OTInto>,
-    {
-        let EmitOpArgs {
-            node,
-            inputs,
-            outputs,
-        } = self;
-        EmitOpArgs {
-            node: node.into_ot(ot),
-            inputs,
-            outputs,
-        }
-    }
-}
+pub use args::EmitOpArgs;
+pub use namer::Namer;
 
 /// A trait used to abstract over emission.
 ///
@@ -111,39 +54,9 @@ impl<OT, H: HugrView> EmitOp<'_, OT, H> for NullEmitLlvm {
     }
 }
 
-/// A type with features for mangling the naming of symbols.
-///
-/// TODO This is mostly a placeholder
-#[derive(Clone)]
-pub struct Namer {
-    prefix: String,
-}
-
-impl Namer {
-    /// Create a new `Namer` that for each symbol:
-    /// * prefix  `prefix`
-    /// * postfixes ".{node.index()}"
-    pub fn new(prefix: impl Into<String>) -> Self {
-        Self {
-            prefix: prefix.into(),
-        }
-    }
-
-    /// Mangle the the name of a [FuncDefn] or [FuncDecl].
-    pub fn name_func(&self, name: impl AsRef<str>, node: Node) -> String {
-        format!("{}{}.{}", &self.prefix, name.as_ref(), node.index())
-    }
-}
-
-impl Default for Namer {
-    fn default() -> Self {
-        Self::new("_hl.")
-    }
-}
-
 pub struct EmitModuleContext<'c, H: HugrView> {
     module: Module<'c>,
-    extension_context: Rc<CodegenExtsMap<'c, H>>,
+    extensions: Rc<CodegenExtsMap<'c, H>>,
     typer: Rc<TypeConverter<'c>>,
     namer: Rc<Namer>,
 }
@@ -174,13 +87,13 @@ impl<'c, H: HugrView> EmitModuleContext<'c, H> {
     pub fn new(
         module: Module<'c>,
         namer: Rc<Namer>,
-        extension_context: Rc<CodegenExtsMap<'c, H>>,
+        extensions: Rc<CodegenExtsMap<'c, H>>,
         typer: Rc<TypeConverter<'c>>,
     ) -> Self {
         Self {
             module,
             namer,
-            extension_context,
+            extensions,
             typer,
         }
     }
@@ -194,7 +107,7 @@ impl<'c, H: HugrView> EmitModuleContext<'c, H> {
 
     /// Returns a reference to the inner [CodegenExtsMap].
     pub fn extensions(&self) -> Rc<CodegenExtsMap<'c, H>> {
-        self.extension_context.clone()
+        self.extensions.clone()
     }
 
     /// Returns a [TypingSession] constructed from it's members.
@@ -375,8 +288,6 @@ impl<'c, H> Clone for Emission<'c, H> {
 
 /// Emits [HugrView]s into an LLVM [Module].
 pub struct EmitHugr<'c, H: HugrView> {
-    // funcs: HashMap<Node, FunctionValue<'c>>,
-    // globals: HashMap<Node, GlobalValue<'c>>,
     emitted: EmissionSet<'c, H>,
     module_context: EmitModuleContext<'c, H>,
 }
@@ -395,19 +306,19 @@ impl<'c, H: HugrView> EmitHugr<'c, H> {
 
     /// Creates a new  `EmitHugr`. We take ownership of the [Module], and return it in [Self::finish].
     pub fn new(
-        iw_context: &'c Context,
+        context: &'c Context,
         module: Module<'c>,
-        exts: Rc<CodegenExtsMap<'c, H>>,
+        namer: Rc<Namer>,
+        extensions: Rc<CodegenExtsMap<'c, H>>,
     ) -> Self {
-        assert_eq!(iw_context, &module.get_context());
+        assert_eq!(context, &module.get_context());
         Self {
-            // todos: Default::default(),
             emitted: Default::default(),
             module_context: EmitModuleContext::new(
                 module,
-                Default::default(),
-                exts,
-                TypeConverter::new(iw_context),
+                namer,
+                extensions,
+                TypeConverter::new(context),
             ),
         }
     }
