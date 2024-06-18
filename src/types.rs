@@ -8,7 +8,7 @@ use hugr::types::SumType;
 use hugr::{types::TypeRow, HugrView};
 use inkwell::builder::Builder;
 use inkwell::types::{self as iw, AnyType, AsTypeRef, IntType};
-use inkwell::values::{BasicValue, BasicValueEnum, StructValue};
+use inkwell::values::{BasicValue, BasicValueEnum, IntValue, StructValue};
 use inkwell::AddressSpace;
 use inkwell::{
     context::Context,
@@ -59,8 +59,7 @@ impl<'c, H: HugrView> TypingSession<'c, H> {
                 .ptr_type(AddressSpace::default()) // Note: deprecated in LLVM >= 15
                 .into()),
 
-            TypeEnum::Alias(ref alias) => Err(anyhow!("Invalid type: {:?}", alias)),
-            x @ TypeEnum::Variable(_, _) => Err(anyhow!("Invalid type: {:?}", x)),
+            x => Err(anyhow!("Invalid type: {:?}", x)),
         }
     }
 
@@ -201,15 +200,17 @@ impl<'c> LLVMSumType<'c> {
         &self,
         builder: &Builder<'c>,
         v: impl BasicValue<'c>,
-    ) -> Result<BasicValueEnum<'c>> {
+    ) -> Result<IntValue<'c>> {
         let struct_value: StructValue<'c> = v
             .as_basic_value_enum()
             .try_into()
             .map_err(|_| anyhow!("Not a struct type"))?;
         if self.has_tag_field() {
-            Ok(builder.build_extract_value(struct_value, 0, "")?)
+            Ok(builder
+                .build_extract_value(struct_value, 0, "")?
+                .into_int_value())
         } else {
-            Ok(self.get_tag_type().const_int(0, false).into())
+            Ok(self.get_tag_type().const_int(0, false))
         }
     }
 

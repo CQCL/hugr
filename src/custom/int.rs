@@ -4,7 +4,7 @@ use hugr::{
     extension::{simple_op::MakeExtensionOp, ExtensionId},
     ops::{constant::CustomConst, CustomOp, NamedOp},
     std_extensions::arithmetic::{
-        int_ops::{self, IntOpType},
+        int_ops::{self, ConcreteIntOp},
         int_types::{self, ConstInt},
     },
     types::{CustomType, TypeArg},
@@ -27,7 +27,7 @@ struct IntOpEmitter<'c, 'd, H: HugrView>(&'d mut EmitFuncContext<'c, H>);
 
 impl<'c, H: HugrView> EmitOp<'c, CustomOp, H> for IntOpEmitter<'c, '_, H> {
     fn emit(&mut self, args: EmitOpArgs<'c, CustomOp, H>) -> Result<()> {
-        let iot = IntOpType::from_optype(&args.node().generalise())
+        let iot = ConcreteIntOp::from_optype(&args.node().generalise())
             .ok_or(anyhow!("IntOpEmitter from_optype_failed"))?;
         match iot.name().as_str() {
             "iadd" => {

@@ -3,7 +3,7 @@ use hugr::{
     hugr::views::SiblingGraph,
     ops::{
         Call, Case, Conditional, Const, Input, LoadConstant, MakeTuple, NamedOp, OpTag, OpTrait,
-        OpType, Output, Tag, UnpackTuple, Value,
+        OpType, Output, Tag, UnpackTuple, Value, CFG,
     },
     types::{SumType, Type, TypeEnum},
     HugrView, NodeIndex,
@@ -19,6 +19,8 @@ use super::{
     func::{EmitFuncContext, RowPromise},
     EmitOp, EmitOpArgs,
 };
+
+mod cfg;
 
 struct SumOpEmitter<'c, 'd, H: HugrView>(&'d mut EmitFuncContext<'c, H>, LLVMSumType<'c>);
 
@@ -228,7 +230,7 @@ impl<'c, H: HugrView> EmitOp<'c, Conditional, H> for ConditionalEmitter<'c, '_, 
             })
             .collect::<Result<Vec<_>>>()?;
 
-        builder.build_switch(tag.into_int_value(), switches[0].1, &switches[1..])?;
+        builder.build_switch(tag, switches[0].1, &switches[1..])?;
         builder.position_at_end(exit_block);
         Ok(())
     }
@@ -370,6 +372,13 @@ fn emit_call<'c, H: HugrView>(
     args.outputs.finish(builder, rets)
 }
 
+fn emit_cfg<'c, H: HugrView>(
+    context: &mut EmitFuncContext<'c, H>,
+    args: EmitOpArgs<'c, CFG, H>,
+) -> Result<()> {
+    cfg::CfgEmitter::new(context, args)?.emit_children()
+}
+
 fn emit_optype<'c, H: HugrView>(
     context: &mut EmitFuncContext<'c, H>,
     args: EmitOpArgs<'c, OpType, H>,
@@ -390,6 +399,7 @@ fn emit_optype<'c, H: HugrView>(
         OpType::LoadConstant(ref lc) => emit_load_constant(context, args.into_ot(lc)),
         OpType::Call(ref cl) => emit_call(context, args.into_ot(cl)),
         OpType::Conditional(ref co) => emit_conditional(context, args.into_ot(co)),
+        OpType::CFG(ref cfg) => emit_cfg(context, args.into_ot(cfg)),
 
         // OpType::FuncDefn(fd) => self.emit(ot.into_ot(fd), context, inputs, outputs),
         _ => todo!("Unimplemented OpTypeEmitter: {}", args.node().name()),

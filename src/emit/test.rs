@@ -1,5 +1,4 @@
 use crate::custom::int::add_int_extensions;
-use crate::fat::FatExt as _;
 use hugr::builder::{
     BuildHandle, Container, DFGWrapper, Dataflow, HugrBuilder, ModuleBuilder, SubContainer,
 };
@@ -7,14 +6,12 @@ use hugr::extension::prelude::BOOL_T;
 use hugr::extension::{ExtensionRegistry, ExtensionSet, EMPTY_REG};
 use hugr::ops::constant::CustomConst;
 use hugr::ops::handle::FuncID;
-use hugr::ops::{Module, Tag, UnpackTuple, Value};
+use hugr::ops::{Tag, UnpackTuple, Value};
 use hugr::std_extensions::arithmetic::int_ops::{self, INT_OPS_REGISTRY};
 use hugr::std_extensions::arithmetic::int_types::ConstInt;
 use hugr::types::{Type, TypeRow};
 use hugr::{builder::DataflowSubContainer, types::FunctionType};
 use hugr::{type_row, Hugr};
-use inkwell::passes::PassManager;
-use insta::assert_snapshot;
 use itertools::Itertools;
 use rstest::rstest;
 
@@ -23,7 +20,7 @@ use crate::test::*;
 #[allow(clippy::upper_case_acronyms)]
 type DFGW<'a> = DFGWrapper<&'a mut Hugr, BuildHandle<FuncID<true>>>;
 
-struct SimpleHugrConfig {
+pub struct SimpleHugrConfig {
     ins: TypeRow,
     outs: TypeRow,
     extensions: ExtensionRegistry,
@@ -75,9 +72,10 @@ impl SimpleHugrConfig {
     }
 }
 
+#[macro_export]
 macro_rules! check_emission {
     ($hugr: ident, $test_ctx:ident) => {
-        let root = $hugr.fat_root::<Module>().unwrap();
+        let root = $crate::fat::FatExt::fat_root::<hugr::ops::Module>(&$hugr).unwrap();
         let (_, module) = $test_ctx.with_emit_context(|ec| ((), ec.emit_module(root).unwrap()));
 
         let mut settings = insta::Settings::clone_current();
@@ -85,17 +83,17 @@ macro_rules! check_emission {
             .snapshot_suffix()
             .map_or("pre-mem2reg".into(), |x| format!("pre-mem2reg@{x}"));
         settings.set_snapshot_suffix(new_suffix);
-        settings.bind(|| assert_snapshot!(module.to_string()));
+        settings.bind(|| insta::assert_snapshot!(module.to_string()));
 
         module
             .verify()
             .unwrap_or_else(|pp| panic!("Failed to verify module: {pp}"));
 
-        let pb = PassManager::create(());
+        let pb = inkwell::passes::PassManager::create(());
         pb.add_promote_memory_to_register_pass();
         pb.run_on(&module);
 
-        assert_snapshot!(module.to_string());
+        insta::assert_snapshot!(module.to_string());
     };
 }
 

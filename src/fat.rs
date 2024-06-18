@@ -5,10 +5,11 @@
 use std::{cmp::Ordering, hash::Hash, marker::PhantomData, ops::Deref};
 
 use hugr::{
-    ops::{Input, NamedOp, OpType, Output},
+    ops::{DataflowBlock, ExitBlock, Input, NamedOp, OpType, Output, CFG},
     types::Type,
     Hugr, HugrView, IncomingPort, Node, NodeIndex, OutgoingPort,
 };
+use itertools::Itertools as _;
 
 /// A Fat Node is a [Node] along with a reference to the [HugrView] whence it
 /// originates. It carries a type `OT`, the [OpType] of that node. `OT` may be
@@ -44,7 +45,7 @@ where
     ///
     /// Note that while we do check that the type of the node's `get_optype`, we do
     /// not verify that it is actually equal to `ot`.
-    pub fn new(hugr: &'c H, node: Node, #[allow(unused)] ot: &'c OT) -> Self {
+    pub fn new(hugr: &'c H, node: Node, #[allow(unused)] ot: &OT) -> Self {
         assert!(hugr.valid_node(node));
         assert!(TryInto::<&'c OT>::try_into(hugr.get_optype(node)).is_ok());
         // We don't actually check `ot == hugr.get_optype(node)` so as to not require OT: PartialEq`
@@ -106,9 +107,9 @@ impl<'c, H: HugrView + ?Sized> FatNode<'c, OpType, H> {
     // Creates a specific `FatNode` from a general `FatNode`.
     //
     // Panics if the node's `get_optype` is not `OT`.
-    pub fn into_ot<OT: PartialEq>(self, ot: &'c OT) -> FatNode<'c, OT, H>
+    pub fn into_ot<OT: PartialEq + 'c>(self, ot: &OT) -> FatNode<'c, OT, H>
     where
-        &'c OpType: TryInto<&'c OT>,
+        for<'a> &'a OpType: TryInto<&'a OT>,
     {
         FatNode::new(self.hugr, self.node, ot)
     }
@@ -155,10 +156,20 @@ impl<'c, OT, H: HugrView + ?Sized> FatNode<'c, OT, H> {
         ))
     }
 
+    pub fn node_outputs(&self) -> impl Iterator<Item = OutgoingPort> + '_ {
+        self.hugr.node_outputs(self.node)
+    }
+
+    pub fn output_neighbours(&self) -> impl Iterator<Item = FatNode<'c, OpType, H>> + '_ {
+        self.hugr
+            .output_neighbours(self.node)
+            .map(|n| FatNode::new_optype(self.hugr, n))
+    }
+
     /// Create a general `FatNode` from a specific one.
     pub fn generalise(self) -> FatNode<'c, OpType, H>
     where
-        &'c OpType: TryInto<&'c OT>,
+        for<'a> &'a OpType: TryInto<&'a OT>,
         OT: 'c,
     {
         // guaranteed to be valid becasue self is valid
@@ -167,6 +178,26 @@ impl<'c, OT, H: HugrView + ?Sized> FatNode<'c, OT, H> {
             node: self.node,
             marker: PhantomData,
         }
+    }
+}
+
+impl<'c, H: HugrView> FatNode<'c, CFG, H> {
+    /// Returns the entry and exit nodes of a CFG.
+    ///
+    /// These are guaranteed to exist the `Hugr` is valid. Panics if they do not
+    /// exist.
+    pub fn get_entry_exit(&self) -> (FatNode<'c, DataflowBlock, H>, FatNode<'c, ExitBlock, H>) {
+        let [i, o] = self
+            .hugr
+            .children(self.node)
+            .take(2)
+            .collect_vec()
+            .try_into()
+            .unwrap();
+        (
+            FatNode::try_new(self.hugr, i).unwrap(),
+            FatNode::try_new(self.hugr, o).unwrap(),
+        )
     }
 }
 
@@ -220,11 +251,9 @@ impl<'c, OT, H> Hash for FatNode<'c, OT, H> {
     }
 }
 
-impl<'c, OT, H: HugrView + ?Sized> AsRef<OT> for FatNode<'c, OT, H>
+impl<'c, OT: 'c, H: HugrView + ?Sized> AsRef<OT> for FatNode<'c, OT, H>
 where
-    &'c OpType: TryInto<&'c OT>,
-    <&'c OpType as TryInto<&'c OT>>::Error: std::fmt::Debug,
-    OT: 'c,
+    for<'a> &'a OpType: TryInto<&'a OT>,
 {
     fn as_ref(&self) -> &OT {
         self.get()
@@ -266,6 +295,12 @@ where
 }
 
 impl<'c, OT, H> NodeIndex for FatNode<'c, OT, H> {
+    fn index(self) -> usize {
+        self.node.index()
+    }
+}
+
+impl<'c, OT, H> NodeIndex for &FatNode<'c, OT, H> {
     fn index(self) -> usize {
         self.node.index()
     }

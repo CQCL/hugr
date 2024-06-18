@@ -14,3 +14,4 @@ devenv.local.nix
 /target
 /.envrc
 /result
+*.snap.new

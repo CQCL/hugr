@@ -71,10 +71,9 @@ impl<'c, H: HugrView> EmitOpArgs<'c, OpType, H> {
     /// Specialise the internal [FatNode].
     ///
     /// Panics if `OT` is not the `get_optype` of the internal [Node].
-    pub fn into_ot<OTInto: PartialEq + 'c>(self, ot: &'c OTInto) -> EmitOpArgs<'c, OTInto, H>
+    pub fn into_ot<'b, OTInto: PartialEq + 'c>(self, ot: &'b OTInto) -> EmitOpArgs<'c, OTInto, H>
     where
-        &'c OpType: TryInto<&'c OTInto>,
-        <&'c OpType as TryInto<&'c OTInto>>::Error: std::fmt::Debug,
+        for<'a> &'a OpType: TryInto<&'a OTInto>,
     {
         let EmitOpArgs {
             node,

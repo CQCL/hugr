@@ -1,0 +1,170 @@
+---
+source: src/emit/ops/cfg.rs
+expression: module.to_string()
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define { i32, {}, {} } @_hl.main.1({ i32, {}, {}, {} } %0, { i32, {}, {} } %1) {
+alloca_block:
+  %"0" = alloca { i32, {}, {} }, align 8
+  %"5_0" = alloca { {} }, align 8
+  %"2_0" = alloca { i32, {}, {}, {} }, align 8
+  %"2_1" = alloca { i32, {}, {} }, align 8
+  %"6_0" = alloca { i32, {}, {} }, align 8
+  %"9_0" = alloca { i32, {}, {}, {} }, align 8
+  %"9_1" = alloca { i32, {}, {} }, align 8
+  %"03" = alloca { i32, {}, {} }, align 8
+  %"11_0" = alloca { i32, {}, {} }, align 8
+  %"06" = alloca { i32, {}, {} }, align 8
+  %"20_0" = alloca { i32, {}, {} }, align 8
+  %"25_0" = alloca { i32, {}, {} }, align 8
+  %"39_0" = alloca { i32, {}, {} }, align 8
+  %"44_0" = alloca { i32, {}, {} }, align 8
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  store { {} } undef, { {} }* %"5_0", align 1
+  store { i32, {}, {}, {} } %0, { i32, {}, {}, {} }* %"2_0", align 4
+  store { i32, {}, {} } %1, { i32, {}, {} }* %"2_1", align 4
+  %"2_01" = load { i32, {}, {}, {} }, { i32, {}, {}, {} }* %"2_0", align 4
+  %"2_12" = load { i32, {}, {} }, { i32, {}, {} }* %"2_1", align 4
+  store { i32, {}, {}, {} } %"2_01", { i32, {}, {}, {} }* %"9_0", align 4
+  store { i32, {}, {} } %"2_12", { i32, {}, {} }* %"9_1", align 4
+  br label %6
+
+2:                                                ; preds = %31
+  %3 = extractvalue { i32, {}, {} } %"11_023", 1
+  br label %9
+
+4:                                                ; preds = %31
+  %5 = extractvalue { i32, {}, {} } %"11_023", 2
+  br label %12
+
+6:                                                ; preds = %entry_block
+  %"9_04" = load { i32, {}, {}, {} }, { i32, {}, {}, {} }* %"9_0", align 4
+  %"9_15" = load { i32, {}, {} }, { i32, {}, {} }* %"9_1", align 4
+  store { i32, {}, {}, {} } %"9_04", { i32, {}, {}, {} }* %"9_0", align 4
+  store { i32, {}, {} } %"9_15", { i32, {}, {} }* %"9_1", align 4
+  br label %20
+
+7:                                                ; preds = %9
+  %8 = extractvalue { {} } %"5_027", 0
+  store { i32, {}, {} } %"39_028", { i32, {}, {} }* %"03", align 4
+  br label %13
+
+9:                                                ; preds = %2
+  store { i32, {}, {} } { i32 1, {} poison, {} undef }, { i32, {}, {} }* %"39_0", align 4
+  %"5_025" = load { {} }, { {} }* %"5_0", align 1
+  %"39_026" = load { i32, {}, {} }, { i32, {}, {} }* %"39_0", align 4
+  store { {} } %"5_025", { {} }* %"5_0", align 1
+  store { i32, {}, {} } %"39_026", { i32, {}, {} }* %"39_0", align 4
+  %"5_027" = load { {} }, { {} }* %"5_0", align 1
+  %"39_028" = load { i32, {}, {} }, { i32, {}, {} }* %"39_0", align 4
+  switch i32 0, label %7 [
+  ]
+
+10:                                               ; preds = %12
+  %11 = extractvalue { {} } %"5_031", 0
+  store { i32, {}, {} } %"44_032", { i32, {}, {} }* %"03", align 4
+  br label %13
+
+12:                                               ; preds = %4
+  store { i32, {}, {} } { i32 0, {} undef, {} poison }, { i32, {}, {} }* %"44_0", align 4
+  %"5_029" = load { {} }, { {} }* %"5_0", align 1
+  %"44_030" = load { i32, {}, {} }, { i32, {}, {} }* %"44_0", align 4
+  store { {} } %"5_029", { {} }* %"5_0", align 1
+  store { i32, {}, {} } %"44_030", { i32, {}, {} }* %"44_0", align 4
+  %"5_031" = load { {} }, { {} }* %"5_0", align 1
+  %"44_032" = load { i32, {}, {} }, { i32, {}, {} }* %"44_0", align 4
+  switch i32 0, label %10 [
+  ]
+
+13:                                               ; preds = %10, %7
+  %"024" = load { i32, {}, {} }, { i32, {}, {} }* %"03", align 4
+  store { i32, {}, {} } %"024", { i32, {}, {} }* %"6_0", align 4
+  %"6_033" = load { i32, {}, {} }, { i32, {}, {} }* %"6_0", align 4
+  store { i32, {}, {} } %"6_033", { i32, {}, {} }* %"0", align 4
+  %"034" = load { i32, {}, {} }, { i32, {}, {} }* %"0", align 4
+  ret { i32, {}, {} } %"034"
+
+14:                                               ; preds = %20
+  %15 = extractvalue { i32, {}, {}, {} } %"9_08", 1
+  br label %24
+
+16:                                               ; preds = %20
+  %17 = extractvalue { i32, {}, {}, {} } %"9_08", 2
+  br label %27
+
+18:                                               ; preds = %20
+  %19 = extractvalue { i32, {}, {}, {} } %"9_08", 3
+  br label %30
+
+20:                                               ; preds = %6
+  %"9_07" = load { i32, {}, {}, {} }, { i32, {}, {}, {} }* %"9_0", align 4
+  store { i32, {}, {}, {} } %"9_07", { i32, {}, {}, {} }* %"9_0", align 4
+  %"9_08" = load { i32, {}, {}, {} }, { i32, {}, {}, {} }* %"9_0", align 4
+  %21 = extractvalue { i32, {}, {}, {} } %"9_08", 0
+  switch i32 %21, label %14 [
+    i32 1, label %16
+    i32 2, label %18
+  ]
+
+22:                                               ; preds = %24
+  %23 = extractvalue { {} } %"5_012", 0
+  store { i32, {}, {} } %"20_013", { i32, {}, {} }* %"06", align 4
+  br label %31
+
+24:                                               ; preds = %14
+  store { i32, {}, {} } { i32 1, {} poison, {} undef }, { i32, {}, {} }* %"20_0", align 4
+  %"5_010" = load { {} }, { {} }* %"5_0", align 1
+  %"20_011" = load { i32, {}, {} }, { i32, {}, {} }* %"20_0", align 4
+  store { {} } %"5_010", { {} }* %"5_0", align 1
+  store { i32, {}, {} } %"20_011", { i32, {}, {} }* %"20_0", align 4
+  %"5_012" = load { {} }, { {} }* %"5_0", align 1
+  %"20_013" = load { i32, {}, {} }, { i32, {}, {} }* %"20_0", align 4
+  switch i32 0, label %22 [
+  ]
+
+25:                                               ; preds = %27
+  %26 = extractvalue { {} } %"5_016", 0
+  store { i32, {}, {} } %"25_017", { i32, {}, {} }* %"06", align 4
+  br label %31
+
+27:                                               ; preds = %16
+  store { i32, {}, {} } { i32 0, {} undef, {} poison }, { i32, {}, {} }* %"25_0", align 4
+  %"5_014" = load { {} }, { {} }* %"5_0", align 1
+  %"25_015" = load { i32, {}, {} }, { i32, {}, {} }* %"25_0", align 4
+  store { {} } %"5_014", { {} }* %"5_0", align 1
+  store { i32, {}, {} } %"25_015", { i32, {}, {} }* %"25_0", align 4
+  %"5_016" = load { {} }, { {} }* %"5_0", align 1
+  %"25_017" = load { i32, {}, {} }, { i32, {}, {} }* %"25_0", align 4
+  switch i32 0, label %25 [
+  ]
+
+28:                                               ; preds = %30
+  %29 = extractvalue { {} } %"5_020", 0
+  store { i32, {}, {} } %"9_121", { i32, {}, {} }* %"06", align 4
+  br label %31
+
+30:                                               ; preds = %18
+  %"5_018" = load { {} }, { {} }* %"5_0", align 1
+  %"9_119" = load { i32, {}, {} }, { i32, {}, {} }* %"9_1", align 4
+  store { {} } %"5_018", { {} }* %"5_0", align 1
+  store { i32, {}, {} } %"9_119", { i32, {}, {} }* %"9_1", align 4
+  %"5_020" = load { {} }, { {} }* %"5_0", align 1
+  %"9_121" = load { i32, {}, {} }, { i32, {}, {} }* %"9_1", align 4
+  switch i32 0, label %28 [
+  ]
+
+31:                                               ; preds = %28, %25, %22
+  %"09" = load { i32, {}, {} }, { i32, {}, {} }* %"06", align 4
+  store { i32, {}, {} } %"09", { i32, {}, {} }* %"11_0", align 4
+  %"11_022" = load { i32, {}, {} }, { i32, {}, {} }* %"11_0", align 4
+  store { i32, {}, {} } %"11_022", { i32, {}, {} }* %"11_0", align 4
+  %"11_023" = load { i32, {}, {} }, { i32, {}, {} }* %"11_0", align 4
+  %32 = extractvalue { i32, {}, {} } %"11_023", 0
+  switch i32 %32, label %2 [
+    i32 1, label %4
+  ]
+}

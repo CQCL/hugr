@@ -298,9 +298,19 @@ dependencies = [
 
 [[package]]
 name = "hugr"
-version = "0.4.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e8e15eaffd64f1cceac13429e5ceaf20017691e647cc56b8b7c53d73ad9f8714"
+checksum = "a20246e5f1a0aae160b80b71bc4d5c1dcccc5605dbe6458ac6f9af73137339c3"
+dependencies = [
+ "hugr-core",
+ "hugr-passes",
+]
+
+[[package]]
+name = "hugr-core"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bd64c708ba21cedae58e37f3557d139ee6eaeaaa7df0ab9541385249c1ee6065"
 dependencies = [
  "bitvec",
  "cgmath",
@@ -310,7 +320,7 @@ dependencies = [
  "downcast-rs",
  "enum_dispatch",
  "html-escape",
- "itertools",
+ "itertools 0.13.0",
  "lazy_static",
  "num-rational",
  "paste",
@@ -337,11 +347,24 @@ dependencies = [
  "hugr",
  "inkwell",
  "insta",
- "itertools",
+ "itertools 0.12.1",
  "lazy_static",
  "llvm-sys",
  "petgraph",
  "rstest",
+]
+
+[[package]]
+name = "hugr-passes"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7522d3a5299a49ee453f6d0e3c3a6e8e7ed08a38cbd11e1d19163b97098ce9be"
+dependencies = [
+ "hugr-core",
+ "itertools 0.13.0",
+ "lazy_static",
+ "paste",
+ "thiserror",
 ]
 
 [[package]]
@@ -402,6 +425,15 @@ name = "itertools"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba291022dbbd398a455acf126c1e341954079855bc60dfdda641363bd6922569"
+dependencies = [
+ "either",
+]
+
+[[package]]
+name = "itertools"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186"
 dependencies = [
  "either",
 ]
@@ -525,9 +557,9 @@ checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
 
 [[package]]
 name = "portgraph"
-version = "0.12.0"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e8ad1ebc029f8dfab4f023f14c7e41b3b3a257cf28b2928949153e563c9bf02c"
+checksum = "0d83271bd5c2249831ff13227e6b3a968e115b6d4f4a2027a8ce02838b789ff8"
 dependencies = [
  "bitvec",
  "context-iterators",

@@ -93,6 +93,10 @@ impl<'c> ValuePromise<'c> {
 pub struct RowMailBox<'c>(Rc<Vec<ValueMailBox<'c>>>, Cow<'static, str>);
 
 impl<'c> RowMailBox<'c> {
+    pub fn new_empty() -> Self {
+        Self::new(std::iter::empty(), None)
+    }
+
     pub(super) fn new(
         mbs: impl IntoIterator<Item = ValueMailBox<'c>>,
         name: Option<String>,

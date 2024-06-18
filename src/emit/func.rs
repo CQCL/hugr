@@ -115,8 +115,6 @@ impl<'c, H: HugrView> EmitFuncContext<'c, H> {
     /// Create a new basic block. When `before` is `Some` the block will be
     /// created immediately before that block, otherwise at the end of the
     /// function.
-    ///
-    /// TODO I think this will be needed for emitting CFGs.
     pub(crate) fn new_basic_block(
         &mut self,
         name: impl AsRef<str>,
