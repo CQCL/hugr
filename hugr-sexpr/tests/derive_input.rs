@@ -1,16 +1,14 @@
-use hugr_sexpr::{import::Import, read_values, Symbol};
+use hugr_sexpr::{from_str, input::Input, read::ReadError, Symbol, Value};
 
 #[test]
 pub fn positional() {
-    #[derive(Import)]
+    #[derive(Input)]
     struct Test {
         first: Symbol,
         second: String,
     }
 
-    let text = r#"symbol "string""#;
-    let values = read_values(text).unwrap();
-    let (_, test) = Test::import(&values).unwrap();
+    let test = from_str::<Test>(r#"symbol "string""#).unwrap();
 
     assert_eq!(test.first, Symbol::new("symbol"));
     assert_eq!(test.second, "string");
@@ -18,36 +16,32 @@ pub fn positional() {
 
 #[test]
 pub fn optional_given() {
-    #[derive(Import)]
+    #[derive(Input)]
     struct Test {
         #[sexpr(optional)]
         field: Option<String>,
     }
 
-    let text = r#"(field "string")"#;
-    let values = read_values(text).unwrap();
-    let (_, test) = Test::import(&values).unwrap();
+    let test = from_str::<Test>(r#"(field "string")"#).unwrap();
 
     assert_eq!(test.field.unwrap(), "string");
 }
 
 pub fn optional_absent() {
-    #[derive(Import)]
+    #[derive(Input)]
     struct Test {
         #[sexpr(optional)]
         field: Option<String>,
     }
 
-    let text = r#""#;
-    let values = read_values(text).unwrap();
-    let (_, test) = Test::import(&values).unwrap();
+    let test = from_str::<Test>(r#""#).unwrap();
 
     assert_eq!(test.field, None);
 }
 
 #[test]
 pub fn optional_duplicate() {
-    #[derive(Import)]
+    #[derive(Debug, Input)]
     struct Test {
         #[allow(dead_code)]
         #[sexpr(optional)]
@@ -55,57 +49,56 @@ pub fn optional_duplicate() {
     }
 
     let text = r#"(field "string") (field "another")"#;
-    let values = read_values(text).unwrap();
-    assert!(Test::import(&values).is_err());
+    let result = from_str::<Test>(text);
+
+    println!("{:#?}", from_str::<Vec<Value>>(text));
+
+    assert!(matches!(result, Err(ReadError::Parse(_))));
 }
 
 #[test]
 pub fn required_given() {
-    #[derive(Import)]
+    #[derive(Input)]
     struct Test {
         #[sexpr(required)]
         field: String,
     }
 
-    let text = r#"(field "string")"#;
-    let values = read_values(text).unwrap();
-    let (_, test) = Test::import(&values).unwrap();
+    let test = from_str::<Test>(r#"(field "string")"#).unwrap();
 
     assert_eq!(test.field, "string");
 }
 
 pub fn required_absent() {
-    #[derive(Import)]
+    #[derive(Input)]
     struct Test {
         #[allow(dead_code)]
         #[sexpr(optional)]
         field: Option<String>,
     }
 
-    let text = r#""#;
-    let values = read_values(text).unwrap();
+    let result = from_str::<Test>(r#""#);
 
-    assert!(Test::import(&values).is_err());
+    assert!(matches!(result, Err(ReadError::Parse(_))));
 }
 
 #[test]
 pub fn required_duplicate() {
-    #[derive(Import)]
+    #[derive(Input)]
     struct Test {
         #[allow(dead_code)]
         #[sexpr(required)]
         field: String,
     }
 
-    let text = r#"(field "string") (field "another")"#;
-    let values = read_values(text).unwrap();
+    let result = from_str::<Test>(r#"(field "string") (field "another")"#);
 
-    assert!(Test::import(&values).is_err());
+    assert!(matches!(result, Err(ReadError::Parse(_))));
 }
 
 #[test]
 pub fn repeated() {
-    #[derive(Import)]
+    #[derive(Input)]
     struct Test {
         #[sexpr(repeated)]
         values: Vec<String>,
@@ -115,8 +108,7 @@ pub fn repeated() {
     let mut expected = Vec::new();
 
     for i in 0..3 {
-        let values = read_values(&text).unwrap();
-        let (_, test) = Test::import(&values).unwrap();
+        let test = from_str::<Test>(&text).unwrap();
         assert_eq!(test.values, expected);
 
         text.push_str(&format!(r#" (values "{}")"#, i));
@@ -126,13 +118,13 @@ pub fn repeated() {
 
 #[test]
 pub fn resursive_field() {
-    #[derive(Import, PartialEq, Eq, Debug)]
+    #[derive(Input, PartialEq, Eq, Debug)]
     struct Outer {
         #[sexpr(repeated)]
         inner: Vec<Inner>,
     }
 
-    #[derive(Import, PartialEq, Eq, Debug)]
+    #[derive(Input, PartialEq, Eq, Debug)]
     struct Inner {
         positional: Symbol,
         #[sexpr(required)]
@@ -157,7 +149,6 @@ pub fn resursive_field() {
         ],
     };
 
-    let values = read_values(&text).unwrap();
-    let (_, test) = Outer::import(&values).unwrap();
+    let test = from_str::<Outer>(text).unwrap();
     assert_eq!(test, expected);
 }

@@ -4,21 +4,21 @@ use syn::{spanned::Spanned, DataStruct, DeriveInput};
 
 use crate::common::{get_first_type_arg, parse_sexpr_attributes, FieldKind};
 
-pub fn derive_export_impl(derive_input: DeriveInput) -> syn::Result<TokenStream> {
+pub fn derive_output_impl(derive_input: DeriveInput) -> syn::Result<TokenStream> {
     match &derive_input.data {
-        syn::Data::Struct(data_struct) => derive_export_struct(&derive_input, data_struct),
+        syn::Data::Struct(data_struct) => derive_output_struct(&derive_input, data_struct),
         syn::Data::Enum(_) => Err(syn::Error::new(
             derive_input.span(),
-            "Can not derive Export for enums.",
+            "Can not derive Output for enums.",
         )),
         syn::Data::Union(_) => Err(syn::Error::new(
             derive_input.span(),
-            "Can not derive Export for unions.",
+            "Can not derive Output for unions.",
         )),
     }
 }
 
-fn derive_export_struct(
+fn derive_output_struct(
     derive_input: &DeriveInput,
     data_struct: &DataStruct,
 ) -> syn::Result<TokenStream> {
@@ -33,7 +33,7 @@ fn derive_export_struct(
             // TODO: Derive Export for tuple structs
             return Err(syn::Error::new_spanned(
                 field,
-                "Fields must be named to derive Export.",
+                "Fields must be named to derive Output.",
             ));
         };
 
@@ -43,41 +43,35 @@ fn derive_export_struct(
             .rename
             .unwrap_or_else(|| format!("{}", field_ident.to_token_stream()));
 
-        let field_symbol = quote! {
-            ::hugr_sexpr::Value::Symbol(
-                ::hugr_sexpr::Symbol::new(#field_name),
-                ::std::default::Default::default()
-            )
-        };
-
         match field_data.kind {
             FieldKind::Positional => {
                 code_fields.push(quote! {
-                    <_ as ::hugr_sexpr::export::Export<A>>::export_into(&self.#field_ident, into);
+                    <_ as ::hugr_sexpr::output::Output<O>>::print(&self.#field_ident, output)?;
                 });
 
                 code_where.push(quote! {
-                    #field_type: ::hugr_sexpr::export::Export<A>,
+                    #field_type: ::hugr_sexpr::output::Output<O>,
                 });
             }
             FieldKind::NamedRequired => {
                 code_fields.push(quote! {
-                    let field_value = &self.#field_ident;
-                    let mut inner = vec![#field_symbol];
-                    <_ as ::hugr_sexpr::export::Export<A>>::export_into(field_value, &mut inner);
-                    into.push(::hugr_sexpr::Value::List(inner, ::std::default::Default::default()));
+                    output.list(|output| {
+                        output.symbol(#field_name)?;
+                        <_ as ::hugr_sexpr::output::Output<O>>::print(&self.#field_ident, output)
+                    })?;
                 });
 
                 code_where.push(quote! {
-                    #field_type: ::hugr_sexpr::export::Export<A>,
+                    #field_type: ::hugr_sexpr::output::Output<O>,
                 });
             }
             FieldKind::NamedOptional => {
                 code_fields.push(quote! {
                     if let Some(field_value) = &self.#field_ident {
-                        let mut inner = vec![#field_symbol];
-                        <_ as ::hugr_sexpr::export::Export<A>>::export_into(field_value, &mut inner);
-                        into.push(::hugr_sexpr::Value::List(inner, ::std::default::Default::default()));
+                        output.list(|output| {
+                            output.symbol(#field_name)?;
+                            <_ as ::hugr_sexpr::output::Output<O>>::print(field_value, output)
+                        })?;
                     }
                 });
 
@@ -87,16 +81,17 @@ fn derive_export_struct(
                 ))?;
 
                 code_where.push(quote! {
-                    #inner_type: ::hugr_sexpr::export::Export<A>,
+                    #inner_type: ::hugr_sexpr::output::Output<O>,
                 });
             }
             FieldKind::NamedRepeated => {
                 code_fields.push(quote! {
-                    into.extend(self.#field_ident.iter().map(|field_value| {
-                        let mut inner = vec![#field_symbol];
-                        <_ as ::hugr_sexpr::export::Export<A>>::export_into(field_value, &mut inner);
-                        ::hugr_sexpr::Value::List(inner, ::std::default::Default::default())
-                    }));
+                    for field_value in self.#field_ident.iter() {
+                        output.list(|output| {
+                            output.symbol(#field_name)?;
+                            <_ as ::hugr_sexpr::output::Output<O>>::print(field_value, output)
+                        })?;
+                    }
                 });
 
                 let inner_type = get_first_type_arg(field_type).ok_or(syn::Error::new_spanned(
@@ -105,7 +100,7 @@ fn derive_export_struct(
                 ))?;
 
                 code_where.push(quote! {
-                    #inner_type: ::hugr_sexpr::export::Export<A>,
+                    #inner_type: ::hugr_sexpr::output::Output<O>,
                 });
             }
         }
@@ -115,10 +110,11 @@ fn derive_export_struct(
     let code_where: TokenStream = code_where.into_iter().collect();
 
     Ok(quote! {
-        impl<A, #struct_generics> ::hugr_sexpr::export::Export<A> for #struct_ident<#struct_generics>
-        where A: ::std::default::Default, #code_where {
-            fn export_into(&self, into: &mut ::std::vec::Vec<::hugr_sexpr::Value<A>>) {
+        impl<O, #struct_generics> ::hugr_sexpr::output::Output<O> for #struct_ident<#struct_generics>
+        where O: ::hugr_sexpr::output::OutputStream, #code_where {
+            fn print(&self, output: &mut O) -> std::result::Result<(), O::Error> {
                 #code_fields
+                Ok(())
             }
         }
     })

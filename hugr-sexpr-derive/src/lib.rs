@@ -4,23 +4,23 @@
 use syn::{parse_macro_input, DeriveInput};
 
 pub(crate) mod common;
-mod export;
-mod import;
+mod input;
+mod output;
 
-/// Derive the [`Import`] trait.
-#[proc_macro_derive(Import, attributes(sexpr))]
-pub fn derive_import(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+/// Derive the [`Input`] trait.
+#[proc_macro_derive(Input, attributes(sexpr))]
+pub fn derive_input(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let derive_input = parse_macro_input!(input as DeriveInput);
-    import::derive_import_impl(derive_input)
+    input::derive_input_impl(derive_input)
         .unwrap_or_else(syn::Error::into_compile_error)
         .into()
 }
 
-/// Derive the [`Export`] trait.
-#[proc_macro_derive(Export, attributes(sexpr))]
+/// Derive the [`Output`] trait.
+#[proc_macro_derive(Output, attributes(sexpr))]
 pub fn derive_export(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let derive_input = parse_macro_input!(input as DeriveInput);
-    export::derive_export_impl(derive_input)
+    output::derive_output_impl(derive_input)
         .unwrap_or_else(syn::Error::into_compile_error)
         .into()
 }

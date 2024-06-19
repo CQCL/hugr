@@ -1,26 +1,28 @@
-//! Read [`Value`]s from a string.
+//! Reading s-expressions from strings.
 use logos::Logos;
+use smol_str::SmolStr;
 use std::ops::Range;
 use thiserror::Error;
 
-use crate::{Symbol, Value};
+use crate::input::{Input, InputStream, ParseError, TokenTree};
+use crate::Symbol;
 
 // TODO: Unescape strings!
 
 #[derive(Debug, Clone, PartialEq, Eq, Logos)]
 #[logos(skip r"[ \t\n\f]+")]
 enum Token {
-    #[token("(")]
-    OpenList,
+    #[token("(", |_| 0)]
+    OpenList(usize),
 
     #[token(")")]
     CloseList,
 
     #[regex(
         r#""([^"\\]|\\["\\bnfrt]|u[a-fA-F0-9]{4})*""#,
-        |lex| String::from(&lex.slice()[1..lex.slice().len() - 1])
+        |lex| SmolStr::from(&lex.slice()[1..lex.slice().len() - 1])
     )]
-    String(String),
+    String(SmolStr),
 
     #[regex(
         "[a-zA-Z!$%&*\\./<>=@\\^_~][a-zA-Z0-9!$%&*+\\-\\./:<>=@\\^_~]*",
@@ -43,8 +45,8 @@ enum Token {
 /// Span within a string.
 pub type Span = Range<usize>;
 
-/// Error while reading a [`Value`] from a string.
-#[derive(Debug, Clone, Error)]
+/// Error while reading a value from an s-expression string.
+#[derive(Debug, Error)]
 #[allow(missing_docs)]
 pub enum ReadError {
     #[error("unrecognized syntax")]
@@ -53,74 +55,113 @@ pub enum ReadError {
     EndOfFile,
     #[error("unexpected closing delimiter")]
     UnexpectedClose { span: Span },
+    #[error(transparent)]
+    Parse(#[from] ParseError<Span>),
 }
 
-/// Reads a sequence of [`Value`]s from a string.
-pub fn read_values(input: &str) -> Result<Vec<Value>, ReadError> {
-    // TODO: Avoid putting in spans in the first place
-    Ok(read_values_with_span(input)?
-        .into_iter()
-        .map(|value| value.map_meta(|_| ()))
-        .collect())
+/// Read a value of type `T` from an s-expression string.
+pub fn from_str<T>(str: &str) -> Result<T, ReadError>
+where
+    T: for<'a> Input<ReaderStream<'a>>,
+{
+    let mut tokens: Vec<_> = Token::lexer(str)
+        .spanned()
+        .filter(|(token, _)| !matches!(token, Ok(Token::Comment)))
+        .map(|(token, span)| match token {
+            Ok(token) => Ok((token, span)),
+            Err(()) => Err(ReadError::Syntax { span: span.clone() }),
+        })
+        .collect::<Result<_, _>>()?;
+
+    balance_lists(&mut tokens)?;
+
+    let result = T::parse(&mut ReaderStream {
+        tokens: &tokens,
+        cur_span: 0..0,
+        parent_span: 0..str.len(),
+    })?;
+
+    Ok(result)
 }
 
-/// Reads a sequence of [`Value`]s from a string, including spans.
-pub fn read_values_with_span(input: &str) -> Result<Vec<Value<Span>>, ReadError> {
-    let lexer = Token::lexer(input);
-    let mut tokens = lexer.spanned().map(|(token, span)| {
-        let token = token.map_err(|()| ReadError::Syntax { span: span.clone() });
-        (token, span)
-    });
-    read_values_from_lexer(&mut tokens)
-}
+/// Check that the parentheses are well-balanced and make the OpenList
+/// tokens reflect the distance to their associated CloseList tokens.
+fn balance_lists(tokens: &mut [(Token, Span)]) -> Result<(), ReadError> {
+    // Stack that holds the indices of all currently unclosed `(`s.
+    let mut stack = Vec::new();
 
-/// Reads a sequence of top level values.
-fn read_values_from_lexer(
-    lexer: &mut impl Iterator<Item = (Result<Token, ReadError>, Span)>,
-) -> Result<Vec<Value<Span>>, ReadError> {
-    let mut values = Vec::new();
+    for i in 0..tokens.len() {
+        let (token, span) = &tokens[i];
 
-    while let Some((token, span)) = lexer.next() {
-        let token = token?;
+        match token {
+            Token::OpenList(_) => stack.push(i),
+            Token::CloseList => {
+                let Some(j) = stack.pop() else {
+                    return Err(ReadError::UnexpectedClose { span: span.clone() });
+                };
 
-        let value = match token {
-            Token::OpenList => read_list_from_lexer(lexer, span.start)?,
-            Token::String(string) => Value::String(string, span),
-            Token::Symbol(symbol) => Value::Symbol(symbol, span),
-            Token::Comment => continue,
-            Token::Bool(bool) => Value::Bool(bool, span),
-            Token::Int(int) => Value::Int(int, span),
-            Token::CloseList => return Err(ReadError::UnexpectedClose { span }),
-        };
-
-        values.push(value);
+                tokens[j].0 = Token::OpenList(i - j);
+            }
+            _ => {}
+        }
     }
 
-    Ok(values)
-}
-
-/// Reads a list value, assuming that the opening `(` has already been read.
-fn read_list_from_lexer(
-    lexer: &mut impl Iterator<Item = (Result<Token, ReadError>, Span)>,
-    open_loc: usize,
-) -> Result<Value<Span>, ReadError> {
-    let mut values = Vec::new();
-
-    while let Some((token, span)) = lexer.next() {
-        let token = token?;
-
-        let value = match token {
-            Token::OpenList => read_list_from_lexer(lexer, span.start)?,
-            Token::String(string) => Value::String(string, span),
-            Token::Symbol(symbol) => Value::Symbol(symbol, span),
-            Token::Comment => continue,
-            Token::Bool(bool) => Value::Bool(bool, span),
-            Token::Int(int) => Value::Int(int, span),
-            Token::CloseList => return Ok(Value::List(values, open_loc..span.end)),
-        };
-
-        values.push(value);
+    if !stack.is_empty() {
+        return Err(ReadError::EndOfFile);
     }
 
-    Err(ReadError::EndOfFile)
+    Ok(())
+}
+
+/// Input stream used by [`from_str`].
+#[derive(Clone)]
+pub struct ReaderStream<'a> {
+    tokens: &'a [(Token, Span)],
+    cur_span: Span,
+    parent_span: Span,
+}
+
+impl<'a> InputStream for ReaderStream<'a> {
+    type Span = Span;
+
+    fn next(&mut self) -> Option<TokenTree<Self>> {
+        match self.peek()? {
+            TokenTree::List(inner) => {
+                self.cur_span = inner.parent_span.clone();
+                self.tokens = &self.tokens[inner.tokens.len() + 1..];
+                Some(TokenTree::List(inner))
+            }
+            token_tree => {
+                self.cur_span = self.tokens[0].1.clone();
+                self.tokens = &self.tokens[1..];
+                Some(token_tree)
+            }
+        }
+    }
+
+    fn peek(&self) -> Option<TokenTree<Self>> {
+        let (token, span) = self.tokens.first()?;
+
+        match token {
+            Token::OpenList(skip) => Some(TokenTree::List(ReaderStream {
+                tokens: &self.tokens[1..=*skip],
+                cur_span: span.end..span.end,
+                parent_span: span.end..self.tokens[*skip].1.end,
+            })),
+            Token::CloseList => None,
+            Token::String(string) => Some(TokenTree::String(string.clone())),
+            Token::Symbol(symbol) => Some(TokenTree::Symbol(symbol.clone())),
+            Token::Comment => unreachable!("comments have been stripped before"),
+            Token::Bool(bool) => Some(TokenTree::Bool(*bool)),
+            Token::Int(int) => Some(TokenTree::Int(*int)),
+        }
+    }
+
+    fn span(&self) -> Self::Span {
+        self.cur_span.clone()
+    }
+
+    fn parent_span(&self) -> Self::Span {
+        self.parent_span.clone()
+    }
 }

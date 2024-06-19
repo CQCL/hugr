@@ -4,21 +4,21 @@ use syn::{spanned::Spanned, DataStruct, DeriveInput};
 
 use crate::common::{get_first_type_arg, parse_sexpr_attributes, FieldKind};
 
-pub fn derive_import_impl(derive_input: DeriveInput) -> syn::Result<TokenStream> {
+pub fn derive_input_impl(derive_input: DeriveInput) -> syn::Result<TokenStream> {
     match &derive_input.data {
-        syn::Data::Struct(data_struct) => derive_import_struct(&derive_input, data_struct),
+        syn::Data::Struct(data_struct) => derive_input_struct(&derive_input, data_struct),
         syn::Data::Enum(_) => Err(syn::Error::new(
             derive_input.span(),
-            "Can not derive Import for enums.",
+            "Can not derive Input for enums.",
         )),
         syn::Data::Union(_) => Err(syn::Error::new(
             derive_input.span(),
-            "Can not derive Import for unions.",
+            "Can not derive Input for unions.",
         )),
     }
 }
 
-fn derive_import_struct(
+fn derive_input_struct(
     derive_input: &DeriveInput,
     data_struct: &DataStruct,
 ) -> syn::Result<TokenStream> {
@@ -50,7 +50,7 @@ fn derive_import_struct(
         let Some(field_ident) = &field.ident else {
             return Err(syn::Error::new_spanned(
                 field,
-                "Fields must be named to derive Import.",
+                "Fields must be named to derive Input.",
             ));
         };
 
@@ -76,11 +76,11 @@ fn derive_import_struct(
                 }
 
                 code_positional.push(quote! {
-                    let (values, #field_ident_var) = <_ as ::hugr_sexpr::import::Import<'a, A>>::import(values)?;
+                    let #field_ident_var = <_ as ::hugr_sexpr::input::Input<I>>::parse(stream)?;
                 });
 
                 code_where.push(quote! {
-                    #field_type: ::hugr_sexpr::import::Import<'a, A>,
+                    #field_type: ::hugr_sexpr::input::Input<I>,
                 });
             }
             FieldKind::NamedRequired => {
@@ -94,8 +94,9 @@ fn derive_import_struct(
 
                 code_field_required.push(quote! {
                     let Some(#field_ident_var) = #field_ident_var else {
-                        return Err(::hugr_sexpr::import::ImportError::new(
-                            #missing_field_message
+                        return Err(::hugr_sexpr::input::ParseError::new(
+                            #missing_field_message,
+                            stream.parent_span()
                         ));
                     };
                 });
@@ -105,19 +106,19 @@ fn derive_import_struct(
                 code_named_match.push(quote! {
                     #field_name => {
                         if #field_ident_var.is_some() {
-                            return Err(::hugr_sexpr::import::ImportError::new_with_meta(
+                            return Err(::hugr_sexpr::input::ParseError::new(
                                 #duplicate_field_message,
-                                field_value.meta().clone()
+                                inner_stream.parent_span()
                             ));
                         }
 
-                        let (values, value) = <_ as ::hugr_sexpr::import::Import<'a, A>>::import(values)?;
+                        let value = <_ as ::hugr_sexpr::input::Input<I>>::parse(&mut inner_stream)?;
                         #field_ident_var = Some(value);
                     },
                 });
 
                 code_where.push(quote! {
-                    #field_type: ::hugr_sexpr::import::Import<'a, A>,
+                    #field_type: ::hugr_sexpr::input::Input<I>,
                 });
             }
             FieldKind::NamedOptional => {
@@ -132,19 +133,19 @@ fn derive_import_struct(
                 code_named_match.push(quote! {
                     #field_name => {
                         if #field_ident_var.is_some() {
-                            return Err(::hugr_sexpr::import::ImportError::new_with_meta(
+                            return Err(::hugr_sexpr::input::ParseError::new(
                                 #duplicate_field_message,
-                                field_value.meta().clone()
+                                inner_stream.parent_span()
                             ));
                         }
 
-                        let (values, value) = <_ as ::hugr_sexpr::import::Import<'a, A>>::import(values)?;
+                        let value = <_ as ::hugr_sexpr::input::Input<I>>::parse(&mut inner_stream)?;
                         #field_ident_var = Some(value);
                     }
                 });
 
                 // As with the positional and required fields, we need to ensure that
-                // the type of the field is parseable by adding a constraint bound for `Import`.
+                // the type of the field is parseable by adding a constraint bound for `Input`.
                 // But since the type of an optional field is wrapped in an `Option`, we
                 // first need to extract it.
                 let inner_type = get_first_type_arg(field_type).ok_or(syn::Error::new_spanned(
@@ -153,7 +154,7 @@ fn derive_import_struct(
                 ))?;
 
                 code_where.push(quote! {
-                    #inner_type: ::hugr_sexpr::import::Import<'a, A>,
+                    #inner_type: ::hugr_sexpr::input::Input<I>,
                 });
             }
             FieldKind::NamedRepeated => {
@@ -165,7 +166,7 @@ fn derive_import_struct(
 
                 code_named_match.push(quote! {
                     #field_name => {
-                        let (values, value) = <_ as ::hugr_sexpr::import::Import<'a, A>>::import(values)?;
+                        let value = <_ as ::hugr_sexpr::input::Input<I>>::parse(&mut inner_stream)?;
                         #field_ident_var.push(value);
                     }
                 });
@@ -179,7 +180,7 @@ fn derive_import_struct(
                 ))?;
 
                 code_where.push(quote! {
-                    #inner_type: ::hugr_sexpr::import::Import<'a, A>,
+                    #inner_type: ::hugr_sexpr::input::Input<I>,
                 });
             }
         };
@@ -191,19 +192,27 @@ fn derive_import_struct(
 
     let code_named_match: TokenStream = code_named_match.into_iter().collect();
     let code_named = quote! {
-        for field_value in values {
-            let (head, values) = field_value.as_list_with_head().ok_or_else(||
-                ::hugr_sexpr::import::ImportError::new_with_meta(
-                    "Expected field.",
-                    field_value.meta().clone()
-                )
-            )?;
+        while let Some(token_tree) = stream.next() {
+            let ::hugr_sexpr::input::TokenTree::List(mut inner_stream) = token_tree else {
+                return Err(::hugr_sexpr::input::ParseError::new(
+                    "expected field",
+                    stream.span()
+                ));
+            };
+
+            let Some(::hugr_sexpr::input::TokenTree::Symbol(head)) = inner_stream.next() else {
+                return Err(::hugr_sexpr::input::ParseError::new(
+                    "expected field name",
+                    inner_stream.parent_span()
+                ));
+            };
+
             match head.as_ref() {
                 #code_named_match
-                _ => {
-                    return Err(::hugr_sexpr::import::ImportError::new_with_meta(
-                        "Unknown field.",
-                        field_value.meta().clone()
+                unknown_name => {
+                    return Err(::hugr_sexpr::input::ParseError::new(
+                        format!("unknown field `{}`", unknown_name),
+                        inner_stream.parent_span()
                     ));
                 }
             };
@@ -218,18 +227,18 @@ fn derive_import_struct(
 
     Ok(quote! {
         #[automatically_derived]
-        impl<'a, A, #struct_generics> ::hugr_sexpr::import::Import<'a, A> for #struct_ident<#struct_generics>
-        where A: Clone, #code_where {
-            fn import(values: &'a [::hugr_sexpr::Value<A>]) -> ::hugr_sexpr::import::ImportResult<'a, Self, A>
+        impl<I, #struct_generics> ::hugr_sexpr::input::Input<I> for #struct_ident<#struct_generics>
+        where I: ::hugr_sexpr::input::InputStream, #code_where {
+            fn parse(stream: &mut I) -> ::std::result::Result<Self, ::hugr_sexpr::input::ParseError<I::Span>>
             where
                 Self: Sized {
                 #code_positional
                 #code_field_setup
                 #code_named
                 #code_field_required
-                Ok((&[], Self {
+                Ok(Self {
                     #constr_fields
-                }))
+                })
             }
         }
     })
