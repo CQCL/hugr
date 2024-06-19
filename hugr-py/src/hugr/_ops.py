@@ -288,9 +288,7 @@ class DataflowBlock(DfParentOp):
 
     @property
     def other_outputs(self) -> tys.TypeRow:
-        if self._other_outputs is None:
-            raise IncompleteOp()
-        return self._other_outputs
+        return _check_complete(self._other_outputs)
 
     @property
     def num_out(self) -> int | None:
@@ -365,9 +363,7 @@ class LoadConst(DataflowOp):
     typ: tys.Type | None = None
 
     def type_(self) -> tys.Type:
-        if self.typ is None:
-            raise IncompleteOp()
-        return self.typ
+        return _check_complete(self.typ)
 
     def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.LoadConstant:
         return sops.LoadConstant(
