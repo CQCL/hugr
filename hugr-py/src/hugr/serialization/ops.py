@@ -347,7 +347,8 @@ class DFG(DataflowOp):
         )
 
     def deserialize(self) -> _ops.DFG:
-        return _ops.DFG(self.signature.deserialize())
+        sig = self.signature.deserialize()
+        return _ops.DFG(sig.input, sig.output)
 
 
 # ------------------------------------------------

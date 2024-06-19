@@ -83,12 +83,13 @@ class _DfBase(ParentBuilder[DP]):
     ) -> Dfg:
         from ._dfg import Dfg
 
-        input_types = [self._get_dataflow_type(w) for w in args]
-
-        parent_op = ops.DFG(list(input_types))
+        parent_op = ops.DFG(self._wire_types(args))
         dfg = Dfg.new_nested(parent_op, self.hugr, self.parent_node)
         self._wire_up(dfg.parent_node, args)
         return dfg
+
+    def _wire_types(self, args: Iterable[Wire]) -> TypeRow:
+        return [self._get_dataflow_type(w) for w in args]
 
     def add_cfg(
         self,
@@ -96,9 +97,7 @@ class _DfBase(ParentBuilder[DP]):
     ) -> Cfg:
         from ._cfg import Cfg
 
-        input_types = [self._get_dataflow_type(w) for w in args]
-
-        cfg = Cfg.new_nested(input_types, self.hugr, self.parent_node)
+        cfg = Cfg.new_nested(self._wire_types(args), self.hugr, self.parent_node)
         self._wire_up(cfg.parent_node, args)
         return cfg
 

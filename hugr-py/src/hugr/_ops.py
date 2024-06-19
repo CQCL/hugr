@@ -219,15 +219,18 @@ class DfParentOp(Op, Protocol):
     def _inputs(self) -> tys.TypeRow: ...
 
 
-@dataclass()
+@dataclass
 class DFG(DfParentOp, DataflowOp):
-    _signature: tys.TypeRow | tys.FunctionType
+    inputs: tys.TypeRow
+    _outputs: tys.TypeRow | None = None
+
+    @property
+    def outputs(self) -> tys.TypeRow:
+        return _check_complete(self._outputs)
 
     @property
     def signature(self) -> tys.FunctionType:
-        if isinstance(self._signature, tys.FunctionType):
-            return self._signature
-        raise IncompleteOp()
+        return tys.FunctionType(self.inputs, self.outputs)
 
     @property
     def num_out(self) -> int | None:
@@ -246,15 +249,10 @@ class DFG(DfParentOp, DataflowOp):
         return self.signature
 
     def _set_out_types(self, types: tys.TypeRow) -> None:
-        assert isinstance(self._signature, list), "Signature has already been set."
-        self._signature = tys.FunctionType(self._signature, types)
+        self._outputs = types
 
     def _inputs(self) -> tys.TypeRow:
-        match self._signature:
-            case tys.FunctionType(input, _):
-                return input
-            case list(_):
-                return self._signature
+        return self.inputs
 
 
 @dataclass()
