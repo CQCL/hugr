@@ -259,11 +259,20 @@ class DFG(DfParentOp, DataflowOp):
 
 @dataclass()
 class CFG(DataflowOp):
-    signature: tys.FunctionType = field(default_factory=tys.FunctionType.empty)
+    inputs: tys.TypeRow
+    _outputs: tys.TypeRow | None = None
+
+    @property
+    def outputs(self) -> tys.TypeRow:
+        return _check_complete(self._outputs)
+
+    @property
+    def signature(self) -> tys.FunctionType:
+        return tys.FunctionType(self.inputs, self.outputs)
 
     @property
     def num_out(self) -> int | None:
-        return len(self.signature.output)
+        return len(self.outputs)
 
     def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.CFG:
         return sops.CFG(

@@ -92,10 +92,11 @@ class _DfBase(ParentBuilder[DP]):
 
     def add_cfg(
         self,
-        input_types: TypeRow,
         *args: Wire,
     ) -> Cfg:
         from ._cfg import Cfg
+
+        input_types = [self._get_dataflow_type(w) for w in args]
 
         cfg = Cfg.new_nested(input_types, self.hugr, self.parent_node)
         self._wire_up(cfg.parent_node, args)
@@ -129,10 +130,11 @@ class _DfBase(ParentBuilder[DP]):
     def add_load_const(self, val: val.Value) -> Node:
         return self.load_const(self.add_const(val))
 
-    def _wire_up(self, node: Node, ports: Iterable[Wire]):
+    def _wire_up(self, node: Node, ports: Iterable[Wire]) -> TypeRow:
         tys = [self._wire_up_port(node, i, p) for i, p in enumerate(ports)]
         if isinstance(op := self.hugr[node].op, ops.PartialOp):
             op.set_in_types(tys)
+        return tys
 
     def _get_dataflow_type(self, wire: Wire) -> Type:
         port = wire.out_port()
@@ -141,7 +143,7 @@ class _DfBase(ParentBuilder[DP]):
             raise ValueError(f"Port {port} is not a dataflow port.")
         return ty
 
-    def _wire_up_port(self, node: Node, offset: int, p: Wire) -> Type:
+    def _wire_up_port(self, node: Node, offset: int, p: Wire):
         src = p.out_port()
         node_ancestor = _ancestral_sibling(self.hugr, src.node, node)
         if node_ancestor is None:

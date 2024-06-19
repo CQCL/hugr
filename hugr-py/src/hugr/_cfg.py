@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 
 import hugr._ops as ops
 
 from ._dfg import _DfBase
 from ._exceptions import NoSiblingAncestor, NotInSameCfg, MismatchedExit
 from ._hugr import Hugr, Node, ParentBuilder, ToNode, Wire
-from ._tys import FunctionType, TypeRow, Type
+from ._tys import TypeRow, Type
 import hugr._val as val
 
 
@@ -47,7 +47,7 @@ class Cfg(ParentBuilder[ops.CFG]):
     exit: Node
 
     def __init__(self, input_types: TypeRow) -> None:
-        root_op = ops.CFG(FunctionType(input=input_types, output=[]))
+        root_op = ops.CFG(inputs=input_types)
         hugr = Hugr(root_op)
         self._init_impl(hugr, hugr.root, input_types)
 
@@ -68,7 +68,7 @@ class Cfg(ParentBuilder[ops.CFG]):
     ) -> Cfg:
         new = cls.__new__(cls)
         root = hugr.add_node(
-            ops.CFG(FunctionType(input=input_types, output=[])),
+            ops.CFG(inputs=input_types),
             parent or hugr.root,
         )
         new._init_impl(hugr, root, input_types)
@@ -125,6 +125,4 @@ class Cfg(ParentBuilder[ops.CFG]):
                 raise MismatchedExit(src.node.idx)
         else:
             self._exit_op._cfg_outputs = out_types
-            self.parent_op.signature = replace(
-                self.parent_op.signature, output=out_types
-            )
+            self.parent_op._outputs = out_types

@@ -426,7 +426,8 @@ class CFG(DataflowOp):
         )
 
     def deserialize(self) -> _ops.CFG:
-        return _ops.CFG(self.signature.deserialize())
+        sig = self.signature.deserialize()
+        return _ops.CFG(inputs=sig.input, _outputs=sig.output)
 
 
 ControlFlowOp = Conditional | TailLoop | CFG
