@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Protocol, TYPE_CHECKING, runtime_checkable
+from typing import Protocol, TYPE_CHECKING, runtime_checkable, TypeVar
 from hugr.serialization.ops import BaseOp
 import hugr.serialization.ops as sops
 from hugr.utils import ser_it
