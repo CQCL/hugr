@@ -349,7 +349,10 @@ impl IntOpDef {
 
 #[cfg(test)]
 mod test {
-    use crate::{ops::dataflow::DataflowOpTrait, std_extensions::arithmetic::int_types::int_type};
+    use crate::{
+        ops::{custom::OpaqueOp, dataflow::DataflowOpTrait, OpType},
+        std_extensions::arithmetic::int_types::{int_type, INT_TYPES},
+    };
 
     use super::*;
 
@@ -425,5 +428,22 @@ mod test {
         let ext_op = o.clone().to_extension_op().unwrap();
 
         assert_eq!(ConcreteIntOp::from_extension_op(&ext_op).unwrap(), o);
+    }
+
+    #[test]
+    #[ignore]
+    fn ilt_s_from_optype() {
+        let ty = &INT_TYPES[3];
+        let sig = FunctionType::new(vec![ty.clone(), ty.clone()], BOOL_T);
+        let args = [3_u64.into()];
+        let custom_op: OpType = OpaqueOp::new(
+            EXTENSION_ID,
+            "ilt_s",
+            "description".into(),
+            args.clone(),
+            sig,
+        )
+        .into();
+        assert!(ConcreteIntOp::from_optype(&custom_op).is_some())
     }
 }
