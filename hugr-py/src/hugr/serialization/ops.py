@@ -2,7 +2,7 @@ from __future__ import annotations
 import inspect
 import sys
 from abc import ABC, abstractmethod
-from typing import Any, Literal, TYPE_CHECKING
+from typing import Any, Literal
 
 from pydantic import Field, RootModel, ConfigDict
 
@@ -22,8 +22,6 @@ from .tys import (
 )
 from hugr.utils import deser_it
 
-if TYPE_CHECKING:
-    from hugr.serialization.serial_hugr import SerialHugr
 
 NodeID = int
 
@@ -104,12 +102,14 @@ class FunctionValue(BaseValue):
     """A higher-order function value."""
 
     v: Literal["Function"] = Field(default="Function", title="ValueTag")
-    hugr: SerialHugr
+    hugr: Any
 
     def deserialize(self) -> _val.Value:
         from hugr._hugr import Hugr
+        from hugr.serialization.serial_hugr import SerialHugr
 
-        return _val.Function(Hugr.from_serial(self.hugr))
+        # pydantic stores the serialized dictionary because of the "Any" annotation
+        return _val.Function(Hugr.from_serial(SerialHugr(**self.hugr)))
 
 
 class TupleValue(BaseValue):
@@ -609,9 +609,8 @@ classes = (
     + tys_classes
 )
 
+tys_model_rebuild(dict(classes))
+
 # needed to avoid circular imports
 from hugr import _ops  # noqa: E402
 from hugr import _val  # noqa: E402
-from hugr.serialization.serial_hugr import SerialHugr  # noqa: E402
-
-tys_model_rebuild(dict(classes))

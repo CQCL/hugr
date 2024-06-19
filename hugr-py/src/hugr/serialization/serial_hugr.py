@@ -1,12 +1,11 @@
-from __future__ import annotations
 from typing import Any, Literal
 
 from pydantic import Field, ConfigDict
 
+from .ops import NodeID, OpType, classes as ops_classes
 from .tys import model_rebuild, ConfiguredBaseModel
 import hugr
 
-NodeID = int
 Port = tuple[NodeID, int | None]  # (node, offset)
 Edge = tuple[Port, Port]
 
@@ -49,6 +48,3 @@ class SerialHugr(ConfiguredBaseModel):
             "required": ["version", "nodes", "edges"],
         },
     )
-
-
-from .ops import OpType, classes as ops_classes  # noqa: E402 # needed to avoid circular import
