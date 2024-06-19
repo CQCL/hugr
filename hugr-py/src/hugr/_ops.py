@@ -192,19 +192,19 @@ UnpackTuple = UnpackTupleDef()
 @dataclass()
 class Tag(DataflowOp):
     tag: int
-    variants: list[tys.TypeRow]
+    sum_ty: tys.Sum
     num_out: int | None = 1
 
     def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.Tag:
         return sops.Tag(
             parent=parent.idx,
             tag=self.tag,
-            variants=[ser_it(r) for r in self.variants],
+            variants=[ser_it(r) for r in self.sum_ty.variant_rows],
         )
 
     def outer_signature(self) -> tys.FunctionType:
         return tys.FunctionType(
-            input=self.variants[self.tag], output=[tys.Sum(self.variants)]
+            input=self.sum_ty.variant_rows[self.tag], output=[self.sum_ty]
         )
 
     def __call__(self, value: Wire) -> Command:
@@ -285,13 +285,13 @@ class CFG(DataflowOp):
 @dataclass
 class DataflowBlock(DfParentOp):
     inputs: tys.TypeRow
-    _sum_rows: list[tys.TypeRow] | None = None
+    _sum: tys.Sum | None = None
     _other_outputs: tys.TypeRow | None = None
     extension_delta: tys.ExtensionSet = field(default_factory=list)
 
     @property
-    def sum_rows(self) -> list[tys.TypeRow]:
-        return _check_complete(self._sum_rows)
+    def sum_ty(self) -> tys.Sum:
+        return _check_complete(self._sum)
 
     @property
     def other_outputs(self) -> tys.TypeRow:
@@ -299,36 +299,35 @@ class DataflowBlock(DfParentOp):
 
     @property
     def num_out(self) -> int | None:
-        return len(self.sum_rows)
+        return len(self.sum_ty.variant_rows)
 
     def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.DataflowBlock:
         return sops.DataflowBlock(
             parent=parent.idx,
             inputs=ser_it(self.inputs),
-            sum_rows=list(map(ser_it, self.sum_rows)),
+            sum_rows=list(map(ser_it, self.sum_ty.variant_rows)),
             other_outputs=ser_it(self.other_outputs),
             extension_delta=self.extension_delta,
         )
 
     def inner_signature(self) -> tys.FunctionType:
         return tys.FunctionType(
-            input=self.inputs, output=[tys.Sum(self.sum_rows), *self.other_outputs]
+            input=self.inputs, output=[self.sum_ty, *self.other_outputs]
         )
 
     def port_kind(self, port: InPort | OutPort) -> tys.Kind:
         return tys.CFKind()
 
     def _set_out_types(self, types: tys.TypeRow) -> None:
-        (sum_, *other) = types
-        assert isinstance(sum_, tys.Sum), f"Expected Sum, got {sum_}"
-        self._sum_rows = sum_.variant_rows
+        (sum_, other) = tys.get_first_sum(types)
+        self._sum = sum_
         self._other_outputs = other
 
     def _inputs(self) -> tys.TypeRow:
         return self.inputs
 
     def nth_outputs(self, n: int) -> tys.TypeRow:
-        return [*self.sum_rows[n], *self.other_outputs]
+        return [*self.sum_ty.variant_rows[n], *self.other_outputs]
 
 
 @dataclass
@@ -380,3 +379,68 @@ class LoadConst(DataflowOp):
 
     def outer_signature(self) -> tys.FunctionType:
         return tys.FunctionType(input=[], output=[self.type_()])
+
+
+@dataclass()
+class Conditional(DataflowOp):
+    sum_ty: tys.Sum
+    other_inputs: tys.TypeRow
+    _outputs: tys.TypeRow | None = None
+
+    @property
+    def outputs(self) -> tys.TypeRow:
+        return _check_complete(self._outputs)
+
+    @property
+    def signature(self) -> tys.FunctionType:
+        inputs = [self.sum_ty, *self.other_inputs]
+        return tys.FunctionType(inputs, self.outputs)
+
+    @property
+    def num_out(self) -> int | None:
+        return len(self.outputs)
+
+    def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.Conditional:
+        return sops.Conditional(
+            parent=parent.idx,
+            sum_rows=[ser_it(r) for r in self.sum_ty.variant_rows],
+            other_inputs=ser_it(self.other_inputs),
+            outputs=ser_it(self.outputs),
+        )
+
+    def outer_signature(self) -> tys.FunctionType:
+        return self.signature
+
+    def nth_inputs(self, n: int) -> tys.TypeRow:
+        return [*self.sum_ty.variant_rows[n], *self.other_inputs]
+
+
+@dataclass
+class Case(DfParentOp):
+    inputs: tys.TypeRow
+    _outputs: tys.TypeRow | None = None
+
+    @property
+    def outputs(self) -> tys.TypeRow:
+        return _check_complete(self._outputs)
+
+    @property
+    def num_out(self) -> int | None:
+        return 0
+
+    def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.Case:
+        return sops.Case(
+            parent=parent.idx, signature=self.inner_signature().to_serial()
+        )
+
+    def inner_signature(self) -> tys.FunctionType:
+        return tys.FunctionType(self.inputs, self.outputs)
+
+    def port_kind(self, port: InPort | OutPort) -> tys.Kind:
+        raise NotImplementedError("Case nodes have no external ports.")
+
+    def _set_out_types(self, types: tys.TypeRow) -> None:
+        self._outputs = types
+
+    def _inputs(self) -> tys.TypeRow:
+        return self.inputs

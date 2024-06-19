@@ -206,7 +206,7 @@ class DataflowBlock(BaseOp):
     def deserialize(self) -> _ops.DataflowBlock:
         return _ops.DataflowBlock(
             inputs=deser_it(self.inputs),
-            _sum_rows=[deser_it(r) for r in self.sum_rows],
+            _sum=_tys.Sum([deser_it(r) for r in self.sum_rows]),
             _other_outputs=deser_it(self.other_outputs),
         )
 
@@ -384,6 +384,13 @@ class Conditional(DataflowOp):
         self.other_inputs = list(in_types[1:])
         self.outputs = list(out_types)
 
+    def deserialize(self) -> _ops.Conditional:
+        return _ops.Conditional(
+            _tys.Sum([deser_it(r) for r in self.sum_rows]),
+            deser_it(self.other_inputs),
+            deser_it(self.outputs),
+        )
+
 
 class Case(BaseOp):
     """Case ops - nodes valid inside Conditional nodes."""
@@ -396,6 +403,10 @@ class Case(BaseOp):
         self.signature = tys.FunctionType(
             input=list(inputs), output=list(outputs), extension_reqs=ExtensionSet([])
         )
+
+    def deserialize(self) -> _ops.Case:
+        sig = self.signature.deserialize()
+        return _ops.Case(inputs=sig.input, _outputs=sig.output)
 
 
 class TailLoop(DataflowOp):
@@ -522,7 +533,7 @@ class Tag(DataflowOp):
     def deserialize(self) -> _ops.Tag:
         return _ops.Tag(
             tag=self.tag,
-            variants=[deser_it(v) for v in self.variants],
+            sum_ty=_tys.Sum([deser_it(v) for v in self.variants]),
         )
 
 
@@ -616,3 +627,4 @@ tys_model_rebuild(dict(classes))
 # needed to avoid circular imports
 from hugr import _ops  # noqa: E402
 from hugr import _val  # noqa: E402
+from hugr import _tys  # noqa: E402

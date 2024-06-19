@@ -73,7 +73,9 @@ def test_asymm_types() -> None:
     entry = cfg.add_entry()
 
     int_load = entry.add_load_const(IntVal(34))
-    tagged_int = entry.add(ops.Tag(0, [[INT_T], [tys.Bool]])(int_load))
+
+    sum_ty = tys.Sum([[INT_T], [tys.Bool]])
+    tagged_int = entry.add(ops.Tag(0, sum_ty)(int_load))
     entry.set_block_outputs(tagged_int)
 
     middle = cfg.add_successor(entry[0])

@@ -303,3 +303,9 @@ class OrderKind: ...
 
 
 Kind = ValueKind | ConstKind | FunctionKind | CFKind | OrderKind
+
+
+def get_first_sum(types: TypeRow) -> tuple[Sum, TypeRow]:
+    (sum_, *other) = types
+    assert isinstance(sum_, Sum), f"Expected Sum, got {sum_}"
+    return sum_, other

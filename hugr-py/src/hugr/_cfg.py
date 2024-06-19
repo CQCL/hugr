@@ -97,6 +97,8 @@ class Cfg(ParentBuilder[ops.CFG]):
         )
         return new_block
 
+    # TODO insert_block
+
     def add_successor(self, pred: Wire) -> Block:
         b = self.add_block(self._nth_outputs(pred))
 

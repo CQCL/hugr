@@ -11,13 +11,14 @@ from typing_extensions import Self
 
 import hugr._ops as ops
 import hugr._val as val
-from hugr._tys import Type, TypeRow
+from hugr._tys import Type, TypeRow, get_first_sum
 
 from ._exceptions import NoSiblingAncestor
 from ._hugr import Hugr, Node, OutPort, ParentBuilder, ToNode, Wire
 
 if TYPE_CHECKING:
     from ._cfg import Cfg
+    from ._cond_loop import Conditional
 
 
 DP = TypeVar("DP", bound=ops.DfParentOp)
@@ -72,10 +73,13 @@ class _DfBase(ParentBuilder[DP]):
     def add(self, com: ops.Command) -> Node:
         return self.add_op(com.op, *com.incoming)
 
+    def _insert_nested_impl(self, builder: ParentBuilder, *args: Wire) -> Node:
+        mapping = self.hugr.insert_hugr(builder.hugr, self.parent_node)
+        self._wire_up(mapping[builder.parent_node], args)
+        return mapping[builder.parent_node]
+
     def insert_nested(self, dfg: Dfg, *args: Wire) -> Node:
-        mapping = self.hugr.insert_hugr(dfg.hugr, self.parent_node)
-        self._wire_up(mapping[dfg.parent_node], args)
-        return mapping[dfg.parent_node]
+        return self._insert_nested_impl(dfg, *args)
 
     def add_nested(
         self,
@@ -102,9 +106,18 @@ class _DfBase(ParentBuilder[DP]):
         return cfg
 
     def insert_cfg(self, cfg: Cfg, *args: Wire) -> Node:
-        mapping = self.hugr.insert_hugr(cfg.hugr, self.parent_node)
-        self._wire_up(mapping[cfg.parent_node], args)
-        return mapping[cfg.parent_node]
+        return self._insert_nested_impl(cfg, *args)
+
+    def add_conditional(self, *args: Wire) -> Conditional:
+        from ._cond_loop import Conditional
+
+        (sum_, other_inputs) = get_first_sum(self._wire_types(args))
+        cond = Conditional.new_nested(sum_, other_inputs, self.hugr, self.parent_node)
+        self._wire_up(cond.parent_node, args)
+        return cond
+
+    def insert_conditional(self, cond: Conditional, *args: Wire) -> Node:
+        return self._insert_nested_impl(cond, *args)
 
     def set_outputs(self, *args: Wire) -> None:
         self._wire_up(self.output_node, args)
