@@ -44,7 +44,7 @@ class BaseOp(ABC, ConfiguredBaseModel):
 
     def deserialize(self) -> _ops.Op:
         """Deserializes the model into the corresponding Op."""
-        return _ops.SerWrap(self)
+        raise NotImplementedError
 
 
 # ----------------------------------------------------------
@@ -94,7 +94,7 @@ class ExtensionValue(BaseValue):
     value: CustomConst
 
     def deserialize(self) -> _val.Value:
-        return _val.Extension(self.value.c, self.typ.deserialize(), self.value)
+        return _val.Extension(self.value.c, self.typ.deserialize(), self.value.v)
 
 
 class FunctionValue(BaseValue):
@@ -151,12 +151,18 @@ class Value(RootModel):
 
     model_config = ConfigDict(json_schema_extra={"required": ["v"]})
 
+    def deserialize(self) -> _val.Value:
+        return self.root.deserialize()
+
 
 class Const(BaseOp):
     """A Const operation definition."""
 
     op: Literal["Const"] = "Const"
     v: Value = Field()
+
+    def deserialize(self) -> _ops.Const:
+        return _ops.Const(self.v.deserialize())
 
 
 # -----------------------------------------------
@@ -192,6 +198,13 @@ class DataflowBlock(BaseOp):
 
         # Needed to avoid random '\n's in the pydantic description
 
+    def deserialize(self) -> _ops.DataflowBlock:
+        return _ops.DataflowBlock(
+            inputs=deser_it(self.inputs),
+            _sum_rows=[deser_it(r) for r in self.sum_rows],
+            _other_outputs=deser_it(self.other_outputs),
+        )
+
     model_config = ConfigDict(
         json_schema_extra={
             "description": "A CFG basic block node. The signature is that of the internal Dataflow graph.",
@@ -212,6 +225,9 @@ class ExitBlock(BaseOp):
             "description": "The single exit node of the CFG, has no children, stores the types of the CFG node output.",
         }
     )
+
+    def deserialize(self) -> _ops.ExitBlock:
+        return _ops.ExitBlock(deser_it(self.cfg_outputs))
 
 
 # ---------------------------------------------
@@ -404,6 +420,9 @@ class CFG(DataflowOp):
             input=list(inputs), output=list(outputs), extension_reqs=ExtensionSet([])
         )
 
+    def deserialize(self) -> _ops.CFG:
+        return _ops.CFG(self.signature.deserialize())
+
 
 ControlFlowOp = Conditional | TailLoop | CFG
 
@@ -492,6 +511,12 @@ class Tag(DataflowOp):
     op: Literal["Tag"] = "Tag"
     tag: int  # The variant to create.
     variants: list[TypeRow]  # The variants of the sum type.
+
+    def deserialize(self) -> _ops.Tag:
+        return _ops.Tag(
+            tag=self.tag,
+            variants=[deser_it(v) for v in self.variants],
+        )
 
 
 class Lift(DataflowOp):

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Generic, Protocol, TypeVar, TYPE_CHECKING, runtime_checkable
+from typing import Protocol, TYPE_CHECKING, runtime_checkable
 from hugr.serialization.ops import BaseOp
 import hugr.serialization.ops as sops
 from hugr.utils import ser_it
@@ -54,23 +54,6 @@ class PartialOp(Protocol):
 class Command:
     op: DataflowOp
     incoming: list[Wire]
-
-
-T = TypeVar("T", bound=BaseOp)
-
-
-@dataclass()
-class SerWrap(Op, Generic[T]):
-    # catch all for serial ops that don't have a corresponding Op class
-    _serial_op: T
-
-    def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> T:
-        root = self._serial_op.model_copy()
-        root.parent = parent.idx
-        return root
-
-    def port_kind(self, port: InPort | OutPort) -> tys.Kind:
-        raise NotImplementedError
 
 
 @dataclass()
