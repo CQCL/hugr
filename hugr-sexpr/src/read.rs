@@ -4,8 +4,8 @@ use smol_str::SmolStr;
 use std::ops::Range;
 use thiserror::Error;
 
+use crate::escape::unescape;
 use crate::input::{Input, InputStream, ParseError, TokenTree};
-use crate::string::unescape_string;
 use crate::Symbol;
 
 #[derive(Debug, Clone, PartialEq, Eq, Logos)]
@@ -18,14 +18,22 @@ enum Token {
     CloseList,
 
     #[regex(
-        r#""([^"\\]|\\["\\bnfrt]|u[a-fA-F0-9]{4})*""#,
-        |lex| Some(unescape_string(&lex.slice()[1..lex.slice().len() - 1])?.into())
+        r#""([^"\\]|\\["\\tnr]|u\{[a-fA-F0-9]{1,4}\})*""#,
+        |lex| Some(unescape(&lex.slice()[1..lex.slice().len() - 1])?.into())
     )]
     String(SmolStr),
 
     #[regex(
-        "[a-zA-Z!$%&*\\./<>=@\\^_~][a-zA-Z0-9!$%&*+\\-\\./:<>=@\\^_~]*",
+        r#"[a-zA-Z!$%&*/:<=>?\^_~\.@][a-zA-Z!$%&*/:<=>?\^_~0-9+\-\.@]*"#,
         |lex| Symbol::new(lex.slice())
+    )]
+    #[regex(
+        r#"[+-]([a-zA-Z!$%&*/:<=>?\^_~+\-\.@][a-zA-Z!$%&*/:<=>?\^_~0-9+\-\.@]*)?"#,
+        |lex| Symbol::new(lex.slice())
+    )]
+    #[regex(
+        r#"\|([^\|\\]|\\u\{[a-fA-F0-9]{1,4}\};|\\[\|\\tnr])*\|"#,
+        |lex| Some(unescape(&lex.slice()[1..lex.slice().len() - 1])?.into())
     )]
     Symbol(Symbol),
 

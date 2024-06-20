@@ -2,8 +2,8 @@
 use std::convert::Infallible;
 
 use crate::{
+    escape::{escape_string, escape_symbol},
     output::{Output, OutputStream},
-    string::escape_string,
 };
 use pretty::BoxDoc;
 
@@ -76,7 +76,8 @@ impl OutputStream for Pretty {
     }
 
     fn symbol(&mut self, symbol: impl AsRef<str>) -> Result<(), Self::Error> {
-        self.current.push(BoxDoc::text(symbol.as_ref().to_string()));
+        let escaped = escape_symbol(symbol.as_ref());
+        self.current.push(BoxDoc::text(escaped));
         Ok(())
     }
 

@@ -24,3 +24,4 @@ derive = ["hugr-sexpr-derive"]
 
 [dev-dependencies]
 proptest.workspace = true
+rstest.workspace = true

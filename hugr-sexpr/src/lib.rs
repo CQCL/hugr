@@ -50,11 +50,11 @@
 //! ```
 use smol_str::SmolStr;
 use std::fmt::Display;
+pub(crate) mod escape;
 pub mod input;
 pub mod output;
 pub mod pretty;
 pub mod read;
-pub(crate) mod string;
 
 pub use output::to_values;
 pub use pretty::{to_fmt_pretty, to_string_pretty};
@@ -205,12 +205,7 @@ impl proptest::arbitrary::Arbitrary for Symbol {
 
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
         use proptest::prelude::*;
-        use proptest::string::string_regex;
-
-        string_regex("[a-zA-Z!$%&*\\./<>=@\\^_~][a-zA-Z0-9!$%&*+\\-\\./:<>=@\\^_~]*")
-            .unwrap()
-            .prop_map(Symbol::from)
-            .sboxed()
+        any::<String>().prop_map(Symbol::from).sboxed()
     }
 }
 
@@ -244,6 +239,7 @@ mod test {
         #[test]
         fn pretty_then_parse(values: Vec<Value>, width in 0..120usize) {
             let pretty = to_string_pretty(&values, width);
+            println!("pretty {}", pretty);
             let parsed: Vec<Value> = from_str(&pretty).unwrap();
             assert_eq!(values, parsed);
         }
