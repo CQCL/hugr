@@ -178,7 +178,7 @@ class _DfBase(ParentBuilder[DP]):
             raise ValueError(f"Port {port} is not a dataflow port.")
         return ty
 
-    def _wire_up_port(self, node: Node, offset: int, p: Wire):
+    def _wire_up_port(self, node: Node, offset: int, p: Wire) -> Type:
         src = p.out_port()
         node_ancestor = _ancestral_sibling(self.hugr, src.node, node)
         if node_ancestor is None:
