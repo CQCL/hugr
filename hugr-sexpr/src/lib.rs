@@ -83,13 +83,6 @@ impl Value {
         }
     }
 
-    /// Attempts to cast this value into a list that begins with a symbol.
-    pub fn as_list_with_head(&self) -> Option<(&Symbol, &[Self])> {
-        let (head, values) = self.as_list()?.split_first()?;
-        let head = head.as_symbol()?;
-        Some((head, values))
-    }
-
     /// Attempts to cast this value into a symbol.
     pub fn as_symbol(&self) -> Option<&Symbol> {
         match self {
@@ -125,6 +118,30 @@ impl Display for Value {
 impl From<Vec<Value>> for Value {
     fn from(value: Vec<Value>) -> Self {
         Value::List(value)
+    }
+}
+
+impl From<String> for Value {
+    fn from(value: String) -> Self {
+        Value::String(value.into())
+    }
+}
+
+impl From<SmolStr> for Value {
+    fn from(value: SmolStr) -> Self {
+        Value::String(value)
+    }
+}
+
+impl From<Symbol> for Value {
+    fn from(value: Symbol) -> Self {
+        Value::Symbol(value)
+    }
+}
+
+impl From<bool> for Value {
+    fn from(value: bool) -> Self {
+        Value::Bool(value)
     }
 }
 
