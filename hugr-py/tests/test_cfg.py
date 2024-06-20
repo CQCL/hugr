@@ -72,7 +72,7 @@ def test_asymm_types() -> None:
     cfg = Cfg([])
     entry = cfg.add_entry()
 
-    int_load = entry.add_load_const(IntVal(34))
+    int_load = entry.load(IntVal(34))
 
     sum_ty = tys.Sum([[INT_T], [tys.Bool]])
     tagged_int = entry.add(ops.Tag(0, sum_ty)(int_load))
@@ -80,7 +80,7 @@ def test_asymm_types() -> None:
 
     middle = cfg.add_successor(entry[0])
     # discard the int and return the bool from entry
-    middle.set_single_succ_outputs(middle.add_load_const(val.TRUE))
+    middle.set_single_succ_outputs(middle.load(val.TRUE))
 
     # middle expects an int and exit expects a bool
     cfg.branch_exit(entry[1])

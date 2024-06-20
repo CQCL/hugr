@@ -31,7 +31,7 @@ def test_nested_cond() -> None:
     h = Dfg(tys.Qubit)
     (q,) = h.inputs()
     tagged_q = h.add(ops.Tag(0, SUM_T)(q))
-    cond = h.add_conditional(tagged_q, h.add_load_const(IntVal(1)))
+    cond = h.add_conditional(tagged_q, h.load(IntVal(1)))
     build_cond(cond)
     h.set_outputs(*cond[:2])
     _validate(h.hugr)

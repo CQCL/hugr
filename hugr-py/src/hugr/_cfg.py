@@ -16,7 +16,7 @@ class Block(_DfBase[ops.DataflowBlock]):
         self.set_outputs(branching, *other_outputs)
 
     def set_single_succ_outputs(self, *outputs: Wire) -> None:
-        u = self.add_load_const(val.Unit)
+        u = self.load(val.Unit)
         self.set_outputs(u, *outputs)
 
     def _wire_up_port(self, node: Node, offset: int, p: Wire) -> Type:

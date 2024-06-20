@@ -130,17 +130,16 @@ class _DfBase(ParentBuilder[DP]):
     def add_const(self, val: val.Value) -> Node:
         return self.hugr.add_const(val, self.parent_node)
 
-    def load_const(self, const_node: ToNode) -> Node:
-        const_op = self.hugr._get_typed_op(const_node, ops.Const)
+    def load(self, const: ToNode | val.Value) -> Node:
+        if isinstance(const, val.Value):
+            const = self.add_const(const)
+        const_op = self.hugr._get_typed_op(const, ops.Const)
         load_op = ops.LoadConst(const_op.val.type_())
 
         load = self.add(load_op())
-        self.hugr.add_link(const_node.out_port(), load.inp(0))
+        self.hugr.add_link(const.out_port(), load.inp(0))
 
         return load
-
-    def add_load_const(self, val: val.Value) -> Node:
-        return self.load_const(self.add_const(val))
 
     def _wire_up(self, node: Node, ports: Iterable[Wire]) -> TypeRow:
         tys = [self._wire_up_port(node, i, p) for i, p in enumerate(ports)]

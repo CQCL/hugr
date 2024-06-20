@@ -281,6 +281,6 @@ def test_ancestral_sibling():
 )
 def test_vals(val: val.Value):
     d = Dfg()
-    d.set_outputs(d.add_load_const(val))
+    d.set_outputs(d.load(val))
 
     _validate(d.hugr)
