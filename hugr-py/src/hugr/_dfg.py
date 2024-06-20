@@ -18,7 +18,7 @@ from ._hugr import Hugr, Node, OutPort, ParentBuilder, ToNode, Wire
 
 if TYPE_CHECKING:
     from ._cfg import Cfg
-    from ._cond_loop import Conditional
+    from ._cond_loop import Conditional, If
 
 
 DP = TypeVar("DP", bound=ops.DfParentOp)
@@ -108,9 +108,10 @@ class _DfBase(ParentBuilder[DP]):
     def insert_cfg(self, cfg: Cfg, *args: Wire) -> Node:
         return self._insert_nested_impl(cfg, *args)
 
-    def add_conditional(self, *args: Wire) -> Conditional:
+    def add_conditional(self, cond: Wire, *args: Wire) -> Conditional:
         from ._cond_loop import Conditional
 
+        args = (cond, *args)
         (sum_, other_inputs) = get_first_sum(self._wire_types(args))
         cond = Conditional.new_nested(sum_, other_inputs, self.hugr, self.parent_node)
         self._wire_up(cond.parent_node, args)
@@ -118,6 +119,12 @@ class _DfBase(ParentBuilder[DP]):
 
     def insert_conditional(self, cond: Conditional, *args: Wire) -> Node:
         return self._insert_nested_impl(cond, *args)
+
+    def add_if(self, cond: Wire, *args: Wire) -> If:
+        from ._cond_loop import If
+
+        conditional = self.add_conditional(cond, *args)
+        return If(conditional.add_case(1))
 
     def set_outputs(self, *args: Wire) -> None:
         self._wire_up(self.output_node, args)

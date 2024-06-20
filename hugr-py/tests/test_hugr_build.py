@@ -54,6 +54,24 @@ Not = NotDef()
 
 
 @dataclass
+class OneQbGate(Custom):
+    num_out: int | None = 1
+    extension: tys.ExtensionId = "tket2.quantum"
+    signature: tys.FunctionType = tys.FunctionType.endo([tys.Qubit])
+
+    def __call__(self, q: Wire) -> Command:
+        return super().__call__(q)
+
+
+@dataclass
+class HDef(OneQbGate):
+    op_name: str = "H"
+
+
+H = HDef()
+
+
+@dataclass
 class IntOps(Custom):
     extension: tys.ExtensionId = "arithmetic.int"
 

@@ -10,12 +10,36 @@ from ._tys import Sum, TypeRow
 
 
 class Case(_DfBase[ops.Case]):
-    _parent: Conditional | None = None
+    _parent_cond: Conditional | None = None
 
     def set_outputs(self, *outputs: Wire) -> None:
         super().set_outputs(*outputs)
-        if self._parent is not None:
-            self._parent._update_outputs(self._wire_types(outputs))
+        if self._parent_cond is not None:
+            self._parent_cond._update_outputs(self._wire_types(outputs))
+
+
+@dataclass
+class _IfElse(Case):
+    def __init__(self, case: Case) -> None:
+        self.hugr = case.hugr
+        self.parent_node = case.parent_node
+        self.input_node = case.input_node
+        self.output_node = case.output_node
+        self._parent_cond = case._parent_cond
+
+    def _parent_conditional(self) -> Conditional:
+        assert self._parent_cond is not None, "If must have a parent conditional."
+        return self._parent_cond
+
+
+class If(_IfElse):
+    def add_else(self) -> Else:
+        return Else(self._parent_conditional().add_case(0))
+
+
+class Else(_IfElse):
+    def finish(self) -> Node:
+        return self._parent_conditional().parent_node
 
 
 @dataclass
@@ -64,7 +88,7 @@ class Conditional(ParentBuilder[ops.Conditional]):
             self.hugr,
             self.parent_node,
         )
-        new_case._parent = self
+        new_case._parent_cond = self
         self.cases[case_id] = new_case.parent_node
         return new_case
 

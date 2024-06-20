@@ -2,8 +2,9 @@ from hugr._cond_loop import Conditional
 from hugr._dfg import Dfg
 import hugr._tys as tys
 import hugr._ops as ops
+import hugr._val as val
 import pytest
-from .test_hugr_build import INT_T, _validate, IntVal
+from .test_hugr_build import INT_T, _validate, IntVal, H
 
 SUM_T = tys.Sum([[tys.Qubit], [tys.Qubit, INT_T]])
 
@@ -35,3 +36,20 @@ def test_nested_cond() -> None:
     build_cond(cond)
     h.set_outputs(*cond[:2])
     _validate(h.hugr)
+
+
+def test_if_else() -> None:
+    # apply an H if a bool is true.
+    h = Dfg(tys.Qubit)
+    (q,) = h.inputs()
+    if_ = h.add_if(h.load(val.TRUE), q)
+
+    if_.set_outputs(if_.add(H(if_.input_node[0])))
+
+    else_ = if_.add_else()
+    else_.set_outputs(else_.input_node[0])
+
+    cond = else_.finish()
+    h.set_outputs(cond)
+
+    _validate(h.hugr, True)
