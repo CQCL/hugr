@@ -425,6 +425,14 @@ class TailLoop(DataflowOp):
         # self.just_outputs = list(out_types)
         self.rest = list(in_types)
 
+    def deserialize(self) -> _ops.TailLoop:
+        return _ops.TailLoop(
+            just_inputs=deser_it(self.just_inputs),
+            _just_outputs=deser_it(self.just_outputs),
+            rest=deser_it(self.rest),
+            extension_delta=self.extension_delta,
+        )
+
 
 class CFG(DataflowOp):
     """A dataflow node which is defined by a child CFG."""

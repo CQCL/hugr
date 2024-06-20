@@ -52,7 +52,7 @@ def test_if_else() -> None:
     cond = else_.finish()
     h.set_outputs(cond)
 
-    _validate(h.hugr, True)
+    _validate(h.hugr)
 
 
 def test_tail_loop() -> None:
@@ -67,3 +67,36 @@ def test_tail_loop() -> None:
     tl.set_loop_outputs(b, q)
 
     h.set_outputs(tl)
+
+    _validate(h.hugr)
+
+
+def test_complex_tail_loop() -> None:
+    h = Dfg(tys.Qubit)
+    (q,) = h.inputs()
+
+    # loop passes qubit to itself, and a bool as in-out
+    tl = h.add_tail_loop([q], [h.load(val.TRUE)])
+    q, b = tl.inputs()
+
+    # if b is true, return first variant (just qubit)
+    if_ = tl.add_if(b, q)
+    (q,) = if_.inputs()
+    tagged_q = if_.add(ops.Tag(0, SUM_T)(q))
+    if_.set_outputs(tagged_q)
+
+    # else return second variant (qubit, int)
+    else_ = if_.add_else()
+    (q,) = else_.inputs()
+    tagged_q_i = else_.add(ops.Tag(1, SUM_T)(q, else_.load(IntVal(1))))
+    else_.set_outputs(tagged_q_i)
+
+    # finish with Sum output from if-else, and bool from inputs
+    tl.set_loop_outputs(else_.finish(), b)
+
+    # loop returns [qubit, int, bool]
+    h.set_outputs(*tl[:3])
+
+    _validate(h.hugr, True)
+
+    # TODO rewrite with context managers

@@ -207,9 +207,6 @@ class Tag(DataflowOp):
             input=self.sum_ty.variant_rows[self.tag], output=[self.sum_ty]
         )
 
-    def __call__(self, value: Wire) -> Command:
-        return super().__call__(value)
-
 
 class DfParentOp(Op, Protocol):
     def inner_signature(self) -> tys.FunctionType: ...
