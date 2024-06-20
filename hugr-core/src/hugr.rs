@@ -221,6 +221,10 @@ pub enum HugrError {
 
 #[cfg(test)]
 mod test {
+    use std::{fs::File, io::BufReader};
+
+    use crate::{extension::PRELUDE_REGISTRY, test_file};
+
     use super::{Hugr, HugrView};
 
     #[test]
@@ -239,5 +243,51 @@ mod test {
 
         let hugr = simple_dfg_hugr();
         assert_matches!(hugr.get_io(hugr.root()), Some(_));
+    }
+
+    #[test]
+    fn hugr_validation_0() {
+        // https://github.com/CQCL/hugr/issues/1091 bad case
+        let mut hugr: Hugr = serde_json::from_reader(BufReader::new(
+            File::open(test_file!("hugr-0.json")).unwrap(),
+        ))
+        .unwrap();
+        assert!(
+            hugr.update_validate(&PRELUDE_REGISTRY).is_err(),
+            "HUGR should not validate."
+        );
+    }
+
+    #[test]
+    fn hugr_validation_1() {
+        // https://github.com/CQCL/hugr/issues/1091 good case
+        let mut hugr: Hugr = serde_json::from_reader(BufReader::new(
+            File::open(test_file!("hugr-1.json")).unwrap(),
+        ))
+        .unwrap();
+        assert!(hugr.update_validate(&PRELUDE_REGISTRY).is_ok());
+    }
+
+    #[test]
+    fn hugr_validation_2() {
+        // https://github.com/CQCL/hugr/issues/1185 bad case
+        let mut hugr: Hugr = serde_json::from_reader(BufReader::new(
+            File::open(test_file!("hugr-2.json")).unwrap(),
+        ))
+        .unwrap();
+        assert!(
+            hugr.update_validate(&PRELUDE_REGISTRY).is_err(),
+            "HUGR should not validate."
+        );
+    }
+
+    #[test]
+    fn hugr_validation_3() {
+        // https://github.com/CQCL/hugr/issues/1185 good case
+        let mut hugr: Hugr = serde_json::from_reader(BufReader::new(
+            File::open(test_file!("hugr-3.json")).unwrap(),
+        ))
+        .unwrap();
+        assert!(hugr.update_validate(&PRELUDE_REGISTRY).is_ok());
     }
 }
