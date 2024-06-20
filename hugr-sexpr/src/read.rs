@@ -8,7 +8,7 @@ use crate::escape::unescape;
 use crate::input::{Input, InputStream, ParseError, TokenTree};
 use crate::Symbol;
 
-#[derive(Debug, Clone, PartialEq, Eq, Logos)]
+#[derive(Debug, Clone, PartialEq, Logos)]
 #[logos(skip r"[ \t\n\f]+")]
 enum Token {
     #[token("(", |_| 0)]
@@ -28,7 +28,7 @@ enum Token {
         |lex| Symbol::new(lex.slice())
     )]
     #[regex(
-        r#"[+-]([a-zA-Z!$%&*/:<=>?\^_~+\-\.@][a-zA-Z!$%&*/:<=>?\^_~0-9+\-\.@]*)?"#,
+        r#"[+-]([a-zA-Z!$%&*/:<=>?\^_~\.@][a-zA-Z!$%&*/:<=>?\^_~0-9+\-\.@]*)?"#,
         |lex| Symbol::new(lex.slice())
     )]
     #[regex(
@@ -44,9 +44,18 @@ enum Token {
     #[token("#f", |_| Some(false))]
     Bool(bool),
 
-    // TODO: Better number parsing
-    #[regex("[+-]?[0-9]+", |lex| lex.slice().parse().map_err(|_| ()))]
+    #[regex("[+-]?[0-9]+", |lex| lex.slice().parse().map_err(|_| ()), priority = 0)]
     Int(i64),
+
+    #[regex(
+        r#"[+-]?[0-9]+\.[0-9]*([eE][+-]?[0-9]+)?"#r,
+        |lex| lex.slice().parse().map_err(|_| ()),
+        priority = 1
+    )]
+    #[token("#+inf", |_| f64::INFINITY)]
+    #[token("#-inf", |_| -f64::INFINITY)]
+    #[token("#nan", |_| f64::NAN)]
+    Float(f64),
 }
 
 /// Span within a string.
@@ -62,6 +71,8 @@ pub enum ReadError {
     EndOfFile,
     #[error("unexpected closing delimiter")]
     UnexpectedClose { span: Span },
+    #[error("expected whitespace")]
+    ExpectedWhitespace { after: Span, before: Span },
     #[error(transparent)]
     Parse(#[from] ParseError<Span>),
 }
@@ -80,6 +91,7 @@ where
         })
         .collect::<Result<_, _>>()?;
 
+    check_whitespace(&tokens)?;
     balance_lists(&mut tokens)?;
 
     let result = T::parse(&mut ReaderStream {
@@ -89,6 +101,34 @@ where
     })?;
 
     Ok(result)
+}
+
+fn check_whitespace(tokens: &[(Token, Span)]) -> Result<(), ReadError> {
+    for window in tokens.windows(2) {
+        let (token_a, span_a) = &window[0];
+        let (token_b, span_b) = &window[1];
+
+        match token_a {
+            Token::OpenList(_) => continue,
+            Token::Comment => continue,
+            _ => {}
+        }
+
+        match token_b {
+            Token::CloseList => continue,
+            Token::Comment => continue,
+            _ => {}
+        }
+
+        if span_a.end == span_b.start {
+            return Err(ReadError::ExpectedWhitespace {
+                after: span_a.clone(),
+                before: span_b.clone(),
+            });
+        }
+    }
+
+    Ok(())
 }
 
 /// Check that the parentheses are well-balanced and make the OpenList
@@ -161,6 +201,7 @@ impl<'a> InputStream for ReaderStream<'a> {
             Token::Comment => unreachable!("comments have been stripped before"),
             Token::Bool(bool) => Some(TokenTree::Bool(*bool)),
             Token::Int(int) => Some(TokenTree::Int(*int)),
+            Token::Float(float) => Some(TokenTree::Float(*float)),
         }
     }
 
@@ -170,5 +211,20 @@ impl<'a> InputStream for ReaderStream<'a> {
 
     fn parent_span(&self) -> Self::Span {
         self.parent_span.clone()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::from_str;
+    use crate::Value;
+    use rstest::rstest;
+
+    #[rstest]
+    #[case("+#f")]
+    #[case("++inf.0")]
+    #[case("()()")]
+    fn require_whitespace(#[case] text: &str) {
+        assert!(from_str::<Vec<Value>>(text).is_err());
     }
 }

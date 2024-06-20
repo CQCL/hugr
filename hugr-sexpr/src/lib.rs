@@ -4,6 +4,7 @@
 //! together with a reader and pretty printer.
 //! Moreover, the crate provides derive macros to conveniently convert between
 //! user defined types and s-expressions.
+//! See [`Value`] for the data model and syntax.
 //!
 //! # Derive Macros
 //!
@@ -48,6 +49,7 @@
 //! let imported = hugr_sexpr::from_str::<Person>(sexpr).unwrap();
 //! assert_eq!(imported, person);
 //! ```
+use ordered_float::OrderedFloat;
 use smol_str::SmolStr;
 use std::fmt::Display;
 pub(crate) mod escape;
@@ -63,16 +65,54 @@ pub use read::from_str;
 /// A value that can be encoded as an s-expression.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Value {
-    /// A list of values.
+    /// Lists are sequences of zero or more values, delimited by `(` and `)`.
+    /// The elements of the list are separated by whitespace.
     List(Vec<Self>),
-    /// A string.
+
+    /// Strings can be any valid UTF-8 string.
+    /// In the text format, strings are delimited by double quotes `"` on both sides,
+    /// using the following escaping rules:
+    ///
+    ///  - `\"` and `\\` are used to escape `"` and `\`.
+    ///  - `\n`, `\r` and `\t` stand for the newline, carriage return and tab characters.
+    ///  - `\u{HEX}` stands in for any unicode character where `HEX` is a UTF-8 codepoint written in up to four hexadecimal digits.
     String(SmolStr),
-    /// A symbol.
+
+    /// Symbols represent identifiers such as variables or field names.
+    /// A symbol can be any valid UTF-8 string.
+    ///
+    /// In the textual representation, a symbol can appear verbatim without delimiters,
+    /// as long as it satisfies all of the following conditions:
+    ///  - The symbol consists only of alphanumeric characters and of the special characters `!$%&*/:<=>?^_~+-.@`.
+    ///  - The symbol does not begin with a digit.
+    ///  - If the symbol begins with `+` or `-`, the following character (if any) is not a digit.
+    ///
+    /// Symbols that are not of this form are delimited by a pipe `|` on both sides.
+    /// For symbols that are delimited, the same escaping rules apply as for strings,
+    /// except that the double quote `"` is exchanged for the pipe `|`.
+    ///
+    /// Notably the hash sign `#` is reserved and may not appear in a non-delimited symbol.
+    /// This is to allow for future extensibility if richer data types are required.
+    /// Currently we make use of `#` for the encoding of booleans.
     Symbol(Symbol),
-    /// A boolean.
+
+    /// Booleans represent truth values.
+    /// True is denoted by `#t` while false is denoted by `#f`.
     Bool(bool),
-    /// An integer.
-    Int(i64), // TODO: More flexible number types?
+
+    /// Signed integers with 64bit precision.
+    ///
+    /// Integers are represented in text in decimal and with an optional sign,
+    /// following the format `[+-]?[0-9]+`.
+    Int(i64),
+
+    /// Floating point numbers with 64bit precision.
+    ///
+    /// Finite floats are represented in text in the format
+    /// `[+-]?[0-9]+\.[0-9]*([eE][+-]?[0-9]+)?`.
+    /// Positive and negative infinity are denoted by `#+inf` and `#-inf`,
+    /// while NaN is written as `#nan`.
+    Float(OrderedFloat<f64>),
 }
 
 impl Value {
@@ -107,6 +147,14 @@ impl Value {
             _ => None,
         }
     }
+
+    /// Attempts to cast this value into a float.
+    pub fn as_float(&self) -> Option<f64> {
+        match self {
+            Value::Float(float) => Some(float.into_inner()),
+            _ => None,
+        }
+    }
 }
 
 impl Display for Value {
@@ -134,6 +182,12 @@ impl From<SmolStr> for Value {
     }
 }
 
+impl From<&str> for Value {
+    fn from(value: &str) -> Self {
+        Value::String(value.into())
+    }
+}
+
 impl From<Symbol> for Value {
     fn from(value: Symbol) -> Self {
         Value::Symbol(value)
@@ -143,6 +197,18 @@ impl From<Symbol> for Value {
 impl From<bool> for Value {
     fn from(value: bool) -> Self {
         Value::Bool(value)
+    }
+}
+
+impl From<i64> for Value {
+    fn from(value: i64) -> Self {
+        Value::Int(value)
+    }
+}
+
+impl From<f64> for Value {
+    fn from(value: f64) -> Self {
+        Value::Float(OrderedFloat(value))
     }
 }
 
@@ -218,9 +284,10 @@ impl proptest::arbitrary::Arbitrary for Value {
 
         let leaf = prop_oneof![
             any::<bool>().prop_map(Value::from),
-            any::<i64>().prop_map(Value::Int),
+            any::<i64>().prop_map(Value::from),
             any::<Symbol>().prop_map(Value::from),
             any::<String>().prop_map(Value::from),
+            any::<f64>().prop_map(Value::from),
         ];
 
         leaf.prop_recursive(8, 256, 10, |inner| {
@@ -239,7 +306,6 @@ mod test {
         #[test]
         fn pretty_then_parse(values: Vec<Value>, width in 0..120usize) {
             let pretty = to_string_pretty(&values, width);
-            println!("pretty {}", pretty);
             let parsed: Vec<Value> = from_str(&pretty).unwrap();
             assert_eq!(values, parsed);
         }

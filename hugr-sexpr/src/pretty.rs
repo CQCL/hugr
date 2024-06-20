@@ -93,4 +93,23 @@ impl OutputStream for Pretty {
         self.current.push(BoxDoc::text(int.to_string()));
         Ok(())
     }
+
+    fn float(&mut self, float: f64) -> Result<(), Self::Error> {
+        let text = if float.is_nan() {
+            "+nan.0".to_string()
+        } else if float == f64::INFINITY {
+            "+inf.0".to_string()
+        } else if float == -f64::INFINITY {
+            "-inf.0".to_string()
+        } else if float == float.ceil() {
+            // To ensure that floats are not confused with ints after printing
+            // we always include a decimal point.
+            format!("{}.0", float)
+        } else {
+            float.to_string()
+        };
+
+        self.current.push(BoxDoc::text(text));
+        Ok(())
+    }
 }

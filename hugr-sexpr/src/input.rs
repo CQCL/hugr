@@ -51,6 +51,7 @@ fn value_to_token(value: &Value) -> TokenTree<&[Value]> {
         Value::Symbol(symbol) => TokenTree::Symbol(symbol.clone()),
         Value::Bool(bool) => TokenTree::Bool(*bool),
         Value::Int(int) => TokenTree::Int(*int),
+        Value::Float(float) => TokenTree::Float(float.into_inner()),
     }
 }
 
@@ -101,10 +102,11 @@ impl<I: InputStream> Input<I> for Value {
 
         let value = match token_tree {
             TokenTree::List(mut list) => Value::List(Input::parse(&mut list)?),
-            TokenTree::String(string) => Value::String(string),
-            TokenTree::Symbol(symbol) => Value::Symbol(symbol),
-            TokenTree::Bool(bool) => Value::Bool(bool),
-            TokenTree::Int(int) => Value::Int(int),
+            TokenTree::String(string) => Value::from(string),
+            TokenTree::Symbol(symbol) => Value::from(symbol),
+            TokenTree::Bool(bool) => Value::from(bool),
+            TokenTree::Int(int) => Value::from(int),
+            TokenTree::Float(float) => Value::from(float),
         };
 
         Ok(value)
@@ -118,10 +120,11 @@ impl<I: InputStream> Input<I> for Vec<Value> {
         while let Some(token_tree) = stream.next() {
             values.push(match token_tree {
                 TokenTree::List(mut list) => Value::List(Input::parse(&mut list)?),
-                TokenTree::String(string) => Value::String(string),
-                TokenTree::Symbol(symbol) => Value::Symbol(symbol),
-                TokenTree::Bool(bool) => Value::Bool(bool),
-                TokenTree::Int(int) => Value::Int(int),
+                TokenTree::String(string) => Value::from(string),
+                TokenTree::Symbol(symbol) => Value::from(symbol),
+                TokenTree::Bool(bool) => Value::from(bool),
+                TokenTree::Int(int) => Value::from(int),
+                TokenTree::Float(float) => Value::from(float),
             });
         }
 
@@ -168,6 +171,8 @@ pub enum TokenTree<L> {
     Bool(bool),
     /// An integer.
     Int(i64),
+    /// A float.
+    Float(f64),
 }
 
 #[cfg(feature = "derive")]

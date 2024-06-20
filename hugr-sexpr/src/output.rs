@@ -25,6 +25,9 @@ pub trait OutputStream {
 
     /// Write an integer to the output stream.
     fn int(&mut self, int: i64) -> Result<(), Self::Error>;
+
+    /// Write a float to the output stream.
+    fn float(&mut self, float: f64) -> Result<(), Self::Error>;
 }
 
 /// Types that can be converted to an s-expression.
@@ -47,6 +50,7 @@ where
             Value::Symbol(symbol) => output.symbol(symbol),
             Value::Bool(bool) => output.bool(*bool),
             Value::Int(int) => output.int(*int),
+            Value::Float(float) => output.float(float.into_inner()),
         }
     }
 }
@@ -149,22 +153,27 @@ impl OutputStream for ValueOutputStream {
     }
 
     fn string(&mut self, string: impl AsRef<str>) -> Result<(), Self::Error> {
-        self.current.push(Value::String(string.as_ref().into()));
+        self.current.push(Value::from(string.as_ref()));
         Ok(())
     }
 
     fn symbol(&mut self, symbol: impl AsRef<str>) -> Result<(), Self::Error> {
-        self.current.push(Value::Symbol(symbol.as_ref().into()));
+        self.current.push(Value::from(Symbol::new(symbol)));
         Ok(())
     }
 
     fn bool(&mut self, bool: bool) -> Result<(), Self::Error> {
-        self.current.push(Value::Bool(bool));
+        self.current.push(Value::from(bool));
         Ok(())
     }
 
     fn int(&mut self, int: i64) -> Result<(), Self::Error> {
-        self.current.push(Value::Int(int));
+        self.current.push(Value::from(int));
+        Ok(())
+    }
+
+    fn float(&mut self, float: f64) -> Result<(), Self::Error> {
+        self.current.push(Value::from(float));
         Ok(())
     }
 }

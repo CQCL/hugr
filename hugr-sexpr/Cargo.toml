@@ -14,6 +14,7 @@ pretty = "0.12.3"
 smol_str.workspace = true
 thiserror.workspace = true
 proptest.workspace = true
+ordered-float = { version = "4.2.0", features = ["proptest"] }
 
 [lints]
 workspace = true

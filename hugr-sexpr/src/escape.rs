@@ -67,10 +67,10 @@ pub fn escape_string(str: &str) -> String {
 /// Since we use the logos crate anyway for parsing, we might as well use it to
 /// check if a symbol needs to be escaped. This avoids some brittle manual code
 /// or pulling in the `regex` crate needlessly.
-#[derive(Debug, Clone, Logos)]
+#[derive(Debug, Clone, PartialEq, Logos)]
 enum BareSymbol {
     #[regex(r#"[a-zA-Z!$%&*/:<=>?\^_~\.@][a-zA-Z!$%&*/:<=>?\^_~0-9+\-\.@]*"#)]
-    #[regex(r#"[+-]([a-zA-Z!$%&*/:<=>?\^_~+\-\.@][a-zA-Z!$%&*/:<=>?\^_~0-9+\-\.@]*)?"#)]
+    #[regex(r#"[+-]([a-zA-Z!$%&*/:<=>?\^_~\.@][a-zA-Z!$%&*/:<=>?\^_~0-9+\-\.@]*)?"#)]
     BareSymbol,
 }
 
@@ -78,8 +78,14 @@ enum BareSymbol {
 /// Otherwise it is escaped and surrounded by `|` characters.
 pub fn escape_symbol(str: &str) -> String {
     // If the symbol is fine without escaping, we can return it directly.
-    if BareSymbol::lexer(str).all(|r| Result::is_ok(&r)) && !str.is_empty() {
-        return str.to_string();
+    {
+        let mut lexer = BareSymbol::lexer(str);
+        let first_token = lexer.next();
+        let second_token = lexer.next();
+
+        if matches!(first_token, Some(Ok(_))) && second_token.is_none() {
+            return str.to_string();
+        }
     }
 
     let mut output = String::with_capacity(str.len() + 2);
@@ -112,13 +118,13 @@ mod test {
     #[case("+", "+")]
     #[case("-", "-")]
     #[case("-3", "|-3|")]
-    #[case("-a", "-a")]
-    #[case("+a", "+a")]
     #[case(".3", ".3")]
     #[case("|", r#"|\||"#)]
     #[case("", "||")]
     #[case(r#"\"#, r#"|\\|"#)]
     #[case(r#"""#, r#"|"|"#)]
+    #[case("+any", "+any")]
+    #[case("-any", "-any")]
     fn test_escape_symbol(#[case] symbol: &str, #[case] expected: &str) {
         assert_eq!(expected, escape_symbol(symbol));
     }
