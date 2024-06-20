@@ -9,6 +9,7 @@ from hugr._ops import Custom, Command
 import hugr._ops as ops
 from hugr.serialization import SerialHugr
 import hugr._tys as tys
+import hugr._val as val
 import pytest
 import json
 
@@ -23,6 +24,14 @@ def int_t(width: int) -> tys.Opaque:
 
 
 INT_T = int_t(5)
+
+
+@dataclass
+class IntVal(val.ExtensionValue):
+    v: int
+
+    def to_value(self) -> val.Extension:
+        return val.Extension("int", INT_T, self.v)
 
 
 @dataclass
@@ -119,12 +128,15 @@ def test_stable_indices():
     assert h._free_nodes == []
 
 
-def test_simple_id():
+def simple_id() -> Dfg:
     h = Dfg(tys.Qubit, tys.Qubit)
     a, b = h.inputs()
     h.set_outputs(a, b)
+    return h
 
-    _validate(h.hugr)
+
+def test_simple_id():
+    _validate(simple_id().hugr)
 
 
 def test_multiport():
@@ -257,3 +269,18 @@ def test_ancestral_sibling():
     nt = nested.add(Not(a))
 
     assert _ancestral_sibling(h.hugr, h.input_node, nt) == nested.parent_node
+
+
+@pytest.mark.parametrize(
+    "val",
+    [
+        val.Function(simple_id().hugr),
+        val.Sum(1, tys.Sum([[INT_T], [tys.Bool, INT_T]]), [IntVal(34)]),
+        val.Tuple([val.TRUE, IntVal(23)]),
+    ],
+)
+def test_vals(val: val.Value):
+    d = Dfg()
+    d.set_outputs(d.add_load_const(val))
+
+    _validate(d.hugr)

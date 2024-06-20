@@ -1,7 +1,7 @@
 from __future__ import annotations
 import inspect
 import sys
-from abc import ABC
+from abc import ABC, abstractmethod
 from typing import Any, Literal
 
 from pydantic import Field, RootModel, ConfigDict
@@ -21,6 +21,7 @@ from .tys import (
     model_rebuild as tys_model_rebuild,
 )
 from hugr.utils import deser_it
+
 
 NodeID = int
 
@@ -44,7 +45,7 @@ class BaseOp(ABC, ConfiguredBaseModel):
 
     def deserialize(self) -> _ops.Op:
         """Deserializes the model into the corresponding Op."""
-        return _ops.SerWrap(self)
+        raise NotImplementedError
 
 
 # ----------------------------------------------------------
@@ -80,36 +81,54 @@ class CustomConst(ConfiguredBaseModel):
     v: Any
 
 
-class ExtensionValue(ConfiguredBaseModel):
+class BaseValue(ABC, ConfiguredBaseModel):
+    @abstractmethod
+    def deserialize(self) -> _val.Value: ...
+
+
+class ExtensionValue(BaseValue):
     """An extension constant value, that can check it is of a given [CustomType]."""
 
-    v: Literal["Extension"] = Field("Extension", title="ValueTag")
+    v: Literal["Extension"] = Field(default="Extension", title="ValueTag")
     extensions: ExtensionSet
     typ: Type
     value: CustomConst
 
+    def deserialize(self) -> _val.Value:
+        return _val.Extension(self.value.c, self.typ.deserialize(), self.value.v)
 
-class FunctionValue(ConfiguredBaseModel):
+
+class FunctionValue(BaseValue):
     """A higher-order function value."""
 
-    v: Literal["Function"] = Field("Function", title="ValueTag")
-    hugr: Any  # TODO
+    v: Literal["Function"] = Field(default="Function", title="ValueTag")
+    hugr: Any
+
+    def deserialize(self) -> _val.Value:
+        from hugr._hugr import Hugr
+        from hugr.serialization.serial_hugr import SerialHugr
+
+        # pydantic stores the serialized dictionary because of the "Any" annotation
+        return _val.Function(Hugr.from_serial(SerialHugr(**self.hugr)))
 
 
-class TupleValue(ConfiguredBaseModel):
+class TupleValue(BaseValue):
     """A constant tuple value."""
 
-    v: Literal["Tuple"] = Field("Tuple", title="ValueTag")
+    v: Literal["Tuple"] = Field(default="Tuple", title="ValueTag")
     vs: list["Value"]
 
+    def deserialize(self) -> _val.Value:
+        return _val.Tuple(deser_it((v.root for v in self.vs)))
 
-class SumValue(ConfiguredBaseModel):
+
+class SumValue(BaseValue):
     """A Sum variant
 
     For any Sum type where this value meets the type of the variant indicated by the tag
     """
 
-    v: Literal["Sum"] = Field("Sum", title="ValueTag")
+    v: Literal["Sum"] = Field(default="Sum", title="ValueTag")
     tag: int
     typ: SumType
     vs: list["Value"]
@@ -122,6 +141,11 @@ class SumValue(ConfiguredBaseModel):
         }
     )
 
+    def deserialize(self) -> _val.Value:
+        return _val.Sum(
+            self.tag, self.typ.deserialize(), deser_it((v.root for v in self.vs))
+        )
+
 
 class Value(RootModel):
     """A constant Value."""
@@ -132,12 +156,18 @@ class Value(RootModel):
 
     model_config = ConfigDict(json_schema_extra={"required": ["v"]})
 
+    def deserialize(self) -> _val.Value:
+        return self.root.deserialize()
+
 
 class Const(BaseOp):
     """A Const operation definition."""
 
     op: Literal["Const"] = "Const"
     v: Value = Field()
+
+    def deserialize(self) -> _ops.Const:
+        return _ops.Const(self.v.deserialize())
 
 
 # -----------------------------------------------
@@ -173,6 +203,13 @@ class DataflowBlock(BaseOp):
 
         # Needed to avoid random '\n's in the pydantic description
 
+    def deserialize(self) -> _ops.DataflowBlock:
+        return _ops.DataflowBlock(
+            inputs=deser_it(self.inputs),
+            _sum_rows=[deser_it(r) for r in self.sum_rows],
+            _other_outputs=deser_it(self.other_outputs),
+        )
+
     model_config = ConfigDict(
         json_schema_extra={
             "description": "A CFG basic block node. The signature is that of the internal Dataflow graph.",
@@ -193,6 +230,9 @@ class ExitBlock(BaseOp):
             "description": "The single exit node of the CFG, has no children, stores the types of the CFG node output.",
         }
     )
+
+    def deserialize(self) -> _ops.ExitBlock:
+        return _ops.ExitBlock(deser_it(self.cfg_outputs))
 
 
 # ---------------------------------------------
@@ -281,6 +321,9 @@ class LoadConstant(DataflowOp):
 
     op: Literal["LoadConstant"] = "LoadConstant"
     datatype: Type
+
+    def deserialize(self) -> _ops.LoadConst:
+        return _ops.LoadConst(self.datatype.deserialize())
 
 
 class LoadFunction(DataflowOp):
@@ -382,6 +425,9 @@ class CFG(DataflowOp):
             input=list(inputs), output=list(outputs), extension_reqs=ExtensionSet([])
         )
 
+    def deserialize(self) -> _ops.CFG:
+        return _ops.CFG(self.signature.deserialize())
+
 
 ControlFlowOp = Conditional | TailLoop | CFG
 
@@ -471,6 +517,12 @@ class Tag(DataflowOp):
     tag: int  # The variant to create.
     variants: list[TypeRow]  # The variants of the sum type.
 
+    def deserialize(self) -> _ops.Tag:
+        return _ops.Tag(
+            tag=self.tag,
+            variants=[deser_it(v) for v in self.variants],
+        )
+
 
 class Lift(DataflowOp):
     """Fixes some TypeParams of a polymorphic type by providing TypeArgs."""
@@ -559,4 +611,6 @@ classes = (
 
 tys_model_rebuild(dict(classes))
 
-from hugr import _ops  # noqa: E402  # needed to avoid circular imports
+# needed to avoid circular imports
+from hugr import _ops  # noqa: E402
+from hugr import _val  # noqa: E402

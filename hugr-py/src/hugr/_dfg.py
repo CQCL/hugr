@@ -1,19 +1,20 @@
 from __future__ import annotations
+
 from dataclasses import dataclass, replace
 from typing import (
-    Iterable,
     TYPE_CHECKING,
+    Iterable,
     TypeVar,
 )
-from ._hugr import Hugr, Node, Wire, OutPort, ParentBuilder
 
 from typing_extensions import Self
+
 import hugr._ops as ops
-from hugr._tys import TypeRow
+import hugr._val as val
+from hugr._tys import Type, TypeRow
 
 from ._exceptions import NoSiblingAncestor
-from ._hugr import ToNode
-from hugr._tys import Type
+from ._hugr import Hugr, Node, OutPort, ParentBuilder, ToNode, Wire
 
 if TYPE_CHECKING:
     from ._cfg import Cfg
@@ -112,6 +113,21 @@ class _DfBase(ParentBuilder[DP]):
     def add_state_order(self, src: Node, dst: Node) -> None:
         # adds edge to the right of all existing edges
         self.hugr.add_link(src.out(-1), dst.inp(-1))
+
+    def add_const(self, val: val.Value) -> Node:
+        return self.hugr.add_const(val, self.parent_node)
+
+    def load_const(self, const_node: ToNode) -> Node:
+        const_op = self.hugr._get_typed_op(const_node, ops.Const)
+        load_op = ops.LoadConst(const_op.val.type_())
+
+        load = self.add(load_op())
+        self.hugr.add_link(const_node.out_port(), load.inp(0))
+
+        return load
+
+    def add_load_const(self, val: val.Value) -> Node:
+        return self.load_const(self.add_const(val))
 
     def _wire_up(self, node: Node, ports: Iterable[Wire]):
         tys = [self._wire_up_port(node, i, p) for i, p in enumerate(ports)]

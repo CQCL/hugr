@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Generic, Protocol, TypeVar, TYPE_CHECKING, runtime_checkable
+from typing import Protocol, TYPE_CHECKING, runtime_checkable, TypeVar
 from hugr.serialization.ops import BaseOp
 import hugr.serialization.ops as sops
 from hugr.utils import ser_it
 import hugr._tys as tys
+import hugr._val as val
 from ._exceptions import IncompleteOp
 
 if TYPE_CHECKING:
@@ -53,23 +54,6 @@ class PartialOp(Protocol):
 class Command:
     op: DataflowOp
     incoming: list[Wire]
-
-
-T = TypeVar("T", bound=BaseOp)
-
-
-@dataclass()
-class SerWrap(Op, Generic[T]):
-    # catch all for serial ops that don't have a corresponding Op class
-    _serial_op: T
-
-    def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> T:
-        root = self._serial_op.model_copy()
-        root.parent = parent.idx
-        return root
-
-    def port_kind(self, port: InPort | OutPort) -> tys.Kind:
-        raise NotImplementedError
 
 
 @dataclass()
@@ -304,9 +288,7 @@ class DataflowBlock(DfParentOp):
 
     @property
     def other_outputs(self) -> tys.TypeRow:
-        if self._other_outputs is None:
-            raise IncompleteOp()
-        return self._other_outputs
+        return _check_complete(self._other_outputs)
 
     @property
     def num_out(self) -> int | None:
@@ -359,3 +341,35 @@ class ExitBlock(Op):
 
     def port_kind(self, port: InPort | OutPort) -> tys.Kind:
         return tys.CFKind()
+
+
+@dataclass
+class Const(Op):
+    val: val.Value
+    num_out: int | None = 1
+
+    def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.Const:
+        return sops.Const(
+            parent=parent.idx,
+            v=self.val.to_serial_root(),
+        )
+
+    def port_kind(self, port: InPort | OutPort) -> tys.Kind:
+        return tys.ConstKind(self.val.type_())
+
+
+@dataclass
+class LoadConst(DataflowOp):
+    typ: tys.Type | None = None
+
+    def type_(self) -> tys.Type:
+        return _check_complete(self.typ)
+
+    def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.LoadConstant:
+        return sops.LoadConstant(
+            parent=parent.idx,
+            datatype=self.type_().to_serial_root(),
+        )
+
+    def outer_signature(self) -> tys.FunctionType:
+        return tys.FunctionType(input=[], output=[self.type_()])

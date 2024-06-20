@@ -17,8 +17,9 @@ from typing import (
 
 from typing_extensions import Self
 
-from hugr._ops import Op, DataflowOp
+from hugr._ops import Op, DataflowOp, Const
 from hugr._tys import Type, Kind
+from hugr._val import Value
 from hugr.serialization.ops import OpType as SerialOp
 from hugr.serialization.serial_hugr import SerialHugr
 from hugr.utils import BiMap
@@ -227,6 +228,9 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
     ) -> Node:
         parent = parent or self.root
         return self._add_node(op, parent, num_outs)
+
+    def add_const(self, value: Value, parent: ToNode | None = None) -> Node:
+        return self.add_node(Const(value), parent)
 
     def delete_node(self, node: ToNode) -> NodeData | None:
         node = node.to_node()

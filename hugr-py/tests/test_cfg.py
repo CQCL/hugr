@@ -1,34 +1,35 @@
 from hugr._cfg import Cfg
 import hugr._tys as tys
+import hugr._val as val
 from hugr._dfg import Dfg
 import hugr._ops as ops
-from .test_hugr_build import _validate, INT_T, DivMod
+from .test_hugr_build import _validate, INT_T, DivMod, IntVal
 
 
 def build_basic_cfg(cfg: Cfg) -> None:
     entry = cfg.add_entry()
 
-    entry.set_block_outputs(*entry.inputs())
+    entry.set_single_succ_outputs(*entry.inputs())
     cfg.branch(entry[0], cfg.exit)
 
 
 def test_basic_cfg() -> None:
-    cfg = Cfg([tys.Unit, tys.Bool])
+    cfg = Cfg([tys.Bool])
     build_basic_cfg(cfg)
     _validate(cfg.hugr)
 
 
 def test_branch() -> None:
-    cfg = Cfg([tys.Bool, tys.Unit, INT_T])
+    cfg = Cfg([tys.Bool, INT_T])
     entry = cfg.add_entry()
     entry.set_block_outputs(*entry.inputs())
 
     middle_1 = cfg.add_successor(entry[0])
-    middle_1.set_block_outputs(*middle_1.inputs())
+    middle_1.set_single_succ_outputs(*middle_1.inputs())
     middle_2 = cfg.add_successor(entry[1])
-    u, i = middle_2.inputs()
+    (i,) = middle_2.inputs()
     n = middle_2.add(DivMod(i, i))
-    middle_2.set_block_outputs(u, n[0])
+    middle_2.set_single_succ_outputs(n[0])
 
     cfg.branch_exit(middle_1[0])
     cfg.branch_exit(middle_2[0])
@@ -37,9 +38,9 @@ def test_branch() -> None:
 
 
 def test_nested_cfg() -> None:
-    dfg = Dfg(tys.Unit, tys.Bool)
+    dfg = Dfg(tys.Bool)
 
-    cfg = dfg.add_cfg([tys.Unit, tys.Bool], *dfg.inputs())
+    cfg = dfg.add_cfg([tys.Bool], *dfg.inputs())
 
     build_basic_cfg(cfg)
     dfg.set_outputs(cfg)
@@ -68,16 +69,16 @@ def test_dom_edge() -> None:
 
 def test_asymm_types() -> None:
     # test different types going to entry block's susccessors
-    cfg = Cfg([tys.Bool, tys.Unit, INT_T])
+    cfg = Cfg([])
     entry = cfg.add_entry()
-    b, u, i = entry.inputs()
 
-    tagged_int = entry.add(ops.Tag(0, [[INT_T], [tys.Bool]])(i))
+    int_load = entry.add_load_const(IntVal(34))
+    tagged_int = entry.add(ops.Tag(0, [[INT_T], [tys.Bool]])(int_load))
     entry.set_block_outputs(tagged_int)
 
     middle = cfg.add_successor(entry[0])
     # discard the int and return the bool from entry
-    middle.set_block_outputs(u, b)
+    middle.set_single_succ_outputs(middle.add_load_const(val.TRUE))
 
     # middle expects an int and exit expects a bool
     cfg.branch_exit(entry[1])
