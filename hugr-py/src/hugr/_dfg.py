@@ -4,6 +4,7 @@ from dataclasses import dataclass, replace
 from typing import (
     TYPE_CHECKING,
     Iterable,
+    Sequence,
     TypeVar,
 )
 
@@ -18,7 +19,7 @@ from ._hugr import Hugr, Node, OutPort, ParentBuilder, ToNode, Wire
 
 if TYPE_CHECKING:
     from ._cfg import Cfg
-    from ._cond_loop import Conditional, If
+    from ._cond_loop import Conditional, If, TailLoop
 
 
 DP = TypeVar("DP", bound=ops.DfParentOp)
@@ -125,6 +126,22 @@ class _DfBase(ParentBuilder[DP]):
 
         conditional = self.add_conditional(cond, *args)
         return If(conditional.add_case(1))
+
+    def add_tail_loop(
+        self, just_inputs: Sequence[Wire], rest: Sequence[Wire]
+    ) -> TailLoop:
+        from ._cond_loop import TailLoop
+
+        rest = rest or []
+        just_input_types = self._wire_types(just_inputs)
+        rest_types = self._wire_types(rest)
+        parent_op = ops.TailLoop(just_input_types, rest_types)
+        tl = TailLoop.new_nested(parent_op, self.hugr, self.parent_node)
+        self._wire_up(tl.parent_node, (*just_inputs, *rest))
+        return tl
+
+    def insert_tail_loop(self, tl: TailLoop, *args: Wire) -> Node:
+        return self._insert_nested_impl(tl, *args)
 
     def set_outputs(self, *args: Wire) -> None:
         self._wire_up(self.output_node, args)

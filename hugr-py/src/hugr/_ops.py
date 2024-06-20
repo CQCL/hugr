@@ -444,3 +444,47 @@ class Case(DfParentOp):
 
     def _inputs(self) -> tys.TypeRow:
         return self.inputs
+
+
+@dataclass
+class TailLoop(DfParentOp, DataflowOp):
+    just_inputs: tys.TypeRow
+    rest: tys.TypeRow
+    _just_outputs: tys.TypeRow | None = None
+    extension_delta: tys.ExtensionSet = field(default_factory=list)
+
+    @property
+    def just_outputs(self) -> tys.TypeRow:
+        return _check_complete(self._just_outputs)
+
+    @property
+    def num_out(self) -> int | None:
+        return len(self.just_outputs) + len(self.rest)
+
+    def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.TailLoop:
+        return sops.TailLoop(
+            parent=parent.idx,
+            just_inputs=ser_it(self.just_inputs),
+            just_outputs=ser_it(self.just_outputs),
+            rest=ser_it(self.rest),
+            extension_delta=self.extension_delta,
+        )
+
+    def inner_signature(self) -> tys.FunctionType:
+        return tys.FunctionType(
+            self._inputs(), [tys.Sum([self.just_inputs, self.just_outputs]), *self.rest]
+        )
+
+    def outer_signature(self) -> tys.FunctionType:
+        return tys.FunctionType(self._inputs(), self.just_outputs + self.rest)
+
+    def _set_out_types(self, types: tys.TypeRow) -> None:
+        (sum_, other) = tys.get_first_sum(types)
+        just_ins, just_outs = sum_.variant_rows
+        assert (
+            just_ins == self.just_inputs
+        ), "First sum variant rows don't match TailLoop inputs."
+        self._just_outputs = just_outs
+
+    def _inputs(self) -> tys.TypeRow:
+        return self.just_inputs + self.rest

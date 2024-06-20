@@ -4,7 +4,7 @@ import hugr._tys as tys
 import hugr._ops as ops
 import hugr._val as val
 import pytest
-from .test_hugr_build import INT_T, _validate, IntVal, H
+from .test_hugr_build import INT_T, _validate, IntVal, H, Measure
 
 SUM_T = tys.Sum([[tys.Qubit], [tys.Qubit, INT_T]])
 
@@ -53,3 +53,17 @@ def test_if_else() -> None:
     h.set_outputs(cond)
 
     _validate(h.hugr, True)
+
+
+def test_tail_loop() -> None:
+    # apply H while measure is true
+
+    h = Dfg(tys.Qubit)
+    (q,) = h.inputs()
+
+    tl = h.add_tail_loop([], [q])
+    q, b = tl.add(Measure(tl.add(H(tl.input_node[0]))))[:]
+
+    tl.set_loop_outputs(b, q)
+
+    h.set_outputs(tl)

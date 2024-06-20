@@ -44,8 +44,6 @@ class Else(_IfElse):
 
 @dataclass
 class Conditional(ParentBuilder[ops.Conditional]):
-    hugr: Hugr
-    parent_node: Node
     cases: dict[int, Node | None]
 
     def __init__(self, sum_ty: Sum, other_inputs: TypeRow) -> None:
@@ -93,3 +91,9 @@ class Conditional(ParentBuilder[ops.Conditional]):
         return new_case
 
     # TODO insert_case
+
+
+@dataclass
+class TailLoop(_DfBase[ops.TailLoop]):
+    def set_loop_outputs(self, sum_wire: Wire, *rest: Wire) -> None:
+        self.set_outputs(sum_wire, *rest)

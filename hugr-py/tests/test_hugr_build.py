@@ -54,21 +54,34 @@ Not = NotDef()
 
 
 @dataclass
-class OneQbGate(Custom):
-    num_out: int | None = 1
+class QuantumOps(Custom):
     extension: tys.ExtensionId = "tket2.quantum"
+
+
+@dataclass
+class OneQbGate(QuantumOps):
+    op_name: str
+    num_out: int | None = 1
     signature: tys.FunctionType = tys.FunctionType.endo([tys.Qubit])
 
     def __call__(self, q: Wire) -> Command:
         return super().__call__(q)
 
 
+H = OneQbGate("H")
+
+
 @dataclass
-class HDef(OneQbGate):
-    op_name: str = "H"
+class MeasureDef(QuantumOps):
+    op_name: str = "Measure"
+    num_out: int | None = 2
+    signature: tys.FunctionType = tys.FunctionType([tys.Qubit], [tys.Qubit, tys.Bool])
+
+    def __call__(self, q: Wire) -> Command:
+        return super().__call__(q)
 
 
-H = HDef()
+Measure = MeasureDef()
 
 
 @dataclass
