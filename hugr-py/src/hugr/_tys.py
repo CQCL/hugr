@@ -237,6 +237,10 @@ class FunctionType(Type):
     def empty(cls) -> FunctionType:
         return cls(input=[], output=[])
 
+    @classmethod
+    def endo(cls, tys: TypeRow) -> FunctionType:
+        return cls(input=tys, output=tys)
+
     def flip(self) -> FunctionType:
         return FunctionType(input=list(self.output), output=list(self.input))
 

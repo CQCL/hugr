@@ -44,9 +44,7 @@ class LogicOps(Custom):
 class NotDef(LogicOps):
     num_out: int | None = 1
     op_name: str = "Not"
-    signature: tys.FunctionType = field(
-        default_factory=lambda: tys.FunctionType(input=[tys.Bool], output=[tys.Bool])
-    )
+    signature: tys.FunctionType = tys.FunctionType.endo([tys.Bool])
 
     def __call__(self, a: Wire) -> Command:
         return super().__call__(a)
