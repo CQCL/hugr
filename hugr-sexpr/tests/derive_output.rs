@@ -1,8 +1,3 @@
-// use hugr_sexpr::{
-//     export::{export_values, Export},
-//     read_values, Value,
-// };
-
 use hugr_sexpr::{from_str, output::Output, to_values, Value};
 
 #[test]

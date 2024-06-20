@@ -13,6 +13,7 @@ logos = "0.14.0"
 pretty = "0.12.3"
 smol_str.workspace = true
 thiserror.workspace = true
+proptest.workspace = true
 
 [lints]
 workspace = true
@@ -20,3 +21,6 @@ workspace = true
 [features]
 default = ["derive"]
 derive = ["hugr-sexpr-derive"]
+
+[dev-dependencies]
+proptest.workspace = true

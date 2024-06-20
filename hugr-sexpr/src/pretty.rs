@@ -1,7 +1,10 @@
 //! Pretty print s-expressions.
 use std::convert::Infallible;
 
-use crate::output::{Output, OutputStream};
+use crate::{
+    output::{Output, OutputStream},
+    string::escape_string,
+};
 use pretty::BoxDoc;
 
 /// Pretty prints a value of type `T` into an s-expression by writing into an
@@ -67,9 +70,8 @@ impl OutputStream for Pretty {
     }
 
     fn string(&mut self, string: impl AsRef<str>) -> Result<(), Self::Error> {
-        // TODO: Escape the string
-        self.current
-            .push(BoxDoc::text(format!("\"{}\"", string.as_ref())));
+        let escaped = escape_string(string.as_ref());
+        self.current.push(BoxDoc::text(format!(r#""{}""#, escaped)));
         Ok(())
     }
 

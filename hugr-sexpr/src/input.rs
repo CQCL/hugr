@@ -173,3 +173,24 @@ pub enum TokenTree<L> {
 #[cfg(feature = "derive")]
 #[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
 pub use hugr_sexpr_derive::Input;
+
+#[cfg(test)]
+mod test {
+    use crate::{input::Input, Value};
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn parse_values_from_values(values: Vec<Value>) {
+            let result = Vec::<Value>::parse(&mut values.as_slice()).unwrap();
+            assert_eq!(values, result);
+        }
+
+        #[test]
+        fn parse_value_from_values(value: Value) {
+            let values = [value; 1];
+            let result = Value::parse(&mut values.as_slice()).unwrap();
+            assert_eq!(values[0], result);
+        }
+    }
+}

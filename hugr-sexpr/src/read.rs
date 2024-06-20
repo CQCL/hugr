@@ -1,11 +1,11 @@
 //! Reading s-expressions from strings.
 use logos::Logos;
 use smol_str::SmolStr;
-use std::collections::VecDeque;
 use std::ops::Range;
 use thiserror::Error;
 
 use crate::input::{Input, InputStream, ParseError, TokenTree};
+use crate::string::unescape_string;
 use crate::Symbol;
 
 #[derive(Debug, Clone, PartialEq, Eq, Logos)]
@@ -19,7 +19,7 @@ enum Token {
 
     #[regex(
         r#""([^"\\]|\\["\\bnfrt]|u[a-fA-F0-9]{4})*""#,
-        |lex| unescape_string(&lex.slice()[1..lex.slice().len() - 1])
+        |lex| Some(unescape_string(&lex.slice()[1..lex.slice().len() - 1])?.into())
     )]
     String(SmolStr),
 
@@ -81,39 +81,6 @@ where
     })?;
 
     Ok(result)
-}
-
-/// Replaces escape sequences with their corresponding characters.
-fn unescape_string(str: &str) -> Option<SmolStr> {
-    let mut input = str.chars().collect::<VecDeque<_>>();
-    let mut output = String::new();
-    let mut unicode = String::new();
-
-    while let Some(c) = input.pop_front() {
-        if c != '\\' {
-            output.push(c);
-            continue;
-        }
-
-        match input.pop_front() {
-            Some('b') => output.push('\u{0008}'),
-            Some('n') => output.push('\n'),
-            Some('f') => output.push('\u{000C}'),
-            Some('r') => output.push('\r'),
-            Some('t') => output.push('\t'),
-            Some('"') => output.push('"'),
-            Some('\\') => output.push('\\'),
-            Some('u') => {
-                unicode.extend(input.drain(..4));
-                let codepoint = u32::from_str_radix(&unicode, 16).ok()?;
-                unicode.clear();
-                output.push(char::from_u32(codepoint)?);
-            }
-            _ => return None,
-        }
-    }
-
-    Some(output.into())
 }
 
 /// Check that the parentheses are well-balanced and make the OpenList

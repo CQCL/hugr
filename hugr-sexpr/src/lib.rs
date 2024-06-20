@@ -54,6 +54,7 @@ pub mod input;
 pub mod output;
 pub mod pretty;
 pub mod read;
+pub(crate) mod string;
 
 pub use output::to_values;
 pub use pretty::{to_fmt_pretty, to_string_pretty};
@@ -195,5 +196,56 @@ impl From<&str> for Symbol {
 impl Display for Symbol {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.as_ref())
+    }
+}
+
+impl proptest::arbitrary::Arbitrary for Symbol {
+    type Parameters = ();
+    type Strategy = proptest::strategy::SBoxedStrategy<Self>;
+
+    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+        use proptest::prelude::*;
+        use proptest::string::string_regex;
+
+        string_regex("[a-zA-Z!$%&*\\./<>=@\\^_~][a-zA-Z0-9!$%&*+\\-\\./:<>=@\\^_~]*")
+            .unwrap()
+            .prop_map(Symbol::from)
+            .sboxed()
+    }
+}
+
+impl proptest::arbitrary::Arbitrary for Value {
+    type Parameters = ();
+    type Strategy = proptest::strategy::BoxedStrategy<Self>;
+
+    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+        use proptest::prelude::*;
+
+        let leaf = prop_oneof![
+            any::<bool>().prop_map(Value::from),
+            any::<i64>().prop_map(Value::Int),
+            any::<Symbol>().prop_map(Value::from),
+            any::<String>().prop_map(Value::from),
+        ];
+
+        leaf.prop_recursive(8, 256, 10, |inner| {
+            proptest::collection::vec(inner, 0..10).prop_map(Value::List)
+        })
+        .boxed()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::{from_str, to_string_pretty, Value};
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn pretty_then_parse(values: Vec<Value>, width in 0..120usize) {
+            let pretty = to_string_pretty(&values, width);
+            let parsed: Vec<Value> = from_str(&pretty).unwrap();
+            assert_eq!(values, parsed);
+        }
     }
 }
