@@ -21,15 +21,15 @@ use crate::{
     types::{LLVMSumType, TypeConverter},
 };
 
-pub use self::func::{EmitFuncContext, RowPromise};
-
 pub mod args;
 pub mod func;
 pub mod namer;
 mod ops;
 
 pub use args::EmitOpArgs;
+pub use func::{EmitFuncContext, RowPromise};
 pub use namer::Namer;
+pub use ops::emit_value;
 
 /// A trait used to abstract over emission.
 ///

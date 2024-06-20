@@ -248,7 +248,7 @@ fn get_exactly_one_sum_type(ts: impl IntoIterator<Item = Type>) -> Result<SumTyp
     Ok(sum_type)
 }
 
-fn emit_value<'c, H: HugrView>(
+pub fn emit_value<'c, H: HugrView>(
     context: &mut EmitFuncContext<'c, H>,
     v: &Value,
 ) -> Result<BasicValueEnum<'c>> {

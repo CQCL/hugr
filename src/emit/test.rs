@@ -18,7 +18,7 @@ use rstest::rstest;
 use crate::test::*;
 
 #[allow(clippy::upper_case_acronyms)]
-type DFGW<'a> = DFGWrapper<&'a mut Hugr, BuildHandle<FuncID<true>>>;
+pub type DFGW<'a> = DFGWrapper<&'a mut Hugr, BuildHandle<FuncID<true>>>;
 
 pub struct SimpleHugrConfig {
     ins: TypeRow,

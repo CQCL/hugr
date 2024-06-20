@@ -23,8 +23,6 @@ use super::emit::EmitOp;
 
 pub mod int;
 pub mod prelude;
-// pub mod float_ops;
-// pub mod logic_ops;
 
 /// The extension point for lowering HUGR Extensions to LLVM.
 pub trait CodegenExtension<'c, H: HugrView> {
