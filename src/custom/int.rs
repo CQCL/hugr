@@ -81,8 +81,10 @@ fn emit_icmp<'c, H: HugrView>(
 
 impl<'c, H: HugrView> EmitOp<'c, CustomOp, H> for IntOpEmitter<'c, '_, H> {
     fn emit(&mut self, args: EmitOpArgs<'c, CustomOp, H>) -> Result<()> {
-        let iot = ConcreteIntOp::from_optype(&args.node().generalise())
-            .ok_or(anyhow!("IntOpEmitter from_optype_failed"))?;
+        let iot = ConcreteIntOp::from_optype(&args.node().generalise()).ok_or(anyhow!(
+            "IntOpEmitter from_optype_failed: {:?}",
+            args.node().as_ref()
+        ))?;
         match iot.name().as_str() {
             "iadd" => emit_custom_binary_op(self.0, args, |builder, lhs, rhs| {
                 Ok(vec![builder

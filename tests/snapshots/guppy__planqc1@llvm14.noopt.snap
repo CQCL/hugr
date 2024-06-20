@@ -1,0 +1,135 @@
+---
+source: tests/guppy.rs
+expression: module_string
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define i16 @_hl.rx.13(i16 %0, double %1) {
+alloca_block:
+  %"0" = alloca i16, align 2
+  %"5_0" = alloca i16, align 2
+  %"5_1" = alloca double, align 8
+  %"15_0" = alloca i16, align 2
+  %"6_0" = alloca i16, align 2
+  %"6_1" = alloca double, align 8
+  %"03" = alloca i16, align 2
+  %"19_0" = alloca { {} }, align 8
+  %"18_0" = alloca i16, align 2
+  %"16_0" = alloca i16, align 2
+  %"17_0" = alloca i16, align 2
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  store i16 %0, i16* %"5_0", align 2
+  store double %1, double* %"5_1", align 8
+  %"5_01" = load i16, i16* %"5_0", align 2
+  %"5_12" = load double, double* %"5_1", align 8
+  store i16 %"5_01", i16* %"6_0", align 2
+  store double %"5_12", double* %"6_1", align 8
+  br label %4
+
+2:                                                ; preds = %4
+  %3 = extractvalue { {} } %"19_012", 0
+  store i16 %"18_013", i16* %"03", align 2
+  br label %8
+
+4:                                                ; preds = %entry_block
+  %"6_04" = load i16, i16* %"6_0", align 2
+  %"6_15" = load double, double* %"6_1", align 8
+  store { {} } undef, { {} }* %"19_0", align 1
+  store i16 %"6_04", i16* %"6_0", align 2
+  store double %"6_15", double* %"6_1", align 8
+  %"6_06" = load i16, i16* %"6_0", align 2
+  %5 = call i16 @H(i16 %"6_06")
+  store i16 %5, i16* %"16_0", align 2
+  %"16_07" = load i16, i16* %"16_0", align 2
+  %"6_18" = load double, double* %"6_1", align 8
+  %6 = call i16 @RzF64(i16 %"16_07", double %"6_18")
+  store i16 %6, i16* %"17_0", align 2
+  %"17_09" = load i16, i16* %"17_0", align 2
+  %7 = call i16 @H(i16 %"17_09")
+  store i16 %7, i16* %"18_0", align 2
+  %"19_010" = load { {} }, { {} }* %"19_0", align 1
+  %"18_011" = load i16, i16* %"18_0", align 2
+  store { {} } %"19_010", { {} }* %"19_0", align 1
+  store i16 %"18_011", i16* %"18_0", align 2
+  %"19_012" = load { {} }, { {} }* %"19_0", align 1
+  %"18_013" = load i16, i16* %"18_0", align 2
+  switch i32 0, label %2 [
+  ]
+
+8:                                                ; preds = %2
+  %"014" = load i16, i16* %"03", align 2
+  store i16 %"014", i16* %"15_0", align 2
+  %"15_015" = load i16, i16* %"15_0", align 2
+  store i16 %"15_015", i16* %"0", align 2
+  %"016" = load i16, i16* %"0", align 2
+  ret i16 %"016"
+}
+
+declare i16 @H(i16)
+
+declare i16 @RzF64(i16, double)
+
+define { i32, {}, {} } @_hl.main.14() {
+alloca_block:
+  %"0" = alloca { i32, {}, {} }, align 8
+  %"20_0" = alloca { i32, {}, {} }, align 8
+  %"01" = alloca { i32, {}, {} }, align 8
+  %"27_0" = alloca { {} }, align 8
+  %"25_1" = alloca { i32, {}, {} }, align 8
+  %"23_0" = alloca double, align 8
+  %"21_0" = alloca i16, align 2
+  %"24_0" = alloca i16, align 2
+  %"25_0" = alloca i16, align 2
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  br label %2
+
+0:                                                ; preds = %2
+  %1 = extractvalue { {} } %"27_08", 0
+  store { i32, {}, {} } %"25_19", { i32, {}, {} }* %"01", align 4
+  br label %8
+
+2:                                                ; preds = %entry_block
+  store { {} } undef, { {} }* %"27_0", align 1
+  store double 1.500000e+00, double* %"23_0", align 8
+  %3 = call i16 @QAlloc()
+  store i16 %3, i16* %"21_0", align 2
+  %"21_02" = load i16, i16* %"21_0", align 2
+  %"23_03" = load double, double* %"23_0", align 8
+  %4 = call i16 @_hl.rx.13(i16 %"21_02", double %"23_03")
+  store i16 %4, i16* %"24_0", align 2
+  %"24_04" = load i16, i16* %"24_0", align 2
+  %5 = call { i16, { i32, {}, {} } } @Measure(i16 %"24_04")
+  %6 = extractvalue { i16, { i32, {}, {} } } %5, 0
+  %7 = extractvalue { i16, { i32, {}, {} } } %5, 1
+  store i16 %6, i16* %"25_0", align 2
+  store { i32, {}, {} } %7, { i32, {}, {} }* %"25_1", align 4
+  %"27_05" = load { {} }, { {} }* %"27_0", align 1
+  %"25_16" = load { i32, {}, {} }, { i32, {}, {} }* %"25_1", align 4
+  store { {} } %"27_05", { {} }* %"27_0", align 1
+  store { i32, {}, {} } %"25_16", { i32, {}, {} }* %"25_1", align 4
+  %"25_07" = load i16, i16* %"25_0", align 2
+  call void @QFree(i16 %"25_07")
+  %"27_08" = load { {} }, { {} }* %"27_0", align 1
+  %"25_19" = load { i32, {}, {} }, { i32, {}, {} }* %"25_1", align 4
+  switch i32 0, label %0 [
+  ]
+
+8:                                                ; preds = %0
+  %"010" = load { i32, {}, {} }, { i32, {}, {} }* %"01", align 4
+  store { i32, {}, {} } %"010", { i32, {}, {} }* %"20_0", align 4
+  %"20_011" = load { i32, {}, {} }, { i32, {}, {} }* %"20_0", align 4
+  store { i32, {}, {} } %"20_011", { i32, {}, {} }* %"0", align 4
+  %"012" = load { i32, {}, {} }, { i32, {}, {} }* %"0", align 4
+  ret { i32, {}, {} } %"012"
+}
+
+declare i16 @QAlloc()
+
+declare { i16, { i32, {}, {} } } @Measure(i16)
+
+declare void @QFree(i16)

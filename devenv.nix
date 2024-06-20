@@ -26,5 +26,13 @@ in {
       enable = true;
       channel = "stable";
     };
+
+    languages.python = {
+      enable = true;
+      poetry = {
+        enable = true;
+        activate.enable = true;
+      };
+    };
   };
 }

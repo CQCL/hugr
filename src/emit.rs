@@ -6,10 +6,11 @@ use hugr::{
     HugrView, Node,
 };
 use inkwell::{
+    builder::Builder,
     context::Context,
     module::{Linkage, Module},
     types::{AnyType, BasicType, BasicTypeEnum, FunctionType},
-    values::{FunctionValue, GlobalValue},
+    values::{BasicValueEnum, CallSiteValue, FunctionValue, GlobalValue},
 };
 use std::{collections::HashSet, hash::Hash, rc::Rc};
 
@@ -409,6 +410,36 @@ impl<'c, H: HugrView> EmitHugr<'c, H> {
     pub fn finish(self) -> Module<'c> {
         self.module_context.finish()
     }
+}
+
+/// Extract all return values from the result of a `call`.
+///
+/// LLVM only supports functions with exactly zero or one return value.
+/// For functions with multiple return values, we return a struct containing
+/// all the return values.
+///
+/// `inkwell` provides a helper [Builder::build_aggregate_return] to construct
+/// the return value, see `EmitHugr::emit_func_impl`. This function performs the
+/// inverse.
+pub fn deaggregate_call_result<'c>(
+    builder: &Builder<'c>,
+    call_result: CallSiteValue<'c>,
+    num_results: usize,
+) -> Result<Vec<BasicValueEnum<'c>>> {
+    let call_result = call_result.try_as_basic_value();
+    Ok(match num_results as u32 {
+        0 => {
+            call_result.expect_right("void");
+            vec![]
+        }
+        1 => vec![call_result.expect_left("non-void")],
+        n => {
+            let return_struct = call_result.expect_left("non-void").into_struct_value();
+            (0..n)
+                .map(|i| builder.build_extract_value(return_struct, i, ""))
+                .collect::<Result<Vec<_>, _>>()?
+        }
+    })
 }
 
 #[cfg(test)]

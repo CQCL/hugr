@@ -1,0 +1,572 @@
+---
+source: tests/guppy.rs
+expression: module_string
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define i16 @_hl.rus.35(i16 %0, i64 %1) {
+alloca_block:
+  %"0" = alloca i16, align 2
+  %"5_0" = alloca i16, align 2
+  %"5_1" = alloca i64, align 8
+  %"37_0" = alloca i16, align 2
+  %"6_0" = alloca i16, align 2
+  %"6_1" = alloca i64, align 8
+  %"03" = alloca i16, align 2
+  %"7_0" = alloca i64, align 8
+  %"7_1" = alloca i64, align 8
+  %"7_2" = alloca i16, align 2
+  %"10_0" = alloca i64, align 8
+  %"10_1" = alloca i64, align 8
+  %"10_2" = alloca i16, align 2
+  %"11_0" = alloca i16, align 2
+  %"12_0" = alloca i64, align 8
+  %"12_1" = alloca i64, align 8
+  %"12_2" = alloca i16, align 2
+  %"12_3" = alloca i16, align 2
+  %"15_0" = alloca i64, align 8
+  %"15_1" = alloca i64, align 8
+  %"15_2" = alloca i16, align 2
+  %"15_3" = alloca i16, align 2
+  %"16_0" = alloca i16, align 2
+  %"17_0" = alloca i64, align 8
+  %"17_1" = alloca i64, align 8
+  %"17_2" = alloca i16, align 2
+  %"40_0" = alloca { {} }, align 8
+  %"39_0" = alloca i64, align 8
+  %"43_0" = alloca { i32, {}, { i64, i64 } }, align 8
+  %"42_0" = alloca { i32, {}, {} }, align 8
+  %"021" = alloca { i32, {}, { i64, i64 } }, align 8
+  %"45_0" = alloca { i32, {}, { i64, i64 } }, align 8
+  %"47_0" = alloca { i32, {}, { i64, i64 } }, align 8
+  %"60_1" = alloca { i32, {}, {} }, align 8
+  %"58_0" = alloca i16, align 2
+  %"51_0" = alloca i16, align 2
+  %"52_0" = alloca i16, align 2
+  %"49_0" = alloca i16, align 2
+  %"50_0" = alloca i16, align 2
+  %"53_0" = alloca { { i16, i16 } }, align 8
+  %"54_0" = alloca i16, align 2
+  %"54_1" = alloca i16, align 2
+  %"55_0" = alloca i16, align 2
+  %"56_0" = alloca i16, align 2
+  %"56_1" = alloca i16, align 2
+  %"57_0" = alloca { { i16, i16 } }, align 8
+  %"58_1" = alloca i16, align 2
+  %"59_0" = alloca i16, align 2
+  %"60_0" = alloca i16, align 2
+  %"63_0" = alloca { {} }, align 8
+  %"73_0" = alloca { i32, { i64, i64 }, {} }, align 8
+  %"69_0" = alloca i16, align 2
+  %"65_0" = alloca i16, align 2
+  %"66_0" = alloca i16, align 2
+  %"67_0" = alloca i16, align 2
+  %"67_1" = alloca i16, align 2
+  %"68_0" = alloca { { i16, i16 } }, align 8
+  %"69_1" = alloca i16, align 2
+  %"70_0" = alloca i16, align 2
+  %"71_0" = alloca i16, align 2
+  %"71_1" = alloca { i32, {}, {} }, align 8
+  %"077" = alloca { i32, { i64, i64 }, {} }, align 8
+  %"75_0" = alloca { i32, { i64, i64 }, {} }, align 8
+  %"77_0" = alloca { i32, { i64, i64 }, {} }, align 8
+  %"81_0" = alloca { {} }, align 8
+  %"80_0" = alloca { {} }, align 8
+  %"83_0" = alloca { {} }, align 8
+  %"89_0" = alloca { {} }, align 8
+  %"88_0" = alloca i64, align 8
+  %"85_0" = alloca i16, align 2
+  %"87_0" = alloca i64, align 8
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  store i16 %0, i16* %"5_0", align 2
+  store i64 %1, i64* %"5_1", align 4
+  %"5_01" = load i16, i16* %"5_0", align 2
+  %"5_12" = load i64, i64* %"5_1", align 4
+  store i16 %"5_01", i16* %"6_0", align 2
+  store i64 %"5_12", i64* %"6_1", align 4
+  br label %4
+
+2:                                                ; preds = %4
+  %3 = extractvalue { {} } %"40_010", 0
+  store i64 %"39_011", i64* %"7_0", align 4
+  store i64 %"6_112", i64* %"7_1", align 4
+  store i16 %"6_013", i16* %"7_2", align 2
+  br label %11
+
+4:                                                ; preds = %entry_block
+  %"6_04" = load i16, i16* %"6_0", align 2
+  %"6_15" = load i64, i64* %"6_1", align 4
+  store { {} } undef, { {} }* %"40_0", align 1
+  store i64 0, i64* %"39_0", align 4
+  store i16 %"6_04", i16* %"6_0", align 2
+  store i64 %"6_15", i64* %"6_1", align 4
+  %"40_06" = load { {} }, { {} }* %"40_0", align 1
+  %"39_07" = load i64, i64* %"39_0", align 4
+  %"6_18" = load i64, i64* %"6_1", align 4
+  %"6_09" = load i16, i16* %"6_0", align 2
+  store { {} } %"40_06", { {} }* %"40_0", align 1
+  store i64 %"39_07", i64* %"39_0", align 4
+  store i64 %"6_18", i64* %"6_1", align 4
+  store i16 %"6_09", i16* %"6_0", align 2
+  %"40_010" = load { {} }, { {} }* %"40_0", align 1
+  %"39_011" = load i64, i64* %"39_0", align 4
+  %"6_112" = load i64, i64* %"6_1", align 4
+  %"6_013" = load i16, i16* %"6_0", align 2
+  switch i32 0, label %2 [
+  ]
+
+5:                                                ; preds = %cond_exit_43
+  %6 = extractvalue { i32, {}, { i64, i64 } } %"43_029", 1
+  store i16 %"7_230", i16* %"11_0", align 2
+  br label %49
+
+7:                                                ; preds = %cond_exit_43
+  %8 = extractvalue { i32, {}, { i64, i64 } } %"43_029", 2
+  %9 = extractvalue { i64, i64 } %8, 0
+  %10 = extractvalue { i64, i64 } %8, 1
+  store i64 %9, i64* %"10_0", align 4
+  store i64 %10, i64* %"10_1", align 4
+  store i16 %"7_230", i16* %"10_2", align 2
+  br label %21
+
+11:                                               ; preds = %81, %75, %2
+  %"7_015" = load i64, i64* %"7_0", align 4
+  %"7_116" = load i64, i64* %"7_1", align 4
+  %"7_217" = load i16, i16* %"7_2", align 2
+  store i64 %"7_015", i64* %"7_0", align 4
+  store i64 %"7_116", i64* %"7_1", align 4
+  store i16 %"7_217", i16* %"7_2", align 2
+  %"7_018" = load i64, i64* %"7_0", align 4
+  %"7_119" = load i64, i64* %"7_1", align 4
+  %12 = icmp slt i64 %"7_018", %"7_119"
+  %13 = select i1 %12, { i32, {}, {} } { i32 1, {} poison, {} undef }, { i32, {}, {} } { i32 0, {} undef, {} poison }
+  store { i32, {}, {} } %13, { i32, {}, {} }* %"42_0", align 4
+  %"42_020" = load { i32, {}, {} }, { i32, {}, {} }* %"42_0", align 4
+  %14 = extractvalue { i32, {}, {} } %"42_020", 0
+  %15 = extractvalue { i32, {}, {} } %"42_020", 1
+  %16 = extractvalue { i32, {}, {} } %"42_020", 2
+  switch i32 %14, label %cond_43_case_0 [
+    i32 1, label %cond_43_case_1
+  ]
+
+17:                                               ; preds = %21
+  %18 = extractvalue { i32, {}, {} } %"60_153", 1
+  store i64 %"10_054", i64* %"15_0", align 4
+  store i64 %"10_155", i64* %"15_1", align 4
+  store i16 %"58_056", i16* %"15_2", align 2
+  store i16 %"10_257", i16* %"15_3", align 2
+  br label %77
+
+19:                                               ; preds = %21
+  %20 = extractvalue { i32, {}, {} } %"60_153", 2
+  store i64 %"10_054", i64* %"12_0", align 4
+  store i64 %"10_155", i64* %"12_1", align 4
+  store i16 %"58_056", i16* %"12_2", align 2
+  store i16 %"10_257", i16* %"12_3", align 2
+  br label %56
+
+21:                                               ; preds = %7
+  %"10_031" = load i64, i64* %"10_0", align 4
+  %"10_132" = load i64, i64* %"10_1", align 4
+  %"10_233" = load i16, i16* %"10_2", align 2
+  %22 = call i16 @QAlloc()
+  store i16 %22, i16* %"51_0", align 2
+  %"51_034" = load i16, i16* %"51_0", align 2
+  %23 = call i16 @H(i16 %"51_034")
+  store i16 %23, i16* %"52_0", align 2
+  %24 = call i16 @QAlloc()
+  store i16 %24, i16* %"49_0", align 2
+  %"49_035" = load i16, i16* %"49_0", align 2
+  %25 = call i16 @H(i16 %"49_035")
+  store i16 %25, i16* %"50_0", align 2
+  %"50_036" = load i16, i16* %"50_0", align 2
+  %"52_037" = load i16, i16* %"52_0", align 2
+  %26 = insertvalue { i16, i16 } undef, i16 %"50_036", 0
+  %27 = insertvalue { i16, i16 } %26, i16 %"52_037", 1
+  %28 = insertvalue { { i16, i16 } } poison, { i16, i16 } %27, 0
+  store { { i16, i16 } } %28, { { i16, i16 } }* %"53_0", align 2
+  %"53_038" = load { { i16, i16 } }, { { i16, i16 } }* %"53_0", align 2
+  %29 = extractvalue { { i16, i16 } } %"53_038", 0
+  %30 = extractvalue { i16, i16 } %29, 0
+  %31 = extractvalue { i16, i16 } %29, 1
+  store i16 %30, i16* %"54_0", align 2
+  store i16 %31, i16* %"54_1", align 2
+  %"54_039" = load i16, i16* %"54_0", align 2
+  %32 = call i16 @Tdg(i16 %"54_039")
+  store i16 %32, i16* %"55_0", align 2
+  %"54_140" = load i16, i16* %"54_1", align 2
+  %"55_041" = load i16, i16* %"55_0", align 2
+  %33 = call { i16, i16 } @CX(i16 %"54_140", i16 %"55_041")
+  %34 = extractvalue { i16, i16 } %33, 0
+  %35 = extractvalue { i16, i16 } %33, 1
+  store i16 %34, i16* %"56_0", align 2
+  store i16 %35, i16* %"56_1", align 2
+  %"56_042" = load i16, i16* %"56_0", align 2
+  %"56_143" = load i16, i16* %"56_1", align 2
+  %36 = insertvalue { i16, i16 } undef, i16 %"56_042", 0
+  %37 = insertvalue { i16, i16 } %36, i16 %"56_143", 1
+  %38 = insertvalue { { i16, i16 } } poison, { i16, i16 } %37, 0
+  store { { i16, i16 } } %38, { { i16, i16 } }* %"57_0", align 2
+  %"57_044" = load { { i16, i16 } }, { { i16, i16 } }* %"57_0", align 2
+  %39 = extractvalue { { i16, i16 } } %"57_044", 0
+  %40 = extractvalue { i16, i16 } %39, 0
+  %41 = extractvalue { i16, i16 } %39, 1
+  store i16 %40, i16* %"58_0", align 2
+  store i16 %41, i16* %"58_1", align 2
+  %"58_145" = load i16, i16* %"58_1", align 2
+  %42 = call i16 @T(i16 %"58_145")
+  store i16 %42, i16* %"59_0", align 2
+  %"59_046" = load i16, i16* %"59_0", align 2
+  %43 = call { i16, { i32, {}, {} } } @Measure(i16 %"59_046")
+  %44 = extractvalue { i16, { i32, {}, {} } } %43, 0
+  %45 = extractvalue { i16, { i32, {}, {} } } %43, 1
+  store i16 %44, i16* %"60_0", align 2
+  store { i32, {}, {} } %45, { i32, {}, {} }* %"60_1", align 4
+  %"60_047" = load i16, i16* %"60_0", align 2
+  call void @QFree(i16 %"60_047")
+  store i64 %"10_031", i64* %"10_0", align 4
+  store i64 %"10_132", i64* %"10_1", align 4
+  store i16 %"10_233", i16* %"10_2", align 2
+  %"60_148" = load { i32, {}, {} }, { i32, {}, {} }* %"60_1", align 4
+  %"10_049" = load i64, i64* %"10_0", align 4
+  %"10_150" = load i64, i64* %"10_1", align 4
+  %"58_051" = load i16, i16* %"58_0", align 2
+  %"10_252" = load i16, i16* %"10_2", align 2
+  store { i32, {}, {} } %"60_148", { i32, {}, {} }* %"60_1", align 4
+  store i64 %"10_049", i64* %"10_0", align 4
+  store i64 %"10_150", i64* %"10_1", align 4
+  store i16 %"58_051", i16* %"58_0", align 2
+  store i16 %"10_252", i16* %"10_2", align 2
+  %"60_153" = load { i32, {}, {} }, { i32, {}, {} }* %"60_1", align 4
+  %"10_054" = load i64, i64* %"10_0", align 4
+  %"10_155" = load i64, i64* %"10_1", align 4
+  %"58_056" = load i16, i16* %"58_0", align 2
+  %"10_257" = load i16, i16* %"10_2", align 2
+  %46 = extractvalue { i32, {}, {} } %"60_153", 0
+  switch i32 %46, label %17 [
+    i32 1, label %19
+  ]
+
+47:                                               ; preds = %49
+  %48 = extractvalue { {} } %"63_061", 0
+  store i16 %"11_062", i16* %"03", align 2
+  br label %86
+
+49:                                               ; preds = %78, %5
+  %"11_058" = load i16, i16* %"11_0", align 2
+  store { {} } undef, { {} }* %"63_0", align 1
+  store i16 %"11_058", i16* %"11_0", align 2
+  %"63_059" = load { {} }, { {} }* %"63_0", align 1
+  %"11_060" = load i16, i16* %"11_0", align 2
+  store { {} } %"63_059", { {} }* %"63_0", align 1
+  store i16 %"11_060", i16* %"11_0", align 2
+  %"63_061" = load { {} }, { {} }* %"63_0", align 1
+  %"11_062" = load i16, i16* %"11_0", align 2
+  switch i32 0, label %47 [
+  ]
+
+50:                                               ; preds = %cond_exit_73
+  %51 = extractvalue { i32, { i64, i64 }, {} } %"73_086", 1
+  %52 = extractvalue { i64, i64 } %51, 0
+  %53 = extractvalue { i64, i64 } %51, 1
+  store i64 %52, i64* %"17_0", align 4
+  store i64 %53, i64* %"17_1", align 4
+  store i16 %"69_087", i16* %"17_2", align 2
+  br label %83
+
+54:                                               ; preds = %cond_exit_73
+  %55 = extractvalue { i32, { i64, i64 }, {} } %"73_086", 2
+  store i16 %"69_087", i16* %"16_0", align 2
+  br label %80
+
+56:                                               ; preds = %19
+  %"12_063" = load i64, i64* %"12_0", align 4
+  %"12_164" = load i64, i64* %"12_1", align 4
+  %"12_265" = load i16, i16* %"12_2", align 2
+  %"12_366" = load i16, i16* %"12_3", align 2
+  store i64 %"12_063", i64* %"12_0", align 4
+  store i64 %"12_164", i64* %"12_1", align 4
+  store i16 %"12_265", i16* %"12_2", align 2
+  store i16 %"12_366", i16* %"12_3", align 2
+  %"12_367" = load i16, i16* %"12_3", align 2
+  %57 = call i16 @T(i16 %"12_367")
+  store i16 %57, i16* %"65_0", align 2
+  %"65_068" = load i16, i16* %"65_0", align 2
+  %58 = call i16 @Z(i16 %"65_068")
+  store i16 %58, i16* %"66_0", align 2
+  %"66_069" = load i16, i16* %"66_0", align 2
+  %"12_270" = load i16, i16* %"12_2", align 2
+  %59 = call { i16, i16 } @CX(i16 %"66_069", i16 %"12_270")
+  %60 = extractvalue { i16, i16 } %59, 0
+  %61 = extractvalue { i16, i16 } %59, 1
+  store i16 %60, i16* %"67_0", align 2
+  store i16 %61, i16* %"67_1", align 2
+  %"67_071" = load i16, i16* %"67_0", align 2
+  %"67_172" = load i16, i16* %"67_1", align 2
+  %62 = insertvalue { i16, i16 } undef, i16 %"67_071", 0
+  %63 = insertvalue { i16, i16 } %62, i16 %"67_172", 1
+  %64 = insertvalue { { i16, i16 } } poison, { i16, i16 } %63, 0
+  store { { i16, i16 } } %64, { { i16, i16 } }* %"68_0", align 2
+  %"68_073" = load { { i16, i16 } }, { { i16, i16 } }* %"68_0", align 2
+  %65 = extractvalue { { i16, i16 } } %"68_073", 0
+  %66 = extractvalue { i16, i16 } %65, 0
+  %67 = extractvalue { i16, i16 } %65, 1
+  store i16 %66, i16* %"69_0", align 2
+  store i16 %67, i16* %"69_1", align 2
+  %"69_174" = load i16, i16* %"69_1", align 2
+  %68 = call i16 @T(i16 %"69_174")
+  store i16 %68, i16* %"70_0", align 2
+  %"70_075" = load i16, i16* %"70_0", align 2
+  %69 = call { i16, { i32, {}, {} } } @Measure(i16 %"70_075")
+  %70 = extractvalue { i16, { i32, {}, {} } } %69, 0
+  %71 = extractvalue { i16, { i32, {}, {} } } %69, 1
+  store i16 %70, i16* %"71_0", align 2
+  store { i32, {}, {} } %71, { i32, {}, {} }* %"71_1", align 4
+  %"71_176" = load { i32, {}, {} }, { i32, {}, {} }* %"71_1", align 4
+  %72 = extractvalue { i32, {}, {} } %"71_176", 0
+  %73 = extractvalue { i32, {}, {} } %"71_176", 1
+  %74 = extractvalue { i32, {}, {} } %"71_176", 2
+  switch i32 %72, label %cond_73_case_0 [
+    i32 1, label %cond_73_case_1
+  ]
+
+75:                                               ; preds = %77
+  %76 = extractvalue { {} } %"81_097", 0
+  store i64 %"15_098", i64* %"7_0", align 4
+  store i64 %"15_199", i64* %"7_1", align 4
+  store i16 %"15_3100", i16* %"7_2", align 2
+  br label %11
+
+77:                                               ; preds = %17
+  %"15_088" = load i64, i64* %"15_0", align 4
+  %"15_189" = load i64, i64* %"15_1", align 4
+  %"15_290" = load i16, i16* %"15_2", align 2
+  %"15_391" = load i16, i16* %"15_3", align 2
+  store { {} } undef, { {} }* %"81_0", align 1
+  store { {} } undef, { {} }* %"80_0", align 1
+  store i64 %"15_088", i64* %"15_0", align 4
+  store i64 %"15_189", i64* %"15_1", align 4
+  store i16 %"15_290", i16* %"15_2", align 2
+  store i16 %"15_391", i16* %"15_3", align 2
+  %"81_092" = load { {} }, { {} }* %"81_0", align 1
+  %"15_093" = load i64, i64* %"15_0", align 4
+  %"15_194" = load i64, i64* %"15_1", align 4
+  %"15_395" = load i16, i16* %"15_3", align 2
+  store { {} } %"81_092", { {} }* %"81_0", align 1
+  store i64 %"15_093", i64* %"15_0", align 4
+  store i64 %"15_194", i64* %"15_1", align 4
+  store i16 %"15_395", i16* %"15_3", align 2
+  %"15_296" = load i16, i16* %"15_2", align 2
+  call void @QFree(i16 %"15_296")
+  %"81_097" = load { {} }, { {} }* %"81_0", align 1
+  %"15_098" = load i64, i64* %"15_0", align 4
+  %"15_199" = load i64, i64* %"15_1", align 4
+  %"15_3100" = load i16, i16* %"15_3", align 2
+  switch i32 0, label %75 [
+  ]
+
+78:                                               ; preds = %80
+  %79 = extractvalue { {} } %"83_0104", 0
+  store i16 %"16_0105", i16* %"11_0", align 2
+  br label %49
+
+80:                                               ; preds = %54
+  %"16_0101" = load i16, i16* %"16_0", align 2
+  store { {} } undef, { {} }* %"83_0", align 1
+  store i16 %"16_0101", i16* %"16_0", align 2
+  %"83_0102" = load { {} }, { {} }* %"83_0", align 1
+  %"16_0103" = load i16, i16* %"16_0", align 2
+  store { {} } %"83_0102", { {} }* %"83_0", align 1
+  store i16 %"16_0103", i16* %"16_0", align 2
+  %"83_0104" = load { {} }, { {} }* %"83_0", align 1
+  %"16_0105" = load i16, i16* %"16_0", align 2
+  switch i32 0, label %78 [
+  ]
+
+81:                                               ; preds = %83
+  %82 = extractvalue { {} } %"89_0116", 0
+  store i64 %"88_0117", i64* %"7_0", align 4
+  store i64 %"17_1118", i64* %"7_1", align 4
+  store i16 %"85_0119", i16* %"7_2", align 2
+  br label %11
+
+83:                                               ; preds = %50
+  %"17_0106" = load i64, i64* %"17_0", align 4
+  %"17_1107" = load i64, i64* %"17_1", align 4
+  %"17_2108" = load i16, i16* %"17_2", align 2
+  store { {} } undef, { {} }* %"89_0", align 1
+  store i64 1, i64* %"87_0", align 4
+  store i64 %"17_0106", i64* %"17_0", align 4
+  store i64 %"17_1107", i64* %"17_1", align 4
+  store i16 %"17_2108", i16* %"17_2", align 2
+  %"17_2109" = load i16, i16* %"17_2", align 2
+  %84 = call i16 @X(i16 %"17_2109")
+  store i16 %84, i16* %"85_0", align 2
+  %"17_0110" = load i64, i64* %"17_0", align 4
+  %"87_0111" = load i64, i64* %"87_0", align 4
+  %85 = add i64 %"17_0110", %"87_0111"
+  store i64 %85, i64* %"88_0", align 4
+  %"89_0112" = load { {} }, { {} }* %"89_0", align 1
+  %"88_0113" = load i64, i64* %"88_0", align 4
+  %"17_1114" = load i64, i64* %"17_1", align 4
+  %"85_0115" = load i16, i16* %"85_0", align 2
+  store { {} } %"89_0112", { {} }* %"89_0", align 1
+  store i64 %"88_0113", i64* %"88_0", align 4
+  store i64 %"17_1114", i64* %"17_1", align 4
+  store i16 %"85_0115", i16* %"85_0", align 2
+  %"89_0116" = load { {} }, { {} }* %"89_0", align 1
+  %"88_0117" = load i64, i64* %"88_0", align 4
+  %"17_1118" = load i64, i64* %"17_1", align 4
+  %"85_0119" = load i16, i16* %"85_0", align 2
+  switch i32 0, label %81 [
+  ]
+
+86:                                               ; preds = %47
+  %"014" = load i16, i16* %"03", align 2
+  store i16 %"014", i16* %"37_0", align 2
+  %"37_0120" = load i16, i16* %"37_0", align 2
+  store i16 %"37_0120", i16* %"0", align 2
+  %"0121" = load i16, i16* %"0", align 2
+  ret i16 %"0121"
+
+cond_43_case_0:                                   ; preds = %11
+  store { i32, {}, { i64, i64 } } { i32 0, {} undef, { i64, i64 } poison }, { i32, {}, { i64, i64 } }* %"45_0", align 4
+  %"45_023" = load { i32, {}, { i64, i64 } }, { i32, {}, { i64, i64 } }* %"45_0", align 4
+  store { i32, {}, { i64, i64 } } %"45_023", { i32, {}, { i64, i64 } }* %"021", align 4
+  br label %cond_exit_43
+
+cond_43_case_1:                                   ; preds = %11
+  %"7_024" = load i64, i64* %"7_0", align 4
+  %"7_125" = load i64, i64* %"7_1", align 4
+  %87 = insertvalue { i64, i64 } undef, i64 %"7_024", 0
+  %88 = insertvalue { i64, i64 } %87, i64 %"7_125", 1
+  %89 = insertvalue { i32, {}, { i64, i64 } } { i32 1, {} poison, { i64, i64 } poison }, { i64, i64 } %88, 2
+  store { i32, {}, { i64, i64 } } %89, { i32, {}, { i64, i64 } }* %"47_0", align 4
+  %"47_026" = load { i32, {}, { i64, i64 } }, { i32, {}, { i64, i64 } }* %"47_0", align 4
+  store { i32, {}, { i64, i64 } } %"47_026", { i32, {}, { i64, i64 } }* %"021", align 4
+  br label %cond_exit_43
+
+cond_exit_43:                                     ; preds = %cond_43_case_1, %cond_43_case_0
+  %"022" = load { i32, {}, { i64, i64 } }, { i32, {}, { i64, i64 } }* %"021", align 4
+  store { i32, {}, { i64, i64 } } %"022", { i32, {}, { i64, i64 } }* %"43_0", align 4
+  %"43_027" = load { i32, {}, { i64, i64 } }, { i32, {}, { i64, i64 } }* %"43_0", align 4
+  %"7_228" = load i16, i16* %"7_2", align 2
+  store { i32, {}, { i64, i64 } } %"43_027", { i32, {}, { i64, i64 } }* %"43_0", align 4
+  store i16 %"7_228", i16* %"7_2", align 2
+  %"43_029" = load { i32, {}, { i64, i64 } }, { i32, {}, { i64, i64 } }* %"43_0", align 4
+  %"7_230" = load i16, i16* %"7_2", align 2
+  %90 = extractvalue { i32, {}, { i64, i64 } } %"43_029", 0
+  switch i32 %90, label %5 [
+    i32 1, label %7
+  ]
+
+cond_73_case_0:                                   ; preds = %56
+  %"12_079" = load i64, i64* %"12_0", align 4
+  %"12_180" = load i64, i64* %"12_1", align 4
+  %91 = insertvalue { i64, i64 } undef, i64 %"12_079", 0
+  %92 = insertvalue { i64, i64 } %91, i64 %"12_180", 1
+  %93 = insertvalue { i32, { i64, i64 }, {} } { i32 0, { i64, i64 } poison, {} poison }, { i64, i64 } %92, 1
+  store { i32, { i64, i64 }, {} } %93, { i32, { i64, i64 }, {} }* %"75_0", align 4
+  %"75_081" = load { i32, { i64, i64 }, {} }, { i32, { i64, i64 }, {} }* %"75_0", align 4
+  store { i32, { i64, i64 }, {} } %"75_081", { i32, { i64, i64 }, {} }* %"077", align 4
+  br label %cond_exit_73
+
+cond_73_case_1:                                   ; preds = %56
+  store { i32, { i64, i64 }, {} } { i32 1, { i64, i64 } poison, {} undef }, { i32, { i64, i64 }, {} }* %"77_0", align 4
+  %"77_082" = load { i32, { i64, i64 }, {} }, { i32, { i64, i64 }, {} }* %"77_0", align 4
+  store { i32, { i64, i64 }, {} } %"77_082", { i32, { i64, i64 }, {} }* %"077", align 4
+  br label %cond_exit_73
+
+cond_exit_73:                                     ; preds = %cond_73_case_1, %cond_73_case_0
+  %"078" = load { i32, { i64, i64 }, {} }, { i32, { i64, i64 }, {} }* %"077", align 4
+  store { i32, { i64, i64 }, {} } %"078", { i32, { i64, i64 }, {} }* %"73_0", align 4
+  %"73_083" = load { i32, { i64, i64 }, {} }, { i32, { i64, i64 }, {} }* %"73_0", align 4
+  %"69_084" = load i16, i16* %"69_0", align 2
+  store { i32, { i64, i64 }, {} } %"73_083", { i32, { i64, i64 }, {} }* %"73_0", align 4
+  store i16 %"69_084", i16* %"69_0", align 2
+  %"71_085" = load i16, i16* %"71_0", align 2
+  call void @QFree(i16 %"71_085")
+  %"73_086" = load { i32, { i64, i64 }, {} }, { i32, { i64, i64 }, {} }* %"73_0", align 4
+  %"69_087" = load i16, i16* %"69_0", align 2
+  %94 = extractvalue { i32, { i64, i64 }, {} } %"73_086", 0
+  switch i32 %94, label %50 [
+    i32 1, label %54
+  ]
+}
+
+declare i16 @QAlloc()
+
+declare i16 @H(i16)
+
+declare i16 @Tdg(i16)
+
+declare { i16, i16 } @CX(i16, i16)
+
+declare i16 @T(i16)
+
+declare { i16, { i32, {}, {} } } @Measure(i16)
+
+declare void @QFree(i16)
+
+declare i16 @Z(i16)
+
+declare i16 @X(i16)
+
+define { i32, {}, {} } @_hl.main.36() {
+alloca_block:
+  %"0" = alloca { i32, {}, {} }, align 8
+  %"90_0" = alloca { i32, {}, {} }, align 8
+  %"01" = alloca { i32, {}, {} }, align 8
+  %"97_0" = alloca { {} }, align 8
+  %"95_1" = alloca { i32, {}, {} }, align 8
+  %"93_0" = alloca i64, align 8
+  %"91_0" = alloca i16, align 2
+  %"94_0" = alloca i16, align 2
+  %"95_0" = alloca i16, align 2
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  br label %2
+
+0:                                                ; preds = %2
+  %1 = extractvalue { {} } %"97_08", 0
+  store { i32, {}, {} } %"95_19", { i32, {}, {} }* %"01", align 4
+  br label %8
+
+2:                                                ; preds = %entry_block
+  store { {} } undef, { {} }* %"97_0", align 1
+  store i64 100, i64* %"93_0", align 4
+  %3 = call i16 @QAlloc()
+  store i16 %3, i16* %"91_0", align 2
+  %"91_02" = load i16, i16* %"91_0", align 2
+  %"93_03" = load i64, i64* %"93_0", align 4
+  %4 = call i16 @_hl.rus.35(i16 %"91_02", i64 %"93_03")
+  store i16 %4, i16* %"94_0", align 2
+  %"94_04" = load i16, i16* %"94_0", align 2
+  %5 = call { i16, { i32, {}, {} } } @Measure(i16 %"94_04")
+  %6 = extractvalue { i16, { i32, {}, {} } } %5, 0
+  %7 = extractvalue { i16, { i32, {}, {} } } %5, 1
+  store i16 %6, i16* %"95_0", align 2
+  store { i32, {}, {} } %7, { i32, {}, {} }* %"95_1", align 4
+  %"97_05" = load { {} }, { {} }* %"97_0", align 1
+  %"95_16" = load { i32, {}, {} }, { i32, {}, {} }* %"95_1", align 4
+  store { {} } %"97_05", { {} }* %"97_0", align 1
+  store { i32, {}, {} } %"95_16", { i32, {}, {} }* %"95_1", align 4
+  %"95_07" = load i16, i16* %"95_0", align 2
+  call void @QFree(i16 %"95_07")
+  %"97_08" = load { {} }, { {} }* %"97_0", align 1
+  %"95_19" = load { i32, {}, {} }, { i32, {}, {} }* %"95_1", align 4
+  switch i32 0, label %0 [
+  ]
+
+8:                                                ; preds = %0
+  %"010" = load { i32, {}, {} }, { i32, {}, {} }* %"01", align 4
+  store { i32, {}, {} } %"010", { i32, {}, {} }* %"90_0", align 4
+  %"90_011" = load { i32, {}, {} }, { i32, {}, {} }* %"90_0", align 4
+  store { i32, {}, {} } %"90_011", { i32, {}, {} }* %"0", align 4
+  %"012" = load { i32, {}, {} }, { i32, {}, {} }* %"0", align 4
+  ret { i32, {}, {} } %"012"
+}

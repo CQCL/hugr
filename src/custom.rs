@@ -108,7 +108,7 @@ impl<'c, H: HugrView> CodegenExtsMap<'c, H> {
         let b = self
             .extensions
             .get(extension)
-            .ok_or(anyhow!("Unknown extension: {}", extension))?;
+            .ok_or(anyhow!("CodegenExtsMap: Unknown extension: {}", extension))?;
         Ok(b.as_ref())
     }
 

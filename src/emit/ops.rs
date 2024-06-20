@@ -16,6 +16,7 @@ use crate::fat::FatExt as _;
 use crate::{fat::FatNode, types::LLVMSumType};
 
 use super::{
+    deaggregate_call_result,
     func::{EmitFuncContext, RowPromise},
     EmitOp, EmitOpArgs,
 };
@@ -353,23 +354,9 @@ fn emit_call<'c, H: HugrView>(
     };
     let inputs = args.inputs.into_iter().map_into().collect_vec();
     let builder = context.builder();
-    let call = builder
-        .build_call(func?, inputs.as_slice(), "")?
-        .try_as_basic_value();
-    let rets = match args.outputs.len() as u32 {
-        0 => {
-            call.expect_right("void");
-            vec![]
-        }
-        1 => vec![call.expect_left("non-void")],
-        n => {
-            let return_struct = call.expect_left("non-void").into_struct_value();
-            (0..n)
-                .map(|i| builder.build_extract_value(return_struct, i, ""))
-                .collect::<Result<Vec<_>, _>>()?
-        }
-    };
-    args.outputs.finish(builder, rets)
+    let call = builder.build_call(func?, inputs.as_slice(), "")?;
+    let call_results = deaggregate_call_result(builder, call, args.outputs.len())?;
+    args.outputs.finish(builder, call_results)
 }
 
 fn emit_cfg<'c, H: HugrView>(
