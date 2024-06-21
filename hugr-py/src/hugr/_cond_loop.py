@@ -102,5 +102,9 @@ class Conditional(ParentBuilder[ops.Conditional]):
 
 @dataclass
 class TailLoop(_DfBase[ops.TailLoop]):
+    def __init__(self, just_inputs: TypeRow, rest: TypeRow) -> None:
+        root_op = ops.TailLoop(just_inputs, rest)
+        super().__init__(root_op)
+
     def set_loop_outputs(self, sum_wire: Wire, *rest: Wire) -> None:
         self.set_outputs(sum_wire, *rest)

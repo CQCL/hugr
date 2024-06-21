@@ -1,4 +1,4 @@
-from hugr._cond_loop import Conditional, ConditionalError
+from hugr._cond_loop import Conditional, ConditionalError, TailLoop
 from hugr._dfg import Dfg
 import hugr._tys as tys
 import hugr._ops as ops
@@ -32,9 +32,20 @@ def test_nested_cond() -> None:
     h = Dfg(tys.Qubit)
     (q,) = h.inputs()
     tagged_q = h.add(ops.Tag(0, SUM_T)(q))
-    cond = h.add_conditional(tagged_q, h.load(IntVal(1)))
+    cond = h.add_conditional(tagged_q, h.load(val.TRUE))
     build_cond(cond)
     h.set_outputs(*cond[:2])
+    _validate(h.hugr)
+
+    # build then insert
+    con = Conditional(SUM_T, [tys.Bool])
+    build_cond(con)
+
+    h = Dfg(tys.Qubit)
+    (q,) = h.inputs()
+    tagged_q = h.add(ops.Tag(0, SUM_T)(q))
+    cond_n = h.insert_conditional(con, tagged_q, h.load(val.TRUE))
+    h.set_outputs(*cond_n[:2])
     _validate(h.hugr)
 
 
@@ -57,17 +68,28 @@ def test_if_else() -> None:
 
 def test_tail_loop() -> None:
     # apply H while measure is true
+    def build_tl(tl: TailLoop) -> None:
+        q, b = tl.add(Measure(tl.add(H(tl.input_node[0]))))[:]
+
+        tl.set_loop_outputs(b, q)
 
     h = Dfg(tys.Qubit)
     (q,) = h.inputs()
 
     tl = h.add_tail_loop([], [q])
-    q, b = tl.add(Measure(tl.add(H(tl.input_node[0]))))[:]
-
-    tl.set_loop_outputs(b, q)
-
+    build_tl(tl)
     h.set_outputs(tl)
 
+    _validate(h.hugr)
+
+    # build then insert
+    tl = TailLoop([], [tys.Qubit])
+    build_tl(tl)
+
+    h = Dfg(tys.Qubit)
+    (q,) = h.inputs()
+    tl_n = h.insert_tail_loop(tl, q)
+    h.set_outputs(tl_n)
     _validate(h.hugr)
 
 
