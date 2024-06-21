@@ -12,10 +12,11 @@ from typing_extensions import Self
 
 import hugr._ops as ops
 import hugr._val as val
-from hugr._tys import Type, TypeRow, get_first_sum
+from hugr._tys import Type, TypeRow, get_first_sum, FunctionType, TypeArg, FunctionKind
 
 from ._exceptions import NoSiblingAncestor
-from ._hugr import Hugr, Node, OutPort, ParentBuilder, ToNode, Wire
+from ._hugr import Hugr, ParentBuilder
+from ._node_port import Node, OutPort, Wire, ToNode
 
 if TYPE_CHECKING:
     from ._cfg import Cfg
@@ -163,6 +164,28 @@ class _DfBase(ParentBuilder[DP]):
         self.hugr.add_link(const.out_port(), load.inp(0))
 
         return load
+
+    def call(
+        self,
+        func: ToNode,
+        *args: Wire,
+        instantiation: FunctionType | None = None,
+        type_args: list[TypeArg] | None = None,
+    ) -> Node:
+        f_op = self.hugr[func]
+        f_kind = f_op.op.port_kind(func.out(0))
+        match f_kind:
+            case FunctionKind(sig):
+                signature = sig
+            case _:
+                raise ValueError("Expected 'func' to be a function")
+        call_op = ops.Call(signature, instantiation, type_args)
+        call_n = self.hugr.add_node(call_op, self.parent_node, call_op.num_out)
+        self.hugr.add_link(func.out(0), call_n.inp(call_op.function_port_offset()))
+
+        self._wire_up(call_n, args)
+
+        return call_n
 
     def _wire_up(self, node: Node, ports: Iterable[Wire]) -> TypeRow:
         tys = [self._wire_up_port(node, i, p) for i, p in enumerate(ports)]

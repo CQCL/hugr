@@ -58,6 +58,9 @@ class Module(BaseOp):
 
     op: Literal["Module"] = "Module"
 
+    def deserialize(self) -> _ops.Module:
+        return _ops.Module()
+
 
 class FuncDefn(BaseOp):
     """A function definition. Children nodes are the body of the definition."""
@@ -67,6 +70,12 @@ class FuncDefn(BaseOp):
     name: str
     signature: PolyFuncType
 
+    def deserialize(self) -> _ops.FuncDefn:
+        poly_func = self.signature.deserialize()
+        return _ops.FuncDefn(
+            self.name, inputs=poly_func.body.input, _outputs=poly_func.body.output
+        )
+
 
 class FuncDecl(BaseOp):
     """External function declaration, linked at runtime."""
@@ -74,6 +83,9 @@ class FuncDecl(BaseOp):
     op: Literal["FuncDecl"] = "FuncDecl"
     name: str
     signature: PolyFuncType
+
+    def deserialize(self) -> _ops.FuncDecl:
+        return _ops.FuncDecl(self.name, self.signature.deserialize())
 
 
 class CustomConst(ConfiguredBaseModel):
@@ -297,6 +309,13 @@ class Call(DataflowOp):
             )
         }
     )
+
+    def deserialize(self) -> _ops.Call:
+        return _ops.Call(
+            self.func_sig.deserialize(),
+            self.instantiation.deserialize(),
+            deser_it(self.type_args),
+        )
 
 
 class CallIndirect(DataflowOp):

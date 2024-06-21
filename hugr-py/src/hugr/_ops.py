@@ -6,11 +6,21 @@ from hugr.serialization.ops import BaseOp
 import hugr.serialization.ops as sops
 from hugr.utils import ser_it
 import hugr._tys as tys
+from hugr._node_port import Node, InPort, OutPort, Wire
 import hugr._val as val
 from ._exceptions import IncompleteOp
 
 if TYPE_CHECKING:
-    from hugr._hugr import Hugr, Node, Wire, InPort, OutPort
+    from hugr._hugr import Hugr
+
+
+@dataclass
+class InvalidPort(Exception):
+    port: InPort | OutPort
+
+    @property
+    def msg(self) -> str:
+        return f"Invalid port {self.port}"
 
 
 @runtime_checkable
@@ -24,6 +34,14 @@ class Op(Protocol):
     def port_kind(self, port: InPort | OutPort) -> tys.Kind: ...
 
 
+def _sig_port_type(sig: tys.FunctionType, port: InPort | OutPort) -> tys.Type:
+    from hugr._hugr import Direction
+
+    if port.direction == Direction.INCOMING:
+        return sig.input[port.offset]
+    return sig.output[port.offset]
+
+
 @runtime_checkable
 class DataflowOp(Op, Protocol):
     def outer_signature(self) -> tys.FunctionType: ...
@@ -34,12 +52,7 @@ class DataflowOp(Op, Protocol):
         return tys.ValueKind(self.port_type(port))
 
     def port_type(self, port: InPort | OutPort) -> tys.Type:
-        from hugr._hugr import Direction
-
-        sig = self.outer_signature()
-        if port.direction == Direction.INCOMING:
-            return sig.input[port.offset]
-        return sig.output[port.offset]
+        return _sig_port_type(self.outer_signature(), port)
 
     def __call__(self, *args) -> Command:
         return Command(self, list(args))
@@ -358,7 +371,11 @@ class Const(Op):
         )
 
     def port_kind(self, port: InPort | OutPort) -> tys.Kind:
-        return tys.ConstKind(self.val.type_())
+        match port:
+            case OutPort(_, 0):
+                return tys.ConstKind(self.val.type_())
+            case _:
+                raise InvalidPort(port)
 
 
 @dataclass
@@ -376,6 +393,15 @@ class LoadConst(DataflowOp):
 
     def outer_signature(self) -> tys.FunctionType:
         return tys.FunctionType(input=[], output=[self.type_()])
+
+    def port_kind(self, port: InPort | OutPort) -> tys.Kind:
+        match port:
+            case InPort(_, 0):
+                return tys.ConstKind(self.type_())
+            case OutPort(_, 0):
+                return tys.ValueKind(self.type_())
+            case _:
+                raise InvalidPort(port)
 
 
 @dataclass()
@@ -416,14 +442,11 @@ class Conditional(DataflowOp):
 class Case(DfParentOp):
     inputs: tys.TypeRow
     _outputs: tys.TypeRow | None = None
+    num_out: int | None = 0
 
     @property
     def outputs(self) -> tys.TypeRow:
         return _check_complete(self._outputs)
-
-    @property
-    def num_out(self) -> int | None:
-        return 0
 
     def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.Case:
         return sops.Case(
@@ -434,7 +457,7 @@ class Case(DfParentOp):
         return tys.FunctionType(self.inputs, self.outputs)
 
     def port_kind(self, port: InPort | OutPort) -> tys.Kind:
-        raise NotImplementedError("Case nodes have no external ports.")
+        raise InvalidPort(port)
 
     def _set_out_types(self, types: tys.TypeRow) -> None:
         self._outputs = types
@@ -485,3 +508,132 @@ class TailLoop(DfParentOp, DataflowOp):
 
     def _inputs(self) -> tys.TypeRow:
         return self.just_inputs + self.rest
+
+
+@dataclass
+class FuncDefn(DfParentOp):
+    name: str
+    inputs: tys.TypeRow
+    params: list[tys.TypeParam] = field(default_factory=list)
+    _outputs: tys.TypeRow | None = None
+    num_out: int | None = 1
+
+    @property
+    def outputs(self) -> tys.TypeRow:
+        return _check_complete(self._outputs)
+
+    @property
+    def signature(self) -> tys.PolyFuncType:
+        return tys.PolyFuncType(
+            self.params, tys.FunctionType(self.inputs, self.outputs)
+        )
+
+    def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.FuncDefn:
+        return sops.FuncDefn(
+            parent=parent.idx,
+            name=self.name,
+            signature=self.signature.to_serial(),
+        )
+
+    def inner_signature(self) -> tys.FunctionType:
+        return self.signature.body
+
+    def _set_out_types(self, types: tys.TypeRow) -> None:
+        self._outputs = types
+
+    def _inputs(self) -> tys.TypeRow:
+        return self.inputs
+
+    def port_kind(self, port: InPort | OutPort) -> tys.Kind:
+        match port:
+            case OutPort(_, 0):
+                return tys.FunctionKind(self.signature)
+            case _:
+                raise InvalidPort(port)
+
+
+@dataclass
+class FuncDecl(Op):
+    name: str
+    signature: tys.PolyFuncType
+    num_out: int | None = 0
+
+    def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.FuncDecl:
+        return sops.FuncDecl(
+            parent=parent.idx,
+            name=self.name,
+            signature=self.signature.to_serial(),
+        )
+
+    def port_kind(self, port: InPort | OutPort) -> tys.Kind:
+        match port:
+            case OutPort(_, 0):
+                return tys.FunctionKind(self.signature)
+            case _:
+                raise InvalidPort(port)
+
+
+@dataclass
+class Module(Op):
+    num_out: int | None = 0
+
+    def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.Module:
+        return sops.Module(parent=parent.idx)
+
+    def port_kind(self, port: InPort | OutPort) -> tys.Kind:
+        raise InvalidPort(port)
+
+
+class NoConcreteFunc(Exception):
+    pass
+
+
+@dataclass
+class Call(Op):
+    signature: tys.PolyFuncType
+    instantiation: tys.FunctionType
+    type_args: list[tys.TypeArg]
+
+    def __init__(
+        self,
+        signature: tys.PolyFuncType,
+        instantiation: tys.FunctionType | None = None,
+        type_args: list[tys.TypeArg] | None = None,
+    ) -> None:
+        self.signature = signature
+        if len(signature.params) == 0:
+            self.instantiation = signature.body
+            self.type_args = []
+
+        else:
+            # TODO substitute type args into signature to get instantiation
+            if instantiation is None:
+                raise NoConcreteFunc("Missing instantiation for polymorphic function.")
+            type_args = type_args or []
+
+            if len(signature.params) != len(type_args):
+                raise NoConcreteFunc("Mismatched number of type arguments.")
+            self.instantiation = instantiation
+            self.type_args = type_args
+
+    def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.Call:
+        return sops.Call(
+            parent=parent.idx,
+            func_sig=self.signature.to_serial(),
+            type_args=ser_it(self.type_args),
+            instantiation=self.instantiation.to_serial(),
+        )
+
+    @property
+    def num_out(self) -> int | None:
+        return len(self.signature.body.output)
+
+    def function_port_offset(self) -> int:
+        return len(self.signature.body.input)
+
+    def port_kind(self, port: InPort | OutPort) -> tys.Kind:
+        match port:
+            case InPort(_, offset) if offset == self.function_port_offset():
+                return tys.FunctionKind(self.signature)
+            case _:
+                return tys.ValueKind(_sig_port_type(self.instantiation, port))

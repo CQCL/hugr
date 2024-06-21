@@ -3,13 +3,16 @@ from dataclasses import dataclass, field
 import subprocess
 import os
 import pathlib
-from hugr._hugr import Hugr, Node, Wire, _SubPort
+from hugr._node_port import Node, Wire, _SubPort
+
+from hugr._hugr import Hugr
 from hugr._dfg import Dfg, _ancestral_sibling
-from hugr._ops import Custom, Command
+from hugr._ops import Custom, Command, NoConcreteFunc
 import hugr._ops as ops
 from hugr.serialization import SerialHugr
 import hugr._tys as tys
 import hugr._val as val
+from hugr._function import Module
 import pytest
 import json
 
@@ -313,3 +316,43 @@ def test_vals(val: val.Value):
     d.set_outputs(d.load(val))
 
     _validate(d.hugr)
+
+
+def test_poly_function() -> None:
+    mod = Module()
+    f_id = mod.declare_function(
+        "id",
+        tys.PolyFuncType(
+            [tys.TypeTypeParam(tys.TypeBound.Any)],
+            tys.FunctionType.endo([tys.Variable(0, tys.TypeBound.Any)]),
+        ),
+    )
+
+    f_main = mod.define_main([tys.Qubit])
+    q = f_main.input_node[0]
+    with pytest.raises(NoConcreteFunc, match="Missing instantiation"):
+        f_main.call(f_id, q)
+    call = f_main.call(
+        f_id,
+        q,
+        # for now concrete instantiations have to be provided.
+        instantiation=tys.FunctionType.endo([tys.Qubit]),
+        type_args=[tys.Qubit.type_arg()],
+    )
+    f_main.set_outputs(call)
+
+    _validate(mod.hugr, True)
+
+
+def test_mono_function() -> None:
+    mod = Module()
+    f_id = mod.define_function("id", [tys.Qubit])
+    f_id.set_outputs(f_id.input_node[0])
+
+    f_main = mod.define_main([tys.Qubit])
+    q = f_main.input_node[0]
+    # monomorphic functions don't need instantiation specified
+    call = f_main.call(f_id, q)
+    f_main.set_outputs(call)
+
+    _validate(mod.hugr, True)

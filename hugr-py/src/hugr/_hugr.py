@@ -2,12 +2,9 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
-from enum import Enum
 from typing import (
-    ClassVar,
     Generic,
     Iterable,
-    Iterator,
     Protocol,
     TypeVar,
     cast,
@@ -15,106 +12,16 @@ from typing import (
     Type as PyType,
 )
 
-from typing_extensions import Self
 
-from hugr._ops import Op, DataflowOp, Const
-from hugr._tys import Type, Kind
+from hugr._ops import Op, DataflowOp, Const, Call
+from hugr._tys import Type, Kind, ValueKind
 from hugr._val import Value
+from hugr._node_port import Direction, InPort, OutPort, ToNode, Node, _SubPort
 from hugr.serialization.ops import OpType as SerialOp
 from hugr.serialization.serial_hugr import SerialHugr
 from hugr.utils import BiMap
 
 from ._exceptions import ParentBeforeChild
-
-
-class Direction(Enum):
-    INCOMING = 0
-    OUTGOING = 1
-
-
-@dataclass(frozen=True, eq=True, order=True)
-class _Port:
-    node: Node
-    offset: int
-    direction: ClassVar[Direction]
-
-
-@dataclass(frozen=True, eq=True, order=True)
-class InPort(_Port):
-    direction: ClassVar[Direction] = Direction.INCOMING
-
-
-class Wire(Protocol):
-    def out_port(self) -> OutPort: ...
-
-
-@dataclass(frozen=True, eq=True, order=True)
-class OutPort(_Port, Wire):
-    direction: ClassVar[Direction] = Direction.OUTGOING
-
-    def out_port(self) -> OutPort:
-        return self
-
-
-class ToNode(Wire, Protocol):
-    def to_node(self) -> Node: ...
-
-    @overload
-    def __getitem__(self, index: int) -> OutPort: ...
-    @overload
-    def __getitem__(self, index: slice) -> Iterator[OutPort]: ...
-    @overload
-    def __getitem__(self, index: tuple[int, ...]) -> Iterator[OutPort]: ...
-
-    def __getitem__(
-        self, index: int | slice | tuple[int, ...]
-    ) -> OutPort | Iterator[OutPort]:
-        return self.to_node()._index(index)
-
-    def out_port(self) -> "OutPort":
-        return OutPort(self.to_node(), 0)
-
-    def inp(self, offset: int) -> InPort:
-        return InPort(self.to_node(), offset)
-
-    def out(self, offset: int) -> OutPort:
-        return OutPort(self.to_node(), offset)
-
-    def port(self, offset: int, direction: Direction) -> InPort | OutPort:
-        if direction == Direction.INCOMING:
-            return self.inp(offset)
-        else:
-            return self.out(offset)
-
-
-@dataclass(frozen=True, eq=True, order=True)
-class Node(ToNode):
-    idx: int
-    _num_out_ports: int | None = field(default=None, compare=False)
-
-    def _index(
-        self, index: int | slice | tuple[int, ...]
-    ) -> OutPort | Iterator[OutPort]:
-        match index:
-            case int(index):
-                if self._num_out_ports is not None:
-                    if index >= self._num_out_ports:
-                        raise IndexError("Index out of range")
-                return self.out(index)
-            case slice():
-                start = index.start or 0
-                stop = index.stop or self._num_out_ports
-                if stop is None:
-                    raise ValueError(
-                        "Stop must be specified when number of outputs unknown"
-                    )
-                step = index.step or 1
-                return (self[i] for i in range(start, stop, step))
-            case tuple(xs):
-                return (self[i] for i in xs)
-
-    def to_node(self) -> Node:
-        return self
 
 
 @dataclass()
@@ -131,23 +38,13 @@ class NodeData:
         return SerialOp(root=o)  # type: ignore[arg-type]
 
 
+_SO = _SubPort[OutPort]
+_SI = _SubPort[InPort]
+
 P = TypeVar("P", InPort, OutPort)
 K = TypeVar("K", InPort, OutPort)
 OpVar = TypeVar("OpVar", bound=Op)
 OpVar2 = TypeVar("OpVar2", bound=Op)
-
-
-@dataclass(frozen=True, eq=True, order=True)
-class _SubPort(Generic[P]):
-    port: P
-    sub_offset: int = 0
-
-    def next_sub_offset(self) -> Self:
-        return replace(self, sub_offset=self.sub_offset + 1)
-
-
-_SO = _SubPort[OutPort]
-_SI = _SubPort[InPort]
 
 
 class ParentBuilder(ToNode, Protocol[OpVar]):
@@ -360,6 +257,10 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
         op = self[port.node].op
         if isinstance(op, DataflowOp):
             return op.port_type(port)
+        if isinstance(op, Call) and isinstance(port, OutPort):
+            kind = self.port_kind(port)
+            if isinstance(kind, ValueKind):
+                return kind.ty
         return None
 
     def insert_hugr(self, hugr: Hugr, parent: ToNode | None = None) -> dict[Node, Node]:
