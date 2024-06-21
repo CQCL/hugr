@@ -4,6 +4,7 @@ from dataclasses import dataclass, replace
 from typing import (
     TYPE_CHECKING,
     Iterable,
+    Sequence,
     TypeVar,
 )
 
@@ -11,13 +12,14 @@ from typing_extensions import Self
 
 import hugr._ops as ops
 import hugr._val as val
-from hugr._tys import Type, TypeRow
+from hugr._tys import Type, TypeRow, get_first_sum
 
 from ._exceptions import NoSiblingAncestor
 from ._hugr import Hugr, Node, OutPort, ParentBuilder, ToNode, Wire
 
 if TYPE_CHECKING:
     from ._cfg import Cfg
+    from ._cond_loop import Conditional, If, TailLoop
 
 
 DP = TypeVar("DP", bound=ops.DfParentOp)
@@ -72,10 +74,13 @@ class _DfBase(ParentBuilder[DP]):
     def add(self, com: ops.Command) -> Node:
         return self.add_op(com.op, *com.incoming)
 
+    def _insert_nested_impl(self, builder: ParentBuilder, *args: Wire) -> Node:
+        mapping = self.hugr.insert_hugr(builder.hugr, self.parent_node)
+        self._wire_up(mapping[builder.parent_node], args)
+        return mapping[builder.parent_node]
+
     def insert_nested(self, dfg: Dfg, *args: Wire) -> Node:
-        mapping = self.hugr.insert_hugr(dfg.hugr, self.parent_node)
-        self._wire_up(mapping[dfg.parent_node], args)
-        return mapping[dfg.parent_node]
+        return self._insert_nested_impl(dfg, *args)
 
     def add_nested(
         self,
@@ -83,28 +88,59 @@ class _DfBase(ParentBuilder[DP]):
     ) -> Dfg:
         from ._dfg import Dfg
 
-        input_types = [self._get_dataflow_type(w) for w in args]
-
-        parent_op = ops.DFG(list(input_types))
+        parent_op = ops.DFG(self._wire_types(args))
         dfg = Dfg.new_nested(parent_op, self.hugr, self.parent_node)
         self._wire_up(dfg.parent_node, args)
         return dfg
 
+    def _wire_types(self, args: Iterable[Wire]) -> TypeRow:
+        return [self._get_dataflow_type(w) for w in args]
+
     def add_cfg(
         self,
-        input_types: TypeRow,
         *args: Wire,
     ) -> Cfg:
         from ._cfg import Cfg
 
-        cfg = Cfg.new_nested(input_types, self.hugr, self.parent_node)
+        cfg = Cfg.new_nested(self._wire_types(args), self.hugr, self.parent_node)
         self._wire_up(cfg.parent_node, args)
         return cfg
 
     def insert_cfg(self, cfg: Cfg, *args: Wire) -> Node:
-        mapping = self.hugr.insert_hugr(cfg.hugr, self.parent_node)
-        self._wire_up(mapping[cfg.parent_node], args)
-        return mapping[cfg.parent_node]
+        return self._insert_nested_impl(cfg, *args)
+
+    def add_conditional(self, cond: Wire, *args: Wire) -> Conditional:
+        from ._cond_loop import Conditional
+
+        args = (cond, *args)
+        (sum_, other_inputs) = get_first_sum(self._wire_types(args))
+        cond = Conditional.new_nested(sum_, other_inputs, self.hugr, self.parent_node)
+        self._wire_up(cond.parent_node, args)
+        return cond
+
+    def insert_conditional(self, cond: Conditional, *args: Wire) -> Node:
+        return self._insert_nested_impl(cond, *args)
+
+    def add_if(self, cond: Wire, *args: Wire) -> If:
+        from ._cond_loop import If
+
+        conditional = self.add_conditional(cond, *args)
+        return If(conditional.add_case(1))
+
+    def add_tail_loop(
+        self, just_inputs: Sequence[Wire], rest: Sequence[Wire]
+    ) -> TailLoop:
+        from ._cond_loop import TailLoop
+
+        just_input_types = self._wire_types(just_inputs)
+        rest_types = self._wire_types(rest)
+        parent_op = ops.TailLoop(just_input_types, rest_types)
+        tl = TailLoop.new_nested(parent_op, self.hugr, self.parent_node)
+        self._wire_up(tl.parent_node, (*just_inputs, *rest))
+        return tl
+
+    def insert_tail_loop(self, tl: TailLoop, *args: Wire) -> Node:
+        return self._insert_nested_impl(tl, *args)
 
     def set_outputs(self, *args: Wire) -> None:
         self._wire_up(self.output_node, args)
@@ -117,22 +153,22 @@ class _DfBase(ParentBuilder[DP]):
     def add_const(self, val: val.Value) -> Node:
         return self.hugr.add_const(val, self.parent_node)
 
-    def load_const(self, const_node: ToNode) -> Node:
-        const_op = self.hugr._get_typed_op(const_node, ops.Const)
+    def load(self, const: ToNode | val.Value) -> Node:
+        if isinstance(const, val.Value):
+            const = self.add_const(const)
+        const_op = self.hugr._get_typed_op(const, ops.Const)
         load_op = ops.LoadConst(const_op.val.type_())
 
         load = self.add(load_op())
-        self.hugr.add_link(const_node.out_port(), load.inp(0))
+        self.hugr.add_link(const.out_port(), load.inp(0))
 
         return load
 
-    def add_load_const(self, val: val.Value) -> Node:
-        return self.load_const(self.add_const(val))
-
-    def _wire_up(self, node: Node, ports: Iterable[Wire]):
+    def _wire_up(self, node: Node, ports: Iterable[Wire]) -> TypeRow:
         tys = [self._wire_up_port(node, i, p) for i, p in enumerate(ports)]
         if isinstance(op := self.hugr[node].op, ops.PartialOp):
             op.set_in_types(tys)
+        return tys
 
     def _get_dataflow_type(self, wire: Wire) -> Type:
         port = wire.out_port()

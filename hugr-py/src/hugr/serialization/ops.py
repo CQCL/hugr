@@ -206,7 +206,7 @@ class DataflowBlock(BaseOp):
     def deserialize(self) -> _ops.DataflowBlock:
         return _ops.DataflowBlock(
             inputs=deser_it(self.inputs),
-            _sum_rows=[deser_it(r) for r in self.sum_rows],
+            _sum=_tys.Sum([deser_it(r) for r in self.sum_rows]),
             _other_outputs=deser_it(self.other_outputs),
         )
 
@@ -347,7 +347,8 @@ class DFG(DataflowOp):
         )
 
     def deserialize(self) -> _ops.DFG:
-        return _ops.DFG(self.signature.deserialize())
+        sig = self.signature.deserialize()
+        return _ops.DFG(sig.input, sig.output)
 
 
 # ------------------------------------------------
@@ -383,6 +384,13 @@ class Conditional(DataflowOp):
         self.other_inputs = list(in_types[1:])
         self.outputs = list(out_types)
 
+    def deserialize(self) -> _ops.Conditional:
+        return _ops.Conditional(
+            _tys.Sum([deser_it(r) for r in self.sum_rows]),
+            deser_it(self.other_inputs),
+            deser_it(self.outputs),
+        )
+
 
 class Case(BaseOp):
     """Case ops - nodes valid inside Conditional nodes."""
@@ -395,6 +403,10 @@ class Case(BaseOp):
         self.signature = tys.FunctionType(
             input=list(inputs), output=list(outputs), extension_reqs=ExtensionSet([])
         )
+
+    def deserialize(self) -> _ops.Case:
+        sig = self.signature.deserialize()
+        return _ops.Case(inputs=sig.input, _outputs=sig.output)
 
 
 class TailLoop(DataflowOp):
@@ -413,6 +425,14 @@ class TailLoop(DataflowOp):
         # self.just_outputs = list(out_types)
         self.rest = list(in_types)
 
+    def deserialize(self) -> _ops.TailLoop:
+        return _ops.TailLoop(
+            just_inputs=deser_it(self.just_inputs),
+            _just_outputs=deser_it(self.just_outputs),
+            rest=deser_it(self.rest),
+            extension_delta=self.extension_delta,
+        )
+
 
 class CFG(DataflowOp):
     """A dataflow node which is defined by a child CFG."""
@@ -426,7 +446,8 @@ class CFG(DataflowOp):
         )
 
     def deserialize(self) -> _ops.CFG:
-        return _ops.CFG(self.signature.deserialize())
+        sig = self.signature.deserialize()
+        return _ops.CFG(inputs=sig.input, _outputs=sig.output)
 
 
 ControlFlowOp = Conditional | TailLoop | CFG
@@ -520,7 +541,7 @@ class Tag(DataflowOp):
     def deserialize(self) -> _ops.Tag:
         return _ops.Tag(
             tag=self.tag,
-            variants=[deser_it(v) for v in self.variants],
+            sum_ty=_tys.Sum([deser_it(v) for v in self.variants]),
         )
 
 
@@ -614,3 +635,4 @@ tys_model_rebuild(dict(classes))
 # needed to avoid circular imports
 from hugr import _ops  # noqa: E402
 from hugr import _val  # noqa: E402
+from hugr import _tys  # noqa: E402

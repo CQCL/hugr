@@ -44,15 +44,44 @@ class LogicOps(Custom):
 class NotDef(LogicOps):
     num_out: int | None = 1
     op_name: str = "Not"
-    signature: tys.FunctionType = field(
-        default_factory=lambda: tys.FunctionType(input=[tys.Bool], output=[tys.Bool])
-    )
+    signature: tys.FunctionType = tys.FunctionType.endo([tys.Bool])
 
     def __call__(self, a: Wire) -> Command:
         return super().__call__(a)
 
 
 Not = NotDef()
+
+
+@dataclass
+class QuantumOps(Custom):
+    extension: tys.ExtensionId = "tket2.quantum"
+
+
+@dataclass
+class OneQbGate(QuantumOps):
+    op_name: str
+    num_out: int | None = 1
+    signature: tys.FunctionType = tys.FunctionType.endo([tys.Qubit])
+
+    def __call__(self, q: Wire) -> Command:
+        return super().__call__(q)
+
+
+H = OneQbGate("H")
+
+
+@dataclass
+class MeasureDef(QuantumOps):
+    op_name: str = "Measure"
+    num_out: int | None = 2
+    signature: tys.FunctionType = tys.FunctionType([tys.Qubit], [tys.Qubit, tys.Bool])
+
+    def __call__(self, q: Wire) -> Command:
+        return super().__call__(q)
+
+
+Measure = MeasureDef()
 
 
 @dataclass
@@ -281,6 +310,6 @@ def test_ancestral_sibling():
 )
 def test_vals(val: val.Value):
     d = Dfg()
-    d.set_outputs(d.add_load_const(val))
+    d.set_outputs(d.load(val))
 
     _validate(d.hugr)

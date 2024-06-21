@@ -237,6 +237,10 @@ class FunctionType(Type):
     def empty(cls) -> FunctionType:
         return cls(input=[], output=[])
 
+    @classmethod
+    def endo(cls, tys: TypeRow) -> FunctionType:
+        return cls(input=tys, output=tys)
+
     def flip(self) -> FunctionType:
         return FunctionType(input=list(self.output), output=list(self.input))
 
@@ -303,3 +307,9 @@ class OrderKind: ...
 
 
 Kind = ValueKind | ConstKind | FunctionKind | CFKind | OrderKind
+
+
+def get_first_sum(types: TypeRow) -> tuple[Sum, TypeRow]:
+    (sum_, *other) = types
+    assert isinstance(sum_, Sum), f"Expected Sum, got {sum_}"
+    return sum_, other
