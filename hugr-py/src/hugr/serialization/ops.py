@@ -334,6 +334,9 @@ class CallIndirect(DataflowOp):
         assert len(fun_ty.output) == len(out_types)
         self.signature = fun_ty
 
+    def deserialize(self) -> _ops.CallIndirectDef:
+        return _ops.CallIndirectDef(self.signature.deserialize())
+
 
 class LoadConstant(DataflowOp):
     """An operation that loads a static constant in to the local dataflow graph."""
@@ -352,6 +355,19 @@ class LoadFunction(DataflowOp):
     func_sig: PolyFuncType
     type_args: list[tys.TypeArg]
     signature: FunctionType
+
+    def deserialize(self) -> _ops.LoadFunc:
+        signature = self.signature.deserialize()
+        assert len(signature.input) == 0
+        (f_ty,) = signature.output
+        assert isinstance(
+            f_ty, _tys.FunctionType
+        ), "Expected single funciton type output"
+        return _ops.LoadFunc(
+            self.func_sig.deserialize(),
+            f_ty,
+            deser_it(self.type_args),
+        )
 
 
 class DFG(DataflowOp):
@@ -519,6 +535,9 @@ class Noop(DataflowOp):
         assert len(out_types) == 1
         assert in_types[0] == out_types[0]
         self.ty = in_types[0]
+
+    def deserialize(self) -> _ops.NoopDef:
+        return _ops.NoopDef(self.ty.deserialize())
 
 
 class MakeTuple(DataflowOp):
