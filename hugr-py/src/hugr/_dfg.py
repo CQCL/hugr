@@ -12,7 +12,7 @@ from typing_extensions import Self
 
 import hugr._ops as ops
 import hugr._val as val
-from hugr._tys import Type, TypeRow, get_first_sum
+from hugr._tys import Type, TypeRow, get_first_sum, FunctionType, TypeArg, FunctionKind
 
 from ._exceptions import NoSiblingAncestor
 from ._hugr import Hugr, Node, OutPort, ParentBuilder, ToNode, Wire

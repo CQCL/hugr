@@ -3,7 +3,9 @@ from dataclasses import dataclass, field
 import subprocess
 import os
 import pathlib
-from hugr._hugr import Hugr, Node, Wire, _SubPort
+from hugr._node_port import Node, Wire, _SubPort
+
+from hugr._hugr import Hugr
 from hugr._dfg import Dfg, _ancestral_sibling
 from hugr._ops import Custom, Command
 import hugr._ops as ops

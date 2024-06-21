@@ -5,7 +5,9 @@ from dataclasses import dataclass
 import hugr._ops as ops
 
 from ._dfg import _DfBase
-from ._hugr import Hugr, Node, ParentBuilder, ToNode, Wire
+from ._hugr import Hugr, ParentBuilder
+from ._node_port import Node, Wire, ToNode
+
 from ._tys import Sum, TypeRow
 
 

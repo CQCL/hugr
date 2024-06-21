@@ -6,7 +6,8 @@ import hugr._ops as ops
 
 from ._dfg import _DfBase
 from ._exceptions import NoSiblingAncestor, NotInSameCfg, MismatchedExit
-from ._hugr import Hugr, Node, ParentBuilder, ToNode, Wire
+from ._hugr import Hugr, ParentBuilder
+from ._node_port import Node, Wire, ToNode
 from ._tys import TypeRow, Type
 import hugr._val as val
 

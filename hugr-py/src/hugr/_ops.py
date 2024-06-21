@@ -6,11 +6,12 @@ from hugr.serialization.ops import BaseOp
 import hugr.serialization.ops as sops
 from hugr.utils import ser_it
 import hugr._tys as tys
+from hugr._node_port import Node, InPort, OutPort, Wire
 import hugr._val as val
 from ._exceptions import IncompleteOp
 
 if TYPE_CHECKING:
-    from hugr._hugr import Hugr, Node, Wire, InPort, OutPort
+    from hugr._hugr import Hugr
 
 
 @runtime_checkable
