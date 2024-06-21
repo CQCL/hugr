@@ -178,7 +178,7 @@ class _DfBase(ParentBuilder[DP]):
             case FunctionKind(sig):
                 signature = sig
             case _:
-                raise ValueError(f"Expected function type, got {f_kind}")
+                raise ValueError("Expected 'func' to be a function")
         call_op = ops.Call(signature, instantiation, type_args)
         call_n = self.hugr.add_node(call_op, self.parent_node, call_op.num_out)
         self.hugr.add_link(func.out(0), call_n.inp(call_op.function_port_offset()))
