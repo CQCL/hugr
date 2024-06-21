@@ -1,5 +1,11 @@
 use hugr_core::{
-    builder::{DFGBuilder, Dataflow, DataflowSubContainer, HugrBuilder, SubContainer}, extension::{prelude::BOOL_T, ExtensionSet, EMPTY_REG}, ops::{handle::NodeHandle, OpTrait, UnpackTuple, Value}, partial_value::PartialSum, type_row, types::{FunctionType, SumType}, Extension
+    builder::{DFGBuilder, Dataflow, DataflowSubContainer, HugrBuilder, SubContainer},
+    extension::{prelude::BOOL_T, ExtensionSet, EMPTY_REG},
+    ops::{handle::NodeHandle, OpTrait, UnpackTuple, Value},
+    partial_value::PartialSum,
+    type_row,
+    types::{FunctionType, SumType},
+    Extension,
 };
 
 use hugr_core::partial_value::PartialValue;
@@ -72,7 +78,7 @@ fn test_tail_loop_never_iterates() {
         .unwrap(),
     );
     let tlb = builder
-        .tail_loop_builder([], [], vec![r_v.get_type()].into())
+        .tail_loop_builder([], [], vec![r_v.get_type()].into(), ExtensionSet::default())
         .unwrap();
     let tail_loop = tlb.finish_with_outputs(r_w, []).unwrap();
     let [tl_o] = tail_loop.outputs_arr();
@@ -99,7 +105,12 @@ fn test_tail_loop_always_iterates() {
     let true_w = builder.add_load_value(Value::true_val());
 
     let tlb = builder
-        .tail_loop_builder([], [(BOOL_T,true_w)], vec![BOOL_T].into())
+        .tail_loop_builder(
+            [],
+            [(BOOL_T, true_w)],
+            vec![BOOL_T].into(),
+            ExtensionSet::default(),
+        )
         .unwrap();
 
     // r_w has tag 0, so we always continue;
@@ -134,7 +145,12 @@ fn test_tail_loop_iterates_twice() {
     // let r_w = builder
     //     .add_load_value(Value::sum(0, [], SumType::new([type_row![], BOOL_T.into()])).unwrap());
     let tlb = builder
-        .tail_loop_builder([], [(BOOL_T, false_w), (BOOL_T, true_w)], vec![].into())
+        .tail_loop_builder(
+            [],
+            [(BOOL_T, false_w), (BOOL_T, true_w)],
+            vec![].into(),
+            ExtensionSet::default(),
+        )
         .unwrap();
     assert_eq!(
         tlb.loop_signature().unwrap().dataflow_signature().unwrap(),
@@ -175,33 +191,45 @@ fn test_tail_loop_iterates_twice() {
 fn conditional() {
     let variants = vec![type_row![], type_row![], type_row![BOOL_T]];
     let cond_t = Type::new_sum(variants.clone());
-    let mut builder = DFGBuilder::new(FunctionType::new(Into::<TypeRow>::into(cond_t),type_row![])).unwrap();
+    let mut builder = DFGBuilder::new(FunctionType::new(
+        Into::<TypeRow>::into(cond_t),
+        type_row![],
+    ))
+    .unwrap();
     let [arg_w] = builder.input_wires_arr();
 
     let true_w = builder.add_load_value(Value::true_val());
     let false_w = builder.add_load_value(Value::false_val());
 
-    let mut cond_builder = builder.conditional_builder((variants, arg_w), [(BOOL_T,true_w)], type_row!(BOOL_T,BOOL_T), ExtensionSet::default()).unwrap();
+    let mut cond_builder = builder
+        .conditional_builder(
+            (variants, arg_w),
+            [(BOOL_T, true_w)],
+            type_row!(BOOL_T, BOOL_T),
+            ExtensionSet::default(),
+        )
+        .unwrap();
     // will be unreachable
     let case1_b = cond_builder.case_builder(0).unwrap();
-    let case1 = case1_b.finish_with_outputs([false_w,false_w]).unwrap();
+    let case1 = case1_b.finish_with_outputs([false_w, false_w]).unwrap();
 
     let case2_b = cond_builder.case_builder(1).unwrap();
     let [c2a] = case2_b.input_wires_arr();
-    let case2 = case2_b.finish_with_outputs([false_w,c2a]).unwrap();
+    let case2 = case2_b.finish_with_outputs([false_w, c2a]).unwrap();
 
     let case3_b = cond_builder.case_builder(2).unwrap();
-    let [c3_1,c3_2] = case3_b.input_wires_arr();
-    let case3 = case3_b.finish_with_outputs([c3_1,false_w]).unwrap();
+    let [c3_1, c3_2] = case3_b.input_wires_arr();
+    let case3 = case3_b.finish_with_outputs([c3_1, false_w]).unwrap();
 
     let cond = cond_builder.finish_sub_container().unwrap();
 
-    let [cond_o1,cond_o2] = cond.outputs_arr();
+    let [cond_o1, cond_o2] = cond.outputs_arr();
 
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
     let mut machine = Machine::new();
-    let arg_pv = PartialValue::variant(1, []).join(PartialValue::variant(2,[PartialValue::variant(0,[])]));
+    let arg_pv =
+        PartialValue::variant(1, []).join(PartialValue::variant(2, [PartialValue::variant(0, [])]));
     machine.propolutate_out_wires([(arg_w, arg_pv)]);
     let c = machine.run_hugr(&hugr);
 

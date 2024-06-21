@@ -183,8 +183,12 @@ impl<'a, H: HugrView> Machine<'a, H> {
         }
     }
 
-    pub fn propolutate_out_wires(&mut self, wires: impl IntoIterator<Item=(Wire,PartialValue)>) {
-        self.program.out_wire_value_proto.extend(wires.into_iter().map(|(w,v)| (w.node(), w.source(), v.into())));
+    pub fn prepopulate_out_wires(&mut self, wires: impl IntoIterator<Item = (Wire, PartialValue)>) {
+        self.program.out_wire_value_proto.extend(
+            wires
+                .into_iter()
+                .map(|(w, v)| (w.node(), w.source(), v.into())),
+        );
     }
 
     pub fn run_hugr(&mut self, hugr: &'a H) -> ArcDataflowContext<'a, H> {
@@ -233,13 +237,17 @@ impl<'a, H: HugrView> Machine<'a, H> {
             .unwrap()
     }
 
-    pub fn case_reachable(&self,
-        context: &ArcDataflowContext<'a, H>,
-        case: Node,) -> bool {
+    pub fn case_reachable(&self, context: &ArcDataflowContext<'a, H>, case: Node) -> bool {
         assert!(context.get_optype(case).is_case());
         let cond = context.hugr().get_parent(case).unwrap();
         assert!(context.get_optype(cond).is_conditional());
-        self.program.case_reachable.iter().find_map(|(c,cond2,case2,i)| (c == context && &cond == cond2 && &case == case2).then_some(*i)).unwrap()
+        self.program
+            .case_reachable
+            .iter()
+            .find_map(|(c, cond2, case2, i)| {
+                (c == context && &cond == cond2 && &case == case2).then_some(*i)
+            })
+            .unwrap()
     }
 }
 

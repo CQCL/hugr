@@ -116,9 +116,9 @@ impl ValueRow {
         zip_eq(value_inputs(context, n), self.0.iter())
     }
 
-    // fn initialised(&self) -> bool {
-    //     self.0.iter().all(|x| x != &PV::top())
-    // }
+    pub fn initialised(&self) -> bool {
+        self.0.iter().all(|x| x != &PV::bottom())
+    }
 }
 
 impl Lattice for ValueRow {
@@ -161,8 +161,9 @@ impl IntoIterator for ValueRow {
     }
 }
 
-impl<Idx> Index<Idx> for ValueRow where
-    Vec<PV>: Index<Idx>
+impl<Idx> Index<Idx> for ValueRow
+where
+    Vec<PV>: Index<Idx>,
 {
     type Output = <Vec<PV> as Index<Idx>>::Output;
 
@@ -263,8 +264,7 @@ pub(super) fn outputs_for_variant<'a>(
 ) -> impl Iterator<Item = (OutgoingPort, PV)> + 'a {
     if output_p.index() == 0 {
         Either::Left(
-            (0..variant_len)
-                .map(move |i| (i.into(), v.variant_field_value(variant_tag, i))),
+            (0..variant_len).map(move |i| (i.into(), v.variant_field_value(variant_tag, i))),
         )
     } else {
         let v = if v.supports_tag(variant_tag) {
@@ -289,8 +289,8 @@ pub enum TailLoopTermination {
 
 impl TailLoopTermination {
     pub fn from_control_value(v: &PV) -> Self {
-        let (may_continue, may_break) = (v.supports_tag(0),v.supports_tag(1));
-        if may_break  && !may_continue {
+        let (may_continue, may_break) = (v.supports_tag(0), v.supports_tag(1));
+        if may_break && !may_continue {
             Self::ExactlyZeroContinues
         } else if may_break && may_continue {
             Self::top()
@@ -306,11 +306,11 @@ impl PartialOrd for TailLoopTermination {
             return Some(std::cmp::Ordering::Equal);
         };
         match (self, other) {
-            (Self::Bottom,_) => Some(Ordering::Less),
-            (_,Self::Bottom) => Some(Ordering::Greater),
-            (Self::Top,_) => Some(Ordering::Greater),
-            (_,Self::Top) => Some(Ordering::Less),
-            _ => None
+            (Self::Bottom, _) => Some(Ordering::Less),
+            (_, Self::Bottom) => Some(Ordering::Greater),
+            (Self::Top, _) => Some(Ordering::Greater),
+            (_, Self::Top) => Some(Ordering::Less),
+            _ => None,
         }
     }
 }
@@ -359,7 +359,6 @@ impl Lattice for TailLoopTermination {
 impl BoundedLattice for TailLoopTermination {
     fn bottom() -> Self {
         Self::Bottom
-
     }
 
     fn top() -> Self {
