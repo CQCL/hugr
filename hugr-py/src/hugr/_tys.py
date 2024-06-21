@@ -36,6 +36,9 @@ class Type(Protocol):
     def to_serial_root(self) -> stys.Type:
         return stys.Type(root=self.to_serial())  # type: ignore[arg-type]
 
+    def type_arg(self) -> TypeTypeArg:
+        return TypeTypeArg(self)
+
 
 TypeRow = list[Type]
 

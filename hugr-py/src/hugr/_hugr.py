@@ -13,8 +13,8 @@ from typing import (
 )
 
 
-from hugr._ops import Op, DataflowOp, Const
-from hugr._tys import Type, Kind
+from hugr._ops import Op, DataflowOp, Const, Call
+from hugr._tys import Type, Kind, ValueKind
 from hugr._val import Value
 from hugr._node_port import Direction, InPort, OutPort, ToNode, Node, _SubPort
 from hugr.serialization.ops import OpType as SerialOp
@@ -257,6 +257,10 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
         op = self[port.node].op
         if isinstance(op, DataflowOp):
             return op.port_type(port)
+        if isinstance(op, Call) and isinstance(port, OutPort):
+            kind = self.port_kind(port)
+            if isinstance(kind, ValueKind):
+                return kind.ty
         return None
 
     def insert_hugr(self, hugr: Hugr, parent: ToNode | None = None) -> dict[Node, Node]:
