@@ -383,7 +383,7 @@ class DFG(DataflowOp):
 
     def deserialize(self) -> _ops.DFG:
         sig = self.signature.deserialize()
-        return _ops.DFG(sig.input, sig.output)
+        return _ops.DFG(sig.input, sig.output, sig.extension_reqs)
 
 
 # ------------------------------------------------
@@ -589,6 +589,12 @@ class Lift(DataflowOp):
     op: Literal["Lift"] = "Lift"
     type_row: TypeRow
     new_extension: ExtensionId
+
+    def deserialize(self) -> _ops.Lift:
+        return _ops.Lift(
+            _type_row=deser_it(self.type_row),
+            new_extension=self.new_extension,
+        )
 
 
 class AliasDecl(BaseOp):

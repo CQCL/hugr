@@ -20,6 +20,7 @@ from hugr._tys import (
     TypeArg,
     FunctionKind,
     PolyFuncType,
+    ExtensionSet,
 )
 
 from ._exceptions import NoSiblingAncestor
@@ -237,8 +238,10 @@ class _DfBase(ParentBuilder[DP]):
 
 
 class Dfg(_DfBase[ops.DFG]):
-    def __init__(self, *input_types: Type) -> None:
-        parent_op = ops.DFG(list(input_types))
+    def __init__(
+        self, *input_types: Type, extension_delta: ExtensionSet | None = None
+    ) -> None:
+        parent_op = ops.DFG(list(input_types), None, extension_delta or [])
         super().__init__(parent_op)
 
 

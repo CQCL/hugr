@@ -234,7 +234,11 @@ class FunctionType(Type):
     extension_reqs: ExtensionSet = field(default_factory=ExtensionSet)
 
     def to_serial(self) -> stys.FunctionType:
-        return stys.FunctionType(input=ser_it(self.input), output=ser_it(self.output))
+        return stys.FunctionType(
+            input=ser_it(self.input),
+            output=ser_it(self.output),
+            extension_reqs=self.extension_reqs,
+        )
 
     @classmethod
     def empty(cls) -> FunctionType:

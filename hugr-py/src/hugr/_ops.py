@@ -233,6 +233,7 @@ class DfParentOp(Op, Protocol):
 class DFG(DfParentOp, DataflowOp):
     inputs: tys.TypeRow
     _outputs: tys.TypeRow | None = None
+    extension_delta: tys.ExtensionSet = field(default_factory=list)
 
     @property
     def outputs(self) -> tys.TypeRow:
@@ -240,7 +241,7 @@ class DFG(DfParentOp, DataflowOp):
 
     @property
     def signature(self) -> tys.FunctionType:
-        return tys.FunctionType(self.inputs, self.outputs)
+        return tys.FunctionType(self.inputs, self.outputs, self.extension_delta)
 
     @property
     def num_out(self) -> int | None:
@@ -746,3 +747,27 @@ class NoopDef(DataflowOp, PartialOp):
 
 
 Noop = NoopDef()
+
+
+@dataclass
+class Lift(DataflowOp, PartialOp):
+    new_extension: tys.ExtensionId
+    _type_row: tys.TypeRow | None = None
+    num_out: int | None = 1
+
+    @property
+    def type_row(self) -> tys.TypeRow:
+        return _check_complete(self._type_row)
+
+    def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.Lift:
+        return sops.Lift(
+            parent=parent.idx,
+            new_extension=self.new_extension,
+            type_row=ser_it(self.type_row),
+        )
+
+    def outer_signature(self) -> tys.FunctionType:
+        return tys.FunctionType.endo(self.type_row)
+
+    def set_in_types(self, types: tys.TypeRow) -> None:
+        self._type_row = types

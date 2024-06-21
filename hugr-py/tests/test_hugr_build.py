@@ -381,3 +381,11 @@ def test_higher_order() -> None:
     d.set_outputs(call)
 
     _validate(d.hugr)
+
+
+def test_lift() -> None:
+    d = Dfg(tys.Qubit, extension_delta=["X"])
+    (q,) = d.inputs()
+    lift = d.add(ops.Lift("X")(q))
+    d.set_outputs(lift)
+    _validate(d.hugr)
