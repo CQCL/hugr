@@ -1,4 +1,4 @@
-from hugr._cond_loop import Conditional
+from hugr._cond_loop import Conditional, ConditionalError
 from hugr._dfg import Dfg
 import hugr._tys as tys
 import hugr._ops as ops
@@ -10,7 +10,7 @@ SUM_T = tys.Sum([[tys.Qubit], [tys.Qubit, INT_T]])
 
 
 def build_cond(h: Conditional) -> None:
-    with pytest.raises(AssertionError):
+    with pytest.raises(ConditionalError, match="Case 2 out of possible range."):
         h.add_case(2)
 
     case0 = h.add_case(0)

@@ -18,6 +18,10 @@ class Case(_DfBase[ops.Case]):
             self._parent_cond._update_outputs(self._wire_types(outputs))
 
 
+class ConditionalError(Exception):
+    pass
+
+
 @dataclass
 class _IfElse(Case):
     def __init__(self, case: Case) -> None:
@@ -28,7 +32,8 @@ class _IfElse(Case):
         self._parent_cond = case._parent_cond
 
     def _parent_conditional(self) -> Conditional:
-        assert self._parent_cond is not None, "If must have a parent conditional."
+        if self._parent_cond is None:
+            raise ConditionalError("If must have a parent conditional.")
         return self._parent_cond
 
 
@@ -76,10 +81,12 @@ class Conditional(ParentBuilder[ops.Conditional]):
         if self.parent_op._outputs is None:
             self.parent_op._outputs = outputs
         else:
-            assert outputs == self.parent_op._outputs, "Mismatched case outputs."
+            if outputs != self.parent_op._outputs:
+                raise ConditionalError("Mismatched case outputs.")
 
     def add_case(self, case_id: int) -> Case:
-        assert case_id in self.cases, f"Case {case_id} out of possible range."
+        if case_id not in self.cases:
+            raise ConditionalError(f"Case {case_id} out of possible range.")
         input_types = self.parent_op.nth_inputs(case_id)
         new_case = Case.new_nested(
             ops.Case(input_types),
