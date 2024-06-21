@@ -43,9 +43,9 @@ class BaseOp(ABC, ConfiguredBaseModel):
         """Name of the op for visualisation"""
         return self.__class__.__name__
 
+    @abstractmethod
     def deserialize(self) -> _ops.Op:
         """Deserializes the model into the corresponding Op."""
-        raise NotImplementedError
 
 
 # ----------------------------------------------------------
@@ -602,11 +602,17 @@ class AliasDecl(BaseOp):
     name: str
     bound: TypeBound
 
+    def deserialize(self) -> _ops.AliasDecl:
+        return _ops.AliasDecl(self.name, self.bound)
+
 
 class AliasDefn(BaseOp):
     op: Literal["AliasDefn"] = "AliasDefn"
     name: str
     definition: Type
+
+    def deserialize(self) -> _ops.AliasDefn:
+        return _ops.AliasDefn(self.name, self.definition.deserialize())
 
 
 class OpType(RootModel):

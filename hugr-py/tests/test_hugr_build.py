@@ -389,3 +389,11 @@ def test_lift() -> None:
     lift = d.add(ops.Lift("X")(q))
     d.set_outputs(lift)
     _validate(d.hugr)
+
+
+def test_alias() -> None:
+    mod = Module()
+    _dfn = mod.add_alias_defn("my_int", INT_T)
+    _dcl = mod.add_alias_decl("my_bool", tys.TypeBound.Eq)
+
+    _validate(mod.hugr)

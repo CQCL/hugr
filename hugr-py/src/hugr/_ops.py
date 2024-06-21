@@ -771,3 +771,37 @@ class Lift(DataflowOp, PartialOp):
 
     def set_in_types(self, types: tys.TypeRow) -> None:
         self._type_row = types
+
+
+@dataclass
+class AliasDecl(Op):
+    name: str
+    bound: tys.TypeBound
+    num_out: int | None = 0
+
+    def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.AliasDecl:
+        return sops.AliasDecl(
+            parent=parent.idx,
+            name=self.name,
+            bound=self.bound,
+        )
+
+    def port_kind(self, port: InPort | OutPort) -> tys.Kind:
+        raise InvalidPort(port)
+
+
+@dataclass
+class AliasDefn(Op):
+    name: str
+    definition: tys.Type
+    num_out: int | None = 0
+
+    def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.AliasDefn:
+        return sops.AliasDefn(
+            parent=parent.idx,
+            name=self.name,
+            definition=self.definition.to_serial_root(),
+        )
+
+    def port_kind(self, port: InPort | OutPort) -> tys.Kind:
+        raise InvalidPort(port)

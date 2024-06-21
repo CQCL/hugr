@@ -8,7 +8,7 @@ import hugr._val as val
 from ._dfg import _DfBase
 from hugr._node_port import Node
 from ._hugr import Hugr
-from ._tys import TypeRow, TypeParam, PolyFuncType
+from ._tys import TypeRow, TypeParam, PolyFuncType, Type, TypeBound
 
 
 @dataclass
@@ -47,3 +47,9 @@ class Module:
 
     def add_const(self, value: val.Value) -> Node:
         return self.hugr.add_node(ops.Const(value), self.hugr.root)
+
+    def add_alias_defn(self, name: str, ty: Type) -> Node:
+        return self.hugr.add_node(ops.AliasDefn(name, ty), self.hugr.root)
+
+    def add_alias_decl(self, name: str, bound: TypeBound) -> Node:
+        return self.hugr.add_node(ops.AliasDecl(name, bound), self.hugr.root)
