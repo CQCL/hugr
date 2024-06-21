@@ -18,7 +18,7 @@ enum Token {
     CloseList,
 
     #[regex(
-        r#""([^"\\]|\\["\\tnr]|u\{[a-fA-F0-9]{1,4}\})*""#,
+        r#""([^"\\]|\\["\\tnr]|u\{[a-fA-F0-9]+\})*""#,
         |lex| Some(unescape(&lex.slice()[1..lex.slice().len() - 1])?.into())
     )]
     String(SmolStr),

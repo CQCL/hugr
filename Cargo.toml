@@ -1,4 +1,4 @@
-# [profile.release]
+[profile.release]
 lto = "thin"
 
 [workspace]

@@ -31,3 +31,23 @@ release = true
 [[package]]
 name = "hugr-cli"
 release = true
+
+[[package]]
+name = "hugr-sexpr"
+release = true
+
+# Don't create github releases for this crate yet.
+git_tag_enable = false
+git_release_enable = false
+# Don't push releases to crates.io
+publish = false
+
+[[package]]
+name = "hugr-sexpr-derive"
+release = true
+
+# Don't create github releases for this crate yet.
+git_tag_enable = false
+git_release_enable = false
+# Don't push releases to crates.io
+publish = false

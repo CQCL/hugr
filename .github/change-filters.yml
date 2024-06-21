@@ -6,6 +6,8 @@ rust:
   - "hugr-cli/**"
   - "hugr-core/**"
   - "hugr-passes/**"
+  - "hugr-sexpr/**"
+  - "hugr-sexpr-derive/**"
   - "Cargo.toml"
   - "specification/schema/**"
 

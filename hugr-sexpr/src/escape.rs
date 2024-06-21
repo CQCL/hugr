@@ -11,7 +11,7 @@ enum EscapedToken {
     #[token(r#"\\"#, |_| '\\')]
     Escaped(char),
 
-    #[regex(r#"\\u\{[a-fA-F0-9]{1,4}\}"#, |lex| parse_unicode(lex.slice()))]
+    #[regex(r#"\\u\{[a-fA-F0-9]+\}"#, |lex| parse_unicode(lex.slice()))]
     Unicode(char),
 
     #[regex(r#"[^\\]"#)]
@@ -108,7 +108,7 @@ pub fn escape_symbol(str: &str) -> String {
 
 #[cfg(test)]
 mod test {
-    use super::escape_symbol;
+    use super::{escape_string, escape_symbol, unescape};
     use rstest::rstest;
 
     #[rstest]
@@ -125,7 +125,27 @@ mod test {
     #[case(r#"""#, r#"|"|"#)]
     #[case("+any", "+any")]
     #[case("-any", "-any")]
+    #[case("#symbol", "|#symbol|")]
     fn test_escape_symbol(#[case] symbol: &str, #[case] expected: &str) {
         assert_eq!(expected, escape_symbol(symbol));
+    }
+
+    #[rstest]
+    #[case("string", "string")]
+    #[case("\n", r"\n")]
+    #[case(r"\", r"\\")]
+    #[case(r#"""#, r#"\""#)]
+    #[case("|", "|")]
+    #[case("", "")]
+    fn test_escape_string(#[case] string: &str, #[case] expected: &str) {
+        assert_eq!(expected, escape_string(string));
+    }
+
+    #[rstest]
+    #[case(r#"\""#, r#"""#)]
+    #[case(r"\|", "|")]
+    #[case(r"\u{1F60A}", "\u{1F60A}")]
+    fn test_unescape(#[case] escaped: &str, #[case] expected: &str) {
+        assert_eq!(expected, unescape(escaped).unwrap());
     }
 }

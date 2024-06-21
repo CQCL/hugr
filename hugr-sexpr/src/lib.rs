@@ -4,7 +4,43 @@
 //! together with a reader and pretty printer.
 //! Moreover, the crate provides derive macros to conveniently convert between
 //! user defined types and s-expressions.
-//! See [`Value`] for the data model and syntax.
+//! See [`Value`] for the data model.
+//!
+//! # Syntax
+//!
+//! **Lists** are sequences of values, delimited on the outside by `(` and `)`
+//! and separated by whitespace.
+//!
+//! **Strings** are delimited by double quotes `"` on both sides,
+//! using the following escaping rules:
+//!
+//!  - `\"` and `\\` are used to escape `"` and `\`.
+//!  - `\n`, `\r` and `\t` stand for the newline, carriage return and tab characters.
+//!  - `\u{HEX}` stands in for any unicode character where `HEX` is a UTF-8 codepoint in hexadecimal notation.
+//!
+//! **Symbols** appear verbatim without delimiters, as long as it satisfies all of the following conditions:
+//!
+//!  - The symbol consists only of alphanumeric characters and of the special characters `!$%&*/:<=>?^_~+-.@`.
+//!  - The symbol does not begin with a digit.
+//!  - If the symbol begins with `+` or `-`, the following character (if any) is not a digit.
+//!
+//! Symbols that are not of this form are delimited by a pipe `|` on both sides.
+//! For symbols that are delimited, the same escaping rules apply as for strings,
+//! except that the double quote `"` is exchanged for the pipe `|`.
+//! Notably the hash sign `#` is reserved and may not appear in a non-delimited symbol.
+//! This is to allow for future extensibility if richer data types are required.
+//!
+//! **Booleans** are encoded by `#t` for true and `#f` for false.
+//!
+//! **Integers** are represented in text in decimal and with an optional sign,
+//! following the format `[+-]?[0-9]+`.
+//!
+//! **Floats** follow the format
+//! `[+-]?[0-9]+\.[0-9]*([eE][+-]?[0-9]+)?`.
+//! Positive and negative infinity are denoted by `#+inf` and `#-inf`,
+//! while NaN is written as `#nan`.
+//!
+//! **Comments** begin with a `;` and extend to the end of the line.
 //!
 //! # Derive Macros
 //!
@@ -65,59 +101,37 @@ pub use read::from_str;
 /// A value that can be encoded as an s-expression.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Value {
-    /// Lists are sequences of zero or more values, delimited by `(` and `)`.
-    /// The elements of the list are separated by whitespace.
+    /// Lists are sequences of zero or more values.
     List(Vec<Self>),
 
     /// Strings can be any valid UTF-8 string.
-    /// In the text format, strings are delimited by double quotes `"` on both sides,
-    /// using the following escaping rules:
-    ///
-    ///  - `\"` and `\\` are used to escape `"` and `\`.
-    ///  - `\n`, `\r` and `\t` stand for the newline, carriage return and tab characters.
-    ///  - `\u{HEX}` stands in for any unicode character where `HEX` is a UTF-8 codepoint written in up to four hexadecimal digits.
     String(SmolStr),
 
     /// Symbols represent identifiers such as variables or field names.
     /// A symbol can be any valid UTF-8 string.
-    ///
-    /// In the textual representation, a symbol can appear verbatim without delimiters,
-    /// as long as it satisfies all of the following conditions:
-    ///  - The symbol consists only of alphanumeric characters and of the special characters `!$%&*/:<=>?^_~+-.@`.
-    ///  - The symbol does not begin with a digit.
-    ///  - If the symbol begins with `+` or `-`, the following character (if any) is not a digit.
-    ///
-    /// Symbols that are not of this form are delimited by a pipe `|` on both sides.
-    /// For symbols that are delimited, the same escaping rules apply as for strings,
-    /// except that the double quote `"` is exchanged for the pipe `|`.
-    ///
-    /// Notably the hash sign `#` is reserved and may not appear in a non-delimited symbol.
-    /// This is to allow for future extensibility if richer data types are required.
-    /// Currently we make use of `#` for the encoding of booleans.
     Symbol(Symbol),
 
-    /// Booleans represent truth values.
-    /// True is denoted by `#t` while false is denoted by `#f`.
+    /// Booleans.
     Bool(bool),
 
     /// Signed integers with 64bit precision.
-    ///
-    /// Integers are represented in text in decimal and with an optional sign,
-    /// following the format `[+-]?[0-9]+`.
     Int(i64),
 
     /// Floating point numbers with 64bit precision.
-    ///
-    /// Finite floats are represented in text in the format
-    /// `[+-]?[0-9]+\.[0-9]*([eE][+-]?[0-9]+)?`.
-    /// Positive and negative infinity are denoted by `#+inf` and `#-inf`,
-    /// while NaN is written as `#nan`.
     Float(OrderedFloat<f64>),
 }
 
 impl Value {
     /// Attempts to cast this value into a list.
-    pub fn as_list(&self) -> Option<&[Self]> {
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use hugr_sexpr::Value;
+    /// assert_eq!(Value::List(vec![]).as_list(), Some(&vec![]));
+    /// assert_eq!(Value::Int(3).as_list(), None);
+    /// ```
+    pub fn as_list(&self) -> Option<&Vec<Value>> {
         match self {
             Value::List(list) => Some(list),
             _ => None,
@@ -125,6 +139,14 @@ impl Value {
     }
 
     /// Attempts to cast this value into a symbol.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use hugr_sexpr::{Value, Symbol};
+    /// assert_eq!(Value::Symbol("s".into()).as_symbol(), Some(&Symbol::new("s")));
+    /// assert_eq!(Value::String("s".into()).as_symbol(), None);
+    /// ```
     pub fn as_symbol(&self) -> Option<&Symbol> {
         match self {
             Value::Symbol(symbol) => Some(symbol),
@@ -133,7 +155,16 @@ impl Value {
     }
 
     /// Attempts to cast this value into a string.
-    pub fn as_string(&self) -> Option<&str> {
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use hugr_sexpr::{Value, Symbol};
+    /// # use smol_str::SmolStr;
+    /// assert_eq!(Value::String("s".into()).as_string(), Some(&SmolStr::new("s")));
+    /// assert_eq!(Value::Symbol("s".into()).as_string(), None);
+    /// ```
+    pub fn as_string(&self) -> Option<&SmolStr> {
         match self {
             Value::String(string) => Some(string),
             _ => None,
@@ -141,6 +172,14 @@ impl Value {
     }
 
     /// Attempts to cast this value into an integer.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use hugr_sexpr::{Value, Symbol};
+    /// assert_eq!(Value::Int(12).as_int(), Some(12));
+    /// assert_eq!(Value::Float((12.5).into()).as_int(), None);
+    /// ```
     pub fn as_int(&self) -> Option<i64> {
         match self {
             Value::Int(int) => Some(*int),
@@ -149,6 +188,14 @@ impl Value {
     }
 
     /// Attempts to cast this value into a float.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use hugr_sexpr::{Value, Symbol};
+    /// assert_eq!(Value::Float((12.5).into()).as_float(), Some(12.5));
+    /// assert_eq!(Value::Int(12).as_float(), None);
+    /// ```
     pub fn as_float(&self) -> Option<f64> {
         match self {
             Value::Float(float) => Some(float.into_inner()),
