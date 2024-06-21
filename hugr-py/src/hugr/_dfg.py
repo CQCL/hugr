@@ -132,7 +132,6 @@ class _DfBase(ParentBuilder[DP]):
     ) -> TailLoop:
         from ._cond_loop import TailLoop
 
-        rest = rest or []
         just_input_types = self._wire_types(just_inputs)
         rest_types = self._wire_types(rest)
         parent_op = ops.TailLoop(just_input_types, rest_types)
