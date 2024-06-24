@@ -295,6 +295,7 @@ pub enum HugrError {
 
 #[cfg(test)]
 mod test {
+    use super::internal::HugrMutInternals;
     #[cfg(feature = "extension_inference")]
     use super::ValidationError;
     use super::{ExtensionError, Hugr, HugrMut, HugrView, Node};
@@ -455,19 +456,22 @@ mod test {
         );
         add_inliftout(&mut h, p, ty.clone());
         assert!(h.validate_extensions().is_err());
+        let backup = h.clone();
         let inf_res = h.infer_extensions(true);
         if success {
             assert!(inf_res.is_ok());
             let expected_p = ops::Case {
                 signature: FunctionType::new_endo(ty).with_extension_delta(result.clone()),
             };
-            assert!(h.get_optype(p) == &expected_p.into());
+            let mut expected = backup;
+            expected.replace_op(p, expected_p).unwrap();
             let expected_gp = ops::Conditional {
                 extension_delta: result,
                 ..root_ty
             };
-            assert!(h.root_type() == &expected_gp.into())
-            // rest should be unchanged...
+            expected.replace_op(h.root(), expected_gp).unwrap();
+
+            assert_eq!(h, expected);
         } else {
             assert_eq!(
                 inf_res,
