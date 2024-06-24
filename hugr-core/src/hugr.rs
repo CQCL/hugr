@@ -414,16 +414,22 @@ mod test {
     }
 
     #[rstest]
-    #[case([XA], [XB, TO_BE_INFERRED], false, [XA, XB])]
+    // Base case success: delta inferred for parent equals grandparent.
     #[case([XA], [TO_BE_INFERRED], true, [XA])]
-    #[case([XB], [TO_BE_INFERRED], false, [XA])]
-    #[case([XB], [XA, TO_BE_INFERRED], false, [XA])]
-    #[case([XA, XB], [XB, TO_BE_INFERRED], true, [XA, XB])]
+    // Success: delta inferred for parent is subset of grandparent
     #[case([XA, XB], [TO_BE_INFERRED], true, [XA])]
+    // Base case failure: infers [XA] for parent but grandparent has disjoint et
+    #[case([XB], [TO_BE_INFERRED], false, [XA])]
+    // Failure: as previous, but extra "lower bound" on parent that has no effect
+    #[case([XB], [XA, TO_BE_INFERRED], false, [XA])]
+    // Failure: grandparent ok wrt. child but parent specifies extra lower-bound XB
+    #[case([XA], [XB, TO_BE_INFERRED], false, [XA, XB])]
+    // Success: grandparent includes extra XB required for parent's "lower bound"
+    #[case([XA, XB], [XB, TO_BE_INFERRED], true, [XA, XB])]
+    // Success: grandparent is also inferred so can include 'extra' XB from parent
     #[case([TO_BE_INFERRED], [TO_BE_INFERRED, XB], true, [XA, XB])]
-    // This one just tests removal:
+    // No inference: extraneous XB in parent is removed so all become [XA].
     #[case([XA], [XA, XB], true, [XA])]
-    // TODO: Consider adding a separate expected-grandparent so we can have something different?
     fn infer_three_generations(
         #[case] grandparent: impl IntoIterator<Item = ExtensionId>,
         #[case] parent: impl IntoIterator<Item = ExtensionId>,
