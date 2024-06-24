@@ -252,7 +252,7 @@ fn weighted_hugr_ser() {
 
         let t_row = vec![Type::new_sum([type_row![NAT], type_row![QB]])];
         let mut f_build = module_builder
-            .define_function("main", FunctionType::new(t_row.clone(), t_row).into())
+            .define_function("main", FunctionType::new(t_row.clone(), t_row))
             .unwrap();
 
         let outputs = f_build

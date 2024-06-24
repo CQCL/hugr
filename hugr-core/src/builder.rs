@@ -42,7 +42,7 @@
 //!     let _dfg_handle = {
 //!         let mut dfg = module_builder.define_function(
 //!             "main",
-//!             FunctionType::new(vec![BOOL_T], vec![BOOL_T]).into(),
+//!             FunctionType::new(vec![BOOL_T], vec![BOOL_T]),
 //!         )?;
 //!
 //!         // Get the wires from the function inputs.
@@ -59,7 +59,7 @@
 //!     let _circuit_handle = {
 //!         let mut dfg = module_builder.define_function(
 //!             "circuit",
-//!             FunctionType::new(vec![BOOL_T, BOOL_T], vec![BOOL_T, BOOL_T]).into(),
+//!             FunctionType::new_endo(vec![BOOL_T, BOOL_T]),
 //!         )?;
 //!         let mut circuit = dfg.as_circuit(dfg.input_wires());
 //!

@@ -78,8 +78,9 @@ pub trait Container {
     fn define_function(
         &mut self,
         name: impl Into<String>,
-        signature: PolyFuncType,
+        signature: impl Into<PolyFuncType>,
     ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
+        let signature = signature.into();
         let body = signature.body().clone();
         let f_node = self.add_child_node(ops::FuncDefn {
             name: name.into(),

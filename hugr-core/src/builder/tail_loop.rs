@@ -128,9 +128,7 @@ mod test {
             let mut module_builder = ModuleBuilder::new();
             let mut fbuild = module_builder.define_function(
                 "main",
-                FunctionType::new(type_row![BIT], type_row![NAT])
-                    .with_extension_delta(PRELUDE_ID)
-                    .into(),
+                FunctionType::new(type_row![BIT], type_row![NAT]).with_extension_delta(PRELUDE_ID),
             )?;
             let _fdef = {
                 let [b1] = fbuild
