@@ -245,10 +245,8 @@ impl SignatureFunc {
             }
         };
 
-        let res = pf.instantiate(args, exts)?;
-        // TODO bring this assert back once resource inference is done?
-        // https://github.com/CQCL/hugr/issues/388
-        // debug_assert!(res.extension_reqs.contains(def.extension()));
+        let mut res = pf.instantiate(args, exts)?;
+        res.extension_reqs.insert(&def.extension);
         Ok(res)
     }
 }
