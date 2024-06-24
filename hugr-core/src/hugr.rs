@@ -419,7 +419,7 @@ mod test {
     #[case([XA], [TO_BE_INFERRED], true, [XA])]
     // Success: delta inferred for parent is subset of grandparent
     #[case([XA, XB], [TO_BE_INFERRED], true, [XA])]
-    // Base case failure: infers [XA] for parent but grandparent has disjoint et
+    // Base case failure: infers [XA] for parent but grandparent has disjoint set
     #[case([XB], [TO_BE_INFERRED], false, [XA])]
     // Failure: as previous, but extra "lower bound" on parent that has no effect
     #[case([XB], [XA, TO_BE_INFERRED], false, [XA])]
