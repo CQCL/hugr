@@ -13,9 +13,9 @@ use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 
 use crate::ops::custom::{resolve_opaque_op, CustomOp, CustomOpError};
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
-use crate::ops::{FuncDefn, OpParent, OpTag, OpTrait, OpType, ValidateOp};
+use crate::ops::{FuncDefn, OpParent, OpTag, OpTrait, OpType, ValidateOp, Value};
 use crate::types::type_param::TypeParam;
-use crate::types::{EdgeKind, FunctionType};
+use crate::types::{EdgeKind, FunctionType, SumType, TypeEnum};
 use crate::{Direction, Hugr, Node, Port};
 
 use super::views::{HierarchyView, HugrView, SiblingGraph};
@@ -209,6 +209,23 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
 
         // Thirdly that the node has correct children
         self.validate_children(node, op_type)?;
+
+        // OpType-specific checks.
+        // TODO Maybe we should delegate these checks to the OpTypes themselves.
+        if let OpType::Const(c) = op_type {
+            if let TypeEnum::Sum(SumType::Unit { size: _ }) = c.get_type().as_type_enum() {
+                if let Value::Sum {
+                    tag: _,
+                    values,
+                    sum_type: _,
+                } = c.value()
+                {
+                    if !values.is_empty() {
+                        return Err(ValidationError::UnitSumWithValues {});
+                    }
+                }
+            }
+        }
 
         Ok(())
     }
@@ -752,6 +769,9 @@ pub enum ValidationError {
     /// [Opaque]: crate::ops::CustomOp::Opaque
     #[error(transparent)]
     CustomOpError(#[from] CustomOpError),
+    /// Error in a [SumType::Unit]
+    #[error("A unit sum contained a non-empty list of values")]
+    UnitSumWithValues {},
 }
 
 /// Errors related to the inter-graph edge validations.
