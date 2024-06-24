@@ -747,8 +747,8 @@ pub enum ValidationError {
     /// There are errors in the extension deltas.
     #[error(transparent)]
     ExtensionError(#[from] ExtensionError),
-    /// A node claims to still be awaiting extension inference. Perhaps it is not acted upon by inference...
-    #[error("Node {node:?} needs a concrete ExtensionSet - inference will provide this for TailLoop/Conditional/CFG/DFG/BasicBlock only")]
+    /// A node claims to still be awaiting extension inference. Perhaps it is not acted upon by inference.
+    #[error("Node {node:?} needs a concrete ExtensionSet - inference will provide this for Case/CFG/Conditional/DataflowBlock/DFG/TailLoop only")]
     ExtensionsNotInferred { node: Node },
     /// Error in a node signature
     #[error("Error in signature of node {node:?}: {cause}")]
