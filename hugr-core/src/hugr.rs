@@ -337,25 +337,25 @@ mod test {
         #[case] result: ExtensionSet,
     ) {
         let parent = ExtensionSet::from_iter(parent).union(TO_BE_INFERRED.into());
-        let (mut h, _) = build_ext_cfg(parent);
+        let (mut h, _) = build_ext_dfg(parent);
         h.infer_extensions(remove).unwrap();
-        assert_eq!(h, build_ext_cfg(result).0);
+        assert_eq!(h, build_ext_dfg(result).0);
     }
 
     #[test]
     fn infer_removes_from_delta() {
         let parent = ExtensionSet::from_iter([XA, XB]);
-        let mut h = build_ext_cfg(parent.clone()).0;
+        let mut h = build_ext_dfg(parent.clone()).0;
         let backup = h.clone();
         h.infer_extensions(false).unwrap();
         assert_eq!(h, backup); // did nothing
         h.infer_extensions(true).unwrap();
-        assert_eq!(h, build_ext_cfg(XA.into()).0);
+        assert_eq!(h, build_ext_dfg(XA.into()).0);
     }
 
     #[test]
     fn infer_bad_remove() {
-        let (mut h, mid) = build_ext_cfg(XB.into());
+        let (mut h, mid) = build_ext_dfg(XB.into());
         let backup = h.clone();
         h.infer_extensions(false).unwrap();
         assert_eq!(h, backup); // did nothing
@@ -378,7 +378,7 @@ mod test {
         assert_eq!(inf_res, Err(expected_err));
     }
 
-    fn build_ext_cfg(parent: ExtensionSet) -> (Hugr, Node) {
+    fn build_ext_dfg(parent: ExtensionSet) -> (Hugr, Node) {
         let ty = Type::new_function(FunctionType::new_endo(type_row![]));
         let mut h = Hugr::new(ops::DFG {
             signature: FunctionType::new_endo(ty.clone()).with_extension_delta(parent.clone()),
