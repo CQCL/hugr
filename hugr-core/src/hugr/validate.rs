@@ -1,5 +1,6 @@
 //! HUGR invariant checks.
 
+use std::any::TypeId;
 use std::collections::HashMap;
 use std::iter;
 
@@ -14,6 +15,7 @@ use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 use crate::ops::custom::{resolve_opaque_op, CustomOp, CustomOpError};
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::{FuncDefn, OpParent, OpTag, OpTrait, OpType, ValidateOp, Value};
+use crate::std_extensions::arithmetic::float_types::ConstF64;
 use crate::types::type_param::TypeParam;
 use crate::types::{EdgeKind, FunctionType, SumType, TypeEnum};
 use crate::{Direction, Hugr, Node, Port};
@@ -213,17 +215,29 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         // OpType-specific checks.
         // TODO Maybe we should delegate these checks to the OpTypes themselves.
         if let OpType::Const(c) = op_type {
-            if let TypeEnum::Sum(SumType::Unit { size: _ }) = c.get_type().as_type_enum() {
-                if let Value::Sum {
-                    tag: _,
-                    values,
-                    sum_type: _,
-                } = c.value()
-                {
-                    if !values.is_empty() {
-                        return Err(ValidationError::UnitSumWithValues {});
+            match c.get_type().as_type_enum() {
+                TypeEnum::Sum(SumType::Unit { size: _ }) => {
+                    if let Value::Sum {
+                        tag: _,
+                        values,
+                        sum_type: _,
+                    } = c.value()
+                    {
+                        if !values.is_empty() {
+                            return Err(ValidationError::UnitSumWithValues {});
+                        }
                     }
                 }
+                TypeEnum::Extension(custom_type) => {
+                    if custom_type.name() == "float64" {
+                        if let Value::Extension { e } = c.value() {
+                            if e.value().type_id() != TypeId::of::<ConstF64>() {
+                                return Err(ValidationError::WrongExtensionValueType {});
+                            }
+                        }
+                    }
+                }
+                _ => {}
             }
         }
 
@@ -772,6 +786,9 @@ pub enum ValidationError {
     /// Error in a [SumType::Unit]
     #[error("A unit sum contained a non-empty list of values")]
     UnitSumWithValues {},
+    /// Wrong type for an extension value
+    #[error("An extension value was of the wrong type")]
+    WrongExtensionValueType {},
 }
 
 /// Errors related to the inter-graph edge validations.
