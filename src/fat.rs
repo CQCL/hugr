@@ -5,6 +5,7 @@
 use std::{cmp::Ordering, hash::Hash, marker::PhantomData, ops::Deref};
 
 use hugr::{
+    hugr::{views::HierarchyView, HugrError},
     ops::{DataflowBlock, ExitBlock, Input, NamedOp, OpType, Output, CFG},
     types::Type,
     Hugr, HugrView, IncomingPort, Node, NodeIndex, OutgoingPort,
@@ -23,7 +24,7 @@ use itertools::Itertools as _;
 /// different base [Hugr]s. Note that [Node] has this same behaviour.
 ///
 /// [FuncDefn]: [hugr::ops::FuncDefn]
-#[derive(Debug, Copy)]
+#[derive(Debug)]
 pub struct FatNode<'c, OT = OpType, H = Hugr>
 where
     H: ?Sized,
@@ -33,9 +34,9 @@ where
     marker: PhantomData<OT>,
 }
 
-impl<'c, OT: 'c, H: HugrView + ?Sized> FatNode<'c, OT, H>
+impl<'c, OT, H: HugrView + ?Sized> FatNode<'c, OT, H>
 where
-    &'c OpType: TryInto<&'c OT>,
+    for<'a> &'a OpType: TryInto<&'a OT>,
 {
     /// Create a `FatNode` from a [HugrView] and a [Node].
     ///
@@ -46,7 +47,7 @@ where
     /// do not verify that it is actually equal to `ot`.
     pub fn new(hugr: &'c H, node: Node, #[allow(unused)] ot: &OT) -> Self {
         assert!(hugr.valid_node(node));
-        assert!(TryInto::<&'c OT>::try_into(hugr.get_optype(node)).is_ok());
+        assert!(TryInto::<&OT>::try_into(hugr.get_optype(node)).is_ok());
         // We don't actually check `ot == hugr.get_optype(node)` so as to not require OT: PartialEq`
         Self {
             hugr,
@@ -68,9 +69,14 @@ where
         ))
     }
 
-    /// Gets the [OpType] of the `FatNode`.
-    pub fn get(&self) -> &'c OT {
-        self.hugr.get_optype(self.node).try_into().ok().unwrap()
+    /// Create a general `FatNode` from a specific one.
+    pub fn generalise(self) -> FatNode<'c, OpType, H> {
+        // guaranteed to be valid becasue self is valid
+        FatNode {
+            hugr: self.hugr,
+            node: self.node,
+            marker: PhantomData,
+        }
     }
 }
 
@@ -96,9 +102,9 @@ impl<'c, H: HugrView + ?Sized> FatNode<'c, OpType, H> {
     }
 
     /// Tries to downcast a general `FatNode` into a specific `OT`.
-    pub fn try_into_ot<OT: 'c>(&self) -> Option<FatNode<'c, OT, H>>
+    pub fn try_into_ot<OT>(&self) -> Option<FatNode<'c, OT, H>>
     where
-        &'c OpType: TryInto<&'c OT>,
+        for<'a> &'a OpType: TryInto<&'a OT>,
     {
         FatNode::try_new(self.hugr, self.node)
     }
@@ -110,7 +116,7 @@ impl<'c, H: HugrView + ?Sized> FatNode<'c, OpType, H> {
     ///
     /// Note that while we do check the type of the node's `get_optype`, we
     /// do not verify that it is actually equal to `ot`.
-    pub fn into_ot<OT: PartialEq + 'c>(self, ot: &OT) -> FatNode<'c, OT, H>
+    pub fn into_ot<OT>(self, ot: &OT) -> FatNode<'c, OT, H>
     where
         for<'a> &'a OpType: TryInto<&'a OT>,
     {
@@ -159,28 +165,24 @@ impl<'c, OT, H: HugrView + ?Sized> FatNode<'c, OT, H> {
         ))
     }
 
-    pub fn node_outputs(&self) -> impl Iterator<Item = OutgoingPort> + '_ {
+    /// Iterator over output ports of node.
+    pub fn node_outputs(&self) -> impl Iterator<Item = OutgoingPort> + 'c {
         self.hugr.node_outputs(self.node)
     }
 
-    pub fn output_neighbours(&self) -> impl Iterator<Item = FatNode<'c, OpType, H>> + '_ {
+    /// Iterates over the output neighbours of the `node`.
+    pub fn output_neighbours(&self) -> impl Iterator<Item = FatNode<'c, OpType, H>> + 'c {
         self.hugr
             .output_neighbours(self.node)
             .map(|n| FatNode::new_optype(self.hugr, n))
     }
 
-    /// Create a general `FatNode` from a specific one.
-    pub fn generalise(self) -> FatNode<'c, OpType, H>
+    /// Delegates to `HV::try_new` with the internal [HugrView] and [Node].
+    pub fn try_new_hierarchy_view<HV: HierarchyView<'c>>(&self) -> Result<HV, HugrError>
     where
-        for<'a> &'a OpType: TryInto<&'a OT>,
-        OT: 'c,
+        H: Sized,
     {
-        // guaranteed to be valid becasue self is valid
-        FatNode {
-            hugr: self.hugr,
-            node: self.node,
-            marker: PhantomData,
-        }
+        HV::try_new(self.hugr, self.node)
     }
 }
 
@@ -204,106 +206,100 @@ impl<'c, H: HugrView> FatNode<'c, CFG, H> {
     }
 }
 
-impl<'c, OT, H> PartialEq<Node> for FatNode<'c, OT, H> {
+impl<OT, H> PartialEq<Node> for FatNode<'_, OT, H> {
     fn eq(&self, other: &Node) -> bool {
         &self.node == other
     }
 }
 
-impl<'c, OT, H> PartialEq<FatNode<'c, OT, H>> for Node {
-    fn eq(&self, other: &FatNode<'c, OT, H>) -> bool {
+impl<OT, H> PartialEq<FatNode<'_, OT, H>> for Node {
+    fn eq(&self, other: &FatNode<'_, OT, H>) -> bool {
         self == &other.node
     }
 }
 
-impl<'c, 'd, OT1, OT2, H1, H2> PartialEq<FatNode<'d, OT1, H1>> for FatNode<'c, OT2, H2> {
-    fn eq(&self, other: &FatNode<'d, OT1, H1>) -> bool {
+impl<OT1, OT2, H1, H2> PartialEq<FatNode<'_, OT1, H1>> for FatNode<'_, OT2, H2> {
+    fn eq(&self, other: &FatNode<'_, OT1, H1>) -> bool {
         self.node == other.node
     }
 }
 
-impl<'c, OT, H> Eq for FatNode<'c, OT, H> {}
+impl<OT, H> Eq for FatNode<'_, OT, H> {}
 
-impl<'c, OT, H> PartialOrd<Node> for FatNode<'c, OT, H> {
+impl<OT, H> PartialOrd<Node> for FatNode<'_, OT, H> {
     fn partial_cmp(&self, other: &Node) -> Option<Ordering> {
         self.node.partial_cmp(other)
     }
 }
 
-impl<'c, OT, H> PartialOrd<FatNode<'c, OT, H>> for Node {
-    fn partial_cmp(&self, other: &FatNode<'c, OT, H>) -> Option<Ordering> {
+impl<OT, H> PartialOrd<FatNode<'_, OT, H>> for Node {
+    fn partial_cmp(&self, other: &FatNode<'_, OT, H>) -> Option<Ordering> {
         self.partial_cmp(&other.node)
     }
 }
 
-impl<'c, 'd, OT1, OT2, H1, H2> PartialOrd<FatNode<'d, OT1, H1>> for FatNode<'c, OT2, H2> {
-    fn partial_cmp(&self, other: &FatNode<'d, OT1, H1>) -> Option<Ordering> {
+impl<OT1, OT2, H1, H2> PartialOrd<FatNode<'_, OT1, H1>> for FatNode<'_, OT2, H2> {
+    fn partial_cmp(&self, other: &FatNode<'_, OT1, H1>) -> Option<Ordering> {
         self.partial_cmp(&other.node)
     }
 }
 
-impl<'c, OT, H> Ord for FatNode<'c, OT, H> {
+impl<OT, H> Ord for FatNode<'_, OT, H> {
     fn cmp(&self, other: &Self) -> Ordering {
         self.node.cmp(&other.node)
     }
 }
 
-impl<'c, OT, H> Hash for FatNode<'c, OT, H> {
+impl<OT, H> Hash for FatNode<'_, OT, H> {
     fn hash<HA: std::hash::Hasher>(&self, state: &mut HA) {
         self.node.hash(state);
     }
 }
 
-impl<'c, OT: 'c, H: HugrView + ?Sized> AsRef<OT> for FatNode<'c, OT, H>
+impl<OT, H: HugrView + ?Sized> AsRef<OT> for FatNode<'_, OT, H>
 where
     for<'a> &'a OpType: TryInto<&'a OT>,
 {
     fn as_ref(&self) -> &OT {
-        self.get()
+        self.hugr.get_optype(self.node).try_into().ok().unwrap()
     }
 }
 
-impl<'c, OT, H: HugrView + ?Sized> Deref for FatNode<'c, OT, H>
+impl<OT, H: HugrView + ?Sized> Deref for FatNode<'_, OT, H>
 where
-    &'c OpType: TryInto<&'c OT>,
-    <&'c OpType as TryInto<&'c OT>>::Error: std::fmt::Debug,
-    OT: 'c,
+    for<'a> &'a OpType: TryInto<&'a OT>,
 {
     type Target = OT;
 
     fn deref(&self) -> &Self::Target {
-        self.get()
+        self.as_ref()
     }
 }
 
-impl<'c, OT, H> Clone for FatNode<'c, OT, H> {
+impl<OT, H> Copy for FatNode<'_, OT, H> {}
+
+impl<OT, H> Clone for FatNode<'_, OT, H> {
     fn clone(&self) -> Self {
-        Self {
-            hugr: self.hugr,
-            node: self.node,
-            marker: self.marker,
-        }
+        *self
     }
 }
 
 impl<'c, OT: NamedOp, H: HugrView + ?Sized> std::fmt::Display for FatNode<'c, OT, H>
 where
-    &'c OpType: TryInto<&'c OT>,
-    <&'c OpType as TryInto<&'c OT>>::Error: std::fmt::Debug,
-    OT: 'c,
+    for<'a> &'a OpType: TryInto<&'a OT>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!("N<{}:{}>", self.get().name(), self.node))
+        f.write_fmt(format_args!("N<{}:{}>", self.as_ref().name(), self.node))
     }
 }
 
-impl<'c, OT, H> NodeIndex for FatNode<'c, OT, H> {
+impl<OT, H> NodeIndex for FatNode<'_, OT, H> {
     fn index(self) -> usize {
         self.node.index()
     }
 }
 
-impl<'c, OT, H> NodeIndex for &FatNode<'c, OT, H> {
+impl<OT, H> NodeIndex for &FatNode<'_, OT, H> {
     fn index(self) -> usize {
         self.node.index()
     }
@@ -316,7 +312,7 @@ impl<'c, OT, H> NodeIndex for &FatNode<'c, OT, H> {
 /// TODO: Add the remaining [HugrView] equivalents that make sense.
 pub trait FatExt: HugrView {
     /// Try to create a specific [FatNode] for a given [Node].
-    fn try_fat<'c, OT: 'c>(&'c self, node: Node) -> Option<FatNode<'c, OT, Self>>
+    fn try_fat<OT>(&self, node: Node) -> Option<FatNode<OT, Self>>
     where
         for<'a> &'a OpType: TryInto<&'a OT>,
     {
@@ -340,10 +336,9 @@ pub trait FatExt: HugrView {
     }
 
     /// Try to create a specific [FatNode] for the root of a [HugrView].
-    fn fat_root<'c, OT: 'c>(&'c self) -> Option<FatNode<'c, OT, Self>>
+    fn fat_root<OT>(&self) -> Option<FatNode<OT, Self>>
     where
         for<'a> &'a OpType: TryInto<&'a OT>,
-        Self: 'c,
     {
         self.try_fat(self.root())
     }

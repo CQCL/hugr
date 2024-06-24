@@ -83,13 +83,14 @@ impl<'c, 'd, H: HugrView> CfgEmitter<'c, 'd, H> {
     fn get_block_data<OT: 'c>(
         &self,
         node: &FatNode<'c, OT, H>,
-    ) -> Result<&(BasicBlock<'c>, RowMailBox<'c>)>
+    ) -> Result<(BasicBlock<'c>, RowMailBox<'c>)>
     where
         for<'a> &'a OpType: TryInto<&'a OT>,
     {
         self.bbs
-            .get(&node.clone().generalise())
+            .get(&node.generalise())
             .ok_or(anyhow!("Couldn't get block data for: {}", node.index()))
+            .cloned()
     }
 
     /// Consume the emitter by emitting each child of the node.
@@ -99,23 +100,23 @@ impl<'c, 'd, H: HugrView> CfgEmitter<'c, 'd, H> {
         // dataflowblock node, and then branch to the basic block of that entry
         // node.
         let inputs = self.take_inputs()?;
-        let (entry_bb, inputs_rmb) = self.get_block_data(&self.entry_node).cloned()?;
+        let (entry_bb, inputs_rmb) = self.get_block_data(&self.entry_node)?;
         let builder = self.context.builder();
         inputs_rmb.write(builder, inputs)?;
         builder.build_unconditional_branch(entry_bb)?;
 
         // emit each child by delegating to the `impl EmitOp<_>` of self.
-        for c in self.node.children() {
+        for child_node in self.node.children() {
             let (inputs, outputs) = (vec![], RowMailBox::new_empty().promise());
             self.emit(EmitOpArgs {
-                node: c.clone(),
+                node: child_node,
                 inputs,
                 outputs,
             })?;
         }
 
         // move the builder to the end of the exit block
-        let (exit_bb, _) = self.get_block_data(&self.exit_node).cloned()?;
+        let (exit_bb, _) = self.get_block_data(&self.exit_node)?;
         self.context.builder().position_at_end(exit_bb);
         Ok(())
     }
@@ -140,14 +141,14 @@ impl<'c, H: HugrView> EmitOp<'c, DataflowBlock, H> for CfgEmitter<'c, '_, H> {
         }: EmitOpArgs<'c, DataflowBlock, H>,
     ) -> Result<()> {
         // our entry basic block and our input RowMailBox
-        let (bb, inputs_rmb) = self.bbs.get(&node.clone().generalise()).unwrap();
+        let (bb, inputs_rmb) = self.get_block_data(&node)?;
         // the basic block and mailbox of each of our successors
         let successor_data = node
             .output_neighbours()
-            .map(|succ| self.get_block_data(&succ).cloned())
+            .map(|succ| self.get_block_data(&succ))
             .collect::<Result<Vec<_>>>()?;
 
-        self.context.build_positioned(*bb, |context| {
+        self.context.build_positioned(bb, |context| {
             let (_, o) = node.get_io().unwrap();
             // get the rowmailbox for our output node
             let outputs_rmb = context.node_ins_rmb(o)?;
@@ -158,7 +159,7 @@ impl<'c, H: HugrView> EmitOp<'c, DataflowBlock, H> for CfgEmitter<'c, '_, H> {
             emit_dataflow_parent(
                 context,
                 EmitOpArgs {
-                    node: node.clone(),
+                    node,
                     inputs,
                     outputs: outputs_rmb.promise(),
                 },
@@ -179,7 +180,7 @@ impl<'c, H: HugrView> EmitOp<'c, DataflowBlock, H> for CfgEmitter<'c, '_, H> {
                 .into_iter()
                 .enumerate()
                 .map(|(tag, (target_bb, target_rmb))| {
-                    let bb = context.build_positioned_new_block("", Some(*bb), |context, bb| {
+                    let bb = context.build_positioned_new_block("", Some(bb), |context, bb| {
                         let builder = context.builder();
                         let mut vals =
                             llvm_sum_type.build_untag(builder, tag as u32, outputs[0])?;
@@ -206,8 +207,8 @@ impl<'c, H: HugrView> EmitOp<'c, DataflowBlock, H> for CfgEmitter<'c, '_, H> {
 impl<'c, H: HugrView> EmitOp<'c, ExitBlock, H> for CfgEmitter<'c, '_, H> {
     fn emit(&mut self, args: EmitOpArgs<'c, ExitBlock, H>) -> Result<()> {
         let outputs = self.take_outputs()?;
-        let (bb, inputs_rmb) = self.bbs.get(&args.node().generalise()).unwrap();
-        self.context.build_positioned(*bb, |context| {
+        let (bb, inputs_rmb) = self.get_block_data(&args.node())?;
+        self.context.build_positioned(bb, |context| {
             let builder = context.builder();
             outputs.finish(builder, inputs_rmb.read_vec(builder, [])?)
         })

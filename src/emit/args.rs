@@ -19,15 +19,15 @@ pub struct EmitOpArgs<'c, OT, H> {
 impl<'c, OT, H> EmitOpArgs<'c, OT, H> {
     /// Get the internal [FatNode]
     pub fn node(&self) -> FatNode<'c, OT, H> {
-        self.node.clone()
+        self.node
     }
 }
 
 impl<'c, H: HugrView> EmitOpArgs<'c, OpType, H> {
     /// Attempt to specialise the internal [FatNode].
-    pub fn try_into_ot<OT: 'c>(self) -> Result<EmitOpArgs<'c, OT, H>, Self>
+    pub fn try_into_ot<OT>(self) -> Result<EmitOpArgs<'c, OT, H>, Self>
     where
-        &'c OpType: TryInto<&'c OT>,
+        for<'a> &'a OpType: TryInto<&'a OT>,
     {
         let EmitOpArgs {
             node,

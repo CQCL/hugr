@@ -258,7 +258,7 @@ impl<'c, H: HugrView> EmitFuncContext<'c, H> {
     pub fn node_outs_rmb<OT: 'c>(&mut self, node: FatNode<'c, OT, H>) -> Result<RowMailBox<'c>> {
         let r = node
             .out_value_types()
-            .map(|(port, hugr_type)| self.map_wire(node.clone(), port, &hugr_type))
+            .map(|(port, hugr_type)| self.map_wire(node, port, &hugr_type))
             .collect::<Result<RowMailBox>>()?;
         debug_assert!(zip_eq(node.out_value_types(), r.get_types())
             .all(|((_, t), lt)| self.llvm_type(&t).unwrap() == lt));

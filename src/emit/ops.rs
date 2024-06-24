@@ -78,11 +78,9 @@ struct DataflowParentEmitter<'c, 'd, OT, H: HugrView> {
     outputs: Option<RowPromise<'c>>,
 }
 
-impl<'c, 'd, OT: OpTrait + 'c, H: HugrView> DataflowParentEmitter<'c, 'd, OT, H>
+impl<'c, 'd, OT: OpTrait, H: HugrView> DataflowParentEmitter<'c, 'd, OT, H>
 where
-    &'c OpType: TryInto<&'c OT>,
-    // &'c OpType: TryInto<&'c OT>,
-    // <&'c OpType as TryInto<&'c OT>>::Error: std::fmt::Debug,
+    for<'a> &'a OpType: TryInto<&'a OT>,
 {
     pub fn new(context: &'d mut EmitFuncContext<'c, H>, args: EmitOpArgs<'c, OT, H>) -> Self {
         Self {
@@ -111,10 +109,9 @@ where
     }
 
     pub fn emit_children(mut self) -> Result<()> {
-        use hugr::hugr::views::HierarchyView;
         use petgraph::visit::Topo;
-        let node = self.node.clone();
-        if !OpTag::DataflowParent.is_superset(OpTrait::tag(node.get())) {
+        let node = self.node;
+        if !OpTag::DataflowParent.is_superset(node.tag()) {
             Err(anyhow!("Not a dataflow parent"))?
         };
 
@@ -124,15 +121,15 @@ where
         debug_assert!(i.out_value_types().count() == self.inputs.as_ref().unwrap().len());
         debug_assert!(o.in_value_types().count() == self.outputs.as_ref().unwrap().len());
 
-        let region: SiblingGraph = SiblingGraph::try_new(node.hugr(), node.node()).unwrap();
+        let region: SiblingGraph = node.try_new_hierarchy_view().unwrap();
         Topo::new(&region.as_petgraph())
             .iter(&region.as_petgraph())
             .filter(|x| (*x != node.node()))
             .map(|x| node.hugr().fat_optype(x))
             .try_for_each(|node| {
-                let inputs_rmb = self.context.node_ins_rmb(node.clone())?;
+                let inputs_rmb = self.context.node_ins_rmb(node)?;
                 let inputs = inputs_rmb.read(self.builder(), [])?;
-                let outputs = self.context.node_outs_rmb(node.clone())?.promise();
+                let outputs = self.context.node_outs_rmb(node)?.promise();
                 self.emit(EmitOpArgs {
                     node,
                     inputs,
@@ -142,17 +139,16 @@ where
     }
 }
 
-impl<'c, OT: OpTrait + 'c, H: HugrView> EmitOp<'c, OpType, H>
-    for DataflowParentEmitter<'c, '_, OT, H>
+impl<'c, OT: OpTrait, H: HugrView> EmitOp<'c, OpType, H> for DataflowParentEmitter<'c, '_, OT, H>
 where
-    &'c OpType: TryInto<&'c OT>,
+    for<'a> &'a OpType: TryInto<&'a OT>,
 {
     fn emit(&mut self, args: EmitOpArgs<'c, OpType, H>) -> Result<()> {
         if !OpTag::DataflowChild.is_superset(args.node().tag()) {
             Err(anyhow!("Not a dataflow child"))?
         };
 
-        match args.node().get() {
+        match args.node().as_ref() {
             OpType::Input(_) => {
                 let i = self.take_input()?;
                 args.outputs.finish(self.builder(), i)
@@ -283,12 +279,12 @@ pub fn emit_value<'c, H: HugrView>(
     }
 }
 
-pub(crate) fn emit_dataflow_parent<'c, OT: OpTrait + 'c, H: HugrView>(
+pub(crate) fn emit_dataflow_parent<'c, OT: OpTrait, H: HugrView>(
     context: &mut EmitFuncContext<'c, H>,
     args: EmitOpArgs<'c, OT, H>,
 ) -> Result<()>
 where
-    &'c OpType: TryInto<&'c OT>,
+    for<'a> &'a OpType: TryInto<&'a OT>,
 {
     DataflowParentEmitter::new(context, args).emit_children()
 }
@@ -347,7 +343,7 @@ fn emit_call<'c, H: HugrView>(
         .node
         .single_linked_output(args.node.called_function_port())
         .unwrap();
-    let func = match func_node.get() {
+    let func = match func_node.as_ref() {
         OpType::FuncDecl(_) => context.get_func_decl(func_node.try_into_ot().unwrap()),
         OpType::FuncDefn(_) => context.get_func_defn(func_node.try_into_ot().unwrap()),
         _ => Err(anyhow!("emit_call: Not a Decl or Defn")),
@@ -371,7 +367,7 @@ fn emit_optype<'c, H: HugrView>(
     args: EmitOpArgs<'c, OpType, H>,
 ) -> Result<()> {
     let node = args.node();
-    match node.get() {
+    match node.as_ref() {
         OpType::MakeTuple(ref mt) => emit_make_tuple(context, args.into_ot(mt)),
         OpType::UnpackTuple(ref ut) => emit_unpack_tuple(context, args.into_ot(ut)),
         OpType::Tag(ref tag) => emit_tag(context, args.into_ot(tag)),
