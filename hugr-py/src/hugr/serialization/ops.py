@@ -43,9 +43,9 @@ class BaseOp(ABC, ConfiguredBaseModel):
         """Name of the op for visualisation"""
         return self.__class__.__name__
 
+    @abstractmethod
     def deserialize(self) -> _ops.Op:
         """Deserializes the model into the corresponding Op."""
-        raise NotImplementedError
 
 
 # ----------------------------------------------------------
@@ -334,6 +334,9 @@ class CallIndirect(DataflowOp):
         assert len(fun_ty.output) == len(out_types)
         self.signature = fun_ty
 
+    def deserialize(self) -> _ops.CallIndirectDef:
+        return _ops.CallIndirectDef(self.signature.deserialize())
+
 
 class LoadConstant(DataflowOp):
     """An operation that loads a static constant in to the local dataflow graph."""
@@ -353,6 +356,19 @@ class LoadFunction(DataflowOp):
     type_args: list[tys.TypeArg]
     signature: FunctionType
 
+    def deserialize(self) -> _ops.LoadFunc:
+        signature = self.signature.deserialize()
+        assert len(signature.input) == 0
+        (f_ty,) = signature.output
+        assert isinstance(
+            f_ty, _tys.FunctionType
+        ), "Expected single funciton type output"
+        return _ops.LoadFunc(
+            self.func_sig.deserialize(),
+            f_ty,
+            deser_it(self.type_args),
+        )
+
 
 class DFG(DataflowOp):
     """A simply nested dataflow graph."""
@@ -367,7 +383,7 @@ class DFG(DataflowOp):
 
     def deserialize(self) -> _ops.DFG:
         sig = self.signature.deserialize()
-        return _ops.DFG(sig.input, sig.output)
+        return _ops.DFG(sig.input, sig.output, sig.extension_reqs)
 
 
 # ------------------------------------------------
@@ -520,6 +536,9 @@ class Noop(DataflowOp):
         assert in_types[0] == out_types[0]
         self.ty = in_types[0]
 
+    def deserialize(self) -> _ops.NoopDef:
+        return _ops.NoopDef(self.ty.deserialize())
+
 
 class MakeTuple(DataflowOp):
     """An operation that packs all its inputs into a tuple."""
@@ -571,17 +590,29 @@ class Lift(DataflowOp):
     type_row: TypeRow
     new_extension: ExtensionId
 
+    def deserialize(self) -> _ops.Lift:
+        return _ops.Lift(
+            _type_row=deser_it(self.type_row),
+            new_extension=self.new_extension,
+        )
+
 
 class AliasDecl(BaseOp):
     op: Literal["AliasDecl"] = "AliasDecl"
     name: str
     bound: TypeBound
 
+    def deserialize(self) -> _ops.AliasDecl:
+        return _ops.AliasDecl(self.name, self.bound)
+
 
 class AliasDefn(BaseOp):
     op: Literal["AliasDefn"] = "AliasDefn"
     name: str
     definition: Type
+
+    def deserialize(self) -> _ops.AliasDefn:
+        return _ops.AliasDefn(self.name, self.definition.deserialize())
 
 
 class OpType(RootModel):

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Protocol, TYPE_CHECKING, runtime_checkable, TypeVar
+from typing import Protocol, TYPE_CHECKING, Sequence, runtime_checkable, TypeVar
 from hugr.serialization.ops import BaseOp
 import hugr.serialization.ops as sops
 from hugr.utils import ser_it
@@ -233,6 +233,7 @@ class DfParentOp(Op, Protocol):
 class DFG(DfParentOp, DataflowOp):
     inputs: tys.TypeRow
     _outputs: tys.TypeRow | None = None
+    extension_delta: tys.ExtensionSet = field(default_factory=list)
 
     @property
     def outputs(self) -> tys.TypeRow:
@@ -240,7 +241,7 @@ class DFG(DfParentOp, DataflowOp):
 
     @property
     def signature(self) -> tys.FunctionType:
-        return tys.FunctionType(self.inputs, self.outputs)
+        return tys.FunctionType(self.inputs, self.outputs, self.extension_delta)
 
     @property
     def num_out(self) -> int | None:
@@ -381,6 +382,7 @@ class Const(Op):
 @dataclass
 class LoadConst(DataflowOp):
     typ: tys.Type | None = None
+    num_out: int | None = 1
 
     def type_(self) -> tys.Type:
         return _check_complete(self.typ)
@@ -588,6 +590,25 @@ class NoConcreteFunc(Exception):
     pass
 
 
+def _fn_instantiation(
+    signature: tys.PolyFuncType,
+    instantiation: tys.FunctionType | None = None,
+    type_args: Sequence[tys.TypeArg] | None = None,
+) -> tuple[tys.FunctionType, list[tys.TypeArg]]:
+    if len(signature.params) == 0:
+        return signature.body, []
+
+    else:
+        # TODO substitute type args into signature to get instantiation
+        if instantiation is None:
+            raise NoConcreteFunc("Missing instantiation for polymorphic function.")
+        type_args = type_args or []
+
+        if len(signature.params) != len(type_args):
+            raise NoConcreteFunc("Mismatched number of type arguments.")
+        return instantiation, list(type_args)
+
+
 @dataclass
 class Call(Op):
     signature: tys.PolyFuncType
@@ -598,23 +619,12 @@ class Call(Op):
         self,
         signature: tys.PolyFuncType,
         instantiation: tys.FunctionType | None = None,
-        type_args: list[tys.TypeArg] | None = None,
+        type_args: Sequence[tys.TypeArg] | None = None,
     ) -> None:
         self.signature = signature
-        if len(signature.params) == 0:
-            self.instantiation = signature.body
-            self.type_args = []
-
-        else:
-            # TODO substitute type args into signature to get instantiation
-            if instantiation is None:
-                raise NoConcreteFunc("Missing instantiation for polymorphic function.")
-            type_args = type_args or []
-
-            if len(signature.params) != len(type_args):
-                raise NoConcreteFunc("Mismatched number of type arguments.")
-            self.instantiation = instantiation
-            self.type_args = type_args
+        self.instantiation, self.type_args = _fn_instantiation(
+            signature, instantiation, type_args
+        )
 
     def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.Call:
         return sops.Call(
@@ -637,3 +647,161 @@ class Call(Op):
                 return tys.FunctionKind(self.signature)
             case _:
                 return tys.ValueKind(_sig_port_type(self.instantiation, port))
+
+
+@dataclass()
+class CallIndirectDef(DataflowOp, PartialOp):
+    _signature: tys.FunctionType | None = None
+
+    @property
+    def num_out(self) -> int | None:
+        return len(self.signature.output)
+
+    @property
+    def signature(self) -> tys.FunctionType:
+        return _check_complete(self._signature)
+
+    def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.CallIndirect:
+        return sops.CallIndirect(
+            parent=parent.idx,
+            signature=self.signature.to_serial(),
+        )
+
+    def __call__(self, function: Wire, *args: Wire) -> Command:  # type: ignore[override]
+        return super().__call__(function, *args)
+
+    def outer_signature(self) -> tys.FunctionType:
+        sig = self.signature
+
+        return tys.FunctionType(input=[sig, *sig.input], output=sig.output)
+
+    def set_in_types(self, types: tys.TypeRow) -> None:
+        func_sig, *_ = types
+        assert isinstance(
+            func_sig, tys.FunctionType
+        ), f"Expected function type, got {func_sig}"
+        self._signature = func_sig
+
+
+# rename to eval?
+CallIndirect = CallIndirectDef()
+
+
+@dataclass
+class LoadFunc(DataflowOp):
+    signature: tys.PolyFuncType
+    instantiation: tys.FunctionType
+    type_args: list[tys.TypeArg]
+    num_out: int | None = 1
+
+    def __init__(
+        self,
+        signature: tys.PolyFuncType,
+        instantiation: tys.FunctionType | None = None,
+        type_args: Sequence[tys.TypeArg] | None = None,
+    ) -> None:
+        self.signature = signature
+        self.instantiation, self.type_args = _fn_instantiation(
+            signature, instantiation, type_args
+        )
+
+    def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.LoadFunction:
+        return sops.LoadFunction(
+            parent=parent.idx,
+            func_sig=self.signature.to_serial(),
+            type_args=ser_it(self.type_args),
+            signature=self.outer_signature().to_serial(),
+        )
+
+    def outer_signature(self) -> tys.FunctionType:
+        return tys.FunctionType(input=[], output=[self.instantiation])
+
+    def port_kind(self, port: InPort | OutPort) -> tys.Kind:
+        match port:
+            case InPort(_, 0):
+                return tys.FunctionKind(self.signature)
+            case OutPort(_, 0):
+                return tys.ValueKind(self.instantiation)
+            case _:
+                raise InvalidPort(port)
+
+
+@dataclass
+class NoopDef(DataflowOp, PartialOp):
+    _type: tys.Type | None = None
+    num_out: int | None = 1
+
+    @property
+    def type_(self) -> tys.Type:
+        return _check_complete(self._type)
+
+    def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.Noop:
+        return sops.Noop(parent=parent.idx, ty=self.type_.to_serial_root())
+
+    def outer_signature(self) -> tys.FunctionType:
+        return tys.FunctionType.endo([self.type_])
+
+    def set_in_types(self, types: tys.TypeRow) -> None:
+        (t,) = types
+        self._type = t
+
+
+Noop = NoopDef()
+
+
+@dataclass
+class Lift(DataflowOp, PartialOp):
+    new_extension: tys.ExtensionId
+    _type_row: tys.TypeRow | None = None
+    num_out: int | None = 1
+
+    @property
+    def type_row(self) -> tys.TypeRow:
+        return _check_complete(self._type_row)
+
+    def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.Lift:
+        return sops.Lift(
+            parent=parent.idx,
+            new_extension=self.new_extension,
+            type_row=ser_it(self.type_row),
+        )
+
+    def outer_signature(self) -> tys.FunctionType:
+        return tys.FunctionType.endo(self.type_row)
+
+    def set_in_types(self, types: tys.TypeRow) -> None:
+        self._type_row = types
+
+
+@dataclass
+class AliasDecl(Op):
+    name: str
+    bound: tys.TypeBound
+    num_out: int | None = 0
+
+    def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.AliasDecl:
+        return sops.AliasDecl(
+            parent=parent.idx,
+            name=self.name,
+            bound=self.bound,
+        )
+
+    def port_kind(self, port: InPort | OutPort) -> tys.Kind:
+        raise InvalidPort(port)
+
+
+@dataclass
+class AliasDefn(Op):
+    name: str
+    definition: tys.Type
+    num_out: int | None = 0
+
+    def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> sops.AliasDefn:
+        return sops.AliasDefn(
+            parent=parent.idx,
+            name=self.name,
+            definition=self.definition.to_serial_root(),
+        )
+
+    def port_kind(self, port: InPort | OutPort) -> tys.Kind:
+        raise InvalidPort(port)

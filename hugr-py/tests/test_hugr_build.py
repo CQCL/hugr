@@ -318,7 +318,8 @@ def test_vals(val: val.Value):
     _validate(d.hugr)
 
 
-def test_poly_function() -> None:
+@pytest.mark.parametrize("direct_call", [True, False])
+def test_poly_function(direct_call: bool) -> None:
     mod = Module()
     f_id = mod.declare_function(
         "id",
@@ -330,21 +331,28 @@ def test_poly_function() -> None:
 
     f_main = mod.define_main([tys.Qubit])
     q = f_main.input_node[0]
-    with pytest.raises(NoConcreteFunc, match="Missing instantiation"):
-        f_main.call(f_id, q)
-    call = f_main.call(
-        f_id,
-        q,
-        # for now concrete instantiations have to be provided.
-        instantiation=tys.FunctionType.endo([tys.Qubit]),
-        type_args=[tys.Qubit.type_arg()],
-    )
+    # for now concrete instantiations have to be provided.
+    instantiation = tys.FunctionType.endo([tys.Qubit])
+    type_args = [tys.Qubit.type_arg()]
+    if direct_call:
+        with pytest.raises(NoConcreteFunc, match="Missing instantiation"):
+            f_main.call(f_id, q)
+        call = f_main.call(f_id, q, instantiation=instantiation, type_args=type_args)
+    else:
+        with pytest.raises(NoConcreteFunc, match="Missing instantiation"):
+            f_main.load_function(f_id)
+        load = f_main.load_function(
+            f_id, instantiation=instantiation, type_args=type_args
+        )
+        call = f_main.add(ops.CallIndirect(load, q))
+
     f_main.set_outputs(call)
 
     _validate(mod.hugr, True)
 
 
-def test_mono_function() -> None:
+@pytest.mark.parametrize("direct_call", [True, False])
+def test_mono_function(direct_call: bool) -> None:
     mod = Module()
     f_id = mod.define_function("id", [tys.Qubit])
     f_id.set_outputs(f_id.input_node[0])
@@ -352,7 +360,40 @@ def test_mono_function() -> None:
     f_main = mod.define_main([tys.Qubit])
     q = f_main.input_node[0]
     # monomorphic functions don't need instantiation specified
-    call = f_main.call(f_id, q)
+    if direct_call:
+        call = f_main.call(f_id, q)
+    else:
+        load = f_main.load_function(f_id)
+        call = f_main.add(ops.CallIndirect(load, q))
     f_main.set_outputs(call)
 
-    _validate(mod.hugr, True)
+    _validate(mod.hugr)
+
+
+def test_higher_order() -> None:
+    noop_fn = Dfg(tys.Qubit)
+    noop_fn.set_outputs(noop_fn.add(ops.Noop(noop_fn.input_node[0])))
+
+    d = Dfg(tys.Qubit)
+    (q,) = d.inputs()
+    f_val = d.load(val.Function(noop_fn.hugr))
+    call = d.add(ops.CallIndirect(f_val, q))[0]
+    d.set_outputs(call)
+
+    _validate(d.hugr)
+
+
+def test_lift() -> None:
+    d = Dfg(tys.Qubit, extension_delta=["X"])
+    (q,) = d.inputs()
+    lift = d.add(ops.Lift("X")(q))
+    d.set_outputs(lift)
+    _validate(d.hugr)
+
+
+def test_alias() -> None:
+    mod = Module()
+    _dfn = mod.add_alias_defn("my_int", INT_T)
+    _dcl = mod.add_alias_decl("my_bool", tys.TypeBound.Eq)
+
+    _validate(mod.hugr)

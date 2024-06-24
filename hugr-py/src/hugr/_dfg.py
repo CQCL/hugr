@@ -12,7 +12,16 @@ from typing_extensions import Self
 
 import hugr._ops as ops
 import hugr._val as val
-from hugr._tys import Type, TypeRow, get_first_sum, FunctionType, TypeArg, FunctionKind
+from hugr._tys import (
+    Type,
+    TypeRow,
+    get_first_sum,
+    FunctionType,
+    TypeArg,
+    FunctionKind,
+    PolyFuncType,
+    ExtensionSet,
+)
 
 from ._exceptions import NoSiblingAncestor
 from ._hugr import Hugr, ParentBuilder
@@ -170,15 +179,9 @@ class _DfBase(ParentBuilder[DP]):
         func: ToNode,
         *args: Wire,
         instantiation: FunctionType | None = None,
-        type_args: list[TypeArg] | None = None,
+        type_args: Sequence[TypeArg] | None = None,
     ) -> Node:
-        f_op = self.hugr[func]
-        f_kind = f_op.op.port_kind(func.out(0))
-        match f_kind:
-            case FunctionKind(sig):
-                signature = sig
-            case _:
-                raise ValueError("Expected 'func' to be a function")
+        signature = self._fn_sig(func)
         call_op = ops.Call(signature, instantiation, type_args)
         call_n = self.hugr.add_node(call_op, self.parent_node, call_op.num_out)
         self.hugr.add_link(func.out(0), call_n.inp(call_op.function_port_offset()))
@@ -186,6 +189,29 @@ class _DfBase(ParentBuilder[DP]):
         self._wire_up(call_n, args)
 
         return call_n
+
+    def load_function(
+        self,
+        func: ToNode,
+        instantiation: FunctionType | None = None,
+        type_args: Sequence[TypeArg] | None = None,
+    ) -> Node:
+        signature = self._fn_sig(func)
+        load_op = ops.LoadFunc(signature, instantiation, type_args)
+        load_n = self.hugr.add_node(load_op, self.parent_node)
+        self.hugr.add_link(func.out(0), load_n.inp(0))
+
+        return load_n
+
+    def _fn_sig(self, func: ToNode) -> PolyFuncType:
+        f_op = self.hugr[func]
+        f_kind = f_op.op.port_kind(func.out(0))
+        match f_kind:
+            case FunctionKind(sig):
+                signature = sig
+            case _:
+                raise ValueError("Expected 'func' to be a function")
+        return signature
 
     def _wire_up(self, node: Node, ports: Iterable[Wire]) -> TypeRow:
         tys = [self._wire_up_port(node, i, p) for i, p in enumerate(ports)]
@@ -212,8 +238,10 @@ class _DfBase(ParentBuilder[DP]):
 
 
 class Dfg(_DfBase[ops.DFG]):
-    def __init__(self, *input_types: Type) -> None:
-        parent_op = ops.DFG(list(input_types))
+    def __init__(
+        self, *input_types: Type, extension_delta: ExtensionSet | None = None
+    ) -> None:
+        parent_op = ops.DFG(list(input_types), None, extension_delta or [])
         super().__init__(parent_op)
 
 
