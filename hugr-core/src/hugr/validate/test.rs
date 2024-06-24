@@ -257,7 +257,7 @@ fn no_ext_edge_into_func() -> Result<(), Box<dyn std::error::Error>> {
         FunctionType::new(vec![], Type::new_function(b2b.clone())),
         [],
     )?;
-    let mut func = dfg.define_function("AndWithOuter", b2b.clone().into())?;
+    let mut func = dfg.define_function("AndWithOuter", b2b.clone())?;
     let [fn_input] = func.input_wires_arr();
     let and_op = func.add_dataflow_op(and_op(), [fn_input, input])?; // 'ext' edge
     let func = func.finish_with_outputs(and_op.outputs())?;
@@ -651,7 +651,7 @@ fn inner_row_variables() -> Result<(), Box<dyn std::error::Error>> {
     // All the wires here are carrying higher-order Function values
     let [func_arg] = fb.input_wires_arr();
     let [id_usz] = {
-        let bldr = fb.define_function("id_usz", FunctionType::new_endo(USIZE_T).into())?;
+        let bldr = fb.define_function("id_usz", FunctionType::new_endo(USIZE_T))?;
         let vals = bldr.input_wires();
         let [inner_def] = bldr.finish_with_outputs(vals)?.outputs_arr();
         let loadf = LoadFunction::try_new(
@@ -843,7 +843,7 @@ fn test_polymorphic_load() -> Result<(), Box<dyn std::error::Error>> {
         vec![],
         vec![Type::new_function(FunctionType::new_endo(vec![USIZE_T]))],
     );
-    let mut f = m.define_function("main", sig.into())?;
+    let mut f = m.define_function("main", sig)?;
     let l = f.load_func(&id, &[USIZE_T.into()], &PRELUDE_REGISTRY)?;
     f.finish_with_outputs([l])?;
     let _ = m.finish_prelude_hugr()?;
