@@ -416,7 +416,7 @@ pub struct ExtensionSet(BTreeSet<ExtensionId>);
 /// [DataflowBlock]: crate::ops::DataflowBlock
 /// [DFG]: crate::ops::DFG
 /// [TailLoop]: crate::ops::TailLoop
-pub const TO_BE_INFERRED: ExtensionId = ExtensionId::new_unchecked("TO_BE_INFERRED");
+pub const TO_BE_INFERRED: ExtensionId = ExtensionId::new_unchecked(".TO_BE_INFERRED");
 
 impl ExtensionSet {
     /// Creates a new empty extension set.
