@@ -406,16 +406,10 @@ pub enum ExtensionBuildError {
 pub struct ExtensionSet(BTreeSet<ExtensionId>);
 
 /// A special ExtensionId which indicates that the delta of a non-Function
-/// container node should be computed by extension inference.
-/// Usable only in non-Function container nodes
-/// ([Case], [CFG], [Conditional], [DataflowBlock], [DFG], [TailLoop])
+/// container node should be computed by extension inference. See [`infer_extensions`]
+/// which lists the container nodes to which this can be applied.
 ///
-/// [Case]: crate::ops::Case
-/// [CFG]: crate::ops::CFG
-/// [Conditional]: crate::ops::Conditional
-/// [DataflowBlock]: crate::ops::DataflowBlock
-/// [DFG]: crate::ops::DFG
-/// [TailLoop]: crate::ops::TailLoop
+/// [`infer_extensions`]: crate::hugr::Hugr::infer_extensions
 pub const TO_BE_INFERRED: ExtensionId = ExtensionId::new_unchecked(".TO_BE_INFERRED");
 
 impl ExtensionSet {

@@ -97,8 +97,25 @@ impl Hugr {
         Ok(())
     }
 
-    /// Leaving this here as in the future we plan for it to infer deltas
-    /// of container nodes e.g. [OpType::DFG]. For the moment it does nothing.
+    /// Infers an extension-delta for any non-function container node
+    /// whose current [extension_delta] contains [TO_BE_INFERRED]. The inferred delta
+    /// will be the smallest delta compatible with its children and that includes any
+    /// other [ExtensionId]s in the current delta.
+    ///
+    /// If `remove` is true, for such container nodes *without* [TO_BE_INFERRED],
+    /// ExtensionIds are removed from the delta if they are *not* used by any child node.
+    ///
+    /// The non-function container nodes are:
+    /// [Case], [CFG], [Conditional], [DataflowBlock], [DFG], [TailLoop]
+    ///
+    /// [Case]: crate::ops::Case
+    /// [CFG]: crate::ops::CFG
+    /// [Conditional]: crate::ops::Conditional
+    /// [DataflowBlock]: crate::ops::DataflowBlock
+    /// [DFG]: crate::ops::DFG
+    /// [TailLoop]: crate::ops::TailLoop
+    /// [extension_delta]: crate::ops::OpType::extension_delta
+    /// [ExtensionId]: crate::extension::ExtensionId
     pub fn infer_extensions(&mut self, remove: bool) -> Result<(), ExtensionError> {
         fn delta_mut(optype: &mut OpType) -> Option<&mut ExtensionSet> {
             match optype {
