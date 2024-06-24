@@ -1,6 +1,7 @@
 use hugr_sexpr::{from_str, input::Input, read::ReadError, Symbol, Value};
 
 #[test]
+#[cfg(feature = "derive")]
 pub fn positional() {
     #[derive(Input)]
     struct Test {
@@ -15,6 +16,7 @@ pub fn positional() {
 }
 
 #[test]
+#[cfg(feature = "derive")]
 pub fn optional_given() {
     #[derive(Input)]
     struct Test {
@@ -27,6 +29,8 @@ pub fn optional_given() {
     assert_eq!(test.field.unwrap(), "string");
 }
 
+#[test]
+#[cfg(feature = "derive")]
 pub fn optional_absent() {
     #[derive(Input)]
     struct Test {
@@ -40,6 +44,7 @@ pub fn optional_absent() {
 }
 
 #[test]
+#[cfg(feature = "derive")]
 pub fn optional_duplicate() {
     #[derive(Debug, Input)]
     struct Test {
@@ -57,6 +62,7 @@ pub fn optional_duplicate() {
 }
 
 #[test]
+#[cfg(feature = "derive")]
 pub fn required_given() {
     #[derive(Input)]
     struct Test {
@@ -69,12 +75,14 @@ pub fn required_given() {
     assert_eq!(test.field, "string");
 }
 
+#[test]
+#[cfg(feature = "derive")]
 pub fn required_absent() {
     #[derive(Input)]
     struct Test {
         #[allow(dead_code)]
-        #[sexpr(optional)]
-        field: Option<String>,
+        #[sexpr(required)]
+        field: String,
     }
 
     let result = from_str::<Test>(r#""#);
@@ -83,6 +91,7 @@ pub fn required_absent() {
 }
 
 #[test]
+#[cfg(feature = "derive")]
 pub fn required_duplicate() {
     #[derive(Input)]
     struct Test {
@@ -97,6 +106,7 @@ pub fn required_duplicate() {
 }
 
 #[test]
+#[cfg(feature = "derive")]
 pub fn repeated() {
     #[derive(Input)]
     struct Test {
@@ -117,6 +127,7 @@ pub fn repeated() {
 }
 
 #[test]
+#[cfg(feature = "derive")]
 pub fn resursive_field() {
     #[derive(Input, PartialEq, Eq, Debug)]
     struct Outer {

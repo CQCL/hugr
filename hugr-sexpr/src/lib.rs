@@ -50,41 +50,46 @@
 //! In particular, the [`output::Output`] and [`input::Input`] traits can be derived
 //! automatically for structs with named fields.
 //!
-//! ```
-//! # use hugr_sexpr::input::Input;
-//! # use hugr_sexpr::output::Output;
-//! #[derive(Debug, PartialEq, Input, Output)]
-//! pub struct Person {
-//!     name: String,
-//!     #[sexpr(required)]
-//!     company: String,
-//!     #[sexpr(optional)]
-//!     birthday: Option<String>,
-//!     #[sexpr(repeated)]
-//!     #[sexpr(rename = "email")]
-//!     email_addresses: Vec<String>,
-//! }
-//!
-//! let person = Person {
-//!     name: "John Doe".to_string(),
-//!     company: "ACME".to_string(),
-//!     birthday: None,
-//!     email_addresses: vec![
-//!       "john@doe.com".to_string(),
-//!       "john.doe@acme.com".to_string()
-//!     ],
-//! };
-//!
-//! let sexpr = r#"
-//!   "John Doe"
-//!   (company "ACME")
-//!   (email "john@doe.com")
-//!   (email "john.doe@acme.com")
-//! "#;
-//!
-//! let imported = hugr_sexpr::from_str::<Person>(sexpr).unwrap();
-//! assert_eq!(imported, person);
-//! ```
+#[cfg_attr(
+    feature = "derive",
+    doc = r##"
+```
+# use hugr_sexpr::input::Input;
+# use hugr_sexpr::output::Output;
+#[derive(Debug, PartialEq, Input, Output)]
+pub struct Person {
+    name: String,
+    #[sexpr(required)]
+    company: String,
+    #[sexpr(optional)]
+    birthday: Option<String>,
+    #[sexpr(repeated)]
+    #[sexpr(rename = "email")]
+    email_addresses: Vec<String>,
+}
+
+let person = Person {
+    name: "John Doe".to_string(),
+    company: "ACME".to_string(),
+    birthday: None,
+    email_addresses: vec![
+      "john@doe.com".to_string(),
+      "john.doe@acme.com".to_string()
+    ],
+};
+
+let sexpr = r#"
+  "John Doe"
+  (company "ACME")
+  (email "john@doe.com")
+  (email "john.doe@acme.com")
+"#;
+
+let imported = hugr_sexpr::from_str::<Person>(sexpr).unwrap();
+assert_eq!(imported, person);
+```
+"##
+)]
 use ordered_float::OrderedFloat;
 use smol_str::SmolStr;
 use std::fmt::Display;

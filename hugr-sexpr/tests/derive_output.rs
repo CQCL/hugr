@@ -1,6 +1,7 @@
 use hugr_sexpr::{from_str, output::Output, to_values, Value};
 
 #[test]
+#[cfg(feature = "derive")]
 pub fn positional() {
     #[derive(Output)]
     pub struct Test {
@@ -19,6 +20,7 @@ pub fn positional() {
 }
 
 #[test]
+#[cfg(feature = "derive")]
 pub fn required() {
     #[derive(Output)]
     pub struct Test {
@@ -38,6 +40,7 @@ pub fn required() {
 }
 
 #[test]
+#[cfg(feature = "derive")]
 pub fn optional_given() {
     #[derive(Output)]
     pub struct Test {
@@ -57,6 +60,7 @@ pub fn optional_given() {
 }
 
 #[test]
+#[cfg(feature = "derive")]
 pub fn optional_absent() {
     #[derive(Output)]
     pub struct Test {
@@ -76,6 +80,7 @@ pub fn optional_absent() {
 }
 
 #[test]
+#[cfg(feature = "derive")]
 pub fn repeated() {
     #[derive(Output)]
     struct Test {
