@@ -653,10 +653,10 @@ pub(super) mod test {
         let args = [TypeArg::BoundedNat { n: 3 }, USIZE_T.into()];
         assert_eq!(
             def.compute_signature(&args, &PRELUDE_REGISTRY),
-            Ok(FunctionType::new(
-                vec![USIZE_T; 3],
-                vec![Type::new_tuple(vec![USIZE_T; 3])]
-            ))
+            Ok(
+                FunctionType::new(vec![USIZE_T; 3], vec![Type::new_tuple(vec![USIZE_T; 3])])
+                    .with_extension_delta(EXT_ID)
+            )
         );
         assert_eq!(def.validate_args(&args, &PRELUDE_REGISTRY, &[]), Ok(()));
 
@@ -666,10 +666,10 @@ pub(super) mod test {
         let args = [TypeArg::BoundedNat { n: 3 }, tyvar.clone().into()];
         assert_eq!(
             def.compute_signature(&args, &PRELUDE_REGISTRY),
-            Ok(FunctionType::new(
-                tyvars.clone(),
-                vec![Type::new_tuple(tyvars)]
-            ))
+            Ok(
+                FunctionType::new(tyvars.clone(), vec![Type::new_tuple(tyvars)])
+                    .with_extension_delta(EXT_ID)
+            )
         );
         def.validate_args(&args, &PRELUDE_REGISTRY, &[TypeBound::Eq.into()])
             .unwrap();
@@ -722,7 +722,7 @@ pub(super) mod test {
         def.validate_args(&args, &EMPTY_REG, &decls).unwrap();
         assert_eq!(
             def.compute_signature(&args, &EMPTY_REG),
-            Ok(FunctionType::new_endo(vec![tv]))
+            Ok(FunctionType::new_endo(vec![tv]).with_extension_delta(EXT_ID))
         );
         // But not with an external row variable
         let arg: TypeArg = Type::new_row_var_use(0, TypeBound::Eq).into();
