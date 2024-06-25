@@ -415,7 +415,7 @@ impl SiblingSubgraph {
     /// The new Hugr will contain a [FuncDefn][crate::ops::FuncDefn] root
     /// with the same signature as the subgraph and the specified `name`
     pub fn extract_subgraph(&self, hugr: &impl HugrView, name: impl Into<String>) -> Hugr {
-        let mut builder = FunctionBuilder::new(name, self.signature(hugr).into()).unwrap();
+        let mut builder = FunctionBuilder::new(name, self.signature(hugr)).unwrap();
         // Take the unfinished Hugr from the builder, to avoid unnecessary
         // validation checks that require connecting the inputs and outputs.
         let mut extracted = mem::take(builder.hugr_mut());

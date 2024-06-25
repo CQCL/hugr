@@ -138,7 +138,11 @@ impl FunctionBuilder<Hugr> {
     /// # Errors
     ///
     /// Error in adding DFG child nodes.
-    pub fn new(name: impl Into<String>, signature: PolyFuncType) -> Result<Self, BuildError> {
+    pub fn new(
+        name: impl Into<String>,
+        signature: impl Into<PolyFuncType>,
+    ) -> Result<Self, BuildError> {
+        let signature = signature.into();
         let body = signature.body().clone();
         let op = ops::FuncDefn {
             signature,
@@ -227,7 +231,7 @@ pub(crate) mod test {
             let _f_id = {
                 let mut func_builder = module_builder.define_function(
                     "main",
-                    FunctionType::new(type_row![NAT, QB], type_row![NAT, QB]).into(),
+                    FunctionType::new(type_row![NAT, QB], type_row![NAT, QB]),
                 )?;
 
                 let [int, qb] = func_builder.input_wires_arr();
@@ -258,7 +262,7 @@ pub(crate) mod test {
 
             let f_build = module_builder.define_function(
                 "main",
-                FunctionType::new(type_row![BOOL_T], type_row![BOOL_T, BOOL_T]).into(),
+                FunctionType::new(type_row![BOOL_T], type_row![BOOL_T, BOOL_T]),
             )?;
 
             f(f_build)?;
@@ -306,10 +310,8 @@ pub(crate) mod test {
         let builder = || {
             let mut module_builder = ModuleBuilder::new();
 
-            let f_build = module_builder.define_function(
-                "main",
-                FunctionType::new(type_row![QB], type_row![QB, QB]).into(),
-            )?;
+            let f_build = module_builder
+                .define_function("main", FunctionType::new(type_row![QB], type_row![QB, QB]))?;
 
             let [q1] = f_build.input_wires_arr();
             f_build.finish_with_outputs([q1, q1])?;
@@ -330,10 +332,8 @@ pub(crate) mod test {
     #[test]
     fn simple_inter_graph_edge() {
         let builder = || -> Result<Hugr, BuildError> {
-            let mut f_build = FunctionBuilder::new(
-                "main",
-                FunctionType::new(type_row![BIT], type_row![BIT]).into(),
-            )?;
+            let mut f_build =
+                FunctionBuilder::new("main", FunctionType::new(type_row![BIT], type_row![BIT]))?;
 
             let [i1] = f_build.input_wires_arr();
             let noop = f_build.add_dataflow_op(Noop { ty: BIT }, [i1])?;
@@ -354,10 +354,8 @@ pub(crate) mod test {
 
     #[test]
     fn error_on_linear_inter_graph_edge() -> Result<(), BuildError> {
-        let mut f_build = FunctionBuilder::new(
-            "main",
-            FunctionType::new(type_row![QB], type_row![QB]).into(),
-        )?;
+        let mut f_build =
+            FunctionBuilder::new("main", FunctionType::new(type_row![QB], type_row![QB]))?;
 
         let [i1] = f_build.input_wires_arr();
         let noop = f_build.add_dataflow_op(Noop { ty: QB }, [i1])?;
@@ -398,10 +396,8 @@ pub(crate) mod test {
         let mut module_builder = ModuleBuilder::new();
 
         let (dfg_node, f_node) = {
-            let mut f_build = module_builder.define_function(
-                "main",
-                FunctionType::new(type_row![BIT], type_row![BIT]).into(),
-            )?;
+            let mut f_build = module_builder
+                .define_function("main", FunctionType::new(type_row![BIT], type_row![BIT]))?;
 
             let [i1] = f_build.input_wires_arr();
             let dfg = f_build.add_hugr_with_wires(dfg_hugr, [i1])?;

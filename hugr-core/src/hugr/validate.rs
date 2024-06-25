@@ -9,7 +9,7 @@ use petgraph::visit::{Topo, Walker};
 use portgraph::{LinkView, PortView};
 use thiserror::Error;
 
-use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
+use crate::extension::{ExtensionRegistry, SignatureError, TO_BE_INFERRED};
 
 use crate::ops::constant::ConstTypeError;
 use crate::ops::custom::{resolve_opaque_op, CustomOp, CustomOpError};
@@ -20,6 +20,7 @@ use crate::types::{EdgeKind, FunctionType};
 use crate::{Direction, Hugr, Node, Port};
 
 use super::views::{HierarchyView, HugrView, SiblingGraph};
+use super::ExtensionError;
 
 /// Structure keeping track of pre-computed information used in the validation
 /// process.
@@ -60,6 +61,9 @@ impl Hugr {
     pub fn validate_extensions(&self) -> Result<(), ValidationError> {
         for parent in self.nodes() {
             let parent_op = self.get_optype(parent);
+            if parent_op.extension_delta().contains(&TO_BE_INFERRED) {
+                return Err(ValidationError::ExtensionsNotInferred { node: parent });
+            }
             let parent_extensions = match parent_op.inner_function_type() {
                 Some(FunctionType { extension_reqs, .. }) => extension_reqs,
                 None => match parent_op.tag() {
@@ -750,6 +754,9 @@ pub enum ValidationError {
     /// There are errors in the extension deltas.
     #[error(transparent)]
     ExtensionError(#[from] ExtensionError),
+    /// A node claims to still be awaiting extension inference. Perhaps it is not acted upon by inference.
+    #[error("Node {node:?} needs a concrete ExtensionSet - inference will provide this for Case/CFG/Conditional/DataflowBlock/DFG/TailLoop only")]
+    ExtensionsNotInferred { node: Node },
     /// Error in a node signature
     #[error("Error in signature of node {node:?}: {cause}")]
     SignatureError { node: Node, cause: SignatureError },
@@ -823,16 +830,6 @@ pub enum InterGraphEdgeError {
         from_parent: Node,
         ancestor: Node,
     },
-}
-
-#[derive(Debug, Clone, PartialEq, Error)]
-#[error("Parent node {parent} has extensions {parent_extensions} that are too restrictive for child node {child}, they must include child extensions {child_extensions}")]
-/// An error in the extension deltas.
-pub struct ExtensionError {
-    parent: Node,
-    parent_extensions: ExtensionSet,
-    child: Node,
-    child_extensions: ExtensionSet,
 }
 
 #[cfg(test)]

@@ -441,7 +441,7 @@ mod test {
         let mut fbuild = module_builder
             .define_function(
                 "main",
-                FunctionType::new(type_row![USIZE_T], type_row![USIZE_T]).into(),
+                FunctionType::new(type_row![USIZE_T], type_row![USIZE_T]),
             )
             .unwrap();
         let [i1] = fbuild.input_wires_arr();

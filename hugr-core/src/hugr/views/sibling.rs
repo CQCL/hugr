@@ -410,7 +410,7 @@ mod test {
     fn nested_flat() -> Result<(), Box<dyn std::error::Error>> {
         let mut module_builder = ModuleBuilder::new();
         let fty = FunctionType::new(type_row![NAT], type_row![NAT]);
-        let mut fbuild = module_builder.define_function("main", fty.clone().into())?;
+        let mut fbuild = module_builder.define_function("main", fty.clone())?;
         let dfg = fbuild.dfg_builder(fty, fbuild.input_wires())?;
         let ins = dfg.input_wires();
         let sub_dfg = dfg.finish_with_outputs(ins)?;
