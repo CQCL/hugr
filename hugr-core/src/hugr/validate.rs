@@ -11,6 +11,7 @@ use thiserror::Error;
 
 use crate::extension::{ExtensionRegistry, SignatureError, TO_BE_INFERRED};
 
+use crate::ops::constant::ConstTypeError;
 use crate::ops::custom::{resolve_opaque_op, CustomOp, CustomOpError};
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::{FuncDefn, OpParent, OpTag, OpTrait, OpType, ValidateOp};
@@ -213,6 +214,12 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
 
         // Thirdly that the node has correct children
         self.validate_children(node, op_type)?;
+
+        // OpType-specific checks.
+        // TODO Maybe we should delegate these checks to the OpTypes themselves.
+        if let OpType::Const(c) = op_type {
+            c.validate()?;
+        };
 
         Ok(())
     }
@@ -759,6 +766,9 @@ pub enum ValidationError {
     /// [Opaque]: crate::ops::CustomOp::Opaque
     #[error(transparent)]
     CustomOpError(#[from] CustomOpError),
+    /// TODO
+    #[error(transparent)]
+    ConstTypeError(#[from] ConstTypeError),
 }
 
 /// Errors related to the inter-graph edge validations.

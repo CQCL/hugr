@@ -136,7 +136,7 @@ fn test_list_ops() -> Result<(), Box<dyn std::error::Error>> {
         collections::EXTENSION.to_owned(),
     ])
     .unwrap();
-    let list: Value = ListValue::new(BOOL_T, [Value::unit_sum(0, 1).unwrap()]).into();
+    let list: Value = ListValue::new(BOOL_T, [Value::false_val()]).into();
     let mut build = DFGBuilder::new(FunctionType::new(
         type_row![],
         vec![list.get_type().clone()],

@@ -295,13 +295,17 @@ pub enum HugrError {
 
 #[cfg(test)]
 mod test {
+    use std::{fs::File, io::BufReader};
+
     use super::internal::HugrMutInternals;
     #[cfg(feature = "extension_inference")]
     use super::ValidationError;
     use super::{ExtensionError, Hugr, HugrMut, HugrView, Node};
-    use crate::extension::{ExtensionId, ExtensionSet, EMPTY_REG, TO_BE_INFERRED};
+    use crate::extension::{
+        ExtensionId, ExtensionSet, EMPTY_REG, PRELUDE_REGISTRY, TO_BE_INFERRED,
+    };
     use crate::types::{FunctionType, Type};
-    use crate::{const_extension_ids, ops, type_row};
+    use crate::{const_extension_ids, ops, test_file, type_row};
     use rstest::rstest;
 
     #[test]
@@ -320,6 +324,53 @@ mod test {
 
         let hugr = simple_dfg_hugr();
         assert_matches!(hugr.get_io(hugr.root()), Some(_));
+    }
+
+    #[test]
+    #[ignore = "issue 1225: In serialisation we do not distinguish between unknown CustomConst serialised value invalid but known CustomConst serialised values"]
+    fn hugr_validation_0() {
+        // https://github.com/CQCL/hugr/issues/1091 bad case
+        let mut hugr: Hugr = serde_json::from_reader(BufReader::new(
+            File::open(test_file!("hugr-0.json")).unwrap(),
+        ))
+        .unwrap();
+        assert!(
+            hugr.update_validate(&PRELUDE_REGISTRY).is_err(),
+            "HUGR should not validate."
+        );
+    }
+
+    #[test]
+    fn hugr_validation_1() {
+        // https://github.com/CQCL/hugr/issues/1091 good case
+        let mut hugr: Hugr = serde_json::from_reader(BufReader::new(
+            File::open(test_file!("hugr-1.json")).unwrap(),
+        ))
+        .unwrap();
+        assert!(hugr.update_validate(&PRELUDE_REGISTRY).is_ok());
+    }
+
+    #[test]
+    fn hugr_validation_2() {
+        // https://github.com/CQCL/hugr/issues/1185 bad case
+        let mut hugr: Hugr = serde_json::from_reader(BufReader::new(
+            File::open(test_file!("hugr-2.json")).unwrap(),
+        ))
+        .unwrap();
+        assert!(
+            hugr.update_validate(&PRELUDE_REGISTRY).is_err(),
+            "HUGR should not validate."
+        );
+    }
+
+    #[test]
+    fn hugr_validation_3() {
+        // https://github.com/CQCL/hugr/issues/1185 good case
+        let mut hugr: Hugr = serde_json::from_reader(BufReader::new(
+            File::open(test_file!("hugr-3.json")).unwrap(),
+        ))
+        .unwrap();
+        assert!(hugr.update_validate(&PRELUDE_REGISTRY).is_ok());
     }
 
     const_extension_ids! {

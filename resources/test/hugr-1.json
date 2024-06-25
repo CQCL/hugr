@@ -1,0 +1,39 @@
+{
+    "version": "v1",
+    "nodes":
+    [
+        {
+            "parent": 0,
+            "input_extensions": null,
+            "op": "Const",
+            "v":
+            {
+                "v": "Extension",
+                "extensions":
+                [
+                    "arithmetic.float.types"
+                ],
+                "typ":
+                {
+                    "t": "Opaque",
+                    "extension": "arithmetic.float.types",
+                    "id": "float64",
+                    "args":
+                    [],
+                    "bound": "C"
+                },
+                "value":
+                {
+                    "c": "ConstF64",
+                    "v":
+                    {
+                        "value": 42.0
+                    }
+                }
+            }
+        }
+    ],
+    "edges":
+    [],
+    "encoder": null
+}
