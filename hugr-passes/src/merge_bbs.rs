@@ -161,9 +161,9 @@ mod test {
     use itertools::Itertools;
     use rstest::rstest;
 
-    use hugr_core::builder::{ft2, CFGBuilder, DFGWrapper, Dataflow, HugrBuilder};
+    use hugr_core::builder::{ft1, ft2, CFGBuilder, DFGWrapper, Dataflow, HugrBuilder};
     use hugr_core::extension::prelude::{ConstUsize, PRELUDE_ID, QB_T, USIZE_T};
-    use hugr_core::extension::{ExtensionRegistry, PRELUDE, PRELUDE_REGISTRY, TO_BE_INFERRED};
+    use hugr_core::extension::{ExtensionRegistry, PRELUDE, PRELUDE_REGISTRY};
     use hugr_core::hugr::views::sibling::SiblingMut;
     use hugr_core::ops::constant::Value;
     use hugr_core::ops::handle::CfgID;
@@ -224,14 +224,13 @@ mod test {
         let tst_op = e.instantiate_extension_op("Test", [], &PRELUDE_REGISTRY)?;
         let reg = ExtensionRegistry::try_new([PRELUDE.to_owned(), e])?;
         let mut h = CFGBuilder::new(ft2(loop_variants.clone(), exit_types.clone()))?;
-        let mut no_b1 = h.simple_entry_builder(loop_variants.clone(), 1, PRELUDE_ID.into())?;
+        let mut no_b1 = h.simple_entry_builder_exts(loop_variants.clone(), 1, PRELUDE_ID)?;
         let n = no_b1.add_dataflow_op(Noop::new(QB_T), no_b1.input_wires())?;
         let br = lifted_unary_unit_sum(&mut no_b1);
         let no_b1 = no_b1.finish_with_outputs(br, n.outputs())?;
         let mut test_block = h.block_builder(
             loop_variants.clone(),
             vec![loop_variants.clone(), exit_types],
-            TO_BE_INFERRED.into(), // TODO infer by default
             type_row![],
         )?;
         let [test_input] = test_block.input_wires_arr();
@@ -243,10 +242,7 @@ mod test {
         let loop_backedge_target = if self_loop {
             no_b1
         } else {
-            let mut no_b2 = h.simple_block_builder(
-                FunctionType::new_endo(loop_variants).with_extension_delta(TO_BE_INFERRED), // TODO infer by default
-                1,
-            )?;
+            let mut no_b2 = h.simple_block_builder(ft1(loop_variants), 1)?;
             let n = no_b2.add_dataflow_op(Noop::new(QB_T), no_b2.input_wires())?;
             let br = lifted_unary_unit_sum(&mut no_b2);
             let nid = no_b2.finish_with_outputs(br, n.outputs())?;
@@ -322,14 +318,8 @@ mod test {
             .into_owned()
             .try_into()
             .unwrap();
-        let mut h = CFGBuilder::new(
-            ft2(QB_T, res_t.clone())
-        )?;
-        let mut bb1 = h.simple_entry_builder(
-            type_row![USIZE_T, QB_T],
-            1,
-            TO_BE_INFERRED.into(), // TODO by default
-        )?;
+        let mut h = CFGBuilder::new(ft2(QB_T, res_t.clone()))?;
+        let mut bb1 = h.simple_entry_builder(type_row![USIZE_T, QB_T], 1)?;
         let [inw] = bb1.input_wires_arr();
         let load_cst = bb1.add_load_value(ConstUsize::new(1));
         let pred = lifted_unary_unit_sum(&mut bb1);
@@ -338,7 +328,6 @@ mod test {
         let mut bb2 = h.block_builder(
             type_row![USIZE_T, QB_T],
             vec![type_row![]],
-            TO_BE_INFERRED.into(),
             type_row![QB_T, USIZE_T],
         )?;
         let [u, q] = bb2.input_wires_arr();
@@ -348,7 +337,6 @@ mod test {
         let mut bb3 = h.block_builder(
             type_row![QB_T, USIZE_T],
             vec![type_row![]],
-            TO_BE_INFERRED.into(),
             res_t.clone().into(),
         )?;
         let [q, u] = bb3.input_wires_arr();

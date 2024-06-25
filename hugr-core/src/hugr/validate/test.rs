@@ -973,7 +973,7 @@ fn cfg_connections() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut hugr = CFGBuilder::new(FunctionType::new_endo(USIZE_T))?;
     let unary_pred = hugr.add_constant(Value::unary_unit_sum());
-    let mut entry = hugr.simple_entry_builder(type_row![USIZE_T], 1, ExtensionSet::new())?;
+    let mut entry = hugr.simple_entry_builder_exts(type_row![USIZE_T], 1, ExtensionSet::new())?;
     let p = entry.load_const(&unary_pred);
     let ins = entry.input_wires();
     let entry = entry.finish_with_outputs(p, ins)?;
@@ -1095,7 +1095,7 @@ mod extension_tests {
         let mut cfg = CFGBuilder::new(
             FunctionType::new_endo(USIZE_T).with_extension_delta(parent_extensions.clone()),
         )?;
-        let mut bb = cfg.simple_entry_builder(USIZE_T.into(), 1, XB.into())?;
+        let mut bb = cfg.simple_entry_builder_exts(USIZE_T.into(), 1, XB)?;
         let pred = bb.add_load_value(Value::unary_unit_sum());
         let inputs = bb.input_wires();
         let blk = bb.finish_with_outputs(pred, inputs)?;

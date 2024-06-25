@@ -5,7 +5,10 @@ use super::{
     BasicBlockID, BuildError, CfgID, Container, Dataflow, HugrBuilder, Wire,
 };
 
-use crate::ops::{self, handle::NodeHandle, DataflowBlock, DataflowParent, ExitBlock, OpType};
+use crate::{
+    extension::TO_BE_INFERRED,
+    ops::{self, handle::NodeHandle, DataflowBlock, DataflowParent, ExitBlock, OpType},
+};
 use crate::{
     extension::{ExtensionRegistry, ExtensionSet},
     types::FunctionType,
@@ -43,7 +46,7 @@ use crate::{hugr::HugrMut, type_row, Hugr};
 ///            +------------+
 /// */
 /// use hugr::{
-///     builder::{BuildError, CFGBuilder, Container, Dataflow, HugrBuilder},
+///     builder::{BuildError, CFGBuilder, Container, Dataflow, HugrBuilder, ft1, ft2},
 ///     extension::{prelude, ExtensionSet},
 ///     ops, type_row,
 ///     types::{FunctionType, SumType, Type},
@@ -62,8 +65,7 @@ use crate::{hugr::HugrMut, type_row, Hugr};
 ///
 ///     // The second argument says what types will be passed through to every
 ///     // successor, in addition to the appropriate `sum_variants` type.
-///     let mut entry_b =
-///         cfg_builder.entry_builder(sum_variants.clone(), type_row![NAT], ExtensionSet::new())?;
+///     let mut entry_b = cfg_builder.entry_builder(sum_variants.clone(), type_row![NAT])?;
 ///
 ///     let [inw] = entry_b.input_wires_arr();
 ///     let entry = {
@@ -82,7 +84,7 @@ use crate::{hugr::HugrMut, type_row, Hugr};
 ///     // `NAT` arguments: one from the `sum_variants` type, and another from the
 ///     // entry node's `other_outputs`.
 ///     let mut successor_builder = cfg_builder.simple_block_builder(
-///         FunctionType::new(type_row![NAT, NAT], type_row![NAT]),
+///         ft2(type_row![NAT, NAT], NAT),
 ///         1, // only one successor to this block
 ///     )?;
 ///     let successor_a = {
@@ -96,8 +98,7 @@ use crate::{hugr::HugrMut, type_row, Hugr};
 ///     };
 ///
 ///     // The only argument to this block is the entry node's `other_outputs`.
-///     let mut successor_builder = cfg_builder
-///         .simple_block_builder(FunctionType::new(type_row![NAT], type_row![NAT]), 1)?;
+///     let mut successor_builder = cfg_builder.simple_block_builder(ft1(NAT), 1)?;
 ///     let successor_b = {
 ///         let sum_unary = successor_builder.add_load_value(ops::Value::unary_unit_sum());
 ///         let [in_wire] = successor_builder.input_wires_arr();
@@ -197,7 +198,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
 
     /// Return a builder for a non-entry [`DataflowBlock`] child graph with `inputs`
     /// and `outputs` and the variants of the branching Sum value
-    /// specified by `sum_rows`.
+    /// specified by `sum_rows`. Extension delta will be inferred.
     ///
     /// # Errors
     ///
@@ -206,18 +207,40 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         &mut self,
         inputs: TypeRow,
         sum_rows: impl IntoIterator<Item = TypeRow>,
-        extension_delta: ExtensionSet,
         other_outputs: TypeRow,
     ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
-        self.any_block_builder(inputs, sum_rows, other_outputs, extension_delta, false)
+        self.block_builder_exts(inputs, sum_rows, TO_BE_INFERRED, other_outputs)
+    }
+
+    /// Return a builder for a non-entry [`DataflowBlock`] child graph with `inputs`
+    /// and `outputs` and the variants of the branching Sum value
+    /// specified by `sum_rows`. Extension delta will be inferred.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error adding the node.
+    pub fn block_builder_exts(
+        &mut self,
+        inputs: TypeRow,
+        sum_rows: impl IntoIterator<Item = TypeRow>,
+        extension_delta: impl Into<ExtensionSet>,
+        other_outputs: TypeRow,
+    ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
+        self.any_block_builder(
+            inputs,
+            extension_delta.into(),
+            sum_rows,
+            other_outputs,
+            false,
+        )
     }
 
     fn any_block_builder(
         &mut self,
         inputs: TypeRow,
+        extension_delta: ExtensionSet,
         sum_rows: impl IntoIterator<Item = TypeRow>,
         other_outputs: TypeRow,
-        extension_delta: ExtensionSet,
         entry: bool,
     ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
         let sum_rows: Vec<_> = sum_rows.into_iter().collect();
@@ -241,7 +264,8 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
     }
 
     /// Return a builder for a non-entry [`DataflowBlock`] child graph with `inputs`
-    /// and `outputs` and a UnitSum type: a Sum of `n_cases` unit types.
+    /// and `outputs` and `extension_delta` explicitly specified, plus a UnitSum type
+    /// (a Sum of `n_cases` unit types) to select the successor.
     ///
     /// # Errors
     ///
@@ -251,7 +275,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         signature: FunctionType,
         n_cases: usize,
     ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
-        self.block_builder(
+        self.block_builder_exts(
             signature.input,
             vec![type_row![]; n_cases],
             signature.extension_reqs,
@@ -259,8 +283,8 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         )
     }
 
-    /// Return a builder for the entry [`DataflowBlock`] child graph with `inputs`
-    /// and `outputs` and the variants of the branching Sum value
+    /// Return a builder for the entry [`DataflowBlock`] child graph with
+    /// `outputs` and the variants of the branching Sum value
     /// specified by `sum_rows`.
     ///
     /// # Errors
@@ -270,13 +294,34 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         &mut self,
         sum_rows: impl IntoIterator<Item = TypeRow>,
         other_outputs: TypeRow,
-        extension_delta: ExtensionSet,
+    ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
+        self.entry_builder_exts(TO_BE_INFERRED, sum_rows, other_outputs)
+    }
+
+    /// Return a builder for the entry [`DataflowBlock`] child graph with `inputs`
+    /// and `outputs` and the variants of the branching Sum value
+    /// specified by `sum_rows`.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if an entry block has already been built.
+    pub fn entry_builder_exts(
+        &mut self,
+        extension_delta: impl Into<ExtensionSet>,
+        sum_rows: impl IntoIterator<Item = TypeRow>,
+        other_outputs: TypeRow,
     ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
         let inputs = self
             .inputs
             .take()
             .ok_or(BuildError::EntryBuiltError(self.cfg_node))?;
-        self.any_block_builder(inputs, sum_rows, other_outputs, extension_delta, true)
+        self.any_block_builder(
+            inputs,
+            extension_delta.into(),
+            sum_rows,
+            other_outputs,
+            true,
+        )
     }
 
     /// Return a builder for the entry [`DataflowBlock`] child graph with `inputs`
@@ -289,9 +334,23 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         &mut self,
         outputs: TypeRow,
         n_cases: usize,
-        extension_delta: ExtensionSet,
     ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
-        self.entry_builder(vec![type_row![]; n_cases], outputs, extension_delta)
+        self.entry_builder(vec![type_row![]; n_cases], outputs)
+    }
+
+    /// Return a builder for the entry [`DataflowBlock`] child graph with `inputs`
+    /// and `outputs` and a UnitSum type: a Sum of `n_cases` unit types.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error adding the node.
+    pub fn simple_entry_builder_exts(
+        &mut self,
+        outputs: TypeRow,
+        n_cases: usize,
+        extension_delta: impl Into<ExtensionSet>,
+    ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
+        self.entry_builder_exts(extension_delta, vec![type_row![]; n_cases], outputs)
     }
 
     /// Returns the exit block of this [`CFGBuilder`].
@@ -439,8 +498,11 @@ pub(crate) mod test {
         cfg_builder: &mut CFGBuilder<T>,
     ) -> Result<(), BuildError> {
         let sum2_variants = vec![type_row![NAT], type_row![NAT]];
-        let mut entry_b =
-            cfg_builder.entry_builder(sum2_variants.clone(), type_row![], ExtensionSet::new())?;
+        let mut entry_b = cfg_builder.entry_builder_exts(
+            ExtensionSet::new(),
+            sum2_variants.clone(),
+            type_row![],
+        )?;
         let entry = {
             let [inw] = entry_b.input_wires_arr();
 
@@ -466,8 +528,11 @@ pub(crate) mod test {
         let sum_tuple_const = cfg_builder.add_constant(ops::Value::unary_unit_sum());
         let sum_variants = vec![type_row![]];
 
-        let mut entry_b =
-            cfg_builder.entry_builder(sum_variants.clone(), type_row![], ExtensionSet::new())?;
+        let mut entry_b = cfg_builder.entry_builder_exts(
+            ExtensionSet::new(),
+            sum_variants.clone(),
+            type_row![],
+        )?;
         let [inw] = entry_b.input_wires_arr();
         let entry = {
             let sum = entry_b.load_const(&sum_tuple_const);
@@ -501,8 +566,7 @@ pub(crate) mod test {
             middle_b.finish_with_outputs(c, [inw])?
         };
 
-        let mut entry_b =
-            cfg_builder.entry_builder(sum_variants.clone(), type_row![NAT], ExtensionSet::new())?;
+        let mut entry_b = cfg_builder.entry_builder(sum_variants.clone(), type_row![NAT])?;
         let entry = {
             let sum = entry_b.load_const(&sum_tuple_const);
             // entry block uses wire from middle block even though middle block
