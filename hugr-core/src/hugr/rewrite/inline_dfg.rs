@@ -352,11 +352,11 @@ mod test {
             .add_dataflow_op(test_quantum_extension::measure(), r.outputs())?
             .outputs_arr();
         // Node using the boolean. Here we just select between two empty computations.
-        let mut if_n = inner.conditional_builder(
+        let mut if_n = inner.conditional_builder_exts(
             ([type_row![], type_row![]], b),
             [],
-            type_row![],
             ExtensionSet::new(),
+            type_row![],
         )?;
         if_n.case_builder(0)?.finish_with_outputs([])?;
         if_n.case_builder(1)?.finish_with_outputs([])?;

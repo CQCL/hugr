@@ -665,7 +665,6 @@ mod test {
             (vec![type_row![]; 2], b),
             [(USIZE_T, i)],
             type_row![USIZE_T],
-            ExtensionSet::new(),
         )?;
         let mut case1 = cond.case_builder(0)?;
         let foo = case1.add_dataflow_op(mk_op("foo"), case1.input_wires())?;

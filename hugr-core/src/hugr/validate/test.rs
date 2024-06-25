@@ -792,7 +792,6 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
             (vec![type_row![USIZE_T; 2]], tup),
             vec![],
             type_row![USIZE_T;2],
-            TO_BE_INFERRED.into(), //TODO make default //es.clone().union(EXT_ID.into()),
         )?;
         let mut cc = c.case_builder(0)?;
         let [i1, i2] = cc.input_wires_arr();
