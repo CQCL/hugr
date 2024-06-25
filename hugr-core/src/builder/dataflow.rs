@@ -61,8 +61,8 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
 }
 
 impl DFGBuilder<Hugr> {
-    /// Begin building a new DFG rooted HUGR.
-    /// Input extensions default to being an open variable
+    /// Begin building a new DFG-rooted HUGR given its inputs, outputs,
+    /// and extension delta.
     ///
     /// # Errors
     ///

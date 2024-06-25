@@ -263,10 +263,9 @@ pub trait Dataflow: Container {
         collect_array(self.input_wires())
     }
 
-    /// Return a builder for a [`crate::ops::DFG`] node, i.e. a nested dataflow subgraph.
-    /// The `inputs` must be an iterable over pairs of the type of the input and
-    /// the corresponding wire.
-    /// The `output_types` are the types of the outputs.
+    /// Return a builder for a [`crate::ops::DFG`] node, i.e. a nested dataflow subgraph,
+    /// given a signature describing its input and output types and extension delta,
+    /// and the input wires (which must match the input types)
     ///
     /// # Errors
     ///
