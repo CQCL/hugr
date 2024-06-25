@@ -402,7 +402,7 @@ impl CustomConst for ConstExternalSymbol {
 #[cfg(test)]
 mod test {
     use crate::{
-        builder::{ft1, DFGBuilder, Dataflow, DataflowHugr},
+        builder::{ft1, ft2, DFGBuilder, Dataflow, DataflowHugr},
         utils::test_quantum_extension::cx_gate,
         Hugr, Wire,
     };
@@ -412,7 +412,7 @@ mod test {
     #[test]
     /// Test building a HUGR involving a new_array operation.
     fn test_new_array() {
-        let mut b = DFGBuilder::new(FunctionType::new(
+        let mut b = DFGBuilder::new(ft2(
             vec![QB_T, QB_T],
             vec![array_type(TypeArg::BoundedNat { n: 2 }, QB_T)],
         ))
