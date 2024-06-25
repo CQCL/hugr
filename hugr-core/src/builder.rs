@@ -29,7 +29,7 @@
 //! # use hugr::Hugr;
 //! # use hugr::builder::{BuildError, BuildHandle, Container, DFGBuilder, Dataflow, DataflowHugr, ModuleBuilder, DataflowSubContainer, HugrBuilder};
 //! use hugr::extension::prelude::BOOL_T;
-//! use hugr::std_extensions::logic::{NotOp, LOGIC_REG};
+//! use hugr::std_extensions::logic::{EXTENSION_ID, LOGIC_REG, NotOp};
 //! use hugr::types::FunctionType;
 //!
 //! # fn doctest() -> Result<(), BuildError> {
@@ -42,7 +42,7 @@
 //!     let _dfg_handle = {
 //!         let mut dfg = module_builder.define_function(
 //!             "main",
-//!             FunctionType::new(vec![BOOL_T], vec![BOOL_T]),
+//!             FunctionType::new_endo(BOOL_T).with_extension_delta(EXTENSION_ID),
 //!         )?;
 //!
 //!         // Get the wires from the function inputs.
@@ -59,7 +59,8 @@
 //!     let _circuit_handle = {
 //!         let mut dfg = module_builder.define_function(
 //!             "circuit",
-//!             FunctionType::new_endo(vec![BOOL_T, BOOL_T]),
+//!             FunctionType::new_endo(vec![BOOL_T, BOOL_T])
+//!                 .with_extension_delta(EXTENSION_ID),
 //!         )?;
 //!         let mut circuit = dfg.as_circuit(dfg.input_wires());
 //!
