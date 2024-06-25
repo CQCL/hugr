@@ -325,9 +325,9 @@ mod test {
         let mut h = CFGBuilder::new(
             ft2(QB_T, res_t.clone())
         )?;
-        let mut bb1 = h.entry_builder(
-            vec![type_row![]],
+        let mut bb1 = h.simple_entry_builder(
             type_row![USIZE_T, QB_T],
+            1,
             TO_BE_INFERRED.into(), // TODO by default
         )?;
         let [inw] = bb1.input_wires_arr();
