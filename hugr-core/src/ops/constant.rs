@@ -48,6 +48,9 @@ impl Const {
             /// For a Const holding a CustomConst, extract the CustomConst by
             /// downcasting.
             pub fn get_custom_value<T: CustomConst>(&self) -> Option<&T>;
+
+            /// Check the value.
+            pub fn validate(&self) -> Result<(), ConstTypeError>;
         }
     }
 }
@@ -409,6 +412,31 @@ impl Value {
             Self::Tuple { vs } => ExtensionSet::union_over(vs.iter().map(Value::extension_reqs)),
             Self::Sum { values, .. } => {
                 ExtensionSet::union_over(values.iter().map(|x| x.extension_reqs()))
+            }
+        }
+    }
+
+    /// Check the value.
+    pub fn validate(&self) -> Result<(), ConstTypeError> {
+        match self {
+            Self::Extension { e } => Ok(e.value().validate()?),
+            Self::Function { hugr } => {
+                mono_fn_type(hugr)?;
+                Ok(())
+            }
+            Self::Tuple { vs } => {
+                for v in vs {
+                    v.validate()?;
+                }
+                Ok(())
+            }
+            Self::Sum {
+                tag,
+                values,
+                sum_type,
+            } => {
+                sum_type.check_type(*tag, values)?;
+                Ok(())
             }
         }
     }

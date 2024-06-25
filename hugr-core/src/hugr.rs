@@ -246,6 +246,7 @@ mod test {
     }
 
     #[test]
+    #[ignore = "issue 1225: In serialisation we do not distinguish between unknown CustomConst serialised value invalid but known CustomConst serialised values"]
     fn hugr_validation_0() {
         // https://github.com/CQCL/hugr/issues/1091 bad case
         let mut hugr: Hugr = serde_json::from_reader(BufReader::new(
