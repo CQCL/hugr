@@ -133,7 +133,7 @@ mod test {
     use rstest::rstest;
 
     use crate::builder::{
-        Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, SubContainer,
+        ft1, ft2, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, SubContainer,
     };
     use crate::extension::prelude::QB_T;
     use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE};
@@ -166,7 +166,6 @@ mod test {
     #[case(true)]
     #[case(false)]
     fn inline_add_load_const(#[case] nonlocal: bool) -> Result<(), Box<dyn std::error::Error>> {
-        let delta = ExtensionSet::from_iter([int_ops::EXTENSION_ID, int_types::EXTENSION_ID]);
         let reg = ExtensionRegistry::try_new([
             PRELUDE.to_owned(),
             int_ops::EXTENSION.to_owned(),
@@ -175,10 +174,7 @@ mod test {
         .unwrap();
         let int_ty = &int_types::INT_TYPES[6];
 
-        let mut outer = DFGBuilder::new(
-            FunctionType::new(vec![int_ty.clone(); 2], vec![int_ty.clone()])
-                .with_extension_delta(delta.clone()),
-        )?;
+        let mut outer = DFGBuilder::new(ft2(vec![int_ty.clone(); 2], vec![int_ty.clone()]))?;
         let [a, b] = outer.input_wires_arr();
         fn make_const<T: AsMut<Hugr> + AsRef<Hugr>>(
             d: &mut DFGBuilder<T>,
@@ -199,10 +195,7 @@ mod test {
         }
         let c1 = nonlocal.then(|| make_const(&mut outer));
         let inner = {
-            let mut inner = outer.dfg_builder(
-                FunctionType::new_endo(vec![int_ty.clone()]).with_extension_delta(delta),
-                [a],
-            )?;
+            let mut inner = outer.dfg_builder(ft1(int_ty.clone()), [a])?;
             let [a] = inner.input_wires_arr();
             let c1 = c1.unwrap_or_else(|| make_const(&mut inner))?;
             let a1 = inner.add_dataflow_op(IntOpDef::iadd.with_log_width(6), [a, c1])?;
@@ -251,10 +244,7 @@ mod test {
 
     #[test]
     fn permutation() -> Result<(), Box<dyn std::error::Error>> {
-        let mut h = DFGBuilder::new(
-            FunctionType::new_endo(type_row![QB_T, QB_T])
-                .with_extension_delta(test_quantum_extension::EXTENSION_ID),
-        )?;
+        let mut h = DFGBuilder::new(ft1(type_row![QB_T, QB_T]))?;
         let [p, q] = h.input_wires_arr();
         let [p_h] = h
             .add_dataflow_op(test_quantum_extension::h_gate(), [p])?
@@ -349,17 +339,11 @@ mod test {
             PRELUDE.to_owned(),
         ])
         .unwrap();
-        let mut outer = DFGBuilder::new(
-            FunctionType::new_endo(type_row![QB_T, QB_T])
-                .with_extension_delta(float_types::EXTENSION_ID),
-        )?;
+        let mut outer = DFGBuilder::new(ft1(type_row![QB_T, QB_T]))?;
         let [a, b] = outer.input_wires_arr();
         let h_a = outer.add_dataflow_op(test_quantum_extension::h_gate(), [a])?;
         let h_b = outer.add_dataflow_op(test_quantum_extension::h_gate(), [b])?;
-        let mut inner = outer.dfg_builder(
-            FunctionType::new_endo(type_row![QB_T]).with_extension_delta(float_types::EXTENSION_ID),
-            h_b.outputs(),
-        )?;
+        let mut inner = outer.dfg_builder(ft1(QB_T), h_b.outputs())?;
         let [i] = inner.input_wires_arr();
         let f = inner.add_load_value(float_types::ConstF64::new(1.0));
         inner.add_other_wire(inner.input().node(), f.node());
