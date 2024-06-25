@@ -207,17 +207,18 @@ fn df_children_restrictions() {
 
 #[test]
 fn test_ext_edge() {
-    let mut h = closed_dfg_root_hugr(FunctionType::new(
-        type_row![BOOL_T, BOOL_T],
-        type_row![BOOL_T],
-    ));
+    let mut h = closed_dfg_root_hugr(
+        FunctionType::new(type_row![BOOL_T, BOOL_T], type_row![BOOL_T])
+            .with_extension_delta(TO_BE_INFERRED),
+    );
     let [input, output] = h.get_io(h.root()).unwrap();
 
     // Nested DFG BOOL_T -> BOOL_T
     let sub_dfg = h.add_node_with_parent(
         h.root(),
         ops::DFG {
-            signature: FunctionType::new_endo(type_row![BOOL_T]),
+            signature: FunctionType::new_endo(type_row![BOOL_T])
+                .with_extension_delta(TO_BE_INFERRED),
         },
     );
     // this Xor has its 2nd input unconnected
@@ -284,7 +285,8 @@ fn no_ext_edge_into_func() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn test_local_const() {
-    let mut h = closed_dfg_root_hugr(FunctionType::new(type_row![BOOL_T], type_row![BOOL_T]));
+    let mut h =
+        closed_dfg_root_hugr(FunctionType::new_endo(BOOL_T).with_extension_delta(TO_BE_INFERRED));
     let [input, output] = h.get_io(h.root()).unwrap();
     let and = h.add_node_with_parent(h.root(), and_op());
     h.connect(input, 0, and, 0);
@@ -606,7 +608,7 @@ fn instantiate_row_variables() -> Result<(), Box<dyn std::error::Error>> {
         vec![TypeArg::Type { ty: USIZE_T }; i].into()
     }
     let e = extension_with_eval_parallel();
-    let mut dfb = DFGBuilder::new(FunctionType::new(
+    let mut dfb = DFGBuilder::new(ft2(
         vec![
             Type::new_function(FunctionType::new(USIZE_T, vec![USIZE_T, USIZE_T])),
             USIZE_T,
@@ -648,7 +650,7 @@ fn inner_row_variables() -> Result<(), Box<dyn std::error::Error>> {
         "id",
         PolyFuncType::new(
             [TypeParam::new_list(TypeBound::Any)],
-            FunctionType::new(inner_ft.clone(), ft_usz),
+            FunctionType::new(inner_ft.clone(), ft_usz).with_extension_delta(e.name.clone()),
         ),
     )?;
     // All the wires here are carrying higher-order Function values
@@ -781,6 +783,7 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
             PolyFuncType::new(
                 vec![TypeParam::Extensions],
                 FunctionType::new(vec![utou(es.clone()), int_pair.clone()], int_pair.clone())
+                    .with_extension_delta(EXT_ID)
                     .with_extension_delta(es.clone()),
             ),
         )?;
@@ -789,7 +792,7 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
             (vec![type_row![USIZE_T; 2]], tup),
             vec![],
             type_row![USIZE_T;2],
-            es.clone(),
+            TO_BE_INFERRED.into(), //TODO make default //es.clone().union(EXT_ID.into()),
         )?;
         let mut cc = c.case_builder(0)?;
         let [i1, i2] = cc.input_wires_arr();
@@ -824,6 +827,7 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
     let h = d.finish_hugr_with_outputs(call.outputs(), &reg)?;
     let call_ty = h.get_optype(call.node()).dataflow_signature().unwrap();
     let exp_fun_ty = FunctionType::new(vec![utou(PRELUDE_ID), int_pair.clone()], int_pair)
+        .with_extension_delta(EXT_ID)
         .with_extension_delta(PRELUDE_ID);
     assert_eq!(call_ty, exp_fun_ty);
     Ok(())
