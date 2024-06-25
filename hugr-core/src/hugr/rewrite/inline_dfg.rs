@@ -195,7 +195,7 @@ mod test {
         }
         let c1 = nonlocal.then(|| make_const(&mut outer));
         let inner = {
-            let mut inner = outer.dfg_builder(ft1(int_ty.clone()), [a])?;
+            let mut inner = outer.dfg_builder_endo([(int_ty.clone(), a)])?;
             let [a] = inner.input_wires_arr();
             let c1 = c1.unwrap_or_else(|| make_const(&mut inner))?;
             let a1 = inner.add_dataflow_op(IntOpDef::iadd.with_log_width(6), [a, c1])?;
