@@ -339,7 +339,7 @@ impl proptest::arbitrary::Arbitrary for Value {
             any::<i64>().prop_map(Value::from),
             any::<Symbol>().prop_map(Value::from),
             any::<String>().prop_map(Value::from),
-            any::<f64>().prop_map(Value::from),
+            proptest::num::f64::ANY.prop_map(Value::from)
         ];
 
         leaf.prop_recursive(8, 256, 10, |inner| {

@@ -96,11 +96,11 @@ impl OutputStream for Pretty {
 
     fn float(&mut self, float: f64) -> Result<(), Self::Error> {
         let text = if float.is_nan() {
-            "+nan.0".to_string()
+            "#nan".to_string()
         } else if float == f64::INFINITY {
-            "+inf.0".to_string()
+            "#+inf".to_string()
         } else if float == -f64::INFINITY {
-            "-inf.0".to_string()
+            "#-inf".to_string()
         } else if float == float.ceil() {
             // To ensure that floats are not confused with ints after printing
             // we always include a decimal point.
