@@ -430,7 +430,7 @@ class Qubit(BaseType):
 
     t: Literal["Q"] = "Q"
 
-    def deserialize(self) -> tys.QubitDef:
+    def deserialize(self) -> tys._QubitDef:
         return tys.Qubit
 
 
