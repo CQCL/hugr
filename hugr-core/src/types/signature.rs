@@ -5,6 +5,7 @@ use itertools::Either;
 use std::fmt::{self, Display, Write};
 
 use super::type_param::TypeParam;
+use super::type_row::TypeRowBase;
 use super::{Substitution, Type, TypeBound, TypeEnum, TypeRow};
 
 use crate::core::PortIndex;
@@ -25,11 +26,11 @@ use {crate::proptest::RecursionDepth, ::proptest::prelude::*, proptest_derive::A
 /// [RowVariable]: crate::types::TypeEnum::RowVariable
 pub struct FuncTypeBase<const ROWVARS: bool> {
     /// Value inputs of the function.
-    #[cfg_attr(test, proptest(strategy = "any_with::<TypeRow<ROWVARS>>(params)"))]
-    pub input: TypeRow<ROWVARS>,
+    #[cfg_attr(test, proptest(strategy = "any_with::<TypeRowBase<ROWVARS>>(params)"))]
+    pub input: TypeRowBase<ROWVARS>,
     /// Value outputs of the function.
-    #[cfg_attr(test, proptest(strategy = "any_with::<TypeRow<ROWVARS>>(params)"))]
-    pub output: TypeRow<ROWVARS>,
+    #[cfg_attr(test, proptest(strategy = "any_with::<TypeRowBase<ROWVARS>>(params)"))]
+    pub output: TypeRowBase<ROWVARS>,
     /// The extension requirements which are added by the operation
     pub extension_reqs: ExtensionSet,
 }
@@ -58,7 +59,7 @@ impl<const RV: bool> FuncTypeBase<RV> {
     }
 
     /// Create a new signature with specified inputs and outputs.
-    pub fn new(input: impl Into<TypeRow<RV>>, output: impl Into<TypeRow<RV>>) -> Self {
+    pub fn new(input: impl Into<TypeRowBase<RV>>, output: impl Into<TypeRowBase<RV>>) -> Self {
         Self {
             input: input.into(),
             output: output.into(),
@@ -68,7 +69,7 @@ impl<const RV: bool> FuncTypeBase<RV> {
 
     /// Create a new signature with the same input and output types (signature of an endomorphic
     /// function).
-    pub fn new_endo(row: impl Into<TypeRow<RV>>) -> Self {
+    pub fn new_endo(row: impl Into<TypeRowBase<RV>>) -> Self {
         let row = row.into();
         Self::new(row.clone(), row)
     }
@@ -82,13 +83,13 @@ impl<const RV: bool> FuncTypeBase<RV> {
 
     #[inline]
     /// Returns a row of the value inputs of the function.
-    pub fn input(&self) -> &TypeRow<RV> {
+    pub fn input(&self) -> &TypeRowBase<RV> {
         &self.input
     }
 
     #[inline]
     /// Returns a row of the value outputs of the function.
-    pub fn output(&self) -> &TypeRow<RV> {
+    pub fn output(&self) -> &TypeRowBase<RV> {
         &self.output
     }
 
@@ -247,8 +248,8 @@ impl TryFrom<FunTypeVarArgs> for FunctionType {
     type Error = SignatureError;
 
     fn try_from(value: FunTypeVarArgs) -> Result<Self, Self::Error> {
-        let input: TypeRow<false> = value.input.try_into()?;
-        let output: TypeRow<false> = value.output.try_into()?;
+        let input: TypeRow = value.input.try_into()?;
+        let output: TypeRow = value.output.try_into()?;
         Ok(Self::new(input, output).with_extension_delta(value.extension_reqs))
     }
 }

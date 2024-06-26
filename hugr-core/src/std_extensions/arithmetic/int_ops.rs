@@ -10,12 +10,13 @@ use crate::ops::custom::ExtensionOp;
 use crate::ops::{NamedOp, OpName};
 use crate::std_extensions::arithmetic::int_types::int_type;
 use crate::type_row;
+use crate::types::type_row::TypeRowRV;
 use crate::types::{FunTypeVarArgs, PolyFuncType};
 use crate::utils::collect_array;
 
 use crate::{
     extension::{ExtensionId, ExtensionSet, SignatureError},
-    types::{type_param::TypeArg, Type, TypeRow},
+    types::{type_param::TypeArg, Type},
     Extension,
 };
 
@@ -127,7 +128,7 @@ impl MakeOpDef for IntOpDef {
             ineg | iabs | inot => iunop_sig().into(),
             //TODO inline
             idivmod_checked_u | idivmod_checked_s => {
-                let intpair: TypeRow<true> = vec![int_tv(0), int_tv(1)].into();
+                let intpair: TypeRowRV = vec![int_tv(0), int_tv(1)].into();
                 int_polytype(
                     2,
                     intpair.clone(),
@@ -136,7 +137,7 @@ impl MakeOpDef for IntOpDef {
             }
             .into(),
             idivmod_u | idivmod_s => {
-                let intpair: TypeRow<true> = vec![int_tv(0), int_tv(1)].into();
+                let intpair: TypeRowRV = vec![int_tv(0), int_tv(1)].into();
                 int_polytype(2, intpair.clone(), intpair.clone())
             }
             .into(),
@@ -232,8 +233,8 @@ impl MakeOpDef for IntOpDef {
 }
 fn int_polytype(
     n_vars: usize,
-    input: impl Into<TypeRow<true>>,
-    output: impl Into<TypeRow<true>>,
+    input: impl Into<TypeRowRV>,
+    output: impl Into<TypeRowRV>,
 ) -> PolyFuncType {
     PolyFuncType::new(
         vec![LOG_WIDTH_TYPE_PARAM; n_vars],

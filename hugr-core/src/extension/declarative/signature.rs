@@ -14,7 +14,7 @@ use smol_str::SmolStr;
 use crate::extension::prelude::PRELUDE_ID;
 use crate::extension::{ExtensionSet, SignatureFunc, TypeDef};
 use crate::types::type_param::TypeParam;
-use crate::types::{CustomType, FunTypeVarArgs, PolyFuncType, Type, TypeRow};
+use crate::types::{CustomType, FunTypeVarArgs, PolyFuncType, Type, TypeRowRV};
 use crate::Extension;
 
 use super::{DeclarationContext, ExtensionDeclarationError};
@@ -41,7 +41,7 @@ impl SignatureDeclaration {
         op_params: &[TypeParam],
     ) -> Result<SignatureFunc, ExtensionDeclarationError> {
         let make_type_row =
-            |v: &[SignaturePortDeclaration]| -> Result<TypeRow<true>, ExtensionDeclarationError> {
+            |v: &[SignaturePortDeclaration]| -> Result<TypeRowRV, ExtensionDeclarationError> {
                 let types = v
                     .iter()
                     .map(|port_decl| port_decl.make_types(ext, ctx, op_params))

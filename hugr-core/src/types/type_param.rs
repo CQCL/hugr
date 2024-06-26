@@ -189,7 +189,9 @@ impl<const RV: bool> From<TypeBase<RV>> for TypeArg {
             assert!(RV);
             TypeArg::new_var_use(idx, TypeParam::new_list(bound))
         } else {
-            TypeArg::Type { ty: TypeBase(ty.0, ty.1)}
+            TypeArg::Type {
+                ty: TypeBase(ty.0, ty.1),
+            }
         }
     }
 }

@@ -8,7 +8,7 @@ use hugr_core::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
 use hugr_core::std_extensions::arithmetic::{self, float_types, int_types};
 use hugr_core::std_extensions::logic::{self, NaryLogic, NotOp};
 use hugr_core::type_row;
-use hugr_core::types::{FunctionType, Type, TypeRow};
+use hugr_core::types::{FunctionType, Type, TypeRow, TypeRowRV};
 
 use rstest::rstest;
 
@@ -909,7 +909,7 @@ fn test_fold_idivmod_checked_u() {
     // x0, x1 := int_u<5>(20), int_u<3>(0)
     // x2 := idivmod_checked_u(x0, x1)
     // output x2 == error
-    let intpair: TypeRow<true> = vec![INT_TYPES[5].clone(), INT_TYPES[3].clone()].into();
+    let intpair: TypeRowRV = vec![INT_TYPES[5].clone(), INT_TYPES[3].clone()].into();
     let sum_type = sum_with_error(Type::new_tuple(intpair));
     let mut build = DFGBuilder::new(int_fn(vec![sum_type.clone().into()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 20).unwrap()));
@@ -979,7 +979,7 @@ fn test_fold_idivmod_checked_s() {
     // x0, x1 := int_s<5>(-20), int_u<3>(0)
     // x2 := idivmod_checked_s(x0, x1)
     // output x2 == error
-    let intpair: TypeRow<true> = vec![INT_TYPES[5].clone(), INT_TYPES[3].clone()].into();
+    let intpair: TypeRowRV = vec![INT_TYPES[5].clone(), INT_TYPES[3].clone()].into();
     let sum_type = sum_with_error(Type::new_tuple(intpair));
     let mut build = DFGBuilder::new(int_fn(vec![sum_type.clone().into()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, -20).unwrap()));
