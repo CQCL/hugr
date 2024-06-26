@@ -6,7 +6,7 @@ use std::fmt::{self, Display, Write};
 
 use super::type_param::TypeParam;
 use super::type_row::TypeRowBase;
-use super::{Substitution, Type, TypeBound, TypeEnum, TypeRow};
+use super::{MaybeRV, NoRV, RowVariable, Substitution, Type, TypeEnum, TypeRow};
 
 use crate::core::PortIndex;
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
@@ -24,7 +24,7 @@ use {crate::proptest::RecursionDepth, ::proptest::prelude::*, proptest_derive::A
 ///
 /// [Graph]: crate::ops::constant::Value::Function
 /// [RowVariable]: crate::types::TypeEnum::RowVariable
-pub struct FuncTypeBase<const ROWVARS: bool> {
+pub struct FuncTypeBase<ROWVARS: MaybeRV> {
     /// Value inputs of the function.
     #[cfg_attr(test, proptest(strategy = "any_with::<TypeRowBase<ROWVARS>>(params)"))]
     pub input: TypeRowBase<ROWVARS>,
@@ -37,15 +37,15 @@ pub struct FuncTypeBase<const ROWVARS: bool> {
 
 /// The concept of "signature" in the spec - the edges required to/from a node or graph
 /// and also the target (value) of a call (static).
-pub type FunctionType = FuncTypeBase<false>;
+pub type FunctionType = FuncTypeBase<NoRV>;
 
 /// A function that may contain [RowVariable]s and thus has potentially-unknown arity;
 /// passable as a value round a Hugr (see [Type::new_function]) but not a valid node type.
 ///
 /// [RowVariable]: crate::types::TypeEnum::RowVariable
-pub type FunctionTypeRV = FuncTypeBase<true>;
+pub type FunctionTypeRV = FuncTypeBase<RowVariable>;
 
-impl<const RV: bool> FuncTypeBase<RV> {
+impl<RV: MaybeRV> FuncTypeBase<RV> {
     /// Builder method, add extension_reqs to an FunctionType
     pub fn with_extension_delta(mut self, rs: impl Into<ExtensionSet>) -> Self {
         self.extension_reqs = self.extension_reqs.union(rs.into());
@@ -108,12 +108,12 @@ impl<const RV: bool> FuncTypeBase<RV> {
 
 impl FunctionTypeRV {
     /// If this FunctionType contains any row variables, return one.
-    pub fn find_rowvar(&self) -> Option<(usize, TypeBound)> {
+    pub fn find_rowvar(&self) -> Option<RowVariable> {
         self.input
             .iter()
             .chain(self.output.iter())
-            .find_map(|t| match t.0 {
-                TypeEnum::RowVariable(idx, bound) => Some((idx, bound)),
+            .find_map(|t| match &t.0 {
+                TypeEnum::RowVar(rv) => Some(rv.clone()),
                 _ => None,
             })
     }
@@ -233,7 +233,7 @@ impl FunctionType {
     }
 }
 
-impl<const RV: bool> Display for FuncTypeBase<RV> {
+impl<RV: MaybeRV> Display for FuncTypeBase<RV> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if !self.input.is_empty() {
             self.input.fmt(f)?;
@@ -266,7 +266,7 @@ impl From<FunctionType> for FunctionTypeRV {
     }
 }
 
-impl<const RV1: bool, const RV2: bool> PartialEq<FuncTypeBase<RV1>> for FuncTypeBase<RV2> {
+impl<RV1: MaybeRV, RV2: MaybeRV> PartialEq<FuncTypeBase<RV1>> for FuncTypeBase<RV2> {
     fn eq(&self, other: &FuncTypeBase<RV1>) -> bool {
         self.input == other.input
             && self.output == other.output
