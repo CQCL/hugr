@@ -760,13 +760,17 @@ pub enum ValidationError {
     /// Error in a node signature
     #[error("Error in signature of node {node:?}: {cause}")]
     SignatureError { node: Node, cause: SignatureError },
-    /// Error in a [CustomOp] serialized as an [Opaque]
+    /// Error in a [CustomOp] serialized as an [Opaque].
     ///
     /// [CustomOp]: crate::ops::CustomOp
     /// [Opaque]: crate::ops::CustomOp::Opaque
     #[error(transparent)]
     CustomOpError(#[from] CustomOpError),
-    /// TODO
+    /// A [Const] contained a [Value] of unexpected [Type].
+    ///
+    /// [Const]: crate::ops::Const
+    /// [Value]: crate::ops::Value
+    /// [Type]: crate::types::Type
     #[error(transparent)]
     ConstTypeError(#[from] ConstTypeError),
 }
