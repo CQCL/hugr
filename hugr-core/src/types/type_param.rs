@@ -14,7 +14,7 @@ use crate::extension::ExtensionRegistry;
 use crate::extension::ExtensionSet;
 use crate::extension::SignatureError;
 
-use super::{check_typevar_decl, CustomType, Substitution, Type, TypeBound};
+use super::{check_typevar_decl, CustomType, Substitution, Type, TypeBound, TypeEnum};
 
 /// The upper non-inclusive bound of a [`TypeParam::BoundedNat`]
 // A None inner value implies the maximum bound: u64::MAX + 1 (all u64 values valid)
@@ -185,9 +185,11 @@ pub enum TypeArg {
 
 impl<const RV: bool> From<Type<RV>> for TypeArg {
     fn from(ty: Type<RV>) -> Self {
-        match ty.try_into_no_rv() {
-            Ok(ty) => Self::Type { ty },
-            Err((idx, bound)) => TypeArg::new_var_use(idx, TypeParam::new_list(bound)),
+        if let TypeEnum::RowVariable(idx, bound) = ty.0 {
+            assert!(RV);
+            TypeArg::new_var_use(idx, TypeParam::new_list(bound))
+        } else {
+            TypeArg::Type { ty: Type(ty.0, ty.1)}
         }
     }
 }

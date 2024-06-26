@@ -478,14 +478,6 @@ impl Type<true> {
 }
 
 impl<const RV: bool> Type<RV> {
-    fn try_into_no_rv(self) -> Result<Type<false>, (usize, TypeBound)> {
-        if let TypeEnum::RowVariable(idx, bound) = self.0 {
-            assert!(RV);
-            return Err((idx, bound));
-        }
-        Ok(Type(self.0, self.1))
-    }
-
     /// A swiss-army-knife for any safe conversion of the const-bool "type" argument
     /// to/from true/false/variable. Any unsafe conversion (that might create
     /// a [Type]`<false>` of a [TypeEnum::RowVariable] will fail statically with an assert.
@@ -505,7 +497,7 @@ impl From<Type<false>> for Type<true> {
 impl TryFrom<Type<true>> for Type<false> {
     type Error = SignatureError;
     fn try_from(value: Type<true>) -> Result<Self, Self::Error> {
-        value.try_into_() // .try_into_no_rv() also fine
+        value.try_into_()
     }
 }
 
