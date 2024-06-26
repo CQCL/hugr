@@ -3,16 +3,16 @@ from dataclasses import dataclass, field
 import subprocess
 import os
 import pathlib
-from hugr._node_port import Node, Wire, _SubPort
+from hugr.node_port import Node, Wire, _SubPort
 
-from hugr._hugr import Hugr
-from hugr._dfg import Dfg, _ancestral_sibling
-from hugr._ops import Custom, Command, NoConcreteFunc
-import hugr._ops as ops
+from hugr.hugr import Hugr
+from hugr.dfg import Dfg, _ancestral_sibling
+from hugr.ops import Custom, Command, NoConcreteFunc
+import hugr.ops as ops
 from hugr.serialization import SerialHugr
-import hugr._tys as tys
-import hugr._val as val
-from hugr._function import Module
+import hugr.tys as tys
+import hugr.val as val
+from hugr.function import Module
 import pytest
 import json
 

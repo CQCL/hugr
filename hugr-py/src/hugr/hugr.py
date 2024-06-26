@@ -13,15 +13,15 @@ from typing import (
 )
 
 
-from hugr._ops import Op, DataflowOp, Const, Call
-from hugr._tys import Type, Kind, ValueKind
-from hugr._val import Value
-from hugr._node_port import Direction, InPort, OutPort, ToNode, Node, _SubPort
+from hugr.ops import Op, DataflowOp, Const, Call
+from hugr.tys import Type, Kind, ValueKind
+from hugr.val import Value
+from hugr.node_port import Direction, InPort, OutPort, ToNode, Node, _SubPort
 from hugr.serialization.ops import OpType as SerialOp
 from hugr.serialization.serial_hugr import SerialHugr
 from hugr.utils import BiMap
 
-from ._exceptions import ParentBeforeChild
+from .exceptions import ParentBeforeChild
 
 
 @dataclass()

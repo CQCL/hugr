@@ -1,8 +1,8 @@
-from hugr._cfg import Cfg
-import hugr._tys as tys
-import hugr._val as val
-from hugr._dfg import Dfg
-import hugr._ops as ops
+from hugr.cfg import Cfg
+import hugr.tys as tys
+import hugr.val as val
+from hugr.dfg import Dfg
+import hugr.ops as ops
 from .test_hugr_build import _validate, INT_T, DivMod, IntVal
 
 

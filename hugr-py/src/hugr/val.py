@@ -3,11 +3,11 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol, runtime_checkable, TYPE_CHECKING
 import hugr.serialization.ops as sops
 import hugr.serialization.tys as stys
-import hugr._tys as tys
+import hugr.tys as tys
 from hugr.utils import ser_it
 
 if TYPE_CHECKING:
-    from hugr._hugr import Hugr
+    from hugr.hugr import Hugr
 
 
 @runtime_checkable

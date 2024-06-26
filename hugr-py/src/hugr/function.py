@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-import hugr._ops as ops
-import hugr._val as val
+import hugr.ops as ops
+import hugr.val as val
 
-from ._dfg import _DfBase
-from hugr._node_port import Node
-from ._hugr import Hugr
-from ._tys import TypeRow, TypeParam, PolyFuncType, Type, TypeBound
+from .dfg import _DfBase
+from hugr.node_port import Node
+from .hugr import Hugr
+from .tys import TypeRow, TypeParam, PolyFuncType, Type, TypeBound
 
 
 @dataclass

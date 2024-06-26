@@ -5,13 +5,13 @@ from typing import Protocol, TYPE_CHECKING, Sequence, runtime_checkable, TypeVar
 from hugr.serialization.ops import BaseOp
 import hugr.serialization.ops as sops
 from hugr.utils import ser_it
-import hugr._tys as tys
-from hugr._node_port import Node, InPort, OutPort, Wire
-import hugr._val as val
-from ._exceptions import IncompleteOp
+import hugr.tys as tys
+from hugr.node_port import Node, InPort, OutPort, Wire
+import hugr.val as val
+from .exceptions import IncompleteOp
 
 if TYPE_CHECKING:
-    from hugr._hugr import Hugr
+    from hugr.hugr import Hugr
 
 
 @dataclass
@@ -35,7 +35,7 @@ class Op(Protocol):
 
 
 def _sig_port_type(sig: tys.FunctionType, port: InPort | OutPort) -> tys.Type:
-    from hugr._hugr import Direction
+    from hugr.node_port import Direction
 
     if port.direction == Direction.INCOMING:
         return sig.input[port.offset]

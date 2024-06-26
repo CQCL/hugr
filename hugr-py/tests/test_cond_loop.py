@@ -1,8 +1,8 @@
-from hugr._cond_loop import Conditional, ConditionalError, TailLoop
-from hugr._dfg import Dfg
-import hugr._tys as tys
-import hugr._ops as ops
-import hugr._val as val
+from hugr.cond_loop import Conditional, ConditionalError, TailLoop
+from hugr.dfg import Dfg
+import hugr.tys as tys
+import hugr.ops as ops
+import hugr.val as val
 import pytest
 from .test_hugr_build import INT_T, _validate, IntVal, H, Measure
 
