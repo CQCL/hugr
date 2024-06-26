@@ -7,7 +7,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use super::{type_param::TypeParam, Substitution, Type, TypeBase};
+use super::{type_param::TypeParam, MaybeRV, NoRV, RowVariable, Substitution, Type, TypeBase};
 use crate::{
     extension::{ExtensionRegistry, SignatureError},
     utils::display_list,
@@ -22,18 +22,18 @@ use itertools::Itertools;
 #[derive(Clone, Eq, Debug, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 #[serde(transparent)]
-pub struct TypeRowBase<const ROWVARS: bool> {
+pub struct TypeRowBase<ROWVARS: MaybeRV> {
     /// The datatypes in the row.
     types: Cow<'static, [TypeBase<ROWVARS>]>,
 }
 
 /// Row of single types i.e. of known length, for node inputs/outputs
-pub type TypeRow = TypeRowBase<false>;
+pub type TypeRow = TypeRowBase<NoRV>;
 
 /// Row of types and/or row variables, the number of actual types is thus unknown
-pub type TypeRowRV = TypeRowBase<true>;
+pub type TypeRowRV = TypeRowBase<RowVariable>;
 
-impl<const RV1: bool, const RV2: bool> PartialEq<TypeRowBase<RV1>> for TypeRowBase<RV2> {
+impl<RV1: MaybeRV, RV2: MaybeRV> PartialEq<TypeRowBase<RV1>> for TypeRowBase<RV2> {
     fn eq(&self, other: &TypeRowBase<RV1>) -> bool {
         self.types.len() == other.types.len()
             && self
@@ -44,7 +44,7 @@ impl<const RV1: bool, const RV2: bool> PartialEq<TypeRowBase<RV1>> for TypeRowBa
     }
 }
 
-impl<const RV: bool> Display for TypeRowBase<RV> {
+impl<RV: MaybeRV> Display for TypeRowBase<RV> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_char('[')?;
         display_list(self.types.as_ref(), f)?;
@@ -52,7 +52,7 @@ impl<const RV: bool> Display for TypeRowBase<RV> {
     }
 }
 
-impl<const RV: bool> TypeRowBase<RV> {
+impl<RV: MaybeRV> TypeRowBase<RV> {
     /// Create a new empty row.
     pub const fn new() -> Self {
         Self {
@@ -138,13 +138,13 @@ impl TryFrom<TypeRowRV> for TypeRow {
     }
 }
 
-impl<const RV: bool> Default for TypeRowBase<RV> {
+impl<RV: MaybeRV> Default for TypeRowBase<RV> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<const RV: bool> From<Vec<TypeBase<RV>>> for TypeRowBase<RV> {
+impl<RV: MaybeRV> From<Vec<TypeBase<RV>>> for TypeRowBase<RV> {
     fn from(types: Vec<TypeBase<RV>>) -> Self {
         Self {
             types: types.into(),
@@ -168,7 +168,7 @@ impl From<TypeRow> for TypeRowRV {
     }
 }
 
-impl<const RV: bool> From<&'static [TypeBase<RV>]> for TypeRowBase<RV> {
+impl<RV: MaybeRV> From<&'static [TypeBase<RV>]> for TypeRowBase<RV> {
     fn from(types: &'static [TypeBase<RV>]) -> Self {
         Self {
             types: types.into(),
@@ -176,7 +176,7 @@ impl<const RV: bool> From<&'static [TypeBase<RV>]> for TypeRowBase<RV> {
     }
 }
 
-impl<const RV1: bool> From<TypeBase<RV1>> for TypeRowRV {
+impl<RV1: MaybeRV + Into<RowVariable>> From<TypeBase<RV1>> for TypeRowRV {
     fn from(t: TypeBase<RV1>) -> Self {
         Self {
             types: vec![t.into_()].into(),
@@ -192,7 +192,7 @@ impl From<Type> for TypeRow {
     }
 }
 
-impl<const RV: bool> Deref for TypeRowBase<RV> {
+impl<RV: MaybeRV> Deref for TypeRowBase<RV> {
     type Target = [TypeBase<RV>];
 
     fn deref(&self) -> &Self::Target {
@@ -200,7 +200,7 @@ impl<const RV: bool> Deref for TypeRowBase<RV> {
     }
 }
 
-impl<const RV: bool> DerefMut for TypeRowBase<RV> {
+impl<RV: MaybeRV> DerefMut for TypeRowBase<RV> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.types.to_mut()
     }
@@ -213,7 +213,7 @@ mod test {
         use crate::types::{TypeBase, TypeRowBase};
         use ::proptest::prelude::*;
 
-        impl<const RV: bool> Arbitrary for super::super::TypeRowBase<RV> {
+        impl<RV: MaybeRV> Arbitrary for super::super::TypeRowBase<RV> {
             type Parameters = RecursionDepth;
             type Strategy = BoxedStrategy<Self>;
             fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {

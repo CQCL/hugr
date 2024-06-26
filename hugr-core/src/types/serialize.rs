@@ -1,4 +1,6 @@
-use super::{FunctionTypeRV, SumType, TypeArg, TypeBase, TypeBound, TypeEnum};
+use super::{
+    FunctionTypeRV, MaybeRV, RowVariable, SumType, TypeArg, TypeBase, TypeBound, TypeEnum,
+};
 
 use super::custom::CustomType;
 
@@ -20,7 +22,7 @@ pub(super) enum SerSimpleType {
     R { i: usize, b: TypeBound },
 }
 
-impl<const RV: bool> From<TypeBase<RV>> for SerSimpleType {
+impl<RV: MaybeRV> From<TypeBase<RV>> for SerSimpleType {
     fn from(value: TypeBase<RV>) -> Self {
         if value == QB_T {
             return SerSimpleType::Q;
@@ -33,13 +35,16 @@ impl<const RV: bool> From<TypeBase<RV>> for SerSimpleType {
             TypeEnum::Alias(a) => SerSimpleType::Alias(a),
             TypeEnum::Function(sig) => SerSimpleType::G(sig),
             TypeEnum::Variable(i, b) => SerSimpleType::V { i, b },
-            TypeEnum::RowVariable(i, b) => SerSimpleType::R { i, b },
+            TypeEnum::RowVar(rv) => {
+                let RowVariable(idx, bound) = rv.as_rv();
+                SerSimpleType::R { i: *idx, b: *bound }
+            }
             TypeEnum::Sum(st) => SerSimpleType::Sum(st),
         }
     }
 }
 
-impl<const RV: bool> TryFrom<SerSimpleType> for TypeBase<RV> {
+impl<RV: MaybeRV> TryFrom<SerSimpleType> for TypeBase<RV> {
     type Error = SignatureError;
     fn try_from(value: SerSimpleType) -> Result<Self, Self::Error> {
         Ok(match value {
@@ -54,7 +59,9 @@ impl<const RV: bool> TryFrom<SerSimpleType> for TypeBase<RV> {
             SerSimpleType::Alias(a) => TypeBase::new_alias(a),
             SerSimpleType::V { i, b } => TypeBase::new_var_use(i, b),
             // We can't use new_row_var because that returns Type<true> not Type<RV>.
-            SerSimpleType::R { i, b } => TypeBase::new(TypeEnum::RowVariable(i, b)).try_into_()?,
+            SerSimpleType::R { i, b } => {
+                TypeBase::new(TypeEnum::RowVar(RV::try_from_rv(RowVariable(i, b))?))
+            }
         })
     }
 }
