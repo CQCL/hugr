@@ -34,11 +34,6 @@ optional = true
 sphinx = "^7.2.6"
 sphinx-book-theme = "^1.1.2"
 
-
-[tool.pytest.ini_options]
-# Lark throws deprecation warnings for `src_parse` and `src_constants`.
-filterwarnings = "ignore::DeprecationWarning:lark.*"
-
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
