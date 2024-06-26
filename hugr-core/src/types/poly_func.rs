@@ -20,7 +20,7 @@ use super::Substitution;
 /// [FuncDefn]: crate::ops::module::FuncDefn
 /// [OpDef]: crate::extension::OpDef
 #[derive(
-    Clone, PartialEq, Debug, Default, Eq, derive_more::Display, serde::Serialize, serde::Deserialize,
+    Clone, PartialEq, Debug, Eq, derive_more::Display, serde::Serialize, serde::Deserialize,
 )]
 #[cfg_attr(test, derive(Arbitrary), proptest(params = "RecursionDepth"))]
 #[display(
@@ -52,6 +52,13 @@ pub type TypeScheme = TypeSchemeBase<NoRV>;
 ///
 /// ]OpDef]: crate::extension::OpDef
 pub type TypeSchemeRV = TypeSchemeBase<RowVariable>;
+
+// deriving Default leads to an impl that only applies for RV: Default
+impl<RV: MaybeRV> Default for TypeSchemeBase<RV> {
+    fn default() -> Self {
+        Self { params: Default::default(), body: Default::default() }
+    }
+}
 
 impl<RV: MaybeRV> From<FuncTypeBase<RV>> for TypeSchemeBase<RV> {
     fn from(body: FuncTypeBase<RV>) -> Self {

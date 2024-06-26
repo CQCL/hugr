@@ -15,7 +15,7 @@ use crate::{Direction, IncomingPort, OutgoingPort, Port};
 #[cfg(test)]
 use {crate::proptest::RecursionDepth, ::proptest::prelude::*, proptest_derive::Arbitrary};
 
-#[derive(Clone, Debug, Default, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(test, derive(Arbitrary), proptest(params = "RecursionDepth"))]
 /// Describes the edges required to/from a node (when ROWVARS=false);
 /// or (when ROWVARS=true) the type of a [Graph] or the inputs/outputs from an OpDef
@@ -116,6 +116,13 @@ impl FunctionTypeRV {
                 TypeEnum::RowVar(rv) => Some(rv.clone()),
                 _ => None,
             })
+    }
+}
+
+// deriving Default leads to an impl that only applies for RV: Default
+impl<RV:MaybeRV> Default for FuncTypeBase<RV> {
+    fn default() -> Self {
+        Self { input: Default::default(), output: Default::default(), extension_reqs: Default::default() }
     }
 }
 
