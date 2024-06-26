@@ -9,7 +9,7 @@ use {
     proptest_derive::Arbitrary,
 };
 
-use super::signature::FuncTypeBase;
+use super::{signature::FuncTypeBase, MaybeRV, NoRV, RowVariable};
 use super::type_param::{check_type_args, TypeArg, TypeParam};
 use super::Substitution;
 
@@ -28,7 +28,7 @@ use super::Substitution;
     "params.iter().map(ToString::to_string).join(\" \")",
     "body"
 )]
-pub struct TypeSchemeBase<const ROWVARS: bool> {
+pub struct TypeSchemeBase<ROWVARS: MaybeRV = RowVariable> {
     /// The declared type parameters, i.e., these must be instantiated with
     /// the same number of [TypeArg]s before the function can be called. This
     /// defines the indices used by variables inside the body.
@@ -45,16 +45,15 @@ pub struct TypeSchemeBase<const ROWVARS: bool> {
 /// [Call]: crate::ops::Call
 /// [FuncDefn]: crate::ops::FuncDefn
 /// [FuncDecl]: crate::ops::FuncDecl
-pub type TypeScheme = TypeSchemeBase<false>;
+pub type TypeScheme = TypeSchemeBase<NoRV>;
 
 /// The polymorphic type of an [OpDef], whose number of input and outputs
 /// may vary according to how [RowVariable]s therein are instantiated.
 ///
 /// ]OpDef]: crate::extension::OpDef
-/// [RowVariable]: crate::types::TypeEnum::RowVariable
-pub type TypeSchemeRV = TypeSchemeBase<true>;
+pub type TypeSchemeRV = TypeSchemeBase<RowVariable>;
 
-impl<const RV: bool> From<FuncTypeBase<RV>> for TypeSchemeBase<RV> {
+impl<RV: MaybeRV> From<FuncTypeBase<RV>> for TypeSchemeBase<RV> {
     fn from(body: FuncTypeBase<RV>) -> Self {
         Self {
             params: vec![],
@@ -72,8 +71,8 @@ impl From<TypeScheme> for TypeSchemeRV {
     }
 }
 
-impl<const RV: bool> TryFrom<TypeSchemeBase<RV>> for FuncTypeBase<RV> {
-    /// If the TypeSchemeBase is not monomorphic, fail with its binders
+impl<RV: MaybeRV> TryFrom<TypeSchemeBase<RV>> for FuncTypeBase<RV> {
+    /// If the PolyFuncType is not monomorphic, fail with its binders
     type Error = Vec<TypeParam>;
 
     fn try_from(value: TypeSchemeBase<RV>) -> Result<Self, Self::Error> {
@@ -85,7 +84,7 @@ impl<const RV: bool> TryFrom<TypeSchemeBase<RV>> for FuncTypeBase<RV> {
     }
 }
 
-impl<const RV: bool> TypeSchemeBase<RV> {
+impl<RV: MaybeRV> TypeSchemeBase<RV> {
     /// The type parameters, aka binders, over which this type is polymorphic
     pub fn params(&self) -> &[TypeParam] {
         &self.params
@@ -157,7 +156,7 @@ pub(crate) mod test {
             ExtensionRegistry::try_new([PRELUDE.to_owned(), EXTENSION.to_owned()]).unwrap();
     }
 
-    impl<const RV: bool> TypeSchemeBase<RV> {
+    impl<RV: MaybeRV> TypeSchemeBase<RV> {
         fn new_validated(
             params: impl Into<Vec<TypeParam>>,
             body: FuncTypeBase<RV>,
