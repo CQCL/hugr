@@ -212,7 +212,7 @@ pub(crate) mod test {
 
     use crate::std_extensions::logic::test::and_op;
     use crate::types::type_param::TypeParam;
-    use crate::types::{FunTypeVarArgs, FunctionType, Type, TypeBound, TypeRV};
+    use crate::types::{FunctionType, FunctionTypeRV, Type, TypeBound, TypeRV};
     use crate::utils::test_quantum_extension::h_gate;
     use crate::{
         builder::test::{n_identity, BIT, NAT, QB},
@@ -540,7 +540,7 @@ pub(crate) mod test {
             PolyFuncType::new(
                 [TypeParam::new_list(TypeBound::Copyable)],
                 FunctionType::new(
-                    Type::new_function(FunTypeVarArgs::new(USIZE_T, tv.clone())),
+                    Type::new_function(FunctionTypeRV::new(USIZE_T, tv.clone())),
                     vec![],
                 ),
             ),

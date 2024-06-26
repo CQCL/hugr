@@ -39,9 +39,11 @@ pub struct FuncTypeBase<const ROWVARS: bool> {
 /// and also the target (value) of a call (static).
 pub type FunctionType = FuncTypeBase<false>;
 
-/// A function of potentially-unknown arity; passable as a value round a Hugr
-/// (see [Type::new_function]) but not a valid node type.
-pub type FunTypeVarArgs = FuncTypeBase<true>;
+/// A function that may contain [RowVariable]s and thus has potentially-unknown arity;
+/// passable as a value round a Hugr (see [Type::new_function]) but not a valid node type.
+///
+/// [RowVariable]: crate::types::TypeEnum::RowVariable
+pub type FunctionTypeRV = FuncTypeBase<true>;
 
 impl<const RV: bool> FuncTypeBase<RV> {
     /// Builder method, add extension_reqs to an FunctionType
@@ -75,7 +77,7 @@ impl<const RV: bool> FuncTypeBase<RV> {
     }
 
     /// True if both inputs and outputs are necessarily empty.
-    /// (For [FunTypeVarArgs], even after any possible substitution of row variables)
+    /// (For [FunctionTypeRV], even after any possible substitution of row variables)
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
         self.input.is_empty() && self.output.is_empty()
@@ -104,7 +106,7 @@ impl<const RV: bool> FuncTypeBase<RV> {
     }
 }
 
-impl FunTypeVarArgs {
+impl FunctionTypeRV {
     /// If this FunctionType contains any row variables, return one.
     pub fn find_rowvar(&self) -> Option<(usize, TypeBound)> {
         self.input
@@ -244,17 +246,17 @@ impl<const RV: bool> Display for FuncTypeBase<RV> {
     }
 }
 
-impl TryFrom<FunTypeVarArgs> for FunctionType {
+impl TryFrom<FunctionTypeRV> for FunctionType {
     type Error = SignatureError;
 
-    fn try_from(value: FunTypeVarArgs) -> Result<Self, Self::Error> {
+    fn try_from(value: FunctionTypeRV) -> Result<Self, Self::Error> {
         let input: TypeRow = value.input.try_into()?;
         let output: TypeRow = value.output.try_into()?;
         Ok(Self::new(input, output).with_extension_delta(value.extension_reqs))
     }
 }
 
-impl From<FunctionType> for FunTypeVarArgs {
+impl From<FunctionType> for FunctionTypeRV {
     fn from(value: FunctionType) -> Self {
         Self {
             input: value.input.into(),

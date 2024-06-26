@@ -4,7 +4,7 @@ use lazy_static::lazy_static;
 
 use crate::ops::constant::{CustomCheckFailure, ValueName};
 use crate::ops::{CustomOp, OpName};
-use crate::types::{FunTypeVarArgs, SumType, TypeName};
+use crate::types::{FunctionTypeRV, SumType, TypeName};
 use crate::{
     extension::{ExtensionId, TypeDefBound},
     ops::constant::CustomConst,
@@ -32,7 +32,7 @@ impl SignatureFromArgs for ArrayOpCustom {
 
         Ok(PolyFuncType::new(
             vec![TypeBound::Any.into()],
-            FunTypeVarArgs::new(var_arg_row, other_row),
+            FunctionTypeRV::new(var_arg_row, other_row),
         ))
     }
 
@@ -67,7 +67,7 @@ impl SignatureFromArgs for GenericOpCustom {
             };
             outs.push(ty.clone());
         }
-        Ok(FunTypeVarArgs::new(inps, outs).into())
+        Ok(FunctionTypeRV::new(inps, outs).into())
     }
 
     fn static_params(&self) -> &[TypeParam] {

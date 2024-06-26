@@ -12,7 +12,7 @@ use crate::{
     },
     ops::{custom::ExtensionOp, NamedOp},
     type_row,
-    types::{FunTypeVarArgs, PolyFuncType, TypeArg, TypeRV},
+    types::{FunctionTypeRV, PolyFuncType, TypeArg, TypeRV},
     Extension,
 };
 
@@ -44,12 +44,12 @@ impl MakeOpDef for ConvertOpDef {
         PolyFuncType::new(
             vec![LOG_WIDTH_TYPE_PARAM],
             match self {
-                trunc_s | trunc_u => FunTypeVarArgs::new(
+                trunc_s | trunc_u => FunctionTypeRV::new(
                     type_row![FLOAT64_TYPE],
                     TypeRV::from(sum_with_error(int_tv(0))),
                 ),
                 convert_s | convert_u => {
-                    FunTypeVarArgs::new(vec![int_tv(0)], type_row![FLOAT64_TYPE])
+                    FunctionTypeRV::new(vec![int_tv(0)], type_row![FLOAT64_TYPE])
                 }
             },
         )
