@@ -1,3 +1,6 @@
+use std::fs::File;
+use std::io::BufReader;
+
 use cool_asserts::assert_matches;
 use rstest::rstest;
 
@@ -19,7 +22,7 @@ use crate::std_extensions::logic::test::{and_op, or_op};
 use crate::std_extensions::logic::{self, NotOp};
 use crate::types::type_param::{TypeArg, TypeArgError};
 use crate::types::{CustomType, FunctionType, PolyFuncType, Type, TypeBound, TypeRow};
-use crate::{const_extension_ids, type_row, Direction, IncomingPort, Node};
+use crate::{const_extension_ids, test_file, type_row, Direction, IncomingPort, Node};
 
 const NAT: Type = crate::extension::prelude::USIZE_T;
 
@@ -927,6 +930,13 @@ fn cfg_children_restrictions() {
 
     // Change the types in the BasicBlock node to work on qubits instead of bits
     b.replace_op(
+        cfg,
+        ops::CFG {
+            signature: FunctionType::new(type_row![QB_T], type_row![BOOL_T]),
+        },
+    )
+    .unwrap();
+    b.replace_op(
         block,
         ops::DataflowBlock {
             inputs: type_row![QB_T],
@@ -986,6 +996,23 @@ fn cfg_connections() -> Result<(), Box<dyn std::error::Error>> {
             port_kind: EdgeKind::ControlFlow
         })
     );
+    Ok(())
+}
+
+#[test]
+fn cfg_entry_io_bug() -> Result<(), Box<dyn std::error::Error>> {
+    // load test file where input node of entry block has types in reversed
+    // order compared to parent CFG node.
+    let mut hugr: Hugr = serde_json::from_reader(BufReader::new(
+        File::open(test_file!("issue-1189.json")).unwrap(),
+    ))
+    .unwrap();
+    assert_matches!(
+        hugr.update_validate(&PRELUDE_REGISTRY),
+        Err(ValidationError::InvalidChildren { parent, source: ChildrenValidationError::IOSignatureMismatch{..}, .. })
+            => assert_eq!(parent, hugr.root())
+    );
+
     Ok(())
 }
 

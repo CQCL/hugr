@@ -12,7 +12,7 @@ use thiserror::Error;
 
 use crate::types::TypeRow;
 
-use super::dataflow::DataflowParent;
+use super::dataflow::{DataflowOpTrait, DataflowParent};
 use super::{impl_validate_op, BasicBlock, ExitBlock, OpTag, OpTrait, OpType, ValidateOp};
 
 /// A set of property flags required for an operation.
@@ -121,9 +121,37 @@ impl ValidateOp for super::CFG {
 
     fn validate_op_children<'a>(
         &self,
-        children: impl Iterator<Item = (NodeIndex, &'a OpType)>,
+        mut children: impl Iterator<Item = (NodeIndex, &'a OpType)>,
     ) -> Result<(), ChildrenValidationError> {
-        for (child, optype) in children.dropping(2) {
+        let (entry, entry_op) = children.next().unwrap();
+        let (exit, exit_op) = children.next().unwrap();
+        let entry_op = entry_op
+            .as_dataflow_block()
+            .expect("Child check should have already checked valid ops.");
+        let exit_op = exit_op
+            .as_exit_block()
+            .expect("Child check should have already checked valid ops.");
+
+        let sig = self.signature();
+        if entry_op.inner_signature().input() != sig.input() {
+            return Err(ChildrenValidationError::IOSignatureMismatch {
+                child: entry,
+                actual: entry_op.inner_signature().input().clone(),
+                expected: sig.input().clone(),
+                node_desc: "BasicBlock Input",
+                container_desc: "CFG",
+            });
+        }
+        if &exit_op.cfg_outputs != sig.output() {
+            return Err(ChildrenValidationError::IOSignatureMismatch {
+                child: exit,
+                actual: exit_op.cfg_outputs.clone(),
+                expected: sig.output().clone(),
+                node_desc: "BasicBlockExit Output",
+                container_desc: "CFG",
+            });
+        }
+        for (child, optype) in children {
             if optype.tag() == OpTag::BasicBlockExit {
                 return Err(ChildrenValidationError::InternalExitChildren { child });
             }
