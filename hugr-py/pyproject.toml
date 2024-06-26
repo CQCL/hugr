@@ -27,6 +27,14 @@ repository = "https://github.com/CQCL/hugr"
 python = ">=3.10"
 pydantic = "~2.7.0"
 
+[tool.poetry.group.docs]
+optional = true
+
+[tool.poetry.group.docs.dependencies]
+sphinx = "^7.2.6"
+sphinx-book-theme = "^1.1.2"
+
+
 [tool.pytest.ini_options]
 # Lark throws deprecation warnings for `src_parse` and `src_constants`.
 filterwarnings = "ignore::DeprecationWarning:lark.*"
