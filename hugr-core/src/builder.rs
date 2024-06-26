@@ -42,7 +42,7 @@
 //!     let _dfg_handle = {
 //!         let mut dfg = module_builder.define_function(
 //!             "main",
-//!             FunctionType::new(vec![BOOL_T], vec![BOOL_T]).into(),
+//!             FunctionType::new(vec![BOOL_T], vec![BOOL_T]),
 //!         )?;
 //!
 //!         // Get the wires from the function inputs.
@@ -59,7 +59,7 @@
 //!     let _circuit_handle = {
 //!         let mut dfg = module_builder.define_function(
 //!             "circuit",
-//!             FunctionType::new(vec![BOOL_T, BOOL_T], vec![BOOL_T, BOOL_T]).into(),
+//!             FunctionType::new_endo(vec![BOOL_T, BOOL_T]),
 //!         )?;
 //!         let mut circuit = dfg.as_circuit(dfg.input_wires());
 //!
@@ -220,7 +220,7 @@ pub enum BuilderWiringError {
 pub(crate) mod test {
     use rstest::fixture;
 
-    use crate::hugr::{views::HugrView, HugrMut, NodeType};
+    use crate::hugr::{views::HugrView, HugrMut};
     use crate::ops;
     use crate::std_extensions::arithmetic::float_ops::FLOAT_OPS_REGISTRY;
     use crate::types::{FunctionType, PolyFuncType, Type};
@@ -278,9 +278,9 @@ pub(crate) mod test {
     /// inference. Using DFGBuilder will default to a root node with an open
     /// extension variable
     pub(crate) fn closed_dfg_root_hugr(signature: FunctionType) -> Hugr {
-        let mut hugr = Hugr::new(NodeType::new_pure(ops::DFG {
+        let mut hugr = Hugr::new(ops::DFG {
             signature: signature.clone(),
-        }));
+        });
         hugr.add_node_with_parent(
             hugr.root(),
             ops::Input {

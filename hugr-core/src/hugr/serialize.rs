@@ -5,8 +5,7 @@ use std::collections::HashMap;
 use thiserror::Error;
 
 use crate::core::NodeIndex;
-use crate::extension::ExtensionSet;
-use crate::hugr::{Hugr, NodeType};
+use crate::hugr::Hugr;
 use crate::ops::OpType;
 use crate::{Node, PortIndex};
 use portgraph::hierarchy::AttachError;
@@ -48,7 +47,6 @@ impl<T> Versioned<T> {
 #[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
 struct NodeSer {
     parent: Node,
-    input_extensions: Option<ExtensionSet>,
     #[serde(flatten)]
     op: OpType,
 }
@@ -143,12 +141,11 @@ impl TryFrom<&Hugr> for SerHugrV1 {
         let mut metadata = vec![None; hugr.node_count()];
         for n in hugr.nodes() {
             let parent = node_rekey[&hugr.get_parent(n).unwrap_or(n)];
-            let opt = hugr.get_nodetype(n);
+            let opt = hugr.get_optype(n);
             let new_node = node_rekey[&n].index();
             nodes[new_node] = Some(NodeSer {
                 parent,
-                input_extensions: opt.input_extensions.clone(),
-                op: opt.op.clone(),
+                op: opt.clone(),
             });
             metadata[new_node].clone_from(hugr.metadata.get(n.pg_index()));
         }
@@ -205,7 +202,6 @@ impl TryFrom<SerHugrV1> for Hugr {
         let mut nodes = nodes.into_iter();
         let NodeSer {
             parent: root_parent,
-            input_extensions,
             op: root_type,
         } = nodes.next().unwrap();
         if root_parent.index() != 0 {
@@ -213,17 +209,10 @@ impl TryFrom<SerHugrV1> for Hugr {
         }
         // if there are any unconnected ports or copy nodes the capacity will be
         // an underestimate
-        let mut hugr = Hugr::with_capacity(
-            NodeType::new(root_type, input_extensions),
-            nodes.len(),
-            edges.len() * 2,
-        );
+        let mut hugr = Hugr::with_capacity(root_type, nodes.len(), edges.len() * 2);
 
         for node_ser in nodes {
-            hugr.add_node_with_parent(
-                node_ser.parent,
-                NodeType::new(node_ser.op, node_ser.input_extensions),
-            );
+            hugr.add_node_with_parent(node_ser.parent, node_ser.op);
         }
 
         if let Some(metadata) = metadata {

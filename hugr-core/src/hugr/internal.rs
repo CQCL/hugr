@@ -5,10 +5,11 @@ use std::ops::Range;
 use portgraph::{LinkView, MultiPortGraph, PortMut, PortView};
 
 use crate::ops::handle::NodeHandle;
+use crate::ops::OpTrait;
 use crate::{Direction, Hugr, Node};
 
 use super::hugrmut::{panic_invalid_node, panic_invalid_non_root};
-use super::{HugrError, NodeType, RootTagged};
+use super::{HugrError, OpType, RootTagged};
 
 /// Trait for accessing the internals of a Hugr(View).
 ///
@@ -138,8 +139,9 @@ pub trait HugrMutInternals: RootTagged {
     /// # Panics
     ///
     /// If the node is not in the graph.
-    fn replace_op(&mut self, node: Node, op: NodeType) -> Result<NodeType, HugrError> {
+    fn replace_op(&mut self, node: Node, op: impl Into<OpType>) -> Result<OpType, HugrError> {
         panic_invalid_node(self, node);
+        let op = op.into();
         if node == self.root() && !Self::RootHandle::TAG.is_superset(op.tag()) {
             return Err(HugrError::InvalidTag {
                 required: Self::RootHandle::TAG,
@@ -206,9 +208,9 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMutInternals for T {
             .expect("Inserting a newly-created node into the hierarchy should never fail.");
     }
 
-    fn replace_op(&mut self, node: Node, op: NodeType) -> Result<NodeType, HugrError> {
+    fn replace_op(&mut self, node: Node, op: impl Into<OpType>) -> Result<OpType, HugrError> {
         // We know RootHandle=Node here so no need to check
         let cur = self.hugr_mut().op_types.get_mut(node.pg_index());
-        Ok(std::mem::replace(cur, op))
+        Ok(std::mem::replace(cur, op.into()))
     }
 }

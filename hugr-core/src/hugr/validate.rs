@@ -9,8 +9,9 @@ use petgraph::visit::{Topo, Walker};
 use portgraph::{LinkView, PortView};
 use thiserror::Error;
 
-use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
+use crate::extension::{ExtensionRegistry, SignatureError, TO_BE_INFERRED};
 
+use crate::ops::constant::ConstTypeError;
 use crate::ops::custom::{resolve_opaque_op, CustomOp, CustomOpError};
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::{FuncDefn, OpParent, OpTag, OpTrait, OpType, ValidateOp};
@@ -19,7 +20,7 @@ use crate::types::{EdgeKind, FunctionType};
 use crate::{Direction, Hugr, Node, Port};
 
 use super::views::{HierarchyView, HugrView, SiblingGraph};
-use super::NodeType;
+use super::ExtensionError;
 
 /// Structure keeping track of pre-computed information used in the validation
 /// process.
@@ -60,6 +61,9 @@ impl Hugr {
     pub fn validate_extensions(&self) -> Result<(), ValidationError> {
         for parent in self.nodes() {
             let parent_op = self.get_optype(parent);
+            if parent_op.extension_delta().contains(&TO_BE_INFERRED) {
+                return Err(ValidationError::ExtensionsNotInferred { node: parent });
+            }
             let parent_extensions = match parent_op.inner_function_type() {
                 Some(FunctionType { extension_reqs, .. }) => extension_reqs,
                 None => match parent_op.tag() {
@@ -152,8 +156,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
     /// - Matching the number of ports with the signature
     /// - Dataflow ports are correct. See `validate_df_port`
     fn validate_node(&self, node: Node) -> Result<(), ValidationError> {
-        let node_type = self.hugr.get_nodetype(node);
-        let op_type = &node_type.op;
+        let op_type = self.hugr.get_optype(node);
 
         // The Hugr can have only one root node.
         if node == self.hugr.root() {
@@ -197,7 +200,13 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         }
 
         // Thirdly that the node has correct children
-        self.validate_children(node, node_type)?;
+        self.validate_children(node, op_type)?;
+
+        // OpType-specific checks.
+        // TODO Maybe we should delegate these checks to the OpTypes themselves.
+        if let OpType::Const(c) = op_type {
+            c.validate()?;
+        };
 
         Ok(())
     }
@@ -302,8 +311,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
     /// Check operation-specific constraints.
     ///
     /// These are flags defined for each operation type as an [`OpValidityFlags`] object.
-    fn validate_children(&self, node: Node, node_type: &NodeType) -> Result<(), ValidationError> {
-        let op_type = &node_type.op;
+    fn validate_children(&self, node: Node, op_type: &OpType) -> Result<(), ValidationError> {
         let flags = op_type.validity_flags();
 
         if self.hugr.hierarchy.child_count(node.pg_index()) > 0 {
@@ -733,15 +741,25 @@ pub enum ValidationError {
     /// There are errors in the extension deltas.
     #[error(transparent)]
     ExtensionError(#[from] ExtensionError),
+    /// A node claims to still be awaiting extension inference. Perhaps it is not acted upon by inference.
+    #[error("Node {node:?} needs a concrete ExtensionSet - inference will provide this for Case/CFG/Conditional/DataflowBlock/DFG/TailLoop only")]
+    ExtensionsNotInferred { node: Node },
     /// Error in a node signature
     #[error("Error in signature of node {node:?}: {cause}")]
     SignatureError { node: Node, cause: SignatureError },
-    /// Error in a [CustomOp] serialized as an [Opaque]
+    /// Error in a [CustomOp] serialized as an [Opaque].
     ///
     /// [CustomOp]: crate::ops::CustomOp
     /// [Opaque]: crate::ops::CustomOp::Opaque
     #[error(transparent)]
     CustomOpError(#[from] CustomOpError),
+    /// A [Const] contained a [Value] of unexpected [Type].
+    ///
+    /// [Const]: crate::ops::Const
+    /// [Value]: crate::ops::Value
+    /// [Type]: crate::types::Type
+    #[error(transparent)]
+    ConstTypeError(#[from] ConstTypeError),
 }
 
 /// Errors related to the inter-graph edge validations.
@@ -803,16 +821,6 @@ pub enum InterGraphEdgeError {
         from_parent: Node,
         ancestor: Node,
     },
-}
-
-#[derive(Debug, Clone, PartialEq, Error)]
-#[error("Parent node {parent} has extensions {parent_extensions} that are too restrictive for child node {child}, they must include child extensions {child_extensions}")]
-/// An error in the extension deltas.
-pub struct ExtensionError {
-    parent: Node,
-    parent_extensions: ExtensionSet,
-    child: Node,
-    child_extensions: ExtensionSet,
 }
 
 #[cfg(test)]

@@ -2,110 +2,26 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
-from enum import Enum
 from typing import (
-    TYPE_CHECKING,
-    ClassVar,
     Generic,
     Iterable,
-    Iterator,
     Protocol,
-    Sequence,
     TypeVar,
     cast,
     overload,
+    Type as PyType,
 )
 
-from typing_extensions import Self
 
-from hugr._ops import Op
+from hugr._ops import Op, DataflowOp, Const, Call
+from hugr._tys import Type, Kind, ValueKind
+from hugr._val import Value
+from hugr._node_port import Direction, InPort, OutPort, ToNode, Node, _SubPort
 from hugr.serialization.ops import OpType as SerialOp
 from hugr.serialization.serial_hugr import SerialHugr
-from hugr.serialization.tys import Type
 from hugr.utils import BiMap
 
 from ._exceptions import ParentBeforeChild
-
-if TYPE_CHECKING:
-    from ._dfg import Dfg
-
-
-class Direction(Enum):
-    INCOMING = 0
-    OUTGOING = 1
-
-
-@dataclass(frozen=True, eq=True, order=True)
-class _Port:
-    node: Node
-    offset: int
-    direction: ClassVar[Direction]
-
-
-@dataclass(frozen=True, eq=True, order=True)
-class InPort(_Port):
-    direction: ClassVar[Direction] = Direction.INCOMING
-
-
-class Wire(Protocol):
-    def out_port(self) -> OutPort: ...
-
-
-@dataclass(frozen=True, eq=True, order=True)
-class OutPort(_Port, Wire):
-    direction: ClassVar[Direction] = Direction.OUTGOING
-
-    def out_port(self) -> OutPort:
-        return self
-
-
-@dataclass(frozen=True, eq=True, order=True)
-class Node(Wire):
-    idx: int
-    _num_out_ports: int | None = field(default=None, compare=False)
-
-    @overload
-    def __getitem__(self, index: int) -> OutPort: ...
-    @overload
-    def __getitem__(self, index: slice) -> Iterator[OutPort]: ...
-    @overload
-    def __getitem__(self, index: tuple[int, ...]) -> Iterator[OutPort]: ...
-
-    def __getitem__(
-        self, index: int | slice | tuple[int, ...]
-    ) -> OutPort | Iterator[OutPort]:
-        match index:
-            case int(index):
-                if self._num_out_ports is not None:
-                    if index >= self._num_out_ports:
-                        raise IndexError("Index out of range")
-                return self.out(index)
-            case slice():
-                start = index.start or 0
-                stop = index.stop or self._num_out_ports
-                if stop is None:
-                    raise ValueError(
-                        "Stop must be specified when number of outputs unknown"
-                    )
-                step = index.step or 1
-                return (self[i] for i in range(start, stop, step))
-            case tuple(xs):
-                return (self[i] for i in xs)
-
-    def out_port(self) -> "OutPort":
-        return OutPort(self, 0)
-
-    def inp(self, offset: int) -> InPort:
-        return InPort(self, offset)
-
-    def out(self, offset: int) -> OutPort:
-        return OutPort(self, offset)
-
-    def port(self, offset: int, direction: Direction) -> InPort | OutPort:
-        if direction == Direction.INCOMING:
-            return self.inp(offset)
-        else:
-            return self.out(offset)
 
 
 @dataclass()
@@ -122,37 +38,42 @@ class NodeData:
         return SerialOp(root=o)  # type: ignore[arg-type]
 
 
-P = TypeVar("P", InPort, OutPort)
-K = TypeVar("K", InPort, OutPort)
-
-
-@dataclass(frozen=True, eq=True, order=True)
-class _SubPort(Generic[P]):
-    port: P
-    sub_offset: int = 0
-
-    def next_sub_offset(self) -> Self:
-        return replace(self, sub_offset=self.sub_offset + 1)
-
-
 _SO = _SubPort[OutPort]
 _SI = _SubPort[InPort]
 
+P = TypeVar("P", InPort, OutPort)
+K = TypeVar("K", InPort, OutPort)
+OpVar = TypeVar("OpVar", bound=Op)
+OpVar2 = TypeVar("OpVar2", bound=Op)
+
+
+class ParentBuilder(ToNode, Protocol[OpVar]):
+    hugr: Hugr[OpVar]
+    parent_node: Node
+
+    def to_node(self) -> Node:
+        return self.parent_node
+
+    @property
+    def parent_op(self) -> OpVar:
+        return cast(OpVar, self.hugr[self.parent_node].op)
+
 
 @dataclass()
-class Hugr(Mapping[Node, NodeData]):
+class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
     root: Node
     _nodes: list[NodeData | None]
     _links: BiMap[_SO, _SI]
     _free_nodes: list[Node]
 
-    def __init__(self, root_op: Op) -> None:
+    def __init__(self, root_op: OpVar) -> None:
         self._free_nodes = []
         self._links = BiMap()
         self._nodes = []
         self.root = self._add_node(root_op, None, 0)
 
-    def __getitem__(self, key: Node) -> NodeData:
+    def __getitem__(self, key: ToNode) -> NodeData:
+        key = key.to_node()
         try:
             n = self._nodes[key.idx]
         except IndexError:
@@ -167,16 +88,22 @@ class Hugr(Mapping[Node, NodeData]):
     def __len__(self) -> int:
         return self.num_nodes()
 
-    def children(self, node: Node | None = None) -> list[Node]:
+    def _get_typed_op(self, node: ToNode, cl: PyType[OpVar2]) -> OpVar2:
+        op = self[node].op
+        assert isinstance(op, cl)
+        return op
+
+    def children(self, node: ToNode | None = None) -> list[Node]:
         node = node or self.root
         return self[node].children
 
     def _add_node(
         self,
         op: Op,
-        parent: Node | None = None,
+        parent: ToNode | None = None,
         num_outs: int | None = None,
     ) -> Node:
+        parent = parent.to_node() if parent else None
         node_data = NodeData(op, parent)
 
         if self._free_nodes:
@@ -193,13 +120,17 @@ class Hugr(Mapping[Node, NodeData]):
     def add_node(
         self,
         op: Op,
-        parent: Node | None = None,
+        parent: ToNode | None = None,
         num_outs: int | None = None,
     ) -> Node:
         parent = parent or self.root
         return self._add_node(op, parent, num_outs)
 
-    def delete_node(self, node: Node) -> NodeData | None:
+    def add_const(self, value: Value, parent: ToNode | None = None) -> Node:
+        return self.add_node(Const(value), parent)
+
+    def delete_node(self, node: ToNode) -> NodeData | None:
+        node = node.to_node()
         parent = self[node].parent
         if parent:
             self[parent].children.remove(node)
@@ -244,20 +175,23 @@ class Hugr(Mapping[Node, NodeData]):
             return
         # TODO make sure sub-offset is handled correctly
 
+    def root_op(self) -> OpVar:
+        return cast(OpVar, self[self.root].op)
+
     def num_nodes(self) -> int:
         return len(self._nodes) - len(self._free_nodes)
 
-    def num_ports(self, node: Node, direction: Direction) -> int:
+    def num_ports(self, node: ToNode, direction: Direction) -> int:
         return (
             self.num_in_ports(node)
             if direction == Direction.INCOMING
             else self.num_out_ports(node)
         )
 
-    def num_in_ports(self, node: Node) -> int:
+    def num_in_ports(self, node: ToNode) -> int:
         return self[node]._num_inps
 
-    def num_out_ports(self, node: Node) -> int:
+    def num_out_ports(self, node: ToNode) -> int:
         return self[node]._num_outs
 
     def _linked_ports(
@@ -282,14 +216,14 @@ class Hugr(Mapping[Node, NodeData]):
 
     # TODO: single linked port
 
-    def outgoing_order_links(self, node: Node) -> Iterable[Node]:
+    def outgoing_order_links(self, node: ToNode) -> Iterable[Node]:
         return (p.node for p in self.linked_ports(node.out(-1)))
 
-    def incoming_order_links(self, node: Node) -> Iterable[Node]:
+    def incoming_order_links(self, node: ToNode) -> Iterable[Node]:
         return (p.node for p in self.linked_ports(node.inp(-1)))
 
     def _node_links(
-        self, node: Node, links: dict[_SubPort[P], _SubPort[K]]
+        self, node: ToNode, links: dict[_SubPort[P], _SubPort[K]]
     ) -> Iterable[tuple[P, list[K]]]:
         try:
             direction = next(iter(links.keys())).port.direction
@@ -300,23 +234,36 @@ class Hugr(Mapping[Node, NodeData]):
             port = cast(P, node.port(offset, direction))
             yield port, list(self._linked_ports(port, links))
 
-    def outgoing_links(self, node: Node) -> Iterable[tuple[OutPort, list[InPort]]]:
+    def outgoing_links(self, node: ToNode) -> Iterable[tuple[OutPort, list[InPort]]]:
         return self._node_links(node, self._links.fwd)
 
-    def incoming_links(self, node: Node) -> Iterable[tuple[InPort, list[OutPort]]]:
+    def incoming_links(self, node: ToNode) -> Iterable[tuple[InPort, list[OutPort]]]:
         return self._node_links(node, self._links.bck)
 
     def num_incoming(self, node: Node) -> int:
         # connecetd links
         return sum(1 for _ in self.incoming_links(node))
 
-    def num_outgoing(self, node: Node) -> int:
+    def num_outgoing(self, node: ToNode) -> int:
         # connecetd links
         return sum(1 for _ in self.outgoing_links(node))
 
     # TODO: num_links and _linked_ports
 
-    def insert_hugr(self, hugr: Hugr, parent: Node | None = None) -> dict[Node, Node]:
+    def port_kind(self, port: InPort | OutPort) -> Kind:
+        return self[port.node].op.port_kind(port)
+
+    def port_type(self, port: InPort | OutPort) -> Type | None:
+        op = self[port.node].op
+        if isinstance(op, DataflowOp):
+            return op.port_type(port)
+        if isinstance(op, Call) and isinstance(port, OutPort):
+            kind = self.port_kind(port)
+            if isinstance(kind, ValueKind):
+                return kind.ty
+        return None
+
+    def insert_hugr(self, hugr: Hugr, parent: ToNode | None = None) -> dict[Node, Node]:
         mapping: dict[Node, Node] = {}
 
         for idx, node_data in enumerate(hugr._nodes):
@@ -336,17 +283,6 @@ class Hugr(Mapping[Node, NodeData]):
                 mapping[dst.port.node].inp(dst.port.offset),
             )
         return mapping
-
-    def add_dfg(self, input_types: Sequence[Type], output_types: Sequence[Type]) -> Dfg:
-        from ._dfg import Dfg
-
-        dfg = Dfg(input_types, output_types)
-        mapping = self.insert_hugr(dfg.hugr, self.root)
-        dfg.hugr = self
-        dfg.input_node = mapping[dfg.input_node]
-        dfg.output_node = mapping[dfg.output_node]
-        dfg.root = mapping[dfg.root]
-        return dfg
 
     def to_serial(self) -> SerialHugr:
         node_it = (node for node in self._nodes if node is not None)

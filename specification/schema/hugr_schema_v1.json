@@ -35,21 +35,6 @@
                     "title": "Parent",
                     "type": "integer"
                 },
-                "input_extensions": {
-                    "anyOf": [
-                        {
-                            "items": {
-                                "type": "string"
-                            },
-                            "type": "array"
-                        },
-                        {
-                            "type": "null"
-                        }
-                    ],
-                    "default": null,
-                    "title": "Input Extensions"
-                },
                 "op": {
                     "const": "AliasDecl",
                     "default": "AliasDecl",
@@ -81,21 +66,6 @@
                 "parent": {
                     "title": "Parent",
                     "type": "integer"
-                },
-                "input_extensions": {
-                    "anyOf": [
-                        {
-                            "items": {
-                                "type": "string"
-                            },
-                            "type": "array"
-                        },
-                        {
-                            "type": "null"
-                        }
-                    ],
-                    "default": null,
-                    "title": "Input Extensions"
                 },
                 "op": {
                     "const": "AliasDefn",
@@ -211,21 +181,6 @@
                     "title": "Parent",
                     "type": "integer"
                 },
-                "input_extensions": {
-                    "anyOf": [
-                        {
-                            "items": {
-                                "type": "string"
-                            },
-                            "type": "array"
-                        },
-                        {
-                            "type": "null"
-                        }
-                    ],
-                    "default": null,
-                    "title": "Input Extensions"
-                },
                 "op": {
                     "const": "CFG",
                     "default": "CFG",
@@ -252,21 +207,6 @@
                 "parent": {
                     "title": "Parent",
                     "type": "integer"
-                },
-                "input_extensions": {
-                    "anyOf": [
-                        {
-                            "items": {
-                                "type": "string"
-                            },
-                            "type": "array"
-                        },
-                        {
-                            "type": "null"
-                        }
-                    ],
-                    "default": null,
-                    "title": "Input Extensions"
                 },
                 "op": {
                     "const": "Call",
@@ -308,21 +248,6 @@
                     "title": "Parent",
                     "type": "integer"
                 },
-                "input_extensions": {
-                    "anyOf": [
-                        {
-                            "items": {
-                                "type": "string"
-                            },
-                            "type": "array"
-                        },
-                        {
-                            "type": "null"
-                        }
-                    ],
-                    "default": null,
-                    "title": "Input Extensions"
-                },
                 "op": {
                     "const": "CallIndirect",
                     "default": "CallIndirect",
@@ -350,21 +275,6 @@
                     "title": "Parent",
                     "type": "integer"
                 },
-                "input_extensions": {
-                    "anyOf": [
-                        {
-                            "items": {
-                                "type": "string"
-                            },
-                            "type": "array"
-                        },
-                        {
-                            "type": "null"
-                        }
-                    ],
-                    "default": null,
-                    "title": "Input Extensions"
-                },
                 "op": {
                     "const": "Case",
                     "default": "Case",
@@ -391,21 +301,6 @@
                 "parent": {
                     "title": "Parent",
                     "type": "integer"
-                },
-                "input_extensions": {
-                    "anyOf": [
-                        {
-                            "items": {
-                                "type": "string"
-                            },
-                            "type": "array"
-                        },
-                        {
-                            "type": "null"
-                        }
-                    ],
-                    "default": null,
-                    "title": "Input Extensions"
                 },
                 "op": {
                     "const": "Conditional",
@@ -463,21 +358,6 @@
                     "title": "Parent",
                     "type": "integer"
                 },
-                "input_extensions": {
-                    "anyOf": [
-                        {
-                            "items": {
-                                "type": "string"
-                            },
-                            "type": "array"
-                        },
-                        {
-                            "type": "null"
-                        }
-                    ],
-                    "default": null,
-                    "title": "Input Extensions"
-                },
                 "op": {
                     "const": "Const",
                     "default": "Const",
@@ -523,21 +403,6 @@
                 "parent": {
                     "title": "Parent",
                     "type": "integer"
-                },
-                "input_extensions": {
-                    "anyOf": [
-                        {
-                            "items": {
-                                "type": "string"
-                            },
-                            "type": "array"
-                        },
-                        {
-                            "type": "null"
-                        }
-                    ],
-                    "default": null,
-                    "title": "Input Extensions"
                 },
                 "op": {
                     "const": "CustomOp",
@@ -588,21 +453,6 @@
                     "title": "Parent",
                     "type": "integer"
                 },
-                "input_extensions": {
-                    "anyOf": [
-                        {
-                            "items": {
-                                "type": "string"
-                            },
-                            "type": "array"
-                        },
-                        {
-                            "type": "null"
-                        }
-                    ],
-                    "default": null,
-                    "title": "Input Extensions"
-                },
                 "op": {
                     "const": "DFG",
                     "default": "DFG",
@@ -629,21 +479,6 @@
                 "parent": {
                     "title": "Parent",
                     "type": "integer"
-                },
-                "input_extensions": {
-                    "anyOf": [
-                        {
-                            "items": {
-                                "type": "string"
-                            },
-                            "type": "array"
-                        },
-                        {
-                            "type": "null"
-                        }
-                    ],
-                    "default": null,
-                    "title": "Input Extensions"
                 },
                 "op": {
                     "const": "DataflowBlock",
@@ -700,21 +535,6 @@
                 "parent": {
                     "title": "Parent",
                     "type": "integer"
-                },
-                "input_extensions": {
-                    "anyOf": [
-                        {
-                            "items": {
-                                "type": "string"
-                            },
-                            "type": "array"
-                        },
-                        {
-                            "type": "null"
-                        }
-                    ],
-                    "default": null,
-                    "title": "Input Extensions"
                 },
                 "op": {
                     "const": "ExitBlock",
@@ -825,21 +645,6 @@
                     "title": "Parent",
                     "type": "integer"
                 },
-                "input_extensions": {
-                    "anyOf": [
-                        {
-                            "items": {
-                                "type": "string"
-                            },
-                            "type": "array"
-                        },
-                        {
-                            "type": "null"
-                        }
-                    ],
-                    "default": null,
-                    "title": "Input Extensions"
-                },
                 "op": {
                     "const": "FuncDecl",
                     "default": "FuncDecl",
@@ -872,21 +677,6 @@
                 "parent": {
                     "title": "Parent",
                     "type": "integer"
-                },
-                "input_extensions": {
-                    "anyOf": [
-                        {
-                            "items": {
-                                "type": "string"
-                            },
-                            "type": "array"
-                        },
-                        {
-                            "type": "null"
-                        }
-                    ],
-                    "default": null,
-                    "title": "Input Extensions"
                 },
                 "op": {
                     "const": "FuncDefn",
@@ -1025,21 +815,6 @@
                     "title": "Parent",
                     "type": "integer"
                 },
-                "input_extensions": {
-                    "anyOf": [
-                        {
-                            "items": {
-                                "type": "string"
-                            },
-                            "type": "array"
-                        },
-                        {
-                            "type": "null"
-                        }
-                    ],
-                    "default": null,
-                    "title": "Input Extensions"
-                },
                 "op": {
                     "const": "Input",
                     "default": "Input",
@@ -1070,21 +845,6 @@
                 "parent": {
                     "title": "Parent",
                     "type": "integer"
-                },
-                "input_extensions": {
-                    "anyOf": [
-                        {
-                            "items": {
-                                "type": "string"
-                            },
-                            "type": "array"
-                        },
-                        {
-                            "type": "null"
-                        }
-                    ],
-                    "default": null,
-                    "title": "Input Extensions"
                 },
                 "op": {
                     "const": "Lift",
@@ -1145,21 +905,6 @@
                     "title": "Parent",
                     "type": "integer"
                 },
-                "input_extensions": {
-                    "anyOf": [
-                        {
-                            "items": {
-                                "type": "string"
-                            },
-                            "type": "array"
-                        },
-                        {
-                            "type": "null"
-                        }
-                    ],
-                    "default": null,
-                    "title": "Input Extensions"
-                },
                 "op": {
                     "const": "LoadConstant",
                     "default": "LoadConstant",
@@ -1187,21 +932,6 @@
                 "parent": {
                     "title": "Parent",
                     "type": "integer"
-                },
-                "input_extensions": {
-                    "anyOf": [
-                        {
-                            "items": {
-                                "type": "string"
-                            },
-                            "type": "array"
-                        },
-                        {
-                            "type": "null"
-                        }
-                    ],
-                    "default": null,
-                    "title": "Input Extensions"
                 },
                 "op": {
                     "const": "LoadFunction",
@@ -1243,21 +973,6 @@
                     "title": "Parent",
                     "type": "integer"
                 },
-                "input_extensions": {
-                    "anyOf": [
-                        {
-                            "items": {
-                                "type": "string"
-                            },
-                            "type": "array"
-                        },
-                        {
-                            "type": "null"
-                        }
-                    ],
-                    "default": null,
-                    "title": "Input Extensions"
-                },
                 "op": {
                     "const": "MakeTuple",
                     "default": "MakeTuple",
@@ -1289,21 +1004,6 @@
                     "title": "Parent",
                     "type": "integer"
                 },
-                "input_extensions": {
-                    "anyOf": [
-                        {
-                            "items": {
-                                "type": "string"
-                            },
-                            "type": "array"
-                        },
-                        {
-                            "type": "null"
-                        }
-                    ],
-                    "default": null,
-                    "title": "Input Extensions"
-                },
                 "op": {
                     "const": "Module",
                     "default": "Module",
@@ -1327,21 +1027,6 @@
                 "parent": {
                     "title": "Parent",
                     "type": "integer"
-                },
-                "input_extensions": {
-                    "anyOf": [
-                        {
-                            "items": {
-                                "type": "string"
-                            },
-                            "type": "array"
-                        },
-                        {
-                            "type": "null"
-                        }
-                    ],
-                    "default": null,
-                    "title": "Input Extensions"
                 },
                 "op": {
                     "const": "Noop",
@@ -1575,21 +1260,6 @@
                     "title": "Parent",
                     "type": "integer"
                 },
-                "input_extensions": {
-                    "anyOf": [
-                        {
-                            "items": {
-                                "type": "string"
-                            },
-                            "type": "array"
-                        },
-                        {
-                            "type": "null"
-                        }
-                    ],
-                    "default": null,
-                    "title": "Input Extensions"
-                },
                 "op": {
                     "const": "Output",
                     "default": "Output",
@@ -1771,21 +1441,6 @@
                     "title": "Parent",
                     "type": "integer"
                 },
-                "input_extensions": {
-                    "anyOf": [
-                        {
-                            "items": {
-                                "type": "string"
-                            },
-                            "type": "array"
-                        },
-                        {
-                            "type": "null"
-                        }
-                    ],
-                    "default": null,
-                    "title": "Input Extensions"
-                },
                 "op": {
                     "const": "Tag",
                     "default": "Tag",
@@ -1825,21 +1480,6 @@
                 "parent": {
                     "title": "Parent",
                     "type": "integer"
-                },
-                "input_extensions": {
-                    "anyOf": [
-                        {
-                            "items": {
-                                "type": "string"
-                            },
-                            "type": "array"
-                        },
-                        {
-                            "type": "null"
-                        }
-                    ],
-                    "default": null,
-                    "title": "Input Extensions"
                 },
                 "op": {
                     "const": "TailLoop",
@@ -2175,21 +1815,6 @@
                     "title": "Parent",
                     "type": "integer"
                 },
-                "input_extensions": {
-                    "anyOf": [
-                        {
-                            "items": {
-                                "type": "string"
-                            },
-                            "type": "array"
-                        },
-                        {
-                            "type": "null"
-                        }
-                    ],
-                    "default": null,
-                    "title": "Input Extensions"
-                },
                 "op": {
                     "const": "UnpackTuple",
                     "default": "UnpackTuple",
@@ -2272,6 +1897,7 @@
             "type": "object"
         },
         "VariableArg": {
+            "additionalProperties": true,
             "properties": {
                 "tya": {
                     "const": "Variable",

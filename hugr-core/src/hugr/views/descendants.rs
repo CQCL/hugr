@@ -223,7 +223,7 @@ pub(super) mod test {
         let (f_id, inner_id) = {
             let mut func_builder = module_builder.define_function(
                 "main",
-                FunctionType::new(type_row![NAT, QB], type_row![NAT, QB]).into(),
+                FunctionType::new(type_row![NAT, QB], type_row![NAT, QB]),
             )?;
 
             let [int, qb] = func_builder.input_wires_arr();
@@ -231,11 +231,8 @@ pub(super) mod test {
             let q_out = func_builder.add_dataflow_op(h_gate(), vec![qb])?;
 
             let inner_id = {
-                let inner_builder = func_builder.dfg_builder(
-                    FunctionType::new(type_row![NAT], type_row![NAT]),
-                    None,
-                    [int],
-                )?;
+                let inner_builder = func_builder
+                    .dfg_builder(FunctionType::new(type_row![NAT], type_row![NAT]), [int])?;
                 let w = inner_builder.input_wires();
                 inner_builder.finish_with_outputs(w)
             }?;

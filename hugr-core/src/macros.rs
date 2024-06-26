@@ -111,3 +111,13 @@ macro_rules! const_extension_ids {
 }
 
 pub use const_extension_ids;
+
+#[cfg(test)]
+/// Get the full path to a test file given its path relative to the
+/// `resources/test` directory in this crate.
+#[macro_export]
+macro_rules! test_file {
+    ($fname:expr) => {
+        concat!(env!("CARGO_MANIFEST_DIR"), "/resources/test/", $fname)
+    };
+}
