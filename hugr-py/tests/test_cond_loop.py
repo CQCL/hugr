@@ -4,7 +4,7 @@ import hugr.tys as tys
 import hugr.ops as ops
 import hugr.val as val
 import pytest
-from .test_hugr_build import INT_T, _validate, IntVal, H, Measure
+from .conftest import INT_T, validate, IntVal, H, Measure
 
 SUM_T = tys.Sum([[tys.Qubit], [tys.Qubit, INT_T]])
 
@@ -25,7 +25,7 @@ def build_cond(h: Conditional) -> None:
 def test_cond() -> None:
     h = Conditional(SUM_T, [tys.Bool])
     build_cond(h)
-    _validate(h.hugr)
+    validate(h.hugr)
 
 
 def test_nested_cond() -> None:
@@ -35,7 +35,7 @@ def test_nested_cond() -> None:
     cond = h.add_conditional(tagged_q, h.load(val.TRUE))
     build_cond(cond)
     h.set_outputs(*cond[:2])
-    _validate(h.hugr)
+    validate(h.hugr)
 
     # build then insert
     con = Conditional(SUM_T, [tys.Bool])
@@ -46,7 +46,7 @@ def test_nested_cond() -> None:
     tagged_q = h.add(ops.Tag(0, SUM_T)(q))
     cond_n = h.insert_conditional(con, tagged_q, h.load(val.TRUE))
     h.set_outputs(*cond_n[:2])
-    _validate(h.hugr)
+    validate(h.hugr)
 
 
 def test_if_else() -> None:
@@ -63,7 +63,7 @@ def test_if_else() -> None:
     cond = else_.finish()
     h.set_outputs(cond)
 
-    _validate(h.hugr)
+    validate(h.hugr)
 
 
 def test_tail_loop() -> None:
@@ -80,7 +80,7 @@ def test_tail_loop() -> None:
     build_tl(tl)
     h.set_outputs(tl)
 
-    _validate(h.hugr)
+    validate(h.hugr)
 
     # build then insert
     tl = TailLoop([], [tys.Qubit])
@@ -90,7 +90,7 @@ def test_tail_loop() -> None:
     (q,) = h.inputs()
     tl_n = h.insert_tail_loop(tl, q)
     h.set_outputs(tl_n)
-    _validate(h.hugr)
+    validate(h.hugr)
 
 
 def test_complex_tail_loop() -> None:
@@ -119,6 +119,6 @@ def test_complex_tail_loop() -> None:
     # loop returns [qubit, int, bool]
     h.set_outputs(*tl[:3])
 
-    _validate(h.hugr, True)
+    validate(h.hugr, True)
 
     # TODO rewrite with context managers
