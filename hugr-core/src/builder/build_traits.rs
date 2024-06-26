@@ -19,7 +19,7 @@ use crate::{
 };
 
 use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE_REGISTRY};
-use crate::types::{FunctionType, PolyFuncType, Type, TypeArg, TypeRow};
+use crate::types::{FunctionType, Type, TypeArg, TypeRow, TypeScheme};
 
 use itertools::Itertools;
 
@@ -78,7 +78,7 @@ pub trait Container {
     fn define_function(
         &mut self,
         name: impl Into<String>,
-        signature: impl Into<PolyFuncType<false>>,
+        signature: impl Into<TypeScheme>,
     ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
         let signature = signature.into();
         let body = signature.body().clone();

@@ -223,7 +223,7 @@ pub(crate) mod test {
     use crate::hugr::{views::HugrView, HugrMut};
     use crate::ops;
     use crate::std_extensions::arithmetic::float_ops::FLOAT_OPS_REGISTRY;
-    use crate::types::{FunctionType, PolyFuncType, Type};
+    use crate::types::{FunctionType, Type, TypeScheme};
     use crate::{type_row, Hugr};
 
     use super::handle::BuildHandle;
@@ -246,7 +246,7 @@ pub(crate) mod test {
     }
 
     pub(super) fn build_main(
-        signature: PolyFuncType<false>,
+        signature: TypeScheme,
         f: impl FnOnce(FunctionBuilder<&mut Hugr>) -> Result<BuildHandle<FuncID<true>>, BuildError>,
     ) -> Result<Hugr, BuildError> {
         let mut module_builder = ModuleBuilder::new();

@@ -7,7 +7,7 @@ use {
     ::proptest_derive::Arbitrary,
 };
 
-use crate::types::{EdgeKind, FunctionType, PolyFuncType};
+use crate::types::{EdgeKind, FunctionType, TypeScheme};
 use crate::types::{Type, TypeBound};
 
 use super::dataflow::DataflowParent;
@@ -45,7 +45,7 @@ pub struct FuncDefn {
     #[cfg_attr(test, proptest(strategy = "any_nonempty_string()"))]
     pub name: String,
     /// Signature of the function
-    pub signature: PolyFuncType<false>,
+    pub signature: TypeScheme,
 }
 
 impl_op_name!(FuncDefn);
@@ -81,7 +81,7 @@ pub struct FuncDecl {
     #[cfg_attr(test, proptest(strategy = "any_nonempty_string()"))]
     pub name: String,
     /// Signature of the function
-    pub signature: PolyFuncType<false>,
+    pub signature: TypeScheme,
 }
 
 impl_op_name!(FuncDecl);

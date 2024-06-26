@@ -18,7 +18,8 @@ use crate::std_extensions::logic::test::{and_op, or_op};
 use crate::std_extensions::logic::{self, NotOp};
 use crate::types::type_param::{TypeArg, TypeArgError};
 use crate::types::{
-    CustomType, FunctionType, FunctionTypeRV, PolyFuncType, Type, TypeBound, TypeRV, TypeRow,
+    CustomType, FunctionType, FunctionTypeRV, Type, TypeBound, TypeRV, TypeRow, TypeScheme,
+    TypeSchemeRV,
 };
 use crate::{const_extension_ids, type_row, Direction, IncomingPort, Node};
 
@@ -460,7 +461,7 @@ fn typevars_declared() -> Result<(), Box<dyn std::error::Error>> {
     // Base case
     let f = FunctionBuilder::new(
         "myfunc",
-        PolyFuncType::new(
+        TypeScheme::new(
             [TypeBound::Any.into()],
             FunctionType::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
         ),
@@ -470,7 +471,7 @@ fn typevars_declared() -> Result<(), Box<dyn std::error::Error>> {
     // Type refers to undeclared variable
     let f = FunctionBuilder::new(
         "myfunc",
-        PolyFuncType::new(
+        TypeScheme::new(
             [TypeBound::Any.into()],
             FunctionType::new_endo(vec![Type::new_var_use(1, TypeBound::Any)]),
         ),
@@ -480,7 +481,7 @@ fn typevars_declared() -> Result<(), Box<dyn std::error::Error>> {
     // Variable declaration incorrectly copied to use site
     let f = FunctionBuilder::new(
         "myfunc",
-        PolyFuncType::new(
+        TypeScheme::new(
             [TypeBound::Any.into()],
             FunctionType::new_endo(vec![Type::new_var_use(1, TypeBound::Copyable)]),
         ),
@@ -498,14 +499,14 @@ fn nested_typevars() -> Result<(), Box<dyn std::error::Error>> {
     fn build(t: Type) -> Result<Hugr, BuildError> {
         let mut outer = FunctionBuilder::new(
             "outer",
-            PolyFuncType::new(
+            TypeScheme::new(
                 [OUTER_BOUND.into()],
                 FunctionType::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
             ),
         )?;
         let inner = outer.define_function(
             "inner",
-            PolyFuncType::new([INNER_BOUND.into()], FunctionType::new_endo(vec![t])),
+            TypeScheme::new([INNER_BOUND.into()], FunctionType::new_endo(vec![t])),
         )?;
         let [w] = inner.input_wires_arr();
         inner.finish_with_outputs([w])?;
@@ -544,7 +545,7 @@ fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
     let reg = ExtensionRegistry::try_new([collections::EXTENSION.to_owned()]).unwrap();
     let mut def = FunctionBuilder::new(
         "myfunc",
-        PolyFuncType::new(
+        TypeScheme::new(
             [BOUND],
             FunctionType::new(vec![], vec![list_of_var.clone()])
                 .with_extension_delta(collections::EXTENSION_NAME),
@@ -576,14 +577,14 @@ pub(crate) fn extension_with_eval_parallel() -> Extension {
     let inputs = TypeRV::new_row_var_use(0, TypeBound::Any);
     let outputs = TypeRV::new_row_var_use(1, TypeBound::Any);
     let evaled_fn = TypeRV::new_function(FunctionTypeRV::new(inputs.clone(), outputs.clone()));
-    let pf = PolyFuncType::new(
+    let pf = TypeSchemeRV::new(
         [rowp.clone(), rowp.clone()],
         FunctionTypeRV::new(vec![evaled_fn, inputs], outputs),
     );
     e.add_op("eval".into(), "".into(), pf).unwrap();
 
     let rv = |idx| TypeRV::new_row_var_use(idx, TypeBound::Any);
-    let pf = PolyFuncType::new(
+    let pf = TypeSchemeRV::new(
         [rowp.clone(), rowp.clone(), rowp.clone(), rowp.clone()],
         FunctionType::new(
             vec![
@@ -644,7 +645,7 @@ fn row_variables() -> Result<(), Box<dyn std::error::Error>> {
     let ft_usz = Type::new_function(FunctionTypeRV::new_endo(vec![tv.clone(), USIZE_T.into()]));
     let mut fb = FunctionBuilder::new(
         "id",
-        PolyFuncType::new(
+        TypeScheme::new(
             [TypeParam::new_list(TypeBound::Any)],
             FunctionType::new(inner_ft.clone(), ft_usz),
         ),
@@ -697,7 +698,7 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
     e.add_op(
         "eval".into(),
         "".into(),
-        PolyFuncType::new(
+        TypeSchemeRV::new(
             params.clone(),
             FunctionType::new(
                 vec![evaled_fn, Type::new_var_use(0, TypeBound::Any)],
@@ -725,7 +726,7 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
         let es = ExtensionSet::type_var(0);
         let mut f = d.define_function(
             "two_ints",
-            PolyFuncType::new(
+            TypeScheme::new(
                 vec![TypeParam::Extensions],
                 FunctionType::new(vec![utou(es.clone()), int_pair.clone()], int_pair.clone())
                     .with_extension_delta(es.clone()),
@@ -781,7 +782,7 @@ fn test_polymorphic_load() -> Result<(), Box<dyn std::error::Error>> {
     let mut m = ModuleBuilder::new();
     let id = m.declare(
         "id",
-        PolyFuncType::new(
+        TypeScheme::new(
             vec![TypeBound::Any.into()],
             FunctionType::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
         ),

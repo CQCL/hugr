@@ -14,7 +14,7 @@ use smol_str::SmolStr;
 use crate::extension::prelude::PRELUDE_ID;
 use crate::extension::{ExtensionSet, SignatureFunc, TypeDef};
 use crate::types::type_param::TypeParam;
-use crate::types::{CustomType, FunctionTypeRV, PolyFuncType, Type, TypeRowRV};
+use crate::types::{CustomType, FunctionTypeRV, Type, TypeRowRV, TypeSchemeRV};
 use crate::Extension;
 
 use super::{DeclarationContext, ExtensionDeclarationError};
@@ -56,7 +56,7 @@ impl SignatureDeclaration {
             extension_reqs: self.extensions.clone(),
         };
 
-        let poly_func = PolyFuncType::new(op_params, body);
+        let poly_func = TypeSchemeRV::new(op_params, body);
         Ok(poly_func.into())
     }
 }

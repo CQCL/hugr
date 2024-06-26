@@ -46,10 +46,10 @@ impl UpperBound {
     }
 }
 
-/// A *kind* of [TypeArg]. Thus, a parameter declared by a [PolyFuncType] (e.g. [OpDef]),
+/// A *kind* of [TypeArg]. Thus, a parameter declared by a [TypeSchemeRV] (e.g. [OpDef]),
 /// specifying a value that may (resp. must) be provided to instantiate it.
 ///
-/// [PolyFuncType]: super::PolyFuncType
+/// [TypeSchemeRV]: super::TypeSchemeRV
 /// [OpDef]: crate::extension::OpDef
 #[derive(
     Clone, Debug, PartialEq, Eq, derive_more::Display, serde::Deserialize, serde::Serialize,

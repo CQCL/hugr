@@ -7,7 +7,7 @@ use std::marker::PhantomData;
 use crate::hugr::{HugrView, ValidationError};
 use crate::ops;
 
-use crate::types::{FunctionType, PolyFuncType};
+use crate::types::{FunctionType, TypeScheme};
 
 use crate::extension::ExtensionRegistry;
 use crate::Node;
@@ -140,7 +140,7 @@ impl FunctionBuilder<Hugr> {
     /// Error in adding DFG child nodes.
     pub fn new(
         name: impl Into<String>,
-        signature: impl Into<PolyFuncType<false>>,
+        signature: impl Into<TypeScheme>,
     ) -> Result<Self, BuildError> {
         let signature = signature.into();
         let body = signature.body().clone();
@@ -537,7 +537,7 @@ pub(crate) mod test {
         // Can *declare* a function that takes a function-value of unknown #args
         FunctionBuilder::new(
             "bad_eval",
-            PolyFuncType::new(
+            TypeScheme::new(
                 [TypeParam::new_list(TypeBound::Copyable)],
                 FunctionType::new(
                     Type::new_function(FunctionTypeRV::new(USIZE_T, tv.clone())),
