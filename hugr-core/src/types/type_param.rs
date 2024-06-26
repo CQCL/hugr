@@ -14,7 +14,7 @@ use crate::extension::ExtensionRegistry;
 use crate::extension::ExtensionSet;
 use crate::extension::SignatureError;
 
-use super::{check_typevar_decl, CustomType, Substitution, Type, TypeBound, TypeEnum};
+use super::{check_typevar_decl, CustomType, Substitution, Type, TypeBase, TypeBound, TypeEnum};
 
 /// The upper non-inclusive bound of a [`TypeParam::BoundedNat`]
 // A None inner value implies the maximum bound: u64::MAX + 1 (all u64 values valid)
@@ -183,13 +183,13 @@ pub enum TypeArg {
     },
 }
 
-impl<const RV: bool> From<Type<RV>> for TypeArg {
-    fn from(ty: Type<RV>) -> Self {
+impl<const RV: bool> From<TypeBase<RV>> for TypeArg {
+    fn from(ty: TypeBase<RV>) -> Self {
         if let TypeEnum::RowVariable(idx, bound) = ty.0 {
             assert!(RV);
             TypeArg::new_var_use(idx, TypeParam::new_list(bound))
         } else {
-            TypeArg::Type { ty: Type(ty.0, ty.1)}
+            TypeArg::Type { ty: TypeBase(ty.0, ty.1)}
         }
     }
 }
@@ -239,7 +239,7 @@ impl TypeArg {
             // Note a TypeParam::List of TypeParam::Type *cannot* be represented
             // as a TypeArg::Type because the latter stores a Type<false> i.e. only a single type,
             // not a RowVariable.
-            TypeParam::Type { b } => Type::<false>::new_var_use(idx, b).into(),
+            TypeParam::Type { b } => Type::new_var_use(idx, b).into(),
             // Prevent TypeArg::Variable(idx, TypeParam::Extensions)
             TypeParam::Extensions => TypeArg::Extensions {
                 es: ExtensionSet::type_var(idx),
@@ -482,11 +482,11 @@ mod test {
 
     use super::{check_type_arg, Substitution, TypeArg, TypeParam};
     use crate::extension::prelude::{BOOL_T, PRELUDE_REGISTRY, USIZE_T};
-    use crate::types::{type_param::TypeArgError, Type, TypeBound};
+    use crate::types::{type_param::TypeArgError, TypeBound, TypeRV};
 
     #[test]
     fn type_arg_fits_param() {
-        let rowvar = Type::new_row_var_use;
+        let rowvar = TypeRV::new_row_var_use;
         fn check(arg: impl Into<TypeArg>, parm: &TypeParam) -> Result<(), TypeArgError> {
             check_type_arg(&arg.into(), parm)
         }
@@ -573,7 +573,7 @@ mod test {
         let outer_param = TypeParam::new_list(TypeBound::Any);
         let outer_arg = TypeArg::Sequence {
             elems: vec![
-                Type::new_row_var_use(0, TypeBound::Copyable).into(),
+                TypeRV::new_row_var_use(0, TypeBound::Copyable).into(),
                 USIZE_T.into(),
             ],
         };

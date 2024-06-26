@@ -1,4 +1,4 @@
-use super::{FunTypeVarArgs, SumType, Type, TypeArg, TypeBound, TypeEnum};
+use super::{FunTypeVarArgs, SumType, TypeArg, TypeBase, TypeBound, TypeEnum};
 
 use super::custom::CustomType;
 
@@ -20,8 +20,8 @@ pub(super) enum SerSimpleType {
     R { i: usize, b: TypeBound },
 }
 
-impl<const RV: bool> From<Type<RV>> for SerSimpleType {
-    fn from(value: Type<RV>) -> Self {
+impl<const RV: bool> From<TypeBase<RV>> for SerSimpleType {
+    fn from(value: TypeBase<RV>) -> Self {
         if value == QB_T {
             return SerSimpleType::Q;
         };
@@ -39,22 +39,22 @@ impl<const RV: bool> From<Type<RV>> for SerSimpleType {
     }
 }
 
-impl<const RV: bool> TryFrom<SerSimpleType> for Type<RV> {
+impl<const RV: bool> TryFrom<SerSimpleType> for TypeBase<RV> {
     type Error = SignatureError;
     fn try_from(value: SerSimpleType) -> Result<Self, Self::Error> {
         Ok(match value {
             SerSimpleType::Q => QB_T.into_(),
             SerSimpleType::I => USIZE_T.into_(),
-            SerSimpleType::G(sig) => Type::new_function(*sig),
+            SerSimpleType::G(sig) => TypeBase::new_function(*sig),
             SerSimpleType::Sum(st) => st.into(),
             SerSimpleType::Array { inner, len } => {
                 array_type(TypeArg::BoundedNat { n: len }, (*inner).try_into().unwrap()).into_()
             }
-            SerSimpleType::Opaque(o) => Type::new_extension(o),
-            SerSimpleType::Alias(a) => Type::new_alias(a),
-            SerSimpleType::V { i, b } => Type::new_var_use(i, b),
+            SerSimpleType::Opaque(o) => TypeBase::new_extension(o),
+            SerSimpleType::Alias(a) => TypeBase::new_alias(a),
+            SerSimpleType::V { i, b } => TypeBase::new_var_use(i, b),
             // We can't use new_row_var because that returns Type<true> not Type<RV>.
-            SerSimpleType::R { i, b } => Type::new(TypeEnum::RowVariable(i, b)).try_into_()?,
+            SerSimpleType::R { i, b } => TypeBase::new(TypeEnum::RowVariable(i, b)).try_into_()?,
         })
     }
 }

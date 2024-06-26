@@ -130,7 +130,9 @@ pub(crate) mod test {
     use crate::std_extensions::collections::{EXTENSION, LIST_TYPENAME};
     use crate::types::signature::FuncTypeBase;
     use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
-    use crate::types::{CustomType, FunTypeVarArgs, FunctionType, Type, TypeBound, TypeName};
+    use crate::types::{
+        CustomType, FunTypeVarArgs, FunctionType, Type, TypeBound, TypeName, TypeRV,
+    };
     use crate::Extension;
 
     use super::PolyFuncType;
@@ -368,7 +370,7 @@ pub(crate) mod test {
             [decl.clone()],
             FunTypeVarArgs::new(
                 vec![USIZE_T],
-                vec![Type::new_row_var_use(0, TypeBound::Copyable)],
+                vec![TypeRV::new_row_var_use(0, TypeBound::Copyable)],
             ),
             &PRELUDE_REGISTRY,
         )
@@ -392,12 +394,12 @@ pub(crate) mod test {
 
     #[test]
     fn row_variables() {
-        let rty = Type::new_row_var_use(0, TypeBound::Any);
+        let rty = TypeRV::new_row_var_use(0, TypeBound::Any);
         let pf = PolyFuncType::new_validated(
             [TypeParam::new_list(TP_ANY)],
             FunTypeVarArgs::new(
                 vec![USIZE_T.into(), rty.clone()],
-                vec![Type::<true>::new_tuple(rty)],
+                vec![TypeRV::new_tuple(rty)],
             ),
             &PRELUDE_REGISTRY,
         )
@@ -430,7 +432,7 @@ pub(crate) mod test {
 
     #[test]
     fn row_variables_inner() {
-        let inner_fty = Type::new_function(FunTypeVarArgs::new_endo(Type::new_row_var_use(
+        let inner_fty = Type::new_function(FunTypeVarArgs::new_endo(TypeRV::new_row_var_use(
             0,
             TypeBound::Copyable,
         )));

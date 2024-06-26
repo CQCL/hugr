@@ -282,7 +282,7 @@ mod test {
         assert_eq!(f_type.input_count(), 1);
         assert_eq!(f_type.output_count(), 1);
 
-        assert_eq!(f_type.input_types(), &[Type::<false>::UNIT]);
+        assert_eq!(f_type.input_types(), &[Type::UNIT]);
 
         assert_eq!(
             f_type.port_type(Port::new(Direction::Incoming, 0)),
@@ -294,7 +294,7 @@ mod test {
 
         assert_eq!(f_type.port_type(out), Some(&USIZE_T));
 
-        assert_eq!(f_type.input_types(), &[Type::<false>::UNIT]);
+        assert_eq!(f_type.input_types(), &[Type::UNIT]);
         assert_eq!(f_type.output_types(), &[USIZE_T]);
     }
 }

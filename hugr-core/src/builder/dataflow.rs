@@ -212,7 +212,7 @@ pub(crate) mod test {
 
     use crate::std_extensions::logic::test::and_op;
     use crate::types::type_param::TypeParam;
-    use crate::types::{FunTypeVarArgs, FunctionType, Type, TypeBound};
+    use crate::types::{FunTypeVarArgs, FunctionType, Type, TypeBound, TypeRV};
     use crate::utils::test_quantum_extension::h_gate;
     use crate::{
         builder::test::{n_identity, BIT, NAT, QB},
@@ -533,7 +533,7 @@ pub(crate) mod test {
     #[test]
     fn no_outer_row_variables() -> Result<(), BuildError> {
         let e = crate::hugr::validate::test::extension_with_eval_parallel();
-        let tv = Type::new_row_var_use(0, TypeBound::Copyable);
+        let tv = TypeRV::new_row_var_use(0, TypeBound::Copyable);
         // Can *declare* a function that takes a function-value of unknown #args
         FunctionBuilder::new(
             "bad_eval",

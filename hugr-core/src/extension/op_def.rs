@@ -496,7 +496,7 @@ pub(super) mod test {
     use crate::ops::{CustomOp, OpName};
     use crate::std_extensions::collections::{EXTENSION, LIST_TYPENAME};
     use crate::types::type_param::{TypeArgError, TypeParam};
-    use crate::types::{FunctionType, PolyFuncType, Type, TypeArg, TypeBound};
+    use crate::types::{FunctionType, PolyFuncType, Type, TypeArg, TypeBound, TypeRV};
     use crate::{const_extension_ids, Extension};
 
     const_extension_ids! {
@@ -734,7 +734,7 @@ pub(super) mod test {
             Ok(FunctionType::new_endo(tv))
         );
         // But not with an external row variable
-        let arg: TypeArg = Type::new_row_var_use(0, TypeBound::Eq).into();
+        let arg: TypeArg = TypeRV::new_row_var_use(0, TypeBound::Eq).into();
         assert_eq!(
             def.compute_signature(&[arg.clone()], &EMPTY_REG),
             Err(SignatureError::TypeArgMismatch(

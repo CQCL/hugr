@@ -173,7 +173,7 @@ impl SumType {
     /// Report the tag'th variant, if it exists.
     pub fn get_variant(&self, tag: usize) -> Option<&TypeRow<true>> {
         match self {
-            SumType::Unit { size } if tag < (*size as usize) => Some(Type::EMPTY_TYPEROW_REF),
+            SumType::Unit { size } if tag < (*size as usize) => Some(TypeRV::EMPTY_TYPEROW_REF),
             SumType::General { rows } => rows.get(tag),
             _ => None,
         }
@@ -188,11 +188,11 @@ impl SumType {
     }
 }
 
-impl<const RV: bool> From<SumType> for Type<RV> {
+impl<const RV: bool> From<SumType> for TypeBase<RV> {
     fn from(sum: SumType) -> Self {
         match sum {
-            SumType::Unit { size } => Type::new_unit_sum(size),
-            SumType::General { rows } => Type::new_sum(rows),
+            SumType::Unit { size } => TypeBase::new_unit_sum(size),
+            SumType::General { rows } => TypeBase::new_sum(rows),
         }
     }
 }
@@ -244,13 +244,13 @@ impl TypeEnum {
             TypeEnum::Sum(SumType::General { rows }) => least_upper_bound(
                 rows.iter()
                     .flat_map(TypeRow::iter)
-                    .map(Type::least_upper_bound),
+                    .map(TypeRV::least_upper_bound),
             ),
         }
     }
 }
 
-struct Implies<const A: bool, const B: bool>(PhantomData<Type<A>>, PhantomData<Type<B>>);
+struct Implies<const A: bool, const B: bool>(PhantomData<TypeBase<A>>, PhantomData<TypeBase<B>>);
 impl<const A: bool, const B: bool> Implies<A, B> {
     const A_IMPLIES_B: () = assert!(B || !A);
 }
@@ -281,15 +281,22 @@ impl<const A: bool, const B: bool> Implies<A, B> {
 /// let func_type: Type = Type::new_function(FunctionType::new_endo(vec![]));
 /// assert_eq!(func_type.least_upper_bound(), TypeBound::Copyable);
 /// ```
-pub struct Type<const ROWVARS: bool = false>(TypeEnum, TypeBound);
+pub struct TypeBase<const ROWVARS: bool>(TypeEnum, TypeBound);
 
-impl<const RV1: bool, const RV2: bool> PartialEq<Type<RV1>> for Type<RV2> {
-    fn eq(&self, other: &Type<RV1>) -> bool {
+/// The type of a single value, that can be sent down a wire
+pub type Type = TypeBase<false>;
+
+/// One or more types - either a single type, or a row variable
+/// standing for multiple types.
+pub type TypeRV = TypeBase<true>;
+
+impl<const RV1: bool, const RV2: bool> PartialEq<TypeBase<RV1>> for TypeBase<RV2> {
+    fn eq(&self, other: &TypeBase<RV1>) -> bool {
         self.0 == other.0 && self.1 == other.1
     }
 }
 
-impl<const RV: bool> Type<RV> {
+impl<const RV: bool> TypeBase<RV> {
     /// An empty `TypeRow`. Provided here for convenience
     pub const EMPTY_TYPEROW: TypeRow<RV> = TypeRow::<RV>::new();
     /// Unit type (empty tuple).
@@ -325,7 +332,7 @@ impl<const RV: bool> Type<RV> {
     // TODO remove? Extensions/TypeDefs should just provide `Type` directly
     pub const fn new_extension(opaque: CustomType) -> Self {
         let bound = opaque.bound();
-        Type(TypeEnum::Extension(opaque), bound)
+        TypeBase(TypeEnum::Extension(opaque), bound)
     }
 
     /// Initialize a new alias.
@@ -430,16 +437,16 @@ impl<const RV: bool> Type<RV> {
                 };
                 vec![ty.into_()]
             }
-            TypeEnum::Extension(cty) => vec![Type::new_extension(cty.substitute(t))],
-            TypeEnum::Function(bf) => vec![Type::new_function(bf.substitute(t))],
+            TypeEnum::Extension(cty) => vec![TypeBase::new_extension(cty.substitute(t))],
+            TypeEnum::Function(bf) => vec![TypeBase::new_function(bf.substitute(t))],
             TypeEnum::Sum(SumType::General { rows }) => {
-                vec![Type::new_sum(rows.iter().map(|r| r.substitute(t)))]
+                vec![TypeBase::new_sum(rows.iter().map(|r| r.substitute(t)))]
             }
         }
     }
 }
 
-impl Type<false> {
+impl Type {
     fn substitute1(&self, s: &Substitution) -> Self {
         let v = self.substitute(s);
         let [r] = v.try_into().unwrap(); // No row vars, so every Type<false> produces exactly one
@@ -447,7 +454,7 @@ impl Type<false> {
     }
 }
 
-impl Type<true> {
+impl TypeRV {
     /// Tells if this Type is a row variable, i.e. could stand for any number >=0 of Types
     pub fn is_row_var(&self) -> bool {
         matches!(self.0, TypeEnum::RowVariable(_, _))
@@ -466,37 +473,37 @@ impl Type<true> {
 }
 
 // ====== Conversions ======
-impl Type<true> {
-    fn try_into_<const RV: bool>(self) -> Result<Type<RV>, SignatureError> {
+impl TypeRV {
+    fn try_into_<const RV: bool>(self) -> Result<TypeBase<RV>, SignatureError> {
         if !RV {
             if let TypeEnum::RowVariable(idx, _) = self.0 {
                 return Err(SignatureError::RowVarWhereTypeExpected { idx });
             }
         }
-        Ok(Type(self.0, self.1))
+        Ok(TypeBase(self.0, self.1))
     }
 }
 
-impl<const RV: bool> Type<RV> {
+impl<const RV: bool> TypeBase<RV> {
     /// A swiss-army-knife for any safe conversion of the const-bool "type" argument
     /// to/from true/false/variable. Any unsafe conversion (that might create
-    /// a [Type]`<false>` of a [TypeEnum::RowVariable]) will fail statically with an assert.
-    fn into_<const RV2: bool>(self) -> Type<RV2> {
+    /// a [Type] of a [TypeEnum::RowVariable]) will fail statically with an assert.
+    fn into_<const RV2: bool>(self) -> TypeBase<RV2> {
         #[allow(clippy::let_unit_value)]
         let _ = Implies::<RV, RV2>::A_IMPLIES_B;
-        Type(self.0, self.1)
+        TypeBase(self.0, self.1)
     }
 }
 
-impl From<Type<false>> for Type<true> {
-    fn from(value: Type<false>) -> Self {
+impl From<Type> for TypeRV {
+    fn from(value: Type) -> Self {
         value.into_()
     }
 }
 
-impl TryFrom<Type<true>> for Type<false> {
+impl TryFrom<TypeRV> for Type {
     type Error = SignatureError;
-    fn try_from(value: Type<true>) -> Result<Self, Self::Error> {
+    fn try_from(value: TypeRV) -> Result<Self, Self::Error> {
         value.try_into_()
     }
 }
@@ -515,7 +522,7 @@ impl<'a> Substitution<'a> {
         arg.clone()
     }
 
-    fn apply_rowvar(&self, idx: usize, bound: TypeBound) -> Vec<Type<true>> {
+    fn apply_rowvar(&self, idx: usize, bound: TypeBound) -> Vec<TypeRV> {
         let arg = self
             .0
             .get(idx)
@@ -529,7 +536,7 @@ impl<'a> Substitution<'a> {
                         TypeArg::Type { ty } => return ty.clone().into(),
                         TypeArg::Variable { v } => {
                             if let Some(b) = v.bound_if_row_var() {
-                                return Type::new_row_var_use(v.index(), b);
+                                return TypeRV::new_row_var_use(v.index(), b);
                             }
                         }
                         _ => (),
@@ -603,14 +610,14 @@ pub(crate) mod test {
 
     #[rstest::rstest]
     fn sum_construct() {
-        let pred1: Type = Type::new_sum([type_row![], type_row![]]);
-        let pred2: Type<true> = Type::new_unit_sum(2);
+        let pred1 = Type::new_sum([type_row![], type_row![]]);
+        let pred2 = TypeRV::new_unit_sum(2);
 
         assert_eq!(pred1, pred2);
 
         let pred_direct = SumType::Unit { size: 2 };
         // Pick <false> arbitrarily
-        assert_eq!(pred1, Type::<false>::from(pred_direct));
+        assert_eq!(pred1, Type::from(pred_direct));
     }
 
     mod proptest {
@@ -635,7 +642,7 @@ pub(crate) mod test {
             }
         }
 
-        impl<const RV: bool> Arbitrary for super::Type<RV> {
+        impl<const RV: bool> Arbitrary for super::TypeBase<RV> {
             type Parameters = RecursionDepth;
             type Strategy = BoxedStrategy<Self>;
             fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {

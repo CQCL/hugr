@@ -688,14 +688,12 @@ mod test {
                     32, // Target around 32 total elements
                     3,  // Each collection is up to 3 elements long
                     |child_strat| {
-                        (any::<Type<false>>(), vec(child_strat, 0..3)).prop_map(
-                            |(typ, children)| {
-                                Self::new(ListValue::new(
-                                    typ,
-                                    children.into_iter().map(|e| Value::Extension { e }),
-                                ))
-                            },
-                        )
+                        (any::<Type>(), vec(child_strat, 0..3)).prop_map(|(typ, children)| {
+                            Self::new(ListValue::new(
+                                typ,
+                                children.into_iter().map(|e| Value::Extension { e }),
+                            ))
+                        })
                     },
                 )
                 .boxed()

@@ -14,7 +14,9 @@ use crate::std_extensions::arithmetic::int_ops::INT_OPS_REGISTRY;
 use crate::std_extensions::arithmetic::int_types::{self, int_custom_type, ConstInt, INT_TYPES};
 use crate::std_extensions::logic::NotOp;
 use crate::types::type_param::TypeParam;
-use crate::types::{FunTypeVarArgs, FunctionType, PolyFuncType, SumType, Type, TypeArg, TypeBound};
+use crate::types::{
+    FunTypeVarArgs, FunctionType, PolyFuncType, SumType, Type, TypeArg, TypeBound, TypeRV,
+};
 use crate::{type_row, OutgoingPort};
 
 use itertools::Itertools;
@@ -30,7 +32,7 @@ const QB: Type = crate::extension::prelude::QB_T;
 /// Version 1 of the Testing HUGR serialisation format, see `testing_hugr.py`.
 #[derive(Serialize, Deserialize, PartialEq, Debug, Default)]
 struct SerTestingV1 {
-    typ: Option<crate::types::Type<true>>,
+    typ: Option<crate::types::TypeRV>,
     sum_type: Option<crate::types::SumType>,
     poly_func_type: Option<crate::types::PolyFuncType>,
     value: Option<crate::ops::Value>,
@@ -85,7 +87,7 @@ macro_rules! impl_sertesting_from {
     };
 }
 
-impl_sertesting_from!(crate::types::Type<true>, typ);
+impl_sertesting_from!(crate::types::TypeRV, typ);
 impl_sertesting_from!(crate::types::SumType, sum_type);
 impl_sertesting_from!(crate::types::PolyFuncType, poly_func_type);
 impl_sertesting_from!(crate::ops::Value, value);
@@ -99,9 +101,9 @@ impl From<PolyFuncType<false>> for TestingModel {
     }
 }
 
-impl From<Type<false>> for TestingModel {
-    fn from(v: Type<false>) -> Self {
-        let t: Type<true> = v.into();
+impl From<Type> for TestingModel {
+    fn from(v: Type) -> Self {
+        let t: TypeRV = v.into();
         t.into()
     }
 }
@@ -382,16 +384,15 @@ fn constants_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn serialize_types_roundtrip() {
-    let g: Type<true> = Type::new_function(FunctionType::new_endo(vec![]));
-
+    let g = Type::new_function(FunctionType::new_endo(vec![]));
     check_testing_roundtrip(g.clone());
 
     // A Simple tuple
-    let t: Type = Type::new_tuple(vec![USIZE_T.into(), g]);
+    let t = Type::new_tuple(vec![USIZE_T.into(), g]);
     check_testing_roundtrip(t);
 
     // A Classic sum
-    let t: Type<true> = Type::new_sum([type_row![USIZE_T], type_row![FLOAT64_TYPE]]);
+    let t = TypeRV::new_sum([type_row![USIZE_T], type_row![FLOAT64_TYPE]]);
     check_testing_roundtrip(t);
 
     let t: Type = Type::new_unit_sum(4);
@@ -438,11 +439,11 @@ fn polyfunctype1() -> PolyFuncType<false> {
 }
 
 fn polyfunctype2() -> PolyFuncType {
-    let tv0 = Type::new_row_var_use(0, TypeBound::Any);
-    let tv1 = Type::new_row_var_use(1, TypeBound::Eq);
+    let tv0 = TypeRV::new_row_var_use(0, TypeBound::Any);
+    let tv1 = TypeRV::new_row_var_use(1, TypeBound::Eq);
     let params = [TypeBound::Any, TypeBound::Eq].map(TypeParam::new_list);
     let inputs = vec![
-        Type::new_function(FunTypeVarArgs::new(tv0.clone(), tv1.clone())),
+        TypeRV::new_function(FunTypeVarArgs::new(tv0.clone(), tv1.clone())),
         tv0,
     ];
     let res = PolyFuncType::new(params, FunTypeVarArgs::new(inputs, tv1));
@@ -461,7 +462,7 @@ fn polyfunctype2() -> PolyFuncType {
 #[case(PolyFuncType::new([TypeParam::Tuple { params: [TypeBound::Any.into(), TypeParam::bounded_nat(2.try_into().unwrap())].into() }], FunctionType::new_endo(type_row![])))]
 #[case(PolyFuncType::new(
     [TypeParam::new_list(TypeBound::Any)],
-    FunctionType::new_endo(Type::new_tuple(Type::new_row_var_use(0, TypeBound::Any)))))]
+    FunctionType::new_endo(Type::new_tuple(TypeRV::new_row_var_use(0, TypeBound::Any)))))]
 fn roundtrip_polyfunctype_fixedlen(#[case] poly_func_type: PolyFuncType<false>) {
     check_testing_roundtrip(poly_func_type)
 }
@@ -474,7 +475,7 @@ fn roundtrip_polyfunctype_fixedlen(#[case] poly_func_type: PolyFuncType<false>) 
 #[case(PolyFuncType::new([TypeParam::Tuple { params: [TypeBound::Any.into(), TypeParam::bounded_nat(2.try_into().unwrap())].into() }], FunctionType::new_endo(type_row![])))]
 #[case(PolyFuncType::new(
     [TypeParam::new_list(TypeBound::Any)],
-    FunTypeVarArgs::new_endo(Type::new_row_var_use(0, TypeBound::Any))))]
+    FunTypeVarArgs::new_endo(TypeRV::new_row_var_use(0, TypeBound::Any))))]
 #[case(polyfunctype2())]
 fn roundtrip_polyfunctype_varlen(#[case] poly_func_type: PolyFuncType<true>) {
     check_testing_roundtrip(poly_func_type)

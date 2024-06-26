@@ -7,7 +7,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use super::{type_param::TypeParam, Substitution, Type};
+use super::{type_param::TypeParam, Substitution, Type, TypeBase};
 use crate::{
     extension::{ExtensionRegistry, SignatureError},
     utils::display_list,
@@ -21,7 +21,7 @@ use itertools::Itertools;
 #[serde(transparent)]
 pub struct TypeRow<const ROWVARS: bool = false> {
     /// The datatypes in the row.
-    types: Cow<'static, [Type<ROWVARS>]>,
+    types: Cow<'static, [TypeBase<ROWVARS>]>,
 }
 
 impl<const RV1: bool, const RV2: bool> PartialEq<TypeRow<RV1>> for TypeRow<RV2> {
@@ -52,12 +52,12 @@ impl<const RV: bool> TypeRow<RV> {
     }
 
     /// Returns a new `TypeRow` with `xs` concatenated onto `self`.
-    pub fn extend<'a>(&'a self, rest: impl IntoIterator<Item = &'a Type<RV>>) -> Self {
+    pub fn extend<'a>(&'a self, rest: impl IntoIterator<Item = &'a TypeBase<RV>>) -> Self {
         self.iter().chain(rest).cloned().collect_vec().into()
     }
 
     /// Returns a reference to the types in the row.
-    pub fn as_slice(&self) -> &[Type<RV>] {
+    pub fn as_slice(&self) -> &[TypeBase<RV>] {
         &self.types
     }
 
@@ -74,13 +74,13 @@ impl<const RV: bool> TypeRow<RV> {
     delegate! {
         to self.types {
             /// Iterator over the types in the row.
-            pub fn iter(&self) -> impl Iterator<Item = &Type<RV>>;
+            pub fn iter(&self) -> impl Iterator<Item = &TypeBase<RV>>;
 
             /// Mutable vector of the types in the row.
-            pub fn to_mut(&mut self) -> &mut Vec<Type<RV>>;
+            pub fn to_mut(&mut self) -> &mut Vec<TypeBase<RV>>;
 
             /// Allow access (consumption) of the contained elements
-            pub fn into_owned(self) -> Vec<Type<RV>>;
+            pub fn into_owned(self) -> Vec<TypeBase<RV>>;
 
             /// Returns `true` if the row contains no types.
             pub fn is_empty(&self) -> bool ;
@@ -135,8 +135,8 @@ impl<const RV: bool> Default for TypeRow<RV> {
     }
 }
 
-impl<const RV: bool> From<Vec<Type<RV>>> for TypeRow<RV> {
-    fn from(types: Vec<Type<RV>>) -> Self {
+impl<const RV: bool> From<Vec<TypeBase<RV>>> for TypeRow<RV> {
+    fn from(types: Vec<TypeBase<RV>>) -> Self {
         Self {
             types: types.into(),
         }
@@ -159,16 +159,16 @@ impl From<TypeRow> for TypeRow<true> {
     }
 }
 
-impl<const RV: bool> From<&'static [Type<RV>]> for TypeRow<RV> {
-    fn from(types: &'static [Type<RV>]) -> Self {
+impl<const RV: bool> From<&'static [TypeBase<RV>]> for TypeRow<RV> {
+    fn from(types: &'static [TypeBase<RV>]) -> Self {
         Self {
             types: types.into(),
         }
     }
 }
 
-impl<const RV1: bool> From<Type<RV1>> for TypeRow<true> {
-    fn from(t: Type<RV1>) -> Self {
+impl<const RV1: bool> From<TypeBase<RV1>> for TypeRow<true> {
+    fn from(t: TypeBase<RV1>) -> Self {
         Self {
             types: vec![t.into_()].into(),
         }
@@ -184,7 +184,7 @@ impl From<Type> for TypeRow {
 }
 
 impl<const RV: bool> Deref for TypeRow<RV> {
-    type Target = [Type<RV>];
+    type Target = [TypeBase<RV>];
 
     fn deref(&self) -> &Self::Target {
         self.as_slice()
@@ -201,7 +201,7 @@ impl<const RV: bool> DerefMut for TypeRow<RV> {
 mod test {
     mod proptest {
         use crate::proptest::RecursionDepth;
-        use crate::types::{Type, TypeRow};
+        use crate::types::{TypeBase, TypeRow};
         use ::proptest::prelude::*;
 
         impl<const RV: bool> Arbitrary for super::super::TypeRow<RV> {
@@ -212,7 +212,7 @@ mod test {
                 if depth.leaf() {
                     Just(TypeRow::new()).boxed()
                 } else {
-                    vec(any_with::<Type<RV>>(depth), 0..4)
+                    vec(any_with::<TypeBase<RV>>(depth), 0..4)
                         .prop_map(|ts| ts.to_vec().into())
                         .boxed()
                 }
