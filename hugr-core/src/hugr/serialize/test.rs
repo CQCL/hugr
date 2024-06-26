@@ -92,7 +92,6 @@ impl_sertesting_from!(crate::ops::Value, value);
 impl_sertesting_from!(NodeSer, optype);
 impl_sertesting_from!(SimpleOpDef, op_def);
 
-#[cfg(test)]
 impl From<PolyFuncType<false>> for TestingModel {
     fn from(v: PolyFuncType<false>) -> Self {
         let v: PolyFuncType<true> = v.into();
@@ -100,7 +99,6 @@ impl From<PolyFuncType<false>> for TestingModel {
     }
 }
 
-#[cfg(test)]
 impl From<Type<false>> for TestingModel {
     fn from(v: Type<false>) -> Self {
         let t: Type<true> = v.into();

@@ -565,7 +565,6 @@ mod test {
     #[test]
     fn type_arg_subst_row() {
         let row_param = TypeParam::new_list(TypeBound::Copyable);
-        // The <false> here is arbitrary but we have to specify it:
         let row_arg: TypeArg = vec![BOOL_T.into(), TypeArg::UNIT].into();
         check_type_arg(&row_arg, &row_param).unwrap();
 

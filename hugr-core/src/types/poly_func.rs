@@ -109,9 +109,6 @@ impl<const RV: bool> PolyFuncType<RV> {
 
     /// Validates this instance, checking that the types in the body are
     /// wellformed with respect to the registry, and the type variables declared.
-    /// Allows both inputs and outputs to contain [RowVariable]s
-    ///
-    /// [RowVariable]: [crate::types::TypeEnum::RowVariable]
     pub fn validate(&self, reg: &ExtensionRegistry) -> Result<(), SignatureError> {
         // TODO https://github.com/CQCL/hugr/issues/624 validate TypeParams declared here, too
         self.body.validate(reg, &self.params)
