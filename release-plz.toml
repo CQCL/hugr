@@ -1,0 +1,33 @@
+# Automatic changelog generation for rust projects
+
+[workspace]
+# Open the release PR as a draft
+pr_draft = true
+
+# Default to not processing the packages
+release = false
+
+[changelog]
+sort_commits = "oldest"
+
+commit_parsers = [
+    { message = "^feat", group = "New Features" },
+    { message = "^fix", group = "Bug Fixes" },
+    { message = "^docs", group = "Documentation" },
+    { message = "^style", group = "Styling" },
+    { message = "^refactor", group = "Refactor" },
+    { message = "^perf", group = "Performance" },
+    { message = "^test", group = "Testing" },
+    { message = "^chore", group = "Miscellaneous Tasks", skip = true },
+    { message = "^revert", group = "Reverted changes", skip = true },
+    { message = "^ci", group = "CI", skip = true },
+]
+
+[[package]]
+name = "hugr-llvm"
+release = true
+
+# Disabled until the first version is manually published
+publish = false
+git_tag_enable = false
+git_release_enable = false

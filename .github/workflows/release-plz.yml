@@ -13,7 +13,6 @@ on:
 jobs:
   release-plz:
     name: Release-plz
-    if: false # TODO
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
