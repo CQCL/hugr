@@ -208,7 +208,7 @@ pub struct RowVariable(usize, TypeBound);
 
 trait MaybeRV: Clone + std::fmt::Debug + std::fmt::Display + From<NoRV> + Eq + PartialEq + 'static {
     fn as_rv(&self) -> &RowVariable;
-    fn try_from_rv(rv: RowVariable) -> Result<Self, SignatureError>;
+    fn try_from_rv(rv: RowVariable) -> Result<Self, RowVariable>;
     fn bound(&self) -> TypeBound;
     fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError>;
     fn substitute(&self, s: &Substitution) -> Vec<TypeBase<Self>>;
@@ -244,7 +244,7 @@ impl MaybeRV for RowVariable {
         s.apply_rowvar(self.0, self.1)
     }
 
-    fn try_from_rv(rv: RowVariable) -> Result<Self, SignatureError> {
+    fn try_from_rv(rv: RowVariable) -> Result<Self, RowVariable> {
         Ok(rv)
     }
 }
@@ -266,8 +266,8 @@ impl MaybeRV for NoRV {
         match *self {}
     }
 
-    fn try_from_rv(rv: RowVariable) -> Result<Self, SignatureError> {
-        Err(SignatureError::RowVarWhereTypeExpected { idx: rv.0 })
+    fn try_from_rv(rv: RowVariable) -> Result<Self, RowVariable> {
+        Err(rv)
     }
 }
 
@@ -543,15 +543,15 @@ impl TypeRV {
 }
 
 // ====== Conversions ======
-impl TypeRV {
-    fn try_into_<RV: MaybeRV>(self) -> Result<TypeBase<RV>, SignatureError> {
+impl<RV: MaybeRV> TypeBase<RV> {
+    fn try_into_(self) -> Result<Type, RowVariable> {
         Ok(TypeBase(
             match self.0 {
                 TypeEnum::Extension(e) => TypeEnum::Extension(e),
                 TypeEnum::Alias(a) => TypeEnum::Alias(a),
                 TypeEnum::Function(f) => TypeEnum::Function(f),
                 TypeEnum::Variable(idx, bound) => TypeEnum::Variable(idx, bound),
-                TypeEnum::RowVar(rv) => TypeEnum::RowVar(RV::try_from_rv(rv)?),
+                TypeEnum::RowVar(rv) => {return Err(rv.as_rv().clone())},
                 TypeEnum::Sum(s) => TypeEnum::Sum(s),
             },
             self.1,
@@ -585,7 +585,7 @@ impl From<Type> for TypeRV {
 impl TryFrom<TypeRV> for Type {
     type Error = SignatureError;
     fn try_from(value: TypeRV) -> Result<Self, Self::Error> {
-        value.try_into_()
+        value.try_into_().map_err(|var| SignatureError::RowVarWhereTypeExpected { var })
     }
 }
 

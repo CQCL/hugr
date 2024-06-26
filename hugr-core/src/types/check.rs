@@ -69,10 +69,10 @@ impl super::SumType {
                 num_variants: self.num_variants(),
             })?;
         let variant: TypeRow = variant.clone().try_into().map_err(|e| {
-            let SignatureError::RowVarWhereTypeExpected { idx } = e else {
+            let SignatureError::RowVarWhereTypeExpected { var } = e else {
                 panic!("Unexpected error")
             };
-            SumTypeError::VariantNotConcrete { tag, varidx: idx }
+            SumTypeError::VariantNotConcrete { tag, varidx: var.0 }
         })?;
 
         if variant.len() != val.len() {
