@@ -230,7 +230,7 @@ fn conditional() {
     let mut machine = Machine::new();
     let arg_pv =
         PartialValue::variant(1, []).join(PartialValue::variant(2, [PartialValue::variant(0, [])]));
-    machine.propolutate_out_wires([(arg_w, arg_pv)]);
+    machine.prepopulate_out_wires([(arg_w, arg_pv)]);
     let c = machine.run_hugr(&hugr);
 
     let cond_r1 = machine.read_out_wire_value(&c, cond_o1).unwrap();
