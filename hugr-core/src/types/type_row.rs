@@ -213,7 +213,7 @@ mod test {
         use crate::types::{MaybeRV, TypeBase, TypeRowBase};
         use ::proptest::prelude::*;
 
-        impl<RV: MaybeRV + Arbitrary> Arbitrary for super::super::TypeRowBase<RV> {
+        impl<RV: MaybeRV> Arbitrary for super::super::TypeRowBase<RV> {
             type Parameters = RecursionDepth;
             type Strategy = BoxedStrategy<Self>;
             fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {

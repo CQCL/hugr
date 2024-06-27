@@ -23,7 +23,7 @@ use itertools::FoldWhile::{Continue, Done};
 use itertools::{repeat_n, Itertools};
 use serde::{Deserialize, Serialize};
 #[cfg(test)]
-use {proptest_derive::Arbitrary};
+use {proptest_derive::Arbitrary, proptest::prelude::{any,BoxedStrategy,Strategy}};
 
 use crate::extension::{ExtensionRegistry, SignatureError};
 use crate::ops::AliasDecl;
@@ -203,7 +203,6 @@ impl<RV: MaybeRV> From<SumType> for TypeBase<RV> {
 #[derive(
     Clone, Debug, Eq, PartialEq, derive_more::Display, serde::Serialize, serde::Deserialize,
 )]
-#[cfg_attr(test, derive(Arbitrary))]
 #[display(fmt = "{}", "_0")]
 pub struct RowVariable(usize, TypeBound);
 
@@ -214,6 +213,7 @@ trait MaybeRV: Clone + std::fmt::Debug + std::fmt::Display + From<NoRV> + Eq + P
     fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError>;
     fn substitute(&self, s: &Substitution) -> Vec<TypeBase<Self>>;
     #[cfg(test)] fn weight() -> u32 {1}
+    #[cfg(test)] fn arb() -> BoxedStrategy<Self>;
 }
 
 // Note that I believe the serde derives here are not used except as markers
@@ -249,6 +249,11 @@ impl MaybeRV for RowVariable {
     fn try_from_rv(rv: RowVariable) -> Result<Self, RowVariable> {
         Ok(rv)
     }
+
+    #[cfg(test)]
+    fn arb() -> BoxedStrategy<Self> {
+        (any::<usize>(), any::<TypeBound>()).prop_map(|(i,b)| Self(i,b)).boxed()
+    }
 }
 
 impl MaybeRV for NoRV {
@@ -275,6 +280,11 @@ impl MaybeRV for NoRV {
     #[cfg(test)]
     fn weight() -> u32 {
         0
+    }
+
+    #[cfg(test)]
+    fn arb() -> BoxedStrategy<Self> {
+        any::<usize>().prop_map(|_| panic!("Should be ruled out by weight==0")).boxed()
     }
 }
 
@@ -708,7 +718,7 @@ pub(crate) mod test {
 
         use crate::types::{CustomType, FunctionTypeRV, SumType, TypeRowRV};
         use ::proptest::prelude::*;
-        use super::{AliasDecl, MaybeRV, NoRV, TypeBase, TypeBound, TypeEnum};
+        use super::{AliasDecl, MaybeRV, TypeBase, TypeBound, TypeEnum};
 
         impl Arbitrary for super::SumType {
             type Parameters = RecursionDepth;
@@ -724,18 +734,8 @@ pub(crate) mod test {
                 }
             }
         }
-
-        impl Arbitrary for NoRV {
-            type Parameters = ();
         
-            fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-                panic!("Should be ruled out by weight==0")
-            }
-        
-            type Strategy = BoxedStrategy<Self>;
-        }
-        
-        impl<RV: MaybeRV + Arbitrary> Arbitrary for TypeBase<RV> {
+        impl<RV: MaybeRV> Arbitrary for TypeBase<RV> {
             type Parameters = RecursionDepth;
             type Strategy = BoxedStrategy<Self>;
             fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
@@ -749,7 +749,7 @@ pub(crate) mod test {
                     1 => (any::<usize>(), any::<TypeBound>()).prop_map(|(i,b)| TypeBase::new_var_use(i,b)),
                     // proptest_derive::Arbitrary's weight attribute requires a constant,
                     // rather than this expression, hence the manual impl:
-                    RV::weight() => any::<RV>().prop_map(|rv| TypeBase::new(TypeEnum::RowVar(rv)))
+                    RV::weight() => RV::arb().prop_map(|rv| TypeBase::new(TypeEnum::RowVar(rv)))
                 ]
                     .boxed()
             }
