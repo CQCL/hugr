@@ -708,7 +708,7 @@ pub(crate) mod test {
 
         use crate::types::{CustomType, FunctionTypeRV, SumType, TypeRowRV};
         use ::proptest::prelude::*;
-        use super::{AliasDecl, MaybeRV, NoRV, TypeBase, TypeBound};
+        use super::{AliasDecl, MaybeRV, NoRV, TypeBase, TypeBound, TypeEnum};
 
         impl Arbitrary for super::SumType {
             type Parameters = RecursionDepth;
@@ -735,18 +735,21 @@ pub(crate) mod test {
             type Strategy = BoxedStrategy<Self>;
         }
         
-        impl<RV: MaybeRV> Arbitrary for TypeBase<RV> {
+        impl<RV: MaybeRV + Arbitrary> Arbitrary for TypeBase<RV> {
             type Parameters = RecursionDepth;
             type Strategy = BoxedStrategy<Self>;
             fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
                 // We descend here, because a TypeEnum may contain a Type
                 let depth = depth.descend();
                 prop_oneof![
-                    any::<AliasDecl>().prop_map(TypeBase::new_alias),
-                    any_with::<CustomType>(depth.into()).prop_map(TypeBase::new_extension),
-                    any_with::<FunctionTypeRV>(depth).prop_map(TypeBase::new_function),
-                    any_with::<SumType>(depth).prop_map(TypeBase::from),
-                    (any::<usize>(), any::<TypeBound>()).prop_map(|(i,b)| TypeBase::new_var_use(i,b))
+                    1 => any::<AliasDecl>().prop_map(TypeBase::new_alias),
+                    1 => any_with::<CustomType>(depth.into()).prop_map(TypeBase::new_extension),
+                    1 => any_with::<FunctionTypeRV>(depth).prop_map(TypeBase::new_function),
+                    1 => any_with::<SumType>(depth).prop_map(TypeBase::from),
+                    1 => (any::<usize>(), any::<TypeBound>()).prop_map(|(i,b)| TypeBase::new_var_use(i,b)),
+                    // proptest_derive::Arbitrary's weight attribute requires a constant,
+                    // rather than this expression, hence the manual impl:
+                    RV::weight() => any::<RV>().prop_map(|rv| TypeBase::new(TypeEnum::RowVar(rv)))
                 ]
                     .boxed()
             }
