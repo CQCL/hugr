@@ -8,7 +8,6 @@ from hugr.utils import ser_it
 import hugr.tys as tys
 from hugr.node_port import Node, InPort, OutPort, Wire
 import hugr.val as val
-from .exceptions import IncompleteOp
 
 
 @dataclass
@@ -65,6 +64,28 @@ class PartialOp(Protocol):
     def set_in_types(self, types: tys.TypeRow) -> None: ...
 
 
+@dataclass
+class IncompleteOp(Exception):
+    """Op types have not been set during building."""
+
+    op: Op
+
+    @property
+    def msg(self) -> str:
+        return (
+            f"Operation {self.op} is incomplete, may require set_in_types to be called."
+        )
+
+
+V = TypeVar("V")
+
+
+def _check_complete(op, v: V | None) -> V:
+    if v is None:
+        raise IncompleteOp(op)
+    return v
+
+
 @dataclass(frozen=True)
 class Command:
     op: DataflowOp
@@ -89,15 +110,6 @@ class Input(DataflowOp):
         return super().__call__()
 
 
-V = TypeVar("V")
-
-
-def _check_complete(v: V | None) -> V:
-    if v is None:
-        raise IncompleteOp()
-    return v
-
-
 @dataclass()
 class Output(DataflowOp, PartialOp):
     _types: tys.TypeRow | None = None
@@ -105,7 +117,7 @@ class Output(DataflowOp, PartialOp):
 
     @property
     def types(self) -> tys.TypeRow:
-        return _check_complete(self._types)
+        return _check_complete(self, self._types)
 
     def to_serial(self, parent: Node) -> sops.Output:
         return sops.Output(parent=parent.idx, types=ser_it(self.types))
@@ -150,7 +162,7 @@ class MakeTupleDef(DataflowOp, PartialOp):
 
     @property
     def types(self) -> tys.TypeRow:
-        return _check_complete(self._types)
+        return _check_complete(self, self._types)
 
     def to_serial(self, parent: Node) -> sops.MakeTuple:
         return sops.MakeTuple(
@@ -177,7 +189,7 @@ class UnpackTupleDef(DataflowOp, PartialOp):
 
     @property
     def types(self) -> tys.TypeRow:
-        return _check_complete(self._types)
+        return _check_complete(self, self._types)
 
     @property
     def num_out(self) -> int:
@@ -240,7 +252,7 @@ class DFG(DfParentOp, DataflowOp):
 
     @property
     def outputs(self) -> tys.TypeRow:
-        return _check_complete(self._outputs)
+        return _check_complete(self, self._outputs)
 
     @property
     def signature(self) -> tys.FunctionType:
@@ -276,7 +288,7 @@ class CFG(DataflowOp):
 
     @property
     def outputs(self) -> tys.TypeRow:
-        return _check_complete(self._outputs)
+        return _check_complete(self, self._outputs)
 
     @property
     def signature(self) -> tys.FunctionType:
@@ -305,11 +317,11 @@ class DataflowBlock(DfParentOp):
 
     @property
     def sum_ty(self) -> tys.Sum:
-        return _check_complete(self._sum)
+        return _check_complete(self, self._sum)
 
     @property
     def other_outputs(self) -> tys.TypeRow:
-        return _check_complete(self._other_outputs)
+        return _check_complete(self, self._other_outputs)
 
     @property
     def num_out(self) -> int:
@@ -351,7 +363,7 @@ class ExitBlock(Op):
 
     @property
     def cfg_outputs(self) -> tys.TypeRow:
-        return _check_complete(self._cfg_outputs)
+        return _check_complete(self, self._cfg_outputs)
 
     def to_serial(self, parent: Node) -> sops.ExitBlock:
         return sops.ExitBlock(
@@ -388,7 +400,7 @@ class LoadConst(DataflowOp):
     num_out: int = 1
 
     def type_(self) -> tys.Type:
-        return _check_complete(self.typ)
+        return _check_complete(self, self.typ)
 
     def to_serial(self, parent: Node) -> sops.LoadConstant:
         return sops.LoadConstant(
@@ -417,7 +429,7 @@ class Conditional(DataflowOp):
 
     @property
     def outputs(self) -> tys.TypeRow:
-        return _check_complete(self._outputs)
+        return _check_complete(self, self._outputs)
 
     @property
     def signature(self) -> tys.FunctionType:
@@ -451,7 +463,7 @@ class Case(DfParentOp):
 
     @property
     def outputs(self) -> tys.TypeRow:
-        return _check_complete(self._outputs)
+        return _check_complete(self, self._outputs)
 
     def to_serial(self, parent: Node) -> sops.Case:
         return sops.Case(
@@ -480,7 +492,7 @@ class TailLoop(DfParentOp, DataflowOp):
 
     @property
     def just_outputs(self) -> tys.TypeRow:
-        return _check_complete(self._just_outputs)
+        return _check_complete(self, self._just_outputs)
 
     @property
     def num_out(self) -> int:
@@ -525,7 +537,7 @@ class FuncDefn(DfParentOp):
 
     @property
     def outputs(self) -> tys.TypeRow:
-        return _check_complete(self._outputs)
+        return _check_complete(self, self._outputs)
 
     @property
     def signature(self) -> tys.PolyFuncType:
@@ -662,7 +674,7 @@ class CallIndirectDef(DataflowOp, PartialOp):
 
     @property
     def signature(self) -> tys.FunctionType:
-        return _check_complete(self._signature)
+        return _check_complete(self, self._signature)
 
     def to_serial(self, parent: Node) -> sops.CallIndirect:
         return sops.CallIndirect(
@@ -736,7 +748,7 @@ class NoopDef(DataflowOp, PartialOp):
 
     @property
     def type_(self) -> tys.Type:
-        return _check_complete(self._type)
+        return _check_complete(self, self._type)
 
     def to_serial(self, parent: Node) -> sops.Noop:
         return sops.Noop(parent=parent.idx, ty=self.type_.to_serial_root())
@@ -760,7 +772,7 @@ class Lift(DataflowOp, PartialOp):
 
     @property
     def type_row(self) -> tys.TypeRow:
-        return _check_complete(self._type_row)
+        return _check_complete(self, self._type_row)
 
     def to_serial(self, parent: Node) -> sops.Lift:
         return sops.Lift(
