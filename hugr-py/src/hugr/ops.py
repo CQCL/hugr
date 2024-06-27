@@ -16,11 +16,14 @@ if TYPE_CHECKING:
 
 @dataclass
 class InvalidPort(Exception):
+    """Port is not valid for this operation."""
+
     port: InPort | OutPort
+    op: Op
 
     @property
     def msg(self) -> str:
-        return f"Invalid port {self.port}"
+        return f"Port {self.port} is invalid for operation {self.op}."
 
 
 @runtime_checkable
@@ -32,6 +35,9 @@ class Op(Protocol):
     def to_serial(self, node: Node, parent: Node, hugr: Hugr) -> BaseOp: ...
 
     def port_kind(self, port: InPort | OutPort) -> tys.Kind: ...
+
+    def _invalid_port(self, port: InPort | OutPort) -> InvalidPort:
+        return InvalidPort(port, self)
 
 
 def _sig_port_type(sig: tys.FunctionType, port: InPort | OutPort) -> tys.Type:
@@ -376,7 +382,7 @@ class Const(Op):
             case OutPort(_, 0):
                 return tys.ConstKind(self.val.type_())
             case _:
-                raise InvalidPort(port)
+                raise self._invalid_port(port)
 
 
 @dataclass
@@ -403,7 +409,7 @@ class LoadConst(DataflowOp):
             case OutPort(_, 0):
                 return tys.ValueKind(self.type_())
             case _:
-                raise InvalidPort(port)
+                raise self._invalid_port(port)
 
 
 @dataclass()
@@ -459,7 +465,7 @@ class Case(DfParentOp):
         return tys.FunctionType(self.inputs, self.outputs)
 
     def port_kind(self, port: InPort | OutPort) -> tys.Kind:
-        raise InvalidPort(port)
+        raise self._invalid_port(port)
 
     def _set_out_types(self, types: tys.TypeRow) -> None:
         self._outputs = types
@@ -551,7 +557,7 @@ class FuncDefn(DfParentOp):
             case OutPort(_, 0):
                 return tys.FunctionKind(self.signature)
             case _:
-                raise InvalidPort(port)
+                raise self._invalid_port(port)
 
 
 @dataclass
@@ -572,7 +578,7 @@ class FuncDecl(Op):
             case OutPort(_, 0):
                 return tys.FunctionKind(self.signature)
             case _:
-                raise InvalidPort(port)
+                raise self._invalid_port(port)
 
 
 @dataclass
@@ -583,7 +589,7 @@ class Module(Op):
         return sops.Module(parent=parent.idx)
 
     def port_kind(self, port: InPort | OutPort) -> tys.Kind:
-        raise InvalidPort(port)
+        raise self._invalid_port(port)
 
 
 class NoConcreteFunc(Exception):
@@ -723,7 +729,7 @@ class LoadFunc(DataflowOp):
             case OutPort(_, 0):
                 return tys.ValueKind(self.instantiation)
             case _:
-                raise InvalidPort(port)
+                raise self._invalid_port(port)
 
 
 @dataclass
@@ -787,7 +793,7 @@ class AliasDecl(Op):
         )
 
     def port_kind(self, port: InPort | OutPort) -> tys.Kind:
-        raise InvalidPort(port)
+        raise self._invalid_port(port)
 
 
 @dataclass
@@ -804,4 +810,4 @@ class AliasDefn(Op):
         )
 
     def port_kind(self, port: InPort | OutPort) -> tys.Kind:
-        raise InvalidPort(port)
+        raise self._invalid_port(port)
