@@ -1,3 +1,5 @@
+"""Definitions of HUGR operations."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -6,7 +8,7 @@ from hugr.serialization.ops import BaseOp
 import hugr.serialization.ops as sops
 from hugr.utils import ser_it
 import hugr.tys as tys
-from hugr.node_port import Node, InPort, OutPort, Wire
+from hugr.node_port import Node, InPort, OutPort, Wire, Direction
 import hugr.val as val
 
 
@@ -24,20 +26,38 @@ class InvalidPort(Exception):
 
 @runtime_checkable
 class Op(Protocol):
+    """An abstract HUGR operation. Must be convertible to a serialisable :class:`BaseOp`."""
+
     @property
-    def num_out(self) -> int: ...
+    def num_out(self) -> int:
+        """The number of output ports for this operation
 
-    def to_serial(self, parent: Node) -> BaseOp: ...
+        Example:
+            >>> op = Const(val.TRUE)
+            >>> op.num_out
+            1
+        """
+        ...  # pragma: no cover
 
-    def port_kind(self, port: InPort | OutPort) -> tys.Kind: ...
+    def to_serial(self, parent: Node) -> BaseOp:
+        """Convert this operation to a serialisable form."""
+        ...  # pragma: no cover
+
+    def port_kind(self, port: InPort | OutPort) -> tys.Kind:
+        """Get the kind of the given port.
+
+        Example:
+            >>> op = Const(val.TRUE)
+            >>> op.port_kind(OutPort(Node(0), 0))
+            ConstKind(ty=Bool)
+        """
+        ...  # pragma: no cover
 
     def _invalid_port(self, port: InPort | OutPort) -> InvalidPort:
         return InvalidPort(port, self)
 
 
 def _sig_port_type(sig: tys.FunctionType, port: InPort | OutPort) -> tys.Type:
-    from hugr.node_port import Direction
-
     if port.direction == Direction.INCOMING:
         return sig.input[port.offset]
     return sig.output[port.offset]
@@ -45,7 +65,13 @@ def _sig_port_type(sig: tys.FunctionType, port: InPort | OutPort) -> tys.Type:
 
 @runtime_checkable
 class DataflowOp(Op, Protocol):
-    def outer_signature(self) -> tys.FunctionType: ...
+    """Abstract dataflow operation, can be assumed to have a signature and Value
+    kind ports."""
+
+    def outer_signature(self) -> tys.FunctionType:
+        """The external signature of this operation, defines the valid external
+        connectivity of the node the operation belongs to."""
+        ...  # pragma: no cover
 
     def port_kind(self, port: InPort | OutPort) -> tys.Kind:
         if port.offset == -1:
@@ -53,15 +79,27 @@ class DataflowOp(Op, Protocol):
         return tys.ValueKind(self.port_type(port))
 
     def port_type(self, port: InPort | OutPort) -> tys.Type:
+        """Get the type of the given dataflow port from the signature of the
+        operation.
+
+        Example:
+            >>> op = Input([tys.Bool])
+            >>> op.port_type(OutPort(Node(0), 0))
+            Bool
+
+        """
         return _sig_port_type(self.outer_signature(), port)
 
     def __call__(self, *args) -> Command:
+        """Calling with incoming :class:`Wire` arguments returns a
+        :class:`Command` which can be used to wire in the operation in to a
+        dataflow graph."""
         return Command(self, list(args))
 
 
 @runtime_checkable
 class _PartialOp(Protocol):
-    def set_in_types(self, types: tys.TypeRow) -> None: ...
+    def _set_in_types(self, types: tys.TypeRow) -> None: ...
 
 
 @dataclass
@@ -88,12 +126,23 @@ def _check_complete(op, v: V | None) -> V:
 
 @dataclass(frozen=True)
 class Command:
+    """A :class:`DataflowOp` and its incoming :class:`Wire <hugr.nodeport.Wire>` arguments.
+    Ephermeral, used to wire in operations to a dataflow graph.
+
+    Example:
+        >>> Noop(Node(0).out(0))
+        Command(op=Noop, incoming=[OutPort(Node(0), 0)])
+    """
+
     op: DataflowOp
     incoming: list[Wire]
 
 
 @dataclass()
 class Input(DataflowOp):
+    """Input operation in dataflow graph. Outputs of this operation are the
+    inputs to the graph."""
+
     types: tys.TypeRow
 
     @property
@@ -112,8 +161,11 @@ class Input(DataflowOp):
 
 @dataclass()
 class Output(DataflowOp, _PartialOp):
+    """Output operation in dataflow graph. Inputs of this operation are the
+    outputs of the graph."""
+
     _types: tys.TypeRow | None = None
-    num_out: int = 0
+    num_out: int = field(default=0, repr=False)
 
     @property
     def types(self) -> tys.TypeRow:
@@ -125,12 +177,14 @@ class Output(DataflowOp, _PartialOp):
     def outer_signature(self) -> tys.FunctionType:
         return tys.FunctionType(input=self.types, output=[])
 
-    def set_in_types(self, types: tys.TypeRow) -> None:
+    def _set_in_types(self, types: tys.TypeRow) -> None:
         self._types = types
 
 
 @dataclass()
 class Custom(DataflowOp):
+    """A non-core dataflow operation defined in an extension."""
+
     op_name: str
     signature: tys.FunctionType = field(default_factory=tys.FunctionType.empty)
     description: str = ""
@@ -157,11 +211,18 @@ class Custom(DataflowOp):
 
 @dataclass()
 class MakeTupleDef(DataflowOp, _PartialOp):
+    """Operation to create a tuple from a sequence of wires."""
+
     _types: tys.TypeRow | None = None
-    num_out: int = 1
+    num_out: int = field(default=1, repr=False)
 
     @property
     def types(self) -> tys.TypeRow:
+        """If set, the types of the tuple elements.
+
+        Raises:
+            IncompleteOp: If the types have not been set.
+        """
         return _check_complete(self, self._types)
 
     def to_serial(self, parent: Node) -> sops.MakeTuple:
@@ -176,19 +237,30 @@ class MakeTupleDef(DataflowOp, _PartialOp):
     def outer_signature(self) -> tys.FunctionType:
         return tys.FunctionType(input=self.types, output=[tys.Tuple(*self.types)])
 
-    def set_in_types(self, types: tys.TypeRow) -> None:
+    def _set_in_types(self, types: tys.TypeRow) -> None:
         self._types = types
 
+    def __repr__(self) -> str:
+        return "MakeTuple" + (f"({self._types})" if self._types is not None else "")
 
+
+#: See :class:`MakeTupleDef`.
 MakeTuple = MakeTupleDef()
 
 
 @dataclass()
 class UnpackTupleDef(DataflowOp, _PartialOp):
+    """Operation to unpack a tuple into its elements."""
+
     _types: tys.TypeRow | None = None
 
     @property
     def types(self) -> tys.TypeRow:
+        """If set, the types of the tuple elements.
+
+        Raises:
+            IncompleteOp: If the types have not been set.
+        """
         return _check_complete(self, self._types)
 
     @property
@@ -207,21 +279,28 @@ class UnpackTupleDef(DataflowOp, _PartialOp):
     def outer_signature(self) -> tys.FunctionType:
         return MakeTupleDef(self.types).outer_signature().flip()
 
-    def set_in_types(self, types: tys.TypeRow) -> None:
+    def _set_in_types(self, types: tys.TypeRow) -> None:
         (t,) = types
         assert isinstance(t, tys.Sum), f"Expected unary Sum, got {t}"
         (row,) = t.variant_rows
         self._types = row
 
 
+#: See :class:`UnpackTupleDef`.
 UnpackTuple = UnpackTupleDef()
 
 
 @dataclass()
 class Tag(DataflowOp):
+    """Tag a row of incoming values to make them a variant of a sum type.
+
+    Requires `sum_ty` to be set as all the variants cannot be extracted from
+    just the input wires for one variant.
+    """
+
     tag: int
     sum_ty: tys.Sum
-    num_out: int = 1
+    num_out: int = field(default=1, repr=False)
 
     def to_serial(self, parent: Node) -> sops.Tag:
         return sops.Tag(
@@ -237,7 +316,12 @@ class Tag(DataflowOp):
 
 
 class DfParentOp(Op, Protocol):
-    def inner_signature(self) -> tys.FunctionType: ...
+    """Abstract parent of dataflow graph operations. Can be queried for the
+    dataflow signature of their child graph."""
+
+    def inner_signature(self) -> tys.FunctionType:
+        """Inner signature of the child dataflow graph."""
+        ...  # pragma: no cover
 
     def _set_out_types(self, types: tys.TypeRow) -> None: ...
 
@@ -246,16 +330,29 @@ class DfParentOp(Op, Protocol):
 
 @dataclass
 class DFG(DfParentOp, DataflowOp):
+    """Simple dataflow graph operation. Outer signature matches inner signature."""
+
+    #: Inputs types of the operation.
     inputs: tys.TypeRow
     _outputs: tys.TypeRow | None = None
-    extension_delta: tys.ExtensionSet = field(default_factory=list)
+    extension_delta: tys.ExtensionSet = field(default_factory=list, repr=False)
 
     @property
     def outputs(self) -> tys.TypeRow:
+        """Output types of the operation.
+
+        Raises:
+            IncompleteOp: If the outputs have not been set.
+        """
         return _check_complete(self, self._outputs)
 
     @property
     def signature(self) -> tys.FunctionType:
+        """Signature of the operation.
+
+        Raises:
+            IncompleteOp: If the outputs have not been set.
+        """
         return tys.FunctionType(self.inputs, self.outputs, self.extension_delta)
 
     @property
@@ -283,15 +380,28 @@ class DFG(DfParentOp, DataflowOp):
 
 @dataclass()
 class CFG(DataflowOp):
+    """Parent operation of a control flow graph."""
+
+    #: Inputs types of the operation.
     inputs: tys.TypeRow
     _outputs: tys.TypeRow | None = None
 
     @property
     def outputs(self) -> tys.TypeRow:
+        """Output types of the operation, if set.
+
+        Raises:
+            IncompleteOp: If the outputs have not been set.
+        """
         return _check_complete(self, self._outputs)
 
     @property
     def signature(self) -> tys.FunctionType:
+        """Dataflow signature of the CFG operation.
+
+        Raises:
+            IncompleteOp: If the outputs have not been set.
+        """
         return tys.FunctionType(self.inputs, self.outputs)
 
     @property
@@ -310,6 +420,9 @@ class CFG(DataflowOp):
 
 @dataclass
 class DataflowBlock(DfParentOp):
+    """Parent of Non-entry basic block in a control flow graph."""
+
+    #: Inputs types of the innner dataflow graph.
     inputs: tys.TypeRow
     _sum: tys.Sum | None = None
     _other_outputs: tys.TypeRow | None = None
@@ -317,10 +430,23 @@ class DataflowBlock(DfParentOp):
 
     @property
     def sum_ty(self) -> tys.Sum:
+        """If set, the sum type that defines the potential branching of the
+        block.
+
+
+        Raises:
+            IncompleteOp: If the sum type has not been set.
+        """
         return _check_complete(self, self._sum)
 
     @property
     def other_outputs(self) -> tys.TypeRow:
+        """The non-branching outputs of the block which are passed to all
+        successors.
+
+        Raises:
+            IncompleteOp: If the outputs have not been set.
+        """
         return _check_complete(self, self._other_outputs)
 
     @property
@@ -353,16 +479,25 @@ class DataflowBlock(DfParentOp):
         return self.inputs
 
     def nth_outputs(self, n: int) -> tys.TypeRow:
+        """The outputs passed to the `n`th successor of the block.
+        Concatenation of the `n`th variant of the sum type and the other outputs."""
         return [*self.sum_ty.variant_rows[n], *self.other_outputs]
 
 
 @dataclass
 class ExitBlock(Op):
+    """Unique exit block of a control flow graph."""
+
     _cfg_outputs: tys.TypeRow | None = None
-    num_out: int = 0
+    num_out: int = field(default=0, repr=False)
 
     @property
     def cfg_outputs(self) -> tys.TypeRow:
+        """Output types of the parent control flow graph of this exit block.
+
+        Raises:
+            IncompleteOp: If the outputs have not been set.
+        """
         return _check_complete(self, self._cfg_outputs)
 
     def to_serial(self, parent: Node) -> sops.ExitBlock:
@@ -377,8 +512,11 @@ class ExitBlock(Op):
 
 @dataclass
 class Const(Op):
+    """A static constant value. Can be used with a :class:`LoadConst` to load in
+    to a dataflow graph."""
+
     val: val.Value
-    num_out: int = 1
+    num_out: int = field(default=1, repr=False)
 
     def to_serial(self, parent: Node) -> sops.Const:
         return sops.Const(
@@ -393,46 +531,72 @@ class Const(Op):
             case _:
                 raise self._invalid_port(port)
 
+    def __repr__(self) -> str:
+        return f"Const({self.val})"
+
 
 @dataclass
 class LoadConst(DataflowOp):
-    typ: tys.Type | None = None
-    num_out: int = 1
+    """Load a constant value into a dataflow graph. Connects to a :class:`Const`."""
 
+    _typ: tys.Type | None = None
+    num_out: int = field(default=1, repr=False)
+
+    @property
     def type_(self) -> tys.Type:
-        return _check_complete(self, self.typ)
+        """The type of the loaded value.
+
+        Raises:
+            IncompleteOp: If the type has not been set.
+        """
+        return _check_complete(self, self._typ)
 
     def to_serial(self, parent: Node) -> sops.LoadConstant:
         return sops.LoadConstant(
             parent=parent.idx,
-            datatype=self.type_().to_serial_root(),
+            datatype=self.type_.to_serial_root(),
         )
 
     def outer_signature(self) -> tys.FunctionType:
-        return tys.FunctionType(input=[], output=[self.type_()])
+        return tys.FunctionType(input=[], output=[self.type_])
 
     def port_kind(self, port: InPort | OutPort) -> tys.Kind:
         match port:
             case InPort(_, 0):
-                return tys.ConstKind(self.type_())
+                return tys.ConstKind(self.type_)
             case OutPort(_, 0):
-                return tys.ValueKind(self.type_())
+                return tys.ValueKind(self.type_)
             case _:
                 raise self._invalid_port(port)
 
 
 @dataclass()
 class Conditional(DataflowOp):
+    """Switch on the variants of an incoming sum type, evaluating the
+    corresponding one of the child :class:`Case` operations."""
+
+    #: Sum type to switch on.
     sum_ty: tys.Sum
+    #: Non-sum inputs that are passed to all cases.
     other_inputs: tys.TypeRow
     _outputs: tys.TypeRow | None = None
 
     @property
     def outputs(self) -> tys.TypeRow:
+        """Outputs of the conditional, common to all cases.
+
+        Raises:
+            IncompleteOp: If the outputs have not been set.
+        """
         return _check_complete(self, self._outputs)
 
     @property
     def signature(self) -> tys.FunctionType:
+        """Dataflow signature of the conditional operation.
+
+        Raises:
+            IncompleteOp: If the outputs have not been set.
+        """
         inputs = [self.sum_ty, *self.other_inputs]
         return tys.FunctionType(inputs, self.outputs)
 
@@ -452,17 +616,27 @@ class Conditional(DataflowOp):
         return self.signature
 
     def nth_inputs(self, n: int) -> tys.TypeRow:
+        """The inputs passed to the `n`th child case.
+        Concatenation of the `n`th variant of the sum type and the other inputs."""
         return [*self.sum_ty.variant_rows[n], *self.other_inputs]
 
 
 @dataclass
 class Case(DfParentOp):
+    """Parent of a dataflow graph that is a branch of a :class:`Conditional`."""
+
+    #: Inputs types of the innner dataflow graph.
     inputs: tys.TypeRow
     _outputs: tys.TypeRow | None = None
-    num_out: int = 0
+    num_out: int = field(default=0, repr=False)
 
     @property
     def outputs(self) -> tys.TypeRow:
+        """Outputs of the case operation.
+
+        Raises:
+            IncompleteOp: If the outputs have not been set.
+        """
         return _check_complete(self, self._outputs)
 
     def to_serial(self, parent: Node) -> sops.Case:
@@ -485,13 +659,23 @@ class Case(DfParentOp):
 
 @dataclass
 class TailLoop(DfParentOp, DataflowOp):
+    """Tail controlled loop operation, child dataflow graph iterates while it
+    outputs the first variant of a sum type."""
+
+    #: Types that are only inputs of the child graph.
     just_inputs: tys.TypeRow
+    #: Types that are appended to both inputs and outputs of the graph.
     rest: tys.TypeRow
     _just_outputs: tys.TypeRow | None = None
     extension_delta: tys.ExtensionSet = field(default_factory=list)
 
     @property
     def just_outputs(self) -> tys.TypeRow:
+        """Types that are only outputs of the child graph.
+
+        Raises:
+            IncompleteOp: If the outputs have not been set.
+        """
         return _check_complete(self, self._just_outputs)
 
     @property
@@ -529,18 +713,34 @@ class TailLoop(DfParentOp, DataflowOp):
 
 @dataclass
 class FuncDefn(DfParentOp):
+    """Function definition operation, parent of a dataflow graph that defines
+    the function."""
+
+    #: function name
     name: str
+    #: input types of the function
     inputs: tys.TypeRow
+    # ? type parameters of the function if polymorphic
     params: list[tys.TypeParam] = field(default_factory=list)
     _outputs: tys.TypeRow | None = None
-    num_out: int = 1
+    num_out: int = field(default=1, repr=False)
 
     @property
     def outputs(self) -> tys.TypeRow:
+        """Output types of the function.
+
+        Raises:
+            IncompleteOp: If the outputs have not been set.
+        """
         return _check_complete(self, self._outputs)
 
     @property
     def signature(self) -> tys.PolyFuncType:
+        """Polymorphic signature of the function.
+
+        Raises:
+            IncompleteOp: If the outputs have not been set.
+        """
         return tys.PolyFuncType(
             self.params, tys.FunctionType(self.inputs, self.outputs)
         )
@@ -571,9 +771,13 @@ class FuncDefn(DfParentOp):
 
 @dataclass
 class FuncDecl(Op):
+    """Function declaration operation, defines the signature of a function."""
+
+    #: function name
     name: str
+    #: polymorphic function signature
     signature: tys.PolyFuncType
-    num_out: int = 0
+    num_out: int = field(default=1, repr=False)
 
     def to_serial(self, parent: Node) -> sops.FuncDecl:
         return sops.FuncDecl(
@@ -592,7 +796,9 @@ class FuncDecl(Op):
 
 @dataclass
 class Module(Op):
-    num_out: int = 0
+    """Root operation of a HUGR which corresponds to a full module definition."""
+
+    num_out: int = field(default=0, repr=False)
 
     def to_serial(self, parent: Node) -> sops.Module:
         return sops.Module(parent=parent.idx)
@@ -602,32 +808,18 @@ class Module(Op):
 
 
 class NoConcreteFunc(Exception):
+    """Could not instantiate a polymorphic function."""
+
     pass
 
 
-def _fn_instantiation(
-    signature: tys.PolyFuncType,
-    instantiation: tys.FunctionType | None = None,
-    type_args: Sequence[tys.TypeArg] | None = None,
-) -> tuple[tys.FunctionType, list[tys.TypeArg]]:
-    if len(signature.params) == 0:
-        return signature.body, []
-
-    else:
-        # TODO substitute type args into signature to get instantiation
-        if instantiation is None:
-            raise NoConcreteFunc("Missing instantiation for polymorphic function.")
-        type_args = type_args or []
-
-        if len(signature.params) != len(type_args):
-            raise NoConcreteFunc("Mismatched number of type arguments.")
-        return instantiation, list(type_args)
-
-
 @dataclass
-class Call(Op):
+class _CallOrLoad:
+    #: polymorphic function signature
     signature: tys.PolyFuncType
+    #: concrete function signature
     instantiation: tys.FunctionType
+    #: type arguments for polymorphic function
     type_args: list[tys.TypeArg]
 
     def __init__(
@@ -637,9 +829,36 @@ class Call(Op):
         type_args: Sequence[tys.TypeArg] | None = None,
     ) -> None:
         self.signature = signature
-        self.instantiation, self.type_args = _fn_instantiation(
-            signature, instantiation, type_args
-        )
+
+        if len(signature.params) == 0:
+            self.instantiation = signature.body
+            self.type_args = []
+
+        else:
+            # TODO substitute type args into signature to get instantiation
+            if instantiation is None:
+                raise NoConcreteFunc("Missing instantiation for polymorphic function.")
+            type_args = type_args or []
+
+            if len(signature.params) != len(type_args):
+                raise NoConcreteFunc("Mismatched number of type arguments.")
+            self.instantiation = instantiation
+            self.type_args = list(type_args)
+
+
+class Call(_CallOrLoad, Op):
+    """Call a function inside a dataflow graph. Connects to :class:`FuncDefn` or
+    :class:`FuncDecl` operations
+
+    Args:
+        signature: Polymorphic function signature.
+        instantiation: Concrete function signature. Defaults to None.
+        type_args: type arguments for polymorphic funciton. Defaults to None.
+
+    Raises:
+        NoConcreteFunc: If the signature is polymorphic and no instantiation
+            is provided.
+    """
 
     def to_serial(self, parent: Node) -> sops.Call:
         return sops.Call(
@@ -653,12 +872,12 @@ class Call(Op):
     def num_out(self) -> int:
         return len(self.signature.body.output)
 
-    def function_port_offset(self) -> int:
+    def _function_port_offset(self) -> int:
         return len(self.signature.body.input)
 
     def port_kind(self, port: InPort | OutPort) -> tys.Kind:
         match port:
-            case InPort(_, offset) if offset == self.function_port_offset():
+            case InPort(_, offset) if offset == self._function_port_offset():
                 return tys.FunctionKind(self.signature)
             case _:
                 return tys.ValueKind(_sig_port_type(self.instantiation, port))
@@ -666,6 +885,8 @@ class Call(Op):
 
 @dataclass()
 class CallIndirectDef(DataflowOp, _PartialOp):
+    """Higher order evaluation of a :class:`FunctionType <hugr.tys.FunctionType>` value."""
+
     _signature: tys.FunctionType | None = None
 
     @property
@@ -674,6 +895,10 @@ class CallIndirectDef(DataflowOp, _PartialOp):
 
     @property
     def signature(self) -> tys.FunctionType:
+        """The signature of the function being called.
+
+        Raises:
+            IncompleteOp: If the signature has not been set."""
         return _check_complete(self, self._signature)
 
     def to_serial(self, parent: Node) -> sops.CallIndirect:
@@ -690,7 +915,7 @@ class CallIndirectDef(DataflowOp, _PartialOp):
 
         return tys.FunctionType(input=[sig, *sig.input], output=sig.output)
 
-    def set_in_types(self, types: tys.TypeRow) -> None:
+    def _set_in_types(self, types: tys.TypeRow) -> None:
         func_sig, *_ = types
         assert isinstance(
             func_sig, tys.FunctionType
@@ -698,27 +923,25 @@ class CallIndirectDef(DataflowOp, _PartialOp):
         self._signature = func_sig
 
 
-# rename to eval?
+#: See :class:`CallIndirectDef`.
 CallIndirect = CallIndirectDef()
 
 
-@dataclass
-class LoadFunc(DataflowOp):
-    signature: tys.PolyFuncType
-    instantiation: tys.FunctionType
-    type_args: list[tys.TypeArg]
-    num_out: int = 1
+class LoadFunc(_CallOrLoad, DataflowOp):
+    """Load a statically defined function as a higher order value. Connects to :class:`FuncDefn` or
+    :class:`FuncDecl` operations.
 
-    def __init__(
-        self,
-        signature: tys.PolyFuncType,
-        instantiation: tys.FunctionType | None = None,
-        type_args: Sequence[tys.TypeArg] | None = None,
-    ) -> None:
-        self.signature = signature
-        self.instantiation, self.type_args = _fn_instantiation(
-            signature, instantiation, type_args
-        )
+    Args:
+        signature: Polymorphic function signature.
+        instantiation: Concrete function signature. Defaults to None.
+        type_args: type arguments for polymorphic funciton. Defaults to None.
+
+    Raises:
+        NoConcreteFunc: If the signature is polymorphic and no instantiation
+            is provided.
+    """
+
+    num_out: int = field(default=1, repr=False)
 
     def to_serial(self, parent: Node) -> sops.LoadFunction:
         return sops.LoadFunction(
@@ -743,11 +966,14 @@ class LoadFunc(DataflowOp):
 
 @dataclass
 class NoopDef(DataflowOp, _PartialOp):
+    """Identity operation that passes through its input."""
+
     _type: tys.Type | None = None
-    num_out: int = 1
+    num_out: int = field(default=1, repr=False)
 
     @property
     def type_(self) -> tys.Type:
+        """The type of the input and output of the operation."""
         return _check_complete(self, self._type)
 
     def to_serial(self, parent: Node) -> sops.Noop:
@@ -756,22 +982,30 @@ class NoopDef(DataflowOp, _PartialOp):
     def outer_signature(self) -> tys.FunctionType:
         return tys.FunctionType.endo([self.type_])
 
-    def set_in_types(self, types: tys.TypeRow) -> None:
+    def _set_in_types(self, types: tys.TypeRow) -> None:
         (t,) = types
         self._type = t
 
+    def __repr__(self) -> str:
+        return "Noop" + (f"({self._type})" if self._type is not None else "")
 
+
+#: See :class:`NoopDef`.
 Noop = NoopDef()
 
 
 @dataclass
 class Lift(DataflowOp, _PartialOp):
+    """Add an extension requirement to input values and pass them through."""
+
+    #: Extension added.
     new_extension: tys.ExtensionId
     _type_row: tys.TypeRow | None = None
-    num_out: int = 1
+    num_out: int = field(default=1, repr=False)
 
     @property
     def type_row(self) -> tys.TypeRow:
+        """Types of the input and output of the operation."""
         return _check_complete(self, self._type_row)
 
     def to_serial(self, parent: Node) -> sops.Lift:
@@ -784,15 +1018,19 @@ class Lift(DataflowOp, _PartialOp):
     def outer_signature(self) -> tys.FunctionType:
         return tys.FunctionType.endo(self.type_row)
 
-    def set_in_types(self, types: tys.TypeRow) -> None:
+    def _set_in_types(self, types: tys.TypeRow) -> None:
         self._type_row = types
 
 
 @dataclass
 class AliasDecl(Op):
+    """Declare an external type alias."""
+
+    #: Alias name
     name: str
+    #: Type bound
     bound: tys.TypeBound
-    num_out: int = 0
+    num_out: int = field(default=0, repr=False)
 
     def to_serial(self, parent: Node) -> sops.AliasDecl:
         return sops.AliasDecl(
@@ -807,9 +1045,13 @@ class AliasDecl(Op):
 
 @dataclass
 class AliasDefn(Op):
+    """Declare a type alias."""
+
+    #: Alias name
     name: str
+    #: Type definition
     definition: tys.Type
-    num_out: int = 0
+    num_out: int = field(default=0, repr=False)
 
     def to_serial(self, parent: Node) -> sops.AliasDefn:
         return sops.AliasDefn(

@@ -184,7 +184,7 @@ class _DfBase(ParentBuilder[DP]):
         signature = self._fn_sig(func)
         call_op = ops.Call(signature, instantiation, type_args)
         call_n = self.hugr.add_node(call_op, self.parent_node, call_op.num_out)
-        self.hugr.add_link(func.out(0), call_n.inp(call_op.function_port_offset()))
+        self.hugr.add_link(func.out(0), call_n.inp(call_op._function_port_offset()))
 
         self._wire_up(call_n, args)
 
@@ -216,7 +216,7 @@ class _DfBase(ParentBuilder[DP]):
     def _wire_up(self, node: Node, ports: Iterable[Wire]) -> TypeRow:
         tys = [self._wire_up_port(node, i, p) for i, p in enumerate(ports)]
         if isinstance(op := self.hugr[node].op, ops._PartialOp):
-            op.set_in_types(tys)
+            op._set_in_types(tys)
         return tys
 
     def _get_dataflow_type(self, wire: Wire) -> Type:
