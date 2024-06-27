@@ -16,7 +16,7 @@ class TypeParam(Protocol):
 
     def to_serial(self) -> stys.BaseTypeParam:
         """Convert to serialisable model."""
-        ...
+        ...  # pragma: no cover
 
     def to_serial_root(self) -> stys.TypeParam:
         return stys.TypeParam(root=self.to_serial())  # type: ignore[arg-type]
@@ -27,7 +27,7 @@ class TypeArg(Protocol):
 
     def to_serial(self) -> stys.BaseTypeArg:
         """Convert to serialisable model."""
-        ...
+        ...  # pragma: no cover
 
     def to_serial_root(self) -> stys.TypeArg:
         return stys.TypeArg(root=self.to_serial())  # type: ignore[arg-type]
@@ -39,7 +39,7 @@ class Type(Protocol):
 
     def to_serial(self) -> stys.BaseType:
         """Convert to serialisable model."""
-        ...
+        ...  # pragma: no cover
 
     def to_serial_root(self) -> stys.Type:
         return stys.Type(root=self.to_serial())  # type: ignore[arg-type]

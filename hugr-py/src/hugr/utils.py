@@ -175,7 +175,7 @@ class SerCollection(Protocol[S]):
 
     def to_serial_root(self) -> S:
         """Convert to serialisable root model."""
-        ...
+        ...  # pragma: no cover
 
 
 class DeserCollection(Protocol[S]):
@@ -183,7 +183,7 @@ class DeserCollection(Protocol[S]):
 
     def deserialize(self) -> S:
         """Deserialize from model."""
-        ...
+        ...  # pragma: no cover
 
 
 def ser_it(it: Iterable[SerCollection[S]]) -> list[S]:

@@ -44,7 +44,7 @@ class Wire(Protocol):
 
     def out_port(self) -> OutPort:
         """OutPort corresponding to this :class:`Wire`."""
-        ...
+        ...  # pragma: no cover
 
 
 @dataclass(frozen=True, eq=True, order=True)
@@ -65,7 +65,7 @@ class ToNode(Wire, Protocol):
 
     def to_node(self) -> Node:
         """Convert in to a :class:`Node`."""
-        ...
+        ...  # pragma: no cover
 
     @overload
     def __getitem__(self, index: int) -> OutPort: ...
