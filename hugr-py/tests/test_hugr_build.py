@@ -196,7 +196,7 @@ def test_ancestral_sibling():
     [
         val.Function(simple_id().hugr),
         val.Sum(1, tys.Sum([[INT_T], [tys.Bool, INT_T]]), [val.TRUE, IntVal(34)]),
-        val.Tuple([val.TRUE, IntVal(23)]),
+        val.Tuple(val.TRUE, IntVal(23)),
     ],
 )
 def test_vals(val: val.Value):

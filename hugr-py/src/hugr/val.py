@@ -50,13 +50,16 @@ FALSE = bool_value(False)
 
 
 @dataclass
-class Tuple(Value):
+class Tuple(Sum):
     vals: list[Value]
 
-    def type_(self) -> tys.Tuple:
-        return tys.Tuple(*(v.type_() for v in self.vals))
+    def __init__(self, *vals: Value):
+        val_list = list(vals)
+        super().__init__(
+            tag=0, typ=tys.Tuple(*(v.type_() for v in val_list)), vals=val_list
+        )
 
-    def to_serial(self) -> sops.TupleValue:
+    def to_serial(self) -> sops.TupleValue:  # type: ignore[override]
         return sops.TupleValue(
             vs=ser_it(self.vals),
         )
