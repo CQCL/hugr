@@ -152,7 +152,7 @@ pub(crate) mod test {
     use crate::types::signature::FuncTypeBase;
     use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
     use crate::types::{
-        CustomType, FunctionType, FunctionTypeRV, Type, TypeBound, TypeName, TypeRV,
+        CustomType, FunctionType, FunctionTypeRV, MaybeRV, Type, TypeBound, TypeName, TypeRV
     };
     use crate::Extension;
 

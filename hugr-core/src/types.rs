@@ -23,7 +23,7 @@ use itertools::FoldWhile::{Continue, Done};
 use itertools::{repeat_n, Itertools};
 use serde::{Deserialize, Serialize};
 #[cfg(test)]
-use {crate::proptest::RecursionDepth, ::proptest::prelude::*, proptest_derive::Arbitrary};
+use {proptest_derive::Arbitrary};
 
 use crate::extension::{ExtensionRegistry, SignatureError};
 use crate::ops::AliasDecl;
@@ -203,6 +203,7 @@ impl<RV: MaybeRV> From<SumType> for TypeBase<RV> {
 #[derive(
     Clone, Debug, Eq, PartialEq, derive_more::Display, serde::Serialize, serde::Deserialize,
 )]
+#[cfg_attr(test, derive(Arbitrary))]
 #[display(fmt = "{}", "_0")]
 pub struct RowVariable(usize, TypeBound);
 
@@ -212,6 +213,7 @@ trait MaybeRV: Clone + std::fmt::Debug + std::fmt::Display + From<NoRV> + Eq + P
     fn bound(&self) -> TypeBound;
     fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError>;
     fn substitute(&self, s: &Substitution) -> Vec<TypeBase<Self>>;
+    #[cfg(test)] fn weight() -> u32 {1}
 }
 
 // Note that I believe the serde derives here are not used except as markers
@@ -269,28 +271,27 @@ impl MaybeRV for NoRV {
     fn try_from_rv(rv: RowVariable) -> Result<Self, RowVariable> {
         Err(rv)
     }
+
+    #[cfg(test)]
+    fn weight() -> u32 {
+        0
+    }
 }
 
 #[derive(Clone, Debug, Eq, derive_more::Display)]
-#[cfg_attr(test, derive(Arbitrary), proptest(params = "RecursionDepth"))]
+//#[cfg_attr(test, derive(Arbitrary), proptest(params = "RecursionDepth"))] // handles RowVariable, not NoRV
 /// Core types
 pub enum TypeEnum<RV: MaybeRV> {
     // TODO optimise with Box<CustomType> ?
     // or some static version of this?
     #[allow(missing_docs)]
-    Extension(
-        #[cfg_attr(test, proptest(strategy = "any_with::<CustomType>(params.into())"))] CustomType,
-    ),
+    Extension(CustomType,),
     #[allow(missing_docs)]
     #[display(fmt = "Alias({})", "_0.name()")]
     Alias(AliasDecl),
     #[allow(missing_docs)]
     #[display(fmt = "Function({})", "_0")]
     Function(
-        #[cfg_attr(
-            test,
-            proptest(strategy = "any_with::<FunctionTypeRV>(params).prop_map(Box::new)")
-        )]
         Box<FunctionTypeRV>,
     ),
     // Index into TypeParams, and cache of TypeBound (checked in validation)
@@ -302,7 +303,7 @@ pub enum TypeEnum<RV: MaybeRV> {
     RowVar(RV),
     #[allow(missing_docs)]
     #[display(fmt = "{}", "_0")]
-    Sum(#[cfg_attr(test, proptest(strategy = "any_with::<SumType>(params)"))] SumType),
+    Sum(SumType),
 }
 
 impl<RV: MaybeRV> TypeEnum<RV> {
@@ -705,8 +706,9 @@ pub(crate) mod test {
 
         use crate::proptest::RecursionDepth;
 
-        use crate::types::{SumType, TypeEnum, TypeRow};
+        use crate::types::{CustomType, FunctionTypeRV, SumType, TypeRowRV};
         use ::proptest::prelude::*;
+        use super::{AliasDecl, MaybeRV, NoRV, TypeBase, TypeBound};
 
         impl Arbitrary for super::SumType {
             type Parameters = RecursionDepth;
@@ -716,23 +718,36 @@ pub(crate) mod test {
                 if depth.leaf() {
                     any::<u8>().prop_map(Self::new_unary).boxed()
                 } else {
-                    vec(any_with::<TypeRow>(depth), 0..3)
+                    vec(any_with::<TypeRowRV>(depth), 0..3)
                         .prop_map(SumType::new)
                         .boxed()
                 }
             }
         }
 
-        impl<const RV: bool> Arbitrary for super::TypeBase<RV> {
+        impl Arbitrary for NoRV {
+            type Parameters = ();
+        
+            fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+                panic!("Should be ruled out by weight==0")
+            }
+        
+            type Strategy = BoxedStrategy<Self>;
+        }
+        
+        impl<RV: MaybeRV> Arbitrary for TypeBase<RV> {
             type Parameters = RecursionDepth;
             type Strategy = BoxedStrategy<Self>;
             fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
                 // We descend here, because a TypeEnum may contain a Type
-                any_with::<TypeEnum>(depth.descend())
-                    .prop_filter("Type<false> cannot be a Row Variable", |t| {
-                        RV || !matches!(t, TypeEnum::RowVariable(_, _))
-                    })
-                    .prop_map(Self::new)
+                let depth = depth.descend();
+                prop_oneof![
+                    any::<AliasDecl>().prop_map(TypeBase::new_alias),
+                    any_with::<CustomType>(depth.into()).prop_map(TypeBase::new_extension),
+                    any_with::<FunctionTypeRV>(depth).prop_map(TypeBase::new_function),
+                    any_with::<SumType>(depth).prop_map(TypeBase::from),
+                    (any::<usize>(), any::<TypeBound>()).prop_map(|(i,b)| TypeBase::new_var_use(i,b))
+                ]
                     .boxed()
             }
         }

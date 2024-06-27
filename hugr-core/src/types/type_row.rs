@@ -210,10 +210,10 @@ impl<RV: MaybeRV> DerefMut for TypeRowBase<RV> {
 mod test {
     mod proptest {
         use crate::proptest::RecursionDepth;
-        use crate::types::{TypeBase, TypeRowBase};
+        use crate::types::{MaybeRV, TypeBase, TypeRowBase};
         use ::proptest::prelude::*;
 
-        impl<RV: MaybeRV> Arbitrary for super::super::TypeRowBase<RV> {
+        impl<RV: MaybeRV> Arbitrary for super::super::TypeRowBase<RV> where TypeBase<RV>: Arbitrary<Parameters = RecursionDepth> {
             type Parameters = RecursionDepth;
             type Strategy = BoxedStrategy<Self>;
             fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
