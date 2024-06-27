@@ -6,7 +6,7 @@ from typing import Any, Literal
 
 from pydantic import Field, RootModel, ConfigDict
 
-from . import tys
+from . import tys as stys
 from .tys import (
     ExtensionId,
     ExtensionSet,
@@ -44,7 +44,7 @@ class BaseOp(ABC, ConfiguredBaseModel):
         return self.__class__.__name__
 
     @abstractmethod
-    def deserialize(self) -> _ops.Op:
+    def deserialize(self) -> ops.Op:
         """Deserializes the model into the corresponding Op."""
 
 
@@ -58,8 +58,8 @@ class Module(BaseOp):
 
     op: Literal["Module"] = "Module"
 
-    def deserialize(self) -> _ops.Module:
-        return _ops.Module()
+    def deserialize(self) -> ops.Module:
+        return ops.Module()
 
 
 class FuncDefn(BaseOp):
@@ -70,9 +70,9 @@ class FuncDefn(BaseOp):
     name: str
     signature: PolyFuncType
 
-    def deserialize(self) -> _ops.FuncDefn:
+    def deserialize(self) -> ops.FuncDefn:
         poly_func = self.signature.deserialize()
-        return _ops.FuncDefn(
+        return ops.FuncDefn(
             self.name, inputs=poly_func.body.input, _outputs=poly_func.body.output
         )
 
@@ -84,8 +84,8 @@ class FuncDecl(BaseOp):
     name: str
     signature: PolyFuncType
 
-    def deserialize(self) -> _ops.FuncDecl:
-        return _ops.FuncDecl(self.name, self.signature.deserialize())
+    def deserialize(self) -> ops.FuncDecl:
+        return ops.FuncDecl(self.name, self.signature.deserialize())
 
 
 class CustomConst(ConfiguredBaseModel):
@@ -95,7 +95,7 @@ class CustomConst(ConfiguredBaseModel):
 
 class BaseValue(ABC, ConfiguredBaseModel):
     @abstractmethod
-    def deserialize(self) -> _val.Value: ...
+    def deserialize(self) -> val.Value: ...
 
 
 class ExtensionValue(BaseValue):
@@ -106,8 +106,8 @@ class ExtensionValue(BaseValue):
     typ: Type
     value: CustomConst
 
-    def deserialize(self) -> _val.Value:
-        return _val.Extension(self.value.c, self.typ.deserialize(), self.value.v)
+    def deserialize(self) -> val.Value:
+        return val.Extension(self.value.c, self.typ.deserialize(), self.value.v)
 
 
 class FunctionValue(BaseValue):
@@ -116,12 +116,12 @@ class FunctionValue(BaseValue):
     v: Literal["Function"] = Field(default="Function", title="ValueTag")
     hugr: Any
 
-    def deserialize(self) -> _val.Value:
-        from hugr._hugr import Hugr
+    def deserialize(self) -> val.Value:
+        from hugr.hugr import Hugr
         from hugr.serialization.serial_hugr import SerialHugr
 
         # pydantic stores the serialized dictionary because of the "Any" annotation
-        return _val.Function(Hugr.from_serial(SerialHugr(**self.hugr)))
+        return val.Function(Hugr.from_serial(SerialHugr(**self.hugr)))
 
 
 class TupleValue(BaseValue):
@@ -130,8 +130,8 @@ class TupleValue(BaseValue):
     v: Literal["Tuple"] = Field(default="Tuple", title="ValueTag")
     vs: list["Value"]
 
-    def deserialize(self) -> _val.Value:
-        return _val.Tuple(deser_it((v.root for v in self.vs)))
+    def deserialize(self) -> val.Value:
+        return val.Tuple(deser_it((v.root for v in self.vs)))
 
 
 class SumValue(BaseValue):
@@ -153,8 +153,8 @@ class SumValue(BaseValue):
         }
     )
 
-    def deserialize(self) -> _val.Value:
-        return _val.Sum(
+    def deserialize(self) -> val.Value:
+        return val.Sum(
             self.tag, self.typ.deserialize(), deser_it((v.root for v in self.vs))
         )
 
@@ -168,7 +168,7 @@ class Value(RootModel):
 
     model_config = ConfigDict(json_schema_extra={"required": ["v"]})
 
-    def deserialize(self) -> _val.Value:
+    def deserialize(self) -> val.Value:
         return self.root.deserialize()
 
 
@@ -178,8 +178,8 @@ class Const(BaseOp):
     op: Literal["Const"] = "Const"
     v: Value = Field()
 
-    def deserialize(self) -> _ops.Const:
-        return _ops.Const(self.v.deserialize())
+    def deserialize(self) -> ops.Const:
+        return ops.Const(self.v.deserialize())
 
 
 # -----------------------------------------------
@@ -204,8 +204,8 @@ class DataflowBlock(BaseOp):
     def insert_child_dfg_signature(self, inputs: TypeRow, outputs: TypeRow) -> None:
         self.inputs = inputs
         pred = outputs[0].root
-        assert isinstance(pred, tys.SumType)
-        if isinstance(pred.root, tys.UnitSum):
+        assert isinstance(pred, stys.SumType)
+        if isinstance(pred.root, stys.UnitSum):
             self.sum_rows = [[] for _ in range(pred.root.size)]
         else:
             self.sum_rows = []
@@ -215,10 +215,10 @@ class DataflowBlock(BaseOp):
 
         # Needed to avoid random '\n's in the pydantic description
 
-    def deserialize(self) -> _ops.DataflowBlock:
-        return _ops.DataflowBlock(
+    def deserialize(self) -> ops.DataflowBlock:
+        return ops.DataflowBlock(
             inputs=deser_it(self.inputs),
-            _sum=_tys.Sum([deser_it(r) for r in self.sum_rows]),
+            _sum=tys.Sum([deser_it(r) for r in self.sum_rows]),
             _other_outputs=deser_it(self.other_outputs),
         )
 
@@ -243,8 +243,8 @@ class ExitBlock(BaseOp):
         }
     )
 
-    def deserialize(self) -> _ops.ExitBlock:
-        return _ops.ExitBlock(deser_it(self.cfg_outputs))
+    def deserialize(self) -> ops.ExitBlock:
+        return ops.ExitBlock(deser_it(self.cfg_outputs))
 
 
 # ---------------------------------------------
@@ -266,8 +266,8 @@ class Input(DataflowOp):
         assert len(in_types) == 0
         self.types = list(out_types)
 
-    def deserialize(self) -> _ops.Input:
-        return _ops.Input(types=[t.deserialize() for t in self.types])
+    def deserialize(self) -> ops.Input:
+        return ops.Input(types=[t.deserialize() for t in self.types])
 
 
 class Output(DataflowOp):
@@ -280,8 +280,8 @@ class Output(DataflowOp):
         assert len(out_types) == 0
         self.types = list(in_types)
 
-    def deserialize(self) -> _ops.Output:
-        return _ops.Output(deser_it(self.types))
+    def deserialize(self) -> ops.Output:
+        return ops.Output(deser_it(self.types))
 
 
 class Call(DataflowOp):
@@ -295,7 +295,7 @@ class Call(DataflowOp):
 
     op: Literal["Call"] = "Call"
     func_sig: PolyFuncType
-    type_args: list[tys.TypeArg]
+    type_args: list[stys.TypeArg]
     instantiation: FunctionType
 
     model_config = ConfigDict(
@@ -310,8 +310,8 @@ class Call(DataflowOp):
         }
     )
 
-    def deserialize(self) -> _ops.Call:
-        return _ops.Call(
+    def deserialize(self) -> ops.Call:
+        return ops.Call(
             self.func_sig.deserialize(),
             self.instantiation.deserialize(),
             deser_it(self.type_args),
@@ -334,8 +334,8 @@ class CallIndirect(DataflowOp):
         assert len(fun_ty.output) == len(out_types)
         self.signature = fun_ty
 
-    def deserialize(self) -> _ops.CallIndirectDef:
-        return _ops.CallIndirectDef(self.signature.deserialize())
+    def deserialize(self) -> ops.CallIndirectDef:
+        return ops.CallIndirectDef(self.signature.deserialize())
 
 
 class LoadConstant(DataflowOp):
@@ -344,8 +344,8 @@ class LoadConstant(DataflowOp):
     op: Literal["LoadConstant"] = "LoadConstant"
     datatype: Type
 
-    def deserialize(self) -> _ops.LoadConst:
-        return _ops.LoadConst(self.datatype.deserialize())
+    def deserialize(self) -> ops.LoadConst:
+        return ops.LoadConst(self.datatype.deserialize())
 
 
 class LoadFunction(DataflowOp):
@@ -353,17 +353,17 @@ class LoadFunction(DataflowOp):
 
     op: Literal["LoadFunction"] = "LoadFunction"
     func_sig: PolyFuncType
-    type_args: list[tys.TypeArg]
+    type_args: list[stys.TypeArg]
     signature: FunctionType
 
-    def deserialize(self) -> _ops.LoadFunc:
+    def deserialize(self) -> ops.LoadFunc:
         signature = self.signature.deserialize()
         assert len(signature.input) == 0
         (f_ty,) = signature.output
         assert isinstance(
-            f_ty, _tys.FunctionType
+            f_ty, tys.FunctionType
         ), "Expected single funciton type output"
-        return _ops.LoadFunc(
+        return ops.LoadFunc(
             self.func_sig.deserialize(),
             f_ty,
             deser_it(self.type_args),
@@ -381,9 +381,9 @@ class DFG(DataflowOp):
             input=list(inputs), output=list(outputs), extension_reqs=ExtensionSet([])
         )
 
-    def deserialize(self) -> _ops.DFG:
+    def deserialize(self) -> ops.DFG:
         sig = self.signature.deserialize()
-        return _ops.DFG(sig.input, sig.output, sig.extension_reqs)
+        return ops.DFG(sig.input, sig.output, sig.extension_reqs)
 
 
 # ------------------------------------------------
@@ -407,21 +407,21 @@ class Conditional(DataflowOp):
         # First port is a predicate, i.e. a sum of tuple types. We need to unpack
         # those into a list of type rows
         pred = in_types[0]
-        assert isinstance(pred.root, tys.SumType)
+        assert isinstance(pred.root, stys.SumType)
         sum = pred.root.root
-        if isinstance(sum, tys.UnitSum):
+        if isinstance(sum, stys.UnitSum):
             self.sum_rows = [[] for _ in range(sum.size)]
         else:
-            assert isinstance(sum, tys.GeneralSum)
+            assert isinstance(sum, stys.GeneralSum)
             self.sum_rows = []
             for ty in sum.rows:
                 self.sum_rows.append(ty)
         self.other_inputs = list(in_types[1:])
         self.outputs = list(out_types)
 
-    def deserialize(self) -> _ops.Conditional:
-        return _ops.Conditional(
-            _tys.Sum([deser_it(r) for r in self.sum_rows]),
+    def deserialize(self) -> ops.Conditional:
+        return ops.Conditional(
+            tys.Sum([deser_it(r) for r in self.sum_rows]),
             deser_it(self.other_inputs),
             deser_it(self.outputs),
         )
@@ -435,13 +435,13 @@ class Case(BaseOp):
     signature: FunctionType = Field(default_factory=FunctionType.empty)
 
     def insert_child_dfg_signature(self, inputs: TypeRow, outputs: TypeRow) -> None:
-        self.signature = tys.FunctionType(
+        self.signature = stys.FunctionType(
             input=list(inputs), output=list(outputs), extension_reqs=ExtensionSet([])
         )
 
-    def deserialize(self) -> _ops.Case:
+    def deserialize(self) -> ops.Case:
         sig = self.signature.deserialize()
-        return _ops.Case(inputs=sig.input, _outputs=sig.output)
+        return ops.Case(inputs=sig.input, _outputs=sig.output)
 
 
 class TailLoop(DataflowOp):
@@ -460,8 +460,8 @@ class TailLoop(DataflowOp):
         # self.just_outputs = list(out_types)
         self.rest = list(in_types)
 
-    def deserialize(self) -> _ops.TailLoop:
-        return _ops.TailLoop(
+    def deserialize(self) -> ops.TailLoop:
+        return ops.TailLoop(
             just_inputs=deser_it(self.just_inputs),
             _just_outputs=deser_it(self.just_outputs),
             rest=deser_it(self.rest),
@@ -480,9 +480,9 @@ class CFG(DataflowOp):
             input=list(inputs), output=list(outputs), extension_reqs=ExtensionSet([])
         )
 
-    def deserialize(self) -> _ops.CFG:
+    def deserialize(self) -> ops.CFG:
         sig = self.signature.deserialize()
-        return _ops.CFG(inputs=sig.input, _outputs=sig.output)
+        return ops.CFG(inputs=sig.input, _outputs=sig.output)
 
 
 ControlFlowOp = Conditional | TailLoop | CFG
@@ -495,18 +495,18 @@ class CustomOp(DataflowOp):
     op: Literal["CustomOp"] = "CustomOp"
     extension: ExtensionId
     op_name: str
-    signature: tys.FunctionType = Field(default_factory=tys.FunctionType.empty)
+    signature: stys.FunctionType = Field(default_factory=stys.FunctionType.empty)
     description: str = ""
-    args: list[tys.TypeArg] = Field(default_factory=list)
+    args: list[stys.TypeArg] = Field(default_factory=list)
 
     def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
-        self.signature = tys.FunctionType(input=list(in_types), output=list(out_types))
+        self.signature = stys.FunctionType(input=list(in_types), output=list(out_types))
 
     def display_name(self) -> str:
         return self.op_name
 
-    def deserialize(self) -> _ops.Custom:
-        return _ops.Custom(
+    def deserialize(self) -> ops.Custom:
+        return ops.Custom(
             extension=self.extension,
             op_name=self.op_name,
             signature=self.signature.deserialize(),
@@ -536,8 +536,8 @@ class Noop(DataflowOp):
         assert in_types[0] == out_types[0]
         self.ty = in_types[0]
 
-    def deserialize(self) -> _ops.NoopDef:
-        return _ops.NoopDef(self.ty.deserialize())
+    def deserialize(self) -> ops.NoopDef:
+        return ops.NoopDef(self.ty.deserialize())
 
 
 class MakeTuple(DataflowOp):
@@ -552,8 +552,8 @@ class MakeTuple(DataflowOp):
             in_types = []
         self.tys = list(in_types)
 
-    def deserialize(self) -> _ops.MakeTupleDef:
-        return _ops.MakeTupleDef(deser_it(self.tys))
+    def deserialize(self) -> ops.MakeTupleDef:
+        return ops.MakeTupleDef(deser_it(self.tys))
 
 
 class UnpackTuple(DataflowOp):
@@ -565,8 +565,8 @@ class UnpackTuple(DataflowOp):
     def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
         self.tys = list(out_types)
 
-    def deserialize(self) -> _ops.UnpackTupleDef:
-        return _ops.UnpackTupleDef(deser_it(self.tys))
+    def deserialize(self) -> ops.UnpackTupleDef:
+        return ops.UnpackTupleDef(deser_it(self.tys))
 
 
 class Tag(DataflowOp):
@@ -576,10 +576,10 @@ class Tag(DataflowOp):
     tag: int  # The variant to create.
     variants: list[TypeRow]  # The variants of the sum type.
 
-    def deserialize(self) -> _ops.Tag:
-        return _ops.Tag(
+    def deserialize(self) -> ops.Tag:
+        return ops.Tag(
             tag=self.tag,
-            sum_ty=_tys.Sum([deser_it(v) for v in self.variants]),
+            sum_ty=tys.Sum([deser_it(v) for v in self.variants]),
         )
 
 
@@ -590,8 +590,8 @@ class Lift(DataflowOp):
     type_row: TypeRow
     new_extension: ExtensionId
 
-    def deserialize(self) -> _ops.Lift:
-        return _ops.Lift(
+    def deserialize(self) -> ops.Lift:
+        return ops.Lift(
             _type_row=deser_it(self.type_row),
             new_extension=self.new_extension,
         )
@@ -602,8 +602,8 @@ class AliasDecl(BaseOp):
     name: str
     bound: TypeBound
 
-    def deserialize(self) -> _ops.AliasDecl:
-        return _ops.AliasDecl(self.name, self.bound)
+    def deserialize(self) -> ops.AliasDecl:
+        return ops.AliasDecl(self.name, self.bound)
 
 
 class AliasDefn(BaseOp):
@@ -611,8 +611,8 @@ class AliasDefn(BaseOp):
     name: str
     definition: Type
 
-    def deserialize(self) -> _ops.AliasDefn:
-        return _ops.AliasDefn(self.name, self.definition.deserialize())
+    def deserialize(self) -> ops.AliasDefn:
+        return ops.AliasDefn(self.name, self.definition.deserialize())
 
 
 class OpType(RootModel):
@@ -683,6 +683,6 @@ classes = (
 tys_model_rebuild(dict(classes))
 
 # needed to avoid circular imports
-from hugr import _ops  # noqa: E402
-from hugr import _val  # noqa: E402
-from hugr import _tys  # noqa: E402
+from hugr import ops  # noqa: E402
+from hugr import val  # noqa: E402
+from hugr import tys  # noqa: E402

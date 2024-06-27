@@ -10,9 +10,9 @@ from typing import (
 
 from typing_extensions import Self
 
-import hugr._ops as ops
-import hugr._val as val
-from hugr._tys import (
+import hugr.ops as ops
+import hugr.val as val
+from hugr.tys import (
     Type,
     TypeRow,
     get_first_sum,
@@ -23,13 +23,13 @@ from hugr._tys import (
     ExtensionSet,
 )
 
-from ._exceptions import NoSiblingAncestor
-from ._hugr import Hugr, ParentBuilder
-from ._node_port import Node, OutPort, Wire, ToNode
+from .exceptions import NoSiblingAncestor
+from .hugr import Hugr, ParentBuilder
+from .node_port import Node, OutPort, Wire, ToNode
 
 if TYPE_CHECKING:
-    from ._cfg import Cfg
-    from ._cond_loop import Conditional, If, TailLoop
+    from .cfg import Cfg
+    from .cond_loop import Conditional, If, TailLoop
 
 
 DP = TypeVar("DP", bound=ops.DfParentOp)
@@ -96,7 +96,7 @@ class _DfBase(ParentBuilder[DP]):
         self,
         *args: Wire,
     ) -> Dfg:
-        from ._dfg import Dfg
+        from .dfg import Dfg
 
         parent_op = ops.DFG(self._wire_types(args))
         dfg = Dfg.new_nested(parent_op, self.hugr, self.parent_node)
@@ -110,7 +110,7 @@ class _DfBase(ParentBuilder[DP]):
         self,
         *args: Wire,
     ) -> Cfg:
-        from ._cfg import Cfg
+        from .cfg import Cfg
 
         cfg = Cfg.new_nested(self._wire_types(args), self.hugr, self.parent_node)
         self._wire_up(cfg.parent_node, args)
@@ -120,7 +120,7 @@ class _DfBase(ParentBuilder[DP]):
         return self._insert_nested_impl(cfg, *args)
 
     def add_conditional(self, cond: Wire, *args: Wire) -> Conditional:
-        from ._cond_loop import Conditional
+        from .cond_loop import Conditional
 
         args = (cond, *args)
         (sum_, other_inputs) = get_first_sum(self._wire_types(args))
@@ -132,7 +132,7 @@ class _DfBase(ParentBuilder[DP]):
         return self._insert_nested_impl(cond, *args)
 
     def add_if(self, cond: Wire, *args: Wire) -> If:
-        from ._cond_loop import If
+        from .cond_loop import If
 
         conditional = self.add_conditional(cond, *args)
         return If(conditional.add_case(1))
@@ -140,7 +140,7 @@ class _DfBase(ParentBuilder[DP]):
     def add_tail_loop(
         self, just_inputs: Sequence[Wire], rest: Sequence[Wire]
     ) -> TailLoop:
-        from ._cond_loop import TailLoop
+        from .cond_loop import TailLoop
 
         just_input_types = self._wire_types(just_inputs)
         rest_types = self._wire_types(rest)

@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-import hugr._ops as ops
+import hugr.ops as ops
 
-from ._dfg import _DfBase
-from ._hugr import Hugr, ParentBuilder
-from ._node_port import Node, Wire, ToNode
+from .dfg import _DfBase
+from .hugr import Hugr, ParentBuilder
+from .node_port import Node, Wire, ToNode
 
-from ._tys import Sum, TypeRow
+from .tys import Sum, TypeRow
 
 
 class Case(_DfBase[ops.Case]):

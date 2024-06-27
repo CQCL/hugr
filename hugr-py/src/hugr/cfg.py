@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-import hugr._ops as ops
+import hugr.ops as ops
 
-from ._dfg import _DfBase
-from ._exceptions import NoSiblingAncestor, NotInSameCfg, MismatchedExit
-from ._hugr import Hugr, ParentBuilder
-from ._node_port import Node, Wire, ToNode
-from ._tys import TypeRow, Type
-import hugr._val as val
+from .dfg import _DfBase
+from .exceptions import NoSiblingAncestor, NotInSameCfg, MismatchedExit
+from .hugr import Hugr, ParentBuilder
+from .node_port import Node, Wire, ToNode
+from .tys import TypeRow, Type
+import hugr.val as val
 
 
 class Block(_DfBase[ops.DataflowBlock]):
