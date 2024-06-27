@@ -60,7 +60,7 @@ class DataflowOp(Op, Protocol):
 
 
 @runtime_checkable
-class PartialOp(Protocol):
+class _PartialOp(Protocol):
     def set_in_types(self, types: tys.TypeRow) -> None: ...
 
 
@@ -111,7 +111,7 @@ class Input(DataflowOp):
 
 
 @dataclass()
-class Output(DataflowOp, PartialOp):
+class Output(DataflowOp, _PartialOp):
     _types: tys.TypeRow | None = None
     num_out: int = 0
 
@@ -156,7 +156,7 @@ class Custom(DataflowOp):
 
 
 @dataclass()
-class MakeTupleDef(DataflowOp, PartialOp):
+class MakeTupleDef(DataflowOp, _PartialOp):
     _types: tys.TypeRow | None = None
     num_out: int = 1
 
@@ -184,7 +184,7 @@ MakeTuple = MakeTupleDef()
 
 
 @dataclass()
-class UnpackTupleDef(DataflowOp, PartialOp):
+class UnpackTupleDef(DataflowOp, _PartialOp):
     _types: tys.TypeRow | None = None
 
     @property
@@ -665,7 +665,7 @@ class Call(Op):
 
 
 @dataclass()
-class CallIndirectDef(DataflowOp, PartialOp):
+class CallIndirectDef(DataflowOp, _PartialOp):
     _signature: tys.FunctionType | None = None
 
     @property
@@ -742,7 +742,7 @@ class LoadFunc(DataflowOp):
 
 
 @dataclass
-class NoopDef(DataflowOp, PartialOp):
+class NoopDef(DataflowOp, _PartialOp):
     _type: tys.Type | None = None
     num_out: int = 1
 
@@ -765,7 +765,7 @@ Noop = NoopDef()
 
 
 @dataclass
-class Lift(DataflowOp, PartialOp):
+class Lift(DataflowOp, _PartialOp):
     new_extension: tys.ExtensionId
     _type_row: tys.TypeRow | None = None
     num_out: int = 1
