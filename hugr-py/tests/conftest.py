@@ -42,7 +42,7 @@ class LogicOps(Custom):
 # TODO get from YAML
 @dataclass
 class NotDef(LogicOps):
-    num_out: int | None = 1
+    num_out: int = 1
     op_name: str = "Not"
     signature: tys.FunctionType = tys.FunctionType.endo([tys.Bool])
 
@@ -61,7 +61,7 @@ class QuantumOps(Custom):
 @dataclass
 class OneQbGate(QuantumOps):
     op_name: str
-    num_out: int | None = 1
+    num_out: int = 1
     signature: tys.FunctionType = tys.FunctionType.endo([tys.Qubit])
 
     def __call__(self, q: Wire) -> Command:
@@ -74,7 +74,7 @@ H = OneQbGate("H")
 @dataclass
 class MeasureDef(QuantumOps):
     op_name: str = "Measure"
-    num_out: int | None = 2
+    num_out: int = 2
     signature: tys.FunctionType = tys.FunctionType([tys.Qubit], [tys.Qubit, tys.Bool])
 
     def __call__(self, q: Wire) -> Command:
@@ -94,7 +94,7 @@ ARG_5 = tys.BoundedNatArg(n=5)
 
 @dataclass
 class DivModDef(IntOps):
-    num_out: int | None = 2
+    num_out: int = 2
     extension: tys.ExtensionId = "arithmetic.int"
     op_name: str = "idivmod_u"
     signature: tys.FunctionType = field(

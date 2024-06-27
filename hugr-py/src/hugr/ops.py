@@ -26,8 +26,7 @@ class InvalidPort(Exception):
 @runtime_checkable
 class Op(Protocol):
     @property
-    def num_out(self) -> int | None:
-        return None
+    def num_out(self) -> int: ...
 
     def to_serial(self, parent: Node) -> BaseOp: ...
 
@@ -77,7 +76,7 @@ class Input(DataflowOp):
     types: tys.TypeRow
 
     @property
-    def num_out(self) -> int | None:
+    def num_out(self) -> int:
         return len(self.types)
 
     def to_serial(self, parent: Node) -> sops.Input:
@@ -102,6 +101,7 @@ def _check_complete(v: V | None) -> V:
 @dataclass()
 class Output(DataflowOp, PartialOp):
     _types: tys.TypeRow | None = None
+    num_out: int = 0
 
     @property
     def types(self) -> tys.TypeRow:
@@ -126,7 +126,7 @@ class Custom(DataflowOp):
     args: list[tys.TypeArg] = field(default_factory=list)
 
     @property
-    def num_out(self) -> int | None:
+    def num_out(self) -> int:
         return len(self.signature.output)
 
     def to_serial(self, parent: Node) -> sops.CustomOp:
@@ -146,7 +146,7 @@ class Custom(DataflowOp):
 @dataclass()
 class MakeTupleDef(DataflowOp, PartialOp):
     _types: tys.TypeRow | None = None
-    num_out: int | None = 1
+    num_out: int = 1
 
     @property
     def types(self) -> tys.TypeRow:
@@ -180,7 +180,7 @@ class UnpackTupleDef(DataflowOp, PartialOp):
         return _check_complete(self._types)
 
     @property
-    def num_out(self) -> int | None:
+    def num_out(self) -> int:
         return len(self.types)
 
     def to_serial(self, parent: Node) -> sops.UnpackTuple:
@@ -209,7 +209,7 @@ UnpackTuple = UnpackTupleDef()
 class Tag(DataflowOp):
     tag: int
     sum_ty: tys.Sum
-    num_out: int | None = 1
+    num_out: int = 1
 
     def to_serial(self, parent: Node) -> sops.Tag:
         return sops.Tag(
@@ -247,7 +247,7 @@ class DFG(DfParentOp, DataflowOp):
         return tys.FunctionType(self.inputs, self.outputs, self.extension_delta)
 
     @property
-    def num_out(self) -> int | None:
+    def num_out(self) -> int:
         return len(self.signature.output)
 
     def to_serial(self, parent: Node) -> sops.DFG:
@@ -283,7 +283,7 @@ class CFG(DataflowOp):
         return tys.FunctionType(self.inputs, self.outputs)
 
     @property
-    def num_out(self) -> int | None:
+    def num_out(self) -> int:
         return len(self.outputs)
 
     def to_serial(self, parent: Node) -> sops.CFG:
@@ -312,7 +312,7 @@ class DataflowBlock(DfParentOp):
         return _check_complete(self._other_outputs)
 
     @property
-    def num_out(self) -> int | None:
+    def num_out(self) -> int:
         return len(self.sum_ty.variant_rows)
 
     def to_serial(self, parent: Node) -> sops.DataflowBlock:
@@ -347,7 +347,7 @@ class DataflowBlock(DfParentOp):
 @dataclass
 class ExitBlock(Op):
     _cfg_outputs: tys.TypeRow | None = None
-    num_out: int | None = 0
+    num_out: int = 0
 
     @property
     def cfg_outputs(self) -> tys.TypeRow:
@@ -366,7 +366,7 @@ class ExitBlock(Op):
 @dataclass
 class Const(Op):
     val: val.Value
-    num_out: int | None = 1
+    num_out: int = 1
 
     def to_serial(self, parent: Node) -> sops.Const:
         return sops.Const(
@@ -385,7 +385,7 @@ class Const(Op):
 @dataclass
 class LoadConst(DataflowOp):
     typ: tys.Type | None = None
-    num_out: int | None = 1
+    num_out: int = 1
 
     def type_(self) -> tys.Type:
         return _check_complete(self.typ)
@@ -425,7 +425,7 @@ class Conditional(DataflowOp):
         return tys.FunctionType(inputs, self.outputs)
 
     @property
-    def num_out(self) -> int | None:
+    def num_out(self) -> int:
         return len(self.outputs)
 
     def to_serial(self, parent: Node) -> sops.Conditional:
@@ -447,7 +447,7 @@ class Conditional(DataflowOp):
 class Case(DfParentOp):
     inputs: tys.TypeRow
     _outputs: tys.TypeRow | None = None
-    num_out: int | None = 0
+    num_out: int = 0
 
     @property
     def outputs(self) -> tys.TypeRow:
@@ -483,7 +483,7 @@ class TailLoop(DfParentOp, DataflowOp):
         return _check_complete(self._just_outputs)
 
     @property
-    def num_out(self) -> int | None:
+    def num_out(self) -> int:
         return len(self.just_outputs) + len(self.rest)
 
     def to_serial(self, parent: Node) -> sops.TailLoop:
@@ -521,7 +521,7 @@ class FuncDefn(DfParentOp):
     inputs: tys.TypeRow
     params: list[tys.TypeParam] = field(default_factory=list)
     _outputs: tys.TypeRow | None = None
-    num_out: int | None = 1
+    num_out: int = 1
 
     @property
     def outputs(self) -> tys.TypeRow:
@@ -561,7 +561,7 @@ class FuncDefn(DfParentOp):
 class FuncDecl(Op):
     name: str
     signature: tys.PolyFuncType
-    num_out: int | None = 0
+    num_out: int = 0
 
     def to_serial(self, parent: Node) -> sops.FuncDecl:
         return sops.FuncDecl(
@@ -580,7 +580,7 @@ class FuncDecl(Op):
 
 @dataclass
 class Module(Op):
-    num_out: int | None = 0
+    num_out: int = 0
 
     def to_serial(self, parent: Node) -> sops.Module:
         return sops.Module(parent=parent.idx)
@@ -638,7 +638,7 @@ class Call(Op):
         )
 
     @property
-    def num_out(self) -> int | None:
+    def num_out(self) -> int:
         return len(self.signature.body.output)
 
     def function_port_offset(self) -> int:
@@ -657,7 +657,7 @@ class CallIndirectDef(DataflowOp, PartialOp):
     _signature: tys.FunctionType | None = None
 
     @property
-    def num_out(self) -> int | None:
+    def num_out(self) -> int:
         return len(self.signature.output)
 
     @property
@@ -695,7 +695,7 @@ class LoadFunc(DataflowOp):
     signature: tys.PolyFuncType
     instantiation: tys.FunctionType
     type_args: list[tys.TypeArg]
-    num_out: int | None = 1
+    num_out: int = 1
 
     def __init__(
         self,
@@ -732,7 +732,7 @@ class LoadFunc(DataflowOp):
 @dataclass
 class NoopDef(DataflowOp, PartialOp):
     _type: tys.Type | None = None
-    num_out: int | None = 1
+    num_out: int = 1
 
     @property
     def type_(self) -> tys.Type:
@@ -756,7 +756,7 @@ Noop = NoopDef()
 class Lift(DataflowOp, PartialOp):
     new_extension: tys.ExtensionId
     _type_row: tys.TypeRow | None = None
-    num_out: int | None = 1
+    num_out: int = 1
 
     @property
     def type_row(self) -> tys.TypeRow:
@@ -780,7 +780,7 @@ class Lift(DataflowOp, PartialOp):
 class AliasDecl(Op):
     name: str
     bound: tys.TypeBound
-    num_out: int | None = 0
+    num_out: int = 0
 
     def to_serial(self, parent: Node) -> sops.AliasDecl:
         return sops.AliasDecl(
@@ -797,7 +797,7 @@ class AliasDecl(Op):
 class AliasDefn(Op):
     name: str
     definition: tys.Type
-    num_out: int | None = 0
+    num_out: int = 0
 
     def to_serial(self, parent: Node) -> sops.AliasDefn:
         return sops.AliasDefn(
