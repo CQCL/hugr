@@ -2,7 +2,7 @@ use portgraph::PortOffset;
 use rstest::{fixture, rstest};
 
 use crate::{
-    builder::{BuildError, BuildHandle, Container, DFGBuilder, Dataflow, DataflowHugr},
+    builder::{ft2, BuildError, BuildHandle, Container, DFGBuilder, Dataflow, DataflowHugr},
     extension::prelude::QB_T,
     ops::{
         handle::{DataflowOpID, NodeHandle},
@@ -150,12 +150,9 @@ fn value_types() {
 
 #[test]
 fn static_targets() {
-    use crate::extension::prelude::{ConstUsize, PRELUDE_ID, USIZE_T};
+    use crate::extension::prelude::{ConstUsize, USIZE_T};
     use itertools::Itertools;
-    let mut dfg = DFGBuilder::new(
-        FunctionType::new(type_row![], type_row![USIZE_T]).with_extension_delta(PRELUDE_ID),
-    )
-    .unwrap();
+    let mut dfg = DFGBuilder::new(ft2(type_row![], type_row![USIZE_T])).unwrap();
 
     let c = dfg.add_constant(Value::extension(ConstUsize::new(1)));
 

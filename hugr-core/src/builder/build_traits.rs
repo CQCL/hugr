@@ -18,7 +18,7 @@ use crate::{
     types::EdgeKind,
 };
 
-use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE_REGISTRY};
+use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE_REGISTRY, TO_BE_INFERRED};
 use crate::types::{FunctionType, Type, TypeArg, TypeRow, TypeScheme};
 
 use itertools::Itertools;
@@ -263,10 +263,9 @@ pub trait Dataflow: Container {
         collect_array(self.input_wires())
     }
 
-    /// Return a builder for a [`crate::ops::DFG`] node, i.e. a nested dataflow subgraph.
-    /// The `inputs` must be an iterable over pairs of the type of the input and
-    /// the corresponding wire.
-    /// The `output_types` are the types of the outputs.
+    /// Return a builder for a [`crate::ops::DFG`] node, i.e. a nested dataflow subgraph,
+    /// given a signature describing its input and output types and extension delta,
+    /// and the input wires (which must match the input types)
     ///
     /// # Errors
     ///
@@ -284,6 +283,21 @@ pub trait Dataflow: Container {
         let (dfg_n, _) = add_node_with_wires(self, op, input_wires)?;
 
         DFGBuilder::create_with_io(self.hugr_mut(), dfg_n, signature)
+    }
+
+    /// Return a builder for a [`crate::ops::DFG`] node, i.e. a nested dataflow subgraph,
+    /// that is endomorphic (the output types are the same as the input types).
+    /// The `inputs` must be an iterable over pairs of the type of the input and
+    /// the corresponding wire.
+    fn dfg_builder_endo(
+        &mut self,
+        inputs: impl IntoIterator<Item = (Type, Wire)>,
+    ) -> Result<DFGBuilder<&mut Hugr>, BuildError> {
+        let (types, input_wires): (Vec<Type>, Vec<Wire>) = inputs.into_iter().unzip();
+        self.dfg_builder(
+            FunctionType::new_endo(types).with_extension_delta(TO_BE_INFERRED),
+            input_wires,
+        )
     }
 
     /// Return a builder for a [`crate::ops::CFG`] node,

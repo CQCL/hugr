@@ -87,12 +87,12 @@
 //! ```
 use thiserror::Error;
 
-use crate::extension::SignatureError;
+use crate::extension::{SignatureError, TO_BE_INFERRED};
 use crate::hugr::ValidationError;
 use crate::ops::handle::{BasicBlockID, CfgID, ConditionalID, DfgID, FuncID, TailLoopID};
 use crate::ops::{NamedOp, OpType};
-use crate::types::ConstTypeError;
 use crate::types::Type;
+use crate::types::{ConstTypeError, FunctionType, TypeRow};
 use crate::{Node, Port, Wire};
 
 pub mod handle;
@@ -120,6 +120,18 @@ pub use conditional::{CaseBuilder, ConditionalBuilder};
 
 mod circuit;
 pub use circuit::{CircuitBuildError, CircuitBuilder};
+
+/// Return a FunctionType with the same input and output types (specified)
+/// whose extension delta, when used in a non-FuncDefn container, will be inferred.
+pub fn ft1(types: impl Into<TypeRow>) -> FunctionType {
+    FunctionType::new_endo(types).with_extension_delta(TO_BE_INFERRED)
+}
+
+/// Return a FunctionType with the specified input and output types
+/// whose extension delta, when used in a non-FuncDefn container, will be inferred.
+pub fn ft2(inputs: impl Into<TypeRow>, outputs: impl Into<TypeRow>) -> FunctionType {
+    FunctionType::new(inputs, outputs).with_extension_delta(TO_BE_INFERRED)
+}
 
 #[derive(Debug, Clone, PartialEq, Error)]
 #[non_exhaustive]
