@@ -130,7 +130,7 @@ class Command:
     Ephermeral, used to wire in operations to a dataflow graph.
 
     Example:
-        >>> Noop(Node(0).out(0))
+        >>> Noop()(Node(0).out(0))
         Command(op=Noop, incoming=[OutPort(Node(0), 0)])
     """
 
@@ -210,7 +210,7 @@ class Custom(DataflowOp):
 
 
 @dataclass()
-class MakeTupleDef(DataflowOp, _PartialOp):
+class MakeTuple(DataflowOp, _PartialOp):
     """Operation to create a tuple from a sequence of wires."""
 
     _types: tys.TypeRow | None = None
@@ -244,12 +244,8 @@ class MakeTupleDef(DataflowOp, _PartialOp):
         return "MakeTuple" + (f"({self._types})" if self._types is not None else "")
 
 
-#: See :class:`MakeTupleDef`.
-MakeTuple = MakeTupleDef()
-
-
 @dataclass()
-class UnpackTupleDef(DataflowOp, _PartialOp):
+class UnpackTuple(DataflowOp, _PartialOp):
     """Operation to unpack a tuple into its elements."""
 
     _types: tys.TypeRow | None = None
@@ -277,17 +273,13 @@ class UnpackTupleDef(DataflowOp, _PartialOp):
         return super().__call__(tuple_)
 
     def outer_signature(self) -> tys.FunctionType:
-        return MakeTupleDef(self.types).outer_signature().flip()
+        return MakeTuple(self.types).outer_signature().flip()
 
     def _set_in_types(self, types: tys.TypeRow) -> None:
         (t,) = types
         assert isinstance(t, tys.Sum), f"Expected unary Sum, got {t}"
         (row,) = t.variant_rows
         self._types = row
-
-
-#: See :class:`UnpackTupleDef`.
-UnpackTuple = UnpackTupleDef()
 
 
 @dataclass()
@@ -884,7 +876,7 @@ class Call(_CallOrLoad, Op):
 
 
 @dataclass()
-class CallIndirectDef(DataflowOp, _PartialOp):
+class CallIndirect(DataflowOp, _PartialOp):
     """Higher order evaluation of a :class:`FunctionType <hugr.tys.FunctionType>` value."""
 
     _signature: tys.FunctionType | None = None
@@ -921,10 +913,6 @@ class CallIndirectDef(DataflowOp, _PartialOp):
             func_sig, tys.FunctionType
         ), f"Expected function type, got {func_sig}"
         self._signature = func_sig
-
-
-#: See :class:`CallIndirectDef`.
-CallIndirect = CallIndirectDef()
 
 
 class LoadFunc(_CallOrLoad, DataflowOp):
@@ -965,7 +953,7 @@ class LoadFunc(_CallOrLoad, DataflowOp):
 
 
 @dataclass
-class NoopDef(DataflowOp, _PartialOp):
+class Noop(DataflowOp, _PartialOp):
     """Identity operation that passes through its input."""
 
     _type: tys.Type | None = None
@@ -988,10 +976,6 @@ class NoopDef(DataflowOp, _PartialOp):
 
     def __repr__(self) -> str:
         return "Noop" + (f"({self._type})" if self._type is not None else "")
-
-
-#: See :class:`NoopDef`.
-Noop = NoopDef()
 
 
 @dataclass

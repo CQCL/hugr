@@ -334,8 +334,8 @@ class CallIndirect(DataflowOp):
         assert len(fun_ty.output) == len(out_types)
         self.signature = fun_ty
 
-    def deserialize(self) -> ops.CallIndirectDef:
-        return ops.CallIndirectDef(self.signature.deserialize())
+    def deserialize(self) -> ops.CallIndirect:
+        return ops.CallIndirect(self.signature.deserialize())
 
 
 class LoadConstant(DataflowOp):
@@ -536,8 +536,8 @@ class Noop(DataflowOp):
         assert in_types[0] == out_types[0]
         self.ty = in_types[0]
 
-    def deserialize(self) -> ops.NoopDef:
-        return ops.NoopDef(self.ty.deserialize())
+    def deserialize(self) -> ops.Noop:
+        return ops.Noop(self.ty.deserialize())
 
 
 class MakeTuple(DataflowOp):
@@ -552,8 +552,8 @@ class MakeTuple(DataflowOp):
             in_types = []
         self.tys = list(in_types)
 
-    def deserialize(self) -> ops.MakeTupleDef:
-        return ops.MakeTupleDef(deser_it(self.tys))
+    def deserialize(self) -> ops.MakeTuple:
+        return ops.MakeTuple(deser_it(self.tys))
 
 
 class UnpackTuple(DataflowOp):
@@ -565,8 +565,8 @@ class UnpackTuple(DataflowOp):
     def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
         self.tys = list(out_types)
 
-    def deserialize(self) -> ops.UnpackTupleDef:
-        return ops.UnpackTupleDef(deser_it(self.tys))
+    def deserialize(self) -> ops.UnpackTuple:
+        return ops.UnpackTuple(deser_it(self.tys))
 
 
 class Tag(DataflowOp):
