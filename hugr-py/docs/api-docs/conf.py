@@ -35,7 +35,7 @@ html_css_files = ["custom.css"]
 autosummary_generate = True
 
 templates_path = ["_templates"]
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "conftest.py"]
 
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3/", None),

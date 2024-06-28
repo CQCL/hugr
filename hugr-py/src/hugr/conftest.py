@@ -1,3 +1,5 @@
+"""Testing setup."""
+
 import pytest
 import hugr.hugr as hugr
 import hugr.node_port as node_port
@@ -8,7 +10,7 @@ import hugr.val as val
 
 
 @pytest.fixture(autouse=True)
-def add_np(doctest_namespace):
+def add_hugr(doctest_namespace):
     doctest_namespace.update(
         {
             "hugr": hugr,
