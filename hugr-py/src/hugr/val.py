@@ -59,6 +59,8 @@ class Tuple(Sum):
             tag=0, typ=tys.Tuple(*(v.type_() for v in val_list)), vals=val_list
         )
 
+    # sops.TupleValue isn't an instance of sops.SumValue
+    # so mypy doesn't like the override of Sum.to_serial
     def to_serial(self) -> sops.TupleValue:  # type: ignore[override]
         return sops.TupleValue(
             vs=ser_it(self.vals),
