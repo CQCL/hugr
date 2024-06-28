@@ -12,16 +12,7 @@ from typing_extensions import Self
 
 import hugr.ops as ops
 import hugr.val as val
-from hugr.tys import (
-    Type,
-    TypeRow,
-    get_first_sum,
-    FunctionType,
-    TypeArg,
-    FunctionKind,
-    PolyFuncType,
-    ExtensionSet,
-)
+import hugr.tys as tys
 
 from .exceptions import NoSiblingAncestor
 from .hugr import Hugr, ParentBuilder
@@ -103,7 +94,7 @@ class _DfBase(ParentBuilder[DP]):
         self._wire_up(dfg.parent_node, args)
         return dfg
 
-    def _wire_types(self, args: Iterable[Wire]) -> TypeRow:
+    def _wire_types(self, args: Iterable[Wire]) -> tys.TypeRow:
         return [self._get_dataflow_type(w) for w in args]
 
     def add_cfg(
@@ -123,7 +114,7 @@ class _DfBase(ParentBuilder[DP]):
         from .cond_loop import Conditional
 
         args = (cond, *args)
-        (sum_, other_inputs) = get_first_sum(self._wire_types(args))
+        (sum_, other_inputs) = tys.get_first_sum(self._wire_types(args))
         cond = Conditional.new_nested(sum_, other_inputs, self.hugr, self.parent_node)
         self._wire_up(cond.parent_node, args)
         return cond
@@ -178,8 +169,8 @@ class _DfBase(ParentBuilder[DP]):
         self,
         func: ToNode,
         *args: Wire,
-        instantiation: FunctionType | None = None,
-        type_args: Sequence[TypeArg] | None = None,
+        instantiation: tys.FunctionType | None = None,
+        type_args: Sequence[tys.TypeArg] | None = None,
     ) -> Node:
         signature = self._fn_sig(func)
         call_op = ops.Call(signature, instantiation, type_args)
@@ -193,8 +184,8 @@ class _DfBase(ParentBuilder[DP]):
     def load_function(
         self,
         func: ToNode,
-        instantiation: FunctionType | None = None,
-        type_args: Sequence[TypeArg] | None = None,
+        instantiation: tys.FunctionType | None = None,
+        type_args: Sequence[tys.TypeArg] | None = None,
     ) -> Node:
         signature = self._fn_sig(func)
         load_op = ops.LoadFunc(signature, instantiation, type_args)
@@ -203,30 +194,30 @@ class _DfBase(ParentBuilder[DP]):
 
         return load_n
 
-    def _fn_sig(self, func: ToNode) -> PolyFuncType:
+    def _fn_sig(self, func: ToNode) -> tys.PolyFuncType:
         f_op = self.hugr[func]
         f_kind = f_op.op.port_kind(func.out(0))
         match f_kind:
-            case FunctionKind(sig):
+            case tys.FunctionKind(sig):
                 signature = sig
             case _:
                 raise ValueError("Expected 'func' to be a function")
         return signature
 
-    def _wire_up(self, node: Node, ports: Iterable[Wire]) -> TypeRow:
+    def _wire_up(self, node: Node, ports: Iterable[Wire]) -> tys.TypeRow:
         tys = [self._wire_up_port(node, i, p) for i, p in enumerate(ports)]
         if isinstance(op := self.hugr[node].op, ops._PartialOp):
             op._set_in_types(tys)
         return tys
 
-    def _get_dataflow_type(self, wire: Wire) -> Type:
+    def _get_dataflow_type(self, wire: Wire) -> tys.Type:
         port = wire.out_port()
         ty = self.hugr.port_type(port)
         if ty is None:
             raise ValueError(f"Port {port} is not a dataflow port.")
         return ty
 
-    def _wire_up_port(self, node: Node, offset: int, p: Wire) -> Type:
+    def _wire_up_port(self, node: Node, offset: int, p: Wire) -> tys.Type:
         src = p.out_port()
         node_ancestor = _ancestral_sibling(self.hugr, src.node, node)
         if node_ancestor is None:
@@ -239,7 +230,7 @@ class _DfBase(ParentBuilder[DP]):
 
 class Dfg(_DfBase[ops.DFG]):
     def __init__(
-        self, *input_types: Type, extension_delta: ExtensionSet | None = None
+        self, *input_types: tys.Type, extension_delta: tys.ExtensionSet | None = None
     ) -> None:
         parent_op = ops.DFG(list(input_types), None, extension_delta or [])
         super().__init__(parent_op)
