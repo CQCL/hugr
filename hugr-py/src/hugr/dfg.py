@@ -215,7 +215,7 @@ class _DfBase(ParentBuilder[DP]):
 
     def _wire_up(self, node: Node, ports: Iterable[Wire]) -> TypeRow:
         tys = [self._wire_up_port(node, i, p) for i, p in enumerate(ports)]
-        if isinstance(op := self.hugr[node].op, ops.PartialOp):
+        if isinstance(op := self.hugr[node].op, ops._PartialOp):
             op.set_in_types(tys)
         return tys
 

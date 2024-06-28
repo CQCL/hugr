@@ -131,7 +131,7 @@ class TupleValue(BaseValue):
     vs: list["Value"]
 
     def deserialize(self) -> val.Value:
-        return val.Tuple(deser_it((v.root for v in self.vs)))
+        return val.Tuple(*deser_it((v.root for v in self.vs)))
 
 
 class SumValue(BaseValue):

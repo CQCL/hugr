@@ -34,8 +34,3 @@ class MismatchedExit(Exception):
 
 class ParentBeforeChild(Exception):
     msg: str = "Parent node must be added before child node."
-
-
-@dataclass
-class IncompleteOp(Exception):
-    msg: str = "Operation is incomplete, may require set_in_types to be called."

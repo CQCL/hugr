@@ -32,8 +32,8 @@ class NodeData:
     _num_outs: int = 0
     children: list[Node] = field(default_factory=list)
 
-    def to_serial(self, node: Node, hugr: Hugr) -> SerialOp:
-        o = self.op.to_serial(node, self.parent if self.parent else node, hugr)
+    def to_serial(self, node: Node) -> SerialOp:
+        o = self.op.to_serial(self.parent if self.parent else node)
 
         return SerialOp(root=o)  # type: ignore[arg-type]
 
@@ -297,7 +297,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
         return SerialHugr(
             version="v1",
             # non contiguous indices will be erased
-            nodes=[node.to_serial(Node(idx), self) for idx, node in enumerate(node_it)],
+            nodes=[node.to_serial(Node(idx)) for idx, node in enumerate(node_it)],
             edges=[_serialise_link(link) for link in self._links.items()],
         )
 
