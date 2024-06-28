@@ -561,6 +561,9 @@ class LoadConst(DataflowOp):
             case _:
                 raise self._invalid_port(port)
 
+    def __repr__(self) -> str:
+        return "LoadConst" + (f"({self._typ})" if self._typ is not None else "")
+
 
 @dataclass()
 class Conditional(DataflowOp):
@@ -659,7 +662,7 @@ class TailLoop(DfParentOp, DataflowOp):
     #: Types that are appended to both inputs and outputs of the graph.
     rest: tys.TypeRow
     _just_outputs: tys.TypeRow | None = field(default=None, repr=False)
-    extension_delta: tys.ExtensionSet = field(default_factory=list)
+    extension_delta: tys.ExtensionSet = field(default_factory=list, repr=False)
 
     @property
     def just_outputs(self) -> tys.TypeRow:
