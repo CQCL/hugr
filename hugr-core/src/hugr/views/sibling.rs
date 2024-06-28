@@ -381,7 +381,6 @@ mod test {
     use crate::builder::test::simple_dfg_hugr;
     use crate::builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder};
     use crate::extension::PRELUDE_REGISTRY;
-    use crate::hugr::views::DescendantsGraph;
     use crate::ops::handle::{CfgID, DataflowParentID, DfgID, FuncID};
     use crate::ops::{dataflow::IOTrait, Input, OpTag, Output};
     use crate::ops::{OpTrait, OpType};
@@ -492,13 +491,13 @@ mod test {
 
     #[rstest]
     fn extract_hugr() -> Result<(), Box<dyn std::error::Error>> {
-        let (hugr, def, _inner) = make_module_hgr()?;
+        let (hugr, _def, inner) = make_module_hgr()?;
 
-        let region: DescendantsGraph = DescendantsGraph::try_new(&hugr, def)?;
+        let region: SiblingGraph = SiblingGraph::try_new(&hugr, inner)?;
         let extracted = region.extract_hugr();
         extracted.validate(&PRELUDE_REGISTRY)?;
 
-        let region: DescendantsGraph = DescendantsGraph::try_new(&hugr, def)?;
+        let region: SiblingGraph = SiblingGraph::try_new(&hugr, inner)?;
 
         assert_eq!(region.node_count(), extracted.node_count());
         assert_eq!(region.root_type(), extracted.root_type());
