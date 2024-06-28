@@ -49,7 +49,7 @@ class Op(Protocol):
         Example:
             >>> op = Const(val.TRUE)
             >>> op.port_kind(OutPort(Node(0), 0))
-            ConstKind(ty=Bool)
+            ConstKind(Bool)
         """
         ...  # pragma: no cover
 

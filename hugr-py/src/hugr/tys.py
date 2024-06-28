@@ -400,21 +400,33 @@ Unit = UnitSum(size=1)
 class ValueKind:
     """Dataflow value edges."""
 
+    #: Type of the value.
     ty: Type
+
+    def __repr__(self) -> str:
+        return f"ValueKind({self.ty})"
 
 
 @dataclass(frozen=True)
 class ConstKind:
     """Static constant value edges."""
 
+    #: Type of the constant.
     ty: Type
+
+    def __repr__(self) -> str:
+        return f"ConstKind({self.ty})"
 
 
 @dataclass(frozen=True)
 class FunctionKind:
     """Statically defined function edges."""
 
+    #: Type of the function.
     ty: PolyFuncType
+
+    def __repr__(self) -> str:
+        return f"FunctionKind({self.ty})"
 
 
 @dataclass(frozen=True)
