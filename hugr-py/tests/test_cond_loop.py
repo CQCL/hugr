@@ -88,7 +88,7 @@ def test_tail_loop() -> None:
 
     h = Dfg(tys.Qubit)
     (q,) = h.inputs()
-    tl_n = h.insert_tail_loop(tl, q)
+    tl_n = h.insert_tail_loop(tl, [q], [])
     h.set_outputs(tl_n)
     validate(h.hugr)
 

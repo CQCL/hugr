@@ -140,8 +140,10 @@ class _DfBase(ParentBuilder[DP]):
         self._wire_up(tl.parent_node, (*just_inputs, *rest))
         return tl
 
-    def insert_tail_loop(self, tl: TailLoop, *args: Wire) -> Node:
-        return self._insert_nested_impl(tl, *args)
+    def insert_tail_loop(
+        self, tl: TailLoop, just_inputs: Sequence[Wire], rest: Sequence[Wire]
+    ) -> Node:
+        return self._insert_nested_impl(tl, *(*just_inputs, *rest))
 
     def set_outputs(self, *args: Wire) -> None:
         self._wire_up(self.output_node, args)
