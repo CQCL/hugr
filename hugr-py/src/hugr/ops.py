@@ -471,8 +471,8 @@ class DataflowBlock(DfParentOp):
         return self.inputs
 
     def nth_outputs(self, n: int) -> tys.TypeRow:
-        """The outputs passed to the `n`th successor of the block.
-        Concatenation of the `n`th variant of the sum type and the other outputs."""
+        """The outputs passed to the nth successor of the block.
+        Concatenation of the nth variant of the sum type and the other outputs."""
         return [*self.sum_ty.variant_rows[n], *self.other_outputs]
 
 
@@ -608,8 +608,8 @@ class Conditional(DataflowOp):
         return self.signature
 
     def nth_inputs(self, n: int) -> tys.TypeRow:
-        """The inputs passed to the `n`th child case.
-        Concatenation of the `n`th variant of the sum type and the other inputs."""
+        """The inputs passed to the nth child case.
+        Concatenation of the nth variant of the sum type and the other inputs."""
         return [*self.sum_ty.variant_rows[n], *self.other_inputs]
 
 
