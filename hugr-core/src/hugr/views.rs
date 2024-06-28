@@ -24,7 +24,7 @@ use itertools::{Itertools, MapInto};
 use portgraph::render::{DotFormat, MermaidFormat};
 use portgraph::{multiportgraph, LinkView, PortView};
 
-use super::internal::HugrInternals;
+use super::internal::{HugrInternals, HugrMutInternals};
 use super::{
     Hugr, HugrError, HugrMut, NodeMetadata, NodeMetadataMap, ValidationError, DEFAULT_OPTYPE,
 };
@@ -512,6 +512,7 @@ pub trait ExtractHugr: HugrView + Sized {
         let old_root = hugr.root();
         let new_root = hugr.insert_from_view(old_root, &self).new_root;
         hugr.set_root(new_root);
+        hugr.set_num_ports(new_root, 0, 0);
         hugr.remove_node(old_root);
         hugr
     }
