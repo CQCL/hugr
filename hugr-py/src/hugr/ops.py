@@ -164,7 +164,7 @@ class Output(DataflowOp, _PartialOp):
     """Output operation in dataflow graph. Inputs of this operation are the
     outputs of the graph."""
 
-    _types: tys.TypeRow | None = None
+    _types: tys.TypeRow | None = field(default=None, repr=False)
     num_out: int = field(default=0, repr=False)
 
     @property
@@ -213,7 +213,7 @@ class Custom(DataflowOp):
 class MakeTuple(DataflowOp, _PartialOp):
     """Operation to create a tuple from a sequence of wires."""
 
-    _types: tys.TypeRow | None = None
+    _types: tys.TypeRow | None = field(default=None, repr=False)
     num_out: int = field(default=1, repr=False)
 
     @property
@@ -248,7 +248,7 @@ class MakeTuple(DataflowOp, _PartialOp):
 class UnpackTuple(DataflowOp, _PartialOp):
     """Operation to unpack a tuple into its elements."""
 
-    _types: tys.TypeRow | None = None
+    _types: tys.TypeRow | None = field(default=None, repr=False)
 
     @property
     def types(self) -> tys.TypeRow:
@@ -326,7 +326,7 @@ class DFG(DfParentOp, DataflowOp):
 
     #: Inputs types of the operation.
     inputs: tys.TypeRow
-    _outputs: tys.TypeRow | None = None
+    _outputs: tys.TypeRow | None = field(default=None, repr=False)
     extension_delta: tys.ExtensionSet = field(default_factory=list, repr=False)
 
     @property
@@ -376,7 +376,7 @@ class CFG(DataflowOp):
 
     #: Inputs types of the operation.
     inputs: tys.TypeRow
-    _outputs: tys.TypeRow | None = None
+    _outputs: tys.TypeRow | None = field(default=None, repr=False)
 
     @property
     def outputs(self) -> tys.TypeRow:
@@ -417,7 +417,7 @@ class DataflowBlock(DfParentOp):
     #: Inputs types of the innner dataflow graph.
     inputs: tys.TypeRow
     _sum: tys.Sum | None = None
-    _other_outputs: tys.TypeRow | None = None
+    _other_outputs: tys.TypeRow | None = field(default=None, repr=False)
     extension_delta: tys.ExtensionSet = field(default_factory=list)
 
     @property
@@ -480,7 +480,7 @@ class DataflowBlock(DfParentOp):
 class ExitBlock(Op):
     """Unique exit block of a control flow graph."""
 
-    _cfg_outputs: tys.TypeRow | None = None
+    _cfg_outputs: tys.TypeRow | None = field(default=None, repr=False)
     num_out: int = field(default=0, repr=False)
 
     @property
@@ -571,7 +571,7 @@ class Conditional(DataflowOp):
     sum_ty: tys.Sum
     #: Non-sum inputs that are passed to all cases.
     other_inputs: tys.TypeRow
-    _outputs: tys.TypeRow | None = None
+    _outputs: tys.TypeRow | None = field(default=None, repr=False)
 
     @property
     def outputs(self) -> tys.TypeRow:
@@ -619,7 +619,7 @@ class Case(DfParentOp):
 
     #: Inputs types of the innner dataflow graph.
     inputs: tys.TypeRow
-    _outputs: tys.TypeRow | None = None
+    _outputs: tys.TypeRow | None = field(default=None, repr=False)
     num_out: int = field(default=0, repr=False)
 
     @property
@@ -658,7 +658,7 @@ class TailLoop(DfParentOp, DataflowOp):
     just_inputs: tys.TypeRow
     #: Types that are appended to both inputs and outputs of the graph.
     rest: tys.TypeRow
-    _just_outputs: tys.TypeRow | None = None
+    _just_outputs: tys.TypeRow | None = field(default=None, repr=False)
     extension_delta: tys.ExtensionSet = field(default_factory=list)
 
     @property
@@ -714,7 +714,7 @@ class FuncDefn(DfParentOp):
     inputs: tys.TypeRow
     # ? type parameters of the function if polymorphic
     params: list[tys.TypeParam] = field(default_factory=list)
-    _outputs: tys.TypeRow | None = None
+    _outputs: tys.TypeRow | None = field(default=None, repr=False)
     num_out: int = field(default=1, repr=False)
 
     @property
@@ -984,7 +984,7 @@ class Lift(DataflowOp, _PartialOp):
 
     #: Extension added.
     new_extension: tys.ExtensionId
-    _type_row: tys.TypeRow | None = None
+    _type_row: tys.TypeRow | None = field(default=None, repr=False)
     num_out: int = field(default=1, repr=False)
 
     @property
