@@ -450,9 +450,7 @@ mod test {
         DataflowSubContainer, HugrBuilder, SubContainer,
     };
     use crate::extension::prelude::{BOOL_T, USIZE_T};
-    use crate::extension::{
-        ExtensionId, ExtensionRegistry, ExtensionSet, PRELUDE, PRELUDE_REGISTRY,
-    };
+    use crate::extension::{ExtensionId, ExtensionRegistry, PRELUDE, PRELUDE_REGISTRY};
     use crate::hugr::internal::HugrMutInternals;
     use crate::hugr::rewrite::replace::WhichHugr;
     use crate::hugr::{HugrMut, Rewrite};
