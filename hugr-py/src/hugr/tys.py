@@ -220,6 +220,9 @@ class Sum(Type):
         ), "Sum type must have exactly one row to be converted to a Tuple"
         return Tuple(*self.variant_rows[0])
 
+    def __repr__(self) -> str:
+        return f"Sum({self.variant_rows})"
+
 
 @dataclass()
 class UnitSum(Sum):
