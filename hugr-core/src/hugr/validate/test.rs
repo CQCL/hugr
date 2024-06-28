@@ -7,7 +7,7 @@ use rstest::rstest;
 use super::*;
 use crate::builder::test::closed_dfg_root_hugr;
 use crate::builder::{
-    BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
+    ft2, BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
     FunctionBuilder, HugrBuilder, ModuleBuilder, SubContainer,
 };
 use crate::extension::prelude::{BOOL_T, PRELUDE, PRELUDE_ID, QB_T, USIZE_T};
@@ -769,13 +769,10 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
 
     let int_pair = Type::new_tuple(type_row![USIZE_T; 2]);
     // Root DFG: applies a function int--PRELUDE-->int to each element of a pair of two ints
-    let mut d = DFGBuilder::new(
-        FunctionType::new(
-            vec![utou(PRELUDE_ID), int_pair.clone()],
-            vec![int_pair.clone()],
-        )
-        .with_extension_delta(PRELUDE_ID),
-    )?;
+    let mut d = DFGBuilder::new(ft2(
+        vec![utou(PRELUDE_ID), int_pair.clone()],
+        vec![int_pair.clone()],
+    ))?;
     // ....by calling a function parametrized<extensions E> (int--e-->int, int_pair) -> int_pair
     let f = {
         let es = ExtensionSet::type_var(0);
