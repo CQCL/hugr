@@ -47,10 +47,11 @@ class Cfg(ParentBuilder[ops.CFG]):
     _entry_block: Block
     exit: Node
 
-    def __init__(self, input_types: TypeRow) -> None:
-        root_op = ops.CFG(inputs=input_types)
+    def __init__(self, *input_types: Type) -> None:
+        input_typs = list(input_types)
+        root_op = ops.CFG(inputs=input_typs)
         hugr = Hugr(root_op)
-        self._init_impl(hugr, hugr.root, input_types)
+        self._init_impl(hugr, hugr.root, input_typs)
 
     def _init_impl(self: Cfg, hugr: Hugr, root: Node, input_types: TypeRow) -> None:
         self.hugr = hugr

@@ -14,13 +14,13 @@ def build_basic_cfg(cfg: Cfg) -> None:
 
 
 def test_basic_cfg() -> None:
-    cfg = Cfg([tys.Bool])
+    cfg = Cfg(tys.Bool)
     build_basic_cfg(cfg)
     validate(cfg.hugr)
 
 
 def test_branch() -> None:
-    cfg = Cfg([tys.Bool, INT_T])
+    cfg = Cfg(tys.Bool, INT_T)
     entry = cfg.add_entry()
     entry.set_block_outputs(*entry.inputs())
 
@@ -49,7 +49,7 @@ def test_nested_cfg() -> None:
 
 
 def test_dom_edge() -> None:
-    cfg = Cfg([tys.Bool, tys.Unit, INT_T])
+    cfg = Cfg(tys.Bool, tys.Unit, INT_T)
     entry = cfg.add_entry()
     b, u, i = entry.inputs()
     entry.set_block_outputs(b, i)
@@ -69,7 +69,7 @@ def test_dom_edge() -> None:
 
 def test_asymm_types() -> None:
     # test different types going to entry block's susccessors
-    cfg = Cfg([])
+    cfg = Cfg()
     entry = cfg.add_entry()
 
     int_load = entry.load(IntVal(34))
