@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.3.0 (2024-06-28)
+
+### Bug Fixes
+
+- SimpleReplacement panic on multiports ([#1191](https://github.com/CQCL/hugr/pull/1191))
+- Add some validation for const nodes ([#1222](https://github.com/CQCL/hugr/pull/1222))
+- Cfg not validating entry/exit types ([#1229](https://github.com/CQCL/hugr/pull/1229))
+
+### Documentation
+
+- Fix documentation of `ValidationError::ConstTypeError` ([#1227](https://github.com/CQCL/hugr/pull/1227))
+
+### Features
+
+- CircuitBuilder::add_constant ([#1168](https://github.com/CQCL/hugr/pull/1168))
+- [**breaking**] Make the rewrite errors more useful ([#1174](https://github.com/CQCL/hugr/pull/1174))
+- [**breaking**] Validate Extensions using hierarchy, ignore input_extensions, RIP inference ([#1142](https://github.com/CQCL/hugr/pull/1142))
+- [**breaking**] Infer extension deltas for Case, Cfg, Conditional, DataflowBlock, Dfg, TailLoop  ([#1195](https://github.com/CQCL/hugr/pull/1195))
+- Helper functions for requesting inference, use with builder in tests ([#1219](https://github.com/CQCL/hugr/pull/1219))
+
+### Refactor
+
+- [**breaking**] Remove NodeType and input_extensions ([#1183](https://github.com/CQCL/hugr/pull/1183))
+- [**breaking**] FunctionBuilder takes impl Into<PolyFuncType> ([#1220](https://github.com/CQCL/hugr/pull/1220))
+
+
 ## 0.2.0 (2024-06-07)
 
 ### Bug Fixes
