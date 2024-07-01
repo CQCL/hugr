@@ -24,7 +24,7 @@ class Function(_DfBase[ops.FuncDefn]):
     Args:
         name: The name of the function.
         input_types: The input types for the function (output types are
-        propagated through the graph to the output).
+        computated by propagating types from input node through the graph).
         type_params: The type parameters for the function, if polymorphic.
 
     Examples:

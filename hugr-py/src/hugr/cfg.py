@@ -53,8 +53,8 @@ class Cfg(ParentBuilder[ops.CFG]):
     being a :class:`CFG <hugr.ops.CFG>`.
 
     Args:
-        input_types: The input types for the CFG, outputs are propagated through
-        the graph to the exit block.
+        input_types: The input types for the CFG, outputs are computed
+        by propagating types through the control flow graph to the exit block.
 
     Examples:
         >>> cfg = Cfg(tys.Bool, tys.Unit)
