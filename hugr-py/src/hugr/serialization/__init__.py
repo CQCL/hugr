@@ -1,1 +1,1 @@
-"""Serialised HUGR objects as pydantic models."""
+"""Serialized HUGR objects as pydantic models."""

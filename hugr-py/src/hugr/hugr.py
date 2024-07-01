@@ -540,10 +540,10 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
         return mapping
 
     def to_serial(self) -> SerialHugr:
-        """Serialise the HUGR."""
+        """Serialize the HUGR."""
         node_it = (node for node in self._nodes if node is not None)
 
-        def _serialise_link(
+        def _serialize_link(
             link: tuple[_SO, _SI],
         ) -> tuple[tuple[int, int], tuple[int, int]]:
             src, dst = link
@@ -554,7 +554,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
             version="v1",
             # non contiguous indices will be erased
             nodes=[node.to_serial(Node(idx)) for idx, node in enumerate(node_it)],
-            edges=[_serialise_link(link) for link in self._links.items()],
+            edges=[_serialize_link(link) for link in self._links.items()],
         )
 
     def _constrain_offset(self, p: P) -> int:
@@ -573,7 +573,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
 
     @classmethod
     def from_serial(cls, serial: SerialHugr) -> Hugr:
-        """Load a HUGR from a serialised form."""
+        """Load a HUGR from a serialized form."""
         assert serial.nodes, "Empty Hugr is invalid"
 
         hugr = Hugr.__new__(Hugr)

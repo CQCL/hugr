@@ -22,7 +22,7 @@ class BiMap(MutableMapping, Generic[L, R]):
     bck: dict[R, L] = field(default_factory=dict)
 
     def __init__(self, fwd: Mapping[L, R] | None = None) -> None:
-        """Initialise a bidirectional map.
+        """Initialize a bidirectional map.
 
         Args:
             fwd: Left to right mapping. Defaults to empty.
