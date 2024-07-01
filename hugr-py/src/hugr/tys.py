@@ -209,7 +209,8 @@ class Array(Type):
 class Sum(Type):
     """Algabraic sum over product type. Instances of this type correspond to
     tuples (products) over one of the `variant_rows` in the sum type, tagged by
-    the index of the row."""
+    the index of the row.
+    """
 
     variant_rows: list[TypeRow]
 
@@ -304,7 +305,8 @@ class Alias(Type):
 @dataclass(frozen=True)
 class FunctionType(Type):
     """A function type, defined by input types,
-    output types and extension requirements."""
+    output types and extension requirements.
+    """
 
     input: TypeRow
     output: TypeRow
@@ -353,7 +355,8 @@ class FunctionType(Type):
 @dataclass(frozen=True)
 class PolyFuncType(Type):
     """Polymorphic function type or type scheme. Defined by a list of type
-    parameters that may appear in the :class:`FunctionType` body."""
+    parameters that may appear in the :class:`FunctionType` body.
+    """
 
     params: list[TypeParam]
     body: FunctionType

@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal  # noqa: D100
 
 from pydantic import ConfigDict
 
@@ -9,7 +9,8 @@ from .tys import ConfiguredBaseModel, PolyFuncType, SumType, Type, model_rebuild
 
 class TestingHugr(ConfiguredBaseModel):
     """A serializable representation of a Hugr Type, SumType, PolyFuncType,
-    Value, OpType. Intended for testing only."""
+    Value, OpType. Intended for testing only.
+    """
 
     version: Literal["v1"] = "v1"
     typ: Type | None = None

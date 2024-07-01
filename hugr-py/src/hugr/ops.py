@@ -32,11 +32,12 @@ class InvalidPort(Exception):
 @runtime_checkable
 class Op(Protocol):
     """An abstract HUGR operation. Must be convertibl
-    to a serialisable :class:`BaseOp`."""
+    to a serialisable :class:`BaseOp`.
+    """
 
     @property
     def num_out(self) -> int:
-        """The number of output ports for this operation
+        """The number of output ports for this operation.
 
         Example:
             >>> op = Const(val.TRUE)
@@ -72,11 +73,13 @@ def _sig_port_type(sig: tys.FunctionType, port: InPort | OutPort) -> tys.Type:
 @runtime_checkable
 class DataflowOp(Op, Protocol):
     """Abstract dataflow operation, can be assumed to have a signature and Value
-    kind ports."""
+    kind ports.
+    """
 
     def outer_signature(self) -> tys.FunctionType:
         """The external signature of this operation, defines the valid external
-        connectivity of the node the operation belongs to."""
+        connectivity of the node the operation belongs to.
+        """
         ...  # pragma: no cover
 
     def port_kind(self, port: InPort | OutPort) -> tys.Kind:
@@ -99,7 +102,8 @@ class DataflowOp(Op, Protocol):
     def __call__(self, *args) -> Command:
         """Calling with incoming :class:`Wire` arguments returns a
         :class:`Command` which can be used to wire in the operation in to a
-        dataflow graph."""
+        dataflow graph.
+        """
         return Command(self, list(args))
 
 
@@ -134,6 +138,7 @@ def _check_complete(op, v: V | None) -> V:
 class Command:
     """A :class:`DataflowOp` and its incoming :class:`Wire <hugr.nodeport.Wire>`
       arguments.
+
     Ephermeral, used to wire in operations to a dataflow graph.
 
     Example:
@@ -148,7 +153,8 @@ class Command:
 @dataclass()
 class Input(DataflowOp):
     """Input operation in dataflow graph. Outputs of this operation are the
-    inputs to the graph."""
+    inputs to the graph.
+    """
 
     types: tys.TypeRow
 
@@ -169,7 +175,8 @@ class Input(DataflowOp):
 @dataclass()
 class Output(DataflowOp, _PartialOp):
     """Output operation in dataflow graph. Inputs of this operation are the
-    outputs of the graph."""
+    outputs of the graph.
+    """
 
     _types: tys.TypeRow | None = field(default=None, repr=False)
     num_out: int = field(default=0, repr=False)
@@ -316,7 +323,8 @@ class Tag(DataflowOp):
 
 class DfParentOp(Op, Protocol):
     """Abstract parent of dataflow graph operations. Can be queried for the
-    dataflow signature of their child graph."""
+    dataflow signature of their child graph.
+    """
 
     def inner_signature(self) -> tys.FunctionType:
         """Inner signature of the child dataflow graph."""
@@ -479,7 +487,8 @@ class DataflowBlock(DfParentOp):
 
     def nth_outputs(self, n: int) -> tys.TypeRow:
         """The outputs passed to the nth successor of the block.
-        Concatenation of the nth variant of the sum type and the other outputs."""
+        Concatenation of the nth variant of the sum type and the other outputs.
+        """
         return [*self.sum_ty.variant_rows[n], *self.other_outputs]
 
 
@@ -512,7 +521,8 @@ class ExitBlock(Op):
 @dataclass
 class Const(Op):
     """A static constant value. Can be used with a :class:`LoadConst` to load in
-    to a dataflow graph."""
+    to a dataflow graph.
+    """
 
     val: val.Value
     num_out: int = field(default=1, repr=False)
@@ -575,7 +585,8 @@ class LoadConst(DataflowOp):
 @dataclass()
 class Conditional(DataflowOp):
     """Switch on the variants of an incoming sum type, evaluating the
-    corresponding one of the child :class:`Case` operations."""
+    corresponding one of the child :class:`Case` operations.
+    """
 
     #: Sum type to switch on.
     sum_ty: tys.Sum
@@ -619,7 +630,8 @@ class Conditional(DataflowOp):
 
     def nth_inputs(self, n: int) -> tys.TypeRow:
         """The inputs passed to the nth child case.
-        Concatenation of the nth variant of the sum type and the other inputs."""
+        Concatenation of the nth variant of the sum type and the other inputs.
+        """
         return [*self.sum_ty.variant_rows[n], *self.other_inputs]
 
 
@@ -662,7 +674,8 @@ class Case(DfParentOp):
 @dataclass
 class TailLoop(DfParentOp, DataflowOp):
     """Tail controlled loop operation, child dataflow graph iterates while it
-    outputs the first variant of a sum type."""
+    outputs the first variant of a sum type.
+    """
 
     #: Types that are only inputs of the child graph.
     just_inputs: tys.TypeRow
@@ -716,7 +729,8 @@ class TailLoop(DfParentOp, DataflowOp):
 @dataclass
 class FuncDefn(DfParentOp):
     """Function definition operation, parent of a dataflow graph that defines
-    the function."""
+    the function.
+    """
 
     #: function name
     name: str
@@ -850,7 +864,7 @@ class _CallOrLoad:
 
 class Call(_CallOrLoad, Op):
     """Call a function inside a dataflow graph. Connects to :class:`FuncDefn` or
-    :class:`FuncDecl` operations
+    :class:`FuncDecl` operations.
 
     Args:
         signature: Polymorphic function signature.
@@ -888,7 +902,8 @@ class Call(_CallOrLoad, Op):
 @dataclass()
 class CallIndirect(DataflowOp, _PartialOp):
     """Higher order evaluation of a
-    :class:`FunctionType <hugr.tys.FunctionType>` value."""
+    :class:`FunctionType <hugr.tys.FunctionType>` value.
+    """
 
     _signature: tys.FunctionType | None = None
 
@@ -901,7 +916,8 @@ class CallIndirect(DataflowOp, _PartialOp):
         """The signature of the function being called.
 
         Raises:
-            IncompleteOp: If the signature has not been set."""
+        IncompleteOp: If the signature has not been set.
+        """
         return _check_complete(self, self._signature)
 
     def to_serial(self, parent: Node) -> sops.CallIndirect:

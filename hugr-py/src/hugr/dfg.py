@@ -371,7 +371,6 @@ class _DfBase(ParentBuilder[DP]):
             args: Wires to connect to the output node.
 
         Example:
-
             >>> dfg = Dfg(tys.Bool)
             >>> dfg.set_outputs(dfg.inputs()[0]) # connect input to output
         """
@@ -462,7 +461,6 @@ class _DfBase(ParentBuilder[DP]):
         Returns:
             The node holding the :class:`Call <hugr.ops.Call>` operation.
         """
-
         signature = self._fn_sig(func)
         call_op = ops.Call(signature, instantiation, type_args)
         call_n = self.hugr.add_node(call_op, self.parent_node, call_op.num_out)

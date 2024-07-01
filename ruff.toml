@@ -21,7 +21,7 @@ select = [
   # "C90",  # mccabe
   # "COM",  # flake8-commas
   # "CPY",  # flake8-copyright
-  # "D",    # pydocstyle
+  "D",    # pydocstyle
   "EM", # flake8-errmsg
   # "ERA",  # eradicate
   "EXE", # flake8-executable
@@ -72,6 +72,7 @@ ignore = [
 
 [lint.per-file-ignores]
 "hugr-py/tests/**" = ["D"]
+"hugr-py/docs" = ["D"]
 "scripts/generate_schema.py"= ["T201", "EXE001"]
 
 [lint.pydocstyle]

@@ -11,7 +11,8 @@ R = TypeVar("R", bound=Hashable)
 @dataclass()
 class BiMap(MutableMapping, Generic[L, R]):
     """Bidirectional map backed by two dictionaries, between left types `L` and
-    right types `R`."""
+    right types `R`.
+    """
 
     fwd: dict[L, R] = field(default_factory=dict)
     bck: dict[R, L] = field(default_factory=dict)
@@ -58,7 +59,6 @@ class BiMap(MutableMapping, Generic[L, R]):
 
     def items(self) -> ItemsView[L, R]:
         """Iterator over left, right pairs.
-
 
         Example:
             >>> bm = BiMap({"a": 1, "b": 2})

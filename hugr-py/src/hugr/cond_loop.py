@@ -1,5 +1,6 @@
 """Builder classes for structured control flow
-in HUGR graphs (Conditional, TailLoop)."""
+in HUGR graphs (Conditional, TailLoop).
+"""
 
 from __future__ import annotations
 
@@ -49,7 +50,6 @@ class _IfElse(Case):
 
 class If(_IfElse):
     """Build the 'if' branch of a conditional branching on a boolean value.
-
 
     Examples:
         >>> from hugr.dfg import Dfg
