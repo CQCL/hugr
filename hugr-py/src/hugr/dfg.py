@@ -62,13 +62,13 @@ class _DfBase(ParentBuilder[DP]):
     def new_nested(
         cls, parent_op: DP, hugr: Hugr, parent: ToNode | None = None
     ) -> Self:
-        """Start building a dataflow graph nested inside a larger hugr.
+        """Start building a dataflow graph nested inside a larger HUGR.
 
         Args:
             parent_op: The parent operation of the new dataflow graph.
-            hugr: The host hugr instance to build the dataflow graph in.
-            parent: Parent of new dataflow graph's root node, defaults to the
-            host hugr root.
+            hugr: The host HUGR instance to build the dataflow graph in.
+            parent: Parent of new dataflow graph's root node: defaults to the
+            host HUGR root.
 
         Example:
             >>> hugr = Hugr()
@@ -90,7 +90,7 @@ class _DfBase(ParentBuilder[DP]):
         return self.hugr._get_typed_op(self.output_node, ops.Output)
 
     def inputs(self) -> list[OutPort]:
-        """List all incoming wires, output ports of the input node.
+        """List all incoming wires (output ports of the input node).
 
         Example:
             >>> dfg = Dfg(tys.Bool)
@@ -235,7 +235,7 @@ class _DfBase(ParentBuilder[DP]):
         graph.
 
         Args:
-            cond_wire: The wire holding the wire (of Sum type) to branch the
+            cond_wire: The wire holding the value (of Sum type) to branch the
             conditional on.
             args: Remaining input wires to the conditional.
 
@@ -267,7 +267,7 @@ class _DfBase(ParentBuilder[DP]):
 
         Args:
             cond: The conditional to insert.
-            cond_wire: The wire holding the wire (of Sum type)
+            cond_wire: The wire holding the value (of Sum type)
               to branch the Conditional on.
             args: Remaining input wires to the conditional.
 
@@ -289,7 +289,7 @@ class _DfBase(ParentBuilder[DP]):
         graph.
 
         Args:
-            cond_wire: The wire holding the Bool wire to branch the If on.
+            cond_wire: The wire holding the Bool value to branch the If on.
             args: Remaining input wires to the If (and subsequent Else).
 
         Returns:
@@ -476,7 +476,7 @@ class _DfBase(ParentBuilder[DP]):
         instantiation: tys.FunctionType | None = None,
         type_args: Sequence[tys.TypeArg] | None = None,
     ) -> Node:
-        """Load a static function in to the graph as a higher-order value.
+        """Load a static function into the graph as a higher-order value.
 
         Args:
             func: The node corresponding to the function definition/declaration to load.

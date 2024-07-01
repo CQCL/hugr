@@ -126,7 +126,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
         """The child nodes of a given `node`.
 
         Args:
-            node: Parent node. Defaults to the Hugr root.
+            node: Parent node. Defaults to the HUGR root.
 
         Returns:
             List of child nodes.
@@ -241,7 +241,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
         return sub_port
 
     def add_link(self, src: OutPort, dst: InPort) -> None:
-        """Add a link (edge)  between two nodes to the HUGR,
+        """Add a link (edge) between two nodes to the HUGR,
           from an outgoing port to an incoming port.
 
         Args:
@@ -503,14 +503,14 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
         return None
 
     def insert_hugr(self, hugr: Hugr, parent: ToNode | None = None) -> dict[Node, Node]:
-        """Insert a HUGR in to this HUGR.
+        """Insert a HUGR into this HUGR.
 
         Args:
             hugr: HUGR to insert.
-            parent: Parent for root of inserted HUGR, defaults to None.
+            parent: Parent for root of inserted HUGR. Defaults to None.
 
         Returns:
-            Mapping from node indices in inserted to HUGR to their new indices
+            Mapping from node indices in inserted HUGR to their new indices
             in this HUGR.
 
         Examples:

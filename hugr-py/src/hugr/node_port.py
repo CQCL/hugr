@@ -68,7 +68,7 @@ class ToNode(Wire, Protocol):
     """Protocol by any object that can be treated as a :class:`Node`."""
 
     def to_node(self) -> Node:
-        """Convert in to a :class:`Node`."""
+        """Convert to a :class:`Node`."""
         ...  # pragma: no cover
 
     @overload

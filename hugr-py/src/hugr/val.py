@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 @runtime_checkable
 class Value(Protocol):
-    """Abstract value definition. Must be serialisable in to a HUGR value."""
+    """Abstract value definition. Must be serialisable into a HUGR value."""
 
     def to_serial(self) -> sops.BaseValue:
         """Convert to serialisable model."""
@@ -37,7 +37,7 @@ class Value(Protocol):
 
 @dataclass
 class Sum(Value):
-    """Sum of product value.
+    """Sum-of-product value.
 
     Example:
         >>> Sum(0, tys.Sum([[tys.Bool], [tys.Unit]]), [TRUE])
@@ -46,7 +46,7 @@ class Sum(Value):
 
     #: Tag identifying the variant.
     tag: int
-    #: Type of the sum, defines all possible variants.
+    #: Type of the sum: defines all possible variants.
     typ: tys.Sum
     #: The values of this variant row.
     vals: list[Value]
@@ -96,7 +96,7 @@ class UnitSum(Sum):
 
 
 def bool_value(b: bool) -> UnitSum:
-    """Convert a python bool to a HUGR bool value.
+    """Convert a python bool to a HUGR boolean value.
 
     Example:
         >>> bool_value(True)

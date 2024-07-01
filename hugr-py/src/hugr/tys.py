@@ -207,7 +207,7 @@ class Array(Type):
 
 @dataclass()
 class Sum(Type):
-    """Algabraic sum over product type. Instances of this type correspond to
+    """Algebraic sum-over-product type. Instances of this type correspond to
     tuples (products) over one of the `variant_rows` in the sum type, tagged by
     the index of the row.
     """
@@ -285,7 +285,7 @@ class RowVariable(Type):
 
 @dataclass(frozen=True)
 class USize(Type):
-    """The prelude unsigned size type."""
+    """The Prelude unsigned size type."""
 
     def to_serial(self) -> stys.USize:
         return stys.USize()

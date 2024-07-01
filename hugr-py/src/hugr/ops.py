@@ -31,7 +31,7 @@ class InvalidPort(Exception):
 
 @runtime_checkable
 class Op(Protocol):
-    """An abstract HUGR operation. Must be convertibl
+    """An abstract HUGR operation. Must be convertible
     to a serialisable :class:`BaseOp`.
     """
 
@@ -77,7 +77,7 @@ class DataflowOp(Op, Protocol):
     """
 
     def outer_signature(self) -> tys.FunctionType:
-        """The external signature of this operation, defines the valid external
+        """The external signature of this operation. Defines the valid external
         connectivity of the node the operation belongs to.
         """
         ...  # pragma: no cover
@@ -101,7 +101,7 @@ class DataflowOp(Op, Protocol):
 
     def __call__(self, *args) -> Command:
         """Calling with incoming :class:`Wire` arguments returns a
-        :class:`Command` which can be used to wire in the operation in to a
+        :class:`Command` which can be used to wire the operation into a
         dataflow graph.
         """
         return Command(self, list(args))
@@ -139,7 +139,7 @@ class Command:
     """A :class:`DataflowOp` and its incoming :class:`Wire <hugr.nodeport.Wire>`
       arguments.
 
-    Ephemeral, used to wire in operations to a dataflow graph.
+    Ephemeral: used to wire operations into a dataflow graph.
 
     Example:
         >>> Noop()(Node(0).out(0))
@@ -300,7 +300,7 @@ class UnpackTuple(DataflowOp, _PartialOp):
 class Tag(DataflowOp):
     """Tag a row of incoming values to make them a variant of a sum type.
 
-    Requires `sum_ty` to be set as all the variants cannot be extracted from
+    Requires `sum_ty` to be set as it is not possible to extract all the variants from
     just the input wires for one variant.
     """
 
@@ -323,7 +323,7 @@ class Tag(DataflowOp):
 
 class DfParentOp(Op, Protocol):
     """Abstract parent of dataflow graph operations. Can be queried for the
-    dataflow signature of their child graph.
+    dataflow signature of its child graph.
     """
 
     def inner_signature(self) -> tys.FunctionType:
@@ -427,7 +427,7 @@ class CFG(DataflowOp):
 
 @dataclass
 class DataflowBlock(DfParentOp):
-    """Parent of Non-entry basic block in a control flow graph."""
+    """Parent of non-entry basic block in a control flow graph."""
 
     #: Inputs types of the innner dataflow graph.
     inputs: tys.TypeRow
@@ -520,8 +520,8 @@ class ExitBlock(Op):
 
 @dataclass
 class Const(Op):
-    """A static constant value. Can be used with a :class:`LoadConst` to load in
-    to a dataflow graph.
+    """A static constant value. Can be used with a :class:`LoadConst` to load into
+    a dataflow graph.
     """
 
     val: val.Value
@@ -584,7 +584,7 @@ class LoadConst(DataflowOp):
 
 @dataclass()
 class Conditional(DataflowOp):
-    """Switch on the variants of an incoming sum type, evaluating the
+    """'Switch' operation on the variants of an incoming sum type, evaluating the
     corresponding one of the child :class:`Case` operations.
     """
 
@@ -869,7 +869,7 @@ class Call(_CallOrLoad, Op):
     Args:
         signature: Polymorphic function signature.
         instantiation: Concrete function signature. Defaults to None.
-        type_args: type arguments for polymorphic function. Defaults to None.
+        type_args: Type arguments for polymorphic function. Defaults to None.
 
     Raises:
         NoConcreteFunc: If the signature is polymorphic and no instantiation
@@ -949,7 +949,7 @@ class LoadFunc(_CallOrLoad, DataflowOp):
     Args:
         signature: Polymorphic function signature.
         instantiation: Concrete function signature. Defaults to None.
-        type_args: type arguments for polymorphic function. Defaults to None.
+        type_args: Type arguments for polymorphic function. Defaults to None.
 
     Raises:
         NoConcreteFunc: If the signature is polymorphic and no instantiation
@@ -1037,9 +1037,9 @@ class Lift(DataflowOp, _PartialOp):
 class AliasDecl(Op):
     """Declare an external type alias."""
 
-    #: Alias name
+    #: Alias name.
     name: str
-    #: Type bound
+    #: Type bound.
     bound: tys.TypeBound
     num_out: int = field(default=0, repr=False)
 
@@ -1058,9 +1058,9 @@ class AliasDecl(Op):
 class AliasDefn(Op):
     """Declare a type alias."""
 
-    #: Alias name
+    #: Alias name.
     name: str
-    #: Type definition
+    #: Type definition.
     definition: tys.Type
     num_out: int = field(default=0, repr=False)
 

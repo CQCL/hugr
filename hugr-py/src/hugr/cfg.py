@@ -53,7 +53,7 @@ class Cfg(ParentBuilder[ops.CFG]):
     being a :class:`CFG <hugr.ops.CFG>`.
 
     Args:
-        input_types: The input types for the CFG, outputs are computed
+        input_types: The input types for the CFG. Outputs are computed
         by propagating types through the control flow graph to the exit block.
 
     Examples:
@@ -96,7 +96,7 @@ class Cfg(ParentBuilder[ops.CFG]):
         Args:
             input_types: The input types for the CFG.
             hugr: The HUGR instance this CFG is part of.
-            parent: The parent node for the CFG, defaults to the root of the HUGR
+            parent: The parent node for the CFG: defaults to the root of the HUGR
                 instance.
 
         Returns:
@@ -175,7 +175,7 @@ class Cfg(ParentBuilder[ops.CFG]):
         """Start building a block that succeeds an existing block.
 
         Args:
-            pred: The wire from the predecessor block to the new block, the
+            pred: The wire from the predecessor block to the new block. The
             port of the wire determines the branching index of the new block.
 
 

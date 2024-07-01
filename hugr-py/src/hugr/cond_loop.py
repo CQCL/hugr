@@ -90,7 +90,7 @@ class Conditional(ParentBuilder[ops.Conditional]):
     Args:
         sum_ty: The sum type to branch on.
         other_inputs: The inputs for the conditional that aren't included in the
-        sum variants - passed to all cases.
+        sum variants. These are passed to all cases.
 
     Examples:
         >>> cond = Conditional(tys.Bool, [tys.Qubit])
@@ -124,9 +124,9 @@ class Conditional(ParentBuilder[ops.Conditional]):
         Args:
             sum_ty: The sum type to branch on.
             other_inputs: The inputs for the conditional that aren't included in the
-                sum variants - passed to all cases.
+                sum variants. These are passed to all cases.
             hugr: The HUGR instance this Conditional is part of.
-            parent: The parent node for the Conditional, defaults to the root of
+            parent: The parent node for the Conditional: defaults to the root of
               the HUGR instance.
 
         Returns:
@@ -157,7 +157,7 @@ class Conditional(ParentBuilder[ops.Conditional]):
             other inputs to the conditional.
 
         Returns:
-                The new case builder.
+            The new case builder.
 
         Raises:
             ConditionalError: If the case index is out of range.
@@ -185,7 +185,7 @@ class Conditional(ParentBuilder[ops.Conditional]):
 
 @dataclass
 class TailLoop(_DfBase[ops.TailLoop]):
-    """Builder for a tail controlled loop.
+    """Builder for a tail-controlled loop.
 
     Args:
         just_inputs: Types that are only inputs to the loop body.
@@ -202,7 +202,7 @@ class TailLoop(_DfBase[ops.TailLoop]):
         super().__init__(root_op)
 
     def set_loop_outputs(self, sum_wire: Wire, *rest: Wire) -> None:
-        """Set the outputs of the loop body, the first wire must be the sum type
+        """Set the outputs of the loop body. The first wire must be the sum type
         that controls loop termination.
 
         Args:
