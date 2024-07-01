@@ -174,7 +174,7 @@ impl<RV: MaybeRV> From<&'static [TypeBase<RV>]> for TypeRowBase<RV> {
     }
 }
 
-impl<RV1: MaybeRV + Into<RowVariable>> From<TypeBase<RV1>> for TypeRowRV {
+impl<RV1: MaybeRV> From<TypeBase<RV1>> for TypeRowRV {
     fn from(t: TypeBase<RV1>) -> Self {
         Self {
             types: vec![t.into_()].into(),

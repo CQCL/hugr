@@ -18,7 +18,7 @@ pub struct RowVariable(pub usize, pub TypeBound);
 
 // Note that whilst 'pub' this is not re-exported outside private module `row_var`
 // so is effectively sealed.
-pub trait MaybeRV: Clone + std::fmt::Debug + std::fmt::Display + From<NoRV> + Eq + PartialEq + 'static {
+pub trait MaybeRV: Clone + std::fmt::Debug + std::fmt::Display + From<NoRV> + Into<RowVariable> + Eq + PartialEq + 'static {
     fn as_rv(&self) -> &RowVariable;
     fn try_from_rv(rv: RowVariable) -> Result<Self, RowVariable>;
     fn bound(&self) -> TypeBound;
