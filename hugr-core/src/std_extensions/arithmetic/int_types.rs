@@ -63,7 +63,7 @@ pub const LOG_WIDTH_TYPE_PARAM: TypeParam = TypeParam::bounded_nat({
 
 /// Get the log width  of the specified type argument or error if the argument
 /// is invalid.
-pub(super) fn get_log_width(arg: &TypeArg) -> Result<u8, TypeArgError> {
+pub(crate) fn get_log_width(arg: &TypeArg) -> Result<u8, TypeArgError> {
     match arg {
         TypeArg::BoundedNat { n } if is_valid_log_width(*n as u8) => Ok(*n as u8),
         _ => Err(TypeArgError::TypeMismatch {
@@ -80,7 +80,7 @@ const fn type_arg(log_width: u8) -> TypeArg {
 }
 
 /// An integer (either signed or unsigned)
-#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct ConstInt {
     log_width: u8,
     // We always use a u64 for the value. The interpretation is:

@@ -14,6 +14,7 @@ pub mod extension;
 pub mod hugr;
 pub mod macros;
 pub mod ops;
+pub mod partial_value;
 pub mod std_extensions;
 pub mod types;
 pub mod utils;
