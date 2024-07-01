@@ -1,9 +1,10 @@
-from hugr.cfg import Cfg
+import hugr.ops as ops
 import hugr.tys as tys
 import hugr.val as val
+from hugr.cfg import Cfg
 from hugr.dfg import Dfg
-import hugr.ops as ops
-from .conftest import validate, INT_T, DivMod, IntVal
+
+from .conftest import INT_T, DivMod, IntVal, validate
 
 
 def build_basic_cfg(cfg: Cfg) -> None:

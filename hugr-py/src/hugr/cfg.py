@@ -1,15 +1,18 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import hugr.ops as ops
+import hugr.val as val
 
 from .dfg import _DfBase
-from .exceptions import NoSiblingAncestor, NotInSameCfg, MismatchedExit
+from .exceptions import MismatchedExit, NoSiblingAncestor, NotInSameCfg
 from .hugr import Hugr, ParentBuilder
-from .node_port import Node, Wire, ToNode
-from .tys import TypeRow, Type
-import hugr.val as val
+
+if TYPE_CHECKING:
+    from .node_port import Node, ToNode, Wire
+    from .tys import Type, TypeRow
 
 
 class Block(_DfBase[ops.DataflowBlock]):
@@ -27,13 +30,13 @@ class Block(_DfBase[ops.DataflowBlock]):
         src_parent = self.hugr[src.node].parent
         try:
             super()._wire_up_port(node, offset, p)
-        except NoSiblingAncestor:
+        except NoSiblingAncestor as e:
             # note this just checks if there is a common CFG ancestor
             # it does not check for valid dominance between basic blocks
             # that is deferred to full HUGR validation.
             while cfg_node != src_parent:
                 if src_parent is None or src_parent == self.hugr.root:
-                    raise NotInSameCfg(src.node.idx, node.idx)
+                    raise NotInSameCfg(src.node.idx, node.idx) from e
                 src_parent = self.hugr[src_parent].parent
 
             self.hugr.add_link(src, node.inp(offset))

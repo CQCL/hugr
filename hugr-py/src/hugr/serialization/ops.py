@@ -1,27 +1,32 @@
 from __future__ import annotations
+
 import inspect
 import sys
 from abc import ABC, abstractmethod
 from typing import Any, Literal
 
-from pydantic import Field, RootModel, ConfigDict
+from pydantic import ConfigDict, Field, RootModel
+
+from hugr.utils import deser_it
 
 from . import tys as stys
 from .tys import (
+    ConfiguredBaseModel,
     ExtensionId,
     ExtensionSet,
     FunctionType,
     PolyFuncType,
-    Type,
-    TypeRow,
     SumType,
+    Type,
     TypeBound,
-    ConfiguredBaseModel,
+    TypeRow,
+)
+from .tys import (
     classes as tys_classes,
+)
+from .tys import (
     model_rebuild as tys_model_rebuild,
 )
-from hugr.utils import deser_it
-
 
 NodeID = int
 
@@ -128,10 +133,10 @@ class TupleValue(BaseValue):
     """A constant tuple value."""
 
     v: Literal["Tuple"] = Field(default="Tuple", title="ValueTag")
-    vs: list["Value"]
+    vs: list[Value]
 
     def deserialize(self) -> val.Value:
-        return val.Tuple(*deser_it((v.root for v in self.vs)))
+        return val.Tuple(*deser_it(v.root for v in self.vs))
 
 
 class SumValue(BaseValue):
@@ -143,7 +148,7 @@ class SumValue(BaseValue):
     v: Literal["Sum"] = Field(default="Sum", title="ValueTag")
     tag: int
     typ: SumType
-    vs: list["Value"]
+    vs: list[Value]
     model_config = ConfigDict(
         json_schema_extra={
             "description": (
@@ -155,7 +160,7 @@ class SumValue(BaseValue):
 
     def deserialize(self) -> val.Value:
         return val.Sum(
-            self.tag, self.typ.deserialize(), deser_it((v.root for v in self.vs))
+            self.tag, self.typ.deserialize(), deser_it(v.root for v in self.vs)
         )
 
 
@@ -224,7 +229,8 @@ class DataflowBlock(BaseOp):
 
     model_config = ConfigDict(
         json_schema_extra={
-            "description": "A CFG basic block node. The signature is that of the internal Dataflow graph.",
+            "description": "A CFG basic block node."
+            " The signature is that of the internal Dataflow graph.",
         }
     )
 
@@ -239,7 +245,8 @@ class ExitBlock(BaseOp):
     model_config = ConfigDict(
         json_schema_extra={
             # Needed to avoid random '\n's in the pydantic description
-            "description": "The single exit node of the CFG, has no children, stores the types of the CFG node output.",
+            "description": "The single exit node of the CFG, has no children,"
+            " stores the types of the CFG node output.",
         }
     )
 
@@ -362,7 +369,7 @@ class LoadFunction(DataflowOp):
         (f_ty,) = signature.output
         assert isinstance(
             f_ty, tys.FunctionType
-        ), "Expected single funciton type output"
+        ), "Expected single function type output"
         return ops.LoadFunc(
             self.func_sig.deserialize(),
             f_ty,
@@ -517,8 +524,8 @@ class CustomOp(DataflowOp):
         # Needed to avoid random '\n's in the pydantic description
         json_schema_extra={
             "description": (
-                "A user-defined operation that can be downcasted by the extensions that "
-                "define it."
+                "A user-defined operation that can be downcasted by the extensions that"
+                " define it."
             )
         }
     )
@@ -682,7 +689,8 @@ classes = (
 
 tys_model_rebuild(dict(classes))
 
-# needed to avoid circular imports
-from hugr import ops  # noqa: E402
-from hugr import val  # noqa: E402
-from hugr import tys  # noqa: E402
+from hugr import (  # noqa: E402 # needed to avoid circular imports
+    ops,
+    tys,
+    val,
+)

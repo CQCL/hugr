@@ -1,7 +1,10 @@
-from pydantic import ConfigDict
 from typing import Literal
-from .tys import Type, SumType, PolyFuncType, ConfiguredBaseModel, model_rebuild
-from .ops import Value, OpType, OpDef, classes as ops_classes
+
+from pydantic import ConfigDict
+
+from .ops import OpDef, OpType, Value
+from .ops import classes as ops_classes
+from .tys import ConfiguredBaseModel, PolyFuncType, SumType, Type, model_rebuild
 
 
 class TestingHugr(ConfiguredBaseModel):
@@ -22,7 +25,8 @@ class TestingHugr(ConfiguredBaseModel):
         return cls().version
 
     @classmethod
-    def _pydantic_rebuild(cls, config: ConfigDict = ConfigDict(), **kwargs):
+    def _pydantic_rebuild(cls, config: ConfigDict | None = None, **kwargs):
+        config = config or ConfigDict()
         my_classes = dict(ops_classes)
         my_classes[cls.__name__] = cls
         model_rebuild(my_classes, config=config, **kwargs)
