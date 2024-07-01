@@ -6,7 +6,7 @@ use std::fmt::{self, Display, Write};
 
 use super::type_param::TypeParam;
 use super::type_row::TypeRowBase;
-use super::{MaybeRV, NoRV, RowVariable, Substitution, Type, TypeEnum, TypeRow};
+use super::{MaybeRV, NoRV, RowVariable, Substitution, Type, TypeRow};
 
 use crate::core::PortIndex;
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
@@ -105,15 +105,12 @@ impl<RV: MaybeRV> FuncTypeBase<RV> {
 }
 
 impl FunctionTypeRV {
-    /// If this FunctionType contains any row variables, return one.
+    /// If this FunctionTypeRV contains any row variables, return one.
     pub fn find_rowvar(&self) -> Option<RowVariable> {
         self.input
             .iter()
             .chain(self.output.iter())
-            .find_map(|t| match &t.0 {
-                TypeEnum::RowVar(rv) => Some(rv.clone()),
-                _ => None,
-            })
+            .find_map(|t| Type::try_from(t.clone()).err())
     }
 }
 
