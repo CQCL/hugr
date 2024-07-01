@@ -1,16 +1,17 @@
 from __future__ import annotations
-from hugr.node_port import Node, _SubPort
 
-from hugr.hugr import Hugr
-from hugr.dfg import Dfg, _ancestral_sibling
-from hugr.ops import NoConcreteFunc
+import pytest
+
 import hugr.ops as ops
 import hugr.tys as tys
 import hugr.val as val
+from hugr.dfg import Dfg, _ancestral_sibling
 from hugr.function import Module
-import pytest
+from hugr.hugr import Hugr
+from hugr.node_port import Node, _SubPort
+from hugr.ops import NoConcreteFunc
 
-from .conftest import Not, INT_T, IntVal, validate, DivMod
+from .conftest import INT_T, DivMod, IntVal, Not, validate
 
 
 def test_stable_indices():

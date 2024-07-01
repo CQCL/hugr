@@ -12,7 +12,10 @@ class NoSiblingAncestor(Exception):
 
     @property
     def msg(self):
-        return f"Source {self.src} has no sibling ancestor of target {self.tgt}, so cannot wire up."
+        return (
+            f"Source {self.src} has no sibling ancestor of target {self.tgt},"
+            " so cannot wire up."
+        )
 
 
 @dataclass
@@ -24,7 +27,10 @@ class NotInSameCfg(Exception):
 
     @property
     def msg(self):
-        return f"Source {self.src} is not in the same CFG as target {self.tgt}, so cannot wire up."
+        return (
+            f"Source {self.src} is not in the same CFG as target {self.tgt},"
+            " so cannot wire up."
+        )
 
 
 @dataclass

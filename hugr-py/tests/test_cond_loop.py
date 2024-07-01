@@ -1,10 +1,12 @@
+import pytest
+
+import hugr.ops as ops
+import hugr.tys as tys
+import hugr.val as val
 from hugr.cond_loop import Conditional, ConditionalError, TailLoop
 from hugr.dfg import Dfg
-import hugr.tys as tys
-import hugr.ops as ops
-import hugr.val as val
-import pytest
-from .conftest import INT_T, validate, IntVal, H, Measure
+
+from .conftest import INT_T, H, IntVal, Measure, validate
 
 SUM_T = tys.Sum([[tys.Qubit], [tys.Qubit, INT_T]])
 

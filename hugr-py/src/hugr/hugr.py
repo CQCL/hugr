@@ -2,28 +2,29 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field, replace
 from typing import (
+    TYPE_CHECKING,
     Generic,
-    Iterable,
     Protocol,
     TypeVar,
     cast,
     overload,
-    Type as PyType,
 )
 
-
-from hugr.ops import Op, DataflowOp, Const, Call, Module
-from hugr.tys import Type, Kind, ValueKind
-from hugr.val import Value
-from hugr.node_port import Direction, InPort, OutPort, ToNode, Node, _SubPort
+from hugr.node_port import Direction, InPort, Node, OutPort, ToNode, _SubPort
+from hugr.ops import Call, Const, DataflowOp, Module, Op
 from hugr.serialization.ops import OpType as SerialOp
 from hugr.serialization.serial_hugr import SerialHugr
+from hugr.tys import Kind, Type, ValueKind
 from hugr.utils import BiMap
+from hugr.val import Value
 
 from .exceptions import ParentBeforeChild
+
+if TYPE_CHECKING:
+    from hugr.val import Value
 
 
 @dataclass()
@@ -116,7 +117,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
     def __len__(self) -> int:
         return self.num_nodes()
 
-    def _get_typed_op(self, node: ToNode, cl: PyType[OpVar2]) -> OpVar2:
+    def _get_typed_op(self, node: ToNode, cl: type[OpVar2]) -> OpVar2:
         op = self[node].op
         assert isinstance(op, cl)
         return op
@@ -528,7 +529,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
                         mapping[node_data.parent] if node_data.parent else parent
                     )
                 except KeyError as e:
-                    raise ParentBeforeChild() from e
+                    raise ParentBeforeChild from e
                 mapping[Node(idx)] = self.add_node(node_data.op, node_parent)
 
         for src, dst in hugr._links.items():

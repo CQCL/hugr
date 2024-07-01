@@ -3,13 +3,18 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Protocol, Sequence, runtime_checkable, TypeVar
-from hugr.serialization.ops import BaseOp
+from typing import TYPE_CHECKING, Protocol, TypeVar, runtime_checkable
+
 import hugr.serialization.ops as sops
-from hugr.utils import ser_it
 import hugr.tys as tys
-from hugr.node_port import Node, InPort, OutPort, Wire, Direction
 import hugr.val as val
+from hugr.node_port import Direction, InPort, Node, OutPort, Wire
+from hugr.utils import ser_it
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from hugr.serialization.ops import BaseOp
 
 
 @dataclass
@@ -805,8 +810,6 @@ class Module(Op):
 class NoConcreteFunc(Exception):
     """Could not instantiate a polymorphic function."""
 
-    pass
-
 
 @dataclass
 class _CallOrLoad:
@@ -832,11 +835,13 @@ class _CallOrLoad:
         else:
             # TODO substitute type args into signature to get instantiation
             if instantiation is None:
-                raise NoConcreteFunc("Missing instantiation for polymorphic function.")
+                msg = "Missing instantiation for polymorphic function."
+                raise NoConcreteFunc(msg)
             type_args = type_args or []
 
             if len(signature.params) != len(type_args):
-                raise NoConcreteFunc("Mismatched number of type arguments.")
+                msg = "Mismatched number of type arguments."
+                raise NoConcreteFunc(msg)
             self.instantiation = instantiation
             self.type_args = list(type_args)
 

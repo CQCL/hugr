@@ -1,10 +1,12 @@
 """HUGR edge kinds, types, type parameters and type arguments."""
 
 from __future__ import annotations
+
 from dataclasses import dataclass, field
+from typing import Any, Protocol, runtime_checkable
+
 import hugr.serialization.tys as stys
 from hugr.utils import ser_it
-from typing import Any, Protocol, runtime_checkable
 
 ExtensionId = stys.ExtensionId
 ExtensionSet = stys.ExtensionSet
