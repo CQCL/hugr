@@ -464,10 +464,11 @@ impl TypeRV {
 }
 
 // ====== Conversions ======
-impl<RV: MaybeRV> TypeBase<RV> {
-    fn try_into_(self) -> Result<Type, RowVariable> {
-        Ok(TypeBase(
-            match self.0 {
+impl TryFrom<TypeRV> for Type {
+    type Error = RowVariable;
+    fn try_from(value: TypeRV) -> Result<Self, RowVariable> {
+        Ok(Self(
+            match value.0 {
                 TypeEnum::Extension(e) => TypeEnum::Extension(e),
                 TypeEnum::Alias(a) => TypeEnum::Alias(a),
                 TypeEnum::Function(f) => TypeEnum::Function(f),
@@ -475,7 +476,7 @@ impl<RV: MaybeRV> TypeBase<RV> {
                 TypeEnum::RowVar(rv) => {return Err(rv.as_rv().clone())},
                 TypeEnum::Sum(s) => TypeEnum::Sum(s),
             },
-            self.1,
+            value.1,
         ))
     }
 }
@@ -500,13 +501,6 @@ impl<RV1: MaybeRV> TypeBase<RV1> {
 impl From<Type> for TypeRV {
     fn from(value: Type) -> Self {
         value.into_()
-    }
-}
-
-impl TryFrom<TypeRV> for Type {
-    type Error = SignatureError;
-    fn try_from(value: TypeRV) -> Result<Self, Self::Error> {
-        value.try_into_().map_err(|var| SignatureError::RowVarWhereTypeExpected { var })
     }
 }
 
