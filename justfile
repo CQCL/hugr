@@ -44,7 +44,7 @@ coverage language="[rust|python]": (_run_lang language \
 
 # Run unsoundness checks using miri
 miri:
-    PROPTEST_DISABLE_FAILURE_PERSISTENCE=true MIRIFLAGS='-Zmiri-env-forward=PROPTEST_DISABLE_FAILURE_PERSISTENCE -Zmiri-disable-isolation' cargo +nightly miri test
+    PROPTEST_DISABLE_FAILURE_PERSISTENCE=true MIRIFLAGS='-Zmiri-env-forward=PROPTEST_DISABLE_FAILURE_PERSISTENCE' cargo +nightly miri test
 
 # Load a shell with all the dependencies installed
 shell:
