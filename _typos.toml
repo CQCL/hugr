@@ -1,0 +1,4 @@
+[default.extend-identifiers]
+bck = "bck" # BiMap uses abbreviation
+ser_it = "ser_it"
+SerCollection = "SerCollection"
