@@ -303,7 +303,8 @@ class Alias(Type):
 
 @dataclass(frozen=True)
 class FunctionType(Type):
-    """A function type, defined by input types, output types and extension requirements."""
+    """A function type, defined by input types,
+    output types and extension requirements."""
 
     input: TypeRow
     output: TypeRow

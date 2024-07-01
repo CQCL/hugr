@@ -267,7 +267,8 @@ class _DfBase(ParentBuilder[DP]):
 
         Args:
             cond: The conditional to insert.
-            cond_wire: The wire holding the wire (of Sum type) to branch the Conditional on.
+            cond_wire: The wire holding the wire (of Sum type)
+              to branch the Conditional on.
             args: Remaining input wires to the conditional.
 
         Returns:

@@ -1,4 +1,5 @@
-"""Builder classes for structured control flow in HUGR graphs (Conditional, TailLoop)."""
+"""Builder classes for structured control flow
+in HUGR graphs (Conditional, TailLoop)."""
 
 from __future__ import annotations
 
@@ -125,8 +126,8 @@ class Conditional(ParentBuilder[ops.Conditional]):
             other_inputs: The inputs for the conditional that aren't included in the
                 sum variants - passed to all cases.
             hugr: The HUGR instance this Conditional is part of.
-            parent: The parent node for the Conditional, defaults to the root of the HUGR
-                instance.
+            parent: The parent node for the Conditional, defaults to the root of
+              the HUGR instance.
 
         Returns:
             The new Conditional builder.

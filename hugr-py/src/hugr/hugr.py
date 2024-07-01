@@ -241,8 +241,8 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
         return sub_port
 
     def add_link(self, src: OutPort, dst: InPort) -> None:
-        """Add a link (edge)  between two nodes to the HUGR, from an outgoing port to an incoming
-        port.
+        """Add a link (edge)  between two nodes to the HUGR,
+          from an outgoing port to an incoming port.
 
         Args:
             src: Source port.
@@ -447,7 +447,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
             >>> df.hugr.add_link(df.input_node.out(0), df.output_node.inp(1))
             >>> list(df.hugr.incoming_links(df.output_node))
             [(InPort(Node(2), 0), [OutPort(Node(1), 0)]), (InPort(Node(2), 1), [OutPort(Node(1), 0)])]
-        """
+        """  # noqa: E501
         return self._node_links(node, self._links.bck)
 
     def num_incoming(self, node: Node) -> int:

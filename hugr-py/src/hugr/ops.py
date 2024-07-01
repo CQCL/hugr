@@ -31,7 +31,8 @@ class InvalidPort(Exception):
 
 @runtime_checkable
 class Op(Protocol):
-    """An abstract HUGR operation. Must be convertible to a serialisable :class:`BaseOp`."""
+    """An abstract HUGR operation. Must be convertibl
+    to a serialisable :class:`BaseOp`."""
 
     @property
     def num_out(self) -> int:
@@ -131,7 +132,8 @@ def _check_complete(op, v: V | None) -> V:
 
 @dataclass(frozen=True)
 class Command:
-    """A :class:`DataflowOp` and its incoming :class:`Wire <hugr.nodeport.Wire>` arguments.
+    """A :class:`DataflowOp` and its incoming :class:`Wire <hugr.nodeport.Wire>`
+      arguments.
     Ephermeral, used to wire in operations to a dataflow graph.
 
     Example:
@@ -885,7 +887,8 @@ class Call(_CallOrLoad, Op):
 
 @dataclass()
 class CallIndirect(DataflowOp, _PartialOp):
-    """Higher order evaluation of a :class:`FunctionType <hugr.tys.FunctionType>` value."""
+    """Higher order evaluation of a
+    :class:`FunctionType <hugr.tys.FunctionType>` value."""
 
     _signature: tys.FunctionType | None = None
 
@@ -924,8 +927,8 @@ class CallIndirect(DataflowOp, _PartialOp):
 
 
 class LoadFunc(_CallOrLoad, DataflowOp):
-    """Load a statically defined function as a higher order value. Connects to :class:`FuncDefn` or
-    :class:`FuncDecl` operations.
+    """Load a statically defined function as a higher order value.
+      Connects to :class:`FuncDefn` or :class:`FuncDecl` operations.
 
     Args:
         signature: Polymorphic function signature.

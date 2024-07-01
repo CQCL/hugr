@@ -71,7 +71,7 @@ ignore = [
 ]
 
 [lint.per-file-ignores]
-"hugr-pr/tests/**" = ["D"]
+"hugr-py/tests/**" = ["D"]
 "scripts/generate_schema.py"= ["T201", "EXE001"]
 
 [lint.pydocstyle]

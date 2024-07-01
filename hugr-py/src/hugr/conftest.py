@@ -11,7 +11,7 @@ import hugr.val as val
 
 
 @pytest.fixture(autouse=True)
-def add_hugr(doctest_namespace):
+def _add_hugr(doctest_namespace):
     doctest_namespace.update(
         {
             "hugr": hugr,

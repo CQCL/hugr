@@ -133,7 +133,8 @@ class ToNode(Wire, Protocol):
 
 @dataclass(frozen=True, eq=True, order=True)
 class Node(ToNode):
-    """Node in hierarchical :class:`Hugr <hugr.hugr.Hugr>` graph, with globally unique index."""
+    """Node in hierarchical :class:`Hugr <hugr.hugr.Hugr>` graph,
+    with globally unique index."""
 
     idx: int
     _num_out_ports: int | None = field(default=None, compare=False)

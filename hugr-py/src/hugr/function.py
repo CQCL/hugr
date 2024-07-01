@@ -93,7 +93,8 @@ class Module:
 
         Examples:
             >>> m = Module()
-            >>> f = m.declare_function("f", tys.PolyFuncType([], tys.FunctionType.empty()))
+            >>> sig = tys.PolyFuncType([], tys.FunctionType.empty())
+            >>> f = m.declare_function("f", sig)
             >>> f
             Node(1)
         """
