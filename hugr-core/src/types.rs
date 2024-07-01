@@ -200,7 +200,6 @@ impl<RV: MaybeRV> From<SumType> for TypeBase<RV> {
 }
 
 #[derive(Clone, Debug, Eq, derive_more::Display)]
-//#[cfg_attr(test, derive(Arbitrary), proptest(params = "RecursionDepth"))] // handles RowVariable, not NoRV
 /// Core types
 pub enum TypeEnum<RV: MaybeRV> {
     // TODO optimise with Box<CustomType> ?
