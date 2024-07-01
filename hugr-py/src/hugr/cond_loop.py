@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
-import hugr._ops as ops
+import hugr.ops as ops
 
-from ._dfg import _DfBase
-from ._hugr import Hugr, ParentBuilder
-from ._node_port import Node, Wire, ToNode
+from .dfg import _DfBase
+from .hugr import Hugr, ParentBuilder
 
-from ._tys import Sum, TypeRow
+if TYPE_CHECKING:
+    from .node_port import Node, ToNode, Wire
+    from .tys import Sum, TypeRow
 
 
 class Case(_DfBase[ops.Case]):
@@ -35,7 +37,8 @@ class _IfElse(Case):
 
     def _parent_conditional(self) -> Conditional:
         if self._parent_cond is None:
-            raise ConditionalError("If must have a parent conditional.")
+            msg = "If must have a parent conditional."
+            raise ConditionalError(msg)
         return self._parent_cond
 
 
@@ -84,11 +87,13 @@ class Conditional(ParentBuilder[ops.Conditional]):
             self.parent_op._outputs = outputs
         else:
             if outputs != self.parent_op._outputs:
-                raise ConditionalError("Mismatched case outputs.")
+                msg = "Mismatched case outputs."
+                raise ConditionalError(msg)
 
     def add_case(self, case_id: int) -> Case:
         if case_id not in self.cases:
-            raise ConditionalError(f"Case {case_id} out of possible range.")
+            msg = f"Case {case_id} out of possible range."
+            raise ConditionalError(msg)
         input_types = self.parent_op.nth_inputs(case_id)
         new_case = Case.new_nested(
             ops.Case(input_types),

@@ -61,8 +61,8 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
 }
 
 impl DFGBuilder<Hugr> {
-    /// Begin building a new DFG rooted HUGR.
-    /// Input extensions default to being an open variable
+    /// Begin building a new DFG-rooted HUGR given its inputs, outputs,
+    /// and extension delta.
     ///
     /// # Errors
     ///
@@ -203,11 +203,9 @@ pub(crate) mod test {
     use serde_json::json;
 
     use crate::builder::build_traits::DataflowHugr;
-    use crate::builder::{BuilderWiringError, DataflowSubContainer, ModuleBuilder};
+    use crate::builder::{ft1, BuilderWiringError, DataflowSubContainer, ModuleBuilder};
     use crate::extension::prelude::{BOOL_T, USIZE_T};
-    use crate::extension::{
-        ExtensionId, ExtensionSet, SignatureError, EMPTY_REG, PRELUDE_REGISTRY,
-    };
+    use crate::extension::{ExtensionId, SignatureError, EMPTY_REG, PRELUDE_REGISTRY};
     use crate::hugr::validate::InterGraphEdgeError;
     use crate::ops::OpTrait;
     use crate::ops::{handle::NodeHandle, Lift, Noop, OpTag};
@@ -421,23 +419,13 @@ pub(crate) mod test {
         let xa: ExtensionId = "A".try_into().unwrap();
         let xb: ExtensionId = "B".try_into().unwrap();
         let xc: ExtensionId = "C".try_into().unwrap();
-        let ab_extensions = ExtensionSet::from_iter([xa.clone(), xb.clone()]);
-        let abc_extensions = ab_extensions.clone().union(xc.clone().into());
 
-        let parent_sig =
-            FunctionType::new(type_row![BIT], type_row![BIT]).with_extension_delta(abc_extensions);
-        let mut parent = DFGBuilder::new(parent_sig)?;
-
-        let add_c_sig =
-            FunctionType::new(type_row![BIT], type_row![BIT]).with_extension_delta(xc.clone());
+        let mut parent = DFGBuilder::new(ft1(BIT))?;
 
         let [w] = parent.input_wires_arr();
 
-        let add_ab_sig = FunctionType::new(type_row![BIT], type_row![BIT])
-            .with_extension_delta(ab_extensions.clone());
-
         // A box which adds extensions A and B, via child Lift nodes
-        let mut add_ab = parent.dfg_builder(add_ab_sig, [w])?;
+        let mut add_ab = parent.dfg_builder(ft1(BIT), [w])?;
         let [w] = add_ab.input_wires_arr();
 
         let lift_a = add_ab.add_dataflow_op(
@@ -463,7 +451,7 @@ pub(crate) mod test {
 
         // Add another node (a sibling to add_ab) which adds extension C
         // via a child lift node
-        let mut add_c = parent.dfg_builder(add_c_sig, [w])?;
+        let mut add_c = parent.dfg_builder(ft1(BIT), [w])?;
         let [w] = add_c.input_wires_arr();
         let lift_c = add_c.add_dataflow_op(
             Lift {

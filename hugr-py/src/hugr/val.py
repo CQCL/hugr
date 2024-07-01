@@ -1,13 +1,15 @@
 from __future__ import annotations
+
 from dataclasses import dataclass, field
-from typing import Any, Protocol, runtime_checkable, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+
 import hugr.serialization.ops as sops
 import hugr.serialization.tys as stys
-import hugr._tys as tys
+import hugr.tys as tys
 from hugr.utils import ser_it
 
 if TYPE_CHECKING:
-    from hugr._hugr import Hugr
+    from hugr.hugr import Hugr
 
 
 @runtime_checkable
@@ -50,13 +52,18 @@ FALSE = bool_value(False)
 
 
 @dataclass
-class Tuple(Value):
+class Tuple(Sum):
     vals: list[Value]
 
-    def type_(self) -> tys.Tuple:
-        return tys.Tuple(*(v.type_() for v in self.vals))
+    def __init__(self, *vals: Value):
+        val_list = list(vals)
+        super().__init__(
+            tag=0, typ=tys.Tuple(*(v.type_() for v in val_list)), vals=val_list
+        )
 
-    def to_serial(self) -> sops.TupleValue:
+    # sops.TupleValue isn't an instance of sops.SumValue
+    # so mypy doesn't like the override of Sum.to_serial
+    def to_serial(self) -> sops.TupleValue:  # type: ignore[override]
         return sops.TupleValue(
             vs=ser_it(self.vals),
         )

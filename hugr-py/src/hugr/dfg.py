@@ -3,33 +3,33 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import (
     TYPE_CHECKING,
-    Iterable,
-    Sequence,
     TypeVar,
 )
 
 from typing_extensions import Self
 
-import hugr._ops as ops
-import hugr._val as val
-from hugr._tys import (
+import hugr.ops as ops
+import hugr.val as val
+from hugr.tys import (
+    ExtensionSet,
+    FunctionKind,
+    FunctionType,
+    PolyFuncType,
     Type,
+    TypeArg,
     TypeRow,
     get_first_sum,
-    FunctionType,
-    TypeArg,
-    FunctionKind,
-    PolyFuncType,
-    ExtensionSet,
 )
 
-from ._exceptions import NoSiblingAncestor
-from ._hugr import Hugr, ParentBuilder
-from ._node_port import Node, OutPort, Wire, ToNode
+from .exceptions import NoSiblingAncestor
+from .hugr import Hugr, ParentBuilder
 
 if TYPE_CHECKING:
-    from ._cfg import Cfg
-    from ._cond_loop import Conditional, If, TailLoop
+    from collections.abc import Iterable, Sequence
+
+    from .cfg import Cfg
+    from .cond_loop import Conditional, If, TailLoop
+    from .node_port import Node, OutPort, ToNode, Wire
 
 
 DP = TypeVar("DP", bound=ops.DfParentOp)
@@ -96,7 +96,7 @@ class _DfBase(ParentBuilder[DP]):
         self,
         *args: Wire,
     ) -> Dfg:
-        from ._dfg import Dfg
+        from .dfg import Dfg
 
         parent_op = ops.DFG(self._wire_types(args))
         dfg = Dfg.new_nested(parent_op, self.hugr, self.parent_node)
@@ -110,7 +110,7 @@ class _DfBase(ParentBuilder[DP]):
         self,
         *args: Wire,
     ) -> Cfg:
-        from ._cfg import Cfg
+        from .cfg import Cfg
 
         cfg = Cfg.new_nested(self._wire_types(args), self.hugr, self.parent_node)
         self._wire_up(cfg.parent_node, args)
@@ -120,7 +120,7 @@ class _DfBase(ParentBuilder[DP]):
         return self._insert_nested_impl(cfg, *args)
 
     def add_conditional(self, cond: Wire, *args: Wire) -> Conditional:
-        from ._cond_loop import Conditional
+        from .cond_loop import Conditional
 
         args = (cond, *args)
         (sum_, other_inputs) = get_first_sum(self._wire_types(args))
@@ -132,7 +132,7 @@ class _DfBase(ParentBuilder[DP]):
         return self._insert_nested_impl(cond, *args)
 
     def add_if(self, cond: Wire, *args: Wire) -> If:
-        from ._cond_loop import If
+        from .cond_loop import If
 
         conditional = self.add_conditional(cond, *args)
         return If(conditional.add_case(1))
@@ -140,7 +140,7 @@ class _DfBase(ParentBuilder[DP]):
     def add_tail_loop(
         self, just_inputs: Sequence[Wire], rest: Sequence[Wire]
     ) -> TailLoop:
-        from ._cond_loop import TailLoop
+        from .cond_loop import TailLoop
 
         just_input_types = self._wire_types(just_inputs)
         rest_types = self._wire_types(rest)
@@ -210,12 +210,13 @@ class _DfBase(ParentBuilder[DP]):
             case FunctionKind(sig):
                 signature = sig
             case _:
-                raise ValueError("Expected 'func' to be a function")
+                msg = "Expected 'func' to be a function"
+                raise ValueError(msg)
         return signature
 
     def _wire_up(self, node: Node, ports: Iterable[Wire]) -> TypeRow:
         tys = [self._wire_up_port(node, i, p) for i, p in enumerate(ports)]
-        if isinstance(op := self.hugr[node].op, ops.PartialOp):
+        if isinstance(op := self.hugr[node].op, ops._PartialOp):
             op.set_in_types(tys)
         return tys
 
@@ -223,7 +224,8 @@ class _DfBase(ParentBuilder[DP]):
         port = wire.out_port()
         ty = self.hugr.port_type(port)
         if ty is None:
-            raise ValueError(f"Port {port} is not a dataflow port.")
+            msg = f"Port {port} is not a dataflow port."
+            raise ValueError(msg)
         return ty
 
     def _wire_up_port(self, node: Node, offset: int, p: Wire) -> Type:

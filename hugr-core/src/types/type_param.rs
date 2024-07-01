@@ -105,7 +105,7 @@ impl TypeParam {
         }
     }
 
-    /// Make a new `TypeParam::List` (an arbitrary-length homogenous list)
+    /// Make a new `TypeParam::List` (an arbitrary-length homogeneous list)
     pub fn new_list(elem: impl Into<TypeParam>) -> Self {
         Self::List {
             param: Box::new(elem.into()),
@@ -232,7 +232,7 @@ impl TypeArg {
                 // 1. TypeArg::Variable(idx, TypeParam::List(TypeParam::Type(typebound)))
                 // 2. TypeArg::Type(Type::new_row_var_use(idx, typebound))
                 // Here we prefer the latter for canonicalization: TypeArgVariable's fields are non-pub
-                // so this pevents constructing malformed cases like the former.
+                // so this prevents constructing malformed cases like the former.
                 let TypeParam::Type { b } = *bx else { panic!() };
                 Type::new_row_var_use(idx, b).into()
             }
@@ -484,15 +484,15 @@ mod test {
     #[test]
     fn type_arg_fits_param() {
         let rowvar = Type::new_row_var_use;
-        fn check(arg: impl Into<TypeArg>, parm: &TypeParam) -> Result<(), TypeArgError> {
-            check_type_arg(&arg.into(), parm)
+        fn check(arg: impl Into<TypeArg>, param: &TypeParam) -> Result<(), TypeArgError> {
+            check_type_arg(&arg.into(), param)
         }
         fn check_seq<T: Clone + Into<TypeArg>>(
             args: &[T],
-            parm: &TypeParam,
+            param: &TypeParam,
         ) -> Result<(), TypeArgError> {
             let arg = args.iter().cloned().map_into().collect_vec().into();
-            check_type_arg(&arg, parm)
+            check_type_arg(&arg, param)
         }
         // Simple cases: a TypeArg::Type is a TypeParam::Type but singleton sequences are lists
         check(USIZE_T, &TypeBound::Eq.into()).unwrap();

@@ -1,9 +1,10 @@
-from hugr._cfg import Cfg
-import hugr._tys as tys
-import hugr._val as val
-from hugr._dfg import Dfg
-import hugr._ops as ops
-from .test_hugr_build import _validate, INT_T, DivMod, IntVal
+import hugr.ops as ops
+import hugr.tys as tys
+import hugr.val as val
+from hugr.cfg import Cfg
+from hugr.dfg import Dfg
+
+from .conftest import INT_T, DivMod, IntVal, validate
 
 
 def build_basic_cfg(cfg: Cfg) -> None:
@@ -16,7 +17,7 @@ def build_basic_cfg(cfg: Cfg) -> None:
 def test_basic_cfg() -> None:
     cfg = Cfg([tys.Bool])
     build_basic_cfg(cfg)
-    _validate(cfg.hugr)
+    validate(cfg.hugr)
 
 
 def test_branch() -> None:
@@ -34,7 +35,7 @@ def test_branch() -> None:
     cfg.branch_exit(middle_1[0])
     cfg.branch_exit(middle_2[0])
 
-    _validate(cfg.hugr)
+    validate(cfg.hugr)
 
 
 def test_nested_cfg() -> None:
@@ -45,7 +46,7 @@ def test_nested_cfg() -> None:
     build_basic_cfg(cfg)
     dfg.set_outputs(cfg)
 
-    _validate(dfg.hugr)
+    validate(dfg.hugr)
 
 
 def test_dom_edge() -> None:
@@ -64,7 +65,7 @@ def test_dom_edge() -> None:
     cfg.branch_exit(middle_1[0])
     cfg.branch_exit(middle_2[0])
 
-    _validate(cfg.hugr)
+    validate(cfg.hugr)
 
 
 def test_asymm_types() -> None:
@@ -86,7 +87,7 @@ def test_asymm_types() -> None:
     cfg.branch_exit(entry[1])
     cfg.branch_exit(middle[0])
 
-    _validate(cfg.hugr)
+    validate(cfg.hugr)
 
 
 # TODO loop

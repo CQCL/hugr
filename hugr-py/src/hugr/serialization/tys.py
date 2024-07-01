@@ -1,23 +1,27 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 import inspect
 import sys
+from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Annotated, Any, Literal, Union, Mapping
+from typing import TYPE_CHECKING, Annotated, Any, Literal
 
-from hugr.utils import deser_it
 from pydantic import (
     BaseModel,
+    ConfigDict,
     Field,
     RootModel,
     ValidationError,
     ValidationInfo,
     ValidatorFunctionWrapHandler,
     WrapValidator,
-    ConfigDict,
 )
 from pydantic_core import PydanticCustomError
+
+from hugr.utils import deser_it
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 
 def _json_custom_error_validator(
@@ -36,8 +40,9 @@ def _json_custom_error_validator(
     try:
         return handler(value)
     except ValidationError as err:
+        msg = "invalid_json"
         raise PydanticCustomError(
-            "invalid_json",
+            msg,
             "Input is not valid json",
         ) from err
 
@@ -63,54 +68,54 @@ class ConfiguredBaseModel(BaseModel):
 
 class BaseTypeParam(ABC, ConfiguredBaseModel):
     @abstractmethod
-    def deserialize(self) -> _tys.TypeParam: ...
+    def deserialize(self) -> tys.TypeParam: ...
 
 
 class TypeTypeParam(BaseTypeParam):
     tp: Literal["Type"] = "Type"
-    b: "TypeBound"
+    b: TypeBound
 
-    def deserialize(self) -> _tys.TypeTypeParam:
-        return _tys.TypeTypeParam(bound=self.b)
+    def deserialize(self) -> tys.TypeTypeParam:
+        return tys.TypeTypeParam(bound=self.b)
 
 
 class BoundedNatParam(BaseTypeParam):
     tp: Literal["BoundedNat"] = "BoundedNat"
     bound: int | None
 
-    def deserialize(self) -> _tys.BoundedNatParam:
-        return _tys.BoundedNatParam(upper_bound=self.bound)
+    def deserialize(self) -> tys.BoundedNatParam:
+        return tys.BoundedNatParam(upper_bound=self.bound)
 
 
 class OpaqueParam(BaseTypeParam):
     tp: Literal["Opaque"] = "Opaque"
-    ty: "Opaque"
+    ty: Opaque
 
-    def deserialize(self) -> _tys.OpaqueParam:
-        return _tys.OpaqueParam(ty=self.ty.deserialize())
+    def deserialize(self) -> tys.OpaqueParam:
+        return tys.OpaqueParam(ty=self.ty.deserialize())
 
 
 class ListParam(BaseTypeParam):
     tp: Literal["List"] = "List"
-    param: "TypeParam"
+    param: TypeParam
 
-    def deserialize(self) -> _tys.ListParam:
-        return _tys.ListParam(param=self.param.deserialize())
+    def deserialize(self) -> tys.ListParam:
+        return tys.ListParam(param=self.param.deserialize())
 
 
 class TupleParam(BaseTypeParam):
     tp: Literal["Tuple"] = "Tuple"
-    params: list["TypeParam"]
+    params: list[TypeParam]
 
-    def deserialize(self) -> _tys.TupleParam:
-        return _tys.TupleParam(params=deser_it(self.params))
+    def deserialize(self) -> tys.TupleParam:
+        return tys.TupleParam(params=deser_it(self.params))
 
 
 class ExtensionsParam(BaseTypeParam):
     tp: Literal["Extensions"] = "Extensions"
 
-    def deserialize(self) -> _tys.ExtensionsParam:
-        return _tys.ExtensionsParam()
+    def deserialize(self) -> tys.ExtensionsParam:
+        return tys.ExtensionsParam()
 
 
 class TypeParam(RootModel):
@@ -128,7 +133,7 @@ class TypeParam(RootModel):
 
     model_config = ConfigDict(json_schema_extra={"required": ["tp"]})
 
-    def deserialize(self) -> _tys.TypeParam:
+    def deserialize(self) -> tys.TypeParam:
         return self.root.deserialize()
 
 
@@ -139,48 +144,48 @@ class TypeParam(RootModel):
 
 class BaseTypeArg(ABC, ConfiguredBaseModel):
     @abstractmethod
-    def deserialize(self) -> _tys.TypeArg: ...
+    def deserialize(self) -> tys.TypeArg: ...
 
 
 class TypeTypeArg(BaseTypeArg):
     tya: Literal["Type"] = "Type"
-    ty: "Type"
+    ty: Type
 
-    def deserialize(self) -> _tys.TypeTypeArg:
-        return _tys.TypeTypeArg(ty=self.ty.deserialize())
+    def deserialize(self) -> tys.TypeTypeArg:
+        return tys.TypeTypeArg(ty=self.ty.deserialize())
 
 
 class BoundedNatArg(BaseTypeArg):
     tya: Literal["BoundedNat"] = "BoundedNat"
     n: int
 
-    def deserialize(self) -> _tys.BoundedNatArg:
-        return _tys.BoundedNatArg(n=self.n)
+    def deserialize(self) -> tys.BoundedNatArg:
+        return tys.BoundedNatArg(n=self.n)
 
 
 class OpaqueArg(BaseTypeArg):
     tya: Literal["Opaque"] = "Opaque"
-    typ: "Opaque"
+    typ: Opaque
     value: Any
 
-    def deserialize(self) -> _tys.OpaqueArg:
-        return _tys.OpaqueArg(ty=self.typ.deserialize(), value=self.value)
+    def deserialize(self) -> tys.OpaqueArg:
+        return tys.OpaqueArg(ty=self.typ.deserialize(), value=self.value)
 
 
 class SequenceArg(BaseTypeArg):
     tya: Literal["Sequence"] = "Sequence"
-    elems: list["TypeArg"]
+    elems: list[TypeArg]
 
-    def deserialize(self) -> _tys.SequenceArg:
-        return _tys.SequenceArg(elems=deser_it(self.elems))
+    def deserialize(self) -> tys.SequenceArg:
+        return tys.SequenceArg(elems=deser_it(self.elems))
 
 
 class ExtensionsArg(BaseTypeArg):
     tya: Literal["Extensions"] = "Extensions"
     es: ExtensionSet
 
-    def deserialize(self) -> _tys.ExtensionsArg:
-        return _tys.ExtensionsArg(extensions=self.es)
+    def deserialize(self) -> tys.ExtensionsArg:
+        return tys.ExtensionsArg(extensions=self.es)
 
 
 class VariableArg(BaseTypeArg):
@@ -188,8 +193,8 @@ class VariableArg(BaseTypeArg):
     idx: int
     cached_decl: TypeParam
 
-    def deserialize(self) -> _tys.VariableArg:
-        return _tys.VariableArg(idx=self.idx, param=self.cached_decl.deserialize())
+    def deserialize(self) -> tys.VariableArg:
+        return tys.VariableArg(idx=self.idx, param=self.cached_decl.deserialize())
 
 
 class TypeArg(RootModel):
@@ -207,7 +212,7 @@ class TypeArg(RootModel):
 
     model_config = ConfigDict(json_schema_extra={"required": ["tya"]})
 
-    def deserialize(self) -> _tys.TypeArg:
+    def deserialize(self) -> tys.TypeArg:
         return self.root.deserialize()
 
 
@@ -218,11 +223,11 @@ class TypeArg(RootModel):
 
 class BaseType(ABC, ConfiguredBaseModel):
     @abstractmethod
-    def deserialize(self) -> _tys.Type: ...
+    def deserialize(self) -> tys.Type: ...
 
 
 class MultiContainer(BaseType):
-    ty: "Type"
+    ty: Type
 
 
 class Array(MultiContainer):
@@ -231,8 +236,8 @@ class Array(MultiContainer):
     t: Literal["Array"] = "Array"
     len: int
 
-    def deserialize(self) -> _tys.Array:
-        return _tys.Array(ty=self.ty.deserialize(), size=self.len)
+    def deserialize(self) -> tys.Array:
+        return tys.Array(ty=self.ty.deserialize(), size=self.len)
 
 
 class UnitSum(BaseType):
@@ -242,8 +247,8 @@ class UnitSum(BaseType):
     s: Literal["Unit"] = "Unit"
     size: int
 
-    def deserialize(self) -> _tys.UnitSum:
-        return _tys.UnitSum(size=self.size)
+    def deserialize(self) -> tys.UnitSum:
+        return tys.UnitSum(size=self.size)
 
 
 class GeneralSum(BaseType):
@@ -251,14 +256,14 @@ class GeneralSum(BaseType):
 
     t: Literal["Sum"] = "Sum"
     s: Literal["General"] = "General"
-    rows: list["TypeRow"]
+    rows: list[TypeRow]
 
-    def deserialize(self) -> _tys.Sum:
-        return _tys.Sum(variant_rows=[[t.deserialize() for t in r] for r in self.rows])
+    def deserialize(self) -> tys.Sum:
+        return tys.Sum(variant_rows=[[t.deserialize() for t in r] for r in self.rows])
 
 
 class SumType(RootModel):
-    root: Annotated[Union[UnitSum, GeneralSum], Field(discriminator="s")]
+    root: Annotated[UnitSum | GeneralSum, Field(discriminator="s")]
 
     # This seems to be required for nested discriminated unions to work
     @property
@@ -267,7 +272,7 @@ class SumType(RootModel):
 
     model_config = ConfigDict(json_schema_extra={"required": ["s"]})
 
-    def deserialize(self) -> _tys.Sum | _tys.UnitSum:
+    def deserialize(self) -> tys.Sum | tys.UnitSum:
         return self.root.deserialize()
 
 
@@ -281,10 +286,10 @@ class Variable(BaseType):
 
     t: Literal["V"] = "V"
     i: int
-    b: "TypeBound"
+    b: TypeBound
 
-    def deserialize(self) -> _tys.Variable:
-        return _tys.Variable(idx=self.i, bound=self.b)
+    def deserialize(self) -> tys.Variable:
+        return tys.Variable(idx=self.i, bound=self.b)
 
 
 class RowVar(BaseType):
@@ -293,10 +298,10 @@ class RowVar(BaseType):
 
     t: Literal["R"] = "R"
     i: int
-    b: "TypeBound"
+    b: TypeBound
 
-    def deserialize(self) -> _tys.RowVariable:
-        return _tys.RowVariable(idx=self.i, bound=self.b)
+    def deserialize(self) -> tys.RowVariable:
+        return tys.RowVariable(idx=self.i, bound=self.b)
 
 
 class USize(BaseType):
@@ -304,8 +309,8 @@ class USize(BaseType):
 
     t: Literal["I"] = "I"
 
-    def deserialize(self) -> _tys.USize:
-        return _tys.USize()
+    def deserialize(self) -> tys.USize:
+        return tys.USize()
 
 
 class FunctionType(BaseType):
@@ -314,17 +319,17 @@ class FunctionType(BaseType):
 
     t: Literal["G"] = "G"
 
-    input: "TypeRow"  # Value inputs of the function.
-    output: "TypeRow"  # Value outputs of the function.
+    input: TypeRow  # Value inputs of the function.
+    output: TypeRow  # Value outputs of the function.
     # The extension requirements which are added by the operation
     extension_reqs: ExtensionSet = Field(default_factory=ExtensionSet)
 
     @classmethod
-    def empty(cls) -> "FunctionType":
+    def empty(cls) -> FunctionType:
         return FunctionType(input=[], output=[], extension_reqs=[])
 
-    def deserialize(self) -> _tys.FunctionType:
-        return _tys.FunctionType(
+    def deserialize(self) -> tys.FunctionType:
+        return tys.FunctionType(
             input=deser_it(self.input),
             output=deser_it(self.output),
             extension_reqs=self.extension_reqs,
@@ -354,11 +359,11 @@ class PolyFuncType(BaseType):
     body: FunctionType
 
     @classmethod
-    def empty(cls) -> "PolyFuncType":
+    def empty(cls) -> PolyFuncType:
         return PolyFuncType(params=[], body=FunctionType.empty())
 
-    def deserialize(self) -> _tys.PolyFuncType:
-        return _tys.PolyFuncType(
+    def deserialize(self) -> tys.PolyFuncType:
+        return tys.PolyFuncType(
             params=deser_it(self.params),
             body=self.body.deserialize(),
         )
@@ -380,7 +385,7 @@ class TypeBound(Enum):
     Any = "A"
 
     @staticmethod
-    def join(*bs: "TypeBound") -> "TypeBound":
+    def join(*bs: TypeBound) -> TypeBound:
         """Computes the least upper bound for a sequence of bounds."""
         res = TypeBound.Eq
         for b in bs:
@@ -400,8 +405,8 @@ class Opaque(BaseType):
     args: list[TypeArg]
     bound: TypeBound
 
-    def deserialize(self) -> _tys.Opaque:
-        return _tys.Opaque(
+    def deserialize(self) -> tys.Opaque:
+        return tys.Opaque(
             extension=self.extension,
             id=self.id,
             args=deser_it(self.args),
@@ -416,8 +421,8 @@ class Alias(BaseType):
     bound: TypeBound
     name: str
 
-    def deserialize(self) -> _tys.Alias:
-        return _tys.Alias(name=self.name, bound=self.bound)
+    def deserialize(self) -> tys.Alias:
+        return tys.Alias(name=self.name, bound=self.bound)
 
 
 # ----------------------------------------------
@@ -430,8 +435,8 @@ class Qubit(BaseType):
 
     t: Literal["Q"] = "Q"
 
-    def deserialize(self) -> _tys.QubitDef:
-        return _tys.Qubit
+    def deserialize(self) -> tys.QubitDef:
+        return tys.Qubit
 
 
 class Type(RootModel):
@@ -453,7 +458,7 @@ class Type(RootModel):
 
     model_config = ConfigDict(json_schema_extra={"required": ["t"]})
 
-    def deserialize(self) -> _tys.Type:
+    def deserialize(self) -> tys.Type:
         return self.root.deserialize()
 
 
@@ -475,9 +480,10 @@ classes = inspect.getmembers(
 
 def model_rebuild(
     classes: Mapping[str, type],
-    config: ConfigDict = ConfigDict(),
+    config: ConfigDict | None = None,
     **kwargs,
 ):
+    config = config or ConfigDict()
     for c in classes.values():
         if issubclass(c, ConfiguredBaseModel):
             c.update_model_config(config)
@@ -487,4 +493,4 @@ def model_rebuild(
 model_rebuild(dict(classes))
 
 
-from hugr import _tys  # noqa: E402  # needed to avoid circular imports
+from hugr import tys  # noqa: E402  # needed to avoid circular imports

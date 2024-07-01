@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
-import hugr._ops as ops
-import hugr._val as val
+import hugr.ops as ops
+import hugr.val as val
 
-from ._dfg import _DfBase
-from hugr._node_port import Node
-from ._hugr import Hugr
-from ._tys import TypeRow, TypeParam, PolyFuncType, Type, TypeBound
+from .dfg import _DfBase
+from .hugr import Hugr
+
+if TYPE_CHECKING:
+    from hugr.node_port import Node
+
+    from .tys import PolyFuncType, Type, TypeBound, TypeParam, TypeRow
 
 
 @dataclass

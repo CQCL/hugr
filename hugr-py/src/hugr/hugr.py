@@ -1,27 +1,27 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field, replace
 from typing import (
+    TYPE_CHECKING,
     Generic,
-    Iterable,
     Protocol,
     TypeVar,
     cast,
     overload,
-    Type as PyType,
 )
 
-
-from hugr._ops import Op, DataflowOp, Const, Call
-from hugr._tys import Type, Kind, ValueKind
-from hugr._val import Value
-from hugr._node_port import Direction, InPort, OutPort, ToNode, Node, _SubPort
+from hugr.node_port import Direction, InPort, Node, OutPort, ToNode, _SubPort
+from hugr.ops import Call, Const, DataflowOp, Op
 from hugr.serialization.ops import OpType as SerialOp
 from hugr.serialization.serial_hugr import SerialHugr
+from hugr.tys import Kind, Type, ValueKind
 from hugr.utils import BiMap
 
-from ._exceptions import ParentBeforeChild
+from .exceptions import ParentBeforeChild
+
+if TYPE_CHECKING:
+    from hugr.val import Value
 
 
 @dataclass()
@@ -32,8 +32,8 @@ class NodeData:
     _num_outs: int = 0
     children: list[Node] = field(default_factory=list)
 
-    def to_serial(self, node: Node, hugr: Hugr) -> SerialOp:
-        o = self.op.to_serial(node, self.parent if self.parent else node, hugr)
+    def to_serial(self, node: Node) -> SerialOp:
+        o = self.op.to_serial(self.parent if self.parent else node)
 
         return SerialOp(root=o)  # type: ignore[arg-type]
 
@@ -88,7 +88,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
     def __len__(self) -> int:
         return self.num_nodes()
 
-    def _get_typed_op(self, node: ToNode, cl: PyType[OpVar2]) -> OpVar2:
+    def _get_typed_op(self, node: ToNode, cl: type[OpVar2]) -> OpVar2:
         op = self[node].op
         assert isinstance(op, cl)
         return op
@@ -241,11 +241,11 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
         return self._node_links(node, self._links.bck)
 
     def num_incoming(self, node: Node) -> int:
-        # connecetd links
+        # connected links
         return sum(1 for _ in self.incoming_links(node))
 
     def num_outgoing(self, node: ToNode) -> int:
-        # connecetd links
+        # connected links
         return sum(1 for _ in self.outgoing_links(node))
 
     # TODO: num_links and _linked_ports
@@ -274,7 +274,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
                         mapping[node_data.parent] if node_data.parent else parent
                     )
                 except KeyError as e:
-                    raise ParentBeforeChild() from e
+                    raise ParentBeforeChild from e
                 mapping[Node(idx)] = self.add_node(node_data.op, node_parent)
 
         for src, dst in hugr._links.items():
@@ -297,7 +297,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
         return SerialHugr(
             version="v1",
             # non contiguous indices will be erased
-            nodes=[node.to_serial(Node(idx), self) for idx, node in enumerate(node_it)],
+            nodes=[node.to_serial(Node(idx)) for idx, node in enumerate(node_it)],
             edges=[_serialise_link(link) for link in self._links.items()],
         )
 

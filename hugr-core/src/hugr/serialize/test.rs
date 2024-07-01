@@ -1,6 +1,6 @@
 use super::*;
 use crate::builder::{
-    test::closed_dfg_root_hugr, Container, DFGBuilder, Dataflow, DataflowHugr,
+    ft2, test::closed_dfg_root_hugr, Container, DFGBuilder, Dataflow, DataflowHugr,
     DataflowSubContainer, HugrBuilder, ModuleBuilder,
 };
 use crate::extension::prelude::{BOOL_T, PRELUDE_ID, QB_T, USIZE_T};
@@ -11,7 +11,7 @@ use crate::ops::custom::{ExtensionOp, OpaqueOp};
 use crate::ops::{self, dataflow::IOTrait, Input, Module, Noop, Output, Value, DFG};
 use crate::std_extensions::arithmetic::float_types::FLOAT64_TYPE;
 use crate::std_extensions::arithmetic::int_ops::INT_OPS_REGISTRY;
-use crate::std_extensions::arithmetic::int_types::{self, int_custom_type, ConstInt, INT_TYPES};
+use crate::std_extensions::arithmetic::int_types::{int_custom_type, ConstInt, INT_TYPES};
 use crate::std_extensions::logic::NotOp;
 use crate::types::{
     type_param::TypeParam, FunctionType, PolyFuncType, SumType, Type, TypeArg, TypeBound,
@@ -351,11 +351,7 @@ fn hierarchy_order() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn constants_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
-    let mut builder = DFGBuilder::new(
-        FunctionType::new(vec![], vec![INT_TYPES[4].clone()])
-            .with_extension_delta(int_types::EXTENSION_ID),
-    )
-    .unwrap();
+    let mut builder = DFGBuilder::new(ft2(vec![], vec![INT_TYPES[4].clone()])).unwrap();
     let w = builder.add_load_value(ConstInt::new_s(4, -2).unwrap());
     let hugr = builder.finish_hugr_with_outputs([w], &INT_OPS_REGISTRY)?;
 

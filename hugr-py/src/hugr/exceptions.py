@@ -8,7 +8,10 @@ class NoSiblingAncestor(Exception):
 
     @property
     def msg(self):
-        return f"Source {self.src} has no sibling ancestor of target {self.tgt}, so cannot wire up."
+        return (
+            f"Source {self.src} has no sibling ancestor of target {self.tgt},"
+            " so cannot wire up."
+        )
 
 
 @dataclass
@@ -18,7 +21,10 @@ class NotInSameCfg(Exception):
 
     @property
     def msg(self):
-        return f"Source {self.src} is not in the same CFG as target {self.tgt}, so cannot wire up."
+        return (
+            f"Source {self.src} is not in the same CFG as target {self.tgt},"
+            " so cannot wire up."
+        )
 
 
 @dataclass
@@ -34,8 +40,3 @@ class MismatchedExit(Exception):
 
 class ParentBeforeChild(Exception):
     msg: str = "Parent node must be added before child node."
-
-
-@dataclass
-class IncompleteOp(Exception):
-    msg: str = "Operation is incomplete, may require set_in_types to be called."

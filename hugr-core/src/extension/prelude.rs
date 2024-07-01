@@ -350,7 +350,7 @@ pub struct ConstExternalSymbol {
     pub symbol: String,
     /// The type of the value found at this symbol reference.
     pub typ: Type,
-    /// Whether the value at the symbol referenence is constant or mutable.
+    /// Whether the value at the symbol reference is constant or mutable.
     pub constant: bool,
 }
 
@@ -402,7 +402,7 @@ impl CustomConst for ConstExternalSymbol {
 #[cfg(test)]
 mod test {
     use crate::{
-        builder::{DFGBuilder, Dataflow, DataflowHugr},
+        builder::{ft1, DFGBuilder, Dataflow, DataflowHugr},
         utils::test_quantum_extension::cx_gate,
         Hugr, Wire,
     };
@@ -452,9 +452,7 @@ mod test {
         assert!(error_val.equal_consts(&ConstError::new(2, "my message")));
         assert!(!error_val.equal_consts(&ConstError::new(3, "my message")));
 
-        let mut b =
-            DFGBuilder::new(FunctionType::new_endo(type_row![]).with_extension_delta(PRELUDE_ID))
-                .unwrap();
+        let mut b = DFGBuilder::new(ft1(type_row![])).unwrap();
 
         let err = b.add_load_value(error_val);
 
@@ -488,10 +486,7 @@ mod test {
             )
             .unwrap();
 
-        let mut b = DFGBuilder::new(
-            FunctionType::new_endo(type_row![QB_T, QB_T]).with_extension_delta(PRELUDE_ID),
-        )
-        .unwrap();
+        let mut b = DFGBuilder::new(ft1(type_row![QB_T, QB_T])).unwrap();
         let [q0, q1] = b.input_wires_arr();
         let [q0, q1] = b
             .add_dataflow_op(cx_gate(), [q0, q1])
@@ -529,9 +524,7 @@ mod test {
     #[test]
     /// Test print operation
     fn test_print() {
-        let mut b: DFGBuilder<Hugr> =
-            DFGBuilder::new(FunctionType::new_endo(vec![]).with_extension_delta(PRELUDE_ID))
-                .unwrap();
+        let mut b: DFGBuilder<Hugr> = DFGBuilder::new(ft1(vec![])).unwrap();
         let greeting: ConstString = ConstString::new("Hello, world!".into());
         let greeting_out: Wire = b.add_load_value(greeting);
         let print_op = PRELUDE
