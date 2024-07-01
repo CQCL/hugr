@@ -369,7 +369,7 @@ class LoadFunction(DataflowOp):
         (f_ty,) = signature.output
         assert isinstance(
             f_ty, tys.FunctionType
-        ), "Expected single funciton type output"
+        ), "Expected single function type output"
         return ops.LoadFunc(
             self.func_sig.deserialize(),
             f_ty,

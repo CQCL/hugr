@@ -241,11 +241,11 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
         return self._node_links(node, self._links.bck)
 
     def num_incoming(self, node: Node) -> int:
-        # connecetd links
+        # connected links
         return sum(1 for _ in self.incoming_links(node))
 
     def num_outgoing(self, node: ToNode) -> int:
-        # connecetd links
+        # connected links
         return sum(1 for _ in self.outgoing_links(node))
 
     # TODO: num_links and _linked_ports
