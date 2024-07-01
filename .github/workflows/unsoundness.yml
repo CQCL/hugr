@@ -16,7 +16,7 @@ env:
   RUSTFLAGS: "--cfg=ci_run"
   # Permissive provenance is required due to warnings in bitvec 1.0.1
   # Proptest flags required to fix https://github.com/proptest-rs/proptest/issues/253
-  MIRIFLAGS: '-Zmiri-permissive-provenance -Zmiri-env-forward=PROPTEST_DISABLE_FAILURE_PERSISTENCE'
+  MIRIFLAGS: '-Zmiri-permissive-provenance -Zmiri-env-forward=PROPTEST_DISABLE_FAILURE_PERSISTENCE -Zmiri-disable-isolation'
   PROPTEST_DISABLE_FAILURE_PERSISTENCE: true
 
 jobs:
