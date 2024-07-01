@@ -94,8 +94,7 @@ class Module:
         Examples:
             >>> m = Module()
             >>> sig = tys.PolyFuncType([], tys.FunctionType.empty())
-            >>> f = m.declare_function("f", sig)
-            >>> f
+            >>> m.declare_function("f", sig)
             Node(1)
         """
         return self.hugr.add_node(ops.FuncDecl(name, signature), self.hugr.root)
@@ -111,8 +110,7 @@ class Module:
 
         Examples:
             >>> m = Module()
-            >>> c = m.add_const(val.FALSE)
-            >>> c
+            >>> m.add_const(val.FALSE)
             Node(1)
         """
         return self.hugr.add_node(ops.Const(value), self.hugr.root)
