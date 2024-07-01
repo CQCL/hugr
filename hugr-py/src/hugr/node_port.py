@@ -3,14 +3,18 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import (
+    TYPE_CHECKING,
     ClassVar,
-    Iterator,
-    Protocol,
-    overload,
-    TypeVar,
     Generic,
+    Protocol,
+    TypeVar,
+    overload,
 )
+
 from typing_extensions import Self
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
 class Direction(Enum):
@@ -57,7 +61,7 @@ class ToNode(Wire, Protocol):
     ) -> OutPort | Iterator[OutPort]:
         return self.to_node()._index(index)
 
-    def out_port(self) -> "OutPort":
+    def out_port(self) -> OutPort:
         return OutPort(self.to_node(), 0)
 
     def inp(self, offset: int) -> InPort:
@@ -83,17 +87,16 @@ class Node(ToNode):
     ) -> OutPort | Iterator[OutPort]:
         match index:
             case int(index):
-                if self._num_out_ports is not None:
-                    if index >= self._num_out_ports:
-                        raise IndexError("Index out of range")
+                if self._num_out_ports is not None and index >= self._num_out_ports:
+                    msg = "Index out of range"
+                    raise IndexError(msg)
                 return self.out(index)
             case slice():
                 start = index.start or 0
                 stop = index.stop or self._num_out_ports
                 if stop is None:
-                    raise ValueError(
-                        "Stop must be specified when number of outputs unknown"
-                    )
+                    msg = "Stop must be specified when number of outputs unknown"
+                    raise ValueError(msg)
                 step = index.step or 1
                 return (self[i] for i in range(start, stop, step))
             case tuple(xs):

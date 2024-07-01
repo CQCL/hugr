@@ -1,7 +1,6 @@
-from collections.abc import Hashable, ItemsView, MutableMapping
+from collections.abc import Hashable, ItemsView, Iterable, MutableMapping
 from dataclasses import dataclass, field
-from typing import Generic, Iterable, Protocol, TypeVar
-
+from typing import Generic, Protocol, TypeVar
 
 L = TypeVar("L", bound=Hashable)
 R = TypeVar("R", bound=Hashable)

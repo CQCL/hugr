@@ -3,8 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import (
     TYPE_CHECKING,
-    Iterable,
-    Sequence,
     TypeVar,
 )
 
@@ -13,23 +11,25 @@ from typing_extensions import Self
 import hugr.ops as ops
 import hugr.val as val
 from hugr.tys import (
+    ExtensionSet,
+    FunctionKind,
+    FunctionType,
+    PolyFuncType,
     Type,
+    TypeArg,
     TypeRow,
     get_first_sum,
-    FunctionType,
-    TypeArg,
-    FunctionKind,
-    PolyFuncType,
-    ExtensionSet,
 )
 
 from .exceptions import NoSiblingAncestor
 from .hugr import Hugr, ParentBuilder
-from .node_port import Node, OutPort, Wire, ToNode
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable, Sequence
+
     from .cfg import Cfg
     from .cond_loop import Conditional, If, TailLoop
+    from .node_port import Node, OutPort, ToNode, Wire
 
 
 DP = TypeVar("DP", bound=ops.DfParentOp)
@@ -210,7 +210,8 @@ class _DfBase(ParentBuilder[DP]):
             case FunctionKind(sig):
                 signature = sig
             case _:
-                raise ValueError("Expected 'func' to be a function")
+                msg = "Expected 'func' to be a function"
+                raise ValueError(msg)
         return signature
 
     def _wire_up(self, node: Node, ports: Iterable[Wire]) -> TypeRow:
@@ -223,7 +224,8 @@ class _DfBase(ParentBuilder[DP]):
         port = wire.out_port()
         ty = self.hugr.port_type(port)
         if ty is None:
-            raise ValueError(f"Port {port} is not a dataflow port.")
+            msg = f"Port {port} is not a dataflow port."
+            raise ValueError(msg)
         return ty
 
     def _wire_up_port(self, node: Node, offset: int, p: Wire) -> Type:

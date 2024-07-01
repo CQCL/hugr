@@ -1,4 +1,4 @@
-from hugr.serialization import SerialHugr
+from hugr.serialization.serial_hugr import SerialHugr
 
 
 def test_empty():
