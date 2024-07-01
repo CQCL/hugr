@@ -2,18 +2,10 @@
 
 ## 0.3.0 (2024-06-28)
 
-### Bug Fixes
-
-- Add some validation for const nodes ([#1222](https://github.com/CQCL/hugr/pull/1222))
-
 ### Features
 
 - [**breaking**] Validate Extensions using hierarchy, ignore input_extensions, RIP inference ([#1142](https://github.com/CQCL/hugr/pull/1142))
 - Helper functions for requesting inference, use with builder in tests ([#1219](https://github.com/CQCL/hugr/pull/1219))
-
-### Refactor
-
-- [**breaking**] Remove NodeType and input_extensions ([#1183](https://github.com/CQCL/hugr/pull/1183))
 
 
 ## 0.2.0 (2024-06-07)
