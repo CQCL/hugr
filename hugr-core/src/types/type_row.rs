@@ -17,8 +17,6 @@ use itertools::Itertools;
 
 /// List of types, used for function signatures.
 /// The `ROWVARS` parameter controls whether this may contain [RowVariable]s
-///
-/// [RowVariable]: crate::types::TypeEnum::RowVariable
 #[derive(Clone, Eq, Debug, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 #[serde(transparent)]

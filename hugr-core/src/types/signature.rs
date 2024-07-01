@@ -41,8 +41,6 @@ pub type FunctionType = FuncTypeBase<NoRV>;
 
 /// A function that may contain [RowVariable]s and thus has potentially-unknown arity;
 /// passable as a value round a Hugr (see [Type::new_function]) but not a valid node type.
-///
-/// [RowVariable]: crate::types::TypeEnum::RowVariable
 pub type FunctionTypeRV = FuncTypeBase<RowVariable>;
 
 impl<RV: MaybeRV> FuncTypeBase<RV> {

@@ -50,7 +50,7 @@ pub type TypeScheme = TypeSchemeBase<NoRV>;
 /// The polymorphic type of an [OpDef], whose number of input and outputs
 /// may vary according to how [RowVariable]s therein are instantiated.
 ///
-/// ]OpDef]: crate::extension::OpDef
+/// [OpDef]: crate::extension::OpDef
 pub type TypeSchemeRV = TypeSchemeBase<RowVariable>;
 
 // deriving Default leads to an impl that only applies for RV: Default

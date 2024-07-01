@@ -7,6 +7,9 @@ mod serialize;
 mod signature;
 pub mod type_param;
 pub mod type_row;
+mod row_var;
+pub use row_var::{NoRV, RowVariable};
+use row_var::MaybeRV;
 
 pub use crate::ops::constant::{ConstTypeError, CustomCheckFailure};
 use crate::types::type_param::check_type_arg;
@@ -23,7 +26,7 @@ use itertools::FoldWhile::{Continue, Done};
 use itertools::{repeat_n, Itertools};
 use serde::{Deserialize, Serialize};
 #[cfg(test)]
-use {proptest_derive::Arbitrary, proptest::prelude::{any,BoxedStrategy,Strategy}};
+use {proptest_derive::Arbitrary};
 
 use crate::extension::{ExtensionRegistry, SignatureError};
 use crate::ops::AliasDecl;
@@ -193,98 +196,6 @@ impl<RV: MaybeRV> From<SumType> for TypeBase<RV> {
             SumType::Unit { size } => TypeBase::new_unit_sum(size),
             SumType::General { rows } => TypeBase::new_sum(rows),
         }
-    }
-}
-
-/// Variable index, and cache of inner TypeBound - matches a [TypeParam::List] of [TypeParam::Type]
-/// of this bound (checked in validation)
-// Note that I believe the serde derives here are not used except as markers
-// so that other types containing this can also #derive-serde the same way.
-#[derive(
-    Clone, Debug, Eq, PartialEq, derive_more::Display, serde::Serialize, serde::Deserialize,
-)]
-#[display(fmt = "{}", "_0")]
-pub struct RowVariable(usize, TypeBound);
-
-trait MaybeRV: Clone + std::fmt::Debug + std::fmt::Display + From<NoRV> + Eq + PartialEq + 'static {
-    fn as_rv(&self) -> &RowVariable;
-    fn try_from_rv(rv: RowVariable) -> Result<Self, RowVariable>;
-    fn bound(&self) -> TypeBound;
-    fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError>;
-    fn substitute(&self, s: &Substitution) -> Vec<TypeBase<Self>>;
-    #[cfg(test)] fn weight() -> u32 {1}
-    #[cfg(test)] fn arb() -> BoxedStrategy<Self>;
-}
-
-// Note that I believe the serde derives here are not used except as markers
-// so that other types containing this can also #derive-serde the same way.
-#[derive(
-    Clone, Debug, Eq, PartialEq, derive_more::Display, serde::Serialize, serde::Deserialize,
-)]
-pub enum NoRV {}
-
-impl From<NoRV> for RowVariable {
-    fn from(value: NoRV) -> Self {
-        match value { }
-    }
-}
-
-impl MaybeRV for RowVariable {
-    fn as_rv(&self) -> &RowVariable {
-        self
-    }
-
-    fn bound(&self) -> TypeBound {
-        self.1
-    }
-
-    fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
-        check_typevar_decl(var_decls, self.0, &TypeParam::new_list(self.1))
-    }
-
-    fn substitute(&self, s: &Substitution) -> Vec<TypeBase<Self>> {
-        s.apply_rowvar(self.0, self.1)
-    }
-
-    fn try_from_rv(rv: RowVariable) -> Result<Self, RowVariable> {
-        Ok(rv)
-    }
-
-    #[cfg(test)]
-    fn arb() -> BoxedStrategy<Self> {
-        (any::<usize>(), any::<TypeBound>()).prop_map(|(i,b)| Self(i,b)).boxed()
-    }
-}
-
-impl MaybeRV for NoRV {
-    fn as_rv(&self) -> &RowVariable {
-        match *self {}
-    }
-
-    fn bound(&self) -> TypeBound {
-        match *self {}
-    }
-
-    fn validate(&self, _var_decls: &[TypeParam]) -> Result<(), SignatureError> {
-        match *self {}
-    }
-
-    fn substitute(&self, _s: &Substitution) -> Vec<TypeBase<Self>> {
-        match *self {}
-    }
-
-    fn try_from_rv(rv: RowVariable) -> Result<Self, RowVariable> {
-        Err(rv)
-    }
-
-    #[cfg(test)]
-    fn weight() -> u32 {
-        0
-    }
-
-    #[cfg(test)]
-    fn arb() -> BoxedStrategy<Self> {
-        any::<usize>().prop_map(|_| panic!("Should be ruled out by weight==0")).boxed()
     }
 }
 
