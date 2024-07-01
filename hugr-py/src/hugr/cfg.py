@@ -50,7 +50,7 @@ class Block(_DfBase[ops.DataflowBlock]):
 @dataclass
 class Cfg(ParentBuilder[ops.CFG]):
     """Builder class for a HUGR control flow graph, with the HUGR root node
-    being an :class:`CFG <hugr.ops.CFG>`.
+    being a :class:`CFG <hugr.ops.CFG>`.
 
     Args:
         input_types: The input types for the CFG, outputs are propagated through
