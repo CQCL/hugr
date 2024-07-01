@@ -1,7 +1,4 @@
-use std::{
-    collections::{HashMap, HashSet},
-    rc::Rc,
-};
+use std::{collections::HashMap, rc::Rc};
 
 use anyhow::{anyhow, Result};
 use hugr::{
@@ -24,7 +21,7 @@ use delegate::delegate;
 
 use self::mailbox::ValueMailBox;
 
-use super::{Emission, EmissionSet, EmitModuleContext};
+use super::{EmissionSet, EmitModuleContext};
 
 mod mailbox;
 pub use mailbox::{RowMailBox, RowPromise};
@@ -48,7 +45,7 @@ pub use mailbox::{RowMailBox, RowPromise};
 /// node, and written to with the output values of each node.
 pub struct EmitFuncContext<'c, H: HugrView> {
     emit_context: EmitModuleContext<'c, H>,
-    todo: HashSet<Emission<'c, H>>,
+    todo: EmissionSet<'c, H>,
     func: FunctionValue<'c>,
     env: HashMap<Wire, ValueMailBox<'c>>,
     builder: Builder<'c>,
@@ -105,7 +102,7 @@ impl<'c, H: HugrView> EmitFuncContext<'c, H> {
     /// Used when emitters encounter a scoped definition. `node` will be
     /// returned from [EmitFuncContext::finish].
     pub fn push_todo_func(&mut self, node: FatNode<'c, FuncDefn, H>) {
-        self.todo.insert(node.into());
+        self.todo.insert(node);
     }
 
     // TODO likely we don't need this

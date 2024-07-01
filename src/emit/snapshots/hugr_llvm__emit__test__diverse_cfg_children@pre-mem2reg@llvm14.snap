@@ -1,0 +1,59 @@
+---
+source: src/emit/test.rs
+expression: module.to_string()
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define { i32, {}, {} } @_hl.main.1() {
+alloca_block:
+  %"0" = alloca { i32, {}, {} }, align 8
+  %"4_0" = alloca { i32, {}, {} }, align 8
+  %"01" = alloca { i32, {}, {} }, align 8
+  %"15_0" = alloca { {} }, align 8
+  %"16_0" = alloca { i32, {}, {} }, align 8
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  br label %2
+
+0:                                                ; preds = %2
+  %1 = extractvalue { {} } %"15_04", 0
+  store { i32, {}, {} } %"16_05", { i32, {}, {} }* %"01", align 4
+  br label %4
+
+2:                                                ; preds = %entry_block
+  %3 = call { i32, {}, {} } @_hl.scoped_func.7()
+  store { i32, {}, {} } %3, { i32, {}, {} }* %"16_0", align 4
+  store { {} } undef, { {} }* %"15_0", align 1
+  %"15_02" = load { {} }, { {} }* %"15_0", align 1
+  %"16_03" = load { i32, {}, {} }, { i32, {}, {} }* %"16_0", align 4
+  store { {} } %"15_02", { {} }* %"15_0", align 1
+  store { i32, {}, {} } %"16_03", { i32, {}, {} }* %"16_0", align 4
+  %"15_04" = load { {} }, { {} }* %"15_0", align 1
+  %"16_05" = load { i32, {}, {} }, { i32, {}, {} }* %"16_0", align 4
+  switch i32 0, label %0 [
+  ]
+
+4:                                                ; preds = %0
+  %"06" = load { i32, {}, {} }, { i32, {}, {} }* %"01", align 4
+  store { i32, {}, {} } %"06", { i32, {}, {} }* %"4_0", align 4
+  %"4_07" = load { i32, {}, {} }, { i32, {}, {} }* %"4_0", align 4
+  store { i32, {}, {} } %"4_07", { i32, {}, {} }* %"0", align 4
+  %"08" = load { i32, {}, {} }, { i32, {}, {} }* %"0", align 4
+  ret { i32, {}, {} } %"08"
+}
+
+define { i32, {}, {} } @_hl.scoped_func.7() {
+alloca_block:
+  %"0" = alloca { i32, {}, {} }, align 8
+  %"10_0" = alloca { i32, {}, {} }, align 8
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  store { i32, {}, {} } { i32 0, {} undef, {} poison }, { i32, {}, {} }* %"10_0", align 4
+  %"10_01" = load { i32, {}, {} }, { i32, {}, {} }* %"10_0", align 4
+  store { i32, {}, {} } %"10_01", { i32, {}, {} }* %"0", align 4
+  %"02" = load { i32, {}, {} }, { i32, {}, {} }* %"0", align 4
+  ret { i32, {}, {} } %"02"
+}

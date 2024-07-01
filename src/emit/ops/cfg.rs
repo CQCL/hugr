@@ -44,22 +44,20 @@ impl<'c, 'd, H: HugrView> CfgEmitter<'c, 'd, H> {
         // to crate the other blocks immediately before it. This is just for
         // nice block ordering.
         let exit_block = context.new_basic_block("", None);
-        let bbs = node
-            .children()
-            .map(|child| {
-                if child.is_exit_block() {
-                    let output_row = {
-                        let out_types = node.out_value_types().map(|x| x.1).collect_vec();
-                        context.new_row_mail_box(out_types.iter(), "")?
-                    };
-                    Ok((child, (exit_block, output_row)))
-                } else {
-                    let bb = context.new_basic_block("", Some(exit_block));
-                    let (i, _) = child.get_io().unwrap();
-                    Ok((child, (bb, context.node_outs_rmb(i)?)))
-                }
-            })
-            .collect::<Result<HashMap<_, _>>>()?;
+        let mut bbs = HashMap::new();
+        for child in node.children() {
+            if child.is_exit_block() {
+                let output_row = {
+                    let out_types = node.out_value_types().map(|x| x.1).collect_vec();
+                    context.new_row_mail_box(out_types.iter(), "")?
+                };
+                bbs.insert(child, (exit_block, output_row));
+            } else if child.is_dataflow_block() {
+                let bb = context.new_basic_block("", Some(exit_block));
+                let (i, _) = child.get_io().unwrap();
+                bbs.insert(child, (bb, context.node_outs_rmb(i)?));
+            }
+        }
         let (entry_node, exit_node) = node.get_entry_exit();
         Ok(CfgEmitter {
             context,
@@ -127,6 +125,16 @@ impl<'c, H: HugrView> EmitOp<'c, OpType, H> for CfgEmitter<'c, '_, H> {
         match args.node().as_ref() {
             OpType::DataflowBlock(ref dfb) => self.emit(args.into_ot(dfb)),
             OpType::ExitBlock(ref eb) => self.emit(args.into_ot(eb)),
+
+            // Const is allowed, but requires no work here. FuncDecl is
+            // technically not allowed, but there is no harm in allowing it.
+            OpType::Const(_) => Ok(()),
+            OpType::FuncDecl(_) => Ok(()),
+            OpType::FuncDefn(ref fd) => {
+                self.context.push_todo_func(args.node.into_ot(fd));
+                Ok(())
+            }
+
             ot => Err(anyhow!("unknown optype: {ot:?}")),
         }
     }

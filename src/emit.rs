@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
 use delegate::delegate;
 use hugr::{
-    ops::{FuncDecl, FuncDefn, NamedOp as _, OpType},
+    ops::{FuncDecl, FuncDefn, OpType},
     types::PolyFuncType,
     HugrView, Node,
 };
@@ -12,7 +12,7 @@ use inkwell::{
     types::{AnyType, BasicType, BasicTypeEnum, FunctionType},
     values::{BasicValueEnum, CallSiteValue, FunctionValue, GlobalValue},
 };
-use std::{collections::HashSet, hash::Hash, rc::Rc};
+use std::{collections::HashSet, rc::Rc};
 
 use crate::types::TypingSession;
 
@@ -236,56 +236,7 @@ impl<'c, H: HugrView> EmitModuleContext<'c, H> {
     }
 }
 
-/// TODO
-type EmissionSet<'c, H> = HashSet<Emission<'c, H>>;
-
-/// An enum with a constructor for each [OpType] which can be emitted by [EmitHugr].
-pub enum Emission<'c, H> {
-    FuncDefn(FatNode<'c, FuncDefn, H>),
-    FuncDecl(FatNode<'c, FuncDecl, H>),
-}
-
-impl<'c, H> From<FatNode<'c, FuncDefn, H>> for Emission<'c, H> {
-    fn from(value: FatNode<'c, FuncDefn, H>) -> Self {
-        Self::FuncDefn(value)
-    }
-}
-
-impl<'c, H> From<FatNode<'c, FuncDecl, H>> for Emission<'c, H> {
-    fn from(value: FatNode<'c, FuncDecl, H>) -> Self {
-        Self::FuncDecl(value)
-    }
-}
-
-impl<'c, H> PartialEq for Emission<'c, H> {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::FuncDefn(l0), Self::FuncDefn(r0)) => l0 == r0,
-            (Self::FuncDecl(l0), Self::FuncDecl(r0)) => l0 == r0,
-            _ => false,
-        }
-    }
-}
-
-impl<'c, H> Eq for Emission<'c, H> {}
-
-impl<'c, H> Hash for Emission<'c, H> {
-    fn hash<HA: std::hash::Hasher>(&self, state: &mut HA) {
-        match self {
-            Emission::FuncDefn(x) => x.hash(state),
-            Emission::FuncDecl(x) => x.hash(state),
-        }
-    }
-}
-
-impl<'c, H> Clone for Emission<'c, H> {
-    fn clone(&self) -> Self {
-        match self {
-            Self::FuncDefn(arg0) => Self::FuncDefn(*arg0),
-            Self::FuncDecl(arg0) => Self::FuncDecl(*arg0),
-        }
-    }
-}
+type EmissionSet<'c, H> = HashSet<FatNode<'c, FuncDefn, H>>;
 
 /// Emits [HugrView]s into an LLVM [Module].
 pub struct EmitHugr<'c, H: HugrView> {
@@ -324,27 +275,26 @@ impl<'c, H: HugrView> EmitHugr<'c, H> {
         }
     }
 
-    /// Emits a global node (either a [FuncDefn] or [FuncDecl]) into the inner [Module].
+    /// Emits a FuncDefn into the inner [Module].
     ///
     /// `node` need not be a child of a hugr [Module](hugr::ops::Module), but it will
     /// be emitted as a top-level function in the inner [Module]. Indeed, there
     /// are only top-level functions in LLVM IR.
     ///
-    /// Any child [FuncDefn] (or [FuncDecl], although those are currently
-    /// prohibited by hugr validation) will also be emitted.
+    /// Any child [FuncDefn] will also be emitted.
     ///
-    /// It is safe to emit the same node multiple times, it will be detected and
-    /// omitted.
+    /// It is safe to emit the same node multiple times: the second and further
+    /// emissions will be no-ops.
     ///
     /// If any LLVM IR declaration which is to be emitted already exists in the
     /// [Module] and it differs from what would be emitted, then we fail.
-    pub fn emit_global(mut self, node: impl Into<Emission<'c, H>>) -> Result<Self> {
-        let mut worklist: EmissionSet<'c, H> = [node.into()].into_iter().collect();
+    pub fn emit_func(mut self, node: FatNode<'c, FuncDefn, H>) -> Result<Self> {
+        let mut worklist: EmissionSet<'c, H> = [node].into_iter().collect();
         let pop =
             |wl: &mut EmissionSet<'c, H>| wl.iter().next().cloned().map(|x| wl.take(&x).unwrap());
 
         while let Some(x) = pop(&mut worklist) {
-            let (new_self, new_tasks) = self.emit_global_impl(x)?;
+            let (new_self, new_tasks) = self.emit_func_impl(x)?;
             self = new_self;
             worklist.extend(new_tasks.into_iter());
         }
@@ -353,35 +303,34 @@ impl<'c, H: HugrView> EmitHugr<'c, H> {
 
     /// Emits all children of a hugr [Module](hugr::ops::Module).
     ///
-    /// Note that type aliases are not supported, and [hugr::ops::Const] nodes
-    /// are not emitted directly, but instead by [hugr::ops::LoadConstant] emission. So
-    /// [FuncDefn] and [FuncDecl] are the only interesting children.
+    /// Note that type aliases are not supported, and that [hugr::ops::Const]
+    /// and [hugr::ops::FuncDecl] nodes are not emitted directly, but instead by
+    /// emission of ops with static edges from them. So [FuncDefn] are the only
+    /// interesting children.
     pub fn emit_module(mut self, node: FatNode<'c, hugr::ops::Module, H>) -> Result<Self> {
         for c in node.children() {
             match c.as_ref() {
                 OpType::FuncDefn(ref fd) => {
-                    self = self.emit_global(c.into_ot(fd))?;
+                    let fat_ot = c.into_ot(fd);
+                    self = self.emit_func(fat_ot)?;
                 }
-                _ => todo!("emit_module: unimplemented: {}", c.name()),
+                // FuncDecls are allowed, but we don't need to do anything here.
+                OpType::FuncDecl(_) => (),
+                // Consts are allowed, but we don't need to do anything here.
+                OpType::Const(_) => (),
+                _ => Err(anyhow!("Module has invalid child: {c}"))?,
             }
         }
         Ok(self)
-    }
-
-    fn emit_global_impl(mut self, em: Emission<'c, H>) -> Result<(Self, EmissionSet<'c, H>)> {
-        if !self.emitted.insert(em.clone()) {
-            return Ok((self, Default::default()));
-        }
-        match em {
-            Emission::FuncDefn(f) => self.emit_func_impl(f),
-            Emission::FuncDecl(_) => todo!(), // Emission::Const(_) => todo!(),
-        }
     }
 
     fn emit_func_impl(
         mut self,
         node: FatNode<'c, FuncDefn, H>,
     ) -> Result<(Self, EmissionSet<'c, H>)> {
+        if !self.emitted.insert(node) {
+            return Ok((self, EmissionSet::default()));
+        }
         let func = self.module_context.get_func_defn(node)?;
         let mut func_ctx = EmitFuncContext::new(self.module_context, func)?;
         let ret_rmb = func_ctx.new_row_mail_box(node.signature.body().output.iter(), "ret")?;

@@ -289,3 +289,99 @@ fn get_external_func(llvm_ctx: TestContext) {
     assert_eq!(foo1, foo2);
     assert!(emc.get_extern_func("foo", func_type2).is_err());
 }
+
+#[rstest]
+fn diverse_module_children(llvm_ctx: TestContext) {
+    let hugr = {
+        let mut builder = ModuleBuilder::new();
+        let _ = {
+            let fbuilder = builder
+                .define_function("f1", FunctionType::new_endo(type_row![]).into())
+                .unwrap();
+            fbuilder.finish_sub_container().unwrap()
+        };
+        let _ = {
+            let fbuilder = builder
+                .define_function("f2", FunctionType::new_endo(type_row![]).into())
+                .unwrap();
+            fbuilder.finish_sub_container().unwrap()
+        };
+        let _ = builder.add_constant(Value::true_val());
+        let _ = builder
+            .declare("decl", FunctionType::new_endo(type_row![]).into())
+            .unwrap();
+        builder.finish_hugr(&EMPTY_REG).unwrap()
+    };
+    check_emission!(hugr, llvm_ctx);
+}
+
+#[rstest]
+fn diverse_dfg_children(llvm_ctx: TestContext) {
+    let hugr = SimpleHugrConfig::new()
+        .with_outs(BOOL_T)
+        .finish(|mut builder: DFGW| {
+            let [r] = {
+                let mut builder = builder
+                    .dfg_builder(FunctionType::new(type_row![], BOOL_T), None, [])
+                    .unwrap();
+                let konst = builder.add_constant(Value::false_val());
+                let func = {
+                    let mut builder = builder
+                        .define_function(
+                            "scoped_func",
+                            FunctionType::new(type_row![], BOOL_T).into(),
+                        )
+                        .unwrap();
+                    let w = builder.load_const(&konst);
+                    builder.finish_with_outputs([w]).unwrap()
+                };
+                let [r] = builder
+                    .call(func.handle(), &[], [], &EMPTY_REG)
+                    .unwrap()
+                    .outputs_arr();
+                builder.finish_with_outputs([r]).unwrap().outputs_arr()
+            };
+            builder.finish_with_outputs([r]).unwrap()
+        });
+    check_emission!(hugr, llvm_ctx);
+}
+
+#[rstest]
+fn diverse_cfg_children(llvm_ctx: TestContext) {
+    let hugr = SimpleHugrConfig::new()
+        .with_outs(BOOL_T)
+        .finish(|mut builder: DFGW| {
+            let [r] = {
+                let mut builder = builder
+                    .cfg_builder([], None, type_row![BOOL_T], ExtensionSet::new())
+                    .unwrap();
+                let konst = builder.add_constant(Value::false_val());
+                let func = {
+                    let mut builder = builder
+                        .define_function(
+                            "scoped_func",
+                            FunctionType::new(type_row![], BOOL_T).into(),
+                        )
+                        .unwrap();
+                    let w = builder.load_const(&konst);
+                    builder.finish_with_outputs([w]).unwrap()
+                };
+                let entry = {
+                    let mut builder = builder
+                        .entry_builder([type_row![]], type_row![BOOL_T], ExtensionSet::new())
+                        .unwrap();
+                    let control = builder.add_load_value(Value::unary_unit_sum());
+                    let [r] = builder
+                        .call(func.handle(), &[], [], &EMPTY_REG)
+                        .unwrap()
+                        .outputs_arr();
+                    builder.finish_with_outputs(control, [r]).unwrap()
+                };
+                let exit = builder.exit_block();
+                builder.branch(&entry, 0, &exit).unwrap();
+                builder.finish_sub_container().unwrap().outputs_arr()
+            };
+            builder.finish_with_outputs([r]).unwrap()
+        });
+    check_emission!(hugr, llvm_ctx);
+}

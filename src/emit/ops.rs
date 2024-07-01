@@ -2,8 +2,8 @@ use anyhow::{anyhow, Result};
 use hugr::{
     hugr::views::SiblingGraph,
     ops::{
-        Call, Case, Conditional, Const, Input, LoadConstant, MakeTuple, NamedOp, OpTag, OpTrait,
-        OpType, Output, Tag, UnpackTuple, Value, CFG,
+        Call, Case, Conditional, Const, Input, LoadConstant, MakeTuple, OpTag, OpTrait, OpType,
+        Output, Tag, UnpackTuple, Value, CFG,
     },
     types::{SumType, Type, TypeEnum},
     HugrView, NodeIndex,
@@ -378,13 +378,19 @@ fn emit_optype<'c, H: HugrView>(
             let extensions = context.extensions();
             extensions.emit(context, args.into_ot(co))
         }
-        OpType::Const(_) => Ok(()),
         OpType::LoadConstant(ref lc) => emit_load_constant(context, args.into_ot(lc)),
         OpType::Call(ref cl) => emit_call(context, args.into_ot(cl)),
         OpType::Conditional(ref co) => emit_conditional(context, args.into_ot(co)),
         OpType::CFG(ref cfg) => emit_cfg(context, args.into_ot(cfg)),
+        // Const is allowed, but requires no work here. FuncDecl is technically
+        // not allowed, but there is no harm in allowing it.
+        OpType::Const(_) => Ok(()),
+        OpType::FuncDecl(_) => Ok(()),
+        OpType::FuncDefn(ref fd) => {
+            context.push_todo_func(node.into_ot(fd));
+            Ok(())
+        }
 
-        // OpType::FuncDefn(fd) => self.emit(ot.into_ot(fd), context, inputs, outputs),
-        _ => todo!("Unimplemented OpTypeEmitter: {}", args.node().name()),
+        _ => Err(anyhow!("Invalid child for Dataflow Parent: {node}")),
     }
 }
