@@ -107,7 +107,6 @@ class Cfg(ParentBuilder[ops.CFG]):
             >>> cfg = Cfg.new_nested([tys.Bool], hugr)
             >>> cfg.parent_op
             CFG(inputs=[Bool])
-
         """
         new = cls.__new__(cls)
         root = hugr.add_node(
