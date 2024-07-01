@@ -1,6 +1,4 @@
-import hugr.ops as ops
-import hugr.tys as tys
-import hugr.val as val
+from hugr import ops, tys, val
 from hugr.cfg import Cfg
 from hugr.dfg import Dfg
 

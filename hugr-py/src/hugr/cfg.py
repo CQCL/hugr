@@ -5,8 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-import hugr.ops as ops
-import hugr.val as val
+from hugr import ops, val
 
 from .dfg import _DfBase
 from .exceptions import MismatchedExit, NoSiblingAncestor, NotInSameCfg

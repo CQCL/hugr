@@ -7,7 +7,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-import hugr.ops as ops
+from hugr import ops
 
 from .dfg import _DfBase
 from .hugr import Hugr, ParentBuilder

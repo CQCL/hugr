@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-import hugr.ops as ops
-import hugr.tys as tys
-import hugr.val as val
+from hugr import ops, tys, val
 from hugr.dfg import Dfg, _ancestral_sibling
 from hugr.function import Module
 from hugr.hugr import Hugr

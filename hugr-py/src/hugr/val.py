@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 import hugr.serialization.ops as sops
 import hugr.serialization.tys as stys
-import hugr.tys as tys
+from hugr import tys
 from hugr.utils import ser_it
 
 if TYPE_CHECKING:

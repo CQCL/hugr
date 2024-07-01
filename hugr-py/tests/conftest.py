@@ -7,8 +7,7 @@ import subprocess
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-import hugr.tys as tys
-import hugr.val as val
+from hugr import tys, val
 from hugr.hugr import Hugr
 from hugr.ops import Command, Custom
 from hugr.serialization.serial_hugr import SerialHugr

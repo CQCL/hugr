@@ -10,9 +10,7 @@ from typing import (
 
 from typing_extensions import Self
 
-import hugr.ops as ops
-import hugr.tys as tys
-import hugr.val as val
+from hugr import ops, tys, val
 
 from .exceptions import NoSiblingAncestor
 from .hugr import Hugr, ParentBuilder

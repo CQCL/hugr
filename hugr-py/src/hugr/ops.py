@@ -6,8 +6,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Protocol, TypeVar, runtime_checkable
 
 import hugr.serialization.ops as sops
-import hugr.tys as tys
-import hugr.val as val
+from hugr import tys, val
 from hugr.node_port import Direction, InPort, Node, OutPort, Wire
 from hugr.utils import ser_it
 
