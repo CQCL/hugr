@@ -139,7 +139,7 @@ class Command:
     """A :class:`DataflowOp` and its incoming :class:`Wire <hugr.nodeport.Wire>`
       arguments.
 
-    Ephermeral, used to wire in operations to a dataflow graph.
+    Ephemeral, used to wire in operations to a dataflow graph.
 
     Example:
         >>> Noop()(Node(0).out(0))
@@ -869,7 +869,7 @@ class Call(_CallOrLoad, Op):
     Args:
         signature: Polymorphic function signature.
         instantiation: Concrete function signature. Defaults to None.
-        type_args: type arguments for polymorphic funciton. Defaults to None.
+        type_args: type arguments for polymorphic function. Defaults to None.
 
     Raises:
         NoConcreteFunc: If the signature is polymorphic and no instantiation
@@ -949,7 +949,7 @@ class LoadFunc(_CallOrLoad, DataflowOp):
     Args:
         signature: Polymorphic function signature.
         instantiation: Concrete function signature. Defaults to None.
-        type_args: type arguments for polymorphic funciton. Defaults to None.
+        type_args: type arguments for polymorphic function. Defaults to None.
 
     Raises:
         NoConcreteFunc: If the signature is polymorphic and no instantiation

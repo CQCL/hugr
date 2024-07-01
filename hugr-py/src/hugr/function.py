@@ -1,4 +1,4 @@
-"""Builder clases for defining functions and modules in HUGR."""
+"""Builder classes for defining functions and modules in HUGR."""
 
 from __future__ import annotations
 
