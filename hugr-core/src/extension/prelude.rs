@@ -350,7 +350,7 @@ pub struct ConstExternalSymbol {
     pub symbol: String,
     /// The type of the value found at this symbol reference.
     pub typ: Type,
-    /// Whether the value at the symbol referenence is constant or mutable.
+    /// Whether the value at the symbol reference is constant or mutable.
     pub constant: bool,
 }
 
