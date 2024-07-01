@@ -79,7 +79,7 @@ impl From<TypeScheme> for TypeSchemeRV {
 }
 
 impl<RV: MaybeRV> TryFrom<TypeSchemeBase<RV>> for FuncTypeBase<RV> {
-    /// If the PolyFuncType is not monomorphic, fail with its binders
+    /// If the TypeSchemeBase is not monomorphic, fail with its binders
     type Error = Vec<TypeParam>;
 
     fn try_from(value: TypeSchemeBase<RV>) -> Result<Self, Self::Error> {
