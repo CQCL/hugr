@@ -1,4 +1,4 @@
-from typing import Literal  # noqa: D100
+from typing import Literal
 
 from pydantic import ConfigDict
 
