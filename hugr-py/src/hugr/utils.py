@@ -8,6 +8,10 @@ L = TypeVar("L", bound=Hashable)
 R = TypeVar("R", bound=Hashable)
 
 
+class NotBijection(Exception):
+    """Initial map is not a bijection."""
+
+
 @dataclass()
 class BiMap(MutableMapping, Generic[L, R]):
     """Bidirectional map backed by two dictionaries, between left types `L` and
@@ -22,8 +26,13 @@ class BiMap(MutableMapping, Generic[L, R]):
 
         Args:
             fwd: Left to right mapping. Defaults to empty.
+
+        Raises:
+            NotBijection: If the initial map is not a bijection.
         """
         fwd = fwd or {}
+        if len(fwd) != len(set(fwd.values())):
+            raise NotBijection
         self.fwd = dict(fwd)
         self.bck = {v: k for k, v in fwd.items()}
 
