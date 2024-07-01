@@ -3,13 +3,13 @@
 mod check;
 pub mod custom;
 mod poly_func;
+mod row_var;
 mod serialize;
 mod signature;
 pub mod type_param;
 pub mod type_row;
-mod row_var;
-pub use row_var::{NoRV, RowVariable};
 use row_var::MaybeRV;
+pub use row_var::{NoRV, RowVariable};
 
 pub use crate::ops::constant::{ConstTypeError, CustomCheckFailure};
 use crate::types::type_param::check_type_arg;
@@ -24,9 +24,9 @@ pub use type_row::{TypeRow, TypeRowRV};
 
 use itertools::FoldWhile::{Continue, Done};
 use itertools::{repeat_n, Itertools};
-use serde::{Deserialize, Serialize};
 #[cfg(test)]
-use {proptest_derive::Arbitrary};
+use proptest_derive::Arbitrary;
+use serde::{Deserialize, Serialize};
 
 use crate::extension::{ExtensionRegistry, SignatureError};
 use crate::ops::AliasDecl;
@@ -205,15 +205,13 @@ pub enum TypeEnum<RV: MaybeRV> {
     // TODO optimise with Box<CustomType> ?
     // or some static version of this?
     #[allow(missing_docs)]
-    Extension(CustomType,),
+    Extension(CustomType),
     #[allow(missing_docs)]
     #[display(fmt = "Alias({})", "_0.name()")]
     Alias(AliasDecl),
     #[allow(missing_docs)]
     #[display(fmt = "Function({})", "_0")]
-    Function(
-        Box<FunctionTypeRV>,
-    ),
+    Function(Box<FunctionTypeRV>),
     // Index into TypeParams, and cache of TypeBound (checked in validation)
     #[allow(missing_docs)]
     #[display(fmt = "Variable({})", _0)]
@@ -473,7 +471,7 @@ impl TryFrom<TypeRV> for Type {
                 TypeEnum::Alias(a) => TypeEnum::Alias(a),
                 TypeEnum::Function(f) => TypeEnum::Function(f),
                 TypeEnum::Variable(idx, bound) => TypeEnum::Variable(idx, bound),
-                TypeEnum::RowVar(rv) => {return Err(rv.as_rv().clone())},
+                TypeEnum::RowVar(rv) => return Err(rv.as_rv().clone()),
                 TypeEnum::Sum(s) => TypeEnum::Sum(s),
             },
             value.1,
@@ -484,7 +482,10 @@ impl TryFrom<TypeRV> for Type {
 impl<RV1: MaybeRV> TypeBase<RV1> {
     /// A swiss-army-knife for any safe conversion of the type argument `RV1`
     /// to/from [NoRV]/RowVariable/rust-type-variable.
-    fn into_<RV2: MaybeRV>(self) -> TypeBase<RV2> where RV1: Into<RV2> {
+    fn into_<RV2: MaybeRV>(self) -> TypeBase<RV2>
+    where
+        RV1: Into<RV2>,
+    {
         TypeBase(
             match self.0 {
                 TypeEnum::Extension(e) => TypeEnum::Extension(e),
@@ -493,7 +494,8 @@ impl<RV1: MaybeRV> TypeBase<RV1> {
                 TypeEnum::Variable(idx, bound) => TypeEnum::Variable(idx, bound),
                 TypeEnum::RowVar(rv) => TypeEnum::RowVar(rv.into()),
                 TypeEnum::Sum(s) => TypeEnum::Sum(s),
-            }, self.1
+            },
+            self.1,
         )
     }
 }
@@ -620,9 +622,9 @@ pub(crate) mod test {
 
         use crate::proptest::RecursionDepth;
 
+        use super::{AliasDecl, MaybeRV, TypeBase, TypeBound, TypeEnum};
         use crate::types::{CustomType, FunctionTypeRV, SumType, TypeRowRV};
         use ::proptest::prelude::*;
-        use super::{AliasDecl, MaybeRV, TypeBase, TypeBound, TypeEnum};
 
         impl Arbitrary for super::SumType {
             type Parameters = RecursionDepth;
@@ -638,7 +640,7 @@ pub(crate) mod test {
                 }
             }
         }
-        
+
         impl<RV: MaybeRV> Arbitrary for TypeBase<RV> {
             type Parameters = RecursionDepth;
             type Strategy = BoxedStrategy<Self>;

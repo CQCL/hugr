@@ -59,10 +59,10 @@ impl<RV: MaybeRV> TryFrom<SerSimpleType> for TypeBase<RV> {
             SerSimpleType::Alias(a) => TypeBase::new_alias(a),
             SerSimpleType::V { i, b } => TypeBase::new_var_use(i, b),
             // We can't use new_row_var because that returns Type<true> not Type<RV>.
-            SerSimpleType::R { i, b } => {
-                TypeBase::new(TypeEnum::RowVar(RV::try_from_rv(RowVariable(i, b))
-                .map_err(|var| SignatureError::RowVarWhereTypeExpected { var })?))
-            }
+            SerSimpleType::R { i, b } => TypeBase::new(TypeEnum::RowVar(
+                RV::try_from_rv(RowVariable(i, b))
+                    .map_err(|var| SignatureError::RowVarWhereTypeExpected { var })?,
+            )),
         })
     }
 }

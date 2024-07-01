@@ -1,11 +1,11 @@
 //! Classes for row variables (i.e. Type variables that can stand for multiple types)
 
-use crate::extension::SignatureError;
 use super::type_param::TypeParam;
 use super::{check_typevar_decl, Substitution, TypeBase, TypeBound};
+use crate::extension::SignatureError;
 
 #[cfg(test)]
-use proptest::prelude::{BoxedStrategy, Strategy, any};
+use proptest::prelude::{any, BoxedStrategy, Strategy};
 /// Describes a row variable - a type variable bound with a [TypeParam::List] of [TypeParam::Type]
 /// of the specified bound (checked in validation)
 // The serde derives here are not used except as markers
@@ -18,20 +18,33 @@ pub struct RowVariable(pub usize, pub TypeBound);
 
 // Note that whilst 'pub' this is not re-exported outside private module `row_var`
 // so is effectively sealed.
-pub trait MaybeRV: Clone + std::fmt::Debug + std::fmt::Display + From<NoRV> + Into<RowVariable> + Eq + PartialEq + 'static {
+pub trait MaybeRV:
+    Clone
+    + std::fmt::Debug
+    + std::fmt::Display
+    + From<NoRV>
+    + Into<RowVariable>
+    + Eq
+    + PartialEq
+    + 'static
+{
     fn as_rv(&self) -> &RowVariable;
     fn try_from_rv(rv: RowVariable) -> Result<Self, RowVariable>;
     fn bound(&self) -> TypeBound;
     fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError>;
     #[allow(private_interfaces)]
     fn substitute(&self, s: &Substitution) -> Vec<TypeBase<Self>>;
-    #[cfg(test)] fn weight() -> u32 {1}
-    #[cfg(test)] fn arb() -> BoxedStrategy<Self>;
+    #[cfg(test)]
+    fn weight() -> u32 {
+        1
+    }
+    #[cfg(test)]
+    fn arb() -> BoxedStrategy<Self>;
 }
 
 /// Has no instances - used as parameter to [Type] to rule out the possibility
 /// of there being any [TypeEnum::RowVar]s
-/// 
+///
 /// [TypeEnum::RowVar]: super::TypeEnum::RowVar
 /// [Type]: super::Type
 // The serde derives here are not used except as markers
@@ -43,7 +56,7 @@ pub enum NoRV {}
 
 impl From<NoRV> for RowVariable {
     fn from(value: NoRV) -> Self {
-        match value { }
+        match value {}
     }
 }
 
@@ -71,7 +84,9 @@ impl MaybeRV for RowVariable {
 
     #[cfg(test)]
     fn arb() -> BoxedStrategy<Self> {
-        (any::<usize>(), any::<TypeBound>()).prop_map(|(i,b)| Self(i,b)).boxed()
+        (any::<usize>(), any::<TypeBound>())
+            .prop_map(|(i, b)| Self(i, b))
+            .boxed()
     }
 }
 
@@ -104,6 +119,8 @@ impl MaybeRV for NoRV {
 
     #[cfg(test)]
     fn arb() -> BoxedStrategy<Self> {
-        any::<usize>().prop_map(|_| panic!("Should be ruled out by weight==0")).boxed()
+        any::<usize>()
+            .prop_map(|_| panic!("Should be ruled out by weight==0"))
+            .boxed()
     }
 }

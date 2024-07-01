@@ -185,16 +185,15 @@ pub enum TypeArg {
 
 impl From<Type> for TypeArg {
     fn from(ty: Type) -> Self {
-        TypeArg::Type {ty}
+        TypeArg::Type { ty }
     }
 }
 
 impl From<TypeRV> for TypeArg {
     fn from(value: TypeRV) -> Self {
         match value.try_into() {
-            Ok(ty) => TypeArg::Type {ty},
-            Err(RowVariable(idx, bound)) =>
-            TypeArg::new_var_use(idx, TypeParam::new_list(bound))
+            Ok(ty) => TypeArg::Type { ty },
+            Err(RowVariable(idx, bound)) => TypeArg::new_var_use(idx, TypeParam::new_list(bound)),
         }
     }
 }

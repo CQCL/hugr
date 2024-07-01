@@ -115,9 +115,13 @@ impl FunctionTypeRV {
 }
 
 // deriving Default leads to an impl that only applies for RV: Default
-impl<RV:MaybeRV> Default for FuncTypeBase<RV> {
+impl<RV: MaybeRV> Default for FuncTypeBase<RV> {
     fn default() -> Self {
-        Self { input: Default::default(), output: Default::default(), extension_reqs: Default::default() }
+        Self {
+            input: Default::default(),
+            output: Default::default(),
+            extension_reqs: Default::default(),
+        }
     }
 }
 

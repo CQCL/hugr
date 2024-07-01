@@ -132,7 +132,7 @@ impl TryFrom<TypeRowRV> for TypeRow {
                 .into_iter()
                 .map(|t| t.try_into())
                 .collect::<Result<Vec<_>, _>>()
-                .map_err(|var| SignatureError::RowVarWhereTypeExpected { var })?
+                .map_err(|var| SignatureError::RowVarWhereTypeExpected { var })?,
         ))
     }
 }

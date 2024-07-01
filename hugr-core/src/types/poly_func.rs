@@ -9,9 +9,9 @@ use {
     proptest_derive::Arbitrary,
 };
 
-use super::{signature::FuncTypeBase, MaybeRV, NoRV, RowVariable};
 use super::type_param::{check_type_args, TypeArg, TypeParam};
 use super::Substitution;
+use super::{signature::FuncTypeBase, MaybeRV, NoRV, RowVariable};
 
 /// A polymorphic type scheme, i.e. of a [FuncDecl], [FuncDefn] or [OpDef].
 /// (Nodes/operations in the Hugr are not polymorphic.)
@@ -56,7 +56,10 @@ pub type TypeSchemeRV = TypeSchemeBase<RowVariable>;
 // deriving Default leads to an impl that only applies for RV: Default
 impl<RV: MaybeRV> Default for TypeSchemeBase<RV> {
     fn default() -> Self {
-        Self { params: Default::default(), body: Default::default() }
+        Self {
+            params: Default::default(),
+            body: Default::default(),
+        }
     }
 }
 
@@ -152,7 +155,7 @@ pub(crate) mod test {
     use crate::types::signature::FuncTypeBase;
     use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
     use crate::types::{
-        CustomType, FunctionType, FunctionTypeRV, MaybeRV, Type, TypeBound, TypeName, TypeRV
+        CustomType, FunctionType, FunctionTypeRV, MaybeRV, Type, TypeBound, TypeName, TypeRV,
     };
     use crate::Extension;
 
