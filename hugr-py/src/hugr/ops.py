@@ -71,7 +71,7 @@ def _sig_port_type(sig: tys.FunctionType, port: InPort | OutPort) -> tys.Type:
 
 @runtime_checkable
 class DataflowOp(Op, Protocol):
-    """Abstract dataflow operation, can be assumed to have a signature and Value
+    """Abstract dataflow operation. Can be assumed to have a signature and Value-
     kind ports.
     """
 
