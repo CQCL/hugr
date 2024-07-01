@@ -535,7 +535,6 @@ class Dfg(_DfBase[ops.DFG]):
     Args:
         input_types: The input types of the the dataflow graph. Output types are
         calculated by propagating types through the graph.
-        extension_delta: The extension delta of the graph.
 
     Example:
         >>> dfg = Dfg(tys.Bool)
@@ -543,10 +542,8 @@ class Dfg(_DfBase[ops.DFG]):
         DFG(inputs=[Bool])
     """
 
-    def __init__(
-        self, *input_types: tys.Type, extension_delta: tys.ExtensionSet | None = None
-    ) -> None:
-        parent_op = ops.DFG(list(input_types), None, extension_delta or [])
+    def __init__(self, *input_types: tys.Type) -> None:
+        parent_op = ops.DFG(list(input_types), None)
         super().__init__(parent_op)
 
 

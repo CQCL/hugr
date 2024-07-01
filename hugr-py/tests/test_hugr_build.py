@@ -271,7 +271,8 @@ def test_higher_order() -> None:
 
 
 def test_lift() -> None:
-    d = Dfg(tys.Qubit, extension_delta=["X"])
+    d = Dfg(tys.Qubit)
+    d.parent_op._extension_delta = ["X"]
     (q,) = d.inputs()
     lift = d.add(ops.Lift("X")(q))
     d.set_outputs(lift)

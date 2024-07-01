@@ -341,7 +341,7 @@ class DFG(DfParentOp, DataflowOp):
     #: Inputs types of the operation.
     inputs: tys.TypeRow
     _outputs: tys.TypeRow | None = field(default=None, repr=False)
-    extension_delta: tys.ExtensionSet = field(default_factory=list, repr=False)
+    _extension_delta: tys.ExtensionSet = field(default_factory=list, repr=False)
 
     @property
     def outputs(self) -> tys.TypeRow:
@@ -359,7 +359,7 @@ class DFG(DfParentOp, DataflowOp):
         Raises:
             IncompleteOp: If the outputs have not been set.
         """
-        return tys.FunctionType(self.inputs, self.outputs, self.extension_delta)
+        return tys.FunctionType(self.inputs, self.outputs, self._extension_delta)
 
     @property
     def num_out(self) -> int:
