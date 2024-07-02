@@ -3,5 +3,6 @@
 mkdir build
 
 touch build/.nojekyll  # Disable jekyll to keep files starting with underscores
-
-sphinx-build -b html ./api-docs ./build/api-docs
+# copy redirect file
+cp ./_static/_redirect.html ./build/index.html
+sphinx-multiversion ./api-docs ./build
