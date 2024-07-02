@@ -142,7 +142,7 @@ pub enum Value {
 /// An opaque newtype around a [`Box<dyn CustomConst>`](CustomConst).
 ///
 /// This type has special serialization behaviour in order to support
-/// serialisation and deserialisation of unknown impls of [CustomConst].
+/// serialization and deserialization of unknown impls of [CustomConst].
 ///
 /// During serialization we first serialize the internal [`dyn` CustomConst](CustomConst)
 /// into a [serde_yaml::Value]. We then create a [CustomSerialized] wrapping
@@ -156,7 +156,7 @@ pub enum Value {
 /// [CustomSerialized] into a [`Box<dyn CustomConst>`](CustomConst). The [OpaqueValue] is
 /// then produced from the [`Box<dyn [CustomConst]>`](CustomConst).
 ///
-/// In the case where the internal serialised value of a `CustomSerialized`
+/// In the case where the internal serialized value of a `CustomSerialized`
 /// is another `CustomSerialized` we do not attempt to recurse. This behaviour
 /// may change in future.
 ///
@@ -675,7 +675,7 @@ mod test {
             type Strategy = BoxedStrategy<Self>;
             fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
                 // We intentionally do not include `ConstF64` because it does not
-                // roundtrip serialise
+                // roundtrip serialize
                 prop_oneof![
                     any::<ConstInt>().prop_map_into(),
                     any::<CustomSerialized>().prop_map_into()

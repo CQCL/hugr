@@ -28,7 +28,7 @@ use rstest::rstest;
 const NAT: Type = crate::extension::prelude::USIZE_T;
 const QB: Type = crate::extension::prelude::QB_T;
 
-/// Version 1 of the Testing HUGR serialisation format, see `testing_hugr.py`.
+/// Version 1 of the Testing HUGR serialization format, see `testing_hugr.py`.
 #[derive(Serialize, Deserialize, PartialEq, Debug, Default)]
 struct SerTestingV1 {
     typ: Option<crate::types::Type>,

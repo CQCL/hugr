@@ -31,7 +31,7 @@ class InvalidPort(Exception):
 @runtime_checkable
 class Op(Protocol):
     """An abstract HUGR operation. Must be convertible
-    to a serialisable :class:`BaseOp`.
+    to a serializable :class:`BaseOp`.
     """
 
     @property
@@ -46,7 +46,7 @@ class Op(Protocol):
         ...  # pragma: no cover
 
     def to_serial(self, parent: Node) -> BaseOp:
-        """Convert this operation to a serialisable form."""
+        """Convert this operation to a serializable form."""
         ...  # pragma: no cover
 
     def port_kind(self, port: InPort | OutPort) -> tys.Kind:

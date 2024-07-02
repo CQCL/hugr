@@ -141,7 +141,7 @@ pub struct CustomSerialized {
 }
 
 #[derive(Debug, Error)]
-#[error("Error serializing value into CustomSerialised: err: {err}, value: {payload:?}")]
+#[error("Error serializing value into CustomSerialized: err: {err}, value: {payload:?}")]
 pub struct SerializeError {
     #[source]
     err: serde_yaml::Error,
@@ -149,7 +149,7 @@ pub struct SerializeError {
 }
 
 #[derive(Debug, Error)]
-#[error("Error deserialising value from CustomSerialised: err: {err}, value: {payload:?}")]
+#[error("Error deserializing value from CustomSerialized: err: {err}, value: {payload:?}")]
 pub struct DeserializeError {
     #[source]
     err: serde_yaml::Error,
@@ -176,13 +176,13 @@ impl CustomSerialized {
     }
 
     /// If `cc` is a [Self], returns a clone of `cc` coerced to [Self].
-    /// Otherwise, returns a [Self] with `cc` serialised in it's value.
+    /// Otherwise, returns a [Self] with `cc` serialized in it's value.
     pub fn try_from_custom_const_ref(cc: &impl CustomConst) -> Result<Self, SerializeError> {
         Self::try_from_dyn_custom_const(cc)
     }
 
     /// If `cc` is a [Self], returns a clone of `cc` coerced to [Self].
-    /// Otherwise, returns a [Self] with `cc` serialised in it's value.
+    /// Otherwise, returns a [Self] with `cc` serialized in it's value.
     pub fn try_from_dyn_custom_const(cc: &dyn CustomConst) -> Result<Self, SerializeError> {
         Ok(match cc.as_any().downcast_ref::<Self>() {
             Some(cs) => cs.clone(),
@@ -222,7 +222,7 @@ impl CustomSerialized {
     /// Attempts to deserialize the value in self into a `Box<dyn CustomConst>`.
     /// This can fail, in particular when the `impl CustomConst` for the trait
     /// is not linked into the running executable.
-    /// If deserialisation fails, returns self in a box.
+    /// If deserialization fails, returns self in a box.
     ///
     /// Note that if the inner value is a [Self] we do not recursively
     /// deserialize it.
@@ -277,7 +277,7 @@ pub(super) mod serde_extension_value {
         use serde::Deserialize;
         // We deserialize a CustomSerialized, i.e. not a dyn CustomConst.
         let cs = CustomSerialized::deserialize(deserializer)?;
-        // We return the inner serialised CustomConst if we can, otherwise the
+        // We return the inner serialized CustomConst if we can, otherwise the
         // CustomSerialized itself.
         Ok(cs.into_custom_const_box())
     }
@@ -470,7 +470,7 @@ mod test {
         assert_eq!(&inner, &cs.clone().try_into_custom_const().unwrap());
 
         let ev: OpaqueValue = cs.clone().into();
-        // A serialisation round-trip results in an OpaqueValue with the value of inner
+        // A serialization round-trip results in an OpaqueValue with the value of inner
         assert_eq!(
             OpaqueValue::new(inner),
             serde_yaml::from_value(serde_yaml::to_value(&ev).unwrap()).unwrap()
