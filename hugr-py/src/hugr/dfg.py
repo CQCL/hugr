@@ -131,7 +131,15 @@ class _DfBase(ParentBuilder[DP]):
             Node(3)
 
         """
-        return self.add_op(com.op, *com.incoming)
+
+        def raise_no_ints():
+            error_message = "Command used with Dfg must hold Wire, not integer indices."
+            raise ValueError(error_message)
+
+        wires = (
+            (w if not isinstance(w, int) else raise_no_ints()) for w in com.incoming
+        )
+        return self.add_op(com.op, *wires)
 
     def _insert_nested_impl(self, builder: ParentBuilder, *args: Wire) -> Node:
         mapping = self.hugr.insert_hugr(builder.hugr, self.parent_node)
