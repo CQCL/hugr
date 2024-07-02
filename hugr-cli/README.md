@@ -8,7 +8,7 @@ hugr-cli
 [![msrv][]](https://github.com/CQCL/hugr)
 [![codecov][]](https://codecov.io/gh/CQCL/hugr)
 
-`hugr` CLI tool for common tasks on serialised HUGR (e.g. validation,
+`hugr` CLI tool for common tasks on serialized HUGR (e.g. validation,
 visualisation).
 
 Refer to the [main HUGR crate](http://crates.io/crates/hugr) for more information.

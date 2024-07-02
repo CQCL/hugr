@@ -16,10 +16,10 @@ if TYPE_CHECKING:
 
 @runtime_checkable
 class Value(Protocol):
-    """Abstract value definition. Must be serialisable into a HUGR value."""
+    """Abstract value definition. Must be serializable into a HUGR value."""
 
     def to_serial(self) -> sops.BaseValue:
-        """Convert to serialisable model."""
+        """Convert to serializable model."""
         ...  # pragma: no cover
 
     def to_serial_root(self) -> sops.Value:

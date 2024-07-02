@@ -1566,7 +1566,7 @@ Unfortunately this then requires a grammar and parsing/codegen, which is
 maintenance and design overhead. We believe that for most cases,
 inspecting and modifying the in-memory structure will be enough. If not,
 in future we can add a human language and a standalone module for
-conversion to/from the binary serialised form.
+conversion to/from the binary serialized form.
 
 ### Schema
 

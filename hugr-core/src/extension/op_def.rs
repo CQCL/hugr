@@ -787,7 +787,7 @@ pub(super) mod test {
             type Strategy = BoxedStrategy<Self>;
             fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
                 // TODO there is also  SignatureFunc::CustomFunc, but for now
-                // this is not serialised. When it is, we should generate
+                // this is not serialized. When it is, we should generate
                 // examples here .
                 any::<PolyFuncType>()
                     .prop_map(|x| SignatureFunc::TypeScheme(CustomValidator::from_polyfunc(x)))
@@ -800,7 +800,7 @@ pub(super) mod test {
             type Strategy = BoxedStrategy<Self>;
             fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
                 // TODO There is also LowerFunc::CustomFunc, but for now this is
-                // not serialised. When it is, we should generate examples here.
+                // not serialized. When it is, we should generate examples here.
                 any::<ExtensionSet>()
                     .prop_map(|extensions| LowerFunc::FixedHugr {
                         extensions,
@@ -834,7 +834,7 @@ pub(super) mod test {
                                 misc,
                                 signature_func,
                                 lower_funcs,
-                                // TODO ``constant_folder` is not serialised, we should
+                                // TODO ``constant_folder` is not serialized, we should
                                 // generate examples once it is.
                                 constant_folder: None,
                             })

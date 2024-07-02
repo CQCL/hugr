@@ -179,15 +179,15 @@ S = TypeVar("S", covariant=True)
 
 
 class SerCollection(Protocol[S]):
-    """Protocol for serialisable objects."""
+    """Protocol for serializable objects."""
 
     def to_serial_root(self) -> S:
-        """Convert to serialisable root model."""
+        """Convert to serializable root model."""
         ...  # pragma: no cover
 
 
 class DeserCollection(Protocol[S]):
-    """Protocol for deserialisable objects."""
+    """Protocol for deserializable objects."""
 
     def deserialize(self) -> S:
         """Deserialize from model."""
