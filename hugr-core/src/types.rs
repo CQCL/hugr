@@ -169,6 +169,11 @@ impl SumType {
         Self::Unit { size }
     }
 
+    /// New tuple (single row of variants)
+    pub fn new_tuple(types: impl Into<TypeRow>) -> Self {
+        Self::new([types.into()])
+    }
+
     /// Report the tag'th variant, if it exists.
     pub fn get_variant(&self, tag: usize) -> Option<&TypeRow> {
         match self {
@@ -183,6 +188,15 @@ impl SumType {
         match self {
             SumType::Unit { size } => *size as usize,
             SumType::General { rows } => rows.len(),
+        }
+    }
+
+    /// Returns variant row if there is only one variant
+    pub fn as_tuple(&self) -> Option<&TypeRow> {
+        match self {
+            SumType::Unit { size } if *size == 1 => Some(Type::EMPTY_TYPEROW_REF),
+            SumType::General { rows } if rows.len() == 1 => Some(&rows[0]),
+            _ => None,
         }
     }
 }
