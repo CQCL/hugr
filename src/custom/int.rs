@@ -93,6 +93,13 @@ impl<'c, H: HugrView> EmitOp<'c, CustomOp, H> for IntOpEmitter<'c, '_, H> {
             }),
             "ieq" => emit_icmp(self.0, args, inkwell::IntPredicate::EQ),
             "ilt_s" => emit_icmp(self.0, args, inkwell::IntPredicate::SLT),
+            "igt_s" => emit_icmp(self.0, args, inkwell::IntPredicate::SGT),
+            "ile_s" => emit_icmp(self.0, args, inkwell::IntPredicate::SLE),
+            "ige_s" => emit_icmp(self.0, args, inkwell::IntPredicate::SGE),
+            "ilt_u" => emit_icmp(self.0, args, inkwell::IntPredicate::ULT),
+            "igt_u" => emit_icmp(self.0, args, inkwell::IntPredicate::UGT),
+            "ile_u" => emit_icmp(self.0, args, inkwell::IntPredicate::ULE),
+            "ige_u" => emit_icmp(self.0, args, inkwell::IntPredicate::UGE),
             "isub" => emit_custom_binary_op(self.0, args, |builder, lhs, rhs| {
                 Ok(vec![builder
                     .build_int_sub(lhs.into_int_value(), rhs.into_int_value(), "")?
