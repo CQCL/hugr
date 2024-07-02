@@ -18,6 +18,7 @@ use portgraph::{view::Subgraph, Direction, PortView};
 use thiserror::Error;
 
 use crate::builder::{Container, FunctionBuilder};
+use crate::extension::ExtensionSet;
 use crate::hugr::{HugrMut, HugrView, RootTagged};
 use crate::ops::dataflow::DataflowOpTrait;
 use crate::ops::handle::{ContainerHandle, DataflowOpID};
@@ -307,7 +308,13 @@ impl SiblingSubgraph {
                 sig.port_type(p).cloned().expect("must be dataflow edge")
             })
             .collect_vec();
-        FunctionType::new(input, output)
+        FunctionType::new(input, output).with_extension_delta(ExtensionSet::union_over(
+            self.nodes.iter().map(|n| {
+                hugr.signature(*n)
+                    .expect("all nodes must have dataflow signature")
+                    .extension_reqs
+            }),
+        ))
     }
 
     /// The parent of the sibling subgraph.
@@ -731,8 +738,10 @@ mod tests {
 
     use cool_asserts::assert_matches;
 
+    use crate::builder::ft2;
     use crate::extension::PRELUDE_REGISTRY;
-    use crate::utils::test_quantum_extension::cx_gate;
+    use crate::std_extensions::logic;
+    use crate::utils::test_quantum_extension::{self, cx_gate};
     use crate::{
         builder::{
             BuildError, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
@@ -778,7 +787,9 @@ mod tests {
         let mut mod_builder = ModuleBuilder::new();
         let func = mod_builder.declare(
             "test",
-            FunctionType::new_endo(type_row![QB_T, QB_T, QB_T]).into(),
+            FunctionType::new_endo(type_row![QB_T, QB_T, QB_T])
+                .with_extension_delta(test_quantum_extension::EXTENSION_ID)
+                .into(),
         )?;
         let func_id = {
             let mut dfg = mod_builder.define_declaration(&func)?;
@@ -794,7 +805,12 @@ mod tests {
 
     fn build_3not_hugr() -> Result<(Hugr, Node), BuildError> {
         let mut mod_builder = ModuleBuilder::new();
-        let func = mod_builder.declare("test", FunctionType::new_endo(type_row![BOOL_T]).into())?;
+        let func = mod_builder.declare(
+            "test",
+            FunctionType::new_endo(type_row![BOOL_T])
+                .with_extension_delta(logic::EXTENSION_ID)
+                .into(),
+        )?;
         let func_id = {
             let mut dfg = mod_builder.define_declaration(&func)?;
             let outs1 = dfg.add_dataflow_op(NotOp, dfg.input_wires())?;
@@ -813,7 +829,9 @@ mod tests {
         let mut mod_builder = ModuleBuilder::new();
         let func = mod_builder.declare(
             "test",
-            FunctionType::new(type_row![BOOL_T], type_row![BOOL_T]).into(),
+            FunctionType::new_endo(BOOL_T)
+                .with_extension_delta(logic::EXTENSION_ID)
+                .into(),
         )?;
         let func_id = {
             let mut dfg = mod_builder.define_declaration(&func)?;
@@ -878,6 +896,7 @@ mod tests {
         assert_eq!(
             sub.signature(&func),
             FunctionType::new_endo(type_row![QB_T, QB_T])
+                .with_extension_delta(test_quantum_extension::EXTENSION_ID)
         );
         Ok(())
     }
@@ -1027,8 +1046,7 @@ mod tests {
         let one_bit = type_row![BOOL_T];
         let two_bit = type_row![BOOL_T, BOOL_T];
 
-        let mut builder =
-            DFGBuilder::new(FunctionType::new(one_bit.clone(), two_bit.clone())).unwrap();
+        let mut builder = DFGBuilder::new(ft2(one_bit.clone(), two_bit.clone())).unwrap();
         let inw = builder.input_wires().exactly_one().unwrap();
         let outw1 = builder.add_dataflow_op(NotOp, [inw]).unwrap().out_wire(0);
         let outw2 = builder

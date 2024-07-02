@@ -438,6 +438,27 @@ pub trait Dataflow: Container {
     }
 
     /// Return a builder for a [`crate::ops::Conditional`] node.
+    /// `sum_input` is a tuple of the type of the Sum
+    /// variants and the corresponding wire.
+    ///
+    /// The `other_inputs` must be an iterable over pairs of the type of the input and
+    /// the corresponding wire.
+    /// The `outputs` are the types of the outputs. Extension delta will be inferred.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error when building
+    /// the Conditional node.
+    fn conditional_builder(
+        &mut self,
+        sum_input: (impl IntoIterator<Item = TypeRow>, Wire),
+        other_inputs: impl IntoIterator<Item = (Type, Wire)>,
+        output_types: TypeRow,
+    ) -> Result<ConditionalBuilder<&mut Hugr>, BuildError> {
+        self.conditional_builder_exts(sum_input, other_inputs, TO_BE_INFERRED, output_types)
+    }
+
+    /// Return a builder for a [`crate::ops::Conditional`] node.
     /// `sum_rows` and `sum_wire` define the type of the Sum
     /// variants and the wire carrying the Sum respectively.
     ///
@@ -449,12 +470,12 @@ pub trait Dataflow: Container {
     ///
     /// This function will return an error if there is an error when building
     /// the Conditional node.
-    fn conditional_builder(
+    fn conditional_builder_exts(
         &mut self,
         (sum_rows, sum_wire): (impl IntoIterator<Item = TypeRow>, Wire),
         other_inputs: impl IntoIterator<Item = (Type, Wire)>,
+        extension_delta: impl Into<ExtensionSet>,
         output_types: TypeRow,
-        extension_delta: ExtensionSet,
     ) -> Result<ConditionalBuilder<&mut Hugr>, BuildError> {
         let mut input_wires = vec![sum_wire];
         let (input_types, rest_input_wires): (Vec<Type>, Vec<Wire>) =
@@ -471,7 +492,7 @@ pub trait Dataflow: Container {
                 sum_rows,
                 other_inputs: inputs,
                 outputs: output_types,
-                extension_delta,
+                extension_delta: extension_delta.into(),
             },
             input_wires,
         )?;

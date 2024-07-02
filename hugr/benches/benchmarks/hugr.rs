@@ -3,7 +3,6 @@
 use criterion::{black_box, criterion_group, AxisScale, Criterion, PlotConfiguration};
 use hugr::builder::{BuildError, CFGBuilder, DFGBuilder, Dataflow, DataflowHugr, HugrBuilder};
 use hugr::extension::prelude::{BOOL_T, USIZE_T};
-use hugr::extension::ExtensionSet;
 use hugr::types::FunctionType;
 use hugr::{type_row, Hugr};
 
@@ -18,8 +17,7 @@ pub fn simple_cfg_builder<T: AsMut<Hugr> + AsRef<Hugr>>(
     cfg_builder: &mut CFGBuilder<T>,
 ) -> Result<(), BuildError> {
     let sum2_variants = vec![type_row![USIZE_T], type_row![USIZE_T]];
-    let mut entry_b =
-        cfg_builder.entry_builder(sum2_variants.clone(), type_row![], ExtensionSet::new())?;
+    let mut entry_b = cfg_builder.entry_builder(sum2_variants.clone(), type_row![])?;
     let entry = {
         let [inw] = entry_b.input_wires_arr();
 

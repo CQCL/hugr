@@ -252,7 +252,7 @@ mod test {
         HugrBuilder, ModuleBuilder,
     };
     use crate::extension::prelude::USIZE_T;
-    use crate::extension::{ExtensionSet, PRELUDE_REGISTRY};
+    use crate::extension::PRELUDE_REGISTRY;
     use crate::hugr::views::sibling::SiblingMut;
     use crate::hugr::HugrMut;
     use crate::ops::constant::Value;
@@ -295,7 +295,7 @@ mod test {
             };
 
             let entry = n_identity(
-                cfg_builder.simple_entry_builder(USIZE_T.into(), 2, ExtensionSet::new())?,
+                cfg_builder.simple_entry_builder(USIZE_T.into(), 2)?,
                 &pred_const,
             )?;
 
