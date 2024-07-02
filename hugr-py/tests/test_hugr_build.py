@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-import hugr.ops as ops
-import hugr.tys as tys
-import hugr.val as val
+from hugr import ops, tys, val
 from hugr.dfg import Dfg, _ancestral_sibling
 from hugr.function import Module
 from hugr.hugr import Hugr
@@ -96,16 +94,16 @@ def test_tuple():
     row = [tys.Bool, tys.Qubit]
     h = Dfg(*row)
     a, b = h.inputs()
-    t = h.add(ops.MakeTuple(a, b))
-    a, b = h.add(ops.UnpackTuple(t))
+    t = h.add(ops.MakeTuple()(a, b))
+    a, b = h.add(ops.UnpackTuple()(t))
     h.set_outputs(a, b)
 
     validate(h.hugr)
 
     h1 = Dfg(*row)
     a, b = h1.inputs()
-    mt = h1.add_op(ops.MakeTuple, a, b)
-    a, b = h1.add_op(ops.UnpackTuple, mt)[0, 1]
+    mt = h1.add_op(ops.MakeTuple(), a, b)
+    a, b = h1.add_op(ops.UnpackTuple(), mt)[0, 1]
     h1.set_outputs(a, b)
 
     assert h.hugr.to_serial() == h1.hugr.to_serial()
@@ -233,7 +231,7 @@ def test_poly_function(direct_call: bool) -> None:
         load = f_main.load_function(
             f_id, instantiation=instantiation, type_args=type_args
         )
-        call = f_main.add(ops.CallIndirect(load, q))
+        call = f_main.add(ops.CallIndirect()(load, q))
 
     f_main.set_outputs(call)
 
@@ -253,7 +251,7 @@ def test_mono_function(direct_call: bool) -> None:
         call = f_main.call(f_id, q)
     else:
         load = f_main.load_function(f_id)
-        call = f_main.add(ops.CallIndirect(load, q))
+        call = f_main.add(ops.CallIndirect()(load, q))
     f_main.set_outputs(call)
 
     validate(mod.hugr)
@@ -261,19 +259,20 @@ def test_mono_function(direct_call: bool) -> None:
 
 def test_higher_order() -> None:
     noop_fn = Dfg(tys.Qubit)
-    noop_fn.set_outputs(noop_fn.add(ops.Noop(noop_fn.input_node[0])))
+    noop_fn.set_outputs(noop_fn.add(ops.Noop()(noop_fn.input_node[0])))
 
     d = Dfg(tys.Qubit)
     (q,) = d.inputs()
     f_val = d.load(val.Function(noop_fn.hugr))
-    call = d.add(ops.CallIndirect(f_val, q))[0]
+    call = d.add(ops.CallIndirect()(f_val, q))[0]
     d.set_outputs(call)
 
     validate(d.hugr)
 
 
 def test_lift() -> None:
-    d = Dfg(tys.Qubit, extension_delta=["X"])
+    d = Dfg(tys.Qubit)
+    d.parent_op._extension_delta = ["X"]
     (q,) = d.inputs()
     lift = d.add(ops.Lift("X")(q))
     d.set_outputs(lift)

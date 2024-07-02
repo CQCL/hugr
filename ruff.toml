@@ -21,7 +21,7 @@ select = [
   # "C90",  # mccabe
   # "COM",  # flake8-commas
   # "CPY",  # flake8-copyright
-  # "D",    # pydocstyle
+  "D",  # pydocstyle
   "EM", # flake8-errmsg
   # "ERA",  # eradicate
   "EXE", # flake8-executable
@@ -68,11 +68,17 @@ select = [
 ignore = [
   "S101",   # Use of `assert` detected
   "TRY003", # Avoid specifying long messages outside the exception class
+  "D102", # Can't detect that abstract method overrides can use the same docstring
+  "D105", # Missing docstrings in dunder methods (repr etc.)
+  "D205", # Blank line requirement
+  "D107", # Missing docstrings in __init__ (covered by class level docstring)
 ]
 
 [lint.per-file-ignores]
-"hugr-pr/tests/**" = ["D"]
-"scripts/generate_schema.py"= ["T201", "EXE001"]
+"hugr-py/tests/**" = ["D"]
+"hugr-py/docs/**" = ["D"]
+"hugr-py/src/hugr/serialization/**" = ["D"]
+"scripts/*" = ["T201", "EXE001", "D"]
 
 [lint.pydocstyle]
 convention = "google"

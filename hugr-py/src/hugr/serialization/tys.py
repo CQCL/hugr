@@ -294,7 +294,8 @@ class Variable(BaseType):
 
 class RowVar(BaseType):
     """A variable standing for a row of some (unknown) number of types.
-    May occur only within a row; not a node input/output."""
+    May occur only within a row; not a node input/output.
+    """
 
     t: Literal["R"] = "R"
     i: int
@@ -315,7 +316,8 @@ class USize(BaseType):
 
 class FunctionType(BaseType):
     """A graph encoded as a value. It contains a concrete signature and a set of
-    required resources."""
+    required resources.
+    """
 
     t: Literal["G"] = "G"
 
@@ -348,7 +350,8 @@ class FunctionType(BaseType):
 
 class PolyFuncType(BaseType):
     """A polymorphic type scheme, i.e. of a FuncDecl, FuncDefn or OpDef.
-    (Nodes/operations in the Hugr are not polymorphic.)"""
+    (Nodes/operations in the Hugr are not polymorphic.).
+    """
 
     # The declared type parameters, i.e., these must be instantiated with the same
     # number of TypeArgs before the function can be called. This defines the indices
@@ -415,7 +418,7 @@ class Opaque(BaseType):
 
 
 class Alias(BaseType):
-    """An Alias Type"""
+    """An Alias Type."""
 
     t: Literal["Alias"] = "Alias"
     bound: TypeBound
@@ -435,7 +438,7 @@ class Qubit(BaseType):
 
     t: Literal["Q"] = "Q"
 
-    def deserialize(self) -> tys.QubitDef:
+    def deserialize(self) -> tys._QubitDef:
         return tys.Qubit
 
 

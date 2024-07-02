@@ -1,8 +1,12 @@
+"""HUGR builder exceptions."""
+
 from dataclasses import dataclass
 
 
 @dataclass
 class NoSiblingAncestor(Exception):
+    """No sibling ancestor of target for valid inter-graph edge."""
+
     src: int
     tgt: int
 
@@ -16,6 +20,8 @@ class NoSiblingAncestor(Exception):
 
 @dataclass
 class NotInSameCfg(Exception):
+    """Source and target nodes are not in the same CFG."""
+
     src: int
     tgt: int
 
@@ -29,6 +35,8 @@ class NotInSameCfg(Exception):
 
 @dataclass
 class MismatchedExit(Exception):
+    """Edge to exit block signature mismatch."""
+
     src: int
 
     @property
@@ -39,4 +47,6 @@ class MismatchedExit(Exception):
 
 
 class ParentBeforeChild(Exception):
+    """Parent added before child."""
+
     msg: str = "Parent node must be added before child node."
