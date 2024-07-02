@@ -25,6 +25,9 @@ jobs:
   build:
     name: Build docs.
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./hugr-py
     steps:
       - uses: actions/checkout@v4
       - name: Install poetry
@@ -43,7 +46,7 @@ jobs:
       - name: Upload artifact.
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./docs/build/main
+          path: ./hugr-py/docs/build
 
   publish:
     name: Publish docs.
