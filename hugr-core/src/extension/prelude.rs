@@ -4,14 +4,14 @@ use lazy_static::lazy_static;
 
 use crate::ops::constant::{CustomCheckFailure, ValueName};
 use crate::ops::{CustomOp, OpName};
-use crate::types::{SumType, TypeName};
+use crate::types::{FunctionTypeRV, SumType, TypeName};
 use crate::{
     extension::{ExtensionId, TypeDefBound},
     ops::constant::CustomConst,
     type_row,
     types::{
         type_param::{TypeArg, TypeParam},
-        CustomType, FunctionType, PolyFuncType, Type, TypeBound,
+        CustomType, FunctionType, Type, TypeBound, TypeSchemeRV,
     },
     Extension,
 };
@@ -21,7 +21,7 @@ struct ArrayOpCustom;
 
 const MAX: &[TypeParam; 1] = &[TypeParam::max_nat()];
 impl SignatureFromArgs for ArrayOpCustom {
-    fn compute_signature(&self, arg_values: &[TypeArg]) -> Result<PolyFuncType, SignatureError> {
+    fn compute_signature(&self, arg_values: &[TypeArg]) -> Result<TypeSchemeRV, SignatureError> {
         let [TypeArg::BoundedNat { n }] = *arg_values else {
             return Err(SignatureError::InvalidTypeArgs);
         };
@@ -30,9 +30,9 @@ impl SignatureFromArgs for ArrayOpCustom {
         let var_arg_row = vec![elem_ty_var.clone(); n as usize];
         let other_row = vec![array_type(TypeArg::BoundedNat { n }, elem_ty_var.clone())];
 
-        Ok(PolyFuncType::new(
+        Ok(TypeSchemeRV::new(
             vec![TypeBound::Any.into()],
-            FunctionType::new(var_arg_row, other_row),
+            FunctionTypeRV::new(var_arg_row, other_row),
         ))
     }
 
@@ -43,7 +43,7 @@ impl SignatureFromArgs for ArrayOpCustom {
 
 struct GenericOpCustom;
 impl SignatureFromArgs for GenericOpCustom {
-    fn compute_signature(&self, arg_values: &[TypeArg]) -> Result<PolyFuncType, SignatureError> {
+    fn compute_signature(&self, arg_values: &[TypeArg]) -> Result<TypeSchemeRV, SignatureError> {
         let [arg0, arg1] = arg_values else {
             return Err(SignatureError::InvalidTypeArgs);
         };
@@ -67,7 +67,7 @@ impl SignatureFromArgs for GenericOpCustom {
             };
             outs.push(ty.clone());
         }
-        Ok(PolyFuncType::new(vec![], FunctionType::new(inps, outs)))
+        Ok(FunctionTypeRV::new(inps, outs).into())
     }
 
     fn static_params(&self) -> &[TypeParam] {
@@ -268,7 +268,7 @@ pub const ERROR_TYPE_NAME: TypeName = TypeName::new_inline("error");
 
 /// Return a Sum type with the first variant as the given type and the second an Error.
 pub fn sum_with_error(ty: Type) -> SumType {
-    SumType::new([vec![ty], vec![ERROR_TYPE]])
+    SumType::new([ty, ERROR_TYPE])
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -436,7 +436,7 @@ mod test {
             .instantiate([])
             .unwrap();
 
-        let ext_type = Type::new_extension(ext_def);
+        let ext_type: Type = Type::new_extension(ext_def);
         assert_eq!(ext_type, ERROR_TYPE);
 
         let error_val = ConstError::new(2, "my message");

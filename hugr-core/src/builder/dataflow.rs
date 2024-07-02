@@ -7,7 +7,7 @@ use std::marker::PhantomData;
 use crate::hugr::{HugrView, ValidationError};
 use crate::ops;
 
-use crate::types::{FunctionType, PolyFuncType};
+use crate::types::{FunctionType, TypeScheme};
 
 use crate::extension::ExtensionRegistry;
 use crate::Node;
@@ -140,7 +140,7 @@ impl FunctionBuilder<Hugr> {
     /// Error in adding DFG child nodes.
     pub fn new(
         name: impl Into<String>,
-        signature: impl Into<PolyFuncType>,
+        signature: impl Into<TypeScheme>,
     ) -> Result<Self, BuildError> {
         let signature = signature.into();
         let body = signature.body().clone();
@@ -205,14 +205,14 @@ pub(crate) mod test {
     use crate::builder::build_traits::DataflowHugr;
     use crate::builder::{ft1, BuilderWiringError, DataflowSubContainer, ModuleBuilder};
     use crate::extension::prelude::{BOOL_T, USIZE_T};
-    use crate::extension::{ExtensionId, SignatureError, EMPTY_REG, PRELUDE_REGISTRY};
+    use crate::extension::{ExtensionId, EMPTY_REG, PRELUDE_REGISTRY};
     use crate::hugr::validate::InterGraphEdgeError;
     use crate::ops::OpTrait;
     use crate::ops::{handle::NodeHandle, Lift, Noop, OpTag};
 
     use crate::std_extensions::logic::test::and_op;
     use crate::types::type_param::TypeParam;
-    use crate::types::{Type, TypeBound};
+    use crate::types::{FunctionType, FunctionTypeRV, Type, TypeBound, TypeRV};
     use crate::utils::test_quantum_extension::h_gate;
     use crate::{
         builder::test::{n_identity, BIT, NAT, QB},
@@ -523,31 +523,26 @@ pub(crate) mod test {
     #[test]
     fn no_outer_row_variables() -> Result<(), BuildError> {
         let e = crate::hugr::validate::test::extension_with_eval_parallel();
-        let tv = Type::new_row_var_use(0, TypeBound::Copyable);
-        let mut fb = FunctionBuilder::new(
+        let tv = TypeRV::new_row_var_use(0, TypeBound::Copyable);
+        // Can *declare* a function that takes a function-value of unknown #args
+        FunctionBuilder::new(
             "bad_eval",
-            PolyFuncType::new(
+            TypeScheme::new(
                 [TypeParam::new_list(TypeBound::Copyable)],
                 FunctionType::new(
-                    Type::new_function(FunctionType::new(USIZE_T, tv.clone())),
+                    Type::new_function(FunctionTypeRV::new(USIZE_T, tv.clone())),
                     vec![],
                 ),
             ),
         )?;
 
-        let [func_arg] = fb.input_wires_arr();
-        let i = fb.add_load_value(crate::extension::prelude::ConstUsize::new(5));
+        // But cannot eval it...
         let ev = e.instantiate_extension_op(
             "eval",
             [vec![USIZE_T.into()].into(), vec![tv.into()].into()],
             &PRELUDE_REGISTRY,
-        )?;
-        let r = fb.add_dataflow_op(ev, [func_arg, i]);
-        // This error would be caught in validation, but the builder detects it much earlier
-        assert_eq!(
-            r.unwrap_err(),
-            BuildError::SignatureError(SignatureError::RowVarWhereTypeExpected { idx: 0 })
         );
+        assert!(ev.is_err());
         Ok(())
     }
 }

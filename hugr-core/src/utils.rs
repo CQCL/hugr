@@ -103,6 +103,7 @@ pub(crate) fn is_default<T: Default + PartialEq>(t: &T) -> bool {
 #[cfg(test)]
 pub(crate) mod test_quantum_extension {
     use crate::ops::{OpName, OpNameRef};
+    use crate::types::FunctionTypeRV;
     use crate::{
         extension::{
             prelude::{BOOL_T, QB_T},
@@ -111,18 +112,18 @@ pub(crate) mod test_quantum_extension {
         ops::CustomOp,
         std_extensions::arithmetic::float_types,
         type_row,
-        types::{FunctionType, PolyFuncType},
+        types::{FunctionType, TypeSchemeRV},
         Extension,
     };
 
     use lazy_static::lazy_static;
 
-    fn one_qb_func() -> PolyFuncType {
-        FunctionType::new_endo(type_row![QB_T]).into()
+    fn one_qb_func() -> TypeSchemeRV {
+        FunctionTypeRV::new_endo(QB_T).into()
     }
 
-    fn two_qb_func() -> PolyFuncType {
-        FunctionType::new_endo(type_row![QB_T, QB_T]).into()
+    fn two_qb_func() -> TypeSchemeRV {
+        FunctionTypeRV::new_endo(type_row![QB_T, QB_T]).into()
     }
     /// The extension identifier.
     pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("test.quantum");

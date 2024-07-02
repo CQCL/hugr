@@ -102,6 +102,7 @@ mod test {
         hugr::ValidationError,
         ops::Value,
         type_row,
+        types::FunctionType,
     };
 
     use super::*;

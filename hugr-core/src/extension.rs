@@ -16,6 +16,7 @@ use crate::ops::constant::{ValueName, ValueNameRef};
 use crate::ops::custom::{ExtensionOp, OpaqueOp};
 use crate::ops::{self, OpName, OpNameRef};
 use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
+use crate::types::RowVariable;
 use crate::types::{check_typevar_decl, CustomType, Substitution, TypeBound, TypeName};
 use crate::types::{FunctionType, TypeNameRef};
 
@@ -155,8 +156,8 @@ pub enum SignatureError {
     #[error("Type variable {idx} was not declared ({num_decls} in scope)")]
     FreeTypeVar { idx: usize, num_decls: usize },
     /// A row variable was found outside of a variable-length row
-    #[error("Expected a single type, but found row variable {idx}")]
-    RowVarWhereTypeExpected { idx: usize },
+    #[error("Expected a single type, but found row variable {var}")]
+    RowVarWhereTypeExpected { var: RowVariable },
     /// The result of the type application stored in a [Call]
     /// is not what we get by applying the type-args to the polymorphic function
     ///

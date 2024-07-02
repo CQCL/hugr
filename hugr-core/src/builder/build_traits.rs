@@ -18,10 +18,8 @@ use crate::{
     types::EdgeKind,
 };
 
-use crate::extension::{
-    ExtensionRegistry, ExtensionSet, SignatureError, PRELUDE_REGISTRY, TO_BE_INFERRED,
-};
-use crate::types::{FunctionType, PolyFuncType, Type, TypeArg, TypeRow};
+use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE_REGISTRY, TO_BE_INFERRED};
+use crate::types::{FunctionType, Type, TypeArg, TypeRow, TypeScheme};
 
 use itertools::Itertools;
 
@@ -80,7 +78,7 @@ pub trait Container {
     fn define_function(
         &mut self,
         name: impl Into<String>,
-        signature: impl Into<PolyFuncType>,
+        signature: impl Into<TypeScheme>,
     ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
         let signature = signature.into();
         let body = signature.body().clone();
@@ -635,14 +633,6 @@ fn add_node_with_wires<T: Dataflow + ?Sized>(
     inputs: impl IntoIterator<Item = Wire>,
 ) -> Result<(Node, usize), BuildError> {
     let op = nodetype.into();
-    // Check there are no row variables, as that would prevent us
-    // from indexing into the node's ports in order to wire up
-    op.dataflow_signature()
-        .as_ref()
-        .and_then(FunctionType::find_rowvar)
-        .map_or(Ok(()), |(idx, _)| {
-            Err(SignatureError::RowVarWhereTypeExpected { idx })
-        })?;
     let num_outputs = op.value_output_count();
     let op_node = data_builder.add_child_node(op.clone());
 
