@@ -18,7 +18,7 @@ digraph {
 7 [shape=plain label=<<table border="1"><tr><td align="text" border="0" colspan="1">(7) Input</td></tr><tr><td port="out0" align="text" colspan="1" cellpadding="1" >0: usize</td></tr></table>>]
 7:out0 -> 8:in1 [style=""]
 8 [shape=plain label=<<table border="1"><tr><td port="in0" align="text" colspan="1" cellpadding="1" >0: []</td><td port="in1" align="text" colspan="1" cellpadding="1" >1: usize</td></tr><tr><td align="text" border="0" colspan="2">(8) Output</td></tr></table>>]
-9 [shape=plain label=<<table border="1"><tr><td align="text" border="0" colspan="1">(9) const:sum:{tag:0, vals:[]}</td></tr><tr><td port="out0" align="text" colspan="1" cellpadding="1" >0: []</td></tr></table>>]
+9 [shape=plain label=<<table border="1"><tr><td align="text" border="0" colspan="1">(9) const:seq:{}</td></tr><tr><td port="out0" align="text" colspan="1" cellpadding="1" >0: []</td></tr></table>>]
 9:out0 -> 10:in0 [style=""]
 10 [shape=plain label=<<table border="1"><tr><td port="in0" align="text" colspan="1" cellpadding="1" >0: []</td></tr><tr><td align="text" border="0" colspan="1">(10) LoadConstant</td></tr><tr><td port="out0" align="text" colspan="1" cellpadding="1" >0: []</td></tr></table>>]
 10:out0 -> 8:in0 [style=""]
@@ -44,3 +44,4 @@ hier8 [shape=plain label="8"]
 hier9 [shape=plain label="9"]
 hier10 [shape=plain label="10"]
 }
+
