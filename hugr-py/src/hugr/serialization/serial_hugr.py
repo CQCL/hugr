@@ -1,10 +1,12 @@
 from typing import Any, Literal
 
-from pydantic import Field, ConfigDict
+from pydantic import ConfigDict, Field
 
-from .ops import NodeID, OpType, classes as ops_classes
-from .tys import model_rebuild, ConfiguredBaseModel
 import hugr
+
+from .ops import NodeID, OpType
+from .ops import classes as ops_classes
+from .tys import ConfiguredBaseModel, model_rebuild
 
 Port = tuple[NodeID, int | None]  # (node, offset)
 Edge = tuple[Port, Port]
@@ -37,7 +39,8 @@ class SerialHugr(ConfiguredBaseModel):
         return cls(nodes=[], edges=[]).version
 
     @classmethod
-    def _pydantic_rebuild(cls, config: ConfigDict = ConfigDict(), **kwargs):
+    def _pydantic_rebuild(cls, config: ConfigDict | None = None, **kwargs):
+        config = config or ConfigDict()
         my_classes = dict(ops_classes)
         my_classes[cls.__name__] = cls
         model_rebuild(my_classes, config=config, **kwargs)

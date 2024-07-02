@@ -186,7 +186,7 @@ these are listed in
 [hierarchical node relationships](#hierarchical-relationships-and-constraints).
 In a valid HUGR the hierarchy edges form a tree joining all nodes of the HUGR,
 with a unique root node. The HUGR is characterized by the type of its root node.
-The root node has no non-hierarchy edges (and this supercedes any other requirements on the
+The root node has no non-hierarchy edges (and this supersedes any other requirements on the
 edges of specific node types).
 
 A *sibling graph* is a subgraph of the HUGR containing all nodes with
@@ -837,7 +837,7 @@ such declarations may include (bind) any number of type parameters, of kinds as 
 TypeParam ::= Type(Any|Copyable|Eq)
             | BoundedUSize(u64|) -- note optional bound
             | Extensions
-            | List(TypeParam) -- homogenous, any sized
+            | List(TypeParam) -- homogeneous, any sized
             | Tuple([TypeParam]) -- heterogenous, fixed size
             | Opaque(Name, [TypeArg]) -- e.g. Opaque("Array", [5, Opaque("usize", [])])
 ```
@@ -1694,7 +1694,7 @@ including the names of the operations. Where WebAssembly specifies a
 "partial" operation (i.e. when the result is not defined on certain
 inputs), we use a Sum type to hold the result.
 
-A few additonal operations not included in WebAssembly are also
+A few additional operations not included in WebAssembly are also
 specified, and there are some other small differences (highlighted
 below).
 

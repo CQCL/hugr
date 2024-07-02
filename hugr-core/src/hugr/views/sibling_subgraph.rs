@@ -213,7 +213,7 @@ impl SiblingSubgraph {
     /// The in- and out-arity of the signature will match the
     /// number of incoming and outgoing edges respectively. In particular, the
     /// assumption is made that no two incoming edges have the same source
-    /// (no copy nodes at the input bounary).
+    /// (no copy nodes at the input boundary).
     pub fn try_from_nodes(
         nodes: impl Into<Vec<Node>>,
         hugr: &impl HugrView,

@@ -10,7 +10,7 @@ use crate::Hugr;
 /// [TypeParam], as well as several others, form a mutually recursive hierarchy.
 ///
 /// The proptest [proptest::strategy::Strategy::prop_recursive] is inadequate to
-/// generate values for these types.  Instead, ther Arbitrary instances take a
+/// generate values for these types.  Instead, the Arbitrary instances take a
 /// `RecursionDepth` as their (or part of their)
 /// [proptest::arbitrary::Arbitrary::Parameters]. We then use that parameter to
 /// generate children of that value. Usually we forward it unchanged, but in

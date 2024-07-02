@@ -1,23 +1,27 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 import inspect
 import sys
+from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Annotated, Any, Literal, Union, Mapping
+from typing import TYPE_CHECKING, Annotated, Any, Literal
 
-from hugr.utils import deser_it
 from pydantic import (
     BaseModel,
+    ConfigDict,
     Field,
     RootModel,
     ValidationError,
     ValidationInfo,
     ValidatorFunctionWrapHandler,
     WrapValidator,
-    ConfigDict,
 )
 from pydantic_core import PydanticCustomError
+
+from hugr.utils import deser_it
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 
 def _json_custom_error_validator(
@@ -36,8 +40,9 @@ def _json_custom_error_validator(
     try:
         return handler(value)
     except ValidationError as err:
+        msg = "invalid_json"
         raise PydanticCustomError(
-            "invalid_json",
+            msg,
             "Input is not valid json",
         ) from err
 
@@ -68,7 +73,7 @@ class BaseTypeParam(ABC, ConfiguredBaseModel):
 
 class TypeTypeParam(BaseTypeParam):
     tp: Literal["Type"] = "Type"
-    b: "TypeBound"
+    b: TypeBound
 
     def deserialize(self) -> tys.TypeTypeParam:
         return tys.TypeTypeParam(bound=self.b)
@@ -84,7 +89,7 @@ class BoundedNatParam(BaseTypeParam):
 
 class OpaqueParam(BaseTypeParam):
     tp: Literal["Opaque"] = "Opaque"
-    ty: "Opaque"
+    ty: Opaque
 
     def deserialize(self) -> tys.OpaqueParam:
         return tys.OpaqueParam(ty=self.ty.deserialize())
@@ -92,7 +97,7 @@ class OpaqueParam(BaseTypeParam):
 
 class ListParam(BaseTypeParam):
     tp: Literal["List"] = "List"
-    param: "TypeParam"
+    param: TypeParam
 
     def deserialize(self) -> tys.ListParam:
         return tys.ListParam(param=self.param.deserialize())
@@ -100,7 +105,7 @@ class ListParam(BaseTypeParam):
 
 class TupleParam(BaseTypeParam):
     tp: Literal["Tuple"] = "Tuple"
-    params: list["TypeParam"]
+    params: list[TypeParam]
 
     def deserialize(self) -> tys.TupleParam:
         return tys.TupleParam(params=deser_it(self.params))
@@ -144,7 +149,7 @@ class BaseTypeArg(ABC, ConfiguredBaseModel):
 
 class TypeTypeArg(BaseTypeArg):
     tya: Literal["Type"] = "Type"
-    ty: "Type"
+    ty: Type
 
     def deserialize(self) -> tys.TypeTypeArg:
         return tys.TypeTypeArg(ty=self.ty.deserialize())
@@ -160,7 +165,7 @@ class BoundedNatArg(BaseTypeArg):
 
 class OpaqueArg(BaseTypeArg):
     tya: Literal["Opaque"] = "Opaque"
-    typ: "Opaque"
+    typ: Opaque
     value: Any
 
     def deserialize(self) -> tys.OpaqueArg:
@@ -169,7 +174,7 @@ class OpaqueArg(BaseTypeArg):
 
 class SequenceArg(BaseTypeArg):
     tya: Literal["Sequence"] = "Sequence"
-    elems: list["TypeArg"]
+    elems: list[TypeArg]
 
     def deserialize(self) -> tys.SequenceArg:
         return tys.SequenceArg(elems=deser_it(self.elems))
@@ -222,7 +227,7 @@ class BaseType(ABC, ConfiguredBaseModel):
 
 
 class MultiContainer(BaseType):
-    ty: "Type"
+    ty: Type
 
 
 class Array(MultiContainer):
@@ -251,14 +256,14 @@ class GeneralSum(BaseType):
 
     t: Literal["Sum"] = "Sum"
     s: Literal["General"] = "General"
-    rows: list["TypeRow"]
+    rows: list[TypeRow]
 
     def deserialize(self) -> tys.Sum:
         return tys.Sum(variant_rows=[[t.deserialize() for t in r] for r in self.rows])
 
 
 class SumType(RootModel):
-    root: Annotated[Union[UnitSum, GeneralSum], Field(discriminator="s")]
+    root: Annotated[UnitSum | GeneralSum, Field(discriminator="s")]
 
     # This seems to be required for nested discriminated unions to work
     @property
@@ -281,7 +286,7 @@ class Variable(BaseType):
 
     t: Literal["V"] = "V"
     i: int
-    b: "TypeBound"
+    b: TypeBound
 
     def deserialize(self) -> tys.Variable:
         return tys.Variable(idx=self.i, bound=self.b)
@@ -289,11 +294,12 @@ class Variable(BaseType):
 
 class RowVar(BaseType):
     """A variable standing for a row of some (unknown) number of types.
-    May occur only within a row; not a node input/output."""
+    May occur only within a row; not a node input/output.
+    """
 
     t: Literal["R"] = "R"
     i: int
-    b: "TypeBound"
+    b: TypeBound
 
     def deserialize(self) -> tys.RowVariable:
         return tys.RowVariable(idx=self.i, bound=self.b)
@@ -310,17 +316,18 @@ class USize(BaseType):
 
 class FunctionType(BaseType):
     """A graph encoded as a value. It contains a concrete signature and a set of
-    required resources."""
+    required resources.
+    """
 
     t: Literal["G"] = "G"
 
-    input: "TypeRow"  # Value inputs of the function.
-    output: "TypeRow"  # Value outputs of the function.
+    input: TypeRow  # Value inputs of the function.
+    output: TypeRow  # Value outputs of the function.
     # The extension requirements which are added by the operation
     extension_reqs: ExtensionSet = Field(default_factory=ExtensionSet)
 
     @classmethod
-    def empty(cls) -> "FunctionType":
+    def empty(cls) -> FunctionType:
         return FunctionType(input=[], output=[], extension_reqs=[])
 
     def deserialize(self) -> tys.FunctionType:
@@ -343,7 +350,8 @@ class FunctionType(BaseType):
 
 class PolyFuncType(BaseType):
     """A polymorphic type scheme, i.e. of a FuncDecl, FuncDefn or OpDef.
-    (Nodes/operations in the Hugr are not polymorphic.)"""
+    (Nodes/operations in the Hugr are not polymorphic.).
+    """
 
     # The declared type parameters, i.e., these must be instantiated with the same
     # number of TypeArgs before the function can be called. This defines the indices
@@ -354,7 +362,7 @@ class PolyFuncType(BaseType):
     body: FunctionType
 
     @classmethod
-    def empty(cls) -> "PolyFuncType":
+    def empty(cls) -> PolyFuncType:
         return PolyFuncType(params=[], body=FunctionType.empty())
 
     def deserialize(self) -> tys.PolyFuncType:
@@ -380,7 +388,7 @@ class TypeBound(Enum):
     Any = "A"
 
     @staticmethod
-    def join(*bs: "TypeBound") -> "TypeBound":
+    def join(*bs: TypeBound) -> TypeBound:
         """Computes the least upper bound for a sequence of bounds."""
         res = TypeBound.Eq
         for b in bs:
@@ -410,7 +418,7 @@ class Opaque(BaseType):
 
 
 class Alias(BaseType):
-    """An Alias Type"""
+    """An Alias Type."""
 
     t: Literal["Alias"] = "Alias"
     bound: TypeBound
@@ -430,7 +438,7 @@ class Qubit(BaseType):
 
     t: Literal["Q"] = "Q"
 
-    def deserialize(self) -> tys.QubitDef:
+    def deserialize(self) -> tys._QubitDef:
         return tys.Qubit
 
 
@@ -475,9 +483,10 @@ classes = inspect.getmembers(
 
 def model_rebuild(
     classes: Mapping[str, type],
-    config: ConfigDict = ConfigDict(),
+    config: ConfigDict | None = None,
     **kwargs,
 ):
+    config = config or ConfigDict()
     for c in classes.values():
         if issubclass(c, ConfiguredBaseModel):
             c.update_model_config(config)

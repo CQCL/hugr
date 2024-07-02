@@ -327,6 +327,7 @@ mod test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
     #[ignore = "issue 1225: In serialisation we do not distinguish between unknown CustomConst serialised value invalid but known CustomConst serialised values"]
     fn hugr_validation_0() {
         // https://github.com/CQCL/hugr/issues/1091 bad case
@@ -341,6 +342,7 @@ mod test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
     fn hugr_validation_1() {
         // https://github.com/CQCL/hugr/issues/1091 good case
         let mut hugr: Hugr = serde_json::from_reader(BufReader::new(
@@ -351,6 +353,7 @@ mod test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
     fn hugr_validation_2() {
         // https://github.com/CQCL/hugr/issues/1185 bad case
         let mut hugr: Hugr = serde_json::from_reader(BufReader::new(
@@ -364,6 +367,7 @@ mod test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
     fn hugr_validation_3() {
         // https://github.com/CQCL/hugr/issues/1185 good case
         let mut hugr: Hugr = serde_json::from_reader(BufReader::new(

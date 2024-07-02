@@ -2,7 +2,7 @@
     "$defs": {
         "Alias": {
             "additionalProperties": false,
-            "description": "An Alias Type",
+            "description": "An Alias Type.",
             "properties": {
                 "t": {
                     "const": "Alias",

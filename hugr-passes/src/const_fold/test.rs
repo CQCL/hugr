@@ -229,7 +229,7 @@ fn orphan_output() {
     // x2 := or(x0,x1)
     // output x2 == true;
     //
-    // We arange things so that the `or` folds away first, leaving the not
+    // We arrange things so that the `or` folds away first, leaving the not
     // with no outputs.
     use hugr_core::ops::handle::NodeHandle;
 

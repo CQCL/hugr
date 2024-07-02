@@ -1,10 +1,10 @@
+import pytest
+
+from hugr import ops, tys, val
 from hugr.cond_loop import Conditional, ConditionalError, TailLoop
 from hugr.dfg import Dfg
-import hugr.tys as tys
-import hugr.ops as ops
-import hugr.val as val
-import pytest
-from .conftest import INT_T, validate, IntVal, H, Measure
+
+from .conftest import INT_T, H, IntVal, Measure, validate
 
 SUM_T = tys.Sum([[tys.Qubit], [tys.Qubit, INT_T]])
 
@@ -88,7 +88,7 @@ def test_tail_loop() -> None:
 
     h = Dfg(tys.Qubit)
     (q,) = h.inputs()
-    tl_n = h.insert_tail_loop(tl, q)
+    tl_n = h.insert_tail_loop(tl, [q], [])
     h.set_outputs(tl_n)
     validate(h.hugr)
 
