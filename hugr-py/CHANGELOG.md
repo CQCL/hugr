@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.3.0](https://github.com/CQCL/hugr/compare/hugr-py-v0.2.1...hugr-py-v0.3.0) (2024-07-03)
+
+### Features
+
+* HUGR builders in hugr-py ([#486](https://github.com/CQCL/hugr/issues/486))
+
+
+### Bug Fixes
+
+* get rid of pydantic config deprecation warnings ([#1084](https://github.com/CQCL/hugr/issues/1084)) ([52fcb9d](https://github.com/CQCL/hugr/commit/52fcb9dc88e95e9660fc291181a37dc9d1802a3d))
+
+
+### Documentation
+
+* build and publish docs ([#1253](https://github.com/CQCL/hugr/issues/1253)) ([902fc14](https://github.com/CQCL/hugr/commit/902fc14069caad0af6af7b55cbf649134703f9b5))
+
 ## [0.2.1](https://github.com/CQCL/hugr/compare/hugr-py-v0.2.0...hugr-py-v0.2.1) (2024-05-20)
 
 ### ⚠ BREAKING CHANGES
