@@ -1,5 +1,57 @@
 # Changelog
 
+## [0.3.0](https://github.com/CQCL/hugr/compare/hugr-py-v0.2.1...hugr-py-v0.3.0) (2024-07-03)
+
+
+### ⚠ BREAKING CHANGES
+
+* * `add_child_op`(`_with_parent`), etc., gone; use `add_child_node`(`_with_parent`) with an (impl Into-)OpType.
+    * `get_nodetype` gone - use `get_optype`.
+    * `NodeType` gone - use `OpType` directly. 
+    * Various (Into<)Option<ExtensionSet> params removed from builder
+    methods especially {cfg_,dfg_}builder.
+    * `input_extensions` removed from serialization schema.
+* the Signature class is gone, but it's not clear how or why you might have been using it...
+* TailLoop node and associated builder functions now require specifying an ExtensionSet; extension/validate.rs deleted; some changes to Hugrs validated/rejected when the `extension_inference` feature flag is turned on
+* Type::validate takes extra bool (allow_rowvars); renamed {FunctionType, PolyFuncType}::(validate=>validate_var_len).
+
+### Features
+
+* Allow "Row Variables" declared as List&lt;Type&gt; ([#804](https://github.com/CQCL/hugr/issues/804)) ([3ea4834](https://github.com/CQCL/hugr/commit/3ea4834dd00466e3c106917c1e09c0c5b74c5826))
+* **hugr-py:** add builders for Conditional and TailLoop ([#1210](https://github.com/CQCL/hugr/issues/1210)) ([43569a4](https://github.com/CQCL/hugr/commit/43569a45575a005dd69808bb8d534b3ed55b2039))
+* **hugr-py:** add CallIndirect, LoadFunction, Lift, Alias ([#1218](https://github.com/CQCL/hugr/issues/1218)) ([db09193](https://github.com/CQCL/hugr/commit/db0919312eb387cfef57f8a71bb2529c267445d1)), closes [#1213](https://github.com/CQCL/hugr/issues/1213)
+* **hugr-py:** add values and constants ([#1203](https://github.com/CQCL/hugr/issues/1203)) ([f7ea178](https://github.com/CQCL/hugr/commit/f7ea17849dce860a84292ef5270a3ce2a65be870)), closes [#1202](https://github.com/CQCL/hugr/issues/1202)
+* **hugr-py:** automatically add state order edges for inter-graph edges ([#1165](https://github.com/CQCL/hugr/issues/1165)) ([5da06e1](https://github.com/CQCL/hugr/commit/5da06e10581cbfed583bd466b27706241341ff14))
+* **hugr-py:** builder for function definition/declaration and call ([#1212](https://github.com/CQCL/hugr/issues/1212)) ([af062ea](https://github.com/CQCL/hugr/commit/af062ea5a64636072bc3168b2301cbf12c96c8d5))
+* **hugr-py:** builder ops separate from serialised ops ([#1140](https://github.com/CQCL/hugr/issues/1140)) ([342eda3](https://github.com/CQCL/hugr/commit/342eda34c1f3b4ea4423268e935af44af07c976f))
+* **hugr-py:** CFG builder ([#1192](https://github.com/CQCL/hugr/issues/1192)) ([c5ea47f](https://github.com/CQCL/hugr/commit/c5ea47fd77cfbdda5f32d651618ed69b97740e2e)), closes [#1188](https://github.com/CQCL/hugr/issues/1188)
+* **hugr-py:** define type hierarchy separate from serialized ([#1176](https://github.com/CQCL/hugr/issues/1176)) ([10f4c42](https://github.com/CQCL/hugr/commit/10f4c42cfe051381e50e6387af603253e941215b))
+* **hugr-py:** only require input type annotations when building ([#1199](https://github.com/CQCL/hugr/issues/1199)) ([2bb079f](https://github.com/CQCL/hugr/commit/2bb079fd80fbec7a4f6fe4a5baeed3cf064d85a9))
+* **hugr-py:** python hugr builder ([#1098](https://github.com/CQCL/hugr/issues/1098)) ([23408b5](https://github.com/CQCL/hugr/commit/23408b5bbb9666002a58bf88a2a33cca0a484b30))
+* **hugr-py:** store children in node weight ([#1160](https://github.com/CQCL/hugr/issues/1160)) ([1cdaeed](https://github.com/CQCL/hugr/commit/1cdaeedde805fe3a9fd7c466ab9f2b34ac2d75c7)), closes [#1159](https://github.com/CQCL/hugr/issues/1159)
+* **hugr-py:** ToNode interface to treat builders as nodes ([#1193](https://github.com/CQCL/hugr/issues/1193)) ([1da33e6](https://github.com/CQCL/hugr/commit/1da33e654df4a122c0af57e1c6db0ada7ca066df))
+* Validate Extensions using hierarchy, ignore input_extensions, RIP inference ([#1142](https://github.com/CQCL/hugr/issues/1142)) ([8bec8e9](https://github.com/CQCL/hugr/commit/8bec8e93bcaa8917b00098837269da60e3312d6c))
+
+
+### Bug Fixes
+
+* Add some validation for const nodes ([#1222](https://github.com/CQCL/hugr/issues/1222)) ([c05edd3](https://github.com/CQCL/hugr/commit/c05edd3cbcb644556bb3b2b23b6d27a211fe7e4f))
+* **hugr-py:** more ruff lints + fix some typos ([#1246](https://github.com/CQCL/hugr/issues/1246)) ([f158384](https://github.com/CQCL/hugr/commit/f158384c88787d1e436b634657dcfc12d531d68e))
+* **py:** get rid of pydantic config deprecation warnings ([#1084](https://github.com/CQCL/hugr/issues/1084)) ([52fcb9d](https://github.com/CQCL/hugr/commit/52fcb9dc88e95e9660fc291181a37dc9d1802a3d))
+
+
+### Documentation
+
+* **hugr-py:** add docs link to README ([#1259](https://github.com/CQCL/hugr/issues/1259)) ([d2a9148](https://github.com/CQCL/hugr/commit/d2a9148ca67e3cd7517c897b3679294993a9526f))
+* **hugr-py:** build and publish docs ([#1253](https://github.com/CQCL/hugr/issues/1253)) ([902fc14](https://github.com/CQCL/hugr/commit/902fc14069caad0af6af7b55cbf649134703f9b5))
+* **hugr-py:** docstrings for builder ([#1231](https://github.com/CQCL/hugr/issues/1231)) ([3e4ac18](https://github.com/CQCL/hugr/commit/3e4ac18931f24a66028afb662019bf2c90304cdc))
+
+
+### Code Refactoring
+
+* Remove "Signature" from hugr-py ([#1186](https://github.com/CQCL/hugr/issues/1186)) ([65718f7](https://github.com/CQCL/hugr/commit/65718f7dbe70397eab7ab856965566f11b9322a5))
+* Remove NodeType and input_extensions ([#1183](https://github.com/CQCL/hugr/issues/1183)) ([ea5213d](https://github.com/CQCL/hugr/commit/ea5213d4b3a42a86c637d709c48cad007eae1f9e))
+
 ## [0.2.1](https://github.com/CQCL/hugr/compare/hugr-py-v0.2.0...hugr-py-v0.2.1) (2024-05-20)
 
 ### ⚠ BREAKING CHANGES
