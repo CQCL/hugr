@@ -42,7 +42,7 @@ jobs:
       - name: Build docs
         run: |
           cd docs
-          ./build.sh
+          poetry run ./build.sh
       - name: Upload artifact.
         uses: actions/upload-pages-artifact@v3
         with:
