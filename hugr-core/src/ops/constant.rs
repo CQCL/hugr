@@ -803,4 +803,75 @@ mod test {
             }
         }
     }
+
+    #[test]
+    fn test_tuple_deserialize() {
+        let json = r#"
+        {
+    "v": "Tuple",
+    "vs": [
+        {
+            "v": "Sum",
+            "tag": 0,
+            "typ": {
+                "t": "Sum",
+                "s": "Unit",
+                "size": 1
+            },
+            "vs": []
+        },
+        {
+            "v": "Sum",
+            "tag": 1,
+            "typ": {
+                "t": "Sum",
+                "s": "General",
+                "rows": [
+                    [
+                        {
+                            "t": "Sum",
+                            "s": "Unit",
+                            "size": 1
+                        }
+                    ],
+                    [
+                        {
+                            "t": "Sum",
+                            "s": "Unit",
+                            "size": 2
+                        }
+                    ]
+                ]
+            },
+            "vs": [
+                {
+                    "v": "Sum",
+                    "tag": 1,
+                    "typ": {
+                        "t": "Sum",
+                        "s": "Unit",
+                        "size": 2
+                    },
+                    "vs": []
+                }
+            ]
+        }
+    ]
+}
+        "#;
+
+        let v: Value = serde_json::from_str(json).unwrap();
+        assert_eq!(
+            v,
+            Value::tuple([
+                Value::unit(),
+                Value::sum(
+                    1,
+                    [Value::true_val()],
+                    SumType::new([vec![Type::UNIT], vec![Value::true_val().get_type()]]),
+                )
+                .unwrap()
+            ])
+        );
+    }
 }
