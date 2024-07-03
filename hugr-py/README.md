@@ -11,6 +11,8 @@ ecosystem.
 This library provides a pure-python implementation of the HUGR data model, and
 a low-level API for constructing HUGR objects.
 
+The API documentation for this package is [here](https://cqcl.github.io/hugr/).
+
 This library is intended to be used as a dependency for other high-level tools.
 See [`guppylang`][] and [`tket2`][] for examples of such tools.
 
