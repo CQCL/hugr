@@ -127,6 +127,13 @@ pub struct Sum {
     pub sum_type: SumType,
 }
 
+impl Sum {
+    /// If value is a sum with a single row variant, return the row.
+    pub fn as_tuple(&self) -> Option<&[Value]> {
+        self.sum_type.as_tuple().map(|_| self.values.as_ref())
+    }
+}
+
 impl TryFrom<SerialSum> for Sum {
     type Error = &'static str;
 
@@ -493,11 +500,10 @@ impl Value {
 
     /// If value is a sum with a single row variant, return the row.
     pub fn as_tuple(&self) -> Option<&[Value]> {
-        match self {
-            Self::Sum(Sum {
-                values, sum_type, ..
-            }) if sum_type.as_tuple().is_some() => Some(values),
-            _ => None,
+        if let Self::Sum(sum) = self {
+            sum.as_tuple()
+        } else {
+            None
         }
     }
 }
