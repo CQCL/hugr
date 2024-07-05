@@ -1,13 +1,13 @@
 import pytest
 
 from hugr import tys
-from hugr.index_dfg import IndexDfg
+from hugr.tracked_dfg import TrackedDfg
 
 from .conftest import CX, FLOAT_T, FloatVal, H, Measure, Not, Rz, validate
 
 
 def test_track_wire():
-    dfg = IndexDfg(tys.Bool, tys.Unit)
+    dfg = TrackedDfg(tys.Bool, tys.Unit)
     inds = dfg.track_inputs()
     assert inds == [0, 1]
     assert dfg.get_wire(inds[0]) == dfg.inputs()[0]
@@ -24,9 +24,9 @@ def test_track_wire():
     validate(dfg.hugr)
 
 
-def simple_circuit(n_qb: int, float_in: int = 0) -> IndexDfg:
+def simple_circuit(n_qb: int, float_in: int = 0) -> TrackedDfg:
     in_tys = [tys.Qubit] * n_qb + [FLOAT_T] * float_in
-    return IndexDfg(*in_tys, track_inputs=True)
+    return TrackedDfg(*in_tys, track_inputs=True)
 
 
 def test_simple_circuit():

@@ -8,7 +8,7 @@ from hugr.node_port import Node, Wire
 from hugr.ops import Command, ComWire
 
 
-class IndexDfg(Dfg):
+class TrackedDfg(Dfg):
     """Dfg builder to append operations to wires by index.
 
     Args:
@@ -16,7 +16,7 @@ class IndexDfg(Dfg):
         track_inputs: Whether to track the input wires.
 
     Examples:
-        >>> dfg = IndexDfg(tys.Bool, tys.Unit, track_inputs=True)
+        >>> dfg = TrackedDfg(tys.Bool, tys.Unit, track_inputs=True)
         >>> dfg.tracked
         [OutPort(Node(1), 0), OutPort(Node(1), 1)]
     """
@@ -38,7 +38,7 @@ class IndexDfg(Dfg):
             Index of the tracked wire.
 
         Examples:
-            >>> dfg = IndexDfg(tys.Bool, tys.Unit)
+            >>> dfg = TrackedDfg(tys.Bool, tys.Unit)
             >>> dfg.track_wire(dfg.inputs()[0])
             0
         """
@@ -58,7 +58,7 @@ class IndexDfg(Dfg):
             IndexError: If the index is not a tracked wire.
 
         Examples:
-            >>> dfg = IndexDfg(tys.Bool, tys.Unit)
+            >>> dfg = TrackedDfg(tys.Bool, tys.Unit)
             >>> w = dfg.inputs()[0]
             >>> idx = dfg.track_wire(w)
             >>> dfg.untrack_wire(idx) == w
@@ -78,7 +78,7 @@ class IndexDfg(Dfg):
             List of indices of the tracked wires.
 
         Examples:
-            >>> dfg = IndexDfg(tys.Bool, tys.Unit)
+            >>> dfg = TrackedDfg(tys.Bool, tys.Unit)
             >>> dfg.track_wires(dfg.inputs())
             [0, 1]
         """
@@ -91,7 +91,7 @@ class IndexDfg(Dfg):
             List of indices of the tracked input wires.
 
         Examples:
-            >>> dfg = IndexDfg(tys.Bool, tys.Unit)
+            >>> dfg = TrackedDfg(tys.Bool, tys.Unit)
             >>> dfg.track_inputs()
             [0, 1]
         """
@@ -110,7 +110,7 @@ class IndexDfg(Dfg):
             Tracked wire
 
         Examples:
-            >>> dfg = IndexDfg(tys.Bool, tys.Unit, track_inputs=True)
+            >>> dfg = TrackedDfg(tys.Bool, tys.Unit, track_inputs=True)
             >>> dfg.get_wire(0) == dfg.inputs()[0]
             True
         """
@@ -140,7 +140,7 @@ class IndexDfg(Dfg):
             The new node.
 
         Examples:
-            >>> dfg = IndexDfg(tys.Bool, track_inputs=True)
+            >>> dfg = TrackedDfg(tys.Bool, track_inputs=True)
             >>> dfg.tracked
             [OutPort(Node(1), 0)]
             >>> dfg.append(ops.Noop()(0))
@@ -177,7 +177,7 @@ class IndexDfg(Dfg):
 
 
         Examples:
-            >>> dfg = IndexDfg(tys.Bool, tys.Unit, track_inputs=True)
+            >>> dfg = TrackedDfg(tys.Bool, tys.Unit, track_inputs=True)
             >>> dfg.extend([ops.Noop()(0), ops.Noop()(1)])
             [Node(3), Node(4)]
         """
@@ -191,7 +191,7 @@ class IndexDfg(Dfg):
             *in_wires: Wires/indices to set as outputs.
 
         Examples:
-            >>> dfg = IndexDfg(tys.Bool, tys.Unit)
+            >>> dfg = TrackedDfg(tys.Bool, tys.Unit)
             >>> (b, i) = dfg.inputs()
             >>> dfg.track_wire(b)
             0
@@ -204,7 +204,7 @@ class IndexDfg(Dfg):
 
 
         Examples:
-            >>> dfg = IndexDfg(tys.Bool, tys.Unit, track_inputs=True)
+            >>> dfg = TrackedDfg(tys.Bool, tys.Unit, track_inputs=True)
             >>> dfg.set_tracked_outputs()
         """
         self.set_outputs(*(w for w in self.tracked if w is not None))
