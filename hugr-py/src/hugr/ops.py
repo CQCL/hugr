@@ -133,6 +133,9 @@ def _check_complete(op, v: V | None) -> V:
     return v
 
 
+ComWire = Wire | int
+
+
 @dataclass(frozen=True)
 class Command:
     """A :class:`DataflowOp` and its incoming :class:`Wire <hugr.nodeport.Wire>`
@@ -146,7 +149,7 @@ class Command:
     """
 
     op: DataflowOp
-    incoming: list[Wire]
+    incoming: list[ComWire]
 
 
 @dataclass()
@@ -244,7 +247,7 @@ class MakeTuple(DataflowOp, _PartialOp):
             tys=ser_it(self.types),
         )
 
-    def __call__(self, *elements: Wire) -> Command:
+    def __call__(self, *elements: ComWire) -> Command:
         return super().__call__(*elements)
 
     def outer_signature(self) -> tys.FunctionType:
@@ -282,7 +285,7 @@ class UnpackTuple(DataflowOp, _PartialOp):
             tys=ser_it(self.types),
         )
 
-    def __call__(self, tuple_: Wire) -> Command:
+    def __call__(self, tuple_: ComWire) -> Command:
         return super().__call__(tuple_)
 
     def outer_signature(self) -> tys.FunctionType:
@@ -925,7 +928,7 @@ class CallIndirect(DataflowOp, _PartialOp):
             signature=self.signature.to_serial(),
         )
 
-    def __call__(self, function: Wire, *args: Wire) -> Command:  # type: ignore[override]
+    def __call__(self, function: ComWire, *args: ComWire) -> Command:  # type: ignore[override]
         return super().__call__(function, *args)
 
     def outer_signature(self) -> tys.FunctionType:
