@@ -44,7 +44,11 @@ pub enum FloatOps {
 
 impl MakeOpDef for FloatOps {
     fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError> {
-        crate::extension::simple_op::try_from_name(op_def.name())
+        crate::extension::simple_op::try_from_name(op_def)
+    }
+
+    fn extension_id() -> ExtensionId {
+        EXTENSION_ID.to_owned()
     }
 
     fn signature(&self) -> SignatureFunc {
