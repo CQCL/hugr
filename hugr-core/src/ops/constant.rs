@@ -326,14 +326,14 @@ pub enum ConstTypeError {
 
 /// Hugrs (even functions) inside Consts must be monomorphic
 fn mono_fn_type(h: &Hugr) -> Result<FunctionType, ConstTypeError> {
-    if let Some(pf) = h.get_function_type() {
-        if let Ok(ft) = pf.try_into() {
-            return Ok(ft);
-        }
-    }
-    Err(ConstTypeError::NotMonomorphicFunction {
+    let err = || ConstTypeError::NotMonomorphicFunction {
         hugr_root_type: h.root_type().clone(),
-    })
+    };
+    if let Some(pf) = h.poly_func_type() {
+        return pf.try_into().map_err(|_| err());
+    }
+
+    h.inner_function_type().ok_or_else(err)
 }
 
 impl Value {
@@ -447,7 +447,7 @@ impl Value {
         match self {
             Self::Extension { e } => format!("const:custom:{}", e.name()),
             Self::Function { hugr: h } => {
-                let Some(t) = h.get_function_type() else {
+                let Ok(t) = mono_fn_type(h) else {
                     panic!("HUGR root node isn't a valid function parent.");
                 };
                 format!("const:function:[{}]", t)

@@ -443,7 +443,7 @@ mod test {
     fn flat_mut(mut simple_dfg_hugr: Hugr) {
         simple_dfg_hugr.update_validate(&PRELUDE_REGISTRY).unwrap();
         let root = simple_dfg_hugr.root();
-        let signature = simple_dfg_hugr.get_df_function_type().unwrap().clone();
+        let signature = simple_dfg_hugr.inner_function_type().unwrap().clone();
 
         let sib_mut = SiblingMut::<CfgID>::try_new(&mut simple_dfg_hugr, root);
         assert_eq!(
