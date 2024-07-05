@@ -54,7 +54,7 @@ pub trait MakeOpDef: NamedOp {
     fn signature(&self) -> SignatureFunc;
 
     /// The ID of the extension this operation is defined in.
-    fn extension_id() -> ExtensionId;
+    fn expected_extension(&self) -> ExtensionId;
 
     /// Description of the operation. By default, the same as `self.name()`.
     fn description(&self) -> String {
@@ -143,20 +143,20 @@ impl<T: MakeOpDef> MakeExtensionOp for T {
 
 /// Load an [MakeOpDef] from its name.
 /// See [strum_macros::EnumString].
-pub fn try_from_name<T>(def: &OpDef) -> Result<T, OpLoadError>
+pub fn try_from_name<T>(name: &OpNameRef, def_extension: &ExtensionId) -> Result<T, OpLoadError>
 where
     T: std::str::FromStr + MakeOpDef,
 {
-    let expected_extension = T::extension_id();
-    if def.extension() != &expected_extension {
+    let op = T::from_str(name).map_err(|_| OpLoadError::NotMember(name.to_string()))?;
+    let expected_extension = op.expected_extension();
+    if def_extension != &expected_extension {
         return Err(OpLoadError::WrongExtension(
-            def.extension().clone(),
+            def_extension.clone(),
             expected_extension,
         ));
     }
-    let name: &OpNameRef = def.name();
 
-    T::from_str(name).map_err(|_| OpLoadError::NotMember(name.to_string()))
+    Ok(op)
 }
 
 /// Wrap an [MakeExtensionOp] with an extension registry to allow type computation.
@@ -260,7 +260,7 @@ mod test {
             Ok(Self::Dumb)
         }
 
-        fn extension_id() -> ExtensionId {
+        fn expected_extension(&self) -> ExtensionId {
             EXT_ID.to_owned()
         }
     }

@@ -36,10 +36,10 @@ pub enum ConvertOpDef {
 
 impl MakeOpDef for ConvertOpDef {
     fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError> {
-        crate::extension::simple_op::try_from_name(op_def)
+        crate::extension::simple_op::try_from_name(op_def.name(), op_def.extension())
     }
 
-    fn extension_id() -> ExtensionId {
+    fn expected_extension(&self) -> ExtensionId {
         EXTENSION_ID.to_owned()
     }
 
