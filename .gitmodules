@@ -1,0 +1,4 @@
+[submodule "hugr-py/docs/quantinuum-sphinx"]
+	path = hugr-py/docs/quantinuum-sphinx
+	url = https://github.com/CQCL/quantinuum-sphinx.git
+	branch = dist
