@@ -64,7 +64,7 @@ class TrackedDfg(Dfg):
             >>> dfg.untrack_wire(idx) == w
             True
         """
-        w = self.get_wire(index)
+        w = self.tracked_wire(index)
         self.tracked[index] = None
         return w
 
@@ -97,7 +97,7 @@ class TrackedDfg(Dfg):
         """
         return self.track_wires(self.inputs())
 
-    def get_wire(self, index: int) -> Wire:
+    def tracked_wire(self, index: int) -> Wire:
         """Get the tracked wire at the given index.
 
         Args:
@@ -111,7 +111,7 @@ class TrackedDfg(Dfg):
 
         Examples:
             >>> dfg = TrackedDfg(tys.Bool, tys.Unit, track_inputs=True)
-            >>> dfg.get_wire(0) == dfg.inputs()[0]
+            >>> dfg.tracked_wire(0) == dfg.inputs()[0]
             True
         """
         try:
@@ -139,6 +139,9 @@ class TrackedDfg(Dfg):
         Returns:
             The new node.
 
+        Raises:
+            IndexError: If any input index is not a tracked wire.
+
         Examples:
             >>> dfg = TrackedDfg(tys.Bool, track_inputs=True)
             >>> dfg.tracked
@@ -162,7 +165,9 @@ class TrackedDfg(Dfg):
         return n
 
     def _to_wires(self, in_wires: Iterable[ComWire]) -> Iterable[Wire]:
-        return (self.get_wire(inc) if isinstance(inc, int) else inc for inc in in_wires)
+        return (
+            self.tracked_wire(inc) if isinstance(inc, int) else inc for inc in in_wires
+        )
 
     def extend(self, coms: Iterable[Command]) -> list[Node]:
         """Add a series of commands to the DFG.
@@ -175,6 +180,8 @@ class TrackedDfg(Dfg):
         Returns:
             List of the new nodes in the same order as the commands.
 
+        Raises:
+            IndexError: If any input index is not a tracked wire.
 
         Examples:
             >>> dfg = TrackedDfg(tys.Bool, tys.Unit, track_inputs=True)
@@ -189,6 +196,9 @@ class TrackedDfg(Dfg):
 
         Args:
             *in_wires: Wires/indices to set as outputs.
+
+        Raises:
+            IndexError: If any input index is not a tracked wire.
 
         Examples:
             >>> dfg = TrackedDfg(tys.Bool, tys.Unit)

@@ -10,14 +10,14 @@ def test_track_wire():
     dfg = TrackedDfg(tys.Bool, tys.Unit)
     inds = dfg.track_inputs()
     assert inds == [0, 1]
-    assert dfg.get_wire(inds[0]) == dfg.inputs()[0]
+    assert dfg.tracked_wire(inds[0]) == dfg.inputs()[0]
     with pytest.raises(IndexError, match="Index 2 not a tracked wire."):
-        dfg.get_wire(2)
-    w1 = dfg.get_wire(inds[1])
+        dfg.tracked_wire(2)
+    w1 = dfg.tracked_wire(inds[1])
     w1_removed = dfg.untrack_wire(inds[1])
     assert w1 == w1_removed
     with pytest.raises(IndexError, match="Index 1 not a tracked wire."):
-        dfg.get_wire(inds[1])
+        dfg.tracked_wire(inds[1])
 
     dfg.set_indexed_outputs(0)
 
