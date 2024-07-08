@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.1 (2024-07-08)
+
+### Bug Fixes
+
+- Bring back input_extensions serialized field in rust NodeSer ([#1275](https://github.com/CQCL/hugr/pull/1275))
+
+
 ## 0.3.0 (2024-06-28)
 
 ### Bug Fixes
