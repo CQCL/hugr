@@ -17,15 +17,11 @@ use super::{impl_op_name, OpTag, OpTrait};
 /// The root of a module, parent of all other `OpType`s.
 #[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(test, derive(Arbitrary))]
-pub struct Module {
-    // can't be simple unit struct due to flattened serialization issues
-    // see https://github.com/CQCL/hugr/issues/1270
-}
-
+pub struct Module;
 impl Module {
     /// Construct a new Module.
     pub const fn new() -> Self {
-        Self {}
+        Self
     }
 }
 
