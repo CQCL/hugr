@@ -1,0 +1,1147 @@
+{
+    "version": "v1",
+    "nodes": [
+        {
+            "parent": 0,
+            "input_extensions": null,
+            "op": "Module"
+        },
+        {
+            "parent": 8,
+            "input_extensions": null,
+            "op": "DataflowBlock",
+            "inputs": [
+                {
+                    "t": "Opaque",
+                    "extension": "prelude",
+                    "id": "qubit",
+                    "args": [],
+                    "bound": "A"
+                },
+                {
+                    "t": "Opaque",
+                    "extension": "prelude",
+                    "id": "qubit",
+                    "args": [],
+                    "bound": "A"
+                }
+            ],
+            "other_outputs": [
+                {
+                    "t": "Sum",
+                    "s": "Unit",
+                    "size": 2
+                }
+            ],
+            "sum_rows": [
+                []
+            ],
+            "extension_delta": []
+        },
+        {
+            "parent": 8,
+            "input_extensions": null,
+            "op": "ExitBlock",
+            "cfg_outputs": [
+                {
+                    "t": "Sum",
+                    "s": "Unit",
+                    "size": 2
+                }
+            ]
+        },
+        {
+            "parent": 7,
+            "input_extensions": null,
+            "op": "Input",
+            "types": [
+                {
+                    "t": "Opaque",
+                    "extension": "prelude",
+                    "id": "qubit",
+                    "args": [],
+                    "bound": "A"
+                },
+                {
+                    "t": "Opaque",
+                    "extension": "prelude",
+                    "id": "qubit",
+                    "args": [],
+                    "bound": "A"
+                }
+            ]
+        },
+        {
+            "parent": 1,
+            "input_extensions": null,
+            "op": "Input",
+            "types": [
+                {
+                    "t": "Opaque",
+                    "extension": "prelude",
+                    "id": "qubit",
+                    "args": [],
+                    "bound": "A"
+                },
+                {
+                    "t": "Opaque",
+                    "extension": "prelude",
+                    "id": "qubit",
+                    "args": [],
+                    "bound": "A"
+                }
+            ]
+        },
+        {
+            "parent": 1,
+            "input_extensions": null,
+            "op": "Output",
+            "types": [
+                {
+                    "t": "Sum",
+                    "s": "Unit",
+                    "size": 1
+                },
+                {
+                    "t": "Sum",
+                    "s": "Unit",
+                    "size": 2
+                }
+            ]
+        },
+        {
+            "parent": 7,
+            "input_extensions": null,
+            "op": "Output",
+            "types": [
+                {
+                    "t": "Sum",
+                    "s": "Unit",
+                    "size": 2
+                }
+            ]
+        },
+        {
+            "parent": 0,
+            "input_extensions": null,
+            "op": "FuncDefn",
+            "name": "my_func",
+            "signature": {
+                "params": [],
+                "body": {
+                    "t": "G",
+                    "input": [
+                        {
+                            "t": "Opaque",
+                            "extension": "prelude",
+                            "id": "qubit",
+                            "args": [],
+                            "bound": "A"
+                        },
+                        {
+                            "t": "Opaque",
+                            "extension": "prelude",
+                            "id": "qubit",
+                            "args": [],
+                            "bound": "A"
+                        }
+                    ],
+                    "output": [
+                        {
+                            "t": "Sum",
+                            "s": "Unit",
+                            "size": 2
+                        }
+                    ],
+                    "extension_reqs": []
+                }
+            }
+        },
+        {
+            "parent": 7,
+            "input_extensions": null,
+            "op": "CFG",
+            "signature": {
+                "t": "G",
+                "input": [
+                    {
+                        "t": "Opaque",
+                        "extension": "prelude",
+                        "id": "qubit",
+                        "args": [],
+                        "bound": "A"
+                    },
+                    {
+                        "t": "Opaque",
+                        "extension": "prelude",
+                        "id": "qubit",
+                        "args": [],
+                        "bound": "A"
+                    }
+                ],
+                "output": [
+                    {
+                        "t": "Sum",
+                        "s": "Unit",
+                        "size": 2
+                    }
+                ],
+                "extension_reqs": []
+            }
+        },
+        {
+            "parent": 1,
+            "input_extensions": null,
+            "op": "Const",
+            "v": {
+                "v": "Extension",
+                "extensions": [
+                    "arithmetic.float.types"
+                ],
+                "typ": {
+                    "t": "Opaque",
+                    "extension": "arithmetic.float.types",
+                    "id": "float64",
+                    "args": [],
+                    "bound": "C"
+                },
+                "value": {
+                    "c": "ConstF64",
+                    "v": {
+                        "value": 1.5707963267948966
+                    }
+                }
+            }
+        },
+        {
+            "parent": 1,
+            "input_extensions": null,
+            "op": "LoadConstant",
+            "datatype": {
+                "t": "Opaque",
+                "extension": "arithmetic.float.types",
+                "id": "float64",
+                "args": [],
+                "bound": "C"
+            }
+        },
+        {
+            "parent": 1,
+            "input_extensions": null,
+            "op": "Const",
+            "v": {
+                "v": "Extension",
+                "extensions": [
+                    "arithmetic.float.types"
+                ],
+                "typ": {
+                    "t": "Opaque",
+                    "extension": "arithmetic.float.types",
+                    "id": "float64",
+                    "args": [],
+                    "bound": "C"
+                },
+                "value": {
+                    "c": "ConstF64",
+                    "v": {
+                        "value": -1.5707963267948966
+                    }
+                }
+            }
+        },
+        {
+            "parent": 1,
+            "input_extensions": null,
+            "op": "LoadConstant",
+            "datatype": {
+                "t": "Opaque",
+                "extension": "arithmetic.float.types",
+                "id": "float64",
+                "args": [],
+                "bound": "C"
+            }
+        },
+        {
+            "parent": 1,
+            "input_extensions": null,
+            "op": "CustomOp",
+            "extension": "quantum.tket2",
+            "op_name": "PhasedX",
+            "signature": {
+                "t": "G",
+                "input": [
+                    {
+                        "t": "Opaque",
+                        "extension": "prelude",
+                        "id": "qubit",
+                        "args": [],
+                        "bound": "A"
+                    },
+                    {
+                        "t": "Opaque",
+                        "extension": "arithmetic.float.types",
+                        "id": "float64",
+                        "args": [],
+                        "bound": "C"
+                    },
+                    {
+                        "t": "Opaque",
+                        "extension": "arithmetic.float.types",
+                        "id": "float64",
+                        "args": [],
+                        "bound": "C"
+                    }
+                ],
+                "output": [
+                    {
+                        "t": "Opaque",
+                        "extension": "prelude",
+                        "id": "qubit",
+                        "args": [],
+                        "bound": "A"
+                    }
+                ],
+                "extension_reqs": []
+            },
+            "description": "",
+            "args": []
+        },
+        {
+            "parent": 1,
+            "input_extensions": null,
+            "op": "Const",
+            "v": {
+                "v": "Extension",
+                "extensions": [
+                    "arithmetic.float.types"
+                ],
+                "typ": {
+                    "t": "Opaque",
+                    "extension": "arithmetic.float.types",
+                    "id": "float64",
+                    "args": [],
+                    "bound": "C"
+                },
+                "value": {
+                    "c": "ConstF64",
+                    "v": {
+                        "value": 3.141592653589793
+                    }
+                }
+            }
+        },
+        {
+            "parent": 1,
+            "input_extensions": null,
+            "op": "LoadConstant",
+            "datatype": {
+                "t": "Opaque",
+                "extension": "arithmetic.float.types",
+                "id": "float64",
+                "args": [],
+                "bound": "C"
+            }
+        },
+        {
+            "parent": 1,
+            "input_extensions": null,
+            "op": "CustomOp",
+            "extension": "quantum.tket2",
+            "op_name": "RzF64",
+            "signature": {
+                "t": "G",
+                "input": [
+                    {
+                        "t": "Opaque",
+                        "extension": "prelude",
+                        "id": "qubit",
+                        "args": [],
+                        "bound": "A"
+                    },
+                    {
+                        "t": "Opaque",
+                        "extension": "arithmetic.float.types",
+                        "id": "float64",
+                        "args": [],
+                        "bound": "C"
+                    }
+                ],
+                "output": [
+                    {
+                        "t": "Opaque",
+                        "extension": "prelude",
+                        "id": "qubit",
+                        "args": [],
+                        "bound": "A"
+                    }
+                ],
+                "extension_reqs": []
+            },
+            "description": "",
+            "args": []
+        },
+        {
+            "parent": 1,
+            "input_extensions": null,
+            "op": "Const",
+            "v": {
+                "v": "Extension",
+                "extensions": [
+                    "arithmetic.float.types"
+                ],
+                "typ": {
+                    "t": "Opaque",
+                    "extension": "arithmetic.float.types",
+                    "id": "float64",
+                    "args": [],
+                    "bound": "C"
+                },
+                "value": {
+                    "c": "ConstF64",
+                    "v": {
+                        "value": 1.5707963267948966
+                    }
+                }
+            }
+        },
+        {
+            "parent": 1,
+            "input_extensions": null,
+            "op": "LoadConstant",
+            "datatype": {
+                "t": "Opaque",
+                "extension": "arithmetic.float.types",
+                "id": "float64",
+                "args": [],
+                "bound": "C"
+            }
+        },
+        {
+            "parent": 1,
+            "input_extensions": null,
+            "op": "Const",
+            "v": {
+                "v": "Extension",
+                "extensions": [
+                    "arithmetic.float.types"
+                ],
+                "typ": {
+                    "t": "Opaque",
+                    "extension": "arithmetic.float.types",
+                    "id": "float64",
+                    "args": [],
+                    "bound": "C"
+                },
+                "value": {
+                    "c": "ConstF64",
+                    "v": {
+                        "value": -1.5707963267948966
+                    }
+                }
+            }
+        },
+        {
+            "parent": 1,
+            "input_extensions": null,
+            "op": "LoadConstant",
+            "datatype": {
+                "t": "Opaque",
+                "extension": "arithmetic.float.types",
+                "id": "float64",
+                "args": [],
+                "bound": "C"
+            }
+        },
+        {
+            "parent": 1,
+            "input_extensions": null,
+            "op": "CustomOp",
+            "extension": "quantum.tket2",
+            "op_name": "PhasedX",
+            "signature": {
+                "t": "G",
+                "input": [
+                    {
+                        "t": "Opaque",
+                        "extension": "prelude",
+                        "id": "qubit",
+                        "args": [],
+                        "bound": "A"
+                    },
+                    {
+                        "t": "Opaque",
+                        "extension": "arithmetic.float.types",
+                        "id": "float64",
+                        "args": [],
+                        "bound": "C"
+                    },
+                    {
+                        "t": "Opaque",
+                        "extension": "arithmetic.float.types",
+                        "id": "float64",
+                        "args": [],
+                        "bound": "C"
+                    }
+                ],
+                "output": [
+                    {
+                        "t": "Opaque",
+                        "extension": "prelude",
+                        "id": "qubit",
+                        "args": [],
+                        "bound": "A"
+                    }
+                ],
+                "extension_reqs": []
+            },
+            "description": "",
+            "args": []
+        },
+        {
+            "parent": 1,
+            "input_extensions": null,
+            "op": "Const",
+            "v": {
+                "v": "Extension",
+                "extensions": [
+                    "arithmetic.float.types"
+                ],
+                "typ": {
+                    "t": "Opaque",
+                    "extension": "arithmetic.float.types",
+                    "id": "float64",
+                    "args": [],
+                    "bound": "C"
+                },
+                "value": {
+                    "c": "ConstF64",
+                    "v": {
+                        "value": 3.141592653589793
+                    }
+                }
+            }
+        },
+        {
+            "parent": 1,
+            "input_extensions": null,
+            "op": "LoadConstant",
+            "datatype": {
+                "t": "Opaque",
+                "extension": "arithmetic.float.types",
+                "id": "float64",
+                "args": [],
+                "bound": "C"
+            }
+        },
+        {
+            "parent": 1,
+            "input_extensions": null,
+            "op": "CustomOp",
+            "extension": "quantum.tket2",
+            "op_name": "RzF64",
+            "signature": {
+                "t": "G",
+                "input": [
+                    {
+                        "t": "Opaque",
+                        "extension": "prelude",
+                        "id": "qubit",
+                        "args": [],
+                        "bound": "A"
+                    },
+                    {
+                        "t": "Opaque",
+                        "extension": "arithmetic.float.types",
+                        "id": "float64",
+                        "args": [],
+                        "bound": "C"
+                    }
+                ],
+                "output": [
+                    {
+                        "t": "Opaque",
+                        "extension": "prelude",
+                        "id": "qubit",
+                        "args": [],
+                        "bound": "A"
+                    }
+                ],
+                "extension_reqs": []
+            },
+            "description": "",
+            "args": []
+        },
+        {
+            "parent": 1,
+            "input_extensions": null,
+            "op": "CustomOp",
+            "extension": "quantum.tket2",
+            "op_name": "ZZMax",
+            "signature": {
+                "t": "G",
+                "input": [
+                    {
+                        "t": "Opaque",
+                        "extension": "prelude",
+                        "id": "qubit",
+                        "args": [],
+                        "bound": "A"
+                    },
+                    {
+                        "t": "Opaque",
+                        "extension": "prelude",
+                        "id": "qubit",
+                        "args": [],
+                        "bound": "A"
+                    }
+                ],
+                "output": [
+                    {
+                        "t": "Opaque",
+                        "extension": "prelude",
+                        "id": "qubit",
+                        "args": [],
+                        "bound": "A"
+                    },
+                    {
+                        "t": "Opaque",
+                        "extension": "prelude",
+                        "id": "qubit",
+                        "args": [],
+                        "bound": "A"
+                    }
+                ],
+                "extension_reqs": []
+            },
+            "description": "",
+            "args": []
+        },
+        {
+            "parent": 1,
+            "input_extensions": null,
+            "op": "MakeTuple",
+            "tys": [
+                {
+                    "t": "Opaque",
+                    "extension": "prelude",
+                    "id": "qubit",
+                    "args": [],
+                    "bound": "A"
+                },
+                {
+                    "t": "Opaque",
+                    "extension": "prelude",
+                    "id": "qubit",
+                    "args": [],
+                    "bound": "A"
+                }
+            ]
+        },
+        {
+            "parent": 1,
+            "input_extensions": null,
+            "op": "UnpackTuple",
+            "tys": [
+                {
+                    "t": "Opaque",
+                    "extension": "prelude",
+                    "id": "qubit",
+                    "args": [],
+                    "bound": "A"
+                },
+                {
+                    "t": "Opaque",
+                    "extension": "prelude",
+                    "id": "qubit",
+                    "args": [],
+                    "bound": "A"
+                }
+            ]
+        },
+        {
+            "parent": 1,
+            "input_extensions": null,
+            "op": "CustomOp",
+            "extension": "quantum.tket2",
+            "op_name": "Measure",
+            "signature": {
+                "t": "G",
+                "input": [
+                    {
+                        "t": "Opaque",
+                        "extension": "prelude",
+                        "id": "qubit",
+                        "args": [],
+                        "bound": "A"
+                    }
+                ],
+                "output": [
+                    {
+                        "t": "Opaque",
+                        "extension": "prelude",
+                        "id": "qubit",
+                        "args": [],
+                        "bound": "A"
+                    },
+                    {
+                        "t": "Sum",
+                        "s": "Unit",
+                        "size": 2
+                    }
+                ],
+                "extension_reqs": []
+            },
+            "description": "",
+            "args": []
+        },
+        {
+            "parent": 1,
+            "input_extensions": null,
+            "op": "CustomOp",
+            "extension": "quantum.tket2",
+            "op_name": "QFree",
+            "signature": {
+                "t": "G",
+                "input": [
+                    {
+                        "t": "Opaque",
+                        "extension": "prelude",
+                        "id": "qubit",
+                        "args": [],
+                        "bound": "A"
+                    }
+                ],
+                "output": [],
+                "extension_reqs": []
+            },
+            "description": "",
+            "args": []
+        },
+        {
+            "parent": 1,
+            "input_extensions": null,
+            "op": "CustomOp",
+            "extension": "quantum.tket2",
+            "op_name": "Measure",
+            "signature": {
+                "t": "G",
+                "input": [
+                    {
+                        "t": "Opaque",
+                        "extension": "prelude",
+                        "id": "qubit",
+                        "args": [],
+                        "bound": "A"
+                    }
+                ],
+                "output": [
+                    {
+                        "t": "Opaque",
+                        "extension": "prelude",
+                        "id": "qubit",
+                        "args": [],
+                        "bound": "A"
+                    },
+                    {
+                        "t": "Sum",
+                        "s": "Unit",
+                        "size": 2
+                    }
+                ],
+                "extension_reqs": []
+            },
+            "description": "",
+            "args": []
+        },
+        {
+            "parent": 1,
+            "input_extensions": null,
+            "op": "CustomOp",
+            "extension": "quantum.tket2",
+            "op_name": "QFree",
+            "signature": {
+                "t": "G",
+                "input": [
+                    {
+                        "t": "Opaque",
+                        "extension": "prelude",
+                        "id": "qubit",
+                        "args": [],
+                        "bound": "A"
+                    }
+                ],
+                "output": [],
+                "extension_reqs": []
+            },
+            "description": "",
+            "args": []
+        },
+        {
+            "parent": 1,
+            "input_extensions": null,
+            "op": "MakeTuple",
+            "tys": [
+                {
+                    "t": "Sum",
+                    "s": "Unit",
+                    "size": 2
+                }
+            ]
+        },
+        {
+            "parent": 1,
+            "input_extensions": null,
+            "op": "UnpackTuple",
+            "tys": [
+                {
+                    "t": "Sum",
+                    "s": "Unit",
+                    "size": 2
+                }
+            ]
+        },
+        {
+            "parent": 1,
+            "input_extensions": null,
+            "op": "Tag",
+            "tag": 0,
+            "variants": [
+                []
+            ]
+        }
+    ],
+    "edges": [
+        [
+            [
+                3,
+                0
+            ],
+            [
+                8,
+                0
+            ]
+        ],
+        [
+            [
+                3,
+                1
+            ],
+            [
+                8,
+                1
+            ]
+        ],
+        [
+            [
+                8,
+                0
+            ],
+            [
+                6,
+                0
+            ]
+        ],
+        [
+            [
+                1,
+                0
+            ],
+            [
+                2,
+                null
+            ]
+        ],
+        [
+            [
+                4,
+                0
+            ],
+            [
+                13,
+                0
+            ]
+        ],
+        [
+            [
+                4,
+                1
+            ],
+            [
+                21,
+                0
+            ]
+        ],
+        [
+            [
+                9,
+                0
+            ],
+            [
+                10,
+                0
+            ]
+        ],
+        [
+            [
+                10,
+                0
+            ],
+            [
+                13,
+                1
+            ]
+        ],
+        [
+            [
+                11,
+                0
+            ],
+            [
+                12,
+                0
+            ]
+        ],
+        [
+            [
+                12,
+                0
+            ],
+            [
+                13,
+                2
+            ]
+        ],
+        [
+            [
+                13,
+                0
+            ],
+            [
+                16,
+                0
+            ]
+        ],
+        [
+            [
+                14,
+                0
+            ],
+            [
+                15,
+                0
+            ]
+        ],
+        [
+            [
+                15,
+                0
+            ],
+            [
+                16,
+                1
+            ]
+        ],
+        [
+            [
+                16,
+                0
+            ],
+            [
+                25,
+                0
+            ]
+        ],
+        [
+            [
+                17,
+                0
+            ],
+            [
+                18,
+                0
+            ]
+        ],
+        [
+            [
+                18,
+                0
+            ],
+            [
+                21,
+                1
+            ]
+        ],
+        [
+            [
+                19,
+                0
+            ],
+            [
+                20,
+                0
+            ]
+        ],
+        [
+            [
+                20,
+                0
+            ],
+            [
+                21,
+                2
+            ]
+        ],
+        [
+            [
+                21,
+                0
+            ],
+            [
+                24,
+                0
+            ]
+        ],
+        [
+            [
+                22,
+                0
+            ],
+            [
+                23,
+                0
+            ]
+        ],
+        [
+            [
+                23,
+                0
+            ],
+            [
+                24,
+                1
+            ]
+        ],
+        [
+            [
+                24,
+                0
+            ],
+            [
+                25,
+                1
+            ]
+        ],
+        [
+            [
+                25,
+                0
+            ],
+            [
+                26,
+                0
+            ]
+        ],
+        [
+            [
+                25,
+                1
+            ],
+            [
+                26,
+                1
+            ]
+        ],
+        [
+            [
+                26,
+                0
+            ],
+            [
+                27,
+                0
+            ]
+        ],
+        [
+            [
+                27,
+                0
+            ],
+            [
+                28,
+                0
+            ]
+        ],
+        [
+            [
+                27,
+                1
+            ],
+            [
+                30,
+                0
+            ]
+        ],
+        [
+            [
+                28,
+                0
+            ],
+            [
+                29,
+                0
+            ]
+        ],
+        [
+            [
+                30,
+                0
+            ],
+            [
+                31,
+                0
+            ]
+        ],
+        [
+            [
+                30,
+                1
+            ],
+            [
+                32,
+                0
+            ]
+        ],
+        [
+            [
+                32,
+                0
+            ],
+            [
+                33,
+                0
+            ]
+        ],
+        [
+            [
+                33,
+                0
+            ],
+            [
+                5,
+                1
+            ]
+        ],
+        [
+            [
+                34,
+                0
+            ],
+            [
+                5,
+                0
+            ]
+        ]
+    ],
+    "metadata": null,
+    "encoder": "hugr-py v0.2.0a1"
+}

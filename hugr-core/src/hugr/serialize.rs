@@ -49,6 +49,9 @@ struct NodeSer {
     parent: Node,
     #[serde(flatten)]
     op: OpType,
+
+    #[serde(skip_serializing, default)]
+    input_extensions: Option<crate::extension::ExtensionSet>,
 }
 
 /// Version 1 of the HUGR serialization format.
@@ -146,6 +149,7 @@ impl TryFrom<&Hugr> for SerHugrV1 {
             nodes[new_node] = Some(NodeSer {
                 parent,
                 op: opt.clone(),
+                input_extensions: None,
             });
             metadata[new_node].clone_from(hugr.metadata.get(n.pg_index()));
         }
@@ -203,6 +207,7 @@ impl TryFrom<SerHugrV1> for Hugr {
         let NodeSer {
             parent: root_parent,
             op: root_type,
+            ..
         } = nodes.next().unwrap();
         if root_parent.index() != 0 {
             return Err(HUGRSerializationError::FirstNodeNotRoot(root_parent));

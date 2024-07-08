@@ -51,7 +51,7 @@ pub struct Hugr {
 
 impl Default for Hugr {
     fn default() -> Self {
-        Self::new(crate::ops::Module)
+        Self::new(crate::ops::Module::new())
     }
 }
 
