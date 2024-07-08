@@ -47,7 +47,7 @@ impl MakeOpDef for FloatOps {
         crate::extension::simple_op::try_from_name(op_def.name(), op_def.extension())
     }
 
-    fn expected_extension(&self) -> ExtensionId {
+    fn extension(&self) -> ExtensionId {
         EXTENSION_ID.to_owned()
     }
 

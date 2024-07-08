@@ -54,7 +54,7 @@ pub trait MakeOpDef: NamedOp {
     fn signature(&self) -> SignatureFunc;
 
     /// The ID of the extension this operation is defined in.
-    fn expected_extension(&self) -> ExtensionId;
+    fn extension(&self) -> ExtensionId;
 
     /// Description of the operation. By default, the same as `self.name()`.
     fn description(&self) -> String {
@@ -148,7 +148,7 @@ where
     T: std::str::FromStr + MakeOpDef,
 {
     let op = T::from_str(name).map_err(|_| OpLoadError::NotMember(name.to_string()))?;
-    let expected_extension = op.expected_extension();
+    let expected_extension = op.extension();
     if def_extension != &expected_extension {
         return Err(OpLoadError::WrongExtension(
             def_extension.clone(),
@@ -260,7 +260,7 @@ mod test {
             Ok(Self::Dumb)
         }
 
-        fn expected_extension(&self) -> ExtensionId {
+        fn extension(&self) -> ExtensionId {
             EXT_ID.to_owned()
         }
     }

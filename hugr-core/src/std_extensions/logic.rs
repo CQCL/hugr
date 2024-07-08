@@ -75,7 +75,7 @@ impl MakeOpDef for NaryLogic {
         try_from_name(op_def.name(), op_def.extension())
     }
 
-    fn expected_extension(&self) -> ExtensionId {
+    fn extension(&self) -> ExtensionId {
         EXTENSION_ID.to_owned()
     }
 
@@ -131,7 +131,7 @@ impl MakeOpDef for NotOp {
         }
     }
 
-    fn expected_extension(&self) -> ExtensionId {
+    fn extension(&self) -> ExtensionId {
         EXTENSION_ID.to_owned()
     }
 
