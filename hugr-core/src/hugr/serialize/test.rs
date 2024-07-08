@@ -466,7 +466,6 @@ fn roundtrip_optype(#[case] optype: impl Into<OpType> + std::fmt::Debug) {
     check_testing_roundtrip(NodeSer {
         parent: portgraph::NodeIndex::new(0).into(),
         op: optype.into(),
-        input_extensions: None,
     });
 }
 
@@ -495,11 +494,7 @@ mod proptest {
                 (0..i32::MAX as usize).prop_map(|x| portgraph::NodeIndex::new(x).into()),
                 any::<OpType>(),
             )
-                .prop_map(|(parent, op)| NodeSer {
-                    parent,
-                    op,
-                    input_extensions: None,
-                })
+                .prop_map(|(parent, op)| NodeSer { parent, op })
                 .boxed()
         }
     }
