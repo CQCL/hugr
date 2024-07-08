@@ -26,8 +26,9 @@ pub use custom::{
 #[non_exhaustive]
 #[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 pub struct Const {
+    /// The [Value] of the constant.
     #[serde(rename = "v")]
-    value: Value,
+    pub value: Value,
 }
 
 impl Const {
