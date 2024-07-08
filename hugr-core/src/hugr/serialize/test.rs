@@ -470,6 +470,7 @@ fn roundtrip_optype(#[case] optype: impl Into<OpType> + std::fmt::Debug) {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
 /// issue 1270
 fn input_extensions_deser() {
     // load a file serialised with `input_extensions` fields on all ops
