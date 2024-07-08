@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.1](https://github.com/CQCL/hugr/compare/hugr-py-v0.3.0...hugr-py-v0.3.1) (2024-07-08)
+
+
+### Features
+
+* **hugr-py:** `TrackedDfg` builder for appending operations by index ([df9b4cc](https://github.com/CQCL/hugr/commit/df9b4cc9725529b0bd9f1cfde97fc7fa544296c9))
+* **hugr-py:** context manager style nested building ([#1276](https://github.com/CQCL/hugr/issues/1276)) ([6b32734](https://github.com/CQCL/hugr/commit/6b32734c929a28ac1e8f5ee48362bce940b53d4a)), closes [#1243](https://github.com/CQCL/hugr/issues/1243)
+
 ## [0.3.0](https://github.com/CQCL/hugr/compare/hugr-py-v0.2.1...hugr-py-v0.3.0) (2024-07-03)
 
 ### Features
