@@ -121,16 +121,16 @@ pub use conditional::{CaseBuilder, ConditionalBuilder};
 mod circuit;
 pub use circuit::{CircuitBuildError, CircuitBuilder};
 
-/// Return a FunctionType with the same input and output types (specified)
-/// whose extension delta, when used in a non-FuncDefn container, will be inferred.
-pub fn ft1(types: impl Into<TypeRow>) -> FunctionType {
-    FunctionType::new_endo(types).with_extension_delta(TO_BE_INFERRED)
+impl<T: Into<TypeRow>> From<(T,)> for FunctionType {
+    fn from(value: (T,)) -> Self {
+        FunctionType::new_endo(value.0).with_extension_delta(TO_BE_INFERRED)
+    }
 }
 
-/// Return a FunctionType with the specified input and output types
-/// whose extension delta, when used in a non-FuncDefn container, will be inferred.
-pub fn ft2(inputs: impl Into<TypeRow>, outputs: impl Into<TypeRow>) -> FunctionType {
-    FunctionType::new(inputs, outputs).with_extension_delta(TO_BE_INFERRED)
+impl<T1: Into<TypeRow>, T2: Into<TypeRow>> From<(T1, T2)> for FunctionType {
+    fn from(value: (T1, T2)) -> Self {
+        FunctionType::new(value.0, value.1).with_extension_delta(TO_BE_INFERRED)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Error)]

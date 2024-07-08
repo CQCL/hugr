@@ -276,9 +276,10 @@ pub trait Dataflow: Container {
     // TODO: Should this be one function, or should there be a temporary "op" one like with the others?
     fn dfg_builder(
         &mut self,
-        signature: FunctionType,
+        signature: impl Into<FunctionType>,
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<DFGBuilder<&mut Hugr>, BuildError> {
+        let signature = signature.into();
         let op = ops::DFG {
             signature: signature.clone(),
         };

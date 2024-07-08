@@ -526,7 +526,6 @@ pub type ValueNameRef = str;
 #[cfg(test)]
 mod test {
     use super::Value;
-    use crate::builder::ft2;
     use crate::builder::test::simple_dfg_hugr;
     use crate::std_extensions::arithmetic::int_types::ConstInt;
     use crate::{
@@ -587,10 +586,7 @@ mod test {
         let pred_rows = vec![type_row![USIZE_T, FLOAT64_TYPE], Type::EMPTY_TYPEROW];
         let pred_ty = SumType::new(pred_rows.clone());
 
-        let mut b = DFGBuilder::new(ft2(
-            type_row![],
-            TypeRow::from(vec![pred_ty.clone().into()]),
-        ))?;
+        let mut b = DFGBuilder::new((type_row![], TypeRow::from(vec![pred_ty.clone().into()])))?;
         let c = b.add_constant(Value::sum(
             0,
             [
