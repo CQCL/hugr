@@ -13,7 +13,7 @@ keywords = ["Quantum", "Quantinuum"]
 categories = ["compilers"]
 
 [dependencies]
-hugr-core = { path = "../hugr-core", version = "0.3.0" }
+hugr-core = { path = "../hugr-core", version = "0.3.1" }
 itertools = { workspace = true }
 lazy_static = { workspace = true }
 paste = { workspace = true }
