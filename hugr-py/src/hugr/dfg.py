@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import AbstractContextManager
 from dataclasses import dataclass, field, replace
 from typing import (
     TYPE_CHECKING,
@@ -27,7 +28,7 @@ DP = TypeVar("DP", bound=ops.DfParentOp)
 
 
 @dataclass()
-class _DfBase(ParentBuilder[DP]):
+class _DfBase(ParentBuilder[DP], AbstractContextManager):
     """Base class for dataflow graph builders.
 
     Args:
@@ -55,6 +56,12 @@ class _DfBase(ParentBuilder[DP]):
             ops.Input(inputs), self.parent_node, len(inputs)
         )
         self.output_node = self.hugr.add_node(ops.Output(), self.parent_node)
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, *args) -> None:
+        return None
 
     @classmethod
     def new_nested(
@@ -179,8 +186,8 @@ class _DfBase(ParentBuilder[DP]):
 
         Example:
             >>> dfg = Dfg(tys.Bool)
-            >>> dfg2 = dfg.add_nested(dfg.inputs()[0])
-            >>> dfg2.parent_node
+            >>> with dfg.add_nested(dfg.inputs()[0]) as dfg2:\
+                   dfg2.parent_node
             Node(3)
         """
         from .dfg import Dfg
@@ -207,8 +214,8 @@ class _DfBase(ParentBuilder[DP]):
 
         Example:
             >>> dfg = Dfg(tys.Bool)
-            >>> cfg = dfg.add_cfg(dfg.inputs()[0])
-            >>> cfg.parent_op
+            >>> with dfg.add_cfg(dfg.inputs()[0]) as cfg:\
+                    cfg.parent_op
             CFG(inputs=[Bool])
         """
         from .cfg import Cfg
