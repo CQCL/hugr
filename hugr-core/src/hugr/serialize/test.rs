@@ -203,7 +203,7 @@ fn gen_optype(g: &MultiPortGraph, node: portgraph::NodeIndex) -> OpType {
         .into(),
         (true, false) => Input::new(vec![NAT; outputs - 1]).into(),
         (false, true) => Output::new(vec![NAT; inputs - 1]).into(),
-        (true, true) => Module.into(),
+        (true, true) => Module::new().into(),
     }
 }
 
@@ -451,7 +451,7 @@ fn roundtrip_polyfunctype(#[case] poly_func_type: PolyFuncType) {
 }
 
 #[rstest]
-#[case(ops::Module)]
+#[case(ops::Module::new())]
 #[case(ops::FuncDefn { name: "polyfunc1".into(), signature: polyfunctype1()})]
 #[case(ops::FuncDecl { name: "polyfunc2".into(), signature: polyfunctype1()})]
 #[case(ops::AliasDefn { name: "aliasdefn".into(), definition: Type::new_unit_sum(4)})]
@@ -466,7 +466,18 @@ fn roundtrip_optype(#[case] optype: impl Into<OpType> + std::fmt::Debug) {
     check_testing_roundtrip(NodeSer {
         parent: portgraph::NodeIndex::new(0).into(),
         op: optype.into(),
+        input_extensions: None,
     });
+}
+
+#[test]
+/// issue 1270
+fn input_extensions_deser() {
+    // load a file serialised with `input_extensions` fields on all ops
+    let _: Hugr = serde_json::from_reader(std::io::BufReader::new(
+        std::fs::File::open(crate::test_file!("issue-1270.json")).unwrap(),
+    ))
+    .unwrap();
 }
 
 mod proptest {
@@ -484,7 +495,11 @@ mod proptest {
                 (0..i32::MAX as usize).prop_map(|x| portgraph::NodeIndex::new(x).into()),
                 any::<OpType>(),
             )
-                .prop_map(|(parent, op)| NodeSer { parent, op })
+                .prop_map(|(parent, op)| NodeSer {
+                    parent,
+                    op,
+                    input_extensions: None,
+                })
                 .boxed()
         }
     }
