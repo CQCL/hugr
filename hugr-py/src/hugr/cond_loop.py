@@ -1,9 +1,16 @@
+"""Builder classes for structured control flow
+in HUGR graphs (Conditional, TailLoop).
+"""
+
 from __future__ import annotations
 
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-import hugr.ops as ops
+from typing_extensions import Self
+
+from hugr import ops
 
 from .dfg import _DfBase
 from .hugr import Hugr, ParentBuilder
@@ -14,6 +21,8 @@ if TYPE_CHECKING:
 
 
 class Case(_DfBase[ops.Case]):
+    """Dataflow graph builder for a case in a conditional."""
+
     _parent_cond: Conditional | None = None
 
     def set_outputs(self, *outputs: Wire) -> None:
@@ -23,7 +32,7 @@ class Case(_DfBase[ops.Case]):
 
 
 class ConditionalError(Exception):
-    pass
+    """Error building a :class:`Conditional`."""
 
 
 @dataclass
@@ -41,19 +50,60 @@ class _IfElse(Case):
             raise ConditionalError(msg)
         return self._parent_cond
 
+    @property
+    def conditional_node(self) -> Node:
+        """The node that represents the parent conditional."""
+        return self._parent_conditional().parent_node
+
 
 class If(_IfElse):
+    """Build the 'if' branch of a conditional branching on a boolean value.
+
+    Examples:
+        >>> from hugr.dfg import Dfg
+        >>> dfg = Dfg(tys.Qubit)
+        >>> (q,) = dfg.inputs()
+        >>> if_ = dfg.add_if(dfg.load(val.TRUE), q)
+        >>> if_.set_outputs(if_.input_node[0])
+        >>> else_= if_.add_else()
+        >>> else_.set_outputs(else_.input_node[0])
+        >>> dfg.hugr[else_.conditional_node].op
+        Conditional(sum_ty=Bool, other_inputs=[Qubit])
+    """
+
     def add_else(self) -> Else:
+        """Finish building the 'if' branch and start building the 'else' branch."""
         return Else(self._parent_conditional().add_case(0))
 
 
 class Else(_IfElse):
+    """Build the 'else' branch of a conditional branching on a boolean value.
+
+    See :class:`If` for an example.
+    """
+
     def finish(self) -> Node:
-        return self._parent_conditional().parent_node
+        """Deprecated, use `conditional_node` property."""
+        # TODO remove in 0.4.0
+        return self.conditional_node  # pragma: no cover
 
 
 @dataclass
-class Conditional(ParentBuilder[ops.Conditional]):
+class Conditional(ParentBuilder[ops.Conditional], AbstractContextManager):
+    """Build a conditional branching on a sum type.
+
+    Args:
+        sum_ty: The sum type to branch on.
+        other_inputs: The inputs for the conditional that aren't included in the
+        sum variants. These are passed to all cases.
+
+    Examples:
+        >>> cond = Conditional(tys.Bool, [tys.Qubit])
+        >>> cond.parent_op
+        Conditional(sum_ty=Bool, other_inputs=[Qubit])
+    """
+
+    #: map from case index to node holding the :class:`Case <hugr.ops.Case>`
     cases: dict[int, Node | None]
 
     def __init__(self, sum_ty: Sum, other_inputs: TypeRow) -> None:
@@ -66,6 +116,15 @@ class Conditional(ParentBuilder[ops.Conditional]):
         self.parent_node = root
         self.cases = {i: None for i in range(n_cases)}
 
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, *args) -> None:
+        if any(c is None for c in self.cases.values()):
+            msg = "All cases must be added before exiting context."
+            raise ConditionalError(msg)
+        return None
+
     @classmethod
     def new_nested(
         cls,
@@ -74,6 +133,19 @@ class Conditional(ParentBuilder[ops.Conditional]):
         hugr: Hugr,
         parent: ToNode | None = None,
     ) -> Conditional:
+        """Build a Conditional nested inside an existing HUGR graph.
+
+        Args:
+            sum_ty: The sum type to branch on.
+            other_inputs: The inputs for the conditional that aren't included in the
+                sum variants. These are passed to all cases.
+            hugr: The HUGR instance this Conditional is part of.
+            parent: The parent node for the Conditional: defaults to the root of
+              the HUGR instance.
+
+        Returns:
+            The new Conditional builder.
+        """
         new = cls.__new__(cls)
         root = hugr.add_node(
             ops.Conditional(sum_ty, other_inputs),
@@ -91,6 +163,24 @@ class Conditional(ParentBuilder[ops.Conditional]):
                 raise ConditionalError(msg)
 
     def add_case(self, case_id: int) -> Case:
+        """Start building a case for the conditional.
+
+        Args:
+            case_id: The index of the case to build. Input types for the case
+            are the corresponding variant of the sum type concatenated with the
+            other inputs to the conditional.
+
+        Returns:
+            The new case builder.
+
+        Raises:
+            ConditionalError: If the case index is out of range.
+
+        Examples:
+            >>> cond = Conditional(tys.Bool, [tys.Qubit])
+            >>> with cond.add_case(0) as case:\
+                    case.set_outputs(*case.inputs())
+        """
         if case_id not in self.cases:
             msg = f"Case {case_id} out of possible range."
             raise ConditionalError(msg)
@@ -109,9 +199,28 @@ class Conditional(ParentBuilder[ops.Conditional]):
 
 @dataclass
 class TailLoop(_DfBase[ops.TailLoop]):
+    """Builder for a tail-controlled loop.
+
+    Args:
+        just_inputs: Types that are only inputs to the loop body.
+        rest: The remaining input types that are also output types.
+
+    Examples:
+        >>> tl = TailLoop([tys.Bool], [tys.Qubit])
+        >>> tl.parent_op
+        TailLoop(just_inputs=[Bool], rest=[Qubit])
+    """
+
     def __init__(self, just_inputs: TypeRow, rest: TypeRow) -> None:
         root_op = ops.TailLoop(just_inputs, rest)
         super().__init__(root_op)
 
     def set_loop_outputs(self, sum_wire: Wire, *rest: Wire) -> None:
+        """Set the outputs of the loop body. The first wire must be the sum type
+        that controls loop termination.
+
+        Args:
+            sum_wire: The wire holding the sum type that controls loop termination.
+            rest: The remaining output wires (corresponding to the 'rest' types).
+        """
         self.set_outputs(sum_wire, *rest)

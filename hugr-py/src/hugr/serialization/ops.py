@@ -32,20 +32,21 @@ NodeID = int
 
 
 class BaseOp(ABC, ConfiguredBaseModel):
-    """Base class for ops that store their node's input/output types"""
+    """Base class for ops that store their node's input/output types."""
 
     # Parent node index of node the op belongs to, used only at serialization time
     parent: NodeID
 
     def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
         """Hook to insert type information from the input and output ports into the
-        op"""
+        op.
+        """
 
     def insert_child_dfg_signature(self, inputs: TypeRow, outputs: TypeRow) -> None:
-        """Hook to insert type information from a child dataflow graph"""
+        """Hook to insert type information from a child dataflow graph."""
 
     def display_name(self) -> str:
-        """Name of the op for visualisation"""
+        """Name of the op for visualisation."""
         return self.__class__.__name__
 
     @abstractmethod
@@ -140,7 +141,7 @@ class TupleValue(BaseValue):
 
 
 class SumValue(BaseValue):
-    """A Sum variant
+    """A Sum variant.
 
     For any Sum type where this value meets the type of the variant indicated by the tag
     """
@@ -194,7 +195,8 @@ class Const(BaseOp):
 
 class DataflowBlock(BaseOp):
     """A CFG basic block node. The signature is that of the internal Dataflow
-    graph."""
+    graph.
+    """
 
     op: Literal["DataflowBlock"] = "DataflowBlock"
     inputs: TypeRow = Field(default_factory=list)
@@ -237,7 +239,8 @@ class DataflowBlock(BaseOp):
 
 class ExitBlock(BaseOp):
     """The single exit node of the CFG, has no children, stores the types of
-    the CFG node output."""
+    the CFG node output.
+    """
 
     op: Literal["ExitBlock"] = "ExitBlock"
     cfg_outputs: TypeRow
@@ -292,8 +295,7 @@ class Output(DataflowOp):
 
 
 class Call(DataflowOp):
-    """
-    Call a function directly.
+    """Call a function directly.
 
     The first port is connected to the def/declare of the function being called
     directly, with a `ConstE<Graph>` edge. The signature of the remaining ports matches
@@ -341,8 +343,8 @@ class CallIndirect(DataflowOp):
         assert len(fun_ty.output) == len(out_types)
         self.signature = fun_ty
 
-    def deserialize(self) -> ops.CallIndirectDef:
-        return ops.CallIndirectDef(self.signature.deserialize())
+    def deserialize(self) -> ops.CallIndirect:
+        return ops.CallIndirect(self.signature.deserialize())
 
 
 class LoadConstant(DataflowOp):
@@ -497,7 +499,8 @@ ControlFlowOp = Conditional | TailLoop | CFG
 
 class CustomOp(DataflowOp):
     """A user-defined operation that can be downcasted by the extensions that define
-    it."""
+    it.
+    """
 
     op: Literal["CustomOp"] = "CustomOp"
     extension: ExtensionId
@@ -543,8 +546,8 @@ class Noop(DataflowOp):
         assert in_types[0] == out_types[0]
         self.ty = in_types[0]
 
-    def deserialize(self) -> ops.NoopDef:
-        return ops.NoopDef(self.ty.deserialize())
+    def deserialize(self) -> ops.Noop:
+        return ops.Noop(self.ty.deserialize())
 
 
 class MakeTuple(DataflowOp):
@@ -559,8 +562,8 @@ class MakeTuple(DataflowOp):
             in_types = []
         self.tys = list(in_types)
 
-    def deserialize(self) -> ops.MakeTupleDef:
-        return ops.MakeTupleDef(deser_it(self.tys))
+    def deserialize(self) -> ops.MakeTuple:
+        return ops.MakeTuple(deser_it(self.tys))
 
 
 class UnpackTuple(DataflowOp):
@@ -572,8 +575,8 @@ class UnpackTuple(DataflowOp):
     def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
         self.tys = list(out_types)
 
-    def deserialize(self) -> ops.UnpackTupleDef:
-        return ops.UnpackTupleDef(deser_it(self.tys))
+    def deserialize(self) -> ops.UnpackTuple:
+        return ops.UnpackTuple(deser_it(self.tys))
 
 
 class Tag(DataflowOp):

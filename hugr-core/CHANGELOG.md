@@ -48,7 +48,7 @@
 
 ### Testing
 
-- Serialisation round trip testing for `OpDef` ([#999](https://github.com/CQCL/hugr/pull/999))
+- Serialization round trip testing for `OpDef` ([#999](https://github.com/CQCL/hugr/pull/999))
 
 
 ## 0.1.0 (2024-05-29)

@@ -18,7 +18,7 @@ graph LR
             direction LR
             7["(7) Input"]
             8["(8) Output"]
-            9["(9) const:sum:{tag:0, vals:[]}"]
+            9["(9) const:seq:{}"]
             10["(10) LoadConstant"]
             7--"0:1<br>usize"-->8
             9--"0:0<br>[]"-->10

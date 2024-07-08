@@ -109,7 +109,7 @@ pub fn fold_leaf_op(op: &OpType, consts: &[(IncomingPort, Value)]) -> ConstFoldR
         }
         OpType::UnpackTuple { .. } => {
             let c = &consts.first()?.1;
-            let Value::Tuple { vs } = c else {
+            let Some(vs) = c.as_tuple() else {
                 panic!("This op always takes a Tuple input.");
             };
             out_row(vs.iter().cloned())

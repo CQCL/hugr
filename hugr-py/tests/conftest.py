@@ -7,14 +7,13 @@ import subprocess
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-import hugr.tys as tys
-import hugr.val as val
+from hugr import tys, val
 from hugr.hugr import Hugr
 from hugr.ops import Command, Custom
 from hugr.serialization.serial_hugr import SerialHugr
 
 if TYPE_CHECKING:
-    from hugr.node_port import Wire
+    from hugr.ops import ComWire
 
 
 def int_t(width: int) -> tys.Opaque:
@@ -37,6 +36,22 @@ class IntVal(val.ExtensionValue):
         return val.Extension("int", INT_T, self.v)
 
 
+FLOAT_T = tys.Opaque(
+    extension="arithmetic.float.types",
+    id="float64",
+    args=[],
+    bound=tys.TypeBound.Copyable,
+)
+
+
+@dataclass
+class FloatVal(val.ExtensionValue):
+    v: float
+
+    def to_value(self) -> val.Extension:
+        return val.Extension("float", FLOAT_T, self.v)
+
+
 @dataclass
 class LogicOps(Custom):
     extension: tys.ExtensionId = "logic"
@@ -52,7 +67,7 @@ class NotDef(LogicOps):
     op_name: str = "Not"
     signature: tys.FunctionType = _NotSig
 
-    def __call__(self, a: Wire) -> Command:
+    def __call__(self, a: ComWire) -> Command:
         return super().__call__(a)
 
 
@@ -73,11 +88,27 @@ class OneQbGate(QuantumOps):
     num_out: int = 1
     signature: tys.FunctionType = _OneQbSig
 
-    def __call__(self, q: Wire) -> Command:
+    def __call__(self, q: ComWire) -> Command:
         return super().__call__(q)
 
 
 H = OneQbGate("H")
+
+
+_TwoQbSig = tys.FunctionType.endo([tys.Qubit] * 2)
+
+
+@dataclass
+class TwoQbGate(QuantumOps):
+    op_name: str
+    num_out: int = 2
+    signature: tys.FunctionType = _TwoQbSig
+
+    def __call__(self, q0: ComWire, q1: ComWire) -> Command:
+        return super().__call__(q0, q1)
+
+
+CX = TwoQbGate("CX")
 
 _MeasSig = tys.FunctionType([tys.Qubit], [tys.Qubit, tys.Bool])
 
@@ -88,11 +119,26 @@ class MeasureDef(QuantumOps):
     num_out: int = 2
     signature: tys.FunctionType = _MeasSig
 
-    def __call__(self, q: Wire) -> Command:
+    def __call__(self, q: ComWire) -> Command:
         return super().__call__(q)
 
 
 Measure = MeasureDef()
+
+_RzSig = tys.FunctionType([tys.Qubit, FLOAT_T], [tys.Qubit])
+
+
+@dataclass
+class RzDef(QuantumOps):
+    op_name: str = "Rz"
+    num_out: int = 1
+    signature: tys.FunctionType = _RzSig
+
+    def __call__(self, q: ComWire, fl_wire: ComWire) -> Command:
+        return super().__call__(q, fl_wire)
+
+
+Rz = RzDef()
 
 
 @dataclass

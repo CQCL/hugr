@@ -28,7 +28,7 @@ use rstest::rstest;
 const NAT: Type = crate::extension::prelude::USIZE_T;
 const QB: Type = crate::extension::prelude::QB_T;
 
-/// Version 1 of the Testing HUGR serialisation format, see `testing_hugr.py`.
+/// Version 1 of the Testing HUGR serialization format, see `testing_hugr.py`.
 #[derive(Serialize, Deserialize, PartialEq, Debug, Default)]
 struct SerTestingV1 {
     typ: Option<crate::types::Type>,
@@ -466,7 +466,6 @@ fn roundtrip_optype(#[case] optype: impl Into<OpType> + std::fmt::Debug) {
     check_testing_roundtrip(NodeSer {
         parent: portgraph::NodeIndex::new(0).into(),
         op: optype.into(),
-        input_extensions: None,
     });
 }
 
@@ -495,11 +494,7 @@ mod proptest {
                 (0..i32::MAX as usize).prop_map(|x| portgraph::NodeIndex::new(x).into()),
                 any::<OpType>(),
             )
-                .prop_map(|(parent, op)| NodeSer {
-                    parent,
-                    op,
-                    input_extensions: None,
-                })
+                .prop_map(|(parent, op)| NodeSer { parent, op })
                 .boxed()
         }
     }

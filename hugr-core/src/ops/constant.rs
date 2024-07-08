@@ -102,6 +102,76 @@ impl AsRef<Value> for Const {
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+struct SerialSum {
+    #[serde(default)]
+    tag: usize,
+    #[serde(rename = "vs")]
+    values: Vec<Value>,
+    #[serde(default, rename = "typ")]
+    sum_type: Option<SumType>,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(try_from = "SerialSum")]
+#[serde(into = "SerialSum")]
+/// A Sum variant, with a tag indicating the index of the variant and its
+/// value.
+pub struct Sum {
+    /// The tag index of the variant.
+    pub tag: usize,
+    /// The value of the variant.
+    ///
+    /// Sum variants are always a row of values, hence the Vec.
+    pub values: Vec<Value>,
+    /// The full type of the Sum, including the other variants.
+    pub sum_type: SumType,
+}
+
+impl Sum {
+    /// If value is a sum with a single row variant, return the row.
+    pub fn as_tuple(&self) -> Option<&[Value]> {
+        self.sum_type.as_tuple().map(|_| self.values.as_ref())
+    }
+}
+
+impl TryFrom<SerialSum> for Sum {
+    type Error = &'static str;
+
+    fn try_from(value: SerialSum) -> Result<Self, Self::Error> {
+        let SerialSum {
+            tag,
+            values,
+            sum_type,
+        } = value;
+
+        let sum_type = if let Some(sum_type) = sum_type {
+            sum_type
+        } else {
+            if tag != 0 {
+                return Err("Sum type must be provided if tag is not 0");
+            }
+            SumType::new_tuple(values.iter().map(Value::get_type).collect_vec())
+        };
+
+        Ok(Self {
+            tag,
+            values,
+            sum_type,
+        })
+    }
+}
+
+impl From<Sum> for SerialSum {
+    fn from(value: Sum) -> Self {
+        Self {
+            tag: value.tag,
+            values: value.values,
+            sum_type: Some(value.sum_type),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "v")]
 /// A value that can be stored as a static constant. Representing core types and
 /// extension types.
@@ -118,31 +188,16 @@ pub enum Value {
         /// A Hugr defining the function.
         hugr: Box<Hugr>,
     },
-    /// A tuple
-    Tuple {
-        /// Constant values in the tuple.
-        vs: Vec<Value>,
-    },
     /// A Sum variant, with a tag indicating the index of the variant and its
     /// value.
-    Sum {
-        /// The tag index of the variant.
-        tag: usize,
-        /// The value of the variant.
-        ///
-        /// Sum variants are always a row of values, hence the Vec.
-        #[serde(rename = "vs")]
-        values: Vec<Value>,
-        /// The full type of the Sum, including the other variants.
-        #[serde(rename = "typ")]
-        sum_type: SumType,
-    },
+    #[serde(alias = "Tuple")]
+    Sum(Sum),
 }
 
 /// An opaque newtype around a [`Box<dyn CustomConst>`](CustomConst).
 ///
 /// This type has special serialization behaviour in order to support
-/// serialisation and deserialisation of unknown impls of [CustomConst].
+/// serialization and deserialization of unknown impls of [CustomConst].
 ///
 /// During serialization we first serialize the internal [`dyn` CustomConst](CustomConst)
 /// into a [serde_yaml::Value]. We then create a [CustomSerialized] wrapping
@@ -156,7 +211,7 @@ pub enum Value {
 /// [CustomSerialized] into a [`Box<dyn CustomConst>`](CustomConst). The [OpaqueValue] is
 /// then produced from the [`Box<dyn [CustomConst]>`](CustomConst).
 ///
-/// In the case where the internal serialised value of a `CustomSerialized`
+/// In the case where the internal serialized value of a `CustomSerialized`
 /// is another `CustomSerialized` we do not attempt to recurse. This behaviour
 /// may change in future.
 ///
@@ -271,14 +326,14 @@ pub enum ConstTypeError {
 
 /// Hugrs (even functions) inside Consts must be monomorphic
 fn mono_fn_type(h: &Hugr) -> Result<FunctionType, ConstTypeError> {
-    if let Some(pf) = h.get_function_type() {
-        if let Ok(ft) = pf.try_into() {
-            return Ok(ft);
-        }
-    }
-    Err(ConstTypeError::NotMonomorphicFunction {
+    let err = || ConstTypeError::NotMonomorphicFunction {
         hugr_root_type: h.root_type().clone(),
-    })
+    };
+    if let Some(pf) = h.poly_func_type() {
+        return pf.try_into().map_err(|_| err());
+    }
+
+    h.inner_function_type().ok_or_else(err)
 }
 
 impl Value {
@@ -286,8 +341,7 @@ impl Value {
     pub fn get_type(&self) -> Type {
         match self {
             Self::Extension { e } => e.get_type(),
-            Self::Tuple { vs } => Type::new_tuple(vs.iter().map(Self::get_type).collect_vec()),
-            Self::Sum { sum_type, .. } => sum_type.clone().into(),
+            Self::Sum(Sum { sum_type, .. }) => sum_type.clone().into(),
             Self::Function { hugr } => {
                 let func_type = mono_fn_type(hugr).unwrap_or_else(|e| panic!("{}", e));
                 Type::new_function(func_type)
@@ -305,18 +359,19 @@ impl Value {
     ) -> Result<Self, ConstTypeError> {
         let values: Vec<Value> = items.into_iter().collect();
         typ.check_type(tag, &values)?;
-        Ok(Self::Sum {
+        Ok(Self::Sum(Sum {
             tag,
             values,
             sum_type: typ,
-        })
+        }))
     }
 
     /// Returns a tuple constant of constant values.
     pub fn tuple(items: impl IntoIterator<Item = Value>) -> Self {
-        Self::Tuple {
-            vs: items.into_iter().collect(),
-        }
+        let vs = items.into_iter().collect_vec();
+        let tys = vs.iter().map(Self::get_type).collect_vec();
+
+        Self::sum(0, vs, SumType::new_tuple(tys)).expect("Tuple type is valid")
     }
 
     /// Returns a constant function defined by a Hugr.
@@ -334,7 +389,11 @@ impl Value {
 
     /// Returns a constant unit type (empty Tuple).
     pub const fn unit() -> Self {
-        Self::Tuple { vs: vec![] }
+        Self::Sum(Sum {
+            tag: 0,
+            values: vec![],
+            sum_type: SumType::Unit { size: 1 },
+        })
     }
 
     /// Returns a constant Sum over units. Used as branching values.
@@ -388,17 +447,22 @@ impl Value {
         match self {
             Self::Extension { e } => format!("const:custom:{}", e.name()),
             Self::Function { hugr: h } => {
-                let Some(t) = h.get_function_type() else {
+                let Ok(t) = mono_fn_type(h) else {
                     panic!("HUGR root node isn't a valid function parent.");
                 };
                 format!("const:function:[{}]", t)
             }
-            Self::Tuple { vs: vals } => {
-                let names: Vec<_> = vals.iter().map(Value::name).collect();
-                format!("const:seq:{{{}}}", names.iter().join(", "))
-            }
-            Self::Sum { tag, values, .. } => {
-                format!("const:sum:{{tag:{tag}, vals:{values:?}}}")
+            Self::Sum(Sum {
+                tag,
+                values,
+                sum_type,
+            }) => {
+                if sum_type.as_tuple().is_some() {
+                    let names: Vec<_> = values.iter().map(Value::name).collect();
+                    format!("const:seq:{{{}}}", names.iter().join(", "))
+                } else {
+                    format!("const:sum:{{tag:{tag}, vals:{values:?}}}")
+                }
             }
         }
         .into()
@@ -409,8 +473,7 @@ impl Value {
         match self {
             Self::Extension { e } => e.extension_reqs().clone(),
             Self::Function { .. } => ExtensionSet::new(), // no extensions required to load Hugr (only to run)
-            Self::Tuple { vs } => ExtensionSet::union_over(vs.iter().map(Value::extension_reqs)),
-            Self::Sum { values, .. } => {
+            Self::Sum(Sum { values, .. }) => {
                 ExtensionSet::union_over(values.iter().map(|x| x.extension_reqs()))
             }
         }
@@ -424,20 +487,23 @@ impl Value {
                 mono_fn_type(hugr)?;
                 Ok(())
             }
-            Self::Tuple { vs } => {
-                for v in vs {
-                    v.validate()?;
-                }
-                Ok(())
-            }
-            Self::Sum {
+            Self::Sum(Sum {
                 tag,
                 values,
                 sum_type,
-            } => {
+            }) => {
                 sum_type.check_type(*tag, values)?;
                 Ok(())
             }
+        }
+    }
+
+    /// If value is a sum with a single row variant, return the row.
+    pub fn as_tuple(&self) -> Option<&[Value]> {
+        if let Self::Sum(sum) = self {
+            sum.as_tuple()
+        } else {
+            None
         }
     }
 }
@@ -662,7 +728,7 @@ mod test {
     }
 
     mod proptest {
-        use super::super::OpaqueValue;
+        use super::super::{OpaqueValue, Sum};
         use crate::{
             ops::{constant::CustomSerialized, Value},
             std_extensions::arithmetic::int_types::ConstInt,
@@ -675,7 +741,7 @@ mod test {
             type Strategy = BoxedStrategy<Self>;
             fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
                 // We intentionally do not include `ConstF64` because it does not
-                // roundtrip serialise
+                // roundtrip serialize
                 prop_oneof![
                     any::<ConstInt>().prop_map_into(),
                     any::<CustomSerialized>().prop_map_into()
@@ -715,7 +781,7 @@ mod test {
                         3,  // Each collection is up to 3 elements long
                         |element| {
                             prop_oneof![
-                                vec(element.clone(), 0..3).prop_map(|vs| Self::Tuple { vs }),
+                                vec(element.clone(), 0..3).prop_map(Self::tuple),
                                 (
                                     any::<usize>(),
                                     vec(element.clone(), 0..3),
@@ -723,11 +789,11 @@ mod test {
                                 )
                                     .prop_map(
                                         |(tag, values, sum_type)| {
-                                            Self::Sum {
+                                            Self::Sum(Sum {
                                                 tag,
                                                 values,
                                                 sum_type,
-                                            }
+                                            })
                                         }
                                     ),
                             ]
@@ -736,5 +802,76 @@ mod test {
                     .boxed()
             }
         }
+    }
+
+    #[test]
+    fn test_tuple_deserialize() {
+        let json = r#"
+        {
+    "v": "Tuple",
+    "vs": [
+        {
+            "v": "Sum",
+            "tag": 0,
+            "typ": {
+                "t": "Sum",
+                "s": "Unit",
+                "size": 1
+            },
+            "vs": []
+        },
+        {
+            "v": "Sum",
+            "tag": 1,
+            "typ": {
+                "t": "Sum",
+                "s": "General",
+                "rows": [
+                    [
+                        {
+                            "t": "Sum",
+                            "s": "Unit",
+                            "size": 1
+                        }
+                    ],
+                    [
+                        {
+                            "t": "Sum",
+                            "s": "Unit",
+                            "size": 2
+                        }
+                    ]
+                ]
+            },
+            "vs": [
+                {
+                    "v": "Sum",
+                    "tag": 1,
+                    "typ": {
+                        "t": "Sum",
+                        "s": "Unit",
+                        "size": 2
+                    },
+                    "vs": []
+                }
+            ]
+        }
+    ]
+}
+        "#;
+
+        let v: Value = serde_json::from_str(json).unwrap();
+        assert_eq!(
+            v,
+            Value::tuple([
+                Value::unit(),
+                Value::sum(
+                    1,
+                    [Value::true_val()],
+                    SumType::new([vec![Type::UNIT], vec![Value::true_val().get_type()]]),
+                )
+                .unwrap()
+            ])
+        );
     }
 }
