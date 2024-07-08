@@ -74,7 +74,7 @@ fn invalid_root() {
     assert_eq!(b.validate(&EMPTY_REG), Ok(()));
 
     // Add another hierarchy root
-    let other = b.add_node(ops::Module.into());
+    let other = b.add_node(ops::Module::new().into());
     assert_matches!(
         b.validate(&EMPTY_REG),
         Err(ValidationError::NoParent { node }) => assert_eq!(node, other)
