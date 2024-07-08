@@ -52,7 +52,7 @@ class FloatVal(val.ExtensionValue):
         return val.Extension("float", FLOAT_T, self.v)
 
 
-@dataclass
+@dataclass(frozen=True)
 class LogicOps(Custom):
     extension: tys.ExtensionId = "logic"
 
@@ -61,7 +61,7 @@ _NotSig = tys.FunctionType.endo([tys.Bool])
 
 
 # TODO get from YAML
-@dataclass
+@dataclass(frozen=True)
 class NotDef(LogicOps):
     num_out: int = 1
     op_name: str = "Not"
@@ -74,7 +74,7 @@ class NotDef(LogicOps):
 Not = NotDef()
 
 
-@dataclass
+@dataclass(frozen=True)
 class QuantumOps(Custom):
     extension: tys.ExtensionId = "tket2.quantum"
 
@@ -82,7 +82,7 @@ class QuantumOps(Custom):
 _OneQbSig = tys.FunctionType.endo([tys.Qubit])
 
 
-@dataclass
+@dataclass(frozen=True)
 class OneQbGate(QuantumOps):
     op_name: str
     num_out: int = 1
@@ -98,7 +98,7 @@ H = OneQbGate("H")
 _TwoQbSig = tys.FunctionType.endo([tys.Qubit] * 2)
 
 
-@dataclass
+@dataclass(frozen=True)
 class TwoQbGate(QuantumOps):
     op_name: str
     num_out: int = 2
@@ -113,7 +113,7 @@ CX = TwoQbGate("CX")
 _MeasSig = tys.FunctionType([tys.Qubit], [tys.Qubit, tys.Bool])
 
 
-@dataclass
+@dataclass(frozen=True)
 class MeasureDef(QuantumOps):
     op_name: str = "Measure"
     num_out: int = 2
@@ -128,7 +128,7 @@ Measure = MeasureDef()
 _RzSig = tys.FunctionType([tys.Qubit, FLOAT_T], [tys.Qubit])
 
 
-@dataclass
+@dataclass(frozen=True)
 class RzDef(QuantumOps):
     op_name: str = "Rz"
     num_out: int = 1
@@ -141,7 +141,7 @@ class RzDef(QuantumOps):
 Rz = RzDef()
 
 
-@dataclass
+@dataclass(frozen=True)
 class IntOps(Custom):
     extension: tys.ExtensionId = "arithmetic.int"
 
@@ -149,7 +149,7 @@ class IntOps(Custom):
 ARG_5 = tys.BoundedNatArg(n=5)
 
 
-@dataclass
+@dataclass(frozen=True)
 class DivModDef(IntOps):
     num_out: int = 2
     extension: tys.ExtensionId = "arithmetic.int"
