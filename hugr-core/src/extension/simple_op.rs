@@ -26,6 +26,8 @@ pub enum OpLoadError {
     NotMember(String),
     #[error("Type args invalid: {0}.")]
     InvalidArgs(#[from] SignatureError),
+    #[error("OpDef belongs to extension {0}, expected {1}.")]
+    WrongExtension(ExtensionId, ExtensionId),
 }
 
 impl<T> NamedOp for T
@@ -50,6 +52,9 @@ pub trait MakeOpDef: NamedOp {
 
     /// Return the signature (polymorphic function type) of the operation.
     fn signature(&self) -> SignatureFunc;
+
+    /// The ID of the extension this operation is defined in.
+    fn extension(&self) -> ExtensionId;
 
     /// Description of the operation. By default, the same as `self.name()`.
     fn description(&self) -> String {
@@ -138,11 +143,20 @@ impl<T: MakeOpDef> MakeExtensionOp for T {
 
 /// Load an [MakeOpDef] from its name.
 /// See [strum_macros::EnumString].
-pub fn try_from_name<T>(name: &OpNameRef) -> Result<T, OpLoadError>
+pub fn try_from_name<T>(name: &OpNameRef, def_extension: &ExtensionId) -> Result<T, OpLoadError>
 where
     T: std::str::FromStr + MakeOpDef,
 {
-    T::from_str(name).map_err(|_| OpLoadError::NotMember(name.to_string()))
+    let op = T::from_str(name).map_err(|_| OpLoadError::NotMember(name.to_string()))?;
+    let expected_extension = op.extension();
+    if def_extension != &expected_extension {
+        return Err(OpLoadError::WrongExtension(
+            def_extension.clone(),
+            expected_extension,
+        ));
+    }
+
+    Ok(op)
 }
 
 /// Wrap an [MakeExtensionOp] with an extension registry to allow type computation.
@@ -244,6 +258,10 @@ mod test {
 
         fn from_def(_op_def: &OpDef) -> Result<Self, OpLoadError> {
             Ok(Self::Dumb)
+        }
+
+        fn extension(&self) -> ExtensionId {
+            EXT_ID.to_owned()
         }
     }
     const_extension_ids! {
