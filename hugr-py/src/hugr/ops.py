@@ -197,7 +197,7 @@ class Output(DataflowOp, _PartialOp):
         self._types = types
 
 
-@dataclass()
+@dataclass(frozen=True)
 class Custom(DataflowOp):
     """A non-core dataflow operation defined in an extension."""
 
