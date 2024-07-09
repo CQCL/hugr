@@ -123,8 +123,11 @@ class TrackedDfg(Dfg):
             raise IndexError(msg)
         return tracked
 
-    def append(self, com: Command) -> Node:
+    def add(self, com: Command) -> Node:
         """Add a command to the DFG.
+
+        Overrides :meth:`Dfg.add <hugr.dfg.Dfg.add>` to allow Command inputs
+        to be either :class:`Wire <hugr.node_port.Wire>` or indices to tracked wires.
 
         Any incoming :class:`Wire <hugr.node_port.Wire>` will
         be connected directly, while any integer will be treated as a reference
@@ -146,7 +149,7 @@ class TrackedDfg(Dfg):
             >>> dfg = TrackedDfg(tys.Bool, track_inputs=True)
             >>> dfg.tracked
             [OutPort(Node(1), 0)]
-            >>> dfg.append(ops.Noop()(0))
+            >>> dfg.add(ops.Noop()(0))
             Node(3)
             >>> dfg.tracked
             [OutPort(Node(3), 0)]
@@ -168,27 +171,6 @@ class TrackedDfg(Dfg):
         return (
             self.tracked_wire(inc) if isinstance(inc, int) else inc for inc in in_wires
         )
-
-    def extend(self, coms: Iterable[Command]) -> list[Node]:
-        """Add a series of commands to the DFG.
-
-        Shorthand for calling :meth:`append` on each command in `coms`.
-
-        Args:
-            coms: Commands to append.
-
-        Returns:
-            List of the new nodes in the same order as the commands.
-
-        Raises:
-            IndexError: If any input index is not a tracked wire.
-
-        Examples:
-            >>> dfg = TrackedDfg(tys.Bool, tys.Unit, track_inputs=True)
-            >>> dfg.extend([ops.Noop()(0), ops.Noop()(1)])
-            [Node(3), Node(4)]
-        """
-        return [self.append(com) for com in coms]
 
     def set_indexed_outputs(self, *in_wires: ComWire) -> None:
         """Set the Dfg outputs, using either :class:`Wire <hugr.node_port.Wire>` or

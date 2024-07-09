@@ -31,8 +31,8 @@ def simple_circuit(n_qb: int, float_in: int = 0) -> TrackedDfg:
 
 def test_simple_circuit():
     circ = simple_circuit(2)
-    circ.append(H(0))
-    [_h, cx_n] = circ.extend([H(0), CX(0, 1)])
+    circ.add(H(0))
+    [_h, cx_n] = circ.extend(H(0), CX(0, 1))
 
     circ.set_tracked_outputs()
 
@@ -52,12 +52,12 @@ def test_complex_circuit():
     circ = simple_circuit(2)
     fl = circ.load(FloatVal(0.5))
 
-    circ.extend([H(0), Rz(0, fl)])
-    [_m0, m1] = circ.extend(Measure(i) for i in range(2))
+    circ.extend(H(0), Rz(0, fl))
+    [_m0, m1] = circ.extend(*(Measure(i) for i in range(2)))
 
     m_idx = circ.track_wire(m1[1])  # track the bool out
     assert m_idx == 2
-    circ.append(Not(m_idx))
+    circ.add(Not(m_idx))
 
     circ.set_tracked_outputs()
 
