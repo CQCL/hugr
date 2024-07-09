@@ -27,24 +27,19 @@ use petgraph::{
 ///
 /// Dataflow parents are ordered by inserting order edges between their
 /// immediate children. A dataflow parent with `C` children will have at most
-/// `C-1` edges added. Any node than can be ordered will be. Nodes that cannot
-/// be ordered are [LoadConstant] and [LoadFunction].
+/// `C-1` edges added. Any node than can be ordered will be.
 ///
 /// Nodes are ordered according to the rank function. Nodes of lower rank will
 /// be ordered earlier in their parent. Note that if  `rank(n1) > rank(n2)` it
 /// is not guaranteed that `n1` will be ordered after `n2`. If `n2` dominates
 /// `n1` it cannot be ordered after `n1`. Nodes of equal rank will be ordered
 /// arbitrarily.
-///
-/// [LoadConstant]: hugr_core::ops::LoadConstant
-/// [LoadFunction]: hugr_core::ops::LoadFunction
 pub fn force_order(
     hugr: &mut impl HugrMut,
     root: Node,
     rank: impl Fn(Node) -> i64,
 ) -> Result<(), HugrError> {
-    let descendents = DescendantsGraph::<Node>::try_new(hugr, root)?;
-    let dataflow_parents = descendents
+    let dataflow_parents = DescendantsGraph::<Node>::try_new(hugr, root)?
         .nodes()
         .filter(|n| hugr.get_optype(*n).tag() <= OpTag::DataflowParent)
         .collect_vec();
@@ -58,22 +53,19 @@ pub fn force_order(
         let [i, _] = hugr.get_io(dp).unwrap();
         let dominators = simple_fast(&petgraph, i);
         for (&n1, &n2) in zip(&ordered_nodes[..], &ordered_nodes[1..]) {
-            println!("considering order edge: {n1},{n2}");
+            // there is already an edge here, order edge unnecessary
             if dominators.immediately_dominated_by(n1).contains(&n2) {
-                println!("nope: dominates");
                 continue;
             }
 
+            // we can only add an order edge if the two ops support it
             let (n1_ot, n2_ot) = (hugr.get_optype(n1), hugr.get_optype(n2));
             let expected_edge_kind = Some(hugr_core::types::EdgeKind::StateOrder);
             if n1_ot.other_port_kind(Direction::Outgoing) != expected_edge_kind
                 || n2_ot.other_port_kind(Direction::Incoming) != expected_edge_kind
             {
-                println!("nope: can't order edge");
                 continue;
             }
-
-            println!("nice");
 
             hugr.connect(
                 n1,
