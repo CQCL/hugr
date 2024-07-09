@@ -10,9 +10,15 @@ use crate::IncomingPort;
 #[cfg(test)]
 use ::proptest_derive::Arbitrary;
 
-pub(crate) trait DataflowOpTrait {
+/// Trait implemented by all dataflow operations.
+pub trait DataflowOpTrait {
+    /// Tag identifying the operation.
     const TAG: OpTag;
+
+    /// A human-readable description of the operation.
     fn description(&self) -> &str;
+
+    /// The signature of the operation.
     fn signature(&self) -> FunctionType;
 
     /// The edge kind for the non-dataflow or constant inputs of the operation,
