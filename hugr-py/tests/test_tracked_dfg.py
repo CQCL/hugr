@@ -1,9 +1,11 @@
 import pytest
 
 from hugr import tys
+from hugr.std.float import FLOAT_T, FloatVal
+from hugr.std.logic import Not
 from hugr.tracked_dfg import TrackedDfg
 
-from .conftest import CX, FLOAT_T, FloatVal, H, Measure, Not, Rz, validate
+from .conftest import CX, H, Measure, Rz, validate
 
 
 def test_track_wire():
