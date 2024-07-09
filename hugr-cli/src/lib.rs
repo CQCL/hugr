@@ -47,7 +47,7 @@ pub const VALID_PRINT: &str = "HUGR valid!";
 impl CmdLineArgs {
     /// Run the HUGR cli and validate against an extension registry.
     pub fn run(&self, registry: &ExtensionRegistry) -> Result<Hugr, CliError> {
-        let mut hugr: Hugr = serde_json::from_reader(self.input.into_reader()?)?;
+        let mut hugr: Hugr = serde_json::from_reader(self.input.clone().into_reader()?)?;
         if self.mermaid {
             println!("{}", hugr.mermaid_string());
         }
