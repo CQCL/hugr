@@ -128,11 +128,11 @@ where
 
     fn extend(&mut self, new_nodes: impl IntoIterator<Item = N>) {
         let mut new_nodes = new_nodes.into_iter().collect_vec();
-        new_nodes.sort_by_cached_key(|&k| (self.rank)(k));
+        new_nodes.sort_by_cached_key(|&k| !(self.rank)(k));
         // Lower rank nodes must be ordered earlier in the graph.
         // This means we should visit them earlier, so they should be at the
         // end of the list passed to extend.
-        self.tovisit.extend(new_nodes.into_iter().rev());
+        self.tovisit.extend(new_nodes.into_iter());
     }
 
     /// Return the next node in the current topological order traversal, or
