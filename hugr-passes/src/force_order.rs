@@ -62,9 +62,7 @@ pub fn force_order_by_key<K: Ord>(
             .filter(|&x| hugr.get_optype(x).tag() <= OpTag::DataflowChild)
             .collect_vec();
 
-        // ordered_nodes must always include the input and output nodes, so the
-        // slice below is in bounds.
-        for (&n1, &n2) in zip(&ordered_nodes[..], &ordered_nodes[1..]) {
+        for (&n1, &n2) in ordered_nodes.iter().tuple_windows() {
             let (n1_ot, n2_ot) = (hugr.get_optype(n1), hugr.get_optype(n2));
             assert_eq!(
                 Some(EdgeKind::StateOrder),
