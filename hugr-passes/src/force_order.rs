@@ -1,5 +1,5 @@
 //! Provides [force_order], a tool for fixing the order of nodes in a Hugr.
-use std::{cmp::Reverse, collections::BinaryHeap, iter::zip};
+use std::{cmp::Reverse, collections::BinaryHeap};
 
 use hugr_core::{
     hugr::{
@@ -93,7 +93,7 @@ pub fn force_order_by_key<K: Ord>(
 /// ensures we visit lower ranked nodes before higher ranked nodes whenever the
 /// topology of the graph allows.
 #[derive(Clone)]
-struct ForceOrder<K: Ord, N: Ord, VM, F> {
+struct ForceOrder<K, N, VM, F> {
     tovisit: BinaryHeap<(Reverse<K>, N)>,
     ordered: VM,
     rank: F,
