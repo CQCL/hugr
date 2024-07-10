@@ -5,11 +5,14 @@ import os
 import pathlib
 import subprocess
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from enum import Enum
+from typing import TYPE_CHECKING, TypeVar
+
+from typing_extensions import Self
 
 from hugr import tys
 from hugr.hugr import Hugr
-from hugr.ops import Command, Custom
+from hugr.ops import AsCustomOp, Command, Custom, DataflowOp
 from hugr.serialization.serial_hugr import SerialHugr
 from hugr.std.float import FLOAT_T
 
@@ -17,50 +20,79 @@ if TYPE_CHECKING:
     from hugr.ops import ComWire
 
 
+QUANTUM_EXTENSION_ID: tys.ExtensionId = "quantum.tket2"
+
+E = TypeVar("E", bound=Enum)
+
+
+def _load_enum(enum_cls: type[E], custom: Custom) -> E | None:
+    if (
+        custom.extension == QUANTUM_EXTENSION_ID
+        and custom.op_name in enum_cls.__members__
+    ):
+        return enum_cls(custom.op_name)
+    return None
+
+
 @dataclass(frozen=True)
-class QuantumOps(Custom):
-    extension: tys.ExtensionId = "tket2.quantum"
+class OneQbGate(AsCustomOp):
+    # Have to nest enum to avoid meta class conflict
+    class _Enum(Enum):
+        H = "H"
 
-
-_OneQbSig = tys.FunctionType.endo([tys.Qubit])
-
-
-@dataclass(frozen=True)
-class OneQbGate(QuantumOps):
-    op_name: str
-    num_out: int = 1
-    signature: tys.FunctionType = _OneQbSig
+    _enum: _Enum
 
     def __call__(self, q: ComWire) -> Command:
-        return super().__call__(q)
+        return DataflowOp.__call__(self, q)
+
+    def to_custom(self) -> Custom:
+        return Custom(
+            self._enum.value,
+            tys.FunctionType.endo([tys.Qubit]),
+            extension=QUANTUM_EXTENSION_ID,
+        )
+
+    @classmethod
+    def from_custom(cls, custom: Custom) -> Self | None:
+        return cls(e) if (e := _load_enum(cls._Enum, custom)) else None
 
 
-H = OneQbGate("H")
-
-
-_TwoQbSig = tys.FunctionType.endo([tys.Qubit] * 2)
+H = OneQbGate(OneQbGate._Enum.H)
 
 
 @dataclass(frozen=True)
-class TwoQbGate(QuantumOps):
-    op_name: str
-    num_out: int = 2
-    signature: tys.FunctionType = _TwoQbSig
+class TwoQbGate(AsCustomOp):
+    class _Enum(Enum):
+        CX = "CX"
+
+    _enum: _Enum
+
+    def to_custom(self) -> Custom:
+        return Custom(
+            self._enum.value,
+            tys.FunctionType.endo([tys.Qubit] * 2),
+            extension=QUANTUM_EXTENSION_ID,
+        )
+
+    @classmethod
+    def from_custom(cls, custom: Custom) -> Self | None:
+        return cls(e) if (e := _load_enum(cls._Enum, custom)) else None
 
     def __call__(self, q0: ComWire, q1: ComWire) -> Command:
-        return super().__call__(q0, q1)
+        return DataflowOp.__call__(self, q0, q1)
 
 
-CX = TwoQbGate("CX")
-
-_MeasSig = tys.FunctionType([tys.Qubit], [tys.Qubit, tys.Bool])
+CX = TwoQbGate(TwoQbGate._Enum.CX)
 
 
 @dataclass(frozen=True)
-class MeasureDef(QuantumOps):
-    op_name: str = "Measure"
-    num_out: int = 2
-    signature: tys.FunctionType = _MeasSig
+class MeasureDef(AsCustomOp):
+    def to_custom(self) -> Custom:
+        return Custom(
+            "Measure",
+            tys.FunctionType([tys.Qubit], [tys.Qubit, tys.Bool]),
+            extension=QUANTUM_EXTENSION_ID,
+        )
 
     def __call__(self, q: ComWire) -> Command:
         return super().__call__(q)
@@ -68,14 +100,15 @@ class MeasureDef(QuantumOps):
 
 Measure = MeasureDef()
 
-_RzSig = tys.FunctionType([tys.Qubit, FLOAT_T], [tys.Qubit])
-
 
 @dataclass(frozen=True)
-class RzDef(QuantumOps):
-    op_name: str = "Rz"
-    num_out: int = 1
-    signature: tys.FunctionType = _RzSig
+class RzDef(AsCustomOp):
+    def to_custom(self) -> Custom:
+        return Custom(
+            "Rz",
+            tys.FunctionType([tys.Qubit, FLOAT_T], [tys.Qubit]),
+            extension=QUANTUM_EXTENSION_ID,
+        )
 
     def __call__(self, q: ComWire, fl_wire: ComWire) -> Command:
         return super().__call__(q, fl_wire)

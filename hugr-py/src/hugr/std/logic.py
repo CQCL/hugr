@@ -6,32 +6,24 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from hugr import tys
-from hugr.ops import Command, Custom
+from hugr.ops import AsCustomOp, Command, Custom, DataflowOp
 
 if TYPE_CHECKING:
     from hugr.ops import ComWire
 
 
-@dataclass(frozen=True)
-class LogicOps(Custom):
-    """Base class for logic operations."""
-
-    extension: tys.ExtensionId = "logic"
-
-
-_NotSig = tys.FunctionType.endo([tys.Bool])
+EXTENSION_ID: tys.ExtensionId = "logic"
 
 
 @dataclass(frozen=True)
-class _NotDef(LogicOps):
+class _NotDef(AsCustomOp):
     """Not operation."""
 
-    num_out: int = 1
-    op_name: str = "Not"
-    signature: tys.FunctionType = _NotSig
+    def to_custom(self) -> Custom:
+        return Custom("Not", tys.FunctionType.endo([tys.Bool]), extension=EXTENSION_ID)
 
     def __call__(self, a: ComWire) -> Command:
-        return super().__call__(a)
+        return DataflowOp.__call__(self, a)
 
 
 #: Not operation
