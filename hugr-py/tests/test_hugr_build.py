@@ -8,8 +8,10 @@ from hugr.function import Module
 from hugr.hugr import Hugr
 from hugr.node_port import Node, _SubPort
 from hugr.ops import NoConcreteFunc
+from hugr.std.int import INT_T, DivMod, IntVal
+from hugr.std.logic import Not
 
-from .conftest import INT_T, DivMod, IntVal, Not, validate
+from .conftest import validate
 
 
 def test_stable_indices():

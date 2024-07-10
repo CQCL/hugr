@@ -4,74 +4,17 @@ import json
 import os
 import pathlib
 import subprocess
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from hugr import tys, val
+from hugr import tys
 from hugr.hugr import Hugr
 from hugr.ops import Command, Custom
 from hugr.serialization.serial_hugr import SerialHugr
+from hugr.std.float import FLOAT_T
 
 if TYPE_CHECKING:
     from hugr.ops import ComWire
-
-
-def int_t(width: int) -> tys.Opaque:
-    return tys.Opaque(
-        extension="arithmetic.int.types",
-        id="int",
-        args=[tys.BoundedNatArg(n=width)],
-        bound=tys.TypeBound.Eq,
-    )
-
-
-INT_T = int_t(5)
-
-
-@dataclass
-class IntVal(val.ExtensionValue):
-    v: int
-
-    def to_value(self) -> val.Extension:
-        return val.Extension("int", INT_T, self.v)
-
-
-FLOAT_T = tys.Opaque(
-    extension="arithmetic.float.types",
-    id="float64",
-    args=[],
-    bound=tys.TypeBound.Copyable,
-)
-
-
-@dataclass
-class FloatVal(val.ExtensionValue):
-    v: float
-
-    def to_value(self) -> val.Extension:
-        return val.Extension("float", FLOAT_T, self.v)
-
-
-@dataclass(frozen=True)
-class LogicOps(Custom):
-    extension: tys.ExtensionId = "logic"
-
-
-_NotSig = tys.FunctionType.endo([tys.Bool])
-
-
-# TODO get from YAML
-@dataclass(frozen=True)
-class NotDef(LogicOps):
-    num_out: int = 1
-    op_name: str = "Not"
-    signature: tys.FunctionType = _NotSig
-
-    def __call__(self, a: ComWire) -> Command:
-        return super().__call__(a)
-
-
-Not = NotDef()
 
 
 @dataclass(frozen=True)
@@ -139,28 +82,6 @@ class RzDef(QuantumOps):
 
 
 Rz = RzDef()
-
-
-@dataclass(frozen=True)
-class IntOps(Custom):
-    extension: tys.ExtensionId = "arithmetic.int"
-
-
-ARG_5 = tys.BoundedNatArg(n=5)
-
-
-@dataclass(frozen=True)
-class DivModDef(IntOps):
-    num_out: int = 2
-    extension: tys.ExtensionId = "arithmetic.int"
-    op_name: str = "idivmod_u"
-    signature: tys.FunctionType = field(
-        default_factory=lambda: tys.FunctionType(input=[INT_T] * 2, output=[INT_T] * 2)
-    )
-    args: list[tys.TypeArg] = field(default_factory=lambda: [ARG_5, ARG_5])
-
-
-DivMod = DivModDef()
 
 
 def validate(h: Hugr, mermaid: bool = False, roundtrip: bool = True):
