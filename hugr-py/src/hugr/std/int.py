@@ -73,13 +73,14 @@ class _DivModDef(AsCustomOp):
 
     @classmethod
     def from_custom(cls, custom: Custom) -> Self | None:
-        if not (custom.extension == OPS_EXTENSION and custom.op_name == cls.op_name):
+        if not custom.check_id(OPS_EXTENSION, "idivmod_u"):
             return None
         match custom.args:
             case [tys.BoundedNatArg(n=a1), tys.BoundedNatArg(n=a2)]:
                 return cls(arg1=a1, arg2=a2)
             case _:
-                return None
+                msg = f"Invalid args: {custom.args}"
+                raise AsCustomOp.InvalidCustomOp(msg)
 
     def __call__(self, a: ComWire, b: ComWire) -> Command:
         return DataflowOp.__call__(self, a, b)

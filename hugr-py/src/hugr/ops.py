@@ -206,6 +206,12 @@ class AsCustomOp(DataflowOp, Protocol):
     to behave as a custom dataflow operation.
     """
 
+    @dataclass(frozen=True)
+    class InvalidCustomOp(Exception):
+        """Custom operation does not match the expected type."""
+
+        msg: str
+
     @cached_property
     def custom_op(self) -> Custom:
         """:class:`Custom` operation that this type represents.
@@ -233,6 +239,10 @@ class AsCustomOp(DataflowOp, Protocol):
         If successful, returns the singleton, else None.
 
         Non-singleton types should override this method.
+
+        Raises:
+            InvalidCustomOp: If the given `custom` does not match the expected one for a
+            given extension/operation name.
         """
         default = cls()
         if default.custom_op == custom:
@@ -287,6 +297,10 @@ class Custom(AsCustomOp):
     @classmethod
     def from_custom(cls, custom: Custom) -> Custom:
         return custom
+
+    def check_id(self, extension: tys.ExtensionId, op_name: str) -> bool:
+        """Check if the operation matches the given extension and operation name."""
+        return self.extension == extension and self.op_name == op_name
 
 
 @dataclass()
