@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from functools import cached_property
 from typing import TYPE_CHECKING, Protocol, TypeVar, runtime_checkable
+
+from typing_extensions import Self
 
 import hugr.serialization.ops as sops
 from hugr import tys, val
@@ -197,8 +200,69 @@ class Output(DataflowOp, _PartialOp):
         self._types = types
 
 
-@dataclass(frozen=True)
-class Custom(DataflowOp):
+@runtime_checkable
+class AsCustomOp(DataflowOp, Protocol):
+    """Abstract interface that types can implement
+    to behave as a custom dataflow operation.
+    """
+
+    @cached_property
+    def custom_op(self) -> Custom:
+        """:class:`Custom` operation that this type represents.
+
+        Computed once using :meth:`to_custom` and cached - should be deterministic.
+        """
+        return self.to_custom()
+
+    def to_custom(self) -> Custom:
+        """Convert this type to a :class:`Custom` operation.
+
+
+        Used by :attr:`custom_op`, so must be deterministic.
+        """
+        ...  # pragma: no cover
+
+    @classmethod
+    def from_custom(cls, custom: Custom) -> Self | None:
+        """Load from a :class:`Custom` operation.
+
+
+        By default assumes the type of `cls` is a singleton,
+        and compares the result of :meth:`to_custom` with the given `custom`.
+
+        If successful, returns the singleton, else None.
+
+        Non-singleton types should override this method.
+        """
+        default = cls()
+        if default.custom_op == custom:
+            return default
+        return None
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, AsCustomOp):
+            return NotImplemented
+        slf, other = self.custom_op, other.custom_op
+        return (
+            slf.extension == other.extension
+            and slf.op_name == other.op_name
+            and slf.signature == other.signature
+            and slf.args == other.args
+        )
+
+    def outer_signature(self) -> tys.FunctionType:
+        return self.custom_op.signature
+
+    def to_serial(self, parent: Node) -> sops.CustomOp:
+        return self.custom_op.to_serial(parent)
+
+    @property
+    def num_out(self) -> int:
+        return len(self.custom_op.signature.output)
+
+
+@dataclass(frozen=True, eq=False)
+class Custom(AsCustomOp):
     """A non-core dataflow operation defined in an extension."""
 
     op_name: str
@@ -206,10 +270,6 @@ class Custom(DataflowOp):
     description: str = ""
     extension: tys.ExtensionId = ""
     args: list[tys.TypeArg] = field(default_factory=list)
-
-    @property
-    def num_out(self) -> int:
-        return len(self.signature.output)
 
     def to_serial(self, parent: Node) -> sops.CustomOp:
         return sops.CustomOp(
@@ -221,8 +281,12 @@ class Custom(DataflowOp):
             args=ser_it(self.args),
         )
 
-    def outer_signature(self) -> tys.FunctionType:
-        return self.signature
+    def to_custom(self) -> Custom:
+        return self
+
+    @classmethod
+    def from_custom(cls, custom: Custom) -> Custom:
+        return custom
 
 
 @dataclass()
