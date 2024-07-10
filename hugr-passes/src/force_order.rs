@@ -23,18 +23,29 @@ use petgraph::{
 /// Insert order edges into a Hugr according to a rank function.
 ///
 /// All dataflow parents which are transitive children of `root`, including
-/// `root` itself, will be ordered.
+/// `root` itself, will have their dataflow regions ordered.
 ///
-/// Dataflow parents are ordered by inserting order edges between their
+/// Dataflow regions are ordered by inserting order edges between their
 /// immediate children. A dataflow parent with `C` children will have at most
 /// `C-1` edges added. Any node than can be ordered will be.
 ///
-/// Nodes are ordered according to the rank function. Nodes of lower rank will
-/// be ordered earlier in their parent. Note that if  `rank(n1) > rank(n2)` it
-/// is not guaranteed that `n1` will be ordered after `n2`. If `n2` dominates
-/// `n1` it cannot be ordered after `n1`. Nodes of equal rank will be ordered
-/// arbitrarily.
-pub fn force_order<K: Ord>(
+/// Nodes are ordered according to the `rank` function. Nodes of lower rank will
+/// be ordered earlier in their parent. Note that if  `rank(n1) < rank(n2)` it
+/// is not guaranteed that `n1` will be ordered before `n2`. If `n1` dominates
+/// `n2` it cannot be ordered after `n1` without invalidating `hugr`.  Nodes of
+/// equal rank will be ordered arbitrarily, although that arbitrary order is
+/// deterministic.
+pub fn force_order(
+    hugr: &mut impl HugrMut,
+    root: Node,
+    rank: impl Fn(Node) -> i64,
+) -> Result<(), HugrError> {
+    force_order_by_key(hugr, root, rank)
+}
+
+/// As [force_order], but allows a generic [Ord] choice for the result of the
+/// `rank` function.
+pub fn force_order_by_key<K: Ord>(
     hugr: &mut impl HugrMut,
     root: Node,
     rank: impl Fn(Node) -> K,
