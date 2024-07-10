@@ -148,6 +148,28 @@ class _DfBase(ParentBuilder[DP], AbstractContextManager):
         )
         return self.add_op(com.op, *wires)
 
+    def extend(self, *coms: ops.Command) -> list[Node]:
+        """Add a series of commands to the DFG.
+
+        Shorthand for calling :meth:`add` on each command in `coms`.
+
+        Args:
+            coms: Commands to add.
+
+        Returns:
+            List of the new nodes in the same order as the commands.
+
+        Raises:
+            IndexError: If any input index is not a tracked wire.
+
+        Examples:
+            >>> dfg = Dfg(tys.Bool, tys.Unit)
+            >>> (b, u) = dfg.inputs()
+            >>> dfg.extend(ops.Noop()(b), ops.Noop()(u))
+            [Node(3), Node(4)]
+        """
+        return [self.add(com) for com in coms]
+
     def _insert_nested_impl(self, builder: ParentBuilder, *args: Wire) -> Node:
         mapping = self.hugr.insert_hugr(builder.hugr, self.parent_node)
         self._wire_up(mapping[builder.parent_node], args)
