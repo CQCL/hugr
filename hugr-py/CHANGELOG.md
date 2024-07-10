@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.4.0](https://github.com/CQCL/hugr/compare/hugr-py-v0.3.1...hugr-py-v0.4.0) (2024-07-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* **hugr-py:** dataclasses that derive from `ops.Custom` now have to be frozen, and instances cannot be mutated.
+
+### Features
+
+* **hugr-py:** `ops.Custom` is now a frozen dataclass ([94702d2](https://github.com/CQCL/hugr/commit/94702d2a9a9a6f4d311db6945ed2bee86b7bc46d))
+* **hugr-py:** move std extension types/ops in to `std` module ([#1288](https://github.com/CQCL/hugr/issues/1288)) ([7d82245](https://github.com/CQCL/hugr/commit/7d8224530ec4e70a7749505b379d7a4fe65f1168))
+
 ## [0.3.1](https://github.com/CQCL/hugr/compare/hugr-py-v0.3.0...hugr-py-v0.3.1) (2024-07-08)
 
 
