@@ -66,11 +66,13 @@ pub fn force_order_by_key<K: Ord>(
             let (n1_ot, n2_ot) = (hugr.get_optype(n1), hugr.get_optype(n2));
             assert_eq!(
                 Some(EdgeKind::StateOrder),
-                n1_ot.other_port_kind(Direction::Outgoing)
+                n1_ot.other_port_kind(Direction::Outgoing),
+                "Node {n1} does not support state order edges"
             );
             assert_eq!(
                 Some(EdgeKind::StateOrder),
-                n2_ot.other_port_kind(Direction::Incoming)
+                n2_ot.other_port_kind(Direction::Incoming),
+                "Node {n2} does not support state order edges"
             );
             if !hugr.output_neighbours(n1).contains(&n2) {
                 hugr.connect(
