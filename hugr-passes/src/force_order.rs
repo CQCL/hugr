@@ -1,5 +1,5 @@
 //! Provides [force_order], a tool for fixing the order of nodes in a Hugr.
-use std::iter::zip;
+use std::{cmp::Reverse, collections::BinaryHeap, iter::zip};
 
 use hugr_core::{
     hugr::{
@@ -8,14 +8,14 @@ use hugr_core::{
         HugrError,
     },
     ops::{OpTag, OpTrait},
+    types::EdgeKind,
     Direction, HugrView as _, Node,
 };
 use itertools::Itertools as _;
 use petgraph::{
-    algo::dominators::simple_fast,
     visit::{
         GraphBase, GraphRef, IntoNeighbors as _, IntoNeighborsDirected, IntoNodeIdentifiers,
-        NodeFiltered, Reversed, VisitMap, Visitable, Walker,
+        NodeFiltered, VisitMap, Visitable, Walker,
     },
     Direction::Incoming,
 };
@@ -34,10 +34,10 @@ use petgraph::{
 /// is not guaranteed that `n1` will be ordered after `n2`. If `n2` dominates
 /// `n1` it cannot be ordered after `n1`. Nodes of equal rank will be ordered
 /// arbitrarily.
-pub fn force_order(
+pub fn force_order<K: Ord>(
     hugr: &mut impl HugrMut,
     root: Node,
-    rank: impl Fn(Node) -> i64,
+    rank: impl Fn(Node) -> K,
 ) -> Result<(), HugrError> {
     let dataflow_parents = DescendantsGraph::<Node>::try_new(hugr, root)?
         .nodes()
@@ -48,31 +48,29 @@ pub fn force_order(
         let petgraph = NodeFiltered::from_fn(sg.as_petgraph(), |x| x != dp);
         let ordered_nodes = ForceOrder::new(&petgraph, &rank)
             .iter(&petgraph)
+            .filter(|&x| hugr.get_optype(x).tag() <= OpTag::DataflowChild)
             .collect_vec();
 
-        let [i, _] = hugr.get_io(dp).unwrap();
-        let dominators = simple_fast(&petgraph, i);
+        // ordered_nodes must always include the input and output nodes, so the
+        // slice below is in bounds.
         for (&n1, &n2) in zip(&ordered_nodes[..], &ordered_nodes[1..]) {
-            // there is already an edge here, order edge unnecessary
-            if dominators.immediately_dominated_by(n1).contains(&n2) {
-                continue;
-            }
-
-            // we can only add an order edge if the two ops support it
             let (n1_ot, n2_ot) = (hugr.get_optype(n1), hugr.get_optype(n2));
-            let expected_edge_kind = Some(hugr_core::types::EdgeKind::StateOrder);
-            if n1_ot.other_port_kind(Direction::Outgoing) != expected_edge_kind
-                || n2_ot.other_port_kind(Direction::Incoming) != expected_edge_kind
-            {
-                continue;
-            }
-
-            hugr.connect(
-                n1,
-                n1_ot.other_output_port().unwrap(),
-                n2,
-                n2_ot.other_input_port().unwrap(),
+            assert_eq!(
+                Some(EdgeKind::StateOrder),
+                n1_ot.other_port_kind(Direction::Outgoing)
             );
+            assert_eq!(
+                Some(EdgeKind::StateOrder),
+                n2_ot.other_port_kind(Direction::Incoming)
+            );
+            if !hugr.output_neighbours(n1).contains(&n2) {
+                hugr.connect(
+                    n1,
+                    n1_ot.other_output_port().unwrap(),
+                    n2,
+                    n2_ot.other_input_port().unwrap(),
+                );
+            }
         }
     }
 
@@ -84,13 +82,13 @@ pub fn force_order(
 /// ensures we visit lower ranked nodes before higher ranked nodes whenever the
 /// topology of the graph allows.
 #[derive(Clone)]
-struct ForceOrder<N, VM, F> {
-    tovisit: Vec<N>,
+struct ForceOrder<K: Ord, N: Ord, VM, F> {
+    tovisit: BinaryHeap<(Reverse<K>, N)>,
     ordered: VM,
     rank: F,
 }
 
-impl<N, VM, F: Fn(N) -> i64> ForceOrder<N, VM, F>
+impl<K: Ord, N: Ord, VM, F: Fn(N) -> K> ForceOrder<K, N, VM, F>
 where
     N: Copy + PartialEq,
     VM: VisitMap<N>,
@@ -127,12 +125,8 @@ where
     }
 
     fn extend(&mut self, new_nodes: impl IntoIterator<Item = N>) {
-        let mut new_nodes = new_nodes.into_iter().collect_vec();
-        new_nodes.sort_by_cached_key(|&k| !(self.rank)(k));
-        // Lower rank nodes must be ordered earlier in the graph.
-        // This means we should visit them earlier, so they should be at the
-        // end of the list passed to extend.
-        self.tovisit.extend(new_nodes.into_iter());
+        self.tovisit
+            .extend(new_nodes.into_iter().map(|x| (Reverse((self.rank)(x)), x)));
     }
 
     /// Return the next node in the current topological order traversal, or
@@ -145,7 +139,7 @@ where
         G: IntoNeighborsDirected + Visitable<NodeId = N, Map = VM>,
     {
         // Take an unvisited element and find which of its neighbors are next
-        while let Some(nix) = self.tovisit.pop() {
+        while let Some((_, nix)) = self.tovisit.pop() {
             if self.ordered.is_visited(&nix) {
                 continue;
             }
@@ -155,7 +149,7 @@ where
             let new_nodes = g
                 .neighbors(nix)
                 .filter(|&n| {
-                    Reversed(g)
+                    petgraph::visit::Reversed(g)
                         .neighbors(n)
                         .all(|b| self.ordered.is_visited(&b))
                 })
@@ -168,8 +162,10 @@ where
     }
 }
 
-impl<G: Visitable + IntoNeighborsDirected, F: Fn(G::NodeId) -> i64> Walker<G>
-    for ForceOrder<G::NodeId, G::Map, F>
+impl<K: Ord, G: Visitable + IntoNeighborsDirected, F: Fn(G::NodeId) -> K> Walker<G>
+    for ForceOrder<K, G::NodeId, G::Map, F>
+where
+    G::NodeId: Ord,
 {
     type Item = <G as GraphBase>::NodeId;
 
@@ -185,6 +181,7 @@ mod test {
     use super::*;
     use hugr_core::builder::{BuildHandle, Dataflow, DataflowHugr};
     use hugr_core::ops::handle::{DataflowOpID, NodeHandle};
+
     use hugr_core::std_extensions::arithmetic::int_ops::{self, IntOpDef};
     use hugr_core::std_extensions::arithmetic::int_types::INT_TYPES;
     use hugr_core::types::FunctionType;
@@ -287,5 +284,13 @@ mod test {
             .collect();
         let topo_sort = force_order_test_impl(&mut hugr, rank_map);
         assert_eq!(vec![v1, v0, v3, v2], topo_sort);
+    }
+
+    #[test]
+    fn test_force_order_3() {
+        let (mut hugr, [v0, v1, v2, v3]) = test_hugr();
+        let rank_map = [(v0, 0), (v1, 1), (v2, 2), (v3, 3)].into_iter().collect();
+        let topo_sort = force_order_test_impl(&mut hugr, rank_map);
+        assert_eq!(vec![v0, v1, v2, v3], topo_sort);
     }
 }
