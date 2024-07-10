@@ -1,18 +1,27 @@
 [package]
 name = "hugr-llvm"
 version = "0.1.0"
+description = "A general and extensible crate for lowering HUGRs into LLVM IR"
+
 edition = "2021"
-readme = "README.md"
-license = "Apache-2.0"
 rust-version = "1.75"
 
+readme = "README.md"
+license = "Apache-2.0"
+homepage = "https://github.com/CQCL/hugr-llvm"
+repository = "https://github.com/CQCL/hugr-llvm"
+documentation = "https://docs.rs/hugr-llvm"
+authors = ["TKET development team <tket-support@quantinuum.com>"]
+keywords = ["Quantum", "Quantinuum"]
+categories = ["compilers"]
+
 [features]
-default = ["llvm14"]
-llvm14 = ["dep:llvm-sys-140", "inkwell/llvm14-0"]
+default = ["llvm14-0"]
+llvm14-0 = ["dep:llvm-sys-140", "inkwell/llvm14-0"]
 
 [dependencies]
 inkwell = { version = "0.4.0", default-features=false }
-llvm-sys-140 = { package = "llvm-sys", version = "140.1.3", features = ["prefer-static"], optional = true}
+llvm-sys-140 = { package = "llvm-sys", version = "140.1.3", optional = true}
 hugr = "0.5.1"
 anyhow = "1.0.83"
 itertools = "0.12.1"

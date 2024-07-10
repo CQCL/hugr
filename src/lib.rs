@@ -68,7 +68,7 @@ pub mod types;
 
 #[allow(unreachable_code)]
 pub fn llvm_version() -> &'static str {
-    #[cfg(feature = "llvm14")]
+    #[cfg(feature = "llvm14-0")]
     return "llvm14";
     panic!("No recognised llvm feature")
 }
