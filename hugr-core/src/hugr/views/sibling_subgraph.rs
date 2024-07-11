@@ -256,13 +256,8 @@ impl SiblingSubgraph {
             .collect_vec();
         let outputs = outgoing_edges
             .filter(|&(n, p)| {
-                if !hugr.is_linked(n, p) {
-                    return false;
-                }
-                // TODO: what if there are multiple outgoing edges?
-                // See https://github.com/CQCL/hugr/issues/518
-                let (in_n, _) = hugr.linked_ports(n, p).next().unwrap();
-                !nodes_set.contains(&in_n)
+                hugr.linked_ports(n, p)
+                    .any(|(n1, _)| !nodes_set.contains(&n1))
             })
             .collect_vec();
         Self::try_new_with_checker(inputs, outputs, hugr, checker)
@@ -1000,6 +995,8 @@ mod tests {
         );
     }
 
+    /// A subgraphs mixed with multiports caused a NonConvex error.
+    /// https://github.com/CQCL/hugr/issues/1294
     #[test]
     fn convex_multiports() {
         let (hugr, func_root) = build_multiport_hugr().unwrap();
