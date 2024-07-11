@@ -207,8 +207,8 @@ pub(crate) mod test {
     use crate::extension::prelude::{BOOL_T, USIZE_T};
     use crate::extension::{ExtensionId, SignatureError, EMPTY_REG, PRELUDE_REGISTRY};
     use crate::hugr::validate::InterGraphEdgeError;
-    use crate::ops::{OpTrait, Value};
     use crate::ops::{handle::NodeHandle, Lift, Noop, OpTag};
+    use crate::ops::{OpTrait, Value};
 
     use crate::std_extensions::logic::test::and_op;
     use crate::types::type_param::TypeParam;
@@ -555,15 +555,26 @@ pub(crate) mod test {
     fn order_edges() {
         let (mut hugr, load_constant, call) = {
             let mut builder = ModuleBuilder::new();
-            let func = builder.declare("func", FunctionType::new_endo(BOOL_T).into()).unwrap();
+            let func = builder
+                .declare("func", FunctionType::new_endo(BOOL_T).into())
+                .unwrap();
             let (load_constant, call) = {
-                let mut builder = builder.define_function("main", FunctionType::new(Type::EMPTY_TYPEROW, BOOL_T)).unwrap();
+                let mut builder = builder
+                    .define_function("main", FunctionType::new(Type::EMPTY_TYPEROW, BOOL_T))
+                    .unwrap();
                 let load_constant = builder.add_load_value(Value::true_val());
-                let [r] = builder.call(&func, &[], [load_constant], &EMPTY_REG).unwrap().outputs_arr();
+                let [r] = builder
+                    .call(&func, &[], [load_constant], &EMPTY_REG)
+                    .unwrap()
+                    .outputs_arr();
                 builder.finish_with_outputs([r]).unwrap();
                 (load_constant.node(), r.node())
             };
-            (builder.finish_hugr(&EMPTY_REG).unwrap(), load_constant, call)
+            (
+                builder.finish_hugr(&EMPTY_REG).unwrap(),
+                load_constant,
+                call,
+            )
         };
 
         let lc_optype = hugr.get_optype(load_constant);
@@ -573,7 +584,12 @@ pub(crate) mod test {
         assert_eq!(EdgeKind::StateOrder, call_optype.other_input().unwrap());
         assert_eq!(EdgeKind::StateOrder, call_optype.other_output().unwrap());
 
-        hugr.connect(load_constant, lc_optype.other_output_port().unwrap(), call, call_optype.other_input_port().unwrap());
+        hugr.connect(
+            load_constant,
+            lc_optype.other_output_port().unwrap(),
+            call,
+            call_optype.other_input_port().unwrap(),
+        );
 
         hugr.validate(&EMPTY_REG).unwrap();
     }
