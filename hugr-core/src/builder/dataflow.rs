@@ -207,12 +207,12 @@ pub(crate) mod test {
     use crate::extension::prelude::{BOOL_T, USIZE_T};
     use crate::extension::{ExtensionId, SignatureError, EMPTY_REG, PRELUDE_REGISTRY};
     use crate::hugr::validate::InterGraphEdgeError;
-    use crate::ops::OpTrait;
+    use crate::ops::{OpTrait, Value};
     use crate::ops::{handle::NodeHandle, Lift, Noop, OpTag};
 
     use crate::std_extensions::logic::test::and_op;
     use crate::types::type_param::TypeParam;
-    use crate::types::{Type, TypeBound};
+    use crate::types::{EdgeKind, Type, TypeBound};
     use crate::utils::test_quantum_extension::h_gate;
     use crate::{
         builder::test::{n_identity, BIT, NAT, QB},
@@ -549,5 +549,32 @@ pub(crate) mod test {
             BuildError::SignatureError(SignatureError::RowVarWhereTypeExpected { idx: 0 })
         );
         Ok(())
+    }
+
+    #[test]
+    fn order_edges() {
+        let (mut hugr, load_constant, call) = {
+            let mut builder = ModuleBuilder::new();
+            let func = builder.declare("func", FunctionType::new_endo(BOOL_T).into()).unwrap();
+            let (load_constant, call) = {
+                let mut builder = builder.define_function("main", FunctionType::new(Type::EMPTY_TYPEROW, BOOL_T)).unwrap();
+                let load_constant = builder.add_load_value(Value::true_val());
+                let [r] = builder.call(&func, &[], [load_constant], &EMPTY_REG).unwrap().outputs_arr();
+                builder.finish_with_outputs([r]).unwrap();
+                (load_constant.node(), r.node())
+            };
+            (builder.finish_hugr(&EMPTY_REG).unwrap(), load_constant, call)
+        };
+
+        let lc_optype = hugr.get_optype(load_constant);
+        let call_optype = hugr.get_optype(call);
+        assert_eq!(EdgeKind::StateOrder, lc_optype.other_input().unwrap());
+        assert_eq!(EdgeKind::StateOrder, lc_optype.other_output().unwrap());
+        assert_eq!(EdgeKind::StateOrder, call_optype.other_input().unwrap());
+        assert_eq!(EdgeKind::StateOrder, call_optype.other_output().unwrap());
+
+        hugr.connect(load_constant, lc_optype.other_output_port().unwrap(), call, call_optype.other_input_port().unwrap());
+
+        hugr.validate(&EMPTY_REG).unwrap();
     }
 }
