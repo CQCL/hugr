@@ -298,11 +298,8 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         match &port_kind {
             EdgeKind::Value(ty) => ty.validate(self.extension_registry, var_decls),
             // Static edges must *not* refer to type variables declared by enclosing FuncDefns
-            // as these are only types at runtime. (Note the choice of `allow_row_vars` as `false` is arbitrary here.)
+            // as these are only types at runtime.
             EdgeKind::Const(ty) => ty.validate(self.extension_registry, &[]),
-            // Allow function "value" to have unknown arity. A Call node will have to provide
-            // TypeArgs that produce a known arity, but a LoadFunction might pass the function
-            // value ("function pointer") around without knowing how to call it.
             EdgeKind::Function(pf) => pf.validate(self.extension_registry),
             _ => Ok(()),
         }

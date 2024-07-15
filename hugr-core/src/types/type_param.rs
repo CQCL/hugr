@@ -46,11 +46,11 @@ impl UpperBound {
     }
 }
 
-/// A *kind* of [TypeArg]. Thus, a parameter declared by a [TypeSchemeRV] (e.g. [OpDef]),
-/// specifying a value that may (resp. must) be provided to instantiate it.
+/// A *kind* of [TypeArg]. Thus, a parameter declared by a [TypeScheme] or [TypeSchemeRV],
+/// specifying a value that must be provided statically in order to instantiate it.
 ///
+/// [TypeScheme]: super::TypeScheme
 /// [TypeSchemeRV]: super::TypeSchemeRV
-/// [OpDef]: crate::extension::OpDef
 #[derive(
     Clone, Debug, PartialEq, Eq, derive_more::Display, serde::Deserialize, serde::Serialize,
 )]

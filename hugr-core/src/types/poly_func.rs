@@ -28,15 +28,15 @@ use super::{signature::FuncTypeBase, MaybeRV, NoRV, RowVariable};
     "params.iter().map(ToString::to_string).join(\" \")",
     "body"
 )]
-pub struct TypeSchemeBase<ROWVARS: MaybeRV = RowVariable> {
+pub struct TypeSchemeBase<RV: MaybeRV> {
     /// The declared type parameters, i.e., these must be instantiated with
     /// the same number of [TypeArg]s before the function can be called. This
     /// defines the indices used by variables inside the body.
     #[cfg_attr(test, proptest(strategy = "vec(any_with::<TypeParam>(params), 0..3)"))]
     params: Vec<TypeParam>,
     /// Template for the function. May contain variables up to length of [Self::params]
-    #[cfg_attr(test, proptest(strategy = "any_with::<FuncTypeBase<ROWVARS>>(params)"))]
-    body: FuncTypeBase<ROWVARS>,
+    #[cfg_attr(test, proptest(strategy = "any_with::<FuncTypeBase<RV>>(params)"))]
+    body: FuncTypeBase<RV>,
 }
 
 /// The polymorphic type of a [Call]-able function ([FuncDecl] or [FuncDefn]).
@@ -106,7 +106,7 @@ impl<RV: MaybeRV> TypeSchemeBase<RV> {
     }
 
     /// Create a new TypeSchemeBase given the kinds of the variables it declares
-    /// and the underlying function type.
+    /// and the underlying [FuncTypeBase].
     pub fn new(params: impl Into<Vec<TypeParam>>, body: impl Into<FuncTypeBase<RV>>) -> Self {
         Self {
             params: params.into(),

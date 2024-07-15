@@ -381,7 +381,7 @@ fn constants_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn serialize_types_roundtrip() {
-    let g = Type::new_function(FunctionType::new_endo(vec![]));
+    let g: Type = Type::new_function(FunctionType::new_endo(vec![]));
     check_testing_roundtrip(g.clone());
 
     // A Simple tuple
@@ -392,7 +392,7 @@ fn serialize_types_roundtrip() {
     let t = TypeRV::new_sum([type_row![USIZE_T], type_row![FLOAT64_TYPE]]);
     check_testing_roundtrip(t);
 
-    let t: Type = Type::new_unit_sum(4);
+    let t = Type::new_unit_sum(4);
     check_testing_roundtrip(t);
 }
 

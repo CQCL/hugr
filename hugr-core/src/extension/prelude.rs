@@ -436,7 +436,7 @@ mod test {
             .instantiate([])
             .unwrap();
 
-        let ext_type: Type = Type::new_extension(ext_def);
+        let ext_type = Type::new_extension(ext_def);
         assert_eq!(ext_type, ERROR_TYPE);
 
         let error_val = ConstError::new(2, "my message");

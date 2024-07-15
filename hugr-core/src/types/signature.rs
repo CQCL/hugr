@@ -17,13 +17,13 @@ use {crate::proptest::RecursionDepth, ::proptest::prelude::*, proptest_derive::A
 
 #[derive(Clone, Debug, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(test, derive(Arbitrary), proptest(params = "RecursionDepth"))]
-/// Describes the edges required to/from a node (when ROWVARS=false);
-/// or (when ROWVARS=true) the type of a [Graph] or the inputs/outputs from an OpDef
+/// Describes the edges required to/from a node or inside a [FuncDefn] (when ROWVARS=[NoRV]);
+/// or (when ROWVARS=[RowVariable]) the type of a higher-order [function value] or the inputs/outputs from an OpDef
 ///
 /// ROWVARS specifies whether it may contain [RowVariable]s or not.
 ///
-/// [Graph]: crate::ops::constant::Value::Function
-/// [RowVariable]: crate::types::TypeEnum::RowVariable
+/// [function value]: crate::ops::constant::Value::Function
+/// [FuncDefn]: crate::ops::FuncDefn
 pub struct FuncTypeBase<ROWVARS: MaybeRV> {
     /// Value inputs of the function.
     #[cfg_attr(test, proptest(strategy = "any_with::<TypeRowBase<ROWVARS>>(params)"))]
@@ -35,12 +35,17 @@ pub struct FuncTypeBase<ROWVARS: MaybeRV> {
     pub extension_reqs: ExtensionSet,
 }
 
-/// The concept of "signature" in the spec - the edges required to/from a node or graph
-/// and also the target (value) of a call (static).
+/// The concept of "signature" in the spec - the edges required to/from a node
+/// or within a [FuncDefn], also the target (value) of a call (static).
+/// 
+/// [FuncDefn]: crate::ops::FuncDefn
 pub type FunctionType = FuncTypeBase<NoRV>;
 
 /// A function that may contain [RowVariable]s and thus has potentially-unknown arity;
-/// passable as a value round a Hugr (see [Type::new_function]) but not a valid node type.
+/// used for [OpDef]'s and passable as a value round a Hugr (see [Type::new_function])
+/// but not a valid node type.
+/// 
+/// [OpDef]: crate::extension::OpDef
 pub type FunctionTypeRV = FuncTypeBase<RowVariable>;
 
 impl<RV: MaybeRV> FuncTypeBase<RV> {
@@ -63,7 +68,7 @@ impl<RV: MaybeRV> FuncTypeBase<RV> {
         Self {
             input: input.into(),
             output: output.into(),
-            extension_reqs: ExtensionSet::default(),
+            extension_reqs: ExtensionSet::new(),
         }
     }
 

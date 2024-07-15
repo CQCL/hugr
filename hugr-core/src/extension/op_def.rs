@@ -235,7 +235,7 @@ impl SignatureFunc {
         args: &[TypeArg],
         exts: &ExtensionRegistry,
     ) -> Result<FunctionType, SignatureError> {
-        let temp: TypeSchemeRV;
+        let temp: TypeSchemeRV; // to keep alive
         let (pf, args) = match &self {
             SignatureFunc::TypeScheme(custom) => {
                 custom.validate.validate(args, def, exts)?;

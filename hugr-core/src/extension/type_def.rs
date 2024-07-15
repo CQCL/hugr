@@ -182,14 +182,14 @@ mod test {
             description: "Some parametrised type".into(),
             bound: TypeDefBound::FromParams(vec![0]),
         };
-        let typ: Type = Type::new_extension(
+        let typ = Type::new_extension(
             def.instantiate(vec![TypeArg::Type {
                 ty: Type::new_function(FunctionType::new(vec![], vec![])),
             }])
             .unwrap(),
         );
         assert_eq!(typ.least_upper_bound(), TypeBound::Copyable);
-        let typ2: Type = Type::new_extension(def.instantiate([USIZE_T.into()]).unwrap());
+        let typ2 = Type::new_extension(def.instantiate([USIZE_T.into()]).unwrap());
         assert_eq!(typ2.least_upper_bound(), TypeBound::Eq);
 
         // And some bad arguments...firstly, wrong kind of TypeArg:

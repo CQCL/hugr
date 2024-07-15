@@ -50,7 +50,7 @@ pub enum EdgeKind {
     Value(Type),
     /// A reference to a static constant value - must be a Copyable type
     Const(Type),
-    /// A reference to a function i.e. [FuncDecl] or [FuncDefn]
+    /// A reference to a function i.e. [FuncDecl] or [FuncDefn].
     ///
     /// [FuncDecl]: crate::ops::FuncDecl
     /// [FuncDefn]: crate::ops::FuncDefn
@@ -259,7 +259,7 @@ impl<RV: MaybeRV> TypeEnum<RV> {
 /// # use hugr::types::{Type, TypeBound};
 /// # use hugr::type_row;
 ///
-/// let sum: Type = Type::new_sum([type_row![], type_row![]]);
+/// let sum = Type::new_sum([type_row![], type_row![]]);
 /// assert_eq!(sum.least_upper_bound(), TypeBound::Eq);
 /// ```
 ///
@@ -614,7 +614,6 @@ pub(crate) mod test {
         assert_eq!(pred1, pred2);
 
         let pred_direct = SumType::Unit { size: 2 };
-        // Pick <false> arbitrarily
         assert_eq!(pred1, Type::from(pred_direct));
     }
 
