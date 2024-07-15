@@ -14,7 +14,7 @@ from hugr import tys
 from hugr.hugr import Hugr
 from hugr.ops import AsCustomOp, Command, Custom, DataflowOp
 from hugr.serialization.serial_hugr import SerialHugr
-from hugr.std.float import FLOAT_T
+from hugr.std.float import FLOAT_EXT_ID, FLOAT_T
 
 if TYPE_CHECKING:
     from hugr.ops import ComWire
@@ -113,7 +113,9 @@ class RzDef(AsCustomOp):
         return Custom(
             "Rz",
             tys.FunctionType(
-                [tys.Qubit, FLOAT_T], [tys.Qubit], extension_reqs=[QUANTUM_EXTENSION_ID]
+                [tys.Qubit, FLOAT_T],
+                [tys.Qubit],
+                extension_reqs=[QUANTUM_EXTENSION_ID, FLOAT_EXT_ID],
             ),
             extension=QUANTUM_EXTENSION_ID,
         )
