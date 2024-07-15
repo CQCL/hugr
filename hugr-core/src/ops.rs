@@ -23,7 +23,8 @@ pub use constant::{Const, Value};
 pub use controlflow::{BasicBlock, Case, Conditional, DataflowBlock, ExitBlock, TailLoop, CFG};
 pub use custom::CustomOp;
 pub use dataflow::{
-    Call, CallIndirect, DataflowParent, Input, LoadConstant, LoadFunction, Output, DFG,
+    Call, CallIndirect, DataflowOpTrait, DataflowParent, Input, LoadConstant, LoadFunction, Output,
+    DFG,
 };
 pub use leaf::{Lift, MakeTuple, Noop, Tag, UnpackTuple};
 pub use module::{AliasDecl, AliasDefn, FuncDecl, FuncDefn, Module};
