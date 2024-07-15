@@ -76,7 +76,7 @@ fn invalid_root() {
     assert_eq!(b.validate(&EMPTY_REG), Ok(()));
 
     // Add another hierarchy root
-    let other = b.add_node(ops::Module.into());
+    let other = b.add_node(ops::Module::new().into());
     assert_matches!(
         b.validate(&EMPTY_REG),
         Err(ValidationError::NoParent { node }) => assert_eq!(node, other)
@@ -945,6 +945,7 @@ fn cfg_connections() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
 fn cfg_entry_io_bug() -> Result<(), Box<dyn std::error::Error>> {
     // load test file where input node of entry block has types in reversed
     // order compared to parent CFG node.

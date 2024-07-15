@@ -724,7 +724,7 @@ mod test {
                         .boxed(),
                     // TODO this is a bit dodgy, TypeArgVariables are supposed
                     // to be constructed from TypeArg::new_var_use. We are only
-                    // using this instance for serialisation now, but if we want
+                    // using this instance for serialization now, but if we want
                     // to generate valid TypeArgs this will need to change.
                     any_with::<TypeArgVariable>(depth)
                         .prop_map(|v| Self::Variable { v })

@@ -331,11 +331,10 @@ pub trait HugrView: HugrInternals {
     /// signature corresponding to the input and output node of its sibling
     /// graph. Otherwise, returns `None`.
     ///
-    /// In contrast to [`get_function_type`][HugrView::get_function_type], this
+    /// In contrast to [`poly_func_type`][HugrView::poly_func_type], this
     /// method always return a concrete [`FunctionType`].
-    fn get_df_function_type(&self) -> Option<FunctionType> {
-        let op = self.get_optype(self.root());
-        op.inner_function_type()
+    fn inner_function_type(&self) -> Option<FunctionType> {
+        self.root_type().inner_function_type()
     }
 
     /// Returns the function type defined by this HUGR.
@@ -348,12 +347,11 @@ pub trait HugrView: HugrInternals {
     /// of the function.
     ///
     /// Otherwise, returns `None`.
-    fn get_function_type(&self) -> Option<TypeScheme> {
-        let op = self.get_optype(self.root());
-        match op {
+    fn poly_func_type(&self) -> Option<TypeScheme> {
+        match self.root_type() {
             OpType::FuncDecl(decl) => Some(decl.signature.clone()),
             OpType::FuncDefn(defn) => Some(defn.signature.clone()),
-            _ => op.inner_function_type().map(TypeScheme::from),
+            _ => None,
         }
     }
 

@@ -30,7 +30,7 @@ use rstest::rstest;
 const NAT: Type = crate::extension::prelude::USIZE_T;
 const QB: Type = crate::extension::prelude::QB_T;
 
-/// Version 1 of the Testing HUGR serialisation format, see `testing_hugr.py`.
+/// Version 1 of the Testing HUGR serialization format, see `testing_hugr.py`.
 #[derive(Serialize, Deserialize, PartialEq, Debug, Default)]
 struct SerTestingV1 {
     typ: Option<crate::types::TypeRV>,
@@ -219,7 +219,7 @@ fn gen_optype(g: &MultiPortGraph, node: portgraph::NodeIndex) -> OpType {
         .into(),
         (true, false) => Input::new(vec![NAT; outputs - 1]).into(),
         (false, true) => Output::new(vec![NAT; inputs - 1]).into(),
-        (true, true) => Module.into(),
+        (true, true) => Module::new().into(),
     }
 }
 
@@ -479,7 +479,7 @@ fn roundtrip_polyfunctype_varlen(#[case] poly_func_type: TypeSchemeRV) {
 }
 
 #[rstest]
-#[case(ops::Module)]
+#[case(ops::Module::new())]
 #[case(ops::FuncDefn { name: "polyfunc1".into(), signature: polyfunctype1()})]
 #[case(ops::FuncDecl { name: "polyfunc2".into(), signature: polyfunctype1()})]
 #[case(ops::AliasDefn { name: "aliasdefn".into(), definition: Type::new_unit_sum(4)})]
@@ -495,6 +495,17 @@ fn roundtrip_optype(#[case] optype: impl Into<OpType> + std::fmt::Debug) {
         parent: portgraph::NodeIndex::new(0).into(),
         op: optype.into(),
     });
+}
+
+#[test]
+#[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
+/// issue 1270
+fn input_extensions_deser() {
+    // load a file serialised with `input_extensions` fields on all ops
+    let _: Hugr = serde_json::from_reader(std::io::BufReader::new(
+        std::fs::File::open(crate::test_file!("issue-1270.json")).unwrap(),
+    ))
+    .unwrap();
 }
 
 mod proptest {

@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.7.0 (2024-07-10)
+
+### Bug Fixes
+
+- Bring back input_extensions serialized field in rust NodeSer ([#1275](https://github.com/CQCL/hugr/pull/1275))
+- [**breaking**] `ops::Module` now empty struct rather than unit struct ([#1271](https://github.com/CQCL/hugr/pull/1271))
+
+### Features
+
+- Add `force_order` pass. ([#1285](https://github.com/CQCL/hugr/pull/1285))
+- [**breaking**] `MakeOpDef` has new `extension` method. ([#1266](https://github.com/CQCL/hugr/pull/1266))
+
+### Refactor
+
+- [**breaking**] Remove `Value::Tuple` ([#1255](https://github.com/CQCL/hugr/pull/1255))
+- [**breaking**] Rename `HugrView` function type methods + simplify behaviour ([#1265](https://github.com/CQCL/hugr/pull/1265))
+
+### Styling
+
+- Change "serialise" etc to "serialize" etc. ([#1251](https://github.com/CQCL/hugr/pull/1251))
+
+### Testing
+
+- Add a test for [#1257](https://github.com/CQCL/hugr/pull/1257) ([#1260](https://github.com/CQCL/hugr/pull/1260))
+
+
+## 0.6.1 (2024-07-08)
+
+### Bug Fixes
+
+- Bring back input_extensions serialized field in rust NodeSer ([#1275](https://github.com/CQCL/hugr/pull/1275))
+
+
 ## 0.6.0 (2024-06-28)
 
 ### Bug Fixes
@@ -41,7 +74,7 @@
 
 ### Testing
 
-- Serialisation round trip testing for `OpDef` ([#999](https://github.com/CQCL/hugr/pull/999))
+- Serialization round trip testing for `OpDef` ([#999](https://github.com/CQCL/hugr/pull/999))
 
 ### Refactor
 
@@ -79,11 +112,11 @@
 - Disallow non-finite values for `ConstF64` ([#1075](https://github.com/CQCL/hugr/pull/1075))
 - Serialization round-trips ([#948](https://github.com/CQCL/hugr/pull/948))
 - [**breaking**] Combine `ConstIntU` and `ConstIntS` ([#974](https://github.com/CQCL/hugr/pull/974))
-- Disable serialisation tests when miri is active ([#977](https://github.com/CQCL/hugr/pull/977))
-- [**breaking**] Serialisation schema ([#968](https://github.com/CQCL/hugr/pull/968))
+- Disable serialization tests when miri is active ([#977](https://github.com/CQCL/hugr/pull/977))
+- [**breaking**] Serialization schema ([#968](https://github.com/CQCL/hugr/pull/968))
 - Correct constant fold for `fne`. ([#995](https://github.com/CQCL/hugr/pull/995))
-- [**breaking**] Serialisation fixes ([#997](https://github.com/CQCL/hugr/pull/997))
-- [**breaking**] OpDef serialisation ([#1013](https://github.com/CQCL/hugr/pull/1013))
+- [**breaking**] Serialization fixes ([#997](https://github.com/CQCL/hugr/pull/997))
+- [**breaking**] OpDef serialization ([#1013](https://github.com/CQCL/hugr/pull/1013))
 - NaryLogicOp constant folding ([#1026](https://github.com/CQCL/hugr/pull/1026))
 
 ### Features
@@ -101,7 +134,7 @@
 - Add LoadFunction node ([#947](https://github.com/CQCL/hugr/pull/947))
 - Add From impls for TypeArg ([#1002](https://github.com/CQCL/hugr/pull/1002))
 - Constant-folding of integer and logic operations ([#1009](https://github.com/CQCL/hugr/pull/1009))
-- [**breaking**] Update serialisation schema, implement `CustomConst` serialisation ([#1005](https://github.com/CQCL/hugr/pull/1005))
+- [**breaking**] Update serialization schema, implement `CustomConst` serialization ([#1005](https://github.com/CQCL/hugr/pull/1005))
 - Merge basic blocks algorithm ([#956](https://github.com/CQCL/hugr/pull/956))
 - [**breaking**] Allow panic operation to have any input and output wires ([#1024](https://github.com/CQCL/hugr/pull/1024))
 
@@ -118,10 +151,10 @@
 - Reorg OutlineCfg/nest_cfgs tests so hugr doesn't depend on algorithm ([#1007](https://github.com/CQCL/hugr/pull/1007))
 - Ignore tests which depend on typetag when cfg(miri) ([#1051](https://github.com/CQCL/hugr/pull/1051))
 - Really ignore tests which depend on typetag when cfg(miri) ([#1058](https://github.com/CQCL/hugr/pull/1058))
-- Proptests for round trip serialisation of `Type`s and `Op`s. ([#981](https://github.com/CQCL/hugr/pull/981))
+- Proptests for round trip serialization of `Type`s and `Op`s. ([#981](https://github.com/CQCL/hugr/pull/981))
 - Add a test of instantiating an extension set ([#939](https://github.com/CQCL/hugr/pull/939))
-- Ignore serialisation tests when using miri ([#975](https://github.com/CQCL/hugr/pull/975))
-- [**breaking**] Test roundtrip serialisation against strict + lax schema ([#982](https://github.com/CQCL/hugr/pull/982))
+- Ignore serialization tests when using miri ([#975](https://github.com/CQCL/hugr/pull/975))
+- [**breaking**] Test roundtrip serialization against strict + lax schema ([#982](https://github.com/CQCL/hugr/pull/982))
 - Fix some bad assert_matches ([#1006](https://github.com/CQCL/hugr/pull/1006))
 - Expand test of instantiating extension sets ([#1003](https://github.com/CQCL/hugr/pull/1003))
 - Fix unconnected ports in extension test ([#1010](https://github.com/CQCL/hugr/pull/1010))

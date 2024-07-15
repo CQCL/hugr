@@ -13,6 +13,7 @@ extensions = [
     "sphinx.ext.autosummary",
     "sphinx.ext.viewcode",
     "sphinx.ext.intersphinx",
+    "sphinx_multiversion",
 ]
 
 html_theme = "sphinx_book_theme"
@@ -36,6 +37,18 @@ autosummary_generate = True
 
 templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "conftest.py"]
+html_sidebars = {
+    "**": [
+        "navbar-logo.html",
+        "icon-links.html",
+        "search-button-field.html",
+        "sbt-sidebar-nav.html",
+        "versioning.html",
+    ],
+}
+
+smv_branch_whitelist = "main"
+smv_tag_whitelist = r"^hugr-py-.*$"
 
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3/", None),

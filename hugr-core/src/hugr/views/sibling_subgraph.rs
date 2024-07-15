@@ -256,13 +256,8 @@ impl SiblingSubgraph {
             .collect_vec();
         let outputs = outgoing_edges
             .filter(|&(n, p)| {
-                if !hugr.is_linked(n, p) {
-                    return false;
-                }
-                // TODO: what if there are multiple outgoing edges?
-                // See https://github.com/CQCL/hugr/issues/518
-                let (in_n, _) = hugr.linked_ports(n, p).next().unwrap();
-                !nodes_set.contains(&in_n)
+                hugr.linked_ports(n, p)
+                    .any(|(n1, _)| !nodes_set.contains(&n1))
             })
             .collect_vec();
         Self::try_new_with_checker(inputs, outputs, hugr, checker)
@@ -792,6 +787,7 @@ mod tests {
         Ok((hugr, func_id.node()))
     }
 
+    /// A bool to bool hugr with three subsequent NOT gates.
     fn build_3not_hugr() -> Result<(Hugr, Node), BuildError> {
         let mut mod_builder = ModuleBuilder::new();
         let func = mod_builder.declare("test", FunctionType::new_endo(type_row![BOOL_T]).into())?;
@@ -801,6 +797,26 @@ mod tests {
             let outs2 = dfg.add_dataflow_op(NotOp, outs1.outputs())?;
             let outs3 = dfg.add_dataflow_op(NotOp, outs2.outputs())?;
             dfg.finish_with_outputs(outs3.outputs())?
+        };
+        let hugr = mod_builder
+            .finish_prelude_hugr()
+            .map_err(|e| -> BuildError { e.into() })?;
+        Ok((hugr, func_id.node()))
+    }
+
+    /// A bool to (bool, bool) with multiports.
+    fn build_multiport_hugr() -> Result<(Hugr, Node), BuildError> {
+        let mut mod_builder = ModuleBuilder::new();
+        let func = mod_builder.declare(
+            "test",
+            FunctionType::new(type_row![BOOL_T], type_row![BOOL_T, BOOL_T]).into(),
+        )?;
+        let func_id = {
+            let mut dfg = mod_builder.define_declaration(&func)?;
+            let [b0] = dfg.input_wires_arr();
+            let [b1] = dfg.add_dataflow_op(NotOp, [b0])?.outputs_arr();
+            let [b2] = dfg.add_dataflow_op(NotOp, [b1])?.outputs_arr();
+            dfg.finish_with_outputs([b1, b2])?
         };
         let hugr = mod_builder
             .finish_prelude_hugr()
@@ -977,6 +993,23 @@ mod tests {
             ),
             Err(InvalidSubgraph::NotConvex)
         );
+    }
+
+    /// A subgraphs mixed with multiports caused a NonConvex error.
+    /// https://github.com/CQCL/hugr/issues/1294
+    #[test]
+    fn convex_multiports() {
+        let (hugr, func_root) = build_multiport_hugr().unwrap();
+        let [inp, out] = hugr.get_io(func_root).unwrap();
+        let not1 = hugr.output_neighbours(inp).exactly_one().unwrap();
+        let not2 = hugr
+            .output_neighbours(not1)
+            .filter(|&n| n != out)
+            .exactly_one()
+            .unwrap();
+
+        let subgraph = SiblingSubgraph::try_from_nodes([not1, not2], &hugr).unwrap();
+        assert_eq!(subgraph.nodes(), [not1, not2]);
     }
 
     #[test]

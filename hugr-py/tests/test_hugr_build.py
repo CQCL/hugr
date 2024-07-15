@@ -8,8 +8,10 @@ from hugr.function import Module
 from hugr.hugr import Hugr
 from hugr.node_port import Node, _SubPort
 from hugr.ops import NoConcreteFunc
+from hugr.std.int import INT_T, DivMod, IntVal
+from hugr.std.logic import Not
 
-from .conftest import INT_T, DivMod, IntVal, Not, validate
+from .conftest import validate
 
 
 def test_stable_indices():
@@ -145,16 +147,14 @@ def test_insert_nested():
 
 
 def test_build_nested():
-    def _nested_nop(dfg: Dfg):
-        (a1,) = dfg.inputs()
-        nt = dfg.add(Not(a1))
-        dfg.set_outputs(nt)
-
     h = Dfg(tys.Bool)
     (a,) = h.inputs()
-    nested = h.add_nested(a)
 
-    _nested_nop(nested)
+    with h.add_nested(a) as nested:
+        (a1,) = nested.inputs()
+        nt = nested.add(Not(a1))
+        nested.set_outputs(nt)
+
     assert len(h.hugr.children(nested)) == 3
     h.set_outputs(nested)
 
@@ -164,10 +164,9 @@ def test_build_nested():
 def test_build_inter_graph():
     h = Dfg(tys.Bool, tys.Bool)
     (a, b) = h.inputs()
-    nested = h.add_nested()
-
-    nt = nested.add(Not(a))
-    nested.set_outputs(nt)
+    with h.add_nested() as nested:
+        nt = nested.add(Not(a))
+        nested.set_outputs(nt)
 
     h.set_outputs(nested, b)
 
@@ -183,9 +182,8 @@ def test_build_inter_graph():
 def test_ancestral_sibling():
     h = Dfg(tys.Bool)
     (a,) = h.inputs()
-    nested = h.add_nested()
-
-    nt = nested.add(Not(a))
+    with h.add_nested() as nested:
+        nt = nested.add(Not(a))
 
     assert _ancestral_sibling(h.hugr, h.input_node, nt) == nested.parent_node
 

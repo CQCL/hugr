@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import AbstractContextManager
 from dataclasses import dataclass, field, replace
 from typing import (
     TYPE_CHECKING,
@@ -27,7 +28,7 @@ DP = TypeVar("DP", bound=ops.DfParentOp)
 
 
 @dataclass()
-class _DfBase(ParentBuilder[DP]):
+class _DfBase(ParentBuilder[DP], AbstractContextManager):
     """Base class for dataflow graph builders.
 
     Args:
@@ -55,6 +56,12 @@ class _DfBase(ParentBuilder[DP]):
             ops.Input(inputs), self.parent_node, len(inputs)
         )
         self.output_node = self.hugr.add_node(ops.Output(), self.parent_node)
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, *args) -> None:
+        return None
 
     @classmethod
     def new_nested(
@@ -131,7 +138,37 @@ class _DfBase(ParentBuilder[DP]):
             Node(3)
 
         """
-        return self.add_op(com.op, *com.incoming)
+
+        def raise_no_ints():
+            error_message = "Command used with Dfg must hold Wire, not integer indices."
+            raise ValueError(error_message)
+
+        wires = (
+            (w if not isinstance(w, int) else raise_no_ints()) for w in com.incoming
+        )
+        return self.add_op(com.op, *wires)
+
+    def extend(self, *coms: ops.Command) -> list[Node]:
+        """Add a series of commands to the DFG.
+
+        Shorthand for calling :meth:`add` on each command in `coms`.
+
+        Args:
+            coms: Commands to add.
+
+        Returns:
+            List of the new nodes in the same order as the commands.
+
+        Raises:
+            IndexError: If any input index is not a tracked wire.
+
+        Examples:
+            >>> dfg = Dfg(tys.Bool, tys.Unit)
+            >>> (b, u) = dfg.inputs()
+            >>> dfg.extend(ops.Noop()(b), ops.Noop()(u))
+            [Node(3), Node(4)]
+        """
+        return [self.add(com) for com in coms]
 
     def _insert_nested_impl(self, builder: ParentBuilder, *args: Wire) -> Node:
         mapping = self.hugr.insert_hugr(builder.hugr, self.parent_node)
@@ -171,8 +208,8 @@ class _DfBase(ParentBuilder[DP]):
 
         Example:
             >>> dfg = Dfg(tys.Bool)
-            >>> dfg2 = dfg.add_nested(dfg.inputs()[0])
-            >>> dfg2.parent_node
+            >>> with dfg.add_nested(dfg.inputs()[0]) as dfg2:\
+                   dfg2.parent_node
             Node(3)
         """
         from .dfg import Dfg
@@ -199,8 +236,8 @@ class _DfBase(ParentBuilder[DP]):
 
         Example:
             >>> dfg = Dfg(tys.Bool)
-            >>> cfg = dfg.add_cfg(dfg.inputs()[0])
-            >>> cfg.parent_op
+            >>> with dfg.add_cfg(dfg.inputs()[0]) as cfg:\
+                    cfg.parent_op
             CFG(inputs=[Bool])
         """
         from .cfg import Cfg

@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
+
+from typing_extensions import Self
 
 from hugr import ops, val
 
@@ -47,7 +50,7 @@ class Block(_DfBase[ops.DataflowBlock]):
 
 
 @dataclass
-class Cfg(ParentBuilder[ops.CFG]):
+class Cfg(ParentBuilder[ops.CFG], AbstractContextManager):
     """Builder class for a HUGR control flow graph, with the HUGR root node
     being a :class:`CFG <hugr.ops.CFG>`.
 
@@ -82,6 +85,12 @@ class Cfg(ParentBuilder[ops.CFG]):
         self._entry_block = Block.new_nested(ops.DataflowBlock(input_types), hugr, root)
 
         self.exit = self.hugr.add_node(ops.ExitBlock(), self.parent_node)
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, *args) -> None:
+        return None
 
     @classmethod
     def new_nested(
@@ -158,8 +167,8 @@ class Cfg(ParentBuilder[ops.CFG]):
 
         Examples:
             >>> cfg = Cfg(tys.Bool)
-            >>> b = cfg.add_block(tys.Unit)
-            >>> b.set_single_succ_outputs(*b.inputs())
+            >>> with cfg.add_block(tys.Unit) as b:\
+                    b.set_single_succ_outputs(*b.inputs())
         """
         new_block = Block.new_nested(
             ops.DataflowBlock(list(input_types)),
@@ -183,10 +192,10 @@ class Cfg(ParentBuilder[ops.CFG]):
 
         Examples:
             >>> cfg = Cfg(tys.Bool)
-            >>> entry = cfg.add_entry()
-            >>> entry.set_single_succ_outputs()
-            >>> b = cfg.add_successor(entry[0])
-            >>> b.set_single_succ_outputs(*b.inputs())
+            >>> with cfg.add_entry() as entry:\
+                    entry.set_single_succ_outputs()
+            >>> with cfg.add_successor(entry[0]) as b:\
+                    b.set_single_succ_outputs(*b.inputs())
         """
         b = self.add_block(*self._nth_outputs(pred))
 
@@ -207,8 +216,8 @@ class Cfg(ParentBuilder[ops.CFG]):
 
         Examples:
             >>> cfg = Cfg(tys.Bool)
-            >>> entry = cfg.add_entry()
-            >>> entry.set_single_succ_outputs()
+            >>> with cfg.add_entry() as entry:\
+                    entry.set_single_succ_outputs()
             >>> b = cfg.add_block(tys.Unit)
             >>> cfg.branch(entry[0], b)
         """
@@ -226,8 +235,8 @@ class Cfg(ParentBuilder[ops.CFG]):
 
         Examples:
             >>> cfg = Cfg(tys.Bool)
-            >>> entry = cfg.add_entry()
-            >>> entry.set_single_succ_outputs()
+            >>> with cfg.add_entry() as entry:\
+                    entry.set_single_succ_outputs()
             >>> cfg.branch_exit(entry[0])
         """
         src = src.out_port()

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.3 (2024-07-10)
+
+### Styling
+
+- Change "serialise" etc to "serialize" etc. ([#1251](https://github.com/CQCL/hugr/pull/1251))
+
+
 
 ## 0.1.1 (2024-06-07)
 

@@ -203,6 +203,7 @@ impl TryFrom<SerHugrV1> for Hugr {
         let NodeSer {
             parent: root_parent,
             op: root_type,
+            ..
         } = nodes.next().unwrap();
         if root_parent.index() != 0 {
             return Err(HUGRSerializationError::FirstNodeNotRoot(root_parent));

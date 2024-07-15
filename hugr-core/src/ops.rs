@@ -125,7 +125,7 @@ impl_op_ref_try_into!(Conditional);
 impl_op_ref_try_into!(Case);
 
 /// The default OpType (as returned by [Default::default])
-pub const DEFAULT_OPTYPE: OpType = OpType::Module(Module);
+pub const DEFAULT_OPTYPE: OpType = OpType::Module(Module::new());
 
 impl Default for OpType {
     fn default() -> Self {

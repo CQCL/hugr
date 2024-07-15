@@ -17,7 +17,7 @@ class TypeParam(Protocol):
     """A HUGR type parameter."""
 
     def to_serial(self) -> stys.BaseTypeParam:
-        """Convert to serialisable model."""
+        """Convert to serializable model."""
         ...  # pragma: no cover
 
     def to_serial_root(self) -> stys.TypeParam:
@@ -28,7 +28,7 @@ class TypeArg(Protocol):
     """A HUGR type argument, which can be bound to a :class:TypeParam."""
 
     def to_serial(self) -> stys.BaseTypeArg:
-        """Convert to serialisable model."""
+        """Convert to serializable model."""
         ...  # pragma: no cover
 
     def to_serial_root(self) -> stys.TypeArg:
@@ -40,7 +40,7 @@ class Type(Protocol):
     """A HUGR type."""
 
     def to_serial(self) -> stys.BaseType:
-        """Convert to serialisable model."""
+        """Convert to serializable model."""
         ...  # pragma: no cover
 
     def to_serial_root(self) -> stys.Type:

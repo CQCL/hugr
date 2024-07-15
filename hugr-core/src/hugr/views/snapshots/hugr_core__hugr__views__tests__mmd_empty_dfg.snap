@@ -6,6 +6,6 @@ graph LR
     subgraph 0 ["(0) DFG"]
         direction LR
         1["(1) Input"]
-        1--"0:0<br>[]+[]"-->2
         2["(2) Output"]
+        1--"0:0<br>[]+[]"-->2
     end

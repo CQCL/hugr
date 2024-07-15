@@ -3,8 +3,9 @@ import pytest
 from hugr import ops, tys, val
 from hugr.cond_loop import Conditional, ConditionalError, TailLoop
 from hugr.dfg import Dfg
+from hugr.std.int import INT_T, IntVal
 
-from .conftest import INT_T, H, IntVal, Measure, validate
+from .conftest import H, Measure, validate
 
 SUM_T = tys.Sum([[tys.Qubit], [tys.Qubit, INT_T]])
 
@@ -13,13 +14,13 @@ def build_cond(h: Conditional) -> None:
     with pytest.raises(ConditionalError, match="Case 2 out of possible range."):
         h.add_case(2)
 
-    case0 = h.add_case(0)
-    q, b = case0.inputs()
-    case0.set_outputs(q, b)
+    with h.add_case(0) as case0:
+        q, b = case0.inputs()
+        case0.set_outputs(q, b)
 
-    case1 = h.add_case(1)
-    q, _i, b = case1.inputs()
-    case1.set_outputs(q, b)
+    with h.add_case(1) as case1:
+        q, _i, b = case1.inputs()
+        case1.set_outputs(q, b)
 
 
 def test_cond() -> None:
@@ -32,8 +33,10 @@ def test_nested_cond() -> None:
     h = Dfg(tys.Qubit)
     (q,) = h.inputs()
     tagged_q = h.add(ops.Tag(0, SUM_T)(q))
-    cond = h.add_conditional(tagged_q, h.load(val.TRUE))
-    build_cond(cond)
+
+    with h.add_conditional(tagged_q, h.load(val.TRUE)) as cond:
+        build_cond(cond)
+
     h.set_outputs(*cond[:2])
     validate(h.hugr)
 
@@ -53,17 +56,27 @@ def test_if_else() -> None:
     # apply an H if a bool is true.
     h = Dfg(tys.Qubit)
     (q,) = h.inputs()
-    if_ = h.add_if(h.load(val.TRUE), q)
+    with h.add_if(h.load(val.TRUE), q) as if_:
+        if_.set_outputs(if_.add(H(if_.input_node[0])))
 
-    if_.set_outputs(if_.add(H(if_.input_node[0])))
+    with if_.add_else() as else_:
+        else_.set_outputs(else_.input_node[0])
 
-    else_ = if_.add_else()
-    else_.set_outputs(else_.input_node[0])
-
-    cond = else_.finish()
-    h.set_outputs(cond)
+    h.set_outputs(else_.conditional_node)
 
     validate(h.hugr)
+
+
+def test_incomplete() -> None:
+    def _build_incomplete():
+        with Conditional(SUM_T, [tys.Bool]) as c, c.add_case(0) as case0:
+            q, b = case0.inputs()
+            case0.set_outputs(q, b)
+
+    with pytest.raises(
+        ConditionalError, match="All cases must be added before exiting context."
+    ):
+        _build_incomplete()
 
 
 def test_tail_loop() -> None:
@@ -76,8 +89,8 @@ def test_tail_loop() -> None:
     h = Dfg(tys.Qubit)
     (q,) = h.inputs()
 
-    tl = h.add_tail_loop([], [q])
-    build_tl(tl)
+    with h.add_tail_loop([], [q]) as tl:
+        build_tl(tl)
     h.set_outputs(tl)
 
     validate(h.hugr)
@@ -98,23 +111,23 @@ def test_complex_tail_loop() -> None:
     (q,) = h.inputs()
 
     # loop passes qubit to itself, and a bool as in-out
-    tl = h.add_tail_loop([q], [h.load(val.TRUE)])
-    q, b = tl.inputs()
+    with h.add_tail_loop([q], [h.load(val.TRUE)]) as tl:
+        q, b = tl.inputs()
 
-    # if b is true, return first variant (just qubit)
-    if_ = tl.add_if(b, q)
-    (q,) = if_.inputs()
-    tagged_q = if_.add(ops.Tag(0, SUM_T)(q))
-    if_.set_outputs(tagged_q)
+        # if b is true, return first variant (just qubit)
+        with tl.add_if(b, q) as if_:
+            (q,) = if_.inputs()
+            tagged_q = if_.add(ops.Tag(0, SUM_T)(q))
+            if_.set_outputs(tagged_q)
 
-    # else return second variant (qubit, int)
-    else_ = if_.add_else()
-    (q,) = else_.inputs()
-    tagged_q_i = else_.add(ops.Tag(1, SUM_T)(q, else_.load(IntVal(1))))
-    else_.set_outputs(tagged_q_i)
+        # else return second variant (qubit, int)
+        with if_.add_else() as else_:
+            (q,) = else_.inputs()
+            tagged_q_i = else_.add(ops.Tag(1, SUM_T)(q, else_.load(IntVal(1))))
+            else_.set_outputs(tagged_q_i)
 
-    # finish with Sum output from if-else, and bool from inputs
-    tl.set_loop_outputs(else_.finish(), b)
+        # finish with Sum output from if-else, and bool from inputs
+        tl.set_loop_outputs(else_.conditional_node, b)
 
     # loop returns [qubit, int, bool]
     h.set_outputs(*tl[:3])

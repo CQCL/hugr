@@ -4,116 +4,117 @@ import json
 import os
 import pathlib
 import subprocess
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from dataclasses import dataclass
+from enum import Enum
+from typing import TYPE_CHECKING, TypeVar
 
-from hugr import tys, val
+from typing_extensions import Self
+
+from hugr import tys
 from hugr.hugr import Hugr
-from hugr.ops import Command, Custom
+from hugr.ops import AsCustomOp, Command, Custom, DataflowOp
 from hugr.serialization.serial_hugr import SerialHugr
+from hugr.std.float import FLOAT_T
 
 if TYPE_CHECKING:
-    from hugr.node_port import Wire
+    from hugr.ops import ComWire
 
 
-def int_t(width: int) -> tys.Opaque:
-    return tys.Opaque(
-        extension="arithmetic.int.types",
-        id="int",
-        args=[tys.BoundedNatArg(n=width)],
-        bound=tys.TypeBound.Eq,
-    )
+QUANTUM_EXTENSION_ID: tys.ExtensionId = "quantum.tket2"
+
+E = TypeVar("E", bound=Enum)
 
 
-INT_T = int_t(5)
+def _load_enum(enum_cls: type[E], custom: Custom) -> E | None:
+    if (
+        custom.extension == QUANTUM_EXTENSION_ID
+        and custom.op_name in enum_cls.__members__
+    ):
+        return enum_cls(custom.op_name)
+    return None
 
 
-@dataclass
-class IntVal(val.ExtensionValue):
-    v: int
+@dataclass(frozen=True)
+class OneQbGate(AsCustomOp):
+    # Have to nest enum to avoid meta class conflict
+    class _Enum(Enum):
+        H = "H"
 
-    def to_value(self) -> val.Extension:
-        return val.Extension("int", INT_T, self.v)
+    _enum: _Enum
 
+    def __call__(self, q: ComWire) -> Command:
+        return DataflowOp.__call__(self, q)
 
-@dataclass
-class LogicOps(Custom):
-    extension: tys.ExtensionId = "logic"
+    def to_custom(self) -> Custom:
+        return Custom(
+            self._enum.value,
+            tys.FunctionType.endo([tys.Qubit]),
+            extension=QUANTUM_EXTENSION_ID,
+        )
 
-
-_NotSig = tys.FunctionType.endo([tys.Bool])
-
-
-# TODO get from YAML
-@dataclass
-class NotDef(LogicOps):
-    num_out: int = 1
-    op_name: str = "Not"
-    signature: tys.FunctionType = _NotSig
-
-    def __call__(self, a: Wire) -> Command:
-        return super().__call__(a)
+    @classmethod
+    def from_custom(cls, custom: Custom) -> Self | None:
+        return cls(e) if (e := _load_enum(cls._Enum, custom)) else None
 
 
-Not = NotDef()
+H = OneQbGate(OneQbGate._Enum.H)
 
 
-@dataclass
-class QuantumOps(Custom):
-    extension: tys.ExtensionId = "tket2.quantum"
+@dataclass(frozen=True)
+class TwoQbGate(AsCustomOp):
+    class _Enum(Enum):
+        CX = "CX"
+
+    _enum: _Enum
+
+    def to_custom(self) -> Custom:
+        return Custom(
+            self._enum.value,
+            tys.FunctionType.endo([tys.Qubit] * 2),
+            extension=QUANTUM_EXTENSION_ID,
+        )
+
+    @classmethod
+    def from_custom(cls, custom: Custom) -> Self | None:
+        return cls(e) if (e := _load_enum(cls._Enum, custom)) else None
+
+    def __call__(self, q0: ComWire, q1: ComWire) -> Command:
+        return DataflowOp.__call__(self, q0, q1)
 
 
-_OneQbSig = tys.FunctionType.endo([tys.Qubit])
+CX = TwoQbGate(TwoQbGate._Enum.CX)
 
 
-@dataclass
-class OneQbGate(QuantumOps):
-    op_name: str
-    num_out: int = 1
-    signature: tys.FunctionType = _OneQbSig
+@dataclass(frozen=True)
+class MeasureDef(AsCustomOp):
+    def to_custom(self) -> Custom:
+        return Custom(
+            "Measure",
+            tys.FunctionType([tys.Qubit], [tys.Qubit, tys.Bool]),
+            extension=QUANTUM_EXTENSION_ID,
+        )
 
-    def __call__(self, q: Wire) -> Command:
-        return super().__call__(q)
-
-
-H = OneQbGate("H")
-
-_MeasSig = tys.FunctionType([tys.Qubit], [tys.Qubit, tys.Bool])
-
-
-@dataclass
-class MeasureDef(QuantumOps):
-    op_name: str = "Measure"
-    num_out: int = 2
-    signature: tys.FunctionType = _MeasSig
-
-    def __call__(self, q: Wire) -> Command:
+    def __call__(self, q: ComWire) -> Command:
         return super().__call__(q)
 
 
 Measure = MeasureDef()
 
 
-@dataclass
-class IntOps(Custom):
-    extension: tys.ExtensionId = "arithmetic.int"
+@dataclass(frozen=True)
+class RzDef(AsCustomOp):
+    def to_custom(self) -> Custom:
+        return Custom(
+            "Rz",
+            tys.FunctionType([tys.Qubit, FLOAT_T], [tys.Qubit]),
+            extension=QUANTUM_EXTENSION_ID,
+        )
+
+    def __call__(self, q: ComWire, fl_wire: ComWire) -> Command:
+        return super().__call__(q, fl_wire)
 
 
-ARG_5 = tys.BoundedNatArg(n=5)
-
-
-@dataclass
-class DivModDef(IntOps):
-    num_out: int = 2
-    extension: tys.ExtensionId = "arithmetic.int"
-    op_name: str = "idivmod_u"
-    signature: tys.FunctionType = field(
-        default_factory=lambda: tys.FunctionType(input=[INT_T] * 2, output=[INT_T] * 2)
-    )
-    args: list[tys.TypeArg] = field(default_factory=lambda: [ARG_5, ARG_5])
-
-
-DivMod = DivModDef()
+Rz = RzDef()
 
 
 def validate(h: Hugr, mermaid: bool = False, roundtrip: bool = True):

@@ -4,8 +4,11 @@ in HUGR graphs (Conditional, TailLoop).
 
 from __future__ import annotations
 
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
+
+from typing_extensions import Self
 
 from hugr import ops
 
@@ -47,6 +50,11 @@ class _IfElse(Case):
             raise ConditionalError(msg)
         return self._parent_cond
 
+    @property
+    def conditional_node(self) -> Node:
+        """The node that represents the parent conditional."""
+        return self._parent_conditional().parent_node
+
 
 class If(_IfElse):
     """Build the 'if' branch of a conditional branching on a boolean value.
@@ -59,7 +67,7 @@ class If(_IfElse):
         >>> if_.set_outputs(if_.input_node[0])
         >>> else_= if_.add_else()
         >>> else_.set_outputs(else_.input_node[0])
-        >>> dfg.hugr[else_.finish()].op
+        >>> dfg.hugr[else_.conditional_node].op
         Conditional(sum_ty=Bool, other_inputs=[Qubit])
     """
 
@@ -75,16 +83,13 @@ class Else(_IfElse):
     """
 
     def finish(self) -> Node:
-        """Finish building the if/else.
-
-        Returns:
-            The node that represents the parent conditional.
-        """
-        return self._parent_conditional().parent_node
+        """Deprecated, use `conditional_node` property."""
+        # TODO remove in 0.4.0
+        return self.conditional_node  # pragma: no cover
 
 
 @dataclass
-class Conditional(ParentBuilder[ops.Conditional]):
+class Conditional(ParentBuilder[ops.Conditional], AbstractContextManager):
     """Build a conditional branching on a sum type.
 
     Args:
@@ -110,6 +115,15 @@ class Conditional(ParentBuilder[ops.Conditional]):
         self.hugr = hugr
         self.parent_node = root
         self.cases = {i: None for i in range(n_cases)}
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, *args) -> None:
+        if any(c is None for c in self.cases.values()):
+            msg = "All cases must be added before exiting context."
+            raise ConditionalError(msg)
+        return None
 
     @classmethod
     def new_nested(
@@ -164,8 +178,8 @@ class Conditional(ParentBuilder[ops.Conditional]):
 
         Examples:
             >>> cond = Conditional(tys.Bool, [tys.Qubit])
-            >>> case = cond.add_case(0)
-            >>> case.set_outputs(*case.inputs())
+            >>> with cond.add_case(0) as case:\
+                    case.set_outputs(*case.inputs())
         """
         if case_id not in self.cases:
             msg = f"Case {case_id} out of possible range."

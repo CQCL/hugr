@@ -126,9 +126,9 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         self.validate_subtree(self.hugr.root(), &[])?;
 
         // In tests we take the opportunity to verify that the hugr
-        // serialization round-trips. We verify the schema of the serialisation
+        // serialization round-trips. We verify the schema of the serialization
         // format only when an environment variable is set. This allows
-        // a developer to modify the definition of serialised types locally
+        // a developer to modify the definition of serialized types locally
         // without having to change the schema.
         #[cfg(all(test, not(miri)))]
         {

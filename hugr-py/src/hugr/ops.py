@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from functools import cached_property
 from typing import TYPE_CHECKING, Protocol, TypeVar, runtime_checkable
+
+from typing_extensions import Self
 
 import hugr.serialization.ops as sops
 from hugr import tys, val
@@ -31,7 +34,7 @@ class InvalidPort(Exception):
 @runtime_checkable
 class Op(Protocol):
     """An abstract HUGR operation. Must be convertible
-    to a serialisable :class:`BaseOp`.
+    to a serializable :class:`BaseOp`.
     """
 
     @property
@@ -46,7 +49,7 @@ class Op(Protocol):
         ...  # pragma: no cover
 
     def to_serial(self, parent: Node) -> BaseOp:
-        """Convert this operation to a serialisable form."""
+        """Convert this operation to a serializable form."""
         ...  # pragma: no cover
 
     def port_kind(self, port: InPort | OutPort) -> tys.Kind:
@@ -133,6 +136,9 @@ def _check_complete(op, v: V | None) -> V:
     return v
 
 
+ComWire = Wire | int
+
+
 @dataclass(frozen=True)
 class Command:
     """A :class:`DataflowOp` and its incoming :class:`Wire <hugr.nodeport.Wire>`
@@ -146,7 +152,7 @@ class Command:
     """
 
     op: DataflowOp
-    incoming: list[Wire]
+    incoming: list[ComWire]
 
 
 @dataclass()
@@ -194,8 +200,79 @@ class Output(DataflowOp, _PartialOp):
         self._types = types
 
 
-@dataclass()
-class Custom(DataflowOp):
+@runtime_checkable
+class AsCustomOp(DataflowOp, Protocol):
+    """Abstract interface that types can implement
+    to behave as a custom dataflow operation.
+    """
+
+    @dataclass(frozen=True)
+    class InvalidCustomOp(Exception):
+        """Custom operation does not match the expected type."""
+
+        msg: str
+
+    @cached_property
+    def custom_op(self) -> Custom:
+        """:class:`Custom` operation that this type represents.
+
+        Computed once using :meth:`to_custom` and cached - should be deterministic.
+        """
+        return self.to_custom()
+
+    def to_custom(self) -> Custom:
+        """Convert this type to a :class:`Custom` operation.
+
+
+        Used by :attr:`custom_op`, so must be deterministic.
+        """
+        ...  # pragma: no cover
+
+    @classmethod
+    def from_custom(cls, custom: Custom) -> Self | None:
+        """Load from a :class:`Custom` operation.
+
+
+        By default assumes the type of `cls` is a singleton,
+        and compares the result of :meth:`to_custom` with the given `custom`.
+
+        If successful, returns the singleton, else None.
+
+        Non-singleton types should override this method.
+
+        Raises:
+            InvalidCustomOp: If the given `custom` does not match the expected one for a
+            given extension/operation name.
+        """
+        default = cls()
+        if default.custom_op == custom:
+            return default
+        return None
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, AsCustomOp):
+            return NotImplemented
+        slf, other = self.custom_op, other.custom_op
+        return (
+            slf.extension == other.extension
+            and slf.op_name == other.op_name
+            and slf.signature == other.signature
+            and slf.args == other.args
+        )
+
+    def outer_signature(self) -> tys.FunctionType:
+        return self.custom_op.signature
+
+    def to_serial(self, parent: Node) -> sops.CustomOp:
+        return self.custom_op.to_serial(parent)
+
+    @property
+    def num_out(self) -> int:
+        return len(self.custom_op.signature.output)
+
+
+@dataclass(frozen=True, eq=False)
+class Custom(AsCustomOp):
     """A non-core dataflow operation defined in an extension."""
 
     op_name: str
@@ -203,10 +280,6 @@ class Custom(DataflowOp):
     description: str = ""
     extension: tys.ExtensionId = ""
     args: list[tys.TypeArg] = field(default_factory=list)
-
-    @property
-    def num_out(self) -> int:
-        return len(self.signature.output)
 
     def to_serial(self, parent: Node) -> sops.CustomOp:
         return sops.CustomOp(
@@ -218,8 +291,16 @@ class Custom(DataflowOp):
             args=ser_it(self.args),
         )
 
-    def outer_signature(self) -> tys.FunctionType:
-        return self.signature
+    def to_custom(self) -> Custom:
+        return self
+
+    @classmethod
+    def from_custom(cls, custom: Custom) -> Custom:
+        return custom
+
+    def check_id(self, extension: tys.ExtensionId, op_name: str) -> bool:
+        """Check if the operation matches the given extension and operation name."""
+        return self.extension == extension and self.op_name == op_name
 
 
 @dataclass()
@@ -244,7 +325,7 @@ class MakeTuple(DataflowOp, _PartialOp):
             tys=ser_it(self.types),
         )
 
-    def __call__(self, *elements: Wire) -> Command:
+    def __call__(self, *elements: ComWire) -> Command:
         return super().__call__(*elements)
 
     def outer_signature(self) -> tys.FunctionType:
@@ -282,7 +363,7 @@ class UnpackTuple(DataflowOp, _PartialOp):
             tys=ser_it(self.types),
         )
 
-    def __call__(self, tuple_: Wire) -> Command:
+    def __call__(self, tuple_: ComWire) -> Command:
         return super().__call__(tuple_)
 
     def outer_signature(self) -> tys.FunctionType:
@@ -925,7 +1006,7 @@ class CallIndirect(DataflowOp, _PartialOp):
             signature=self.signature.to_serial(),
         )
 
-    def __call__(self, function: Wire, *args: Wire) -> Command:  # type: ignore[override]
+    def __call__(self, function: ComWire, *args: ComWire) -> Command:  # type: ignore[override]
         return super().__call__(function, *args)
 
     def outer_signature(self) -> tys.FunctionType:

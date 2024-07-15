@@ -70,7 +70,11 @@ impl MakeOpDef for NaryLogic {
     }
 
     fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError> {
-        try_from_name(op_def.name())
+        try_from_name(op_def.name(), op_def.extension())
+    }
+
+    fn extension(&self) -> ExtensionId {
+        EXTENSION_ID.to_owned()
     }
 
     fn post_opdef(&self, def: &mut OpDef) {
@@ -123,6 +127,10 @@ impl MakeOpDef for NotOp {
         } else {
             Err(OpLoadError::NotMember(op_def.name().to_string()))
         }
+    }
+
+    fn extension(&self) -> ExtensionId {
+        EXTENSION_ID.to_owned()
     }
 
     fn signature(&self) -> SignatureFunc {

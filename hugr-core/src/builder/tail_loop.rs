@@ -195,4 +195,15 @@ mod test {
 
         Ok(())
     }
+
+    #[test]
+    #[should_panic] // issue 1257: When building a TailLoop, calling outputs_arr, you are given an OrderEdge "output wire"
+    fn tailloop_output_arr() {
+        let mut builder =
+            TailLoopBuilder::new(type_row![], type_row![], type_row![], ExtensionSet::new())
+                .unwrap();
+        let control = builder.add_load_value(Value::false_val());
+        let tailloop = builder.finish_with_outputs(control, []).unwrap();
+        let [] = tailloop.outputs_arr();
+    }
 }
