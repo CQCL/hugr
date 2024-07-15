@@ -208,7 +208,7 @@ pub(super) mod test {
         builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
         type_row,
         types::{FunctionType, Type},
-        utils::test_quantum_extension::h_gate,
+        utils::test_quantum_extension::{h_gate, EXTENSION_ID},
     };
 
     use super::*;
@@ -226,7 +226,7 @@ pub(super) mod test {
         let (f_id, inner_id) = {
             let mut func_builder = module_builder.define_function(
                 "main",
-                FunctionType::new(type_row![NAT, QB], type_row![NAT, QB]),
+                FunctionType::new_endo(type_row![NAT, QB]).with_extension_delta(EXTENSION_ID),
             )?;
 
             let [int, qb] = func_builder.input_wires_arr();
@@ -262,7 +262,11 @@ pub(super) mod test {
 
         assert_eq!(
             region.poly_func_type(),
-            Some(FunctionType::new_endo(type_row![NAT, QB]).into())
+            Some(
+                FunctionType::new_endo(type_row![NAT, QB])
+                    .with_extension_delta(EXTENSION_ID)
+                    .into()
+            )
         );
         let inner_region: DescendantsGraph = DescendantsGraph::try_new(&hugr, inner)?;
         assert_eq!(

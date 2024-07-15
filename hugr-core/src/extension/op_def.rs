@@ -245,10 +245,8 @@ impl SignatureFunc {
             }
         };
 
-        let res = pf.instantiate(args, exts)?;
-        // TODO bring this assert back once resource inference is done?
-        // https://github.com/CQCL/hugr/issues/388
-        // debug_assert!(res.extension_reqs.contains(def.extension()));
+        let mut res = pf.instantiate(args, exts)?;
+        res.extension_reqs.insert(&def.extension);
         Ok(res)
     }
 }
@@ -480,7 +478,7 @@ pub(super) mod test {
     use itertools::Itertools;
 
     use super::SignatureFromArgs;
-    use crate::builder::{DFGBuilder, Dataflow, DataflowHugr};
+    use crate::builder::{endo_ft, DFGBuilder, Dataflow, DataflowHugr};
     use crate::extension::op_def::{CustomValidator, LowerFunc, OpDef, SignatureFunc};
     use crate::extension::prelude::USIZE_T;
     use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE};
@@ -603,7 +601,7 @@ pub(super) mod test {
 
         let list_usize =
             Type::new_extension(list_def.instantiate(vec![TypeArg::Type { ty: USIZE_T }])?);
-        let mut dfg = DFGBuilder::new(FunctionType::new_endo(vec![list_usize]))?;
+        let mut dfg = DFGBuilder::new(endo_ft(vec![list_usize]))?;
         let rev = dfg.add_dataflow_op(
             CustomOp::new_extension(
                 e.instantiate_extension_op(&OP_NAME, vec![TypeArg::Type { ty: USIZE_T }], &reg)
@@ -655,10 +653,10 @@ pub(super) mod test {
         let args = [TypeArg::BoundedNat { n: 3 }, USIZE_T.into()];
         assert_eq!(
             def.compute_signature(&args, &PRELUDE_REGISTRY),
-            Ok(FunctionType::new(
-                vec![USIZE_T; 3],
-                vec![Type::new_tuple(vec![USIZE_T; 3])]
-            ))
+            Ok(
+                FunctionType::new(vec![USIZE_T; 3], vec![Type::new_tuple(vec![USIZE_T; 3])])
+                    .with_extension_delta(EXT_ID)
+            )
         );
         assert_eq!(def.validate_args(&args, &PRELUDE_REGISTRY, &[]), Ok(()));
 
@@ -668,10 +666,10 @@ pub(super) mod test {
         let args = [TypeArg::BoundedNat { n: 3 }, tyvar.clone().into()];
         assert_eq!(
             def.compute_signature(&args, &PRELUDE_REGISTRY),
-            Ok(FunctionType::new(
-                tyvars.clone(),
-                vec![Type::new_tuple(tyvars)]
-            ))
+            Ok(
+                FunctionType::new(tyvars.clone(), vec![Type::new_tuple(tyvars)])
+                    .with_extension_delta(EXT_ID)
+            )
         );
         def.validate_args(&args, &PRELUDE_REGISTRY, &[TypeBound::Eq.into()])
             .unwrap();
@@ -724,7 +722,7 @@ pub(super) mod test {
         def.validate_args(&args, &EMPTY_REG, &decls).unwrap();
         assert_eq!(
             def.compute_signature(&args, &EMPTY_REG),
-            Ok(FunctionType::new_endo(vec![tv]))
+            Ok(FunctionType::new_endo(vec![tv]).with_extension_delta(EXT_ID))
         );
         // But not with an external row variable
         let arg: TypeArg = Type::new_row_var_use(0, TypeBound::Eq).into();

@@ -446,13 +446,11 @@ mod test {
     use itertools::Itertools;
 
     use crate::builder::{
-        BuildError, CFGBuilder, Container, DFGBuilder, Dataflow, DataflowHugr,
+        endo_ft, BuildError, CFGBuilder, Container, DFGBuilder, Dataflow, DataflowHugr,
         DataflowSubContainer, HugrBuilder, SubContainer,
     };
     use crate::extension::prelude::{BOOL_T, USIZE_T};
-    use crate::extension::{
-        ExtensionId, ExtensionRegistry, ExtensionSet, PRELUDE, PRELUDE_REGISTRY,
-    };
+    use crate::extension::{ExtensionId, ExtensionRegistry, PRELUDE, PRELUDE_REGISTRY};
     use crate::hugr::internal::HugrMutInternals;
     use crate::hugr::rewrite::replace::WhichHugr;
     use crate::hugr::{HugrMut, Rewrite};
@@ -490,11 +488,7 @@ mod test {
         let just_list = TypeRow::from(vec![listy.clone()]);
         let intermed = TypeRow::from(vec![listy.clone(), USIZE_T]);
 
-        let mut cfg = CFGBuilder::new(
-            // One might expect an extension_delta of "collections" here, but push/pop
-            // have an empty delta themselves, pending https://github.com/CQCL/hugr/issues/388
-            FunctionType::new_endo(just_list.clone()),
-        )?;
+        let mut cfg = CFGBuilder::new(endo_ft(just_list.clone()))?;
 
         let pred_const = cfg.add_constant(ops::Value::unary_unit_sum());
 
@@ -532,9 +526,7 @@ mod test {
                 inputs: vec![listy.clone()].into(),
                 sum_rows: vec![type_row![]],
                 other_outputs: vec![listy.clone()].into(),
-                // This should be ExtensionSet::singleton(&collections::EXTENSION_NAME),
-                // at least when https://github.com/CQCL/issues/388 is fixed
-                extension_delta: ExtensionSet::new(),
+                extension_delta: collections::EXTENSION_NAME.into(),
             },
         );
         let r_df1 = replacement.add_node_with_parent(
@@ -543,13 +535,15 @@ mod test {
                 signature: FunctionType::new(
                     vec![listy.clone()],
                     simple_unary_plus(intermed.clone()),
-                ),
+                )
+                .with_extension_delta(collections::EXTENSION_NAME),
             },
         );
         let r_df2 = replacement.add_node_with_parent(
             r_bb,
             DFG {
-                signature: FunctionType::new(intermed, simple_unary_plus(just_list.clone())),
+                signature: FunctionType::new(intermed, simple_unary_plus(just_list.clone()))
+                    .with_extension_delta(collections::EXTENSION_NAME),
             },
         );
         [0, 1]
@@ -632,7 +626,7 @@ mod test {
                 },
                 op_sig.input()
             );
-            h.simple_entry_builder(op_sig.output, 1, op_sig.extension_reqs.clone())?
+            h.simple_entry_builder_exts(op_sig.output, 1, op_sig.extension_reqs.clone())?
         } else {
             h.simple_block_builder(op_sig, 1)?
         };
@@ -669,7 +663,6 @@ mod test {
             (vec![type_row![]; 2], b),
             [(USIZE_T, i)],
             type_row![USIZE_T],
-            ExtensionSet::new(),
         )?;
         let mut case1 = cond.case_builder(0)?;
         let foo = case1.add_dataflow_op(mk_op("foo"), case1.input_wires())?;

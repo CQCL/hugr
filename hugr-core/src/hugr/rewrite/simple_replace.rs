@@ -219,11 +219,11 @@ pub(in crate::hugr::rewrite) mod test {
     use std::collections::{HashMap, HashSet};
 
     use crate::builder::{
-        BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
-        HugrBuilder, ModuleBuilder,
+        endo_ft, inout_ft, BuildError, Container, DFGBuilder, Dataflow, DataflowHugr,
+        DataflowSubContainer, HugrBuilder, ModuleBuilder,
     };
     use crate::extension::prelude::BOOL_T;
-    use crate::extension::{EMPTY_REG, PRELUDE_REGISTRY};
+    use crate::extension::{ExtensionSet, EMPTY_REG, PRELUDE_REGISTRY};
     use crate::hugr::views::{HugrView, SiblingSubgraph};
     use crate::hugr::{Hugr, HugrMut, Rewrite};
     use crate::ops::dataflow::DataflowOpTrait;
@@ -234,7 +234,7 @@ pub(in crate::hugr::rewrite) mod test {
     use crate::std_extensions::logic::NotOp;
     use crate::type_row;
     use crate::types::{FunctionType, Type};
-    use crate::utils::test_quantum_extension::{cx_gate, h_gate};
+    use crate::utils::test_quantum_extension::{cx_gate, h_gate, EXTENSION_ID};
     use crate::{IncomingPort, Node};
 
     use super::SimpleReplacement;
@@ -253,19 +253,17 @@ pub(in crate::hugr::rewrite) mod test {
     fn make_hugr() -> Result<Hugr, BuildError> {
         let mut module_builder = ModuleBuilder::new();
         let _f_id = {
+            let just_q: ExtensionSet = EXTENSION_ID.into();
             let mut func_builder = module_builder.define_function(
                 "main",
-                FunctionType::new(type_row![QB, QB, QB], type_row![QB, QB, QB]),
+                FunctionType::new_endo(type_row![QB, QB, QB]).with_extension_delta(just_q.clone()),
             )?;
 
             let [qb0, qb1, qb2] = func_builder.input_wires_arr();
 
             let q_out = func_builder.add_dataflow_op(h_gate(), vec![qb2])?;
 
-            let mut inner_builder = func_builder.dfg_builder(
-                FunctionType::new(type_row![QB, QB], type_row![QB, QB]),
-                [qb0, qb1],
-            )?;
+            let mut inner_builder = func_builder.dfg_builder_endo([(QB, qb0), (QB, qb1)])?;
             let inner_graph = {
                 let [wire0, wire1] = inner_builder.input_wires_arr();
                 let wire2 = inner_builder.add_dataflow_op(h_gate(), vec![wire0])?;
@@ -294,8 +292,7 @@ pub(in crate::hugr::rewrite) mod test {
     /// ┤ H ├┤ X ├
     /// └───┘└───┘
     fn make_dfg_hugr() -> Result<Hugr, BuildError> {
-        let mut dfg_builder =
-            DFGBuilder::new(FunctionType::new(type_row![QB, QB], type_row![QB, QB]))?;
+        let mut dfg_builder = DFGBuilder::new(endo_ft(type_row![QB, QB]))?;
         let [wire0, wire1] = dfg_builder.input_wires_arr();
         let wire2 = dfg_builder.add_dataflow_op(h_gate(), vec![wire0])?;
         let wire3 = dfg_builder.add_dataflow_op(h_gate(), vec![wire1])?;
@@ -315,8 +312,8 @@ pub(in crate::hugr::rewrite) mod test {
     /// ┤ H ├
     /// └───┘
     fn make_dfg_hugr2() -> Result<Hugr, BuildError> {
-        let mut dfg_builder =
-            DFGBuilder::new(FunctionType::new(type_row![QB, QB], type_row![QB, QB]))?;
+        let mut dfg_builder = DFGBuilder::new(endo_ft(type_row![QB, QB]))?;
+
         let [wire0, wire1] = dfg_builder.input_wires_arr();
         let wire2 = dfg_builder.add_dataflow_op(h_gate(), vec![wire1])?;
         let wire2out = wire2.outputs().exactly_one().unwrap();
@@ -343,10 +340,8 @@ pub(in crate::hugr::rewrite) mod test {
     #[fixture]
     pub(in crate::hugr::rewrite) fn dfg_hugr_copy_bools() -> (Hugr, Vec<Node>) {
         fn build() -> Result<(Hugr, Vec<Node>), BuildError> {
-            let mut dfg_builder = DFGBuilder::new(FunctionType::new(
-                type_row![BOOL_T],
-                type_row![BOOL_T, BOOL_T],
-            ))?;
+            let mut dfg_builder =
+                DFGBuilder::new(inout_ft(type_row![BOOL_T], type_row![BOOL_T, BOOL_T]))?;
             let [b] = dfg_builder.input_wires_arr();
 
             let not_inp = dfg_builder.add_dataflow_op(NotOp, vec![b])?;
@@ -523,7 +518,7 @@ pub(in crate::hugr::rewrite) mod test {
     #[test]
     fn test_replace_cx_cross() {
         let q_row: Vec<Type> = vec![QB, QB];
-        let mut builder = DFGBuilder::new(FunctionType::new(q_row.clone(), q_row)).unwrap();
+        let mut builder = DFGBuilder::new(endo_ft(q_row)).unwrap();
         let mut circ = builder.as_circuit(builder.input_wires());
         circ.append(cx_gate(), [0, 1]).unwrap();
         circ.append(cx_gate(), [1, 0]).unwrap();
@@ -581,8 +576,7 @@ pub(in crate::hugr::rewrite) mod test {
         let one_bit = type_row![BOOL_T];
         let two_bit = type_row![BOOL_T, BOOL_T];
 
-        let mut builder =
-            DFGBuilder::new(FunctionType::new(one_bit.clone(), one_bit.clone())).unwrap();
+        let mut builder = DFGBuilder::new(endo_ft(one_bit.clone())).unwrap();
         let inw = builder.input_wires().exactly_one().unwrap();
         let outw = builder
             .add_dataflow_op(and_op(), [inw, inw])
@@ -591,7 +585,7 @@ pub(in crate::hugr::rewrite) mod test {
         let [input, _] = builder.io();
         let mut h = builder.finish_hugr_with_outputs(outw, &EMPTY_REG).unwrap();
 
-        let mut builder = DFGBuilder::new(FunctionType::new(two_bit, one_bit)).unwrap();
+        let mut builder = DFGBuilder::new(inout_ft(two_bit, one_bit)).unwrap();
         let inw = builder.input_wires();
         let outw = builder.add_dataflow_op(and_op(), inw).unwrap().outputs();
         let [repl_input, repl_output] = builder.io();

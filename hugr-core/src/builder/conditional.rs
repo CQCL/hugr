@@ -245,7 +245,6 @@ mod test {
                         ([type_row![], type_row![]], const_wire),
                         other_inputs,
                         outputs,
-                        ExtensionSet::new(),
                     )?;
 
                     n_identity(conditional_b.case_builder(0)?)?;
