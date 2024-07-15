@@ -27,14 +27,15 @@ use petgraph::{
 ///
 /// Dataflow regions are ordered by inserting order edges between their
 /// immediate children. A dataflow parent with `C` children will have at most
-/// `C-1` edges added. Any node than can be ordered will be.
+/// `C-1` edges added. Any node that can be ordered will be.
 ///
-/// Nodes are ordered according to the `rank` function. Nodes of lower rank will
-/// be ordered earlier in their parent. Note that if  `rank(n1) < rank(n2)` it
-/// is not guaranteed that `n1` will be ordered before `n2`. If `n1` dominates
-/// `n2` it cannot be ordered after `n1` without invalidating `hugr`.  Nodes of
-/// equal rank will be ordered arbitrarily, although that arbitrary order is
-/// deterministic.
+/// Nodes are ordered according to the `rank` function but respecting the order
+/// required for their dependencies (edges). The algorithm will put nodes of
+/// lower rank earlier in their parent whenever (transitive) dependencies allow.
+/// If `rank(n1) < rank(n2)` then `n1` will be ordered before `n2` so long as
+/// there is no path from `n2` to `n1` (otherwise this would invalidate `hugr`).
+/// Nodes of equal rank will be ordered arbitrarily, although that arbitrary
+/// order is deterministic.
 pub fn force_order(
     hugr: &mut impl HugrMut,
     root: Node,
