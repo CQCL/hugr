@@ -129,7 +129,7 @@ pub fn endo_ft(types: impl Into<TypeRow>) -> FunctionType {
 
 /// Return a FunctionType with the specified input and output types
 /// whose extension delta, when used in a non-FuncDefn container, will be inferred.
-pub fn ft2(inputs: impl Into<TypeRow>, outputs: impl Into<TypeRow>) -> FunctionType {
+pub fn inout_ft(inputs: impl Into<TypeRow>, outputs: impl Into<TypeRow>) -> FunctionType {
     FunctionType::new(inputs, outputs).with_extension_delta(TO_BE_INFERRED)
 }
 

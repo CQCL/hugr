@@ -133,7 +133,7 @@ mod test {
     use rstest::rstest;
 
     use crate::builder::{
-        endo_ft, ft2, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
+        endo_ft, inout_ft, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
         SubContainer,
     };
     use crate::extension::prelude::QB_T;
@@ -175,7 +175,7 @@ mod test {
         .unwrap();
         let int_ty = &int_types::INT_TYPES[6];
 
-        let mut outer = DFGBuilder::new(ft2(vec![int_ty.clone(); 2], vec![int_ty.clone()]))?;
+        let mut outer = DFGBuilder::new(inout_ft(vec![int_ty.clone(); 2], vec![int_ty.clone()]))?;
         let [a, b] = outer.input_wires_arr();
         fn make_const<T: AsMut<Hugr> + AsRef<Hugr>>(
             d: &mut DFGBuilder<T>,
