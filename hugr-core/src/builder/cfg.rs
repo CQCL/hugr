@@ -283,9 +283,9 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         )
     }
 
-    /// Return a builder for the entry [`DataflowBlock`] child graph with
-    /// `outputs` and the variants of the branching Sum value
-    /// specified by `sum_rows`.
+    /// Return a builder for the entry [`DataflowBlock`] child graph with `outputs`
+    /// and the variants of the branching Sum value specified by `sum_rows`.
+    /// Extension delta will be inferred.
     ///
     /// # Errors
     ///
@@ -298,9 +298,10 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         self.entry_builder_exts(TO_BE_INFERRED, sum_rows, other_outputs)
     }
 
-    /// Return a builder for the entry [`DataflowBlock`] child graph with `inputs`
-    /// and `outputs` and the variants of the branching Sum value
-    /// specified by `sum_rows`.
+    /// Return a builder for the entry [`DataflowBlock`] child graph with `outputs`,
+    /// the variants of the branching Sum value specified by `sum_rows`, and
+    /// `extension_delta` explicitly specified. ([entry_builder](Self::entry_builder)
+    /// may be used to infer.)
     ///
     /// # Errors
     ///
@@ -324,8 +325,8 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         )
     }
 
-    /// Return a builder for the entry [`DataflowBlock`] child graph with `inputs`
-    /// and `outputs` and a UnitSum type: a Sum of `n_cases` unit types.
+    /// Return a builder for the entry [`DataflowBlock`] child graph with
+    /// `outputs` and a UnitSum type: a Sum of `n_cases` unit types.
     ///
     /// # Errors
     ///
@@ -338,8 +339,9 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         self.entry_builder(vec![type_row![]; n_cases], outputs)
     }
 
-    /// Return a builder for the entry [`DataflowBlock`] child graph with `inputs`
-    /// and `outputs` and a UnitSum type: a Sum of `n_cases` unit types.
+    /// Return a builder for the entry [`DataflowBlock`] child graph with
+    /// `outputs` and a Sum of `n_cases` unit types, and explicit `extension_delta`.
+    /// ([simple_entry_builder](Self::simple_entry_builder) may be used to infer.)
     ///
     /// # Errors
     ///

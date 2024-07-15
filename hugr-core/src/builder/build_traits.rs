@@ -465,6 +465,7 @@ pub trait Dataflow: Container {
     /// The `other_inputs` must be an iterable over pairs of the type of the input and
     /// the corresponding wire.
     /// The `outputs` are the types of the outputs.
+    /// `exts` is the extension delta, here explicit. [conditional_builder](Self::conditional_builder) may be used to infer.
     ///
     /// # Errors
     ///
