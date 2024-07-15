@@ -100,7 +100,11 @@ pub enum IntOpDef {
 
 impl MakeOpDef for IntOpDef {
     fn from_def(op_def: &OpDef) -> Result<Self, crate::extension::simple_op::OpLoadError> {
-        crate::extension::simple_op::try_from_name(op_def.name())
+        crate::extension::simple_op::try_from_name(op_def.name(), op_def.extension())
+    }
+
+    fn extension(&self) -> ExtensionId {
+        EXTENSION_ID.to_owned()
     }
 
     fn signature(&self) -> SignatureFunc {

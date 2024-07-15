@@ -1,46 +1,52 @@
 from __future__ import annotations
+
 import inspect
 import sys
 from abc import ABC, abstractmethod
 from typing import Any, Literal
 
-from pydantic import Field, RootModel, ConfigDict
+from pydantic import ConfigDict, Field, RootModel
+
+from hugr.utils import deser_it
 
 from . import tys as stys
 from .tys import (
+    ConfiguredBaseModel,
     ExtensionId,
     ExtensionSet,
     FunctionType,
     PolyFuncType,
-    Type,
-    TypeRow,
     SumType,
+    Type,
     TypeBound,
-    ConfiguredBaseModel,
+    TypeRow,
+)
+from .tys import (
     classes as tys_classes,
+)
+from .tys import (
     model_rebuild as tys_model_rebuild,
 )
-from hugr.utils import deser_it
-
 
 NodeID = int
 
 
 class BaseOp(ABC, ConfiguredBaseModel):
-    """Base class for ops that store their node's input/output types"""
+    """Base class for ops that store their node's input/output types."""
 
     # Parent node index of node the op belongs to, used only at serialization time
     parent: NodeID
 
     def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
         """Hook to insert type information from the input and output ports into the
-        op"""
+        op.
+        """
 
     def insert_child_dfg_signature(self, inputs: TypeRow, outputs: TypeRow) -> None:
-        """Hook to insert type information from a child dataflow graph"""
+        """Hook to insert type information from a child dataflow graph."""
 
     def display_name(self) -> str:
-        """Name of the op for visualisation"""
+        """Name of the op for visualisation."""
         return self.__class__.__name__
 
     @abstractmethod
@@ -128,14 +134,14 @@ class TupleValue(BaseValue):
     """A constant tuple value."""
 
     v: Literal["Tuple"] = Field(default="Tuple", title="ValueTag")
-    vs: list["Value"]
+    vs: list[Value]
 
     def deserialize(self) -> val.Value:
-        return val.Tuple(deser_it((v.root for v in self.vs)))
+        return val.Tuple(*deser_it(v.root for v in self.vs))
 
 
 class SumValue(BaseValue):
-    """A Sum variant
+    """A Sum variant.
 
     For any Sum type where this value meets the type of the variant indicated by the tag
     """
@@ -143,7 +149,7 @@ class SumValue(BaseValue):
     v: Literal["Sum"] = Field(default="Sum", title="ValueTag")
     tag: int
     typ: SumType
-    vs: list["Value"]
+    vs: list[Value]
     model_config = ConfigDict(
         json_schema_extra={
             "description": (
@@ -155,7 +161,7 @@ class SumValue(BaseValue):
 
     def deserialize(self) -> val.Value:
         return val.Sum(
-            self.tag, self.typ.deserialize(), deser_it((v.root for v in self.vs))
+            self.tag, self.typ.deserialize(), deser_it(v.root for v in self.vs)
         )
 
 
@@ -189,7 +195,8 @@ class Const(BaseOp):
 
 class DataflowBlock(BaseOp):
     """A CFG basic block node. The signature is that of the internal Dataflow
-    graph."""
+    graph.
+    """
 
     op: Literal["DataflowBlock"] = "DataflowBlock"
     inputs: TypeRow = Field(default_factory=list)
@@ -224,14 +231,16 @@ class DataflowBlock(BaseOp):
 
     model_config = ConfigDict(
         json_schema_extra={
-            "description": "A CFG basic block node. The signature is that of the internal Dataflow graph.",
+            "description": "A CFG basic block node."
+            " The signature is that of the internal Dataflow graph.",
         }
     )
 
 
 class ExitBlock(BaseOp):
     """The single exit node of the CFG, has no children, stores the types of
-    the CFG node output."""
+    the CFG node output.
+    """
 
     op: Literal["ExitBlock"] = "ExitBlock"
     cfg_outputs: TypeRow
@@ -239,7 +248,8 @@ class ExitBlock(BaseOp):
     model_config = ConfigDict(
         json_schema_extra={
             # Needed to avoid random '\n's in the pydantic description
-            "description": "The single exit node of the CFG, has no children, stores the types of the CFG node output.",
+            "description": "The single exit node of the CFG, has no children,"
+            " stores the types of the CFG node output.",
         }
     )
 
@@ -285,8 +295,7 @@ class Output(DataflowOp):
 
 
 class Call(DataflowOp):
-    """
-    Call a function directly.
+    """Call a function directly.
 
     The first port is connected to the def/declare of the function being called
     directly, with a `ConstE<Graph>` edge. The signature of the remaining ports matches
@@ -334,8 +343,8 @@ class CallIndirect(DataflowOp):
         assert len(fun_ty.output) == len(out_types)
         self.signature = fun_ty
 
-    def deserialize(self) -> ops.CallIndirectDef:
-        return ops.CallIndirectDef(self.signature.deserialize())
+    def deserialize(self) -> ops.CallIndirect:
+        return ops.CallIndirect(self.signature.deserialize())
 
 
 class LoadConstant(DataflowOp):
@@ -362,7 +371,7 @@ class LoadFunction(DataflowOp):
         (f_ty,) = signature.output
         assert isinstance(
             f_ty, tys.FunctionType
-        ), "Expected single funciton type output"
+        ), "Expected single function type output"
         return ops.LoadFunc(
             self.func_sig.deserialize(),
             f_ty,
@@ -490,7 +499,8 @@ ControlFlowOp = Conditional | TailLoop | CFG
 
 class CustomOp(DataflowOp):
     """A user-defined operation that can be downcasted by the extensions that define
-    it."""
+    it.
+    """
 
     op: Literal["CustomOp"] = "CustomOp"
     extension: ExtensionId
@@ -517,8 +527,8 @@ class CustomOp(DataflowOp):
         # Needed to avoid random '\n's in the pydantic description
         json_schema_extra={
             "description": (
-                "A user-defined operation that can be downcasted by the extensions that "
-                "define it."
+                "A user-defined operation that can be downcasted by the extensions that"
+                " define it."
             )
         }
     )
@@ -536,8 +546,8 @@ class Noop(DataflowOp):
         assert in_types[0] == out_types[0]
         self.ty = in_types[0]
 
-    def deserialize(self) -> ops.NoopDef:
-        return ops.NoopDef(self.ty.deserialize())
+    def deserialize(self) -> ops.Noop:
+        return ops.Noop(self.ty.deserialize())
 
 
 class MakeTuple(DataflowOp):
@@ -552,8 +562,8 @@ class MakeTuple(DataflowOp):
             in_types = []
         self.tys = list(in_types)
 
-    def deserialize(self) -> ops.MakeTupleDef:
-        return ops.MakeTupleDef(deser_it(self.tys))
+    def deserialize(self) -> ops.MakeTuple:
+        return ops.MakeTuple(deser_it(self.tys))
 
 
 class UnpackTuple(DataflowOp):
@@ -565,8 +575,8 @@ class UnpackTuple(DataflowOp):
     def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
         self.tys = list(out_types)
 
-    def deserialize(self) -> ops.UnpackTupleDef:
-        return ops.UnpackTupleDef(deser_it(self.tys))
+    def deserialize(self) -> ops.UnpackTuple:
+        return ops.UnpackTuple(deser_it(self.tys))
 
 
 class Tag(DataflowOp):
@@ -682,7 +692,8 @@ classes = (
 
 tys_model_rebuild(dict(classes))
 
-# needed to avoid circular imports
-from hugr import ops  # noqa: E402
-from hugr import val  # noqa: E402
-from hugr import tys  # noqa: E402
+from hugr import (  # noqa: E402 # needed to avoid circular imports
+    ops,
+    tys,
+    val,
+)

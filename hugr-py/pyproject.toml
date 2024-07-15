@@ -13,7 +13,7 @@ classifiers = [
     "Topic :: Scientific/Engineering",
 ]
 name = "hugr"
-version = "0.2.1"
+version = "0.4.0"
 description = "Quantinuum's common representation for quantum programs"
 #keywords = []
 authors = ["TKET development team <tket-support@cambridgequantum.com>"]
@@ -25,11 +25,15 @@ repository = "https://github.com/CQCL/hugr"
 
 [tool.poetry.dependencies]
 python = ">=3.10"
-pydantic = "~2.7.0"
+pydantic = ">=2.7,<2.9"
 
-[tool.pytest.ini_options]
-# Lark throws deprecation warnings for `src_parse` and `src_constants`.
-filterwarnings = "ignore::DeprecationWarning:lark.*"
+[tool.poetry.group.docs]
+optional = true
+
+[tool.poetry.group.docs.dependencies]
+sphinx = "^7.2.6"
+sphinx-book-theme = "^1.1.2"
+sphinx-multiversion = "^0.2.4"
 
 [build-system]
 requires = ["poetry-core"]

@@ -575,7 +575,7 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> EdgeClassifier<T> {
 pub(crate) mod test {
     use super::*;
     use hugr_core::builder::{
-        ft1, BuildError, CFGBuilder, Container, DataflowSubContainer, HugrBuilder,
+        endo_ft, BuildError, CFGBuilder, Container, DataflowSubContainer, HugrBuilder,
     };
     use hugr_core::extension::PRELUDE_REGISTRY;
     use hugr_core::extension::{prelude::USIZE_T, ExtensionSet};
@@ -619,8 +619,14 @@ pub(crate) mod test {
         )?;
         let (split, merge) = build_if_then_else_merge(&mut cfg_builder, &pred_const, &const_unit)?;
         cfg_builder.branch(&entry, 0, &split)?;
-        let head = n_identity(cfg_builder.simple_block_builder(ft1(NAT), 1)?, &const_unit)?;
-        let tail = n_identity(cfg_builder.simple_block_builder(ft1(NAT), 2)?, &pred_const)?;
+        let head = n_identity(
+            cfg_builder.simple_block_builder(endo_ft(NAT), 1)?,
+            &const_unit,
+        )?;
+        let tail = n_identity(
+            cfg_builder.simple_block_builder(endo_ft(NAT), 2)?,
+            &pred_const,
+        )?;
         cfg_builder.branch(&tail, 1, &head)?;
         cfg_builder.branch(&head, 0, &tail)?; // trivial "loop body"
         cfg_builder.branch(&merge, 0, &head)?;
@@ -845,7 +851,7 @@ pub(crate) mod test {
         const_pred: &ConstID,
         unit_const: &ConstID,
     ) -> Result<(BasicBlockID, BasicBlockID), BuildError> {
-        let split = n_identity(cfg.simple_block_builder(ft1(NAT), 2)?, const_pred)?;
+        let split = n_identity(cfg.simple_block_builder(endo_ft(NAT), 2)?, const_pred)?;
         let merge = build_then_else_merge_from_if(cfg, unit_const, split)?;
         Ok((split, merge))
     }
@@ -855,9 +861,9 @@ pub(crate) mod test {
         unit_const: &ConstID,
         split: BasicBlockID,
     ) -> Result<BasicBlockID, BuildError> {
-        let merge = n_identity(cfg.simple_block_builder(ft1(NAT), 1)?, unit_const)?;
-        let left = n_identity(cfg.simple_block_builder(ft1(NAT), 1)?, unit_const)?;
-        let right = n_identity(cfg.simple_block_builder(ft1(NAT), 1)?, unit_const)?;
+        let merge = n_identity(cfg.simple_block_builder(endo_ft(NAT), 1)?, unit_const)?;
+        let left = n_identity(cfg.simple_block_builder(endo_ft(NAT), 1)?, unit_const)?;
+        let right = n_identity(cfg.simple_block_builder(endo_ft(NAT), 1)?, unit_const)?;
         cfg.branch(&split, 0, &left)?;
         cfg.branch(&split, 1, &right)?;
         cfg.branch(&left, 0, &merge)?;
@@ -880,7 +886,10 @@ pub(crate) mod test {
         )?;
         let merge = build_then_else_merge_from_if(&mut cfg_builder, &const_unit, entry)?;
         // The merge block is also the loop header (so it merges three incoming control-flow edges)
-        let tail = n_identity(cfg_builder.simple_block_builder(ft1(NAT), 2)?, &pred_const)?;
+        let tail = n_identity(
+            cfg_builder.simple_block_builder(endo_ft(NAT), 2)?,
+            &pred_const,
+        )?;
         cfg_builder.branch(&tail, 1, &merge)?;
         cfg_builder.branch(&merge, 0, &tail)?; // trivial "loop body"
         let exit = cfg_builder.exit_block();
@@ -914,14 +923,20 @@ pub(crate) mod test {
         let (split, merge) = build_if_then_else_merge(cfg_builder, &pred_const, &const_unit)?;
 
         let head = if separate_headers {
-            let head = n_identity(cfg_builder.simple_block_builder(ft1(NAT), 1)?, &const_unit)?;
+            let head = n_identity(
+                cfg_builder.simple_block_builder(endo_ft(NAT), 1)?,
+                &const_unit,
+            )?;
             cfg_builder.branch(&head, 0, &split)?;
             head
         } else {
             // Combine loop header with split.
             split
         };
-        let tail = n_identity(cfg_builder.simple_block_builder(ft1(NAT), 2)?, &pred_const)?;
+        let tail = n_identity(
+            cfg_builder.simple_block_builder(endo_ft(NAT), 2)?,
+            &pred_const,
+        )?;
         cfg_builder.branch(&tail, 1, &head)?;
         cfg_builder.branch(&merge, 0, &tail)?;
 

@@ -2,7 +2,9 @@ use portgraph::PortOffset;
 use rstest::{fixture, rstest};
 
 use crate::{
-    builder::{ft1, ft2, BuildError, BuildHandle, Container, DFGBuilder, Dataflow, DataflowHugr},
+    builder::{
+        endo_ft, inout_ft, BuildError, BuildHandle, Container, DFGBuilder, Dataflow, DataflowHugr,
+    },
     extension::prelude::QB_T,
     ops::{
         handle::{DataflowOpID, NodeHandle},
@@ -16,7 +18,7 @@ use crate::{
 
 #[fixture]
 fn sample_hugr() -> (Hugr, BuildHandle<DataflowOpID>, BuildHandle<DataflowOpID>) {
-    let mut dfg = DFGBuilder::new(ft1(type_row![QB_T, QB_T])).unwrap();
+    let mut dfg = DFGBuilder::new(endo_ft(type_row![QB_T, QB_T])).unwrap();
 
     let [q1, q2] = dfg.input_wires_arr();
 
@@ -121,7 +123,8 @@ fn value_types() {
     use crate::utils::test_quantum_extension::h_gate;
     use itertools::Itertools;
 
-    let mut dfg = DFGBuilder::new(ft2(type_row![QB_T, BOOL_T], type_row![BOOL_T, QB_T])).unwrap();
+    let mut dfg =
+        DFGBuilder::new(inout_ft(type_row![QB_T, BOOL_T], type_row![BOOL_T, QB_T])).unwrap();
 
     let [q, b] = dfg.input_wires_arr();
     let n1 = dfg.add_dataflow_op(h_gate(), [q]).unwrap();
@@ -144,7 +147,7 @@ fn value_types() {
 fn static_targets() {
     use crate::extension::prelude::{ConstUsize, USIZE_T};
     use itertools::Itertools;
-    let mut dfg = DFGBuilder::new(ft2(type_row![], type_row![USIZE_T])).unwrap();
+    let mut dfg = DFGBuilder::new(inout_ft(type_row![], type_row![USIZE_T])).unwrap();
 
     let c = dfg.add_constant(Value::extension(ConstUsize::new(1)));
 
@@ -168,7 +171,7 @@ fn test_dataflow_ports_only() {
     use crate::std_extensions::logic::NotOp;
     use itertools::Itertools;
 
-    let mut dfg = DFGBuilder::new(ft1(BOOL_T)).unwrap();
+    let mut dfg = DFGBuilder::new(endo_ft(BOOL_T)).unwrap();
     let local_and = {
         let local_and = dfg
             .define_function(

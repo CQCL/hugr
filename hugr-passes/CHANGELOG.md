@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.4.0 (2024-07-10)
+
+### Features
+
+- Add `force_order` pass. ([#1285](https://github.com/CQCL/hugr/pull/1285))
+
+### Refactor
+
+- [**breaking**] Remove `Value::Tuple` ([#1255](https://github.com/CQCL/hugr/pull/1255))
+
+
+## 0.3.0 (2024-06-28)
+
+### Features
+
+- [**breaking**] Validate Extensions using hierarchy, ignore input_extensions, RIP inference ([#1142](https://github.com/CQCL/hugr/pull/1142))
+- Helper functions for requesting inference, use with builder in tests ([#1219](https://github.com/CQCL/hugr/pull/1219))
+
+
 ## 0.2.0 (2024-06-07)
 
 ### Features

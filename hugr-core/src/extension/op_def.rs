@@ -478,7 +478,7 @@ pub(super) mod test {
     use itertools::Itertools;
 
     use super::SignatureFromArgs;
-    use crate::builder::{ft1, DFGBuilder, Dataflow, DataflowHugr};
+    use crate::builder::{endo_ft, DFGBuilder, Dataflow, DataflowHugr};
     use crate::extension::op_def::{CustomValidator, LowerFunc, OpDef, SignatureFunc};
     use crate::extension::prelude::USIZE_T;
     use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE};
@@ -601,7 +601,7 @@ pub(super) mod test {
 
         let list_usize =
             Type::new_extension(list_def.instantiate(vec![TypeArg::Type { ty: USIZE_T }])?);
-        let mut dfg = DFGBuilder::new(ft1(vec![list_usize]))?;
+        let mut dfg = DFGBuilder::new(endo_ft(vec![list_usize]))?;
         let rev = dfg.add_dataflow_op(
             CustomOp::new_extension(
                 e.instantiate_extension_op(&OP_NAME, vec![TypeArg::Type { ty: USIZE_T }], &reg)
@@ -785,7 +785,7 @@ pub(super) mod test {
             type Strategy = BoxedStrategy<Self>;
             fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
                 // TODO there is also  SignatureFunc::CustomFunc, but for now
-                // this is not serialised. When it is, we should generate
+                // this is not serialized. When it is, we should generate
                 // examples here .
                 any::<PolyFuncType>()
                     .prop_map(|x| SignatureFunc::TypeScheme(CustomValidator::from_polyfunc(x)))
@@ -798,7 +798,7 @@ pub(super) mod test {
             type Strategy = BoxedStrategy<Self>;
             fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
                 // TODO There is also LowerFunc::CustomFunc, but for now this is
-                // not serialised. When it is, we should generate examples here.
+                // not serialized. When it is, we should generate examples here.
                 any::<ExtensionSet>()
                     .prop_map(|extensions| LowerFunc::FixedHugr {
                         extensions,
@@ -832,7 +832,7 @@ pub(super) mod test {
                                 misc,
                                 signature_func,
                                 lower_funcs,
-                                // TODO ``constant_folder` is not serialised, we should
+                                // TODO ``constant_folder` is not serialized, we should
                                 // generate examples once it is.
                                 constant_folder: None,
                             })

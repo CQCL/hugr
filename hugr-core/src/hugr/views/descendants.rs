@@ -201,6 +201,9 @@ where
 
 #[cfg(test)]
 pub(super) mod test {
+    use rstest::rstest;
+
+    use crate::extension::PRELUDE_REGISTRY;
     use crate::{
         builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
         type_row,
@@ -258,7 +261,7 @@ pub(super) mod test {
         assert_eq!(region.children(inner).count(), 2);
 
         assert_eq!(
-            region.get_function_type(),
+            region.poly_func_type(),
             Some(
                 FunctionType::new_endo(type_row![NAT, QB])
                     .with_extension_delta(EXTENSION_ID)
@@ -267,9 +270,25 @@ pub(super) mod test {
         );
         let inner_region: DescendantsGraph = DescendantsGraph::try_new(&hugr, inner)?;
         assert_eq!(
-            inner_region.get_function_type(),
-            Some(FunctionType::new(type_row![NAT], type_row![NAT]).into())
+            inner_region.inner_function_type(),
+            Some(FunctionType::new(type_row![NAT], type_row![NAT]))
         );
+
+        Ok(())
+    }
+
+    #[rstest]
+    fn extract_hugr() -> Result<(), Box<dyn std::error::Error>> {
+        let (hugr, def, _inner) = make_module_hgr()?;
+
+        let region: DescendantsGraph = DescendantsGraph::try_new(&hugr, def)?;
+        let extracted = region.extract_hugr();
+        extracted.validate(&PRELUDE_REGISTRY)?;
+
+        let region: DescendantsGraph = DescendantsGraph::try_new(&hugr, def)?;
+
+        assert_eq!(region.node_count(), extracted.node_count());
+        assert_eq!(region.root_type(), extracted.root_type());
 
         Ok(())
     }

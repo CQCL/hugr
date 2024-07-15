@@ -1,5 +1,64 @@
 # Changelog
 
+## 0.4.0 (2024-07-10)
+
+### Bug Fixes
+
+- Bring back input_extensions serialized field in rust NodeSer ([#1275](https://github.com/CQCL/hugr/pull/1275))
+- [**breaking**] `ops::Module` now empty struct rather than unit struct ([#1271](https://github.com/CQCL/hugr/pull/1271))
+
+### Features
+
+- [**breaking**] `MakeOpDef` has new `extension` method. ([#1266](https://github.com/CQCL/hugr/pull/1266))
+
+### Refactor
+
+- [**breaking**] Remove `Value::Tuple` ([#1255](https://github.com/CQCL/hugr/pull/1255))
+- [**breaking**] Rename `HugrView` function type methods + simplify behaviour ([#1265](https://github.com/CQCL/hugr/pull/1265))
+
+### Styling
+
+- Change "serialise" etc to "serialize" etc. ([#1251](https://github.com/CQCL/hugr/pull/1251))
+
+### Testing
+
+- Add a test for [#1257](https://github.com/CQCL/hugr/pull/1257) ([#1260](https://github.com/CQCL/hugr/pull/1260))
+
+
+## 0.3.1 (2024-07-08)
+
+### Bug Fixes
+
+- Bring back input_extensions serialized field in rust NodeSer ([#1275](https://github.com/CQCL/hugr/pull/1275))
+
+
+## 0.3.0 (2024-06-28)
+
+### Bug Fixes
+
+- SimpleReplacement panic on multiports ([#1191](https://github.com/CQCL/hugr/pull/1191))
+- Add some validation for const nodes ([#1222](https://github.com/CQCL/hugr/pull/1222))
+- Cfg not validating entry/exit types ([#1229](https://github.com/CQCL/hugr/pull/1229))
+- `extract_hugr` not removing root node ports ([#1239](https://github.com/CQCL/hugr/pull/1239))
+
+### Documentation
+
+- Fix documentation of `ValidationError::ConstTypeError` ([#1227](https://github.com/CQCL/hugr/pull/1227))
+
+### Features
+
+- CircuitBuilder::add_constant ([#1168](https://github.com/CQCL/hugr/pull/1168))
+- [**breaking**] Make the rewrite errors more useful ([#1174](https://github.com/CQCL/hugr/pull/1174))
+- [**breaking**] Validate Extensions using hierarchy, ignore input_extensions, RIP inference ([#1142](https://github.com/CQCL/hugr/pull/1142))
+- [**breaking**] Infer extension deltas for Case, Cfg, Conditional, DataflowBlock, Dfg, TailLoop  ([#1195](https://github.com/CQCL/hugr/pull/1195))
+- Helper functions for requesting inference, use with builder in tests ([#1219](https://github.com/CQCL/hugr/pull/1219))
+
+### Refactor
+
+- [**breaking**] Remove NodeType and input_extensions ([#1183](https://github.com/CQCL/hugr/pull/1183))
+- [**breaking**] FunctionBuilder takes impl Into<PolyFuncType> ([#1220](https://github.com/CQCL/hugr/pull/1220))
+
+
 ## 0.2.0 (2024-06-07)
 
 ### Bug Fixes
@@ -14,7 +73,7 @@
 
 ### Testing
 
-- Serialisation round trip testing for `OpDef` ([#999](https://github.com/CQCL/hugr/pull/999))
+- Serialization round trip testing for `OpDef` ([#999](https://github.com/CQCL/hugr/pull/999))
 
 
 ## 0.1.0 (2024-05-29)

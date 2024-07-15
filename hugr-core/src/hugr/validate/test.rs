@@ -7,7 +7,7 @@ use rstest::rstest;
 use super::*;
 use crate::builder::test::closed_dfg_root_hugr;
 use crate::builder::{
-    ft2, BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
+    inout_ft, BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
     FunctionBuilder, HugrBuilder, ModuleBuilder, SubContainer,
 };
 use crate::extension::prelude::{BOOL_T, PRELUDE, PRELUDE_ID, QB_T, USIZE_T};
@@ -74,7 +74,7 @@ fn invalid_root() {
     assert_eq!(b.validate(&EMPTY_REG), Ok(()));
 
     // Add another hierarchy root
-    let other = b.add_node(ops::Module.into());
+    let other = b.add_node(ops::Module::new().into());
     assert_matches!(
         b.validate(&EMPTY_REG),
         Err(ValidationError::NoParent { node }) => assert_eq!(node, other)
@@ -608,7 +608,7 @@ fn instantiate_row_variables() -> Result<(), Box<dyn std::error::Error>> {
         vec![TypeArg::Type { ty: USIZE_T }; i].into()
     }
     let e = extension_with_eval_parallel();
-    let mut dfb = DFGBuilder::new(ft2(
+    let mut dfb = DFGBuilder::new(inout_ft(
         vec![
             Type::new_function(FunctionType::new(USIZE_T, vec![USIZE_T, USIZE_T])),
             USIZE_T,
@@ -771,7 +771,7 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
 
     let int_pair = Type::new_tuple(type_row![USIZE_T; 2]);
     // Root DFG: applies a function int--PRELUDE-->int to each element of a pair of two ints
-    let mut d = DFGBuilder::new(ft2(
+    let mut d = DFGBuilder::new(inout_ft(
         vec![utou(PRELUDE_ID), int_pair.clone()],
         vec![int_pair.clone()],
     ))?;
@@ -1000,6 +1000,7 @@ fn cfg_connections() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
 fn cfg_entry_io_bug() -> Result<(), Box<dyn std::error::Error>> {
     // load test file where input node of entry block has types in reversed
     // order compared to parent CFG node.

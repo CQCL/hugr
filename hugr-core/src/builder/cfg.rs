@@ -46,7 +46,7 @@ use crate::{hugr::HugrMut, type_row, Hugr};
 ///            +------------+
 /// */
 /// use hugr::{
-///     builder::{BuildError, CFGBuilder, Container, Dataflow, HugrBuilder, ft1, ft2},
+///     builder::{BuildError, CFGBuilder, Container, Dataflow, HugrBuilder, endo_ft, inout_ft},
 ///     extension::{prelude, ExtensionSet},
 ///     ops, type_row,
 ///     types::{FunctionType, SumType, Type},
@@ -84,7 +84,7 @@ use crate::{hugr::HugrMut, type_row, Hugr};
 ///     // `NAT` arguments: one from the `sum_variants` type, and another from the
 ///     // entry node's `other_outputs`.
 ///     let mut successor_builder = cfg_builder.simple_block_builder(
-///         ft2(type_row![NAT, NAT], NAT),
+///         inout_ft(type_row![NAT, NAT], NAT),
 ///         1, // only one successor to this block
 ///     )?;
 ///     let successor_a = {
@@ -98,7 +98,7 @@ use crate::{hugr::HugrMut, type_row, Hugr};
 ///     };
 ///
 ///     // The only argument to this block is the entry node's `other_outputs`.
-///     let mut successor_builder = cfg_builder.simple_block_builder(ft1(NAT), 1)?;
+///     let mut successor_builder = cfg_builder.simple_block_builder(endo_ft(NAT), 1)?;
 ///     let successor_b = {
 ///         let sum_unary = successor_builder.add_load_value(ops::Value::unary_unit_sum());
 ///         let [in_wire] = successor_builder.input_wires_arr();

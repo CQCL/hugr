@@ -1,6 +1,6 @@
 use super::*;
 use crate::builder::{
-    ft1, ft2, test::closed_dfg_root_hugr, Container, DFGBuilder, Dataflow, DataflowHugr,
+    endo_ft, inout_ft, test::closed_dfg_root_hugr, Container, DFGBuilder, Dataflow, DataflowHugr,
     DataflowSubContainer, HugrBuilder, ModuleBuilder,
 };
 use crate::extension::prelude::{BOOL_T, PRELUDE_ID, QB_T, USIZE_T};
@@ -28,7 +28,7 @@ use rstest::rstest;
 const NAT: Type = crate::extension::prelude::USIZE_T;
 const QB: Type = crate::extension::prelude::QB_T;
 
-/// Version 1 of the Testing HUGR serialisation format, see `testing_hugr.py`.
+/// Version 1 of the Testing HUGR serialization format, see `testing_hugr.py`.
 #[derive(Serialize, Deserialize, PartialEq, Debug, Default)]
 struct SerTestingV1 {
     typ: Option<crate::types::Type>,
@@ -203,7 +203,7 @@ fn gen_optype(g: &MultiPortGraph, node: portgraph::NodeIndex) -> OpType {
         .into(),
         (true, false) => Input::new(vec![NAT; outputs - 1]).into(),
         (false, true) => Output::new(vec![NAT; inputs - 1]).into(),
-        (true, true) => Module.into(),
+        (true, true) => Module::new().into(),
     }
 }
 
@@ -298,7 +298,7 @@ fn dfg_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn opaque_ops() -> Result<(), Box<dyn std::error::Error>> {
     let tp: Vec<Type> = vec![BOOL_T; 1];
-    let mut dfg = DFGBuilder::new(ft1(tp))?;
+    let mut dfg = DFGBuilder::new(endo_ft(tp))?;
     let [wire] = dfg.input_wires_arr();
 
     // Add an extension operation
@@ -351,7 +351,7 @@ fn hierarchy_order() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn constants_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
-    let mut builder = DFGBuilder::new(ft2(vec![], vec![INT_TYPES[4].clone()])).unwrap();
+    let mut builder = DFGBuilder::new(inout_ft(vec![], INT_TYPES[4].clone())).unwrap();
     let w = builder.add_load_value(ConstInt::new_s(4, -2).unwrap());
     let hugr = builder.finish_hugr_with_outputs([w], &INT_OPS_REGISTRY)?;
 
@@ -451,7 +451,7 @@ fn roundtrip_polyfunctype(#[case] poly_func_type: PolyFuncType) {
 }
 
 #[rstest]
-#[case(ops::Module)]
+#[case(ops::Module::new())]
 #[case(ops::FuncDefn { name: "polyfunc1".into(), signature: polyfunctype1()})]
 #[case(ops::FuncDecl { name: "polyfunc2".into(), signature: polyfunctype1()})]
 #[case(ops::AliasDefn { name: "aliasdefn".into(), definition: Type::new_unit_sum(4)})]
@@ -467,6 +467,17 @@ fn roundtrip_optype(#[case] optype: impl Into<OpType> + std::fmt::Debug) {
         parent: portgraph::NodeIndex::new(0).into(),
         op: optype.into(),
     });
+}
+
+#[test]
+#[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
+/// issue 1270
+fn input_extensions_deser() {
+    // load a file serialised with `input_extensions` fields on all ops
+    let _: Hugr = serde_json::from_reader(std::io::BufReader::new(
+        std::fs::File::open(crate::test_file!("issue-1270.json")).unwrap(),
+    ))
+    .unwrap();
 }
 
 mod proptest {

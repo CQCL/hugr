@@ -443,7 +443,7 @@ mod test {
     fn flat_mut(mut simple_dfg_hugr: Hugr) {
         simple_dfg_hugr.update_validate(&PRELUDE_REGISTRY).unwrap();
         let root = simple_dfg_hugr.root();
-        let signature = simple_dfg_hugr.get_df_function_type().unwrap().clone();
+        let signature = simple_dfg_hugr.inner_function_type().unwrap().clone();
 
         let sib_mut = SiblingMut::<CfgID>::try_new(&mut simple_dfg_hugr, root);
         assert_eq!(
@@ -491,12 +491,13 @@ mod test {
 
     #[rstest]
     fn extract_hugr() -> Result<(), Box<dyn std::error::Error>> {
-        let (hugr, def, _inner) = make_module_hgr()?;
+        let (hugr, _def, inner) = make_module_hgr()?;
 
-        let region: SiblingGraph = SiblingGraph::try_new(&hugr, def)?;
+        let region: SiblingGraph = SiblingGraph::try_new(&hugr, inner)?;
         let extracted = region.extract_hugr();
+        extracted.validate(&PRELUDE_REGISTRY)?;
 
-        let region: SiblingGraph = SiblingGraph::try_new(&hugr, def)?;
+        let region: SiblingGraph = SiblingGraph::try_new(&hugr, inner)?;
 
         assert_eq!(region.node_count(), extracted.node_count());
         assert_eq!(region.root_type(), extracted.root_type());

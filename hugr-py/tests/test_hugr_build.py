@@ -1,16 +1,17 @@
 from __future__ import annotations
-from hugr.node_port import Node, _SubPort
 
-from hugr.hugr import Hugr
-from hugr.dfg import Dfg, _ancestral_sibling
-from hugr.ops import NoConcreteFunc
-import hugr.ops as ops
-import hugr.tys as tys
-import hugr.val as val
-from hugr.function import Module
 import pytest
 
-from .conftest import Not, INT_T, IntVal, validate, DivMod
+from hugr import ops, tys, val
+from hugr.dfg import Dfg, _ancestral_sibling
+from hugr.function import Module
+from hugr.hugr import Hugr
+from hugr.node_port import Node, _SubPort
+from hugr.ops import NoConcreteFunc
+from hugr.std.int import INT_T, DivMod, IntVal
+from hugr.std.logic import Not
+
+from .conftest import validate
 
 
 def test_stable_indices():
@@ -95,16 +96,16 @@ def test_tuple():
     row = [tys.Bool, tys.Qubit]
     h = Dfg(*row)
     a, b = h.inputs()
-    t = h.add(ops.MakeTuple(a, b))
-    a, b = h.add(ops.UnpackTuple(t))
+    t = h.add(ops.MakeTuple()(a, b))
+    a, b = h.add(ops.UnpackTuple()(t))
     h.set_outputs(a, b)
 
     validate(h.hugr)
 
     h1 = Dfg(*row)
     a, b = h1.inputs()
-    mt = h1.add_op(ops.MakeTuple, a, b)
-    a, b = h1.add_op(ops.UnpackTuple, mt)[0, 1]
+    mt = h1.add_op(ops.MakeTuple(), a, b)
+    a, b = h1.add_op(ops.UnpackTuple(), mt)[0, 1]
     h1.set_outputs(a, b)
 
     assert h.hugr.to_serial() == h1.hugr.to_serial()
@@ -146,16 +147,14 @@ def test_insert_nested():
 
 
 def test_build_nested():
-    def _nested_nop(dfg: Dfg):
-        (a1,) = dfg.inputs()
-        nt = dfg.add(Not(a1))
-        dfg.set_outputs(nt)
-
     h = Dfg(tys.Bool)
     (a,) = h.inputs()
-    nested = h.add_nested(a)
 
-    _nested_nop(nested)
+    with h.add_nested(a) as nested:
+        (a1,) = nested.inputs()
+        nt = nested.add(Not(a1))
+        nested.set_outputs(nt)
+
     assert len(h.hugr.children(nested)) == 3
     h.set_outputs(nested)
 
@@ -165,10 +164,9 @@ def test_build_nested():
 def test_build_inter_graph():
     h = Dfg(tys.Bool, tys.Bool)
     (a, b) = h.inputs()
-    nested = h.add_nested()
-
-    nt = nested.add(Not(a))
-    nested.set_outputs(nt)
+    with h.add_nested() as nested:
+        nt = nested.add(Not(a))
+        nested.set_outputs(nt)
 
     h.set_outputs(nested, b)
 
@@ -184,9 +182,8 @@ def test_build_inter_graph():
 def test_ancestral_sibling():
     h = Dfg(tys.Bool)
     (a,) = h.inputs()
-    nested = h.add_nested()
-
-    nt = nested.add(Not(a))
+    with h.add_nested() as nested:
+        nt = nested.add(Not(a))
 
     assert _ancestral_sibling(h.hugr, h.input_node, nt) == nested.parent_node
 
@@ -196,7 +193,7 @@ def test_ancestral_sibling():
     [
         val.Function(simple_id().hugr),
         val.Sum(1, tys.Sum([[INT_T], [tys.Bool, INT_T]]), [val.TRUE, IntVal(34)]),
-        val.Tuple([val.TRUE, IntVal(23)]),
+        val.Tuple(val.TRUE, IntVal(23)),
     ],
 )
 def test_vals(val: val.Value):
@@ -232,7 +229,7 @@ def test_poly_function(direct_call: bool) -> None:
         load = f_main.load_function(
             f_id, instantiation=instantiation, type_args=type_args
         )
-        call = f_main.add(ops.CallIndirect(load, q))
+        call = f_main.add(ops.CallIndirect()(load, q))
 
     f_main.set_outputs(call)
 
@@ -252,7 +249,7 @@ def test_mono_function(direct_call: bool) -> None:
         call = f_main.call(f_id, q)
     else:
         load = f_main.load_function(f_id)
-        call = f_main.add(ops.CallIndirect(load, q))
+        call = f_main.add(ops.CallIndirect()(load, q))
     f_main.set_outputs(call)
 
     validate(mod.hugr)
@@ -260,19 +257,20 @@ def test_mono_function(direct_call: bool) -> None:
 
 def test_higher_order() -> None:
     noop_fn = Dfg(tys.Qubit)
-    noop_fn.set_outputs(noop_fn.add(ops.Noop(noop_fn.input_node[0])))
+    noop_fn.set_outputs(noop_fn.add(ops.Noop()(noop_fn.input_node[0])))
 
     d = Dfg(tys.Qubit)
     (q,) = d.inputs()
     f_val = d.load(val.Function(noop_fn.hugr))
-    call = d.add(ops.CallIndirect(f_val, q))[0]
+    call = d.add(ops.CallIndirect()(f_val, q))[0]
     d.set_outputs(call)
 
     validate(d.hugr)
 
 
 def test_lift() -> None:
-    d = Dfg(tys.Qubit, extension_delta=["X"])
+    d = Dfg(tys.Qubit)
+    d.parent_op._extension_delta = ["X"]
     (q,) = d.inputs()
     lift = d.add(ops.Lift("X")(q))
     d.set_outputs(lift)

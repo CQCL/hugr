@@ -1,28 +1,29 @@
 #!/usr/bin/env python
 """Dumps the json schema for `hugr.serialization.SerialHugr` to a file.
 
-The schema is written to a file named `hugr_schema_v#.json` in the specified output directory.
-If no output directory is specified, the schema is written to the current working directory.
+The schema is written to a file named `hugr_schema_v#.json`
+in the specified output directory.
+If no output directory is specified,
+the schema is written to the current working directory.
 
 usage: python generate_schema.py [<OUT_DIR>]
 """
 
 import json
 import sys
-from typing import Type, Optional
 from pathlib import Path
 
 from pydantic import ConfigDict
 
-from hugr.serialization import SerialHugr
+from hugr.serialization.serial_hugr import SerialHugr
 from hugr.serialization.testing_hugr import TestingHugr
 
 
 def write_schema(
     out_dir: Path,
     name_prefix: str,
-    schema: Type[SerialHugr] | Type[TestingHugr],
-    config: Optional[ConfigDict] = None,
+    schema: type[SerialHugr] | type[TestingHugr],
+    config: ConfigDict | None = None,
     **kwargs,
 ):
     version = schema.get_version()

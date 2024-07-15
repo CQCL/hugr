@@ -1,19 +1,27 @@
+"""Node and port classes for Hugr graphs."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import (
+    TYPE_CHECKING,
     ClassVar,
-    Iterator,
-    Protocol,
-    overload,
-    TypeVar,
     Generic,
+    Protocol,
+    TypeVar,
+    overload,
 )
+
 from typing_extensions import Self
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
 class Direction(Enum):
+    """Enum over port directions, INCOMING and OUTGOING."""
+
     INCOMING = 0
     OUTGOING = 1
 
@@ -27,23 +35,41 @@ class _Port:
 
 @dataclass(frozen=True, eq=True, order=True)
 class InPort(_Port):
+    """Incoming port, defined by the `node` it belongs to and the port `offset`."""
+
     direction: ClassVar[Direction] = Direction.INCOMING
+
+    def __repr__(self) -> str:
+        return f"InPort({self.node}, {self.offset})"
 
 
 class Wire(Protocol):
-    def out_port(self) -> OutPort: ...
+    """Protocol for objects that can provide a dataflow output port."""
+
+    def out_port(self) -> OutPort:
+        """OutPort corresponding to this :class:`Wire`."""
+        ...  # pragma: no cover
 
 
 @dataclass(frozen=True, eq=True, order=True)
 class OutPort(_Port, Wire):
+    """Outgoing port, defined by the `node` it belongs to and the port `offset`."""
+
     direction: ClassVar[Direction] = Direction.OUTGOING
 
     def out_port(self) -> OutPort:
         return self
 
+    def __repr__(self) -> str:
+        return f"OutPort({self.node}, {self.offset})"
+
 
 class ToNode(Wire, Protocol):
-    def to_node(self) -> Node: ...
+    """Protocol by any object that can be treated as a :class:`Node`."""
+
+    def to_node(self) -> Node:
+        """Convert to a :class:`Node`."""
+        ...  # pragma: no cover
 
     @overload
     def __getitem__(self, index: int) -> OutPort: ...
@@ -57,16 +83,48 @@ class ToNode(Wire, Protocol):
     ) -> OutPort | Iterator[OutPort]:
         return self.to_node()._index(index)
 
-    def out_port(self) -> "OutPort":
+    def out_port(self) -> OutPort:
         return OutPort(self.to_node(), 0)
 
     def inp(self, offset: int) -> InPort:
+        """Generate an input port for this node.
+
+        Args:
+            offset: port offset.
+
+        Returns:
+            Incoming port for this node.
+
+        Examples:
+            >>> Node(0).inp(1)
+            InPort(Node(0), 1)
+        """
         return InPort(self.to_node(), offset)
 
     def out(self, offset: int) -> OutPort:
+        """Generate an output port for this node.
+
+        Args:
+            offset: port offset.
+
+        Returns:
+            Outgoing port for this node.
+
+        Examples:
+            >>> Node(0).out(1)
+            OutPort(Node(0), 1)
+        """
         return OutPort(self.to_node(), offset)
 
     def port(self, offset: int, direction: Direction) -> InPort | OutPort:
+        """Generate a port in `direction` for this node with `offset`.
+
+        Examples:
+            >>> Node(0).port(1, Direction.INCOMING)
+            InPort(Node(0), 1)
+            >>> Node(0).port(1, Direction.OUTGOING)
+            OutPort(Node(0), 1)
+        """
         if direction == Direction.INCOMING:
             return self.inp(offset)
         else:
@@ -75,6 +133,10 @@ class ToNode(Wire, Protocol):
 
 @dataclass(frozen=True, eq=True, order=True)
 class Node(ToNode):
+    """Node in hierarchical :class:`Hugr <hugr.hugr.Hugr>` graph,
+    with globally unique index.
+    """
+
     idx: int
     _num_out_ports: int | None = field(default=None, compare=False)
 
@@ -83,17 +145,16 @@ class Node(ToNode):
     ) -> OutPort | Iterator[OutPort]:
         match index:
             case int(index):
-                if self._num_out_ports is not None:
-                    if index >= self._num_out_ports:
-                        raise IndexError("Index out of range")
+                if self._num_out_ports is not None and index >= self._num_out_ports:
+                    msg = "Index out of range"
+                    raise IndexError(msg)
                 return self.out(index)
             case slice():
                 start = index.start or 0
                 stop = index.stop or self._num_out_ports
                 if stop is None:
-                    raise ValueError(
-                        "Stop must be specified when number of outputs unknown"
-                    )
+                    msg = "Stop must be specified when number of outputs unknown"
+                    raise ValueError(msg)
                 step = index.step or 1
                 return (self[i] for i in range(start, stop, step))
             case tuple(xs):
@@ -101,6 +162,9 @@ class Node(ToNode):
 
     def to_node(self) -> Node:
         return self
+
+    def __repr__(self) -> str:
+        return f"Node({self.idx})"
 
 
 P = TypeVar("P", InPort, OutPort)
