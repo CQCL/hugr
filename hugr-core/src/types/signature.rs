@@ -37,14 +37,14 @@ pub struct FuncTypeBase<ROWVARS: MaybeRV> {
 
 /// The concept of "signature" in the spec - the edges required to/from a node
 /// or within a [FuncDefn], also the target (value) of a call (static).
-/// 
+///
 /// [FuncDefn]: crate::ops::FuncDefn
 pub type FunctionType = FuncTypeBase<NoRV>;
 
 /// A function that may contain [RowVariable]s and thus has potentially-unknown arity;
 /// used for [OpDef]'s and passable as a value round a Hugr (see [Type::new_function])
 /// but not a valid node type.
-/// 
+///
 /// [OpDef]: crate::extension::OpDef
 pub type FunctionTypeRV = FuncTypeBase<RowVariable>;
 
