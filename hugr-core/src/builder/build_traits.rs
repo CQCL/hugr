@@ -455,7 +455,7 @@ pub trait Dataflow: Container {
         other_inputs: impl IntoIterator<Item = (Type, Wire)>,
         output_types: TypeRow,
     ) -> Result<ConditionalBuilder<&mut Hugr>, BuildError> {
-        self.conditional_builder_exts(sum_input, other_inputs, TO_BE_INFERRED, output_types)
+        self.conditional_builder_exts(sum_input, other_inputs, output_types, TO_BE_INFERRED)
     }
 
     /// Return a builder for a [`crate::ops::Conditional`] node.
@@ -476,8 +476,8 @@ pub trait Dataflow: Container {
         &mut self,
         (sum_rows, sum_wire): (impl IntoIterator<Item = TypeRow>, Wire),
         other_inputs: impl IntoIterator<Item = (Type, Wire)>,
-        extension_delta: impl Into<ExtensionSet>,
         output_types: TypeRow,
+        extension_delta: impl Into<ExtensionSet>,
     ) -> Result<ConditionalBuilder<&mut Hugr>, BuildError> {
         let mut input_wires = vec![sum_wire];
         let (input_types, rest_input_wires): (Vec<Type>, Vec<Wire>) =

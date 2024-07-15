@@ -356,8 +356,8 @@ mod test {
         let mut if_n = inner.conditional_builder_exts(
             ([type_row![], type_row![]], b),
             [],
-            ExtensionSet::new(),
             type_row![],
+            ExtensionSet::new(),
         )?;
         if_n.case_builder(0)?.finish_with_outputs([])?;
         if_n.case_builder(1)?.finish_with_outputs([])?;

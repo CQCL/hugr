@@ -209,7 +209,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         sum_rows: impl IntoIterator<Item = TypeRow>,
         other_outputs: TypeRow,
     ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
-        self.block_builder_exts(inputs, sum_rows, TO_BE_INFERRED, other_outputs)
+        self.block_builder_exts(inputs, sum_rows, other_outputs, TO_BE_INFERRED)
     }
 
     /// Return a builder for a non-entry [`DataflowBlock`] child graph with `inputs`
@@ -223,8 +223,8 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         &mut self,
         inputs: TypeRow,
         sum_rows: impl IntoIterator<Item = TypeRow>,
-        extension_delta: impl Into<ExtensionSet>,
         other_outputs: TypeRow,
+        extension_delta: impl Into<ExtensionSet>,
     ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
         self.any_block_builder(
             inputs,
@@ -278,8 +278,8 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         self.block_builder_exts(
             signature.input,
             vec![type_row![]; n_cases],
-            signature.extension_reqs,
             signature.output,
+            signature.extension_reqs,
         )
     }
 
@@ -295,7 +295,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         sum_rows: impl IntoIterator<Item = TypeRow>,
         other_outputs: TypeRow,
     ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
-        self.entry_builder_exts(TO_BE_INFERRED, sum_rows, other_outputs)
+        self.entry_builder_exts(sum_rows, other_outputs, TO_BE_INFERRED)
     }
 
     /// Return a builder for the entry [`DataflowBlock`] child graph with `outputs`,
@@ -308,9 +308,9 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
     /// This function will return an error if an entry block has already been built.
     pub fn entry_builder_exts(
         &mut self,
-        extension_delta: impl Into<ExtensionSet>,
         sum_rows: impl IntoIterator<Item = TypeRow>,
         other_outputs: TypeRow,
+        extension_delta: impl Into<ExtensionSet>,
     ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
         let inputs = self
             .inputs
@@ -352,7 +352,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         n_cases: usize,
         extension_delta: impl Into<ExtensionSet>,
     ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
-        self.entry_builder_exts(extension_delta, vec![type_row![]; n_cases], outputs)
+        self.entry_builder_exts(vec![type_row![]; n_cases], outputs, extension_delta)
     }
 
     /// Returns the exit block of this [`CFGBuilder`].
@@ -501,9 +501,9 @@ pub(crate) mod test {
     ) -> Result<(), BuildError> {
         let sum2_variants = vec![type_row![NAT], type_row![NAT]];
         let mut entry_b = cfg_builder.entry_builder_exts(
-            ExtensionSet::new(),
             sum2_variants.clone(),
             type_row![],
+            ExtensionSet::new(),
         )?;
         let entry = {
             let [inw] = entry_b.input_wires_arr();
@@ -531,9 +531,9 @@ pub(crate) mod test {
         let sum_variants = vec![type_row![]];
 
         let mut entry_b = cfg_builder.entry_builder_exts(
-            ExtensionSet::new(),
             sum_variants.clone(),
             type_row![],
+            ExtensionSet::new(),
         )?;
         let [inw] = entry_b.input_wires_arr();
         let entry = {
