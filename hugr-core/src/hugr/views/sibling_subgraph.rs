@@ -825,7 +825,9 @@ mod tests {
         let mut mod_builder = ModuleBuilder::new();
         let func = mod_builder.declare(
             "test",
-            FunctionType::new(type_row![BOOL_T], type_row![BOOL_T, BOOL_T]).into(),
+            FunctionType::new(BOOL_T, type_row![BOOL_T, BOOL_T])
+                .with_extension_delta(logic::EXTENSION_ID)
+                .into(),
         )?;
         let func_id = {
             let mut dfg = mod_builder.define_declaration(&func)?;
