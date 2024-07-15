@@ -2,8 +2,8 @@ use anyhow::{anyhow, Result};
 use hugr::{
     hugr::views::SiblingGraph,
     ops::{
-        Call, Case, Conditional, Const, Input, LoadConstant, MakeTuple, OpTag, OpTrait, OpType,
-        Output, Tag, UnpackTuple, Value, CFG,
+        constant::Sum, Call, Case, Conditional, Const, Input, LoadConstant, MakeTuple, OpTag,
+        OpTrait, OpType, Output, Tag, UnpackTuple, Value, CFG,
     },
     types::{SumType, Type, TypeEnum},
     HugrView, NodeIndex,
@@ -255,20 +255,11 @@ pub fn emit_value<'c, H: HugrView>(
             exts.load_constant(context, e.value())
         }
         Value::Function { .. } => todo!(),
-        Value::Tuple { vs } => {
-            let tys = vs.iter().map(|x| x.get_type()).collect_vec();
-            let llvm_st = LLVMSumType::try_new(&context.typing_session(), SumType::new([tys]))?;
-            let llvm_vs = vs
-                .iter()
-                .map(|x| emit_value(context, x))
-                .collect::<Result<Vec<_>>>()?;
-            llvm_st.build_tag(context.builder(), 0, llvm_vs)
-        }
-        Value::Sum {
+        Value::Sum(Sum {
             tag,
             values,
             sum_type,
-        } => {
+        }) => {
             let llvm_st = LLVMSumType::try_new(&context.typing_session(), sum_type.clone())?;
             let vs = values
                 .iter()

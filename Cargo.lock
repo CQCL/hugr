@@ -298,9 +298,9 @@ dependencies = [
 
 [[package]]
 name = "hugr"
-version = "0.5.1"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a20246e5f1a0aae160b80b71bc4d5c1dcccc5605dbe6458ac6f9af73137339c3"
+checksum = "93a66a8749a4713a4421aaf479e9db1f281abbd7eaf2f03ae16e772c1b248f7c"
 dependencies = [
  "hugr-core",
  "hugr-passes",
@@ -308,9 +308,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-core"
-version = "0.2.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bd64c708ba21cedae58e37f3557d139ee6eaeaaa7df0ab9541385249c1ee6065"
+checksum = "fd3a6cde9950d93a466b63e43777651ecd8becccf2d9bffa857d77301a280541"
 dependencies = [
  "bitvec",
  "cgmath",
@@ -359,14 +359,15 @@ dependencies = [
 
 [[package]]
 name = "hugr-passes"
-version = "0.2.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7522d3a5299a49ee453f6d0e3c3a6e8e7ed08a38cbd11e1d19163b97098ce9be"
+checksum = "a034c5f270b5827418acee2e867423f57c030bb13685d715df12281865b78bda"
 dependencies = [
  "hugr-core",
  "itertools 0.13.0",
  "lazy_static",
  "paste",
+ "petgraph",
  "thiserror",
 ]
 
@@ -570,13 +571,14 @@ checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
 
 [[package]]
 name = "portgraph"
-version = "0.12.1"
+version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d83271bd5c2249831ff13227e6b3a968e115b6d4f4a2027a8ce02838b789ff8"
+checksum = "4791aa897c125c0f9e606c9a26092f1a6ca50af86f7e37de54ab7e5a7673bdb0"
 dependencies = [
  "bitvec",
  "context-iterators",
  "delegate",
+ "itertools 0.13.0",
  "petgraph",
  "serde",
  "thiserror",

@@ -257,7 +257,6 @@ mod test {
                 let mut cfg_builder = builder
                     .cfg_builder(
                         [(t1.clone(), in1), (t2.clone(), in2)],
-                        None,
                         t2.clone().into(),
                         es.clone(),
                     )
@@ -314,7 +313,6 @@ mod test {
                     let mut outer_cfg_builder = builder
                         .cfg_builder(
                             [(t1.clone(), in1), (BOOL_T, in2)],
-                            None,
                             BOOL_T.into(),
                             es.clone(),
                         )
@@ -328,7 +326,7 @@ mod test {
                             outer_entry_builder.input_wires_arr();
                         let [outer_entry_out] = {
                             let mut inner_cfg_builder = outer_entry_builder
-                                .cfg_builder([], None, BOOL_T.into(), es.clone())
+                                .cfg_builder([], BOOL_T.into(), es.clone())
                                 .unwrap();
                             let inner_exit_block = inner_cfg_builder.exit_block();
                             let inner_entry_block = {

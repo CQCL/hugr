@@ -65,7 +65,7 @@ impl SimpleHugrConfig {
     ) -> Hugr {
         let mut mod_b = ModuleBuilder::new();
         let func_b = mod_b
-            .define_function("main", FunctionType::new(self.ins, self.outs).into())
+            .define_function("main", FunctionType::new(self.ins, self.outs))
             .unwrap();
         make(func_b, &self.extensions);
         mod_b.finish_hugr(&self.extensions).unwrap()
@@ -161,11 +161,7 @@ fn emit_hugr_dfg(llvm_ctx: TestContext) {
         .finish(|mut builder: DFGW| {
             let dfg = {
                 let b = builder
-                    .dfg_builder(
-                        FunctionType::new_endo(Type::UNIT),
-                        None,
-                        builder.input_wires(),
-                    )
+                    .dfg_builder(FunctionType::new_endo(Type::UNIT), builder.input_wires())
                     .unwrap();
                 let w = b.input_wires();
                 b.finish_with_outputs(w).unwrap()
@@ -296,13 +292,13 @@ fn diverse_module_children(llvm_ctx: TestContext) {
         let mut builder = ModuleBuilder::new();
         let _ = {
             let fbuilder = builder
-                .define_function("f1", FunctionType::new_endo(type_row![]).into())
+                .define_function("f1", FunctionType::new_endo(type_row![]))
                 .unwrap();
             fbuilder.finish_sub_container().unwrap()
         };
         let _ = {
             let fbuilder = builder
-                .define_function("f2", FunctionType::new_endo(type_row![]).into())
+                .define_function("f2", FunctionType::new_endo(type_row![]))
                 .unwrap();
             fbuilder.finish_sub_container().unwrap()
         };
@@ -322,15 +318,12 @@ fn diverse_dfg_children(llvm_ctx: TestContext) {
         .finish(|mut builder: DFGW| {
             let [r] = {
                 let mut builder = builder
-                    .dfg_builder(FunctionType::new(type_row![], BOOL_T), None, [])
+                    .dfg_builder(FunctionType::new(type_row![], BOOL_T), [])
                     .unwrap();
                 let konst = builder.add_constant(Value::false_val());
                 let func = {
                     let mut builder = builder
-                        .define_function(
-                            "scoped_func",
-                            FunctionType::new(type_row![], BOOL_T).into(),
-                        )
+                        .define_function("scoped_func", FunctionType::new(type_row![], BOOL_T))
                         .unwrap();
                     let w = builder.load_const(&konst);
                     builder.finish_with_outputs([w]).unwrap()
@@ -353,15 +346,12 @@ fn diverse_cfg_children(llvm_ctx: TestContext) {
         .finish(|mut builder: DFGW| {
             let [r] = {
                 let mut builder = builder
-                    .cfg_builder([], None, type_row![BOOL_T], ExtensionSet::new())
+                    .cfg_builder([], type_row![BOOL_T], ExtensionSet::new())
                     .unwrap();
                 let konst = builder.add_constant(Value::false_val());
                 let func = {
                     let mut builder = builder
-                        .define_function(
-                            "scoped_func",
-                            FunctionType::new(type_row![], BOOL_T).into(),
-                        )
+                        .define_function("scoped_func", FunctionType::new(type_row![], BOOL_T))
                         .unwrap();
                     let w = builder.load_const(&konst);
                     builder.finish_with_outputs([w]).unwrap()
