@@ -203,7 +203,7 @@ pub(crate) mod test {
     use serde_json::json;
 
     use crate::builder::build_traits::DataflowHugr;
-    use crate::builder::{ft1, BuilderWiringError, DataflowSubContainer, ModuleBuilder};
+    use crate::builder::{endo_ft, BuilderWiringError, DataflowSubContainer, ModuleBuilder};
     use crate::extension::prelude::{BOOL_T, USIZE_T};
     use crate::extension::{ExtensionId, SignatureError, EMPTY_REG, PRELUDE_REGISTRY};
     use crate::hugr::validate::InterGraphEdgeError;
@@ -420,12 +420,12 @@ pub(crate) mod test {
         let xb: ExtensionId = "B".try_into().unwrap();
         let xc: ExtensionId = "C".try_into().unwrap();
 
-        let mut parent = DFGBuilder::new(ft1(BIT))?;
+        let mut parent = DFGBuilder::new(endo_ft(BIT))?;
 
         let [w] = parent.input_wires_arr();
 
         // A box which adds extensions A and B, via child Lift nodes
-        let mut add_ab = parent.dfg_builder(ft1(BIT), [w])?;
+        let mut add_ab = parent.dfg_builder(endo_ft(BIT), [w])?;
         let [w] = add_ab.input_wires_arr();
 
         let lift_a = add_ab.add_dataflow_op(
@@ -451,7 +451,7 @@ pub(crate) mod test {
 
         // Add another node (a sibling to add_ab) which adds extension C
         // via a child lift node
-        let mut add_c = parent.dfg_builder(ft1(BIT), [w])?;
+        let mut add_c = parent.dfg_builder(endo_ft(BIT), [w])?;
         let [w] = add_c.input_wires_arr();
         let lift_c = add_c.add_dataflow_op(
             Lift {

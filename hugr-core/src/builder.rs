@@ -123,7 +123,7 @@ pub use circuit::{CircuitBuildError, CircuitBuilder};
 
 /// Return a FunctionType with the same input and output types (specified)
 /// whose extension delta, when used in a non-FuncDefn container, will be inferred.
-pub fn ft1(types: impl Into<TypeRow>) -> FunctionType {
+pub fn endo_ft(types: impl Into<TypeRow>) -> FunctionType {
     FunctionType::new_endo(types).with_extension_delta(TO_BE_INFERRED)
 }
 
