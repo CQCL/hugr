@@ -1,6 +1,7 @@
 //! Serialization definition for [`Hugr`]
 //! [`Hugr`]: crate::hugr::Hugr
 
+use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 use thiserror::Error;
 
@@ -13,7 +14,11 @@ use portgraph::{Direction, LinkError, PortView};
 
 use serde::{Deserialize, Deserializer, Serialize};
 
+use self::upgrade::UpgradeError;
+
 use super::{HugrMut, HugrView, NodeMetadataMap};
+
+mod upgrade;
 
 /// A wrapper over the available HUGR serialization formats.
 ///
@@ -26,21 +31,44 @@ use super::{HugrMut, HugrView, NodeMetadataMap};
 ///
 /// Make sure to order the variants from newest to oldest, as the deserializer
 /// will try to deserialize them in order.
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "version", rename_all = "lowercase")]
-enum Versioned<SerHugr> {
+enum Versioned<SerHugr = SerHugrLatest> {
+    #[serde(skip_serializing)]
     /// Version 0 of the HUGR serialization format.
     V0,
-    /// Version 1 of the HUGR serialization format.
-    V1(SerHugr),
 
+    V1(serde_json::Value),
+    V2(SerHugr),
+
+    #[serde(skip_serializing)]
     #[serde(other)]
     Unsupported,
 }
 
 impl<T> Versioned<T> {
-    pub fn new(t: T) -> Self {
-        Self::V1(t)
+    pub fn new_latest(t: T) -> Self {
+        Self::V2(t)
+    }
+}
+
+impl<T: DeserializeOwned> Versioned<T> {
+    fn upgrade(mut self) -> Result<T, UpgradeError> {
+        // go is polymorphic in D. When we are upgrading to the latest version
+        // D is T. When we are upgrading to a version which is not the latest D
+        // is serde_json::Value.
+        fn go<D: serde::de::DeserializeOwned>(v: serde_json::Value) -> Result<D, UpgradeError> {
+            serde_json::from_value(v).map_err(Into::into)
+        }
+        loop {
+            match self {
+                Self::V0 => Err(UpgradeError::KnownVersionUnsupported("0".into()))?,
+                // the upgrade lines remain unchanged when adding a new constructor
+                Self::V1(json) => self = Self::V2(upgrade::v1_to_v2(json).and_then(go)?),
+                Self::V2(ser_hugr) => return Ok(ser_hugr),
+                Versioned::Unsupported => Err(UpgradeError::UnknownVersionUnsupported)?,
+            }
+        }
     }
 }
 
@@ -52,8 +80,8 @@ struct NodeSer {
 }
 
 /// Version 1 of the HUGR serialization format.
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-struct SerHugrV1 {
+#[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
+struct SerHugrLatest {
     /// For each node: (parent, node_operation)
     nodes: Vec<NodeSer>,
     /// for each edge: (src, src_offset, tgt, tgt_offset)
@@ -102,8 +130,8 @@ impl Serialize for Hugr {
     where
         S: serde::Serializer,
     {
-        let shg: SerHugrV1 = self.try_into().map_err(serde::ser::Error::custom)?;
-        let versioned = Versioned::new(shg);
+        let shg: SerHugrLatest = self.try_into().map_err(serde::ser::Error::custom)?;
+        let versioned = Versioned::new_latest(shg);
         versioned.serialize(serializer)
     }
 }
@@ -113,20 +141,13 @@ impl<'de> Deserialize<'de> for Hugr {
     where
         D: Deserializer<'de>,
     {
-        let shg: Versioned<SerHugrV1> = Versioned::deserialize(deserializer)?;
-        match shg {
-            Versioned::V0 => Err(serde::de::Error::custom(
-                "Version 0 HUGR serialization format is not supported.",
-            )),
-            Versioned::V1(shg) => shg.try_into().map_err(serde::de::Error::custom),
-            Versioned::Unsupported => Err(serde::de::Error::custom(
-                "Unsupported HUGR serialization format.",
-            )),
-        }
+        let versioned = Versioned::deserialize(deserializer)?;
+        let shl: SerHugrLatest = versioned.upgrade().map_err(serde::de::Error::custom)?;
+        shl.try_into().map_err(serde::de::Error::custom)
     }
 }
 
-impl TryFrom<&Hugr> for SerHugrV1 {
+impl TryFrom<&Hugr> for SerHugrLatest {
     type Error = HUGRSerializationError;
 
     fn try_from(hugr: &Hugr) -> Result<Self, Self::Error> {
@@ -188,15 +209,15 @@ impl TryFrom<&Hugr> for SerHugrV1 {
     }
 }
 
-impl TryFrom<SerHugrV1> for Hugr {
+impl TryFrom<SerHugrLatest> for Hugr {
     type Error = HUGRSerializationError;
     fn try_from(
-        SerHugrV1 {
+        SerHugrLatest {
             nodes,
             edges,
             metadata,
-            ..
-        }: SerHugrV1,
+            encoder: _,
+        }: SerHugrLatest,
     ) -> Result<Self, Self::Error> {
         // Root must be first node
         let mut nodes = nodes.into_iter();

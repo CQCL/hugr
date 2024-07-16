@@ -32,7 +32,7 @@ const QB: Type = crate::extension::prelude::QB_T;
 
 /// Version 1 of the Testing HUGR serialization format, see `testing_hugr.py`.
 #[derive(Serialize, Deserialize, PartialEq, Debug, Default)]
-struct SerTestingV1 {
+struct SerTestingLatest {
     typ: Option<crate::types::TypeRV>,
     sum_type: Option<crate::types::SumType>,
     poly_func_type: Option<crate::types::PolyFuncTypeRV>,
@@ -41,44 +41,75 @@ struct SerTestingV1 {
     op_def: Option<SimpleOpDef>,
 }
 
-type TestingModel = SerTestingV1;
+struct NamedSchema {
+    name: &'static str,
+    schema: JSONSchema,
+}
+
+impl NamedSchema {
+    pub fn new(name: &'static str, schema: JSONSchema) -> Self {
+        Self { name, schema }
+    }
+
+    pub fn check(&self, val: &serde_json::Value) {
+        if let Err(errors) = self.schema.validate(val) {
+            // errors don't necessarily implement Debug
+            println!("Schema failed to validate: {}", self.name);
+            for error in errors {
+                println!("Validation error: {}", error);
+                println!("Instance path: {}", error.instance_path);
+            }
+            panic!("Serialization test failed.");
+        }
+    }
+
+    pub fn check_schemas(
+        val: &serde_json::Value,
+        schemas: impl IntoIterator<Item = &'static Self>,
+    ) {
+        for schema in schemas {
+            schema.check(val);
+        }
+    }
+}
 
 macro_rules! include_schema {
     ($name:ident, $path:literal) => {
         lazy_static! {
-            static ref $name: JSONSchema = {
-                let schema_val: serde_json::Value =
-                    serde_json::from_str(include_str!($path)).unwrap();
-                JSONSchema::options()
-                    .with_draft(Draft::Draft7)
-                    .compile(&schema_val)
-                    .expect("Schema is invalid.")
-            };
+            static ref $name: NamedSchema =
+                NamedSchema::new("$name", {
+                    let schema_val: serde_json::Value = serde_json::from_str(include_str!(
+                        concat!("../../../../specification/schema/", $path, "_v2.json")
+                    ))
+                    .unwrap();
+                    JSONSchema::options()
+                        .with_draft(Draft::Draft7)
+                        .compile(&schema_val)
+                        .expect("Schema is invalid.")
+                });
         }
     };
 }
 
-include_schema!(
-    SCHEMA,
-    "../../../../specification/schema/hugr_schema_v1.json"
-);
-include_schema!(
-    SCHEMA_STRICT,
-    "../../../../specification/schema/hugr_schema_strict_v1.json"
-);
-include_schema!(
-    TESTING_SCHEMA,
-    "../../../../specification/schema/testing_hugr_schema_v1.json"
-);
-include_schema!(
-    TESTING_SCHEMA_STRICT,
-    "../../../../specification/schema/testing_hugr_schema_strict_v1.json"
-);
+include_schema!(SCHEMA, "hugr_schema");
+include_schema!(SCHEMA_STRICT, "hugr_schema_strict");
+include_schema!(TESTING_SCHEMA, "testing_hugr_schema");
+include_schema!(TESTING_SCHEMA_STRICT, "testing_hugr_schema_strict");
+
+fn get_schemas(b: bool) -> impl IntoIterator<Item = &'static NamedSchema> {
+    let schemas: Vec<&'static NamedSchema> = vec![&SCHEMA, &SCHEMA_STRICT];
+    b.then_some(schemas.into_iter()).into_iter().flatten()
+}
+
+fn get_testing_schemas(b: bool) -> impl IntoIterator<Item = &'static NamedSchema> {
+    let schemas: Vec<&'static NamedSchema> = vec![&TESTING_SCHEMA, &TESTING_SCHEMA_STRICT];
+    b.then_some(schemas.into_iter()).into_iter().flatten()
+}
 
 macro_rules! impl_sertesting_from {
     ($typ:ty, $field:ident) => {
         #[cfg(test)]
-        impl From<$typ> for TestingModel {
+        impl From<$typ> for SerTestingLatest {
             fn from(v: $typ) -> Self {
                 let mut r: Self = Default::default();
                 r.$field = Some(v);
@@ -95,14 +126,14 @@ impl_sertesting_from!(crate::ops::Value, value);
 impl_sertesting_from!(NodeSer, optype);
 impl_sertesting_from!(SimpleOpDef, op_def);
 
-impl From<PolyFuncType> for TestingModel {
+impl From<PolyFuncType> for SerTestingLatest {
     fn from(v: PolyFuncType) -> Self {
         let v: PolyFuncTypeRV = v.into();
         v.into()
     }
 }
 
-impl From<Type> for TestingModel {
+impl From<Type> for SerTestingLatest {
     fn from(v: Type) -> Self {
         let t: TypeRV = v.into();
         t.into()
@@ -114,35 +145,22 @@ fn empty_hugr_serialize() {
     check_hugr_roundtrip(&Hugr::default(), true);
 }
 
-/// Serialize and deserialize a value, optionally validating against a schema.
-pub fn ser_serialize_check_schema<T: Serialize + serde::de::DeserializeOwned>(
-    g: &T,
-    schema: Option<&JSONSchema>,
-) -> serde_json::Value {
-    let s = serde_json::to_string(g).unwrap();
-    let val: serde_json::Value = serde_json::from_str(&s).unwrap();
-
-    if let Some(schema) = schema {
-        let validate = schema.validate(&val);
-
-        if let Err(errors) = validate {
-            // errors don't necessarily implement Debug
-            for error in errors {
-                println!("Validation error: {}", error);
-                println!("Instance path: {}", error.instance_path);
-            }
-            panic!("Serialization test failed.");
-        }
-    }
-    val
+fn ser_deserialize_check_schema<T: serde::de::DeserializeOwned>(
+    val: serde_json::Value,
+    schemas: impl IntoIterator<Item = &'static NamedSchema>,
+) -> T {
+    NamedSchema::check_schemas(&val, schemas);
+    serde_json::from_value(val).unwrap()
 }
 
-/// Serialize and deserialize a HUGR, and check that the result is the same as the original.
-/// Checks the serialized json against the in-tree schema.
-///
-/// Returns the deserialized HUGR.
-pub fn check_hugr_schema_roundtrip(hugr: &Hugr) -> Hugr {
-    check_hugr_roundtrip(hugr, true)
+/// Serialize and deserialize a value, optionally validating against a schema.
+fn ser_roundtrip_check_schema<T: Serialize + serde::de::DeserializeOwned>(
+    g: &T,
+    schemas: impl IntoIterator<Item = &'static NamedSchema>,
+) -> T {
+    let val = serde_json::to_value(g).unwrap();
+    NamedSchema::check_schemas(&val, schemas);
+    serde_json::from_value(val).unwrap()
 }
 
 /// Serialize and deserialize a HUGR, and check that the result is the same as the original.
@@ -155,22 +173,33 @@ pub fn check_hugr_schema_roundtrip(hugr: &Hugr) -> Hugr {
 ///
 /// Returns the deserialized HUGR.
 pub fn check_hugr_roundtrip(hugr: &Hugr, check_schema: bool) -> Hugr {
-    let hugr_ser = ser_serialize_check_schema(hugr, check_schema.then_some(&SCHEMA));
-    let _ = ser_serialize_check_schema(hugr, check_schema.then_some(&SCHEMA_STRICT));
-    let new_hugr: Hugr = serde_json::from_value(hugr_ser).unwrap();
+    let new_hugr = ser_roundtrip_check_schema(hugr, get_schemas(check_schema));
+
+    check_hugr(hugr, &new_hugr);
+    new_hugr
+}
+
+pub fn check_hugr_deserialize(hugr: &Hugr, value: serde_json::Value, check_schema: bool) -> Hugr {
+    let new_hugr = ser_deserialize_check_schema(value, get_schemas(check_schema));
+
+    check_hugr(hugr, &new_hugr);
+    new_hugr
+}
+
+pub fn check_hugr(lhs: &Hugr, rhs: &Hugr) {
     // Original HUGR, with canonicalized node indices
     //
     // The internal port indices may still be different.
-    let mut h_canon = hugr.clone();
+    let mut h_canon = lhs.clone();
     h_canon.canonicalize_nodes(|_, _| {});
 
-    assert_eq!(new_hugr.root, h_canon.root);
-    assert_eq!(new_hugr.hierarchy, h_canon.hierarchy);
-    assert_eq!(new_hugr.metadata, h_canon.metadata);
+    assert_eq!(rhs.root, h_canon.root);
+    assert_eq!(rhs.hierarchy, h_canon.hierarchy);
+    assert_eq!(rhs.metadata, h_canon.metadata);
 
     // Extension operations may have been downgraded to opaque operations.
-    for node in new_hugr.nodes() {
-        let new_op = new_hugr.get_optype(node);
+    for node in rhs.nodes() {
+        let new_op = rhs.get_optype(node);
         let old_op = h_canon.get_optype(node);
         if !new_op.is_const() {
             assert_eq!(new_op, old_op);
@@ -178,7 +207,7 @@ pub fn check_hugr_roundtrip(hugr: &Hugr, check_schema: bool) -> Hugr {
     }
 
     // Check that the graphs are equivalent up to port renumbering.
-    let new_graph = &new_hugr.graph;
+    let new_graph = &rhs.graph;
     let old_graph = &h_canon.graph;
     assert_eq!(new_graph.node_count(), old_graph.node_count());
     assert_eq!(new_graph.port_count(), old_graph.port_count());
@@ -191,21 +220,12 @@ pub fn check_hugr_roundtrip(hugr: &Hugr, check_schema: bool) -> Hugr {
             old_graph.output_neighbours(n).collect_vec()
         );
     }
-
-    new_hugr
 }
 
-fn check_testing_roundtrip(t: impl Into<TestingModel>) {
-    let before = Versioned::new(t.into());
-    let after_strict = serde_json::from_value(ser_serialize_check_schema(
-        &before,
-        Some(&TESTING_SCHEMA_STRICT),
-    ))
-    .unwrap();
-    let after =
-        serde_json::from_value(ser_serialize_check_schema(&before, Some(&TESTING_SCHEMA))).unwrap();
+fn check_testing_roundtrip(t: impl Into<SerTestingLatest>) {
+    let before = Versioned::new_latest(t.into());
+    let after = ser_roundtrip_check_schema(&before, get_testing_schemas(true));
     assert_eq!(before, after);
-    assert_eq!(after, after_strict);
 }
 
 /// Generate an optype for a node with a matching amount of inputs and outputs.
@@ -257,7 +277,7 @@ fn simpleser() {
         metadata: Default::default(),
     };
 
-    check_hugr_schema_roundtrip(&hugr);
+    check_hugr_roundtrip(&hugr, true);
 }
 
 #[test]
@@ -291,7 +311,7 @@ fn weighted_hugr_ser() {
         module_builder.finish_prelude_hugr().unwrap()
     };
 
-    check_hugr_schema_roundtrip(&hugr);
+    check_hugr_roundtrip(&hugr, true);
 }
 
 #[test]
@@ -307,7 +327,7 @@ fn dfg_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
     }
     let hugr = dfg.finish_hugr_with_outputs(params, &EMPTY_REG)?;
 
-    check_hugr_schema_roundtrip(&hugr);
+    check_hugr_roundtrip(&hugr, true);
     Ok(())
 }
 
@@ -330,7 +350,7 @@ fn opaque_ops() -> Result<(), Box<dyn std::error::Error>> {
 
     let hugr = dfg.finish_hugr_with_outputs([wire], &PRELUDE_REGISTRY)?;
 
-    check_hugr_schema_roundtrip(&hugr);
+    check_hugr_roundtrip(&hugr, true);
     Ok(())
 }
 
@@ -341,7 +361,7 @@ fn function_type() -> Result<(), Box<dyn std::error::Error>> {
     let op = bldr.add_dataflow_op(Noop { ty: fn_ty }, bldr.input_wires())?;
     let h = bldr.finish_prelude_hugr_with_outputs(op.outputs())?;
 
-    check_hugr_schema_roundtrip(&h);
+    check_hugr_roundtrip(&h, true);
     Ok(())
 }
 
@@ -359,9 +379,9 @@ fn hierarchy_order() -> Result<(), Box<dyn std::error::Error>> {
     hugr.remove_node(old_in);
     hugr.update_validate(&PRELUDE_REGISTRY)?;
 
-    let new_hugr: Hugr = check_hugr_schema_roundtrip(&hugr);
-    new_hugr.validate(&EMPTY_REG).unwrap_err();
-    new_hugr.validate(&PRELUDE_REGISTRY)?;
+    let rhs: Hugr = check_hugr_roundtrip(&hugr, true);
+    rhs.validate(&EMPTY_REG).unwrap_err();
+    rhs.validate(&PRELUDE_REGISTRY)?;
     Ok(())
 }
 

@@ -110,6 +110,24 @@ just coverage
 and open it with your favourite coverage viewer. In VSCode, you can use
 [`coverage-gutters`](https://marketplace.visualstudio.com/items?itemName=ryanluker.vscode-coverage-gutters).
 
+## Serialisation
+
+- before you modify the schema, write a test case in
+  `hugr::serialize::upgrade::test` that exercises the part of the schema that
+  will change.
+- run the tests, this will create a file in the `testcases` subdirectory.
+
+- modify the rust types in a schema-breaking way.
+- update the `hugry-py` schema to match
+- update `get_serialisation_version` in `hugr-py/src/hugr/__init__.py`
+- rename last `V` constructor to match. (e.g. `V12` -> `V13`)
+- create new `V` constructor holding a `serde_json::Value`. (e.g. `V12(serde_json::Value)`)
+- add a stub implement `v12_to_13` in `hugr::serialize::upgrade`
+- add a line to the pattern match in `Versioned::Upgrade` e.g.  `Self::V12(json) => self = Self::V13(upgrade::v12_to_v13(json).and_then(go)?)`,
+- Ensure all non-upgrade tests are passing.
+- implement `v12_to_13` in `hugr::serialize::upgrade`
+- Ensure all tests are passing
+
 ## 🌐 Contributing to HUGR
 
 We welcome contributions to HUGR! Please open [an issue](https://github.com/CQCL/hugr/issues/new) or [pull request](https://github.com/CQCL/hugr/compare) if you have any questions or suggestions.

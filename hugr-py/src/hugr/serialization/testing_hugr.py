@@ -1,9 +1,8 @@
-from typing import Literal
-
 from pydantic import ConfigDict
 
 from .ops import OpDef, OpType, Value
 from .ops import classes as ops_classes
+from .serial_hugr import VersionField
 from .tys import ConfiguredBaseModel, PolyFuncType, SumType, Type, model_rebuild
 
 
@@ -12,7 +11,7 @@ class TestingHugr(ConfiguredBaseModel):
     Value, OpType. Intended for testing only.
     """
 
-    version: Literal["v1"] = "v1"
+    version: str = VersionField
     typ: Type | None = None
     sum_type: SumType | None = None
     poly_func_type: PolyFuncType | None = None
