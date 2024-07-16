@@ -171,6 +171,7 @@ jobs:
         if: |
           needs.changes.result == 'failure' || needs.changes.result == 'cancelled' ||
           needs.check.result == 'failure' || needs.check.result == 'cancelled' ||
+          needs.test.result == 'failure' || needs.test.result == 'cancelled' ||
           needs.serialization-schema.result == 'failure' || needs.serialization-schema.result == 'cancelled'
         run: |
           echo "Required checks failed"
