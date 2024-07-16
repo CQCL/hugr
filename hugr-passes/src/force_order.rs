@@ -57,9 +57,7 @@ pub fn force_order_by_key<K: Ord>(
         .collect_vec();
     for dp in dataflow_parents {
         // we filter out the input and output nodes from the topological sort
-        let Some([i, o]) = hugr.get_io(dp) else {
-            continue;
-        };
+        let [i, o] = hugr.get_io(dp).unwrap();
         let sg = SiblingGraph::<Node>::try_new(hugr, dp)?;
         let petgraph = NodeFiltered::from_fn(sg.as_petgraph(), |x| x != dp && x != i && x != o);
         let ordered_nodes = ForceOrder::new(&petgraph, &rank)
