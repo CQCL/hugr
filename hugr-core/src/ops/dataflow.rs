@@ -164,10 +164,12 @@ impl<T: DataflowOpTrait> StaticTag for T {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(test, derive(Arbitrary))]
 pub struct Call {
-    /// Signature of function being called
-    func_sig: PolyFuncType,
-    type_args: Vec<TypeArg>,
-    instantiation: FunctionType, // Cache, so we can fail in try_new() not in signature()
+    /// Signature of function being called.
+    pub func_sig: PolyFuncType,
+    /// The type arguments that instantiate `func_sig`.
+    pub type_args: Vec<TypeArg>,
+    /// The instantiation of `func_sig`.
+    pub instantiation: FunctionType, // Cache, so we can fail in try_new() not in signature()
 }
 impl_op_name!(Call);
 
@@ -335,9 +337,11 @@ impl LoadConstant {
 #[cfg_attr(test, derive(Arbitrary))]
 pub struct LoadFunction {
     /// Signature of the function
-    func_sig: PolyFuncType,
-    type_args: Vec<TypeArg>,
-    signature: FunctionType, // Cache, so we can fail in try_new() not in signature()
+    pub func_sig: PolyFuncType,
+    /// The type arguments that instantiate `func_sig`.
+    pub type_args: Vec<TypeArg>,
+    /// The instantiation of `func_sig`.
+    pub signature: FunctionType, // Cache, so we can fail in try_new() not in signature()
 }
 impl_op_name!(LoadFunction);
 impl DataflowOpTrait for LoadFunction {
