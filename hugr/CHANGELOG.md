@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.8.0 (2024-07-16)
+
+### Bug Fixes
+
+- [**breaking**] Force_order failing on Const nodes, add arg to rank. ([#1300](https://github.com/CQCL/hugr/pull/1300))
+- NonConvex error on SiblingSubgraph::from_nodes with multiports ([#1295](https://github.com/CQCL/hugr/pull/1295))
+- [**breaking**] Ops require their own extension ([#1226](https://github.com/CQCL/hugr/pull/1226))
+
+### Documentation
+
+- Attempt to correct force_order docs ([#1299](https://github.com/CQCL/hugr/pull/1299))
+
+### Features
+
+- Make `DataflowOpTrait` public ([#1283](https://github.com/CQCL/hugr/pull/1283))
+- Make op members consistently public ([#1274](https://github.com/CQCL/hugr/pull/1274))
+
+### Refactor
+
+- [**breaking**] Rename builder helpers: ft1->endo_ft, ft2->inout_ft ([#1297](https://github.com/CQCL/hugr/pull/1297))
+
+
 ## 0.7.0 (2024-07-10)
 
 ### Bug Fixes
