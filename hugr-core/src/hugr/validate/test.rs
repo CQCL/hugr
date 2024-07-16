@@ -21,8 +21,8 @@ use crate::std_extensions::logic::test::{and_op, or_op};
 use crate::std_extensions::logic::{self, NotOp};
 use crate::types::type_param::{TypeArg, TypeArgError};
 use crate::types::{
-    CustomType, FunctionType, FunctionTypeRV, PolyFuncType, PolyFuncTypeRV, Type, TypeBound,
-    TypeRV, TypeRow,
+    CustomType, FuncValueType, FunctionType, PolyFuncType, PolyFuncTypeRV, Type, TypeBound, TypeRV,
+    TypeRow,
 };
 use crate::{const_extension_ids, test_file, type_row, Direction, IncomingPort, Node};
 
@@ -579,10 +579,10 @@ pub(crate) fn extension_with_eval_parallel() -> Extension {
 
     let inputs = TypeRV::new_row_var_use(0, TypeBound::Any);
     let outputs = TypeRV::new_row_var_use(1, TypeBound::Any);
-    let evaled_fn = TypeRV::new_function(FunctionTypeRV::new(inputs.clone(), outputs.clone()));
+    let evaled_fn = TypeRV::new_function(FuncValueType::new(inputs.clone(), outputs.clone()));
     let pf = PolyFuncTypeRV::new(
         [rowp.clone(), rowp.clone()],
-        FunctionTypeRV::new(vec![evaled_fn, inputs], outputs),
+        FuncValueType::new(vec![evaled_fn, inputs], outputs),
     );
     e.add_op("eval".into(), "".into(), pf).unwrap();
 
@@ -591,10 +591,10 @@ pub(crate) fn extension_with_eval_parallel() -> Extension {
         [rowp.clone(), rowp.clone(), rowp.clone(), rowp.clone()],
         FunctionType::new(
             vec![
-                Type::new_function(FunctionTypeRV::new(rv(0), rv(2))),
-                Type::new_function(FunctionTypeRV::new(rv(1), rv(3))),
+                Type::new_function(FuncValueType::new(rv(0), rv(2))),
+                Type::new_function(FuncValueType::new(rv(1), rv(3))),
             ],
-            Type::new_function(FunctionTypeRV::new(vec![rv(0), rv(1)], vec![rv(2), rv(3)])),
+            Type::new_function(FuncValueType::new(vec![rv(0), rv(1)], vec![rv(2), rv(3)])),
         ),
     );
     e.add_op("parallel".into(), "".into(), pf).unwrap();
@@ -644,8 +644,8 @@ fn seq1ty(t: TypeRV) -> TypeArg {
 fn row_variables() -> Result<(), Box<dyn std::error::Error>> {
     let e = extension_with_eval_parallel();
     let tv = TypeRV::new_row_var_use(0, TypeBound::Any);
-    let inner_ft = Type::new_function(FunctionTypeRV::new_endo(tv.clone()));
-    let ft_usz = Type::new_function(FunctionTypeRV::new_endo(vec![tv.clone(), USIZE_T.into()]));
+    let inner_ft = Type::new_function(FuncValueType::new_endo(tv.clone()));
+    let ft_usz = Type::new_function(FuncValueType::new_endo(vec![tv.clone(), USIZE_T.into()]));
     let mut fb = FunctionBuilder::new(
         "id",
         PolyFuncType::new(

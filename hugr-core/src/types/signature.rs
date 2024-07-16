@@ -46,7 +46,7 @@ pub type FunctionType = FuncTypeBase<NoRV>;
 /// but not a valid node type.
 ///
 /// [OpDef]: crate::extension::OpDef
-pub type FunctionTypeRV = FuncTypeBase<RowVariable>;
+pub type FuncValueType = FuncTypeBase<RowVariable>;
 
 impl<RV: MaybeRV> FuncTypeBase<RV> {
     /// Builder method, add extension_reqs to an FunctionType
@@ -80,7 +80,7 @@ impl<RV: MaybeRV> FuncTypeBase<RV> {
     }
 
     /// True if both inputs and outputs are necessarily empty.
-    /// (For [FunctionTypeRV], even after any possible substitution of row variables)
+    /// (For [FuncValueType], even after any possible substitution of row variables)
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
         self.input.is_empty() && self.output.is_empty()
@@ -109,8 +109,8 @@ impl<RV: MaybeRV> FuncTypeBase<RV> {
     }
 }
 
-impl FunctionTypeRV {
-    /// If this FunctionTypeRV contains any row variables, return one.
+impl FuncValueType {
+    /// If this FuncValueType contains any row variables, return one.
     pub fn find_rowvar(&self) -> Option<RowVariable> {
         self.input
             .iter()
@@ -257,17 +257,17 @@ impl<RV: MaybeRV> Display for FuncTypeBase<RV> {
     }
 }
 
-impl TryFrom<FunctionTypeRV> for FunctionType {
+impl TryFrom<FuncValueType> for FunctionType {
     type Error = SignatureError;
 
-    fn try_from(value: FunctionTypeRV) -> Result<Self, Self::Error> {
+    fn try_from(value: FuncValueType) -> Result<Self, Self::Error> {
         let input: TypeRow = value.input.try_into()?;
         let output: TypeRow = value.output.try_into()?;
         Ok(Self::new(input, output).with_extension_delta(value.extension_reqs))
     }
 }
 
-impl From<FunctionType> for FunctionTypeRV {
+impl From<FunctionType> for FuncValueType {
     fn from(value: FunctionType) -> Self {
         Self {
             input: value.input.into(),

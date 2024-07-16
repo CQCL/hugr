@@ -15,7 +15,7 @@ use crate::std_extensions::arithmetic::int_types::{int_custom_type, ConstInt, IN
 use crate::std_extensions::logic::NotOp;
 use crate::types::type_param::TypeParam;
 use crate::types::{
-    FunctionType, FunctionTypeRV, PolyFuncType, PolyFuncTypeRV, SumType, Type, TypeArg, TypeBound,
+    FuncValueType, FunctionType, PolyFuncType, PolyFuncTypeRV, SumType, Type, TypeArg, TypeBound,
     TypeRV,
 };
 use crate::{type_row, OutgoingPort};
@@ -440,10 +440,10 @@ fn polyfunctype2() -> PolyFuncTypeRV {
     let tv1 = TypeRV::new_row_var_use(1, TypeBound::Eq);
     let params = [TypeBound::Any, TypeBound::Eq].map(TypeParam::new_list);
     let inputs = vec![
-        TypeRV::new_function(FunctionTypeRV::new(tv0.clone(), tv1.clone())),
+        TypeRV::new_function(FuncValueType::new(tv0.clone(), tv1.clone())),
         tv0,
     ];
-    let res = PolyFuncTypeRV::new(params, FunctionTypeRV::new(inputs, tv1));
+    let res = PolyFuncTypeRV::new(params, FuncValueType::new(inputs, tv1));
     // Just check we've got the arguments the right way round
     // (not that it really matters for the serialization schema we have)
     res.validate(&EMPTY_REG).unwrap();
@@ -465,14 +465,14 @@ fn roundtrip_polyfunctype_fixedlen(#[case] poly_func_type: PolyFuncType) {
 }
 
 #[rstest]
-#[case(FunctionTypeRV::new_endo(type_row![]).into())]
+#[case(FuncValueType::new_endo(type_row![]).into())]
 #[case(PolyFuncTypeRV::new([TypeParam::Opaque { ty: int_custom_type(TypeArg::BoundedNat { n: 1 }) }], FunctionType::new_endo(type_row![Type::new_var_use(0, TypeBound::Copyable)])))]
 #[case(PolyFuncTypeRV::new([TypeBound::Eq.into()], FunctionType::new_endo(type_row![Type::new_var_use(0, TypeBound::Eq)])))]
 #[case(PolyFuncTypeRV::new([TypeParam::new_list(TypeBound::Any)], FunctionType::new_endo(type_row![])))]
 #[case(PolyFuncTypeRV::new([TypeParam::Tuple { params: [TypeBound::Any.into(), TypeParam::bounded_nat(2.try_into().unwrap())].into() }], FunctionType::new_endo(type_row![])))]
 #[case(PolyFuncTypeRV::new(
     [TypeParam::new_list(TypeBound::Any)],
-    FunctionTypeRV::new_endo(TypeRV::new_row_var_use(0, TypeBound::Any))))]
+    FuncValueType::new_endo(TypeRV::new_row_var_use(0, TypeBound::Any))))]
 #[case(polyfunctype2())]
 fn roundtrip_polyfunctype_varlen(#[case] poly_func_type: PolyFuncTypeRV) {
     check_testing_roundtrip(poly_func_type)

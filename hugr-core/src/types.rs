@@ -17,7 +17,7 @@ use crate::utils::display_list_with_separator;
 pub use check::SumTypeError;
 pub use custom::CustomType;
 pub use poly_func::{PolyFuncType, PolyFuncTypeRV};
-pub use signature::{FunctionType, FunctionTypeRV};
+pub use signature::{FuncValueType, FunctionType};
 use smol_str::SmolStr;
 pub use type_param::TypeArg;
 pub use type_row::{TypeRow, TypeRowRV};
@@ -225,7 +225,7 @@ pub enum TypeEnum<RV: MaybeRV> {
     Alias(AliasDecl),
     #[allow(missing_docs)]
     #[display(fmt = "Function({})", "_0")]
-    Function(Box<FunctionTypeRV>),
+    Function(Box<FuncValueType>),
     // Index into TypeParams, and cache of TypeBound (checked in validation)
     #[allow(missing_docs)]
     #[display(fmt = "Variable({})", _0)]
@@ -321,7 +321,7 @@ impl<RV: MaybeRV> TypeBase<RV> {
     const EMPTY_TYPEROW_REF: &'static TypeRowBase<RV> = &Self::EMPTY_TYPEROW;
 
     /// Initialize a new function type.
-    pub fn new_function(fun_ty: impl Into<FunctionTypeRV>) -> Self {
+    pub fn new_function(fun_ty: impl Into<FuncValueType>) -> Self {
         Self::new(TypeEnum::Function(Box::new(fun_ty.into())))
     }
 
@@ -636,7 +636,7 @@ pub(crate) mod test {
         use crate::proptest::RecursionDepth;
 
         use super::{AliasDecl, MaybeRV, TypeBase, TypeBound, TypeEnum};
-        use crate::types::{CustomType, FunctionTypeRV, SumType, TypeRowRV};
+        use crate::types::{CustomType, FuncValueType, SumType, TypeRowRV};
         use ::proptest::prelude::*;
 
         impl Arbitrary for super::SumType {
@@ -663,7 +663,7 @@ pub(crate) mod test {
                 prop_oneof![
                     1 => any::<AliasDecl>().prop_map(TypeBase::new_alias),
                     1 => any_with::<CustomType>(depth.into()).prop_map(TypeBase::new_extension),
-                    1 => any_with::<FunctionTypeRV>(depth).prop_map(TypeBase::new_function),
+                    1 => any_with::<FuncValueType>(depth).prop_map(TypeBase::new_function),
                     1 => any_with::<SumType>(depth).prop_map(TypeBase::from),
                     1 => (any::<usize>(), any::<TypeBound>()).prop_map(|(i,b)| TypeBase::new_var_use(i,b)),
                     // proptest_derive::Arbitrary's weight attribute requires a constant,

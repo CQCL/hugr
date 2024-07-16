@@ -43,18 +43,18 @@
 //!         },
 //!         ops::{CustomOp, OpName},
 //!         type_row,
-//!         types::{FunctionTypeRV, PolyFuncTypeRV},
+//!         types::{FuncValueType, PolyFuncTypeRV},
 //!         Extension,
 //!     };
 //!
 //!     use lazy_static::lazy_static;
 //!
 //!     fn one_qb_func() -> PolyFuncTypeRV {
-//!         FunctionTypeRV::new_endo(type_row![QB_T]).into()
+//!         FuncValueType::new_endo(type_row![QB_T]).into()
 //!     }
 //!
 //!     fn two_qb_func() -> PolyFuncTypeRV {
-//!         FunctionTypeRV::new_endo(type_row![QB_T, QB_T]).into()
+//!         FuncValueType::new_endo(type_row![QB_T, QB_T]).into()
 //!     }
 //!     /// The extension identifier.
 //!     pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("mini.quantum");
@@ -73,7 +73,7 @@
 //!             .add_op(
 //!                 OpName::new_inline("Measure"),
 //!                 "Measure a qubit, returning the qubit and the measurement result.".into(),
-//!                 FunctionTypeRV::new(type_row![QB_T], type_row![QB_T, BOOL_T]),
+//!                 FuncValueType::new(type_row![QB_T], type_row![QB_T, BOOL_T]),
 //!             )
 //!             .unwrap();
 //!
