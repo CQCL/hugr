@@ -32,7 +32,7 @@ use crate::extension::ExtensionRegistry;
 use crate::ops::handle::NodeHandle;
 use crate::ops::{OpParent, OpTag, OpTrait, OpType};
 
-use crate::types::{EdgeKind, FunctionType, Type, TypeScheme};
+use crate::types::{EdgeKind, FunctionType, PolyFuncType, Type};
 use crate::{Direction, IncomingPort, Node, OutgoingPort, Port};
 
 use itertools::Either;
@@ -347,7 +347,7 @@ pub trait HugrView: HugrInternals {
     /// of the function.
     ///
     /// Otherwise, returns `None`.
-    fn poly_func_type(&self) -> Option<TypeScheme> {
+    fn poly_func_type(&self) -> Option<PolyFuncType> {
         match self.root_type() {
             OpType::FuncDecl(decl) => Some(decl.signature.clone()),
             OpType::FuncDefn(defn) => Some(defn.signature.clone()),

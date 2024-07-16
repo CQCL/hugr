@@ -28,7 +28,7 @@ use super::{signature::FuncTypeBase, MaybeRV, NoRV, RowVariable};
     "params.iter().map(ToString::to_string).join(\" \")",
     "body"
 )]
-pub struct TypeSchemeBase<RV: MaybeRV> {
+pub struct PolyFuncTypeBase<RV: MaybeRV> {
     /// The declared type parameters, i.e., these must be instantiated with
     /// the same number of [TypeArg]s before the function can be called. This
     /// defines the indices used by variables inside the body.
@@ -45,16 +45,16 @@ pub struct TypeSchemeBase<RV: MaybeRV> {
 /// [Call]: crate::ops::Call
 /// [FuncDefn]: crate::ops::FuncDefn
 /// [FuncDecl]: crate::ops::FuncDecl
-pub type TypeScheme = TypeSchemeBase<NoRV>;
+pub type PolyFuncType = PolyFuncTypeBase<NoRV>;
 
 /// The polymorphic type of an [OpDef], whose number of input and outputs
 /// may vary according to how [RowVariable]s therein are instantiated.
 ///
 /// [OpDef]: crate::extension::OpDef
-pub type TypeSchemeRV = TypeSchemeBase<RowVariable>;
+pub type PolyFuncTypeRV = PolyFuncTypeBase<RowVariable>;
 
 // deriving Default leads to an impl that only applies for RV: Default
-impl<RV: MaybeRV> Default for TypeSchemeBase<RV> {
+impl<RV: MaybeRV> Default for PolyFuncTypeBase<RV> {
     fn default() -> Self {
         Self {
             params: Default::default(),
@@ -63,7 +63,7 @@ impl<RV: MaybeRV> Default for TypeSchemeBase<RV> {
     }
 }
 
-impl<RV: MaybeRV> From<FuncTypeBase<RV>> for TypeSchemeBase<RV> {
+impl<RV: MaybeRV> From<FuncTypeBase<RV>> for PolyFuncTypeBase<RV> {
     fn from(body: FuncTypeBase<RV>) -> Self {
         Self {
             params: vec![],
@@ -72,8 +72,8 @@ impl<RV: MaybeRV> From<FuncTypeBase<RV>> for TypeSchemeBase<RV> {
     }
 }
 
-impl From<TypeScheme> for TypeSchemeRV {
-    fn from(value: TypeScheme) -> Self {
+impl From<PolyFuncType> for PolyFuncTypeRV {
+    fn from(value: PolyFuncType) -> Self {
         Self {
             params: value.params,
             body: value.body.into(),
@@ -81,11 +81,11 @@ impl From<TypeScheme> for TypeSchemeRV {
     }
 }
 
-impl<RV: MaybeRV> TryFrom<TypeSchemeBase<RV>> for FuncTypeBase<RV> {
-    /// If the TypeSchemeBase is not monomorphic, fail with its binders
+impl<RV: MaybeRV> TryFrom<PolyFuncTypeBase<RV>> for FuncTypeBase<RV> {
+    /// If the PolyFuncTypeBase is not monomorphic, fail with its binders
     type Error = Vec<TypeParam>;
 
-    fn try_from(value: TypeSchemeBase<RV>) -> Result<Self, Self::Error> {
+    fn try_from(value: PolyFuncTypeBase<RV>) -> Result<Self, Self::Error> {
         if value.params.is_empty() {
             Ok(value.body)
         } else {
@@ -94,7 +94,7 @@ impl<RV: MaybeRV> TryFrom<TypeSchemeBase<RV>> for FuncTypeBase<RV> {
     }
 }
 
-impl<RV: MaybeRV> TypeSchemeBase<RV> {
+impl<RV: MaybeRV> PolyFuncTypeBase<RV> {
     /// The type parameters, aka binders, over which this type is polymorphic
     pub fn params(&self) -> &[TypeParam] {
         &self.params
@@ -105,7 +105,7 @@ impl<RV: MaybeRV> TypeSchemeBase<RV> {
         &self.body
     }
 
-    /// Create a new TypeSchemeBase given the kinds of the variables it declares
+    /// Create a new PolyFuncTypeBase given the kinds of the variables it declares
     /// and the underlying [FuncTypeBase].
     pub fn new(params: impl Into<Vec<TypeParam>>, body: impl Into<FuncTypeBase<RV>>) -> Self {
         Self {
@@ -114,7 +114,7 @@ impl<RV: MaybeRV> TypeSchemeBase<RV> {
         }
     }
 
-    /// Instantiates an outer [TypeSchemeBase], i.e. with no free variables
+    /// Instantiates an outer [PolyFuncTypeBase], i.e. with no free variables
     /// (as ensured by [Self::validate]), into a monomorphic type.
     ///
     /// # Errors
@@ -159,14 +159,14 @@ pub(crate) mod test {
     };
     use crate::Extension;
 
-    use super::TypeSchemeBase;
+    use super::PolyFuncTypeBase;
 
     lazy_static! {
         static ref REGISTRY: ExtensionRegistry =
             ExtensionRegistry::try_new([PRELUDE.to_owned(), EXTENSION.to_owned()]).unwrap();
     }
 
-    impl<RV: MaybeRV> TypeSchemeBase<RV> {
+    impl<RV: MaybeRV> PolyFuncTypeBase<RV> {
         fn new_validated(
             params: impl Into<Vec<TypeParam>>,
             body: FuncTypeBase<RV>,
@@ -183,7 +183,7 @@ pub(crate) mod test {
         let list_def = EXTENSION.get_type(&LIST_TYPENAME).unwrap();
         let tyvar = TypeArg::new_var_use(0, TypeBound::Any.into());
         let list_of_var = Type::new_extension(list_def.instantiate([tyvar.clone()])?);
-        let list_len = TypeSchemeBase::new_validated(
+        let list_len = PolyFuncTypeBase::new_validated(
             [TypeBound::Any.into()],
             FunctionType::new(vec![list_of_var], vec![USIZE_T]),
             &REGISTRY,
@@ -214,7 +214,7 @@ pub(crate) mod test {
 
         // Valid schema...
         let good_array = Type::new_extension(ar_def.instantiate([tyvar.clone(), szvar.clone()])?);
-        let good_ts = TypeSchemeBase::new_validated(
+        let good_ts = PolyFuncTypeBase::new_validated(
             typarams.clone(),
             FunctionType::new_endo(good_array),
             &PRELUDE_REGISTRY,
@@ -256,7 +256,7 @@ pub(crate) mod test {
             PRELUDE_ID,
             TypeBound::Any,
         ));
-        let bad_ts = TypeSchemeBase::new_validated(
+        let bad_ts = PolyFuncTypeBase::new_validated(
             typarams.clone(),
             FunctionType::new_endo(bad_array),
             &PRELUDE_REGISTRY,
@@ -283,7 +283,7 @@ pub(crate) mod test {
             },
         ] {
             let invalid_ts =
-                TypeSchemeBase::new_validated([decl.clone()], body_type.clone(), &REGISTRY);
+                PolyFuncTypeBase::new_validated([decl.clone()], body_type.clone(), &REGISTRY);
             assert_eq!(
                 invalid_ts.err(),
                 Some(SignatureError::TypeVarDoesNotMatchDeclaration {
@@ -293,7 +293,7 @@ pub(crate) mod test {
             );
         }
         // Variable not declared at all
-        let invalid_ts = TypeSchemeBase::new_validated([], body_type, &REGISTRY);
+        let invalid_ts = PolyFuncTypeBase::new_validated([], body_type, &REGISTRY);
         assert_eq!(
             invalid_ts.err(),
             Some(SignatureError::FreeTypeVar {
@@ -325,7 +325,7 @@ pub(crate) mod test {
         let reg = ExtensionRegistry::try_new([e]).unwrap();
 
         let make_scheme = |tp: TypeParam| {
-            TypeSchemeBase::new_validated(
+            PolyFuncTypeBase::new_validated(
                 [tp.clone()],
                 FunctionType::new_endo(Type::new_extension(CustomType::new(
                     TYPE_NAME,
@@ -390,7 +390,7 @@ pub(crate) mod test {
         let decl = TypeParam::List {
             param: Box::new(TP_ANY),
         };
-        let e = TypeSchemeBase::new_validated(
+        let e = PolyFuncTypeBase::new_validated(
             [decl.clone()],
             FunctionTypeRV::new(
                 vec![USIZE_T],
@@ -404,7 +404,7 @@ pub(crate) mod test {
             assert_eq!(cached, TypeParam::List {param: Box::new(TypeParam::Type {b: TypeBound::Copyable})});
         });
         // Declared as row variable, used as type variable
-        let e = TypeSchemeBase::new_validated(
+        let e = PolyFuncTypeBase::new_validated(
             [decl.clone()],
             FunctionType::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
             &EMPTY_REG,
@@ -419,7 +419,7 @@ pub(crate) mod test {
     #[test]
     fn row_variables() {
         let rty = TypeRV::new_row_var_use(0, TypeBound::Any);
-        let pf = TypeSchemeBase::new_validated(
+        let pf = PolyFuncTypeBase::new_validated(
             [TypeParam::new_list(TP_ANY)],
             FunctionTypeRV::new(
                 vec![USIZE_T.into(), rty.clone()],
@@ -460,7 +460,7 @@ pub(crate) mod test {
             0,
             TypeBound::Copyable,
         )));
-        let pf = TypeSchemeBase::new_validated(
+        let pf = PolyFuncTypeBase::new_validated(
             [TypeParam::List {
                 param: Box::new(TypeParam::Type {
                     b: TypeBound::Copyable,

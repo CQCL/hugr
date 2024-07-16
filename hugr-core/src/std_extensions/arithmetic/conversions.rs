@@ -12,7 +12,7 @@ use crate::{
     },
     ops::{custom::ExtensionOp, NamedOp},
     type_row,
-    types::{FunctionTypeRV, TypeArg, TypeRV, TypeSchemeRV},
+    types::{FunctionTypeRV, PolyFuncTypeRV, TypeArg, TypeRV},
     Extension,
 };
 
@@ -45,7 +45,7 @@ impl MakeOpDef for ConvertOpDef {
 
     fn signature(&self) -> SignatureFunc {
         use ConvertOpDef::*;
-        TypeSchemeRV::new(
+        PolyFuncTypeRV::new(
             vec![LOG_WIDTH_TYPE_PARAM],
             match self {
                 trunc_s | trunc_u => FunctionTypeRV::new(

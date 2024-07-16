@@ -46,11 +46,11 @@ impl UpperBound {
     }
 }
 
-/// A *kind* of [TypeArg]. Thus, a parameter declared by a [TypeScheme] or [TypeSchemeRV],
+/// A *kind* of [TypeArg]. Thus, a parameter declared by a [PolyFuncType] or [PolyFuncTypeRV],
 /// specifying a value that must be provided statically in order to instantiate it.
 ///
-/// [TypeScheme]: super::TypeScheme
-/// [TypeSchemeRV]: super::TypeSchemeRV
+/// [PolyFuncType]: super::PolyFuncType
+/// [PolyFuncTypeRV]: super::PolyFuncTypeRV
 #[derive(
     Clone, Debug, PartialEq, Eq, derive_more::Display, serde::Deserialize, serde::Serialize,
 )]

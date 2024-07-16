@@ -16,7 +16,7 @@ use crate::types::type_param::check_type_arg;
 use crate::utils::display_list_with_separator;
 pub use check::SumTypeError;
 pub use custom::CustomType;
-pub use poly_func::{TypeScheme, TypeSchemeRV};
+pub use poly_func::{PolyFuncType, PolyFuncTypeRV};
 pub use signature::{FunctionType, FunctionTypeRV};
 use smol_str::SmolStr;
 pub use type_param::TypeArg;
@@ -54,7 +54,7 @@ pub enum EdgeKind {
     ///
     /// [FuncDecl]: crate::ops::FuncDecl
     /// [FuncDefn]: crate::ops::FuncDefn
-    Function(TypeScheme),
+    Function(PolyFuncType),
     /// Explicitly enforce an ordering between nodes in a DDG.
     StateOrder,
 }

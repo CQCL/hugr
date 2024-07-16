@@ -10,7 +10,7 @@ use crate::ops::custom::ExtensionOp;
 use crate::ops::{NamedOp, OpName};
 use crate::std_extensions::arithmetic::int_types::int_type;
 use crate::type_row;
-use crate::types::{FunctionTypeRV, TypeRowRV, TypeSchemeRV};
+use crate::types::{FunctionTypeRV, PolyFuncTypeRV, TypeRowRV};
 use crate::utils::collect_array;
 
 use crate::{
@@ -160,7 +160,7 @@ impl MakeOpDef for IntOpDef {
             ishl | ishr | irotl | irotr => {
                 int_polytype(2, vec![int_tv(0), int_tv(1)], vec![int_tv(0)]).into()
             }
-            itostring_u | itostring_s => TypeSchemeRV::new(
+            itostring_u | itostring_s => PolyFuncTypeRV::new(
                 vec![LOG_WIDTH_TYPE_PARAM],
                 FunctionTypeRV::new(vec![int_tv(0)], vec![STRING_TYPE]),
             )
@@ -238,20 +238,20 @@ fn int_polytype(
     n_vars: usize,
     input: impl Into<TypeRowRV>,
     output: impl Into<TypeRowRV>,
-) -> TypeSchemeRV {
-    TypeSchemeRV::new(
+) -> PolyFuncTypeRV {
+    PolyFuncTypeRV::new(
         vec![LOG_WIDTH_TYPE_PARAM; n_vars],
         FunctionTypeRV::new(input, output),
     )
 }
 
-fn ibinop_sig() -> TypeSchemeRV {
+fn ibinop_sig() -> PolyFuncTypeRV {
     let int_type_var = int_tv(0);
 
     int_polytype(1, vec![int_type_var.clone(); 2], vec![int_type_var])
 }
 
-fn iunop_sig() -> TypeSchemeRV {
+fn iunop_sig() -> PolyFuncTypeRV {
     let int_type_var = int_tv(0);
     int_polytype(1, vec![int_type_var.clone()], vec![int_type_var])
 }

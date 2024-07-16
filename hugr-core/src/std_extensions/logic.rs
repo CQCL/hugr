@@ -162,7 +162,7 @@ fn logic_op_sig() -> impl SignatureFromArgs {
         fn compute_signature(
             &self,
             arg_values: &[TypeArg],
-        ) -> Result<crate::types::TypeSchemeRV, SignatureError> {
+        ) -> Result<crate::types::PolyFuncTypeRV, SignatureError> {
             // get the number of input booleans.
             let [TypeArg::BoundedNat { n }] = *arg_values else {
                 return Err(SignatureError::InvalidTypeArgs);

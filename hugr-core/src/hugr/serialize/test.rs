@@ -15,8 +15,8 @@ use crate::std_extensions::arithmetic::int_types::{int_custom_type, ConstInt, IN
 use crate::std_extensions::logic::NotOp;
 use crate::types::type_param::TypeParam;
 use crate::types::{
-    FunctionType, FunctionTypeRV, SumType, Type, TypeArg, TypeBound, TypeRV, TypeScheme,
-    TypeSchemeRV,
+    FunctionType, FunctionTypeRV, PolyFuncType, PolyFuncTypeRV, SumType, Type, TypeArg, TypeBound,
+    TypeRV,
 };
 use crate::{type_row, OutgoingPort};
 
@@ -35,7 +35,7 @@ const QB: Type = crate::extension::prelude::QB_T;
 struct SerTestingV1 {
     typ: Option<crate::types::TypeRV>,
     sum_type: Option<crate::types::SumType>,
-    poly_func_type: Option<crate::types::TypeSchemeRV>,
+    poly_func_type: Option<crate::types::PolyFuncTypeRV>,
     value: Option<crate::ops::Value>,
     optype: Option<NodeSer>,
     op_def: Option<SimpleOpDef>,
@@ -90,14 +90,14 @@ macro_rules! impl_sertesting_from {
 
 impl_sertesting_from!(crate::types::TypeRV, typ);
 impl_sertesting_from!(crate::types::SumType, sum_type);
-impl_sertesting_from!(crate::types::TypeSchemeRV, poly_func_type);
+impl_sertesting_from!(crate::types::PolyFuncTypeRV, poly_func_type);
 impl_sertesting_from!(crate::ops::Value, value);
 impl_sertesting_from!(NodeSer, optype);
 impl_sertesting_from!(SimpleOpDef, op_def);
 
-impl From<TypeScheme> for TestingModel {
-    fn from(v: TypeScheme) -> Self {
-        let v: TypeSchemeRV = v.into();
+impl From<PolyFuncType> for TestingModel {
+    fn from(v: PolyFuncType) -> Self {
+        let v: PolyFuncTypeRV = v.into();
         v.into()
     }
 }
@@ -428,14 +428,14 @@ fn roundtrip_value(#[case] value: Value) {
     check_testing_roundtrip(value);
 }
 
-fn polyfunctype1() -> TypeScheme {
+fn polyfunctype1() -> PolyFuncType {
     let mut extension_set = ExtensionSet::new();
     extension_set.insert_type_var(1);
     let function_type = FunctionType::new_endo(type_row![]).with_extension_delta(extension_set);
-    TypeScheme::new([TypeParam::max_nat(), TypeParam::Extensions], function_type)
+    PolyFuncType::new([TypeParam::max_nat(), TypeParam::Extensions], function_type)
 }
 
-fn polyfunctype2() -> TypeSchemeRV {
+fn polyfunctype2() -> PolyFuncTypeRV {
     let tv0 = TypeRV::new_row_var_use(0, TypeBound::Any);
     let tv1 = TypeRV::new_row_var_use(1, TypeBound::Eq);
     let params = [TypeBound::Any, TypeBound::Eq].map(TypeParam::new_list);
@@ -443,7 +443,7 @@ fn polyfunctype2() -> TypeSchemeRV {
         TypeRV::new_function(FunctionTypeRV::new(tv0.clone(), tv1.clone())),
         tv0,
     ];
-    let res = TypeSchemeRV::new(params, FunctionTypeRV::new(inputs, tv1));
+    let res = PolyFuncTypeRV::new(params, FunctionTypeRV::new(inputs, tv1));
     // Just check we've got the arguments the right way round
     // (not that it really matters for the serialization schema we have)
     res.validate(&EMPTY_REG).unwrap();
@@ -453,28 +453,28 @@ fn polyfunctype2() -> TypeSchemeRV {
 #[rstest]
 #[case(FunctionType::new_endo(type_row![]).into())]
 #[case(polyfunctype1())]
-#[case(TypeScheme::new([TypeParam::Opaque { ty: int_custom_type(TypeArg::BoundedNat { n: 1 }) }], FunctionType::new_endo(type_row![Type::new_var_use(0, TypeBound::Copyable)])))]
-#[case(TypeScheme::new([TypeBound::Eq.into()], FunctionType::new_endo(type_row![Type::new_var_use(0, TypeBound::Eq)])))]
-#[case(TypeScheme::new([TypeParam::new_list(TypeBound::Any)], FunctionType::new_endo(type_row![])))]
-#[case(TypeScheme::new([TypeParam::Tuple { params: [TypeBound::Any.into(), TypeParam::bounded_nat(2.try_into().unwrap())].into() }], FunctionType::new_endo(type_row![])))]
-#[case(TypeScheme::new(
+#[case(PolyFuncType::new([TypeParam::Opaque { ty: int_custom_type(TypeArg::BoundedNat { n: 1 }) }], FunctionType::new_endo(type_row![Type::new_var_use(0, TypeBound::Copyable)])))]
+#[case(PolyFuncType::new([TypeBound::Eq.into()], FunctionType::new_endo(type_row![Type::new_var_use(0, TypeBound::Eq)])))]
+#[case(PolyFuncType::new([TypeParam::new_list(TypeBound::Any)], FunctionType::new_endo(type_row![])))]
+#[case(PolyFuncType::new([TypeParam::Tuple { params: [TypeBound::Any.into(), TypeParam::bounded_nat(2.try_into().unwrap())].into() }], FunctionType::new_endo(type_row![])))]
+#[case(PolyFuncType::new(
     [TypeParam::new_list(TypeBound::Any)],
     FunctionType::new_endo(Type::new_tuple(TypeRV::new_row_var_use(0, TypeBound::Any)))))]
-fn roundtrip_polyfunctype_fixedlen(#[case] poly_func_type: TypeScheme) {
+fn roundtrip_polyfunctype_fixedlen(#[case] poly_func_type: PolyFuncType) {
     check_testing_roundtrip(poly_func_type)
 }
 
 #[rstest]
 #[case(FunctionTypeRV::new_endo(type_row![]).into())]
-#[case(TypeSchemeRV::new([TypeParam::Opaque { ty: int_custom_type(TypeArg::BoundedNat { n: 1 }) }], FunctionType::new_endo(type_row![Type::new_var_use(0, TypeBound::Copyable)])))]
-#[case(TypeSchemeRV::new([TypeBound::Eq.into()], FunctionType::new_endo(type_row![Type::new_var_use(0, TypeBound::Eq)])))]
-#[case(TypeSchemeRV::new([TypeParam::new_list(TypeBound::Any)], FunctionType::new_endo(type_row![])))]
-#[case(TypeSchemeRV::new([TypeParam::Tuple { params: [TypeBound::Any.into(), TypeParam::bounded_nat(2.try_into().unwrap())].into() }], FunctionType::new_endo(type_row![])))]
-#[case(TypeSchemeRV::new(
+#[case(PolyFuncTypeRV::new([TypeParam::Opaque { ty: int_custom_type(TypeArg::BoundedNat { n: 1 }) }], FunctionType::new_endo(type_row![Type::new_var_use(0, TypeBound::Copyable)])))]
+#[case(PolyFuncTypeRV::new([TypeBound::Eq.into()], FunctionType::new_endo(type_row![Type::new_var_use(0, TypeBound::Eq)])))]
+#[case(PolyFuncTypeRV::new([TypeParam::new_list(TypeBound::Any)], FunctionType::new_endo(type_row![])))]
+#[case(PolyFuncTypeRV::new([TypeParam::Tuple { params: [TypeBound::Any.into(), TypeParam::bounded_nat(2.try_into().unwrap())].into() }], FunctionType::new_endo(type_row![])))]
+#[case(PolyFuncTypeRV::new(
     [TypeParam::new_list(TypeBound::Any)],
     FunctionTypeRV::new_endo(TypeRV::new_row_var_use(0, TypeBound::Any))))]
 #[case(polyfunctype2())]
-fn roundtrip_polyfunctype_varlen(#[case] poly_func_type: TypeSchemeRV) {
+fn roundtrip_polyfunctype_varlen(#[case] poly_func_type: PolyFuncTypeRV) {
     check_testing_roundtrip(poly_func_type)
 }
 
@@ -512,7 +512,7 @@ mod proptest {
     use super::check_testing_roundtrip;
     use super::{NodeSer, SimpleOpDef};
     use crate::ops::{OpType, Value};
-    use crate::types::{Type, TypeSchemeRV};
+    use crate::types::{PolyFuncTypeRV, Type};
     use proptest::prelude::*;
 
     impl Arbitrary for NodeSer {
@@ -535,7 +535,7 @@ mod proptest {
         }
 
         #[test]
-        fn prop_roundtrip_poly_func_type(t: TypeSchemeRV) {
+        fn prop_roundtrip_poly_func_type(t: PolyFuncTypeRV) {
             check_testing_roundtrip(t)
         }
 

@@ -9,7 +9,7 @@ use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::views::HugrView;
 use crate::hugr::ValidationError;
 use crate::ops;
-use crate::types::{Type, TypeBound, TypeScheme};
+use crate::types::{PolyFuncType, Type, TypeBound};
 
 use crate::ops::handle::{AliasID, FuncID, NodeHandle};
 
@@ -100,7 +100,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
     pub fn declare(
         &mut self,
         name: impl Into<String>,
-        signature: TypeScheme,
+        signature: PolyFuncType,
     ) -> Result<FuncID<false>, BuildError> {
         // TODO add param names to metadata
         let declare_n = self.add_child_node(ops::FuncDecl {

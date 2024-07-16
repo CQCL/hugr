@@ -4,7 +4,7 @@ use super::{impl_op_name, OpTag, OpTrait};
 
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 use crate::ops::StaticTag;
-use crate::types::{EdgeKind, FunctionType, Type, TypeArg, TypeRow, TypeScheme};
+use crate::types::{EdgeKind, FunctionType, PolyFuncType, Type, TypeArg, TypeRow};
 use crate::IncomingPort;
 
 #[cfg(test)]
@@ -159,7 +159,7 @@ impl<T: DataflowOpTrait> StaticTag for T {
 #[cfg_attr(test, derive(Arbitrary))]
 pub struct Call {
     /// Signature of function being called
-    func_sig: TypeScheme,
+    func_sig: PolyFuncType,
     type_args: Vec<TypeArg>,
     instantiation: FunctionType, // Cache, so we can fail in try_new() not in signature()
 }
@@ -186,7 +186,7 @@ impl Call {
     ///
     /// [TypeParam]: crate::types::type_param::TypeParam
     pub fn try_new(
-        func_sig: TypeScheme,
+        func_sig: PolyFuncType,
         type_args: impl Into<Vec<TypeArg>>,
         exts: &ExtensionRegistry,
     ) -> Result<Self, SignatureError> {
@@ -201,7 +201,7 @@ impl Call {
 
     #[inline]
     /// Return the signature of the function called by this op.
-    pub fn called_function_type(&self) -> &TypeScheme {
+    pub fn called_function_type(&self) -> &PolyFuncType {
         &self.func_sig
     }
 
@@ -329,7 +329,7 @@ impl LoadConstant {
 #[cfg_attr(test, derive(Arbitrary))]
 pub struct LoadFunction {
     /// Signature of the function
-    func_sig: TypeScheme,
+    func_sig: PolyFuncType,
     type_args: Vec<TypeArg>,
     signature: FunctionType, // Cache, so we can fail in try_new() not in signature()
 }
@@ -355,7 +355,7 @@ impl LoadFunction {
     ///
     /// [TypeParam]: crate::types::type_param::TypeParam
     pub fn try_new(
-        func_sig: TypeScheme,
+        func_sig: PolyFuncType,
         type_args: impl Into<Vec<TypeArg>>,
         exts: &ExtensionRegistry,
     ) -> Result<Self, SignatureError> {
@@ -371,7 +371,7 @@ impl LoadFunction {
 
     #[inline]
     /// Return the type of the function loaded by this op.
-    pub fn function_type(&self) -> &TypeScheme {
+    pub fn function_type(&self) -> &PolyFuncType {
         &self.func_sig
     }
 
