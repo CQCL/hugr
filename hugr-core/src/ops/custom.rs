@@ -429,7 +429,13 @@ pub enum CustomOpError {
 
 #[cfg(test)]
 mod test {
-    use crate::extension::prelude::{QB_T, USIZE_T};
+    use crate::{
+        extension::prelude::{BOOL_T, QB_T, USIZE_T},
+        std_extensions::arithmetic::{
+            int_ops::{self, INT_OPS_REGISTRY},
+            int_types::INT_TYPES,
+        },
+    };
 
     use super::*;
 
@@ -450,5 +456,24 @@ mod test {
         assert_eq!(op.signature(), sig);
         assert!(op.is_opaque());
         assert!(!op.is_extension_op());
+    }
+
+    #[test]
+    #[should_panic] // https://github.com/CQCL/hugr/issues/1315
+    fn resolve_opaque_op() {
+        let registry = &INT_OPS_REGISTRY;
+        let i0 = &INT_TYPES[0];
+        let opaque = OpaqueOp::new(
+            int_ops::EXTENSION_ID,
+            "itobool",
+            "description".into(),
+            vec![],
+            FunctionType::new(i0.clone(), BOOL_T),
+        );
+        let resolved =
+            super::resolve_opaque_op(Node::from(portgraph::NodeIndex::new(1)), &opaque, registry)
+                .unwrap()
+                .unwrap();
+        assert_eq!(resolved.def().name(), "itobool");
     }
 }
