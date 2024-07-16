@@ -392,11 +392,13 @@ pub fn resolve_opaque_op(
                 r.name().clone(),
             ));
         };
-        let ext_op =
-            ExtensionOp::new(def.clone(), opaque.args.clone(), extension_registry)?;
+        let ext_op = ExtensionOp::new(def.clone(), opaque.args.clone(), extension_registry)?;
         // ops always require their own extensions, so we do not force OpaqueOps
         // to add their extension to their signature
-        let opaque_sig = opaque.signature.clone().with_extension_delta(opaque.extension().clone());
+        let opaque_sig = opaque
+            .signature
+            .clone()
+            .with_extension_delta(opaque.extension().clone());
         if opaque_sig != ext_op.signature {
             return Err(CustomOpError::SignatureMismatch {
                 extension: opaque.extension.clone(),
@@ -431,7 +433,6 @@ pub enum CustomOpError {
     /// An error in computing the signature of the ExtensionOp
     #[error(transparent)]
     SignatureError(#[from] SignatureError),
-
 }
 
 #[cfg(test)]
