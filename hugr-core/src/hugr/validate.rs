@@ -16,7 +16,7 @@ use crate::ops::custom::{resolve_opaque_op, CustomOp, CustomOpError};
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::{FuncDefn, OpParent, OpTag, OpTrait, OpType, ValidateOp};
 use crate::types::type_param::TypeParam;
-use crate::types::{EdgeKind, FunctionType};
+use crate::types::{EdgeKind, Signature};
 use crate::{Direction, Hugr, Node, Port};
 
 use super::views::{HierarchyView, HugrView, SiblingGraph};
@@ -65,7 +65,7 @@ impl Hugr {
                 return Err(ValidationError::ExtensionsNotInferred { node: parent });
             }
             let parent_extensions = match parent_op.inner_function_type() {
-                Some(FunctionType { extension_reqs, .. }) => extension_reqs,
+                Some(Signature { extension_reqs, .. }) => extension_reqs,
                 None => match parent_op.tag() {
                     OpTag::Cfg | OpTag::Conditional => parent_op.extension_delta(),
                     // ModuleRoot holds but does not execute its children, so allow any extensions

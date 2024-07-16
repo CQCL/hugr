@@ -211,7 +211,7 @@ mod test {
     use hugr_core::ops::Value;
     use hugr_core::std_extensions::arithmetic::int_ops::{self, IntOpDef};
     use hugr_core::std_extensions::arithmetic::int_types::INT_TYPES;
-    use hugr_core::types::{FunctionType, Type};
+    use hugr_core::types::{Signature, Type};
     use hugr_core::{builder::DFGBuilder, hugr::Hugr};
     use hugr_core::{HugrView, Wire};
 
@@ -324,7 +324,7 @@ mod test {
     fn test_force_order_const() {
         let mut hugr = {
             let mut builder =
-                DFGBuilder::new(FunctionType::new(Type::EMPTY_TYPEROW, Type::UNIT)).unwrap();
+                DFGBuilder::new(Signature::new(Type::EMPTY_TYPEROW, Type::UNIT)).unwrap();
             let unit = builder.add_load_value(Value::unary_unit_sum());
             builder
                 .finish_hugr_with_outputs([unit], &EMPTY_REG)

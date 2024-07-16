@@ -17,7 +17,7 @@ use crate::utils::display_list_with_separator;
 pub use check::SumTypeError;
 pub use custom::CustomType;
 pub use poly_func::{PolyFuncType, PolyFuncTypeRV};
-pub use signature::{FuncValueType, FunctionType};
+pub use signature::{FuncValueType, Signature};
 use smol_str::SmolStr;
 pub use type_param::TypeArg;
 pub use type_row::{TypeRow, TypeRowRV};
@@ -278,9 +278,9 @@ impl<RV: MaybeRV> TypeEnum<RV> {
 /// ```
 ///
 /// ```
-/// # use hugr::types::{Type, TypeBound, FunctionType};
+/// # use hugr::types::{Type, TypeBound, Signature};
 ///
-/// let func_type: Type = Type::new_function(FunctionType::new_endo(vec![]));
+/// let func_type: Type = Type::new_function(Signature::new_endo(vec![]));
 /// assert_eq!(func_type.least_upper_bound(), TypeBound::Copyable);
 /// ```
 pub struct TypeBase<RV: MaybeRV>(TypeEnum<RV>, TypeBound);
@@ -605,7 +605,7 @@ pub(crate) mod test {
     fn construct() {
         let t: Type = Type::new_tuple(vec![
             USIZE_T,
-            Type::new_function(FunctionType::new_endo(vec![])),
+            Type::new_function(Signature::new_endo(vec![])),
             Type::new_extension(CustomType::new(
                 "my_custom",
                 [],

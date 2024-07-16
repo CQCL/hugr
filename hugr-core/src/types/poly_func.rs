@@ -155,7 +155,7 @@ pub(crate) mod test {
     use crate::types::signature::FuncTypeBase;
     use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
     use crate::types::{
-        CustomType, FuncValueType, FunctionType, MaybeRV, Type, TypeBound, TypeName, TypeRV,
+        CustomType, FuncValueType, MaybeRV, Signature, Type, TypeBound, TypeName, TypeRV,
     };
     use crate::Extension;
 
@@ -185,14 +185,14 @@ pub(crate) mod test {
         let list_of_var = Type::new_extension(list_def.instantiate([tyvar.clone()])?);
         let list_len = PolyFuncTypeBase::new_validated(
             [TypeBound::Any.into()],
-            FunctionType::new(vec![list_of_var], vec![USIZE_T]),
+            Signature::new(vec![list_of_var], vec![USIZE_T]),
             &REGISTRY,
         )?;
 
         let t = list_len.instantiate(&[TypeArg::Type { ty: USIZE_T }], &REGISTRY)?;
         assert_eq!(
             t,
-            FunctionType::new(
+            Signature::new(
                 vec![Type::new_extension(
                     list_def
                         .instantiate([TypeArg::Type { ty: USIZE_T }])
@@ -216,7 +216,7 @@ pub(crate) mod test {
         let good_array = Type::new_extension(ar_def.instantiate([tyvar.clone(), szvar.clone()])?);
         let good_ts = PolyFuncTypeBase::new_validated(
             typarams.clone(),
-            FunctionType::new_endo(good_array),
+            Signature::new_endo(good_array),
             &PRELUDE_REGISTRY,
         )?;
 
@@ -258,7 +258,7 @@ pub(crate) mod test {
         ));
         let bad_ts = PolyFuncTypeBase::new_validated(
             typarams.clone(),
-            FunctionType::new_endo(bad_array),
+            Signature::new_endo(bad_array),
             &PRELUDE_REGISTRY,
         );
         assert_eq!(bad_ts.err(), Some(arg_err));
@@ -271,7 +271,7 @@ pub(crate) mod test {
         // Variables in args have different bounds from variable declaration
         let tv = TypeArg::new_var_use(0, TypeBound::Copyable.into());
         let list_def = EXTENSION.get_type(&LIST_TYPENAME).unwrap();
-        let body_type = FunctionType::new_endo(Type::new_extension(list_def.instantiate([tv])?));
+        let body_type = Signature::new_endo(Type::new_extension(list_def.instantiate([tv])?));
         for decl in [
             TypeParam::Extensions,
             TypeParam::List {
@@ -327,7 +327,7 @@ pub(crate) mod test {
         let make_scheme = |tp: TypeParam| {
             PolyFuncTypeBase::new_validated(
                 [tp.clone()],
-                FunctionType::new_endo(Type::new_extension(CustomType::new(
+                Signature::new_endo(Type::new_extension(CustomType::new(
                     TYPE_NAME,
                     [TypeArg::new_var_use(0, tp)],
                     EXT_ID,
@@ -406,7 +406,7 @@ pub(crate) mod test {
         // Declared as row variable, used as type variable
         let e = PolyFuncTypeBase::new_validated(
             [decl.clone()],
-            FunctionType::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
+            Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
             &EMPTY_REG,
         )
         .unwrap_err();
@@ -447,7 +447,7 @@ pub(crate) mod test {
             .unwrap();
         assert_eq!(
             t2,
-            FunctionType::new(
+            Signature::new(
                 vec![USIZE_T, USIZE_T, BOOL_T],
                 vec![Type::new_tuple(vec![USIZE_T, BOOL_T])]
             )
@@ -466,12 +466,12 @@ pub(crate) mod test {
                     b: TypeBound::Copyable,
                 }),
             }],
-            FunctionType::new(vec![USIZE_T, inner_fty.clone()], vec![inner_fty]),
+            Signature::new(vec![USIZE_T, inner_fty.clone()], vec![inner_fty]),
             &PRELUDE_REGISTRY,
         )
         .unwrap();
 
-        let inner3 = Type::new_function(FunctionType::new_endo(vec![USIZE_T, BOOL_T, USIZE_T]));
+        let inner3 = Type::new_function(Signature::new_endo(vec![USIZE_T, BOOL_T, USIZE_T]));
         let t3 = pf
             .instantiate(
                 &[TypeArg::Sequence {
@@ -482,7 +482,7 @@ pub(crate) mod test {
             .unwrap();
         assert_eq!(
             t3,
-            FunctionType::new(vec![USIZE_T, inner3.clone()], vec![inner3])
+            Signature::new(vec![USIZE_T, inner3.clone()], vec![inner3])
         );
     }
 }

@@ -168,7 +168,7 @@ mod test {
     use hugr_core::ops::constant::Value;
     use hugr_core::ops::handle::CfgID;
     use hugr_core::ops::{Lift, LoadConstant, Noop, OpTrait, OpType};
-    use hugr_core::types::{FunctionType, Type, TypeRow};
+    use hugr_core::types::{Signature, Type, TypeRow};
     use hugr_core::{const_extension_ids, type_row, Extension, Hugr, HugrView, Wire};
 
     use super::merge_basic_blocks;
@@ -182,7 +182,7 @@ mod test {
         e.add_op(
             "Test".into(),
             String::new(),
-            FunctionType::new(
+            Signature::new(
                 type_row![QB_T, USIZE_T],
                 TypeRow::from(vec![Type::new_sum(vec![
                     type_row![QB_T],

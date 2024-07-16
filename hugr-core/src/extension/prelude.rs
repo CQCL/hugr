@@ -11,7 +11,7 @@ use crate::{
     type_row,
     types::{
         type_param::{TypeArg, TypeParam},
-        CustomType, FunctionType, PolyFuncTypeRV, Type, TypeBound,
+        CustomType, PolyFuncTypeRV, Signature, Type, TypeBound,
     },
     Extension,
 };
@@ -106,7 +106,7 @@ lazy_static! {
         prelude.add_op(
             PRINT_OP_ID,
             "Print the string to standard output".to_string(),
-            FunctionType::new(type_row![STRING_TYPE], type_row![]),
+            Signature::new(type_row![STRING_TYPE], type_row![]),
             )
             .unwrap();
         prelude.add_type(

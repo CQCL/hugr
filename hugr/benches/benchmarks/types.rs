@@ -2,7 +2,7 @@
 #![allow(clippy::unit_arg)]
 use hugr::extension::prelude::{QB_T, USIZE_T};
 use hugr::ops::AliasDecl;
-use hugr::types::{FunctionType, Type, TypeBound};
+use hugr::types::{Signature, Type, TypeBound};
 
 use criterion::{black_box, criterion_group, AxisScale, Criterion, PlotConfiguration};
 
@@ -14,7 +14,7 @@ fn make_complex_type() -> Type {
     let b_register = Type::new_tuple(vec![int; 8]);
     let q_alias = Type::new_alias(AliasDecl::new("QReg", TypeBound::Any));
     let sum = Type::new_sum([q_register, q_alias]);
-    Type::new_function(FunctionType::new(vec![sum], vec![b_register]))
+    Type::new_function(Signature::new(vec![sum], vec![b_register]))
 }
 
 fn bench_construction(c: &mut Criterion) {

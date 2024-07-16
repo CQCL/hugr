@@ -5,7 +5,7 @@ use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 use crate::extension::{ConstFold, ConstFoldResult};
 use crate::ops::constant::ValueName;
 use crate::ops::{OpName, Value};
-use crate::types::{FuncValueType, FunctionType};
+use crate::types::{FuncValueType, Signature};
 use crate::{
     extension::{
         prelude::BOOL_T,
@@ -134,7 +134,7 @@ impl MakeOpDef for NotOp {
     }
 
     fn signature(&self) -> SignatureFunc {
-        FunctionType::new_endo(type_row![BOOL_T]).into()
+        Signature::new_endo(type_row![BOOL_T]).into()
     }
     fn description(&self) -> String {
         "logical 'not'".into()

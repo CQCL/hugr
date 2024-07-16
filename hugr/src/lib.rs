@@ -31,7 +31,7 @@
 //! use hugr::extension::prelude::{BOOL_T, QB_T};
 //! use hugr::hugr::Hugr;
 //! use hugr::type_row;
-//! use hugr::types::FunctionType;
+//! use hugr::types::FuncValueType;
 //!
 //! // The type of qubits, `QB_T` is in the prelude but, by default, no gateset
 //! // is defined. This module provides Hadamard and CX gates.

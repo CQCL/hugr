@@ -240,7 +240,7 @@ impl<T: MakeRegisteredOp> From<T> for OpType {
 
 #[cfg(test)]
 mod test {
-    use crate::{const_extension_ids, type_row, types::FunctionType};
+    use crate::{const_extension_ids, type_row, types::Signature};
 
     use super::*;
     use lazy_static::lazy_static;
@@ -253,7 +253,7 @@ mod test {
 
     impl MakeOpDef for DummyEnum {
         fn signature(&self) -> SignatureFunc {
-            FunctionType::new_endo(type_row![]).into()
+            Signature::new_endo(type_row![]).into()
         }
 
         fn from_def(_op_def: &OpDef) -> Result<Self, OpLoadError> {

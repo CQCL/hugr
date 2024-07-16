@@ -585,7 +585,7 @@ pub(crate) mod test {
     use hugr_core::ops::handle::{ConstID, NodeHandle};
     use hugr_core::ops::Value;
     use hugr_core::type_row;
-    use hugr_core::types::{EdgeKind, FunctionType, Type};
+    use hugr_core::types::{EdgeKind, Signature, Type};
     use hugr_core::utils::depth;
     const NAT: Type = USIZE_T;
 
@@ -608,7 +608,7 @@ pub(crate) mod test {
         //               /-> left --\
         // entry -> split            > merge -> head -> tail -> exit
         //               \-> right -/             \-<--<-/
-        let mut cfg_builder = CFGBuilder::new(FunctionType::new_endo(NAT))?;
+        let mut cfg_builder = CFGBuilder::new(Signature::new_endo(NAT))?;
 
         let pred_const = cfg_builder.add_constant(Value::unit_sum(0, 2).expect("0 < 2"));
         let const_unit = cfg_builder.add_constant(Value::unary_unit_sum());
@@ -876,7 +876,7 @@ pub(crate) mod test {
     //      \-> right -/     \-<--<-/
     // Result is Hugr plus merge and tail blocks
     fn build_cond_then_loop_cfg() -> Result<(Hugr, BasicBlockID, BasicBlockID), BuildError> {
-        let mut cfg_builder = CFGBuilder::new(FunctionType::new_endo(NAT))?;
+        let mut cfg_builder = CFGBuilder::new(Signature::new_endo(NAT))?;
         let pred_const = cfg_builder.add_constant(Value::unit_sum(0, 2).expect("0 < 2"));
         let const_unit = cfg_builder.add_constant(Value::unary_unit_sum());
 
@@ -903,7 +903,7 @@ pub(crate) mod test {
     pub(crate) fn build_conditional_in_loop_cfg(
         separate_headers: bool,
     ) -> Result<(Hugr, BasicBlockID, BasicBlockID), BuildError> {
-        let mut cfg_builder = CFGBuilder::new(FunctionType::new_endo(NAT))?;
+        let mut cfg_builder = CFGBuilder::new(Signature::new_endo(NAT))?;
         let (head, tail) = build_conditional_in_loop(&mut cfg_builder, separate_headers)?;
         let h = cfg_builder.finish_prelude_hugr()?;
         Ok((h, head, tail))

@@ -5,7 +5,7 @@ mod custom;
 use super::{NamedOp, OpName, OpTrait, StaticTag};
 use super::{OpTag, OpType};
 use crate::extension::ExtensionSet;
-use crate::types::{CustomType, EdgeKind, FunctionType, SumType, SumTypeError, Type};
+use crate::types::{CustomType, EdgeKind, Signature, SumType, SumTypeError, Type};
 use crate::{Hugr, HugrView};
 
 use delegate::delegate;
@@ -327,7 +327,7 @@ pub enum ConstTypeError {
 }
 
 /// Hugrs (even functions) inside Consts must be monomorphic
-fn mono_fn_type(h: &Hugr) -> Result<FunctionType, ConstTypeError> {
+fn mono_fn_type(h: &Hugr) -> Result<Signature, ConstTypeError> {
     let err = || ConstTypeError::NotMonomorphicFunction {
         hugr_root_type: h.root_type().clone(),
     };
@@ -604,7 +604,7 @@ mod test {
         let w = b.load_const(&c);
         b.finish_hugr_with_outputs([w], &test_registry()).unwrap();
 
-        let mut b = DFGBuilder::new(FunctionType::new(
+        let mut b = DFGBuilder::new(Signature::new(
             type_row![],
             TypeRow::from(vec![pred_ty.clone().into()]),
         ))?;
@@ -661,7 +661,7 @@ mod test {
     fn function_value(simple_dfg_hugr: Hugr) {
         let v = Value::function(simple_dfg_hugr).unwrap();
 
-        let correct_type = Type::new_function(FunctionType::new_endo(type_row![
+        let correct_type = Type::new_function(Signature::new_endo(type_row![
             crate::extension::prelude::BOOL_T
         ]));
 

@@ -12,7 +12,7 @@ use hugr_core::{
     builder::{Container, Dataflow, DataflowHugr},
     extension::prelude::{BOOL_T, QB_T},
     type_row,
-    types::FunctionType,
+    types::Signature,
     Hugr,
 };
 use predicates::{prelude::*, str::contains};
@@ -25,7 +25,7 @@ fn cmd() -> Command {
 
 #[fixture]
 fn test_hugr() -> Hugr {
-    let df = DFGBuilder::new(FunctionType::new_endo(type_row![BOOL_T])).unwrap();
+    let df = DFGBuilder::new(Signature::new_endo(type_row![BOOL_T])).unwrap();
     let [i] = df.input_wires_arr();
     df.finish_prelude_hugr_with_outputs([i]).unwrap()
 }
@@ -83,7 +83,7 @@ fn test_mermaid(test_hugr_file: NamedTempFile, mut cmd: Command) {
 
 #[rstest]
 fn test_bad_hugr(mut cmd: Command) {
-    let df = DFGBuilder::new(FunctionType::new_endo(type_row![QB_T])).unwrap();
+    let df = DFGBuilder::new(Signature::new_endo(type_row![QB_T])).unwrap();
     let bad_hugr = df.hugr().clone();
 
     let bad_hugr_string = serde_json::to_string(&bad_hugr).unwrap();

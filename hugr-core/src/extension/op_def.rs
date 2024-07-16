@@ -11,7 +11,7 @@ use super::{
 
 use crate::ops::{OpName, OpNameRef};
 use crate::types::type_param::{check_type_args, TypeArg, TypeParam};
-use crate::types::{FuncValueType, FunctionType, PolyFuncTypeRV};
+use crate::types::{FuncValueType, PolyFuncTypeRV, Signature};
 use crate::Hugr;
 
 /// Trait necessary for binary computations of OpDef signature
@@ -198,8 +198,8 @@ impl From<FuncValueType> for SignatureFunc {
     }
 }
 
-impl From<FunctionType> for SignatureFunc {
-    fn from(v: FunctionType) -> Self {
+impl From<Signature> for SignatureFunc {
+    fn from(v: Signature) -> Self {
         Self::PolyFuncType(CustomValidator::from_polyfunc(FuncValueType::from(v)))
     }
 }
@@ -234,7 +234,7 @@ impl SignatureFunc {
         def: &OpDef,
         args: &[TypeArg],
         exts: &ExtensionRegistry,
-    ) -> Result<FunctionType, SignatureError> {
+    ) -> Result<Signature, SignatureError> {
         let temp: PolyFuncTypeRV; // to keep alive
         let (pf, args) = match &self {
             SignatureFunc::PolyFuncType(custom) => {
@@ -362,7 +362,7 @@ impl OpDef {
         &self,
         args: &[TypeArg],
         exts: &ExtensionRegistry,
-    ) -> Result<FunctionType, SignatureError> {
+    ) -> Result<Signature, SignatureError> {
         self.signature_func.compute_signature(self, args, exts)
     }
 
@@ -494,7 +494,7 @@ pub(super) mod test {
     use crate::ops::{CustomOp, OpName};
     use crate::std_extensions::collections::{EXTENSION, LIST_TYPENAME};
     use crate::types::type_param::{TypeArgError, TypeParam};
-    use crate::types::{FunctionType, PolyFuncTypeRV, Type, TypeArg, TypeBound, TypeRV};
+    use crate::types::{PolyFuncTypeRV, Signature, Type, TypeArg, TypeBound, TypeRV};
     use crate::{const_extension_ids, Extension};
 
     const_extension_ids! {
@@ -590,7 +590,7 @@ pub(super) mod test {
         let list_of_var =
             Type::new_extension(list_def.instantiate(vec![TypeArg::new_var_use(0, TP)])?);
         const OP_NAME: OpName = OpName::new_inline("Reverse");
-        let type_scheme = PolyFuncTypeRV::new(vec![TP], FunctionType::new_endo(vec![list_of_var]));
+        let type_scheme = PolyFuncTypeRV::new(vec![TP], Signature::new_endo(vec![list_of_var]));
 
         let def = e.add_op(OP_NAME, "desc".into(), type_scheme)?;
         def.add_lower_func(LowerFunc::FixedHugr {
@@ -643,7 +643,7 @@ pub(super) mod test {
                     .collect();
                 Ok(PolyFuncTypeRV::new(
                     vec![TP.to_owned()],
-                    FunctionType::new(tvs.clone(), vec![Type::new_tuple(tvs)]),
+                    Signature::new(tvs.clone(), vec![Type::new_tuple(tvs)]),
                 ))
             }
 
@@ -661,7 +661,7 @@ pub(super) mod test {
         assert_eq!(
             def.compute_signature(&args, &PRELUDE_REGISTRY),
             Ok(
-                FunctionType::new(vec![USIZE_T; 3], vec![Type::new_tuple(vec![USIZE_T; 3])])
+                Signature::new(vec![USIZE_T; 3], vec![Type::new_tuple(vec![USIZE_T; 3])])
                     .with_extension_delta(EXT_ID)
             )
         );
@@ -674,7 +674,7 @@ pub(super) mod test {
         assert_eq!(
             def.compute_signature(&args, &PRELUDE_REGISTRY),
             Ok(
-                FunctionType::new(tyvars.clone(), vec![Type::new_tuple(tyvars)])
+                Signature::new(tyvars.clone(), vec![Type::new_tuple(tyvars)])
                     .with_extension_delta(EXT_ID)
             )
         );
@@ -720,7 +720,7 @@ pub(super) mod test {
             "".into(),
             PolyFuncTypeRV::new(
                 vec![TypeBound::Any.into()],
-                FunctionType::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
+                Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
             ),
         )?;
         let tv = Type::new_var_use(1, TypeBound::Eq);
@@ -729,7 +729,7 @@ pub(super) mod test {
         def.validate_args(&args, &EMPTY_REG, &decls).unwrap();
         assert_eq!(
             def.compute_signature(&args, &EMPTY_REG),
-            Ok(FunctionType::new_endo(tv).with_extension_delta(EXT_ID))
+            Ok(Signature::new_endo(tv).with_extension_delta(EXT_ID))
         );
         // But not with an external row variable
         let arg: TypeArg = TypeRV::new_row_var_use(0, TypeBound::Eq).into();
@@ -753,7 +753,7 @@ pub(super) mod test {
 
         let params: Vec<TypeParam> = vec![TypeParam::Extensions];
         let db_set = ExtensionSet::type_var(0);
-        let fun_ty = FunctionType::new_endo(BOOL_T).with_extension_delta(db_set);
+        let fun_ty = Signature::new_endo(BOOL_T).with_extension_delta(db_set);
 
         let def = e.add_op(
             "SimpleOp".into(),
@@ -763,7 +763,7 @@ pub(super) mod test {
 
         // Concrete extension set
         let es = ExtensionSet::singleton(&EXT_ID);
-        let exp_fun_ty = FunctionType::new_endo(BOOL_T).with_extension_delta(es.clone());
+        let exp_fun_ty = Signature::new_endo(BOOL_T).with_extension_delta(es.clone());
         let args = [TypeArg::Extensions { es }];
 
         def.validate_args(&args, &PRELUDE_REGISTRY, &params)

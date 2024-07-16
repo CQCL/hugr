@@ -8,7 +8,7 @@ use hugr_core::std_extensions::arithmetic::int_ops::IntOpDef;
 use hugr_core::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
 use hugr_core::std_extensions::logic::{self, NaryLogic, NotOp};
 use hugr_core::type_row;
-use hugr_core::types::{FunctionType, Type, TypeRow, TypeRowRV};
+use hugr_core::types::{Signature, Type, TypeRow, TypeRowRV};
 
 use rstest::rstest;
 
@@ -73,7 +73,7 @@ fn test_add(#[case] a: f64, #[case] b: f64, #[case] c: f64) {
     assert_eq!(outs.as_slice(), &[(0.into(), c)]);
 }
 
-fn noargfn(outputs: impl Into<TypeRow>) -> FunctionType {
+fn noargfn(outputs: impl Into<TypeRow>) -> Signature {
     inout_ft(type_row![], outputs)
 }
 
@@ -137,11 +137,8 @@ fn test_list_ops() -> Result<(), Box<dyn std::error::Error>> {
     ])
     .unwrap();
     let list: Value = ListValue::new(BOOL_T, [Value::false_val()]).into();
-    let mut build = DFGBuilder::new(FunctionType::new(
-        type_row![],
-        vec![list.get_type().clone()],
-    ))
-    .unwrap();
+    let mut build =
+        DFGBuilder::new(Signature::new(type_row![], vec![list.get_type().clone()])).unwrap();
 
     let list_wire = build.add_load_const(list.clone());
 

@@ -39,7 +39,7 @@ pub struct FuncTypeBase<ROWVARS: MaybeRV> {
 /// or within a [FuncDefn], also the target (value) of a call (static).
 ///
 /// [FuncDefn]: crate::ops::FuncDefn
-pub type FunctionType = FuncTypeBase<NoRV>;
+pub type Signature = FuncTypeBase<NoRV>;
 
 /// A function that may contain [RowVariable]s and thus has potentially-unknown arity;
 /// used for [OpDef]'s and passable as a value round a Hugr (see [Type::new_function])
@@ -130,7 +130,7 @@ impl<RV: MaybeRV> Default for FuncTypeBase<RV> {
     }
 }
 
-impl FunctionType {
+impl Signature {
     /// Returns the type of a value [`Port`]. Returns `None` if the port is out
     /// of bounds.
     #[inline]
@@ -257,7 +257,7 @@ impl<RV: MaybeRV> Display for FuncTypeBase<RV> {
     }
 }
 
-impl TryFrom<FuncValueType> for FunctionType {
+impl TryFrom<FuncValueType> for Signature {
     type Error = SignatureError;
 
     fn try_from(value: FuncValueType) -> Result<Self, Self::Error> {
@@ -267,8 +267,8 @@ impl TryFrom<FuncValueType> for FunctionType {
     }
 }
 
-impl From<FunctionType> for FuncValueType {
-    fn from(value: FunctionType) -> Self {
+impl From<Signature> for FuncValueType {
+    fn from(value: Signature) -> Self {
         Self {
             input: value.input.into(),
             output: value.output.into(),
@@ -292,7 +292,7 @@ mod test {
     use super::*;
     #[test]
     fn test_function_type() {
-        let mut f_type = FunctionType::new(type_row![Type::UNIT], type_row![Type::UNIT]);
+        let mut f_type = Signature::new(type_row![Type::UNIT], type_row![Type::UNIT]);
         assert_eq!(f_type.input_count(), 1);
         assert_eq!(f_type.output_count(), 1);
 

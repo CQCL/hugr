@@ -3,12 +3,12 @@
 use criterion::{black_box, criterion_group, AxisScale, Criterion, PlotConfiguration};
 use hugr::builder::{BuildError, CFGBuilder, DFGBuilder, Dataflow, DataflowHugr, HugrBuilder};
 use hugr::extension::prelude::{BOOL_T, USIZE_T};
-use hugr::types::FunctionType;
+use hugr::types::Signature;
 use hugr::{type_row, Hugr};
 
 pub fn simple_dfg_hugr() -> Hugr {
     let dfg_builder =
-        DFGBuilder::new(FunctionType::new(type_row![BOOL_T], type_row![BOOL_T])).unwrap();
+        DFGBuilder::new(Signature::new(type_row![BOOL_T], type_row![BOOL_T])).unwrap();
     let [i1] = dfg_builder.input_wires_arr();
     dfg_builder.finish_prelude_hugr_with_outputs([i1]).unwrap()
 }
@@ -25,7 +25,7 @@ pub fn simple_cfg_builder<T: AsMut<Hugr> + AsRef<Hugr>>(
         entry_b.finish_with_outputs(sum, [])?
     };
     let mut middle_b = cfg_builder
-        .simple_block_builder(FunctionType::new(type_row![USIZE_T], type_row![USIZE_T]), 1)?;
+        .simple_block_builder(Signature::new(type_row![USIZE_T], type_row![USIZE_T]), 1)?;
     let middle = {
         let c = middle_b.add_load_const(hugr::ops::Value::unary_unit_sum());
         let [inw] = middle_b.input_wires_arr();
@@ -40,7 +40,7 @@ pub fn simple_cfg_builder<T: AsMut<Hugr> + AsRef<Hugr>>(
 
 pub fn simple_cfg_hugr() -> Hugr {
     let mut cfg_builder =
-        CFGBuilder::new(FunctionType::new(type_row![USIZE_T], type_row![USIZE_T])).unwrap();
+        CFGBuilder::new(Signature::new(type_row![USIZE_T], type_row![USIZE_T])).unwrap();
     simple_cfg_builder(&mut cfg_builder).unwrap();
     cfg_builder.finish_prelude_hugr().unwrap()
 }

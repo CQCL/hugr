@@ -145,7 +145,7 @@ mod test {
     use crate::std_extensions::arithmetic::float_types;
     use crate::std_extensions::arithmetic::int_ops::{self, IntOpDef};
     use crate::std_extensions::arithmetic::int_types::{self, ConstInt};
-    use crate::types::FunctionType;
+    use crate::types::Signature;
     use crate::utils::test_quantum_extension;
     use crate::{type_row, Direction, HugrView, Node, Port};
     use crate::{Hugr, Wire};
@@ -251,7 +251,7 @@ mod test {
             .add_dataflow_op(test_quantum_extension::h_gate(), [p])?
             .outputs_arr();
         let swap = {
-            let swap = h.dfg_builder(FunctionType::new_endo(type_row![QB_T, QB_T]), [p_h, q])?;
+            let swap = h.dfg_builder(Signature::new_endo(type_row![QB_T, QB_T]), [p_h, q])?;
             let [a, b] = swap.input_wires_arr();
             swap.finish_with_outputs([b, a])?
         };

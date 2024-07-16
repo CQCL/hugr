@@ -7,7 +7,7 @@ use {
     ::proptest_derive::Arbitrary,
 };
 
-use crate::types::{EdgeKind, FunctionType, PolyFuncType};
+use crate::types::{EdgeKind, PolyFuncType, Signature};
 use crate::types::{Type, TypeBound};
 
 use super::dataflow::DataflowParent;
@@ -64,7 +64,7 @@ impl StaticTag for FuncDefn {
 }
 
 impl DataflowParent for FuncDefn {
-    fn inner_signature(&self) -> FunctionType {
+    fn inner_signature(&self) -> Signature {
         self.signature.body().clone()
     }
 }

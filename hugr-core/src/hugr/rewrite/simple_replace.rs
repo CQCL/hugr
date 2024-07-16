@@ -233,7 +233,7 @@ pub(in crate::hugr::rewrite) mod test {
     use crate::std_extensions::logic::test::and_op;
     use crate::std_extensions::logic::NotOp;
     use crate::type_row;
-    use crate::types::{FunctionType, Type};
+    use crate::types::{Signature, Type};
     use crate::utils::test_quantum_extension::{cx_gate, h_gate, EXTENSION_ID};
     use crate::{IncomingPort, Node};
 
@@ -256,7 +256,7 @@ pub(in crate::hugr::rewrite) mod test {
             let just_q: ExtensionSet = EXTENSION_ID.into();
             let mut func_builder = module_builder.define_function(
                 "main",
-                FunctionType::new_endo(type_row![QB, QB, QB]).with_extension_delta(just_q.clone()),
+                Signature::new_endo(type_row![QB, QB, QB]).with_extension_delta(just_q.clone()),
             )?;
 
             let [qb0, qb1, qb2] = func_builder.input_wires_arr();
@@ -633,10 +633,7 @@ pub(in crate::hugr::rewrite) mod test {
         let [_input, output] = hugr.get_io(hugr.root()).unwrap();
 
         let replacement = {
-            let b = DFGBuilder::new(FunctionType::new(
-                type_row![BOOL_T],
-                type_row![BOOL_T, BOOL_T],
-            ))?;
+            let b = DFGBuilder::new(Signature::new(type_row![BOOL_T], type_row![BOOL_T, BOOL_T]))?;
             let [w] = b.input_wires_arr();
             b.finish_prelude_hugr_with_outputs([w, w])?
         };

@@ -23,7 +23,7 @@ use crate::hugr::{HugrMut, HugrView, RootTagged};
 use crate::ops::dataflow::DataflowOpTrait;
 use crate::ops::handle::{ContainerHandle, DataflowOpID};
 use crate::ops::{NamedOp, OpTag, OpTrait, OpType};
-use crate::types::{FunctionType, Type};
+use crate::types::{Signature, Type};
 use crate::{Hugr, IncomingPort, Node, OutgoingPort, Port, SimpleReplacement};
 
 /// A non-empty convex subgraph of a HUGR sibling graph.
@@ -285,7 +285,7 @@ impl SiblingSubgraph {
     }
 
     /// The signature of the subgraph.
-    pub fn signature(&self, hugr: &impl HugrView) -> FunctionType {
+    pub fn signature(&self, hugr: &impl HugrView) -> Signature {
         let input = self
             .inputs
             .iter()
@@ -303,7 +303,7 @@ impl SiblingSubgraph {
                 sig.port_type(p).cloned().expect("must be dataflow edge")
             })
             .collect_vec();
-        FunctionType::new(input, output).with_extension_delta(ExtensionSet::union_over(
+        Signature::new(input, output).with_extension_delta(ExtensionSet::union_over(
             self.nodes.iter().map(|n| {
                 hugr.signature(*n)
                     .expect("all nodes must have dataflow signature")
@@ -666,9 +666,9 @@ pub enum InvalidReplacement {
     ]
     InvalidSignature {
         /// The expected signature.
-        expected: FunctionType,
+        expected: Signature,
         /// The actual signature.
-        actual: Option<FunctionType>,
+        actual: Option<Signature>,
     },
     /// SiblingSubgraph is not convex.
     #[error("SiblingSubgraph is not convex.")]
@@ -782,7 +782,7 @@ mod tests {
         let mut mod_builder = ModuleBuilder::new();
         let func = mod_builder.declare(
             "test",
-            FunctionType::new_endo(type_row![QB_T, QB_T, QB_T])
+            Signature::new_endo(type_row![QB_T, QB_T, QB_T])
                 .with_extension_delta(test_quantum_extension::EXTENSION_ID)
                 .into(),
         )?;
@@ -803,7 +803,7 @@ mod tests {
         let mut mod_builder = ModuleBuilder::new();
         let func = mod_builder.declare(
             "test",
-            FunctionType::new_endo(type_row![BOOL_T])
+            Signature::new_endo(type_row![BOOL_T])
                 .with_extension_delta(logic::EXTENSION_ID)
                 .into(),
         )?;
@@ -825,7 +825,7 @@ mod tests {
         let mut mod_builder = ModuleBuilder::new();
         let func = mod_builder.declare(
             "test",
-            FunctionType::new(BOOL_T, type_row![BOOL_T, BOOL_T])
+            Signature::new(BOOL_T, type_row![BOOL_T, BOOL_T])
                 .with_extension_delta(logic::EXTENSION_ID)
                 .into(),
         )?;
@@ -847,7 +847,7 @@ mod tests {
         let mut mod_builder = ModuleBuilder::new();
         let func = mod_builder.declare(
             "test",
-            FunctionType::new_endo(BOOL_T)
+            Signature::new_endo(BOOL_T)
                 .with_extension_delta(logic::EXTENSION_ID)
                 .into(),
         )?;
@@ -888,7 +888,7 @@ mod tests {
         let sub = SiblingSubgraph::try_new_dataflow_subgraph(&func)?;
 
         let empty_dfg = {
-            let builder = DFGBuilder::new(FunctionType::new_endo(type_row![QB_T, QB_T])).unwrap();
+            let builder = DFGBuilder::new(Signature::new_endo(type_row![QB_T, QB_T])).unwrap();
             let inputs = builder.input_wires();
             builder.finish_prelude_hugr_with_outputs(inputs).unwrap()
         };
@@ -913,7 +913,7 @@ mod tests {
         // the first two qubits.
         assert_eq!(
             sub.signature(&func),
-            FunctionType::new_endo(type_row![QB_T, QB_T])
+            Signature::new_endo(type_row![QB_T, QB_T])
                 .with_extension_delta(test_quantum_extension::EXTENSION_ID)
         );
         Ok(())
@@ -926,7 +926,7 @@ mod tests {
         let sub = SiblingSubgraph::from_sibling_graph(&func)?;
 
         let empty_dfg = {
-            let builder = DFGBuilder::new(FunctionType::new_endo(type_row![QB_T])).unwrap();
+            let builder = DFGBuilder::new(Signature::new_endo(type_row![QB_T])).unwrap();
             let inputs = builder.input_wires();
             builder.finish_prelude_hugr_with_outputs(inputs).unwrap()
         };

@@ -112,7 +112,7 @@ pub(crate) mod test_quantum_extension {
         ops::CustomOp,
         std_extensions::arithmetic::float_types,
         type_row,
-        types::{FunctionType, PolyFuncTypeRV},
+        types::{PolyFuncTypeRV, Signature},
         Extension,
     };
 
@@ -137,7 +137,7 @@ pub(crate) mod test_quantum_extension {
             .add_op(
                 OpName::new_inline("RzF64"),
                 "Rotation specified by float".into(),
-                FunctionType::new(type_row![QB_T, float_types::FLOAT64_TYPE], type_row![QB_T]),
+                Signature::new(type_row![QB_T, float_types::FLOAT64_TYPE], type_row![QB_T]),
             )
             .unwrap();
 
@@ -149,7 +149,7 @@ pub(crate) mod test_quantum_extension {
             .add_op(
                 OpName::new_inline("Measure"),
                 "Measure a qubit, returning the qubit and the measurement result.".into(),
-                FunctionType::new(type_row![QB_T], type_row![QB_T, BOOL_T]),
+                Signature::new(type_row![QB_T], type_row![QB_T, BOOL_T]),
             )
             .unwrap();
 
@@ -157,7 +157,7 @@ pub(crate) mod test_quantum_extension {
             .add_op(
                 OpName::new_inline("QAlloc"),
                 "Allocate a new qubit.".into(),
-                FunctionType::new(type_row![], type_row![QB_T]),
+                Signature::new(type_row![], type_row![QB_T]),
             )
             .unwrap();
 
@@ -165,7 +165,7 @@ pub(crate) mod test_quantum_extension {
             .add_op(
                 OpName::new_inline("QDiscard"),
                 "Discard a qubit.".into(),
-                FunctionType::new(type_row![QB_T], type_row![]),
+                Signature::new(type_row![QB_T], type_row![]),
             )
             .unwrap();
 
