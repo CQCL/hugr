@@ -7,6 +7,7 @@ use hugr_core::{Extension, Hugr};
 use std::{ffi::OsString, path::PathBuf};
 use thiserror::Error;
 
+pub mod convert;
 pub mod extensions;
 pub mod mermaid;
 pub mod validate;
@@ -24,6 +25,8 @@ pub enum CliArgs {
     GenExtensions(extensions::ExtArgs),
     /// Write HUGR as mermaid diagrams.
     Mermaid(mermaid::MermaidArgs),
+    /// Convert between HUGR formats (EXPERIMENTAL).
+    Convert(convert::CliArgs),
     /// External commands
     #[command(external_subcommand)]
     External(Vec<OsString>),
@@ -42,6 +45,8 @@ pub enum CliError {
     Parse(#[from] serde_json::Error),
     /// Errors produced by the `validate` subcommand.
     Validate(#[from] validate::ValError),
+    /// Errors produced by the `convert` subcommand.
+    Convert(#[from] convert::CliError),
 }
 
 /// Validate and visualise a HUGR file.

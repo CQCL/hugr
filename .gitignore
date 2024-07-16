@@ -19,6 +19,7 @@ proptest-regressions/
 # Devenv
 .devenv*
 devenv.local.nix
+.direnv
 
 # Coverage report
 lcov.info

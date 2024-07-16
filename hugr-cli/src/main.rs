@@ -2,7 +2,9 @@
 
 use clap::Parser as _;
 
+use hugr_cli::{convert, validate, CliArgs};
 use hugr_cli::{validate, CliArgs};
+use hugr_core::extension::{ExtensionRegistry, PRELUDE};
 
 use clap_verbosity_flag::Level;
 
@@ -11,6 +13,7 @@ fn main() {
         CliArgs::Validate(args) => run_validate(args),
         CliArgs::GenExtensions(args) => args.run_dump(),
         CliArgs::Mermaid(mut args) => args.run_print().unwrap(),
+        CliArgs::Convert(args) => run_convert(args),
         CliArgs::External(_) => {
             // TODO: Implement support for external commands.
             // Running `hugr COMMAND` would look for `hugr-COMMAND` in the path
@@ -33,6 +36,14 @@ fn run_validate(mut args: validate::ValArgs) {
         if args.verbosity(Level::Error) {
             eprintln!("{}", e);
         }
+        std::process::exit(1);
+    }
+}
+
+/// Run the `convert` command.
+fn run_convert(args: convert::CliArgs) {
+    if let Err(e) = args.run() {
+        e.print();
         std::process::exit(1);
     }
 }

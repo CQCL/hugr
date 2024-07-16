@@ -16,10 +16,13 @@ categories = ["compilers"]
 clap = { workspace = true, features = ["derive"] }
 clap-verbosity-flag.workspace = true
 hugr-core = { path = "../hugr-core", version = "0.7.0" }
+hugr-model = { path = "../hugr-model", version = "0.1.0" }
 serde_json.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 clio = { workspace = true, features = ["clap-parse"] }
+parens = { path = "../../parens/parens" }
+ariadne = "0.4.1"
 
 [lints]
 workspace = true
