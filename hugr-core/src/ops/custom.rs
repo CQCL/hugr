@@ -467,7 +467,6 @@ mod test {
     }
 
     #[test]
-    #[should_panic] // https://github.com/CQCL/hugr/issues/1315
     fn resolve_opaque_op() {
         let registry = &INT_OPS_REGISTRY;
         let i0 = &INT_TYPES[0];
