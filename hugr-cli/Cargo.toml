@@ -5,13 +5,12 @@ edition = { workspace = true }
 rust-version = { workspace = true }
 license = { workspace = true }
 readme = "README.md"
-documentation = "https://docs.rs/hugr-passes/"
+documentation = "https://docs.rs/hugr-cli/"
 homepage = { workspace = true }
 repository = { workspace = true }
 description = "Compiler passes for Quantinuum's HUGR"
 keywords = ["Quantum", "Quantinuum"]
 categories = ["compilers"]
-
 
 [dependencies]
 clap = { workspace = true, features = ["derive"] }
@@ -33,3 +32,4 @@ rstest.workspace = true
 [[bin]]
 name = "hugr"
 path = "src/main.rs"
+doc = false
