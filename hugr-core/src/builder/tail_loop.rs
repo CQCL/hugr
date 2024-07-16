@@ -166,7 +166,6 @@ mod test {
                             ([type_row![], type_row![]], const_wire),
                             vec![(BIT, b1)],
                             output_row,
-                            PRELUDE_ID.into(),
                         )?;
 
                         let mut branch_0 = conditional_b.case_builder(0)?;

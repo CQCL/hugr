@@ -203,7 +203,9 @@ pub(crate) mod test {
     use serde_json::json;
 
     use crate::builder::build_traits::DataflowHugr;
-    use crate::builder::{ft1, BuilderWiringError, DataflowSubContainer, ModuleBuilder};
+    use crate::builder::{
+        endo_ft, inout_ft, BuilderWiringError, DataflowSubContainer, ModuleBuilder,
+    };
     use crate::extension::prelude::{BOOL_T, USIZE_T};
     use crate::extension::{ExtensionId, EMPTY_REG, PRELUDE_REGISTRY};
     use crate::hugr::validate::InterGraphEdgeError;
@@ -224,25 +226,17 @@ pub(crate) mod test {
     #[test]
     fn nested_identity() -> Result<(), BuildError> {
         let build_result = {
-            let mut module_builder = ModuleBuilder::new();
+            let mut outer_builder = DFGBuilder::new(endo_ft(type_row![NAT, QB]))?;
 
-            let _f_id = {
-                let mut func_builder = module_builder.define_function(
-                    "main",
-                    FunctionType::new(type_row![NAT, QB], type_row![NAT, QB]),
-                )?;
+            let [int, qb] = outer_builder.input_wires_arr();
 
-                let [int, qb] = func_builder.input_wires_arr();
+            let q_out = outer_builder.add_dataflow_op(h_gate(), vec![qb])?;
 
-                let q_out = func_builder.add_dataflow_op(h_gate(), vec![qb])?;
+            let inner_builder = outer_builder.dfg_builder_endo([(NAT, int)])?;
+            let inner_id = n_identity(inner_builder)?;
 
-                let inner_builder = func_builder
-                    .dfg_builder(FunctionType::new(type_row![NAT], type_row![NAT]), [int])?;
-                let inner_id = n_identity(inner_builder)?;
-
-                func_builder.finish_with_outputs(inner_id.outputs().chain(q_out.outputs()))?
-            };
-            module_builder.finish_prelude_hugr()
+            outer_builder
+                .finish_prelude_hugr_with_outputs(inner_id.outputs().chain(q_out.outputs()))
         };
 
         assert_eq!(build_result.err(), None);
@@ -253,19 +247,14 @@ pub(crate) mod test {
     // Scaffolding for copy insertion tests
     fn copy_scaffold<F>(f: F, msg: &'static str) -> Result<(), BuildError>
     where
-        F: FnOnce(FunctionBuilder<&mut Hugr>) -> Result<BuildHandle<FuncID<true>>, BuildError>,
+        F: FnOnce(&mut DFGBuilder<Hugr>) -> Result<(), BuildError>,
     {
         let build_result = {
-            let mut module_builder = ModuleBuilder::new();
+            let mut builder = DFGBuilder::new(inout_ft(BOOL_T, type_row![BOOL_T, BOOL_T]))?;
 
-            let f_build = module_builder.define_function(
-                "main",
-                FunctionType::new(type_row![BOOL_T], type_row![BOOL_T, BOOL_T]),
-            )?;
+            f(&mut builder)?;
 
-            f(f_build)?;
-
-            module_builder.finish_hugr(&EMPTY_REG)
+            builder.finish_hugr(&EMPTY_REG)
         };
         assert_matches!(build_result, Ok(_), "Failed on example: {}", msg);
 
@@ -276,26 +265,26 @@ pub(crate) mod test {
         copy_scaffold(
             |f_build| {
                 let [b1] = f_build.input_wires_arr();
-                f_build.finish_with_outputs([b1, b1])
+                f_build.set_outputs([b1, b1])
             },
             "Copy input and output",
         )?;
 
         copy_scaffold(
-            |mut f_build| {
+            |f_build| {
                 let [b1] = f_build.input_wires_arr();
                 let xor = f_build.add_dataflow_op(and_op(), [b1, b1])?;
-                f_build.finish_with_outputs([xor.out_wire(0), b1])
+                f_build.set_outputs([xor.out_wire(0), b1])
             },
             "Copy input and use with binary function",
         )?;
 
         copy_scaffold(
-            |mut f_build| {
+            |f_build| {
                 let [b1] = f_build.input_wires_arr();
                 let xor1 = f_build.add_dataflow_op(and_op(), [b1, b1])?;
                 let xor2 = f_build.add_dataflow_op(and_op(), [b1, xor1.out_wire(0)])?;
-                f_build.finish_with_outputs([xor2.out_wire(0), b1])
+                f_build.set_outputs([xor2.out_wire(0), b1])
             },
             "Copy multiple times",
         )?;
@@ -420,12 +409,12 @@ pub(crate) mod test {
         let xb: ExtensionId = "B".try_into().unwrap();
         let xc: ExtensionId = "C".try_into().unwrap();
 
-        let mut parent = DFGBuilder::new(ft1(BIT))?;
+        let mut parent = DFGBuilder::new(endo_ft(BIT))?;
 
         let [w] = parent.input_wires_arr();
 
         // A box which adds extensions A and B, via child Lift nodes
-        let mut add_ab = parent.dfg_builder(ft1(BIT), [w])?;
+        let mut add_ab = parent.dfg_builder(endo_ft(BIT), [w])?;
         let [w] = add_ab.input_wires_arr();
 
         let lift_a = add_ab.add_dataflow_op(
@@ -451,7 +440,7 @@ pub(crate) mod test {
 
         // Add another node (a sibling to add_ab) which adds extension C
         // via a child lift node
-        let mut add_c = parent.dfg_builder(ft1(BIT), [w])?;
+        let mut add_c = parent.dfg_builder(endo_ft(BIT), [w])?;
         let [w] = add_c.input_wires_arr();
         let lift_c = add_c.add_dataflow_op(
             Lift {

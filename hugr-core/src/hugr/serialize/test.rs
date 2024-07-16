@@ -1,6 +1,6 @@
 use super::*;
 use crate::builder::{
-    ft2, test::closed_dfg_root_hugr, Container, DFGBuilder, Dataflow, DataflowHugr,
+    endo_ft, inout_ft, test::closed_dfg_root_hugr, Container, DFGBuilder, Dataflow, DataflowHugr,
     DataflowSubContainer, HugrBuilder, ModuleBuilder,
 };
 use crate::extension::prelude::{BOOL_T, PRELUDE_ID, QB_T, USIZE_T};
@@ -314,7 +314,7 @@ fn dfg_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn opaque_ops() -> Result<(), Box<dyn std::error::Error>> {
     let tp: Vec<Type> = vec![BOOL_T; 1];
-    let mut dfg = DFGBuilder::new(FunctionType::new_endo(tp))?;
+    let mut dfg = DFGBuilder::new(endo_ft(tp))?;
     let [wire] = dfg.input_wires_arr();
 
     // Add an extension operation
@@ -367,7 +367,7 @@ fn hierarchy_order() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn constants_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
-    let mut builder = DFGBuilder::new(ft2(vec![], vec![INT_TYPES[4].clone()])).unwrap();
+    let mut builder = DFGBuilder::new(inout_ft(vec![], INT_TYPES[4].clone())).unwrap();
     let w = builder.add_load_value(ConstInt::new_s(4, -2).unwrap());
     let hugr = builder.finish_hugr_with_outputs([w], &INT_OPS_REGISTRY)?;
 

@@ -379,7 +379,7 @@ mod test {
                 .to_extension_op()
                 .unwrap()
                 .signature(),
-            FunctionType::new(vec![int_type(3)], vec![int_type(4)],)
+            FunctionType::new(int_type(3), int_type(4)).with_extension_delta(EXTENSION_ID)
         );
         assert_eq!(
             IntOpDef::iwiden_s
@@ -387,7 +387,7 @@ mod test {
                 .to_extension_op()
                 .unwrap()
                 .signature(),
-            FunctionType::new(vec![int_type(3)], vec![int_type(3)],)
+            FunctionType::new_endo(int_type(3)).with_extension_delta(EXTENSION_ID)
         );
         assert_eq!(
             IntOpDef::inarrow_s
@@ -395,7 +395,8 @@ mod test {
                 .to_extension_op()
                 .unwrap()
                 .signature(),
-            FunctionType::new(vec![int_type(3)], vec![sum_ty_with_err(int_type(3))],)
+            FunctionType::new(int_type(3), sum_ty_with_err(int_type(3)))
+                .with_extension_delta(EXTENSION_ID)
         );
         assert!(
             IntOpDef::iwiden_u
@@ -411,7 +412,8 @@ mod test {
                 .to_extension_op()
                 .unwrap()
                 .signature(),
-            FunctionType::new(vec![int_type(2)], vec![sum_ty_with_err(int_type(1))],)
+            FunctionType::new(int_type(2), sum_ty_with_err(int_type(1)))
+                .with_extension_delta(EXTENSION_ID)
         );
 
         assert!(IntOpDef::inarrow_u

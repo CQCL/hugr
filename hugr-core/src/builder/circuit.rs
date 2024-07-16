@@ -244,7 +244,7 @@ mod test {
 
     use crate::std_extensions::arithmetic::float_types::{self, ConstF64};
     use crate::utils::test_quantum_extension::{
-        cx_gate, h_gate, measure, q_alloc, q_discard, rz_f64,
+        self, cx_gate, h_gate, measure, q_alloc, q_discard, rz_f64,
     };
     use crate::{
         builder::{
@@ -261,6 +261,7 @@ mod test {
     fn simple_linear() {
         let build_res = build_main(
             FunctionType::new(type_row![QB, QB], type_row![QB, QB])
+                .with_extension_delta(test_quantum_extension::EXTENSION_ID)
                 .with_extension_delta(float_types::EXTENSION_ID)
                 .into(),
             |mut f_build| {
@@ -302,7 +303,9 @@ mod test {
             FunctionType::new(vec![QB, NAT], vec![QB]),
         ));
         let build_res = build_main(
-            FunctionType::new(type_row![QB, QB, NAT], type_row![QB, QB, BOOL_T]).into(),
+            FunctionType::new(type_row![QB, QB, NAT], type_row![QB, QB, BOOL_T])
+                .with_extension_delta(test_quantum_extension::EXTENSION_ID)
+                .into(),
             |mut f_build| {
                 let [q0, q1, angle]: [Wire; 3] = f_build.input_wires_arr();
 
@@ -327,7 +330,9 @@ mod test {
     #[test]
     fn ancillae() {
         let build_res = build_main(
-            FunctionType::new(type_row![QB], type_row![QB]).into(),
+            FunctionType::new_endo(QB)
+                .with_extension_delta(test_quantum_extension::EXTENSION_ID)
+                .into(),
             |mut f_build| {
                 let mut circ = f_build.as_circuit(f_build.input_wires());
                 assert_eq!(circ.n_wires(), 1);

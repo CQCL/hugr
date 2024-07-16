@@ -29,7 +29,7 @@
 //! # use hugr::Hugr;
 //! # use hugr::builder::{BuildError, BuildHandle, Container, DFGBuilder, Dataflow, DataflowHugr, ModuleBuilder, DataflowSubContainer, HugrBuilder};
 //! use hugr::extension::prelude::BOOL_T;
-//! use hugr::std_extensions::logic::{NotOp, LOGIC_REG};
+//! use hugr::std_extensions::logic::{EXTENSION_ID, LOGIC_REG, NotOp};
 //! use hugr::types::FunctionType;
 //!
 //! # fn doctest() -> Result<(), BuildError> {
@@ -42,7 +42,7 @@
 //!     let _dfg_handle = {
 //!         let mut dfg = module_builder.define_function(
 //!             "main",
-//!             FunctionType::new(vec![BOOL_T], vec![BOOL_T]),
+//!             FunctionType::new_endo(BOOL_T).with_extension_delta(EXTENSION_ID),
 //!         )?;
 //!
 //!         // Get the wires from the function inputs.
@@ -59,7 +59,8 @@
 //!     let _circuit_handle = {
 //!         let mut dfg = module_builder.define_function(
 //!             "circuit",
-//!             FunctionType::new_endo(vec![BOOL_T, BOOL_T]),
+//!             FunctionType::new_endo(vec![BOOL_T, BOOL_T])
+//!                 .with_extension_delta(EXTENSION_ID),
 //!         )?;
 //!         let mut circuit = dfg.as_circuit(dfg.input_wires());
 //!
@@ -123,13 +124,13 @@ pub use circuit::{CircuitBuildError, CircuitBuilder};
 
 /// Return a FunctionType with the same input and output types (specified)
 /// whose extension delta, when used in a non-FuncDefn container, will be inferred.
-pub fn ft1(types: impl Into<TypeRow>) -> FunctionType {
+pub fn endo_ft(types: impl Into<TypeRow>) -> FunctionType {
     FunctionType::new_endo(types).with_extension_delta(TO_BE_INFERRED)
 }
 
 /// Return a FunctionType with the specified input and output types
 /// whose extension delta, when used in a non-FuncDefn container, will be inferred.
-pub fn ft2(inputs: impl Into<TypeRow>, outputs: impl Into<TypeRow>) -> FunctionType {
+pub fn inout_ft(inputs: impl Into<TypeRow>, outputs: impl Into<TypeRow>) -> FunctionType {
     FunctionType::new(inputs, outputs).with_extension_delta(TO_BE_INFERRED)
 }
 
@@ -285,10 +286,9 @@ pub(crate) mod test {
         cfg_builder.finish_prelude_hugr().unwrap()
     }
 
-    /// A helper method which creates a DFG rooted hugr with closed resources,
-    /// for tests which want to avoid having open extension variables after
-    /// inference. Using DFGBuilder will default to a root node with an open
-    /// extension variable
+    /// A helper method which creates a DFG rooted hugr with Input and Output node
+    /// only (no wires), given a function type with extension delta.
+    // TODO consider taking two type rows and using TO_BE_INFERRED
     pub(crate) fn closed_dfg_root_hugr(signature: FunctionType) -> Hugr {
         let mut hugr = Hugr::new(ops::DFG {
             signature: signature.clone(),

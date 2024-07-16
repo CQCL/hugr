@@ -65,7 +65,9 @@ class _DivModDef(AsCustomOp):
         return Custom(
             "idivmod_u",
             tys.FunctionType(
-                input=[int_t(self.arg1)] * 2, output=[int_t(self.arg2)] * 2
+                input=[int_t(self.arg1)] * 2,
+                output=[int_t(self.arg2)] * 2,
+                extension_reqs=[OPS_EXTENSION],
             ),
             extension=OPS_EXTENSION,
             args=[tys.BoundedNatArg(n=self.arg1), tys.BoundedNatArg(n=self.arg2)],
