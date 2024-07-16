@@ -136,7 +136,11 @@ def validate(h: Hugr, mermaid: bool = False, roundtrip: bool = True):
     if mermaid:
         cmd.append("--mermaid")
     serial = h.to_serial().to_json()
-    subprocess.run(cmd, check=True, input=serial.encode())  # noqa: S603
+    try:
+        subprocess.run(cmd, check=True, input=serial.encode(), capture_output=True)  # noqa: S603
+    except subprocess.CalledProcessError as e:
+        error = e.stderr.decode()
+        raise RuntimeError(error) from e
 
     if roundtrip:
         h2 = Hugr.from_serial(SerialHugr.load_json(json.loads(serial)))

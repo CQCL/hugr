@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.5.0 (2024-07-16)
+
+### Bug Fixes
+
+- [**breaking**] Ops require their own extension ([#1226](https://github.com/CQCL/hugr/pull/1226))
+- [**breaking**] Force_order failing on Const nodes, add arg to rank. ([#1300](https://github.com/CQCL/hugr/pull/1300))
+
+### Documentation
+
+- Attempt to correct force_order docs ([#1299](https://github.com/CQCL/hugr/pull/1299))
+
+### Refactor
+
+- [**breaking**] Rename builder helpers: ft1->endo_ft, ft2->inout_ft ([#1297](https://github.com/CQCL/hugr/pull/1297))
+
+
 ## 0.4.0 (2024-07-10)
 
 ### Features

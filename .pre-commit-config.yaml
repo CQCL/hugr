@@ -85,7 +85,10 @@ repos:
       - id: py-test
         name: pytest
         description: Run python tests
-        entry: sh -c "poetry install && poetry run pytest"
+        # We need to rebuild `hugr-cli` without the `extension_inference` feature
+        # to avoid test errors.
+        # TODO: Remove this once the issue is fixed.
+        entry: sh -c "cargo build -p hugr-cli && poetry install && poetry run pytest"
         language: system
         files: \.py$
         pass_filenames: false

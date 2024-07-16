@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.5.0 (2024-07-16)
+
+### Bug Fixes
+
+- NonConvex error on SiblingSubgraph::from_nodes with multiports ([#1295](https://github.com/CQCL/hugr/pull/1295))
+- [**breaking**] Ops require their own extension ([#1226](https://github.com/CQCL/hugr/pull/1226))
+
+### Features
+
+- Make `DataflowOpTrait` public ([#1283](https://github.com/CQCL/hugr/pull/1283))
+- Make op members consistently public ([#1274](https://github.com/CQCL/hugr/pull/1274))
+
+### Refactor
+
+- [**breaking**] Rename builder helpers: ft1->endo_ft, ft2->inout_ft ([#1297](https://github.com/CQCL/hugr/pull/1297))
+
+
 ## 0.4.0 (2024-07-10)
 
 ### Bug Fixes
