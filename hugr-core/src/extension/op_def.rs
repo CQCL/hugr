@@ -218,7 +218,7 @@ impl SignatureFunc {
         }
     }
 
-    /// Compute the concrete signature ([FunctionType]).
+    /// Compute the concrete signature ([FuncValueType]).
     ///
     /// # Panics
     ///

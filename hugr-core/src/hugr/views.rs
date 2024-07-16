@@ -332,7 +332,7 @@ pub trait HugrView: HugrInternals {
     /// graph. Otherwise, returns `None`.
     ///
     /// In contrast to [`poly_func_type`][HugrView::poly_func_type], this
-    /// method always return a concrete [`FunctionType`].
+    /// method always return a concrete [`Signature`].
     fn inner_function_type(&self) -> Option<Signature> {
         self.root_type().inner_function_type()
     }
