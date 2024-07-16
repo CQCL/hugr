@@ -36,20 +36,20 @@ use petgraph::{
 /// there is no path from `n2` to `n1` (otherwise this would invalidate `hugr`).
 /// Nodes of equal rank will be ordered arbitrarily, although that arbitrary
 /// order is deterministic.
-pub fn force_order(
-    hugr: &mut impl HugrMut,
+pub fn force_order<H: HugrMut>(
+    hugr: &mut H,
     root: Node,
-    rank: impl Fn(Node) -> i64,
+    rank: impl Fn(&H, Node) -> i64,
 ) -> Result<(), HugrError> {
     force_order_by_key(hugr, root, rank)
 }
 
 /// As [force_order], but allows a generic [Ord] choice for the result of the
 /// `rank` function.
-pub fn force_order_by_key<K: Ord>(
-    hugr: &mut impl HugrMut,
+pub fn force_order_by_key<H: HugrMut, K: Ord>(
+    hugr: &mut H,
     root: Node,
-    rank: impl Fn(Node) -> K,
+    rank: impl Fn(&H, Node) -> K,
 ) -> Result<(), HugrError> {
     let dataflow_parents = DescendantsGraph::<Node>::try_new(hugr, root)?
         .nodes()
@@ -58,6 +58,7 @@ pub fn force_order_by_key<K: Ord>(
     for dp in dataflow_parents {
         // we filter out the input and output nodes from the topological sort
         let [i, o] = hugr.get_io(dp).unwrap();
+        let rank = |n| rank(hugr, n);
         let sg = SiblingGraph::<Node>::try_new(hugr, dp)?;
         let petgraph = NodeFiltered::from_fn(sg.as_petgraph(), |x| x != dp && x != i && x != o);
         let ordered_nodes = ForceOrder::new(&petgraph, &rank)
@@ -272,7 +273,7 @@ mod test {
     type RankMap = HashMap<Node, i64>;
 
     fn force_order_test_impl(hugr: &mut Hugr, rank_map: RankMap) -> Vec<Node> {
-        force_order(hugr, hugr.root(), |n| *rank_map.get(&n).unwrap_or(&0)).unwrap();
+        force_order(hugr, hugr.root(), |_, n| *rank_map.get(&n).unwrap_or(&0)).unwrap();
 
         let topo_sorted = Topo::new(&hugr.as_petgraph())
             .iter(&hugr.as_petgraph())
@@ -330,6 +331,6 @@ mod test {
                 .unwrap()
         };
         let root = hugr.root();
-        force_order(&mut hugr, root, |_| 0).unwrap();
+        force_order(&mut hugr, root, |_, _| 0).unwrap();
     }
 }
