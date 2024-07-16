@@ -204,7 +204,7 @@ mod test {
     use std::collections::HashMap;
 
     use super::*;
-    use hugr_core::builder::{endo_ft, BuildHandle, Dataflow, DataflowHugr};
+    use hugr_core::builder::{endo_sig, BuildHandle, Dataflow, DataflowHugr};
     use hugr_core::extension::EMPTY_REG;
     use hugr_core::ops::handle::{DataflowOpID, NodeHandle};
 
@@ -247,7 +247,7 @@ mod test {
     ///      Output
     fn test_hugr() -> (Hugr, [Node; 4]) {
         let t = INT_TYPES[I as usize].clone();
-        let mut builder = DFGBuilder::new(endo_ft(vec![t.clone(), t.clone()])).unwrap();
+        let mut builder = DFGBuilder::new(endo_sig(vec![t.clone(), t.clone()])).unwrap();
         let [iw1, iw2] = builder.input_wires_arr();
         let v0 = build_neg(&mut builder, iw1);
         let v1 = build_neg(&mut builder, iw2);

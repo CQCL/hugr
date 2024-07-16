@@ -124,13 +124,13 @@ pub use circuit::{CircuitBuildError, CircuitBuilder};
 
 /// Return a FunctionType with the same input and output types (specified)
 /// whose extension delta, when used in a non-FuncDefn container, will be inferred.
-pub fn endo_ft(types: impl Into<TypeRow>) -> Signature {
+pub fn endo_sig(types: impl Into<TypeRow>) -> Signature {
     Signature::new_endo(types).with_extension_delta(TO_BE_INFERRED)
 }
 
 /// Return a FunctionType with the specified input and output types
 /// whose extension delta, when used in a non-FuncDefn container, will be inferred.
-pub fn inout_ft(inputs: impl Into<TypeRow>, outputs: impl Into<TypeRow>) -> Signature {
+pub fn inout_sig(inputs: impl Into<TypeRow>, outputs: impl Into<TypeRow>) -> Signature {
     Signature::new(inputs, outputs).with_extension_delta(TO_BE_INFERRED)
 }
 

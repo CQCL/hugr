@@ -204,7 +204,7 @@ pub(crate) mod test {
 
     use crate::builder::build_traits::DataflowHugr;
     use crate::builder::{
-        endo_ft, inout_ft, BuilderWiringError, DataflowSubContainer, ModuleBuilder,
+        endo_sig, inout_sig, BuilderWiringError, DataflowSubContainer, ModuleBuilder,
     };
     use crate::extension::prelude::{BOOL_T, USIZE_T};
     use crate::extension::{ExtensionId, EMPTY_REG, PRELUDE_REGISTRY};
@@ -226,7 +226,7 @@ pub(crate) mod test {
     #[test]
     fn nested_identity() -> Result<(), BuildError> {
         let build_result = {
-            let mut outer_builder = DFGBuilder::new(endo_ft(type_row![NAT, QB]))?;
+            let mut outer_builder = DFGBuilder::new(endo_sig(type_row![NAT, QB]))?;
 
             let [int, qb] = outer_builder.input_wires_arr();
 
@@ -250,7 +250,7 @@ pub(crate) mod test {
         F: FnOnce(&mut DFGBuilder<Hugr>) -> Result<(), BuildError>,
     {
         let build_result = {
-            let mut builder = DFGBuilder::new(inout_ft(BOOL_T, type_row![BOOL_T, BOOL_T]))?;
+            let mut builder = DFGBuilder::new(inout_sig(BOOL_T, type_row![BOOL_T, BOOL_T]))?;
 
             f(&mut builder)?;
 
@@ -409,12 +409,12 @@ pub(crate) mod test {
         let xb: ExtensionId = "B".try_into().unwrap();
         let xc: ExtensionId = "C".try_into().unwrap();
 
-        let mut parent = DFGBuilder::new(endo_ft(BIT))?;
+        let mut parent = DFGBuilder::new(endo_sig(BIT))?;
 
         let [w] = parent.input_wires_arr();
 
         // A box which adds extensions A and B, via child Lift nodes
-        let mut add_ab = parent.dfg_builder(endo_ft(BIT), [w])?;
+        let mut add_ab = parent.dfg_builder(endo_sig(BIT), [w])?;
         let [w] = add_ab.input_wires_arr();
 
         let lift_a = add_ab.add_dataflow_op(
@@ -440,7 +440,7 @@ pub(crate) mod test {
 
         // Add another node (a sibling to add_ab) which adds extension C
         // via a child lift node
-        let mut add_c = parent.dfg_builder(endo_ft(BIT), [w])?;
+        let mut add_c = parent.dfg_builder(endo_sig(BIT), [w])?;
         let [w] = add_c.input_wires_arr();
         let lift_c = add_c.add_dataflow_op(
             Lift {

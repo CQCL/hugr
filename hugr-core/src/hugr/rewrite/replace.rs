@@ -446,7 +446,7 @@ mod test {
     use itertools::Itertools;
 
     use crate::builder::{
-        endo_ft, BuildError, CFGBuilder, Container, DFGBuilder, Dataflow, DataflowHugr,
+        endo_sig, BuildError, CFGBuilder, Container, DFGBuilder, Dataflow, DataflowHugr,
         DataflowSubContainer, HugrBuilder, SubContainer,
     };
     use crate::extension::prelude::{BOOL_T, USIZE_T};
@@ -488,7 +488,7 @@ mod test {
         let just_list = TypeRow::from(vec![listy.clone()]);
         let intermed = TypeRow::from(vec![listy.clone(), USIZE_T]);
 
-        let mut cfg = CFGBuilder::new(endo_ft(just_list.clone()))?;
+        let mut cfg = CFGBuilder::new(endo_sig(just_list.clone()))?;
 
         let pred_const = cfg.add_constant(ops::Value::unary_unit_sum());
 

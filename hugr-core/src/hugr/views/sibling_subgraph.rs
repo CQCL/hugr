@@ -733,7 +733,7 @@ mod tests {
 
     use cool_asserts::assert_matches;
 
-    use crate::builder::inout_ft;
+    use crate::builder::inout_sig;
     use crate::extension::PRELUDE_REGISTRY;
     use crate::std_extensions::logic;
     use crate::utils::test_quantum_extension::{self, cx_gate};
@@ -1081,7 +1081,7 @@ mod tests {
         let one_bit = type_row![BOOL_T];
         let two_bit = type_row![BOOL_T, BOOL_T];
 
-        let mut builder = DFGBuilder::new(inout_ft(one_bit.clone(), two_bit.clone())).unwrap();
+        let mut builder = DFGBuilder::new(inout_sig(one_bit.clone(), two_bit.clone())).unwrap();
         let inw = builder.input_wires().exactly_one().unwrap();
         let outw1 = builder.add_dataflow_op(NotOp, [inw]).unwrap().out_wire(0);
         let outw2 = builder

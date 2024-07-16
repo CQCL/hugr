@@ -74,7 +74,7 @@ fn test_add(#[case] a: f64, #[case] b: f64, #[case] c: f64) {
 }
 
 fn noargfn(outputs: impl Into<TypeRow>) -> Signature {
-    inout_ft(type_row![], outputs)
+    inout_sig(type_row![], outputs)
 }
 
 #[test]

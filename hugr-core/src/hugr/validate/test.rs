@@ -6,7 +6,7 @@ use cool_asserts::assert_matches;
 use super::*;
 use crate::builder::test::closed_dfg_root_hugr;
 use crate::builder::{
-    inout_ft, BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
+    inout_sig, BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
     FunctionBuilder, HugrBuilder, ModuleBuilder, SubContainer,
 };
 use crate::extension::prelude::{BOOL_T, PRELUDE, PRELUDE_ID, QB_T, USIZE_T};
@@ -603,7 +603,7 @@ fn instantiate_row_variables() -> Result<(), Box<dyn std::error::Error>> {
         vec![TypeArg::Type { ty: USIZE_T }; i].into()
     }
     let e = extension_with_eval_parallel();
-    let mut dfb = DFGBuilder::new(inout_ft(
+    let mut dfb = DFGBuilder::new(inout_sig(
         vec![
             Type::new_function(Signature::new(USIZE_T, vec![USIZE_T, USIZE_T])),
             USIZE_T,
@@ -709,7 +709,7 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
 
     let int_pair = Type::new_tuple(type_row![USIZE_T; 2]);
     // Root DFG: applies a function int--PRELUDE-->int to each element of a pair of two ints
-    let mut d = DFGBuilder::new(inout_ft(
+    let mut d = DFGBuilder::new(inout_sig(
         vec![utou(PRELUDE_ID), int_pair.clone()],
         vec![int_pair.clone()],
     ))?;
