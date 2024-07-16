@@ -207,14 +207,14 @@ pub(crate) mod test {
         endo_sig, inout_sig, BuilderWiringError, DataflowSubContainer, ModuleBuilder,
     };
     use crate::extension::prelude::{BOOL_T, USIZE_T};
-    use crate::extension::{ExtensionId, EMPTY_REG, PRELUDE_REGISTRY};
+    use crate::extension::{ExtensionId, SignatureError, EMPTY_REG, PRELUDE_REGISTRY};
     use crate::hugr::validate::InterGraphEdgeError;
     use crate::ops::{handle::NodeHandle, Lift, Noop, OpTag};
     use crate::ops::{OpTrait, Value};
 
     use crate::std_extensions::logic::test::and_op;
     use crate::types::type_param::TypeParam;
-    use crate::types::{EdgeKind, FuncValueType, Signature, Type, TypeBound, TypeRV};
+    use crate::types::{EdgeKind, FuncValueType, RowVariable, Signature, Type, TypeBound, TypeRV};
     use crate::utils::test_quantum_extension::h_gate;
     use crate::{
         builder::test::{n_identity, BIT, NAT, QB},
@@ -531,7 +531,12 @@ pub(crate) mod test {
             [vec![USIZE_T.into()].into(), vec![tv.into()].into()],
             &PRELUDE_REGISTRY,
         );
-        assert!(ev.is_err());
+        assert_eq!(
+            ev,
+            Err(SignatureError::RowVarWhereTypeExpected {
+                var: RowVariable(0, TypeBound::Copyable)
+            })
+        );
         Ok(())
     }
 
