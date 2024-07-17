@@ -45,7 +45,11 @@ impl TestCase {
     fn run(&self) {
         let path = TEST_CASE_DIR.join(format!("{}.json", &self.name));
         if !path.exists() {
-            let f = OpenOptions::new().create_new(true).open(&path).unwrap();
+            let f = OpenOptions::new()
+                .create(true)
+                .write(true)
+                .open(&path)
+                .unwrap();
             serde_json::to_writer_pretty(f, &self.hugr).unwrap();
         }
 
