@@ -97,7 +97,6 @@ impl Rewrite for SimpleReplacement {
             h.overwrite_node_metadata(new_node, meta);
         }
         // Add edges between all newly added nodes matching those in replacement.
-        // TODO This will probably change when implicit copies are implemented.
         for &node in replacement_inner_nodes {
             let new_node = index_map.get(&node).unwrap();
             for outport in self.replacement.node_outputs(node) {
@@ -109,6 +108,17 @@ impl Rewrite for SimpleReplacement {
                 }
             }
         }
+
+        // Now we proceed to connect the edges between the newly inserted
+        // replacement and the rest of the graph.
+        //
+        // We delay creating these connections to avoid them getting mixed with
+        // the pre-existing ones in the following logic.
+        //
+        // Existing connections to the removed subgraph will be automatically
+        // removed when the nodes are removed.
+        let mut connect: HashSet<(Node, OutgoingPort, Node, IncomingPort)> = HashSet::new();
+
         // 3.2. For each p = self.nu_inp[q] such that q is not an Output port, add an edge from the
         // predecessor of p to (the new copy of) q.
         for ((rep_inp_node, rep_inp_port), (rem_inp_node, rem_inp_port)) in &self.nu_inp {
@@ -117,14 +127,13 @@ impl Rewrite for SimpleReplacement {
                 let (rem_inp_pred_node, rem_inp_pred_port) = h
                     .single_linked_output(*rem_inp_node, *rem_inp_port)
                     .unwrap();
-                h.disconnect(*rem_inp_node, *rem_inp_port);
                 let new_inp_node = index_map.get(rep_inp_node).unwrap();
-                h.connect(
+                connect.insert((
                     rem_inp_pred_node,
                     rem_inp_pred_port,
                     *new_inp_node,
                     *rep_inp_port,
-                );
+                ));
             }
         }
         // 3.3. For each q = self.nu_out[p] such that the predecessor of q is not an Input port, add an
@@ -136,21 +145,18 @@ impl Rewrite for SimpleReplacement {
                 .unwrap();
             if self.replacement.get_optype(rep_out_pred_node).tag() != OpTag::Input {
                 let new_out_node = index_map.get(&rep_out_pred_node).unwrap();
-                h.disconnect(*rem_out_node, *rem_out_port);
-                h.connect(
+                connect.insert((
                     *new_out_node,
                     rep_out_pred_port,
                     *rem_out_node,
                     *rem_out_port,
-                );
+                ));
             }
         }
         // 3.4. For each q = self.nu_out[p1], p0 = self.nu_inp[q], add an edge from the predecessor of p0
         // to p1.
         //
         // i.e. the replacement graph has direct edges between the input and output nodes.
-        let mut disconnect: HashSet<(Node, IncomingPort)> = HashSet::new();
-        let mut connect: HashSet<(Node, OutgoingPort, Node, IncomingPort)> = HashSet::new();
         for ((rem_out_node, rem_out_port), &rep_out_port) in &self.nu_out {
             let rem_inp_nodeport = self.nu_inp.get(&(replacement_output_node, rep_out_port));
             if let Some((rem_inp_node, rem_inp_port)) = rem_inp_nodeport {
@@ -158,13 +164,11 @@ impl Rewrite for SimpleReplacement {
                 let (rem_inp_pred_node, rem_inp_pred_port) = h
                     .single_linked_output(*rem_inp_node, *rem_inp_port)
                     .unwrap();
-                // Delay connecting/disconnecting the nodes until after
-                // processing all nu_out entries.
+                // Delay connecting the nodes until after processing all nu_out
+                // entries.
                 //
                 // Otherwise, we might disconnect other wires in `rem_inp_node`
                 // that are needed for the following iterations.
-                disconnect.insert((*rem_inp_node, *rem_inp_port));
-                disconnect.insert((*rem_out_node, *rem_out_port));
                 connect.insert((
                     rem_inp_pred_node,
                     rem_inp_pred_port,
@@ -173,9 +177,6 @@ impl Rewrite for SimpleReplacement {
                 ));
             }
         }
-        disconnect.into_iter().for_each(|(node, port)| {
-            h.disconnect(node, port);
-        });
         connect
             .into_iter()
             .for_each(|(src_node, src_port, tgt_node, tgt_port)| {
@@ -366,7 +367,7 @@ pub(in crate::hugr::rewrite) mod test {
     ///                ┌────┤ (1) NOT ├──
     ///  ┌─────────┐   │    └─────────┘
     /// ─┤ (0) NOT ├───┤
-    ///  └─────────┘   │               
+    ///  └─────────┘   │
     ///                └─────────────────
     ///
     /// This can be replaced with a single NOT gate, coping the input to the first output.
@@ -757,6 +758,12 @@ pub(in crate::hugr::rewrite) mod test {
         ]
         .into_iter()
         .collect();
+
+        println!("Graph:\n{}", hugr.mermaid_string());
+        println!("Subgraph: {subgraph:?}");
+        println!("Replacement:\n{}", replacement.mermaid_string());
+        println!("nu_inp: {nu_inp:?}");
+        println!("nu_out: {nu_out:?}");
 
         let rewrite = SimpleReplacement {
             subgraph,
