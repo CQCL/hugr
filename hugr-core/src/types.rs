@@ -478,7 +478,7 @@ impl TypeRV {
 // ====== Conversions ======
 impl<RV: MaybeRV> TypeBase<RV> {
     /// (Fallibly) converts a TypeBase (parameterized, so may or may not be able
-    /// to contain [RowVariables]) into a [Type] that definitely does not.
+    /// to contain [RowVariable]s) into a [Type] that definitely does not.
     pub fn try_into_type(self) -> Result<Type, RowVariable> {
         Ok(TypeBase(
             match self.0 {
