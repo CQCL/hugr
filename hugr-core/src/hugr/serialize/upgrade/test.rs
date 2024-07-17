@@ -1,4 +1,11 @@
-use crate::hugr::serialize::test::check_hugr_deserialize;
+use crate::{
+    builder::{DFGBuilder, Dataflow, DataflowHugr},
+    extension::prelude::BOOL_T,
+    hugr::serialize::test::check_hugr_deserialize,
+    std_extensions::logic::NaryLogic,
+    type_row,
+    types::Signature,
+};
 use lazy_static::lazy_static;
 use std::{
     fs::OpenOptions,
@@ -63,4 +70,19 @@ impl TestCase {
 #[test]
 fn empty_hugr() {
     TestCase::new("empty_hugr", Hugr::default()).run();
+}
+
+#[test]
+#[cfg_attr(feature = "extension_inference", ignore = "Fails extension inference")]
+fn hugr_with_named_op() {
+    let mut builder =
+        DFGBuilder::new(Signature::new(type_row![BOOL_T, BOOL_T], type_row![BOOL_T])).unwrap();
+    let [a, b] = builder.input_wires_arr();
+    let x = builder
+        .add_dataflow_op(NaryLogic::And.with_n_inputs(2), [a, b])
+        .unwrap();
+    let h = builder
+        .finish_prelude_hugr_with_outputs(x.outputs())
+        .unwrap();
+    TestCase::new("hugr_with_named_op", h).run();
 }
