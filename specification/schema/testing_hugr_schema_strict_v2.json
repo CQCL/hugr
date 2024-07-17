@@ -417,8 +417,8 @@
                     "title": "Extension",
                     "type": "string"
                 },
-                "op_name": {
-                    "title": "Op Name",
+                "name": {
+                    "title": "Name",
                     "type": "string"
                 },
                 "signature": {
@@ -440,7 +440,7 @@
             "required": [
                 "parent",
                 "extension",
-                "op_name"
+                "name"
             ],
             "title": "CustomOp",
             "type": "object"
