@@ -660,6 +660,8 @@ pub(in crate::hugr::rewrite) mod test {
 
     /// Remove all the NOT gates in [`dfg_hugr_copy_bools`] by connecting the input
     /// directly to the outputs.
+    ///
+    /// https://github.com/CQCL/hugr/issues/1190
     #[rstest]
     fn test_copy_inputs(
         dfg_hugr_copy_bools: (Hugr, Vec<Node>),
@@ -717,6 +719,8 @@ pub(in crate::hugr::rewrite) mod test {
 
     /// Remove one of the NOT gates in [`dfg_hugr_half_not_bools`] by connecting the input
     /// directly to the output.
+    ///
+    /// https://github.com/CQCL/hugr/issues/1323
     #[rstest]
     fn test_half_nots(
         dfg_hugr_half_not_bools: (Hugr, Vec<Node>),
