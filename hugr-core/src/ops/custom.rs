@@ -406,10 +406,7 @@ pub fn resolve_opaque_op(
             ));
         };
         let ext_op = ExtensionOp::new(def.clone(), opaque.args.clone(), extension_registry)?;
-        // ops always require their own extensions, so we do not force OpaqueOps
-        // to add their extension to their signature
-        let opaque_sig = opaque.signature();
-        if opaque_sig != ext_op.signature {
+        if opaque.signature() != ext_op.signature() {
             return Err(CustomOpError::SignatureMismatch {
                 extension: opaque.extension.clone(),
                 op: def.name().clone(),
