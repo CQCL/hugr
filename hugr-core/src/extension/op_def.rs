@@ -11,7 +11,7 @@ use super::{
 
 use crate::ops::{OpName, OpNameRef};
 use crate::types::type_param::{check_type_args, TypeArg, TypeParam};
-use crate::types::{FuncValueType, PolyFuncTypeRV, Signature};
+use crate::types::{FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature};
 use crate::Hugr;
 
 /// Trait necessary for binary computations of OpDef signature
@@ -183,6 +183,12 @@ impl Default for Box<dyn ValidateTypeArgs> {
 impl<T: CustomSignatureFunc + 'static> From<T> for SignatureFunc {
     fn from(v: T) -> Self {
         Self::CustomFunc(Box::new(v))
+    }
+}
+
+impl From<PolyFuncType> for SignatureFunc {
+    fn from(value: PolyFuncType) -> Self {
+        Self::PolyFuncType(CustomValidator::from_polyfunc(value))
     }
 }
 
