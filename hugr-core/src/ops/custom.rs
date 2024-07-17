@@ -294,7 +294,7 @@ pub struct OpaqueOp {
     #[cfg_attr(test, proptest(strategy = "any_nonempty_string()"))]
     description: String, // cache in advance so description() can return &str
     args: Vec<TypeArg>,
-    // note that `signature` may not include `extension`. Thus this field must
+    // note that the `signature` field might not include `extension`. Thus this must
     // remain private, and should be accessed through
     // `DataflowOpTrait::signature`.
     signature: Signature,
