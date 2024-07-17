@@ -167,7 +167,7 @@ mod test {
     use crate::extension::SignatureError;
     use crate::std_extensions::arithmetic::float_types::FLOAT64_TYPE;
     use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
-    use crate::types::{FunctionType, Type, TypeBound};
+    use crate::types::{Signature, Type, TypeBound};
 
     use super::{TypeDef, TypeDefBound};
 
@@ -184,12 +184,12 @@ mod test {
         };
         let typ = Type::new_extension(
             def.instantiate(vec![TypeArg::Type {
-                ty: Type::new_function(FunctionType::new(vec![], vec![])),
+                ty: Type::new_function(Signature::new(vec![], vec![])),
             }])
             .unwrap(),
         );
         assert_eq!(typ.least_upper_bound(), TypeBound::Copyable);
-        let typ2 = Type::new_extension(def.instantiate([TypeArg::Type { ty: USIZE_T }]).unwrap());
+        let typ2 = Type::new_extension(def.instantiate([USIZE_T.into()]).unwrap());
         assert_eq!(typ2.least_upper_bound(), TypeBound::Eq);
 
         // And some bad arguments...firstly, wrong kind of TypeArg:

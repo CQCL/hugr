@@ -30,7 +30,7 @@
 //! # use hugr::builder::{BuildError, BuildHandle, Container, DFGBuilder, Dataflow, DataflowHugr, ModuleBuilder, DataflowSubContainer, HugrBuilder};
 //! use hugr::extension::prelude::BOOL_T;
 //! use hugr::std_extensions::logic::{EXTENSION_ID, LOGIC_REG, NotOp};
-//! use hugr::types::FunctionType;
+//! use hugr::types::Signature;
 //!
 //! # fn doctest() -> Result<(), BuildError> {
 //! let hugr = {
@@ -42,7 +42,7 @@
 //!     let _dfg_handle = {
 //!         let mut dfg = module_builder.define_function(
 //!             "main",
-//!             FunctionType::new_endo(BOOL_T).with_extension_delta(EXTENSION_ID),
+//!             Signature::new_endo(BOOL_T).with_extension_delta(EXTENSION_ID),
 //!         )?;
 //!
 //!         // Get the wires from the function inputs.
@@ -59,7 +59,7 @@
 //!     let _circuit_handle = {
 //!         let mut dfg = module_builder.define_function(
 //!             "circuit",
-//!             FunctionType::new_endo(vec![BOOL_T, BOOL_T])
+//!             Signature::new_endo(vec![BOOL_T, BOOL_T])
 //!                 .with_extension_delta(EXTENSION_ID),
 //!         )?;
 //!         let mut circuit = dfg.as_circuit(dfg.input_wires());
@@ -93,7 +93,7 @@ use crate::hugr::ValidationError;
 use crate::ops::handle::{BasicBlockID, CfgID, ConditionalID, DfgID, FuncID, TailLoopID};
 use crate::ops::{NamedOp, OpType};
 use crate::types::Type;
-use crate::types::{ConstTypeError, FunctionType, TypeRow};
+use crate::types::{ConstTypeError, Signature, TypeRow};
 use crate::{Node, Port, Wire};
 
 pub mod handle;
@@ -124,14 +124,14 @@ pub use circuit::{CircuitBuildError, CircuitBuilder};
 
 /// Return a FunctionType with the same input and output types (specified)
 /// whose extension delta, when used in a non-FuncDefn container, will be inferred.
-pub fn endo_ft(types: impl Into<TypeRow>) -> FunctionType {
-    FunctionType::new_endo(types).with_extension_delta(TO_BE_INFERRED)
+pub fn endo_sig(types: impl Into<TypeRow>) -> Signature {
+    Signature::new_endo(types).with_extension_delta(TO_BE_INFERRED)
 }
 
 /// Return a FunctionType with the specified input and output types
 /// whose extension delta, when used in a non-FuncDefn container, will be inferred.
-pub fn inout_ft(inputs: impl Into<TypeRow>, outputs: impl Into<TypeRow>) -> FunctionType {
-    FunctionType::new(inputs, outputs).with_extension_delta(TO_BE_INFERRED)
+pub fn inout_sig(inputs: impl Into<TypeRow>, outputs: impl Into<TypeRow>) -> Signature {
+    Signature::new(inputs, outputs).with_extension_delta(TO_BE_INFERRED)
 }
 
 #[derive(Debug, Clone, PartialEq, Error)]
@@ -236,7 +236,7 @@ pub(crate) mod test {
     use crate::hugr::{views::HugrView, HugrMut};
     use crate::ops;
     use crate::std_extensions::arithmetic::float_ops::FLOAT_OPS_REGISTRY;
-    use crate::types::{FunctionType, PolyFuncType, Type};
+    use crate::types::{PolyFuncType, Signature, Type};
     use crate::{type_row, Hugr};
 
     use super::handle::BuildHandle;
@@ -272,8 +272,7 @@ pub(crate) mod test {
 
     #[fixture]
     pub(crate) fn simple_dfg_hugr() -> Hugr {
-        let dfg_builder =
-            DFGBuilder::new(FunctionType::new(type_row![BIT], type_row![BIT])).unwrap();
+        let dfg_builder = DFGBuilder::new(Signature::new(type_row![BIT], type_row![BIT])).unwrap();
         let [i1] = dfg_builder.input_wires_arr();
         dfg_builder.finish_prelude_hugr_with_outputs([i1]).unwrap()
     }
@@ -281,7 +280,7 @@ pub(crate) mod test {
     #[fixture]
     pub(crate) fn simple_cfg_hugr() -> Hugr {
         let mut cfg_builder =
-            CFGBuilder::new(FunctionType::new(type_row![NAT], type_row![NAT])).unwrap();
+            CFGBuilder::new(Signature::new(type_row![NAT], type_row![NAT])).unwrap();
         super::cfg::test::build_basic_cfg(&mut cfg_builder).unwrap();
         cfg_builder.finish_prelude_hugr().unwrap()
     }
@@ -289,7 +288,7 @@ pub(crate) mod test {
     /// A helper method which creates a DFG rooted hugr with Input and Output node
     /// only (no wires), given a function type with extension delta.
     // TODO consider taking two type rows and using TO_BE_INFERRED
-    pub(crate) fn closed_dfg_root_hugr(signature: FunctionType) -> Hugr {
+    pub(crate) fn closed_dfg_root_hugr(signature: Signature) -> Hugr {
         let mut hugr = Hugr::new(ops::DFG {
             signature: signature.clone(),
         });

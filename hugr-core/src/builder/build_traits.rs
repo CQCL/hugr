@@ -18,10 +18,8 @@ use crate::{
     types::EdgeKind,
 };
 
-use crate::extension::{
-    ExtensionRegistry, ExtensionSet, SignatureError, PRELUDE_REGISTRY, TO_BE_INFERRED,
-};
-use crate::types::{FunctionType, PolyFuncType, Type, TypeArg, TypeRow};
+use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE_REGISTRY, TO_BE_INFERRED};
+use crate::types::{PolyFuncType, Signature, Type, TypeArg, TypeRow};
 
 use itertools::Itertools;
 
@@ -276,7 +274,7 @@ pub trait Dataflow: Container {
     // TODO: Should this be one function, or should there be a temporary "op" one like with the others?
     fn dfg_builder(
         &mut self,
-        signature: FunctionType,
+        signature: Signature,
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<DFGBuilder<&mut Hugr>, BuildError> {
         let op = ops::DFG {
@@ -297,7 +295,7 @@ pub trait Dataflow: Container {
     ) -> Result<DFGBuilder<&mut Hugr>, BuildError> {
         let (types, input_wires): (Vec<Type>, Vec<Wire>) = inputs.into_iter().unzip();
         self.dfg_builder(
-            FunctionType::new_endo(types).with_extension_delta(TO_BE_INFERRED),
+            Signature::new_endo(types).with_extension_delta(TO_BE_INFERRED),
             input_wires,
         )
     }
@@ -325,7 +323,7 @@ pub trait Dataflow: Container {
         let (cfg_node, _) = add_node_with_wires(
             self,
             ops::CFG {
-                signature: FunctionType::new(inputs.clone(), output_types.clone())
+                signature: Signature::new(inputs.clone(), output_types.clone())
                     .with_extension_delta(extension_delta),
             },
             input_wires,
@@ -658,14 +656,6 @@ fn add_node_with_wires<T: Dataflow + ?Sized>(
     inputs: impl IntoIterator<Item = Wire>,
 ) -> Result<(Node, usize), BuildError> {
     let op = nodetype.into();
-    // Check there are no row variables, as that would prevent us
-    // from indexing into the node's ports in order to wire up
-    op.dataflow_signature()
-        .as_ref()
-        .and_then(FunctionType::find_rowvar)
-        .map_or(Ok(()), |(idx, _)| {
-            Err(SignatureError::RowVarWhereTypeExpected { idx })
-        })?;
     let num_outputs = op.value_output_count();
     let op_node = data_builder.add_child_node(op.clone());
 

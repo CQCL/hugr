@@ -5,6 +5,7 @@ use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 use crate::extension::{ConstFold, ConstFoldResult};
 use crate::ops::constant::ValueName;
 use crate::ops::{OpName, Value};
+use crate::types::{FuncValueType, Signature};
 use crate::{
     extension::{
         prelude::BOOL_T,
@@ -13,10 +14,7 @@ use crate::{
     },
     ops::{self, custom::ExtensionOp, NamedOp},
     type_row,
-    types::{
-        type_param::{TypeArg, TypeParam},
-        FunctionType,
-    },
+    types::type_param::{TypeArg, TypeParam},
     utils::sorted_consts,
     Extension, IncomingPort,
 };
@@ -136,7 +134,7 @@ impl MakeOpDef for NotOp {
     }
 
     fn signature(&self) -> SignatureFunc {
-        FunctionType::new_endo(type_row![BOOL_T]).into()
+        Signature::new_endo(type_row![BOOL_T]).into()
     }
     fn description(&self) -> String {
         "logical 'not'".into()
@@ -164,13 +162,13 @@ fn logic_op_sig() -> impl SignatureFromArgs {
         fn compute_signature(
             &self,
             arg_values: &[TypeArg],
-        ) -> Result<crate::types::PolyFuncType, SignatureError> {
+        ) -> Result<crate::types::PolyFuncTypeRV, SignatureError> {
             // get the number of input booleans.
             let [TypeArg::BoundedNat { n }] = *arg_values else {
                 return Err(SignatureError::InvalidTypeArgs);
             };
             let var_arg_row = vec![BOOL_T; n as usize];
-            Ok(FunctionType::new(var_arg_row, vec![BOOL_T]).into())
+            Ok(FuncValueType::new(var_arg_row, vec![BOOL_T]).into())
         }
 
         fn static_params(&self) -> &[TypeParam] {

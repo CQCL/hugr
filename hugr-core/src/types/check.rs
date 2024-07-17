@@ -2,8 +2,8 @@
 
 use thiserror::Error;
 
-use super::Type;
-use crate::ops::Value;
+use super::{Type, TypeRow};
+use crate::{extension::SignatureError, ops::Value};
 
 /// Errors that arise from typechecking constants
 #[derive(Clone, Debug, PartialEq, Error)]
@@ -20,6 +20,14 @@ pub enum SumTypeError {
         expected: Type,
         /// The value that was found.
         found: Value,
+    },
+    /// The type of the variant we were trying to convert into contained type variables
+    #[error("Sum variant #{tag} contained a variable #{varidx}")]
+    VariantNotConcrete {
+        /// The variant index
+        tag: usize,
+        /// The index (identifier) of the type-variable
+        varidx: usize,
     },
     /// The length of the sum value doesn't match the length of the variant of
     /// the sum type.
@@ -60,6 +68,12 @@ impl super::SumType {
                 tag,
                 num_variants: self.num_variants(),
             })?;
+        let variant: TypeRow = variant.clone().try_into().map_err(|e| {
+            let SignatureError::RowVarWhereTypeExpected { var } = e else {
+                panic!("Unexpected error")
+            };
+            SumTypeError::VariantNotConcrete { tag, varidx: var.0 }
+        })?;
 
         if variant.len() != val.len() {
             Err(SumTypeError::WrongVariantLength {

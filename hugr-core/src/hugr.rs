@@ -304,7 +304,7 @@ mod test {
     use crate::extension::{
         ExtensionId, ExtensionSet, EMPTY_REG, PRELUDE_REGISTRY, TO_BE_INFERRED,
     };
-    use crate::types::{FunctionType, Type};
+    use crate::types::{Signature, Type};
     use crate::{const_extension_ids, ops, test_file, type_row};
     use rstest::rstest;
 
@@ -435,9 +435,9 @@ mod test {
     }
 
     fn build_ext_dfg(parent: ExtensionSet) -> (Hugr, Node) {
-        let ty = Type::new_function(FunctionType::new_endo(type_row![]));
+        let ty = Type::new_function(Signature::new_endo(type_row![]));
         let mut h = Hugr::new(ops::DFG {
-            signature: FunctionType::new_endo(ty.clone()).with_extension_delta(parent.clone()),
+            signature: Signature::new_endo(ty.clone()).with_extension_delta(parent.clone()),
         });
         let root = h.root();
         let mid = add_inliftout(&mut h, root, ty);
@@ -492,7 +492,7 @@ mod test {
         #[case] success: bool,
         #[case] result: impl IntoIterator<Item = ExtensionId>,
     ) {
-        let ty = Type::new_function(FunctionType::new_endo(type_row![]));
+        let ty = Type::new_function(Signature::new_endo(type_row![]));
         let grandparent = ExtensionSet::from_iter(grandparent);
         let result = ExtensionSet::from_iter(result);
         let root_ty = ops::Conditional {
@@ -505,7 +505,7 @@ mod test {
         let p = h.add_node_with_parent(
             h.root(),
             ops::Case {
-                signature: FunctionType::new_endo(ty.clone())
+                signature: Signature::new_endo(ty.clone())
                     .with_extension_delta(ExtensionSet::from_iter(parent)),
             },
         );
@@ -516,7 +516,7 @@ mod test {
         if success {
             assert!(inf_res.is_ok());
             let expected_p = ops::Case {
-                signature: FunctionType::new_endo(ty).with_extension_delta(result.clone()),
+                signature: Signature::new_endo(ty).with_extension_delta(result.clone()),
             };
             let mut expected = backup;
             expected.replace_op(p, expected_p).unwrap();

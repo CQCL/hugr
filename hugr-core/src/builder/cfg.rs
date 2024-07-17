@@ -11,7 +11,7 @@ use crate::{
 };
 use crate::{
     extension::{ExtensionRegistry, ExtensionSet},
-    types::FunctionType,
+    types::Signature,
 };
 use crate::{hugr::views::HugrView, types::TypeRow};
 
@@ -46,17 +46,17 @@ use crate::{hugr::HugrMut, type_row, Hugr};
 ///            +------------+
 /// */
 /// use hugr::{
-///     builder::{BuildError, CFGBuilder, Container, Dataflow, HugrBuilder, endo_ft, inout_ft},
+///     builder::{BuildError, CFGBuilder, Container, Dataflow, HugrBuilder, endo_sig, inout_sig},
 ///     extension::{prelude, ExtensionSet},
 ///     ops, type_row,
-///     types::{FunctionType, SumType, Type},
+///     types::{Signature, SumType, Type},
 ///     Hugr,
 /// };
 ///
 /// const NAT: Type = prelude::USIZE_T;
 ///
 /// fn make_cfg() -> Result<Hugr, BuildError> {
-///     let mut cfg_builder = CFGBuilder::new(FunctionType::new(type_row![NAT], type_row![NAT]))?;
+///     let mut cfg_builder = CFGBuilder::new(Signature::new_endo(NAT))?;
 ///
 ///     // Outputs from basic blocks must be packed in a sum which corresponds to
 ///     // which successor to pick. We'll either choose the first branch and pass
@@ -84,7 +84,7 @@ use crate::{hugr::HugrMut, type_row, Hugr};
 ///     // `NAT` arguments: one from the `sum_variants` type, and another from the
 ///     // entry node's `other_outputs`.
 ///     let mut successor_builder = cfg_builder.simple_block_builder(
-///         inout_ft(type_row![NAT, NAT], NAT),
+///         inout_sig(type_row![NAT, NAT], NAT),
 ///         1, // only one successor to this block
 ///     )?;
 ///     let successor_a = {
@@ -98,7 +98,7 @@ use crate::{hugr::HugrMut, type_row, Hugr};
 ///     };
 ///
 ///     // The only argument to this block is the entry node's `other_outputs`.
-///     let mut successor_builder = cfg_builder.simple_block_builder(endo_ft(NAT), 1)?;
+///     let mut successor_builder = cfg_builder.simple_block_builder(endo_sig(NAT), 1)?;
 ///     let successor_b = {
 ///         let sum_unary = successor_builder.add_load_value(ops::Value::unary_unit_sum());
 ///         let [in_wire] = successor_builder.input_wires_arr();
@@ -151,7 +151,7 @@ impl<H: AsMut<Hugr> + AsRef<Hugr>> SubContainer for CFGBuilder<H> {
 
 impl CFGBuilder<Hugr> {
     /// New CFG rooted HUGR builder
-    pub fn new(signature: FunctionType) -> Result<Self, BuildError> {
+    pub fn new(signature: Signature) -> Result<Self, BuildError> {
         let cfg_op = ops::CFG {
             signature: signature.clone(),
         };
@@ -272,7 +272,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
     /// This function will return an error if there is an error adding the node.
     pub fn simple_block_builder(
         &mut self,
-        signature: FunctionType,
+        signature: Signature,
         n_cases: usize,
     ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
         self.block_builder_exts(
@@ -463,7 +463,7 @@ pub(crate) mod test {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
             let mut func_builder = module_builder
-                .define_function("main", FunctionType::new(vec![NAT], type_row![NAT]))?;
+                .define_function("main", Signature::new(vec![NAT], type_row![NAT]))?;
             let _f_id = {
                 let [int] = func_builder.input_wires_arr();
 
@@ -489,7 +489,7 @@ pub(crate) mod test {
     }
     #[test]
     fn basic_cfg_hugr() -> Result<(), BuildError> {
-        let mut cfg_builder = CFGBuilder::new(FunctionType::new(type_row![NAT], type_row![NAT]))?;
+        let mut cfg_builder = CFGBuilder::new(Signature::new(type_row![NAT], type_row![NAT]))?;
         build_basic_cfg(&mut cfg_builder)?;
         assert_matches!(cfg_builder.finish_prelude_hugr(), Ok(_));
 
@@ -511,8 +511,8 @@ pub(crate) mod test {
             let sum = entry_b.make_sum(1, sum2_variants, [inw])?;
             entry_b.finish_with_outputs(sum, [])?
         };
-        let mut middle_b = cfg_builder
-            .simple_block_builder(FunctionType::new(type_row![NAT], type_row![NAT]), 1)?;
+        let mut middle_b =
+            cfg_builder.simple_block_builder(Signature::new(type_row![NAT], type_row![NAT]), 1)?;
         let middle = {
             let c = middle_b.add_load_const(ops::Value::unary_unit_sum());
             let [inw] = middle_b.input_wires_arr();
@@ -526,7 +526,7 @@ pub(crate) mod test {
     }
     #[test]
     fn test_dom_edge() -> Result<(), BuildError> {
-        let mut cfg_builder = CFGBuilder::new(FunctionType::new(type_row![NAT], type_row![NAT]))?;
+        let mut cfg_builder = CFGBuilder::new(Signature::new(type_row![NAT], type_row![NAT]))?;
         let sum_tuple_const = cfg_builder.add_constant(ops::Value::unary_unit_sum());
         let sum_variants = vec![type_row![]];
 
@@ -542,7 +542,7 @@ pub(crate) mod test {
             entry_b.finish_with_outputs(sum, [])?
         };
         let mut middle_b =
-            cfg_builder.simple_block_builder(FunctionType::new(type_row![], type_row![NAT]), 1)?;
+            cfg_builder.simple_block_builder(Signature::new(type_row![], type_row![NAT]), 1)?;
         let middle = {
             let c = middle_b.load_const(&sum_tuple_const);
             middle_b.finish_with_outputs(c, [inw])?
@@ -557,11 +557,11 @@ pub(crate) mod test {
 
     #[test]
     fn test_non_dom_edge() -> Result<(), BuildError> {
-        let mut cfg_builder = CFGBuilder::new(FunctionType::new(type_row![NAT], type_row![NAT]))?;
+        let mut cfg_builder = CFGBuilder::new(Signature::new(type_row![NAT], type_row![NAT]))?;
         let sum_tuple_const = cfg_builder.add_constant(ops::Value::unary_unit_sum());
         let sum_variants = vec![type_row![]];
-        let mut middle_b = cfg_builder
-            .simple_block_builder(FunctionType::new(type_row![NAT], type_row![NAT]), 1)?;
+        let mut middle_b =
+            cfg_builder.simple_block_builder(Signature::new(type_row![NAT], type_row![NAT]), 1)?;
         let [inw] = middle_b.input_wires_arr();
         let middle = {
             let c = middle_b.load_const(&sum_tuple_const);

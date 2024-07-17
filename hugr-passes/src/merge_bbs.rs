@@ -161,14 +161,14 @@ mod test {
     use itertools::Itertools;
     use rstest::rstest;
 
-    use hugr_core::builder::{endo_ft, inout_ft, CFGBuilder, DFGWrapper, Dataflow, HugrBuilder};
+    use hugr_core::builder::{endo_sig, inout_sig, CFGBuilder, DFGWrapper, Dataflow, HugrBuilder};
     use hugr_core::extension::prelude::{ConstUsize, PRELUDE_ID, QB_T, USIZE_T};
     use hugr_core::extension::{ExtensionRegistry, PRELUDE, PRELUDE_REGISTRY};
     use hugr_core::hugr::views::sibling::SiblingMut;
     use hugr_core::ops::constant::Value;
     use hugr_core::ops::handle::CfgID;
     use hugr_core::ops::{Lift, LoadConstant, Noop, OpTrait, OpType};
-    use hugr_core::types::{FunctionType, Type, TypeRow};
+    use hugr_core::types::{Signature, Type, TypeRow};
     use hugr_core::{const_extension_ids, type_row, Extension, Hugr, HugrView, Wire};
 
     use super::merge_basic_blocks;
@@ -182,7 +182,7 @@ mod test {
         e.add_op(
             "Test".into(),
             String::new(),
-            FunctionType::new(
+            Signature::new(
                 type_row![QB_T, USIZE_T],
                 TypeRow::from(vec![Type::new_sum(vec![
                     type_row![QB_T],
@@ -197,7 +197,10 @@ mod test {
     fn lifted_unary_unit_sum<B: AsMut<Hugr> + AsRef<Hugr>, T>(b: &mut DFGWrapper<B, T>) -> Wire {
         let lc = b.add_load_value(Value::unary_unit_sum());
         let lift = b
-            .add_dataflow_op(Lift::new(Type::new_unit_sum(1).into(), PRELUDE_ID), [lc])
+            .add_dataflow_op(
+                Lift::new(type_row![Type::new_unit_sum(1)], PRELUDE_ID),
+                [lc],
+            )
             .unwrap();
         let [w] = lift.outputs_arr();
         w
@@ -223,7 +226,7 @@ mod test {
         let e = extension();
         let tst_op = e.instantiate_extension_op("Test", [], &PRELUDE_REGISTRY)?;
         let reg = ExtensionRegistry::try_new([PRELUDE.to_owned(), e])?;
-        let mut h = CFGBuilder::new(inout_ft(loop_variants.clone(), exit_types.clone()))?;
+        let mut h = CFGBuilder::new(inout_sig(loop_variants.clone(), exit_types.clone()))?;
         let mut no_b1 = h.simple_entry_builder_exts(loop_variants.clone(), 1, PRELUDE_ID)?;
         let n = no_b1.add_dataflow_op(Noop::new(QB_T), no_b1.input_wires())?;
         let br = lifted_unary_unit_sum(&mut no_b1);
@@ -242,7 +245,7 @@ mod test {
         let loop_backedge_target = if self_loop {
             no_b1
         } else {
-            let mut no_b2 = h.simple_block_builder(endo_ft(loop_variants), 1)?;
+            let mut no_b2 = h.simple_block_builder(endo_sig(loop_variants), 1)?;
             let n = no_b2.add_dataflow_op(Noop::new(QB_T), no_b2.input_wires())?;
             let br = lifted_unary_unit_sum(&mut no_b2);
             let nid = no_b2.finish_with_outputs(br, n.outputs())?;
@@ -318,7 +321,7 @@ mod test {
             .into_owned()
             .try_into()
             .unwrap();
-        let mut h = CFGBuilder::new(inout_ft(QB_T, res_t.clone()))?;
+        let mut h = CFGBuilder::new(inout_sig(QB_T, res_t.clone()))?;
         let mut bb1 = h.simple_entry_builder(type_row![USIZE_T, QB_T], 1)?;
         let [inw] = bb1.input_wires_arr();
         let load_cst = bb1.add_load_value(ConstUsize::new(1));

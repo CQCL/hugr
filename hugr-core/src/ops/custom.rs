@@ -14,7 +14,7 @@ use crate::extension::{ConstFoldResult, ExtensionId, ExtensionRegistry, OpDef, S
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::HugrView;
 use crate::types::EdgeKind;
-use crate::types::{type_param::TypeArg, FunctionType};
+use crate::types::{type_param::TypeArg, Signature};
 use crate::{ops, Hugr, IncomingPort, Node};
 
 use super::dataflow::DataflowOpTrait;
@@ -132,7 +132,7 @@ impl DataflowOpTrait for CustomOp {
     }
 
     /// The signature of the operation.
-    fn signature(&self) -> FunctionType {
+    fn signature(&self) -> Signature {
         match self {
             Self::Opaque(op) => op.signature(),
             Self::Extension(ext_op) => ext_op.signature(),
@@ -181,7 +181,7 @@ pub struct ExtensionOp {
     )]
     def: Arc<OpDef>,
     args: Vec<TypeArg>,
-    signature: FunctionType, // Cache
+    signature: Signature, // Cache
 }
 
 impl ExtensionOp {
@@ -271,7 +271,7 @@ impl DataflowOpTrait for ExtensionOp {
         self.def().description()
     }
 
-    fn signature(&self) -> FunctionType {
+    fn signature(&self) -> Signature {
         self.signature.clone()
     }
 }
@@ -297,7 +297,7 @@ pub struct OpaqueOp {
     // note that `signature` may not include `extension`. Thus this field must
     // remain private, and should be accessed through
     // `DataflowOpTrait::signature`.
-    signature: FunctionType,
+    signature: Signature,
 }
 
 fn qualify_name(res_id: &ExtensionId, op_name: &OpNameRef) -> OpName {
@@ -311,7 +311,7 @@ impl OpaqueOp {
         op_name: impl Into<OpName>,
         description: String,
         args: impl Into<Vec<TypeArg>>,
-        signature: FunctionType,
+        signature: Signature,
     ) -> Self {
         Self {
             extension,
@@ -353,7 +353,7 @@ impl DataflowOpTrait for OpaqueOp {
         &self.description
     }
 
-    fn signature(&self) -> FunctionType {
+    fn signature(&self) -> Signature {
         self.signature
             .clone()
             .with_extension_delta(self.extension().clone())
@@ -434,8 +434,8 @@ pub enum CustomOpError {
     SignatureMismatch {
         extension: ExtensionId,
         op: OpName,
-        stored: FunctionType,
-        computed: FunctionType,
+        stored: Signature,
+        computed: Signature,
     },
     /// An error in computing the signature of the ExtensionOp
     #[error(transparent)]
@@ -457,7 +457,7 @@ mod test {
 
     #[test]
     fn new_opaque_op() {
-        let sig = FunctionType::new_endo(vec![QB_T]);
+        let sig = Signature::new_endo(vec![QB_T]);
         let op: CustomOp = OpaqueOp::new(
             "res".try_into().unwrap(),
             "op",
@@ -486,7 +486,7 @@ mod test {
             "itobool",
             "description".into(),
             vec![],
-            FunctionType::new(i0.clone(), BOOL_T),
+            Signature::new(i0.clone(), BOOL_T),
         );
         let resolved =
             super::resolve_opaque_op(Node::from(portgraph::NodeIndex::new(1)), &opaque, registry)

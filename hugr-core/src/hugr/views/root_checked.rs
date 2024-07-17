@@ -75,12 +75,12 @@ mod test {
     use crate::hugr::{HugrError, HugrMut};
     use crate::ops::handle::{BasicBlockID, CfgID, DataflowParentID, DfgID};
     use crate::ops::{DataflowBlock, MakeTuple, OpTag, OpType};
-    use crate::{ops, type_row, types::FunctionType, Hugr, HugrView};
+    use crate::{ops, type_row, types::Signature, Hugr, HugrView};
 
     #[test]
     fn root_checked() {
         let root_type: OpType = ops::DFG {
-            signature: FunctionType::new(vec![], vec![]),
+            signature: Signature::new(vec![], vec![]),
         }
         .into();
         let mut h = Hugr::new(root_type.clone());

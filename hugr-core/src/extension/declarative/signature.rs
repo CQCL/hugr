@@ -12,9 +12,9 @@ use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 
 use crate::extension::prelude::PRELUDE_ID;
-use crate::extension::{CustomValidator, ExtensionSet, SignatureFunc, TypeDef};
+use crate::extension::{ExtensionSet, SignatureFunc, TypeDef};
 use crate::types::type_param::TypeParam;
-use crate::types::{CustomType, FunctionType, PolyFuncType, Type, TypeRow};
+use crate::types::{CustomType, FuncValueType, PolyFuncTypeRV, Type, TypeRowRV};
 use crate::Extension;
 
 use super::{DeclarationContext, ExtensionDeclarationError};
@@ -41,7 +41,7 @@ impl SignatureDeclaration {
         op_params: &[TypeParam],
     ) -> Result<SignatureFunc, ExtensionDeclarationError> {
         let make_type_row =
-            |v: &[SignaturePortDeclaration]| -> Result<TypeRow, ExtensionDeclarationError> {
+            |v: &[SignaturePortDeclaration]| -> Result<TypeRowRV, ExtensionDeclarationError> {
                 let types = v
                     .iter()
                     .map(|port_decl| port_decl.make_types(ext, ctx, op_params))
@@ -50,16 +50,14 @@ impl SignatureDeclaration {
                 Ok(types.into())
             };
 
-        let body = FunctionType {
+        let body = FuncValueType {
             input: make_type_row(&self.inputs)?,
             output: make_type_row(&self.outputs)?,
             extension_reqs: self.extensions.clone(),
         };
 
-        let poly_func = PolyFuncType::new(op_params, body);
-        Ok(SignatureFunc::TypeScheme(CustomValidator::from_polyfunc(
-            poly_func,
-        )))
+        let poly_func = PolyFuncTypeRV::new(op_params, body);
+        Ok(poly_func.into())
     }
 }
 

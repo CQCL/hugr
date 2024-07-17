@@ -257,7 +257,7 @@ mod test {
     use crate::hugr::HugrMut;
     use crate::ops::constant::Value;
     use crate::ops::handle::{BasicBlockID, CfgID, ConstID, NodeHandle};
-    use crate::types::FunctionType;
+    use crate::types::Signature;
     use crate::{type_row, Hugr, HugrView, Node};
     use cool_asserts::assert_matches;
     use itertools::Itertools;
@@ -278,7 +278,7 @@ mod test {
     }
     impl CondThenLoopCfg {
         fn new() -> Result<CondThenLoopCfg, BuildError> {
-            let block_ty = FunctionType::new_endo(USIZE_T);
+            let block_ty = Signature::new_endo(USIZE_T);
             let mut cfg_builder = CFGBuilder::new(block_ty.clone())?;
             let pred_const = cfg_builder.add_constant(Value::unit_sum(0, 2).expect("0 < 2"));
             let const_unit = cfg_builder.add_constant(Value::unary_unit_sum());
@@ -311,7 +311,7 @@ mod test {
             let head = id_block(&mut cfg_builder)?;
             cfg_builder.branch(&merge, 0, &head)?;
             let tail = n_identity(
-                cfg_builder.simple_block_builder(FunctionType::new_endo(USIZE_T), 2)?,
+                cfg_builder.simple_block_builder(Signature::new_endo(USIZE_T), 2)?,
                 &pred_const,
             )?;
             cfg_builder.branch(&tail, 1, &head)?;
@@ -441,7 +441,7 @@ mod test {
         let mut fbuild = module_builder
             .define_function(
                 "main",
-                FunctionType::new(type_row![USIZE_T], type_row![USIZE_T]),
+                Signature::new(type_row![USIZE_T], type_row![USIZE_T]),
             )
             .unwrap();
         let [i1] = fbuild.input_wires_arr();
