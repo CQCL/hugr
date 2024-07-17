@@ -476,20 +476,28 @@ impl TypeRV {
 }
 
 // ====== Conversions ======
-impl TryFrom<TypeRV> for Type {
-    type Error = RowVariable;
-    fn try_from(value: TypeRV) -> Result<Self, RowVariable> {
-        Ok(Self(
-            match value.0 {
+impl<RV: MaybeRV> TypeBase<RV> {
+    /// (Fallibly) converts a TypeBase (parameterized, so may or may not be able
+    /// to contain [RowVariables]) into a [Type] that definitely does not.
+    pub fn try_into_type(self) -> Result<Type, RowVariable> {
+        Ok(TypeBase(
+            match self.0 {
                 TypeEnum::Extension(e) => TypeEnum::Extension(e),
                 TypeEnum::Alias(a) => TypeEnum::Alias(a),
                 TypeEnum::Function(f) => TypeEnum::Function(f),
                 TypeEnum::Variable(idx, bound) => TypeEnum::Variable(idx, bound),
-                TypeEnum::RowVar(rv) => return Err(rv.as_rv().clone()),
+                TypeEnum::RowVar(rv) => Err(rv.as_rv().clone())?,
                 TypeEnum::Sum(s) => TypeEnum::Sum(s),
             },
-            value.1,
+            self.1,
         ))
+    }
+}
+
+impl TryFrom<TypeRV> for Type {
+    type Error = RowVariable;
+    fn try_from(value: TypeRV) -> Result<Self, RowVariable> {
+        value.try_into_type()
     }
 }
 
