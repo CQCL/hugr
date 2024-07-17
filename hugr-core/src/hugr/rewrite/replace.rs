@@ -643,38 +643,56 @@ mod test {
     }
 
     #[test]
-    fn test_invalid() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_invalid() {
+        let unknown_ext: ExtensionId = "unknown_ext".try_into().unwrap();
         let utou = FunctionType::new_endo(vec![USIZE_T]);
         let mk_op = |s| {
             CustomOp::new_opaque(OpaqueOp::new(
-                ExtensionId::new("unknown_ext").unwrap(),
+                unknown_ext.clone(),
                 s,
                 String::new(),
                 vec![],
                 utou.clone(),
             ))
         };
-        let mut h = DFGBuilder::new(FunctionType::new(
-            type_row![USIZE_T, BOOL_T],
-            type_row![USIZE_T],
-        ))?;
+        let mut h = DFGBuilder::new(
+            FunctionType::new(type_row![USIZE_T, BOOL_T], type_row![USIZE_T])
+                .with_extension_delta(unknown_ext.clone()),
+        )
+        .unwrap();
         let [i, b] = h.input_wires_arr();
-        let mut cond = h.conditional_builder(
-            (vec![type_row![]; 2], b),
-            [(USIZE_T, i)],
-            type_row![USIZE_T],
-        )?;
-        let mut case1 = cond.case_builder(0)?;
-        let foo = case1.add_dataflow_op(mk_op("foo"), case1.input_wires())?;
-        let case1 = case1.finish_with_outputs(foo.outputs())?.node();
-        let mut case2 = cond.case_builder(1)?;
-        let bar = case2.add_dataflow_op(mk_op("bar"), case2.input_wires())?;
-        let mut baz_dfg = case2.dfg_builder(utou.clone(), bar.outputs())?;
-        let baz = baz_dfg.add_dataflow_op(mk_op("baz"), baz_dfg.input_wires())?;
-        let baz_dfg = baz_dfg.finish_with_outputs(baz.outputs())?;
-        let case2 = case2.finish_with_outputs(baz_dfg.outputs())?.node();
-        let cond = cond.finish_sub_container()?;
-        let h = h.finish_hugr_with_outputs(cond.outputs(), &PRELUDE_REGISTRY)?;
+        let mut cond = h
+            .conditional_builder_exts(
+                (vec![type_row![]; 2], b),
+                [(USIZE_T, i)],
+                type_row![USIZE_T],
+                unknown_ext.clone(),
+            )
+            .unwrap();
+        let mut case1 = cond.case_builder(0).unwrap();
+        let foo = case1
+            .add_dataflow_op(mk_op("foo"), case1.input_wires())
+            .unwrap();
+        let case1 = case1.finish_with_outputs(foo.outputs()).unwrap().node();
+        let mut case2 = cond.case_builder(1).unwrap();
+        let bar = case2
+            .add_dataflow_op(mk_op("bar"), case2.input_wires())
+            .unwrap();
+        let mut baz_dfg = case2
+            .dfg_builder(
+                utou.clone().with_extension_delta(unknown_ext.clone()),
+                bar.outputs(),
+            )
+            .unwrap();
+        let baz = baz_dfg
+            .add_dataflow_op(mk_op("baz"), baz_dfg.input_wires())
+            .unwrap();
+        let baz_dfg = baz_dfg.finish_with_outputs(baz.outputs()).unwrap();
+        let case2 = case2.finish_with_outputs(baz_dfg.outputs()).unwrap().node();
+        let cond = cond.finish_sub_container().unwrap();
+        let h = h
+            .finish_hugr_with_outputs(cond.outputs(), &PRELUDE_REGISTRY)
+            .unwrap();
 
         let mut r_hugr = Hugr::new(h.get_optype(cond.node()).clone());
         let r1 = r_hugr.add_node_with_parent(
@@ -701,7 +719,7 @@ mod test {
         rep.verify(&h).unwrap();
         {
             let mut target = h.clone();
-            let node_map = rep.clone().apply(&mut target)?;
+            let node_map = rep.clone().apply(&mut target).unwrap();
             let new_case2 = *node_map.get(&r2).unwrap();
             assert_eq!(target.get_parent(baz.node()), Some(new_case2));
         }
@@ -716,7 +734,8 @@ mod test {
         // Root node type needs to be that of common parent of the removed nodes:
         let mut rep2 = rep.clone();
         rep2.replacement
-            .replace_op(rep2.replacement.root(), h.root_type().clone())?;
+            .replace_op(rep2.replacement.root(), h.root_type().clone())
+            .unwrap();
         assert_eq!(
             check_same_errors(rep2),
             ReplaceError::WrongRootNodeTag {
@@ -815,6 +834,5 @@ mod test {
             }),
             ReplaceError::BadEdgeKind(Direction::Outgoing, new_out_edge)
         );
-        Ok(())
     }
 }

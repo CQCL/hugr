@@ -447,7 +447,6 @@ pub enum CustomOpError {
 
 #[cfg(test)]
 mod test {
-    
 
     use crate::{
         extension::prelude::{BOOL_T, QB_T, USIZE_T},
