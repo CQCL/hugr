@@ -242,6 +242,7 @@ mod test {
     use super::*;
     use cool_asserts::assert_matches;
 
+    use crate::extension::{ExtensionId, ExtensionSet};
     use crate::std_extensions::arithmetic::float_types::{self, ConstF64};
     use crate::utils::test_quantum_extension::{
         self, cx_gate, h_gate, measure, q_alloc, q_discard, rz_f64,
@@ -295,8 +296,9 @@ mod test {
 
     #[test]
     fn with_nonlinear_and_outputs() {
+        let missing_ext: ExtensionId = "MissingExt".try_into().unwrap();
         let my_custom_op = CustomOp::new_opaque(OpaqueOp::new(
-            "MissingRsrc".try_into().unwrap(),
+            missing_ext.clone(),
             "MyOp",
             "unknown op".to_string(),
             vec![],
@@ -304,7 +306,10 @@ mod test {
         ));
         let build_res = build_main(
             Signature::new(type_row![QB, QB, NAT], type_row![QB, QB, BOOL_T])
-                .with_extension_delta(test_quantum_extension::EXTENSION_ID)
+                .with_extension_delta(ExtensionSet::from_iter([
+                    test_quantum_extension::EXTENSION_ID,
+                    missing_ext,
+                ]))
                 .into(),
             |mut f_build| {
                 let [q0, q1, angle]: [Wire; 3] = f_build.input_wires_arr();

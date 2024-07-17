@@ -14,7 +14,7 @@ from hugr import tys
 from hugr.hugr import Hugr
 from hugr.ops import AsCustomOp, Command, Custom, DataflowOp
 from hugr.serialization.serial_hugr import SerialHugr
-from hugr.std.float import FLOAT_EXT_ID, FLOAT_T
+from hugr.std.float import FLOAT_T
 
 if TYPE_CHECKING:
     from hugr.ops import ComWire
@@ -48,7 +48,7 @@ class OneQbGate(AsCustomOp):
     def to_custom(self) -> Custom:
         return Custom(
             self._enum.value,
-            tys.FunctionType.endo([tys.Qubit], extension_reqs=[QUANTUM_EXTENSION_ID]),
+            tys.FunctionType.endo([tys.Qubit]),
             extension=QUANTUM_EXTENSION_ID,
         )
 
@@ -70,9 +70,7 @@ class TwoQbGate(AsCustomOp):
     def to_custom(self) -> Custom:
         return Custom(
             self._enum.value,
-            tys.FunctionType.endo(
-                [tys.Qubit] * 2, extension_reqs=[QUANTUM_EXTENSION_ID]
-            ),
+            tys.FunctionType.endo([tys.Qubit] * 2),
             extension=QUANTUM_EXTENSION_ID,
         )
 
@@ -92,11 +90,7 @@ class MeasureDef(AsCustomOp):
     def to_custom(self) -> Custom:
         return Custom(
             "Measure",
-            tys.FunctionType(
-                [tys.Qubit],
-                [tys.Qubit, tys.Bool],
-                extension_reqs=[QUANTUM_EXTENSION_ID],
-            ),
+            tys.FunctionType([tys.Qubit], [tys.Qubit, tys.Bool]),
             extension=QUANTUM_EXTENSION_ID,
         )
 
@@ -112,11 +106,7 @@ class RzDef(AsCustomOp):
     def to_custom(self) -> Custom:
         return Custom(
             "Rz",
-            tys.FunctionType(
-                [tys.Qubit, FLOAT_T],
-                [tys.Qubit],
-                extension_reqs=[QUANTUM_EXTENSION_ID, FLOAT_EXT_ID],
-            ),
+            tys.FunctionType([tys.Qubit, FLOAT_T], [tys.Qubit]),
             extension=QUANTUM_EXTENSION_ID,
         )
 

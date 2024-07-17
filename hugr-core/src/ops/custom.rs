@@ -134,7 +134,7 @@ impl DataflowOpTrait for CustomOp {
     /// The signature of the operation.
     fn signature(&self) -> Signature {
         match self {
-            Self::Opaque(op) => op.signature.clone(),
+            Self::Opaque(op) => op.signature(),
             Self::Extension(ext_op) => ext_op.signature(),
         }
     }
@@ -276,7 +276,15 @@ impl DataflowOpTrait for ExtensionOp {
     }
 }
 
-/// An opaquely-serialized op that refers to an as-yet-unresolved [`OpDef`]
+/// An opaquely-serialized op that refers to an as-yet-unresolved [`OpDef`].
+///
+/// All [CustomOp]s are serialised as `OpaqueOp`s.
+///
+/// The signature of a [CustomOp] always includes that op's extension. We do not
+/// require that the `signature` field of [OpaqueOp] contains `extension`,
+/// instead we are careful to add it whenever we look at the `signature` of an
+/// `OpaqueOp`. This is a small efficiency in serialisation and allows us to
+/// be more liberal in deserialisation.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(test, derive(Arbitrary))]
 pub struct OpaqueOp {
@@ -286,6 +294,9 @@ pub struct OpaqueOp {
     #[cfg_attr(test, proptest(strategy = "any_nonempty_string()"))]
     description: String, // cache in advance so description() can return &str
     args: Vec<TypeArg>,
+    // note that the `signature` field might not include `extension`. Thus this must
+    // remain private, and should be accessed through
+    // `DataflowOpTrait::signature`.
     signature: Signature,
 }
 
@@ -343,7 +354,9 @@ impl DataflowOpTrait for OpaqueOp {
     }
 
     fn signature(&self) -> Signature {
-        self.signature.clone()
+        self.signature
+            .clone()
+            .with_extension_delta(self.extension().clone())
     }
 }
 
@@ -392,9 +405,8 @@ pub fn resolve_opaque_op(
                 r.name().clone(),
             ));
         };
-        let ext_op =
-            ExtensionOp::new(def.clone(), opaque.args.clone(), extension_registry).unwrap();
-        if opaque.signature != ext_op.signature {
+        let ext_op = ExtensionOp::new(def.clone(), opaque.args.clone(), extension_registry)?;
+        if opaque.signature() != ext_op.signature() {
             return Err(CustomOpError::SignatureMismatch {
                 extension: opaque.extension.clone(),
                 op: def.name().clone(),
@@ -425,10 +437,14 @@ pub enum CustomOpError {
         stored: Signature,
         computed: Signature,
     },
+    /// An error in computing the signature of the ExtensionOp
+    #[error(transparent)]
+    SignatureError(#[from] SignatureError),
 }
 
 #[cfg(test)]
 mod test {
+
     use crate::{
         extension::prelude::{BOOL_T, QB_T, USIZE_T},
         std_extensions::arithmetic::{
@@ -453,13 +469,15 @@ mod test {
         assert_eq!(op.name(), "res.op");
         assert_eq!(DataflowOpTrait::description(&op), "desc");
         assert_eq!(op.args(), &[TypeArg::Type { ty: USIZE_T }]);
-        assert_eq!(op.signature(), sig);
+        assert_eq!(
+            op.signature(),
+            sig.with_extension_delta(op.extension().clone())
+        );
         assert!(op.is_opaque());
         assert!(!op.is_extension_op());
     }
 
     #[test]
-    #[should_panic] // https://github.com/CQCL/hugr/issues/1315
     fn resolve_opaque_op() {
         let registry = &INT_OPS_REGISTRY;
         let i0 = &INT_TYPES[0];
