@@ -504,7 +504,7 @@ class CustomOp(DataflowOp):
 
     op: Literal["CustomOp"] = "CustomOp"
     extension: ExtensionId
-    op_name: str
+    name: str
     signature: stys.FunctionType = Field(default_factory=stys.FunctionType.empty)
     description: str = ""
     args: list[stys.TypeArg] = Field(default_factory=list)
@@ -513,12 +513,12 @@ class CustomOp(DataflowOp):
         self.signature = stys.FunctionType(input=list(in_types), output=list(out_types))
 
     def display_name(self) -> str:
-        return self.op_name
+        return self.name
 
     def deserialize(self) -> ops.Custom:
         return ops.Custom(
             extension=self.extension,
-            op_name=self.op_name,
+            name=self.name,
             signature=self.signature.deserialize(),
             args=deser_it(self.args),
         )

@@ -57,7 +57,7 @@ OPS_EXTENSION: tys.ExtensionId = "arithmetic.int"
 class _DivModDef(AsCustomOp):
     """DivMod operation, has two inputs and two outputs."""
 
-    op_name: ClassVar[str] = "idivmod_u"
+    name: ClassVar[str] = "idivmod_u"
     arg1: int = 5
     arg2: int = 5
 

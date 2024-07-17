@@ -26,11 +26,8 @@ E = TypeVar("E", bound=Enum)
 
 
 def _load_enum(enum_cls: type[E], custom: Custom) -> E | None:
-    if (
-        custom.extension == QUANTUM_EXTENSION_ID
-        and custom.op_name in enum_cls.__members__
-    ):
-        return enum_cls(custom.op_name)
+    if custom.extension == QUANTUM_EXTENSION_ID and custom.name in enum_cls.__members__:
+        return enum_cls(custom.name)
     return None
 
 
