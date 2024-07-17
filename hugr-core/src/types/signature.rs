@@ -5,7 +5,8 @@ use itertools::Either;
 use std::fmt::{self, Display, Write};
 
 use super::type_param::TypeParam;
-use super::{Substitution, Type, TypeBound, TypeEnum, TypeRow};
+use super::type_row::TypeRowBase;
+use super::{MaybeRV, NoRV, RowVariable, Substitution, Type, TypeRow};
 
 use crate::core::PortIndex;
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
@@ -14,75 +15,122 @@ use crate::{Direction, IncomingPort, OutgoingPort, Port};
 #[cfg(test)]
 use {crate::proptest::RecursionDepth, ::proptest::prelude::*, proptest_derive::Arbitrary};
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(test, derive(Arbitrary), proptest(params = "RecursionDepth"))]
-/// Describes the edges required to/from a node, and thus, also the type of a [Graph].
-/// This includes both the concept of "signature" in the spec,
-/// and also the target (value) of a call (static).
+/// Describes the edges required to/from a node or inside a [FuncDefn] (when ROWVARS=[NoRV]);
+/// or (when ROWVARS=[RowVariable]) the type of a higher-order [function value] or the inputs/outputs from an OpDef
 ///
-/// [Graph]: crate::ops::constant::Value::Function
-pub struct FunctionType {
+/// ROWVARS specifies whether it may contain [RowVariable]s or not.
+///
+/// [function value]: crate::ops::constant::Value::Function
+/// [FuncDefn]: crate::ops::FuncDefn
+pub struct FuncTypeBase<ROWVARS: MaybeRV> {
     /// Value inputs of the function.
-    #[cfg_attr(test, proptest(strategy = "any_with::<TypeRow>(params)"))]
-    pub input: TypeRow,
+    #[cfg_attr(test, proptest(strategy = "any_with::<TypeRowBase<ROWVARS>>(params)"))]
+    pub input: TypeRowBase<ROWVARS>,
     /// Value outputs of the function.
-    #[cfg_attr(test, proptest(strategy = "any_with::<TypeRow>(params)"))]
-    pub output: TypeRow,
+    #[cfg_attr(test, proptest(strategy = "any_with::<TypeRowBase<ROWVARS>>(params)"))]
+    pub output: TypeRowBase<ROWVARS>,
     /// The extension requirements which are added by the operation
     pub extension_reqs: ExtensionSet,
 }
 
-impl FunctionType {
+/// The concept of "signature" in the spec - the edges required to/from a node
+/// or within a [FuncDefn], also the target (value) of a call (static).
+///
+/// [FuncDefn]: crate::ops::FuncDefn
+pub type Signature = FuncTypeBase<NoRV>;
+
+/// A function that may contain [RowVariable]s and thus has potentially-unknown arity;
+/// used for [OpDef]'s and passable as a value round a Hugr (see [Type::new_function])
+/// but not a valid node type.
+///
+/// [OpDef]: crate::extension::OpDef
+pub type FuncValueType = FuncTypeBase<RowVariable>;
+
+impl<RV: MaybeRV> FuncTypeBase<RV> {
     /// Builder method, add extension_reqs to an FunctionType
     pub fn with_extension_delta(mut self, rs: impl Into<ExtensionSet>) -> Self {
         self.extension_reqs = self.extension_reqs.union(rs.into());
         self
     }
 
-    pub(super) fn validate_var_len(
-        &self,
-        extension_registry: &ExtensionRegistry,
-        var_decls: &[TypeParam],
-    ) -> Result<(), SignatureError> {
-        self.input.validate_var_len(extension_registry, var_decls)?;
-        self.output
-            .validate_var_len(extension_registry, var_decls)?;
-        self.extension_reqs.validate(var_decls)
-    }
-
     pub(crate) fn substitute(&self, tr: &Substitution) -> Self {
-        FunctionType {
+        Self {
             input: self.input.substitute(tr),
             output: self.output.substitute(tr),
             extension_reqs: self.extension_reqs.substitute(tr),
         }
     }
-}
 
-impl FunctionType {
-    /// The number of wires in the signature.
-    #[inline(always)]
-    pub fn is_empty(&self) -> bool {
-        self.input.is_empty() && self.output.is_empty()
-    }
-}
-
-impl FunctionType {
     /// Create a new signature with specified inputs and outputs.
-    pub fn new(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Self {
+    pub fn new(input: impl Into<TypeRowBase<RV>>, output: impl Into<TypeRowBase<RV>>) -> Self {
         Self {
             input: input.into(),
             output: output.into(),
             extension_reqs: ExtensionSet::new(),
         }
     }
+
     /// Create a new signature with the same input and output types (signature of an endomorphic
     /// function).
-    pub fn new_endo(linear: impl Into<TypeRow>) -> Self {
-        let linear = linear.into();
-        Self::new(linear.clone(), linear)
+    pub fn new_endo(row: impl Into<TypeRowBase<RV>>) -> Self {
+        let row = row.into();
+        Self::new(row.clone(), row)
     }
 
+    /// True if both inputs and outputs are necessarily empty.
+    /// (For [FuncValueType], even after any possible substitution of row variables)
+    #[inline(always)]
+    pub fn is_empty(&self) -> bool {
+        self.input.is_empty() && self.output.is_empty()
+    }
+
+    #[inline]
+    /// Returns a row of the value inputs of the function.
+    pub fn input(&self) -> &TypeRowBase<RV> {
+        &self.input
+    }
+
+    #[inline]
+    /// Returns a row of the value outputs of the function.
+    pub fn output(&self) -> &TypeRowBase<RV> {
+        &self.output
+    }
+
+    pub(super) fn validate(
+        &self,
+        extension_registry: &ExtensionRegistry,
+        var_decls: &[TypeParam],
+    ) -> Result<(), SignatureError> {
+        self.input.validate(extension_registry, var_decls)?;
+        self.output.validate(extension_registry, var_decls)?;
+        self.extension_reqs.validate(var_decls)
+    }
+}
+
+impl FuncValueType {
+    /// If this FuncValueType contains any row variables, return one.
+    pub fn find_rowvar(&self) -> Option<RowVariable> {
+        self.input
+            .iter()
+            .chain(self.output.iter())
+            .find_map(|t| Type::try_from(t.clone()).err())
+    }
+}
+
+// deriving Default leads to an impl that only applies for RV: Default
+impl<RV: MaybeRV> Default for FuncTypeBase<RV> {
+    fn default() -> Self {
+        Self {
+            input: Default::default(),
+            output: Default::default(),
+            extension_reqs: Default::default(),
+        }
+    }
+}
+
+impl Signature {
     /// Returns the type of a value [`Port`]. Returns `None` if the port is out
     /// of bounds.
     #[inline]
@@ -98,7 +146,6 @@ impl FunctionType {
     /// of bounds.
     #[inline]
     pub fn in_port_type(&self, port: impl Into<IncomingPort>) -> Option<&Type> {
-        debug_assert!(self.find_rowvar().is_none());
         self.input.get(port.into().index())
     }
 
@@ -106,7 +153,6 @@ impl FunctionType {
     /// of bounds.
     #[inline]
     pub fn out_port_type(&self, port: impl Into<OutgoingPort>) -> Option<&Type> {
-        debug_assert!(self.find_rowvar().is_none());
         self.output.get(port.into().index())
     }
 
@@ -114,7 +160,6 @@ impl FunctionType {
     /// of bounds.
     #[inline]
     pub fn in_port_type_mut(&mut self, port: impl Into<IncomingPort>) -> Option<&mut Type> {
-        debug_assert!(self.find_rowvar().is_none());
         self.input.get_mut(port.into().index())
     }
 
@@ -122,7 +167,6 @@ impl FunctionType {
     /// of bounds.
     #[inline]
     pub fn out_port_type_mut(&mut self, port: impl Into<OutgoingPort>) -> Option<&mut Type> {
-        debug_assert!(self.find_rowvar().is_none());
         self.output.get_mut(port.into().index())
     }
 
@@ -179,31 +223,6 @@ impl FunctionType {
         self.types(Direction::Outgoing)
     }
 
-    #[inline]
-    /// Returns the input row
-    pub fn input(&self) -> &TypeRow {
-        &self.input
-    }
-
-    #[inline]
-    /// Returns the output row
-    pub fn output(&self) -> &TypeRow {
-        &self.output
-    }
-}
-
-impl FunctionType {
-    /// If this FunctionType contains any row variables, return one.
-    pub fn find_rowvar(&self) -> Option<(usize, TypeBound)> {
-        self.input
-            .iter()
-            .chain(self.output.iter())
-            .find_map(|t| match t.0 {
-                TypeEnum::RowVariable(idx, bound) => Some((idx, bound)),
-                _ => None,
-            })
-    }
-
     /// Returns the `Port`s in the signature for a given direction.
     #[inline]
     pub fn ports(&self, dir: Direction) -> impl Iterator<Item = Port> {
@@ -225,7 +244,7 @@ impl FunctionType {
     }
 }
 
-impl Display for FunctionType {
+impl<RV: MaybeRV> Display for FuncTypeBase<RV> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if !self.input.is_empty() {
             self.input.fmt(f)?;
@@ -238,6 +257,34 @@ impl Display for FunctionType {
     }
 }
 
+impl TryFrom<FuncValueType> for Signature {
+    type Error = SignatureError;
+
+    fn try_from(value: FuncValueType) -> Result<Self, Self::Error> {
+        let input: TypeRow = value.input.try_into()?;
+        let output: TypeRow = value.output.try_into()?;
+        Ok(Self::new(input, output).with_extension_delta(value.extension_reqs))
+    }
+}
+
+impl From<Signature> for FuncValueType {
+    fn from(value: Signature) -> Self {
+        Self {
+            input: value.input.into(),
+            output: value.output.into(),
+            extension_reqs: value.extension_reqs,
+        }
+    }
+}
+
+impl<RV1: MaybeRV, RV2: MaybeRV> PartialEq<FuncTypeBase<RV1>> for FuncTypeBase<RV2> {
+    fn eq(&self, other: &FuncTypeBase<RV1>) -> bool {
+        self.input == other.input
+            && self.output == other.output
+            && self.extension_reqs == other.extension_reqs
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::{extension::prelude::USIZE_T, type_row};
@@ -245,7 +292,7 @@ mod test {
     use super::*;
     #[test]
     fn test_function_type() {
-        let mut f_type = FunctionType::new(type_row![Type::UNIT], type_row![Type::UNIT]);
+        let mut f_type = Signature::new(type_row![Type::UNIT], type_row![Type::UNIT]);
         assert_eq!(f_type.input_count(), 1);
         assert_eq!(f_type.output_count(), 1);
 

@@ -16,7 +16,7 @@ use crate::ops::custom::{resolve_opaque_op, CustomOp, CustomOpError};
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::{FuncDefn, OpParent, OpTag, OpTrait, OpType, ValidateOp};
 use crate::types::type_param::TypeParam;
-use crate::types::{EdgeKind, FunctionType};
+use crate::types::{EdgeKind, Signature};
 use crate::{Direction, Hugr, Node, Port};
 
 use super::views::{HierarchyView, HugrView, SiblingGraph};
@@ -65,7 +65,7 @@ impl Hugr {
                 return Err(ValidationError::ExtensionsNotInferred { node: parent });
             }
             let parent_extensions = match parent_op.inner_function_type() {
-                Some(FunctionType { extension_reqs, .. }) => extension_reqs,
+                Some(Signature { extension_reqs, .. }) => extension_reqs,
                 None => match parent_op.tag() {
                     OpTag::Cfg | OpTag::Conditional => parent_op.extension_delta(),
                     // ModuleRoot holds but does not execute its children, so allow any extensions
@@ -199,19 +199,6 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
             }
         }
 
-        // Secondly, check that the node signature does not contain any row variables.
-        // (We do this here so it's before we try indexing into the ports of any nodes).
-        op_type
-            .dataflow_signature()
-            .as_ref()
-            .and_then(FunctionType::find_rowvar)
-            .map_or(Ok(()), |(idx, _)| {
-                Err(ValidationError::SignatureError {
-                    node,
-                    cause: SignatureError::RowVarWhereTypeExpected { idx },
-                })
-            })?;
-
         // Thirdly that the node has correct children
         self.validate_children(node, op_type)?;
 
@@ -309,14 +296,11 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         var_decls: &[TypeParam],
     ) -> Result<(), SignatureError> {
         match &port_kind {
-            EdgeKind::Value(ty) => ty.validate(false, self.extension_registry, var_decls),
+            EdgeKind::Value(ty) => ty.validate(self.extension_registry, var_decls),
             // Static edges must *not* refer to type variables declared by enclosing FuncDefns
-            // as these are only types at runtime. (Note the choice of `allow_row_vars` as `false` is arbitrary here.)
-            EdgeKind::Const(ty) => ty.validate(false, self.extension_registry, &[]),
-            // Allow function "value" to have unknown arity. A Call node will have to provide
-            // TypeArgs that produce a known arity, but a LoadFunction might pass the function
-            // value ("function pointer") around without knowing how to call it.
-            EdgeKind::Function(pf) => pf.validate_var_len(self.extension_registry),
+            // as these are only types at runtime.
+            EdgeKind::Const(ty) => ty.validate(self.extension_registry, &[]),
+            EdgeKind::Function(pf) => pf.validate(self.extension_registry),
             _ => Ok(()),
         }
     }

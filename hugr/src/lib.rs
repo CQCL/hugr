@@ -27,11 +27,11 @@
 //! To build a HUGR for a simple quantum circuit and then serialize it to a buffer, we can define
 //! a simple quantum extension and then use the [[builder::DFGBuilder]] as follows:
 //! ```
-//! use hugr::builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr, inout_ft};
+//! use hugr::builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr, inout_sig};
 //! use hugr::extension::prelude::{BOOL_T, QB_T};
 //! use hugr::hugr::Hugr;
 //! use hugr::type_row;
-//! use hugr::types::FunctionType;
+//! use hugr::types::FuncValueType;
 //!
 //! // The type of qubits, `QB_T` is in the prelude but, by default, no gateset
 //! // is defined. This module provides Hadamard and CX gates.
@@ -43,18 +43,18 @@
 //!         },
 //!         ops::{CustomOp, OpName},
 //!         type_row,
-//!         types::{FunctionType, PolyFuncType},
+//!         types::{FuncValueType, PolyFuncTypeRV},
 //!         Extension,
 //!     };
 //!
 //!     use lazy_static::lazy_static;
 //!
-//!     fn one_qb_func() -> PolyFuncType {
-//!         FunctionType::new_endo(type_row![QB_T]).into()
+//!     fn one_qb_func() -> PolyFuncTypeRV {
+//!         FuncValueType::new_endo(type_row![QB_T]).into()
 //!     }
 //!
-//!     fn two_qb_func() -> PolyFuncType {
-//!         FunctionType::new_endo(type_row![QB_T, QB_T]).into()
+//!     fn two_qb_func() -> PolyFuncTypeRV {
+//!         FuncValueType::new_endo(type_row![QB_T, QB_T]).into()
 //!     }
 //!     /// The extension identifier.
 //!     pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("mini.quantum");
@@ -73,7 +73,7 @@
 //!             .add_op(
 //!                 OpName::new_inline("Measure"),
 //!                 "Measure a qubit, returning the qubit and the measurement result.".into(),
-//!                 FunctionType::new(type_row![QB_T], type_row![QB_T, BOOL_T]),
+//!                 FuncValueType::new(type_row![QB_T], type_row![QB_T, BOOL_T]),
 //!             )
 //!             .unwrap();
 //!
@@ -115,7 +115,7 @@
 //! //      └───┘└───┘└╥┘
 //! // c:              ╚═
 //! fn make_dfg_hugr() -> Result<Hugr, BuildError> {
-//!     let mut dfg_builder = DFGBuilder::new(inout_ft(
+//!     let mut dfg_builder = DFGBuilder::new(inout_sig(
 //!         type_row![QB_T, QB_T],
 //!         type_row![QB_T, QB_T, BOOL_T],
 //!     ))?;

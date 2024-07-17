@@ -1,7 +1,7 @@
 //! Control flow operations.
 
 use crate::extension::ExtensionSet;
-use crate::types::{EdgeKind, FunctionType, Type, TypeRow};
+use crate::types::{EdgeKind, Signature, Type, TypeRow};
 use crate::Direction;
 
 use super::dataflow::{DataflowOpTrait, DataflowParent};
@@ -31,10 +31,10 @@ impl DataflowOpTrait for TailLoop {
         "A tail-controlled loop"
     }
 
-    fn signature(&self) -> FunctionType {
+    fn signature(&self) -> Signature {
         let [inputs, outputs] =
             [&self.just_inputs, &self.just_outputs].map(|row| row.extend(self.rest.iter()));
-        FunctionType::new(inputs, outputs).with_extension_delta(self.extension_delta.clone())
+        Signature::new(inputs, outputs).with_extension_delta(self.extension_delta.clone())
     }
 }
 
@@ -54,8 +54,8 @@ impl TailLoop {
 }
 
 impl DataflowParent for TailLoop {
-    fn inner_signature(&self) -> FunctionType {
-        FunctionType::new(self.body_input_row(), self.body_output_row())
+    fn inner_signature(&self) -> Signature {
+        Signature::new(self.body_input_row(), self.body_output_row())
             .with_extension_delta(self.extension_delta.clone())
     }
 }
@@ -82,12 +82,12 @@ impl DataflowOpTrait for Conditional {
         "HUGR conditional operation"
     }
 
-    fn signature(&self) -> FunctionType {
+    fn signature(&self) -> Signature {
         let mut inputs = self.other_inputs.clone();
         inputs
             .to_mut()
             .insert(0, Type::new_sum(self.sum_rows.clone()));
-        FunctionType::new(inputs, self.outputs.clone())
+        Signature::new(inputs, self.outputs.clone())
             .with_extension_delta(self.extension_delta.clone())
     }
 }
@@ -104,7 +104,7 @@ impl Conditional {
 #[allow(missing_docs)]
 #[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 pub struct CFG {
-    pub signature: FunctionType,
+    pub signature: Signature,
 }
 
 impl_op_name!(CFG);
@@ -116,7 +116,7 @@ impl DataflowOpTrait for CFG {
         "A dataflow node defined by a child CFG"
     }
 
-    fn signature(&self) -> FunctionType {
+    fn signature(&self) -> Signature {
         self.signature.clone()
     }
 }
@@ -162,12 +162,12 @@ impl StaticTag for ExitBlock {
 }
 
 impl DataflowParent for DataflowBlock {
-    fn inner_signature(&self) -> FunctionType {
+    fn inner_signature(&self) -> Signature {
         // The node outputs a Sum before the data outputs of the block node
         let sum_type = Type::new_sum(self.sum_rows.clone());
         let mut node_outputs = vec![sum_type];
         node_outputs.extend_from_slice(&self.other_outputs);
-        FunctionType::new(self.inputs.clone(), TypeRow::from(node_outputs))
+        Signature::new(self.inputs.clone(), TypeRow::from(node_outputs))
             .with_extension_delta(self.extension_delta.clone())
     }
 }
@@ -260,7 +260,7 @@ impl BasicBlock for ExitBlock {
 /// Case ops - nodes valid inside Conditional nodes.
 pub struct Case {
     /// The signature of the contained dataflow graph.
-    pub signature: FunctionType,
+    pub signature: Signature,
 }
 
 impl_op_name!(Case);
@@ -270,7 +270,7 @@ impl StaticTag for Case {
 }
 
 impl DataflowParent for Case {
-    fn inner_signature(&self) -> FunctionType {
+    fn inner_signature(&self) -> Signature {
         self.signature.clone()
     }
 }

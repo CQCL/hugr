@@ -385,7 +385,7 @@ mod test {
     use crate::ops::{dataflow::IOTrait, Input, OpTag, Output};
     use crate::ops::{OpTrait, OpType};
     use crate::type_row;
-    use crate::types::{FunctionType, Type};
+    use crate::types::{Signature, Type};
 
     use super::super::descendants::test::make_module_hgr;
     use super::*;
@@ -409,7 +409,7 @@ mod test {
     #[test]
     fn nested_flat() -> Result<(), Box<dyn std::error::Error>> {
         let mut module_builder = ModuleBuilder::new();
-        let fty = FunctionType::new(type_row![NAT], type_row![NAT]);
+        let fty = Signature::new(type_row![NAT], type_row![NAT]);
         let mut fbuild = module_builder.define_function("main", fty.clone())?;
         let dfg = fbuild.dfg_builder(fty, fbuild.input_wires())?;
         let ins = dfg.input_wires();

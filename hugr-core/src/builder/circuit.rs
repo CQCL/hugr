@@ -254,13 +254,13 @@ mod test {
         extension::prelude::BOOL_T,
         ops::{custom::OpaqueOp, CustomOp},
         type_row,
-        types::FunctionType,
+        types::Signature,
     };
 
     #[test]
     fn simple_linear() {
         let build_res = build_main(
-            FunctionType::new(type_row![QB, QB], type_row![QB, QB])
+            Signature::new(type_row![QB, QB], type_row![QB, QB])
                 .with_extension_delta(test_quantum_extension::EXTENSION_ID)
                 .with_extension_delta(float_types::EXTENSION_ID)
                 .into(),
@@ -300,10 +300,10 @@ mod test {
             "MyOp",
             "unknown op".to_string(),
             vec![],
-            FunctionType::new(vec![QB, NAT], vec![QB]),
+            Signature::new(vec![QB, NAT], vec![QB]),
         ));
         let build_res = build_main(
-            FunctionType::new(type_row![QB, QB, NAT], type_row![QB, QB, BOOL_T])
+            Signature::new(type_row![QB, QB, NAT], type_row![QB, QB, BOOL_T])
                 .with_extension_delta(test_quantum_extension::EXTENSION_ID)
                 .into(),
             |mut f_build| {
@@ -330,7 +330,7 @@ mod test {
     #[test]
     fn ancillae() {
         let build_res = build_main(
-            FunctionType::new_endo(QB)
+            Signature::new_endo(QB)
                 .with_extension_delta(test_quantum_extension::EXTENSION_ID)
                 .into(),
             |mut f_build| {
@@ -368,7 +368,7 @@ mod test {
     #[test]
     fn circuit_builder_errors() {
         let _build_res = build_main(
-            FunctionType::new_endo(type_row![QB, QB]).into(),
+            Signature::new_endo(type_row![QB, QB]).into(),
             |mut f_build| {
                 let mut circ = f_build.as_circuit(f_build.input_wires());
                 let [q0, q1] = circ.tracked_units_arr();

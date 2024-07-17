@@ -2,12 +2,11 @@ use std::fs::File;
 use std::io::BufReader;
 
 use cool_asserts::assert_matches;
-use rstest::rstest;
 
 use super::*;
 use crate::builder::test::closed_dfg_root_hugr;
 use crate::builder::{
-    inout_ft, BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
+    inout_sig, BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
     FunctionBuilder, HugrBuilder, ModuleBuilder, SubContainer,
 };
 use crate::extension::prelude::{BOOL_T, PRELUDE, PRELUDE_ID, QB_T, USIZE_T};
@@ -21,7 +20,10 @@ use crate::ops::{self, Noop, OpType, Value};
 use crate::std_extensions::logic::test::{and_op, or_op};
 use crate::std_extensions::logic::{self, NotOp};
 use crate::types::type_param::{TypeArg, TypeArgError};
-use crate::types::{CustomType, FunctionType, PolyFuncType, Type, TypeBound, TypeRow};
+use crate::types::{
+    CustomType, FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, Type, TypeBound, TypeRV,
+    TypeRow,
+};
 use crate::{const_extension_ids, test_file, type_row, Direction, IncomingPort, Node};
 
 const NAT: Type = crate::extension::prelude::USIZE_T;
@@ -32,7 +34,7 @@ const NAT: Type = crate::extension::prelude::USIZE_T;
 fn make_simple_hugr(copies: usize) -> (Hugr, Node) {
     let def_op: OpType = ops::FuncDefn {
         name: "main".into(),
-        signature: FunctionType::new(type_row![BOOL_T], vec![BOOL_T; copies]).into(),
+        signature: Signature::new(type_row![BOOL_T], vec![BOOL_T; copies]).into(),
     }
     .into();
 
@@ -106,7 +108,7 @@ fn leaf_root() {
 #[test]
 fn dfg_root() {
     let dfg_op: OpType = ops::DFG {
-        signature: FunctionType::new_endo(type_row![BOOL_T]),
+        signature: Signature::new_endo(type_row![BOOL_T]),
     }
     .into();
 
@@ -135,7 +137,7 @@ fn children_restrictions() {
         .unwrap();
 
     // Add a definition without children
-    let def_sig = FunctionType::new(type_row![BOOL_T], type_row![BOOL_T, BOOL_T]);
+    let def_sig = Signature::new(type_row![BOOL_T], type_row![BOOL_T, BOOL_T]);
     let new_def = b.add_node_with_parent(
         root,
         ops::FuncDefn {
@@ -208,7 +210,7 @@ fn df_children_restrictions() {
 #[test]
 fn test_ext_edge() {
     let mut h = closed_dfg_root_hugr(
-        FunctionType::new(type_row![BOOL_T, BOOL_T], type_row![BOOL_T])
+        Signature::new(type_row![BOOL_T, BOOL_T], type_row![BOOL_T])
             .with_extension_delta(TO_BE_INFERRED),
     );
     let [input, output] = h.get_io(h.root()).unwrap();
@@ -217,8 +219,7 @@ fn test_ext_edge() {
     let sub_dfg = h.add_node_with_parent(
         h.root(),
         ops::DFG {
-            signature: FunctionType::new_endo(type_row![BOOL_T])
-                .with_extension_delta(TO_BE_INFERRED),
+            signature: Signature::new_endo(type_row![BOOL_T]).with_extension_delta(TO_BE_INFERRED),
         },
     );
     // this Xor has its 2nd input unconnected
@@ -253,14 +254,11 @@ fn test_ext_edge() {
 
 #[test]
 fn no_ext_edge_into_func() -> Result<(), Box<dyn std::error::Error>> {
-    let b2b = FunctionType::new_endo(BOOL_T);
-    let mut h = DFGBuilder::new(FunctionType::new(BOOL_T, Type::new_function(b2b.clone())))?;
+    let b2b = Signature::new_endo(BOOL_T);
+    let mut h = DFGBuilder::new(Signature::new(BOOL_T, Type::new_function(b2b.clone())))?;
     let [input] = h.input_wires_arr();
 
-    let mut dfg = h.dfg_builder(
-        FunctionType::new(vec![], Type::new_function(b2b.clone())),
-        [],
-    )?;
+    let mut dfg = h.dfg_builder(Signature::new(vec![], Type::new_function(b2b.clone())), [])?;
     let mut func = dfg.define_function("AndWithOuter", b2b.clone())?;
     let [fn_input] = func.input_wires_arr();
     let and_op = func.add_dataflow_op(and_op(), [fn_input, input])?; // 'ext' edge
@@ -286,7 +284,7 @@ fn no_ext_edge_into_func() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn test_local_const() {
     let mut h =
-        closed_dfg_root_hugr(FunctionType::new_endo(BOOL_T).with_extension_delta(TO_BE_INFERRED));
+        closed_dfg_root_hugr(Signature::new_endo(BOOL_T).with_extension_delta(TO_BE_INFERRED));
     let [input, output] = h.get_io(h.root()).unwrap();
     let and = h.add_node_with_parent(h.root(), and_op());
     h.connect(input, 0, and, 0);
@@ -318,10 +316,7 @@ fn test_local_const() {
 
 #[test]
 fn dfg_with_cycles() {
-    let mut h = closed_dfg_root_hugr(FunctionType::new(
-        type_row![BOOL_T, BOOL_T],
-        type_row![BOOL_T],
-    ));
+    let mut h = closed_dfg_root_hugr(Signature::new(type_row![BOOL_T, BOOL_T], type_row![BOOL_T]));
     let [input, output] = h.get_io(h.root()).unwrap();
     let or = h.add_node_with_parent(h.root(), or_op());
     let not1 = h.add_node_with_parent(h.root(), NotOp);
@@ -343,7 +338,7 @@ fn identity_hugr_with_type(t: Type) -> (Hugr, Node) {
         b.root(),
         ops::FuncDefn {
             name: "main".into(),
-            signature: FunctionType::new(row.clone(), row.clone()).into(),
+            signature: Signature::new(row.clone(), row.clone()).into(),
         },
     );
 
@@ -466,7 +461,7 @@ fn typevars_declared() -> Result<(), Box<dyn std::error::Error>> {
         "myfunc",
         PolyFuncType::new(
             [TypeBound::Any.into()],
-            FunctionType::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
+            Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
         ),
     )?;
     let [w] = f.input_wires_arr();
@@ -476,7 +471,7 @@ fn typevars_declared() -> Result<(), Box<dyn std::error::Error>> {
         "myfunc",
         PolyFuncType::new(
             [TypeBound::Any.into()],
-            FunctionType::new_endo(vec![Type::new_var_use(1, TypeBound::Any)]),
+            Signature::new_endo(vec![Type::new_var_use(1, TypeBound::Any)]),
         ),
     )?;
     let [w] = f.input_wires_arr();
@@ -486,7 +481,7 @@ fn typevars_declared() -> Result<(), Box<dyn std::error::Error>> {
         "myfunc",
         PolyFuncType::new(
             [TypeBound::Any.into()],
-            FunctionType::new_endo(vec![Type::new_var_use(1, TypeBound::Copyable)]),
+            Signature::new_endo(vec![Type::new_var_use(1, TypeBound::Copyable)]),
         ),
     )?;
     let [w] = f.input_wires_arr();
@@ -504,12 +499,12 @@ fn nested_typevars() -> Result<(), Box<dyn std::error::Error>> {
             "outer",
             PolyFuncType::new(
                 [OUTER_BOUND.into()],
-                FunctionType::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
+                Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
             ),
         )?;
         let inner = outer.define_function(
             "inner",
-            PolyFuncType::new([INNER_BOUND.into()], FunctionType::new_endo(vec![t])),
+            PolyFuncType::new([INNER_BOUND.into()], Signature::new_endo(vec![t])),
         )?;
         let [w] = inner.input_wires_arr();
         inner.finish_with_outputs([w])?;
@@ -550,7 +545,7 @@ fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
         "myfunc",
         PolyFuncType::new(
             [BOUND],
-            FunctionType::new(vec![], vec![list_of_var.clone()])
+            Signature::new(vec![], vec![list_of_var.clone()])
                 .with_extension_delta(collections::EXTENSION_NAME),
         ),
     )?;
@@ -577,24 +572,24 @@ pub(crate) fn extension_with_eval_parallel() -> Extension {
     let rowp = TypeParam::new_list(TypeBound::Any);
     let mut e = Extension::new(EXT_ID);
 
-    let inputs = Type::new_row_var_use(0, TypeBound::Any);
-    let outputs = Type::new_row_var_use(1, TypeBound::Any);
-    let evaled_fn = Type::new_function(FunctionType::new(inputs.clone(), outputs.clone()));
-    let pf = PolyFuncType::new(
+    let inputs = TypeRV::new_row_var_use(0, TypeBound::Any);
+    let outputs = TypeRV::new_row_var_use(1, TypeBound::Any);
+    let evaled_fn = TypeRV::new_function(FuncValueType::new(inputs.clone(), outputs.clone()));
+    let pf = PolyFuncTypeRV::new(
         [rowp.clone(), rowp.clone()],
-        FunctionType::new(vec![evaled_fn, inputs], outputs),
+        FuncValueType::new(vec![evaled_fn, inputs], outputs),
     );
     e.add_op("eval".into(), "".into(), pf).unwrap();
 
-    let rv = |idx| Type::new_row_var_use(idx, TypeBound::Any);
-    let pf = PolyFuncType::new(
+    let rv = |idx| TypeRV::new_row_var_use(idx, TypeBound::Any);
+    let pf = PolyFuncTypeRV::new(
         [rowp.clone(), rowp.clone(), rowp.clone(), rowp.clone()],
-        FunctionType::new(
+        Signature::new(
             vec![
-                Type::new_function(FunctionType::new(rv(0), rv(2))),
-                Type::new_function(FunctionType::new(rv(1), rv(3))),
+                Type::new_function(FuncValueType::new(rv(0), rv(2))),
+                Type::new_function(FuncValueType::new(rv(1), rv(3))),
             ],
-            Type::new_function(FunctionType::new(vec![rv(0), rv(1)], vec![rv(2), rv(3)])),
+            Type::new_function(FuncValueType::new(vec![rv(0), rv(1)], vec![rv(2), rv(3)])),
         ),
     );
     e.add_op("parallel".into(), "".into(), pf).unwrap();
@@ -608,9 +603,9 @@ fn instantiate_row_variables() -> Result<(), Box<dyn std::error::Error>> {
         vec![TypeArg::Type { ty: USIZE_T }; i].into()
     }
     let e = extension_with_eval_parallel();
-    let mut dfb = DFGBuilder::new(inout_ft(
+    let mut dfb = DFGBuilder::new(inout_sig(
         vec![
-            Type::new_function(FunctionType::new(USIZE_T, vec![USIZE_T, USIZE_T])),
+            Type::new_function(Signature::new(USIZE_T, vec![USIZE_T, USIZE_T])),
             USIZE_T,
         ], // inputs: function + its argument
         vec![USIZE_T; 4], // outputs (*2^2, three calls)
@@ -634,42 +629,39 @@ fn instantiate_row_variables() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn seq1ty(t: Type) -> TypeArg {
+fn seq1ty(t: TypeRV) -> TypeArg {
     TypeArg::Sequence {
         elems: vec![t.into()],
     }
 }
 
 #[test]
-fn inner_row_variables() -> Result<(), Box<dyn std::error::Error>> {
+fn row_variables() -> Result<(), Box<dyn std::error::Error>> {
     let e = extension_with_eval_parallel();
-    let tv = Type::new_row_var_use(0, TypeBound::Any);
-    let inner_ft = Type::new_function(FunctionType::new_endo(tv.clone()));
-    let ft_usz = Type::new_function(FunctionType::new_endo(vec![tv.clone(), USIZE_T]));
+    let tv = TypeRV::new_row_var_use(0, TypeBound::Any);
+    let inner_ft = Type::new_function(FuncValueType::new_endo(tv.clone()));
+    let ft_usz = Type::new_function(FuncValueType::new_endo(vec![tv.clone(), USIZE_T.into()]));
     let mut fb = FunctionBuilder::new(
         "id",
         PolyFuncType::new(
             [TypeParam::new_list(TypeBound::Any)],
-            FunctionType::new(inner_ft.clone(), ft_usz).with_extension_delta(e.name.clone()),
+            Signature::new(inner_ft.clone(), ft_usz).with_extension_delta(e.name.clone()),
         ),
     )?;
     // All the wires here are carrying higher-order Function values
     let [func_arg] = fb.input_wires_arr();
     let [id_usz] = {
-        let bldr = fb.define_function("id_usz", FunctionType::new_endo(USIZE_T))?;
+        let bldr = fb.define_function("id_usz", Signature::new_endo(USIZE_T))?;
         let vals = bldr.input_wires();
         let [inner_def] = bldr.finish_with_outputs(vals)?.outputs_arr();
-        let loadf = LoadFunction::try_new(
-            FunctionType::new_endo(USIZE_T).into(),
-            [],
-            &PRELUDE_REGISTRY,
-        )
-        .unwrap();
+        let loadf =
+            LoadFunction::try_new(Signature::new_endo(USIZE_T).into(), [], &PRELUDE_REGISTRY)
+                .unwrap();
         fb.add_dataflow_op(loadf, [inner_def])?.outputs_arr()
     };
     let par = e.instantiate_extension_op(
         "parallel",
-        [tv.clone(), USIZE_T, tv.clone(), USIZE_T].map(seq1ty),
+        [tv.clone(), USIZE_T.into(), tv.clone(), USIZE_T.into()].map(seq1ty),
         &PRELUDE_REGISTRY,
     )?;
     let par_func = fb.add_dataflow_op(par, [func_arg, id_usz])?;
@@ -677,60 +669,6 @@ fn inner_row_variables() -> Result<(), Box<dyn std::error::Error>> {
         par_func.outputs(),
         &ExtensionRegistry::try_new([PRELUDE.to_owned(), e]).unwrap(),
     )?;
-    Ok(())
-}
-
-#[rstest]
-#[case(false)]
-#[case(true)]
-fn no_outer_row_variables(#[case] connect: bool) -> Result<(), Box<dyn std::error::Error>> {
-    let e = extension_with_eval_parallel();
-    let tv = Type::new_row_var_use(0, TypeBound::Copyable);
-    let fun_ty = Type::new_function(FunctionType::new(USIZE_T, tv.clone()));
-    let results = if connect { vec![tv.clone()] } else { vec![] };
-    let mut fb = Hugr::new(FuncDefn {
-        name: "bad_eval".to_string(),
-        signature: PolyFuncType::new(
-            [TypeParam::new_list(TypeBound::Copyable)],
-            FunctionType::new(fun_ty.clone(), results.clone()),
-        ),
-    });
-    let inp = fb.add_node_with_parent(
-        fb.root(),
-        ops::Input {
-            types: fun_ty.into(),
-        },
-    );
-    let out = fb.add_node_with_parent(
-        fb.root(),
-        ops::Output {
-            types: results.into(),
-        },
-    );
-    let cst = fb.add_node_with_parent(
-        fb.root(),
-        ops::Const::new(crate::extension::prelude::ConstUsize::new(5).into()),
-    );
-    let i = fb.add_node_with_parent(fb.root(), ops::LoadConstant { datatype: USIZE_T });
-    fb.connect(cst, 0, i, 0);
-
-    let ev = fb.add_node_with_parent(
-        fb.root(),
-        e.instantiate_extension_op("eval", [seq1ty(USIZE_T), seq1ty(tv)], &PRELUDE_REGISTRY)?,
-    );
-    fb.connect(inp, 0, ev, 0);
-    fb.connect(i, 0, ev, 1);
-    if connect {
-        fb.connect(ev, 0, out, 0);
-    }
-    let reg = ExtensionRegistry::try_new([PRELUDE.to_owned(), e]).unwrap();
-    assert_matches!(
-        fb.validate(&reg).unwrap_err(),
-        ValidationError::SignatureError {
-            node,
-            cause: SignatureError::RowVarWhereTypeExpected { idx: 0 }
-        } => assert!([ev, out].contains(&node))
-    );
     Ok(())
 }
 
@@ -744,7 +682,7 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
         TypeBound::Any.into(),
     ];
     let evaled_fn = Type::new_function(
-        FunctionType::new(
+        Signature::new(
             Type::new_var_use(0, TypeBound::Any),
             Type::new_var_use(2, TypeBound::Any),
         )
@@ -755,9 +693,9 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
     e.add_op(
         "eval".into(),
         "".into(),
-        PolyFuncType::new(
+        PolyFuncTypeRV::new(
             params.clone(),
-            FunctionType::new(
+            Signature::new(
                 vec![evaled_fn, Type::new_var_use(0, TypeBound::Any)],
                 Type::new_var_use(2, TypeBound::Any),
             )
@@ -766,12 +704,12 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
     )?;
 
     fn utou(e: impl Into<ExtensionSet>) -> Type {
-        Type::new_function(FunctionType::new_endo(USIZE_T).with_extension_delta(e.into()))
+        Type::new_function(Signature::new_endo(USIZE_T).with_extension_delta(e.into()))
     }
 
     let int_pair = Type::new_tuple(type_row![USIZE_T; 2]);
     // Root DFG: applies a function int--PRELUDE-->int to each element of a pair of two ints
-    let mut d = DFGBuilder::new(inout_ft(
+    let mut d = DFGBuilder::new(inout_sig(
         vec![utou(PRELUDE_ID), int_pair.clone()],
         vec![int_pair.clone()],
     ))?;
@@ -782,7 +720,7 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
             "two_ints",
             PolyFuncType::new(
                 vec![TypeParam::Extensions],
-                FunctionType::new(vec![utou(es.clone()), int_pair.clone()], int_pair.clone())
+                Signature::new(vec![utou(es.clone()), int_pair.clone()], int_pair.clone())
                     .with_extension_delta(EXT_ID)
                     .with_extension_delta(es.clone()),
             ),
@@ -825,7 +763,7 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     let h = d.finish_hugr_with_outputs(call.outputs(), &reg)?;
     let call_ty = h.get_optype(call.node()).dataflow_signature().unwrap();
-    let exp_fun_ty = FunctionType::new(vec![utou(PRELUDE_ID), int_pair.clone()], int_pair)
+    let exp_fun_ty = Signature::new(vec![utou(PRELUDE_ID), int_pair.clone()], int_pair)
         .with_extension_delta(EXT_ID)
         .with_extension_delta(PRELUDE_ID);
     assert_eq!(call_ty, exp_fun_ty);
@@ -839,12 +777,12 @@ fn test_polymorphic_load() -> Result<(), Box<dyn std::error::Error>> {
         "id",
         PolyFuncType::new(
             vec![TypeBound::Any.into()],
-            FunctionType::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
+            Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
         ),
     )?;
-    let sig = FunctionType::new(
+    let sig = Signature::new(
         vec![],
-        vec![Type::new_function(FunctionType::new_endo(vec![USIZE_T]))],
+        vec![Type::new_function(Signature::new_endo(vec![USIZE_T]))],
     );
     let mut f = m.define_function("main", sig)?;
     let l = f.load_func(&id, &[USIZE_T.into()], &PRELUDE_REGISTRY)?;
@@ -869,7 +807,7 @@ fn cfg_children_restrictions() {
     b.replace_op(
         copy,
         ops::CFG {
-            signature: FunctionType::new(type_row![BOOL_T], type_row![BOOL_T]),
+            signature: Signature::new(type_row![BOOL_T], type_row![BOOL_T]),
         },
     )
     .unwrap();
@@ -932,7 +870,7 @@ fn cfg_children_restrictions() {
     b.replace_op(
         cfg,
         ops::CFG {
-            signature: FunctionType::new(type_row![QB_T], type_row![BOOL_T]),
+            signature: Signature::new(type_row![QB_T], type_row![BOOL_T]),
         },
     )
     .unwrap();
@@ -970,14 +908,14 @@ fn cfg_children_restrictions() {
 fn cfg_connections() -> Result<(), Box<dyn std::error::Error>> {
     use crate::builder::CFGBuilder;
 
-    let mut hugr = CFGBuilder::new(FunctionType::new_endo(USIZE_T))?;
+    let mut hugr = CFGBuilder::new(Signature::new_endo(USIZE_T))?;
     let unary_pred = hugr.add_constant(Value::unary_unit_sum());
     let mut entry = hugr.simple_entry_builder_exts(type_row![USIZE_T], 1, ExtensionSet::new())?;
     let p = entry.load_const(&unary_pred);
     let ins = entry.input_wires();
     let entry = entry.finish_with_outputs(p, ins)?;
 
-    let mut middle = hugr.simple_block_builder(FunctionType::new_endo(USIZE_T), 1)?;
+    let mut middle = hugr.simple_block_builder(Signature::new_endo(USIZE_T), 1)?;
     let p = middle.load_const(&unary_pred);
     let ins = middle.input_wires();
     let middle = middle.finish_with_outputs(p, ins)?;
@@ -1020,6 +958,7 @@ fn cfg_entry_io_bug() -> Result<(), Box<dyn std::error::Error>> {
 #[cfg(feature = "extension_inference")]
 mod extension_tests {
     use self::ops::handle::{BasicBlockID, TailLoopID};
+    use rstest::rstest;
 
     use super::*;
     use crate::builder::handle::Outputs;
@@ -1035,17 +974,16 @@ mod extension_tests {
 
     #[rstest]
     #[case::d1(|signature| ops::DFG {signature}.into())]
-    #[case::f1(|ft: FunctionType| ops::FuncDefn {name: "foo".to_string(), signature: ft.into()}.into())]
+    #[case::f1(|sig: Signature| ops::FuncDefn {name: "foo".to_string(), signature: sig.into()}.into())]
     #[case::c1(|signature| ops::Case {signature}.into())]
     fn parent_extension_mismatch(
-        #[case] parent_f: impl Fn(FunctionType) -> OpType,
+        #[case] parent_f: impl Fn(Signature) -> OpType,
         #[values(ExtensionSet::new(), XA.into())] parent_extensions: ExtensionSet,
     ) {
         // Child graph adds extension "XB", but the parent (in all cases)
         // declares a different delta, causing a mismatch.
-        let parent = parent_f(
-            FunctionType::new_endo(USIZE_T).with_extension_delta(parent_extensions.clone()),
-        );
+        let parent =
+            parent_f(Signature::new_endo(USIZE_T).with_extension_delta(parent_extensions.clone()));
         let mut hugr = Hugr::new(parent);
 
         let input = hugr.add_node_with_parent(
@@ -1093,7 +1031,7 @@ mod extension_tests {
         #[case] success: bool,
     ) -> Result<(), BuildError> {
         let mut cfg = CFGBuilder::new(
-            FunctionType::new_endo(USIZE_T).with_extension_delta(parent_extensions.clone()),
+            Signature::new_endo(USIZE_T).with_extension_delta(parent_extensions.clone()),
         )?;
         let mut bb = cfg.simple_entry_builder_exts(USIZE_T.into(), 1, XB)?;
         let pred = bb.add_load_value(Value::unary_unit_sum());
@@ -1143,8 +1081,7 @@ mod extension_tests {
             let case = hugr.add_node_with_parent(
                 hugr.root(),
                 ops::Case {
-                    signature: FunctionType::new_endo(USIZE_T)
-                        .with_extension_delta(case_exts.clone()),
+                    signature: Signature::new_endo(USIZE_T).with_extension_delta(case_exts.clone()),
                 },
             );
 

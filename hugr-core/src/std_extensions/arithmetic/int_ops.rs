@@ -10,12 +10,12 @@ use crate::ops::custom::ExtensionOp;
 use crate::ops::{NamedOp, OpName};
 use crate::std_extensions::arithmetic::int_types::int_type;
 use crate::type_row;
-use crate::types::{FunctionType, PolyFuncType};
+use crate::types::{FuncValueType, PolyFuncTypeRV, TypeRowRV};
 use crate::utils::collect_array;
 
 use crate::{
     extension::{ExtensionId, ExtensionSet, SignatureError},
-    types::{type_param::TypeArg, Type, TypeRow},
+    types::{type_param::TypeArg, Type},
     Extension,
 };
 
@@ -116,7 +116,7 @@ impl MakeOpDef for IntOpDef {
             )
             .into(),
             inarrow_s | inarrow_u => CustomValidator::new_with_validator(
-                int_polytype(2, vec![int_tv(0)], vec![sum_with_error(int_tv(1)).into()]),
+                int_polytype(2, int_tv(0), sum_ty_with_err(int_tv(1))),
                 IOValidator { f_ge_s: true },
             )
             .into(),
@@ -131,30 +131,27 @@ impl MakeOpDef for IntOpDef {
             ineg | iabs | inot => iunop_sig().into(),
             //TODO inline
             idivmod_checked_u | idivmod_checked_s => {
-                let intpair: TypeRow = vec![int_tv(0), int_tv(1)].into();
+                let intpair: TypeRowRV = vec![int_tv(0), int_tv(1)].into();
                 int_polytype(
                     2,
                     intpair.clone(),
-                    vec![sum_with_error(Type::new_tuple(intpair)).into()],
+                    sum_ty_with_err(Type::new_tuple(intpair)),
                 )
             }
             .into(),
             idivmod_u | idivmod_s => {
-                let intpair: TypeRow = vec![int_tv(0), int_tv(1)].into();
+                let intpair: TypeRowRV = vec![int_tv(0), int_tv(1)].into();
                 int_polytype(2, intpair.clone(), intpair.clone())
             }
             .into(),
             idiv_u | idiv_s => int_polytype(2, vec![int_tv(0), int_tv(1)], vec![int_tv(0)]).into(),
-            idiv_checked_u | idiv_checked_s => int_polytype(
-                2,
-                vec![int_tv(0), int_tv(1)],
-                vec![sum_with_error(int_tv(0)).into()],
-            )
-            .into(),
+            idiv_checked_u | idiv_checked_s => {
+                int_polytype(2, vec![int_tv(0), int_tv(1)], sum_ty_with_err(int_tv(0))).into()
+            }
             imod_checked_u | imod_checked_s => int_polytype(
                 2,
                 vec![int_tv(0), int_tv(1).clone()],
-                vec![sum_with_error(int_tv(1)).into()],
+                sum_ty_with_err(int_tv(1)),
             )
             .into(),
             imod_u | imod_s => {
@@ -163,9 +160,9 @@ impl MakeOpDef for IntOpDef {
             ishl | ishr | irotl | irotr => {
                 int_polytype(2, vec![int_tv(0), int_tv(1)], vec![int_tv(0)]).into()
             }
-            itostring_u | itostring_s => PolyFuncType::new(
+            itostring_u | itostring_s => PolyFuncTypeRV::new(
                 vec![LOG_WIDTH_TYPE_PARAM],
-                FunctionType::new(vec![int_tv(0)], vec![STRING_TYPE]),
+                FuncValueType::new(vec![int_tv(0)], vec![STRING_TYPE]),
             )
             .into(),
         }
@@ -239,22 +236,22 @@ impl MakeOpDef for IntOpDef {
 }
 fn int_polytype(
     n_vars: usize,
-    input: impl Into<TypeRow>,
-    output: impl Into<TypeRow>,
-) -> PolyFuncType {
-    PolyFuncType::new(
+    input: impl Into<TypeRowRV>,
+    output: impl Into<TypeRowRV>,
+) -> PolyFuncTypeRV {
+    PolyFuncTypeRV::new(
         vec![LOG_WIDTH_TYPE_PARAM; n_vars],
-        FunctionType::new(input, output),
+        FuncValueType::new(input, output),
     )
 }
 
-fn ibinop_sig() -> PolyFuncType {
+fn ibinop_sig() -> PolyFuncTypeRV {
     let int_type_var = int_tv(0);
 
     int_polytype(1, vec![int_type_var.clone(); 2], vec![int_type_var])
 }
 
-fn iunop_sig() -> PolyFuncType {
+fn iunop_sig() -> PolyFuncTypeRV {
     let int_type_var = int_tv(0);
     int_polytype(1, vec![int_type_var.clone()], vec![int_type_var])
 }
@@ -351,9 +348,16 @@ impl IntOpDef {
     }
 }
 
+fn sum_ty_with_err(t: Type) -> Type {
+    sum_with_error(t).into()
+}
+
 #[cfg(test)]
 mod test {
-    use crate::{ops::dataflow::DataflowOpTrait, std_extensions::arithmetic::int_types::int_type};
+    use crate::{
+        ops::dataflow::DataflowOpTrait, std_extensions::arithmetic::int_types::int_type,
+        types::Signature,
+    };
 
     use super::*;
 
@@ -375,7 +379,7 @@ mod test {
                 .to_extension_op()
                 .unwrap()
                 .signature(),
-            FunctionType::new(int_type(3), int_type(4)).with_extension_delta(EXTENSION_ID)
+            Signature::new(int_type(3), int_type(4)).with_extension_delta(EXTENSION_ID)
         );
         assert_eq!(
             IntOpDef::iwiden_s
@@ -383,7 +387,7 @@ mod test {
                 .to_extension_op()
                 .unwrap()
                 .signature(),
-            FunctionType::new_endo(int_type(3)).with_extension_delta(EXTENSION_ID)
+            Signature::new_endo(int_type(3)).with_extension_delta(EXTENSION_ID)
         );
         assert_eq!(
             IntOpDef::inarrow_s
@@ -391,7 +395,7 @@ mod test {
                 .to_extension_op()
                 .unwrap()
                 .signature(),
-            FunctionType::new(vec![int_type(3)], vec![sum_with_error(int_type(3)).into()])
+            Signature::new(int_type(3), sum_ty_with_err(int_type(3)))
                 .with_extension_delta(EXTENSION_ID)
         );
         assert!(
@@ -408,7 +412,7 @@ mod test {
                 .to_extension_op()
                 .unwrap()
                 .signature(),
-            FunctionType::new(vec![int_type(2)], vec![sum_with_error(int_type(1)).into()])
+            Signature::new(int_type(2), sum_ty_with_err(int_type(1)))
                 .with_extension_delta(EXTENSION_ID)
         );
 

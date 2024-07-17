@@ -8,7 +8,7 @@ use hugr_core::std_extensions::arithmetic::int_ops::IntOpDef;
 use hugr_core::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
 use hugr_core::std_extensions::logic::{self, NaryLogic, NotOp};
 use hugr_core::type_row;
-use hugr_core::types::{FunctionType, Type, TypeRow};
+use hugr_core::types::{Signature, Type, TypeRow, TypeRowRV};
 
 use rstest::rstest;
 
@@ -73,8 +73,8 @@ fn test_add(#[case] a: f64, #[case] b: f64, #[case] c: f64) {
     assert_eq!(outs.as_slice(), &[(0.into(), c)]);
 }
 
-fn noargfn(outputs: impl Into<TypeRow>) -> FunctionType {
-    inout_ft(type_row![], outputs)
+fn noargfn(outputs: impl Into<TypeRow>) -> Signature {
+    inout_sig(type_row![], outputs)
 }
 
 #[test]
@@ -137,11 +137,8 @@ fn test_list_ops() -> Result<(), Box<dyn std::error::Error>> {
     ])
     .unwrap();
     let list: Value = ListValue::new(BOOL_T, [Value::false_val()]).into();
-    let mut build = DFGBuilder::new(FunctionType::new(
-        type_row![],
-        vec![list.get_type().clone()],
-    ))
-    .unwrap();
+    let mut build =
+        DFGBuilder::new(Signature::new(type_row![], vec![list.get_type().clone()])).unwrap();
 
     let list_wire = build.add_load_const(list.clone());
 
@@ -904,7 +901,7 @@ fn test_fold_idivmod_checked_u() {
     // x0, x1 := int_u<5>(20), int_u<3>(0)
     // x2 := idivmod_checked_u(x0, x1)
     // output x2 == error
-    let intpair: TypeRow = vec![INT_TYPES[5].clone(), INT_TYPES[3].clone()].into();
+    let intpair: TypeRowRV = vec![INT_TYPES[5].clone(), INT_TYPES[3].clone()].into();
     let sum_type = sum_with_error(Type::new_tuple(intpair));
     let mut build = DFGBuilder::new(noargfn(vec![sum_type.clone().into()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 20).unwrap()));
@@ -974,7 +971,7 @@ fn test_fold_idivmod_checked_s() {
     // x0, x1 := int_s<5>(-20), int_u<3>(0)
     // x2 := idivmod_checked_s(x0, x1)
     // output x2 == error
-    let intpair: TypeRow = vec![INT_TYPES[5].clone(), INT_TYPES[3].clone()].into();
+    let intpair: TypeRowRV = vec![INT_TYPES[5].clone(), INT_TYPES[3].clone()].into();
     let sum_type = sum_with_error(Type::new_tuple(intpair));
     let mut build = DFGBuilder::new(noargfn(vec![sum_type.clone().into()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, -20).unwrap()));

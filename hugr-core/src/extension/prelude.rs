@@ -4,14 +4,14 @@ use lazy_static::lazy_static;
 
 use crate::ops::constant::{CustomCheckFailure, ValueName};
 use crate::ops::{CustomOp, OpName};
-use crate::types::{SumType, TypeName};
+use crate::types::{FuncValueType, SumType, TypeName};
 use crate::{
     extension::{ExtensionId, TypeDefBound},
     ops::constant::CustomConst,
     type_row,
     types::{
         type_param::{TypeArg, TypeParam},
-        CustomType, FunctionType, PolyFuncType, Type, TypeBound,
+        CustomType, PolyFuncTypeRV, Signature, Type, TypeBound,
     },
     Extension,
 };
@@ -21,7 +21,7 @@ struct ArrayOpCustom;
 
 const MAX: &[TypeParam; 1] = &[TypeParam::max_nat()];
 impl SignatureFromArgs for ArrayOpCustom {
-    fn compute_signature(&self, arg_values: &[TypeArg]) -> Result<PolyFuncType, SignatureError> {
+    fn compute_signature(&self, arg_values: &[TypeArg]) -> Result<PolyFuncTypeRV, SignatureError> {
         let [TypeArg::BoundedNat { n }] = *arg_values else {
             return Err(SignatureError::InvalidTypeArgs);
         };
@@ -30,9 +30,9 @@ impl SignatureFromArgs for ArrayOpCustom {
         let var_arg_row = vec![elem_ty_var.clone(); n as usize];
         let other_row = vec![array_type(TypeArg::BoundedNat { n }, elem_ty_var.clone())];
 
-        Ok(PolyFuncType::new(
+        Ok(PolyFuncTypeRV::new(
             vec![TypeBound::Any.into()],
-            FunctionType::new(var_arg_row, other_row),
+            FuncValueType::new(var_arg_row, other_row),
         ))
     }
 
@@ -43,7 +43,7 @@ impl SignatureFromArgs for ArrayOpCustom {
 
 struct GenericOpCustom;
 impl SignatureFromArgs for GenericOpCustom {
-    fn compute_signature(&self, arg_values: &[TypeArg]) -> Result<PolyFuncType, SignatureError> {
+    fn compute_signature(&self, arg_values: &[TypeArg]) -> Result<PolyFuncTypeRV, SignatureError> {
         let [arg0, arg1] = arg_values else {
             return Err(SignatureError::InvalidTypeArgs);
         };
@@ -67,7 +67,7 @@ impl SignatureFromArgs for GenericOpCustom {
             };
             outs.push(ty.clone());
         }
-        Ok(PolyFuncType::new(vec![], FunctionType::new(inps, outs)))
+        Ok(FuncValueType::new(inps, outs).into())
     }
 
     fn static_params(&self) -> &[TypeParam] {
@@ -106,7 +106,7 @@ lazy_static! {
         prelude.add_op(
             PRINT_OP_ID,
             "Print the string to standard output".to_string(),
-            FunctionType::new(type_row![STRING_TYPE], type_row![]),
+            Signature::new(type_row![STRING_TYPE], type_row![]),
             )
             .unwrap();
         prelude.add_type(
@@ -268,7 +268,7 @@ pub const ERROR_TYPE_NAME: TypeName = TypeName::new_inline("error");
 
 /// Return a Sum type with the first variant as the given type and the second an Error.
 pub fn sum_with_error(ty: Type) -> SumType {
-    SumType::new([vec![ty], vec![ERROR_TYPE]])
+    SumType::new([ty, ERROR_TYPE])
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -402,7 +402,7 @@ impl CustomConst for ConstExternalSymbol {
 #[cfg(test)]
 mod test {
     use crate::{
-        builder::{endo_ft, inout_ft, DFGBuilder, Dataflow, DataflowHugr},
+        builder::{endo_sig, inout_sig, DFGBuilder, Dataflow, DataflowHugr},
         utils::test_quantum_extension::cx_gate,
         Hugr, Wire,
     };
@@ -412,7 +412,7 @@ mod test {
     #[test]
     /// Test building a HUGR involving a new_array operation.
     fn test_new_array() {
-        let mut b = DFGBuilder::new(inout_ft(
+        let mut b = DFGBuilder::new(inout_sig(
             vec![QB_T, QB_T],
             array_type(TypeArg::BoundedNat { n: 2 }, QB_T),
         ))
@@ -452,7 +452,7 @@ mod test {
         assert!(error_val.equal_consts(&ConstError::new(2, "my message")));
         assert!(!error_val.equal_consts(&ConstError::new(3, "my message")));
 
-        let mut b = DFGBuilder::new(endo_ft(type_row![])).unwrap();
+        let mut b = DFGBuilder::new(endo_sig(type_row![])).unwrap();
 
         let err = b.add_load_value(error_val);
 
@@ -486,7 +486,7 @@ mod test {
             )
             .unwrap();
 
-        let mut b = DFGBuilder::new(endo_ft(type_row![QB_T, QB_T])).unwrap();
+        let mut b = DFGBuilder::new(endo_sig(type_row![QB_T, QB_T])).unwrap();
         let [q0, q1] = b.input_wires_arr();
         let [q0, q1] = b
             .add_dataflow_op(cx_gate(), [q0, q1])
@@ -524,7 +524,7 @@ mod test {
     #[test]
     /// Test print operation
     fn test_print() {
-        let mut b: DFGBuilder<Hugr> = DFGBuilder::new(endo_ft(vec![])).unwrap();
+        let mut b: DFGBuilder<Hugr> = DFGBuilder::new(endo_sig(vec![])).unwrap();
         let greeting: ConstString = ConstString::new("Hello, world!".into());
         let greeting_out: Wire = b.add_load_value(greeting);
         let print_op = PRELUDE

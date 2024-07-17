@@ -7,7 +7,7 @@ use crate::extension::ExtensionSet;
 
 use crate::{
     extension::ExtensionId,
-    types::{EdgeKind, FunctionType, Type, TypeRow},
+    types::{EdgeKind, Signature, Type, TypeRow},
 };
 
 /// A no-op operation.
@@ -72,6 +72,8 @@ pub struct Tag {
     /// The variant to create.
     pub tag: usize,
     /// The variants of the sum type.
+    /// TODO this allows *none* of the variants to contain row variables, but
+    /// we could allow variants *other than the tagged one* to contain rowvars.
     pub variants: Vec<TypeRow>,
 }
 
@@ -119,8 +121,8 @@ impl DataflowOpTrait for Noop {
     }
 
     /// The signature of the operation.
-    fn signature(&self) -> FunctionType {
-        FunctionType::new(vec![self.ty.clone()], vec![self.ty.clone()])
+    fn signature(&self) -> Signature {
+        Signature::new(vec![self.ty.clone()], vec![self.ty.clone()])
     }
 
     fn other_input(&self) -> Option<EdgeKind> {
@@ -141,8 +143,8 @@ impl DataflowOpTrait for MakeTuple {
     }
 
     /// The signature of the operation.
-    fn signature(&self) -> FunctionType {
-        FunctionType::new(self.tys.clone(), vec![Type::new_tuple(self.tys.clone())])
+    fn signature(&self) -> Signature {
+        Signature::new(self.tys.clone(), vec![Type::new_tuple(self.tys.clone())])
     }
 
     fn other_input(&self) -> Option<EdgeKind> {
@@ -163,8 +165,8 @@ impl DataflowOpTrait for UnpackTuple {
     }
 
     /// The signature of the operation.
-    fn signature(&self) -> FunctionType {
-        FunctionType::new(vec![Type::new_tuple(self.tys.clone())], self.tys.clone())
+    fn signature(&self) -> Signature {
+        Signature::new(vec![Type::new_tuple(self.tys.clone())], self.tys.clone())
     }
 
     fn other_input(&self) -> Option<EdgeKind> {
@@ -185,8 +187,8 @@ impl DataflowOpTrait for Tag {
     }
 
     /// The signature of the operation.
-    fn signature(&self) -> FunctionType {
-        FunctionType::new(
+    fn signature(&self) -> Signature {
+        Signature::new(
             self.variants
                 .get(self.tag)
                 .expect("Not a valid tag")
@@ -213,8 +215,8 @@ impl DataflowOpTrait for Lift {
     }
 
     /// The signature of the operation.
-    fn signature(&self) -> FunctionType {
-        FunctionType::new(self.type_row.clone(), self.type_row.clone())
+    fn signature(&self) -> Signature {
+        Signature::new(self.type_row.clone(), self.type_row.clone())
             .with_extension_delta(ExtensionSet::singleton(&self.new_extension))
     }
 

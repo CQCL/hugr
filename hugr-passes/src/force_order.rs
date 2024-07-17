@@ -204,14 +204,14 @@ mod test {
     use std::collections::HashMap;
 
     use super::*;
-    use hugr_core::builder::{endo_ft, BuildHandle, Dataflow, DataflowHugr};
+    use hugr_core::builder::{endo_sig, BuildHandle, Dataflow, DataflowHugr};
     use hugr_core::extension::EMPTY_REG;
     use hugr_core::ops::handle::{DataflowOpID, NodeHandle};
 
     use hugr_core::ops::Value;
     use hugr_core::std_extensions::arithmetic::int_ops::{self, IntOpDef};
     use hugr_core::std_extensions::arithmetic::int_types::INT_TYPES;
-    use hugr_core::types::{FunctionType, Type};
+    use hugr_core::types::{Signature, Type};
     use hugr_core::{builder::DFGBuilder, hugr::Hugr};
     use hugr_core::{HugrView, Wire};
 
@@ -247,7 +247,7 @@ mod test {
     ///      Output
     fn test_hugr() -> (Hugr, [Node; 4]) {
         let t = INT_TYPES[I as usize].clone();
-        let mut builder = DFGBuilder::new(endo_ft(vec![t.clone(), t.clone()])).unwrap();
+        let mut builder = DFGBuilder::new(endo_sig(vec![t.clone(), t.clone()])).unwrap();
         let [iw1, iw2] = builder.input_wires_arr();
         let v0 = build_neg(&mut builder, iw1);
         let v1 = build_neg(&mut builder, iw2);
@@ -324,7 +324,7 @@ mod test {
     fn test_force_order_const() {
         let mut hugr = {
             let mut builder =
-                DFGBuilder::new(FunctionType::new(Type::EMPTY_TYPEROW, Type::UNIT)).unwrap();
+                DFGBuilder::new(Signature::new(Type::EMPTY_TYPEROW, Type::UNIT)).unwrap();
             let unit = builder.add_load_value(Value::unary_unit_sum());
             builder
                 .finish_hugr_with_outputs([unit], &EMPTY_REG)

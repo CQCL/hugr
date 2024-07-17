@@ -43,11 +43,11 @@ pub(crate) use impl_box_clone;
 /// Example:
 /// ```
 /// # use hugr::type_row;
-/// # use hugr::types::{FunctionType, Type, TypeRow};
+/// # use hugr::types::{Signature, Type, TypeRow};
 /// const U: Type = Type::UNIT;
 /// let static_row: TypeRow = type_row![U, U];
 /// let dynamic_row: TypeRow = vec![U, U, U].into();
-/// let sig = FunctionType::new(static_row, dynamic_row);
+/// let sig = Signature::new(static_row, dynamic_row);
 ///
 /// let repeated_row: TypeRow = type_row![U; 3];
 /// assert_eq!(repeated_row, *sig.output());
