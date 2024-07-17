@@ -330,14 +330,18 @@ class FunctionType(Type):
         return cls(input=[], output=[])
 
     @classmethod
-    def endo(cls, tys: TypeRow) -> FunctionType:
+    def endo(
+        cls, tys: TypeRow, extension_reqs: ExtensionSet | None = None
+    ) -> FunctionType:
         """Function type with the same input and output types.
 
         Example:
             >>> FunctionType.endo([Qubit])
             FunctionType([Qubit], [Qubit])
         """
-        return cls(input=tys, output=tys)
+        return cls(
+            input=tys, output=tys, extension_reqs=extension_reqs or ExtensionSet()
+        )
 
     def flip(self) -> FunctionType:
         """Return a new function type with input and output types swapped.
