@@ -7,9 +7,8 @@ from dataclasses import dataclass
 from hugr import tys, val
 
 #: HUGR 64-bit IEEE 754-2019 floating point type.
-FLOAT_EXT_ID = "arithmetic.float.types"
 FLOAT_T = tys.Opaque(
-    extension=FLOAT_EXT_ID,
+    extension="arithmetic.float.types",
     id="float64",
     args=[],
     bound=tys.TypeBound.Copyable,

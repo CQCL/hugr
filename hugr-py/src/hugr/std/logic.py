@@ -20,8 +20,7 @@ class _NotDef(AsCustomOp):
     """Not operation."""
 
     def to_custom(self) -> Custom:
-        sig = tys.FunctionType.endo([tys.Bool], [EXTENSION_ID])
-        return Custom("Not", sig, extension=EXTENSION_ID)
+        return Custom("Not", tys.FunctionType.endo([tys.Bool]), extension=EXTENSION_ID)
 
     def __call__(self, a: ComWire) -> Command:
         return DataflowOp.__call__(self, a)
