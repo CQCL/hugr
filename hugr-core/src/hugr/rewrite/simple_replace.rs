@@ -361,6 +361,40 @@ pub(in crate::hugr::rewrite) mod test {
         build().unwrap()
     }
 
+    /// A hugr with a DFG root mapping BOOL_T to (BOOL_T, BOOL_T)
+    ///                     ┌─────────┐
+    ///                ┌────┤ (1) NOT ├──
+    ///  ┌─────────┐   │    └─────────┘
+    /// ─┤ (0) NOT ├───┤
+    ///  └─────────┘   │               
+    ///                └─────────────────
+    ///
+    /// This can be replaced with a single NOT gate, coping the input to the first output.
+    ///
+    /// Returns the hugr and the nodes of the NOT gates, in order.
+    #[fixture]
+    pub(in crate::hugr::rewrite) fn dfg_hugr_half_not_bools() -> (Hugr, Vec<Node>) {
+        fn build() -> Result<(Hugr, Vec<Node>), BuildError> {
+            let mut dfg_builder =
+                DFGBuilder::new(inout_sig(type_row![BOOL_T], type_row![BOOL_T, BOOL_T]))?;
+            let [b] = dfg_builder.input_wires_arr();
+
+            let not_inp = dfg_builder.add_dataflow_op(NotOp, vec![b])?;
+            let [b] = not_inp.outputs_arr();
+
+            let not_0 = dfg_builder.add_dataflow_op(NotOp, vec![b])?;
+            let [b0] = not_0.outputs_arr();
+            let b1 = b;
+
+            Ok((
+                dfg_builder.finish_prelude_hugr_with_outputs([b0, b1])?,
+                vec![not_inp.node(), not_0.node()],
+            ))
+        }
+
+        build().unwrap()
+    }
+
     #[rstest]
     /// Replace the
     ///      ┌───┐
@@ -623,6 +657,8 @@ pub(in crate::hugr::rewrite) mod test {
         assert_eq!(h.node_count(), orig.node_count());
     }
 
+    /// Remove all the NOT gates in [`dfg_hugr_copy_bools`] by connecting the input
+    /// directly to the outputs.
     #[rstest]
     fn test_copy_inputs(
         dfg_hugr_copy_bools: (Hugr, Vec<Node>),
@@ -674,6 +710,64 @@ pub(in crate::hugr::rewrite) mod test {
 
         assert_eq!(hugr.update_validate(&PRELUDE_REGISTRY), Ok(()));
         assert_eq!(hugr.node_count(), 3);
+
+        Ok(())
+    }
+
+    /// Remove one of the NOT gates in [`dfg_hugr_half_not_bools`] by connecting the input
+    /// directly to the output.
+    #[rstest]
+    fn test_half_nots(
+        dfg_hugr_half_not_bools: (Hugr, Vec<Node>),
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let (mut hugr, nodes) = dfg_hugr_half_not_bools;
+        let (input_not, output_not_0) = nodes.into_iter().collect_tuple().unwrap();
+
+        let [_input, output] = hugr.get_io(hugr.root()).unwrap();
+
+        let (replacement, repl_not) = {
+            let mut b = DFGBuilder::new(inout_sig(type_row![BOOL_T], type_row![BOOL_T, BOOL_T]))?;
+            let [w] = b.input_wires_arr();
+            let not = b.add_dataflow_op(NotOp, vec![w])?;
+            let [w_not] = not.outputs_arr();
+            (b.finish_prelude_hugr_with_outputs([w, w_not])?, not.node())
+        };
+        let [_repl_input, repl_output] = replacement.get_io(replacement.root()).unwrap();
+
+        let subgraph = SiblingSubgraph::try_from_nodes(vec![input_not, output_not_0], &hugr)?;
+        // A map from (target ports of edges from the Input node of `replacement`) to (target ports of
+        // edges from nodes not in `removal` to nodes in `removal`).
+        let nu_inp = [
+            (
+                (repl_output, IncomingPort::from(0)),
+                (input_not, IncomingPort::from(0)),
+            ),
+            (
+                (repl_not, IncomingPort::from(0)),
+                (input_not, IncomingPort::from(0)),
+            ),
+        ]
+        .into_iter()
+        .collect();
+        // A map from (target ports of edges from nodes in `removal` to nodes not in `removal`) to
+        // (input ports of the Output node of `replacement`).
+        let nu_out = [
+            ((output, IncomingPort::from(0)), IncomingPort::from(0)),
+            ((output, IncomingPort::from(1)), IncomingPort::from(1)),
+        ]
+        .into_iter()
+        .collect();
+
+        let rewrite = SimpleReplacement {
+            subgraph,
+            replacement,
+            nu_inp,
+            nu_out,
+        };
+        rewrite.apply(&mut hugr).unwrap_or_else(|e| panic!("{e}"));
+
+        assert_eq!(hugr.update_validate(&PRELUDE_REGISTRY), Ok(()));
+        assert_eq!(hugr.node_count(), 4);
 
         Ok(())
     }
