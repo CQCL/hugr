@@ -54,6 +54,7 @@ impl TestCase {
         if !path.exists() {
             let f = OpenOptions::new()
                 .create(true)
+                .truncate(true)
                 .write(true)
                 .open(&path)
                 .unwrap();
