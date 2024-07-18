@@ -137,8 +137,10 @@ assume that you are upgrading from v5 to v6.)
     return `"v6"`.
 7.  Run `just update-schema` to generate new v6 schema files. Commit these to
     the repo.
-8.  Implement `v5_to_v6()`.
-9.  Ensure all tests are passing.
+8.  In `hugr-core/src/hugr/serialize/test.rs`, in the `include_schema` macro
+    change `v5` to `v6`.
+9.  Implement `v5_to_v6()`.
+10. Ensure all tests are passing.
 
 ## 🌐 Contributing to HUGR
 
