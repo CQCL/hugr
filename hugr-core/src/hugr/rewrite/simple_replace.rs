@@ -340,26 +340,24 @@ pub(in crate::hugr::rewrite) mod test {
     /// Returns the hugr and the nodes of the NOT gates, in order.
     #[fixture]
     pub(in crate::hugr::rewrite) fn dfg_hugr_copy_bools() -> (Hugr, Vec<Node>) {
-        fn build() -> Result<(Hugr, Vec<Node>), BuildError> {
-            let mut dfg_builder =
-                DFGBuilder::new(inout_sig(type_row![BOOL_T], type_row![BOOL_T, BOOL_T]))?;
-            let [b] = dfg_builder.input_wires_arr();
+        let mut dfg_builder =
+            DFGBuilder::new(inout_sig(type_row![BOOL_T], type_row![BOOL_T, BOOL_T])).unwrap();
+        let [b] = dfg_builder.input_wires_arr();
 
-            let not_inp = dfg_builder.add_dataflow_op(NotOp, vec![b])?;
-            let [b] = not_inp.outputs_arr();
+        let not_inp = dfg_builder.add_dataflow_op(NotOp, vec![b]).unwrap();
+        let [b] = not_inp.outputs_arr();
 
-            let not_0 = dfg_builder.add_dataflow_op(NotOp, vec![b])?;
-            let [b0] = not_0.outputs_arr();
-            let not_1 = dfg_builder.add_dataflow_op(NotOp, vec![b])?;
-            let [b1] = not_1.outputs_arr();
+        let not_0 = dfg_builder.add_dataflow_op(NotOp, vec![b]).unwrap();
+        let [b0] = not_0.outputs_arr();
+        let not_1 = dfg_builder.add_dataflow_op(NotOp, vec![b]).unwrap();
+        let [b1] = not_1.outputs_arr();
 
-            Ok((
-                dfg_builder.finish_prelude_hugr_with_outputs([b0, b1])?,
-                vec![not_inp.node(), not_0.node(), not_1.node()],
-            ))
-        }
-
-        build().unwrap()
+        (
+            dfg_builder
+                .finish_prelude_hugr_with_outputs([b0, b1])
+                .unwrap(),
+            vec![not_inp.node(), not_0.node(), not_1.node()],
+        )
     }
 
     /// A hugr with a DFG root mapping BOOL_T to (BOOL_T, BOOL_T)
@@ -375,25 +373,23 @@ pub(in crate::hugr::rewrite) mod test {
     /// Returns the hugr and the nodes of the NOT ops, in order.
     #[fixture]
     pub(in crate::hugr::rewrite) fn dfg_hugr_half_not_bools() -> (Hugr, Vec<Node>) {
-        fn build() -> Result<(Hugr, Vec<Node>), BuildError> {
-            let mut dfg_builder =
-                DFGBuilder::new(inout_sig(type_row![BOOL_T], type_row![BOOL_T, BOOL_T]))?;
-            let [b] = dfg_builder.input_wires_arr();
+        let mut dfg_builder =
+            DFGBuilder::new(inout_sig(type_row![BOOL_T], type_row![BOOL_T, BOOL_T])).unwrap();
+        let [b] = dfg_builder.input_wires_arr();
 
-            let not_inp = dfg_builder.add_dataflow_op(NotOp, vec![b])?;
-            let [b] = not_inp.outputs_arr();
+        let not_inp = dfg_builder.add_dataflow_op(NotOp, vec![b]).unwrap();
+        let [b] = not_inp.outputs_arr();
 
-            let not_0 = dfg_builder.add_dataflow_op(NotOp, vec![b])?;
-            let [b0] = not_0.outputs_arr();
-            let b1 = b;
+        let not_0 = dfg_builder.add_dataflow_op(NotOp, vec![b]).unwrap();
+        let [b0] = not_0.outputs_arr();
+        let b1 = b;
 
-            Ok((
-                dfg_builder.finish_prelude_hugr_with_outputs([b0, b1])?,
-                vec![not_inp.node(), not_0.node()],
-            ))
-        }
-
-        build().unwrap()
+        (
+            dfg_builder
+                .finish_prelude_hugr_with_outputs([b0, b1])
+                .unwrap(),
+            vec![not_inp.node(), not_0.node()],
+        )
     }
 
     #[rstest]
@@ -663,23 +659,23 @@ pub(in crate::hugr::rewrite) mod test {
     ///
     /// https://github.com/CQCL/hugr/issues/1190
     #[rstest]
-    fn test_copy_inputs(
-        dfg_hugr_copy_bools: (Hugr, Vec<Node>),
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn test_copy_inputs(dfg_hugr_copy_bools: (Hugr, Vec<Node>)) {
         let (mut hugr, nodes) = dfg_hugr_copy_bools;
         let (input_not, output_not_0, output_not_1) = nodes.into_iter().collect_tuple().unwrap();
 
         let [_input, output] = hugr.get_io(hugr.root()).unwrap();
 
         let replacement = {
-            let b = DFGBuilder::new(Signature::new(type_row![BOOL_T], type_row![BOOL_T, BOOL_T]))?;
+            let b = DFGBuilder::new(Signature::new(type_row![BOOL_T], type_row![BOOL_T, BOOL_T]))
+                .unwrap();
             let [w] = b.input_wires_arr();
-            b.finish_prelude_hugr_with_outputs([w, w])?
+            b.finish_prelude_hugr_with_outputs([w, w]).unwrap()
         };
         let [_repl_input, repl_output] = replacement.get_io(replacement.root()).unwrap();
 
         let subgraph =
-            SiblingSubgraph::try_from_nodes(vec![input_not, output_not_0, output_not_1], &hugr)?;
+            SiblingSubgraph::try_from_nodes(vec![input_not, output_not_0, output_not_1], &hugr)
+                .unwrap();
         // A map from (target ports of edges from the Input node of `replacement`) to (target ports of
         // edges from nodes not in `removal` to nodes in `removal`).
         let nu_inp = [
@@ -713,8 +709,6 @@ pub(in crate::hugr::rewrite) mod test {
 
         assert_eq!(hugr.update_validate(&PRELUDE_REGISTRY), Ok(()));
         assert_eq!(hugr.node_count(), 3);
-
-        Ok(())
     }
 
     /// Remove one of the NOT ops in [`dfg_hugr_half_not_bools`] by connecting the input
@@ -722,24 +716,27 @@ pub(in crate::hugr::rewrite) mod test {
     ///
     /// https://github.com/CQCL/hugr/issues/1323
     #[rstest]
-    fn test_half_nots(
-        dfg_hugr_half_not_bools: (Hugr, Vec<Node>),
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn test_half_nots(dfg_hugr_half_not_bools: (Hugr, Vec<Node>)) {
         let (mut hugr, nodes) = dfg_hugr_half_not_bools;
         let (input_not, output_not_0) = nodes.into_iter().collect_tuple().unwrap();
 
         let [_input, output] = hugr.get_io(hugr.root()).unwrap();
 
         let (replacement, repl_not) = {
-            let mut b = DFGBuilder::new(inout_sig(type_row![BOOL_T], type_row![BOOL_T, BOOL_T]))?;
+            let mut b =
+                DFGBuilder::new(inout_sig(type_row![BOOL_T], type_row![BOOL_T, BOOL_T])).unwrap();
             let [w] = b.input_wires_arr();
-            let not = b.add_dataflow_op(NotOp, vec![w])?;
+            let not = b.add_dataflow_op(NotOp, vec![w]).unwrap();
             let [w_not] = not.outputs_arr();
-            (b.finish_prelude_hugr_with_outputs([w, w_not])?, not.node())
+            (
+                b.finish_prelude_hugr_with_outputs([w, w_not]).unwrap(),
+                not.node(),
+            )
         };
         let [_repl_input, repl_output] = replacement.get_io(replacement.root()).unwrap();
 
-        let subgraph = SiblingSubgraph::try_from_nodes(vec![input_not, output_not_0], &hugr)?;
+        let subgraph =
+            SiblingSubgraph::try_from_nodes(vec![input_not, output_not_0], &hugr).unwrap();
         // A map from (target ports of edges from the Input node of `replacement`) to (target ports of
         // edges from nodes not in `removal` to nodes in `removal`).
         let nu_inp = [
@@ -763,12 +760,6 @@ pub(in crate::hugr::rewrite) mod test {
         .into_iter()
         .collect();
 
-        println!("Graph:\n{}", hugr.mermaid_string());
-        println!("Subgraph: {subgraph:?}");
-        println!("Replacement:\n{}", replacement.mermaid_string());
-        println!("nu_inp: {nu_inp:?}");
-        println!("nu_out: {nu_out:?}");
-
         let rewrite = SimpleReplacement {
             subgraph,
             replacement,
@@ -779,8 +770,6 @@ pub(in crate::hugr::rewrite) mod test {
 
         assert_eq!(hugr.update_validate(&PRELUDE_REGISTRY), Ok(()));
         assert_eq!(hugr.node_count(), 4);
-
-        Ok(())
     }
 
     use crate::hugr::rewrite::replace::Replacement;
