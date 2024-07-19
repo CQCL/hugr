@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.9.0 (2024-07-19)
+
+### Bug Fixes
+
+- Add op's extension to signature check in `resolve_opaque_op` ([#1317](https://github.com/CQCL/hugr/pull/1317))
+- Panic on `SimpleReplace` with multiports ([#1324](https://github.com/CQCL/hugr/pull/1324))
+
+### Refactor
+
+- [**breaking**] Separate Signature from FuncValueType by parametrizing Type(/Row)/etc. ([#1138](https://github.com/CQCL/hugr/pull/1138))
+
+### Testing
+
+- Verify order edges ([#1293](https://github.com/CQCL/hugr/pull/1293))
+- Add failing test case for [#1315](https://github.com/CQCL/hugr/pull/1315) ([#1316](https://github.com/CQCL/hugr/pull/1316))
+
+
 ## 0.8.0 (2024-07-16)
 
 ### Bug Fixes
