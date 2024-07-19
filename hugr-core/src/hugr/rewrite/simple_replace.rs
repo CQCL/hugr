@@ -370,9 +370,9 @@ pub(in crate::hugr::rewrite) mod test {
     ///  └─────────┘   │
     ///                └─────────────────
     ///
-    /// This can be replaced with a single NOT gate, coping the input to the first output.
+    /// This can be replaced with a single NOT op, coping the input to the first output.
     ///
-    /// Returns the hugr and the nodes of the NOT gates, in order.
+    /// Returns the hugr and the nodes of the NOT ops, in order.
     #[fixture]
     pub(in crate::hugr::rewrite) fn dfg_hugr_half_not_bools() -> (Hugr, Vec<Node>) {
         fn build() -> Result<(Hugr, Vec<Node>), BuildError> {
@@ -717,7 +717,7 @@ pub(in crate::hugr::rewrite) mod test {
         Ok(())
     }
 
-    /// Remove one of the NOT gates in [`dfg_hugr_half_not_bools`] by connecting the input
+    /// Remove one of the NOT ops in [`dfg_hugr_half_not_bools`] by connecting the input
     /// directly to the output.
     ///
     /// https://github.com/CQCL/hugr/issues/1323
