@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.0 (2024-07-19)
+
+### Refactor
+
+- [**breaking**] Separate Signature from FuncValueType by parametrizing Type(/Row)/etc. ([#1138](https://github.com/CQCL/hugr/pull/1138))
+
+
 ## 0.5.0 (2024-07-16)
 
 ### Bug Fixes
