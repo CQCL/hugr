@@ -1,4 +1,6 @@
 use crate::custom::int::add_int_extensions;
+use crate::types::HugrFuncType;
+use hugr::builder::DataflowSubContainer;
 use hugr::builder::{
     BuildHandle, Container, DFGWrapper, Dataflow, HugrBuilder, ModuleBuilder, SubContainer,
 };
@@ -10,7 +12,6 @@ use hugr::ops::{Tag, UnpackTuple, Value};
 use hugr::std_extensions::arithmetic::int_ops::{self, INT_OPS_REGISTRY};
 use hugr::std_extensions::arithmetic::int_types::ConstInt;
 use hugr::types::{Type, TypeRow};
-use hugr::{builder::DataflowSubContainer, types::FunctionType};
 use hugr::{type_row, Hugr};
 use itertools::Itertools;
 use rstest::rstest;
@@ -65,7 +66,7 @@ impl SimpleHugrConfig {
     ) -> Hugr {
         let mut mod_b = ModuleBuilder::new();
         let func_b = mod_b
-            .define_function("main", FunctionType::new(self.ins, self.outs))
+            .define_function("main", HugrFuncType::new(self.ins, self.outs))
             .unwrap();
         make(func_b, &self.extensions);
         mod_b.finish_hugr(&self.extensions).unwrap()
@@ -161,7 +162,7 @@ fn emit_hugr_dfg(llvm_ctx: TestContext) {
         .finish(|mut builder: DFGW| {
             let dfg = {
                 let b = builder
-                    .dfg_builder(FunctionType::new_endo(Type::UNIT), builder.input_wires())
+                    .dfg_builder(HugrFuncType::new_endo(Type::UNIT), builder.input_wires())
                     .unwrap();
                 let w = b.input_wires();
                 b.finish_with_outputs(w).unwrap()
@@ -236,7 +237,7 @@ fn emit_hugr_load_constant(mut llvm_ctx: TestContext) {
 fn emit_hugr_call(llvm_ctx: TestContext) {
     fn build_recursive(mod_b: &mut ModuleBuilder<Hugr>, name: &str, io: TypeRow) {
         let f_id = mod_b
-            .declare(name, FunctionType::new_endo(io).into())
+            .declare(name, HugrFuncType::new_endo(io).into())
             .unwrap();
         let mut func_b = mod_b.define_declaration(&f_id).unwrap();
         let call = func_b
@@ -292,19 +293,19 @@ fn diverse_module_children(llvm_ctx: TestContext) {
         let mut builder = ModuleBuilder::new();
         let _ = {
             let fbuilder = builder
-                .define_function("f1", FunctionType::new_endo(type_row![]))
+                .define_function("f1", HugrFuncType::new_endo(type_row![]))
                 .unwrap();
             fbuilder.finish_sub_container().unwrap()
         };
         let _ = {
             let fbuilder = builder
-                .define_function("f2", FunctionType::new_endo(type_row![]))
+                .define_function("f2", HugrFuncType::new_endo(type_row![]))
                 .unwrap();
             fbuilder.finish_sub_container().unwrap()
         };
         let _ = builder.add_constant(Value::true_val());
         let _ = builder
-            .declare("decl", FunctionType::new_endo(type_row![]).into())
+            .declare("decl", HugrFuncType::new_endo(type_row![]).into())
             .unwrap();
         builder.finish_hugr(&EMPTY_REG).unwrap()
     };
@@ -318,12 +319,12 @@ fn diverse_dfg_children(llvm_ctx: TestContext) {
         .finish(|mut builder: DFGW| {
             let [r] = {
                 let mut builder = builder
-                    .dfg_builder(FunctionType::new(type_row![], BOOL_T), [])
+                    .dfg_builder(HugrFuncType::new(type_row![], BOOL_T), [])
                     .unwrap();
                 let konst = builder.add_constant(Value::false_val());
                 let func = {
                     let mut builder = builder
-                        .define_function("scoped_func", FunctionType::new(type_row![], BOOL_T))
+                        .define_function("scoped_func", HugrFuncType::new(type_row![], BOOL_T))
                         .unwrap();
                     let w = builder.load_const(&konst);
                     builder.finish_with_outputs([w]).unwrap()
@@ -351,7 +352,7 @@ fn diverse_cfg_children(llvm_ctx: TestContext) {
                 let konst = builder.add_constant(Value::false_val());
                 let func = {
                     let mut builder = builder
-                        .define_function("scoped_func", FunctionType::new(type_row![], BOOL_T))
+                        .define_function("scoped_func", HugrFuncType::new(type_row![], BOOL_T))
                         .unwrap();
                     let w = builder.load_const(&konst);
                     builder.finish_with_outputs([w]).unwrap()

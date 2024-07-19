@@ -232,7 +232,6 @@ mod test {
     use hugr::std_extensions::arithmetic::int_types::{self, INT_TYPES};
     use hugr::type_row;
 
-    use hugr::types::Type;
     use itertools::Itertools as _;
     use rstest::rstest;
 
@@ -241,6 +240,7 @@ mod test {
     use crate::test::{llvm_ctx, TestContext};
 
     use crate::check_emission;
+    use crate::types::HugrType;
 
     #[rstest]
     fn diverse_outputs(mut llvm_ctx: TestContext) {
@@ -301,7 +301,7 @@ mod test {
 
     #[rstest]
     fn nested(llvm_ctx: TestContext) {
-        let t1 = Type::new_unit_sum(3);
+        let t1 = HugrType::new_unit_sum(3);
         let es = ExtensionSet::default();
         let hugr = SimpleHugrConfig::new()
             .with_ins(vec![t1.clone(), BOOL_T])

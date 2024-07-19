@@ -4,7 +4,7 @@ use std::rc::Rc;
 
 use anyhow::{anyhow, Result};
 use delegate::delegate;
-use hugr::types::SumType;
+use hugr::types::{SumType, Type};
 use hugr::{types::TypeRow, HugrView};
 use inkwell::builder::Builder;
 use inkwell::types::{self as iw, AnyType, AsTypeRef, IntType};
@@ -19,6 +19,16 @@ use llvm_sys_140::prelude::LLVMTypeRef;
 
 use super::custom::CodegenExtsMap;
 
+/// A type alias for a hugr function type. We use this to disambiguate from
+/// the LLVM [iw::FunctionType].
+pub type HugrFuncType = hugr::types::FunctionType;
+
+/// A type alias for a hugr type. We use this to disambiguate from LLVM types.
+pub type HugrType = Type;
+
+/// A type alias for a hugr sum type.
+pub type HugrSumType = SumType;
+
 /// This type is mostly vestigal, it does very little but hold a &[Context].
 ///
 /// I had thought it would grow some configuration that it would use while
@@ -29,7 +39,7 @@ pub struct TypeConverter<'c> {
 }
 
 /// A type that holds [Rc] shared pointers to everything needed to convert from
-/// a hugr [hugr::types::Type] to an LLVM [Type](inkwell::types).
+/// a hugr [HugrType] to an LLVM [Type](inkwell::types).
 pub struct TypingSession<'c, H: HugrView> {
     tc: Rc<TypeConverter<'c>>,
     extensions: Rc<CodegenExtsMap<'c, H>>,
@@ -48,8 +58,8 @@ impl<'c, H: HugrView> TypingSession<'c, H> {
         TypingSession { tc, extensions }
     }
 
-    /// Convert hugr [hugr::types::Type] into an LLVM [Type](BasicTypeEnum).
-    pub fn llvm_type(&self, hugr_type: &hugr::types::Type) -> Result<BasicTypeEnum<'c>> {
+    /// Convert a [HugrType] into an LLVM [Type](BasicTypeEnum).
+    pub fn llvm_type(&self, hugr_type: &HugrType) -> Result<BasicTypeEnum<'c>> {
         use hugr::types::TypeEnum;
         match hugr_type.as_type_enum() {
             TypeEnum::Extension(ref custom_type) => self.extensions.llvm_type(self, custom_type),
@@ -63,10 +73,10 @@ impl<'c, H: HugrView> TypingSession<'c, H> {
         }
     }
 
-    /// Convert a hugr (FunctionType)[hugr::types::FunctionType] into an LLVM [iw::FunctionType].
+    /// Convert a [HugrFuncType] into an LLVM [iw::FunctionType].
     pub fn llvm_func_type(
         &self,
-        hugr_type: &hugr::types::FunctionType,
+        hugr_type: &HugrFuncType,
     ) -> Result<inkwell::types::FunctionType<'c>> {
         let args = hugr_type
             .input()
@@ -89,8 +99,8 @@ impl<'c, H: HugrView> TypingSession<'c, H> {
         })
     }
 
-    /// Convert a hugr [hugr::types::SumType] into an LLVM [LLVMSumType].
-    pub fn llvm_sum_type(&self, sum_type: hugr::types::SumType) -> Result<LLVMSumType<'c>> {
+    /// Convert a hugr [HugrSumType] into an LLVM [LLVMSumType].
+    pub fn llvm_sum_type(&self, sum_type: HugrSumType) -> Result<LLVMSumType<'c>> {
         LLVMSumType::try_new(self, sum_type)
     }
 }
@@ -114,29 +124,29 @@ impl<'c> TypeConverter<'c> {
         TypingSession::new(self, exts)
     }
 
-    /// Convert hugr [hugr::types::Type] into an LLVM [Type](BasicTypeEnum).
+    /// Convert a [HugrType] into an LLVM [Type](BasicTypeEnum).
     pub fn llvm_type<H: HugrView>(
         self: Rc<Self>,
         extensions: Rc<CodegenExtsMap<'c, H>>,
-        hugr_type: &hugr::types::Type,
+        hugr_type: &HugrType,
     ) -> Result<BasicTypeEnum<'c>> {
         self.session(extensions).llvm_type(hugr_type)
     }
 
-    /// Convert a hugr (FunctionType)[hugr::types::FunctionType] into an LLVM [iw::FunctionType].
+    /// Convert a [HugrFuncType] into an LLVM [iw::FunctionType].
     pub fn llvm_func_type<H: HugrView>(
         self: Rc<Self>,
         extensions: Rc<CodegenExtsMap<'c, H>>,
-        hugr_type: &hugr::types::FunctionType,
+        hugr_type: &HugrFuncType,
     ) -> Result<iw::FunctionType<'c>> {
         self.session(extensions).llvm_func_type(hugr_type)
     }
 
-    /// Convert a hugr [hugr::types::SumType] into an LLVM [LLVMSumType].
+    /// Convert a hugr [HugrSumType] into an LLVM [LLVMSumType].
     pub fn llvm_sum_type<H: HugrView>(
         self: Rc<Self>,
         extensions: Rc<CodegenExtsMap<'c, H>>,
-        sum_type: hugr::types::SumType,
+        sum_type: HugrSumType,
     ) -> Result<LLVMSumType<'c>> {
         self.session(extensions).llvm_sum_type(sum_type)
     }
@@ -152,7 +162,7 @@ impl<'c> TypeConverter<'c> {
 pub struct LLVMSumType<'c>(StructType<'c>, SumType);
 
 impl<'c> LLVMSumType<'c> {
-    /// Attempt to create a new `LLVMSumType` from a [hugr::types::SumType].
+    /// Attempt to create a new `LLVMSumType` from a [HugrSumType].
     pub fn try_new<H: HugrView>(session: &TypingSession<'c, H>, sum_type: SumType) -> Result<Self> {
         let mut i = 0;
         let (sum_type_ref, session_ref) = (&sum_type, &session);
@@ -341,19 +351,19 @@ pub mod test {
     use hugr::{
         std_extensions::arithmetic::int_types::INT_TYPES,
         type_row,
-        types::{FunctionType, SumType, Type},
+        types::{SumType, Type},
     };
 
     use insta::assert_snapshot;
     use rstest::rstest;
 
-    use crate::{custom::int::add_int_extensions, test::*};
+    use crate::{custom::int::add_int_extensions, test::*, types::HugrFuncType};
 
     #[rstest]
-    #[case(0,FunctionType::new(type_row!(Type::new_unit_sum(2)), type_row!()))]
-    #[case(1, FunctionType::new(Type::new_unit_sum(1), Type::new_unit_sum(3)))]
-    #[case(2,FunctionType::new(vec![], vec![Type::new_unit_sum(1), Type::new_unit_sum(1)]))]
-    fn func_types(#[case] _id: i32, #[with(_id)] llvm_ctx: TestContext, #[case] ft: FunctionType) {
+    #[case(0,HugrFuncType::new(type_row!(Type::new_unit_sum(2)), type_row!()))]
+    #[case(1, HugrFuncType::new(Type::new_unit_sum(1), Type::new_unit_sum(3)))]
+    #[case(2,HugrFuncType::new(vec![], vec![Type::new_unit_sum(1), Type::new_unit_sum(1)]))]
+    fn func_types(#[case] _id: i32, #[with(_id)] llvm_ctx: TestContext, #[case] ft: HugrFuncType) {
         assert_snapshot!(
             "func_type_to_llvm",
             llvm_ctx.get_typing_session().llvm_func_type(&ft).unwrap(),
@@ -385,7 +395,7 @@ pub mod test {
     #[case(4, INT_TYPES[6].clone())]
     #[case(5, Type::new_sum([vec![INT_TYPES[2].clone()].into()]))]
     #[case(6, Type::new_sum([vec![INT_TYPES[6].clone(),Type::new_unit_sum(1)].into(), vec![Type::new_unit_sum(2), INT_TYPES[2].clone()].into()]))]
-    #[case(7, Type::new_function(FunctionType::new(type_row!(Type::new_unit_sum(2)), Type::new_unit_sum(3))))]
+    #[case(7, Type::new_function(HugrFuncType::new(type_row!(Type::new_unit_sum(2)), Type::new_unit_sum(3))))]
     fn ext_types(#[case] _id: i32, #[with(_id)] mut llvm_ctx: TestContext, #[case] t: Type) {
         llvm_ctx.add_extensions(add_int_extensions);
         assert_snapshot!(

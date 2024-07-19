@@ -168,12 +168,12 @@ impl<'c, H: HugrView> CodegenExtsMap<'c, H> {
 mod test {
     use hugr::builder::{Dataflow, DataflowSubContainer};
     use hugr::type_row;
-    use hugr::types::Type;
     use rstest::rstest;
 
     use crate::check_emission;
     use crate::emit::test::SimpleHugrConfig;
     use crate::test::{llvm_ctx, TestContext};
+    use crate::types::HugrType;
 
     use super::*;
 
@@ -248,7 +248,7 @@ mod test {
         let konst1 = ConstExternalSymbol::new("sym1", USIZE_T, true);
         let konst2 = ConstExternalSymbol::new(
             "sym2",
-            Type::new_sum([type_row![USIZE_T, Type::new_unit_sum(3)], type_row![]]),
+            HugrType::new_sum([type_row![USIZE_T, HugrType::new_unit_sum(3)], type_row![]]),
             false,
         );
 

@@ -15,7 +15,7 @@ use inkwell::{
 };
 use itertools::zip_eq;
 
-use crate::types::TypingSession;
+use crate::types::{HugrFuncType, HugrSumType, HugrType, TypingSession};
 use crate::{custom::CodegenExtsMap, fat::FatNode, types::LLVMSumType};
 use delegate::delegate;
 
@@ -62,12 +62,12 @@ impl<'c, H: HugrView> EmitFuncContext<'c, H> {
             pub fn extensions(&self) ->  Rc<CodegenExtsMap<'c,H>>;
             /// Returns a new [TypingSession].
             pub fn typing_session(&self) -> TypingSession<'c,H>;
-            /// Convert hugr [Type] into an LLVM [Type](BasicTypeEnum).
-            pub fn llvm_type(&self, hugr_type: &hugr::types::Type) -> Result<BasicTypeEnum<'c> >;
-            /// Convert a hugr (FunctionType)[hugr::types::FunctionType] into an LLVM [FunctionType].
-            pub fn llvm_func_type(&self, hugr_type: &hugr::types::FunctionType) -> Result<FunctionType<'c> >;
-            /// Convert a hugr [hugr::types::SumType] into an LLVM [LLVMSumType].
-            pub fn llvm_sum_type(&self, sum_ty: hugr::types::SumType) -> Result<LLVMSumType<'c>>;
+            /// Convert hugr [HugrType] into an LLVM [Type](BasicTypeEnum).
+            pub fn llvm_type(&self, hugr_type: &HugrType) -> Result<BasicTypeEnum<'c> >;
+            /// Convert a [HugrFuncType] into an LLVM [FunctionType].
+            pub fn llvm_func_type(&self, hugr_type: &HugrFuncType) -> Result<FunctionType<'c> >;
+            /// Convert a hugr [HugrSumType] into an LLVM [LLVMSumType].
+            pub fn llvm_sum_type(&self, sum_ty: HugrSumType) -> Result<LLVMSumType<'c>>;
             /// Adds or gets the [FunctionValue] in the [inkwell::module::Module] corresponding to the given [FuncDefn].
             ///
             /// The name of the result may have been mangled.
