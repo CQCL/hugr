@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import base64
 from dataclasses import dataclass, field
-from typing import Any, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 import hugr.serialization.tys as stys
 from hugr.utils import ser_it
@@ -88,10 +89,8 @@ class BoundedNatParam(TypeParam):
 class OpaqueParam(TypeParam):
     """Opaque type parameter."""
 
-    ty: Opaque
-
     def to_serial(self) -> stys.OpaqueParam:
-        return stys.OpaqueParam(ty=self.ty.to_serial())
+        return stys.OpaqueParam()
 
 
 @dataclass(frozen=True)
@@ -149,13 +148,19 @@ class BoundedNatArg(TypeArg):
 
 @dataclass(frozen=True)
 class OpaqueArg(TypeArg):
-    """An opaque type argument for a :class:`OpaqueParam`."""
+    """An opaque type argument for a :class:`OpaqueParam` defined by bytes."""
 
-    ty: Opaque
-    value: Any
+    value: bytes
 
     def to_serial(self) -> stys.OpaqueArg:
-        return stys.OpaqueArg(typ=self.ty.to_serial(), value=self.value)
+        return stys.OpaqueArg(arg=base64.b64encode(self.value).decode("utf-8"))
+
+    @classmethod
+    def from_string(cls, value: str) -> OpaqueArg:
+        return cls(value=value.encode("utf-8"))
+
+    def as_string(self) -> str:
+        return self.value.decode("utf-8")
 
 
 @dataclass(frozen=True)

@@ -48,6 +48,7 @@ rstest = "0.21.0"
 serde = "1.0"
 serde_json = "1.0.97"
 serde_yaml = "0.9.19"
+serde_with = { version = "3.9.0", features = ["base64"] }
 smol_str = "0.2.0"
 strum = "0.26.1"
 strum_macros = "0.26.1"

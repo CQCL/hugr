@@ -7,15 +7,16 @@
 use itertools::Itertools;
 #[cfg(test)]
 use proptest_derive::Arbitrary;
+use serde_with::serde_as;
 use std::num::NonZeroU64;
 use thiserror::Error;
 
+use super::row_var::MaybeRV;
+use super::{check_typevar_decl, RowVariable, Substitution, Type, TypeBase, TypeBound};
 use crate::extension::ExtensionRegistry;
 use crate::extension::ExtensionSet;
 use crate::extension::SignatureError;
-
-use super::row_var::MaybeRV;
-use super::{check_typevar_decl, CustomType, RowVariable, Substitution, Type, TypeBase, TypeBound};
+use serde_with::base64::Base64;
 
 /// The upper non-inclusive bound of a [`TypeParam::BoundedNat`]
 // A None inner value implies the maximum bound: u64::MAX + 1 (all u64 values valid)
@@ -68,11 +69,8 @@ pub enum TypeParam {
         /// Upper bound for the Nat parameter.
         bound: UpperBound,
     },
-    /// Argument is a [TypeArg::Opaque], defined by a [CustomType].
-    Opaque {
-        /// The [CustomType] defining the parameter.
-        ty: CustomType,
-    },
+    /// Argument is a [TypeArg::Opaque].
+    Opaque,
     /// Argument is a [TypeArg::Sequence]. A list of indeterminate size containing
     /// parameters all of the (same) specified element type.
     List {
@@ -119,7 +117,7 @@ impl TypeParam {
             (TypeParam::BoundedNat { bound: b1 }, TypeParam::BoundedNat { bound: b2 }) => {
                 b1.contains(b2)
             }
-            (TypeParam::Opaque { ty: c1 }, TypeParam::Opaque { ty: c2 }) => c1 == c2,
+            (TypeParam::Opaque, TypeParam::Opaque) => true,
             (TypeParam::List { param: e1 }, TypeParam::List { param: e2 }) => e1.contains(e2),
             (TypeParam::Tuple { params: es1 }, TypeParam::Tuple { params: es2 }) => {
                 es1.len() == es2.len() && es1.iter().zip(es2).all(|(e1, e2)| e1.contains(e2))
@@ -157,10 +155,9 @@ pub enum TypeArg {
         #[allow(missing_docs)]
         n: u64,
     },
-    ///Instance of [TypeParam::Opaque] An opaque value, stored as serialized blob.
+    ///Instance of [TypeParam::Opaque] An opaque value, stored as bytes.
     Opaque {
         #[allow(missing_docs)]
-        #[serde(flatten)]
         arg: CustomTypeArg,
     },
     /// Instance of [TypeParam::List] or [TypeParam::Tuple], defined by a
@@ -201,7 +198,7 @@ impl From<u64> for TypeArg {
 
 impl From<CustomTypeArg> for TypeArg {
     fn from(arg: CustomTypeArg) -> Self {
-        Self::Opaque { arg }
+        TypeArg::Opaque { arg }
     }
 }
 
@@ -261,14 +258,7 @@ impl TypeArg {
     ) -> Result<(), SignatureError> {
         match self {
             TypeArg::Type { ty } => ty.validate(extension_registry, var_decls),
-            TypeArg::BoundedNat { .. } => Ok(()),
-            TypeArg::Opaque { arg: custarg } => {
-                // We could also add a facility to Extension to validate that the constant *value*
-                // here is a valid instance of the type.
-                // The type must be equal to that declared (in a TypeParam) by the instantiated TypeDef,
-                // so cannot contain variables declared by the instantiator (providing the TypeArgs)
-                custarg.typ.validate(extension_registry, &[])
-            }
+            TypeArg::BoundedNat { .. } | TypeArg::Opaque { .. } => Ok(()),
             TypeArg::Sequence { elems } => elems
                 .iter()
                 .try_for_each(|a| a.validate(extension_registry, var_decls)),
@@ -293,15 +283,7 @@ impl TypeArg {
                 // RowVariables are represented as TypeArg::Variable
                 ty.substitute1(t).into()
             }
-            TypeArg::BoundedNat { .. } => self.clone(), // We do not allow variables as bounds on BoundedNat's
-            TypeArg::Opaque {
-                arg: CustomTypeArg { typ, .. },
-            } => {
-                // The type must be equal to that declared (in a TypeParam) by the instantiated TypeDef,
-                // so cannot contain variables declared by the instantiator (providing the TypeArgs)
-                debug_assert_eq!(&typ.substitute(t), typ);
-                self.clone()
-            }
+            TypeArg::BoundedNat { .. } | TypeArg::Opaque { .. } => self.clone(), // We do not allow variables as bounds on BoundedNat's
             TypeArg::Sequence { elems } => {
                 let mut are_types = elems.iter().map(|ta| match ta {
                     TypeArg::Type { .. } => true,
@@ -356,26 +338,44 @@ impl TypeArgVariable {
     }
 }
 
-/// A serialized representation of a value of a [CustomType]
-/// restricted to equatable types.
+#[serde_as]
+/// An opaque type argument, internally represented as a byte array.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct CustomTypeArg {
-    /// The type of the constant.
-    /// (Exact matches only - the constant is exactly this type.)
-    pub typ: CustomType,
-    /// Serialized representation.
-    pub value: serde_yaml::Value,
-}
+pub struct CustomTypeArg(#[serde_as(as = "Base64")] Vec<u8>);
 
 impl CustomTypeArg {
-    /// Create a new CustomTypeArg. Enforces that the type must be checkable for
-    /// equality.
-    pub fn new(typ: CustomType, value: serde_yaml::Value) -> Result<Self, &'static str> {
-        if typ.bound() == TypeBound::Eq {
-            Ok(Self { typ, value })
-        } else {
-            Err("Only TypeBound::Eq CustomTypes can be used as TypeArgs")
-        }
+    /// Create a new opaque type argument.
+    pub fn new(value: Vec<u8>) -> Self {
+        Self(value)
+    }
+
+    /// Get the value of the opaque type argument.
+    pub fn bytes(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl From<Vec<u8>> for CustomTypeArg {
+    fn from(arg: Vec<u8>) -> Self {
+        Self(arg)
+    }
+}
+
+impl std::str::FromStr for CustomTypeArg {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self(s.as_bytes().to_vec()))
+    }
+}
+
+impl TryFrom<CustomTypeArg> for String {
+    type Error = std::string::FromUtf8Error;
+
+    /// Convert a CustomTypeArg to a String.
+    /// Errors if the byte array is not valid UTF-8.
+    fn try_from(value: CustomTypeArg) -> Result<Self, Self::Error> {
+        String::from_utf8(value.0)
     }
 }
 
@@ -424,11 +424,7 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
             Ok(())
         }
 
-        (TypeArg::Opaque { arg }, TypeParam::Opaque { ty: param })
-            if param.bound() == TypeBound::Eq && &arg.typ == param =>
-        {
-            Ok(())
-        }
+        (TypeArg::Opaque { .. }, TypeParam::Opaque) => Ok(()),
         (TypeArg::Extensions { .. }, TypeParam::Extensions) => Ok(()),
         _ => Err(TypeArgError::TypeMismatch {
             arg: arg.clone(),
@@ -641,23 +637,8 @@ mod test {
 
         use super::super::{CustomTypeArg, TypeArg, TypeArgVariable, TypeParam, UpperBound};
         use crate::extension::ExtensionSet;
-        use crate::proptest::{any_serde_yaml_value, RecursionDepth};
-        use crate::types::{CustomType, Type, TypeBound};
-
-        impl Arbitrary for CustomTypeArg {
-            type Parameters = RecursionDepth;
-            type Strategy = BoxedStrategy<Self>;
-            fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
-                (
-                    any_with::<CustomType>(
-                        <CustomType as Arbitrary>::Parameters::new(depth).with_bound(TypeBound::Eq),
-                    ),
-                    any_serde_yaml_value(),
-                )
-                    .prop_map(|(ct, value)| CustomTypeArg::new(ct, value.clone()).unwrap())
-                    .boxed()
-            }
-        }
+        use crate::proptest::RecursionDepth;
+        use crate::types::{Type, TypeBound};
 
         impl Arbitrary for TypeArgVariable {
             type Parameters = RecursionDepth;
@@ -677,12 +658,10 @@ mod test {
                 use prop::strategy::Union;
                 let mut strat = Union::new([
                     Just(Self::Extensions).boxed(),
+                    Just(Self::Opaque).boxed(),
                     any::<TypeBound>().prop_map(|b| Self::Type { b }).boxed(),
                     any::<UpperBound>()
                         .prop_map(|bound| Self::BoundedNat { bound })
-                        .boxed(),
-                    any_with::<CustomType>(depth.into())
-                        .prop_map(|ty| Self::Opaque { ty })
                         .boxed(),
                 ]);
                 if !depth.leaf() {
@@ -708,14 +687,16 @@ mod test {
                 use prop::strategy::Union;
                 let mut strat = Union::new([
                     any::<u64>().prop_map(|n| Self::BoundedNat { n }).boxed(),
+                    any::<Vec<u8>>()
+                        .prop_map(|v| Self::Opaque {
+                            arg: CustomTypeArg(v),
+                        })
+                        .boxed(),
                     any::<ExtensionSet>()
                         .prop_map(|es| Self::Extensions { es })
                         .boxed(),
                     any_with::<Type>(depth)
                         .prop_map(|ty| Self::Type { ty })
-                        .boxed(),
-                    any_with::<CustomTypeArg>(depth)
-                        .prop_map(|arg| Self::Opaque { arg })
                         .boxed(),
                     // TODO this is a bit dodgy, TypeArgVariables are supposed
                     // to be constructed from TypeArg::new_var_use. We are only

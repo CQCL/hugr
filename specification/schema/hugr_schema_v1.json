@@ -1216,16 +1216,13 @@
                     "title": "Tya",
                     "type": "string"
                 },
-                "typ": {
-                    "$ref": "#/$defs/Opaque"
-                },
-                "value": {
-                    "title": "Value"
+                "arg": {
+                    "title": "Arg",
+                    "type": "string"
                 }
             },
             "required": [
-                "typ",
-                "value"
+                "arg"
             ],
             "title": "OpaqueArg",
             "type": "object"
@@ -1241,14 +1238,8 @@
                     ],
                     "title": "Tp",
                     "type": "string"
-                },
-                "ty": {
-                    "$ref": "#/$defs/Opaque"
                 }
             },
-            "required": [
-                "ty"
-            ],
             "title": "OpaqueParam",
             "type": "object"
         },

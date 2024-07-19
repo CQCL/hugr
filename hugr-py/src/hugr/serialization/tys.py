@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import inspect
 import sys
 from abc import ABC, abstractmethod
@@ -89,10 +90,9 @@ class BoundedNatParam(BaseTypeParam):
 
 class OpaqueParam(BaseTypeParam):
     tp: Literal["Opaque"] = "Opaque"
-    ty: Opaque
 
     def deserialize(self) -> tys.OpaqueParam:
-        return tys.OpaqueParam(ty=self.ty.deserialize())
+        return tys.OpaqueParam()
 
 
 class ListParam(BaseTypeParam):
@@ -165,11 +165,11 @@ class BoundedNatArg(BaseTypeArg):
 
 class OpaqueArg(BaseTypeArg):
     tya: Literal["Opaque"] = "Opaque"
-    typ: Opaque
-    value: Any
+    # Base64 encoded string
+    arg: str
 
     def deserialize(self) -> tys.OpaqueArg:
-        return tys.OpaqueArg(ty=self.typ.deserialize(), value=self.value)
+        return tys.OpaqueArg(value=base64.b64decode(self.arg.encode("utf-8")))
 
 
 class SequenceArg(BaseTypeArg):
