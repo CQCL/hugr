@@ -6,7 +6,7 @@
 
 use assert_cmd::Command;
 use assert_fs::{fixture::FileWriteStr, NamedTempFile};
-use hugr_cli::VALID_PRINT;
+use hugr_cli::validate::VALID_PRINT;
 use hugr_core::builder::DFGBuilder;
 use hugr_core::{
     builder::{Container, Dataflow, DataflowHugr},
@@ -20,7 +20,9 @@ use rstest::{fixture, rstest};
 
 #[fixture]
 fn cmd() -> Command {
-    Command::cargo_bin("hugr").unwrap()
+    let mut cmd = Command::cargo_bin("hugr").unwrap();
+    cmd.arg("validate");
+    cmd
 }
 
 #[fixture]
