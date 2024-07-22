@@ -1,7 +1,7 @@
 # Filters used by [dorny/path-filters](https://github.com/dorny/paths-filter)
 # to detect changes in each subproject, and only run the corresponding jobs.
 
-rust:
+rust: &rust
   - "hugr/**"
   - "hugr-cli/**"
   - "hugr-core/**"
@@ -11,6 +11,7 @@ rust:
   - ".github/workflows/ci-rs.yml"
 
 python:
+  - *rust
   - "hugr-py/**"
   - "pyproject.toml"
   - "poetry.lock"
