@@ -1,5 +1,5 @@
 //! Handles to nodes in HUGR used during the building phase.
-use crate::ops::handle::{BasicBlockID, CaseID, DfgID, FuncID, NodeHandle, TailLoopID};
+use crate::ops::handle::{BasicBlockID, CaseID, DfgID, FuncID, NodeHandle};
 use crate::ops::OpTag;
 use crate::utils::collect_array;
 use crate::{Node, OutgoingPort, Wire};
@@ -70,7 +70,7 @@ impl From<BuildHandle<DfgID>> for BuildHandle<FuncID<true>> {
     fn from(value: BuildHandle<DfgID>) -> Self {
         Self {
             node_handle: value.node().into(),
-            num_value_outputs: value.num_value_outputs,
+            num_value_outputs: 0,
         }
     }
 }
@@ -87,17 +87,7 @@ impl From<BuildHandle<DfgID>> for BuildHandle<CaseID> {
     fn from(value: BuildHandle<DfgID>) -> Self {
         Self {
             node_handle: value.node().into(),
-            num_value_outputs: value.num_value_outputs,
-        }
-    }
-}
-
-impl From<BuildHandle<DfgID>> for BuildHandle<TailLoopID> {
-    #[inline]
-    fn from(value: BuildHandle<DfgID>) -> Self {
-        Self {
-            node_handle: value.node().into(),
-            num_value_outputs: value.num_value_outputs,
+            num_value_outputs: 0,
         }
     }
 }
