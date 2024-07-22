@@ -1,11 +1,10 @@
 use crate::extension::ExtensionSet;
-use crate::ops;
+use crate::ops::{self, DataflowOpTrait};
 
 use crate::hugr::views::HugrView;
 use crate::types::{Signature, TypeRow};
 use crate::{Hugr, Node};
 
-use super::build_traits::SubContainer;
 use super::handle::BuildHandle;
 use super::{
     dataflow::{DFGBuilder, DFGWrapper},
@@ -52,20 +51,22 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> TailLoopBuilder<B> {
     pub fn internal_output_row(&self) -> Result<TypeRow, BuildError> {
         self.loop_signature().map(ops::TailLoop::body_output_row)
     }
-}
 
-impl<H: AsMut<Hugr> + AsRef<Hugr>> TailLoopBuilder<H> {
     /// Set outputs and finish, see [`TailLoopBuilder::set_outputs`]
     pub fn finish_with_outputs(
         mut self,
         out_variant: Wire,
         rest: impl IntoIterator<Item = Wire>,
-    ) -> Result<<Self as SubContainer>::ContainerHandle, BuildError>
+    ) -> Result<BuildHandle<TailLoopID>, BuildError>
     where
         Self: Sized,
     {
         self.set_outputs(out_variant, rest)?;
-        self.finish_sub_container()
+        Ok((
+            self.container_node(),
+            self.loop_signature()?.signature().output_count(),
+        )
+            .into())
     }
 }
 
@@ -96,7 +97,7 @@ mod test {
     use crate::{
         builder::{
             test::{BIT, NAT},
-            DataflowSubContainer, HugrBuilder, ModuleBuilder,
+            DataflowSubContainer, HugrBuilder, ModuleBuilder, SubContainer,
         },
         extension::prelude::{ConstUsize, PRELUDE_ID, USIZE_T},
         hugr::ValidationError,
@@ -196,7 +197,7 @@ mod test {
     }
 
     #[test]
-    #[should_panic] // issue 1257: When building a TailLoop, calling outputs_arr, you are given an OrderEdge "output wire"
+    // fixed: issue 1257: When building a TailLoop, calling outputs_arr, you are given an OrderEdge "output wire"
     fn tailloop_output_arr() {
         let mut builder =
             TailLoopBuilder::new(type_row![], type_row![], type_row![], ExtensionSet::new())
