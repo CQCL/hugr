@@ -1,10 +1,9 @@
 use std::fmt::Display;
-use std::iter;
 use std::rc::Rc;
 
 use anyhow::{anyhow, Result};
 use delegate::delegate;
-use hugr::types::{SumType, Type};
+use hugr::types::{Signature, SumType, Type};
 use hugr::{types::TypeRow, HugrView};
 use inkwell::builder::Builder;
 use inkwell::types::{self as iw, AnyType, AsTypeRef, IntType};
@@ -21,7 +20,7 @@ use super::custom::CodegenExtsMap;
 
 /// A type alias for a hugr function type. We use this to disambiguate from
 /// the LLVM [iw::FunctionType].
-pub type HugrFuncType = hugr::types::FunctionType;
+pub type HugrFuncType = hugr::types::Signature;
 
 /// A type alias for a hugr type. We use this to disambiguate from LLVM types.
 pub type HugrType = Type;
@@ -64,10 +63,13 @@ impl<'c, H: HugrView> TypingSession<'c, H> {
         match hugr_type.as_type_enum() {
             TypeEnum::Extension(ref custom_type) => self.extensions.llvm_type(self, custom_type),
             TypeEnum::Sum(sum) => self.llvm_sum_type(sum.clone()).map(Into::into),
-            TypeEnum::Function(ref func_ty) => Ok(self
-                .llvm_func_type(func_ty)?
-                .ptr_type(AddressSpace::default()) // Note: deprecated in LLVM >= 15
-                .into()),
+            TypeEnum::Function(func_ty) => {
+                let func_ty: Signature = func_ty.as_ref().clone().try_into()?;
+                Ok(self
+                    .llvm_func_type(&func_ty)?
+                    .ptr_type(AddressSpace::default()) // Note: deprecated in LLVM >= 15
+                    .into())
+            }
 
             x => Err(anyhow!("Invalid type: {:?}", x)),
         }
@@ -164,21 +166,17 @@ pub struct LLVMSumType<'c>(StructType<'c>, SumType);
 impl<'c> LLVMSumType<'c> {
     /// Attempt to create a new `LLVMSumType` from a [HugrSumType].
     pub fn try_new<H: HugrView>(session: &TypingSession<'c, H>, sum_type: SumType) -> Result<Self> {
-        let mut i = 0;
-        let (sum_type_ref, session_ref) = (&sum_type, &session);
-        let variants = iter::from_fn(move || {
-            let r = sum_type_ref.get_variant(i).map(|tr| {
+        assert!(sum_type.num_variants() < u32::MAX as usize);
+        let variants = (0..sum_type.num_variants())
+            .map(|i| {
+                let tr = Self::get_variant_typerow_st(&sum_type, i as u32)?;
                 tr.iter()
-                    .map(|t| session_ref.llvm_type(t))
+                    .map(|t| session.llvm_type(t))
                     .collect::<Result<Vec<_>>>()
-            });
-            i += 1;
-            r
-        })
-        .collect::<Result<Vec<_>>>()?;
-        assert!(variants.len() < u32::MAX as usize);
-        let htf = Self::sum_type_has_tag_field(&sum_type);
-        let types = htf
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let has_tag_field = Self::sum_type_has_tag_field(&sum_type);
+        let types = has_tag_field
             .then_some(session.iw_context().i32_type().as_basic_type_enum())
             .into_iter()
             .chain(
@@ -314,11 +312,19 @@ impl<'c> LLVMSumType<'c> {
         tag + (if self.has_tag_field() { 1 } else { 0 })
     }
 
+    fn get_variant_typerow_st(st: &HugrSumType, tag: u32) -> Result<TypeRow> {
+        st.get_variant(tag as usize)
+            .ok_or(anyhow!("Bad variant index {tag} in {st}"))
+            .and_then(|tr| Ok(TypeRow::try_from(tr.clone())?))
+    }
+
+    fn get_variant_typerow(&self, tag: u32) -> Result<TypeRow> {
+        Self::get_variant_typerow_st(&self.1, tag)
+    }
+
     fn num_fields(&self, tag: u32) -> Result<usize> {
-        self.1
-            .get_variant(tag as usize)
-            .ok_or(anyhow!("Bad variant index"))
-            .map(TypeRow::len)
+        let tr = self.get_variant_typerow(tag)?;
+        Ok(tr.len())
     }
 }
 
@@ -393,8 +399,8 @@ pub mod test {
     #[case(2, INT_TYPES[4].clone())]
     #[case(3, INT_TYPES[5].clone())]
     #[case(4, INT_TYPES[6].clone())]
-    #[case(5, Type::new_sum([vec![INT_TYPES[2].clone()].into()]))]
-    #[case(6, Type::new_sum([vec![INT_TYPES[6].clone(),Type::new_unit_sum(1)].into(), vec![Type::new_unit_sum(2), INT_TYPES[2].clone()].into()]))]
+    #[case(5, Type::new_sum([vec![INT_TYPES[2].clone()]]))]
+    #[case(6, Type::new_sum([vec![INT_TYPES[6].clone(),Type::new_unit_sum(1)], vec![Type::new_unit_sum(2), INT_TYPES[2].clone()]]))]
     #[case(7, Type::new_function(HugrFuncType::new(type_row!(Type::new_unit_sum(2)), Type::new_unit_sum(3))))]
     fn ext_types(#[case] _id: i32, #[with(_id)] mut llvm_ctx: TestContext, #[case] t: Type) {
         llvm_ctx.add_extensions(add_int_extensions);

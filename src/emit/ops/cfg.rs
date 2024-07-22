@@ -264,11 +264,7 @@ mod test {
 
                 // entry block takes (t1,t2) and unconditionally branches to b1 with no other outputs
                 let mut entry_builder = cfg_builder
-                    .entry_builder(
-                        [vec![t1.clone(), t2.clone()].into()],
-                        type_row![],
-                        es.clone(),
-                    )
+                    .entry_builder([vec![t1.clone(), t2.clone()].into()], type_row![])
                     .unwrap();
                 let [entry_in1, entry_in2] = entry_builder.input_wires_arr();
                 let r = entry_builder.make_tuple([entry_in1, entry_in2]).unwrap();
@@ -280,7 +276,6 @@ mod test {
                     .block_builder(
                         vec![t1.clone(), t2.clone()].into(),
                         variants.clone(),
-                        es,
                         t2.clone().into(),
                     )
                     .unwrap();
@@ -320,7 +315,7 @@ mod test {
 
                     let outer_entry_block = {
                         let mut outer_entry_builder = outer_cfg_builder
-                            .entry_builder([type_row![], type_row![]], type_row![], es.clone())
+                            .entry_builder([type_row![], type_row![]], type_row![])
                             .unwrap();
                         let [outer_entry_in1, outer_entry_in2] =
                             outer_entry_builder.input_wires_arr();
@@ -334,7 +329,6 @@ mod test {
                                     .entry_builder(
                                         [type_row![], type_row![], type_row![]],
                                         type_row![],
-                                        es.clone(),
                                     )
                                     .unwrap();
                                 // non-local edge
@@ -348,7 +342,6 @@ mod test {
                                         .block_builder(
                                             type_row![],
                                             vec![type_row![]],
-                                            es.clone(),
                                             BOOL_T.into(),
                                         )
                                         .unwrap();
@@ -389,12 +382,7 @@ mod test {
                     let [b1, b2] = (0..2)
                         .map(|i| {
                             let mut b_builder = outer_cfg_builder
-                                .block_builder(
-                                    type_row![],
-                                    vec![type_row![]],
-                                    es.clone(),
-                                    BOOL_T.into(),
-                                )
+                                .block_builder(type_row![], vec![type_row![]], BOOL_T.into())
                                 .unwrap();
                             let output = match i {
                                 0 => b_builder.add_load_value(Value::true_val()),

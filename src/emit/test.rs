@@ -193,7 +193,6 @@ fn emit_hugr_conditional(llvm_ctx: TestContext) {
                             (input_v_rows.clone(), sum_input),
                             [(Type::UNIT, other_input)],
                             vec![Type::new_sum(output_v_rows.clone()), Type::UNIT].into(),
-                            ExtensionSet::default(),
                         )
                         .unwrap();
                     for i in 0..3 {
@@ -359,7 +358,7 @@ fn diverse_cfg_children(llvm_ctx: TestContext) {
                 };
                 let entry = {
                     let mut builder = builder
-                        .entry_builder([type_row![]], type_row![BOOL_T], ExtensionSet::new())
+                        .entry_builder([type_row![]], type_row![BOOL_T])
                         .unwrap();
                     let control = builder.add_load_value(Value::unary_unit_sum());
                     let [r] = builder
