@@ -13,11 +13,7 @@ use std::{
 };
 
 use crate::Hugr;
-
-struct TestCase {
-    name: String,
-    hugr: Hugr,
-}
+use rstest::{fixture, rstest};
 
 lazy_static! {
     static ref TEST_CASE_DIR: PathBuf = {
@@ -41,49 +37,44 @@ fn test_case_dir_exists() {
     );
 }
 
-impl TestCase {
-    fn new(name: impl Into<String>, hugr: Hugr) -> Self {
-        Self {
-            name: name.into(),
-            hugr,
-        }
-    }
-
-    fn run(&self) {
-        let path = TEST_CASE_DIR.join(format!("{}.json", &self.name));
-        if !path.exists() {
-            let f = OpenOptions::new()
-                .create(true)
-                .truncate(true)
-                .write(true)
-                .open(&path)
-                .unwrap();
-            serde_json::to_writer_pretty(f, &self.hugr).unwrap();
-        }
-
-        let val = serde_json::from_reader(std::fs::File::open(&path).unwrap()).unwrap();
-        // we do not expect `val` to satisfy any schemas, it is a non-latest
-        // version.
-        check_hugr_deserialize(&self.hugr, val, false);
-    }
+#[fixture]
+#[once]
+pub fn empty_hugr() -> Hugr {
+    Hugr::default()
 }
 
-#[test]
-fn empty_hugr() {
-    TestCase::new("empty_hugr", Hugr::default()).run();
-}
-
-#[test]
-#[cfg_attr(feature = "extension_inference", ignore = "Fails extension inference")]
-fn hugr_with_named_op() {
+#[fixture]
+#[once]
+pub fn hugr_with_named_op() -> Hugr {
     let mut builder =
         DFGBuilder::new(Signature::new(type_row![BOOL_T, BOOL_T], type_row![BOOL_T])).unwrap();
     let [a, b] = builder.input_wires_arr();
     let x = builder
         .add_dataflow_op(NaryLogic::And.with_n_inputs(2), [a, b])
         .unwrap();
-    let h = builder
+    builder
         .finish_prelude_hugr_with_outputs(x.outputs())
-        .unwrap();
-    TestCase::new("hugr_with_named_op", h).run();
+        .unwrap()
+}
+
+#[rstest]
+#[case("empty_hugr", empty_hugr())]
+#[case("hugr_with_named_op", hugr_with_named_op())]
+#[cfg_attr(feature = "extension_inference", ignore = "Fails extension inference")]
+fn serial_upgrade(#[case] name: String, #[case] hugr: Hugr) {
+    let path = TEST_CASE_DIR.join(format!("{}.json", name));
+    if !path.exists() {
+        let f = OpenOptions::new()
+            .create(true)
+            .truncate(true)
+            .write(true)
+            .open(&path)
+            .unwrap();
+        serde_json::to_writer_pretty(f, &hugr).unwrap();
+    }
+
+    let val = serde_json::from_reader(std::fs::File::open(&path).unwrap()).unwrap();
+    // we do not expect `val` to satisfy any schemas, it is a non-latest
+    // version.
+    check_hugr_deserialize(&hugr, val, false);
 }
