@@ -56,8 +56,8 @@ impl NamedSchema {
             // errors don't necessarily implement Debug
             println!("Schema failed to validate: {}", self.name);
             for error in errors {
-                println!("Validation error: {}", error);
-                println!("Instance path: {}", error.instance_path);
+                eprintln!("Validation error: {}", error);
+                eprintln!("Instance path: {}", error.instance_path);
             }
             panic!("Serialization test failed.");
         }
