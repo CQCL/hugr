@@ -54,7 +54,7 @@ impl NamedSchema {
     pub fn check(&self, val: &serde_json::Value) {
         if let Err(errors) = self.schema.validate(val) {
             // errors don't necessarily implement Debug
-            println!("Schema failed to validate: {}", self.name);
+            eprintln!("Schema failed to validate: {}", self.name);
             for error in errors {
                 eprintln!("Validation error: {}", error);
                 eprintln!("Instance path: {}", error.instance_path);
