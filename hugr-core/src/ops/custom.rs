@@ -112,11 +112,11 @@ impl CustomOp {
 impl NamedOp for CustomOp {
     /// The name of the operation.
     fn name(&self) -> OpName {
-        let (res_id, op_name) = match self {
-            Self::Opaque(op) => (&op.extension, &op.op_name),
+        let (res_id, name) = match self {
+            Self::Opaque(op) => (&op.extension, &op.name),
             Self::Extension(ext) => (ext.def.extension(), ext.def.name()),
         };
-        qualify_name(res_id, op_name)
+        qualify_name(res_id, name)
     }
 }
 
@@ -225,7 +225,7 @@ impl ExtensionOp {
     pub fn make_opaque(&self) -> OpaqueOp {
         OpaqueOp {
             extension: self.def.extension().clone(),
-            op_name: self.def.name().clone(),
+            name: self.def.name().clone(),
             description: self.def.description().into(),
             args: self.args.clone(),
             signature: self.signature.clone(),
@@ -242,7 +242,7 @@ impl From<ExtensionOp> for OpaqueOp {
         } = op;
         OpaqueOp {
             extension: def.extension().clone(),
-            op_name: def.name().clone(),
+            name: def.name().clone(),
             description: def.description().into(),
             args,
             signature,
@@ -290,7 +290,7 @@ impl DataflowOpTrait for ExtensionOp {
 pub struct OpaqueOp {
     extension: ExtensionId,
     #[cfg_attr(test, proptest(strategy = "any_nonempty_smolstr()"))]
-    op_name: OpName,
+    name: OpName,
     #[cfg_attr(test, proptest(strategy = "any_nonempty_string()"))]
     description: String, // cache in advance so description() can return &str
     args: Vec<TypeArg>,
@@ -300,22 +300,22 @@ pub struct OpaqueOp {
     signature: Signature,
 }
 
-fn qualify_name(res_id: &ExtensionId, op_name: &OpNameRef) -> OpName {
-    format!("{}.{}", res_id, op_name).into()
+fn qualify_name(res_id: &ExtensionId, name: &OpNameRef) -> OpName {
+    format!("{}.{}", res_id, name).into()
 }
 
 impl OpaqueOp {
     /// Creates a new OpaqueOp from all the fields we'd expect to serialize.
     pub fn new(
         extension: ExtensionId,
-        op_name: impl Into<OpName>,
+        name: impl Into<OpName>,
         description: String,
         args: impl Into<Vec<TypeArg>>,
         signature: Signature,
     ) -> Self {
         Self {
             extension,
-            op_name: op_name.into(),
+            name: name.into(),
             description,
             args: args.into(),
             signature,
@@ -326,7 +326,7 @@ impl OpaqueOp {
 impl OpaqueOp {
     /// Unique name of the operation.
     pub fn name(&self) -> &OpName {
-        &self.op_name
+        &self.name
     }
 
     /// Type arguments.
@@ -399,9 +399,9 @@ pub fn resolve_opaque_op(
 ) -> Result<Option<ExtensionOp>, CustomOpError> {
     if let Some(r) = extension_registry.get(&opaque.extension) {
         // Fail if the Extension was found but did not have the expected operation
-        let Some(def) = r.get_op(&opaque.op_name) else {
+        let Some(def) = r.get_op(&opaque.name) else {
             return Err(CustomOpError::OpNotFoundInExtension(
-                opaque.op_name.clone(),
+                opaque.name.clone(),
                 r.name().clone(),
             ));
         };

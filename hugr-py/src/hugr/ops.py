@@ -255,7 +255,7 @@ class AsCustomOp(DataflowOp, Protocol):
         slf, other = self.custom_op, other.custom_op
         return (
             slf.extension == other.extension
-            and slf.op_name == other.op_name
+            and slf.name == other.name
             and slf.signature == other.signature
             and slf.args == other.args
         )
@@ -275,7 +275,7 @@ class AsCustomOp(DataflowOp, Protocol):
 class Custom(AsCustomOp):
     """A non-core dataflow operation defined in an extension."""
 
-    op_name: str
+    name: str
     signature: tys.FunctionType = field(default_factory=tys.FunctionType.empty)
     description: str = ""
     extension: tys.ExtensionId = ""
@@ -285,7 +285,7 @@ class Custom(AsCustomOp):
         return sops.CustomOp(
             parent=parent.idx,
             extension=self.extension,
-            op_name=self.op_name,
+            name=self.name,
             signature=self.signature.to_serial(),
             description=self.description,
             args=ser_it(self.args),
@@ -298,9 +298,9 @@ class Custom(AsCustomOp):
     def from_custom(cls, custom: Custom) -> Custom:
         return custom
 
-    def check_id(self, extension: tys.ExtensionId, op_name: str) -> bool:
+    def check_id(self, extension: tys.ExtensionId, name: str) -> bool:
         """Check if the operation matches the given extension and operation name."""
-        return self.extension == extension and self.op_name == op_name
+        return self.extension == extension and self.name == name
 
 
 @dataclass()

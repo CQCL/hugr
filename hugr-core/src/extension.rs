@@ -301,8 +301,8 @@ impl Extension {
     }
 
     /// Allows read-only access to the operations in this Extension
-    pub fn get_op(&self, op_name: &OpNameRef) -> Option<&Arc<op_def::OpDef>> {
-        self.operations.get(op_name)
+    pub fn get_op(&self, name: &OpNameRef) -> Option<&Arc<op_def::OpDef>> {
+        self.operations.get(name)
     }
 
     /// Allows read-only access to the types in this Extension
@@ -352,11 +352,11 @@ impl Extension {
     /// Instantiate an [`ExtensionOp`] which references an [`OpDef`] in this extension.
     pub fn instantiate_extension_op(
         &self,
-        op_name: &OpNameRef,
+        name: &OpNameRef,
         args: impl Into<Vec<TypeArg>>,
         ext_reg: &ExtensionRegistry,
     ) -> Result<ExtensionOp, SignatureError> {
-        let op_def = self.get_op(op_name).expect("Op not found.");
+        let op_def = self.get_op(name).expect("Op not found.");
         ExtensionOp::new(op_def.clone(), args, ext_reg)
     }
 
