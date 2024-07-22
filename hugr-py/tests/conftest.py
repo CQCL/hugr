@@ -121,7 +121,7 @@ def validate(h: Hugr, mermaid: bool = False, roundtrip: bool = True):
     workspace_dir = pathlib.Path(__file__).parent.parent.parent
     # use the HUGR_BIN environment variable if set, otherwise use the debug build
     bin_loc = os.environ.get("HUGR_BIN", str(workspace_dir / "target/debug/hugr"))
-    cmd = [bin_loc, "-"]
+    cmd = [bin_loc, "validate", "-"]
 
     if mermaid:
         cmd.append("--mermaid")
