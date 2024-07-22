@@ -13,7 +13,7 @@ use crate::extension::prelude::{BOOL_T, PRELUDE, PRELUDE_ID, QB_T, USIZE_T};
 use crate::extension::{Extension, ExtensionSet, TypeDefBound, EMPTY_REG, PRELUDE_REGISTRY};
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::HugrMut;
-use crate::ops::dataflow::{IOTrait, LoadFunction};
+use crate::ops::dataflow::IOTrait;
 use crate::ops::handle::NodeHandle;
 use crate::ops::leaf::MakeTuple;
 use crate::ops::{self, Noop, OpType, Value};
@@ -650,14 +650,11 @@ fn row_variables() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     // All the wires here are carrying higher-order Function values
     let [func_arg] = fb.input_wires_arr();
-    let [id_usz] = {
+    let id_usz = {
         let bldr = fb.define_function("id_usz", Signature::new_endo(USIZE_T))?;
         let vals = bldr.input_wires();
-        let [inner_def] = bldr.finish_with_outputs(vals)?.outputs_arr();
-        let loadf =
-            LoadFunction::try_new(Signature::new_endo(USIZE_T).into(), [], &PRELUDE_REGISTRY)
-                .unwrap();
-        fb.add_dataflow_op(loadf, [inner_def])?.outputs_arr()
+        let inner_def = bldr.finish_with_outputs(vals)?;
+        fb.load_func(inner_def.handle(), &[], &PRELUDE_REGISTRY)?
     };
     let par = e.instantiate_extension_op(
         "parallel",
