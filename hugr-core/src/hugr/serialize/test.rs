@@ -153,7 +153,7 @@ fn ser_deserialize_check_schema<T: serde::de::DeserializeOwned>(
     serde_json::from_value(val).unwrap()
 }
 
-/// Serialize and deserialize a value, optionally validating against a schema.
+/// Serialize and deserialize a value, validating against a schema.
 fn ser_roundtrip_check_schema<T: Serialize + serde::de::DeserializeOwned>(
     g: &T,
     schemas: impl IntoIterator<Item = &'static NamedSchema>,
