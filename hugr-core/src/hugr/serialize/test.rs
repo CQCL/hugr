@@ -97,7 +97,7 @@ include_schema!(TESTING_SCHEMA, "testing_hugr_schema");
 include_schema!(TESTING_SCHEMA_STRICT, "testing_hugr_schema_strict");
 
 fn get_schemas(b: bool) -> impl IntoIterator<Item = &'static NamedSchema> {
-    let schemas: Vec<&'static NamedSchema> = vec![&SCHEMA, &SCHEMA_STRICT];
+    let schemas: [&'static NamedSchema; 2] = [&SCHEMA, &SCHEMA_STRICT];
     b.then_some(schemas.into_iter()).into_iter().flatten()
 }
 
