@@ -23,7 +23,7 @@ use super::{
 
 mod cfg;
 
-struct SumOpEmitter<'c, 'd, H: HugrView>(&'d mut EmitFuncContext<'c, H>, LLVMSumType<'c>);
+struct SumOpEmitter<'c, 'd, H>(&'d mut EmitFuncContext<'c, H>, LLVMSumType<'c>);
 
 impl<'c, 'd, H: HugrView> SumOpEmitter<'c, 'd, H> {
     pub fn new(context: &'d mut EmitFuncContext<'c, H>, st: LLVMSumType<'c>) -> Self {
@@ -71,7 +71,7 @@ impl<'c, H: HugrView> EmitOp<'c, Tag, H> for SumOpEmitter<'c, '_, H> {
     }
 }
 
-struct DataflowParentEmitter<'c, 'd, OT, H: HugrView> {
+struct DataflowParentEmitter<'c, 'd, OT, H> {
     context: &'d mut EmitFuncContext<'c, H>,
     node: FatNode<'c, OT, H>,
     inputs: Option<Vec<BasicValueEnum<'c>>>,
@@ -162,7 +162,7 @@ where
     }
 }
 
-struct ConditionalEmitter<'c, 'd, H: HugrView>(&'d mut EmitFuncContext<'c, H>);
+struct ConditionalEmitter<'c, 'd, H>(&'d mut EmitFuncContext<'c, H>);
 
 impl<'c, H: HugrView> EmitOp<'c, Conditional, H> for ConditionalEmitter<'c, '_, H> {
     fn emit(

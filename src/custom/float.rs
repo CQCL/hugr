@@ -92,7 +92,7 @@ impl<'c, H: HugrView> CodegenExtension<'c, H> for FloatOpsCodegenExtension {
 // we allow dead code for now, but once we implement the emitter, we should
 // remove this
 #[allow(dead_code)]
-struct FloatOpEmitter<'c, 'd, H: HugrView>(&'d mut EmitFuncContext<'c, H>);
+struct FloatOpEmitter<'c, 'd, H>(&'d mut EmitFuncContext<'c, H>);
 
 impl<'c, H: HugrView> EmitOp<'c, CustomOp, H> for FloatOpEmitter<'c, '_, H> {
     fn emit(&mut self, args: EmitOpArgs<'c, CustomOp, H>) -> Result<()> {

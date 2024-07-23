@@ -19,7 +19,7 @@ use crate::{
 
 use super::emit_dataflow_parent;
 
-pub struct CfgEmitter<'c, 'd, H: HugrView> {
+pub struct CfgEmitter<'c, 'd, H> {
     context: &'d mut EmitFuncContext<'c, H>,
     bbs: HashMap<FatNode<'c, OpType, H>, (BasicBlock<'c>, RowMailBox<'c>)>,
     inputs: Option<Vec<BasicValueEnum<'c>>>,

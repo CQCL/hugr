@@ -32,7 +32,7 @@ lazy_static! {
     .unwrap();
 }
 
-struct Tket2Emitter<'a, 'c, H: HugrView>(&'a mut hugr_llvm::emit::EmitFuncContext<'c, H>);
+struct Tket2Emitter<'a, 'c, H>(&'a mut hugr_llvm::emit::EmitFuncContext<'c, H>);
 
 impl<'a, 'c, H: HugrView> EmitOp<'c, CustomOp, H> for Tket2Emitter<'a, 'c, H> {
     fn emit(&mut self, args: EmitOpArgs<'c, CustomOp, H>) -> Result<()> {

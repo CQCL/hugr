@@ -3,8 +3,8 @@ use std::rc::Rc;
 
 use anyhow::{anyhow, Result};
 use delegate::delegate;
+use hugr::types::TypeRow;
 use hugr::types::{Signature, SumType, Type};
-use hugr::{types::TypeRow, HugrView};
 use inkwell::builder::Builder;
 use inkwell::types::{self as iw, AnyType, AsTypeRef, IntType};
 use inkwell::values::{BasicValue, BasicValueEnum, IntValue, StructValue};
@@ -39,12 +39,12 @@ pub struct TypeConverter<'c> {
 
 /// A type that holds [Rc] shared pointers to everything needed to convert from
 /// a hugr [HugrType] to an LLVM [Type](inkwell::types).
-pub struct TypingSession<'c, H: HugrView> {
+pub struct TypingSession<'c, H> {
     tc: Rc<TypeConverter<'c>>,
     extensions: Rc<CodegenExtsMap<'c, H>>,
 }
 
-impl<'c, H: HugrView> TypingSession<'c, H> {
+impl<'c, H> TypingSession<'c, H> {
     delegate! {
         to self.tc {
             /// Returns a reference to the inner [Context].
@@ -119,15 +119,12 @@ impl<'c> TypeConverter<'c> {
     }
 
     /// Creates a new [TypingSession].
-    pub fn session<H: HugrView>(
-        self: Rc<Self>,
-        exts: Rc<CodegenExtsMap<'c, H>>,
-    ) -> TypingSession<'c, H> {
+    pub fn session<H>(self: Rc<Self>, exts: Rc<CodegenExtsMap<'c, H>>) -> TypingSession<'c, H> {
         TypingSession::new(self, exts)
     }
 
     /// Convert a [HugrType] into an LLVM [Type](BasicTypeEnum).
-    pub fn llvm_type<H: HugrView>(
+    pub fn llvm_type<H>(
         self: Rc<Self>,
         extensions: Rc<CodegenExtsMap<'c, H>>,
         hugr_type: &HugrType,
@@ -136,7 +133,7 @@ impl<'c> TypeConverter<'c> {
     }
 
     /// Convert a [HugrFuncType] into an LLVM [iw::FunctionType].
-    pub fn llvm_func_type<H: HugrView>(
+    pub fn llvm_func_type<H>(
         self: Rc<Self>,
         extensions: Rc<CodegenExtsMap<'c, H>>,
         hugr_type: &HugrFuncType,
@@ -145,7 +142,7 @@ impl<'c> TypeConverter<'c> {
     }
 
     /// Convert a hugr [HugrSumType] into an LLVM [LLVMSumType].
-    pub fn llvm_sum_type<H: HugrView>(
+    pub fn llvm_sum_type<H>(
         self: Rc<Self>,
         extensions: Rc<CodegenExtsMap<'c, H>>,
         sum_type: HugrSumType,
@@ -165,7 +162,7 @@ pub struct LLVMSumType<'c>(StructType<'c>, SumType);
 
 impl<'c> LLVMSumType<'c> {
     /// Attempt to create a new `LLVMSumType` from a [HugrSumType].
-    pub fn try_new<H: HugrView>(session: &TypingSession<'c, H>, sum_type: SumType) -> Result<Self> {
+    pub fn try_new<H>(session: &TypingSession<'c, H>, sum_type: SumType) -> Result<Self> {
         assert!(sum_type.num_variants() < u32::MAX as usize);
         let variants = (0..sum_type.num_variants())
             .map(|i| {

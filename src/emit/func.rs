@@ -43,7 +43,7 @@ pub use mailbox::{RowMailBox, RowPromise};
 /// [MailBox](RowMailBox)es are stack allocations that are `alloca`ed in the
 /// first basic block of the function, read from to get the input values of each
 /// node, and written to with the output values of each node.
-pub struct EmitFuncContext<'c, H: HugrView> {
+pub struct EmitFuncContext<'c, H> {
     emit_context: EmitModuleContext<'c, H>,
     todo: EmissionSet<'c, H>,
     func: FunctionValue<'c>,

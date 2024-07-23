@@ -25,7 +25,7 @@ use crate::{
 use super::{CodegenExtension, CodegenExtsMap};
 use anyhow::{anyhow, Result};
 
-struct IntOpEmitter<'c, 'd, H: HugrView>(&'d mut EmitFuncContext<'c, H>);
+struct IntOpEmitter<'c, 'd, H>(&'d mut EmitFuncContext<'c, H>);
 
 // TODO this is probably useful enough to offer as a general utility
 fn emit_custom_binary_op<'c, H: HugrView>(
