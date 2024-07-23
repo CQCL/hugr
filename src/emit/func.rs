@@ -57,7 +57,7 @@ impl<'c, H: HugrView> EmitFuncContext<'c, H> {
     delegate! {
         to self.emit_context {
             /// Returns the inkwell [Context].
-            fn iw_context(&self) ->  &'c Context;
+            pub fn iw_context(&self) ->  &'c Context;
             /// Returns the internal [CodegenExtsMap] .
             pub fn extensions(&self) ->  Rc<CodegenExtsMap<'c,H>>;
             /// Returns a new [TypingSession].
