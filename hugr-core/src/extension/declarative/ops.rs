@@ -44,7 +44,7 @@ pub(super) struct OperationDeclaration {
     /// This data is kept in the Hugr, and may be accessed by the relevant runtime.
     #[serde(default)]
     #[serde(skip_serializing_if = "crate::utils::is_default")]
-    misc: HashMap<String, serde_yaml::Value>,
+    misc: HashMap<String, serde_json::Value>,
     /// A pre-compiled lowering routine.
     ///
     /// This is not yet supported, and will raise an error if present.

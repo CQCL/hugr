@@ -109,7 +109,7 @@ pub trait CustomLowerFunc: Send + Sync {
         &self,
         name: &OpNameRef,
         arg_values: &[TypeArg],
-        misc: &HashMap<String, serde_yaml::Value>,
+        misc: &HashMap<String, serde_json::Value>,
         available_extensions: &ExtensionSet,
     ) -> Option<Hugr>;
 }
@@ -319,7 +319,7 @@ pub struct OpDef {
     description: String,
     /// Miscellaneous data associated with the operation.
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
-    misc: HashMap<String, serde_yaml::Value>,
+    misc: HashMap<String, serde_json::Value>,
 
     #[serde(flatten)]
     signature_func: SignatureFunc,
@@ -434,8 +434,8 @@ impl OpDef {
     pub fn add_misc(
         &mut self,
         k: impl ToString,
-        v: serde_yaml::Value,
-    ) -> Option<serde_yaml::Value> {
+        v: serde_json::Value,
+    ) -> Option<serde_json::Value> {
         self.misc.insert(k.to_string(), v)
     }
 
@@ -825,9 +825,9 @@ pub(super) mod test {
             type Parameters = ();
             type Strategy = BoxedStrategy<Self>;
             fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-                use crate::proptest::{any_serde_yaml_value, any_smolstr, any_string};
+                use crate::proptest::{any_serde_json_value, any_smolstr, any_string};
                 use proptest::collection::{hash_map, vec};
-                let misc = hash_map(any_string(), any_serde_yaml_value(), 0..3);
+                let misc = hash_map(any_string(), any_serde_json_value(), 0..3);
                 (
                     any::<ExtensionId>(),
                     any_smolstr(),

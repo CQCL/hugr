@@ -103,18 +103,18 @@ pub fn downcast_equal_consts<T: CustomConst + PartialEq>(
 }
 
 /// Serialize any CustomConst using the `impl Serialize for &dyn CustomConst`.
-fn serialize_custom_const(cc: &dyn CustomConst) -> Result<serde_yaml::Value, serde_yaml::Error> {
-    serde_yaml::to_value(cc)
+fn serialize_custom_const(cc: &dyn CustomConst) -> Result<serde_json::Value, serde_json::Error> {
+    serde_json::to_value(cc)
 }
 
 /// Deserialize a `Box<&dyn CustomConst>` and attempt to downcast it to `CC`;
 /// propagating failure.
 fn deserialize_custom_const<CC: CustomConst>(
-    value: serde_yaml::Value,
-) -> Result<CC, serde_yaml::Error> {
+    value: serde_json::Value,
+) -> Result<CC, serde_json::Error> {
     match deserialize_dyn_custom_const(value)?.downcast::<CC>() {
         Ok(cc) => Ok(*cc),
-        Err(dyn_cc) => Err(<serde_yaml::Error as serde::de::Error>::custom(format!(
+        Err(dyn_cc) => Err(<serde_json::Error as serde::de::Error>::custom(format!(
             "Failed to deserialize [{}]: {:?}",
             std::any::type_name::<CC>(),
             dyn_cc
@@ -124,9 +124,9 @@ fn deserialize_custom_const<CC: CustomConst>(
 
 /// Deserialize a `Box<&dyn CustomConst>`.
 fn deserialize_dyn_custom_const(
-    value: serde_yaml::Value,
-) -> Result<Box<dyn CustomConst>, serde_yaml::Error> {
-    serde_yaml::from_value(value)
+    value: serde_json::Value,
+) -> Result<Box<dyn CustomConst>, serde_json::Error> {
+    serde_json::from_value(value)
 }
 
 impl_downcast!(CustomConst);
@@ -136,7 +136,7 @@ impl_box_clone!(CustomConst, CustomConstBoxClone);
 /// A constant value stored as a serialized blob that can report its own type.
 pub struct CustomSerialized {
     typ: Type,
-    value: serde_yaml::Value,
+    value: serde_json::Value,
     extensions: ExtensionSet,
 }
 
@@ -144,7 +144,7 @@ pub struct CustomSerialized {
 #[error("Error serializing value into CustomSerialized: err: {err}, value: {payload:?}")]
 pub struct SerializeError {
     #[source]
-    err: serde_yaml::Error,
+    err: serde_json::Error,
     payload: Box<dyn CustomConst>,
 }
 
@@ -152,15 +152,15 @@ pub struct SerializeError {
 #[error("Error deserializing value from CustomSerialized: err: {err}, value: {payload:?}")]
 pub struct DeserializeError {
     #[source]
-    err: serde_yaml::Error,
-    payload: serde_yaml::Value,
+    err: serde_json::Error,
+    payload: serde_json::Value,
 }
 
 impl CustomSerialized {
     /// Creates a new [`CustomSerialized`].
     pub fn new(
         typ: impl Into<Type>,
-        value: serde_yaml::Value,
+        value: serde_json::Value,
         exts: impl Into<ExtensionSet>,
     ) -> Self {
         Self {
@@ -171,7 +171,7 @@ impl CustomSerialized {
     }
 
     /// Returns the inner value.
-    pub fn value(&self) -> &serde_yaml::Value {
+    pub fn value(&self) -> &serde_json::Value {
         &self.value
     }
 
@@ -238,7 +238,7 @@ impl CustomSerialized {
     /// deserialize it. In particular if that inner value were a [Self] whose
     /// inner value were a `CC`, then we would still fail.
     pub fn try_into_custom_const<CC: CustomConst>(self) -> Result<CC, DeserializeError> {
-        // ideally we would not have to clone, but serde_yaml does not allow us
+        // ideally we would not have to clone, but serde_json does not allow us
         // to recover the value from the error
         deserialize_custom_const(self.value.clone()).map_err(|err| DeserializeError {
             err,
@@ -250,7 +250,7 @@ impl CustomSerialized {
 #[typetag::serde]
 impl CustomConst for CustomSerialized {
     fn name(&self) -> ValueName {
-        format!("yaml:{:?}", self.value).into()
+        format!("json:{:?}", self.value).into()
     }
 
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
@@ -330,13 +330,13 @@ mod test {
     struct SerializeCustomConstExample<CC: CustomConst + serde::Serialize + 'static> {
         cc: CC,
         tag: &'static str,
-        yaml: serde_yaml::Value,
+        json: serde_json::Value,
     }
 
     impl<CC: CustomConst + serde::Serialize + 'static> SerializeCustomConstExample<CC> {
         fn new(cc: CC, tag: &'static str) -> Self {
-            let yaml = serde_yaml::to_value(&cc).unwrap();
-            Self { cc, tag, yaml }
+            let json = serde_json::to_value(&cc).unwrap();
+            Self { cc, tag, json }
         }
     }
 
@@ -363,21 +363,21 @@ mod test {
     >(
         #[case] example: SerializeCustomConstExample<CC>,
     ) {
-        assert_eq!(example.yaml, serde_yaml::to_value(&example.cc).unwrap()); // sanity check
-        let expected_yaml: serde_yaml::Value = [
+        assert_eq!(example.json, serde_json::to_value(&example.cc).unwrap()); // sanity check
+        let expected_json: serde_json::Value = [
             ("c".into(), example.tag.into()),
-            ("v".into(), example.yaml.clone()),
+            ("v".into(), example.json.clone()),
         ]
         .into_iter()
-        .collect::<serde_yaml::Mapping>()
+        .collect::<serde_json::Map<String, serde_json::Value>>()
         .into();
 
         // check serialize_custom_const
-        assert_eq!(expected_yaml, serialize_custom_const(&example.cc).unwrap());
+        assert_eq!(expected_json, serialize_custom_const(&example.cc).unwrap());
 
         let expected_custom_serialized = CustomSerialized::new(
             example.cc.get_type(),
-            expected_yaml,
+            expected_json,
             example.cc.extension_reqs(),
         );
 
@@ -412,12 +412,12 @@ mod test {
 
         // check OpaqueValue serializes/deserializes as a CustomSerialized
         let ev: OpaqueValue = example.cc.clone().into();
-        let ev_val = serde_yaml::to_value(&ev).unwrap();
+        let ev_val = serde_json::to_value(&ev).unwrap();
         assert_eq!(
             &ev_val,
-            &serde_yaml::to_value(&expected_custom_serialized).unwrap()
+            &serde_json::to_value(&expected_custom_serialized).unwrap()
         );
-        assert_eq!(ev, serde_yaml::from_value(ev_val).unwrap());
+        assert_eq!(ev, serde_json::from_value(ev_val).unwrap());
     }
 
     fn example_custom_serialized() -> (ConstUsize, CustomSerialized) {
@@ -473,7 +473,7 @@ mod test {
         // A serialization round-trip results in an OpaqueValue with the value of inner
         assert_eq!(
             OpaqueValue::new(inner),
-            serde_yaml::from_value(serde_yaml::to_value(&ev).unwrap()).unwrap()
+            serde_json::from_value(serde_json::to_value(&ev).unwrap()).unwrap()
         );
     }
 }
@@ -485,7 +485,7 @@ mod proptest {
     use crate::{
         extension::ExtensionSet,
         ops::constant::CustomSerialized,
-        proptest::{any_serde_yaml_value, any_string},
+        proptest::{any_serde_json_value, any_string},
         types::Type,
     };
 
@@ -502,10 +502,10 @@ mod proptest {
             // generate a valid tag(e.g. "ConstInt") then things will
             // go wrong: the serde::Deserialize impl for that type will
             // interpret "v" and fail.
-            let value = (any_serde_yaml_value(), any_string()).prop_map(|(content, tag)| {
+            let value = (any_serde_json_value(), any_string()).prop_map(|(content, tag)| {
                 [("c".into(), tag.into()), ("v".into(), content)]
                     .into_iter()
-                    .collect::<serde_yaml::Mapping>()
+                    .collect::<serde_json::Map<String, _>>()
                     .into()
             });
             (typ, value, extensions)

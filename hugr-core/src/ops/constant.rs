@@ -202,12 +202,12 @@ pub enum Value {
 /// serialization and deserialization of unknown impls of [CustomConst].
 ///
 /// During serialization we first serialize the internal [`dyn` CustomConst](CustomConst)
-/// into a [serde_yaml::Value]. We then create a [CustomSerialized] wrapping
+/// into a [serde_json::Value]. We then create a [CustomSerialized] wrapping
 /// that value.  That [CustomSerialized] is then serialized in place of the
 /// [OpaqueValue].
 ///
 /// During deserialization, first we deserialize a [CustomSerialized]. We
-/// attempt to deserialize the internal [serde_yaml::Value] using the [`Box<dyn
+/// attempt to deserialize the internal [serde_json::Value] using the [`Box<dyn
 /// CustomConst>`](CustomConst) impl. This will fail if the appropriate `impl CustomConst`
 /// is not linked into the running program, in which case we coerce the
 /// [CustomSerialized] into a [`Box<dyn CustomConst>`](CustomConst). The [OpaqueValue] is
@@ -235,7 +235,7 @@ pub enum Value {
 /// assert_eq!(&serde_json::to_value(&ev).unwrap(), &expected_json);
 /// assert_eq!(ev, serde_json::from_value(expected_json).unwrap());
 ///
-/// let ev = OpaqueValue::new(CustomSerialized::new(USIZE_T.clone(), serde_yaml::Value::Null, ExtensionSet::default()));
+/// let ev = OpaqueValue::new(CustomSerialized::new(USIZE_T.clone(), serde_json::Value::Null, ExtensionSet::default()));
 /// let expected_json = json!({
 ///     "extensions": [],
 ///     "typ": USIZE_T,
@@ -544,7 +544,6 @@ mod test {
     };
     use cool_asserts::assert_matches;
     use rstest::{fixture, rstest};
-    use serde_yaml::Value as YamlValue;
 
     use super::*;
 
@@ -682,7 +681,7 @@ mod test {
     #[rstest]
     #[case(Value::unit(), Type::UNIT, "const:seq:{}")]
     #[case(const_usize(), USIZE_T, "const:custom:ConstUsize(")]
-    #[case(serialized_float(17.4), FLOAT64_TYPE, "const:custom:yaml:Mapping")]
+    #[case(serialized_float(17.4), FLOAT64_TYPE, "const:custom:json:Object")]
     #[case(const_tuple(), Type::new_tuple(type_row![USIZE_T, FLOAT64_TYPE]), "const:seq:{")]
     fn const_type(
         #[case] const_value: Value,
@@ -709,7 +708,7 @@ mod test {
     }
 
     #[test]
-    fn test_yaml_const() {
+    fn test_json_const() {
         let ex_id: ExtensionId = "my_extension".try_into().unwrap();
         let typ_int = CustomType::new(
             "my_type",
@@ -717,16 +716,15 @@ mod test {
             ex_id.clone(),
             TypeBound::Eq,
         );
-        let yaml_const: Value =
-            CustomSerialized::new(typ_int.clone(), YamlValue::Number(6.into()), ex_id.clone())
-                .into();
+        let json_const: Value =
+            CustomSerialized::new(typ_int.clone(), 6.into(), ex_id.clone()).into();
         let classic_t = Type::new_extension(typ_int.clone());
         assert_matches!(classic_t.least_upper_bound(), TypeBound::Eq);
-        assert_eq!(yaml_const.get_type(), classic_t);
+        assert_eq!(json_const.get_type(), classic_t);
 
         let typ_qb = CustomType::new("my_type", vec![], ex_id, TypeBound::Eq);
         let t = Type::new_extension(typ_qb.clone());
-        assert_ne!(yaml_const.get_type(), t);
+        assert_ne!(json_const.get_type(), t);
     }
 
     mod proptest {
