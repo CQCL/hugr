@@ -19,6 +19,8 @@ Please read the [API documentation here][].
   Experimental feature which allows automatic inference of extension usages and
   requirements in a HUGR and validation that extensions are correctly specified.
   Not enabled by default.
+- `declarative`:
+  Experimental support for declaring extensions in YAML files, support is limited.
 
 ## Recent Changes
 
