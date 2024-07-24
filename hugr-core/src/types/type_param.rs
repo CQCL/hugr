@@ -7,7 +7,6 @@
 use itertools::Itertools;
 #[cfg(test)]
 use proptest_derive::Arbitrary;
-use serde_with::serde_as;
 use std::num::NonZeroU64;
 use thiserror::Error;
 
@@ -16,7 +15,6 @@ use super::{check_typevar_decl, RowVariable, Substitution, Type, TypeBase, TypeB
 use crate::extension::ExtensionRegistry;
 use crate::extension::ExtensionSet;
 use crate::extension::SignatureError;
-use serde_with::base64::Base64;
 
 /// The upper non-inclusive bound of a [`TypeParam::BoundedNat`]
 // A None inner value implies the maximum bound: u64::MAX + 1 (all u64 values valid)
@@ -338,47 +336,6 @@ impl TypeArgVariable {
     }
 }
 
-#[serde_as]
-/// An opaque type argument, internally represented as a byte array.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct CustomTypeArg(#[serde_as(as = "Base64")] Vec<u8>);
-
-impl CustomTypeArg {
-    /// Create a new opaque type argument.
-    pub fn new(value: Vec<u8>) -> Self {
-        Self(value)
-    }
-
-    /// Get the value of the opaque type argument.
-    pub fn bytes(&self) -> &[u8] {
-        &self.0
-    }
-}
-
-impl From<Vec<u8>> for CustomTypeArg {
-    fn from(arg: Vec<u8>) -> Self {
-        Self(arg)
-    }
-}
-
-impl std::str::FromStr for CustomTypeArg {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self(s.as_bytes().to_vec()))
-    }
-}
-
-impl TryFrom<CustomTypeArg> for String {
-    type Error = std::string::FromUtf8Error;
-
-    /// Convert a CustomTypeArg to a String.
-    /// Errors if the byte array is not valid UTF-8.
-    fn try_from(value: CustomTypeArg) -> Result<Self, Self::Error> {
-        String::from_utf8(value.0)
-    }
-}
-
 /// Checks a [TypeArg] is as expected for a [TypeParam]
 pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgError> {
     match (arg, param) {
@@ -635,7 +592,7 @@ mod test {
 
         use proptest::prelude::*;
 
-        use super::super::{CustomTypeArg, TypeArg, TypeArgVariable, TypeParam, UpperBound};
+        use super::super::{TypeArg, TypeArgVariable, TypeParam, UpperBound};
         use crate::extension::ExtensionSet;
         use crate::proptest::RecursionDepth;
         use crate::types::{Type, TypeBound};
