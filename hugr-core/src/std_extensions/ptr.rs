@@ -49,11 +49,11 @@ impl MakeOpDef for PtrOpDef {
     }
 
     fn signature(&self) -> SignatureFunc {
-        let ptr_t = ptr_type(TypeArg::new_var_use(0, TYPE_PARAMS[0].clone()));
+        let ptr_t = ptr_type(Type::new_var_use(0, TypeBound::Copyable));
         let inner_t = Type::new_var_use(0, TypeBound::Copyable);
         let body = match self {
-            PtrOpDef::New => Signature::new(vec![inner_t], vec![ptr_t]),
-            PtrOpDef::Read => Signature::new(vec![ptr_t.clone()], vec![inner_t]),
+            PtrOpDef::New => Signature::new(inner_t, ptr_t),
+            PtrOpDef::Read => Signature::new(ptr_t, inner_t),
             PtrOpDef::Write => Signature::new(vec![ptr_t, inner_t], type_row![]),
         };
 
@@ -107,14 +107,15 @@ lazy_static! {
 /// Integer type of a given bit width (specified by the TypeArg).  Depending on
 /// the operation, the semantic interpretation may be unsigned integer, signed
 /// integer or bit string.
-pub fn ptr_custom_type(ty: impl Into<TypeArg>) -> CustomType {
+pub fn ptr_custom_type(ty: impl Into<Type>) -> CustomType {
+    let ty = ty.into();
     CustomType::new(PTR_TYPE_ID, [ty.into()], EXTENSION_ID, TypeBound::Eq)
 }
 
 /// Integer type of a given bit width (specified by the TypeArg).
 ///
 /// Constructed from [ptr_custom_type].
-pub fn ptr_type(ty: impl Into<TypeArg>) -> Type {
+pub fn ptr_type(ty: impl Into<Type>) -> Type {
     Type::new_extension(ptr_custom_type(ty))
 }
 
@@ -144,9 +145,7 @@ impl MakeExtensionOp for PtrOp {
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
-        vec![TypeArg::Type {
-            ty: self.ty.clone(),
-        }]
+        vec![self.ty.clone().into()]
     }
 }
 
@@ -231,10 +230,8 @@ pub(crate) mod test {
     #[test]
     fn create_extension() {
         assert_eq!(EXTENSION.name(), &EXTENSION_ID);
-        println!("HERE");
 
         for o in PtrOpDef::iter() {
-            println!("{:?}", o);
             assert_eq!(PtrOpDef::from_def(get_opdef(o).unwrap()), Ok(o));
         }
     }
