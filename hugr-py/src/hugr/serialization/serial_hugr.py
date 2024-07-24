@@ -4,12 +4,13 @@ from pydantic import ConfigDict, Field
 
 import hugr
 from hugr import get_serialisation_version
+from hugr.node_port import NodeIdx, PortOffset
 
-from .ops import NodeID, OpType
+from .ops import OpType
 from .ops import classes as ops_classes
 from .tys import ConfiguredBaseModel, model_rebuild
 
-Port = tuple[NodeID, int | None]  # (node, offset)
+Port = tuple[NodeIdx, PortOffset | None]
 Edge = tuple[Port, Port]
 
 VersionField = Field(

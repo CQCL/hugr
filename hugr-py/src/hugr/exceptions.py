@@ -2,13 +2,15 @@
 
 from dataclasses import dataclass
 
+from .node_port import NodeIdx
+
 
 @dataclass
 class NoSiblingAncestor(Exception):
     """No sibling ancestor of target for valid inter-graph edge."""
 
-    src: int
-    tgt: int
+    src: NodeIdx
+    tgt: NodeIdx
 
     @property
     def msg(self):
@@ -22,8 +24,8 @@ class NoSiblingAncestor(Exception):
 class NotInSameCfg(Exception):
     """Source and target nodes are not in the same CFG."""
 
-    src: int
-    tgt: int
+    src: NodeIdx
+    tgt: NodeIdx
 
     @property
     def msg(self):
@@ -37,7 +39,7 @@ class NotInSameCfg(Exception):
 class MismatchedExit(Exception):
     """Edge to exit block signature mismatch."""
 
-    src: int
+    src: NodeIdx
 
     @property
     def msg(self):

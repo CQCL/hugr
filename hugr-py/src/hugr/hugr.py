@@ -13,7 +13,16 @@ from typing import (
     overload,
 )
 
-from hugr.node_port import Direction, InPort, Node, OutPort, ToNode, _SubPort
+from hugr.node_port import (
+    Direction,
+    InPort,
+    Node,
+    NodeIdx,
+    OutPort,
+    PortOffset,
+    ToNode,
+    _SubPort,
+)
 from hugr.ops import Call, Const, DataflowOp, Module, Op
 from hugr.serialization.ops import OpType as SerialOp
 from hugr.serialization.serial_hugr import SerialHugr
@@ -545,7 +554,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
 
         def _serialize_link(
             link: tuple[_SO, _SI],
-        ) -> tuple[tuple[int, int], tuple[int, int]]:
+        ) -> tuple[tuple[NodeIdx, PortOffset], tuple[NodeIdx, PortOffset]]:
             src, dst = link
             s, d = self._constrain_offset(src.port), self._constrain_offset(dst.port)
             return (src.port.node.idx, s), (dst.port.node.idx, d)
@@ -557,7 +566,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
             edges=[_serialize_link(link) for link in self._links.items()],
         )
 
-    def _constrain_offset(self, p: P) -> int:
+    def _constrain_offset(self, p: P) -> PortOffset:
         # negative offsets are used to refer to the last port
         if p.offset < 0:
             match p.direction:

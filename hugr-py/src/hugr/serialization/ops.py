@@ -7,6 +7,7 @@ from typing import Any, Literal
 
 from pydantic import ConfigDict, Field, RootModel
 
+from hugr.node_port import NodeIdx  # noqa: TCH001 # pydantic needs this alias in scope
 from hugr.utils import deser_it
 
 from . import tys as stys
@@ -28,14 +29,12 @@ from .tys import (
     model_rebuild as tys_model_rebuild,
 )
 
-NodeID = int
-
 
 class BaseOp(ABC, ConfiguredBaseModel):
     """Base class for ops that store their node's input/output types."""
 
     # Parent node index of node the op belongs to, used only at serialization time
-    parent: NodeID
+    parent: NodeIdx
 
     def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
         """Hook to insert type information from the input and output ports into the
