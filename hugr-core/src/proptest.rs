@@ -105,7 +105,7 @@ lazy_static! {
     };
 
     /// A strategy for an arbitrary non-recursive [serde_json::Value].
-    /// In particular, no `Mapping`, `Sequence`, or `Tagged`.
+    /// In particular, no `Array` or `Object`
     ///
     /// This is used as the base strategy for the general
     /// [recursive](Strategy::prop_recursive) strategy.
@@ -156,7 +156,6 @@ pub fn any_smolstr() -> SBoxedStrategy<SmolStr> {
 }
 
 pub fn any_serde_json_value() -> impl Strategy<Value = serde_json::Value> {
-    // use serde_json::value::{Tag, TaggedValue, Value};
     ANY_SERDE_JSON_VALUE_LEAF
         .clone()
         .prop_recursive(
@@ -165,8 +164,6 @@ pub fn any_serde_json_value() -> impl Strategy<Value = serde_json::Value> {
             3,  // Each collection is up to 3 elements long
             |element| {
                 prop_oneof![
-                    // TODO TaggedValue doesn't roundtrip through JSON
-                    // (any_nonempty_string().prop_map(Tag::new), element.clone()).prop_map(|(tag, value)| Value::Tagged(Box::new(TaggedValue { tag, value }))),
                     proptest::collection::vec(element.clone(), 0..3).prop_map_into(),
                     vec((any_string().prop_map_into(), element.clone()), 0..3).prop_map(|x| x
                         .into_iter()
