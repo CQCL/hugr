@@ -69,8 +69,8 @@ pub enum TypeParam {
         /// Upper bound for the Nat parameter.
         bound: UpperBound,
     },
-    /// Argument is a [TypeArg::Opaque].
-    Opaque,
+    /// Argument is a [TypeArg::String].
+    String,
     /// Argument is a [TypeArg::Sequence]. A list of indeterminate size containing
     /// parameters all of the (same) specified element type.
     List {
@@ -117,7 +117,7 @@ impl TypeParam {
             (TypeParam::BoundedNat { bound: b1 }, TypeParam::BoundedNat { bound: b2 }) => {
                 b1.contains(b2)
             }
-            (TypeParam::Opaque, TypeParam::Opaque) => true,
+            (TypeParam::String, TypeParam::String) => true,
             (TypeParam::List { param: e1 }, TypeParam::List { param: e2 }) => e1.contains(e2),
             (TypeParam::Tuple { params: es1 }, TypeParam::Tuple { params: es2 }) => {
                 es1.len() == es2.len() && es1.iter().zip(es2).all(|(e1, e2)| e1.contains(e2))
@@ -155,10 +155,10 @@ pub enum TypeArg {
         #[allow(missing_docs)]
         n: u64,
     },
-    ///Instance of [TypeParam::Opaque] An opaque value, stored as bytes.
-    Opaque {
+    ///Instance of [TypeParam::String]. UTF-8 encoded string argument.
+    String {
         #[allow(missing_docs)]
-        arg: CustomTypeArg,
+        arg: String,
     },
     /// Instance of [TypeParam::List] or [TypeParam::Tuple], defined by a
     /// sequence of elements.
@@ -196,9 +196,9 @@ impl From<u64> for TypeArg {
     }
 }
 
-impl From<CustomTypeArg> for TypeArg {
-    fn from(arg: CustomTypeArg) -> Self {
-        TypeArg::Opaque { arg }
+impl From<String> for TypeArg {
+    fn from(arg: String) -> Self {
+        TypeArg::String { arg }
     }
 }
 
@@ -258,7 +258,7 @@ impl TypeArg {
     ) -> Result<(), SignatureError> {
         match self {
             TypeArg::Type { ty } => ty.validate(extension_registry, var_decls),
-            TypeArg::BoundedNat { .. } | TypeArg::Opaque { .. } => Ok(()),
+            TypeArg::BoundedNat { .. } | TypeArg::String { .. } => Ok(()),
             TypeArg::Sequence { elems } => elems
                 .iter()
                 .try_for_each(|a| a.validate(extension_registry, var_decls)),
@@ -283,7 +283,7 @@ impl TypeArg {
                 // RowVariables are represented as TypeArg::Variable
                 ty.substitute1(t).into()
             }
-            TypeArg::BoundedNat { .. } | TypeArg::Opaque { .. } => self.clone(), // We do not allow variables as bounds on BoundedNat's
+            TypeArg::BoundedNat { .. } | TypeArg::String { .. } => self.clone(), // We do not allow variables as bounds on BoundedNat's
             TypeArg::Sequence { elems } => {
                 let mut are_types = elems.iter().map(|ta| match ta {
                     TypeArg::Type { .. } => true,
@@ -424,7 +424,7 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
             Ok(())
         }
 
-        (TypeArg::Opaque { .. }, TypeParam::Opaque) => Ok(()),
+        (TypeArg::String { .. }, TypeParam::String) => Ok(()),
         (TypeArg::Extensions { .. }, TypeParam::Extensions) => Ok(()),
         _ => Err(TypeArgError::TypeMismatch {
             arg: arg.clone(),
@@ -658,7 +658,7 @@ mod test {
                 use prop::strategy::Union;
                 let mut strat = Union::new([
                     Just(Self::Extensions).boxed(),
-                    Just(Self::Opaque).boxed(),
+                    Just(Self::String).boxed(),
                     any::<TypeBound>().prop_map(|b| Self::Type { b }).boxed(),
                     any::<UpperBound>()
                         .prop_map(|bound| Self::BoundedNat { bound })
@@ -687,11 +687,7 @@ mod test {
                 use prop::strategy::Union;
                 let mut strat = Union::new([
                     any::<u64>().prop_map(|n| Self::BoundedNat { n }).boxed(),
-                    any::<Vec<u8>>()
-                        .prop_map(|v| Self::Opaque {
-                            arg: CustomTypeArg(v),
-                        })
-                        .boxed(),
+                    any::<String>().prop_map(|arg| Self::String { arg }).boxed(),
                     any::<ExtensionSet>()
                         .prop_map(|es| Self::Extensions { es })
                         .boxed(),

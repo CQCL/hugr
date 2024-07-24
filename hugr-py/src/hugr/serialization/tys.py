@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 import inspect
 import sys
 from abc import ABC, abstractmethod
@@ -88,8 +87,8 @@ class BoundedNatParam(BaseTypeParam):
         return tys.BoundedNatParam(upper_bound=self.bound)
 
 
-class OpaqueParam(BaseTypeParam):
-    tp: Literal["Opaque"] = "Opaque"
+class StringParam(BaseTypeParam):
+    tp: Literal["String"] = "String"
 
     def deserialize(self) -> tys.OpaqueParam:
         return tys.OpaqueParam()
@@ -124,7 +123,7 @@ class TypeParam(RootModel):
     root: Annotated[
         TypeTypeParam
         | BoundedNatParam
-        | OpaqueParam
+        | StringParam
         | ListParam
         | TupleParam
         | ExtensionsParam,
@@ -163,13 +162,12 @@ class BoundedNatArg(BaseTypeArg):
         return tys.BoundedNatArg(n=self.n)
 
 
-class OpaqueArg(BaseTypeArg):
-    tya: Literal["Opaque"] = "Opaque"
-    # Base64 encoded string
+class StringArg(BaseTypeArg):
+    tya: Literal["String"] = "String"
     arg: str
 
-    def deserialize(self) -> tys.OpaqueArg:
-        return tys.OpaqueArg(value=base64.b64decode(self.arg.encode("utf-8")))
+    def deserialize(self) -> tys.StringArg:
+        return tys.StringArg(value=self.arg)
 
 
 class SequenceArg(BaseTypeArg):
@@ -203,7 +201,7 @@ class TypeArg(RootModel):
     root: Annotated[
         TypeTypeArg
         | BoundedNatArg
-        | OpaqueArg
+        | StringArg
         | SequenceArg
         | ExtensionsArg
         | VariableArg,

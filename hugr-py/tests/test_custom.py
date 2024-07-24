@@ -21,18 +21,18 @@ class StringlyOp(AsCustomOp):
             "StringlyOp",
             extension="my_extension",
             signature=tys.FunctionType.endo([]),
-            args=[tys.OpaqueArg.from_string(self.tag)],
+            args=[tys.StringArg(self.tag)],
         )
 
     @classmethod
     def from_custom(cls, custom: Custom) -> "StringlyOp":
         match custom:
             case Custom(
-                op_name="StringlyOp",
+                name="StringlyOp",
                 extension="my_extension",
-                args=[tys.OpaqueArg() as tag],
+                args=[tys.StringArg(tag)],
             ):
-                return cls(tag=tag.as_string())
+                return cls(tag=tag)
             case _:
                 msg = f"Invalid custom op: {custom}"
                 raise AsCustomOp.InvalidCustomOp(msg)

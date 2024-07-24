@@ -277,7 +277,7 @@ pub(crate) mod test {
             TypeParam::List {
                 param: Box::new(TypeParam::max_nat()),
             },
-            TypeParam::Opaque,
+            TypeParam::String,
             TypeParam::Tuple {
                 params: vec![TypeBound::Any.into(), TypeParam::max_nat()],
             },
