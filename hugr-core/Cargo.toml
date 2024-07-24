@@ -18,6 +18,7 @@ workspace = true
 
 [features]
 extension_inference = []
+declarative = ["serde_yaml"]
 
 [dependencies]
 portgraph = { workspace = true, features = ["serde", "petgraph"] }
@@ -28,7 +29,7 @@ num-rational = { workspace = true, features = ["serde"] }
 downcast-rs = { workspace = true }
 # Rc used here for Extension, but unfortunately we must turn the feature on globally
 serde = { workspace = true, features = ["derive", "rc"] }
-serde_yaml = { workspace = true }
+serde_yaml = { workspace = true, optional = true }
 typetag = { workspace = true }
 smol_str = { workspace = true, features = ["serde"] }
 derive_more = { workspace = true }

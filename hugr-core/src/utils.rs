@@ -96,6 +96,7 @@ pub fn try_collect_array<const N: usize, T>(
 /// ```
 ///
 /// From https://github.com/serde-rs/serde/issues/818.
+#[allow(dead_code)]
 pub(crate) fn is_default<T: Default + PartialEq>(t: &T) -> bool {
     *t == Default::default()
 }
