@@ -15,7 +15,7 @@ from .exceptions import MismatchedExit, NoSiblingAncestor, NotInSameCfg
 from .hugr import Hugr, ParentBuilder
 
 if TYPE_CHECKING:
-    from .node_port import Node, ToNode, Wire
+    from .node_port import Node, PortOffset, ToNode, Wire
     from .tys import Type, TypeRow
 
 
@@ -29,7 +29,7 @@ class Block(_DfBase[ops.DataflowBlock]):
         u = self.load(val.Unit)
         self.set_outputs(u, *outputs)
 
-    def _wire_up_port(self, node: Node, offset: int, p: Wire) -> Type:
+    def _wire_up_port(self, node: Node, offset: PortOffset, p: Wire) -> Type:
         src = p.out_port()
         cfg_node = self.hugr[self.parent_node].parent
         assert cfg_node is not None

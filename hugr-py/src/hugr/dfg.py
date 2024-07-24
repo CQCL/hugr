@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
     from .cfg import Cfg
     from .cond_loop import Conditional, If, TailLoop
-    from .node_port import Node, OutPort, ToNode, Wire
+    from .node_port import Node, OutPort, PortOffset, ToNode, Wire
 
 
 DP = TypeVar("DP", bound=ops.DfParentOp)
@@ -554,7 +554,7 @@ class _DfBase(ParentBuilder[DP], AbstractContextManager):
             raise ValueError(msg)
         return ty
 
-    def _wire_up_port(self, node: Node, offset: int, p: Wire) -> tys.Type:
+    def _wire_up_port(self, node: Node, offset: PortOffset, p: Wire) -> tys.Type:
         src = p.out_port()
         node_ancestor = _ancestral_sibling(self.hugr, src.node, node)
         if node_ancestor is None:

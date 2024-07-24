@@ -10,7 +10,7 @@ from typing_extensions import Self
 
 import hugr.serialization.ops as sops
 from hugr import tys, val
-from hugr.node_port import Direction, InPort, Node, OutPort, Wire
+from hugr.node_port import Direction, InPort, Node, OutPort, PortOffset, Wire
 from hugr.utils import ser_it
 
 if TYPE_CHECKING:
@@ -968,7 +968,7 @@ class Call(_CallOrLoad, Op):
     def num_out(self) -> int:
         return len(self.signature.body.output)
 
-    def _function_port_offset(self) -> int:
+    def _function_port_offset(self) -> PortOffset:
         return len(self.signature.body.input)
 
     def port_kind(self, port: InPort | OutPort) -> tys.Kind:

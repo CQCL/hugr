@@ -26,10 +26,14 @@ class Direction(Enum):
     OUTGOING = 1
 
 
+NodeIdx = int
+PortOffset = int
+
+
 @dataclass(frozen=True, eq=True, order=True)
 class _Port:
     node: Node
-    offset: int
+    offset: PortOffset
     direction: ClassVar[Direction]
 
 
@@ -72,21 +76,21 @@ class ToNode(Wire, Protocol):
         ...  # pragma: no cover
 
     @overload
-    def __getitem__(self, index: int) -> OutPort: ...
+    def __getitem__(self, index: PortOffset) -> OutPort: ...
     @overload
     def __getitem__(self, index: slice) -> Iterator[OutPort]: ...
     @overload
-    def __getitem__(self, index: tuple[int, ...]) -> Iterator[OutPort]: ...
+    def __getitem__(self, index: tuple[PortOffset, ...]) -> Iterator[OutPort]: ...
 
     def __getitem__(
-        self, index: int | slice | tuple[int, ...]
+        self, index: PortOffset | slice | tuple[PortOffset, ...]
     ) -> OutPort | Iterator[OutPort]:
         return self.to_node()._index(index)
 
     def out_port(self) -> OutPort:
         return OutPort(self.to_node(), 0)
 
-    def inp(self, offset: int) -> InPort:
+    def inp(self, offset: PortOffset) -> InPort:
         """Generate an input port for this node.
 
         Args:
@@ -101,7 +105,7 @@ class ToNode(Wire, Protocol):
         """
         return InPort(self.to_node(), offset)
 
-    def out(self, offset: int) -> OutPort:
+    def out(self, offset: PortOffset) -> OutPort:
         """Generate an output port for this node.
 
         Args:
@@ -116,7 +120,7 @@ class ToNode(Wire, Protocol):
         """
         return OutPort(self.to_node(), offset)
 
-    def port(self, offset: int, direction: Direction) -> InPort | OutPort:
+    def port(self, offset: PortOffset, direction: Direction) -> InPort | OutPort:
         """Generate a port in `direction` for this node with `offset`.
 
         Examples:
@@ -137,14 +141,14 @@ class Node(ToNode):
     with globally unique index.
     """
 
-    idx: int
+    idx: NodeIdx
     _num_out_ports: int | None = field(default=None, compare=False)
 
     def _index(
-        self, index: int | slice | tuple[int, ...]
+        self, index: PortOffset | slice | tuple[PortOffset, ...]
     ) -> OutPort | Iterator[OutPort]:
         match index:
-            case int(index):
+            case PortOffset(index):
                 if self._num_out_ports is not None and index >= self._num_out_ports:
                     msg = "Index out of range"
                     raise IndexError(msg)
