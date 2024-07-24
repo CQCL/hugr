@@ -22,7 +22,8 @@ bench = false
 path = "src/lib.rs"
 
 [features]
-extension_inference = []
+extension_inference = ["hugr-core/extension_inference"]
+declarative = ["hugr-core/declarative"]
 
 [dependencies]
 hugr-core = { path = "../hugr-core", version = "0.6.0" }
