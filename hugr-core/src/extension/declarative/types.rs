@@ -100,11 +100,13 @@ impl From<TypeDefBoundDeclaration> for TypeDefBound {
 
 /// A declarative type parameter definition.
 ///
-/// Only supports opaque parameters for now.
+/// Only supports [TypeParam::String]s for now.
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
 enum TypeParamDeclaration {
-    Opaque,
+    String,
+    /// A 2-tuple containing a human-readable name and a type id.
+    WithDescription(String),
 }
 
 impl TypeParamDeclaration {

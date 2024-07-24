@@ -90,8 +90,8 @@ class BoundedNatParam(BaseTypeParam):
 class StringParam(BaseTypeParam):
     tp: Literal["String"] = "String"
 
-    def deserialize(self) -> tys.OpaqueParam:
-        return tys.OpaqueParam()
+    def deserialize(self) -> tys.StringParam:
+        return tys.StringParam()
 
 
 class ListParam(BaseTypeParam):

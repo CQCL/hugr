@@ -313,13 +313,13 @@ extensions:
   - name: MyType
     description: A simple type with no parameters
     # Parametric types are not currently supported.
-    # params: [Any]
+    params: [String]
   operations:
   - name: UnsupportedOperation
     description: An operation from 3 qubits to 3 qubits
-    # params:
+    params:
         # Parametric operations are not currently supported.
-        # param1: USize
+         param1: String
     signature:
         # Type declarations will have their own syntax.
         inputs: []

@@ -85,8 +85,8 @@ class BoundedNatParam(TypeParam):
 
 
 @dataclass(frozen=True)
-class OpaqueParam(TypeParam):
-    """Opaque type parameter."""
+class StringParam(TypeParam):
+    """String type parameter."""
 
     def to_serial(self) -> stys.StringParam:
         return stys.StringParam()
