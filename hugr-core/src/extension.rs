@@ -33,6 +33,7 @@ pub mod simple_op;
 pub use const_fold::{ConstFold, ConstFoldResult, Folder};
 pub use prelude::{PRELUDE, PRELUDE_REGISTRY};
 
+#[cfg(feature = "declarative")]
 pub mod declarative;
 
 /// Extension Registries store extensions to be looked up e.g. during validation.
