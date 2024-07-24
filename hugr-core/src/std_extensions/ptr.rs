@@ -122,8 +122,10 @@ pub fn ptr_type(ty: impl Into<Type>) -> Type {
 #[derive(Clone, Debug, PartialEq)]
 /// A concrete pointer operation.
 pub struct PtrOp {
-    def: PtrOpDef,
-    ty: Type,
+    /// The operation definition.
+    pub def: PtrOpDef,
+    /// Type of the value being pointed to.
+    pub ty: Type,
 }
 
 impl PtrOp {
