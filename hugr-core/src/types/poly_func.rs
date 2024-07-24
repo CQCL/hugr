@@ -146,7 +146,7 @@ pub(crate) mod test {
     use cool_asserts::assert_matches;
     use lazy_static::lazy_static;
 
-    use crate::extension::prelude::{BOOL_T, PRELUDE_ID, USIZE_CUSTOM_T, USIZE_T};
+    use crate::extension::prelude::{BOOL_T, PRELUDE_ID, USIZE_T};
     use crate::extension::{
         ExtensionId, ExtensionRegistry, SignatureError, TypeDefBound, EMPTY_REG, PRELUDE,
         PRELUDE_REGISTRY,
@@ -277,7 +277,7 @@ pub(crate) mod test {
             TypeParam::List {
                 param: Box::new(TypeParam::max_nat()),
             },
-            TypeParam::Opaque { ty: USIZE_CUSTOM_T },
+            TypeParam::String,
             TypeParam::Tuple {
                 params: vec![TypeBound::Any.into(), TypeParam::max_nat()],
             },

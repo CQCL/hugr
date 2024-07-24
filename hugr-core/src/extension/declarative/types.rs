@@ -9,7 +9,7 @@
 
 use crate::extension::{TypeDef, TypeDefBound};
 use crate::types::type_param::TypeParam;
-use crate::types::{CustomType, TypeBound, TypeName};
+use crate::types::{TypeBound, TypeName};
 use crate::Extension;
 
 use serde::{Deserialize, Serialize};
@@ -100,14 +100,13 @@ impl From<TypeDefBoundDeclaration> for TypeDefBound {
 
 /// A declarative type parameter definition.
 ///
-/// Either a type, or a 2-element list containing a human-readable name and a type id.
+/// Only supports [TypeParam::String]s for now.
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
 enum TypeParamDeclaration {
-    /// Just the type id.
-    Type(TypeName),
+    String,
     /// A 2-tuple containing a human-readable name and a type id.
-    WithDescription(String, TypeName),
+    WithDescription(String),
 }
 
 impl TypeParamDeclaration {
@@ -119,52 +118,9 @@ impl TypeParamDeclaration {
     /// TODO: The parameter description is currently ignored.
     pub fn make_type_param(
         &self,
-        extension: &Extension,
-        ctx: DeclarationContext<'_>,
+        _extension: &Extension,
+        _ctx: DeclarationContext<'_>,
     ) -> Result<TypeParam, ExtensionDeclarationError> {
-        let instantiate_type = |ty: &TypeDef| -> Result<CustomType, ExtensionDeclarationError> {
-            match ty.params() {
-                [] => Ok(ty.instantiate([]).unwrap()),
-                _ => Err(ExtensionDeclarationError::ParametricTypeParameter {
-                    ext: extension.name().clone(),
-                    ty: self.type_name().clone(),
-                }),
-            }
-        };
-
-        // First try the previously defined types in the current extension.
-        if let Some(ty) = extension.get_type(self.type_name()) {
-            return Ok(TypeParam::Opaque {
-                ty: instantiate_type(ty)?,
-            });
-        }
-
-        // Try every extension in scope.
-        //
-        // TODO: Can we resolve the extension id from the type name instead?
-        for ext in ctx.scope.iter() {
-            if let Some(ty) = ctx
-                .registry
-                .get(ext)
-                .and_then(|ext| ext.get_type(self.type_name()))
-            {
-                return Ok(TypeParam::Opaque {
-                    ty: instantiate_type(ty)?,
-                });
-            }
-        }
-
-        Err(ExtensionDeclarationError::MissingType {
-            ext: extension.name().clone(),
-            ty: self.type_name().clone(),
-        })
-    }
-
-    /// Returns the type name of this type parameter.
-    fn type_name(&self) -> &TypeName {
-        match self {
-            Self::Type(ty) => ty,
-            Self::WithDescription(_, ty) => ty,
-        }
+        Ok(TypeParam::String)
     }
 }

@@ -1,17 +1,54 @@
+from dataclasses import dataclass
+
 import pytest
 
 from hugr import tys
+from hugr.dfg import Dfg
 from hugr.node_port import Node
 from hugr.ops import AsCustomOp, Custom
 from hugr.std.int import DivMod
 from hugr.std.logic import EXTENSION_ID, Not
 
-from .conftest import CX, H, Measure, Rz
+from .conftest import CX, H, Measure, Rz, validate
+
+
+@dataclass
+class StringlyOp(AsCustomOp):
+    tag: str
+
+    def to_custom(self) -> Custom:
+        return Custom(
+            "StringlyOp",
+            extension="my_extension",
+            signature=tys.FunctionType.endo([]),
+            args=[tys.StringArg(self.tag)],
+        )
+
+    @classmethod
+    def from_custom(cls, custom: Custom) -> "StringlyOp":
+        match custom:
+            case Custom(
+                name="StringlyOp",
+                extension="my_extension",
+                args=[tys.StringArg(tag)],
+            ):
+                return cls(tag=tag)
+            case _:
+                msg = f"Invalid custom op: {custom}"
+                raise AsCustomOp.InvalidCustomOp(msg)
+
+
+def test_stringly_typed():
+    dfg = Dfg()
+    n = dfg.add(StringlyOp("world")())
+    dfg.set_outputs()
+    assert dfg.hugr[n].op == StringlyOp("world")
+    validate(dfg.hugr)
 
 
 @pytest.mark.parametrize(
     "as_custom",
-    [Not, DivMod, H, CX, Measure, Rz],
+    [Not, DivMod, H, CX, Measure, Rz, StringlyOp("hello")],
 )
 def test_custom(as_custom: AsCustomOp):
     custom = as_custom.to_custom()

@@ -1204,54 +1204,6 @@
             "title": "Opaque",
             "type": "object"
         },
-        "OpaqueArg": {
-            "additionalProperties": true,
-            "properties": {
-                "tya": {
-                    "const": "Opaque",
-                    "default": "Opaque",
-                    "enum": [
-                        "Opaque"
-                    ],
-                    "title": "Tya",
-                    "type": "string"
-                },
-                "typ": {
-                    "$ref": "#/$defs/Opaque"
-                },
-                "value": {
-                    "title": "Value"
-                }
-            },
-            "required": [
-                "typ",
-                "value"
-            ],
-            "title": "OpaqueArg",
-            "type": "object"
-        },
-        "OpaqueParam": {
-            "additionalProperties": true,
-            "properties": {
-                "tp": {
-                    "const": "Opaque",
-                    "default": "Opaque",
-                    "enum": [
-                        "Opaque"
-                    ],
-                    "title": "Tp",
-                    "type": "string"
-                },
-                "ty": {
-                    "$ref": "#/$defs/Opaque"
-                }
-            },
-            "required": [
-                "ty"
-            ],
-            "title": "OpaqueParam",
-            "type": "object"
-        },
         "Output": {
             "additionalProperties": true,
             "description": "An output node. The inputs are the outputs of the function.",
@@ -1374,6 +1326,45 @@
                 "elems"
             ],
             "title": "SequenceArg",
+            "type": "object"
+        },
+        "StringArg": {
+            "additionalProperties": true,
+            "properties": {
+                "tya": {
+                    "const": "String",
+                    "default": "String",
+                    "enum": [
+                        "String"
+                    ],
+                    "title": "Tya",
+                    "type": "string"
+                },
+                "arg": {
+                    "title": "Arg",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "arg"
+            ],
+            "title": "StringArg",
+            "type": "object"
+        },
+        "StringParam": {
+            "additionalProperties": true,
+            "properties": {
+                "tp": {
+                    "const": "String",
+                    "default": "String",
+                    "enum": [
+                        "String"
+                    ],
+                    "title": "Tp",
+                    "type": "string"
+                }
+            },
+            "title": "StringParam",
             "type": "object"
         },
         "SumType": {
@@ -1634,8 +1625,8 @@
                 "mapping": {
                     "BoundedNat": "#/$defs/BoundedNatArg",
                     "Extensions": "#/$defs/ExtensionsArg",
-                    "Opaque": "#/$defs/OpaqueArg",
                     "Sequence": "#/$defs/SequenceArg",
+                    "String": "#/$defs/StringArg",
                     "Type": "#/$defs/TypeTypeArg",
                     "Variable": "#/$defs/VariableArg"
                 },
@@ -1649,7 +1640,7 @@
                     "$ref": "#/$defs/BoundedNatArg"
                 },
                 {
-                    "$ref": "#/$defs/OpaqueArg"
+                    "$ref": "#/$defs/StringArg"
                 },
                 {
                     "$ref": "#/$defs/SequenceArg"
@@ -1682,7 +1673,7 @@
                     "BoundedNat": "#/$defs/BoundedNatParam",
                     "Extensions": "#/$defs/ExtensionsParam",
                     "List": "#/$defs/ListParam",
-                    "Opaque": "#/$defs/OpaqueParam",
+                    "String": "#/$defs/StringParam",
                     "Tuple": "#/$defs/TupleParam",
                     "Type": "#/$defs/TypeTypeParam"
                 },
@@ -1696,7 +1687,7 @@
                     "$ref": "#/$defs/BoundedNatParam"
                 },
                 {
-                    "$ref": "#/$defs/OpaqueParam"
+                    "$ref": "#/$defs/StringParam"
                 },
                 {
                     "$ref": "#/$defs/ListParam"

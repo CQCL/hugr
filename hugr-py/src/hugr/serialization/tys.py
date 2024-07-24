@@ -87,12 +87,11 @@ class BoundedNatParam(BaseTypeParam):
         return tys.BoundedNatParam(upper_bound=self.bound)
 
 
-class OpaqueParam(BaseTypeParam):
-    tp: Literal["Opaque"] = "Opaque"
-    ty: Opaque
+class StringParam(BaseTypeParam):
+    tp: Literal["String"] = "String"
 
-    def deserialize(self) -> tys.OpaqueParam:
-        return tys.OpaqueParam(ty=self.ty.deserialize())
+    def deserialize(self) -> tys.StringParam:
+        return tys.StringParam()
 
 
 class ListParam(BaseTypeParam):
@@ -124,7 +123,7 @@ class TypeParam(RootModel):
     root: Annotated[
         TypeTypeParam
         | BoundedNatParam
-        | OpaqueParam
+        | StringParam
         | ListParam
         | TupleParam
         | ExtensionsParam,
@@ -163,13 +162,12 @@ class BoundedNatArg(BaseTypeArg):
         return tys.BoundedNatArg(n=self.n)
 
 
-class OpaqueArg(BaseTypeArg):
-    tya: Literal["Opaque"] = "Opaque"
-    typ: Opaque
-    value: Any
+class StringArg(BaseTypeArg):
+    tya: Literal["String"] = "String"
+    arg: str
 
-    def deserialize(self) -> tys.OpaqueArg:
-        return tys.OpaqueArg(ty=self.typ.deserialize(), value=self.value)
+    def deserialize(self) -> tys.StringArg:
+        return tys.StringArg(value=self.arg)
 
 
 class SequenceArg(BaseTypeArg):
@@ -203,7 +201,7 @@ class TypeArg(RootModel):
     root: Annotated[
         TypeTypeArg
         | BoundedNatArg
-        | OpaqueArg
+        | StringArg
         | SequenceArg
         | ExtensionsArg
         | VariableArg,
