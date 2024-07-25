@@ -20,7 +20,7 @@ use super::{signature::FuncTypeBase, MaybeRV, NoRV, RowVariable};
 /// [FuncDefn]: crate::ops::module::FuncDefn
 /// [OpDef]: crate::extension::OpDef
 #[derive(
-    Clone, PartialEq, Debug, Eq, derive_more::Display, serde::Serialize, serde::Deserialize,
+    Clone, PartialEq, Debug, Eq, Hash, derive_more::Display, serde::Serialize, serde::Deserialize,
 )]
 #[cfg_attr(test, derive(Arbitrary), proptest(params = "RecursionDepth"))]
 #[display(

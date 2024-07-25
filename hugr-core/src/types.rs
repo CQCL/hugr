@@ -121,7 +121,7 @@ pub(crate) fn least_upper_bound(mut tags: impl Iterator<Item = TypeBound>) -> Ty
     .into_inner()
 }
 
-#[derive(Clone, PartialEq, Debug, Eq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Debug, Eq, Hash, Serialize, Deserialize)]
 #[serde(tag = "s")]
 #[non_exhaustive]
 /// Representation of a Sum type.
@@ -213,7 +213,7 @@ impl<RV: MaybeRV> From<SumType> for TypeBase<RV> {
     }
 }
 
-#[derive(Clone, Debug, Eq, derive_more::Display)]
+#[derive(Clone, Debug, Eq, Hash, derive_more::Display)]
 /// Core types
 pub enum TypeEnum<RV: MaybeRV> {
     // TODO optimise with Box<CustomType> ?
@@ -257,7 +257,7 @@ impl<RV: MaybeRV> TypeEnum<RV> {
     }
 }
 
-#[derive(Clone, Debug, Eq, derive_more::Display, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Eq, Hash, derive_more::Display, serde::Serialize, serde::Deserialize)]
 #[display(fmt = "{}", "_0")]
 #[serde(
     into = "serialize::SerSimpleType",

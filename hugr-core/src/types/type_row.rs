@@ -17,7 +17,7 @@ use itertools::Itertools;
 
 /// List of types, used for function signatures.
 /// The `ROWVARS` parameter controls whether this may contain [RowVariable]s
-#[derive(Clone, Eq, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Eq, Debug, Hash, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 #[serde(transparent)]
 pub struct TypeRowBase<ROWVARS: MaybeRV> {
