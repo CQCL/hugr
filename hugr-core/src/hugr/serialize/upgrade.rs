@@ -33,5 +33,6 @@ pub fn v1_to_v2(mut input: serde_json::Value) -> Result<serde_json::Value, Upgra
     Ok(input)
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(miri)))]
+// see serialize::test.
 mod test;
