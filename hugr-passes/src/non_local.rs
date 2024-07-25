@@ -15,7 +15,7 @@ pub fn nonlocal_edges(hugr: &impl HugrView) -> impl Iterator<Item = (Node, Incom
     hugr.nodes().flat_map(move |node| {
         hugr.in_value_types(node).filter_map(move |(in_p, _)| {
             hugr.linked_outputs(node, in_p)
-                .any(|(neighbour_node, _)| hugr.get_parent(node) == hugr.get_parent(neighbour_node))
+                .any(|(neighbour_node, _)| hugr.get_parent(node) != hugr.get_parent(neighbour_node))
                 .then_some((node, in_p))
         })
     })
@@ -34,5 +34,67 @@ pub fn ensure_no_nonlocal_edges(hugr: &impl HugrView) -> Result<(), NonLocalEdge
         Ok(())
     } else {
         Err(NonLocalEdgesError::Edges(non_local_edges))?
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use hugr_core::{
+        builder::{DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer},
+        extension::{prelude::BOOL_T, EMPTY_REG},
+        ops::{handle::NodeHandle, Noop},
+        type_row,
+        types::Signature,
+    };
+    use rstest::rstest;
+
+    use super::*;
+
+    #[rstest]
+    fn ensures_no_nonlocal_edges() {
+        let hugr = {
+            let mut builder = DFGBuilder::new(Signature::new_endo(BOOL_T)).unwrap();
+            let [in_w] = builder.input_wires_arr();
+            let [out_w] = builder
+                .add_dataflow_op(Noop::new(BOOL_T), [in_w])
+                .unwrap()
+                .outputs_arr();
+            builder
+                .finish_hugr_with_outputs([out_w], &EMPTY_REG)
+                .unwrap()
+        };
+        ensure_no_nonlocal_edges(&hugr).unwrap();
+    }
+
+    #[rstest]
+    fn find_nonlocal_edges() {
+        let (hugr, edge) = {
+            let mut builder = DFGBuilder::new(Signature::new_endo(BOOL_T)).unwrap();
+            let [in_w] = builder.input_wires_arr();
+            let ([out_w], edge) = {
+                let mut builder = builder
+                    .dfg_builder(Signature::new(type_row![], BOOL_T), [])
+                    .unwrap();
+                let noop = builder.add_dataflow_op(Noop::new(BOOL_T), [in_w]).unwrap();
+                let noop_edge = (noop.node(), IncomingPort::from(0));
+                (
+                    builder
+                        .finish_with_outputs(noop.outputs())
+                        .unwrap()
+                        .outputs_arr(),
+                    noop_edge,
+                )
+            };
+            (
+                builder
+                    .finish_hugr_with_outputs([out_w], &EMPTY_REG)
+                    .unwrap(),
+                edge,
+            )
+        };
+        assert_eq!(
+            ensure_no_nonlocal_edges(&hugr).unwrap_err(),
+            NonLocalEdgesError::Edges(vec![edge])
+        );
     }
 }
