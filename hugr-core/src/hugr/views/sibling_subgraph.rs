@@ -910,7 +910,7 @@ mod tests {
 
         assert_eq!(rep.subgraph().nodes().len(), 4);
 
-        assert_eq!(hugr.node_count(), 8); // Module + Def + In + CX + Out
+        assert_eq!(hugr.node_count(), 8); // Module + Def + In + CX + Rz + Const + LoadConst + Out
         hugr.apply_rewrite(rep).unwrap();
         assert_eq!(hugr.node_count(), 4); // Module + Def + In + Out
 
@@ -922,8 +922,6 @@ mod tests {
         let (hugr, dfg) = build_hugr().unwrap();
         let func: SiblingGraph<'_, FuncID<true>> = SiblingGraph::try_new(&hugr, dfg).unwrap();
         let sub = SiblingSubgraph::try_new_dataflow_subgraph(&func)?;
-        // The identity wire on the third qubit is ignored, so the subgraph's signature only contains
-        // the first two qubits.
         assert_eq!(
             sub.signature(&func),
             Signature::new_endo(type_row![QB_T, QB_T, QB_T]).with_extension_delta(
