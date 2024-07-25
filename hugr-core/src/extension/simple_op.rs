@@ -2,7 +2,7 @@
 
 use strum::IntoEnumIterator;
 
-use crate::ops::{OpName, OpNameRef};
+use crate::ops::{CustomOp, OpName, OpNameRef};
 use crate::{
     ops::{custom::ExtensionOp, NamedOp, OpType},
     types::TypeArg,
@@ -84,6 +84,43 @@ pub trait MakeOpDef: NamedOp {
             op.add_to_extension(extension)?;
         }
         Ok(())
+    }
+
+    /// If the definition can be loaded from a string, load from an [ExtensionOp].
+    fn from_op(custom_op: &CustomOp) -> Result<Self, OpLoadError>
+    where
+        Self: Sized + std::str::FromStr,
+    {
+        match custom_op {
+            CustomOp::Extension(ext) => Self::from_extension_op(ext),
+            CustomOp::Opaque(opaque) => try_from_name(opaque.name(), opaque.extension()),
+        }
+    }
+}
+
+/// [MakeOpDef] with an associate concrete Op type which can be instantiated with type arguments.
+pub trait HasConcrete: MakeOpDef {
+    /// Associated concrete type.
+    type Concrete: MakeExtensionOp;
+
+    /// Instantiate the operation with type arguments.
+    fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError>;
+}
+
+/// [MakeExtensionOp] with an associated [HasConcrete].
+pub trait HasDef: MakeExtensionOp {
+    /// Associated [HasConcrete] type.
+    type Def: HasConcrete<Concrete = Self> + std::str::FromStr;
+
+    /// Load the operation from a [CustomOp].
+    fn from_op(custom_op: &CustomOp) -> Result<Self, OpLoadError>
+    where
+        Self: Sized,
+    {
+        match custom_op {
+            CustomOp::Extension(ext) => Self::from_extension_op(ext),
+            CustomOp::Opaque(opaque) => Self::Def::from_op(custom_op)?.instantiate(opaque.args()),
+        }
     }
 }
 
@@ -264,6 +301,18 @@ mod test {
             EXT_ID.to_owned()
         }
     }
+
+    impl HasConcrete for DummyEnum {
+        type Concrete = Self;
+
+        fn instantiate(&self, _type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
+            if _type_args.is_empty() {
+                Ok(self.clone())
+            } else {
+                Err(OpLoadError::InvalidArgs(SignatureError::InvalidTypeArgs))
+            }
+        }
+    }
     const_extension_ids! {
         const EXT_ID: ExtensionId = "DummyExt";
     }
@@ -302,5 +351,11 @@ mod test {
         );
         let registered: RegisteredOp<_> = o.clone().into();
         assert_eq!(registered.to_inner(), o);
+
+        assert_eq!(o.instantiate(&[]), Ok(o.clone()));
+        assert_eq!(
+            o.instantiate(&[TypeArg::BoundedNat { n: 1 }]),
+            Err(OpLoadError::InvalidArgs(SignatureError::InvalidTypeArgs))
+        );
     }
 }

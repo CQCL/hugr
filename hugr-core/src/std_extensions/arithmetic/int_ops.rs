@@ -2,7 +2,9 @@
 
 use super::int_types::{get_log_width, int_tv, LOG_WIDTH_TYPE_PARAM};
 use crate::extension::prelude::{sum_with_error, BOOL_T, STRING_TYPE};
-use crate::extension::simple_op::{MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError};
+use crate::extension::simple_op::{
+    HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
+};
 use crate::extension::{
     CustomValidator, ExtensionRegistry, OpDef, SignatureFunc, ValidateJustArgs, PRELUDE,
 };
@@ -278,6 +280,25 @@ lazy_static! {
     .unwrap();
 }
 
+impl HasConcrete for IntOpDef {
+    type Concrete = ConcreteIntOp;
+
+    fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
+        let log_widths: Vec<u8> = type_args
+            .iter()
+            .map(|a| get_log_width(a).map_err(|_| SignatureError::InvalidTypeArgs))
+            .collect::<Result<_, _>>()?;
+        Ok(ConcreteIntOp {
+            def: *self,
+            log_widths,
+        })
+    }
+}
+
+impl HasDef for ConcreteIntOp {
+    type Def = IntOpDef;
+}
+
 /// Concrete integer operation with integer widths set.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
@@ -298,12 +319,7 @@ impl NamedOp for ConcreteIntOp {
 impl MakeExtensionOp for ConcreteIntOp {
     fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError> {
         let def = IntOpDef::from_def(ext_op.def())?;
-        let args = ext_op.args();
-        let log_widths: Vec<u8> = args
-            .iter()
-            .map(|a| get_log_width(a).map_err(|_| SignatureError::InvalidTypeArgs))
-            .collect::<Result<_, _>>()?;
-        Ok(Self { def, log_widths })
+        def.instantiate(ext_op.args())
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
@@ -355,7 +371,8 @@ fn sum_ty_with_err(t: Type) -> Type {
 #[cfg(test)]
 mod test {
     use crate::{
-        ops::dataflow::DataflowOpTrait, std_extensions::arithmetic::int_types::int_type,
+        ops::{dataflow::DataflowOpTrait, CustomOp},
+        std_extensions::arithmetic::int_types::int_type,
         types::Signature,
     };
 
@@ -432,8 +449,13 @@ mod test {
                 .is_none(),
             "type arguments invalid"
         );
-        let ext_op = o.clone().to_extension_op().unwrap();
+        let custom_op: CustomOp = o.clone().to_extension_op().unwrap().into();
 
-        assert_eq!(ConcreteIntOp::from_extension_op(&ext_op).unwrap(), o);
+        assert_eq!(ConcreteIntOp::from_op(&custom_op).unwrap(), o);
+        assert_eq!(IntOpDef::from_op(&custom_op).unwrap(), IntOpDef::itobool);
+        assert_eq!(
+            IntOpDef::from_op(&custom_op.into_opaque().into()).unwrap(),
+            IntOpDef::itobool
+        );
     }
 }

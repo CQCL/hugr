@@ -9,7 +9,10 @@ use crate::types::{FuncValueType, Signature};
 use crate::{
     extension::{
         prelude::BOOL_T,
-        simple_op::{try_from_name, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError},
+        simple_op::{
+            try_from_name, HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp,
+            OpLoadError,
+        },
         ExtensionId, ExtensionRegistry, OpDef, SignatureError, SignatureFromArgs, SignatureFunc,
     },
     ops::{self, custom::ExtensionOp, NamedOp},
@@ -82,6 +85,21 @@ impl MakeOpDef for NaryLogic {
     }
 }
 
+impl HasConcrete for NaryLogic {
+    type Concrete = ConcreteLogicOp;
+
+    fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
+        let [TypeArg::BoundedNat { n }] = type_args else {
+            return Err(SignatureError::InvalidTypeArgs.into());
+        };
+        Ok(self.with_n_inputs(*n))
+    }
+}
+
+impl HasDef for ConcreteLogicOp {
+    type Def = NaryLogic;
+}
+
 /// Make a [NaryLogic] operation concrete by setting the type argument.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ConcreteLogicOp(pub NaryLogic, u64);
@@ -101,10 +119,7 @@ impl NamedOp for ConcreteLogicOp {
 impl MakeExtensionOp for ConcreteLogicOp {
     fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError> {
         let def: NaryLogic = NaryLogic::from_def(ext_op.def())?;
-        let [TypeArg::BoundedNat { n }] = *ext_op.args() else {
-            return Err(SignatureError::InvalidTypeArgs.into());
-        };
-        Ok(Self(def, n))
+        def.instantiate(ext_op.args())
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
@@ -245,9 +260,9 @@ pub(crate) mod test {
     use crate::{
         extension::{
             prelude::BOOL_T,
-            simple_op::{MakeExtensionOp, MakeOpDef, MakeRegisteredOp},
+            simple_op::{HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp},
         },
-        ops::{NamedOp, Value},
+        ops::{CustomOp, NamedOp, Value},
         Extension,
     };
 
@@ -273,7 +288,13 @@ pub(crate) mod test {
         for def in [NaryLogic::And, NaryLogic::Or] {
             let o = def.with_n_inputs(3);
             let ext_op = o.clone().to_extension_op().unwrap();
-            assert_eq!(ConcreteLogicOp::from_extension_op(&ext_op).unwrap(), o);
+            let custom_op: CustomOp = ext_op.into();
+            assert_eq!(NaryLogic::from_op(&custom_op).unwrap(), def);
+            assert_eq!(ConcreteLogicOp::from_op(&custom_op).unwrap(), o);
+            assert_eq!(
+                ConcreteLogicOp::from_op(&custom_op.into_opaque().into()).unwrap(),
+                o
+            );
         }
 
         NotOp::from_extension_op(&NotOp.to_extension_op().unwrap()).unwrap();
