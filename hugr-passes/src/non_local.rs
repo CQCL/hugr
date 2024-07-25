@@ -46,11 +46,10 @@ mod test {
         type_row,
         types::Signature,
     };
-    use rstest::rstest;
 
     use super::*;
 
-    #[rstest]
+    #[test]
     fn ensures_no_nonlocal_edges() {
         let hugr = {
             let mut builder = DFGBuilder::new(Signature::new_endo(BOOL_T)).unwrap();
@@ -66,7 +65,7 @@ mod test {
         ensure_no_nonlocal_edges(&hugr).unwrap();
     }
 
-    #[rstest]
+    #[test]
     fn find_nonlocal_edges() {
         let (hugr, edge) = {
             let mut builder = DFGBuilder::new(Signature::new_endo(BOOL_T)).unwrap();
