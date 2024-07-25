@@ -208,10 +208,35 @@ to include all the changes that have been merged into the main branch. In this c
 you can create a new branch from the latest release tag and cherry-pick the commits
 you want to include in the patch release.
 
+#### Rust patch releases
+
+You can use [`release-plz`](https://release-plz.ieni.dev/) to automatically generate the changelogs and bump the package versions.
+
+```bash
+release-plz update
+```
+
+Once the branch is ready, create a draft PR so that the release team can review
+it.
+
+Now someone from the release team can run `release-plz` on the **unmerged**
+branch to create the github releases and publish to crates.io.
+
+```bash
+# Make sure you are logged in to `crates.io`
+cargo login <your_crates_io_token>
+# Get a github token with permissions to create releases
+GITHUB_TOKEN=<your_github_token>
+# Run release-plz
+release-plz release --git-token $GITHUB_TOKEN
+```
+
+#### Python patch releases
+
 You will need to modify the version and changelog manually in this case. Check
 the existing release PRs for examples on how to do this. Once the branch is
-ready, create a [github release](https://github.com/CQCL/hugr/releases/new).
-The tag should follow the format used in the previous releases, e.g. `hugr-py-v0.1.1`.
+ready, create a draft PR so that the release team can review it.
 
-For rust crates, you will need someone from the release team to manually
-publish the new version to crates.io by running `cargo release`.
+The wheel building process and publication to PyPI is handled by the CI.
+Just create a [github release](https://github.com/CQCL/hugr/releases/new) from the **unmerged** branch.
+The release tag should follow the format used in the previous releases, e.g. `hugr-py-v0.1.1`.
