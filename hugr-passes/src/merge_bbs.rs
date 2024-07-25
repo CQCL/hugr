@@ -178,7 +178,7 @@ mod test {
     }
 
     fn extension() -> Extension {
-        let mut e = Extension::new(EXT_ID);
+        let mut e = Extension::new(EXT_ID, hugr_core::extension::Version::new(0, 1, 0));
         e.add_op(
             "Test".into(),
             String::new(),

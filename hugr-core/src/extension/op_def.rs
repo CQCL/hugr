@@ -591,7 +591,7 @@ pub(super) mod test {
     #[test]
     fn op_def_with_type_scheme() -> Result<(), Box<dyn std::error::Error>> {
         let list_def = EXTENSION.get_type(&LIST_TYPENAME).unwrap();
-        let mut e = Extension::new(EXT_ID);
+        let mut e = Extension::new(EXT_ID, semver::Version::new(0, 1, 0));
         const TP: TypeParam = TypeParam::Type { b: TypeBound::Any };
         let list_of_var =
             Type::new_extension(list_def.instantiate(vec![TypeArg::new_var_use(0, TP)])?);
@@ -658,7 +658,7 @@ pub(super) mod test {
                 MAX_NAT
             }
         }
-        let mut e = Extension::new(EXT_ID);
+        let mut e = Extension::new(EXT_ID, semver::Version::new(0, 1, 0));
         let def: &mut crate::extension::OpDef =
             e.add_op("MyOp".into(), "".to_string(), SigFun())?;
 
@@ -720,7 +720,7 @@ pub(super) mod test {
     fn type_scheme_instantiate_var() -> Result<(), Box<dyn std::error::Error>> {
         // Check that we can instantiate a PolyFuncTypeRV-scheme with an (external)
         // type variable
-        let mut e = Extension::new(EXT_ID);
+        let mut e = Extension::new(EXT_ID, semver::Version::new(0, 1, 0));
         let def = e.add_op(
             "SimpleOp".into(),
             "".into(),
@@ -755,7 +755,7 @@ pub(super) mod test {
     fn instantiate_extension_delta() -> Result<(), Box<dyn std::error::Error>> {
         use crate::extension::prelude::{BOOL_T, PRELUDE_REGISTRY};
 
-        let mut e = Extension::new(EXT_ID);
+        let mut e = Extension::new(EXT_ID, semver::Version::new(0, 1, 0));
 
         let params: Vec<TypeParam> = vec![TypeParam::Extensions];
         let db_set = ExtensionSet::type_var(0);

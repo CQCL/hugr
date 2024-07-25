@@ -85,9 +85,11 @@ impl SignatureFromArgs for GenericOpCustom {
 
 /// Name of prelude extension.
 pub const PRELUDE_ID: ExtensionId = ExtensionId::new_unchecked("prelude");
+/// Extension version.
+pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
 lazy_static! {
     static ref PRELUDE_DEF: Extension = {
-        let mut prelude = Extension::new(PRELUDE_ID);
+        let mut prelude = Extension::new(PRELUDE_ID, VERSION);
         prelude
             .add_type(
                 TypeName::new_inline("usize"),

@@ -313,7 +313,7 @@ pub(crate) mod test {
         const EXT_ID: ExtensionId = ExtensionId::new_unchecked("my_ext");
         const TYPE_NAME: TypeName = TypeName::new_inline("MyType");
 
-        let mut e = Extension::new(EXT_ID);
+        let mut e = Extension::new(EXT_ID, semver::Version::new(0, 1, 0));
         e.add_type(
             TYPE_NAME,
             vec![bound.clone()],

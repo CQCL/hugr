@@ -3,6 +3,7 @@
 //! TODO: YAML declaration and parsing. This should be similar to a plugin
 //! system (outside the `types` module), which also parses nested [`OpDef`]s.
 
+pub use semver::Version;
 use std::collections::btree_map;
 use std::collections::hash_map;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -264,6 +265,8 @@ pub type ExtensionId = IdentList;
 /// A extension is a set of capabilities required to execute a graph.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Extension {
+    /// Extension version, follows semver.
+    pub version: Version,
     /// Unique identifier for the extension.
     pub name: ExtensionId,
     /// Other extensions defining types used by this extension.
@@ -286,18 +289,22 @@ pub struct Extension {
 
 impl Extension {
     /// Creates a new extension with the given name.
-    pub fn new(name: ExtensionId) -> Self {
-        Self::new_with_reqs(name, ExtensionSet::default())
-    }
-
-    /// Creates a new extension with the given name and requirements.
-    pub fn new_with_reqs(name: ExtensionId, extension_reqs: impl Into<ExtensionSet>) -> Self {
+    pub fn new(name: ExtensionId, version: Version) -> Self {
         Self {
             name,
-            extension_reqs: extension_reqs.into(),
+            version,
+            extension_reqs: Default::default(),
             types: Default::default(),
             values: Default::default(),
             operations: Default::default(),
+        }
+    }
+
+    /// Creates a new extension with the given name and requirements.
+    pub fn with_reqs(self, extension_reqs: impl Into<ExtensionSet>) -> Self {
+        Self {
+            extension_reqs: extension_reqs.into(),
+            ..self
         }
     }
 

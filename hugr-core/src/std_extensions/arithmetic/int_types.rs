@@ -16,6 +16,8 @@ use crate::{
 use lazy_static::lazy_static;
 /// The extension identifier.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.int.types");
+/// Extension version.
+pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
 
 /// Identifier for the integer type.
 pub const INT_TYPE_ID: TypeName = TypeName::new_inline("int");
@@ -185,7 +187,7 @@ impl CustomConst for ConstInt {
 
 /// Extension for basic integer types.
 pub fn extension() -> Extension {
-    let mut extension = Extension::new(EXTENSION_ID);
+    let mut extension = Extension::new(EXTENSION_ID, VERSION);
 
     extension
         .add_type(

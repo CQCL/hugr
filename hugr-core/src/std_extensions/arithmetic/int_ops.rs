@@ -28,6 +28,8 @@ mod const_fold;
 
 /// The extension identifier.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.int");
+/// Extension version.
+pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
 
 struct IOValidator {
     // whether the first type argument should be greater than or equal to the second
@@ -261,9 +263,10 @@ fn iunop_sig() -> PolyFuncTypeRV {
 lazy_static! {
     /// Extension for basic integer operations.
     pub static ref EXTENSION: Extension = {
-        let mut extension = Extension::new_with_reqs(
+        let mut extension = Extension::new(
             EXTENSION_ID,
-            ExtensionSet::singleton(&super::int_types::EXTENSION_ID),
+            VERSION).with_reqs(
+            ExtensionSet::singleton(&super::int_types::EXTENSION_ID)
         );
 
         IntOpDef::load_all_ops(&mut extension).unwrap();

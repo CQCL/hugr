@@ -12,6 +12,8 @@ use lazy_static::lazy_static;
 
 /// The extension identifier.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.float.types");
+/// Extension version.
+pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
 
 /// Identifier for the 64-bit IEEE 754-2019 floating-point type.
 const FLOAT_TYPE_ID: TypeName = TypeName::new_inline("float64");
@@ -76,7 +78,7 @@ impl CustomConst for ConstF64 {
 lazy_static! {
     /// Extension defining the float type.
     pub static ref EXTENSION: Extension = {
-        let mut extension = Extension::new(EXTENSION_ID);
+        let mut extension = Extension::new(EXTENSION_ID, VERSION);
 
         extension
             .add_type(

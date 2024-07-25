@@ -39,7 +39,7 @@
 //!     use hugr::{
 //!         extension::{
 //!             prelude::{BOOL_T, QB_T},
-//!             ExtensionId, ExtensionRegistry, PRELUDE,
+//!             ExtensionId, ExtensionRegistry, PRELUDE, Version,
 //!         },
 //!         ops::{CustomOp, OpName},
 //!         type_row,
@@ -58,8 +58,9 @@
 //!     }
 //!     /// The extension identifier.
 //!     pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("mini.quantum");
+//!     pub const VERSION: Version = Version::new(0, 1, 0);
 //!     fn extension() -> Extension {
-//!         let mut extension = Extension::new(EXTENSION_ID);
+//!         let mut extension = Extension::new(EXTENSION_ID, VERSION);
 //!
 //!         extension
 //!             .add_op(OpName::new_inline("H"), "Hadamard".into(), one_qb_func())

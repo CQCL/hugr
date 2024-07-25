@@ -45,6 +45,7 @@ delegate = { workspace = true }
 paste = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
+semver = { version = "1.0.23", features = ["serde"] }
 
 [dev-dependencies]
 rstest = { workspace = true }

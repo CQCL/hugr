@@ -22,6 +22,8 @@ use lazy_static::lazy_static;
 mod const_fold;
 /// The extension identifier.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.conversions");
+/// Extension version.
+pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
 
 /// Extension for conversions between floats and integers.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, EnumIter, IntoStaticStr, EnumString)]
@@ -121,8 +123,9 @@ impl MakeExtensionOp for ConvertOpType {
 lazy_static! {
     /// Extension for conversions between integers and floats.
     pub static ref EXTENSION: Extension = {
-        let mut extension = Extension::new_with_reqs(
+        let mut extension = Extension::new(
             EXTENSION_ID,
+            VERSION).with_reqs(
             ExtensionSet::from_iter(vec![
                 super::int_types::EXTENSION_ID,
                 super::float_types::EXTENSION_ID,

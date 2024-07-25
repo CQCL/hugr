@@ -168,6 +168,8 @@ impl MakeOpDef for NotOp {
 }
 /// The extension identifier.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("logic");
+/// Extension version.
+pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
 
 fn logic_op_sig() -> impl SignatureFromArgs {
     struct LogicOpCustom;
@@ -194,7 +196,7 @@ fn logic_op_sig() -> impl SignatureFromArgs {
 }
 /// Extension for basic logical operations.
 fn extension() -> Extension {
-    let mut extension = Extension::new(EXTENSION_ID);
+    let mut extension = Extension::new(EXTENSION_ID, VERSION);
     NaryLogic::load_all_ops(&mut extension).unwrap();
     NotOp.add_to_extension(&mut extension).unwrap();
 

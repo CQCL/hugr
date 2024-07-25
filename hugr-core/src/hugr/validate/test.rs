@@ -365,7 +365,7 @@ const_extension_ids! {
 }
 #[test]
 fn invalid_types() {
-    let mut e = Extension::new(EXT_ID);
+    let mut e = Extension::new(EXT_ID, semver::Version::new(0, 1, 0));
     e.add_type(
         "MyContainer".into(),
         vec![TypeBound::Copyable.into()],
@@ -570,7 +570,7 @@ fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
 
 pub(crate) fn extension_with_eval_parallel() -> Extension {
     let rowp = TypeParam::new_list(TypeBound::Any);
-    let mut e = Extension::new(EXT_ID);
+    let mut e = Extension::new(EXT_ID, semver::Version::new(0, 1, 0));
 
     let inputs = TypeRV::new_row_var_use(0, TypeBound::Any);
     let outputs = TypeRV::new_row_var_use(1, TypeBound::Any);
@@ -671,7 +671,7 @@ fn row_variables() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
-    let mut e = Extension::new(EXT_ID);
+    let mut e = Extension::new(EXT_ID, semver::Version::new(0, 1, 0));
 
     let params: Vec<TypeParam> = vec![
         TypeBound::Any.into(),
