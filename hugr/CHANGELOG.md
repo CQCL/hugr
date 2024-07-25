@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.1 (2024-07-25)
+
+### Bug Fixes
+
+- Dfg wrapper build handles incorrect output wire numbers ([#1332](https://github.com/CQCL/hugr/pull/1332))
+- Sibling extension panics while computing signature with non-dataflow nodes ([#1350](https://github.com/CQCL/hugr/pull/1350))
+
+
 ## 0.9.0 (2024-07-19)
 
 ### Bug Fixes

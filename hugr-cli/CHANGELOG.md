@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.1 (2024-07-25)
+
+- Updated `hugr` dependencies.
+
+
 ## 0.2.0 (2024-07-19)
 
 ### Refactor
