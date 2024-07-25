@@ -304,11 +304,9 @@ impl SiblingSubgraph {
             })
             .collect_vec();
         Signature::new(input, output).with_extension_delta(ExtensionSet::union_over(
-            self.nodes.iter().map(|n| {
-                hugr.signature(*n)
-                    .expect("all nodes must have dataflow signature")
-                    .extension_reqs
-            }),
+            self.nodes
+                .iter()
+                .map(|n| hugr.get_optype(*n).extension_delta()),
         ))
     }
 
@@ -729,8 +727,6 @@ pub enum InvalidSubgraphBoundary {
 
 #[cfg(test)]
 mod tests {
-    use std::error::Error;
-
     use cool_asserts::assert_matches;
 
     use crate::builder::inout_sig;
