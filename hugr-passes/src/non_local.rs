@@ -27,7 +27,7 @@ pub enum NonLocalEdgesError {
     Edges(Vec<(Node, IncomingPort)>),
 }
 
-/// Verifies that there are no non local edges in the Hugr.
+/// Verifies that there are no non local value edges in the Hugr.
 pub fn ensure_no_nonlocal_edges(hugr: &impl HugrView) -> Result<(), NonLocalEdgesError> {
     let non_local_edges: Vec<_> = nonlocal_edges(hugr).collect_vec();
     if non_local_edges.is_empty() {
