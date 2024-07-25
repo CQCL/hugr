@@ -11,7 +11,7 @@ use hugr::ops::handle::FuncID;
 use hugr::ops::{Tag, UnpackTuple, Value};
 use hugr::std_extensions::arithmetic::int_ops::{self, INT_OPS_REGISTRY};
 use hugr::std_extensions::arithmetic::int_types::ConstInt;
-use hugr::types::{Type, TypeRow};
+use hugr::types::{Signature, Type, TypeRow};
 use hugr::{type_row, Hugr};
 use itertools::Itertools;
 use rstest::rstest;
@@ -373,5 +373,30 @@ fn diverse_cfg_children(llvm_ctx: TestContext) {
             };
             builder.finish_with_outputs([r]).unwrap()
         });
+    check_emission!(hugr, llvm_ctx);
+}
+
+#[rstest]
+#[should_panic]
+fn load_function(llvm_ctx: TestContext) {
+    let hugr = {
+        let mut builder = ModuleBuilder::new();
+        let target_sig = Signature::new_endo(type_row![]);
+        let target_func = builder
+            .declare("target_func", target_sig.clone().into())
+            .unwrap();
+        let _ = {
+            let mut builder = builder
+                .define_function(
+                    "main",
+                    Signature::new(type_row![], Type::new_function(target_sig)),
+                )
+                .unwrap();
+            let r = builder.load_func(&target_func, &[], &EMPTY_REG).unwrap();
+            builder.finish_with_outputs([r]).unwrap()
+        };
+        builder.finish_hugr(&EMPTY_REG).unwrap()
+    };
+
     check_emission!(hugr, llvm_ctx);
 }
