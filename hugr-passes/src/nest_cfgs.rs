@@ -5,13 +5,13 @@
 //! * a dominates b
 //! * b postdominates a
 //! * there are no other edges in/out of the nodes inbetween
-//!  (this last condition is necessary because loop backedges do not affect (post)dominance).
+//!   (this last condition is necessary because loop backedges do not affect (post)dominance).
 //!
 //! # Algorithm
 //! See paper: <https://doi.org/10.1145/178243.178258>, approximately:
 //! 1. those three conditions are equivalent to:
-//! *a and b are cycle-equivalent in the CFG with an extra edge from the exit node to the entry*
-//! where cycle-equivalent means every cycle has either both a and b, or neither
+//!    *a and b are cycle-equivalent in the CFG with an extra edge from the exit node to the entry*
+//!    where cycle-equivalent means every cycle has either both a and b, or neither
 //! 2. cycle equivalence is unaffected if all edges are considered *un*directed
 //!     (not obvious, see paper for proof)
 //! 3. take undirected CFG, perform depth-first traversal
@@ -31,12 +31,12 @@
 //!
 //! # Restrictions
 //! * The paper assumes that all CFG nodes are on paths from entry to exit, i.e. no loops without exits.
-//! HUGR assumes only that they are all reachable from entry, so we do a backward traversal from exit node
-//! first and restrict to the CFG nodes in the reachable set. (This means we will not discover SESE regions
-//! in exit-free loops, but that doesn't seem a major concern.)
+//!   HUGR assumes only that they are all reachable from entry, so we do a backward traversal from exit node
+//!   first and restrict to the CFG nodes in the reachable set. (This means we will not discover SESE regions
+//!   in exit-free loops, but that doesn't seem a major concern.)
 //! * Multiple edges in the same direction between the same BBs will "confuse" the algorithm in the paper.
-//! However it is straightforward for us to treat successors and predecessors as sets. (Two edges between
-//! the same BBs but in opposite directions must be distinct!)
+//!   However it is straightforward for us to treat successors and predecessors as sets. (Two edges between
+//!   the same BBs but in opposite directions must be distinct!)
 
 use std::collections::{HashMap, HashSet, LinkedList, VecDeque};
 use std::hash::Hash;
@@ -348,7 +348,7 @@ pub fn region_blocks<T: Copy + Eq + Hash + std::fmt::Debug>(
 /// *Undirected* DFS classifies all edges into *only two* categories
 ///   * tree edges, which on their own (with the nodes) form a tree (minimum spanning tree);
 ///   * backedges, i.e. those for which, when DFS tried to traverse them, the other endpoint was an ancestor
-/// Moreover, we record *which way* along the underlying CFG edge we went.
+///     Moreover, we record *which way* along the underlying CFG edge we went.
 struct UndirectedDFSTree<T> {
     /// Pre-order traversal numbering
     dfs_num: HashMap<T, usize>,
