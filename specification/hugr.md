@@ -787,7 +787,7 @@ indices after the list of node indices?
 
 There are two classes of type: `AnyType` $\supset$ `CopyableType`. Types in these
 classes are distinguished by whether the runtime values of those types can be implicitly
-copied or discard (multiple or 0 links from on output port respectively):
+copied or discarded (multiple or 0 links from on output port respectively):
 
 - For the broadest class (`AnyType`), the only operation supported is the identity operation (aka no-op, or `lift` - see [Extension Tracking](#extension-tracking) below). Specifically, we do not require it to be possible to copy or discard all values, hence the requirement that outports of linear type must have exactly one edge. (That is, a type not known to be in the copyable subset). All incoming ports must have exactly one edge.
 
