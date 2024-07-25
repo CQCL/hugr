@@ -88,7 +88,7 @@ fn extension() -> Extension {
             PTR_TYPE_ID,
             TYPE_PARAMS.into(),
             "Standard extension pointer type.".into(),
-            TypeDefBound::Explicit(TypeBound::Eq),
+            TypeDefBound::Explicit(TypeBound::Copyable),
         )
         .unwrap();
     PtrOpDef::load_all_ops(&mut extension).unwrap();
@@ -109,7 +109,7 @@ lazy_static! {
 /// integer or bit string.
 pub fn ptr_custom_type(ty: impl Into<Type>) -> CustomType {
     let ty = ty.into();
-    CustomType::new(PTR_TYPE_ID, [ty.into()], EXTENSION_ID, TypeBound::Eq)
+    CustomType::new(PTR_TYPE_ID, [ty.into()], EXTENSION_ID, TypeBound::Copyable)
 }
 
 /// Integer type of a given bit width (specified by the TypeArg).

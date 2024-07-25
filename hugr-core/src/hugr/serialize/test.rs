@@ -457,8 +457,8 @@ fn polyfunctype1() -> PolyFuncType {
 
 fn polyfunctype2() -> PolyFuncTypeRV {
     let tv0 = TypeRV::new_row_var_use(0, TypeBound::Any);
-    let tv1 = TypeRV::new_row_var_use(1, TypeBound::Eq);
-    let params = [TypeBound::Any, TypeBound::Eq].map(TypeParam::new_list);
+    let tv1 = TypeRV::new_row_var_use(1, TypeBound::Copyable);
+    let params = [TypeBound::Any, TypeBound::Copyable].map(TypeParam::new_list);
     let inputs = vec![
         TypeRV::new_function(FuncValueType::new(tv0.clone(), tv1.clone())),
         tv0,
@@ -474,7 +474,7 @@ fn polyfunctype2() -> PolyFuncTypeRV {
 #[case(Signature::new_endo(type_row![]).into())]
 #[case(polyfunctype1())]
 #[case(PolyFuncType::new([TypeParam::String], Signature::new_endo(type_row![Type::new_var_use(0, TypeBound::Copyable)])))]
-#[case(PolyFuncType::new([TypeBound::Eq.into()], Signature::new_endo(type_row![Type::new_var_use(0, TypeBound::Eq)])))]
+#[case(PolyFuncType::new([TypeBound::Copyable.into()], Signature::new_endo(type_row![Type::new_var_use(0, TypeBound::Copyable)])))]
 #[case(PolyFuncType::new([TypeParam::new_list(TypeBound::Any)], Signature::new_endo(type_row![])))]
 #[case(PolyFuncType::new([TypeParam::Tuple { params: [TypeBound::Any.into(), TypeParam::bounded_nat(2.try_into().unwrap())].into() }], Signature::new_endo(type_row![])))]
 #[case(PolyFuncType::new(
@@ -487,7 +487,7 @@ fn roundtrip_polyfunctype_fixedlen(#[case] poly_func_type: PolyFuncType) {
 #[rstest]
 #[case(FuncValueType::new_endo(type_row![]).into())]
 #[case(PolyFuncTypeRV::new([TypeParam::String], FuncValueType::new_endo(type_row![Type::new_var_use(0, TypeBound::Copyable)])))]
-#[case(PolyFuncTypeRV::new([TypeBound::Eq.into()], FuncValueType::new_endo(type_row![Type::new_var_use(0, TypeBound::Eq)])))]
+#[case(PolyFuncTypeRV::new([TypeBound::Copyable.into()], FuncValueType::new_endo(type_row![Type::new_var_use(0, TypeBound::Copyable)])))]
 #[case(PolyFuncTypeRV::new([TypeParam::new_list(TypeBound::Any)], FuncValueType::new_endo(type_row![])))]
 #[case(PolyFuncTypeRV::new([TypeParam::Tuple { params: [TypeBound::Any.into(), TypeParam::bounded_nat(2.try_into().unwrap())].into() }], FuncValueType::new_endo(type_row![])))]
 #[case(PolyFuncTypeRV::new(
@@ -506,7 +506,7 @@ fn roundtrip_polyfunctype_varlen(#[case] poly_func_type: PolyFuncTypeRV) {
 #[case(ops::AliasDecl { name: "aliasdecl".into(), bound: TypeBound::Any})]
 #[case(ops::Const::new(Value::false_val()))]
 #[case(ops::Const::new(Value::function(crate::builder::test::simple_dfg_hugr()).unwrap()))]
-#[case(ops::Input::new(type_row![Type::new_var_use(3,TypeBound::Eq)]))]
+#[case(ops::Input::new(type_row![Type::new_var_use(3,TypeBound::Copyable)]))]
 #[case(ops::Output::new(vec![Type::new_function(FuncValueType::new_endo(type_row![]))]))]
 #[case(ops::Call::try_new(polyfunctype1(), [TypeArg::BoundedNat{n: 1}, TypeArg::Extensions{ es: ExtensionSet::singleton(&PRELUDE_ID)} ], &EMPTY_REG).unwrap())]
 #[case(ops::CallIndirect { signature : Signature::new_endo(type_row![BOOL_T]) })]

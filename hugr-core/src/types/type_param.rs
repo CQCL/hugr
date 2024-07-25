@@ -450,21 +450,21 @@ mod test {
             check_type_arg(&arg, param)
         }
         // Simple cases: a TypeArg::Type is a TypeParam::Type but singleton sequences are lists
-        check(USIZE_T, &TypeBound::Eq.into()).unwrap();
-        let seq_param = TypeParam::new_list(TypeBound::Eq);
+        check(USIZE_T, &TypeBound::Copyable.into()).unwrap();
+        let seq_param = TypeParam::new_list(TypeBound::Copyable);
         check(USIZE_T, &seq_param).unwrap_err();
         check_seq(&[USIZE_T], &TypeBound::Any.into()).unwrap_err();
 
         // Into a list of type, we can fit a single row var
-        check(rowvar(0, TypeBound::Eq), &seq_param).unwrap();
+        check(rowvar(0, TypeBound::Copyable), &seq_param).unwrap();
         // or a list of (types or row vars)
         check(vec![], &seq_param).unwrap();
-        check_seq(&[rowvar(0, TypeBound::Eq)], &seq_param).unwrap();
+        check_seq(&[rowvar(0, TypeBound::Copyable)], &seq_param).unwrap();
         check_seq(
             &[
                 rowvar(1, TypeBound::Any),
                 USIZE_T.into(),
-                rowvar(0, TypeBound::Eq),
+                rowvar(0, TypeBound::Copyable),
             ],
             &TypeParam::new_list(TypeBound::Any),
         )
@@ -474,7 +474,7 @@ mod test {
             &[
                 rowvar(1, TypeBound::Any),
                 USIZE_T.into(),
-                rowvar(0, TypeBound::Eq),
+                rowvar(0, TypeBound::Copyable),
             ],
             &seq_param,
         )
@@ -502,7 +502,7 @@ mod test {
 
         // TypeParam::Tuples require a TypeArg::Seq of the same number of elems
         let usize_and_ty = TypeParam::Tuple {
-            params: vec![TypeParam::max_nat(), TypeBound::Eq.into()],
+            params: vec![TypeParam::max_nat(), TypeBound::Copyable.into()],
         };
         check(vec![5.into(), USIZE_T.into()], &usize_and_ty).unwrap();
         check(vec![USIZE_T.into(), 5.into()], &usize_and_ty).unwrap_err(); // Wrong way around

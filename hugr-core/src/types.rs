@@ -78,11 +78,8 @@ impl EdgeKind {
 #[cfg_attr(test, derive(Arbitrary))]
 /// Bounds on the valid operations on a type in a HUGR program.
 pub enum TypeBound {
-    /// The equality operation is valid on this type.
-    #[serde(rename = "E")]
-    Eq,
     /// The type can be copied in the program.
-    #[serde(rename = "C")]
+    #[serde(rename = "C", alias = "E")] // alias to read in legacy Eq variants
     Copyable,
     /// No bound on the type.
     #[serde(rename = "A")]
@@ -105,13 +102,13 @@ impl TypeBound {
     /// Report if this bound contains another.
     pub const fn contains(&self, other: TypeBound) -> bool {
         use TypeBound::*;
-        matches!((self, other), (Any, _) | (_, Eq) | (Copyable, Copyable))
+        matches!((self, other), (Any, _) | (_, Copyable))
     }
 }
 
 /// Calculate the least upper bound for an iterator of bounds
 pub(crate) fn least_upper_bound(mut tags: impl Iterator<Item = TypeBound>) -> TypeBound {
-    tags.fold_while(TypeBound::Eq, |acc, new| {
+    tags.fold_while(TypeBound::Copyable, |acc, new| {
         if acc == TypeBound::Any || new == TypeBound::Any {
             Done(TypeBound::Any)
         } else {
@@ -247,7 +244,7 @@ impl<RV: MaybeRV> TypeEnum<RV> {
             TypeEnum::Function(_) => TypeBound::Copyable,
             TypeEnum::Variable(_, b) => *b,
             TypeEnum::RowVar(b) => b.bound(),
-            TypeEnum::Sum(SumType::Unit { size: _ }) => TypeBound::Eq,
+            TypeEnum::Sum(SumType::Unit { size: _ }) => TypeBound::Copyable,
             TypeEnum::Sum(SumType::General { rows }) => least_upper_bound(
                 rows.iter()
                     .flat_map(TypeRowRV::iter)
@@ -274,7 +271,7 @@ impl<RV: MaybeRV> TypeEnum<RV> {
 /// # use hugr::type_row;
 ///
 /// let sum = Type::new_sum([type_row![], type_row![]]);
-/// assert_eq!(sum.least_upper_bound(), TypeBound::Eq);
+/// assert_eq!(sum.least_upper_bound(), TypeBound::Copyable);
 /// ```
 ///
 /// ```
@@ -316,7 +313,10 @@ impl<RV: MaybeRV> TypeBase<RV> {
     /// An empty `TypeRow` or `TypeRowRV`. Provided here for convenience
     pub const EMPTY_TYPEROW: TypeRowBase<RV> = TypeRowBase::<RV>::new();
     /// Unit type (empty tuple).
-    pub const UNIT: Self = Self(TypeEnum::Sum(SumType::Unit { size: 1 }), TypeBound::Eq);
+    pub const UNIT: Self = Self(
+        TypeEnum::Sum(SumType::Unit { size: 1 }),
+        TypeBound::Copyable,
+    );
 
     const EMPTY_TYPEROW_REF: &'static TypeRowBase<RV> = &Self::EMPTY_TYPEROW;
 
@@ -364,7 +364,7 @@ impl<RV: MaybeRV> TypeBase<RV> {
     /// New UnitSum with empty Tuple variants
     pub const fn new_unit_sum(size: u8) -> Self {
         // should be the only way to avoid going through SumType::new
-        Self(TypeEnum::Sum(SumType::new_unary(size)), TypeBound::Eq)
+        Self(TypeEnum::Sum(SumType::new_unary(size)), TypeBound::Copyable)
     }
 
     /// New use (occurrence) of the type variable with specified index.
@@ -620,7 +620,7 @@ pub(crate) mod test {
                 "my_extension".try_into().unwrap(),
                 TypeBound::Copyable,
             )),
-            Type::new_alias(AliasDecl::new("my_alias", TypeBound::Eq)),
+            Type::new_alias(AliasDecl::new("my_alias", TypeBound::Copyable)),
         ]);
         assert_eq!(
             &t.to_string(),

@@ -357,7 +357,7 @@ pub(crate) mod test {
     fn test_bound_covariance() -> Result<(), SignatureError> {
         decl_accepts_rejects_var(
             TypeBound::Copyable.into(),
-            &[TypeBound::Copyable.into(), TypeBound::Eq.into()],
+            &[TypeBound::Copyable.into(), TypeBound::Copyable.into()],
             &[TypeBound::Any.into()],
         )?;
 
@@ -366,7 +366,10 @@ pub(crate) mod test {
         };
         decl_accepts_rejects_var(
             list_of_tys(TypeBound::Copyable),
-            &[list_of_tys(TypeBound::Copyable), list_of_tys(TypeBound::Eq)],
+            &[
+                list_of_tys(TypeBound::Copyable),
+                list_of_tys(TypeBound::Copyable),
+            ],
             &[list_of_tys(TypeBound::Any)],
         )?;
 

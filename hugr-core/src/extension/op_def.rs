@@ -674,7 +674,7 @@ pub(super) mod test {
         assert_eq!(def.validate_args(&args, &PRELUDE_REGISTRY, &[]), Ok(()));
 
         // Second arg may be a variable (substitutable)
-        let tyvar = Type::new_var_use(0, TypeBound::Eq);
+        let tyvar = Type::new_var_use(0, TypeBound::Copyable);
         let tyvars: Vec<Type> = vec![tyvar.clone(); 3];
         let args = [TypeArg::BoundedNat { n: 3 }, tyvar.clone().into()];
         assert_eq!(
@@ -684,7 +684,7 @@ pub(super) mod test {
                     .with_extension_delta(EXT_ID)
             )
         );
-        def.validate_args(&args, &PRELUDE_REGISTRY, &[TypeBound::Eq.into()])
+        def.validate_args(&args, &PRELUDE_REGISTRY, &[TypeBound::Copyable.into()])
             .unwrap();
 
         // quick sanity check that we are validating the args - note changed bound:
@@ -692,7 +692,7 @@ pub(super) mod test {
             def.validate_args(&args, &PRELUDE_REGISTRY, &[TypeBound::Any.into()]),
             Err(SignatureError::TypeVarDoesNotMatchDeclaration {
                 actual: TypeBound::Any.into(),
-                cached: TypeBound::Eq.into()
+                cached: TypeBound::Copyable.into()
             })
         );
 
@@ -729,16 +729,16 @@ pub(super) mod test {
                 Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
             ),
         )?;
-        let tv = Type::new_var_use(1, TypeBound::Eq);
+        let tv = Type::new_var_use(1, TypeBound::Copyable);
         let args = [TypeArg::Type { ty: tv.clone() }];
-        let decls = [TypeParam::Extensions, TypeBound::Eq.into()];
+        let decls = [TypeParam::Extensions, TypeBound::Copyable.into()];
         def.validate_args(&args, &EMPTY_REG, &decls).unwrap();
         assert_eq!(
             def.compute_signature(&args, &EMPTY_REG),
             Ok(Signature::new_endo(tv).with_extension_delta(EXT_ID))
         );
         // But not with an external row variable
-        let arg: TypeArg = TypeRV::new_row_var_use(0, TypeBound::Eq).into();
+        let arg: TypeArg = TypeRV::new_row_var_use(0, TypeBound::Copyable).into();
         assert_eq!(
             def.compute_signature(&[arg.clone()], &EMPTY_REG),
             Err(SignatureError::TypeArgMismatch(

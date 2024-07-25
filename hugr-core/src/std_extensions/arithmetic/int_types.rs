@@ -24,7 +24,12 @@ pub const INT_TYPE_ID: TypeName = TypeName::new_inline("int");
 /// the operation, the semantic interpretation may be unsigned integer, signed
 /// integer or bit string.
 pub fn int_custom_type(width_arg: impl Into<TypeArg>) -> CustomType {
-    CustomType::new(INT_TYPE_ID, [width_arg.into()], EXTENSION_ID, TypeBound::Eq)
+    CustomType::new(
+        INT_TYPE_ID,
+        [width_arg.into()],
+        EXTENSION_ID,
+        TypeBound::Copyable,
+    )
 }
 
 /// Integer type of a given bit width (specified by the TypeArg).
@@ -187,7 +192,7 @@ pub fn extension() -> Extension {
             INT_TYPE_ID,
             vec![LOG_WIDTH_TYPE_PARAM],
             "integral value of a given bit width".to_owned(),
-            TypeBound::Eq.into(),
+            TypeBound::Copyable.into(),
         )
         .unwrap();
 
