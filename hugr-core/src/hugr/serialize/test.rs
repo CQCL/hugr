@@ -79,7 +79,7 @@ macro_rules! include_schema {
             static ref $name: NamedSchema =
                 NamedSchema::new("$name", {
                     let schema_val: serde_json::Value = serde_json::from_str(include_str!(
-                        concat!("../../../../specification/schema/", $path, "_v2.json")
+                        concat!("../../../../specification/schema/", $path, "_v3.json")
                     ))
                     .unwrap();
                     JSONSchema::options()
@@ -515,17 +515,6 @@ fn roundtrip_optype(#[case] optype: impl Into<OpType> + std::fmt::Debug) {
         parent: portgraph::NodeIndex::new(0).into(),
         op: optype.into(),
     });
-}
-
-#[test]
-#[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
-/// issue 1270
-fn input_extensions_deser() {
-    // load a file serialised with `input_extensions` fields on all ops
-    let _: Hugr = serde_json::from_reader(std::io::BufReader::new(
-        std::fs::File::open(crate::test_file!("issue-1270.json")).unwrap(),
-    ))
-    .unwrap();
 }
 
 mod proptest {
