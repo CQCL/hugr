@@ -1,7 +1,7 @@
 //! This module provides functions for inspecting and modifying the nature of
 //! non local edges in a Hugr.
-//!
-//! TODO Add `remove_nonlocal_edges` and `add_nonlocal_edges` functions
+//
+//TODO Add `remove_nonlocal_edges` and `add_nonlocal_edges` functions
 use itertools::Itertools as _;
 use thiserror::Error;
 
@@ -9,13 +9,14 @@ use hugr_core::{HugrView, IncomingPort, Node};
 
 /// Returns an iterator over all non local edges in a Hugr.
 ///
-/// All `(node, in_port)` pairs are returned where `in_port` is connected to a
-/// node with a parent other than the parent of `node`.
+/// All `(node, in_port)` pairs are returned where `in_port` is a value port
+/// connected to a node with a parent other than the parent of `node`.
 pub fn nonlocal_edges(hugr: &impl HugrView) -> impl Iterator<Item = (Node, IncomingPort)> + '_ {
     hugr.nodes().flat_map(move |node| {
         hugr.in_value_types(node).filter_map(move |(in_p, _)| {
+            let parent = hugr.get_parent(node);
             hugr.linked_outputs(node, in_p)
-                .any(|(neighbour_node, _)| hugr.get_parent(node) != hugr.get_parent(neighbour_node))
+                .any(|(neighbour_node, _)| parent != hugr.get_parent(neighbour_node))
                 .then_some((node, in_p))
         })
     })
@@ -71,13 +72,13 @@ mod test {
             let mut builder = DFGBuilder::new(Signature::new_endo(BOOL_T)).unwrap();
             let [in_w] = builder.input_wires_arr();
             let ([out_w], edge) = {
-                let mut builder = builder
+                let mut dfg_builder = builder
                     .dfg_builder(Signature::new(type_row![], BOOL_T), [])
                     .unwrap();
-                let noop = builder.add_dataflow_op(Noop::new(BOOL_T), [in_w]).unwrap();
+                let noop = dfg_builder.add_dataflow_op(Noop::new(BOOL_T), [in_w]).unwrap();
                 let noop_edge = (noop.node(), IncomingPort::from(0));
                 (
-                    builder
+                    dfg_builder
                         .finish_with_outputs(noop.outputs())
                         .unwrap()
                         .outputs_arr(),
