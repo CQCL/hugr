@@ -11,7 +11,7 @@ use proptest::prelude::{any, BoxedStrategy, Strategy};
 // The serde derives here are not used except as markers
 // so that other types containing this can also #derive-serde the same way.
 #[derive(
-    Clone, Debug, Eq, PartialEq, derive_more::Display, serde::Serialize, serde::Deserialize,
+    Clone, Debug, Eq, Hash, PartialEq, derive_more::Display, serde::Serialize, serde::Deserialize,
 )]
 #[display(fmt = "{}", "_0")]
 pub struct RowVariable(pub usize, pub TypeBound);
@@ -50,7 +50,7 @@ pub trait MaybeRV:
 // The serde derives here are not used except as markers
 // so that other types containing this can also #derive-serde the same way.
 #[derive(
-    Clone, Debug, Eq, PartialEq, derive_more::Display, serde::Serialize, serde::Deserialize,
+    Clone, Debug, Eq, PartialEq, Hash, derive_more::Display, serde::Serialize, serde::Deserialize,
 )]
 pub enum NoRV {}
 

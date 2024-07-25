@@ -19,7 +19,7 @@ use crate::extension::SignatureError;
 /// The upper non-inclusive bound of a [`TypeParam::BoundedNat`]
 // A None inner value implies the maximum bound: u64::MAX + 1 (all u64 values valid)
 #[derive(
-    Clone, Debug, PartialEq, Eq, derive_more::Display, serde::Deserialize, serde::Serialize,
+    Clone, Debug, PartialEq, Eq, Hash, derive_more::Display, serde::Deserialize, serde::Serialize,
 )]
 #[display(fmt = "{}", "_0.map(|i|i.to_string()).unwrap_or(\"-\".to_string())")]
 #[cfg_attr(test, derive(Arbitrary))]
@@ -52,7 +52,7 @@ impl UpperBound {
 /// [PolyFuncType]: super::PolyFuncType
 /// [PolyFuncTypeRV]: super::PolyFuncTypeRV
 #[derive(
-    Clone, Debug, PartialEq, Eq, derive_more::Display, serde::Deserialize, serde::Serialize,
+    Clone, Debug, PartialEq, Eq, Hash, derive_more::Display, serde::Deserialize, serde::Serialize,
 )]
 #[non_exhaustive]
 #[serde(tag = "tp")]
@@ -139,7 +139,7 @@ impl From<UpperBound> for TypeParam {
 }
 
 /// A statically-known argument value to an operation.
-#[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize)]
 #[non_exhaustive]
 #[serde(tag = "tya")]
 pub enum TypeArg {
@@ -215,7 +215,7 @@ impl From<ExtensionSet> for TypeArg {
 /// Variable in a TypeArg, that is neither a [TypeArg::Extensions]
 /// nor a single [TypeArg::Type] (i.e. not a [Type::new_var_use]
 /// - it might be a [Type::new_row_var_use]).
-#[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize)]
 pub struct TypeArgVariable {
     idx: usize,
     cached_decl: TypeParam,

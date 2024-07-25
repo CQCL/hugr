@@ -138,7 +138,7 @@ impl OpTrait for AliasDefn {
 }
 
 /// A type alias declaration. Resolved at link time.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 pub struct AliasDecl {
     /// Alias name
