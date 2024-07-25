@@ -32,7 +32,7 @@ def int_t(width: int) -> tys.Opaque:
         extension="arithmetic.int.types",
         id="int",
         args=[tys.BoundedNatArg(n=width)],
-        bound=tys.TypeBound.Eq,
+        bound=tys.TypeBound.Copyable,
     )
 
 

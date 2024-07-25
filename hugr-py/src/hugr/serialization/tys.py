@@ -381,18 +381,17 @@ class PolyFuncType(BaseType):
 
 
 class TypeBound(Enum):
-    Eq = "E"
     Copyable = "C"
     Any = "A"
 
     @staticmethod
     def join(*bs: TypeBound) -> TypeBound:
         """Computes the least upper bound for a sequence of bounds."""
-        res = TypeBound.Eq
+        res = TypeBound.Copyable
         for b in bs:
             if b == TypeBound.Any:
                 return TypeBound.Any
-            if res == TypeBound.Eq:
+            if res == TypeBound.Copyable:
                 res = b
         return res
 
