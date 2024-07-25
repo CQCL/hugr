@@ -783,9 +783,9 @@ mod tests {
         let func = mod_builder.declare(
             "test",
             Signature::new_endo(type_row![QB_T, QB_T, QB_T])
-                .with_extension_delta(ExtensionSet::union_over([
-                    test_quantum_extension::EXTENSION_ID.into(),
-                    float_types::EXTENSION_ID.into(),
+                .with_extension_delta(ExtensionSet::from_iter([
+                    test_quantum_extension::EXTENSION_ID,
+                    float_types::EXTENSION_ID,
                 ]))
                 .into(),
         )?;
@@ -925,9 +925,9 @@ mod tests {
         assert_eq!(
             sub.signature(&func),
             Signature::new_endo(type_row![QB_T, QB_T, QB_T]).with_extension_delta(
-                ExtensionSet::union_over([
-                    test_quantum_extension::EXTENSION_ID.into(),
-                    float_types::EXTENSION_ID.into(),
+                ExtensionSet::from_iter([
+                    test_quantum_extension::EXTENSION_ID,
+                    float_types::EXTENSION_ID,
                 ])
             )
         );
