@@ -75,7 +75,9 @@ mod test {
                 let mut dfg_builder = builder
                     .dfg_builder(Signature::new(type_row![], BOOL_T), [])
                     .unwrap();
-                let noop = dfg_builder.add_dataflow_op(Noop::new(BOOL_T), [in_w]).unwrap();
+                let noop = dfg_builder
+                    .add_dataflow_op(Noop::new(BOOL_T), [in_w])
+                    .unwrap();
                 let noop_edge = (noop.node(), IncomingPort::from(0));
                 (
                     dfg_builder
