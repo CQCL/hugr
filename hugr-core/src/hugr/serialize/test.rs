@@ -79,7 +79,7 @@ macro_rules! include_schema {
             static ref $name: NamedSchema =
                 NamedSchema::new("$name", {
                     let schema_val: serde_json::Value = serde_json::from_str(include_str!(
-                        concat!("../../../../specification/schema/", $path, "_v4.json")
+                        concat!("../../../../specification/schema/", $path, "_v2.json")
                     ))
                     .unwrap();
                     JSONSchema::options()
