@@ -9,7 +9,7 @@ extensions:
         # Parameters are not currently supported.
         name: CopyableType
         description: A simple type with no parameters
-        # Types may have a "Eq", "Copyable", or "Any" bound.
+        # Types may have a "Copyable", or "Any" bound.
         # This field is optional and defaults to "Any".
         bound: Copyable
     operations:
