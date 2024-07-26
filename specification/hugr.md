@@ -673,6 +673,7 @@ flowchart
             BB1In["Input"]
             BB1_["Const"] -- "[()]" --> BB1Out["Output"]
             G -- "angle" --> BB1Out
+            BB1In ~~~ G
         end
         subgraph BB2
             direction TB
@@ -684,6 +685,7 @@ flowchart
             BB3In["Input"]
             BB3_["Const"] -- "[()]" --> BB3Out["Output"]
             C -- "angle" --> BB3Out
+            BB3In ~~~ C
         end
         subgraph Exit
         end
