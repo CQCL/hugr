@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0 (2024-07-26)
+
+### Features
+
+- [**breaking**] Created `validate` CLI subcommand. ([#1312](https://github.com/CQCL/hugr/pull/1312))
+
+
 ## 0.2.1 (2024-07-25)
 
 - Updated `hugr` dependencies.

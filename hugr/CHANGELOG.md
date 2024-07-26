@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.10.0 (2024-07-26)
+
+### Bug Fixes
+
+- Dfg wrapper build handles incorrect output wire numbers ([#1332](https://github.com/CQCL/hugr/pull/1332))
+- Sibling extension panics while computing signature with non-dataflow nodes ([#1350](https://github.com/CQCL/hugr/pull/1350))
+- [**breaking**] Bump serialisation version with no upgrade path ([#1352](https://github.com/CQCL/hugr/pull/1352))
+
+### Features
+
+- Add `nonlocal_edges` and `ensure_no_nonlocal_edges` ([#1345](https://github.com/CQCL/hugr/pull/1345))
+- Serialization upgrade path ([#1327](https://github.com/CQCL/hugr/pull/1327))
+- [**breaking**] Replace opaque type arguments with String ([#1328](https://github.com/CQCL/hugr/pull/1328))
+- Add `impl Hash for Type` ([#1347](https://github.com/CQCL/hugr/pull/1347))
+- `HasDef` and `HasConcrete` traits for def/concrete op design pattern ([#1336](https://github.com/CQCL/hugr/pull/1336))
+- Add pointer standard extension ([#1337](https://github.com/CQCL/hugr/pull/1337))
+- [**breaking**] Remove the `Eq` type bound. ([#1364](https://github.com/CQCL/hugr/pull/1364))
+
+### Refactor
+
+- [**breaking**] Use JSON rather than YAML in opaque fields. ([#1338](https://github.com/CQCL/hugr/pull/1338))
+- [**breaking**] Declarative module behind optional feature flag ([#1341](https://github.com/CQCL/hugr/pull/1341))
+
+### Testing
+
+- Miri gate serialization upgrades ([#1349](https://github.com/CQCL/hugr/pull/1349))
+
+
 ## 0.9.1 (2024-07-25)
 
 ### Bug Fixes

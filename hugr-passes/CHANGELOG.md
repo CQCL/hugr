@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.2 (2024-07-26)
+
+### Features
+
+- Add `nonlocal_edges` and `ensure_no_nonlocal_edges` ([#1345](https://github.com/CQCL/hugr/pull/1345))
+
+
 ## 0.6.1 (2024-07-25)
 
 - Updated `hugr` dependencies.
