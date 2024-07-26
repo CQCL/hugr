@@ -89,8 +89,12 @@ enum TypeDefBoundDeclaration {
 impl From<TypeDefBoundDeclaration> for TypeDefBound {
     fn from(bound: TypeDefBoundDeclaration) -> Self {
         match bound {
-            TypeDefBoundDeclaration::Copyable => Self::Explicit(TypeBound::Copyable),
-            TypeDefBoundDeclaration::Any => Self::Explicit(TypeBound::Any),
+            TypeDefBoundDeclaration::Copyable => Self::Explicit {
+                bound: TypeBound::Copyable,
+            },
+            TypeDefBoundDeclaration::Any => Self::Explicit {
+                bound: TypeBound::Any,
+            },
         }
     }
 }

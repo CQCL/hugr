@@ -147,7 +147,7 @@ fn extension() -> Extension {
             LIST_TYPENAME,
             vec![TP],
             "Generic dynamically sized list of type T.".into(),
-            TypeDefBound::FromParams(vec![0]),
+            TypeDefBound::FromParams { indices: vec![0] },
         )
         .unwrap();
     let list_type_def = extension.get_type(&LIST_TYPENAME).unwrap();
