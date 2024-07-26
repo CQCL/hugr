@@ -54,7 +54,7 @@ impl<T> Versioned<T> {
 }
 
 impl<T: DeserializeOwned> Versioned<T> {
-    fn upgrade(#[allow(unused_mut)] mut self) -> Result<T, UpgradeError> {
+    fn upgrade(self) -> Result<T, UpgradeError> {
         // go is polymorphic in D. When we are upgrading to the latest version
         // D is T. When we are upgrading to a version which is not the latest D
         // is serde_json::Value.
