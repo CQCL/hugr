@@ -787,23 +787,19 @@ indices after the list of node indices?
 
 ## Type System
 
-There are three classes of type: `AnyType` $\supset$ `CopyableType` $\supset$ `EqType`. Types in these classes are distinguished by the operations possible on (runtime) values of those types:
+There are two classes of type: `AnyType` $\supset$ `CopyableType`. Types in these
+classes are distinguished by whether the runtime values of those types can be implicitly
+copied or discarded (multiple or 0 links from on output port respectively):
 
 - For the broadest class (`AnyType`), the only operation supported is the identity operation (aka no-op, or `lift` - see [Extension Tracking](#extension-tracking) below). Specifically, we do not require it to be possible to copy or discard all values, hence the requirement that outports of linear type must have exactly one edge. (That is, a type not known to be in the copyable subset). All incoming ports must have exactly one edge.
 
     In fully qubit-counted contexts programs take in a number of qubits as input and return the same number, with no discarding.
 
-- The next class is `CopyableType`, i.e. types holding ordinary classical
+- The smaller class is `CopyableType`, i.e. types holding ordinary classical
   data, where values can be copied (and discarded, the 0-ary copy). This
   allows multiple (or 0) outgoing edges from an outport; also these types can
   be sent down `Const` edges. Note: dataflow inputs (`Value`, `Const` and `Function`) always
   require a single connection.
-
-- The final class is `EqType`: these are copyable types with a well-defined
-  notion of equality between values. (While *some* notion of equality is defined on
-  any type with a binary representation, that if the bits are equal then the value is, the converse is not necessarily true - values that are indistinguishable can have different bit representations.)
-
-For example, a `float` type (defined in an extension) would be a `CopyableType`, but not an `EqType`.
 
 **Rows** The `#` is a *row* which is a sequence of zero or more types. Types in the row can optionally be given names in metadata i.e. this does not affect behaviour of the HUGR. When writing literal types, we use `#` to distinguish between tuples and rows, e.g. `(int<1>,int<2>)` is a tuple while `Sum(#(int<1>),#(int<2>))` contains two rows.
 
@@ -825,9 +821,7 @@ Tuples are represented as Sum types with a single variant. The type `(int<1>,int
 
 The majority of types will be Opaque ones defined by extensions including the [standard library](#standard-library). However a number of types can be constructed using only the core type constructors: for example the empty tuple type, aka `unit`, with exactly one instance (so 0 bits of data); the empty sum, with no instances; the empty Function type (taking no arguments and producing no results - `void -> void`); and compositions thereof.
 
-Types representing functions are generally `CopyableType`, but not `EqType`. (It is undecidable whether two functions produce the same result for all possible inputs, or similarly whether one computation graph can be rewritten into another by semantic-preserving rewrites).
-
-Sums are `CopyableType` (respectively, `EqType`) if all their components are; they are also fixed-size if their components are.
+Sums are `CopyableType` if all their components are; they are also fixed-size if their components are.
 
 ### Polymorphism
 
@@ -836,7 +830,7 @@ While function *values* passed around the graph at runtime have types that are m
 such declarations may include (bind) any number of type parameters, of kinds as follows:
 
 ```haskell
-TypeParam ::= Type(Any|Copyable|Eq)
+TypeParam ::= Type(Any|Copyable)
             | BoundedUSize(u64|) -- note optional bound
             | Extensions
             | List(TypeParam) -- homogeneous, any sized

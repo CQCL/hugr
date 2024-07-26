@@ -93,14 +93,14 @@ lazy_static! {
                 TypeName::new_inline("usize"),
                 vec![],
                 "usize".into(),
-                TypeDefBound::Explicit(crate::types::TypeBound::Eq),
+                TypeDefBound::Explicit(crate::types::TypeBound::Copyable),
             )
             .unwrap();
         prelude.add_type(
                 STRING_TYPE_NAME,
                 vec![],
                 "string".into(),
-                TypeDefBound::Explicit(crate::types::TypeBound::Eq),
+                TypeDefBound::Explicit(crate::types::TypeBound::Copyable),
             )
             .unwrap();
         prelude.add_op(
@@ -137,7 +137,7 @@ lazy_static! {
             ERROR_TYPE_NAME,
             vec![],
             "Simple opaque error type.".into(),
-            TypeDefBound::Explicit(TypeBound::Eq),
+            TypeDefBound::Explicit(TypeBound::Copyable),
         )
         .unwrap();
         prelude
@@ -158,8 +158,11 @@ lazy_static! {
 
 }
 
-pub(crate) const USIZE_CUSTOM_T: CustomType =
-    CustomType::new_simple(TypeName::new_inline("usize"), PRELUDE_ID, TypeBound::Eq);
+pub(crate) const USIZE_CUSTOM_T: CustomType = CustomType::new_simple(
+    TypeName::new_inline("usize"),
+    PRELUDE_ID,
+    TypeBound::Copyable,
+);
 
 pub(crate) const QB_CUSTOM_T: CustomType =
     CustomType::new_simple(TypeName::new_inline("qubit"), PRELUDE_ID, TypeBound::Any);
@@ -214,7 +217,7 @@ pub const STRING_TYPE_NAME: TypeName = TypeName::new_inline("string");
 
 /// Custom type for strings.
 pub const STRING_CUSTOM_TYPE: CustomType =
-    CustomType::new_simple(STRING_TYPE_NAME, PRELUDE_ID, TypeBound::Eq);
+    CustomType::new_simple(STRING_TYPE_NAME, PRELUDE_ID, TypeBound::Copyable);
 
 /// String type.
 pub const STRING_TYPE: Type = Type::new_extension(STRING_CUSTOM_TYPE);
@@ -259,7 +262,7 @@ pub const PRINT_OP_ID: OpName = OpName::new_inline("print");
 
 /// The custom type for Errors.
 pub const ERROR_CUSTOM_TYPE: CustomType =
-    CustomType::new_simple(ERROR_TYPE_NAME, PRELUDE_ID, TypeBound::Eq);
+    CustomType::new_simple(ERROR_TYPE_NAME, PRELUDE_ID, TypeBound::Copyable);
 /// Unspecified opaque error type.
 pub const ERROR_TYPE: Type = Type::new_extension(ERROR_CUSTOM_TYPE);
 

@@ -79,8 +79,6 @@ impl TypeDeclaration {
     Debug, Copy, Clone, Serialize, Deserialize, Hash, PartialEq, Eq, Default, derive_more::Display,
 )]
 enum TypeDefBoundDeclaration {
-    /// The equality operation is valid on this type.
-    Eq,
     /// The type can be copied in the program.
     Copyable,
     /// No bound on the type.
@@ -91,7 +89,6 @@ enum TypeDefBoundDeclaration {
 impl From<TypeDefBoundDeclaration> for TypeDefBound {
     fn from(bound: TypeDefBoundDeclaration) -> Self {
         match bound {
-            TypeDefBoundDeclaration::Eq => Self::Explicit(TypeBound::Eq),
             TypeDefBoundDeclaration::Copyable => Self::Explicit(TypeBound::Copyable),
             TypeDefBoundDeclaration::Any => Self::Explicit(TypeBound::Any),
         }

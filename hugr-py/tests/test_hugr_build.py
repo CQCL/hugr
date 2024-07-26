@@ -280,6 +280,6 @@ def test_lift() -> None:
 def test_alias() -> None:
     mod = Module()
     _dfn = mod.add_alias_defn("my_int", INT_T)
-    _dcl = mod.add_alias_decl("my_bool", tys.TypeBound.Eq)
+    _dcl = mod.add_alias_decl("my_bool", tys.TypeBound.Copyable)
 
     validate(mod.hugr)
