@@ -560,7 +560,6 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
             return (src.port.node.idx, s), (dst.port.node.idx, d)
 
         return SerialHugr(
-            version="v1",
             # non contiguous indices will be erased
             nodes=[node.to_serial(Node(idx)) for idx, node in enumerate(node_it)],
             edges=[_serialize_link(link) for link in self._links.items()],

@@ -39,7 +39,8 @@ enum Versioned<SerHugr = SerHugrLatest> {
     V0,
 
     V1(serde_json::Value),
-    V2(SerHugr),
+    V2(serde_json::Value),
+    Live(SerHugr),
 
     #[serde(skip_serializing)]
     #[serde(other)]
@@ -48,15 +49,16 @@ enum Versioned<SerHugr = SerHugrLatest> {
 
 impl<T> Versioned<T> {
     pub fn new_latest(t: T) -> Self {
-        Self::V2(t)
+        Self::Live(t)
     }
 }
 
 impl<T: DeserializeOwned> Versioned<T> {
-    fn upgrade(mut self) -> Result<T, UpgradeError> {
+    fn upgrade(self) -> Result<T, UpgradeError> {
         // go is polymorphic in D. When we are upgrading to the latest version
         // D is T. When we are upgrading to a version which is not the latest D
         // is serde_json::Value.
+        #[allow(unused)]
         fn go<D: serde::de::DeserializeOwned>(v: serde_json::Value) -> Result<D, UpgradeError> {
             serde_json::from_value(v).map_err(Into::into)
         }
@@ -64,8 +66,10 @@ impl<T: DeserializeOwned> Versioned<T> {
             match self {
                 Self::V0 => Err(UpgradeError::KnownVersionUnsupported("0".into()))?,
                 // the upgrade lines remain unchanged when adding a new constructor
-                Self::V1(json) => self = Self::V2(upgrade::v1_to_v2(json).and_then(go)?),
-                Self::V2(ser_hugr) => return Ok(ser_hugr),
+                // Self::V1(json) => self = Self::V2(upgrade::v1_to_v2(json).and_then(go)?),
+                Self::V1(_) => Err(UpgradeError::KnownVersionUnsupported("1".into()))?,
+                Self::V2(_) => Err(UpgradeError::KnownVersionUnsupported("2".into()))?,
+                Self::Live(ser_hugr) => return Ok(ser_hugr),
                 Versioned::Unsupported => Err(UpgradeError::UnknownVersionUnsupported)?,
             }
         }
