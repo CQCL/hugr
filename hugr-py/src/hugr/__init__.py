@@ -9,4 +9,4 @@ __version__ = "0.4.0"
 
 def get_serialisation_version() -> str:
     """Return the current version of the serialization schema."""
-    return "v2"
+    return "live"
