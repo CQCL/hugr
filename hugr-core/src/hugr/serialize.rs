@@ -40,7 +40,7 @@ enum Versioned<SerHugr = SerHugrLatest> {
 
     V1(serde_json::Value),
     V2(serde_json::Value),
-    V3(SerHugr),
+    Live(SerHugr),
 
     #[serde(skip_serializing)]
     #[serde(other)]
@@ -49,7 +49,7 @@ enum Versioned<SerHugr = SerHugrLatest> {
 
 impl<T> Versioned<T> {
     pub fn new_latest(t: T) -> Self {
-        Self::V3(t)
+        Self::Live(t)
     }
 }
 
@@ -69,7 +69,7 @@ impl<T: DeserializeOwned> Versioned<T> {
                 // Self::V1(json) => self = Self::V2(upgrade::v1_to_v2(json).and_then(go)?),
                 Self::V1(_) => Err(UpgradeError::KnownVersionUnsupported("1".into()))?,
                 Self::V2(_) => Err(UpgradeError::KnownVersionUnsupported("2".into()))?,
-                Self::V3(ser_hugr) => return Ok(ser_hugr),
+                Self::Live(ser_hugr) => return Ok(ser_hugr),
                 Versioned::Unsupported => Err(UpgradeError::UnknownVersionUnsupported)?,
             }
         }
