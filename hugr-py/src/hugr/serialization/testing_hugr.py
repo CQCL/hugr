@@ -1,6 +1,7 @@
 from pydantic import ConfigDict
 
-from .ops import OpDef, OpType, Value
+from .extension import OpDef
+from .ops import OpType, Value
 from .ops import classes as ops_classes
 from .serial_hugr import VersionField
 from .tys import ConfiguredBaseModel, PolyFuncType, SumType, Type, model_rebuild

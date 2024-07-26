@@ -658,27 +658,6 @@ class OpType(RootModel):
     model_config = ConfigDict(json_schema_extra={"required": ["parent", "op"]})
 
 
-# --------------------------------------
-# --------------- OpDef ----------------
-# --------------------------------------
-
-
-class FixedHugr(ConfiguredBaseModel):
-    extensions: ExtensionSet
-    hugr: Any
-
-
-class OpDef(ConfiguredBaseModel, populate_by_name=True):
-    """Serializable definition for dynamically loaded operations."""
-
-    extension: ExtensionId
-    name: str  # Unique identifier of the operation.
-    description: str  # Human readable description of the operation.
-    misc: dict[str, Any] | None = None
-    signature: PolyFuncType | None = None
-    lower_funcs: list[FixedHugr]
-
-
 # Now that all classes are defined, we need to update the ForwardRefs in all type
 # annotations. We use some inspect magic to find all classes defined in this file.
 classes = (
