@@ -117,12 +117,9 @@ pub trait CustomLowerFunc: Send + Sync {
 /// Encode a signature as `PolyFuncTypeRV` but optionally allow validating type
 /// arguments via a custom binary. The binary cannot be serialized so will be
 /// lost over a serialization round-trip.
-#[derive(serde::Deserialize, serde::Serialize)]
 pub struct CustomValidator {
-    #[serde(flatten)]
     poly_func: PolyFuncTypeRV,
-    #[serde(skip)]
-    pub(crate) validate: Box<dyn ValidateTypeArgs>,
+    pub(crate) validate: Option<Box<dyn ValidateTypeArgs>>,
 }
 
 impl CustomValidator {
@@ -142,26 +139,74 @@ impl CustomValidator {
     ) -> Self {
         Self {
             poly_func: poly_func.into(),
-            validate: Box::new(validate),
+            validate: Some(Box::new(validate)),
         }
     }
 }
 
 /// The two ways in which an OpDef may compute the Signature of each operation node.
-#[derive(serde::Deserialize, serde::Serialize)]
 pub enum SignatureFunc {
     // Note: except for serialization, we could have type schemes just implement the same
     // CustomSignatureFunc trait too, and replace this enum with Box<dyn CustomSignatureFunc>.
     // However instead we treat all CustomFunc's as non-serializable.
     /// A PolyFuncType (polymorphic function type), with optional custom
     /// validation for provided type arguments,
-    #[serde(rename = "signature")]
     PolyFuncType(CustomValidator),
-    #[serde(skip)]
     /// A custom binary which computes a polymorphic function type given values
     /// for its static type parameters.
     CustomFunc(Box<dyn CustomSignatureFunc>),
+    /// Declaration specified a custom binary but it was not provided.
+    MissingCustomFunc,
 }
+
+mod serialize_signature_func {
+    use serde::{Deserialize, Serialize};
+
+    use super::{PolyFuncTypeRV, SignatureFunc};
+    #[derive(serde::Deserialize, serde::Serialize)]
+    struct SerSignatureFunc {
+        signature: Option<PolyFuncTypeRV>,
+        binary: bool,
+    }
+
+    pub(super) fn serialize<S>(
+        value: &super::SignatureFunc,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match value {
+            SignatureFunc::PolyFuncType(custom) => SerSignatureFunc {
+                signature: Some(custom.poly_func.clone()),
+                binary: custom.validate.is_some(),
+            },
+            SignatureFunc::CustomFunc(_) => SerSignatureFunc {
+                signature: None,
+                binary: true,
+            },
+            SignatureFunc::MissingCustomFunc => SerSignatureFunc {
+                signature: None,
+                binary: false,
+            },
+        }
+        .serialize(serializer)
+    }
+
+    pub(super) fn deserialize<'de, D>(deserializer: D) -> Result<super::SignatureFunc, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let SerSignatureFunc { signature, .. } = SerSignatureFunc::deserialize(deserializer)?;
+        Ok(if let Some(sig) = signature {
+            sig.into()
+        } else {
+            SignatureFunc::MissingCustomFunc
+        })
+    }
+}
+
+#[derive(PartialEq, Eq, Debug)]
 struct NoValidate;
 impl ValidateTypeArgs for NoValidate {
     fn validate<'o, 'a: 'o>(
@@ -221,6 +266,7 @@ impl SignatureFunc {
         match self {
             SignatureFunc::PolyFuncType(ts) => ts.poly_func.params(),
             SignatureFunc::CustomFunc(func) => func.static_params(),
+            SignatureFunc::MissingCustomFunc => panic!("Missing signature function."),
         }
     }
 
@@ -244,7 +290,11 @@ impl SignatureFunc {
         let temp: PolyFuncTypeRV; // to keep alive
         let (pf, args) = match &self {
             SignatureFunc::PolyFuncType(custom) => {
-                custom.validate.validate(args, def, exts)?;
+                custom
+                    .validate
+                    .as_ref()
+                    .unwrap_or(&Default::default())
+                    .validate(args, def, exts)?;
                 (&custom.poly_func, args)
             }
             SignatureFunc::CustomFunc(func) => {
@@ -255,6 +305,7 @@ impl SignatureFunc {
                 temp = func.compute_signature(static_args, def, exts)?;
                 (&temp, other_args)
             }
+            SignatureFunc::MissingCustomFunc => panic!("Missing signature function."),
         };
 
         let mut res = pf.instantiate(args, exts)?;
@@ -270,6 +321,7 @@ impl Debug for SignatureFunc {
         match self {
             Self::PolyFuncType(ts) => ts.poly_func.fmt(f),
             Self::CustomFunc { .. } => f.write_str("<custom sig>"),
+            Self::MissingCustomFunc => f.write_str("<missing custom sig>"),
         }
     }
 }
@@ -321,7 +373,7 @@ pub struct OpDef {
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     misc: HashMap<String, serde_json::Value>,
 
-    #[serde(flatten)]
+    #[serde(with = "serialize_signature_func", flatten)]
     signature_func: SignatureFunc,
     // Some operations cannot lower themselves and tools that do not understand them
     // can only treat them as opaque/black-box ops.
@@ -355,6 +407,7 @@ impl OpDef {
                 temp = custom.compute_signature(static_args, self, exts)?;
                 (&temp, other_args)
             }
+            SignatureFunc::MissingCustomFunc => panic!("Missing signature function."),
         };
         args.iter()
             .try_for_each(|ta| ta.validate(exts, var_decls))?;
@@ -562,7 +615,7 @@ pub(super) mod test {
                     validate: _,
                 }) => Some(poly_func.clone()),
                 // This is ruled out by `new()` but leave it here for later.
-                SignatureFunc::CustomFunc(_) => None,
+                SignatureFunc::CustomFunc(_) | SignatureFunc::MissingCustomFunc => None,
             };
 
             let get_lower_funcs = |lfs: &Vec<LowerFunc>| {
