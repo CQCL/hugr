@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.5.0](https://github.com/CQCL/hugr/compare/hugr-py-v0.4.0...hugr-py-v0.5.0) (2024-07-29)
+
+
+### ⚠ BREAKING CHANGES
+
+* Eq type bound removed. References to `Eq` in serialized HUGRs will be treated as `Copyable`.
+* **hugr-core:** All Hugrs serialised with earlier versions will fail to deserialise
+* opaque type parameters replaced with string parameters.
+
+### Features
+
+* **hugr-py:** `AsCustomOp` protocol for user-defined custom op types. ([#1290](https://github.com/CQCL/hugr/issues/1290)) ([1db43eb](https://github.com/CQCL/hugr/commit/1db43eb57cb7455fc5b11e777aa299d7b10ce7c6))
+* remove the `Eq` type bound. ([#1364](https://github.com/CQCL/hugr/issues/1364)) ([1218d21](https://github.com/CQCL/hugr/commit/1218d21cb6509c253fed011ca37c0dbbb566ae83))
+* replace opaque type arguments with String ([#1328](https://github.com/CQCL/hugr/issues/1328)) ([24b2217](https://github.com/CQCL/hugr/commit/24b2217c45d6bfeef53573684787a7d57989ae75)), closes [#1308](https://github.com/CQCL/hugr/issues/1308)
+* Serialization upgrade path ([#1327](https://github.com/CQCL/hugr/issues/1327)) ([d493139](https://github.com/CQCL/hugr/commit/d49313989b69f30072e7f36a380ecd538a3ac18e))
+
+
+### Bug Fixes
+
+* add op's extension to signature check in `resolve_opaque_op` ([#1317](https://github.com/CQCL/hugr/issues/1317)) ([01da7ba](https://github.com/CQCL/hugr/commit/01da7ba75e2c48604605c41cadae9360d567cf89))
+* **hugr-core:** bump serialisation version with no upgrade path ([#1352](https://github.com/CQCL/hugr/issues/1352)) ([657cbb0](https://github.com/CQCL/hugr/commit/657cbb0399fbd9f151a494ef34d4745b30b047d2))
+* **hugr-py:** ops require their own extensions ([#1303](https://github.com/CQCL/hugr/issues/1303)) ([026bfcb](https://github.com/CQCL/hugr/commit/026bfcb0008ce55b102fffd21fb31f24aefe4a69)), closes [#1301](https://github.com/CQCL/hugr/issues/1301)
+
 ## [0.4.0](https://github.com/CQCL/hugr/compare/hugr-py-v0.3.1...hugr-py-v0.4.0) (2024-07-10)
 
 
