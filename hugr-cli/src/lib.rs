@@ -18,7 +18,7 @@ pub enum CliArgs {
     /// Validate and visualize a HUGR file.
     Validate(validate::CliArgs),
     /// Write standard extensions out in serialized form.
-    GenExtension(extensions::ExtArgs),
+    GenExtensions(extensions::ExtArgs),
     /// External commands
     #[command(external_subcommand)]
     External(Vec<OsString>),

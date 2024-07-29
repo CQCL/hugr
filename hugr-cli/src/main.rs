@@ -9,7 +9,7 @@ use clap_verbosity_flag::Level;
 fn main() {
     match CliArgs::parse() {
         CliArgs::Validate(args) => run_validate(args),
-        CliArgs::GenExtension(args) => args.run_dump(),
+        CliArgs::GenExtensions(args) => args.run_dump(),
         CliArgs::External(_) => {
             // TODO: Implement support for external commands.
             // Running `hugr COMMAND` would look for `hugr-COMMAND` in the path
