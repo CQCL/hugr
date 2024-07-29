@@ -31,6 +31,8 @@ pub const POP_NAME: OpName = OpName::new_inline("pop");
 pub const PUSH_NAME: OpName = OpName::new_inline("push");
 /// Reported unique name of the extension
 pub const EXTENSION_NAME: ExtensionId = ExtensionId::new_unchecked("Collections");
+/// Extension version.
+pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 /// Dynamically sized list of values, all of the same type.
@@ -138,7 +140,7 @@ impl ConstFold for PushFold {
 const TP: TypeParam = TypeParam::Type { b: TypeBound::Any };
 
 fn extension() -> Extension {
-    let mut extension = Extension::new(EXTENSION_NAME);
+    let mut extension = Extension::new(EXTENSION_NAME, VERSION);
 
     extension
         .add_type(

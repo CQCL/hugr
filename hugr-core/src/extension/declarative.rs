@@ -89,6 +89,7 @@ struct ExtensionSetDeclaration {
 /// A declarative extension definition.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 struct ExtensionDeclaration {
+    // TODO add version
     /// The name of the extension.
     name: ExtensionId,
     /// A list of types that this extension provides.
@@ -150,7 +151,8 @@ impl ExtensionDeclaration {
         imports: &ExtensionSet,
         ctx: DeclarationContext<'_>,
     ) -> Result<Extension, ExtensionDeclarationError> {
-        let mut ext = Extension::new_with_reqs(self.name.clone(), imports.clone());
+        let mut ext = Extension::new(self.name.clone(), crate::extension::Version::new(0, 0, 0))
+            .with_reqs(imports.clone());
 
         for t in &self.types {
             t.register(&mut ext, ctx)?;
