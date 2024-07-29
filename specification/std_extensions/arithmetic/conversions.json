@@ -1,0 +1,222 @@
+{
+  "version": "0.1.0",
+  "name": "arithmetic.conversions",
+  "extension_reqs": [
+    "arithmetic.float.types",
+    "arithmetic.int.types"
+  ],
+  "types": {},
+  "values": {},
+  "operations": {
+    "convert_s": {
+      "extension": "arithmetic.conversions",
+      "name": "convert_s",
+      "description": "signed int to float",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "convert_u": {
+      "extension": "arithmetic.conversions",
+      "name": "convert_u",
+      "description": "unsigned int to float",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "trunc_s": {
+      "extension": "arithmetic.conversions",
+      "name": "trunc_s",
+      "description": "float to signed int",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "General",
+              "rows": [
+                [
+                  {
+                    "t": "Opaque",
+                    "extension": "arithmetic.int.types",
+                    "id": "int",
+                    "args": [
+                      {
+                        "tya": "Variable",
+                        "idx": 0,
+                        "cached_decl": {
+                          "tp": "BoundedNat",
+                          "bound": 7
+                        }
+                      }
+                    ],
+                    "bound": "C"
+                  }
+                ],
+                [
+                  {
+                    "t": "Opaque",
+                    "extension": "prelude",
+                    "id": "error",
+                    "args": [],
+                    "bound": "C"
+                  }
+                ]
+              ]
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "trunc_u": {
+      "extension": "arithmetic.conversions",
+      "name": "trunc_u",
+      "description": "float to unsigned int",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "General",
+              "rows": [
+                [
+                  {
+                    "t": "Opaque",
+                    "extension": "arithmetic.int.types",
+                    "id": "int",
+                    "args": [
+                      {
+                        "tya": "Variable",
+                        "idx": 0,
+                        "cached_decl": {
+                          "tp": "BoundedNat",
+                          "bound": 7
+                        }
+                      }
+                    ],
+                    "bound": "C"
+                  }
+                ],
+                [
+                  {
+                    "t": "Opaque",
+                    "extension": "prelude",
+                    "id": "error",
+                    "args": [],
+                    "bound": "C"
+                  }
+                ]
+              ]
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    }
+  }
+}

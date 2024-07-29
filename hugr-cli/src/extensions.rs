@@ -1,6 +1,6 @@
 //! Dump standard extensions in serialized form.
 use clap::Parser;
-use std::path::PathBuf;
+use std::{io::Write, path::PathBuf};
 
 /// Dump the standard extensions.
 #[derive(Parser, Debug)]
@@ -36,9 +36,12 @@ impl ExtArgs {
 
             std::fs::create_dir_all(path.clone().parent().unwrap()).unwrap();
             // file buffer
-            let file = std::fs::File::create(&path).unwrap();
+            let mut file = std::fs::File::create(&path).unwrap();
 
-            serde_json::to_writer_pretty(file, &ext).unwrap();
+            serde_json::to_writer_pretty(&mut file, &ext).unwrap();
+
+            // write newline, for pre-commit checks.
+            file.write_all(b"\n").unwrap();
         }
     }
 }
