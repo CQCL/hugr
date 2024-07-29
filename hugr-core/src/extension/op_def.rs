@@ -119,6 +119,8 @@ pub trait CustomLowerFunc: Send + Sync {
 /// lost over a serialization round-trip.
 pub struct CustomValidator {
     poly_func: PolyFuncTypeRV,
+    /// Optional custom function for validating type arguments before returning the signature.
+    /// If None, no custom validation is performed.
     pub(crate) validate: Option<Box<dyn ValidateTypeArgs>>,
 }
 
