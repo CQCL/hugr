@@ -19,3 +19,26 @@ pub struct ExtArgs {
     )]
     pub outdir: PathBuf,
 }
+
+impl ExtArgs {
+    /// Write out the standard extensions in serialized form.
+    /// Qualified names of extensions used to generate directories under the specified output directory.
+    /// E.g. extension "foo.bar.baz" will be written to "OUTPUT/foo/bar/baz.json".
+    pub fn run_dump(&self) {
+        let base_dir = &self.outdir;
+
+        for (name, ext) in hugr_core::std_extensions::std_reg().into_iter() {
+            let mut path = base_dir.clone();
+            for part in name.split('.') {
+                path.push(part);
+            }
+            path.set_extension("json");
+
+            std::fs::create_dir_all(path.clone().parent().unwrap()).unwrap();
+            // file buffer
+            let file = std::fs::File::create(&path).unwrap();
+
+            serde_json::to_writer_pretty(file, &ext).unwrap();
+        }
+    }
+}
