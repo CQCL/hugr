@@ -56,24 +56,17 @@ impl ExtensionRegistry {
     pub fn try_new(
         value: impl IntoIterator<Item = Extension>,
     ) -> Result<Self, ExtensionRegistryError> {
-        let mut exts = BTreeMap::new();
+        let mut res = ExtensionRegistry(BTreeMap::new());
+
         for ext in value.into_iter() {
-            let ext_v = ext.version().clone();
-            let prev = exts.insert(ext.name.clone(), ext);
-            if let Some(prev) = prev {
-                return Err(ExtensionRegistryError::AlreadyRegistered(
-                    prev.name().clone(),
-                    prev.version().clone(),
-                    ext_v,
-                ));
-            };
+            res.register(ext)?;
         }
+
         // Note this potentially asks extensions to validate themselves against other extensions that
         // may *not* be valid themselves yet. It'd be better to order these respecting dependencies,
         // or at least to validate the types first - which we don't do at all yet:
         // TODO https://github.com/CQCL/hugr/issues/624. However, parametrized types could be
         // cyclically dependent, so there is no perfect solution, and this is at least simple.
-        let res = ExtensionRegistry(exts);
         for ext in res.0.values() {
             ext.validate(&res)
                 .map_err(|e| ExtensionRegistryError::InvalidSignature(ext.name().clone(), e))?;
