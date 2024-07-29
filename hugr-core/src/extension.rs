@@ -5,8 +5,7 @@
 
 pub use semver::Version;
 use std::collections::btree_map;
-use std::collections::hash_map;
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
 
@@ -308,16 +307,16 @@ pub struct Extension {
     /// for any possible [TypeArg].
     pub extension_reqs: ExtensionSet,
     /// Types defined by this extension.
-    types: HashMap<TypeName, TypeDef>,
+    types: BTreeMap<TypeName, TypeDef>,
     /// Static values defined by this extension.
-    values: HashMap<ValueName, ExtensionValue>,
+    values: BTreeMap<ValueName, ExtensionValue>,
     /// Operation declarations with serializable definitions.
     // Note: serde will serialize this because we configure with `features=["rc"]`.
     // That will clone anything that has multiple references, but each
     // OpDef should appear exactly once in this map (keyed by its name),
     // and the other references to the OpDef are from ExternalOp's in the Hugr
     // (which are serialized as OpaqueOp's i.e. Strings).
-    operations: HashMap<OpName, Arc<op_def::OpDef>>,
+    operations: BTreeMap<OpName, Arc<op_def::OpDef>>,
 }
 
 impl Extension {
@@ -388,10 +387,10 @@ impl Extension {
             typed_value,
         };
         match self.values.entry(extension_value.name.clone()) {
-            hash_map::Entry::Occupied(_) => {
+            btree_map::Entry::Occupied(_) => {
                 Err(ExtensionBuildError::ValueExists(extension_value.name))
             }
-            hash_map::Entry::Vacant(ve) => Ok(ve.insert(extension_value)),
+            btree_map::Entry::Vacant(ve) => Ok(ve.insert(extension_value)),
         }
     }
 
