@@ -154,10 +154,12 @@ pub enum SignatureFunc {
     /// A PolyFuncType (polymorphic function type), with optional custom
     /// validation for provided type arguments,
     PolyFuncType(CustomValidator),
+    /// Declaration specified a custom validate binary but it was not provided.
+    MissingValidateFunc(PolyFuncTypeRV),
     /// A custom binary which computes a polymorphic function type given values
     /// for its static type parameters.
     CustomFunc(Box<dyn CustomSignatureFunc>),
-    /// Declaration specified a custom binary but it was not provided.
+    /// Declaration specified a custom compute binary but it was not provided.
     MissingComputeFunc,
 }
 
@@ -187,6 +189,10 @@ mod serialize_signature_func {
                 signature: Some(custom.poly_func.clone()),
                 binary: custom.validate.is_some(),
             },
+            SignatureFunc::MissingValidateFunc(poly_func) => SerSignatureFunc {
+                signature: Some(poly_func.clone()),
+                binary: true,
+            },
             SignatureFunc::CustomFunc(_) => SerSignatureFunc {
                 signature: None,
                 binary: true,
@@ -203,14 +209,16 @@ mod serialize_signature_func {
     where
         D: serde::Deserializer<'de>,
     {
-        let SerSignatureFunc { signature, .. } = SerSignatureFunc::deserialize(deserializer)?;
+        let SerSignatureFunc { signature, binary } = SerSignatureFunc::deserialize(deserializer)?;
 
-        // TODO for now, an indication of expected custom validation function is ignored.
-        Ok(if let Some(sig) = signature {
-            sig.into()
-        } else {
-            SignatureFunc::MissingComputeFunc
-        })
+        match (signature, binary) {
+            (Some(sig), false) => Ok(sig.into()),
+            (Some(sig), true) => Ok(SignatureFunc::MissingValidateFunc(sig)),
+            (None, true) => Ok(SignatureFunc::MissingComputeFunc),
+            (None, false) => Err(serde::de::Error::custom(
+                "No signature provided and custom computation not expected.",
+            )),
+        }
     }
 }
 
@@ -272,10 +280,20 @@ impl From<CustomValidator> for SignatureFunc {
 impl SignatureFunc {
     fn static_params(&self) -> Result<&[TypeParam], SignatureError> {
         Ok(match self {
-            SignatureFunc::PolyFuncType(ts) => ts.poly_func.params(),
+            SignatureFunc::PolyFuncType(CustomValidator { poly_func: ts, .. })
+            | SignatureFunc::MissingValidateFunc(ts) => ts.params(),
             SignatureFunc::CustomFunc(func) => func.static_params(),
             SignatureFunc::MissingComputeFunc => return Err(SignatureError::MissingComputeFunc),
         })
+    }
+
+    /// If the signature is missing a custom validation function, ignore and treat as
+    /// self-contained type scheme (with no custom validation).
+    pub fn ignore_missing_validation(self) -> Self {
+        match self {
+            SignatureFunc::MissingValidateFunc(ts) => CustomValidator::from_polyfunc(ts).into(),
+            _ => self,
+        }
     }
 
     /// Compute the concrete signature ([FuncValueType]).
@@ -314,6 +332,9 @@ impl SignatureFunc {
                 (&temp, other_args)
             }
             SignatureFunc::MissingComputeFunc => return Err(SignatureError::MissingComputeFunc),
+            SignatureFunc::MissingValidateFunc(_) => {
+                return Err(SignatureError::MissingValidateFunc)
+            }
         };
 
         let mut res = pf.instantiate(args, exts)?;
@@ -330,6 +351,7 @@ impl Debug for SignatureFunc {
             Self::PolyFuncType(ts) => ts.poly_func.fmt(f),
             Self::CustomFunc { .. } => f.write_str("<custom sig>"),
             Self::MissingComputeFunc => f.write_str("<missing custom sig>"),
+            Self::MissingValidateFunc(_) => f.write_str("<missing custom validation>"),
         }
     }
 }
@@ -417,6 +439,9 @@ impl OpDef {
                 (&temp, other_args)
             }
             SignatureFunc::MissingComputeFunc => return Err(SignatureError::MissingComputeFunc),
+            SignatureFunc::MissingValidateFunc(_) => {
+                return Err(SignatureError::MissingValidateFunc)
+            }
         };
         args.iter()
             .try_for_each(|ta| ta.validate(exts, var_decls))?;
@@ -622,7 +647,8 @@ pub(super) mod test {
                 SignatureFunc::PolyFuncType(CustomValidator {
                     poly_func,
                     validate: _,
-                }) => Some(poly_func.clone()),
+                })
+                | SignatureFunc::MissingValidateFunc(poly_func) => Some(poly_func.clone()),
                 // This is ruled out by `new()` but leave it here for later.
                 SignatureFunc::CustomFunc(_) | SignatureFunc::MissingComputeFunc => None,
             };
