@@ -13,6 +13,7 @@ use crate::ops::{OpName, OpNameRef};
 use crate::types::type_param::{check_type_args, TypeArg, TypeParam};
 use crate::types::{FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature};
 use crate::Hugr;
+mod serialize_signature_func;
 
 /// Trait necessary for binary computations of OpDef signature
 pub trait CustomSignatureFunc: Send + Sync {
@@ -161,65 +162,6 @@ pub enum SignatureFunc {
     CustomFunc(Box<dyn CustomSignatureFunc>),
     /// Declaration specified a custom compute binary but it was not provided.
     MissingComputeFunc,
-}
-
-mod serialize_signature_func {
-    use serde::{Deserialize, Serialize};
-
-    use super::{PolyFuncTypeRV, SignatureFunc};
-    #[derive(serde::Deserialize, serde::Serialize)]
-    struct SerSignatureFunc {
-        /// If the type scheme is available explicitly, store it.
-        signature: Option<PolyFuncTypeRV>,
-        /// Whether an associated binary function is expected.
-        /// If `signature` is `None`, a true value here indicates a custom compute function.
-        /// If `signature` is not `None`, a true value here indicates a custom validation function.
-        binary: bool,
-    }
-
-    pub(super) fn serialize<S>(
-        value: &super::SignatureFunc,
-        serializer: S,
-    ) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        match value {
-            SignatureFunc::PolyFuncType(custom) => SerSignatureFunc {
-                signature: Some(custom.poly_func.clone()),
-                binary: custom.validate.is_some(),
-            },
-            SignatureFunc::MissingValidateFunc(poly_func) => SerSignatureFunc {
-                signature: Some(poly_func.clone()),
-                binary: true,
-            },
-            SignatureFunc::CustomFunc(_) => SerSignatureFunc {
-                signature: None,
-                binary: true,
-            },
-            SignatureFunc::MissingComputeFunc => SerSignatureFunc {
-                signature: None,
-                binary: false,
-            },
-        }
-        .serialize(serializer)
-    }
-
-    pub(super) fn deserialize<'de, D>(deserializer: D) -> Result<super::SignatureFunc, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let SerSignatureFunc { signature, binary } = SerSignatureFunc::deserialize(deserializer)?;
-
-        match (signature, binary) {
-            (Some(sig), false) => Ok(sig.into()),
-            (Some(sig), true) => Ok(SignatureFunc::MissingValidateFunc(sig)),
-            (None, true) => Ok(SignatureFunc::MissingComputeFunc),
-            (None, false) => Err(serde::de::Error::custom(
-                "No signature provided and custom computation not expected.",
-            )),
-        }
-    }
 }
 
 #[derive(PartialEq, Eq, Debug)]
