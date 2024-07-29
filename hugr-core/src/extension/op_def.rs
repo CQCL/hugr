@@ -156,7 +156,7 @@ pub enum SignatureFunc {
     /// for its static type parameters.
     CustomFunc(Box<dyn CustomSignatureFunc>),
     /// Declaration specified a custom binary but it was not provided.
-    MissingCustomFunc,
+    MissingComputeFunc,
 }
 
 mod serialize_signature_func {
@@ -185,7 +185,7 @@ mod serialize_signature_func {
                 signature: None,
                 binary: true,
             },
-            SignatureFunc::MissingCustomFunc => SerSignatureFunc {
+            SignatureFunc::MissingComputeFunc => SerSignatureFunc {
                 signature: None,
                 binary: false,
             },
@@ -201,7 +201,7 @@ mod serialize_signature_func {
         Ok(if let Some(sig) = signature {
             sig.into()
         } else {
-            SignatureFunc::MissingCustomFunc
+            SignatureFunc::MissingComputeFunc
         })
     }
 }
@@ -262,12 +262,12 @@ impl From<CustomValidator> for SignatureFunc {
 }
 
 impl SignatureFunc {
-    fn static_params(&self) -> &[TypeParam] {
-        match self {
+    fn static_params(&self) -> Result<&[TypeParam], SignatureError> {
+        Ok(match self {
             SignatureFunc::PolyFuncType(ts) => ts.poly_func.params(),
             SignatureFunc::CustomFunc(func) => func.static_params(),
-            SignatureFunc::MissingCustomFunc => panic!("Missing signature function."),
-        }
+            SignatureFunc::MissingComputeFunc => return Err(SignatureError::MissingComputeFunc),
+        })
     }
 
     /// Compute the concrete signature ([FuncValueType]).
@@ -305,7 +305,7 @@ impl SignatureFunc {
                 temp = func.compute_signature(static_args, def, exts)?;
                 (&temp, other_args)
             }
-            SignatureFunc::MissingCustomFunc => panic!("Missing signature function."),
+            SignatureFunc::MissingComputeFunc => return Err(SignatureError::MissingComputeFunc),
         };
 
         let mut res = pf.instantiate(args, exts)?;
@@ -321,7 +321,7 @@ impl Debug for SignatureFunc {
         match self {
             Self::PolyFuncType(ts) => ts.poly_func.fmt(f),
             Self::CustomFunc { .. } => f.write_str("<custom sig>"),
-            Self::MissingCustomFunc => f.write_str("<missing custom sig>"),
+            Self::MissingComputeFunc => f.write_str("<missing custom sig>"),
         }
     }
 }
@@ -408,7 +408,7 @@ impl OpDef {
                 temp = custom.compute_signature(static_args, self, exts)?;
                 (&temp, other_args)
             }
-            SignatureFunc::MissingCustomFunc => panic!("Missing signature function."),
+            SignatureFunc::MissingComputeFunc => return Err(SignatureError::MissingComputeFunc),
         };
         args.iter()
             .try_for_each(|ta| ta.validate(exts, var_decls))?;
@@ -463,7 +463,7 @@ impl OpDef {
     }
 
     /// Returns a reference to the params of this [`OpDef`].
-    pub fn params(&self) -> &[TypeParam] {
+    pub fn params(&self) -> Result<&[TypeParam], SignatureError> {
         self.signature_func.static_params()
     }
 
@@ -616,7 +616,7 @@ pub(super) mod test {
                     validate: _,
                 }) => Some(poly_func.clone()),
                 // This is ruled out by `new()` but leave it here for later.
-                SignatureFunc::CustomFunc(_) | SignatureFunc::MissingCustomFunc => None,
+                SignatureFunc::CustomFunc(_) | SignatureFunc::MissingComputeFunc => None,
             };
 
             let get_lower_funcs = |lfs: &Vec<LowerFunc>| {

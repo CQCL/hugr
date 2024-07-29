@@ -205,6 +205,11 @@ pub enum SignatureError {
         cached: Signature,
         expected: Signature,
     },
+
+    /// Extension declaration specifies a binary compute signature function, but none
+    /// was loaded.
+    #[error("Binary compute signature function not loaded.")]
+    MissingComputeFunc,
 }
 
 /// Concrete instantiations of types and operations defined in extensions.
