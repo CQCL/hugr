@@ -15,6 +15,7 @@ use crate::{
         EmitOp, EmitOpArgs,
     },
     fat::FatNode,
+    sum::LLVMSumValue,
 };
 
 use super::emit_dataflow_parent;
@@ -183,31 +184,16 @@ impl<'c, H: HugrView> EmitOp<'c, DataflowBlock, H> for CfgEmitter<'c, '_, H> {
             // code here at the expense of messier generated code. We expect the
             // simplify-cfg pass to clean this up without issue.
             let branch_sum_type = SumType::new(node.sum_rows.clone());
-            let llvm_sum_type = context.llvm_sum_type(branch_sum_type)?;
-            let tag_bbs = successor_data
-                .into_iter()
-                .enumerate()
-                .map(|(tag, (target_bb, target_rmb))| {
-                    let bb = context.build_positioned_new_block("", Some(bb), |context, bb| {
-                        let builder = context.builder();
-                        let mut vals =
-                            llvm_sum_type.build_untag(builder, tag as u32, outputs[0])?;
-                        vals.extend(&outputs[1..]);
-                        target_rmb.write(builder, vals)?;
-                        builder.build_unconditional_branch(target_bb)?;
-                        Ok::<_, anyhow::Error>(bb)
-                    })?;
-                    Ok((
-                        llvm_sum_type.get_tag_type().const_int(tag as u64, false),
-                        bb,
-                    ))
-                })
-                .collect::<Result<Vec<_>>>()?;
-            let tag_v = llvm_sum_type.build_get_tag(context.builder(), outputs[0])?;
-            context
-                .builder()
-                .build_switch(tag_v, tag_bbs[0].1, &tag_bbs[1..])?;
-            Ok(())
+            let sum_input =
+                LLVMSumValue::try_new(outputs[0], context.llvm_sum_type(branch_sum_type)?)?;
+
+            sum_input.build_destructure(context.builder(), |builder, tag, mut values| {
+                let (target_bb, target_rmb) = &successor_data[tag];
+                values.extend(&outputs[1..]);
+                target_rmb.write(builder, values)?;
+                builder.build_unconditional_branch(*target_bb)?;
+                Ok(())
+            })
         })
     }
 }

@@ -8,11 +8,11 @@ use hugr::{
     types::{SumType, Type, TypeEnum},
     HugrView, NodeIndex,
 };
-use inkwell::{builder::Builder, types::BasicType, values::BasicValueEnum};
+use inkwell::{builder::Builder, values::BasicValueEnum};
 use itertools::Itertools;
 use petgraph::visit::Walker;
 
-use crate::fat::FatExt as _;
+use crate::{fat::FatExt as _, sum::LLVMSumValue};
 use crate::{fat::FatNode, types::LLVMSumType};
 
 use super::{
@@ -49,13 +49,14 @@ impl<'c, H: HugrView> EmitOp<'c, MakeTuple, H> for SumOpEmitter<'c, '_, H> {
 impl<'c, H: HugrView> EmitOp<'c, UnpackTuple, H> for SumOpEmitter<'c, '_, H> {
     fn emit(&mut self, args: EmitOpArgs<'c, UnpackTuple, H>) -> Result<()> {
         let builder = self.0.builder();
-        let input = args
-            .inputs
-            .into_iter()
-            .exactly_one()
-            .map_err(|_| anyhow!("unpacktuple expected exactly one input"))?;
-        args.outputs
-            .finish(builder, self.1.build_untag(builder, 0, input)?)
+        let input = LLVMSumValue::try_new(
+            args.inputs
+                .into_iter()
+                .exactly_one()
+                .map_err(|_| anyhow!("unpacktuple expected exactly one input"))?,
+            self.1.clone(),
+        )?;
+        args.outputs.finish(builder, input.build_untag(builder, 0)?)
     }
 }
 
@@ -64,9 +65,7 @@ impl<'c, H: HugrView> EmitOp<'c, Tag, H> for SumOpEmitter<'c, '_, H> {
         let builder = self.0.builder();
         args.outputs.finish(
             builder,
-            [self
-                .1
-                .build_tag(builder, args.node.tag as u32, args.inputs)?],
+            [self.1.build_tag(builder, args.node.tag, args.inputs)?],
         )
     }
 }
@@ -186,7 +185,7 @@ impl<'c, H: HugrView> EmitOp<'c, Conditional, H> for ConditionalEmitter<'c, '_, 
             },
         )?;
 
-        let case_values_rmbs_blocks = node
+        let rmbs_blocks = node
             .children()
             .enumerate()
             .map(|(i, n)| {
@@ -205,29 +204,21 @@ impl<'c, H: HugrView> EmitOp<'c, Conditional, H> for ConditionalEmitter<'c, '_, 
                         },
                     )?;
                     context.builder().build_unconditional_branch(exit_block)?;
-                    Ok((i, rmb, bb))
+                    Ok((rmb, bb))
                 })
             })
             .collect::<Result<Vec<_>>>()?;
 
         let sum_type = get_exactly_one_sum_type(node.in_value_types().next().map(|x| x.1))?;
-        let llvm_sum_type = context.llvm_sum_type(sum_type)?;
-        debug_assert!(inputs[0].get_type() == llvm_sum_type.as_basic_type_enum());
-
-        let sum_input = inputs[0].into_struct_value();
+        let sum_input = LLVMSumValue::try_new(inputs[0], context.llvm_sum_type(sum_type)?)?;
         let builder = context.builder();
-        let tag = llvm_sum_type.build_get_tag(builder, sum_input)?;
-        let switches = case_values_rmbs_blocks
-            .into_iter()
-            .map(|(i, rmb, bb)| {
-                let mut vs = llvm_sum_type.build_untag(builder, i as u32, sum_input)?;
-                vs.extend(&inputs[1..]);
-                rmb.write(builder, vs)?;
-                Ok((llvm_sum_type.get_tag_type().const_int(i as u64, false), bb))
-            })
-            .collect::<Result<Vec<_>>>()?;
-
-        builder.build_switch(tag, switches[0].1, &switches[1..])?;
+        sum_input.build_destructure(builder, |builder, tag, mut vs| {
+            let (rmb, bb) = &rmbs_blocks[tag];
+            vs.extend(&inputs[1..]);
+            rmb.write(builder, vs)?;
+            builder.build_unconditional_branch(*bb)?;
+            Ok(())
+        })?;
         builder.position_at_end(exit_block);
         Ok(())
     }
@@ -265,7 +256,7 @@ pub fn emit_value<'c, H: HugrView>(
                 .iter()
                 .map(|x| emit_value(context, x))
                 .collect::<Result<Vec<_>>>()?;
-            llvm_st.build_tag(context.builder(), *tag as u32, vs)
+            llvm_st.build_tag(context.builder(), *tag, vs)
         }
     }
 }

@@ -10,21 +10,21 @@ alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  br label %4
+  br label %2
 
-2:                                                ; preds = %4
-  %3 = extractvalue { {} } undef, 0
-  br label %8
-
-4:                                                ; preds = %entry_block
-  %5 = call i16 @H(i16 %0)
-  %6 = call i16 @RzF64(i16 %5, double %1)
-  %7 = call i16 @H(i16 %6)
-  switch i32 0, label %2 [
+2:                                                ; preds = %entry_block
+  %3 = call i16 @H(i16 %0)
+  %4 = call i16 @RzF64(i16 %3, double %1)
+  %5 = call i16 @H(i16 %4)
+  switch i32 0, label %6 [
   ]
 
-8:                                                ; preds = %2
-  ret i16 %7
+6:                                                ; preds = %2
+  %7 = extractvalue { {} } undef, 0
+  br label %8
+
+8:                                                ; preds = %6
+  ret i16 %5
 }
 
 declare i16 @H(i16)
@@ -36,24 +36,24 @@ alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  br label %2
+  br label %0
 
-0:                                                ; preds = %2
-  %1 = extractvalue { {} } undef, 0
-  br label %8
-
-2:                                                ; preds = %entry_block
-  %3 = call i16 @QAlloc()
-  %4 = call i16 @_hl.rx.13(i16 %3, double 1.500000e+00)
-  %5 = call { i16, { i32, {}, {} } } @Measure(i16 %4)
-  %6 = extractvalue { i16, { i32, {}, {} } } %5, 0
-  %7 = extractvalue { i16, { i32, {}, {} } } %5, 1
-  call void @QFree(i16 %6)
-  switch i32 0, label %0 [
+0:                                                ; preds = %entry_block
+  %1 = call i16 @QAlloc()
+  %2 = call i16 @_hl.rx.13(i16 %1, double 1.500000e+00)
+  %3 = call { i16, { i32, {}, {} } } @Measure(i16 %2)
+  %4 = extractvalue { i16, { i32, {}, {} } } %3, 0
+  %5 = extractvalue { i16, { i32, {}, {} } } %3, 1
+  call void @QFree(i16 %4)
+  switch i32 0, label %6 [
   ]
 
-8:                                                ; preds = %0
-  ret { i32, {}, {} } %7
+6:                                                ; preds = %0
+  %7 = extractvalue { {} } undef, 0
+  br label %8
+
+8:                                                ; preds = %6
+  ret { i32, {}, {} } %5
 }
 
 declare i16 @QAlloc()

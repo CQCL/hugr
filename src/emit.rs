@@ -74,7 +74,7 @@ impl<'c, H> EmitModuleContext<'c, H> {
             /// Convert a [HugrFuncType] into an LLVM [FunctionType].
             pub fn llvm_func_type(&self, [self.extensions()], hugr_type: &HugrFuncType) -> Result<FunctionType<'c>>;
             /// Convert a hugr [HugrSumType] into an LLVM [LLVMSumType].
-            pub fn llvm_sum_type(&self, [self.extensions()], sum_ty: HugrSumType) -> Result<LLVMSumType<'c>>;
+            pub fn llvm_sum_type(&self, [self.extensions()], sum_type: HugrSumType) -> Result<LLVMSumType<'c>>;
         }
 
         to self.namer {
@@ -212,7 +212,7 @@ impl<'c, H> EmitModuleContext<'c, H> {
                 use inkwell::types::AnyTypeEnum;
                 use inkwell::values::AsValueRef;
                 unsafe {
-                    AnyTypeEnum::new(llvm_sys_140::core::LLVMGlobalGetValueType(
+                    AnyTypeEnum::new(inkwell::llvm_sys::core::LLVMGlobalGetValueType(
                         global.as_value_ref(),
                     ))
                 }

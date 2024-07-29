@@ -15,16 +15,11 @@ alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  br label %2
+  br label %0
 
-0:                                                ; preds = %2
-  %1 = extractvalue { {} } %"15_04", 0
-  store { i32, {}, {} } %"16_05", { i32, {}, {} }* %"01", align 4
-  br label %4
-
-2:                                                ; preds = %entry_block
-  %3 = call { i32, {}, {} } @_hl.scoped_func.7()
-  store { i32, {}, {} } %3, { i32, {}, {} }* %"16_0", align 4
+0:                                                ; preds = %entry_block
+  %1 = call { i32, {}, {} } @_hl.scoped_func.7()
+  store { i32, {}, {} } %1, { i32, {}, {} }* %"16_0", align 4
   store { {} } undef, { {} }* %"15_0", align 1
   %"15_02" = load { {} }, { {} }* %"15_0", align 1
   %"16_03" = load { i32, {}, {} }, { i32, {}, {} }* %"16_0", align 4
@@ -32,10 +27,15 @@ entry_block:                                      ; preds = %alloca_block
   store { i32, {}, {} } %"16_03", { i32, {}, {} }* %"16_0", align 4
   %"15_04" = load { {} }, { {} }* %"15_0", align 1
   %"16_05" = load { i32, {}, {} }, { i32, {}, {} }* %"16_0", align 4
-  switch i32 0, label %0 [
+  switch i32 0, label %2 [
   ]
 
-4:                                                ; preds = %0
+2:                                                ; preds = %0
+  %3 = extractvalue { {} } %"15_04", 0
+  store { i32, {}, {} } %"16_05", { i32, {}, {} }* %"01", align 4
+  br label %4
+
+4:                                                ; preds = %2
   %"06" = load { i32, {}, {} }, { i32, {}, {} }* %"01", align 4
   store { i32, {}, {} } %"06", { i32, {}, {} }* %"4_0", align 4
   %"4_07" = load { i32, {}, {} }, { i32, {}, {} }* %"4_0", align 4

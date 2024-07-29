@@ -67,7 +67,7 @@ impl<'c, H: HugrView> EmitFuncContext<'c, H> {
             /// Convert a [HugrFuncType] into an LLVM [FunctionType].
             pub fn llvm_func_type(&self, hugr_type: &HugrFuncType) -> Result<FunctionType<'c> >;
             /// Convert a hugr [HugrSumType] into an LLVM [LLVMSumType].
-            pub fn llvm_sum_type(&self, sum_ty: HugrSumType) -> Result<LLVMSumType<'c>>;
+            pub fn llvm_sum_type(&self, sum_type: HugrSumType) -> Result<LLVMSumType<'c>>;
             /// Adds or gets the [FunctionValue] in the [inkwell::module::Module] corresponding to the given [FuncDefn].
             ///
             /// The name of the result may have been mangled.

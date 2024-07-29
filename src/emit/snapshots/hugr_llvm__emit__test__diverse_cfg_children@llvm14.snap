@@ -10,19 +10,19 @@ alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  br label %2
+  br label %0
 
-0:                                                ; preds = %2
-  %1 = extractvalue { {} } undef, 0
-  br label %4
-
-2:                                                ; preds = %entry_block
-  %3 = call { i32, {}, {} } @_hl.scoped_func.7()
-  switch i32 0, label %0 [
+0:                                                ; preds = %entry_block
+  %1 = call { i32, {}, {} } @_hl.scoped_func.7()
+  switch i32 0, label %2 [
   ]
 
-4:                                                ; preds = %0
-  ret { i32, {}, {} } %3
+2:                                                ; preds = %0
+  %3 = extractvalue { {} } undef, 0
+  br label %4
+
+4:                                                ; preds = %2
+  ret { i32, {}, {} } %1
 }
 
 define { i32, {}, {} } @_hl.scoped_func.7() {

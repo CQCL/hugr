@@ -64,6 +64,7 @@
 pub mod custom;
 pub mod emit;
 pub mod fat;
+pub mod sum;
 pub mod types;
 
 #[allow(unreachable_code)]
