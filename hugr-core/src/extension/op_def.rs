@@ -377,6 +377,7 @@ pub struct OpDef {
     signature_func: SignatureFunc,
     // Some operations cannot lower themselves and tools that do not understand them
     // can only treat them as opaque/black-box ops.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub(crate) lower_funcs: Vec<LowerFunc>,
 
     /// Operations can optionally implement [`ConstFold`] to implement constant folding.
