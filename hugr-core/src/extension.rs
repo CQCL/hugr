@@ -129,6 +129,11 @@ impl ExtensionRegistry {
     pub fn iter(&self) -> impl Iterator<Item = (&ExtensionId, &Extension)> {
         self.0.iter()
     }
+
+    /// Delete an extension from the registry and return it if it was present.
+    pub fn remove_extension(&mut self, name: &ExtensionId) -> Option<Extension> {
+        self.0.remove(name)
+    }
 }
 
 impl IntoIterator for ExtensionRegistry {
@@ -599,7 +604,7 @@ pub mod test {
         assert_eq!(
             reg.register(ext1_1.clone()),
             Err(ExtensionRegistryError::AlreadyRegistered(
-                ext_1_id,
+                ext_1_id.clone(),
                 Version::new(1, 0, 0),
                 Version::new(1, 1, 0)
             ))
@@ -616,6 +621,9 @@ pub mod test {
         reg.register(ext2.clone()).unwrap();
         assert_eq!(reg.get("ext2").unwrap().version(), &Version::new(1, 0, 0));
         assert_eq!(reg.len(), 2);
+
+        assert!(reg.remove_extension(&ext_1_id).unwrap().version() == &Version::new(1, 1, 0));
+        assert_eq!(reg.len(), 1);
     }
     mod proptest {
 
