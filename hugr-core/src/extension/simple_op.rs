@@ -319,7 +319,7 @@ mod test {
 
     lazy_static! {
         static ref EXT: Extension = {
-            let mut e = Extension::new(EXT_ID.clone(), semver::Version::new(0, 1, 0));
+            let mut e = Extension::new_test(EXT_ID.clone());
             DummyEnum::Dumb.add_to_extension(&mut e).unwrap();
             e
         };

@@ -580,6 +580,14 @@ pub mod test {
     pub use super::op_def::test::SimpleOpDef;
 
     use super::*;
+
+    impl Extension {
+        /// Create a new extension for testing, with a 0 version.
+        pub(crate) fn new_test(name: ExtensionId) -> Self {
+            Self::new(name, Version::new(0, 0, 0))
+        }
+    }
+
     #[test]
     fn test_register_update() {
         let mut reg = ExtensionRegistry::try_new([]).unwrap();

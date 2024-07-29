@@ -151,7 +151,7 @@ impl ExtensionDeclaration {
         imports: &ExtensionSet,
         ctx: DeclarationContext<'_>,
     ) -> Result<Extension, ExtensionDeclarationError> {
-        let mut ext = Extension::new(self.name.clone(), semver::Version::new(0, 0, 0))
+        let mut ext = Extension::new(self.name.clone(), crate::extension::Version::new(0, 0, 0))
             .with_reqs(imports.clone());
 
         for t in &self.types {

@@ -129,7 +129,7 @@ pub(crate) mod test_quantum_extension {
     /// The extension identifier.
     pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("test.quantum");
     fn extension() -> Extension {
-        let mut extension = Extension::new(EXTENSION_ID, semver::Version::parse("0.1.0").unwrap());
+        let mut extension = Extension::new_test(EXTENSION_ID);
 
         extension
             .add_op(OpName::new_inline("H"), "Hadamard".into(), one_qb_func())
