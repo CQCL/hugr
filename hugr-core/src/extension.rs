@@ -330,10 +330,10 @@ impl Extension {
         }
     }
 
-    /// Creates a new extension with the given name and requirements.
+    /// Extend the requirements of this extension with another set of extensions.
     pub fn with_reqs(self, extension_reqs: impl Into<ExtensionSet>) -> Self {
         Self {
-            extension_reqs: extension_reqs.into(),
+            extension_reqs: self.extension_reqs.union(extension_reqs.into()),
             ..self
         }
     }
