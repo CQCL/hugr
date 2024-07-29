@@ -165,7 +165,11 @@ mod serialize_signature_func {
     use super::{PolyFuncTypeRV, SignatureFunc};
     #[derive(serde::Deserialize, serde::Serialize)]
     struct SerSignatureFunc {
+        /// If the type scheme is available explicitly, store it.
         signature: Option<PolyFuncTypeRV>,
+        /// Whether an associated binary function is expected.
+        /// If `signature` is `None`, a true value here indicates a custom compute function.
+        /// If `signature` is not `None`, a true value here indicates a custom validation function.
         binary: bool,
     }
 
@@ -198,6 +202,8 @@ mod serialize_signature_func {
         D: serde::Deserializer<'de>,
     {
         let SerSignatureFunc { signature, .. } = SerSignatureFunc::deserialize(deserializer)?;
+
+        // TODO for now, an indication of expected custom validation function is ignored.
         Ok(if let Some(sig) = signature {
             sig.into()
         } else {
