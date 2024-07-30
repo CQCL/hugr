@@ -40,7 +40,8 @@ impl ExtArgs {
 
             serde_json::to_writer_pretty(&mut file, &ext).unwrap();
 
-            // write newline, for pre-commit checks.
+            // write newline, for pre-commit end of file check that edits the file to
+            // add newlines if missing.
             file.write_all(b"\n").unwrap();
         }
     }
