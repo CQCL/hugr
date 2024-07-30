@@ -5,6 +5,7 @@ use thiserror::Error;
 /// We reexport some clap types that are used in the public API.
 pub use {clap::Parser, clap_verbosity_flag::Level};
 
+pub mod extensions;
 pub mod validate;
 
 /// CLI arguments.
@@ -16,6 +17,8 @@ pub mod validate;
 pub enum CliArgs {
     /// Validate and visualize a HUGR file.
     Validate(validate::CliArgs),
+    /// Write standard extensions out in serialized form.
+    GenExtensions(extensions::ExtArgs),
     /// External commands
     #[command(external_subcommand)]
     External(Vec<OsString>),
