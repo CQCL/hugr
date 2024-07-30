@@ -147,7 +147,7 @@ jobs:
 
   tests-nightly-coverage:
     needs: changes
-    # Run only if there are changes in the relevant files and the check job passed or was skipped
+    # Run only if there are changes in the relevant files
     if: ${{ needs.changes.outputs.rust == 'true' && github.event_name != 'merge_group' }}
     runs-on: ubuntu-latest
     name: tests (Rust nightly, coverage)
