@@ -95,7 +95,7 @@ jobs:
   test:
     needs: [changes, build_binary]
     if: ${{ needs.changes.outputs.python == 'true' }}
-    name: check python ${{ matrix.python-version }}
+    name: test python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
 
     strategy:
