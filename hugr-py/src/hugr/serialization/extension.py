@@ -76,7 +76,3 @@ class Extension(ConfiguredBaseModel):
     @classmethod
     def get_version(cls) -> str:
         return get_serialisation_version()
-
-    @classmethod
-    def _pydantic_rebuild(cls, config: pd.ConfigDict | None = None, **kwargs):
-        pass
