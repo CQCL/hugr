@@ -115,13 +115,12 @@ pub trait CustomLowerFunc: Send + Sync {
     ) -> Option<Hugr>;
 }
 
-/// Encode a signature as `PolyFuncTypeRV` but optionally allow validating type
+/// Encode a signature as `PolyFuncTypeRV` but allow validating type
 /// arguments via a custom binary. The binary cannot be serialized so will be
 /// lost over a serialization round-trip.
 pub struct CustomValidator {
     poly_func: PolyFuncTypeRV,
-    //Optional custom function for validating type arguments before returning the signature.
-    //If None, no custom validation is performed.
+    /// Custom function for validating type arguments before returning the signature.
     pub(crate) validate: Box<dyn ValidateTypeArgs>,
 }
 
