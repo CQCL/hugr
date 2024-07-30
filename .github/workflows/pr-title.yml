@@ -14,6 +14,8 @@ on:
 
 jobs:
     check-title:
+        name: Validate Conventional Commit PR title
+        if: github.event_name == 'pull_request_target'
         uses: CQCL/hugrverse-actions/.github/workflows/pr-title.yml@main
         secrets:
             GITHUB_PAT: ${{ secrets.HUGRBOT_PAT }}
