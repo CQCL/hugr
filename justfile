@@ -56,6 +56,10 @@ update-schema:
     poetry run python scripts/generate_schema.py specification/schema/
 
 
+
+build-py-docs:
+    cd hugr-py/docs && ./build.sh
+
 # Runs a rust and a python command, depending on the `language` variable.
 #
 # If `language` is set to `rust` or `python`, only run the command for that language.
