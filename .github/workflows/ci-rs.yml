@@ -163,9 +163,10 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: hugr_binary
+          path: ${{ github.workspace }}/target/debug
       - name: Generate the updated definitions
         run: |
-          ./hugr gen-extensions -o specification/std_extensions
+          ./target/debug/hugr gen-extensions -o specification/std_extensions
       - name: Check if the declarations are up to date
         run: |
           git diff --exit-code --name-only specification/std_extensions/
