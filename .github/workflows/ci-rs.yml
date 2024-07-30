@@ -114,6 +114,13 @@ jobs:
         run: cargo test --verbose --workspace --all-features --no-run
       - name: Tests with all features
         run: cargo test --verbose --workspace --all-features
+      - name: Build HUGR binary
+        run: cargo build -p hugr-cli
+      - name: Upload the binary to the artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: hugr_binary
+          path: target/debug/hugr
 
   # Run tests on other toolchains
   tests-other:
@@ -144,6 +151,31 @@ jobs:
         run: cargo test --verbose --workspace --all-features --no-run
       - name: Tests with all features
         run: cargo test --verbose --workspace --all-features
+
+  # Ensure that serialized extensions match rust implementation
+  std-extensions:
+    needs: [tests-stable-all-features]
+    name: Check standard extensions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.05
+      - name: Download the hugr binary
+        uses: actions/download-artifact@v4
+        with:
+          name: hugr_binary
+      - name: Generate the updated definitions
+        run: |
+          ./hugr gen-extensions -o specification/std_extensions
+      - name: Check if the declarations are up to date
+        run: |
+          git diff --exit-code --name-only specification/std_extensions/
+          if [ $? -ne 0 ]; then
+            echo "The serialized standard extensions are not up to date"
+            echo "Please run 'just gen-extensions' and commit the changes"
+            exit 1
+          fi
 
   tests-nightly-coverage:
     needs: changes
