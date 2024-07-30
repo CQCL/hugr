@@ -24,7 +24,7 @@ from hugr.serialization.testing_hugr import TestingHugr
 def write_schema(
     out_dir: Path,
     name_prefix: str,
-    schema: type[SerialHugr] | type[TestingHugr] | type[Extension],
+    schema: type[SerialHugr] | type[TestingHugr],
     config: ConfigDict | None = None,
     **kwargs,
 ):
@@ -32,9 +32,8 @@ def write_schema(
     filename = f"{name_prefix}_{version}.json"
     path = out_dir / filename
     print(f"Rebuilding model with config: {config}")
+    schema._pydantic_rebuild(config or ConfigDict(), force=True, **kwargs)
     schemas = [schema, Extension]
-    for s in schemas:
-        s._pydantic_rebuild(config or ConfigDict(), force=True, **kwargs)
     print(f"Writing schema to {path}")
     _, top_level_schema = models_json_schema(
         [(s, "validation") for s in schemas], title="HUGR schema"
