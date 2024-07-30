@@ -48,16 +48,6 @@ where
         )),
     }
 }
-#[derive(serde::Deserialize, serde::Serialize, Debug)]
-/// Wrapper we can derive serde for, to allow round-trip serialization
-struct Wrapper {
-    #[serde(
-        serialize_with = "serialize",
-        deserialize_with = "deserialize",
-        flatten
-    )]
-    inner: SignatureFunc,
-}
 
 #[cfg(test)]
 mod test {
@@ -69,6 +59,17 @@ mod test {
         extension::{op_def::NoValidate, prelude::USIZE_T, CustomSignatureFunc, CustomValidator},
         types::{FuncValueType, Signature, TypeArg},
     };
+
+    #[derive(serde::Deserialize, serde::Serialize, Debug)]
+    /// Wrapper we can derive serde for, to allow round-trip serialization
+    struct Wrapper {
+        #[serde(
+            serialize_with = "serialize",
+            deserialize_with = "deserialize",
+            flatten
+        )]
+        inner: SignatureFunc,
+    }
     // Define test-only conversions via serialization roundtrip
     impl TryFrom<SerSignatureFunc> for SignatureFunc {
         type Error = serde_json::Error;

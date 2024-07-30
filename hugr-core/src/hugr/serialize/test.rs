@@ -525,7 +525,8 @@ fn std_extensions_valid() {
         let val = serde_json::to_value(ext).unwrap();
         NamedSchema::check_schemas(&val, get_schemas(true));
         // check deserialises correctly, can't check equality because of custom binaries.
-        let _: crate::extension::Extension = serde_json::from_value(val).unwrap();
+        let deser: crate::extension::Extension = serde_json::from_value(val.clone()).unwrap();
+        assert_eq!(serde_json::to_value(deser).unwrap(), val);
     }
 }
 
