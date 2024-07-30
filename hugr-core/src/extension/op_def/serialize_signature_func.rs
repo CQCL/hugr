@@ -56,7 +56,10 @@ mod test {
 
     use super::*;
     use crate::{
-        extension::{op_def::NoValidate, prelude::USIZE_T, CustomSignatureFunc, CustomValidator},
+        extension::{
+            prelude::USIZE_T, CustomSignatureFunc, CustomValidator, ExtensionRegistry, OpDef,
+            SignatureError, ValidateTypeArgs,
+        },
         types::{FuncValueType, Signature, TypeArg},
     };
 
@@ -102,6 +105,19 @@ mod test {
             &[]
         }
     }
+
+    struct NoValidate;
+    impl ValidateTypeArgs for NoValidate {
+        fn validate<'o, 'a: 'o>(
+            &self,
+            _arg_values: &[TypeArg],
+            _def: &'o OpDef,
+            _extension_registry: &ExtensionRegistry,
+        ) -> Result<(), SignatureError> {
+            Ok(())
+        }
+    }
+
     #[test]
     fn test_serial_sig_func() {
         // test round-trip

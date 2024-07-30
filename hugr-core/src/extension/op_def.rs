@@ -153,25 +153,6 @@ pub enum SignatureFunc {
     MissingComputeFunc,
 }
 
-#[derive(PartialEq, Eq, Debug)]
-struct NoValidate;
-impl ValidateTypeArgs for NoValidate {
-    fn validate<'o, 'a: 'o>(
-        &self,
-        _arg_values: &[TypeArg],
-        _def: &'o OpDef,
-        _extension_registry: &ExtensionRegistry,
-    ) -> Result<(), SignatureError> {
-        Ok(())
-    }
-}
-
-impl Default for Box<dyn ValidateTypeArgs> {
-    fn default() -> Self {
-        Box::new(NoValidate)
-    }
-}
-
 impl<T: CustomSignatureFunc + 'static> From<T> for SignatureFunc {
     fn from(v: T) -> Self {
         Self::CustomFunc(Box::new(v))
