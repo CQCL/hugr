@@ -166,6 +166,7 @@ jobs:
           path: ${{ github.workspace }}/target/debug
       - name: Generate the updated definitions
         run: |
+          chmod +x target/debug/hugr
           ./target/debug/hugr gen-extensions -o specification/std_extensions
       - name: Check if the declarations are up to date
         run: |
