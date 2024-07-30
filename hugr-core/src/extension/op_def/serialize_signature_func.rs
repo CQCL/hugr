@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use super::{PolyFuncTypeRV, SignatureFunc};
+use super::{CustomValidator, PolyFuncTypeRV, SignatureFunc};
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 struct SerSignatureFunc {
     /// If the type scheme is available explicitly, store it.
@@ -16,11 +16,12 @@ where
     S: serde::Serializer,
 {
     match value {
-        SignatureFunc::PolyFuncType(custom) => SerSignatureFunc {
-            signature: Some(custom.poly_func.clone()),
-            binary: custom.validate.is_some(),
+        SignatureFunc::PolyFuncType(poly) => SerSignatureFunc {
+            signature: Some(poly.clone()),
+            binary: false,
         },
-        SignatureFunc::MissingValidateFunc(poly_func) => SerSignatureFunc {
+        SignatureFunc::CustomValidator(CustomValidator { poly_func, .. })
+        | SignatureFunc::MissingValidateFunc(poly_func) => SerSignatureFunc {
             signature: Some(poly_func.clone()),
             binary: true,
         },
@@ -114,16 +115,11 @@ mod test {
         assert_eq!(ser, expected_ser);
         let deser = SignatureFunc::try_from(ser).unwrap();
         assert_matches!( deser,
-        SignatureFunc::PolyFuncType(CustomValidator {
-            poly_func,
-            validate,
-        }) => {
+        SignatureFunc::PolyFuncType(poly_func) => {
             assert_eq!(poly_func, sig.clone().into());
-            assert!(validate.is_none());
         });
 
-        let with_custom: SignatureFunc =
-            CustomValidator::new_with_validator(sig.clone(), NoValidate).into();
+        let with_custom: SignatureFunc = CustomValidator::new(sig.clone(), NoValidate).into();
         let ser: SerSignatureFunc = with_custom.into();
         let expected_ser = SerSignatureFunc {
             signature: Some(sig.clone().into()),
@@ -144,10 +140,7 @@ mod test {
         );
 
         deser.ignore_missing_validation();
-        assert_matches!(
-            &deser,
-            &SignatureFunc::PolyFuncType(CustomValidator { validate: None, .. })
-        );
+        assert_matches!(&deser, &SignatureFunc::PolyFuncType(_));
 
         let custom: SignatureFunc = CustomSig.into();
         let ser: SerSignatureFunc = custom.into();

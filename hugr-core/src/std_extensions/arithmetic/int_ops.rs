@@ -114,12 +114,12 @@ impl MakeOpDef for IntOpDef {
     fn signature(&self) -> SignatureFunc {
         use IntOpDef::*;
         match self {
-            iwiden_s | iwiden_u => CustomValidator::new_with_validator(
+            iwiden_s | iwiden_u => CustomValidator::new(
                 int_polytype(2, vec![int_tv(0)], vec![int_tv(1)]),
                 IOValidator { f_ge_s: false },
             )
             .into(),
-            inarrow_s | inarrow_u => CustomValidator::new_with_validator(
+            inarrow_s | inarrow_u => CustomValidator::new(
                 int_polytype(2, int_tv(0), sum_ty_with_err(int_tv(1))),
                 IOValidator { f_ge_s: true },
             )
