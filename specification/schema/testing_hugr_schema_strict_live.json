@@ -560,39 +560,76 @@
             "title": "ExitBlock",
             "type": "object"
         },
-        "ExtensionValue": {
-            "additionalProperties": false,
-            "description": "An extension constant value, that can check it is of a given [CustomType].",
+        "ExplicitBound": {
             "properties": {
-                "v": {
-                    "const": "Extension",
-                    "default": "Extension",
+                "b": {
+                    "const": "Explicit",
+                    "default": "Explicit",
                     "enum": [
-                        "Extension"
+                        "Explicit"
                     ],
-                    "title": "ValueTag",
+                    "title": "B",
                     "type": "string"
                 },
-                "extensions": {
-                    "items": {
-                        "type": "string"
-                    },
-                    "title": "Extensions",
-                    "type": "array"
-                },
-                "typ": {
-                    "$ref": "#/$defs/Type"
-                },
-                "value": {
-                    "$ref": "#/$defs/CustomConst"
+                "bound": {
+                    "$ref": "#/$defs/TypeBound"
                 }
             },
             "required": [
-                "extensions",
-                "typ",
-                "value"
+                "bound"
             ],
-            "title": "ExtensionValue",
+            "title": "ExplicitBound",
+            "type": "object"
+        },
+        "Extension": {
+            "properties": {
+                "version": {
+                    "title": "Version",
+                    "type": "string"
+                },
+                "name": {
+                    "title": "Name",
+                    "type": "string"
+                },
+                "extension_reqs": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "title": "Extension Reqs",
+                    "type": "array",
+                    "uniqueItems": true
+                },
+                "types": {
+                    "additionalProperties": {
+                        "$ref": "#/$defs/TypeDef"
+                    },
+                    "title": "Types",
+                    "type": "object"
+                },
+                "values": {
+                    "additionalProperties": {
+                        "$ref": "#/$defs/hugr__serialization__extension__ExtensionValue"
+                    },
+                    "title": "Values",
+                    "type": "object"
+                },
+                "operations": {
+                    "additionalProperties": {
+                        "$ref": "#/$defs/OpDef"
+                    },
+                    "title": "Operations",
+                    "type": "object"
+                }
+            },
+            "required": [
+                "version",
+                "name",
+                "extension_reqs",
+                "types",
+                "values",
+                "operations"
+            ],
+            "title": "Extension",
             "type": "object"
         },
         "ExtensionsArg": {
@@ -638,7 +675,6 @@
             "type": "object"
         },
         "FixedHugr": {
-            "additionalProperties": false,
             "properties": {
                 "extensions": {
                     "items": {
@@ -656,6 +692,31 @@
                 "hugr"
             ],
             "title": "FixedHugr",
+            "type": "object"
+        },
+        "FromParamsBound": {
+            "properties": {
+                "b": {
+                    "const": "FromParams",
+                    "default": "FromParams",
+                    "enum": [
+                        "FromParams"
+                    ],
+                    "title": "B",
+                    "type": "string"
+                },
+                "indices": {
+                    "items": {
+                        "type": "integer"
+                    },
+                    "title": "Indices",
+                    "type": "array"
+                }
+            },
+            "required": [
+                "indices"
+            ],
+            "title": "FromParamsBound",
             "type": "object"
         },
         "FuncDecl": {
@@ -1070,7 +1131,6 @@
             "type": "object"
         },
         "OpDef": {
-            "additionalProperties": false,
             "description": "Serializable definition for dynamically loaded operations.",
             "properties": {
                 "extension": {
@@ -1593,6 +1653,85 @@
             "title": "TailLoop",
             "type": "object"
         },
+        "TestingHugr": {
+            "additionalProperties": false,
+            "description": "A serializable representation of a Hugr Type, SumType, PolyFuncType,\nValue, OpType. Intended for testing only.",
+            "properties": {
+                "version": {
+                    "description": "Serialisation Schema Version",
+                    "title": "Version",
+                    "type": "string"
+                },
+                "typ": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/Type"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "default": null
+                },
+                "sum_type": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/SumType"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "default": null
+                },
+                "poly_func_type": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/PolyFuncType"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "default": null
+                },
+                "value": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/Value"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "default": null
+                },
+                "optype": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/OpType"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "default": null
+                },
+                "op_def": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/OpDef"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "default": null
+                }
+            },
+            "title": "TestingHugr",
+            "type": "object"
+        },
         "TupleParam": {
             "additionalProperties": false,
             "properties": {
@@ -1741,6 +1880,59 @@
             ],
             "title": "TypeBound",
             "type": "string"
+        },
+        "TypeDef": {
+            "properties": {
+                "extension": {
+                    "title": "Extension",
+                    "type": "string"
+                },
+                "name": {
+                    "title": "Name",
+                    "type": "string"
+                },
+                "description": {
+                    "title": "Description",
+                    "type": "string"
+                },
+                "params": {
+                    "items": {
+                        "$ref": "#/$defs/TypeParam"
+                    },
+                    "title": "Params",
+                    "type": "array"
+                },
+                "bound": {
+                    "$ref": "#/$defs/TypeDefBound"
+                }
+            },
+            "required": [
+                "extension",
+                "name",
+                "description",
+                "params",
+                "bound"
+            ],
+            "title": "TypeDef",
+            "type": "object"
+        },
+        "TypeDefBound": {
+            "discriminator": {
+                "mapping": {
+                    "Explicit": "#/$defs/ExplicitBound",
+                    "FromParams": "#/$defs/FromParamsBound"
+                },
+                "propertyName": "b"
+            },
+            "oneOf": [
+                {
+                    "$ref": "#/$defs/ExplicitBound"
+                },
+                {
+                    "$ref": "#/$defs/FromParamsBound"
+                }
+            ],
+            "title": "TypeDefBound"
         },
         "TypeParam": {
             "description": "A type parameter.",
@@ -1909,7 +2101,7 @@
             "description": "A constant Value.",
             "discriminator": {
                 "mapping": {
-                    "Extension": "#/$defs/ExtensionValue",
+                    "Extension": "#/$defs/hugr__serialization__ops__ExtensionValue",
                     "Function": "#/$defs/FunctionValue",
                     "Sum": "#/$defs/SumValue",
                     "Tuple": "#/$defs/TupleValue"
@@ -1918,7 +2110,7 @@
             },
             "oneOf": [
                 {
-                    "$ref": "#/$defs/ExtensionValue"
+                    "$ref": "#/$defs/hugr__serialization__ops__ExtensionValue"
                 },
                 {
                     "$ref": "#/$defs/FunctionValue"
@@ -1989,83 +2181,64 @@
             ],
             "title": "VariableArg",
             "type": "object"
-        }
-    },
-    "additionalProperties": false,
-    "description": "A serializable representation of a Hugr Type, SumType, PolyFuncType,\nValue, OpType. Intended for testing only.",
-    "properties": {
-        "version": {
-            "description": "Serialisation Schema Version",
-            "title": "Version",
-            "type": "string"
         },
-        "typ": {
-            "anyOf": [
-                {
+        "hugr__serialization__extension__ExtensionValue": {
+            "properties": {
+                "extension": {
+                    "title": "Extension",
+                    "type": "string"
+                },
+                "name": {
+                    "title": "Name",
+                    "type": "string"
+                },
+                "typed_value": {
+                    "$ref": "#/$defs/Value"
+                }
+            },
+            "required": [
+                "extension",
+                "name",
+                "typed_value"
+            ],
+            "title": "ExtensionValue",
+            "type": "object"
+        },
+        "hugr__serialization__ops__ExtensionValue": {
+            "additionalProperties": false,
+            "description": "An extension constant value, that can check it is of a given [CustomType].",
+            "properties": {
+                "v": {
+                    "const": "Extension",
+                    "default": "Extension",
+                    "enum": [
+                        "Extension"
+                    ],
+                    "title": "ValueTag",
+                    "type": "string"
+                },
+                "extensions": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "title": "Extensions",
+                    "type": "array"
+                },
+                "typ": {
                     "$ref": "#/$defs/Type"
                 },
-                {
-                    "type": "null"
+                "value": {
+                    "$ref": "#/$defs/CustomConst"
                 }
+            },
+            "required": [
+                "extensions",
+                "typ",
+                "value"
             ],
-            "default": null
-        },
-        "sum_type": {
-            "anyOf": [
-                {
-                    "$ref": "#/$defs/SumType"
-                },
-                {
-                    "type": "null"
-                }
-            ],
-            "default": null
-        },
-        "poly_func_type": {
-            "anyOf": [
-                {
-                    "$ref": "#/$defs/PolyFuncType"
-                },
-                {
-                    "type": "null"
-                }
-            ],
-            "default": null
-        },
-        "value": {
-            "anyOf": [
-                {
-                    "$ref": "#/$defs/Value"
-                },
-                {
-                    "type": "null"
-                }
-            ],
-            "default": null
-        },
-        "optype": {
-            "anyOf": [
-                {
-                    "$ref": "#/$defs/OpType"
-                },
-                {
-                    "type": "null"
-                }
-            ],
-            "default": null
-        },
-        "op_def": {
-            "anyOf": [
-                {
-                    "$ref": "#/$defs/OpDef"
-                },
-                {
-                    "type": "null"
-                }
-            ],
-            "default": null
+            "title": "ExtensionValue",
+            "type": "object"
         }
     },
-    "title": "TestingHugr",
-    "type": "object"
+    "title": "HUGR schema"
 }

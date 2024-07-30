@@ -517,6 +517,19 @@ fn roundtrip_optype(#[case] optype: impl Into<OpType> + std::fmt::Debug) {
     });
 }
 
+#[test]
+// test all standard extension serialisations are valid against scheme
+fn std_extensions_valid() {
+    let std_reg = crate::std_extensions::std_reg();
+    for (_, ext) in std_reg.into_iter() {
+        let val = serde_json::to_value(ext).unwrap();
+        NamedSchema::check_schemas(&val, get_schemas(true));
+        // check deserialises correctly, can't check equality because of custom binaries.
+        let deser: crate::extension::Extension = serde_json::from_value(val.clone()).unwrap();
+        assert_eq!(serde_json::to_value(deser).unwrap(), val);
+    }
+}
+
 mod proptest {
     use super::check_testing_roundtrip;
     use super::{NodeSer, SimpleOpDef};

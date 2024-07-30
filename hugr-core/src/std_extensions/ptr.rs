@@ -91,11 +91,10 @@ fn extension() -> Extension {
             PTR_TYPE_ID,
             TYPE_PARAMS.into(),
             "Standard extension pointer type.".into(),
-            TypeDefBound::Explicit(TypeBound::Copyable),
+            TypeDefBound::copyable(),
         )
         .unwrap();
     PtrOpDef::load_all_ops(&mut extension).unwrap();
-
     extension
 }
 

@@ -370,7 +370,7 @@ fn invalid_types() {
         "MyContainer".into(),
         vec![TypeBound::Copyable.into()],
         "".into(),
-        TypeDefBound::Explicit(TypeBound::Any),
+        TypeDefBound::any(),
     )
     .unwrap();
     let reg = ExtensionRegistry::try_new([e, PRELUDE.to_owned()]).unwrap();

@@ -26,6 +26,8 @@ repository = "https://github.com/CQCL/hugr"
 [tool.poetry.dependencies]
 python = ">=3.10"
 pydantic = ">=2.7,<2.9"
+pydantic-extra-types = "^2.9.0"
+semver = "^3.0.2"
 
 [tool.poetry.group.docs]
 optional = true

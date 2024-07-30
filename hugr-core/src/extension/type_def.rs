@@ -13,16 +13,39 @@ use crate::types::TypeBound;
 
 /// The type bound of a [`TypeDef`]
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "b")]
+#[allow(missing_docs)]
 pub enum TypeDefBound {
     /// Defined by an explicit bound.
-    Explicit(TypeBound),
+    Explicit { bound: TypeBound },
     /// Derived as the least upper bound of the marked parameters.
-    FromParams(Vec<usize>),
+    FromParams { indices: Vec<usize> },
 }
 
 impl From<TypeBound> for TypeDefBound {
     fn from(bound: TypeBound) -> Self {
-        Self::Explicit(bound)
+        Self::Explicit { bound }
+    }
+}
+
+impl TypeDefBound {
+    /// Create a new [`TypeDefBound::Explicit`] with the `Any` bound.
+    pub fn any() -> Self {
+        TypeDefBound::Explicit {
+            bound: TypeBound::Any,
+        }
+    }
+
+    /// Create a new [`TypeDefBound::Explicit`] with the `Copyable` bound.
+    pub fn copyable() -> Self {
+        TypeDefBound::Explicit {
+            bound: TypeBound::Copyable,
+        }
+    }
+
+    /// Create a new [`TypeDefBound::FromParams`] with the given indices.
+    pub fn from_params(indices: Vec<usize>) -> Self {
+        TypeDefBound::FromParams { indices }
     }
 }
 
@@ -105,8 +128,8 @@ impl TypeDef {
     /// The [`TypeBound`] of the definition.
     pub fn bound(&self, args: &[TypeArg]) -> TypeBound {
         match &self.bound {
-            TypeDefBound::Explicit(bound) => *bound,
-            TypeDefBound::FromParams(indices) => {
+            TypeDefBound::Explicit { bound } => *bound,
+            TypeDefBound::FromParams { indices } => {
                 let args: Vec<_> = args.iter().collect();
                 if indices.is_empty() {
                     // Assume most general case
@@ -180,7 +203,7 @@ mod test {
             }],
             extension: "MyRsrc".try_into().unwrap(),
             description: "Some parametrised type".into(),
-            bound: TypeDefBound::FromParams(vec![0]),
+            bound: TypeDefBound::FromParams { indices: vec![0] },
         };
         let typ = Type::new_extension(
             def.instantiate(vec![TypeArg::Type {
