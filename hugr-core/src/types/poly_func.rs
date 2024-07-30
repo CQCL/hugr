@@ -318,9 +318,7 @@ pub(crate) mod test {
             TYPE_NAME,
             vec![bound.clone()],
             "".into(),
-            TypeDefBound::Explicit {
-                bound: TypeBound::Any,
-            },
+            TypeDefBound::any(),
         )
         .unwrap();
 

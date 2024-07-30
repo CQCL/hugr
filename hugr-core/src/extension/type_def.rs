@@ -28,6 +28,27 @@ impl From<TypeBound> for TypeDefBound {
     }
 }
 
+impl TypeDefBound {
+    /// Create a new [`TypeDefBound::Explicit`] with the `Any` bound.
+    pub fn any() -> Self {
+        TypeDefBound::Explicit {
+            bound: TypeBound::Any,
+        }
+    }
+
+    /// Create a new [`TypeDefBound::Explicit`] with the `Copyable` bound.
+    pub fn copyable() -> Self {
+        TypeDefBound::Explicit {
+            bound: TypeBound::Copyable,
+        }
+    }
+
+    /// Create a new [`TypeDefBound::FromParams`] with the given indices.
+    pub fn from_params(indices: Vec<usize>) -> Self {
+        TypeDefBound::FromParams { indices }
+    }
+}
+
 /// A declaration of an opaque type.
 /// Note this does not provide any way to create instances
 /// - typically these are operations also provided by the Extension.

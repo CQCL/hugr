@@ -95,14 +95,14 @@ lazy_static! {
                 TypeName::new_inline("usize"),
                 vec![],
                 "usize".into(),
-                TypeDefBound::Explicit { bound: crate::types::TypeBound::Copyable },
+                TypeDefBound::copyable(),
             )
             .unwrap();
         prelude.add_type(
                 STRING_TYPE_NAME,
                 vec![],
                 "string".into(),
-                TypeDefBound::Explicit { bound: crate::types::TypeBound::Copyable },
+                TypeDefBound::copyable(),
             )
             .unwrap();
         prelude.add_op(
@@ -115,7 +115,7 @@ lazy_static! {
                 TypeName::new_inline("array"),
                 vec![ TypeParam::max_nat(), TypeBound::Any.into()],
                 "array".into(),
-                TypeDefBound::FromParams { indices: vec![1] },
+                TypeDefBound::from_params(vec![1] ),
             )
             .unwrap();
         prelude
@@ -131,7 +131,7 @@ lazy_static! {
                 TypeName::new_inline("qubit"),
                 vec![],
                 "qubit".into(),
-                TypeDefBound::Explicit { bound: TypeBound::Any },
+                TypeDefBound::any(),
             )
             .unwrap();
         prelude
@@ -139,7 +139,7 @@ lazy_static! {
             ERROR_TYPE_NAME,
             vec![],
             "Simple opaque error type.".into(),
-            TypeDefBound::Explicit { bound: TypeBound::Copyable },
+            TypeDefBound::copyable(),
         )
         .unwrap();
         prelude
