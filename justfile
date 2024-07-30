@@ -55,6 +55,9 @@ update-schema:
     poetry update
     poetry run python scripts/generate_schema.py specification/schema/
 
+# Generate serialized declarations for the standard extensions and prelude.
+gen-extensions:
+    cargo run -p hugr-cli gen-extensions -o specification/std_extensions
 
 
 build-py-docs:

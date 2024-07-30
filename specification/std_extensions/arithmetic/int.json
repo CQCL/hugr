@@ -1,0 +1,3206 @@
+{
+  "version": "0.1.0",
+  "name": "arithmetic.int",
+  "extension_reqs": [
+    "arithmetic.int.types"
+  ],
+  "types": {},
+  "values": {},
+  "operations": {
+    "iabs": {
+      "extension": "arithmetic.int",
+      "name": "iabs",
+      "description": "convert signed to unsigned by taking absolute value",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "iadd": {
+      "extension": "arithmetic.int",
+      "name": "iadd",
+      "description": "addition modulo 2^N (signed and unsigned versions are the same op)",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "iand": {
+      "extension": "arithmetic.int",
+      "name": "iand",
+      "description": "bitwise AND",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "idiv_checked_s": {
+      "extension": "arithmetic.int",
+      "name": "idiv_checked_s",
+      "description": "as idivmod_checked_s but discarding the second output",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          },
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 1,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "General",
+              "rows": [
+                [
+                  {
+                    "t": "Opaque",
+                    "extension": "arithmetic.int.types",
+                    "id": "int",
+                    "args": [
+                      {
+                        "tya": "Variable",
+                        "idx": 0,
+                        "cached_decl": {
+                          "tp": "BoundedNat",
+                          "bound": 7
+                        }
+                      }
+                    ],
+                    "bound": "C"
+                  }
+                ],
+                [
+                  {
+                    "t": "Opaque",
+                    "extension": "prelude",
+                    "id": "error",
+                    "args": [],
+                    "bound": "C"
+                  }
+                ]
+              ]
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "idiv_checked_u": {
+      "extension": "arithmetic.int",
+      "name": "idiv_checked_u",
+      "description": "as idivmod_checked_u but discarding the second output",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          },
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 1,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "General",
+              "rows": [
+                [
+                  {
+                    "t": "Opaque",
+                    "extension": "arithmetic.int.types",
+                    "id": "int",
+                    "args": [
+                      {
+                        "tya": "Variable",
+                        "idx": 0,
+                        "cached_decl": {
+                          "tp": "BoundedNat",
+                          "bound": 7
+                        }
+                      }
+                    ],
+                    "bound": "C"
+                  }
+                ],
+                [
+                  {
+                    "t": "Opaque",
+                    "extension": "prelude",
+                    "id": "error",
+                    "args": [],
+                    "bound": "C"
+                  }
+                ]
+              ]
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "idiv_s": {
+      "extension": "arithmetic.int",
+      "name": "idiv_s",
+      "description": "as idivmod_s but discarding the second output",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          },
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 1,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "idiv_u": {
+      "extension": "arithmetic.int",
+      "name": "idiv_u",
+      "description": "as idivmod_u but discarding the second output",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          },
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 1,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "idivmod_checked_s": {
+      "extension": "arithmetic.int",
+      "name": "idivmod_checked_s",
+      "description": "given signed integer -2^{N-1} <= n < 2^{N-1} and unsigned 0 <= m < 2^M, generates signed q and unsigned r where q*m+r=n, 0<=r<m (m=0 is an error)",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          },
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 1,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "General",
+              "rows": [
+                [
+                  {
+                    "t": "Sum",
+                    "s": "General",
+                    "rows": [
+                      [
+                        {
+                          "t": "Opaque",
+                          "extension": "arithmetic.int.types",
+                          "id": "int",
+                          "args": [
+                            {
+                              "tya": "Variable",
+                              "idx": 0,
+                              "cached_decl": {
+                                "tp": "BoundedNat",
+                                "bound": 7
+                              }
+                            }
+                          ],
+                          "bound": "C"
+                        },
+                        {
+                          "t": "Opaque",
+                          "extension": "arithmetic.int.types",
+                          "id": "int",
+                          "args": [
+                            {
+                              "tya": "Variable",
+                              "idx": 1,
+                              "cached_decl": {
+                                "tp": "BoundedNat",
+                                "bound": 7
+                              }
+                            }
+                          ],
+                          "bound": "C"
+                        }
+                      ]
+                    ]
+                  }
+                ],
+                [
+                  {
+                    "t": "Opaque",
+                    "extension": "prelude",
+                    "id": "error",
+                    "args": [],
+                    "bound": "C"
+                  }
+                ]
+              ]
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "idivmod_checked_u": {
+      "extension": "arithmetic.int",
+      "name": "idivmod_checked_u",
+      "description": "given unsigned integers 0 <= n < 2^N, 0 <= m < 2^M, generates unsigned q, r where q*m+r=n, 0<=r<m (m=0 is an error)",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          },
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 1,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "General",
+              "rows": [
+                [
+                  {
+                    "t": "Sum",
+                    "s": "General",
+                    "rows": [
+                      [
+                        {
+                          "t": "Opaque",
+                          "extension": "arithmetic.int.types",
+                          "id": "int",
+                          "args": [
+                            {
+                              "tya": "Variable",
+                              "idx": 0,
+                              "cached_decl": {
+                                "tp": "BoundedNat",
+                                "bound": 7
+                              }
+                            }
+                          ],
+                          "bound": "C"
+                        },
+                        {
+                          "t": "Opaque",
+                          "extension": "arithmetic.int.types",
+                          "id": "int",
+                          "args": [
+                            {
+                              "tya": "Variable",
+                              "idx": 1,
+                              "cached_decl": {
+                                "tp": "BoundedNat",
+                                "bound": 7
+                              }
+                            }
+                          ],
+                          "bound": "C"
+                        }
+                      ]
+                    ]
+                  }
+                ],
+                [
+                  {
+                    "t": "Opaque",
+                    "extension": "prelude",
+                    "id": "error",
+                    "args": [],
+                    "bound": "C"
+                  }
+                ]
+              ]
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "idivmod_s": {
+      "extension": "arithmetic.int",
+      "name": "idivmod_s",
+      "description": "given signed integer -2^{N-1} <= n < 2^{N-1} and unsigned 0 <= m < 2^M, generates signed q and unsigned r where q*m+r=n, 0<=r<m (m=0 will call panic)",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          },
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 1,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 1,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "idivmod_u": {
+      "extension": "arithmetic.int",
+      "name": "idivmod_u",
+      "description": "given unsigned integers 0 <= n < 2^N, 0 <= m < 2^M, generates unsigned q, r where q*m+r=n, 0<=r<m (m=0 will call panic)",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          },
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 1,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 1,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "ieq": {
+      "extension": "arithmetic.int",
+      "name": "ieq",
+      "description": "equality test",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "Unit",
+              "size": 2
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "ifrombool": {
+      "extension": "arithmetic.int",
+      "name": "ifrombool",
+      "description": "convert from bool (1 is true, 0 is false)",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Sum",
+              "s": "Unit",
+              "size": 2
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "BoundedNat",
+                  "n": 0
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "ige_s": {
+      "extension": "arithmetic.int",
+      "name": "ige_s",
+      "description": "\"greater than or equal\" as signed integers",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "Unit",
+              "size": 2
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "ige_u": {
+      "extension": "arithmetic.int",
+      "name": "ige_u",
+      "description": "\"greater than or equal\" as unsigned integers",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "Unit",
+              "size": 2
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "igt_s": {
+      "extension": "arithmetic.int",
+      "name": "igt_s",
+      "description": "\"greater than\" as signed integers",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "Unit",
+              "size": 2
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "igt_u": {
+      "extension": "arithmetic.int",
+      "name": "igt_u",
+      "description": "\"greater than\" as unsigned integers",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "Unit",
+              "size": 2
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "ile_s": {
+      "extension": "arithmetic.int",
+      "name": "ile_s",
+      "description": "\"less than or equal\" as signed integers",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "Unit",
+              "size": 2
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "ile_u": {
+      "extension": "arithmetic.int",
+      "name": "ile_u",
+      "description": "\"less than or equal\" as unsigned integers",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "Unit",
+              "size": 2
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "ilt_s": {
+      "extension": "arithmetic.int",
+      "name": "ilt_s",
+      "description": "\"less than\" as signed integers",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "Unit",
+              "size": 2
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "ilt_u": {
+      "extension": "arithmetic.int",
+      "name": "ilt_u",
+      "description": "\"less than\" as unsigned integers",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "Unit",
+              "size": 2
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "imax_s": {
+      "extension": "arithmetic.int",
+      "name": "imax_s",
+      "description": "maximum of signed integers",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "imax_u": {
+      "extension": "arithmetic.int",
+      "name": "imax_u",
+      "description": "maximum of unsigned integers",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "imin_s": {
+      "extension": "arithmetic.int",
+      "name": "imin_s",
+      "description": "minimum of signed integers",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "imin_u": {
+      "extension": "arithmetic.int",
+      "name": "imin_u",
+      "description": "minimum of unsigned integers",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "imod_checked_s": {
+      "extension": "arithmetic.int",
+      "name": "imod_checked_s",
+      "description": "as idivmod_checked_s but discarding the first output",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          },
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 1,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "General",
+              "rows": [
+                [
+                  {
+                    "t": "Opaque",
+                    "extension": "arithmetic.int.types",
+                    "id": "int",
+                    "args": [
+                      {
+                        "tya": "Variable",
+                        "idx": 1,
+                        "cached_decl": {
+                          "tp": "BoundedNat",
+                          "bound": 7
+                        }
+                      }
+                    ],
+                    "bound": "C"
+                  }
+                ],
+                [
+                  {
+                    "t": "Opaque",
+                    "extension": "prelude",
+                    "id": "error",
+                    "args": [],
+                    "bound": "C"
+                  }
+                ]
+              ]
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "imod_checked_u": {
+      "extension": "arithmetic.int",
+      "name": "imod_checked_u",
+      "description": "as idivmod_checked_u but discarding the first output",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          },
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 1,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "General",
+              "rows": [
+                [
+                  {
+                    "t": "Opaque",
+                    "extension": "arithmetic.int.types",
+                    "id": "int",
+                    "args": [
+                      {
+                        "tya": "Variable",
+                        "idx": 1,
+                        "cached_decl": {
+                          "tp": "BoundedNat",
+                          "bound": 7
+                        }
+                      }
+                    ],
+                    "bound": "C"
+                  }
+                ],
+                [
+                  {
+                    "t": "Opaque",
+                    "extension": "prelude",
+                    "id": "error",
+                    "args": [],
+                    "bound": "C"
+                  }
+                ]
+              ]
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "imod_s": {
+      "extension": "arithmetic.int",
+      "name": "imod_s",
+      "description": "as idivmod_s but discarding the first output",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          },
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 1,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 1,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "imod_u": {
+      "extension": "arithmetic.int",
+      "name": "imod_u",
+      "description": "as idivmod_u but discarding the first output",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          },
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 1,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 1,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "imul": {
+      "extension": "arithmetic.int",
+      "name": "imul",
+      "description": "multiplication modulo 2^N (signed and unsigned versions are the same op)",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "inarrow_s": {
+      "extension": "arithmetic.int",
+      "name": "inarrow_s",
+      "description": "narrow a signed integer to a narrower one with the same value if possible",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          },
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "General",
+              "rows": [
+                [
+                  {
+                    "t": "Opaque",
+                    "extension": "arithmetic.int.types",
+                    "id": "int",
+                    "args": [
+                      {
+                        "tya": "Variable",
+                        "idx": 1,
+                        "cached_decl": {
+                          "tp": "BoundedNat",
+                          "bound": 7
+                        }
+                      }
+                    ],
+                    "bound": "C"
+                  }
+                ],
+                [
+                  {
+                    "t": "Opaque",
+                    "extension": "prelude",
+                    "id": "error",
+                    "args": [],
+                    "bound": "C"
+                  }
+                ]
+              ]
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": true
+    },
+    "inarrow_u": {
+      "extension": "arithmetic.int",
+      "name": "inarrow_u",
+      "description": "narrow an unsigned integer to a narrower one with the same value if possible",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          },
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "General",
+              "rows": [
+                [
+                  {
+                    "t": "Opaque",
+                    "extension": "arithmetic.int.types",
+                    "id": "int",
+                    "args": [
+                      {
+                        "tya": "Variable",
+                        "idx": 1,
+                        "cached_decl": {
+                          "tp": "BoundedNat",
+                          "bound": 7
+                        }
+                      }
+                    ],
+                    "bound": "C"
+                  }
+                ],
+                [
+                  {
+                    "t": "Opaque",
+                    "extension": "prelude",
+                    "id": "error",
+                    "args": [],
+                    "bound": "C"
+                  }
+                ]
+              ]
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": true
+    },
+    "ine": {
+      "extension": "arithmetic.int",
+      "name": "ine",
+      "description": "inequality test",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "Unit",
+              "size": 2
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "ineg": {
+      "extension": "arithmetic.int",
+      "name": "ineg",
+      "description": "negation modulo 2^N (signed and unsigned versions are the same op)",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "inot": {
+      "extension": "arithmetic.int",
+      "name": "inot",
+      "description": "bitwise NOT",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "ior": {
+      "extension": "arithmetic.int",
+      "name": "ior",
+      "description": "bitwise OR",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "irotl": {
+      "extension": "arithmetic.int",
+      "name": "irotl",
+      "description": "rotate first input left by k bits where k is unsigned interpretation of second input (leftmost bits replace rightmost bits)",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          },
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 1,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "irotr": {
+      "extension": "arithmetic.int",
+      "name": "irotr",
+      "description": "rotate first input right by k bits where k is unsigned interpretation of second input (rightmost bits replace leftmost bits)",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          },
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 1,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "ishl": {
+      "extension": "arithmetic.int",
+      "name": "ishl",
+      "description": "shift first input left by k bits where k is unsigned interpretation of second input (leftmost bits dropped, rightmost bits set to zero",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          },
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 1,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "ishr": {
+      "extension": "arithmetic.int",
+      "name": "ishr",
+      "description": "shift first input right by k bits where k is unsigned interpretation of second input (rightmost bits dropped, leftmost bits set to zero)",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          },
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 1,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "isub": {
+      "extension": "arithmetic.int",
+      "name": "isub",
+      "description": "subtraction modulo 2^N (signed and unsigned versions are the same op)",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "itobool": {
+      "extension": "arithmetic.int",
+      "name": "itobool",
+      "description": "convert to bool (1 is true, 0 is false)",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "BoundedNat",
+                  "n": 0
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "Unit",
+              "size": 2
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "itostring_s": {
+      "extension": "arithmetic.int",
+      "name": "itostring_s",
+      "description": "convert a signed integer to its string representation",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "prelude",
+              "id": "string",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "itostring_u": {
+      "extension": "arithmetic.int",
+      "name": "itostring_u",
+      "description": "convert an unsigned integer to its string representation",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "prelude",
+              "id": "string",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "iwiden_s": {
+      "extension": "arithmetic.int",
+      "name": "iwiden_s",
+      "description": "widen a signed integer to a wider one with the same value",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          },
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 1,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": true
+    },
+    "iwiden_u": {
+      "extension": "arithmetic.int",
+      "name": "iwiden_u",
+      "description": "widen an unsigned integer to a wider one with the same value",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          },
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 1,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": true
+    },
+    "ixor": {
+      "extension": "arithmetic.int",
+      "name": "ixor",
+      "description": "bitwise XOR",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    }
+  }
+}

@@ -1,4 +1,4 @@
-use std::collections::hash_map::Entry;
+use std::collections::btree_map::Entry;
 
 use super::{CustomConcrete, ExtensionBuildError};
 use super::{Extension, ExtensionId, SignatureError};

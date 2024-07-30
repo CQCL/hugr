@@ -1,0 +1,107 @@
+{
+  "version": "0.1.0",
+  "name": "prelude",
+  "extension_reqs": [],
+  "types": {
+    "array": {
+      "extension": "prelude",
+      "name": "array",
+      "params": [
+        {
+          "tp": "BoundedNat",
+          "bound": null
+        },
+        {
+          "tp": "Type",
+          "b": "A"
+        }
+      ],
+      "description": "array",
+      "bound": {
+        "b": "FromParams",
+        "indices": [
+          1
+        ]
+      }
+    },
+    "error": {
+      "extension": "prelude",
+      "name": "error",
+      "params": [],
+      "description": "Simple opaque error type.",
+      "bound": {
+        "b": "Explicit",
+        "bound": "C"
+      }
+    },
+    "qubit": {
+      "extension": "prelude",
+      "name": "qubit",
+      "params": [],
+      "description": "qubit",
+      "bound": {
+        "b": "Explicit",
+        "bound": "A"
+      }
+    },
+    "string": {
+      "extension": "prelude",
+      "name": "string",
+      "params": [],
+      "description": "string",
+      "bound": {
+        "b": "Explicit",
+        "bound": "C"
+      }
+    },
+    "usize": {
+      "extension": "prelude",
+      "name": "usize",
+      "params": [],
+      "description": "usize",
+      "bound": {
+        "b": "Explicit",
+        "bound": "C"
+      }
+    }
+  },
+  "values": {},
+  "operations": {
+    "new_array": {
+      "extension": "prelude",
+      "name": "new_array",
+      "description": "Create a new array from elements",
+      "signature": null,
+      "binary": true
+    },
+    "panic": {
+      "extension": "prelude",
+      "name": "panic",
+      "description": "Panic with input error",
+      "signature": null,
+      "binary": true
+    },
+    "print": {
+      "extension": "prelude",
+      "name": "print",
+      "description": "Print the string to standard output",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "prelude",
+              "id": "string",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "output": [],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    }
+  }
+}
