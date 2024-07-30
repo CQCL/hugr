@@ -115,7 +115,7 @@ pub trait CustomLowerFunc: Send + Sync {
     ) -> Option<Hugr>;
 }
 
-/// Encode a signature as `PolyFuncTypeRV` but allow validating type
+/// Encode a signature as [PolyFuncTypeRV] but with additional validation of type
 /// arguments via a custom binary. The binary cannot be serialized so will be
 /// lost over a serialization round-trip.
 pub struct CustomValidator {
@@ -142,7 +142,7 @@ impl CustomValidator {
 pub enum SignatureFunc {
     /// An explicit polymorphic function type.
     PolyFuncType(PolyFuncTypeRV),
-    /// A polymorphic function type with a custom binary for validating type arguments.
+    /// A polymorphic function type (like [Self::PolyFuncType] but also with a custom binary for validating type arguments.
     CustomValidator(CustomValidator),
     /// Serialized declaration specified a custom validate binary but it was not provided.
     MissingValidateFunc(PolyFuncTypeRV),
@@ -247,7 +247,7 @@ impl SignatureFunc {
         let temp: PolyFuncTypeRV; // to keep alive
         let (pf, args) = match &self {
             SignatureFunc::CustomValidator(custom) => {
-                custom.validate.as_ref().validate(args, def, exts)?;
+                custom.validate.validate(args, def, exts)?;
                 (&custom.poly_func, args)
             }
             SignatureFunc::PolyFuncType(ts) => (ts, args),
@@ -580,7 +580,6 @@ pub(super) mod test {
                 })
                 | SignatureFunc::PolyFuncType(poly_func)
                 | SignatureFunc::MissingValidateFunc(poly_func) => Some(poly_func.clone()),
-                // This is ruled out by `new()` but leave it here for later.
                 SignatureFunc::CustomFunc(_) | SignatureFunc::MissingComputeFunc => None,
             };
 
