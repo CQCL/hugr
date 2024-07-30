@@ -130,7 +130,7 @@ mod test {
             binary: true,
         };
         assert_eq!(ser, expected_ser);
-        let deser = SignatureFunc::try_from(ser.clone()).unwrap();
+        let mut deser = SignatureFunc::try_from(ser.clone()).unwrap();
         assert_matches!(&deser,
             SignatureFunc::MissingValidateFunc(poly_func) => {
                 assert_eq!(poly_func, &PolyFuncTypeRV::from(sig.clone()));
@@ -143,9 +143,9 @@ mod test {
             expected_ser
         );
 
-        let deser_ignored = deser.ignore_missing_validation();
+        deser.ignore_missing_validation();
         assert_matches!(
-            &deser_ignored,
+            &deser,
             &SignatureFunc::PolyFuncType(CustomValidator { validate: None, .. })
         );
 

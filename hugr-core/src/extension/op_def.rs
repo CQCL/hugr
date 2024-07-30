@@ -231,10 +231,9 @@ impl SignatureFunc {
 
     /// If the signature is missing a custom validation function, ignore and treat as
     /// self-contained type scheme (with no custom validation).
-    pub fn ignore_missing_validation(self) -> Self {
-        match self {
-            SignatureFunc::MissingValidateFunc(ts) => CustomValidator::from_polyfunc(ts).into(),
-            _ => self,
+    pub fn ignore_missing_validation(&mut self) {
+        if let SignatureFunc::MissingValidateFunc(ts) = self {
+            *self = SignatureFunc::PolyFuncType(CustomValidator::from_polyfunc(ts.clone()));
         }
     }
 
