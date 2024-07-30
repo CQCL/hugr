@@ -299,6 +299,7 @@ impl Debug for LowerFunc {
 
 /// Serializable definition for dynamically loaded operations.
 ///
+///
 /// TODO: Define a way to construct new OpDef's from a serialized definition.
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct OpDef {
