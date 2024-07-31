@@ -1,4 +1,4 @@
-use crate::extension::ExtensionRegistry;
+use crate::extension::{ExtensionRegistry, TO_BE_INFERRED};
 use crate::hugr::views::HugrView;
 use crate::ops::dataflow::DataflowOpTrait;
 use crate::types::{Signature, TypeRow};
@@ -152,12 +152,23 @@ impl HugrBuilder for ConditionalBuilder<Hugr> {
 }
 
 impl ConditionalBuilder<Hugr> {
-    /// Initialize a Conditional rooted HUGR builder
+    /// Initialize a Conditional rooted HUGR builder, extension delta will be inferred.
     pub fn new(
         sum_rows: impl IntoIterator<Item = TypeRow>,
         other_inputs: impl Into<TypeRow>,
         outputs: impl Into<TypeRow>,
-        extension_delta: ExtensionSet,
+    ) -> Result<Self, BuildError> {
+        Self::new_exts(sum_rows, other_inputs, outputs, TO_BE_INFERRED)
+    }
+
+    /// Initialize a Conditional rooted HUGR builder,
+    /// `extension_delta` explicitly specified. Alternatively,
+    /// [new](Self::new) may be used to infer it.
+    pub fn new_exts(
+        sum_rows: impl IntoIterator<Item = TypeRow>,
+        other_inputs: impl Into<TypeRow>,
+        outputs: impl Into<TypeRow>,
+        extension_delta: impl Into<ExtensionSet>,
     ) -> Result<Self, BuildError> {
         let sum_rows: Vec<_> = sum_rows.into_iter().collect();
         let other_inputs = other_inputs.into();
@@ -170,7 +181,7 @@ impl ConditionalBuilder<Hugr> {
             sum_rows,
             other_inputs,
             outputs,
-            extension_delta,
+            extension_delta: extension_delta.into(),
         };
         let base = Hugr::new(op);
         let conditional_node = base.root();
@@ -216,7 +227,7 @@ mod test {
 
     #[test]
     fn basic_conditional() -> Result<(), BuildError> {
-        let mut conditional_b = ConditionalBuilder::new(
+        let mut conditional_b = ConditionalBuilder::new_exts(
             [type_row![], type_row![]],
             type_row![NAT],
             type_row![NAT],
@@ -265,12 +276,8 @@ mod test {
 
     #[test]
     fn test_not_all_cases() -> Result<(), BuildError> {
-        let mut builder = ConditionalBuilder::new(
-            [type_row![], type_row![]],
-            type_row![],
-            type_row![],
-            ExtensionSet::new(),
-        )?;
+        let mut builder =
+            ConditionalBuilder::new([type_row![], type_row![]], type_row![], type_row![])?;
         n_identity(builder.case_builder(0)?)?;
         assert_matches!(
             builder.finish_sub_container().map(|_| ()),
@@ -283,12 +290,8 @@ mod test {
 
     #[test]
     fn test_case_already_built() -> Result<(), BuildError> {
-        let mut builder = ConditionalBuilder::new(
-            [type_row![], type_row![]],
-            type_row![],
-            type_row![],
-            ExtensionSet::new(),
-        )?;
+        let mut builder =
+            ConditionalBuilder::new([type_row![], type_row![]], type_row![], type_row![])?;
         n_identity(builder.case_builder(0)?)?;
         assert_matches!(
             builder.case_builder(0).map(|_| ()),
