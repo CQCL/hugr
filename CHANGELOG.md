@@ -6,6 +6,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0](https://github.com/CQCL/hugr-llvm/compare/v0.1.0...v0.2.0) - 2024-07-31
+
+### New Features
+- make EmitFuncContext::iw_context pub ([#55](https://github.com/CQCL/hugr-llvm/pull/55))
+
+### Refactor
+- use HugrFuncType/HugrType/HugrSumType ([#56](https://github.com/CQCL/hugr-llvm/pull/56))
+- remove unneeded `HugrView` constraints  ([#59](https://github.com/CQCL/hugr-llvm/pull/59))
+- [**breaking**] add `LLVMSumValue` ([#63](https://github.com/CQCL/hugr-llvm/pull/63))
+
+### Testing
+- Add test for LoadFunction Op ([#60](https://github.com/CQCL/hugr-llvm/pull/60))
+
 ## [0.1.0](https://github.com/CQCL/hugr-llvm/releases/tag/v0.1.0) - 2024-07-10
 
 ### Bug Fixes
