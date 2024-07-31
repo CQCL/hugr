@@ -305,6 +305,7 @@ pub trait Dataflow: Container {
     /// The `inputs` must be an iterable over pairs of the type of the input and
     /// the corresponding wire.
     /// The `output_types` are the types of the outputs.
+    /// The Extension delta will be inferred.
     ///
     /// # Errors
     ///
@@ -314,7 +315,27 @@ pub trait Dataflow: Container {
         &mut self,
         inputs: impl IntoIterator<Item = (Type, Wire)>,
         output_types: TypeRow,
-        extension_delta: ExtensionSet,
+    ) -> Result<CFGBuilder<&mut Hugr>, BuildError> {
+        self.cfg_builder_exts(inputs, output_types, TO_BE_INFERRED)
+    }
+
+    /// Return a builder for a [`crate::ops::CFG`] node,
+    /// i.e. a nested controlflow subgraph.
+    /// The `inputs` must be an iterable over pairs of the type of the input and
+    /// the corresponding wire.
+    /// The `output_types` are the types of the outputs.
+    /// `extension_delta` is explicitly specified. Alternatively
+    /// [cfg_builder](Self::cfg_builder) may be used to infer it.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error when building
+    /// the CFG node.
+    fn cfg_builder_exts(
+        &mut self,
+        inputs: impl IntoIterator<Item = (Type, Wire)>,
+        output_types: TypeRow,
+        extension_delta: impl Into<ExtensionSet>,
     ) -> Result<CFGBuilder<&mut Hugr>, BuildError> {
         let (input_types, input_wires): (Vec<Type>, Vec<Wire>) = inputs.into_iter().unzip();
 

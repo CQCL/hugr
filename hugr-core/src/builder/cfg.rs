@@ -468,11 +468,8 @@ pub(crate) mod test {
                 let [int] = func_builder.input_wires_arr();
 
                 let cfg_id = {
-                    let mut cfg_builder = func_builder.cfg_builder(
-                        vec![(NAT, int)],
-                        type_row![NAT],
-                        ExtensionSet::new(),
-                    )?;
+                    let mut cfg_builder =
+                        func_builder.cfg_builder(vec![(NAT, int)], type_row![NAT])?;
                     build_basic_cfg(&mut cfg_builder)?;
 
                     cfg_builder.finish_sub_container()?

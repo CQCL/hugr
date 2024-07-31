@@ -134,7 +134,7 @@ impl Rewrite for OutlineCfg {
             .unwrap();
             let wires_in = inputs.iter().cloned().zip(new_block_bldr.input_wires());
             let cfg = new_block_bldr
-                .cfg_builder(wires_in, outputs, extension_delta)
+                .cfg_builder_exts(wires_in, outputs, extension_delta)
                 .unwrap();
             let cfg = cfg.finish_sub_container().unwrap();
             let unit_sum = new_block_bldr.add_constant(ops::Value::unary_unit_sum());
