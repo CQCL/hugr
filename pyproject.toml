@@ -8,7 +8,7 @@ package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.11"
-guppylang= "^0.5.2"
+guppylang= "^0.8"
 
 
 [build-system]

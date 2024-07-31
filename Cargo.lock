@@ -298,9 +298,9 @@ dependencies = [
 
 [[package]]
 name = "hugr"
-version = "0.9.0"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6bcfc2468cd2c63e86c562d491130a32d9a8e6f192dc67916818b9a3da02d7e0"
+checksum = "daa4ecfcad4aaf337f974e196e0b79ac9288a19535a5b57c9c77f0aaed1d0c6a"
 dependencies = [
  "hugr-core",
  "hugr-passes",
@@ -308,9 +308,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-core"
-version = "0.6.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7384f55699d0290a2d6d491518d0fe15f43d7c5d312814a112b8a17d5666d7c4"
+checksum = "7de0f6d5bd8ce765a989d928a773b6816b89051bdf1da55d27ac2b6965fa0e07"
 dependencies = [
  "bitvec",
  "cgmath",
@@ -329,7 +329,6 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
- "serde_yaml",
  "smol_str",
  "strum",
  "strum_macros",
@@ -359,9 +358,9 @@ dependencies = [
 
 [[package]]
 name = "hugr-passes"
-version = "0.6.0"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a9905dac38c839a5ea493dde57a3761d656fe782526b6e2d2a258f574a40799a"
+checksum = "31c601b2bc2168e841cb1087f2f7d383a4cace5c9926e10e79e2dd4829cd6758"
 dependencies = [
  "hugr-core",
  "itertools 0.13.0",
@@ -731,19 +730,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "serde_yaml"
-version = "0.9.34+deprecated"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a8b1a1a2ebf674015cc02edccce75287f1a0130d394307b36743c2f5d504b47"
-dependencies = [
- "indexmap",
- "itoa",
- "ryu",
- "serde",
- "unsafe-libyaml",
-]
-
-[[package]]
 name = "similar"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -869,12 +855,6 @@ name = "unicode-ident"
 version = "1.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3354b9ac3fae1ff6755cb6db53683adb661634f67557942dea4facebec0fee4b"
-
-[[package]]
-name = "unsafe-libyaml"
-version = "0.2.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "673aac59facbab8a9007c7f6108d11f63b603f7cabff99fabf650fea5c32b861"
 
 [[package]]
 name = "utf8-width"

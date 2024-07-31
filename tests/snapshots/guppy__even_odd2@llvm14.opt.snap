@@ -14,23 +14,26 @@ entry_block:                                      ; preds = %alloca_block
 
 1:                                                ; preds = %entry_block
   %2 = call i16 @QAlloc()
-  %3 = call i16 @H(i16 %2)
-  %4 = call { i16, { i32, {}, {} } } @Measure(i16 %3)
-  %5 = extractvalue { i16, { i32, {}, {} } } %4, 0
-  %6 = extractvalue { i16, { i32, {}, {} } } %4, 1
-  call void @QFree(i16 %5)
-  switch i32 0, label %7 [
+  %3 = call i16 @Reset(i16 %2)
+  %4 = call i16 @H(i16 %3)
+  %5 = call { i16, { i32, {}, {} } } @Measure(i16 %4)
+  %6 = extractvalue { i16, { i32, {}, {} } } %5, 0
+  %7 = extractvalue { i16, { i32, {}, {} } } %5, 1
+  call void @QFree(i16 %6)
+  switch i32 0, label %8 [
   ]
 
-7:                                                ; preds = %1
-  %8 = extractvalue { {} } undef, 0
-  br label %9
+8:                                                ; preds = %1
+  %9 = extractvalue { {} } undef, 0
+  br label %10
 
-9:                                                ; preds = %7
-  ret { i32, {}, {} } %6
+10:                                               ; preds = %8
+  ret { i32, {}, {} } %7
 }
 
 declare i16 @QAlloc()
+
+declare i16 @Reset(i16)
 
 declare i16 @H(i16)
 
@@ -55,11 +58,11 @@ entry_block:                                      ; preds = %alloca_block
 
 5:                                                ; preds = %1
   %6 = extractvalue { i32, {}, {} } %3, 1
-  br label %cond_33_case_0
+  br label %cond_34_case_0
 
 7:                                                ; preds = %1
   %8 = extractvalue { i32, {}, {} } %3, 2
-  br label %cond_33_case_1
+  br label %cond_34_case_1
 
 9:                                                ; preds = %24
   switch i32 0, label %10 [
@@ -83,27 +86,27 @@ entry_block:                                      ; preds = %alloca_block
   %"02.0" = phi { i32, {}, {} } [ %14, %15 ], [ { i32 0, {} undef, {} poison }, %10 ]
   ret { i32, {}, {} } %"02.0"
 
-cond_33_case_0:                                   ; preds = %5
+cond_34_case_0:                                   ; preds = %5
   %18 = insertvalue { i64 } undef, i64 %0, 0
   %19 = insertvalue { i32, { i64 }, {} } { i32 0, { i64 } poison, {} poison }, { i64 } %18, 1
-  br label %cond_exit_33
+  br label %cond_exit_34
 
-cond_33_case_1:                                   ; preds = %7
-  br label %cond_exit_33
+cond_34_case_1:                                   ; preds = %7
+  br label %cond_exit_34
 
-cond_exit_33:                                     ; preds = %cond_33_case_1, %cond_33_case_0
-  %"07.0" = phi { i32, { i64 }, {} } [ %19, %cond_33_case_0 ], [ { i32 1, { i64 } poison, {} undef }, %cond_33_case_1 ]
+cond_exit_34:                                     ; preds = %cond_34_case_1, %cond_34_case_0
+  %"07.0" = phi { i32, { i64 }, {} } [ %19, %cond_34_case_0 ], [ { i32 1, { i64 } poison, {} undef }, %cond_34_case_1 ]
   %20 = extractvalue { i32, { i64 }, {} } %"07.0", 0
   switch i32 %20, label %21 [
     i32 1, label %24
   ]
 
-21:                                               ; preds = %cond_exit_33
+21:                                               ; preds = %cond_exit_34
   %22 = extractvalue { i32, { i64 }, {} } %"07.0", 1
   %23 = extractvalue { i64 } %22, 0
   br label %12
 
-24:                                               ; preds = %cond_exit_33
+24:                                               ; preds = %cond_exit_34
   %25 = extractvalue { i32, { i64 }, {} } %"07.0", 2
   br label %9
 }

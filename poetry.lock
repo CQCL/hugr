@@ -29,35 +29,35 @@ test = ["coverage", "pytest (>=7,<8.1)", "pytest-cov", "pytest-mock (>=3)"]
 
 [[package]]
 name = "guppylang"
-version = "0.5.2"
+version = "0.8.0"
 description = "Pythonic quantum-classical programming language"
 optional = false
 python-versions = "<4.0,>=3.10"
 files = [
-    {file = "guppylang-0.5.2-py3-none-any.whl", hash = "sha256:fc7f397869c96280fb19ed1eb7ef55e6a3198235e73dabf937cea106e91ee1f4"},
-    {file = "guppylang-0.5.2.tar.gz", hash = "sha256:a7716e5fa15190f9c3cadaec363f4f1a59660251cb7c45b180d96500cec9346f"},
+    {file = "guppylang-0.8.0-py3-none-any.whl", hash = "sha256:1687991d7da986498d9e10a7d8d11f364187c7b9344ae60eedb0c18642fd55a9"},
+    {file = "guppylang-0.8.0.tar.gz", hash = "sha256:0eb36cb528f39b247c19ab1f16b7be09014e552dfb1e9f25416684e9f23d9f89"},
 ]
 
 [package.dependencies]
 graphviz = ">=0.20.1,<0.21.0"
-hugr = ">=0.2.1,<0.3.0"
+hugr = ">=0.5.0,<0.6.0"
 networkx = ">=3.2.1,<4.0.0"
 pydantic = ">=2.7.0b1,<3.0.0"
 typing-extensions = ">=4.9.0,<5.0.0"
 
 [[package]]
 name = "hugr"
-version = "0.2.1"
+version = "0.5.0"
 description = "Quantinuum's common representation for quantum programs"
 optional = false
 python-versions = ">=3.10"
 files = [
-    {file = "hugr-0.2.1-py3-none-any.whl", hash = "sha256:9bed349f342740d1f7e92859f8c12553d494f39ff26216eadbbdfd92513f64e6"},
-    {file = "hugr-0.2.1.tar.gz", hash = "sha256:899203ee02000a0ed3fe36ae1bf3f3ec5e06bddfa4d53bea15ab06aa8b452de5"},
+    {file = "hugr-0.5.0-py3-none-any.whl", hash = "sha256:7e6c6660e3c7143dd5b89bf429e3ccc68add0d329db4ac35076e7692d2899326"},
+    {file = "hugr-0.5.0.tar.gz", hash = "sha256:c362e19e6842c89d00c9eab8e3afe161a380459ecb212374ecb78e4081964f15"},
 ]
 
 [package.dependencies]
-pydantic = ">=2.7.0,<2.8.0"
+pydantic = ">=2.7,<2.9"
 
 [[package]]
 name = "networkx"
@@ -201,4 +201,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "28bbb18cdb8049833dc99fa0d64e65229ad6039b836e68e250e0b4271930a6ff"
+content-hash = "e540590a3bfab9a86d033260ed63728dd0d4f7c1cb8e92df65c65e5bdfa46f49"
