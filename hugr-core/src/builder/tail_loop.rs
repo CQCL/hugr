@@ -1,4 +1,4 @@
-use crate::extension::ExtensionSet;
+use crate::extension::{ExtensionSet, TO_BE_INFERRED};
 use crate::ops::{self, DataflowOpTrait};
 
 use crate::hugr::views::HugrView;
@@ -71,18 +71,30 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> TailLoopBuilder<B> {
 }
 
 impl TailLoopBuilder<Hugr> {
-    /// Initialize new builder for a [`ops::TailLoop`] rooted HUGR
+    /// Initialize new builder for a [`ops::TailLoop`] rooted HUGR.
+    /// Extension delta will be inferred.
     pub fn new(
         just_inputs: impl Into<TypeRow>,
         inputs_outputs: impl Into<TypeRow>,
         just_outputs: impl Into<TypeRow>,
-        extension_delta: ExtensionSet,
+    ) -> Result<Self, BuildError> {
+        Self::new_exts(just_inputs, inputs_outputs, just_outputs, TO_BE_INFERRED)
+    }
+
+    /// Initialize new builder for a [`ops::TailLoop`] rooted HUGR.
+    /// `extension_delta` is explicitly specified; alternatively, [new](Self::new)
+    /// may be used to infer it.
+    pub fn new_exts(
+        just_inputs: impl Into<TypeRow>,
+        inputs_outputs: impl Into<TypeRow>,
+        just_outputs: impl Into<TypeRow>,
+        extension_delta: impl Into<ExtensionSet>,
     ) -> Result<Self, BuildError> {
         let tail_loop = ops::TailLoop {
             just_inputs: just_inputs.into(),
             just_outputs: just_outputs.into(),
             rest: inputs_outputs.into(),
-            extension_delta,
+            extension_delta: extension_delta.into(),
         };
         let base = Hugr::new(tail_loop.clone());
         let root = base.root();
@@ -111,7 +123,7 @@ mod test {
     fn basic_loop() -> Result<(), BuildError> {
         let build_result: Result<Hugr, ValidationError> = {
             let mut loop_b =
-                TailLoopBuilder::new(vec![], vec![BIT], vec![USIZE_T], PRELUDE_ID.into())?;
+                TailLoopBuilder::new_exts(vec![], vec![BIT], vec![USIZE_T], PRELUDE_ID)?;
             let [i1] = loop_b.input_wires_arr();
             let const_wire = loop_b.add_load_value(ConstUsize::new(1));
 
@@ -195,9 +207,7 @@ mod test {
     #[test]
     // fixed: issue 1257: When building a TailLoop, calling outputs_arr, you are given an OrderEdge "output wire"
     fn tailloop_output_arr() {
-        let mut builder =
-            TailLoopBuilder::new(type_row![], type_row![], type_row![], ExtensionSet::new())
-                .unwrap();
+        let mut builder = TailLoopBuilder::new(type_row![], type_row![], type_row![]).unwrap();
         let control = builder.add_load_value(Value::false_val());
         let tailloop = builder.finish_with_outputs(control, []).unwrap();
         let [] = tailloop.outputs_arr();
