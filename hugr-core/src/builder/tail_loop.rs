@@ -143,12 +143,8 @@ mod test {
                     )?
                     .outputs_arr();
                 let loop_id = {
-                    let mut loop_b = fbuild.tail_loop_builder(
-                        vec![(BIT, b1)],
-                        vec![],
-                        type_row![NAT],
-                        PRELUDE_ID.into(),
-                    )?;
+                    let mut loop_b =
+                        fbuild.tail_loop_builder(vec![(BIT, b1)], vec![], type_row![NAT])?;
                     let signature = loop_b.loop_signature()?.clone();
                     let const_val = Value::true_val();
                     let const_wire = loop_b.add_load_const(Value::true_val());

@@ -426,17 +426,39 @@ pub trait Dataflow: Container {
     /// The `inputs` must be an iterable over pairs of the type of the input and
     /// the corresponding wire.
     /// The `output_types` are the types of the outputs.
+    /// The extension delta will be inferred.
     ///
     /// # Errors
     ///
     /// This function will return an error if there is an error when building
     /// the [`ops::TailLoop`] node.
+    ///
     fn tail_loop_builder(
         &mut self,
         just_inputs: impl IntoIterator<Item = (Type, Wire)>,
         inputs_outputs: impl IntoIterator<Item = (Type, Wire)>,
         just_out_types: TypeRow,
-        extension_delta: ExtensionSet,
+    ) -> Result<TailLoopBuilder<&mut Hugr>, BuildError> {
+        self.tail_loop_builder_exts(just_inputs, inputs_outputs, just_out_types, TO_BE_INFERRED)
+    }
+
+    /// Return a builder for a [`crate::ops::TailLoop`] node.
+    /// The `inputs` must be an iterable over pairs of the type of the input and
+    /// the corresponding wire.
+    /// The `output_types` are the types of the outputs.
+    /// `extension_delta` explicitly specified. Alternatively
+    /// [tail_loop_builder](Self::tail_loop_builder) may be used to infer it.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error when building
+    /// the [`ops::TailLoop`] node.
+    fn tail_loop_builder_exts(
+        &mut self,
+        just_inputs: impl IntoIterator<Item = (Type, Wire)>,
+        inputs_outputs: impl IntoIterator<Item = (Type, Wire)>,
+        just_out_types: TypeRow,
+        extension_delta: impl Into<ExtensionSet>,
     ) -> Result<TailLoopBuilder<&mut Hugr>, BuildError> {
         let (input_types, mut input_wires): (Vec<Type>, Vec<Wire>) =
             just_inputs.into_iter().unzip();
@@ -448,7 +470,7 @@ pub trait Dataflow: Container {
             just_inputs: input_types.into(),
             just_outputs: just_out_types,
             rest: rest_types.into(),
-            extension_delta,
+            extension_delta: extension_delta.into(),
         };
         // TODO: Make input extensions a parameter
         let (loop_node, _) = add_node_with_wires(self, tail_loop.clone(), input_wires)?;
@@ -484,7 +506,7 @@ pub trait Dataflow: Container {
     /// The `other_inputs` must be an iterable over pairs of the type of the input and
     /// the corresponding wire.
     /// The `output_types` are the types of the outputs.
-    /// `exts` explicitly specifies the extension delta. Alternatively
+    /// `extension_delta` is explicitly specified. Alternatively
     /// [conditional_builder](Self::conditional_builder) may be used to infer it.
     ///
     /// # Errors
