@@ -59,6 +59,10 @@ update-schema:
 gen-extensions:
     cargo run -p hugr-cli gen-extensions -o specification/std_extensions
 
+
+build-py-docs:
+    cd hugr-py/docs && ./build.sh
+
 # Runs a rust and a python command, depending on the `language` variable.
 #
 # If `language` is set to `rust` or `python`, only run the command for that language.
