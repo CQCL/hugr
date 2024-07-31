@@ -1166,7 +1166,7 @@ mod extension_tests {
     }
 
     fn make_bb(t: Type, es: ExtensionSet) -> DFGWrapper<Hugr, BasicBlockID> {
-        BlockBuilder::new(t.clone(), vec![t.into()], type_row![], es).unwrap()
+        BlockBuilder::new_exts(t.clone(), vec![t.into()], type_row![], es).unwrap()
     }
 
     fn make_tailloop(t: Type, es: ExtensionSet) -> DFGWrapper<Hugr, BuildHandle<TailLoopID>> {

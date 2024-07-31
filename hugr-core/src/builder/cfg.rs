@@ -413,12 +413,24 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
 }
 
 impl BlockBuilder<Hugr> {
-    /// Initialize a [`DataflowBlock`] rooted HUGR builder
+    /// Initialize a [`DataflowBlock`] rooted HUGR builder.
+    /// Extension delta will be inferred.
     pub fn new(
         inputs: impl Into<TypeRow>,
         sum_rows: impl IntoIterator<Item = TypeRow>,
         other_outputs: impl Into<TypeRow>,
-        extension_delta: ExtensionSet,
+    ) -> Result<Self, BuildError> {
+        Self::new_exts(inputs, sum_rows, other_outputs, TO_BE_INFERRED)
+    }
+
+    /// Initialize a [`DataflowBlock`] rooted HUGR builder.
+    /// `extension_delta` is explicitly specified; alternatively, [new](Self::new)
+    /// may be used to infer it.
+    pub fn new_exts(
+        inputs: impl Into<TypeRow>,
+        sum_rows: impl IntoIterator<Item = TypeRow>,
+        other_outputs: impl Into<TypeRow>,
+        extension_delta: impl Into<ExtensionSet>,
     ) -> Result<Self, BuildError> {
         let inputs = inputs.into();
         let sum_rows: Vec<_> = sum_rows.into_iter().collect();
@@ -427,7 +439,7 @@ impl BlockBuilder<Hugr> {
             inputs: inputs.clone(),
             other_outputs: other_outputs.clone(),
             sum_rows,
-            extension_delta,
+            extension_delta: extension_delta.into(),
         };
 
         let base = Hugr::new(op);

@@ -125,7 +125,7 @@ impl Rewrite for OutlineCfg {
 
         // 2. new_block contains input node, sub-cfg, exit node all connected
         let (new_block, cfg_node) = {
-            let mut new_block_bldr = BlockBuilder::new(
+            let mut new_block_bldr = BlockBuilder::new_exts(
                 inputs.clone(),
                 vec![type_row![]],
                 outputs.clone(),
