@@ -6,7 +6,7 @@
 
 use assert_cmd::Command;
 use assert_fs::{fixture::FileWriteStr, NamedTempFile};
-use hugr_cli::validate::VALID_PRINT;
+use hugr_cli::validate::{Package, VALID_PRINT};
 use hugr_core::builder::DFGBuilder;
 use hugr_core::types::Type;
 use hugr_core::{
@@ -146,17 +146,36 @@ fn test_no_std_fail(float_hugr_string: String, mut cmd: Command) {
         .stderr(contains(" Extension 'arithmetic.float.types' not found"));
 }
 
+// path to the fully serialized float extension
+const FLOAT_EXT_FILE: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../specification/std_extensions/arithmetic/float/types.json"
+);
+
 #[rstest]
 fn test_float_extension(float_hugr_string: String, mut cmd: Command) {
     cmd.write_stdin(float_hugr_string);
     cmd.arg("-");
     cmd.arg("--no-std");
     cmd.arg("--extensions");
-    // path to the fully serialized float extension
-    cmd.arg(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../specification/std_extensions/arithmetic/float/types.json"
-    ));
+    cmd.arg(FLOAT_EXT_FILE);
+
+    cmd.assert().success().stderr(contains(VALID_PRINT));
+}
+#[fixture]
+fn package_string(#[with(FLOAT64_TYPE)] test_hugr: Hugr) -> String {
+    let rdr = std::fs::File::open(FLOAT_EXT_FILE).unwrap();
+    let float_ext: hugr_core::Extension = serde_json::from_reader(rdr).unwrap();
+    let package = Package::new(vec![test_hugr], vec![float_ext]);
+    serde_json::to_string(&package).unwrap()
+}
+
+#[rstest]
+fn test_package(package_string: String, mut cmd: Command) {
+    // package with float extension and hugr that uses floats can validate
+    cmd.write_stdin(package_string);
+    cmd.arg("-");
+    cmd.arg("--no-std");
 
     cmd.assert().success().stderr(contains(VALID_PRINT));
 }
