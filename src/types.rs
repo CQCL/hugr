@@ -66,7 +66,6 @@ impl<'c, H> TypingSession<'c, H> {
                     .ptr_type(AddressSpace::default()) // Note: deprecated in LLVM >= 15
                     .into())
             }
-
             x => Err(anyhow!("Invalid type: {:?}", x)),
         }
     }

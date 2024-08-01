@@ -377,7 +377,6 @@ fn diverse_cfg_children(llvm_ctx: TestContext) {
 }
 
 #[rstest]
-#[should_panic]
 fn load_function(llvm_ctx: TestContext) {
     let hugr = {
         let mut builder = ModuleBuilder::new();
