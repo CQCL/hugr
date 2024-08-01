@@ -6,6 +6,7 @@ from pydantic_extra_types.semantic_version import SemanticVersion
 from hugr import get_serialisation_version
 
 from .ops import Value
+from .serial_hugr import SerialHugr
 from .tys import (
     ConfiguredBaseModel,
     ExtensionId,
@@ -72,6 +73,15 @@ class Extension(ConfiguredBaseModel):
     types: dict[str, TypeDef]
     values: dict[str, ExtensionValue]
     operations: dict[str, OpDef]
+
+    @classmethod
+    def get_version(cls) -> str:
+        return get_serialisation_version()
+
+
+class Package(ConfiguredBaseModel):
+    modules: list[SerialHugr]
+    extensions: list[Extension]
 
     @classmethod
     def get_version(cls) -> str:

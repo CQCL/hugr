@@ -1372,6 +1372,30 @@
             "title": "Output",
             "type": "object"
         },
+        "Package": {
+            "properties": {
+                "modules": {
+                    "items": {
+                        "$ref": "#/$defs/SerialHugr"
+                    },
+                    "title": "Modules",
+                    "type": "array"
+                },
+                "extensions": {
+                    "items": {
+                        "$ref": "#/$defs/Extension"
+                    },
+                    "title": "Extensions",
+                    "type": "array"
+                }
+            },
+            "required": [
+                "modules",
+                "extensions"
+            ],
+            "title": "Package",
+            "type": "object"
+        },
         "PolyFuncType": {
             "additionalProperties": false,
             "description": "A polymorphic type scheme, i.e. of a FuncDecl, FuncDefn or OpDef.  (Nodes/operations in the Hugr are not polymorphic.)",
@@ -1463,6 +1487,116 @@
                 "elems"
             ],
             "title": "SequenceArg",
+            "type": "object"
+        },
+        "SerialHugr": {
+            "description": "A serializable representation of a Hugr.",
+            "properties": {
+                "version": {
+                    "description": "Serialisation Schema Version",
+                    "title": "Version",
+                    "type": "string"
+                },
+                "nodes": {
+                    "items": {
+                        "$ref": "#/$defs/OpType"
+                    },
+                    "title": "Nodes",
+                    "type": "array"
+                },
+                "edges": {
+                    "items": {
+                        "maxItems": 2,
+                        "minItems": 2,
+                        "prefixItems": [
+                            {
+                                "maxItems": 2,
+                                "minItems": 2,
+                                "prefixItems": [
+                                    {
+                                        "type": "integer"
+                                    },
+                                    {
+                                        "anyOf": [
+                                            {
+                                                "type": "integer"
+                                            },
+                                            {
+                                                "type": "null"
+                                            }
+                                        ]
+                                    }
+                                ],
+                                "type": "array"
+                            },
+                            {
+                                "maxItems": 2,
+                                "minItems": 2,
+                                "prefixItems": [
+                                    {
+                                        "type": "integer"
+                                    },
+                                    {
+                                        "anyOf": [
+                                            {
+                                                "type": "integer"
+                                            },
+                                            {
+                                                "type": "null"
+                                            }
+                                        ]
+                                    }
+                                ],
+                                "type": "array"
+                            }
+                        ],
+                        "type": "array"
+                    },
+                    "title": "Edges",
+                    "type": "array"
+                },
+                "metadata": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "anyOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "type": "null"
+                                    }
+                                ]
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "default": null,
+                    "title": "Metadata"
+                },
+                "encoder": {
+                    "anyOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "default": null,
+                    "description": "The name of the encoder used to generate the Hugr.",
+                    "title": "Encoder"
+                }
+            },
+            "required": [
+                "version",
+                "nodes",
+                "edges"
+            ],
+            "title": "Hugr",
             "type": "object"
         },
         "StringArg": {

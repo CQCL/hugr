@@ -4,9 +4,11 @@ from hugr.serialization.extension import (
     ExplicitBound,
     Extension,
     OpDef,
+    Package,
     TypeDef,
     TypeDefBound,
 )
+from hugr.serialization.serial_hugr import SerialHugr
 from hugr.serialization.tys import (
     FunctionType,
     PolyFuncType,
@@ -71,7 +73,7 @@ EXAMPLE = r"""
 """
 
 
-def test_deserialize():
+def test_extension():
     param = TypeParam(root=TypeTypeParam(b=TypeBound.Copyable))
 
     bound = TypeDefBound(root=ExplicitBound(bound=TypeBound.Copyable))
@@ -106,3 +108,21 @@ def test_deserialize():
     dumped_json = ext.model_dump_json()
 
     assert Extension.model_validate_json(dumped_json) == ext
+
+
+def test_package():
+    ext = Extension(
+        version=Version(0, 1, 0),
+        name="ext",
+        extension_reqs=set(),
+        types={},
+        values={},
+        operations={},
+    )
+    ext_load = Extension.model_validate_json(EXAMPLE)
+    package = Package(
+        extensions=[ext, ext_load], modules=[SerialHugr(nodes=[], edges=[])]
+    )
+
+    package_load = Package.model_validate_json(package.model_dump_json())
+    assert package == package_load
