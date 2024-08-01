@@ -130,14 +130,33 @@ fn test_no_std(test_hugr_string: String, mut cmd: Command) {
     cmd.assert().success().stderr(contains(VALID_PRINT));
 }
 
+#[fixture]
+fn float_hugr_string(#[with(FLOAT64_TYPE)] test_hugr: Hugr) -> String {
+    serde_json::to_string(&test_hugr).unwrap()
+}
+
 #[rstest]
-fn test_no_std_fail(#[with(FLOAT64_TYPE)] test_hugr: Hugr, mut cmd: Command) {
-    cmd.write_stdin(serde_json::to_string(&test_hugr).unwrap());
+fn test_no_std_fail(float_hugr_string: String, mut cmd: Command) {
+    cmd.write_stdin(float_hugr_string);
     cmd.arg("-");
     cmd.arg("--no-std");
-    // test hugr doesn't have any standard extensions, so this should succceed
 
     cmd.assert()
         .failure()
         .stderr(contains(" Extension 'arithmetic.float.types' not found"));
+}
+
+#[rstest]
+fn test_float_extension(float_hugr_string: String, mut cmd: Command) {
+    cmd.write_stdin(float_hugr_string);
+    cmd.arg("-");
+    cmd.arg("--no-std");
+    cmd.arg("--extensions");
+    // path to the fully serialized float extension
+    cmd.arg(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../specification/std_extensions/arithmetic/float/types.json"
+    ));
+
+    cmd.assert().success().stderr(contains(VALID_PRINT));
 }
