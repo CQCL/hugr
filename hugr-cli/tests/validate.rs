@@ -8,9 +8,11 @@ use assert_cmd::Command;
 use assert_fs::{fixture::FileWriteStr, NamedTempFile};
 use hugr_cli::validate::VALID_PRINT;
 use hugr_core::builder::DFGBuilder;
+use hugr_core::types::Type;
 use hugr_core::{
-    builder::{Container, Dataflow, DataflowHugr},
+    builder::{Container, Dataflow},
     extension::prelude::{BOOL_T, QB_T},
+    std_extensions::arithmetic::float_types::FLOAT64_TYPE,
     type_row,
     types::Signature,
     Hugr,
@@ -26,10 +28,11 @@ fn cmd() -> Command {
 }
 
 #[fixture]
-fn test_hugr() -> Hugr {
-    let df = DFGBuilder::new(Signature::new_endo(type_row![BOOL_T])).unwrap();
+fn test_hugr(#[default(BOOL_T)] id_type: Type) -> Hugr {
+    let mut df = DFGBuilder::new(Signature::new_endo(id_type)).unwrap();
     let [i] = df.input_wires_arr();
-    df.finish_prelude_hugr_with_outputs([i]).unwrap()
+    df.set_outputs([i]).unwrap();
+    df.hugr().clone() // unvalidated
 }
 
 #[fixture]
@@ -115,4 +118,26 @@ fn test_bad_json_silent(mut cmd: Command) {
     cmd.assert()
         .failure()
         .stderr(contains("Error parsing input").not());
+}
+
+#[rstest]
+fn test_no_std(test_hugr_string: String, mut cmd: Command) {
+    cmd.write_stdin(test_hugr_string);
+    cmd.arg("-");
+    cmd.arg("--no-std");
+    // test hugr doesn't have any standard extensions, so this should succceed
+
+    cmd.assert().success().stderr(contains(VALID_PRINT));
+}
+
+#[rstest]
+fn test_no_std_fail(#[with(FLOAT64_TYPE)] test_hugr: Hugr, mut cmd: Command) {
+    cmd.write_stdin(serde_json::to_string(&test_hugr).unwrap());
+    cmd.arg("-");
+    cmd.arg("--no-std");
+    // test hugr doesn't have any standard extensions, so this should succceed
+
+    cmd.assert()
+        .failure()
+        .stderr(contains(" Extension 'arithmetic.float.types' not found"));
 }

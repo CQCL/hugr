@@ -23,7 +23,9 @@ pub struct CliArgs {
     /// Verbosity.
     #[command(flatten)]
     pub verbose: Verbosity<InfoLevel>,
-    // TODO YAML extensions
+    /// No standard extensions.
+    #[arg(long, help = "Don't use standard extensions when validating.")]
+    pub no_std: bool,
 }
 
 /// Error type for the CLI.

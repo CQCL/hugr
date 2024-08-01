@@ -5,6 +5,7 @@ use clap::Parser as _;
 use hugr_cli::{validate, CliArgs};
 
 use clap_verbosity_flag::Level;
+use hugr_core::extension::ExtensionRegistry;
 
 fn main() {
     match CliArgs::parse() {
@@ -26,10 +27,15 @@ fn main() {
 
 /// Run the `validate` subcommand.
 fn run_validate(args: validate::CliArgs) {
-    // validate with all std extensions
-    let reg = hugr_core::std_extensions::std_reg();
+    let std_reg: ExtensionRegistry;
+    let reg: &ExtensionRegistry = if args.no_std {
+        &hugr_core::extension::PRELUDE_REGISTRY
+    } else {
+        std_reg = hugr_core::std_extensions::std_reg();
+        &std_reg
+    };
 
-    let result = args.run(&reg);
+    let result = args.run(reg);
 
     if let Err(e) = result {
         if args.verbosity(Level::Error) {
