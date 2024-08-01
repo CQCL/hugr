@@ -7,6 +7,6 @@ representation.
 __version__ = "0.5.0"
 
 
-def get_serialisation_version() -> str:
+def get_serialization_version() -> str:
     """Return the current version of the serialization schema."""
     return "live"

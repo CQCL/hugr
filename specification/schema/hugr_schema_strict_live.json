@@ -1372,6 +1372,29 @@
             "title": "Output",
             "type": "object"
         },
+        "Package": {
+            "properties": {
+                "modules": {
+                    "items": {
+                        "$ref": "#/$defs/SerialHugr"
+                    },
+                    "title": "Modules",
+                    "type": "array"
+                },
+                "extensions": {
+                    "items": {
+                        "$ref": "#/$defs/Extension"
+                    },
+                    "title": "Extensions",
+                    "type": "array"
+                }
+            },
+            "required": [
+                "modules"
+            ],
+            "title": "Package",
+            "type": "object"
+        },
         "PolyFuncType": {
             "additionalProperties": false,
             "description": "A polymorphic type scheme, i.e. of a FuncDecl, FuncDefn or OpDef.  (Nodes/operations in the Hugr are not polymorphic.)",

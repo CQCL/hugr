@@ -16,7 +16,7 @@ from pathlib import Path
 from pydantic import ConfigDict
 from pydantic.json_schema import models_json_schema
 
-from hugr.serialization.extension import Extension
+from hugr.serialization.extension import Extension, Package
 from hugr.serialization.serial_hugr import SerialHugr
 from hugr.serialization.testing_hugr import TestingHugr
 
@@ -33,7 +33,7 @@ def write_schema(
     path = out_dir / filename
     print(f"Rebuilding model with config: {config}")
     schema._pydantic_rebuild(config or ConfigDict(), force=True, **kwargs)
-    schemas = [schema, Extension]
+    schemas = [schema, Extension, Package]
     print(f"Writing schema to {path}")
     _, top_level_schema = models_json_schema(
         [(s, "validation") for s in schemas], title="HUGR schema"
