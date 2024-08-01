@@ -81,7 +81,7 @@ class Extension(ConfiguredBaseModel):
 
 class Package(ConfiguredBaseModel):
     modules: list[SerialHugr]
-    extensions: list[Extension]
+    extensions: list[Extension] = pd.Field(default_factory=list)
 
     @classmethod
     def get_version(cls) -> str:

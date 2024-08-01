@@ -1390,8 +1390,7 @@
                 }
             },
             "required": [
-                "modules",
-                "extensions"
+                "modules"
             ],
             "title": "Package",
             "type": "object"
