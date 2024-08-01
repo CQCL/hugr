@@ -3,7 +3,7 @@ from typing import Any
 from pydantic import ConfigDict, Field
 
 import hugr
-from hugr import get_serialisation_version
+from hugr import get_serialization_version
 from hugr.node_port import NodeIdx, PortOffset
 
 from .ops import OpType
@@ -14,7 +14,7 @@ Port = tuple[NodeIdx, PortOffset | None]
 Edge = tuple[Port, Port]
 
 VersionField = Field(
-    default_factory=get_serialisation_version,
+    default_factory=get_serialization_version,
     title="Version",
     description="Serialisation Schema Version",
     frozen=True,

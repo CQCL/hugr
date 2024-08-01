@@ -1,5 +1,6 @@
 from semver import Version
 
+from hugr import get_serialization_version
 from hugr.serialization.extension import (
     ExplicitBound,
     Extension,
@@ -74,6 +75,7 @@ EXAMPLE = r"""
 
 
 def test_extension():
+    assert get_serialization_version() == Extension.get_version()
     param = TypeParam(root=TypeTypeParam(b=TypeBound.Copyable))
 
     bound = TypeDefBound(root=ExplicitBound(bound=TypeBound.Copyable))
@@ -111,6 +113,8 @@ def test_extension():
 
 
 def test_package():
+    assert get_serialization_version() == Package.get_version()
+
     ext = Extension(
         version=Version(0, 1, 0),
         name="ext",
