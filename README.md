@@ -9,10 +9,9 @@ A general, extensible, rust crate for lowering `HUGR`s into `LLVM` IR. Built on 
 
 ## Usage
 
-You'll need to point your `Cargo.toml` to use a single LLVM version feature flag corresponding to your LLVM version, as below:
-```
-[dependencies]
-hugr-llvm = { version = "0.1.0", features = ["llvm14-0"] }
+You'll need to point your `Cargo.toml` to use a single LLVM version feature flag corresponding to your LLVM version, by calling
+```bash
+cargo add hugr-llvm --features llvm14-0
 ```
 
 At present only `llvm14-0` is supported but we expect to introduce supported versions as required. Contributions are welcome.
