@@ -1,8 +1,8 @@
 use std::{
     env,
     fmt::Display,
+    fs::File,
     path::{Path, PathBuf},
-    process::{Command, Stdio},
 };
 
 use anyhow::Result;
@@ -91,23 +91,14 @@ fn hugr_to_module<'c>(context: &'c Context, hugr: &'c Hugr) -> Module<'c> {
 }
 
 struct TestConfig {
-    python_bin: PathBuf,
     test_dir: PathBuf,
 }
 
 impl TestConfig {
     pub fn new() -> TestConfig {
-        let python_bin = env::var("HUGR_LLVM_PYTHON_BIN")
-            .map(Into::into)
-            .ok()
-            .or_else(|| pathsearch::find_executable_in_path("python"))
-            .unwrap_or_else(|| panic!("Could not find python in PATH or HUGR_LLVM_PYTHON_BIN"));
         let test_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/guppy_test_cases");
         assert!(test_dir.is_dir());
-        TestConfig {
-            python_bin,
-            test_dir,
-        }
+        TestConfig { test_dir }
     }
 }
 
@@ -115,13 +106,8 @@ impl TestConfig {
     // invokes the path with python, expecting to recieve Hugr serialised as
     // JSON on stdout.
     fn get_guppy_output(&self, path: impl AsRef<Path>) -> Hugr {
-        let mut guppy_cmd = Command::new(&self.python_bin);
-        guppy_cmd
-            .arg(self.test_dir.join(path.as_ref()))
-            .stdout(Stdio::piped());
-        let mut guppy_proc = guppy_cmd.spawn().unwrap();
-        let mut hugr: Hugr = serde_json::from_reader(guppy_proc.stdout.take().unwrap()).unwrap();
-        assert!(guppy_proc.wait().unwrap().success());
+        let mut hugr: Hugr =
+            serde_json::from_reader(File::open(self.test_dir.join(path)).unwrap()).unwrap();
         hugr.update_validate(&EXTENSION_REGISTRY).unwrap();
         hugr
     }
@@ -175,8 +161,8 @@ macro_rules! guppy_test {
     };
 }
 
-guppy_test!("even_odd.py", even_odd);
-guppy_test!("even_odd2.py", even_odd2);
-guppy_test!("planqc-1.py", planqc1);
-guppy_test!("planqc-2.py", planqc2);
-guppy_test!("planqc-3.py", planqc3);
+guppy_test!("even_odd.py.json", even_odd);
+guppy_test!("even_odd2.py.json", even_odd2);
+guppy_test!("planqc-1.py.json", planqc1);
+guppy_test!("planqc-2.py.json", planqc2);
+guppy_test!("planqc-3.py.json", planqc3);

@@ -118,19 +118,10 @@ jobs:
           toolchain: 'stable'
       - name: Configure default rust toolchain
         run: rustup override set ${{steps.toolchain.outputs.name}}
-      - name: Install poetry
-        run: pipx install poetry
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: "poetry"
-      - name: Install python libraries
-        run: poetry install
       - name: Build with all features
         run: cargo test --verbose --workspace --no-run
       - name: Tests with all features
-        run: poetry run -- cargo test --verbose --workspace
+        run: cargo test --verbose --workspace
 
   # Run tests on other toolchains
   tests-other:
@@ -155,19 +146,10 @@ jobs:
           toolchain: ${{ matrix.rust }}
       - name: Configure default rust toolchain
         run: rustup override set ${{steps.toolchain.outputs.name}}
-      - name: Install poetry
-        run: pipx install poetry
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: "poetry"
-      - name: Install python libraries
-        run: poetry install
       - name: Build with all features
         run: cargo test --verbose --workspace --no-run
       - name: Tests with all features
-        run: poetry run -- cargo test --verbose --workspace
+        run: cargo test --verbose --workspace
 
   # This is a meta job to mark successful completion of the required checks,
   # even if they are skipped due to no changes in the relevant files.
@@ -216,21 +198,12 @@ jobs:
           # https://github.com/rust-lang/rust/issues/125474
           toolchain: 'nightly-2024-05-22'
           components: llvm-tools-preview
-      - name: Install poetry
-        run: pipx install poetry
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: "poetry"
-      - name: Install python libraries
-        run: poetry install
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
       - name: Run tests with coverage instrumentation
         run: |
-            poetry run -- cargo llvm-cov clean --workspace
-            poetry run -- cargo llvm-cov --no-report --workspace --doctests
+            cargo llvm-cov clean --workspace
+            cargo llvm-cov --no-report --workspace --doctests
       - name: Generate coverage report
         run: cargo llvm-cov report --codecov --output-path coverage.json
       - name: Upload coverage to codecov.io
