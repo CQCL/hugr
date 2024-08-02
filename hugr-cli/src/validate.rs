@@ -2,8 +2,8 @@
 use std::path::PathBuf;
 
 use clap::Parser;
-use clap_stdin::FileOrStdin;
 use clap_verbosity_flag::{InfoLevel, Level, Verbosity};
+use clio::Input;
 use hugr_core::{extension::ExtensionRegistry, Extension, Hugr, HugrView as _};
 use thiserror::Error;
 
@@ -14,8 +14,9 @@ use thiserror::Error;
 #[group(id = "hugr")]
 #[non_exhaustive]
 pub struct CliArgs {
-    /// The input hugr to parse.
-    pub input: FileOrStdin,
+    /// Input HUGR file, use '-' for stdin
+    #[clap(value_parser, default_value = "-")]
+    pub input: Input,
     /// Visualise with mermaid.
     #[arg(short, long, value_name = "MERMAID", help = "Visualise with mermaid.")]
     pub mermaid: bool,
@@ -44,9 +45,6 @@ pub struct CliArgs {
 #[derive(Error, Debug)]
 #[non_exhaustive]
 pub enum CliError {
-    /// Error reading input.
-    #[error("Error reading input: {0}")]
-    Input(#[from] clap_stdin::StdinError),
     /// Error reading input.
     #[error("Error reading from path: {0}")]
     InputFile(#[from] std::io::Error),
@@ -86,9 +84,9 @@ pub const VALID_PRINT: &str = "HUGR valid!";
 
 impl CliArgs {
     /// Run the HUGR cli and validate against an extension registry.
-    pub fn run(&self) -> Result<Vec<Hugr>, CliError> {
-        let rdr = self.input.clone().into_reader()?;
-        let val: serde_json::Value = serde_json::from_reader(rdr)?;
+    pub fn run(&mut self) -> Result<Vec<Hugr>, CliError> {
+        // let rdr = self.input.
+        let val: serde_json::Value = serde_json::from_reader(&mut self.input)?;
         // read either a package or a single hugr
         let (mut modules, packed_exts) = if let Ok(Package {
             modules,

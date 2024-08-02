@@ -25,7 +25,7 @@ fn main() {
 }
 
 /// Run the `validate` subcommand.
-fn run_validate(args: validate::CliArgs) {
+fn run_validate(mut args: validate::CliArgs) {
     let result = args.run();
 
     if let Err(e) = result {

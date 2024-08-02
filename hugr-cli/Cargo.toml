@@ -14,12 +14,12 @@ categories = ["compilers"]
 
 [dependencies]
 clap = { workspace = true, features = ["derive"] }
-clap-stdin.workspace = true
 clap-verbosity-flag.workspace = true
 hugr-core = { path = "../hugr-core", version = "0.7.0" }
 serde_json.workspace = true
 serde.workspace = true
 thiserror.workspace = true
+clio = { workspace = true, features = ["clap-parse"] }
 
 [lints]
 workspace = true

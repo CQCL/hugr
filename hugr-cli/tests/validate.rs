@@ -52,7 +52,7 @@ fn test_doesnt_exist(mut cmd: Command) {
     cmd.arg("foobar");
     cmd.assert()
         .failure()
-        .stderr(contains("No such file or directory").and(contains("Error reading input")));
+        .stderr(contains("No such file or directory"));
 }
 
 #[rstest]
