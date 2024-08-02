@@ -26,7 +26,10 @@ pub struct CliArgs {
     #[command(flatten)]
     pub verbose: Verbosity<InfoLevel>,
     /// No standard extensions.
-    #[arg(long, help = "Don't use standard extensions when validating.")]
+    #[arg(
+        long,
+        help = "Don't use standard extensions when validating. Prelude is still used."
+    )]
     pub no_std: bool,
     /// Extensions paths.
     #[arg(
