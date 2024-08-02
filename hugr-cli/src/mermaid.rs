@@ -15,9 +15,12 @@ pub struct MermaidArgs {
     /// Common arguments
     #[command(flatten)]
     pub hugr_args: crate::HugrArgs,
-    /// Skip validation.
-    #[arg(short, long, help = "Skip validation.")]
-    pub no_validate: bool,
+    /// Validate package.
+    #[arg(
+        long,
+        help = "Validate before rendering, includes extension inference."
+    )]
+    pub validate: bool,
     /// Output file '-' for stdout
     #[clap(long, short, value_parser, default_value = "-")]
     output: Output,
@@ -26,10 +29,10 @@ pub struct MermaidArgs {
 impl MermaidArgs {
     /// Write the mermaid diagram to the output.
     pub fn run_print(&mut self) -> Result<(), crate::CliError> {
-        let hugrs = if self.no_validate {
-            self.hugr_args.get_package()?.modules
-        } else {
+        let hugrs = if self.validate {
             self.hugr_args.validate()?
+        } else {
+            self.hugr_args.get_package()?.modules
         };
 
         for hugr in hugrs {

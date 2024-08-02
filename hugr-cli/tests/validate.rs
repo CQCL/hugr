@@ -103,11 +103,10 @@ fn bad_hugr_string() -> String {
 
 #[rstest]
 fn test_mermaid_invalid(bad_hugr_string: String, mut cmd: Command) {
-    const MERMAID: &str = "graph LR\n    subgraph 0 [\"(0) DFG\"]";
     cmd.arg("mermaid");
-    cmd.arg("--no-validate");
+    cmd.arg("--validate");
     cmd.write_stdin(bad_hugr_string);
-    cmd.assert().success().stdout(contains(MERMAID));
+    cmd.assert().failure().stderr(contains("UnconnectedPort"));
 }
 
 #[rstest]
