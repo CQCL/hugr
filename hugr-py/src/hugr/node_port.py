@@ -28,6 +28,8 @@ class Direction(Enum):
 
 NodeIdx = int
 PortOffset = int
+Edge = tuple["OutPort", "InPort"]
+OrderEdge = tuple[NodeIdx, NodeIdx]
 
 
 @dataclass(frozen=True, eq=True, order=True)
