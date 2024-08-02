@@ -10,8 +10,7 @@ from typing import TYPE_CHECKING
 
 from typing_extensions import Self
 
-from hugr import ops
-
+from . import ops
 from .dfg import _DfBase
 from .hugr import Hugr, ParentBuilder
 

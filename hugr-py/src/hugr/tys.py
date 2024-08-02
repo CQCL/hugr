@@ -5,8 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Protocol, runtime_checkable
 
-import hugr.serialization.tys as stys
-from hugr.utils import ser_it
+from .serialization import tys as stys
+from .utils import ser_it
 
 ExtensionId = stys.ExtensionId
 ExtensionSet = stys.ExtensionSet

@@ -12,8 +12,7 @@ from typing import (
 
 from typing_extensions import Self
 
-from hugr import ops, tys, val
-
+from . import ops, tys, val
 from .exceptions import NoSiblingAncestor
 from .hugr import Hugr, ParentBuilder
 

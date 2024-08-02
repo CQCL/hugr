@@ -8,15 +8,15 @@ from typing import TYPE_CHECKING, Protocol, TypeVar, runtime_checkable
 
 from typing_extensions import Self
 
-import hugr.serialization.ops as sops
-from hugr import tys, val
-from hugr.node_port import Direction, InPort, Node, OutPort, PortOffset, Wire
-from hugr.utils import ser_it
+from . import tys, val
+from .node_port import Direction, InPort, Node, OutPort, PortOffset, Wire
+from .serialization import ops as sops
+from .utils import ser_it
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from hugr.serialization.ops import BaseOp
+    from .serialization.ops import BaseOp
 
 
 @dataclass

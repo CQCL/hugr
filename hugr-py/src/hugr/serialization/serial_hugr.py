@@ -2,8 +2,6 @@ from typing import Any
 
 from pydantic import ConfigDict, Field
 
-import hugr
-from hugr import get_serialization_version
 from hugr.node_port import NodeIdx, PortOffset
 
 from .ops import OpType
@@ -12,6 +10,14 @@ from .tys import ConfiguredBaseModel, model_rebuild
 
 Port = tuple[NodeIdx, PortOffset | None]
 Edge = tuple[Port, Port]
+
+
+def get_serialization_version() -> str:
+    # Delay importing hugr to avoid circular imports
+    from hugr import get_serialization_version
+
+    return get_serialization_version()
+
 
 VersionField = Field(
     default_factory=get_serialization_version,
@@ -34,7 +40,9 @@ class SerialHugr(ConfiguredBaseModel):
 
     def to_json(self) -> str:
         """Return a JSON representation of the Hugr."""
-        self.encoder = f"hugr-py v{hugr.__version__}"
+        from hugr import __version__ as hugr_version
+
+        self.encoder = f"hugr-py v{hugr_version}"
         return self.model_dump_json()
 
     @classmethod

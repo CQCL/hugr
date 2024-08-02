@@ -8,8 +8,7 @@ from typing import TYPE_CHECKING
 
 from typing_extensions import Self
 
-from hugr import ops, val
-
+from . import ops, val
 from .dfg import _DfBase
 from .exceptions import MismatchedExit, NoSiblingAncestor, NotInSameCfg
 from .hugr import Hugr, ParentBuilder
