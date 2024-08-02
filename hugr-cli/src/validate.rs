@@ -58,8 +58,10 @@ pub enum CliError {
 /// Package of module HUGRs and extensions.
 /// The HUGRs are validated against the extensions.
 pub struct Package {
-    modules: Vec<Hugr>,
-    extensions: Vec<Extension>,
+    /// Module HUGRs included in the package.
+    pub modules: Vec<Hugr>,
+    /// Extensions to validate against.
+    pub extensions: Vec<Extension>,
 }
 
 impl Package {
@@ -69,16 +71,6 @@ impl Package {
             modules,
             extensions,
         }
-    }
-
-    /// Modules in the package.
-    pub fn modules(&self) -> &[Hugr] {
-        &self.modules
-    }
-
-    /// Extensions in the package.
-    pub fn extensions(&self) -> &[Extension] {
-        &self.extensions
     }
 }
 
