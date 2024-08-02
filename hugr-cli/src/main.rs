@@ -26,10 +26,7 @@ fn main() {
 
 /// Run the `validate` subcommand.
 fn run_validate(args: validate::CliArgs) {
-    // validate with all std extensions
-    let reg = hugr_core::std_extensions::std_reg();
-
-    let result = args.run(&reg);
+    let result = args.run();
 
     if let Err(e) = result {
         if args.verbosity(Level::Error) {
