@@ -13,7 +13,7 @@ use thiserror::Error;
 #[clap(about = "Validate a HUGR.")]
 #[group(id = "hugr")]
 #[non_exhaustive]
-pub struct CliArgs {
+pub struct ValArgs {
     /// Input HUGR file, use '-' for stdin
     #[clap(value_parser, default_value = "-")]
     pub input: Input,
@@ -82,7 +82,7 @@ impl Package {
 /// String to print when validation is successful.
 pub const VALID_PRINT: &str = "HUGR valid!";
 
-impl CliArgs {
+impl ValArgs {
     /// Run the HUGR cli and validate against an extension registry.
     pub fn run(&mut self) -> Result<Vec<Hugr>, CliError> {
         // let rdr = self.input.

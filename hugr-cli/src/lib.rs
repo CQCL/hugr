@@ -16,7 +16,7 @@ pub mod validate;
 #[non_exhaustive]
 pub enum CliArgs {
     /// Validate and visualize a HUGR file.
-    Validate(validate::CliArgs),
+    Validate(validate::ValArgs),
     /// Write standard extensions out in serialized form.
     GenExtensions(extensions::ExtArgs),
     /// External commands
