@@ -114,21 +114,32 @@ class RzDef(AsCustomOp):
 Rz = RzDef()
 
 
-def validate(h: Hugr, mermaid: bool = False, roundtrip: bool = True):
+def _base_command() -> list[str]:
     workspace_dir = pathlib.Path(__file__).parent.parent.parent
     # use the HUGR_BIN environment variable if set, otherwise use the debug build
     bin_loc = os.environ.get("HUGR_BIN", str(workspace_dir / "target/debug/hugr"))
-    cmd = [bin_loc, "validate", "-"]
+    return [bin_loc]
 
-    if mermaid:
-        cmd.append("--mermaid")
+
+def mermaid(h: Hugr):
+    """Render the Hugr as a mermaid diagram for debugging."""
+    cmd = [*_base_command(), "mermaid", "-"]
+    _run_hugr_cmd(h.to_serial().to_json(), cmd)
+
+
+def validate(h: Hugr, roundtrip: bool = True):
+    cmd = [*_base_command(), "validate", "-"]
     serial = h.to_serial().to_json()
+    _run_hugr_cmd(serial, cmd)
+
+    if roundtrip:
+        h2 = Hugr.from_serial(SerialHugr.load_json(json.loads(serial)))
+        assert serial == h2.to_serial().to_json()
+
+
+def _run_hugr_cmd(serial: str, cmd: list[str]):
     try:
         subprocess.run(cmd, check=True, input=serial.encode(), capture_output=True)  # noqa: S603
     except subprocess.CalledProcessError as e:
         error = e.stderr.decode()
         raise RuntimeError(error) from e
-
-    if roundtrip:
-        h2 = Hugr.from_serial(SerialHugr.load_json(json.loads(serial)))
-        assert serial == h2.to_serial().to_json()

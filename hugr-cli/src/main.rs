@@ -10,6 +10,7 @@ fn main() {
     match CliArgs::parse() {
         CliArgs::Validate(args) => run_validate(args),
         CliArgs::GenExtensions(args) => args.run_dump(),
+        CliArgs::Mermaid(mut args) => args.run_print().unwrap(),
         CliArgs::External(_) => {
             // TODO: Implement support for external commands.
             // Running `hugr COMMAND` would look for `hugr-COMMAND` in the path
@@ -25,7 +26,7 @@ fn main() {
 }
 
 /// Run the `validate` subcommand.
-fn run_validate(args: validate::CliArgs) {
+fn run_validate(mut args: validate::ValArgs) {
     let result = args.run();
 
     if let Err(e) = result {
