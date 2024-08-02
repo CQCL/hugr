@@ -37,12 +37,24 @@ pub const VALID_PRINT: &str = "HUGR valid!";
 impl ValArgs {
     /// Run the HUGR cli and validate against an extension registry.
     pub fn run(&mut self) -> Result<Vec<Hugr>, CliError> {
+        self.hugr_args.validate()
+    }
+
+    /// Test whether a `level` message should be output.
+    pub fn verbosity(&self, level: Level) -> bool {
+        self.hugr_args.verbosity(level)
+    }
+}
+
+impl HugrArgs {
+    /// Load the package and validate against an extension registry.
+    pub fn validate(&mut self) -> Result<Vec<Hugr>, CliError> {
         let Package {
             mut modules,
             extensions: packed_exts,
-        } = self.hugr_args.get_package()?;
+        } = self.get_package()?;
 
-        let mut reg: ExtensionRegistry = if self.hugr_args.no_std {
+        let mut reg: ExtensionRegistry = if self.no_std {
             hugr_core::extension::PRELUDE_REGISTRY.to_owned()
         } else {
             hugr_core::std_extensions::std_reg()
@@ -54,7 +66,7 @@ impl ValArgs {
         }
 
         // register external extensions
-        for ext in &self.hugr_args.extensions {
+        for ext in &self.extensions {
             let f = std::fs::File::open(ext)?;
             let ext: Extension = serde_json::from_reader(f)?;
             reg.register_updated(ext).map_err(ValError::ExtReg)?;
@@ -71,6 +83,6 @@ impl ValArgs {
 
     /// Test whether a `level` message should be output.
     pub fn verbosity(&self, level: Level) -> bool {
-        self.hugr_args.verbose.log_level_filter() >= level
+        self.verbose.log_level_filter() >= level
     }
 }

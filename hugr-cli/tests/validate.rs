@@ -93,12 +93,25 @@ fn test_mermaid(test_hugr_file: NamedTempFile, mut cmd: Command) {
     cmd.assert().success().stdout(contains(MERMAID));
 }
 
-#[rstest]
-fn test_bad_hugr(mut val_cmd: Command) {
+#[fixture]
+fn bad_hugr_string() -> String {
     let df = DFGBuilder::new(Signature::new_endo(type_row![QB_T])).unwrap();
     let bad_hugr = df.hugr().clone();
 
-    let bad_hugr_string = serde_json::to_string(&bad_hugr).unwrap();
+    serde_json::to_string(&bad_hugr).unwrap()
+}
+
+#[rstest]
+fn test_mermaid_invalid(bad_hugr_string: String, mut cmd: Command) {
+    const MERMAID: &str = "graph LR\n    subgraph 0 [\"(0) DFG\"]";
+    cmd.arg("mermaid");
+    cmd.arg("--no-validate");
+    cmd.write_stdin(bad_hugr_string);
+    cmd.assert().success().stdout(contains(MERMAID));
+}
+
+#[rstest]
+fn test_bad_hugr(bad_hugr_string: String, mut val_cmd: Command) {
     val_cmd.write_stdin(bad_hugr_string);
     val_cmd.arg("-");
 
