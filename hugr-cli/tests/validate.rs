@@ -6,7 +6,7 @@
 
 use assert_cmd::Command;
 use assert_fs::{fixture::FileWriteStr, NamedTempFile};
-use hugr_cli::validate::{Package, VALID_PRINT};
+use hugr_cli::{validate::VALID_PRINT, Package};
 use hugr_core::builder::DFGBuilder;
 use hugr_core::types::Type;
 use hugr_core::{
@@ -22,7 +22,11 @@ use rstest::{fixture, rstest};
 
 #[fixture]
 fn cmd() -> Command {
-    let mut cmd = Command::cargo_bin("hugr").unwrap();
+    Command::cargo_bin("hugr").unwrap()
+}
+
+#[fixture]
+fn val_cmd(mut cmd: Command) -> Command {
     cmd.arg("validate");
     cmd
 }
@@ -48,86 +52,92 @@ fn test_hugr_file(test_hugr_string: String) -> NamedTempFile {
 }
 
 #[rstest]
-fn test_doesnt_exist(mut cmd: Command) {
-    cmd.arg("foobar");
-    cmd.assert()
+fn test_doesnt_exist(mut val_cmd: Command) {
+    val_cmd.arg("foobar");
+    val_cmd
+        .assert()
         .failure()
         .stderr(contains("No such file or directory"));
 }
 
 #[rstest]
-fn test_validate(test_hugr_file: NamedTempFile, mut cmd: Command) {
-    cmd.arg(test_hugr_file.path());
-    cmd.assert().success().stderr(contains(VALID_PRINT));
+fn test_validate(test_hugr_file: NamedTempFile, mut val_cmd: Command) {
+    val_cmd.arg(test_hugr_file.path());
+    val_cmd.assert().success().stderr(contains(VALID_PRINT));
 }
 
 #[rstest]
-fn test_stdin(test_hugr_string: String, mut cmd: Command) {
-    cmd.write_stdin(test_hugr_string);
-    cmd.arg("-");
+fn test_stdin(test_hugr_string: String, mut val_cmd: Command) {
+    val_cmd.write_stdin(test_hugr_string);
+    val_cmd.arg("-");
 
-    cmd.assert().success().stderr(contains(VALID_PRINT));
+    val_cmd.assert().success().stderr(contains(VALID_PRINT));
 }
 
 #[rstest]
-fn test_stdin_silent(test_hugr_string: String, mut cmd: Command) {
-    cmd.args(["-", "-q"]);
-    cmd.write_stdin(test_hugr_string);
+fn test_stdin_silent(test_hugr_string: String, mut val_cmd: Command) {
+    val_cmd.args(["-", "-q"]);
+    val_cmd.write_stdin(test_hugr_string);
 
-    cmd.assert().success().stderr(contains(VALID_PRINT).not());
+    val_cmd
+        .assert()
+        .success()
+        .stderr(contains(VALID_PRINT).not());
 }
 
 #[rstest]
 fn test_mermaid(test_hugr_file: NamedTempFile, mut cmd: Command) {
     const MERMAID: &str = "graph LR\n    subgraph 0 [\"(0) DFG\"]";
+    cmd.arg("mermaid");
     cmd.arg(test_hugr_file.path());
-    cmd.arg("--mermaid");
-    cmd.arg("--no-validate");
     cmd.assert().success().stdout(contains(MERMAID));
 }
 
 #[rstest]
-fn test_bad_hugr(mut cmd: Command) {
+fn test_bad_hugr(mut val_cmd: Command) {
     let df = DFGBuilder::new(Signature::new_endo(type_row![QB_T])).unwrap();
     let bad_hugr = df.hugr().clone();
 
     let bad_hugr_string = serde_json::to_string(&bad_hugr).unwrap();
-    cmd.write_stdin(bad_hugr_string);
-    cmd.arg("-");
+    val_cmd.write_stdin(bad_hugr_string);
+    val_cmd.arg("-");
 
-    cmd.assert()
+    val_cmd
+        .assert()
         .failure()
         .stderr(contains("Error validating HUGR").and(contains("unconnected port")));
 }
 
 #[rstest]
-fn test_bad_json(mut cmd: Command) {
-    cmd.write_stdin(r#"{"foo": "bar"}"#);
-    cmd.arg("-");
+fn test_bad_json(mut val_cmd: Command) {
+    val_cmd.write_stdin(r#"{"foo": "bar"}"#);
+    val_cmd.arg("-");
 
-    cmd.assert()
+    val_cmd
+        .assert()
         .failure()
         .stderr(contains("Error parsing input"));
 }
 
 #[rstest]
-fn test_bad_json_silent(mut cmd: Command) {
-    cmd.write_stdin(r#"{"foo": "bar"}"#);
-    cmd.args(["-", "-qqq"]);
+fn test_bad_json_silent(mut val_cmd: Command) {
+    val_cmd.write_stdin(r#"{"foo": "bar"}"#);
+    val_cmd.args(["-", "-qqq"]);
 
-    cmd.assert()
+    val_cmd
+        .assert()
         .failure()
         .stderr(contains("Error parsing input").not());
 }
 
 #[rstest]
-fn test_no_std(test_hugr_string: String, mut cmd: Command) {
-    cmd.write_stdin(test_hugr_string);
-    cmd.arg("-");
-    cmd.arg("--no-std");
+fn test_no_std(test_hugr_string: String, mut val_cmd: Command) {
+    val_cmd.write_stdin(test_hugr_string);
+    val_cmd.arg("-");
+    val_cmd.arg("--no-std");
     // test hugr doesn't have any standard extensions, so this should succceed
 
-    cmd.assert().success().stderr(contains(VALID_PRINT));
+    val_cmd.assert().success().stderr(contains(VALID_PRINT));
 }
 
 #[fixture]
@@ -136,12 +146,13 @@ fn float_hugr_string(#[with(FLOAT64_TYPE)] test_hugr: Hugr) -> String {
 }
 
 #[rstest]
-fn test_no_std_fail(float_hugr_string: String, mut cmd: Command) {
-    cmd.write_stdin(float_hugr_string);
-    cmd.arg("-");
-    cmd.arg("--no-std");
+fn test_no_std_fail(float_hugr_string: String, mut val_cmd: Command) {
+    val_cmd.write_stdin(float_hugr_string);
+    val_cmd.arg("-");
+    val_cmd.arg("--no-std");
 
-    cmd.assert()
+    val_cmd
+        .assert()
         .failure()
         .stderr(contains(" Extension 'arithmetic.float.types' not found"));
 }
@@ -153,14 +164,14 @@ const FLOAT_EXT_FILE: &str = concat!(
 );
 
 #[rstest]
-fn test_float_extension(float_hugr_string: String, mut cmd: Command) {
-    cmd.write_stdin(float_hugr_string);
-    cmd.arg("-");
-    cmd.arg("--no-std");
-    cmd.arg("--extensions");
-    cmd.arg(FLOAT_EXT_FILE);
+fn test_float_extension(float_hugr_string: String, mut val_cmd: Command) {
+    val_cmd.write_stdin(float_hugr_string);
+    val_cmd.arg("-");
+    val_cmd.arg("--no-std");
+    val_cmd.arg("--extensions");
+    val_cmd.arg(FLOAT_EXT_FILE);
 
-    cmd.assert().success().stderr(contains(VALID_PRINT));
+    val_cmd.assert().success().stderr(contains(VALID_PRINT));
 }
 #[fixture]
 fn package_string(#[with(FLOAT64_TYPE)] test_hugr: Hugr) -> String {
@@ -171,11 +182,11 @@ fn package_string(#[with(FLOAT64_TYPE)] test_hugr: Hugr) -> String {
 }
 
 #[rstest]
-fn test_package(package_string: String, mut cmd: Command) {
+fn test_package(package_string: String, mut val_cmd: Command) {
     // package with float extension and hugr that uses floats can validate
-    cmd.write_stdin(package_string);
-    cmd.arg("-");
-    cmd.arg("--no-std");
+    val_cmd.write_stdin(package_string);
+    val_cmd.arg("-");
+    val_cmd.arg("--no-std");
 
-    cmd.assert().success().stderr(contains(VALID_PRINT));
+    val_cmd.assert().success().stderr(contains(VALID_PRINT));
 }
