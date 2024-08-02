@@ -6,6 +6,7 @@ from contextlib import AbstractContextManager
 from dataclasses import dataclass, field, replace
 from typing import (
     TYPE_CHECKING,
+    Generic,
     TypeVar,
 )
 
@@ -22,13 +23,66 @@ if TYPE_CHECKING:
     from .cfg import Cfg
     from .cond_loop import Conditional, If, TailLoop
     from .node_port import Node, OutPort, PortOffset, ToNode, Wire
+    from .tys import Type, TypeParam, TypeRow
+
+OpVar = TypeVar("OpVar", bound=ops.Op)
+
+
+@dataclass()
+class _DefinitionBuilder(Generic[OpVar]):
+    """Base class for builders that can define functions, constants, and aliases.
+
+    As this class may be a root node, it does not extend `ParentBuilder`.
+    """
+
+    hugr: Hugr[OpVar]
+
+    def define_function(
+        self,
+        name: str,
+        input_types: TypeRow,
+        type_params: list[TypeParam] | None = None,
+    ) -> Function:
+        """Start building a function definition in the graph.
+
+        Args:
+            name: The name of the function.
+            input_types: The input types for the function.
+            type_params: The type parameters for the function, if polymorphic.
+
+        Returns:
+            The new function builder.
+        """
+        parent_op = ops.FuncDefn(name, input_types, type_params or [])
+        return Function.new_nested(parent_op, self.hugr)
+
+    def add_const(self, value: val.Value) -> Node:
+        """Add a static constant to the graph.
+
+        Args:
+            value: The constant value to add.
+
+        Returns:
+            The node holding the :class:`Const <hugr.ops.Const>` operation.
+
+        Example:
+            >>> dfg = Dfg()
+            >>> const_n = dfg.add_const(val.TRUE)
+            >>> dfg.hugr[const_n].op
+            Const(TRUE)
+        """
+        return self.hugr.add_node(ops.Const(value), self.hugr.root)
+
+    def add_alias_defn(self, name: str, ty: Type) -> Node:
+        """Add a type alias definition."""
+        return self.hugr.add_node(ops.AliasDefn(name, ty), self.hugr.root)
 
 
 DP = TypeVar("DP", bound=ops.DfParentOp)
 
 
 @dataclass()
-class _DfBase(ParentBuilder[DP], AbstractContextManager):
+class _DfBase(ParentBuilder[DP], _DefinitionBuilder, AbstractContextManager):
     """Base class for dataflow graph builders.
 
     Args:
@@ -428,23 +482,6 @@ class _DfBase(ParentBuilder[DP], AbstractContextManager):
         # adds edge to the right of all existing edges
         self.hugr.add_link(src.out(-1), dst.inp(-1))
 
-    def add_const(self, val: val.Value) -> Node:
-        """Add a static constant to the graph.
-
-        Args:
-            val: The value to add.
-
-        Returns:
-            The node holding the :class:`Const <hugr.ops.Const>` operation.
-
-        Example:
-            >>> dfg = Dfg()
-            >>> const_n = dfg.add_const(val.TRUE)
-            >>> dfg.hugr[const_n].op
-            Const(TRUE)
-        """
-        return self.hugr.add_const(val, self.parent_node)
-
     def load(self, const: ToNode | val.Value) -> Node:
         """Load a constant into the graph as a dataflow value.
 
@@ -594,3 +631,29 @@ def _ancestral_sibling(h: Hugr, src: Node, tgt: Node) -> Node | None:
         tgt = tgt_parent
 
     return None
+
+
+@dataclass
+class Function(_DfBase[ops.FuncDefn]):
+    """Build a function definition as a HUGR dataflow graph.
+
+    Args:
+        name: The name of the function.
+        input_types: The input types for the function (output types are
+        computed by propagating types from input node through the graph).
+        type_params: The type parameters for the function, if polymorphic.
+
+    Examples:
+        >>> f = Function("f", [tys.Bool])
+        >>> f.parent_op
+        FuncDefn(name='f', inputs=[Bool], params=[])
+    """
+
+    def __init__(
+        self,
+        name: str,
+        input_types: TypeRow,
+        type_params: list[TypeParam] | None = None,
+    ) -> None:
+        root_op = ops.FuncDefn(name, input_types, type_params or [])
+        super().__init__(root_op)
