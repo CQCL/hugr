@@ -28,8 +28,12 @@ pub struct CliArgs {
     /// No standard extensions.
     #[arg(long, help = "Don't use standard extensions when validating.")]
     pub no_std: bool,
-    /// Skip validation.
-    #[arg(short, long, help = "Skip validation.")]
+    /// Extensions paths.
+    #[arg(
+        short,
+        long,
+        help = "Paths to serialised extensions to validate against."
+    )]
     pub extensions: Vec<PathBuf>,
 }
 
