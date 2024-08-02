@@ -12,15 +12,13 @@ Port = tuple[NodeIdx, PortOffset | None]
 Edge = tuple[Port, Port]
 
 
-def get_serialization_version() -> str:
-    # Delay importing hugr to avoid circular imports
-    from hugr import get_serialization_version
-
-    return get_serialization_version()
+def serialization_version() -> str:
+    """Return the current version of the serialization schema."""
+    return "live"
 
 
 VersionField = Field(
-    default_factory=get_serialization_version,
+    default_factory=serialization_version,
     title="Version",
     description="Serialisation Schema Version",
     frozen=True,
