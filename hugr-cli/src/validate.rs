@@ -1,11 +1,11 @@
 //! The `validate` subcommand.
-use std::path::PathBuf;
 
 use clap::Parser;
-use clap_verbosity_flag::{InfoLevel, Level, Verbosity};
-use clio::Input;
+use clap_verbosity_flag::Level;
 use hugr_core::{extension::ExtensionRegistry, Extension, Hugr, HugrView as _};
 use thiserror::Error;
+
+use crate::HugrArgs;
 
 /// Validate and visualise a HUGR file.
 #[derive(Parser, Debug)]
@@ -14,31 +14,15 @@ use thiserror::Error;
 #[group(id = "hugr")]
 #[non_exhaustive]
 pub struct ValArgs {
-    /// Input HUGR file, use '-' for stdin
-    #[clap(value_parser, default_value = "-")]
-    pub input: Input,
+    #[command(flatten)]
+    /// common arguments
+    pub hugr_args: HugrArgs,
     /// Visualise with mermaid.
     #[arg(short, long, value_name = "MERMAID", help = "Visualise with mermaid.")]
     pub mermaid: bool,
     /// Skip validation.
     #[arg(short, long, help = "Skip validation.")]
     pub no_validate: bool,
-    /// Verbosity.
-    #[command(flatten)]
-    pub verbose: Verbosity<InfoLevel>,
-    /// No standard extensions.
-    #[arg(
-        long,
-        help = "Don't use standard extensions when validating. Prelude is still used."
-    )]
-    pub no_std: bool,
-    /// Extensions paths.
-    #[arg(
-        short,
-        long,
-        help = "Paths to serialised extensions to validate against."
-    )]
-    pub extensions: Vec<PathBuf>,
 }
 
 /// Error type for the CLI.
@@ -86,7 +70,7 @@ impl ValArgs {
     /// Run the HUGR cli and validate against an extension registry.
     pub fn run(&mut self) -> Result<Vec<Hugr>, CliError> {
         // let rdr = self.input.
-        let val: serde_json::Value = serde_json::from_reader(&mut self.input)?;
+        let val: serde_json::Value = serde_json::from_reader(&mut self.hugr_args.input)?;
         // read either a package or a single hugr
         let (mut modules, packed_exts) = if let Ok(Package {
             modules,
@@ -99,7 +83,7 @@ impl ValArgs {
             (vec![hugr], vec![])
         };
 
-        let mut reg: ExtensionRegistry = if self.no_std {
+        let mut reg: ExtensionRegistry = if self.hugr_args.no_std {
             hugr_core::extension::PRELUDE_REGISTRY.to_owned()
         } else {
             hugr_core::std_extensions::std_reg()
@@ -111,7 +95,7 @@ impl ValArgs {
         }
 
         // register external extensions
-        for ext in &self.extensions {
+        for ext in &self.hugr_args.extensions {
             let f = std::fs::File::open(ext)?;
             let ext: Extension = serde_json::from_reader(f)?;
             reg.register_updated(ext)?;
@@ -134,6 +118,6 @@ impl ValArgs {
 
     /// Test whether a `level` message should be output.
     pub fn verbosity(&self, level: Level) -> bool {
-        self.verbose.log_level_filter() >= level
+        self.hugr_args.verbose.log_level_filter() >= level
     }
 }

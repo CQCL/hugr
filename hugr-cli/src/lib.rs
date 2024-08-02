@@ -1,9 +1,10 @@
 //! Standard command line tools, used by the hugr binary.
 
-use std::ffi::OsString;
+use clap::Parser;
+use clap_verbosity_flag::{InfoLevel, Verbosity};
+use clio::Input;
+use std::{ffi::OsString, path::PathBuf};
 use thiserror::Error;
-/// We reexport some clap types that are used in the public API.
-pub use {clap::Parser, clap_verbosity_flag::Level};
 
 pub mod extensions;
 pub mod validate;
@@ -31,4 +32,28 @@ pub enum CliArgs {
 pub enum CliError {
     /// Errors produced by the `validate` subcommand.
     Validate(#[from] validate::CliError),
+}
+
+/// Validate and visualise a HUGR file.
+#[derive(Parser, Debug)]
+pub struct HugrArgs {
+    /// Input HUGR file, use '-' for stdin
+    #[clap(value_parser, default_value = "-")]
+    pub input: Input,
+    /// Verbosity.
+    #[command(flatten)]
+    pub verbose: Verbosity<InfoLevel>,
+    /// No standard extensions.
+    #[arg(
+        long,
+        help = "Don't use standard extensions when validating. Prelude is still used."
+    )]
+    pub no_std: bool,
+    /// Extensions paths.
+    #[arg(
+        short,
+        long,
+        help = "Paths to serialised extensions to validate against."
+    )]
+    pub extensions: Vec<PathBuf>,
 }
