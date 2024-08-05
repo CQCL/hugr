@@ -2,10 +2,10 @@
 
 from collections.abc import Iterable
 
-from . import tys
-from .dfg import Dfg
-from .node_port import Node, Wire
-from .ops import Command, ComWire
+from hugr import tys
+from hugr.dfg import Dfg
+from hugr.node_port import Node, Wire
+from hugr.ops import Command, ComWire
 
 
 class TrackedDfg(Dfg):

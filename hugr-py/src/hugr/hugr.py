@@ -13,8 +13,7 @@ from typing import (
     overload,
 )
 
-from .exceptions import ParentBeforeChild
-from .node_port import (
+from hugr.node_port import (
     Direction,
     InPort,
     Node,
@@ -24,15 +23,17 @@ from .node_port import (
     ToNode,
     _SubPort,
 )
-from .ops import Call, Const, DataflowOp, Module, Op
-from .serialization.ops import OpType as SerialOp
-from .serialization.serial_hugr import SerialHugr
-from .tys import Kind, Type, ValueKind
-from .utils import BiMap
-from .val import Value
+from hugr.ops import Call, Const, DataflowOp, Module, Op
+from hugr.serialization.ops import OpType as SerialOp
+from hugr.serialization.serial_hugr import SerialHugr
+from hugr.tys import Kind, Type, ValueKind
+from hugr.utils import BiMap
+from hugr.val import Value
+
+from .exceptions import ParentBeforeChild
 
 if TYPE_CHECKING:
-    from .val import Value
+    from hugr.val import Value
 
 
 @dataclass()

@@ -5,13 +5,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
-from . import tys
-from .serialization import ops as sops
-from .serialization import tys as stys
-from .utils import ser_it
+import hugr.serialization.ops as sops
+import hugr.serialization.tys as stys
+from hugr import tys
+from hugr.utils import ser_it
 
 if TYPE_CHECKING:
-    from .hugr import Hugr
+    from hugr.hugr import Hugr
 
 
 @runtime_checkable

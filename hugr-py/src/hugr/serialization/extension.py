@@ -74,8 +74,6 @@ class Extension(ConfiguredBaseModel):
 
     @classmethod
     def get_version(cls) -> str:
-        from hugr.serialization.serial_hugr import serialization_version
-
         return serialization_version()
 
 
