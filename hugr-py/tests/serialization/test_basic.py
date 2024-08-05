@@ -1,11 +1,10 @@
-from hugr import get_serialization_version
-from hugr.serialization.serial_hugr import SerialHugr
+from hugr.serialization.serial_hugr import SerialHugr, serialization_version
 
 
 def test_empty():
     h = SerialHugr(nodes=[], edges=[])
     assert h.model_dump() == {
-        "version": get_serialization_version(),
+        "version": serialization_version(),
         "nodes": [],
         "edges": [],
         "metadata": None,

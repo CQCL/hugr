@@ -3,10 +3,8 @@ from typing import Annotated, Any, Literal
 import pydantic as pd
 from pydantic_extra_types.semantic_version import SemanticVersion
 
-from hugr import get_serialization_version
-
 from .ops import Value
-from .serial_hugr import SerialHugr
+from .serial_hugr import SerialHugr, serialization_version
 from .tys import (
     ConfiguredBaseModel,
     ExtensionId,
@@ -76,7 +74,7 @@ class Extension(ConfiguredBaseModel):
 
     @classmethod
     def get_version(cls) -> str:
-        return get_serialization_version()
+        return serialization_version()
 
 
 class Package(ConfiguredBaseModel):
@@ -85,4 +83,4 @@ class Package(ConfiguredBaseModel):
 
     @classmethod
     def get_version(cls) -> str:
-        return get_serialization_version()
+        return serialization_version()
