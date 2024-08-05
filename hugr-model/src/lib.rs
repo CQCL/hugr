@@ -8,6 +8,4 @@
 //! We intend to support serialization from and into the following file formats:
 //!
 //! - S-expressions via `parens` as a human readable and writable format.
-//! - MessagePack via `serde` for efficient serialization.
-//! - JSON via `serde` for serialisation where MessagePack can not be used.
-pub mod v2;
+pub mod v2_syntax;

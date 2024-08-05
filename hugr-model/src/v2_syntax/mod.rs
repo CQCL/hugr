@@ -1,6 +1,6 @@
-//! Version 2 of the HUGR file format.
+//! Version 2 of the HUGR text format.
 pub mod file;
 pub mod hugr;
 pub mod ident;
 pub mod keywords;
-pub mod types;
+pub mod terms;

@@ -62,7 +62,7 @@ make_id!(
     "%",
     /// Type variable name, starting with a `%` sigil.
     #[derive(Serialize, Deserialize)]
-    pub struct TypeVar;
+    pub struct TermVar;
 );
 
 make_id!(

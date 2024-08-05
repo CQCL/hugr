@@ -11,6 +11,9 @@ license.workspace = true
 serde = { workspace = true, features = ["derive"] }
 smol_str = { workspace = true, features = ["serde"] }
 parens = { path = "../../parens/parens" }
+tinyvec = { version = "1.8.0", features = ["alloc"] }
+leb128 = "0.2.5"
+indexmap = "2.2.6"
 
 [lints]
 workspace = true

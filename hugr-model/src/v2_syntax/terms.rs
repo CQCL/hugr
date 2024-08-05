@@ -1,4 +1,4 @@
-//! Types.
+//! Terms.
 
 use parens::parser::{self, Parse, Parser, Peek};
 use parens::printer::{Print, Printer};
@@ -6,27 +6,30 @@ use parens::util::Form;
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 
-use super::ident::{Label, Symbol, TypeVar};
+use super::ident::{Label, Symbol, TermVar};
 use super::keywords as kw;
 
 /// A type.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum Type {
+pub enum Term {
     /// Type constructor application.
     #[serde(rename = "ctr")]
-    Ctr(TypeCtr),
+    Ctr(TermCtr),
     /// Type variable.
     #[serde(rename = "var")]
-    Var(TypeVar),
+    Var(TermVar),
     /// Row type.
     #[serde(rename = "row")]
-    Row(TypeRow),
+    Row(TermRow),
     /// List type.
     #[serde(rename = "list")]
-    List(TypeList),
+    List(TermList),
     /// Label.
     #[serde(rename = "label")]
     Label(Label),
+    /// Scheme.
+    #[serde(rename = "scheme")]
+    Scheme(TermScheme),
     /// Literal integer.
     #[serde(rename = "int")]
     LitInt(i64),
@@ -35,15 +38,15 @@ pub enum Type {
     LitStr(SmolStr),
 }
 
-impl Parse for Type {
+impl Parse for Term {
     fn parse(parser: &mut Parser<'_>) -> parser::Result<Self> {
-        if parser.peek::<TypeCtr>() {
+        if parser.peek::<TermCtr>() {
             Ok(Self::Ctr(parser.parse()?))
-        } else if parser.peek::<TypeVar>() {
+        } else if parser.peek::<TermVar>() {
             Ok(Self::Var(parser.parse()?))
-        } else if parser.peek::<TypeRow>() {
+        } else if parser.peek::<TermRow>() {
             Ok(Self::Row(parser.parse()?))
-        } else if parser.peek::<TypeList>() {
+        } else if parser.peek::<TermList>() {
             Ok(Self::List(parser.parse()?))
         } else if parser.peek::<Label>() {
             Ok(Self::Label(parser.parse()?))
@@ -63,19 +66,20 @@ impl Parse for Type {
     }
 }
 
-impl Print for Type {
+impl Print for Term {
     fn print<P: Printer>(&self, printer: &mut P) -> Result<(), P::Error> {
         match self {
-            Type::Ctr(ctr) => printer.print(ctr),
-            Type::Var(var) => printer.print(var),
-            Type::Row(row) => printer.print(row),
-            Type::List(list) => printer.print(list),
-            Type::Label(label) => printer.print(label),
-            Type::LitInt(int) => printer.print(int),
-            Type::LitStr(str) => printer.list(|printer| {
+            Term::Ctr(ctr) => printer.print(ctr),
+            Term::Var(var) => printer.print(var),
+            Term::Row(row) => printer.print(row),
+            Term::List(list) => printer.print(list),
+            Term::Label(label) => printer.print(label),
+            Term::LitInt(int) => printer.print(int),
+            Term::LitStr(str) => printer.list(|printer| {
                 printer.print(kw::str)?;
                 printer.print(str)
             }),
+            Term::Scheme(_) => todo!(),
         }
     }
 }
@@ -89,14 +93,14 @@ impl Print for Type {
 /// does not have any arguments, it can also be written as `@name`. For example,
 /// `(@hashmap @str @int)` may denote a hashmap type with string keys and integer values.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TypeCtr {
+pub struct TermCtr {
     /// The name of the type constructor.
     pub ctr: Symbol,
     /// The arguments to the type constructor.
-    pub args: Vec<Type>,
+    pub args: Vec<Term>,
 }
 
-impl Parse for TypeCtr {
+impl Parse for TermCtr {
     fn parse(parser: &mut Parser<'_>) -> parser::Result<Self> {
         if parser.peek::<Symbol>() {
             let ctr = parser.parse()?;
@@ -112,13 +116,13 @@ impl Parse for TypeCtr {
     }
 }
 
-impl Peek for TypeCtr {
+impl Peek for TermCtr {
     fn peek(cursor: parser::Cursor<'_>) -> bool {
         cursor.peek::<Symbol>() || cursor.peek_list(|cursor| cursor.peek::<Symbol>())
     }
 }
 
-impl Print for TypeCtr {
+impl Print for TermCtr {
     fn print<P: Printer>(&self, printer: &mut P) -> Result<(), P::Error> {
         if self.args.is_empty() {
             printer.print(&self.ctr)
@@ -131,13 +135,13 @@ impl Print for TypeCtr {
     }
 }
 
-/// A row type.
+/// A row.
 ///
 /// Rows have an optional tail.
 /// If the tail is present the row is called *open*, and otherwise *closed*.
 /// A row whose tail is again a row is considered equivalent to a single
 /// concatenated row.
-/// An open row is *proper* when its tail is either a proper row or a type variable,
+/// An open row is *proper* when its tail is either a proper row or a variable,
 /// and *improper* otherwise. A closed row is always *proper*.
 ///
 /// Two adjacent entries in a row may exchange place as long as their label is different.
@@ -157,14 +161,14 @@ impl Print for TypeCtr {
 ///
 /// [scoped labels]: https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/scopedlabels.pdf
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TypeRow {
+pub struct TermRow {
     /// The entries in the row type.
-    pub entries: Vec<TypeRowEntry>,
+    pub entries: Vec<TermRowEntry>,
     /// The tail of the row or `None` if the row is closed.
-    pub tail: Option<Box<Type>>,
+    pub tail: Option<Box<Term>>,
 }
 
-impl Parse for TypeRow {
+impl Parse for TermRow {
     fn parse(parser: &mut Parser<'_>) -> parser::Result<Self> {
         parser.map(|parser| {
             let mut entries = Vec::new();
@@ -180,18 +184,18 @@ impl Parse for TypeRow {
                 }
             }
 
-            Ok(TypeRow { entries, tail })
+            Ok(TermRow { entries, tail })
         })
     }
 }
 
-impl Peek for TypeRow {
+impl Peek for TermRow {
     fn peek(cursor: parser::Cursor<'_>) -> bool {
         cursor.peek_map(|_| true)
     }
 }
 
-impl Print for TypeRow {
+impl Print for TermRow {
     fn print<P: Printer>(&self, printer: &mut P) -> Result<(), P::Error> {
         printer.print(&self.entries)?;
 
@@ -206,24 +210,24 @@ impl Print for TypeRow {
 
 /// An entry in a row type.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TypeRowEntry {
+pub struct TermRowEntry {
     /// The label of the row entry.
     pub label: Label,
     /// The type associated to the row entry.
-    pub value: Box<Type>,
+    pub value: Box<Term>,
 }
 
-impl Parse for TypeRowEntry {
+impl Parse for TermRowEntry {
     fn parse(parser: &mut Parser<'_>) -> parser::Result<Self> {
         parser.list(|parser| {
             let label = parser.parse()?;
             let value = parser.parse()?;
-            Ok(TypeRowEntry { label, value })
+            Ok(TermRowEntry { label, value })
         })
     }
 }
 
-impl Print for TypeRowEntry {
+impl Print for TermRowEntry {
     fn print<P: Printer>(&self, printer: &mut P) -> Result<(), P::Error> {
         printer.list(|printer| {
             printer.print(&self.label)?;
@@ -232,19 +236,19 @@ impl Print for TypeRowEntry {
     }
 }
 
-/// A type level list.
+/// A list.
 ///
 /// Lists have an optional tail.
 /// If the tail is present the list is called *open*, and otherwise *closed*.
 /// A list whose tail is again a list is considered equivalent to a single
 /// concatenated list.
-/// An open list is *proper* when its tail is either a proper list or a type variable,
+/// An open list is *proper* when its tail is either a proper list or a variable,
 /// and *improper* otherwise. A closed list is always *proper*.
 ///
 /// # Syntax
 ///
-/// A closed list is a sequence of types delimited by square brackets: `[item-1 ... item-n]`.
-/// Open lists are denoted as `[item-1 ... item-n . tail]` where `tail` is again a type.
+/// A closed list is a sequence of terms delimited by square brackets: `[item-1 ... item-n]`.
+/// Open lists are denoted as `[item-1 ... item-n . tail]` where `tail` is again a term.
 ///
 /// # Examples
 ///
@@ -253,14 +257,14 @@ impl Print for TypeRowEntry {
 ///  - The types in a tuple: `(@tuple [@int @str])`
 ///  - Dimensions of a tensor: `(@tensor @f32 [512 128 128])`
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TypeList {
+pub struct TermList {
     /// The items in the list.
-    pub items: Vec<Type>,
+    pub items: Vec<Term>,
     /// The tail of the list, or `None` if the list is closed.
-    pub tail: Option<Box<Type>>,
+    pub tail: Option<Box<Term>>,
 }
 
-impl Parse for TypeList {
+impl Parse for TermList {
     fn parse(parser: &mut Parser<'_>) -> parser::Result<Self> {
         parser.seq(|parser| {
             let mut items = Vec::new();
@@ -276,18 +280,18 @@ impl Parse for TypeList {
                 }
             }
 
-            Ok(TypeList { items, tail })
+            Ok(TermList { items, tail })
         })
     }
 }
 
-impl Peek for TypeList {
+impl Peek for TermList {
     fn peek(cursor: parser::Cursor<'_>) -> bool {
         cursor.peek_seq(|_| true)
     }
 }
 
-impl Print for TypeList {
+impl Print for TermList {
     fn print<P: Printer>(&self, printer: &mut P) -> Result<(), P::Error> {
         printer.seq(|printer| {
             printer.print(&self.items)?;
@@ -302,20 +306,20 @@ impl Print for TypeList {
     }
 }
 
-/// Type schemes.
+/// Term schemes.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TypeScheme {
-    /// List of universally quantified type variables.
+pub struct TermScheme {
+    /// List of universally quantified variables.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub variables: Vec<TypeVar>,
-    /// Type constraints imposed by the type scheme.
+    pub variables: Vec<TermVar>,
+    /// Constraints imposed by the scheme.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub constraints: Vec<TypeConstraint>,
-    /// The monomorphic type.
-    pub r#type: Box<Type>,
+    pub constraints: Vec<TermConstraint>,
+    /// The monomorphic term.
+    pub r#type: Box<Term>,
 }
 
-impl Parse for TypeScheme {
+impl Parse for TermScheme {
     fn parse(parser: &mut Parser<'_>) -> parser::Result<Self> {
         let mut variables = Vec::new();
         let mut constraints = Vec::new();
@@ -346,7 +350,7 @@ impl Parse for TypeScheme {
     }
 }
 
-impl Print for TypeScheme {
+impl Print for TermScheme {
     fn print<P: Printer>(&self, printer: &mut P) -> Result<(), P::Error> {
         if !self.variables.is_empty() {
             printer.list(|printer| {
@@ -371,14 +375,14 @@ impl Print for TypeScheme {
 
 /// Type constraint.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TypeConstraint {
+pub struct TermConstraint {
     /// The name of the type constraint.
     pub name: Symbol,
     /// The arguments to the type constraint.
-    pub args: Vec<Type>,
+    pub args: Vec<Term>,
 }
 
-impl Parse for TypeConstraint {
+impl Parse for TermConstraint {
     fn parse(parser: &mut Parser<'_>) -> parser::Result<Self> {
         parser.list(|parser| {
             let name = parser.parse()?;
@@ -388,7 +392,7 @@ impl Parse for TypeConstraint {
     }
 }
 
-impl Print for TypeConstraint {
+impl Print for TermConstraint {
     fn print<P: Printer>(&self, printer: &mut P) -> Result<(), P::Error> {
         printer.list(|printer| {
             printer.print(&self.name)?;

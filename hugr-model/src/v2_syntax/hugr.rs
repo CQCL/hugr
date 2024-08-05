@@ -2,7 +2,7 @@
 
 use super::ident::{Symbol, VarName};
 use super::keywords as kw;
-use super::types::Type;
+use super::terms::Term;
 use parens::parser::{self, Parse, Parser, Peek, Span};
 use parens::printer::{Print, Printer};
 use serde::{Deserialize, Serialize};
@@ -127,7 +127,7 @@ pub struct Operation {
     pub name: Symbol,
     /// The list of custom arguments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub args: Vec<Type>,
+    pub args: Vec<Term>,
 }
 
 impl Parse for Operation {
