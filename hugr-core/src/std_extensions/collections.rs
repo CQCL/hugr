@@ -1,10 +1,12 @@
 //! List type and operations.
 
+use std::hash::{Hash, Hasher};
+
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 
-use crate::ops::constant::ValueName;
+use crate::ops::constant::{maybe_hash_values, MaybeHash, ValueName};
 use crate::ops::{OpName, Value};
 use crate::types::TypeName;
 use crate::{
@@ -53,6 +55,16 @@ impl ListValue {
     /// Returns the type of the `[ListValue]` as a `[CustomType]`.`
     pub fn custom_type(&self) -> CustomType {
         list_custom_type(self.1.clone())
+    }
+}
+
+impl MaybeHash for ListValue {
+    fn maybe_hash(&self, st: &mut dyn Hasher) -> bool {
+        let mut b = Box::new(st);
+        maybe_hash_values(&self.0, &mut b) && {
+            self.1.hash(&mut b);
+            true
+        }
     }
 }
 

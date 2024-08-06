@@ -5,19 +5,17 @@
 //! [`Const`]: crate::ops::Const
 
 use std::any::Any;
+use std::hash::{Hash, Hasher};
 
 use downcast_rs::{impl_downcast, Downcast};
 use thiserror::Error;
 
 use crate::extension::ExtensionSet;
 use crate::macros::impl_box_clone;
-
 use crate::types::{CustomCheckFailure, Type};
 use crate::IncomingPort;
 
-use super::Value;
-
-use super::ValueName;
+use super::{Value, ValueName};
 
 /// Extensible constant values.
 ///
@@ -37,7 +35,7 @@ use super::ValueName;
 ///   extension::ExtensionSet, std_extensions::arithmetic::int_types};
 /// use serde_json::json;
 ///
-/// #[derive(std::fmt::Debug, Clone, Serialize,Deserialize)]
+/// #[derive(std::fmt::Debug, Clone, Hash, Serialize,Deserialize)]
 /// struct CC(i64);
 ///
 /// #[typetag::serde]
@@ -55,7 +53,7 @@ use super::ValueName;
 /// ```
 #[typetag::serde(tag = "c", content = "v")]
 pub trait CustomConst:
-    Send + Sync + std::fmt::Debug + CustomConstBoxClone + Any + Downcast
+    Send + Sync + std::fmt::Debug + MaybeHash + CustomConstBoxClone + Any + Downcast
 {
     /// An identifier for the constant.
     fn name(&self) -> ValueName;
@@ -90,6 +88,34 @@ pub trait CustomConst:
     fn get_type(&self) -> Type;
 }
 
+/// Prerequisite for `CustomConst`. Allows to declare a custom hash function, but the easiest
+/// options are either to `impl MaybeHash for ... {}` to declare "not hashable", or else
+/// to implement (or derive) [Hash].
+pub trait MaybeHash {
+    /// Hashes the value, if possible; else return `false` without mutating the `Hasher`.
+    /// This relates with [CustomConst::equal_consts] just like [Hash] with [Eq]:
+    /// * if `x.equal_consts(y)` ==> `x.maybe_hash(s)` behaves equivalently to `y.maybe_hash(s)`
+    /// * if `x.hash(s)` behaves differently from `y.hash(s)` ==> `x.equal_consts(y) == false`
+    /// As with [Hash], these requirements can trivially be satisfied by either
+    /// * `equal_consts` always returning `false`, or
+    /// * `maybe_hash` always behaving the same (e.g. returning `false`, as it does by default)
+    /// Note: this uses `dyn` rather than being parametrized by `<H: Hasher>` so that we can
+    /// still use `dyn CustomConst`.
+    ///
+    /// If the type implements `Hash`, just use ``
+    fn maybe_hash(&self, _state: &mut dyn Hasher) -> bool {
+        false
+    }
+}
+
+impl<T: Hash> MaybeHash for T {
+    /// Utility for implementing [CustomConst::maybe_hash] for any [Hash].
+    /// Always returns `true` to indicate success.
+    fn maybe_hash(&self, st: &mut dyn Hasher) -> bool {
+        Hash::hash(self, &mut Box::new(st));
+        true
+    }
+}
 impl PartialEq for dyn CustomConst {
     fn eq(&self, other: &Self) -> bool {
         (*self).equal_consts(other)
@@ -253,6 +279,14 @@ impl CustomSerialized {
     }
 }
 
+impl MaybeHash for CustomSerialized {
+    fn maybe_hash(&self, state: &mut dyn Hasher) -> bool {
+        // Consistent with equality, same serialization <=> same hash.
+        self.value.to_string().hash(&mut Box::new(state));
+        true
+    }
+}
+
 #[typetag::serde]
 impl CustomConst for CustomSerialized {
     fn name(&self) -> ValueName {
@@ -266,6 +300,7 @@ impl CustomConst for CustomSerialized {
     fn extension_reqs(&self) -> ExtensionSet {
         self.extensions.clone()
     }
+
     fn get_type(&self) -> Type {
         self.typ.clone()
     }
