@@ -1,6 +1,7 @@
 //! Compilation passes acting on the HUGR program representation.
 
 pub mod const_fold;
+pub mod const_fold2;
 pub mod force_order;
 mod half_node;
 pub mod lower;
