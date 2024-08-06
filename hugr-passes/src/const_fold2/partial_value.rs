@@ -1,10 +1,8 @@
 #![allow(missing_docs)]
+use itertools::{zip_eq, Itertools as _};
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
-
-use hugr_core::ops::constant::Sum;
-use itertools::{zip_eq, Itertools as _};
 
 use hugr_core::ops::Value;
 use hugr_core::types::{Type, TypeEnum, TypeRow};
@@ -22,7 +20,7 @@ impl PartialSum {
         Self::variant(0, [])
     }
     pub fn variant(tag: usize, values: impl IntoIterator<Item = PartialValue>) -> Self {
-        Self([(tag, values.into_iter().collect())].into_iter().collect())
+        Self(HashMap::from([(tag, Vec::from_iter(values))]))
     }
 
     pub fn num_variants(&self) -> usize {
@@ -171,16 +169,10 @@ impl TryFrom<ValueHandle> for PartialSum {
     type Error = ValueHandle;
 
     fn try_from(value: ValueHandle) -> Result<Self, Self::Error> {
-        match value.value() {
-            Value::Sum(Sum { tag, values, .. }) => {
-                let vec = (0..values.len())
-                    .map(|i| PartialValue::from(value.index(i)).into())
-                    .collect();
-                return Ok(Self([(*tag, vec)].into_iter().collect()));
-            }
-            _ => (),
-        };
-        Err(value)
+        value
+            .as_sum()
+            .map(|(tag, values)| Self::variant(tag, values.into_iter().map(PartialValue::from)))
+            .ok_or(value)
     }
 }
 
@@ -421,13 +413,9 @@ impl PartialValue {
         match self {
             Self::Bottom => Self::Bottom,
             Self::PartialSum(ps) => ps.variant_field_value(variant, idx),
-            Self::Value(v) => {
-                if v.tag() == variant {
-                    Self::Value(v.index(idx))
-                } else {
-                    Self::Bottom
-                }
-            }
+            Self::Value(v) => v
+                .variant_values(variant)
+                .map_or(Self::Bottom, |vals| Self::Value(vals[idx].clone())),
             Self::Top => Self::Top,
         }
     }

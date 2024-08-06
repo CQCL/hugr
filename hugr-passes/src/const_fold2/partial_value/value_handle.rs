@@ -78,43 +78,31 @@ impl ValueHandle {
         self.1.as_ref()
     }
 
-    pub fn is_compound(&self) -> bool {
-        matches!(self.value(), Value::Sum(_))
+    pub fn variant_values(&self, variant: usize) -> Option<Vec<Self>> {
+        self.as_sum()
+            .and_then(|(tag, vals)| (tag == variant).then_some(vals))
     }
 
-    pub fn num_fields(&self) -> usize {
-        assert!(
-            self.is_compound(),
-            "ValueHandle::num_fields called on non-Sum, non-Tuple value: {:#?}",
-            self
-        );
+    pub fn as_sum(&self) -> Option<(usize, Vec<Self>)> {
         match self.value() {
-            Value::Sum(Sum { values, .. }) => values.len(),
-            _ => unreachable!(),
+            Value::Sum(Sum { tag, values, .. }) => {
+                let vals = values.iter().cloned().map(Arc::new);
+                let keys = (0..).map(|i| self.0.clone().index(i));
+                let vec = keys.zip(vals).map(|(i, v)| Self(i, v)).collect();
+                Some((*tag, vec))
+            }
+            _ => None,
         }
     }
 
     pub fn tag(&self) -> usize {
         match self.value() {
             Value::Sum(Sum { tag, .. }) => *tag,
-            _ => panic!("ValueHandle::tag called on non-Sum, non-Tuple value: {:#?}",
-                        self),
+            _ => panic!(
+                "ValueHandle::tag called on non-Sum, non-Tuple value: {:#?}",
+                self
+            ),
         }
-    }
-
-    pub fn index(self: &ValueHandle, i: usize) -> ValueHandle {
-        assert!(
-            i < self.num_fields(),
-            "ValueHandle::index called with out-of-bounds index {}: {:#?}",
-            i,
-            &self
-        );
-        let vs = match self.value() {
-            Value::Sum(Sum { values, .. }) => values,
-            _ => unreachable!(),
-        };
-        let v = vs[i].clone().into();
-        Self(self.0.clone().index(i), v)
     }
 }
 
@@ -238,8 +226,9 @@ mod test {
         let v1 = ValueHandle::new(k1.clone(), subject_val.clone());
         let v2 = ValueHandle::new(k1.clone(), Value::extension(k_i).into());
 
+        let (_, fields) = v1.as_sum().unwrap();
         // we do not compare the value, just the key
-        assert_ne!(v1.index(0), v2);
-        assert_eq!(v1.index(0).value(), v2.value());
+        assert_ne!(fields[0], v2);
+        assert_eq!(fields[0].value(), v2.value());
     }
 }
