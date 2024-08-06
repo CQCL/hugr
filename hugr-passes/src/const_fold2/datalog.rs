@@ -115,12 +115,9 @@ ascent::ascent! {
         io_node(c,tl_n,in_n, IO::Input),
         io_node(c,tl_n,out_n, IO::Output),
         node_in_value_row(c, out_n, out_in_row), // get the whole input row for the output node
-        if out_in_row[0].supports_tag(0), // if it is possible for tag to be 0
         if let Some(tailloop) = c.get_optype(*tl_n).as_tail_loop(),
-        let variant_len = tailloop.just_inputs.len(),
-        for (out_p, v) in out_in_row.iter(c.hugr(), *out_n).flat_map(
-            |(input_p, v)| utils::outputs_for_variant(input_p, 0, variant_len, v)
-        );
+        if let Some(fields) = out_in_row[0].variant_values(0, tailloop.just_inputs.len()), // if it is possible for tag to be 0
+        for (out_p, v) in (0..).map(OutgoingPort::from).zip(fields.into_iter().chain(out_in_row.iter().skip(1).cloned()));
 
     // Output node of child region propagate to outputs of tail loop
     out_wire_value(c, tl_n, out_p, v) <-- tail_loop_node(c, tl_n),
@@ -129,7 +126,7 @@ ascent::ascent! {
         if out_in_row[0].supports_tag(1), // if it is possible for the tag to be 1
         if let Some(tailloop) = c.get_optype(*tl_n).as_tail_loop(),
         let variant_len = tailloop.just_outputs.len(),
-        for (out_p, v) in out_in_row.iter(c.hugr(), *out_n).flat_map(
+        for (out_p, v) in out_in_row.iter_with_ports(c.hugr(), *out_n).flat_map(
             |(input_p, v)| utils::outputs_for_variant(input_p, 1, variant_len, v)
         );
 

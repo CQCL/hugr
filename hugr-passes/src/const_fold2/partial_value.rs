@@ -34,6 +34,12 @@ impl PartialSum {
         }
     }
 
+    pub fn variant_values(&self, variant: usize, len: usize) -> Option<Vec<PartialValue>> {
+        let row = self.0.get(&variant)?;
+        assert!(row.len() == len);
+        Some(row.clone())
+    }
+
     pub fn variant_field_value(&self, variant: usize, idx: usize) -> PartialValue {
         if let Some(row) = self.0.get(&variant) {
             assert!(row.len() > idx);
@@ -392,6 +398,21 @@ impl PartialValue {
 
     pub fn unit() -> Self {
         Self::variant(0, [])
+    }
+
+    pub fn variant_values(&self, tag: usize, len: usize) -> Option<Vec<PartialValue>> {
+        let vals = match self {
+            PartialValue::Bottom => return None,
+            PartialValue::Value(v) => v
+                .variant_values(tag)?
+                .into_iter()
+                .map(PartialValue::Value)
+                .collect(),
+            PartialValue::PartialSum(ps) => ps.variant_values(tag, len)?,
+            PartialValue::Top => vec![PartialValue::Top; len],
+        };
+        assert_eq!(vals.len(), len);
+        Some(vals)
     }
 
     pub fn supports_tag(&self, tag: usize) -> bool {

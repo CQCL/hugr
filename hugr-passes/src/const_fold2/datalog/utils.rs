@@ -30,6 +30,16 @@ impl PV {
         self.variant_field_value(0, idx)
     }
 
+    pub fn variant_values(&self, variant: usize, len: usize) -> Option<Vec<PV>> {
+        Some(
+            self.0
+                .variant_values(variant, len)?
+                .into_iter()
+                .map(PV::from)
+                .collect(),
+        )
+    }
+
     /// TODO the arguments here are not  pretty, two usizes, better not mix them
     /// up!!!
     pub fn variant_field_value(&self, variant: usize, idx: usize) -> Self {
@@ -104,7 +114,11 @@ impl ValueRow {
         Self::new(r.len())
     }
 
-    pub fn iter<'b>(
+    pub fn iter(&self) -> impl Iterator<Item = &PV> {
+        self.0.iter()
+    }
+
+    pub fn iter_with_ports<'b>(
         &'b self,
         h: &'b impl HugrView,
         n: Node,
