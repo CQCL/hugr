@@ -1,10 +1,10 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
-use std::ops::Deref;
 use std::sync::Arc;
 
 use hugr_core::ops::constant::{CustomConst, Sum};
 
 use hugr_core::ops::Value;
+use hugr_core::types::Type;
 use hugr_core::Node;
 
 #[derive(Clone, Debug)]
@@ -94,6 +94,10 @@ impl ValueHandle {
             _ => None,
         }
     }
+
+    pub fn get_type(&self) -> Type {
+        self.1.get_type()
+    }
 }
 
 impl PartialEq for ValueHandle {
@@ -116,18 +120,6 @@ impl Eq for ValueHandle {}
 impl Hash for ValueHandle {
     fn hash<I: Hasher>(&self, state: &mut I) {
         self.0.hash(state);
-    }
-}
-
-/// TODO this is perhaps dodgy
-/// we do not hash or compare the value, just the key
-/// this means two handles with different keys, but with the same value, will
-/// not compare equal.
-impl Deref for ValueHandle {
-    type Target = Value;
-
-    fn deref(&self) -> &Self::Target {
-        self.value()
     }
 }
 
