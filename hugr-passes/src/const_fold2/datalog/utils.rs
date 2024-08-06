@@ -108,6 +108,16 @@ impl ValueRow {
         self.0.iter()
     }
 
+    pub fn unpack_first(
+        &self,
+        variant: usize,
+        len: usize,
+    ) -> Option<impl Iterator<Item = PV> + '_> {
+        self[0]
+            .variant_values(variant, len)
+            .map(|vals| vals.into_iter().chain(self.iter().skip(1).cloned()))
+    }
+
     // fn initialised(&self) -> bool {
     //     self.0.iter().all(|x| x != &PV::top())
     // }

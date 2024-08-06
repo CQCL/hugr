@@ -117,19 +117,16 @@ ascent::ascent! {
         io_node(c,tl_n,out_n, IO::Output),
         node_in_value_row(c, out_n, out_in_row), // get the whole input row for the output node
         if let Some(tailloop) = c.get_optype(*tl_n).as_tail_loop(),
-        if let Some(fields) = out_in_row[0].variant_values(0, tailloop.just_inputs.len()), // if it is possible for tag to be 0
-        for (out_p, v) in (0..).map(OutgoingPort::from).zip(
-            fields.into_iter().chain(out_in_row.iter().skip(1).cloned()));
+        if let Some(fields) = out_in_row.unpack_first(0, tailloop.just_inputs.len()), // if it is possible for tag to be 0
+        for (out_p, v) in (0..).map(OutgoingPort::from).zip(fields);
 
     // Output node of child region propagate to outputs of tail loop
     out_wire_value(c, tl_n, out_p, v) <-- tail_loop_node(c, tl_n),
         io_node(c,tl_n,out_n, IO::Output),
         node_in_value_row(c, out_n, out_in_row), // get the whole input row for the output node
         if let Some(tailloop) = c.get_optype(*tl_n).as_tail_loop(),
-        if let Some(fields) = out_in_row[0].variant_values(1, tailloop.just_outputs.len()), // if it is possible for the tag to be 1
-        for (out_p, v) in (0..).map(OutgoingPort::from).zip(
-            fields.into_iter().chain(out_in_row.iter().skip(1).cloned())
-        );
+        if let Some(fields) = out_in_row.unpack_first(1, tailloop.just_outputs.len()), // if it is possible for the tag to be 1
+        for (out_p, v) in (0..).map(OutgoingPort::from).zip(fields);
 
     lattice tail_loop_termination(C,Node,TailLoopTermination);
     tail_loop_termination(c,tl_n,TailLoopTermination::bottom()) <--
@@ -156,8 +153,8 @@ ascent::ascent! {
       node_in_value_row(c, cond, in_row),
       //in_wire_value(c, cond, cond_in_p, cond_in_v),
       if let Some(conditional) = c.get_optype(*cond).as_conditional(),
-      if let Some(fields) = in_row[0].variant_values(*case_index, conditional.sum_rows[*case_index].len()),
-      for (i_p, v) in (0..).map(OutgoingPort::from).zip(fields.into_iter().chain(in_row.iter().skip(1).cloned()));
+      if let Some(fields) = in_row.unpack_first(*case_index, conditional.sum_rows[*case_index].len()),
+      for (i_p, v) in (0..).map(OutgoingPort::from).zip(fields);
 
     // outputs of case nodes propagate to outputs of conditional
     out_wire_value(c, cond, OutgoingPort::from(o_p.index()), v) <--
