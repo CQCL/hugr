@@ -94,16 +94,6 @@ impl ValueHandle {
             _ => None,
         }
     }
-
-    pub fn tag(&self) -> usize {
-        match self.value() {
-            Value::Sum(Sum { tag, .. }) => *tag,
-            _ => panic!(
-                "ValueHandle::tag called on non-Sum, non-Tuple value: {:#?}",
-                self
-            ),
-        }
-    }
 }
 
 impl PartialEq for ValueHandle {

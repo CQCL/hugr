@@ -397,7 +397,7 @@ impl PartialValue {
     pub fn supports_tag(&self, tag: usize) -> bool {
         match self {
             PartialValue::Bottom => false,
-            PartialValue::Value(v) => v.tag() == tag, // can never be a sum or tuple
+            PartialValue::Value(v) => v.variant_values(tag).is_some(),
             PartialValue::PartialSum(ps) => ps.supports_tag(tag),
             PartialValue::Top => true,
         }
