@@ -233,48 +233,6 @@ pub(super) fn value_outputs(h: &impl HugrView, n: Node) -> impl Iterator<Item = 
     h.out_value_types(n).map(|x| x.0)
 }
 
-// We have several cases where sum types propagate to different places depending
-// on their variant tag:
-//  - From the input of a conditional to the inputs of it's case nodes
-//  - From the input of the output node of a tail loop to the output of the input node of the tail loop
-//  - From the input of the output node of a tail loop to the output of tail loop node
-//  - From the input of a the output node of a dataflow block to the output of the input node of a dataflow block
-//  - From the input of a the output node of a dataflow block to the output of the cfg
-//
-// For a value `v` on an incoming porg `output_p`, compute the (out port,value)
-// pairs that should be propagated for a given variant tag. We must also supply
-// the length of this variant because it cannot always be deduced from the other
-// inputs.
-//
-// If `v` does not support `variant_tag`, then all propagated values will be bottom.`
-//
-// If `output_p.index()` is 0 then the result is the contents of the variant.
-// Otherwise, it is the single "other_output".
-//
-// TODO doctests
-pub(super) fn outputs_for_variant<'a>(
-    output_p: IncomingPort,
-    variant_tag: usize,
-    variant_len: usize,
-    v: &'a PV,
-) -> impl Iterator<Item = (OutgoingPort, PV)> + 'a {
-    if output_p.index() == 0 {
-        Either::Left(
-            (0..variant_len).map(move |i| (i.into(), v.variant_field_value(variant_tag, i))),
-        )
-    } else {
-        let v = if v.supports_tag(variant_tag) {
-            v.clone()
-        } else {
-            PV::bottom()
-        };
-        Either::Right(std::iter::once((
-            (variant_len + output_p.index() - 1).into(),
-            v,
-        )))
-    }
-}
-
 #[derive(PartialEq, Eq, Hash, Debug, Clone, Copy)]
 #[cfg_attr(test, derive(Arbitrary))]
 pub enum TailLoopTermination {
