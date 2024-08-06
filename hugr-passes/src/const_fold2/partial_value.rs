@@ -412,7 +412,6 @@ impl PartialValue {
     }
 
     /// TODO docs
-    /// just delegate to variant_field_value
     pub fn tuple_field_value(&self, idx: usize) -> Self {
         self.variant_field_value(0, idx)
     }

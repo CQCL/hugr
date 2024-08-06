@@ -95,14 +95,10 @@ impl ValueHandle {
     }
 
     pub fn tag(&self) -> usize {
-        assert!(
-            self.is_compound(),
-            "ValueHandle::tag called on non-Sum, non-Tuple value: {:#?}",
-            self
-        );
         match self.value() {
             Value::Sum(Sum { tag, .. }) => *tag,
-            _ => unreachable!(),
+            _ => panic!("ValueHandle::tag called on non-Sum, non-Tuple value: {:#?}",
+                        self),
         }
     }
 
