@@ -85,10 +85,11 @@ ascent::ascent! {
     relation unpack_tuple_node(C, Node);
     unpack_tuple_node(c,n) <-- node(c, n), if c.get_optype(*n).is_unpack_tuple();
 
-    out_wire_value(c, n, p, v.tuple_field_value(p.index())) <--
+    out_wire_value(c, n, p, v) <--
         unpack_tuple_node(c, n),
-        in_wire_value(c, n, IncomingPort::from(0), v),
-        out_wire(c, n, p);
+        in_wire_value(c, n, IncomingPort::from(0), tup),
+        if let Some(fields) = tup.variant_values(0, utils::value_outputs(c.hugr(),*n).count()),
+        for (p,v) in (0..).map(OutgoingPort::from).zip(fields);
 
 
     // DFG
