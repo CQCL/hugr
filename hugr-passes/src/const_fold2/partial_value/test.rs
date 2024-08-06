@@ -74,7 +74,8 @@ impl TestSumLeafType {
                 (0u64..(1 << (2u64.pow(lw as u32) - 1)))
                     .prop_map(move |x| {
                         let ki = ConstInt::new_u(lw as u8, x).unwrap();
-                        ValueHandle::new(ValueKey::new(ki.clone()), Arc::new(ki.into())).into()
+                        let k = ValueKey::try_new(ki.clone()).unwrap();
+                        ValueHandle::new(k, Arc::new(ki.into())).into()
                     })
                     .boxed()
             }

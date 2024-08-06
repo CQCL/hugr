@@ -1,96 +1,68 @@
-use std::any::Any;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::ops::Deref;
 use std::sync::Arc;
 
-use downcast_rs::Downcast;
-use hugr_core::ops::constant::Sum;
-use itertools::Either;
+use hugr_core::ops::constant::{CustomConst, Sum};
 
 use hugr_core::ops::Value;
-use hugr_core::std_extensions::arithmetic::int_types::ConstInt;
 use hugr_core::Node;
 
-pub trait ValueName: std::fmt::Debug + Downcast + Any {
-    fn hash(&self) -> u64;
-    fn eq(&self, other: &dyn ValueName) -> bool;
-}
-
-fn hash_hash(x: &impl Hash) -> u64 {
-    let mut hasher = DefaultHasher::new();
-    x.hash(&mut hasher);
-    hasher.finish()
-}
-
-fn value_name_eq<T: Eq + Downcast + Any>(x: &T, other: &dyn ValueName) -> bool {
-    if let Some(other) = other.as_any().downcast_ref::<T>() {
-        x == other
-    } else {
-        false
-    }
-}
-
-impl ValueName for String {
-    fn hash(&self) -> u64 {
-        hash_hash(self)
-    }
-
-    fn eq(&self, other: &dyn ValueName) -> bool {
-        value_name_eq(self, other)
-    }
-}
-
-impl ValueName for ConstInt {
-    fn hash(&self) -> u64 {
-        hash_hash(self)
-    }
-
-    fn eq(&self, other: &dyn ValueName) -> bool {
-        value_name_eq(self, other)
-    }
-}
-
 #[derive(Clone, Debug)]
-pub struct ValueKey(Vec<usize>, Either<Node, Arc<dyn ValueName>>);
+pub struct HashedConst {
+    hash: u64,
+    val: Arc<dyn CustomConst>,
+}
 
-impl PartialEq for ValueKey {
+impl PartialEq for HashedConst {
     fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
-            && match (&self.1, &other.1) {
-                (Either::Left(ref n1), Either::Left(ref n2)) => n1 == n2,
-                (Either::Right(ref v1), Either::Right(ref v2)) => v1.eq(v2.as_ref()),
-                _ => false,
-            }
+        self.hash == other.hash && self.val.equal_consts(other.val.as_ref())
     }
 }
 
-impl Eq for ValueKey {}
+impl Eq for HashedConst {}
 
-impl Hash for ValueKey {
+impl Hash for HashedConst {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.0.hash(state);
-        match &self.1 {
-            Either::Left(n) => (0, n).hash(state),
-            Either::Right(v) => (1, v.hash()).hash(state),
-        }
+        state.write_u64(self.hash);
     }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum ValueKey {
+    Select(usize, Box<ValueKey>),
+    Const(HashedConst),
+    Node(Node),
 }
 
 impl From<Node> for ValueKey {
     fn from(n: Node) -> Self {
-        Self(vec![], Either::Left(n))
+        Self::Node(n)
+    }
+}
+
+impl From<HashedConst> for ValueKey {
+    fn from(value: HashedConst) -> Self {
+        Self::Const(value)
     }
 }
 
 impl ValueKey {
-    pub fn new(k: impl ValueName) -> Self {
-        Self(vec![], Either::Right(Arc::new(k)))
+    pub fn new(n: Node, k: impl CustomConst) -> Self {
+        Self::try_new(k).unwrap_or(Self::Node(n))
+    }
+
+    pub fn try_new(cst: impl CustomConst) -> Option<Self> {
+        let mut hasher = DefaultHasher::new();
+        cst.maybe_hash(&mut hasher).then(|| {
+            Self::Const(HashedConst {
+                hash: hasher.finish(),
+                val: Arc::new(cst),
+            })
+        })
     }
 
     pub fn index(self, i: usize) -> Self {
-        let mut is = self.0;
-        is.push(i);
-        Self(is, self.1)
+        Self::Select(i, Box::new(self))
     }
 }
 
@@ -187,22 +159,40 @@ impl Deref for ValueHandle {
 
 #[cfg(test)]
 mod test {
-    use hugr_core::{ops::constant::CustomConst as _, types::SumType};
+    use hugr_core::{
+        extension::prelude::ConstString,
+        ops::constant::CustomConst as _,
+        std_extensions::{
+            arithmetic::{
+                float_types::{ConstF64, FLOAT64_TYPE},
+                int_types::{ConstInt, INT_TYPES},
+            },
+            collections::ListValue,
+        },
+        types::SumType,
+    };
 
     use super::*;
 
     #[test]
     fn value_key_eq() {
-        let k1 = ValueKey::new("foo".to_string());
-        let k2 = ValueKey::new("foo".to_string());
-        let k3 = ValueKey::new("bar".to_string());
+        let n = Node::from(portgraph::NodeIndex::new(0));
+        let n2: Node = portgraph::NodeIndex::new(1).into();
+        let k1 = ValueKey::new(n, ConstString::new("foo".to_string()));
+        let k2 = ValueKey::new(n2, ConstString::new("foo".to_string()));
+        let k3 = ValueKey::new(n, ConstString::new("bar".to_string()));
 
-        assert_eq!(k1, k2);
+        assert_eq!(k1, k2); // Node ignored
         assert_ne!(k1, k3);
 
-        let k4: ValueKey = Node::from(portgraph::NodeIndex::new(1)).into();
-        let k5: ValueKey = Node::from(portgraph::NodeIndex::new(1)).into();
-        let k6: ValueKey = Node::from(portgraph::NodeIndex::new(2)).into();
+        assert_eq!(ValueKey::from(n), ValueKey::from(n));
+        let f = ConstF64::new(3.141);
+        assert_eq!(ValueKey::new(n, f.clone()), ValueKey::from(n));
+
+        assert_ne!(ValueKey::new(n, f.clone()), ValueKey::new(n2, f)); // Node taken into account
+        let k4 = ValueKey::from(n);
+        let k5 = ValueKey::from(n);
+        let k6: ValueKey = ValueKey::from(n2);
 
         assert_eq!(&k4, &k5);
         assert_ne!(&k4, &k6);
@@ -218,6 +208,25 @@ mod test {
     }
 
     #[test]
+    fn value_key_list() {
+        let v1 = ConstInt::new_u(3, 3).unwrap();
+        let v2 = ConstInt::new_u(4, 3).unwrap();
+        let v3 = ConstF64::new(3.141);
+
+        let n = Node::from(portgraph::NodeIndex::new(0));
+        let n2: Node = portgraph::NodeIndex::new(1).into();
+
+        let lst = ListValue::new(INT_TYPES[0].clone(), [v1.into(), v2.into()]);
+        assert_eq!(ValueKey::new(n, lst.clone()), ValueKey::new(n2, lst));
+
+        let lst = ListValue::new(FLOAT64_TYPE, [v3.into()]);
+        assert_ne!(
+            ValueKey::new(n, lst.clone()),
+            ValueKey::new(n2, lst.clone())
+        );
+    }
+
+    #[test]
     fn value_handle_eq() {
         let k_i = ConstInt::new_u(4, 2).unwrap();
         let subject_val = Arc::new(
@@ -229,7 +238,7 @@ mod test {
             .unwrap(),
         );
 
-        let k1 = ValueKey::new("foo".to_string());
+        let k1 = ValueKey::try_new(ConstString::new("foo".to_string())).unwrap();
         let v1 = ValueHandle::new(k1.clone(), subject_val.clone());
         let v2 = ValueHandle::new(k1.clone(), Value::extension(k_i).into());
 
