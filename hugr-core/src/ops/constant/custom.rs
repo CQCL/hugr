@@ -96,13 +96,13 @@ pub trait MaybeHash {
     /// This relates with [CustomConst::equal_consts] just like [Hash] with [Eq]:
     /// * if `x.equal_consts(y)` ==> `x.maybe_hash(s)` behaves equivalently to `y.maybe_hash(s)`
     /// * if `x.hash(s)` behaves differently from `y.hash(s)` ==> `x.equal_consts(y) == false`
+    ///
     /// As with [Hash], these requirements can trivially be satisfied by either
     /// * `equal_consts` always returning `false`, or
     /// * `maybe_hash` always behaving the same (e.g. returning `false`, as it does by default)
+    ///
     /// Note: this uses `dyn` rather than being parametrized by `<H: Hasher>` so that we can
     /// still use `dyn CustomConst`.
-    ///
-    /// If the type implements `Hash`, just use ``
     fn maybe_hash(&self, _state: &mut dyn Hasher) -> bool {
         false
     }
