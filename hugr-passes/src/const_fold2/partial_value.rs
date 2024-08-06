@@ -40,15 +40,6 @@ impl PartialSum {
         Some(row.clone())
     }
 
-    pub fn variant_field_value(&self, variant: usize, idx: usize) -> PartialValue {
-        if let Some(row) = self.0.get(&variant) {
-            assert!(row.len() > idx);
-            row[idx].clone()
-        } else {
-            PartialValue::bottom()
-        }
-    }
-
     pub fn try_into_value(self, typ: &Type) -> Result<Value, Self> {
         let Ok((k, v)) = self.0.iter().exactly_one() else {
             Err(self)?
@@ -418,26 +409,10 @@ impl PartialValue {
     pub fn supports_tag(&self, tag: usize) -> bool {
         match self {
             PartialValue::Bottom => false,
+            // TODO this is wildly expensive - only used for case reachability but still...
             PartialValue::Value(v) => v.variant_values(tag).is_some(),
             PartialValue::PartialSum(ps) => ps.supports_tag(tag),
             PartialValue::Top => true,
-        }
-    }
-
-    /// TODO docs
-    pub fn tuple_field_value(&self, idx: usize) -> Self {
-        self.variant_field_value(0, idx)
-    }
-
-    /// TODO docs
-    pub fn variant_field_value(&self, variant: usize, idx: usize) -> Self {
-        match self {
-            Self::Bottom => Self::Bottom,
-            Self::PartialSum(ps) => ps.variant_field_value(variant, idx),
-            Self::Value(v) => v
-                .variant_values(variant)
-                .map_or(Self::Bottom, |vals| Self::Value(vals[idx].clone())),
-            Self::Top => Self::Top,
         }
     }
 }

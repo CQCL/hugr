@@ -26,10 +26,6 @@ impl From<PartialValue> for PV {
 }
 
 impl PV {
-    pub fn tuple_field_value(&self, idx: usize) -> Self {
-        self.variant_field_value(0, idx)
-    }
-
     pub fn variant_values(&self, variant: usize, len: usize) -> Option<Vec<PV>> {
         Some(
             self.0
@@ -38,12 +34,6 @@ impl PV {
                 .map(PV::from)
                 .collect(),
         )
-    }
-
-    /// TODO the arguments here are not  pretty, two usizes, better not mix them
-    /// up!!!
-    pub fn variant_field_value(&self, variant: usize, idx: usize) -> Self {
-        self.0.variant_field_value(variant, idx).into()
     }
 
     pub fn supports_tag(&self, tag: usize) -> bool {
@@ -116,14 +106,6 @@ impl ValueRow {
 
     pub fn iter(&self) -> impl Iterator<Item = &PV> {
         self.0.iter()
-    }
-
-    pub fn iter_with_ports<'b>(
-        &'b self,
-        h: &'b impl HugrView,
-        n: Node,
-    ) -> impl Iterator<Item = (IncomingPort, &PV)> + 'b {
-        zip_eq(value_inputs(h, n), self.0.iter())
     }
 
     // fn initialised(&self) -> bool {
