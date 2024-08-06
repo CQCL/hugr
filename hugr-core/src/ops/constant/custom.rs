@@ -109,13 +109,12 @@ pub trait MaybeHash {
 }
 
 impl<T: Hash> MaybeHash for T {
-    /// Utility for implementing [CustomConst::maybe_hash] for any [Hash].
-    /// Always returns `true` to indicate success.
     fn maybe_hash(&self, st: &mut dyn Hasher) -> bool {
         Hash::hash(self, &mut Box::new(st));
         true
     }
 }
+
 impl PartialEq for dyn CustomConst {
     fn eq(&self, other: &Self) -> bool {
         (*self).equal_consts(other)
