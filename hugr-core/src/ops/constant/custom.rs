@@ -77,9 +77,10 @@ pub trait CustomConst:
     /// If the type implements `PartialEq`, use [`downcast_equal_consts`] to compare the values.
     ///
     /// Note that this does not require any equivalent of [Eq]: it is permissible to return
-    /// `false` if in doubt, and in particular, there is no requirement for reflexivity.
-    /// However, we do expect symmetry (`x.equal_consts(y) == y.equal_consts(x)`).
-    /// TODO What about transitivity?
+    /// `false` if in doubt, and in particular, there is no requirement for reflexivity
+    /// (i.e. `x.equal_consts(x)` can be `false`). However, we do expect both
+    /// symmetry (`x.equal_consts(y) == y.equal_consts(x)`) and transitivity
+    /// (if `x.equal_consts(y) && y.equal_consts(z)` then `x.equal_consts(z)`).
     fn equal_consts(&self, _other: &dyn CustomConst) -> bool {
         // false unless overridden
         false
