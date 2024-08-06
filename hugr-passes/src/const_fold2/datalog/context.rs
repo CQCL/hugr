@@ -2,7 +2,6 @@ use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::sync::Arc;
 
-use hugr_core::hugr::internal::HugrInternals;
 use hugr_core::{Hugr, HugrView};
 
 use super::DFContext;
@@ -25,13 +24,13 @@ impl<H: HugrView> Clone for DataflowContext<H> {
 }
 
 impl<H: HugrView> Hash for DataflowContext<H> {
-    fn hash<I: Hasher>(&self, state: &mut I) {}
+    fn hash<I: Hasher>(&self, _state: &mut I) {}
 }
 
 impl<H: HugrView> PartialEq for DataflowContext<H> {
     fn eq(&self, other: &Self) -> bool {
-        // Any AscentProgram should have only one DataflowContext
-        assert_eq!(self as *const _, other as *const _);
+        // Any AscentProgram should have only one DataflowContext (maybe cloned)
+        assert!(Arc::ptr_eq(&self.0, &other.0));
         true
     }
 }
@@ -40,8 +39,8 @@ impl<H: HugrView> Eq for DataflowContext<H> {}
 
 impl<H: HugrView> PartialOrd for DataflowContext<H> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        // Any AscentProgram should have only one DataflowContext
-        assert_eq!(self as *const _, other as *const _);
+        // Any AscentProgram should have only one DataflowContext (maybe cloned)
+        assert!(Arc::ptr_eq(&self.0, &other.0));
         Some(std::cmp::Ordering::Equal)
     }
 }
@@ -54,10 +53,8 @@ impl<H: HugrView> Deref for DataflowContext<H> {
     }
 }
 
-impl<H: HugrView> AsRef<Hugr> for DataflowContext<H> {
-    fn as_ref(&self) -> &Hugr {
-        self.base_hugr()
+impl<H: HugrView> DFContext for DataflowContext<H> {
+    fn hugr(&self) -> &impl HugrView {
+        self.0.as_ref()
     }
 }
-
-impl<H: HugrView> DFContext for DataflowContext<H> {}

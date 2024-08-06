@@ -138,7 +138,12 @@ fn test_tail_loop_iterates_twice() {
     // let r_w = builder
     //     .add_load_value(Value::sum(0, [], SumType::new([type_row![], BOOL_T.into()])).unwrap());
     let tlb = builder
-        .tail_loop_builder([], [(BOOL_T, false_w), (BOOL_T, true_w)], vec![].into())
+        .tail_loop_builder_exts(
+            [],
+            [(BOOL_T, false_w), (BOOL_T, true_w)],
+            vec![].into(),
+            ExtensionSet::new(),
+        )
         .unwrap();
     assert_eq!(
         tlb.loop_signature().unwrap().dataflow_signature().unwrap(),
@@ -157,7 +162,7 @@ fn test_tail_loop_iterates_twice() {
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
     // TODO once we can do conditionals put these wires inside `just_outputs` and
     // we should be able to propagate their values
-    let [o_w1, o_w2, _] = tail_loop.outputs_arr();
+    let [o_w1, o_w2] = tail_loop.outputs_arr();
 
     let mut machine = Machine::new();
     machine.run_hugr(&hugr);

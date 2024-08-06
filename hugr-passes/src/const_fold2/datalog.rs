@@ -12,7 +12,9 @@ mod utils;
 use context::DataflowContext;
 pub use utils::{TailLoopTermination, ValueRow, IO, PV};
 
-pub trait DFContext: AsRef<Hugr> + Clone + Eq + Hash + std::ops::Deref<Target = Hugr> {}
+pub trait DFContext: Clone + Eq + Hash + std::ops::Deref<Target = Hugr> {
+    fn hugr(&self) -> &impl HugrView;
+}
 
 ascent::ascent! {
     // The trait-indirection layer here means we can just write 'C' but in practice ATM
@@ -34,9 +36,9 @@ ascent::ascent! {
 
     node(c, n) <-- context(c), for n in c.nodes();
 
-    in_wire(c, n,p) <-- node(c, n), for p in utils::value_inputs(c, *n);
+    in_wire(c, n,p) <-- node(c, n), for p in utils::value_inputs(c.hugr(), *n);
 
-    out_wire(c, n,p) <-- node(c, n), for p in utils::value_outputs(c, *n);
+    out_wire(c, n,p) <-- node(c, n), for p in utils::value_outputs(c.hugr(), *n);
 
     parent_of_node(c, parent, child) <--
         node(c, child), if let Some(parent) = c.get_parent(*child);
@@ -55,8 +57,8 @@ ascent::ascent! {
         out_wire_value(c, m, op, v);
 
 
-    node_in_value_row(c, n, utils::bottom_row(c, *n)) <-- node(c, n);
-    node_in_value_row(c, n, utils::singleton_in_row(c, n, p, v.clone())) <-- in_wire_value(c, n, p, v);
+    node_in_value_row(c, n, utils::bottom_row(c.hugr(), *n)) <-- node(c, n);
+    node_in_value_row(c, n, utils::singleton_in_row(c.hugr(), n, p, v.clone())) <-- in_wire_value(c, n, p, v);
 
 
     // Per node-type rules
@@ -67,7 +69,7 @@ ascent::ascent! {
     relation load_constant_node(C, Node);
     load_constant_node(c, n) <-- node(c, n), if c.get_optype(*n).is_load_constant();
 
-    out_wire_value(c, n, 0.into(), utils::partial_value_from_load_constant(c, *n)) <--
+    out_wire_value(c, n, 0.into(), utils::partial_value_from_load_constant(c.hugr(), *n)) <--
         load_constant_node(c, n);
 
 
@@ -116,7 +118,7 @@ ascent::ascent! {
         if out_in_row[0].supports_tag(0), // if it is possible for tag to be 0
         if let Some(tailloop) = c.get_optype(*tl_n).as_tail_loop(),
         let variant_len = tailloop.just_inputs.len(),
-        for (out_p, v) in out_in_row.iter(c, *out_n).flat_map(
+        for (out_p, v) in out_in_row.iter(c.hugr(), *out_n).flat_map(
             |(input_p, v)| utils::outputs_for_variant(input_p, 0, variant_len, v)
         );
 
@@ -127,7 +129,7 @@ ascent::ascent! {
         if out_in_row[0].supports_tag(1), // if it is possible for the tag to be 1
         if let Some(tailloop) = c.get_optype(*tl_n).as_tail_loop(),
         let variant_len = tailloop.just_outputs.len(),
-        for (out_p, v) in out_in_row.iter(c, *out_n).flat_map(
+        for (out_p, v) in out_in_row.iter(c.hugr(), *out_n).flat_map(
             |(input_p, v)| utils::outputs_for_variant(input_p, 1, variant_len, v)
         );
 
