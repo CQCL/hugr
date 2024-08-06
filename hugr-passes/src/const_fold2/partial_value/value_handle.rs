@@ -29,7 +29,7 @@ impl Hash for HashedConst {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ValueKey {
-    Select(usize, Box<ValueKey>),
+    Field(usize, Box<ValueKey>),
     Const(HashedConst),
     Node(Node),
 }
@@ -61,8 +61,8 @@ impl ValueKey {
         })
     }
 
-    pub fn index(self, i: usize) -> Self {
-        Self::Select(i, Box::new(self))
+    pub fn field(self, i: usize) -> Self {
+        Self::Field(i, Box::new(self))
     }
 }
 
@@ -87,7 +87,7 @@ impl ValueHandle {
         match self.value() {
             Value::Sum(Sum { tag, values, .. }) => {
                 let vals = values.iter().cloned().map(Arc::new);
-                let keys = (0..).map(|i| self.0.clone().index(i));
+                let keys = (0..).map(|i| self.0.clone().field(i));
                 let vec = keys.zip(vals).map(|(i, v)| Self(i, v)).collect();
                 Some((*tag, vec))
             }
@@ -163,12 +163,12 @@ mod test {
         assert_eq!(&k4, &k5);
         assert_ne!(&k4, &k6);
 
-        let k7 = k5.clone().index(3);
-        let k4 = k4.index(3);
+        let k7 = k5.clone().field(3);
+        let k4 = k4.field(3);
 
         assert_eq!(&k4, &k7);
 
-        let k5 = k5.index(2);
+        let k5 = k5.field(2);
 
         assert_ne!(&k5, &k7);
     }
