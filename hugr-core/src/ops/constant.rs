@@ -2,7 +2,8 @@
 
 mod custom;
 
-use std::hash::{DefaultHasher, Hash, Hasher};
+use std::collections::hash_map::DefaultHasher; // Moves into std::hash in Rust 1.76.
+use std::hash::{Hash, Hasher};
 
 use super::{NamedOp, OpName, OpTrait, StaticTag};
 use super::{OpTag, OpType};
@@ -148,7 +149,7 @@ impl Sum {
 
 pub(crate) fn maybe_hash_values<H: Hasher>(vals: &[Value], st: &mut H) -> bool {
     // We can't mutate the Hasher with the first element
-    // even if the last element fails.
+    // if any element, even the last, fails.
     let mut hasher = DefaultHasher::new();
     vals.iter().all(|e| e.maybe_hash(&mut hasher)) && {
         st.write_u64(hasher.finish());
@@ -529,7 +530,7 @@ impl Value {
         }
     }
 
-    /// Hashes this value, if possible. [Value::extension]s are hashable according
+    /// Hashes this value, if possible. [Value::Extension]s are hashable according
     /// to their implementation of [MaybeHash]; [Value::Function]s never are;
     /// [Value::Sum]s are if their contents are.
     pub fn maybe_hash<H: Hasher>(&self, st: &mut H) -> bool {

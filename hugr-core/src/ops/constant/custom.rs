@@ -299,7 +299,6 @@ impl CustomConst for CustomSerialized {
     fn extension_reqs(&self) -> ExtensionSet {
         self.extensions.clone()
     }
-
     fn get_type(&self) -> Type {
         self.typ.clone()
     }
