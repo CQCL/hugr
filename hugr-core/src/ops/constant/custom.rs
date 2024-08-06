@@ -81,7 +81,7 @@ pub trait CustomConst:
     /// However, we do expect symmetry (`x.equal_consts(y) == y.equal_consts(x)`).
     /// TODO What about transitivity?
     fn equal_consts(&self, _other: &dyn CustomConst) -> bool {
-        // false unless overloaded
+        // false unless overridden
         false
     }
 
