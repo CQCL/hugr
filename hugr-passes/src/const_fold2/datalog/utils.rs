@@ -10,9 +10,7 @@ use itertools::{zip_eq, Either};
 
 use crate::const_fold2::partial_value::{PartialValue, ValueHandle};
 use hugr_core::{
-    ops::OpTrait as _,
-    types::{EdgeKind, TypeRow},
-    HugrView, IncomingPort, Node, OutgoingPort, PortIndex as _,
+    ops::OpTrait as _, types::TypeRow, HugrView, IncomingPort, Node, OutgoingPort, PortIndex as _,
 };
 
 #[cfg(test)]

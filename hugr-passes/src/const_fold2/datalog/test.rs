@@ -3,8 +3,7 @@ use hugr_core::{
     extension::{prelude::BOOL_T, ExtensionSet, EMPTY_REG},
     ops::{handle::NodeHandle, OpTrait, UnpackTuple, Value},
     type_row,
-    types::{Signature, SumType},
-    Extension,
+    types::{Signature, SumType, Type, TypeRow},
 };
 
 use crate::const_fold2::partial_value::PartialValue;
@@ -58,7 +57,7 @@ fn test_unpack_const() {
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
     let mut machine = Machine::new();
-    let c = machine.run_hugr(&hugr);
+    machine.run_hugr(&hugr);
 
     let o_r = machine.read_out_wire_value(&hugr, o).unwrap();
     assert_eq!(o_r, Value::true_val());
@@ -161,7 +160,7 @@ fn test_tail_loop_iterates_twice() {
     let [o_w1, o_w2, _] = tail_loop.outputs_arr();
 
     let mut machine = Machine::new();
-    let c = machine.run_hugr(&hugr);
+    machine.run_hugr(&hugr);
     // dbg!(&machine.tail_loop_io_node);
     // dbg!(&machine.out_wire_value);
 

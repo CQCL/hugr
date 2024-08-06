@@ -1,12 +1,9 @@
-use ascent::lattice::{ord_lattice::OrdLattice, BoundedLattice, Dual, Lattice};
-use itertools::{zip_eq, Itertools};
+use ascent::lattice::BoundedLattice;
 use std::collections::HashMap;
-use std::hash::{Hash, Hasher};
-use std::sync::{Arc, Mutex};
+use std::hash::Hash;
 
-use super::partial_value::{PartialValue, ValueHandle, ValueKey};
-use hugr_core::ops::{OpTag, OpTrait, Value};
-use hugr_core::types::{EdgeKind, SumType, Type, TypeEnum, TypeRow};
+use super::partial_value::PartialValue;
+use hugr_core::ops::Value;
 use hugr_core::{Hugr, HugrView, IncomingPort, Node, OutgoingPort, PortIndex as _, Wire};
 
 mod context;

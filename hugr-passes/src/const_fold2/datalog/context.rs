@@ -1,12 +1,9 @@
-use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
-use std::sync::atomic::AtomicUsize;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use hugr_core::hugr::internal::HugrInternals;
-use hugr_core::ops::Value;
-use hugr_core::{Hugr, HugrView, Node};
+use hugr_core::{Hugr, HugrView};
 
 use super::DFContext;
 

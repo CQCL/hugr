@@ -1,13 +1,11 @@
 use std::sync::Arc;
 
 use itertools::{zip_eq, Either, Itertools as _};
-use lazy_static::lazy_static;
 use proptest::prelude::*;
 
 use hugr_core::{
-    ops::Value,
     std_extensions::arithmetic::int_types::{self, ConstInt, INT_TYPES, LOG_WIDTH_BOUND},
-    types::{CustomType, Type, TypeArg, TypeEnum},
+    types::{Type, TypeArg, TypeEnum},
 };
 
 use super::{PartialSum, PartialValue, ValueHandle, ValueKey};
@@ -141,7 +139,6 @@ impl TestSumType {
             TestSumType::Leaf(l) => {
                 l.assert_invariants();
             }
-            _ => (),
         }
     }
 
