@@ -59,10 +59,9 @@ impl ListValue {
 }
 
 impl MaybeHash for ListValue {
-    fn maybe_hash(&self, st: &mut dyn Hasher) -> bool {
-        let mut b = Box::new(st);
-        maybe_hash_values(&self.0, &mut b) && {
-            self.1.hash(&mut b);
+    fn maybe_hash(&self, mut st: &mut dyn Hasher) -> bool {
+        maybe_hash_values(&self.0, &mut st) && {
+            self.1.hash(&mut st);
             true
         }
     }

@@ -109,8 +109,8 @@ pub trait MaybeHash {
 }
 
 impl<T: Hash> MaybeHash for T {
-    fn maybe_hash(&self, st: &mut dyn Hasher) -> bool {
-        Hash::hash(self, &mut Box::new(st));
+    fn maybe_hash(&self, mut st: &mut dyn Hasher) -> bool {
+        Hash::hash(self, &mut st);
         true
     }
 }
@@ -279,9 +279,9 @@ impl CustomSerialized {
 }
 
 impl MaybeHash for CustomSerialized {
-    fn maybe_hash(&self, state: &mut dyn Hasher) -> bool {
+    fn maybe_hash(&self, mut st: &mut dyn Hasher) -> bool {
         // Consistent with equality, same serialization <=> same hash.
-        self.value.to_string().hash(&mut Box::new(state));
+        self.value.to_string().hash(&mut st);
         true
     }
 }
