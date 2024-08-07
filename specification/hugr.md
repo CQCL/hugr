@@ -813,7 +813,7 @@ Extensions ::= (Extension)* -- a set, not a list
 Type ::= Sum([#]) -- disjoint union of rows of other types, tagged by unsigned int
        | Opaque(Name, [TypeArg]) -- a (instantiation of a) custom type defined by an extension
        | Function(#, #, Extensions) -- monomorphic function: arguments, results, and delta (see below)
-       | Variable -- refers to a TypeParam bound by the nearest enclosing FuncDefn node, or an enclosing Function Type
+       | Variable -- refers to a TypeParam bound by an the nearest enclosing FuncDefn node or polymorphic type scheme
 ```
 
 (We write `[Foo]` to indicate a list of Foo's.)
