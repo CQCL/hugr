@@ -791,15 +791,16 @@ There are two classes of type: `AnyType` $\supset$ `CopyableType`. Types in thes
 classes are distinguished by whether the runtime values of those types can be implicitly
 copied or discarded (multiple or 0 links from on output port respectively):
 
-- For the broadest class (`AnyType`), the only operation supported is the identity operation (aka no-op, or `lift` - see [Extension Tracking](#extension-tracking) below). Specifically, we do not require it to be possible to copy or discard all values, hence the requirement that outports of linear type must have exactly one edge. (That is, a type not known to be in the copyable subset). All incoming ports must have exactly one edge.
+- For the broadest class (`AnyType`), the only operation supported is the identity operation (aka no-op, or `lift` - see [Extension Tracking](#extension-tracking) below). Specifically, we do not require it to be possible to copy or discard all values, hence the requirement that outports of linear type must have exactly one edge. (That is, a type not known to be in the copyable subset).
 
     In fully qubit-counted contexts programs take in a number of qubits as input and return the same number, with no discarding.
 
 - The smaller class is `CopyableType`, i.e. types holding ordinary classical
   data, where values can be copied (and discarded, the 0-ary copy). This
   allows multiple (or 0) outgoing edges from an outport; also these types can
-  be sent down `Const` edges. Note: dataflow inputs (`Value`, `Const` and `Function`) always
-  require a single connection.
+  be sent down `Const` edges.
+
+Note that all dataflow inputs (`Value`, `Const` and `Function`) always require a single connection, regardless of whether the type is `AnyType` or `Copyable`.
 
 **Rows** The `#` is a *row* which is a sequence of zero or more types. Types in the row can optionally be given names in metadata i.e. this does not affect behaviour of the HUGR. When writing literal types, we use `#` to distinguish between tuples and rows, e.g. `(int<1>,int<2>)` is a tuple while `Sum(#(int<1>),#(int<2>))` contains two rows.
 
