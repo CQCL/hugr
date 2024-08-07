@@ -535,7 +535,7 @@ impl Value {
     /// [Value::Sum]s are if their contents are.
     pub fn maybe_hash<H: Hasher>(&self, st: &mut H) -> bool {
         match self {
-            Value::Extension { e } => e.value().maybe_hash(&mut Box::new(st)),
+            Value::Extension { e } => e.value().maybe_hash(&mut *st),
             Value::Function { .. } => false,
             Value::Sum(s) => s.maybe_hash(st),
         }
