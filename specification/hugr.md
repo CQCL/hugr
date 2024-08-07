@@ -850,11 +850,11 @@ TypeArgs appropriate for the function's TypeParams:
 
 ```haskell
 TypeArg ::= Type(Type) -- could be a variable of kind Type, or contain variable(s)
-          | Extensions(Extensions) -- may contain TypeArg's of kind Extensions
-          | Variable -- refers to an enclosing TypeParam (binder) of any kind below
           | BoundedUSize(u64)
+          | Extensions(Extensions) -- may contain TypeArg's of kind Extensions
           | Sequence([TypeArg]) -- fits either a List or Tuple TypeParam
           | Opaque(Value)
+          | Variable -- refers to an enclosing TypeParam (binder) of any kind above
 ```
 
 For example, a Function node declaring a `TypeParam::Opaque("Array", [5, TypeArg::Type(Type::Opaque("usize"))])`
