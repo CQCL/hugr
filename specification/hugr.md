@@ -869,6 +869,25 @@ a valid type as long as the TypeArgs match the declared TypeParams, which can be
 (Note that within a polymorphic type scheme, type variables of kind `Sequence` or `Opaque` will only be usable
 as arguments to Opaque types---see [Extension System](#extension-system).)
 
+#### Row Variables
+
+Type variables of kind `TypeParam::List(TypeParam::Type(_))` are known as
+"row variables" and along with type parameters of the same kinds are given special
+treatment, as follows:
+* A `TypeParam` of such kind may be instantiated with not just a `TypeArg::List`
+  but also a single `TypeArg::Type`. (This is purely a notational convenience.)
+  For example, `Type::Function(usize, unit, <exts>)` is equivalent shorthand
+  for `Type::Function(#(usize), #(unit), <exts>)`.
+* When a `TypeArg::Sequence` is provided as argument for such a TypeParam, we allow
+  the elements of the Sequence to be not just types (including variables of kind
+  `TypeParam::Type(_)`), but also row variables. These are implicitly spliced in
+  (appending with other elements).
+
+For example, a polymorphic FuncDefn might declare a row variable X of kind
+`TypeParam::List(TypeParam::Type(Copyable))` and have as output a (tuple) type
+`Sum([#(X, usize)])`. A call that instantiates said type-parameter with
+`TypeArg::Sequence([usize, unit])` would then have output `Sum([#(usize, unit, usize)])`.
+
 ### Extension Tracking
 
 The type of `Function` includes a set of [extensions](#extension-system) which are required to execute the graph.
