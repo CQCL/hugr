@@ -66,12 +66,16 @@ impl PartialSum {
         }
     }
 
-    // unsafe because we panic if any common rows have different lengths
-    fn join_mut_unsafe(&mut self, other: Self) -> bool {
+    // Err with key if any common rows have different lengths (self may have been mutated)
+    fn try_join_mut(&mut self, other: Self) -> Result<bool, usize> {
         let mut changed = false;
 
         for (k, v) in other.0 {
             if let Some(row) = self.0.get_mut(&k) {
+                if v.len() != row.len() {
+                    // Better to check first and avoid mutation, but fine here
+                    return Err(k);
+                }
                 for (lhs, rhs) in zip_eq(row.iter_mut(), v.into_iter()) {
                     changed |= lhs.join_mut(rhs);
                 }
@@ -80,16 +84,21 @@ impl PartialSum {
                 changed = true;
             }
         }
-        changed
+        Ok(changed)
     }
 
-    // unsafe because we panic if any common rows have different lengths
-    fn meet_mut_unsafe(&mut self, other: Self) -> bool {
+    // Error with key if any common rows have different lengths ( => Bottom)
+    fn try_meet_mut(&mut self, other: Self) -> Result<bool, usize> {
         let mut changed = false;
         let mut keys_to_remove = vec![];
-        for k in self.0.keys() {
-            if !other.0.contains_key(k) {
-                keys_to_remove.push(*k);
+        for (k, v) in self.0.iter() {
+            match other.0.get(k) {
+                None => keys_to_remove.push(*k),
+                Some(o_v) => {
+                    if v.len() != o_v.len() {
+                        return Err(*k);
+                    }
+                }
             }
         }
         for (k, v) in other.0 {
@@ -105,7 +114,7 @@ impl PartialSum {
             self.0.remove(&k);
             changed = true;
         }
-        changed
+        Ok(changed)
     }
 
     pub fn supports_tag(&self, tag: usize) -> bool {
@@ -304,7 +313,13 @@ impl PartialValue {
                 let Self::PartialSum(ps1) = self else {
                     unreachable!()
                 };
-                ps1.join_mut_unsafe(ps2)
+                match ps1.try_join_mut(ps2) {
+                    Ok(ch) => ch,
+                    Err(_) => {
+                        *self = Self::Top;
+                        true
+                    }
+                }
             }
             (Self::Value(_), mut other) => {
                 std::mem::swap(self, &mut other);
@@ -354,7 +369,13 @@ impl PartialValue {
                 let Self::PartialSum(ps1) = self else {
                     unreachable!()
                 };
-                ps1.meet_mut_unsafe(ps2)
+                match ps1.try_meet_mut(ps2) {
+                    Ok(ch) => ch,
+                    Err(_) => {
+                        *self = Self::Bottom;
+                        true
+                    }
+                }
             }
             (Self::Value(_), mut other @ Self::PartialSum(_)) => {
                 std::mem::swap(self, &mut other);
