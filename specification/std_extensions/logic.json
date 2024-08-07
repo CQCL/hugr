@@ -39,6 +39,13 @@
       "signature": null,
       "binary": true
     },
+    "Eq": {
+      "extension": "logic",
+      "name": "Eq",
+      "description": "test if bools are equal",
+      "signature": null,
+      "binary": true
+    },
     "Not": {
       "extension": "logic",
       "name": "Not",
