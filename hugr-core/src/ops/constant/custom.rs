@@ -53,7 +53,7 @@ use super::{Value, ValueName};
 /// ```
 #[typetag::serde(tag = "c", content = "v")]
 pub trait CustomConst:
-    Send + Sync + std::fmt::Debug + MaybeHash + CustomConstBoxClone + Any + Downcast
+    Send + Sync + std::fmt::Debug + TryHash + CustomConstBoxClone + Any + Downcast
 {
     /// An identifier for the constant.
     fn name(&self) -> ValueName;
@@ -89,27 +89,27 @@ pub trait CustomConst:
 }
 
 /// Prerequisite for `CustomConst`. Allows to declare a custom hash function, but the easiest
-/// options are either to `impl MaybeHash for ... {}` to declare "not hashable", or else
+/// options are either to `impl TryHash for ... {}` to declare "not hashable", or else
 /// to implement (or derive) [Hash].
-pub trait MaybeHash {
+pub trait TryHash {
     /// Hashes the value, if possible; else return `false` without mutating the `Hasher`.
     /// This relates with [CustomConst::equal_consts] just like [Hash] with [Eq]:
-    /// * if `x.equal_consts(y)` ==> `x.maybe_hash(s)` behaves equivalently to `y.maybe_hash(s)`
+    /// * if `x.equal_consts(y)` ==> `x.try_hash(s)` behaves equivalently to `y.try_hash(s)`
     /// * if `x.hash(s)` behaves differently from `y.hash(s)` ==> `x.equal_consts(y) == false`
     ///
     /// As with [Hash], these requirements can trivially be satisfied by either
     /// * `equal_consts` always returning `false`, or
-    /// * `maybe_hash` always behaving the same (e.g. returning `false`, as it does by default)
+    /// * `try_hash` always behaving the same (e.g. returning `false`, as it does by default)
     ///
     /// Note: this uses `dyn` rather than being parametrized by `<H: Hasher>` so that we can
     /// still use `dyn CustomConst`.
-    fn maybe_hash(&self, _state: &mut dyn Hasher) -> bool {
+    fn try_hash(&self, _state: &mut dyn Hasher) -> bool {
         false
     }
 }
 
-impl<T: Hash> MaybeHash for T {
-    fn maybe_hash(&self, mut st: &mut dyn Hasher) -> bool {
+impl<T: Hash> TryHash for T {
+    fn try_hash(&self, mut st: &mut dyn Hasher) -> bool {
         Hash::hash(self, &mut st);
         true
     }
@@ -278,8 +278,8 @@ impl CustomSerialized {
     }
 }
 
-impl MaybeHash for CustomSerialized {
-    fn maybe_hash(&self, mut st: &mut dyn Hasher) -> bool {
+impl TryHash for CustomSerialized {
+    fn try_hash(&self, mut st: &mut dyn Hasher) -> bool {
         // Consistent with equality, same serialization <=> same hash.
         self.value.to_string().hash(&mut st);
         true

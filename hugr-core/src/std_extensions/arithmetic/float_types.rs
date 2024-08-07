@@ -1,6 +1,6 @@
 //! Basic floating-point types
 
-use crate::ops::constant::{MaybeHash, ValueName};
+use crate::ops::constant::{TryHash, ValueName};
 use crate::types::TypeName;
 use crate::{
     extension::{ExtensionId, ExtensionSet},
@@ -56,7 +56,7 @@ impl ConstF64 {
     }
 }
 
-impl MaybeHash for ConstF64 {}
+impl TryHash for ConstF64 {}
 
 #[typetag::serde]
 impl CustomConst for ConstF64 {

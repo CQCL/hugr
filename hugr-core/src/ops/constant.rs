@@ -19,7 +19,7 @@ use thiserror::Error;
 
 pub use custom::{
     downcast_equal_consts, get_pair_of_input_values, get_single_input_value, CustomConst,
-    CustomSerialized, MaybeHash,
+    CustomSerialized, TryHash,
 };
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -138,7 +138,7 @@ impl Sum {
         self.sum_type.as_tuple().map(|_| self.values.as_ref())
     }
 
-    fn maybe_hash<H: Hasher>(&self, st: &mut H) -> bool {
+    fn try_hash<H: Hasher>(&self, st: &mut H) -> bool {
         maybe_hash_values(&self.values, st) && {
             st.write_usize(self.tag);
             self.sum_type.hash(st);
@@ -151,7 +151,7 @@ pub(crate) fn maybe_hash_values<H: Hasher>(vals: &[Value], st: &mut H) -> bool {
     // We can't mutate the Hasher with the first element
     // if any element, even the last, fails.
     let mut hasher = DefaultHasher::new();
-    vals.iter().all(|e| e.maybe_hash(&mut hasher)) && {
+    vals.iter().all(|e| e.try_hash(&mut hasher)) && {
         st.write_u64(hasher.finish());
         true
     }
@@ -531,13 +531,13 @@ impl Value {
     }
 
     /// Hashes this value, if possible. [Value::Extension]s are hashable according
-    /// to their implementation of [MaybeHash]; [Value::Function]s never are;
+    /// to their implementation of [TryHash]; [Value::Function]s never are;
     /// [Value::Sum]s are if their contents are.
-    pub fn maybe_hash<H: Hasher>(&self, st: &mut H) -> bool {
+    pub fn try_hash<H: Hasher>(&self, st: &mut H) -> bool {
         match self {
-            Value::Extension { e } => e.value().maybe_hash(&mut *st),
+            Value::Extension { e } => e.value().try_hash(&mut *st),
             Value::Function { .. } => false,
-            Value::Sum(s) => s.maybe_hash(st),
+            Value::Sum(s) => s.try_hash(st),
         }
     }
 }

@@ -6,7 +6,7 @@ use itertools::Itertools;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 
-use crate::ops::constant::{maybe_hash_values, MaybeHash, ValueName};
+use crate::ops::constant::{maybe_hash_values, TryHash, ValueName};
 use crate::ops::{OpName, Value};
 use crate::types::TypeName;
 use crate::{
@@ -58,8 +58,8 @@ impl ListValue {
     }
 }
 
-impl MaybeHash for ListValue {
-    fn maybe_hash(&self, mut st: &mut dyn Hasher) -> bool {
+impl TryHash for ListValue {
+    fn try_hash(&self, mut st: &mut dyn Hasher) -> bool {
         maybe_hash_values(&self.0, &mut st) && {
             self.1.hash(&mut st);
             true
