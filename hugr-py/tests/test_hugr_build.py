@@ -17,8 +17,11 @@ from .conftest import validate
 def test_stable_indices():
     h = Hugr(ops.DFG([]))
 
-    nodes = [h.add_node(Not) for _ in range(3)]
+    nodes = [h.add_node(Not, num_outs=1) for _ in range(3)]
     assert len(h) == 4
+
+    assert len(list(nodes[0].outputs())) == 1
+    assert list(nodes[0]) == list(nodes[0].outputs())
 
     h.add_link(nodes[0].out(0), nodes[1].inp(0))
     assert h.children() == nodes
