@@ -50,7 +50,7 @@ impl ConstFold for NaryLogic {
             Self::Eq => {
                 let inps = read_inputs(consts)?;
                 let res = inps.clone().into_iter().reduce(|a, b| a == b)?;
-                // We can only fold to true if we have a const for all our inputs
+                // If we have only some inputs, we can still fold to false, but not to true
                 (!res || inps.len() as u64 == num_args)
                     .then_some(vec![(0.into(), ops::Value::from_bool(res))])
             }
