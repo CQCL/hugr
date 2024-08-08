@@ -416,7 +416,9 @@ impl PartialValue {
         let vals = match self {
             PartialValue::Bottom => return None,
             PartialValue::Value(v) => v
-                .variant_values(tag)?
+                .as_sum()
+                .filter(|(variant, _)| tag == *variant)?
+                .1
                 .into_iter()
                 .map(PartialValue::Value)
                 .collect(),
@@ -431,7 +433,7 @@ impl PartialValue {
         match self {
             PartialValue::Bottom => false,
             // TODO this is wildly expensive - only used for case reachability but still...
-            PartialValue::Value(v) => v.variant_values(tag).is_some(),
+            PartialValue::Value(v) => v.as_sum().is_some_and(|(v, _)| v == tag),
             PartialValue::PartialSum(ps) => ps.supports_tag(tag),
             PartialValue::Top => true,
         }

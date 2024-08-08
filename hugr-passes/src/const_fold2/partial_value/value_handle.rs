@@ -78,11 +78,6 @@ impl ValueHandle {
         self.1.as_ref()
     }
 
-    pub fn variant_values(&self, variant: usize) -> Option<Vec<Self>> {
-        self.as_sum()
-            .and_then(|(tag, vals)| (tag == variant).then_some(vals))
-    }
-
     pub fn as_sum(&self) -> Option<(usize, Vec<Self>)> {
         match self.value() {
             Value::Sum(Sum { tag, values, .. }) => {
