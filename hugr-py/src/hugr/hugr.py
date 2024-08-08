@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass, field, replace
 from typing import (
     TYPE_CHECKING,
@@ -120,8 +120,10 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
             raise KeyError(key)
         return n
 
-    def __iter__(self):
-        return iter(self._nodes)
+    def __iter__(self) -> Iterator[Node]:
+        for idx, data in enumerate(self._nodes):
+            if data is not None:
+                yield Node(idx, data._num_outs)
 
     def __len__(self) -> int:
         return self.num_nodes()
@@ -130,6 +132,12 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
         op = self[node].op
         assert isinstance(op, cl)
         return op
+
+    def nodes(self) -> Iterator[tuple[Node, NodeData]]:
+        """Iterator over nodes of the hugr and their data."""
+        for idx, data in enumerate(self._nodes):
+            if data is not None:
+                yield Node(idx, data._num_outs), data
 
     def children(self, node: ToNode | None = None) -> list[Node]:
         """The child nodes of a given `node`.
