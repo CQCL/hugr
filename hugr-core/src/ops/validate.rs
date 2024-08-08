@@ -110,7 +110,7 @@ impl ValidateOp for super::CFG {
     fn validity_flags(&self) -> OpValidityFlags {
         OpValidityFlags {
             allowed_children: OpTag::ControlFlowChild,
-            allowed_first_child: OpTag::BasicBlock,
+            allowed_first_child: OpTag::DataflowBlock,
             allowed_second_child: OpTag::BasicBlockExit,
             requires_children: true,
             requires_dag: false,

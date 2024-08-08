@@ -69,6 +69,8 @@ pub enum OpTag {
 
     /// A control flow basic block.
     BasicBlock,
+    /// A control flow basic block defining a dataflow graph.
+    DataflowBlock,
     /// A control flow exit node.
     BasicBlockExit,
 }
@@ -113,7 +115,8 @@ impl OpTag {
             OpTag::Function => &[OpTag::ModuleOp, OpTag::StaticOutput],
             OpTag::Alias => &[OpTag::ScopedDefn],
             OpTag::FuncDefn => &[OpTag::Function, OpTag::ScopedDefn, OpTag::DataflowParent],
-            OpTag::BasicBlock => &[OpTag::ControlFlowChild, OpTag::DataflowParent],
+            OpTag::BasicBlock => &[OpTag::ControlFlowChild],
+            OpTag::DataflowBlock => &[OpTag::BasicBlock, OpTag::DataflowParent],
             OpTag::BasicBlockExit => &[OpTag::BasicBlock],
             OpTag::Case => &[OpTag::Any, OpTag::DataflowParent],
             OpTag::ModuleRoot => &[OpTag::Any],
@@ -149,6 +152,7 @@ impl OpTag {
             OpTag::Output => "Output node",
             OpTag::FuncDefn => "Function definition",
             OpTag::BasicBlock => "Basic block",
+            OpTag::DataflowBlock => "Basic block containing a dataflow graph",
             OpTag::BasicBlockExit => "Exit basic block node",
             OpTag::Case => "Case",
             OpTag::ModuleRoot => "Module root node",
@@ -224,5 +228,9 @@ mod test {
         assert!(!OpTag::None.is_superset(OpTag::ModuleOp));
         assert!(!OpTag::None.is_superset(OpTag::DataflowChild));
         assert!(!OpTag::None.is_superset(OpTag::BasicBlock));
+
+        // Other specific checks
+        assert!(!OpTag::DataflowParent.is_superset(OpTag::BasicBlockExit));
+        assert!(!OpTag::DataflowParent.is_superset(OpTag::Cfg));
     }
 }
