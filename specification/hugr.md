@@ -896,9 +896,12 @@ Note that since a row variable does not have kind Type, it cannot be used as the
 ### Extension Tracking
 
 The type of `Function` includes a set of [extensions](#extension-system) which are required to execute the graph.
-Every node in the HUGR is annotated with the set of extensions required to produce its inputs,
-and each operation provides (a way to compute) the set of extensions required to execute the node, known as the "delta";
-the union of these two must match the set of extensions on each successor node.
+Similarly, every dataflow node in the HUGR has a set of extensions required to execute the node (computed from its operation), also known as the "delta". The delta of any node must be a subset of its parent,
+except for FuncDefn's:
+* the delta of any child of a FuncDefn, must be a subset of the extensions in the FuncDefn's *type*
+* the FuncDefn itself has no delta (trivially a subset of any parent): as no extensions are required
+merely to know the code inside a FuncDefn; only a Call actually executes this, and the Call takes the delta
+from the called FuncDefn's *type*.
 
 Keeping track of the extension requirements like this allows extension designers
 and third-party tooling to control how/where a module is run.
@@ -915,36 +918,24 @@ running different extensions. By the same mechanism, the runtime can reason
 about where to run different parts of the graph by inspecting their
 extension requirements.
 
-To allow extension annotations on nodes to be made equal, we will have operations
- **lift** and **liftGraph** which can add extension constraints to values.
+Special operations **lift** and **liftGraph** can add extension requirements:
+* `lift<E: ExtensionId, R: List<Type>>` is a node with input and output rows `R` and extension-delta `{E}`
+* `liftGraph<N: ExtensionSet, I: List<Type>, E: ExtensionSet, O: List<Type>>` has one input
+$ \vec{I}^{\underrightarrow{\;E\;}}\vec{O} $ and one output $ \vec{I}^{\underrightarrow{\;E \cup N\;}}\vec{O}$.
+That is, given a graph, it adds extensions $N$ to the requirements of the graph.
 
-$\displaystyle{\frac{v : [ \rho ] T}{\textbf{lift} \langle X \rangle (v) : [X, \rho] T}}$
+The latter is useful for higher-order operations such as conditionally selecting
+one function or another, where the output must have a consistent type (including
+the extension-requirements of the function).
 
-**lift** - Takes as a node weight parameter the single extension
-**X** which it adds to the
-extension requirements of its argument.
+# Having these as explicit nodes on the graph allows us to search for the
+# point before extensions were added when we want to copy graphs, allowing
+# us to get the version with minimal extension requirements.
 
-$\displaystyle{\frac{f : [ \rho ] \textbf{Function}[R](\vec{I}, \vec{O})}{\textbf{liftGraph} \langle X \rangle (f) : [ \rho ] \textbf{Function}[X, R](\vec{I}, \vec{O})}}$
-
-**liftGraph** - Like **lift**, takes an
-extension X as a constant node
-weight parameter. Given a graph, it will add extension
-X to the requirements of the
-graph.
-
-Having these as explicit nodes on the graph allows us to search for the
-point before extensions were added when we want to copy graphs, allowing
-us to get the version with minimal extension requirements.
-
-Graphs which are almost alike can both be squeezed into a
-Conditional-node that selects one or the other, by wrapping them in a
-parent graph to correct the inputs/outputs and using the **lift**
-function from below.
-
-Note that here, any letter with vector notation refers to a variable
-which stands in for a row. Hence, when checking the inputs and outputs
-align, we're introducing a *row equality constraint*, rather than the
-equality constraint of `typeof(b) ~ Bool`.
+# Note that here, any letter with vector notation refers to a variable
+# which stands in for a row. Hence, when checking the inputs and outputs
+# align, we're introducing a *row equality constraint*, rather than the
+# equality constraint of `typeof(b) ~ Bool`.
 
 ### Rewriting Extension Requirements
 
@@ -1623,8 +1614,6 @@ struct HUGR {
 struct Node{
   // parent node index
   parent: Int,
-  // The input extensions to the node
-  input_extensions: Option<ExtensionSet>
   // name of operation
   op: String
   //other op-specific fields
