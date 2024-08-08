@@ -19,6 +19,8 @@ def test_stable_indices():
 
     nodes = [h.add_node(Not) for _ in range(3)]
     assert len(h) == 4
+    assert list(iter(h)) == [Node(i) for i in range(4)]
+    assert all(data is not None for node, data in h.nodes())
 
     h.add_link(nodes[0].out(0), nodes[1].inp(0))
     assert h.children() == nodes
@@ -47,6 +49,8 @@ def test_stable_indices():
 
     assert len(h) == 4
     assert h._free_nodes == []
+    assert list(iter(h)) == [Node(i) for i in range(4)]
+    assert all(data is not None for node, data in h.nodes())
 
 
 def simple_id() -> Dfg:
