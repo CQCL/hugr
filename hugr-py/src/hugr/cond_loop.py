@@ -11,13 +11,14 @@ from typing import TYPE_CHECKING
 from typing_extensions import Self
 
 from hugr import ops
+from hugr.tys import Sum
 
 from .dfg import _DfBase
 from .hugr import Hugr, ParentBuilder
 
 if TYPE_CHECKING:
     from .node_port import Node, ToNode, Wire
-    from .tys import Sum, TypeRow
+    from .tys import TypeRow
 
 
 class Case(_DfBase[ops.Case]):
@@ -214,6 +215,16 @@ class TailLoop(_DfBase[ops.TailLoop]):
     def __init__(self, just_inputs: TypeRow, rest: TypeRow) -> None:
         root_op = ops.TailLoop(just_inputs, rest)
         super().__init__(root_op)
+
+    def set_outputs(self, *outputs: Wire) -> None:
+        super().set_outputs(*outputs)
+
+        assert len(outputs) > 0
+        sum_wire = outputs[0]
+        sum_type = self.hugr.port_type(sum_wire.out_port())
+        assert isinstance(sum_type, Sum)
+        assert len(sum_type.variant_rows) == 2
+        self._set_parent_output_count(len(sum_type.variant_rows[1]) + len(outputs) - 1)
 
     def set_loop_outputs(self, sum_wire: Wire, *rest: Wire) -> None:
         """Set the outputs of the loop body. The first wire must be the sum type

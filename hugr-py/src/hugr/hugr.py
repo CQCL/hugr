@@ -173,6 +173,20 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
             self[parent].children.append(node)
         return node
 
+    def _update_node_outs(self, node: Node, num_outs: int | None) -> Node:
+        """Update the number of outgoing ports for a node.
+
+        Returns:
+            The updated node.
+        """
+        self[node]._num_outs = num_outs or 0
+        node = replace(node, _num_out_ports=num_outs)
+        parent = self[node].parent
+        if parent is not None:
+            pos = self[parent].children.index(node)
+            self[parent].children[pos] = node
+        return node
+
     def add_node(
         self,
         op: Op,
