@@ -879,14 +879,17 @@ treatment, as follows:
   For example, `Type::Function(usize, unit, <exts>)` is equivalent shorthand
   for `Type::Function(#(usize), #(unit), <exts>)`.
 * When a `TypeArg::Sequence` is provided as argument for such a TypeParam, we allow
-  the elements of the Sequence to be not just types (including variables of kind
-  `TypeParam::Type(_)`), but also row variables. These are implicitly spliced in
-  (appending with other elements).
+  elements to be a mixture of both types (including variables of kind
+  `TypeParam::Type(_)`) and also row variables. When such variables are instantiated
+  (with other Sequences) the elements of the inner Sequence are spliced directly into
+  the outer (concatenating their elements), eliding the inner (Sequence) wrapper.
 
 For example, a polymorphic FuncDefn might declare a row variable X of kind
 `TypeParam::List(TypeParam::Type(Copyable))` and have as output a (tuple) type
 `Sum([#(X, usize)])`. A call that instantiates said type-parameter with
 `TypeArg::Sequence([usize, unit])` would then have output `Sum([#(usize, unit, usize)])`.
+
+Note that since a row variable does not have kind Type, it cannot be used as the type of an edge.
 
 ### Extension Tracking
 
