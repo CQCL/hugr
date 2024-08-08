@@ -224,7 +224,7 @@ pub const STRING_CUSTOM_TYPE: CustomType =
 /// String type.
 pub const STRING_TYPE: Type = Type::new_extension(STRING_CUSTOM_TYPE);
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
 /// Structure for holding constant string values.
 pub struct ConstString(String);
 
@@ -276,7 +276,7 @@ pub fn sum_with_error(ty: Type) -> SumType {
     SumType::new([ty, ERROR_TYPE])
 }
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
 /// Structure for holding constant usize values.
 pub struct ConstUsize(u64);
 
@@ -311,7 +311,7 @@ impl CustomConst for ConstUsize {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
 /// Structure for holding constant usize values.
 pub struct ConstError {
     /// Integer tag/signal for the error.
@@ -348,7 +348,7 @@ impl CustomConst for ConstError {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 /// A structure for holding references to external symbols.
 pub struct ConstExternalSymbol {
     /// The symbol name that this value refers to. Must be nonempty.
