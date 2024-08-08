@@ -889,6 +889,8 @@ For example, a polymorphic FuncDefn might declare a row variable X of kind
 `Sum([#(X, usize)])`. A call that instantiates said type-parameter with
 `TypeArg::Sequence([usize, unit])` would then have output `Sum([#(usize, unit, usize)])`.
 
+See [Declarative Format](#declarative-format) for more examples.
+
 Note that since a row variable does not have kind Type, it cannot be used as the type of an edge.
 
 ### Extension Tracking
@@ -1170,6 +1172,14 @@ extensions:
     # outputs would be, in principle: Array<i+j>(t)
     # - but default type scheme interpreter does not support such addition
     # Hence, no signature block => will look up a compute_signature in registry.
+  - name: TupleConcat
+    description: "Concatenate two tuples"
+    params:
+      a: List[Type]
+      b: List[Type]
+    signature:
+      inputs: Sum([a]), Sum([b])
+      outputs: Sum([(a,b)]) # Syntax! Sum([a,b]) would be either-a-or-b, this has one variant
   - name: GraphOp
     description: "Involves running an argument Graph. E.g. run it some variable number of times."
     params:
