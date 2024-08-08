@@ -90,6 +90,13 @@ class ToNode(Wire, Protocol):
     def out_port(self) -> OutPort:
         return OutPort(self.to_node(), 0)
 
+    def outputs(self) -> Iterator[OutPort]:
+        """Returns an iterator over the output ports of this node."""
+        return self[:]
+
+    def __iter__(self) -> Iterator[OutPort]:
+        return self.outputs()
+
     def inp(self, offset: PortOffset) -> InPort:
         """Generate an input port for this node.
 
