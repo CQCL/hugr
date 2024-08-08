@@ -21,6 +21,9 @@ class ExplicitBound:
     def to_serial(self) -> ext_s.ExplicitBound:
         return ext_s.ExplicitBound(bound=self.bound)
 
+    def to_serial_root(self) -> ext_s.TypeDefBound:
+        return ext_s.TypeDefBound(root=self.to_serial())
+
 
 @dataclass
 class FromParamsBound:
@@ -29,16 +32,20 @@ class FromParamsBound:
     def to_serial(self) -> ext_s.FromParamsBound:
         return ext_s.FromParamsBound(indices=self.indices)
 
+    def to_serial_root(self) -> ext_s.TypeDefBound:
+        return ext_s.TypeDefBound(root=self.to_serial())
+
 
 @dataclass
 class TypeDef:
-    extension: ExtensionId
     name: str
     description: str
     params: list[tys.TypeParam]
     bound: ExplicitBound | FromParamsBound
+    extension: ExtensionId | None = None
 
     def to_serial(self) -> ext_s.TypeDef:
+        assert self.extension is not None, "Extension must be initialised."
         return ext_s.TypeDef(
             extension=self.extension,
             name=self.name,
@@ -104,11 +111,12 @@ class OpDef:
 
 @dataclass
 class ExtensionValue:
-    extension: ExtensionId
     name: str
     typed_value: val.Value
+    extension: ExtensionId | None = None
 
     def to_serial(self) -> ext_s.ExtensionValue:
+        assert self.extension is not None, "Extension must be initialised."
         return ext_s.ExtensionValue(
             extension=self.extension,
             name=self.name,
@@ -137,6 +145,12 @@ class Extension:
 
     def add_op_def(self, op_def: OpDef) -> None:
         self.operations[op_def.name] = op_def
+
+    def add_type_def(self, type_def: TypeDef) -> None:
+        self.types[type_def.name] = type_def
+
+    def add_extension_value(self, extension_value: ExtensionValue) -> None:
+        self.values[extension_value.name] = extension_value
 
 
 @dataclass
