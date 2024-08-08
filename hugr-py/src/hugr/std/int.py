@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, ClassVar
 
 from typing_extensions import Self
@@ -73,9 +73,10 @@ class IntVal(val.ExtensionValue):
     """Custom value for an integer."""
 
     v: int
+    width: int = field(default=5)
 
     def to_value(self) -> val.Extension:
-        return val.Extension("int", INT_T, self.v)
+        return val.Extension("int", int_t(self.width), self.v)
 
 
 OPS_EXTENSION: tys.ExtensionId = "arithmetic.int"
