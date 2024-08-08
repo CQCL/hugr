@@ -39,6 +39,17 @@ class TypeArg(Protocol):
 class Type(Protocol):
     """A HUGR type."""
 
+    def type_bound(self) -> stys.TypeBound:
+        """The bound of this type.
+
+        Example:
+            >>> Tuple(Bool, Bool).type_bound()
+            <TypeBound.Copyable: 'C'>
+            >>> Tuple(Qubit, Bool).type_bound()
+            <TypeBound.Any: 'A'>
+        """
+        ...  # pragma: no cover
+
     def to_serial(self) -> stys.BaseType:
         """Convert to serializable model."""
         ...  # pragma: no cover
@@ -201,6 +212,9 @@ class Array(Type):
     def to_serial(self) -> stys.Array:
         return stys.Array(ty=self.ty.to_serial_root(), len=self.size)
 
+    def type_bound(self) -> TypeBound:
+        return self.ty.type_bound()
+
 
 @dataclass()
 class Sum(Type):
@@ -222,6 +236,9 @@ class Sum(Type):
 
     def __repr__(self) -> str:
         return f"Sum({self.variant_rows})"
+
+    def type_bound(self) -> TypeBound:
+        return TypeBound.join(*(t.type_bound() for r in self.variant_rows for t in r))
 
 
 @dataclass()
@@ -268,6 +285,9 @@ class Variable(Type):
     def to_serial(self) -> stys.Variable:
         return stys.Variable(i=self.idx, b=self.bound)
 
+    def type_bound(self) -> TypeBound:
+        return self.bound
+
 
 @dataclass(frozen=True)
 class RowVariable(Type):
@@ -279,6 +299,9 @@ class RowVariable(Type):
     def to_serial(self) -> stys.RowVar:
         return stys.RowVar(i=self.idx, b=self.bound)
 
+    def type_bound(self) -> TypeBound:
+        return self.bound
+
 
 @dataclass(frozen=True)
 class USize(Type):
@@ -286,6 +309,9 @@ class USize(Type):
 
     def to_serial(self) -> stys.USize:
         return stys.USize()
+
+    def type_bound(self) -> TypeBound:
+        return TypeBound.Copyable
 
 
 @dataclass(frozen=True)
@@ -298,6 +324,9 @@ class Alias(Type):
     def to_serial(self) -> stys.Alias:
         return stys.Alias(name=self.name, bound=self.bound)
 
+    def type_bound(self) -> TypeBound:
+        return self.bound
+
 
 @dataclass(frozen=True)
 class FunctionType(Type):
@@ -308,6 +337,9 @@ class FunctionType(Type):
     input: TypeRow
     output: TypeRow
     extension_reqs: ExtensionSet = field(default_factory=ExtensionSet)
+
+    def type_bound(self) -> TypeBound:
+        return TypeBound.Copyable
 
     def to_serial(self) -> stys.FunctionType:
         return stys.FunctionType(
@@ -362,6 +394,9 @@ class PolyFuncType(Type):
     params: list[TypeParam]
     body: FunctionType
 
+    def type_bound(self) -> TypeBound:
+        return TypeBound.Copyable
+
     def to_serial(self) -> stys.PolyFuncType:
         return stys.PolyFuncType(
             params=[p.to_serial_root() for p in self.params], body=self.body.to_serial()
@@ -385,9 +420,15 @@ class Opaque(Type):
             bound=self.bound,
         )
 
+    def type_bound(self) -> TypeBound:
+        return self.bound
+
 
 @dataclass
 class _QubitDef(Type):
+    def type_bound(self) -> TypeBound:
+        return TypeBound.Any
+
     def to_serial(self) -> stys.Qubit:
         return stys.Qubit()
 
