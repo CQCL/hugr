@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, TypeVar
 
 from typing_extensions import Self
 
-from hugr import tys
+import hugr.tys as tys
 from hugr.hugr import Hugr
 from hugr.ops import AsCustomOp, Command, Custom, DataflowOp
 from hugr.serialization.serial_hugr import SerialHugr
