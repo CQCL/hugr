@@ -976,7 +976,7 @@ tooling. These operations cover various flavours:
 
 - Instruction sets specific to a target.
 - Operations that are best expressed in some other format that can be
-  compiled in to a graph (e.g. ZX).
+  compiled into a graph (e.g. ZX).
 - Ephemeral operations used by specific compiler passes.
 
 A nice-to-have for this extensibility is a human-friendly format for
