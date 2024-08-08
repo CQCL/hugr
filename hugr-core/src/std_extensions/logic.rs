@@ -366,6 +366,9 @@ pub(crate) mod test {
     #[case(NaryLogic::And, [Some(false), None], Some(false))]
     #[case(NaryLogic::Or, [None, Some(false)], None)]
     #[case(NaryLogic::Or, [None, Some(true)], Some(true))]
+    #[case(NaryLogic::Eq, [None, Some(true), Some(true)], None)]
+    #[case(NaryLogic::Eq, [None, Some(false), Some(true)], Some(false))]
+    #[case(NaryLogic::Eq, [Some(true), Some(true), Some(true)], Some(true))]
     fn nary_partial_const_fold(
         #[case] op: NaryLogic,
         #[case] ins: impl IntoIterator<Item = Option<bool>>,
