@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 
 def int_t(width: int) -> tys.Opaque:
-    """Create an integer type with a given log bit width.
+    """Create an integer type with a fixed log bit width.
 
 
     Args:
@@ -32,6 +32,34 @@ def int_t(width: int) -> tys.Opaque:
         extension="arithmetic.int.types",
         id="int",
         args=[tys.BoundedNatArg(n=width)],
+        bound=tys.TypeBound.Copyable,
+    )
+
+
+# The exclusive bound for the integer type width.
+# Integer widths are in the closed range [0, LOG_WIDTH_BOUND-1].
+LOG_WIDTH_BOUND = 7
+
+
+def int_tv(var_id: int) -> tys.Opaque:
+    """Create an integer type with a parametric log bit width.
+
+
+    Args:
+        var_id: The id of the type argument. It must correspond to a `BoundedNatArg`.
+
+    Returns:
+        The integer type.
+
+    Examples:
+        >>> int_tv(0).id
+        'int'
+    """
+    return tys.Opaque(
+        extension="arithmetic.int.types",
+        id="int",
+        # param is a `TypeParam`
+        args=[tys.VariableArg(idx=var_id, param=tys.BoundedNatParam(LOG_WIDTH_BOUND))],
         bound=tys.TypeBound.Copyable,
     )
 
