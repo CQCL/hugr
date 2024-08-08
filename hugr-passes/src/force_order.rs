@@ -56,7 +56,6 @@ pub fn force_order_by_key<H: HugrMut, K: Ord>(
         .filter(|n| hugr.get_optype(*n).tag() <= OpTag::DataflowParent)
         .collect_vec();
     for dp in dataflow_parents {
-        println!("Dataflow parent: {:?}", dp);
         // we filter out the input and output nodes from the topological sort
         let [i, o] = hugr.get_io(dp).unwrap();
         let rank = |n| rank(hugr, n);
