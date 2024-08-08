@@ -216,6 +216,16 @@ class TailLoop(_DfBase[ops.TailLoop]):
         root_op = ops.TailLoop(just_inputs, rest)
         super().__init__(root_op)
 
+    def set_outputs(self, *outputs: Wire) -> None:
+        super().set_outputs(*outputs)
+
+        assert len(outputs) > 0
+        sum_wire = outputs[0]
+        sum_type = self.hugr.port_type(sum_wire.out_port())
+        assert isinstance(sum_type, Sum)
+        assert len(sum_type.variant_rows) == 2
+        self._set_parent_output_count(len(sum_type.variant_rows[1]) + len(outputs[1:]))
+
     def set_loop_outputs(self, sum_wire: Wire, *rest: Wire) -> None:
         """Set the outputs of the loop body. The first wire must be the sum type
         that controls loop termination.
@@ -225,8 +235,3 @@ class TailLoop(_DfBase[ops.TailLoop]):
             rest: The remaining output wires (corresponding to the 'rest' types).
         """
         self.set_outputs(sum_wire, *rest)
-
-        sum_type = self.hugr.port_type(sum_wire.out_port())
-        assert isinstance(sum_type, Sum)
-        assert len(sum_type.variant_rows) == 2
-        self.set_parent_output_count(len(sum_type.variant_rows[1]) + len(rest))

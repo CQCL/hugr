@@ -22,17 +22,21 @@ if TYPE_CHECKING:
 class Block(_DfBase[ops.DataflowBlock]):
     """Builder class for a basic block in a HUGR control flow graph."""
 
-    def set_block_outputs(self, branching: Wire, *other_outputs: Wire) -> None:
-        self.set_outputs(branching, *other_outputs)
+    def set_outputs(self, *outputs: Wire) -> None:
+        super().set_outputs(*outputs)
 
+        assert len(outputs) > 0
+        branching = outputs[0]
         branch_type = self.hugr.port_type(branching.out_port())
         assert isinstance(branch_type, tys.Sum)
-        self.set_parent_output_count(len(branch_type.variant_rows))
+        self._set_parent_output_count(len(branch_type.variant_rows))
+
+    def set_block_outputs(self, branching: Wire, *other_outputs: Wire) -> None:
+        self.set_outputs(branching, *other_outputs)
 
     def set_single_succ_outputs(self, *outputs: Wire) -> None:
         u = self.load(val.Unit)
         self.set_outputs(u, *outputs)
-        self.set_parent_output_count(1)
 
     def _wire_up_port(self, node: Node, offset: PortOffset, p: Wire) -> Type:
         src = p.out_port()

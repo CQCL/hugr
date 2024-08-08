@@ -466,7 +466,7 @@ class _DfBase(ParentBuilder[DP], _DefinitionBuilder, AbstractContextManager):
         self._wire_up(self.output_node, args)
         self.parent_op._set_out_types(self._output_op().types)
 
-    def set_parent_output_count(self, count: int) -> None:
+    def _set_parent_output_count(self, count: int) -> None:
         """Set the final number of output ports on the parent operation.
 
         Args:
@@ -474,7 +474,7 @@ class _DfBase(ParentBuilder[DP], _DefinitionBuilder, AbstractContextManager):
 
         Example:
             >>> dfg = Dfg(tys.Bool)
-            >>> dfg.set_parent_output_count(2)
+            >>> dfg._set_parent_output_count(2)
         """
         self.parent_node = self.hugr._update_node_outs(self.parent_node, count)
 
@@ -634,7 +634,7 @@ class Dfg(_DfBase[ops.DFG]):
 
     def set_outputs(self, *outputs: Wire) -> None:
         super().set_outputs(*outputs)
-        self.set_parent_output_count(len(outputs))
+        self._set_parent_output_count(len(outputs))
 
 
 def _ancestral_sibling(h: Hugr, src: Node, tgt: Node) -> Node | None:

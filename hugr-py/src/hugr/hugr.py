@@ -176,10 +176,10 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
             The updated node.
         """
         self[node]._num_outs = num_outs or 0
+        node = replace(node, _num_out_ports=num_outs)
         parent = self[node].parent
         if parent is not None:
             pos = self[parent].children.index(node)
-            node = replace(node, _num_out_ports=num_outs)
             self[parent].children[pos] = node
         return node
 
