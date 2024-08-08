@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field, replace
 from typing import (
@@ -605,3 +606,14 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
             )
 
         return hugr
+
+    def to_json(self) -> str:
+        """Serialize the HUGR to a JSON string."""
+        return self.to_serial().to_json()
+
+    @classmethod
+    def load_json(cls, json_str: str) -> Hugr:
+        """Deserialize a JSON string into a HUGR."""
+        json_dict = json.loads(json_str)
+        serial = SerialHugr.load_json(json_dict)
+        return cls.from_serial(serial)
