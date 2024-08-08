@@ -78,14 +78,15 @@ impl ValueHandle {
         self.1.as_ref()
     }
 
-    pub fn as_sum(&self) -> Option<(usize, Vec<Self>)> {
+    pub fn as_sum(&self) -> Option<(usize, impl Iterator<Item = Self> + '_)> {
         match self.value() {
-            Value::Sum(Sum { tag, values, .. }) => {
-                let vals = values.iter().cloned().map(Arc::new);
-                let keys = (0..).map(|i| self.0.clone().field(i));
-                let vec = keys.zip(vals).map(|(i, v)| Self(i, v)).collect();
-                Some((*tag, vec))
-            }
+            Value::Sum(Sum { tag, values, .. }) => Some((
+                *tag,
+                values
+                    .iter()
+                    .enumerate()
+                    .map(|(i, v)| Self(self.0.clone().field(i), Arc::new(v.clone()))),
+            )),
             _ => None,
         }
     }
@@ -203,7 +204,7 @@ mod test {
         let v1 = ValueHandle::new(k1.clone(), subject_val.clone());
         let v2 = ValueHandle::new(k1.clone(), Value::extension(k_i).into());
 
-        let (_, fields) = v1.as_sum().unwrap();
+        let fields = v1.as_sum().unwrap().1.collect::<Vec<_>>();
         // we do not compare the value, just the key
         assert_ne!(fields[0], v2);
         assert_eq!(fields[0].value(), v2.value());

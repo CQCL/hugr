@@ -177,7 +177,7 @@ impl TryFrom<ValueHandle> for PartialSum {
     fn try_from(value: ValueHandle) -> Result<Self, Self::Error> {
         value
             .as_sum()
-            .map(|(tag, values)| Self::variant(tag, values.into_iter().map(PartialValue::from)))
+            .map(|(tag, values)| Self::variant(tag, values.map(PartialValue::from)))
             .ok_or(value)
     }
 }
@@ -419,7 +419,6 @@ impl PartialValue {
                 .as_sum()
                 .filter(|(variant, _)| tag == *variant)?
                 .1
-                .into_iter()
                 .map(PartialValue::Value)
                 .collect(),
             PartialValue::PartialSum(ps) => ps.variant_values(tag, len)?,
@@ -432,7 +431,6 @@ impl PartialValue {
     pub fn supports_tag(&self, tag: usize) -> bool {
         match self {
             PartialValue::Bottom => false,
-            // TODO this is wildly expensive - only used for case reachability but still...
             PartialValue::Value(v) => v.as_sum().is_some_and(|(v, _)| v == tag),
             PartialValue::PartialSum(ps) => ps.supports_tag(tag),
             PartialValue::Top => true,
