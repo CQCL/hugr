@@ -121,9 +121,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
         return n
 
     def __iter__(self) -> Iterator[Node]:
-        for idx, data in enumerate(self._nodes):
-            if data is not None:
-                yield Node(idx, data._num_outs)
+        return (Node(idx) for idx, data in enumerate(self._nodes) if data is not None)
 
     def __len__(self) -> int:
         return self.num_nodes()
@@ -133,11 +131,9 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
         assert isinstance(op, cl)
         return op
 
-    def nodes(self) -> Iterator[tuple[Node, NodeData]]:
+    def nodes(self) -> Iterable[tuple[Node, NodeData]]:
         """Iterator over nodes of the hugr and their data."""
-        for idx, data in enumerate(self._nodes):
-            if data is not None:
-                yield Node(idx, data._num_outs), data
+        return self.items()
 
     def children(self, node: ToNode | None = None) -> list[Node]:
         """The child nodes of a given `node`.
