@@ -175,6 +175,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
         Returns:
             The updated node.
         """
+        self[node]._num_outs = num_outs or 0
         parent = self[node].parent
         if parent is not None:
             pos = self[parent].children.index(node)
