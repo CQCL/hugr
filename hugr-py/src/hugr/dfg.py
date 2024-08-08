@@ -466,6 +466,18 @@ class _DfBase(ParentBuilder[DP], _DefinitionBuilder, AbstractContextManager):
         self._wire_up(self.output_node, args)
         self.parent_op._set_out_types(self._output_op().types)
 
+    def set_parent_output_count(self, count: int) -> None:
+        """Set the final number of output ports on the parent operation.
+
+        Args:
+            count: The number of output ports.
+
+        Example:
+            >>> dfg = Dfg(tys.Bool)
+            >>> dfg.set_parent_output_count(2)
+        """
+        self.parent_node = self.hugr._update_node_outs(self.parent_node, count)
+
     def add_state_order(self, src: Node, dst: Node) -> None:
         """Add a state order link between two nodes.
 
@@ -619,6 +631,10 @@ class Dfg(_DfBase[ops.DFG]):
     def __init__(self, *input_types: tys.Type) -> None:
         parent_op = ops.DFG(list(input_types), None)
         super().__init__(parent_op)
+
+    def set_outputs(self, *outputs: Wire) -> None:
+        super().set_outputs(*outputs)
+        self.set_parent_output_count(len(outputs))
 
 
 def _ancestral_sibling(h: Hugr, src: Node, tgt: Node) -> Node | None:

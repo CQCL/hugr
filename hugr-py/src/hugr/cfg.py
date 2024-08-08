@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from typing_extensions import Self
 
-from hugr import ops, val
+from hugr import ops, tys, val
 
 from .dfg import _DfBase
 from .exceptions import MismatchedExit, NoSiblingAncestor, NotInSameCfg
@@ -25,9 +25,14 @@ class Block(_DfBase[ops.DataflowBlock]):
     def set_block_outputs(self, branching: Wire, *other_outputs: Wire) -> None:
         self.set_outputs(branching, *other_outputs)
 
+        branch_type = self.hugr.port_type(branching.out_port())
+        assert isinstance(branch_type, tys.Sum)
+        self.set_parent_output_count(len(branch_type.variant_rows))
+
     def set_single_succ_outputs(self, *outputs: Wire) -> None:
         u = self.load(val.Unit)
         self.set_outputs(u, *outputs)
+        self.set_parent_output_count(1)
 
     def _wire_up_port(self, node: Node, offset: PortOffset, p: Wire) -> Type:
         src = p.out_port()
@@ -249,3 +254,6 @@ class Cfg(ParentBuilder[ops.CFG], AbstractContextManager):
         else:
             self._exit_op._cfg_outputs = out_types
             self.parent_op._outputs = out_types
+            self.parent_node = self.hugr._update_node_outs(
+                self.parent_node, len(out_types)
+            )
