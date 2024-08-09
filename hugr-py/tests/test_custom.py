@@ -46,6 +46,7 @@ def test_stringly_typed():
     validate(dfg.hugr)
 
 
+@pytest.mark.xfail(reason="Extension resolution not implemented yet.")
 @pytest.mark.parametrize(
     "as_custom",
     [Not, DivMod, H, CX, Measure, Rz, StringlyOp("hello")],

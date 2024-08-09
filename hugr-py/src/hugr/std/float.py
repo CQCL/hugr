@@ -4,16 +4,22 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from hugr import tys, val
+from semver import Version
 
+from hugr import ext, tys, val
+
+Extension = ext.Extension("arithmetic.float.types", Version(0, 1, 0))
 #: HUGR 64-bit IEEE 754-2019 floating point type.
-FLOAT_EXT_ID = "arithmetic.float.types"
-FLOAT_T = tys.Opaque(
-    extension=FLOAT_EXT_ID,
-    id="float64",
-    args=[],
-    bound=tys.TypeBound.Copyable,
+FLOAT_T_DEF = Extension.add_type_def(
+    ext.TypeDef(
+        name="float64",
+        description="64-bit IEEE 754-2019 floating point number",
+        params=[],
+        bound=ext.ExplicitBound(tys.TypeBound.Copyable),
+    )
 )
+
+FLOAT_T = FLOAT_T_DEF.instantiate([])
 
 
 @dataclass
