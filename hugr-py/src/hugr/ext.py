@@ -96,15 +96,15 @@ class OpDefSig:  # noqa: D101
 class OpDef:  # noqa: D101
     name: str
     signature: OpDefSig
-    extension: ExtensionId | None = None
     description: str = ""
     misc: dict[str, Any] = field(default_factory=dict)
     lower_funcs: list[FixedHugr] = field(default_factory=list)
+    _extension: Extension | None = field(default=None, init=False)
 
     def to_serial(self) -> ext_s.OpDef:
-        assert self.extension is not None, "Extension must be initialised."
+        assert self._extension is not None, "Extension must be initialised."
         return ext_s.OpDef(
-            extension=self.extension,
+            extension=self._extension.name,
             name=self.name,
             description=self.description,
             misc=self.misc,
@@ -120,12 +120,12 @@ class OpDef:  # noqa: D101
 class ExtensionValue:  # noqa: D101
     name: str
     typed_value: val.Value
-    extension: ExtensionId | None = None
+    _extension: Extension | None = field(default=None, init=False)
 
     def to_serial(self) -> ext_s.ExtensionValue:
-        assert self.extension is not None, "Extension must be initialised."
+        assert self._extension is not None, "Extension must be initialised."
         return ext_s.ExtensionValue(
-            extension=self.extension,
+            extension=self._extension.name,
             name=self.name,
             typed_value=self.typed_value.to_serial_root(),
         )
@@ -150,16 +150,20 @@ class Extension:  # noqa: D101
             operations={k: v.to_serial() for k, v in self.operations.items()},
         )
 
-    def add_op_def(self, op_def: OpDef) -> None:
+    def add_op_def(self, op_def: OpDef) -> OpDef:
+        op_def._extension = self
         self.operations[op_def.name] = op_def
+        return self.operations[op_def.name]
 
     def add_type_def(self, type_def: TypeDef) -> TypeDef:
         type_def._extension = self
         self.types[type_def.name] = type_def
         return self.types[type_def.name]
 
-    def add_extension_value(self, extension_value: ExtensionValue) -> None:
+    def add_extension_value(self, extension_value: ExtensionValue) -> ExtensionValue:
+        extension_value._extension = self
         self.values[extension_value.name] = extension_value
+        return self.values[extension_value.name]
 
 
 @dataclass
