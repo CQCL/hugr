@@ -10,23 +10,58 @@ from typing import TYPE_CHECKING, TypeVar
 
 from typing_extensions import Self
 
-import hugr.tys as tys
+from hugr import ext, tys
 from hugr.hugr import Hugr
-from hugr.ops import AsCustomOp, Command, Custom, DataflowOp
+from hugr.ops import AsCustomOp, Command, Custom, DataflowOp, ExtOp
 from hugr.serialization.serial_hugr import SerialHugr
 from hugr.std.float import FLOAT_T
 
 if TYPE_CHECKING:
     from hugr.ops import ComWire
 
+EXTENSION = ext.Extension("pytest.quantum,", ext.Version(0, 1, 0))
+_SINGLE_QUBIT = ext.OpDefSig(tys.FunctionType.endo([tys.Qubit]))
+_TWO_QUBIT = ext.OpDefSig(tys.FunctionType.endo([tys.Qubit] * 2))
+_MEAS_SIG = ext.OpDefSig(tys.FunctionType([tys.Qubit], [tys.Qubit, tys.Bool]))
+_RZ_SIG = ext.OpDefSig(tys.FunctionType([tys.Qubit, FLOAT_T], [tys.Qubit]))
 
-QUANTUM_EXTENSION_ID: tys.ExtensionId = "quantum.tket2"
+EXTENSION.add_op_def(
+    ext.OpDef(
+        name="H",
+        description="Hadamard gate",
+        signature=_SINGLE_QUBIT,
+    )
+)
+
+EXTENSION.add_op_def(
+    ext.OpDef(
+        name="CX",
+        description="CNOT gate",
+        signature=_TWO_QUBIT,
+    )
+)
+
+EXTENSION.add_op_def(
+    ext.OpDef(
+        name="Measure",
+        description="Measurement operation",
+        signature=_MEAS_SIG,
+    )
+)
+
+EXTENSION.add_op_def(
+    ext.OpDef(
+        name="Rz",
+        description="Rotation around the z-axis",
+        signature=_RZ_SIG,
+    )
+)
 
 E = TypeVar("E", bound=Enum)
 
 
 def _load_enum(enum_cls: type[E], custom: Custom) -> E | None:
-    if custom.extension == QUANTUM_EXTENSION_ID and custom.name in enum_cls.__members__:
+    if custom.extension == EXTENSION.name and custom.name in enum_cls.__members__:
         return enum_cls(custom.name)
     return None
 
@@ -43,11 +78,7 @@ class OneQbGate(AsCustomOp):
         return DataflowOp.__call__(self, q)
 
     def to_custom(self) -> Custom:
-        return Custom(
-            self._enum.value,
-            tys.FunctionType.endo([tys.Qubit]),
-            extension=QUANTUM_EXTENSION_ID,
-        )
+        return ExtOp(EXTENSION.operations[self._enum.value]).to_custom()
 
     @classmethod
     def from_custom(cls, custom: Custom) -> Self | None:
@@ -65,11 +96,7 @@ class TwoQbGate(AsCustomOp):
     _enum: _Enum
 
     def to_custom(self) -> Custom:
-        return Custom(
-            self._enum.value,
-            tys.FunctionType.endo([tys.Qubit] * 2),
-            extension=QUANTUM_EXTENSION_ID,
-        )
+        return ExtOp(EXTENSION.operations[self._enum.value]).to_custom()
 
     @classmethod
     def from_custom(cls, custom: Custom) -> Self | None:
@@ -85,11 +112,7 @@ CX = TwoQbGate(TwoQbGate._Enum.CX)
 @dataclass(frozen=True)
 class MeasureDef(AsCustomOp):
     def to_custom(self) -> Custom:
-        return Custom(
-            "Measure",
-            tys.FunctionType([tys.Qubit], [tys.Qubit, tys.Bool]),
-            extension=QUANTUM_EXTENSION_ID,
-        )
+        return ExtOp(EXTENSION.operations["Measure"]).to_custom()
 
     def __call__(self, q: ComWire) -> Command:
         return super().__call__(q)
@@ -101,11 +124,7 @@ Measure = MeasureDef()
 @dataclass(frozen=True)
 class RzDef(AsCustomOp):
     def to_custom(self) -> Custom:
-        return Custom(
-            "Rz",
-            tys.FunctionType([tys.Qubit, FLOAT_T], [tys.Qubit]),
-            extension=QUANTUM_EXTENSION_ID,
-        )
+        return ExtOp(EXTENSION.operations["Rz"]).to_custom()
 
     def __call__(self, q: ComWire, fl_wire: ComWire) -> Command:
         return super().__call__(q, fl_wire)

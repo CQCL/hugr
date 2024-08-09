@@ -5,14 +5,27 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from semver import Version
+
 import hugr.serialization.ext as ext_s
 from hugr import tys, val
 from hugr.utils import ser_it
 
+__all__ = [
+    "ExplicitBound",
+    "FromParamsBound",
+    "TypeDef",
+    "FixedHugr",
+    "OpDefSig",
+    "OpDef",
+    "ExtensionValue",
+    "Extension",
+    "Package",
+    "Version",
+]
+
 if TYPE_CHECKING:
     from collections.abc import Sequence
-
-    from semver import Version
 
     from hugr.hugr import Hugr
     from hugr.tys import ExtensionId
@@ -46,7 +59,9 @@ class TypeDef:  # noqa: D101
     description: str
     params: list[tys.TypeParam]
     bound: ExplicitBound | FromParamsBound
-    _extension: Extension | None = field(default=None, init=False)
+    _extension: Extension | None = field(
+        default=None, init=False, repr=False, compare=False
+    )
 
     def to_serial(self) -> ext_s.TypeDef:
         assert self._extension is not None, "Extension must be initialised."
@@ -98,8 +113,10 @@ class OpDef:  # noqa: D101
     signature: OpDefSig
     description: str = ""
     misc: dict[str, Any] = field(default_factory=dict)
-    lower_funcs: list[FixedHugr] = field(default_factory=list)
-    _extension: Extension | None = field(default=None, init=False)
+    lower_funcs: list[FixedHugr] = field(default_factory=list, repr=False)
+    _extension: Extension | None = field(
+        default=None, init=False, repr=False, compare=False
+    )
 
     def to_serial(self) -> ext_s.OpDef:
         assert self._extension is not None, "Extension must be initialised."
@@ -120,7 +137,9 @@ class OpDef:  # noqa: D101
 class ExtensionValue:  # noqa: D101
     name: str
     typed_value: val.Value
-    _extension: Extension | None = field(default=None, init=False)
+    _extension: Extension | None = field(
+        default=None, init=False, repr=False, compare=False
+    )
 
     def to_serial(self) -> ext_s.ExtensionValue:
         assert self._extension is not None, "Extension must be initialised."

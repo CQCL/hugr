@@ -3,24 +3,24 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING
 
-from semver import Version
 from typing_extensions import Self
 
 from hugr import ext, tys, val
-from hugr.ops import AsCustomOp, Custom, DataflowOp
+from hugr.ops import AsCustomOp, Custom, DataflowOp, ExtOp
 
 if TYPE_CHECKING:
     from hugr.ops import Command, ComWire
 
-EXTENSION = ext.Extension("arithmetic.int.types", Version(0, 1, 0))
-INT_T_DEF = EXTENSION.add_type_def(
+TYPES_EXTENSION = ext.Extension("arithmetic.int.types", ext.Version(0, 1, 0))
+_INT_PARAM = tys.BoundedNatParam(7)
+INT_T_DEF = TYPES_EXTENSION.add_type_def(
     ext.TypeDef(
         name="int",
         description="Variable width integer.",
         bound=ext.ExplicitBound(tys.TypeBound.Copyable),
-        params=[tys.BoundedNatParam(7)],
+        params=[_INT_PARAM],
     )
 )
 
@@ -44,6 +44,12 @@ def int_t(width: int) -> tys.ExtType:
     )
 
 
+def _int_tv(index: int) -> tys.ExtType:
+    return INT_T_DEF.instantiate(
+        [tys.VariableArg(idx=index, param=_INT_PARAM)],
+    )
+
+
 #: HUGR 32-bit integer type.
 INT_T = int_t(5)
 
@@ -59,30 +65,39 @@ class IntVal(val.ExtensionValue):
         return val.Extension("int", int_t(self.width), self.v)
 
 
-OPS_EXTENSION: tys.ExtensionId = "arithmetic.int"
+OPS_EXTENSION = ext.Extension("arithmetic.int", ext.Version(0, 1, 0))
+
+_DivMod = OPS_EXTENSION.add_op_def(
+    ext.OpDef(
+        name="idivmod_u",
+        description="Unsigned integer division and modulo.",
+        signature=ext.OpDefSig(
+            tys.FunctionType([_int_tv(0), _int_tv(1)], [_int_tv(0), _int_tv(1)])
+        ),
+    )
+)
 
 
 @dataclass(frozen=True)
 class _DivModDef(AsCustomOp):
     """DivMod operation, has two inputs and two outputs."""
 
-    name: ClassVar[str] = "idivmod_u"
     arg1: int = 5
     arg2: int = 5
+    op_def: ext.OpDef = field(default_factory=lambda: _DivMod, init=False)
 
     def to_custom(self) -> Custom:
-        return Custom(
-            "idivmod_u",
-            tys.FunctionType(
-                input=[int_t(self.arg1)] * 2, output=[int_t(self.arg2)] * 2
-            ),
-            extension=OPS_EXTENSION,
-            args=[tys.BoundedNatArg(n=self.arg1), tys.BoundedNatArg(n=self.arg2)],
+        row: list[tys.Type] = [int_t(self.arg1), int_t(self.arg2)]
+        ext_op = ExtOp(
+            self.op_def,
+            tys.FunctionType.endo(row),
+            [tys.BoundedNatArg(n=self.arg1), tys.BoundedNatArg(n=self.arg2)],
         )
+        return ext_op.to_custom()
 
     @classmethod
     def from_custom(cls, custom: Custom) -> Self | None:
-        if not custom.check_id(OPS_EXTENSION, "idivmod_u"):
+        if not custom.check_id(OPS_EXTENSION.name, _DivMod.name):
             return None
         match custom.args:
             case [tys.BoundedNatArg(n=a1), tys.BoundedNatArg(n=a2)]:
