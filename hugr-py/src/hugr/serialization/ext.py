@@ -66,11 +66,12 @@ class ExtensionValue(ConfiguredBaseModel):
     name: str
     typed_value: Value
 
-    def deserialize(self) -> ext.ExtensionValue:
-        return ext.ExtensionValue(
-            extension=self.extension,
-            name=self.name,
-            typed_value=self.typed_value.deserialize(),
+    def deserialize(self, extension: ext.Extension) -> ext.ExtensionValue:
+        return extension.add_extension_value(
+            ext.ExtensionValue(
+                name=self.name,
+                typed_value=self.typed_value.deserialize(),
+            )
         )
 
 
@@ -98,16 +99,18 @@ class OpDef(ConfiguredBaseModel, populate_by_name=True):
     binary: bool = False
     lower_funcs: list[FixedHugr]
 
-    def deserialize(self) -> ext.OpDef:
-        return ext.OpDef(
-            extension=self.extension,
-            name=self.name,
-            description=self.description,
-            misc=self.misc or {},
-            signature=ext.OpDefSig(
-                self.signature.deserialize() if self.signature else None, self.binary
-            ),
-            lower_funcs=[f.deserialize() for f in self.lower_funcs],
+    def deserialize(self, extension: ext.Extension) -> ext.OpDef:
+        return extension.add_op_def(
+            ext.OpDef(
+                name=self.name,
+                description=self.description,
+                misc=self.misc or {},
+                signature=ext.OpDefSig(
+                    self.signature.deserialize() if self.signature else None,
+                    self.binary,
+                ),
+                lower_funcs=[f.deserialize() for f in self.lower_funcs],
+            )
         )
 
 
@@ -128,13 +131,16 @@ class Extension(ConfiguredBaseModel):
             version=self.version,  # type: ignore[arg-type]
             name=self.name,
             extension_reqs=self.extension_reqs,
-            # types={k: v.deserialize() for k, v in self.types.items()},
-            values={k: v.deserialize() for k, v in self.values.items()},
-            operations={k: v.deserialize() for k, v in self.operations.items()},
         )
 
-        for v in self.types.values():
-            e.add_type_def(v.deserialize(e))
+        for t in self.types.values():
+            e.add_type_def(t.deserialize(e))
+
+        for o in self.operations.values():
+            e.add_op_def(o.deserialize(e))
+
+        for v in self.values.values():
+            e.add_extension_value(v.deserialize(e))
 
         return e
 
