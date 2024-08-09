@@ -1,6 +1,6 @@
 from semver import Version
 
-from hugr.serialization.extension import (
+from hugr.serialization.ext import (
     ExplicitBound,
     Extension,
     OpDef,

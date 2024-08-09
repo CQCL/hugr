@@ -142,4 +142,4 @@ class Package(ConfiguredBaseModel):
         return serialization_version()
 
 
-import hugr.extension as ext  # noqa: E402
+from hugr import ext  # noqa: E402
