@@ -50,13 +50,14 @@ class TypeDef(ConfiguredBaseModel):
     params: list[TypeParam]
     bound: TypeDefBound
 
-    def deserialize(self) -> ext.TypeDef:
-        return ext.TypeDef(
-            extension=self.extension,
-            name=self.name,
-            description=self.description,
-            params=deser_it(self.params),
-            bound=self.bound.root.deserialize(),
+    def deserialize(self, extension: ext.Extension) -> ext.TypeDef:
+        return extension.add_type_def(
+            ext.TypeDef(
+                name=self.name,
+                description=self.description,
+                params=deser_it(self.params),
+                bound=self.bound.root.deserialize(),
+            )
         )
 
 
@@ -123,14 +124,19 @@ class Extension(ConfiguredBaseModel):
         return serialization_version()
 
     def deserialize(self) -> ext.Extension:
-        return ext.Extension(
+        e = ext.Extension(
             version=self.version,  # type: ignore[arg-type]
             name=self.name,
             extension_reqs=self.extension_reqs,
-            types={k: v.deserialize() for k, v in self.types.items()},
+            # types={k: v.deserialize() for k, v in self.types.items()},
             values={k: v.deserialize() for k, v in self.values.items()},
             operations={k: v.deserialize() for k, v in self.operations.items()},
         )
+
+        for v in self.types.values():
+            e.add_type_def(v.deserialize(e))
+
+        return e
 
 
 class Package(ConfiguredBaseModel):

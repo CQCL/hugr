@@ -1,3 +1,5 @@
+"""HUGR extensions and packages."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -8,6 +10,8 @@ from hugr import tys, val
 from hugr.utils import ser_it
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from semver import Version
 
     from hugr.hugr import Hugr
@@ -15,7 +19,7 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class ExplicitBound:
+class ExplicitBound:  # noqa: D101
     bound: tys.TypeBound
 
     def to_serial(self) -> ext_s.ExplicitBound:
@@ -26,7 +30,7 @@ class ExplicitBound:
 
 
 @dataclass
-class FromParamsBound:
+class FromParamsBound:  # noqa: D101
     indices: list[int]
 
     def to_serial(self) -> ext_s.FromParamsBound:
@@ -37,26 +41,29 @@ class FromParamsBound:
 
 
 @dataclass
-class TypeDef:
+class TypeDef:  # noqa: D101
     name: str
     description: str
     params: list[tys.TypeParam]
     bound: ExplicitBound | FromParamsBound
-    extension: ExtensionId | None = None
+    _extension: Extension | None = field(default=None, init=False)
 
     def to_serial(self) -> ext_s.TypeDef:
-        assert self.extension is not None, "Extension must be initialised."
+        assert self._extension is not None, "Extension must be initialised."
         return ext_s.TypeDef(
-            extension=self.extension,
+            extension=self._extension.name,
             name=self.name,
             description=self.description,
             params=ser_it(self.params),
             bound=ext_s.TypeDefBound(root=self.bound.to_serial()),
         )
 
+    def instantiate(self, args: Sequence[tys.TypeArg]) -> tys.ExtType:
+        return tys.ExtType(self, list(args))
+
 
 @dataclass
-class FixedHugr:
+class FixedHugr:  # noqa: D101
     extensions: tys.ExtensionSet
     hugr: Hugr
 
@@ -64,7 +71,7 @@ class FixedHugr:
         return ext_s.FixedHugr(extensions=self.extensions, hugr=self.hugr)
 
 
-class OpDefSig:
+class OpDefSig:  # noqa: D101
     poly_func: tys.PolyFuncType | None
     binary: bool
 
@@ -86,7 +93,7 @@ class OpDefSig:
 
 
 @dataclass
-class OpDef:
+class OpDef:  # noqa: D101
     name: str
     signature: OpDefSig
     extension: ExtensionId | None = None
@@ -110,7 +117,7 @@ class OpDef:
 
 
 @dataclass
-class ExtensionValue:
+class ExtensionValue:  # noqa: D101
     name: str
     typed_value: val.Value
     extension: ExtensionId | None = None
@@ -125,7 +132,7 @@ class ExtensionValue:
 
 
 @dataclass
-class Extension:
+class Extension:  # noqa: D101
     name: ExtensionId
     version: Version
     extension_reqs: set[ExtensionId] = field(default_factory=set)
@@ -146,15 +153,17 @@ class Extension:
     def add_op_def(self, op_def: OpDef) -> None:
         self.operations[op_def.name] = op_def
 
-    def add_type_def(self, type_def: TypeDef) -> None:
+    def add_type_def(self, type_def: TypeDef) -> TypeDef:
+        type_def._extension = self
         self.types[type_def.name] = type_def
+        return self.types[type_def.name]
 
     def add_extension_value(self, extension_value: ExtensionValue) -> None:
         self.values[extension_value.name] = extension_value
 
 
 @dataclass
-class Package:
+class Package:  # noqa: D101
     modules: list[Hugr]
     extensions: list[Extension] = field(default_factory=list)
 

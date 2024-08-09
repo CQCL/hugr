@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 import hugr.serialization.tys as stys
 from hugr.utils import ser_it
+
+if TYPE_CHECKING:
+    from hugr.ext import TypeDef
 
 ExtensionId = stys.ExtensionId
 ExtensionSet = stys.ExtensionSet
@@ -400,6 +403,38 @@ class PolyFuncType(Type):
     def to_serial(self) -> stys.PolyFuncType:
         return stys.PolyFuncType(
             params=[p.to_serial_root() for p in self.params], body=self.body.to_serial()
+        )
+
+
+@dataclass
+class ExtType(Type):
+    """Extension type, defined by a type definition and type arguments."""
+
+    type_def: TypeDef
+    args: list[TypeArg] = field(default_factory=list)
+
+    def type_bound(self) -> TypeBound:
+        from hugr.ext import ExplicitBound, FromParamsBound
+
+        match self.type_def.bound:
+            case ExplicitBound(exp_bound):
+                return exp_bound
+            case FromParamsBound(indices):
+                bounds: list[TypeBound] = []
+                for idx in indices:
+                    arg = self.args[idx]
+                    if isinstance(arg, TypeTypeArg):
+                        bounds.append(arg.ty.type_bound())
+                return TypeBound.join(*bounds)
+
+    def to_serial(self) -> stys.Opaque:
+        assert self.type_def._extension is not None, "Extension must be initialised."
+
+        return stys.Opaque(
+            extension=self.type_def._extension.name,
+            id=self.type_def.name,
+            args=[arg.to_serial_root() for arg in self.args],
+            bound=self.type_bound(),
         )
 
 

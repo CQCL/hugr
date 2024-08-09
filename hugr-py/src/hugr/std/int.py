@@ -5,16 +5,27 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, ClassVar
 
+from semver import Version
 from typing_extensions import Self
 
-from hugr import tys, val
+from hugr import ext, tys, val
 from hugr.ops import AsCustomOp, Custom, DataflowOp
 
 if TYPE_CHECKING:
     from hugr.ops import Command, ComWire
 
+EXTENSION = ext.Extension("arithmetic.int.types", Version(0, 1, 0))
+INT_T_DEF = EXTENSION.add_type_def(
+    ext.TypeDef(
+        name="int",
+        description="Variable width integer.",
+        bound=ext.ExplicitBound(tys.TypeBound.Copyable),
+        params=[tys.BoundedNatParam(7)],
+    )
+)
 
-def int_t(width: int) -> tys.Opaque:
+
+def int_t(width: int) -> tys.ExtType:
     """Create an integer type with a fixed log bit width.
 
 
@@ -25,14 +36,11 @@ def int_t(width: int) -> tys.Opaque:
         The integer type.
 
     Examples:
-        >>> int_t(5).id # 32 bit integer
+        >>> int_t(5).type_def.name # 32 bit integer
         'int'
     """
-    return tys.Opaque(
-        extension="arithmetic.int.types",
-        id="int",
-        args=[tys.BoundedNatArg(n=width)],
-        bound=tys.TypeBound.Copyable,
+    return INT_T_DEF.instantiate(
+        [tys.BoundedNatArg(n=width)],
     )
 
 
