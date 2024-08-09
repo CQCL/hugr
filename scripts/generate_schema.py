@@ -16,7 +16,7 @@ from pathlib import Path
 from pydantic import ConfigDict
 from pydantic.json_schema import models_json_schema
 
-from hugr.serialization.ext import Extension, Package
+from hugr.serialization.extension import Extension, Package
 from hugr.serialization.serial_hugr import SerialHugr
 from hugr.serialization.testing_hugr import TestingHugr
 

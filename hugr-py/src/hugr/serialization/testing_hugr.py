@@ -1,6 +1,6 @@
 from pydantic import ConfigDict
 
-from .ext import OpDef
+from .extension import OpDef
 from .ops import OpType, Value
 from .ops import classes as ops_classes
 from .serial_hugr import VersionField
