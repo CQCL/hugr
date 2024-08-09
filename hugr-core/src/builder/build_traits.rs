@@ -777,8 +777,8 @@ fn wire_up<T: Dataflow + ?Sized>(
                 });
             };
 
-            if !OpTag::BasicBlock.is_superset(base.get_optype(src).tag())
-                && !OpTag::BasicBlock.is_superset(base.get_optype(src_sibling).tag())
+            if !OpTag::ControlFlowChild.is_superset(base.get_optype(src).tag())
+                && !OpTag::ControlFlowChild.is_superset(base.get_optype(src_sibling).tag())
             {
                 // Add a state order constraint unless one of the nodes is a CFG BasicBlock
                 base.add_other_edge(src, src_sibling);
