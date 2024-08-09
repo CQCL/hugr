@@ -258,7 +258,7 @@ pub(crate) mod test {
         dataflow_builder.finish_with_outputs(w)
     }
 
-    pub(super) fn build_main(
+    pub(crate) fn build_main(
         signature: PolyFuncType,
         f: impl FnOnce(FunctionBuilder<&mut Hugr>) -> Result<BuildHandle<FuncID<true>>, BuildError>,
     ) -> Result<Hugr, BuildError> {

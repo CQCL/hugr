@@ -3,7 +3,7 @@ lto = "thin"
 
 [workspace]
 resolver = "2"
-members = ["hugr", "hugr-core", "hugr-passes", "hugr-cli"]
+members = ["hugr", "hugr-core", "hugr-passes", "hugr-cli", "hugr-model"]
 
 [workspace.package]
 rust-version = "1.75"
@@ -62,6 +62,10 @@ clap-verbosity-flag = "2.2.0"
 assert_cmd = "2.0.14"
 assert_fs = "1.1.1"
 predicates = "3.1.0"
+tinyvec = { version = "1.8.0", features = ["alloc", "serde"] }
+indexmap = "2.3.0"
+fxhash = "0.2.1"
+bumpalo = { version = "3.16.0", features = ["collections"] }
 
 [profile.dev.package]
 insta.opt-level = 3

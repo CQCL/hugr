@@ -1,0 +1,38 @@
+(hugr 0)
+
+; NOTE: The @ in front of the names indicates that their implicit arguments are
+; explicitly given as well. This is necessary everywhere at the moment
+; since we do not have inference for implicit arguments yet.
+
+; NOTE: Every port in this file has been annotated with its type. This is quite
+; verbose, but it is necessary currently until we have inference.
+
+(define-alias local.int type (@ arithmetic.int.types.int))
+
+(define-func example.add
+  [(@ arithmetic.int.types.int) (@ arithmetic.int.types.int)] [(@ arithmetic.int.types.int)] (ext)
+  (dfg
+    [(%0 (@ arithmetic.int.types.int)) (%1 (@ arithmetic.int.types.int))]
+    [(%2 (@ arithmetic.int.types.int))]
+    ((@ arithmetic.int.iadd) [(%0 (@ arithmetic.int.types.int)) (%1 (@ arithmetic.int.types.int))] [(%2 (@ arithmetic.int.types.int))])))
+
+(declare-func example.callee
+  [(@ arithmetic.int.types.int)] [(@ arithmetic.int.types.int)] (ext)
+  (meta doc.title "Callee")
+  (meta doc.description "This is a function declaration."))
+
+(define-func example.caller
+  [(@ arithmetic.int.types.int)] [(@ arithmetic.int.types.int)] (ext)
+  (meta doc.title "Caller")
+  (meta doc.description "This defines a function that calls the function which we declared earlier.")
+  (dfg
+    [(%3 (@ arithmetic.int.types.int))]
+    [(%4 (@ arithmetic.int.types.int))]
+    (call (@ example.callee) [(%3 (@ arithmetic.int.types.int))] [(%4 (@ arithmetic.int.types.int))])))
+
+(define-func example.swap
+  ; The types of the values to be swapped are passed as implicit parameters.
+  (forall ?a type)
+  (forall ?b type)
+  [?a ?b] [?b ?a] (ext)
+  (dfg [(%a ?a) (%b ?b)] [(%b ?b) (%a ?a)]))
