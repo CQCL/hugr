@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Protocol, TypeVar, runtime_checkable
 from typing_extensions import Self
 
 import hugr.serialization.ops as sops
-from hugr import tys, val
+from hugr import ext, tys, val
 from hugr.node_port import Direction, InPort, Node, OutPort, PortOffset, Wire
 from hugr.utils import ser_it
 
@@ -301,6 +301,36 @@ class Custom(AsCustomOp):
     def check_id(self, extension: tys.ExtensionId, name: str) -> bool:
         """Check if the operation matches the given extension and operation name."""
         return self.extension == extension and self.name == name
+
+
+@dataclass(frozen=True)
+class ExtOp(AsCustomOp):
+    """A non-core dataflow operation defined in an extension."""
+
+    op_def: ext.OpDef
+    signature: tys.FunctionType | None = None
+    args: list[tys.TypeArg] = field(default_factory=list)
+
+    def to_custom(self) -> Custom:
+        ext = self.op_def._extension
+        if self.signature is None:
+            poly_func = self.op_def.signature.poly_func
+            if poly_func is None or len(poly_func.params) > 0:
+                msg = "For polymorphic ops signature must be cached."
+                raise ValueError(msg)
+            sig = poly_func.body
+        else:
+            sig = self.signature
+
+        return Custom(
+            name=self.op_def.name,
+            signature=sig,
+            extension=ext.name if ext else "",
+            args=self.args,
+        )
+
+    def to_serial(self, parent: Node) -> sops.CustomOp:
+        return self.to_custom().to_serial(parent)
 
 
 @dataclass()

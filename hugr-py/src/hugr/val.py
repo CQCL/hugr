@@ -199,3 +199,6 @@ class ExtensionValue(Value, Protocol):
 
     def to_serial(self) -> sops.ExtensionValue:
         return self.to_value().to_serial()
+
+
+# TODO extension value that points to an extension.
