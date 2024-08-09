@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-import hugr.serialization.extension as ext_s
+import hugr.serialization.ext as ext_s
 from hugr import tys, val
 from hugr.utils import ser_it
 
