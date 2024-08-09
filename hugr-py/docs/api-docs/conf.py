@@ -27,6 +27,7 @@ html_theme_options = {
         "image_light": "_static/Quantinuum_logo_black.png",
         "image_dark": "_static/Quantinuum_logo_white.png",
     },
+    "show_navbar_depth": 2,
 }
 
 html_static_path = ["../_static"]
