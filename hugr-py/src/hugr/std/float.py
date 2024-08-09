@@ -4,11 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from semver import Version
-
 from hugr import ext, tys, val
 
-Extension = ext.Extension("arithmetic.float.types", Version(0, 1, 0))
+Extension = ext.Extension("arithmetic.float.types", ext.Version(0, 1, 0))
 #: HUGR 64-bit IEEE 754-2019 floating point type.
 FLOAT_T_DEF = Extension.add_type_def(
     ext.TypeDef(
