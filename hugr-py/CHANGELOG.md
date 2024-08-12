@@ -1,5 +1,40 @@
 # Changelog
 
+## [0.6.0](https://github.com/CQCL/hugr/compare/hugr-py-v0.5.0...hugr-py-v0.6.0) (2024-08-12)
+
+
+### ⚠ BREAKING CHANGES
+
+* **hugr-py:** Moved `hugr.get_serialization_version` to `hugr.serialization.serial_hugr.serialization_version`
+* **hugr-cli:** Cli validate command no longer has a mermaid option, use `mermaid` sub-command instead.
+* `TypeDefBound` uses struct-variants for serialization. `SignatureFunc` now has variants for missing binary functions, and serializes in to a new format that indicates expected binaries.
+
+### Features
+
+* `Package` pydantic model for modules + extensions ([#1387](https://github.com/CQCL/hugr/issues/1387)) ([68cfac5](https://github.com/CQCL/hugr/commit/68cfac5f63b35e8d709c5738a8893048240d5706)), closes [#1358](https://github.com/CQCL/hugr/issues/1358)
+* Define `Const` inline by default, and add a parameter to change the parent ([#1404](https://github.com/CQCL/hugr/issues/1404)) ([3609736](https://github.com/CQCL/hugr/commit/36097366df6bb3b79058b5f3bc49cb25362dc1b2))
+* **hugr-cli:** move mermaid to own sub-command ([#1390](https://github.com/CQCL/hugr/issues/1390)) ([77795b9](https://github.com/CQCL/hugr/commit/77795b90f029d5c00a99037f4306724176e1dfbd))
+* **hugr-py:** add type_bound method to `Type` ([#1410](https://github.com/CQCL/hugr/issues/1410)) ([bd5ba47](https://github.com/CQCL/hugr/commit/bd5ba478c6d6f821a5ba2fbcaa56bcb61c490b2f)), closes [#1365](https://github.com/CQCL/hugr/issues/1365)
+* **hugr-py:** Allow defining functions, consts, and aliases inside DFGs ([#1394](https://github.com/CQCL/hugr/issues/1394)) ([d554072](https://github.com/CQCL/hugr/commit/d554072d0266a7a584ef1c03e6fd78c9d4167933))
+* **hugr-py:** Reexport commonly used classes from the package root ([#1393](https://github.com/CQCL/hugr/issues/1393)) ([69925d0](https://github.com/CQCL/hugr/commit/69925d05b152205eb277e48605a6a8806d4fda24))
+* **py:** `Hugr.to_json` and `.load_json` helpers ([#1403](https://github.com/CQCL/hugr/issues/1403)) ([e7f9f4c](https://github.com/CQCL/hugr/commit/e7f9f4c739e1b523fb7f2b7df0246baea2abf3df))
+* **py:** Allow pre-declaring a `Function`'s output types ([#1417](https://github.com/CQCL/hugr/issues/1417)) ([fa0f5a4](https://github.com/CQCL/hugr/commit/fa0f5a4d4c13f54e5247ea16f43b928d4850c34b))
+* **py:** implement `iter` on `ToNode` ([#1399](https://github.com/CQCL/hugr/issues/1399)) ([e88910b](https://github.com/CQCL/hugr/commit/e88910bc50f6459213e17d0ce5a8c1b87037b9a6))
+* **py:** Parametric int type helper, and arbitrary width int constants ([#1406](https://github.com/CQCL/hugr/issues/1406)) ([abd70c9](https://github.com/CQCL/hugr/commit/abd70c99291f41fce57ed8d8b0692faa63117b74))
+* Serialised extensions ([#1371](https://github.com/CQCL/hugr/issues/1371)) ([31be204](https://github.com/CQCL/hugr/commit/31be2047ffb5515e3ac4d7a4214a3164399f9b3c))
+
+
+### Bug Fixes
+
+* **py:** `Hugr.__iter__` returning `NodeData | None` instead of `Node`s ([#1401](https://github.com/CQCL/hugr/issues/1401)) ([c134584](https://github.com/CQCL/hugr/commit/c1345849a83e33571e1a51398f94348ea221d96b))
+* **py:** Set output cont for Conditionals ([#1415](https://github.com/CQCL/hugr/issues/1415)) ([67bb8a0](https://github.com/CQCL/hugr/commit/67bb8a0bb31a93798606712695085422607e6c7c))
+
+
+### Documentation
+
+* **hugr-py:** expand toctree ([#1411](https://github.com/CQCL/hugr/issues/1411)) ([aa81c9a](https://github.com/CQCL/hugr/commit/aa81c9a79f1737c0e3dd77ff65c3af8716f26d21))
+* **hugr-py:** remove multiversion + add justfile command ([#1381](https://github.com/CQCL/hugr/issues/1381)) ([dd1dc48](https://github.com/CQCL/hugr/commit/dd1dc484447cc2180058f4474594ddb51fa45cd6))
+
 ## [0.5.0](https://github.com/CQCL/hugr/compare/hugr-py-v0.4.0...hugr-py-v0.5.0) (2024-07-29)
 
 
