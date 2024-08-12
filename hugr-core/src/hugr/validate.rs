@@ -742,8 +742,12 @@ pub enum ValidationError {
     #[error("Node {node:?} needs a concrete ExtensionSet - inference will provide this for Case/CFG/Conditional/DataflowBlock/DFG/TailLoop only")]
     ExtensionsNotInferred { node: Node },
     /// Error in a node signature
-    #[error("Error in signature of node {node:?}: {cause}")]
-    SignatureError { node: Node, cause: SignatureError },
+    #[error("Error in signature of node {node}: {cause}")]
+    SignatureError {
+        node: Node,
+        #[source]
+        cause: SignatureError,
+    },
     /// Error in a [CustomOp] serialized as an [Opaque].
     ///
     /// [CustomOp]: crate::ops::CustomOp

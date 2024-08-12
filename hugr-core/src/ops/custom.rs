@@ -393,7 +393,7 @@ pub fn resolve_extension_ops(
 /// If the serialized opaque resolves to a definition that conflicts with what
 /// was serialized
 pub fn resolve_opaque_op(
-    _n: Node,
+    node: Node,
     opaque: &OpaqueOp,
     extension_registry: &ExtensionRegistry,
 ) -> Result<Option<ExtensionOp>, CustomOpError> {
@@ -401,13 +401,20 @@ pub fn resolve_opaque_op(
         // Fail if the Extension was found but did not have the expected operation
         let Some(def) = r.get_op(&opaque.name) else {
             return Err(CustomOpError::OpNotFoundInExtension(
+                node,
                 opaque.name.clone(),
                 r.name().clone(),
             ));
         };
-        let ext_op = ExtensionOp::new(def.clone(), opaque.args.clone(), extension_registry)?;
+        let ext_op = ExtensionOp::new(def.clone(), opaque.args.clone(), extension_registry)
+            .map_err(|e| CustomOpError::SignatureError {
+                node,
+                name: opaque.name.clone(),
+                cause: e,
+            })?;
         if opaque.signature() != ext_op.signature() {
             return Err(CustomOpError::SignatureMismatch {
+                node,
                 extension: opaque.extension.clone(),
                 op: def.name().clone(),
                 computed: ext_op.signature.clone(),
@@ -426,20 +433,27 @@ pub fn resolve_opaque_op(
 #[non_exhaustive]
 pub enum CustomOpError {
     /// The Extension was found but did not contain the expected OpDef
-    #[error("Operation {0} not found in Extension {1}")]
-    OpNotFoundInExtension(OpName, ExtensionId),
+    #[error("Operation '{1}' in {0} not found in Extension {2}")]
+    OpNotFoundInExtension(Node, OpName, ExtensionId),
     /// Extension and OpDef found, but computed signature did not match stored
     #[error("Conflicting signature: resolved {op} in extension {extension} to a concrete implementation which computed {computed} but stored signature was {stored}")]
     #[allow(missing_docs)]
     SignatureMismatch {
+        node: Node,
         extension: ExtensionId,
         op: OpName,
         stored: Signature,
         computed: Signature,
     },
     /// An error in computing the signature of the ExtensionOp
-    #[error(transparent)]
-    SignatureError(#[from] SignatureError),
+    #[error("Error in signature of operation '{name}' in {node}: {cause}")]
+    #[allow(missing_docs)]
+    SignatureError {
+        node: Node,
+        name: OpName,
+        #[source]
+        cause: SignatureError,
+    },
 }
 
 #[cfg(test)]
