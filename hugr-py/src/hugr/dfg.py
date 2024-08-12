@@ -684,3 +684,38 @@ class Function(_DfBase[ops.FuncDefn]):
     ) -> None:
         root_op = ops.FuncDefn(name, input_types, type_params or [])
         super().__init__(root_op)
+
+    def declare_outputs(self, output_types: TypeRow) -> None:
+        """Declare the output types of the function.
+
+        This is required when calling a function with hasn't been completely
+        defined yet. The wires passed to :meth:`set_outputs` must match the
+        declared output types.
+        """
+        self._set_parent_output_count(len(output_types))
+        self.parent_op._set_out_types(output_types)
+
+    def set_outputs(self, *args: Wire) -> None:
+        """Set the outputs of the dataflow graph.
+        Connects wires to the output node.
+
+        If :meth:`declare_outputs` has been called, the wire types must match
+        the declared output types.
+
+        Args:
+            args: Wires to connect to the output node.
+
+        Example:
+            >>> dfg = Dfg(tys.Bool)
+            >>> dfg.set_outputs(dfg.inputs()[0]) # connect input to output
+        """
+        if self.parent_op._outputs is not None:
+            arg_types = [self._get_dataflow_type(w) for w in args]
+            if arg_types != self.parent_op._outputs:
+                error_message = (
+                    f"The function has fixed output types {self.parent_op._outputs}, "
+                    f"but was given output wires of types {arg_types}."
+                )
+                raise ValueError(error_message)
+
+        super().set_outputs(*args)
