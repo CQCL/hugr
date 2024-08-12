@@ -688,7 +688,7 @@ class Function(_DfBase[ops.FuncDefn]):
     def declare_outputs(self, output_types: TypeRow) -> None:
         """Declare the output types of the function.
 
-        This is required when calling a function with hasn't been completely
+        This is required when calling a function which hasn't been completely
         defined yet. The wires passed to :meth:`set_outputs` must match the
         declared output types.
         """
