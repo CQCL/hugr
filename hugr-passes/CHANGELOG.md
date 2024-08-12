@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.0 (2024-08-12)
+
+### Features
+
+- [**breaking**] `Extension` requires a version ([#1367](https://github.com/CQCL/hugr/pull/1367))
+
+
 ## 0.6.2 (2024-07-26)
 
 ### Features

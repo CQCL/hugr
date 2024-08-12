@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.11.0 (2024-08-12)
+
+### Bug Fixes
+
+- [**breaking**] BasicBlockExits should not be `OpTag::DataflowParent` ([#1409](https://github.com/CQCL/hugr/pull/1409))
+
+### Documentation
+
+- Clarify CustomConst::equal_consts ([#1396](https://github.com/CQCL/hugr/pull/1396))
+
+### Features
+
+- [**breaking**] Serialised extensions ([#1371](https://github.com/CQCL/hugr/pull/1371))
+- Serialised standard extensions ([#1377](https://github.com/CQCL/hugr/pull/1377))
+- [**breaking**] Update remaining builder methods to "infer by default" ([#1386](https://github.com/CQCL/hugr/pull/1386))
+- Add Eq op to logic extension ([#1398](https://github.com/CQCL/hugr/pull/1398))
+- Improve error message on failed custom op validation ([#1416](https://github.com/CQCL/hugr/pull/1416))
+- [**breaking**] `Extension` requires a version ([#1367](https://github.com/CQCL/hugr/pull/1367))
+
+
 ## 0.10.0 (2024-07-26)
 
 ### Bug Fixes
