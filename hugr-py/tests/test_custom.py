@@ -4,8 +4,9 @@ import pytest
 
 from hugr import ext, ops, tys
 from hugr.dfg import Dfg
+from hugr.hugr import Hugr
 from hugr.node_port import Node
-from hugr.ops import AsCustomOp, Custom
+from hugr.ops import AsCustomOp, Custom, ExtOp
 from hugr.std.float import EXTENSION as FLOAT_EXT
 from hugr.std.int import OPS_EXTENSION, TYPES_EXTENSION, DivMod
 from hugr.std.logic import EXTENSION as LOGIC_EXT
@@ -56,6 +57,16 @@ def test_stringly_typed():
     dfg.set_outputs()
     assert dfg.hugr[n].op == StringlyOp("world")
     validate(dfg.hugr)
+
+    new_h = Hugr.from_serial(dfg.hugr.to_serial())
+
+    assert isinstance(new_h[n].op, Custom)
+
+    registry = ext.ExtensionRegistry()
+    registry.add_extension(STRINGLY_EXT)
+    new_h.resolve_extensions(registry)
+
+    assert isinstance(new_h[n].op, ExtOp)
 
 
 def test_registry():

@@ -86,6 +86,7 @@ class FixedHugr:  # noqa: D101
         return ext_s.FixedHugr(extensions=self.extensions, hugr=self.hugr)
 
 
+@dataclass
 class OpDefSig:  # noqa: D101
     poly_func: tys.PolyFuncType | None
     binary: bool
