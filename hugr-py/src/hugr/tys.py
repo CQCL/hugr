@@ -9,7 +9,8 @@ import hugr.serialization.tys as stys
 from hugr.utils import ser_it
 
 if TYPE_CHECKING:
-    from hugr.ext import TypeDef
+    from hugr import ext
+
 
 ExtensionId = stys.ExtensionId
 ExtensionSet = stys.ExtensionSet
@@ -36,6 +37,10 @@ class TypeArg(Protocol):
 
     def to_serial_root(self) -> stys.TypeArg:
         return stys.TypeArg(root=self.to_serial())  # type: ignore[arg-type]
+
+    def resolve(self, registry: ext.ExtensionRegistry) -> TypeArg:
+        """Resolve types in the argument using the given registry."""
+        return self
 
 
 @runtime_checkable
@@ -68,6 +73,10 @@ class Type(Protocol):
             TypeTypeArg(ty=Qubit)
         """
         return TypeTypeArg(self)
+
+    def resolve(self, registry: ext.ExtensionRegistry) -> Type:
+        """Resolve types in the type using the given registry."""
+        return self
 
 
 #: Row of types.
@@ -148,6 +157,9 @@ class TypeTypeArg(TypeArg):
     def to_serial(self) -> stys.TypeTypeArg:
         return stys.TypeTypeArg(ty=self.ty.to_serial_root())
 
+    def resolve(self, registry: ext.ExtensionRegistry) -> TypeArg:
+        return TypeTypeArg(self.ty.resolve(registry))
+
 
 @dataclass(frozen=True)
 class BoundedNatArg(TypeArg):
@@ -177,6 +189,9 @@ class SequenceArg(TypeArg):
 
     def to_serial(self) -> stys.SequenceArg:
         return stys.SequenceArg(elems=ser_it(self.elems))
+
+    def resolve(self, registry: ext.ExtensionRegistry) -> TypeArg:
+        return SequenceArg([arg.resolve(registry) for arg in self.elems])
 
 
 @dataclass(frozen=True)
@@ -387,6 +402,14 @@ class FunctionType(Type):
     def __repr__(self) -> str:
         return f"FunctionType({self.input}, {self.output})"
 
+    def resolve(self, registry: ext.ExtensionRegistry) -> FunctionType:
+        """Resolve types in the function type using the given registry."""
+        return FunctionType(
+            input=[ty.resolve(registry) for ty in self.input],
+            output=[ty.resolve(registry) for ty in self.output],
+            extension_reqs=self.extension_reqs,
+        )
+
 
 @dataclass(frozen=True)
 class PolyFuncType(Type):
@@ -405,12 +428,19 @@ class PolyFuncType(Type):
             params=[p.to_serial_root() for p in self.params], body=self.body.to_serial()
         )
 
+    def resolve(self, registry: ext.ExtensionRegistry) -> PolyFuncType:
+        """Resolve types in the polymorphic function type using the given registry."""
+        return PolyFuncType(
+            params=self.params,
+            body=self.body.resolve(registry),
+        )
+
 
 @dataclass
 class ExtType(Type):
     """Extension type, defined by a type definition and type arguments."""
 
-    type_def: TypeDef
+    type_def: ext.TypeDef
     args: list[TypeArg] = field(default_factory=list)
 
     def type_bound(self) -> TypeBound:
@@ -457,6 +487,12 @@ class Opaque(Type):
 
     def type_bound(self) -> TypeBound:
         return self.bound
+
+    def resolve(self, registry: ext.ExtensionRegistry) -> ExtType:
+        """Resolve the opaque type to an :class:`ExtType` using the given registry."""
+        type_def = registry.get_extension(self.extension).get_type(self.id)
+
+        return ExtType(type_def, self.args)
 
 
 @dataclass

@@ -159,6 +159,12 @@ class Extension:  # noqa: D101
     values: dict[str, ExtensionValue] = field(default_factory=dict)
     operations: dict[str, OpDef] = field(default_factory=dict)
 
+    @dataclass
+    class NotFound(Exception):
+        """An object was not found in the extension."""
+
+        name: str
+
     def to_serial(self) -> ext_s.Extension:
         return ext_s.Extension(
             name=self.name,
@@ -183,6 +189,62 @@ class Extension:  # noqa: D101
         extension_value._extension = self
         self.values[extension_value.name] = extension_value
         return self.values[extension_value.name]
+
+    @dataclass
+    class OperationNotFound(NotFound):
+        """Operation not found in extension."""
+
+    def get_op(self, name: str) -> OpDef:
+        try:
+            return self.operations[name]
+        except KeyError as e:
+            raise self.OperationNotFound(name) from e
+
+    @dataclass
+    class TypeNotFound(NotFound):
+        """Type not found in extension."""
+
+    def get_type(self, name: str) -> TypeDef:
+        try:
+            return self.types[name]
+        except KeyError as e:
+            raise self.TypeNotFound(name) from e
+
+    @dataclass
+    class ValueNotFound(NotFound):
+        """Value not found in extension."""
+
+    def get_value(self, name: str) -> ExtensionValue:
+        try:
+            return self.values[name]
+        except KeyError as e:
+            raise self.ValueNotFound(name) from e
+
+
+@dataclass
+class ExtensionRegistry:
+    extensions: dict[ExtensionId, Extension] = field(default_factory=dict)
+
+    @dataclass
+    class ExtensionNotFound(Exception):
+        extension_id: ExtensionId
+
+    @dataclass
+    class ExtensionExists(Exception):
+        extension_id: ExtensionId
+
+    def add_extension(self, extension: Extension) -> Extension:
+        if extension.name in self.extensions:
+            raise self.ExtensionExists(extension.name)
+        # TODO version updates
+        self.extensions[extension.name] = extension
+        return self.extensions[extension.name]
+
+    def get_extension(self, name: ExtensionId) -> Extension:
+        try:
+            return self.extensions[name]
+        except KeyError as e:
+            raise self.ExtensionNotFound(name) from e
 
 
 @dataclass
