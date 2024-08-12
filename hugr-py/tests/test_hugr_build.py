@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import pytest
 
-from hugr import ops, tys, val
+import hugr.ops as ops
+import hugr.tys as tys
+import hugr.val as val
 from hugr.dfg import Dfg, _ancestral_sibling
 from hugr.function import Module
 from hugr.hugr import Hugr
@@ -65,6 +67,16 @@ def simple_id() -> Dfg:
 
 def test_simple_id():
     validate(simple_id().hugr)
+
+
+def test_json_roundtrip():
+    hugr = simple_id().hugr
+    json = hugr.to_json()
+
+    hugr2 = Hugr.load_json(json)
+    json2 = hugr2.to_json()
+
+    assert json2 == json
 
 
 def test_multiport():
