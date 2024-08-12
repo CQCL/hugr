@@ -12,7 +12,7 @@ from typing_extensions import Self
 
 from hugr import ext, tys
 from hugr.hugr import Hugr
-from hugr.ops import AsExtOp, Command, DataflowOp, ExtOp
+from hugr.ops import AsExtOp, Command, DataflowOp, ExtOp, RegisteredOp
 from hugr.serialization.serial_hugr import SerialHugr
 from hugr.std.float import FLOAT_T
 
@@ -36,21 +36,6 @@ EXTENSION.add_op_def(
     )
 )
 
-EXTENSION.add_op_def(
-    ext.OpDef(
-        name="Measure",
-        description="Measurement operation",
-        signature=ext.OpDefSig(tys.FunctionType([tys.Qubit], [tys.Qubit, tys.Bool])),
-    )
-)
-
-EXTENSION.add_op_def(
-    ext.OpDef(
-        name="Rz",
-        description="Rotation around the z-axis",
-        signature=ext.OpDefSig(tys.FunctionType([tys.Qubit, FLOAT_T], [tys.Qubit])),
-    )
-)
 
 E = TypeVar("E", bound=Enum)
 
@@ -106,11 +91,12 @@ class TwoQbGate(AsExtOp):
 CX = TwoQbGate(TwoQbGate._Enum.CX)
 
 
+@EXTENSION.register_op(
+    "Measure",
+    signature=tys.FunctionType([tys.Qubit], [tys.Qubit, tys.Bool]),
+)
 @dataclass(frozen=True)
-class MeasureDef(AsExtOp):
-    def op_def(self) -> ext.OpDef:
-        return EXTENSION.operations["Measure"]
-
+class MeasureDef(RegisteredOp):
     def __call__(self, q: ComWire) -> Command:
         return super().__call__(q)
 
@@ -118,11 +104,12 @@ class MeasureDef(AsExtOp):
 Measure = MeasureDef()
 
 
+@EXTENSION.register_op(
+    "Rz",
+    signature=tys.FunctionType([tys.Qubit, FLOAT_T], [tys.Qubit]),
+)
 @dataclass(frozen=True)
-class RzDef(AsExtOp):
-    def op_def(self) -> ext.OpDef:
-        return EXTENSION.operations["Rz"]
-
+class RzDef(RegisteredOp):
     def __call__(self, q: ComWire, fl_wire: ComWire) -> Command:
         return super().__call__(q, fl_wire)
 

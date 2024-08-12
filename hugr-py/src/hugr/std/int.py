@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from typing_extensions import Self
 
 from hugr import ext, tys, val
-from hugr.ops import AsExtOp, DataflowOp, ExtOp
+from hugr.ops import AsExtOp, DataflowOp, ExtOp, RegisteredOp
 
 if TYPE_CHECKING:
     from hugr.ops import Command, ComWire
@@ -67,26 +67,18 @@ class IntVal(val.ExtensionValue):
 
 OPS_EXTENSION = ext.Extension("arithmetic.int", ext.Version(0, 1, 0))
 
-_DivMod = OPS_EXTENSION.add_op_def(
-    ext.OpDef(
-        name="idivmod_u",
-        description="Unsigned integer division and modulo.",
-        signature=ext.OpDefSig(
-            tys.FunctionType([_int_tv(0), _int_tv(1)], [_int_tv(0), _int_tv(1)])
-        ),
-    )
+
+@OPS_EXTENSION.register_op(
+    signature=ext.OpDefSig(
+        tys.FunctionType([_int_tv(0), _int_tv(1)], [_int_tv(0), _int_tv(1)])
+    ),
 )
-
-
 @dataclass(frozen=True)
-class _DivModDef(AsExtOp):
+class idivmod_u(RegisteredOp):
     """DivMod operation, has two inputs and two outputs."""
 
     arg1: int = 5
     arg2: int = 5
-
-    def op_def(self) -> ext.OpDef:
-        return _DivMod
 
     def type_args(self) -> list[tys.TypeArg]:
         return [tys.BoundedNatArg(n=self.arg1), tys.BoundedNatArg(n=self.arg2)]
@@ -97,7 +89,7 @@ class _DivModDef(AsExtOp):
 
     @classmethod
     def from_ext(cls, custom: ExtOp) -> Self | None:
-        if custom.op_def() != _DivMod:
+        if custom.op_def() != cls.const_op_def:
             return None
         match custom.args:
             case [tys.BoundedNatArg(n=a1), tys.BoundedNatArg(n=a2)]:
@@ -111,4 +103,4 @@ class _DivModDef(AsExtOp):
 
 
 #: DivMod operation.
-DivMod = _DivModDef()
+DivMod = idivmod_u()

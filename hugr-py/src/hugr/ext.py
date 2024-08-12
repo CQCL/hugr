@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from semver import Version
 
 import hugr.serialization.extension as ext_s
-from hugr import tys, val
+from hugr import ops, tys, val
 from hugr.utils import ser_it
 
 __all__ = [
@@ -25,7 +25,7 @@ __all__ = [
 ]
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
 
     from hugr.hugr import Hugr
     from hugr.tys import ExtensionId
@@ -151,6 +151,9 @@ class ExtensionValue:  # noqa: D101
         )
 
 
+T = TypeVar("T", bound=ops.RegisteredOp)
+
+
 @dataclass
 class Extension:  # noqa: D101
     name: ExtensionId
@@ -220,6 +223,45 @@ class Extension:  # noqa: D101
             return self.values[name]
         except KeyError as e:
             raise self.ValueNotFound(name) from e
+
+    T = TypeVar("T", bound=ops.RegisteredOp)
+
+    def register_op(
+        self,
+        name: str | None = None,
+        signature: OpDefSig | tys.PolyFuncType | tys.FunctionType | None = None,
+        description: str | None = None,
+        misc: dict[str, Any] | None = None,
+        lower_funcs: list[FixedHugr] | None = None,
+    ) -> Callable[[type[T]], type[T]]:
+        """Register a class as corresponding to an operation definition.
+
+        If `name` is not provided, the class name is used.
+        If `signature` is not provided, a binary signature is assumed.
+        If `description` is not provided, the class docstring is used.
+
+        See :class:`OpDef` for other parameters.
+        """
+        if not isinstance(signature, OpDefSig):
+            binary = signature is None
+            signature = OpDefSig(signature, binary)
+
+        def _inner(cls: type[T]) -> type[T]:
+            new_description = cls.__doc__ if description is None and cls.__doc__ else ""
+            new_name = cls.__name__ if name is None else name
+            op_def = self.add_op_def(
+                OpDef(
+                    new_name,
+                    signature,
+                    new_description,
+                    misc or {},
+                    lower_funcs or [],
+                )
+            )
+            cls.const_op_def = op_def
+            return cls
+
+        return _inner
 
 
 @dataclass

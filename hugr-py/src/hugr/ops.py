@@ -9,13 +9,14 @@ from typing import TYPE_CHECKING, Protocol, TypeVar, runtime_checkable
 from typing_extensions import Self
 
 import hugr.serialization.ops as sops
-from hugr import ext, tys, val
+from hugr import tys, val
 from hugr.node_port import Direction, InPort, Node, OutPort, PortOffset, Wire
 from hugr.utils import ser_it
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    from hugr import ext
     from hugr.serialization.ops import BaseOp
 
 
@@ -377,6 +378,19 @@ class ExtOp(AsExtOp):
             msg = "Polymorphic signature must be cached."
             raise ValueError(msg)
         return poly_func.body
+
+
+class RegisteredOp(AsExtOp):
+    """Base class for operations that are registered with an extension using
+    :meth:`Extension.register_op <hugr.ext.Extension.register_op>`.
+    """
+
+    #: Known operation definition.
+    const_op_def: ext.OpDef  # must be initialised by register_op
+
+    def op_def(self) -> ext.OpDef:
+        # override for AsExtOp.op_def
+        return self.const_op_def
 
 
 @dataclass()
