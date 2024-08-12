@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass, field, replace
 from typing import (
     TYPE_CHECKING,
@@ -121,8 +121,8 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
             raise KeyError(key)
         return n
 
-    def __iter__(self):
-        return iter(self._nodes)
+    def __iter__(self) -> Iterator[Node]:
+        return (Node(idx) for idx, data in enumerate(self._nodes) if data is not None)
 
     def __len__(self) -> int:
         return self.num_nodes()
@@ -131,6 +131,10 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
         op = self[node].op
         assert isinstance(op, cl)
         return op
+
+    def nodes(self) -> Iterable[tuple[Node, NodeData]]:
+        """Iterator over nodes of the hugr and their data."""
+        return self.items()
 
     def children(self, node: ToNode | None = None) -> list[Node]:
         """The child nodes of a given `node`.
@@ -168,6 +172,20 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
         node = replace(node, _num_out_ports=num_outs)
         if parent:
             self[parent].children.append(node)
+        return node
+
+    def _update_node_outs(self, node: Node, num_outs: int | None) -> Node:
+        """Update the number of outgoing ports for a node.
+
+        Returns:
+            The updated node.
+        """
+        self[node]._num_outs = num_outs or 0
+        node = replace(node, _num_out_ports=num_outs)
+        parent = self[node].parent
+        if parent is not None:
+            pos = self[parent].children.index(node)
+            self[parent].children[pos] = node
         return node
 
     def add_node(

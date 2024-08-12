@@ -19,8 +19,13 @@ from .conftest import validate
 def test_stable_indices():
     h = Hugr(ops.DFG([]))
 
-    nodes = [h.add_node(Not) for _ in range(3)]
+    nodes = [h.add_node(Not, num_outs=1) for _ in range(3)]
     assert len(h) == 4
+    assert list(iter(h)) == [Node(i) for i in range(4)]
+    assert all(data is not None for node, data in h.nodes())
+
+    assert len(list(nodes[0].outputs())) == 1
+    assert list(nodes[0]) == list(nodes[0].outputs())
 
     h.add_link(nodes[0].out(0), nodes[1].inp(0))
     assert h.children() == nodes
@@ -49,6 +54,8 @@ def test_stable_indices():
 
     assert len(h) == 4
     assert h._free_nodes == []
+    assert list(iter(h)) == [Node(i) for i in range(4)]
+    assert all(data is not None for node, data in h.nodes())
 
 
 def simple_id() -> Dfg:

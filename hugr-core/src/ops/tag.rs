@@ -67,8 +67,8 @@ pub enum OpTag {
     /// A leaf operation.
     Leaf,
 
-    /// A control flow basic block.
-    BasicBlock,
+    /// A control flow basic block defining a dataflow graph.
+    DataflowBlock,
     /// A control flow exit node.
     BasicBlockExit,
 }
@@ -113,8 +113,8 @@ impl OpTag {
             OpTag::Function => &[OpTag::ModuleOp, OpTag::StaticOutput],
             OpTag::Alias => &[OpTag::ScopedDefn],
             OpTag::FuncDefn => &[OpTag::Function, OpTag::ScopedDefn, OpTag::DataflowParent],
-            OpTag::BasicBlock => &[OpTag::ControlFlowChild, OpTag::DataflowParent],
-            OpTag::BasicBlockExit => &[OpTag::BasicBlock],
+            OpTag::DataflowBlock => &[OpTag::ControlFlowChild, OpTag::DataflowParent],
+            OpTag::BasicBlockExit => &[OpTag::ControlFlowChild],
             OpTag::Case => &[OpTag::Any, OpTag::DataflowParent],
             OpTag::ModuleRoot => &[OpTag::Any],
             OpTag::Const => &[OpTag::ScopedDefn, OpTag::StaticOutput],
@@ -148,7 +148,7 @@ impl OpTag {
             OpTag::Input => "Input node",
             OpTag::Output => "Output node",
             OpTag::FuncDefn => "Function definition",
-            OpTag::BasicBlock => "Basic block",
+            OpTag::DataflowBlock => "Basic block containing a dataflow graph",
             OpTag::BasicBlockExit => "Exit basic block node",
             OpTag::Case => "Case",
             OpTag::ModuleRoot => "Module root node",
@@ -213,16 +213,20 @@ mod test {
         assert!(OpTag::None.is_superset(OpTag::None));
         assert!(OpTag::ModuleOp.is_superset(OpTag::ModuleOp));
         assert!(OpTag::DataflowChild.is_superset(OpTag::DataflowChild));
-        assert!(OpTag::BasicBlock.is_superset(OpTag::BasicBlock));
+        assert!(OpTag::ControlFlowChild.is_superset(OpTag::ControlFlowChild));
 
         assert!(OpTag::Any.is_superset(OpTag::None));
         assert!(OpTag::Any.is_superset(OpTag::ModuleOp));
         assert!(OpTag::Any.is_superset(OpTag::DataflowChild));
-        assert!(OpTag::Any.is_superset(OpTag::BasicBlock));
+        assert!(OpTag::Any.is_superset(OpTag::ControlFlowChild));
 
         assert!(!OpTag::None.is_superset(OpTag::Any));
         assert!(!OpTag::None.is_superset(OpTag::ModuleOp));
         assert!(!OpTag::None.is_superset(OpTag::DataflowChild));
-        assert!(!OpTag::None.is_superset(OpTag::BasicBlock));
+        assert!(!OpTag::None.is_superset(OpTag::ControlFlowChild));
+
+        // Other specific checks
+        assert!(!OpTag::DataflowParent.is_superset(OpTag::BasicBlockExit));
+        assert!(!OpTag::DataflowParent.is_superset(OpTag::Cfg));
     }
 }

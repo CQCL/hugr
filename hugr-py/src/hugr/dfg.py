@@ -42,6 +42,7 @@ class _DefinitionBuilder(Generic[OpVar]):
         name: str,
         input_types: TypeRow,
         type_params: list[TypeParam] | None = None,
+        parent: ToNode | None = None,
     ) -> Function:
         """Start building a function definition in the graph.
 
@@ -49,18 +50,21 @@ class _DefinitionBuilder(Generic[OpVar]):
             name: The name of the function.
             input_types: The input types for the function.
             type_params: The type parameters for the function, if polymorphic.
+            parent: The parent node of the constant. Defaults to the root node.
 
         Returns:
             The new function builder.
         """
+        parent_node = parent or self.hugr.root
         parent_op = ops.FuncDefn(name, input_types, type_params or [])
-        return Function.new_nested(parent_op, self.hugr)
+        return Function.new_nested(parent_op, self.hugr, parent_node)
 
-    def add_const(self, value: val.Value) -> Node:
+    def add_const(self, value: val.Value, parent: ToNode | None = None) -> Node:
         """Add a static constant to the graph.
 
         Args:
             value: The constant value to add.
+            parent: The parent node of the constant. Defaults to the root node.
 
         Returns:
             The node holding the :class:`Const <hugr.ops.Const>` operation.
@@ -71,11 +75,13 @@ class _DefinitionBuilder(Generic[OpVar]):
             >>> dfg.hugr[const_n].op
             Const(TRUE)
         """
-        return self.hugr.add_node(ops.Const(value), self.hugr.root)
+        parent_node = parent or self.hugr.root
+        return self.hugr.add_node(ops.Const(value), parent_node)
 
-    def add_alias_defn(self, name: str, ty: Type) -> Node:
+    def add_alias_defn(self, name: str, ty: Type, parent: ToNode | None = None) -> Node:
         """Add a type alias definition."""
-        return self.hugr.add_node(ops.AliasDefn(name, ty), self.hugr.root)
+        parent_node = parent or self.hugr.root
+        return self.hugr.add_node(ops.AliasDefn(name, ty), parent_node)
 
 
 DP = TypeVar("DP", bound=ops.DfParentOp)
@@ -466,6 +472,18 @@ class _DfBase(ParentBuilder[DP], _DefinitionBuilder, AbstractContextManager):
         self._wire_up(self.output_node, args)
         self.parent_op._set_out_types(self._output_op().types)
 
+    def _set_parent_output_count(self, count: int) -> None:
+        """Set the final number of output ports on the parent operation.
+
+        Args:
+            count: The number of output ports.
+
+        Example:
+            >>> dfg = Dfg(tys.Bool)
+            >>> dfg._set_parent_output_count(2)
+        """
+        self.parent_node = self.hugr._update_node_outs(self.parent_node, count)
+
     def add_state_order(self, src: Node, dst: Node) -> None:
         """Add a state order link between two nodes.
 
@@ -482,13 +500,17 @@ class _DfBase(ParentBuilder[DP], _DefinitionBuilder, AbstractContextManager):
         # adds edge to the right of all existing edges
         self.hugr.add_link(src.out(-1), dst.inp(-1))
 
-    def load(self, const: ToNode | val.Value) -> Node:
+    def load(
+        self, const: ToNode | val.Value, const_parent: ToNode | None = None
+    ) -> Node:
         """Load a constant into the graph as a dataflow value.
 
         Args:
             const: The constant to load, either a Value that will be added as a
-            child Const node then loaded, or a node corresponding to an existing
-            Const.
+                child Const node then loaded, or a node corresponding to an
+                existing Const.
+            const_parent: If `const` is a Value, the parent node for the new
+                constant definition. Defaults to the current dataflow container.
 
         Returns:
             The node holding the :class:`LoadConst <hugr.ops.LoadConst>`
@@ -503,7 +525,8 @@ class _DfBase(ParentBuilder[DP], _DefinitionBuilder, AbstractContextManager):
             LoadConst(Bool)
         """
         if isinstance(const, val.Value):
-            const = self.add_const(const)
+            const_parent = const_parent or self.parent_node
+            const = self.add_const(const, parent=const_parent)
         const_op = self.hugr._get_typed_op(const, ops.Const)
         load_op = ops.LoadConst(const_op.val.type_())
 
@@ -619,6 +642,10 @@ class Dfg(_DfBase[ops.DFG]):
     def __init__(self, *input_types: tys.Type) -> None:
         parent_op = ops.DFG(list(input_types), None)
         super().__init__(parent_op)
+
+    def set_outputs(self, *outputs: Wire) -> None:
+        super().set_outputs(*outputs)
+        self._set_parent_output_count(len(outputs))
 
 
 def _ancestral_sibling(h: Hugr, src: Node, tgt: Node) -> Node | None:

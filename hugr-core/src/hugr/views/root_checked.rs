@@ -107,7 +107,7 @@ mod test {
             r,
             Err(HugrError::InvalidTag {
                 required: OpTag::Dfg,
-                actual: ops::OpTag::BasicBlock
+                actual: ops::OpTag::DataflowBlock
             })
         );
         // That didn't do anything:
