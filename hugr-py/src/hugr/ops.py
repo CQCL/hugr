@@ -201,79 +201,78 @@ class Output(DataflowOp, _PartialOp):
 
 
 @runtime_checkable
-class AsCustomOp(DataflowOp, Protocol):
+class AsExtOp(DataflowOp, Protocol):
     """Abstract interface that types can implement
-    to behave as a custom dataflow operation.
+    to behave as an extension dataflow operation.
     """
 
     @dataclass(frozen=True)
-    class InvalidCustomOp(Exception):
-        """Custom operation does not match the expected type."""
+    class InvalidExtOp(Exception):
+        """Extension operation does not match the expected type."""
 
         msg: str
 
     @cached_property
-    def custom_op(self) -> Custom:
-        """:class:`Custom` operation that this type represents.
+    def ext_op(self) -> ExtOp:
+        """:class:`ExtOp` operation that this type represents.
 
-        Computed once using :meth:`to_custom` and cached - should be deterministic.
+        Computed once using :meth:`to_ext` and cached - should be deterministic.
         """
-        return self.to_custom()
+        return self.to_ext()
 
-    def to_custom(self) -> Custom:
-        """Convert this type to a :class:`Custom` operation.
+    def to_ext(self) -> ExtOp:
+        """Convert this type to a :class:`ExtOp` operation.
 
 
-        Used by :attr:`custom_op`, so must be deterministic.
+        Used by :attr:`ext_op`, so must be deterministic.
         """
         ...  # pragma: no cover
 
     @classmethod
-    def from_custom(cls, custom: Custom) -> Self | None:
-        """Load from a :class:`Custom` operation.
+    def from_ext(cls, ext_op: ExtOp) -> Self | None:
+        """Load from a :class:`ExtOp` operation.
 
 
         By default assumes the type of `cls` is a singleton,
-        and compares the result of :meth:`to_custom` with the given `custom`.
+        and compares the result of :meth:`to_ext` with the given `ext_op`.
 
         If successful, returns the singleton, else None.
 
         Non-singleton types should override this method.
 
         Raises:
-            InvalidCustomOp: If the given `custom` does not match the expected one for a
+            InvalidCustomOp: If the given `ext_op` does not match the expected one for a
             given extension/operation name.
         """
         default = cls()
-        if default.custom_op == custom:
+        if default.ext_op == ext_op:
             return default
         return None
 
     def __eq__(self, other: object) -> bool:
-        if not isinstance(other, AsCustomOp):
+        if not isinstance(other, AsExtOp):
             return NotImplemented
-        slf, other = self.custom_op, other.custom_op
+        slf, other = self.ext_op, other.ext_op
         return (
-            slf.extension == other.extension
-            and slf.name == other.name
-            and slf.signature == other.signature
+            slf.op_def == other.op_def
+            and slf.outer_signature() == other.outer_signature()
             and slf.args == other.args
         )
 
     def outer_signature(self) -> tys.FunctionType:
-        return self.custom_op.signature
+        return self.ext_op.outer_signature()
 
     def to_serial(self, parent: Node) -> sops.CustomOp:
-        return self.custom_op.to_serial(parent)
+        return self.ext_op.to_serial(parent)
 
     @property
     def num_out(self) -> int:
-        return len(self.custom_op.signature.output)
+        return len(self.outer_signature().output)
 
 
 @dataclass(frozen=True, eq=False)
-class Custom(AsCustomOp):
-    """A non-core dataflow operation defined in an extension."""
+class Custom(DataflowOp):
+    """Serialisable version of non-core dataflow operation defined in an extension."""
 
     name: str
     signature: tys.FunctionType = field(default_factory=tys.FunctionType.empty)
@@ -291,12 +290,12 @@ class Custom(AsCustomOp):
             args=ser_it(self.args),
         )
 
-    def to_custom(self) -> Custom:
-        return self
+    def outer_signature(self) -> tys.FunctionType:
+        return self.signature
 
-    @classmethod
-    def from_custom(cls, custom: Custom) -> Custom:
-        return custom
+    @property
+    def num_out(self) -> int:
+        return len(self.outer_signature().output)
 
     def check_id(self, extension: tys.ExtensionId, name: str) -> bool:
         """Check if the operation matches the given extension and operation name."""
@@ -312,15 +311,15 @@ class Custom(AsCustomOp):
         return ExtOp(op_def, signature, args)
 
 
-@dataclass(frozen=True)
-class ExtOp(AsCustomOp):
+@dataclass(frozen=True, eq=False)
+class ExtOp(AsExtOp):
     """A non-core dataflow operation defined in an extension."""
 
     op_def: ext.OpDef
     signature: tys.FunctionType | None = None
     args: list[tys.TypeArg] = field(default_factory=list)
 
-    def to_custom(self) -> Custom:
+    def to_custom_op(self) -> Custom:
         ext = self.op_def._extension
         if self.signature is None:
             poly_func = self.op_def.signature.poly_func
@@ -339,7 +338,23 @@ class ExtOp(AsCustomOp):
         )
 
     def to_serial(self, parent: Node) -> sops.CustomOp:
-        return self.to_custom().to_serial(parent)
+        return self.to_custom_op().to_serial(parent)
+
+    def to_ext(self) -> ExtOp:
+        return self
+
+    @classmethod
+    def from_ext(cls, custom: ExtOp) -> ExtOp:
+        return custom
+
+    def outer_signature(self) -> tys.FunctionType:
+        if self.signature is not None:
+            return self.signature
+        poly_func = self.op_def.signature.poly_func
+        if poly_func is None:
+            msg = "Polymorphic signature must be cached."
+            raise ValueError(msg)
+        return poly_func.body
 
 
 @dataclass()

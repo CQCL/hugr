@@ -6,7 +6,7 @@ from hugr import ext, ops, tys
 from hugr.dfg import Dfg
 from hugr.hugr import Hugr
 from hugr.node_port import Node
-from hugr.ops import AsCustomOp, Custom, ExtOp
+from hugr.ops import AsExtOp, Custom, ExtOp
 from hugr.std.float import EXTENSION as FLOAT_EXT
 from hugr.std.int import OPS_EXTENSION, TYPES_EXTENSION, DivMod
 from hugr.std.logic import EXTENSION as LOGIC_EXT
@@ -16,7 +16,7 @@ from .conftest import CX, H, Measure, Rz, validate
 from .conftest import EXTENSION as QUANTUM_EXT
 
 STRINGLY_EXT = ext.Extension("my_extension", ext.Version(0, 0, 0))
-STRINGLY_EXT.add_op_def(
+_STRINGLY_DEF = STRINGLY_EXT.add_op_def(
     ext.OpDef(
         "StringlyOp",
         signature=ext.OpDefSig(
@@ -27,28 +27,27 @@ STRINGLY_EXT.add_op_def(
 
 
 @dataclass
-class StringlyOp(AsCustomOp):
+class StringlyOp(AsExtOp):
     tag: str
 
-    def to_custom(self) -> Custom:
+    def to_ext(self) -> ops.ExtOp:
         return ops.ExtOp(
             STRINGLY_EXT.get_op("StringlyOp"),
             tys.FunctionType.endo([]),
             [tys.StringArg(self.tag)],
-        ).to_custom()
+        )
 
     @classmethod
-    def from_custom(cls, custom: Custom) -> "StringlyOp":
+    def from_ext(cls, custom: ops.ExtOp) -> "StringlyOp":
         match custom:
-            case Custom(
-                name="StringlyOp",
-                extension="my_extension",
+            case ops.ExtOp(
+                op_def=_STRINGLY_DEF,
                 args=[tys.StringArg(tag)],
             ):
                 return cls(tag=tag)
             case _:
                 msg = f"Invalid custom op: {custom}"
-                raise AsCustomOp.InvalidCustomOp(msg)
+                raise AsExtOp.InvalidExtOp(msg)
 
 
 def test_stringly_typed():
@@ -95,20 +94,22 @@ def registry() -> ext.ExtensionRegistry:
 
 
 @pytest.mark.parametrize(
-    "as_custom",
+    "as_ext",
     [Not, DivMod, H, CX, Measure, Rz, StringlyOp("hello")],
 )
-def test_custom(as_custom: AsCustomOp, registry: ext.ExtensionRegistry):
-    custom = as_custom.to_custom()
+def test_custom(as_ext: AsExtOp, registry: ext.ExtensionRegistry):
+    ext_op = as_ext.to_ext()
 
-    assert custom.to_custom() == custom
-    assert Custom.from_custom(custom) == custom
+    assert ext_op.to_ext() == ext_op
+    assert ExtOp.from_ext(ext_op) == ext_op
 
-    assert type(as_custom).from_custom(custom) == as_custom
+    assert type(as_ext).from_ext(ext_op) == as_ext
+    custom = as_ext.to_serial(Node(0)).deserialize()
+    assert isinstance(custom, Custom)
     # ExtOp compared to Custom via `to_custom`
-    assert as_custom.to_serial(Node(0)).deserialize().resolve(registry) == custom
-    assert custom == as_custom
-    assert as_custom == custom
+    assert custom.resolve(registry) == ext_op
+    assert ext_op == as_ext
+    assert as_ext == ext_op
 
 
 def test_custom_bad_eq():

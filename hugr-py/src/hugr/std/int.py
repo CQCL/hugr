@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from typing_extensions import Self
 
 from hugr import ext, tys, val
-from hugr.ops import AsCustomOp, Custom, DataflowOp, ExtOp
+from hugr.ops import AsExtOp, DataflowOp, ExtOp
 
 if TYPE_CHECKING:
     from hugr.ops import Command, ComWire
@@ -79,32 +79,32 @@ _DivMod = OPS_EXTENSION.add_op_def(
 
 
 @dataclass(frozen=True)
-class _DivModDef(AsCustomOp):
+class _DivModDef(AsExtOp):
     """DivMod operation, has two inputs and two outputs."""
 
     arg1: int = 5
     arg2: int = 5
     op_def: ext.OpDef = field(default_factory=lambda: _DivMod, init=False)
 
-    def to_custom(self) -> Custom:
+    def to_ext(self) -> ExtOp:
         row: list[tys.Type] = [int_t(self.arg1), int_t(self.arg2)]
         ext_op = ExtOp(
             self.op_def,
             tys.FunctionType.endo(row),
             [tys.BoundedNatArg(n=self.arg1), tys.BoundedNatArg(n=self.arg2)],
         )
-        return ext_op.to_custom()
+        return ext_op
 
     @classmethod
-    def from_custom(cls, custom: Custom) -> Self | None:
-        if not custom.check_id(OPS_EXTENSION.name, _DivMod.name):
+    def from_ext(cls, custom: ExtOp) -> Self | None:
+        if custom.op_def != _DivMod:
             return None
         match custom.args:
             case [tys.BoundedNatArg(n=a1), tys.BoundedNatArg(n=a2)]:
                 return cls(arg1=a1, arg2=a2)
             case _:
                 msg = f"Invalid args: {custom.args}"
-                raise AsCustomOp.InvalidCustomOp(msg)
+                raise AsExtOp.InvalidExtOp(msg)
 
     def __call__(self, a: ComWire, b: ComWire) -> Command:
         return DataflowOp.__call__(self, a, b)
