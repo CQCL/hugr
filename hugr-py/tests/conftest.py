@@ -20,16 +20,11 @@ if TYPE_CHECKING:
     from hugr.ops import ComWire
 
 EXTENSION = ext.Extension("pytest.quantum,", ext.Version(0, 1, 0))
-_SINGLE_QUBIT = ext.OpDefSig(tys.FunctionType.endo([tys.Qubit]))
-_TWO_QUBIT = ext.OpDefSig(tys.FunctionType.endo([tys.Qubit] * 2))
-_MEAS_SIG = ext.OpDefSig(tys.FunctionType([tys.Qubit], [tys.Qubit, tys.Bool]))
-_RZ_SIG = ext.OpDefSig(tys.FunctionType([tys.Qubit, FLOAT_T], [tys.Qubit]))
-
 EXTENSION.add_op_def(
     ext.OpDef(
         name="H",
         description="Hadamard gate",
-        signature=_SINGLE_QUBIT,
+        signature=ext.OpDefSig(tys.FunctionType.endo([tys.Qubit])),
     )
 )
 
@@ -37,7 +32,7 @@ EXTENSION.add_op_def(
     ext.OpDef(
         name="CX",
         description="CNOT gate",
-        signature=_TWO_QUBIT,
+        signature=ext.OpDefSig(tys.FunctionType.endo([tys.Qubit] * 2)),
     )
 )
 
@@ -45,7 +40,7 @@ EXTENSION.add_op_def(
     ext.OpDef(
         name="Measure",
         description="Measurement operation",
-        signature=_MEAS_SIG,
+        signature=ext.OpDefSig(tys.FunctionType([tys.Qubit], [tys.Qubit, tys.Bool])),
     )
 )
 
@@ -53,7 +48,7 @@ EXTENSION.add_op_def(
     ext.OpDef(
         name="Rz",
         description="Rotation around the z-axis",
-        signature=_RZ_SIG,
+        signature=ext.OpDefSig(tys.FunctionType([tys.Qubit, FLOAT_T], [tys.Qubit])),
     )
 )
 
