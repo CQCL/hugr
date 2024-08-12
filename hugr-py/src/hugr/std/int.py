@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from typing_extensions import Self
@@ -84,20 +84,20 @@ class _DivModDef(AsExtOp):
 
     arg1: int = 5
     arg2: int = 5
-    op_def: ext.OpDef = field(default_factory=lambda: _DivMod, init=False)
 
-    def to_ext(self) -> ExtOp:
+    def op_def(self) -> ext.OpDef:
+        return _DivMod
+
+    def type_args(self) -> list[tys.TypeArg]:
+        return [tys.BoundedNatArg(n=self.arg1), tys.BoundedNatArg(n=self.arg2)]
+
+    def cached_signature(self) -> tys.FunctionType | None:
         row: list[tys.Type] = [int_t(self.arg1), int_t(self.arg2)]
-        ext_op = ExtOp(
-            self.op_def,
-            tys.FunctionType.endo(row),
-            [tys.BoundedNatArg(n=self.arg1), tys.BoundedNatArg(n=self.arg2)],
-        )
-        return ext_op
+        return tys.FunctionType.endo(row)
 
     @classmethod
     def from_ext(cls, custom: ExtOp) -> Self | None:
-        if custom.op_def != _DivMod:
+        if custom.op_def() != _DivMod:
             return None
         match custom.args:
             case [tys.BoundedNatArg(n=a1), tys.BoundedNatArg(n=a2)]:

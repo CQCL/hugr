@@ -216,17 +216,33 @@ class AsExtOp(DataflowOp, Protocol):
     def ext_op(self) -> ExtOp:
         """:class:`ExtOp` operation that this type represents.
 
-        Computed once using :meth:`to_ext` and cached - should be deterministic.
+        Computed once using :meth:`op_def` :meth:`type_args` and :meth:`type_args`.
+        Each of those methods should be deterministic.
         """
-        return self.to_ext()
+        return ExtOp(self.op_def(), self.cached_signature(), self.type_args())
 
-    def to_ext(self) -> ExtOp:
-        """Convert this type to a :class:`ExtOp` operation.
+    def op_def(self) -> ext.OpDef:
+        """The :class:`tys.OpDef` for this operation.
 
 
         Used by :attr:`ext_op`, so must be deterministic.
         """
         ...  # pragma: no cover
+
+    def type_args(self) -> list[tys.TypeArg]:
+        """Type arguments of the operation.
+
+        Used by :attr:`op_def`, so must be deterministic.
+        """
+        return []
+
+    def cached_signature(self) -> tys.FunctionType | None:
+        """Cached signature of the operation, if there is one.
+
+
+        Used by :attr:`op_def`, so must be deterministic.
+        """
+        return None
 
     @classmethod
     def from_ext(cls, ext_op: ExtOp) -> Self | None:
@@ -254,7 +270,7 @@ class AsExtOp(DataflowOp, Protocol):
             return NotImplemented
         slf, other = self.ext_op, other.ext_op
         return (
-            slf.op_def == other.op_def
+            slf._op_def == other._op_def
             and slf.outer_signature() == other.outer_signature()
             and slf.args == other.args
         )
@@ -315,14 +331,14 @@ class Custom(DataflowOp):
 class ExtOp(AsExtOp):
     """A non-core dataflow operation defined in an extension."""
 
-    op_def: ext.OpDef
+    _op_def: ext.OpDef
     signature: tys.FunctionType | None = None
     args: list[tys.TypeArg] = field(default_factory=list)
 
     def to_custom_op(self) -> Custom:
-        ext = self.op_def._extension
+        ext = self._op_def._extension
         if self.signature is None:
-            poly_func = self.op_def.signature.poly_func
+            poly_func = self._op_def.signature.poly_func
             if poly_func is None or len(poly_func.params) > 0:
                 msg = "For polymorphic ops signature must be cached."
                 raise ValueError(msg)
@@ -331,7 +347,7 @@ class ExtOp(AsExtOp):
             sig = self.signature
 
         return Custom(
-            name=self.op_def.name,
+            name=self._op_def.name,
             signature=sig,
             extension=ext.name if ext else "",
             args=self.args,
@@ -340,8 +356,14 @@ class ExtOp(AsExtOp):
     def to_serial(self, parent: Node) -> sops.CustomOp:
         return self.to_custom_op().to_serial(parent)
 
-    def to_ext(self) -> ExtOp:
-        return self
+    def op_def(self) -> ext.OpDef:
+        return self._op_def
+
+    def type_args(self) -> list[tys.TypeArg]:
+        return self.args
+
+    def cached_signature(self) -> tys.FunctionType | None:
+        return self.signature
 
     @classmethod
     def from_ext(cls, custom: ExtOp) -> ExtOp:
@@ -350,7 +372,7 @@ class ExtOp(AsExtOp):
     def outer_signature(self) -> tys.FunctionType:
         if self.signature is not None:
             return self.signature
-        poly_func = self.op_def.signature.poly_func
+        poly_func = self._op_def.signature.poly_func
         if poly_func is None:
             msg = "Polymorphic signature must be cached."
             raise ValueError(msg)

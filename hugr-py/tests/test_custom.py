@@ -30,18 +30,20 @@ _STRINGLY_DEF = STRINGLY_EXT.add_op_def(
 class StringlyOp(AsExtOp):
     tag: str
 
-    def to_ext(self) -> ops.ExtOp:
-        return ops.ExtOp(
-            STRINGLY_EXT.get_op("StringlyOp"),
-            tys.FunctionType.endo([]),
-            [tys.StringArg(self.tag)],
-        )
+    def op_def(self) -> ext.OpDef:
+        return STRINGLY_EXT.get_op("StringlyOp")
+
+    def type_args(self) -> list[tys.TypeArg]:
+        return [tys.StringArg(self.tag)]
+
+    def cached_signature(self) -> tys.FunctionType | None:
+        return tys.FunctionType.endo([])
 
     @classmethod
     def from_ext(cls, custom: ops.ExtOp) -> "StringlyOp":
         match custom:
             case ops.ExtOp(
-                op_def=_STRINGLY_DEF,
+                _op_def=_STRINGLY_DEF,
                 args=[tys.StringArg(tag)],
             ):
                 return cls(tag=tag)
@@ -98,9 +100,8 @@ def registry() -> ext.ExtensionRegistry:
     [Not, DivMod, H, CX, Measure, Rz, StringlyOp("hello")],
 )
 def test_custom(as_ext: AsExtOp, registry: ext.ExtensionRegistry):
-    ext_op = as_ext.to_ext()
+    ext_op = as_ext.ext_op
 
-    assert ext_op.to_ext() == ext_op
     assert ExtOp.from_ext(ext_op) == ext_op
 
     assert type(as_ext).from_ext(ext_op) == as_ext

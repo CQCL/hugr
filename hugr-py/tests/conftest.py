@@ -61,10 +61,10 @@ E = TypeVar("E", bound=Enum)
 
 
 def _load_enum(enum_cls: type[E], custom: ExtOp) -> E | None:
-    ext = custom.op_def._extension
+    ext = custom._op_def._extension
     assert ext is not None
-    if ext.name == EXTENSION.name and custom.op_def.name in enum_cls.__members__:
-        return enum_cls(custom.op_def.name)
+    if ext.name == EXTENSION.name and custom._op_def.name in enum_cls.__members__:
+        return enum_cls(custom._op_def.name)
     return None
 
 
@@ -79,8 +79,8 @@ class OneQbGate(AsExtOp):
     def __call__(self, q: ComWire) -> Command:
         return DataflowOp.__call__(self, q)
 
-    def to_ext(self) -> ExtOp:
-        return ExtOp(EXTENSION.operations[self._enum.value])
+    def op_def(self) -> ext.OpDef:
+        return EXTENSION.operations[self._enum.value]
 
     @classmethod
     def from_ext(cls, custom: ExtOp) -> Self | None:
@@ -97,8 +97,8 @@ class TwoQbGate(AsExtOp):
 
     _enum: _Enum
 
-    def to_ext(self) -> ExtOp:
-        return ExtOp(EXTENSION.operations[self._enum.value])
+    def op_def(self) -> ext.OpDef:
+        return EXTENSION.operations[self._enum.value]
 
     @classmethod
     def from_ext(cls, custom: ExtOp) -> Self | None:
@@ -113,8 +113,8 @@ CX = TwoQbGate(TwoQbGate._Enum.CX)
 
 @dataclass(frozen=True)
 class MeasureDef(AsExtOp):
-    def to_ext(self) -> ExtOp:
-        return ExtOp(EXTENSION.operations["Measure"])
+    def op_def(self) -> ext.OpDef:
+        return EXTENSION.operations["Measure"]
 
     def __call__(self, q: ComWire) -> Command:
         return super().__call__(q)
@@ -125,8 +125,8 @@ Measure = MeasureDef()
 
 @dataclass(frozen=True)
 class RzDef(AsExtOp):
-    def to_ext(self) -> ExtOp:
-        return ExtOp(EXTENSION.operations["Rz"])
+    def op_def(self) -> ext.OpDef:
+        return EXTENSION.operations["Rz"]
 
     def __call__(self, q: ComWire, fl_wire: ComWire) -> Command:
         return super().__call__(q, fl_wire)

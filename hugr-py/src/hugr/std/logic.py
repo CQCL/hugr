@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from hugr import ext, tys
-from hugr.ops import AsExtOp, Command, DataflowOp, ExtOp
+from hugr.ops import AsExtOp, Command, DataflowOp
 
 if TYPE_CHECKING:
     from hugr.ops import ComWire
@@ -25,8 +25,8 @@ _NotDef = EXTENSION.add_op_def(
 
 @dataclass(frozen=True)
 class _NotOp(AsExtOp):
-    def to_ext(self) -> ExtOp:
-        return ExtOp(_NotDef)
+    def op_def(self) -> ext.OpDef:
+        return _NotDef
 
     def __call__(self, a: ComWire) -> Command:
         return DataflowOp.__call__(self, a)
