@@ -41,6 +41,7 @@ class _DefinitionBuilder(Generic[OpVar]):
         self,
         name: str,
         input_types: TypeRow,
+        output_types: TypeRow | None = None,
         type_params: list[TypeParam] | None = None,
         parent: ToNode | None = None,
     ) -> Function:
@@ -49,6 +50,8 @@ class _DefinitionBuilder(Generic[OpVar]):
         Args:
             name: The name of the function.
             input_types: The input types for the function.
+            output_types: The output types for the function.
+                If not provided, it will be inferred after the function is built.
             type_params: The type parameters for the function, if polymorphic.
             parent: The parent node of the constant. Defaults to the root node.
 
@@ -57,7 +60,10 @@ class _DefinitionBuilder(Generic[OpVar]):
         """
         parent_node = parent or self.hugr.root
         parent_op = ops.FuncDefn(name, input_types, type_params or [])
-        return Function.new_nested(parent_op, self.hugr, parent_node)
+        func = Function.new_nested(parent_op, self.hugr, parent_node)
+        if output_types is not None:
+            func.declare_outputs(output_types)
+        return func
 
     def add_const(self, value: val.Value, parent: ToNode | None = None) -> Node:
         """Add a static constant to the graph.

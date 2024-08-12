@@ -288,8 +288,7 @@ def test_recursive_function() -> None:
 def test_invalid_recursive_function() -> None:
     mod = Module()
 
-    f_recursive = mod.define_function("recurse", [tys.Bool])
-    f_recursive.declare_outputs([tys.Qubit])
+    f_recursive = mod.define_function("recurse", [tys.Bool], [tys.Qubit])
     f_recursive.call(f_recursive, f_recursive.input_node[0])
 
     with pytest.raises(ValueError, match="The function has fixed output type"):
