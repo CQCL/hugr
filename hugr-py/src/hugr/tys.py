@@ -258,6 +258,10 @@ class Sum(Type):
     def type_bound(self) -> TypeBound:
         return TypeBound.join(*(t.type_bound() for r in self.variant_rows for t in r))
 
+    def resolve(self, registry: ext.ExtensionRegistry) -> Sum:
+        """Resolve types in the sum type using the given registry."""
+        return Sum([[ty.resolve(registry) for ty in row] for row in self.variant_rows])
+
 
 @dataclass()
 class UnitSum(Sum):
@@ -278,6 +282,9 @@ class UnitSum(Sum):
         elif self == Unit:
             return "Unit"
         return f"UnitSum({self.size})"
+
+    def resolve(self, registry: ext.ExtensionRegistry) -> UnitSum:
+        return self
 
 
 @dataclass()
