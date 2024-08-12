@@ -713,8 +713,8 @@ class Function(_DfBase[ops.FuncDefn]):
             arg_types = [self._get_dataflow_type(w) for w in args]
             if arg_types != self.parent_op._outputs:
                 error_message = (
-                    f"The function has fixed output types {self.parent_op._outputs}, "
-                    f"but was given output wires of types {arg_types}."
+                    f"The function has fixed output type {self.parent_op._outputs}, "
+                    f"but was given output wires with types {arg_types}."
                 )
                 raise ValueError(error_message)
 

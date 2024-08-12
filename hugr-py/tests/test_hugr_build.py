@@ -274,6 +274,28 @@ def test_mono_function(direct_call: bool) -> None:
     validate(mod.hugr)
 
 
+def test_recursive_function() -> None:
+    mod = Module()
+
+    f_recursive = mod.define_function("recurse", [tys.Qubit])
+    f_recursive.declare_outputs([tys.Qubit])
+    call = f_recursive.call(f_recursive, f_recursive.input_node[0])
+    f_recursive.set_outputs(call)
+
+    validate(mod.hugr)
+
+
+def test_invalid_recursive_function() -> None:
+    mod = Module()
+
+    f_recursive = mod.define_function("recurse", [tys.Bool])
+    f_recursive.declare_outputs([tys.Qubit])
+    f_recursive.call(f_recursive, f_recursive.input_node[0])
+
+    with pytest.raises(ValueError, match="The function has fixed output type"):
+        f_recursive.set_outputs(f_recursive.input_node[0])
+
+
 def test_higher_order() -> None:
     noop_fn = Dfg(tys.Qubit)
     noop_fn.set_outputs(noop_fn.add(ops.Noop()(noop_fn.input_node[0])))
