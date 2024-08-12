@@ -158,6 +158,9 @@ class Conditional(ParentBuilder[ops.Conditional], AbstractContextManager):
     def _update_outputs(self, outputs: TypeRow) -> None:
         if self.parent_op._outputs is None:
             self.parent_op._outputs = outputs
+            self.parent_node = self.hugr._update_node_outs(
+                self.parent_node, len(outputs)
+            )
         else:
             if outputs != self.parent_op._outputs:
                 msg = "Mismatched case outputs."
