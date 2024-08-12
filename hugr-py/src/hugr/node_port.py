@@ -164,7 +164,10 @@ class Node(ToNode):
                 start = index.start or 0
                 stop = index.stop or self._num_out_ports
                 if stop is None:
-                    msg = "Stop must be specified when number of outputs unknown"
+                    msg = (
+                        f"{self} does not have a fixed number of output ports. "
+                        "Iterating over all output ports is not supported."
+                    )
                     raise ValueError(msg)
                 step = index.step or 1
                 return (self[i] for i in range(start, stop, step))
