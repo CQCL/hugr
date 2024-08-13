@@ -71,7 +71,40 @@ class FromParamsBound:
 
 
 @dataclass
-class TypeDef:
+class NoParentExtension(Exception):
+    """Parent extension must be set."""
+
+    kind: str
+
+    def __str__(self):
+        return f"{self.kind} does not belong to an extension."
+
+
+@dataclass(init=False)
+class ExtensionObject:
+    """An object associated with an :class:`Extension`."""
+
+    _extension: Extension | None = field(
+        default=None, init=False, repr=False, compare=False
+    )
+
+    def get_extension(self) -> Extension:
+        """Retrieve the extension associated with the object.
+
+        Returns:
+            The extension associated with the object.
+
+        Raises:
+            NoParentExtension: If the object is not associated with an extension.
+        """
+        if self._extension is None:
+            msg = self.__class__.__name__
+            raise NoParentExtension(msg)
+        return self._extension
+
+
+@dataclass
+class TypeDef(ExtensionObject):
     """Type definition in an :class:`Extension`.
 
 
@@ -94,14 +127,10 @@ class TypeDef:
     params: list[tys.TypeParam]
     #: The type bound of the type.
     bound: ExplicitBound | FromParamsBound
-    _extension: Extension | None = field(
-        default=None, init=False, repr=False, compare=False
-    )
 
     def to_serial(self) -> ext_s.TypeDef:
-        assert self._extension is not None, "Extension must be initialised."
         return ext_s.TypeDef(
-            extension=self._extension.name,
+            extension=self.get_extension().name,
             name=self.name,
             description=self.description,
             params=ser_it(self.params),
@@ -157,7 +186,7 @@ class OpDefSig:
 
 
 @dataclass
-class OpDef:
+class OpDef(ExtensionObject):
     """Operation definition in an :class:`Extension`."""
 
     #: The name of the operation.
@@ -170,14 +199,10 @@ class OpDef:
     misc: dict[str, Any] = field(default_factory=dict)
     #: Lowerings of the operation.
     lower_funcs: list[FixedHugr] = field(default_factory=list, repr=False)
-    _extension: Extension | None = field(
-        default=None, init=False, repr=False, compare=False
-    )
 
     def to_serial(self) -> ext_s.OpDef:
-        assert self._extension is not None, "Extension must be initialised."
         return ext_s.OpDef(
-            extension=self._extension.name,
+            extension=self.get_extension().name,
             name=self.name,
             description=self.description,
             misc=self.misc,
@@ -190,21 +215,17 @@ class OpDef:
 
 
 @dataclass
-class ExtensionValue:
+class ExtensionValue(ExtensionObject):
     """A value defined in an :class:`Extension`."""
 
     #: The name of the value.
     name: str
     #: Value payload.
     val: val.Value
-    _extension: Extension | None = field(
-        default=None, init=False, repr=False, compare=False
-    )
 
     def to_serial(self) -> ext_s.ExtensionValue:
-        assert self._extension is not None, "Extension must be initialised."
         return ext_s.ExtensionValue(
-            extension=self._extension.name,
+            extension=self.get_extension().name,
             name=self.name,
             typed_value=self.val.to_serial_root(),
         )
