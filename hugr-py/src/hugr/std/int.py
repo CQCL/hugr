@@ -13,9 +13,9 @@ from hugr.ops import AsExtOp, DataflowOp, ExtOp, RegisteredOp
 if TYPE_CHECKING:
     from hugr.ops import Command, ComWire
 
-TYPES_EXTENSION = ext.Extension("arithmetic.int.types", ext.Version(0, 1, 0))
+INT_TYPES_EXTENSION = ext.Extension("arithmetic.int.types", ext.Version(0, 1, 0))
 _INT_PARAM = tys.BoundedNatParam(7)
-INT_T_DEF = TYPES_EXTENSION.add_type_def(
+INT_T_DEF = INT_TYPES_EXTENSION.add_type_def(
     ext.TypeDef(
         name="int",
         description="Variable-width integer.",
@@ -65,10 +65,10 @@ class IntVal(val.ExtensionValue):
         return val.Extension("int", int_t(self.width), self.v)
 
 
-OPS_EXTENSION = ext.Extension("arithmetic.int", ext.Version(0, 1, 0))
+INT_OPS_EXTENSION = ext.Extension("arithmetic.int", ext.Version(0, 1, 0))
 
 
-@OPS_EXTENSION.register_op(
+@INT_OPS_EXTENSION.register_op(
     signature=ext.OpDefSig(
         tys.FunctionType([_int_tv(0), _int_tv(1)], [_int_tv(0), _int_tv(1)])
     ),

@@ -8,7 +8,7 @@ from hugr.hugr import Hugr
 from hugr.node_port import Node
 from hugr.ops import AsExtOp, Custom, ExtOp
 from hugr.std.float import EXTENSION as FLOAT_EXT
-from hugr.std.int import OPS_EXTENSION, TYPES_EXTENSION, DivMod
+from hugr.std.int import INT_OPS_EXTENSION, INT_TYPES_EXTENSION, DivMod
 from hugr.std.logic import EXTENSION as LOGIC_EXT
 from hugr.std.logic import Not
 
@@ -93,8 +93,8 @@ def registry() -> ext.ExtensionRegistry:
     reg.add_extension(LOGIC_EXT)
     reg.add_extension(QUANTUM_EXT)
     reg.add_extension(STRINGLY_EXT)
-    reg.add_extension(TYPES_EXTENSION)
-    reg.add_extension(OPS_EXTENSION)
+    reg.add_extension(INT_TYPES_EXTENSION)
+    reg.add_extension(INT_OPS_EXTENSION)
     reg.add_extension(FLOAT_EXT)
 
     return reg
