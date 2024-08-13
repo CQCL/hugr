@@ -289,7 +289,7 @@ class AsExtOp(DataflowOp, Protocol):
 
 @dataclass(frozen=True, eq=False)
 class Custom(DataflowOp):
-    """Serialisable version of non-core dataflow operation defined in an extension."""
+    """Serializable version of non-core dataflow operation defined in an extension."""
 
     name: str
     signature: tys.FunctionType = field(default_factory=tys.FunctionType.empty)
@@ -321,7 +321,7 @@ class Custom(DataflowOp):
     def resolve(self, registry: ext.ExtensionRegistry) -> ExtOp | Custom:
         """Resolve the custom operation to an :class:`ExtOp`.
 
-        If extension or operation is not, returns itself.
+        If extension or operation is not found, returns itself.
         """
         from hugr.ext import ExtensionRegistry, Extension  # noqa: I001 # no circular import
 

@@ -165,7 +165,7 @@ class OpDefSig:
 
     #: The polymorphic function type of the operation (type scheme).
     poly_func: tys.PolyFuncType | None
-    #: If no static type scheme known, flag indidcates a computation of the signature.
+    #: If no static type scheme known, flag indicates a computation of the signature.
     binary: bool
 
     def __init__(

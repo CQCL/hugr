@@ -18,7 +18,7 @@ _INT_PARAM = tys.BoundedNatParam(7)
 INT_T_DEF = TYPES_EXTENSION.add_type_def(
     ext.TypeDef(
         name="int",
-        description="Variable width integer.",
+        description="Variable-width integer.",
         bound=ext.ExplicitBound(tys.TypeBound.Copyable),
         params=[_INT_PARAM],
     )
