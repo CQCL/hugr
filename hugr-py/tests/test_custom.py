@@ -64,6 +64,11 @@ def test_stringly_typed():
     assert isinstance(new_h[n].op, Custom)
 
     registry = ext.ExtensionRegistry()
+    new_h.resolve_extensions(registry)
+
+    # doesn't resolve without extension
+    assert isinstance(new_h[n].op, Custom)
+
     registry.add_extension(STRINGLY_EXT)
     new_h.resolve_extensions(registry)
 

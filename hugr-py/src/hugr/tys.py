@@ -495,9 +495,17 @@ class Opaque(Type):
     def type_bound(self) -> TypeBound:
         return self.bound
 
-    def resolve(self, registry: ext.ExtensionRegistry) -> ExtType:
-        """Resolve the opaque type to an :class:`ExtType` using the given registry."""
-        type_def = registry.get_extension(self.extension).get_type(self.id)
+    def resolve(self, registry: ext.ExtensionRegistry) -> Type:
+        """Resolve the opaque type to an :class:`ExtType` using the given registry.
+
+        If the extension or type is not found, return the original type.
+        """
+        from hugr.ext import ExtensionRegistry, Extension  # noqa: I001 # no circular import
+
+        try:
+            type_def = registry.get_extension(self.extension).get_type(self.id)
+        except (ExtensionRegistry.ExtensionNotFound, Extension.TypeNotFound):
+            return self
 
         return ExtType(type_def, self.args)
 

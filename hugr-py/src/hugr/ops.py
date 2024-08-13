@@ -318,9 +318,20 @@ class Custom(DataflowOp):
         """Check if the operation matches the given extension and operation name."""
         return self.extension == extension and self.name == name
 
-    def resolve(self, registry: ext.ExtensionRegistry) -> ExtOp:
-        """Resolve the custom operation to an :class:`ExtOp`."""
-        op_def = registry.get_extension(self.extension).get_op(self.name)
+    def resolve(self, registry: ext.ExtensionRegistry) -> ExtOp | Custom:
+        """Resolve the custom operation to an :class:`ExtOp`.
+
+        If extension or operation is not, returns itself.
+        """
+        from hugr.ext import ExtensionRegistry, Extension  # noqa: I001 # no circular import
+
+        try:
+            op_def = registry.get_extension(self.extension).get_op(self.name)
+        except (
+            Extension.OperationNotFound,
+            ExtensionRegistry.ExtensionNotFound,
+        ):
+            return self
 
         signature = self.signature.resolve(registry)
         args = [arg.resolve(registry) for arg in self.args]
