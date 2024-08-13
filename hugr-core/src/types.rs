@@ -218,20 +218,19 @@ pub enum TypeEnum<RV: MaybeRV> {
     #[allow(missing_docs)]
     Extension(CustomType),
     #[allow(missing_docs)]
-    #[display(fmt = "Alias({})", "_0.name()")]
+    #[display("Alias({})", _0.name())]
     Alias(AliasDecl),
     #[allow(missing_docs)]
-    #[display(fmt = "Function({})", "_0")]
+    #[display("Function({_0})")]
     Function(Box<FuncValueType>),
     // Index into TypeParams, and cache of TypeBound (checked in validation)
     #[allow(missing_docs)]
-    #[display(fmt = "Variable({})", _0)]
+    #[display("Variable({_0})")]
     Variable(usize, TypeBound),
     /// RowVariable. Of course, this requires that `RV` has instances, [NoRV] doesn't.
-    #[display(fmt = "RowVar({})", _0)]
+    #[display("RowVar({_0})")]
     RowVar(RV),
     #[allow(missing_docs)]
-    #[display(fmt = "{}", "_0")]
     Sum(SumType),
 }
 
@@ -255,7 +254,7 @@ impl<RV: MaybeRV> TypeEnum<RV> {
 }
 
 #[derive(Clone, Debug, Eq, Hash, derive_more::Display, serde::Serialize, serde::Deserialize)]
-#[display(fmt = "{}", "_0")]
+#[display("{_0}")]
 #[serde(
     into = "serialize::SerSimpleType",
     try_from = "serialize::SerSimpleType"
