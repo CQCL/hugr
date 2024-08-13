@@ -70,7 +70,7 @@ class ExtensionValue(ConfiguredBaseModel):
         return extension.add_extension_value(
             ext.ExtensionValue(
                 name=self.name,
-                typed_value=self.typed_value.deserialize(),
+                val=self.typed_value.deserialize(),
             )
         )
 
