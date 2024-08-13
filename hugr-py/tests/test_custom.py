@@ -8,7 +8,8 @@ from hugr.hugr import Hugr
 from hugr.node_port import Node
 from hugr.ops import AsExtOp, Custom, ExtOp
 from hugr.std.float import EXTENSION as FLOAT_EXT
-from hugr.std.int import INT_OPS_EXTENSION, INT_TYPES_EXTENSION, DivMod
+from hugr.std.float import FLOAT_T
+from hugr.std.int import INT_OPS_EXTENSION, INT_TYPES_EXTENSION, DivMod, int_t
 from hugr.std.logic import EXTENSION as LOGIC_EXT
 from hugr.std.logic import Not
 
@@ -104,7 +105,7 @@ def registry() -> ext.ExtensionRegistry:
     "as_ext",
     [Not, DivMod, H, CX, Measure, Rz, StringlyOp("hello")],
 )
-def test_custom(as_ext: AsExtOp, registry: ext.ExtensionRegistry):
+def test_custom_op(as_ext: AsExtOp, registry: ext.ExtensionRegistry):
     ext_op = as_ext.ext_op
 
     assert ExtOp.from_ext(ext_op) == ext_op
@@ -133,3 +134,21 @@ def test_custom_bad_eq():
     )
 
     assert Not != bad_custom_args
+
+
+@pytest.mark.parametrize(
+    "ext_t",
+    [FLOAT_T, int_t(5)],
+)
+def test_custom_type(ext_t: tys.ExtType, registry: ext.ExtensionRegistry):
+    opaque = ext_t.to_serial().deserialize()
+    assert isinstance(opaque, tys.Opaque)
+    assert opaque.resolve(registry) == ext_t
+
+    assert opaque.resolve(ext.ExtensionRegistry()) == opaque
+
+    f_t = tys.FunctionType.endo([ext_t])
+    f_t_opaque = f_t.to_serial().deserialize()
+    assert isinstance(f_t_opaque.input[0], tys.Opaque)
+
+    assert f_t_opaque.resolve(registry) == f_t
