@@ -237,15 +237,18 @@ class Sum(Type):
     def __repr__(self) -> str:
         return f"Sum({self.variant_rows})"
 
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, Sum) and self.variant_rows == other.variant_rows
+
     def type_bound(self) -> TypeBound:
         return TypeBound.join(*(t.type_bound() for r in self.variant_rows for t in r))
 
 
-@dataclass()
+@dataclass(eq=False)
 class UnitSum(Sum):
     """Simple :class:`Sum` type with `size` variants of empty rows."""
 
-    size: int
+    size: int = field(compare=False)
 
     def __init__(self, size: int):
         self.size = size
@@ -262,7 +265,7 @@ class UnitSum(Sum):
         return f"UnitSum({self.size})"
 
 
-@dataclass()
+@dataclass(eq=False)
 class Tuple(Sum):
     """Product type with `tys` elements. Instances of this type correspond to
     :class:`Sum` with a single variant.
