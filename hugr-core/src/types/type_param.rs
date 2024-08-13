@@ -4,7 +4,6 @@
 //!
 //! [`TypeDef`]: crate::extension::TypeDef
 
-use itertools::Itertools;
 #[cfg(test)]
 use proptest_derive::Arbitrary;
 use std::num::NonZeroU64;
@@ -21,7 +20,7 @@ use crate::extension::SignatureError;
 #[derive(
     Clone, Debug, PartialEq, Eq, Hash, derive_more::Display, serde::Deserialize, serde::Serialize,
 )]
-#[display(fmt = "{}", "_0.map(|i|i.to_string()).unwrap_or(\"-\".to_string())")]
+#[display("{}", "_0.map(|i|i.to_string()).unwrap_or(\"-\".to_string())")]
 #[cfg_attr(test, derive(Arbitrary))]
 pub struct UpperBound(Option<NonZeroU64>);
 impl UpperBound {
@@ -76,7 +75,7 @@ pub enum TypeParam {
         param: Box<TypeParam>,
     },
     /// Argument is a [TypeArg::Sequence]. A tuple of parameters.
-    #[display(fmt = "Tuple({})", "params.iter().map(|t|t.to_string()).join(\", \")")]
+    #[display("Tuple({})", "params.iter().map(|t|t.to_string()).join(\", \")")]
     Tuple {
         /// The [TypeParam]s contained in the tuple.
         params: Vec<TypeParam>,
