@@ -1,6 +1,7 @@
 """Dfg builder that allows tracking a set of wires and appending operations by index."""
 
 from collections.abc import Iterable
+from typing import Any
 
 from hugr import tys
 from hugr.dfg import Dfg
@@ -123,7 +124,7 @@ class TrackedDfg(Dfg):
             raise IndexError(msg)
         return tracked
 
-    def add(self, com: Command) -> Node:
+    def add(self, com: Command, *, metadata: dict[str, Any] | None = None) -> Node:
         """Add a command to the DFG.
 
         Overrides :meth:`Dfg.add <hugr.dfg.Dfg.add>` to allow Command inputs
@@ -138,6 +139,7 @@ class TrackedDfg(Dfg):
 
         Args:
             com: Command to append.
+            metadata: Metadata to attach to the function definition. Defaults to None.
 
         Returns:
             The new node.

@@ -6,6 +6,7 @@ from contextlib import AbstractContextManager
 from dataclasses import dataclass, field, replace
 from typing import (
     TYPE_CHECKING,
+    Any,
     Generic,
     TypeVar,
 )
@@ -170,12 +171,15 @@ class _DfBase(ParentBuilder[DP], _DefinitionBuilder, AbstractContextManager):
         """
         return [self.input_node.out(i) for i in range(len(self._input_op().types))]
 
-    def add_op(self, op: ops.DataflowOp, /, *args: Wire) -> Node:
+    def add_op(
+        self, op: ops.DataflowOp, /, *args: Wire, metadata: dict[str, Any] | None = None
+    ) -> Node:
         """Add a dataflow operation to the graph, wiring in input ports.
 
         Args:
             op: The operation to add.
             args: The input wires to the operation.
+            metadata: Metadata to attach to the function definition. Defaults to None.
 
         Returns:
             The node holding the new operation.
@@ -185,17 +189,18 @@ class _DfBase(ParentBuilder[DP], _DefinitionBuilder, AbstractContextManager):
             >>> dfg.add_op(ops.Noop(), dfg.inputs()[0])
             Node(3)
         """
-        new_n = self.hugr.add_node(op, self.parent_node)
+        new_n = self.hugr.add_node(op, self.parent_node, metadata=metadata)
         self._wire_up(new_n, args)
 
         return replace(new_n, _num_out_ports=op.num_out)
 
-    def add(self, com: ops.Command) -> Node:
+    def add(self, com: ops.Command, *, metadata: dict[str, Any] | None = None) -> Node:
         """Add a command (holding a dataflow operation and the incoming wires)
         to the graph.
 
         Args:
             com: The command to add.
+            metadata: Metadata to attach to the function definition. Defaults to None.
 
         Example:
             >>> dfg = Dfg(tys.Bool)
@@ -212,7 +217,7 @@ class _DfBase(ParentBuilder[DP], _DefinitionBuilder, AbstractContextManager):
         wires = (
             (w if not isinstance(w, int) else raise_no_ints()) for w in com.incoming
         )
-        return self.add_op(com.op, *wires)
+        return self.add_op(com.op, *wires, metadata=metadata)
 
     def extend(self, *coms: ops.Command) -> list[Node]:
         """Add a series of commands to the DFG.
