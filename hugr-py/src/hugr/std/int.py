@@ -62,7 +62,14 @@ class IntVal(val.ExtensionValue):
     width: int = field(default=5)
 
     def to_value(self) -> val.Extension:
-        return val.Extension("int", int_t(self.width), self.v)
+        name = "ConstInt"
+        payload = {"log_width": self.width, "value": self.v}
+        return val.Extension(
+            name,
+            typ=int_t(self.width),
+            val=payload,
+            extensions=[INT_TYPES_EXTENSION.name],
+        )
 
 
 INT_OPS_EXTENSION = ext.Extension("arithmetic.int", ext.Version(0, 1, 0))

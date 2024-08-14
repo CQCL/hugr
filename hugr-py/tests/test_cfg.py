@@ -68,7 +68,7 @@ def test_dom_edge() -> None:
 
 
 def test_asymm_types() -> None:
-    # test different types going to entry block's susccessors
+    # test different types going to entry block's successors
     with Cfg() as cfg:
         with cfg.add_entry() as entry:
             int_load = entry.load(IntVal(34))
