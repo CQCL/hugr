@@ -336,6 +336,7 @@ class Custom(DataflowOp):
         signature = self.signature.resolve(registry)
         args = [arg.resolve(registry) for arg in self.args]
         # TODO check signature matches op_def reported signature
+        # if/once op_def can compute signature from type scheme + args
         return ExtOp(op_def, signature, args)
 
 

@@ -431,7 +431,6 @@ class ExtensionRegistry:
         """
         if extension.name in self.extensions:
             raise self.ExtensionExists(extension.name)
-        # TODO version updates
         self.extensions[extension.name] = extension
         return self.extensions[extension.name]
 
