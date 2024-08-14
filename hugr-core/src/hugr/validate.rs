@@ -578,7 +578,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         match op_type {
             OpType::ExtensionOp(ext_op) => validate_ext(ext_op)?,
             OpType::OpaqueOp(opaque) => {
-                // ry to resolve serialized names to actual OpDefs in Extensions.
+                // Try to resolve serialized names to actual OpDefs in Extensions.
                 if let Some(ext_op) = resolve_opaque_op(node, opaque, self.extension_registry)? {
                     validate_ext(&ext_op)?;
                 } else {
