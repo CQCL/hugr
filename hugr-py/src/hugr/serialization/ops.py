@@ -112,7 +112,12 @@ class ExtensionValue(BaseValue):
     value: CustomConst
 
     def deserialize(self) -> val.Value:
-        return val.Extension(self.value.c, self.typ.deserialize(), self.value.v)
+        return val.Extension(
+            name=self.value.c,
+            typ=self.typ.deserialize(),
+            val=self.value.v,
+            extensions=self.extensions,
+        )
 
 
 class FunctionValue(BaseValue):

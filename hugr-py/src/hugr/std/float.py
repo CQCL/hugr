@@ -27,4 +27,8 @@ class FloatVal(val.ExtensionValue):
     v: float
 
     def to_value(self) -> val.Extension:
-        return val.Extension("float", FLOAT_T, self.v)
+        name = "ConstF64"
+        payload = {"value": self.v}
+        return val.Extension(
+            name, typ=FLOAT_T, val=payload, extensions=[EXTENSION.name]
+        )

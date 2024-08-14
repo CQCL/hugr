@@ -136,8 +136,10 @@ def validate(h: Hugr, roundtrip: bool = True):
     _run_hugr_cmd(serial, cmd)
 
     if roundtrip:
-        h2 = Hugr.from_serial(SerialHugr.load_json(json.loads(serial)))
-        assert serial == h2.to_serial().to_json()
+        starting_json = json.loads(serial)
+        h2 = Hugr.from_serial(SerialHugr.load_json(starting_json))
+        roundtrip_json = json.loads(h2.to_serial().to_json())
+        assert roundtrip_json == starting_json
 
 
 def _run_hugr_cmd(serial: str, cmd: list[str]):
