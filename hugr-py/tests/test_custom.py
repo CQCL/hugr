@@ -136,9 +136,21 @@ def test_custom_bad_eq():
     assert Not != bad_custom_args
 
 
+_LIST_T = STRINGLY_EXT.add_type_def(
+    ext.TypeDef(
+        "List",
+        description="A list of elements.",
+        params=[tys.TypeTypeParam(tys.TypeBound.Any)],
+        bound=ext.FromParamsBound([0]),
+    )
+)
+
+_BOOL_LIST_T = _LIST_T.instantiate([tys.Bool.type_arg()])
+
+
 @pytest.mark.parametrize(
     "ext_t",
-    [FLOAT_T, int_t(5)],
+    [FLOAT_T, int_t(5), _BOOL_LIST_T],
 )
 def test_custom_type(ext_t: tys.ExtType, registry: ext.ExtensionRegistry):
     opaque = ext_t.to_serial().deserialize()
