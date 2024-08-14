@@ -452,13 +452,9 @@ mod test {
                 .is_none(),
             "type arguments invalid"
         );
-        let custom_op: CustomOp = o.clone().to_extension_op().unwrap().into();
+        let custom_op: CustomOp = o.clone().to_extension_op().unwrap();
 
         assert_eq!(ConcreteIntOp::from_op(&custom_op).unwrap(), o);
         assert_eq!(IntOpDef::from_op(&custom_op).unwrap(), IntOpDef::itobool);
-        assert_eq!(
-            IntOpDef::from_op(&custom_op.into_opaque().into()).unwrap(),
-            IntOpDef::itobool
-        );
     }
 }

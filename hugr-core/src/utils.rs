@@ -184,7 +184,6 @@ pub(crate) mod test_quantum_extension {
         EXTENSION
             .instantiate_extension_op(gate_name, [], &REG)
             .unwrap()
-            .into()
     }
     pub(crate) fn h_gate() -> CustomOp {
         get_gate("H")

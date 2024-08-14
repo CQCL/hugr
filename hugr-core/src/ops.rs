@@ -21,7 +21,7 @@ use enum_dispatch::enum_dispatch;
 
 pub use constant::{Const, Value};
 pub use controlflow::{BasicBlock, Case, Conditional, DataflowBlock, ExitBlock, TailLoop, CFG};
-pub use custom::CustomOp;
+pub use custom::{CustomOp, OpaqueOp};
 pub use dataflow::{
     Call, CallIndirect, DataflowOpTrait, DataflowParent, Input, LoadConstant, LoadFunction, Output,
     DFG,
@@ -53,7 +53,9 @@ pub enum OpType {
     LoadConstant,
     LoadFunction,
     DFG,
+    #[serde(skip_deserializing, rename = "OpaqueOp")]
     CustomOp,
+    OpaqueOp,
     Noop,
     MakeTuple,
     UnpackTuple,
@@ -428,6 +430,7 @@ impl OpParent for CallIndirect {}
 impl OpParent for LoadConstant {}
 impl OpParent for LoadFunction {}
 impl OpParent for CustomOp {}
+impl OpParent for OpaqueOp {}
 impl OpParent for Noop {}
 impl OpParent for MakeTuple {}
 impl OpParent for UnpackTuple {}

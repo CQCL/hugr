@@ -248,7 +248,7 @@ pub(crate) mod test {
             PtrOp::new(PtrOpDef::Write, INT_TYPES[5].clone()),
         ];
         for op in ops {
-            let op_t: CustomOp = op.clone().to_extension_op().unwrap().into();
+            let op_t: CustomOp = op.clone().to_extension_op().unwrap();
             let def_op = PtrOpDef::from_op(&op_t).unwrap();
             assert_eq!(op.def, def_op);
             let new_op = PtrOp::from_op(&op_t).unwrap();

@@ -202,7 +202,14 @@ pub fn check_hugr(lhs: &Hugr, rhs: &Hugr) {
         let new_op = rhs.get_optype(node);
         let old_op = h_canon.get_optype(node);
         if !new_op.is_const() {
-            assert_eq!(new_op, old_op);
+            match (new_op, old_op) {
+                (OpType::CustomOp(ext), OpType::OpaqueOp(opaque))
+                | (OpType::OpaqueOp(opaque), OpType::CustomOp(ext)) => {
+                    let ext_opaque: OpaqueOp = ext.clone().into();
+                    assert_eq!(ext_opaque, opaque.clone());
+                }
+                _ => assert_eq!(new_op, old_op),
+            }
         }
     }
 
@@ -533,7 +540,7 @@ fn std_extensions_valid() {
 mod proptest {
     use super::check_testing_roundtrip;
     use super::{NodeSer, SimpleOpDef};
-    use crate::ops::{OpType, Value};
+    use crate::ops::{OpType, OpaqueOp, Value};
     use crate::types::{PolyFuncTypeRV, Type};
     use proptest::prelude::*;
 
@@ -545,7 +552,17 @@ mod proptest {
                 (0..i32::MAX as usize).prop_map(|x| portgraph::NodeIndex::new(x).into()),
                 any::<OpType>(),
             )
-                .prop_map(|(parent, op)| NodeSer { parent, op })
+                .prop_map(|(parent, op)| {
+                    if let OpType::CustomOp(ext_op) = op {
+                        let opaque: OpaqueOp = ext_op.into();
+                        NodeSer {
+                            parent,
+                            op: opaque.into(),
+                        }
+                    } else {
+                        NodeSer { parent, op }
+                    }
+                })
                 .boxed()
         }
     }

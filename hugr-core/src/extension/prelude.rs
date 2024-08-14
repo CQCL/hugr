@@ -211,7 +211,6 @@ pub fn new_array_op(element_ty: Type, size: u64) -> CustomOp {
             &PRELUDE_REGISTRY,
         )
         .unwrap()
-        .into()
 }
 
 /// Name of the string type.

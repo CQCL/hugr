@@ -506,7 +506,7 @@ class CustomOp(DataflowOp):
     it.
     """
 
-    op: Literal["CustomOp"] = "CustomOp"
+    op: Literal["OpaqueOp"] = "OpaqueOp"
     extension: ExtensionId
     name: str
     signature: stys.FunctionType = Field(default_factory=stys.FunctionType.empty)
