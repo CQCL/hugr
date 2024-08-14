@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.7.0](https://github.com/CQCL/hugr/compare/hugr-py-v0.6.0...hugr-py-v0.7.0) (2024-08-14)
+
+
+### ⚠ BREAKING CHANGES
+
+* **hugr-py:** `AsCustomOp` replaced with `AsExtOp`, so all such operations now need to be attached to an extension.
+
+### Features
+
+* **hugr-py:** user facing Extension class ([#1413](https://github.com/CQCL/hugr/issues/1413)) ([c6473c9](https://github.com/CQCL/hugr/commit/c6473c9de27f7371798c8fbb27d193329d3210f2))
+* **py:** Add node metadata ([#1428](https://github.com/CQCL/hugr/issues/1428)) ([b229be6](https://github.com/CQCL/hugr/commit/b229be6b8f709d28c5b57c380db03cd21598c3c1)), closes [#1319](https://github.com/CQCL/hugr/issues/1319)
+
+
+### Bug Fixes
+
+* Equality check between `Sum` types ([#1422](https://github.com/CQCL/hugr/issues/1422)) ([8dfea09](https://github.com/CQCL/hugr/commit/8dfea09c61d9e4e0d85c8f9829e85db7285d99c1))
+* **py:** Invalid serialization of float and int constants ([#1427](https://github.com/CQCL/hugr/issues/1427)) ([b89c08f](https://github.com/CQCL/hugr/commit/b89c08f597019dae30f415787f7054c1a79bcefa))
+
 ## [0.6.0](https://github.com/CQCL/hugr/compare/hugr-py-v0.5.0...hugr-py-v0.6.0) (2024-08-12)
 
 
