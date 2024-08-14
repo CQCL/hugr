@@ -310,6 +310,9 @@ pub enum OpaqueOpError {
         #[source]
         cause: SignatureError,
     },
+    /// Unresolved operation encountered during validation.
+    #[error("Unexpected unresolved opaque operation '{1}' in {0}, from Extension {2}.")]
+    UnresolvedOp(Node, OpName, ExtensionId),
 }
 
 #[cfg(test)]

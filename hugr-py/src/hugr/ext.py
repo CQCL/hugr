@@ -470,3 +470,6 @@ class Package:
             modules=[m.to_serial() for m in self.modules],
             extensions=[e.to_serial() for e in self.extensions],
         )
+
+    def to_json(self) -> str:
+        return self.to_serial().model_dump_json()

@@ -158,6 +158,13 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
     fn validate_node(&self, node: Node) -> Result<(), ValidationError> {
         let op_type = self.hugr.get_optype(node);
 
+        if let OpType::OpaqueOp(opaque) = op_type {
+            Err(OpaqueOpError::UnresolvedOp(
+                node,
+                opaque.op_name().clone(),
+                opaque.extension().clone(),
+            ))?;
+        }
         // The Hugr can have only one root node.
         if node == self.hugr.root() {
             // The root node has no edges.

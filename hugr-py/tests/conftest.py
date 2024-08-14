@@ -19,8 +19,8 @@ from hugr.std.float import FLOAT_T
 if TYPE_CHECKING:
     from hugr.ops import ComWire
 
-EXTENSION = ext.Extension("pytest.quantum,", ext.Version(0, 1, 0))
-EXTENSION.add_op_def(
+QUANTUM_EXT = ext.Extension("pytest.quantum,", ext.Version(0, 1, 0))
+QUANTUM_EXT.add_op_def(
     ext.OpDef(
         name="H",
         description="Hadamard gate",
@@ -28,7 +28,7 @@ EXTENSION.add_op_def(
     )
 )
 
-EXTENSION.add_op_def(
+QUANTUM_EXT.add_op_def(
     ext.OpDef(
         name="CX",
         description="CNOT gate",
@@ -43,7 +43,7 @@ E = TypeVar("E", bound=Enum)
 def _load_enum(enum_cls: type[E], custom: ExtOp) -> E | None:
     ext = custom._op_def._extension
     assert ext is not None
-    if ext.name == EXTENSION.name and custom._op_def.name in enum_cls.__members__:
+    if ext.name == QUANTUM_EXT.name and custom._op_def.name in enum_cls.__members__:
         return enum_cls(custom._op_def.name)
     return None
 
@@ -60,7 +60,7 @@ class OneQbGate(AsExtOp):
         return DataflowOp.__call__(self, q)
 
     def op_def(self) -> ext.OpDef:
-        return EXTENSION.operations[self._enum.value]
+        return QUANTUM_EXT.operations[self._enum.value]
 
     @classmethod
     def from_ext(cls, custom: ExtOp) -> Self | None:
@@ -78,7 +78,7 @@ class TwoQbGate(AsExtOp):
     _enum: _Enum
 
     def op_def(self) -> ext.OpDef:
-        return EXTENSION.operations[self._enum.value]
+        return QUANTUM_EXT.operations[self._enum.value]
 
     @classmethod
     def from_ext(cls, custom: ExtOp) -> Self | None:
@@ -91,7 +91,7 @@ class TwoQbGate(AsExtOp):
 CX = TwoQbGate(TwoQbGate._Enum.CX)
 
 
-@EXTENSION.register_op(
+@QUANTUM_EXT.register_op(
     "Measure",
     signature=tys.FunctionType([tys.Qubit], [tys.Qubit, tys.Bool]),
 )
@@ -104,7 +104,7 @@ class MeasureDef(RegisteredOp):
 Measure = MeasureDef()
 
 
-@EXTENSION.register_op(
+@QUANTUM_EXT.register_op(
     "Rz",
     signature=tys.FunctionType([tys.Qubit, FLOAT_T], [tys.Qubit]),
 )
@@ -130,12 +130,17 @@ def mermaid(h: Hugr):
     _run_hugr_cmd(h.to_serial().to_json(), cmd)
 
 
-def validate(h: Hugr, roundtrip: bool = True):
+def validate(h: Hugr | ext.Package, roundtrip: bool = True):
     cmd = [*_base_command(), "validate", "-"]
-    serial = h.to_serial().to_json()
+    serial = h.to_json()
     _run_hugr_cmd(serial, cmd)
 
-    if roundtrip:
+    if not roundtrip:
+        return
+    hugrs = [h] if isinstance(h, Hugr) else h.modules
+    for h in hugrs:
+        serial = h.to_json()
+
         starting_json = json.loads(serial)
         h2 = Hugr.from_serial(SerialHugr.load_json(starting_json))
         roundtrip_json = json.loads(h2.to_serial().to_json())

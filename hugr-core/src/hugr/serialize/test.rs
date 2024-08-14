@@ -7,7 +7,8 @@ use crate::extension::prelude::{BOOL_T, PRELUDE_ID, QB_T, USIZE_T};
 use crate::extension::simple_op::MakeRegisteredOp;
 use crate::extension::{test::SimpleOpDef, ExtensionSet, EMPTY_REG, PRELUDE_REGISTRY};
 use crate::hugr::internal::HugrMutInternals;
-use crate::ops::custom::{ExtensionOp, OpaqueOp};
+use crate::hugr::validate::ValidationError;
+use crate::ops::custom::{ExtensionOp, OpaqueOp, OpaqueOpError};
 use crate::ops::{self, dataflow::IOTrait, Input, Module, Noop, Output, Value, DFG};
 use crate::std_extensions::arithmetic::float_types::FLOAT64_TYPE;
 use crate::std_extensions::arithmetic::int_ops::INT_OPS_REGISTRY;
@@ -339,6 +340,25 @@ fn dfg_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[test]
+fn extension_ops() -> Result<(), Box<dyn std::error::Error>> {
+    let tp: Vec<Type> = vec![BOOL_T; 1];
+    let mut dfg = DFGBuilder::new(endo_sig(tp))?;
+    let [wire] = dfg.input_wires_arr();
+
+    // Add an extension operation
+    let extension_op: ExtensionOp = NotOp.to_extension_op().unwrap();
+    let wire = dfg
+        .add_dataflow_op(extension_op.clone(), [wire])
+        .unwrap()
+        .out_wire(0);
+
+    let hugr = dfg.finish_hugr_with_outputs([wire], &PRELUDE_REGISTRY)?;
+
+    check_hugr_roundtrip(&hugr, true);
+    Ok(())
+}
+
+#[test]
 fn opaque_ops() -> Result<(), Box<dyn std::error::Error>> {
     let tp: Vec<Type> = vec![BOOL_T; 1];
     let mut dfg = DFGBuilder::new(endo_sig(tp))?;
@@ -353,11 +373,19 @@ fn opaque_ops() -> Result<(), Box<dyn std::error::Error>> {
 
     // Add an unresolved opaque operation
     let opaque_op: OpaqueOp = extension_op.into();
+    let ext_name = opaque_op.extension().clone();
     let wire = dfg.add_dataflow_op(opaque_op, [wire]).unwrap().out_wire(0);
 
-    let hugr = dfg.finish_hugr_with_outputs([wire], &PRELUDE_REGISTRY)?;
+    assert_eq!(
+        dfg.finish_hugr_with_outputs([wire], &PRELUDE_REGISTRY),
+        Err(ValidationError::OpaqueOpError(OpaqueOpError::UnresolvedOp(
+            wire.node(),
+            "Not".into(),
+            ext_name
+        ))
+        .into())
+    );
 
-    check_hugr_roundtrip(&hugr, true);
     Ok(())
 }
 
