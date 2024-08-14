@@ -56,7 +56,7 @@
     },
     {
       "parent": 0,
-      "op": "OpaqueOp",
+      "op": "Extension",
       "extension": "logic",
       "name": "And",
       "description": "logical 'and'",
