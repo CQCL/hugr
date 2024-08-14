@@ -69,14 +69,15 @@ def test_simple_id():
     validate(simple_id().hugr)
 
 
-def test_json_roundtrip():
-    hugr = simple_id().hugr
-    json = hugr.to_json()
+def test_metadata():
+    h = Dfg(tys.Bool)
+    h.metadata["name"] = "simple_id"
 
-    hugr2 = Hugr.load_json(json)
-    json2 = hugr2.to_json()
+    (b,) = h.inputs()
+    b = h.add_op(Not, b, metadata={"name": "not"})
 
-    assert json2 == json
+    h.set_outputs(b)
+    validate(h.hugr)
 
 
 def test_multiport():

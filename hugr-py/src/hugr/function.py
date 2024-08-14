@@ -57,3 +57,8 @@ class Module(_DefinitionBuilder[ops.Module]):
     def add_alias_decl(self, name: str, bound: TypeBound) -> Node:
         """Add a type alias declaration."""
         return self.hugr.add_node(ops.AliasDecl(name, bound), self.hugr.root)
+
+    @property
+    def metadata(self) -> dict[str, object]:
+        """Metadata associated with this module."""
+        return self.hugr.root.metadata

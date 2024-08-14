@@ -141,6 +141,11 @@ class ToNode(Wire, Protocol):
         else:
             return self.out(offset)
 
+    @property
+    def metadata(self) -> dict[str, object]:
+        """Metadata associated with this node."""
+        return self.to_node()._metadata
+
 
 @dataclass(frozen=True, eq=True, order=True)
 class Node(ToNode):
@@ -149,7 +154,10 @@ class Node(ToNode):
     """
 
     idx: NodeIdx
-    _num_out_ports: int | None = field(default=None, compare=False)
+    _metadata: dict[str, object] = field(
+        repr=False, compare=False, default_factory=dict
+    )
+    _num_out_ports: int | None = field(default=None, compare=False, repr=False)
 
     def _index(
         self, index: PortOffset | slice | tuple[PortOffset, ...]

@@ -7,6 +7,7 @@ from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass, field, replace
 from typing import (
     TYPE_CHECKING,
+    Any,
     Generic,
     Protocol,
     TypeVar,
@@ -49,6 +50,7 @@ class NodeData:
     _num_inps: int = field(default=0, repr=False)
     _num_outs: int = field(default=0, repr=False)
     children: list[Node] = field(default_factory=list, repr=False)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_serial(self, node: Node) -> SerialOp:
         o = self.op.to_serial(self.parent if self.parent else node)
@@ -123,7 +125,11 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
         return n
 
     def __iter__(self) -> Iterator[Node]:
-        return (Node(idx) for idx, data in enumerate(self._nodes) if data is not None)
+        return (
+            Node(idx, data.metadata)
+            for idx, data in enumerate(self._nodes)
+            if data is not None
+        )
 
     def __len__(self) -> int:
         return self.num_nodes()
@@ -160,17 +166,18 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
         op: Op,
         parent: ToNode | None = None,
         num_outs: int | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> Node:
         parent = parent.to_node() if parent else None
-        node_data = NodeData(op, parent)
+        node_data = NodeData(op, parent, metadata=metadata or {})
 
         if self._free_nodes:
             node = self._free_nodes.pop()
             self._nodes[node.idx] = node_data
         else:
-            node = Node(len(self._nodes))
+            node = Node(len(self._nodes), {})
             self._nodes.append(node_data)
-        node = replace(node, _num_out_ports=num_outs)
+        node = replace(node, _num_out_ports=num_outs, _metadata=node_data.metadata)
         if parent:
             self[parent].children.append(node)
         return node
@@ -194,6 +201,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
         op: Op,
         parent: ToNode | None = None,
         num_outs: int | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> Node:
         """Add a node to the HUGR.
 
@@ -201,19 +209,28 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
             op: Operation of the node.
             parent: Parent node of added node. Defaults to HUGR root if None.
             num_outs: Number of output ports expected for this node. Defaults to None.
+            metadata: A dictionary of metadata to associate with the node.
+                Defaults to None.
 
         Returns:
             Handle to the added node.
         """
         parent = parent or self.root
-        return self._add_node(op, parent, num_outs)
+        return self._add_node(op, parent, num_outs, metadata)
 
-    def add_const(self, value: Value, parent: ToNode | None = None) -> Node:
+    def add_const(
+        self,
+        value: Value,
+        parent: ToNode | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> Node:
         """Add a constant node to the HUGR.
 
         Args:
             value: Value of the constant.
             parent: Parent node of added node. Defaults to HUGR root if None.
+            metadata: A dictionary of metadata to associate with the node.
+                Defaults to None.
 
         Returns:
             Handle to the added node.
@@ -224,7 +241,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
             >>> h[n].op
             Const(TRUE)
         """
-        return self.add_node(Const(value), parent)
+        return self.add_node(Const(value), parent, metadata=metadata)
 
     def delete_node(self, node: ToNode) -> NodeData | None:
         """Delete a node from the HUGR.
@@ -254,6 +271,10 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
             self._links.delete_left(_SubPort(node.out(offset)))
 
         weight, self._nodes[node.idx] = self._nodes[node.idx], None
+
+        # Free up the metadata dictionary
+        node = replace(node, _metadata={})
+
         self._free_nodes.append(node)
         return weight
 
@@ -550,16 +571,18 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
         """
         mapping: dict[Node, Node] = {}
 
-        for idx, node_data in enumerate(hugr._nodes):
-            if node_data is not None:
-                # relies on parents being inserted before any children
-                try:
-                    node_parent = (
-                        mapping[node_data.parent] if node_data.parent else parent
-                    )
-                except KeyError as e:
-                    raise ParentBeforeChild from e
-                mapping[Node(idx)] = self.add_node(node_data.op, node_parent)
+        for node, node_data in hugr.nodes():
+            # relies on parents being inserted before any children
+            try:
+                node_parent = mapping[node_data.parent] if node_data.parent else parent
+            except KeyError as e:
+                raise ParentBeforeChild from e
+            mapping[node] = self.add_node(
+                node_data.op,
+                node_parent,
+                num_outs=node_data._num_outs,
+                metadata=node_data.metadata,
+            )
 
         for src, dst in hugr._links.items():
             self.add_link(
@@ -581,8 +604,9 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
 
         return SerialHugr(
             # non contiguous indices will be erased
-            nodes=[node.to_serial(Node(idx)) for idx, node in enumerate(node_it)],
+            nodes=[node.to_serial(Node(idx, {})) for idx, node in enumerate(node_it)],
             edges=[_serialize_link(link) for link in self._links.items()],
+            metadata=[node.metadata if node.metadata else None for node in node_it],
         )
 
     def _constrain_offset(self, p: P) -> PortOffset:
@@ -619,19 +643,32 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
         hugr._links = BiMap()
         hugr._free_nodes = []
         hugr.root = Node(0)
+
+        def get_meta(idx: int) -> dict[str, Any]:
+            if not serial.metadata:
+                return {}
+            if idx < len(serial.metadata):
+                return serial.metadata[idx] or {}
+            return {}
+
         for idx, serial_node in enumerate(serial.nodes):
+            node_meta = get_meta(idx)
             parent: Node | None = Node(serial_node.root.parent)
             if serial_node.root.parent == idx:
-                hugr.root = Node(idx)
+                hugr.root = Node(idx, _metadata=node_meta)
                 parent = None
+
             serial_node.root.parent = -1
-            hugr._nodes.append(NodeData(serial_node.root.deserialize(), parent))
+            hugr._nodes.append(
+                NodeData(serial_node.root.deserialize(), parent, metadata=node_meta)
+            )
 
         for (src_node, src_offset), (dst_node, dst_offset) in serial.edges:
             if src_offset is None or dst_offset is None:
                 continue
             hugr.add_link(
-                Node(src_node).out(src_offset), Node(dst_node).inp(dst_offset)
+                Node(src_node, _metadata=get_meta(src_node)).out(src_offset),
+                Node(dst_node, _metadata=get_meta(dst_node)).inp(dst_offset),
             )
 
         return hugr
