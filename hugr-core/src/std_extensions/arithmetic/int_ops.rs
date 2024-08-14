@@ -374,7 +374,7 @@ fn sum_ty_with_err(t: Type) -> Type {
 #[cfg(test)]
 mod test {
     use crate::{
-        ops::{dataflow::DataflowOpTrait, CustomOp},
+        ops::{dataflow::DataflowOpTrait, ExtensionOp},
         std_extensions::arithmetic::int_types::int_type,
         types::Signature,
     };
@@ -452,13 +452,9 @@ mod test {
                 .is_none(),
             "type arguments invalid"
         );
-        let custom_op: CustomOp = o.clone().to_extension_op().unwrap().into();
+        let ext_op: ExtensionOp = o.clone().to_extension_op().unwrap();
 
-        assert_eq!(ConcreteIntOp::from_op(&custom_op).unwrap(), o);
-        assert_eq!(IntOpDef::from_op(&custom_op).unwrap(), IntOpDef::itobool);
-        assert_eq!(
-            IntOpDef::from_op(&custom_op.into_opaque().into()).unwrap(),
-            IntOpDef::itobool
-        );
+        assert_eq!(ConcreteIntOp::from_op(&ext_op).unwrap(), o);
+        assert_eq!(IntOpDef::from_op(&ext_op).unwrap(), IntOpDef::itobool);
     }
 }

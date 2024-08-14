@@ -41,7 +41,7 @@
 //!             prelude::{BOOL_T, QB_T},
 //!             ExtensionId, ExtensionRegistry, PRELUDE, Version,
 //!         },
-//!         ops::{CustomOp, OpName},
+//!         ops::{ExtensionOp, OpName},
 //!         type_row,
 //!         types::{FuncValueType, PolyFuncTypeRV},
 //!         Extension,
@@ -88,21 +88,21 @@
 //!             ExtensionRegistry::try_new([EXTENSION.to_owned(), PRELUDE.to_owned()]).unwrap();
 //!
 //!     }
-//!     fn get_gate(gate_name: impl Into<OpName>) -> CustomOp {
+//!     fn get_gate(gate_name: impl Into<OpName>) -> ExtensionOp {
 //!         EXTENSION
 //!             .instantiate_extension_op(&gate_name.into(), [], &REG)
 //!             .unwrap()
 //!             .into()
 //!     }
-//!     pub fn h_gate() -> CustomOp {
+//!     pub fn h_gate() -> ExtensionOp {
 //!         get_gate("H")
 //!     }
 //!
-//!     pub fn cx_gate() -> CustomOp {
+//!     pub fn cx_gate() -> ExtensionOp {
 //!         get_gate("CX")
 //!     }
 //!
-//!     pub fn measure() -> CustomOp {
+//!     pub fn measure() -> ExtensionOp {
 //!         get_gate("Measure")
 //!     }
 //! }

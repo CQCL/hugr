@@ -454,7 +454,7 @@ mod test {
     use crate::hugr::internal::HugrMutInternals;
     use crate::hugr::rewrite::replace::WhichHugr;
     use crate::hugr::{HugrMut, Rewrite};
-    use crate::ops::custom::{CustomOp, OpaqueOp};
+    use crate::ops::custom::{ExtensionOp, OpaqueOp};
     use crate::ops::dataflow::DataflowOpTrait;
     use crate::ops::handle::{BasicBlockID, ConstID, NodeHandle};
     use crate::ops::{self, Case, DataflowBlock, OpTag, OpType, DFG};
@@ -477,14 +477,12 @@ mod test {
                 .instantiate([TypeArg::Type { ty: USIZE_T }])
                 .unwrap(),
         );
-        let pop: CustomOp = collections::EXTENSION
+        let pop: ExtensionOp = collections::EXTENSION
             .instantiate_extension_op("pop", [TypeArg::Type { ty: USIZE_T }], &reg)
-            .unwrap()
-            .into();
-        let push: CustomOp = collections::EXTENSION
+            .unwrap();
+        let push: ExtensionOp = collections::EXTENSION
             .instantiate_extension_op("push", [TypeArg::Type { ty: USIZE_T }], &reg)
-            .unwrap()
-            .into();
+            .unwrap();
         let just_list = TypeRow::from(vec![listy.clone()]);
         let intermed = TypeRow::from(vec![listy.clone(), USIZE_T]);
 
@@ -643,15 +641,7 @@ mod test {
     fn test_invalid() {
         let unknown_ext: ExtensionId = "unknown_ext".try_into().unwrap();
         let utou = Signature::new_endo(vec![USIZE_T]);
-        let mk_op = |s| {
-            CustomOp::new_opaque(OpaqueOp::new(
-                unknown_ext.clone(),
-                s,
-                String::new(),
-                vec![],
-                utou.clone(),
-            ))
-        };
+        let mk_op = |s| OpaqueOp::new(unknown_ext.clone(), s, String::new(), vec![], utou.clone());
         let mut h = DFGBuilder::new(
             Signature::new(type_row![USIZE_T, BOOL_T], type_row![USIZE_T])
                 .with_extension_delta(unknown_ext.clone()),

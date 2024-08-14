@@ -121,10 +121,7 @@ pub fn fold_leaf_op(op: &OpType, consts: &[(IncomingPort, Value)]) -> ConstFoldR
             SumType::new(t.variants.clone()),
         )
         .unwrap()]),
-        OpType::CustomOp(op) => {
-            let ext_op = op.as_extension_op()?;
-            ext_op.constant_fold(consts)
-        }
+        OpType::ExtensionOp(ext_op) => ext_op.constant_fold(consts),
         _ => None,
     };
     debug_assert!(fold_result.as_ref().map_or(true, |x| x.len()

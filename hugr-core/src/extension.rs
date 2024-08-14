@@ -234,7 +234,7 @@ impl CustomConcrete for OpaqueOp {
     type Identifier = OpName;
 
     fn def_name(&self) -> &OpName {
-        self.name()
+        self.op_name()
     }
 
     fn type_args(&self) -> &[TypeArg] {

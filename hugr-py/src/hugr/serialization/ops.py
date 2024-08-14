@@ -501,12 +501,12 @@ class CFG(DataflowOp):
 ControlFlowOp = Conditional | TailLoop | CFG
 
 
-class CustomOp(DataflowOp):
+class Extension(DataflowOp):
     """A user-defined operation that can be downcasted by the extensions that define
     it.
     """
 
-    op: Literal["CustomOp"] = "CustomOp"
+    op: Literal["Extension"] = "Extension"
     extension: ExtensionId
     name: str
     signature: stys.FunctionType = Field(default_factory=stys.FunctionType.empty)
@@ -649,7 +649,7 @@ class OpType(RootModel):
         | CallIndirect
         | LoadConstant
         | LoadFunction
-        | CustomOp
+        | Extension
         | Noop
         | MakeTuple
         | UnpackTuple

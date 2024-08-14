@@ -273,7 +273,7 @@ pub(crate) mod test {
             prelude::BOOL_T,
             simple_op::{HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp},
         },
-        ops::{CustomOp, NamedOp, Value},
+        ops::{NamedOp, Value},
         Extension,
     };
 
@@ -299,13 +299,8 @@ pub(crate) mod test {
         for def in [NaryLogic::And, NaryLogic::Or, NaryLogic::Eq] {
             let o = def.with_n_inputs(3);
             let ext_op = o.clone().to_extension_op().unwrap();
-            let custom_op: CustomOp = ext_op.into();
-            assert_eq!(NaryLogic::from_op(&custom_op).unwrap(), def);
-            assert_eq!(ConcreteLogicOp::from_op(&custom_op).unwrap(), o);
-            assert_eq!(
-                ConcreteLogicOp::from_op(&custom_op.into_opaque().into()).unwrap(),
-                o
-            );
+            assert_eq!(NaryLogic::from_op(&ext_op).unwrap(), def);
+            assert_eq!(ConcreteLogicOp::from_op(&ext_op).unwrap(), o);
         }
 
         NotOp::from_extension_op(&NotOp.to_extension_op().unwrap()).unwrap();

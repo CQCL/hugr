@@ -276,10 +276,10 @@ pub enum LowerFunc {
     FixedHugr {
         /// The extensions required by the [`Hugr`]
         extensions: ExtensionSet,
-        /// The [`Hugr`] to be used to replace [CustomOp]s matching the parent
+        /// The [`Hugr`] to be used to replace [ExtensionOp]s matching the parent
         /// [OpDef]
         ///
-        /// [CustomOp]: crate::ops::CustomOp
+        /// [ExtensionOp]: crate::ops::ExtensionOp
         hugr: Hugr,
     },
     /// Custom binary function that can (fallibly) compute a Hugr
@@ -495,7 +495,7 @@ pub(super) mod test {
     use crate::extension::prelude::USIZE_T;
     use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE};
     use crate::extension::{SignatureError, EMPTY_REG, PRELUDE_REGISTRY};
-    use crate::ops::{CustomOp, OpName};
+    use crate::ops::OpName;
     use crate::std_extensions::collections::{EXTENSION, LIST_TYPENAME};
     use crate::types::type_param::{TypeArgError, TypeParam};
     use crate::types::{PolyFuncTypeRV, Signature, Type, TypeArg, TypeBound, TypeRV};
@@ -615,10 +615,8 @@ pub(super) mod test {
             Type::new_extension(list_def.instantiate(vec![TypeArg::Type { ty: USIZE_T }])?);
         let mut dfg = DFGBuilder::new(endo_sig(vec![list_usize]))?;
         let rev = dfg.add_dataflow_op(
-            CustomOp::new_extension(
-                e.instantiate_extension_op(&OP_NAME, vec![TypeArg::Type { ty: USIZE_T }], &reg)
-                    .unwrap(),
-            ),
+            e.instantiate_extension_op(&OP_NAME, vec![TypeArg::Type { ty: USIZE_T }], &reg)
+                .unwrap(),
             dfg.input_wires(),
         )?;
         dfg.finish_hugr_with_outputs(rev.outputs(), &reg)?;

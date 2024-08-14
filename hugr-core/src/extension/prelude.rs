@@ -3,7 +3,7 @@
 use lazy_static::lazy_static;
 
 use crate::ops::constant::{CustomCheckFailure, ValueName};
-use crate::ops::{CustomOp, OpName};
+use crate::ops::{ExtensionOp, OpName};
 use crate::types::{FuncValueType, SumType, TypeName};
 use crate::{
     extension::{ExtensionId, TypeDefBound},
@@ -200,7 +200,7 @@ pub const NEW_ARRAY_OP_ID: OpName = OpName::new_inline("new_array");
 pub const PANIC_OP_ID: OpName = OpName::new_inline("panic");
 
 /// Initialize a new array op of element type `element_ty` of length `size`
-pub fn new_array_op(element_ty: Type, size: u64) -> CustomOp {
+pub fn new_array_op(element_ty: Type, size: u64) -> ExtensionOp {
     PRELUDE
         .instantiate_extension_op(
             &NEW_ARRAY_OP_ID,
@@ -211,7 +211,6 @@ pub fn new_array_op(element_ty: Type, size: u64) -> CustomOp {
             &PRELUDE_REGISTRY,
         )
         .unwrap()
-        .into()
 }
 
 /// Name of the string type.

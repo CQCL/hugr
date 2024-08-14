@@ -12,7 +12,7 @@ use thiserror::Error;
 use crate::extension::{ExtensionRegistry, SignatureError, TO_BE_INFERRED};
 
 use crate::ops::constant::ConstTypeError;
-use crate::ops::custom::{resolve_opaque_op, CustomOp, CustomOpError};
+use crate::ops::custom::{resolve_opaque_op, ExtensionOp, OpaqueOpError};
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::{FuncDefn, OpParent, OpTag, OpTrait, OpType, ValidateOp};
 use crate::types::type_param::TypeParam;
@@ -566,37 +566,26 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
     ) -> Result<(), ValidationError> {
         let op_type = self.hugr.get_optype(node);
         // The op_type must be defined only in terms of type variables defined outside the node
-        // TODO consider turning this match into a trait method?
+
+        let validate_ext = |ext_op: &ExtensionOp| -> Result<(), ValidationError> {
+            // Check TypeArgs are valid, and if we can, fit the declared TypeParams
+            ext_op
+                .def()
+                .validate_args(ext_op.args(), self.extension_registry, var_decls)
+                .map_err(|cause| ValidationError::SignatureError { node, cause })
+        };
         match op_type {
-            OpType::CustomOp(op) => {
+            OpType::ExtensionOp(ext_op) => validate_ext(ext_op)?,
+            OpType::OpaqueOp(opaque) => {
                 // Try to resolve serialized names to actual OpDefs in Extensions.
-                let temp: CustomOp;
-                let resolved = match op {
-                    CustomOp::Opaque(opaque) => {
-                        // If resolve_extension_ops has been called first, this would always return Ok(None)
-                        match resolve_opaque_op(node, opaque, self.extension_registry)? {
-                            Some(exten) => {
-                                temp = CustomOp::new_extension(exten);
-                                &temp
-                            }
-                            None => op,
-                        }
-                    }
-                    CustomOp::Extension(_) => op,
-                };
-                // Check TypeArgs are valid, and if we can, fit the declared TypeParams
-                match resolved {
-                    CustomOp::Extension(exten) => exten
-                        .def()
-                        .validate_args(exten.args(), self.extension_registry, var_decls)
-                        .map_err(|cause| ValidationError::SignatureError { node, cause })?,
-                    CustomOp::Opaque(opaque) => {
-                        // Best effort. Just check TypeArgs are valid in themselves, allowing any of them
-                        // to contain type vars (we don't know how many are binary params, so accept if in doubt)
-                        for arg in opaque.args() {
-                            arg.validate(self.extension_registry, var_decls)
-                                .map_err(|cause| ValidationError::SignatureError { node, cause })?;
-                        }
+                if let Some(ext_op) = resolve_opaque_op(node, opaque, self.extension_registry)? {
+                    validate_ext(&ext_op)?;
+                } else {
+                    // Best effort. Just check TypeArgs are valid in themselves, allowing any of them
+                    // to contain type vars (we don't know how many are binary params, so accept if in doubt)
+                    for arg in opaque.args() {
+                        arg.validate(self.extension_registry, var_decls)
+                            .map_err(|cause| ValidationError::SignatureError { node, cause })?;
                     }
                 }
             }
@@ -748,12 +737,12 @@ pub enum ValidationError {
         #[source]
         cause: SignatureError,
     },
-    /// Error in a [CustomOp] serialized as an [Opaque].
+    /// Error in a [ExtensionOp] serialized as an [Opaque].
     ///
-    /// [CustomOp]: crate::ops::CustomOp
-    /// [Opaque]: crate::ops::CustomOp::Opaque
+    /// [ExtensionOp]: crate::ops::ExtensionOp
+    /// [Opaque]: crate::ops::OpaqueOp
     #[error(transparent)]
-    CustomOpError(#[from] CustomOpError),
+    OpaqueOpError(#[from] OpaqueOpError),
     /// A [Const] contained a [Value] of unexpected [Type].
     ///
     /// [Const]: crate::ops::Const

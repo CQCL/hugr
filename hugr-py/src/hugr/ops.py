@@ -279,7 +279,7 @@ class AsExtOp(DataflowOp, Protocol):
     def outer_signature(self) -> tys.FunctionType:
         return self.ext_op.outer_signature()
 
-    def to_serial(self, parent: Node) -> sops.CustomOp:
+    def to_serial(self, parent: Node) -> sops.Extension:
         return self.ext_op.to_serial(parent)
 
     @property
@@ -297,8 +297,8 @@ class Custom(DataflowOp):
     extension: tys.ExtensionId = ""
     args: list[tys.TypeArg] = field(default_factory=list)
 
-    def to_serial(self, parent: Node) -> sops.CustomOp:
-        return sops.CustomOp(
+    def to_serial(self, parent: Node) -> sops.Extension:
+        return sops.Extension(
             parent=parent.idx,
             extension=self.extension,
             name=self.name,
@@ -366,7 +366,7 @@ class ExtOp(AsExtOp):
             args=self.args,
         )
 
-    def to_serial(self, parent: Node) -> sops.CustomOp:
+    def to_serial(self, parent: Node) -> sops.Extension:
         return self.to_custom_op().to_serial(parent)
 
     def op_def(self) -> ext.OpDef:

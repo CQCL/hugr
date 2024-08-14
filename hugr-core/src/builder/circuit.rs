@@ -253,7 +253,7 @@ mod test {
             DataflowSubContainer,
         },
         extension::prelude::BOOL_T,
-        ops::{custom::OpaqueOp, CustomOp},
+        ops::custom::OpaqueOp,
         type_row,
         types::Signature,
     };
@@ -297,13 +297,13 @@ mod test {
     #[test]
     fn with_nonlinear_and_outputs() {
         let missing_ext: ExtensionId = "MissingExt".try_into().unwrap();
-        let my_custom_op = CustomOp::new_opaque(OpaqueOp::new(
+        let my_custom_op = OpaqueOp::new(
             missing_ext.clone(),
             "MyOp",
             "unknown op".to_string(),
             vec![],
             Signature::new(vec![QB, NAT], vec![QB]),
-        ));
+        );
         let build_res = build_main(
             Signature::new(type_row![QB, QB, NAT], type_row![QB, QB, BOOL_T])
                 .with_extension_delta(ExtensionSet::from_iter([
