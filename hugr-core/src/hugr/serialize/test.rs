@@ -203,8 +203,8 @@ pub fn check_hugr(lhs: &Hugr, rhs: &Hugr) {
         let old_op = h_canon.get_optype(node);
         if !new_op.is_const() {
             match (new_op, old_op) {
-                (OpType::CustomOp(ext), OpType::OpaqueOp(opaque))
-                | (OpType::OpaqueOp(opaque), OpType::CustomOp(ext)) => {
+                (OpType::ExtensionOp(ext), OpType::OpaqueOp(opaque))
+                | (OpType::OpaqueOp(opaque), OpType::ExtensionOp(ext)) => {
                     let ext_opaque: OpaqueOp = ext.clone().into();
                     assert_eq!(ext_opaque, opaque.clone());
                 }
@@ -553,7 +553,7 @@ mod proptest {
                 any::<OpType>(),
             )
                 .prop_map(|(parent, op)| {
-                    if let OpType::CustomOp(ext_op) = op {
+                    if let OpType::ExtensionOp(ext_op) = op {
                         let opaque: OpaqueOp = ext_op.into();
                         NodeSer {
                             parent,

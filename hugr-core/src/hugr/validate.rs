@@ -12,7 +12,7 @@ use thiserror::Error;
 use crate::extension::{ExtensionRegistry, SignatureError, TO_BE_INFERRED};
 
 use crate::ops::constant::ConstTypeError;
-use crate::ops::custom::{resolve_opaque_op, CustomOpError, ExtensionOp};
+use crate::ops::custom::{resolve_opaque_op, ExtensionOp, OpaqueOpError};
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::{FuncDefn, OpParent, OpTag, OpTrait, OpType, ValidateOp};
 use crate::types::type_param::TypeParam;
@@ -576,7 +576,7 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
                 .map_err(|cause| ValidationError::SignatureError { node, cause })
         };
         match op_type {
-            OpType::CustomOp(ext_op) => validate_ext(ext_op)?,
+            OpType::ExtensionOp(ext_op) => validate_ext(ext_op)?,
             OpType::OpaqueOp(opaque) => {
                 // ry to resolve serialized names to actual OpDefs in Extensions.
                 if let Some(ext_op) = resolve_opaque_op(node, opaque, self.extension_registry)? {
@@ -738,12 +738,12 @@ pub enum ValidationError {
         #[source]
         cause: SignatureError,
     },
-    /// Error in a [CustomOp] serialized as an [Opaque].
+    /// Error in a [ExtensionOp] serialized as an [Opaque].
     ///
-    /// [CustomOp]: crate::ops::CustomOp
+    /// [ExtensionOp]: crate::ops::ExtensionOp
     /// [Opaque]: crate::ops::OpaqueOp
     #[error(transparent)]
-    CustomOpError(#[from] CustomOpError),
+    OpaqueOpError(#[from] OpaqueOpError),
     /// A [Const] contained a [Value] of unexpected [Type].
     ///
     /// [Const]: crate::ops::Const

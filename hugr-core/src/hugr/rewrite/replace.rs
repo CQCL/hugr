@@ -454,7 +454,7 @@ mod test {
     use crate::hugr::internal::HugrMutInternals;
     use crate::hugr::rewrite::replace::WhichHugr;
     use crate::hugr::{HugrMut, Rewrite};
-    use crate::ops::custom::{CustomOp, OpaqueOp};
+    use crate::ops::custom::{ExtensionOp, OpaqueOp};
     use crate::ops::dataflow::DataflowOpTrait;
     use crate::ops::handle::{BasicBlockID, ConstID, NodeHandle};
     use crate::ops::{self, Case, DataflowBlock, OpTag, OpType, DFG};
@@ -477,10 +477,10 @@ mod test {
                 .instantiate([TypeArg::Type { ty: USIZE_T }])
                 .unwrap(),
         );
-        let pop: CustomOp = collections::EXTENSION
+        let pop: ExtensionOp = collections::EXTENSION
             .instantiate_extension_op("pop", [TypeArg::Type { ty: USIZE_T }], &reg)
             .unwrap();
-        let push: CustomOp = collections::EXTENSION
+        let push: ExtensionOp = collections::EXTENSION
             .instantiate_extension_op("push", [TypeArg::Type { ty: USIZE_T }], &reg)
             .unwrap();
         let just_list = TypeRow::from(vec![listy.clone()]);

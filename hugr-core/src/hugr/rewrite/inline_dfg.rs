@@ -159,7 +159,7 @@ mod test {
     }
     fn extension_ops(h: &impl HugrView) -> Vec<Node> {
         h.nodes()
-            .filter(|n| matches!(h.get_optype(*n), OpType::CustomOp(_)))
+            .filter(|n| matches!(h.get_optype(*n), OpType::ExtensionOp(_)))
             .collect()
     }
 

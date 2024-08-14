@@ -276,10 +276,10 @@ pub enum LowerFunc {
     FixedHugr {
         /// The extensions required by the [`Hugr`]
         extensions: ExtensionSet,
-        /// The [`Hugr`] to be used to replace [CustomOp]s matching the parent
+        /// The [`Hugr`] to be used to replace [ExtensionOp]s matching the parent
         /// [OpDef]
         ///
-        /// [CustomOp]: crate::ops::CustomOp
+        /// [ExtensionOp]: crate::ops::ExtensionOp
         hugr: Hugr,
     },
     /// Custom binary function that can (fallibly) compute a Hugr

@@ -295,7 +295,7 @@ mod test {
         );
         // And the Noop in the entry block is consumed by the custom Test op
         let tst = find_unique(h.nodes(), |n| {
-            matches!(h.get_optype(*n), OpType::CustomOp(_))
+            matches!(h.get_optype(*n), OpType::ExtensionOp(_))
         });
         assert_eq!(h.get_parent(tst), Some(entry));
         assert_eq!(
@@ -360,7 +360,7 @@ mod test {
         // Should only be one BB left
         let [bb, _exit] = h.children(h.root()).collect::<Vec<_>>().try_into().unwrap();
         let tst = find_unique(h.nodes(), |n| {
-            matches!(h.get_optype(*n), OpType::CustomOp(_))
+            matches!(h.get_optype(*n), OpType::ExtensionOp(_))
         });
         assert_eq!(h.get_parent(tst), Some(bb));
 

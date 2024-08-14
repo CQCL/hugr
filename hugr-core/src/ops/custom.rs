@@ -20,9 +20,6 @@ use super::dataflow::DataflowOpTrait;
 use super::tag::OpTag;
 use super::{NamedOp, OpName, OpNameRef, OpTrait, OpType};
 
-/// Alias for [ExtensionOp].
-pub type CustomOp = ExtensionOp;
-
 /// An operation defined by an [OpDef] from a loaded [Extension].
 ///
 /// Extension ops are not serializable. They must be downgraded into an [OpaqueOp] instead.
@@ -137,9 +134,9 @@ impl DataflowOpTrait for ExtensionOp {
 
 /// An opaquely-serialized op that refers to an as-yet-unresolved [`OpDef`].
 ///
-/// All [CustomOp]s are serialised as `OpaqueOp`s.
+/// [ExtensionOp]s are serialised as `OpaqueOp`s.
 ///
-/// The signature of a [CustomOp] always includes that op's extension. We do not
+/// The signature of a [ExtensionOp] always includes that op's extension. We do not
 /// require that the `signature` field of [OpaqueOp] contains `extension`,
 /// instead we are careful to add it whenever we look at the `signature` of an
 /// `OpaqueOp`. This is a small efficiency in serialisation and allows us to
@@ -223,7 +220,7 @@ impl DataflowOpTrait for OpaqueOp {
 pub fn resolve_extension_ops(
     h: &mut Hugr,
     extension_registry: &ExtensionRegistry,
-) -> Result<(), CustomOpError> {
+) -> Result<(), OpaqueOpError> {
     let mut replacements = Vec::new();
     for n in h.nodes() {
         if let OpType::OpaqueOp(opaque) = h.get_optype(n) {
@@ -255,24 +252,24 @@ pub fn resolve_opaque_op(
     node: Node,
     opaque: &OpaqueOp,
     extension_registry: &ExtensionRegistry,
-) -> Result<Option<ExtensionOp>, CustomOpError> {
+) -> Result<Option<ExtensionOp>, OpaqueOpError> {
     if let Some(r) = extension_registry.get(&opaque.extension) {
         // Fail if the Extension was found but did not have the expected operation
         let Some(def) = r.get_op(&opaque.name) else {
-            return Err(CustomOpError::OpNotFoundInExtension(
+            return Err(OpaqueOpError::OpNotFoundInExtension(
                 node,
                 opaque.name.clone(),
                 r.name().clone(),
             ));
         };
         let ext_op = ExtensionOp::new(def.clone(), opaque.args.clone(), extension_registry)
-            .map_err(|e| CustomOpError::SignatureError {
+            .map_err(|e| OpaqueOpError::SignatureError {
                 node,
                 name: opaque.name.clone(),
                 cause: e,
             })?;
         if opaque.signature() != ext_op.signature() {
-            return Err(CustomOpError::SignatureMismatch {
+            return Err(OpaqueOpError::SignatureMismatch {
                 node,
                 extension: opaque.extension.clone(),
                 op: def.name().clone(),
@@ -290,7 +287,7 @@ pub fn resolve_opaque_op(
 /// when trying to resolve the serialized names against a registry of known Extensions.
 #[derive(Clone, Debug, Error, PartialEq)]
 #[non_exhaustive]
-pub enum CustomOpError {
+pub enum OpaqueOpError {
     /// The Extension was found but did not contain the expected OpDef
     #[error("Operation '{1}' in {0} not found in Extension {2}")]
     OpNotFoundInExtension(Node, OpName, ExtensionId),

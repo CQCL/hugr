@@ -110,7 +110,7 @@ pub(crate) mod test_quantum_extension {
             prelude::{BOOL_T, QB_T},
             ExtensionId, ExtensionRegistry, PRELUDE,
         },
-        ops::CustomOp,
+        ops::ExtensionOp,
         std_extensions::arithmetic::float_types,
         type_row,
         types::{PolyFuncTypeRV, Signature},
@@ -180,32 +180,32 @@ pub(crate) mod test_quantum_extension {
 
     }
 
-    fn get_gate(gate_name: &OpNameRef) -> CustomOp {
+    fn get_gate(gate_name: &OpNameRef) -> ExtensionOp {
         EXTENSION
             .instantiate_extension_op(gate_name, [], &REG)
             .unwrap()
     }
-    pub(crate) fn h_gate() -> CustomOp {
+    pub(crate) fn h_gate() -> ExtensionOp {
         get_gate("H")
     }
 
-    pub(crate) fn cx_gate() -> CustomOp {
+    pub(crate) fn cx_gate() -> ExtensionOp {
         get_gate("CX")
     }
 
-    pub(crate) fn measure() -> CustomOp {
+    pub(crate) fn measure() -> ExtensionOp {
         get_gate("Measure")
     }
 
-    pub(crate) fn rz_f64() -> CustomOp {
+    pub(crate) fn rz_f64() -> ExtensionOp {
         get_gate("RzF64")
     }
 
-    pub(crate) fn q_alloc() -> CustomOp {
+    pub(crate) fn q_alloc() -> ExtensionOp {
         get_gate("QAlloc")
     }
 
-    pub(crate) fn q_discard() -> CustomOp {
+    pub(crate) fn q_discard() -> ExtensionOp {
         get_gate("QDiscard")
     }
 }

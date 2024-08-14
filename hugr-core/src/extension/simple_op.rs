@@ -2,9 +2,9 @@
 
 use strum::IntoEnumIterator;
 
-use crate::ops::{CustomOp, OpName, OpNameRef};
+use crate::ops::{ExtensionOp, OpName, OpNameRef};
 use crate::{
-    ops::{custom::ExtensionOp, NamedOp, OpType},
+    ops::{NamedOp, OpType},
     types::TypeArg,
     Extension,
 };
@@ -87,11 +87,11 @@ pub trait MakeOpDef: NamedOp {
     }
 
     /// If the definition can be loaded from a string, load from an [ExtensionOp].
-    fn from_op(custom_op: &CustomOp) -> Result<Self, OpLoadError>
+    fn from_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError>
     where
         Self: Sized + std::str::FromStr,
     {
-        Self::from_extension_op(custom_op)
+        Self::from_extension_op(ext_op)
     }
 }
 
@@ -109,12 +109,12 @@ pub trait HasDef: MakeExtensionOp {
     /// Associated [HasConcrete] type.
     type Def: HasConcrete<Concrete = Self> + std::str::FromStr;
 
-    /// Load the operation from a [CustomOp].
-    fn from_op(custom_op: &CustomOp) -> Result<Self, OpLoadError>
+    /// Load the operation from a [ExtensionOp].
+    fn from_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError>
     where
         Self: Sized,
     {
-        Self::from_extension_op(custom_op)
+        Self::from_extension_op(ext_op)
     }
 }
 
@@ -131,7 +131,7 @@ pub trait MakeExtensionOp: NamedOp {
     where
         Self: Sized,
     {
-        let ext: &ExtensionOp = op.as_custom_op()?;
+        let ext: &ExtensionOp = op.as_extension_op()?;
         Self::from_extension_op(ext).ok()
     }
 
