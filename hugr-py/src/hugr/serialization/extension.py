@@ -133,13 +133,16 @@ class Extension(ConfiguredBaseModel):
             extension_reqs=self.extension_reqs,
         )
 
-        for t in self.types.values():
+        for k, t in self.types.items():
+            assert k == t.name, "Type name must match key"
             e.add_type_def(t.deserialize(e))
 
-        for o in self.operations.values():
+        for k, o in self.operations.items():
+            assert k == o.name, "Operation name must match key"
             e.add_op_def(o.deserialize(e))
 
-        for v in self.values.values():
+        for k, v in self.values.items():
+            assert k == v.name, "Value name must match key"
             e.add_extension_value(v.deserialize(e))
 
         return e
