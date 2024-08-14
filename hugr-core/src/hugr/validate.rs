@@ -566,7 +566,6 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
     ) -> Result<(), ValidationError> {
         let op_type = self.hugr.get_optype(node);
         // The op_type must be defined only in terms of type variables defined outside the node
-        // TODO consider turning this match into a trait method?
 
         let validate_ext = |ext_op: &ExtensionOp| -> Result<(), ValidationError> {
             // Check TypeArgs are valid, and if we can, fit the declared TypeParams
