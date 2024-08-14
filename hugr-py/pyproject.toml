@@ -13,7 +13,7 @@ classifiers = [
     "Topic :: Scientific/Engineering",
 ]
 name = "hugr"
-version = "0.6.0"
+version = "0.7.0"
 description = "Quantinuum's common representation for quantum programs"
 #keywords = []
 authors = ["TKET development team <tket-support@cambridgequantum.com>"]
