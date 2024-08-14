@@ -396,55 +396,6 @@
             "title": "CustomConst",
             "type": "object"
         },
-        "CustomOp": {
-            "additionalProperties": true,
-            "description": "A user-defined operation that can be downcasted by the extensions that define it.",
-            "properties": {
-                "parent": {
-                    "title": "Parent",
-                    "type": "integer"
-                },
-                "op": {
-                    "const": "CustomOp",
-                    "default": "CustomOp",
-                    "enum": [
-                        "CustomOp"
-                    ],
-                    "title": "Op",
-                    "type": "string"
-                },
-                "extension": {
-                    "title": "Extension",
-                    "type": "string"
-                },
-                "name": {
-                    "title": "Name",
-                    "type": "string"
-                },
-                "signature": {
-                    "$ref": "#/$defs/FunctionType"
-                },
-                "description": {
-                    "default": "",
-                    "title": "Description",
-                    "type": "string"
-                },
-                "args": {
-                    "items": {
-                        "$ref": "#/$defs/TypeArg"
-                    },
-                    "title": "Args",
-                    "type": "array"
-                }
-            },
-            "required": [
-                "parent",
-                "extension",
-                "name"
-            ],
-            "title": "CustomOp",
-            "type": "object"
-        },
         "DFG": {
             "additionalProperties": true,
             "description": "A simply nested dataflow graph.",
@@ -579,57 +530,6 @@
                 "bound"
             ],
             "title": "ExplicitBound",
-            "type": "object"
-        },
-        "Extension": {
-            "properties": {
-                "version": {
-                    "title": "Version",
-                    "type": "string"
-                },
-                "name": {
-                    "title": "Name",
-                    "type": "string"
-                },
-                "extension_reqs": {
-                    "items": {
-                        "type": "string"
-                    },
-                    "title": "Extension Reqs",
-                    "type": "array",
-                    "uniqueItems": true
-                },
-                "types": {
-                    "additionalProperties": {
-                        "$ref": "#/$defs/TypeDef"
-                    },
-                    "title": "Types",
-                    "type": "object"
-                },
-                "values": {
-                    "additionalProperties": {
-                        "$ref": "#/$defs/hugr__serialization__extension__ExtensionValue"
-                    },
-                    "title": "Values",
-                    "type": "object"
-                },
-                "operations": {
-                    "additionalProperties": {
-                        "$ref": "#/$defs/OpDef"
-                    },
-                    "title": "Operations",
-                    "type": "object"
-                }
-            },
-            "required": [
-                "version",
-                "name",
-                "extension_reqs",
-                "types",
-                "values",
-                "operations"
-            ],
-            "title": "Extension",
             "type": "object"
         },
         "ExtensionsArg": {
@@ -1202,10 +1102,10 @@
                     "Case": "#/$defs/Case",
                     "Conditional": "#/$defs/Conditional",
                     "Const": "#/$defs/Const",
-                    "CustomOp": "#/$defs/CustomOp",
                     "DFG": "#/$defs/DFG",
                     "DataflowBlock": "#/$defs/DataflowBlock",
                     "ExitBlock": "#/$defs/ExitBlock",
+                    "Extension": "#/$defs/hugr__serialization__ops__Extension",
                     "FuncDecl": "#/$defs/FuncDecl",
                     "FuncDefn": "#/$defs/FuncDefn",
                     "Input": "#/$defs/Input",
@@ -1272,7 +1172,7 @@
                     "$ref": "#/$defs/LoadFunction"
                 },
                 {
-                    "$ref": "#/$defs/CustomOp"
+                    "$ref": "#/$defs/hugr__serialization__ops__Extension"
                 },
                 {
                     "$ref": "#/$defs/Noop"
@@ -1388,7 +1288,7 @@
                 },
                 "extensions": {
                     "items": {
-                        "$ref": "#/$defs/Extension"
+                        "$ref": "#/$defs/hugr__serialization__extension__Extension"
                     },
                     "title": "Extensions",
                     "type": "array"
@@ -2242,6 +2142,57 @@
             "title": "VariableArg",
             "type": "object"
         },
+        "hugr__serialization__extension__Extension": {
+            "properties": {
+                "version": {
+                    "title": "Version",
+                    "type": "string"
+                },
+                "name": {
+                    "title": "Name",
+                    "type": "string"
+                },
+                "extension_reqs": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "title": "Extension Reqs",
+                    "type": "array",
+                    "uniqueItems": true
+                },
+                "types": {
+                    "additionalProperties": {
+                        "$ref": "#/$defs/TypeDef"
+                    },
+                    "title": "Types",
+                    "type": "object"
+                },
+                "values": {
+                    "additionalProperties": {
+                        "$ref": "#/$defs/hugr__serialization__extension__ExtensionValue"
+                    },
+                    "title": "Values",
+                    "type": "object"
+                },
+                "operations": {
+                    "additionalProperties": {
+                        "$ref": "#/$defs/OpDef"
+                    },
+                    "title": "Operations",
+                    "type": "object"
+                }
+            },
+            "required": [
+                "version",
+                "name",
+                "extension_reqs",
+                "types",
+                "values",
+                "operations"
+            ],
+            "title": "Extension",
+            "type": "object"
+        },
         "hugr__serialization__extension__ExtensionValue": {
             "properties": {
                 "extension": {
@@ -2262,6 +2213,55 @@
                 "typed_value"
             ],
             "title": "ExtensionValue",
+            "type": "object"
+        },
+        "hugr__serialization__ops__Extension": {
+            "additionalProperties": true,
+            "description": "A user-defined operation that can be downcasted by the extensions that define it.",
+            "properties": {
+                "parent": {
+                    "title": "Parent",
+                    "type": "integer"
+                },
+                "op": {
+                    "const": "Extension",
+                    "default": "Extension",
+                    "enum": [
+                        "Extension"
+                    ],
+                    "title": "Op",
+                    "type": "string"
+                },
+                "extension": {
+                    "title": "Extension",
+                    "type": "string"
+                },
+                "name": {
+                    "title": "Name",
+                    "type": "string"
+                },
+                "signature": {
+                    "$ref": "#/$defs/FunctionType"
+                },
+                "description": {
+                    "default": "",
+                    "title": "Description",
+                    "type": "string"
+                },
+                "args": {
+                    "items": {
+                        "$ref": "#/$defs/TypeArg"
+                    },
+                    "title": "Args",
+                    "type": "array"
+                }
+            },
+            "required": [
+                "parent",
+                "extension",
+                "name"
+            ],
+            "title": "Extension",
             "type": "object"
         },
         "hugr__serialization__ops__ExtensionValue": {
