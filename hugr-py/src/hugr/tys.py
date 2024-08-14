@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 import hugr.serialization.tys as stys
 from hugr.utils import ser_it
+
+if TYPE_CHECKING:
+    from hugr import ext
+
 
 ExtensionId = stys.ExtensionId
 ExtensionSet = stys.ExtensionSet
@@ -33,6 +37,10 @@ class TypeArg(Protocol):
 
     def to_serial_root(self) -> stys.TypeArg:
         return stys.TypeArg(root=self.to_serial())  # type: ignore[arg-type]
+
+    def resolve(self, registry: ext.ExtensionRegistry) -> TypeArg:
+        """Resolve types in the argument using the given registry."""
+        return self
 
 
 @runtime_checkable
@@ -65,6 +73,10 @@ class Type(Protocol):
             TypeTypeArg(ty=Qubit)
         """
         return TypeTypeArg(self)
+
+    def resolve(self, registry: ext.ExtensionRegistry) -> Type:
+        """Resolve types in the type using the given registry."""
+        return self
 
 
 #: Row of types.
@@ -145,6 +157,9 @@ class TypeTypeArg(TypeArg):
     def to_serial(self) -> stys.TypeTypeArg:
         return stys.TypeTypeArg(ty=self.ty.to_serial_root())
 
+    def resolve(self, registry: ext.ExtensionRegistry) -> TypeArg:
+        return TypeTypeArg(self.ty.resolve(registry))
+
 
 @dataclass(frozen=True)
 class BoundedNatArg(TypeArg):
@@ -174,6 +189,9 @@ class SequenceArg(TypeArg):
 
     def to_serial(self) -> stys.SequenceArg:
         return stys.SequenceArg(elems=ser_it(self.elems))
+
+    def resolve(self, registry: ext.ExtensionRegistry) -> TypeArg:
+        return SequenceArg([arg.resolve(registry) for arg in self.elems])
 
 
 @dataclass(frozen=True)
@@ -243,6 +261,10 @@ class Sum(Type):
     def type_bound(self) -> TypeBound:
         return TypeBound.join(*(t.type_bound() for r in self.variant_rows for t in r))
 
+    def resolve(self, registry: ext.ExtensionRegistry) -> Sum:
+        """Resolve types in the sum type using the given registry."""
+        return Sum([[ty.resolve(registry) for ty in row] for row in self.variant_rows])
+
 
 @dataclass(eq=False)
 class UnitSum(Sum):
@@ -263,6 +285,9 @@ class UnitSum(Sum):
         elif self == Unit:
             return "Unit"
         return f"UnitSum({self.size})"
+
+    def resolve(self, registry: ext.ExtensionRegistry) -> UnitSum:
+        return self
 
 
 @dataclass(eq=False)
@@ -387,6 +412,14 @@ class FunctionType(Type):
     def __repr__(self) -> str:
         return f"FunctionType({self.input}, {self.output})"
 
+    def resolve(self, registry: ext.ExtensionRegistry) -> FunctionType:
+        """Resolve types in the function type using the given registry."""
+        return FunctionType(
+            input=[ty.resolve(registry) for ty in self.input],
+            output=[ty.resolve(registry) for ty in self.output],
+            extension_reqs=self.extension_reqs,
+        )
+
 
 @dataclass(frozen=True)
 class PolyFuncType(Type):
@@ -403,6 +436,45 @@ class PolyFuncType(Type):
     def to_serial(self) -> stys.PolyFuncType:
         return stys.PolyFuncType(
             params=[p.to_serial_root() for p in self.params], body=self.body.to_serial()
+        )
+
+    def resolve(self, registry: ext.ExtensionRegistry) -> PolyFuncType:
+        """Resolve types in the polymorphic function type using the given registry."""
+        return PolyFuncType(
+            params=self.params,
+            body=self.body.resolve(registry),
+        )
+
+
+@dataclass
+class ExtType(Type):
+    """Extension type, defined by a type definition and type arguments."""
+
+    type_def: ext.TypeDef
+    args: list[TypeArg] = field(default_factory=list)
+
+    def type_bound(self) -> TypeBound:
+        from hugr.ext import ExplicitBound, FromParamsBound
+
+        match self.type_def.bound:
+            case ExplicitBound(exp_bound):
+                return exp_bound
+            case FromParamsBound(indices):
+                bounds: list[TypeBound] = []
+                for idx in indices:
+                    arg = self.args[idx]
+                    if isinstance(arg, TypeTypeArg):
+                        bounds.append(arg.ty.type_bound())
+                return TypeBound.join(*bounds)
+
+    def to_serial(self) -> stys.Opaque:
+        assert self.type_def._extension is not None, "Extension must be initialised."
+
+        return stys.Opaque(
+            extension=self.type_def._extension.name,
+            id=self.type_def.name,
+            args=[arg.to_serial_root() for arg in self.args],
+            bound=self.type_bound(),
         )
 
 
@@ -425,6 +497,20 @@ class Opaque(Type):
 
     def type_bound(self) -> TypeBound:
         return self.bound
+
+    def resolve(self, registry: ext.ExtensionRegistry) -> Type:
+        """Resolve the opaque type to an :class:`ExtType` using the given registry.
+
+        If the extension or type is not found, return the original type.
+        """
+        from hugr.ext import ExtensionRegistry, Extension  # noqa: I001 # no circular import
+
+        try:
+            type_def = registry.get_extension(self.extension).get_type(self.id)
+        except (ExtensionRegistry.ExtensionNotFound, Extension.TypeNotFound):
+            return self
+
+        return ExtType(type_def, self.args)
 
 
 @dataclass

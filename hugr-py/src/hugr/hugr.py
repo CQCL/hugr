@@ -24,7 +24,7 @@ from hugr.node_port import (
     ToNode,
     _SubPort,
 )
-from hugr.ops import Call, Const, DataflowOp, Module, Op
+from hugr.ops import Call, Const, Custom, DataflowOp, Module, Op
 from hugr.serialization.ops import OpType as SerialOp
 from hugr.serialization.serial_hugr import SerialHugr
 from hugr.tys import Kind, Type, ValueKind
@@ -34,6 +34,7 @@ from hugr.val import Value
 from .exceptions import ParentBeforeChild
 
 if TYPE_CHECKING:
+    from hugr import ext
     from hugr.val import Value
 
 
@@ -597,6 +598,16 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
             offset = p.offset
 
         return offset
+
+    def resolve_extensions(self, registry: ext.ExtensionRegistry) -> Hugr:
+        """Resolve extension types and operations in the HUGR by matching them to
+        extensions in the registry.
+        """
+        for node in self:
+            op = self[node].op
+            if isinstance(op, Custom):
+                self[node].op = op.resolve(registry)
+        return self
 
     @classmethod
     def from_serial(cls, serial: SerialHugr) -> Hugr:

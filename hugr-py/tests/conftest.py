@@ -10,29 +10,46 @@ from typing import TYPE_CHECKING, TypeVar
 
 from typing_extensions import Self
 
-import hugr.tys as tys
+from hugr import ext, tys
 from hugr.hugr import Hugr
-from hugr.ops import AsCustomOp, Command, Custom, DataflowOp
+from hugr.ops import AsExtOp, Command, DataflowOp, ExtOp, RegisteredOp
 from hugr.serialization.serial_hugr import SerialHugr
 from hugr.std.float import FLOAT_T
 
 if TYPE_CHECKING:
     from hugr.ops import ComWire
 
+EXTENSION = ext.Extension("pytest.quantum,", ext.Version(0, 1, 0))
+EXTENSION.add_op_def(
+    ext.OpDef(
+        name="H",
+        description="Hadamard gate",
+        signature=ext.OpDefSig(tys.FunctionType.endo([tys.Qubit])),
+    )
+)
 
-QUANTUM_EXTENSION_ID: tys.ExtensionId = "quantum.tket2"
+EXTENSION.add_op_def(
+    ext.OpDef(
+        name="CX",
+        description="CNOT gate",
+        signature=ext.OpDefSig(tys.FunctionType.endo([tys.Qubit] * 2)),
+    )
+)
+
 
 E = TypeVar("E", bound=Enum)
 
 
-def _load_enum(enum_cls: type[E], custom: Custom) -> E | None:
-    if custom.extension == QUANTUM_EXTENSION_ID and custom.name in enum_cls.__members__:
-        return enum_cls(custom.name)
+def _load_enum(enum_cls: type[E], custom: ExtOp) -> E | None:
+    ext = custom._op_def._extension
+    assert ext is not None
+    if ext.name == EXTENSION.name and custom._op_def.name in enum_cls.__members__:
+        return enum_cls(custom._op_def.name)
     return None
 
 
 @dataclass(frozen=True)
-class OneQbGate(AsCustomOp):
+class OneQbGate(AsExtOp):
     # Have to nest enum to avoid meta class conflict
     class _Enum(Enum):
         H = "H"
@@ -42,15 +59,11 @@ class OneQbGate(AsCustomOp):
     def __call__(self, q: ComWire) -> Command:
         return DataflowOp.__call__(self, q)
 
-    def to_custom(self) -> Custom:
-        return Custom(
-            self._enum.value,
-            tys.FunctionType.endo([tys.Qubit]),
-            extension=QUANTUM_EXTENSION_ID,
-        )
+    def op_def(self) -> ext.OpDef:
+        return EXTENSION.operations[self._enum.value]
 
     @classmethod
-    def from_custom(cls, custom: Custom) -> Self | None:
+    def from_ext(cls, custom: ExtOp) -> Self | None:
         return cls(e) if (e := _load_enum(cls._Enum, custom)) else None
 
 
@@ -58,21 +71,17 @@ H = OneQbGate(OneQbGate._Enum.H)
 
 
 @dataclass(frozen=True)
-class TwoQbGate(AsCustomOp):
+class TwoQbGate(AsExtOp):
     class _Enum(Enum):
         CX = "CX"
 
     _enum: _Enum
 
-    def to_custom(self) -> Custom:
-        return Custom(
-            self._enum.value,
-            tys.FunctionType.endo([tys.Qubit] * 2),
-            extension=QUANTUM_EXTENSION_ID,
-        )
+    def op_def(self) -> ext.OpDef:
+        return EXTENSION.operations[self._enum.value]
 
     @classmethod
-    def from_custom(cls, custom: Custom) -> Self | None:
+    def from_ext(cls, custom: ExtOp) -> Self | None:
         return cls(e) if (e := _load_enum(cls._Enum, custom)) else None
 
     def __call__(self, q0: ComWire, q1: ComWire) -> Command:
@@ -82,15 +91,12 @@ class TwoQbGate(AsCustomOp):
 CX = TwoQbGate(TwoQbGate._Enum.CX)
 
 
+@EXTENSION.register_op(
+    "Measure",
+    signature=tys.FunctionType([tys.Qubit], [tys.Qubit, tys.Bool]),
+)
 @dataclass(frozen=True)
-class MeasureDef(AsCustomOp):
-    def to_custom(self) -> Custom:
-        return Custom(
-            "Measure",
-            tys.FunctionType([tys.Qubit], [tys.Qubit, tys.Bool]),
-            extension=QUANTUM_EXTENSION_ID,
-        )
-
+class MeasureDef(RegisteredOp):
     def __call__(self, q: ComWire) -> Command:
         return super().__call__(q)
 
@@ -98,15 +104,12 @@ class MeasureDef(AsCustomOp):
 Measure = MeasureDef()
 
 
+@EXTENSION.register_op(
+    "Rz",
+    signature=tys.FunctionType([tys.Qubit, FLOAT_T], [tys.Qubit]),
+)
 @dataclass(frozen=True)
-class RzDef(AsCustomOp):
-    def to_custom(self) -> Custom:
-        return Custom(
-            "Rz",
-            tys.FunctionType([tys.Qubit, FLOAT_T], [tys.Qubit]),
-            extension=QUANTUM_EXTENSION_ID,
-        )
-
+class RzDef(RegisteredOp):
     def __call__(self, q: ComWire, fl_wire: ComWire) -> Command:
         return super().__call__(q, fl_wire)
 

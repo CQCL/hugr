@@ -1168,6 +1168,11 @@
                     ],
                     "default": null
                 },
+                "binary": {
+                    "default": false,
+                    "title": "Binary",
+                    "type": "boolean"
+                },
                 "lower_funcs": {
                     "items": {
                         "$ref": "#/$defs/FixedHugr"
