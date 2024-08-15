@@ -241,9 +241,8 @@ impl SignatureFunc {
                 (&temp, other_args)
             }
             SignatureFunc::MissingComputeFunc => return Err(SignatureError::MissingComputeFunc),
-            SignatureFunc::MissingValidateFunc(_) => {
-                return Err(SignatureError::MissingValidateFunc)
-            }
+            // TODO raise warning: https://github.com/CQCL/hugr/issues/1432
+            SignatureFunc::MissingValidateFunc(ts) => (ts, args),
         };
 
         let mut res = pf.instantiate(args, exts)?;

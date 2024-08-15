@@ -247,13 +247,13 @@ mod test {
     use crate::utils::test_quantum_extension::{
         self, cx_gate, h_gate, measure, q_alloc, q_discard, rz_f64,
     };
+    use crate::Extension;
     use crate::{
         builder::{
             test::{build_main, NAT, QB},
             DataflowSubContainer,
         },
         extension::prelude::BOOL_T,
-        ops::custom::OpaqueOp,
         type_row,
         types::Signature,
     };
@@ -296,19 +296,15 @@ mod test {
 
     #[test]
     fn with_nonlinear_and_outputs() {
-        let missing_ext: ExtensionId = "MissingExt".try_into().unwrap();
-        let my_custom_op = OpaqueOp::new(
-            missing_ext.clone(),
-            "MyOp",
-            "unknown op".to_string(),
-            vec![],
-            Signature::new(vec![QB, NAT], vec![QB]),
-        );
+        let my_ext_name: ExtensionId = "MyExt".try_into().unwrap();
+        let mut my_ext = Extension::new_test(my_ext_name.clone());
+        let my_custom_op = my_ext.simple_ext_op("MyOp", Signature::new(vec![QB, NAT], vec![QB]));
+
         let build_res = build_main(
             Signature::new(type_row![QB, QB, NAT], type_row![QB, QB, BOOL_T])
                 .with_extension_delta(ExtensionSet::from_iter([
                     test_quantum_extension::EXTENSION_ID,
-                    missing_ext,
+                    my_ext_name,
                 ]))
                 .into(),
             |mut f_build| {

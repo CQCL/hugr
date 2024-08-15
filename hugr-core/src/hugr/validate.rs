@@ -12,7 +12,7 @@ use thiserror::Error;
 use crate::extension::{ExtensionRegistry, SignatureError, TO_BE_INFERRED};
 
 use crate::ops::constant::ConstTypeError;
-use crate::ops::custom::{resolve_opaque_op, ExtensionOp, OpaqueOpError};
+use crate::ops::custom::{ExtensionOp, OpaqueOpError};
 use crate::ops::validate::{ChildrenEdgeData, ChildrenValidationError, EdgeValidationError};
 use crate::ops::{FuncDefn, OpParent, OpTag, OpTrait, OpType, ValidateOp};
 use crate::types::type_param::TypeParam;
@@ -158,6 +158,13 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
     fn validate_node(&self, node: Node) -> Result<(), ValidationError> {
         let op_type = self.hugr.get_optype(node);
 
+        if let OpType::OpaqueOp(opaque) = op_type {
+            Err(OpaqueOpError::UnresolvedOp(
+                node,
+                opaque.op_name().clone(),
+                opaque.extension().clone(),
+            ))?;
+        }
         // The Hugr can have only one root node.
         if node == self.hugr.root() {
             // The root node has no edges.
@@ -577,17 +584,11 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         match op_type {
             OpType::ExtensionOp(ext_op) => validate_ext(ext_op)?,
             OpType::OpaqueOp(opaque) => {
-                // Try to resolve serialized names to actual OpDefs in Extensions.
-                if let Some(ext_op) = resolve_opaque_op(node, opaque, self.extension_registry)? {
-                    validate_ext(&ext_op)?;
-                } else {
-                    // Best effort. Just check TypeArgs are valid in themselves, allowing any of them
-                    // to contain type vars (we don't know how many are binary params, so accept if in doubt)
-                    for arg in opaque.args() {
-                        arg.validate(self.extension_registry, var_decls)
-                            .map_err(|cause| ValidationError::SignatureError { node, cause })?;
-                    }
-                }
+                Err(OpaqueOpError::UnresolvedOp(
+                    node,
+                    opaque.op_name().clone(),
+                    opaque.extension().clone(),
+                ))?;
             }
             OpType::Call(c) => {
                 c.validate(self.extension_registry)

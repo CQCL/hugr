@@ -299,7 +299,7 @@ the following basic dataflow operations are available (in addition to the
   The signature of the operation comprises the output signature of the child
   Input node (as input) and the input signature of the child Output node (as
   output).
-- `OpaqueOp`: an operation defined by an [Extension](#extension-system).
+- `ExtensionOp`: an operation defined by an [Extension](#extension-system).
 
 The example below shows two DFGs, one nested within the other. Each has an Input
 and an Output node, whose outputs and inputs respectively match the inputs and
@@ -1015,7 +1015,7 @@ named **TypeDef**s and **OpDef**s---see [Declarative Format](#declarative-format
 These are (potentially polymorphic) definitions of types and operations, respectively---polymorphism arises because both may
 declare any number of TypeParams, as per [Polymorphism](#polymorphism). To use a TypeDef as a type,
 it must be instantiated with TypeArgs appropriate for its TypeParams, and similarly
-to use an OpDef as a node operation: each `OpaqueOp` node stores a static-constant list of TypeArgs.
+to use an OpDef as a node operation: each `ExtensionOp` node stores a static-constant list of TypeArgs.
 
 For TypeDef's, any set of TypeArgs conforming to its TypeParams, produces a valid type.
 However, for OpDef's, greater flexibility is allowed: each OpDef *either*
