@@ -13,8 +13,7 @@ from hugr.std.int import INT_OPS_EXTENSION, INT_TYPES_EXTENSION, DivMod, int_t
 from hugr.std.logic import EXTENSION as LOGIC_EXT
 from hugr.std.logic import Not
 
-from .conftest import CX, H, Measure, Rz, validate
-from .conftest import QUANTUM_EXT as QUANTUM_EXT
+from .conftest import CX, QUANTUM_EXT, H, Measure, Rz, validate
 
 STRINGLY_EXT = ext.Extension("my_extension", ext.Version(0, 0, 0))
 _STRINGLY_DEF = STRINGLY_EXT.add_op_def(
