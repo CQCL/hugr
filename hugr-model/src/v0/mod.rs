@@ -1,4 +1,17 @@
-//! Version 0.
+//! Version 0 (unstable).
+//!
+//! Instead of directly nesting `Node`s or `Term`s, we store them in tables and refer to them
+//! by their index in the table. This allows us to attach additional data to nodes and terms
+//! without changing the data structure itself. This can be used, for example, to keep track
+//! of metadata that has been parsed from its generic reprensentation as a term into a more
+//! specific in-memory reprensentation.
+//!
+//! The tabling is also used for deduplication of terms. In practice, many terms will share
+//! the same subterms, and we can save memory and validation time by storing them only once.
+//! However we allow non-deduplicated terms for cases in which terms carry additional identity
+//! over just their structure. For instance, structurally identical terms could originate
+//! from different locations in a text file and therefore should be treated differently when
+//! locating type errors.
 use smol_str::SmolStr;
 use tinyvec::TinyVec;
 
@@ -222,10 +235,12 @@ pub struct SchemeParam {
 /// A term in the compile time meta language.
 #[derive(Debug, Clone)]
 pub enum Term {
-    /// The type of types.
-    Type,
     /// Standin for any term.
     Wildcard,
+    /// The type of types.
+    Type,
+    /// The type of constraints.
+    Constraint,
     /// A variable.
     Var(TermVar),
     /// A symbolic function application.
