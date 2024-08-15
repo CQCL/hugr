@@ -55,6 +55,31 @@ impl ExtensionOp {
         })
     }
 
+    /// If OpDef is missing binary computation, trust the cached signature.
+    fn new_with_cached(
+        def: Arc<OpDef>,
+        args: impl Into<Vec<TypeArg>>,
+        opaque: &OpaqueOp,
+        exts: &ExtensionRegistry,
+    ) -> Result<Self, SignatureError> {
+        let args = args.into();
+        // TODO skip computation depending on config
+        // see https://github.com/CQCL/hugr/issues/1363
+        let signature = match def.compute_signature(&args, exts) {
+            Ok(sig) => sig,
+            Err(SignatureError::MissingComputeFunc) => {
+                // TODO raise warning: https://github.com/CQCL/hugr/issues/1432
+                opaque.signature()
+            }
+            Err(e) => return Err(e),
+        };
+        Ok(Self {
+            def,
+            args,
+            signature,
+        })
+    }
+
     /// Return the argument values for this operation.
     pub fn args(&self) -> &[TypeArg] {
         &self.args
@@ -224,9 +249,8 @@ pub fn resolve_extension_ops(
     let mut replacements = Vec::new();
     for n in h.nodes() {
         if let OpType::OpaqueOp(opaque) = h.get_optype(n) {
-            if let Some(resolved) = resolve_opaque_op(n, opaque, extension_registry)? {
-                replacements.push((n, resolved))
-            }
+            let resolved = resolve_opaque_op(n, opaque, extension_registry)?;
+            replacements.push((n, resolved));
         }
     }
     // Only now can we perform the replacements as the 'for' loop was borrowing 'h' preventing use from using it mutably
@@ -252,7 +276,7 @@ pub fn resolve_opaque_op(
     node: Node,
     opaque: &OpaqueOp,
     extension_registry: &ExtensionRegistry,
-) -> Result<Option<ExtensionOp>, OpaqueOpError> {
+) -> Result<ExtensionOp, OpaqueOpError> {
     if let Some(r) = extension_registry.get(&opaque.extension) {
         // Fail if the Extension was found but did not have the expected operation
         let Some(def) = r.get_op(&opaque.name) else {
@@ -262,12 +286,17 @@ pub fn resolve_opaque_op(
                 r.name().clone(),
             ));
         };
-        let ext_op = ExtensionOp::new(def.clone(), opaque.args.clone(), extension_registry)
-            .map_err(|e| OpaqueOpError::SignatureError {
-                node,
-                name: opaque.name.clone(),
-                cause: e,
-            })?;
+        let ext_op = ExtensionOp::new_with_cached(
+            def.clone(),
+            opaque.args.clone(),
+            opaque,
+            extension_registry,
+        )
+        .map_err(|e| OpaqueOpError::SignatureError {
+            node,
+            name: opaque.name.clone(),
+            cause: e,
+        })?;
         if opaque.signature() != ext_op.signature() {
             return Err(OpaqueOpError::SignatureMismatch {
                 node,
@@ -277,9 +306,13 @@ pub fn resolve_opaque_op(
                 stored: opaque.signature.clone(),
             });
         };
-        Ok(Some(ext_op))
+        Ok(ext_op)
     } else {
-        Ok(None)
+        Err(OpaqueOpError::UnresolvedOp(
+            node,
+            opaque.name.clone(),
+            opaque.extension.clone(),
+        ))
     }
 }
 
@@ -319,11 +352,16 @@ pub enum OpaqueOpError {
 mod test {
 
     use crate::{
-        extension::prelude::{BOOL_T, QB_T, USIZE_T},
+        extension::{
+            prelude::{BOOL_T, QB_T, USIZE_T},
+            SignatureFunc,
+        },
         std_extensions::arithmetic::{
             int_ops::{self, INT_OPS_REGISTRY},
             int_types::INT_TYPES,
         },
+        types::FuncValueType,
+        Extension,
     };
 
     use super::*;
@@ -360,8 +398,54 @@ mod test {
         );
         let resolved =
             super::resolve_opaque_op(Node::from(portgraph::NodeIndex::new(1)), &opaque, registry)
-                .unwrap()
                 .unwrap();
         assert_eq!(resolved.def().name(), "itobool");
+    }
+
+    #[test]
+    fn resolve_missing() {
+        let mut ext = Extension::new_test("ext".try_into().unwrap());
+        let ext_id = ext.name().clone();
+        let val_name = "missing_val";
+        let comp_name = "missing_comp";
+
+        let endo_sig = Signature::new_endo(BOOL_T);
+        ext.add_op(
+            val_name.into(),
+            "".to_string(),
+            SignatureFunc::MissingValidateFunc(FuncValueType::from(endo_sig.clone()).into()),
+        )
+        .unwrap();
+
+        ext.add_op(
+            comp_name.into(),
+            "".to_string(),
+            SignatureFunc::MissingComputeFunc,
+        )
+        .unwrap();
+        let registry = ExtensionRegistry::try_new([ext]).unwrap();
+        let opaque_val = OpaqueOp::new(
+            ext_id.clone(),
+            val_name,
+            "".into(),
+            vec![],
+            endo_sig.clone(),
+        );
+        let opaque_comp = OpaqueOp::new(ext_id.clone(), comp_name, "".into(), vec![], endo_sig);
+        let resolved_val = super::resolve_opaque_op(
+            Node::from(portgraph::NodeIndex::new(1)),
+            &opaque_val,
+            &registry,
+        )
+        .unwrap();
+        assert_eq!(resolved_val.def().name(), val_name);
+
+        let resolved_comp = super::resolve_opaque_op(
+            Node::from(portgraph::NodeIndex::new(2)),
+            &opaque_comp,
+            &registry,
+        )
+        .unwrap();
+        assert_eq!(resolved_comp.def().name(), comp_name);
     }
 }
