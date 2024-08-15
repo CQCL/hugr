@@ -596,7 +596,7 @@ pub mod test {
             Self::new(name, Version::new(0, 0, 0))
         }
 
-        /// Add a simple OpDef to the extension and return an extension op for it..
+        /// Add a simple OpDef to the extension and return an extension op for it.
         /// No description, no type parameters.
         pub(crate) fn simple_ext_op(
             &mut self,

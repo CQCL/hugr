@@ -641,7 +641,6 @@ mod test {
     fn test_invalid() {
         let mut new_ext = crate::Extension::new_test("new_ext".try_into().unwrap());
         let ext_name = new_ext.name().clone();
-        // let unknown_ext: ExtensionId = "unknown_ext".try_into().unwrap();
         let utou = Signature::new_endo(vec![USIZE_T]);
         let mut mk_op = |s| new_ext.simple_ext_op(s, utou.clone());
         let mut h = DFGBuilder::new(
