@@ -163,13 +163,25 @@ fn bench_serialization(c: &mut Criterion) {
             black_box(roundtrip(&h, JsonSer));
         });
     });
-    let mut group = c.benchmark_group("circuit_serialize");
+    let mut group = c.benchmark_group("circuit_roundtrip");
     group.plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic));
     for size in [0, 1, 10, 100, 1000].iter() {
         group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
             let h = circuit(size);
             b.iter(|| {
                 black_box(roundtrip(&h, JsonSer));
+            });
+        });
+    }
+    group.finish();
+
+    let mut group = c.benchmark_group("circuit_serialize");
+    group.plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic));
+    for size in [0, 1, 10, 100, 1000].iter() {
+        group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
+            let h = circuit(size);
+            b.iter(|| {
+                black_box(JsonSer.serialize(&h));
             });
         });
     }
