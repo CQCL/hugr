@@ -67,9 +67,9 @@ impl Serializer for JsonSer {
     }
 }
 
-fn roundtrip(hugr: Hugr, serializer: impl Serializer) -> Hugr {
-    let bytes = serializer.serialize(&hugr);
-    serde_json::from_slice(&bytes).unwrap()
+fn roundtrip(hugr: &Hugr, serializer: impl Serializer) -> Hugr {
+    let bytes = serializer.serialize(hugr);
+    serializer.deserialize(&bytes)
 }
 
 lazy_static! {
@@ -160,7 +160,7 @@ fn bench_serialization(c: &mut Criterion) {
     c.bench_function("simple_cfg_serialize", |b| {
         let h = simple_cfg_hugr();
         b.iter(|| {
-            black_box(roundtrip(h.clone(), JsonSer));
+            black_box(roundtrip(&h, JsonSer));
         });
     });
     let mut group = c.benchmark_group("circuit_serialize");
@@ -169,7 +169,7 @@ fn bench_serialization(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
             let h = circuit(size);
             b.iter(|| {
-                black_box(roundtrip(h.clone(), JsonSer));
+                black_box(roundtrip(&h, JsonSer));
             });
         });
     }
