@@ -1,10 +1,21 @@
 //! Version 0 (unstable).
 //!
-//! Instead of directly nesting `Node`s or `Term`s, we store them in tables and refer to them
-//! by their index in the table. This allows us to attach additional data to nodes and terms
+//! # Terms
+//!
+//! Terms form a meta language that is used to describe types, parameters and metadata that
+//! are known statically. To allow types to be parameterized by values, types and values
+//! are treated uniformly as terms, enabling a restricted form of dependent typing.
+//! The type system is extensible and can be used to declaratively encode the desired shape
+//! of operation parameters and metadata. Type constraints can be used to express more complex
+//! validation rules.
+//!
+//! # Tabling
+//!
+//! Instead of directly nesting structures, we store them in tables and refer to them
+//! by their index in the table. This allows us to attach additional data to the structures
 //! without changing the data structure itself. This can be used, for example, to keep track
-//! of metadata that has been parsed from its generic reprensentation as a term into a more
-//! specific in-memory reprensentation.
+//! of metadata that has been parsed from its generic representation as a term into a more
+//! specific in-memory representation.
 //!
 //! The tabling is also used for deduplication of terms. In practice, many terms will share
 //! the same subterms, and we can save memory and validation time by storing them only once.
@@ -44,7 +55,7 @@ pub struct TermVar(pub SmolStr);
 pub struct EdgeVar(pub SmolStr);
 
 /// A module consisting of a hugr graph together with terms.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub struct Module {
     /// Table of [`Node`]s.
     pub nodes: Vec<Node>,
@@ -57,7 +68,7 @@ pub struct Module {
 }
 
 /// Nodes in the hugr graph.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Node {
     /// The operation that the node performs.
     pub operation: Operation,
@@ -74,7 +85,7 @@ pub struct Node {
 }
 
 /// Operations that nodes can perform.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Operation {
     /// Root node of the hugr graph.
     Module,
@@ -115,7 +126,7 @@ pub mod operation {
     use super::{Scheme, Symbol, TermId};
 
     /// See [`Operation::DefineFunc`].
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
     pub struct DefineFunc {
         /// The name of the function to be defined.
         pub name: Symbol,
@@ -124,7 +135,7 @@ pub mod operation {
     }
 
     /// See [`Operation::DeclareFunc`].
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
     pub struct DeclareFunc {
         /// The name of the function to be declared.
         pub name: Symbol,
@@ -133,28 +144,28 @@ pub mod operation {
     }
 
     /// See [`Operation::CallFunc`].
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
     pub struct CallFunc {
         /// The name of the function to be called.
         pub name: Symbol,
     }
 
     /// See [`Operation::LoadFunc`].
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
     pub struct LoadFunc {
         /// The name of the function to be loaded.
         pub name: Symbol,
     }
 
     /// See [`Operation::Custom`].
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
     pub struct Custom {
         /// The name of the custom operation.
         pub name: Symbol,
     }
 
     /// See [`Operation::DefineAlias`].
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
     pub struct DefineAlias {
         /// The name of the alias to be defined.
         pub name: Symbol,
@@ -163,7 +174,7 @@ pub mod operation {
     }
 
     /// See [`Operation::DeclareAlias`].
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
     pub struct DeclareAlias {
         /// The name of the alias to be declared.
         pub name: Symbol,
@@ -173,7 +184,7 @@ pub mod operation {
 }
 
 /// A metadata item.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct MetaItem {
     /// Name of the metadata item.
     pub name: SmolStr,
@@ -182,7 +193,7 @@ pub struct MetaItem {
 }
 
 /// A port in the graph.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Port {
     /// The type of the port.
     ///
@@ -198,7 +209,7 @@ pub struct Port {
 ///
 /// An edge connects input ports to output ports.
 /// A port may only be part of at most one edge.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub struct Edge {
     /// The input ports of the edge.
     pub inputs: TinyVec<[PortId; 3]>,
@@ -206,8 +217,8 @@ pub struct Edge {
     pub outputs: TinyVec<[PortId; 3]>,
 }
 
-/// Parameterized terms.
-#[derive(Debug, Clone)]
+/// Schemes are parameterized terms.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Scheme {
     /// The named parameters of the scheme.
     ///
@@ -216,6 +227,7 @@ pub struct Scheme {
     /// Constraints on the parameters of the scheme.
     ///
     /// All parameters are available as variables within the constraints.
+    /// The constraints must be terms of type `Constraint`.
     pub constraints: TinyVec<[TermId; 3]>,
     /// The body of the scheme.
     ///
@@ -224,7 +236,7 @@ pub struct Scheme {
 }
 
 /// A named parameter of a scheme.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SchemeParam {
     /// The name of the parameter.
     pub name: TermVar,
@@ -233,7 +245,7 @@ pub struct SchemeParam {
 }
 
 /// A term in the compile time meta language.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Term {
     /// Standin for any term.
     Wildcard,
@@ -280,7 +292,7 @@ pub mod term {
     use tinyvec::TinyVec;
 
     /// Named terms.
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
     pub struct Named {
         /// The name of the term.
         pub name: Symbol,
@@ -289,7 +301,7 @@ pub mod term {
     }
 
     /// A homogeneous list of terms.
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
     pub struct List {
         /// The items that are contained in the list.
         pub items: TinyVec<[TermId; 3]>,
@@ -298,28 +310,28 @@ pub mod term {
     }
 
     /// The type of a list of terms.
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
     pub struct ListType {
         /// The type of the items contained in the list.
         pub item_type: TermId,
     }
 
     /// A heterogeneous list of terms.
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
     pub struct Tuple {
         /// The items that are contained in the tuple.
         pub items: TinyVec<[TermId; 3]>,
     }
 
     /// A product type.
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
     pub struct ProductType {
         /// The types that are contained in the product type.
         pub types: TermId,
     }
 
     /// Function type.
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
     pub struct FuncType {
         /// The type of the inputs to the function.
         ///
@@ -336,14 +348,14 @@ pub mod term {
     }
 
     /// Sum type.
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
     pub struct SumType {
         /// The types of the variants in the sum.
         pub types: TermId,
     }
 
     /// Tagged term.
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
     pub struct Tagged {
         /// The tag of the tagged term.
         pub tag: u8,
@@ -352,7 +364,7 @@ pub mod term {
     }
 
     /// Extension set.
-    #[derive(Debug, Clone, Default)]
+    #[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
     pub struct ExtSet {
         /// The extensions that are contained in the extension set.
         pub extensions: Vec<SmolStr>,

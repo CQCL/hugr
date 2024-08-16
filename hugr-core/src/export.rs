@@ -26,6 +26,7 @@ pub fn export(hugr: &Hugr) -> model::Module {
 struct Context<'a> {
     /// The HUGR graph to convert.
     hugr: &'a Hugr,
+    /// The module that is being built.
     module: model::Module,
     /// Mapping from ports to edge indices.
     /// This only includes the minimum port among groups of linked ports.
