@@ -87,7 +87,7 @@ def test_registry():
         reg.get_extension("not_found")
 
 
-@pytest.fixture()
+@pytest.fixture
 def registry() -> ext.ExtensionRegistry:
     reg = ext.ExtensionRegistry()
     reg.add_extension(LOGIC_EXT)
