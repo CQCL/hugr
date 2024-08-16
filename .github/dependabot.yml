@@ -11,14 +11,36 @@ updates:
       interval: "weekly"
     commit-message:
       # Use a conventional commit tag
-      prefix: "chore(deps)"
+      prefix: "chore(deps-rs)"
+    groups:
+      dev:
+        dependency-type: "development"
+        update-types: ["patch", "minor"]
+      patch:
+        update-types: ["patch"]
+      minor:
+        update-types: ["minor"]
+      # Major updates still generate individual PRs
+
   - package-ecosystem: "pip"
-    directory: "/hugr-py/" # Location of package manifests
+    directories: # Location of package manifests
+      - "/hugr-py/"
+      - "/"
     schedule:
       interval: "weekly"
     commit-message:
       # Use a conventional commit tag
       prefix: "chore(deps-py)"
+    groups:
+      dev:
+        dependency-type: "development"
+        update-types: ["patch", "minor"]
+      patch:
+        update-types: ["patch"]
+      minor:
+        update-types: ["minor"]
+      # Major updates still generate individual PRs
+
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
