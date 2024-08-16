@@ -2,13 +2,16 @@ use anyhow::{anyhow, Result};
 use hugr::{
     hugr::views::SiblingGraph,
     ops::{
-        constant::Sum, Call, Case, Conditional, Const, Input, LoadConstant, LoadFunction,
-        MakeTuple, OpTag, OpTrait, OpType, Output, Tag, UnpackTuple, Value, CFG,
+        constant::Sum, Call, CallIndirect, Case, Conditional, Const, Input, LoadConstant,
+        LoadFunction, MakeTuple, OpTag, OpTrait, OpType, Output, Tag, UnpackTuple, Value, CFG,
     },
     types::{SumType, Type, TypeEnum},
     HugrView, NodeIndex,
 };
-use inkwell::{builder::Builder, values::BasicValueEnum};
+use inkwell::{
+    builder::Builder,
+    values::{BasicValueEnum, CallableValue},
+};
 use itertools::Itertools;
 use petgraph::visit::Walker;
 
@@ -337,6 +340,23 @@ fn emit_call<'c, H: HugrView>(
     args.outputs.finish(builder, call_results)
 }
 
+fn emit_call_indirect<'c, H: HugrView>(
+    context: &mut EmitFuncContext<'c, H>,
+    args: EmitOpArgs<'c, CallIndirect, H>,
+) -> Result<()> {
+    let func_ptr = match args.inputs[0] {
+        BasicValueEnum::PointerValue(v) => Ok(v),
+        _ => Err(anyhow!("emit_call_indirect: Not a pointer")),
+    }?;
+    let func =
+        CallableValue::try_from(func_ptr).expect("emit_call_indirect: Not a function pointer");
+    let inputs = args.inputs.into_iter().skip(1).map_into().collect_vec();
+    let builder = context.builder();
+    let call = builder.build_call(func, inputs.as_slice(), "")?;
+    let call_results = deaggregate_call_result(builder, call, args.outputs.len())?;
+    args.outputs.finish(builder, call_results)
+}
+
 fn emit_load_function<'c, H: HugrView>(
     context: &mut EmitFuncContext<'c, H>,
     args: EmitOpArgs<'c, LoadFunction, H>,
@@ -385,6 +405,7 @@ fn emit_optype<'c, H: HugrView>(
         }
         OpType::LoadConstant(ref lc) => emit_load_constant(context, args.into_ot(lc)),
         OpType::Call(ref cl) => emit_call(context, args.into_ot(cl)),
+        OpType::CallIndirect(ref cl) => emit_call_indirect(context, args.into_ot(cl)),
         OpType::LoadFunction(ref lf) => emit_load_function(context, args.into_ot(lf)),
         OpType::Conditional(ref co) => emit_conditional(context, args.into_ot(co)),
         OpType::CFG(ref cfg) => emit_cfg(context, args.into_ot(cfg)),

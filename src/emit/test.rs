@@ -1,3 +1,5 @@
+use std::iter;
+
 use crate::custom::int::add_int_extensions;
 use crate::types::HugrFuncType;
 use hugr::builder::DataflowSubContainer;
@@ -8,7 +10,7 @@ use hugr::extension::prelude::BOOL_T;
 use hugr::extension::{ExtensionRegistry, ExtensionSet, EMPTY_REG};
 use hugr::ops::constant::CustomConst;
 use hugr::ops::handle::FuncID;
-use hugr::ops::{Tag, UnpackTuple, Value};
+use hugr::ops::{CallIndirect, Tag, UnpackTuple, Value};
 use hugr::std_extensions::arithmetic::int_ops::{self, INT_OPS_REGISTRY};
 use hugr::std_extensions::arithmetic::int_types::ConstInt;
 use hugr::types::{Signature, Type, TypeRow};
@@ -243,6 +245,28 @@ fn emit_hugr_call(llvm_ctx: TestContext) {
             .call(&f_id, &[], func_b.input_wires(), &EMPTY_REG)
             .unwrap();
         func_b.finish_with_outputs(call.outputs()).unwrap();
+    }
+
+    let mut mod_b = ModuleBuilder::new();
+    build_recursive(&mut mod_b, "main_void", type_row![]);
+    build_recursive(&mut mod_b, "main_unary", type_row![BOOL_T]);
+    build_recursive(&mut mod_b, "main_binary", type_row![BOOL_T, BOOL_T]);
+    let hugr = mod_b.finish_hugr(&EMPTY_REG).unwrap();
+    check_emission!(hugr, llvm_ctx);
+}
+
+#[rstest]
+fn emit_hugr_call_indirect(llvm_ctx: TestContext) {
+    fn build_recursive(mod_b: &mut ModuleBuilder<Hugr>, name: &str, io: TypeRow) {
+        let signature = HugrFuncType::new_endo(io);
+        let f_id = mod_b.declare(name, signature.clone().into()).unwrap();
+        let mut func_b = mod_b.define_declaration(&f_id).unwrap();
+        let func = func_b.load_func(&f_id, &[], &EMPTY_REG).unwrap();
+        let inputs = iter::once(func).chain(func_b.input_wires());
+        let call_indirect = func_b
+            .add_dataflow_op(CallIndirect { signature }, inputs)
+            .unwrap();
+        func_b.finish_with_outputs(call_indirect.outputs()).unwrap();
     }
 
     let mut mod_b = ModuleBuilder::new();
