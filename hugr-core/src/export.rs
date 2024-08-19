@@ -49,7 +49,7 @@ impl<'a> Context<'a> {
     }
 
     pub fn make_node(&mut self, node: model::Node) -> model::NodeId {
-        let index = self.module.terms.len();
+        let index = self.module.nodes.len();
         self.module.nodes.push(node);
         model::NodeId(index as _)
     }
