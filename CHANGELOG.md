@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1](https://github.com/CQCL/hugr-llvm/compare/v0.2.0...v0.2.1) - 2024-08-19
+
+### Documentation
+- Remove fixed crate version in usage instructions ([#68](https://github.com/CQCL/hugr-llvm/pull/68))
+
+### New Features
+- Add lowering for LoadFunction ([#65](https://github.com/CQCL/hugr-llvm/pull/65))
+- Emission for CallIndirect nodes ([#73](https://github.com/CQCL/hugr-llvm/pull/73))
+
 ## [0.2.0](https://github.com/CQCL/hugr-llvm/compare/v0.1.0...v0.2.0) - 2024-07-31
 
 ### New Features
