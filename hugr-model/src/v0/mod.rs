@@ -34,6 +34,10 @@ pub struct NodeId(pub u32);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct PortId(pub u32);
 
+/// Index of an edge in a hugr graph.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+pub struct EdgeId(pub u32);
+
 /// Index of a term in a hugr graph.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct TermId(pub u32);
@@ -61,8 +65,6 @@ pub struct Module {
     pub nodes: Vec<Node>,
     /// Table of [`Port`]s.
     pub ports: Vec<Port>,
-    /// Table of [`Edge`]s.
-    pub edges: Vec<Edge>,
     /// Table of [`Term`]s.
     pub terms: Vec<Term>,
 }
@@ -195,6 +197,10 @@ pub struct MetaItem {
 /// A port in the graph.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Port {
+    /// The id of the edge that the port is connected to.
+    /// All ports referencing the same edge are connected.
+    pub edge: EdgeId,
+
     /// The type of the port.
     ///
     /// This must be a term of type `Type`.
@@ -203,18 +209,6 @@ pub struct Port {
 
     /// Metadata attached to the port.
     pub meta: Vec<MetaItem>,
-}
-
-/// An edge in the graph.
-///
-/// An edge connects input ports to output ports.
-/// A port may only be part of at most one edge.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
-pub struct Edge {
-    /// The input ports of the edge.
-    pub inputs: TinyVec<[PortId; 3]>,
-    /// The output ports of the edge.
-    pub outputs: TinyVec<[PortId; 3]>,
 }
 
 /// Schemes are parameterized terms.
