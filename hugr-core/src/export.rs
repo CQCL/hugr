@@ -8,10 +8,10 @@ use crate::{
         CustomType, FuncTypeBase, MaybeRV, PolyFuncTypeBase, RowVariable, SumType, TypeArg,
         TypeBase, TypeEnum,
     },
-    Direction, Hugr, HugrView, Node, Port,
+    Hugr, HugrView, Node, Port,
 };
 use hugr_model::v0 as model;
-use indexmap::IndexMap;
+use indexmap::IndexSet;
 use smol_str::ToSmolStr;
 use tinyvec::TinyVec;
 
@@ -30,7 +30,7 @@ struct Context<'a> {
     module: model::Module,
     /// Mapping from ports to edge indices.
     /// This only includes the minimum port among groups of linked ports.
-    edges: IndexMap<(Node, Port), usize>,
+    edges: IndexSet<(Node, Port)>,
 }
 
 impl<'a> Context<'a> {
@@ -38,7 +38,7 @@ impl<'a> Context<'a> {
         Self {
             hugr,
             module: model::Module::default(),
-            edges: IndexMap::new(),
+            edges: IndexSet::new(),
         }
     }
 
@@ -54,33 +54,31 @@ impl<'a> Context<'a> {
         model::NodeId(index as _)
     }
 
-    pub fn make_port(&mut self, node: Node, port: impl Into<Port>) -> model::PortId {
-        let port = port.into();
-        let index = self.module.ports.len();
-        let port_id = model::PortId(index as _);
-        let r#type = self.make_term(model::Term::Wildcard); // TODO
-        self.module.ports.push(model::Port {
-            r#type,
-            meta: Vec::new(),
-        });
-
+    /// Returns the edge id for a given port, creating a new edge if necessary.
+    ///
+    /// Any two ports that are linked will be represented by the same edge.
+    fn get_edge_id(&mut self, node: Node, port: Port) -> model::EdgeId {
         // To ensure that linked ports are represented by the same edge, we take the minimum port
         // among all the linked ports, including the one we started with.
         let linked_ports = self.hugr.linked_ports(node, port);
         let all_ports = std::iter::once((node, port)).chain(linked_ports);
         let repr = all_ports.min().unwrap();
+        let edge = self.edges.insert_full(repr).1 as _;
+        model::EdgeId(edge)
+    }
 
-        let edge_id = *self.edges.entry(repr).or_insert_with(|| {
-            let edge_id = self.module.edges.len();
-            let edge = model::Edge::default();
-            self.module.edges.push(edge);
-            edge_id
+    pub fn make_port(&mut self, node: Node, port: impl Into<Port>) -> model::PortId {
+        let port = port.into();
+        let index = self.module.ports.len();
+        let port_id = model::PortId(index as _);
+        let r#type = self.make_term(model::Term::Wildcard); // TODO
+        let edge = self.get_edge_id(node, port);
+
+        self.module.ports.push(model::Port {
+            r#type,
+            meta: Vec::new(),
+            edge,
         });
-
-        match port.direction() {
-            Direction::Incoming => self.module.edges[edge_id].inputs.push(port_id),
-            Direction::Outgoing => self.module.edges[edge_id].outputs.push(port_id),
-        }
 
         port_id
     }
