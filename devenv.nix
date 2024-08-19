@@ -20,6 +20,7 @@ in
       pkgs.llvmPackages_16.libllvm
       # cargo-llvm-cov is currently marked broken on nixpkgs unstable
       pkgs-stable.cargo-llvm-cov
+      pkgs.capnproto
     ] ++ lib.optionals
       pkgs.stdenv.isDarwin
       (with pkgs.darwin.apple_sdk; [

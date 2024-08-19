@@ -7,9 +7,16 @@ homepage.workspace = true
 repository.workspace = true
 license.workspace = true
 
+
+build = "build.rs"
+
 [dependencies]
+capnp = "0.19.6"
 smol_str.workspace = true
 tinyvec.workspace = true
 
 [lints]
 workspace = true
+
+[build-dependencies]
+capnpc = "0.19.0"
