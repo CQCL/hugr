@@ -241,7 +241,7 @@ mod test {
             .finish(|mut builder| {
                 let [in1, in2] = builder.input_wires_arr();
                 let mut cfg_builder = builder
-                    .cfg_builder(
+                    .cfg_builder_exts(
                         [(t1.clone(), in1), (t2.clone(), in2)],
                         t2.clone().into(),
                         es.clone(),
@@ -283,7 +283,6 @@ mod test {
     #[rstest]
     fn nested(llvm_ctx: TestContext) {
         let t1 = HugrType::new_unit_sum(3);
-        let es = ExtensionSet::default();
         let hugr = SimpleHugrConfig::new()
             .with_ins(vec![t1.clone(), BOOL_T])
             .with_outs(BOOL_T)
@@ -292,11 +291,7 @@ mod test {
                 let unit_val = builder.add_load_value(Value::unit());
                 let [outer_cfg_out] = {
                     let mut outer_cfg_builder = builder
-                        .cfg_builder(
-                            [(t1.clone(), in1), (BOOL_T, in2)],
-                            BOOL_T.into(),
-                            es.clone(),
-                        )
+                        .cfg_builder([(t1.clone(), in1), (BOOL_T, in2)], BOOL_T.into())
                         .unwrap();
 
                     let outer_entry_block = {
@@ -306,9 +301,8 @@ mod test {
                         let [outer_entry_in1, outer_entry_in2] =
                             outer_entry_builder.input_wires_arr();
                         let [outer_entry_out] = {
-                            let mut inner_cfg_builder = outer_entry_builder
-                                .cfg_builder([], BOOL_T.into(), es.clone())
-                                .unwrap();
+                            let mut inner_cfg_builder =
+                                outer_entry_builder.cfg_builder([], BOOL_T.into()).unwrap();
                             let inner_exit_block = inner_cfg_builder.exit_block();
                             let inner_entry_block = {
                                 let inner_entry_builder = inner_cfg_builder
