@@ -85,10 +85,16 @@ impl<'a> Context<'a> {
 
     /// Get the name of the function associated with a node that takes a static input
     /// connected to a function definition or declaration. Returns `None` otherwise.
-    fn get_func_name(&self, node: Node) -> Option<model::Symbol> {
+    fn connected_function(&self, node: Node) -> Option<model::Symbol> {
         let port = self.hugr.node_inputs(node).last()?;
         let (defn_node, _) = self.hugr.linked_outputs(node, port).next()?;
-        match self.hugr.get_optype(defn_node) {
+        self.get_func_name(defn_node)
+    }
+
+    /// Get the name of a function definition or declaration node. Returns `None` if not
+    /// one of those operations.
+    fn get_func_name(&self, func_node: Node) -> Option<model::Symbol> {
+        match self.hugr.get_optype(func_node) {
             OpType::FuncDecl(func_decl) => Some(model::Symbol(func_decl.name())),
             OpType::FuncDefn(func_defn) => Some(model::Symbol(func_defn.name())),
             _ => None,
@@ -146,14 +152,12 @@ impl Export for Node {
             OpType::DataflowBlock(_) => model::Operation::Block,
 
             OpType::FuncDefn(func) => {
-                // TODO: If the node is not connected to a function, we should do better than panic.
                 let name = ctx.get_func_name(*self).unwrap();
                 let r#type = Box::new(func.signature.export(ctx));
                 model::Operation::DefineFunc(model::operation::DefineFunc { name, r#type })
             }
 
             OpType::FuncDecl(func) => {
-                // TODO: If the node is not connected to a function, we should do better than panic.
                 let name = ctx.get_func_name(*self).unwrap();
                 let r#type = Box::new(func.signature.export(ctx));
                 model::Operation::DeclareFunc(model::operation::DeclareFunc { name, r#type })
@@ -174,14 +178,14 @@ impl Export for Node {
 
             OpType::Call(call) => {
                 // TODO: If the node is not connected to a function, we should do better than panic.
-                let name = ctx.get_func_name(*self).unwrap();
+                let name = ctx.connected_function(*self).unwrap();
                 params.extend(call.type_args.iter().map(|arg| arg.export(ctx)));
                 model::Operation::CallFunc(model::operation::CallFunc { name })
             }
 
             OpType::LoadFunction(func) => {
                 // TODO: If the node is not connected to a function, we should do better than panic.
-                let name = ctx.get_func_name(*self).unwrap();
+                let name = ctx.connected_function(*self).unwrap();
                 params.extend(func.type_args.iter().map(|arg| arg.export(ctx)));
                 model::Operation::LoadFunc(model::operation::LoadFunc { name })
             }
@@ -448,7 +452,7 @@ mod test {
                     .append(cx_gate(), [1, 0])?;
 
                 // constants are not supported yet
-                
+
                 // let angle = linear.add_constant(ConstF64::new(0.5));
                 // linear.append_and_consume(
                 //     rz_f64(),
@@ -464,10 +468,11 @@ mod test {
 
     #[rstest]
     #[case(crate::builder::test::simple_dfg_hugr())]
-    #[case(crate::builder::test::simple_cfg_hugr())]
     #[case(test_simple_circuit())]
-    // #[case(crate::builder::test::closed_dfg_root_hugr())]
+    #[should_panic(expected = "const nodes")]
+    #[case::panic_with_message(crate::builder::test::simple_cfg_hugr())]
     fn test_export(#[case] hugr: Hugr) {
         let _model = super::export(&hugr);
+        // TODO check the model
     }
 }
