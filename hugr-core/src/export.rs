@@ -414,3 +414,60 @@ impl Export for ExtensionSet {
         }))
     }
 }
+
+#[cfg(test)]
+mod test {
+    use rstest::{fixture, rstest};
+
+    use crate::{
+        builder::{Dataflow, DataflowSubContainer},
+        extension::prelude::QB_T,
+        std_extensions::arithmetic::float_types,
+        type_row,
+        types::Signature,
+        utils::test_quantum_extension::{self, cx_gate, h_gate},
+        Hugr,
+    };
+
+    #[fixture]
+    fn test_simple_circuit() -> Hugr {
+        crate::builder::test::build_main(
+            Signature::new_endo(type_row![QB_T, QB_T])
+                .with_extension_delta(test_quantum_extension::EXTENSION_ID)
+                .with_extension_delta(float_types::EXTENSION_ID)
+                .into(),
+            |mut f_build| {
+                let wires: Vec<_> = f_build.input_wires().collect();
+                let mut linear = f_build.as_circuit(wires);
+
+                assert_eq!(linear.n_wires(), 2);
+
+                linear
+                    .append(h_gate(), [0])?
+                    .append(cx_gate(), [0, 1])?
+                    .append(cx_gate(), [1, 0])?;
+
+                // constants are not supported yet
+                
+                // let angle = linear.add_constant(ConstF64::new(0.5));
+                // linear.append_and_consume(
+                //     rz_f64(),
+                //     [CircuitUnit::Linear(0), CircuitUnit::Wire(angle)],
+                // )?;
+
+                let outs = linear.finish();
+                f_build.finish_with_outputs(outs)
+            },
+        )
+        .unwrap()
+    }
+
+    #[rstest]
+    #[case(crate::builder::test::simple_dfg_hugr())]
+    #[case(crate::builder::test::simple_cfg_hugr())]
+    #[case(test_simple_circuit())]
+    // #[case(crate::builder::test::closed_dfg_root_hugr())]
+    fn test_export(#[case] hugr: Hugr) {
+        let _model = super::export(&hugr);
+    }
+}
