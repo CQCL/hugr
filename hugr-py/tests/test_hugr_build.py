@@ -253,7 +253,7 @@ def test_poly_function(direct_call: bool) -> None:
 
     f_main.set_outputs(call)
 
-    validate(mod.hugr, True)
+    validate(mod.hugr)
 
 
 @pytest.mark.parametrize("direct_call", [True, False])

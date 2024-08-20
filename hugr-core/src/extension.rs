@@ -595,6 +595,18 @@ pub mod test {
         pub(crate) fn new_test(name: ExtensionId) -> Self {
             Self::new(name, Version::new(0, 0, 0))
         }
+
+        /// Add a simple OpDef to the extension and return an extension op for it.
+        /// No description, no type parameters.
+        pub(crate) fn simple_ext_op(
+            &mut self,
+            name: &str,
+            signature: impl Into<SignatureFunc>,
+        ) -> ExtensionOp {
+            self.add_op(name.into(), "".to_string(), signature).unwrap();
+            self.instantiate_extension_op(name, [], &PRELUDE_REGISTRY)
+                .unwrap()
+        }
     }
 
     #[test]

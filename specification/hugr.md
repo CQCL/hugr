@@ -299,7 +299,7 @@ the following basic dataflow operations are available (in addition to the
   The signature of the operation comprises the output signature of the child
   Input node (as input) and the input signature of the child Output node (as
   output).
-- `OpaqueOp`: an operation defined by an [Extension](#extension-system).
+- `ExtensionOp`: an operation defined by an [Extension](#extension-system).
 
 The example below shows two DFGs, one nested within the other. Each has an Input
 and an Output node, whose outputs and inputs respectively match the inputs and
@@ -791,15 +791,16 @@ There are two classes of type: `AnyType` $\supset$ `CopyableType`. Types in thes
 classes are distinguished by whether the runtime values of those types can be implicitly
 copied or discarded (multiple or 0 links from on output port respectively):
 
-- For the broadest class (`AnyType`), the only operation supported is the identity operation (aka no-op, or `lift` - see [Extension Tracking](#extension-tracking) below). Specifically, we do not require it to be possible to copy or discard all values, hence the requirement that outports of linear type must have exactly one edge. (That is, a type not known to be in the copyable subset). All incoming ports must have exactly one edge.
+- For the broadest class (`AnyType`), the only operation supported is the identity operation (aka no-op, or `lift` - see [Extension Tracking](#extension-tracking) below). Specifically, we do not require it to be possible to copy or discard all values, hence the requirement that outports of linear type must have exactly one edge. (That is, a type not known to be in the copyable subset).
 
     In fully qubit-counted contexts programs take in a number of qubits as input and return the same number, with no discarding.
 
 - The smaller class is `CopyableType`, i.e. types holding ordinary classical
   data, where values can be copied (and discarded, the 0-ary copy). This
   allows multiple (or 0) outgoing edges from an outport; also these types can
-  be sent down `Const` edges. Note: dataflow inputs (`Value`, `Const` and `Function`) always
-  require a single connection.
+  be sent down `Const` edges.
+
+Note that all dataflow inputs (`Value`, `Const` and `Function`) always require a single connection, regardless of whether the type is `AnyType` or `Copyable`.
 
 **Rows** The `#` is a *row* which is a sequence of zero or more types. Types in the row can optionally be given names in metadata i.e. this does not affect behaviour of the HUGR. When writing literal types, we use `#` to distinguish between tuples and rows, e.g. `(int<1>,int<2>)` is a tuple while `Sum(#(int<1>),#(int<2>))` contains two rows.
 
@@ -812,7 +813,7 @@ Extensions ::= (Extension)* -- a set, not a list
 Type ::= Sum([#]) -- disjoint union of rows of other types, tagged by unsigned int
        | Opaque(Name, [TypeArg]) -- a (instantiation of a) custom type defined by an extension
        | Function(#, #, Extensions) -- monomorphic function: arguments, results, and delta (see below)
-       | Variable -- refers to a TypeParam bound by the nearest enclosing FuncDefn node, or an enclosing Function Type
+       | Variable -- refers to a TypeParam bound by the nearest enclosing FuncDefn node or polymorphic type scheme
 ```
 
 (We write `[Foo]` to indicate a list of Foo's.)
@@ -849,11 +850,11 @@ TypeArgs appropriate for the function's TypeParams:
 
 ```haskell
 TypeArg ::= Type(Type) -- could be a variable of kind Type, or contain variable(s)
-          | Extensions(Extensions) -- may contain TypeArg's of kind Extensions
-          | Variable -- refers to an enclosing TypeParam (binder) of any kind below
           | BoundedUSize(u64)
+          | Extensions(Extensions) -- may contain TypeArg's of kind Extensions
           | Sequence([TypeArg]) -- fits either a List or Tuple TypeParam
           | Opaque(Value)
+          | Variable -- refers to an enclosing TypeParam (binder) of any kind above
 ```
 
 For example, a Function node declaring a `TypeParam::Opaque("Array", [5, TypeArg::Type(Type::Opaque("usize"))])`
@@ -868,12 +869,40 @@ a valid type as long as the TypeArgs match the declared TypeParams, which can be
 (Note that within a polymorphic type scheme, type variables of kind `Sequence` or `Opaque` will only be usable
 as arguments to Opaque types---see [Extension System](#extension-system).)
 
+#### Row Variables
+
+Type variables of kind `TypeParam::List(TypeParam::Type(_))` are known as
+"row variables" and along with type parameters of the same kinds are given special
+treatment, as follows:
+* A `TypeParam` of such kind may be instantiated with not just a `TypeArg::List`
+  but also a single `TypeArg::Type`. (This is purely a notational convenience.)
+  For example, `Type::Function(usize, unit, <exts>)` is equivalent shorthand
+  for `Type::Function(#(usize), #(unit), <exts>)`.
+* When a `TypeArg::Sequence` is provided as argument for such a TypeParam, we allow
+  elements to be a mixture of both types (including variables of kind
+  `TypeParam::Type(_)`) and also row variables. When such variables are instantiated
+  (with other Sequences) the elements of the inner Sequence are spliced directly into
+  the outer (concatenating their elements), eliding the inner (Sequence) wrapper.
+
+For example, a polymorphic FuncDefn might declare a row variable X of kind
+`TypeParam::List(TypeParam::Type(Copyable))` and have as output a (tuple) type
+`Sum([#(X, usize)])`. A call that instantiates said type-parameter with
+`TypeArg::Sequence([usize, unit])` would then have output `Sum([#(usize, unit, usize)])`.
+
+See [Declarative Format](#declarative-format) for more examples.
+
+Note that since a row variable does not have kind Type, it cannot be used as the type of an edge.
+
 ### Extension Tracking
 
 The type of `Function` includes a set of [extensions](#extension-system) which are required to execute the graph.
-Every node in the HUGR is annotated with the set of extensions required to produce its inputs,
-and each operation provides (a way to compute) the set of extensions required to execute the node, known as the "delta";
-the union of these two must match the set of extensions on each successor node.
+Similarly, every dataflow node in the HUGR has a set of extensions required to execute the node (computed from its operation),
+also known as the "delta". The delta of any node must be a subset of its parent's delta,
+except for FuncDefn's:
+* the delta of any child of a FuncDefn must be a subset of the extensions in the FuncDefn's *type*
+* the FuncDefn itself has no delta (trivially a subset of any parent): this reflects that the extensions
+are not needed to *know* the FuncDefn, only to *execute* it
+(by a Call node, whose delta is taken from the called FuncDefn's *type*).
 
 Keeping track of the extension requirements like this allows extension designers
 and third-party tooling to control how/where a module is run.
@@ -890,36 +919,15 @@ running different extensions. By the same mechanism, the runtime can reason
 about where to run different parts of the graph by inspecting their
 extension requirements.
 
-To allow extension annotations on nodes to be made equal, we will have operations
- **lift** and **liftGraph** which can add extension constraints to values.
+Special operations **lift** and **liftGraph** can add extension requirements:
+* `lift<E: ExtensionId, R: List<Type>>` is a node with input and output rows `R` and extension-delta `{E}`
+* `liftGraph<N: ExtensionSet, I: List<Type>, E: ExtensionSet, O: List<Type>>` has one input
+$ \vec{I}^{\underrightarrow{\;E\;}}\vec{O} $ and one output $ \vec{I}^{\underrightarrow{\;E \cup N\;}}\vec{O}$.
+That is, given a graph, it adds extensions $N$ to the requirements of the graph.
 
-$\displaystyle{\frac{v : [ \rho ] T}{\textbf{lift} \langle X \rangle (v) : [X, \rho] T}}$
-
-**lift** - Takes as a node weight parameter the single extension
-**X** which it adds to the
-extension requirements of its argument.
-
-$\displaystyle{\frac{f : [ \rho ] \textbf{Function}[R](\vec{I}, \vec{O})}{\textbf{liftGraph} \langle X \rangle (f) : [ \rho ] \textbf{Function}[X, R](\vec{I}, \vec{O})}}$
-
-**liftGraph** - Like **lift**, takes an
-extension X as a constant node
-weight parameter. Given a graph, it will add extension
-X to the requirements of the
-graph.
-
-Having these as explicit nodes on the graph allows us to search for the
-point before extensions were added when we want to copy graphs, allowing
-us to get the version with minimal extension requirements.
-
-Graphs which are almost alike can both be squeezed into a
-Conditional-node that selects one or the other, by wrapping them in a
-parent graph to correct the inputs/outputs and using the **lift**
-function from below.
-
-Note that here, any letter with vector notation refers to a variable
-which stands in for a row. Hence, when checking the inputs and outputs
-align, we're introducing a *row equality constraint*, rather than the
-equality constraint of `typeof(b) ~ Bool`.
+The latter is useful for higher-order operations such as conditionally selecting
+one function or another, where the output must have a consistent type (including
+the extension-requirements of the function).
 
 ### Rewriting Extension Requirements
 
@@ -960,7 +968,7 @@ tooling. These operations cover various flavours:
 
 - Instruction sets specific to a target.
 - Operations that are best expressed in some other format that can be
-  compiled in to a graph (e.g. ZX).
+  compiled into a graph (e.g. ZX).
 - Ephemeral operations used by specific compiler passes.
 
 A nice-to-have for this extensibility is a human-friendly format for
@@ -1015,7 +1023,7 @@ named **TypeDef**s and **OpDef**s---see [Declarative Format](#declarative-format
 These are (potentially polymorphic) definitions of types and operations, respectively---polymorphism arises because both may
 declare any number of TypeParams, as per [Polymorphism](#polymorphism). To use a TypeDef as a type,
 it must be instantiated with TypeArgs appropriate for its TypeParams, and similarly
-to use an OpDef as a node operation: each `OpaqueOp` node stores a static-constant list of TypeArgs.
+to use an OpDef as a node operation: each `ExtensionOp` node stores a static-constant list of TypeArgs.
 
 For TypeDef's, any set of TypeArgs conforming to its TypeParams, produces a valid type.
 However, for OpDef's, greater flexibility is allowed: each OpDef *either*
@@ -1147,6 +1155,14 @@ extensions:
     # outputs would be, in principle: Array<i+j>(t)
     # - but default type scheme interpreter does not support such addition
     # Hence, no signature block => will look up a compute_signature in registry.
+  - name: TupleConcat
+    description: "Concatenate two tuples"
+    params:
+      a: List[Type]
+      b: List[Type]
+    signature:
+      inputs: [[null, Sum(a)], [null, Sum(b)]] # Sums with single variant are tuples
+      outputs: [[null, Sum([a,b])]] # Tuple of elements of a concatenated with elements of b
   - name: GraphOp
     description: "Involves running an argument Graph. E.g. run it some variable number of times."
     params:
@@ -1590,8 +1606,6 @@ struct HUGR {
 struct Node{
   // parent node index
   parent: Int,
-  // The input extensions to the node
-  input_extensions: Option<ExtensionSet>
   // name of operation
   op: String
   //other op-specific fields

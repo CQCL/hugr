@@ -13,8 +13,7 @@ from hugr.std.int import INT_OPS_EXTENSION, INT_TYPES_EXTENSION, DivMod, int_t
 from hugr.std.logic import EXTENSION as LOGIC_EXT
 from hugr.std.logic import Not
 
-from .conftest import CX, H, Measure, Rz, validate
-from .conftest import EXTENSION as QUANTUM_EXT
+from .conftest import CX, QUANTUM_EXT, H, Measure, Rz, validate
 
 STRINGLY_EXT = ext.Extension("my_extension", ext.Version(0, 0, 0))
 _STRINGLY_DEF = STRINGLY_EXT.add_op_def(
@@ -58,7 +57,7 @@ def test_stringly_typed():
     n = dfg.add(StringlyOp("world")())
     dfg.set_outputs()
     assert dfg.hugr[n].op == StringlyOp("world")
-    validate(dfg.hugr)
+    validate(ext.Package([dfg.hugr], [STRINGLY_EXT]))
 
     new_h = Hugr.from_serial(dfg.hugr.to_serial())
 
@@ -88,7 +87,7 @@ def test_registry():
         reg.get_extension("not_found")
 
 
-@pytest.fixture()
+@pytest.fixture
 def registry() -> ext.ExtensionRegistry:
     reg = ext.ExtensionRegistry()
     reg.add_extension(LOGIC_EXT)
