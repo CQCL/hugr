@@ -813,7 +813,7 @@ Extensions ::= (Extension)* -- a set, not a list
 Type ::= Sum([#]) -- disjoint union of rows of other types, tagged by unsigned int
        | Opaque(Name, [TypeArg]) -- a (instantiation of a) custom type defined by an extension
        | Function(#, #, Extensions) -- monomorphic function: arguments, results, and delta (see below)
-       | Variable -- refers to a TypeParam bound by an the nearest enclosing FuncDefn node or polymorphic type scheme
+       | Variable -- refers to a TypeParam bound by the nearest enclosing FuncDefn node or polymorphic type scheme
 ```
 
 (We write `[Foo]` to indicate a list of Foo's.)
@@ -896,12 +896,13 @@ Note that since a row variable does not have kind Type, it cannot be used as the
 ### Extension Tracking
 
 The type of `Function` includes a set of [extensions](#extension-system) which are required to execute the graph.
-Similarly, every dataflow node in the HUGR has a set of extensions required to execute the node (computed from its operation), also known as the "delta". The delta of any node must be a subset of its parent,
+Similarly, every dataflow node in the HUGR has a set of extensions required to execute the node (computed from its operation),
+also known as the "delta". The delta of any node must be a subset of its parent's delta,
 except for FuncDefn's:
-* the delta of any child of a FuncDefn, must be a subset of the extensions in the FuncDefn's *type*
-* the FuncDefn itself has no delta (trivially a subset of any parent): as no extensions are required
-merely to know the code inside a FuncDefn; only a Call actually executes this, and the Call takes the delta
-from the called FuncDefn's *type*.
+* the delta of any child of a FuncDefn must be a subset of the extensions in the FuncDefn's *type*
+* the FuncDefn itself has no delta (trivially a subset of any parent): this reflects that the extensions
+are not needed to *know* the FuncDefn, only to *execute* it
+(by a Call node, whose delta is taken from the called FuncDefn's *type*).
 
 Keeping track of the extension requirements like this allows extension designers
 and third-party tooling to control how/where a module is run.
@@ -927,15 +928,6 @@ That is, given a graph, it adds extensions $N$ to the requirements of the graph.
 The latter is useful for higher-order operations such as conditionally selecting
 one function or another, where the output must have a consistent type (including
 the extension-requirements of the function).
-
-# Having these as explicit nodes on the graph allows us to search for the
-# point before extensions were added when we want to copy graphs, allowing
-# us to get the version with minimal extension requirements.
-
-# Note that here, any letter with vector notation refers to a variable
-# which stands in for a row. Hence, when checking the inputs and outputs
-# align, we're introducing a *row equality constraint*, rather than the
-# equality constraint of `typeof(b) ~ Bool`.
 
 ### Rewriting Extension Requirements
 
@@ -1169,8 +1161,8 @@ extensions:
       a: List[Type]
       b: List[Type]
     signature:
-      inputs: Sum([a]), Sum([b])
-      outputs: Sum([(a,b)]) # Syntax! Sum([a,b]) would be either-a-or-b, this has one variant
+      inputs: [[null, Sum(a)], [null, Sum(b)]] # Sums with single variant are tuples
+      outputs: [[null, Sum([a,b])]] # Tuple of elements of a concatenated with elements of b
   - name: GraphOp
     description: "Involves running an argument Graph. E.g. run it some variable number of times."
     params:
