@@ -53,7 +53,7 @@ pub trait CodegenExtension<'c, H> {
     /// Return an emitter that will be asked to emit `CustomOp`s that have an
     /// extension that matches `Self.`
     fn emitter<'a>(
-        &self,
+        &'a self,
         context: &'a mut EmitFuncContext<'c, H>,
     ) -> Box<dyn EmitOp<'c, CustomOp, H> + 'a>;
 

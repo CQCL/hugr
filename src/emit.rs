@@ -24,6 +24,7 @@ use crate::{
 
 pub mod args;
 pub mod func;
+pub mod libc;
 pub mod namer;
 mod ops;
 
