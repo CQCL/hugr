@@ -3,7 +3,7 @@
 //!
 #![allow(missing_docs)]
 
-use std::collections::{hash_map::Entry, HashMap};
+use std::{collections::HashMap, sync::Arc};
 
 use capnp::message::HeapAllocator;
 
@@ -37,18 +37,18 @@ pub fn convert_module(
         }
     }
 
-    let mut term_hash: HashMap<&v0::Term, u32> = HashMap::new();
-    let mut counter = 0..;
+    let term_hash: HashMap<&Arc<v0::Term>, u32> = module
+        .term_table
+        .iter()
+        .enumerate()
+        .map(|(i, term)| (term, i as u32))
+        .collect();
     {
         let mut terms = module_builder
             .reborrow()
             .init_terms(module.terms.len() as u32);
         for (i, term) in module.terms.iter().enumerate() {
-            let term_id = match term_hash.entry(term) {
-                Entry::Occupied(entry) => *entry.get(),
-                Entry::Vacant(entry) => *entry.insert(counter.next().unwrap()),
-            };
-            terms.set(i as u32, term_id);
+            terms.set(i as u32, *term_hash.get(term).expect("Term not in table."));
         }
     }
 
@@ -96,11 +96,7 @@ mod test {
 
     #[test]
     fn test() {
-        let module = v0::Module {
-            nodes: vec![],
-            ports: vec![],
-            terms: vec![],
-        };
+        let module = v0::Module::default();
         let _ = convert_module(&module).unwrap();
     }
 }

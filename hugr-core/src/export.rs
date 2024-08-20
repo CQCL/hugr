@@ -43,9 +43,7 @@ impl<'a> Context<'a> {
     }
 
     pub fn make_term(&mut self, term: model::Term) -> model::TermId {
-        let index = self.module.terms.len();
-        self.module.terms.push(term);
-        model::TermId(index as _)
+        self.module.add_term(term)
     }
 
     pub fn make_node(&mut self, node: model::Node) -> model::NodeId {

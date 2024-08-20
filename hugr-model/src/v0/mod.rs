@@ -23,8 +23,13 @@
 //! over just their structure. For instance, structurally identical terms could originate
 //! from different locations in a text file and therefore should be treated differently when
 //! locating type errors.
+use std::{collections::HashSet, sync::Arc};
+
 use smol_str::SmolStr;
 use tinyvec::TinyVec;
+
+#[cfg(test)]
+mod test;
 
 /// Index of a node in a hugr graph.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
@@ -59,14 +64,32 @@ pub struct TermVar(pub SmolStr);
 pub struct EdgeVar(pub SmolStr);
 
 /// A module consisting of a hugr graph together with terms.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Default)]
 pub struct Module {
     /// Table of [`Node`]s.
     pub nodes: Vec<Node>,
     /// Table of [`Port`]s.
     pub ports: Vec<Port>,
+    /// HashCons table of [`Term`]s.
+    pub(crate) term_table: HashSet<Arc<Term>>,
     /// Table of [`Term`]s.
-    pub terms: Vec<Term>,
+    pub terms: Vec<Arc<Term>>,
+}
+
+impl Module {
+    /// Insert a term into the module.
+    pub fn add_term(&mut self, term: Term) -> TermId {
+        let index = self.terms.len();
+        let term = if let Some(existing) = self.term_table.get(&term) {
+            existing.clone()
+        } else {
+            let term = Arc::new(term);
+            self.term_table.insert(term.clone());
+            term
+        };
+        self.terms.push(term);
+        TermId(index as _)
+    }
 }
 
 /// Nodes in the hugr graph.
