@@ -87,16 +87,57 @@ fn build_term(
     term: &v0::Term,
     builder: &mut hugr_capnp::term::Builder,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Set the fields of the term_builder using the data from the v0::Term
+    match term {
+        v0::Term::Wildcard => todo!(),
+        v0::Term::Type => todo!(),
+        v0::Term::Constraint => todo!(),
+        v0::Term::Var(_) => todo!(),
+        v0::Term::Named(_) => todo!(),
+        v0::Term::List(_) => todo!(),
+        v0::Term::ListType(_) => todo!(),
+        v0::Term::Str(s) => {
+            let mut s_build = builder.reborrow().init_str(s.len() as u32);
+            s_build.push_str(s);
+        }
+        v0::Term::StrType => todo!(),
+        v0::Term::Nat(_) => todo!(),
+        v0::Term::NatType => todo!(),
+        v0::Term::ExtSet(_) => todo!(),
+        v0::Term::ExtSetType => todo!(),
+        v0::Term::Tuple(_) => todo!(),
+        v0::Term::ProductType(_) => todo!(),
+        v0::Term::Tagged(_) => todo!(),
+        v0::Term::SumType(_) => todo!(),
+        v0::Term::FuncType(_) => todo!(),
+    }
     Ok(())
 }
+
 #[cfg(test)]
 mod test {
+    use smol_str::SmolStr;
+
     use super::*;
 
     #[test]
-    fn test() {
-        let module = v0::Module::default();
-        let _ = convert_module(&module).unwrap();
+    fn test_hashcons() {
+        let mut module = v0::Module::default();
+        let s = SmolStr::new_inline("Hello, world!");
+        module.add_term(v0::Term::Str(s.clone()));
+        module.add_term(v0::Term::Str(s.clone()));
+        module.add_term(v0::Term::Str(SmolStr::new_inline("Hello, world")));
+
+        let message = convert_module(&module).unwrap();
+        let mut buf: Vec<u8> = Vec::new();
+        capnp::serialize_packed::write_message(&mut buf, &message).unwrap();
+
+        let message_reader =
+            capnp::serialize_packed::read_message(&buf[..], ::capnp::message::ReaderOptions::new())
+                .unwrap();
+
+        let message: hugr_capnp::module::Reader = message_reader.get_root().unwrap();
+        let terms = message.get_terms().unwrap();
+        assert_eq!(terms.len(), 3);
+        assert_eq!(message.get_term_table().unwrap().len(), 2);
     }
 }
