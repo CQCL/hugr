@@ -18,8 +18,14 @@ pub fn std_reg() -> ExtensionRegistry {
         arithmetic::conversions::EXTENSION.to_owned(),
         arithmetic::float_ops::EXTENSION.to_owned(),
         arithmetic::float_types::EXTENSION.to_owned(),
+        collections::EXTENSION.to_owned(),
         logic::EXTENSION.to_owned(),
         ptr::EXTENSION.to_owned(),
     ])
     .unwrap()
+}
+
+lazy_static::lazy_static! {
+    /// Standard extension registry.
+    pub static ref STD_REG: ExtensionRegistry = std_reg();
 }

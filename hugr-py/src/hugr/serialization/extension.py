@@ -97,7 +97,7 @@ class OpDef(ConfiguredBaseModel, populate_by_name=True):
     misc: dict[str, Any] | None = None
     signature: PolyFuncType | None = None
     binary: bool = False
-    lower_funcs: list[FixedHugr]
+    lower_funcs: list[FixedHugr] = pd.Field(default_factory=list)
 
     def deserialize(self, extension: ext.Extension) -> ext.OpDef:
         return extension.add_op_def(

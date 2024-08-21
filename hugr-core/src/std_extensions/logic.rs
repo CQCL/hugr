@@ -4,20 +4,16 @@ use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 
 use crate::extension::{ConstFold, ConstFoldResult};
 use crate::ops::constant::ValueName;
-use crate::ops::{OpName, Value};
-use crate::types::{FuncValueType, Signature};
+use crate::ops::Value;
+use crate::types::Signature;
 use crate::{
     extension::{
         prelude::BOOL_T,
-        simple_op::{
-            try_from_name, HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp,
-            OpLoadError,
-        },
-        ExtensionId, ExtensionRegistry, OpDef, SignatureError, SignatureFromArgs, SignatureFunc,
+        simple_op::{try_from_name, MakeOpDef, MakeRegisteredOp, OpLoadError},
+        ExtensionId, ExtensionRegistry, OpDef, SignatureFunc,
     },
-    ops::{self, custom::ExtensionOp, NamedOp},
-    type_row,
-    types::type_param::{TypeArg, TypeParam},
+    ops, type_row,
+    types::type_param::TypeArg,
     utils::sorted_consts,
     Extension, IncomingPort,
 };
@@ -27,31 +23,34 @@ pub const FALSE_NAME: ValueName = ValueName::new_inline("FALSE");
 /// Name of extension true value.
 pub const TRUE_NAME: ValueName = ValueName::new_inline("TRUE");
 
-impl ConstFold for NaryLogic {
-    fn fold(&self, type_args: &[TypeArg], consts: &[(IncomingPort, Value)]) -> ConstFoldResult {
-        let [TypeArg::BoundedNat { n: num_args }] = *type_args else {
-            panic!("impossible by validation");
-        };
+impl ConstFold for LogicOp {
+    fn fold(&self, _type_args: &[TypeArg], consts: &[(IncomingPort, Value)]) -> ConstFoldResult {
         match self {
             Self::And => {
                 let inps = read_inputs(consts)?;
                 let res = inps.iter().all(|x| *x);
                 // We can only fold to true if we have a const for all our inputs.
-                (!res || inps.len() as u64 == num_args)
+                (!res || inps.len() as u64 == 2)
                     .then_some(vec![(0.into(), ops::Value::from_bool(res))])
             }
             Self::Or => {
                 let inps = read_inputs(consts)?;
                 let res = inps.iter().any(|x| *x);
                 // We can only fold to false if we have a const for all our inputs
-                (res || inps.len() as u64 == num_args)
+                (res || inps.len() as u64 == 2)
                     .then_some(vec![(0.into(), ops::Value::from_bool(res))])
             }
             Self::Eq => {
                 let inps = read_inputs(consts)?;
                 let res = inps.iter().copied().reduce(|a, b| a == b)?;
                 // If we have only some inputs, we can still fold to false, but not to true
-                (!res || inps.len() as u64 == num_args)
+                (!res || inps.len() as u64 == 2)
+                    .then_some(vec![(0.into(), ops::Value::from_bool(res))])
+            }
+            Self::Not => {
+                let inps = read_inputs(consts)?;
+                let res = inps.iter().all(|x| !*x);
+                (!res || inps.len() as u64 == 1)
                     .then_some(vec![(0.into(), ops::Value::from_bool(res))])
             }
         }
@@ -61,22 +60,30 @@ impl ConstFold for NaryLogic {
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, EnumIter, IntoStaticStr, EnumString)]
 #[allow(missing_docs)]
 #[non_exhaustive]
-pub enum NaryLogic {
+pub enum LogicOp {
     And,
     Or,
     Eq,
+    Not,
 }
 
-impl MakeOpDef for NaryLogic {
+impl MakeOpDef for LogicOp {
     fn signature(&self) -> SignatureFunc {
-        logic_op_sig().into()
+        match self {
+            LogicOp::And | LogicOp::Or | LogicOp::Eq => {
+                Signature::new(type_row![BOOL_T; 2], type_row![BOOL_T])
+            }
+            LogicOp::Not => Signature::new_endo(type_row![BOOL_T]),
+        }
+        .into()
     }
 
     fn description(&self) -> String {
         match self {
-            NaryLogic::And => "logical 'and'",
-            NaryLogic::Or => "logical 'or'",
-            NaryLogic::Eq => "test if bools are equal",
+            LogicOp::And => "logical 'and'",
+            LogicOp::Or => "logical 'or'",
+            LogicOp::Eq => "test if bools are equal",
+            LogicOp::Not => "logical 'not'",
         }
         .to_string()
     }
@@ -94,120 +101,15 @@ impl MakeOpDef for NaryLogic {
     }
 }
 
-impl HasConcrete for NaryLogic {
-    type Concrete = ConcreteLogicOp;
-
-    fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
-        let [TypeArg::BoundedNat { n }] = type_args else {
-            return Err(SignatureError::InvalidTypeArgs.into());
-        };
-        Ok(self.with_n_inputs(*n))
-    }
-}
-
-impl HasDef for ConcreteLogicOp {
-    type Def = NaryLogic;
-}
-
-/// Make a [NaryLogic] operation concrete by setting the type argument.
-#[derive(Debug, Clone, PartialEq)]
-pub struct ConcreteLogicOp(pub NaryLogic, u64);
-
-impl NaryLogic {
-    /// Initialise a [ConcreteLogicOp] by setting the number of inputs to this
-    /// logic operation.
-    pub fn with_n_inputs(self, n: u64) -> ConcreteLogicOp {
-        ConcreteLogicOp(self, n)
-    }
-}
-impl NamedOp for ConcreteLogicOp {
-    fn name(&self) -> OpName {
-        self.0.name()
-    }
-}
-impl MakeExtensionOp for ConcreteLogicOp {
-    fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError> {
-        let def: NaryLogic = NaryLogic::from_def(ext_op.def())?;
-        def.instantiate(ext_op.args())
-    }
-
-    fn type_args(&self) -> Vec<TypeArg> {
-        vec![TypeArg::BoundedNat { n: self.1 }]
-    }
-}
-
-/// Not operation.
-#[derive(Debug, Copy, Clone)]
-pub struct NotOp;
-impl NamedOp for NotOp {
-    fn name(&self) -> OpName {
-        "Not".into()
-    }
-}
-impl MakeOpDef for NotOp {
-    fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError> {
-        if op_def.name() == &NotOp.name() {
-            Ok(NotOp)
-        } else {
-            Err(OpLoadError::NotMember(op_def.name().to_string()))
-        }
-    }
-
-    fn extension(&self) -> ExtensionId {
-        EXTENSION_ID.to_owned()
-    }
-
-    fn signature(&self) -> SignatureFunc {
-        Signature::new_endo(type_row![BOOL_T]).into()
-    }
-    fn description(&self) -> String {
-        "logical 'not'".into()
-    }
-
-    fn post_opdef(&self, def: &mut OpDef) {
-        def.set_constant_folder(|consts: &_| {
-            let inps = read_inputs(consts)?;
-            if inps.len() != 1 {
-                None
-            } else {
-                Some(vec![(0.into(), ops::Value::from_bool(!inps[0]))])
-            }
-        })
-    }
-}
 /// The extension identifier.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("logic");
 /// Extension version.
 pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
 
-fn logic_op_sig() -> impl SignatureFromArgs {
-    struct LogicOpCustom;
-
-    const MAX: &[TypeParam; 1] = &[TypeParam::max_nat()];
-    impl SignatureFromArgs for LogicOpCustom {
-        fn compute_signature(
-            &self,
-            arg_values: &[TypeArg],
-        ) -> Result<crate::types::PolyFuncTypeRV, SignatureError> {
-            // get the number of input booleans.
-            let [TypeArg::BoundedNat { n }] = *arg_values else {
-                return Err(SignatureError::InvalidTypeArgs);
-            };
-            let var_arg_row = vec![BOOL_T; n as usize];
-            Ok(FuncValueType::new(var_arg_row, vec![BOOL_T]).into())
-        }
-
-        fn static_params(&self) -> &[TypeParam] {
-            MAX
-        }
-    }
-    LogicOpCustom
-}
 /// Extension for basic logical operations.
 fn extension() -> Extension {
     let mut extension = Extension::new(EXTENSION_ID, VERSION);
-    NaryLogic::load_all_ops(&mut extension).unwrap();
-    NotOp.add_to_extension(&mut extension).unwrap();
+    LogicOp::load_all_ops(&mut extension).unwrap();
 
     extension
         .add_value(FALSE_NAME, ops::Value::false_val())
@@ -226,17 +128,7 @@ lazy_static! {
         ExtensionRegistry::try_new([EXTENSION.to_owned()]).unwrap();
 }
 
-impl MakeRegisteredOp for ConcreteLogicOp {
-    fn extension_id(&self) -> ExtensionId {
-        EXTENSION_ID.to_owned()
-    }
-
-    fn registry<'s, 'r: 's>(&'s self) -> &'r ExtensionRegistry {
-        &LOGIC_REG
-    }
-}
-
-impl MakeRegisteredOp for NotOp {
+impl MakeRegisteredOp for LogicOp {
     fn extension_id(&self) -> ExtensionId {
         EXTENSION_ID.to_owned()
     }
@@ -267,11 +159,11 @@ fn read_inputs(consts: &[(IncomingPort, ops::Value)]) -> Option<Vec<bool>> {
 
 #[cfg(test)]
 pub(crate) mod test {
-    use super::{extension, ConcreteLogicOp, NaryLogic, NotOp, FALSE_NAME, TRUE_NAME};
+    use super::{extension, LogicOp, FALSE_NAME, TRUE_NAME};
     use crate::{
         extension::{
             prelude::BOOL_T,
-            simple_op::{HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp},
+            simple_op::{MakeOpDef, MakeRegisteredOp},
         },
         ops::{NamedOp, Value},
         Extension,
@@ -286,9 +178,9 @@ pub(crate) mod test {
         assert_eq!(r.name() as &str, "logic");
         assert_eq!(r.operations().count(), 4);
 
-        for op in NaryLogic::iter() {
+        for op in LogicOp::iter() {
             assert_eq!(
-                NaryLogic::from_def(r.get_op(&op.name()).unwrap(),).unwrap(),
+                LogicOp::from_def(r.get_op(&op.name()).unwrap(),).unwrap(),
                 op
             );
         }
@@ -296,14 +188,10 @@ pub(crate) mod test {
 
     #[test]
     fn test_conversions() {
-        for def in [NaryLogic::And, NaryLogic::Or, NaryLogic::Eq] {
-            let o = def.with_n_inputs(3);
-            let ext_op = o.clone().to_extension_op().unwrap();
-            assert_eq!(NaryLogic::from_op(&ext_op).unwrap(), def);
-            assert_eq!(ConcreteLogicOp::from_op(&ext_op).unwrap(), o);
+        for o in LogicOp::iter() {
+            let ext_op = o.to_extension_op().unwrap();
+            assert_eq!(LogicOp::from_op(&ext_op).unwrap(), o);
         }
-
-        NotOp::from_extension_op(&NotOp.to_extension_op().unwrap()).unwrap();
     }
 
     #[test]
@@ -319,26 +207,26 @@ pub(crate) mod test {
     }
 
     /// Generate a logic extension "and" operation over [`crate::prelude::BOOL_T`]
-    pub(crate) fn and_op() -> ConcreteLogicOp {
-        NaryLogic::And.with_n_inputs(2)
+    pub(crate) fn and_op() -> LogicOp {
+        LogicOp::And
     }
 
     /// Generate a logic extension "or" operation over [`crate::prelude::BOOL_T`]
-    pub(crate) fn or_op() -> ConcreteLogicOp {
-        NaryLogic::Or.with_n_inputs(2)
+    pub(crate) fn or_op() -> LogicOp {
+        LogicOp::Or
     }
 
     #[rstest]
-    #[case(NaryLogic::And, [], true)]
-    #[case(NaryLogic::And, [true, true, true], true)]
-    #[case(NaryLogic::And, [true, false, true], false)]
-    #[case(NaryLogic::Or, [], false)]
-    #[case(NaryLogic::Or, [false, false, true], true)]
-    #[case(NaryLogic::Or, [false, false, false], false)]
-    #[case(NaryLogic::Eq, [true, true, false, true], false)]
-    #[case(NaryLogic::Eq, [false, false], true)]
-    fn nary_const_fold(
-        #[case] op: NaryLogic,
+    #[case(LogicOp::And, [true, true], true)]
+    #[case(LogicOp::And, [true, false], false)]
+    #[case(LogicOp::Or, [false, true], true)]
+    #[case(LogicOp::Or, [false, false], false)]
+    #[case(LogicOp::Eq, [true, false], false)]
+    #[case(LogicOp::Eq, [false, false], true)]
+    #[case(LogicOp::Not, [false], true)]
+    #[case(LogicOp::Not, [true], false)]
+    fn const_fold(
+        #[case] op: LogicOp,
         #[case] ins: impl IntoIterator<Item = bool>,
         #[case] out: bool,
     ) {
@@ -357,14 +245,14 @@ pub(crate) mod test {
     }
 
     #[rstest]
-    #[case(NaryLogic::And, [Some(true), None], None)]
-    #[case(NaryLogic::And, [Some(false), None], Some(false))]
-    #[case(NaryLogic::Or, [None, Some(false)], None)]
-    #[case(NaryLogic::Or, [None, Some(true)], Some(true))]
-    #[case(NaryLogic::Eq, [None, Some(true), Some(true)], None)]
-    #[case(NaryLogic::Eq, [None, Some(false), Some(true)], Some(false))]
-    fn nary_partial_const_fold(
-        #[case] op: NaryLogic,
+    #[case(LogicOp::And, [Some(true), None], None)]
+    #[case(LogicOp::And, [Some(false), None], Some(false))]
+    #[case(LogicOp::Or, [None, Some(false)], None)]
+    #[case(LogicOp::Or, [None, Some(true)], Some(true))]
+    #[case(LogicOp::Eq, [None, Some(true)], None)]
+    #[case(LogicOp::Not, [None], None)]
+    fn partial_const_fold(
+        #[case] op: LogicOp,
         #[case] ins: impl IntoIterator<Item = Option<bool>>,
         #[case] mb_out: Option<bool>,
     ) {

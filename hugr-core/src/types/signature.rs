@@ -98,6 +98,12 @@ impl<RV: MaybeRV> FuncTypeBase<RV> {
         &self.output
     }
 
+    #[inline]
+    /// Returns a tuple with the input and output rows of the function.
+    pub fn io(&self) -> (&TypeRowBase<RV>, &TypeRowBase<RV>) {
+        (&self.input, &self.output)
+    }
+
     pub(super) fn validate(
         &self,
         extension_registry: &ExtensionRegistry,
@@ -310,5 +316,6 @@ mod test {
 
         assert_eq!(f_type.input_types(), &[Type::UNIT]);
         assert_eq!(f_type.output_types(), &[USIZE_T]);
+        assert_eq!(f_type.io(), (&type_row![Type::UNIT], &type_row![USIZE_T]));
     }
 }

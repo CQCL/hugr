@@ -232,7 +232,7 @@ pub(in crate::hugr::rewrite) mod test {
     use crate::ops::OpTag;
     use crate::ops::OpTrait;
     use crate::std_extensions::logic::test::and_op;
-    use crate::std_extensions::logic::NotOp;
+    use crate::std_extensions::logic::LogicOp;
     use crate::type_row;
     use crate::types::{Signature, Type};
     use crate::utils::test_quantum_extension::{cx_gate, h_gate, EXTENSION_ID};
@@ -344,12 +344,12 @@ pub(in crate::hugr::rewrite) mod test {
             DFGBuilder::new(inout_sig(type_row![BOOL_T], type_row![BOOL_T, BOOL_T])).unwrap();
         let [b] = dfg_builder.input_wires_arr();
 
-        let not_inp = dfg_builder.add_dataflow_op(NotOp, vec![b]).unwrap();
+        let not_inp = dfg_builder.add_dataflow_op(LogicOp::Not, vec![b]).unwrap();
         let [b] = not_inp.outputs_arr();
 
-        let not_0 = dfg_builder.add_dataflow_op(NotOp, vec![b]).unwrap();
+        let not_0 = dfg_builder.add_dataflow_op(LogicOp::Not, vec![b]).unwrap();
         let [b0] = not_0.outputs_arr();
-        let not_1 = dfg_builder.add_dataflow_op(NotOp, vec![b]).unwrap();
+        let not_1 = dfg_builder.add_dataflow_op(LogicOp::Not, vec![b]).unwrap();
         let [b1] = not_1.outputs_arr();
 
         (
@@ -377,10 +377,10 @@ pub(in crate::hugr::rewrite) mod test {
             DFGBuilder::new(inout_sig(type_row![BOOL_T], type_row![BOOL_T, BOOL_T])).unwrap();
         let [b] = dfg_builder.input_wires_arr();
 
-        let not_inp = dfg_builder.add_dataflow_op(NotOp, vec![b]).unwrap();
+        let not_inp = dfg_builder.add_dataflow_op(LogicOp::Not, vec![b]).unwrap();
         let [b] = not_inp.outputs_arr();
 
-        let not_0 = dfg_builder.add_dataflow_op(NotOp, vec![b]).unwrap();
+        let not_0 = dfg_builder.add_dataflow_op(LogicOp::Not, vec![b]).unwrap();
         let [b0] = not_0.outputs_arr();
         let b1 = b;
 
@@ -726,7 +726,7 @@ pub(in crate::hugr::rewrite) mod test {
             let mut b =
                 DFGBuilder::new(inout_sig(type_row![BOOL_T], type_row![BOOL_T, BOOL_T])).unwrap();
             let [w] = b.input_wires_arr();
-            let not = b.add_dataflow_op(NotOp, vec![w]).unwrap();
+            let not = b.add_dataflow_op(LogicOp::Not, vec![w]).unwrap();
             let [w_not] = not.outputs_arr();
             (
                 b.finish_prelude_hugr_with_outputs([w, w_not]).unwrap(),

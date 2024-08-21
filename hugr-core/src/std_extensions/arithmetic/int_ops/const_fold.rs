@@ -590,17 +590,16 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
         IntOpDef::idivmod_checked_u => Folder {
             folder: Box::new(
                 |type_args: &[TypeArg], consts: &[(IncomingPort, Value)]| -> ConstFoldResult {
-                    let [arg0, arg1] = type_args else {
+                    let [arg0] = type_args else {
                         return None;
                     };
                     let logwidth0: u8 = get_log_width(arg0).ok()?;
-                    let logwidth1: u8 = get_log_width(arg1).ok()?;
                     let (n, m): (&ConstInt, &ConstInt) = get_pair_of_input_values(consts)?;
-                    if n.log_width() != logwidth0 || m.log_width() != logwidth1 {
+                    if n.log_width() != logwidth0 || m.log_width() != logwidth0 {
                         None
                     } else {
                         let q_type = INT_TYPES[logwidth0 as usize].to_owned();
-                        let r_type = INT_TYPES[logwidth1 as usize].to_owned();
+                        let r_type = q_type.clone();
                         let qr_type: Type = Type::new_tuple(vec![q_type, r_type]);
                         let sum_type: SumType = sum_with_error(qr_type);
                         let err_value = || {
@@ -620,7 +619,7 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                             let rval = nval % mval;
                             Value::tuple(vec![
                                 Value::extension(ConstInt::new_u(logwidth0, qval).unwrap()),
-                                Value::extension(ConstInt::new_u(logwidth1, rval).unwrap()),
+                                Value::extension(ConstInt::new_u(logwidth0, rval).unwrap()),
                             ])
                         };
                         Some(vec![(0.into(), out_const)])
@@ -631,21 +630,20 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
         IntOpDef::idivmod_u => Folder {
             folder: Box::new(
                 |type_args: &[TypeArg], consts: &[(IncomingPort, Value)]| -> ConstFoldResult {
-                    let [arg0, arg1] = type_args else {
+                    let [arg0] = type_args else {
                         return None;
                     };
                     let logwidth0: u8 = get_log_width(arg0).ok()?;
-                    let logwidth1: u8 = get_log_width(arg1).ok()?;
                     let (n, m): (&ConstInt, &ConstInt) = get_pair_of_input_values(consts)?;
                     let nval = n.value_u();
                     let mval = m.value_u();
-                    if n.log_width() != logwidth0 || m.log_width() != logwidth1 || mval == 0 {
+                    if n.log_width() != logwidth0 || m.log_width() != logwidth0 || mval == 0 {
                         None
                     } else {
                         let qval = nval / mval;
                         let rval = nval % mval;
                         let q = Value::extension(ConstInt::new_u(logwidth0, qval).unwrap());
-                        let r = Value::extension(ConstInt::new_u(logwidth1, rval).unwrap());
+                        let r = Value::extension(ConstInt::new_u(logwidth0, rval).unwrap());
                         Some(vec![(0.into(), q), (1.into(), r)])
                     }
                 },
@@ -654,17 +652,17 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
         IntOpDef::idivmod_checked_s => Folder {
             folder: Box::new(
                 |type_args: &[TypeArg], consts: &[(IncomingPort, Value)]| -> ConstFoldResult {
-                    let [arg0, arg1] = type_args else {
+                    let [arg0] = type_args else {
                         return None;
                     };
                     let logwidth0: u8 = get_log_width(arg0).ok()?;
-                    let logwidth1: u8 = get_log_width(arg1).ok()?;
+
                     let (n, m): (&ConstInt, &ConstInt) = get_pair_of_input_values(consts)?;
-                    if n.log_width() != logwidth0 || m.log_width() != logwidth1 {
+                    if n.log_width() != logwidth0 || m.log_width() != logwidth0 {
                         None
                     } else {
                         let q_type = INT_TYPES[logwidth0 as usize].to_owned();
-                        let r_type = INT_TYPES[logwidth1 as usize].to_owned();
+                        let r_type = INT_TYPES[logwidth0 as usize].to_owned();
                         let qr_type: Type = Type::new_tuple(vec![q_type, r_type]);
                         let sum_type: SumType = sum_with_error(qr_type);
                         let err_value = || {
@@ -683,7 +681,7 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                             let (qval, rval) = divmod_s(nval, mval);
                             Value::tuple(vec![
                                 Value::extension(ConstInt::new_s(logwidth0, qval).unwrap()),
-                                Value::extension(ConstInt::new_u(logwidth1, rval).unwrap()),
+                                Value::extension(ConstInt::new_u(logwidth0, rval).unwrap()),
                             ])
                         };
                         Some(vec![(0.into(), out_const)])
@@ -694,20 +692,20 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
         IntOpDef::idivmod_s => Folder {
             folder: Box::new(
                 |type_args: &[TypeArg], consts: &[(IncomingPort, Value)]| -> ConstFoldResult {
-                    let [arg0, arg1] = type_args else {
+                    let [arg0] = type_args else {
                         return None;
                     };
                     let logwidth0: u8 = get_log_width(arg0).ok()?;
-                    let logwidth1: u8 = get_log_width(arg1).ok()?;
+
                     let (n, m): (&ConstInt, &ConstInt) = get_pair_of_input_values(consts)?;
                     let nval = n.value_s();
                     let mval = m.value_u();
-                    if n.log_width() != logwidth0 || m.log_width() != logwidth1 || mval == 0 {
+                    if n.log_width() != logwidth0 || m.log_width() != logwidth0 || mval == 0 {
                         None
                     } else {
                         let (qval, rval) = divmod_s(nval, mval);
                         let q = Value::extension(ConstInt::new_s(logwidth0, qval).unwrap());
-                        let r = Value::extension(ConstInt::new_u(logwidth1, rval).unwrap());
+                        let r = Value::extension(ConstInt::new_u(logwidth0, rval).unwrap());
                         Some(vec![(0.into(), q), (1.into(), r)])
                     }
                 },
@@ -716,13 +714,13 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
         IntOpDef::idiv_checked_u => Folder {
             folder: Box::new(
                 |type_args: &[TypeArg], consts: &[(IncomingPort, Value)]| -> ConstFoldResult {
-                    let [arg0, arg1] = type_args else {
+                    let [arg0] = type_args else {
                         return None;
                     };
                     let logwidth0: u8 = get_log_width(arg0).ok()?;
-                    let logwidth1: u8 = get_log_width(arg1).ok()?;
+
                     let (n, m): (&ConstInt, &ConstInt) = get_pair_of_input_values(consts)?;
-                    if n.log_width() != logwidth0 || m.log_width() != logwidth1 {
+                    if n.log_width() != logwidth0 || m.log_width() != logwidth0 {
                         None
                     } else {
                         let int_out_type = INT_TYPES[logwidth0 as usize].to_owned();
@@ -750,15 +748,15 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
         IntOpDef::idiv_u => Folder {
             folder: Box::new(
                 |type_args: &[TypeArg], consts: &[(IncomingPort, Value)]| -> ConstFoldResult {
-                    let [arg0, arg1] = type_args else {
+                    let [arg0] = type_args else {
                         return None;
                     };
                     let logwidth0: u8 = get_log_width(arg0).ok()?;
-                    let logwidth1: u8 = get_log_width(arg1).ok()?;
+
                     let (n, m): (&ConstInt, &ConstInt) = get_pair_of_input_values(consts)?;
                     let nval = n.value_u();
                     let mval = m.value_u();
-                    if n.log_width() != logwidth0 || m.log_width() != logwidth1 || mval == 0 {
+                    if n.log_width() != logwidth0 || m.log_width() != logwidth0 || mval == 0 {
                         None
                     } else {
                         let q = Value::extension(ConstInt::new_u(logwidth0, nval / mval).unwrap());
@@ -770,16 +768,16 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
         IntOpDef::imod_checked_u => Folder {
             folder: Box::new(
                 |type_args: &[TypeArg], consts: &[(IncomingPort, Value)]| -> ConstFoldResult {
-                    let [arg0, arg1] = type_args else {
+                    let [arg0] = type_args else {
                         return None;
                     };
                     let logwidth0: u8 = get_log_width(arg0).ok()?;
-                    let logwidth1: u8 = get_log_width(arg1).ok()?;
+
                     let (n, m): (&ConstInt, &ConstInt) = get_pair_of_input_values(consts)?;
-                    if n.log_width() != logwidth0 || m.log_width() != logwidth1 {
+                    if n.log_width() != logwidth0 || m.log_width() != logwidth0 {
                         None
                     } else {
-                        let int_out_type = INT_TYPES[logwidth1 as usize].to_owned();
+                        let int_out_type = INT_TYPES[logwidth0 as usize].to_owned();
                         let sum_type = sum_with_error(int_out_type.clone());
                         let err_value = || {
                             let err_val = ConstError {
@@ -794,7 +792,7 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                         let out_const: Value = if mval == 0 {
                             err_value()
                         } else {
-                            Value::extension(ConstInt::new_u(logwidth1, nval % mval).unwrap())
+                            Value::extension(ConstInt::new_u(logwidth0, nval % mval).unwrap())
                         };
                         Some(vec![(0.into(), out_const)])
                     }
@@ -804,18 +802,18 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
         IntOpDef::imod_u => Folder {
             folder: Box::new(
                 |type_args: &[TypeArg], consts: &[(IncomingPort, Value)]| -> ConstFoldResult {
-                    let [arg0, arg1] = type_args else {
+                    let [arg0] = type_args else {
                         return None;
                     };
                     let logwidth0: u8 = get_log_width(arg0).ok()?;
-                    let logwidth1: u8 = get_log_width(arg1).ok()?;
+
                     let (n, m): (&ConstInt, &ConstInt) = get_pair_of_input_values(consts)?;
                     let nval = n.value_u();
                     let mval = m.value_u();
-                    if n.log_width() != logwidth0 || m.log_width() != logwidth1 || mval == 0 {
+                    if n.log_width() != logwidth0 || m.log_width() != logwidth0 || mval == 0 {
                         None
                     } else {
-                        let r = Value::extension(ConstInt::new_u(logwidth1, nval % mval).unwrap());
+                        let r = Value::extension(ConstInt::new_u(logwidth0, nval % mval).unwrap());
                         Some(vec![(0.into(), r)])
                     }
                 },
@@ -824,13 +822,13 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
         IntOpDef::idiv_checked_s => Folder {
             folder: Box::new(
                 |type_args: &[TypeArg], consts: &[(IncomingPort, Value)]| -> ConstFoldResult {
-                    let [arg0, arg1] = type_args else {
+                    let [arg0] = type_args else {
                         return None;
                     };
                     let logwidth0: u8 = get_log_width(arg0).ok()?;
-                    let logwidth1: u8 = get_log_width(arg1).ok()?;
+
                     let (n, m): (&ConstInt, &ConstInt) = get_pair_of_input_values(consts)?;
-                    if n.log_width() != logwidth0 || m.log_width() != logwidth1 {
+                    if n.log_width() != logwidth0 || m.log_width() != logwidth0 {
                         None
                     } else {
                         let int_out_type = INT_TYPES[logwidth0 as usize].to_owned();
@@ -849,7 +847,7 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                             err_value()
                         } else {
                             let (qval, _) = divmod_s(nval, mval);
-                            Value::extension(ConstInt::new_s(logwidth1, qval).unwrap())
+                            Value::extension(ConstInt::new_s(logwidth0, qval).unwrap())
                         };
                         Some(vec![(0.into(), out_const)])
                     }
@@ -859,15 +857,15 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
         IntOpDef::idiv_s => Folder {
             folder: Box::new(
                 |type_args: &[TypeArg], consts: &[(IncomingPort, Value)]| -> ConstFoldResult {
-                    let [arg0, arg1] = type_args else {
+                    let [arg0] = type_args else {
                         return None;
                     };
                     let logwidth0: u8 = get_log_width(arg0).ok()?;
-                    let logwidth1: u8 = get_log_width(arg1).ok()?;
+
                     let (n, m): (&ConstInt, &ConstInt) = get_pair_of_input_values(consts)?;
                     let nval = n.value_s();
                     let mval = m.value_u();
-                    if n.log_width() != logwidth0 || m.log_width() != logwidth1 || mval == 0 {
+                    if n.log_width() != logwidth0 || m.log_width() != logwidth0 || mval == 0 {
                         None
                     } else {
                         let (qval, _) = divmod_s(nval, mval);
@@ -880,16 +878,16 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
         IntOpDef::imod_checked_s => Folder {
             folder: Box::new(
                 |type_args: &[TypeArg], consts: &[(IncomingPort, Value)]| -> ConstFoldResult {
-                    let [arg0, arg1] = type_args else {
+                    let [arg0] = type_args else {
                         return None;
                     };
                     let logwidth0: u8 = get_log_width(arg0).ok()?;
-                    let logwidth1: u8 = get_log_width(arg1).ok()?;
+
                     let (n, m): (&ConstInt, &ConstInt) = get_pair_of_input_values(consts)?;
-                    if n.log_width() != logwidth0 || m.log_width() != logwidth1 {
+                    if n.log_width() != logwidth0 || m.log_width() != logwidth0 {
                         None
                     } else {
-                        let int_out_type = INT_TYPES[logwidth1 as usize].to_owned();
+                        let int_out_type = INT_TYPES[logwidth0 as usize].to_owned();
                         let sum_type = sum_with_error(int_out_type.clone());
                         let err_value = || {
                             let err_val = ConstError {
@@ -905,7 +903,7 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                             err_value()
                         } else {
                             let (_, rval) = divmod_s(nval, mval);
-                            Value::extension(ConstInt::new_u(logwidth1, rval).unwrap())
+                            Value::extension(ConstInt::new_u(logwidth0, rval).unwrap())
                         };
                         Some(vec![(0.into(), out_const)])
                     }
@@ -915,19 +913,19 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
         IntOpDef::imod_s => Folder {
             folder: Box::new(
                 |type_args: &[TypeArg], consts: &[(IncomingPort, Value)]| -> ConstFoldResult {
-                    let [arg0, arg1] = type_args else {
+                    let [arg0] = type_args else {
                         return None;
                     };
                     let logwidth0: u8 = get_log_width(arg0).ok()?;
-                    let logwidth1: u8 = get_log_width(arg1).ok()?;
+
                     let (n, m): (&ConstInt, &ConstInt) = get_pair_of_input_values(consts)?;
                     let nval = n.value_s();
                     let mval = m.value_u();
-                    if n.log_width() != logwidth0 || m.log_width() != logwidth1 || mval == 0 {
+                    if n.log_width() != logwidth0 || m.log_width() != logwidth0 || mval == 0 {
                         None
                     } else {
                         let (_, rval) = divmod_s(nval, mval);
-                        let r = Value::extension(ConstInt::new_u(logwidth1, rval).unwrap());
+                        let r = Value::extension(ConstInt::new_u(logwidth0, rval).unwrap());
                         Some(vec![(0.into(), r)])
                     }
                 },
@@ -1052,13 +1050,13 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
         IntOpDef::ishl => Folder {
             folder: Box::new(
                 |type_args: &[TypeArg], consts: &[(IncomingPort, Value)]| -> ConstFoldResult {
-                    let [arg0, arg1] = type_args else {
+                    let [arg0] = type_args else {
                         return None;
                     };
                     let logwidth0: u8 = get_log_width(arg0).ok()?;
-                    let logwidth1: u8 = get_log_width(arg1).ok()?;
+
                     let (n0, n1): (&ConstInt, &ConstInt) = get_pair_of_input_values(consts)?;
-                    if n0.log_width() != logwidth0 || n1.log_width() != logwidth1 {
+                    if n0.log_width() != logwidth0 || n1.log_width() != logwidth0 {
                         None
                     } else {
                         Some(vec![(
@@ -1079,13 +1077,13 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
         IntOpDef::ishr => Folder {
             folder: Box::new(
                 |type_args: &[TypeArg], consts: &[(IncomingPort, Value)]| -> ConstFoldResult {
-                    let [arg0, arg1] = type_args else {
+                    let [arg0] = type_args else {
                         return None;
                     };
                     let logwidth0: u8 = get_log_width(arg0).ok()?;
-                    let logwidth1: u8 = get_log_width(arg1).ok()?;
+
                     let (n0, n1): (&ConstInt, &ConstInt) = get_pair_of_input_values(consts)?;
-                    if n0.log_width() != logwidth0 || n1.log_width() != logwidth1 {
+                    if n0.log_width() != logwidth0 || n1.log_width() != logwidth0 {
                         None
                     } else {
                         Some(vec![(
@@ -1101,13 +1099,13 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
         IntOpDef::irotl => Folder {
             folder: Box::new(
                 |type_args: &[TypeArg], consts: &[(IncomingPort, Value)]| -> ConstFoldResult {
-                    let [arg0, arg1] = type_args else {
+                    let [arg0] = type_args else {
                         return None;
                     };
                     let logwidth0: u8 = get_log_width(arg0).ok()?;
-                    let logwidth1: u8 = get_log_width(arg1).ok()?;
+
                     let (n0, n1): (&ConstInt, &ConstInt) = get_pair_of_input_values(consts)?;
-                    if n0.log_width() != logwidth0 || n1.log_width() != logwidth1 {
+                    if n0.log_width() != logwidth0 || n1.log_width() != logwidth0 {
                         None
                     } else {
                         let n = n0.value_u();
@@ -1130,13 +1128,13 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
         IntOpDef::irotr => Folder {
             folder: Box::new(
                 |type_args: &[TypeArg], consts: &[(IncomingPort, Value)]| -> ConstFoldResult {
-                    let [arg0, arg1] = type_args else {
+                    let [arg0] = type_args else {
                         return None;
                     };
                     let logwidth0: u8 = get_log_width(arg0).ok()?;
-                    let logwidth1: u8 = get_log_width(arg1).ok()?;
+
                     let (n0, n1): (&ConstInt, &ConstInt) = get_pair_of_input_values(consts)?;
-                    if n0.log_width() != logwidth0 || n1.log_width() != logwidth1 {
+                    if n0.log_width() != logwidth0 || n1.log_width() != logwidth0 {
                         None
                     } else {
                         let n = n0.value_u();

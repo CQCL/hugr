@@ -1,0 +1,19 @@
+{
+  "version": "0.1.0",
+  "name": "arithmetic.float.types",
+  "extension_reqs": [],
+  "types": {
+    "float64": {
+      "extension": "arithmetic.float.types",
+      "name": "float64",
+      "params": [],
+      "description": "64-bit IEEE 754-2019 floating-point value",
+      "bound": {
+        "b": "Explicit",
+        "bound": "C"
+      }
+    }
+  },
+  "values": {},
+  "operations": {}
+}

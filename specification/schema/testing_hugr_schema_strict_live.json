@@ -1084,8 +1084,7 @@
             "required": [
                 "extension",
                 "name",
-                "description",
-                "lower_funcs"
+                "description"
             ],
             "title": "OpDef",
             "type": "object"

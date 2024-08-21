@@ -1,0 +1,593 @@
+{
+  "version": "0.1.0",
+  "name": "arithmetic.float",
+  "extension_reqs": [
+    "arithmetic.int.types"
+  ],
+  "types": {},
+  "values": {},
+  "operations": {
+    "fabs": {
+      "extension": "arithmetic.float",
+      "name": "fabs",
+      "description": "absolute value",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "fadd": {
+      "extension": "arithmetic.float",
+      "name": "fadd",
+      "description": "addition",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "fceil": {
+      "extension": "arithmetic.float",
+      "name": "fceil",
+      "description": "ceiling",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "fdiv": {
+      "extension": "arithmetic.float",
+      "name": "fdiv",
+      "description": "division",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "feq": {
+      "extension": "arithmetic.float",
+      "name": "feq",
+      "description": "equality test",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "Unit",
+              "size": 2
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "ffloor": {
+      "extension": "arithmetic.float",
+      "name": "ffloor",
+      "description": "floor",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "fge": {
+      "extension": "arithmetic.float",
+      "name": "fge",
+      "description": "\"greater than or equal\"",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "Unit",
+              "size": 2
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "fgt": {
+      "extension": "arithmetic.float",
+      "name": "fgt",
+      "description": "\"greater than\"",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "Unit",
+              "size": 2
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "fle": {
+      "extension": "arithmetic.float",
+      "name": "fle",
+      "description": "\"less than or equal\"",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "Unit",
+              "size": 2
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "flt": {
+      "extension": "arithmetic.float",
+      "name": "flt",
+      "description": "\"less than\"",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "Unit",
+              "size": 2
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "fmax": {
+      "extension": "arithmetic.float",
+      "name": "fmax",
+      "description": "maximum",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "fmin": {
+      "extension": "arithmetic.float",
+      "name": "fmin",
+      "description": "minimum",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "fmul": {
+      "extension": "arithmetic.float",
+      "name": "fmul",
+      "description": "multiplication",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "fne": {
+      "extension": "arithmetic.float",
+      "name": "fne",
+      "description": "inequality test",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "Unit",
+              "size": 2
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "fneg": {
+      "extension": "arithmetic.float",
+      "name": "fneg",
+      "description": "negation",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "fsub": {
+      "extension": "arithmetic.float",
+      "name": "fsub",
+      "description": "subtraction",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "ftostring": {
+      "extension": "arithmetic.float",
+      "name": "ftostring",
+      "description": "string representation",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "prelude",
+              "id": "string",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    }
+  }
+}

@@ -13,7 +13,7 @@ use crate::ops::{self, dataflow::IOTrait, Input, Module, Noop, Output, Value, DF
 use crate::std_extensions::arithmetic::float_types::FLOAT64_TYPE;
 use crate::std_extensions::arithmetic::int_ops::INT_OPS_REGISTRY;
 use crate::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
-use crate::std_extensions::logic::NotOp;
+use crate::std_extensions::logic::LogicOp;
 use crate::types::type_param::TypeParam;
 use crate::types::{
     FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, SumType, Type, TypeArg, TypeBound,
@@ -346,7 +346,7 @@ fn extension_ops() -> Result<(), Box<dyn std::error::Error>> {
     let [wire] = dfg.input_wires_arr();
 
     // Add an extension operation
-    let extension_op: ExtensionOp = NotOp.to_extension_op().unwrap();
+    let extension_op: ExtensionOp = LogicOp::Not.to_extension_op().unwrap();
     let wire = dfg
         .add_dataflow_op(extension_op.clone(), [wire])
         .unwrap()
@@ -365,7 +365,7 @@ fn opaque_ops() -> Result<(), Box<dyn std::error::Error>> {
     let [wire] = dfg.input_wires_arr();
 
     // Add an extension operation
-    let extension_op: ExtensionOp = NotOp.to_extension_op().unwrap();
+    let extension_op: ExtensionOp = LogicOp::Not.to_extension_op().unwrap();
     let wire = dfg
         .add_dataflow_op(extension_op.clone(), [wire])
         .unwrap()

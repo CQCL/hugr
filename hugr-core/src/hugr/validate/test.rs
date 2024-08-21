@@ -18,7 +18,8 @@ use crate::ops::handle::NodeHandle;
 use crate::ops::leaf::MakeTuple;
 use crate::ops::{self, Noop, OpType, Value};
 use crate::std_extensions::logic::test::{and_op, or_op};
-use crate::std_extensions::logic::{self, NotOp};
+use crate::std_extensions::logic::LogicOp;
+use crate::std_extensions::logic::{self};
 use crate::types::type_param::{TypeArg, TypeArgError};
 use crate::types::{
     CustomType, FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, Type, TypeBound, TypeRV,
@@ -319,8 +320,8 @@ fn dfg_with_cycles() {
     let mut h = closed_dfg_root_hugr(Signature::new(type_row![BOOL_T, BOOL_T], type_row![BOOL_T]));
     let [input, output] = h.get_io(h.root()).unwrap();
     let or = h.add_node_with_parent(h.root(), or_op());
-    let not1 = h.add_node_with_parent(h.root(), NotOp);
-    let not2 = h.add_node_with_parent(h.root(), NotOp);
+    let not1 = h.add_node_with_parent(h.root(), LogicOp::Not);
+    let not2 = h.add_node_with_parent(h.root(), LogicOp::Not);
     h.connect(input, 0, or, 0);
     h.connect(or, 0, not1, 0);
     h.connect(not1, 0, or, 1);
