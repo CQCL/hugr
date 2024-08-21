@@ -885,19 +885,16 @@ fn test_fold_imul() {
 #[test]
 fn test_fold_idivmod_checked_u() {
     // pseudocode:
-    // x0, x1 := int_u<5>(20), int_u<3>(0)
+    // x0, x1 := int_u<5>(20), int_u<5>(0)
     // x2 := idivmod_checked_u(x0, x1)
     // output x2 == error
-    let intpair: TypeRowRV = vec![INT_TYPES[5].clone(), INT_TYPES[3].clone()].into();
+    let intpair: TypeRowRV = vec![INT_TYPES[5].clone(), INT_TYPES[5].clone()].into();
     let sum_type = sum_with_error(Type::new_tuple(intpair));
     let mut build = DFGBuilder::new(noargfn(vec![sum_type.clone().into()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 20).unwrap()));
-    let x1 = build.add_load_const(Value::extension(ConstInt::new_u(3, 0).unwrap()));
+    let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 0).unwrap()));
     let x2 = build
-        .add_dataflow_op(
-            IntOpDef::idivmod_checked_u.with_two_log_widths(5, 3),
-            [x0, x1],
-        )
+        .add_dataflow_op(IntOpDef::idivmod_checked_u.with_log_width(5), [x0, x1])
         .unwrap();
     let reg = ExtensionRegistry::try_new([
         PRELUDE.to_owned(),
@@ -922,52 +919,44 @@ fn test_fold_idivmod_checked_u() {
 #[test]
 fn test_fold_idivmod_u() {
     // pseudocode:
-    // x0, x1 := int_u<5>(20), int_u<3>(3);
+    // x0, x1 := int_u<3>(20), int_u<3>(3);
     // x2, x3 := idivmod_u(x0, x1); // 6, 2
-    // x4 := iwiden_u<3,5>(x3); // 2
-    // x5 := iadd<5>(x2, x4); // 8
-    // output x5 == int_u<5>(8);
-    let mut build = DFGBuilder::new(noargfn(vec![INT_TYPES[5].clone()])).unwrap();
-    let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 20).unwrap()));
+    // x4 := iadd<3>(x2, x3); // 8
+    // output x4 == int_u<5>(8);
+    let mut build = DFGBuilder::new(noargfn(vec![INT_TYPES[3].clone()])).unwrap();
+    let x0 = build.add_load_const(Value::extension(ConstInt::new_u(3, 20).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(3, 3).unwrap()));
     let [x2, x3] = build
-        .add_dataflow_op(IntOpDef::idivmod_u.with_two_log_widths(5, 3), [x0, x1])
+        .add_dataflow_op(IntOpDef::idivmod_u.with_log_width(3), [x0, x1])
         .unwrap()
         .outputs_arr();
-    let [x4] = build
-        .add_dataflow_op(IntOpDef::iwiden_u.with_two_log_widths(3, 5), [x3])
-        .unwrap()
-        .outputs_arr();
-    let x5 = build
-        .add_dataflow_op(IntOpDef::iadd.with_log_width(5), [x2, x4])
+    let x4 = build
+        .add_dataflow_op(IntOpDef::iadd.with_log_width(3), [x2, x3])
         .unwrap();
     let reg = ExtensionRegistry::try_new([
         PRELUDE.to_owned(),
         arithmetic::int_types::EXTENSION.to_owned(),
     ])
     .unwrap();
-    let mut h = build.finish_hugr_with_outputs(x5.outputs(), &reg).unwrap();
+    let mut h = build.finish_hugr_with_outputs(x4.outputs(), &reg).unwrap();
     constant_fold_pass(&mut h, &reg);
-    let expected = Value::extension(ConstInt::new_u(5, 8).unwrap());
+    let expected = Value::extension(ConstInt::new_u(3, 8).unwrap());
     assert_fully_folded(&h, &expected);
 }
 
 #[test]
 fn test_fold_idivmod_checked_s() {
     // pseudocode:
-    // x0, x1 := int_s<5>(-20), int_u<3>(0)
+    // x0, x1 := int_s<5>(-20), int_u<5>(0)
     // x2 := idivmod_checked_s(x0, x1)
     // output x2 == error
-    let intpair: TypeRowRV = vec![INT_TYPES[5].clone(), INT_TYPES[3].clone()].into();
+    let intpair: TypeRowRV = vec![INT_TYPES[5].clone(), INT_TYPES[5].clone()].into();
     let sum_type = sum_with_error(Type::new_tuple(intpair));
     let mut build = DFGBuilder::new(noargfn(vec![sum_type.clone().into()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, -20).unwrap()));
-    let x1 = build.add_load_const(Value::extension(ConstInt::new_u(3, 0).unwrap()));
+    let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 0).unwrap()));
     let x2 = build
-        .add_dataflow_op(
-            IntOpDef::idivmod_checked_s.with_two_log_widths(5, 3),
-            [x0, x1],
-        )
+        .add_dataflow_op(IntOpDef::idivmod_checked_s.with_log_width(5), [x0, x1])
         .unwrap();
     let reg = ExtensionRegistry::try_new([
         PRELUDE.to_owned(),
@@ -1002,7 +991,7 @@ fn test_fold_idivmod_s(#[case] a: i64, #[case] b: u64, #[case] c: i64) {
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(6, a).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(6, b).unwrap()));
     let [x2, x3] = build
-        .add_dataflow_op(IntOpDef::idivmod_s.with_two_log_widths(6, 6), [x0, x1])
+        .add_dataflow_op(IntOpDef::idivmod_s.with_log_width(6), [x0, x1])
         .unwrap()
         .outputs_arr();
     let x4 = build
@@ -1022,15 +1011,15 @@ fn test_fold_idivmod_s(#[case] a: i64, #[case] b: u64, #[case] c: i64) {
 #[test]
 fn test_fold_idiv_checked_u() {
     // pseudocode:
-    // x0, x1 := int_u<5>(20), int_u<3>(0)
+    // x0, x1 := int_u<5>(20), int_u<5>(0)
     // x2 := idiv_checked_u(x0, x1)
     // output x2 == error
     let sum_type = sum_with_error(INT_TYPES[5].to_owned());
     let mut build = DFGBuilder::new(noargfn(vec![sum_type.clone().into()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 20).unwrap()));
-    let x1 = build.add_load_const(Value::extension(ConstInt::new_u(3, 0).unwrap()));
+    let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 0).unwrap()));
     let x2 = build
-        .add_dataflow_op(IntOpDef::idiv_checked_u.with_two_log_widths(5, 3), [x0, x1])
+        .add_dataflow_op(IntOpDef::idiv_checked_u.with_log_width(5), [x0, x1])
         .unwrap();
     let reg = ExtensionRegistry::try_new([
         PRELUDE.to_owned(),
@@ -1055,14 +1044,14 @@ fn test_fold_idiv_checked_u() {
 #[test]
 fn test_fold_idiv_u() {
     // pseudocode:
-    // x0, x1 := int_u<5>(20), int_u<3>(3);
+    // x0, x1 := int_u<5>(20), int_u<5>(3);
     // x2 := idiv_u(x0, x1);
     // output x2 == int_u<5>(6);
     let mut build = DFGBuilder::new(noargfn(vec![INT_TYPES[5].clone()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 20).unwrap()));
-    let x1 = build.add_load_const(Value::extension(ConstInt::new_u(3, 3).unwrap()));
+    let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 3).unwrap()));
     let x2 = build
-        .add_dataflow_op(IntOpDef::idiv_u.with_two_log_widths(5, 3), [x0, x1])
+        .add_dataflow_op(IntOpDef::idiv_u.with_log_width(5), [x0, x1])
         .unwrap();
     let reg = ExtensionRegistry::try_new([
         PRELUDE.to_owned(),
@@ -1078,15 +1067,15 @@ fn test_fold_idiv_u() {
 #[test]
 fn test_fold_imod_checked_u() {
     // pseudocode:
-    // x0, x1 := int_u<5>(20), int_u<3>(0)
+    // x0, x1 := int_u<5>(20), int_u<5>(0)
     // x2 := imod_checked_u(x0, x1)
     // output x2 == error
-    let sum_type = sum_with_error(INT_TYPES[3].to_owned());
+    let sum_type = sum_with_error(INT_TYPES[5].to_owned());
     let mut build = DFGBuilder::new(noargfn(vec![sum_type.clone().into()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 20).unwrap()));
-    let x1 = build.add_load_const(Value::extension(ConstInt::new_u(3, 0).unwrap()));
+    let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 0).unwrap()));
     let x2 = build
-        .add_dataflow_op(IntOpDef::imod_checked_u.with_two_log_widths(5, 3), [x0, x1])
+        .add_dataflow_op(IntOpDef::imod_checked_u.with_log_width(5), [x0, x1])
         .unwrap();
     let reg = ExtensionRegistry::try_new([
         PRELUDE.to_owned(),
@@ -1111,14 +1100,14 @@ fn test_fold_imod_checked_u() {
 #[test]
 fn test_fold_imod_u() {
     // pseudocode:
-    // x0, x1 := int_u<5>(20), int_u<3>(3);
+    // x0, x1 := int_u<5>(20), int_u<5>(3);
     // x2 := imod_u(x0, x1);
     // output x2 == int_u<3>(2);
-    let mut build = DFGBuilder::new(noargfn(vec![INT_TYPES[3].clone()])).unwrap();
+    let mut build = DFGBuilder::new(noargfn(vec![INT_TYPES[5].clone()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 20).unwrap()));
-    let x1 = build.add_load_const(Value::extension(ConstInt::new_u(3, 3).unwrap()));
+    let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 3).unwrap()));
     let x2 = build
-        .add_dataflow_op(IntOpDef::imod_u.with_two_log_widths(5, 3), [x0, x1])
+        .add_dataflow_op(IntOpDef::imod_u.with_log_width(5), [x0, x1])
         .unwrap();
     let reg = ExtensionRegistry::try_new([
         PRELUDE.to_owned(),
@@ -1127,22 +1116,22 @@ fn test_fold_imod_u() {
     .unwrap();
     let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
     constant_fold_pass(&mut h, &reg);
-    let expected = Value::extension(ConstInt::new_u(3, 2).unwrap());
+    let expected = Value::extension(ConstInt::new_u(5, 2).unwrap());
     assert_fully_folded(&h, &expected);
 }
 
 #[test]
 fn test_fold_idiv_checked_s() {
     // pseudocode:
-    // x0, x1 := int_s<5>(-20), int_u<3>(0)
+    // x0, x1 := int_s<5>(-20), int_u<5>(0)
     // x2 := idiv_checked_s(x0, x1)
     // output x2 == error
     let sum_type = sum_with_error(INT_TYPES[5].to_owned());
     let mut build = DFGBuilder::new(noargfn(vec![sum_type.clone().into()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, -20).unwrap()));
-    let x1 = build.add_load_const(Value::extension(ConstInt::new_u(3, 0).unwrap()));
+    let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 0).unwrap()));
     let x2 = build
-        .add_dataflow_op(IntOpDef::idiv_checked_s.with_two_log_widths(5, 3), [x0, x1])
+        .add_dataflow_op(IntOpDef::idiv_checked_s.with_log_width(5), [x0, x1])
         .unwrap();
     let reg = ExtensionRegistry::try_new([
         PRELUDE.to_owned(),
@@ -1167,14 +1156,14 @@ fn test_fold_idiv_checked_s() {
 #[test]
 fn test_fold_idiv_s() {
     // pseudocode:
-    // x0, x1 := int_s<5>(-20), int_u<3>(3);
+    // x0, x1 := int_s<5>(-20), int_u<5>(3);
     // x2 := idiv_s(x0, x1);
     // output x2 == int_s<5>(-7);
     let mut build = DFGBuilder::new(noargfn(vec![INT_TYPES[5].clone()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, -20).unwrap()));
-    let x1 = build.add_load_const(Value::extension(ConstInt::new_u(3, 3).unwrap()));
+    let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 3).unwrap()));
     let x2 = build
-        .add_dataflow_op(IntOpDef::idiv_s.with_two_log_widths(5, 3), [x0, x1])
+        .add_dataflow_op(IntOpDef::idiv_s.with_log_width(5), [x0, x1])
         .unwrap();
     let reg = ExtensionRegistry::try_new([
         PRELUDE.to_owned(),
@@ -1190,15 +1179,15 @@ fn test_fold_idiv_s() {
 #[test]
 fn test_fold_imod_checked_s() {
     // pseudocode:
-    // x0, x1 := int_s<5>(-20), int_u<3>(0)
+    // x0, x1 := int_s<5>(-20), int_u<5>(0)
     // x2 := imod_checked_u(x0, x1)
     // output x2 == error
-    let sum_type = sum_with_error(INT_TYPES[3].to_owned());
+    let sum_type = sum_with_error(INT_TYPES[5].to_owned());
     let mut build = DFGBuilder::new(noargfn(vec![sum_type.clone().into()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, -20).unwrap()));
-    let x1 = build.add_load_const(Value::extension(ConstInt::new_u(3, 0).unwrap()));
+    let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 0).unwrap()));
     let x2 = build
-        .add_dataflow_op(IntOpDef::imod_checked_s.with_two_log_widths(5, 3), [x0, x1])
+        .add_dataflow_op(IntOpDef::imod_checked_s.with_log_width(5), [x0, x1])
         .unwrap();
     let reg = ExtensionRegistry::try_new([
         PRELUDE.to_owned(),
@@ -1223,14 +1212,14 @@ fn test_fold_imod_checked_s() {
 #[test]
 fn test_fold_imod_s() {
     // pseudocode:
-    // x0, x1 := int_s<5>(-20), int_u<3>(3);
+    // x0, x1 := int_s<5>(-20), int_u<5>(3);
     // x2 := imod_s(x0, x1);
-    // output x2 == int_u<3>(1);
-    let mut build = DFGBuilder::new(noargfn(vec![INT_TYPES[3].clone()])).unwrap();
+    // output x2 == int_u<5>(1);
+    let mut build = DFGBuilder::new(noargfn(vec![INT_TYPES[5].clone()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, -20).unwrap()));
-    let x1 = build.add_load_const(Value::extension(ConstInt::new_u(3, 3).unwrap()));
+    let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 3).unwrap()));
     let x2 = build
-        .add_dataflow_op(IntOpDef::imod_s.with_two_log_widths(5, 3), [x0, x1])
+        .add_dataflow_op(IntOpDef::imod_s.with_log_width(5), [x0, x1])
         .unwrap();
     let reg = ExtensionRegistry::try_new([
         PRELUDE.to_owned(),
@@ -1239,7 +1228,7 @@ fn test_fold_imod_s() {
     .unwrap();
     let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
     constant_fold_pass(&mut h, &reg);
-    let expected = Value::extension(ConstInt::new_u(3, 1).unwrap());
+    let expected = Value::extension(ConstInt::new_u(5, 1).unwrap());
     assert_fully_folded(&h, &expected);
 }
 
@@ -1364,9 +1353,9 @@ fn test_fold_ishl() {
     // output x2 == int_u<5>(112);
     let mut build = DFGBuilder::new(noargfn(vec![INT_TYPES[5].clone()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, 14).unwrap()));
-    let x1 = build.add_load_const(Value::extension(ConstInt::new_u(3, 3).unwrap()));
+    let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 3).unwrap()));
     let x2 = build
-        .add_dataflow_op(IntOpDef::ishl.with_two_log_widths(5, 3), [x0, x1])
+        .add_dataflow_op(IntOpDef::ishl.with_log_width(5), [x0, x1])
         .unwrap();
     let reg = ExtensionRegistry::try_new([
         PRELUDE.to_owned(),
@@ -1387,9 +1376,9 @@ fn test_fold_ishr() {
     // output x2 == int_u<5>(1);
     let mut build = DFGBuilder::new(noargfn(vec![INT_TYPES[5].clone()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, 14).unwrap()));
-    let x1 = build.add_load_const(Value::extension(ConstInt::new_u(3, 3).unwrap()));
+    let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 3).unwrap()));
     let x2 = build
-        .add_dataflow_op(IntOpDef::ishr.with_two_log_widths(5, 3), [x0, x1])
+        .add_dataflow_op(IntOpDef::ishr.with_log_width(5), [x0, x1])
         .unwrap();
     let reg = ExtensionRegistry::try_new([
         PRELUDE.to_owned(),
@@ -1410,9 +1399,9 @@ fn test_fold_irotl() {
     // output x2 == int_u<5>(2^30 + 2^31 + 1);
     let mut build = DFGBuilder::new(noargfn(vec![INT_TYPES[5].clone()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, 14).unwrap()));
-    let x1 = build.add_load_const(Value::extension(ConstInt::new_u(3, 61).unwrap()));
+    let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 61).unwrap()));
     let x2 = build
-        .add_dataflow_op(IntOpDef::irotl.with_two_log_widths(5, 3), [x0, x1])
+        .add_dataflow_op(IntOpDef::irotl.with_log_width(5), [x0, x1])
         .unwrap();
     let reg = ExtensionRegistry::try_new([
         PRELUDE.to_owned(),
@@ -1433,9 +1422,9 @@ fn test_fold_irotr() {
     // output x2 == int_u<5>(2^30 + 2^31 + 1);
     let mut build = DFGBuilder::new(noargfn(vec![INT_TYPES[5].clone()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, 14).unwrap()));
-    let x1 = build.add_load_const(Value::extension(ConstInt::new_u(3, 3).unwrap()));
+    let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 3).unwrap()));
     let x2 = build
-        .add_dataflow_op(IntOpDef::irotr.with_two_log_widths(5, 3), [x0, x1])
+        .add_dataflow_op(IntOpDef::irotr.with_log_width(5), [x0, x1])
         .unwrap();
     let reg = ExtensionRegistry::try_new([
         PRELUDE.to_owned(),

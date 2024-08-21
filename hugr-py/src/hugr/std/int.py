@@ -76,22 +76,19 @@ INT_OPS_EXTENSION = ext.Extension("arithmetic.int", ext.Version(0, 1, 0))
 
 
 @INT_OPS_EXTENSION.register_op(
-    signature=ext.OpDefSig(
-        tys.FunctionType([_int_tv(0), _int_tv(1)], [_int_tv(0), _int_tv(1)])
-    ),
+    signature=ext.OpDefSig(tys.FunctionType.endo([_int_tv(0)] * 2)),
 )
 @dataclass(frozen=True)
 class idivmod_u(RegisteredOp):
     """DivMod operation, has two inputs and two outputs."""
 
-    arg1: int = 5
-    arg2: int = 5
+    width: int = 5
 
     def type_args(self) -> list[tys.TypeArg]:
-        return [tys.BoundedNatArg(n=self.arg1), tys.BoundedNatArg(n=self.arg2)]
+        return [tys.BoundedNatArg(n=self.width)]
 
     def cached_signature(self) -> tys.FunctionType | None:
-        row: list[tys.Type] = [int_t(self.arg1), int_t(self.arg2)]
+        row: list[tys.Type] = [int_t(self.width)] * 2
         return tys.FunctionType.endo(row)
 
     @classmethod
@@ -99,8 +96,8 @@ class idivmod_u(RegisteredOp):
         if custom.op_def() != cls.const_op_def:
             return None
         match custom.args:
-            case [tys.BoundedNatArg(n=a1), tys.BoundedNatArg(n=a2)]:
-                return cls(arg1=a1, arg2=a2)
+            case [tys.BoundedNatArg(n=a1)]:
+                return cls(width=a1)
             case _:
                 msg = f"Invalid args: {custom.args}"
                 raise AsExtOp.InvalidExtOp(msg)

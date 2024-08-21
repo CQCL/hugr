@@ -207,10 +207,6 @@
           {
             "tp": "BoundedNat",
             "bound": 7
-          },
-          {
-            "tp": "BoundedNat",
-            "bound": 7
           }
         ],
         "body": {
@@ -238,7 +234,7 @@
               "args": [
                 {
                   "tya": "Variable",
-                  "idx": 1,
+                  "idx": 0,
                   "cached_decl": {
                     "tp": "BoundedNat",
                     "bound": 7
@@ -297,10 +293,6 @@
           {
             "tp": "BoundedNat",
             "bound": 7
-          },
-          {
-            "tp": "BoundedNat",
-            "bound": 7
           }
         ],
         "body": {
@@ -328,7 +320,7 @@
               "args": [
                 {
                   "tya": "Variable",
-                  "idx": 1,
+                  "idx": 0,
                   "cached_decl": {
                     "tp": "BoundedNat",
                     "bound": 7
@@ -387,10 +379,6 @@
           {
             "tp": "BoundedNat",
             "bound": 7
-          },
-          {
-            "tp": "BoundedNat",
-            "bound": 7
           }
         ],
         "body": {
@@ -418,7 +406,7 @@
               "args": [
                 {
                   "tya": "Variable",
-                  "idx": 1,
+                  "idx": 0,
                   "cached_decl": {
                     "tp": "BoundedNat",
                     "bound": 7
@@ -460,10 +448,6 @@
           {
             "tp": "BoundedNat",
             "bound": 7
-          },
-          {
-            "tp": "BoundedNat",
-            "bound": 7
           }
         ],
         "body": {
@@ -491,7 +475,7 @@
               "args": [
                 {
                   "tya": "Variable",
-                  "idx": 1,
+                  "idx": 0,
                   "cached_decl": {
                     "tp": "BoundedNat",
                     "bound": 7
@@ -527,13 +511,9 @@
     "idivmod_checked_s": {
       "extension": "arithmetic.int",
       "name": "idivmod_checked_s",
-      "description": "given signed integer -2^{N-1} <= n < 2^{N-1} and unsigned 0 <= m < 2^M, generates signed q and unsigned r where q*m+r=n, 0<=r<m (m=0 is an error)",
+      "description": "given signed integer -2^{N-1} <= n < 2^{N-1} and unsigned 0 <= m < 2^N, generates signed q and unsigned r where q*m+r=n, 0<=r<m (m=0 is an error)",
       "signature": {
         "params": [
-          {
-            "tp": "BoundedNat",
-            "bound": 7
-          },
           {
             "tp": "BoundedNat",
             "bound": 7
@@ -564,7 +544,7 @@
               "args": [
                 {
                   "tya": "Variable",
-                  "idx": 1,
+                  "idx": 0,
                   "cached_decl": {
                     "tp": "BoundedNat",
                     "bound": 7
@@ -608,7 +588,7 @@
                           "args": [
                             {
                               "tya": "Variable",
-                              "idx": 1,
+                              "idx": 0,
                               "cached_decl": {
                                 "tp": "BoundedNat",
                                 "bound": 7
@@ -641,13 +621,9 @@
     "idivmod_checked_u": {
       "extension": "arithmetic.int",
       "name": "idivmod_checked_u",
-      "description": "given unsigned integers 0 <= n < 2^N, 0 <= m < 2^M, generates unsigned q, r where q*m+r=n, 0<=r<m (m=0 is an error)",
+      "description": "given unsigned integers 0 <= n < 2^N, 0 <= m < 2^N, generates unsigned q, r where q*m+r=n, 0<=r<m (m=0 is an error)",
       "signature": {
         "params": [
-          {
-            "tp": "BoundedNat",
-            "bound": 7
-          },
           {
             "tp": "BoundedNat",
             "bound": 7
@@ -678,7 +654,7 @@
               "args": [
                 {
                   "tya": "Variable",
-                  "idx": 1,
+                  "idx": 0,
                   "cached_decl": {
                     "tp": "BoundedNat",
                     "bound": 7
@@ -722,7 +698,7 @@
                           "args": [
                             {
                               "tya": "Variable",
-                              "idx": 1,
+                              "idx": 0,
                               "cached_decl": {
                                 "tp": "BoundedNat",
                                 "bound": 7
@@ -755,13 +731,9 @@
     "idivmod_s": {
       "extension": "arithmetic.int",
       "name": "idivmod_s",
-      "description": "given signed integer -2^{N-1} <= n < 2^{N-1} and unsigned 0 <= m < 2^M, generates signed q and unsigned r where q*m+r=n, 0<=r<m (m=0 will call panic)",
+      "description": "given signed integer -2^{N-1} <= n < 2^{N-1} and unsigned 0 <= m < 2^N, generates signed q and unsigned r where q*m+r=n, 0<=r<m (m=0 will call panic)",
       "signature": {
         "params": [
-          {
-            "tp": "BoundedNat",
-            "bound": 7
-          },
           {
             "tp": "BoundedNat",
             "bound": 7
@@ -792,7 +764,7 @@
               "args": [
                 {
                   "tya": "Variable",
-                  "idx": 1,
+                  "idx": 0,
                   "cached_decl": {
                     "tp": "BoundedNat",
                     "bound": 7
@@ -826,7 +798,7 @@
               "args": [
                 {
                   "tya": "Variable",
-                  "idx": 1,
+                  "idx": 0,
                   "cached_decl": {
                     "tp": "BoundedNat",
                     "bound": 7
@@ -844,13 +816,9 @@
     "idivmod_u": {
       "extension": "arithmetic.int",
       "name": "idivmod_u",
-      "description": "given unsigned integers 0 <= n < 2^N, 0 <= m < 2^M, generates unsigned q, r where q*m+r=n, 0<=r<m (m=0 will call panic)",
+      "description": "given unsigned integers 0 <= n < 2^N, 0 <= m < 2^N, generates unsigned q, r where q*m+r=n, 0<=r<m (m=0 will call panic)",
       "signature": {
         "params": [
-          {
-            "tp": "BoundedNat",
-            "bound": 7
-          },
           {
             "tp": "BoundedNat",
             "bound": 7
@@ -881,7 +849,7 @@
               "args": [
                 {
                   "tya": "Variable",
-                  "idx": 1,
+                  "idx": 0,
                   "cached_decl": {
                     "tp": "BoundedNat",
                     "bound": 7
@@ -915,7 +883,7 @@
               "args": [
                 {
                   "tya": "Variable",
-                  "idx": 1,
+                  "idx": 0,
                   "cached_decl": {
                     "tp": "BoundedNat",
                     "bound": 7
@@ -1770,10 +1738,6 @@
           {
             "tp": "BoundedNat",
             "bound": 7
-          },
-          {
-            "tp": "BoundedNat",
-            "bound": 7
           }
         ],
         "body": {
@@ -1801,7 +1765,7 @@
               "args": [
                 {
                   "tya": "Variable",
-                  "idx": 1,
+                  "idx": 0,
                   "cached_decl": {
                     "tp": "BoundedNat",
                     "bound": 7
@@ -1824,7 +1788,7 @@
                     "args": [
                       {
                         "tya": "Variable",
-                        "idx": 1,
+                        "idx": 0,
                         "cached_decl": {
                           "tp": "BoundedNat",
                           "bound": 7
@@ -1860,10 +1824,6 @@
           {
             "tp": "BoundedNat",
             "bound": 7
-          },
-          {
-            "tp": "BoundedNat",
-            "bound": 7
           }
         ],
         "body": {
@@ -1891,7 +1851,7 @@
               "args": [
                 {
                   "tya": "Variable",
-                  "idx": 1,
+                  "idx": 0,
                   "cached_decl": {
                     "tp": "BoundedNat",
                     "bound": 7
@@ -1914,7 +1874,7 @@
                     "args": [
                       {
                         "tya": "Variable",
-                        "idx": 1,
+                        "idx": 0,
                         "cached_decl": {
                           "tp": "BoundedNat",
                           "bound": 7
@@ -1950,10 +1910,6 @@
           {
             "tp": "BoundedNat",
             "bound": 7
-          },
-          {
-            "tp": "BoundedNat",
-            "bound": 7
           }
         ],
         "body": {
@@ -1981,7 +1937,7 @@
               "args": [
                 {
                   "tya": "Variable",
-                  "idx": 1,
+                  "idx": 0,
                   "cached_decl": {
                     "tp": "BoundedNat",
                     "bound": 7
@@ -1999,7 +1955,7 @@
               "args": [
                 {
                   "tya": "Variable",
-                  "idx": 1,
+                  "idx": 0,
                   "cached_decl": {
                     "tp": "BoundedNat",
                     "bound": 7
@@ -2023,10 +1979,6 @@
           {
             "tp": "BoundedNat",
             "bound": 7
-          },
-          {
-            "tp": "BoundedNat",
-            "bound": 7
           }
         ],
         "body": {
@@ -2054,7 +2006,7 @@
               "args": [
                 {
                   "tya": "Variable",
-                  "idx": 1,
+                  "idx": 0,
                   "cached_decl": {
                     "tp": "BoundedNat",
                     "bound": 7
@@ -2072,7 +2024,7 @@
               "args": [
                 {
                   "tya": "Variable",
-                  "idx": 1,
+                  "idx": 0,
                   "cached_decl": {
                     "tp": "BoundedNat",
                     "bound": 7
@@ -2546,10 +2498,6 @@
           {
             "tp": "BoundedNat",
             "bound": 7
-          },
-          {
-            "tp": "BoundedNat",
-            "bound": 7
           }
         ],
         "body": {
@@ -2577,7 +2525,7 @@
               "args": [
                 {
                   "tya": "Variable",
-                  "idx": 1,
+                  "idx": 0,
                   "cached_decl": {
                     "tp": "BoundedNat",
                     "bound": 7
@@ -2619,10 +2567,6 @@
           {
             "tp": "BoundedNat",
             "bound": 7
-          },
-          {
-            "tp": "BoundedNat",
-            "bound": 7
           }
         ],
         "body": {
@@ -2650,7 +2594,7 @@
               "args": [
                 {
                   "tya": "Variable",
-                  "idx": 1,
+                  "idx": 0,
                   "cached_decl": {
                     "tp": "BoundedNat",
                     "bound": 7
@@ -2692,10 +2636,6 @@
           {
             "tp": "BoundedNat",
             "bound": 7
-          },
-          {
-            "tp": "BoundedNat",
-            "bound": 7
           }
         ],
         "body": {
@@ -2723,7 +2663,7 @@
               "args": [
                 {
                   "tya": "Variable",
-                  "idx": 1,
+                  "idx": 0,
                   "cached_decl": {
                     "tp": "BoundedNat",
                     "bound": 7
@@ -2765,10 +2705,6 @@
           {
             "tp": "BoundedNat",
             "bound": 7
-          },
-          {
-            "tp": "BoundedNat",
-            "bound": 7
           }
         ],
         "body": {
@@ -2796,7 +2732,7 @@
               "args": [
                 {
                   "tya": "Variable",
-                  "idx": 1,
+                  "idx": 0,
                   "cached_decl": {
                     "tp": "BoundedNat",
                     "bound": 7
