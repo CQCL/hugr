@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from . import ops
-from .dfg import Function, _DefinitionBuilder
+from .dfg import Function, DefinitionBuilder
 from .hugr import Hugr
 
 if TYPE_CHECKING:
@@ -17,7 +17,7 @@ __all__ = ["Function", "Module"]
 
 
 @dataclass
-class Module(_DefinitionBuilder[ops.Module]):
+class Module(DefinitionBuilder[ops.Module]):
     """Build a top-level HUGR module.
 
     Examples:

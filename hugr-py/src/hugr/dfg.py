@@ -30,7 +30,7 @@ OpVar = TypeVar("OpVar", bound=ops.Op)
 
 
 @dataclass()
-class _DefinitionBuilder(Generic[OpVar]):
+class DefinitionBuilder(Generic[OpVar]):
     """Base class for builders that can define functions, constants, and aliases.
 
     As this class may be a root node, it does not extend `ParentBuilder`.
@@ -95,7 +95,7 @@ DP = TypeVar("DP", bound=ops.DfParentOp)
 
 
 @dataclass()
-class _DfBase(ParentBuilder[DP], _DefinitionBuilder, AbstractContextManager):
+class DfBase(ParentBuilder[DP], DefinitionBuilder, AbstractContextManager):
     """Base class for dataflow graph builders.
 
     Args:
@@ -636,7 +636,7 @@ class _DfBase(ParentBuilder[DP], _DefinitionBuilder, AbstractContextManager):
         return self._get_dataflow_type(src)
 
 
-class Dfg(_DfBase[ops.DFG]):
+class Dfg(DfBase[ops.DFG]):
     """Builder for a simple nested Dataflow graph, with root node of type
     :class:`DFG <hugr.ops.DFG>`.
 
@@ -672,7 +672,7 @@ def _ancestral_sibling(h: Hugr, src: Node, tgt: Node) -> Node | None:
 
 
 @dataclass
-class Function(_DfBase[ops.FuncDefn]):
+class Function(DfBase[ops.FuncDefn]):
     """Build a function definition as a HUGR dataflow graph.
 
     Args:
