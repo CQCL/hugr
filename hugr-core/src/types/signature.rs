@@ -316,5 +316,6 @@ mod test {
 
         assert_eq!(f_type.input_types(), &[Type::UNIT]);
         assert_eq!(f_type.output_types(), &[USIZE_T]);
+        assert_eq!(f_type.io(), (&type_row![Type::UNIT], &type_row![USIZE_T]));
     }
 }
