@@ -30,7 +30,7 @@ pub const POP_NAME: OpName = OpName::new_inline("pop");
 /// Push operation name.
 pub const PUSH_NAME: OpName = OpName::new_inline("push");
 /// Reported unique name of the extension
-pub const EXTENSION_NAME: ExtensionId = ExtensionId::new_unchecked("Collections");
+pub const EXTENSION_NAME: ExtensionId = ExtensionId::new_unchecked("collections");
 /// Extension version.
 pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
 
