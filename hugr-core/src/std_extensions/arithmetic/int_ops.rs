@@ -113,21 +113,22 @@ impl MakeOpDef for IntOpDef {
 
     fn signature(&self) -> SignatureFunc {
         use IntOpDef::*;
+        let tv0 = int_tv(0);
         match self {
             iwiden_s | iwiden_u => CustomValidator::new(
-                int_polytype(2, vec![int_tv(0)], vec![int_tv(1)]),
+                int_polytype(2, vec![tv0.clone()], vec![int_tv(1)]),
                 IOValidator { f_ge_s: false },
             )
             .into(),
             inarrow_s | inarrow_u => CustomValidator::new(
-                int_polytype(2, int_tv(0), sum_ty_with_err(int_tv(1))),
+                int_polytype(2, tv0.clone(), sum_ty_with_err(int_tv(1))),
                 IOValidator { f_ge_s: true },
             )
             .into(),
             itobool => int_polytype(0, vec![int_type(0)], type_row![BOOL_T]).into(),
             ifrombool => int_polytype(0, type_row![BOOL_T], vec![int_type(0)]).into(),
             ieq | ine | ilt_u | ilt_s | igt_u | igt_s | ile_u | ile_s | ige_u | ige_s => {
-                int_polytype(1, vec![int_tv(0); 2], type_row![BOOL_T]).into()
+                int_polytype(1, vec![tv0; 2], type_row![BOOL_T]).into()
             }
             imax_u | imax_s | imin_u | imin_s | iadd | isub | imul | iand | ior | ixor => {
                 ibinop_sig().into()
@@ -135,38 +136,31 @@ impl MakeOpDef for IntOpDef {
             ineg | iabs | inot => iunop_sig().into(),
             //TODO inline
             idivmod_checked_u | idivmod_checked_s => {
-                let intpair: TypeRowRV = vec![int_tv(0), int_tv(1)].into();
+                let intpair: TypeRowRV = vec![tv0; 2].into();
                 int_polytype(
-                    2,
+                    1,
                     intpair.clone(),
                     sum_ty_with_err(Type::new_tuple(intpair)),
                 )
             }
             .into(),
             idivmod_u | idivmod_s => {
-                let intpair: TypeRowRV = vec![int_tv(0), int_tv(1)].into();
-                int_polytype(2, intpair.clone(), intpair.clone())
+                let intpair: TypeRowRV = vec![tv0; 2].into();
+                int_polytype(1, intpair.clone(), intpair.clone())
             }
             .into(),
-            idiv_u | idiv_s => int_polytype(2, vec![int_tv(0), int_tv(1)], vec![int_tv(0)]).into(),
+            idiv_u | idiv_s => int_polytype(1, vec![tv0.clone(); 2], vec![tv0]).into(),
             idiv_checked_u | idiv_checked_s => {
-                int_polytype(2, vec![int_tv(0), int_tv(1)], sum_ty_with_err(int_tv(0))).into()
+                int_polytype(1, vec![tv0.clone(); 2], sum_ty_with_err(tv0)).into()
             }
-            imod_checked_u | imod_checked_s => int_polytype(
-                2,
-                vec![int_tv(0), int_tv(1).clone()],
-                sum_ty_with_err(int_tv(1)),
-            )
-            .into(),
-            imod_u | imod_s => {
-                int_polytype(2, vec![int_tv(0), int_tv(1).clone()], vec![int_tv(1)]).into()
+            imod_checked_u | imod_checked_s => {
+                int_polytype(1, vec![tv0.clone(); 2], sum_ty_with_err(tv0)).into()
             }
-            ishl | ishr | irotl | irotr => {
-                int_polytype(2, vec![int_tv(0), int_tv(1)], vec![int_tv(0)]).into()
-            }
+            imod_u | imod_s => int_polytype(1, vec![tv0.clone(); 2], vec![tv0]).into(),
+            ishl | ishr | irotl | irotr => int_polytype(1, vec![tv0.clone(); 2], vec![tv0]).into(),
             itostring_u | itostring_s => PolyFuncTypeRV::new(
                 vec![LOG_WIDTH_TYPE_PARAM],
-                FuncValueType::new(vec![int_tv(0)], vec![STRING_TYPE]),
+                FuncValueType::new(vec![tv0], vec![STRING_TYPE]),
             )
             .into(),
         }
