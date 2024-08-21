@@ -134,7 +134,6 @@ impl MakeOpDef for IntOpDef {
                 ibinop_sig().into()
             }
             ineg | iabs | inot => iunop_sig().into(),
-            //TODO inline
             idivmod_checked_u | idivmod_checked_s => {
                 let intpair: TypeRowRV = vec![tv0; 2].into();
                 int_polytype(
