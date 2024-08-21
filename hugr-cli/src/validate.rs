@@ -57,7 +57,7 @@ impl HugrArgs {
         let mut reg: ExtensionRegistry = if self.no_std {
             hugr_core::extension::PRELUDE_REGISTRY.to_owned()
         } else {
-            hugr_core::std_extensions::std_reg()
+            hugr_core::std_extensions::STD_REG.to_owned()
         };
 
         // register packed extensions
