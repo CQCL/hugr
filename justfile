@@ -58,7 +58,7 @@ update-schema:
 # Generate serialized declarations for the standard extensions and prelude.
 gen-extensions:
     cargo run -p hugr-cli gen-extensions -o specification/std_extensions
-
+    cp -r specification/std_extensions/* hugr-py/src/hugr/std/_json_defs/
 
 build-py-docs:
     cd hugr-py/docs && ./build.sh

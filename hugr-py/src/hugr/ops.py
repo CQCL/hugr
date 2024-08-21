@@ -398,11 +398,12 @@ class RegisteredOp(AsExtOp):
     """
 
     #: Known operation definition.
-    const_op_def: ext.OpDef  # must be initialised by register_op
+    const_op_def: ext.OpDef
 
-    def op_def(self) -> ext.OpDef:
+    @classmethod
+    def op_def(cls) -> ext.OpDef:
         # override for AsExtOp.op_def
-        return self.const_op_def
+        return cls.const_op_def
 
 
 @dataclass()

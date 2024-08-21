@@ -9,20 +9,15 @@ from typing_extensions import Self
 
 from hugr import ext, tys, val
 from hugr.ops import AsExtOp, DataflowOp, ExtOp, RegisteredOp
+from hugr.std import _load_extension
 
 if TYPE_CHECKING:
     from hugr.ops import Command, ComWire
 
-INT_TYPES_EXTENSION = ext.Extension("arithmetic.int.types", ext.Version(0, 1, 0))
+INT_TYPES_EXTENSION = _load_extension("arithmetic.int.types")
 _INT_PARAM = tys.BoundedNatParam(7)
-INT_T_DEF = INT_TYPES_EXTENSION.add_type_def(
-    ext.TypeDef(
-        name="int",
-        description="Variable-width integer.",
-        bound=ext.ExplicitBound(tys.TypeBound.Copyable),
-        params=[_INT_PARAM],
-    )
-)
+
+INT_T_DEF = INT_TYPES_EXTENSION.types["int"]
 
 
 def int_t(width: int) -> tys.ExtType:
@@ -72,17 +67,18 @@ class IntVal(val.ExtensionValue):
         )
 
 
-INT_OPS_EXTENSION = ext.Extension("arithmetic.int", ext.Version(0, 1, 0))
+INT_OPS_EXTENSION = _load_extension("arithmetic.int")
 
 
-@INT_OPS_EXTENSION.register_op(
-    signature=ext.OpDefSig(tys.FunctionType.endo([_int_tv(0)] * 2)),
-)
 @dataclass(frozen=True)
-class idivmod_u(RegisteredOp):
+class _DivModDef(RegisteredOp):
     """DivMod operation, has two inputs and two outputs."""
 
     width: int = 5
+
+    @classmethod
+    def op_def(cls) -> ext.OpDef:
+        return INT_OPS_EXTENSION.operations["idivmod_u"]
 
     def type_args(self) -> list[tys.TypeArg]:
         return [tys.BoundedNatArg(n=self.width)]
@@ -93,7 +89,7 @@ class idivmod_u(RegisteredOp):
 
     @classmethod
     def from_ext(cls, custom: ExtOp) -> Self | None:
-        if custom.op_def() != cls.const_op_def:
+        if custom.op_def() != cls.op_def():
             return None
         match custom.args:
             case [tys.BoundedNatArg(n=a1)]:
@@ -107,4 +103,4 @@ class idivmod_u(RegisteredOp):
 
 
 #: DivMod operation.
-DivMod = idivmod_u()
+DivMod = _DivModDef()

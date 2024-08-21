@@ -1,0 +1,155 @@
+{
+  "version": "0.1.0",
+  "name": "logic",
+  "extension_reqs": [],
+  "types": {},
+  "values": {
+    "FALSE": {
+      "extension": "logic",
+      "name": "FALSE",
+      "typed_value": {
+        "v": "Sum",
+        "tag": 0,
+        "vs": [],
+        "typ": {
+          "s": "Unit",
+          "size": 2
+        }
+      }
+    },
+    "TRUE": {
+      "extension": "logic",
+      "name": "TRUE",
+      "typed_value": {
+        "v": "Sum",
+        "tag": 1,
+        "vs": [],
+        "typ": {
+          "s": "Unit",
+          "size": 2
+        }
+      }
+    }
+  },
+  "operations": {
+    "And": {
+      "extension": "logic",
+      "name": "And",
+      "description": "logical 'and'",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Sum",
+              "s": "Unit",
+              "size": 2
+            },
+            {
+              "t": "Sum",
+              "s": "Unit",
+              "size": 2
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "Unit",
+              "size": 2
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "Eq": {
+      "extension": "logic",
+      "name": "Eq",
+      "description": "test if bools are equal",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Sum",
+              "s": "Unit",
+              "size": 2
+            },
+            {
+              "t": "Sum",
+              "s": "Unit",
+              "size": 2
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "Unit",
+              "size": 2
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "Not": {
+      "extension": "logic",
+      "name": "Not",
+      "description": "logical 'not'",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Sum",
+              "s": "Unit",
+              "size": 2
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "Unit",
+              "size": 2
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "Or": {
+      "extension": "logic",
+      "name": "Or",
+      "description": "logical 'or'",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Sum",
+              "s": "Unit",
+              "size": 2
+            },
+            {
+              "t": "Sum",
+              "s": "Unit",
+              "size": 2
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "Unit",
+              "size": 2
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    }
+  }
+}
