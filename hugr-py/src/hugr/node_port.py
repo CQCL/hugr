@@ -185,6 +185,20 @@ class Node(ToNode):
                 return (self[i] for i in xs)
 
     def _normalize_index(self, index: int, allow_eq_len: bool = False) -> int:
+        """Given an index passed to `__getitem__`, normalize it to be within the
+        range of output ports.
+
+        Args:
+            index: index to normalize.
+            allow_eq_len: whether to allow the index to be equal to the number of
+                output ports.
+
+        Returns:
+            Normalized index.
+
+        Raises:
+            IndexError: if the index is out of range.
+        """
         msg = f"Index {index} out of range"
 
         if self._num_out_ports is not None:
