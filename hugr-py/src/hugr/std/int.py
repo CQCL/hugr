@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 from typing_extensions import Self
 
@@ -75,10 +75,7 @@ class _DivModDef(RegisteredOp):
     """DivMod operation, has two inputs and two outputs."""
 
     width: int = 5
-
-    @classmethod
-    def op_def(cls) -> ext.OpDef:
-        return INT_OPS_EXTENSION.operations["idivmod_u"]
+    const_op_def: ClassVar[ext.OpDef] = INT_OPS_EXTENSION.operations["idivmod_u"]
 
     def type_args(self) -> list[tys.TypeArg]:
         return [tys.BoundedNatArg(n=self.width)]
