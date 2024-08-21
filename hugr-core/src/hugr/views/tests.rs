@@ -10,6 +10,7 @@ use crate::{
         handle::{DataflowOpID, NodeHandle},
         Value,
     },
+    std_extensions::logic::LogicOp,
     type_row,
     types::Signature,
     utils::test_quantum_extension::cx_gate,
@@ -119,7 +120,7 @@ fn all_ports(sample_hugr: (Hugr, BuildHandle<DataflowOpID>, BuildHandle<Dataflow
 fn value_types() {
     use crate::builder::Container;
     use crate::extension::prelude::BOOL_T;
-    use crate::std_extensions::logic::NotOp;
+
     use crate::utils::test_quantum_extension::h_gate;
     use itertools::Itertools;
 
@@ -128,7 +129,7 @@ fn value_types() {
 
     let [q, b] = dfg.input_wires_arr();
     let n1 = dfg.add_dataflow_op(h_gate(), [q]).unwrap();
-    let n2 = dfg.add_dataflow_op(NotOp, [b]).unwrap();
+    let n2 = dfg.add_dataflow_op(LogicOp::Not, [b]).unwrap();
     dfg.add_other_wire(n1.node(), n2.node());
     let h = dfg
         .finish_prelude_hugr_with_outputs([n2.out_wire(0), n1.out_wire(0)])
@@ -168,7 +169,7 @@ fn test_dataflow_ports_only() {
     use crate::builder::DataflowSubContainer;
     use crate::extension::{prelude::BOOL_T, PRELUDE_REGISTRY};
     use crate::hugr::views::PortIterator;
-    use crate::std_extensions::logic::NotOp;
+
     use itertools::Itertools;
 
     let mut dfg = DFGBuilder::new(endo_sig(BOOL_T)).unwrap();
@@ -184,7 +185,7 @@ fn test_dataflow_ports_only() {
     };
     let [in_bool] = dfg.input_wires_arr();
 
-    let not = dfg.add_dataflow_op(NotOp, [in_bool]).unwrap();
+    let not = dfg.add_dataflow_op(LogicOp::Not, [in_bool]).unwrap();
     let call = dfg
         .call(
             local_and.handle(),

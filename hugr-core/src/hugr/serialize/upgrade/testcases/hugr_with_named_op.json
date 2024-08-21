@@ -60,12 +60,7 @@
       "extension": "logic",
       "name": "And",
       "description": "logical 'and'",
-      "args": [
-        {
-          "tya": "BoundedNat",
-          "n": 2
-        }
-      ],
+      "args": [],
       "signature": {
         "input": [
           {
