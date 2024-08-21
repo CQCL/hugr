@@ -816,7 +816,7 @@
     "idivmod_u": {
       "extension": "arithmetic.int",
       "name": "idivmod_u",
-      "description": "given unsigned integers 0 <= n < 2^N, 0 <= m < 2^M, generates unsigned q, r where q*m+r=n, 0<=r<m (m=0 will call panic)",
+      "description": "given unsigned integers 0 <= n < 2^N, 0 <= m < 2^N, generates unsigned q, r where q*m+r=n, 0<=r<m (m=0 will call panic)",
       "signature": {
         "params": [
           {

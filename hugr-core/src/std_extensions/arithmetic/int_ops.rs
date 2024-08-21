@@ -193,13 +193,13 @@ impl MakeOpDef for IntOpDef {
             isub => "subtraction modulo 2^N (signed and unsigned versions are the same op)",
             ineg => "negation modulo 2^N (signed and unsigned versions are the same op)",
             imul => "multiplication modulo 2^N (signed and unsigned versions are the same op)",
-            idivmod_checked_u => "given unsigned integers 0 <= n < 2^N, 0 <= m < 2^M, generates unsigned q, r where \
+            idivmod_checked_u => "given unsigned integers 0 <= n < 2^N, 0 <= m < 2^N, generates unsigned q, r where \
             q*m+r=n, 0<=r<m (m=0 is an error)",
-            idivmod_u => "given unsigned integers 0 <= n < 2^N, 0 <= m < 2^M, generates unsigned q, r where \
+            idivmod_u => "given unsigned integers 0 <= n < 2^N, 0 <= m < 2^N, generates unsigned q, r where \
             q*m+r=n, 0<=r<m (m=0 will call panic)",
-            idivmod_checked_s => "given signed integer -2^{N-1} <= n < 2^{N-1} and unsigned 0 <= m < 2^M, generates \
+            idivmod_checked_s => "given signed integer -2^{N-1} <= n < 2^{N-1} and unsigned 0 <= m < 2^N, generates \
             signed q and unsigned r where q*m+r=n, 0<=r<m (m=0 is an error)",
-            idivmod_s => "given signed integer -2^{N-1} <= n < 2^{N-1} and unsigned 0 <= m < 2^M, generates \
+            idivmod_s => "given signed integer -2^{N-1} <= n < 2^{N-1} and unsigned 0 <= m < 2^N, generates \
             signed q and unsigned r where q*m+r=n, 0<=r<m (m=0 will call panic)",
             idiv_checked_u => "as idivmod_checked_u but discarding the second output",
             idiv_u => "as idivmod_u but discarding the second output",
