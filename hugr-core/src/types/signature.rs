@@ -98,6 +98,12 @@ impl<RV: MaybeRV> FuncTypeBase<RV> {
         &self.output
     }
 
+    #[inline]
+    /// Returns a tuple with the input and output rows of the function.
+    pub fn io(&self) -> (&TypeRowBase<RV>, &TypeRowBase<RV>) {
+        (&self.input, &self.output)
+    }
+
     pub(super) fn validate(
         &self,
         extension_registry: &ExtensionRegistry,
