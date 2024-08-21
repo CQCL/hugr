@@ -2,7 +2,7 @@ use crate::{
     builder::{DFGBuilder, Dataflow, DataflowHugr},
     extension::prelude::BOOL_T,
     hugr::serialize::test::check_hugr_deserialize,
-    std_extensions::logic::NaryLogic,
+    std_extensions::logic::LogicOp,
     type_row,
     types::Signature,
 };
@@ -49,9 +49,7 @@ pub fn hugr_with_named_op() -> Hugr {
     let mut builder =
         DFGBuilder::new(Signature::new(type_row![BOOL_T, BOOL_T], type_row![BOOL_T])).unwrap();
     let [a, b] = builder.input_wires_arr();
-    let x = builder
-        .add_dataflow_op(NaryLogic::And.with_n_inputs(2), [a, b])
-        .unwrap();
+    let x = builder.add_dataflow_op(LogicOp::And, [a, b]).unwrap();
     builder
         .finish_prelude_hugr_with_outputs(x.outputs())
         .unwrap()

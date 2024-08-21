@@ -29,7 +29,7 @@
 //! # use hugr::Hugr;
 //! # use hugr::builder::{BuildError, BuildHandle, Container, DFGBuilder, Dataflow, DataflowHugr, ModuleBuilder, DataflowSubContainer, HugrBuilder};
 //! use hugr::extension::prelude::BOOL_T;
-//! use hugr::std_extensions::logic::{EXTENSION_ID, LOGIC_REG, NotOp};
+//! use hugr::std_extensions::logic::{EXTENSION_ID, LOGIC_REG, LogicOp};
 //! use hugr::types::Signature;
 //!
 //! # fn doctest() -> Result<(), BuildError> {
@@ -49,7 +49,7 @@
 //!         let [w] = dfg.input_wires_arr();
 //!
 //!         // Add an operation connected to the input wire, and get the new dangling wires.
-//!         let [w] = dfg.add_dataflow_op(NotOp, [w])?.outputs_arr();
+//!         let [w] = dfg.add_dataflow_op(LogicOp::Not, [w])?.outputs_arr();
 //!
 //!         // Finish the function, connecting some wires to the output.
 //!         dfg.finish_with_outputs([w])
@@ -65,7 +65,7 @@
 //!         let mut circuit = dfg.as_circuit(dfg.input_wires());
 //!
 //!         // Add multiple operations, indicating only the wire index.
-//!         circuit.append(NotOp, [0])?.append(NotOp, [1])?;
+//!         circuit.append(LogicOp::Not, [0])?.append(LogicOp::Not, [1])?;
 //!
 //!         // Finish the circuit, and return the dataflow graph after connecting its outputs.
 //!         let outputs = circuit.finish();

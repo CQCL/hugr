@@ -6,7 +6,7 @@ use hugr_core::ops::Value;
 use hugr_core::std_extensions::arithmetic;
 use hugr_core::std_extensions::arithmetic::int_ops::IntOpDef;
 use hugr_core::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
-use hugr_core::std_extensions::logic::{self, NaryLogic, NotOp};
+use hugr_core::std_extensions::logic::{self, LogicOp};
 use hugr_core::type_row;
 use hugr_core::types::{Signature, Type, TypeRow, TypeRowRV};
 
@@ -170,9 +170,7 @@ fn test_fold_and() {
     let mut build = DFGBuilder::new(noargfn(BOOL_T)).unwrap();
     let x0 = build.add_load_const(Value::true_val());
     let x1 = build.add_load_const(Value::true_val());
-    let x2 = build
-        .add_dataflow_op(NaryLogic::And.with_n_inputs(2), [x0, x1])
-        .unwrap();
+    let x2 = build.add_dataflow_op(LogicOp::And, [x0, x1]).unwrap();
     let reg =
         ExtensionRegistry::try_new([PRELUDE.to_owned(), logic::EXTENSION.to_owned()]).unwrap();
     let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
@@ -190,9 +188,7 @@ fn test_fold_or() {
     let mut build = DFGBuilder::new(noargfn(BOOL_T)).unwrap();
     let x0 = build.add_load_const(Value::true_val());
     let x1 = build.add_load_const(Value::false_val());
-    let x2 = build
-        .add_dataflow_op(NaryLogic::Or.with_n_inputs(2), [x0, x1])
-        .unwrap();
+    let x2 = build.add_dataflow_op(LogicOp::Or, [x0, x1]).unwrap();
     let reg =
         ExtensionRegistry::try_new([PRELUDE.to_owned(), logic::EXTENSION.to_owned()]).unwrap();
     let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
@@ -209,7 +205,7 @@ fn test_fold_not() {
     // output x1 == false;
     let mut build = DFGBuilder::new(noargfn(BOOL_T)).unwrap();
     let x0 = build.add_load_const(Value::true_val());
-    let x1 = build.add_dataflow_op(NotOp, [x0]).unwrap();
+    let x1 = build.add_dataflow_op(LogicOp::Not, [x0]).unwrap();
     let reg =
         ExtensionRegistry::try_new([PRELUDE.to_owned(), logic::EXTENSION.to_owned()]).unwrap();
     let mut h = build.finish_hugr_with_outputs(x1.outputs(), &reg).unwrap();
@@ -233,12 +229,9 @@ fn orphan_output() {
     let mut build = DFGBuilder::new(noargfn(vec![BOOL_T])).unwrap();
     let true_wire = build.add_load_value(Value::true_val());
     // this Not will be manually replaced
-    let orig_not = build.add_dataflow_op(NotOp, [true_wire]).unwrap();
+    let orig_not = build.add_dataflow_op(LogicOp::Not, [true_wire]).unwrap();
     let r = build
-        .add_dataflow_op(
-            NaryLogic::Or.with_n_inputs(2),
-            [true_wire, orig_not.out_wire(0)],
-        )
+        .add_dataflow_op(LogicOp::Or, [true_wire, orig_not.out_wire(0)])
         .unwrap();
     let or_node = r.node();
     let parent = build.container_node();
@@ -248,7 +241,7 @@ fn orphan_output() {
 
     // we delete the original Not and create a new One. This means it will be
     // traversed by `constant_fold_pass` after the Or.
-    let new_not = h.add_node_with_parent(parent, NotOp);
+    let new_not = h.add_node_with_parent(parent, LogicOp::Not);
     h.connect(true_wire.node(), true_wire.source(), new_not, 0);
     h.disconnect(or_node, IncomingPort::from(1));
     h.connect(new_not, 0, or_node, 1);
@@ -276,18 +269,12 @@ fn test_folding_pass_issue_996() {
     let x2 = build.add_dataflow_op(FloatOps::fne, [x0, x1]).unwrap();
     let x3 = build.add_dataflow_op(FloatOps::flt, [x0, x1]).unwrap();
     let x4 = build
-        .add_dataflow_op(
-            NaryLogic::And.with_n_inputs(2),
-            x2.outputs().chain(x3.outputs()),
-        )
+        .add_dataflow_op(LogicOp::And, x2.outputs().chain(x3.outputs()))
         .unwrap();
     let x5 = build.add_load_const(Value::extension(ConstF64::new(-10.0)));
     let x6 = build.add_dataflow_op(FloatOps::flt, [x0, x5]).unwrap();
     let x7 = build
-        .add_dataflow_op(
-            NaryLogic::Or.with_n_inputs(2),
-            x4.outputs().chain(x6.outputs()),
-        )
+        .add_dataflow_op(LogicOp::Or, x4.outputs().chain(x6.outputs()))
         .unwrap();
     let reg = ExtensionRegistry::try_new([
         PRELUDE.to_owned(),
@@ -1528,20 +1515,14 @@ fn test_fold_int_ops() {
         .add_dataflow_op(IntOpDef::ilt_u.with_log_width(5), [x0, x1])
         .unwrap();
     let x4 = build
-        .add_dataflow_op(
-            NaryLogic::And.with_n_inputs(2),
-            x2.outputs().chain(x3.outputs()),
-        )
+        .add_dataflow_op(LogicOp::And, x2.outputs().chain(x3.outputs()))
         .unwrap();
     let x5 = build.add_load_const(Value::extension(ConstInt::new_s(5, -10).unwrap()));
     let x6 = build
         .add_dataflow_op(IntOpDef::ilt_s.with_log_width(5), [x0, x5])
         .unwrap();
     let x7 = build
-        .add_dataflow_op(
-            NaryLogic::Or.with_n_inputs(2),
-            x4.outputs().chain(x6.outputs()),
-        )
+        .add_dataflow_op(LogicOp::Or, x4.outputs().chain(x6.outputs()))
         .unwrap();
     let reg = ExtensionRegistry::try_new([
         PRELUDE.to_owned(),
