@@ -164,23 +164,59 @@ class Node(ToNode):
     ) -> OutPort | Iterator[OutPort]:
         match index:
             case PortOffset(index):
-                if self._num_out_ports is not None and index >= self._num_out_ports:
-                    msg = "Index out of range"
-                    raise IndexError(msg)
+                index = self._normalize_index(index)
                 return self.out(index)
             case slice():
                 start = index.start or 0
-                stop = index.stop or self._num_out_ports
+                stop = index.stop if index.stop is not None else self._num_out_ports
                 if stop is None:
                     msg = (
                         f"{self} does not have a fixed number of output ports. "
                         "Iterating over all output ports is not supported."
                     )
                     raise ValueError(msg)
+
+                start = self._normalize_index(start)
+                stop = self._normalize_index(stop, allow_eq_len=True)
                 step = index.step or 1
+
                 return (self[i] for i in range(start, stop, step))
             case tuple(xs):
                 return (self[i] for i in xs)
+
+    def _normalize_index(self, index: int, allow_eq_len: bool = False) -> int:
+        """Given an index passed to `__getitem__`, normalize it to be within the
+        range of output ports.
+
+        Args:
+            index: index to normalize.
+            allow_eq_len: whether to allow the index to be equal to the number of
+                output ports.
+
+        Returns:
+            Normalized index.
+
+        Raises:
+            IndexError: if the index is out of range.
+        """
+        msg = f"Index {index} out of range"
+
+        if self._num_out_ports is not None:
+            if index > self._num_out_ports:
+                raise IndexError(msg)
+            if index == self._num_out_ports and not allow_eq_len:
+                raise IndexError(msg)
+            if index < -self._num_out_ports:
+                raise IndexError(msg)
+        else:
+            if index < 0:
+                raise IndexError(msg)
+
+        if index >= 0:
+            return index
+        else:
+            assert self._num_out_ports is not None
+            return self._num_out_ports + index
 
     def to_node(self) -> Node:
         return self
