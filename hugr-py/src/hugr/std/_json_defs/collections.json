@@ -1,0 +1,143 @@
+{
+  "version": "0.1.0",
+  "name": "collections",
+  "extension_reqs": [],
+  "types": {
+    "List": {
+      "extension": "collections",
+      "name": "List",
+      "params": [
+        {
+          "tp": "Type",
+          "b": "A"
+        }
+      ],
+      "description": "Generic dynamically sized list of type T.",
+      "bound": {
+        "b": "FromParams",
+        "indices": [
+          0
+        ]
+      }
+    }
+  },
+  "values": {},
+  "operations": {
+    "pop": {
+      "extension": "collections",
+      "name": "pop",
+      "description": "Pop from back of list",
+      "signature": {
+        "params": [
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "collections",
+              "id": "List",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "collections",
+              "id": "List",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "V",
+              "i": 0,
+              "b": "A"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "push": {
+      "extension": "collections",
+      "name": "push",
+      "description": "Push to back of list",
+      "signature": {
+        "params": [
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "collections",
+              "id": "List",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "V",
+              "i": 0,
+              "b": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "collections",
+              "id": "List",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    }
+  }
+}

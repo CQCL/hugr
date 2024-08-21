@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import TYPE_CHECKING, Protocol, TypeVar, runtime_checkable
+from typing import TYPE_CHECKING, ClassVar, Protocol, TypeVar, runtime_checkable
 
 from typing_extensions import Self
 
@@ -398,11 +398,12 @@ class RegisteredOp(AsExtOp):
     """
 
     #: Known operation definition.
-    const_op_def: ext.OpDef  # must be initialised by register_op
+    const_op_def: ClassVar[ext.OpDef]  # may be set by registered_op decorator.
 
-    def op_def(self) -> ext.OpDef:
+    @classmethod
+    def op_def(cls) -> ext.OpDef:
         # override for AsExtOp.op_def
-        return self.const_op_def
+        return cls.const_op_def
 
 
 @dataclass()
