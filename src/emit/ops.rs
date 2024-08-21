@@ -1,18 +1,19 @@
 use anyhow::{anyhow, Result};
+use hugr::ops::{
+    constant::Sum, Call, CallIndirect, Case, Conditional, Const, CustomOp, Input, LoadConstant,
+    LoadFunction, MakeTuple, OpTag, OpTrait, OpType, Output, Tag, UnpackTuple, Value, CFG,
+};
 use hugr::{
     hugr::views::SiblingGraph,
-    ops::{
-        constant::Sum, Call, CallIndirect, Case, Conditional, Const, Input, LoadConstant,
-        LoadFunction, MakeTuple, OpTag, OpTrait, OpType, Output, Tag, UnpackTuple, Value, CFG,
-    },
     types::{SumType, Type, TypeEnum},
     HugrView, NodeIndex,
 };
+use inkwell::types::BasicTypeEnum;
 use inkwell::{
     builder::Builder,
     values::{BasicValueEnum, CallableValue},
 };
-use itertools::Itertools;
+use itertools::{zip_eq, Itertools};
 use petgraph::visit::Walker;
 
 use crate::{fat::FatExt as _, sum::LLVMSumValue};
@@ -420,4 +421,92 @@ fn emit_optype<'c, H: HugrView>(
 
         _ => Err(anyhow!("Invalid child for Dataflow Parent: {node}")),
     }
+}
+
+/// Emit a custom operation with a single input.
+///
+/// # Arguments
+///
+/// * `context` - The context in which to emit the operation.
+/// * `args` - The arguments to the operation.
+/// * `go` - The operation to build the result given a [`Builder`], the input,
+///   and an iterator over the expected output types.
+pub(crate) fn emit_custom_unary_op<'c, H, F>(
+    context: &mut EmitFuncContext<'c, H>,
+    args: EmitOpArgs<'c, CustomOp, H>,
+    go: F,
+) -> Result<()>
+where
+    H: HugrView,
+    F: FnOnce(
+        &Builder<'c>,
+        BasicValueEnum<'c>,
+        &[BasicTypeEnum<'c>],
+    ) -> Result<Vec<BasicValueEnum<'c>>>,
+{
+    let [inp] = TryInto::<[_; 1]>::try_into(args.inputs).map_err(|v| {
+        anyhow!(
+            "emit_custom_unary_op: expected exactly one input, got {}",
+            v.len()
+        )
+    })?;
+    let out_types = args.outputs.get_types().collect_vec();
+    let res = go(context.builder(), inp, &out_types)?;
+    if res.len() != args.outputs.len()
+        || zip_eq(res.iter(), out_types).any(|(a, b)| a.get_type() != b)
+    {
+        return Err(anyhow!(
+            "emit_custom_unary_op: expected outputs of types {:?}, got {:?}",
+            args.outputs.get_types().collect_vec(),
+            res.iter().map(BasicValueEnum::get_type).collect_vec()
+        ));
+    }
+    args.outputs.finish(context.builder(), res)
+}
+
+/// Emit a custom operation with two inputs of the same type.
+///
+/// # Arguments
+///
+/// * `context` - The context in which to emit the operation.
+/// * `args` - The arguments to the operation.
+/// * `go` - The operation to build the result given a [`Builder`], the two
+///   inputs, and an iterator over the expected output types.
+pub(crate) fn emit_custom_binary_op<'c, H, F>(
+    context: &mut EmitFuncContext<'c, H>,
+    args: EmitOpArgs<'c, CustomOp, H>,
+    go: F,
+) -> Result<()>
+where
+    H: HugrView,
+    F: FnOnce(
+        &Builder<'c>,
+        (BasicValueEnum<'c>, BasicValueEnum<'c>),
+        &[BasicTypeEnum<'c>],
+    ) -> Result<Vec<BasicValueEnum<'c>>>,
+{
+    let [lhs, rhs] = TryInto::<[_; 2]>::try_into(args.inputs).map_err(|v| {
+        anyhow!(
+            "emit_custom_binary_op: expected exactly 2 inputs, got {}",
+            v.len()
+        )
+    })?;
+    if lhs.get_type() != rhs.get_type() {
+        return Err(anyhow!(
+            "emit_custom_binary_op: expected inputs of the same type, got {} and {}",
+            lhs.get_type(),
+            rhs.get_type()
+        ));
+    }
+    let out_types = args.outputs.get_types().collect_vec();
+    let res = go(context.builder(), (lhs, rhs), &out_types)?;
+    if res.len() != out_types.len() || zip_eq(res.iter(), out_types).any(|(a, b)| a.get_type() != b)
+    {
+        return Err(anyhow!(
+            "emit_custom_binary_op: expected outputs of types {:?}, got {:?}",
+            args.outputs.get_types().collect_vec(),
+            res.iter().map(BasicValueEnum::get_type).collect_vec()
+        ));
+    }
+    args.outputs.finish(context.builder(), res)
 }

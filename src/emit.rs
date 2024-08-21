@@ -26,7 +26,7 @@ pub mod args;
 pub mod func;
 pub mod libc;
 pub mod namer;
-mod ops;
+pub mod ops;
 
 pub use args::EmitOpArgs;
 pub use func::{EmitFuncContext, RowPromise};

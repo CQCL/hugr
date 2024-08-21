@@ -81,9 +81,21 @@ impl Default for SimpleHugrConfig {
     }
 }
 
+/// A macro used to check the emission of a Hugr module,
+/// and to assert the correctness of the emitted LLVM IR using [insta].
+///
+/// Call with
+/// ```ignore
+/// check_emission!(hugr, llvm_ctx);
+/// ```
+/// or
+/// ```ignore
+/// check_emission!("snapshot_name", hugr, llvm_ctx);
+/// ```
 #[macro_export]
 macro_rules! check_emission {
-    ($hugr: ident, $test_ctx:ident) => {
+    // Call the macro with a snapshot name.
+    ($snapshot_name:expr, $hugr: ident, $test_ctx:ident) => {
         let root = $crate::fat::FatExt::fat_root::<hugr::ops::Module>(&$hugr).unwrap();
         let module = $test_ctx
             .get_emit_hugr()
@@ -96,7 +108,13 @@ macro_rules! check_emission {
             .snapshot_suffix()
             .map_or("pre-mem2reg".into(), |x| format!("pre-mem2reg@{x}"));
         settings.set_snapshot_suffix(new_suffix);
-        settings.bind(|| insta::assert_snapshot!(module.to_string()));
+        settings.bind(|| {
+            if $snapshot_name == "" {
+                insta::assert_snapshot!(module.to_string())
+            } else {
+                insta::assert_snapshot!($snapshot_name, module.to_string())
+            }
+        });
 
         module
             .verify()
@@ -106,7 +124,15 @@ macro_rules! check_emission {
         pb.add_promote_memory_to_register_pass();
         pb.run_on(&module);
 
-        insta::assert_snapshot!(module.to_string());
+        if $snapshot_name == "" {
+            insta::assert_snapshot!(module.to_string())
+        } else {
+            insta::assert_snapshot!($snapshot_name, module.to_string())
+        }
+    };
+    // Use the default snapshot name.
+    ($hugr: ident, $test_ctx:ident) => {
+        check_emission!("", $hugr, $test_ctx);
     };
 }
 

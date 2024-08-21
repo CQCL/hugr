@@ -11,58 +11,21 @@ use hugr::{
     HugrView,
 };
 use inkwell::{
-    builder::Builder,
     types::{BasicTypeEnum, IntType},
     values::{BasicValue, BasicValueEnum},
 };
-use itertools::{zip_eq, Itertools as _};
 
-use crate::{
-    emit::{emit_value, func::EmitFuncContext, EmitOp, EmitOpArgs, NullEmitLlvm},
-    types::TypingSession,
+use crate::emit::{
+    emit_value, func::EmitFuncContext, ops::emit_custom_binary_op, EmitOp, EmitOpArgs, NullEmitLlvm,
 };
+use crate::types::TypingSession;
 
 use super::{CodegenExtension, CodegenExtsMap};
 use anyhow::{anyhow, Result};
 
 struct IntOpEmitter<'c, 'd, H>(&'d mut EmitFuncContext<'c, H>);
 
-// TODO this is probably useful enough to offer as a general utility
-fn emit_custom_binary_op<'c, H: HugrView>(
-    context: &mut EmitFuncContext<'c, H>,
-    args: EmitOpArgs<'c, CustomOp, H>,
-    go: impl FnOnce(
-        &Builder<'c>,
-        BasicValueEnum<'c>,
-        BasicValueEnum<'c>,
-    ) -> Result<Vec<BasicValueEnum<'c>>>,
-) -> Result<()> {
-    let [lhs, rhs] = TryInto::<[_; 2]>::try_into(args.inputs).map_err(|v| {
-        anyhow!(
-            "emit_custom_2_to_1_op: expected exactly 2 inputs, got {}",
-            v.len()
-        )
-    })?;
-    if lhs.get_type() != rhs.get_type() {
-        return Err(anyhow!(
-            "emit_custom_2_to_1_op: expected inputs of the same type, got {} and {}",
-            lhs.get_type(),
-            rhs.get_type()
-        ));
-    }
-    let res = go(context.builder(), lhs, rhs)?;
-    if res.len() != args.outputs.len()
-        || zip_eq(res.iter(), args.outputs.get_types()).any(|(a, b)| a.get_type() != b)
-    {
-        return Err(anyhow!(
-            "emit_custom_2_to_1_op: expected outputs of types {:?}, got {:?}",
-            args.outputs.get_types().collect_vec(),
-            res.iter().map(BasicValueEnum::get_type).collect_vec()
-        ));
-    }
-    args.outputs.finish(context.builder(), res)
-}
-
+/// Emit an integer comparison operation.
 fn emit_icmp<'c, H: HugrView>(
     context: &mut EmitFuncContext<'c, H>,
     args: EmitOpArgs<'c, CustomOp, H>,
@@ -71,7 +34,7 @@ fn emit_icmp<'c, H: HugrView>(
     let true_val = emit_value(context, &Value::true_val())?;
     let false_val = emit_value(context, &Value::false_val())?;
 
-    emit_custom_binary_op(context, args, |builder, lhs, rhs| {
+    emit_custom_binary_op(context, args, |builder, (lhs, rhs), _| {
         // get result as an i1
         let r = builder.build_int_compare(pred, lhs.into_int_value(), rhs.into_int_value(), "")?;
         // convert to whatever BOOL_T is
@@ -85,8 +48,9 @@ impl<'c, H: HugrView> EmitOp<'c, CustomOp, H> for IntOpEmitter<'c, '_, H> {
             "IntOpEmitter from_optype_failed: {:?}",
             args.node().as_ref()
         ))?;
+        // TODO: Match on `iot.def` instead.
         match iot.name().as_str() {
-            "iadd" => emit_custom_binary_op(self.0, args, |builder, lhs, rhs| {
+            "iadd" => emit_custom_binary_op(self.0, args, |builder, (lhs, rhs), _| {
                 Ok(vec![builder
                     .build_int_add(lhs.into_int_value(), rhs.into_int_value(), "")?
                     .as_basic_value_enum()])
@@ -100,7 +64,7 @@ impl<'c, H: HugrView> EmitOp<'c, CustomOp, H> for IntOpEmitter<'c, '_, H> {
             "igt_u" => emit_icmp(self.0, args, inkwell::IntPredicate::UGT),
             "ile_u" => emit_icmp(self.0, args, inkwell::IntPredicate::ULE),
             "ige_u" => emit_icmp(self.0, args, inkwell::IntPredicate::UGE),
-            "isub" => emit_custom_binary_op(self.0, args, |builder, lhs, rhs| {
+            "isub" => emit_custom_binary_op(self.0, args, |builder, (lhs, rhs), _| {
                 Ok(vec![builder
                     .build_int_sub(lhs.into_int_value(), rhs.into_int_value(), "")?
                     .as_basic_value_enum()])
