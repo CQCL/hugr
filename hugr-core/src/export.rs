@@ -85,10 +85,16 @@ impl<'a> Context<'a> {
 
     /// Get the name of the function associated with a node that takes a static input
     /// connected to a function definition or declaration. Returns `None` otherwise.
-    fn get_func_name(&self, node: Node) -> Option<model::Symbol> {
+    fn connected_function(&self, node: Node) -> Option<model::Symbol> {
         let port = self.hugr.node_inputs(node).last()?;
         let (defn_node, _) = self.hugr.linked_outputs(node, port).next()?;
-        match self.hugr.get_optype(defn_node) {
+        self.get_func_name(defn_node)
+    }
+
+    /// Get the name of a function definition or declaration node. Returns `None` if not
+    /// one of those operations.
+    fn get_func_name(&self, func_node: Node) -> Option<model::Symbol> {
+        match self.hugr.get_optype(func_node) {
             OpType::FuncDecl(func_decl) => Some(model::Symbol(func_decl.name())),
             OpType::FuncDefn(func_defn) => Some(model::Symbol(func_defn.name())),
             _ => None,
@@ -146,14 +152,12 @@ impl Export for Node {
             OpType::DataflowBlock(_) => model::Operation::Block,
 
             OpType::FuncDefn(func) => {
-                // TODO: If the node is not connected to a function, we should do better than panic.
                 let name = ctx.get_func_name(*self).unwrap();
                 let r#type = Box::new(func.signature.export(ctx));
                 model::Operation::DefineFunc(model::operation::DefineFunc { name, r#type })
             }
 
             OpType::FuncDecl(func) => {
-                // TODO: If the node is not connected to a function, we should do better than panic.
                 let name = ctx.get_func_name(*self).unwrap();
                 let r#type = Box::new(func.signature.export(ctx));
                 model::Operation::DeclareFunc(model::operation::DeclareFunc { name, r#type })
@@ -174,14 +178,14 @@ impl Export for Node {
 
             OpType::Call(call) => {
                 // TODO: If the node is not connected to a function, we should do better than panic.
-                let name = ctx.get_func_name(*self).unwrap();
+                let name = ctx.connected_function(*self).unwrap();
                 params.extend(call.type_args.iter().map(|arg| arg.export(ctx)));
                 model::Operation::CallFunc(model::operation::CallFunc { name })
             }
 
             OpType::LoadFunction(func) => {
                 // TODO: If the node is not connected to a function, we should do better than panic.
-                let name = ctx.get_func_name(*self).unwrap();
+                let name = ctx.connected_function(*self).unwrap();
                 params.extend(func.type_args.iter().map(|arg| arg.export(ctx)));
                 model::Operation::LoadFunc(model::operation::LoadFunc { name })
             }
@@ -412,5 +416,63 @@ impl Export for ExtensionSet {
             extensions,
             rest: None,
         }))
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use rstest::{fixture, rstest};
+
+    use crate::{
+        builder::{Dataflow, DataflowSubContainer},
+        extension::prelude::QB_T,
+        std_extensions::arithmetic::float_types,
+        type_row,
+        types::Signature,
+        utils::test_quantum_extension::{self, cx_gate, h_gate},
+        Hugr,
+    };
+
+    #[fixture]
+    fn test_simple_circuit() -> Hugr {
+        crate::builder::test::build_main(
+            Signature::new_endo(type_row![QB_T, QB_T])
+                .with_extension_delta(test_quantum_extension::EXTENSION_ID)
+                .with_extension_delta(float_types::EXTENSION_ID)
+                .into(),
+            |mut f_build| {
+                let wires: Vec<_> = f_build.input_wires().collect();
+                let mut linear = f_build.as_circuit(wires);
+
+                assert_eq!(linear.n_wires(), 2);
+
+                linear
+                    .append(h_gate(), [0])?
+                    .append(cx_gate(), [0, 1])?
+                    .append(cx_gate(), [1, 0])?;
+
+                // constants are not supported yet
+
+                // let angle = linear.add_constant(ConstF64::new(0.5));
+                // linear.append_and_consume(
+                //     rz_f64(),
+                //     [CircuitUnit::Linear(0), CircuitUnit::Wire(angle)],
+                // )?;
+
+                let outs = linear.finish();
+                f_build.finish_with_outputs(outs)
+            },
+        )
+        .unwrap()
+    }
+
+    #[rstest]
+    #[case(crate::builder::test::simple_dfg_hugr())]
+    #[case(test_simple_circuit())]
+    #[should_panic(expected = "const nodes")]
+    #[case::panic_with_message(crate::builder::test::simple_cfg_hugr())]
+    fn test_export(#[case] hugr: Hugr) {
+        let _model = super::export(&hugr);
+        // TODO check the model
     }
 }
