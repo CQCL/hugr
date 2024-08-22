@@ -55,8 +55,7 @@ pub fn convert_module(module: &v0::Module) -> capnp::message::Builder<HeapAlloca
             .reborrow()
             .init_term_table(term_hash.len() as u32);
         for (term, id) in term_hash {
-            let mut term_builder = term_table.reborrow().get(id);
-            term.build(&mut term_builder);
+            term.build(&mut term_table.reborrow().get(id));
         }
     }
 
@@ -67,11 +66,11 @@ pub fn convert_module(module: &v0::Module) -> capnp::message::Builder<HeapAlloca
 
 trait Build {
     type SerBuilder<'a>;
-    fn build<'s>(&self, builder: &mut Self::SerBuilder<'s>);
+    fn build(&self, builder: &mut Self::SerBuilder<'_>);
 }
 impl Build for v0::Node {
     type SerBuilder<'a> = hugr_capnp::node::Builder<'a>;
-    fn build<'s>(&self, builder: &mut Self::SerBuilder<'s>) {
+    fn build(&self, builder: &mut Self::SerBuilder<'_>) {
         let mut operation_build = builder.reborrow().init_operation();
         self.operation.build(&mut operation_build);
 
@@ -95,17 +94,18 @@ impl Build for v0::Node {
             children.set(i as u32, child_id.0);
         }
 
-        let meta_builder = builder.reborrow().init_meta(self.meta.len() as u32);
-        build_meta_list(self.meta.iter(), meta_builder);
+        build_meta_list(
+            self.meta.iter(),
+            builder.reborrow().init_meta(self.meta.len() as u32),
+        );
     }
 }
 
 impl Build for v0::MetaItem {
     type SerBuilder<'a> = hugr_capnp::meta_item::Builder<'a>;
-    fn build<'s>(&self, builder: &mut Self::SerBuilder<'s>) {
+    fn build(&self, builder: &mut Self::SerBuilder<'_>) {
         builder.set_name(&self.name);
-        let mut value_builder = builder.reborrow().init_value();
-        self.value.build(&mut value_builder);
+        self.value.build(&mut builder.reborrow().init_value());
     }
 }
 
@@ -114,14 +114,13 @@ fn build_meta_list<'a>(
     mut metadata: capnp::struct_list::Builder<hugr_capnp::meta_item::Owned>,
 ) {
     for (i, meta_item) in metas.enumerate() {
-        let mut meta_builder = metadata.reborrow().get(i as u32);
-        meta_item.build(&mut meta_builder);
+        meta_item.build(&mut metadata.reborrow().get(i as u32));
     }
 }
 
 impl Build for v0::Operation {
     type SerBuilder<'a> = hugr_capnp::operation::Builder<'a>;
-    fn build<'s>(&self, builder: &mut Self::SerBuilder<'s>) {
+    fn build(&self, builder: &mut Self::SerBuilder<'_>) {
         match self {
             v0::Operation::Module => builder.set_module(()),
             v0::Operation::Input => builder.set_input(()),
@@ -140,8 +139,7 @@ impl Build for v0::Operation {
             v0::Operation::CallFunc(_) => todo!(),
             v0::Operation::LoadFunc(_) => todo!(),
             v0::Operation::Custom(cust) => {
-                let mut cust_builder = builder.reborrow().init_custom();
-                cust.build(&mut cust_builder);
+                cust.build(&mut builder.reborrow().init_custom());
             }
             v0::Operation::DefineAlias(_) => todo!(),
             v0::Operation::DeclareAlias(_) => todo!(),
@@ -151,27 +149,31 @@ impl Build for v0::Operation {
 
 impl Build for v0::operation::DefineFunc {
     type SerBuilder<'a> = hugr_capnp::operation::define_func::Builder<'a>;
-    fn build<'s>(&self, builder: &mut Self::SerBuilder<'s>) {
+    fn build(&self, builder: &mut Self::SerBuilder<'_>) {
         builder.set_name(&self.name.0);
-        let mut type_builder = builder.reborrow().init_type();
 
-        self.r#type.build(&mut type_builder);
+        self.r#type.build(&mut builder.reborrow().init_type());
     }
 }
 
 impl Build for v0::operation::DeclareFunc {
     type SerBuilder<'a> = hugr_capnp::operation::define_func::Builder<'a>;
-    fn build<'s>(&self, builder: &mut Self::SerBuilder<'s>) {
+    fn build(&self, builder: &mut Self::SerBuilder<'_>) {
         builder.set_name(&self.name.0);
-        let mut type_builder = builder.reborrow().init_type();
+        self.r#type.build(&mut builder.reborrow().init_type());
+    }
+}
 
-        self.r#type.build(&mut type_builder);
+impl Build for v0::operation::CallFunc {
+    type SerBuilder<'a> = hugr_capnp::operation::call_func::Builder<'a>;
+    fn build(&self, builder: &mut Self::SerBuilder<'_>) {
+        builder.set_name(&self.name.0);
     }
 }
 
 impl Build for v0::operation::Custom {
     type SerBuilder<'a> = hugr_capnp::operation::custom::Builder<'a>;
-    fn build<'s>(&self, builder: &mut Self::SerBuilder<'s>) {
+    fn build(&self, builder: &mut Self::SerBuilder<'_>) {
         builder.set_name(&self.name.0);
     }
 }
@@ -179,14 +181,14 @@ impl Build for v0::operation::Custom {
 impl Build for v0::Scheme {
     type SerBuilder<'a> = hugr_capnp::scheme::Builder<'a>;
 
-    fn build<'s>(&self, builder: &mut Self::SerBuilder<'s>) {
+    fn build(&self, _builder: &mut Self::SerBuilder<'_>) {
         todo!()
     }
 }
 
 impl Build for v0::Port {
     type SerBuilder<'a> = hugr_capnp::port::Builder<'a>;
-    fn build<'s>(&self, builder: &mut Self::SerBuilder<'s>) {
+    fn build(&self, builder: &mut Self::SerBuilder<'_>) {
         builder.set_type(self.r#type.0);
         let meta_builder = builder.reborrow().init_meta(self.meta.len() as u32);
         build_meta_list(self.meta.iter(), meta_builder);
@@ -195,24 +197,21 @@ impl Build for v0::Port {
 
 impl Build for v0::Term {
     type SerBuilder<'a> = hugr_capnp::term::Builder<'a>;
-    fn build<'s>(&self, builder: &mut Self::SerBuilder<'s>) {
+    fn build(&self, builder: &mut Self::SerBuilder<'_>) {
         match self {
-            v0::Term::Wildcard => todo!(),
-            v0::Term::Type => todo!(),
+            v0::Term::Wildcard => builder.set_wildcard(()),
+            v0::Term::Type => builder.set_type(()),
             v0::Term::Constraint => todo!(),
             v0::Term::Var(_) => todo!(),
             v0::Term::Named(_) => todo!(),
             v0::Term::List(_) => todo!(),
             v0::Term::ListType(_) => todo!(),
-            v0::Term::Str(s) => {
-                let mut s_build = builder.reborrow().init_str(s.len() as u32);
-                s_build.push_str(s);
-            }
-            v0::Term::StrType => todo!(),
-            v0::Term::Nat(_) => todo!(),
-            v0::Term::NatType => todo!(),
+            v0::Term::Str(s) => builder.set_str(s),
+            v0::Term::StrType => builder.set_str_type(()),
+            v0::Term::Nat(v) => builder.set_nat(*v),
+            v0::Term::NatType => builder.set_nat_type(()),
             v0::Term::ExtSet(_) => todo!(),
-            v0::Term::ExtSetType => todo!(),
+            v0::Term::ExtSetType => builder.set_ext_set_type(()),
             v0::Term::Tuple(_) => todo!(),
             v0::Term::ProductType(_) => todo!(),
             v0::Term::Tagged(_) => todo!(),

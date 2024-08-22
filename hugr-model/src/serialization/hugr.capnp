@@ -62,7 +62,7 @@ struct Operation {
 
   struct CallFunc {
     name @0 :Text;
-    args @1 :List(UInt32);
+    # args @1 :List(UInt32);
   }
 
   struct LoadFunc {
