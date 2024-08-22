@@ -372,6 +372,8 @@ fn sum_ty_with_err(t: Type) -> Type {
 
 #[cfg(test)]
 mod test {
+    use rstest::rstest;
+
     use crate::{
         ops::{dataflow::DataflowOpTrait, ExtensionOp},
         std_extensions::arithmetic::int_types::int_type,
@@ -455,5 +457,53 @@ mod test {
 
         assert_eq!(ConcreteIntOp::from_op(&ext_op).unwrap(), o);
         assert_eq!(IntOpDef::from_op(&ext_op).unwrap(), IntOpDef::itobool);
+    }
+
+    #[rstest]
+    #[case::iadd(IntOpDef::iadd.with_log_width(5), &[1, 2], &[3], 5)]
+    #[case::isub(IntOpDef::isub.with_log_width(5), &[5, 2], &[3], 5)]
+    #[case::imul(IntOpDef::imul.with_log_width(5), &[2, 8], &[16], 5)]
+    #[case::idiv(IntOpDef::idiv_u.with_log_width(5), &[37, 8], &[4], 5)]
+    #[case::imod(IntOpDef::imod_u.with_log_width(5), &[43, 8], &[3], 5)]
+    #[case::ipow(IntOpDef::ipow.with_log_width(5), &[2, 8], &[256], 5)]
+    #[case::iu_to_s(IntOpDef::iu_to_s.with_log_width(5), &[42], &[42], 5)]
+    #[case::is_to_u(IntOpDef::is_to_u.with_log_width(5), &[42], &[42], 5)]
+    fn int_fold(
+        #[case] op: ConcreteIntOp,
+        #[case] inputs: &[u64],
+        #[case] outputs: &[u64],
+        #[case] log_width: u8,
+    ) {
+        use crate::ops::Value;
+        use crate::std_extensions::arithmetic::int_types::ConstInt;
+
+        let consts: Vec<_> = inputs
+            .iter()
+            .enumerate()
+            .map(|(i, &x)| {
+                (
+                    i.into(),
+                    Value::extension(ConstInt::new_u(log_width, x).unwrap()),
+                )
+            })
+            .collect();
+
+        let res = op
+            .to_extension_op()
+            .unwrap()
+            .constant_fold(&consts)
+            .unwrap();
+
+        for (i, &expected) in outputs.iter().enumerate() {
+            let res_val: u64 = res
+                .get(i)
+                .unwrap()
+                .1
+                .get_custom_value::<ConstInt>()
+                .expect("This function assumes all incoming constants are floats.")
+                .value_u();
+
+            assert_eq!(res_val, expected);
+        }
     }
 }

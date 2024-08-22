@@ -137,6 +137,9 @@ impl MakeRegisteredOp for FloatOps {
 
 #[cfg(test)]
 mod test {
+    use cgmath::AbsDiffEq;
+    use rstest::rstest;
+
     use super::*;
 
     #[test]
@@ -146,6 +149,49 @@ mod test {
         assert_eq!(r.types().count(), 0);
         for (name, _) in r.operations() {
             assert!(name.as_str().starts_with('f'));
+        }
+    }
+
+    #[rstest]
+    #[case::fadd(FloatOps::fadd, &[0.1, 0.2], &[0.30000000000000004])]
+    #[case::fsub(FloatOps::fsub, &[1., 2.], &[-1.])]
+    #[case::fmul(FloatOps::fmul, &[2., 3.], &[6.])]
+    #[case::fdiv(FloatOps::fdiv, &[7., 2.], &[3.5])]
+    #[case::fpow(FloatOps::fpow, &[0.5, 3.], &[0.125])]
+    #[case::ffloor(FloatOps::ffloor, &[42.42], &[42.])]
+    #[case::fceil(FloatOps::fceil, &[42.42], &[43.])]
+    #[case::fround(FloatOps::fround, &[42.42], &[42.])]
+    fn float_fold(#[case] op: FloatOps, #[case] inputs: &[f64], #[case] outputs: &[f64]) {
+        use crate::ops::Value;
+        use crate::std_extensions::arithmetic::float_types::ConstF64;
+
+        let consts: Vec<_> = inputs
+            .iter()
+            .enumerate()
+            .map(|(i, &x)| (i.into(), Value::extension(ConstF64::new(x))))
+            .collect();
+
+        let res = op
+            .to_extension_op()
+            .unwrap()
+            .constant_fold(&consts)
+            .unwrap();
+
+        for (i, expected) in outputs.iter().enumerate() {
+            let res_val: f64 = res
+                .get(i)
+                .unwrap()
+                .1
+                .get_custom_value::<ConstF64>()
+                .expect("This function assumes all incoming constants are floats.")
+                .value();
+
+            assert!(
+                res_val.abs_diff_eq(expected, f64::EPSILON),
+                "expected {:?}, got {:?}",
+                expected,
+                res_val
+            );
         }
     }
 }
