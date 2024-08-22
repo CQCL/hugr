@@ -587,6 +587,36 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                 },
             ),
         },
+        IntOpDef::ipow => Folder {
+            folder: Box::new(
+                |type_args: &[TypeArg], consts: &[(IncomingPort, Value)]| -> ConstFoldResult {
+                    let [arg] = type_args else {
+                        return None;
+                    };
+                    let logwidth: u8 = get_log_width(arg).ok()?;
+                    let (n0, n1): (&ConstInt, &ConstInt) = get_pair_of_input_values(consts)?;
+                    if n0.log_width() != logwidth || n1.log_width() != logwidth {
+                        None
+                    } else {
+                        Some(vec![(
+                            0.into(),
+                            Value::extension(
+                                ConstInt::new_u(
+                                    logwidth,
+                                    n0.value_u()
+                                        .overflowing_pow(
+                                            n1.value_u().try_into().unwrap_or(u32::MAX),
+                                        )
+                                        .0
+                                        & bitmask_from_logwidth(logwidth),
+                                )
+                                .unwrap(),
+                            ),
+                        )])
+                    }
+                },
+            ),
+        },
         IntOpDef::idivmod_checked_u => Folder {
             folder: Box::new(
                 |type_args: &[TypeArg], consts: &[(IncomingPort, Value)]| -> ConstFoldResult {
@@ -1150,6 +1180,50 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                                 .unwrap(),
                             ),
                         )])
+                    }
+                },
+            ),
+        },
+        IntOpDef::is_to_u => Folder {
+            folder: Box::new(
+                |type_args: &[TypeArg], consts: &[(IncomingPort, Value)]| -> ConstFoldResult {
+                    let [arg] = type_args else {
+                        return None;
+                    };
+                    let logwidth: u8 = get_log_width(arg).ok()?;
+                    let n0: &ConstInt = get_single_input_value(consts)?;
+                    if n0.log_width() != logwidth {
+                        None
+                    } else {
+                        if n0.value_s() < 0 {
+                            panic!(
+                                "Cannot convert negative integer {} to unsigned.",
+                                n0.value_s()
+                            );
+                        }
+                        Some(vec![(0.into(), Value::extension(n0.clone()))])
+                    }
+                },
+            ),
+        },
+        IntOpDef::iu_to_s => Folder {
+            folder: Box::new(
+                |type_args: &[TypeArg], consts: &[(IncomingPort, Value)]| -> ConstFoldResult {
+                    let [arg] = type_args else {
+                        return None;
+                    };
+                    let logwidth: u8 = get_log_width(arg).ok()?;
+                    let n0: &ConstInt = get_single_input_value(consts)?;
+                    if n0.log_width() != logwidth {
+                        None
+                    } else {
+                        if n0.value_s() < 0 {
+                            panic!(
+                                "Unsigned integer {} is too large to be converted to signed.",
+                                n0.value_u()
+                            );
+                        }
+                        Some(vec![(0.into(), Value::extension(n0.clone()))])
                     }
                 },
             ),

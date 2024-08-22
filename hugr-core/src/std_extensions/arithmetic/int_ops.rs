@@ -89,6 +89,7 @@ pub enum IntOpDef {
     idiv_s,
     imod_checked_s,
     imod_s,
+    ipow,
     iabs,
     iand,
     ior,
@@ -98,6 +99,8 @@ pub enum IntOpDef {
     ishr,
     irotl,
     irotr,
+    iu_to_s,
+    is_to_u,
     itostring_u,
     itostring_s,
 }
@@ -130,10 +133,10 @@ impl MakeOpDef for IntOpDef {
             ieq | ine | ilt_u | ilt_s | igt_u | igt_s | ile_u | ile_s | ige_u | ige_s => {
                 int_polytype(1, vec![tv0; 2], type_row![BOOL_T]).into()
             }
-            imax_u | imax_s | imin_u | imin_s | iadd | isub | imul | iand | ior | ixor => {
+            imax_u | imax_s | imin_u | imin_s | iadd | isub | imul | iand | ior | ixor | ipow => {
                 ibinop_sig().into()
             }
-            ineg | iabs | inot => iunop_sig().into(),
+            ineg | iabs | inot | iu_to_s | is_to_u => iunop_sig().into(),
             idivmod_checked_u | idivmod_checked_s => {
                 let intpair: TypeRowRV = vec![tv0; 2].into();
                 int_polytype(
@@ -209,6 +212,7 @@ impl MakeOpDef for IntOpDef {
             idiv_s => "as idivmod_s but discarding the second output",
             imod_checked_s => "as idivmod_checked_s but discarding the first output",
             imod_s => "as idivmod_s but discarding the first output",
+            ipow => "raise first input to the power of second input",
             iabs => "convert signed to unsigned by taking absolute value",
             iand => "bitwise AND",
             ior => "bitwise OR",
@@ -222,6 +226,8 @@ impl MakeOpDef for IntOpDef {
             (leftmost bits replace rightmost bits)",
             irotr => "rotate first input right by k bits where k is unsigned interpretation of second input \
             (rightmost bits replace leftmost bits)",
+            is_to_u => "convert signed to unsigned by taking absolute value. Panics if the input is negative",
+            iu_to_s => "convert unsigned to signed by taking absolute value. Panics if the input is too large",
             itostring_s => "convert a signed integer to its string representation",
             itostring_u => "convert an unsigned integer to its string representation",
         }.into()
@@ -378,7 +384,7 @@ mod test {
     fn test_int_ops_extension() {
         assert_eq!(EXTENSION.name() as &str, "arithmetic.int");
         assert_eq!(EXTENSION.types().count(), 0);
-        assert_eq!(EXTENSION.operations().count(), 47);
+        assert_eq!(EXTENSION.operations().count(), 50);
         for (name, _) in EXTENSION.operations() {
             assert!(name.starts_with('i'));
         }
