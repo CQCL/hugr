@@ -2,7 +2,6 @@
 
 use super::dataflow::DataflowOpTrait;
 use super::{impl_op_name, OpTag};
-
 use crate::extension::ExtensionSet;
 
 use crate::{
@@ -29,38 +28,6 @@ impl Noop {
 impl Default for Noop {
     fn default() -> Self {
         Self { ty: Type::UNIT }
-    }
-}
-
-// /// An operation that packs all its inputs into a tuple.
-// #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-// #[cfg_attr(test, derive(proptest_derive::Arbitrary))]
-// #[non_exhaustive]
-// pub struct MakeTuple {
-//     ///Tuple element types.
-//     pub tys: TypeRow,
-// }
-
-// impl MakeTuple {
-//     /// Create a new MakeTuple operation.
-//     pub fn new(tys: TypeRow) -> Self {
-//         Self { tys }
-//     }
-// }
-
-/// An operation that unpacks a tuple into its components.
-#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
-#[non_exhaustive]
-pub struct UnpackTuple {
-    ///Tuple element types.
-    pub tys: TypeRow,
-}
-
-impl UnpackTuple {
-    /// Create a new UnpackTuple operation.
-    pub fn new(tys: TypeRow) -> Self {
-        Self { tys }
     }
 }
 
@@ -107,8 +74,6 @@ impl Lift {
 }
 
 impl_op_name!(Noop);
-// impl_op_name!(MakeTuple);
-impl_op_name!(UnpackTuple);
 impl_op_name!(Tag);
 impl_op_name!(Lift);
 
@@ -123,50 +88,6 @@ impl DataflowOpTrait for Noop {
     /// The signature of the operation.
     fn signature(&self) -> Signature {
         Signature::new(vec![self.ty.clone()], vec![self.ty.clone()])
-    }
-
-    fn other_input(&self) -> Option<EdgeKind> {
-        Some(EdgeKind::StateOrder)
-    }
-
-    fn other_output(&self) -> Option<EdgeKind> {
-        Some(EdgeKind::StateOrder)
-    }
-}
-
-// impl DataflowOpTrait for MakeTuple {
-//     const TAG: OpTag = OpTag::Leaf;
-
-//     /// A human-readable description of the operation.
-//     fn description(&self) -> &str {
-//         "MakeTuple operation"
-//     }
-
-//     /// The signature of the operation.
-//     fn signature(&self) -> Signature {
-//         Signature::new(self.tys.clone(), vec![Type::new_tuple(self.tys.clone())])
-//     }
-
-//     fn other_input(&self) -> Option<EdgeKind> {
-//         Some(EdgeKind::StateOrder)
-//     }
-
-//     fn other_output(&self) -> Option<EdgeKind> {
-//         Some(EdgeKind::StateOrder)
-//     }
-// }
-
-impl DataflowOpTrait for UnpackTuple {
-    const TAG: OpTag = OpTag::Leaf;
-
-    /// A human-readable description of the operation.
-    fn description(&self) -> &str {
-        "UnpackTuple operation"
-    }
-
-    /// The signature of the operation.
-    fn signature(&self) -> Signature {
-        Signature::new(vec![Type::new_tuple(self.tys.clone())], self.tys.clone())
     }
 
     fn other_input(&self) -> Option<EdgeKind> {

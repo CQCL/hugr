@@ -442,9 +442,15 @@ pub mod leaf {
             consts: &[(crate::IncomingPort, Value)],
         ) -> crate::extension::ConstFoldResult {
             match self {
-                TupleOpDef::MakeTuple => fold_out_row([consts.first()?.1.clone()]),
-                TupleOpDef::UnpackTuple => {
+                TupleOpDef::MakeTuple => {
                     fold_out_row([Value::tuple(sorted_consts(consts).into_iter().cloned())])
+                }
+                TupleOpDef::UnpackTuple => {
+                    let c = &consts.first()?.1;
+                    let Some(vs) = c.as_tuple() else {
+                        panic!("This op always takes a Tuple input.");
+                    };
+                    fold_out_row(vs.iter().cloned())
                 }
             }
         }
@@ -513,7 +519,10 @@ pub mod leaf {
         where
             Self: Sized,
         {
-            let _def = TupleOpDef::from_def(ext_op.def())?;
+            let def = TupleOpDef::from_def(ext_op.def())?;
+            if def != TupleOpDef::MakeTuple {
+                return Err(OpLoadError::NotMember(ext_op.def().name().to_string()))?;
+            }
             let [TypeArg::Sequence { elems }] = ext_op.args() else {
                 return Err(SignatureError::InvalidTypeArgs)?;
             };
@@ -548,15 +557,80 @@ pub mod leaf {
         }
     }
 
+    /// An operation that unpacks a tuple into its components.
+    #[derive(Debug, Clone, Default, PartialEq, Eq)]
+    #[cfg_attr(test, derive(proptest_derive::Arbitrary))]
+    #[non_exhaustive]
+    pub struct UnpackTuple {
+        ///Tuple element types.
+        pub tys: TypeRow,
+    }
+
+    impl UnpackTuple {
+        /// Create a new UnpackTuple operation.
+        pub fn new(tys: TypeRow) -> Self {
+            Self { tys }
+        }
+    }
+
+    impl NamedOp for UnpackTuple {
+        fn name(&self) -> OpName {
+            TupleOpDef::UnpackTuple.name()
+        }
+    }
+
+    impl MakeExtensionOp for UnpackTuple {
+        fn from_extension_op(ext_op: &crate::ops::ExtensionOp) -> Result<Self, OpLoadError>
+        where
+            Self: Sized,
+        {
+            let def = TupleOpDef::from_def(ext_op.def())?;
+            if def != TupleOpDef::UnpackTuple {
+                return Err(OpLoadError::NotMember(ext_op.def().name().to_string()))?;
+            }
+            let [TypeArg::Sequence { elems }] = ext_op.args() else {
+                return Err(SignatureError::InvalidTypeArgs)?;
+            };
+            let tys: Result<Vec<Type>, _> = elems
+                .iter()
+                .map(|a| match a {
+                    TypeArg::Type { ty } => Ok(ty.clone()),
+                    _ => Err(SignatureError::InvalidTypeArgs),
+                })
+                .collect();
+            Ok(Self { tys: tys?.into() })
+        }
+
+        fn type_args(&self) -> Vec<TypeArg> {
+            vec![TypeArg::Sequence {
+                elems: self
+                    .tys
+                    .iter()
+                    .map(|t| TypeArg::Type { ty: t.clone() })
+                    .collect(),
+            }]
+        }
+    }
+
+    impl MakeRegisteredOp for UnpackTuple {
+        fn extension_id(&self) -> ExtensionId {
+            PRELUDE_ID.to_owned()
+        }
+
+        fn registry<'s, 'r: 's>(&'s self) -> &'r crate::extension::ExtensionRegistry {
+            &PRELUDE_REGISTRY
+        }
+    }
+
     #[cfg(test)]
     mod test {
+        use super::*;
         use crate::{
             ops::{OpTrait, OpType},
             type_row,
         };
         #[test]
         fn test_make_tuple() {
-            use super::*;
             let op = MakeTuple::new(type_row![Type::UNIT]);
             let op: OpType = op.into();
             assert_eq!(
@@ -564,6 +638,19 @@ pub mod leaf {
                 (
                     &type_row![Type::UNIT],
                     &vec![Type::new_tuple(type_row![Type::UNIT])].into(),
+                )
+            );
+        }
+
+        #[test]
+        fn test_unmake_tuple() {
+            let op = UnpackTuple::new(type_row![Type::UNIT]);
+            let op: OpType = op.into();
+            assert_eq!(
+                op.dataflow_signature().unwrap().io(),
+                (
+                    &vec![Type::new_tuple(type_row![Type::UNIT])].into(),
+                    &type_row![Type::UNIT],
                 )
             );
         }

@@ -554,35 +554,6 @@ class Noop(DataflowOp):
         return ops.Noop(self.ty.deserialize())
 
 
-# class MakeTuple(DataflowOp):
-#     """An operation that packs all its inputs into a tuple."""
-
-#     op: Literal["MakeTuple"] = "MakeTuple"
-#     tys: TypeRow = Field(default_factory=list)
-
-#     def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
-#         # If we have a single order edge as input, this is a unit
-#         if in_types == [None]:
-#             in_types = []
-#         self.tys = list(in_types)
-
-#     def deserialize(self) -> ops.MakeTuple:
-#         return ops.MakeTuple(deser_it(self.tys))
-
-
-class UnpackTuple(DataflowOp):
-    """An operation that packs all its inputs into a tuple."""
-
-    op: Literal["UnpackTuple"] = "UnpackTuple"
-    tys: TypeRow = Field(default_factory=list)
-
-    def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
-        self.tys = list(out_types)
-
-    def deserialize(self) -> ops.UnpackTuple:
-        return ops.UnpackTuple(deser_it(self.tys))
-
-
 class Tag(DataflowOp):
     """An operation that creates a tagged sum value from one of its variants."""
 
@@ -651,8 +622,6 @@ class OpType(RootModel):
         | LoadFunction
         | Extension
         | Noop
-        # | MakeTuple
-        | UnpackTuple
         | Tag
         | Lift
         | DFG

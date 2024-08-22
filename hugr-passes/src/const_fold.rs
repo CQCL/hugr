@@ -92,17 +92,6 @@ impl ConstantFoldPass {
 pub fn fold_leaf_op(op: &OpType, consts: &[(IncomingPort, Value)]) -> ConstFoldResult {
     let fold_result = match op {
         OpType::Noop { .. } => fold_out_row([consts.first()?.1.clone()]),
-        // OpType::MakeTuple { .. } => {
-        //     fold_out_row([Value::tuple(sorted_consts(consts).into_iter().cloned())])
-        // }
-        OpType::UnpackTuple { .. } => {
-            let c = &consts.first()?.1;
-            let Some(vs) = c.as_tuple() else {
-                panic!("This op always takes a Tuple input.");
-            };
-            fold_out_row(vs.iter().cloned())
-        }
-
         OpType::Tag(t) => fold_out_row([Value::sum(
             t.tag,
             consts.iter().map(|(_, konst)| konst.clone()),

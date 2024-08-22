@@ -1,5 +1,6 @@
 use crate::const_fold::constant_fold_pass;
 use hugr_core::builder::{DFGBuilder, Dataflow, DataflowHugr};
+use hugr_core::extension::prelude::leaf::UnpackTuple;
 use hugr_core::extension::prelude::{sum_with_error, ConstError, ConstString, BOOL_T, STRING_TYPE};
 use hugr_core::extension::{ExtensionRegistry, PRELUDE};
 use hugr_core::ops::Value;
@@ -16,7 +17,7 @@ use lazy_static::lazy_static;
 
 use super::*;
 use hugr_core::builder::Container;
-use hugr_core::ops::{OpType, UnpackTuple};
+use hugr_core::ops::OpType;
 use hugr_core::std_extensions::arithmetic::conversions::ConvertOpDef;
 use hugr_core::std_extensions::arithmetic::float_ops::FloatOps;
 use hugr_core::std_extensions::arithmetic::float_types::{ConstF64, FLOAT64_TYPE};
