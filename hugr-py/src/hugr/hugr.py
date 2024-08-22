@@ -145,7 +145,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         """Iterator over nodes of the hugr and their data."""
         return self.items()
 
-    def links(self) -> Iterable[tuple[OutPort, InPort]]:
+    def links(self) -> Iterator[tuple[OutPort, InPort]]:
         """Iterator over all the links in the HUGR.
 
         Returns:

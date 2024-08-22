@@ -2,12 +2,13 @@
 
 from collections.abc import Iterable
 from dataclasses import dataclass
+from typing import assert_never
 
 import graphviz as gv  # type: ignore[import-untyped]
 from graphviz import Digraph
 
 from hugr.hugr import Hugr
-from hugr.tys import ConstKind, Kind, OrderKind, ValueKind
+from hugr.tys import CFKind, ConstKind, FunctionKind, Kind, OrderKind, ValueKind
 
 from .node_port import InPort, Node, OutPort
 
@@ -86,7 +87,7 @@ class DotRenderer:
             "margin": "0",
             "bgcolor": self.palette.background,
         }
-        if not (name := hugr[hugr.root].metadata.get("name")):
+        if not (name := hugr[hugr.root].metadata.get("name", None)):
             name = ""
 
         graph = gv.Digraph(name, strict=False)
@@ -197,10 +198,6 @@ class DotRenderer:
 
     def _viz_node(self, node: Node, hugr: Hugr, graph: Digraph) -> None:
         """Render a (possibly nested) node to a graphviz graph."""
-        # TODO: Port the CFG special-case rendering from guppy, and use it here
-        # when a node is a CFG node.
-        # See https://github.com/CQCL/guppylang/blob/7d5106cd59ad452046d0dfffd10eea9d9b617431/guppylang/hugr_builder/visualise.py#L250
-
         meta = hugr[node].metadata
         if len(meta) > 0:
             data = "<BR/><BR/>" + "<BR/>".join(
@@ -266,10 +263,12 @@ class DotRenderer:
                 color = self.palette.edge
             case OrderKind():
                 color = self.palette.dark
-            case ConstKind():
+            case ConstKind() | FunctionKind():
                 color = self.palette.const
-            case _:
+            case CFKind():
                 color = self.palette.dark
+            case _:
+                assert_never(kind)
 
         graph.edge(
             self._out_port_name(src_port),
