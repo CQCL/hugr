@@ -39,8 +39,10 @@ pub enum FloatOps {
     fabs,
     fmul,
     fdiv,
+    fpow,
     ffloor,
     fceil,
+    fround,
     ftostring,
 }
 
@@ -60,10 +62,10 @@ impl MakeOpDef for FloatOps {
             feq | fne | flt | fgt | fle | fge => {
                 Signature::new(type_row![FLOAT64_TYPE; 2], type_row![BOOL_T])
             }
-            fmax | fmin | fadd | fsub | fmul | fdiv => {
+            fmax | fmin | fadd | fsub | fmul | fdiv | fpow => {
                 Signature::new(type_row![FLOAT64_TYPE; 2], type_row![FLOAT64_TYPE])
             }
-            fneg | fabs | ffloor | fceil => Signature::new_endo(type_row![FLOAT64_TYPE]),
+            fneg | fabs | ffloor | fceil | fround => Signature::new_endo(type_row![FLOAT64_TYPE]),
             ftostring => Signature::new(type_row![FLOAT64_TYPE], STRING_TYPE),
         }
         .into()
@@ -86,8 +88,10 @@ impl MakeOpDef for FloatOps {
             fabs => "absolute value",
             fmul => "multiplication",
             fdiv => "division",
+            fpow => "exponentiation",
             ffloor => "floor",
             fceil => "ceiling",
+            fround => "round",
             ftostring => "string representation",
         }
         .to_string()
