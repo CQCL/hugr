@@ -119,12 +119,12 @@ impl MakeOpDef for IntOpDef {
         let tv0 = int_tv(0);
         match self {
             iwiden_s | iwiden_u => CustomValidator::new(
-                int_polytype(2, vec![tv0.clone()], vec![int_tv(1)]),
+                int_polytype(2, vec![tv0], vec![int_tv(1)]),
                 IOValidator { f_ge_s: false },
             )
             .into(),
             inarrow_s | inarrow_u => CustomValidator::new(
-                int_polytype(2, tv0.clone(), sum_ty_with_err(int_tv(1))),
+                int_polytype(2, tv0, sum_ty_with_err(int_tv(1))),
                 IOValidator { f_ge_s: true },
             )
             .into(),
@@ -176,8 +176,8 @@ impl MakeOpDef for IntOpDef {
             iwiden_s => "widen a signed integer to a wider one with the same value",
             inarrow_u => "narrow an unsigned integer to a narrower one with the same value if possible",
             inarrow_s => "narrow a signed integer to a narrower one with the same value if possible",
-            itobool => "convert to bool (1 is true, 0 is false)",
-            ifrombool => "convert from bool (1 is true, 0 is false)",
+            itobool => "convert a 1-bit integer to bool (1 is true, 0 is false)",
+            ifrombool => "convert from bool into a 1-bit integer (1 is true, 0 is false)",
             ieq => "equality test",
             ine => "inequality test",
             ilt_u => "\"less than\" as unsigned integers",
@@ -226,8 +226,8 @@ impl MakeOpDef for IntOpDef {
             (leftmost bits replace rightmost bits)",
             irotr => "rotate first input right by k bits where k is unsigned interpretation of second input \
             (rightmost bits replace leftmost bits)",
-            is_to_u => "convert signed to unsigned by taking absolute value. Panics if the input is negative",
-            iu_to_s => "convert unsigned to signed by taking absolute value. Panics if the input is too large",
+            is_to_u => "convert signed to unsigned by taking absolute value",
+            iu_to_s => "convert unsigned to signed by taking absolute value",
             itostring_s => "convert a signed integer to its string representation",
             itostring_u => "convert an unsigned integer to its string representation",
         }.into()
