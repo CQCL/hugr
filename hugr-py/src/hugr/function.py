@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from . import ops
-from .dfg import Function, DefinitionBuilder
+from .dfg import DefinitionBuilder, Function
 from .hugr import Hugr
 
 if TYPE_CHECKING:

@@ -64,7 +64,7 @@ _SI = _SubPort[InPort]
 P = TypeVar("P", InPort, OutPort)
 K = TypeVar("K", InPort, OutPort)
 OpVar = TypeVar("OpVar", bound=Op)
-OpVar2 = TypeVar("OpVar2", bound=Op)
+OpVarCov = TypeVar("OpVarCov", bound=Op, covariant=True)
 
 
 class ParentBuilder(ToNode, Protocol[OpVar]):
@@ -85,7 +85,7 @@ class ParentBuilder(ToNode, Protocol[OpVar]):
 
 
 @dataclass()
-class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
+class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
     """The core HUGR datastructure.
 
     Args:
@@ -108,7 +108,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
     # List of free node indices, populated when nodes are deleted.
     _free_nodes: list[Node]
 
-    def __init__(self, root_op: OpVar | None = None) -> None:
+    def __init__(self, root_op: OpVarCov | None = None) -> None:
         self._free_nodes = []
         self._links = BiMap()
         self._nodes = []
@@ -134,7 +134,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
     def __len__(self) -> int:
         return self.num_nodes()
 
-    def _get_typed_op(self, node: ToNode, cl: type[OpVar2]) -> OpVar2:
+    def _get_typed_op(self, node: ToNode, cl: type[OpVar]) -> OpVar:
         op = self[node].op
         assert isinstance(op, cl)
         return op
@@ -329,7 +329,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
             return
         # TODO make sure sub-offset is handled correctly
 
-    def root_op(self) -> OpVar:
+    def root_op(self) -> OpVarCov:
         """The operation of the root node.
 
         Examples:
@@ -337,7 +337,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
             >>> h.root_op()
             Module()
         """
-        return cast(OpVar, self[self.root].op)
+        return cast(OpVarCov, self[self.root].op)
 
     def num_nodes(self) -> int:
         """The number of nodes in the HUGR.
