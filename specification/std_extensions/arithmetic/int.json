@@ -959,7 +959,7 @@
     "ifrombool": {
       "extension": "arithmetic.int",
       "name": "ifrombool",
-      "description": "convert from bool (1 is true, 0 is false)",
+      "description": "convert from bool into a 1-bit integer (1 is true, 0 is false)",
       "signature": {
         "params": [],
         "body": {
@@ -2489,6 +2489,75 @@
       },
       "binary": false
     },
+    "ipow": {
+      "extension": "arithmetic.int",
+      "name": "ipow",
+      "description": "raise first input to the power of second input",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
     "irotl": {
       "extension": "arithmetic.int",
       "name": "irotl",
@@ -2587,6 +2656,59 @@
               ],
               "bound": "C"
             },
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "is_to_u": {
+      "extension": "arithmetic.int",
+      "name": "is_to_u",
+      "description": "convert signed to unsigned by taking absolute value",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
             {
               "t": "Opaque",
               "extension": "arithmetic.int.types",
@@ -2837,7 +2959,7 @@
     "itobool": {
       "extension": "arithmetic.int",
       "name": "itobool",
-      "description": "convert to bool (1 is true, 0 is false)",
+      "description": "convert a 1-bit integer to bool (1 is true, 0 is false)",
       "signature": {
         "params": [],
         "body": {
@@ -2947,6 +3069,59 @@
               "extension": "prelude",
               "id": "string",
               "args": [],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "iu_to_s": {
+      "extension": "arithmetic.int",
+      "name": "iu_to_s",
+      "description": "convert unsigned to signed by taking absolute value",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
               "bound": "C"
             }
           ],
