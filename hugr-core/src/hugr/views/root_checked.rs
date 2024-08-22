@@ -70,11 +70,12 @@ impl<H: HugrMutInternals + AsRef<Hugr>, Root: NodeHandle> HugrMut for RootChecke
 #[cfg(test)]
 mod test {
     use super::RootChecked;
+    use crate::extension::prelude::leaf::MakeTuple;
     use crate::extension::ExtensionSet;
     use crate::hugr::internal::HugrMutInternals;
     use crate::hugr::{HugrError, HugrMut};
     use crate::ops::handle::{BasicBlockID, CfgID, DataflowParentID, DfgID};
-    use crate::ops::{DataflowBlock, MakeTuple, OpTag, OpType};
+    use crate::ops::{DataflowBlock, OpTag, OpType};
     use crate::{ops, type_row, types::Signature, Hugr, HugrView};
 
     #[test]

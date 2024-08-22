@@ -1,7 +1,8 @@
+use crate::extension::prelude::leaf::MakeTuple;
 use crate::hugr::hugrmut::InsertionResult;
 use crate::hugr::views::HugrView;
 use crate::hugr::{NodeMetadata, ValidationError};
-use crate::ops::{self, MakeTuple, OpTag, OpTrait, OpType, Tag};
+use crate::ops::{self, OpTag, OpTrait, OpType, Tag};
 use crate::utils::collect_array;
 use crate::{IncomingPort, Node, OutgoingPort};
 

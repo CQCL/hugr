@@ -67,6 +67,90 @@
   },
   "values": {},
   "operations": {
+    "MakeTuple": {
+      "extension": "prelude",
+      "name": "MakeTuple",
+      "description": "MakeTuple operation",
+      "signature": {
+        "params": [
+          {
+            "tp": "List",
+            "param": {
+              "tp": "Type",
+              "b": "A"
+            }
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "R",
+              "i": 0,
+              "b": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "General",
+              "rows": [
+                [
+                  {
+                    "t": "R",
+                    "i": 0,
+                    "b": "A"
+                  }
+                ]
+              ]
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "UnpackTuple": {
+      "extension": "prelude",
+      "name": "UnpackTuple",
+      "description": "UnpackTuple operation",
+      "signature": {
+        "params": [
+          {
+            "tp": "List",
+            "param": {
+              "tp": "Type",
+              "b": "A"
+            }
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Sum",
+              "s": "General",
+              "rows": [
+                [
+                  {
+                    "t": "R",
+                    "i": 0,
+                    "b": "A"
+                  }
+                ]
+              ]
+            }
+          ],
+          "output": [
+            {
+              "t": "R",
+              "i": 0,
+              "b": "A"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
     "new_array": {
       "extension": "prelude",
       "name": "new_array",

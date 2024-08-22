@@ -15,7 +15,6 @@ use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::HugrMut;
 use crate::ops::dataflow::IOTrait;
 use crate::ops::handle::NodeHandle;
-use crate::ops::leaf::MakeTuple;
 use crate::ops::{self, Noop, OpType, Value};
 use crate::std_extensions::logic::test::{and_op, or_op};
 use crate::std_extensions::logic::LogicOp;
@@ -720,6 +719,7 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
                 vec![TypeParam::Extensions],
                 Signature::new(vec![utou(es.clone()), int_pair.clone()], int_pair.clone())
                     .with_extension_delta(EXT_ID)
+                    .with_extension_delta(PRELUDE_ID)
                     .with_extension_delta(es.clone()),
             ),
         )?;
@@ -740,13 +740,8 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
         let [f2] = cc.add_dataflow_op(op, [func, i2])?.outputs_arr();
         cc.finish_with_outputs([f1, f2])?;
         let res = c.finish_sub_container()?.outputs();
-        let tup = f.add_dataflow_op(
-            MakeTuple {
-                tys: type_row![USIZE_T; 2],
-            },
-            res,
-        )?;
-        f.finish_with_outputs(tup.outputs())?
+        let tup = f.make_tuple(res)?;
+        f.finish_with_outputs([tup])?
     };
 
     let reg = ExtensionRegistry::try_new([e, PRELUDE.to_owned()])?;
@@ -961,10 +956,10 @@ mod extension_tests {
     use super::*;
     use crate::builder::handle::Outputs;
     use crate::builder::{BlockBuilder, BuildHandle, CFGBuilder, DFGWrapper, TailLoopBuilder};
+    use crate::extension::prelude::PRELUDE_ID;
     use crate::extension::ExtensionSet;
     use crate::macros::const_extension_ids;
     use crate::Wire;
-
     const_extension_ids! {
         const XA: ExtensionId = "A";
         const XB: ExtensionId = "BOOL_EXT";
@@ -1133,7 +1128,7 @@ mod extension_tests {
     fn bb_extension_mismatch<T>(
         #[case] dfg_fn: impl Fn(Type, ExtensionSet) -> DFGWrapper<Hugr, T>,
         #[case] make_pred: impl Fn(&mut DFGWrapper<Hugr, T>, Outputs) -> Result<Wire, BuildError>,
-        #[values((XA.into(), false), (ExtensionSet::new(), false), (ExtensionSet::from_iter([XA,XB]), true))]
+        #[values((ExtensionSet::from_iter([XA,PRELUDE_ID]), false), (PRELUDE_ID.into(), false), (ExtensionSet::from_iter([XA,XB,PRELUDE_ID]), true))]
         parent_exts_success: (ExtensionSet, bool),
     ) -> Result<(), BuildError> {
         let (parent_extensions, success) = parent_exts_success;
