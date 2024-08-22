@@ -2,10 +2,10 @@
 
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import assert_never
 
 import graphviz as gv  # type: ignore[import-untyped]
 from graphviz import Digraph
+from typing_extensions import assert_never
 
 from hugr.hugr import Hugr
 from hugr.tys import CFKind, ConstKind, FunctionKind, Kind, OrderKind, ValueKind
