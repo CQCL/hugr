@@ -1,6 +1,5 @@
 from hugr import ops, tys, val
-from hugr.cfg import Cfg
-from hugr.dfg import Dfg
+from hugr.build import Cfg, Dfg
 from hugr.std.int import INT_T, DivMod, IntVal
 
 from .conftest import validate

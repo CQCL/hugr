@@ -14,17 +14,18 @@ from typing import (
 from typing_extensions import Self
 
 from hugr import ops, tys, val
-
-from .exceptions import NoSiblingAncestor
-from .hugr import Hugr, ParentBuilder
+from hugr.build.base import ParentBuilder
+from hugr.exceptions import NoSiblingAncestor
+from hugr.hugr import Hugr
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
+    from hugr.hugr.node_port import Node, OutPort, PortOffset, ToNode, Wire
+    from hugr.tys import Type, TypeParam, TypeRow
+
     from .cfg import Cfg
     from .cond_loop import Conditional, If, TailLoop
-    from .node_port import Node, OutPort, PortOffset, ToNode, Wire
-    from .tys import Type, TypeParam, TypeRow
 
 OpVar = TypeVar("OpVar", bound=ops.Op)
 

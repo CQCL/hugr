@@ -1,6 +1,6 @@
 import pytest
 
-from hugr.node_port import Node, OutPort
+from hugr.hugr import Node, OutPort
 
 
 def test_index():

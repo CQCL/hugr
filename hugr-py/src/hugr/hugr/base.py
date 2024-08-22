@@ -9,15 +9,20 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Generic,
-    Protocol,
     TypeVar,
     cast,
     overload,
 )
 
+from hugr.exceptions import ParentBeforeChild
+from hugr.ops import Call, Const, Custom, DataflowOp, Module, Op
 from hugr._serialization.ops import OpType as SerialOp
 from hugr._serialization.serial_hugr import SerialHugr
-from hugr.node_port import (
+from hugr.tys import Kind, Type, ValueKind
+from hugr.utils import BiMap
+from hugr.val import Value
+
+from .node_port import (
     Direction,
     InPort,
     Node,
@@ -27,12 +32,6 @@ from hugr.node_port import (
     ToNode,
     _SubPort,
 )
-from hugr.ops import Call, Const, Custom, DataflowOp, Module, Op
-from hugr.tys import Kind, Type, ValueKind
-from hugr.utils import BiMap
-from hugr.val import Value
-
-from .exceptions import ParentBeforeChild
 
 if TYPE_CHECKING:
     import graphviz as gv  # type: ignore[import-untyped]
@@ -67,23 +66,6 @@ P = TypeVar("P", InPort, OutPort)
 K = TypeVar("K", InPort, OutPort)
 OpVar = TypeVar("OpVar", bound=Op)
 OpVarCov = TypeVar("OpVarCov", bound=Op, covariant=True)
-
-
-class ParentBuilder(ToNode, Protocol[OpVar]):
-    """Abstract interface implemented by builders of nodes that contain child HUGRs."""
-
-    #: The child HUGR.
-    hugr: Hugr[OpVar]
-    # Unique parent node.
-    parent_node: Node
-
-    def to_node(self) -> Node:
-        return self.parent_node
-
-    @property
-    def parent_op(self) -> OpVar:
-        """The parent node's operation."""
-        return cast(OpVar, self.hugr[self.parent_node].op)
 
 
 @dataclass()

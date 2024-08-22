@@ -5,10 +5,10 @@ import pytest
 import hugr.ops as ops
 import hugr.tys as tys
 import hugr.val as val
-from hugr.dfg import Dfg, _ancestral_sibling
-from hugr.function import Module
+from hugr.build.dfg import Dfg, _ancestral_sibling
+from hugr.build.function import Module
 from hugr.hugr import Hugr
-from hugr.node_port import Node, _SubPort
+from hugr.hugr.node_port import Node, _SubPort
 from hugr.ops import NoConcreteFunc
 from hugr.std.int import INT_T, DivMod, IntVal
 from hugr.std.logic import Not

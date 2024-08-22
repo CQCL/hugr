@@ -7,7 +7,9 @@ from typing import Any, Literal
 
 from pydantic import ConfigDict, Field, RootModel
 
-from hugr.node_port import NodeIdx  # noqa: TCH001 # pydantic needs this alias in scope
+from hugr.hugr.node_port import (
+    NodeIdx,  # noqa: TCH001 # pydantic needs this alias in scope
+)
 from hugr.utils import deser_it
 
 from . import tys as stys
