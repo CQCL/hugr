@@ -35,6 +35,8 @@ from hugr.val import Value
 from .exceptions import ParentBeforeChild
 
 if TYPE_CHECKING:
+    import graphviz as gv  # type: ignore[import-untyped]
+
     from hugr import ext
     from hugr.val import Value
 
@@ -142,6 +144,14 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
     def nodes(self) -> Iterable[tuple[Node, NodeData]]:
         """Iterator over nodes of the hugr and their data."""
         return self.items()
+
+    def links(self) -> Iterator[tuple[OutPort, InPort]]:
+        """Iterator over all the links in the HUGR.
+
+        Returns:
+            Iterator of pairs of outgoing port and the incoming ports.
+        """
+        return ((src.port, tgt.port) for src, tgt in self._links.items())
 
     def children(self, node: ToNode | None = None) -> list[Node]:
         """The child nodes of a given `node`.
@@ -683,3 +693,33 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         json_dict = json.loads(json_str)
         serial = SerialHugr.load_json(json_dict)
         return cls.from_serial(serial)
+
+    def render_dot(self, palette: str | None = None) -> gv.Digraph:
+        """Render the HUGR to a graphviz Digraph.
+
+        Args:
+            palette: The palette to use for rendering. See :obj:`PALETTE` for the
+                included options.
+
+        Returns:
+            The graphviz Digraph.
+        """
+        from .render import DotRenderer
+
+        return DotRenderer(palette).render(self)
+
+    def store_dot(
+        self, filename: str, format: str = "svg", palette: str | None = None
+    ) -> None:
+        """Render the HUGR to a graphviz dot file.
+
+        Args:
+            filename: The file to render to.
+            format: The format used for rendering ('pdf', 'png', etc.).
+                Defaults to SVG.
+            palette: The palette to use for rendering. See :obj:`PALETTE` for the
+                included options.
+        """
+        from .render import DotRenderer
+
+        DotRenderer(palette).store(self, filename=filename, format=format)
