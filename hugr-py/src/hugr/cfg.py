@@ -10,7 +10,7 @@ from typing_extensions import Self
 
 from hugr import ops, tys, val
 
-from .dfg import _DfBase
+from .dfg import DfBase
 from .exceptions import MismatchedExit, NoSiblingAncestor, NotInSameCfg
 from .hugr import Hugr, ParentBuilder
 
@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from .tys import Type, TypeRow
 
 
-class Block(_DfBase[ops.DataflowBlock]):
+class Block(DfBase[ops.DataflowBlock]):
     """Builder class for a basic block in a HUGR control flow graph."""
 
     def set_outputs(self, *outputs: Wire) -> None:
