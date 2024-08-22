@@ -468,6 +468,10 @@ mod test {
     #[case::ipow(IntOpDef::ipow.with_log_width(5), &[2, 8], &[256], 5)]
     #[case::iu_to_s(IntOpDef::iu_to_s.with_log_width(5), &[42], &[42], 5)]
     #[case::is_to_u(IntOpDef::is_to_u.with_log_width(5), &[42], &[42], 5)]
+    #[should_panic(expected = "too large to be converted to signed")]
+    #[case::iu_to_s_panic(IntOpDef::iu_to_s.with_log_width(5), &[u32::MAX as u64], &[], 5)]
+    #[should_panic(expected = "Cannot convert negative integer")]
+    #[case::is_to_u_panic(IntOpDef::is_to_u.with_log_width(5), &[(0u32.wrapping_sub(42)) as u64], &[], 5)]
     fn int_fold(
         #[case] op: ConcreteIntOp,
         #[case] inputs: &[u64],
