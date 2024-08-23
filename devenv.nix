@@ -43,9 +43,8 @@ in
 
     languages.python = {
       enable = true;
-      poetry = {
+      uv = {
         enable = true;
-        activate.enable = true;
       };
     };
 
