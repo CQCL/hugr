@@ -5,8 +5,8 @@ pub mod controlflow;
 pub mod custom;
 pub mod dataflow;
 pub mod handle;
-pub mod leaf;
 pub mod module;
+pub mod sum;
 pub mod tag;
 pub mod validate;
 use crate::extension::simple_op::MakeExtensionOp;
@@ -27,9 +27,9 @@ pub use dataflow::{
     Call, CallIndirect, DataflowOpTrait, DataflowParent, Input, LoadConstant, LoadFunction, Output,
     DFG,
 };
-pub use leaf::Tag;
 pub use module::{AliasDecl, AliasDefn, FuncDecl, FuncDefn, Module};
 use smol_str::SmolStr;
+pub use sum::Tag;
 pub use tag::OpTag;
 
 #[enum_dispatch(OpTrait, NamedOp, ValidateOp, OpParent)]
