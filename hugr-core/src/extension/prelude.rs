@@ -821,28 +821,64 @@ mod test {
     #[test]
     fn test_make_tuple() {
         let op = MakeTuple::new(type_row![Type::UNIT]);
-        let op: OpType = op.into();
+        let optype: OpType = op.clone().into();
         assert_eq!(
-            op.dataflow_signature().unwrap().io(),
+            optype.dataflow_signature().unwrap().io(),
             (
                 &type_row![Type::UNIT],
                 &vec![Type::new_tuple(type_row![Type::UNIT])].into(),
             )
         );
+
+        let new_op = MakeTuple::from_extension_op(optype.as_extension_op().unwrap()).unwrap();
+        assert_eq!(new_op, op);
     }
 
     #[test]
     fn test_unmake_tuple() {
         let op = UnpackTuple::new(type_row![Type::UNIT]);
-        let op: OpType = op.into();
+        let optype: OpType = op.clone().into();
         assert_eq!(
-            op.dataflow_signature().unwrap().io(),
+            optype.dataflow_signature().unwrap().io(),
             (
                 &vec![Type::new_tuple(type_row![Type::UNIT])].into(),
                 &type_row![Type::UNIT],
             )
         );
+
+        let new_op = UnpackTuple::from_extension_op(optype.as_extension_op().unwrap()).unwrap();
+        assert_eq!(new_op, op);
     }
+
+    #[test]
+    fn test_noop() {
+        let op = Noop::new(Type::UNIT);
+        let optype: OpType = op.clone().into();
+        assert_eq!(
+            optype.dataflow_signature().unwrap().io(),
+            (&type_row![Type::UNIT], &type_row![Type::UNIT])
+        );
+
+        let new_op = Noop::from_extension_op(optype.as_extension_op().unwrap()).unwrap();
+        assert_eq!(new_op, op);
+    }
+
+    #[test]
+    fn test_lift() {
+        const XA: ExtensionId = ExtensionId::new_unchecked("xa");
+        let op = Lift::new(type_row![Type::UNIT], ExtensionSet::singleton(&XA));
+        let optype: OpType = op.clone().into();
+        assert_eq!(
+            optype.dataflow_signature().unwrap(),
+            Signature::new_endo(type_row![Type::UNIT])
+                .with_extension_delta(XA)
+                .with_prelude()
+        );
+
+        let new_op = Lift::from_extension_op(optype.as_extension_op().unwrap()).unwrap();
+        assert_eq!(new_op, op);
+    }
+
     #[test]
     /// Test building a HUGR involving a new_array operation.
     fn test_new_array() {
