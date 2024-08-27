@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0](https://github.com/CQCL/hugr-llvm/compare/v0.2.1...v0.3.0) - 2024-08-27
+
+### New Features
+- [**breaking**] Lower string, print, and panic ([#78](https://github.com/CQCL/hugr-llvm/pull/78))
+- Lower float operations ([#83](https://github.com/CQCL/hugr-llvm/pull/83))
+- Lower logic extension ([#81](https://github.com/CQCL/hugr-llvm/pull/81))
+- Lower arrays ([#82](https://github.com/CQCL/hugr-llvm/pull/82))
+
 ## [0.2.1](https://github.com/CQCL/hugr-llvm/compare/v0.2.0...v0.2.1) - 2024-08-19
 
 ### Documentation
