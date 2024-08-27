@@ -9,13 +9,14 @@ use crate::builder::{
     inout_sig, BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
     FunctionBuilder, HugrBuilder, ModuleBuilder, SubContainer,
 };
+use crate::extension::prelude::leaf::Noop;
 use crate::extension::prelude::{BOOL_T, PRELUDE, PRELUDE_ID, QB_T, USIZE_T};
 use crate::extension::{Extension, ExtensionSet, TypeDefBound, EMPTY_REG, PRELUDE_REGISTRY};
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::HugrMut;
 use crate::ops::dataflow::IOTrait;
 use crate::ops::handle::NodeHandle;
-use crate::ops::{self, Noop, OpType, Value};
+use crate::ops::{self, OpType, Value};
 use crate::std_extensions::logic::test::{and_op, or_op};
 use crate::std_extensions::logic::LogicOp;
 use crate::std_extensions::logic::{self};
@@ -34,7 +35,9 @@ const NAT: Type = crate::extension::prelude::USIZE_T;
 fn make_simple_hugr(copies: usize) -> (Hugr, Node) {
     let def_op: OpType = ops::FuncDefn {
         name: "main".into(),
-        signature: Signature::new(type_row![BOOL_T], vec![BOOL_T; copies]).into(),
+        signature: Signature::new(type_row![BOOL_T], vec![BOOL_T; copies])
+            .with_prelude()
+            .into(),
     }
     .into();
 
@@ -102,13 +105,13 @@ fn leaf_root() {
     let leaf_op: OpType = Noop { ty: USIZE_T }.into();
 
     let b = Hugr::new(leaf_op);
-    assert_eq!(b.validate(&EMPTY_REG), Ok(()));
+    assert_eq!(b.validate(&PRELUDE_REGISTRY), Ok(()));
 }
 
 #[test]
 fn dfg_root() {
     let dfg_op: OpType = ops::DFG {
-        signature: Signature::new_endo(type_row![BOOL_T]),
+        signature: Signature::new_endo(type_row![BOOL_T]).with_prelude(),
     }
     .into();
 
@@ -719,7 +722,7 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
                 vec![TypeParam::Extensions],
                 Signature::new(vec![utou(es.clone()), int_pair.clone()], int_pair.clone())
                     .with_extension_delta(EXT_ID)
-                    .with_extension_delta(PRELUDE_ID)
+                    .with_prelude()
                     .with_extension_delta(es.clone()),
             ),
         )?;
@@ -758,7 +761,7 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
     let call_ty = h.get_optype(call.node()).dataflow_signature().unwrap();
     let exp_fun_ty = Signature::new(vec![utou(PRELUDE_ID), int_pair.clone()], int_pair)
         .with_extension_delta(EXT_ID)
-        .with_extension_delta(PRELUDE_ID);
+        .with_prelude();
     assert_eq!(call_ty, exp_fun_ty);
     Ok(())
 }

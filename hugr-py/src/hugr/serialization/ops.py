@@ -538,22 +538,6 @@ class Extension(DataflowOp):
     )
 
 
-class Noop(DataflowOp):
-    """A no-op operation."""
-
-    op: Literal["Noop"] = "Noop"
-    ty: Type
-
-    def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
-        assert len(in_types) == 1
-        assert len(out_types) == 1
-        assert in_types[0] == out_types[0]
-        self.ty = in_types[0]
-
-    def deserialize(self) -> ops.Noop:
-        return ops.Noop(self.ty.deserialize())
-
-
 class Tag(DataflowOp):
     """An operation that creates a tagged sum value from one of its variants."""
 
@@ -621,7 +605,6 @@ class OpType(RootModel):
         | LoadConstant
         | LoadFunction
         | Extension
-        | Noop
         | Tag
         | Lift
         | DFG

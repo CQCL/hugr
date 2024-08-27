@@ -2,8 +2,10 @@
 
 use std::iter;
 
+use crate::extension::prelude::leaf::Noop;
 use crate::hugr::{HugrMut, Node};
-use crate::ops::{Noop, OpTag, OpTrait};
+use crate::ops::{OpTag, OpTrait};
+
 use crate::types::EdgeKind;
 use crate::{HugrView, IncomingPort};
 
@@ -123,7 +125,7 @@ mod tests {
 
         assert_eq!(h.node_count(), 7);
 
-        let noop: Noop = h.get_optype(noop_node).clone().try_into().unwrap();
+        let noop: Noop = h.get_optype(noop_node).cast().unwrap();
 
         assert_eq!(noop, Noop { ty: QB_T });
 

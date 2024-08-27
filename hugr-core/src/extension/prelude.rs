@@ -152,6 +152,7 @@ lazy_static! {
         .unwrap();
 
         leaf::TupleOpDef::load_all_ops(&mut prelude).unwrap();
+        leaf::NoopDef.add_to_extension(&mut prelude).unwrap();
         prelude
     };
     /// An extension registry containing only the prelude
@@ -418,8 +419,8 @@ pub mod leaf {
         },
         ops::{NamedOp, OpName, Value},
         types::{
-            type_param::TypeParam, FuncValueType, PolyFuncTypeRV, Type, TypeArg, TypeBound, TypeRV,
-            TypeRow,
+            type_param::TypeParam, FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, Type,
+            TypeArg, TypeBound, TypeRV, TypeRow,
         },
         utils::sorted_consts,
     };
@@ -613,6 +614,116 @@ pub mod leaf {
     }
 
     impl MakeRegisteredOp for UnpackTuple {
+        fn extension_id(&self) -> ExtensionId {
+            PRELUDE_ID.to_owned()
+        }
+
+        fn registry<'s, 'r: 's>(&'s self) -> &'r crate::extension::ExtensionRegistry {
+            &PRELUDE_REGISTRY
+        }
+    }
+
+    #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+    /// A no-op operation definition.
+    pub struct NoopDef;
+
+    impl NamedOp for NoopDef {
+        fn name(&self) -> OpName {
+            "Noop".into()
+        }
+    }
+
+    impl std::str::FromStr for NoopDef {
+        type Err = ();
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            if s == NoopDef.name() {
+                Ok(Self)
+            } else {
+                Err(())
+            }
+        }
+    }
+    impl MakeOpDef for NoopDef {
+        fn signature(&self) -> SignatureFunc {
+            let tv = Type::new_var_use(0, TypeBound::Any);
+            PolyFuncType::new([TypeBound::Any.into()], Signature::new_endo(tv)).into()
+        }
+
+        fn description(&self) -> String {
+            "Noop gate".to_string()
+        }
+
+        fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError> {
+            try_from_name(op_def.name(), op_def.extension())
+        }
+
+        fn extension(&self) -> ExtensionId {
+            PRELUDE_ID.to_owned()
+        }
+
+        fn post_opdef(&self, def: &mut OpDef) {
+            def.set_constant_folder(*self);
+        }
+    }
+
+    impl ConstFold for NoopDef {
+        fn fold(
+            &self,
+            _type_args: &[TypeArg],
+            consts: &[(crate::IncomingPort, Value)],
+        ) -> crate::extension::ConstFoldResult {
+            fold_out_row([consts.first()?.1.clone()])
+        }
+    }
+
+    /// A no-op operation.
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    #[non_exhaustive]
+    #[cfg_attr(test, derive(proptest_derive::Arbitrary))]
+    pub struct Noop {
+        /// The type of edges connecting the Noop.
+        pub ty: Type,
+    }
+
+    impl Noop {
+        /// Create a new Noop operation.
+        pub fn new(ty: Type) -> Self {
+            Self { ty }
+        }
+    }
+
+    impl Default for Noop {
+        fn default() -> Self {
+            Self { ty: Type::UNIT }
+        }
+    }
+    impl NamedOp for Noop {
+        fn name(&self) -> OpName {
+            NoopDef.name()
+        }
+    }
+
+    impl MakeExtensionOp for Noop {
+        fn from_extension_op(ext_op: &crate::ops::ExtensionOp) -> Result<Self, OpLoadError>
+        where
+            Self: Sized,
+        {
+            let _def = NoopDef::from_def(ext_op.def())?;
+            let [TypeArg::Type { ty }] = ext_op.args() else {
+                return Err(SignatureError::InvalidTypeArgs)?;
+            };
+            Ok(Self { ty: ty.clone() })
+        }
+
+        fn type_args(&self) -> Vec<TypeArg> {
+            vec![TypeArg::Type {
+                ty: self.ty.clone(),
+            }]
+        }
+    }
+
+    impl MakeRegisteredOp for Noop {
         fn extension_id(&self) -> ExtensionId {
             PRELUDE_ID.to_owned()
         }

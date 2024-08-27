@@ -1170,7 +1170,7 @@ class LoadFunc(_CallOrLoad, DataflowOp):
 
 
 @dataclass
-class Noop(DataflowOp, _PartialOp):
+class Noop(AsExtOp, _PartialOp):
     """Identity operation that passes through its input."""
 
     _type: tys.Type | None = None
@@ -1181,8 +1181,13 @@ class Noop(DataflowOp, _PartialOp):
         """The type of the input and output of the operation."""
         return _check_complete(self, self._type)
 
-    def to_serial(self, parent: Node) -> sops.Noop:
-        return sops.Noop(parent=parent.idx, ty=self.type_.to_serial_root())
+    def op_def(self) -> ext.OpDef:
+        from hugr import std  # no circular import
+
+        return std.PRELUDE.get_op("Noop")
+
+    def cached_signature(self) -> tys.FunctionType | None:
+        return tys.FunctionType.endo([self.type_])
 
     def outer_signature(self) -> tys.FunctionType:
         return tys.FunctionType.endo([self.type_])

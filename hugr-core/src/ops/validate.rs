@@ -351,7 +351,7 @@ fn validate_cfg_edge(edge: ChildrenEdgeData) -> Result<(), EdgeValidationError> 
 
 #[cfg(test)]
 mod test {
-    use crate::extension::prelude::USIZE_T;
+    use crate::extension::prelude::{leaf::Noop, USIZE_T};
     use crate::ops::dataflow::IOTrait;
     use crate::{ops, type_row};
     use cool_asserts::assert_matches;
@@ -365,7 +365,7 @@ mod test {
 
         let input_node: OpType = ops::Input::new(in_types.clone()).into();
         let output_node = ops::Output::new(out_types.clone()).into();
-        let leaf_node = ops::Noop { ty: USIZE_T }.into();
+        let leaf_node = Noop { ty: USIZE_T }.into();
 
         // Well-formed dataflow sibling nodes. Check the input and output node signatures.
         let children = vec![
@@ -410,7 +410,7 @@ mod test {
 
 use super::{
     AliasDecl, AliasDefn, Call, CallIndirect, Const, ExtensionOp, FuncDecl, Input, Lift,
-    LoadConstant, LoadFunction, Noop, OpaqueOp, Output, Tag,
+    LoadConstant, LoadFunction, OpaqueOp, Output, Tag,
 };
 impl_validate_op!(FuncDecl);
 impl_validate_op!(AliasDecl);
@@ -424,7 +424,6 @@ impl_validate_op!(LoadFunction);
 impl_validate_op!(CallIndirect);
 impl_validate_op!(ExtensionOp);
 impl_validate_op!(OpaqueOp);
-impl_validate_op!(Noop);
 impl_validate_op!(Tag);
 impl_validate_op!(Lift);
 impl_validate_op!(ExitBlock);

@@ -506,10 +506,12 @@ pub(super) fn panic_invalid_port<H: HugrView + ?Sized>(
 #[cfg(test)]
 mod test {
     use crate::{
-        extension::prelude::USIZE_T,
-        extension::PRELUDE_REGISTRY,
+        extension::{
+            prelude::{leaf::Noop, USIZE_T},
+            PRELUDE_REGISTRY,
+        },
         macros::type_row,
-        ops::{self, dataflow::IOTrait, Noop},
+        ops::{self, dataflow::IOTrait},
         types::{Signature, Type},
     };
 
@@ -529,7 +531,9 @@ mod test {
             module,
             ops::FuncDefn {
                 name: "main".into(),
-                signature: Signature::new(type_row![NAT], type_row![NAT, NAT]).into(),
+                signature: Signature::new(type_row![NAT], type_row![NAT, NAT])
+                    .with_prelude()
+                    .into(),
             },
         );
 

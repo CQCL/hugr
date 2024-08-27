@@ -109,6 +109,37 @@
       },
       "binary": false
     },
+    "Noop": {
+      "extension": "prelude",
+      "name": "Noop",
+      "description": "Noop gate",
+      "signature": {
+        "params": [
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "V",
+              "i": 0,
+              "b": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "V",
+              "i": 0,
+              "b": "A"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
     "UnpackTuple": {
       "extension": "prelude",
       "name": "UnpackTuple",

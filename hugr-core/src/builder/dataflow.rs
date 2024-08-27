@@ -206,10 +206,11 @@ pub(crate) mod test {
     use crate::builder::{
         endo_sig, inout_sig, BuilderWiringError, DataflowSubContainer, ModuleBuilder,
     };
+    use crate::extension::prelude::leaf::Noop;
     use crate::extension::prelude::{BOOL_T, USIZE_T};
     use crate::extension::{ExtensionId, SignatureError, EMPTY_REG, PRELUDE_REGISTRY};
     use crate::hugr::validate::InterGraphEdgeError;
-    use crate::ops::{handle::NodeHandle, Lift, Noop, OpTag};
+    use crate::ops::{handle::NodeHandle, Lift, OpTag};
     use crate::ops::{OpTrait, Value};
 
     use crate::std_extensions::logic::test::and_op;
@@ -319,21 +320,25 @@ pub(crate) mod test {
     #[test]
     fn simple_inter_graph_edge() {
         let builder = || -> Result<Hugr, BuildError> {
-            let mut f_build =
-                FunctionBuilder::new("main", Signature::new(type_row![BIT], type_row![BIT]))?;
+            let mut f_build = FunctionBuilder::new(
+                "main",
+                Signature::new(type_row![BIT], type_row![BIT]).with_prelude(),
+            )?;
 
             let [i1] = f_build.input_wires_arr();
             let noop = f_build.add_dataflow_op(Noop { ty: BIT }, [i1])?;
             let i1 = noop.out_wire(0);
 
-            let mut nested =
-                f_build.dfg_builder(Signature::new(type_row![], type_row![BIT]), [])?;
+            let mut nested = f_build.dfg_builder(
+                Signature::new(type_row![], type_row![BIT]).with_prelude(),
+                [],
+            )?;
 
             let id = nested.add_dataflow_op(Noop { ty: BIT }, [i1])?;
 
             let nested = nested.finish_with_outputs([id.out_wire(0)])?;
 
-            f_build.finish_hugr_with_outputs([nested.out_wire(0)], &EMPTY_REG)
+            f_build.finish_prelude_hugr_with_outputs([nested.out_wire(0)])
         };
 
         assert_matches!(builder(), Ok(_));

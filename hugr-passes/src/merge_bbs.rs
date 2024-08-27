@@ -168,7 +168,7 @@ mod test {
     use hugr_core::hugr::views::sibling::SiblingMut;
     use hugr_core::ops::constant::Value;
     use hugr_core::ops::handle::CfgID;
-    use hugr_core::ops::{Lift, LoadConstant, NamedOp, Noop, OpTrait, OpType};
+    use hugr_core::ops::{Lift, LoadConstant, NamedOp, OpTrait, OpType};
     use hugr_core::types::{Signature, Type, TypeRow};
     use hugr_core::{const_extension_ids, type_row, Extension, Hugr, HugrView, Wire};
 
@@ -222,6 +222,8 @@ mod test {
                |        |                =>     /           \
                \--<--<--/                       \--<-----<--/
         */
+
+        use hugr_core::extension::prelude::leaf::Noop;
         let loop_variants = type_row![QB_T];
         let exit_types = type_row![USIZE_T];
         let e = extension();
@@ -272,7 +274,7 @@ mod test {
         // Check the Noop('s) is/are in the right block(s)
         let nops = h
             .nodes()
-            .filter(|n| matches!(h.get_optype(*n), OpType::Noop(_)));
+            .filter(|n| h.get_optype(*n).cast::<Noop>().is_some());
         let (entry_nop, expected_backedge_target) = if self_loop {
             assert_eq!(h.children(r).len(), 2);
             (nops.exactly_one().ok().unwrap(), entry)
@@ -297,7 +299,7 @@ mod test {
         // And the Noop in the entry block is consumed by the custom Test op
         let tst = find_unique(
             h.nodes(),
-            |n| matches!(h.get_optype(*n), OpType::ExtensionOp(c)if c.def().name() != &TupleOpDef::UnpackTuple.name()),
+            |n| matches!(h.get_optype(*n), OpType::ExtensionOp(c) if c.def().extension() != &PRELUDE_ID),
         );
         assert_eq!(h.get_parent(tst), Some(entry));
         assert_eq!(

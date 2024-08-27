@@ -91,7 +91,6 @@ impl ConstantFoldPass {
 /// For a given op and consts, attempt to evaluate the op.
 pub fn fold_leaf_op(op: &OpType, consts: &[(IncomingPort, Value)]) -> ConstFoldResult {
     let fold_result = match op {
-        OpType::Noop { .. } => fold_out_row([consts.first()?.1.clone()]),
         OpType::Tag(t) => fold_out_row([Value::sum(
             t.tag,
             consts.iter().map(|(_, konst)| konst.clone()),

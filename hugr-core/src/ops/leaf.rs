@@ -9,28 +9,6 @@ use crate::{
     types::{EdgeKind, Signature, Type, TypeRow},
 };
 
-/// A no-op operation.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[non_exhaustive]
-#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
-pub struct Noop {
-    /// The type of edges connecting the Noop.
-    pub ty: Type,
-}
-
-impl Noop {
-    /// Create a new Noop operation.
-    pub fn new(ty: Type) -> Self {
-        Self { ty }
-    }
-}
-
-impl Default for Noop {
-    fn default() -> Self {
-        Self { ty: Type::UNIT }
-    }
-}
-
 /// An operation that creates a tagged sum value from one of its variants.
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
@@ -73,31 +51,8 @@ impl Lift {
     }
 }
 
-impl_op_name!(Noop);
 impl_op_name!(Tag);
 impl_op_name!(Lift);
-
-impl DataflowOpTrait for Noop {
-    const TAG: OpTag = OpTag::Leaf;
-
-    /// A human-readable description of the operation.
-    fn description(&self) -> &str {
-        "Noop gate"
-    }
-
-    /// The signature of the operation.
-    fn signature(&self) -> Signature {
-        Signature::new(vec![self.ty.clone()], vec![self.ty.clone()])
-    }
-
-    fn other_input(&self) -> Option<EdgeKind> {
-        Some(EdgeKind::StateOrder)
-    }
-
-    fn other_output(&self) -> Option<EdgeKind> {
-        Some(EdgeKind::StateOrder)
-    }
-}
 
 impl DataflowOpTrait for Tag {
     const TAG: OpTag = OpTag::Leaf;
