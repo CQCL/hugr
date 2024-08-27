@@ -14,10 +14,10 @@ python = "^3.10"
 pre-commit = "^3.6.2"
 pytest = "^8.1.1"
 pytest-cov = "^5.0.0"
-mypy = "^1.9.0"
-ruff = "^0.6.1"
+mypy = "^1.11.2"
+ruff = "^0.6.2"
 toml = "^0.10.0"
-syrupy = "^4.6.4"
+syrupy = "^4.7.1"
 
 [tool.poetry.group.hugr.dependencies]
 hugr = { path = "hugr-py", develop = true }
