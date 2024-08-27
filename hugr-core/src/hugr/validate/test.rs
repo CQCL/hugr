@@ -547,7 +547,7 @@ fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
         PolyFuncType::new(
             [BOUND],
             Signature::new(vec![], vec![list_of_var.clone()])
-                .with_extension_delta(collections::EXTENSION_NAME),
+                .with_extension_delta(collections::EXTENSION_ID),
         ),
     )?;
     let empty_list = Value::extension(collections::ListValue::new_empty(Type::new_var_use(

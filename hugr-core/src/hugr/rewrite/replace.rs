@@ -524,21 +524,21 @@ mod test {
                 inputs: vec![listy.clone()].into(),
                 sum_rows: vec![type_row![]],
                 other_outputs: vec![listy.clone()].into(),
-                extension_delta: collections::EXTENSION_NAME.into(),
+                extension_delta: collections::EXTENSION_ID.into(),
             },
         );
         let r_df1 = replacement.add_node_with_parent(
             r_bb,
             DFG {
                 signature: Signature::new(vec![listy.clone()], simple_unary_plus(intermed.clone()))
-                    .with_extension_delta(collections::EXTENSION_NAME),
+                    .with_extension_delta(collections::EXTENSION_ID),
             },
         );
         let r_df2 = replacement.add_node_with_parent(
             r_bb,
             DFG {
                 signature: Signature::new(intermed, simple_unary_plus(just_list.clone()))
-                    .with_extension_delta(collections::EXTENSION_NAME),
+                    .with_extension_delta(collections::EXTENSION_ID),
             },
         );
         [0, 1]
