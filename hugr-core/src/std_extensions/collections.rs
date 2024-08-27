@@ -208,7 +208,7 @@ impl MakeOpDef for ListOp {
 }
 
 lazy_static! {
-    /// Extension for basic float operations.
+    /// Extension for list operations.
     pub static ref EXTENSION: Extension = {
         println!("creating collections extension");
         let mut extension = Extension::new(EXTENSION_ID, VERSION);
@@ -227,7 +227,7 @@ lazy_static! {
         extension
     };
 
-    /// Registry of extensions required to validate float operations.
+    /// Registry of extensions required to validate list operations.
     pub static ref COLLECTIONS_REGISTRY: ExtensionRegistry  = ExtensionRegistry::try_new([
         PRELUDE.to_owned(),
         EXTENSION.to_owned(),
