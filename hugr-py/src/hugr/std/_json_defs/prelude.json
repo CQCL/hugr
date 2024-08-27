@@ -67,6 +67,45 @@
   },
   "values": {},
   "operations": {
+    "Lift": {
+      "extension": "prelude",
+      "name": "Lift",
+      "description": "Add extension requirements to a row of values",
+      "signature": {
+        "params": [
+          {
+            "tp": "Extensions"
+          },
+          {
+            "tp": "List",
+            "param": {
+              "tp": "Type",
+              "b": "A"
+            }
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "R",
+              "i": 1,
+              "b": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "R",
+              "i": 1,
+              "b": "A"
+            }
+          ],
+          "extension_reqs": [
+            "0"
+          ]
+        }
+      },
+      "binary": false
+    },
     "MakeTuple": {
       "extension": "prelude",
       "name": "MakeTuple",
@@ -193,8 +232,49 @@
       "extension": "prelude",
       "name": "panic",
       "description": "Panic with input error",
-      "signature": null,
-      "binary": true
+      "signature": {
+        "params": [
+          {
+            "tp": "List",
+            "param": {
+              "tp": "Type",
+              "b": "A"
+            }
+          },
+          {
+            "tp": "List",
+            "param": {
+              "tp": "Type",
+              "b": "A"
+            }
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "prelude",
+              "id": "error",
+              "args": [],
+              "bound": "C"
+            },
+            {
+              "t": "R",
+              "i": 0,
+              "b": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "R",
+              "i": 1,
+              "b": "A"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
     },
     "print": {
       "extension": "prelude",

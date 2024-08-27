@@ -27,7 +27,7 @@ pub use dataflow::{
     Call, CallIndirect, DataflowOpTrait, DataflowParent, Input, LoadConstant, LoadFunction, Output,
     DFG,
 };
-pub use leaf::{Lift, Tag};
+pub use leaf::Tag;
 pub use module::{AliasDecl, AliasDefn, FuncDecl, FuncDefn, Module};
 use smol_str::SmolStr;
 pub use tag::OpTag;
@@ -59,7 +59,6 @@ pub enum OpType {
     #[serde(rename = "Extension")]
     OpaqueOp,
     Tag,
-    Lift,
     DataflowBlock,
     ExitBlock,
     TailLoop,
@@ -115,7 +114,6 @@ impl_op_ref_try_into!(LoadFunction);
 impl_op_ref_try_into!(DFG, dfg);
 impl_op_ref_try_into!(ExtensionOp);
 impl_op_ref_try_into!(Tag);
-impl_op_ref_try_into!(Lift);
 impl_op_ref_try_into!(DataflowBlock);
 impl_op_ref_try_into!(ExitBlock);
 impl_op_ref_try_into!(TailLoop);
@@ -434,7 +432,6 @@ impl OpParent for LoadFunction {}
 impl OpParent for ExtensionOp {}
 impl OpParent for OpaqueOp {}
 impl OpParent for Tag {}
-impl OpParent for Lift {}
 impl OpParent for CFG {}
 impl OpParent for Conditional {}
 impl OpParent for FuncDecl {}

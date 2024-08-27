@@ -111,7 +111,7 @@ mod test {
             test::{BIT, NAT},
             DataflowSubContainer, HugrBuilder, ModuleBuilder, SubContainer,
         },
-        extension::prelude::{ConstUsize, PRELUDE_ID, USIZE_T},
+        extension::prelude::{leaf::Lift, ConstUsize, PRELUDE_ID, USIZE_T},
         hugr::ValidationError,
         ops::Value,
         type_row,
@@ -146,13 +146,7 @@ mod test {
             )?;
             let _fdef = {
                 let [b1] = fbuild
-                    .add_dataflow_op(
-                        ops::Lift {
-                            type_row: type_row![BIT],
-                            new_extension: PRELUDE_ID,
-                        },
-                        fbuild.input_wires(),
-                    )?
+                    .add_dataflow_op(Lift::new(type_row![BIT], PRELUDE_ID), fbuild.input_wires())?
                     .outputs_arr();
                 let loop_id = {
                     let mut loop_b =
@@ -161,10 +155,7 @@ mod test {
                     let const_val = Value::true_val();
                     let const_wire = loop_b.add_load_const(Value::true_val());
                     let lift_node = loop_b.add_dataflow_op(
-                        ops::Lift {
-                            type_row: vec![const_val.get_type().clone()].into(),
-                            new_extension: PRELUDE_ID,
-                        },
+                        Lift::new(vec![const_val.get_type().clone()].into(), PRELUDE_ID),
                         [const_wire],
                     )?;
                     let [const_wire] = lift_node.outputs_arr();

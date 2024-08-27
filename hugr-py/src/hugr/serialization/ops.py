@@ -552,20 +552,6 @@ class Tag(DataflowOp):
         )
 
 
-class Lift(DataflowOp):
-    """Fixes some TypeParams of a polymorphic type by providing TypeArgs."""
-
-    op: Literal["Lift"] = "Lift"
-    type_row: TypeRow
-    new_extension: ExtensionId
-
-    def deserialize(self) -> ops.Lift:
-        return ops.Lift(
-            _type_row=deser_it(self.type_row),
-            new_extension=self.new_extension,
-        )
-
-
 class AliasDecl(BaseOp):
     op: Literal["AliasDecl"] = "AliasDecl"
     name: str
@@ -606,7 +592,6 @@ class OpType(RootModel):
         | LoadFunction
         | Extension
         | Tag
-        | Lift
         | DFG
         | AliasDecl
         | AliasDefn

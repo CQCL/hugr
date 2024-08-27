@@ -310,15 +310,6 @@ def test_higher_order() -> None:
     validate(d.hugr)
 
 
-def test_lift() -> None:
-    d = Dfg(tys.Qubit)
-    d.parent_op._extension_delta = ["X"]
-    (q,) = d.inputs()
-    lift = d.add(ops.Lift("X")(q))
-    d.set_outputs(lift)
-    validate(d.hugr)
-
-
 def test_alias() -> None:
     mod = Module()
     _dfn = mod.add_alias_defn("my_int", INT_T)

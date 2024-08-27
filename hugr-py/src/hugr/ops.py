@@ -1201,34 +1201,6 @@ class Noop(AsExtOp, _PartialOp):
 
 
 @dataclass
-class Lift(DataflowOp, _PartialOp):
-    """Add an extension requirement to input values and pass them through."""
-
-    #: Extension added.
-    new_extension: tys.ExtensionId
-    _type_row: tys.TypeRow | None = field(default=None, repr=False)
-    num_out: int = field(default=1, repr=False)
-
-    @property
-    def type_row(self) -> tys.TypeRow:
-        """Types of the input and output of the operation."""
-        return _check_complete(self, self._type_row)
-
-    def to_serial(self, parent: Node) -> sops.Lift:
-        return sops.Lift(
-            parent=parent.idx,
-            new_extension=self.new_extension,
-            type_row=ser_it(self.type_row),
-        )
-
-    def outer_signature(self) -> tys.FunctionType:
-        return tys.FunctionType.endo(self.type_row)
-
-    def _set_in_types(self, types: tys.TypeRow) -> None:
-        self._type_row = types
-
-
-@dataclass
 class AliasDecl(Op):
     """Declare an external type alias."""
 

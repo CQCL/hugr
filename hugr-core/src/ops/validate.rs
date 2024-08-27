@@ -409,8 +409,8 @@ mod test {
 }
 
 use super::{
-    AliasDecl, AliasDefn, Call, CallIndirect, Const, ExtensionOp, FuncDecl, Input, Lift,
-    LoadConstant, LoadFunction, OpaqueOp, Output, Tag,
+    AliasDecl, AliasDefn, Call, CallIndirect, Const, ExtensionOp, FuncDecl, Input, LoadConstant,
+    LoadFunction, OpaqueOp, Output, Tag,
 };
 impl_validate_op!(FuncDecl);
 impl_validate_op!(AliasDecl);
@@ -425,5 +425,4 @@ impl_validate_op!(CallIndirect);
 impl_validate_op!(ExtensionOp);
 impl_validate_op!(OpaqueOp);
 impl_validate_op!(Tag);
-impl_validate_op!(Lift);
 impl_validate_op!(ExitBlock);

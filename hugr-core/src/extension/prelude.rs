@@ -119,6 +119,7 @@ lazy_static! {
 
         leaf::TupleOpDef::load_all_ops(&mut prelude).unwrap();
         leaf::NoopDef.add_to_extension(&mut prelude).unwrap();
+        leaf::LiftDef.add_to_extension(&mut prelude).unwrap();
         prelude
     };
     /// An extension registry containing only the prelude
@@ -381,7 +382,7 @@ pub mod leaf {
         extension::{
             const_fold::fold_out_row,
             simple_op::{try_from_name, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError},
-            ConstFold, ExtensionId, OpDef, SignatureError, SignatureFunc,
+            ConstFold, ExtensionId, ExtensionSet, OpDef, SignatureError, SignatureFunc,
         },
         ops::{NamedOp, OpName, Value},
         types::{
@@ -690,6 +691,128 @@ pub mod leaf {
     }
 
     impl MakeRegisteredOp for Noop {
+        fn extension_id(&self) -> ExtensionId {
+            PRELUDE_ID.to_owned()
+        }
+
+        fn registry<'s, 'r: 's>(&'s self) -> &'r crate::extension::ExtensionRegistry {
+            &PRELUDE_REGISTRY
+        }
+    }
+
+    #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+    /// A lift operation definition.
+    pub struct LiftDef;
+
+    impl NamedOp for LiftDef {
+        fn name(&self) -> OpName {
+            "Lift".into()
+        }
+    }
+
+    impl std::str::FromStr for LiftDef {
+        type Err = ();
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            if s == LiftDef.name() {
+                Ok(Self)
+            } else {
+                Err(())
+            }
+        }
+    }
+
+    impl MakeOpDef for LiftDef {
+        fn signature(&self) -> SignatureFunc {
+            PolyFuncTypeRV::new(
+                vec![TypeParam::Extensions, TypeParam::new_list(TypeBound::Any)],
+                FuncValueType::new_endo(TypeRV::new_row_var_use(1, TypeBound::Any))
+                    .with_extension_delta(ExtensionSet::type_var(0)),
+            )
+            .into()
+        }
+
+        fn description(&self) -> String {
+            "Add extension requirements to a row of values".to_string()
+        }
+
+        fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError> {
+            try_from_name(op_def.name(), op_def.extension())
+        }
+
+        fn extension(&self) -> ExtensionId {
+            PRELUDE_ID.to_owned()
+        }
+    }
+
+    /// A node which adds a extension req to the types of the wires it is passed
+    /// It has no effect on the values passed along the edge
+    #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+    #[cfg_attr(test, derive(proptest_derive::Arbitrary))]
+    #[non_exhaustive]
+    pub struct Lift {
+        /// The types of the edges
+        pub type_row: TypeRow,
+        /// The extensions which we're adding to the inputs
+        pub new_extensions: ExtensionSet,
+    }
+
+    impl Lift {
+        /// Create a new Lift operation with the extensions to add.
+        pub fn new(type_row: TypeRow, set: impl Into<ExtensionSet>) -> Self {
+            Self {
+                type_row,
+                new_extensions: set.into(),
+            }
+        }
+    }
+
+    impl NamedOp for Lift {
+        fn name(&self) -> OpName {
+            LiftDef.name()
+        }
+    }
+
+    impl MakeExtensionOp for Lift {
+        fn from_extension_op(ext_op: &crate::ops::ExtensionOp) -> Result<Self, OpLoadError>
+        where
+            Self: Sized,
+        {
+            let _def = LiftDef::from_def(ext_op.def())?;
+
+            let [TypeArg::Extensions { es }, TypeArg::Sequence { elems }] = ext_op.args() else {
+                return Err(SignatureError::InvalidTypeArgs)?;
+            };
+            let tys: Result<Vec<Type>, _> = elems
+                .iter()
+                .map(|a| match a {
+                    TypeArg::Type { ty } => Ok(ty.clone()),
+                    _ => Err(SignatureError::InvalidTypeArgs),
+                })
+                .collect();
+            Ok(Self {
+                type_row: tys?.into(),
+                new_extensions: es.clone(),
+            })
+        }
+
+        fn type_args(&self) -> Vec<TypeArg> {
+            vec![
+                TypeArg::Extensions {
+                    es: self.new_extensions.clone(),
+                },
+                TypeArg::Sequence {
+                    elems: self
+                        .type_row
+                        .iter()
+                        .map(|t| TypeArg::Type { ty: t.clone() })
+                        .collect(),
+                },
+            ]
+        }
+    }
+
+    impl MakeRegisteredOp for Lift {
         fn extension_id(&self) -> ExtensionId {
             PRELUDE_ID.to_owned()
         }

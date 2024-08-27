@@ -158,7 +158,7 @@ fn mk_rep(
 mod test {
     use std::collections::HashSet;
 
-    use hugr_core::extension::prelude::leaf::TupleOpDef;
+    use hugr_core::extension::prelude::leaf::Lift;
     use itertools::Itertools;
     use rstest::rstest;
 
@@ -168,7 +168,7 @@ mod test {
     use hugr_core::hugr::views::sibling::SiblingMut;
     use hugr_core::ops::constant::Value;
     use hugr_core::ops::handle::CfgID;
-    use hugr_core::ops::{Lift, LoadConstant, NamedOp, OpTrait, OpType};
+    use hugr_core::ops::{LoadConstant, OpTrait, OpType};
     use hugr_core::types::{Signature, Type, TypeRow};
     use hugr_core::{const_extension_ids, type_row, Extension, Hugr, HugrView, Wire};
 
@@ -365,7 +365,7 @@ mod test {
         let [bb, _exit] = h.children(h.root()).collect::<Vec<_>>().try_into().unwrap();
         let tst = find_unique(
             h.nodes(),
-            |n| matches!(h.get_optype(*n), OpType::ExtensionOp(c) if c.def().name() != &TupleOpDef::UnpackTuple.name()),
+            |n| matches!(h.get_optype(*n), OpType::ExtensionOp(c) if c.def().extension() != &PRELUDE_ID),
         );
         assert_eq!(h.get_parent(tst), Some(bb));
 

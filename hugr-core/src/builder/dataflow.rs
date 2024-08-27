@@ -206,11 +206,11 @@ pub(crate) mod test {
     use crate::builder::{
         endo_sig, inout_sig, BuilderWiringError, DataflowSubContainer, ModuleBuilder,
     };
-    use crate::extension::prelude::leaf::Noop;
+    use crate::extension::prelude::leaf::{Lift, Noop};
     use crate::extension::prelude::{BOOL_T, USIZE_T};
     use crate::extension::{ExtensionId, SignatureError, EMPTY_REG, PRELUDE_REGISTRY};
     use crate::hugr::validate::InterGraphEdgeError;
-    use crate::ops::{handle::NodeHandle, Lift, OpTag};
+    use crate::ops::{handle::NodeHandle, OpTag};
     use crate::ops::{OpTrait, Value};
 
     use crate::std_extensions::logic::test::and_op;
@@ -422,22 +422,10 @@ pub(crate) mod test {
         let mut add_ab = parent.dfg_builder(endo_sig(BIT), [w])?;
         let [w] = add_ab.input_wires_arr();
 
-        let lift_a = add_ab.add_dataflow_op(
-            Lift {
-                type_row: type_row![BIT],
-                new_extension: xa.clone(),
-            },
-            [w],
-        )?;
+        let lift_a = add_ab.add_dataflow_op(Lift::new(type_row![BIT], xa.clone()), [w])?;
         let [w] = lift_a.outputs_arr();
 
-        let lift_b = add_ab.add_dataflow_op(
-            Lift {
-                type_row: type_row![BIT],
-                new_extension: xb,
-            },
-            [w],
-        )?;
+        let lift_b = add_ab.add_dataflow_op(Lift::new(type_row![BIT], xb), [w])?;
         let [w] = lift_b.outputs_arr();
 
         let add_ab = add_ab.finish_with_outputs([w])?;
@@ -447,13 +435,7 @@ pub(crate) mod test {
         // via a child lift node
         let mut add_c = parent.dfg_builder(endo_sig(BIT), [w])?;
         let [w] = add_c.input_wires_arr();
-        let lift_c = add_c.add_dataflow_op(
-            Lift {
-                type_row: type_row![BIT],
-                new_extension: xc,
-            },
-            [w],
-        )?;
+        let lift_c = add_c.add_dataflow_op(Lift::new(type_row![BIT], xc), [w])?;
         let wires: Vec<Wire> = lift_c.outputs().collect();
 
         let add_c = add_c.finish_with_outputs(wires)?;
