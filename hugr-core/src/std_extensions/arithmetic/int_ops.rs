@@ -89,6 +89,7 @@ pub enum IntOpDef {
     idiv_s,
     imod_checked_s,
     imod_s,
+    ipow,
     iabs,
     iand,
     ior,
@@ -98,6 +99,8 @@ pub enum IntOpDef {
     ishr,
     irotl,
     irotr,
+    iu_to_s,
+    is_to_u,
     itostring_u,
     itostring_s,
 }
@@ -116,12 +119,12 @@ impl MakeOpDef for IntOpDef {
         let tv0 = int_tv(0);
         match self {
             iwiden_s | iwiden_u => CustomValidator::new(
-                int_polytype(2, vec![tv0.clone()], vec![int_tv(1)]),
+                int_polytype(2, vec![tv0], vec![int_tv(1)]),
                 IOValidator { f_ge_s: false },
             )
             .into(),
             inarrow_s | inarrow_u => CustomValidator::new(
-                int_polytype(2, tv0.clone(), sum_ty_with_err(int_tv(1))),
+                int_polytype(2, tv0, sum_ty_with_err(int_tv(1))),
                 IOValidator { f_ge_s: true },
             )
             .into(),
@@ -130,10 +133,10 @@ impl MakeOpDef for IntOpDef {
             ieq | ine | ilt_u | ilt_s | igt_u | igt_s | ile_u | ile_s | ige_u | ige_s => {
                 int_polytype(1, vec![tv0; 2], type_row![BOOL_T]).into()
             }
-            imax_u | imax_s | imin_u | imin_s | iadd | isub | imul | iand | ior | ixor => {
+            imax_u | imax_s | imin_u | imin_s | iadd | isub | imul | iand | ior | ixor | ipow => {
                 ibinop_sig().into()
             }
-            ineg | iabs | inot => iunop_sig().into(),
+            ineg | iabs | inot | iu_to_s | is_to_u => iunop_sig().into(),
             idivmod_checked_u | idivmod_checked_s => {
                 let intpair: TypeRowRV = vec![tv0; 2].into();
                 int_polytype(
@@ -173,8 +176,8 @@ impl MakeOpDef for IntOpDef {
             iwiden_s => "widen a signed integer to a wider one with the same value",
             inarrow_u => "narrow an unsigned integer to a narrower one with the same value if possible",
             inarrow_s => "narrow a signed integer to a narrower one with the same value if possible",
-            itobool => "convert to bool (1 is true, 0 is false)",
-            ifrombool => "convert from bool (1 is true, 0 is false)",
+            itobool => "convert a 1-bit integer to bool (1 is true, 0 is false)",
+            ifrombool => "convert from bool into a 1-bit integer (1 is true, 0 is false)",
             ieq => "equality test",
             ine => "inequality test",
             ilt_u => "\"less than\" as unsigned integers",
@@ -209,6 +212,7 @@ impl MakeOpDef for IntOpDef {
             idiv_s => "as idivmod_s but discarding the second output",
             imod_checked_s => "as idivmod_checked_s but discarding the first output",
             imod_s => "as idivmod_s but discarding the first output",
+            ipow => "raise first input to the power of second input",
             iabs => "convert signed to unsigned by taking absolute value",
             iand => "bitwise AND",
             ior => "bitwise OR",
@@ -222,6 +226,8 @@ impl MakeOpDef for IntOpDef {
             (leftmost bits replace rightmost bits)",
             irotr => "rotate first input right by k bits where k is unsigned interpretation of second input \
             (rightmost bits replace leftmost bits)",
+            is_to_u => "convert signed to unsigned by taking absolute value",
+            iu_to_s => "convert unsigned to signed by taking absolute value",
             itostring_s => "convert a signed integer to its string representation",
             itostring_u => "convert an unsigned integer to its string representation",
         }.into()
@@ -366,6 +372,8 @@ fn sum_ty_with_err(t: Type) -> Type {
 
 #[cfg(test)]
 mod test {
+    use rstest::rstest;
+
     use crate::{
         ops::{dataflow::DataflowOpTrait, ExtensionOp},
         std_extensions::arithmetic::int_types::int_type,
@@ -378,7 +386,7 @@ mod test {
     fn test_int_ops_extension() {
         assert_eq!(EXTENSION.name() as &str, "arithmetic.int");
         assert_eq!(EXTENSION.types().count(), 0);
-        assert_eq!(EXTENSION.operations().count(), 47);
+        assert_eq!(EXTENSION.operations().count(), 50);
         for (name, _) in EXTENSION.operations() {
             assert!(name.starts_with('i'));
         }
@@ -449,5 +457,57 @@ mod test {
 
         assert_eq!(ConcreteIntOp::from_op(&ext_op).unwrap(), o);
         assert_eq!(IntOpDef::from_op(&ext_op).unwrap(), IntOpDef::itobool);
+    }
+
+    #[rstest]
+    #[case::iadd(IntOpDef::iadd.with_log_width(5), &[1, 2], &[3], 5)]
+    #[case::isub(IntOpDef::isub.with_log_width(5), &[5, 2], &[3], 5)]
+    #[case::imul(IntOpDef::imul.with_log_width(5), &[2, 8], &[16], 5)]
+    #[case::idiv(IntOpDef::idiv_u.with_log_width(5), &[37, 8], &[4], 5)]
+    #[case::imod(IntOpDef::imod_u.with_log_width(5), &[43, 8], &[3], 5)]
+    #[case::ipow(IntOpDef::ipow.with_log_width(5), &[2, 8], &[256], 5)]
+    #[case::iu_to_s(IntOpDef::iu_to_s.with_log_width(5), &[42], &[42], 5)]
+    #[case::is_to_u(IntOpDef::is_to_u.with_log_width(5), &[42], &[42], 5)]
+    #[should_panic(expected = "too large to be converted to signed")]
+    #[case::iu_to_s_panic(IntOpDef::iu_to_s.with_log_width(5), &[u32::MAX as u64], &[], 5)]
+    #[should_panic(expected = "Cannot convert negative integer")]
+    #[case::is_to_u_panic(IntOpDef::is_to_u.with_log_width(5), &[(0u32.wrapping_sub(42)) as u64], &[], 5)]
+    fn int_fold(
+        #[case] op: ConcreteIntOp,
+        #[case] inputs: &[u64],
+        #[case] outputs: &[u64],
+        #[case] log_width: u8,
+    ) {
+        use crate::ops::Value;
+        use crate::std_extensions::arithmetic::int_types::ConstInt;
+
+        let consts: Vec<_> = inputs
+            .iter()
+            .enumerate()
+            .map(|(i, &x)| {
+                (
+                    i.into(),
+                    Value::extension(ConstInt::new_u(log_width, x).unwrap()),
+                )
+            })
+            .collect();
+
+        let res = op
+            .to_extension_op()
+            .unwrap()
+            .constant_fold(&consts)
+            .unwrap();
+
+        for (i, &expected) in outputs.iter().enumerate() {
+            let res_val: u64 = res
+                .get(i)
+                .unwrap()
+                .1
+                .get_custom_value::<ConstInt>()
+                .expect("This function assumes all incoming constants are floats.")
+                .value_u();
+
+            assert_eq!(res_val, expected);
+        }
     }
 }
