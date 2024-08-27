@@ -337,7 +337,9 @@ mod test {
 
     #[test]
     fn test_extension() {
-        assert_eq!(EXTENSION.name(), &EXTENSION_ID);
+        assert_eq!(&ListOp::push.extension_id(), EXTENSION.name());
+        assert_eq!(&ListOp::push.extension(), EXTENSION.name());
+        assert!(ListOp::pop.registry().contains(EXTENSION.name()));
         for (_, op_def) in EXTENSION.operations() {
             assert_eq!(op_def.extension(), &EXTENSION_ID);
         }
