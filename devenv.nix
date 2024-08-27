@@ -39,13 +39,14 @@ in
       export LLVM_PROFDATA="${pkgs.llvmPackages_16.libllvm}/bin/llvm-profdata"
     '' + lib.optionalString cfg.setupInShell ''
       just setup
+    '' + ''
+      source .venv/bin/activate
     '';
 
     languages.python = {
       enable = true;
-      poetry = {
+      uv = {
         enable = true;
-        activate.enable = true;
       };
     };
 

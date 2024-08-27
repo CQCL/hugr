@@ -5,17 +5,17 @@ help:
 # Prepare the environment for development, installing all the dependencies and
 # setting up the pre-commit hooks.
 setup:
-    poetry install
-    [[ -n "${HUGR_JUST_INHIBIT_GIT_HOOKS:-}" ]] || poetry run pre-commit install -t pre-commit
+    uv sync
+    [[ -n "${HUGR_JUST_INHIBIT_GIT_HOOKS:-}" ]] || uv run pre-commit install -t pre-commit
 
 # Run the pre-commit checks.
 check:
-    HUGR_TEST_SCHEMA=1 poetry run pre-commit run --all-files
+    HUGR_TEST_SCHEMA=1 uv run pre-commit run --all-files
 
 # Run all the tests.
 test language="[rust|python]" : (_run_lang language \
         "HUGR_TEST_SCHEMA=1 cargo test --all-features" \
-        "cargo build -p hugr-cli && poetry run pytest"
+        "cargo build -p hugr-cli && uv run pytest"
     )
 
 # Run all the benchmarks.
@@ -27,37 +27,32 @@ bench language="[rust|python]": (_run_lang language \
 # Auto-fix all clippy warnings.
 fix language="[rust|python]": (_run_lang language \
         "cargo clippy --all-targets --all-features --workspace --fix --allow-staged --allow-dirty" \
-        "poetry run ruff check --fix"
+        "uv run ruff check --fix"
     )
 
 # Format the code.
 format language="[rust|python]": (_run_lang language \
         "cargo fmt" \
-        "poetry run ruff format"
+        "uv run ruff format"
     )
 
 # Generate a test coverage report.
 coverage language="[rust|python]": (_run_lang language \
         "cargo llvm-cov --lcov > lcov.info" \
-        "poetry run pytest --cov=./ --cov-report=html"
+        "uv run pytest --cov=./ --cov-report=html"
     )
 
 # Run unsoundness checks using miri
 miri:
     PROPTEST_DISABLE_FAILURE_PERSISTENCE=true MIRIFLAGS='-Zmiri-env-forward=PROPTEST_DISABLE_FAILURE_PERSISTENCE' cargo +nightly miri test
 
-# Load a shell with all the dependencies installed
-shell:
-    poetry shell
-
 # Update the HUGR schema.
 update-schema:
-    poetry update
-    poetry run python scripts/generate_schema.py specification/schema/
+    uv run scripts/generate_schema.py specification/schema/
 
 # Update snapshots used in the pytest tests.
 update-pytest-snapshots:
-    poetry run pytest --snapshot-update
+    uv run pytest --snapshot-update
 
 # Generate serialized declarations for the standard extensions and prelude.
 gen-extensions:
