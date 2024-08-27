@@ -4,10 +4,10 @@ use anyhow::{anyhow, Ok, Result};
 use hugr::{
     extension::prelude::{
         self, ConstError, ConstExternalSymbol, ConstString, ConstUsize, ERROR_CUSTOM_TYPE,
-        ERROR_TYPE, PANIC_OP_ID, PRINT_OP_ID, QB_T, STRING_CUSTOM_TYPE, USIZE_T,
+        ERROR_TYPE, NEW_ARRAY_OP_ID, PANIC_OP_ID, PRINT_OP_ID, QB_T, STRING_CUSTOM_TYPE, USIZE_T,
     },
     ops::{constant::CustomConst, CustomOp},
-    types::TypeEnum,
+    types::{TypeArg, TypeEnum},
     HugrView,
 };
 use inkwell::{
@@ -54,6 +54,34 @@ pub trait PreludeCodegen: Clone {
         session.iw_context().i16_type()
     }
 
+    /// Return the llvm type of [hugr::extension::prelude::array_type].
+    fn array_type<'c, H: HugrView>(
+        &self,
+        _session: &TypingSession<'c, H>,
+        elem_ty: BasicTypeEnum<'c>,
+        size: u64,
+    ) -> impl BasicType<'c> {
+        elem_ty.array_type(size as u32)
+    }
+
+    /// Emit a [hugr::extension::prelude::new_array_op].
+    fn emit_new_array_alloc<'c, H: HugrView>(
+        &self,
+        ctx: &mut EmitFuncContext<'c, H>,
+        elem_ty: BasicTypeEnum<'c>,
+        elems: Vec<BasicValueEnum>,
+    ) -> Result<BasicValueEnum<'c>> {
+        let builder = ctx.builder();
+        let ts = ctx.typing_session();
+        let array_ty = self.array_type(&ts, elem_ty, elems.len() as u64);
+        let array_ptr = builder.build_alloca(array_ty, "")?;
+        let array = builder.build_load(array_ptr, "")?.into_array_value();
+        for (i, v) in elems.into_iter().enumerate() {
+            ctx.builder().build_insert_value(array, v, i as u32, "")?;
+        }
+        Ok(array.into())
+    }
+
     /// Emit a [hugr::extension::prelude::PRINT_OP_ID] node.
     fn emit_print<H: HugrView>(
         &self,
@@ -97,7 +125,14 @@ impl<'c, 'a, H: HugrView, PCG: PreludeCodegen> EmitOp<'c, CustomOp, H>
     fn emit(&mut self, args: EmitOpArgs<'c, CustomOp, H>) -> Result<()> {
         let node = args.node();
         let name = node.as_extension_op().unwrap().def().name();
-        if *name == PRINT_OP_ID {
+        if *name == NEW_ARRAY_OP_ID {
+            let [TypeArg::BoundedNat { .. }, TypeArg::Type { ty }] = node.args() else {
+                return Err(anyhow!("Invalid type args for op {NEW_ARRAY_OP_ID}"));
+            };
+            let elem_ty = self.0.llvm_type(ty)?;
+            let array = self.1.emit_new_array_alloc(self.0, elem_ty, args.inputs)?;
+            args.outputs.finish(self.0.builder(), vec![array])
+        } else if *name == PRINT_OP_ID {
             let text = args.inputs[0];
             self.1.emit_print(self.0, text)?;
             args.outputs.finish(self.0.builder(), [])
@@ -174,6 +209,12 @@ impl<'c, H: HugrView, PCG: PreludeCodegen> CodegenExtension<'c, H>
             let signal_ty = ctx.i32_type().into();
             let message_ty = ctx.i8_type().ptr_type(AddressSpace::default()).into();
             Ok(ctx.struct_type(&[signal_ty, message_ty], false).into())
+        } else if hugr_type.name() == "array" {
+            let [TypeArg::BoundedNat { n }, TypeArg::Type { ty }] = hugr_type.args() else {
+                return Err(anyhow!("Invalid type args for array type"));
+            };
+            let elem_ty = ts.llvm_type(ty)?;
+            Ok(self.0.array_type(ts, elem_ty, *n).as_basic_type_enum())
         } else {
             Err(anyhow::anyhow!(
                 "Type not supported by prelude extension: {hugr_type:?}"
@@ -275,6 +316,7 @@ mod test {
     use hugr::extension::{PRELUDE, PRELUDE_REGISTRY};
     use hugr::type_row;
     use hugr::types::TypeArg;
+    use prelude::{array_type, new_array_op};
     use rstest::rstest;
 
     use crate::check_emission;
@@ -368,6 +410,22 @@ mod test {
                 let k2 = builder.add_load_value(konst2);
                 builder.finish_with_outputs([k1, k2]).unwrap()
             });
+        check_emission!(hugr, llvm_ctx);
+    }
+
+    #[rstest]
+    fn prelude_new_array(mut llvm_ctx: TestContext) {
+        let hugr = SimpleHugrConfig::new()
+            .with_ins(vec![QB_T, QB_T])
+            .with_outs(array_type(TypeArg::BoundedNat { n: 2 }, QB_T))
+            .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
+            .finish(|mut builder| {
+                let [q1, q2] = builder.input_wires_arr();
+                let op = new_array_op(QB_T, 2);
+                let out = builder.add_dataflow_op(op, [q1, q2]).unwrap();
+                builder.finish_with_outputs(out.outputs()).unwrap()
+            });
+        llvm_ctx.add_extensions(add_default_prelude_extensions);
         check_emission!(hugr, llvm_ctx);
     }
 
