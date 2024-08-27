@@ -143,12 +143,12 @@ fn test_list_ops() -> Result<(), Box<dyn std::error::Error>> {
     let list_wire = build.add_load_const(list.clone());
 
     let pop = build.add_dataflow_op(
-        ListOp::Pop.with_type(BOOL_T).to_extension_op(&reg).unwrap(),
+        ListOp::pop.with_type(BOOL_T).to_extension_op(&reg).unwrap(),
         [list_wire],
     )?;
 
     let push = build.add_dataflow_op(
-        ListOp::Push
+        ListOp::push
             .with_type(BOOL_T)
             .to_extension_op(&reg)
             .unwrap(),
