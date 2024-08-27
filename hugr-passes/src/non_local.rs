@@ -43,7 +43,7 @@ mod test {
     use hugr_core::{
         builder::{DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer},
         extension::{
-            prelude::{leaf::Noop, BOOL_T},
+            prelude::{Noop, BOOL_T},
             EMPTY_REG,
         },
         ops::handle::NodeHandle,

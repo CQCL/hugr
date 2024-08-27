@@ -206,7 +206,7 @@ pub(crate) mod test {
     use crate::builder::{
         endo_sig, inout_sig, BuilderWiringError, DataflowSubContainer, ModuleBuilder,
     };
-    use crate::extension::prelude::leaf::{Lift, Noop};
+    use crate::extension::prelude::{Lift, Noop};
     use crate::extension::prelude::{BOOL_T, USIZE_T};
     use crate::extension::{ExtensionId, SignatureError, EMPTY_REG, PRELUDE_REGISTRY};
     use crate::hugr::validate::InterGraphEdgeError;
@@ -326,7 +326,7 @@ pub(crate) mod test {
             )?;
 
             let [i1] = f_build.input_wires_arr();
-            let noop = f_build.add_dataflow_op(Noop { ty: BIT }, [i1])?;
+            let noop = f_build.add_dataflow_op(Noop(BIT), [i1])?;
             let i1 = noop.out_wire(0);
 
             let mut nested = f_build.dfg_builder(
@@ -334,7 +334,7 @@ pub(crate) mod test {
                 [],
             )?;
 
-            let id = nested.add_dataflow_op(Noop { ty: BIT }, [i1])?;
+            let id = nested.add_dataflow_op(Noop(BIT), [i1])?;
 
             let nested = nested.finish_with_outputs([id.out_wire(0)])?;
 
@@ -350,12 +350,12 @@ pub(crate) mod test {
             FunctionBuilder::new("main", Signature::new(type_row![QB], type_row![QB]))?;
 
         let [i1] = f_build.input_wires_arr();
-        let noop = f_build.add_dataflow_op(Noop { ty: QB }, [i1])?;
+        let noop = f_build.add_dataflow_op(Noop(QB), [i1])?;
         let i1 = noop.out_wire(0);
 
         let mut nested = f_build.dfg_builder(Signature::new(type_row![], type_row![QB]), [])?;
 
-        let id_res = nested.add_dataflow_op(Noop { ty: QB }, [i1]);
+        let id_res = nested.add_dataflow_op(Noop(QB), [i1]);
 
         // The error would anyway be caught in validation when we finish the Hugr,
         // but the builder catches it earlier

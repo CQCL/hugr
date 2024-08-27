@@ -111,7 +111,7 @@ mod test {
             test::{BIT, NAT},
             DataflowSubContainer, HugrBuilder, ModuleBuilder, SubContainer,
         },
-        extension::prelude::{leaf::Lift, ConstUsize, PRELUDE_ID, USIZE_T},
+        extension::prelude::{ConstUsize, Lift, PRELUDE_ID, USIZE_T},
         hugr::ValidationError,
         ops::Value,
         type_row,

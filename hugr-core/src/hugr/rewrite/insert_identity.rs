@@ -2,7 +2,7 @@
 
 use std::iter;
 
-use crate::extension::prelude::leaf::Noop;
+use crate::extension::prelude::Noop;
 use crate::hugr::{HugrMut, Node};
 use crate::ops::{OpTag, OpTrait};
 
@@ -82,7 +82,7 @@ impl Rewrite for IdentityInsertion {
         if !OpTag::DataflowParent.is_superset(h.get_optype(parent).tag()) {
             return Err(IdentityInsertionError::InvalidParentNode);
         }
-        let new_node = h.add_node_with_parent(parent, Noop { ty });
+        let new_node = h.add_node_with_parent(parent, Noop(ty));
         h.connect(pre_node, pre_port, new_node, 0);
 
         h.connect(new_node, 0, self.post_node, self.post_port);
@@ -127,7 +127,7 @@ mod tests {
 
         let noop: Noop = h.get_optype(noop_node).cast().unwrap();
 
-        assert_eq!(noop, Noop { ty: QB_T });
+        assert_eq!(noop, Noop(QB_T));
 
         h.update_validate(&PRELUDE_REGISTRY).unwrap();
     }

@@ -2,7 +2,7 @@
 //! and the target BB has no other predecessors.
 use std::collections::HashMap;
 
-use hugr_core::extension::prelude::leaf::UnpackTuple;
+use hugr_core::extension::prelude::UnpackTuple;
 use hugr_core::hugr::hugrmut::HugrMut;
 use itertools::Itertools;
 
@@ -158,7 +158,7 @@ fn mk_rep(
 mod test {
     use std::collections::HashSet;
 
-    use hugr_core::extension::prelude::leaf::Lift;
+    use hugr_core::extension::prelude::Lift;
     use itertools::Itertools;
     use rstest::rstest;
 
@@ -223,7 +223,7 @@ mod test {
                \--<--<--/                       \--<-----<--/
         */
 
-        use hugr_core::extension::prelude::leaf::Noop;
+        use hugr_core::extension::prelude::Noop;
         let loop_variants = type_row![QB_T];
         let exit_types = type_row![USIZE_T];
         let e = extension();

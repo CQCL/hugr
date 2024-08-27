@@ -70,7 +70,7 @@ impl<H: HugrMutInternals + AsRef<Hugr>, Root: NodeHandle> HugrMut for RootChecke
 #[cfg(test)]
 mod test {
     use super::RootChecked;
-    use crate::extension::prelude::leaf::MakeTuple;
+    use crate::extension::prelude::MakeTuple;
     use crate::extension::ExtensionSet;
     use crate::hugr::internal::HugrMutInternals;
     use crate::hugr::{HugrError, HugrMut};
@@ -132,7 +132,7 @@ mod test {
         let mut bb_v = RootChecked::<_, BasicBlockID>::try_new(dfp_v).unwrap();
 
         // And it's a HugrMut:
-        let nodetype = MakeTuple { tys: type_row![] };
+        let nodetype = MakeTuple(type_row![]);
         bb_v.add_node_with_parent(bb_v.root(), nodetype);
     }
 }

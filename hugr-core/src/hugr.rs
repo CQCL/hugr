@@ -301,7 +301,7 @@ mod test {
     #[cfg(feature = "extension_inference")]
     use super::ValidationError;
     use super::{ExtensionError, Hugr, HugrMut, HugrView, Node};
-    use crate::extension::prelude::leaf::Lift;
+    use crate::extension::prelude::Lift;
     use crate::extension::prelude::PRELUDE_ID;
     use crate::extension::{
         ExtensionId, ExtensionSet, EMPTY_REG, PRELUDE_REGISTRY, TO_BE_INFERRED,

@@ -167,7 +167,7 @@ mod test {
     #[case(true)]
     #[case(false)]
     fn inline_add_load_const(#[case] nonlocal: bool) -> Result<(), Box<dyn std::error::Error>> {
-        use crate::extension::prelude::leaf::Lift;
+        use crate::extension::prelude::Lift;
 
         let reg = ExtensionRegistry::try_new([
             PRELUDE.to_owned(),

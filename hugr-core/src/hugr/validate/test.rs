@@ -9,7 +9,7 @@ use crate::builder::{
     inout_sig, BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
     FunctionBuilder, HugrBuilder, ModuleBuilder, SubContainer,
 };
-use crate::extension::prelude::leaf::Noop;
+use crate::extension::prelude::Noop;
 use crate::extension::prelude::{BOOL_T, PRELUDE, PRELUDE_ID, QB_T, USIZE_T};
 use crate::extension::{Extension, ExtensionSet, TypeDefBound, EMPTY_REG, PRELUDE_REGISTRY};
 use crate::hugr::internal::HugrMutInternals;
@@ -56,7 +56,7 @@ fn make_simple_hugr(copies: usize) -> (Hugr, Node) {
 fn add_df_children(b: &mut Hugr, parent: Node, copies: usize) -> (Node, Node, Node) {
     let input = b.add_node_with_parent(parent, ops::Input::new(type_row![BOOL_T]));
     let output = b.add_node_with_parent(parent, ops::Output::new(vec![BOOL_T; copies]));
-    let copy = b.add_node_with_parent(parent, Noop { ty: BOOL_T });
+    let copy = b.add_node_with_parent(parent, Noop(BOOL_T));
 
     b.connect(input, 0, copy, 0);
     for i in 0..copies {
@@ -102,7 +102,7 @@ fn invalid_root() {
 
 #[test]
 fn leaf_root() {
-    let leaf_op: OpType = Noop { ty: USIZE_T }.into();
+    let leaf_op: OpType = Noop(USIZE_T).into();
 
     let b = Hugr::new(leaf_op);
     assert_eq!(b.validate(&PRELUDE_REGISTRY), Ok(()));
@@ -183,7 +183,7 @@ fn df_children_restrictions() {
         .unwrap();
 
     // Replace the output operation of the df subgraph with a copy
-    b.replace_op(output, Noop { ty: NAT }).unwrap();
+    b.replace_op(output, Noop(NAT)).unwrap();
     assert_matches!(
         b.validate(&EMPTY_REG),
         Err(ValidationError::InvalidInitialChild { parent, .. }) => assert_eq!(parent, def)
@@ -959,7 +959,7 @@ mod extension_tests {
     use super::*;
     use crate::builder::handle::Outputs;
     use crate::builder::{BlockBuilder, BuildHandle, CFGBuilder, DFGWrapper, TailLoopBuilder};
-    use crate::extension::prelude::leaf::Lift;
+    use crate::extension::prelude::Lift;
     use crate::extension::prelude::PRELUDE_ID;
     use crate::extension::ExtensionSet;
     use crate::macros::const_extension_ids;
