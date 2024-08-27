@@ -17,6 +17,7 @@ pytest-cov = "^5.0.0"
 mypy = "^1.9.0"
 ruff = "^0.6.1"
 toml = "^0.10.0"
+syrupy = "^4.6.4"
 
 [tool.poetry.group.hugr.dependencies]
 hugr = { path = "hugr-py", develop = true }

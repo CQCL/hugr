@@ -13,7 +13,7 @@ from typing_extensions import Self
 from hugr import ops
 from hugr.tys import Sum
 
-from .dfg import _DfBase
+from .dfg import DfBase
 from .hugr import Hugr, ParentBuilder
 
 if TYPE_CHECKING:
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from .tys import TypeRow
 
 
-class Case(_DfBase[ops.Case]):
+class Case(DfBase[ops.Case]):
     """Dataflow graph builder for a case in a conditional."""
 
     _parent_cond: Conditional | None = None
@@ -202,7 +202,7 @@ class Conditional(ParentBuilder[ops.Conditional], AbstractContextManager):
 
 
 @dataclass
-class TailLoop(_DfBase[ops.TailLoop]):
+class TailLoop(DfBase[ops.TailLoop]):
     """Builder for a tail-controlled loop.
 
     Args:

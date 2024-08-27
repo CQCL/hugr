@@ -35,6 +35,8 @@ from hugr.val import Value
 from .exceptions import ParentBeforeChild
 
 if TYPE_CHECKING:
+    import graphviz as gv  # type: ignore[import-untyped]
+
     from hugr import ext
     from hugr.val import Value
 
@@ -64,7 +66,7 @@ _SI = _SubPort[InPort]
 P = TypeVar("P", InPort, OutPort)
 K = TypeVar("K", InPort, OutPort)
 OpVar = TypeVar("OpVar", bound=Op)
-OpVar2 = TypeVar("OpVar2", bound=Op)
+OpVarCov = TypeVar("OpVarCov", bound=Op, covariant=True)
 
 
 class ParentBuilder(ToNode, Protocol[OpVar]):
@@ -85,7 +87,7 @@ class ParentBuilder(ToNode, Protocol[OpVar]):
 
 
 @dataclass()
-class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
+class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
     """The core HUGR datastructure.
 
     Args:
@@ -108,7 +110,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
     # List of free node indices, populated when nodes are deleted.
     _free_nodes: list[Node]
 
-    def __init__(self, root_op: OpVar | None = None) -> None:
+    def __init__(self, root_op: OpVarCov | None = None) -> None:
         self._free_nodes = []
         self._links = BiMap()
         self._nodes = []
@@ -134,7 +136,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
     def __len__(self) -> int:
         return self.num_nodes()
 
-    def _get_typed_op(self, node: ToNode, cl: type[OpVar2]) -> OpVar2:
+    def _get_typed_op(self, node: ToNode, cl: type[OpVar]) -> OpVar:
         op = self[node].op
         assert isinstance(op, cl)
         return op
@@ -142,6 +144,14 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
     def nodes(self) -> Iterable[tuple[Node, NodeData]]:
         """Iterator over nodes of the hugr and their data."""
         return self.items()
+
+    def links(self) -> Iterator[tuple[OutPort, InPort]]:
+        """Iterator over all the links in the HUGR.
+
+        Returns:
+            Iterator of pairs of outgoing port and the incoming ports.
+        """
+        return ((src.port, tgt.port) for src, tgt in self._links.items())
 
     def children(self, node: ToNode | None = None) -> list[Node]:
         """The child nodes of a given `node`.
@@ -329,7 +339,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
             return
         # TODO make sure sub-offset is handled correctly
 
-    def root_op(self) -> OpVar:
+    def root_op(self) -> OpVarCov:
         """The operation of the root node.
 
         Examples:
@@ -337,7 +347,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
             >>> h.root_op()
             Module()
         """
-        return cast(OpVar, self[self.root].op)
+        return cast(OpVarCov, self[self.root].op)
 
     def num_nodes(self) -> int:
         """The number of nodes in the HUGR.
@@ -683,3 +693,33 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
         json_dict = json.loads(json_str)
         serial = SerialHugr.load_json(json_dict)
         return cls.from_serial(serial)
+
+    def render_dot(self, palette: str | None = None) -> gv.Digraph:
+        """Render the HUGR to a graphviz Digraph.
+
+        Args:
+            palette: The palette to use for rendering. See :obj:`PALETTE` for the
+                included options.
+
+        Returns:
+            The graphviz Digraph.
+        """
+        from .render import DotRenderer
+
+        return DotRenderer(palette).render(self)
+
+    def store_dot(
+        self, filename: str, format: str = "svg", palette: str | None = None
+    ) -> None:
+        """Render the HUGR to a graphviz dot file.
+
+        Args:
+            filename: The file to render to.
+            format: The format used for rendering ('pdf', 'png', etc.).
+                Defaults to SVG.
+            palette: The palette to use for rendering. See :obj:`PALETTE` for the
+                included options.
+        """
+        from .render import DotRenderer
+
+        DotRenderer(palette).store(self, filename=filename, format=format)

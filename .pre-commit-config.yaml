@@ -14,16 +14,18 @@ repos:
         exclude: |
           (?x)^(
             specification/schema/.*|
-            .*.snap|
-            .*.snap.new|
+            .*\.snap|
+            .*\.snap\.new|
+            .*\.ambr|
             .release-please-manifest.json
           )$
       - id: trailing-whitespace
         exclude: |
           (?x)^(
             specification/schema/.*|
-            .*.snap|
-            .*.snap.new
+            .*\.snap|
+            .*\.ambr|
+            .*\.snap\.new
           )$
       - id: fix-byte-order-marker
       - id: mixed-line-ending

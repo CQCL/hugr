@@ -55,6 +55,10 @@ update-schema:
     poetry update
     poetry run python scripts/generate_schema.py specification/schema/
 
+# Update snapshots used in the pytest tests.
+update-pytest-snapshots:
+    poetry run pytest --snapshot-update
+
 # Generate serialized declarations for the standard extensions and prelude.
 gen-extensions:
     cargo run -p hugr-cli gen-extensions -o specification/std_extensions
