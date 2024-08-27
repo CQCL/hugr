@@ -5,7 +5,7 @@ use lazy_static::lazy_static;
 use crate::extension::simple_op::MakeOpDef;
 use crate::ops::constant::{CustomCheckFailure, ValueName};
 use crate::ops::{ExtensionOp, OpName};
-use crate::types::{FuncValueType, SumType, TypeName};
+use crate::types::{FuncValueType, SumType, TypeName, TypeRV};
 use crate::{
     extension::{ExtensionId, TypeDefBound},
     ops::constant::CustomConst,
@@ -39,48 +39,6 @@ impl SignatureFromArgs for ArrayOpCustom {
 
     fn static_params(&self) -> &[TypeParam] {
         MAX
-    }
-}
-
-struct GenericOpCustom;
-impl SignatureFromArgs for GenericOpCustom {
-    fn compute_signature(&self, arg_values: &[TypeArg]) -> Result<PolyFuncTypeRV, SignatureError> {
-        let [arg0, arg1] = arg_values else {
-            return Err(SignatureError::InvalidTypeArgs);
-        };
-        let TypeArg::Sequence { elems: inp_args } = arg0 else {
-            return Err(SignatureError::InvalidTypeArgs);
-        };
-        let TypeArg::Sequence { elems: out_args } = arg1 else {
-            return Err(SignatureError::InvalidTypeArgs);
-        };
-        let mut inps: Vec<Type> = vec![Type::new_extension(ERROR_CUSTOM_TYPE)];
-        for inp_arg in inp_args.iter() {
-            let TypeArg::Type { ty } = inp_arg else {
-                return Err(SignatureError::InvalidTypeArgs);
-            };
-            inps.push(ty.clone());
-        }
-        let mut outs: Vec<Type> = vec![];
-        for out_arg in out_args.iter() {
-            let TypeArg::Type { ty } = out_arg else {
-                return Err(SignatureError::InvalidTypeArgs);
-            };
-            outs.push(ty.clone());
-        }
-        Ok(FuncValueType::new(inps, outs).into())
-    }
-
-    fn static_params(&self) -> &[TypeParam] {
-        fn list_of_type() -> TypeParam {
-            TypeParam::List {
-                param: Box::new(TypeParam::Type { b: TypeBound::Any }),
-            }
-        }
-        lazy_static! {
-            static ref PARAMS: [TypeParam; 2] = [list_of_type(), list_of_type()];
-        }
-        PARAMS.as_slice()
     }
 }
 
@@ -143,11 +101,19 @@ lazy_static! {
             TypeDefBound::copyable(),
         )
         .unwrap();
+
+
         prelude
         .add_op(
             PANIC_OP_ID,
             "Panic with input error".to_string(),
-            GenericOpCustom,
+            PolyFuncTypeRV::new(
+                [TypeParam::new_list(TypeBound::Any), TypeParam::new_list(TypeBound::Any)],
+                FuncValueType::new(
+                    vec![TypeRV::new_extension(ERROR_CUSTOM_TYPE), TypeRV::new_row_var_use(0, TypeBound::Any)],
+                    vec![TypeRV::new_row_var_use(1, TypeBound::Any)],
+                ),
+            ),
         )
         .unwrap();
 
