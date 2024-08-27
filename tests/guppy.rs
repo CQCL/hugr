@@ -80,6 +80,7 @@ fn hugr_to_module<'c>(context: &'c Context, hugr: &'c Hugr) -> Module<'c> {
     let namer = Namer::default().into();
     let exts = CodegenExtsMap::default()
         .add_int_extensions()
+        .add_logic_extensions()
         .add_default_prelude_extensions()
         .add_float_extensions()
         .add_cge(Tket2CodegenExtension);

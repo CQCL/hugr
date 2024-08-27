@@ -23,6 +23,7 @@ use super::emit::EmitOp;
 
 pub mod float;
 pub mod int;
+pub mod logic;
 pub mod prelude;
 
 /// The extension point for lowering HUGR Extensions to LLVM.

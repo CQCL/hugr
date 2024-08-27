@@ -1,0 +1,21 @@
+---
+source: src/custom/logic.rs
+expression: module.to_string()
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define { i32, {}, {} } @_hl.main.1({ i32, {}, {} } %0, { i32, {}, {} } %1, { i32, {}, {} } %2) {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  %3 = extractvalue { i32, {}, {} } %0, 0
+  %4 = extractvalue { i32, {}, {} } %1, 0
+  %5 = extractvalue { i32, {}, {} } %2, 0
+  %6 = icmp eq i32 %5, %4
+  %7 = icmp eq i32 %3, %5
+  %8 = and i1 %6, %7
+  %9 = select i1 %8, { i32, {}, {} } { i32 1, {} poison, {} undef }, { i32, {}, {} } { i32 0, {} undef, {} poison }
+  ret { i32, {}, {} } %9
+}
