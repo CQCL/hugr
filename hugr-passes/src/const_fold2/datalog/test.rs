@@ -118,9 +118,9 @@ fn test_tail_loop_always_iterates() {
     machine.run_hugr(&hugr);
 
     let o_r1 = machine.read_out_wire_partial_value(tl_o1).unwrap();
-    assert_eq!(o_r1, PartialValue::bottom());
+    assert_eq!(o_r1, PartialValue::bottom().into());
     let o_r2 = machine.read_out_wire_partial_value(tl_o2).unwrap();
-    assert_eq!(o_r2, PartialValue::bottom());
+    assert_eq!(o_r2, PartialValue::bottom().into());
     assert_eq!(
         TailLoopTermination::bottom(),
         machine.tail_loop_terminates(&hugr, tail_loop.node())
@@ -220,7 +220,7 @@ fn conditional() {
     let mut machine = Machine::new();
     let arg_pv =
         PartialValue::variant(1, []).join(PartialValue::variant(2, [PartialValue::variant(0, [])]));
-    machine.propolutate_out_wires([(arg_w, arg_pv)]);
+    machine.propolutate_out_wires([(arg_w, arg_pv.into())]);
     machine.run_hugr(&hugr);
 
     let cond_r1 = machine.read_out_wire_value(&hugr, cond_o1).unwrap();

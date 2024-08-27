@@ -10,7 +10,9 @@ use itertools::{zip_eq, Either};
 
 use crate::const_fold2::partial_value::{PartialValue, ValueHandle};
 use hugr_core::{
-    ops::OpTrait as _, types::TypeRow, HugrView, IncomingPort, Node, OutgoingPort, PortIndex as _,
+    ops::{OpTrait as _, Value},
+    types::{Type, TypeRow},
+    HugrView, IncomingPort, Node, OutgoingPort, PortIndex as _,
 };
 
 #[cfg(test)]
@@ -38,6 +40,10 @@ impl PV {
 
     pub fn supports_tag(&self, tag: usize) -> bool {
         self.0.supports_tag(tag)
+    }
+
+    pub fn try_into_value(self, ty: &Type) -> Result<Value, Self> {
+        self.0.try_into_value(ty).map_err(Self)
     }
 }
 

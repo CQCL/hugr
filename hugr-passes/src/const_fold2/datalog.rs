@@ -2,7 +2,6 @@ use ascent::lattice::BoundedLattice;
 use std::collections::HashMap;
 use std::hash::Hash;
 
-use super::partial_value::PartialValue;
 use hugr_core::ops::Value;
 use hugr_core::{Hugr, HugrView, IncomingPort, Node, OutgoingPort, PortIndex as _, Wire};
 
@@ -170,10 +169,7 @@ ascent::ascent! {
 }
 
 // TODO This should probably be called 'Analyser' or something
-struct Machine<H: HugrView>(
-    AscentProgram<DataflowContext<H>>,
-    Option<HashMap<Wire, PartialValue>>,
-);
+struct Machine<H: HugrView>(AscentProgram<DataflowContext<H>>, Option<HashMap<Wire, PV>>);
 
 /// Usage:
 /// 1. [Self::new()]
@@ -185,7 +181,7 @@ impl<H: HugrView> Machine<H> {
         Self(Default::default(), None)
     }
 
-    pub fn propolutate_out_wires(&mut self, wires: impl IntoIterator<Item = (Wire, PartialValue)>) {
+    pub fn propolutate_out_wires(&mut self, wires: impl IntoIterator<Item = (Wire, PV)>) {
         assert!(self.1.is_none());
         self.0.out_wire_value_proto.extend(
             wires
@@ -207,7 +203,7 @@ impl<H: HugrView> Machine<H> {
         )
     }
 
-    pub fn read_out_wire_partial_value(&self, w: Wire) -> Option<PartialValue> {
+    pub fn read_out_wire_partial_value(&self, w: Wire) -> Option<PV> {
         self.1.as_ref().unwrap().get(&w).cloned()
     }
 
