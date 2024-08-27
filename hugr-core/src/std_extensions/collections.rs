@@ -131,8 +131,8 @@ impl ListOp {
     /// Compute the signature of the operation, given the list type definition.
     fn compute_signature(self, list_type_def: &TypeDef) -> SignatureFunc {
         use ListOp::*;
-        let e = self.elem_type();
-        let l = self.list_type(list_type_def);
+        let e = Type::new_var_use(0, TypeBound::Any);
+        let l = self.list_type(list_type_def, 0);
         match self {
             pop => self
                 .list_polytype(vec![l.clone()], vec![l.clone(), e.clone()])
@@ -150,16 +150,11 @@ impl ListOp {
         PolyFuncTypeRV::new(vec![Self::TP], FuncValueType::new(input, output))
     }
 
-    /// Returns a generic unbounded type for a list element.
-    fn elem_type(self) -> Type {
-        Type::new_var_use(0, TypeBound::Any)
-    }
-
-    /// Returns the type of a generic list.
-    fn list_type(self, list_type_def: &TypeDef) -> Type {
+    /// Returns the type of a generic list, associated with the element type parameter at index `idx`.
+    fn list_type(self, list_type_def: &TypeDef, idx: usize) -> Type {
         Type::new_extension(
             list_type_def
-                .instantiate(vec![TypeArg::new_var_use(0, Self::TP)])
+                .instantiate(vec![TypeArg::new_var_use(idx, Self::TP)])
                 .unwrap(),
         )
     }
