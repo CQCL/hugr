@@ -105,15 +105,11 @@ impl<V: AbstractValue> ValueRow<V> {
         Self(vec![PV::bottom(); len])
     }
 
-    fn singleton(len: usize, idx: usize, v: PV<V>) -> Self {
+    fn single_among_bottoms(len: usize, idx: usize, v: PV<V>) -> Self {
         assert!(idx < len);
         let mut r = Self::new(len);
         r.0[idx] = v;
         r
-    }
-
-    fn singleton_from_row(r: &TypeRow, idx: usize, v: PV<V>) -> Self {
-        Self::singleton(r.len(), idx, v)
     }
 
     fn bottom_from_row(r: &TypeRow) -> Self {
@@ -222,7 +218,7 @@ pub(super) fn singleton_in_row<V: AbstractValue>(
             h.get_optype(*n).description()
         );
     }
-    ValueRow::singleton_from_row(&h.signature(*n).unwrap().input, ip.index(), v)
+    ValueRow::single_among_bottoms(h.signature(*n).unwrap().input.len(), ip.index(), v)
 }
 
 pub(super) fn partial_value_tuple_from_value_row<V: AbstractValue>(r: ValueRow<V>) -> PV<V> {
