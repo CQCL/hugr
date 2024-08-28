@@ -179,8 +179,8 @@ class Extension(Value):
     def type_(self) -> tys.Type:
         return self.typ
 
-    def _to_serial(self) -> sops.ExtensionValue:
-        return sops.ExtensionValue(
+    def _to_serial(self) -> sops.CustomValue:
+        return sops.CustomValue(
             typ=self.typ._to_serial_root(),
             value=sops.CustomConst(c=self.name, v=self.val),
             extensions=self.extensions,
@@ -197,5 +197,5 @@ class ExtensionValue(Value, Protocol):
     def type_(self) -> tys.Type:
         return self.to_value().type_()
 
-    def _to_serial(self) -> sops.ExtensionValue:
+    def _to_serial(self) -> sops.CustomValue:
         return self.to_value()._to_serial()
