@@ -11,12 +11,16 @@ mod utils;
 
 use utils::{TailLoopTermination, ValueRow};
 
-pub use partial_value::AbstractValue;
+pub use partial_value::{AbstractValue, PartialSum, PartialValue};
 type PV<V> = partial_value::PartialValue<V>;
 
 pub trait DFContext<V>: Clone + Eq + Hash + std::ops::Deref<Target = Hugr> {
     fn hugr(&self) -> &impl HugrView;
-    fn value_from_load_constant(&self, node: Node) -> V;
+    fn interpret_leaf_op(
+        &self,
+        node: Node,
+        ins: &[PartialValue<V>],
+    ) -> Option<Vec<PartialValue<V>>>;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -73,7 +77,7 @@ ascent::ascent! {
        node(c, n),
        if !c.get_optype(*n).is_container(),
        node_in_value_row(c, n, vs),
-       if let Some(outs) = propagate_leaf_op(c, *n, vs.clone()),
+       if let Some(outs) = propagate_leaf_op(c, *n, &vs[..]),
        for (p,v) in (0..).map(OutgoingPort::from).zip(outs);
 
     // DFG
@@ -156,20 +160,26 @@ ascent::ascent! {
 fn propagate_leaf_op<V: AbstractValue>(
     c: &impl DFContext<V>,
     n: Node,
-    ins: ValueRow<V>,
+    ins: &[PV<V>],
 ) -> Option<ValueRow<V>> {
     match c.get_optype(n) {
-        OpType::LoadConstant(_) => Some(ValueRow::from_iter([PV::from(
-            c.value_from_load_constant(n),
-        )])), // ins empty
-        OpType::MakeTuple(_) => Some(ValueRow::from_iter([PV::variant(0, ins)])),
+        // Handle basics here. I guess we could allow DFContext to specify but at the least
+        // we'd want these ones to be easily available for reuse.
+        OpType::MakeTuple(_) => Some(ValueRow::from_iter([PV::variant(
+            0,
+            ins.into_iter().cloned(),
+        )])),
         OpType::UnpackTuple(_) => {
             let [tup] = ins.into_iter().collect::<Vec<_>>().try_into().unwrap();
             tup.variant_values(0, utils::value_outputs(c.hugr(), n).count())
                 .map(ValueRow::from_iter)
         }
-        OpType::Tag(t) => Some(ValueRow::from_iter([PV::variant(t.tag, ins)])),
-        _ => None,
+        OpType::Tag(t) => Some(ValueRow::from_iter([PV::variant(
+            t.tag,
+            ins.into_iter().cloned(),
+        )])),
+        OpType::Input(_) | OpType::Output(_) => None, // handled by parent
+        _ => c.interpret_leaf_op(n, ins).map(ValueRow::from_iter),
     }
 }
 

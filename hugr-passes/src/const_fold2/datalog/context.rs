@@ -2,11 +2,12 @@ use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::sync::Arc;
 
-use hugr_core::{Hugr, HugrView};
+use hugr_core::ops::OpType;
+use hugr_core::{Hugr, HugrView, Node};
 
+// ALAN Note this probably belongs with ValueHandle, outside datalog
+use super::{DFContext, PartialValue};
 use crate::const_fold2::value_handle::ValueHandle;
-
-use super::DFContext;
 
 #[derive(Debug)]
 pub(super) struct DataflowContext<H: HugrView>(Arc<H>);
@@ -60,14 +61,27 @@ impl<H: HugrView> DFContext<ValueHandle> for DataflowContext<H> {
         self.0.as_ref()
     }
 
-    fn value_from_load_constant(&self, node: hugr_core::Node) -> ValueHandle {
-        let load_op = self.0.get_optype(node).as_load_constant().unwrap();
-        let const_node = self
-            .0
-            .single_linked_output(node, load_op.constant_port())
-            .unwrap()
-            .0;
-        let const_op = self.0.get_optype(const_node).as_const().unwrap();
-        ValueHandle::new(const_node.into(), Arc::new(const_op.value().clone()))
+    fn interpret_leaf_op(
+        &self,
+        n: Node,
+        ins: &[PartialValue<ValueHandle>],
+    ) -> Option<Vec<PartialValue<ValueHandle>>> {
+        match self.0.get_optype(n) {
+            OpType::LoadConstant(load_op) => {
+                // ins empty as static edge, we need to find the constant ourselves
+                let const_node = self
+                    .0
+                    .single_linked_output(n, load_op.constant_port())
+                    .unwrap()
+                    .0;
+                let const_op = self.0.get_optype(const_node).as_const().unwrap();
+                Some(vec![ValueHandle::new(
+                    const_node.into(),
+                    Arc::new(const_op.value().clone()),
+                )
+                .into()])
+            }
+            _ => None,
+        }
     }
 }
