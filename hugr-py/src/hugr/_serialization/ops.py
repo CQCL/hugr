@@ -127,11 +127,11 @@ class FunctionValue(BaseValue):
     hugr: Any
 
     def deserialize(self) -> val.Value:
+        from hugr._serialization.serial_hugr import SerialHugr
         from hugr.hugr import Hugr
-        from hugr.serialization.serial_hugr import SerialHugr
 
         # pydantic stores the serialized dictionary because of the "Any" annotation
-        return val.Function(Hugr.from_serial(SerialHugr(**self.hugr)))
+        return val.Function(Hugr._from_serial(SerialHugr(**self.hugr)))
 
 
 class TupleValue(BaseValue):

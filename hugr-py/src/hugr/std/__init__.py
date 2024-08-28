@@ -2,8 +2,8 @@
 
 import pkgutil
 
+from hugr._serialization.extension import Extension as PdExtension
 from hugr.ext import Extension
-from hugr.serialization.extension import Extension as PdExtension
 
 
 def _load_extension(name: str) -> Extension:

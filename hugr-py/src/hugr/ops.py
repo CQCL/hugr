@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, ClassVar, Protocol, TypeVar, runtime_checkable
 
 from typing_extensions import Self
 
-import hugr.serialization.ops as sops
+import hugr._serialization.ops as sops
 from hugr import tys, val
 from hugr.node_port import Direction, InPort, Node, OutPort, PortOffset, Wire
 from hugr.utils import ser_it
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from hugr import ext
-    from hugr.serialization.ops import BaseOp
+    from hugr._serialization.ops import BaseOp
 
 
 @dataclass
@@ -49,7 +49,7 @@ class Op(Protocol):
         """
         ...  # pragma: no cover
 
-    def to_serial(self, parent: Node) -> BaseOp:
+    def _to_serial(self, parent: Node) -> BaseOp:
         """Convert this operation to a serializable form."""
         ...  # pragma: no cover
 
@@ -168,7 +168,7 @@ class Input(DataflowOp):
     def num_out(self) -> int:
         return len(self.types)
 
-    def to_serial(self, parent: Node) -> sops.Input:
+    def _to_serial(self, parent: Node) -> sops.Input:
         return sops.Input(parent=parent.idx, types=ser_it(self.types))
 
     def outer_signature(self) -> tys.FunctionType:
@@ -191,7 +191,7 @@ class Output(DataflowOp, _PartialOp):
     def types(self) -> tys.TypeRow:
         return _check_complete(self, self._types)
 
-    def to_serial(self, parent: Node) -> sops.Output:
+    def _to_serial(self, parent: Node) -> sops.Output:
         return sops.Output(parent=parent.idx, types=ser_it(self.types))
 
     def outer_signature(self) -> tys.FunctionType:
@@ -279,8 +279,8 @@ class AsExtOp(DataflowOp, Protocol):
     def outer_signature(self) -> tys.FunctionType:
         return self.ext_op.outer_signature()
 
-    def to_serial(self, parent: Node) -> sops.Extension:
-        return self.ext_op.to_serial(parent)
+    def _to_serial(self, parent: Node) -> sops.Extension:
+        return self.ext_op._to_serial(parent)
 
     @property
     def num_out(self) -> int:
@@ -297,12 +297,12 @@ class Custom(DataflowOp):
     extension: tys.ExtensionId = ""
     args: list[tys.TypeArg] = field(default_factory=list)
 
-    def to_serial(self, parent: Node) -> sops.Extension:
+    def _to_serial(self, parent: Node) -> sops.Extension:
         return sops.Extension(
             parent=parent.idx,
             extension=self.extension,
             name=self.name,
-            signature=self.signature.to_serial(),
+            signature=self.signature._to_serial(),
             description=self.description,
             args=ser_it(self.args),
         )
@@ -366,8 +366,8 @@ class ExtOp(AsExtOp):
             args=self.args,
         )
 
-    def to_serial(self, parent: Node) -> sops.Extension:
-        return self.to_custom_op().to_serial(parent)
+    def _to_serial(self, parent: Node) -> sops.Extension:
+        return self.to_custom_op()._to_serial(parent)
 
     def op_def(self) -> ext.OpDef:
         return self._op_def
@@ -422,7 +422,7 @@ class MakeTuple(DataflowOp, _PartialOp):
         """
         return _check_complete(self, self._types)
 
-    def to_serial(self, parent: Node) -> sops.MakeTuple:
+    def _to_serial(self, parent: Node) -> sops.MakeTuple:
         return sops.MakeTuple(
             parent=parent.idx,
             tys=ser_it(self.types),
@@ -460,7 +460,7 @@ class UnpackTuple(DataflowOp, _PartialOp):
     def num_out(self) -> int:
         return len(self.types)
 
-    def to_serial(self, parent: Node) -> sops.UnpackTuple:
+    def _to_serial(self, parent: Node) -> sops.UnpackTuple:
         return sops.UnpackTuple(
             parent=parent.idx,
             tys=ser_it(self.types),
@@ -491,7 +491,7 @@ class Tag(DataflowOp):
     sum_ty: tys.Sum
     num_out: int = field(default=1, repr=False)
 
-    def to_serial(self, parent: Node) -> sops.Tag:
+    def _to_serial(self, parent: Node) -> sops.Tag:
         return sops.Tag(
             parent=parent.idx,
             tag=self.tag,
@@ -549,10 +549,10 @@ class DFG(DfParentOp, DataflowOp):
     def num_out(self) -> int:
         return len(self.signature.output)
 
-    def to_serial(self, parent: Node) -> sops.DFG:
+    def _to_serial(self, parent: Node) -> sops.DFG:
         return sops.DFG(
             parent=parent.idx,
-            signature=self.signature.to_serial(),
+            signature=self.signature._to_serial(),
         )
 
     def inner_signature(self) -> tys.FunctionType:
@@ -598,10 +598,10 @@ class CFG(DataflowOp):
     def num_out(self) -> int:
         return len(self.outputs)
 
-    def to_serial(self, parent: Node) -> sops.CFG:
+    def _to_serial(self, parent: Node) -> sops.CFG:
         return sops.CFG(
             parent=parent.idx,
-            signature=self.signature.to_serial(),
+            signature=self.signature._to_serial(),
         )
 
     def outer_signature(self) -> tys.FunctionType:
@@ -643,7 +643,7 @@ class DataflowBlock(DfParentOp):
     def num_out(self) -> int:
         return len(self.sum_ty.variant_rows)
 
-    def to_serial(self, parent: Node) -> sops.DataflowBlock:
+    def _to_serial(self, parent: Node) -> sops.DataflowBlock:
         return sops.DataflowBlock(
             parent=parent.idx,
             inputs=ser_it(self.inputs),
@@ -691,7 +691,7 @@ class ExitBlock(Op):
         """
         return _check_complete(self, self._cfg_outputs)
 
-    def to_serial(self, parent: Node) -> sops.ExitBlock:
+    def _to_serial(self, parent: Node) -> sops.ExitBlock:
         return sops.ExitBlock(
             parent=parent.idx,
             cfg_outputs=ser_it(self.cfg_outputs),
@@ -710,10 +710,10 @@ class Const(Op):
     val: val.Value
     num_out: int = field(default=1, repr=False)
 
-    def to_serial(self, parent: Node) -> sops.Const:
+    def _to_serial(self, parent: Node) -> sops.Const:
         return sops.Const(
             parent=parent.idx,
-            v=self.val.to_serial_root(),
+            v=self.val._to_serial_root(),
         )
 
     def port_kind(self, port: InPort | OutPort) -> tys.Kind:
@@ -743,10 +743,10 @@ class LoadConst(DataflowOp):
         """
         return _check_complete(self, self._typ)
 
-    def to_serial(self, parent: Node) -> sops.LoadConstant:
+    def _to_serial(self, parent: Node) -> sops.LoadConstant:
         return sops.LoadConstant(
             parent=parent.idx,
-            datatype=self.type_.to_serial_root(),
+            datatype=self.type_._to_serial_root(),
         )
 
     def outer_signature(self) -> tys.FunctionType:
@@ -800,7 +800,7 @@ class Conditional(DataflowOp):
     def num_out(self) -> int:
         return len(self.outputs)
 
-    def to_serial(self, parent: Node) -> sops.Conditional:
+    def _to_serial(self, parent: Node) -> sops.Conditional:
         return sops.Conditional(
             parent=parent.idx,
             sum_rows=[ser_it(r) for r in self.sum_ty.variant_rows],
@@ -836,9 +836,9 @@ class Case(DfParentOp):
         """
         return _check_complete(self, self._outputs)
 
-    def to_serial(self, parent: Node) -> sops.Case:
+    def _to_serial(self, parent: Node) -> sops.Case:
         return sops.Case(
-            parent=parent.idx, signature=self.inner_signature().to_serial()
+            parent=parent.idx, signature=self.inner_signature()._to_serial()
         )
 
     def inner_signature(self) -> tys.FunctionType:
@@ -880,7 +880,7 @@ class TailLoop(DfParentOp, DataflowOp):
     def num_out(self) -> int:
         return len(self.just_outputs) + len(self.rest)
 
-    def to_serial(self, parent: Node) -> sops.TailLoop:
+    def _to_serial(self, parent: Node) -> sops.TailLoop:
         return sops.TailLoop(
             parent=parent.idx,
             just_inputs=ser_it(self.just_inputs),
@@ -944,11 +944,11 @@ class FuncDefn(DfParentOp):
             self.params, tys.FunctionType(self.inputs, self.outputs)
         )
 
-    def to_serial(self, parent: Node) -> sops.FuncDefn:
+    def _to_serial(self, parent: Node) -> sops.FuncDefn:
         return sops.FuncDefn(
             parent=parent.idx,
             name=self.name,
-            signature=self.signature.to_serial(),
+            signature=self.signature._to_serial(),
         )
 
     def inner_signature(self) -> tys.FunctionType:
@@ -978,11 +978,11 @@ class FuncDecl(Op):
     signature: tys.PolyFuncType
     num_out: int = field(default=1, repr=False)
 
-    def to_serial(self, parent: Node) -> sops.FuncDecl:
+    def _to_serial(self, parent: Node) -> sops.FuncDecl:
         return sops.FuncDecl(
             parent=parent.idx,
             name=self.name,
-            signature=self.signature.to_serial(),
+            signature=self.signature._to_serial(),
         )
 
     def port_kind(self, port: InPort | OutPort) -> tys.Kind:
@@ -999,7 +999,7 @@ class Module(Op):
 
     num_out: int = field(default=0, repr=False)
 
-    def to_serial(self, parent: Node) -> sops.Module:
+    def _to_serial(self, parent: Node) -> sops.Module:
         return sops.Module(parent=parent.idx)
 
     def port_kind(self, port: InPort | OutPort) -> tys.Kind:
@@ -1059,12 +1059,12 @@ class Call(_CallOrLoad, Op):
             is provided.
     """
 
-    def to_serial(self, parent: Node) -> sops.Call:
+    def _to_serial(self, parent: Node) -> sops.Call:
         return sops.Call(
             parent=parent.idx,
-            func_sig=self.signature.to_serial(),
+            func_sig=self.signature._to_serial(),
             type_args=ser_it(self.type_args),
-            instantiation=self.instantiation.to_serial(),
+            instantiation=self.instantiation._to_serial(),
         )
 
     @property
@@ -1103,10 +1103,10 @@ class CallIndirect(DataflowOp, _PartialOp):
         """
         return _check_complete(self, self._signature)
 
-    def to_serial(self, parent: Node) -> sops.CallIndirect:
+    def _to_serial(self, parent: Node) -> sops.CallIndirect:
         return sops.CallIndirect(
             parent=parent.idx,
-            signature=self.signature.to_serial(),
+            signature=self.signature._to_serial(),
         )
 
     def __call__(self, function: ComWire, *args: ComWire) -> Command:  # type: ignore[override]
@@ -1141,12 +1141,12 @@ class LoadFunc(_CallOrLoad, DataflowOp):
 
     num_out: int = field(default=1, repr=False)
 
-    def to_serial(self, parent: Node) -> sops.LoadFunction:
+    def _to_serial(self, parent: Node) -> sops.LoadFunction:
         return sops.LoadFunction(
             parent=parent.idx,
-            func_sig=self.signature.to_serial(),
+            func_sig=self.signature._to_serial(),
             type_args=ser_it(self.type_args),
-            signature=self.outer_signature().to_serial(),
+            signature=self.outer_signature()._to_serial(),
         )
 
     def outer_signature(self) -> tys.FunctionType:
@@ -1174,8 +1174,8 @@ class Noop(DataflowOp, _PartialOp):
         """The type of the input and output of the operation."""
         return _check_complete(self, self._type)
 
-    def to_serial(self, parent: Node) -> sops.Noop:
-        return sops.Noop(parent=parent.idx, ty=self.type_.to_serial_root())
+    def _to_serial(self, parent: Node) -> sops.Noop:
+        return sops.Noop(parent=parent.idx, ty=self.type_._to_serial_root())
 
     def outer_signature(self) -> tys.FunctionType:
         return tys.FunctionType.endo([self.type_])
@@ -1202,7 +1202,7 @@ class Lift(DataflowOp, _PartialOp):
         """Types of the input and output of the operation."""
         return _check_complete(self, self._type_row)
 
-    def to_serial(self, parent: Node) -> sops.Lift:
+    def _to_serial(self, parent: Node) -> sops.Lift:
         return sops.Lift(
             parent=parent.idx,
             new_extension=self.new_extension,
@@ -1226,7 +1226,7 @@ class AliasDecl(Op):
     bound: tys.TypeBound
     num_out: int = field(default=0, repr=False)
 
-    def to_serial(self, parent: Node) -> sops.AliasDecl:
+    def _to_serial(self, parent: Node) -> sops.AliasDecl:
         return sops.AliasDecl(
             parent=parent.idx,
             name=self.name,
@@ -1247,11 +1247,11 @@ class AliasDefn(Op):
     definition: tys.Type
     num_out: int = field(default=0, repr=False)
 
-    def to_serial(self, parent: Node) -> sops.AliasDefn:
+    def _to_serial(self, parent: Node) -> sops.AliasDefn:
         return sops.AliasDefn(
             parent=parent.idx,
             name=self.name,
-            definition=self.definition.to_serial_root(),
+            definition=self.definition._to_serial_root(),
         )
 
     def port_kind(self, port: InPort | OutPort) -> tys.Kind:

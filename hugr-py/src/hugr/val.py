@@ -5,8 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
-import hugr.serialization.ops as sops
-import hugr.serialization.tys as stys
+import hugr._serialization.ops as sops
+import hugr._serialization.tys as stys
 from hugr import tys
 from hugr.utils import ser_it
 
@@ -18,12 +18,12 @@ if TYPE_CHECKING:
 class Value(Protocol):
     """Abstract value definition. Must be serializable into a HUGR value."""
 
-    def to_serial(self) -> sops.BaseValue:
+    def _to_serial(self) -> sops.BaseValue:
         """Convert to serializable model."""
         ...  # pragma: no cover
 
-    def to_serial_root(self) -> sops.Value:
-        return sops.Value(root=self.to_serial())  # type: ignore[arg-type]
+    def _to_serial_root(self) -> sops.Value:
+        return sops.Value(root=self._to_serial())  # type: ignore[arg-type]
 
     def type_(self) -> tys.Type:
         """Report the type of the value.
@@ -58,10 +58,10 @@ class Sum(Value):
     def type_(self) -> tys.Sum:
         return self.typ
 
-    def to_serial(self) -> sops.SumValue:
+    def _to_serial(self) -> sops.SumValue:
         return sops.SumValue(
             tag=self.tag,
-            typ=stys.SumType(root=self.type_().to_serial()),
+            typ=stys.SumType(root=self.type_()._to_serial()),
             vs=ser_it(self.vals),
         )
 
@@ -139,8 +139,8 @@ class Tuple(Sum):
         )
 
     # sops.TupleValue isn't an instance of sops.SumValue
-    # so mypy doesn't like the override of Sum.to_serial
-    def to_serial(self) -> sops.TupleValue:  # type: ignore[override]
+    # so mypy doesn't like the override of Sum._to_serial
+    def _to_serial(self) -> sops.TupleValue:  # type: ignore[override]
         return sops.TupleValue(
             vs=ser_it(self.vals),
         )
@@ -158,9 +158,9 @@ class Function(Value):
     def type_(self) -> tys.FunctionType:
         return self.body.root_op().inner_signature()
 
-    def to_serial(self) -> sops.FunctionValue:
+    def _to_serial(self) -> sops.FunctionValue:
         return sops.FunctionValue(
-            hugr=self.body.to_serial(),
+            hugr=self.body._to_serial(),
         )
 
 
@@ -179,9 +179,9 @@ class Extension(Value):
     def type_(self) -> tys.Type:
         return self.typ
 
-    def to_serial(self) -> sops.ExtensionValue:
+    def _to_serial(self) -> sops.ExtensionValue:
         return sops.ExtensionValue(
-            typ=self.typ.to_serial_root(),
+            typ=self.typ._to_serial_root(),
             value=sops.CustomConst(c=self.name, v=self.val),
             extensions=self.extensions,
         )
@@ -197,5 +197,5 @@ class ExtensionValue(Value, Protocol):
     def type_(self) -> tys.Type:
         return self.to_value().type_()
 
-    def to_serial(self) -> sops.ExtensionValue:
-        return self.to_value().to_serial()
+    def _to_serial(self) -> sops.ExtensionValue:
+        return self.to_value()._to_serial()

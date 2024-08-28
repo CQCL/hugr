@@ -129,7 +129,7 @@ def test_tuple(snapshot):
     a, b = h1.add_op(ops.UnpackTuple(), mt)[0, 1]
     h1.set_outputs(a, b)
 
-    assert h.hugr.to_serial() == h1.hugr.to_serial()
+    assert h.hugr._to_serial() == h1.hugr._to_serial()
 
 
 def test_multi_out(snapshot):

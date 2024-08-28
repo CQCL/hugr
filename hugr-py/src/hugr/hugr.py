@@ -15,6 +15,8 @@ from typing import (
     overload,
 )
 
+from hugr._serialization.ops import OpType as SerialOp
+from hugr._serialization.serial_hugr import SerialHugr
 from hugr.node_port import (
     Direction,
     InPort,
@@ -26,8 +28,6 @@ from hugr.node_port import (
     _SubPort,
 )
 from hugr.ops import Call, Const, Custom, DataflowOp, Module, Op
-from hugr.serialization.ops import OpType as SerialOp
-from hugr.serialization.serial_hugr import SerialHugr
 from hugr.tys import Kind, Type, ValueKind
 from hugr.utils import BiMap
 from hugr.val import Value
@@ -54,8 +54,8 @@ class NodeData:
     children: list[Node] = field(default_factory=list, repr=False)
     metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_serial(self, node: Node) -> SerialOp:
-        o = self.op.to_serial(self.parent if self.parent else node)
+    def _to_serial(self, node: Node) -> SerialOp:
+        o = self.op._to_serial(self.parent if self.parent else node)
 
         return SerialOp(root=o)  # type: ignore[arg-type]
 
@@ -601,7 +601,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             )
         return mapping
 
-    def to_serial(self) -> SerialHugr:
+    def _to_serial(self) -> SerialHugr:
         """Serialize the HUGR."""
         node_it = (node for node in self._nodes if node is not None)
 
@@ -614,7 +614,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
 
         return SerialHugr(
             # non contiguous indices will be erased
-            nodes=[node.to_serial(Node(idx, {})) for idx, node in enumerate(node_it)],
+            nodes=[node._to_serial(Node(idx, {})) for idx, node in enumerate(node_it)],
             edges=[_serialize_link(link) for link in self._links.items()],
             metadata=[node.metadata if node.metadata else None for node in node_it],
         )
@@ -644,7 +644,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         return self
 
     @classmethod
-    def from_serial(cls, serial: SerialHugr) -> Hugr:
+    def _from_serial(cls, serial: SerialHugr) -> Hugr:
         """Load a HUGR from a serialized form."""
         assert serial.nodes, "Empty Hugr is invalid"
 
@@ -685,14 +685,14 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
 
     def to_json(self) -> str:
         """Serialize the HUGR to a JSON string."""
-        return self.to_serial().to_json()
+        return self._to_serial().to_json()
 
     @classmethod
     def load_json(cls, json_str: str) -> Hugr:
         """Deserialize a JSON string into a HUGR."""
         json_dict = json.loads(json_str)
         serial = SerialHugr.load_json(json_dict)
-        return cls.from_serial(serial)
+        return cls._from_serial(serial)
 
     def render_dot(self, palette: str | None = None) -> gv.Digraph:
         """Render the HUGR to a graphviz Digraph.
