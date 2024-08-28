@@ -339,7 +339,7 @@ dependencies = [
 
 [[package]]
 name = "hugr-llvm"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "anyhow",
  "delegate",
