@@ -4,7 +4,7 @@ use hugr::{
     extension::{simple_op::MakeExtensionOp, ExtensionId},
     ops::{constant::CustomConst, CustomOp, NamedOp, Value},
     std_extensions::arithmetic::{
-        int_ops::{self, ConcreteIntOp},
+        int_ops::{self, ConcreteIntOp, IntOpDef},
         int_types::{self, ConstInt},
     },
     types::{CustomType, TypeArg},
@@ -16,7 +16,8 @@ use inkwell::{
 };
 
 use crate::emit::{
-    emit_value, func::EmitFuncContext, ops::emit_custom_binary_op, EmitOp, EmitOpArgs, NullEmitLlvm,
+    emit_value, func::EmitFuncContext, ops::emit_custom_binary_op, ops::emit_custom_unary_op,
+    EmitOp, EmitOpArgs, NullEmitLlvm,
 };
 use crate::types::TypingSession;
 
@@ -48,28 +49,52 @@ impl<'c, H: HugrView> EmitOp<'c, CustomOp, H> for IntOpEmitter<'c, '_, H> {
             "IntOpEmitter from_optype_failed: {:?}",
             args.node().as_ref()
         ))?;
-        // TODO: Match on `iot.def` instead.
-        match iot.name().as_str() {
-            "iadd" => emit_custom_binary_op(self.0, args, |builder, (lhs, rhs), _| {
+        match iot.def {
+            IntOpDef::iadd => emit_custom_binary_op(self.0, args, |builder, (lhs, rhs), _| {
                 Ok(vec![builder
                     .build_int_add(lhs.into_int_value(), rhs.into_int_value(), "")?
                     .as_basic_value_enum()])
             }),
-            "ieq" => emit_icmp(self.0, args, inkwell::IntPredicate::EQ),
-            "ilt_s" => emit_icmp(self.0, args, inkwell::IntPredicate::SLT),
-            "igt_s" => emit_icmp(self.0, args, inkwell::IntPredicate::SGT),
-            "ile_s" => emit_icmp(self.0, args, inkwell::IntPredicate::SLE),
-            "ige_s" => emit_icmp(self.0, args, inkwell::IntPredicate::SGE),
-            "ilt_u" => emit_icmp(self.0, args, inkwell::IntPredicate::ULT),
-            "igt_u" => emit_icmp(self.0, args, inkwell::IntPredicate::UGT),
-            "ile_u" => emit_icmp(self.0, args, inkwell::IntPredicate::ULE),
-            "ige_u" => emit_icmp(self.0, args, inkwell::IntPredicate::UGE),
-            "isub" => emit_custom_binary_op(self.0, args, |builder, (lhs, rhs), _| {
+            IntOpDef::imul => emit_custom_binary_op(self.0, args, |builder, (lhs, rhs), _| {
+                Ok(vec![builder
+                    .build_int_mul(lhs.into_int_value(), rhs.into_int_value(), "")?
+                    .as_basic_value_enum()])
+            }),
+            IntOpDef::isub => emit_custom_binary_op(self.0, args, |builder, (lhs, rhs), _| {
                 Ok(vec![builder
                     .build_int_sub(lhs.into_int_value(), rhs.into_int_value(), "")?
                     .as_basic_value_enum()])
             }),
-            n => Err(anyhow!("IntOpEmitter: unimplemented op: {n}")),
+            IntOpDef::idiv_s => emit_custom_binary_op(self.0, args, |builder, (lhs, rhs), _| {
+                Ok(vec![builder
+                    .build_int_signed_div(lhs.into_int_value(), rhs.into_int_value(), "")?
+                    .as_basic_value_enum()])
+            }),
+            IntOpDef::idiv_u => emit_custom_binary_op(self.0, args, |builder, (lhs, rhs), _| {
+                Ok(vec![builder
+                    .build_int_unsigned_div(lhs.into_int_value(), rhs.into_int_value(), "")?
+                    .as_basic_value_enum()])
+            }),
+            IntOpDef::imod_s => emit_custom_binary_op(self.0, args, |builder, (lhs, rhs), _| {
+                Ok(vec![builder
+                    .build_int_signed_rem(lhs.into_int_value(), rhs.into_int_value(), "")?
+                    .as_basic_value_enum()])
+            }),
+            IntOpDef::ineg => emit_custom_unary_op(self.0, args, |builder, arg, _| {
+                Ok(vec![builder
+                    .build_int_neg(arg.into_int_value(), "")?
+                    .as_basic_value_enum()])
+            }),
+            IntOpDef::ieq => emit_icmp(self.0, args, inkwell::IntPredicate::EQ),
+            IntOpDef::ilt_s => emit_icmp(self.0, args, inkwell::IntPredicate::SLT),
+            IntOpDef::igt_s => emit_icmp(self.0, args, inkwell::IntPredicate::SGT),
+            IntOpDef::ile_s => emit_icmp(self.0, args, inkwell::IntPredicate::SLE),
+            IntOpDef::ige_s => emit_icmp(self.0, args, inkwell::IntPredicate::SGE),
+            IntOpDef::ilt_u => emit_icmp(self.0, args, inkwell::IntPredicate::ULT),
+            IntOpDef::igt_u => emit_icmp(self.0, args, inkwell::IntPredicate::UGT),
+            IntOpDef::ile_u => emit_icmp(self.0, args, inkwell::IntPredicate::ULE),
+            IntOpDef::ige_u => emit_icmp(self.0, args, inkwell::IntPredicate::UGE),
+            _ => Err(anyhow!("IntOpEmitter: unimplemented op: {}", iot.name())),
         }
     }
 }
@@ -250,31 +275,51 @@ mod test {
             })
     }
 
-    #[rstest]
-    fn iadd(mut llvm_ctx: TestContext) {
-        llvm_ctx.add_extensions(add_int_extensions);
-        let hugr = test_binary_int_op("iadd", 3);
-        check_emission!(hugr, llvm_ctx);
+    fn test_unary_int_op(name: impl AsRef<str>, log_width: u8) -> Hugr {
+        let ty = &INT_TYPES[log_width as usize];
+        SimpleHugrConfig::new()
+            .with_ins(vec![ty.clone()])
+            .with_outs(vec![ty.clone()])
+            .with_extensions(int_ops::INT_OPS_REGISTRY.clone())
+            .finish(|mut hugr_builder| {
+                let [in1] = hugr_builder.input_wires_arr();
+                let ext_op = int_ops::EXTENSION
+                    .instantiate_extension_op(
+                        name.as_ref(),
+                        [(log_width as u64).into()],
+                        &int_ops::INT_OPS_REGISTRY,
+                    )
+                    .unwrap();
+                let outputs = hugr_builder
+                    .add_dataflow_op(ext_op, [in1])
+                    .unwrap()
+                    .outputs();
+                hugr_builder.finish_with_outputs(outputs).unwrap()
+            })
     }
 
     #[rstest]
-    fn isub(mut llvm_ctx: TestContext) {
+    fn test_neg_emission(mut llvm_ctx: TestContext) {
         llvm_ctx.add_extensions(add_int_extensions);
-        let hugr = test_binary_int_op("isub", 6);
-        check_emission!(hugr, llvm_ctx);
+        let hugr = test_unary_int_op("ineg", 2);
+        check_emission!("ineg", hugr, llvm_ctx);
     }
 
     #[rstest]
-    fn ieq(mut llvm_ctx: TestContext) {
+    #[case::iadd("iadd", 3)]
+    #[case::isub("isub", 6)]
+    fn test_binop_emission(mut llvm_ctx: TestContext, #[case] op: String, #[case] width: u8) {
         llvm_ctx.add_extensions(add_int_extensions);
-        let hugr = test_binary_icmp_op("ieq", 1);
-        check_emission!(hugr, llvm_ctx);
+        let hugr = test_binary_int_op(op.clone(), width);
+        check_emission!(op.clone(), hugr, llvm_ctx);
     }
 
     #[rstest]
-    fn ilt_s(mut llvm_ctx: TestContext) {
+    #[case::ieq("ieq", 1)]
+    #[case::ilt_s("ilt_s", 0)]
+    fn test_cmp_emission(mut llvm_ctx: TestContext, #[case] op: String, #[case] width: u8) {
         llvm_ctx.add_extensions(add_int_extensions);
-        let hugr = test_binary_icmp_op("ilt_s", 0);
-        check_emission!(hugr, llvm_ctx);
+        let hugr = test_binary_icmp_op(op.clone(), width);
+        check_emission!(op.clone(), hugr, llvm_ctx);
     }
 }
