@@ -9,9 +9,10 @@ mod context;
 mod partial_value;
 mod utils;
 
-use utils::{TailLoopTermination, ValueRow, PV};
+use utils::{TailLoopTermination, ValueRow};
 
 pub use partial_value::AbstractValue;
+type PV<V> = partial_value::PartialValue<V>;
 
 pub trait DFContext<V>: Clone + Eq + Hash + std::ops::Deref<Target = Hugr> {
     fn hugr(&self) -> &impl HugrView;
@@ -190,11 +191,9 @@ impl<V: AbstractValue, C: DFContext<V>> Machine<V, C> {
 
     pub fn propolutate_out_wires(&mut self, wires: impl IntoIterator<Item = (Wire, PV<V>)>) {
         assert!(self.1.is_none());
-        self.0.out_wire_value_proto.extend(
-            wires
-                .into_iter()
-                .map(|(w, v)| (w.node(), w.source(), v.into())),
-        );
+        self.0
+            .out_wire_value_proto
+            .extend(wires.into_iter().map(|(w, v)| (w.node(), w.source(), v)));
     }
 
     pub fn run(&mut self, context: C) {
@@ -205,7 +204,7 @@ impl<V: AbstractValue, C: DFContext<V>> Machine<V, C> {
             self.0
                 .out_wire_value
                 .iter()
-                .map(|(_, n, p, v)| (Wire::new(*n, *p), v.clone().into()))
+                .map(|(_, n, p, v)| (Wire::new(*n, *p), v.clone()))
                 .collect(),
         )
     }

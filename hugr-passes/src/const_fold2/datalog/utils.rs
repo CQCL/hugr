@@ -10,106 +10,51 @@ use itertools::zip_eq;
 
 use super::{partial_value::PartialValue, AbstractValue};
 use hugr_core::{
-    ops::{OpTrait as _, Value},
-    types::{Signature, Type, TypeRow},
+    ops::OpTrait as _,
+    types::{Signature, TypeRow},
     HugrView, IncomingPort, Node, OutgoingPort, PortIndex as _,
 };
 
 #[cfg(test)]
 use proptest_derive::Arbitrary;
 
-#[derive(PartialEq, Eq, Hash, Clone, Debug)]
-pub struct PV<V>(PartialValue<V>);
-
-// Implement manually as PartialValue<V> is PartialOrd even when V isn't
-// (deriving PartialOrd conditions on V: PartialOrd, which is not necessary)
-impl<V: PartialEq> PartialOrd for PV<V> {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.0.partial_cmp(&other.0)
-    }
-}
-
-impl<V> From<PartialValue<V>> for PV<V> {
-    fn from(inner: PartialValue<V>) -> Self {
-        Self(inner)
-    }
-}
-
-impl<V: AbstractValue> PV<V> {
-    pub fn variant(tag: usize, r: impl IntoIterator<Item = PV<V>>) -> Self {
-        PartialValue::variant(tag, r.into_iter().map(|x| x.0)).into()
-    }
-
-    pub fn variant_values(&self, variant: usize, len: usize) -> Option<Vec<PV<V>>> {
-        Some(
-            self.0
-                .variant_values(variant, len)?
-                .into_iter()
-                .map(PV::from)
-                .collect(),
-        )
-    }
-
-    pub fn supports_tag(&self, tag: usize) -> bool {
-        self.0.supports_tag(tag)
-    }
-}
-
-impl<V: Clone + Into<Value>> PV<V> {
-    pub fn try_into_value(self, ty: &Type) -> Result<Value, Self> {
-        self.0.try_into_value(ty).map_err(Self)
-    }
-}
-
-impl<V> From<PV<V>> for PartialValue<V> {
-    fn from(value: PV<V>) -> Self {
-        value.0
-    }
-}
-
-impl<V: AbstractValue> From<V> for PV<V> {
-    fn from(inner: V) -> Self {
-        Self(inner.into())
-    }
-}
-
-impl<V: AbstractValue> Lattice for PV<V> {
+impl<V: AbstractValue> Lattice for PartialValue<V> {
     fn meet(self, other: Self) -> Self {
-        self.0.meet(other.0).into()
+        self.meet(other)
     }
 
     fn meet_mut(&mut self, other: Self) -> bool {
-        self.0.meet_mut(other.0)
+        self.meet_mut(other)
     }
 
     fn join(self, other: Self) -> Self {
-        self.0.join(other.0).into()
+        self.join(other)
     }
 
     fn join_mut(&mut self, other: Self) -> bool {
-        self.0.join_mut(other.0)
+        self.join_mut(other)
     }
 }
 
-impl<V: AbstractValue> BoundedLattice for PV<V> {
+impl<V: AbstractValue> BoundedLattice for PartialValue<V> {
     fn bottom() -> Self {
-        PartialValue::bottom().into()
+        Self::bottom()
     }
 
     fn top() -> Self {
-        PartialValue::top().into()
+        Self::top()
     }
 }
 
 #[derive(PartialEq, Clone, Eq, Hash)]
-pub struct ValueRow<V>(Vec<PV<V>>);
+pub struct ValueRow<V>(Vec<PartialValue<V>>);
 
 impl<V: AbstractValue> ValueRow<V> {
     fn new(len: usize) -> Self {
-        Self(vec![PV::bottom(); len])
+        Self(vec![PartialValue::bottom(); len])
     }
 
-    fn single_among_bottoms(len: usize, idx: usize, v: PV<V>) -> Self {
+    fn single_among_bottoms(len: usize, idx: usize, v: PartialValue<V>) -> Self {
         assert!(idx < len);
         let mut r = Self::new(len);
         r.0[idx] = v;
@@ -120,7 +65,7 @@ impl<V: AbstractValue> ValueRow<V> {
         Self::new(r.len())
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = &PV<V>> {
+    pub fn iter(&self) -> impl Iterator<Item = &PartialValue<V>> {
         self.0.iter()
     }
 
@@ -128,7 +73,7 @@ impl<V: AbstractValue> ValueRow<V> {
         &self,
         variant: usize,
         len: usize,
-    ) -> Option<impl Iterator<Item = PV<V>> + '_> {
+    ) -> Option<impl Iterator<Item = PartialValue<V>> + '_> {
         self[0]
             .variant_values(variant, len)
             .map(|vals| vals.into_iter().chain(self.iter().skip(1).cloned()))
@@ -139,8 +84,8 @@ impl<V: AbstractValue> ValueRow<V> {
     // }
 }
 
-impl<V> FromIterator<PV<V>> for ValueRow<V> {
-    fn from_iter<T: IntoIterator<Item = PV<V>>>(iter: T) -> Self {
+impl<V> FromIterator<PartialValue<V>> for ValueRow<V> {
+    fn from_iter<T: IntoIterator<Item = PartialValue<V>>>(iter: T) -> Self {
         Self(iter.into_iter().collect())
     }
 }
@@ -182,9 +127,9 @@ impl<V: AbstractValue> Lattice for ValueRow<V> {
 }
 
 impl<V> IntoIterator for ValueRow<V> {
-    type Item = PV<V>;
+    type Item = PartialValue<V>;
 
-    type IntoIter = <Vec<PV<V>> as IntoIterator>::IntoIter;
+    type IntoIter = <Vec<PartialValue<V>> as IntoIterator>::IntoIter;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
@@ -193,9 +138,9 @@ impl<V> IntoIterator for ValueRow<V> {
 
 impl<V, Idx> Index<Idx> for ValueRow<V>
 where
-    Vec<PV<V>>: Index<Idx>,
+    Vec<PartialValue<V>>: Index<Idx>,
 {
-    type Output = <Vec<PV<V>> as Index<Idx>>::Output;
+    type Output = <Vec<PartialValue<V>> as Index<Idx>>::Output;
 
     fn index(&self, index: Idx) -> &Self::Output {
         self.0.index(index)
@@ -215,7 +160,7 @@ pub(super) fn singleton_in_row<V: AbstractValue>(
     h: &impl HugrView,
     n: &Node,
     ip: &IncomingPort,
-    v: PV<V>,
+    v: PartialValue<V>,
 ) -> ValueRow<V> {
     let Some(sig) = h.signature(*n) else {
         panic!("dougrulz");
@@ -248,7 +193,7 @@ pub enum TailLoopTermination {
 }
 
 impl TailLoopTermination {
-    pub fn from_control_value<V: AbstractValue>(v: &PV<V>) -> Self {
+    pub fn from_control_value<V: AbstractValue>(v: &PartialValue<V>) -> Self {
         let (may_continue, may_break) = (v.supports_tag(0), v.supports_tag(1));
         if may_break && !may_continue {
             Self::ExactlyZeroContinues
