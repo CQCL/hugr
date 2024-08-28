@@ -181,7 +181,7 @@ S = TypeVar("S", covariant=True)
 class SerCollection(Protocol[S]):
     """Protocol for serializable objects."""
 
-    def to_serial_root(self) -> S:
+    def _to_serial_root(self) -> S:
         """Convert to serializable root model."""
         ...  # pragma: no cover
 
@@ -196,7 +196,7 @@ class DeserCollection(Protocol[S]):
 
 def ser_it(it: Iterable[SerCollection[S]]) -> list[S]:
     """Serialize an iterable of serializable objects."""
-    return [v.to_serial_root() for v in it]
+    return [v._to_serial_root() for v in it]
 
 
 def deser_it(it: Iterable[DeserCollection[S]]) -> list[S]:

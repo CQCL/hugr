@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, TypeVar
 
 from semver import Version
 
-import hugr.serialization.extension as ext_s
+import hugr._serialization.extension as ext_s
 from hugr import ops, tys, val
 from hugr.utils import ser_it
 
@@ -43,11 +43,11 @@ class ExplicitBound:
 
     bound: tys.TypeBound
 
-    def to_serial(self) -> ext_s.ExplicitBound:
+    def _to_serial(self) -> ext_s.ExplicitBound:
         return ext_s.ExplicitBound(bound=self.bound)
 
-    def to_serial_root(self) -> ext_s.TypeDefBound:
-        return ext_s.TypeDefBound(root=self.to_serial())
+    def _to_serial_root(self) -> ext_s.TypeDefBound:
+        return ext_s.TypeDefBound(root=self._to_serial())
 
 
 @dataclass
@@ -63,11 +63,11 @@ class FromParamsBound:
 
     indices: list[int]
 
-    def to_serial(self) -> ext_s.FromParamsBound:
+    def _to_serial(self) -> ext_s.FromParamsBound:
         return ext_s.FromParamsBound(indices=self.indices)
 
-    def to_serial_root(self) -> ext_s.TypeDefBound:
-        return ext_s.TypeDefBound(root=self.to_serial())
+    def _to_serial_root(self) -> ext_s.TypeDefBound:
+        return ext_s.TypeDefBound(root=self._to_serial())
 
 
 @dataclass
@@ -128,13 +128,13 @@ class TypeDef(ExtensionObject):
     #: The type bound of the type.
     bound: ExplicitBound | FromParamsBound
 
-    def to_serial(self) -> ext_s.TypeDef:
+    def _to_serial(self) -> ext_s.TypeDef:
         return ext_s.TypeDef(
             extension=self.get_extension().name,
             name=self.name,
             description=self.description,
             params=ser_it(self.params),
-            bound=ext_s.TypeDefBound(root=self.bound.to_serial()),
+            bound=ext_s.TypeDefBound(root=self.bound._to_serial()),
         )
 
     def instantiate(self, args: Sequence[tys.TypeArg]) -> tys.ExtType:
@@ -155,7 +155,7 @@ class FixedHugr:
     #: HUGR defining operation lowering.
     hugr: Hugr
 
-    def to_serial(self) -> ext_s.FixedHugr:
+    def _to_serial(self) -> ext_s.FixedHugr:
         return ext_s.FixedHugr(extensions=self.extensions, hugr=self.hugr)
 
 
@@ -200,17 +200,17 @@ class OpDef(ExtensionObject):
     #: Lowerings of the operation.
     lower_funcs: list[FixedHugr] = field(default_factory=list, repr=False)
 
-    def to_serial(self) -> ext_s.OpDef:
+    def _to_serial(self) -> ext_s.OpDef:
         return ext_s.OpDef(
             extension=self.get_extension().name,
             name=self.name,
             description=self.description,
             misc=self.misc,
-            signature=self.signature.poly_func.to_serial()
+            signature=self.signature.poly_func._to_serial()
             if self.signature.poly_func
             else None,
             binary=self.signature.binary,
-            lower_funcs=[f.to_serial() for f in self.lower_funcs],
+            lower_funcs=[f._to_serial() for f in self.lower_funcs],
         )
 
 
@@ -223,11 +223,11 @@ class ExtensionValue(ExtensionObject):
     #: Value payload.
     val: val.Value
 
-    def to_serial(self) -> ext_s.ExtensionValue:
+    def _to_serial(self) -> ext_s.ExtensionValue:
         return ext_s.ExtensionValue(
             extension=self.get_extension().name,
             name=self.name,
-            typed_value=self.val.to_serial_root(),
+            typed_value=self.val._to_serial_root(),
         )
 
 
@@ -257,14 +257,14 @@ class Extension:
 
         name: str
 
-    def to_serial(self) -> ext_s.Extension:
+    def _to_serial(self) -> ext_s.Extension:
         return ext_s.Extension(
             name=self.name,
             version=self.version,  # type: ignore[arg-type]
             extension_reqs=self.extension_reqs,
-            types={k: v.to_serial() for k, v in self.types.items()},
-            values={k: v.to_serial() for k, v in self.values.items()},
-            operations={k: v.to_serial() for k, v in self.operations.items()},
+            types={k: v._to_serial() for k, v in self.types.items()},
+            values={k: v._to_serial() for k, v in self.values.items()},
+            operations={k: v._to_serial() for k, v in self.operations.items()},
         )
 
     def add_op_def(self, op_def: OpDef) -> OpDef:
@@ -465,11 +465,11 @@ class Package:
     #: Extensions included in the package.
     extensions: list[Extension] = field(default_factory=list)
 
-    def to_serial(self) -> ext_s.Package:
+    def _to_serial(self) -> ext_s.Package:
         return ext_s.Package(
-            modules=[m.to_serial() for m in self.modules],
-            extensions=[e.to_serial() for e in self.extensions],
+            modules=[m._to_serial() for m in self.modules],
+            extensions=[e._to_serial() for e in self.extensions],
         )
 
     def to_json(self) -> str:
-        return self.to_serial().model_dump_json()
+        return self._to_serial().model_dump_json()

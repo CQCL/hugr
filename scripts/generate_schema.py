@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Dumps the json schema for `hugr.serialization.SerialHugr` to a file.
+"""Dumps the json schema for `hugr._serialization.SerialHugr` to a file.
 
 The schema is written to a file named `hugr_schema_v#.json`
 in the specified output directory.
@@ -16,9 +16,9 @@ from pathlib import Path
 from pydantic import ConfigDict
 from pydantic.json_schema import models_json_schema
 
-from hugr.serialization.extension import Extension, Package
-from hugr.serialization.serial_hugr import SerialHugr
-from hugr.serialization.testing_hugr import TestingHugr
+from hugr._serialization.extension import Extension, Package
+from hugr._serialization.serial_hugr import SerialHugr
+from hugr._serialization.testing_hugr import TestingHugr
 
 
 def write_schema(

@@ -59,7 +59,7 @@ def test_stringly_typed():
     assert dfg.hugr[n].op == StringlyOp("world")
     validate(ext.Package([dfg.hugr], [STRINGLY_EXT]))
 
-    new_h = Hugr.from_serial(dfg.hugr.to_serial())
+    new_h = Hugr._from_serial(dfg.hugr._to_serial())
 
     assert isinstance(new_h[n].op, Custom)
 
@@ -110,7 +110,7 @@ def test_custom_op(as_ext: AsExtOp, registry: ext.ExtensionRegistry):
     assert ExtOp.from_ext(ext_op) == ext_op
 
     assert type(as_ext).from_ext(ext_op) == as_ext
-    custom = as_ext.to_serial(Node(0)).deserialize()
+    custom = as_ext._to_serial(Node(0)).deserialize()
     assert isinstance(custom, Custom)
     # ExtOp compared to Custom via `to_custom`
     assert custom.resolve(registry) == ext_op
@@ -152,14 +152,14 @@ _BOOL_LIST_T = _LIST_T.instantiate([tys.Bool.type_arg()])
     [FLOAT_T, int_t(5), _BOOL_LIST_T],
 )
 def test_custom_type(ext_t: tys.ExtType, registry: ext.ExtensionRegistry):
-    opaque = ext_t.to_serial().deserialize()
+    opaque = ext_t._to_serial().deserialize()
     assert isinstance(opaque, tys.Opaque)
     assert opaque.resolve(registry) == ext_t
 
     assert opaque.resolve(ext.ExtensionRegistry()) == opaque
 
     f_t = tys.FunctionType.endo([ext_t])
-    f_t_opaque = f_t.to_serial().deserialize()
+    f_t_opaque = f_t._to_serial().deserialize()
     assert isinstance(f_t_opaque.input[0], tys.Opaque)
 
     assert f_t_opaque.resolve(registry) == f_t
