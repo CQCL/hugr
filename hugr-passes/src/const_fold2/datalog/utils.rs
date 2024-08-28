@@ -8,7 +8,7 @@ use std::{cmp::Ordering, ops::Index};
 use ascent::lattice::{BoundedLattice, Lattice};
 use itertools::zip_eq;
 
-use crate::const_fold2::datalog::{AbstractValue, PartialValue};
+use super::{partial_value::PartialValue, AbstractValue};
 use hugr_core::{
     ops::{OpTrait as _, Value},
     types::{Signature, Type, TypeRow},

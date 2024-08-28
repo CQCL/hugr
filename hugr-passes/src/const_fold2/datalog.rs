@@ -11,7 +11,7 @@ mod utils;
 
 use utils::{TailLoopTermination, ValueRow, PV};
 
-pub use partial_value::{AbstractValue, PartialSum, PartialValue};
+pub use partial_value::AbstractValue;
 
 pub trait DFContext<V>: Clone + Eq + Hash + std::ops::Deref<Target = Hugr> {
     fn hugr(&self) -> &impl HugrView;
