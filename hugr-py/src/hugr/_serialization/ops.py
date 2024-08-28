@@ -103,7 +103,7 @@ class BaseValue(ABC, ConfiguredBaseModel):
     def deserialize(self) -> val.Value: ...
 
 
-class ExtensionValue(BaseValue):
+class CustomValue(BaseValue):
     """An extension constant value, that can check it is of a given [CustomType]."""
 
     v: Literal["Extension"] = Field(default="Extension", title="ValueTag")
@@ -127,11 +127,11 @@ class FunctionValue(BaseValue):
     hugr: Any
 
     def deserialize(self) -> val.Value:
+        from hugr._serialization.serial_hugr import SerialHugr
         from hugr.hugr import Hugr
-        from hugr.serialization.serial_hugr import SerialHugr
 
         # pydantic stores the serialized dictionary because of the "Any" annotation
-        return val.Function(Hugr.from_serial(SerialHugr(**self.hugr)))
+        return val.Function(Hugr._from_serial(SerialHugr(**self.hugr)))
 
 
 class TupleValue(BaseValue):
@@ -172,9 +172,7 @@ class SumValue(BaseValue):
 class Value(RootModel):
     """A constant Value."""
 
-    root: ExtensionValue | FunctionValue | TupleValue | SumValue = Field(
-        discriminator="v"
-    )
+    root: CustomValue | FunctionValue | TupleValue | SumValue = Field(discriminator="v")
 
     model_config = ConfigDict(json_schema_extra={"required": ["v"]})
 
@@ -501,7 +499,7 @@ class CFG(DataflowOp):
 ControlFlowOp = Conditional | TailLoop | CFG
 
 
-class Extension(DataflowOp):
+class ExtensionOp(DataflowOp):
     """A user-defined operation that can be downcasted by the extensions that define
     it.
     """
@@ -649,7 +647,7 @@ class OpType(RootModel):
         | CallIndirect
         | LoadConstant
         | LoadFunction
-        | Extension
+        | ExtensionOp
         | Noop
         | MakeTuple
         | UnpackTuple

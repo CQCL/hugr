@@ -1,4 +1,4 @@
-from hugr.serialization.serial_hugr import SerialHugr, serialization_version
+from hugr._serialization.serial_hugr import SerialHugr, serialization_version
 
 
 def test_empty():
