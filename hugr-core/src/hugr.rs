@@ -513,7 +513,7 @@ mod test {
         let backup = h.clone();
         let inf_res = h.infer_extensions(true);
         if success {
-            assert!(dbg!(inf_res).is_ok());
+            assert!(inf_res.is_ok());
             let expected_p = ops::Case {
                 signature: Signature::new_endo(ty).with_extension_delta(result.clone()),
             };
