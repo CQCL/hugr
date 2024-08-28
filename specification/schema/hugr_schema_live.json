@@ -977,43 +977,6 @@
             "title": "Input",
             "type": "object"
         },
-        "Lift": {
-            "additionalProperties": true,
-            "description": "Fixes some TypeParams of a polymorphic type by providing TypeArgs.",
-            "properties": {
-                "parent": {
-                    "title": "Parent",
-                    "type": "integer"
-                },
-                "op": {
-                    "const": "Lift",
-                    "default": "Lift",
-                    "enum": [
-                        "Lift"
-                    ],
-                    "title": "Op",
-                    "type": "string"
-                },
-                "type_row": {
-                    "items": {
-                        "$ref": "#/$defs/Type"
-                    },
-                    "title": "Type Row",
-                    "type": "array"
-                },
-                "new_extension": {
-                    "title": "New Extension",
-                    "type": "string"
-                }
-            },
-            "required": [
-                "parent",
-                "type_row",
-                "new_extension"
-            ],
-            "title": "Lift",
-            "type": "object"
-        },
         "ListParam": {
             "additionalProperties": true,
             "properties": {
@@ -1104,37 +1067,6 @@
             "title": "LoadFunction",
             "type": "object"
         },
-        "MakeTuple": {
-            "additionalProperties": true,
-            "description": "An operation that packs all its inputs into a tuple.",
-            "properties": {
-                "parent": {
-                    "title": "Parent",
-                    "type": "integer"
-                },
-                "op": {
-                    "const": "MakeTuple",
-                    "default": "MakeTuple",
-                    "enum": [
-                        "MakeTuple"
-                    ],
-                    "title": "Op",
-                    "type": "string"
-                },
-                "tys": {
-                    "items": {
-                        "$ref": "#/$defs/Type"
-                    },
-                    "title": "Tys",
-                    "type": "array"
-                }
-            },
-            "required": [
-                "parent"
-            ],
-            "title": "MakeTuple",
-            "type": "object"
-        },
         "Module": {
             "additionalProperties": true,
             "description": "The root of a module, parent of all other `ModuleOp`s.",
@@ -1157,34 +1089,6 @@
                 "parent"
             ],
             "title": "Module",
-            "type": "object"
-        },
-        "Noop": {
-            "additionalProperties": true,
-            "description": "A no-op operation.",
-            "properties": {
-                "parent": {
-                    "title": "Parent",
-                    "type": "integer"
-                },
-                "op": {
-                    "const": "Noop",
-                    "default": "Noop",
-                    "enum": [
-                        "Noop"
-                    ],
-                    "title": "Op",
-                    "type": "string"
-                },
-                "ty": {
-                    "$ref": "#/$defs/Type"
-                }
-            },
-            "required": [
-                "parent",
-                "ty"
-            ],
-            "title": "Noop",
             "type": "object"
         },
         "OpDef": {
@@ -1265,16 +1169,12 @@
                     "FuncDecl": "#/$defs/FuncDecl",
                     "FuncDefn": "#/$defs/FuncDefn",
                     "Input": "#/$defs/Input",
-                    "Lift": "#/$defs/Lift",
                     "LoadConstant": "#/$defs/LoadConstant",
                     "LoadFunction": "#/$defs/LoadFunction",
-                    "MakeTuple": "#/$defs/MakeTuple",
                     "Module": "#/$defs/Module",
-                    "Noop": "#/$defs/Noop",
                     "Output": "#/$defs/Output",
                     "Tag": "#/$defs/Tag",
-                    "TailLoop": "#/$defs/TailLoop",
-                    "UnpackTuple": "#/$defs/UnpackTuple"
+                    "TailLoop": "#/$defs/TailLoop"
                 },
                 "propertyName": "op"
             },
@@ -1331,19 +1231,7 @@
                     "$ref": "#/$defs/ExtensionOp"
                 },
                 {
-                    "$ref": "#/$defs/Noop"
-                },
-                {
-                    "$ref": "#/$defs/MakeTuple"
-                },
-                {
-                    "$ref": "#/$defs/UnpackTuple"
-                },
-                {
                     "$ref": "#/$defs/Tag"
-                },
-                {
-                    "$ref": "#/$defs/Lift"
                 },
                 {
                     "$ref": "#/$defs/DFG"
@@ -2180,37 +2068,6 @@
                 "size"
             ],
             "title": "UnitSum",
-            "type": "object"
-        },
-        "UnpackTuple": {
-            "additionalProperties": true,
-            "description": "An operation that packs all its inputs into a tuple.",
-            "properties": {
-                "parent": {
-                    "title": "Parent",
-                    "type": "integer"
-                },
-                "op": {
-                    "const": "UnpackTuple",
-                    "default": "UnpackTuple",
-                    "enum": [
-                        "UnpackTuple"
-                    ],
-                    "title": "Op",
-                    "type": "string"
-                },
-                "tys": {
-                    "items": {
-                        "$ref": "#/$defs/Type"
-                    },
-                    "title": "Tys",
-                    "type": "array"
-                }
-            },
-            "required": [
-                "parent"
-            ],
-            "title": "UnpackTuple",
             "type": "object"
         },
         "Value": {

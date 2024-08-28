@@ -206,10 +206,11 @@ pub(crate) mod test {
     use crate::builder::{
         endo_sig, inout_sig, BuilderWiringError, DataflowSubContainer, ModuleBuilder,
     };
+    use crate::extension::prelude::{Lift, Noop};
     use crate::extension::prelude::{BOOL_T, USIZE_T};
     use crate::extension::{ExtensionId, SignatureError, EMPTY_REG, PRELUDE_REGISTRY};
     use crate::hugr::validate::InterGraphEdgeError;
-    use crate::ops::{handle::NodeHandle, Lift, Noop, OpTag};
+    use crate::ops::{handle::NodeHandle, OpTag};
     use crate::ops::{OpTrait, Value};
 
     use crate::std_extensions::logic::test::and_op;
@@ -319,21 +320,25 @@ pub(crate) mod test {
     #[test]
     fn simple_inter_graph_edge() {
         let builder = || -> Result<Hugr, BuildError> {
-            let mut f_build =
-                FunctionBuilder::new("main", Signature::new(type_row![BIT], type_row![BIT]))?;
+            let mut f_build = FunctionBuilder::new(
+                "main",
+                Signature::new(type_row![BIT], type_row![BIT]).with_prelude(),
+            )?;
 
             let [i1] = f_build.input_wires_arr();
-            let noop = f_build.add_dataflow_op(Noop { ty: BIT }, [i1])?;
+            let noop = f_build.add_dataflow_op(Noop(BIT), [i1])?;
             let i1 = noop.out_wire(0);
 
-            let mut nested =
-                f_build.dfg_builder(Signature::new(type_row![], type_row![BIT]), [])?;
+            let mut nested = f_build.dfg_builder(
+                Signature::new(type_row![], type_row![BIT]).with_prelude(),
+                [],
+            )?;
 
-            let id = nested.add_dataflow_op(Noop { ty: BIT }, [i1])?;
+            let id = nested.add_dataflow_op(Noop(BIT), [i1])?;
 
             let nested = nested.finish_with_outputs([id.out_wire(0)])?;
 
-            f_build.finish_hugr_with_outputs([nested.out_wire(0)], &EMPTY_REG)
+            f_build.finish_prelude_hugr_with_outputs([nested.out_wire(0)])
         };
 
         assert_matches!(builder(), Ok(_));
@@ -345,12 +350,12 @@ pub(crate) mod test {
             FunctionBuilder::new("main", Signature::new(type_row![QB], type_row![QB]))?;
 
         let [i1] = f_build.input_wires_arr();
-        let noop = f_build.add_dataflow_op(Noop { ty: QB }, [i1])?;
+        let noop = f_build.add_dataflow_op(Noop(QB), [i1])?;
         let i1 = noop.out_wire(0);
 
         let mut nested = f_build.dfg_builder(Signature::new(type_row![], type_row![QB]), [])?;
 
-        let id_res = nested.add_dataflow_op(Noop { ty: QB }, [i1]);
+        let id_res = nested.add_dataflow_op(Noop(QB), [i1]);
 
         // The error would anyway be caught in validation when we finish the Hugr,
         // but the builder catches it earlier
@@ -417,22 +422,10 @@ pub(crate) mod test {
         let mut add_ab = parent.dfg_builder(endo_sig(BIT), [w])?;
         let [w] = add_ab.input_wires_arr();
 
-        let lift_a = add_ab.add_dataflow_op(
-            Lift {
-                type_row: type_row![BIT],
-                new_extension: xa.clone(),
-            },
-            [w],
-        )?;
+        let lift_a = add_ab.add_dataflow_op(Lift::new(type_row![BIT], xa.clone()), [w])?;
         let [w] = lift_a.outputs_arr();
 
-        let lift_b = add_ab.add_dataflow_op(
-            Lift {
-                type_row: type_row![BIT],
-                new_extension: xb,
-            },
-            [w],
-        )?;
+        let lift_b = add_ab.add_dataflow_op(Lift::new(type_row![BIT], xb), [w])?;
         let [w] = lift_b.outputs_arr();
 
         let add_ab = add_ab.finish_with_outputs([w])?;
@@ -442,13 +435,7 @@ pub(crate) mod test {
         // via a child lift node
         let mut add_c = parent.dfg_builder(endo_sig(BIT), [w])?;
         let [w] = add_c.input_wires_arr();
-        let lift_c = add_c.add_dataflow_op(
-            Lift {
-                type_row: type_row![BIT],
-                new_extension: xc,
-            },
-            [w],
-        )?;
+        let lift_c = add_c.add_dataflow_op(Lift::new(type_row![BIT], xc), [w])?;
         let wires: Vec<Wire> = lift_c.outputs().collect();
 
         let add_c = add_c.finish_with_outputs(wires)?;

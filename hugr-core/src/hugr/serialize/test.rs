@@ -3,13 +3,14 @@ use crate::builder::{
     endo_sig, inout_sig, test::closed_dfg_root_hugr, Container, DFGBuilder, Dataflow, DataflowHugr,
     DataflowSubContainer, HugrBuilder, ModuleBuilder,
 };
+use crate::extension::prelude::Noop;
 use crate::extension::prelude::{BOOL_T, PRELUDE_ID, QB_T, USIZE_T};
 use crate::extension::simple_op::MakeRegisteredOp;
 use crate::extension::{test::SimpleOpDef, ExtensionSet, EMPTY_REG, PRELUDE_REGISTRY};
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::validate::ValidationError;
 use crate::ops::custom::{ExtensionOp, OpaqueOp, OpaqueOpError};
-use crate::ops::{self, dataflow::IOTrait, Input, Module, Noop, Output, Value, DFG};
+use crate::ops::{self, dataflow::IOTrait, Input, Module, Output, Value, DFG};
 use crate::std_extensions::arithmetic::float_types::FLOAT64_TYPE;
 use crate::std_extensions::arithmetic::int_ops::INT_OPS_REGISTRY;
 use crate::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
@@ -296,19 +297,14 @@ fn weighted_hugr_ser() {
 
         let t_row = vec![Type::new_sum([type_row![NAT], type_row![QB]])];
         let mut f_build = module_builder
-            .define_function("main", Signature::new(t_row.clone(), t_row))
+            .define_function("main", Signature::new(t_row.clone(), t_row).with_prelude())
             .unwrap();
 
         let outputs = f_build
             .input_wires()
             .map(|in_wire| {
                 f_build
-                    .add_dataflow_op(
-                        Noop {
-                            ty: f_build.get_wire_type(in_wire).unwrap(),
-                        },
-                        [in_wire],
-                    )
+                    .add_dataflow_op(Noop(f_build.get_wire_type(in_wire).unwrap()), [in_wire])
                     .unwrap()
                     .out_wire(0)
             })
@@ -325,13 +321,10 @@ fn weighted_hugr_ser() {
 #[test]
 fn dfg_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
     let tp: Vec<Type> = vec![BOOL_T; 2];
-    let mut dfg = DFGBuilder::new(Signature::new(tp.clone(), tp))?;
+    let mut dfg = DFGBuilder::new(Signature::new(tp.clone(), tp).with_prelude())?;
     let mut params: [_; 2] = dfg.input_wires_arr();
     for p in params.iter_mut() {
-        *p = dfg
-            .add_dataflow_op(Noop { ty: BOOL_T }, [*p])
-            .unwrap()
-            .out_wire(0);
+        *p = dfg.add_dataflow_op(Noop(BOOL_T), [*p]).unwrap().out_wire(0);
     }
     let hugr = dfg.finish_hugr_with_outputs(params, &EMPTY_REG)?;
 
@@ -391,9 +384,9 @@ fn opaque_ops() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn function_type() -> Result<(), Box<dyn std::error::Error>> {
-    let fn_ty = Type::new_function(Signature::new_endo(type_row![BOOL_T]));
-    let mut bldr = DFGBuilder::new(Signature::new_endo(vec![fn_ty.clone()]))?;
-    let op = bldr.add_dataflow_op(Noop { ty: fn_ty }, bldr.input_wires())?;
+    let fn_ty = Type::new_function(Signature::new_endo(type_row![BOOL_T]).with_prelude());
+    let mut bldr = DFGBuilder::new(Signature::new_endo(vec![fn_ty.clone()]).with_prelude())?;
+    let op = bldr.add_dataflow_op(Noop(fn_ty), bldr.input_wires())?;
     let h = bldr.finish_prelude_hugr_with_outputs(op.outputs())?;
 
     check_hugr_roundtrip(&h, true);

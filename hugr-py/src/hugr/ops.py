@@ -407,7 +407,7 @@ class RegisteredOp(AsExtOp):
 
 
 @dataclass()
-class MakeTuple(DataflowOp, _PartialOp):
+class MakeTuple(AsExtOp, _PartialOp):
     """Operation to create a tuple from a sequence of wires."""
 
     _types: tys.TypeRow | None = field(default=None, repr=False)
@@ -422,17 +422,19 @@ class MakeTuple(DataflowOp, _PartialOp):
         """
         return _check_complete(self, self._types)
 
-    def _to_serial(self, parent: Node) -> sops.MakeTuple:
-        return sops.MakeTuple(
-            parent=parent.idx,
-            tys=ser_it(self.types),
-        )
+    def op_def(self) -> ext.OpDef:
+        from hugr import std  # no circular import
+
+        return std.PRELUDE.get_op("MakeTuple")
+
+    def cached_signature(self) -> tys.FunctionType | None:
+        return tys.FunctionType(input=self.types, output=[tys.Tuple(*self.types)])
+
+    def type_args(self) -> list[tys.TypeArg]:
+        return [tys.SequenceArg([t.type_arg() for t in self.types])]
 
     def __call__(self, *elements: ComWire) -> Command:
         return super().__call__(*elements)
-
-    def outer_signature(self) -> tys.FunctionType:
-        return tys.FunctionType(input=self.types, output=[tys.Tuple(*self.types)])
 
     def _set_in_types(self, types: tys.TypeRow) -> None:
         self._types = types
@@ -442,7 +444,7 @@ class MakeTuple(DataflowOp, _PartialOp):
 
 
 @dataclass()
-class UnpackTuple(DataflowOp, _PartialOp):
+class UnpackTuple(AsExtOp, _PartialOp):
     """Operation to unpack a tuple into its elements."""
 
     _types: tys.TypeRow | None = field(default=None, repr=False)
@@ -456,15 +458,20 @@ class UnpackTuple(DataflowOp, _PartialOp):
         """
         return _check_complete(self, self._types)
 
+    def op_def(self) -> ext.OpDef:
+        from hugr import std  # no circular import
+
+        return std.PRELUDE.get_op("UnpackTuple")
+
+    def cached_signature(self) -> tys.FunctionType | None:
+        return tys.FunctionType(input=[tys.Tuple(*self.types)], output=self.types)
+
+    def type_args(self) -> list[tys.TypeArg]:
+        return [tys.SequenceArg([t.type_arg() for t in self.types])]
+
     @property
     def num_out(self) -> int:
         return len(self.types)
-
-    def _to_serial(self, parent: Node) -> sops.UnpackTuple:
-        return sops.UnpackTuple(
-            parent=parent.idx,
-            tys=ser_it(self.types),
-        )
 
     def __call__(self, tuple_: ComWire) -> Command:
         return super().__call__(tuple_)
@@ -1163,7 +1170,7 @@ class LoadFunc(_CallOrLoad, DataflowOp):
 
 
 @dataclass
-class Noop(DataflowOp, _PartialOp):
+class Noop(AsExtOp, _PartialOp):
     """Identity operation that passes through its input."""
 
     _type: tys.Type | None = None
@@ -1174,8 +1181,13 @@ class Noop(DataflowOp, _PartialOp):
         """The type of the input and output of the operation."""
         return _check_complete(self, self._type)
 
-    def _to_serial(self, parent: Node) -> sops.Noop:
-        return sops.Noop(parent=parent.idx, ty=self.type_._to_serial_root())
+    def op_def(self) -> ext.OpDef:
+        from hugr import std  # no circular import
+
+        return std.PRELUDE.get_op("Noop")
+
+    def cached_signature(self) -> tys.FunctionType | None:
+        return tys.FunctionType.endo([self.type_])
 
     def outer_signature(self) -> tys.FunctionType:
         return tys.FunctionType.endo([self.type_])
@@ -1186,34 +1198,6 @@ class Noop(DataflowOp, _PartialOp):
 
     def __repr__(self) -> str:
         return "Noop" + (f"({self._type})" if self._type is not None else "")
-
-
-@dataclass
-class Lift(DataflowOp, _PartialOp):
-    """Add an extension requirement to input values and pass them through."""
-
-    #: Extension added.
-    new_extension: tys.ExtensionId
-    _type_row: tys.TypeRow | None = field(default=None, repr=False)
-    num_out: int = field(default=1, repr=False)
-
-    @property
-    def type_row(self) -> tys.TypeRow:
-        """Types of the input and output of the operation."""
-        return _check_complete(self, self._type_row)
-
-    def _to_serial(self, parent: Node) -> sops.Lift:
-        return sops.Lift(
-            parent=parent.idx,
-            new_extension=self.new_extension,
-            type_row=ser_it(self.type_row),
-        )
-
-    def outer_signature(self) -> tys.FunctionType:
-        return tys.FunctionType.endo(self.type_row)
-
-    def _set_in_types(self, types: tys.TypeRow) -> None:
-        self._type_row = types
 
 
 @dataclass

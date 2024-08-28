@@ -2,9 +2,10 @@
 //! operations and constants.
 use lazy_static::lazy_static;
 
+use crate::extension::simple_op::MakeOpDef;
 use crate::ops::constant::{CustomCheckFailure, ValueName};
 use crate::ops::{ExtensionOp, OpName};
-use crate::types::{FuncValueType, SumType, TypeName};
+use crate::types::{FuncValueType, SumType, TypeName, TypeRV};
 use crate::{
     extension::{ExtensionId, TypeDefBound},
     ops::constant::CustomConst,
@@ -16,7 +17,20 @@ use crate::{
     Extension,
 };
 
-use super::{ExtensionRegistry, ExtensionSet, SignatureError, SignatureFromArgs};
+use strum_macros::{EnumIter, EnumString, IntoStaticStr};
+
+use crate::{
+    extension::{
+        const_fold::fold_out_row,
+        simple_op::{try_from_name, MakeExtensionOp, MakeRegisteredOp, OpLoadError},
+        ConstFold, ExtensionSet, OpDef, SignatureError, SignatureFunc,
+    },
+    ops::{NamedOp, Value},
+    types::{PolyFuncType, TypeRow},
+    utils::sorted_consts,
+};
+
+use super::{ExtensionRegistry, SignatureFromArgs};
 struct ArrayOpCustom;
 
 const MAX: &[TypeParam; 1] = &[TypeParam::max_nat()];
@@ -38,48 +52,6 @@ impl SignatureFromArgs for ArrayOpCustom {
 
     fn static_params(&self) -> &[TypeParam] {
         MAX
-    }
-}
-
-struct GenericOpCustom;
-impl SignatureFromArgs for GenericOpCustom {
-    fn compute_signature(&self, arg_values: &[TypeArg]) -> Result<PolyFuncTypeRV, SignatureError> {
-        let [arg0, arg1] = arg_values else {
-            return Err(SignatureError::InvalidTypeArgs);
-        };
-        let TypeArg::Sequence { elems: inp_args } = arg0 else {
-            return Err(SignatureError::InvalidTypeArgs);
-        };
-        let TypeArg::Sequence { elems: out_args } = arg1 else {
-            return Err(SignatureError::InvalidTypeArgs);
-        };
-        let mut inps: Vec<Type> = vec![Type::new_extension(ERROR_CUSTOM_TYPE)];
-        for inp_arg in inp_args.iter() {
-            let TypeArg::Type { ty } = inp_arg else {
-                return Err(SignatureError::InvalidTypeArgs);
-            };
-            inps.push(ty.clone());
-        }
-        let mut outs: Vec<Type> = vec![];
-        for out_arg in out_args.iter() {
-            let TypeArg::Type { ty } = out_arg else {
-                return Err(SignatureError::InvalidTypeArgs);
-            };
-            outs.push(ty.clone());
-        }
-        Ok(FuncValueType::new(inps, outs).into())
-    }
-
-    fn static_params(&self) -> &[TypeParam] {
-        fn list_of_type() -> TypeParam {
-            TypeParam::List {
-                param: Box::new(TypeParam::Type { b: TypeBound::Any }),
-            }
-        }
-        lazy_static! {
-            static ref PARAMS: [TypeParam; 2] = [list_of_type(), list_of_type()];
-        }
-        PARAMS.as_slice()
     }
 }
 
@@ -142,13 +114,25 @@ lazy_static! {
             TypeDefBound::copyable(),
         )
         .unwrap();
+
+
         prelude
         .add_op(
             PANIC_OP_ID,
             "Panic with input error".to_string(),
-            GenericOpCustom,
+            PolyFuncTypeRV::new(
+                [TypeParam::new_list(TypeBound::Any), TypeParam::new_list(TypeBound::Any)],
+                FuncValueType::new(
+                    vec![TypeRV::new_extension(ERROR_CUSTOM_TYPE), TypeRV::new_row_var_use(0, TypeBound::Any)],
+                    vec![TypeRV::new_row_var_use(1, TypeBound::Any)],
+                ),
+            ),
         )
         .unwrap();
+
+        TupleOpDef::load_all_ops(&mut prelude).unwrap();
+        NoopDef.add_to_extension(&mut prelude).unwrap();
+        LiftDef.add_to_extension(&mut prelude).unwrap();
         prelude
     };
     /// An extension registry containing only the prelude
@@ -403,6 +387,423 @@ impl CustomConst for ConstExternalSymbol {
     }
 }
 
+/// Logic extension operation definitions.
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, EnumIter, IntoStaticStr, EnumString)]
+#[allow(missing_docs)]
+#[non_exhaustive]
+pub enum TupleOpDef {
+    MakeTuple,
+    UnpackTuple,
+}
+
+impl ConstFold for TupleOpDef {
+    fn fold(
+        &self,
+        _type_args: &[TypeArg],
+        consts: &[(crate::IncomingPort, Value)],
+    ) -> crate::extension::ConstFoldResult {
+        match self {
+            TupleOpDef::MakeTuple => {
+                fold_out_row([Value::tuple(sorted_consts(consts).into_iter().cloned())])
+            }
+            TupleOpDef::UnpackTuple => {
+                let c = &consts.first()?.1;
+                let Some(vs) = c.as_tuple() else {
+                    panic!("This op always takes a Tuple input.");
+                };
+                fold_out_row(vs.iter().cloned())
+            }
+        }
+    }
+}
+impl MakeOpDef for TupleOpDef {
+    fn signature(&self) -> SignatureFunc {
+        let rv = TypeRV::new_row_var_use(0, TypeBound::Any);
+        let tuple_type = TypeRV::new_tuple(vec![rv.clone()]);
+
+        let param = TypeParam::new_list(TypeBound::Any);
+        match self {
+            TupleOpDef::MakeTuple => {
+                PolyFuncTypeRV::new([param], FuncValueType::new(rv, tuple_type))
+            }
+            TupleOpDef::UnpackTuple => {
+                PolyFuncTypeRV::new([param], FuncValueType::new(tuple_type, rv))
+            }
+        }
+        .into()
+    }
+
+    fn description(&self) -> String {
+        match self {
+            TupleOpDef::MakeTuple => "MakeTuple operation",
+            TupleOpDef::UnpackTuple => "UnpackTuple operation",
+        }
+        .to_string()
+    }
+
+    fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError> {
+        try_from_name(op_def.name(), op_def.extension())
+    }
+
+    fn extension(&self) -> ExtensionId {
+        PRELUDE_ID.to_owned()
+    }
+
+    fn post_opdef(&self, def: &mut OpDef) {
+        def.set_constant_folder(*self);
+    }
+}
+/// An operation that packs all its inputs into a tuple.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
+#[non_exhaustive]
+pub struct MakeTuple(pub TypeRow);
+
+impl MakeTuple {
+    /// Create a new MakeTuple operation.
+    pub fn new(tys: TypeRow) -> Self {
+        Self(tys)
+    }
+}
+
+impl NamedOp for MakeTuple {
+    fn name(&self) -> OpName {
+        TupleOpDef::MakeTuple.name()
+    }
+}
+
+impl MakeExtensionOp for MakeTuple {
+    fn from_extension_op(ext_op: &crate::ops::ExtensionOp) -> Result<Self, OpLoadError>
+    where
+        Self: Sized,
+    {
+        let def = TupleOpDef::from_def(ext_op.def())?;
+        if def != TupleOpDef::MakeTuple {
+            return Err(OpLoadError::NotMember(ext_op.def().name().to_string()))?;
+        }
+        let [TypeArg::Sequence { elems }] = ext_op.args() else {
+            return Err(SignatureError::InvalidTypeArgs)?;
+        };
+        let tys: Result<Vec<Type>, _> = elems
+            .iter()
+            .map(|a| match a {
+                TypeArg::Type { ty } => Ok(ty.clone()),
+                _ => Err(SignatureError::InvalidTypeArgs),
+            })
+            .collect();
+        Ok(Self(tys?.into()))
+    }
+
+    fn type_args(&self) -> Vec<TypeArg> {
+        vec![TypeArg::Sequence {
+            elems: self
+                .0
+                .iter()
+                .map(|t| TypeArg::Type { ty: t.clone() })
+                .collect(),
+        }]
+    }
+}
+
+impl MakeRegisteredOp for MakeTuple {
+    fn extension_id(&self) -> ExtensionId {
+        PRELUDE_ID.to_owned()
+    }
+
+    fn registry<'s, 'r: 's>(&'s self) -> &'r crate::extension::ExtensionRegistry {
+        &PRELUDE_REGISTRY
+    }
+}
+
+/// An operation that unpacks a tuple into its components.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
+#[non_exhaustive]
+pub struct UnpackTuple(pub TypeRow);
+
+impl UnpackTuple {
+    /// Create a new UnpackTuple operation.
+    pub fn new(tys: TypeRow) -> Self {
+        Self(tys)
+    }
+}
+
+impl NamedOp for UnpackTuple {
+    fn name(&self) -> OpName {
+        TupleOpDef::UnpackTuple.name()
+    }
+}
+
+impl MakeExtensionOp for UnpackTuple {
+    fn from_extension_op(ext_op: &crate::ops::ExtensionOp) -> Result<Self, OpLoadError>
+    where
+        Self: Sized,
+    {
+        let def = TupleOpDef::from_def(ext_op.def())?;
+        if def != TupleOpDef::UnpackTuple {
+            return Err(OpLoadError::NotMember(ext_op.def().name().to_string()))?;
+        }
+        let [TypeArg::Sequence { elems }] = ext_op.args() else {
+            return Err(SignatureError::InvalidTypeArgs)?;
+        };
+        let tys: Result<Vec<Type>, _> = elems
+            .iter()
+            .map(|a| match a {
+                TypeArg::Type { ty } => Ok(ty.clone()),
+                _ => Err(SignatureError::InvalidTypeArgs),
+            })
+            .collect();
+        Ok(Self(tys?.into()))
+    }
+
+    fn type_args(&self) -> Vec<TypeArg> {
+        vec![TypeArg::Sequence {
+            elems: self
+                .0
+                .iter()
+                .map(|t| TypeArg::Type { ty: t.clone() })
+                .collect(),
+        }]
+    }
+}
+
+impl MakeRegisteredOp for UnpackTuple {
+    fn extension_id(&self) -> ExtensionId {
+        PRELUDE_ID.to_owned()
+    }
+
+    fn registry<'s, 'r: 's>(&'s self) -> &'r crate::extension::ExtensionRegistry {
+        &PRELUDE_REGISTRY
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+/// A no-op operation definition.
+pub struct NoopDef;
+
+impl NamedOp for NoopDef {
+    fn name(&self) -> OpName {
+        "Noop".into()
+    }
+}
+
+impl std::str::FromStr for NoopDef {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s == NoopDef.name() {
+            Ok(Self)
+        } else {
+            Err(())
+        }
+    }
+}
+impl MakeOpDef for NoopDef {
+    fn signature(&self) -> SignatureFunc {
+        let tv = Type::new_var_use(0, TypeBound::Any);
+        PolyFuncType::new([TypeBound::Any.into()], Signature::new_endo(tv)).into()
+    }
+
+    fn description(&self) -> String {
+        "Noop gate".to_string()
+    }
+
+    fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError> {
+        try_from_name(op_def.name(), op_def.extension())
+    }
+
+    fn extension(&self) -> ExtensionId {
+        PRELUDE_ID.to_owned()
+    }
+
+    fn post_opdef(&self, def: &mut OpDef) {
+        def.set_constant_folder(*self);
+    }
+}
+
+impl ConstFold for NoopDef {
+    fn fold(
+        &self,
+        _type_args: &[TypeArg],
+        consts: &[(crate::IncomingPort, Value)],
+    ) -> crate::extension::ConstFoldResult {
+        fold_out_row([consts.first()?.1.clone()])
+    }
+}
+
+/// A no-op operation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
+pub struct Noop(pub Type);
+
+impl Noop {
+    /// Create a new Noop operation.
+    pub fn new(ty: Type) -> Self {
+        Self(ty)
+    }
+}
+
+impl Default for Noop {
+    fn default() -> Self {
+        Self(Type::UNIT)
+    }
+}
+impl NamedOp for Noop {
+    fn name(&self) -> OpName {
+        NoopDef.name()
+    }
+}
+
+impl MakeExtensionOp for Noop {
+    fn from_extension_op(ext_op: &crate::ops::ExtensionOp) -> Result<Self, OpLoadError>
+    where
+        Self: Sized,
+    {
+        let _def = NoopDef::from_def(ext_op.def())?;
+        let [TypeArg::Type { ty }] = ext_op.args() else {
+            return Err(SignatureError::InvalidTypeArgs)?;
+        };
+        Ok(Self(ty.clone()))
+    }
+
+    fn type_args(&self) -> Vec<TypeArg> {
+        vec![TypeArg::Type { ty: self.0.clone() }]
+    }
+}
+
+impl MakeRegisteredOp for Noop {
+    fn extension_id(&self) -> ExtensionId {
+        PRELUDE_ID.to_owned()
+    }
+
+    fn registry<'s, 'r: 's>(&'s self) -> &'r crate::extension::ExtensionRegistry {
+        &PRELUDE_REGISTRY
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+/// A lift operation definition.
+pub struct LiftDef;
+
+impl NamedOp for LiftDef {
+    fn name(&self) -> OpName {
+        "Lift".into()
+    }
+}
+
+impl std::str::FromStr for LiftDef {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s == LiftDef.name() {
+            Ok(Self)
+        } else {
+            Err(())
+        }
+    }
+}
+
+impl MakeOpDef for LiftDef {
+    fn signature(&self) -> SignatureFunc {
+        PolyFuncTypeRV::new(
+            vec![TypeParam::Extensions, TypeParam::new_list(TypeBound::Any)],
+            FuncValueType::new_endo(TypeRV::new_row_var_use(1, TypeBound::Any))
+                .with_extension_delta(ExtensionSet::type_var(0)),
+        )
+        .into()
+    }
+
+    fn description(&self) -> String {
+        "Add extension requirements to a row of values".to_string()
+    }
+
+    fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError> {
+        try_from_name(op_def.name(), op_def.extension())
+    }
+
+    fn extension(&self) -> ExtensionId {
+        PRELUDE_ID.to_owned()
+    }
+}
+
+/// A node which adds a extension req to the types of the wires it is passed
+/// It has no effect on the values passed along the edge
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
+#[non_exhaustive]
+pub struct Lift {
+    /// The types of the edges
+    pub type_row: TypeRow,
+    /// The extensions which we're adding to the inputs
+    pub new_extensions: ExtensionSet,
+}
+
+impl Lift {
+    /// Create a new Lift operation with the extensions to add.
+    pub fn new(type_row: TypeRow, set: impl Into<ExtensionSet>) -> Self {
+        Self {
+            type_row,
+            new_extensions: set.into(),
+        }
+    }
+}
+
+impl NamedOp for Lift {
+    fn name(&self) -> OpName {
+        LiftDef.name()
+    }
+}
+
+impl MakeExtensionOp for Lift {
+    fn from_extension_op(ext_op: &crate::ops::ExtensionOp) -> Result<Self, OpLoadError>
+    where
+        Self: Sized,
+    {
+        let _def = LiftDef::from_def(ext_op.def())?;
+
+        let [TypeArg::Extensions { es }, TypeArg::Sequence { elems }] = ext_op.args() else {
+            return Err(SignatureError::InvalidTypeArgs)?;
+        };
+        let tys: Result<Vec<Type>, _> = elems
+            .iter()
+            .map(|a| match a {
+                TypeArg::Type { ty } => Ok(ty.clone()),
+                _ => Err(SignatureError::InvalidTypeArgs),
+            })
+            .collect();
+        Ok(Self {
+            type_row: tys?.into(),
+            new_extensions: es.clone(),
+        })
+    }
+
+    fn type_args(&self) -> Vec<TypeArg> {
+        vec![
+            TypeArg::Extensions {
+                es: self.new_extensions.clone(),
+            },
+            TypeArg::Sequence {
+                elems: self
+                    .type_row
+                    .iter()
+                    .map(|t| TypeArg::Type { ty: t.clone() })
+                    .collect(),
+            },
+        ]
+    }
+}
+
+impl MakeRegisteredOp for Lift {
+    fn extension_id(&self) -> ExtensionId {
+        PRELUDE_ID.to_owned()
+    }
+
+    fn registry<'s, 'r: 's>(&'s self) -> &'r crate::extension::ExtensionRegistry {
+        &PRELUDE_REGISTRY
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::{
@@ -412,6 +813,71 @@ mod test {
     };
 
     use super::*;
+    use crate::{
+        ops::{OpTrait, OpType},
+        type_row,
+    };
+
+    #[test]
+    fn test_make_tuple() {
+        let op = MakeTuple::new(type_row![Type::UNIT]);
+        let optype: OpType = op.clone().into();
+        assert_eq!(
+            optype.dataflow_signature().unwrap().io(),
+            (
+                &type_row![Type::UNIT],
+                &vec![Type::new_tuple(type_row![Type::UNIT])].into(),
+            )
+        );
+
+        let new_op = MakeTuple::from_extension_op(optype.as_extension_op().unwrap()).unwrap();
+        assert_eq!(new_op, op);
+    }
+
+    #[test]
+    fn test_unmake_tuple() {
+        let op = UnpackTuple::new(type_row![Type::UNIT]);
+        let optype: OpType = op.clone().into();
+        assert_eq!(
+            optype.dataflow_signature().unwrap().io(),
+            (
+                &vec![Type::new_tuple(type_row![Type::UNIT])].into(),
+                &type_row![Type::UNIT],
+            )
+        );
+
+        let new_op = UnpackTuple::from_extension_op(optype.as_extension_op().unwrap()).unwrap();
+        assert_eq!(new_op, op);
+    }
+
+    #[test]
+    fn test_noop() {
+        let op = Noop::new(Type::UNIT);
+        let optype: OpType = op.clone().into();
+        assert_eq!(
+            optype.dataflow_signature().unwrap().io(),
+            (&type_row![Type::UNIT], &type_row![Type::UNIT])
+        );
+
+        let new_op = Noop::from_extension_op(optype.as_extension_op().unwrap()).unwrap();
+        assert_eq!(new_op, op);
+    }
+
+    #[test]
+    fn test_lift() {
+        const XA: ExtensionId = ExtensionId::new_unchecked("xa");
+        let op = Lift::new(type_row![Type::UNIT], ExtensionSet::singleton(&XA));
+        let optype: OpType = op.clone().into();
+        assert_eq!(
+            optype.dataflow_signature().unwrap(),
+            Signature::new_endo(type_row![Type::UNIT])
+                .with_extension_delta(XA)
+                .with_prelude()
+        );
+
+        let new_op = Lift::from_extension_op(optype.as_extension_op().unwrap()).unwrap();
+        assert_eq!(new_op, op);
+    }
 
     #[test]
     /// Test building a HUGR involving a new_array operation.

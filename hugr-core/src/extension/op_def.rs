@@ -244,7 +244,6 @@ impl SignatureFunc {
             // TODO raise warning: https://github.com/CQCL/hugr/issues/1432
             SignatureFunc::MissingValidateFunc(ts) => (ts, args),
         };
-
         let mut res = pf.instantiate(args, exts)?;
         res.extension_reqs.insert(&def.extension);
 

@@ -5,10 +5,11 @@ pub mod controlflow;
 pub mod custom;
 pub mod dataflow;
 pub mod handle;
-pub mod leaf;
 pub mod module;
+pub mod sum;
 pub mod tag;
 pub mod validate;
+use crate::extension::simple_op::MakeExtensionOp;
 use crate::extension::ExtensionSet;
 use crate::types::{EdgeKind, Signature};
 use crate::{Direction, OutgoingPort, Port};
@@ -26,9 +27,9 @@ pub use dataflow::{
     Call, CallIndirect, DataflowOpTrait, DataflowParent, Input, LoadConstant, LoadFunction, Output,
     DFG,
 };
-pub use leaf::{Lift, MakeTuple, Noop, Tag, UnpackTuple};
 pub use module::{AliasDecl, AliasDefn, FuncDecl, FuncDefn, Module};
 use smol_str::SmolStr;
+pub use sum::Tag;
 pub use tag::OpTag;
 
 #[enum_dispatch(OpTrait, NamedOp, ValidateOp, OpParent)]
@@ -57,11 +58,7 @@ pub enum OpType {
     ExtensionOp,
     #[serde(rename = "Extension")]
     OpaqueOp,
-    Noop,
-    MakeTuple,
-    UnpackTuple,
     Tag,
-    Lift,
     DataflowBlock,
     ExitBlock,
     TailLoop,
@@ -116,11 +113,7 @@ impl_op_ref_try_into!(LoadConstant);
 impl_op_ref_try_into!(LoadFunction);
 impl_op_ref_try_into!(DFG, dfg);
 impl_op_ref_try_into!(ExtensionOp);
-impl_op_ref_try_into!(Noop);
-impl_op_ref_try_into!(MakeTuple);
-impl_op_ref_try_into!(UnpackTuple);
 impl_op_ref_try_into!(Tag);
-impl_op_ref_try_into!(Lift);
 impl_op_ref_try_into!(DataflowBlock);
 impl_op_ref_try_into!(ExitBlock);
 impl_op_ref_try_into!(TailLoop);
@@ -295,6 +288,12 @@ impl OpType {
     pub fn is_container(&self) -> bool {
         self.validity_flags().allowed_children != OpTag::None
     }
+
+    /// Cast to an extension operation.
+    pub fn cast<T: MakeExtensionOp>(&self) -> Option<T> {
+        self.as_extension_op()
+            .and_then(|o| T::from_extension_op(o).ok())
+    }
 }
 
 /// Macro used by operations that want their
@@ -432,11 +431,7 @@ impl OpParent for LoadConstant {}
 impl OpParent for LoadFunction {}
 impl OpParent for ExtensionOp {}
 impl OpParent for OpaqueOp {}
-impl OpParent for Noop {}
-impl OpParent for MakeTuple {}
-impl OpParent for UnpackTuple {}
 impl OpParent for Tag {}
-impl OpParent for Lift {}
 impl OpParent for CFG {}
 impl OpParent for Conditional {}
 impl OpParent for FuncDecl {}

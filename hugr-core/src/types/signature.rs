@@ -49,10 +49,15 @@ pub type Signature = FuncTypeBase<NoRV>;
 pub type FuncValueType = FuncTypeBase<RowVariable>;
 
 impl<RV: MaybeRV> FuncTypeBase<RV> {
-    /// Builder method, add extension_reqs to an FunctionType
+    /// Builder method, add extension_reqs to a FunctionType
     pub fn with_extension_delta(mut self, rs: impl Into<ExtensionSet>) -> Self {
         self.extension_reqs = self.extension_reqs.union(rs.into());
         self
+    }
+
+    /// Shorthand for adding the prelude extension to a FunctionType.
+    pub fn with_prelude(self) -> Self {
+        self.with_extension_delta(crate::extension::prelude::PRELUDE_ID)
     }
 
     pub(crate) fn substitute(&self, tr: &Substitution) -> Self {
