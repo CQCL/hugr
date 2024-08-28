@@ -36,6 +36,10 @@ impl<V> From<PartialValue<V>> for PV<V> {
 }
 
 impl<V: AbstractValue> PV<V> {
+    pub fn variant(tag: usize, r: impl IntoIterator<Item = PV<V>>) -> Self {
+        PartialValue::variant(tag, r.into_iter().map(|x| x.0)).into()
+    }
+
     pub fn variant_values(&self, variant: usize, len: usize) -> Option<Vec<PV<V>>> {
         Some(
             self.0
@@ -225,10 +229,6 @@ pub(super) fn singleton_in_row<V: AbstractValue>(
         );
     }
     ValueRow::single_among_bottoms(h.signature(*n).unwrap().input.len(), ip.index(), v)
-}
-
-pub(super) fn partial_value_tuple_from_value_row<V: AbstractValue>(r: ValueRow<V>) -> PV<V> {
-    PartialValue::variant(0, r.into_iter().map(|x| x.0)).into()
 }
 
 pub(super) fn value_inputs(h: &impl HugrView, n: Node) -> impl Iterator<Item = IncomingPort> + '_ {

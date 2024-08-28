@@ -161,14 +161,13 @@ fn propagate_leaf_op<V: AbstractValue>(
         OpType::LoadConstant(_) => Some(ValueRow::from_iter([PV::from(
             c.value_from_load_constant(n),
         )])), // ins empty
-        OpType::MakeTuple(_) => Some(ValueRow::from_iter([
-            utils::partial_value_tuple_from_value_row(ins),
-        ])),
+        OpType::MakeTuple(_) => Some(ValueRow::from_iter([PV::variant(0, ins)])),
         OpType::UnpackTuple(_) => {
             let [tup] = ins.into_iter().collect::<Vec<_>>().try_into().unwrap();
             tup.variant_values(0, utils::value_outputs(c.hugr(), n).count())
                 .map(ValueRow::from_iter)
         }
+        OpType::Tag(t) => Some(ValueRow::from_iter([PV::variant(t.tag, ins)])),
         _ => None,
     }
 }
