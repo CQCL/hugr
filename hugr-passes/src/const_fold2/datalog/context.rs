@@ -2,12 +2,11 @@ use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::sync::Arc;
 
-use hugr_core::ops::OpType;
-use hugr_core::{Hugr, HugrView, Node};
+use hugr_core::ops::{CustomOp, DataflowOpTrait, OpType};
+use hugr_core::{Hugr, HugrView, IncomingPort, Node, PortIndex};
 
-// ALAN Note this probably belongs with ValueHandle, outside datalog
+use crate::const_fold2::value_handle::{ValueHandle, ValueKey};
 use super::{DFContext, PartialValue};
-use crate::const_fold2::value_handle::ValueHandle;
 
 #[derive(Debug)]
 pub(super) struct DataflowContext<H: HugrView>(Arc<H>);
@@ -80,6 +79,27 @@ impl<H: HugrView> DFContext<ValueHandle> for DataflowContext<H> {
                     Arc::new(const_op.value().clone()),
                 )
                 .into()])
+            }
+            OpType::CustomOp(CustomOp::Extension(op)) => {
+                let sig = op.signature();
+                let known_ins = sig
+                    .input_types()
+                    .into_iter()
+                    .enumerate()
+                    .zip(ins.iter())
+                    .filter_map(|((i, ty), pv)| {
+                        pv.clone()
+                            .try_into_value(ty)
+                            .map(|v| (IncomingPort::from(i), v))
+                            .ok()
+                    })
+                    .collect::<Vec<_>>();
+                let outs = op.constant_fold(&known_ins)?;
+                let mut res = vec![PartialValue::bottom(); sig.output_count()];
+                for (op, v) in outs {
+                    res[op.index()] = ValueHandle::new(ValueKey::Node(n), Arc::new(v)).into()
+                }
+                Some(res)
             }
             _ => None,
         }
