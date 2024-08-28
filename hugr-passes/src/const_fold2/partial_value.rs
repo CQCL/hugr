@@ -1,68 +1,38 @@
 #![allow(missing_docs)]
-use itertools::{zip_eq, Itertools as _};
+
+use hugr_core::ops::Value;
+use hugr_core::types::{Type, TypeEnum, TypeRow};
+use itertools::{zip_eq, Itertools};
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
-use hugr_core::ops::Value;
-use hugr_core::types::{Type, TypeEnum, TypeRow};
+pub trait AbstractValue: Clone + std::fmt::Debug + PartialEq + Eq + Hash {
+    fn as_sum(&self) -> Option<(usize, impl Iterator<Item = Self> + '_)>;
+}
 
-mod value_handle;
-
-pub use value_handle::{ValueHandle, ValueKey};
-
-// TODO ALAN inline into PartialValue
+// TODO ALAN inline into PartialValue? Has to be public as it's in a pub enum
 #[derive(PartialEq, Clone, Eq)]
-struct PartialSum(HashMap<usize, Vec<PartialValue>>);
+pub struct PartialSum<V>(pub HashMap<usize, Vec<PartialValue<V>>>);
 
-impl PartialSum {
+impl<V> PartialSum<V> {
     pub fn unit() -> Self {
         Self::variant(0, [])
     }
-    pub fn variant(tag: usize, values: impl IntoIterator<Item = PartialValue>) -> Self {
+    pub fn variant(tag: usize, values: impl IntoIterator<Item = PartialValue<V>>) -> Self {
         Self(HashMap::from([(tag, Vec::from_iter(values))]))
     }
 
     pub fn num_variants(&self) -> usize {
         self.0.len()
     }
+}
 
+impl<V: AbstractValue> PartialSum<V> {
     fn assert_variants(&self) {
         assert_ne!(self.num_variants(), 0);
         for pv in self.0.values().flat_map(|x| x.iter()) {
             pv.assert_invariants();
-        }
-    }
-
-    pub fn variant_values(&self, variant: usize, len: usize) -> Option<Vec<PartialValue>> {
-        let row = self.0.get(&variant)?;
-        assert!(row.len() == len);
-        Some(row.clone())
-    }
-
-    pub fn try_into_value(self, typ: &Type) -> Result<Value, Self> {
-        let Ok((k, v)) = self.0.iter().exactly_one() else {
-            Err(self)?
-        };
-
-        let TypeEnum::Sum(st) = typ.as_type_enum() else {
-            Err(self)?
-        };
-        let Some(r) = st.get_variant(*k) else {
-            Err(self)?
-        };
-        let Ok(r): Result<TypeRow, _> = r.clone().try_into() else {
-            Err(self)?
-        };
-        if v.len() != r.len() {
-            return Err(self);
-        }
-        match zip_eq(v.into_iter(), r.into_iter())
-            .map(|(v, t)| v.clone().try_into_value(t))
-            .collect::<Result<Vec<_>, _>>()
-        {
-            Ok(vs) => Value::sum(*k, vs, st.clone()).map_err(|_| self),
-            Err(_) => Err(self),
         }
     }
 
@@ -122,7 +92,43 @@ impl PartialSum {
     }
 }
 
-impl PartialOrd for PartialSum {
+impl<V: Clone + Into<Value>> PartialSum<V> {
+    pub fn try_into_value(self, typ: &Type) -> Result<Value, Self> {
+        let Ok((k, v)) = self.0.iter().exactly_one() else {
+            Err(self)?
+        };
+
+        let TypeEnum::Sum(st) = typ.as_type_enum() else {
+            Err(self)?
+        };
+        let Some(r) = st.get_variant(*k) else {
+            Err(self)?
+        };
+        let Ok(r): Result<TypeRow, _> = r.clone().try_into() else {
+            Err(self)?
+        };
+        if v.len() != r.len() {
+            return Err(self);
+        }
+        match zip_eq(v.into_iter(), r.into_iter())
+            .map(|(v, t)| v.clone().try_into_value(t))
+            .collect::<Result<Vec<_>, _>>()
+        {
+            Ok(vs) => Value::sum(*k, vs, st.clone()).map_err(|_| self),
+            Err(_) => Err(self),
+        }
+    }
+}
+
+impl<V: Clone> PartialSum<V> {
+    pub fn variant_values(&self, variant: usize, len: usize) -> Option<Vec<PartialValue<V>>> {
+        let row = self.0.get(&variant)?;
+        assert!(row.len() == len);
+        Some(row.clone())
+    }
+}
+
+impl<V: PartialEq> PartialOrd for PartialSum<V> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         let max_key = self.0.keys().chain(other.0.keys()).copied().max().unwrap();
         let (mut keys1, mut keys2) = (vec![0; max_key + 1], vec![0; max_key + 1]);
@@ -156,13 +162,13 @@ impl PartialOrd for PartialSum {
     }
 }
 
-impl std::fmt::Debug for PartialSum {
+impl<V: std::fmt::Debug> std::fmt::Debug for PartialSum<V> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.fmt(f)
     }
 }
 
-impl Hash for PartialSum {
+impl<V: Hash> Hash for PartialSum<V> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         for (k, v) in &self.0 {
             k.hash(state);
@@ -171,38 +177,29 @@ impl Hash for PartialSum {
     }
 }
 
-impl TryFrom<ValueHandle> for PartialSum {
-    type Error = ValueHandle;
-
-    fn try_from(value: ValueHandle) -> Result<Self, Self::Error> {
-        value
-            .as_sum()
-            .map(|(tag, values)| Self::variant(tag, values.map(PartialValue::from)))
-            .ok_or(value)
-    }
-}
-
 #[derive(PartialEq, Clone, Eq, Hash, Debug)]
-pub enum PartialValue {
+pub enum PartialValue<V> {
     Bottom,
-    Value(ValueHandle),
-    PartialSum(PartialSum),
+    Value(V),
+    PartialSum(PartialSum<V>),
     Top,
 }
 
-impl From<ValueHandle> for PartialValue {
-    fn from(v: ValueHandle) -> Self {
-        TryInto::<PartialSum>::try_into(v).map_or_else(Self::Value, Self::PartialSum)
+impl<V: AbstractValue> From<V> for PartialValue<V> {
+    fn from(v: V) -> Self {
+        v.as_sum()
+            .map(|(tag, values)| Self::variant(tag, values.map(Self::Value)))
+            .unwrap_or(Self::Value(v))
     }
 }
 
-impl From<PartialSum> for PartialValue {
-    fn from(v: PartialSum) -> Self {
+impl<V> From<PartialSum<V>> for PartialValue<V> {
+    fn from(v: PartialSum<V>) -> Self {
         Self::PartialSum(v)
     }
 }
 
-impl PartialValue {
+impl<V: AbstractValue> PartialValue<V> {
     // const BOTTOM: Self = Self::Bottom;
     // const BOTTOM_REF: &'static Self = &Self::BOTTOM;
 
@@ -220,23 +217,13 @@ impl PartialValue {
                 ps.assert_variants();
             }
             Self::Value(v) => {
-                assert!(matches!(v.clone().into(), Self::Value(_)))
+                assert!(v.as_sum().is_none())
             }
             _ => {}
         }
     }
 
-    pub fn try_into_value(self, typ: &Type) -> Result<Value, Self> {
-        let r = match self {
-            Self::Value(v) => Ok(v.value().clone()),
-            Self::PartialSum(ps) => ps.try_into_value(typ).map_err(Self::PartialSum),
-            x => Err(x),
-        }?;
-        assert_eq!(typ, &r.get_type());
-        Ok(r)
-    }
-
-    fn join_mut_value_handle(&mut self, vh: ValueHandle) -> bool {
+    fn join_mut_value_handle(&mut self, vh: V) -> bool {
         self.assert_invariants();
         match &*self {
             Self::Top => return false,
@@ -257,7 +244,7 @@ impl PartialValue {
         true
     }
 
-    fn meet_mut_value_handle(&mut self, vh: ValueHandle) -> bool {
+    fn meet_mut_value_handle(&mut self, vh: V) -> bool {
         self.assert_invariants();
         match &*self {
             Self::Bottom => false,
@@ -412,7 +399,7 @@ impl PartialValue {
         Self::variant(0, [])
     }
 
-    pub fn variant_values(&self, tag: usize, len: usize) -> Option<Vec<PartialValue>> {
+    pub fn variant_values(&self, tag: usize, len: usize) -> Option<Vec<PartialValue<V>>> {
         let vals = match self {
             PartialValue::Bottom => return None,
             PartialValue::Value(v) => v
@@ -438,7 +425,19 @@ impl PartialValue {
     }
 }
 
-impl PartialOrd for PartialValue {
+impl<V: Clone + Into<Value>> PartialValue<V> {
+    pub fn try_into_value(self, typ: &Type) -> Result<Value, Self> {
+        let r = match self {
+            Self::Value(v) => Ok(v.into().clone()),
+            Self::PartialSum(ps) => ps.try_into_value(typ).map_err(Self::PartialSum),
+            x => Err(x),
+        }?;
+        assert_eq!(typ, &r.get_type());
+        Ok(r)
+    }
+}
+
+impl<V: PartialEq> PartialOrd for PartialValue<V> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         use std::cmp::Ordering;
         match (self, other) {

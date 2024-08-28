@@ -2,10 +2,11 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use std::sync::Arc;
 
 use hugr_core::ops::constant::{CustomConst, Sum};
-
 use hugr_core::ops::Value;
 use hugr_core::types::Type;
 use hugr_core::Node;
+
+use super::partial_value::{AbstractValue, PartialSum, PartialValue};
 
 #[derive(Clone, Debug)]
 pub struct HashedConst {
@@ -78,7 +79,13 @@ impl ValueHandle {
         self.1.as_ref()
     }
 
-    pub fn as_sum(&self) -> Option<(usize, impl Iterator<Item = Self> + '_)> {
+    pub fn get_type(&self) -> Type {
+        self.1.get_type()
+    }
+}
+
+impl AbstractValue for ValueHandle {
+    fn as_sum(&self) -> Option<(usize, impl Iterator<Item = Self> + '_)> {
         match self.value() {
             Value::Sum(Sum { tag, values, .. }) => Some((
                 *tag,
@@ -89,10 +96,6 @@ impl ValueHandle {
             )),
             _ => None,
         }
-    }
-
-    pub fn get_type(&self) -> Type {
-        self.1.get_type()
     }
 }
 
@@ -116,6 +119,12 @@ impl Eq for ValueHandle {}
 impl Hash for ValueHandle {
     fn hash<I: Hasher>(&self, state: &mut I) {
         self.0.hash(state);
+    }
+}
+
+impl From<ValueHandle> for Value {
+    fn from(value: ValueHandle) -> Self {
+        (*value.1).clone()
     }
 }
 

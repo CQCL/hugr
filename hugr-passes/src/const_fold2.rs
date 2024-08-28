@@ -1,2 +1,3 @@
-mod datalog;
-pub mod partial_value;
+pub mod datalog;
+mod partial_value;
+pub mod value_handle;

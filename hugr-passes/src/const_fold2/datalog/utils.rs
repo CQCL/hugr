@@ -3,32 +3,40 @@
 // https://github.com/proptest-rs/proptest/issues/447
 #![cfg_attr(test, allow(non_local_definitions))]
 
-use std::{cmp::Ordering, ops::Index, sync::Arc};
+use std::{cmp::Ordering, ops::Index};
 
 use ascent::lattice::{BoundedLattice, Lattice};
-use itertools::{zip_eq, Either};
+use itertools::zip_eq;
 
-use crate::const_fold2::partial_value::{PartialValue, ValueHandle};
+use crate::const_fold2::partial_value::{AbstractValue, PartialValue};
 use hugr_core::{
     ops::{OpTrait as _, Value},
-    types::{Type, TypeRow},
+    types::{Signature, Type, TypeRow},
     HugrView, IncomingPort, Node, OutgoingPort, PortIndex as _,
 };
 
 #[cfg(test)]
 use proptest_derive::Arbitrary;
 
-#[derive(PartialEq, Eq, Hash, PartialOrd, Clone, Debug)]
-pub struct PV(PartialValue);
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
+pub struct PV<V>(PartialValue<V>);
 
-impl From<PartialValue> for PV {
-    fn from(inner: PartialValue) -> Self {
+// Implement manually as PartialValue<V> is PartialOrd even when V isn't
+// (deriving PartialOrd conditions on V: PartialOrd, which is not necessary)
+impl<V: PartialEq> PartialOrd for PV<V> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.0.partial_cmp(&other.0)
+    }
+}
+
+impl<V> From<PartialValue<V>> for PV<V> {
+    fn from(inner: PartialValue<V>) -> Self {
         Self(inner)
     }
 }
 
-impl PV {
-    pub fn variant_values(&self, variant: usize, len: usize) -> Option<Vec<PV>> {
+impl<V: AbstractValue> PV<V> {
+    pub fn variant_values(&self, variant: usize, len: usize) -> Option<Vec<PV<V>>> {
         Some(
             self.0
                 .variant_values(variant, len)?
@@ -41,25 +49,27 @@ impl PV {
     pub fn supports_tag(&self, tag: usize) -> bool {
         self.0.supports_tag(tag)
     }
+}
 
+impl<V: Clone + Into<Value>> PV<V> {
     pub fn try_into_value(self, ty: &Type) -> Result<Value, Self> {
         self.0.try_into_value(ty).map_err(Self)
     }
 }
 
-impl From<PV> for PartialValue {
-    fn from(value: PV) -> Self {
+impl<V> From<PV<V>> for PartialValue<V> {
+    fn from(value: PV<V>) -> Self {
         value.0
     }
 }
 
-impl From<ValueHandle> for PV {
-    fn from(inner: ValueHandle) -> Self {
+impl<V: AbstractValue> From<V> for PV<V> {
+    fn from(inner: V) -> Self {
         Self(inner.into())
     }
 }
 
-impl Lattice for PV {
+impl<V: AbstractValue> Lattice for PV<V> {
     fn meet(self, other: Self) -> Self {
         self.0.meet(other.0).into()
     }
@@ -77,7 +87,7 @@ impl Lattice for PV {
     }
 }
 
-impl BoundedLattice for PV {
+impl<V: AbstractValue> BoundedLattice for PV<V> {
     fn bottom() -> Self {
         PartialValue::bottom().into()
     }
@@ -87,22 +97,22 @@ impl BoundedLattice for PV {
     }
 }
 
-#[derive(PartialEq, Clone, Eq, Hash, PartialOrd)]
-pub struct ValueRow(Vec<PV>);
+#[derive(PartialEq, Clone, Eq, Hash)]
+pub struct ValueRow<V>(Vec<PV<V>>);
 
-impl ValueRow {
+impl<V: AbstractValue> ValueRow<V> {
     fn new(len: usize) -> Self {
         Self(vec![PV::bottom(); len])
     }
 
-    fn singleton(len: usize, idx: usize, v: PV) -> Self {
+    fn singleton(len: usize, idx: usize, v: PV<V>) -> Self {
         assert!(idx < len);
         let mut r = Self::new(len);
         r.0[idx] = v;
         r
     }
 
-    fn singleton_from_row(r: &TypeRow, idx: usize, v: PV) -> Self {
+    fn singleton_from_row(r: &TypeRow, idx: usize, v: PV<V>) -> Self {
         Self::singleton(r.len(), idx, v)
     }
 
@@ -110,7 +120,7 @@ impl ValueRow {
         Self::new(r.len())
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = &PV> {
+    pub fn iter(&self) -> impl Iterator<Item = &PV<V>> {
         self.0.iter()
     }
 
@@ -118,7 +128,7 @@ impl ValueRow {
         &self,
         variant: usize,
         len: usize,
-    ) -> Option<impl Iterator<Item = PV> + '_> {
+    ) -> Option<impl Iterator<Item = PV<V>> + '_> {
         self[0]
             .variant_values(variant, len)
             .map(|vals| vals.into_iter().chain(self.iter().skip(1).cloned()))
@@ -129,7 +139,13 @@ impl ValueRow {
     // }
 }
 
-impl Lattice for ValueRow {
+impl<V: PartialEq> PartialOrd for ValueRow<V> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.0.partial_cmp(&other.0)
+    }
+}
+
+impl<V: AbstractValue> Lattice for ValueRow<V> {
     fn meet(mut self, other: Self) -> Self {
         self.meet_mut(other);
         self
@@ -159,36 +175,42 @@ impl Lattice for ValueRow {
     }
 }
 
-impl IntoIterator for ValueRow {
-    type Item = PV;
+impl<V> IntoIterator for ValueRow<V> {
+    type Item = PV<V>;
 
-    type IntoIter = <Vec<PV> as IntoIterator>::IntoIter;
+    type IntoIter = <Vec<PV<V>> as IntoIterator>::IntoIter;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
     }
 }
 
-impl<Idx> Index<Idx> for ValueRow
+impl<V, Idx> Index<Idx> for ValueRow<V>
 where
-    Vec<PV>: Index<Idx>,
+    Vec<PV<V>>: Index<Idx>,
 {
-    type Output = <Vec<PV> as Index<Idx>>::Output;
+    type Output = <Vec<PV<V>> as Index<Idx>>::Output;
 
     fn index(&self, index: Idx) -> &Self::Output {
         self.0.index(index)
     }
 }
 
-pub(super) fn bottom_row(h: &impl HugrView, n: Node) -> ValueRow {
-    if let Some(sig) = h.signature(n) {
-        ValueRow::new(sig.input_count())
-    } else {
-        ValueRow::new(0)
-    }
+pub(super) fn bottom_row<V: AbstractValue>(h: &impl HugrView, n: Node) -> ValueRow<V> {
+    ValueRow::new(
+        h.signature(n)
+            .as_ref()
+            .map(Signature::input_count)
+            .unwrap_or(0),
+    )
 }
 
-pub(super) fn singleton_in_row(h: &impl HugrView, n: &Node, ip: &IncomingPort, v: PV) -> ValueRow {
+pub(super) fn singleton_in_row<V: AbstractValue>(
+    h: &impl HugrView,
+    n: &Node,
+    ip: &IncomingPort,
+    v: PV<V>,
+) -> ValueRow<V> {
     let Some(sig) = h.signature(*n) else {
         panic!("dougrulz");
     };
@@ -203,17 +225,7 @@ pub(super) fn singleton_in_row(h: &impl HugrView, n: &Node, ip: &IncomingPort, v
     ValueRow::singleton_from_row(&h.signature(*n).unwrap().input, ip.index(), v)
 }
 
-pub(super) fn partial_value_from_load_constant(h: &impl HugrView, node: Node) -> PV {
-    let load_op = h.get_optype(node).as_load_constant().unwrap();
-    let const_node = h
-        .single_linked_output(node, load_op.constant_port())
-        .unwrap()
-        .0;
-    let const_op = h.get_optype(const_node).as_const().unwrap();
-    ValueHandle::new(const_node.into(), Arc::new(const_op.value().clone())).into()
-}
-
-pub(super) fn partial_value_tuple_from_value_row(r: ValueRow) -> PV {
+pub(super) fn partial_value_tuple_from_value_row<V: AbstractValue>(r: ValueRow<V>) -> PV<V> {
     PartialValue::variant(0, r.into_iter().map(|x| x.0)).into()
 }
 
@@ -240,7 +252,7 @@ pub enum TailLoopTermination {
 }
 
 impl TailLoopTermination {
-    pub fn from_control_value(v: &PV) -> Self {
+    pub fn from_control_value<V: AbstractValue>(v: &PV<V>) -> Self {
         let (may_continue, may_break) = (v.supports_tag(0), v.supports_tag(1));
         if may_break && !may_continue {
             Self::ExactlyZeroContinues

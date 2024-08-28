@@ -8,7 +8,9 @@ use hugr_core::{
     types::{Type, TypeArg, TypeEnum},
 };
 
-use super::{PartialSum, PartialValue, ValueHandle, ValueKey};
+use super::{PartialSum, PartialValue};
+use crate::const_fold2::value_handle::{ValueHandle, ValueKey};
+
 impl Arbitrary for ValueHandle {
     type Parameters = ();
     type Strategy = BoxedStrategy<Self>;
@@ -48,7 +50,7 @@ impl TestSumLeafType {
         }
     }
 
-    fn type_check(&self, ps: &PartialSum) -> bool {
+    fn type_check(&self, ps: &PartialSum<ValueHandle>) -> bool {
         match self {
             Self::Int(_) => false,
             Self::Unit => {
@@ -61,7 +63,7 @@ impl TestSumLeafType {
         }
     }
 
-    fn partial_value_strategy(self) -> impl Strategy<Value = PartialValue> {
+    fn partial_value_strategy(self) -> impl Strategy<Value = PartialValue<ValueHandle>> {
         match self {
             Self::Int(t) => {
                 let TypeEnum::Extension(ct) = t.as_type_enum() else {
@@ -165,7 +167,7 @@ impl TestSumType {
         }
     }
 
-    fn type_check(&self, pv: &PartialValue) -> bool {
+    fn type_check(&self, pv: &PartialValue<ValueHandle>) -> bool {
         match (self, pv) {
             (_, PartialValue::Bottom) | (_, PartialValue::Top) => true,
             (_, PartialValue::Value(v)) => self.get_type() == v.get_type(),
@@ -253,7 +255,7 @@ proptest! {
     }
 }
 
-fn any_partial_value_of_type(ust: TestSumType) -> impl Strategy<Value = PartialValue> {
+fn any_partial_value_of_type(ust: TestSumType) -> impl Strategy<Value = PartialValue<ValueHandle>> {
     ust.select().prop_flat_map(|x| match x {
         Either::Left(l) => l.partial_value_strategy().boxed(),
         Either::Right((index, usts)) => {
@@ -273,15 +275,15 @@ fn any_partial_value_of_type(ust: TestSumType) -> impl Strategy<Value = PartialV
 
 fn any_partial_value_with(
     params: <TestSumType as Arbitrary>::Parameters,
-) -> impl Strategy<Value = PartialValue> {
+) -> impl Strategy<Value = PartialValue<ValueHandle>> {
     any_with::<TestSumType>(params).prop_flat_map(any_partial_value_of_type)
 }
 
-fn any_partial_value() -> impl Strategy<Value = PartialValue> {
+fn any_partial_value() -> impl Strategy<Value = PartialValue<ValueHandle>> {
     any_partial_value_with(Default::default())
 }
 
-fn any_partial_values<const N: usize>() -> impl Strategy<Value = [PartialValue; N]> {
+fn any_partial_values<const N: usize>() -> impl Strategy<Value = [PartialValue<ValueHandle>; N]> {
     any::<TestSumType>().prop_flat_map(|ust| {
         TryInto::<[_; N]>::try_into(
             (0..N)
@@ -292,7 +294,7 @@ fn any_partial_values<const N: usize>() -> impl Strategy<Value = [PartialValue; 
     })
 }
 
-fn any_typed_partial_value() -> impl Strategy<Value = (TestSumType, PartialValue)> {
+fn any_typed_partial_value() -> impl Strategy<Value = (TestSumType, PartialValue<ValueHandle>)> {
     any::<TestSumType>()
         .prop_flat_map(|t| any_partial_value_of_type(t.clone()).prop_map(move |v| (t.clone(), v)))
 }

@@ -4,6 +4,8 @@ use std::sync::Arc;
 
 use hugr_core::{Hugr, HugrView};
 
+use crate::const_fold2::value_handle::ValueHandle;
+
 use super::DFContext;
 
 #[derive(Debug)]
@@ -53,8 +55,19 @@ impl<H: HugrView> Deref for DataflowContext<H> {
     }
 }
 
-impl<H: HugrView> DFContext for DataflowContext<H> {
+impl<H: HugrView> DFContext<ValueHandle> for DataflowContext<H> {
     fn hugr(&self) -> &impl HugrView {
         self.0.as_ref()
+    }
+
+    fn value_from_load_constant(&self, node: hugr_core::Node) -> ValueHandle {
+        let load_op = self.0.get_optype(node).as_load_constant().unwrap();
+        let const_node = self
+            .0
+            .single_linked_output(node, load_op.constant_port())
+            .unwrap()
+            .0;
+        let const_op = self.0.get_optype(const_node).as_const().unwrap();
+        ValueHandle::new(const_node.into(), Arc::new(const_op.value().clone()))
     }
 }

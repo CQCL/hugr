@@ -8,11 +8,13 @@ use hugr_core::{Hugr, HugrView, IncomingPort, Node, OutgoingPort, PortIndex as _
 mod context;
 mod utils;
 
-use context::DataflowContext;
 pub use utils::{TailLoopTermination, ValueRow, IO, PV};
 
-pub trait DFContext: Clone + Eq + Hash + std::ops::Deref<Target = Hugr> {
+use super::partial_value::AbstractValue;
+
+pub trait DFContext<V>: Clone + Eq + Hash + std::ops::Deref<Target = Hugr> {
     fn hugr(&self) -> &impl HugrView;
+    fn value_from_load_constant(&self, node: Node) -> V;
 }
 
 ascent::ascent! {
@@ -20,18 +22,18 @@ ascent::ascent! {
     // DataflowContext<H> (for H: HugrView) would be sufficient, there's really no
     // point in using anything else yet. However DFContext will be useful when we
     // move interpretation of nodes out into a trait method.
-    struct AscentProgram<C: DFContext>;
+    struct AscentProgram<V: AbstractValue, C: DFContext<V>>;
     relation context(C);
-    relation out_wire_value_proto(Node, OutgoingPort, PV);
+    relation out_wire_value_proto(Node, OutgoingPort, PV<V>);
 
     relation node(C, Node);
     relation in_wire(C, Node, IncomingPort);
     relation out_wire(C, Node, OutgoingPort);
     relation parent_of_node(C, Node, Node);
     relation io_node(C, Node, Node, IO);
-    lattice out_wire_value(C, Node, OutgoingPort, PV);
-    lattice node_in_value_row(C, Node, ValueRow);
-    lattice in_wire_value(C, Node, IncomingPort, PV);
+    lattice out_wire_value(C, Node, OutgoingPort, PV<V>);
+    lattice node_in_value_row(C, Node, ValueRow<V>);
+    lattice in_wire_value(C, Node, IncomingPort, PV<V>);
 
     node(c, n) <-- context(c), for n in c.nodes();
 
@@ -68,7 +70,7 @@ ascent::ascent! {
     relation load_constant_node(C, Node);
     load_constant_node(c, n) <-- node(c, n), if c.get_optype(*n).is_load_constant();
 
-    out_wire_value(c, n, 0.into(), utils::partial_value_from_load_constant(c.hugr(), *n)) <--
+    out_wire_value(c, n, 0.into(), PV::from(c.value_from_load_constant(*n))) <--
         load_constant_node(c, n);
 
 
@@ -169,19 +171,22 @@ ascent::ascent! {
 }
 
 // TODO This should probably be called 'Analyser' or something
-struct Machine<H: HugrView>(AscentProgram<DataflowContext<H>>, Option<HashMap<Wire, PV>>);
+pub struct Machine<V: AbstractValue, C: DFContext<V>>(
+    AscentProgram<V, C>,
+    Option<HashMap<Wire, PV<V>>>,
+);
 
 /// Usage:
 /// 1. [Self::new()]
 /// 2. Zero or more [Self::propolutate_out_wires] with initial values
 /// 3. Exactly one [Self::run_hugr] to do the analysis
 /// 4. Results then available via [Self::read_out_wire_partial_value] and [Self::read_out_wire_value]
-impl<H: HugrView> Machine<H> {
+impl<V: AbstractValue, C: DFContext<V>> Machine<V, C> {
     pub fn new() -> Self {
         Self(Default::default(), None)
     }
 
-    pub fn propolutate_out_wires(&mut self, wires: impl IntoIterator<Item = (Wire, PV)>) {
+    pub fn propolutate_out_wires(&mut self, wires: impl IntoIterator<Item = (Wire, PV<V>)>) {
         assert!(self.1.is_none());
         self.0.out_wire_value_proto.extend(
             wires
@@ -190,9 +195,9 @@ impl<H: HugrView> Machine<H> {
         );
     }
 
-    pub fn run_hugr(&mut self, hugr: H) {
+    pub fn run(&mut self, context: C) {
         assert!(self.1.is_none());
-        self.0.context.push((DataflowContext::new(hugr),));
+        self.0.context.push((context,));
         self.0.run();
         self.1 = Some(
             self.0
@@ -203,22 +208,11 @@ impl<H: HugrView> Machine<H> {
         )
     }
 
-    pub fn read_out_wire_partial_value(&self, w: Wire) -> Option<PV> {
+    pub fn read_out_wire_partial_value(&self, w: Wire) -> Option<PV<V>> {
         self.1.as_ref().unwrap().get(&w).cloned()
     }
 
-    pub fn read_out_wire_value(&self, hugr: H, w: Wire) -> Option<Value> {
-        // dbg!(&w);
-        let pv = self.read_out_wire_partial_value(w)?;
-        // dbg!(&pv);
-        let (_, typ) = hugr
-            .out_value_types(w.node())
-            .find(|(p, _)| *p == w.source())
-            .unwrap();
-        pv.try_into_value(&typ).ok()
-    }
-
-    pub fn tail_loop_terminates(&self, hugr: H, node: Node) -> TailLoopTermination {
+    pub fn tail_loop_terminates(&self, hugr: impl HugrView, node: Node) -> TailLoopTermination {
         assert!(hugr.get_optype(node).is_tail_loop());
         self.0
             .tail_loop_termination
@@ -227,7 +221,7 @@ impl<H: HugrView> Machine<H> {
             .unwrap()
     }
 
-    pub fn case_reachable(&self, hugr: H, case: Node) -> bool {
+    pub fn case_reachable(&self, hugr: impl HugrView, case: Node) -> bool {
         assert!(hugr.get_optype(case).is_case());
         let cond = hugr.get_parent(case).unwrap();
         assert!(hugr.get_optype(cond).is_conditional());
@@ -236,6 +230,19 @@ impl<H: HugrView> Machine<H> {
             .iter()
             .find_map(|(_, cond2, case2, i)| (&cond == cond2 && &case == case2).then_some(*i))
             .unwrap()
+    }
+}
+
+impl<V: AbstractValue + Into<Value>, C: DFContext<V>> Machine<V, C> {
+    pub fn read_out_wire_value(&self, hugr: impl HugrView, w: Wire) -> Option<Value> {
+        // dbg!(&w);
+        let pv = self.read_out_wire_partial_value(w)?;
+        // dbg!(&pv);
+        let (_, typ) = hugr
+            .out_value_types(w.node())
+            .find(|(p, _)| *p == w.source())
+            .unwrap();
+        pv.try_into_value(&typ).ok()
     }
 }
 
