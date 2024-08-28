@@ -6,7 +6,7 @@ use hugr_core::ops::Value;
 use hugr_core::types::Type;
 use hugr_core::Node;
 
-use super::partial_value::{AbstractValue, PartialSum, PartialValue};
+use super::datalog::{AbstractValue, PartialSum, PartialValue};
 
 #[derive(Clone, Debug)]
 pub struct HashedConst {

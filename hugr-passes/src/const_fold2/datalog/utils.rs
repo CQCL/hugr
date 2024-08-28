@@ -8,7 +8,7 @@ use std::{cmp::Ordering, ops::Index};
 use ascent::lattice::{BoundedLattice, Lattice};
 use itertools::zip_eq;
 
-use crate::const_fold2::partial_value::{AbstractValue, PartialValue};
+use crate::const_fold2::datalog::{AbstractValue, PartialValue};
 use hugr_core::{
     ops::{OpTrait as _, Value},
     types::{Signature, Type, TypeRow},
@@ -227,12 +227,6 @@ pub(super) fn singleton_in_row<V: AbstractValue>(
 
 pub(super) fn partial_value_tuple_from_value_row<V: AbstractValue>(r: ValueRow<V>) -> PV<V> {
     PartialValue::variant(0, r.into_iter().map(|x| x.0)).into()
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum IO {
-    Input,
-    Output,
 }
 
 pub(super) fn value_inputs(h: &impl HugrView, n: Node) -> impl Iterator<Item = IncomingPort> + '_ {

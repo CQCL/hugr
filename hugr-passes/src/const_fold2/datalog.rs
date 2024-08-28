@@ -6,15 +6,22 @@ use hugr_core::ops::Value;
 use hugr_core::{Hugr, HugrView, IncomingPort, Node, OutgoingPort, PortIndex as _, Wire};
 
 mod context;
+mod partial_value;
 mod utils;
 
-pub use utils::{TailLoopTermination, ValueRow, IO, PV};
+use utils::{TailLoopTermination, ValueRow, PV};
 
-use super::partial_value::AbstractValue;
+pub use partial_value::{AbstractValue, PartialSum, PartialValue};
 
 pub trait DFContext<V>: Clone + Eq + Hash + std::ops::Deref<Target = Hugr> {
     fn hugr(&self) -> &impl HugrView;
     fn value_from_load_constant(&self, node: Node) -> V;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum IO {
+    Input,
+    Output,
 }
 
 ascent::ascent! {
