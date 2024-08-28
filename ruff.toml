@@ -77,7 +77,7 @@ ignore = [
 [lint.per-file-ignores]
 "hugr-py/tests/**" = ["D"]
 "hugr-py/docs/**" = ["D"]
-"hugr-py/src/hugr/serialization/**" = ["D"]
+"hugr-py/src/hugr/_serialization/**" = ["D"]
 "scripts/*" = ["T201", "EXE001", "D"]
 
 [lint.pydocstyle]
