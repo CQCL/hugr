@@ -135,6 +135,12 @@ impl<V: AbstractValue> ValueRow<V> {
     // }
 }
 
+impl<V> FromIterator<PV<V>> for ValueRow<V> {
+    fn from_iter<T: IntoIterator<Item = PV<V>>>(iter: T) -> Self {
+        Self(iter.into_iter().collect())
+    }
+}
+
 impl<V: PartialEq> PartialOrd for ValueRow<V> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.0.partial_cmp(&other.0)

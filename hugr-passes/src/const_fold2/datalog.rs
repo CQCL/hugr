@@ -2,7 +2,7 @@ use ascent::lattice::BoundedLattice;
 use std::collections::HashMap;
 use std::hash::Hash;
 
-use hugr_core::ops::Value;
+use hugr_core::ops::{OpType, Value};
 use hugr_core::{Hugr, HugrView, IncomingPort, Node, OutgoingPort, PortIndex as _, Wire};
 
 mod context;
@@ -68,37 +68,12 @@ ascent::ascent! {
     node_in_value_row(c, n, utils::bottom_row(c.hugr(), *n)) <-- node(c, n);
     node_in_value_row(c, n, utils::singleton_in_row(c.hugr(), n, p, v.clone())) <-- in_wire_value(c, n, p, v);
 
-
-    // Per node-type rules
-    // TODO do all leaf ops with a rule
-    // define `fn propagate_leaf_op(Context, Node, ValueRow) -> ValueRow
-
-    // LoadConstant
-    relation load_constant_node(C, Node);
-    load_constant_node(c, n) <-- node(c, n), if c.get_optype(*n).is_load_constant();
-
-    out_wire_value(c, n, 0.into(), PV::from(c.value_from_load_constant(*n))) <--
-        load_constant_node(c, n);
-
-
-    // MakeTuple
-    relation make_tuple_node(C, Node);
-    make_tuple_node(c, n) <-- node(c, n), if c.get_optype(*n).is_make_tuple();
-
-    out_wire_value(c, n, 0.into(), utils::partial_value_tuple_from_value_row(vs.clone())) <--
-        make_tuple_node(c, n), node_in_value_row(c, n, vs);
-
-
-    // UnpackTuple
-    relation unpack_tuple_node(C, Node);
-    unpack_tuple_node(c,n) <-- node(c, n), if c.get_optype(*n).is_unpack_tuple();
-
     out_wire_value(c, n, p, v) <--
-        unpack_tuple_node(c, n),
-        in_wire_value(c, n, IncomingPort::from(0), tup),
-        if let Some(fields) = tup.variant_values(0, utils::value_outputs(c.hugr(),*n).count()),
-        for (p,v) in (0..).map(OutgoingPort::from).zip(fields);
-
+       node(c, n),
+       if !c.get_optype(*n).is_container(),
+       node_in_value_row(c, n, vs),
+       if let Some(outs) = propagate_leaf_op(c, *n, vs.clone()),
+       for (p,v) in (0..).map(OutgoingPort::from).zip(outs);
 
     // DFG
     relation dfg_node(C, Node);
@@ -175,6 +150,27 @@ ascent::ascent! {
         in_wire_value(c, cond, IncomingPort::from(0), v),
         let reachable = v.supports_tag(*i);
 
+}
+
+fn propagate_leaf_op<V: AbstractValue>(
+    c: &impl DFContext<V>,
+    n: Node,
+    ins: ValueRow<V>,
+) -> Option<ValueRow<V>> {
+    match c.get_optype(n) {
+        OpType::LoadConstant(_) => Some(ValueRow::from_iter([PV::from(
+            c.value_from_load_constant(n),
+        )])), // ins empty
+        OpType::MakeTuple(_) => Some(ValueRow::from_iter([
+            utils::partial_value_tuple_from_value_row(ins),
+        ])),
+        OpType::UnpackTuple(_) => {
+            let [tup] = ins.into_iter().collect::<Vec<_>>().try_into().unwrap();
+            tup.variant_values(0, utils::value_outputs(c.hugr(), n).count())
+                .map(ValueRow::from_iter)
+        }
+        _ => None,
+    }
 }
 
 // TODO This should probably be called 'Analyser' or something
