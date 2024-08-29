@@ -11,6 +11,8 @@ from hugr import tys
 from hugr.utils import ser_it
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from hugr.hugr import Hugr
 
 
@@ -147,6 +149,133 @@ class Tuple(Sum):
 
     def __repr__(self) -> str:
         return f"Tuple({', '.join(map(repr, self.vals))})"
+
+
+@dataclass
+class Some(Sum):
+    """Optional tuple of value, containing a list of values.
+
+    Example:
+        >>> some = Some(TRUE, FALSE)
+        >>> some
+        Some(TRUE, FALSE)
+        >>> str(some)
+        'Some(TRUE, FALSE)'
+        >>> some.type_()
+        Option(Bool, Bool)
+
+    """
+
+    #: The values of this tuple.
+    vals: list[Value]
+
+    def __init__(self, *vals: Value):
+        val_list = list(vals)
+        super().__init__(
+            tag=0, typ=tys.Option(*(v.type_() for v in val_list)), vals=val_list
+        )
+
+    def __repr__(self) -> str:
+        return f"Some({', '.join(map(repr, self.vals))})"
+
+
+@dataclass
+class None_(Sum):
+    """Optional tuple of value, containing no values.
+
+    Example:
+        >>> none = None_(tys.Bool)
+        >>> none
+        None(Bool)
+        >>> str(none)
+        'None'
+        >>> none.type_()
+        Option(Bool)
+
+    """
+
+    def __init__(self, *types: tys.Type):
+        super().__init__(tag=1, typ=tys.Option(*types), vals=[])
+
+    def __repr__(self) -> str:
+        return f"None({', '.join(map(repr, self.typ.variant_rows[0]))})"
+
+    def __str__(self) -> str:
+        return "None"
+
+
+@dataclass
+class Left(Sum):
+    """Left variant of a :class:`tys.Either` type, containing a list of values.
+
+    In fallible contexts, this represents the success variant.
+
+    Example:
+        >>> left = Left([TRUE, FALSE], [tys.Bool])
+        >>> left
+        Left(vals=[TRUE, FALSE], right_typ=[Bool])
+        >>> str(left)
+        'Left(TRUE, FALSE)'
+        >>> str(left.type_())
+        'Either((Bool, Bool), Bool)'
+    """
+
+    #: The values of this tuple.
+    vals: list[Value]
+
+    def __init__(self, vals: Iterable[Value], right_typ: Iterable[tys.Type]):
+        val_list = list(vals)
+        super().__init__(
+            tag=0,
+            typ=tys.Either([v.type_() for v in val_list], right_typ),
+            vals=val_list,
+        )
+
+    def __repr__(self) -> str:
+        _, right_typ = self.typ.variant_rows
+        return f"Left(vals={self.vals}, right_typ={list(right_typ)})"
+
+    def __str__(self) -> str:
+        vals_str = ", ".join(map(str, self.vals))
+        return f"Left({vals_str})"
+
+
+@dataclass
+class Right(Sum):
+    """Right variant of a :class:`tys.Either` type, containing a list of values.
+
+    In fallible contexts, this represents the failure variant.
+
+    Internally a :class:`Sum` with two variant rows.
+
+    Example:
+        >>> right = Right([tys.Bool, tys.Bool, tys.Bool], [TRUE, FALSE])
+        >>> right
+        Right(left_typ=[Bool, Bool, Bool], vals=[TRUE, FALSE])
+        >>> str(right)
+        'Right(TRUE, FALSE)'
+        >>> str(right.type_())
+        'Either((Bool, Bool, Bool), (Bool, Bool))'
+    """
+
+    #: The values of this tuple.
+    vals: list[Value]
+
+    def __init__(self, left_typ: Iterable[tys.Type], vals: Iterable[Value]):
+        val_list = list(vals)
+        super().__init__(
+            tag=1,
+            typ=tys.Either(left_typ, [v.type_() for v in val_list]),
+            vals=val_list,
+        )
+
+    def __repr__(self) -> str:
+        left_typ, _ = self.typ.variant_rows
+        return f"Right(left_typ={list(left_typ)}, vals={self.vals})"
+
+    def __str__(self) -> str:
+        vals_str = ", ".join(map(str, self.vals))
+        return f"Right({vals_str})"
 
 
 @dataclass

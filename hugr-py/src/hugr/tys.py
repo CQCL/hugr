@@ -9,6 +9,8 @@ import hugr._serialization.tys as stys
 from hugr.utils import ser_it
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from hugr import ext
 
 
@@ -301,6 +303,52 @@ class Tuple(Sum):
 
     def __repr__(self) -> str:
         return f"Tuple{tuple(self.variant_rows[0])}"
+
+
+@dataclass(eq=False)
+class Option(Sum):
+    """Optional tuple of elements.
+
+    Instances of this type correspond to :class:`Sum` with two variants.
+    The first variant is the tuple of elements, the second is empty.
+    """
+
+    def __init__(self, *tys: Type):
+        self.variant_rows = [list(tys), []]
+
+    def __repr__(self) -> str:
+        return f"Option({', '.join(map(repr, self.variant_rows[0]))})"
+
+
+@dataclass(eq=False)
+class Either(Sum):
+    """Two-variant tuple of elements.
+
+    Instances of this type correspond to :class:`Sum` with a Left and a Right variant.
+
+    In fallible contexts, the Left variant is used to represent success, and the
+    Right variant is used to represent failure.
+
+    Example:
+        >>> either = Either([Bool, Bool], [Bool])
+        >>> either
+        Either(left=[Bool, Bool], right=[Bool])
+        >>> str(either)
+        'Either((Bool, Bool), Bool)'
+    """
+
+    def __init__(self, left: Iterable[Type], right: Iterable[Type]):
+        self.variant_rows = [list(left), list(right)]
+
+    def __repr__(self) -> str:  # pragma: no cover
+        left, right = self.variant_rows
+        return f"Either(left={left}, right={right})"
+
+    def __str__(self) -> str:
+        left, right = self.variant_rows
+        left_str = left[0] if len(left) == 1 else tuple(left)
+        right_str = right[0] if len(right) == 1 else tuple(right)
+        return f"Either({left_str}, {right_str})"
 
 
 @dataclass(frozen=True)
