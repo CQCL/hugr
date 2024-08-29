@@ -669,9 +669,10 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
                 parent = None
 
             serial_node.root.parent = -1
-            hugr._nodes.append(
-                NodeData(serial_node.root.deserialize(), parent, metadata=node_meta)
+            n = hugr._add_node(
+                serial_node.root.deserialize(), parent, metadata=node_meta
             )
+            assert n.idx == idx, "Nodes should be added contiguously"
 
         for (src_node, src_offset), (dst_node, dst_offset) in serial.edges:
             if src_offset is None or dst_offset is None:
