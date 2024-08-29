@@ -248,13 +248,13 @@ pub const ERROR_TYPE_NAME: TypeName = TypeName::new_inline("error");
 
 /// Return a Sum type with the first variant as the given type and the second an Error.
 pub fn sum_with_error(ty: impl Into<TypeRowRV>) -> SumType {
-    SumType::new([ty.into(), ERROR_TYPE.into()])
+    result_type(ty, ERROR_TYPE)
 }
 
 /// An optional type, i.e. a Sum type with the first variant as the given type and the second as an empty tuple.
 #[inline]
 pub fn option_type(ty: impl Into<TypeRowRV>) -> SumType {
-    result_type(ty, Type::UNIT)
+    result_type(ty, TypeRow::new())
 }
 
 /// A result type, i.e. a two-element Sum type where the first variant
@@ -277,7 +277,7 @@ pub fn const_some(value: Value) -> Value {
 ///
 /// See [option_type].
 pub fn const_some_tuple(values: impl IntoIterator<Item = Value>) -> Value {
-    const_ok_tuple(values, Type::UNIT)
+    const_ok_tuple(values, TypeRow::new())
 }
 
 /// A constant optional value with no value.
@@ -882,6 +882,8 @@ impl MakeRegisteredOp for Lift {
 
 #[cfg(test)]
 mod test {
+    use crate::std_extensions::arithmetic::float_ops::FLOAT_OPS_REGISTRY;
+    use crate::std_extensions::arithmetic::float_types::{ConstF64, FLOAT64_TYPE};
     use crate::{
         builder::{endo_sig, inout_sig, DFGBuilder, Dataflow, DataflowHugr},
         utils::test_quantum_extension::cx_gate,
@@ -971,6 +973,35 @@ mod test {
         let out = b.add_dataflow_op(op, [q1, q2]).unwrap();
 
         b.finish_prelude_hugr_with_outputs(out.outputs()).unwrap();
+    }
+
+    #[test]
+    fn test_option() {
+        let typ: Type = option_type(BOOL_T).into();
+        let const_val1 = const_some(Value::true_val());
+        let const_val2 = const_none(BOOL_T);
+
+        let mut b = DFGBuilder::new(inout_sig(type_row![], vec![typ.clone(), typ])).unwrap();
+
+        let some = b.add_load_value(const_val1);
+        let none = b.add_load_value(const_val2);
+
+        b.finish_prelude_hugr_with_outputs([some, none]).unwrap();
+    }
+
+    #[test]
+    fn test_result() {
+        let typ: Type = result_type(BOOL_T, FLOAT64_TYPE).into();
+        let const_bool = const_ok(Value::true_val(), FLOAT64_TYPE);
+        let const_float = const_err(BOOL_T, ConstF64::new(0.5).into());
+
+        let mut b = DFGBuilder::new(inout_sig(type_row![], vec![typ.clone(), typ])).unwrap();
+
+        let bool = b.add_load_value(const_bool);
+        let float = b.add_load_value(const_float);
+
+        b.finish_hugr_with_outputs([bool, float], &FLOAT_OPS_REGISTRY)
+            .unwrap();
     }
 
     #[test]
