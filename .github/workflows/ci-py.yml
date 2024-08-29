@@ -143,7 +143,7 @@ jobs:
         if: github.event_name == 'merge_group' || !matrix.python-version.coverage
         run: |
           chmod +x $HUGR_BIN
-          uv run pytest
+          HUGR_RENDER_DOT=1 uv run pytest
 
       - name: Run python tests with coverage instrumentation
         if: github.event_name != 'merge_group' && matrix.python-version.coverage
