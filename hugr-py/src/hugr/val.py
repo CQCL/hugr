@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 import hugr._serialization.ops as sops
 import hugr._serialization.tys as stys
 from hugr import tys
-from hugr.utils import ser_it
+from hugr.utils import comma_sep_repr, comma_sep_str, ser_it
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -153,7 +153,7 @@ class Tuple(Sum):
         )
 
     def __repr__(self) -> str:
-        return f"Tuple({', '.join(map(repr, self.vals))})"
+        return f"Tuple({comma_sep_repr(self.vals)})"
 
 
 @dataclass(eq=False)
@@ -176,7 +176,7 @@ class Some(Sum):
         )
 
     def __repr__(self) -> str:
-        return f"Some({', '.join(map(repr, self.vals))})"
+        return f"Some({comma_sep_repr(self.vals)})"
 
 
 @dataclass(eq=False)
@@ -229,8 +229,7 @@ class Left(Sum):
         return f"Left(vals={self.vals}, right_typ={list(right_typ)})"
 
     def __str__(self) -> str:
-        vals_str = ", ".join(map(str, self.vals))
-        return f"Left({vals_str})"
+        return f"Left({comma_sep_str(self.vals)})"
 
 
 @dataclass(eq=False)
@@ -262,8 +261,7 @@ class Right(Sum):
         return f"Right(left_typ={list(left_typ)}, vals={self.vals})"
 
     def __str__(self) -> str:
-        vals_str = ", ".join(map(str, self.vals))
-        return f"Right({vals_str})"
+        return f"Right({comma_sep_str(self.vals)})"
 
 
 @dataclass
