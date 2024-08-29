@@ -328,13 +328,6 @@ class Either(Sum):
 
     In fallible contexts, the Left variant is used to represent success, and the
     Right variant is used to represent failure.
-
-    Example:
-        >>> either = Either([Bool, Bool], [Bool])
-        >>> either
-        Either(left=[Bool, Bool], right=[Bool])
-        >>> str(either)
-        'Either((Bool, Bool), Bool)'
     """
 
     def __init__(self, left: Iterable[Type], right: Iterable[Type]):
