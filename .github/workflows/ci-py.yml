@@ -139,6 +139,9 @@ jobs:
       - name: Setup dependencies
         run: uv sync
 
+      - name: Setup Graphviz
+        uses: ts-graphviz/setup-graphviz@v2
+
       - name: Run tests
         if: github.event_name == 'merge_group' || !matrix.python-version.coverage
         run: |
