@@ -1,34 +1,26 @@
 //! Prelude extension - available in all contexts, defining common types,
 //! operations and constants.
+use itertools::Itertools;
 use lazy_static::lazy_static;
 
-use crate::extension::simple_op::MakeOpDef;
-use crate::ops::constant::{CustomCheckFailure, ValueName};
-use crate::ops::{ExtensionOp, OpName};
-use crate::types::{FuncValueType, SumType, TypeName, TypeRV};
-use crate::{
-    extension::{ExtensionId, TypeDefBound},
-    ops::constant::CustomConst,
-    type_row,
-    types::{
-        type_param::{TypeArg, TypeParam},
-        CustomType, PolyFuncTypeRV, Signature, Type, TypeBound,
-    },
-    Extension,
+use crate::extension::const_fold::fold_out_row;
+use crate::extension::simple_op::{
+    try_from_name, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
 };
+use crate::extension::{
+    ConstFold, ExtensionId, ExtensionSet, OpDef, SignatureError, SignatureFunc, TypeDefBound,
+};
+use crate::ops::constant::{CustomCheckFailure, CustomConst, ValueName};
+use crate::ops::{ExtensionOp, NamedOp, OpName, Value};
+use crate::types::type_param::{TypeArg, TypeParam};
+use crate::types::{
+    CustomType, FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, SumType, Type, TypeBound,
+    TypeName, TypeRV, TypeRow, TypeRowRV,
+};
+use crate::utils::sorted_consts;
+use crate::{type_row, Extension};
 
 use strum_macros::{EnumIter, EnumString, IntoStaticStr};
-
-use crate::{
-    extension::{
-        const_fold::fold_out_row,
-        simple_op::{try_from_name, MakeExtensionOp, MakeRegisteredOp, OpLoadError},
-        ConstFold, ExtensionSet, OpDef, SignatureError, SignatureFunc,
-    },
-    ops::{NamedOp, Value},
-    types::{PolyFuncType, TypeRow},
-    utils::sorted_consts,
-};
 
 use super::{ExtensionRegistry, SignatureFromArgs};
 struct ArrayOpCustom;
@@ -255,8 +247,92 @@ pub const ERROR_TYPE: Type = Type::new_extension(ERROR_CUSTOM_TYPE);
 pub const ERROR_TYPE_NAME: TypeName = TypeName::new_inline("error");
 
 /// Return a Sum type with the first variant as the given type and the second an Error.
-pub fn sum_with_error(ty: Type) -> SumType {
-    SumType::new([ty, ERROR_TYPE])
+pub fn sum_with_error(ty: impl Into<TypeRowRV>) -> SumType {
+    SumType::new([ty.into(), ERROR_TYPE.into()])
+}
+
+/// An optional type, i.e. a Sum type with the first variant as the given type and the second as an empty tuple.
+#[inline]
+pub fn option_type(ty: impl Into<TypeRowRV>) -> SumType {
+    result_type(ty, Type::UNIT)
+}
+
+/// A result type, i.e. a two-element Sum type where the first variant
+/// represents the "Ok" value, and the second is the "Error" value.
+#[inline]
+pub fn result_type(ty_ok: impl Into<TypeRowRV>, ty_err: impl Into<TypeRowRV>) -> SumType {
+    SumType::new([ty_ok.into(), ty_err.into()])
+}
+
+/// A constant optional value with a given value.
+///
+/// See [option_type].
+pub fn const_some(value: Value) -> Value {
+    const_some_tuple([value])
+}
+
+/// A constant optional value with a row of values.
+///
+/// For single values, use [const_some].
+///
+/// See [option_type].
+pub fn const_some_tuple(values: impl IntoIterator<Item = Value>) -> Value {
+    const_ok_tuple(values, Type::UNIT)
+}
+
+/// A constant optional value with no value.
+///
+/// See [option_type].
+pub fn const_none(ty: impl Into<TypeRowRV>) -> Value {
+    const_err_tuple(ty, [])
+}
+
+/// A constant result value with an Ok value.
+///
+/// See [result_type].
+pub fn const_ok(value: Value, ty_err: impl Into<TypeRowRV>) -> Value {
+    const_ok_tuple([value], ty_err)
+}
+
+/// A constant result value with a row of Ok values.
+///
+/// See [result_type].
+pub fn const_ok_tuple(
+    values: impl IntoIterator<Item = Value>,
+    ty_err: impl Into<TypeRowRV>,
+) -> Value {
+    let values = values.into_iter().collect_vec();
+    let types: TypeRowRV = values
+        .iter()
+        .map(|v| TypeRV::from(v.get_type()))
+        .collect_vec()
+        .into();
+    let typ = result_type(types, ty_err);
+    Value::sum(0, values, typ).unwrap()
+}
+
+/// A constant result value with an Err value.
+///
+/// See [result_type].
+pub fn const_err(ty_ok: impl Into<TypeRowRV>, value: Value) -> Value {
+    const_err_tuple(ty_ok, [value])
+}
+
+/// A constant result value with a row of Err values.
+///
+/// See [result_type].
+pub fn const_err_tuple(
+    ty_ok: impl Into<TypeRowRV>,
+    values: impl IntoIterator<Item = Value>,
+) -> Value {
+    let values = values.into_iter().collect_vec();
+    let types: TypeRowRV = values
+        .iter()
+        .map(|v| TypeRV::from(v.get_type()))
+        .collect_vec()
+        .into();
+    let typ = result_type(ty_ok, types);
+    Value::sum(1, values, typ).unwrap()
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
