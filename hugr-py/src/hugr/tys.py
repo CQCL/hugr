@@ -9,6 +9,8 @@ import hugr._serialization.tys as stys
 from hugr.utils import ser_it
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from hugr import ext
 
 
@@ -301,6 +303,41 @@ class Tuple(Sum):
 
     def __repr__(self) -> str:
         return f"Tuple{tuple(self.variant_rows[0])}"
+
+
+@dataclass(eq=False)
+class Option(Sum):
+    """Optional tuple of elements.
+
+    Instances of this type correspond to :class:`Sum` with two variants.
+    The first variant is the tuple of elements, the second is empty.
+    """
+
+    def __init__(self, *tys: Type):
+        self.variant_rows = [list(tys), []]
+
+    def __repr__(self) -> str:
+        return f"Option({', '.join(map(repr, self.variant_rows[0]))})"
+
+
+@dataclass(eq=False)
+class Result(Sum):
+    """Fallible tuple of elements.
+
+    Instances of this type correspond to :class:`Sum` with two variants. The
+    first variant is a tuple of elements representing the successful state, the
+    second is a tuple of elements representing failure.
+    """
+
+    def __init__(self, ok: Iterable[Type], err: Iterable[Type]):
+        self.variant_rows = [list(ok), list(err)]
+
+    def __repr__(self) -> str:
+        ok = self.variant_rows[0]
+        err = self.variant_rows[1]
+        ok_str = ok[0] if len(ok) == 1 else tuple(ok)
+        err_str = err[0] if len(err) == 1 else tuple(err)
+        return f"Result({ok_str}, {err_str})"
 
 
 @dataclass(frozen=True)

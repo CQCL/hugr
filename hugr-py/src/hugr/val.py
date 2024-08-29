@@ -11,6 +11,8 @@ from hugr import tys
 from hugr.utils import ser_it
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from hugr.hugr import Hugr
 
 
@@ -147,6 +149,114 @@ class Tuple(Sum):
 
     def __repr__(self) -> str:
         return f"Tuple({', '.join(map(repr, self.vals))})"
+
+
+@dataclass
+class Some(Sum):
+    """Optional tuple of value, containing a list of values.
+    Internally a :class:`Sum` with two variant rows.
+
+    Example:
+        >>> some = Some(TRUE, FALSE)
+        >>> some
+        Some(TRUE, FALSE)
+        >>> some.type_()
+        Option(Bool, Bool)
+
+    """
+
+    #: The values of this tuple.
+    vals: list[Value]
+
+    def __init__(self, *vals: Value):
+        val_list = list(vals)
+        super().__init__(
+            tag=0, typ=tys.Option(*(v.type_() for v in val_list)), vals=val_list
+        )
+
+    def __repr__(self) -> str:
+        return f"Some({', '.join(map(repr, self.vals))})"
+
+
+@dataclass
+class None_(Sum):
+    """Optional tuple of value, containing no values.
+    Internally a :class:`Sum` with two variant rows.
+
+    Example:
+        >>> none = None_(tys.Bool)
+        >>> none
+        None(Bool)
+        >>> none.type_()
+        Option(Bool)
+
+    """
+
+    def __init__(self, *types: tys.Type):
+        super().__init__(tag=1, typ=tys.Option(*types), vals=[])
+
+    def __repr__(self) -> str:
+        return f"None({', '.join(map(repr, self.typ.variant_rows[0]))})"
+
+
+@dataclass
+class Ok(Sum):
+    """Success variant of a :class:`tys.Result` type, containing a list of values.
+
+    Internally a :class:`Sum` with two variant rows.
+
+    Example:
+        >>> ok = Ok([TRUE, FALSE], [tys.Bool])
+        >>> ok
+        Ok((TRUE, FALSE), Bool)
+        >>> ok.type_()
+        Result((Bool, Bool), Bool)
+    """
+
+    #: The values of this tuple.
+    vals: list[Value]
+
+    def __init__(self, vals: Iterable[Value], err_typ: Iterable[tys.Type]):
+        val_list = list(vals)
+        super().__init__(
+            tag=0, typ=tys.Result([v.type_() for v in val_list], err_typ), vals=val_list
+        )
+
+    def __repr__(self) -> str:
+        vals_str = self.vals[0] if len(self.vals) == 1 else tuple(self.vals)
+        err = self.typ.variant_rows[1]
+        err_str = err[0] if len(err) == 1 else tuple(err)
+        return f"Ok({vals_str}, {err_str})"
+
+
+@dataclass
+class Err(Sum):
+    """Error variant of a :class:`tys.Result` type, containing a list of values.
+
+    Internally a :class:`Sum` with two variant rows.
+
+    Example:
+        >>> err = Err([tys.Bool, tys.Bool], [TRUE, FALSE])
+        >>> err
+        Err((Bool, Bool), (TRUE, FALSE))
+        >>> err.type_()
+        Result((Bool, Bool), (Bool, Bool))
+    """
+
+    #: The values of this tuple.
+    vals: list[Value]
+
+    def __init__(self, ok_typ: Iterable[tys.Type], vals: Iterable[Value]):
+        val_list = list(vals)
+        super().__init__(
+            tag=1, typ=tys.Result(ok_typ, [v.type_() for v in val_list]), vals=val_list
+        )
+
+    def __repr__(self) -> str:
+        ok = self.typ.variant_rows[1]
+        ok_str = ok[0] if len(ok) == 1 else tuple(ok)
+        vals_str = self.vals[0] if len(self.vals) == 1 else tuple(self.vals)
+        return f"Err({ok_str}, {vals_str})"
 
 
 @dataclass
