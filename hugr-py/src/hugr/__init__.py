@@ -4,8 +4,6 @@ representation.
 
 from .hugr.base import Hugr
 from .hugr.node_port import Direction, InPort, Node, OutPort, Wire
-from .ops import Op
-from .tys import Kind, Type
 
 __all__ = [
     "Hugr",
@@ -13,9 +11,6 @@ __all__ = [
     "OutPort",
     "InPort",
     "Direction",
-    "Op",
-    "Kind",
-    "Type",
     "Wire",
 ]
 
