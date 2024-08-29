@@ -72,7 +72,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>logic.Not</B></FONT></TD></TR>
+                  COLOR="black"><B>Not</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -236,7 +236,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>logic.Not</B></FONT></TD></TR>
+                  COLOR="black"><B>Not</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -440,7 +440,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>logic.Not</B></FONT></TD></TR>
+                  COLOR="black"><B>Not</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -653,7 +653,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>logic.Not</B></FONT></TD></TR>
+                  COLOR="black"><B>Not</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -815,7 +815,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>logic.Not</B><BR/><BR/>name: not</FONT></TD></TR>
+                  COLOR="black"><B>Not</B><BR/><BR/>name: not</FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -938,7 +938,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>arithmetic.int.idivmod_u</B></FONT></TD></TR>
+                  COLOR="black"><B>idivmod_u</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
