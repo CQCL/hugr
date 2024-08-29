@@ -124,10 +124,8 @@ fn test_big() {
 }
 
 #[test]
-#[cfg_attr(
-    feature = "extension_inference",
-    ignore = "inference fails for test graph, it shouldn't"
-)]
+#[ignore = "Waiting for `unwrap` operation"]
+// TODO: https://github.com/CQCL/hugr/issues/1486
 fn test_list_ops() -> Result<(), Box<dyn std::error::Error>> {
     use hugr_core::std_extensions::collections::{self, ListOp, ListValue};
 
@@ -137,28 +135,40 @@ fn test_list_ops() -> Result<(), Box<dyn std::error::Error>> {
         collections::EXTENSION.to_owned(),
     ])
     .unwrap();
-    let list: Value = ListValue::new(BOOL_T, [Value::false_val()]).into();
-    let mut build =
-        DFGBuilder::new(Signature::new(type_row![], vec![list.get_type().clone()])).unwrap();
+    let base_list: Value = ListValue::new(BOOL_T, [Value::false_val()]).into();
+    let mut build = DFGBuilder::new(Signature::new(
+        type_row![],
+        vec![base_list.get_type().clone()],
+    ))
+    .unwrap();
 
-    let list_wire = build.add_load_const(list.clone());
+    let list = build.add_load_const(base_list.clone());
 
-    let pop = build.add_dataflow_op(
-        ListOp::pop.with_type(BOOL_T).to_extension_op(&reg).unwrap(),
-        [list_wire],
-    )?;
+    let [list, maybe_elem] = build
+        .add_dataflow_op(
+            ListOp::pop.with_type(BOOL_T).to_extension_op(&reg).unwrap(),
+            [list],
+        )?
+        .outputs_arr();
 
-    let push = build.add_dataflow_op(
-        ListOp::push
-            .with_type(BOOL_T)
-            .to_extension_op(&reg)
-            .unwrap(),
-        pop.outputs(),
-    )?;
-    let mut h = build.finish_hugr_with_outputs(push.outputs(), &reg)?;
+    // FIXME: Unwrap the Option<BOOL_T>
+    let elem = maybe_elem;
+
+    let [list] = build
+        .add_dataflow_op(
+            ListOp::push
+                .with_type(BOOL_T)
+                .to_extension_op(&reg)
+                .unwrap(),
+            [list, elem],
+        )?
+        .outputs_arr();
+
+    let mut h = build.finish_hugr_with_outputs([list], &reg)?;
+
     constant_fold_pass(&mut h, &reg);
 
-    assert_fully_folded(&h, &list);
+    assert_fully_folded(&h, &base_list);
     Ok(())
 }
 
