@@ -154,7 +154,6 @@ class Tuple(Sum):
 @dataclass
 class Some(Sum):
     """Optional tuple of value, containing a list of values.
-    Internally a :class:`Sum` with two variant rows.
 
     Example:
         >>> some = Some(TRUE, FALSE)
@@ -181,7 +180,6 @@ class Some(Sum):
 @dataclass
 class None_(Sum):
     """Optional tuple of value, containing no values.
-    Internally a :class:`Sum` with two variant rows.
 
     Example:
         >>> none = None_(tys.Bool)
@@ -200,63 +198,69 @@ class None_(Sum):
 
 
 @dataclass
-class Ok(Sum):
-    """Success variant of a :class:`tys.Result` type, containing a list of values.
+class Left(Sum):
+    """Left variant of a :class:`tys.Either` type, containing a list of values.
 
-    Internally a :class:`Sum` with two variant rows.
+    In fallible contexts, this represents the success variant.
 
     Example:
-        >>> ok = Ok([TRUE, FALSE], [tys.Bool])
-        >>> ok
-        Ok((TRUE, FALSE), Bool)
-        >>> ok.type_()
-        Result((Bool, Bool), Bool)
+        >>> left = Left([TRUE, FALSE], [tys.Bool])
+        >>> left
+        Left((TRUE, FALSE), Bool)
+        >>> left.type_()
+        Either((Bool, Bool), Bool)
     """
 
     #: The values of this tuple.
     vals: list[Value]
 
-    def __init__(self, vals: Iterable[Value], err_typ: Iterable[tys.Type]):
+    def __init__(self, vals: Iterable[Value], left_typ: Iterable[tys.Type]):
         val_list = list(vals)
         super().__init__(
-            tag=0, typ=tys.Result([v.type_() for v in val_list], err_typ), vals=val_list
+            tag=0,
+            typ=tys.Either([v.type_() for v in val_list], left_typ),
+            vals=val_list,
         )
 
     def __repr__(self) -> str:
         vals_str = self.vals[0] if len(self.vals) == 1 else tuple(self.vals)
-        _, err = self.typ.variant_rows
-        err_str = err[0] if len(err) == 1 else tuple(err)
-        return f"Ok({vals_str}, {err_str})"
+        _, right = self.typ.variant_rows
+        right_str = right[0] if len(right) == 1 else tuple(right)
+        return f"Left({vals_str}, {right_str})"
 
 
 @dataclass
-class Err(Sum):
-    """Error variant of a :class:`tys.Result` type, containing a list of values.
+class Right(Sum):
+    """Right variant of a :class:`tys.Either` type, containing a list of values.
+
+    In fallible contexts, this represents the failure variant.
 
     Internally a :class:`Sum` with two variant rows.
 
     Example:
-        >>> err = Err([tys.Bool, tys.Bool], [TRUE, FALSE])
-        >>> err
-        Err((Bool, Bool), (TRUE, FALSE))
-        >>> err.type_()
-        Result((Bool, Bool), (Bool, Bool))
+        >>> right = Right([tys.Bool, tys.Bool, tys.Bool], [TRUE, FALSE])
+        >>> right
+        Right((Bool, Bool, Bool), (TRUE, FALSE))
+        >>> right.type_()
+        Either((Bool, Bool, Bool), (Bool, Bool))
     """
 
     #: The values of this tuple.
     vals: list[Value]
 
-    def __init__(self, ok_typ: Iterable[tys.Type], vals: Iterable[Value]):
+    def __init__(self, left_typ: Iterable[tys.Type], vals: Iterable[Value]):
         val_list = list(vals)
         super().__init__(
-            tag=1, typ=tys.Result(ok_typ, [v.type_() for v in val_list]), vals=val_list
+            tag=1,
+            typ=tys.Either(left_typ, [v.type_() for v in val_list]),
+            vals=val_list,
         )
 
     def __repr__(self) -> str:
-        ok, _ = self.typ.variant_rows
-        ok_str = ok[0] if len(ok) == 1 else tuple(ok)
+        left, _ = self.typ.variant_rows
+        left_str = left[0] if len(left) == 1 else tuple(left)
         vals_str = self.vals[0] if len(self.vals) == 1 else tuple(self.vals)
-        return f"Err({ok_str}, {vals_str})"
+        return f"Right({left_str}, {vals_str})"
 
 
 @dataclass

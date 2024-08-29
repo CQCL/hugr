@@ -321,22 +321,23 @@ class Option(Sum):
 
 
 @dataclass(eq=False)
-class Result(Sum):
-    """Fallible tuple of elements.
+class Either(Sum):
+    """Two-variant tuple of elements.
 
-    Instances of this type correspond to :class:`Sum` with two variants. The
-    first variant is a tuple of elements representing the successful state, the
-    second is a tuple of elements representing failure.
+    Instances of this type correspond to :class:`Sum` with a Left and a Right variant.
+
+    In fallible contexts, the Left variant is used to represent success, and the
+    Right variant is used to represent failure.
     """
 
-    def __init__(self, ok: Iterable[Type], err: Iterable[Type]):
-        self.variant_rows = [list(ok), list(err)]
+    def __init__(self, left: Iterable[Type], right: Iterable[Type]):
+        self.variant_rows = [list(left), list(right)]
 
     def __repr__(self) -> str:
-        ok, err  = self.variant_rows
-        ok_str = ok[0] if len(ok) == 1 else tuple(ok)
-        err_str = err[0] if len(err) == 1 else tuple(err)
-        return f"Result({ok_str}, {err_str})"
+        left, right = self.variant_rows
+        left_str = left[0] if len(left) == 1 else tuple(left)
+        right_str = right[0] if len(right) == 1 else tuple(right)
+        return f"Either({left_str}, {right_str})"
 
 
 @dataclass(frozen=True)
