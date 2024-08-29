@@ -11,7 +11,7 @@ from typing_extensions import Self
 import hugr._serialization.ops as sops
 from hugr import tys, val
 from hugr.hugr.node_port import Direction, InPort, Node, OutPort, PortOffset, Wire
-from hugr.utils import ser_it
+from hugr.utils import comma_sep_str, ser_it
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -297,7 +297,11 @@ class AsExtOp(DataflowOp, Protocol):
         return len(self.outer_signature().output)
 
     def name(self) -> str:
-        return self.ext_op._op_def.qualified_name()
+        name = self.ext_op._op_def.qualified_name()
+        ta = self.type_args()
+        if len(ta) == 0:
+            return name
+        return f"{name}<{comma_sep_str(self.type_args())}>"
 
 
 @dataclass(frozen=True, eq=False)

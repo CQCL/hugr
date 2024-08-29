@@ -546,6 +546,16 @@ class PolyFuncType(Type):
     def __str__(self) -> str:
         return f"∀ {comma_sep_str(self.params)}. {self.body!s}"
 
+    @classmethod
+    def empty(cls) -> PolyFuncType:
+        """Generate an empty polymorphic function type.
+
+        Example:
+            >>> PolyFuncType.empty()
+            PolyFuncType(params=[], body=FunctionType([], []))
+        """
+        return PolyFuncType(params=[], body=FunctionType.empty())
+
 
 @dataclass
 class ExtType(Type):
