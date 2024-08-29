@@ -333,8 +333,7 @@ class Result(Sum):
         self.variant_rows = [list(ok), list(err)]
 
     def __repr__(self) -> str:
-        ok = self.variant_rows[0]
-        err = self.variant_rows[1]
+        ok, err  = self.variant_rows
         ok_str = ok[0] if len(ok) == 1 else tuple(ok)
         err_str = err[0] if len(err) == 1 else tuple(err)
         return f"Result({ok_str}, {err_str})"

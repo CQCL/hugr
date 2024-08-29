@@ -224,7 +224,7 @@ class Ok(Sum):
 
     def __repr__(self) -> str:
         vals_str = self.vals[0] if len(self.vals) == 1 else tuple(self.vals)
-        err = self.typ.variant_rows[1]
+        _, err = self.typ.variant_rows
         err_str = err[0] if len(err) == 1 else tuple(err)
         return f"Ok({vals_str}, {err_str})"
 
@@ -253,7 +253,7 @@ class Err(Sum):
         )
 
     def __repr__(self) -> str:
-        ok = self.typ.variant_rows[1]
+        ok, _ = self.typ.variant_rows
         ok_str = ok[0] if len(ok) == 1 else tuple(ok)
         vals_str = self.vals[0] if len(self.vals) == 1 else tuple(self.vals)
         return f"Err({ok_str}, {vals_str})"
