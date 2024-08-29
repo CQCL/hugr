@@ -12,7 +12,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>Input(types=[Bool])</B></FONT></TD></TR>
+                  COLOR="black"><B>Input</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -47,7 +47,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>Output()</B></FONT></TD></TR>
+                  COLOR="black"><B>Output</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -72,7 +72,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>_NotOp()</B></FONT></TD></TR>
+                  COLOR="black"><B>logic.Not</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -97,7 +97,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>DFG(inputs=[Bool])</B></FONT></TD></TR>
+                  COLOR="black"><B>DFG</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -135,7 +135,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>Input(types=[Bool, Bool])</B></FONT></TD></TR>
+                  COLOR="black"><B>Input</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -170,7 +170,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>Output()</B></FONT></TD></TR>
+                  COLOR="black"><B>Output</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -186,7 +186,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>Input(types=[])</B></FONT></TD></TR>
+                  COLOR="black"><B>Input</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -211,7 +211,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>Output()</B></FONT></TD></TR>
+                  COLOR="black"><B>Output</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -236,7 +236,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>_NotOp()</B></FONT></TD></TR>
+                  COLOR="black"><B>logic.Not</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -261,7 +261,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>DFG(inputs=[])</B></FONT></TD></TR>
+                  COLOR="black"><B>DFG</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -288,7 +288,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>DFG(inputs=[Bool, Bool])</B></FONT></TD></TR>
+                  COLOR="black"><B>DFG</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -329,7 +329,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>Input(types=[Bool])</B></FONT></TD></TR>
+                  COLOR="black"><B>Input</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -364,7 +364,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>Output()</B></FONT></TD></TR>
+                  COLOR="black"><B>Output</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -380,7 +380,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>Input(types=[Bool])</B></FONT></TD></TR>
+                  COLOR="black"><B>Input</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -415,7 +415,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>Output()</B></FONT></TD></TR>
+                  COLOR="black"><B>Output</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -440,7 +440,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>_NotOp()</B></FONT></TD></TR>
+                  COLOR="black"><B>logic.Not</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -475,7 +475,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>DFG(inputs=[Bool])</B></FONT></TD></TR>
+                  COLOR="black"><B>DFG</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -502,7 +502,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>DFG(inputs=[Bool])</B></FONT></TD></TR>
+                  COLOR="black"><B>DFG</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -542,7 +542,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>Input(types=[Bool])</B></FONT></TD></TR>
+                  COLOR="black"><B>Input</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -577,7 +577,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>Output()</B></FONT></TD></TR>
+                  COLOR="black"><B>Output</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -593,7 +593,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>Input(types=[Bool])</B></FONT></TD></TR>
+                  COLOR="black"><B>Input</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -628,7 +628,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>Output()</B></FONT></TD></TR>
+                  COLOR="black"><B>Output</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -653,7 +653,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>_NotOp()</B></FONT></TD></TR>
+                  COLOR="black"><B>logic.Not</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -688,7 +688,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>DFG(inputs=[Bool])</B></FONT></TD></TR>
+                  COLOR="black"><B>DFG</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -715,7 +715,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>DFG(inputs=[Bool])</B></FONT></TD></TR>
+                  COLOR="black"><B>DFG</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -755,7 +755,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>Input(types=[Bool])</B></FONT></TD></TR>
+                  COLOR="black"><B>Input</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -790,7 +790,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>Output()</B></FONT></TD></TR>
+                  COLOR="black"><B>Output</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -815,7 +815,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>_NotOp()</B><BR/><BR/>name: not</FONT></TD></TR>
+                  COLOR="black"><B>logic.Not</B><BR/><BR/>name: not</FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -840,7 +840,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>DFG(inputs=[Bool])</B><BR/><BR/>name: simple_id</FONT></TD></TR>
+                  COLOR="black"><B>DFG</B><BR/><BR/>name: simple_id</FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -878,7 +878,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>Input(types=[ExtType(type_def=TypeDef(name='int', description='integral value of a given bit width', params=[BoundedNatParam(upper_bound=7)], bound=ExplicitBound(bound=<TypeBound.Copyable: 'C'>)), args=[BoundedNatArg(n=5)]), ExtType(type_def=TypeDef(name='int', description='integral value of a given bit width', params=[BoundedNatParam(upper_bound=7)], bound=ExplicitBound(bound=<TypeBound.Copyable: 'C'>)), args=[BoundedNatArg(n=5)])])</B></FONT></TD></TR>
+                  COLOR="black"><B>Input</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -913,7 +913,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>Output()</B></FONT></TD></TR>
+                  COLOR="black"><B>Output</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -938,7 +938,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>_DivModDef(width=5)</B></FONT></TD></TR>
+                  COLOR="black"><B>arithmetic.int.idivmod_u</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -963,7 +963,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>DFG(inputs=[ExtType(type_def=TypeDef(name='int', description='integral value of a given bit width', params=[BoundedNatParam(upper_bound=7)], bound=ExplicitBound(bound=<TypeBound.Copyable: 'C'>)), args=[BoundedNatArg(n=5)]), ExtType(type_def=TypeDef(name='int', description='integral value of a given bit width', params=[BoundedNatParam(upper_bound=7)], bound=ExplicitBound(bound=<TypeBound.Copyable: 'C'>)), args=[BoundedNatArg(n=5)])])</B></FONT></TD></TR>
+                  COLOR="black"><B>DFG</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -982,10 +982,10 @@
       > shape=plain]
   		color="#1CADE4" label="" margin=10
   	}
-  	1:"out.0" -> 3:"in.0" [label="ExtType(type_def=TypeDef(name='int', description='integral value of a given bit width', params=[BoundedNatParam(upper_bound=7)], bound=ExplicitBound(bound=<TypeBound.Copyable: 'C'>)), args=[BoundedNatArg(n=5)])" arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	1:"out.1" -> 3:"in.1" [label="ExtType(type_def=TypeDef(name='int', description='integral value of a given bit width', params=[BoundedNatParam(upper_bound=7)], bound=ExplicitBound(bound=<TypeBound.Copyable: 'C'>)), args=[BoundedNatArg(n=5)])" arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	3:"out.0" -> 2:"in.0" [label="ExtType(type_def=TypeDef(name='int', description='integral value of a given bit width', params=[BoundedNatParam(upper_bound=7)], bound=ExplicitBound(bound=<TypeBound.Copyable: 'C'>)), args=[BoundedNatArg(n=5)])" arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	3:"out.1" -> 2:"in.1" [label="ExtType(type_def=TypeDef(name='int', description='integral value of a given bit width', params=[BoundedNatParam(upper_bound=7)], bound=ExplicitBound(bound=<TypeBound.Copyable: 'C'>)), args=[BoundedNatArg(n=5)])" arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
+  	1:"out.0" -> 3:"in.0" [label="int<5>" arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
+  	1:"out.1" -> 3:"in.1" [label="int<5>" arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
+  	3:"out.0" -> 2:"in.0" [label="int<5>" arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
+  	3:"out.1" -> 2:"in.1" [label="int<5>" arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
   }
   
   '''
@@ -1003,7 +1003,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>Input(types=[Bool])</B></FONT></TD></TR>
+                  COLOR="black"><B>Input</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -1038,7 +1038,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>Output()</B></FONT></TD></TR>
+                  COLOR="black"><B>Output</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -1053,7 +1053,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>DFG(inputs=[Bool])</B></FONT></TD></TR>
+                  COLOR="black"><B>DFG</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -1092,7 +1092,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>Input(types=[Qubit])</B></FONT></TD></TR>
+                  COLOR="black"><B>Input</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -1127,7 +1127,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>Output()</B></FONT></TD></TR>
+                  COLOR="black"><B>Output</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -1152,7 +1152,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>Call(signature=PolyFuncType(params=[], body=FunctionType([Qubit], [Qubit])), instantiation=FunctionType([Qubit], [Qubit]), type_args=[])</B></FONT></TD></TR>
+                  COLOR="black"><B>Call</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -1177,7 +1177,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>FuncDefn(name='recurse', inputs=[Qubit], params=[])</B></FONT></TD></TR>
+                  COLOR="black"><B>FuncDefn(recurse)</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -1204,7 +1204,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>Module()</B></FONT></TD></TR>
+                  COLOR="black"><B>Module</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -1233,7 +1233,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>Input(types=[Qubit, Qubit])</B></FONT></TD></TR>
+                  COLOR="black"><B>Input</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -1268,7 +1268,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>Output()</B></FONT></TD></TR>
+                  COLOR="black"><B>Output</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -1283,7 +1283,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>DFG(inputs=[Qubit, Qubit])</B></FONT></TD></TR>
+                  COLOR="black"><B>DFG</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -1321,7 +1321,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>Input(types=[Bool, Qubit])</B></FONT></TD></TR>
+                  COLOR="black"><B>Input</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -1356,7 +1356,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>Output()</B></FONT></TD></TR>
+                  COLOR="black"><B>Output</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -1381,7 +1381,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>MakeTuple([Bool, Qubit])</B></FONT></TD></TR>
+                  COLOR="black"><B>MakeTuple</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -1416,7 +1416,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>UnpackTuple()</B></FONT></TD></TR>
+                  COLOR="black"><B>UnpackTuple</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -1441,7 +1441,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>DFG(inputs=[Bool, Qubit])</B></FONT></TD></TR>
+                  COLOR="black"><B>DFG</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>

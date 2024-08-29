@@ -162,6 +162,9 @@ class TypeTypeArg(TypeArg):
     def resolve(self, registry: ext.ExtensionRegistry) -> TypeArg:
         return TypeTypeArg(self.ty.resolve(registry))
 
+    def __str__(self) -> str:
+        return str(self.ty)
+
 
 @dataclass(frozen=True)
 class BoundedNatArg(TypeArg):
@@ -172,6 +175,9 @@ class BoundedNatArg(TypeArg):
     def _to_serial(self) -> stys.BoundedNatArg:
         return stys.BoundedNatArg(n=self.n)
 
+    def __str__(self) -> str:
+        return str(self.n)
+
 
 @dataclass(frozen=True)
 class StringArg(TypeArg):
@@ -181,6 +187,9 @@ class StringArg(TypeArg):
 
     def _to_serial(self) -> stys.StringArg:
         return stys.StringArg(arg=self.value)
+
+    def __str__(self) -> str:
+        return self.value
 
 
 @dataclass(frozen=True)
@@ -195,6 +204,9 @@ class SequenceArg(TypeArg):
     def resolve(self, registry: ext.ExtensionRegistry) -> TypeArg:
         return SequenceArg([arg.resolve(registry) for arg in self.elems])
 
+    def __str__(self) -> str:
+        return f"({', '.join(str(arg) for arg in self.elems)})"
+
 
 @dataclass(frozen=True)
 class ExtensionsArg(TypeArg):
@@ -204,6 +216,9 @@ class ExtensionsArg(TypeArg):
 
     def _to_serial(self) -> stys.ExtensionsArg:
         return stys.ExtensionsArg(es=self.extensions)
+
+    def __str__(self) -> str:
+        return str(self.extensions)
 
 
 @dataclass(frozen=True)
@@ -215,6 +230,9 @@ class VariableArg(TypeArg):
 
     def _to_serial(self) -> stys.VariableArg:
         return stys.VariableArg(idx=self.idx, cached_decl=self.param._to_serial_root())
+
+    def __str__(self) -> str:
+        return f"VariableArg({self.idx})"
 
 
 # ----------------------------------------------
@@ -234,6 +252,9 @@ class Array(Type):
 
     def type_bound(self) -> TypeBound:
         return self.ty.type_bound()
+
+    def __repr__(self) -> str:
+        return f"Array({self.ty}, {self.size})"
 
 
 @dataclass()
@@ -357,6 +378,9 @@ class Variable(Type):
     def type_bound(self) -> TypeBound:
         return self.bound
 
+    def __repr__(self) -> str:
+        return f"Variable({self.idx})"
+
 
 @dataclass(frozen=True)
 class RowVariable(Type):
@@ -371,6 +395,9 @@ class RowVariable(Type):
     def type_bound(self) -> TypeBound:
         return self.bound
 
+    def __repr__(self) -> str:
+        return f"RowVariable({self.idx})"
+
 
 @dataclass(frozen=True)
 class USize(Type):
@@ -381,6 +408,9 @@ class USize(Type):
 
     def type_bound(self) -> TypeBound:
         return TypeBound.Copyable
+
+    def __repr__(self) -> str:
+        return "USize"
 
 
 @dataclass(frozen=True)
@@ -395,6 +425,9 @@ class Alias(Type):
 
     def type_bound(self) -> TypeBound:
         return self.bound
+
+    def __repr__(self) -> str:
+        return f"Alias({self.name})"
 
 
 @dataclass(frozen=True)
@@ -461,6 +494,10 @@ class FunctionType(Type):
             extension_reqs=self.extension_reqs,
         )
 
+    def __str__(self) -> str:
+        # [Qubit] -> [Bool]
+        return f"{self.input} -> {self.output})"
+
 
 @dataclass(frozen=True)
 class PolyFuncType(Type):
@@ -486,6 +523,10 @@ class PolyFuncType(Type):
             params=self.params,
             body=self.body.resolve(registry),
         )
+
+    def __str__(self) -> str:
+        # ∀[a]. [list<a>] -> [Bool]
+        return f"∀{self.params}. {self.body!s})"
 
 
 @dataclass
@@ -518,6 +559,9 @@ class ExtType(Type):
             args=[arg._to_serial_root() for arg in self.args],
             bound=self.type_bound(),
         )
+
+    def __str__(self) -> str:
+        return f"{self.type_def.name}<{', '.join(str(arg) for arg in self.args)}>"
 
 
 @dataclass
@@ -553,6 +597,9 @@ class Opaque(Type):
             return self
 
         return ExtType(type_def, self.args)
+
+    def __str__(self) -> str:
+        return f"{self.id}<{', '.join(str(arg) for arg in self.args)}>"
 
 
 @dataclass

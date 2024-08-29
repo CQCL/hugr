@@ -225,7 +225,7 @@ class DotRenderer:
                     self._viz_node(child, hugr, sub)
                 html_label = self._format_html_label(
                     node_back_color=self.palette.edge,
-                    node_label=str(op),
+                    node_label=op.name(),
                     node_data=data,
                     border_colour=self.palette.port_border,
                     inputs_row=inputs_row,
@@ -236,7 +236,7 @@ class DotRenderer:
         else:
             html_label = self._format_html_label(
                 node_back_color=self.palette.node,
-                node_label=str(op),
+                node_label=op.name(),
                 node_data=data,
                 inputs_row=inputs_row,
                 outputs_row=outputs_row,

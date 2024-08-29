@@ -685,7 +685,7 @@ class Function(DfBase[ops.FuncDefn]):
     Examples:
         >>> f = Function("f", [tys.Bool])
         >>> f.parent_op
-        FuncDefn(name='f', inputs=[Bool], params=[])
+        FuncDefn(f_name='f', inputs=[Bool], params=[])
     """
 
     def __init__(

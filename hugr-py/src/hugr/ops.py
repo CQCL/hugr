@@ -66,6 +66,10 @@ class Op(Protocol):
     def _invalid_port(self, port: InPort | OutPort) -> InvalidPort:
         return InvalidPort(port, self)
 
+    def name(self) -> str:
+        """Name of the operation."""
+        return str(self)
+
 
 def _sig_port_type(sig: tys.FunctionType, port: InPort | OutPort) -> tys.Type:
     if port.direction == Direction.INCOMING:
@@ -177,6 +181,9 @@ class Input(DataflowOp):
     def __call__(self) -> Command:
         return super().__call__()
 
+    def name(self) -> str:
+        return "Input"
+
 
 @dataclass()
 class Output(DataflowOp, _PartialOp):
@@ -199,6 +206,9 @@ class Output(DataflowOp, _PartialOp):
 
     def _set_in_types(self, types: tys.TypeRow) -> None:
         self._types = types
+
+    def name(self) -> str:
+        return "Output"
 
 
 @runtime_checkable
@@ -286,12 +296,15 @@ class AsExtOp(DataflowOp, Protocol):
     def num_out(self) -> int:
         return len(self.outer_signature().output)
 
+    def name(self) -> str:
+        return f"{self.ext_op._op_def.qualified_name()}"
+
 
 @dataclass(frozen=True, eq=False)
 class Custom(DataflowOp):
     """Serializable version of non-core dataflow operation defined in an extension."""
 
-    name: str
+    op_name: str
     signature: tys.FunctionType = field(default_factory=tys.FunctionType.empty)
     description: str = ""
     extension: tys.ExtensionId = ""
@@ -301,7 +314,7 @@ class Custom(DataflowOp):
         return sops.ExtensionOp(
             parent=parent.idx,
             extension=self.extension,
-            name=self.name,
+            name=self.op_name,
             signature=self.signature._to_serial(),
             description=self.description,
             args=ser_it(self.args),
@@ -316,7 +329,7 @@ class Custom(DataflowOp):
 
     def check_id(self, extension: tys.ExtensionId, name: str) -> bool:
         """Check if the operation matches the given extension and operation name."""
-        return self.extension == extension and self.name == name
+        return self.extension == extension and self.op_name == name
 
     def resolve(self, registry: ext.ExtensionRegistry) -> ExtOp | Custom:
         """Resolve the custom operation to an :class:`ExtOp`.
@@ -326,7 +339,7 @@ class Custom(DataflowOp):
         from hugr.ext import ExtensionRegistry, Extension  # noqa: I001 # no circular import
 
         try:
-            op_def = registry.get_extension(self.extension).get_op(self.name)
+            op_def = registry.get_extension(self.extension).get_op(self.op_name)
         except (
             Extension.OperationNotFound,
             ExtensionRegistry.ExtensionNotFound,
@@ -338,6 +351,9 @@ class Custom(DataflowOp):
         # TODO check signature matches op_def reported signature
         # if/once op_def can compute signature from type scheme + args
         return ExtOp(op_def, signature, args)
+
+    def name(self) -> str:
+        return f"Custom({self.op_name})"
 
 
 @dataclass(frozen=True, eq=False)
@@ -360,7 +376,7 @@ class ExtOp(AsExtOp):
             sig = self.signature
 
         return Custom(
-            name=self._op_def.name,
+            op_name=self._op_def.name,
             signature=sig,
             extension=ext.name if ext else "",
             args=self.args,
@@ -442,6 +458,9 @@ class MakeTuple(AsExtOp, _PartialOp):
     def __repr__(self) -> str:
         return "MakeTuple" + (f"({self._types})" if self._types is not None else "")
 
+    def name(self) -> str:
+        return "MakeTuple"
+
 
 @dataclass()
 class UnpackTuple(AsExtOp, _PartialOp):
@@ -485,6 +504,12 @@ class UnpackTuple(AsExtOp, _PartialOp):
         (row,) = t.variant_rows
         self._types = row
 
+    def __repr__(self) -> str:
+        return "UnpackTuple" + (f"({self._types})" if self._types is not None else "")
+
+    def name(self) -> str:
+        return "UnpackTuple"
+
 
 @dataclass()
 class Tag(DataflowOp):
@@ -509,6 +534,9 @@ class Tag(DataflowOp):
         return tys.FunctionType(
             input=self.sum_ty.variant_rows[self.tag], output=[self.sum_ty]
         )
+
+    def __repr__(self) -> str:
+        return f"Tag({self.tag})"
 
 
 class DfParentOp(Op, Protocol):
@@ -574,6 +602,9 @@ class DFG(DfParentOp, DataflowOp):
     def _inputs(self) -> tys.TypeRow:
         return self.inputs
 
+    def name(self) -> str:
+        return "DFG"
+
 
 @dataclass()
 class CFG(DataflowOp):
@@ -613,6 +644,9 @@ class CFG(DataflowOp):
 
     def outer_signature(self) -> tys.FunctionType:
         return self.signature
+
+    def name(self) -> str:
+        return "CFG"
 
 
 @dataclass
@@ -681,6 +715,9 @@ class DataflowBlock(DfParentOp):
         """
         return [*self.sum_ty.variant_rows[n], *self.other_outputs]
 
+    def name(self) -> str:
+        return "DataflowBlock"
+
 
 @dataclass
 class ExitBlock(Op):
@@ -706,6 +743,9 @@ class ExitBlock(Op):
 
     def port_kind(self, port: InPort | OutPort) -> tys.Kind:
         return tys.CFKind()
+
+    def name(self) -> str:
+        return "ExitBlock"
 
 
 @dataclass
@@ -771,6 +811,9 @@ class LoadConst(DataflowOp):
     def __repr__(self) -> str:
         return "LoadConst" + (f"({self._typ})" if self._typ is not None else "")
 
+    def name(self) -> str:
+        return "LoadConst"
+
 
 @dataclass()
 class Conditional(DataflowOp):
@@ -824,6 +867,9 @@ class Conditional(DataflowOp):
         """
         return [*self.sum_ty.variant_rows[n], *self.other_inputs]
 
+    def name(self) -> str:
+        return "Conditional"
+
 
 @dataclass
 class Case(DfParentOp):
@@ -859,6 +905,9 @@ class Case(DfParentOp):
 
     def _inputs(self) -> tys.TypeRow:
         return self.inputs
+
+    def name(self) -> str:
+        return "Case"
 
 
 @dataclass
@@ -915,6 +964,9 @@ class TailLoop(DfParentOp, DataflowOp):
     def _inputs(self) -> tys.TypeRow:
         return self.just_inputs + self.rest
 
+    def name(self) -> str:
+        return "TailLoop"
+
 
 @dataclass
 class FuncDefn(DfParentOp):
@@ -923,7 +975,7 @@ class FuncDefn(DfParentOp):
     """
 
     #: function name
-    name: str
+    f_name: str
     #: input types of the function
     inputs: tys.TypeRow
     # ? type parameters of the function if polymorphic
@@ -954,7 +1006,7 @@ class FuncDefn(DfParentOp):
     def _to_serial(self, parent: Node) -> sops.FuncDefn:
         return sops.FuncDefn(
             parent=parent.idx,
-            name=self.name,
+            name=self.f_name,
             signature=self.signature._to_serial(),
         )
 
@@ -974,13 +1026,16 @@ class FuncDefn(DfParentOp):
             case _:
                 raise self._invalid_port(port)
 
+    def name(self) -> str:
+        return f"FuncDefn({self.f_name})"
+
 
 @dataclass
 class FuncDecl(Op):
     """Function declaration operation, defines the signature of a function."""
 
     #: function name
-    name: str
+    f_name: str
     #: polymorphic function signature
     signature: tys.PolyFuncType
     num_out: int = field(default=1, repr=False)
@@ -988,7 +1043,7 @@ class FuncDecl(Op):
     def _to_serial(self, parent: Node) -> sops.FuncDecl:
         return sops.FuncDecl(
             parent=parent.idx,
-            name=self.name,
+            name=self.f_name,
             signature=self.signature._to_serial(),
         )
 
@@ -998,6 +1053,9 @@ class FuncDecl(Op):
                 return tys.FunctionKind(self.signature)
             case _:
                 raise self._invalid_port(port)
+
+    def name(self) -> str:
+        return f"FuncDecl({self.f_name})"
 
 
 @dataclass
@@ -1011,6 +1069,9 @@ class Module(Op):
 
     def port_kind(self, port: InPort | OutPort) -> tys.Kind:
         raise self._invalid_port(port)
+
+    def name(self) -> str:
+        return "Module"
 
 
 class NoConcreteFunc(Exception):
@@ -1088,6 +1149,9 @@ class Call(_CallOrLoad, Op):
             case _:
                 return tys.ValueKind(_sig_port_type(self.instantiation, port))
 
+    def name(self) -> str:
+        return "Call"
+
 
 @dataclass()
 class CallIndirect(DataflowOp, _PartialOp):
@@ -1131,6 +1195,9 @@ class CallIndirect(DataflowOp, _PartialOp):
         ), f"Expected function type, got {func_sig}"
         self._signature = func_sig
 
+    def name(self) -> str:
+        return "CallIndirect"
+
 
 class LoadFunc(_CallOrLoad, DataflowOp):
     """Load a statically defined function as a higher order value.
@@ -1168,6 +1235,9 @@ class LoadFunc(_CallOrLoad, DataflowOp):
             case _:
                 raise self._invalid_port(port)
 
+    def name(self) -> str:
+        return "LoadFunc"
+
 
 @dataclass
 class Noop(AsExtOp, _PartialOp):
@@ -1199,13 +1269,16 @@ class Noop(AsExtOp, _PartialOp):
     def __repr__(self) -> str:
         return "Noop" + (f"({self._type})" if self._type is not None else "")
 
+    def name(self) -> str:
+        return "Noop"
+
 
 @dataclass
 class AliasDecl(Op):
     """Declare an external type alias."""
 
     #: Alias name.
-    name: str
+    alias: str
     #: Type bound.
     bound: tys.TypeBound
     num_out: int = field(default=0, repr=False)
@@ -1213,12 +1286,15 @@ class AliasDecl(Op):
     def _to_serial(self, parent: Node) -> sops.AliasDecl:
         return sops.AliasDecl(
             parent=parent.idx,
-            name=self.name,
+            name=self.alias,
             bound=self.bound,
         )
 
     def port_kind(self, port: InPort | OutPort) -> tys.Kind:
         raise self._invalid_port(port)
+
+    def name(self) -> str:
+        return f"AliasDecl({self.alias})"
 
 
 @dataclass
@@ -1226,7 +1302,7 @@ class AliasDefn(Op):
     """Declare a type alias."""
 
     #: Alias name.
-    name: str
+    alias: str
     #: Type definition.
     definition: tys.Type
     num_out: int = field(default=0, repr=False)
@@ -1234,9 +1310,12 @@ class AliasDefn(Op):
     def _to_serial(self, parent: Node) -> sops.AliasDefn:
         return sops.AliasDefn(
             parent=parent.idx,
-            name=self.name,
+            name=self.alias,
             definition=self.definition._to_serial_root(),
         )
 
     def port_kind(self, port: InPort | OutPort) -> tys.Kind:
         raise self._invalid_port(port)
+
+    def name(self) -> str:
+        return f"AliasDefn({self.alias})"
