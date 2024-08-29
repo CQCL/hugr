@@ -248,19 +248,21 @@ pub const ERROR_TYPE_NAME: TypeName = TypeName::new_inline("error");
 
 /// Return a Sum type with the first variant as the given type and the second an Error.
 pub fn sum_with_error(ty: impl Into<TypeRowRV>) -> SumType {
-    result_type(ty, ERROR_TYPE)
+    either_type(ty, ERROR_TYPE)
 }
 
 /// An optional type, i.e. a Sum type with the first variant as the given type and the second as an empty tuple.
 #[inline]
 pub fn option_type(ty: impl Into<TypeRowRV>) -> SumType {
-    result_type(ty, TypeRow::new())
+    either_type(ty, TypeRow::new())
 }
 
-/// A result type, i.e. a two-element Sum type where the first variant
-/// represents the "Ok" value, and the second is the "Error" value.
+/// An "either" type, i.e. a Sum type with a "left" and a "right" variant.
+///
+/// When used as a fallible value, the "left" variant represents a successful computation,
+/// and the "right" variant represents a failure.
 #[inline]
-pub fn result_type(ty_ok: impl Into<TypeRowRV>, ty_err: impl Into<TypeRowRV>) -> SumType {
+pub fn either_type(ty_ok: impl Into<TypeRowRV>, ty_err: impl Into<TypeRowRV>) -> SumType {
     SumType::new([ty_ok.into(), ty_err.into()])
 }
 
@@ -277,29 +279,33 @@ pub fn const_some(value: Value) -> Value {
 ///
 /// See [option_type].
 pub fn const_some_tuple(values: impl IntoIterator<Item = Value>) -> Value {
-    const_ok_tuple(values, TypeRow::new())
+    const_left_tuple(values, TypeRow::new())
 }
 
 /// A constant optional value with no value.
 ///
 /// See [option_type].
 pub fn const_none(ty: impl Into<TypeRowRV>) -> Value {
-    const_err_tuple(ty, [])
+    const_right_tuple(ty, [])
 }
 
-/// A constant result value with an Ok value.
+/// A constant Either value with a left variant.
 ///
-/// See [result_type].
-pub fn const_ok(value: Value, ty_err: impl Into<TypeRowRV>) -> Value {
-    const_ok_tuple([value], ty_err)
+/// In fallible computations, this represents a successful result.
+///
+/// See [either_type].
+pub fn const_left(value: Value, ty_right: impl Into<TypeRowRV>) -> Value {
+    const_left_tuple([value], ty_right)
 }
 
-/// A constant result value with a row of Ok values.
+/// A constant Either value with a row of left values.
 ///
-/// See [result_type].
-pub fn const_ok_tuple(
+/// In fallible computations, this represents a successful result.
+///
+/// See [either_type].
+pub fn const_left_tuple(
     values: impl IntoIterator<Item = Value>,
-    ty_err: impl Into<TypeRowRV>,
+    ty_right: impl Into<TypeRowRV>,
 ) -> Value {
     let values = values.into_iter().collect_vec();
     let types: TypeRowRV = values
@@ -307,22 +313,26 @@ pub fn const_ok_tuple(
         .map(|v| TypeRV::from(v.get_type()))
         .collect_vec()
         .into();
-    let typ = result_type(types, ty_err);
+    let typ = either_type(types, ty_right);
     Value::sum(0, values, typ).unwrap()
 }
 
-/// A constant result value with an Err value.
+/// A constant Either value with a right variant.
 ///
-/// See [result_type].
-pub fn const_err(ty_ok: impl Into<TypeRowRV>, value: Value) -> Value {
-    const_err_tuple(ty_ok, [value])
+/// In fallible computations, this represents a failure.
+///
+/// See [either_type].
+pub fn const_right(ty_left: impl Into<TypeRowRV>, value: Value) -> Value {
+    const_right_tuple(ty_left, [value])
 }
 
-/// A constant result value with a row of Err values.
+/// A constant Either value with a row of right values.
 ///
-/// See [result_type].
-pub fn const_err_tuple(
-    ty_ok: impl Into<TypeRowRV>,
+/// In fallible computations, this represents a failure.
+///
+/// See [either_type].
+pub fn const_right_tuple(
+    ty_left: impl Into<TypeRowRV>,
     values: impl IntoIterator<Item = Value>,
 ) -> Value {
     let values = values.into_iter().collect_vec();
@@ -331,7 +341,7 @@ pub fn const_err_tuple(
         .map(|v| TypeRV::from(v.get_type()))
         .collect_vec()
         .into();
-    let typ = result_type(ty_ok, types);
+    let typ = either_type(ty_left, types);
     Value::sum(1, values, typ).unwrap()
 }
 
@@ -991,9 +1001,9 @@ mod test {
 
     #[test]
     fn test_result() {
-        let typ: Type = result_type(BOOL_T, FLOAT64_TYPE).into();
-        let const_bool = const_ok(Value::true_val(), FLOAT64_TYPE);
-        let const_float = const_err(BOOL_T, ConstF64::new(0.5).into());
+        let typ: Type = either_type(BOOL_T, FLOAT64_TYPE).into();
+        let const_bool = const_left(Value::true_val(), FLOAT64_TYPE);
+        let const_float = const_right(BOOL_T, ConstF64::new(0.5).into());
 
         let mut b = DFGBuilder::new(inout_sig(type_row![], vec![typ.clone(), typ])).unwrap();
 
