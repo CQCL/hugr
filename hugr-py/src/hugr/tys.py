@@ -189,7 +189,7 @@ class StringArg(TypeArg):
         return stys.StringArg(arg=self.value)
 
     def __str__(self) -> str:
-        return self.value
+        return f'{"self.value"}'
 
 
 @dataclass(frozen=True)

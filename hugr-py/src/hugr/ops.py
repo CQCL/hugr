@@ -297,7 +297,7 @@ class AsExtOp(DataflowOp, Protocol):
         return len(self.outer_signature().output)
 
     def name(self) -> str:
-        return f"{self.ext_op._op_def.qualified_name()}"
+        return self.ext_op._op_def.qualified_name()
 
 
 @dataclass(frozen=True, eq=False)

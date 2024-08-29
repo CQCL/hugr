@@ -37,8 +37,9 @@ if TYPE_CHECKING:
     import graphviz as gv  # type: ignore[import-untyped]
 
     from hugr import ext
-    from hugr.render import RenderConfig
     from hugr.val import Value
+
+    from .render import RenderConfig
 
 
 @dataclass()
