@@ -159,6 +159,8 @@ class Some(Sum):
         >>> some = Some(TRUE, FALSE)
         >>> some
         Some(TRUE, FALSE)
+        >>> str(some)
+        'Some(TRUE, FALSE)'
         >>> some.type_()
         Option(Bool, Bool)
 
@@ -185,6 +187,8 @@ class None_(Sum):
         >>> none = None_(tys.Bool)
         >>> none
         None(Bool)
+        >>> str(none)
+        'None'
         >>> none.type_()
         Option(Bool)
 
@@ -196,6 +200,9 @@ class None_(Sum):
     def __repr__(self) -> str:
         return f"None({', '.join(map(repr, self.typ.variant_rows[0]))})"
 
+    def __str__(self) -> str:
+        return "None"
+
 
 @dataclass
 class Left(Sum):
@@ -206,27 +213,31 @@ class Left(Sum):
     Example:
         >>> left = Left([TRUE, FALSE], [tys.Bool])
         >>> left
-        Left((TRUE, FALSE), Bool)
-        >>> left.type_()
-        Either((Bool, Bool), Bool)
+        Left(vals=[TRUE, FALSE], right_typ=[Bool])
+        >>> str(left)
+        'Left(TRUE, FALSE)'
+        >>> str(left.type_())
+        'Either((Bool, Bool), Bool)'
     """
 
     #: The values of this tuple.
     vals: list[Value]
 
-    def __init__(self, vals: Iterable[Value], left_typ: Iterable[tys.Type]):
+    def __init__(self, vals: Iterable[Value], right_typ: Iterable[tys.Type]):
         val_list = list(vals)
         super().__init__(
             tag=0,
-            typ=tys.Either([v.type_() for v in val_list], left_typ),
+            typ=tys.Either([v.type_() for v in val_list], right_typ),
             vals=val_list,
         )
 
     def __repr__(self) -> str:
-        vals_str = self.vals[0] if len(self.vals) == 1 else tuple(self.vals)
-        _, right = self.typ.variant_rows
-        right_str = right[0] if len(right) == 1 else tuple(right)
-        return f"Left({vals_str}, {right_str})"
+        _, right_typ = self.typ.variant_rows
+        return f"Left(vals={self.vals}, right_typ={list(right_typ)})"
+
+    def __str__(self) -> str:
+        vals_str = ", ".join(map(str, self.vals))
+        return f"Left({vals_str})"
 
 
 @dataclass
@@ -240,9 +251,11 @@ class Right(Sum):
     Example:
         >>> right = Right([tys.Bool, tys.Bool, tys.Bool], [TRUE, FALSE])
         >>> right
-        Right((Bool, Bool, Bool), (TRUE, FALSE))
-        >>> right.type_()
-        Either((Bool, Bool, Bool), (Bool, Bool))
+        Right(left_typ=[Bool, Bool, Bool], vals=[TRUE, FALSE])
+        >>> str(right)
+        'Right(TRUE, FALSE)'
+        >>> str(right.type_())
+        'Either((Bool, Bool, Bool), (Bool, Bool))'
     """
 
     #: The values of this tuple.
@@ -257,10 +270,12 @@ class Right(Sum):
         )
 
     def __repr__(self) -> str:
-        left, _ = self.typ.variant_rows
-        left_str = left[0] if len(left) == 1 else tuple(left)
-        vals_str = self.vals[0] if len(self.vals) == 1 else tuple(self.vals)
-        return f"Right({left_str}, {vals_str})"
+        left_typ, _ = self.typ.variant_rows
+        return f"Right(left_typ={list(left_typ)}, vals={self.vals})"
+
+    def __str__(self) -> str:
+        vals_str = ", ".join(map(str, self.vals))
+        return f"Right({vals_str})"
 
 
 @dataclass
