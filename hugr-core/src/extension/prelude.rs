@@ -27,7 +27,7 @@ use super::ExtensionRegistry;
 
 /// Array type and operations.
 pub mod array;
-pub use array::{array_type, new_array_op, NEW_ARRAY_OP_ID};
+pub use array::{array_type, new_array_op, ArrayOp, ArrayOpDef, ARRAY_TYPE_NAME, NEW_ARRAY_OP_ID};
 
 /// Name of prelude extension.
 pub const PRELUDE_ID: ExtensionId = ExtensionId::new_unchecked("prelude");
@@ -58,17 +58,10 @@ lazy_static! {
             )
             .unwrap();
         prelude.add_type(
-                TypeName::new_inline("array"),
+                TypeName::new_inline(ARRAY_TYPE_NAME),
                 vec![ TypeParam::max_nat(), TypeBound::Any.into()],
                 "array".into(),
                 TypeDefBound::from_params(vec![1] ),
-            )
-            .unwrap();
-        prelude
-            .add_op(
-                array::NEW_ARRAY_OP_ID,
-                "Create a new array from elements".to_string(),
-                array::ArrayOpCustom,
             )
             .unwrap();
 
@@ -107,6 +100,7 @@ lazy_static! {
         TupleOpDef::load_all_ops(&mut prelude).unwrap();
         NoopDef.add_to_extension(&mut prelude).unwrap();
         LiftDef.add_to_extension(&mut prelude).unwrap();
+        array::ArrayOpDef::load_all_ops(&mut prelude).unwrap();
         prelude
     };
     /// An extension registry containing only the prelude
