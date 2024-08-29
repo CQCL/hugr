@@ -6,7 +6,6 @@ import pathlib
 import subprocess
 from dataclasses import dataclass
 from enum import Enum
-from tempfile import NamedTemporaryFile
 from typing import TYPE_CHECKING, TypeVar
 
 from typing_extensions import Self
@@ -166,9 +165,7 @@ def validate(
         dot = h.render_dot()
         assert snap == dot.source
         if os.environ.get("HUGR_RENDER_DOT"):
-            with NamedTemporaryFile(mode="w", delete=True) as f:
-                # test rendering succeeds
-                dot.render(f.name)
+            dot.pipe("svg")
 
 
 def _run_hugr_cmd(serial: str, cmd: list[str]):
