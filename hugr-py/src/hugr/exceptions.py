@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from .node_port import NodeIdx
+from .hugr.node_port import NodeIdx
 
 
 @dataclass

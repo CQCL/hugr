@@ -10,7 +10,7 @@ from typing_extensions import Self
 
 import hugr._serialization.ops as sops
 from hugr import tys, val
-from hugr.node_port import Direction, InPort, Node, OutPort, PortOffset, Wire
+from hugr.hugr.node_port import Direction, InPort, Node, OutPort, PortOffset, Wire
 from hugr.utils import ser_it
 
 if TYPE_CHECKING:

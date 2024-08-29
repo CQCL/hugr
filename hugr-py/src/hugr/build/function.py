@@ -5,13 +5,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from . import ops
-from .dfg import DefinitionBuilder, Function
-from .hugr import Hugr
+from hugr import ops
+from hugr.build.dfg import DefinitionBuilder, Function
+from hugr.hugr import Hugr
 
 if TYPE_CHECKING:
-    from .node_port import Node
-    from .tys import PolyFuncType, TypeBound, TypeRow
+    from hugr.hugr.node_port import Node
+    from hugr.tys import PolyFuncType, TypeBound, TypeRow
 
 __all__ = ["Function", "Module"]
 

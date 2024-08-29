@@ -3,9 +3,8 @@ from dataclasses import dataclass
 import pytest
 
 from hugr import ext, ops, tys
-from hugr.dfg import Dfg
-from hugr.hugr import Hugr
-from hugr.node_port import Node
+from hugr.build.dfg import Dfg
+from hugr.hugr import Hugr, Node
 from hugr.ops import AsExtOp, Custom, ExtOp
 from hugr.std.float import EXTENSION as FLOAT_EXT
 from hugr.std.float import FLOAT_T

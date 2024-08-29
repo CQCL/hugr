@@ -11,14 +11,14 @@ from typing import TYPE_CHECKING
 from typing_extensions import Self
 
 from hugr import ops
+from hugr.build.base import ParentBuilder
+from hugr.build.dfg import DfBase
+from hugr.hugr.base import Hugr
 from hugr.tys import Sum
 
-from .dfg import DfBase
-from .hugr import Hugr, ParentBuilder
-
 if TYPE_CHECKING:
-    from .node_port import Node, ToNode, Wire
-    from .tys import TypeRow
+    from hugr.hugr.node_port import Node, ToNode, Wire
+    from hugr.tys import TypeRow
 
 
 class Case(DfBase[ops.Case]):
