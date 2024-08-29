@@ -14,10 +14,10 @@ from typing import (
     overload,
 )
 
-from hugr.exceptions import ParentBeforeChild
-from hugr.ops import Call, Const, Custom, DataflowOp, Module, Op
 from hugr._serialization.ops import OpType as SerialOp
 from hugr._serialization.serial_hugr import SerialHugr
+from hugr.exceptions import ParentBeforeChild
+from hugr.ops import Call, Const, Custom, DataflowOp, Module, Op
 from hugr.tys import Kind, Type, ValueKind
 from hugr.utils import BiMap
 from hugr.val import Value

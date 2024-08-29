@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from hugr import ops
-from hugr.build.dfg import Function, DefinitionBuilder
+from hugr.build.dfg import DefinitionBuilder, Function
 from hugr.hugr import Hugr
 
 if TYPE_CHECKING:

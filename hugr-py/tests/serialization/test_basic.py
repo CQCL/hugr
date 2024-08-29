@@ -1,6 +1,6 @@
 from hugr import Hugr, tys
 from hugr._serialization.serial_hugr import SerialHugr, serialization_version
-from hugr.function import Module
+from hugr.build.function import Module
 
 
 def test_empty():

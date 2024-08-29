@@ -3,7 +3,7 @@
 from .base import ParentBuilder
 from .cfg import Block, Cfg
 from .cond_loop import Case, Conditional, If, TailLoop
-from .dfg import Dfg, Function, _DefinitionBuilder, _DfBase
+from .dfg import DefinitionBuilder, DfBase, Dfg, Function
 from .function import Module
 from .tracked_dfg import TrackedDfg
 
@@ -19,6 +19,6 @@ __all__ = [
     "Module",
     "TrackedDfg",
     "Dfg",
-    "_DefinitionBuilder",
-    "_DfBase",
+    "DefinitionBuilder",
+    "DfBase",
 ]
