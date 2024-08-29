@@ -38,7 +38,7 @@ jobs:
           fetch-tags: true
 
       - name: Set up uv
-        run: .github/script/install-uv.sh
+        run: ../.github/script/install-uv.sh
       - name: "Set up Python"
         uses: actions/setup-python@v5
         with:
