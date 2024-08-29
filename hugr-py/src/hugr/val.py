@@ -67,6 +67,14 @@ class Sum(Value):
             vs=ser_it(self.vals),
         )
 
+    def __eq__(self, other: object) -> bool:
+        return (
+            isinstance(other, Sum)
+            and self.tag == other.tag
+            and self.typ == other.typ
+            and self.vals == other.vals
+        )
+
 
 class UnitSum(Sum):
     """Simple :class:`Sum` with each variant being an empty row.
@@ -117,7 +125,7 @@ TRUE = bool_value(True)
 FALSE = bool_value(False)
 
 
-@dataclass
+@dataclass(eq=False)
 class Tuple(Sum):
     """Tuple or product value, defined by a list of values.
     Internally a :class:`Sum` with a single variant row.
@@ -130,9 +138,6 @@ class Tuple(Sum):
         Tuple(Bool, Bool)
 
     """
-
-    #: The values of this tuple.
-    vals: list[Value]
 
     def __init__(self, *vals: Value):
         val_list = list(vals)
@@ -151,23 +156,18 @@ class Tuple(Sum):
         return f"Tuple({', '.join(map(repr, self.vals))})"
 
 
-@dataclass
+@dataclass(eq=False)
 class Some(Sum):
     """Optional tuple of value, containing a list of values.
 
     Example:
         >>> some = Some(TRUE, FALSE)
-        >>> some
-        Some(TRUE, FALSE)
         >>> str(some)
         'Some(TRUE, FALSE)'
         >>> some.type_()
         Option(Bool, Bool)
 
     """
-
-    #: The values of this tuple.
-    vals: list[Value]
 
     def __init__(self, *vals: Value):
         val_list = list(vals)
@@ -179,14 +179,12 @@ class Some(Sum):
         return f"Some({', '.join(map(repr, self.vals))})"
 
 
-@dataclass
+@dataclass(eq=False)
 class None_(Sum):
     """Optional tuple of value, containing no values.
 
     Example:
         >>> none = None_(tys.Bool)
-        >>> none
-        None(Bool)
         >>> str(none)
         'None'
         >>> none.type_()
@@ -204,7 +202,7 @@ class None_(Sum):
         return "None"
 
 
-@dataclass
+@dataclass(eq=False)
 class Left(Sum):
     """Left variant of a :class:`tys.Either` type, containing a list of values.
 
@@ -212,16 +210,11 @@ class Left(Sum):
 
     Example:
         >>> left = Left([TRUE, FALSE], [tys.Bool])
-        >>> left
-        Left(vals=[TRUE, FALSE], right_typ=[Bool])
         >>> str(left)
         'Left(TRUE, FALSE)'
         >>> str(left.type_())
         'Either((Bool, Bool), Bool)'
     """
-
-    #: The values of this tuple.
-    vals: list[Value]
 
     def __init__(self, vals: Iterable[Value], right_typ: Iterable[tys.Type]):
         val_list = list(vals)
@@ -240,7 +233,7 @@ class Left(Sum):
         return f"Left({vals_str})"
 
 
-@dataclass
+@dataclass(eq=False)
 class Right(Sum):
     """Right variant of a :class:`tys.Either` type, containing a list of values.
 
@@ -250,16 +243,11 @@ class Right(Sum):
 
     Example:
         >>> right = Right([tys.Bool, tys.Bool, tys.Bool], [TRUE, FALSE])
-        >>> right
-        Right(left_typ=[Bool, Bool, Bool], vals=[TRUE, FALSE])
         >>> str(right)
         'Right(TRUE, FALSE)'
         >>> str(right.type_())
         'Either((Bool, Bool, Bool), (Bool, Bool))'
     """
-
-    #: The values of this tuple.
-    vals: list[Value]
 
     def __init__(self, left_typ: Iterable[tys.Type], vals: Iterable[Value]):
         val_list = list(vals)
