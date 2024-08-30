@@ -125,6 +125,15 @@
                 [
                   {
                     "t": "Opaque",
+                    "extension": "prelude",
+                    "id": "error",
+                    "args": [],
+                    "bound": "C"
+                  }
+                ],
+                [
+                  {
+                    "t": "Opaque",
                     "extension": "arithmetic.int.types",
                     "id": "int",
                     "args": [
@@ -137,15 +146,6 @@
                         }
                       }
                     ],
-                    "bound": "C"
-                  }
-                ],
-                [
-                  {
-                    "t": "Opaque",
-                    "extension": "prelude",
-                    "id": "error",
-                    "args": [],
                     "bound": "C"
                   }
                 ]
@@ -186,6 +186,15 @@
                 [
                   {
                     "t": "Opaque",
+                    "extension": "prelude",
+                    "id": "error",
+                    "args": [],
+                    "bound": "C"
+                  }
+                ],
+                [
+                  {
+                    "t": "Opaque",
                     "extension": "arithmetic.int.types",
                     "id": "int",
                     "args": [
@@ -198,15 +207,6 @@
                         }
                       }
                     ],
-                    "bound": "C"
-                  }
-                ],
-                [
-                  {
-                    "t": "Opaque",
-                    "extension": "prelude",
-                    "id": "error",
-                    "args": [],
                     "bound": "C"
                   }
                 ]
