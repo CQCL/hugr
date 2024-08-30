@@ -117,11 +117,18 @@ impl ConvertOpDef {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ConvertOpType {
     /// The kind of conversion op.
-    pub def: ConvertOpDef,
+    def: ConvertOpDef,
     /// The integer width parameters of the conversion op. These are interpreted
     /// differently, depending on `def`. The integer types in the inputs and
     /// outputs of the op will have [int_type]s of these widths.
-    pub log_widths: Vec<u8>,
+    log_widths: Vec<u8>,
+}
+
+impl ConvertOpType {
+    /// Returns the generic [ConvertOpDef] of this [ConvertOpType].
+    pub fn def(&self) -> &ConvertOpDef {
+        &self.def
+    }
 }
 
 impl NamedOp for ConvertOpType {
