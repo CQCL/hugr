@@ -3,7 +3,7 @@ use crate::ops::Value;
 use crate::std_extensions::arithmetic::int_types::INT_TYPES;
 use crate::{
     extension::{
-        prelude::{sum_with_error, ConstError},
+        prelude::{const_ok, ConstError, ERROR_TYPE},
         ConstFold, ConstFoldResult, OpDef,
     },
     ops,
@@ -40,21 +40,19 @@ fn fold_trunc(
     };
     let log_width = get_log_width(arg).ok()?;
     let int_type = INT_TYPES[log_width as usize].to_owned();
-    let sum_type = sum_with_error(int_type.clone());
     let err_value = || {
-        let err_val = ConstError {
+        ConstError {
             signal: 0,
             message: "Can't truncate non-finite float".to_string(),
-        };
-        Value::sum(1, [err_val.into()], sum_type.clone())
-            .unwrap_or_else(|e| panic!("Invalid computed sum, {}", e))
+        }
+        .as_either(int_type.clone())
     };
     let out_const: ops::Value = if !f.is_finite() {
         err_value()
     } else {
         let cv = convert(f, log_width);
         if let Ok(cv) = cv {
-            Value::sum(0, [cv], sum_type).unwrap_or_else(|e| panic!("Invalid computed sum, {}", e))
+            const_ok(cv, ERROR_TYPE)
         } else {
             err_value()
         }

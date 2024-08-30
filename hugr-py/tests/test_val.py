@@ -10,11 +10,11 @@ def test_sums():
     assert Sum(0, tys.Tuple(), []) == Tuple()
     assert Sum(0, tys.Tuple(tys.Bool, tys.Bool), [TRUE, FALSE]) == Tuple(TRUE, FALSE)
 
-    ty = tys.Sum([[tys.Bool, tys.Bool], []])
-    assert Sum(0, ty, [TRUE, FALSE]) == Some(TRUE, FALSE)
-    assert Sum(0, ty, [TRUE, FALSE]) == Left([TRUE, FALSE], [])
-    assert Sum(1, ty, []) == None_(tys.Bool, tys.Bool)
-    assert Sum(1, ty, []) == Right([tys.Bool, tys.Bool], [])
+    ty = tys.Sum([[], [tys.Bool, tys.Bool]])
+    assert Sum(1, ty, [TRUE, FALSE]) == Some(TRUE, FALSE)
+    assert Sum(1, ty, [TRUE, FALSE]) == Right([], [TRUE, FALSE])
+    assert Sum(0, ty, []) == None_(tys.Bool, tys.Bool)
+    assert Sum(0, ty, []) == Left([], [tys.Bool, tys.Bool])
 
     ty = tys.Sum([[tys.Bool], [tys.Bool]])
     assert Sum(0, ty, [TRUE]) == Left([TRUE], [tys.Bool])

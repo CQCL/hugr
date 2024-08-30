@@ -10,7 +10,7 @@ use crate::{
         Value,
     },
     std_extensions::arithmetic::int_types::{get_log_width, ConstInt, INT_TYPES},
-    types::{SumType, Type, TypeArg},
+    types::{Type, TypeArg},
     IncomingPort,
 };
 
@@ -132,9 +132,9 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                     };
                     let n0val: u64 = n0.value_u();
                     let out_const: Value = if n0val >> (1 << logwidth1) != 0 {
-                        mk_out_const(1, Ok(INARROW_ERROR_VALUE.clone()))
+                        mk_out_const(0, Ok(INARROW_ERROR_VALUE.clone()))
                     } else {
-                        mk_out_const(0, ConstInt::new_u(logwidth1, n0val).map(Into::into))
+                        mk_out_const(1, ConstInt::new_u(logwidth1, n0val).map(Into::into))
                     };
                     Some(vec![(0.into(), out_const)])
                 },
@@ -160,9 +160,9 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                     let n0val: i64 = n0.value_s();
                     let ub = 1i64 << ((1 << logwidth1) - 1);
                     let out_const: Value = if n0val >= ub || n0val < -ub {
-                        mk_out_const(1, Ok(INARROW_ERROR_VALUE.clone()))
+                        mk_out_const(0, Ok(INARROW_ERROR_VALUE.clone()))
                     } else {
-                        mk_out_const(0, ConstInt::new_s(logwidth1, n0val).map(Into::into))
+                        mk_out_const(1, ConstInt::new_s(logwidth1, n0val).map(Into::into))
                     };
                     Some(vec![(0.into(), out_const)])
                 },
@@ -631,14 +631,12 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                         let q_type = INT_TYPES[logwidth0 as usize].to_owned();
                         let r_type = q_type.clone();
                         let qr_type: Type = Type::new_tuple(vec![q_type, r_type]);
-                        let sum_type: SumType = sum_with_error(qr_type);
                         let err_value = || {
-                            let err_val = ConstError {
+                            ConstError {
                                 signal: 0,
                                 message: "Division by zero".to_string(),
-                            };
-                            Value::sum(1, [err_val.into()], sum_type.clone())
-                                .unwrap_or_else(|e| panic!("Invalid computed sum, {}", e))
+                            }
+                            .as_either(qr_type)
                         };
                         let nval = n.value_u();
                         let mval = m.value_u();
@@ -694,14 +692,12 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                         let q_type = INT_TYPES[logwidth0 as usize].to_owned();
                         let r_type = INT_TYPES[logwidth0 as usize].to_owned();
                         let qr_type: Type = Type::new_tuple(vec![q_type, r_type]);
-                        let sum_type: SumType = sum_with_error(qr_type);
                         let err_value = || {
-                            let err_val = ConstError {
+                            ConstError {
                                 signal: 0,
                                 message: "Division by zero".to_string(),
-                            };
-                            Value::sum(1, [err_val.into()], sum_type.clone())
-                                .unwrap_or_else(|e| panic!("Invalid computed sum, {}", e))
+                            }
+                            .as_either(qr_type)
                         };
                         let nval = n.value_s();
                         let mval = m.value_u();
@@ -754,14 +750,12 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                         None
                     } else {
                         let int_out_type = INT_TYPES[logwidth0 as usize].to_owned();
-                        let sum_type = sum_with_error(int_out_type.clone());
                         let err_value = || {
-                            let err_val = ConstError {
+                            ConstError {
                                 signal: 0,
                                 message: "Division by zero".to_string(),
-                            };
-                            Value::sum(1, [err_val.into()], sum_type.clone())
-                                .unwrap_or_else(|e| panic!("Invalid computed sum, {}", e))
+                            }
+                            .as_either(int_out_type.clone())
                         };
                         let nval = n.value_u();
                         let mval = m.value_u();
@@ -808,14 +802,12 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                         None
                     } else {
                         let int_out_type = INT_TYPES[logwidth0 as usize].to_owned();
-                        let sum_type = sum_with_error(int_out_type.clone());
                         let err_value = || {
-                            let err_val = ConstError {
+                            ConstError {
                                 signal: 0,
                                 message: "Division by zero".to_string(),
-                            };
-                            Value::sum(1, [err_val.into()], sum_type.clone())
-                                .unwrap_or_else(|e| panic!("Invalid computed sum, {}", e))
+                            }
+                            .as_either(int_out_type.clone())
                         };
                         let nval = n.value_u();
                         let mval = m.value_u();
@@ -862,14 +854,12 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                         None
                     } else {
                         let int_out_type = INT_TYPES[logwidth0 as usize].to_owned();
-                        let sum_type = sum_with_error(int_out_type.clone());
                         let err_value = || {
-                            let err_val = ConstError {
+                            ConstError {
                                 signal: 0,
                                 message: "Division by zero".to_string(),
-                            };
-                            Value::sum(1, [err_val.into()], sum_type.clone())
-                                .unwrap_or_else(|e| panic!("Invalid computed sum, {}", e))
+                            }
+                            .as_either(int_out_type.clone())
                         };
                         let nval = n.value_s();
                         let mval = m.value_u();
@@ -918,14 +908,12 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                         None
                     } else {
                         let int_out_type = INT_TYPES[logwidth0 as usize].to_owned();
-                        let sum_type = sum_with_error(int_out_type.clone());
                         let err_value = || {
-                            let err_val = ConstError {
+                            ConstError {
                                 signal: 0,
                                 message: "Division by zero".to_string(),
-                            };
-                            Value::sum(1, [err_val.into()], sum_type.clone())
-                                .unwrap_or_else(|e| panic!("Invalid computed sum, {}", e))
+                            }
+                            .as_either(int_out_type.clone())
                         };
                         let nval = n.value_s();
                         let mval = m.value_u();

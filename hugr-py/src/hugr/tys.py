@@ -310,14 +310,14 @@ class Option(Sum):
     """Optional tuple of elements.
 
     Instances of this type correspond to :class:`Sum` with two variants.
-    The first variant is the tuple of elements, the second is empty.
+    The second variant is the tuple of elements, the first is empty.
     """
 
     def __init__(self, *tys: Type):
-        self.variant_rows = [list(tys), []]
+        self.variant_rows = [[], list(tys)]
 
     def __repr__(self) -> str:
-        return f"Option({', '.join(map(repr, self.variant_rows[0]))})"
+        return f"Option({', '.join(map(repr, self.variant_rows[1]))})"
 
 
 @dataclass(eq=False)
@@ -326,8 +326,8 @@ class Either(Sum):
 
     Instances of this type correspond to :class:`Sum` with a Left and a Right variant.
 
-    In fallible contexts, the Left variant is used to represent success, and the
-    Right variant is used to represent failure.
+    In fallible contexts, the Right variant is used to represent success, and the
+    Left variant is used to represent failure.
     """
 
     def __init__(self, left: Iterable[Type], right: Iterable[Type]):
