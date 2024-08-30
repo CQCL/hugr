@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.12.0 (2024-08-30)
+
+### Features
+
+- [**breaking**] Disallow opaque ops during validation ([#1431](https://github.com/CQCL/hugr/pull/1431))
+- [**breaking**] Add collections to serialized standard extensions ([#1452](https://github.com/CQCL/hugr/pull/1452))
+- [**breaking**] Variadic logic ops now binary ([#1451](https://github.com/CQCL/hugr/pull/1451))
+- [**breaking**] Int operations other than widen/narrow have only one width arg ([#1455](https://github.com/CQCL/hugr/pull/1455))
+- Add a `FuncTypeBase::io` method ([#1458](https://github.com/CQCL/hugr/pull/1458))
+- Add missing ops ([#1463](https://github.com/CQCL/hugr/pull/1463))
+- [**breaking**] Move `Lift`, `MakeTuple`, `UnpackTuple` and `Lift` to prelude ([#1475](https://github.com/CQCL/hugr/pull/1475))
+- `Option` / `Result` helpers ([#1481](https://github.com/CQCL/hugr/pull/1481))
+- [**breaking**] Add more list operations ([#1474](https://github.com/CQCL/hugr/pull/1474))
+- [**breaking**] Move int conversions to `conversions` ext, add to/from usize ([#1490](https://github.com/CQCL/hugr/pull/1490))
+
+### Refactor
+
+- [**breaking**] Bring the collections ext in line with other extension defs ([#1469](https://github.com/CQCL/hugr/pull/1469))
+- [**breaking**] Make Either::Right the "success" case ([#1489](https://github.com/CQCL/hugr/pull/1489))
+- [**breaking**] Flatten `CustomOp` in to `OpType` ([#1429](https://github.com/CQCL/hugr/pull/1429))
+
+### Testing
+
+- Add serialization benchmarks ([#1439](https://github.com/CQCL/hugr/pull/1439))
+
+
 ## 0.11.0 (2024-08-12)
 
 ### Bug Fixes
