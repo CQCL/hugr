@@ -47,7 +47,9 @@ pub enum ArrayOpDef {
     pop_right,
     discard_empty,
 }
-const MAX: &[TypeParam; 1] = &[TypeParam::max_nat()];
+
+/// Static parameters for array operations. Includes array size. Type is part of the type scheme.
+const STATIC_SIZE_PARAM: &[TypeParam; 1] = &[TypeParam::max_nat()];
 
 impl SignatureFromArgs for ArrayOpDef {
     fn compute_signature(&self, arg_values: &[TypeArg]) -> Result<PolyFuncTypeRV, SignatureError> {
@@ -79,7 +81,7 @@ impl SignatureFromArgs for ArrayOpDef {
     }
 
     fn static_params(&self) -> &[TypeParam] {
-        MAX
+        STATIC_SIZE_PARAM
     }
 }
 
