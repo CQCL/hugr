@@ -9,6 +9,7 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 
+use crate::extension::prelude::{either_type, option_type, USIZE_T};
 use crate::extension::simple_op::{MakeOpDef, MakeRegisteredOp};
 use crate::extension::{ExtensionBuildError, OpDef, SignatureFunc, PRELUDE};
 use crate::ops::constant::ValueName;
@@ -110,17 +111,30 @@ impl CustomConst for ListValue {
 #[allow(non_camel_case_types)]
 #[non_exhaustive]
 pub enum ListOp {
-    /// Pop from end of list
+    /// Pop from the end of list. Return an optional value.
     pop,
-    /// Push to end of list
+    /// Push to end of list. Return the new list.
     push,
+    /// Lookup an element in a list by index.
+    get,
+    /// Replace the element at index `i` with value `v`, and return the old value.
+    ///
+    /// If the index is out of bounds, returns the input value as an error.
+    set,
+    /// Insert an element at index `i`.
+    ///
+    /// Elements at higher indices are shifted one position to the right.
+    /// Returns an Err with the element if the index is out of bounds.
+    insert,
+    /// Get the length of a list.
+    length,
 }
 
 impl ListOp {
     /// Type parameter used in the list types.
     const TP: TypeParam = TypeParam::Type { b: TypeBound::Any };
 
-    /// Instantiate a list operation with an `element_type`
+    /// Instantiate a list operation with an `element_type`.
     pub fn with_type(self, element_type: Type) -> ListOpInst {
         ListOpInst {
             elem_type: element_type,
@@ -135,9 +149,25 @@ impl ListOp {
         let l = self.list_type(list_type_def, 0);
         match self {
             pop => self
-                .list_polytype(vec![l.clone()], vec![l.clone(), e.clone()])
+                .list_polytype(vec![l.clone()], vec![l, Type::from(option_type(e))])
                 .into(),
             push => self.list_polytype(vec![l.clone(), e], vec![l]).into(),
+            get => self
+                .list_polytype(vec![l, USIZE_T], vec![Type::from(option_type(e))])
+                .into(),
+            set => self
+                .list_polytype(
+                    vec![l.clone(), USIZE_T, e.clone()],
+                    vec![l, Type::from(either_type(e.clone(), e))],
+                )
+                .into(),
+            insert => self
+                .list_polytype(
+                    vec![l.clone(), USIZE_T, e.clone()],
+                    vec![l, either_type(Type::UNIT, e).into()],
+                )
+                .into(),
+            length => self.list_polytype(vec![l], vec![USIZE_T]).into(),
         }
     }
 
@@ -191,8 +221,12 @@ impl MakeOpDef for ListOp {
         use ListOp::*;
 
         match self {
-            pop => "Pop from back of list",
-            push => "Push to back of list",
+            pop => "Pop from the back of list. Returns an optional value.",
+            push => "Push to the back of list",
+            get => "Lookup an element in a list by index. Panics if the index is out of bounds.",
+            set => "Replace the element at index `i` with value `v`.",
+            insert => "Insert an element at index `i`. Elements at higher indices are shifted one position to the right. Panics if the index is out of bounds.",
+            length => "Get the length of a list",
         }
         .into()
     }
@@ -205,7 +239,6 @@ impl MakeOpDef for ListOp {
 lazy_static! {
     /// Extension for list operations.
     pub static ref EXTENSION: Extension = {
-        println!("creating collections extension");
         let mut extension = Extension::new(EXTENSION_ID, VERSION);
 
         // The list type must be defined before the operations are added.
@@ -323,7 +356,13 @@ impl ListOpInst {
 
 #[cfg(test)]
 mod test {
+    use rstest::rstest;
+
+    use crate::extension::prelude::{
+        const_left_tuple, const_none, const_right_tuple, const_some_tuple,
+    };
     use crate::ops::OpTrait;
+    use crate::PortIndex;
     use crate::{
         extension::{
             prelude::{ConstUsize, QB_T, USIZE_T},
@@ -378,7 +417,7 @@ mod test {
 
         let list_t = list_type(QB_T);
 
-        let both_row: TypeRow = vec![list_t.clone(), QB_T].into();
+        let both_row: TypeRow = vec![list_t.clone(), option_type(QB_T).into()].into();
         let just_list_row: TypeRow = vec![list_t].into();
         assert_eq!(pop_sig.input(), &just_list_row);
         assert_eq!(pop_sig.output(), &both_row);
@@ -395,5 +434,84 @@ mod test {
 
         assert_eq!(push_sig.input(), &both_row);
         assert_eq!(push_sig.output(), &just_list_row);
+    }
+
+    /// Values used in the `list_fold` test cases.
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    enum TestVal {
+        Idx(usize),
+        List(Vec<usize>),
+        Elem(usize),
+        Some(Vec<TestVal>),
+        None(TypeRow),
+        Ok(Vec<TestVal>, TypeRow),
+        Err(TypeRow, Vec<TestVal>),
+    }
+
+    impl TestVal {
+        fn to_value(&self) -> Value {
+            match self {
+                TestVal::Idx(i) => Value::extension(ConstUsize::new(*i as u64)),
+                TestVal::Elem(e) => Value::extension(ConstUsize::new(*e as u64)),
+                TestVal::List(l) => {
+                    let elems = l
+                        .iter()
+                        .map(|&i| Value::extension(ConstUsize::new(i as u64)))
+                        .collect();
+                    Value::extension(ListValue(elems, USIZE_T))
+                }
+                TestVal::Some(l) => {
+                    let elems = l.iter().map(TestVal::to_value);
+                    const_some_tuple(elems)
+                }
+                TestVal::None(tr) => const_none(tr.clone()),
+                TestVal::Ok(l, tr) => {
+                    let elems = l.iter().map(TestVal::to_value);
+                    const_left_tuple(elems, tr.clone())
+                }
+                TestVal::Err(tr, l) => {
+                    let elems = l.iter().map(TestVal::to_value);
+                    const_right_tuple(tr.clone(), elems)
+                }
+            }
+        }
+    }
+
+    #[rstest]
+    #[case::pop(ListOp::pop, &[TestVal::List(vec![77,88, 42])], &[TestVal::List(vec![77,88]), TestVal::Some(vec![TestVal::Elem(42)])])]
+    #[case::pop_empty(ListOp::pop, &[TestVal::List(vec![])], &[TestVal::List(vec![]), TestVal::None(vec![USIZE_T].into())])]
+    #[case::push(ListOp::push, &[TestVal::List(vec![77,88]), TestVal::Elem(42)], &[TestVal::List(vec![77,88,42])])]
+    #[case::set(ListOp::set, &[TestVal::List(vec![77,88,42]), TestVal::Idx(1), TestVal::Elem(99)], &[TestVal::List(vec![77,99,42]), TestVal::Ok(vec![TestVal::Elem(88)], vec![USIZE_T].into())])]
+    #[case::set_invalid(ListOp::set, &[TestVal::List(vec![77,88,42]), TestVal::Idx(123), TestVal::Elem(99)], &[TestVal::List(vec![77,88,42]), TestVal::Err(vec![USIZE_T].into(), vec![TestVal::Elem(99)])])]
+    #[case::get(ListOp::get, &[TestVal::List(vec![77,88,42]), TestVal::Idx(1)], &[TestVal::Some(vec![TestVal::Elem(88)])])]
+    #[case::get_invalid(ListOp::get, &[TestVal::List(vec![77,88,42]), TestVal::Idx(99)], &[TestVal::None(vec![USIZE_T].into())])]
+    #[case::insert(ListOp::insert, &[TestVal::List(vec![77,88,42]), TestVal::Idx(1), TestVal::Elem(99)], &[TestVal::List(vec![77,99,88,42]), TestVal::Ok(vec![], vec![USIZE_T].into())])]
+    #[case::insert_invalid(ListOp::insert, &[TestVal::List(vec![77,88,42]), TestVal::Idx(52), TestVal::Elem(99)], &[TestVal::List(vec![77,88,42]), TestVal::Err(Type::UNIT.into(), vec![TestVal::Elem(99)])])]
+    #[case::length(ListOp::length, &[TestVal::List(vec![77,88,42])], &[TestVal::Elem(3)])]
+    fn list_fold(#[case] op: ListOp, #[case] inputs: &[TestVal], #[case] outputs: &[TestVal]) {
+        let consts: Vec<_> = inputs
+            .iter()
+            .enumerate()
+            .map(|(i, x)| (i.into(), x.to_value()))
+            .collect();
+
+        let res = op
+            .with_type(USIZE_T)
+            .to_extension_op(&COLLECTIONS_REGISTRY)
+            .unwrap()
+            .constant_fold(&consts)
+            .unwrap();
+
+        for (i, expected) in outputs.iter().enumerate() {
+            let expected = expected.to_value();
+            let res_val = res
+                .iter()
+                .find(|(port, _)| port.index() == i)
+                .unwrap()
+                .1
+                .clone();
+
+            assert_eq!(res_val, expected);
+        }
     }
 }

@@ -23,10 +23,185 @@
   },
   "values": {},
   "operations": {
+    "get": {
+      "extension": "collections",
+      "name": "get",
+      "description": "Lookup an element in a list by index. Panics if the index is out of bounds.",
+      "signature": {
+        "params": [
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "collections",
+              "id": "List",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "I"
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "General",
+              "rows": [
+                [
+                  {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                ],
+                []
+              ]
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "insert": {
+      "extension": "collections",
+      "name": "insert",
+      "description": "Insert an element at index `i`. Elements at higher indices are shifted one position to the right. Panics if the index is out of bounds.",
+      "signature": {
+        "params": [
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "collections",
+              "id": "List",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "I"
+            },
+            {
+              "t": "V",
+              "i": 0,
+              "b": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "collections",
+              "id": "List",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "Sum",
+              "s": "General",
+              "rows": [
+                [
+                  {
+                    "t": "Sum",
+                    "s": "Unit",
+                    "size": 1
+                  }
+                ],
+                [
+                  {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                ]
+              ]
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "length": {
+      "extension": "collections",
+      "name": "length",
+      "description": "Get the length of a list",
+      "signature": {
+        "params": [
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "collections",
+              "id": "List",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "I"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
     "pop": {
       "extension": "collections",
       "name": "pop",
-      "description": "Pop from back of list",
+      "description": "Pop from the back of list. Returns an optional value.",
       "signature": {
         "params": [
           {
@@ -71,9 +246,18 @@
               "bound": "A"
             },
             {
-              "t": "V",
-              "i": 0,
-              "b": "A"
+              "t": "Sum",
+              "s": "General",
+              "rows": [
+                [
+                  {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                ],
+                []
+              ]
             }
           ],
           "extension_reqs": []
@@ -84,7 +268,7 @@
     "push": {
       "extension": "collections",
       "name": "push",
-      "description": "Push to back of list",
+      "description": "Push to the back of list",
       "signature": {
         "params": [
           {
@@ -132,6 +316,87 @@
                 }
               ],
               "bound": "A"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "set": {
+      "extension": "collections",
+      "name": "set",
+      "description": "Replace the element at index `i` with value `v`.",
+      "signature": {
+        "params": [
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "collections",
+              "id": "List",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "I"
+            },
+            {
+              "t": "V",
+              "i": 0,
+              "b": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "collections",
+              "id": "List",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "Sum",
+              "s": "General",
+              "rows": [
+                [
+                  {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                ],
+                [
+                  {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                ]
+              ]
             }
           ],
           "extension_reqs": []
