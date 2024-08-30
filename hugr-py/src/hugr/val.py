@@ -196,7 +196,7 @@ class None_(Sum):
         super().__init__(tag=0, typ=tys.Option(*types), vals=[])
 
     def __repr__(self) -> str:
-        return f"None({', '.join(map(repr, self.typ.variant_rows[1]))})"
+        return f"None({comma_sep_str(self.typ.variant_rows[1])})"
 
     def __str__(self) -> str:
         return "None"
