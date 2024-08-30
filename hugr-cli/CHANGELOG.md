@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.0 (2024-08-30)
+
+### Features
+
+- [**breaking**] Add collections to serialized standard extensions ([#1452](https://github.com/CQCL/hugr/pull/1452))
+
+
 ## 0.4.0 (2024-08-12)
 
 ### Features
