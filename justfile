@@ -15,7 +15,7 @@ check:
 # Run all the tests.
 test language="[rust|python]" : (_run_lang language \
         "HUGR_TEST_SCHEMA=1 cargo test --all-features" \
-        "cargo build -p hugr-cli && uv run pytest"
+        "cargo build -p hugr-cli && HUGR_RENDER_DOT=1 uv run pytest"
     )
 
 # Run all the benchmarks.

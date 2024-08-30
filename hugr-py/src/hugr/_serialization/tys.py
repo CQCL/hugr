@@ -395,6 +395,13 @@ class TypeBound(Enum):
                 res = b
         return res
 
+    def __str__(self) -> str:
+        match self:
+            case TypeBound.Copyable:
+                return "Copyable"
+            case TypeBound.Any:
+                return "Any"
+
 
 class Opaque(BaseType):
     """An opaque Type that can be downcasted by the extensions that define it."""

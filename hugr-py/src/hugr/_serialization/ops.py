@@ -522,7 +522,7 @@ class ExtensionOp(DataflowOp):
     def deserialize(self) -> ops.Custom:
         return ops.Custom(
             extension=self.extension,
-            name=self.name,
+            op_name=self.name,
             signature=self.signature.deserialize(),
             args=deser_it(self.args),
         )
