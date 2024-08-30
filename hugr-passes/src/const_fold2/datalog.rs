@@ -30,10 +30,6 @@ pub enum IO {
 }
 
 ascent::ascent! {
-    // The trait-indirection layer here means we can just write 'C' but in practice ATM
-    // DataflowContext<H> (for H: HugrView) would be sufficient, there's really no
-    // point in using anything else yet. However DFContext will be useful when we
-    // move interpretation of nodes out into a trait method.
     struct AscentProgram<V: AbstractValue, C: DFContext<V>>;
     relation context(C);
     relation out_wire_value_proto(Node, OutgoingPort, PV<V>);

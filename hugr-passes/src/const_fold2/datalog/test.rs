@@ -1,4 +1,4 @@
-use context::DataflowContext;
+use context::HugrValueContext;
 use hugr_core::{
     builder::{DFGBuilder, Dataflow, DataflowSubContainer, HugrBuilder, SubContainer},
     extension::{prelude::BOOL_T, ExtensionSet, EMPTY_REG},
@@ -20,7 +20,7 @@ fn test_make_tuple() {
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
     let mut machine = Machine::new();
-    machine.run(DataflowContext::new(&hugr));
+    machine.run(HugrValueContext::new(&hugr));
 
     let x = machine.read_out_wire_value(&hugr, v3).unwrap();
     assert_eq!(x, Value::tuple([Value::false_val(), Value::true_val()]));
@@ -39,7 +39,7 @@ fn test_unpack_tuple() {
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
     let mut machine = Machine::new();
-    machine.run(DataflowContext::new(&hugr));
+    machine.run(HugrValueContext::new(&hugr));
 
     let o1_r = machine.read_out_wire_value(&hugr, o1).unwrap();
     assert_eq!(o1_r, Value::false_val());
@@ -58,7 +58,7 @@ fn test_unpack_const() {
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
     let mut machine = Machine::new();
-    machine.run(DataflowContext::new(&hugr));
+    machine.run(HugrValueContext::new(&hugr));
 
     let o_r = machine.read_out_wire_value(&hugr, o).unwrap();
     assert_eq!(o_r, Value::true_val());
@@ -84,7 +84,7 @@ fn test_tail_loop_never_iterates() {
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
     let mut machine = Machine::new();
-    machine.run(DataflowContext::new(&hugr));
+    machine.run(HugrValueContext::new(&hugr));
     // dbg!(&machine.tail_loop_io_node);
     // dbg!(&machine.out_wire_value);
 
@@ -116,7 +116,7 @@ fn test_tail_loop_always_iterates() {
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
     let mut machine = Machine::new();
-    machine.run(DataflowContext::new(&hugr));
+    machine.run(HugrValueContext::new(&hugr));
 
     let o_r1 = machine.read_out_wire_partial_value(tl_o1).unwrap();
     assert_eq!(o_r1, PartialValue::bottom().into());
@@ -166,7 +166,7 @@ fn test_tail_loop_iterates_twice() {
     let [o_w1, o_w2] = tail_loop.outputs_arr();
 
     let mut machine = Machine::new();
-    machine.run(DataflowContext::new(&hugr));
+    machine.run(HugrValueContext::new(&hugr));
     // dbg!(&machine.tail_loop_io_node);
     // dbg!(&machine.out_wire_value);
 
@@ -222,7 +222,7 @@ fn conditional() {
     let arg_pv =
         PartialValue::variant(1, []).join(PartialValue::variant(2, [PartialValue::variant(0, [])]));
     machine.propolutate_out_wires([(arg_w, arg_pv.into())]);
-    machine.run(DataflowContext::new(&hugr));
+    machine.run(HugrValueContext::new(&hugr));
 
     let cond_r1 = machine.read_out_wire_value(&hugr, cond_o1).unwrap();
     assert_eq!(cond_r1, Value::false_val());
