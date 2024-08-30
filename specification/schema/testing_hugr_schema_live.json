@@ -96,9 +96,6 @@
             "additionalProperties": true,
             "description": "Known size array whose elements are of the same type.",
             "properties": {
-                "ty": {
-                    "$ref": "#/$defs/Type"
-                },
                 "t": {
                     "const": "Array",
                     "default": "Array",
@@ -108,13 +105,16 @@
                     "title": "T",
                     "type": "string"
                 },
+                "inner": {
+                    "$ref": "#/$defs/Type"
+                },
                 "len": {
                     "title": "Len",
                     "type": "integer"
                 }
             },
             "required": [
-                "ty",
+                "inner",
                 "len"
             ],
             "title": "Array",

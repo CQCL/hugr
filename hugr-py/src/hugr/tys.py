@@ -268,7 +268,7 @@ class Array(Type):
     size: int
 
     def _to_serial(self) -> stys.Array:
-        return stys.Array(ty=self.ty._to_serial_root(), len=self.size)
+        return stys.Array(inner=self.ty._to_serial_root(), len=self.size)
 
     def type_bound(self) -> TypeBound:
         return self.ty.type_bound()
