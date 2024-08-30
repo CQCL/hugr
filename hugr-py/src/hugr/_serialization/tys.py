@@ -224,18 +224,15 @@ class BaseType(ABC, ConfiguredBaseModel):
     def deserialize(self) -> tys.Type: ...
 
 
-class MultiContainer(BaseType):
-    ty: Type
-
-
-class Array(MultiContainer):
+class Array(BaseType):
     """Known size array whose elements are of the same type."""
 
     t: Literal["Array"] = "Array"
+    inner: Type
     len: int
 
     def deserialize(self) -> tys.Array:
-        return tys.Array(ty=self.ty.deserialize(), size=self.len)
+        return tys.Array(ty=self.inner.deserialize(), size=self.len)
 
 
 class UnitSum(BaseType):
