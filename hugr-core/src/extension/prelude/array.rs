@@ -75,7 +75,10 @@ impl SignatureFromArgs for ArrayOpDef {
                     ),
                 )
             }
-            _ => unreachable!("Other operations should not need custom computation."),
+            _ => unreachable!(
+                "Operation {} should not need custom computation.",
+                self.name()
+            ),
         };
         Ok(poly_func_ty)
     }
