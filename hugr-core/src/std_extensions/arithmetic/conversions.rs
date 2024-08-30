@@ -101,7 +101,7 @@ impl ConvertOpDef {
     pub fn without_log_width(self) -> ConvertOpType {
         ConvertOpType {
             def: self,
-            log_widths: vec![],
+            log_width: None,
         }
     }
     /// Initialize a [ConvertOpType] from a [ConvertOpDef] which requires one
@@ -109,7 +109,7 @@ impl ConvertOpDef {
     pub fn with_log_width(self, log_width: u8) -> ConvertOpType {
         ConvertOpType {
             def: self,
-            log_widths: vec![log_width],
+            log_width: Some(log_width),
         }
     }
 }
@@ -118,16 +118,21 @@ impl ConvertOpDef {
 pub struct ConvertOpType {
     /// The kind of conversion op.
     def: ConvertOpDef,
-    /// The integer width parameters of the conversion op. These are interpreted
+    /// The integer width parameter of the conversion op, if any. This is interpreted
     /// differently, depending on `def`. The integer types in the inputs and
-    /// outputs of the op will have [int_type]s of these widths.
-    log_widths: Vec<u8>,
+    /// outputs of the op will have [int_type]s of this width.
+    log_width: Option<u8>,
 }
 
 impl ConvertOpType {
     /// Returns the generic [ConvertOpDef] of this [ConvertOpType].
     pub fn def(&self) -> &ConvertOpDef {
         &self.def
+    }
+
+    /// Returns the integer width parameters of this [ConvertOpType], if any.
+    pub fn log_widths(&self) -> &[u8] {
+        self.log_width.as_slice()
     }
 }
 
@@ -144,7 +149,7 @@ impl MakeExtensionOp for ConvertOpType {
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
-        self.log_widths.iter().map(|&n| (n as u64).into()).collect()
+        self.log_width.iter().map(|&n| (n as u64).into()).collect()
     }
 }
 
@@ -189,13 +194,14 @@ impl HasConcrete for ConvertOpDef {
     type Concrete = ConvertOpType;
 
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
-        let log_widths: Vec<u8> = type_args
-            .iter()
-            .map(|a| get_log_width(a).map_err(|_| SignatureError::InvalidTypeArgs))
-            .collect::<Result<_, _>>()?;
+        let log_width = match type_args {
+            [] => None,
+            [arg] => Some(get_log_width(arg).map_err(|_| SignatureError::InvalidTypeArgs)?),
+            _ => return Err(SignatureError::InvalidTypeArgs.into()),
+        };
         Ok(ConvertOpType {
             def: *self,
-            log_widths,
+            log_width,
         })
     }
 }
