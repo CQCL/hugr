@@ -348,8 +348,8 @@ pub fn const_right_tuple(
 /// A constant Either value with a success variant.
 ///
 /// Alias for [const_right].
-pub fn const_ok(value: Value, ty_err: impl Into<TypeRowRV>) -> Value {
-    const_right(ty_err, value)
+pub fn const_ok(value: Value, ty_fail: impl Into<TypeRowRV>) -> Value {
+    const_right(ty_fail, value)
 }
 
 /// A constant Either with a row of success values.
@@ -357,22 +357,22 @@ pub fn const_ok(value: Value, ty_err: impl Into<TypeRowRV>) -> Value {
 /// Alias for [const_right_tuple].
 pub fn const_ok_tuple(
     values: impl IntoIterator<Item = Value>,
-    ty_err: impl Into<TypeRowRV>,
+    ty_fail: impl Into<TypeRowRV>,
 ) -> Value {
-    const_right_tuple(ty_err, values)
+    const_right_tuple(ty_fail, values)
 }
 
 /// A constant Either value with a failure variant.
 ///
 /// Alias for [const_left].
-pub fn const_err(value: Value, ty_ok: impl Into<TypeRowRV>) -> Value {
+pub fn const_fail(value: Value, ty_ok: impl Into<TypeRowRV>) -> Value {
     const_left(value, ty_ok)
 }
 
 /// A constant Either with a row of failure values.
 ///
 /// Alias for [const_left_tuple].
-pub fn const_err_tuple(
+pub fn const_fail_tuple(
     values: impl IntoIterator<Item = Value>,
     ty_ok: impl Into<TypeRowRV>,
 ) -> Value {
@@ -437,7 +437,7 @@ impl ConstError {
     /// args:
     ///     ty_ok: The type of the success variant.
     pub fn as_either(self, ty_ok: impl Into<TypeRowRV>) -> Value {
-        const_err(self.into(), ty_ok)
+        const_fail(self.into(), ty_ok)
     }
 }
 

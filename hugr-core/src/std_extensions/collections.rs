@@ -359,7 +359,7 @@ mod test {
     use rstest::rstest;
 
     use crate::extension::prelude::{
-        const_err_tuple, const_none, const_ok_tuple, const_some_tuple,
+        const_fail_tuple, const_none, const_ok_tuple, const_some_tuple,
     };
     use crate::ops::OpTrait;
     use crate::PortIndex;
@@ -471,7 +471,7 @@ mod test {
                 }
                 TestVal::Err(tr, l) => {
                     let elems = l.iter().map(TestVal::to_value);
-                    const_err_tuple(elems, tr.clone())
+                    const_fail_tuple(elems, tr.clone())
                 }
             }
         }
