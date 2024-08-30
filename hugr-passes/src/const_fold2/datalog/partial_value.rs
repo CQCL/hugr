@@ -7,7 +7,11 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
+/// Aka, deconstructible into Sum (TryIntoSum ?)
 pub trait AbstractValue: Clone + std::fmt::Debug + PartialEq + Eq + Hash {
+    /// We write this way to optimize query/inspection (is-it-a-sum),
+    /// at the cost of requiring more cloning during actual conversion
+    /// (inside the lazy Iterator, or for the error case, as Self remains)
     fn as_sum(&self) -> Option<(usize, impl Iterator<Item = Self> + '_)>;
 }
 
