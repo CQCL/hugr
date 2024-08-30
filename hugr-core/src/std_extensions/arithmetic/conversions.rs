@@ -2,7 +2,7 @@
 
 use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 
-use crate::extension::prelude::{BOOL_T, STRING_TYPE};
+use crate::extension::prelude::{BOOL_T, STRING_TYPE, USIZE_T};
 use crate::extension::simple_op::{HasConcrete, HasDef};
 use crate::ops::OpName;
 use crate::std_extensions::arithmetic::int_ops::int_polytype;
@@ -42,6 +42,8 @@ pub enum ConvertOpDef {
     ifrombool,
     itostring_u,
     itostring_s,
+    itousize,
+    ifromusize,
 }
 
 impl MakeOpDef for ConvertOpDef {
@@ -65,6 +67,8 @@ impl MakeOpDef for ConvertOpDef {
             itobool => int_polytype(0, vec![int_type(0)], vec![BOOL_T]),
             ifrombool => int_polytype(0, vec![BOOL_T], vec![int_type(0)]),
             itostring_u | itostring_s => int_polytype(1, vec![int_tv(0)], vec![STRING_TYPE]),
+            itousize => int_polytype(0, vec![int_type(6)], vec![USIZE_T]),
+            ifromusize => int_polytype(0, vec![USIZE_T], vec![int_type(6)]),
         }
         .into()
     }
@@ -80,6 +84,8 @@ impl MakeOpDef for ConvertOpDef {
             ifrombool => "convert from bool into a 1-bit integer (1 is true, 0 is false)",
             itostring_s => "convert a signed integer to its string representation",
             itostring_u => "convert an unsigned integer to its string representation",
+            itousize => "convert a 64b unsigned integer to its usize representation",
+            ifromusize => "convert a usize to a 64b unsigned integer",
         }
         .to_string()
     }
@@ -193,6 +199,13 @@ impl HasDef for ConvertOpType {
 
 #[cfg(test)]
 mod test {
+    use rstest::rstest;
+
+    use crate::extension::prelude::ConstUsize;
+    use crate::ops::Value;
+    use crate::std_extensions::arithmetic::int_types::ConstInt;
+    use crate::IncomingPort;
+
     use super::*;
 
     #[test]
@@ -222,5 +235,38 @@ mod test {
             ConvertOpDef::from_op(&ext_op).unwrap(),
             ConvertOpDef::itobool
         );
+    }
+
+    #[rstest]
+    #[case::itobool_false(ConvertOpDef::itobool.without_log_width(), &[ConstInt::new_u(0, 0).unwrap().into()], &[Value::false_val()])]
+    #[case::itobool_true(ConvertOpDef::itobool.without_log_width(), &[ConstInt::new_u(0, 1).unwrap().into()], &[Value::true_val()])]
+    #[case::ifrombool_false(ConvertOpDef::ifrombool.without_log_width(), &[Value::false_val()], &[ConstInt::new_u(0, 0).unwrap().into()])]
+    #[case::ifrombool_true(ConvertOpDef::ifrombool.without_log_width(), &[Value::true_val()], &[ConstInt::new_u(0, 1).unwrap().into()])]
+    #[case::itousize(ConvertOpDef::itousize.without_log_width(), &[ConstInt::new_u(6, 42).unwrap().into()], &[ConstUsize::new(42).into()])]
+    #[case::ifromusize(ConvertOpDef::ifromusize.without_log_width(), &[ConstUsize::new(42).into()], &[ConstInt::new_u(6, 42).unwrap().into()])]
+    fn convert_fold(
+        #[case] op: ConvertOpType,
+        #[case] inputs: &[Value],
+        #[case] outputs: &[Value],
+    ) {
+        use crate::ops::Value;
+
+        let consts: Vec<(IncomingPort, Value)> = inputs
+            .iter()
+            .enumerate()
+            .map(|(i, v)| (i.into(), v.clone()))
+            .collect();
+
+        let res = op
+            .to_extension_op()
+            .unwrap()
+            .constant_fold(&consts)
+            .unwrap();
+
+        for (i, expected) in outputs.iter().enumerate() {
+            let res_val: &Value = &res.get(i).unwrap().1;
+
+            assert_eq!(res_val, expected);
+        }
     }
 }

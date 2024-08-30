@@ -1,4 +1,4 @@
-use crate::extension::prelude::ConstString;
+use crate::extension::prelude::{ConstString, ConstUsize};
 use crate::ops::constant::get_single_input_value;
 use crate::ops::Value;
 use crate::std_extensions::arithmetic::int_types::INT_TYPES;
@@ -30,6 +30,8 @@ pub(super) fn set_fold(op: &ConvertOpDef, def: &mut OpDef) {
         ifrombool => def.set_constant_folder(IFromBool),
         itostring_u => def.set_constant_folder(IToStringU),
         itostring_s => def.set_constant_folder(IToStringS),
+        itousize => def.set_constant_folder(IToUsize),
+        ifromusize => def.set_constant_folder(IFromUsize),
     }
 }
 
@@ -220,5 +222,47 @@ impl ConstFold for IToStringS {
                 Value::extension(ConstString::new(n0.value_s().to_string())),
             )])
         }
+    }
+}
+
+struct IToUsize;
+
+impl ConstFold for IToUsize {
+    fn fold(
+        &self,
+        type_args: &[crate::types::TypeArg],
+        consts: &[(IncomingPort, ops::Value)],
+    ) -> ConstFoldResult {
+        if !type_args.is_empty() {
+            return None;
+        };
+        let n0: &ConstInt = get_single_input_value(consts)?;
+        if n0.log_width() != 6 {
+            None
+        } else {
+            Some(vec![(
+                0.into(),
+                Value::extension(ConstUsize::new(n0.value_u())),
+            )])
+        }
+    }
+}
+
+struct IFromUsize;
+
+impl ConstFold for IFromUsize {
+    fn fold(
+        &self,
+        type_args: &[crate::types::TypeArg],
+        consts: &[(IncomingPort, ops::Value)],
+    ) -> ConstFoldResult {
+        if !type_args.is_empty() {
+            return None;
+        };
+        let n0: &ConstUsize = get_single_input_value(consts)?;
+        Some(vec![(
+            0.into(),
+            Value::extension(ConstInt::new_u(6, n0.value()).unwrap()),
+        )])
     }
 }
