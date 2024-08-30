@@ -5,10 +5,9 @@ use strum_macros::IntoStaticStr;
 use crate::extension::prelude::either_type;
 use crate::extension::prelude::option_type;
 use crate::extension::prelude::USIZE_T;
-use crate::extension::simple_op::MakeExtensionOp;
-use crate::extension::simple_op::MakeOpDef;
-use crate::extension::simple_op::MakeRegisteredOp;
-use crate::extension::simple_op::OpLoadError;
+use crate::extension::simple_op::{
+    HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
+};
 use crate::extension::ExtensionId;
 use crate::extension::OpDef;
 use crate::extension::SignatureFromArgs;
@@ -68,7 +67,10 @@ impl SignatureFromArgs for ArrayOpDef {
                     array_type(TypeArg::BoundedNat { n: n - 1 }, elem_ty_var.clone());
                 PolyFuncTypeRV::new(
                     params,
-                    FuncValueType::new(array_ty, vec![elem_ty_var, popped_array_ty]),
+                    FuncValueType::new(
+                        array_ty,
+                        Type::from(option_type(vec![elem_ty_var, popped_array_ty])),
+                    ),
                 )
             }
             _ => unreachable!("Other operations should not need custom computation."),
@@ -223,14 +225,7 @@ impl MakeExtensionOp for ArrayOp {
         Self: Sized,
     {
         let def = ArrayOpDef::from_def(ext_op.def())?;
-
-        let (ty, size) = match (def, ext_op.args()) {
-            (ArrayOpDef::discard_empty, [TypeArg::Type { ty }]) => (ty.clone(), 0),
-            (_, [TypeArg::BoundedNat { n }, TypeArg::Type { ty }]) => (ty.clone(), *n),
-            _ => return Err(SignatureError::InvalidTypeArgs.into()),
-        };
-
-        Ok(def.to_concrete(ty.clone(), size))
+        def.instantiate(ext_op.args())
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
@@ -260,6 +255,24 @@ impl MakeRegisteredOp for ArrayOp {
 
     fn registry<'s, 'r: 's>(&'s self) -> &'r crate::extension::ExtensionRegistry {
         &PRELUDE_REGISTRY
+    }
+}
+
+impl HasDef for ArrayOp {
+    type Def = ArrayOpDef;
+}
+
+impl HasConcrete for ArrayOpDef {
+    type Concrete = ArrayOp;
+
+    fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
+        let (ty, size) = match (self, type_args) {
+            (ArrayOpDef::discard_empty, [TypeArg::Type { ty }]) => (ty.clone(), 0),
+            (_, [TypeArg::BoundedNat { n }, TypeArg::Type { ty }]) => (ty.clone(), *n),
+            _ => return Err(SignatureError::InvalidTypeArgs.into()),
+        };
+
+        Ok(self.to_concrete(ty.clone(), size))
     }
 }
 
@@ -301,7 +314,7 @@ mod tests {
     use crate::{
         builder::{inout_sig, DFGBuilder, Dataflow, DataflowHugr},
         extension::prelude::{BOOL_T, QB_T},
-        ops::OpType,
+        ops::{OpTrait, OpType},
     };
 
     use super::*;
@@ -309,7 +322,6 @@ mod tests {
     #[test]
     fn test_array_ops() {
         for def in ArrayOpDef::iter() {
-            dbg!(def);
             let ty = if def == ArrayOpDef::get { BOOL_T } else { QB_T };
             let size = if def == ArrayOpDef::discard_empty {
                 0
@@ -317,8 +329,7 @@ mod tests {
                 2
             };
             let op = def.to_concrete(ty, size);
-            let ext_op = op.clone().to_extension_op().unwrap();
-            let optype: OpType = ext_op.into();
+            let optype: OpType = op.clone().into();
             let new_op: ArrayOp = optype.cast().unwrap();
             assert_eq!(new_op, op);
         }
@@ -340,5 +351,107 @@ mod tests {
         let out = b.add_dataflow_op(op, [q1, q2]).unwrap();
 
         b.finish_prelude_hugr_with_outputs(out.outputs()).unwrap();
+    }
+
+    #[test]
+    fn test_get() {
+        let size = 2;
+        let element_ty = BOOL_T;
+        let op = ArrayOpDef::get.to_concrete(element_ty.clone(), size);
+
+        let optype: OpType = op.into();
+
+        let sig = optype.dataflow_signature().unwrap();
+
+        assert_eq!(
+            sig.io(),
+            (
+                &vec![array_type(size, element_ty.clone()), USIZE_T].into(),
+                &vec![option_type(element_ty.clone()).into()].into()
+            )
+        );
+    }
+
+    #[test]
+    fn test_set() {
+        let size = 2;
+        let element_ty = BOOL_T;
+        let op = ArrayOpDef::set.to_concrete(element_ty.clone(), size);
+
+        let optype: OpType = op.into();
+
+        let sig = optype.dataflow_signature().unwrap();
+        let array_ty = array_type(size, element_ty.clone());
+        let result_row = vec![element_ty.clone(), array_ty.clone()];
+        assert_eq!(
+            sig.io(),
+            (
+                &vec![array_ty.clone(), USIZE_T, element_ty.clone()].into(),
+                &vec![either_type(result_row.clone(), result_row).into()].into()
+            )
+        );
+    }
+
+    #[test]
+    fn test_swap() {
+        let size = 2;
+        let element_ty = BOOL_T;
+        let op = ArrayOpDef::swap.to_concrete(element_ty.clone(), size);
+
+        let optype: OpType = op.into();
+
+        let sig = optype.dataflow_signature().unwrap();
+        let array_ty = array_type(size, element_ty.clone());
+        assert_eq!(
+            sig.io(),
+            (
+                &vec![array_ty.clone(), USIZE_T, USIZE_T].into(),
+                &vec![either_type(array_ty.clone(), array_ty).into()].into()
+            )
+        );
+    }
+
+    #[test]
+    fn test_pops() {
+        let size = 2;
+        let element_ty = BOOL_T;
+        for op in [ArrayOpDef::pop_left, ArrayOpDef::pop_right].iter() {
+            let op = op.to_concrete(element_ty.clone(), size);
+
+            let optype: OpType = op.into();
+
+            let sig = optype.dataflow_signature().unwrap();
+            assert_eq!(
+                sig.io(),
+                (
+                    &vec![array_type(size, element_ty.clone())].into(),
+                    &vec![option_type(vec![
+                        element_ty.clone(),
+                        array_type(size - 1, element_ty.clone())
+                    ])
+                    .into()]
+                    .into()
+                )
+            );
+        }
+    }
+
+    #[test]
+    fn test_discard_empty() {
+        let size = 0;
+        let element_ty = BOOL_T;
+        let op = ArrayOpDef::discard_empty.to_concrete(element_ty.clone(), size);
+
+        let optype: OpType = op.into();
+
+        let sig = optype.dataflow_signature().unwrap();
+
+        assert_eq!(
+            sig.io(),
+            (
+                &vec![array_type(size, element_ty.clone())].into(),
+                &type_row![]
+            )
+        );
     }
 }
