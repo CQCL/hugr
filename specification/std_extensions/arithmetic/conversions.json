@@ -96,6 +96,222 @@
       },
       "binary": false
     },
+    "ifrombool": {
+      "extension": "arithmetic.conversions",
+      "name": "ifrombool",
+      "description": "convert from bool into a 1-bit integer (1 is true, 0 is false)",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Sum",
+              "s": "Unit",
+              "size": 2
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "BoundedNat",
+                  "n": 0
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "ifromusize": {
+      "extension": "arithmetic.conversions",
+      "name": "ifromusize",
+      "description": "convert a usize to a 64b unsigned integer",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "I"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "BoundedNat",
+                  "n": 6
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "itobool": {
+      "extension": "arithmetic.conversions",
+      "name": "itobool",
+      "description": "convert a 1-bit integer to bool (1 is true, 0 is false)",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "BoundedNat",
+                  "n": 0
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "Unit",
+              "size": 2
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "itostring_s": {
+      "extension": "arithmetic.conversions",
+      "name": "itostring_s",
+      "description": "convert a signed integer to its string representation",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "prelude",
+              "id": "string",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "itostring_u": {
+      "extension": "arithmetic.conversions",
+      "name": "itostring_u",
+      "description": "convert an unsigned integer to its string representation",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": 7
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": 7
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "prelude",
+              "id": "string",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "itousize": {
+      "extension": "arithmetic.conversions",
+      "name": "itousize",
+      "description": "convert a 64b unsigned integer to its usize representation",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.int.types",
+              "id": "int",
+              "args": [
+                {
+                  "tya": "BoundedNat",
+                  "n": 6
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "I"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
     "trunc_s": {
       "extension": "arithmetic.conversions",
       "name": "trunc_s",
