@@ -351,15 +351,13 @@ pub enum OpaqueOpError {
 #[cfg(test)]
 mod test {
 
+    use crate::std_extensions::arithmetic::conversions::{self, CONVERT_OPS_REGISTRY};
     use crate::{
         extension::{
             prelude::{BOOL_T, QB_T, USIZE_T},
             SignatureFunc,
         },
-        std_extensions::arithmetic::{
-            int_ops::{self, INT_OPS_REGISTRY},
-            int_types::INT_TYPES,
-        },
+        std_extensions::arithmetic::int_types::INT_TYPES,
         types::FuncValueType,
         Extension,
     };
@@ -387,10 +385,10 @@ mod test {
 
     #[test]
     fn resolve_opaque_op() {
-        let registry = &INT_OPS_REGISTRY;
+        let registry = &CONVERT_OPS_REGISTRY;
         let i0 = &INT_TYPES[0];
         let opaque = OpaqueOp::new(
-            int_ops::EXTENSION_ID,
+            conversions::EXTENSION_ID,
             "itobool",
             "description".into(),
             vec![],

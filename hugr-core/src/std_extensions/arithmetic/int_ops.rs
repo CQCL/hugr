@@ -1,7 +1,7 @@
 //! Basic integer operations.
 
 use super::int_types::{get_log_width, int_tv, LOG_WIDTH_TYPE_PARAM};
-use crate::extension::prelude::{sum_with_error, BOOL_T, STRING_TYPE};
+use crate::extension::prelude::{sum_with_error, BOOL_T};
 use crate::extension::simple_op::{
     HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
 };
@@ -10,7 +10,6 @@ use crate::extension::{
 };
 use crate::ops::custom::ExtensionOp;
 use crate::ops::{NamedOp, OpName};
-use crate::std_extensions::arithmetic::int_types::int_type;
 use crate::type_row;
 use crate::types::{FuncValueType, PolyFuncTypeRV, TypeRowRV};
 use crate::utils::collect_array;
@@ -57,8 +56,6 @@ pub enum IntOpDef {
     iwiden_s,
     inarrow_u,
     inarrow_s,
-    itobool,
-    ifrombool,
     ieq,
     ine,
     ilt_u,
@@ -101,8 +98,6 @@ pub enum IntOpDef {
     irotr,
     iu_to_s,
     is_to_u,
-    itostring_u,
-    itostring_s,
 }
 
 impl MakeOpDef for IntOpDef {
@@ -128,8 +123,6 @@ impl MakeOpDef for IntOpDef {
                 IOValidator { f_ge_s: true },
             )
             .into(),
-            itobool => int_polytype(0, vec![int_type(0)], type_row![BOOL_T]).into(),
-            ifrombool => int_polytype(0, type_row![BOOL_T], vec![int_type(0)]).into(),
             ieq | ine | ilt_u | ilt_s | igt_u | igt_s | ile_u | ile_s | ige_u | ige_s => {
                 int_polytype(1, vec![tv0; 2], type_row![BOOL_T]).into()
             }
@@ -160,11 +153,6 @@ impl MakeOpDef for IntOpDef {
             }
             imod_u | imod_s => int_polytype(1, vec![tv0.clone(); 2], vec![tv0]).into(),
             ishl | ishr | irotl | irotr => int_polytype(1, vec![tv0.clone(); 2], vec![tv0]).into(),
-            itostring_u | itostring_s => PolyFuncTypeRV::new(
-                vec![LOG_WIDTH_TYPE_PARAM],
-                FuncValueType::new(vec![tv0], vec![STRING_TYPE]),
-            )
-            .into(),
         }
     }
 
@@ -176,8 +164,6 @@ impl MakeOpDef for IntOpDef {
             iwiden_s => "widen a signed integer to a wider one with the same value",
             inarrow_u => "narrow an unsigned integer to a narrower one with the same value if possible",
             inarrow_s => "narrow a signed integer to a narrower one with the same value if possible",
-            itobool => "convert a 1-bit integer to bool (1 is true, 0 is false)",
-            ifrombool => "convert from bool into a 1-bit integer (1 is true, 0 is false)",
             ieq => "equality test",
             ine => "inequality test",
             ilt_u => "\"less than\" as unsigned integers",
@@ -228,8 +214,6 @@ impl MakeOpDef for IntOpDef {
             (rightmost bits replace leftmost bits)",
             is_to_u => "convert signed to unsigned by taking absolute value",
             iu_to_s => "convert unsigned to signed by taking absolute value",
-            itostring_s => "convert a signed integer to its string representation",
-            itostring_u => "convert an unsigned integer to its string representation",
         }.into()
     }
 
@@ -237,7 +221,9 @@ impl MakeOpDef for IntOpDef {
         const_fold::set_fold(self, def)
     }
 }
-fn int_polytype(
+
+/// Returns a polytype composed by a function type, and a number of integer width type parameters.
+pub(in crate::std_extensions::arithmetic) fn int_polytype(
     n_vars: usize,
     input: impl Into<TypeRowRV>,
     output: impl Into<TypeRowRV>,
@@ -310,6 +296,8 @@ pub struct ConcreteIntOp {
     /// The width parameters of the int op. These are interpreted differently,
     /// depending on `def`. The types of inputs and outputs of the op will have
     /// [int_type]s of these widths.
+    ///
+    /// [int_type]: crate::std_extensions::arithmetic::int_types::int_type
     pub log_widths: Vec<u8>,
 }
 
@@ -375,8 +363,7 @@ mod test {
     use rstest::rstest;
 
     use crate::{
-        ops::{dataflow::DataflowOpTrait, ExtensionOp},
-        std_extensions::arithmetic::int_types::int_type,
+        ops::dataflow::DataflowOpTrait, std_extensions::arithmetic::int_types::int_type,
         types::Signature,
     };
 
@@ -386,7 +373,6 @@ mod test {
     fn test_int_ops_extension() {
         assert_eq!(EXTENSION.name() as &str, "arithmetic.int");
         assert_eq!(EXTENSION.types().count(), 0);
-        assert_eq!(EXTENSION.operations().count(), 50);
         for (name, _) in EXTENSION.operations() {
             assert!(name.starts_with('i'));
         }
@@ -441,22 +427,6 @@ mod test {
             .with_two_log_widths(1, 2)
             .to_extension_op()
             .is_none());
-    }
-
-    #[test]
-    fn test_conversions() {
-        let o = IntOpDef::itobool.without_log_width();
-        assert!(
-            IntOpDef::itobool
-                .with_two_log_widths(1, 2)
-                .to_extension_op()
-                .is_none(),
-            "type arguments invalid"
-        );
-        let ext_op: ExtensionOp = o.clone().to_extension_op().unwrap();
-
-        assert_eq!(ConcreteIntOp::from_op(&ext_op).unwrap(), o);
-        assert_eq!(IntOpDef::from_op(&ext_op).unwrap(), IntOpDef::itobool);
     }
 
     #[rstest]
