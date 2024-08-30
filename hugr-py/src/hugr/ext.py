@@ -213,6 +213,12 @@ class OpDef(ExtensionObject):
             lower_funcs=[f._to_serial() for f in self.lower_funcs],
         )
 
+    def qualified_name(self) -> str:
+        ext_name = self._extension.name if self._extension else ""
+        if ext_name:
+            return f"{ext_name}.{self.name}"
+        return self.name
+
 
 @dataclass
 class ExtensionValue(ExtensionObject):

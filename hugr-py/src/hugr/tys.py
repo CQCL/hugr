@@ -6,10 +6,10 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 import hugr._serialization.tys as stys
-from hugr.utils import ser_it
+from hugr.utils import comma_sep_repr, comma_sep_str, ser_it
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Iterable, Sequence
 
     from hugr import ext
 
@@ -98,6 +98,9 @@ class TypeTypeParam(TypeParam):
     def _to_serial(self) -> stys.TypeTypeParam:
         return stys.TypeTypeParam(b=self.bound)
 
+    def __str__(self) -> str:
+        return str(self.bound)
+
 
 @dataclass(frozen=True)
 class BoundedNatParam(TypeParam):
@@ -108,6 +111,11 @@ class BoundedNatParam(TypeParam):
     def _to_serial(self) -> stys.BoundedNatParam:
         return stys.BoundedNatParam(bound=self.upper_bound)
 
+    def __str__(self) -> str:
+        if self.upper_bound is None:
+            return "Nat"
+        return f"Nat({self.upper_bound})"
+
 
 @dataclass(frozen=True)
 class StringParam(TypeParam):
@@ -115,6 +123,9 @@ class StringParam(TypeParam):
 
     def _to_serial(self) -> stys.StringParam:
         return stys.StringParam()
+
+    def __str__(self) -> str:
+        return "String"
 
 
 @dataclass(frozen=True)
@@ -126,6 +137,9 @@ class ListParam(TypeParam):
     def _to_serial(self) -> stys.ListParam:
         return stys.ListParam(param=self.param._to_serial_root())
 
+    def __str__(self) -> str:
+        return f"[{self.param}]"
+
 
 @dataclass(frozen=True)
 class TupleParam(TypeParam):
@@ -136,6 +150,9 @@ class TupleParam(TypeParam):
     def _to_serial(self) -> stys.TupleParam:
         return stys.TupleParam(params=ser_it(self.params))
 
+    def __str__(self) -> str:
+        return f"({comma_sep_str(self.params)})"
+
 
 @dataclass(frozen=True)
 class ExtensionsParam(TypeParam):
@@ -143,6 +160,9 @@ class ExtensionsParam(TypeParam):
 
     def _to_serial(self) -> stys.ExtensionsParam:
         return stys.ExtensionsParam()
+
+    def __str__(self) -> str:
+        return "Extensions"
 
 
 # ------------------------------------------
@@ -162,6 +182,9 @@ class TypeTypeArg(TypeArg):
     def resolve(self, registry: ext.ExtensionRegistry) -> TypeArg:
         return TypeTypeArg(self.ty.resolve(registry))
 
+    def __str__(self) -> str:
+        return f"Type({self.ty!s})"
+
 
 @dataclass(frozen=True)
 class BoundedNatArg(TypeArg):
@@ -172,6 +195,9 @@ class BoundedNatArg(TypeArg):
     def _to_serial(self) -> stys.BoundedNatArg:
         return stys.BoundedNatArg(n=self.n)
 
+    def __str__(self) -> str:
+        return str(self.n)
+
 
 @dataclass(frozen=True)
 class StringArg(TypeArg):
@@ -181,6 +207,9 @@ class StringArg(TypeArg):
 
     def _to_serial(self) -> stys.StringArg:
         return stys.StringArg(arg=self.value)
+
+    def __str__(self) -> str:
+        return f'"{self.value}"'
 
 
 @dataclass(frozen=True)
@@ -195,6 +224,9 @@ class SequenceArg(TypeArg):
     def resolve(self, registry: ext.ExtensionRegistry) -> TypeArg:
         return SequenceArg([arg.resolve(registry) for arg in self.elems])
 
+    def __str__(self) -> str:
+        return f"({comma_sep_str(self.elems)})"
+
 
 @dataclass(frozen=True)
 class ExtensionsArg(TypeArg):
@@ -204,6 +236,9 @@ class ExtensionsArg(TypeArg):
 
     def _to_serial(self) -> stys.ExtensionsArg:
         return stys.ExtensionsArg(es=self.extensions)
+
+    def __str__(self) -> str:
+        return f"Extensions({comma_sep_str(self.extensions)})"
 
 
 @dataclass(frozen=True)
@@ -215,6 +250,9 @@ class VariableArg(TypeArg):
 
     def _to_serial(self) -> stys.VariableArg:
         return stys.VariableArg(idx=self.idx, cached_decl=self.param._to_serial_root())
+
+    def __str__(self) -> str:
+        return f"${self.idx}"
 
 
 # ----------------------------------------------
@@ -234,6 +272,9 @@ class Array(Type):
 
     def type_bound(self) -> TypeBound:
         return self.ty.type_bound()
+
+    def __repr__(self) -> str:
+        return f"Array<{self.ty}, {self.size}>"
 
 
 @dataclass()
@@ -317,7 +358,7 @@ class Option(Sum):
         self.variant_rows = [[], list(tys)]
 
     def __repr__(self) -> str:
-        return f"Option({', '.join(map(repr, self.variant_rows[1]))})"
+        return f"Option({comma_sep_repr(self.variant_rows[1])})"
 
 
 @dataclass(eq=False)
@@ -357,6 +398,9 @@ class Variable(Type):
     def type_bound(self) -> TypeBound:
         return self.bound
 
+    def __repr__(self) -> str:
+        return f"${self.idx}"
+
 
 @dataclass(frozen=True)
 class RowVariable(Type):
@@ -371,6 +415,9 @@ class RowVariable(Type):
     def type_bound(self) -> TypeBound:
         return self.bound
 
+    def __repr__(self) -> str:
+        return f"${self.idx}"
+
 
 @dataclass(frozen=True)
 class USize(Type):
@@ -381,6 +428,9 @@ class USize(Type):
 
     def type_bound(self) -> TypeBound:
         return TypeBound.Copyable
+
+    def __repr__(self) -> str:
+        return "USize"
 
 
 @dataclass(frozen=True)
@@ -395,6 +445,9 @@ class Alias(Type):
 
     def type_bound(self) -> TypeBound:
         return self.bound
+
+    def __repr__(self) -> str:
+        return self.name
 
 
 @dataclass(frozen=True)
@@ -461,6 +514,9 @@ class FunctionType(Type):
             extension_reqs=self.extension_reqs,
         )
 
+    def __str__(self) -> str:
+        return f"{comma_sep_str(self.input)} -> {comma_sep_str(self.output)}"
+
 
 @dataclass(frozen=True)
 class PolyFuncType(Type):
@@ -487,6 +543,19 @@ class PolyFuncType(Type):
             body=self.body.resolve(registry),
         )
 
+    def __str__(self) -> str:
+        return f"∀ {comma_sep_str(self.params)}. {self.body!s}"
+
+    @classmethod
+    def empty(cls) -> PolyFuncType:
+        """Generate an empty polymorphic function type.
+
+        Example:
+            >>> PolyFuncType.empty()
+            PolyFuncType(params=[], body=FunctionType([], []))
+        """
+        return PolyFuncType(params=[], body=FunctionType.empty())
+
 
 @dataclass
 class ExtType(Type):
@@ -510,14 +579,26 @@ class ExtType(Type):
                 return TypeBound.join(*bounds)
 
     def _to_serial(self) -> stys.Opaque:
+        return self._to_opaque()._to_serial()
+
+    def _to_opaque(self) -> Opaque:
         assert self.type_def._extension is not None, "Extension must be initialised."
 
-        return stys.Opaque(
+        return Opaque(
             extension=self.type_def._extension.name,
             id=self.type_def.name,
-            args=[arg._to_serial_root() for arg in self.args],
+            args=self.args,
             bound=self.type_bound(),
         )
+
+    def __str__(self) -> str:
+        return _type_str(self.type_def.name, self.args)
+
+
+def _type_str(name: str, args: Sequence[TypeArg]) -> str:
+    if len(args) == 0:
+        return name
+    return f"{name}<{comma_sep_str(args)}>"
 
 
 @dataclass
@@ -553,6 +634,9 @@ class Opaque(Type):
             return self
 
         return ExtType(type_def, self.args)
+
+    def __str__(self) -> str:
+        return _type_str(self.id, self.args)
 
 
 @dataclass

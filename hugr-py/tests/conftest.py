@@ -164,6 +164,8 @@ def validate(
     if snap is not None and isinstance(h, Hugr):
         dot = h.render_dot()
         assert snap == dot.source
+        if os.environ.get("HUGR_RENDER_DOT"):
+            dot.pipe("svg")
 
 
 def _run_hugr_cmd(serial: str, cmd: list[str]):

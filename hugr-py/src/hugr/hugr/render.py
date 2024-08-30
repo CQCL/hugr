@@ -1,13 +1,14 @@
 """Visualise HUGR using graphviz."""
 
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import graphviz as gv  # type: ignore[import-untyped]
 from graphviz import Digraph
 from typing_extensions import assert_never
 
 from hugr.hugr import Hugr
+from hugr.ops import AsExtOp
 from hugr.tys import CFKind, ConstKind, FunctionKind, Kind, OrderKind, ValueKind
 
 from .node_port import InPort, Node, OutPort
@@ -25,6 +26,10 @@ class Palette:
     discard: str
     node_border: str
     port_border: str
+
+    @classmethod
+    def named(cls, name: str) -> "Palette":
+        return PALETTE[name]
 
 
 PALETTE: dict[str, Palette] = {
@@ -61,22 +66,27 @@ PALETTE: dict[str, Palette] = {
 }
 
 
+@dataclass
+class RenderConfig:
+    """Configuration for rendering a HUGR to a graphviz dot file."""
+
+    #: The palette to use for rendering. See :obj:`PALETTE` for the included options.
+    palette: Palette = field(default_factory=lambda: PALETTE["default"])
+    #: If true prepend extension name to operation name.
+    qualify_op_name: bool = False
+
+
 class DotRenderer:
     """Render a HUGR to a graphviz dot file.
 
     Args:
-        palette: The palette to use for rendering. See :obj:`PALETTE` for the
-        included options.
+        config: Render config
     """
 
-    palette: Palette
+    config: RenderConfig
 
-    def __init__(self, palette: Palette | str | None = None) -> None:
-        if palette is None:
-            palette = "default"
-        if isinstance(palette, str):
-            palette = PALETTE[palette]
-        self.palette = palette
+    def __init__(self, config: RenderConfig | None = None) -> None:
+        self.config = config or RenderConfig()
 
     def render(self, hugr: Hugr) -> Digraph:
         """Render a HUGR to a graphviz dot object."""
@@ -85,7 +95,7 @@ class DotRenderer:
             "ranksep": "0.1",
             "nodesep": "0.15",
             "margin": "0",
-            "bgcolor": self.palette.background,
+            "bgcolor": self.config.palette.background,
         }
         if not (name := hugr[hugr.root].metadata.get("name", None)):
             name = ""
@@ -155,11 +165,11 @@ class DotRenderer:
 
     def _format_html_label(self, **kwargs: str) -> str:
         _HTML_LABEL_DEFAULTS = {
-            "label_color": self.palette.dark,
-            "node_back_color": self.palette.node,
+            "label_color": self.config.palette.dark,
+            "node_back_color": self.config.palette.node,
             "inputs_row": "",
             "outputs_row": "",
-            "border_colour": self.palette.port_border,
+            "border_colour": self.config.palette.port_border,
             "border_width": "1",
             "fontface": self._FONTFACE,
             "fontsize": 11.0,
@@ -174,10 +184,10 @@ class DotRenderer:
                     # differentiate input and output node identifiers
                     # with a prefix
                     port_id=id_prefix + port,
-                    back_colour=self.palette.background,
-                    font_colour=self.palette.dark,
+                    back_colour=self.config.palette.background,
+                    font_colour=self.config.palette.dark,
                     border_width="1",
-                    border_colour=self.palette.port_border,
+                    border_colour=self.config.palette.port_border,
                     fontface=self._FONTFACE,
                 )
                 for port in ports
@@ -218,29 +228,32 @@ class DotRenderer:
         )
 
         op = hugr[node].op
-
+        if isinstance(op, AsExtOp) and not self.config.qualify_op_name:
+            op_name = op.op_def().name
+        else:
+            op_name = op.name()
         if hugr.children(node):
             with graph.subgraph(name=f"cluster{node.idx}") as sub:
                 for child in hugr.children(node):
                     self._viz_node(child, hugr, sub)
                 html_label = self._format_html_label(
-                    node_back_color=self.palette.edge,
-                    node_label=str(op),
+                    node_back_color=self.config.palette.edge,
+                    node_label=op_name,
                     node_data=data,
-                    border_colour=self.palette.port_border,
+                    border_colour=self.config.palette.port_border,
                     inputs_row=inputs_row,
                     outputs_row=outputs_row,
                 )
                 sub.node(f"{node.idx}", shape="plain", label=f"<{html_label}>")
-                sub.attr(label="", margin="10", color=self.palette.edge)
+                sub.attr(label="", margin="10", color=self.config.palette.edge)
         else:
             html_label = self._format_html_label(
-                node_back_color=self.palette.node,
-                node_label=str(op),
+                node_back_color=self.config.palette.node,
+                node_label=op_name,
                 node_data=data,
                 inputs_row=inputs_row,
                 outputs_row=outputs_row,
-                border_colour=self.palette.background,
+                border_colour=self.config.palette.background,
             )
             graph.node(f"{node.idx}", label=f"<{html_label}>", shape="plain")
 
@@ -260,13 +273,13 @@ class DotRenderer:
         match kind:
             case ValueKind(ty):
                 label = str(ty)
-                color = self.palette.edge
+                color = self.config.palette.edge
             case OrderKind():
-                color = self.palette.dark
+                color = self.config.palette.dark
             case ConstKind() | FunctionKind():
-                color = self.palette.const
+                color = self.config.palette.const
             case CFKind():
-                color = self.palette.dark
+                color = self.config.palette.dark
             case _:
                 assert_never(kind)
 

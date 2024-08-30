@@ -139,17 +139,20 @@ jobs:
       - name: Setup dependencies
         run: uv sync
 
+      - name: Setup Graphviz
+        uses: ts-graphviz/setup-graphviz@v2
+
       - name: Run tests
         if: github.event_name == 'merge_group' || !matrix.python-version.coverage
         run: |
           chmod +x $HUGR_BIN
-          uv run pytest
+          HUGR_RENDER_DOT=1 uv run pytest
 
       - name: Run python tests with coverage instrumentation
         if: github.event_name != 'merge_group' && matrix.python-version.coverage
         run: |
           chmod +x $HUGR_BIN
-          uv run pytest --cov=./ --cov-report=xml
+          HUGR_RENDER_DOT=1 uv run pytest --cov=./ --cov-report=xml
 
       - name: Upload python coverage to codecov.io
         if: github.event_name != 'merge_group' && matrix.python-version.coverage

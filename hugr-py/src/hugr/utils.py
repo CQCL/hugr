@@ -202,3 +202,16 @@ def ser_it(it: Iterable[SerCollection[S]]) -> list[S]:
 def deser_it(it: Iterable[DeserCollection[S]]) -> list[S]:
     """Deserialize an iterable of deserializable objects."""
     return [v.deserialize() for v in it]
+
+
+T = TypeVar("T")
+
+
+def comma_sep_str(items: Iterable[T]) -> str:
+    """Join items with commas and str."""
+    return ", ".join(map(str, items))
+
+
+def comma_sep_repr(items: Iterable[T]) -> str:
+    """Join items with commas and repr."""
+    return ", ".join(map(repr, items))

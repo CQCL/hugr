@@ -39,6 +39,8 @@ if TYPE_CHECKING:
     from hugr import ext
     from hugr.val import Value
 
+    from .render import RenderConfig
+
 
 @dataclass()
 class NodeData:
@@ -677,22 +679,21 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         serial = SerialHugr.load_json(json_dict)
         return cls._from_serial(serial)
 
-    def render_dot(self, palette: str | None = None) -> gv.Digraph:
+    def render_dot(self, config: RenderConfig | None = None) -> gv.Digraph:
         """Render the HUGR to a graphviz Digraph.
 
         Args:
-            palette: The palette to use for rendering. See :obj:`PALETTE` for the
-                included options.
+            config: Render configuration.
 
         Returns:
             The graphviz Digraph.
         """
         from .render import DotRenderer
 
-        return DotRenderer(palette).render(self)
+        return DotRenderer(config).render(self)
 
     def store_dot(
-        self, filename: str, format: str = "svg", palette: str | None = None
+        self, filename: str, format: str = "svg", config: RenderConfig | None = None
     ) -> None:
         """Render the HUGR to a graphviz dot file.
 
@@ -700,9 +701,8 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             filename: The file to render to.
             format: The format used for rendering ('pdf', 'png', etc.).
                 Defaults to SVG.
-            palette: The palette to use for rendering. See :obj:`PALETTE` for the
-                included options.
+            config: Render configuration.
         """
         from .render import DotRenderer
 
-        DotRenderer(palette).store(self, filename=filename, format=format)
+        DotRenderer(config).store(self, filename=filename, format=format)
