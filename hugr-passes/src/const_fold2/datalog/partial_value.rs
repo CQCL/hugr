@@ -14,8 +14,13 @@ pub trait AbstractValue: Clone + std::fmt::Debug + PartialEq + Eq + Hash {
     fn as_sum(&self) -> Option<(usize, impl Iterator<Item = Self> + '_)>;
 }
 
-pub trait FromSum {
-    fn new_sum(tag: usize, items: impl IntoIterator<Item=Self>, st: &SumType) -> Self;
+pub trait FromSum: Sized {
+    type Err: std::error::Error;
+    fn try_new_sum(
+        tag: usize,
+        items: impl IntoIterator<Item = Self>,
+        st: &SumType,
+    ) -> Result<Self, Self::Err>;
     fn debug_check_is_type(&self, _ty: &Type) {}
 }
 
@@ -120,7 +125,7 @@ impl<V: AbstractValue> PartialSum<V> {
             .map(|(v, t)| v.clone().try_into_value(t))
             .collect::<Result<Vec<_>, _>>()
         {
-            Ok(vs) => Ok(V2::new_sum(*k, vs, &st)),
+            Ok(vs) => V2::try_new_sum(*k, vs, &st).map_err(|_| self),
             Err(_) => Err(self),
         }
     }

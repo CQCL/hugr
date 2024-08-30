@@ -68,7 +68,7 @@ impl<H: HugrView> DFContext<ValueHandle> for HugrValueContext<H> {
         &self,
         n: Node,
         ins: &[(IncomingPort, Value)],
-    ) -> Vec<(OutgoingPort,ValueHandle)> {
+    ) -> Vec<(OutgoingPort, ValueHandle)> {
         match self.0.get_optype(n) {
             OpType::LoadConstant(load_op) => {
                 assert!(ins.is_empty()); // static edge, so need to find constant
@@ -78,14 +78,21 @@ impl<H: HugrView> DFContext<ValueHandle> for HugrValueContext<H> {
                     .unwrap()
                     .0;
                 let const_op = self.0.get_optype(const_node).as_const().unwrap();
-                vec![(OutgoingPort::from(0), ValueHandle::new(
-                    const_node.into(),
-                    Arc::new(const_op.value().clone()),
-                ))]
+                vec![(
+                    OutgoingPort::from(0),
+                    ValueHandle::new(const_node.into(), Arc::new(const_op.value().clone())),
+                )]
             }
             OpType::CustomOp(CustomOp::Extension(op)) => {
-                let ins = ins.into_iter().map(|(p,v)|(*p,v.clone())).collect::<Vec<_>>();
-                op.constant_fold(&ins).map_or(Vec::new(), |outs|outs.into_iter().map(|(p,v)|(p, ValueHandle::new(ValueKey::Node(n), Arc::new(v)))).collect())
+                let ins = ins
+                    .into_iter()
+                    .map(|(p, v)| (*p, v.clone()))
+                    .collect::<Vec<_>>();
+                op.constant_fold(&ins).map_or(Vec::new(), |outs| {
+                    outs.into_iter()
+                        .map(|(p, v)| (p, ValueHandle::new(ValueKey::Node(n), Arc::new(v))))
+                        .collect()
+                })
             }
             _ => vec![],
         }

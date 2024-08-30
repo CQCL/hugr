@@ -3,7 +3,10 @@
 // https://github.com/proptest-rs/proptest/issues/447
 #![cfg_attr(test, allow(non_local_definitions))]
 
-use std::{cmp::Ordering, ops::{Index, IndexMut}};
+use std::{
+    cmp::Ordering,
+    ops::{Index, IndexMut},
+};
 
 use ascent::lattice::{BoundedLattice, Lattice};
 use itertools::zip_eq;
@@ -149,8 +152,9 @@ where
 
 impl<V, Idx> IndexMut<Idx> for ValueRow<V>
 where
-    Vec<PartialValue<V>>: IndexMut<Idx> {
-        fn index_mut(&mut self, index: Idx) -> &mut Self::Output {
+    Vec<PartialValue<V>>: IndexMut<Idx>,
+{
+    fn index_mut(&mut self, index: Idx) -> &mut Self::Output {
         self.0.index_mut(index)
     }
 }
