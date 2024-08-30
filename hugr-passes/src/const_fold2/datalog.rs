@@ -5,7 +5,6 @@ use std::hash::Hash;
 use hugr_core::ops::{OpType, Value};
 use hugr_core::{Hugr, HugrView, IncomingPort, Node, OutgoingPort, PortIndex as _, Wire};
 
-mod context;
 mod partial_value;
 mod utils;
 

@@ -1,4 +1,5 @@
-use context::HugrValueContext;
+use crate::const_fold2::value_handle::HugrValueContext;
+
 use hugr_core::{
     builder::{DFGBuilder, Dataflow, DataflowSubContainer, HugrBuilder, SubContainer},
     extension::{prelude::BOOL_T, ExtensionSet, EMPTY_REG},

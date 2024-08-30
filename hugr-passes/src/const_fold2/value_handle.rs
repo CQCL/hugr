@@ -8,6 +8,9 @@ use hugr_core::Node;
 
 use super::datalog::AbstractValue;
 
+mod context;
+pub use context::HugrValueContext;
+
 #[derive(Clone, Debug)]
 pub struct HashedConst {
     hash: u64,
