@@ -1,7 +1,8 @@
 use crate::const_fold::constant_fold_pass;
 use hugr_core::builder::{DFGBuilder, Dataflow, DataflowHugr};
-use hugr_core::extension::prelude::UnpackTuple;
-use hugr_core::extension::prelude::{sum_with_error, ConstError, ConstString, BOOL_T, STRING_TYPE};
+use hugr_core::extension::prelude::{
+    const_ok, sum_with_error, ConstError, ConstString, UnpackTuple, BOOL_T, ERROR_TYPE, STRING_TYPE,
+};
 use hugr_core::extension::{ExtensionRegistry, PRELUDE};
 use hugr_core::ops::Value;
 use hugr_core::std_extensions::arithmetic;
@@ -119,7 +120,7 @@ fn test_big() {
 
     constant_fold_pass(&mut h, &reg);
 
-    let expected = Value::sum(0, [i2c(2).clone()], sum_type).unwrap();
+    let expected = const_ok(i2c(2).clone(), ERROR_TYPE);
     assert_fully_folded(&h, &expected);
 }
 
@@ -403,7 +404,10 @@ fn test_fold_inarrow<I: Copy, C: Into<Value>, E: std::fmt::Debug>(
     // val => the value to pass to the op
     // succeeds => whether to expect a int<to_log_width> variant or an error
     //   variant.
-    let sum_type = sum_with_error(INT_TYPES[to_log_width as usize].to_owned());
+
+    use hugr_core::extension::prelude::const_ok;
+    let elem_type = INT_TYPES[to_log_width as usize].to_owned();
+    let sum_type = sum_with_error(elem_type.clone());
     let mut build = DFGBuilder::new(noargfn(vec![sum_type.clone().into()])).unwrap();
     let x0 = build.add_load_const(mk_const(from_log_width, val).unwrap().into());
     let x1 = build
@@ -420,16 +424,15 @@ fn test_fold_inarrow<I: Copy, C: Into<Value>, E: std::fmt::Debug>(
     let mut h = build.finish_hugr_with_outputs(x1.outputs(), &reg).unwrap();
     constant_fold_pass(&mut h, &reg);
     lazy_static! {
-        static ref INARROW_ERROR_VALUE: Value = ConstError {
+        static ref INARROW_ERROR_VALUE: ConstError = ConstError {
             signal: 0,
             message: "Integer too large to narrow".to_string(),
-        }
-        .into();
+        };
     }
     let expected = if succeeds {
-        Value::sum(0, [mk_const(to_log_width, val).unwrap().into()], sum_type).unwrap()
+        const_ok(mk_const(to_log_width, val).unwrap().into(), ERROR_TYPE)
     } else {
-        Value::sum(1, [INARROW_ERROR_VALUE.clone()], sum_type).unwrap()
+        INARROW_ERROR_VALUE.clone().as_either(elem_type)
     };
     assert_fully_folded(&h, &expected);
 }
@@ -900,7 +903,8 @@ fn test_fold_idivmod_checked_u() {
     // x2 := idivmod_checked_u(x0, x1)
     // output x2 == error
     let intpair: TypeRowRV = vec![INT_TYPES[5].clone(), INT_TYPES[5].clone()].into();
-    let sum_type = sum_with_error(Type::new_tuple(intpair));
+    let elem_type = Type::new_tuple(intpair);
+    let sum_type = sum_with_error(elem_type.clone());
     let mut build = DFGBuilder::new(noargfn(vec![sum_type.clone().into()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 20).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 0).unwrap()));
@@ -914,16 +918,11 @@ fn test_fold_idivmod_checked_u() {
     .unwrap();
     let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
     constant_fold_pass(&mut h, &reg);
-    let expected = Value::sum(
-        1,
-        [ConstError {
-            signal: 0,
-            message: "Division by zero".to_string(),
-        }
-        .into()],
-        sum_type.clone(),
-    )
-    .unwrap();
+    let expected = ConstError {
+        signal: 0,
+        message: "Division by zero".to_string(),
+    }
+    .as_either(elem_type);
     assert_fully_folded(&h, &expected);
 }
 
@@ -962,7 +961,8 @@ fn test_fold_idivmod_checked_s() {
     // x2 := idivmod_checked_s(x0, x1)
     // output x2 == error
     let intpair: TypeRowRV = vec![INT_TYPES[5].clone(), INT_TYPES[5].clone()].into();
-    let sum_type = sum_with_error(Type::new_tuple(intpair));
+    let elem_type = Type::new_tuple(intpair);
+    let sum_type = sum_with_error(elem_type.clone());
     let mut build = DFGBuilder::new(noargfn(vec![sum_type.clone().into()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, -20).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 0).unwrap()));
@@ -976,16 +976,11 @@ fn test_fold_idivmod_checked_s() {
     .unwrap();
     let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
     constant_fold_pass(&mut h, &reg);
-    let expected = Value::sum(
-        1,
-        [ConstError {
-            signal: 0,
-            message: "Division by zero".to_string(),
-        }
-        .into()],
-        sum_type.clone(),
-    )
-    .unwrap();
+    let expected = ConstError {
+        signal: 0,
+        message: "Division by zero".to_string(),
+    }
+    .as_either(elem_type);
     assert_fully_folded(&h, &expected);
 }
 
@@ -1039,16 +1034,11 @@ fn test_fold_idiv_checked_u() {
     .unwrap();
     let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
     constant_fold_pass(&mut h, &reg);
-    let expected = Value::sum(
-        1,
-        [ConstError {
-            signal: 0,
-            message: "Division by zero".to_string(),
-        }
-        .into()],
-        sum_type.clone(),
-    )
-    .unwrap();
+    let expected = ConstError {
+        signal: 0,
+        message: "Division by zero".to_string(),
+    }
+    .as_either(INT_TYPES[5].to_owned());
     assert_fully_folded(&h, &expected);
 }
 
@@ -1095,16 +1085,11 @@ fn test_fold_imod_checked_u() {
     .unwrap();
     let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
     constant_fold_pass(&mut h, &reg);
-    let expected = Value::sum(
-        1,
-        [ConstError {
-            signal: 0,
-            message: "Division by zero".to_string(),
-        }
-        .into()],
-        sum_type.clone(),
-    )
-    .unwrap();
+    let expected = ConstError {
+        signal: 0,
+        message: "Division by zero".to_string(),
+    }
+    .as_either(INT_TYPES[5].to_owned());
     assert_fully_folded(&h, &expected);
 }
 
@@ -1151,16 +1136,11 @@ fn test_fold_idiv_checked_s() {
     .unwrap();
     let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
     constant_fold_pass(&mut h, &reg);
-    let expected = Value::sum(
-        1,
-        [ConstError {
-            signal: 0,
-            message: "Division by zero".to_string(),
-        }
-        .into()],
-        sum_type.clone(),
-    )
-    .unwrap();
+    let expected = ConstError {
+        signal: 0,
+        message: "Division by zero".to_string(),
+    }
+    .as_either(INT_TYPES[5].to_owned());
     assert_fully_folded(&h, &expected);
 }
 
@@ -1207,16 +1187,11 @@ fn test_fold_imod_checked_s() {
     .unwrap();
     let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
     constant_fold_pass(&mut h, &reg);
-    let expected = Value::sum(
-        1,
-        [ConstError {
-            signal: 0,
-            message: "Division by zero".to_string(),
-        }
-        .into()],
-        sum_type.clone(),
-    )
-    .unwrap();
+    let expected = ConstError {
+        signal: 0,
+        message: "Division by zero".to_string(),
+    }
+    .as_either(INT_TYPES[5].to_owned());
     assert_fully_folded(&h, &expected);
 }
 

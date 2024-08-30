@@ -44,9 +44,9 @@ def test_sums():
     assert Tuple(Bool, Qubit) == Sum([[Bool, Qubit]])
     assert Sum([[Bool, Qubit]]).as_tuple() == Sum([[Bool, Qubit]])
 
-    assert Sum([[Bool, Qubit], []]) == Option(Bool, Qubit)
-    assert Sum([[Bool, Qubit], []]) == Either([Bool, Qubit], [])
-    assert Option(Bool, Qubit) == Either([Bool, Qubit], [])
+    assert Sum([[], [Bool, Qubit]]) == Option(Bool, Qubit)
+    assert Sum([[], [Bool, Qubit]]) == Either([], [Bool, Qubit])
+    assert Option(Bool, Qubit) == Either([], [Bool, Qubit])
     assert Sum([[Qubit], [Bool]]) == Either([Qubit], [Bool])
 
     assert Tuple() == Sum([[]])

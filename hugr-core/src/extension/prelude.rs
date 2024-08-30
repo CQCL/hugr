@@ -246,24 +246,24 @@ pub const ERROR_TYPE: Type = Type::new_extension(ERROR_CUSTOM_TYPE);
 /// The string name of the error type.
 pub const ERROR_TYPE_NAME: TypeName = TypeName::new_inline("error");
 
-/// Return a Sum type with the first variant as the given type and the second an Error.
+/// Return a Sum type with the second variant as the given type and the first an Error.
 pub fn sum_with_error(ty: impl Into<TypeRowRV>) -> SumType {
-    either_type(ty, ERROR_TYPE)
+    either_type(ERROR_TYPE, ty)
 }
 
-/// An optional type, i.e. a Sum type with the first variant as the given type and the second as an empty tuple.
+/// An optional type, i.e. a Sum type with the second variant as the given type and the first as an empty tuple.
 #[inline]
 pub fn option_type(ty: impl Into<TypeRowRV>) -> SumType {
-    either_type(ty, TypeRow::new())
+    either_type(TypeRow::new(), ty)
 }
 
 /// An "either" type, i.e. a Sum type with a "left" and a "right" variant.
 ///
-/// When used as a fallible value, the "left" variant represents a successful computation,
-/// and the "right" variant represents a failure.
+/// When used as a fallible value, the "right" variant represents a successful computation,
+/// and the "left" variant represents a failure.
 #[inline]
-pub fn either_type(ty_ok: impl Into<TypeRowRV>, ty_err: impl Into<TypeRowRV>) -> SumType {
-    SumType::new([ty_ok.into(), ty_err.into()])
+pub fn either_type(ty_left: impl Into<TypeRowRV>, ty_right: impl Into<TypeRowRV>) -> SumType {
+    SumType::new([ty_left.into(), ty_right.into()])
 }
 
 /// A constant optional value with a given value.
@@ -279,19 +279,19 @@ pub fn const_some(value: Value) -> Value {
 ///
 /// See [option_type].
 pub fn const_some_tuple(values: impl IntoIterator<Item = Value>) -> Value {
-    const_left_tuple(values, TypeRow::new())
+    const_right_tuple(TypeRow::new(), values)
 }
 
 /// A constant optional value with no value.
 ///
 /// See [option_type].
 pub fn const_none(ty: impl Into<TypeRowRV>) -> Value {
-    const_right_tuple(ty, [])
+    const_left_tuple([], ty)
 }
 
 /// A constant Either value with a left variant.
 ///
-/// In fallible computations, this represents a successful result.
+/// In fallible computations, this represents a failure.
 ///
 /// See [either_type].
 pub fn const_left(value: Value, ty_right: impl Into<TypeRowRV>) -> Value {
@@ -300,7 +300,7 @@ pub fn const_left(value: Value, ty_right: impl Into<TypeRowRV>) -> Value {
 
 /// A constant Either value with a row of left values.
 ///
-/// In fallible computations, this represents a successful result.
+/// In fallible computations, this represents a failure.
 ///
 /// See [either_type].
 pub fn const_left_tuple(
@@ -319,7 +319,7 @@ pub fn const_left_tuple(
 
 /// A constant Either value with a right variant.
 ///
-/// In fallible computations, this represents a failure.
+/// In fallible computations, this represents a successful result.
 ///
 /// See [either_type].
 pub fn const_right(ty_left: impl Into<TypeRowRV>, value: Value) -> Value {
@@ -328,7 +328,7 @@ pub fn const_right(ty_left: impl Into<TypeRowRV>, value: Value) -> Value {
 
 /// A constant Either value with a row of right values.
 ///
-/// In fallible computations, this represents a failure.
+/// In fallible computations, this represents a successful result.
 ///
 /// See [either_type].
 pub fn const_right_tuple(
@@ -343,6 +343,40 @@ pub fn const_right_tuple(
         .into();
     let typ = either_type(ty_left, types);
     Value::sum(1, values, typ).unwrap()
+}
+
+/// A constant Either value with a success variant.
+///
+/// Alias for [const_right].
+pub fn const_ok(value: Value, ty_fail: impl Into<TypeRowRV>) -> Value {
+    const_right(ty_fail, value)
+}
+
+/// A constant Either with a row of success values.
+///
+/// Alias for [const_right_tuple].
+pub fn const_ok_tuple(
+    values: impl IntoIterator<Item = Value>,
+    ty_fail: impl Into<TypeRowRV>,
+) -> Value {
+    const_right_tuple(ty_fail, values)
+}
+
+/// A constant Either value with a failure variant.
+///
+/// Alias for [const_left].
+pub fn const_fail(value: Value, ty_ok: impl Into<TypeRowRV>) -> Value {
+    const_left(value, ty_ok)
+}
+
+/// A constant Either with a row of failure values.
+///
+/// Alias for [const_left_tuple].
+pub fn const_fail_tuple(
+    values: impl IntoIterator<Item = Value>,
+    ty_ok: impl Into<TypeRowRV>,
+) -> Value {
+    const_left_tuple(values, ty_ok)
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -396,6 +430,14 @@ impl ConstError {
             signal,
             message: message.to_string(),
         }
+    }
+
+    /// Returns an "either" value with a failure variant.
+    ///
+    /// args:
+    ///     ty_ok: The type of the success variant.
+    pub fn as_either(self, ty_ok: impl Into<TypeRowRV>) -> Value {
+        const_fail(self.into(), ty_ok)
     }
 }
 

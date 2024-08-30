@@ -172,7 +172,7 @@ class Some(Sum):
     def __init__(self, *vals: Value):
         val_list = list(vals)
         super().__init__(
-            tag=0, typ=tys.Option(*(v.type_() for v in val_list)), vals=val_list
+            tag=1, typ=tys.Option(*(v.type_() for v in val_list)), vals=val_list
         )
 
     def __repr__(self) -> str:
@@ -193,10 +193,10 @@ class None_(Sum):
     """
 
     def __init__(self, *types: tys.Type):
-        super().__init__(tag=1, typ=tys.Option(*types), vals=[])
+        super().__init__(tag=0, typ=tys.Option(*types), vals=[])
 
     def __repr__(self) -> str:
-        return f"None({', '.join(map(repr, self.typ.variant_rows[0]))})"
+        return f"None({comma_sep_str(self.typ.variant_rows[1])})"
 
     def __str__(self) -> str:
         return "None"
@@ -206,7 +206,7 @@ class None_(Sum):
 class Left(Sum):
     """Left variant of a :class:`tys.Either` type, containing a list of values.
 
-    In fallible contexts, this represents the success variant.
+    In fallible contexts, this represents the failure variant.
 
     Example:
         >>> left = Left([TRUE, FALSE], [tys.Bool])
@@ -236,7 +236,7 @@ class Left(Sum):
 class Right(Sum):
     """Right variant of a :class:`tys.Either` type, containing a list of values.
 
-    In fallible contexts, this represents the failure variant.
+    In fallible contexts, this represents the success variant.
 
     Internally a :class:`Sum` with two variant rows.
 

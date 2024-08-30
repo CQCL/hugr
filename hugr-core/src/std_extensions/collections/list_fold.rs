@@ -1,7 +1,7 @@
 //! Folding definitions for list operations.
 
 use crate::extension::prelude::{
-    const_left, const_left_tuple, const_none, const_right, const_some, ConstUsize,
+    const_fail, const_none, const_ok, const_ok_tuple, const_some, ConstUsize,
 };
 use crate::extension::{ConstFold, ConstFoldResult, OpDef};
 use crate::ops::Value;
@@ -96,9 +96,9 @@ impl ConstFold for SetFold {
         let res_elem: Value = match list.0.get_mut(idx) {
             Some(old_elem) => {
                 std::mem::swap(old_elem, &mut elem);
-                const_left(elem, list.1.clone())
+                const_ok(elem, list.1.clone())
             }
-            None => const_right(list.1.clone(), elem),
+            None => const_fail(elem, list.1.clone()),
         };
         Some(vec![(0.into(), list.into()), (1.into(), res_elem)])
     }
@@ -118,9 +118,9 @@ impl ConstFold for InsertFold {
         let elem = elem.clone();
         let res_elem: Value = if list.0.len() > idx {
             list.0.insert(idx, elem);
-            const_left_tuple([], list.1.clone())
+            const_ok_tuple([], list.1.clone())
         } else {
-            const_right(Type::UNIT, elem)
+            const_fail(elem, Type::UNIT)
         };
         Some(vec![(0.into(), list.into()), (1.into(), res_elem)])
     }
