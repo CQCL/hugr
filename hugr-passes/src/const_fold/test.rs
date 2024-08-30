@@ -444,7 +444,7 @@ fn test_fold_itobool() {
     let mut build = DFGBuilder::new(noargfn(vec![BOOL_T])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(0, 1).unwrap()));
     let x1 = build
-        .add_dataflow_op(IntOpDef::itobool.without_log_width(), [x0])
+        .add_dataflow_op(ConvertOpDef::itobool.without_log_width(), [x0])
         .unwrap();
     let reg = ExtensionRegistry::try_new([
         PRELUDE.to_owned(),
@@ -467,7 +467,7 @@ fn test_fold_ifrombool() {
     let mut build = DFGBuilder::new(noargfn(vec![INT_TYPES[0].clone()])).unwrap();
     let x0 = build.add_load_const(Value::false_val());
     let x1 = build
-        .add_dataflow_op(IntOpDef::ifrombool.without_log_width(), [x0])
+        .add_dataflow_op(ConvertOpDef::ifrombool.without_log_width(), [x0])
         .unwrap();
     let reg = ExtensionRegistry::try_new([
         PRELUDE.to_owned(),
@@ -1457,7 +1457,7 @@ fn test_fold_itostring_u() {
     let mut build = DFGBuilder::new(noargfn(vec![STRING_TYPE])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 17).unwrap()));
     let x1 = build
-        .add_dataflow_op(IntOpDef::itostring_u.with_log_width(5), [x0])
+        .add_dataflow_op(ConvertOpDef::itostring_u.with_log_width(5), [x0])
         .unwrap();
     let reg = ExtensionRegistry::try_new([
         PRELUDE.to_owned(),
@@ -1479,7 +1479,7 @@ fn test_fold_itostring_s() {
     let mut build = DFGBuilder::new(noargfn(vec![STRING_TYPE])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, -17).unwrap()));
     let x1 = build
-        .add_dataflow_op(IntOpDef::itostring_s.with_log_width(5), [x0])
+        .add_dataflow_op(ConvertOpDef::itostring_s.with_log_width(5), [x0])
         .unwrap();
     let reg = ExtensionRegistry::try_new([
         PRELUDE.to_owned(),

@@ -2,7 +2,7 @@ use std::cmp::{max, min};
 
 use crate::{
     extension::{
-        prelude::{sum_with_error, ConstError, ConstString},
+        prelude::{sum_with_error, ConstError},
         ConstFoldResult, Folder, OpDef,
     },
     ops::{
@@ -165,47 +165,6 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                         mk_out_const(0, ConstInt::new_s(logwidth1, n0val).map(Into::into))
                     };
                     Some(vec![(0.into(), out_const)])
-                },
-            ),
-        },
-        IntOpDef::itobool => Folder {
-            folder: Box::new(
-                |type_args: &[TypeArg], consts: &[(IncomingPort, Value)]| -> ConstFoldResult {
-                    if !type_args.is_empty() {
-                        return None;
-                    }
-                    let n0: &ConstInt = get_single_input_value(consts)?;
-                    if n0.log_width() != 0 {
-                        None
-                    } else {
-                        Some(vec![(0.into(), Value::from_bool(n0.value_u() == 1))])
-                    }
-                },
-            ),
-        },
-        IntOpDef::ifrombool => Folder {
-            folder: Box::new(
-                |type_args: &[TypeArg], consts: &[(IncomingPort, Value)]| -> ConstFoldResult {
-                    if !type_args.is_empty() {
-                        return None;
-                    }
-                    let [(_, b0)] = consts else {
-                        return None;
-                    };
-                    Some(vec![(
-                        0.into(),
-                        Value::extension(
-                            ConstInt::new_u(
-                                0,
-                                if b0.clone() == Value::true_val() {
-                                    1
-                                } else {
-                                    0
-                                },
-                            )
-                            .unwrap(),
-                        ),
-                    )])
                 },
             ),
         },
@@ -1224,44 +1183,6 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                             );
                         }
                         Some(vec![(0.into(), Value::extension(n0.clone()))])
-                    }
-                },
-            ),
-        },
-        IntOpDef::itostring_u => Folder {
-            folder: Box::new(
-                |type_args: &[TypeArg], consts: &[(IncomingPort, Value)]| -> ConstFoldResult {
-                    let [arg] = type_args else {
-                        return None;
-                    };
-                    let logwidth: u8 = get_log_width(arg).ok()?;
-                    let n0: &ConstInt = get_single_input_value(consts)?;
-                    if n0.log_width() != logwidth {
-                        None
-                    } else {
-                        Some(vec![(
-                            0.into(),
-                            Value::extension(ConstString::new(n0.value_u().to_string())),
-                        )])
-                    }
-                },
-            ),
-        },
-        IntOpDef::itostring_s => Folder {
-            folder: Box::new(
-                |type_args: &[TypeArg], consts: &[(IncomingPort, Value)]| -> ConstFoldResult {
-                    let [arg] = type_args else {
-                        return None;
-                    };
-                    let logwidth: u8 = get_log_width(arg).ok()?;
-                    let n0: &ConstInt = get_single_input_value(consts)?;
-                    if n0.log_width() != logwidth {
-                        None
-                    } else {
-                        Some(vec![(
-                            0.into(),
-                            Value::extension(ConstString::new(n0.value_s().to_string())),
-                        )])
                     }
                 },
             ),
