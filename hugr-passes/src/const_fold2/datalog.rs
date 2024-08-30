@@ -158,8 +158,9 @@ fn propagate_leaf_op<V: AbstractValue>(
     ins: &[PV<V>],
 ) -> Option<ValueRow<V>> {
     match c.get_optype(n) {
-        // Handle basics here. I guess we could allow DFContext to specify but at the least
-        // we'd want these ones to be easily available for reuse.
+        // Handle basics here. I guess (given the current interface) we could allow
+        // DFContext to handle these but at the least we'd want these impls to be
+        // easily available for reuse.
         OpType::MakeTuple(_) => Some(ValueRow::from_iter([PV::variant(
             0,
             ins.into_iter().cloned(),
@@ -174,6 +175,9 @@ fn propagate_leaf_op<V: AbstractValue>(
             ins.into_iter().cloned(),
         )])),
         OpType::Input(_) | OpType::Output(_) => None, // handled by parent
+        // It'd be nice to convert these to [(IncomingPort, Value)] to pass to the context,
+        // thus keeping PartialValue hidden, but AbstractValues
+        // are not necessarily convertible to Value!
         _ => c.interpret_leaf_op(n, ins).map(ValueRow::from_iter),
     }
 }
