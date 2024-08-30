@@ -6,7 +6,7 @@ use hugr_core::ops::Value;
 use hugr_core::types::Type;
 use hugr_core::Node;
 
-use super::datalog::AbstractValue;
+use super::datalog::{AbstractValue, FromSum};
 
 mod context;
 pub use context::HugrValueContext;
@@ -99,6 +99,12 @@ impl AbstractValue for ValueHandle {
             )),
             _ => None,
         }
+    }
+}
+
+impl FromSum for Value {
+    fn new_sum(tag: usize, items: impl IntoIterator<Item=Self>, st: &hugr_core::types::SumType) -> Self {
+        Value::Sum(Sum {tag, values: items.into_iter().collect(), sum_type: st.clone()})
     }
 }
 

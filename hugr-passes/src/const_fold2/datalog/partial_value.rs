@@ -1,7 +1,6 @@
 #![allow(missing_docs)]
 
-use hugr_core::ops::Value;
-use hugr_core::types::{Type, TypeEnum, TypeRow};
+use hugr_core::types::{SumType, Type, TypeEnum, TypeRow};
 use itertools::{zip_eq, Itertools};
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -13,6 +12,11 @@ pub trait AbstractValue: Clone + std::fmt::Debug + PartialEq + Eq + Hash {
     /// at the cost of requiring more cloning during actual conversion
     /// (inside the lazy Iterator, or for the error case, as Self remains)
     fn as_sum(&self) -> Option<(usize, impl Iterator<Item = Self> + '_)>;
+}
+
+pub trait FromSum {
+    fn new_sum(tag: usize, items: impl IntoIterator<Item=Self>, st: &SumType) -> Self;
+    fn debug_check_is_type(&self, _ty: &Type) {}
 }
 
 // TODO ALAN inline into PartialValue? Has to be public as it's in a pub enum
@@ -94,10 +98,8 @@ impl<V: AbstractValue> PartialSum<V> {
     pub fn supports_tag(&self, tag: usize) -> bool {
         self.0.contains_key(&tag)
     }
-}
 
-impl<V: Clone + Into<Value>> PartialSum<V> {
-    pub fn try_into_value(self, typ: &Type) -> Result<Value, Self> {
+    pub fn try_into_value<V2: FromSum + From<V>>(self, typ: &Type) -> Result<V2, Self> {
         let Ok((k, v)) = self.0.iter().exactly_one() else {
             Err(self)?
         };
@@ -118,7 +120,7 @@ impl<V: Clone + Into<Value>> PartialSum<V> {
             .map(|(v, t)| v.clone().try_into_value(t))
             .collect::<Result<Vec<_>, _>>()
         {
-            Ok(vs) => Value::sum(*k, vs, st.clone()).map_err(|_| self),
+            Ok(vs) => Ok(V2::new_sum(*k, vs, &st)),
             Err(_) => Err(self),
         }
     }
@@ -427,16 +429,14 @@ impl<V: AbstractValue> PartialValue<V> {
             PartialValue::Top => true,
         }
     }
-}
 
-impl<V: Clone + Into<Value>> PartialValue<V> {
-    pub fn try_into_value(self, typ: &Type) -> Result<Value, Self> {
-        let r = match self {
-            Self::Value(v) => Ok(v.into().clone()),
+    pub fn try_into_value<V2: FromSum + From<V>>(self, typ: &Type) -> Result<V2, Self> {
+        let r: V2 = match self {
+            Self::Value(v) => Ok(v.clone().into()),
             Self::PartialSum(ps) => ps.try_into_value(typ).map_err(Self::PartialSum),
             x => Err(x),
         }?;
-        assert_eq!(typ, &r.get_type());
+        r.debug_check_is_type(typ);
         Ok(r)
     }
 }

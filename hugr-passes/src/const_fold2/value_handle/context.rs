@@ -2,11 +2,11 @@ use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::sync::Arc;
 
-use hugr_core::ops::{CustomOp, DataflowOpTrait, OpType};
-use hugr_core::{Hugr, HugrView, IncomingPort, Node, PortIndex};
+use hugr_core::ops::{CustomOp, OpType, Value};
+use hugr_core::{Hugr, HugrView, IncomingPort, Node, OutgoingPort};
 
 use super::{ValueHandle, ValueKey};
-use crate::const_fold2::datalog::{DFContext, PartialValue};
+use crate::const_fold2::datalog::DFContext;
 
 /// An implementation of [DFContext] with [ValueHandle]
 /// that just stores a Hugr (actually any [HugrView]),
@@ -59,6 +59,7 @@ impl<H: HugrView> Deref for HugrValueContext<H> {
 }
 
 impl<H: HugrView> DFContext<ValueHandle> for HugrValueContext<H> {
+    type InterpretableVal = Value;
     fn hugr(&self) -> &impl HugrView {
         self.0.as_ref()
     }
@@ -66,45 +67,27 @@ impl<H: HugrView> DFContext<ValueHandle> for HugrValueContext<H> {
     fn interpret_leaf_op(
         &self,
         n: Node,
-        ins: &[PartialValue<ValueHandle>],
-    ) -> Option<Vec<PartialValue<ValueHandle>>> {
+        ins: &[(IncomingPort, Value)],
+    ) -> Vec<(OutgoingPort,ValueHandle)> {
         match self.0.get_optype(n) {
             OpType::LoadConstant(load_op) => {
-                // ins empty as static edge, we need to find the constant ourselves
+                assert!(ins.is_empty()); // static edge, so need to find constant
                 let const_node = self
                     .0
                     .single_linked_output(n, load_op.constant_port())
                     .unwrap()
                     .0;
                 let const_op = self.0.get_optype(const_node).as_const().unwrap();
-                Some(vec![ValueHandle::new(
+                vec![(OutgoingPort::from(0), ValueHandle::new(
                     const_node.into(),
                     Arc::new(const_op.value().clone()),
-                )
-                .into()])
+                ))]
             }
             OpType::CustomOp(CustomOp::Extension(op)) => {
-                let sig = op.signature();
-                let known_ins = sig
-                    .input_types()
-                    .into_iter()
-                    .enumerate()
-                    .zip(ins.iter())
-                    .filter_map(|((i, ty), pv)| {
-                        pv.clone()
-                            .try_into_value(ty)
-                            .map(|v| (IncomingPort::from(i), v))
-                            .ok()
-                    })
-                    .collect::<Vec<_>>();
-                let outs = op.constant_fold(&known_ins)?;
-                let mut res = vec![PartialValue::bottom(); sig.output_count()];
-                for (op, v) in outs {
-                    res[op.index()] = ValueHandle::new(ValueKey::Node(n), Arc::new(v)).into()
-                }
-                Some(res)
+                let ins = ins.into_iter().map(|(p,v)|(*p,v.clone())).collect::<Vec<_>>();
+                op.constant_fold(&ins).map_or(Vec::new(), |outs|outs.into_iter().map(|(p,v)|(p, ValueHandle::new(ValueKey::Node(n), Arc::new(v)))).collect())
             }
-            _ => None,
+            _ => vec![],
         }
     }
 }

@@ -2,24 +2,25 @@ use ascent::lattice::BoundedLattice;
 use std::collections::HashMap;
 use std::hash::Hash;
 
-use hugr_core::ops::{OpType, Value};
-use hugr_core::{Hugr, HugrView, IncomingPort, Node, OutgoingPort, PortIndex as _, Wire};
+use hugr_core::ops::{OpTrait, OpType};
+use hugr_core::{Hugr, HugrView, IncomingPort, Node, OutgoingPort, PortIndex, Wire};
 
 mod partial_value;
 mod utils;
 
 use utils::{TailLoopTermination, ValueRow};
 
-pub use partial_value::{AbstractValue, PartialSum, PartialValue};
+pub use partial_value::{AbstractValue, FromSum};
 type PV<V> = partial_value::PartialValue<V>;
 
 pub trait DFContext<V>: Clone + Eq + Hash + std::ops::Deref<Target = Hugr> {
+    type InterpretableVal: FromSum + From<V>;
     fn hugr(&self) -> &impl HugrView;
     fn interpret_leaf_op(
         &self,
         node: Node,
-        ins: &[PartialValue<V>],
-    ) -> Option<Vec<PartialValue<V>>>;
+        ins: &[(IncomingPort, Self::InterpretableVal)],
+    ) -> Vec<(OutgoingPort, V)>;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -178,7 +179,29 @@ fn propagate_leaf_op<V: AbstractValue>(
         // It'd be nice to convert these to [(IncomingPort, Value)] to pass to the context,
         // thus keeping PartialValue hidden, but AbstractValues
         // are not necessarily convertible to Value!
-        _ => c.interpret_leaf_op(n, ins).map(ValueRow::from_iter),
+        op => {
+            let sig = op.dataflow_signature()?;
+            let known_ins = sig
+                .input_types()
+                .into_iter()
+                .enumerate()
+                .zip(ins.iter())
+                .filter_map(|((i, ty), pv)| {
+                    pv.clone()
+                        .try_into_value(ty)
+                        .ok()
+                        .map(|v| (IncomingPort::from(i), v))
+                })
+                .collect::<Vec<_>>();
+            let known_outs = c.interpret_leaf_op(n, &known_ins);
+            (!known_outs.is_empty()).then(|| {
+                let mut res = ValueRow::new(sig.output_count());
+                for (p, v) in known_outs {
+                    res[p.index()] = v.into();
+                }
+                res
+            })
+        }
     }
 }
 
@@ -241,10 +264,8 @@ impl<V: AbstractValue, C: DFContext<V>> Machine<V, C> {
             .find_map(|(_, cond2, case2, i)| (&cond == cond2 && &case == case2).then_some(*i))
             .unwrap()
     }
-}
 
-impl<V: AbstractValue + Into<Value>, C: DFContext<V>> Machine<V, C> {
-    pub fn read_out_wire_value(&self, hugr: impl HugrView, w: Wire) -> Option<Value> {
+    pub fn read_out_wire_value(&self, hugr: impl HugrView, w: Wire) -> Option<C::InterpretableVal> {
         // dbg!(&w);
         let pv = self.read_out_wire_partial_value(w)?;
         // dbg!(&pv);

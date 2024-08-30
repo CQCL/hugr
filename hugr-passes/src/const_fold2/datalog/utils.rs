@@ -3,7 +3,7 @@
 // https://github.com/proptest-rs/proptest/issues/447
 #![cfg_attr(test, allow(non_local_definitions))]
 
-use std::{cmp::Ordering, ops::Index};
+use std::{cmp::Ordering, ops::{Index, IndexMut}};
 
 use ascent::lattice::{BoundedLattice, Lattice};
 use itertools::zip_eq;
@@ -50,7 +50,7 @@ impl<V: AbstractValue> BoundedLattice for PartialValue<V> {
 pub struct ValueRow<V>(Vec<PartialValue<V>>);
 
 impl<V: AbstractValue> ValueRow<V> {
-    fn new(len: usize) -> Self {
+    pub fn new(len: usize) -> Self {
         Self(vec![PartialValue::bottom(); len])
     }
 
@@ -144,6 +144,14 @@ where
 
     fn index(&self, index: Idx) -> &Self::Output {
         self.0.index(index)
+    }
+}
+
+impl<V, Idx> IndexMut<Idx> for ValueRow<V>
+where
+    Vec<PartialValue<V>>: IndexMut<Idx> {
+        fn index_mut(&mut self, index: Idx) -> &mut Self::Output {
+        self.0.index_mut(index)
     }
 }
 
