@@ -5,8 +5,8 @@ use std::sync::Arc;
 use hugr_core::ops::{OpType, Value};
 use hugr_core::{Hugr, HugrView, IncomingPort, Node, OutgoingPort};
 
-use super::{ValueHandle, ValueKey};
-use crate::const_fold2::total_context::TotalContext;
+use super::value_handle::{ValueHandle, ValueKey};
+use crate::dataflow::TotalContext;
 
 /// An implementation of [DFContext] with [ValueHandle]
 /// that just stores a Hugr (actually any [HugrView]),

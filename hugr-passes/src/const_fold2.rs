@@ -1,10 +1,7 @@
-mod datalog;
-pub use datalog::Machine;
+//! An (example) use of the [super::dataflow](dataflow-analysis framework)
+//! to perform constant-folding.
 
-pub mod partial_value;
-
-mod value_row;
-pub use value_row::ValueRow;
-
-pub mod total_context;
+// These are pub because this "example" is used for testing the framework.
 pub mod value_handle;
+mod context;
+pub use context::HugrValueContext;

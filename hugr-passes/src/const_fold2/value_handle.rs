@@ -6,10 +6,7 @@ use hugr_core::ops::Value;
 use hugr_core::types::Type;
 use hugr_core::Node;
 
-use super::partial_value::AbstractValue;
-
-mod context;
-pub use context::HugrValueContext;
+use crate::dataflow::AbstractValue;
 
 #[derive(Clone, Debug)]
 pub struct HashedConst {
