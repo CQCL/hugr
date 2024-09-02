@@ -1,7 +1,7 @@
 use hugr::{
     extension::{simple_op::MakeExtensionOp, ExtensionId},
-    ops::{CustomOp, Value},
-    std_extensions::logic::{self, ConcreteLogicOp, NaryLogic},
+    ops::{ExtensionOp, Value},
+    std_extensions::logic::{self, LogicOp},
     types::{CustomType, SumType},
     HugrView,
 };
@@ -18,9 +18,9 @@ use anyhow::{anyhow, Result};
 
 struct LogicOpEmitter<'c, 'd, H>(&'d mut EmitFuncContext<'c, H>);
 
-impl<'c, H: HugrView> EmitOp<'c, CustomOp, H> for LogicOpEmitter<'c, '_, H> {
-    fn emit(&mut self, args: EmitOpArgs<'c, CustomOp, H>) -> Result<()> {
-        let lot = ConcreteLogicOp::from_optype(&args.node().generalise()).ok_or(anyhow!(
+impl<'c, H: HugrView> EmitOp<'c, ExtensionOp, H> for LogicOpEmitter<'c, '_, H> {
+    fn emit(&mut self, args: EmitOpArgs<'c, ExtensionOp, H>) -> Result<()> {
+        let lot = LogicOp::from_optype(&args.node().generalise()).ok_or(anyhow!(
             "LogicOpEmitter: from_optype_failed: {:?}",
             args.node().as_ref()
         ))?;
@@ -32,22 +32,22 @@ impl<'c, H: HugrView> EmitOp<'c, CustomOp, H> for LogicOpEmitter<'c, '_, H> {
             let bool_val = LLVMSumValue::try_new(inp, bool_ty)?;
             inputs.push(bool_val.build_get_tag(builder)?);
         }
-        let res = match lot.0 {
-            NaryLogic::And => {
+        let res = match lot {
+            LogicOp::And => {
                 let mut acc = inputs[0];
                 for inp in inputs.into_iter().skip(1) {
                     acc = builder.build_and(acc, inp, "")?;
                 }
                 acc
             }
-            NaryLogic::Or => {
+            LogicOp::Or => {
                 let mut acc = inputs[0];
                 for inp in inputs.into_iter().skip(1) {
                     acc = builder.build_or(acc, inp, "")?;
                 }
                 acc
             }
-            NaryLogic::Eq => {
+            LogicOp::Eq => {
                 let x = inputs.pop().unwrap();
                 let y = inputs.pop().unwrap();
                 let mut acc = builder.build_int_compare(IntPredicate::EQ, x, y, "")?;
@@ -96,7 +96,7 @@ impl<'c, H: HugrView> CodegenExtension<'c, H> for LogicCodegenExtension {
     fn emitter<'a>(
         &self,
         context: &'a mut EmitFuncContext<'c, H>,
-    ) -> Box<dyn EmitOp<'c, CustomOp, H> + 'a> {
+    ) -> Box<dyn EmitOp<'c, ExtensionOp, H> + 'a> {
         Box::new(LogicOpEmitter(context))
     }
 }
@@ -120,7 +120,7 @@ mod test {
     use hugr::{
         builder::{Dataflow, DataflowSubContainer},
         extension::{prelude::BOOL_T, ExtensionRegistry},
-        std_extensions::logic::{self, NaryLogic},
+        std_extensions::logic::{self, LogicOp},
         Hugr,
     };
     use rstest::rstest;
@@ -132,14 +132,14 @@ mod test {
         test::{llvm_ctx, TestContext},
     };
 
-    fn test_logic_op(op: NaryLogic, arity: usize) -> Hugr {
+    fn test_logic_op(op: LogicOp, arity: usize) -> Hugr {
         SimpleHugrConfig::new()
             .with_ins(vec![BOOL_T; arity])
             .with_outs(vec![BOOL_T])
             .with_extensions(ExtensionRegistry::try_new(vec![logic::EXTENSION.to_owned()]).unwrap())
             .finish(|mut builder| {
                 let outputs = builder
-                    .add_dataflow_op(op.with_n_inputs(arity as u64), builder.input_wires())
+                    .add_dataflow_op(op, builder.input_wires())
                     .unwrap()
                     .outputs();
                 builder.finish_with_outputs(outputs).unwrap()
@@ -149,21 +149,21 @@ mod test {
     #[rstest]
     fn and(mut llvm_ctx: TestContext) {
         llvm_ctx.add_extensions(add_logic_extensions);
-        let hugr = test_logic_op(NaryLogic::And, 3);
+        let hugr = test_logic_op(LogicOp::And, 2);
         check_emission!(hugr, llvm_ctx);
     }
 
     #[rstest]
     fn or(mut llvm_ctx: TestContext) {
         llvm_ctx.add_extensions(add_logic_extensions);
-        let hugr = test_logic_op(NaryLogic::Or, 3);
+        let hugr = test_logic_op(LogicOp::Or, 2);
         check_emission!(hugr, llvm_ctx);
     }
 
     #[rstest]
     fn eq(mut llvm_ctx: TestContext) {
         llvm_ctx.add_extensions(add_logic_extensions);
-        let hugr = test_logic_op(NaryLogic::Eq, 3);
+        let hugr = test_logic_op(LogicOp::Eq, 2);
         check_emission!(hugr, llvm_ctx);
     }
 }

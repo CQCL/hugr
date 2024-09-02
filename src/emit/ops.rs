@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
 use hugr::ops::{
-    constant::Sum, Call, CallIndirect, Case, Conditional, Const, CustomOp, Input, LoadConstant,
-    LoadFunction, MakeTuple, OpTag, OpTrait, OpType, Output, Tag, UnpackTuple, Value, CFG,
+    constant::Sum, Call, CallIndirect, Case, Conditional, Const, ExtensionOp, Input, LoadConstant,
+    LoadFunction, OpTag, OpTrait, OpType, Output, Tag, Value, CFG,
 };
 use hugr::{
     hugr::views::SiblingGraph,
@@ -39,28 +39,6 @@ impl<'c, 'd, H: HugrView> SumOpEmitter<'c, 'd, H> {
     ) -> Result<Self> {
         let llvm_sum_type = context.llvm_sum_type(get_exactly_one_sum_type(ts)?)?;
         Ok(Self::new(context, llvm_sum_type))
-    }
-}
-
-impl<'c, H: HugrView> EmitOp<'c, MakeTuple, H> for SumOpEmitter<'c, '_, H> {
-    fn emit(&mut self, args: EmitOpArgs<'c, MakeTuple, H>) -> Result<()> {
-        let builder = self.0.builder();
-        args.outputs
-            .finish(builder, [self.1.build_tag(builder, 0, args.inputs)?])
-    }
-}
-
-impl<'c, H: HugrView> EmitOp<'c, UnpackTuple, H> for SumOpEmitter<'c, '_, H> {
-    fn emit(&mut self, args: EmitOpArgs<'c, UnpackTuple, H>) -> Result<()> {
-        let builder = self.0.builder();
-        let input = LLVMSumValue::try_new(
-            args.inputs
-                .into_iter()
-                .exactly_one()
-                .map_err(|_| anyhow!("unpacktuple expected exactly one input"))?,
-            self.1.clone(),
-        )?;
-        args.outputs.finish(builder, input.build_untag(builder, 0)?)
     }
 }
 
@@ -275,20 +253,6 @@ where
     DataflowParentEmitter::new(context, args).emit_children()
 }
 
-fn emit_make_tuple<'c, H: HugrView>(
-    context: &mut EmitFuncContext<'c, H>,
-    args: EmitOpArgs<'c, MakeTuple, H>,
-) -> Result<()> {
-    SumOpEmitter::try_new(context, args.node.out_value_types().map(|x| x.1))?.emit(args)
-}
-
-fn emit_unpack_tuple<'c, H: HugrView>(
-    context: &mut EmitFuncContext<'c, H>,
-    args: EmitOpArgs<'c, UnpackTuple, H>,
-) -> Result<()> {
-    SumOpEmitter::try_new(context, args.node.in_value_types().map(|x| x.1))?.emit(args)
-}
-
 fn emit_tag<'c, H: HugrView>(
     context: &mut EmitFuncContext<'c, H>,
     args: EmitOpArgs<'c, Tag, H>,
@@ -394,13 +358,10 @@ fn emit_optype<'c, H: HugrView>(
 ) -> Result<()> {
     let node = args.node();
     match node.as_ref() {
-        OpType::MakeTuple(ref mt) => emit_make_tuple(context, args.into_ot(mt)),
-        OpType::UnpackTuple(ref ut) => emit_unpack_tuple(context, args.into_ot(ut)),
         OpType::Tag(ref tag) => emit_tag(context, args.into_ot(tag)),
         OpType::DFG(_) => emit_dataflow_parent(context, args),
 
-        // TODO Test cases
-        OpType::CustomOp(ref co) => {
+        OpType::ExtensionOp(ref co) => {
             let extensions = context.extensions();
             extensions.emit(context, args.into_ot(co))
         }
@@ -433,7 +394,7 @@ fn emit_optype<'c, H: HugrView>(
 ///   and an iterator over the expected output types.
 pub(crate) fn emit_custom_unary_op<'c, H, F>(
     context: &mut EmitFuncContext<'c, H>,
-    args: EmitOpArgs<'c, CustomOp, H>,
+    args: EmitOpArgs<'c, ExtensionOp, H>,
     go: F,
 ) -> Result<()>
 where
@@ -474,7 +435,7 @@ where
 ///   inputs, and an iterator over the expected output types.
 pub(crate) fn emit_custom_binary_op<'c, H, F>(
     context: &mut EmitFuncContext<'c, H>,
-    args: EmitOpArgs<'c, CustomOp, H>,
+    args: EmitOpArgs<'c, ExtensionOp, H>,
     go: F,
 ) -> Result<()>
 where

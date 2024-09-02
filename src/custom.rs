@@ -6,7 +6,7 @@ use std::{
 
 use hugr::{
     extension::ExtensionId,
-    ops::{constant::CustomConst, CustomOp},
+    ops::{constant::CustomConst, ExtensionOp},
     types::CustomType,
     HugrView,
 };
@@ -51,12 +51,12 @@ pub trait CodegenExtension<'c, H> {
         hugr_type: &CustomType,
     ) -> Result<BasicTypeEnum<'c>>;
 
-    /// Return an emitter that will be asked to emit `CustomOp`s that have an
+    /// Return an emitter that will be asked to emit `ExtensionOp`s that have an
     /// extension that matches `Self.`
     fn emitter<'a>(
         &'a self,
         context: &'a mut EmitFuncContext<'c, H>,
-    ) -> Box<dyn EmitOp<'c, CustomOp, H> + 'a>;
+    ) -> Box<dyn EmitOp<'c, ExtensionOp, H> + 'a>;
 
     /// Emit instructions to materialise `konst`. `konst` will have a [TypeId]
     /// that matches `self.supported_consts`.
@@ -128,13 +128,12 @@ impl<'c, H> CodegenExtsMap<'c, H> {
     pub fn emit(
         self: Rc<Self>,
         context: &mut EmitFuncContext<'c, H>,
-        args: EmitOpArgs<'c, CustomOp, H>,
+        args: EmitOpArgs<'c, ExtensionOp, H>,
     ) -> Result<()>
     where
         H: HugrView,
     {
-        let node = args.node();
-        self.get(custom_op_extension(&node))?
+        self.get(args.node().def().extension())?
             .emitter(context)
             .emit(args)
     }
@@ -170,13 +169,5 @@ impl<'c, H> CodegenExtsMap<'c, H> {
 impl<'c, H: HugrView> Default for CodegenExtsMap<'c, H> {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-// TODO upstream this to hugr
-fn custom_op_extension(o: &CustomOp) -> &ExtensionId {
-    match o {
-        CustomOp::Extension(e) => e.def().extension(),
-        CustomOp::Opaque(o) => o.extension(),
     }
 }

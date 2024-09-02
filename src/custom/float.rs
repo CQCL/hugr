@@ -2,7 +2,8 @@ use std::{any::TypeId, collections::HashSet};
 
 use anyhow::{anyhow, Result};
 use hugr::extension::simple_op::MakeExtensionOp;
-use hugr::ops::{constant::CustomConst, CustomOp, Value};
+use hugr::ops::ExtensionOp;
+use hugr::ops::{constant::CustomConst, Value};
 use hugr::std_extensions::arithmetic::float_ops::FloatOps;
 use hugr::{
     std_extensions::arithmetic::{
@@ -48,7 +49,7 @@ impl<'c, H: HugrView> CodegenExtension<'c, H> for FloatTypesCodegenExtension {
     fn emitter<'a>(
         &self,
         _context: &'a mut crate::emit::func::EmitFuncContext<'c, H>,
-    ) -> Box<dyn crate::emit::EmitOp<'c, hugr::ops::CustomOp, H> + 'a> {
+    ) -> Box<dyn crate::emit::EmitOp<'c, hugr::ops::ExtensionOp, H> + 'a> {
         Box::new(NullEmitLlvm)
     }
 
@@ -89,7 +90,7 @@ impl<'c, H: HugrView> CodegenExtension<'c, H> for FloatOpsCodegenExtension {
     fn emitter<'a>(
         &self,
         context: &'a mut crate::emit::func::EmitFuncContext<'c, H>,
-    ) -> Box<dyn crate::emit::EmitOp<'c, hugr::ops::CustomOp, H> + 'a> {
+    ) -> Box<dyn crate::emit::EmitOp<'c, hugr::ops::ExtensionOp, H> + 'a> {
         Box::new(FloatOpEmitter(context))
     }
 }
@@ -100,7 +101,7 @@ struct FloatOpEmitter<'c, 'd, H>(&'d mut EmitFuncContext<'c, H>);
 /// Emit a float comparison operation.
 fn emit_fcmp<'c, H: HugrView>(
     context: &mut EmitFuncContext<'c, H>,
-    args: EmitOpArgs<'c, CustomOp, H>,
+    args: EmitOpArgs<'c, ExtensionOp, H>,
     pred: inkwell::FloatPredicate,
 ) -> Result<()> {
     let true_val = emit_value(context, &Value::true_val())?;
@@ -119,8 +120,8 @@ fn emit_fcmp<'c, H: HugrView>(
     })
 }
 
-impl<'c, H: HugrView> EmitOp<'c, CustomOp, H> for FloatOpEmitter<'c, '_, H> {
-    fn emit(&mut self, args: EmitOpArgs<'c, CustomOp, H>) -> Result<()> {
+impl<'c, H: HugrView> EmitOp<'c, ExtensionOp, H> for FloatOpEmitter<'c, '_, H> {
+    fn emit(&mut self, args: EmitOpArgs<'c, ExtensionOp, H>) -> Result<()> {
         let op = FloatOps::from_optype(&args.node().generalise()).ok_or(anyhow!(
             "FloatOpEmitter: from_optype_failed: {:?}",
             args.node().as_ref()

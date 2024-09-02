@@ -1,5 +1,5 @@
 ---
-source: src/emit/test.rs
+source: src/custom/prelude.rs
 expression: module.to_string()
 ---
 ; ModuleID = 'test_context'

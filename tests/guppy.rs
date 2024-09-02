@@ -8,7 +8,7 @@ use std::{
 use anyhow::Result;
 use hugr::{
     extension::{prelude, ExtensionId, ExtensionRegistry},
-    ops::{CustomOp, OpTrait},
+    ops::{DataflowOpTrait as _, ExtensionOp},
     std_extensions::arithmetic::{float_types, int_ops, int_types},
     Hugr, HugrView,
 };
@@ -34,14 +34,15 @@ lazy_static! {
 
 struct Tket2Emitter<'a, 'c, H>(&'a mut hugr_llvm::emit::EmitFuncContext<'c, H>);
 
-impl<'a, 'c, H: HugrView> EmitOp<'c, CustomOp, H> for Tket2Emitter<'a, 'c, H> {
-    fn emit(&mut self, args: EmitOpArgs<'c, CustomOp, H>) -> Result<()> {
+impl<'a, 'c, H: HugrView> EmitOp<'c, ExtensionOp, H> for Tket2Emitter<'a, 'c, H> {
+    fn emit(&mut self, args: EmitOpArgs<'c, ExtensionOp, H>) -> Result<()> {
         // we lower all ops by declaring an extern function of the same name
         // and signature, and calling that function.
-        let opaque = args.node().as_ref().clone().into_opaque();
-        let sig = opaque.dataflow_signature().unwrap();
+        // let opaque = args.node().as_ref().clone().into_opaque();
+        let node = args.node();
+        let sig = node.signature();
         let func_type = self.0.llvm_func_type(&sig)?;
-        let func = self.0.get_extern_func(opaque.name(), func_type)?;
+        let func = self.0.get_extern_func(node.def().name(), func_type)?;
         let call_args = args.inputs.into_iter().map_into().collect_vec();
         let builder = self.0.builder();
         let call_result = builder.build_call(func, &call_args, "")?;
@@ -69,7 +70,7 @@ impl<'c, H: HugrView> CodegenExtension<'c, H> for Tket2CodegenExtension {
     fn emitter<'a>(
         &self,
         context: &'a mut hugr_llvm::emit::EmitFuncContext<'c, H>,
-    ) -> Box<dyn hugr_llvm::emit::EmitOp<'c, hugr::ops::CustomOp, H> + 'a> {
+    ) -> Box<dyn hugr_llvm::emit::EmitOp<'c, hugr::ops::ExtensionOp, H> + 'a> {
         Box::new(Tket2Emitter(context))
     }
 }
@@ -147,6 +148,7 @@ fn with_suffix<R>(s: impl Display, go: impl FnOnce() -> R) -> R {
 macro_rules! guppy_test {
     ($filename:expr, $testname:ident) => {
         #[rstest]
+        #[ignore = "Guppy has not yet been upgraded to hugr-0.12.0"]
         fn $testname(test_config: TestConfig) {
             with_suffix("noopt", || {
                 test_config.run($filename, false, |module_string| {

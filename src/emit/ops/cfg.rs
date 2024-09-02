@@ -212,7 +212,7 @@ impl<'c, H: HugrView> EmitOp<'c, ExitBlock, H> for CfgEmitter<'c, '_, H> {
 #[cfg(test)]
 mod test {
     use hugr::builder::{Dataflow, DataflowSubContainer, SubContainer};
-    use hugr::extension::prelude::BOOL_T;
+    use hugr::extension::prelude::{self, BOOL_T};
     use hugr::extension::{ExtensionRegistry, ExtensionSet};
     use hugr::ops::Value;
     use hugr::std_extensions::arithmetic::int_types::{self, INT_TYPES};
@@ -222,6 +222,7 @@ mod test {
     use rstest::rstest;
 
     use crate::custom::int::add_int_extensions;
+    use crate::custom::prelude::add_default_prelude_extensions;
     use crate::emit::test::SimpleHugrConfig;
     use crate::test::{llvm_ctx, TestContext};
 
@@ -233,11 +234,14 @@ mod test {
         llvm_ctx.add_extensions(add_int_extensions);
         let t1 = INT_TYPES[0].clone();
         let t2 = INT_TYPES[1].clone();
-        let es = ExtensionSet::singleton(&int_types::EXTENSION_ID);
+        let es = ExtensionSet::from_iter([int_types::EXTENSION_ID, prelude::PRELUDE_ID]);
         let hugr = SimpleHugrConfig::new()
             .with_ins(vec![t1.clone(), t2.clone()])
             .with_outs(t2.clone())
-            .with_extensions(ExtensionRegistry::try_new([int_types::extension()]).unwrap())
+            .with_extensions(
+                ExtensionRegistry::try_new([int_types::extension(), prelude::PRELUDE.to_owned()])
+                    .unwrap(),
+            )
             .finish(|mut builder| {
                 let [in1, in2] = builder.input_wires_arr();
                 let mut cfg_builder = builder
@@ -277,6 +281,7 @@ mod test {
                 let [cfg_out] = cfg.outputs_arr();
                 builder.finish_with_outputs([cfg_out]).unwrap()
             });
+        llvm_ctx.add_extensions(add_default_prelude_extensions);
         check_emission!(hugr, llvm_ctx);
     }
 

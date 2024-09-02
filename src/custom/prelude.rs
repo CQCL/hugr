@@ -2,12 +2,16 @@ use std::{any::TypeId, collections::HashSet};
 
 use anyhow::{anyhow, Ok, Result};
 use hugr::{
-    extension::prelude::{
-        self, ConstError, ConstExternalSymbol, ConstString, ConstUsize, ERROR_CUSTOM_TYPE,
-        ERROR_TYPE, NEW_ARRAY_OP_ID, PANIC_OP_ID, PRINT_OP_ID, QB_T, STRING_CUSTOM_TYPE, USIZE_T,
+    extension::{
+        prelude::{
+            self, ConstError, ConstExternalSymbol, ConstString, ConstUsize, MakeTuple, UnpackTuple,
+            ERROR_CUSTOM_TYPE, ERROR_TYPE, NEW_ARRAY_OP_ID, PANIC_OP_ID, PRINT_OP_ID, QB_T,
+            STRING_CUSTOM_TYPE, USIZE_T,
+        },
+        simple_op::MakeExtensionOp as _,
     },
-    ops::{constant::CustomConst, CustomOp},
-    types::{TypeArg, TypeEnum},
+    ops::{constant::CustomConst, ExtensionOp},
+    types::{SumType, TypeArg, TypeEnum},
     HugrView,
 };
 use inkwell::{
@@ -23,6 +27,7 @@ use crate::{
         libc::{emit_libc_abort, emit_libc_printf},
         EmitOp, EmitOpArgs,
     },
+    sum::LLVMSumValue,
     types::TypingSession,
 };
 
@@ -119,13 +124,27 @@ struct PreludeEmitter<'c, 'd, H: HugrView, PCG: PreludeCodegen>(
     PCG,
 );
 
-impl<'c, 'a, H: HugrView, PCG: PreludeCodegen> EmitOp<'c, CustomOp, H>
+impl<'c, 'a, H: HugrView, PCG: PreludeCodegen> EmitOp<'c, ExtensionOp, H>
     for PreludeEmitter<'c, 'a, H, PCG>
 {
-    fn emit(&mut self, args: EmitOpArgs<'c, CustomOp, H>) -> Result<()> {
+    fn emit(&mut self, args: EmitOpArgs<'c, ExtensionOp, H>) -> Result<()> {
         let node = args.node();
-        let name = node.as_extension_op().unwrap().def().name();
-        if *name == NEW_ARRAY_OP_ID {
+        let name = node.def().name();
+        if let Result::Ok(make_tuple) = MakeTuple::from_extension_op(&node) {
+            let llvm_sum_type = self.0.llvm_sum_type(SumType::new([make_tuple.0]))?;
+            let r = llvm_sum_type.build_tag(self.0.builder(), 0, args.inputs)?;
+            args.outputs.finish(self.0.builder(), [r])
+        } else if let Result::Ok(unpack_tuple) = UnpackTuple::from_extension_op(&node) {
+            let llvm_sum_type = self.0.llvm_sum_type(SumType::new([unpack_tuple.0]))?;
+            let llvm_sum_value = args
+                .inputs
+                .into_iter()
+                .exactly_one()
+                .map_err(|_| anyhow!("UnpackTuple does not have exactly one input"))
+                .and_then(|v| LLVMSumValue::try_new(v, llvm_sum_type))?;
+            let rs = llvm_sum_value.build_untag(self.0.builder(), 0)?;
+            args.outputs.finish(self.0.builder(), rs)
+        } else if *name == NEW_ARRAY_OP_ID {
             let [TypeArg::BoundedNat { .. }, TypeArg::Type { ty }] = node.args() else {
                 return Err(anyhow!("Invalid type args for op {NEW_ARRAY_OP_ID}"));
             };
@@ -225,7 +244,7 @@ impl<'c, H: HugrView, PCG: PreludeCodegen> CodegenExtension<'c, H>
     fn emitter<'a>(
         &'a self,
         ctx: &'a mut EmitFuncContext<'c, H>,
-    ) -> Box<dyn EmitOp<'c, CustomOp, H> + 'a> {
+    ) -> Box<dyn EmitOp<'c, ExtensionOp, H> + 'a> {
         Box::new(PreludeEmitter(ctx, self.0.clone()))
     }
 
@@ -315,8 +334,8 @@ mod test {
     use hugr::builder::{Dataflow, DataflowSubContainer};
     use hugr::extension::{PRELUDE, PRELUDE_REGISTRY};
     use hugr::type_row;
-    use hugr::types::TypeArg;
-    use prelude::{array_type, new_array_op};
+    use hugr::types::{Type, TypeArg};
+    use prelude::{array_type, new_array_op, BOOL_T};
     use rstest::rstest;
 
     use crate::check_emission;
@@ -410,6 +429,40 @@ mod test {
                 let k2 = builder.add_load_value(konst2);
                 builder.finish_with_outputs([k1, k2]).unwrap()
             });
+        check_emission!(hugr, llvm_ctx);
+    }
+
+    #[rstest]
+    fn prelude_make_tuple(mut llvm_ctx: TestContext) {
+        let hugr = SimpleHugrConfig::new()
+            .with_ins(vec![BOOL_T, BOOL_T])
+            .with_outs(Type::new_tuple(vec![BOOL_T, BOOL_T]))
+            .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
+            .finish(|mut builder| {
+                let in_wires = builder.input_wires();
+                let r = builder.make_tuple(in_wires).unwrap();
+                builder.finish_with_outputs([r]).unwrap()
+            });
+        llvm_ctx.add_extensions(add_default_prelude_extensions);
+        check_emission!(hugr, llvm_ctx);
+    }
+
+    #[rstest]
+    fn prelude_unpack_tuple(mut llvm_ctx: TestContext) {
+        let hugr = SimpleHugrConfig::new()
+            .with_ins(Type::new_tuple(vec![BOOL_T, BOOL_T]))
+            .with_outs(vec![BOOL_T, BOOL_T])
+            .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
+            .finish(|mut builder| {
+                let unpack = builder
+                    .add_dataflow_op(
+                        UnpackTuple::new(vec![BOOL_T, BOOL_T].into()),
+                        builder.input_wires(),
+                    )
+                    .unwrap();
+                builder.finish_with_outputs(unpack.outputs()).unwrap()
+            });
+        llvm_ctx.add_extensions(add_default_prelude_extensions);
         check_emission!(hugr, llvm_ctx);
     }
 

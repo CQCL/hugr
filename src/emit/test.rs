@@ -10,7 +10,7 @@ use hugr::extension::prelude::BOOL_T;
 use hugr::extension::{ExtensionRegistry, EMPTY_REG};
 use hugr::ops::constant::CustomConst;
 use hugr::ops::handle::FuncID;
-use hugr::ops::{CallIndirect, Tag, UnpackTuple, Value};
+use hugr::ops::{CallIndirect, Tag, Value};
 use hugr::std_extensions::arithmetic::int_ops::{self, INT_OPS_REGISTRY};
 use hugr::std_extensions::arithmetic::int_types::ConstInt;
 use hugr::types::{Signature, Type, TypeRow};
@@ -134,36 +134,6 @@ macro_rules! check_emission {
     ($hugr: ident, $test_ctx:ident) => {
         check_emission!("", $hugr, $test_ctx);
     };
-}
-
-#[rstest]
-fn emit_hugr_make_tuple(llvm_ctx: TestContext) {
-    let hugr = SimpleHugrConfig::new()
-        .with_ins(vec![BOOL_T, BOOL_T])
-        .with_outs(Type::new_tuple(vec![BOOL_T, BOOL_T]))
-        .finish(|mut builder: DFGW| {
-            let in_wires = builder.input_wires();
-            let r = builder.make_tuple(in_wires).unwrap();
-            builder.finish_with_outputs([r]).unwrap()
-        });
-    check_emission!(hugr, llvm_ctx);
-}
-
-#[rstest]
-fn emit_hugr_unpack_tuple(llvm_ctx: TestContext) {
-    let hugr = SimpleHugrConfig::new()
-        .with_ins(Type::new_tuple(vec![BOOL_T, BOOL_T]))
-        .with_outs(vec![BOOL_T, BOOL_T])
-        .finish(|mut builder: DFGW| {
-            let unpack = builder
-                .add_dataflow_op(
-                    UnpackTuple::new(vec![BOOL_T, BOOL_T].into()),
-                    builder.input_wires(),
-                )
-                .unwrap();
-            builder.finish_with_outputs(unpack.outputs()).unwrap()
-        });
-    check_emission!(hugr, llvm_ctx);
 }
 
 #[rstest]
