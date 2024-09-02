@@ -13,7 +13,7 @@ use hugr_core::{
     types::{Signature, SumType, Type, TypeRow},
 };
 
-use super::super::partial_value::PartialValue;
+use super::partial_value::PartialValue;
 
 #[test]
 fn test_make_tuple() {

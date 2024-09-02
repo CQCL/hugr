@@ -19,3 +19,6 @@ use std::hash::Hash;
 pub trait DFContext<V>: Clone + Eq + Hash + std::ops::Deref<Target = Hugr> {
     fn interpret_leaf_op(&self, node: Node, ins: &[PartialValue<V>]) -> Option<ValueRow<V>>;
 }
+
+#[cfg(test)]
+mod test;

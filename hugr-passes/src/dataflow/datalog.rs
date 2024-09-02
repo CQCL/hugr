@@ -183,6 +183,3 @@ fn value_inputs(h: &impl HugrView, n: Node) -> impl Iterator<Item = IncomingPort
 fn value_outputs(h: &impl HugrView, n: Node) -> impl Iterator<Item = OutgoingPort> + '_ {
     h.out_value_types(n).map(|x| x.0)
 }
-
-#[cfg(test)]
-mod test;
