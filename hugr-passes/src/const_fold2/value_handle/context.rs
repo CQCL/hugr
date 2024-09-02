@@ -6,7 +6,7 @@ use hugr_core::ops::{OpType, Value};
 use hugr_core::{Hugr, HugrView, IncomingPort, Node, OutgoingPort};
 
 use super::{ValueHandle, ValueKey};
-use crate::const_fold2::datalog::DFContext;
+use crate::const_fold2::total_context::TotalContext;
 
 /// An implementation of [DFContext] with [ValueHandle]
 /// that just stores a Hugr (actually any [HugrView]),
@@ -58,11 +58,8 @@ impl<H: HugrView> Deref for HugrValueContext<H> {
     }
 }
 
-impl<H: HugrView> DFContext<ValueHandle> for HugrValueContext<H> {
+impl<H: HugrView> TotalContext<ValueHandle> for HugrValueContext<H> {
     type InterpretableVal = Value;
-    fn hugr(&self) -> &impl HugrView {
-        self.0.as_ref()
-    }
 
     fn interpret_leaf_op(
         &self,
