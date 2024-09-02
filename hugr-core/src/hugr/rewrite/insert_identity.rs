@@ -125,9 +125,7 @@ mod tests {
 
         assert_eq!(h.node_count(), 7);
 
-        let noop: Noop = h.get_optype(noop_node).cast().unwrap();
-
-        assert_eq!(noop, Noop(QB_T));
+        assert_eq!(h.get_optype(noop_node).cast(), Some(Noop(QB_T)));
 
         h.update_validate(&PRELUDE_REGISTRY).unwrap();
     }

@@ -335,8 +335,7 @@ mod tests {
             };
             let op = def.to_concrete(ty, size);
             let optype: OpType = op.clone().into();
-            let new_op: ArrayOp = optype.cast().unwrap();
-            assert_eq!(new_op, op);
+            assert!(optype.is_ext(op));
         }
     }
 

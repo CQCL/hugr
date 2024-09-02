@@ -294,6 +294,14 @@ impl OpType {
         self.as_extension_op()
             .and_then(|o| T::from_extension_op(o).ok())
     }
+
+    /// Check if the operation is an extension operation by casting to it.
+    pub fn is_ext<T>(&self, op: T) -> bool
+    where
+        T: MakeExtensionOp + PartialEq,
+    {
+        self.cast::<T>() == Some(op)
+    }
 }
 
 /// Macro used by operations that want their
