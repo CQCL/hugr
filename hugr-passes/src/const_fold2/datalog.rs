@@ -17,7 +17,6 @@ pub use utils::ValueRow;
 type PV<V> = partial_value::PartialValue<V>;
 
 pub trait DFContext<V>: Clone + Eq + Hash + std::ops::Deref<Target = Hugr> {
-    fn hugr(&self) -> &impl HugrView;
     fn interpret_leaf_op(&self, node: Node, ins: &[PartialValue<V>]) -> Option<ValueRow<V>>;
 }
 
@@ -43,9 +42,9 @@ ascent::ascent! {
 
     node(c, n) <-- context(c), for n in c.nodes();
 
-    in_wire(c, n,p) <-- node(c, n), for p in utils::value_inputs(c.hugr(), *n);
+    in_wire(c, n,p) <-- node(c, n), for p in utils::value_inputs(c.as_ref(), *n);
 
-    out_wire(c, n,p) <-- node(c, n), for p in utils::value_outputs(c.hugr(), *n);
+    out_wire(c, n,p) <-- node(c, n), for p in utils::value_outputs(c.as_ref(), *n);
 
     parent_of_node(c, parent, child) <--
         node(c, child), if let Some(parent) = c.get_parent(*child);
@@ -64,8 +63,8 @@ ascent::ascent! {
         out_wire_value(c, m, op, v);
 
 
-    node_in_value_row(c, n, utils::bottom_row(c.hugr(), *n)) <-- node(c, n);
-    node_in_value_row(c, n, utils::singleton_in_row(c.hugr(), n, p, v.clone())) <-- in_wire_value(c, n, p, v);
+    node_in_value_row(c, n, utils::bottom_row(c.as_ref(), *n)) <-- node(c, n);
+    node_in_value_row(c, n, utils::singleton_in_row(c.as_ref(), n, p, v.clone())) <-- in_wire_value(c, n, p, v);
 
     out_wire_value(c, n, p, v) <--
        node(c, n),
@@ -166,7 +165,7 @@ fn propagate_leaf_op<V: AbstractValue>(
         )])),
         op if op.cast::<UnpackTuple>().is_some() => {
             let [tup] = ins.into_iter().collect::<Vec<_>>().try_into().unwrap();
-            tup.variant_values(0, utils::value_outputs(c.hugr(), n).count())
+            tup.variant_values(0, utils::value_outputs(c.as_ref(), n).count())
                 .map(ValueRow::from_iter)
         }
         OpType::Tag(t) => Some(ValueRow::from_iter([PV::variant(

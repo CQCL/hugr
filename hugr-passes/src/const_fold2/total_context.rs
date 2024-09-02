@@ -41,10 +41,4 @@ impl<V: AbstractValue, T: TotalContext<V>> DFContext<V> for T {
             res
         })
     }
-
-    fn hugr(&self) -> &impl HugrView {
-        // Adding `fn hugr(&self) -> &impl HugrView` to trait TotalContext
-        // and calling that here requires a lifetime bound on V, so avoid that
-        self.as_ref()
-    }
 }
