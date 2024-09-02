@@ -4,8 +4,8 @@ from collections.abc import Iterable
 from typing import Any
 
 from hugr import tys
-from hugr.dfg import Dfg
-from hugr.node_port import Node, Wire
+from hugr.build.dfg import Dfg
+from hugr.hugr.node_port import Node, Wire
 from hugr.ops import Command, ComWire
 
 

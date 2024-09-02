@@ -2,7 +2,7 @@ use std::cmp::{max, min};
 
 use crate::{
     extension::{
-        prelude::{sum_with_error, ConstError, ConstString},
+        prelude::{sum_with_error, ConstError},
         ConstFoldResult, Folder, OpDef,
     },
     ops::{
@@ -10,7 +10,7 @@ use crate::{
         Value,
     },
     std_extensions::arithmetic::int_types::{get_log_width, ConstInt, INT_TYPES},
-    types::{SumType, Type, TypeArg},
+    types::{Type, TypeArg},
     IncomingPort,
 };
 
@@ -132,9 +132,9 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                     };
                     let n0val: u64 = n0.value_u();
                     let out_const: Value = if n0val >> (1 << logwidth1) != 0 {
-                        mk_out_const(1, Ok(INARROW_ERROR_VALUE.clone()))
+                        mk_out_const(0, Ok(INARROW_ERROR_VALUE.clone()))
                     } else {
-                        mk_out_const(0, ConstInt::new_u(logwidth1, n0val).map(Into::into))
+                        mk_out_const(1, ConstInt::new_u(logwidth1, n0val).map(Into::into))
                     };
                     Some(vec![(0.into(), out_const)])
                 },
@@ -160,52 +160,11 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                     let n0val: i64 = n0.value_s();
                     let ub = 1i64 << ((1 << logwidth1) - 1);
                     let out_const: Value = if n0val >= ub || n0val < -ub {
-                        mk_out_const(1, Ok(INARROW_ERROR_VALUE.clone()))
+                        mk_out_const(0, Ok(INARROW_ERROR_VALUE.clone()))
                     } else {
-                        mk_out_const(0, ConstInt::new_s(logwidth1, n0val).map(Into::into))
+                        mk_out_const(1, ConstInt::new_s(logwidth1, n0val).map(Into::into))
                     };
                     Some(vec![(0.into(), out_const)])
-                },
-            ),
-        },
-        IntOpDef::itobool => Folder {
-            folder: Box::new(
-                |type_args: &[TypeArg], consts: &[(IncomingPort, Value)]| -> ConstFoldResult {
-                    if !type_args.is_empty() {
-                        return None;
-                    }
-                    let n0: &ConstInt = get_single_input_value(consts)?;
-                    if n0.log_width() != 0 {
-                        None
-                    } else {
-                        Some(vec![(0.into(), Value::from_bool(n0.value_u() == 1))])
-                    }
-                },
-            ),
-        },
-        IntOpDef::ifrombool => Folder {
-            folder: Box::new(
-                |type_args: &[TypeArg], consts: &[(IncomingPort, Value)]| -> ConstFoldResult {
-                    if !type_args.is_empty() {
-                        return None;
-                    }
-                    let [(_, b0)] = consts else {
-                        return None;
-                    };
-                    Some(vec![(
-                        0.into(),
-                        Value::extension(
-                            ConstInt::new_u(
-                                0,
-                                if b0.clone() == Value::true_val() {
-                                    1
-                                } else {
-                                    0
-                                },
-                            )
-                            .unwrap(),
-                        ),
-                    )])
                 },
             ),
         },
@@ -587,6 +546,36 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                 },
             ),
         },
+        IntOpDef::ipow => Folder {
+            folder: Box::new(
+                |type_args: &[TypeArg], consts: &[(IncomingPort, Value)]| -> ConstFoldResult {
+                    let [arg] = type_args else {
+                        return None;
+                    };
+                    let logwidth: u8 = get_log_width(arg).ok()?;
+                    let (n0, n1): (&ConstInt, &ConstInt) = get_pair_of_input_values(consts)?;
+                    if n0.log_width() != logwidth || n1.log_width() != logwidth {
+                        None
+                    } else {
+                        Some(vec![(
+                            0.into(),
+                            Value::extension(
+                                ConstInt::new_u(
+                                    logwidth,
+                                    n0.value_u()
+                                        .overflowing_pow(
+                                            n1.value_u().try_into().unwrap_or(u32::MAX),
+                                        )
+                                        .0
+                                        & bitmask_from_logwidth(logwidth),
+                                )
+                                .unwrap(),
+                            ),
+                        )])
+                    }
+                },
+            ),
+        },
         IntOpDef::idivmod_checked_u => Folder {
             folder: Box::new(
                 |type_args: &[TypeArg], consts: &[(IncomingPort, Value)]| -> ConstFoldResult {
@@ -601,14 +590,12 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                         let q_type = INT_TYPES[logwidth0 as usize].to_owned();
                         let r_type = q_type.clone();
                         let qr_type: Type = Type::new_tuple(vec![q_type, r_type]);
-                        let sum_type: SumType = sum_with_error(qr_type);
                         let err_value = || {
-                            let err_val = ConstError {
+                            ConstError {
                                 signal: 0,
                                 message: "Division by zero".to_string(),
-                            };
-                            Value::sum(1, [err_val.into()], sum_type.clone())
-                                .unwrap_or_else(|e| panic!("Invalid computed sum, {}", e))
+                            }
+                            .as_either(qr_type)
                         };
                         let nval = n.value_u();
                         let mval = m.value_u();
@@ -664,14 +651,12 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                         let q_type = INT_TYPES[logwidth0 as usize].to_owned();
                         let r_type = INT_TYPES[logwidth0 as usize].to_owned();
                         let qr_type: Type = Type::new_tuple(vec![q_type, r_type]);
-                        let sum_type: SumType = sum_with_error(qr_type);
                         let err_value = || {
-                            let err_val = ConstError {
+                            ConstError {
                                 signal: 0,
                                 message: "Division by zero".to_string(),
-                            };
-                            Value::sum(1, [err_val.into()], sum_type.clone())
-                                .unwrap_or_else(|e| panic!("Invalid computed sum, {}", e))
+                            }
+                            .as_either(qr_type)
                         };
                         let nval = n.value_s();
                         let mval = m.value_u();
@@ -724,14 +709,12 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                         None
                     } else {
                         let int_out_type = INT_TYPES[logwidth0 as usize].to_owned();
-                        let sum_type = sum_with_error(int_out_type.clone());
                         let err_value = || {
-                            let err_val = ConstError {
+                            ConstError {
                                 signal: 0,
                                 message: "Division by zero".to_string(),
-                            };
-                            Value::sum(1, [err_val.into()], sum_type.clone())
-                                .unwrap_or_else(|e| panic!("Invalid computed sum, {}", e))
+                            }
+                            .as_either(int_out_type.clone())
                         };
                         let nval = n.value_u();
                         let mval = m.value_u();
@@ -778,14 +761,12 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                         None
                     } else {
                         let int_out_type = INT_TYPES[logwidth0 as usize].to_owned();
-                        let sum_type = sum_with_error(int_out_type.clone());
                         let err_value = || {
-                            let err_val = ConstError {
+                            ConstError {
                                 signal: 0,
                                 message: "Division by zero".to_string(),
-                            };
-                            Value::sum(1, [err_val.into()], sum_type.clone())
-                                .unwrap_or_else(|e| panic!("Invalid computed sum, {}", e))
+                            }
+                            .as_either(int_out_type.clone())
                         };
                         let nval = n.value_u();
                         let mval = m.value_u();
@@ -832,14 +813,12 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                         None
                     } else {
                         let int_out_type = INT_TYPES[logwidth0 as usize].to_owned();
-                        let sum_type = sum_with_error(int_out_type.clone());
                         let err_value = || {
-                            let err_val = ConstError {
+                            ConstError {
                                 signal: 0,
                                 message: "Division by zero".to_string(),
-                            };
-                            Value::sum(1, [err_val.into()], sum_type.clone())
-                                .unwrap_or_else(|e| panic!("Invalid computed sum, {}", e))
+                            }
+                            .as_either(int_out_type.clone())
                         };
                         let nval = n.value_s();
                         let mval = m.value_u();
@@ -888,14 +867,12 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                         None
                     } else {
                         let int_out_type = INT_TYPES[logwidth0 as usize].to_owned();
-                        let sum_type = sum_with_error(int_out_type.clone());
                         let err_value = || {
-                            let err_val = ConstError {
+                            ConstError {
                                 signal: 0,
                                 message: "Division by zero".to_string(),
-                            };
-                            Value::sum(1, [err_val.into()], sum_type.clone())
-                                .unwrap_or_else(|e| panic!("Invalid computed sum, {}", e))
+                            }
+                            .as_either(int_out_type.clone())
                         };
                         let nval = n.value_s();
                         let mval = m.value_u();
@@ -1154,7 +1131,7 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                 },
             ),
         },
-        IntOpDef::itostring_u => Folder {
+        IntOpDef::is_to_u => Folder {
             folder: Box::new(
                 |type_args: &[TypeArg], consts: &[(IncomingPort, Value)]| -> ConstFoldResult {
                     let [arg] = type_args else {
@@ -1165,15 +1142,18 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                     if n0.log_width() != logwidth {
                         None
                     } else {
-                        Some(vec![(
-                            0.into(),
-                            Value::extension(ConstString::new(n0.value_u().to_string())),
-                        )])
+                        if n0.value_s() < 0 {
+                            panic!(
+                                "Cannot convert negative integer {} to unsigned.",
+                                n0.value_s()
+                            );
+                        }
+                        Some(vec![(0.into(), Value::extension(n0.clone()))])
                     }
                 },
             ),
         },
-        IntOpDef::itostring_s => Folder {
+        IntOpDef::iu_to_s => Folder {
             folder: Box::new(
                 |type_args: &[TypeArg], consts: &[(IncomingPort, Value)]| -> ConstFoldResult {
                     let [arg] = type_args else {
@@ -1184,10 +1164,13 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                     if n0.log_width() != logwidth {
                         None
                     } else {
-                        Some(vec![(
-                            0.into(),
-                            Value::extension(ConstString::new(n0.value_s().to_string())),
-                        )])
+                        if n0.value_s() < 0 {
+                            panic!(
+                                "Unsigned integer {} is too large to be converted to signed.",
+                                n0.value_u()
+                            );
+                        }
+                        Some(vec![(0.into(), Value::extension(n0.clone()))])
                     }
                 },
             ),

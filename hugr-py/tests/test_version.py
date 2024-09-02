@@ -1,4 +1,3 @@
-# from https://github.com/python-poetry/poetry/issues/144#issuecomment-877835259
 from pathlib import Path
 
 import toml  # type: ignore[import-untyped]
@@ -12,7 +11,7 @@ def test_versions_are_in_sync():
     path = Path(__file__).resolve().parents[1] / "pyproject.toml"
     with Path.open(path, "r") as f:
         pyproject = toml.loads(f.read())
-    pyproject_version = pyproject["tool"]["poetry"]["version"]
+    pyproject_version = pyproject["project"]["version"]
 
     package_init_version = hugr.__version__
 

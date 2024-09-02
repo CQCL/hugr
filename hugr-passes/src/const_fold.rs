@@ -11,16 +11,14 @@ use hugr_core::types::SumType;
 use hugr_core::Direction;
 use hugr_core::{
     builder::{DFGBuilder, Dataflow, DataflowHugr},
-    extension::{ConstFoldResult, ExtensionRegistry},
+    extension::{fold_out_row, ConstFoldResult, ExtensionRegistry},
     hugr::{
         hugrmut::HugrMut,
         rewrite::consts::{RemoveConst, RemoveLoadConstant},
         views::SiblingSubgraph,
     },
     ops::{OpType, Value},
-    type_row,
-    utils::sorted_consts,
-    Hugr, HugrView, IncomingPort, Node, SimpleReplacement,
+    type_row, Hugr, HugrView, IncomingPort, Node, SimpleReplacement,
 };
 
 use crate::validation::{ValidatePassError, ValidationLevel};
@@ -90,32 +88,10 @@ impl ConstantFoldPass {
     }
 }
 
-/// Tag some output constants with [`OutgoingPort`] inferred from the ordering.
-fn out_row(consts: impl IntoIterator<Item = Value>) -> ConstFoldResult {
-    let vec = consts
-        .into_iter()
-        .enumerate()
-        .map(|(i, c)| (i.into(), c))
-        .collect();
-    Some(vec)
-}
-
 /// For a given op and consts, attempt to evaluate the op.
 pub fn fold_leaf_op(op: &OpType, consts: &[(IncomingPort, Value)]) -> ConstFoldResult {
     let fold_result = match op {
-        OpType::Noop { .. } => out_row([consts.first()?.1.clone()]),
-        OpType::MakeTuple { .. } => {
-            out_row([Value::tuple(sorted_consts(consts).into_iter().cloned())])
-        }
-        OpType::UnpackTuple { .. } => {
-            let c = &consts.first()?.1;
-            let Some(vs) = c.as_tuple() else {
-                panic!("This op always takes a Tuple input.");
-            };
-            out_row(vs.iter().cloned())
-        }
-
-        OpType::Tag(t) => out_row([Value::sum(
+        OpType::Tag(t) => fold_out_row([Value::sum(
             t.tag,
             consts.iter().map(|(_, konst)| konst.clone()),
             SumType::new(t.variants.clone()),

@@ -1,7 +1,8 @@
+use crate::extension::prelude::MakeTuple;
 use crate::hugr::hugrmut::InsertionResult;
 use crate::hugr::views::HugrView;
 use crate::hugr::{NodeMetadata, ValidationError};
-use crate::ops::{self, MakeTuple, OpTag, OpTrait, OpType, Tag};
+use crate::ops::{self, OpTag, OpTrait, OpType, Tag};
 use crate::utils::collect_array;
 use crate::{IncomingPort, Node, OutgoingPort};
 
@@ -579,7 +580,7 @@ pub trait Dataflow: Container {
             .map(|&wire| self.get_wire_type(wire))
             .collect();
         let types = types?.into();
-        let make_op = self.add_dataflow_op(MakeTuple { tys: types }, values)?;
+        let make_op = self.add_dataflow_op(MakeTuple(types), values)?;
         Ok(make_op.out_wire(0))
     }
 

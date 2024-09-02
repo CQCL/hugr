@@ -5,10 +5,10 @@ import pytest
 import hugr.ops as ops
 import hugr.tys as tys
 import hugr.val as val
-from hugr.dfg import Dfg, _ancestral_sibling
-from hugr.function import Module
+from hugr.build.dfg import Dfg, _ancestral_sibling
+from hugr.build.function import Module
 from hugr.hugr import Hugr
-from hugr.node_port import Node, _SubPort
+from hugr.hugr.node_port import Node, _SubPort
 from hugr.ops import NoConcreteFunc
 from hugr.std.int import INT_T, DivMod, IntVal
 from hugr.std.logic import Not
@@ -65,11 +65,12 @@ def simple_id() -> Dfg:
     return h
 
 
-def test_simple_id():
-    validate(simple_id().hugr)
+def test_simple_id(snapshot):
+    hugr = simple_id().hugr
+    validate(hugr, snap=snapshot)
 
 
-def test_metadata():
+def test_metadata(snapshot):
     h = Dfg(tys.Bool)
     h.metadata["name"] = "simple_id"
 
@@ -77,10 +78,10 @@ def test_metadata():
     b = h.add_op(Not, b, metadata={"name": "not"})
 
     h.set_outputs(b)
-    validate(h.hugr)
+    validate(h.hugr, snap=snapshot)
 
 
-def test_multiport():
+def test_multiport(snapshot):
     h = Dfg(tys.Bool)
     (a,) = h.inputs()
     h.set_outputs(a, a)
@@ -100,19 +101,19 @@ def test_multiport():
     ]
 
     assert list(h.hugr.linked_ports(ou_n.inp(0))) == [in_n.out(0)]
-    validate(h.hugr)
+    validate(h.hugr, snap=snapshot)
 
 
-def test_add_op():
+def test_add_op(snapshot):
     h = Dfg(tys.Bool)
     (a,) = h.inputs()
     nt = h.add_op(Not, a)
     h.set_outputs(nt)
 
-    validate(h.hugr)
+    validate(h.hugr, snap=snapshot)
 
 
-def test_tuple():
+def test_tuple(snapshot):
     row = [tys.Bool, tys.Qubit]
     h = Dfg(*row)
     a, b = h.inputs()
@@ -120,7 +121,7 @@ def test_tuple():
     a, b = h.add(ops.UnpackTuple()(t))
     h.set_outputs(a, b)
 
-    validate(h.hugr)
+    validate(h.hugr, snap=snapshot)
 
     h1 = Dfg(*row)
     a, b = h1.inputs()
@@ -128,15 +129,15 @@ def test_tuple():
     a, b = h1.add_op(ops.UnpackTuple(), mt)[0, 1]
     h1.set_outputs(a, b)
 
-    assert h.hugr.to_serial() == h1.hugr.to_serial()
+    assert h.hugr._to_serial() == h1.hugr._to_serial()
 
 
-def test_multi_out():
+def test_multi_out(snapshot):
     h = Dfg(INT_T, INT_T)
     a, b = h.inputs()
     a, b = h.add(DivMod(a, b))
     h.set_outputs(a, b)
-    validate(h.hugr)
+    validate(h.hugr, snap=snapshot)
 
 
 def test_insert():
@@ -152,7 +153,7 @@ def test_insert():
     assert mapping == {new_h.root: Node(4)}
 
 
-def test_insert_nested():
+def test_insert_nested(snapshot):
     h1 = Dfg(tys.Bool)
     (a1,) = h1.inputs()
     nt = h1.add(Not(a1))
@@ -163,10 +164,10 @@ def test_insert_nested():
     nested = h.insert_nested(h1, a)
     h.set_outputs(nested)
     assert len(h.hugr.children(nested)) == 3
-    validate(h.hugr)
+    validate(h.hugr, snap=snapshot)
 
 
-def test_build_nested():
+def test_build_nested(snapshot):
     h = Dfg(tys.Bool)
     (a,) = h.inputs()
 
@@ -178,10 +179,10 @@ def test_build_nested():
     assert len(h.hugr.children(nested)) == 3
     h.set_outputs(nested)
 
-    validate(h.hugr)
+    validate(h.hugr, snap=snapshot)
 
 
-def test_build_inter_graph():
+def test_build_inter_graph(snapshot):
     h = Dfg(tys.Bool, tys.Bool)
     (a, b) = h.inputs()
     with h.add_nested() as nested:
@@ -190,7 +191,7 @@ def test_build_inter_graph():
 
     h.set_outputs(nested, b)
 
-    validate(h.hugr)
+    validate(h.hugr, snap=snapshot)
 
     assert _SubPort(h.input_node.out(-1)) in h.hugr._links
     assert h.hugr.num_outgoing(h.input_node) == 2  # doesn't count state order
@@ -275,7 +276,7 @@ def test_mono_function(direct_call: bool) -> None:
     validate(mod.hugr)
 
 
-def test_recursive_function() -> None:
+def test_recursive_function(snapshot) -> None:
     mod = Module()
 
     f_recursive = mod.define_function("recurse", [tys.Qubit])
@@ -283,7 +284,7 @@ def test_recursive_function() -> None:
     call = f_recursive.call(f_recursive, f_recursive.input_node[0])
     f_recursive.set_outputs(call)
 
-    validate(mod.hugr)
+    validate(mod.hugr, snap=snapshot)
 
 
 def test_invalid_recursive_function() -> None:
@@ -306,15 +307,6 @@ def test_higher_order() -> None:
     call = d.add(ops.CallIndirect()(f_val, q))[0]
     d.set_outputs(call)
 
-    validate(d.hugr)
-
-
-def test_lift() -> None:
-    d = Dfg(tys.Qubit)
-    d.parent_op._extension_delta = ["X"]
-    (q,) = d.inputs()
-    lift = d.add(ops.Lift("X")(q))
-    d.set_outputs(lift)
     validate(d.hugr)
 
 

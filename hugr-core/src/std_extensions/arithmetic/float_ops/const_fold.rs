@@ -12,9 +12,11 @@ pub(super) fn set_fold(op: &FloatOps, def: &mut OpDef) {
     use FloatOps::*;
 
     match op {
-        fmax | fmin | fadd | fsub | fmul | fdiv => def.set_constant_folder(BinaryFold::from_op(op)),
+        fmax | fmin | fadd | fsub | fmul | fdiv | fpow => {
+            def.set_constant_folder(BinaryFold::from_op(op))
+        }
         feq | fne | flt | fgt | fle | fge => def.set_constant_folder(CmpFold::from_op(*op)),
-        fneg | fabs | ffloor | fceil => def.set_constant_folder(UnaryFold::from_op(op)),
+        fneg | fabs | ffloor | fceil | fround => def.set_constant_folder(UnaryFold::from_op(op)),
         ftostring => def.set_constant_folder(ToStringFold::from_op(op)),
     }
 }
@@ -43,6 +45,7 @@ impl BinaryFold {
             fsub => std::ops::Sub::sub,
             fmul => std::ops::Mul::mul,
             fdiv => std::ops::Div::div,
+            fpow => f64::powf,
             _ => panic!("not binary op"),
         }))
     }
@@ -106,6 +109,7 @@ impl UnaryFold {
             fabs => f64::abs,
             ffloor => f64::floor,
             fceil => f64::ceil,
+            fround => f64::round,
             _ => panic!("not unary op."),
         }))
     }

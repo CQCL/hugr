@@ -14,16 +14,18 @@ repos:
         exclude: |
           (?x)^(
             specification/schema/.*|
-            .*.snap|
-            .*.snap.new|
+            .*\.snap|
+            .*\.snap\.new|
+            .*\.ambr|
             .release-please-manifest.json
           )$
       - id: trailing-whitespace
         exclude: |
           (?x)^(
             specification/schema/.*|
-            .*.snap|
-            .*.snap.new
+            .*\.snap|
+            .*\.ambr|
+            .*\.snap\.new
           )$
       - id: fix-byte-order-marker
       - id: mixed-line-ending
@@ -34,31 +36,24 @@ repos:
 
   - repo: local
     hooks:
-      - id: poetry-install
-        name: sync poetry deps
-        description: Ensure development tools are installed.
-        entry: poetry install --sync
-        language: system
-        files: poetry.lock
-        pass_filenames: false
       - id: ruff-format
         name: ruff format
         description: Format python code with `ruff`.
-        entry: poetry run ruff format
+        entry: uv run ruff format
         language: system
         files: \.py$
         pass_filenames: false
       - id: ruff-check
         name: ruff
         description: Check python code with `ruff`.
-        entry: poetry run ruff check --fix --exit-non-zero-on-fix
+        entry: uv run ruff check --fix --exit-non-zero-on-fix
         language: system
         files: \.py$
         pass_filenames: false
       - id: mypy-check
         name: mypy
         description: Check python code with `mypy`.
-        entry: poetry run mypy .
+        entry: uv run mypy .
         language: system
         files: \.py$
         pass_filenames: false
@@ -103,7 +98,7 @@ repos:
         # We need to rebuild `hugr-cli` without the `extension_inference` feature
         # to avoid test errors.
         # TODO: Remove this once the issue is fixed.
-        entry: sh -c "cargo build -p hugr-cli && poetry run pytest"
+        entry: sh -c "cargo build -p hugr-cli && uv run pytest"
         language: system
         files: \.py$
         pass_filenames: false

@@ -11,12 +11,14 @@ from typing import TYPE_CHECKING, TypeVar
 from typing_extensions import Self
 
 from hugr import ext, tys
+from hugr._serialization.serial_hugr import SerialHugr
 from hugr.hugr import Hugr
 from hugr.ops import AsExtOp, Command, DataflowOp, ExtOp, RegisteredOp
-from hugr.serialization.serial_hugr import SerialHugr
 from hugr.std.float import FLOAT_T
 
 if TYPE_CHECKING:
+    from syrupy.assertion import SnapshotAssertion
+
     from hugr.ops import ComWire
 
 QUANTUM_EXT = ext.Extension("pytest.quantum,", ext.Version(0, 1, 0))
@@ -127,10 +129,23 @@ def _base_command() -> list[str]:
 def mermaid(h: Hugr):
     """Render the Hugr as a mermaid diagram for debugging."""
     cmd = [*_base_command(), "mermaid", "-"]
-    _run_hugr_cmd(h.to_serial().to_json(), cmd)
+    _run_hugr_cmd(h._to_serial().to_json(), cmd)
 
 
-def validate(h: Hugr | ext.Package, roundtrip: bool = True):
+def validate(
+    h: Hugr | ext.Package,
+    *,
+    roundtrip: bool = True,
+    snap: SnapshotAssertion | None = None,
+):
+    """Validate a HUGR or package.
+
+    args:
+        h: The HUGR or package to validate.
+        roundtrip: Whether to roundtrip the HUGR through the CLI.
+        snapshot: A hugr render snapshot. If not None, it will be compared against the
+        rendered HUGR. Pass `--snapshot-update` to pytest to update the snapshot file.
+    """
     cmd = [*_base_command(), "validate", "-"]
     serial = h.to_json()
     _run_hugr_cmd(serial, cmd)
@@ -142,9 +157,15 @@ def validate(h: Hugr | ext.Package, roundtrip: bool = True):
         serial = h.to_json()
 
         starting_json = json.loads(serial)
-        h2 = Hugr.from_serial(SerialHugr.load_json(starting_json))
-        roundtrip_json = json.loads(h2.to_serial().to_json())
+        h2 = Hugr._from_serial(SerialHugr.load_json(starting_json))
+        roundtrip_json = json.loads(h2._to_serial().to_json())
         assert roundtrip_json == starting_json
+
+    if snap is not None and isinstance(h, Hugr):
+        dot = h.render_dot()
+        assert snap == dot.source
+        if os.environ.get("HUGR_RENDER_DOT"):
+            dot.pipe("svg")
 
 
 def _run_hugr_cmd(serial: str, cmd: list[str]):

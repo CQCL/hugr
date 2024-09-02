@@ -30,7 +30,7 @@ pub use type_def::{TypeDef, TypeDefBound};
 mod const_fold;
 pub mod prelude;
 pub mod simple_op;
-pub use const_fold::{ConstFold, ConstFoldResult, Folder};
+pub use const_fold::{fold_out_row, ConstFold, ConstFoldResult, Folder};
 pub use prelude::{PRELUDE, PRELUDE_REGISTRY};
 
 #[cfg(feature = "declarative")]

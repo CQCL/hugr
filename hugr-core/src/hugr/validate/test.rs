@@ -9,14 +9,14 @@ use crate::builder::{
     inout_sig, BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
     FunctionBuilder, HugrBuilder, ModuleBuilder, SubContainer,
 };
+use crate::extension::prelude::Noop;
 use crate::extension::prelude::{BOOL_T, PRELUDE, PRELUDE_ID, QB_T, USIZE_T};
 use crate::extension::{Extension, ExtensionSet, TypeDefBound, EMPTY_REG, PRELUDE_REGISTRY};
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::HugrMut;
 use crate::ops::dataflow::IOTrait;
 use crate::ops::handle::NodeHandle;
-use crate::ops::leaf::MakeTuple;
-use crate::ops::{self, Noop, OpType, Value};
+use crate::ops::{self, OpType, Value};
 use crate::std_extensions::logic::test::{and_op, or_op};
 use crate::std_extensions::logic::LogicOp;
 use crate::std_extensions::logic::{self};
@@ -35,7 +35,9 @@ const NAT: Type = crate::extension::prelude::USIZE_T;
 fn make_simple_hugr(copies: usize) -> (Hugr, Node) {
     let def_op: OpType = ops::FuncDefn {
         name: "main".into(),
-        signature: Signature::new(type_row![BOOL_T], vec![BOOL_T; copies]).into(),
+        signature: Signature::new(type_row![BOOL_T], vec![BOOL_T; copies])
+            .with_prelude()
+            .into(),
     }
     .into();
 
@@ -54,7 +56,7 @@ fn make_simple_hugr(copies: usize) -> (Hugr, Node) {
 fn add_df_children(b: &mut Hugr, parent: Node, copies: usize) -> (Node, Node, Node) {
     let input = b.add_node_with_parent(parent, ops::Input::new(type_row![BOOL_T]));
     let output = b.add_node_with_parent(parent, ops::Output::new(vec![BOOL_T; copies]));
-    let copy = b.add_node_with_parent(parent, Noop { ty: BOOL_T });
+    let copy = b.add_node_with_parent(parent, Noop(BOOL_T));
 
     b.connect(input, 0, copy, 0);
     for i in 0..copies {
@@ -100,16 +102,16 @@ fn invalid_root() {
 
 #[test]
 fn leaf_root() {
-    let leaf_op: OpType = Noop { ty: USIZE_T }.into();
+    let leaf_op: OpType = Noop(USIZE_T).into();
 
     let b = Hugr::new(leaf_op);
-    assert_eq!(b.validate(&EMPTY_REG), Ok(()));
+    assert_eq!(b.validate(&PRELUDE_REGISTRY), Ok(()));
 }
 
 #[test]
 fn dfg_root() {
     let dfg_op: OpType = ops::DFG {
-        signature: Signature::new_endo(type_row![BOOL_T]),
+        signature: Signature::new_endo(type_row![BOOL_T]).with_prelude(),
     }
     .into();
 
@@ -181,7 +183,7 @@ fn df_children_restrictions() {
         .unwrap();
 
     // Replace the output operation of the df subgraph with a copy
-    b.replace_op(output, Noop { ty: NAT }).unwrap();
+    b.replace_op(output, Noop(NAT)).unwrap();
     assert_matches!(
         b.validate(&EMPTY_REG),
         Err(ValidationError::InvalidInitialChild { parent, .. }) => assert_eq!(parent, def)
@@ -547,7 +549,7 @@ fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
         PolyFuncType::new(
             [BOUND],
             Signature::new(vec![], vec![list_of_var.clone()])
-                .with_extension_delta(collections::EXTENSION_NAME),
+                .with_extension_delta(collections::EXTENSION_ID),
         ),
     )?;
     let empty_list = Value::extension(collections::ListValue::new_empty(Type::new_var_use(
@@ -720,6 +722,7 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
                 vec![TypeParam::Extensions],
                 Signature::new(vec![utou(es.clone()), int_pair.clone()], int_pair.clone())
                     .with_extension_delta(EXT_ID)
+                    .with_prelude()
                     .with_extension_delta(es.clone()),
             ),
         )?;
@@ -740,13 +743,8 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
         let [f2] = cc.add_dataflow_op(op, [func, i2])?.outputs_arr();
         cc.finish_with_outputs([f1, f2])?;
         let res = c.finish_sub_container()?.outputs();
-        let tup = f.add_dataflow_op(
-            MakeTuple {
-                tys: type_row![USIZE_T; 2],
-            },
-            res,
-        )?;
-        f.finish_with_outputs(tup.outputs())?
+        let tup = f.make_tuple(res)?;
+        f.finish_with_outputs([tup])?
     };
 
     let reg = ExtensionRegistry::try_new([e, PRELUDE.to_owned()])?;
@@ -763,7 +761,7 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
     let call_ty = h.get_optype(call.node()).dataflow_signature().unwrap();
     let exp_fun_ty = Signature::new(vec![utou(PRELUDE_ID), int_pair.clone()], int_pair)
         .with_extension_delta(EXT_ID)
-        .with_extension_delta(PRELUDE_ID);
+        .with_prelude();
     assert_eq!(call_ty, exp_fun_ty);
     Ok(())
 }
@@ -961,10 +959,11 @@ mod extension_tests {
     use super::*;
     use crate::builder::handle::Outputs;
     use crate::builder::{BlockBuilder, BuildHandle, CFGBuilder, DFGWrapper, TailLoopBuilder};
+    use crate::extension::prelude::Lift;
+    use crate::extension::prelude::PRELUDE_ID;
     use crate::extension::ExtensionSet;
     use crate::macros::const_extension_ids;
     use crate::Wire;
-
     const_extension_ids! {
         const XA: ExtensionId = "A";
         const XB: ExtensionId = "BOOL_EXT";
@@ -997,13 +996,7 @@ mod extension_tests {
             },
         );
 
-        let lift = hugr.add_node_with_parent(
-            hugr.root(),
-            ops::Lift {
-                type_row: type_row![USIZE_T],
-                new_extension: XB,
-            },
-        );
+        let lift = hugr.add_node_with_parent(hugr.root(), Lift::new(type_row![USIZE_T], XB));
 
         hugr.connect(input, 0, lift, 0);
         hugr.connect(lift, 0, output, 0);
@@ -1015,7 +1008,7 @@ mod extension_tests {
                 parent: hugr.root(),
                 parent_extensions,
                 child: lift,
-                child_extensions: XB.into()
+                child_extensions: ExtensionSet::from_iter([PRELUDE_ID, XB]),
             }))
         );
     }
@@ -1058,7 +1051,7 @@ mod extension_tests {
     #[rstest]
     #[case(XA.into(), false)]
     #[case(ExtensionSet::new(), false)]
-    #[case(ExtensionSet::from_iter([XA, XB]), true)]
+    #[case(ExtensionSet::from_iter([XA, XB, PRELUDE_ID]), true)]
     fn conditional_extension_mismatch(
         #[case] parent_extensions: ExtensionSet,
         #[case] success: bool,
@@ -1075,11 +1068,15 @@ mod extension_tests {
 
         // First case with no delta should be ok in all cases. Second one may not be.
         let [_, child] = [None, Some(XB)].map(|case_ext| {
-            let case_exts = ExtensionSet::from_iter(case_ext.clone());
+            let case_exts = if let Some(ex) = &case_ext {
+                ExtensionSet::from_iter([ex.clone(), PRELUDE_ID])
+            } else {
+                ExtensionSet::new()
+            };
             let case = hugr.add_node_with_parent(
                 hugr.root(),
                 ops::Case {
-                    signature: Signature::new_endo(USIZE_T).with_extension_delta(case_exts.clone()),
+                    signature: Signature::new_endo(USIZE_T).with_extension_delta(case_exts),
                 },
             );
 
@@ -1098,13 +1095,8 @@ mod extension_tests {
             let res = match case_ext {
                 None => input,
                 Some(new_ext) => {
-                    let lift = hugr.add_node_with_parent(
-                        case,
-                        ops::Lift {
-                            type_row: type_row![USIZE_T],
-                            new_extension: new_ext,
-                        },
-                    );
+                    let lift =
+                        hugr.add_node_with_parent(case, Lift::new(type_row![USIZE_T], new_ext));
                     hugr.connect(input, 0, lift, 0);
                     lift
                 }
@@ -1121,7 +1113,7 @@ mod extension_tests {
                 parent: hugr.root(),
                 parent_extensions,
                 child,
-                child_extensions: XB.into(),
+                child_extensions: ExtensionSet::from_iter([XB, PRELUDE_ID]),
             }))
         };
         assert_eq!(result, expected);
@@ -1133,18 +1125,12 @@ mod extension_tests {
     fn bb_extension_mismatch<T>(
         #[case] dfg_fn: impl Fn(Type, ExtensionSet) -> DFGWrapper<Hugr, T>,
         #[case] make_pred: impl Fn(&mut DFGWrapper<Hugr, T>, Outputs) -> Result<Wire, BuildError>,
-        #[values((XA.into(), false), (ExtensionSet::new(), false), (ExtensionSet::from_iter([XA,XB]), true))]
+        #[values((ExtensionSet::from_iter([XA,PRELUDE_ID]), false), (PRELUDE_ID.into(), false), (ExtensionSet::from_iter([XA,XB,PRELUDE_ID]), true))]
         parent_exts_success: (ExtensionSet, bool),
     ) -> Result<(), BuildError> {
         let (parent_extensions, success) = parent_exts_success;
         let mut dfg = dfg_fn(USIZE_T, parent_extensions.clone());
-        let lift = dfg.add_dataflow_op(
-            ops::Lift {
-                type_row: USIZE_T.into(),
-                new_extension: XB,
-            },
-            dfg.input_wires(),
-        )?;
+        let lift = dfg.add_dataflow_op(Lift::new(USIZE_T.into(), XB), dfg.input_wires())?;
         let pred = make_pred(&mut dfg, lift.outputs())?;
         let root = dfg.hugr().root();
         let res = dfg.finish_prelude_hugr_with_outputs([pred]);
@@ -1158,7 +1144,7 @@ mod extension_tests {
                         parent: root,
                         parent_extensions,
                         child: lift.node(),
-                        child_extensions: XB.into()
+                        child_extensions: ExtensionSet::from_iter([XB, PRELUDE_ID])
                     }
                 )))
             );

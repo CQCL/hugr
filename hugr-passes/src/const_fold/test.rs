@@ -1,6 +1,8 @@
 use crate::const_fold::constant_fold_pass;
 use hugr_core::builder::{DFGBuilder, Dataflow, DataflowHugr};
-use hugr_core::extension::prelude::{sum_with_error, ConstError, ConstString, BOOL_T, STRING_TYPE};
+use hugr_core::extension::prelude::{
+    const_ok, sum_with_error, ConstError, ConstString, UnpackTuple, BOOL_T, ERROR_TYPE, STRING_TYPE,
+};
 use hugr_core::extension::{ExtensionRegistry, PRELUDE};
 use hugr_core::ops::Value;
 use hugr_core::std_extensions::arithmetic;
@@ -16,7 +18,7 @@ use lazy_static::lazy_static;
 
 use super::*;
 use hugr_core::builder::Container;
-use hugr_core::ops::{OpType, UnpackTuple};
+use hugr_core::ops::OpType;
 use hugr_core::std_extensions::arithmetic::conversions::ConvertOpDef;
 use hugr_core::std_extensions::arithmetic::float_ops::FloatOps;
 use hugr_core::std_extensions::arithmetic::float_types::{ConstF64, FLOAT64_TYPE};
@@ -118,15 +120,13 @@ fn test_big() {
 
     constant_fold_pass(&mut h, &reg);
 
-    let expected = Value::sum(0, [i2c(2).clone()], sum_type).unwrap();
+    let expected = const_ok(i2c(2).clone(), ERROR_TYPE);
     assert_fully_folded(&h, &expected);
 }
 
 #[test]
-#[cfg_attr(
-    feature = "extension_inference",
-    ignore = "inference fails for test graph, it shouldn't"
-)]
+#[ignore = "Waiting for `unwrap` operation"]
+// TODO: https://github.com/CQCL/hugr/issues/1486
 fn test_list_ops() -> Result<(), Box<dyn std::error::Error>> {
     use hugr_core::std_extensions::collections::{self, ListOp, ListValue};
 
@@ -136,28 +136,40 @@ fn test_list_ops() -> Result<(), Box<dyn std::error::Error>> {
         collections::EXTENSION.to_owned(),
     ])
     .unwrap();
-    let list: Value = ListValue::new(BOOL_T, [Value::false_val()]).into();
-    let mut build =
-        DFGBuilder::new(Signature::new(type_row![], vec![list.get_type().clone()])).unwrap();
+    let base_list: Value = ListValue::new(BOOL_T, [Value::false_val()]).into();
+    let mut build = DFGBuilder::new(Signature::new(
+        type_row![],
+        vec![base_list.get_type().clone()],
+    ))
+    .unwrap();
 
-    let list_wire = build.add_load_const(list.clone());
+    let list = build.add_load_const(base_list.clone());
 
-    let pop = build.add_dataflow_op(
-        ListOp::Pop.with_type(BOOL_T).to_extension_op(&reg).unwrap(),
-        [list_wire],
-    )?;
+    let [list, maybe_elem] = build
+        .add_dataflow_op(
+            ListOp::pop.with_type(BOOL_T).to_extension_op(&reg).unwrap(),
+            [list],
+        )?
+        .outputs_arr();
 
-    let push = build.add_dataflow_op(
-        ListOp::Push
-            .with_type(BOOL_T)
-            .to_extension_op(&reg)
-            .unwrap(),
-        pop.outputs(),
-    )?;
-    let mut h = build.finish_hugr_with_outputs(push.outputs(), &reg)?;
+    // FIXME: Unwrap the Option<BOOL_T>
+    let elem = maybe_elem;
+
+    let [list] = build
+        .add_dataflow_op(
+            ListOp::push
+                .with_type(BOOL_T)
+                .to_extension_op(&reg)
+                .unwrap(),
+            [list, elem],
+        )?
+        .outputs_arr();
+
+    let mut h = build.finish_hugr_with_outputs([list], &reg)?;
+
     constant_fold_pass(&mut h, &reg);
 
-    assert_fully_folded(&h, &list);
+    assert_fully_folded(&h, &base_list);
     Ok(())
 }
 
@@ -392,7 +404,10 @@ fn test_fold_inarrow<I: Copy, C: Into<Value>, E: std::fmt::Debug>(
     // val => the value to pass to the op
     // succeeds => whether to expect a int<to_log_width> variant or an error
     //   variant.
-    let sum_type = sum_with_error(INT_TYPES[to_log_width as usize].to_owned());
+
+    use hugr_core::extension::prelude::const_ok;
+    let elem_type = INT_TYPES[to_log_width as usize].to_owned();
+    let sum_type = sum_with_error(elem_type.clone());
     let mut build = DFGBuilder::new(noargfn(vec![sum_type.clone().into()])).unwrap();
     let x0 = build.add_load_const(mk_const(from_log_width, val).unwrap().into());
     let x1 = build
@@ -409,16 +424,15 @@ fn test_fold_inarrow<I: Copy, C: Into<Value>, E: std::fmt::Debug>(
     let mut h = build.finish_hugr_with_outputs(x1.outputs(), &reg).unwrap();
     constant_fold_pass(&mut h, &reg);
     lazy_static! {
-        static ref INARROW_ERROR_VALUE: Value = ConstError {
+        static ref INARROW_ERROR_VALUE: ConstError = ConstError {
             signal: 0,
             message: "Integer too large to narrow".to_string(),
-        }
-        .into();
+        };
     }
     let expected = if succeeds {
-        Value::sum(0, [mk_const(to_log_width, val).unwrap().into()], sum_type).unwrap()
+        const_ok(mk_const(to_log_width, val).unwrap().into(), ERROR_TYPE)
     } else {
-        Value::sum(1, [INARROW_ERROR_VALUE.clone()], sum_type).unwrap()
+        INARROW_ERROR_VALUE.clone().as_either(elem_type)
     };
     assert_fully_folded(&h, &expected);
 }
@@ -433,7 +447,7 @@ fn test_fold_itobool() {
     let mut build = DFGBuilder::new(noargfn(vec![BOOL_T])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(0, 1).unwrap()));
     let x1 = build
-        .add_dataflow_op(IntOpDef::itobool.without_log_width(), [x0])
+        .add_dataflow_op(ConvertOpDef::itobool.without_log_width(), [x0])
         .unwrap();
     let reg = ExtensionRegistry::try_new([
         PRELUDE.to_owned(),
@@ -456,7 +470,7 @@ fn test_fold_ifrombool() {
     let mut build = DFGBuilder::new(noargfn(vec![INT_TYPES[0].clone()])).unwrap();
     let x0 = build.add_load_const(Value::false_val());
     let x1 = build
-        .add_dataflow_op(IntOpDef::ifrombool.without_log_width(), [x0])
+        .add_dataflow_op(ConvertOpDef::ifrombool.without_log_width(), [x0])
         .unwrap();
     let reg = ExtensionRegistry::try_new([
         PRELUDE.to_owned(),
@@ -889,7 +903,8 @@ fn test_fold_idivmod_checked_u() {
     // x2 := idivmod_checked_u(x0, x1)
     // output x2 == error
     let intpair: TypeRowRV = vec![INT_TYPES[5].clone(), INT_TYPES[5].clone()].into();
-    let sum_type = sum_with_error(Type::new_tuple(intpair));
+    let elem_type = Type::new_tuple(intpair);
+    let sum_type = sum_with_error(elem_type.clone());
     let mut build = DFGBuilder::new(noargfn(vec![sum_type.clone().into()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 20).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 0).unwrap()));
@@ -903,16 +918,11 @@ fn test_fold_idivmod_checked_u() {
     .unwrap();
     let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
     constant_fold_pass(&mut h, &reg);
-    let expected = Value::sum(
-        1,
-        [ConstError {
-            signal: 0,
-            message: "Division by zero".to_string(),
-        }
-        .into()],
-        sum_type.clone(),
-    )
-    .unwrap();
+    let expected = ConstError {
+        signal: 0,
+        message: "Division by zero".to_string(),
+    }
+    .as_either(elem_type);
     assert_fully_folded(&h, &expected);
 }
 
@@ -951,7 +961,8 @@ fn test_fold_idivmod_checked_s() {
     // x2 := idivmod_checked_s(x0, x1)
     // output x2 == error
     let intpair: TypeRowRV = vec![INT_TYPES[5].clone(), INT_TYPES[5].clone()].into();
-    let sum_type = sum_with_error(Type::new_tuple(intpair));
+    let elem_type = Type::new_tuple(intpair);
+    let sum_type = sum_with_error(elem_type.clone());
     let mut build = DFGBuilder::new(noargfn(vec![sum_type.clone().into()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, -20).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 0).unwrap()));
@@ -965,16 +976,11 @@ fn test_fold_idivmod_checked_s() {
     .unwrap();
     let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
     constant_fold_pass(&mut h, &reg);
-    let expected = Value::sum(
-        1,
-        [ConstError {
-            signal: 0,
-            message: "Division by zero".to_string(),
-        }
-        .into()],
-        sum_type.clone(),
-    )
-    .unwrap();
+    let expected = ConstError {
+        signal: 0,
+        message: "Division by zero".to_string(),
+    }
+    .as_either(elem_type);
     assert_fully_folded(&h, &expected);
 }
 
@@ -1028,16 +1034,11 @@ fn test_fold_idiv_checked_u() {
     .unwrap();
     let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
     constant_fold_pass(&mut h, &reg);
-    let expected = Value::sum(
-        1,
-        [ConstError {
-            signal: 0,
-            message: "Division by zero".to_string(),
-        }
-        .into()],
-        sum_type.clone(),
-    )
-    .unwrap();
+    let expected = ConstError {
+        signal: 0,
+        message: "Division by zero".to_string(),
+    }
+    .as_either(INT_TYPES[5].to_owned());
     assert_fully_folded(&h, &expected);
 }
 
@@ -1084,16 +1085,11 @@ fn test_fold_imod_checked_u() {
     .unwrap();
     let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
     constant_fold_pass(&mut h, &reg);
-    let expected = Value::sum(
-        1,
-        [ConstError {
-            signal: 0,
-            message: "Division by zero".to_string(),
-        }
-        .into()],
-        sum_type.clone(),
-    )
-    .unwrap();
+    let expected = ConstError {
+        signal: 0,
+        message: "Division by zero".to_string(),
+    }
+    .as_either(INT_TYPES[5].to_owned());
     assert_fully_folded(&h, &expected);
 }
 
@@ -1140,16 +1136,11 @@ fn test_fold_idiv_checked_s() {
     .unwrap();
     let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
     constant_fold_pass(&mut h, &reg);
-    let expected = Value::sum(
-        1,
-        [ConstError {
-            signal: 0,
-            message: "Division by zero".to_string(),
-        }
-        .into()],
-        sum_type.clone(),
-    )
-    .unwrap();
+    let expected = ConstError {
+        signal: 0,
+        message: "Division by zero".to_string(),
+    }
+    .as_either(INT_TYPES[5].to_owned());
     assert_fully_folded(&h, &expected);
 }
 
@@ -1196,16 +1187,11 @@ fn test_fold_imod_checked_s() {
     .unwrap();
     let mut h = build.finish_hugr_with_outputs(x2.outputs(), &reg).unwrap();
     constant_fold_pass(&mut h, &reg);
-    let expected = Value::sum(
-        1,
-        [ConstError {
-            signal: 0,
-            message: "Division by zero".to_string(),
-        }
-        .into()],
-        sum_type.clone(),
-    )
-    .unwrap();
+    let expected = ConstError {
+        signal: 0,
+        message: "Division by zero".to_string(),
+    }
+    .as_either(INT_TYPES[5].to_owned());
     assert_fully_folded(&h, &expected);
 }
 
@@ -1446,7 +1432,7 @@ fn test_fold_itostring_u() {
     let mut build = DFGBuilder::new(noargfn(vec![STRING_TYPE])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 17).unwrap()));
     let x1 = build
-        .add_dataflow_op(IntOpDef::itostring_u.with_log_width(5), [x0])
+        .add_dataflow_op(ConvertOpDef::itostring_u.with_log_width(5), [x0])
         .unwrap();
     let reg = ExtensionRegistry::try_new([
         PRELUDE.to_owned(),
@@ -1468,7 +1454,7 @@ fn test_fold_itostring_s() {
     let mut build = DFGBuilder::new(noargfn(vec![STRING_TYPE])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, -17).unwrap()));
     let x1 = build
-        .add_dataflow_op(IntOpDef::itostring_s.with_log_width(5), [x0])
+        .add_dataflow_op(ConvertOpDef::itostring_s.with_log_width(5), [x0])
         .unwrap();
     let reg = ExtensionRegistry::try_new([
         PRELUDE.to_owned(),

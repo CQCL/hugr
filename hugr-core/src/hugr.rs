@@ -301,6 +301,8 @@ mod test {
     #[cfg(feature = "extension_inference")]
     use super::ValidationError;
     use super::{ExtensionError, Hugr, HugrMut, HugrView, Node};
+    use crate::extension::prelude::Lift;
+    use crate::extension::prelude::PRELUDE_ID;
     use crate::extension::{
         ExtensionId, ExtensionSet, EMPTY_REG, PRELUDE_REGISTRY, TO_BE_INFERRED,
     };
@@ -395,18 +397,21 @@ mod test {
         let parent = ExtensionSet::from_iter(parent).union(TO_BE_INFERRED.into());
         let (mut h, _) = build_ext_dfg(parent);
         h.infer_extensions(remove).unwrap();
-        assert_eq!(h, build_ext_dfg(result).0);
+        assert_eq!(h, build_ext_dfg(result.union(PRELUDE_ID.into())).0);
     }
 
     #[test]
     fn infer_removes_from_delta() {
-        let parent = ExtensionSet::from_iter([XA, XB]);
+        let parent = ExtensionSet::from_iter([XA, XB, PRELUDE_ID]);
         let mut h = build_ext_dfg(parent.clone()).0;
         let backup = h.clone();
         h.infer_extensions(false).unwrap();
         assert_eq!(h, backup); // did nothing
         h.infer_extensions(true).unwrap();
-        assert_eq!(h, build_ext_dfg(XA.into()).0);
+        assert_eq!(
+            h,
+            build_ext_dfg(ExtensionSet::from_iter([XA, PRELUDE_ID])).0
+        );
     }
 
     #[test]
@@ -420,7 +425,7 @@ mod test {
             parent: h.root(),
             parent_extensions: XB.into(),
             child: mid,
-            child_extensions: XA.into(),
+            child_extensions: ExtensionSet::from_iter([XA, PRELUDE_ID]),
         };
         #[cfg(feature = "extension_inference")]
         assert_eq!(
@@ -457,13 +462,7 @@ mod test {
                 types: ty.clone().into(),
             },
         );
-        let mid = h.add_node_with_parent(
-            p,
-            ops::Lift {
-                type_row: ty.into(),
-                new_extension: XA,
-            },
-        );
+        let mid = h.add_node_with_parent(p, Lift::new(ty.into(), XA));
         h.connect(inp, 0, mid, 0);
         h.connect(mid, 0, out, 0);
         mid
@@ -493,8 +492,9 @@ mod test {
         #[case] result: impl IntoIterator<Item = ExtensionId>,
     ) {
         let ty = Type::new_function(Signature::new_endo(type_row![]));
-        let grandparent = ExtensionSet::from_iter(grandparent);
-        let result = ExtensionSet::from_iter(result);
+        let grandparent = ExtensionSet::from_iter(grandparent).union(PRELUDE_ID.into());
+        let parent = ExtensionSet::from_iter(parent).union(PRELUDE_ID.into());
+        let result = ExtensionSet::from_iter(result).union(PRELUDE_ID.into());
         let root_ty = ops::Conditional {
             sum_rows: vec![type_row![]],
             other_inputs: ty.clone().into(),
@@ -505,8 +505,7 @@ mod test {
         let p = h.add_node_with_parent(
             h.root(),
             ops::Case {
-                signature: Signature::new_endo(ty.clone())
-                    .with_extension_delta(ExtensionSet::from_iter(parent)),
+                signature: Signature::new_endo(ty.clone()).with_extension_delta(parent),
             },
         );
         add_inliftout(&mut h, p, ty.clone());

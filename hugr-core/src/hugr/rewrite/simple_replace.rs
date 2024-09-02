@@ -293,7 +293,7 @@ pub(in crate::hugr::rewrite) mod test {
     /// ┤ H ├┤ X ├
     /// └───┘└───┘
     fn make_dfg_hugr() -> Result<Hugr, BuildError> {
-        let mut dfg_builder = DFGBuilder::new(endo_sig(type_row![QB, QB]))?;
+        let mut dfg_builder = DFGBuilder::new(endo_sig(type_row![QB, QB]).with_prelude())?;
         let [wire0, wire1] = dfg_builder.input_wires_arr();
         let wire2 = dfg_builder.add_dataflow_op(h_gate(), vec![wire0])?;
         let wire3 = dfg_builder.add_dataflow_op(h_gate(), vec![wire1])?;

@@ -113,13 +113,12 @@ impl Rewrite for RemoveConst {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    use crate::extension::prelude::PRELUDE_ID;
     use crate::{
         builder::{Container, Dataflow, HugrBuilder, ModuleBuilder, SubContainer},
-        extension::{
-            prelude::{ConstUsize, USIZE_T},
-            PRELUDE_REGISTRY,
-        },
-        ops::{handle::NodeHandle, MakeTuple, Value},
+        extension::{prelude::ConstUsize, PRELUDE_REGISTRY},
+        ops::{handle::NodeHandle, Value},
         type_row,
         types::Signature,
     };
@@ -128,15 +127,13 @@ mod test {
         let mut build = ModuleBuilder::new();
         let con_node = build.add_constant(Value::extension(ConstUsize::new(2)));
 
-        let mut dfg_build = build.define_function("main", Signature::new_endo(type_row![]))?;
+        let mut dfg_build = build.define_function(
+            "main",
+            Signature::new_endo(type_row![]).with_extension_delta(PRELUDE_ID.clone()),
+        )?;
         let load_1 = dfg_build.load_const(&con_node);
         let load_2 = dfg_build.load_const(&con_node);
-        let tup = dfg_build.add_dataflow_op(
-            MakeTuple {
-                tys: type_row![USIZE_T, USIZE_T],
-            },
-            [load_1, load_2],
-        )?;
+        let tup = dfg_build.make_tuple([load_1, load_2])?;
         dfg_build.finish_sub_container()?;
 
         let mut h = build.finish_prelude_hugr()?;

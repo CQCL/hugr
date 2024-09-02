@@ -20,6 +20,7 @@ in
       pkgs.llvmPackages_16.libllvm
       # cargo-llvm-cov is currently marked broken on nixpkgs unstable
       pkgs-stable.cargo-llvm-cov
+      pkgs.graphviz
     ] ++ lib.optionals
       pkgs.stdenv.isDarwin
       (with pkgs.darwin.apple_sdk; [
@@ -39,13 +40,14 @@ in
       export LLVM_PROFDATA="${pkgs.llvmPackages_16.libllvm}/bin/llvm-profdata"
     '' + lib.optionalString cfg.setupInShell ''
       just setup
+    '' + ''
+      source .venv/bin/activate
     '';
 
     languages.python = {
       enable = true;
-      poetry = {
+      uv = {
         enable = true;
-        activate.enable = true;
       };
     };
 

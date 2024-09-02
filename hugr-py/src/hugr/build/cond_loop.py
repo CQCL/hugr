@@ -11,17 +11,17 @@ from typing import TYPE_CHECKING
 from typing_extensions import Self
 
 from hugr import ops
+from hugr.build.base import ParentBuilder
+from hugr.build.dfg import DfBase
+from hugr.hugr.base import Hugr
 from hugr.tys import Sum
 
-from .dfg import _DfBase
-from .hugr import Hugr, ParentBuilder
-
 if TYPE_CHECKING:
-    from .node_port import Node, ToNode, Wire
-    from .tys import TypeRow
+    from hugr.hugr.node_port import Node, ToNode, Wire
+    from hugr.tys import TypeRow
 
 
-class Case(_DfBase[ops.Case]):
+class Case(DfBase[ops.Case]):
     """Dataflow graph builder for a case in a conditional."""
 
     _parent_cond: Conditional | None = None
@@ -202,7 +202,7 @@ class Conditional(ParentBuilder[ops.Conditional], AbstractContextManager):
 
 
 @dataclass
-class TailLoop(_DfBase[ops.TailLoop]):
+class TailLoop(DfBase[ops.TailLoop]):
     """Builder for a tail-controlled loop.
 
     Args:

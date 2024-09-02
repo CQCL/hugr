@@ -1,8 +1,8 @@
 import pytest
 
 from hugr import ops, tys, val
-from hugr.cond_loop import Conditional, ConditionalError, TailLoop
-from hugr.dfg import Dfg
+from hugr.build.cond_loop import Conditional, ConditionalError, TailLoop
+from hugr.build.dfg import Dfg
 from hugr.ext import Package
 from hugr.std.int import INT_T, IntVal
 

@@ -5,19 +5,19 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from . import ops
-from .dfg import Function, _DefinitionBuilder
-from .hugr import Hugr
+from hugr import ops
+from hugr.build.dfg import DefinitionBuilder, Function
+from hugr.hugr import Hugr
 
 if TYPE_CHECKING:
-    from .node_port import Node
-    from .tys import PolyFuncType, TypeBound, TypeRow
+    from hugr.hugr.node_port import Node
+    from hugr.tys import PolyFuncType, TypeBound, TypeRow
 
 __all__ = ["Function", "Module"]
 
 
 @dataclass
-class Module(_DefinitionBuilder[ops.Module]):
+class Module(DefinitionBuilder[ops.Module]):
     """Build a top-level HUGR module.
 
     Examples:
