@@ -1,3 +1,4 @@
+use ascent::lattice::BoundedLattice;
 use hugr_core::extension::prelude::{MakeTuple, UnpackTuple};
 use std::collections::HashMap;
 use std::hash::Hash;

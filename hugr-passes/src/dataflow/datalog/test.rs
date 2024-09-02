@@ -1,5 +1,6 @@
 use crate::const_fold2::HugrValueContext;
 
+use ascent::lattice::BoundedLattice;
 use hugr_core::{
     builder::{DFGBuilder, Dataflow, DataflowSubContainer, HugrBuilder, SubContainer},
     extension::prelude::{UnpackTuple, BOOL_T},

@@ -5,7 +5,7 @@ use std::{
     ops::{Index, IndexMut},
 };
 
-use ascent::lattice::Lattice;
+use ascent::lattice::{BoundedLattice, Lattice};
 use itertools::zip_eq;
 
 use super::partial_value::{AbstractValue, PartialValue};

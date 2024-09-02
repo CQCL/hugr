@@ -1,5 +1,7 @@
 #![allow(missing_docs)]
 
+use ascent::lattice::BoundedLattice;
+use ascent::Lattice;
 use itertools::zip_eq;
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -176,15 +178,6 @@ impl<V> From<PartialSum<V>> for PartialValue<V> {
 impl<V: AbstractValue> PartialValue<V> {
     // const BOTTOM: Self = Self::Bottom;
     // const BOTTOM_REF: &'static Self = &Self::BOTTOM;
-
-    // fn initialised(&self) -> bool {
-    //     !self.is_top()
-    // }
-
-    // fn is_top(&self) -> bool {
-    //     self == &PartialValue::Top
-    // }
-
     fn assert_invariants(&self) {
         match self {
             Self::PartialSum(ps) => {
@@ -249,7 +242,42 @@ impl<V: AbstractValue> PartialValue<V> {
         self
     }
 
-    pub fn join_mut(&mut self, other: Self) -> bool {
+    pub fn variant(tag: usize, values: impl IntoIterator<Item = Self>) -> Self {
+        PartialSum::variant(tag, values).into()
+    }
+
+    pub fn unit() -> Self {
+        Self::variant(0, [])
+    }
+
+    pub fn variant_values(&self, tag: usize, len: usize) -> Option<Vec<PartialValue<V>>> {
+        let vals = match self {
+            PartialValue::Bottom => return None,
+            PartialValue::Value(v) => v
+                .as_sum()
+                .filter(|(variant, _)| tag == *variant)?
+                .1
+                .map(PartialValue::Value)
+                .collect(),
+            PartialValue::PartialSum(ps) => ps.variant_values(tag, len)?,
+            PartialValue::Top => vec![PartialValue::Top; len],
+        };
+        assert_eq!(vals.len(), len);
+        Some(vals)
+    }
+
+    pub fn supports_tag(&self, tag: usize) -> bool {
+        match self {
+            PartialValue::Bottom => false,
+            PartialValue::Value(v) => v.as_sum().is_some_and(|(v, _)| v == tag),
+            PartialValue::PartialSum(ps) => ps.supports_tag(tag),
+            PartialValue::Top => true,
+        }
+    }
+}
+
+impl<V: AbstractValue> Lattice for PartialValue<V> {
+    fn join_mut(&mut self, other: Self) -> bool {
         // println!("join {self:?}\n{:?}", &other);
         let changed = match (&*self, other) {
             (Self::Top, _) => false,
@@ -301,12 +329,12 @@ impl<V: AbstractValue> PartialValue<V> {
         changed
     }
 
-    pub fn meet(mut self, other: Self) -> Self {
+    fn meet(mut self, other: Self) -> Self {
         self.meet_mut(other);
         self
     }
 
-    pub fn meet_mut(&mut self, other: Self) -> bool {
+    fn meet_mut(&mut self, other: Self) -> bool {
         let changed = match (&*self, other) {
             (Self::Bottom, _) => false,
             (_, other @ Self::Bottom) => {
@@ -356,46 +384,15 @@ impl<V: AbstractValue> PartialValue<V> {
         // }
         changed
     }
+}
 
-    pub fn top() -> Self {
+impl<V: AbstractValue> BoundedLattice for PartialValue<V> {
+    fn top() -> Self {
         Self::Top
     }
 
-    pub fn bottom() -> Self {
+    fn bottom() -> Self {
         Self::Bottom
-    }
-
-    pub fn variant(tag: usize, values: impl IntoIterator<Item = Self>) -> Self {
-        PartialSum::variant(tag, values).into()
-    }
-
-    pub fn unit() -> Self {
-        Self::variant(0, [])
-    }
-
-    pub fn variant_values(&self, tag: usize, len: usize) -> Option<Vec<PartialValue<V>>> {
-        let vals = match self {
-            PartialValue::Bottom => return None,
-            PartialValue::Value(v) => v
-                .as_sum()
-                .filter(|(variant, _)| tag == *variant)?
-                .1
-                .map(PartialValue::Value)
-                .collect(),
-            PartialValue::PartialSum(ps) => ps.variant_values(tag, len)?,
-            PartialValue::Top => vec![PartialValue::Top; len],
-        };
-        assert_eq!(vals.len(), len);
-        Some(vals)
-    }
-
-    pub fn supports_tag(&self, tag: usize) -> bool {
-        match self {
-            PartialValue::Bottom => false,
-            PartialValue::Value(v) => v.as_sum().is_some_and(|(v, _)| v == tag),
-            PartialValue::PartialSum(ps) => ps.supports_tag(tag),
-            PartialValue::Top => true,
-        }
     }
 }
 
@@ -420,6 +417,7 @@ impl<V: PartialEq> PartialOrd for PartialValue<V> {
 mod test {
     use std::sync::Arc;
 
+    use ascent::{lattice::BoundedLattice, Lattice};
     use itertools::{zip_eq, Either, Itertools as _};
     use proptest::prelude::*;
 

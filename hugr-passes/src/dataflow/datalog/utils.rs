@@ -1,35 +1,5 @@
-use ascent::lattice::{BoundedLattice, Lattice};
-
 use super::super::partial_value::{AbstractValue, PartialValue};
 use hugr_core::{types::Signature, HugrView, IncomingPort, Node, OutgoingPort};
-
-impl<V: AbstractValue> Lattice for PartialValue<V> {
-    fn meet(self, other: Self) -> Self {
-        self.meet(other)
-    }
-
-    fn meet_mut(&mut self, other: Self) -> bool {
-        self.meet_mut(other)
-    }
-
-    fn join(self, other: Self) -> Self {
-        self.join(other)
-    }
-
-    fn join_mut(&mut self, other: Self) -> bool {
-        self.join_mut(other)
-    }
-}
-
-impl<V: AbstractValue> BoundedLattice for PartialValue<V> {
-    fn bottom() -> Self {
-        Self::bottom()
-    }
-
-    fn top() -> Self {
-        Self::top()
-    }
-}
 
 pub(super) fn input_count(h: &impl HugrView, n: Node) -> usize {
     h.signature(n)
