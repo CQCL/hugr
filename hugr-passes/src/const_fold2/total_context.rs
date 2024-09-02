@@ -2,7 +2,9 @@ use std::hash::Hash;
 
 use hugr_core::{ops::OpTrait, Hugr, HugrView, IncomingPort, Node, OutgoingPort, PortIndex};
 
-use super::datalog::{AbstractValue, DFContext, FromSum, PartialValue, ValueRow};
+use super::datalog::DFContext;
+use super::partial_value::{AbstractValue, FromSum, PartialValue};
+use super::ValueRow;
 
 /// A simpler interface like [DFContext] but where the context only cares about
 /// values that are completely known (in the lattice `V`)

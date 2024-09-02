@@ -9,7 +9,7 @@ use hugr_core::{
     types::{Signature, SumType, Type, TypeRow},
 };
 
-use super::partial_value::PartialValue;
+use super::super::partial_value::PartialValue;
 
 use super::*;
 

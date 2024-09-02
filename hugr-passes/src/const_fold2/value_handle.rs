@@ -6,7 +6,7 @@ use hugr_core::ops::Value;
 use hugr_core::types::{ConstTypeError, Type};
 use hugr_core::Node;
 
-use super::datalog::{AbstractValue, FromSum};
+use super::partial_value::{AbstractValue, FromSum};
 
 mod context;
 pub use context::HugrValueContext;

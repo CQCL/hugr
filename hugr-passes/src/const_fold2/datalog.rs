@@ -6,18 +6,17 @@ use std::hash::Hash;
 use hugr_core::ops::{OpType, Value};
 use hugr_core::{Hugr, HugrView, IncomingPort, Node, OutgoingPort, PortIndex as _, Wire};
 
-mod partial_value;
 mod utils;
 
 // TODO separate this into its own analysis?
 use utils::TailLoopTermination;
 
-pub use partial_value::{AbstractValue, FromSum, PartialSum, PartialValue};
-pub use utils::ValueRow;
-type PV<V> = partial_value::PartialValue<V>;
+use super::partial_value::AbstractValue;
+use super::value_row::ValueRow;
+type PV<V> = super::partial_value::PartialValue<V>;
 
 pub trait DFContext<V>: Clone + Eq + Hash + std::ops::Deref<Target = Hugr> {
-    fn interpret_leaf_op(&self, node: Node, ins: &[PartialValue<V>]) -> Option<ValueRow<V>>;
+    fn interpret_leaf_op(&self, node: Node, ins: &[PV<V>]) -> Option<ValueRow<V>>;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -63,8 +62,8 @@ ascent::ascent! {
         out_wire_value(c, m, op, v);
 
 
-    node_in_value_row(c, n, utils::bottom_row(c.as_ref(), *n)) <-- node(c, n);
-    node_in_value_row(c, n, utils::singleton_in_row(c.as_ref(), n, p, v.clone())) <-- in_wire_value(c, n, p, v);
+    node_in_value_row(c, n, ValueRow::new(utils::input_count(c.as_ref(), *n))) <-- node(c, n);
+    node_in_value_row(c, n, ValueRow::single_known(c.signature(*n).unwrap().input.len(), p.index(), v.clone())) <-- in_wire_value(c, n, p, v);
 
     out_wire_value(c, n, p, v) <--
        node(c, n),
