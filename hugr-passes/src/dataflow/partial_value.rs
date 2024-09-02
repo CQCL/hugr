@@ -1,5 +1,3 @@
-#![allow(missing_docs)]
-
 use ascent::lattice::BoundedLattice;
 use ascent::Lattice;
 use itertools::zip_eq;

@@ -179,7 +179,7 @@ pub struct Machine<V: AbstractValue, C: DFContext<V>>(
 /// Usage:
 /// 1. [Self::new()]
 /// 2. Zero or more [Self::propolutate_out_wires] with initial values
-/// 3. Exactly one [Self::run_hugr] to do the analysis
+/// 3. Exactly one [Self::run] to do the analysis
 /// 4. Results then available via [Self::read_out_wire_partial_value] and [Self::read_out_wire_value]
 impl<V: AbstractValue, C: DFContext<V>> Machine<V, C> {
     pub fn new() -> Self {

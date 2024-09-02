@@ -1,7 +1,7 @@
 //! Dataflow analysis of Hugrs.
 
 mod datalog;
-pub use datalog::Machine;
+pub use datalog::{DFContext, Machine};
 
 mod partial_value;
 pub use partial_value::{AbstractValue, PartialValue};
