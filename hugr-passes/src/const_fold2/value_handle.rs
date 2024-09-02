@@ -1,4 +1,5 @@
-use std::hash::{DefaultHasher, Hash, Hasher};
+use std::collections::hash_map::DefaultHasher; // Moves into std::hash in Rust 1.76.
+use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
 use hugr_core::ops::constant::{CustomConst, Sum};

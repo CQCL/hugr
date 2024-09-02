@@ -17,7 +17,7 @@ impl<V: AbstractValue, C: DFContext<V>> Default for Machine<V, C> {
 }
 
 /// Usage:
-/// 1. [Self::new()]
+/// 1. Get a new instance via [Self::default()]
 /// 2. Zero or more [Self::propolutate_out_wires] with initial values
 /// 3. Exactly one [Self::run] to do the analysis
 /// 4. Results then available via [Self::read_out_wire_partial_value] and [Self::read_out_wire_value]
