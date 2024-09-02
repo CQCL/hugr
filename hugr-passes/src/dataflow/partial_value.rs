@@ -122,7 +122,7 @@ impl<V: PartialEq> PartialOrd for PartialSum<V> {
             return None;
         }
         for (k, lhs) in &self.0 {
-            let Some(rhs) = other.0.get(&k) else {
+            let Some(rhs) = other.0.get(k) else {
                 unreachable!()
             };
             match lhs.partial_cmp(rhs) {
@@ -192,8 +192,10 @@ impl<V: AbstractValue> PartialValue<V> {
         self.assert_invariants();
         match &*self {
             Self::Top => return false,
-            Self::Value(v) if v == &vh => return false,
             Self::Value(v) => {
+                if v == &vh {
+                    return false;
+                };
                 *self = Self::Top;
             }
             Self::PartialSum(_) => match vh.into() {
@@ -277,7 +279,7 @@ impl<V: AbstractValue> PartialValue<V> {
 impl<V: AbstractValue> Lattice for PartialValue<V> {
     fn join_mut(&mut self, other: Self) -> bool {
         // println!("join {self:?}\n{:?}", &other);
-        let changed = match (&*self, other) {
+        match (&*self, other) {
             (Self::Top, _) => false,
             (_, other @ Self::Top) => {
                 *self = other;
@@ -316,15 +318,7 @@ impl<V: AbstractValue> Lattice for PartialValue<V> {
                 self.join_mut_value_handle(old_self)
             }
             (_, Self::Value(h)) => self.join_mut_value_handle(h),
-            // (new_self, _) => {
-            //     **new_self = Self::Top;
-            //     false
-            // }
-        };
-        // if changed {
-        // println!("join new self: {:?}", s);
-        // }
-        changed
+        }
     }
 
     fn meet(mut self, other: Self) -> Self {
@@ -333,7 +327,7 @@ impl<V: AbstractValue> Lattice for PartialValue<V> {
     }
 
     fn meet_mut(&mut self, other: Self) -> bool {
-        let changed = match (&*self, other) {
+        match (&*self, other) {
             (Self::Bottom, _) => false,
             (_, other @ Self::Bottom) => {
                 *self = other;
@@ -372,15 +366,7 @@ impl<V: AbstractValue> Lattice for PartialValue<V> {
                 self.meet_mut_value_handle(old_self)
             }
             (Self::PartialSum(_), Self::Value(h)) => self.meet_mut_value_handle(h),
-            // (new_self, _) => {
-            //     **new_self = Self::Bottom;
-            //     false
-            // }
-        };
-        // if changed {
-        // println!("join new self: {:?}", s);
-        // }
-        changed
+        }
     }
 }
 
@@ -519,8 +505,7 @@ mod test {
     }
 
     impl TestSumType {
-        const UNIT: TestSumLeafType = TestSumLeafType::Unit;
-
+        #[allow(unused)] // ALAN ?
         fn leaf(v: Type) -> Self {
             TestSumType::Leaf(TestSumLeafType::Int(v))
         }
@@ -543,6 +528,7 @@ mod test {
             }
         }
 
+        #[allow(unused)] // ALAN ?
         fn is_leaf(&self) -> bool {
             self.depth() == 0
         }

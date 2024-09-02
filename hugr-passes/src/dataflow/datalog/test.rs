@@ -22,7 +22,7 @@ fn test_make_tuple() {
     let v3 = builder.make_tuple([v1, v2]).unwrap();
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
-    let mut machine = Machine::new();
+    let mut machine = Machine::default();
     machine.run(HugrValueContext::new(&hugr));
 
     let x = machine.read_out_wire_value(&hugr, v3).unwrap();
@@ -41,7 +41,7 @@ fn test_unpack_tuple() {
         .outputs_arr();
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
-    let mut machine = Machine::new();
+    let mut machine = Machine::default();
     machine.run(HugrValueContext::new(&hugr));
 
     let o1_r = machine.read_out_wire_value(&hugr, o1).unwrap();
@@ -60,7 +60,7 @@ fn test_unpack_const() {
         .outputs_arr();
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
-    let mut machine = Machine::new();
+    let mut machine = Machine::default();
     machine.run(HugrValueContext::new(&hugr));
 
     let o_r = machine.read_out_wire_value(&hugr, o).unwrap();
@@ -86,7 +86,7 @@ fn test_tail_loop_never_iterates() {
     let [tl_o] = tail_loop.outputs_arr();
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
-    let mut machine = Machine::new();
+    let mut machine = Machine::default();
     machine.run(HugrValueContext::new(&hugr));
     // dbg!(&machine.tail_loop_io_node);
     // dbg!(&machine.out_wire_value);
@@ -118,7 +118,7 @@ fn test_tail_loop_always_iterates() {
     let [tl_o1, tl_o2] = tail_loop.outputs_arr();
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
-    let mut machine = Machine::new();
+    let mut machine = Machine::default();
     machine.run(HugrValueContext::new(&hugr));
 
     let o_r1 = machine.read_out_wire_partial_value(tl_o1).unwrap();
@@ -168,15 +168,15 @@ fn test_tail_loop_iterates_twice() {
     // we should be able to propagate their values
     let [o_w1, o_w2] = tail_loop.outputs_arr();
 
-    let mut machine = Machine::new();
+    let mut machine = Machine::default();
     machine.run(HugrValueContext::new(&hugr));
     // dbg!(&machine.tail_loop_io_node);
     // dbg!(&machine.out_wire_value);
 
     // TODO these hould be the propagated values for now they will bt join(true,false)
-    let o_r1 = machine.read_out_wire_partial_value(o_w1).unwrap();
+    let _ = machine.read_out_wire_partial_value(o_w1).unwrap();
     // assert_eq!(o_r1, PartialValue::top());
-    let o_r2 = machine.read_out_wire_partial_value(o_w2).unwrap();
+    let _ = machine.read_out_wire_partial_value(o_w2).unwrap();
     // assert_eq!(o_r2, Value::true_val());
     assert_eq!(
         TailLoopTermination::Top,
@@ -212,7 +212,7 @@ fn conditional() {
     let case2 = case2_b.finish_with_outputs([false_w, c2a]).unwrap();
 
     let case3_b = cond_builder.case_builder(2).unwrap();
-    let [c3_1, c3_2] = case3_b.input_wires_arr();
+    let [c3_1, _c3_2] = case3_b.input_wires_arr();
     let case3 = case3_b.finish_with_outputs([c3_1, false_w]).unwrap();
 
     let cond = cond_builder.finish_sub_container().unwrap();
@@ -221,7 +221,7 @@ fn conditional() {
 
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
-    let mut machine = Machine::new();
+    let mut machine = Machine::default();
     let arg_pv =
         PartialValue::variant(1, []).join(PartialValue::variant(2, [PartialValue::variant(0, [])]));
     machine.propolutate_out_wires([(arg_w, arg_pv.into())]);

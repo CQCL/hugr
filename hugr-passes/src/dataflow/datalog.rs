@@ -1,3 +1,9 @@
+#![allow(
+    clippy::clone_on_copy,
+    clippy::unused_enumerate_index,
+    clippy::collapsible_if
+)]
+
 use ascent::lattice::BoundedLattice;
 use hugr_core::extension::prelude::{MakeTuple, UnpackTuple};
 use std::collections::HashMap;
@@ -149,18 +155,17 @@ fn propagate_leaf_op<V: AbstractValue>(
         // Handle basics here. I guess (given the current interface) we could allow
         // DFContext to handle these but at the least we'd want these impls to be
         // easily available for reuse.
-        op if op.cast::<MakeTuple>().is_some() => Some(ValueRow::from_iter([PV::variant(
-            0,
-            ins.into_iter().cloned(),
-        )])),
+        op if op.cast::<MakeTuple>().is_some() => {
+            Some(ValueRow::from_iter([PV::variant(0, ins.iter().cloned())]))
+        }
         op if op.cast::<UnpackTuple>().is_some() => {
-            let [tup] = ins.into_iter().collect::<Vec<_>>().try_into().unwrap();
+            let [tup] = ins.iter().collect::<Vec<_>>().try_into().unwrap();
             tup.variant_values(0, utils::value_outputs(c.as_ref(), n).count())
                 .map(ValueRow::from_iter)
         }
         OpType::Tag(t) => Some(ValueRow::from_iter([PV::variant(
             t.tag,
-            ins.into_iter().cloned(),
+            ins.iter().cloned(),
         )])),
         OpType::Input(_) | OpType::Output(_) => None, // handled by parent
         // It'd be nice to convert these to [(IncomingPort, Value)] to pass to the context,
@@ -170,11 +175,17 @@ fn propagate_leaf_op<V: AbstractValue>(
     }
 }
 
-// TODO This should probably be called 'Analyser' or something
 pub struct Machine<V: AbstractValue, C: DFContext<V>>(
     AscentProgram<V, C>,
     Option<HashMap<Wire, PV<V>>>,
 );
+
+/// derived-Default requires the context to be Defaultable, which is unnecessary
+impl<V: AbstractValue, C: DFContext<V>> Default for Machine<V, C> {
+    fn default() -> Self {
+        Self(Default::default(), None)
+    }
+}
 
 /// Usage:
 /// 1. [Self::new()]
@@ -182,10 +193,6 @@ pub struct Machine<V: AbstractValue, C: DFContext<V>>(
 /// 3. Exactly one [Self::run] to do the analysis
 /// 4. Results then available via [Self::read_out_wire_partial_value] and [Self::read_out_wire_value]
 impl<V: AbstractValue, C: DFContext<V>> Machine<V, C> {
-    pub fn new() -> Self {
-        Self(Default::default(), None)
-    }
-
     pub fn propolutate_out_wires(&mut self, wires: impl IntoIterator<Item = (Wire, PV<V>)>) {
         assert!(self.1.is_none());
         self.0

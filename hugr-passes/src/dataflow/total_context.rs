@@ -74,11 +74,11 @@ impl<V: AbstractValue> PartialSum<V> {
         if v.len() != r.len() {
             return Err(self);
         }
-        match zip_eq(v.into_iter(), r.into_iter())
+        match zip_eq(v, r.iter())
             .map(|(v, t)| v.clone().try_into_value(t))
             .collect::<Result<Vec<_>, _>>()
         {
-            Ok(vs) => V2::try_new_sum(*k, vs, &st).map_err(|_| self),
+            Ok(vs) => V2::try_new_sum(*k, vs, st).map_err(|_| self),
             Err(_) => Err(self),
         }
     }
@@ -90,7 +90,7 @@ impl<V: AbstractValue, T: TotalContext<V>> DFContext<V> for T {
         let sig = op.dataflow_signature()?;
         let known_ins = sig
             .input_types()
-            .into_iter()
+            .iter()
             .enumerate()
             .zip(ins.iter())
             .filter_map(|((i, ty), pv)| {

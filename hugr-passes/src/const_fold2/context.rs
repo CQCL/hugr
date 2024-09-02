@@ -83,10 +83,7 @@ impl<H: HugrView> TotalContext<ValueHandle> for HugrValueContext<H> {
                 )]
             }
             OpType::ExtensionOp(op) => {
-                let ins = ins
-                    .into_iter()
-                    .map(|(p, v)| (*p, v.clone()))
-                    .collect::<Vec<_>>();
+                let ins = ins.iter().map(|(p, v)| (*p, v.clone())).collect::<Vec<_>>();
                 op.constant_fold(&ins).map_or(Vec::new(), |outs| {
                     outs.into_iter()
                         .map(|(p, v)| (p, ValueHandle::new(ValueKey::Node(n), Arc::new(v))))
