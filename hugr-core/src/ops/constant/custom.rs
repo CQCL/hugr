@@ -88,9 +88,9 @@ pub trait CustomConst:
     fn get_type(&self) -> Type;
 }
 
-/// Prerequisite for `CustomConst`. Allows to declare a custom hash function, but the easiest
-/// options are either to `impl TryHash for ... {}` to declare "not hashable", or else
-/// to implement (or derive) [Hash].
+/// Prerequisite for `CustomConst`. Allows to declare a custom hash function,
+/// but the easiest options are either to `impl TryHash for ... {}` to indicate
+/// "not hashable", or else to implement/derive [Hash].
 pub trait TryHash {
     /// Hashes the value, if possible; else return `false` without mutating the `Hasher`.
     /// This relates with [CustomConst::equal_consts] just like [Hash] with [Eq]:
@@ -101,8 +101,7 @@ pub trait TryHash {
     /// * `equal_consts` always returning `false`, or
     /// * `try_hash` always behaving the same (e.g. returning `false`, as it does by default)
     ///
-    /// Note: this uses `dyn` rather than being parametrized by `<H: Hasher>` so that we can
-    /// still use `dyn CustomConst`.
+    /// Note: uses `dyn` rather than being parametrized by `<H: Hasher>` to be object-safe.
     fn try_hash(&self, _state: &mut dyn Hasher) -> bool {
         false
     }
