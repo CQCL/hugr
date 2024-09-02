@@ -2,7 +2,7 @@ use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::sync::Arc;
 
-use hugr_core::ops::{CustomOp, OpType, Value};
+use hugr_core::ops::{OpType, Value};
 use hugr_core::{Hugr, HugrView, IncomingPort, Node, OutgoingPort};
 
 use super::{ValueHandle, ValueKey};
@@ -83,7 +83,7 @@ impl<H: HugrView> DFContext<ValueHandle> for HugrValueContext<H> {
                     ValueHandle::new(const_node.into(), Arc::new(const_op.value().clone())),
                 )]
             }
-            OpType::CustomOp(CustomOp::Extension(op)) => {
+            OpType::ExtensionOp(op) => {
                 let ins = ins
                     .into_iter()
                     .map(|(p, v)| (*p, v.clone()))

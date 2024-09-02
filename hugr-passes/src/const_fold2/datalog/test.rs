@@ -2,8 +2,9 @@ use crate::const_fold2::value_handle::HugrValueContext;
 
 use hugr_core::{
     builder::{DFGBuilder, Dataflow, DataflowSubContainer, HugrBuilder, SubContainer},
-    extension::{prelude::BOOL_T, ExtensionSet, EMPTY_REG},
-    ops::{handle::NodeHandle, OpTrait, UnpackTuple, Value},
+    extension::prelude::{UnpackTuple, BOOL_T},
+    extension::{ExtensionSet, EMPTY_REG},
+    ops::{handle::NodeHandle, OpTrait, Value},
     type_row,
     types::{Signature, SumType, Type, TypeRow},
 };

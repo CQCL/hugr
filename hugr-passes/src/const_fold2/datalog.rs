@@ -1,4 +1,5 @@
 use ascent::lattice::BoundedLattice;
+use hugr_core::extension::prelude::{MakeTuple, UnpackTuple};
 use std::collections::HashMap;
 use std::hash::Hash;
 
@@ -162,11 +163,11 @@ fn propagate_leaf_op<V: AbstractValue>(
         // Handle basics here. I guess (given the current interface) we could allow
         // DFContext to handle these but at the least we'd want these impls to be
         // easily available for reuse.
-        OpType::MakeTuple(_) => Some(ValueRow::from_iter([PV::variant(
+        op if op.cast::<MakeTuple>().is_some() => Some(ValueRow::from_iter([PV::variant(
             0,
             ins.into_iter().cloned(),
         )])),
-        OpType::UnpackTuple(_) => {
+        op if op.cast::<UnpackTuple>().is_some() => {
             let [tup] = ins.into_iter().collect::<Vec<_>>().try_into().unwrap();
             tup.variant_values(0, utils::value_outputs(c.hugr(), n).count())
                 .map(ValueRow::from_iter)

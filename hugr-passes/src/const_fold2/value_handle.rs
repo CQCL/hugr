@@ -57,7 +57,7 @@ impl ValueKey {
 
     pub fn try_new(cst: impl CustomConst) -> Option<Self> {
         let mut hasher = DefaultHasher::new();
-        cst.maybe_hash(&mut hasher).then(|| {
+        cst.try_hash(&mut hasher).then(|| {
             Self::Const(HashedConst {
                 hash: hasher.finish(),
                 val: Arc::new(cst),
