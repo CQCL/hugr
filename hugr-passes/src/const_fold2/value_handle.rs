@@ -3,10 +3,10 @@ use std::sync::Arc;
 
 use hugr_core::ops::constant::{CustomConst, Sum};
 use hugr_core::ops::Value;
-use hugr_core::types::{ConstTypeError, Type};
+use hugr_core::types::Type;
 use hugr_core::Node;
 
-use super::partial_value::{AbstractValue, FromSum};
+use super::partial_value::AbstractValue;
 
 mod context;
 pub use context::HugrValueContext;
@@ -99,17 +99,6 @@ impl AbstractValue for ValueHandle {
             )),
             _ => None,
         }
-    }
-}
-
-impl FromSum for Value {
-    type Err = ConstTypeError;
-    fn try_new_sum(
-        tag: usize,
-        items: impl IntoIterator<Item = Self>,
-        st: &hugr_core::types::SumType,
-    ) -> Result<Self, ConstTypeError> {
-        Self::sum(tag, items, st.clone())
     }
 }
 
