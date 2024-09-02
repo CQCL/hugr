@@ -125,7 +125,7 @@ fn test_tail_loop_always_iterates() {
     let o_r2 = machine.read_out_wire_partial_value(tl_o2).unwrap();
     assert_eq!(o_r2, PartialValue::bottom().into());
     assert_eq!(
-        TailLoopTermination::bottom(),
+        TailLoopTermination::Bottom,
         machine.tail_loop_terminates(&hugr, tail_loop.node())
     )
 }

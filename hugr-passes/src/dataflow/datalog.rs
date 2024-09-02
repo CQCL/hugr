@@ -1,4 +1,3 @@
-use ascent::lattice::BoundedLattice;
 use hugr_core::extension::prelude::{MakeTuple, UnpackTuple};
 use std::collections::HashMap;
 use std::hash::Hash;
@@ -108,15 +107,6 @@ ascent::ascent! {
         if let Some(fields) = out_in_row.unpack_first(1, tailloop.just_outputs.len()), // if it is possible for the tag to be 1
         for (out_p, v) in (0..).map(OutgoingPort::from).zip(fields);
 
-    lattice tail_loop_termination(C,Node,TailLoopTermination);
-    tail_loop_termination(c,tl_n,TailLoopTermination::bottom()) <--
-        tail_loop_node(c,tl_n);
-    tail_loop_termination(c,tl_n,TailLoopTermination::from_control_value(v)) <--
-        tail_loop_node(c,tl_n),
-        io_node(c,tl,out_n, IO::Output),
-        in_wire_value(c, out_n, IncomingPort::from(0), v);
-
-
     // Conditional
     relation conditional_node(C, Node);
     relation case_node(C,Node,usize, Node);
@@ -221,11 +211,14 @@ impl<V: AbstractValue, C: DFContext<V>> Machine<V, C> {
 
     pub fn tail_loop_terminates(&self, hugr: impl HugrView, node: Node) -> TailLoopTermination {
         assert!(hugr.get_optype(node).is_tail_loop());
-        self.0
-            .tail_loop_termination
-            .iter()
-            .find_map(|(_, n, v)| (n == &node).then_some(*v))
-            .unwrap()
+        let [_, out] = hugr.get_io(node).unwrap();
+        TailLoopTermination::from_control_value(
+            self.0
+                .in_wire_value
+                .iter()
+                .find_map(|(_, n, p, v)| (*n == out && p.index() == 0).then_some(v))
+                .unwrap(),
+        )
     }
 
     pub fn case_reachable(&self, hugr: impl HugrView, case: Node) -> bool {
