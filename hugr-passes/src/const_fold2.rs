@@ -2,6 +2,6 @@
 //! to perform constant-folding.
 
 // These are pub because this "example" is used for testing the framework.
-pub mod value_handle;
 mod context;
+pub mod value_handle;
 pub use context::HugrValueContext;

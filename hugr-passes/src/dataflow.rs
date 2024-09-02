@@ -4,7 +4,7 @@ mod datalog;
 pub use datalog::Machine;
 
 mod partial_value;
-pub use partial_value::{PartialValue, AbstractValue};
+pub use partial_value::{AbstractValue, PartialValue};
 
 mod value_row;
 pub use value_row::ValueRow;
