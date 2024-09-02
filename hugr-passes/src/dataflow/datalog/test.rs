@@ -1,4 +1,7 @@
-use crate::const_fold2::HugrValueContext;
+use crate::{
+    const_fold2::HugrValueContext,
+    dataflow::{machine::TailLoopTermination, Machine},
+};
 
 use ascent::lattice::BoundedLattice;
 use hugr_core::{
@@ -11,8 +14,6 @@ use hugr_core::{
 };
 
 use super::super::partial_value::PartialValue;
-
-use super::*;
 
 #[test]
 fn test_make_tuple() {

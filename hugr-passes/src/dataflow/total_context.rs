@@ -5,8 +5,8 @@ use hugr_core::types::{ConstTypeError, SumType, Type, TypeEnum, TypeRow};
 use hugr_core::{ops::OpTrait, Hugr, HugrView, IncomingPort, Node, OutgoingPort, PortIndex};
 use itertools::{zip_eq, Itertools};
 
-use super::datalog::DFContext;
 use super::partial_value::{AbstractValue, PartialSum, PartialValue};
+use super::DFContext;
 use super::ValueRow;
 
 pub trait FromSum: Sized {

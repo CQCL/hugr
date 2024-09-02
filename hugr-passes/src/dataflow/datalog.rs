@@ -1,3 +1,6 @@
+//! [ascent] datalog implementation of analysis.
+//! Since ascent-(macro-)generated code generates a bunch of warnings,
+//! keep code in here to a minimum.
 #![allow(
     clippy::clone_on_copy,
     clippy::unused_enumerate_index,
@@ -6,24 +9,15 @@
 
 use ascent::lattice::BoundedLattice;
 use hugr_core::extension::prelude::{MakeTuple, UnpackTuple};
-use std::collections::HashMap;
+use hugr_core::types::Signature;
 use std::hash::Hash;
 
-use hugr_core::ops::{OpType, Value};
-use hugr_core::{Hugr, HugrView, IncomingPort, Node, OutgoingPort, PortIndex as _, Wire};
+use hugr_core::ops::OpType;
+use hugr_core::{HugrView, IncomingPort, Node, OutgoingPort, PortIndex as _};
 
-mod utils;
-
-// TODO separate this into its own analysis?
-use utils::TailLoopTermination;
-
-use super::partial_value::AbstractValue;
 use super::value_row::ValueRow;
+use super::{AbstractValue, DFContext};
 type PV<V> = super::partial_value::PartialValue<V>;
-
-pub trait DFContext<V>: Clone + Eq + Hash + std::ops::Deref<Target = Hugr> {
-    fn interpret_leaf_op(&self, node: Node, ins: &[PV<V>]) -> Option<ValueRow<V>>;
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum IO {
@@ -32,7 +26,7 @@ pub enum IO {
 }
 
 ascent::ascent! {
-    struct AscentProgram<V: AbstractValue, C: DFContext<V>>;
+    pub(super) struct AscentProgram<V: AbstractValue, C: DFContext<V>>;
     relation context(C);
     relation out_wire_value_proto(Node, OutgoingPort, PV<V>);
 
@@ -47,9 +41,9 @@ ascent::ascent! {
 
     node(c, n) <-- context(c), for n in c.nodes();
 
-    in_wire(c, n,p) <-- node(c, n), for p in utils::value_inputs(c.as_ref(), *n);
+    in_wire(c, n,p) <-- node(c, n), for p in value_inputs(c.as_ref(), *n);
 
-    out_wire(c, n,p) <-- node(c, n), for p in utils::value_outputs(c.as_ref(), *n);
+    out_wire(c, n,p) <-- node(c, n), for p in value_outputs(c.as_ref(), *n);
 
     parent_of_node(c, parent, child) <--
         node(c, child), if let Some(parent) = c.get_parent(*child);
@@ -68,7 +62,7 @@ ascent::ascent! {
         out_wire_value(c, m, op, v);
 
 
-    node_in_value_row(c, n, ValueRow::new(utils::input_count(c.as_ref(), *n))) <-- node(c, n);
+    node_in_value_row(c, n, ValueRow::new(input_count(c.as_ref(), *n))) <-- node(c, n);
     node_in_value_row(c, n, ValueRow::single_known(c.signature(*n).unwrap().input.len(), p.index(), v.clone())) <-- in_wire_value(c, n, p, v);
 
     out_wire_value(c, n, p, v) <--
@@ -160,7 +154,7 @@ fn propagate_leaf_op<V: AbstractValue>(
         }
         op if op.cast::<UnpackTuple>().is_some() => {
             let [tup] = ins.iter().collect::<Vec<_>>().try_into().unwrap();
-            tup.variant_values(0, utils::value_outputs(c.as_ref(), n).count())
+            tup.variant_values(0, value_outputs(c.as_ref(), n).count())
                 .map(ValueRow::from_iter)
         }
         OpType::Tag(t) => Some(ValueRow::from_iter([PV::variant(
@@ -175,86 +169,19 @@ fn propagate_leaf_op<V: AbstractValue>(
     }
 }
 
-pub struct Machine<V: AbstractValue, C: DFContext<V>>(
-    AscentProgram<V, C>,
-    Option<HashMap<Wire, PV<V>>>,
-);
-
-/// derived-Default requires the context to be Defaultable, which is unnecessary
-impl<V: AbstractValue, C: DFContext<V>> Default for Machine<V, C> {
-    fn default() -> Self {
-        Self(Default::default(), None)
-    }
+fn input_count(h: &impl HugrView, n: Node) -> usize {
+    h.signature(n)
+        .as_ref()
+        .map(Signature::input_count)
+        .unwrap_or(0)
 }
 
-/// Usage:
-/// 1. [Self::new()]
-/// 2. Zero or more [Self::propolutate_out_wires] with initial values
-/// 3. Exactly one [Self::run] to do the analysis
-/// 4. Results then available via [Self::read_out_wire_partial_value] and [Self::read_out_wire_value]
-impl<V: AbstractValue, C: DFContext<V>> Machine<V, C> {
-    pub fn propolutate_out_wires(&mut self, wires: impl IntoIterator<Item = (Wire, PV<V>)>) {
-        assert!(self.1.is_none());
-        self.0
-            .out_wire_value_proto
-            .extend(wires.into_iter().map(|(w, v)| (w.node(), w.source(), v)));
-    }
-
-    pub fn run(&mut self, context: C) {
-        assert!(self.1.is_none());
-        self.0.context.push((context,));
-        self.0.run();
-        self.1 = Some(
-            self.0
-                .out_wire_value
-                .iter()
-                .map(|(_, n, p, v)| (Wire::new(*n, *p), v.clone()))
-                .collect(),
-        )
-    }
-
-    pub fn read_out_wire_partial_value(&self, w: Wire) -> Option<PV<V>> {
-        self.1.as_ref().unwrap().get(&w).cloned()
-    }
-
-    pub fn tail_loop_terminates(&self, hugr: impl HugrView, node: Node) -> TailLoopTermination {
-        assert!(hugr.get_optype(node).is_tail_loop());
-        let [_, out] = hugr.get_io(node).unwrap();
-        TailLoopTermination::from_control_value(
-            self.0
-                .in_wire_value
-                .iter()
-                .find_map(|(_, n, p, v)| (*n == out && p.index() == 0).then_some(v))
-                .unwrap(),
-        )
-    }
-
-    pub fn case_reachable(&self, hugr: impl HugrView, case: Node) -> bool {
-        assert!(hugr.get_optype(case).is_case());
-        let cond = hugr.get_parent(case).unwrap();
-        assert!(hugr.get_optype(cond).is_conditional());
-        self.0
-            .case_reachable
-            .iter()
-            .find_map(|(_, cond2, case2, i)| (&cond == cond2 && &case == case2).then_some(*i))
-            .unwrap()
-    }
+fn value_inputs(h: &impl HugrView, n: Node) -> impl Iterator<Item = IncomingPort> + '_ {
+    h.in_value_types(n).map(|x| x.0)
 }
 
-impl<V: AbstractValue, C: DFContext<V>> Machine<V, C>
-where
-    Value: From<V>,
-{
-    pub fn read_out_wire_value(&self, hugr: impl HugrView, w: Wire) -> Option<Value> {
-        // dbg!(&w);
-        let pv = self.read_out_wire_partial_value(w)?;
-        // dbg!(&pv);
-        let (_, typ) = hugr
-            .out_value_types(w.node())
-            .find(|(p, _)| *p == w.source())
-            .unwrap();
-        pv.try_into_value(&typ).ok()
-    }
+fn value_outputs(h: &impl HugrView, n: Node) -> impl Iterator<Item = OutgoingPort> + '_ {
+    h.out_value_types(n).map(|x| x.0)
 }
 
 #[cfg(test)]
