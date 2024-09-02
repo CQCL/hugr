@@ -1,4 +1,16 @@
-[tool.poetry]
+[project]
+name = "hugr"
+version = "0.8.0"
+requires-python = ">=3.10,<3.13"
+description = "Quantinuum's common representation for quantum programs"
+license = { file = "LICENCE" }
+readme = "README.md"
+authors = [
+    { name = "TKET development team", email = "tket-support@quantinuum.com" },
+]
+maintainers = [
+    { name = "TKET development team", email = "tket-support@quantinuum.com" },
+]
 classifiers = [
     "Environment :: Console",
     "Programming Language :: Python :: 3.10",
@@ -12,30 +24,21 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering",
 ]
-name = "hugr"
-version = "0.5.0"
-description = "Quantinuum's common representation for quantum programs"
-#keywords = []
-authors = ["TKET development team <tket-support@cambridgequantum.com>"]
-maintainers = ["TKET development team <tket-support@cambridgequantum.com>"]
-license = "Apache-2.0"
-readme = "README.md"
-homepage = "https://github.com/CQCL/hugr"
-repository = "https://github.com/CQCL/hugr"
 
-[tool.poetry.dependencies]
-python = ">=3.10"
-pydantic = ">=2.7,<2.9"
-pydantic-extra-types = "^2.9.0"
-semver = "^3.0.2"
+dependencies = [
+    "pydantic>=2.8,<2.9",
+    "pydantic-extra-types>=2.9.0",
+    "semver>=3.0.2",
+    "graphviz>=0.20.3",
+]
 
-[tool.poetry.group.docs]
-optional = true
+[project.optional-dependencies]
+docs = ["sphinx>=8.0.2,<9.0.0", "sphinx-book-theme>=1.1.2"]
 
-[tool.poetry.group.docs.dependencies]
-sphinx = ">=7.2.6,<9.0.0"
-sphinx-book-theme = "^1.1.2"
+[project.urls]
+homepage = "https://github.com/CQCL/hugr/tree/main/hugr-py"
+repository = "https://github.com/CQCL/hugr/tree/main/hugr-py"
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"

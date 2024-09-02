@@ -506,10 +506,12 @@ pub(super) fn panic_invalid_port<H: HugrView + ?Sized>(
 #[cfg(test)]
 mod test {
     use crate::{
-        extension::prelude::USIZE_T,
-        extension::PRELUDE_REGISTRY,
+        extension::{
+            prelude::{Noop, USIZE_T},
+            PRELUDE_REGISTRY,
+        },
         macros::type_row,
-        ops::{self, dataflow::IOTrait, Noop},
+        ops::{self, dataflow::IOTrait},
         types::{Signature, Type},
     };
 
@@ -529,14 +531,16 @@ mod test {
             module,
             ops::FuncDefn {
                 name: "main".into(),
-                signature: Signature::new(type_row![NAT], type_row![NAT, NAT]).into(),
+                signature: Signature::new(type_row![NAT], type_row![NAT, NAT])
+                    .with_prelude()
+                    .into(),
             },
         );
 
         {
             let f_in = hugr.add_node_with_parent(f, ops::Input::new(type_row![NAT]));
             let f_out = hugr.add_node_with_parent(f, ops::Output::new(type_row![NAT, NAT]));
-            let noop = hugr.add_node_with_parent(f, Noop { ty: NAT });
+            let noop = hugr.add_node_with_parent(f, Noop(NAT));
 
             hugr.connect(f_in, 0, noop, 0);
             hugr.connect(noop, 0, f_out, 0);

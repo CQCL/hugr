@@ -8,19 +8,28 @@ from typing import TYPE_CHECKING
 
 from typing_extensions import Self
 
-from hugr import ops, val
-
-from .dfg import _DfBase
-from .exceptions import MismatchedExit, NoSiblingAncestor, NotInSameCfg
-from .hugr import Hugr, ParentBuilder
+from hugr import ops, tys, val
+from hugr.build.base import ParentBuilder
+from hugr.build.dfg import DfBase
+from hugr.exceptions import MismatchedExit, NoSiblingAncestor, NotInSameCfg
+from hugr.hugr import Hugr
 
 if TYPE_CHECKING:
-    from .node_port import Node, PortOffset, ToNode, Wire
-    from .tys import Type, TypeRow
+    from hugr.hugr.node_port import Node, PortOffset, ToNode, Wire
+    from hugr.tys import Type, TypeRow
 
 
-class Block(_DfBase[ops.DataflowBlock]):
+class Block(DfBase[ops.DataflowBlock]):
     """Builder class for a basic block in a HUGR control flow graph."""
+
+    def set_outputs(self, *outputs: Wire) -> None:
+        super().set_outputs(*outputs)
+
+        assert len(outputs) > 0
+        branching = outputs[0]
+        branch_type = self.hugr.port_type(branching.out_port())
+        assert isinstance(branch_type, tys.Sum)
+        self._set_parent_output_count(len(branch_type.variant_rows))
 
     def set_block_outputs(self, branching: Wire, *other_outputs: Wire) -> None:
         self.set_outputs(branching, *other_outputs)
@@ -249,3 +258,6 @@ class Cfg(ParentBuilder[ops.CFG], AbstractContextManager):
         else:
             self._exit_op._cfg_outputs = out_types
             self.parent_op._outputs = out_types
+            self.parent_node = self.hugr._update_node_outs(
+                self.parent_node, len(out_types)
+            )

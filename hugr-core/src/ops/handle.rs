@@ -154,7 +154,7 @@ impl_nodehandle!(ModuleRootID, OpTag::ModuleRoot);
 impl_nodehandle!(ModuleID, OpTag::ModuleOp);
 impl_nodehandle!(ConstID, OpTag::Const);
 
-impl_nodehandle!(BasicBlockID, OpTag::BasicBlock);
+impl_nodehandle!(BasicBlockID, OpTag::DataflowBlock);
 
 impl<const DEF: bool> NodeHandle for FuncID<DEF> {
     const TAG: OpTag = OpTag::Function;

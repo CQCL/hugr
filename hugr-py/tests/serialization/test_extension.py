@@ -1,6 +1,6 @@
 from semver import Version
 
-from hugr.serialization.extension import (
+from hugr._serialization.extension import (
     ExplicitBound,
     Extension,
     OpDef,
@@ -8,8 +8,8 @@ from hugr.serialization.extension import (
     TypeDef,
     TypeDefBound,
 )
-from hugr.serialization.serial_hugr import SerialHugr, serialization_version
-from hugr.serialization.tys import (
+from hugr._serialization.serial_hugr import SerialHugr, serialization_version
+from hugr._serialization.tys import (
     FunctionType,
     PolyFuncType,
     Type,

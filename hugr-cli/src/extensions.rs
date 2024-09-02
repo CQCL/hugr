@@ -27,7 +27,7 @@ impl ExtArgs {
     pub fn run_dump(&self) {
         let base_dir = &self.outdir;
 
-        for (name, ext) in hugr_core::std_extensions::std_reg().into_iter() {
+        for (name, ext) in hugr_core::std_extensions::STD_REG.iter() {
             let mut path = base_dir.clone();
             for part in name.split('.') {
                 path.push(part);

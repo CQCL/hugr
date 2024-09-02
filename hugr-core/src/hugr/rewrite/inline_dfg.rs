@@ -141,7 +141,7 @@ mod test {
     use crate::hugr::rewrite::inline_dfg::InlineDFGError;
     use crate::hugr::HugrMut;
     use crate::ops::handle::{DfgID, NodeHandle};
-    use crate::ops::{Lift, OpType, Value};
+    use crate::ops::{OpType, Value};
     use crate::std_extensions::arithmetic::float_types;
     use crate::std_extensions::arithmetic::int_ops::{self, IntOpDef};
     use crate::std_extensions::arithmetic::int_types::{self, ConstInt};
@@ -159,7 +159,7 @@ mod test {
     }
     fn extension_ops(h: &impl HugrView) -> Vec<Node> {
         h.nodes()
-            .filter(|n| matches!(h.get_optype(*n), OpType::CustomOp(_)))
+            .filter(|n| matches!(h.get_optype(*n), OpType::ExtensionOp(_)))
             .collect()
     }
 
@@ -167,6 +167,8 @@ mod test {
     #[case(true)]
     #[case(false)]
     fn inline_add_load_const(#[case] nonlocal: bool) -> Result<(), Box<dyn std::error::Error>> {
+        use crate::extension::prelude::Lift;
+
         let reg = ExtensionRegistry::try_new([
             PRELUDE.to_owned(),
             int_ops::EXTENSION.to_owned(),
@@ -185,10 +187,7 @@ mod test {
             let c1 = d.add_load_const(cst);
             let [lifted] = d
                 .add_dataflow_op(
-                    Lift {
-                        type_row: vec![int_ty.clone()].into(),
-                        new_extension: int_ops::EXTENSION_ID,
-                    },
+                    Lift::new(vec![int_ty.clone()].into(), int_ops::EXTENSION_ID),
                     [c1],
                 )?
                 .outputs_arr();
@@ -213,7 +212,7 @@ mod test {
             if nonlocal { 3 } else { 6 }
         ); // Input, Output, add; + const, load_const, lift
         assert_eq!(find_dfgs(&outer), vec![outer.root(), inner.node()]);
-        let [add, sub] = extension_ops(&outer).try_into().unwrap();
+        let [_lift, add, sub] = extension_ops(&outer).try_into().unwrap();
         assert_eq!(
             outer.get_parent(outer.get_parent(add).unwrap()),
             outer.get_parent(sub)
@@ -233,7 +232,7 @@ mod test {
         outer.validate(&reg)?;
         assert_eq!(outer.nodes().len(), 8);
         assert_eq!(find_dfgs(&outer), vec![outer.root()]);
-        let [add, sub] = extension_ops(&outer).try_into().unwrap();
+        let [_lift, add, sub] = extension_ops(&outer).try_into().unwrap();
         assert_eq!(outer.get_parent(add), Some(outer.root()));
         assert_eq!(outer.get_parent(sub), Some(outer.root()));
         assert_eq!(

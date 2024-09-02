@@ -10,29 +10,48 @@ from typing import TYPE_CHECKING, TypeVar
 
 from typing_extensions import Self
 
-from hugr import tys
+from hugr import ext, tys
+from hugr._serialization.serial_hugr import SerialHugr
 from hugr.hugr import Hugr
-from hugr.ops import AsCustomOp, Command, Custom, DataflowOp
-from hugr.serialization.serial_hugr import SerialHugr
+from hugr.ops import AsExtOp, Command, DataflowOp, ExtOp, RegisteredOp
 from hugr.std.float import FLOAT_T
 
 if TYPE_CHECKING:
+    from syrupy.assertion import SnapshotAssertion
+
     from hugr.ops import ComWire
 
+QUANTUM_EXT = ext.Extension("pytest.quantum,", ext.Version(0, 1, 0))
+QUANTUM_EXT.add_op_def(
+    ext.OpDef(
+        name="H",
+        description="Hadamard gate",
+        signature=ext.OpDefSig(tys.FunctionType.endo([tys.Qubit])),
+    )
+)
 
-QUANTUM_EXTENSION_ID: tys.ExtensionId = "quantum.tket2"
+QUANTUM_EXT.add_op_def(
+    ext.OpDef(
+        name="CX",
+        description="CNOT gate",
+        signature=ext.OpDefSig(tys.FunctionType.endo([tys.Qubit] * 2)),
+    )
+)
+
 
 E = TypeVar("E", bound=Enum)
 
 
-def _load_enum(enum_cls: type[E], custom: Custom) -> E | None:
-    if custom.extension == QUANTUM_EXTENSION_ID and custom.name in enum_cls.__members__:
-        return enum_cls(custom.name)
+def _load_enum(enum_cls: type[E], custom: ExtOp) -> E | None:
+    ext = custom._op_def._extension
+    assert ext is not None
+    if ext.name == QUANTUM_EXT.name and custom._op_def.name in enum_cls.__members__:
+        return enum_cls(custom._op_def.name)
     return None
 
 
 @dataclass(frozen=True)
-class OneQbGate(AsCustomOp):
+class OneQbGate(AsExtOp):
     # Have to nest enum to avoid meta class conflict
     class _Enum(Enum):
         H = "H"
@@ -42,15 +61,11 @@ class OneQbGate(AsCustomOp):
     def __call__(self, q: ComWire) -> Command:
         return DataflowOp.__call__(self, q)
 
-    def to_custom(self) -> Custom:
-        return Custom(
-            self._enum.value,
-            tys.FunctionType.endo([tys.Qubit]),
-            extension=QUANTUM_EXTENSION_ID,
-        )
+    def op_def(self) -> ext.OpDef:
+        return QUANTUM_EXT.operations[self._enum.value]
 
     @classmethod
-    def from_custom(cls, custom: Custom) -> Self | None:
+    def from_ext(cls, custom: ExtOp) -> Self | None:
         return cls(e) if (e := _load_enum(cls._Enum, custom)) else None
 
 
@@ -58,21 +73,17 @@ H = OneQbGate(OneQbGate._Enum.H)
 
 
 @dataclass(frozen=True)
-class TwoQbGate(AsCustomOp):
+class TwoQbGate(AsExtOp):
     class _Enum(Enum):
         CX = "CX"
 
     _enum: _Enum
 
-    def to_custom(self) -> Custom:
-        return Custom(
-            self._enum.value,
-            tys.FunctionType.endo([tys.Qubit] * 2),
-            extension=QUANTUM_EXTENSION_ID,
-        )
+    def op_def(self) -> ext.OpDef:
+        return QUANTUM_EXT.operations[self._enum.value]
 
     @classmethod
-    def from_custom(cls, custom: Custom) -> Self | None:
+    def from_ext(cls, custom: ExtOp) -> Self | None:
         return cls(e) if (e := _load_enum(cls._Enum, custom)) else None
 
     def __call__(self, q0: ComWire, q1: ComWire) -> Command:
@@ -82,15 +93,12 @@ class TwoQbGate(AsCustomOp):
 CX = TwoQbGate(TwoQbGate._Enum.CX)
 
 
+@QUANTUM_EXT.register_op(
+    "Measure",
+    signature=tys.FunctionType([tys.Qubit], [tys.Qubit, tys.Bool]),
+)
 @dataclass(frozen=True)
-class MeasureDef(AsCustomOp):
-    def to_custom(self) -> Custom:
-        return Custom(
-            "Measure",
-            tys.FunctionType([tys.Qubit], [tys.Qubit, tys.Bool]),
-            extension=QUANTUM_EXTENSION_ID,
-        )
-
+class MeasureDef(RegisteredOp):
     def __call__(self, q: ComWire) -> Command:
         return super().__call__(q)
 
@@ -98,15 +106,12 @@ class MeasureDef(AsCustomOp):
 Measure = MeasureDef()
 
 
+@QUANTUM_EXT.register_op(
+    "Rz",
+    signature=tys.FunctionType([tys.Qubit, FLOAT_T], [tys.Qubit]),
+)
 @dataclass(frozen=True)
-class RzDef(AsCustomOp):
-    def to_custom(self) -> Custom:
-        return Custom(
-            "Rz",
-            tys.FunctionType([tys.Qubit, FLOAT_T], [tys.Qubit]),
-            extension=QUANTUM_EXTENSION_ID,
-        )
-
+class RzDef(RegisteredOp):
     def __call__(self, q: ComWire, fl_wire: ComWire) -> Command:
         return super().__call__(q, fl_wire)
 
@@ -124,17 +129,43 @@ def _base_command() -> list[str]:
 def mermaid(h: Hugr):
     """Render the Hugr as a mermaid diagram for debugging."""
     cmd = [*_base_command(), "mermaid", "-"]
-    _run_hugr_cmd(h.to_serial().to_json(), cmd)
+    _run_hugr_cmd(h._to_serial().to_json(), cmd)
 
 
-def validate(h: Hugr, roundtrip: bool = True):
+def validate(
+    h: Hugr | ext.Package,
+    *,
+    roundtrip: bool = True,
+    snap: SnapshotAssertion | None = None,
+):
+    """Validate a HUGR or package.
+
+    args:
+        h: The HUGR or package to validate.
+        roundtrip: Whether to roundtrip the HUGR through the CLI.
+        snapshot: A hugr render snapshot. If not None, it will be compared against the
+        rendered HUGR. Pass `--snapshot-update` to pytest to update the snapshot file.
+    """
     cmd = [*_base_command(), "validate", "-"]
-    serial = h.to_serial().to_json()
+    serial = h.to_json()
     _run_hugr_cmd(serial, cmd)
 
-    if roundtrip:
-        h2 = Hugr.from_serial(SerialHugr.load_json(json.loads(serial)))
-        assert serial == h2.to_serial().to_json()
+    if not roundtrip:
+        return
+    hugrs = [h] if isinstance(h, Hugr) else h.modules
+    for h in hugrs:
+        serial = h.to_json()
+
+        starting_json = json.loads(serial)
+        h2 = Hugr._from_serial(SerialHugr.load_json(starting_json))
+        roundtrip_json = json.loads(h2._to_serial().to_json())
+        assert roundtrip_json == starting_json
+
+    if snap is not None and isinstance(h, Hugr):
+        dot = h.render_dot()
+        assert snap == dot.source
+        if os.environ.get("HUGR_RENDER_DOT"):
+            dot.pipe("svg")
 
 
 def _run_hugr_cmd(serial: str, cmd: list[str]):

@@ -733,7 +733,7 @@ mod tests {
     use crate::extension::{prelude, ExtensionRegistry};
     use crate::ops::Const;
     use crate::std_extensions::arithmetic::float_types::{self, ConstF64};
-    use crate::std_extensions::logic;
+    use crate::std_extensions::logic::{self, LogicOp};
     use crate::utils::test_quantum_extension::{self, cx_gate, rz_f64};
     use crate::{
         builder::{
@@ -746,7 +746,7 @@ mod tests {
         },
         hugr::views::{HierarchyView, SiblingGraph},
         ops::handle::{DfgID, FuncID, NodeHandle},
-        std_extensions::logic::{test::and_op, NotOp},
+        std_extensions::logic::test::and_op,
         type_row,
     };
 
@@ -821,9 +821,9 @@ mod tests {
         )?;
         let func_id = {
             let mut dfg = mod_builder.define_declaration(&func)?;
-            let outs1 = dfg.add_dataflow_op(NotOp, dfg.input_wires())?;
-            let outs2 = dfg.add_dataflow_op(NotOp, outs1.outputs())?;
-            let outs3 = dfg.add_dataflow_op(NotOp, outs2.outputs())?;
+            let outs1 = dfg.add_dataflow_op(LogicOp::Not, dfg.input_wires())?;
+            let outs2 = dfg.add_dataflow_op(LogicOp::Not, outs1.outputs())?;
+            let outs3 = dfg.add_dataflow_op(LogicOp::Not, outs2.outputs())?;
             dfg.finish_with_outputs(outs3.outputs())?
         };
         let hugr = mod_builder
@@ -844,8 +844,8 @@ mod tests {
         let func_id = {
             let mut dfg = mod_builder.define_declaration(&func)?;
             let [b0] = dfg.input_wires_arr();
-            let [b1] = dfg.add_dataflow_op(NotOp, [b0])?.outputs_arr();
-            let [b2] = dfg.add_dataflow_op(NotOp, [b1])?.outputs_arr();
+            let [b1] = dfg.add_dataflow_op(LogicOp::Not, [b0])?.outputs_arr();
+            let [b2] = dfg.add_dataflow_op(LogicOp::Not, [b1])?.outputs_arr();
             dfg.finish_with_outputs([b1, b2])?
         };
         let hugr = mod_builder
@@ -1106,7 +1106,10 @@ mod tests {
 
         let mut builder = DFGBuilder::new(inout_sig(one_bit.clone(), two_bit.clone())).unwrap();
         let inw = builder.input_wires().exactly_one().unwrap();
-        let outw1 = builder.add_dataflow_op(NotOp, [inw]).unwrap().out_wire(0);
+        let outw1 = builder
+            .add_dataflow_op(LogicOp::Not, [inw])
+            .unwrap()
+            .out_wire(0);
         let outw2 = builder
             .add_dataflow_op(and_op(), [inw, outw1])
             .unwrap()

@@ -30,7 +30,7 @@ To setup the environment manually you will need:
 
 - Just: https://just.systems/
 - Rust `>=1.75`: https://www.rust-lang.org/tools/install
-- Poetry `>=1.8`: https://python-poetry.org/
+- uv `>=0.3`: docs.astral.sh/uv/getting-started/installation
 
 Once you have these installed, you can install the required python dependencies and setup pre-commit hooks with:
 

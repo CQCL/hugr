@@ -2,20 +2,26 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, ClassVar
 
 from typing_extensions import Self
 
-from hugr import tys, val
-from hugr.ops import AsCustomOp, Custom, DataflowOp
+from hugr import ext, tys, val
+from hugr.ops import AsExtOp, DataflowOp, ExtOp, RegisteredOp
+from hugr.std import _load_extension
 
 if TYPE_CHECKING:
     from hugr.ops import Command, ComWire
 
+INT_TYPES_EXTENSION = _load_extension("arithmetic.int.types")
+_INT_PARAM = tys.BoundedNatParam(7)
 
-def int_t(width: int) -> tys.Opaque:
-    """Create an integer type with a given log bit width.
+INT_T_DEF = INT_TYPES_EXTENSION.types["int"]
+
+
+def int_t(width: int) -> tys.ExtType:
+    """Create an integer type with a fixed log bit width.
 
 
     Args:
@@ -25,14 +31,17 @@ def int_t(width: int) -> tys.Opaque:
         The integer type.
 
     Examples:
-        >>> int_t(5).id # 32 bit integer
+        >>> int_t(5).type_def.name # 32 bit integer
         'int'
     """
-    return tys.Opaque(
-        extension="arithmetic.int.types",
-        id="int",
-        args=[tys.BoundedNatArg(n=width)],
-        bound=tys.TypeBound.Copyable,
+    return INT_T_DEF.instantiate(
+        [tys.BoundedNatArg(n=width)],
+    )
+
+
+def _int_tv(index: int) -> tys.ExtType:
+    return INT_T_DEF.instantiate(
+        [tys.VariableArg(idx=index, param=_INT_PARAM)],
     )
 
 
@@ -45,42 +54,46 @@ class IntVal(val.ExtensionValue):
     """Custom value for an integer."""
 
     v: int
+    width: int = field(default=5)
 
     def to_value(self) -> val.Extension:
-        return val.Extension("int", INT_T, self.v)
+        name = "ConstInt"
+        payload = {"log_width": self.width, "value": self.v}
+        return val.Extension(
+            name,
+            typ=int_t(self.width),
+            val=payload,
+            extensions=[INT_TYPES_EXTENSION.name],
+        )
 
 
-OPS_EXTENSION: tys.ExtensionId = "arithmetic.int"
+INT_OPS_EXTENSION = _load_extension("arithmetic.int")
 
 
 @dataclass(frozen=True)
-class _DivModDef(AsCustomOp):
+class _DivModDef(RegisteredOp):
     """DivMod operation, has two inputs and two outputs."""
 
-    name: ClassVar[str] = "idivmod_u"
-    arg1: int = 5
-    arg2: int = 5
+    width: int = 5
+    const_op_def: ClassVar[ext.OpDef] = INT_OPS_EXTENSION.operations["idivmod_u"]
 
-    def to_custom(self) -> Custom:
-        return Custom(
-            "idivmod_u",
-            tys.FunctionType(
-                input=[int_t(self.arg1)] * 2, output=[int_t(self.arg2)] * 2
-            ),
-            extension=OPS_EXTENSION,
-            args=[tys.BoundedNatArg(n=self.arg1), tys.BoundedNatArg(n=self.arg2)],
-        )
+    def type_args(self) -> list[tys.TypeArg]:
+        return [tys.BoundedNatArg(n=self.width)]
+
+    def cached_signature(self) -> tys.FunctionType | None:
+        row: list[tys.Type] = [int_t(self.width)] * 2
+        return tys.FunctionType.endo(row)
 
     @classmethod
-    def from_custom(cls, custom: Custom) -> Self | None:
-        if not custom.check_id(OPS_EXTENSION, "idivmod_u"):
+    def from_ext(cls, custom: ExtOp) -> Self | None:
+        if custom.op_def() != cls.op_def():
             return None
         match custom.args:
-            case [tys.BoundedNatArg(n=a1), tys.BoundedNatArg(n=a2)]:
-                return cls(arg1=a1, arg2=a2)
+            case [tys.BoundedNatArg(n=a1)]:
+                return cls(width=a1)
             case _:
                 msg = f"Invalid args: {custom.args}"
-                raise AsCustomOp.InvalidCustomOp(msg)
+                raise AsExtOp.InvalidExtOp(msg)
 
     def __call__(self, a: ComWire, b: ComWire) -> Command:
         return DataflowOp.__call__(self, a, b)

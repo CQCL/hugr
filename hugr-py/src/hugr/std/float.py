@@ -4,16 +4,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from hugr import tys, val
+from hugr import val
+from hugr.std import _load_extension
 
-#: HUGR 64-bit IEEE 754-2019 floating point type.
-FLOAT_EXT_ID = "arithmetic.float.types"
-FLOAT_T = tys.Opaque(
-    extension=FLOAT_EXT_ID,
-    id="float64",
-    args=[],
-    bound=tys.TypeBound.Copyable,
-)
+EXTENSION = _load_extension("arithmetic.float.types")
+
+FLOAT_T = EXTENSION.types["float64"].instantiate([])
 
 
 @dataclass
@@ -23,4 +19,8 @@ class FloatVal(val.ExtensionValue):
     v: float
 
     def to_value(self) -> val.Extension:
-        return val.Extension("float", FLOAT_T, self.v)
+        name = "ConstF64"
+        payload = {"value": self.v}
+        return val.Extension(
+            name, typ=FLOAT_T, val=payload, extensions=[EXTENSION.name]
+        )

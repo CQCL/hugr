@@ -1,7 +1,6 @@
 //! Polymorphic Function Types
 
 use crate::extension::{ExtensionRegistry, SignatureError};
-use itertools::Itertools;
 #[cfg(test)]
 use {
     crate::proptest::RecursionDepth,
@@ -24,7 +23,7 @@ use super::{signature::FuncTypeBase, MaybeRV, NoRV, RowVariable};
 )]
 #[cfg_attr(test, derive(Arbitrary), proptest(params = "RecursionDepth"))]
 #[display(
-    fmt = "forall {}. {}",
+    "forall {}. {}",
     "params.iter().map(ToString::to_string).join(\" \")",
     "body"
 )]

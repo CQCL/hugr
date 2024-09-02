@@ -5,12 +5,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
-import hugr.serialization.ops as sops
-import hugr.serialization.tys as stys
+import hugr._serialization.ops as sops
+import hugr._serialization.tys as stys
 from hugr import tys
-from hugr.utils import ser_it
+from hugr.utils import comma_sep_repr, comma_sep_str, ser_it
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from hugr.hugr import Hugr
 
 
@@ -18,12 +20,12 @@ if TYPE_CHECKING:
 class Value(Protocol):
     """Abstract value definition. Must be serializable into a HUGR value."""
 
-    def to_serial(self) -> sops.BaseValue:
+    def _to_serial(self) -> sops.BaseValue:
         """Convert to serializable model."""
         ...  # pragma: no cover
 
-    def to_serial_root(self) -> sops.Value:
-        return sops.Value(root=self.to_serial())  # type: ignore[arg-type]
+    def _to_serial_root(self) -> sops.Value:
+        return sops.Value(root=self._to_serial())  # type: ignore[arg-type]
 
     def type_(self) -> tys.Type:
         """Report the type of the value.
@@ -58,11 +60,19 @@ class Sum(Value):
     def type_(self) -> tys.Sum:
         return self.typ
 
-    def to_serial(self) -> sops.SumValue:
+    def _to_serial(self) -> sops.SumValue:
         return sops.SumValue(
             tag=self.tag,
-            typ=stys.SumType(root=self.type_().to_serial()),
+            typ=stys.SumType(root=self.type_()._to_serial()),
             vs=ser_it(self.vals),
+        )
+
+    def __eq__(self, other: object) -> bool:
+        return (
+            isinstance(other, Sum)
+            and self.tag == other.tag
+            and self.typ == other.typ
+            and self.vals == other.vals
         )
 
 
@@ -115,7 +125,7 @@ TRUE = bool_value(True)
 FALSE = bool_value(False)
 
 
-@dataclass
+@dataclass(eq=False)
 class Tuple(Sum):
     """Tuple or product value, defined by a list of values.
     Internally a :class:`Sum` with a single variant row.
@@ -129,9 +139,6 @@ class Tuple(Sum):
 
     """
 
-    #: The values of this tuple.
-    vals: list[Value]
-
     def __init__(self, *vals: Value):
         val_list = list(vals)
         super().__init__(
@@ -139,14 +146,122 @@ class Tuple(Sum):
         )
 
     # sops.TupleValue isn't an instance of sops.SumValue
-    # so mypy doesn't like the override of Sum.to_serial
-    def to_serial(self) -> sops.TupleValue:  # type: ignore[override]
+    # so mypy doesn't like the override of Sum._to_serial
+    def _to_serial(self) -> sops.TupleValue:  # type: ignore[override]
         return sops.TupleValue(
             vs=ser_it(self.vals),
         )
 
     def __repr__(self) -> str:
-        return f"Tuple({', '.join(map(repr, self.vals))})"
+        return f"Tuple({comma_sep_repr(self.vals)})"
+
+
+@dataclass(eq=False)
+class Some(Sum):
+    """Optional tuple of value, containing a list of values.
+
+    Example:
+        >>> some = Some(TRUE, FALSE)
+        >>> str(some)
+        'Some(TRUE, FALSE)'
+        >>> some.type_()
+        Option(Bool, Bool)
+
+    """
+
+    def __init__(self, *vals: Value):
+        val_list = list(vals)
+        super().__init__(
+            tag=1, typ=tys.Option(*(v.type_() for v in val_list)), vals=val_list
+        )
+
+    def __repr__(self) -> str:
+        return f"Some({comma_sep_repr(self.vals)})"
+
+
+@dataclass(eq=False)
+class None_(Sum):
+    """Optional tuple of value, containing no values.
+
+    Example:
+        >>> none = None_(tys.Bool)
+        >>> str(none)
+        'None'
+        >>> none.type_()
+        Option(Bool)
+
+    """
+
+    def __init__(self, *types: tys.Type):
+        super().__init__(tag=0, typ=tys.Option(*types), vals=[])
+
+    def __repr__(self) -> str:
+        return f"None({comma_sep_str(self.typ.variant_rows[1])})"
+
+    def __str__(self) -> str:
+        return "None"
+
+
+@dataclass(eq=False)
+class Left(Sum):
+    """Left variant of a :class:`tys.Either` type, containing a list of values.
+
+    In fallible contexts, this represents the failure variant.
+
+    Example:
+        >>> left = Left([TRUE, FALSE], [tys.Bool])
+        >>> str(left)
+        'Left(TRUE, FALSE)'
+        >>> str(left.type_())
+        'Either((Bool, Bool), Bool)'
+    """
+
+    def __init__(self, vals: Iterable[Value], right_typ: Iterable[tys.Type]):
+        val_list = list(vals)
+        super().__init__(
+            tag=0,
+            typ=tys.Either([v.type_() for v in val_list], right_typ),
+            vals=val_list,
+        )
+
+    def __repr__(self) -> str:
+        _, right_typ = self.typ.variant_rows
+        return f"Left(vals={self.vals}, right_typ={list(right_typ)})"
+
+    def __str__(self) -> str:
+        return f"Left({comma_sep_str(self.vals)})"
+
+
+@dataclass(eq=False)
+class Right(Sum):
+    """Right variant of a :class:`tys.Either` type, containing a list of values.
+
+    In fallible contexts, this represents the success variant.
+
+    Internally a :class:`Sum` with two variant rows.
+
+    Example:
+        >>> right = Right([tys.Bool, tys.Bool, tys.Bool], [TRUE, FALSE])
+        >>> str(right)
+        'Right(TRUE, FALSE)'
+        >>> str(right.type_())
+        'Either((Bool, Bool, Bool), (Bool, Bool))'
+    """
+
+    def __init__(self, left_typ: Iterable[tys.Type], vals: Iterable[Value]):
+        val_list = list(vals)
+        super().__init__(
+            tag=1,
+            typ=tys.Either(left_typ, [v.type_() for v in val_list]),
+            vals=val_list,
+        )
+
+    def __repr__(self) -> str:
+        left_typ, _ = self.typ.variant_rows
+        return f"Right(left_typ={list(left_typ)}, vals={self.vals})"
+
+    def __str__(self) -> str:
+        return f"Right({comma_sep_str(self.vals)})"
 
 
 @dataclass
@@ -158,9 +273,9 @@ class Function(Value):
     def type_(self) -> tys.FunctionType:
         return self.body.root_op().inner_signature()
 
-    def to_serial(self) -> sops.FunctionValue:
+    def _to_serial(self) -> sops.FunctionValue:
         return sops.FunctionValue(
-            hugr=self.body.to_serial(),
+            hugr=self.body._to_serial(),
         )
 
 
@@ -179,9 +294,9 @@ class Extension(Value):
     def type_(self) -> tys.Type:
         return self.typ
 
-    def to_serial(self) -> sops.ExtensionValue:
-        return sops.ExtensionValue(
-            typ=self.typ.to_serial_root(),
+    def _to_serial(self) -> sops.CustomValue:
+        return sops.CustomValue(
+            typ=self.typ._to_serial_root(),
             value=sops.CustomConst(c=self.name, v=self.val),
             extensions=self.extensions,
         )
@@ -197,5 +312,5 @@ class ExtensionValue(Value, Protocol):
     def type_(self) -> tys.Type:
         return self.to_value().type_()
 
-    def to_serial(self) -> sops.ExtensionValue:
-        return self.to_value().to_serial()
+    def _to_serial(self) -> sops.CustomValue:
+        return self.to_value()._to_serial()

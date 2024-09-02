@@ -1,7 +1,7 @@
 //! Basic integer operations.
 
 use super::int_types::{get_log_width, int_tv, LOG_WIDTH_TYPE_PARAM};
-use crate::extension::prelude::{sum_with_error, BOOL_T, STRING_TYPE};
+use crate::extension::prelude::{sum_with_error, BOOL_T};
 use crate::extension::simple_op::{
     HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
 };
@@ -10,7 +10,6 @@ use crate::extension::{
 };
 use crate::ops::custom::ExtensionOp;
 use crate::ops::{NamedOp, OpName};
-use crate::std_extensions::arithmetic::int_types::int_type;
 use crate::type_row;
 use crate::types::{FuncValueType, PolyFuncTypeRV, TypeRowRV};
 use crate::utils::collect_array;
@@ -57,8 +56,6 @@ pub enum IntOpDef {
     iwiden_s,
     inarrow_u,
     inarrow_s,
-    itobool,
-    ifrombool,
     ieq,
     ine,
     ilt_u,
@@ -89,6 +86,7 @@ pub enum IntOpDef {
     idiv_s,
     imod_checked_s,
     imod_s,
+    ipow,
     iabs,
     iand,
     ior,
@@ -98,8 +96,8 @@ pub enum IntOpDef {
     ishr,
     irotl,
     irotr,
-    itostring_u,
-    itostring_s,
+    iu_to_s,
+    is_to_u,
 }
 
 impl MakeOpDef for IntOpDef {
@@ -113,62 +111,48 @@ impl MakeOpDef for IntOpDef {
 
     fn signature(&self) -> SignatureFunc {
         use IntOpDef::*;
+        let tv0 = int_tv(0);
         match self {
             iwiden_s | iwiden_u => CustomValidator::new(
-                int_polytype(2, vec![int_tv(0)], vec![int_tv(1)]),
+                int_polytype(2, vec![tv0], vec![int_tv(1)]),
                 IOValidator { f_ge_s: false },
             )
             .into(),
             inarrow_s | inarrow_u => CustomValidator::new(
-                int_polytype(2, int_tv(0), sum_ty_with_err(int_tv(1))),
+                int_polytype(2, tv0, sum_ty_with_err(int_tv(1))),
                 IOValidator { f_ge_s: true },
             )
             .into(),
-            itobool => int_polytype(0, vec![int_type(0)], type_row![BOOL_T]).into(),
-            ifrombool => int_polytype(0, type_row![BOOL_T], vec![int_type(0)]).into(),
             ieq | ine | ilt_u | ilt_s | igt_u | igt_s | ile_u | ile_s | ige_u | ige_s => {
-                int_polytype(1, vec![int_tv(0); 2], type_row![BOOL_T]).into()
+                int_polytype(1, vec![tv0; 2], type_row![BOOL_T]).into()
             }
-            imax_u | imax_s | imin_u | imin_s | iadd | isub | imul | iand | ior | ixor => {
+            imax_u | imax_s | imin_u | imin_s | iadd | isub | imul | iand | ior | ixor | ipow => {
                 ibinop_sig().into()
             }
-            ineg | iabs | inot => iunop_sig().into(),
-            //TODO inline
+            ineg | iabs | inot | iu_to_s | is_to_u => iunop_sig().into(),
             idivmod_checked_u | idivmod_checked_s => {
-                let intpair: TypeRowRV = vec![int_tv(0), int_tv(1)].into();
+                let intpair: TypeRowRV = vec![tv0; 2].into();
                 int_polytype(
-                    2,
+                    1,
                     intpair.clone(),
                     sum_ty_with_err(Type::new_tuple(intpair)),
                 )
             }
             .into(),
             idivmod_u | idivmod_s => {
-                let intpair: TypeRowRV = vec![int_tv(0), int_tv(1)].into();
-                int_polytype(2, intpair.clone(), intpair.clone())
+                let intpair: TypeRowRV = vec![tv0; 2].into();
+                int_polytype(1, intpair.clone(), intpair.clone())
             }
             .into(),
-            idiv_u | idiv_s => int_polytype(2, vec![int_tv(0), int_tv(1)], vec![int_tv(0)]).into(),
+            idiv_u | idiv_s => int_polytype(1, vec![tv0.clone(); 2], vec![tv0]).into(),
             idiv_checked_u | idiv_checked_s => {
-                int_polytype(2, vec![int_tv(0), int_tv(1)], sum_ty_with_err(int_tv(0))).into()
+                int_polytype(1, vec![tv0.clone(); 2], sum_ty_with_err(tv0)).into()
             }
-            imod_checked_u | imod_checked_s => int_polytype(
-                2,
-                vec![int_tv(0), int_tv(1).clone()],
-                sum_ty_with_err(int_tv(1)),
-            )
-            .into(),
-            imod_u | imod_s => {
-                int_polytype(2, vec![int_tv(0), int_tv(1).clone()], vec![int_tv(1)]).into()
+            imod_checked_u | imod_checked_s => {
+                int_polytype(1, vec![tv0.clone(); 2], sum_ty_with_err(tv0)).into()
             }
-            ishl | ishr | irotl | irotr => {
-                int_polytype(2, vec![int_tv(0), int_tv(1)], vec![int_tv(0)]).into()
-            }
-            itostring_u | itostring_s => PolyFuncTypeRV::new(
-                vec![LOG_WIDTH_TYPE_PARAM],
-                FuncValueType::new(vec![int_tv(0)], vec![STRING_TYPE]),
-            )
-            .into(),
+            imod_u | imod_s => int_polytype(1, vec![tv0.clone(); 2], vec![tv0]).into(),
+            ishl | ishr | irotl | irotr => int_polytype(1, vec![tv0.clone(); 2], vec![tv0]).into(),
         }
     }
 
@@ -180,8 +164,6 @@ impl MakeOpDef for IntOpDef {
             iwiden_s => "widen a signed integer to a wider one with the same value",
             inarrow_u => "narrow an unsigned integer to a narrower one with the same value if possible",
             inarrow_s => "narrow a signed integer to a narrower one with the same value if possible",
-            itobool => "convert to bool (1 is true, 0 is false)",
-            ifrombool => "convert from bool (1 is true, 0 is false)",
             ieq => "equality test",
             ine => "inequality test",
             ilt_u => "\"less than\" as unsigned integers",
@@ -200,13 +182,13 @@ impl MakeOpDef for IntOpDef {
             isub => "subtraction modulo 2^N (signed and unsigned versions are the same op)",
             ineg => "negation modulo 2^N (signed and unsigned versions are the same op)",
             imul => "multiplication modulo 2^N (signed and unsigned versions are the same op)",
-            idivmod_checked_u => "given unsigned integers 0 <= n < 2^N, 0 <= m < 2^M, generates unsigned q, r where \
+            idivmod_checked_u => "given unsigned integers 0 <= n < 2^N, 0 <= m < 2^N, generates unsigned q, r where \
             q*m+r=n, 0<=r<m (m=0 is an error)",
-            idivmod_u => "given unsigned integers 0 <= n < 2^N, 0 <= m < 2^M, generates unsigned q, r where \
+            idivmod_u => "given unsigned integers 0 <= n < 2^N, 0 <= m < 2^N, generates unsigned q, r where \
             q*m+r=n, 0<=r<m (m=0 will call panic)",
-            idivmod_checked_s => "given signed integer -2^{N-1} <= n < 2^{N-1} and unsigned 0 <= m < 2^M, generates \
+            idivmod_checked_s => "given signed integer -2^{N-1} <= n < 2^{N-1} and unsigned 0 <= m < 2^N, generates \
             signed q and unsigned r where q*m+r=n, 0<=r<m (m=0 is an error)",
-            idivmod_s => "given signed integer -2^{N-1} <= n < 2^{N-1} and unsigned 0 <= m < 2^M, generates \
+            idivmod_s => "given signed integer -2^{N-1} <= n < 2^{N-1} and unsigned 0 <= m < 2^N, generates \
             signed q and unsigned r where q*m+r=n, 0<=r<m (m=0 will call panic)",
             idiv_checked_u => "as idivmod_checked_u but discarding the second output",
             idiv_u => "as idivmod_u but discarding the second output",
@@ -216,6 +198,7 @@ impl MakeOpDef for IntOpDef {
             idiv_s => "as idivmod_s but discarding the second output",
             imod_checked_s => "as idivmod_checked_s but discarding the first output",
             imod_s => "as idivmod_s but discarding the first output",
+            ipow => "raise first input to the power of second input",
             iabs => "convert signed to unsigned by taking absolute value",
             iand => "bitwise AND",
             ior => "bitwise OR",
@@ -229,8 +212,8 @@ impl MakeOpDef for IntOpDef {
             (leftmost bits replace rightmost bits)",
             irotr => "rotate first input right by k bits where k is unsigned interpretation of second input \
             (rightmost bits replace leftmost bits)",
-            itostring_s => "convert a signed integer to its string representation",
-            itostring_u => "convert an unsigned integer to its string representation",
+            is_to_u => "convert signed to unsigned by taking absolute value",
+            iu_to_s => "convert unsigned to signed by taking absolute value",
         }.into()
     }
 
@@ -238,7 +221,9 @@ impl MakeOpDef for IntOpDef {
         const_fold::set_fold(self, def)
     }
 }
-fn int_polytype(
+
+/// Returns a polytype composed by a function type, and a number of integer width type parameters.
+pub(in crate::std_extensions::arithmetic) fn int_polytype(
     n_vars: usize,
     input: impl Into<TypeRowRV>,
     output: impl Into<TypeRowRV>,
@@ -311,6 +296,8 @@ pub struct ConcreteIntOp {
     /// The width parameters of the int op. These are interpreted differently,
     /// depending on `def`. The types of inputs and outputs of the op will have
     /// [int_type]s of these widths.
+    ///
+    /// [int_type]: crate::std_extensions::arithmetic::int_types::int_type
     pub log_widths: Vec<u8>,
 }
 
@@ -373,9 +360,10 @@ fn sum_ty_with_err(t: Type) -> Type {
 
 #[cfg(test)]
 mod test {
+    use rstest::rstest;
+
     use crate::{
-        ops::{dataflow::DataflowOpTrait, CustomOp},
-        std_extensions::arithmetic::int_types::int_type,
+        ops::dataflow::DataflowOpTrait, std_extensions::arithmetic::int_types::int_type,
         types::Signature,
     };
 
@@ -385,7 +373,6 @@ mod test {
     fn test_int_ops_extension() {
         assert_eq!(EXTENSION.name() as &str, "arithmetic.int");
         assert_eq!(EXTENSION.types().count(), 0);
-        assert_eq!(EXTENSION.operations().count(), 47);
         for (name, _) in EXTENSION.operations() {
             assert!(name.starts_with('i'));
         }
@@ -442,23 +429,55 @@ mod test {
             .is_none());
     }
 
-    #[test]
-    fn test_conversions() {
-        let o = IntOpDef::itobool.without_log_width();
-        assert!(
-            IntOpDef::itobool
-                .with_two_log_widths(1, 2)
-                .to_extension_op()
-                .is_none(),
-            "type arguments invalid"
-        );
-        let custom_op: CustomOp = o.clone().to_extension_op().unwrap().into();
+    #[rstest]
+    #[case::iadd(IntOpDef::iadd.with_log_width(5), &[1, 2], &[3], 5)]
+    #[case::isub(IntOpDef::isub.with_log_width(5), &[5, 2], &[3], 5)]
+    #[case::imul(IntOpDef::imul.with_log_width(5), &[2, 8], &[16], 5)]
+    #[case::idiv(IntOpDef::idiv_u.with_log_width(5), &[37, 8], &[4], 5)]
+    #[case::imod(IntOpDef::imod_u.with_log_width(5), &[43, 8], &[3], 5)]
+    #[case::ipow(IntOpDef::ipow.with_log_width(5), &[2, 8], &[256], 5)]
+    #[case::iu_to_s(IntOpDef::iu_to_s.with_log_width(5), &[42], &[42], 5)]
+    #[case::is_to_u(IntOpDef::is_to_u.with_log_width(5), &[42], &[42], 5)]
+    #[should_panic(expected = "too large to be converted to signed")]
+    #[case::iu_to_s_panic(IntOpDef::iu_to_s.with_log_width(5), &[u32::MAX as u64], &[], 5)]
+    #[should_panic(expected = "Cannot convert negative integer")]
+    #[case::is_to_u_panic(IntOpDef::is_to_u.with_log_width(5), &[(0u32.wrapping_sub(42)) as u64], &[], 5)]
+    fn int_fold(
+        #[case] op: ConcreteIntOp,
+        #[case] inputs: &[u64],
+        #[case] outputs: &[u64],
+        #[case] log_width: u8,
+    ) {
+        use crate::ops::Value;
+        use crate::std_extensions::arithmetic::int_types::ConstInt;
 
-        assert_eq!(ConcreteIntOp::from_op(&custom_op).unwrap(), o);
-        assert_eq!(IntOpDef::from_op(&custom_op).unwrap(), IntOpDef::itobool);
-        assert_eq!(
-            IntOpDef::from_op(&custom_op.into_opaque().into()).unwrap(),
-            IntOpDef::itobool
-        );
+        let consts: Vec<_> = inputs
+            .iter()
+            .enumerate()
+            .map(|(i, &x)| {
+                (
+                    i.into(),
+                    Value::extension(ConstInt::new_u(log_width, x).unwrap()),
+                )
+            })
+            .collect();
+
+        let res = op
+            .to_extension_op()
+            .unwrap()
+            .constant_fold(&consts)
+            .unwrap();
+
+        for (i, &expected) in outputs.iter().enumerate() {
+            let res_val: u64 = res
+                .get(i)
+                .unwrap()
+                .1
+                .get_custom_value::<ConstInt>()
+                .expect("This function assumes all incoming constants are floats.")
+                .value_u();
+
+            assert_eq!(res_val, expected);
+        }
     }
 }

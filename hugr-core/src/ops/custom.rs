@@ -13,7 +13,6 @@ use {
 use crate::extension::{ConstFoldResult, ExtensionId, ExtensionRegistry, OpDef, SignatureError};
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::HugrView;
-use crate::types::EdgeKind;
 use crate::types::{type_param::TypeArg, Signature};
 use crate::{ops, Hugr, IncomingPort, Node};
 
@@ -21,158 +20,14 @@ use super::dataflow::DataflowOpTrait;
 use super::tag::OpTag;
 use super::{NamedOp, OpName, OpNameRef, OpTrait, OpType};
 
-/// A user-defined operation defined in an extension.
-///
-/// Any custom operation can be encoded as a serializable [`OpaqueOp`]. If the
-/// operation's extension is loaded in the current context, the operation can be
-/// resolved into an [`ExtensionOp`] containing a reference to its definition.
-///
-///   [`OpaqueOp`]: crate::ops::custom::OpaqueOp
-///   [`ExtensionOp`]: crate::ops::custom::ExtensionOp
-#[derive(Clone, Debug, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(test, derive(Arbitrary))]
-#[serde(into = "OpaqueOp", from = "OpaqueOp")]
-pub enum CustomOp {
-    /// When we've found (loaded) the [Extension] definition and identified the [OpDef]
-    ///
-    /// [Extension]: crate::Extension
-    Extension(Box<ExtensionOp>),
-    /// When we either haven't tried to identify the [Extension] or failed to find it.
-    ///
-    /// [Extension]: crate::Extension
-    Opaque(Box<OpaqueOp>),
-}
-
-impl PartialEq for CustomOp {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::Extension(l0), Self::Extension(r0)) => l0 == r0,
-            (Self::Opaque(l0), Self::Opaque(r0)) => l0 == r0,
-            (Self::Extension(l0), Self::Opaque(r0)) => &l0.make_opaque() == r0.as_ref(),
-            (Self::Opaque(l0), Self::Extension(r0)) => l0.as_ref() == &r0.make_opaque(),
-        }
-    }
-}
-
-impl CustomOp {
-    /// Create a new CustomOp from an [ExtensionOp].
-    pub fn new_extension(op: ExtensionOp) -> Self {
-        Self::Extension(Box::new(op))
-    }
-
-    /// Create a new CustomOp from an [OpaqueOp].
-    pub fn new_opaque(op: OpaqueOp) -> Self {
-        Self::Opaque(Box::new(op))
-    }
-
-    /// Return the argument values for this operation.
-    pub fn args(&self) -> &[TypeArg] {
-        match self {
-            Self::Opaque(op) => op.args(),
-            Self::Extension(op) => op.args(),
-        }
-    }
-
-    /// Returns the extension ID of this operation.
-    pub fn extension(&self) -> &ExtensionId {
-        match self {
-            Self::Opaque(op) => op.extension(),
-            Self::Extension(op) => op.def.extension(),
-        }
-    }
-
-    /// If the operation is an instance of [ExtensionOp], return a reference to it.
-    /// If the operation is opaque, return None.
-    pub fn as_extension_op(&self) -> Option<&ExtensionOp> {
-        match self {
-            Self::Extension(e) => Some(e),
-            Self::Opaque(_) => None,
-        }
-    }
-
-    /// Downgrades this opaque operation into an [`OpaqueOp`].
-    pub fn into_opaque(self) -> OpaqueOp {
-        match self {
-            Self::Opaque(op) => *op,
-            Self::Extension(op) => (*op).into(),
-        }
-    }
-
-    /// Returns `true` if this operation is an instance of [`ExtensionOp`].
-    pub fn is_extension_op(&self) -> bool {
-        matches!(self, Self::Extension(_))
-    }
-
-    /// Returns `true` if this operation is an instance of [`OpaqueOp`].
-    pub fn is_opaque(&self) -> bool {
-        matches!(self, Self::Opaque(_))
-    }
-}
-
-impl NamedOp for CustomOp {
-    /// The name of the operation.
-    fn name(&self) -> OpName {
-        let (res_id, name) = match self {
-            Self::Opaque(op) => (&op.extension, &op.name),
-            Self::Extension(ext) => (ext.def.extension(), ext.def.name()),
-        };
-        qualify_name(res_id, name)
-    }
-}
-
-impl DataflowOpTrait for CustomOp {
-    const TAG: OpTag = OpTag::Leaf;
-
-    /// A human-readable description of the operation.
-    fn description(&self) -> &str {
-        match self {
-            Self::Opaque(op) => DataflowOpTrait::description(op.as_ref()),
-            Self::Extension(ext_op) => DataflowOpTrait::description(ext_op.as_ref()),
-        }
-    }
-
-    /// The signature of the operation.
-    fn signature(&self) -> Signature {
-        match self {
-            Self::Opaque(op) => op.signature(),
-            Self::Extension(ext_op) => ext_op.signature(),
-        }
-    }
-
-    fn other_input(&self) -> Option<EdgeKind> {
-        Some(EdgeKind::StateOrder)
-    }
-
-    fn other_output(&self) -> Option<EdgeKind> {
-        Some(EdgeKind::StateOrder)
-    }
-}
-
-impl From<OpaqueOp> for CustomOp {
-    fn from(op: OpaqueOp) -> Self {
-        Self::new_opaque(op)
-    }
-}
-
-impl From<CustomOp> for OpaqueOp {
-    fn from(value: CustomOp) -> Self {
-        value.into_opaque()
-    }
-}
-
-impl From<ExtensionOp> for CustomOp {
-    fn from(op: ExtensionOp) -> Self {
-        Self::new_extension(op)
-    }
-}
-
 /// An operation defined by an [OpDef] from a loaded [Extension].
 ///
 /// Extension ops are not serializable. They must be downgraded into an [OpaqueOp] instead.
 /// See [ExtensionOp::make_opaque].
 ///
 /// [Extension]: crate::Extension
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize)]
+#[serde(into = "OpaqueOp")]
 #[cfg_attr(test, derive(Arbitrary))]
 pub struct ExtensionOp {
     #[cfg_attr(
@@ -193,6 +48,31 @@ impl ExtensionOp {
     ) -> Result<Self, SignatureError> {
         let args = args.into();
         let signature = def.compute_signature(&args, exts)?;
+        Ok(Self {
+            def,
+            args,
+            signature,
+        })
+    }
+
+    /// If OpDef is missing binary computation, trust the cached signature.
+    fn new_with_cached(
+        def: Arc<OpDef>,
+        args: impl Into<Vec<TypeArg>>,
+        opaque: &OpaqueOp,
+        exts: &ExtensionRegistry,
+    ) -> Result<Self, SignatureError> {
+        let args = args.into();
+        // TODO skip computation depending on config
+        // see https://github.com/CQCL/hugr/issues/1363
+        let signature = match def.compute_signature(&args, exts) {
+            Ok(sig) => sig,
+            Err(SignatureError::MissingComputeFunc) => {
+                // TODO raise warning: https://github.com/CQCL/hugr/issues/1432
+                opaque.signature()
+            }
+            Err(e) => return Err(e),
+        };
         Ok(Self {
             def,
             args,
@@ -250,12 +130,6 @@ impl From<ExtensionOp> for OpaqueOp {
     }
 }
 
-impl From<ExtensionOp> for OpType {
-    fn from(value: ExtensionOp) -> Self {
-        OpType::CustomOp(value.into())
-    }
-}
-
 impl PartialEq for ExtensionOp {
     fn eq(&self, other: &Self) -> bool {
         Arc::<OpDef>::ptr_eq(&self.def, &other.def) && self.args == other.args
@@ -263,6 +137,13 @@ impl PartialEq for ExtensionOp {
 }
 
 impl Eq for ExtensionOp {}
+
+impl NamedOp for ExtensionOp {
+    /// The name of the operation.
+    fn name(&self) -> OpName {
+        qualify_name(self.def.extension(), self.def.name())
+    }
+}
 
 impl DataflowOpTrait for ExtensionOp {
     const TAG: OpTag = OpTag::Leaf;
@@ -278,9 +159,9 @@ impl DataflowOpTrait for ExtensionOp {
 
 /// An opaquely-serialized op that refers to an as-yet-unresolved [`OpDef`].
 ///
-/// All [CustomOp]s are serialised as `OpaqueOp`s.
+/// [ExtensionOp]s are serialised as `OpaqueOp`s.
 ///
-/// The signature of a [CustomOp] always includes that op's extension. We do not
+/// The signature of a [ExtensionOp] always includes that op's extension. We do not
 /// require that the `signature` field of [OpaqueOp] contains `extension`,
 /// instead we are careful to add it whenever we look at the `signature` of an
 /// `OpaqueOp`. This is a small efficiency in serialisation and allows us to
@@ -323,9 +204,15 @@ impl OpaqueOp {
     }
 }
 
+impl NamedOp for OpaqueOp {
+    /// The name of the operation.
+    fn name(&self) -> OpName {
+        qualify_name(&self.extension, &self.name)
+    }
+}
 impl OpaqueOp {
     /// Unique name of the operation.
-    pub fn name(&self) -> &OpName {
+    pub fn op_name(&self) -> &OpName {
         &self.name
     }
 
@@ -337,12 +224,6 @@ impl OpaqueOp {
     /// Parent extension.
     pub fn extension(&self) -> &ExtensionId {
         &self.extension
-    }
-}
-
-impl From<OpaqueOp> for OpType {
-    fn from(value: OpaqueOp) -> Self {
-        OpType::CustomOp(value.into())
     }
 }
 
@@ -364,13 +245,12 @@ impl DataflowOpTrait for OpaqueOp {
 pub fn resolve_extension_ops(
     h: &mut Hugr,
     extension_registry: &ExtensionRegistry,
-) -> Result<(), CustomOpError> {
+) -> Result<(), OpaqueOpError> {
     let mut replacements = Vec::new();
     for n in h.nodes() {
-        if let OpType::CustomOp(CustomOp::Opaque(opaque)) = h.get_optype(n) {
-            if let Some(resolved) = resolve_opaque_op(n, opaque, extension_registry)? {
-                replacements.push((n, resolved))
-            }
+        if let OpType::OpaqueOp(opaque) = h.get_optype(n) {
+            let resolved = resolve_opaque_op(n, opaque, extension_registry)?;
+            replacements.push((n, resolved));
         }
     }
     // Only now can we perform the replacements as the 'for' loop was borrowing 'h' preventing use from using it mutably
@@ -393,30 +273,46 @@ pub fn resolve_extension_ops(
 /// If the serialized opaque resolves to a definition that conflicts with what
 /// was serialized
 pub fn resolve_opaque_op(
-    _n: Node,
+    node: Node,
     opaque: &OpaqueOp,
     extension_registry: &ExtensionRegistry,
-) -> Result<Option<ExtensionOp>, CustomOpError> {
+) -> Result<ExtensionOp, OpaqueOpError> {
     if let Some(r) = extension_registry.get(&opaque.extension) {
         // Fail if the Extension was found but did not have the expected operation
         let Some(def) = r.get_op(&opaque.name) else {
-            return Err(CustomOpError::OpNotFoundInExtension(
+            return Err(OpaqueOpError::OpNotFoundInExtension(
+                node,
                 opaque.name.clone(),
                 r.name().clone(),
             ));
         };
-        let ext_op = ExtensionOp::new(def.clone(), opaque.args.clone(), extension_registry)?;
+        let ext_op = ExtensionOp::new_with_cached(
+            def.clone(),
+            opaque.args.clone(),
+            opaque,
+            extension_registry,
+        )
+        .map_err(|e| OpaqueOpError::SignatureError {
+            node,
+            name: opaque.name.clone(),
+            cause: e,
+        })?;
         if opaque.signature() != ext_op.signature() {
-            return Err(CustomOpError::SignatureMismatch {
+            return Err(OpaqueOpError::SignatureMismatch {
+                node,
                 extension: opaque.extension.clone(),
                 op: def.name().clone(),
                 computed: ext_op.signature.clone(),
                 stored: opaque.signature.clone(),
             });
         };
-        Ok(Some(ext_op))
+        Ok(ext_op)
     } else {
-        Ok(None)
+        Err(OpaqueOpError::UnresolvedOp(
+            node,
+            opaque.name.clone(),
+            opaque.extension.clone(),
+        ))
     }
 }
 
@@ -424,33 +320,46 @@ pub fn resolve_opaque_op(
 /// when trying to resolve the serialized names against a registry of known Extensions.
 #[derive(Clone, Debug, Error, PartialEq)]
 #[non_exhaustive]
-pub enum CustomOpError {
+pub enum OpaqueOpError {
     /// The Extension was found but did not contain the expected OpDef
-    #[error("Operation {0} not found in Extension {1}")]
-    OpNotFoundInExtension(OpName, ExtensionId),
+    #[error("Operation '{1}' in {0} not found in Extension {2}")]
+    OpNotFoundInExtension(Node, OpName, ExtensionId),
     /// Extension and OpDef found, but computed signature did not match stored
     #[error("Conflicting signature: resolved {op} in extension {extension} to a concrete implementation which computed {computed} but stored signature was {stored}")]
     #[allow(missing_docs)]
     SignatureMismatch {
+        node: Node,
         extension: ExtensionId,
         op: OpName,
         stored: Signature,
         computed: Signature,
     },
     /// An error in computing the signature of the ExtensionOp
-    #[error(transparent)]
-    SignatureError(#[from] SignatureError),
+    #[error("Error in signature of operation '{name}' in {node}: {cause}")]
+    #[allow(missing_docs)]
+    SignatureError {
+        node: Node,
+        name: OpName,
+        #[source]
+        cause: SignatureError,
+    },
+    /// Unresolved operation encountered during validation.
+    #[error("Unexpected unresolved opaque operation '{1}' in {0}, from Extension {2}.")]
+    UnresolvedOp(Node, OpName, ExtensionId),
 }
 
 #[cfg(test)]
 mod test {
 
+    use crate::std_extensions::arithmetic::conversions::{self, CONVERT_OPS_REGISTRY};
     use crate::{
-        extension::prelude::{BOOL_T, QB_T, USIZE_T},
-        std_extensions::arithmetic::{
-            int_ops::{self, INT_OPS_REGISTRY},
-            int_types::INT_TYPES,
+        extension::{
+            prelude::{BOOL_T, QB_T, USIZE_T},
+            SignatureFunc,
         },
+        std_extensions::arithmetic::int_types::INT_TYPES,
+        types::FuncValueType,
+        Extension,
     };
 
     use super::*;
@@ -458,14 +367,13 @@ mod test {
     #[test]
     fn new_opaque_op() {
         let sig = Signature::new_endo(vec![QB_T]);
-        let op: CustomOp = OpaqueOp::new(
+        let op = OpaqueOp::new(
             "res".try_into().unwrap(),
             "op",
             "desc".into(),
             vec![TypeArg::Type { ty: USIZE_T }],
             sig.clone(),
-        )
-        .into();
+        );
         assert_eq!(op.name(), "res.op");
         assert_eq!(DataflowOpTrait::description(&op), "desc");
         assert_eq!(op.args(), &[TypeArg::Type { ty: USIZE_T }]);
@@ -473,16 +381,14 @@ mod test {
             op.signature(),
             sig.with_extension_delta(op.extension().clone())
         );
-        assert!(op.is_opaque());
-        assert!(!op.is_extension_op());
     }
 
     #[test]
     fn resolve_opaque_op() {
-        let registry = &INT_OPS_REGISTRY;
+        let registry = &CONVERT_OPS_REGISTRY;
         let i0 = &INT_TYPES[0];
         let opaque = OpaqueOp::new(
-            int_ops::EXTENSION_ID,
+            conversions::EXTENSION_ID,
             "itobool",
             "description".into(),
             vec![],
@@ -490,8 +396,54 @@ mod test {
         );
         let resolved =
             super::resolve_opaque_op(Node::from(portgraph::NodeIndex::new(1)), &opaque, registry)
-                .unwrap()
                 .unwrap();
         assert_eq!(resolved.def().name(), "itobool");
+    }
+
+    #[test]
+    fn resolve_missing() {
+        let mut ext = Extension::new_test("ext".try_into().unwrap());
+        let ext_id = ext.name().clone();
+        let val_name = "missing_val";
+        let comp_name = "missing_comp";
+
+        let endo_sig = Signature::new_endo(BOOL_T);
+        ext.add_op(
+            val_name.into(),
+            "".to_string(),
+            SignatureFunc::MissingValidateFunc(FuncValueType::from(endo_sig.clone()).into()),
+        )
+        .unwrap();
+
+        ext.add_op(
+            comp_name.into(),
+            "".to_string(),
+            SignatureFunc::MissingComputeFunc,
+        )
+        .unwrap();
+        let registry = ExtensionRegistry::try_new([ext]).unwrap();
+        let opaque_val = OpaqueOp::new(
+            ext_id.clone(),
+            val_name,
+            "".into(),
+            vec![],
+            endo_sig.clone(),
+        );
+        let opaque_comp = OpaqueOp::new(ext_id.clone(), comp_name, "".into(), vec![], endo_sig);
+        let resolved_val = super::resolve_opaque_op(
+            Node::from(portgraph::NodeIndex::new(1)),
+            &opaque_val,
+            &registry,
+        )
+        .unwrap();
+        assert_eq!(resolved_val.def().name(), val_name);
+
+        let resolved_comp = super::resolve_opaque_op(
+            Node::from(portgraph::NodeIndex::new(2)),
+            &opaque_comp,
+            &registry,
+        )
+        .unwrap();
+        assert_eq!(resolved_comp.def().name(), comp_name);
     }
 }

@@ -30,7 +30,7 @@ pub use type_def::{TypeDef, TypeDefBound};
 mod const_fold;
 pub mod prelude;
 pub mod simple_op;
-pub use const_fold::{ConstFold, ConstFoldResult, Folder};
+pub use const_fold::{fold_out_row, ConstFold, ConstFoldResult, Folder};
 pub use prelude::{PRELUDE, PRELUDE_REGISTRY};
 
 #[cfg(feature = "declarative")]
@@ -234,7 +234,7 @@ impl CustomConcrete for OpaqueOp {
     type Identifier = OpName;
 
     fn def_name(&self) -> &OpName {
-        self.name()
+        self.op_name()
     }
 
     fn type_args(&self) -> &[TypeArg] {
@@ -594,6 +594,18 @@ pub mod test {
         /// Create a new extension for testing, with a 0 version.
         pub(crate) fn new_test(name: ExtensionId) -> Self {
             Self::new(name, Version::new(0, 0, 0))
+        }
+
+        /// Add a simple OpDef to the extension and return an extension op for it.
+        /// No description, no type parameters.
+        pub(crate) fn simple_ext_op(
+            &mut self,
+            name: &str,
+            signature: impl Into<SignatureFunc>,
+        ) -> ExtensionOp {
+            self.add_op(name.into(), "".to_string(), signature).unwrap();
+            self.instantiate_extension_op(name, [], &PRELUDE_REGISTRY)
+                .unwrap()
         }
     }
 

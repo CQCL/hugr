@@ -1,9 +1,10 @@
+use crate::extension::prelude::{ConstString, ConstUsize};
 use crate::ops::constant::get_single_input_value;
 use crate::ops::Value;
 use crate::std_extensions::arithmetic::int_types::INT_TYPES;
 use crate::{
     extension::{
-        prelude::{sum_with_error, ConstError},
+        prelude::{const_ok, ConstError, ERROR_TYPE},
         ConstFold, ConstFoldResult, OpDef,
     },
     ops,
@@ -25,6 +26,12 @@ pub(super) fn set_fold(op: &ConvertOpDef, def: &mut OpDef) {
         trunc_s => def.set_constant_folder(TruncS),
         convert_u => def.set_constant_folder(ConvertU),
         convert_s => def.set_constant_folder(ConvertS),
+        itobool => def.set_constant_folder(IToBool),
+        ifrombool => def.set_constant_folder(IFromBool),
+        itostring_u => def.set_constant_folder(IToStringU),
+        itostring_s => def.set_constant_folder(IToStringS),
+        itousize => def.set_constant_folder(IToUsize),
+        ifromusize => def.set_constant_folder(IFromUsize),
     }
 }
 
@@ -40,21 +47,19 @@ fn fold_trunc(
     };
     let log_width = get_log_width(arg).ok()?;
     let int_type = INT_TYPES[log_width as usize].to_owned();
-    let sum_type = sum_with_error(int_type.clone());
     let err_value = || {
-        let err_val = ConstError {
+        ConstError {
             signal: 0,
             message: "Can't truncate non-finite float".to_string(),
-        };
-        Value::sum(1, [err_val.into()], sum_type.clone())
-            .unwrap_or_else(|e| panic!("Invalid computed sum, {}", e))
+        }
+        .as_either(int_type.clone())
     };
     let out_const: ops::Value = if !f.is_finite() {
         err_value()
     } else {
         let cv = convert(f, log_width);
         if let Ok(cv) = cv {
-            Value::sum(0, [cv], sum_type).unwrap_or_else(|e| panic!("Invalid computed sum, {}", e))
+            const_ok(cv, ERROR_TYPE)
         } else {
             err_value()
         }
@@ -116,5 +121,146 @@ impl ConstFold for ConvertS {
         let u: &ConstInt = get_single_input_value(consts)?;
         let f = u.value_s() as f64;
         Some(vec![(0.into(), ConstF64::new(f).into())])
+    }
+}
+
+struct IToBool;
+
+impl ConstFold for IToBool {
+    fn fold(
+        &self,
+        type_args: &[crate::types::TypeArg],
+        consts: &[(IncomingPort, ops::Value)],
+    ) -> ConstFoldResult {
+        if !type_args.is_empty() {
+            return None;
+        }
+        let n0: &ConstInt = get_single_input_value(consts)?;
+        if n0.log_width() != 0 {
+            None
+        } else {
+            Some(vec![(0.into(), Value::from_bool(n0.value_u() == 1))])
+        }
+    }
+}
+
+struct IFromBool;
+
+impl ConstFold for IFromBool {
+    fn fold(
+        &self,
+        type_args: &[crate::types::TypeArg],
+        consts: &[(IncomingPort, ops::Value)],
+    ) -> ConstFoldResult {
+        if !type_args.is_empty() {
+            return None;
+        }
+        let [(_, b0)] = consts else {
+            return None;
+        };
+        Some(vec![(
+            0.into(),
+            Value::extension(
+                ConstInt::new_u(
+                    0,
+                    if b0.clone() == Value::true_val() {
+                        1
+                    } else {
+                        0
+                    },
+                )
+                .unwrap(),
+            ),
+        )])
+    }
+}
+
+struct IToStringU;
+
+impl ConstFold for IToStringU {
+    fn fold(
+        &self,
+        type_args: &[crate::types::TypeArg],
+        consts: &[(IncomingPort, ops::Value)],
+    ) -> ConstFoldResult {
+        let [arg] = type_args else {
+            return None;
+        };
+        let logwidth: u8 = get_log_width(arg).ok()?;
+        let n0: &ConstInt = get_single_input_value(consts)?;
+        if n0.log_width() != logwidth {
+            None
+        } else {
+            Some(vec![(
+                0.into(),
+                Value::extension(ConstString::new(n0.value_u().to_string())),
+            )])
+        }
+    }
+}
+
+struct IToStringS;
+
+impl ConstFold for IToStringS {
+    fn fold(
+        &self,
+        type_args: &[crate::types::TypeArg],
+        consts: &[(IncomingPort, ops::Value)],
+    ) -> ConstFoldResult {
+        let [arg] = type_args else {
+            return None;
+        };
+        let logwidth: u8 = get_log_width(arg).ok()?;
+        let n0: &ConstInt = get_single_input_value(consts)?;
+        if n0.log_width() != logwidth {
+            None
+        } else {
+            Some(vec![(
+                0.into(),
+                Value::extension(ConstString::new(n0.value_s().to_string())),
+            )])
+        }
+    }
+}
+
+struct IToUsize;
+
+impl ConstFold for IToUsize {
+    fn fold(
+        &self,
+        type_args: &[crate::types::TypeArg],
+        consts: &[(IncomingPort, ops::Value)],
+    ) -> ConstFoldResult {
+        if !type_args.is_empty() {
+            return None;
+        };
+        let n0: &ConstInt = get_single_input_value(consts)?;
+        if n0.log_width() != 6 {
+            None
+        } else {
+            Some(vec![(
+                0.into(),
+                Value::extension(ConstUsize::new(n0.value_u())),
+            )])
+        }
+    }
+}
+
+struct IFromUsize;
+
+impl ConstFold for IFromUsize {
+    fn fold(
+        &self,
+        type_args: &[crate::types::TypeArg],
+        consts: &[(IncomingPort, ops::Value)],
+    ) -> ConstFoldResult {
+        if !type_args.is_empty() {
+            return None;
+        };
+        let n0: &ConstUsize = get_single_input_value(consts)?;
+        Some(vec![(
+            0.into(),
+            Value::extension(ConstInt::new_u(6, n0.value()).unwrap()),
+        )])
     }
 }

@@ -6,6 +6,7 @@ from contextlib import AbstractContextManager
 from dataclasses import dataclass, field, replace
 from typing import (
     TYPE_CHECKING,
+    Any,
     Generic,
     TypeVar,
 )
@@ -13,23 +14,24 @@ from typing import (
 from typing_extensions import Self
 
 from hugr import ops, tys, val
-
-from .exceptions import NoSiblingAncestor
-from .hugr import Hugr, ParentBuilder
+from hugr.build.base import ParentBuilder
+from hugr.exceptions import NoSiblingAncestor
+from hugr.hugr import Hugr
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
+    from hugr.hugr.node_port import Node, OutPort, PortOffset, ToNode, Wire
+    from hugr.tys import Type, TypeParam, TypeRow
+
     from .cfg import Cfg
     from .cond_loop import Conditional, If, TailLoop
-    from .node_port import Node, OutPort, PortOffset, ToNode, Wire
-    from .tys import Type, TypeParam, TypeRow
 
 OpVar = TypeVar("OpVar", bound=ops.Op)
 
 
 @dataclass()
-class _DefinitionBuilder(Generic[OpVar]):
+class DefinitionBuilder(Generic[OpVar]):
     """Base class for builders that can define functions, constants, and aliases.
 
     As this class may be a root node, it does not extend `ParentBuilder`.
@@ -41,26 +43,36 @@ class _DefinitionBuilder(Generic[OpVar]):
         self,
         name: str,
         input_types: TypeRow,
+        output_types: TypeRow | None = None,
         type_params: list[TypeParam] | None = None,
+        parent: ToNode | None = None,
     ) -> Function:
         """Start building a function definition in the graph.
 
         Args:
             name: The name of the function.
             input_types: The input types for the function.
+            output_types: The output types for the function.
+                If not provided, it will be inferred after the function is built.
             type_params: The type parameters for the function, if polymorphic.
+            parent: The parent node of the constant. Defaults to the root node.
 
         Returns:
             The new function builder.
         """
+        parent_node = parent or self.hugr.root
         parent_op = ops.FuncDefn(name, input_types, type_params or [])
-        return Function.new_nested(parent_op, self.hugr)
+        func = Function.new_nested(parent_op, self.hugr, parent_node)
+        if output_types is not None:
+            func.declare_outputs(output_types)
+        return func
 
-    def add_const(self, value: val.Value) -> Node:
+    def add_const(self, value: val.Value, parent: ToNode | None = None) -> Node:
         """Add a static constant to the graph.
 
         Args:
             value: The constant value to add.
+            parent: The parent node of the constant. Defaults to the root node.
 
         Returns:
             The node holding the :class:`Const <hugr.ops.Const>` operation.
@@ -71,18 +83,20 @@ class _DefinitionBuilder(Generic[OpVar]):
             >>> dfg.hugr[const_n].op
             Const(TRUE)
         """
-        return self.hugr.add_node(ops.Const(value), self.hugr.root)
+        parent_node = parent or self.hugr.root
+        return self.hugr.add_node(ops.Const(value), parent_node)
 
-    def add_alias_defn(self, name: str, ty: Type) -> Node:
+    def add_alias_defn(self, name: str, ty: Type, parent: ToNode | None = None) -> Node:
         """Add a type alias definition."""
-        return self.hugr.add_node(ops.AliasDefn(name, ty), self.hugr.root)
+        parent_node = parent or self.hugr.root
+        return self.hugr.add_node(ops.AliasDefn(name, ty), parent_node)
 
 
 DP = TypeVar("DP", bound=ops.DfParentOp)
 
 
 @dataclass()
-class _DfBase(ParentBuilder[DP], _DefinitionBuilder, AbstractContextManager):
+class DfBase(ParentBuilder[DP], DefinitionBuilder, AbstractContextManager):
     """Base class for dataflow graph builders.
 
     Args:
@@ -158,12 +172,15 @@ class _DfBase(ParentBuilder[DP], _DefinitionBuilder, AbstractContextManager):
         """
         return [self.input_node.out(i) for i in range(len(self._input_op().types))]
 
-    def add_op(self, op: ops.DataflowOp, /, *args: Wire) -> Node:
+    def add_op(
+        self, op: ops.DataflowOp, /, *args: Wire, metadata: dict[str, Any] | None = None
+    ) -> Node:
         """Add a dataflow operation to the graph, wiring in input ports.
 
         Args:
             op: The operation to add.
             args: The input wires to the operation.
+            metadata: Metadata to attach to the function definition. Defaults to None.
 
         Returns:
             The node holding the new operation.
@@ -173,17 +190,18 @@ class _DfBase(ParentBuilder[DP], _DefinitionBuilder, AbstractContextManager):
             >>> dfg.add_op(ops.Noop(), dfg.inputs()[0])
             Node(3)
         """
-        new_n = self.hugr.add_node(op, self.parent_node)
+        new_n = self.hugr.add_node(op, self.parent_node, metadata=metadata)
         self._wire_up(new_n, args)
 
         return replace(new_n, _num_out_ports=op.num_out)
 
-    def add(self, com: ops.Command) -> Node:
+    def add(self, com: ops.Command, *, metadata: dict[str, Any] | None = None) -> Node:
         """Add a command (holding a dataflow operation and the incoming wires)
         to the graph.
 
         Args:
             com: The command to add.
+            metadata: Metadata to attach to the function definition. Defaults to None.
 
         Example:
             >>> dfg = Dfg(tys.Bool)
@@ -200,7 +218,7 @@ class _DfBase(ParentBuilder[DP], _DefinitionBuilder, AbstractContextManager):
         wires = (
             (w if not isinstance(w, int) else raise_no_ints()) for w in com.incoming
         )
-        return self.add_op(com.op, *wires)
+        return self.add_op(com.op, *wires, metadata=metadata)
 
     def extend(self, *coms: ops.Command) -> list[Node]:
         """Add a series of commands to the DFG.
@@ -466,6 +484,18 @@ class _DfBase(ParentBuilder[DP], _DefinitionBuilder, AbstractContextManager):
         self._wire_up(self.output_node, args)
         self.parent_op._set_out_types(self._output_op().types)
 
+    def _set_parent_output_count(self, count: int) -> None:
+        """Set the final number of output ports on the parent operation.
+
+        Args:
+            count: The number of output ports.
+
+        Example:
+            >>> dfg = Dfg(tys.Bool)
+            >>> dfg._set_parent_output_count(2)
+        """
+        self.parent_node = self.hugr._update_node_outs(self.parent_node, count)
+
     def add_state_order(self, src: Node, dst: Node) -> None:
         """Add a state order link between two nodes.
 
@@ -482,13 +512,17 @@ class _DfBase(ParentBuilder[DP], _DefinitionBuilder, AbstractContextManager):
         # adds edge to the right of all existing edges
         self.hugr.add_link(src.out(-1), dst.inp(-1))
 
-    def load(self, const: ToNode | val.Value) -> Node:
+    def load(
+        self, const: ToNode | val.Value, const_parent: ToNode | None = None
+    ) -> Node:
         """Load a constant into the graph as a dataflow value.
 
         Args:
             const: The constant to load, either a Value that will be added as a
-            child Const node then loaded, or a node corresponding to an existing
-            Const.
+                child Const node then loaded, or a node corresponding to an
+                existing Const.
+            const_parent: If `const` is a Value, the parent node for the new
+                constant definition. Defaults to the current dataflow container.
 
         Returns:
             The node holding the :class:`LoadConst <hugr.ops.LoadConst>`
@@ -503,7 +537,8 @@ class _DfBase(ParentBuilder[DP], _DefinitionBuilder, AbstractContextManager):
             LoadConst(Bool)
         """
         if isinstance(const, val.Value):
-            const = self.add_const(const)
+            const_parent = const_parent or self.parent_node
+            const = self.add_const(const, parent=const_parent)
         const_op = self.hugr._get_typed_op(const, ops.Const)
         load_op = ops.LoadConst(const_op.val.type_())
 
@@ -602,7 +637,7 @@ class _DfBase(ParentBuilder[DP], _DefinitionBuilder, AbstractContextManager):
         return self._get_dataflow_type(src)
 
 
-class Dfg(_DfBase[ops.DFG]):
+class Dfg(DfBase[ops.DFG]):
     """Builder for a simple nested Dataflow graph, with root node of type
     :class:`DFG <hugr.ops.DFG>`.
 
@@ -620,6 +655,10 @@ class Dfg(_DfBase[ops.DFG]):
         parent_op = ops.DFG(list(input_types), None)
         super().__init__(parent_op)
 
+    def set_outputs(self, *outputs: Wire) -> None:
+        super().set_outputs(*outputs)
+        self._set_parent_output_count(len(outputs))
+
 
 def _ancestral_sibling(h: Hugr, src: Node, tgt: Node) -> Node | None:
     """Find the ancestor of `tgt` that is a sibling of `src`, if one exists."""
@@ -634,7 +673,7 @@ def _ancestral_sibling(h: Hugr, src: Node, tgt: Node) -> Node | None:
 
 
 @dataclass
-class Function(_DfBase[ops.FuncDefn]):
+class Function(DfBase[ops.FuncDefn]):
     """Build a function definition as a HUGR dataflow graph.
 
     Args:
@@ -646,7 +685,7 @@ class Function(_DfBase[ops.FuncDefn]):
     Examples:
         >>> f = Function("f", [tys.Bool])
         >>> f.parent_op
-        FuncDefn(name='f', inputs=[Bool], params=[])
+        FuncDefn(f_name='f', inputs=[Bool], params=[])
     """
 
     def __init__(
@@ -657,3 +696,38 @@ class Function(_DfBase[ops.FuncDefn]):
     ) -> None:
         root_op = ops.FuncDefn(name, input_types, type_params or [])
         super().__init__(root_op)
+
+    def declare_outputs(self, output_types: TypeRow) -> None:
+        """Declare the output types of the function.
+
+        This is required when calling a function which hasn't been completely
+        defined yet. The wires passed to :meth:`set_outputs` must match the
+        declared output types.
+        """
+        self._set_parent_output_count(len(output_types))
+        self.parent_op._set_out_types(output_types)
+
+    def set_outputs(self, *args: Wire) -> None:
+        """Set the outputs of the dataflow graph.
+        Connects wires to the output node.
+
+        If :meth:`declare_outputs` has been called, the wire types must match
+        the declared output types.
+
+        Args:
+            args: Wires to connect to the output node.
+
+        Example:
+            >>> dfg = Dfg(tys.Bool)
+            >>> dfg.set_outputs(dfg.inputs()[0]) # connect input to output
+        """
+        if self.parent_op._outputs is not None:
+            arg_types = [self._get_dataflow_type(w) for w in args]
+            if arg_types != self.parent_op._outputs:
+                error_message = (
+                    f"The function has fixed output type {self.parent_op._outputs}, "
+                    f"but was given output wires with types {arg_types}."
+                )
+                raise ValueError(error_message)
+
+        super().set_outputs(*args)

@@ -1,11 +1,12 @@
 import pytest
 
 from hugr import ops, tys, val
-from hugr.cond_loop import Conditional, ConditionalError, TailLoop
-from hugr.dfg import Dfg
+from hugr.build.cond_loop import Conditional, ConditionalError, TailLoop
+from hugr.build.dfg import Dfg
+from hugr.ext import Package
 from hugr.std.int import INT_T, IntVal
 
-from .conftest import H, Measure, validate
+from .conftest import QUANTUM_EXT, H, Measure, validate
 
 SUM_T = tys.Sum([[tys.Qubit], [tys.Qubit, INT_T]])
 
@@ -64,7 +65,7 @@ def test_if_else() -> None:
 
     h.set_outputs(else_.conditional_node)
 
-    validate(h.hugr)
+    validate(Package([h.hugr], [QUANTUM_EXT]))
 
 
 def test_incomplete() -> None:
@@ -93,7 +94,7 @@ def test_tail_loop() -> None:
         build_tl(tl)
     h.set_outputs(tl)
 
-    validate(h.hugr)
+    validate(Package([h.hugr], [QUANTUM_EXT]))
 
     # build then insert
     tl = TailLoop([], [tys.Qubit])
@@ -103,7 +104,7 @@ def test_tail_loop() -> None:
     (q,) = h.inputs()
     tl_n = h.insert_tail_loop(tl, [q], [])
     h.set_outputs(tl_n)
-    validate(h.hugr)
+    validate(Package([h.hugr], [QUANTUM_EXT]))
 
 
 def test_complex_tail_loop() -> None:
@@ -132,6 +133,4 @@ def test_complex_tail_loop() -> None:
     # loop returns [qubit, int, bool]
     h.set_outputs(*tl[:3])
 
-    validate(h.hugr, True)
-
-    # TODO rewrite with context managers
+    validate(h.hugr)

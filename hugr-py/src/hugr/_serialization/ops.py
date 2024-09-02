@@ -7,7 +7,9 @@ from typing import Any, Literal
 
 from pydantic import ConfigDict, Field, RootModel
 
-from hugr.node_port import NodeIdx  # noqa: TCH001 # pydantic needs this alias in scope
+from hugr.hugr.node_port import (
+    NodeIdx,  # noqa: TCH001 # pydantic needs this alias in scope
+)
 from hugr.utils import deser_it
 
 from . import tys as stys
@@ -103,7 +105,7 @@ class BaseValue(ABC, ConfiguredBaseModel):
     def deserialize(self) -> val.Value: ...
 
 
-class ExtensionValue(BaseValue):
+class CustomValue(BaseValue):
     """An extension constant value, that can check it is of a given [CustomType]."""
 
     v: Literal["Extension"] = Field(default="Extension", title="ValueTag")
@@ -112,7 +114,12 @@ class ExtensionValue(BaseValue):
     value: CustomConst
 
     def deserialize(self) -> val.Value:
-        return val.Extension(self.value.c, self.typ.deserialize(), self.value.v)
+        return val.Extension(
+            name=self.value.c,
+            typ=self.typ.deserialize(),
+            val=self.value.v,
+            extensions=self.extensions,
+        )
 
 
 class FunctionValue(BaseValue):
@@ -122,11 +129,11 @@ class FunctionValue(BaseValue):
     hugr: Any
 
     def deserialize(self) -> val.Value:
+        from hugr._serialization.serial_hugr import SerialHugr
         from hugr.hugr import Hugr
-        from hugr.serialization.serial_hugr import SerialHugr
 
         # pydantic stores the serialized dictionary because of the "Any" annotation
-        return val.Function(Hugr.from_serial(SerialHugr(**self.hugr)))
+        return val.Function(Hugr._from_serial(SerialHugr(**self.hugr)))
 
 
 class TupleValue(BaseValue):
@@ -167,9 +174,7 @@ class SumValue(BaseValue):
 class Value(RootModel):
     """A constant Value."""
 
-    root: ExtensionValue | FunctionValue | TupleValue | SumValue = Field(
-        discriminator="v"
-    )
+    root: CustomValue | FunctionValue | TupleValue | SumValue = Field(discriminator="v")
 
     model_config = ConfigDict(json_schema_extra={"required": ["v"]})
 
@@ -496,12 +501,12 @@ class CFG(DataflowOp):
 ControlFlowOp = Conditional | TailLoop | CFG
 
 
-class CustomOp(DataflowOp):
+class ExtensionOp(DataflowOp):
     """A user-defined operation that can be downcasted by the extensions that define
     it.
     """
 
-    op: Literal["CustomOp"] = "CustomOp"
+    op: Literal["Extension"] = "Extension"
     extension: ExtensionId
     name: str
     signature: stys.FunctionType = Field(default_factory=stys.FunctionType.empty)
@@ -517,7 +522,7 @@ class CustomOp(DataflowOp):
     def deserialize(self) -> ops.Custom:
         return ops.Custom(
             extension=self.extension,
-            name=self.name,
+            op_name=self.name,
             signature=self.signature.deserialize(),
             args=deser_it(self.args),
         )
@@ -533,51 +538,6 @@ class CustomOp(DataflowOp):
     )
 
 
-class Noop(DataflowOp):
-    """A no-op operation."""
-
-    op: Literal["Noop"] = "Noop"
-    ty: Type
-
-    def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
-        assert len(in_types) == 1
-        assert len(out_types) == 1
-        assert in_types[0] == out_types[0]
-        self.ty = in_types[0]
-
-    def deserialize(self) -> ops.Noop:
-        return ops.Noop(self.ty.deserialize())
-
-
-class MakeTuple(DataflowOp):
-    """An operation that packs all its inputs into a tuple."""
-
-    op: Literal["MakeTuple"] = "MakeTuple"
-    tys: TypeRow = Field(default_factory=list)
-
-    def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
-        # If we have a single order edge as input, this is a unit
-        if in_types == [None]:
-            in_types = []
-        self.tys = list(in_types)
-
-    def deserialize(self) -> ops.MakeTuple:
-        return ops.MakeTuple(deser_it(self.tys))
-
-
-class UnpackTuple(DataflowOp):
-    """An operation that packs all its inputs into a tuple."""
-
-    op: Literal["UnpackTuple"] = "UnpackTuple"
-    tys: TypeRow = Field(default_factory=list)
-
-    def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
-        self.tys = list(out_types)
-
-    def deserialize(self) -> ops.UnpackTuple:
-        return ops.UnpackTuple(deser_it(self.tys))
-
-
 class Tag(DataflowOp):
     """An operation that creates a tagged sum value from one of its variants."""
 
@@ -589,20 +549,6 @@ class Tag(DataflowOp):
         return ops.Tag(
             tag=self.tag,
             sum_ty=tys.Sum([deser_it(v) for v in self.variants]),
-        )
-
-
-class Lift(DataflowOp):
-    """Fixes some TypeParams of a polymorphic type by providing TypeArgs."""
-
-    op: Literal["Lift"] = "Lift"
-    type_row: TypeRow
-    new_extension: ExtensionId
-
-    def deserialize(self) -> ops.Lift:
-        return ops.Lift(
-            _type_row=deser_it(self.type_row),
-            new_extension=self.new_extension,
         )
 
 
@@ -644,12 +590,8 @@ class OpType(RootModel):
         | CallIndirect
         | LoadConstant
         | LoadFunction
-        | CustomOp
-        | Noop
-        | MakeTuple
-        | UnpackTuple
+        | ExtensionOp
         | Tag
-        | Lift
         | DFG
         | AliasDecl
         | AliasDefn

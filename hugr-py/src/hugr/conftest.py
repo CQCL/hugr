@@ -2,7 +2,10 @@
 
 import pytest
 
-from hugr import dfg, hugr, node_port, ops, tys, val
+from hugr import ops, tys, val
+from hugr.build import dfg
+from hugr.hugr import base as hugr
+from hugr.hugr import node_port
 
 
 @pytest.fixture(autouse=True)

@@ -1,0 +1,150 @@
+{
+  "version": "0.1.0",
+  "name": "ptr",
+  "extension_reqs": [],
+  "types": {
+    "ptr": {
+      "extension": "ptr",
+      "name": "ptr",
+      "params": [
+        {
+          "tp": "Type",
+          "b": "C"
+        }
+      ],
+      "description": "Standard extension pointer type.",
+      "bound": {
+        "b": "Explicit",
+        "bound": "C"
+      }
+    }
+  },
+  "values": {},
+  "operations": {
+    "New": {
+      "extension": "ptr",
+      "name": "New",
+      "description": "Create a new pointer from a value.",
+      "signature": {
+        "params": [
+          {
+            "tp": "Type",
+            "b": "C"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "V",
+              "i": 0,
+              "b": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "ptr",
+              "id": "ptr",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "C"
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "Read": {
+      "extension": "ptr",
+      "name": "Read",
+      "description": "Read a value from a pointer.",
+      "signature": {
+        "params": [
+          {
+            "tp": "Type",
+            "b": "C"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "ptr",
+              "id": "ptr",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "C"
+                  }
+                }
+              ],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "V",
+              "i": 0,
+              "b": "C"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "Write": {
+      "extension": "ptr",
+      "name": "Write",
+      "description": "Write a value to a pointer, overwriting existing value.",
+      "signature": {
+        "params": [
+          {
+            "tp": "Type",
+            "b": "C"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "ptr",
+              "id": "ptr",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "C"
+                  }
+                }
+              ],
+              "bound": "C"
+            },
+            {
+              "t": "V",
+              "i": 0,
+              "b": "C"
+            }
+          ],
+          "output": [],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    }
+  }
+}

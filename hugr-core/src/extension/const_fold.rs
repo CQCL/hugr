@@ -15,6 +15,16 @@ use crate::ops;
 /// successful and no values are output.
 pub type ConstFoldResult = Option<Vec<(OutgoingPort, ops::Value)>>;
 
+/// Tag some output constants with [`OutgoingPort`] inferred from the ordering.
+pub fn fold_out_row(consts: impl IntoIterator<Item = Value>) -> ConstFoldResult {
+    let vec = consts
+        .into_iter()
+        .enumerate()
+        .map(|(i, c)| (i.into(), c))
+        .collect();
+    Some(vec)
+}
+
 /// Trait implemented by extension operations that can perform constant folding.
 pub trait ConstFold: Send + Sync {
     /// Given type arguments `type_args` and

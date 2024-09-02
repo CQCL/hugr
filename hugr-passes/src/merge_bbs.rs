@@ -2,6 +2,7 @@
 //! and the target BB has no other predecessors.
 use std::collections::HashMap;
 
+use hugr_core::extension::prelude::UnpackTuple;
 use hugr_core::hugr::hugrmut::HugrMut;
 use itertools::Itertools;
 
@@ -9,7 +10,6 @@ use hugr_core::hugr::rewrite::inline_dfg::InlineDFG;
 use hugr_core::hugr::rewrite::replace::{NewEdgeKind, NewEdgeSpec, Replacement};
 use hugr_core::hugr::RootTagged;
 use hugr_core::ops::handle::CfgID;
-use hugr_core::ops::leaf::UnpackTuple;
 use hugr_core::ops::{DataflowBlock, DataflowParent, Input, Output, DFG};
 use hugr_core::{Hugr, HugrView, Node};
 
@@ -158,6 +158,7 @@ fn mk_rep(
 mod test {
     use std::collections::HashSet;
 
+    use hugr_core::extension::prelude::Lift;
     use itertools::Itertools;
     use rstest::rstest;
 
@@ -167,7 +168,7 @@ mod test {
     use hugr_core::hugr::views::sibling::SiblingMut;
     use hugr_core::ops::constant::Value;
     use hugr_core::ops::handle::CfgID;
-    use hugr_core::ops::{Lift, LoadConstant, Noop, OpTrait, OpType};
+    use hugr_core::ops::{LoadConstant, OpTrait, OpType};
     use hugr_core::types::{Signature, Type, TypeRow};
     use hugr_core::{const_extension_ids, type_row, Extension, Hugr, HugrView, Wire};
 
@@ -221,6 +222,8 @@ mod test {
                |        |                =>     /           \
                \--<--<--/                       \--<-----<--/
         */
+
+        use hugr_core::extension::prelude::Noop;
         let loop_variants = type_row![QB_T];
         let exit_types = type_row![USIZE_T];
         let e = extension();
@@ -271,7 +274,7 @@ mod test {
         // Check the Noop('s) is/are in the right block(s)
         let nops = h
             .nodes()
-            .filter(|n| matches!(h.get_optype(*n), OpType::Noop(_)));
+            .filter(|n| h.get_optype(*n).cast::<Noop>().is_some());
         let (entry_nop, expected_backedge_target) = if self_loop {
             assert_eq!(h.children(r).len(), 2);
             (nops.exactly_one().ok().unwrap(), entry)
@@ -294,9 +297,10 @@ mod test {
             HashSet::from([expected_backedge_target, exit])
         );
         // And the Noop in the entry block is consumed by the custom Test op
-        let tst = find_unique(h.nodes(), |n| {
-            matches!(h.get_optype(*n), OpType::CustomOp(_))
-        });
+        let tst = find_unique(
+            h.nodes(),
+            |n| matches!(h.get_optype(*n), OpType::ExtensionOp(c) if c.def().extension() != &PRELUDE_ID),
+        );
         assert_eq!(h.get_parent(tst), Some(entry));
         assert_eq!(
             h.output_neighbours(entry_nop).collect::<Vec<_>>(),
@@ -359,9 +363,10 @@ mod test {
 
         // Should only be one BB left
         let [bb, _exit] = h.children(h.root()).collect::<Vec<_>>().try_into().unwrap();
-        let tst = find_unique(h.nodes(), |n| {
-            matches!(h.get_optype(*n), OpType::CustomOp(_))
-        });
+        let tst = find_unique(
+            h.nodes(),
+            |n| matches!(h.get_optype(*n), OpType::ExtensionOp(c) if c.def().extension() != &PRELUDE_ID),
+        );
         assert_eq!(h.get_parent(tst), Some(bb));
 
         let inp = find_unique(h.nodes(), |n| matches!(h.get_optype(*n), OpType::Input(_)));

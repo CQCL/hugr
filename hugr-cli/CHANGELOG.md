@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.5.0 (2024-08-30)
+
+### Features
+
+- [**breaking**] Add collections to serialized standard extensions ([#1452](https://github.com/CQCL/hugr/pull/1452))
+
+
+## 0.4.0 (2024-08-12)
+
+### Features
+
+- Serialised standard extensions ([#1377](https://github.com/CQCL/hugr/pull/1377))
+- Validate with extra extensions and packages ([#1389](https://github.com/CQCL/hugr/pull/1389))
+- [**breaking**] Move mermaid to own sub-command ([#1390](https://github.com/CQCL/hugr/pull/1390))
+
+
 ## 0.3.0 (2024-07-26)
 
 ### Features

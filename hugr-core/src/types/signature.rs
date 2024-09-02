@@ -49,10 +49,15 @@ pub type Signature = FuncTypeBase<NoRV>;
 pub type FuncValueType = FuncTypeBase<RowVariable>;
 
 impl<RV: MaybeRV> FuncTypeBase<RV> {
-    /// Builder method, add extension_reqs to an FunctionType
+    /// Builder method, add extension_reqs to a FunctionType
     pub fn with_extension_delta(mut self, rs: impl Into<ExtensionSet>) -> Self {
         self.extension_reqs = self.extension_reqs.union(rs.into());
         self
+    }
+
+    /// Shorthand for adding the prelude extension to a FunctionType.
+    pub fn with_prelude(self) -> Self {
+        self.with_extension_delta(crate::extension::prelude::PRELUDE_ID)
     }
 
     pub(crate) fn substitute(&self, tr: &Substitution) -> Self {
@@ -96,6 +101,12 @@ impl<RV: MaybeRV> FuncTypeBase<RV> {
     /// Returns a row of the value outputs of the function.
     pub fn output(&self) -> &TypeRowBase<RV> {
         &self.output
+    }
+
+    #[inline]
+    /// Returns a tuple with the input and output rows of the function.
+    pub fn io(&self) -> (&TypeRowBase<RV>, &TypeRowBase<RV>) {
+        (&self.input, &self.output)
     }
 
     pub(super) fn validate(
@@ -310,5 +321,6 @@ mod test {
 
         assert_eq!(f_type.input_types(), &[Type::UNIT]);
         assert_eq!(f_type.output_types(), &[USIZE_T]);
+        assert_eq!(f_type.io(), (&type_row![Type::UNIT], &type_row![USIZE_T]));
     }
 }

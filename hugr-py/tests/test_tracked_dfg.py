@@ -1,11 +1,12 @@
 import pytest
 
 from hugr import tys
+from hugr.build.tracked_dfg import TrackedDfg
+from hugr.ext import Package
 from hugr.std.float import FLOAT_T, FloatVal
 from hugr.std.logic import Not
-from hugr.tracked_dfg import TrackedDfg
 
-from .conftest import CX, H, Measure, Rz, validate
+from .conftest import CX, QUANTUM_EXT, H, Measure, Rz, validate
 
 
 def test_track_wire():
@@ -47,7 +48,7 @@ def test_simple_circuit():
         for out in outs
     }
     assert out_ins == {cx_n}
-    validate(circ.hugr)
+    validate(Package([circ.hugr], [QUANTUM_EXT]))
 
 
 def test_complex_circuit():
@@ -67,4 +68,4 @@ def test_complex_circuit():
 
     assert circ._output_op().types == [tys.Qubit, tys.Qubit, tys.Bool]
 
-    validate(circ.hugr)
+    validate(Package([circ.hugr], [QUANTUM_EXT]))

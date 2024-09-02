@@ -1,5 +1,106 @@
 # Changelog
 
+## [0.8.0](https://github.com/CQCL/hugr/compare/hugr-py-v0.7.0...hugr-py-v0.8.0) (2024-08-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* Moved `itobool`/`ifrombool`/`itostring_{u,s}` to the conversions extension.
+* Binary sums representing fallible values now use tag `1` for the successful variant
+* Renamed `Custom.name` to `Custom.op_name` and `Func(Defn/Decl).name` to `f_name` to allow for new `name` method
+* `ListOp::pop` now returns an option.
+* Moved all builder definitions into the `hugr.build` module. Moved `node_port` and `render` into the `hugr.hugr` module.
+* Moved `Lift`, `MakeTuple`, `UnpackTuple` and `Lift` from core operations to prelude. Rename `ops::leaf` module to `ops::sum`.
+* `hugr.serialization` module and `Hugr.to_serial` methods are now internal only.
+* Renamed `_DfBase` to `DfBase` and `_DefinitionBuilder` to `DefinitionBuilder`
+* `idivmod_checked`, `idivmod`, `idiv`, `idiv_checked`, `imod`, `ishl`, `ishr`, `irotl`, `irotr` operations now only have one width argument for all inputs and outputs rather than two.
+* HUGRs containing opaque operations that don't point to an extension in the registry will fail to validate. Use `Package` to pack extensions with HUGRs for serialisation.
+* Removed `CustomOp`, `OpType` now contains `ExtensionOp` and `OpaqueOp` directly. `CustomOpError` renamed to`OpaqueOpError`.
+
+### Features
+
+* `Option` / `Result` helpers ([#1481](https://github.com/CQCL/hugr/issues/1481)) ([9698420](https://github.com/CQCL/hugr/commit/969842091e06d1482c8bc77965847865cb9f77a0))
+* Add missing ops ([#1463](https://github.com/CQCL/hugr/issues/1463)) ([841f450](https://github.com/CQCL/hugr/commit/841f450dab3b50bb3fa7d0da75902608ff7165e7))
+* Add more list operations ([#1474](https://github.com/CQCL/hugr/issues/1474)) ([037005f](https://github.com/CQCL/hugr/commit/037005f27520511401b4c116244435fbbdbe0b60))
+* Bring in the pure-python renderer from guppy ([#1462](https://github.com/CQCL/hugr/issues/1462)) ([001e66a](https://github.com/CQCL/hugr/commit/001e66a49ae2cbd0b49a7c2ed0b73eae8ab07379))
+* Disallow opaque ops during validation ([#1431](https://github.com/CQCL/hugr/issues/1431)) ([fbbb805](https://github.com/CQCL/hugr/commit/fbbb805b9d25d5219e1081d015c67422225d7f79))
+* Fill out array ops ([#1491](https://github.com/CQCL/hugr/issues/1491)) ([26ec57a](https://github.com/CQCL/hugr/commit/26ec57ac006ab6c44902c68dbf354f8f8e0933f1))
+* Pretty printing for ops and types ([#1482](https://github.com/CQCL/hugr/issues/1482)) ([aca403a](https://github.com/CQCL/hugr/commit/aca403a2f3eef5dd6a1fd614079d8eee1243fdde))
+* Use serialized extensions in python ([#1459](https://github.com/CQCL/hugr/issues/1459)) ([a61f4df](https://github.com/CQCL/hugr/commit/a61f4df66cb6ce11b342103af705145441ea9b5c)), closes [#1450](https://github.com/CQCL/hugr/issues/1450)
+* Int operations other than widen/narrow have only one width arg ([#1455](https://github.com/CQCL/hugr/issues/1455)) ([c39ed15](https://github.com/CQCL/hugr/commit/c39ed151f413284091f0d861f926541dfed8a1ef))
+* Move `Lift`, `MakeTuple`, `UnpackTuple` and `Lift` to prelude ([#1475](https://github.com/CQCL/hugr/issues/1475)) ([b387505](https://github.com/CQCL/hugr/commit/b38750585c19b41cc486095186f72d70ff11980c))
+* Move int conversions to `conversions` ext, add to/from usize ([#1490](https://github.com/CQCL/hugr/issues/1490)) ([88913f2](https://github.com/CQCL/hugr/commit/88913f29287efafc5303e91dd4677582348ee2f7))
+
+
+### Bug Fixes
+
+* Fixed deserialization panic while extracting node children ([#1480](https://github.com/CQCL/hugr/issues/1480)) ([331125a](https://github.com/CQCL/hugr/commit/331125a6ca9d05e58b30c8593257126d68a02bc7)), closes [#1479](https://github.com/CQCL/hugr/issues/1479)
+* Fixed errors while indexing on a `ToNode` ([#1457](https://github.com/CQCL/hugr/issues/1457)) ([d6edcd7](https://github.com/CQCL/hugr/commit/d6edcd77e7679791ae5ab910d13ccccf9f8ca914))
+* Fixed schema for array inner types ([#1494](https://github.com/CQCL/hugr/issues/1494)) ([d43cbb2](https://github.com/CQCL/hugr/commit/d43cbb2c3035f49e4ea7a7769fd1a51db31806ce)), closes [#1471](https://github.com/CQCL/hugr/issues/1471)
+* Fixed `val.Sum` equality. Add unit tests ([#1484](https://github.com/CQCL/hugr/issues/1484)) ([a7b2718](https://github.com/CQCL/hugr/commit/a7b27180cbb85490c09f8e24f46eeb4d5fd5eb21))
+
+
+### Code Refactoring
+
+* Flattened `CustomOp` in to `OpType` ([#1429](https://github.com/CQCL/hugr/issues/1429)) ([8e8bba5](https://github.com/CQCL/hugr/commit/8e8bba55a5d2a0a421a835b80c8aea07eae28e65))
+* Made serialization (module/methods) private ([#1477](https://github.com/CQCL/hugr/issues/1477)) ([49a5bad](https://github.com/CQCL/hugr/commit/49a5bad5399eef248aba0b74b14ac23546324b14))
+* Made `_DfBase` and `_DefinitionBuilder` public ([#1461](https://github.com/CQCL/hugr/issues/1461)) ([ea9cca0](https://github.com/CQCL/hugr/commit/ea9cca001bff3fff41d84e861f8b2b7ee26645d1))
+* Made Either::Right the "success" case ([#1489](https://github.com/CQCL/hugr/issues/1489)) ([8caa572](https://github.com/CQCL/hugr/commit/8caa572d01aac59715480827eaf568d8488ff542))
+* Reorganised the python module structure ([#1460](https://github.com/CQCL/hugr/issues/1460)) ([3ca56f4](https://github.com/CQCL/hugr/commit/3ca56f43c9499c629307b0a52aabee6661e22c99))
+
+## [0.7.0](https://github.com/CQCL/hugr/compare/hugr-py-v0.6.0...hugr-py-v0.7.0) (2024-08-14)
+
+
+### ⚠ BREAKING CHANGES
+
+* `AsCustomOp` replaced with `AsExtOp`, so all such operations now need to be attached to an extension.
+
+### Features
+
+* user facing Extension class ([#1413](https://github.com/CQCL/hugr/issues/1413)) ([c6473c9](https://github.com/CQCL/hugr/commit/c6473c9de27f7371798c8fbb27d193329d3210f2))
+* Add node metadata ([#1428](https://github.com/CQCL/hugr/issues/1428)) ([b229be6](https://github.com/CQCL/hugr/commit/b229be6b8f709d28c5b57c380db03cd21598c3c1)), closes [#1319](https://github.com/CQCL/hugr/issues/1319)
+
+
+### Bug Fixes
+
+* Equality check between `Sum` types ([#1422](https://github.com/CQCL/hugr/issues/1422)) ([8dfea09](https://github.com/CQCL/hugr/commit/8dfea09c61d9e4e0d85c8f9829e85db7285d99c1))
+* Invalid serialization of float and int constants ([#1427](https://github.com/CQCL/hugr/issues/1427)) ([b89c08f](https://github.com/CQCL/hugr/commit/b89c08f597019dae30f415787f7054c1a79bcefa))
+
+## [0.6.0](https://github.com/CQCL/hugr/compare/hugr-py-v0.5.0...hugr-py-v0.6.0) (2024-08-12)
+
+
+### ⚠ BREAKING CHANGES
+
+* **hugr-py:** Moved `hugr.get_serialization_version` to `hugr.serialization.serial_hugr.serialization_version`
+* **hugr-cli:** Cli validate command no longer has a mermaid option, use `mermaid` sub-command instead.
+* `TypeDefBound` uses struct-variants for serialization. `SignatureFunc` now has variants for missing binary functions, and serializes in to a new format that indicates expected binaries.
+
+### Features
+
+* `Package` pydantic model for modules + extensions ([#1387](https://github.com/CQCL/hugr/issues/1387)) ([68cfac5](https://github.com/CQCL/hugr/commit/68cfac5f63b35e8d709c5738a8893048240d5706)), closes [#1358](https://github.com/CQCL/hugr/issues/1358)
+* Define `Const` inline by default, and add a parameter to change the parent ([#1404](https://github.com/CQCL/hugr/issues/1404)) ([3609736](https://github.com/CQCL/hugr/commit/36097366df6bb3b79058b5f3bc49cb25362dc1b2))
+* **hugr-cli:** move mermaid to own sub-command ([#1390](https://github.com/CQCL/hugr/issues/1390)) ([77795b9](https://github.com/CQCL/hugr/commit/77795b90f029d5c00a99037f4306724176e1dfbd))
+* **hugr-py:** add type_bound method to `Type` ([#1410](https://github.com/CQCL/hugr/issues/1410)) ([bd5ba47](https://github.com/CQCL/hugr/commit/bd5ba478c6d6f821a5ba2fbcaa56bcb61c490b2f)), closes [#1365](https://github.com/CQCL/hugr/issues/1365)
+* **hugr-py:** Allow defining functions, consts, and aliases inside DFGs ([#1394](https://github.com/CQCL/hugr/issues/1394)) ([d554072](https://github.com/CQCL/hugr/commit/d554072d0266a7a584ef1c03e6fd78c9d4167933))
+* **hugr-py:** Reexport commonly used classes from the package root ([#1393](https://github.com/CQCL/hugr/issues/1393)) ([69925d0](https://github.com/CQCL/hugr/commit/69925d05b152205eb277e48605a6a8806d4fda24))
+* **py:** `Hugr.to_json` and `.load_json` helpers ([#1403](https://github.com/CQCL/hugr/issues/1403)) ([e7f9f4c](https://github.com/CQCL/hugr/commit/e7f9f4c739e1b523fb7f2b7df0246baea2abf3df))
+* **py:** Allow pre-declaring a `Function`'s output types ([#1417](https://github.com/CQCL/hugr/issues/1417)) ([fa0f5a4](https://github.com/CQCL/hugr/commit/fa0f5a4d4c13f54e5247ea16f43b928d4850c34b))
+* **py:** implement `iter` on `ToNode` ([#1399](https://github.com/CQCL/hugr/issues/1399)) ([e88910b](https://github.com/CQCL/hugr/commit/e88910bc50f6459213e17d0ce5a8c1b87037b9a6))
+* **py:** Parametric int type helper, and arbitrary width int constants ([#1406](https://github.com/CQCL/hugr/issues/1406)) ([abd70c9](https://github.com/CQCL/hugr/commit/abd70c99291f41fce57ed8d8b0692faa63117b74))
+* Serialised extensions ([#1371](https://github.com/CQCL/hugr/issues/1371)) ([31be204](https://github.com/CQCL/hugr/commit/31be2047ffb5515e3ac4d7a4214a3164399f9b3c))
+
+
+### Bug Fixes
+
+* **py:** `Hugr.__iter__` returning `NodeData | None` instead of `Node`s ([#1401](https://github.com/CQCL/hugr/issues/1401)) ([c134584](https://github.com/CQCL/hugr/commit/c1345849a83e33571e1a51398f94348ea221d96b))
+* **py:** Set output cont for Conditionals ([#1415](https://github.com/CQCL/hugr/issues/1415)) ([67bb8a0](https://github.com/CQCL/hugr/commit/67bb8a0bb31a93798606712695085422607e6c7c))
+
+
+### Documentation
+
+* **hugr-py:** expand toctree ([#1411](https://github.com/CQCL/hugr/issues/1411)) ([aa81c9a](https://github.com/CQCL/hugr/commit/aa81c9a79f1737c0e3dd77ff65c3af8716f26d21))
+* **hugr-py:** remove multiversion + add justfile command ([#1381](https://github.com/CQCL/hugr/issues/1381)) ([dd1dc48](https://github.com/CQCL/hugr/commit/dd1dc484447cc2180058f4474594ddb51fa45cd6))
+
 ## [0.5.0](https://github.com/CQCL/hugr/compare/hugr-py-v0.4.0...hugr-py-v0.5.0) (2024-07-29)
 
 

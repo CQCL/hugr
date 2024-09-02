@@ -2,7 +2,7 @@ from typing import Any
 
 from pydantic import ConfigDict, Field
 
-from hugr.node_port import NodeIdx, PortOffset
+from hugr.hugr.node_port import NodeIdx, PortOffset
 
 from .ops import OpType
 from .ops import classes as ops_classes

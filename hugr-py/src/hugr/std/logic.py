@@ -3,28 +3,28 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
-from hugr import tys
-from hugr.ops import AsCustomOp, Command, Custom, DataflowOp
+from hugr.ops import Command, DataflowOp, RegisteredOp
+from hugr.std import _load_extension
 
 if TYPE_CHECKING:
+    from hugr import ext
     from hugr.ops import ComWire
 
 
-EXTENSION_ID: tys.ExtensionId = "logic"
+EXTENSION = _load_extension("logic")
 
 
 @dataclass(frozen=True)
-class _NotDef(AsCustomOp):
-    """Not operation."""
+class _NotOp(RegisteredOp):
+    """Logical NOT operation."""
 
-    def to_custom(self) -> Custom:
-        return Custom("Not", tys.FunctionType.endo([tys.Bool]), extension=EXTENSION_ID)
+    const_op_def: ClassVar[ext.OpDef] = EXTENSION.operations["Not"]
 
     def __call__(self, a: ComWire) -> Command:
         return DataflowOp.__call__(self, a)
 
 
 #: Not operation
-Not = _NotDef()
+Not = _NotOp()

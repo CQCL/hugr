@@ -1,6 +1,5 @@
 from hugr import ops, tys, val
-from hugr.cfg import Cfg
-from hugr.dfg import Dfg
+from hugr.build import Cfg, Dfg
 from hugr.std.int import INT_T, DivMod, IntVal
 
 from .conftest import validate
@@ -68,7 +67,7 @@ def test_dom_edge() -> None:
 
 
 def test_asymm_types() -> None:
-    # test different types going to entry block's susccessors
+    # test different types going to entry block's successors
     with Cfg() as cfg:
         with cfg.add_entry() as entry:
             int_load = entry.load(IntVal(34))

@@ -2,18 +2,27 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+import json
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass, field, replace
 from typing import (
     TYPE_CHECKING,
+    Any,
     Generic,
-    Protocol,
     TypeVar,
     cast,
     overload,
 )
 
-from hugr.node_port import (
+from hugr._serialization.ops import OpType as SerialOp
+from hugr._serialization.serial_hugr import SerialHugr
+from hugr.exceptions import ParentBeforeChild
+from hugr.ops import Call, Const, Custom, DataflowOp, Module, Op
+from hugr.tys import Kind, Type, ValueKind
+from hugr.utils import BiMap
+from hugr.val import Value
+
+from .node_port import (
     Direction,
     InPort,
     Node,
@@ -23,17 +32,14 @@ from hugr.node_port import (
     ToNode,
     _SubPort,
 )
-from hugr.ops import Call, Const, DataflowOp, Module, Op
-from hugr.serialization.ops import OpType as SerialOp
-from hugr.serialization.serial_hugr import SerialHugr
-from hugr.tys import Kind, Type, ValueKind
-from hugr.utils import BiMap
-from hugr.val import Value
-
-from .exceptions import ParentBeforeChild
 
 if TYPE_CHECKING:
+    import graphviz as gv  # type: ignore[import-untyped]
+
+    from hugr import ext
     from hugr.val import Value
+
+    from .render import RenderConfig
 
 
 @dataclass()
@@ -47,9 +53,10 @@ class NodeData:
     _num_inps: int = field(default=0, repr=False)
     _num_outs: int = field(default=0, repr=False)
     children: list[Node] = field(default_factory=list, repr=False)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_serial(self, node: Node) -> SerialOp:
-        o = self.op.to_serial(self.parent if self.parent else node)
+    def _to_serial(self, node: Node) -> SerialOp:
+        o = self.op._to_serial(self.parent if self.parent else node)
 
         return SerialOp(root=o)  # type: ignore[arg-type]
 
@@ -60,28 +67,11 @@ _SI = _SubPort[InPort]
 P = TypeVar("P", InPort, OutPort)
 K = TypeVar("K", InPort, OutPort)
 OpVar = TypeVar("OpVar", bound=Op)
-OpVar2 = TypeVar("OpVar2", bound=Op)
-
-
-class ParentBuilder(ToNode, Protocol[OpVar]):
-    """Abstract interface implemented by builders of nodes that contain child HUGRs."""
-
-    #: The child HUGR.
-    hugr: Hugr[OpVar]
-    # Unique parent node.
-    parent_node: Node
-
-    def to_node(self) -> Node:
-        return self.parent_node
-
-    @property
-    def parent_op(self) -> OpVar:
-        """The parent node's operation."""
-        return cast(OpVar, self.hugr[self.parent_node].op)
+OpVarCov = TypeVar("OpVarCov", bound=Op, covariant=True)
 
 
 @dataclass()
-class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
+class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
     """The core HUGR datastructure.
 
     Args:
@@ -104,7 +94,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
     # List of free node indices, populated when nodes are deleted.
     _free_nodes: list[Node]
 
-    def __init__(self, root_op: OpVar | None = None) -> None:
+    def __init__(self, root_op: OpVarCov | None = None) -> None:
         self._free_nodes = []
         self._links = BiMap()
         self._nodes = []
@@ -120,16 +110,32 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
             raise KeyError(key)
         return n
 
-    def __iter__(self):
-        return iter(self._nodes)
+    def __iter__(self) -> Iterator[Node]:
+        return (
+            Node(idx, data.metadata)
+            for idx, data in enumerate(self._nodes)
+            if data is not None
+        )
 
     def __len__(self) -> int:
         return self.num_nodes()
 
-    def _get_typed_op(self, node: ToNode, cl: type[OpVar2]) -> OpVar2:
+    def _get_typed_op(self, node: ToNode, cl: type[OpVar]) -> OpVar:
         op = self[node].op
         assert isinstance(op, cl)
         return op
+
+    def nodes(self) -> Iterable[tuple[Node, NodeData]]:
+        """Iterator over nodes of the hugr and their data."""
+        return self.items()
+
+    def links(self) -> Iterator[tuple[OutPort, InPort]]:
+        """Iterator over all the links in the HUGR.
+
+        Returns:
+            Iterator of pairs of outgoing port and the incoming ports.
+        """
+        return ((src.port, tgt.port) for src, tgt in self._links.items())
 
     def children(self, node: ToNode | None = None) -> list[Node]:
         """The child nodes of a given `node`.
@@ -154,19 +160,34 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
         op: Op,
         parent: ToNode | None = None,
         num_outs: int | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> Node:
         parent = parent.to_node() if parent else None
-        node_data = NodeData(op, parent)
+        node_data = NodeData(op, parent, metadata=metadata or {})
 
         if self._free_nodes:
             node = self._free_nodes.pop()
             self._nodes[node.idx] = node_data
         else:
-            node = Node(len(self._nodes))
+            node = Node(len(self._nodes), {})
             self._nodes.append(node_data)
-        node = replace(node, _num_out_ports=num_outs)
+        node = replace(node, _num_out_ports=num_outs, _metadata=node_data.metadata)
         if parent:
             self[parent].children.append(node)
+        return node
+
+    def _update_node_outs(self, node: Node, num_outs: int | None) -> Node:
+        """Update the number of outgoing ports for a node.
+
+        Returns:
+            The updated node.
+        """
+        self[node]._num_outs = num_outs or 0
+        node = replace(node, _num_out_ports=num_outs)
+        parent = self[node].parent
+        if parent is not None:
+            pos = self[parent].children.index(node)
+            self[parent].children[pos] = node
         return node
 
     def add_node(
@@ -174,6 +195,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
         op: Op,
         parent: ToNode | None = None,
         num_outs: int | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> Node:
         """Add a node to the HUGR.
 
@@ -181,19 +203,28 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
             op: Operation of the node.
             parent: Parent node of added node. Defaults to HUGR root if None.
             num_outs: Number of output ports expected for this node. Defaults to None.
+            metadata: A dictionary of metadata to associate with the node.
+                Defaults to None.
 
         Returns:
             Handle to the added node.
         """
         parent = parent or self.root
-        return self._add_node(op, parent, num_outs)
+        return self._add_node(op, parent, num_outs, metadata)
 
-    def add_const(self, value: Value, parent: ToNode | None = None) -> Node:
+    def add_const(
+        self,
+        value: Value,
+        parent: ToNode | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> Node:
         """Add a constant node to the HUGR.
 
         Args:
             value: Value of the constant.
             parent: Parent node of added node. Defaults to HUGR root if None.
+            metadata: A dictionary of metadata to associate with the node.
+                Defaults to None.
 
         Returns:
             Handle to the added node.
@@ -204,7 +235,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
             >>> h[n].op
             Const(TRUE)
         """
-        return self.add_node(Const(value), parent)
+        return self.add_node(Const(value), parent, metadata=metadata)
 
     def delete_node(self, node: ToNode) -> NodeData | None:
         """Delete a node from the HUGR.
@@ -234,6 +265,10 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
             self._links.delete_left(_SubPort(node.out(offset)))
 
         weight, self._nodes[node.idx] = self._nodes[node.idx], None
+
+        # Free up the metadata dictionary
+        node = replace(node, _metadata={})
+
         self._free_nodes.append(node)
         return weight
 
@@ -288,7 +323,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
             return
         # TODO make sure sub-offset is handled correctly
 
-    def root_op(self) -> OpVar:
+    def root_op(self) -> OpVarCov:
         """The operation of the root node.
 
         Examples:
@@ -296,7 +331,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
             >>> h.root_op()
             Module()
         """
-        return cast(OpVar, self[self.root].op)
+        return cast(OpVarCov, self[self.root].op)
 
     def num_nodes(self) -> int:
         """The number of nodes in the HUGR.
@@ -530,16 +565,18 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
         """
         mapping: dict[Node, Node] = {}
 
-        for idx, node_data in enumerate(hugr._nodes):
-            if node_data is not None:
-                # relies on parents being inserted before any children
-                try:
-                    node_parent = (
-                        mapping[node_data.parent] if node_data.parent else parent
-                    )
-                except KeyError as e:
-                    raise ParentBeforeChild from e
-                mapping[Node(idx)] = self.add_node(node_data.op, node_parent)
+        for node, node_data in hugr.nodes():
+            # relies on parents being inserted before any children
+            try:
+                node_parent = mapping[node_data.parent] if node_data.parent else parent
+            except KeyError as e:
+                raise ParentBeforeChild from e
+            mapping[node] = self.add_node(
+                node_data.op,
+                node_parent,
+                num_outs=node_data._num_outs,
+                metadata=node_data.metadata,
+            )
 
         for src, dst in hugr._links.items():
             self.add_link(
@@ -548,7 +585,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
             )
         return mapping
 
-    def to_serial(self) -> SerialHugr:
+    def _to_serial(self) -> SerialHugr:
         """Serialize the HUGR."""
         node_it = (node for node in self._nodes if node is not None)
 
@@ -561,8 +598,9 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
 
         return SerialHugr(
             # non contiguous indices will be erased
-            nodes=[node.to_serial(Node(idx)) for idx, node in enumerate(node_it)],
+            nodes=[node._to_serial(Node(idx, {})) for idx, node in enumerate(node_it)],
             edges=[_serialize_link(link) for link in self._links.items()],
+            metadata=[node.metadata if node.metadata else None for node in node_it],
         )
 
     def _constrain_offset(self, p: P) -> PortOffset:
@@ -579,8 +617,18 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
 
         return offset
 
+    def resolve_extensions(self, registry: ext.ExtensionRegistry) -> Hugr:
+        """Resolve extension types and operations in the HUGR by matching them to
+        extensions in the registry.
+        """
+        for node in self:
+            op = self[node].op
+            if isinstance(op, Custom):
+                self[node].op = op.resolve(registry)
+        return self
+
     @classmethod
-    def from_serial(cls, serial: SerialHugr) -> Hugr:
+    def _from_serial(cls, serial: SerialHugr) -> Hugr:
         """Load a HUGR from a serialized form."""
         assert serial.nodes, "Empty Hugr is invalid"
 
@@ -589,19 +637,72 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVar]):
         hugr._links = BiMap()
         hugr._free_nodes = []
         hugr.root = Node(0)
+
+        def get_meta(idx: int) -> dict[str, Any]:
+            if not serial.metadata:
+                return {}
+            if idx < len(serial.metadata):
+                return serial.metadata[idx] or {}
+            return {}
+
         for idx, serial_node in enumerate(serial.nodes):
+            node_meta = get_meta(idx)
             parent: Node | None = Node(serial_node.root.parent)
             if serial_node.root.parent == idx:
-                hugr.root = Node(idx)
+                hugr.root = Node(idx, _metadata=node_meta)
                 parent = None
+
             serial_node.root.parent = -1
-            hugr._nodes.append(NodeData(serial_node.root.deserialize(), parent))
+            n = hugr._add_node(
+                serial_node.root.deserialize(), parent, metadata=node_meta
+            )
+            assert n.idx == idx, "Nodes should be added contiguously"
 
         for (src_node, src_offset), (dst_node, dst_offset) in serial.edges:
             if src_offset is None or dst_offset is None:
                 continue
             hugr.add_link(
-                Node(src_node).out(src_offset), Node(dst_node).inp(dst_offset)
+                Node(src_node, _metadata=get_meta(src_node)).out(src_offset),
+                Node(dst_node, _metadata=get_meta(dst_node)).inp(dst_offset),
             )
 
         return hugr
+
+    def to_json(self) -> str:
+        """Serialize the HUGR to a JSON string."""
+        return self._to_serial().to_json()
+
+    @classmethod
+    def load_json(cls, json_str: str) -> Hugr:
+        """Deserialize a JSON string into a HUGR."""
+        json_dict = json.loads(json_str)
+        serial = SerialHugr.load_json(json_dict)
+        return cls._from_serial(serial)
+
+    def render_dot(self, config: RenderConfig | None = None) -> gv.Digraph:
+        """Render the HUGR to a graphviz Digraph.
+
+        Args:
+            config: Render configuration.
+
+        Returns:
+            The graphviz Digraph.
+        """
+        from .render import DotRenderer
+
+        return DotRenderer(config).render(self)
+
+    def store_dot(
+        self, filename: str, format: str = "svg", config: RenderConfig | None = None
+    ) -> None:
+        """Render the HUGR to a graphviz dot file.
+
+        Args:
+            filename: The file to render to.
+            format: The format used for rendering ('pdf', 'png', etc.).
+                Defaults to SVG.
+            config: Render configuration.
+        """
+        from .render import DotRenderer
+
+        DotRenderer(config).store(self, filename=filename, format=format)

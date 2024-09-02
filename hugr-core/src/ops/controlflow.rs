@@ -154,7 +154,7 @@ impl NamedOp for ExitBlock {
 }
 
 impl StaticTag for DataflowBlock {
-    const TAG: OpTag = OpTag::BasicBlock;
+    const TAG: OpTag = OpTag::DataflowBlock;
 }
 
 impl StaticTag for ExitBlock {

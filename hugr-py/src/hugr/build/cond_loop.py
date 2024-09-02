@@ -11,16 +11,17 @@ from typing import TYPE_CHECKING
 from typing_extensions import Self
 
 from hugr import ops
-
-from .dfg import _DfBase
-from .hugr import Hugr, ParentBuilder
+from hugr.build.base import ParentBuilder
+from hugr.build.dfg import DfBase
+from hugr.hugr.base import Hugr
+from hugr.tys import Sum
 
 if TYPE_CHECKING:
-    from .node_port import Node, ToNode, Wire
-    from .tys import Sum, TypeRow
+    from hugr.hugr.node_port import Node, ToNode, Wire
+    from hugr.tys import TypeRow
 
 
-class Case(_DfBase[ops.Case]):
+class Case(DfBase[ops.Case]):
     """Dataflow graph builder for a case in a conditional."""
 
     _parent_cond: Conditional | None = None
@@ -157,6 +158,9 @@ class Conditional(ParentBuilder[ops.Conditional], AbstractContextManager):
     def _update_outputs(self, outputs: TypeRow) -> None:
         if self.parent_op._outputs is None:
             self.parent_op._outputs = outputs
+            self.parent_node = self.hugr._update_node_outs(
+                self.parent_node, len(outputs)
+            )
         else:
             if outputs != self.parent_op._outputs:
                 msg = "Mismatched case outputs."
@@ -198,7 +202,7 @@ class Conditional(ParentBuilder[ops.Conditional], AbstractContextManager):
 
 
 @dataclass
-class TailLoop(_DfBase[ops.TailLoop]):
+class TailLoop(DfBase[ops.TailLoop]):
     """Builder for a tail-controlled loop.
 
     Args:
@@ -214,6 +218,16 @@ class TailLoop(_DfBase[ops.TailLoop]):
     def __init__(self, just_inputs: TypeRow, rest: TypeRow) -> None:
         root_op = ops.TailLoop(just_inputs, rest)
         super().__init__(root_op)
+
+    def set_outputs(self, *outputs: Wire) -> None:
+        super().set_outputs(*outputs)
+
+        assert len(outputs) > 0
+        sum_wire = outputs[0]
+        sum_type = self.hugr.port_type(sum_wire.out_port())
+        assert isinstance(sum_type, Sum)
+        assert len(sum_type.variant_rows) == 2
+        self._set_parent_output_count(len(sum_type.variant_rows[1]) + len(outputs) - 1)
 
     def set_loop_outputs(self, sum_wire: Wire, *rest: Wire) -> None:
         """Set the outputs of the loop body. The first wire must be the sum type

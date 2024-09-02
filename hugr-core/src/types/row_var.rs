@@ -13,7 +13,7 @@ use proptest::prelude::{any, BoxedStrategy, Strategy};
 #[derive(
     Clone, Debug, Eq, Hash, PartialEq, derive_more::Display, serde::Serialize, serde::Deserialize,
 )]
-#[display(fmt = "{}", "_0")]
+#[display("{_0}")]
 pub struct RowVariable(pub usize, pub TypeBound);
 
 // Note that whilst 'pub' this is not re-exported outside private module `row_var`

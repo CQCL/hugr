@@ -1,6 +1,6 @@
 [package]
 name = "hugr-passes"
-version = "0.6.2"
+version = "0.8.0"
 edition = { workspace = true }
 rust-version = { workspace = true }
 license = { workspace = true }
@@ -13,7 +13,7 @@ keywords = ["Quantum", "Quantinuum"]
 categories = ["compilers"]
 
 [dependencies]
-hugr-core = { path = "../hugr-core", version = "0.7.0" }
+hugr-core = { path = "../hugr-core", version = "0.9.0" }
 itertools = { workspace = true }
 lazy_static = { workspace = true }
 paste = { workspace = true }
