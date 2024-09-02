@@ -5,7 +5,7 @@ use crate::{
 
 use ascent::lattice::BoundedLattice;
 use hugr_core::{
-    builder::{DFGBuilder, Dataflow, DataflowSubContainer, HugrBuilder, SubContainer},
+    builder::{endo_sig, DFGBuilder, Dataflow, DataflowSubContainer, HugrBuilder, SubContainer},
     extension::prelude::{UnpackTuple, BOOL_T},
     extension::{ExtensionSet, EMPTY_REG},
     ops::{handle::NodeHandle, OpTrait, Value},
@@ -17,7 +17,7 @@ use super::partial_value::PartialValue;
 
 #[test]
 fn test_make_tuple() {
-    let mut builder = DFGBuilder::new(Signature::new_endo(vec![])).unwrap();
+    let mut builder = DFGBuilder::new(endo_sig(vec![])).unwrap();
     let v1 = builder.add_load_value(Value::false_val());
     let v2 = builder.add_load_value(Value::true_val());
     let v3 = builder.make_tuple([v1, v2]).unwrap();
@@ -32,7 +32,7 @@ fn test_make_tuple() {
 
 #[test]
 fn test_unpack_tuple() {
-    let mut builder = DFGBuilder::new(Signature::new_endo(vec![])).unwrap();
+    let mut builder = DFGBuilder::new(endo_sig(vec![])).unwrap();
     let v1 = builder.add_load_value(Value::false_val());
     let v2 = builder.add_load_value(Value::true_val());
     let v3 = builder.make_tuple([v1, v2]).unwrap();
@@ -53,7 +53,7 @@ fn test_unpack_tuple() {
 
 #[test]
 fn test_unpack_const() {
-    let mut builder = DFGBuilder::new(Signature::new_endo(vec![])).unwrap();
+    let mut builder = DFGBuilder::new(endo_sig(vec![])).unwrap();
     let v1 = builder.add_load_value(Value::tuple([Value::true_val()]));
     let [o] = builder
         .add_dataflow_op(UnpackTuple::new(type_row![BOOL_T]), [v1])
