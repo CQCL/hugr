@@ -157,7 +157,7 @@ mod test {
         assert_ne!(k1, k3);
 
         assert_eq!(ValueKey::from(n), ValueKey::from(n));
-        let f = ConstF64::new(3.141);
+        let f = ConstF64::new(std::f64::consts::PI);
         assert_eq!(ValueKey::new(n, f.clone()), ValueKey::from(n));
 
         assert_ne!(ValueKey::new(n, f.clone()), ValueKey::new(n2, f)); // Node taken into account
@@ -182,7 +182,7 @@ mod test {
     fn value_key_list() {
         let v1 = ConstInt::new_u(3, 3).unwrap();
         let v2 = ConstInt::new_u(4, 3).unwrap();
-        let v3 = ConstF64::new(3.141);
+        let v3 = ConstF64::new(std::f64::consts::PI);
 
         let n = Node::from(portgraph::NodeIndex::new(0));
         let n2: Node = portgraph::NodeIndex::new(1).into();

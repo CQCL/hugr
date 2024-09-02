@@ -432,16 +432,13 @@ mod test {
 
     impl TestSumLeafType {
         fn assert_invariants(&self) {
-            match self {
-                Self::Int(t) => {
-                    if let TypeEnum::Extension(ct) = t.as_type_enum() {
-                        assert_eq!("int", ct.name());
-                        assert_eq!(&int_types::EXTENSION_ID, ct.extension());
-                    } else {
-                        panic!("Expected int type, got {:#?}", t);
-                    }
+            if let Self::Int(t) = self {
+                if let TypeEnum::Extension(ct) = t.as_type_enum() {
+                    assert_eq!("int", ct.name());
+                    assert_eq!(&int_types::EXTENSION_ID, ct.extension());
+                } else {
+                    panic!("Expected int type, got {:#?}", t);
                 }
-                _ => (),
             }
         }
 
