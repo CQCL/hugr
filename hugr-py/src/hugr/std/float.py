@@ -24,3 +24,6 @@ class FloatVal(val.ExtensionValue):
         return val.Extension(
             name, typ=FLOAT_T, val=payload, extensions=[EXTENSION.name]
         )
+
+    def __str__(self) -> str:
+        return f"{self.v}"
