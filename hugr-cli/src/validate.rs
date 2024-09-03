@@ -36,8 +36,12 @@ pub const VALID_PRINT: &str = "HUGR valid!";
 
 impl ValArgs {
     /// Run the HUGR cli and validate against an extension registry.
-    pub fn run(&mut self) -> Result<Vec<Hugr>, CliError> {
-        self.hugr_args.validate()
+    pub fn run(&mut self) -> Result<(Vec<Hugr>, ExtensionRegistry), CliError> {
+        let result = self.hugr_args.validate()?;
+        if self.verbosity(Level::Info) {
+            eprintln!("{}", VALID_PRINT);
+        }
+        Ok(result)
     }
 
     /// Test whether a `level` message should be output.
@@ -46,24 +50,32 @@ impl ValArgs {
     }
 }
 
+impl Package {
+    /// TODO
+    pub fn validate(mut self, reg: &mut ExtensionRegistry) -> Result<Vec<Hugr>, ValError> {
+        // register packed extension
+        for ext in self.extensions {
+            reg.register_updated(ext)?;
+        }
+
+        for hugr in self.modules.iter_mut() {
+            hugr.update_validate(&reg)?;
+        }
+
+        Ok(self.modules)
+    }
+}
+
 impl HugrArgs {
     /// Load the package and validate against an extension registry.
-    pub fn validate(&mut self) -> Result<Vec<Hugr>, CliError> {
-        let Package {
-            mut modules,
-            extensions: packed_exts,
-        } = self.get_package()?;
+    pub fn validate(&mut self) -> Result<(Vec<Hugr>, ExtensionRegistry), CliError> {
+        let package = self.get_package()?;
 
         let mut reg: ExtensionRegistry = if self.no_std {
             hugr_core::extension::PRELUDE_REGISTRY.to_owned()
         } else {
             hugr_core::std_extensions::STD_REG.to_owned()
         };
-
-        // register packed extensions
-        for ext in packed_exts {
-            reg.register_updated(ext).map_err(ValError::ExtReg)?;
-        }
 
         // register external extensions
         for ext in &self.extensions {
@@ -72,13 +84,8 @@ impl HugrArgs {
             reg.register_updated(ext).map_err(ValError::ExtReg)?;
         }
 
-        for hugr in modules.iter_mut() {
-            hugr.update_validate(&reg).map_err(ValError::Validate)?;
-            if self.verbosity(Level::Info) {
-                eprintln!("{}", VALID_PRINT);
-            }
-        }
-        Ok(modules)
+        let modules = package.validate(&mut reg)?;
+        Ok((modules, reg))
     }
 
     /// Test whether a `level` message should be output.

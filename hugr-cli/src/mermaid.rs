@@ -30,7 +30,7 @@ impl MermaidArgs {
     /// Write the mermaid diagram to the output.
     pub fn run_print(&mut self) -> Result<(), crate::CliError> {
         let hugrs = if self.validate {
-            self.hugr_args.validate()?
+            self.hugr_args.validate()?.0
         } else {
             self.hugr_args.get_package()?.modules
         };
