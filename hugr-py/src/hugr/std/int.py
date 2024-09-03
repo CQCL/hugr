@@ -66,6 +66,9 @@ class IntVal(val.ExtensionValue):
             extensions=[INT_TYPES_EXTENSION.name],
         )
 
+    def __str__(self) -> str:
+        return f"{self.v}"
+
 
 INT_OPS_EXTENSION = _load_extension("arithmetic.int")
 
