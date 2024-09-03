@@ -7,9 +7,12 @@ from dataclasses import dataclass
 from hugr import val
 from hugr.std import _load_extension
 
-EXTENSION = _load_extension("arithmetic.float.types")
+FLOAT_TYPES_EXTENSION = _load_extension("arithmetic.float.types")
 
-FLOAT_T = EXTENSION.types["float64"].instantiate([])
+FLOAT_T = FLOAT_TYPES_EXTENSION.types["float64"].instantiate([])
+
+
+FLOAT_OPS_EXTENSION = _load_extension("arithmetic.float")
 
 
 @dataclass
@@ -22,7 +25,7 @@ class FloatVal(val.ExtensionValue):
         name = "ConstF64"
         payload = {"value": self.v}
         return val.Extension(
-            name, typ=FLOAT_T, val=payload, extensions=[EXTENSION.name]
+            name, typ=FLOAT_T, val=payload, extensions=[FLOAT_TYPES_EXTENSION.name]
         )
 
     def __str__(self) -> str:
