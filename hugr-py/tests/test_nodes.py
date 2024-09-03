@@ -30,8 +30,19 @@ def test_slices():
     assert list(n[0:]) == all_ports
     assert list(n[:3]) == all_ports
     assert list(n[0:3]) == all_ports
+    assert list(n[0:999]) == all_ports
+    assert list(n[999:1000]) == []
     assert list(n[-1:]) == [OutPort(n, 2)]
     assert list(n[-3:]) == all_ports
 
     with pytest.raises(IndexError, match="Index -4 out of range"):
         _ = n[-4:]
+
+    n0 = Node(0, _num_out_ports=0)
+    assert list(n0) == []
+    assert list(n0[:0]) == []
+    assert list(n0[:10]) == []
+    assert list(n0[0:0]) == []
+    assert list(n0[0:]) == []
+    assert list(n0[10:]) == []
+    assert list(n0[:]) == []
