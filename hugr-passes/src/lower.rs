@@ -48,6 +48,10 @@ pub enum LowerError {
 }
 
 /// Lower operations in a HUGR according to a mapping to a replacement HUGR.
+///
+/// # Errors
+///
+/// Returns a [`LowerError`] if the lowered HUGR is invalid or if any rewrite fails.
 pub fn lower_ops(
     hugr: &mut impl HugrMut,
     lowering: impl Fn(&OpType) -> Option<Hugr>,
@@ -65,6 +69,7 @@ pub fn lower_ops(
         .map(|(node, replacement)| {
             let subcirc = SiblingSubgraph::try_from_nodes([node], hugr)?;
             let rw = subcirc.create_simple_replacement(hugr, replacement)?;
+            // TODO return weights once https://github.com/CQCL/hugr/issues/476 is done.
             hugr.apply_rewrite(rw)?;
             Ok(node)
         })
