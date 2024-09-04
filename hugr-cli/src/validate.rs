@@ -57,13 +57,13 @@ impl Package {
     ///
     /// Returns the validated modules.
     pub fn validate(mut self, reg: &mut ExtensionRegistry) -> Result<Vec<Hugr>, ValError> {
-        // register packed extension
+        // register packed extensions
         for ext in self.extensions {
             reg.register_updated(ext)?;
         }
 
         for hugr in self.modules.iter_mut() {
-            hugr.update_validate(&reg)?;
+            hugr.update_validate(reg)?;
         }
 
         Ok(self.modules)
