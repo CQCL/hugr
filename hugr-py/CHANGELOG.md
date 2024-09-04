@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.8.1](https://github.com/CQCL/hugr/compare/hugr-py-v0.8.0...hugr-py-v0.8.1) (2024-09-04)
+
+
+### Features
+
+* Export the collections extension ([#1506](https://github.com/CQCL/hugr/issues/1506)) ([70e0a64](https://github.com/CQCL/hugr/commit/70e0a64cf3aaa8d8be8c999684a6c173d7181663))
+
+
+### Bug Fixes
+
+* Export the float ops extension ([#1517](https://github.com/CQCL/hugr/issues/1517)) ([4cbe890](https://github.com/CQCL/hugr/commit/4cbe890ab4e72090708ff83592c0771caf2335df))
+* IndexError on node slicing ([#1500](https://github.com/CQCL/hugr/issues/1500)) ([a32bd84](https://github.com/CQCL/hugr/commit/a32bd84139013f279ba62d42ffc71ef79340de52))
+* Update collections extension ([#1518](https://github.com/CQCL/hugr/issues/1518)) ([60e1da0](https://github.com/CQCL/hugr/commit/60e1da0144c5080de7427d49d3700d6d8443609b))
+
 ## [0.8.0](https://github.com/CQCL/hugr/compare/hugr-py-v0.7.0...hugr-py-v0.8.0) (2024-08-30)
 
 
