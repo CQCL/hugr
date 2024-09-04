@@ -213,7 +213,7 @@ jobs:
   # even if they are skipped due to no changes in the relevant files.
   required-checks:
     name: Required checks 🦀
-    needs: [changes, check, tests-stable-no-features, tests-stable-all-features]
+    needs: [changes, check, tests-stable-no-features, tests-stable-all-features, std-extensions]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
@@ -226,7 +226,8 @@ jobs:
           needs.changes.result == 'failure' || needs.changes.result == 'cancelled' ||
           needs.check.result == 'failure' || needs.check.result == 'cancelled' ||
           needs.tests-stable-no-features.result == 'failure' || needs.tests-stable-no-features.result == 'cancelled' ||
-          needs.tests-stable-all-features.result == 'failure' || needs.tests-stable-all-features.result == 'cancelled'
+          needs.tests-stable-all-features.result == 'failure' || needs.tests-stable-all-features.result == 'cancelled' ||
+          needs.std-extensions.result == 'failure' || needs.std-extensions.result == 'cancelled'
         run: |
           echo "Required checks failed"
           echo "Please check the logs for more information"
