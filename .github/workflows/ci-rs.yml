@@ -154,7 +154,7 @@ jobs:
 
   # Ensure that serialized extensions match rust implementation
   std-extensions:
-    needs: [changes]
+    needs: [changes, tests-stable-all-features]
     if: ${{ needs.changes.outputs.rust == 'true' && github.event_name != 'merge_group' }}
     name: Check standard extensions
     runs-on: ubuntu-latest
