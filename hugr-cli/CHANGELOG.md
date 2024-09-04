@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.0 (2024-09-04)
+
+### Features
+
+- [**breaking**] Allow registry specification in `run_dump` ([#1501](https://github.com/CQCL/hugr/pull/1501))
+- [**breaking**] Add `Package::validate` and return `ExtensionRegistry` in helpers. ([#1507](https://github.com/CQCL/hugr/pull/1507))
+
+
 ## 0.5.0 (2024-08-30)
 
 ### Features

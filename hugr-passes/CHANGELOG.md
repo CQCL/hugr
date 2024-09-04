@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.1 (2024-09-04)
+
+### Features
+
+- Op replacement and lowering functions ([#1509](https://github.com/CQCL/hugr/pull/1509))
+
+
 ## 0.8.0 (2024-08-30)
 
 ### Features
