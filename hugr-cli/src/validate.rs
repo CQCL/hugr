@@ -51,7 +51,11 @@ impl ValArgs {
 }
 
 impl Package {
-    /// TODO
+    /// Validate the package against an extension registry.
+    ///
+    /// `reg` is updated with any new extensions.
+    ///
+    /// Returns the validated modules.
     pub fn validate(mut self, reg: &mut ExtensionRegistry) -> Result<Vec<Hugr>, ValError> {
         // register packed extension
         for ext in self.extensions {
@@ -68,6 +72,9 @@ impl Package {
 
 impl HugrArgs {
     /// Load the package and validate against an extension registry.
+    ///
+    /// Returns the validated modules and the extension registry the modules
+    /// were validated against.
     pub fn validate(&mut self) -> Result<(Vec<Hugr>, ExtensionRegistry), CliError> {
         let package = self.get_package()?;
 
