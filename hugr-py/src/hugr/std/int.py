@@ -14,6 +14,8 @@ from hugr.std import _load_extension
 if TYPE_CHECKING:
     from hugr.ops import Command, ComWire
 
+CONVERSIONS_EXTENSION = _load_extension("arithmetic.conversions")
+
 INT_TYPES_EXTENSION = _load_extension("arithmetic.int.types")
 _INT_PARAM = tys.BoundedNatParam(7)
 
@@ -65,6 +67,9 @@ class IntVal(val.ExtensionValue):
             val=payload,
             extensions=[INT_TYPES_EXTENSION.name],
         )
+
+    def __str__(self) -> str:
+        return f"{self.v}"
 
 
 INT_OPS_EXTENSION = _load_extension("arithmetic.int")
