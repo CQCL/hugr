@@ -559,6 +559,8 @@ pub type ValueNameRef = str;
 
 #[cfg(test)]
 mod test {
+    use std::collections::HashSet;
+
     use super::Value;
     use crate::builder::inout_sig;
     use crate::builder::test::simple_dfg_hugr;
@@ -757,6 +759,42 @@ mod test {
         let typ_qb = CustomType::new("my_type", vec![], ex_id, TypeBound::Copyable);
         let t = Type::new_extension(typ_qb.clone());
         assert_ne!(json_const.get_type(), t);
+    }
+
+    #[test]
+    fn hash_tuple() {
+        let vals = [
+            Value::unit(),
+            Value::true_val(),
+            Value::false_val(),
+            ConstUsize::new(13).into(),
+            Value::tuple([ConstUsize::new(13).into()]),
+            Value::tuple([ConstUsize::new(13).into(), ConstUsize::new(14).into()]),
+            Value::tuple([ConstUsize::new(13).into(), ConstUsize::new(15).into()]),
+        ];
+
+        let num_vals = vals.len();
+        let hashes = vals.map(|v| {
+            let mut h = DefaultHasher::new();
+            v.try_hash(&mut h).then_some(()).unwrap();
+            h.finish()
+        });
+        assert_eq!(HashSet::from(hashes).len(), num_vals); // all distinct
+    }
+
+    #[test]
+    fn unhashable_tuple() {
+        let tup = Value::tuple([ConstUsize::new(5).into(), ConstF64::new(4.97).into()]);
+        let mut h1 = DefaultHasher::new();
+        let r = tup.try_hash(&mut h1);
+        assert!(!r);
+
+        // Check that didn't do anything, by checking the hasher behaves
+        // just like one which never saw the tuple
+        h1.write_usize(5);
+        let mut h2 = DefaultHasher::new();
+        h2.write_usize(5);
+        assert_eq!(h1.finish(), h2.finish());
     }
 
     mod proptest {
