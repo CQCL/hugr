@@ -761,8 +761,8 @@ mod test {
         assert_ne!(json_const.get_type(), t);
     }
 
-    #[test]
-    fn hash_tuple() {
+    #[rstest]
+    fn hash_tuple(const_tuple: Value) {
         let vals = [
             Value::unit(),
             Value::true_val(),
@@ -771,6 +771,7 @@ mod test {
             Value::tuple([ConstUsize::new(13).into()]),
             Value::tuple([ConstUsize::new(13).into(), ConstUsize::new(14).into()]),
             Value::tuple([ConstUsize::new(13).into(), ConstUsize::new(15).into()]),
+            const_tuple,
         ];
 
         let num_vals = vals.len();
