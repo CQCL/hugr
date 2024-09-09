@@ -126,7 +126,7 @@ jobs:
     if: needs.check-coverage.outputs.should_notify == 'true'
     steps:
       - name: Send notification
-        uses: slackapi/slack-github-action@v1.26.0
+        uses: slackapi/slack-github-action@v1.27.0
         with:
           channel-id: 'C04SHCL4FKP'
           slack-message: ${{ needs.check-coverage.outputs.msg }}

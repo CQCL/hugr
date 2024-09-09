@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.12.1 (2024-09-04)
+
+### Bug Fixes
+
+- `std.collections.insert` wrong output order ([#1513](https://github.com/CQCL/hugr/pull/1513))
+
+### Features
+
+- Op replacement and lowering functions ([#1509](https://github.com/CQCL/hugr/pull/1509))
+
+
 ## 0.12.0 (2024-08-30)
 
 ### Features

@@ -1,5 +1,6 @@
 //! Dump standard extensions in serialized form.
 use clap::Parser;
+use hugr_core::extension::ExtensionRegistry;
 use std::{io::Write, path::PathBuf};
 
 /// Dump the standard extensions.
@@ -24,10 +25,10 @@ impl ExtArgs {
     /// Write out the standard extensions in serialized form.
     /// Qualified names of extensions used to generate directories under the specified output directory.
     /// E.g. extension "foo.bar.baz" will be written to "OUTPUT/foo/bar/baz.json".
-    pub fn run_dump(&self) {
+    pub fn run_dump(&self, registry: &ExtensionRegistry) {
         let base_dir = &self.outdir;
 
-        for (name, ext) in hugr_core::std_extensions::STD_REG.iter() {
+        for (name, ext) in registry.iter() {
             let mut path = base_dir.clone();
             for part in name.split('.') {
                 path.push(part);
