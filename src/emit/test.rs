@@ -1,24 +1,31 @@
 use std::iter;
 
 use crate::custom::int::add_int_extensions;
+use crate::custom::prelude::add_default_prelude_extensions;
+use crate::fat::FatNode;
 use crate::types::HugrFuncType;
+use anyhow::{anyhow, Result};
 use hugr::builder::DataflowSubContainer;
 use hugr::builder::{
     BuildHandle, Container, DFGWrapper, Dataflow, HugrBuilder, ModuleBuilder, SubContainer,
 };
-use hugr::extension::prelude::BOOL_T;
-use hugr::extension::{ExtensionRegistry, EMPTY_REG};
+use hugr::extension::prelude::{ConstUsize, BOOL_T, USIZE_T};
+use hugr::extension::{ExtensionRegistry, EMPTY_REG, PRELUDE_REGISTRY};
 use hugr::ops::constant::CustomConst;
 use hugr::ops::handle::FuncID;
 use hugr::ops::{CallIndirect, Tag, Value};
 use hugr::std_extensions::arithmetic::int_ops::{self, INT_OPS_REGISTRY};
 use hugr::std_extensions::arithmetic::int_types::ConstInt;
 use hugr::types::{Signature, Type, TypeRow};
-use hugr::{type_row, Hugr};
+use hugr::{type_row, Hugr, HugrView};
+use inkwell::module::Module;
+use inkwell::passes::PassManager;
 use itertools::Itertools;
 use rstest::rstest;
 
 use crate::test::*;
+
+use super::EmitHugr;
 
 #[allow(clippy::upper_case_acronyms)]
 pub type DFGW<'a> = DFGWrapper<&'a mut Hugr, BuildHandle<FuncID<true>>>;
@@ -27,6 +34,68 @@ pub struct SimpleHugrConfig {
     ins: TypeRow,
     outs: TypeRow,
     extensions: ExtensionRegistry,
+}
+
+/// A wrapper for a module into which our tests will emit hugr.
+pub struct Emission<'c> {
+    module: Module<'c>,
+}
+
+impl<'c> Emission<'c> {
+    /// Create an `Emission` from a HUGR.
+    pub fn emit_hugr<H: HugrView>(
+        hugr: FatNode<'c, hugr::ops::Module, H>,
+        eh: EmitHugr<'c, H>,
+    ) -> Result<Self> {
+        let module = eh.emit_module(hugr)?.finish();
+        Ok(Self { module })
+    }
+
+    /// Create an `Emission` from an LLVM Module.
+    pub fn new(module: Module<'c>) -> Self {
+        Self { module }
+    }
+
+    // Verify the inner Module.
+    pub fn verify(&self) -> Result<()> {
+        self.module
+            .verify()
+            .map_err(|err| anyhow!("Failed to verify module: {err}"))
+    }
+
+    /// Return the inner module.
+    pub fn module(&self) -> &Module<'c> {
+        &self.module
+    }
+
+    /// Run passes on the inner module.
+    pub fn opt(&self, go: impl FnOnce() -> PassManager<Module<'c>>) {
+        go().run_on(&self.module);
+    }
+
+    // Print the inner module to stderr.
+    pub fn print_module(&self) {
+        self.module.print_to_stderr();
+    }
+
+    /// JIT and execute the function named `entry` in the inner module.
+    ///
+    /// That function must take no arguments and return an `i64`.
+    pub fn exec_u64(&self, entry: impl AsRef<str>) -> Result<u64> {
+        let entry_fv = self
+            .module
+            .get_function(entry.as_ref())
+            .ok_or_else(|| anyhow!("Function {} not found in module", entry.as_ref()))?;
+
+        entry_fv.set_linkage(inkwell::module::Linkage::External);
+
+        let ee = self
+            .module
+            .create_jit_execution_engine(inkwell::OptimizationLevel::None)
+            .map_err(|err| anyhow!("Failed to create execution engine: {err}"))?;
+        let fv = ee.get_function_value(entry.as_ref())?;
+        Ok(unsafe { ee.run_function(fv, &[]).as_int(false) })
+    }
 }
 
 impl SimpleHugrConfig {
@@ -71,6 +140,12 @@ impl SimpleHugrConfig {
             .define_function("main", HugrFuncType::new(self.ins, self.outs))
             .unwrap();
         make(func_b, &self.extensions);
+
+        // Intentionally left as a debugging aid. If the HUGR you construct
+        // fails validation, uncomment the following line to print it out
+        // unvalidated.
+        // println!("{}", mod_b.hugr().mermaid_string());
+
         mod_b.finish_hugr(&self.extensions).unwrap()
     }
 }
@@ -95,13 +170,10 @@ impl Default for SimpleHugrConfig {
 #[macro_export]
 macro_rules! check_emission {
     // Call the macro with a snapshot name.
-    ($snapshot_name:expr, $hugr: ident, $test_ctx:ident) => {
+    ($snapshot_name:expr, $hugr: ident, $test_ctx:ident) => {{
         let root = $crate::fat::FatExt::fat_root::<hugr::ops::Module>(&$hugr).unwrap();
-        let module = $test_ctx
-            .get_emit_hugr()
-            .emit_module(root)
-            .unwrap()
-            .finish();
+        let emission =
+            $crate::emit::test::Emission::emit_hugr(root, $test_ctx.get_emit_hugr()).unwrap();
 
         let mut settings = insta::Settings::clone_current();
         let new_suffix = settings
@@ -109,30 +181,33 @@ macro_rules! check_emission {
             .map_or("pre-mem2reg".into(), |x| format!("pre-mem2reg@{x}"));
         settings.set_snapshot_suffix(new_suffix);
         settings.bind(|| {
+            let mod_str = emission.module().to_string();
             if $snapshot_name == "" {
-                insta::assert_snapshot!(module.to_string())
+                insta::assert_snapshot!(mod_str)
             } else {
-                insta::assert_snapshot!($snapshot_name, module.to_string())
+                insta::assert_snapshot!($snapshot_name, mod_str)
             }
         });
 
-        module
-            .verify()
-            .unwrap_or_else(|pp| panic!("Failed to verify module: {pp}"));
+        emission.verify().unwrap();
 
-        let pb = inkwell::passes::PassManager::create(());
-        pb.add_promote_memory_to_register_pass();
-        pb.run_on(&module);
+        emission.opt(|| {
+            let pb = inkwell::passes::PassManager::create(());
+            pb.add_promote_memory_to_register_pass();
+            pb
+        });
 
+        let mod_str = emission.module().to_string();
         if $snapshot_name == "" {
-            insta::assert_snapshot!(module.to_string())
+            insta::assert_snapshot!(mod_str)
         } else {
-            insta::assert_snapshot!($snapshot_name, module.to_string())
+            insta::assert_snapshot!($snapshot_name, mod_str)
         }
-    };
+        emission
+    }};
     // Use the default snapshot name.
     ($hugr: ident, $test_ctx:ident) => {
-        check_emission!("", $hugr, $test_ctx);
+        check_emission!("", $hugr, $test_ctx)
     };
 }
 
@@ -149,7 +224,7 @@ fn emit_hugr_tag(llvm_ctx: TestContext) {
                 .unwrap();
             builder.finish_with_outputs(tag.outputs()).unwrap()
         });
-    check_emission!(hugr, llvm_ctx);
+    let _ = check_emission!(hugr, llvm_ctx);
 }
 
 #[rstest]
@@ -416,4 +491,17 @@ fn load_function(llvm_ctx: TestContext) {
     };
 
     check_emission!(hugr, llvm_ctx);
+}
+
+#[rstest]
+fn test_exec(mut exec_ctx: TestContext) {
+    let hugr = SimpleHugrConfig::new()
+        .with_outs(USIZE_T)
+        .with_extensions(PRELUDE_REGISTRY.to_owned())
+        .finish(|mut builder: DFGW| {
+            let konst = builder.add_load_value(ConstUsize::new(42));
+            builder.finish_with_outputs([konst]).unwrap()
+        });
+    exec_ctx.add_extensions(add_default_prelude_extensions);
+    assert_eq!(42, exec_ctx.exec_hugr_u64(hugr, "main"));
 }

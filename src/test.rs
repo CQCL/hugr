@@ -10,7 +10,8 @@ use rstest::fixture;
 
 use crate::{
     custom::CodegenExtsMap,
-    emit::{EmitHugr, EmitModuleContext, Namer},
+    emit::{test::Emission, EmitHugr, EmitModuleContext, Namer},
+    fat::FatExt,
     types::{TypeConverter, TypingSession},
 };
 
@@ -67,6 +68,7 @@ pub struct TestContext {
     context: Context,
     mk_exts: MakeCodegenExtsMapFn,
     _insta: Option<insta::internals::SettingsBindDropGuard>,
+    namer: Namer,
 }
 
 impl TestContext {
@@ -79,6 +81,7 @@ impl TestContext {
             context,
             mk_exts: Box::new(ext_builder),
             _insta: insta_settings.and_then(InstaSettingsBuilder::finish),
+            namer: Default::default(),
         }
     }
 
@@ -130,9 +133,13 @@ impl TestContext {
     pub fn get_emit_hugr(&'_ self) -> EmitHugr<'_, THugrView> {
         let ctx = self.iw_context();
         let m = ctx.create_module("test_context");
-        let namer = Namer::default().into();
+        let namer = self.namer.clone().into();
         let exts = self.extensions();
         EmitHugr::new(ctx, m, namer, exts)
+    }
+
+    pub fn set_namer(&mut self, namer: Namer) {
+        self.namer = namer;
     }
 
     pub fn get_emit_module_context(&'_ self) -> EmitModuleContext<'_, THugrView> {
@@ -140,10 +147,20 @@ impl TestContext {
         let m = ctx.create_module("test_context");
         EmitModuleContext::new(
             m,
-            Namer::default().into(),
+            self.namer.clone().into(),
             self.extensions(),
             self.type_converter(),
         )
+    }
+
+    /// Lower `hugr` to LLVM, then JIT and execute the function named `entry` in
+    /// the inner module.
+    ///
+    /// That function must take no arguments and return an `i64`.
+    pub fn exec_hugr_u64(&self, hugr: THugrView, entry_point: impl AsRef<str>) -> u64 {
+        let emission = Emission::emit_hugr(hugr.fat_root().unwrap(), self.get_emit_hugr()).unwrap();
+
+        emission.exec_u64(entry_point).unwrap()
     }
 }
 
@@ -163,6 +180,18 @@ pub fn llvm_ctx(#[default(-1)] id: i32) -> TestContext {
         |_| CodegenExtsMap::default(),
         Some(InstaSettingsBuilder::new_llvm(id)),
     )
+}
+
+#[fixture]
+pub fn exec_ctx(#[default(-1)] id: i32) -> TestContext {
+    let id = (id >= 0).then_some(id as usize);
+    let mut r = TestContext::new(
+        |_| CodegenExtsMap::default(),
+        Some(InstaSettingsBuilder::new_llvm(id)),
+    );
+    // we need to refer to functions by name, so no mangling
+    r.set_namer(Namer::new("", false));
+    r
 }
 
 impl Default for InstaSettingsBuilder {
