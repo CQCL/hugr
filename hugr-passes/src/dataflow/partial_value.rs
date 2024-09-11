@@ -310,14 +310,14 @@ impl<V: AbstractValue> Lattice for PartialValue<V> {
                     }
                 }
             }
-            (Self::Value(_), mut other) => {
+            (Self::Value(_), mut other@Self::PartialSum(_)) => {
                 std::mem::swap(self, &mut other);
                 let Self::Value(old_self) = other else {
                     unreachable!()
                 };
                 self.join_mut_value_handle(old_self)
             }
-            (_, Self::Value(h)) => self.join_mut_value_handle(h),
+            (Self::PartialSum(_), Self::Value(h)) => self.join_mut_value_handle(h),
         }
     }
 
