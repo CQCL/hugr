@@ -6,14 +6,14 @@
 use std::{cmp::Ordering, ops::Index, sync::Arc};
 
 use ascent::lattice::{BoundedLattice, Lattice};
-use either::Either;
+use itertools::{zip_eq, Either};
+
+use crate::const_fold2::partial_value::{PartialValue, ValueHandle};
 use hugr_core::{
     ops::OpTrait as _,
-    partial_value::{PartialValue, ValueHandle},
     types::{EdgeKind, TypeRow},
     HugrView, IncomingPort, Node, OutgoingPort, PortIndex as _,
 };
-use itertools::zip_eq;
 
 #[cfg(test)]
 use proptest_derive::Arbitrary;

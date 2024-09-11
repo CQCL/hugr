@@ -3,10 +3,11 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
+use hugr_core::ops::constant::Sum;
 use itertools::{zip_eq, Itertools as _};
 
-use crate::ops::Value;
-use crate::types::{Type, TypeEnum};
+use hugr_core::ops::Value;
+use hugr_core::types::{Type, TypeEnum, TypeRow};
 
 mod value_handle;
 
@@ -17,6 +18,9 @@ pub use value_handle::{ValueHandle, ValueKey};
 struct PartialSum(HashMap<usize, Vec<PartialValue>>);
 
 impl PartialSum {
+    pub fn unit() -> Self {
+        Self::variant(0, [])
+    }
     pub fn variant(tag: usize, values: impl IntoIterator<Item = PartialValue>) -> Self {
         Self([(tag, values.into_iter().collect())].into_iter().collect())
     }
@@ -50,6 +54,9 @@ impl PartialSum {
             Err(self)?
         };
         let Some(r) = st.get_variant(*k) else {
+            Err(self)?
+        };
+        let Ok(r): Result<TypeRow, _> = r.clone().try_into() else {
             Err(self)?
         };
         if v.len() != r.len() {
@@ -165,13 +172,7 @@ impl TryFrom<ValueHandle> for PartialSum {
 
     fn try_from(value: ValueHandle) -> Result<Self, Self::Error> {
         match value.value() {
-            Value::Tuple { vs } => {
-                let vec = (0..vs.len())
-                    .map(|i| PartialValue::from(value.index(i)).into())
-                    .collect();
-                return Ok(Self([(0, vec)].into_iter().collect()));
-            }
-            Value::Sum { tag, values, .. } => {
+            Value::Sum(Sum { tag, values, .. }) => {
                 let vec = (0..values.len())
                     .map(|i| PartialValue::from(value.index(i)).into())
                     .collect();

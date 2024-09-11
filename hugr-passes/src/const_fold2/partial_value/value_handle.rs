@@ -4,11 +4,12 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use downcast_rs::Downcast;
+use hugr_core::ops::constant::Sum;
 use itertools::Either;
 
-use crate::ops::Value;
-use crate::std_extensions::arithmetic::int_types::ConstInt;
-use crate::Node;
+use hugr_core::ops::Value;
+use hugr_core::std_extensions::arithmetic::int_types::ConstInt;
+use hugr_core::Node;
 
 pub trait ValueName: std::fmt::Debug + Downcast + Any {
     fn hash(&self) -> u64;
@@ -106,10 +107,7 @@ impl ValueHandle {
     }
 
     pub fn is_compound(&self) -> bool {
-        match self.value() {
-            Value::Sum { .. } | Value::Tuple { .. } => true,
-            _ => false,
-        }
+        matches!(self.value(), Value::Sum(_))
     }
 
     pub fn num_fields(&self) -> usize {
@@ -119,8 +117,7 @@ impl ValueHandle {
             self
         );
         match self.value() {
-            Value::Sum { values, .. } => values.len(),
-            Value::Tuple { vs } => vs.len(),
+            Value::Sum(Sum { values, .. }) => values.len(),
             _ => unreachable!(),
         }
     }
@@ -132,8 +129,7 @@ impl ValueHandle {
             self
         );
         match self.value() {
-            Value::Sum { tag, .. } => *tag,
-            Value::Tuple { .. } => 0,
+            Value::Sum(Sum { tag, .. }) => *tag,
             _ => unreachable!(),
         }
     }
@@ -146,8 +142,7 @@ impl ValueHandle {
             &self
         );
         let vs = match self.value() {
-            Value::Sum { values, .. } => values,
-            Value::Tuple { vs, .. } => vs,
+            Value::Sum(Sum { values, .. }) => values,
             _ => unreachable!(),
         };
         let v = vs[i].clone().into();
@@ -192,7 +187,7 @@ impl Deref for ValueHandle {
 
 #[cfg(test)]
 mod test {
-    use crate::{ops::constant::CustomConst as _, types::SumType};
+    use hugr_core::{ops::constant::CustomConst as _, types::SumType};
 
     use super::*;
 
@@ -205,9 +200,9 @@ mod test {
         assert_eq!(k1, k2);
         assert_ne!(k1, k3);
 
-        let k4: ValueKey = From::<Node>::from(portgraph::NodeIndex::new(1).into());
-        let k5 = From::<Node>::from(portgraph::NodeIndex::new(1).into());
-        let k6 = From::<Node>::from(portgraph::NodeIndex::new(2).into());
+        let k4: ValueKey = Node::from(portgraph::NodeIndex::new(1)).into();
+        let k5: ValueKey = Node::from(portgraph::NodeIndex::new(1)).into();
+        let k6: ValueKey = Node::from(portgraph::NodeIndex::new(2)).into();
 
         assert_eq!(&k4, &k5);
         assert_ne!(&k4, &k6);

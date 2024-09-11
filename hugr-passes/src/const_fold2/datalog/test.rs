@@ -3,17 +3,17 @@ use hugr_core::{
     extension::{prelude::BOOL_T, ExtensionSet, EMPTY_REG},
     ops::{handle::NodeHandle, OpTrait, UnpackTuple, Value},
     type_row,
-    types::{FunctionType, SumType},
+    types::{Signature, SumType},
     Extension,
 };
 
-use hugr_core::partial_value::PartialValue;
+use crate::const_fold2::partial_value::PartialValue;
 
 use super::*;
 
 #[test]
 fn test_make_tuple() {
-    let mut builder = DFGBuilder::new(FunctionType::new_endo(&[])).unwrap();
+    let mut builder = DFGBuilder::new(Signature::new_endo(vec![])).unwrap();
     let v1 = builder.add_load_value(Value::false_val());
     let v2 = builder.add_load_value(Value::true_val());
     let v3 = builder.make_tuple([v1, v2]).unwrap();
@@ -28,7 +28,7 @@ fn test_make_tuple() {
 
 #[test]
 fn test_unpack_tuple() {
-    let mut builder = DFGBuilder::new(FunctionType::new_endo(&[])).unwrap();
+    let mut builder = DFGBuilder::new(Signature::new_endo(vec![])).unwrap();
     let v1 = builder.add_load_value(Value::false_val());
     let v2 = builder.add_load_value(Value::true_val());
     let v3 = builder.make_tuple([v1, v2]).unwrap();
@@ -49,7 +49,7 @@ fn test_unpack_tuple() {
 
 #[test]
 fn test_unpack_const() {
-    let mut builder = DFGBuilder::new(FunctionType::new_endo(&[])).unwrap();
+    let mut builder = DFGBuilder::new(Signature::new_endo(vec![])).unwrap();
     let v1 = builder.add_load_value(Value::tuple([Value::true_val()]));
     let [o] = builder
         .add_dataflow_op(UnpackTuple::new(type_row![BOOL_T]), [v1])
@@ -66,7 +66,7 @@ fn test_unpack_const() {
 
 #[test]
 fn test_tail_loop_never_iterates() {
-    let mut builder = DFGBuilder::new(FunctionType::new_endo(&[])).unwrap();
+    let mut builder = DFGBuilder::new(Signature::new_endo(vec![])).unwrap();
     let r_v = Value::unit_sum(3, 6).unwrap();
     let r_w = builder.add_load_value(
         Value::sum(
@@ -98,7 +98,7 @@ fn test_tail_loop_never_iterates() {
 
 #[test]
 fn test_tail_loop_always_iterates() {
-    let mut builder = DFGBuilder::new(FunctionType::new_endo(&[])).unwrap();
+    let mut builder = DFGBuilder::new(Signature::new_endo(vec![])).unwrap();
     let r_w = builder
         .add_load_value(Value::sum(0, [], SumType::new([type_row![], BOOL_T.into()])).unwrap());
     let true_w = builder.add_load_value(Value::true_val());
@@ -130,7 +130,7 @@ fn test_tail_loop_always_iterates() {
 
 #[test]
 fn test_tail_loop_iterates_twice() {
-    let mut builder = DFGBuilder::new(FunctionType::new_endo(&[])).unwrap();
+    let mut builder = DFGBuilder::new(Signature::new_endo(vec![])).unwrap();
     // let var_type = Type::new_sum([type_row![BOOL_T,BOOL_T], type_row![BOOL_T,BOOL_T]]);
 
     let true_w = builder.add_load_value(Value::true_val());
@@ -143,7 +143,7 @@ fn test_tail_loop_iterates_twice() {
         .unwrap();
     assert_eq!(
         tlb.loop_signature().unwrap().dataflow_signature().unwrap(),
-        FunctionType::new_endo(type_row![BOOL_T, BOOL_T])
+        Signature::new_endo(type_row![BOOL_T, BOOL_T])
     );
     let [in_w1, in_w2] = tlb.input_wires_arr();
     let tail_loop = tlb.finish_with_outputs(in_w1, [in_w2, in_w1]).unwrap();
@@ -180,18 +180,15 @@ fn test_tail_loop_iterates_twice() {
 fn conditional() {
     let variants = vec![type_row![], type_row![], type_row![BOOL_T]];
     let cond_t = Type::new_sum(variants.clone());
-    let mut builder = DFGBuilder::new(FunctionType::new(
-        Into::<TypeRow>::into(cond_t),
-        type_row![],
-    ))
-    .unwrap();
+    let mut builder =
+        DFGBuilder::new(Signature::new(Into::<TypeRow>::into(cond_t), type_row![])).unwrap();
     let [arg_w] = builder.input_wires_arr();
 
     let true_w = builder.add_load_value(Value::true_val());
     let false_w = builder.add_load_value(Value::false_val());
 
     let mut cond_builder = builder
-        .conditional_builder(
+        .conditional_builder_exts(
             (variants, arg_w),
             [(BOOL_T, true_w)],
             type_row!(BOOL_T, BOOL_T),

@@ -6,7 +6,6 @@ use std::sync::{Arc, Mutex};
 
 use hugr_core::hugr::internal::HugrInternals;
 use hugr_core::ops::Value;
-use hugr_core::partial_value::{ValueHandle, ValueKey};
 use hugr_core::{Hugr, HugrView, Node};
 
 use super::DFContext;

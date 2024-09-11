@@ -4,12 +4,10 @@ use itertools::{zip_eq, Either, Itertools as _};
 use lazy_static::lazy_static;
 use proptest::prelude::*;
 
-use crate::{
+use hugr_core::{
     ops::Value,
-    std_extensions::arithmetic::int_types::{
-        self, get_log_width, ConstInt, INT_TYPES, LOG_WIDTH_BOUND,
-    },
-    types::{CustomType, Type, TypeEnum},
+    std_extensions::arithmetic::int_types::{self, ConstInt, INT_TYPES, LOG_WIDTH_BOUND},
+    types::{CustomType, Type, TypeArg, TypeEnum},
 };
 
 use super::{PartialSum, PartialValue, ValueHandle, ValueKey};
@@ -71,10 +69,13 @@ impl TestSumLeafType {
                 let TypeEnum::Extension(ct) = t.as_type_enum() else {
                     unreachable!()
                 };
-                let lw = get_log_width(&ct.args()[0]).unwrap();
+                // TODO this should be get_log_width, but that's not pub
+                let TypeArg::BoundedNat { n: lw } = ct.args()[0] else {
+                    panic!()
+                };
                 (0u64..(1 << (2u64.pow(lw as u32) - 1)))
                     .prop_map(move |x| {
-                        let ki = ConstInt::new_u(lw, x).unwrap();
+                        let ki = ConstInt::new_u(lw as u8, x).unwrap();
                         ValueHandle::new(ValueKey::new(ki.clone()), Arc::new(ki.into())).into()
                     })
                     .boxed()
@@ -160,7 +161,7 @@ impl TestSumType {
         match self {
             TestSumType::Branch(_, sop) => Type::new_sum(
                 sop.iter()
-                    .map(|row| row.iter().map(|x| x.get_type()).collect_vec().into()),
+                    .map(|row| row.iter().map(|x| x.get_type()).collect_vec()),
             ),
             TestSumType::Leaf(l) => l.get_type(),
         }
