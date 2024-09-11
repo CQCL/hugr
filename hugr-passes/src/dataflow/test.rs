@@ -232,7 +232,7 @@ fn conditional() {
     assert_eq!(cond_r1, Value::false_val());
     assert!(machine.read_out_wire_value(&hugr, cond_o2).is_none());
 
-    assert!(!machine.case_reachable(&hugr, case1.node()));
+    assert!(!machine.case_reachable(&hugr, case1.node())); // arg_pv is variant 1 or 2 only
     assert!(machine.case_reachable(&hugr, case2.node()));
     assert!(machine.case_reachable(&hugr, case3.node()));
 }
