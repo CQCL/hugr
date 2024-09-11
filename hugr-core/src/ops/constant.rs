@@ -2,6 +2,9 @@
 
 mod custom;
 
+use std::collections::hash_map::DefaultHasher; // Moves into std::hash in Rust 1.76.
+use std::hash::{Hash, Hasher};
+
 use super::{NamedOp, OpName, OpTrait, StaticTag};
 use super::{OpTag, OpType};
 use crate::extension::ExtensionSet;
@@ -16,7 +19,7 @@ use thiserror::Error;
 
 pub use custom::{
     downcast_equal_consts, get_pair_of_input_values, get_single_input_value, CustomConst,
-    CustomSerialized,
+    CustomSerialized, TryHash,
 };
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -133,6 +136,24 @@ impl Sum {
     pub fn as_tuple(&self) -> Option<&[Value]> {
         // For valid instances, the type row will not have any row variables.
         self.sum_type.as_tuple().map(|_| self.values.as_ref())
+    }
+
+    fn try_hash<H: Hasher>(&self, st: &mut H) -> bool {
+        maybe_hash_values(&self.values, st) && {
+            st.write_usize(self.tag);
+            self.sum_type.hash(st);
+            true
+        }
+    }
+}
+
+pub(crate) fn maybe_hash_values<H: Hasher>(vals: &[Value], st: &mut H) -> bool {
+    // We can't mutate the Hasher with the first element
+    // if any element, even the last, fails.
+    let mut hasher = DefaultHasher::new();
+    vals.iter().all(|e| e.try_hash(&mut hasher)) && {
+        st.write_u64(hasher.finish());
+        true
     }
 }
 
@@ -508,6 +529,17 @@ impl Value {
             None
         }
     }
+
+    /// Hashes this value, if possible. [Value::Extension]s are hashable according
+    /// to their implementation of [TryHash]; [Value::Function]s never are;
+    /// [Value::Sum]s are if their contents are.
+    pub fn try_hash<H: Hasher>(&self, st: &mut H) -> bool {
+        match self {
+            Value::Extension { e } => e.value().try_hash(&mut *st),
+            Value::Function { .. } => false,
+            Value::Sum(s) => s.try_hash(st),
+        }
+    }
 }
 
 impl<T> From<T> for Value
@@ -527,6 +559,8 @@ pub type ValueNameRef = str;
 
 #[cfg(test)]
 mod test {
+    use std::collections::HashSet;
+
     use super::Value;
     use crate::builder::inout_sig;
     use crate::builder::test::simple_dfg_hugr;
@@ -547,7 +581,7 @@ mod test {
 
     use super::*;
 
-    #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
     /// A custom constant value used in testing
     pub(crate) struct CustomTestValue(pub CustomType);
 
@@ -725,6 +759,43 @@ mod test {
         let typ_qb = CustomType::new("my_type", vec![], ex_id, TypeBound::Copyable);
         let t = Type::new_extension(typ_qb.clone());
         assert_ne!(json_const.get_type(), t);
+    }
+
+    #[rstest]
+    fn hash_tuple(const_tuple: Value) {
+        let vals = [
+            Value::unit(),
+            Value::true_val(),
+            Value::false_val(),
+            ConstUsize::new(13).into(),
+            Value::tuple([ConstUsize::new(13).into()]),
+            Value::tuple([ConstUsize::new(13).into(), ConstUsize::new(14).into()]),
+            Value::tuple([ConstUsize::new(13).into(), ConstUsize::new(15).into()]),
+            const_tuple,
+        ];
+
+        let num_vals = vals.len();
+        let hashes = vals.map(|v| {
+            let mut h = DefaultHasher::new();
+            v.try_hash(&mut h).then_some(()).unwrap();
+            h.finish()
+        });
+        assert_eq!(HashSet::from(hashes).len(), num_vals); // all distinct
+    }
+
+    #[test]
+    fn unhashable_tuple() {
+        let tup = Value::tuple([ConstUsize::new(5).into(), ConstF64::new(4.97).into()]);
+        let mut h1 = DefaultHasher::new();
+        let r = tup.try_hash(&mut h1);
+        assert!(!r);
+
+        // Check that didn't do anything, by checking the hasher behaves
+        // just like one which never saw the tuple
+        h1.write_usize(5);
+        let mut h2 = DefaultHasher::new();
+        h2.write_usize(5);
+        assert_eq!(h1.finish(), h2.finish());
     }
 
     mod proptest {
