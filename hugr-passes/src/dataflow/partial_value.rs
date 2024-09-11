@@ -190,32 +190,6 @@ impl<V: AbstractValue> PartialValue<V> {
         }
     }
 
-    fn meet_mut_value_handle(&mut self, vh: V) -> bool {
-        self.assert_invariants();
-        match &*self {
-            Self::Bottom => false,
-            Self::Value(v) => {
-                if v == &vh {
-                    false
-                } else {
-                    *self = Self::Bottom;
-                    true
-                }
-            }
-            Self::PartialSum(_) => match vh.into() {
-                Self::Value(_) => {
-                    *self = Self::Bottom;
-                    true
-                }
-                other => self.meet_mut(other),
-            },
-            Self::Top => {
-                *self = vh.into();
-                true
-            }
-        }
-    }
-
     pub fn join(mut self, other: Self) -> Self {
         self.join_mut(other);
         self
@@ -336,14 +310,12 @@ impl<V: AbstractValue> Lattice for PartialValue<V> {
                     }
                 }
             }
-            (Self::Value(_), mut other @ Self::PartialSum(_)) => {
-                std::mem::swap(self, &mut other);
-                let Self::Value(old_self) = other else {
-                    unreachable!()
-                };
-                self.meet_mut_value_handle(old_self)
+            (Self::Value(ref v), Self::PartialSum(_))
+            | (Self::PartialSum(_), Self::Value(ref v)) => {
+                assert!(v.as_sum().is_none());
+                *self = Self::Bottom;
+                true
             }
-            (Self::PartialSum(_), Self::Value(h)) => self.meet_mut_value_handle(h),
         }
     }
 }
