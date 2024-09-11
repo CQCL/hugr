@@ -151,6 +151,8 @@ impl<V: Hash> Hash for PartialSum<V> {
     }
 }
 
+/// We really must prevent people from constructing PartialValue::Value of
+/// any `value` where `value.as_sum().is_some()``
 #[derive(PartialEq, Clone, Eq, Hash, Debug)]
 pub enum PartialValue<V> {
     Bottom,
@@ -253,12 +255,10 @@ impl<V: AbstractValue> PartialValue<V> {
     pub fn variant_values(&self, tag: usize, len: usize) -> Option<Vec<PartialValue<V>>> {
         let vals = match self {
             PartialValue::Bottom => return None,
-            PartialValue::Value(v) => v
-                .as_sum()
-                .filter(|(variant, _)| tag == *variant)?
-                .1
-                .map(PartialValue::Value)
-                .collect(),
+            PartialValue::Value(v) => {
+                assert!(v.as_sum().is_none());
+                return None;
+            }
             PartialValue::PartialSum(ps) => ps.variant_values(tag, len)?,
             PartialValue::Top => vec![PartialValue::Top; len],
         };
@@ -269,7 +269,10 @@ impl<V: AbstractValue> PartialValue<V> {
     pub fn supports_tag(&self, tag: usize) -> bool {
         match self {
             PartialValue::Bottom => false,
-            PartialValue::Value(v) => v.as_sum().is_some_and(|(v, _)| v == tag),
+            PartialValue::Value(v) => {
+                assert!(v.as_sum().is_none());
+                false
+            }
             PartialValue::PartialSum(ps) => ps.supports_tag(tag),
             PartialValue::Top => true,
         }
@@ -310,7 +313,7 @@ impl<V: AbstractValue> Lattice for PartialValue<V> {
                     }
                 }
             }
-            (Self::Value(_), mut other@Self::PartialSum(_)) => {
+            (Self::Value(_), mut other @ Self::PartialSum(_)) => {
                 std::mem::swap(self, &mut other);
                 let Self::Value(old_self) = other else {
                     unreachable!()
