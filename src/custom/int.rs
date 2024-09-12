@@ -35,53 +35,67 @@ fn emit_icmp<'c, H: HugrView>(
     let true_val = emit_value(context, &Value::true_val())?;
     let false_val = emit_value(context, &Value::false_val())?;
 
-    emit_custom_binary_op(context, args, |builder, (lhs, rhs), _| {
+    emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
         // get result as an i1
-        let r = builder.build_int_compare(pred, lhs.into_int_value(), rhs.into_int_value(), "")?;
+        let r = ctx.builder().build_int_compare(
+            pred,
+            lhs.into_int_value(),
+            rhs.into_int_value(),
+            "",
+        )?;
         // convert to whatever BOOL_T is
-        Ok(vec![builder.build_select(r, true_val, false_val, "")?])
+        Ok(vec![ctx
+            .builder()
+            .build_select(r, true_val, false_val, "")?])
     })
 }
 
 impl<'c, H: HugrView> EmitOp<'c, ExtensionOp, H> for IntOpEmitter<'c, '_, H> {
     fn emit(&mut self, args: EmitOpArgs<'c, ExtensionOp, H>) -> Result<()> {
         let iot = ConcreteIntOp::from_optype(&args.node().generalise()).ok_or(anyhow!(
-            "IntOpEmitter from_optype_failed: {:?}",
+            "IntOpEmitter from_optype failed: {:?}",
             args.node().as_ref()
         ))?;
         match iot.def {
-            IntOpDef::iadd => emit_custom_binary_op(self.0, args, |builder, (lhs, rhs), _| {
-                Ok(vec![builder
+            IntOpDef::iadd => emit_custom_binary_op(self.0, args, |ctx, (lhs, rhs), _| {
+                Ok(vec![ctx
+                    .builder()
                     .build_int_add(lhs.into_int_value(), rhs.into_int_value(), "")?
                     .as_basic_value_enum()])
             }),
-            IntOpDef::imul => emit_custom_binary_op(self.0, args, |builder, (lhs, rhs), _| {
-                Ok(vec![builder
+            IntOpDef::imul => emit_custom_binary_op(self.0, args, |ctx, (lhs, rhs), _| {
+                Ok(vec![ctx
+                    .builder()
                     .build_int_mul(lhs.into_int_value(), rhs.into_int_value(), "")?
                     .as_basic_value_enum()])
             }),
-            IntOpDef::isub => emit_custom_binary_op(self.0, args, |builder, (lhs, rhs), _| {
-                Ok(vec![builder
+            IntOpDef::isub => emit_custom_binary_op(self.0, args, |ctx, (lhs, rhs), _| {
+                Ok(vec![ctx
+                    .builder()
                     .build_int_sub(lhs.into_int_value(), rhs.into_int_value(), "")?
                     .as_basic_value_enum()])
             }),
-            IntOpDef::idiv_s => emit_custom_binary_op(self.0, args, |builder, (lhs, rhs), _| {
-                Ok(vec![builder
+            IntOpDef::idiv_s => emit_custom_binary_op(self.0, args, |ctx, (lhs, rhs), _| {
+                Ok(vec![ctx
+                    .builder()
                     .build_int_signed_div(lhs.into_int_value(), rhs.into_int_value(), "")?
                     .as_basic_value_enum()])
             }),
-            IntOpDef::idiv_u => emit_custom_binary_op(self.0, args, |builder, (lhs, rhs), _| {
-                Ok(vec![builder
+            IntOpDef::idiv_u => emit_custom_binary_op(self.0, args, |ctx, (lhs, rhs), _| {
+                Ok(vec![ctx
+                    .builder()
                     .build_int_unsigned_div(lhs.into_int_value(), rhs.into_int_value(), "")?
                     .as_basic_value_enum()])
             }),
-            IntOpDef::imod_s => emit_custom_binary_op(self.0, args, |builder, (lhs, rhs), _| {
-                Ok(vec![builder
+            IntOpDef::imod_s => emit_custom_binary_op(self.0, args, |ctx, (lhs, rhs), _| {
+                Ok(vec![ctx
+                    .builder()
                     .build_int_signed_rem(lhs.into_int_value(), rhs.into_int_value(), "")?
                     .as_basic_value_enum()])
             }),
-            IntOpDef::ineg => emit_custom_unary_op(self.0, args, |builder, arg, _| {
-                Ok(vec![builder
+            IntOpDef::ineg => emit_custom_unary_op(self.0, args, |ctx, arg, _| {
+                Ok(vec![ctx
+                    .builder()
                     .build_int_neg(arg.into_int_value(), "")?
                     .as_basic_value_enum()])
             }),

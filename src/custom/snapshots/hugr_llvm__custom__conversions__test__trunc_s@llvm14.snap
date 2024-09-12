@@ -1,0 +1,23 @@
+---
+source: src/custom/conversions.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+@0 = private unnamed_addr constant [58 x i8] c"Float value too big to convert to int of given width (32)\00", align 1
+
+define { i32, { { i32, i8* } }, { i32 } } @_hl.main.1(double %0) {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  %within_upper_bound = fcmp ole double %0, 0x41DFFFFFFFC00000
+  %within_lower_bound = fcmp ole double 0xC1E0000000000000, %0
+  %success = and i1 %within_upper_bound, %within_lower_bound
+  %trunc_result = fptosi double %0 to i32
+  %1 = insertvalue { i32 } undef, i32 %trunc_result, 0
+  %2 = insertvalue { i32, { { i32, i8* } }, { i32 } } { i32 1, { { i32, i8* } } poison, { i32 } poison }, { i32 } %1, 2
+  %3 = select i1 %success, { i32, { { i32, i8* } }, { i32 } } %2, { i32, { { i32, i8* } }, { i32 } } { i32 0, { { i32, i8* } } { { i32, i8* } { i32 2, i8* getelementptr inbounds ([58 x i8], [58 x i8]* @0, i32 0, i32 0) } }, { i32 } poison }
+  ret { i32, { { i32, i8* } }, { i32 } } %3
+}

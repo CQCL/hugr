@@ -153,10 +153,10 @@ impl TestContext {
         )
     }
 
-    /// Lower `hugr` to LLVM, then JIT and execute the function named `entry` in
-    /// the inner module.
+    /// Lower `hugr` to LLVM, then JIT and execute the function named
+    /// by `entry_point` in the inner module.
     ///
-    /// That function must take no arguments and return an `i64`.
+    /// That function must take no arguments and return an LLVM `i64`.
     pub fn exec_hugr_u64(&self, hugr: THugrView, entry_point: impl AsRef<str>) -> u64 {
         let emission = Emission::emit_hugr(hugr.fat_root().unwrap(), self.get_emit_hugr()).unwrap();
 

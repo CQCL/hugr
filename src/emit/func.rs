@@ -10,6 +10,7 @@ use inkwell::{
     basic_block::BasicBlock,
     builder::Builder,
     context::Context,
+    module::Module,
     types::{BasicType, BasicTypeEnum, FunctionType},
     values::{FunctionValue, GlobalValue},
 };
@@ -279,6 +280,10 @@ impl<'c, H: HugrView> EmitFuncContext<'c, H> {
         )?;
         self.env.insert(wire, mb.clone());
         Ok(mb)
+    }
+
+    pub fn get_current_module(&self) -> &Module<'c> {
+        self.emit_context.module()
     }
 
     /// Consumes the `EmitFuncContext` and returns both the inner

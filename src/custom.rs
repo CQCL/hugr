@@ -21,6 +21,7 @@ use crate::{
 
 use super::emit::EmitOp;
 
+pub mod conversions;
 pub mod float;
 pub mod int;
 pub mod logic;

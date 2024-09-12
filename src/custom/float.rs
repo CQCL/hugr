@@ -107,16 +107,18 @@ fn emit_fcmp<'c, H: HugrView>(
     let true_val = emit_value(context, &Value::true_val())?;
     let false_val = emit_value(context, &Value::false_val())?;
 
-    emit_custom_binary_op(context, args, |builder, (lhs, rhs), _| {
+    emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
         // get result as an i1
-        let r = builder.build_float_compare(
+        let r = ctx.builder().build_float_compare(
             pred,
             lhs.into_float_value(),
             rhs.into_float_value(),
             "",
         )?;
         // convert to whatever BOOL_T is
-        Ok(vec![builder.build_select(r, true_val, false_val, "")?])
+        Ok(vec![ctx
+            .builder()
+            .build_select(r, true_val, false_val, "")?])
     })
 }
 
@@ -136,28 +138,33 @@ impl<'c, H: HugrView> EmitOp<'c, ExtensionOp, H> for FloatOpEmitter<'c, '_, H> {
             FloatOps::fgt => emit_fcmp(self.0, args, inkwell::FloatPredicate::OGT),
             FloatOps::fle => emit_fcmp(self.0, args, inkwell::FloatPredicate::OLE),
             FloatOps::fge => emit_fcmp(self.0, args, inkwell::FloatPredicate::OGE),
-            FloatOps::fadd => emit_custom_binary_op(self.0, args, |builder, (lhs, rhs), _| {
-                Ok(vec![builder
+            FloatOps::fadd => emit_custom_binary_op(self.0, args, |ctx, (lhs, rhs), _| {
+                Ok(vec![ctx
+                    .builder()
                     .build_float_add(lhs.into_float_value(), rhs.into_float_value(), "")?
                     .as_basic_value_enum()])
             }),
-            FloatOps::fsub => emit_custom_binary_op(self.0, args, |builder, (lhs, rhs), _| {
-                Ok(vec![builder
+            FloatOps::fsub => emit_custom_binary_op(self.0, args, |ctx, (lhs, rhs), _| {
+                Ok(vec![ctx
+                    .builder()
                     .build_float_sub(lhs.into_float_value(), rhs.into_float_value(), "")?
                     .as_basic_value_enum()])
             }),
-            FloatOps::fneg => emit_custom_unary_op(self.0, args, |builder, v, _| {
-                Ok(vec![builder
+            FloatOps::fneg => emit_custom_unary_op(self.0, args, |ctx, v, _| {
+                Ok(vec![ctx
+                    .builder()
                     .build_float_neg(v.into_float_value(), "")?
                     .as_basic_value_enum()])
             }),
-            FloatOps::fmul => emit_custom_binary_op(self.0, args, |builder, (lhs, rhs), _| {
-                Ok(vec![builder
+            FloatOps::fmul => emit_custom_binary_op(self.0, args, |ctx, (lhs, rhs), _| {
+                Ok(vec![ctx
+                    .builder()
                     .build_float_mul(lhs.into_float_value(), rhs.into_float_value(), "")?
                     .as_basic_value_enum()])
             }),
-            FloatOps::fdiv => emit_custom_binary_op(self.0, args, |builder, (lhs, rhs), _| {
-                Ok(vec![builder
+            FloatOps::fdiv => emit_custom_binary_op(self.0, args, |ctx, (lhs, rhs), _| {
+                Ok(vec![ctx
+                    .builder()
                     .build_float_div(lhs.into_float_value(), rhs.into_float_value(), "")?
                     .as_basic_value_enum()])
             }),
