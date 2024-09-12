@@ -5,7 +5,7 @@ mod machine;
 pub use machine::Machine;
 
 mod partial_value;
-pub use partial_value::{AbstractValue, PartialValue};
+pub use partial_value::{AbstractValue, PartialValue, ValueOrSum};
 
 mod value_row;
 pub use value_row::ValueRow;

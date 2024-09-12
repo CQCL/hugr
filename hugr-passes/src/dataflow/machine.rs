@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 
-use hugr_core::{ops::Value, HugrView, Node, PortIndex, Wire};
+use hugr_core::{ops::Value, types::ConstTypeError, HugrView, Node, PortIndex, Wire};
 
-use super::{datalog::AscentProgram, AbstractValue, DFContext, PartialValue};
+use super::{
+    datalog::AscentProgram, partial_value::ValueOrSum, AbstractValue, DFContext, PartialValue,
+};
 
 pub struct Machine<V: AbstractValue, C: DFContext<V>>(
     AscentProgram<V, C>,
@@ -85,7 +87,27 @@ where
             .out_value_types(w.node())
             .find(|(p, _)| *p == w.source())
             .unwrap();
-        pv.try_into_value(&typ).ok()
+        let v: ValueOrSum<V> = pv.try_into_value(&typ).ok()?;
+        v.try_into().ok()
+    }
+}
+
+impl<V> TryFrom<ValueOrSum<V>> for Value
+where
+    Value: From<V>,
+{
+    type Error = ConstTypeError;
+    fn try_from(value: ValueOrSum<V>) -> Result<Self, ConstTypeError> {
+        match value {
+            ValueOrSum::Value(v) => Ok(v.into()),
+            ValueOrSum::Sum { tag, items, st } => {
+                let items = items
+                    .into_iter()
+                    .map(Value::try_from)
+                    .collect::<Result<Vec<_>, _>>()?;
+                Value::sum(tag, items, st.clone())
+            }
+        }
     }
 }
 

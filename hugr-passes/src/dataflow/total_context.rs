@@ -1,87 +1,21 @@
 use std::hash::Hash;
 
-use hugr_core::ops::Value;
-use hugr_core::types::{ConstTypeError, SumType, Type, TypeEnum, TypeRow};
 use hugr_core::{ops::OpTrait, Hugr, HugrView, IncomingPort, Node, OutgoingPort, PortIndex};
-use itertools::{zip_eq, Itertools};
 
-use super::partial_value::{AbstractValue, PartialSum, PartialValue};
+use super::partial_value::{AbstractValue, PartialValue, ValueOrSum};
 use super::DFContext;
 use super::ValueRow;
-
-pub trait FromSum: Sized {
-    type Err: std::error::Error;
-    fn try_new_sum(
-        tag: usize,
-        items: impl IntoIterator<Item = Self>,
-        st: &SumType,
-    ) -> Result<Self, Self::Err>;
-    fn debug_check_is_type(&self, _ty: &Type) {}
-}
 
 /// A simpler interface like [DFContext] but where the context only cares about
 /// values that are completely known (in the lattice `V`)
 /// rather than e.g. Sums potentially of two variants each of known values.
 pub trait TotalContext<V>: Clone + Eq + Hash + std::ops::Deref<Target = Hugr> {
-    type InterpretableVal: FromSum + From<V>;
+    type InterpretableVal: TryFrom<ValueOrSum<V>>;
     fn interpret_leaf_op(
         &self,
         node: Node,
         ins: &[(IncomingPort, Self::InterpretableVal)],
     ) -> Vec<(OutgoingPort, V)>;
-}
-
-impl FromSum for Value {
-    type Err = ConstTypeError;
-    fn try_new_sum(
-        tag: usize,
-        items: impl IntoIterator<Item = Self>,
-        st: &hugr_core::types::SumType,
-    ) -> Result<Self, ConstTypeError> {
-        Self::sum(tag, items, st.clone())
-    }
-}
-
-// These are here because they rely on FromSum, that they are `impl PartialSum/Value`
-// is merely a nice syntax.
-impl<V: AbstractValue> PartialValue<V> {
-    pub fn try_into_value<V2: FromSum + From<V>>(self, typ: &Type) -> Result<V2, Self> {
-        let r: V2 = match self {
-            Self::Value(v) => Ok(v.clone().into()),
-            Self::PartialSum(ps) => ps.try_into_value(typ).map_err(Self::PartialSum),
-            x => Err(x),
-        }?;
-        r.debug_check_is_type(typ);
-        Ok(r)
-    }
-}
-
-impl<V: AbstractValue> PartialSum<V> {
-    pub fn try_into_value<V2: FromSum + From<V>>(self, typ: &Type) -> Result<V2, Self> {
-        let Ok((k, v)) = self.0.iter().exactly_one() else {
-            Err(self)?
-        };
-
-        let TypeEnum::Sum(st) = typ.as_type_enum() else {
-            Err(self)?
-        };
-        let Some(r) = st.get_variant(*k) else {
-            Err(self)?
-        };
-        let Ok(r): Result<TypeRow, _> = r.clone().try_into() else {
-            Err(self)?
-        };
-        if v.len() != r.len() {
-            return Err(self);
-        }
-        match zip_eq(v, r.iter())
-            .map(|(v, t)| v.clone().try_into_value(t))
-            .collect::<Result<Vec<_>, _>>()
-        {
-            Ok(vs) => V2::try_new_sum(*k, vs, st).map_err(|_| self),
-            Err(_) => Err(self),
-        }
-    }
 }
 
 impl<V: AbstractValue, T: TotalContext<V>> DFContext<V> for T {
@@ -96,7 +30,10 @@ impl<V: AbstractValue, T: TotalContext<V>> DFContext<V> for T {
             .filter_map(|((i, ty), pv)| {
                 pv.clone()
                     .try_into_value(ty)
+                    // Discard PVs which don't produce ValueOrSum, i.e. Bottom/Top :-)
                     .ok()
+                    // And discard any ValueOrSum that don't produce V - this is a bit silent :-(
+                    .and_then(|v_s| T::InterpretableVal::try_from(v_s).ok())
                     .map(|v| (IncomingPort::from(i), v))
             })
             .collect::<Vec<_>>();

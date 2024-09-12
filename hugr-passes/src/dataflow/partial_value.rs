@@ -1,6 +1,7 @@
 use ascent::lattice::BoundedLattice;
 use ascent::Lattice;
-use itertools::zip_eq;
+use hugr_core::types::{SumType, Type, TypeEnum, TypeRow};
+use itertools::{zip_eq, Itertools};
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
@@ -11,6 +12,16 @@ pub trait AbstractValue: Clone + std::fmt::Debug + PartialEq + Eq + Hash {
     /// at the cost of requiring more cloning during actual conversion
     /// (inside the lazy Iterator, or for the error case, as Self remains)
     fn as_sum(&self) -> Option<(usize, impl Iterator<Item = Self> + '_)>;
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ValueOrSum<V> {
+    Value(V),
+    Sum {
+        tag: usize,
+        items: Vec<Self>,
+        st: SumType,
+    },
 }
 
 // TODO ALAN inline into PartialValue? Has to be public as it's in a pub enum
@@ -91,6 +102,36 @@ impl<V: AbstractValue> PartialSum<V> {
 
     pub fn supports_tag(&self, tag: usize) -> bool {
         self.0.contains_key(&tag)
+    }
+
+    pub fn try_into_value(self, typ: &Type) -> Result<ValueOrSum<V>, Self> {
+        let Ok((k, v)) = self.0.iter().exactly_one() else {
+            Err(self)?
+        };
+
+        let TypeEnum::Sum(st) = typ.as_type_enum() else {
+            Err(self)?
+        };
+        let Some(r) = st.get_variant(*k) else {
+            Err(self)?
+        };
+        let Ok(r) = TypeRow::try_from(r.clone()) else {
+            Err(self)?
+        };
+        if v.len() != r.len() {
+            return Err(self);
+        }
+        match zip_eq(v, r.into_iter())
+            .map(|(v, t)| v.clone().try_into_value(t))
+            .collect::<Result<Vec<_>, _>>()
+        {
+            Ok(vs) => Ok(ValueOrSum::Sum {
+                tag: *k,
+                items: vs,
+                st: st.clone(),
+            }),
+            Err(_) => Err(self),
+        }
     }
 }
 
@@ -226,6 +267,14 @@ impl<V: AbstractValue> PartialValue<V> {
             }
             PartialValue::PartialSum(ps) => ps.supports_tag(tag),
             PartialValue::Top => true,
+        }
+    }
+
+    pub fn try_into_value(self, typ: &Type) -> Result<ValueOrSum<V>, Self> {
+        match self {
+            Self::Value(v) => Ok(ValueOrSum::Value(v.clone())),
+            Self::PartialSum(ps) => ps.try_into_value(typ).map_err(Self::PartialSum),
+            x => Err(x),
         }
     }
 }
