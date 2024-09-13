@@ -31,13 +31,11 @@ fn test_make_tuple() {
 }
 
 #[test]
-fn test_unpack_tuple() {
+fn test_unpack_tuple_const() {
     let mut builder = DFGBuilder::new(endo_sig(vec![])).unwrap();
-    let v1 = builder.add_load_value(Value::false_val());
-    let v2 = builder.add_load_value(Value::true_val());
-    let v3 = builder.make_tuple([v1, v2]).unwrap();
+    let v = builder.add_load_value(Value::tuple([Value::false_val(), Value::true_val()]));
     let [o1, o2] = builder
-        .add_dataflow_op(UnpackTuple::new(type_row![BOOL_T, BOOL_T]), [v3])
+        .add_dataflow_op(UnpackTuple::new(type_row![BOOL_T, BOOL_T]), [v])
         .unwrap()
         .outputs_arr();
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
