@@ -381,7 +381,7 @@ mod test {
     }
 
     impl TestSumLeafType {
-        fn assert_invariants(&self) {
+        fn assert_valid(&self) {
             if let Self::Int(t) = self {
                 if let TypeEnum::Extension(ct) = t.as_type_enum() {
                     assert_eq!("int", ct.name());
@@ -480,17 +480,17 @@ mod test {
             self.depth() == 0
         }
 
-        fn assert_invariants(&self) {
+        fn assert_valid(&self) {
             match self {
                 TestSumType::Branch(d, sop) => {
                     assert!(!sop.is_empty(), "No variants");
                     for v in sop.iter().flat_map(|x| x.iter()) {
                         assert!(v.depth() < *d);
-                        v.assert_invariants();
+                        v.assert_valid();
                     }
                 }
                 TestSumType::Leaf(l) => {
-                    l.assert_invariants();
+                    l.assert_valid();
                 }
             }
         }
@@ -601,7 +601,7 @@ mod test {
     proptest! {
         #[test]
         fn unary_sum_type_valid(ust: TestSumType) {
-            ust.assert_invariants();
+            ust.assert_valid();
         }
     }
 
