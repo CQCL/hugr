@@ -31,7 +31,7 @@ impl<V> PartialSum<V> {
 }
 
 impl<V: AbstractValue> PartialSum<V> {
-    fn assert_variants(&self) {
+    fn assert_invariants(&self) {
         assert_ne!(self.num_variants(), 0);
         for pv in self.0.values().flat_map(|x| x.iter()) {
             pv.assert_invariants();
@@ -164,7 +164,7 @@ pub enum PartialValue<V> {
 impl<V: AbstractValue> From<V> for PartialValue<V> {
     fn from(v: V) -> Self {
         v.as_sum()
-            .map(|(tag, values)| Self::variant(tag, values.map(Self::Value)))
+            .map(|(tag, values)| Self::variant(tag, values.map(Self::from)))
             .unwrap_or(Self::Value(v))
     }
 }
@@ -181,7 +181,7 @@ impl<V: AbstractValue> PartialValue<V> {
     fn assert_invariants(&self) {
         match self {
             Self::PartialSum(ps) => {
-                ps.assert_variants();
+                ps.assert_invariants();
             }
             Self::Value(v) => {
                 assert!(v.as_sum().is_none())
@@ -232,6 +232,7 @@ impl<V: AbstractValue> PartialValue<V> {
 
 impl<V: AbstractValue> Lattice for PartialValue<V> {
     fn join_mut(&mut self, other: Self) -> bool {
+        self.assert_invariants();
         // println!("join {self:?}\n{:?}", &other);
         match (&*self, other) {
             (Self::Top, _) => false,
@@ -279,6 +280,7 @@ impl<V: AbstractValue> Lattice for PartialValue<V> {
     }
 
     fn meet_mut(&mut self, other: Self) -> bool {
+        self.assert_invariants();
         match (&*self, other) {
             (Self::Bottom, _) => false,
             (_, other @ Self::Bottom) => {
