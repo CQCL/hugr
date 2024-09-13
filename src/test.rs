@@ -159,6 +159,7 @@ impl TestContext {
     /// That function must take no arguments and return an LLVM `i64`.
     pub fn exec_hugr_u64(&self, hugr: THugrView, entry_point: impl AsRef<str>) -> u64 {
         let emission = Emission::emit_hugr(hugr.fat_root().unwrap(), self.get_emit_hugr()).unwrap();
+        emission.verify().unwrap();
 
         emission.exec_u64(entry_point).unwrap()
     }
