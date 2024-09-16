@@ -20,6 +20,7 @@ use hugr::types::{Signature, Type, TypeRow};
 use hugr::{type_row, Hugr, HugrView};
 use inkwell::module::Module;
 use inkwell::passes::PassManager;
+use inkwell::values::GenericValue;
 use itertools::Itertools;
 use rstest::rstest;
 
@@ -46,7 +47,7 @@ impl<'c> Emission<'c> {
     pub fn emit_hugr<H: HugrView>(
         hugr: FatNode<'c, hugr::ops::Module, H>,
         eh: EmitHugr<'c, H>,
-    ) -> Result<Self> {
+    ) -> Result<Self> where {
         let module = eh.emit_module(hugr)?.finish();
         Ok(Self { module })
     }
@@ -82,6 +83,19 @@ impl<'c> Emission<'c> {
     ///
     /// That function must take no arguments and return an `i64`.
     pub fn exec_u64(&self, entry: impl AsRef<str>) -> Result<u64> {
+        let gv = self.exec_impl(entry)?;
+        Ok(gv.as_int(false))
+    }
+
+    /// JIT and execute the function named `entry` in the inner module.
+    ///
+    /// That function must take no arguments and return an `f64`.
+    pub fn exec_f64(&self, entry: impl AsRef<str>) -> Result<f64> {
+        let gv = self.exec_impl(entry)?;
+        Ok(gv.as_float(&self.module.get_context().f64_type()))
+    }
+
+    pub(crate) fn exec_impl(&self, entry: impl AsRef<str>) -> Result<GenericValue<'c>> {
         let entry_fv = self
             .module
             .get_function(entry.as_ref())
@@ -94,7 +108,7 @@ impl<'c> Emission<'c> {
             .create_jit_execution_engine(inkwell::OptimizationLevel::None)
             .map_err(|err| anyhow!("Failed to create execution engine: {err}"))?;
         let fv = ee.get_function_value(entry.as_ref())?;
-        Ok(unsafe { ee.run_function(fv, &[]).as_int(false) })
+        Ok(unsafe { ee.run_function(fv, &[]) })
     }
 }
 
