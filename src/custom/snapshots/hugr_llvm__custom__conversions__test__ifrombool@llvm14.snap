@@ -1,0 +1,17 @@
+---
+source: src/custom/conversions.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define i8 @_hl.main.1({ i32, {}, {} } %0) {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  %1 = extractvalue { i32, {}, {} } %0, 0
+  %2 = icmp eq i32 %1, 1
+  %3 = select i1 %2, i8 1, i8 0
+  ret i8 %3
+}
