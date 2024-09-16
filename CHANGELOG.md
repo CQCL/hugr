@@ -6,6 +6,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0](https://github.com/CQCL/hugr-llvm/compare/v0.4.0...v0.5.0) - 2024-09-16
+
+### New Features
+
+- Add emitters for int <-> float/usize conversions ([#94](https://github.com/CQCL/hugr-llvm/pull/94))
+- [**breaking**] array ops ([#96](https://github.com/CQCL/hugr-llvm/pull/96))
+- Add conversions itobool, ifrombool ([#101](https://github.com/CQCL/hugr-llvm/pull/101))
+- Add `tket2` feature and lowerings for `tket2.rotation` extension ([#100](https://github.com/CQCL/hugr-llvm/pull/100))
+
+### Testing
+
+- Add execution test framework ([#97](https://github.com/CQCL/hugr-llvm/pull/97))
+
 ## [0.3.1](https://github.com/CQCL/hugr-llvm/compare/v0.3.0...v0.3.1) - 2024-08-28
 
 ### New Features
