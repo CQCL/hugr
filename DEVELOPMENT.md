@@ -28,17 +28,16 @@ shell by setting up [direnv](https://devenv.sh/automatic-shell-activation/).
 
 To set up the environment manually you will need:
 
-- Rust `>=1.75`: https://www.rust-lang.org/tools/install
-- llvm `== 14.0`: we use the rust bindings 
-[llvm-sys](https://crates.io/crates/llvm-sys) to [llvm](https://llvm.org/), 
-- Poetry `>=1.8`: https://python-poetry.org/
+- Rust `>=1.75`: <https://www.rust-lang.org/tools/install>
+- llvm `== 14.0`: we use the rust bindings
+[llvm-sys](https://crates.io/crates/llvm-sys) to [llvm](https://llvm.org/),
+- Poetry `>=1.8`: <https://python-poetry.org/>
 
 Once you have these installed, verify that your setup is working
 
 ```bash
 cargo test
 ```
-
 
 ## 💅 Coding Style
 
@@ -51,7 +50,6 @@ cargo format
 ```
 
 We also use various linters to catch common mistakes and enforce best practices. To run these, see [our CI config](./.github/workflows/ci-rs.yml). TODO Provide a better way, contributions welcome.
-
 
 ## 📈 Code Coverage
 

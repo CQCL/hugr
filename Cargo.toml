@@ -38,8 +38,8 @@ rstest = "0.19.0"
 portgraph = "0.12.1"
 pathsearch = "0.2.0"
 serde_json = "1.0.117"
-serde = "*"
-typetag = "*"
+serde = "1"
+typetag = "0.2"
 
 [profile.dev.package]
 insta.opt-level = 3
