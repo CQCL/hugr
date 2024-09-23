@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 use hugr::ops::{
     constant::Sum, Call, CallIndirect, Case, Conditional, Const, ExtensionOp, Input, LoadConstant,
     LoadFunction, OpTag, OpTrait, OpType, Output, Tag, Value, CFG,
@@ -227,7 +227,11 @@ pub fn emit_value<'c, H: HugrView>(
             let exts = context.extensions();
             exts.load_constant(context, e.value())
         }
-        Value::Function { .. } => todo!(),
+        Value::Function { .. } => bail!(
+            "Value::Function Const nodes are not supported. \
+            Ensure you eliminate these from the HUGR before lowering to LLVM. \
+            `hugr_llvm::utils::inline_constant_functions` is provided for this purpose."
+        ),
         Value::Sum(Sum {
             tag,
             values,
