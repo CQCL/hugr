@@ -17,7 +17,7 @@ use delegate::delegate;
 use thiserror::Error;
 
 /// Error loading operation.
-#[derive(Debug, Error, PartialEq)]
+#[derive(Debug, Error, PartialEq, Clone)]
 #[error("{0}")]
 #[allow(missing_docs)]
 #[non_exhaustive]
