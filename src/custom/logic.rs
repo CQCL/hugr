@@ -8,7 +8,7 @@ use hugr::{
 use inkwell::{types::BasicTypeEnum, IntPredicate};
 
 use crate::{
-    emit::{emit_value, func::EmitFuncContext, EmitOp, EmitOpArgs},
+    emit::{emit_value, func::EmitFuncContext, EmitOpArgs},
     sum::LLVMSumValue,
     types::TypingSession,
 };
@@ -16,19 +16,40 @@ use crate::{
 use super::{CodegenExtension, CodegenExtsMap};
 use anyhow::{anyhow, Result};
 
-struct LogicOpEmitter<'c, 'd, H>(&'d mut EmitFuncContext<'c, H>);
+/// A [CodegenExtension] for the [hugr::std_extensions::logic]
+/// extension.
+pub struct LogicCodegenExtension;
 
-impl<'c, H: HugrView> EmitOp<'c, ExtensionOp, H> for LogicOpEmitter<'c, '_, H> {
-    fn emit(&mut self, args: EmitOpArgs<'c, ExtensionOp, H>) -> Result<()> {
+impl<H: HugrView> CodegenExtension<H> for LogicCodegenExtension {
+    fn extension(&self) -> ExtensionId {
+        logic::EXTENSION_ID
+    }
+
+    fn llvm_type<'c>(
+        &self,
+        _context: &TypingSession<'c, H>,
+        hugr_type: &CustomType,
+    ) -> Result<BasicTypeEnum<'c>> {
+        Err(anyhow!(
+            "LogicCodegenExtension: unsupported type: {}",
+            hugr_type
+        ))
+    }
+
+    fn emit_extension_op<'c>(
+        &self,
+        context: &mut EmitFuncContext<'c, H>,
+        args: EmitOpArgs<'c, '_, ExtensionOp, H>,
+    ) -> Result<()> {
         let lot = LogicOp::from_optype(&args.node().generalise()).ok_or(anyhow!(
             "LogicOpEmitter: from_optype_failed: {:?}",
             args.node().as_ref()
         ))?;
-        let builder = self.0.builder();
+        let builder = context.builder();
         // Turn bool sum inputs into i1's
         let mut inputs = vec![];
         for inp in args.inputs {
-            let bool_ty = self.0.llvm_sum_type(SumType::Unit { size: 2 })?;
+            let bool_ty = context.llvm_sum_type(SumType::Unit { size: 2 })?;
             let bool_val = LLVMSumValue::try_new(inp, bool_ty)?;
             inputs.push(bool_val.build_get_tag(builder)?);
         }
@@ -62,42 +83,13 @@ impl<'c, H: HugrView> EmitOp<'c, ExtensionOp, H> for LogicOpEmitter<'c, '_, H> {
             }
         };
         // Turn result back into sum
-        let res = builder.build_int_cast(res, self.0.iw_context().bool_type(), "")?;
-        let true_val = emit_value(self.0, &Value::true_val())?;
-        let false_val = emit_value(self.0, &Value::false_val())?;
-        let res = self
-            .0
+        let res = builder.build_int_cast(res, context.iw_context().bool_type(), "")?;
+        let true_val = emit_value(context, &Value::true_val())?;
+        let false_val = emit_value(context, &Value::false_val())?;
+        let res = context
             .builder()
             .build_select(res, true_val, false_val, "")?;
-        args.outputs.finish(self.0.builder(), vec![res])
-    }
-}
-
-/// A [CodegenExtension] for the [hugr::std_extensions::logic]
-/// extension.
-pub struct LogicCodegenExtension;
-
-impl<'c, H: HugrView> CodegenExtension<'c, H> for LogicCodegenExtension {
-    fn extension(&self) -> ExtensionId {
-        logic::EXTENSION_ID
-    }
-
-    fn llvm_type<'d>(
-        &self,
-        _context: &TypingSession<'c, H>,
-        hugr_type: &CustomType,
-    ) -> Result<BasicTypeEnum<'c>> {
-        Err(anyhow!(
-            "LogicCodegenExtension: unsupported type: {}",
-            hugr_type
-        ))
-    }
-
-    fn emitter<'a>(
-        &self,
-        context: &'a mut EmitFuncContext<'c, H>,
-    ) -> Box<dyn EmitOp<'c, ExtensionOp, H> + 'a> {
-        Box::new(LogicOpEmitter(context))
+        args.outputs.finish(context.builder(), vec![res])
     }
 }
 

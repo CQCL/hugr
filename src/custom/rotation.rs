@@ -14,7 +14,7 @@ use inkwell::{
 };
 
 use crate::{
-    emit::{get_intrinsic, EmitFuncContext, EmitOp, EmitOpArgs},
+    emit::{get_intrinsic, EmitFuncContext, EmitOpArgs},
     types::TypingSession,
 };
 
@@ -33,12 +33,12 @@ fn llvm_angle_type<'c, H: HugrView>(ts: &TypingSession<'c, H>) -> FloatType<'c> 
     ts.iw_context().f64_type()
 }
 
-impl<'c, H: HugrView> CodegenExtension<'c, H> for RotationCodegenExtension {
+impl<H: HugrView> CodegenExtension<H> for RotationCodegenExtension {
     fn extension(&self) -> ExtensionId {
         ROTATION_EXTENSION_ID
     }
 
-    fn llvm_type(
+    fn llvm_type<'c>(
         &self,
         context: &TypingSession<'c, H>,
         hugr_type: &CustomType,
@@ -49,39 +49,14 @@ impl<'c, H: HugrView> CodegenExtension<'c, H> for RotationCodegenExtension {
             bail!("Unsupported type: {hugr_type}")
         }
     }
-
-    fn emitter<'a>(
-        &'a self,
-        context: &'a mut EmitFuncContext<'c, H>,
-    ) -> Box<dyn crate::emit::EmitOp<'c, hugr::ops::ExtensionOp, H> + 'a> {
-        Box::new(RotationOpEmitter(context))
-    }
-
-    fn supported_consts(&self) -> std::collections::HashSet<std::any::TypeId> {
-        let of = TypeId::of::<ConstRotation>();
-        [of].into_iter().collect()
-    }
-
-    fn load_constant(
+    fn emit_extension_op<'c>(
         &self,
         context: &mut EmitFuncContext<'c, H>,
-        konst: &dyn CustomConst,
-    ) -> Result<Option<BasicValueEnum<'c>>> {
-        let Some(rotation) = konst.downcast_ref::<ConstRotation>() else {
-            return Ok(None);
-        };
-        let angle_type = llvm_angle_type(&context.typing_session());
-        Ok(Some(angle_type.const_float(rotation.half_turns()).into()))
-    }
-}
-
-struct RotationOpEmitter<'c, 'd, H>(&'d mut EmitFuncContext<'c, H>);
-
-impl<'c, H: HugrView> EmitOp<'c, ExtensionOp, H> for RotationOpEmitter<'c, '_, H> {
-    fn emit(&mut self, args: EmitOpArgs<'c, ExtensionOp, H>) -> Result<()> {
-        let ts = self.0.typing_session();
-        let module = self.0.get_current_module();
-        let builder = self.0.builder();
+        args: EmitOpArgs<'c, '_, ExtensionOp, H>,
+    ) -> Result<()> {
+        let ts = context.typing_session();
+        let module = context.get_current_module();
+        let builder = context.builder();
         let angle_ty = llvm_angle_type(&ts);
 
         match RotationOp::from_op(&args.node())? {
@@ -190,6 +165,23 @@ impl<'c, H: HugrView> EmitOp<'c, ExtensionOp, H> for RotationOpEmitter<'c, '_, H
             }
             op => bail!("Unsupported op: {op:?}"),
         }
+    }
+
+    fn supported_consts(&self) -> std::collections::HashSet<std::any::TypeId> {
+        let of = TypeId::of::<ConstRotation>();
+        [of].into_iter().collect()
+    }
+
+    fn load_constant<'c>(
+        &self,
+        context: &mut EmitFuncContext<'c, H>,
+        konst: &dyn CustomConst,
+    ) -> Result<Option<BasicValueEnum<'c>>> {
+        let Some(rotation) = konst.downcast_ref::<ConstRotation>() else {
+            return Ok(None);
+        };
+        let angle_type = llvm_angle_type(&context.typing_session());
+        Ok(Some(angle_type.const_float(rotation.half_turns()).into()))
     }
 }
 
@@ -341,19 +333,24 @@ mod test {
 
     struct NonFiniteConst64CodegenExtension;
 
-    impl<'c, H: HugrView> CodegenExtension<'c, H> for NonFiniteConst64CodegenExtension {
+    impl<H: HugrView> CodegenExtension<H> for NonFiniteConst64CodegenExtension {
         fn extension(&self) -> ExtensionId {
             ExtensionId::new_unchecked("NonFiniteConst64")
         }
 
-        fn llvm_type(&self, _: &TypingSession<'c, H>, _: &CustomType) -> Result<BasicTypeEnum<'c>> {
+        fn llvm_type<'c>(
+            &self,
+            _: &TypingSession<'c, H>,
+            _: &CustomType,
+        ) -> Result<BasicTypeEnum<'c>> {
             panic!("no types")
         }
 
-        fn emitter<'a>(
-            &'a self,
-            _: &'a mut EmitFuncContext<'c, H>,
-        ) -> Box<dyn EmitOp<'c, ExtensionOp, H> + 'a> {
+        fn emit_extension_op<'c>(
+            &self,
+            _: &mut EmitFuncContext<'c, H>,
+            _: EmitOpArgs<'c, '_, ExtensionOp, H>,
+        ) -> Result<()> {
             panic!("no ops")
         }
 
@@ -362,7 +359,7 @@ mod test {
             [of].into_iter().collect()
         }
 
-        fn load_constant(
+        fn load_constant<'c>(
             &self,
             context: &mut EmitFuncContext<'c, H>,
             konst: &dyn CustomConst,

@@ -12,7 +12,7 @@ use itertools::Itertools as _;
 use crate::{
     emit::{
         func::{EmitFuncContext, RowMailBox, RowPromise},
-        EmitOp, EmitOpArgs,
+        EmitOpArgs,
     },
     fat::FatNode,
     sum::LLVMSumValue,
@@ -20,24 +20,26 @@ use crate::{
 
 use super::emit_dataflow_parent;
 
-pub struct CfgEmitter<'c, 'd, H> {
-    context: &'d mut EmitFuncContext<'c, H>,
-    bbs: HashMap<FatNode<'c, OpType, H>, (BasicBlock<'c>, RowMailBox<'c>)>,
+pub struct CfgEmitter<'c, 'hugr, H> {
+    bbs: HashMap<FatNode<'hugr, OpType, H>, (BasicBlock<'c>, RowMailBox<'c>)>,
     inputs: Option<Vec<BasicValueEnum<'c>>>,
     outputs: Option<RowPromise<'c>>,
-    node: FatNode<'c, CFG, H>,
-    entry_node: FatNode<'c, DataflowBlock, H>,
-    exit_node: FatNode<'c, ExitBlock, H>,
+    node: FatNode<'hugr, CFG, H>,
+    entry_node: FatNode<'hugr, DataflowBlock, H>,
+    exit_node: FatNode<'hugr, ExitBlock, H>,
 }
 
-impl<'c, 'd, H: HugrView> CfgEmitter<'c, 'd, H> {
+impl<'c, 'hugr, H: HugrView> CfgEmitter<'c, 'hugr, H> {
     // Constructs a new CfgEmitter. Creates a basic block for each of
     // the children in the llvm function. Note that this does not move the
     // position of the builder.
-    pub fn new(
+    pub fn new<'d>(
         context: &'d mut EmitFuncContext<'c, H>,
-        args: EmitOpArgs<'c, CFG, H>,
-    ) -> Result<Self> {
+        args: EmitOpArgs<'c, 'hugr, CFG, H>,
+    ) -> Result<Self>
+    where
+        'c: 'd,
+    {
         let node = args.node();
         let (inputs, outputs) = (Some(args.inputs), Some(args.outputs));
 
@@ -61,7 +63,6 @@ impl<'c, 'd, H: HugrView> CfgEmitter<'c, 'd, H> {
         }
         let (entry_node, exit_node) = node.get_entry_exit();
         Ok(CfgEmitter {
-            context,
             bbs,
             node,
             inputs,
@@ -79,9 +80,9 @@ impl<'c, 'd, H: HugrView> CfgEmitter<'c, 'd, H> {
         self.outputs.take().ok_or(anyhow!("Couldn't take inputs"))
     }
 
-    fn get_block_data<OT: 'c>(
+    fn get_block_data<OT: 'hugr>(
         &self,
-        node: &FatNode<'c, OT, H>,
+        node: &FatNode<'hugr, OT, H>,
     ) -> Result<(BasicBlock<'c>, RowMailBox<'c>)>
     where
         for<'a> &'a OpType: TryInto<&'a OT>,
@@ -94,60 +95,63 @@ impl<'c, 'd, H: HugrView> CfgEmitter<'c, 'd, H> {
 
     /// Consume the emitter by emitting each child of the node.
     /// After returning the builder will be at the end of the exit block.
-    pub fn emit_children(mut self) -> Result<()> {
+    pub fn emit_children(mut self, context: &mut EmitFuncContext<'c, H>) -> Result<()> {
         // write the inputs of the cfg node into the inputs of the entry
         // dataflowblock node, and then branch to the basic block of that entry
         // node.
         let inputs = self.take_inputs()?;
         let (entry_bb, inputs_rmb) = self.get_block_data(&self.entry_node)?;
-        let builder = self.context.builder();
+        let builder = context.builder();
         inputs_rmb.write(builder, inputs)?;
         builder.build_unconditional_branch(entry_bb)?;
 
         // emit each child by delegating to the `impl EmitOp<_>` of self.
         for child_node in self.node.children() {
             let (inputs, outputs) = (vec![], RowMailBox::new_empty().promise());
-            self.emit(EmitOpArgs {
-                node: child_node,
-                inputs,
-                outputs,
-            })?;
+            match child_node.as_ref() {
+                OpType::DataflowBlock(ref dfb) => self.emit_dataflow_block(
+                    context,
+                    EmitOpArgs {
+                        node: child_node.into_ot(dfb),
+                        inputs,
+                        outputs,
+                    },
+                ),
+                OpType::ExitBlock(ref eb) => self.emit_exit_block(
+                    context,
+                    EmitOpArgs {
+                        node: child_node.into_ot(eb),
+                        inputs,
+                        outputs,
+                    },
+                ),
+
+                // Const is allowed, but requires no work here. FuncDecl is
+                // technically not allowed, but there is no harm in allowing it.
+                OpType::Const(_) => Ok(()),
+                OpType::FuncDecl(_) => Ok(()),
+                OpType::FuncDefn(ref fd) => {
+                    context.push_todo_func(child_node.into_ot(fd));
+                    Ok(())
+                }
+
+                ot => Err(anyhow!("unknown optype: {ot:?}")),
+            }?;
         }
 
         // move the builder to the end of the exit block
         let (exit_bb, _) = self.get_block_data(&self.exit_node)?;
-        self.context.builder().position_at_end(exit_bb);
+        context.builder().position_at_end(exit_bb);
         Ok(())
     }
-}
-
-impl<'c, H: HugrView> EmitOp<'c, OpType, H> for CfgEmitter<'c, '_, H> {
-    fn emit(&mut self, args: EmitOpArgs<'c, OpType, H>) -> Result<()> {
-        match args.node().as_ref() {
-            OpType::DataflowBlock(ref dfb) => self.emit(args.into_ot(dfb)),
-            OpType::ExitBlock(ref eb) => self.emit(args.into_ot(eb)),
-
-            // Const is allowed, but requires no work here. FuncDecl is
-            // technically not allowed, but there is no harm in allowing it.
-            OpType::Const(_) => Ok(()),
-            OpType::FuncDecl(_) => Ok(()),
-            OpType::FuncDefn(ref fd) => {
-                self.context.push_todo_func(args.node.into_ot(fd));
-                Ok(())
-            }
-
-            ot => Err(anyhow!("unknown optype: {ot:?}")),
-        }
-    }
-}
-impl<'c, H: HugrView> EmitOp<'c, DataflowBlock, H> for CfgEmitter<'c, '_, H> {
-    fn emit(
+    fn emit_dataflow_block(
         &mut self,
+        context: &mut EmitFuncContext<'c, H>,
         EmitOpArgs {
             node,
             inputs: _,
             outputs: _,
-        }: EmitOpArgs<'c, DataflowBlock, H>,
+        }: EmitOpArgs<'c, 'hugr, DataflowBlock, H>,
     ) -> Result<()> {
         // our entry basic block and our input RowMailBox
         let (bb, inputs_rmb) = self.get_block_data(&node)?;
@@ -157,7 +161,7 @@ impl<'c, H: HugrView> EmitOp<'c, DataflowBlock, H> for CfgEmitter<'c, '_, H> {
             .map(|succ| self.get_block_data(&succ))
             .collect::<Result<Vec<_>>>()?;
 
-        self.context.build_positioned(bb, |context| {
+        context.build_positioned(bb, |context| {
             let (_, o) = node.get_io().unwrap();
             // get the rowmailbox for our output node
             let outputs_rmb = context.node_ins_rmb(o)?;
@@ -196,13 +200,15 @@ impl<'c, H: HugrView> EmitOp<'c, DataflowBlock, H> for CfgEmitter<'c, '_, H> {
             })
         })
     }
-}
 
-impl<'c, H: HugrView> EmitOp<'c, ExitBlock, H> for CfgEmitter<'c, '_, H> {
-    fn emit(&mut self, args: EmitOpArgs<'c, ExitBlock, H>) -> Result<()> {
+    fn emit_exit_block(
+        &mut self,
+        context: &mut EmitFuncContext<'c, H>,
+        args: EmitOpArgs<'c, 'hugr, ExitBlock, H>,
+    ) -> Result<()> {
         let outputs = self.take_outputs()?;
         let (bb, inputs_rmb) = self.get_block_data(&args.node())?;
-        self.context.build_positioned(bb, |context| {
+        context.build_positioned(bb, |context| {
             let builder = context.builder();
             outputs.finish(builder, inputs_rmb.read_vec(builder, [])?)
         })

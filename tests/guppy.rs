@@ -10,14 +10,16 @@ use hugr::{
     extension::{prelude, ExtensionId, ExtensionRegistry},
     ops::{DataflowOpTrait as _, ExtensionOp},
     std_extensions::arithmetic::{float_types, int_ops, int_types},
+    types::CustomType,
     Hugr, HugrView,
 };
 use hugr_llvm::{
     custom::{CodegenExtension, CodegenExtsMap},
-    emit::{deaggregate_call_result, EmitHugr, EmitOp, EmitOpArgs, Namer},
+    emit::{deaggregate_call_result, EmitFuncContext, EmitHugr, EmitOpArgs, Namer},
     fat::FatExt as _,
+    types::TypingSession,
 };
-use inkwell::{context::Context, module::Module};
+use inkwell::{context::Context, module::Module, types::BasicTypeEnum};
 use itertools::Itertools as _;
 use lazy_static::lazy_static;
 use rstest::{fixture, rstest};
@@ -32,46 +34,39 @@ lazy_static! {
     .unwrap();
 }
 
-struct Tket2Emitter<'a, 'c, H>(&'a mut hugr_llvm::emit::EmitFuncContext<'c, H>);
+// A toy codegen extension for "quantum.tket2" ops.
+struct Tket2CodegenExtension;
 
-impl<'a, 'c, H: HugrView> EmitOp<'c, ExtensionOp, H> for Tket2Emitter<'a, 'c, H> {
-    fn emit(&mut self, args: EmitOpArgs<'c, ExtensionOp, H>) -> Result<()> {
+impl<H: HugrView> CodegenExtension<H> for Tket2CodegenExtension {
+    fn extension(&self) -> ExtensionId {
+        ExtensionId::new("quantum.tket2").unwrap()
+    }
+
+    fn llvm_type<'c>(
+        &self,
+        _context: &TypingSession<'c, H>,
+        _hugr_type: &CustomType,
+    ) -> anyhow::Result<BasicTypeEnum<'c>> {
+        unimplemented!()
+    }
+
+    fn emit_extension_op<'c>(
+        &self,
+        context: &mut EmitFuncContext<'c, H>,
+        args: EmitOpArgs<'c, '_, ExtensionOp, H>,
+    ) -> Result<()> {
         // we lower all ops by declaring an extern function of the same name
         // and signature, and calling that function.
         // let opaque = args.node().as_ref().clone().into_opaque();
         let node = args.node();
         let sig = node.signature();
-        let func_type = self.0.llvm_func_type(&sig)?;
-        let func = self.0.get_extern_func(node.def().name(), func_type)?;
+        let func_type = context.llvm_func_type(&sig)?;
+        let func = context.get_extern_func(node.def().name(), func_type)?;
         let call_args = args.inputs.into_iter().map_into().collect_vec();
-        let builder = self.0.builder();
+        let builder = context.builder();
         let call_result = builder.build_call(func, &call_args, "")?;
         let call_result = deaggregate_call_result(builder, call_result, args.outputs.len())?;
         args.outputs.finish(builder, call_result)
-    }
-}
-
-// A toy codegen extension for "quantum.tket2" ops.
-struct Tket2CodegenExtension;
-
-impl<'c, H: HugrView> CodegenExtension<'c, H> for Tket2CodegenExtension {
-    fn extension(&self) -> ExtensionId {
-        ExtensionId::new("quantum.tket2").unwrap()
-    }
-
-    fn llvm_type(
-        &self,
-        _context: &hugr_llvm::types::TypingSession<'c, H>,
-        _hugr_type: &hugr::types::CustomType,
-    ) -> anyhow::Result<inkwell::types::BasicTypeEnum<'c>> {
-        unimplemented!()
-    }
-
-    fn emitter<'a>(
-        &self,
-        context: &'a mut hugr_llvm::emit::EmitFuncContext<'c, H>,
-    ) -> Box<dyn hugr_llvm::emit::EmitOp<'c, hugr::ops::ExtensionOp, H> + 'a> {
-        Box::new(Tket2Emitter(context))
     }
 }
 

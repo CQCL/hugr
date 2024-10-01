@@ -9,10 +9,7 @@ use hugr::{
     HugrView, NodeIndex,
 };
 use inkwell::types::BasicTypeEnum;
-use inkwell::{
-    builder::Builder,
-    values::{BasicValueEnum, CallableValue},
-};
+use inkwell::values::{BasicValueEnum, CallableValue};
 use itertools::{zip_eq, Itertools};
 use petgraph::visit::Walker;
 
@@ -22,50 +19,23 @@ use crate::{fat::FatNode, types::LLVMSumType};
 use super::{
     deaggregate_call_result,
     func::{EmitFuncContext, RowPromise},
-    EmitOp, EmitOpArgs,
+    EmitOpArgs,
 };
 
 mod cfg;
 
-struct SumOpEmitter<'c, 'd, H>(&'d mut EmitFuncContext<'c, H>, LLVMSumType<'c>);
-
-impl<'c, 'd, H: HugrView> SumOpEmitter<'c, 'd, H> {
-    pub fn new(context: &'d mut EmitFuncContext<'c, H>, st: LLVMSumType<'c>) -> Self {
-        Self(context, st)
-    }
-    pub fn try_new(
-        context: &'d mut EmitFuncContext<'c, H>,
-        ts: impl IntoIterator<Item = Type>,
-    ) -> Result<Self> {
-        let llvm_sum_type = context.llvm_sum_type(get_exactly_one_sum_type(ts)?)?;
-        Ok(Self::new(context, llvm_sum_type))
-    }
-}
-
-impl<'c, H: HugrView> EmitOp<'c, Tag, H> for SumOpEmitter<'c, '_, H> {
-    fn emit(&mut self, args: EmitOpArgs<'c, Tag, H>) -> Result<()> {
-        let builder = self.0.builder();
-        args.outputs.finish(
-            builder,
-            [self.1.build_tag(builder, args.node.tag, args.inputs)?],
-        )
-    }
-}
-
-struct DataflowParentEmitter<'c, 'd, OT, H> {
-    context: &'d mut EmitFuncContext<'c, H>,
-    node: FatNode<'c, OT, H>,
+struct DataflowParentEmitter<'c, 'hugr, OT, H> {
+    node: FatNode<'hugr, OT, H>,
     inputs: Option<Vec<BasicValueEnum<'c>>>,
     outputs: Option<RowPromise<'c>>,
 }
 
-impl<'c, 'd, OT: OpTrait, H: HugrView> DataflowParentEmitter<'c, 'd, OT, H>
+impl<'c, 'hugr, OT: OpTrait, H: HugrView> DataflowParentEmitter<'c, 'hugr, OT, H>
 where
     for<'a> &'a OpType: TryInto<&'a OT>,
 {
-    pub fn new(context: &'d mut EmitFuncContext<'c, H>, args: EmitOpArgs<'c, OT, H>) -> Self {
+    pub fn new(args: EmitOpArgs<'c, 'hugr, OT, H>) -> Self {
         Self {
-            context,
             node: args.node,
             inputs: Some(args.inputs),
             outputs: Some(args.outputs),
@@ -85,11 +55,7 @@ where
             .ok_or(anyhow!("DataflowParentEmitter: Output taken twice"))
     }
 
-    pub fn builder(&mut self) -> &Builder<'c> {
-        self.context.builder()
-    }
-
-    pub fn emit_children(mut self) -> Result<()> {
+    pub fn emit_children(mut self, context: &mut EmitFuncContext<'c, H>) -> Result<()> {
         use petgraph::visit::Topo;
         let node = self.node;
         if !OpTag::DataflowParent.is_superset(node.tag()) {
@@ -108,101 +74,28 @@ where
             .filter(|x| (*x != node.node()))
             .map(|x| node.hugr().fat_optype(x))
             .try_for_each(|node| {
-                let inputs_rmb = self.context.node_ins_rmb(node)?;
-                let inputs = inputs_rmb.read(self.builder(), [])?;
-                let outputs = self.context.node_outs_rmb(node)?.promise();
-                self.emit(EmitOpArgs {
-                    node,
-                    inputs,
-                    outputs,
-                })
-            })
-    }
-}
-
-impl<'c, OT: OpTrait, H: HugrView> EmitOp<'c, OpType, H> for DataflowParentEmitter<'c, '_, OT, H>
-where
-    for<'a> &'a OpType: TryInto<&'a OT>,
-{
-    fn emit(&mut self, args: EmitOpArgs<'c, OpType, H>) -> Result<()> {
-        if !OpTag::DataflowChild.is_superset(args.node().tag()) {
-            Err(anyhow!("Not a dataflow child"))?
-        };
-
-        match args.node().as_ref() {
-            OpType::Input(_) => {
-                let i = self.take_input()?;
-                args.outputs.finish(self.builder(), i)
-            }
-            OpType::Output(_) => {
-                let o = self.take_output()?;
-                o.finish(self.builder(), args.inputs)
-            }
-            _ => emit_optype(self.context, args),
-        }
-    }
-}
-
-struct ConditionalEmitter<'c, 'd, H>(&'d mut EmitFuncContext<'c, H>);
-
-impl<'c, H: HugrView> EmitOp<'c, Conditional, H> for ConditionalEmitter<'c, '_, H> {
-    fn emit(
-        &mut self,
-        EmitOpArgs {
-            node,
-            inputs,
-            outputs,
-        }: EmitOpArgs<'c, Conditional, H>,
-    ) -> Result<()> {
-        let context = &mut self.0;
-        let exit_rmb = context
-            .new_row_mail_box(node.dataflow_signature().unwrap().output.iter(), "exit_rmb")?;
-        let exit_block = context.build_positioned_new_block(
-            format!("cond_exit_{}", node.node().index()),
-            None,
-            |context, bb| {
-                let builder = context.builder();
-                outputs.finish(builder, exit_rmb.read_vec(builder, [])?)?;
-                Ok::<_, anyhow::Error>(bb)
-            },
-        )?;
-
-        let rmbs_blocks = node
-            .children()
-            .enumerate()
-            .map(|(i, n)| {
-                let label = format!("cond_{}_case_{}", node.node().index(), i);
-                let node = n.try_into_ot::<Case>().ok_or(anyhow!("not a case node"))?;
-                let rmb =
-                    context.new_row_mail_box(node.get_io().unwrap().0.types.iter(), &label)?;
-                context.build_positioned_new_block(&label, Some(exit_block), |context, bb| {
-                    let inputs = rmb.read_vec(context.builder(), [])?;
-                    emit_dataflow_parent(
+                let inputs_rmb = context.node_ins_rmb(node)?;
+                let inputs = inputs_rmb.read(context.builder(), [])?;
+                let outputs = context.node_outs_rmb(node)?.promise();
+                match node.as_ref() {
+                    OpType::Input(_) => {
+                        let i = self.take_input()?;
+                        outputs.finish(context.builder(), i)
+                    }
+                    OpType::Output(_) => {
+                        let o = self.take_output()?;
+                        o.finish(context.builder(), inputs)
+                    }
+                    _ => emit_optype(
                         context,
                         EmitOpArgs {
                             node,
                             inputs,
-                            outputs: exit_rmb.promise(),
+                            outputs,
                         },
-                    )?;
-                    context.builder().build_unconditional_branch(exit_block)?;
-                    Ok((rmb, bb))
-                })
+                    ),
+                }
             })
-            .collect::<Result<Vec<_>>>()?;
-
-        let sum_type = get_exactly_one_sum_type(node.in_value_types().next().map(|x| x.1))?;
-        let sum_input = LLVMSumValue::try_new(inputs[0], context.llvm_sum_type(sum_type)?)?;
-        let builder = context.builder();
-        sum_input.build_destructure(builder, |builder, tag, mut vs| {
-            let (rmb, bb) = &rmbs_blocks[tag];
-            vs.extend(&inputs[1..]);
-            rmb.write(builder, vs)?;
-            builder.build_unconditional_branch(*bb)?;
-            Ok(())
-        })?;
-        builder.position_at_end(exit_block);
-        Ok(())
     }
 }
 
@@ -247,33 +140,90 @@ pub fn emit_value<'c, H: HugrView>(
     }
 }
 
-pub(crate) fn emit_dataflow_parent<'c, OT: OpTrait, H: HugrView>(
+pub(crate) fn emit_dataflow_parent<'c, 'hugr, OT: OpTrait, H: HugrView>(
     context: &mut EmitFuncContext<'c, H>,
-    args: EmitOpArgs<'c, OT, H>,
+    args: EmitOpArgs<'c, 'hugr, OT, H>,
 ) -> Result<()>
 where
     for<'a> &'a OpType: TryInto<&'a OT>,
 {
-    DataflowParentEmitter::new(context, args).emit_children()
+    DataflowParentEmitter::new(args).emit_children(context)
 }
 
 fn emit_tag<'c, H: HugrView>(
     context: &mut EmitFuncContext<'c, H>,
-    args: EmitOpArgs<'c, Tag, H>,
+    args: EmitOpArgs<'c, '_, Tag, H>,
 ) -> Result<()> {
-    SumOpEmitter::try_new(context, args.node.out_value_types().map(|x| x.1))?.emit(args)
+    let st = context.llvm_sum_type(get_exactly_one_sum_type(
+        args.node.out_value_types().map(|x| x.1),
+    )?)?;
+    let builder = context.builder();
+    args.outputs.finish(
+        builder,
+        [st.build_tag(builder, args.node.tag, args.inputs)?],
+    )
 }
 
 fn emit_conditional<'c, H: HugrView>(
     context: &mut EmitFuncContext<'c, H>,
-    args: EmitOpArgs<'c, Conditional, H>,
+    EmitOpArgs {
+        node,
+        inputs,
+        outputs,
+    }: EmitOpArgs<'c, '_, Conditional, H>,
 ) -> Result<()> {
-    ConditionalEmitter(context).emit(args)
+    let exit_rmb =
+        context.new_row_mail_box(node.dataflow_signature().unwrap().output.iter(), "exit_rmb")?;
+    let exit_block = context.build_positioned_new_block(
+        format!("cond_exit_{}", node.node().index()),
+        None,
+        |context, bb| {
+            let builder = context.builder();
+            outputs.finish(builder, exit_rmb.read_vec(builder, [])?)?;
+            Ok::<_, anyhow::Error>(bb)
+        },
+    )?;
+
+    let rmbs_blocks = node
+        .children()
+        .enumerate()
+        .map(|(i, n)| {
+            let label = format!("cond_{}_case_{}", node.node().index(), i);
+            let node = n.try_into_ot::<Case>().ok_or(anyhow!("not a case node"))?;
+            let rmb = context.new_row_mail_box(node.get_io().unwrap().0.types.iter(), &label)?;
+            context.build_positioned_new_block(&label, Some(exit_block), |context, bb| {
+                let inputs = rmb.read_vec(context.builder(), [])?;
+                emit_dataflow_parent(
+                    context,
+                    EmitOpArgs {
+                        node,
+                        inputs,
+                        outputs: exit_rmb.promise(),
+                    },
+                )?;
+                context.builder().build_unconditional_branch(exit_block)?;
+                Ok((rmb, bb))
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    let sum_type = get_exactly_one_sum_type(node.in_value_types().next().map(|x| x.1))?;
+    let sum_input = LLVMSumValue::try_new(inputs[0], context.llvm_sum_type(sum_type)?)?;
+    let builder = context.builder();
+    sum_input.build_destructure(builder, |builder, tag, mut vs| {
+        let (rmb, bb) = &rmbs_blocks[tag];
+        vs.extend(&inputs[1..]);
+        rmb.write(builder, vs)?;
+        builder.build_unconditional_branch(*bb)?;
+        Ok(())
+    })?;
+    builder.position_at_end(exit_block);
+    Ok(())
 }
 
 fn emit_load_constant<'c, H: HugrView>(
     context: &mut EmitFuncContext<'c, H>,
-    args: EmitOpArgs<'c, LoadConstant, H>,
+    args: EmitOpArgs<'c, '_, LoadConstant, H>,
 ) -> Result<()> {
     let konst_node = args
         .node
@@ -288,7 +238,7 @@ fn emit_load_constant<'c, H: HugrView>(
 
 fn emit_call<'c, H: HugrView>(
     context: &mut EmitFuncContext<'c, H>,
-    args: EmitOpArgs<'c, Call, H>,
+    args: EmitOpArgs<'c, '_, Call, H>,
 ) -> Result<()> {
     if !args.node.called_function_type().params().is_empty() {
         return Err(anyhow!("Call of generic function"));
@@ -311,7 +261,7 @@ fn emit_call<'c, H: HugrView>(
 
 fn emit_call_indirect<'c, H: HugrView>(
     context: &mut EmitFuncContext<'c, H>,
-    args: EmitOpArgs<'c, CallIndirect, H>,
+    args: EmitOpArgs<'c, '_, CallIndirect, H>,
 ) -> Result<()> {
     let func_ptr = match args.inputs[0] {
         BasicValueEnum::PointerValue(v) => Ok(v),
@@ -328,7 +278,7 @@ fn emit_call_indirect<'c, H: HugrView>(
 
 fn emit_load_function<'c, H: HugrView>(
     context: &mut EmitFuncContext<'c, H>,
-    args: EmitOpArgs<'c, LoadFunction, H>,
+    args: EmitOpArgs<'c, '_, LoadFunction, H>,
 ) -> Result<()> {
     if !args.node.func_sig.params().is_empty() {
         return Err(anyhow!("Load of generic function"));
@@ -351,14 +301,14 @@ fn emit_load_function<'c, H: HugrView>(
 
 fn emit_cfg<'c, H: HugrView>(
     context: &mut EmitFuncContext<'c, H>,
-    args: EmitOpArgs<'c, CFG, H>,
+    args: EmitOpArgs<'c, '_, CFG, H>,
 ) -> Result<()> {
-    cfg::CfgEmitter::new(context, args)?.emit_children()
+    cfg::CfgEmitter::new(context, args)?.emit_children(context)
 }
 
 fn emit_optype<'c, H: HugrView>(
     context: &mut EmitFuncContext<'c, H>,
-    args: EmitOpArgs<'c, OpType, H>,
+    args: EmitOpArgs<'c, '_, OpType, H>,
 ) -> Result<()> {
     let node = args.node();
     match node.as_ref() {
@@ -396,9 +346,9 @@ fn emit_optype<'c, H: HugrView>(
 /// * `args` - The arguments to the operation.
 /// * `go` - The operation to build the result given a [`Builder`], the input,
 ///   and an iterator over the expected output types.
-pub(crate) fn emit_custom_unary_op<'c, H, F>(
+pub(crate) fn emit_custom_unary_op<'c, 'hugr, H, F>(
     context: &mut EmitFuncContext<'c, H>,
-    args: EmitOpArgs<'c, ExtensionOp, H>,
+    args: EmitOpArgs<'c, 'hugr, ExtensionOp, H>,
     go: F,
 ) -> Result<()>
 where
@@ -437,9 +387,9 @@ where
 /// * `args` - The arguments to the operation.
 /// * `go` - The operation to build the result given a [`Builder`], the two
 ///   inputs, and an iterator over the expected output types.
-pub(crate) fn emit_custom_binary_op<'c, H, F>(
+pub(crate) fn emit_custom_binary_op<'c, 'hugr, H, F>(
     context: &mut EmitFuncContext<'c, H>,
-    args: EmitOpArgs<'c, ExtensionOp, H>,
+    args: EmitOpArgs<'c, 'hugr, ExtensionOp, H>,
     go: F,
 ) -> Result<()>
 where

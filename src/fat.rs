@@ -25,16 +25,16 @@ use itertools::Itertools as _;
 ///
 /// [FuncDefn]: [hugr::ops::FuncDefn]
 #[derive(Debug)]
-pub struct FatNode<'c, OT = OpType, H = Hugr>
+pub struct FatNode<'hugr, OT = OpType, H = Hugr>
 where
     H: ?Sized,
 {
-    hugr: &'c H,
+    hugr: &'hugr H,
     node: Node,
     marker: PhantomData<OT>,
 }
 
-impl<'c, OT, H: HugrView + ?Sized> FatNode<'c, OT, H>
+impl<'hugr, OT, H: HugrView + ?Sized> FatNode<'hugr, OT, H>
 where
     for<'a> &'a OpType: TryInto<&'a OT>,
 {
@@ -45,7 +45,7 @@ where
     ///
     /// Note that while we do check the type of the node's `get_optype`, we
     /// do not verify that it is actually equal to `ot`.
-    pub fn new(hugr: &'c H, node: Node, #[allow(unused)] ot: &OT) -> Self {
+    pub fn new(hugr: &'hugr H, node: Node, #[allow(unused)] ot: &OT) -> Self {
         assert!(hugr.valid_node(node));
         assert!(TryInto::<&OT>::try_into(hugr.get_optype(node)).is_ok());
         // We don't actually check `ot == hugr.get_optype(node)` so as to not require OT: PartialEq`
@@ -60,7 +60,7 @@ where
     ///
     /// If the node is invalid, or if its `get_optype` is not `OT`, returns
     /// `None`.
-    pub fn try_new(hugr: &'c H, node: Node) -> Option<Self> {
+    pub fn try_new(hugr: &'hugr H, node: Node) -> Option<Self> {
         (hugr.valid_node(node)).then_some(())?;
         Some(Self::new(
             hugr,
@@ -70,7 +70,7 @@ where
     }
 
     /// Create a general `FatNode` from a specific one.
-    pub fn generalise(self) -> FatNode<'c, OpType, H> {
+    pub fn generalise(self) -> FatNode<'hugr, OpType, H> {
         // guaranteed to be valid becasue self is valid
         FatNode {
             hugr: self.hugr,
@@ -80,29 +80,29 @@ where
     }
 }
 
-impl<'c, OT, H> FatNode<'c, OT, H> {
+impl<'hugr, OT, H> FatNode<'hugr, OT, H> {
     /// Gets the [Node] of the `FatNode`.
     pub fn node(&self) -> Node {
         self.node
     }
 
     /// Gets the [HugrView] of the `FatNode`.
-    pub fn hugr(&self) -> &'c H {
+    pub fn hugr(&self) -> &'hugr H {
         self.hugr
     }
 }
 
-impl<'c, H: HugrView + ?Sized> FatNode<'c, OpType, H> {
+impl<'hugr, H: HugrView + ?Sized> FatNode<'hugr, OpType, H> {
     /// Creates a new general `FatNode` from a [HugrView] and a [Node].
     ///
     /// Panics if the node is not valid in the [Hugr].
-    pub fn new_optype(hugr: &'c H, node: Node) -> Self {
+    pub fn new_optype(hugr: &'hugr H, node: Node) -> Self {
         assert!(hugr.valid_node(node));
         FatNode::new(hugr, node, hugr.get_optype(node))
     }
 
     /// Tries to downcast a general `FatNode` into a specific `OT`.
-    pub fn try_into_ot<OT>(&self) -> Option<FatNode<'c, OT, H>>
+    pub fn try_into_ot<OT>(&self) -> Option<FatNode<'hugr, OT, H>>
     where
         for<'a> &'a OpType: TryInto<&'a OT>,
     {
@@ -116,7 +116,7 @@ impl<'c, H: HugrView + ?Sized> FatNode<'c, OpType, H> {
     ///
     /// Note that while we do check the type of the node's `get_optype`, we
     /// do not verify that it is actually equal to `ot`.
-    pub fn into_ot<OT>(self, ot: &OT) -> FatNode<'c, OT, H>
+    pub fn into_ot<OT>(self, ot: &OT) -> FatNode<'hugr, OT, H>
     where
         for<'a> &'a OpType: TryInto<&'a OT>,
     {
@@ -124,13 +124,13 @@ impl<'c, H: HugrView + ?Sized> FatNode<'c, OpType, H> {
     }
 }
 
-impl<'c, OT, H: HugrView + ?Sized> FatNode<'c, OT, H> {
+impl<'hugr, OT, H: HugrView + ?Sized> FatNode<'hugr, OT, H> {
     /// If there is exactly one OutgoingPort connected to this IncomingPort,
     /// return it and its node.
     pub fn single_linked_output(
         &self,
         port: IncomingPort,
-    ) -> Option<(FatNode<'c, OpType, H>, OutgoingPort)> {
+    ) -> Option<(FatNode<'hugr, OpType, H>, OutgoingPort)> {
         self.hugr
             .single_linked_output(self.node, port)
             .map(|(n, p)| (FatNode::new_optype(self.hugr, n), p))
@@ -138,18 +138,18 @@ impl<'c, OT, H: HugrView + ?Sized> FatNode<'c, OT, H> {
 
     /// Iterator over all incoming ports that have Value type, along
     /// with corresponding types.
-    pub fn out_value_types(&self) -> impl Iterator<Item = (OutgoingPort, Type)> + 'c {
+    pub fn out_value_types(&self) -> impl Iterator<Item = (OutgoingPort, Type)> + 'hugr {
         self.hugr.out_value_types(self.node)
     }
 
     /// Iterator over all incoming ports that have Value type, along
     /// with corresponding types.
-    pub fn in_value_types(&self) -> impl Iterator<Item = (IncomingPort, Type)> + 'c {
+    pub fn in_value_types(&self) -> impl Iterator<Item = (IncomingPort, Type)> + 'hugr {
         self.hugr.in_value_types(self.node)
     }
 
     /// Return iterator over the direct children of node.
-    pub fn children(&self) -> impl Iterator<Item = FatNode<'c, OpType, H>> + 'c {
+    pub fn children(&self) -> impl Iterator<Item = FatNode<'hugr, OpType, H>> + 'hugr {
         self.hugr
             .children(self.node)
             .map(|n| FatNode::new_optype(self.hugr, n))
@@ -157,7 +157,7 @@ impl<'c, OT, H: HugrView + ?Sized> FatNode<'c, OT, H> {
 
     /// Get the input and output child nodes of a dataflow parent.
     /// If the node isn't a dataflow parent, then return None
-    pub fn get_io(&self) -> Option<(FatNode<'c, Input, H>, FatNode<'c, Output, H>)> {
+    pub fn get_io(&self) -> Option<(FatNode<'hugr, Input, H>, FatNode<'hugr, Output, H>)> {
         let [i, o] = self.hugr.get_io(self.node)?;
         Some((
             FatNode::try_new(self.hugr, i)?,
@@ -166,19 +166,19 @@ impl<'c, OT, H: HugrView + ?Sized> FatNode<'c, OT, H> {
     }
 
     /// Iterator over output ports of node.
-    pub fn node_outputs(&self) -> impl Iterator<Item = OutgoingPort> + 'c {
+    pub fn node_outputs(&self) -> impl Iterator<Item = OutgoingPort> + 'hugr {
         self.hugr.node_outputs(self.node)
     }
 
     /// Iterates over the output neighbours of the `node`.
-    pub fn output_neighbours(&self) -> impl Iterator<Item = FatNode<'c, OpType, H>> + 'c {
+    pub fn output_neighbours(&self) -> impl Iterator<Item = FatNode<'hugr, OpType, H>> + 'hugr {
         self.hugr
             .output_neighbours(self.node)
             .map(|n| FatNode::new_optype(self.hugr, n))
     }
 
     /// Delegates to `HV::try_new` with the internal [HugrView] and [Node].
-    pub fn try_new_hierarchy_view<HV: HierarchyView<'c>>(&self) -> Result<HV, HugrError>
+    pub fn try_new_hierarchy_view<HV: HierarchyView<'hugr>>(&self) -> Result<HV, HugrError>
     where
         H: Sized,
     {
@@ -186,12 +186,17 @@ impl<'c, OT, H: HugrView + ?Sized> FatNode<'c, OT, H> {
     }
 }
 
-impl<'c, H: HugrView> FatNode<'c, CFG, H> {
+impl<'hugr, H: HugrView> FatNode<'hugr, CFG, H> {
     /// Returns the entry and exit nodes of a CFG.
     ///
     /// These are guaranteed to exist the `Hugr` is valid. Panics if they do not
     /// exist.
-    pub fn get_entry_exit(&self) -> (FatNode<'c, DataflowBlock, H>, FatNode<'c, ExitBlock, H>) {
+    pub fn get_entry_exit(
+        &self,
+    ) -> (
+        FatNode<'hugr, DataflowBlock, H>,
+        FatNode<'hugr, ExitBlock, H>,
+    ) {
         let [i, o] = self
             .hugr
             .children(self.node)
@@ -284,7 +289,7 @@ impl<OT, H> Clone for FatNode<'_, OT, H> {
     }
 }
 
-impl<'c, OT: NamedOp, H: HugrView + ?Sized> std::fmt::Display for FatNode<'c, OT, H>
+impl<'hugr, OT: NamedOp, H: HugrView + ?Sized> std::fmt::Display for FatNode<'hugr, OT, H>
 where
     for<'a> &'a OpType: TryInto<&'a OT>,
 {

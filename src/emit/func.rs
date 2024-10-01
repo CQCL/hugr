@@ -29,9 +29,8 @@ pub use mailbox::{RowMailBox, RowPromise};
 
 /// A context for emitting an LLVM function.
 ///
-/// One of the primary interfaces that impls of
-/// [crate::custom::CodegenExtension] and [super::EmitOp] will interface with,
-/// we have methods for:
+/// One of the primary interfaces for implementing codegen extensions.
+/// We have methods for:
 ///   * Converting from hugr [Type]s to LLVM [Type](BasicTypeEnum)s;
 ///   * Maintaing [MailBox](RowMailBox) for each [Wire] in the [FuncDefn];
 ///   * Accessing the [CodegenExtsMap];
@@ -46,7 +45,7 @@ pub use mailbox::{RowMailBox, RowPromise};
 /// node, and written to with the output values of each node.
 pub struct EmitFuncContext<'c, H> {
     emit_context: EmitModuleContext<'c, H>,
-    todo: EmissionSet<'c, H>,
+    todo: EmissionSet,
     func: FunctionValue<'c>,
     env: HashMap<Wire, ValueMailBox<'c>>,
     builder: Builder<'c>,
@@ -72,11 +71,11 @@ impl<'c, H: HugrView> EmitFuncContext<'c, H> {
             /// Adds or gets the [FunctionValue] in the [inkwell::module::Module] corresponding to the given [FuncDefn].
             ///
             /// The name of the result may have been mangled.
-            pub fn get_func_defn(&self, node: FatNode<'c, FuncDefn, H>) -> Result<FunctionValue<'c>>;
+            pub fn get_func_defn<'hugr>(&self, node: FatNode<'hugr, FuncDefn, H>) -> Result<FunctionValue<'c>>;
             /// Adds or gets the [FunctionValue] in the [inkwell::module::Module] corresponding to the given [FuncDecl].
             ///
             /// The name of the result may have been mangled.
-            pub fn get_func_decl(&self, node: FatNode<'c, FuncDecl, H>) -> Result<FunctionValue<'c>>;
+            pub fn get_func_decl<'hugr>(&self, node: FatNode<'hugr, FuncDecl, H>) -> Result<FunctionValue<'c>>;
             /// Adds or get the [FunctionValue] in the [inkwell::module::Module] with the given symbol
             /// and function type.
             ///
@@ -102,8 +101,8 @@ impl<'c, H: HugrView> EmitFuncContext<'c, H> {
 
     /// Used when emitters encounter a scoped definition. `node` will be
     /// returned from [EmitFuncContext::finish].
-    pub fn push_todo_func(&mut self, node: FatNode<'c, FuncDefn, H>) {
-        self.todo.insert(node);
+    pub fn push_todo_func(&mut self, node: FatNode<'_, FuncDefn, H>) {
+        self.todo.insert(node.node());
     }
 
     // TODO likely we don't need this
@@ -235,7 +234,10 @@ impl<'c, H: HugrView> EmitFuncContext<'c, H> {
 
     /// Returns a [RowMailBox] mapped to thie input wires of `node`. When emitting a node
     /// input values are from this mailbox.
-    pub fn node_ins_rmb<OT: 'c>(&mut self, node: FatNode<'c, OT, H>) -> Result<RowMailBox<'c>> {
+    pub fn node_ins_rmb<'hugr, OT: 'hugr>(
+        &mut self,
+        node: FatNode<'hugr, OT, H>,
+    ) -> Result<RowMailBox<'c>> {
         let r = node
             .in_value_types()
             .map(|(p, t)| {
@@ -253,7 +255,10 @@ impl<'c, H: HugrView> EmitFuncContext<'c, H> {
 
     /// Returns a [RowMailBox] mapped to thie ouput wires of `node`. When emitting a node
     /// output values are written to this mailbox.
-    pub fn node_outs_rmb<OT: 'c>(&mut self, node: FatNode<'c, OT, H>) -> Result<RowMailBox<'c>> {
+    pub fn node_outs_rmb<'hugr, OT: 'hugr>(
+        &mut self,
+        node: FatNode<'hugr, OT, H>,
+    ) -> Result<RowMailBox<'c>> {
         let r = node
             .out_value_types()
             .map(|(port, hugr_type)| self.map_wire(node, port, &hugr_type))
@@ -263,9 +268,9 @@ impl<'c, H: HugrView> EmitFuncContext<'c, H> {
         Ok(r)
     }
 
-    fn map_wire<OT>(
+    fn map_wire<'hugr, OT>(
         &mut self,
-        node: FatNode<'c, OT, H>,
+        node: FatNode<'hugr, OT, H>,
         port: hugr::OutgoingPort,
         hugr_type: &Type,
     ) -> Result<ValueMailBox<'c>> {
@@ -288,7 +293,7 @@ impl<'c, H: HugrView> EmitFuncContext<'c, H> {
 
     /// Consumes the `EmitFuncContext` and returns both the inner
     /// [EmitModuleContext] and the scoped [FuncDefn]s that were encountered.
-    pub fn finish(self) -> Result<(EmitModuleContext<'c, H>, EmissionSet<'c, H>)> {
+    pub fn finish(self) -> Result<(EmitModuleContext<'c, H>, EmissionSet)> {
         self.builder.position_at_end(self.prologue_bb);
         self.builder.build_unconditional_branch(self.launch_bb)?;
         Ok((self.emit_context, self.todo))

@@ -34,29 +34,6 @@ pub use func::{EmitFuncContext, RowPromise};
 pub use namer::Namer;
 pub use ops::emit_value;
 
-/// A trait used to abstract over emission.
-///
-/// In particular a `Box<dyn EmitOp>` is returned by
-/// [crate::custom::CodegenExtension::emitter].
-///
-/// Any non-trivial implementation will need to contain an [&mut
-/// EmitFuncContext](EmitFuncContext) in `Self` in order to be able to implement
-/// this trait.
-pub trait EmitOp<'c, OT, H> {
-    /// Emit the node in `args` using the inputs, and [finishing](RowPromise::finish) the outputs.
-    fn emit(&mut self, args: EmitOpArgs<'c, OT, H>) -> Result<()>;
-}
-
-/// A trivial implementation of [EmitOp] used for [crate::custom::CodegenExtension]s that do
-/// not support emitting any ops.
-pub struct NullEmitLlvm;
-
-impl<OT, H> EmitOp<'_, OT, H> for NullEmitLlvm {
-    fn emit(&mut self, _args: EmitOpArgs<OT, H>) -> Result<()> {
-        Err(anyhow!("NullEmitLLVM"))
-    }
-}
-
 pub struct EmitModuleContext<'c, H> {
     module: Module<'c>,
     extensions: Rc<CodegenExtsMap<'c, H>>,
@@ -155,7 +132,10 @@ impl<'c, H> EmitModuleContext<'c, H> {
     /// Adds or gets the [FunctionValue] in the [Module] corresponding to the given [FuncDefn].
     ///
     /// The name of the result is mangled by [EmitModuleContext::name_func].
-    pub fn get_func_defn(&self, node: FatNode<'c, FuncDefn, H>) -> Result<FunctionValue<'c>>
+    pub fn get_func_defn<'hugr>(
+        &self,
+        node: FatNode<'hugr, FuncDefn, H>,
+    ) -> Result<FunctionValue<'c>>
     where
         H: HugrView,
     {
@@ -165,7 +145,10 @@ impl<'c, H> EmitModuleContext<'c, H> {
     /// Adds or gets the [FunctionValue] in the [Module] corresponding to the given [FuncDecl].
     ///
     /// The name of the result is mangled by [EmitModuleContext::name_func].
-    pub fn get_func_decl(&self, node: FatNode<'c, FuncDecl, H>) -> Result<FunctionValue<'c>>
+    pub fn get_func_decl<'hugr>(
+        &self,
+        node: FatNode<'hugr, FuncDecl, H>,
+    ) -> Result<FunctionValue<'c>>
     where
         H: HugrView,
     {
@@ -244,11 +227,11 @@ impl<'c, H> EmitModuleContext<'c, H> {
     }
 }
 
-type EmissionSet<'c, H> = HashSet<FatNode<'c, FuncDefn, H>>;
+type EmissionSet = HashSet<Node>;
 
 /// Emits [HugrView]s into an LLVM [Module].
 pub struct EmitHugr<'c, H> {
-    emitted: EmissionSet<'c, H>,
+    emitted: EmissionSet,
     module_context: EmitModuleContext<'c, H>,
 }
 
@@ -296,13 +279,19 @@ impl<'c, H: HugrView> EmitHugr<'c, H> {
     ///
     /// If any LLVM IR declaration which is to be emitted already exists in the
     /// [Module] and it differs from what would be emitted, then we fail.
-    pub fn emit_func(mut self, node: FatNode<'c, FuncDefn, H>) -> Result<Self> {
-        let mut worklist: EmissionSet<'c, H> = [node].into_iter().collect();
-        let pop =
-            |wl: &mut EmissionSet<'c, H>| wl.iter().next().cloned().map(|x| wl.take(&x).unwrap());
+    pub fn emit_func(mut self, node: FatNode<'_, FuncDefn, H>) -> Result<Self> {
+        let mut worklist: EmissionSet = [node.node()].into_iter().collect();
+        let pop = |wl: &mut EmissionSet| wl.iter().next().cloned().map(|x| wl.take(&x).unwrap());
 
-        while let Some(x) = pop(&mut worklist) {
-            let (new_self, new_tasks) = self.emit_func_impl(x)?;
+        while let Some(next_node) = pop(&mut worklist) {
+            use crate::fat::FatExt as _;
+            let Some(func) = node.hugr().try_fat(next_node) else {
+                panic!(
+                    "emit_func: node in worklist was not a FuncDefn: {:?}",
+                    node.hugr().get_optype(next_node)
+                )
+            };
+            let (new_self, new_tasks) = self.emit_func_impl(func)?;
             self = new_self;
             worklist.extend(new_tasks.into_iter());
         }
@@ -315,7 +304,7 @@ impl<'c, H: HugrView> EmitHugr<'c, H> {
     /// and [hugr::ops::FuncDecl] nodes are not emitted directly, but instead by
     /// emission of ops with static edges from them. So [FuncDefn] are the only
     /// interesting children.
-    pub fn emit_module(mut self, node: FatNode<'c, hugr::ops::Module, H>) -> Result<Self> {
+    pub fn emit_module(mut self, node: FatNode<'_, hugr::ops::Module, H>) -> Result<Self> {
         for c in node.children() {
             match c.as_ref() {
                 OpType::FuncDefn(ref fd) => {
@@ -332,11 +321,8 @@ impl<'c, H: HugrView> EmitHugr<'c, H> {
         Ok(self)
     }
 
-    fn emit_func_impl(
-        mut self,
-        node: FatNode<'c, FuncDefn, H>,
-    ) -> Result<(Self, EmissionSet<'c, H>)> {
-        if !self.emitted.insert(node) {
+    fn emit_func_impl(mut self, node: FatNode<'_, FuncDefn, H>) -> Result<(Self, EmissionSet)> {
+        if !self.emitted.insert(node.node()) {
             return Ok((self, EmissionSet::default()));
         }
         let func = self.module_context.get_func_defn(node)?;
