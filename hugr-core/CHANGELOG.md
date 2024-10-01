@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.1 (2024-09-04)
+
+### Bug Fixes
+
+- `std.collections.insert` wrong output order ([#1513](https://github.com/CQCL/hugr/pull/1513))
+
+
 ## 0.9.0 (2024-08-30)
 
 ### Features

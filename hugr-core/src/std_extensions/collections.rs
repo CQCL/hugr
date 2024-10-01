@@ -1,5 +1,7 @@
 //! List type and operations.
 
+use std::hash::{Hash, Hasher};
+
 mod list_fold;
 
 use std::str::FromStr;
@@ -12,7 +14,7 @@ use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 use crate::extension::prelude::{either_type, option_type, USIZE_T};
 use crate::extension::simple_op::{MakeOpDef, MakeRegisteredOp};
 use crate::extension::{ExtensionBuildError, OpDef, SignatureFunc, PRELUDE};
-use crate::ops::constant::ValueName;
+use crate::ops::constant::{maybe_hash_values, TryHash, ValueName};
 use crate::ops::{OpName, Value};
 use crate::types::{TypeName, TypeRowRV};
 use crate::{
@@ -55,6 +57,15 @@ impl ListValue {
     /// Returns the type of the `[ListValue]` as a `[CustomType]`.`
     pub fn custom_type(&self) -> CustomType {
         list_custom_type(self.1.clone())
+    }
+}
+
+impl TryHash for ListValue {
+    fn try_hash(&self, mut st: &mut dyn Hasher) -> bool {
+        maybe_hash_values(&self.0, &mut st) && {
+            self.1.hash(&mut st);
+            true
+        }
     }
 }
 
@@ -164,7 +175,7 @@ impl ListOp {
             insert => self
                 .list_polytype(
                     vec![l.clone(), USIZE_T, e.clone()],
-                    vec![l, either_type(Type::UNIT, e).into()],
+                    vec![l, either_type(e, Type::UNIT).into()],
                 )
                 .into(),
             length => self.list_polytype(vec![l], vec![USIZE_T]).into(),

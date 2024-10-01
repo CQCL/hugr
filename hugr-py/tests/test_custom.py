@@ -6,8 +6,8 @@ from hugr import ext, ops, tys
 from hugr.build.dfg import Dfg
 from hugr.hugr import Hugr, Node
 from hugr.ops import AsExtOp, Custom, ExtOp
-from hugr.std.float import EXTENSION as FLOAT_EXT
 from hugr.std.float import FLOAT_T
+from hugr.std.float import FLOAT_TYPES_EXTENSION as FLOAT_EXT
 from hugr.std.int import INT_OPS_EXTENSION, INT_TYPES_EXTENSION, DivMod, int_t
 from hugr.std.logic import EXTENSION as LOGIC_EXT
 from hugr.std.logic import Not
