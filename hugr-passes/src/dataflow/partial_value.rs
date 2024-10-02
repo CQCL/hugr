@@ -29,7 +29,7 @@ pub enum ValueOrSum<V> {
 pub struct PartialSum<V>(pub HashMap<usize, Vec<PartialValue<V>>>);
 
 impl<V> PartialSum<V> {
-    pub fn variant(tag: usize, values: impl IntoIterator<Item = PartialValue<V>>) -> Self {
+    pub fn new_variant(tag: usize, values: impl IntoIterator<Item = PartialValue<V>>) -> Self {
         Self(HashMap::from([(tag, Vec::from_iter(values))]))
     }
 
@@ -212,7 +212,7 @@ pub enum PVEnum<V> {
 impl<V: AbstractValue> From<V> for PartialValue<V> {
     fn from(v: V) -> Self {
         v.as_sum()
-            .map(|(tag, values)| Self::variant(tag, values.map(Self::from)))
+            .map(|(tag, values)| Self::new_variant(tag, values.map(Self::from)))
             .unwrap_or(Self(PVEnum::Value(v)))
     }
 }
@@ -243,12 +243,12 @@ impl<V: AbstractValue> PartialValue<V> {
         self
     }
 
-    pub fn variant(tag: usize, values: impl IntoIterator<Item = Self>) -> Self {
-        PartialSum::variant(tag, values).into()
+    pub fn new_variant(tag: usize, values: impl IntoIterator<Item = Self>) -> Self {
+        PartialSum::new_variant(tag, values).into()
     }
 
-    pub fn unit() -> Self {
-        Self::variant(0, [])
+    pub fn new_unit() -> Self {
+        Self::new_variant(0, [])
     }
 
     pub fn variant_values(&self, tag: usize, len: usize) -> Option<Vec<PartialValue<V>>> {
@@ -487,7 +487,7 @@ mod test {
                         })
                         .boxed()
                 }
-                Self::Unit => Just(PartialValue::unit()).boxed(),
+                Self::Unit => Just(PartialValue::new_unit()).boxed(),
             }
         }
     }
@@ -677,7 +677,7 @@ mod test {
                         )
                     })
                     .collect_vec();
-                pvs.prop_map(move |pvs| PartialValue::variant(index, pvs))
+                pvs.prop_map(move |pvs| PartialValue::new_variant(index, pvs))
                     .boxed()
             }
         })

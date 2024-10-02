@@ -153,15 +153,16 @@ fn propagate_leaf_op<V: AbstractValue>(
         // Handle basics here. I guess (given the current interface) we could allow
         // DFContext to handle these but at the least we'd want these impls to be
         // easily available for reuse.
-        op if op.cast::<MakeTuple>().is_some() => {
-            Some(ValueRow::from_iter([PV::variant(0, ins.iter().cloned())]))
-        }
+        op if op.cast::<MakeTuple>().is_some() => Some(ValueRow::from_iter([PV::new_variant(
+            0,
+            ins.iter().cloned(),
+        )])),
         op if op.cast::<UnpackTuple>().is_some() => {
             let [tup] = ins.iter().collect::<Vec<_>>().try_into().unwrap();
             tup.variant_values(0, value_outputs(c.as_ref(), n).count())
                 .map(ValueRow::from_iter)
         }
-        OpType::Tag(t) => Some(ValueRow::from_iter([PV::variant(
+        OpType::Tag(t) => Some(ValueRow::from_iter([PV::new_variant(
             t.tag,
             ins.iter().cloned(),
         )])),

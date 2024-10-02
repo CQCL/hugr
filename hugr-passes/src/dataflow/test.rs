@@ -221,8 +221,10 @@ fn conditional() {
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
     let mut machine = Machine::default();
-    let arg_pv =
-        PartialValue::variant(1, []).join(PartialValue::variant(2, [PartialValue::variant(0, [])]));
+    let arg_pv = PartialValue::new_variant(1, []).join(PartialValue::new_variant(
+        2,
+        [PartialValue::new_variant(0, [])],
+    ));
     machine.propolutate_out_wires([(arg_w, arg_pv)]);
     machine.run(HugrValueContext::new(&hugr));
 
