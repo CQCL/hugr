@@ -1,0 +1,37 @@
+---
+source: hugr-core/tests/model.rs
+expression: roundtrip_str
+---
+(hugr 0)
+
+(define-alias local.int type (@ arithmetic.int.types.int))
+
+(define-func example.add
+  [(@ arithmetic.int.types.int) (@ arithmetic.int.types.int)]
+  [(@ arithmetic.int.types.int)]
+  (ext)
+  (dfg
+    [(%0 (@ arithmetic.int.types.int)) (%1 (@ arithmetic.int.types.int))]
+    [(%2 (@ arithmetic.int.types.int))]
+    (arithmetic.int.iadd
+      [(%0 (@ arithmetic.int.types.int)) (%1 (@ arithmetic.int.types.int))]
+      [(%2 (@ arithmetic.int.types.int))])))
+
+(declare-func example.callee
+  [(@ arithmetic.int.types.int)] [(@ arithmetic.int.types.int)] (ext))
+
+(define-func example.caller
+  [(@ arithmetic.int.types.int)] [(@ arithmetic.int.types.int)] (ext)
+  (dfg
+    [(%3 (@ arithmetic.int.types.int))]
+    [(%4 (@ arithmetic.int.types.int))]
+    (call
+      (@ example.callee)
+      [(%3 (@ arithmetic.int.types.int))]
+      [(%4 (@ arithmetic.int.types.int))])))
+
+(define-func example.swap
+  (forall ?0 type)
+  (forall ?1 type)
+  [?0 ?1] [?1 ?0] (ext)
+  (dfg [(%5 ?0) (%6 ?1)] [(%6 ?1) (%5 ?0)]))

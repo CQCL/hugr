@@ -21,6 +21,7 @@ in
       # cargo-llvm-cov is currently marked broken on nixpkgs unstable
       pkgs-stable.cargo-llvm-cov
       pkgs.graphviz
+      pkgs.cargo-insta
     ] ++ lib.optionals
       pkgs.stdenv.isDarwin
       (with pkgs.darwin.apple_sdk; [
