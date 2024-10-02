@@ -105,13 +105,13 @@ pub trait HugrMut: HugrMutInternals {
         self.hugr_mut().add_node_after(sibling, op)
     }
 
-    /// Remove a node from the graph.
+    /// Remove a node from the graph and return the node weight.
     ///
     /// # Panics
     ///
     /// If the node is not in the graph, or if the node is the root node.
     #[inline]
-    fn remove_node(&mut self, node: Node) {
+    fn remove_node(&mut self, node: Node) -> OpType {
         panic_invalid_non_root(self, node);
         self.hugr_mut().remove_node(node)
     }
@@ -264,11 +264,11 @@ impl<T: RootTagged<RootHandle = Node> + AsMut<Hugr>> HugrMut for T {
         node
     }
 
-    fn remove_node(&mut self, node: Node) {
+    fn remove_node(&mut self, node: Node) -> OpType {
         panic_invalid_non_root(self, node);
         self.as_mut().hierarchy.remove(node.pg_index());
         self.as_mut().graph.remove_node(node.pg_index());
-        self.as_mut().op_types.remove(node.pg_index());
+        self.as_mut().op_types.take(node.pg_index())
     }
 
     fn connect(
