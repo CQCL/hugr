@@ -44,7 +44,7 @@ node_cond          = { "(" ~ "cond" ~ port_lists? ~ type_hint? ~ meta* ~ region*
 node_tag           = { "(" ~ "tag" ~ tag ~ port_lists? ~ type_hint? ~ meta* ~ region* ~ ")" }
 node_custom        = { "(" ~ (term_apply | term_apply_full) ~ port_lists? ~ type_hint? ~ meta* ~ region* ~ ")" }
 
-type_hint    = { "(" ~ "type" ~ term ~ term ~ term ~ ")" }
+type_hint    = { "(" ~ "type" ~ term ~ ")" }
 func_header  = { symbol ~ param* ~ term ~ term ~ term }
 alias_header = { symbol ~ param* ~ term }
 

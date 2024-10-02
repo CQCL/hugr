@@ -584,17 +584,7 @@ impl<'a> ParseContext<'a> {
         };
 
         let pair = pairs.next().unwrap();
-        let mut inner = pair.into_inner();
-
-        let inputs = self.parse_term(inner.next().unwrap())?;
-        let outputs = self.parse_term(inner.next().unwrap())?;
-        let extensions = self.parse_term(inner.next().unwrap())?;
-
-        Ok(self.module.insert_term(Term::FuncType {
-            inputs,
-            outputs,
-            extensions,
-        }))
+        self.parse_term(pair.into_inner().next().unwrap())
     }
 
     fn parse_port_list(&mut self, pairs: &mut Pairs<'a, Rule>) -> ParseResult<&'a [Port<'a>]> {

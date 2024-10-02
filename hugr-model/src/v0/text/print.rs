@@ -149,6 +149,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                     this.print_port_list(node_data.inputs)?;
                     this.print_port_list(node_data.outputs)
                 })?;
+                this.print_type_hint(node_data.r#type)?;
                 this.print_meta(node_data.meta)?;
                 this.print_regions(node_data.regions)
             }
@@ -158,6 +159,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                     this.print_port_list(node_data.inputs)?;
                     this.print_port_list(node_data.outputs)
                 })?;
+                this.print_type_hint(node_data.r#type)?;
                 this.print_meta(node_data.meta)?;
                 this.print_regions(node_data.regions)
             }
@@ -167,6 +169,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                     this.print_port_list(node_data.inputs)?;
                     this.print_port_list(node_data.outputs)
                 })?;
+                this.print_type_hint(node_data.r#type)?;
                 this.print_meta(node_data.meta)?;
                 this.print_regions(node_data.regions)
             }
@@ -238,6 +241,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                     this.print_port_list(node_data.inputs)?;
                     this.print_port_list(node_data.outputs)
                 })?;
+                this.print_type_hint(node_data.r#type)?;
                 this.print_meta(node_data.meta)?;
                 Ok(())
             }
@@ -249,6 +253,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                     this.print_port_list(node_data.inputs)?;
                     this.print_port_list(node_data.outputs)
                 })?;
+                this.print_type_hint(node_data.r#type)?;
                 this.print_meta(node_data.meta)?;
                 Ok(())
             }
@@ -272,6 +277,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                     this.print_port_list(node_data.inputs)?;
                     this.print_port_list(node_data.outputs)
                 })?;
+                this.print_type_hint(node_data.r#type)?;
                 this.print_meta(node_data.meta)?;
                 this.print_regions(node_data.regions)
             }
@@ -292,6 +298,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                     this.print_port_list(node_data.inputs)?;
                     this.print_port_list(node_data.outputs)
                 })?;
+                this.print_type_hint(node_data.r#type)?;
                 this.print_meta(node_data.meta)?;
                 this.print_regions(node_data.regions)
             }
@@ -330,6 +337,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_text("tail-loop");
                 this.print_port_list(node_data.inputs)?;
                 this.print_port_list(node_data.outputs)?;
+                this.print_type_hint(node_data.r#type)?;
                 this.print_meta(node_data.meta)?;
                 this.print_regions(node_data.regions)
             }
@@ -338,6 +346,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_text("cond");
                 this.print_port_list(node_data.inputs)?;
                 this.print_port_list(node_data.outputs)?;
+                this.print_type_hint(node_data.r#type)?;
                 this.print_meta(node_data.meta)?;
                 this.print_regions(node_data.regions)
             }
@@ -347,6 +356,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_text(format!("{}", tag));
                 this.print_port_list(node_data.inputs)?;
                 this.print_port_list(node_data.outputs)?;
+                this.print_type_hint(node_data.r#type)?;
                 this.print_meta(node_data.meta)
             }
         })
@@ -380,6 +390,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_port_list(region_data.targets)?;
             }
 
+            this.print_type_hint(region_data.r#type)?;
             this.print_meta(region_data.meta)?;
             this.print_nodes(region)
         })
@@ -623,5 +634,16 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
         }
 
         Ok(())
+    }
+
+    fn print_type_hint(&mut self, term: TermId) -> PrintResult<()> {
+        if let Some(Term::Wildcard) = self.module.get_term(term) {
+            return Ok(());
+        }
+
+        self.print_parens(|this| {
+            this.print_text("type-hint");
+            this.print_term(term)
+        })
     }
 }
