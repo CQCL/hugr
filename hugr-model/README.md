@@ -1,29 +1,19 @@
 ![](/hugr/assets/hugr_logo.svg)
 
-hugr-core
+hugr-model
 ===============
 
 [![build_status][]](https://github.com/CQCL/hugr/actions)
-[![crates][]](https://crates.io/crates/hugr-core)
+[![crates][]](https://crates.io/crates/hugr-model)
 [![msrv][]](https://github.com/CQCL/hugr)
 [![codecov][]](https://codecov.io/gh/CQCL/hugr)
 
-Internal core definitions for the `hugr` package.
+Experimental data model for `hugr`.
 Refer to the [main crate](http://crates.io/crates/hugr) for more information.
 
 Please read the [API documentation here][].
 
 ## Experimental Features
-
-- `extension_inference`:
-  Experimental feature which allows automatic inference of extension usages and
-  requirements in a HUGR and validation that extensions are correctly specified.
-  Not enabled by default.
-- `declarative`:
-  Experimental support for declaring extensions in YAML files, support is limited.
-- `model`
-  Import and export from the representation defined in the `hugr-model` crate.
-  Not enabled by default.
 
 ## Recent Changes
 
