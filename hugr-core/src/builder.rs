@@ -88,6 +88,7 @@
 //! ```
 use thiserror::Error;
 
+use crate::extension::simple_op::OpLoadError;
 use crate::extension::{SignatureError, TO_BE_INFERRED};
 use crate::hugr::ValidationError;
 use crate::ops::handle::{BasicBlockID, CfgID, ConditionalID, DfgID, FuncID, TailLoopID};
@@ -194,6 +195,10 @@ pub enum BuildError {
         #[source]
         error: BuilderWiringError,
     },
+
+    #[error("Failed to load an extension op: {0}")]
+    #[allow(missing_docs)]
+    ExtensionOp(#[from] OpLoadError),
 }
 
 #[derive(Debug, Clone, PartialEq, Error)]
