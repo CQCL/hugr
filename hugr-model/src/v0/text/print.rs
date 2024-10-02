@@ -329,18 +329,21 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 Ok(())
             }),
 
-            Operation::TailLoop {
-                inputs,
-                outputs,
-                rest,
-                extensions,
-            } => todo!(),
-            Operation::Conditional {
-                cases,
-                context,
-                outputs,
-                extensions,
-            } => todo!(),
+            Operation::TailLoop => {
+                this.print_text("tail-loop");
+                this.print_port_list(node_data.inputs)?;
+                this.print_port_list(node_data.outputs)?;
+                this.print_meta(node_data.meta)?;
+                this.print_regions(node_data.regions)
+            }
+
+            Operation::Conditional => {
+                this.print_text("cond");
+                this.print_port_list(node_data.inputs)?;
+                this.print_port_list(node_data.outputs)?;
+                this.print_meta(node_data.meta)?;
+                this.print_regions(node_data.regions)
+            }
         })
     }
 
@@ -509,7 +512,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
             Term::Str(str) => {
                 // TODO: escape
                 self.print_text("\"");
-                self.print_text(str.as_ref());
+                self.print_text(*str);
                 self.print_text("\"");
                 Ok(())
             }

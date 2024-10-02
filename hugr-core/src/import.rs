@@ -15,7 +15,7 @@ use crate::{
     types::{
         type_param::TypeParam, type_row::TypeRowBase, CustomType, FuncTypeBase, MaybeRV, NoRV,
         PolyFuncType, PolyFuncTypeBase, RowVariable, Signature, Type, TypeArg, TypeBase, TypeBound,
-        TypeEnum, TypeRow, TypeRowRV,
+        TypeRow,
     },
     Direction, Hugr, HugrView, Node, Port,
 };
@@ -402,7 +402,7 @@ impl<'a> Context<'a> {
             }
 
             model::Operation::Block => self.import_cfg_block(node_id, parent),
-            // Err(model::ModelError::UnexpectedOperation(node_id).into())},
+
             model::Operation::DefineFunc { decl } => {
                 self.import_poly_func_type(*decl, |ctx, signature| {
                     let optype = OpType::FuncDefn(FuncDefn {
@@ -478,70 +478,8 @@ impl<'a> Context<'a> {
                 self.make_node(node_id, optype, parent)
             }
 
-            model::Operation::TailLoop {
-                inputs,
-                outputs,
-                rest,
-                extensions,
-            } => {
-                let just_inputs = self.import_type_row(inputs)?;
-                let just_outputs = self.import_type_row(outputs)?;
-                let rest = self.import_type_row(rest)?;
-                let extension_delta = self.import_extension_set(extensions)?;
-
-                let optype = OpType::TailLoop(TailLoop {
-                    just_inputs,
-                    just_outputs,
-                    rest,
-                    extension_delta,
-                });
-
-                let node = self.make_node(node_id, optype, parent)?;
-
-                let [region] = node_data.regions else {
-                    return Err(model::ModelError::InvalidRegions(node_id).into());
-                };
-
-                self.import_dfg_region(node_id, *region, node)?;
-                Ok(node)
-            }
-
-            model::Operation::Conditional {
-                cases,
-                context,
-                outputs,
-                extensions,
-            } => {
-                let sum_rows: Vec<_> = self.import_type_rows(cases)?;
-                let other_inputs = self.import_type_row(context)?;
-                let outputs = self.import_type_row(outputs)?;
-                let extension_delta = self.import_extension_set(extensions)?;
-
-                let optype = OpType::Conditional(Conditional {
-                    sum_rows,
-                    other_inputs,
-                    outputs,
-                    extension_delta,
-                });
-
-                let node = self.make_node(node_id, optype, parent)?;
-
-                for region in node_data.regions {
-                    let region_data = self.get_region(*region)?;
-
-                    let source_types = self.get_port_types(region_data.sources)?;
-                    let target_types = self.get_port_types(region_data.targets)?;
-                    let signature = FuncTypeBase::new(source_types, target_types);
-
-                    let case_node = self
-                        .hugr
-                        .add_node_with_parent(node, OpType::Case(Case { signature }));
-
-                    self.import_dfg_region(node_id, *region, case_node)?;
-                }
-
-                Ok(node)
-            }
+            model::Operation::TailLoop => self.import_tail_loop(node_id, parent),
+            model::Operation::Conditional => self.import_conditional(node_id, parent),
 
             model::Operation::CustomFull {
                 name: GlobalRef::Named(name),
@@ -645,6 +583,113 @@ impl<'a> Context<'a> {
         }
 
         Ok(())
+    }
+
+    fn import_adt_and_rest(
+        &mut self,
+        node_id: model::NodeId,
+        ports: &'a [model::Port<'a>],
+    ) -> Result<(Vec<TypeRow>, TypeRow), ImportError> {
+        let Some((first, rest)) = ports.split_first() else {
+            return Err(model::ModelError::InvalidRegions(node_id).into());
+        };
+
+        let sum_rows: Vec<_> = {
+            let Some(term) = first.r#type else {
+                return Err(error_uninferred!("port type"));
+            };
+
+            let model::Term::Adt { variants } = self.get_term(term)? else {
+                return Err(model::ModelError::TypeError(term).into());
+            };
+
+            self.import_type_rows(*variants)?
+        };
+
+        let rest = self.get_port_types(rest)?;
+
+        Ok((sum_rows, rest))
+    }
+
+    fn import_tail_loop(
+        &mut self,
+        node_id: model::NodeId,
+        parent: Node,
+    ) -> Result<Node, ImportError> {
+        let node_data = self.get_node(node_id)?;
+        assert!(matches!(node_data.operation, model::Operation::TailLoop));
+
+        let [region] = node_data.regions else {
+            return Err(model::ModelError::InvalidRegions(node_id).into());
+        };
+        let region_data = self.get_region(*region)?;
+
+        let (sum_rows, rest) = self.import_adt_and_rest(node_id, region_data.targets)?;
+
+        let (just_inputs, just_outputs) = {
+            let mut sum_rows = sum_rows.into_iter();
+
+            let term = region_data.targets[0].r#type.unwrap();
+
+            let Some(just_inputs) = sum_rows.next() else {
+                return Err(model::ModelError::TypeError(term).into());
+            };
+
+            let Some(just_outputs) = sum_rows.next() else {
+                return Err(model::ModelError::TypeError(term).into());
+            };
+
+            (just_inputs, just_outputs)
+        };
+
+        let optype = OpType::TailLoop(TailLoop {
+            just_inputs,
+            just_outputs,
+            rest,
+            extension_delta: ExtensionSet::new(),
+        });
+
+        let node = self.make_node(node_id, optype, parent)?;
+
+        self.import_dfg_region(node_id, *region, node)?;
+        Ok(node)
+    }
+
+    fn import_conditional(
+        &mut self,
+        node_id: model::NodeId,
+        parent: Node,
+    ) -> Result<Node, ImportError> {
+        let node_data = self.get_node(node_id)?;
+        assert!(matches!(node_data.operation, model::Operation::Conditional));
+
+        let (sum_rows, other_inputs) = self.import_adt_and_rest(node_id, node_data.inputs)?;
+        let outputs = self.get_port_types(node_data.outputs)?;
+
+        let optype = OpType::Conditional(Conditional {
+            sum_rows,
+            other_inputs,
+            outputs,
+            extension_delta: ExtensionSet::new(),
+        });
+
+        let node = self.make_node(node_id, optype, parent)?;
+
+        for region in node_data.regions {
+            let region_data = self.get_region(*region)?;
+
+            let source_types = self.get_port_types(region_data.sources)?;
+            let target_types = self.get_port_types(region_data.targets)?;
+            let signature = FuncTypeBase::new(source_types, target_types);
+
+            let case_node = self
+                .hugr
+                .add_node_with_parent(node, OpType::Case(Case { signature }));
+
+            self.import_dfg_region(node_id, *region, case_node)?;
+        }
+
+        Ok(node)
     }
 
     /// Create the entry block for a control flow region.
@@ -765,26 +810,8 @@ impl<'a> Context<'a> {
             return Err(model::ModelError::InvalidRegions(node_id).into());
         };
         let region_data = self.get_region(*region)?;
-
         let inputs = self.get_port_types(region_data.sources)?;
-
-        let Some((targets_first, targets_rest)) = region_data.targets.split_first() else {
-            return Err(model::ModelError::InvalidRegions(node_id).into());
-        };
-
-        let sum_rows: Vec<_> = {
-            let Some(term) = targets_first.r#type else {
-                return Err(error_uninferred!("port type"));
-            };
-
-            let model::Term::Adt { variants } = self.get_term(term)? else {
-                return Err(model::ModelError::TypeError(term).into());
-            };
-
-            self.import_type_rows(*variants)?
-        };
-
-        let other_outputs = self.get_port_types(targets_rest)?;
+        let (sum_rows, other_outputs) = self.import_adt_and_rest(node_id, region_data.targets)?;
 
         let optype = OpType::DataflowBlock(DataflowBlock {
             inputs,

@@ -245,28 +245,7 @@ pub enum Operation<'a> {
     /// - **Outputs**: `outputs` + `rest`
     /// - **Sources**: `inputs` + `rest`
     /// - **Targets**: `(adt [inputs outputs])` + `rest`
-    TailLoop {
-        // TODO: These can be determined by the port types?
-        /// Types of the values that are passed as inputs to the loop, and are returned
-        /// by the loop body when the loop is continued.
-        ///
-        /// **Type**: `(list type)`
-        inputs: TermId,
-        /// Types of the values that are produced at the end of the loop body when the loop
-        /// should be ended.
-        ///
-        /// **Type**: `(list type)`
-        outputs: TermId,
-        /// Types of the values that are passed as inputs to the loop, to each iteration and
-        /// are then returned at the end of the loop.
-        ///
-        /// **Type**: `(list type)`
-        rest: TermId,
-        ///
-        ///
-        /// **Type**: `ext-set`
-        extensions: TermId,
-    },
+    TailLoop,
 
     /// Conditional operation.
     ///
@@ -274,24 +253,7 @@ pub enum Operation<'a> {
     ///
     /// - **Inputs**: `[(adt inputs)]` + `context`
     /// - **Outputs**: `outputs`
-    Conditional {
-        /// Port types for each case of the conditional.
-        ///
-        /// **Type**: `(list (list type))`
-        cases: TermId,
-        /// Port types for additional inputs to the conditional.
-        ///
-        /// **Type**: `(list type)`
-        context: TermId,
-        /// Port types for the outputs of each case.
-        ///
-        /// **Type**: `(list type)`
-        outputs: TermId,
-        ///
-        ///
-        /// **Type**: `ext-set`
-        extensions: TermId,
-    },
+    Conditional,
 }
 
 /// A region in the hugr.
@@ -502,7 +464,7 @@ pub enum Term<'a> {
     /// A literal string.
     ///
     /// `"STRING" : str`
-    Str(SmolStr),
+    Str(&'a str),
 
     /// The type of literal strings.
     ///

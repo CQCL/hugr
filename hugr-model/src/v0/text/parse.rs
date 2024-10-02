@@ -33,8 +33,6 @@ use pest_parser::{HugrParser, Rule};
 pub struct ParsedModule<'a> {
     /// The parsed module.
     pub module: Module<'a>,
-    /// The names of the edges.
-    pub edges: Vec<SmolStr>,
     // TODO: Spans
 }
 
@@ -46,13 +44,11 @@ pub fn parse<'a>(input: &'a str, bump: &'a Bump) -> Result<ParsedModule<'a>, Par
 
     Ok(ParsedModule {
         module: context.module,
-        edges: context.edge_names.into_iter().collect(),
     })
 }
 
 struct ParseContext<'a> {
     module: Module<'a>,
-    edge_names: IndexSet<SmolStr>,
     bump: &'a Bump,
 }
 
@@ -60,7 +56,6 @@ impl<'a> ParseContext<'a> {
     fn new(bump: &'a Bump) -> Self {
         Self {
             module: Module::default(),
-            edge_names: IndexSet::default(),
             bump,
         }
     }
@@ -171,7 +166,7 @@ impl<'a> ParseContext<'a> {
 
             Rule::term_str => {
                 // TODO: Escaping?
-                let value = inner.next().unwrap().as_str().to_smolstr();
+                let value = inner.next().unwrap().as_str();
                 Term::Str(value)
             }
 
@@ -386,22 +381,12 @@ impl<'a> ParseContext<'a> {
             }
 
             Rule::node_tail_loop => {
-                let inputs = self.module.insert_term(Term::Wildcard);
-                let outputs = self.module.insert_term(Term::Wildcard);
-                let rest = self.module.insert_term(Term::Wildcard);
-                let extensions = self.module.insert_term(Term::Wildcard);
-                let operation = Operation::TailLoop {
-                    inputs,
-                    outputs,
-                    rest,
-                    extensions,
-                };
                 let inputs = self.parse_port_list(&mut inner)?;
                 let outputs = self.parse_port_list(&mut inner)?;
                 let meta = self.parse_meta(&mut inner)?;
                 let regions = self.parse_regions(&mut inner)?;
                 Node {
-                    operation,
+                    operation: Operation::TailLoop,
                     inputs,
                     outputs,
                     params: &[],
@@ -411,22 +396,12 @@ impl<'a> ParseContext<'a> {
             }
 
             Rule::node_cond => {
-                let cases = self.module.insert_term(Term::Wildcard);
-                let context = self.module.insert_term(Term::Wildcard);
-                let outputs = self.module.insert_term(Term::Wildcard);
-                let extensions = self.module.insert_term(Term::Wildcard);
-                let operation = Operation::Conditional {
-                    cases,
-                    context,
-                    outputs,
-                    extensions,
-                };
                 let inputs = self.parse_port_list(&mut inner)?;
                 let outputs = self.parse_port_list(&mut inner)?;
                 let meta = self.parse_meta(&mut inner)?;
                 let regions = self.parse_regions(&mut inner)?;
                 Node {
-                    operation,
+                    operation: Operation::Conditional,
                     inputs,
                     outputs,
                     params: &[],

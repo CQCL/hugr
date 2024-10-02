@@ -297,12 +297,7 @@ impl<'a> Context<'a> {
 
             OpType::TailLoop(op) => {
                 regions = self.bump.alloc_slice_copy(&[self.export_dfg(node)]);
-                model::Operation::TailLoop {
-                    inputs: self.export_type_row(&op.just_inputs),
-                    outputs: self.export_type_row(&op.just_outputs),
-                    rest: self.export_type_row(&op.rest),
-                    extensions: self.export_ext_set(&op.extension_delta),
-                }
+                model::Operation::TailLoop
             }
 
             OpType::Conditional(op) => {
@@ -314,12 +309,7 @@ impl<'a> Context<'a> {
                     tail: None,
                 };
                 regions = self.export_conditional_regions(node);
-                model::Operation::Conditional {
-                    cases: self.module.insert_term(sum_rows),
-                    context: self.export_type_row(&op.other_inputs),
-                    outputs: self.export_type_row(&op.outputs),
-                    extensions: self.export_ext_set(&op.extension_delta),
-                }
+                model::Operation::Conditional
             }
 
             // Opaque/extension operations should in the future support having multiple different
@@ -544,7 +534,9 @@ impl<'a> Context<'a> {
         match t {
             TypeArg::Type { ty } => self.export_type(ty),
             TypeArg::BoundedNat { n } => self.module.insert_term(model::Term::Nat(*n)),
-            TypeArg::String { arg } => self.module.insert_term(model::Term::Str(arg.into())),
+            TypeArg::String { arg } => self
+                .module
+                .insert_term(model::Term::Str(self.bump.alloc_str(arg))),
             TypeArg::Sequence { elems } => {
                 // For now we assume that the sequence is meant to be a list.
                 let items = self
