@@ -118,7 +118,7 @@ impl<V: AbstractValue> PartialSum<V> {
         if v.len() != r.len() {
             return Err(self);
         }
-        match zip_eq(v, r.into_iter())
+        match zip_eq(v, r.iter())
             .map(|(v, t)| v.clone().try_into_value(t))
             .collect::<Result<Vec<_>, _>>()
         {
@@ -273,7 +273,7 @@ impl<V: AbstractValue> PartialValue<V> {
 
     pub fn try_into_value(self, typ: &Type) -> Result<ValueOrSum<V>, Self> {
         match self.0 {
-            PVEnum::Value(v) => return Ok(ValueOrSum::Value(v.clone())),
+            PVEnum::Value(v) => Ok(ValueOrSum::Value(v.clone())),
             PVEnum::Sum(ps) => ps.try_into_value(typ).map_err(Self::from),
             _ => Err(self),
         }
