@@ -179,7 +179,6 @@ impl<'a> Context<'a> {
         let outputs = self.make_ports(node, Direction::Outgoing);
         let mut params: &[_] = &[];
         let mut regions: &[_] = &[];
-        let mut r#type = None;
 
         fn make_custom(name: &'static str) -> model::Operation {
             model::Operation::Custom {
@@ -344,7 +343,7 @@ impl<'a> Context<'a> {
             }
         };
 
-        let r#type = r#type.unwrap_or_else(|| self.module.insert_term(model::Term::Wildcard));
+        let r#type = self.module.insert_term(model::Term::Wildcard);
 
         self.module.insert_node(model::Node {
             operation,
