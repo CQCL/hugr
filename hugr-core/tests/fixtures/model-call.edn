@@ -1,0 +1,15 @@
+(hugr 0)
+
+(declare-func example.callee
+  [(@ arithmetic.int.types.int)] [(@ arithmetic.int.types.int)] (ext)
+  (meta doc.title "Callee")
+  (meta doc.description "This is a function declaration."))
+
+(define-func example.caller
+  [(@ arithmetic.int.types.int)] [(@ arithmetic.int.types.int)] (ext)
+  (meta doc.title "Caller")
+  (meta doc.description "This defines a function that calls the function which we declared earlier.")
+  (dfg
+    [(%3 (@ arithmetic.int.types.int))]
+    [(%4 (@ arithmetic.int.types.int))]
+    (call (@ example.callee) [(%3 (@ arithmetic.int.types.int))] [(%4 (@ arithmetic.int.types.int))])))

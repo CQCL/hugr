@@ -1,0 +1,26 @@
+---
+source: hugr-core/tests/model.rs
+expression: "roundtrip(include_str!(\"fixtures/model-cfg.edn\"))"
+---
+(hugr 0)
+
+(define-func example.cfg
+  (forall ?0 type)
+  [?0] [?0] (ext)
+  (dfg
+    [(%0 ?0)]
+    [(%1 ?0)]
+    (cfg [(%0 ?0)] [(%1 ?0)]
+      (cfg
+        [(%2 (ctrl [?0]))]
+        [(%6 (ctrl [?0]))]
+        (block [(%2 (ctrl [?0]))] [(%3 (ctrl [?0]))]
+          (dfg
+            [(%4 ?0)]
+            [(%5 (adt [[?0]]))]
+            (tag 0 [(%4 ?0)] [(%5 (adt [[?0]]))])))
+        (block [(%3 (ctrl [?0]))] [(%6 (ctrl [?0]))]
+          (dfg
+            [(%7 ?0)]
+            [(%8 (adt [[?0]]))]
+            (tag 0 [(%7 ?0)] [(%8 (adt [[?0]]))])))))))
