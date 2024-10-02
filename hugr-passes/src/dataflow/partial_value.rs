@@ -219,8 +219,6 @@ impl<V> From<PartialSum<V>> for PartialValue<V> {
 }
 
 impl<V: AbstractValue> PartialValue<V> {
-    // const BOTTOM: Self = PVEnum::Bottom;
-    // const BOTTOM_REF: &'static Self = &Self::BOTTOM;
     fn assert_invariants(&self) {
         match &self.0 {
             PVEnum::Sum(ps) => {
