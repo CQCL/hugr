@@ -6,17 +6,31 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
-/// Aka, deconstructible into Sum (TryIntoSum ?)
+/// Trait for values which can be deconstructed into Sums (with a single known tag).
+/// Required for values used in dataflow analysis.
 pub trait AbstractValue: Clone + std::fmt::Debug + PartialEq + Eq + Hash {
-    /// We write this way to optimize query/inspection (is-it-a-sum),
+    /// Deconstruct a value into a single known tag plus a row of values, if it is a [Sum].
+    /// Note that one can just always return `None` but this will mean the analysis
+    /// is unable to understand untupling, and may give inconsistent results wrt. [Tag]
+    /// operations, etc.
+    ///
+    /// The signature is this way to optimize query/inspection (is-it-a-sum),
     /// at the cost of requiring more cloning during actual conversion
     /// (inside the lazy Iterator, or for the error case, as Self remains)
+    ///
+    /// [Sum]: TypeEnum::Sum
+    /// [Tag]: hugr_core::ops::Tag
     fn as_sum(&self) -> Option<(usize, impl Iterator<Item = Self> + '_)>;
 }
 
+/// A struct returned from [PartialValue::try_into_value] and [PartialSum::try_into_value]
+/// indicating the value is either a single value or a sum with a single known tag.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ValueOrSum<V> {
+    /// Single value in the domain `V`
     Value(V),
+    /// Sum with a single known Tag
+    #[allow(missing_docs)]
     Sum {
         tag: usize,
         items: Vec<Self>,
@@ -24,15 +38,20 @@ pub enum ValueOrSum<V> {
     },
 }
 
-// TODO ALAN inline into PartialValue? Has to be public as it's in a pub enum
+/// A representation of a value of [SumType], that may have one or more possible tags,
+/// with a [PartialValue] representation of each element-value of each possible tag.
 #[derive(PartialEq, Clone, Eq)]
 pub struct PartialSum<V>(pub HashMap<usize, Vec<PartialValue<V>>>);
 
 impl<V> PartialSum<V> {
+    /// New instance for a single known tag.
+    /// (Multi-tag instances can be created via [Self::try_join_mut].)
     pub fn new_variant(tag: usize, values: impl IntoIterator<Item = PartialValue<V>>) -> Self {
         Self(HashMap::from([(tag, Vec::from_iter(values))]))
     }
 
+    /// The number of possible variants we know about. (NOT the number
+    /// of tags possible for the value's type, whatever [SumType] that might be.)
     pub fn num_variants(&self) -> usize {
         self.0.len()
     }
@@ -46,7 +65,10 @@ impl<V: AbstractValue> PartialSum<V> {
         }
     }
 
-    // Err with key if any common rows have different lengths (self not mutated)
+    /// Joins (towards `Top`) self with another [PartialSum]. If successful, returns
+    /// whether `self` has changed.
+    ///
+    /// Fails (without mutation) with the conflicting tag if any common rows have different lengths.
     pub fn try_join_mut(&mut self, other: Self) -> Result<bool, usize> {
         for (k, v) in &other.0 {
             if self.0.get(k).is_some_and(|row| row.len() != v.len()) {
@@ -68,7 +90,10 @@ impl<V: AbstractValue> PartialSum<V> {
         Ok(changed)
     }
 
-    // Error with key if any common rows have different lengths ( => Bottom)
+    /// Mutates self according to lattice meet operation (towards `Bottom`). If successful,
+    /// returns whether `self` has changed.
+    ///
+    /// Fails (without mutation) with the conflicting tag if any common rows have different lengths
     pub fn try_meet_mut(&mut self, other: Self) -> Result<bool, usize> {
         let mut changed = false;
         let mut keys_to_remove = vec![];
@@ -98,10 +123,14 @@ impl<V: AbstractValue> PartialSum<V> {
         Ok(changed)
     }
 
+    /// Whether this sum might have the specified tag
     pub fn supports_tag(&self, tag: usize) -> bool {
         self.0.contains_key(&tag)
     }
 
+    /// Turns this instance into a [ValueOrSum::Sum] if it has exactly one possible tag,
+    /// otherwise failing and returning itself back unmodified (also if there is another
+    /// error, e.g. this instance is not described by `typ`).
     pub fn try_into_value(self, typ: &Type) -> Result<ValueOrSum<V>, Self> {
         let Ok((k, v)) = self.0.iter().exactly_one() else {
             Err(self)?
@@ -134,6 +163,7 @@ impl<V: AbstractValue> PartialSum<V> {
 }
 
 impl<V: Clone> PartialSum<V> {
+    /// If this Sum might have the specified `tag`, get the elements inside that tag.
     pub fn variant_values(&self, variant: usize) -> Option<Vec<PartialValue<V>>> {
         self.0.get(&variant).cloned()
     }
@@ -184,6 +214,9 @@ impl<V: Hash> Hash for PartialSum<V> {
     }
 }
 
+/// Wraps some underlying representation (knowledge) of values into a lattice
+/// for use in dataflow analysis, including that an instance may be a [PartialSum]
+/// of values of the underlying representation
 #[derive(PartialEq, Clone, Eq, Hash, Debug)]
 pub struct PartialValue<V>(PVEnum<V>);
 
@@ -196,11 +229,16 @@ impl<V> PartialValue<V> {
     }
 }
 
+/// The contents of a [PartialValue], i.e. used as a view.
 #[derive(PartialEq, Clone, Eq, Hash, Debug)]
 pub enum PVEnum<V> {
+    /// No possibilities known (so far)
     Bottom,
+    /// A single value (of the underlying representation)
     Value(V),
+    /// Sum (with perhaps several possible tags) of underlying values
     Sum(PartialSum<V>),
+    /// Might be more than one distinct value of the underlying type `V`
     Top,
 }
 
@@ -231,19 +269,27 @@ impl<V: AbstractValue> PartialValue<V> {
         }
     }
 
+    /// Computes the lattice-join (i.e. towards `Top`) of this [PartialValue] with another.
     pub fn join(mut self, other: Self) -> Self {
         self.join_mut(other);
         self
     }
 
+    /// New instance of a sum with a single known tag.
     pub fn new_variant(tag: usize, values: impl IntoIterator<Item = Self>) -> Self {
         PartialSum::new_variant(tag, values).into()
     }
 
+    /// New instance of unit type (i.e. the only possible value, with no contents)
     pub fn new_unit() -> Self {
         Self::new_variant(0, [])
     }
 
+    /// If this value might be a Sum with the specified `tag`, get the elements inside that tag.
+    ///
+    /// # Panics
+    ///
+    /// if the value is believed, for that tag, to have a number of values other than `len`
     pub fn variant_values(&self, tag: usize, len: usize) -> Option<Vec<PartialValue<V>>> {
         let vals = match &self.0 {
             PVEnum::Bottom => return None,
@@ -258,6 +304,7 @@ impl<V: AbstractValue> PartialValue<V> {
         Some(vals)
     }
 
+    /// Tells us whether this value might be a Sum with the specified `tag`
     pub fn supports_tag(&self, tag: usize) -> bool {
         match &self.0 {
             PVEnum::Bottom => false,
@@ -270,6 +317,7 @@ impl<V: AbstractValue> PartialValue<V> {
         }
     }
 
+    /// Extracts a [ValueOrSum] if there is such a single representation
     pub fn try_into_value(self, typ: &Type) -> Result<ValueOrSum<V>, Self> {
         match self.0 {
             PVEnum::Value(v) => Ok(ValueOrSum::Value(v.clone())),

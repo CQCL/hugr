@@ -7,10 +7,14 @@ use super::partial_value::{AbstractValue, PartialValue, ValueOrSum};
 use super::DFContext;
 
 /// A simpler interface like [DFContext] but where the context only cares about
-/// values that are completely known (in the lattice `V`)
-/// rather than e.g. Sums potentially of two variants each of known values.
+/// values that are completely known (as `V`s), i.e. not `Bottom`, `Top`, or
+/// Sums of potentially multiple variants.
 pub trait TotalContext<V>: Clone + Eq + Hash + std::ops::Deref<Target = Hugr> {
+    /// The representation of values on which [Self::interpret_leaf_op] operates
     type InterpretableVal: TryFrom<ValueOrSum<V>>;
+    /// Interpret a leaf op.
+    /// `ins` gives the input ports for which we know (interpretable) values, and will be non-empty.
+    /// Returns a list of output ports for which we know (abstract) values (may be empty).
     fn interpret_leaf_op(
         &self,
         node: Node,

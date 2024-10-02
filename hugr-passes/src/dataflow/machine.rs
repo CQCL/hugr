@@ -6,6 +6,11 @@ use super::{
     datalog::AscentProgram, partial_value::ValueOrSum, AbstractValue, DFContext, PartialValue,
 };
 
+/// Basic structure for performing an analysis. Usage:
+/// 1. Get a new instance via [Self::default()]
+/// 2. Zero or more [Self::propolutate_out_wires] with initial values
+/// 3. Exactly one [Self::run] to do the analysis
+/// 4. Results then available via [Self::read_out_wire_partial_value] and [Self::read_out_wire_value]
 pub struct Machine<V: AbstractValue, C: DFContext<V>>(
     AscentProgram<V, C>,
     Option<HashMap<Wire, PartialValue<V>>>,
@@ -18,12 +23,9 @@ impl<V: AbstractValue, C: DFContext<V>> Default for Machine<V, C> {
     }
 }
 
-/// Usage:
-/// 1. Get a new instance via [Self::default()]
-/// 2. Zero or more [Self::propolutate_out_wires] with initial values
-/// 3. Exactly one [Self::run] to do the analysis
-/// 4. Results then available via [Self::read_out_wire_partial_value] and [Self::read_out_wire_value]
 impl<V: AbstractValue, C: DFContext<V>> Machine<V, C> {
+    /// Provide initial values for some wires.
+    /// (For example, if some properties of the Hugr's inputs are known.)
     pub fn propolutate_out_wires(
         &mut self,
         wires: impl IntoIterator<Item = (Wire, PartialValue<V>)>,
@@ -34,6 +36,13 @@ impl<V: AbstractValue, C: DFContext<V>> Machine<V, C> {
             .extend(wires.into_iter().map(|(w, v)| (w.node(), w.source(), v)));
     }
 
+    /// Run the analysis (iterate until a lattice fixpoint is reached).
+    /// The context passed in allows interpretation of leaf operations.
+    ///
+    /// # Panics
+    ///
+    /// If this Machine has been run already.
+    ///
     pub fn run(&mut self, context: C) {
         assert!(self.1.is_none());
         self.0.context.push((context,));
@@ -47,10 +56,16 @@ impl<V: AbstractValue, C: DFContext<V>> Machine<V, C> {
         )
     }
 
+    /// Gets the lattice value computed by [Self::run] for the given wire
     pub fn read_out_wire_partial_value(&self, w: Wire) -> Option<PartialValue<V>> {
         self.1.as_ref().unwrap().get(&w).cloned()
     }
 
+    /// Tells whether a [TailLoop] node can terminate, i.e. whether
+    /// `Break` and/or `Continue` tags may be returned by the nested DFG.
+    /// Returns `None` if the specified `node` is not a [TailLoop].
+    ///
+    /// [TailLoop]: hugr_core::ops::TailLoop
     pub fn tail_loop_terminates(
         &self,
         hugr: impl HugrView,
@@ -67,6 +82,13 @@ impl<V: AbstractValue, C: DFContext<V>> Machine<V, C> {
         ))
     }
 
+    /// Tells whether a [Case] node is reachable, i.e. whether the predicate
+    /// to its parent [Conditional] may possibly have the tag corresponding to the [Case].
+    /// Returns `None` if the specified `case` is not a [Case], or is not within a [Conditional]
+    /// (e.g. a [Case]-rooted Hugr).
+    ///
+    /// [Case]: hugr_core::ops::Case
+    /// [Conditional]: hugr_core::ops::Conditional
     pub fn case_reachable(&self, hugr: impl HugrView, case: Node) -> Option<bool> {
         hugr.get_optype(case).as_case()?;
         let cond = hugr.get_parent(case)?;
@@ -85,6 +107,18 @@ impl<V: AbstractValue, C: DFContext<V>> Machine<V, C>
 where
     Value: From<V>,
 {
+    /// Gets the Hugr [Value] computed by [Self::run] for the given wire, if possible.
+    /// (Only if the analysis determined a single `V`, or a Sum of `V`s with a single
+    /// possible tag, was present on that wire.)
+    ///
+    /// # Errors
+    /// `None` if the analysis did not result in a single [ValueOrSum] on that wire
+    /// `Some(e)` if conversion to a [Value] produced a [ConstTypeError]
+    ///
+    /// # Panics
+    /// If a [Type] for the specified wire could not be extracted from the Hugr
+    ///
+    /// [Type]: hugr_core::types::Type
     pub fn read_out_wire_value(
         &self,
         hugr: impl HugrView,
