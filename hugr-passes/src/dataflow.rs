@@ -6,7 +6,7 @@ mod machine;
 pub use machine::Machine;
 
 mod partial_value;
-pub use partial_value::{AbstractValue, PVEnum, PartialValue, ValueOrSum};
+pub use partial_value::{AbstractValue, PVEnum, PartialSum, PartialValue, ValueOrSum};
 
 mod total_context;
 pub use total_context::TotalContext;
