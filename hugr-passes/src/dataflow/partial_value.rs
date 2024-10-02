@@ -152,25 +152,21 @@ impl<V: PartialEq> PartialOrd for PartialSum<V> {
             keys2[*k] = 1;
         }
 
-        if let Some(ord) = keys1.partial_cmp(&keys2) {
-            if ord != Ordering::Equal {
-                return Some(ord);
-            }
-        } else {
-            return None;
-        }
-        for (k, lhs) in &self.0 {
-            let Some(rhs) = other.0.get(k) else {
-                unreachable!()
-            };
-            match lhs.partial_cmp(rhs) {
-                Some(Ordering::Equal) => continue,
-                x => {
-                    return x;
+        Some(match keys1.cmp(&keys2) {
+            ord @ Ordering::Greater | ord @ Ordering::Less => ord,
+            Ordering::Equal => {
+                for (k, lhs) in &self.0 {
+                    let Some(rhs) = other.0.get(k) else {
+                        unreachable!()
+                    };
+                    let key_cmp = lhs.partial_cmp(rhs);
+                    if key_cmp != Some(Ordering::Equal) {
+                        return key_cmp;
+                    }
                 }
+                Ordering::Equal
             }
-        }
-        Some(Ordering::Equal)
+        })
     }
 }
 
