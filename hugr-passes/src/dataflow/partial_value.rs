@@ -133,10 +133,8 @@ impl<V: AbstractValue> PartialSum<V> {
 }
 
 impl<V: Clone> PartialSum<V> {
-    pub fn variant_values(&self, variant: usize, len: usize) -> Option<Vec<PartialValue<V>>> {
-        let row = self.0.get(&variant)?;
-        assert!(row.len() == len);
-        Some(row.clone())
+    pub fn variant_values(&self, variant: usize) -> Option<Vec<PartialValue<V>>> {
+        self.0.get(&variant).cloned()
     }
 }
 
@@ -254,7 +252,7 @@ impl<V: AbstractValue> PartialValue<V> {
                 assert!(v.as_sum().is_none());
                 return None;
             }
-            PVEnum::Sum(ps) => ps.variant_values(tag, len)?,
+            PVEnum::Sum(ps) => ps.variant_values(tag)?,
             PVEnum::Top => vec![PartialValue(PVEnum::Top); len],
         };
         assert_eq!(vals.len(), len);
