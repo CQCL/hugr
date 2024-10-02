@@ -20,6 +20,7 @@ workspace = true
 extension_inference = []
 declarative = ["serde_yaml"]
 model = ["hugr-model"]
+default = ["model"]
 
 [dependencies]
 portgraph = { workspace = true, features = ["serde", "petgraph"] }

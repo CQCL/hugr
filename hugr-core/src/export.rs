@@ -54,6 +54,8 @@ impl<'a> Context<'a> {
     }
 
     pub fn export_root(&mut self) {
+        let r#type = self.module.insert_term(model::Term::Wildcard);
+
         let hugr_children = self.hugr.children(self.hugr.root());
         let mut children = BumpVec::with_capacity_in(hugr_children.len(), self.bump);
 
@@ -67,6 +69,7 @@ impl<'a> Context<'a> {
             targets: &[],
             children: children.into_bump_slice(),
             meta: &[],
+            r#type,
         });
 
         self.module.root = root;
@@ -146,7 +149,6 @@ impl<'a> Context<'a> {
         Some(model::Port {
             r#type: Some(r#type),
             link,
-            meta: &[],
         })
     }
 
@@ -177,6 +179,7 @@ impl<'a> Context<'a> {
         let outputs = self.make_ports(node, Direction::Outgoing);
         let mut params: &[_] = &[];
         let mut regions: &[_] = &[];
+        let mut r#type = None;
 
         fn make_custom(name: &'static str) -> model::Operation {
             model::Operation::Custom {
@@ -341,6 +344,8 @@ impl<'a> Context<'a> {
             }
         };
 
+        let r#type = r#type.unwrap_or_else(|| self.module.insert_term(model::Term::Wildcard));
+
         self.module.insert_node(model::Node {
             operation,
             inputs,
@@ -348,6 +353,7 @@ impl<'a> Context<'a> {
             params,
             regions,
             meta: &[],
+            r#type,
         })
     }
 
@@ -388,12 +394,16 @@ impl<'a> Context<'a> {
             region_children.push(self.export_node(child));
         }
 
+        // TODO: We can determine the type of the region
+        let r#type = self.module.insert_term(model::Term::Wildcard);
+
         self.module.insert_region(model::Region {
             kind: model::RegionKind::DataFlow,
             sources,
             targets,
             children: region_children.into_bump_slice(),
             meta: &[],
+            r#type,
         })
     }
 
@@ -435,12 +445,16 @@ impl<'a> Context<'a> {
             region_children.push(self.export_node(child));
         }
 
+        // TODO: We can determine the type of the region
+        let r#type = self.module.insert_term(model::Term::Wildcard);
+
         self.module.insert_region(model::Region {
             kind: model::RegionKind::DataFlow,
             sources: self.bump.alloc_slice_copy(&[source]),
             targets,
             children: region_children.into_bump_slice(),
             meta: &[],
+            r#type,
         })
     }
 

@@ -401,7 +401,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
     fn print_port_list(&mut self, ports: &'a [Port<'a>]) -> PrintResult<()> {
         self.print_brackets(|this| {
             for port in ports {
-                if port.r#type.is_some() || !port.meta.is_empty() {
+                if port.r#type.is_some() {
                     this.print_parens(|this| {
                         this.print_link_ref(port.link);
 
@@ -410,7 +410,6 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                             None => this.print_text("_"),
                         };
 
-                        this.print_meta(port.meta)?;
                         Ok(())
                     })?;
                 } else {

@@ -31,19 +31,20 @@ node = {
   | node_custom
 }
 
-node_dfg           = { "(" ~ "dfg" ~ port_lists? ~ meta* ~ region* ~ ")" }
-node_cfg           = { "(" ~ "cfg" ~ port_lists? ~ meta* ~ region* ~ ")" }
-node_block         = { "(" ~ "block" ~ port_lists? ~ meta* ~ region* ~ ")" }
+node_dfg           = { "(" ~ "dfg" ~ port_lists? ~ type_hint? ~ meta* ~ region* ~ ")" }
+node_cfg           = { "(" ~ "cfg" ~ port_lists? ~ type_hint? ~ meta* ~ region* ~ ")" }
+node_block         = { "(" ~ "block" ~ port_lists? ~ type_hint? ~ meta* ~ region* ~ ")" }
 node_define_func   = { "(" ~ "define-func" ~ func_header ~ meta* ~ region* ~ ")" }
 node_declare_func  = { "(" ~ "declare-func" ~ func_header ~ meta* ~ ")" }
-node_call_func     = { "(" ~ "call" ~ term ~ port_lists? ~ meta* ~ ")" }
+node_call_func     = { "(" ~ "call" ~ term ~ port_lists? ~ type_hint? ~ meta* ~ ")" }
 node_define_alias  = { "(" ~ "define-alias" ~ alias_header ~ term ~ meta* ~ ")" }
 node_declare_alias = { "(" ~ "declare-alias" ~ alias_header ~ meta* ~ ")" }
-node_tail_loop     = { "(" ~ "tail-loop" ~ port_lists? ~ meta* ~ region* ~ ")" }
-node_cond          = { "(" ~ "cond" ~ port_lists? ~ meta* ~ region* ~ ")" }
-node_tag           = { "(" ~ "tag" ~ tag ~ port_lists? ~ meta* ~ region* ~ ")" }
-node_custom        = { "(" ~ (term_apply | term_apply_full) ~ port_lists? ~ meta* ~ region* ~ ")" }
+node_tail_loop     = { "(" ~ "tail-loop" ~ port_lists? ~ type_hint? ~ meta* ~ region* ~ ")" }
+node_cond          = { "(" ~ "cond" ~ port_lists? ~ type_hint? ~ meta* ~ region* ~ ")" }
+node_tag           = { "(" ~ "tag" ~ tag ~ port_lists? ~ type_hint? ~ meta* ~ region* ~ ")" }
+node_custom        = { "(" ~ (term_apply | term_apply_full) ~ port_lists? ~ type_hint? ~ meta* ~ region* ~ ")" }
 
+type_hint    = { "(" ~ "type" ~ term ~ term ~ term ~ ")" }
 func_header  = { symbol ~ param* ~ term ~ term ~ term }
 alias_header = { symbol ~ param* ~ term }
 
@@ -54,8 +55,8 @@ param_explicit   = { "(" ~ "param" ~ term_var ~ term ~ ")" }
 param_constraint = { "(" ~ "where" ~ term ~ ")" }
 
 region     = { region_dfg | region_cfg }
-region_dfg = { "(" ~ "dfg" ~ port_lists? ~ meta* ~ node* ~ ")" }
-region_cfg = { "(" ~ "cfg" ~ port_lists? ~ meta* ~ node* ~ ")" }
+region_dfg = { "(" ~ "dfg" ~ port_lists? ~ type_hint? ~ meta* ~ node* ~ ")" }
+region_cfg = { "(" ~ "cfg" ~ port_lists? ~ type_hint? ~ meta* ~ node* ~ ")" }
 
 term = {
     term_wildcard

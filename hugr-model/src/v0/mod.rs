@@ -174,6 +174,8 @@ pub struct Node<'a> {
     pub regions: &'a [RegionId],
     /// The meta information attached to the node.
     pub meta: &'a [MetaItem<'a>],
+    /// The type of the node.
+    pub r#type: TermId,
 }
 
 /// Operations that nodes can perform.
@@ -274,6 +276,8 @@ pub struct Region<'a> {
     pub children: &'a [NodeId],
     /// The metadata attached to the region.
     pub meta: &'a [MetaItem<'a>],
+    /// The type of the region.
+    pub r#type: TermId,
 }
 
 /// The kind of a region.
@@ -292,8 +296,6 @@ pub struct Port<'a> {
     pub link: LinkRef<'a>,
     /// The type of the port.
     pub r#type: Option<TermId>,
-    /// Metadata attached to the port.
-    pub meta: &'a [MetaItem<'a>],
 }
 
 /// A function declaration.
