@@ -85,16 +85,21 @@ impl<V: AbstractValue, C: DFContext<V>> Machine<V, C>
 where
     Value: From<V>,
 {
-    pub fn read_out_wire_value(&self, hugr: impl HugrView, w: Wire) -> Option<Value> {
+    pub fn read_out_wire_value(
+        &self,
+        hugr: impl HugrView,
+        w: Wire,
+    ) -> Result<Value, Option<ConstTypeError>> {
         // dbg!(&w);
-        let pv = self.read_out_wire_partial_value(w)?;
-        // dbg!(&pv);
         let (_, typ) = hugr
             .out_value_types(w.node())
             .find(|(p, _)| *p == w.source())
             .unwrap();
-        let v: ValueOrSum<V> = pv.try_into_value(&typ).ok()?;
-        v.try_into().ok()
+        let v = self
+            .read_out_wire_partial_value(w)
+            .and_then(|pv| pv.try_into_value(&typ).ok())
+            .ok_or(None)?;
+        Ok(v.try_into().map_err(Some)?)
     }
 }
 
