@@ -4,7 +4,6 @@ use hugr_core::{ops::OpTrait, Hugr, HugrView, IncomingPort, Node, OutgoingPort, 
 
 use super::partial_value::{AbstractValue, PartialValue, ValueOrSum};
 use super::DFContext;
-use super::ValueRow;
 
 /// A simpler interface like [DFContext] but where the context only cares about
 /// values that are completely known (in the lattice `V`)
@@ -19,7 +18,11 @@ pub trait TotalContext<V>: Clone + Eq + Hash + std::ops::Deref<Target = Hugr> {
 }
 
 impl<V: AbstractValue, T: TotalContext<V>> DFContext<V> for T {
-    fn interpret_leaf_op(&self, node: Node, ins: &[PartialValue<V>]) -> Option<ValueRow<V>> {
+    fn interpret_leaf_op(
+        &self,
+        node: Node,
+        ins: &[PartialValue<V>],
+    ) -> Option<Vec<PartialValue<V>>> {
         let op = self.get_optype(node);
         let sig = op.dataflow_signature()?;
         let known_ins = sig
@@ -39,7 +42,7 @@ impl<V: AbstractValue, T: TotalContext<V>> DFContext<V> for T {
             .collect::<Vec<_>>();
         let known_outs = self.interpret_leaf_op(node, &known_ins);
         (!known_outs.is_empty()).then(|| {
-            let mut res = ValueRow::new(sig.output_count());
+            let mut res = vec![PartialValue::Bottom; sig.output_count()];
             for (p, v) in known_outs {
                 res[p.index()] = v.into();
             }
