@@ -7,3 +7,5 @@ expression: "roundtrip(include_str!(\"fixtures/model-alias.edn\"))"
 (declare-alias local.float type)
 
 (define-alias local.int type (@ arithmetic.int.types.int))
+
+(define-alias local.endo type (fn [] [] (ext)))

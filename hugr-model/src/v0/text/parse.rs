@@ -324,6 +324,23 @@ impl<'a> ParseContext<'a> {
                 }
             }
 
+            Rule::node_load_func => {
+                let func = self.parse_term(inner.next().unwrap())?;
+                let inputs = self.parse_port_list(&mut inner)?;
+                let outputs = self.parse_port_list(&mut inner)?;
+                let r#type = self.parse_type_hint(&mut inner)?;
+                let meta = self.parse_meta(&mut inner)?;
+                Node {
+                    operation: Operation::LoadFunc { func },
+                    inputs,
+                    outputs,
+                    params: &[],
+                    regions: &[],
+                    meta,
+                    r#type,
+                }
+            }
+
             Rule::node_define_alias => {
                 let decl = self.parse_alias_header(inner.next().unwrap())?;
                 let value = self.parse_term(inner.next().unwrap())?;

@@ -13,3 +13,10 @@
     [(%3 (@ arithmetic.int.types.int))]
     [(%4 (@ arithmetic.int.types.int))]
     (call (@ example.callee) [(%3 (@ arithmetic.int.types.int))] [(%4 (@ arithmetic.int.types.int))])))
+
+(define-func example.load
+  [] [(fn [(@ arithmetic.int.types.int)] [(@ arithmetic.int.types.int)] (ext))] (ext)
+  (dfg
+    []
+    [(%5 (fn [(@ arithmetic.int.types.int)] [(@ arithmetic.int.types.int)] (ext)))]
+    (load-func (@ example.caller) [] [(%5 (fn [(@ arithmetic.int.types.int)] [(@ arithmetic.int.types.int)] (ext)))])))
