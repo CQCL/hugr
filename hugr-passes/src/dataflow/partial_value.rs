@@ -189,13 +189,23 @@ impl<V: Hash> Hash for PartialSum<V> {
     }
 }
 
-/// We really must prevent people from constructing PartialValue::Value of
-/// any `value` where `value.as_sum().is_some()``
 #[derive(PartialEq, Clone, Eq, Hash, Debug)]
-pub enum PartialValue<V> {
+pub struct PartialValue<V>(PVEnum<V>);
+
+impl<V> PartialValue<V> {
+    /// Allows to read the enum, which guarantees that we never return [PVEnum::Value]
+    /// for a value whose [AbstractValue::as_sum] is `Some` - any such value will be
+    /// in the form of a [PVEnum::Sum] instead.
+    pub fn as_enum(&self) -> &PVEnum<V> {
+        &self.0
+    }
+}
+
+#[derive(PartialEq, Clone, Eq, Hash, Debug)]
+pub enum PVEnum<V> {
     Bottom,
     Value(V),
-    PartialSum(PartialSum<V>),
+    Sum(PartialSum<V>),
     Top,
 }
 
@@ -203,25 +213,25 @@ impl<V: AbstractValue> From<V> for PartialValue<V> {
     fn from(v: V) -> Self {
         v.as_sum()
             .map(|(tag, values)| Self::variant(tag, values.map(Self::from)))
-            .unwrap_or(Self::Value(v))
+            .unwrap_or(Self(PVEnum::Value(v)))
     }
 }
 
 impl<V> From<PartialSum<V>> for PartialValue<V> {
     fn from(v: PartialSum<V>) -> Self {
-        Self::PartialSum(v)
+        Self(PVEnum::Sum(v))
     }
 }
 
 impl<V: AbstractValue> PartialValue<V> {
-    // const BOTTOM: Self = Self::Bottom;
+    // const BOTTOM: Self = PVEnum::Bottom;
     // const BOTTOM_REF: &'static Self = &Self::BOTTOM;
     fn assert_invariants(&self) {
-        match self {
-            Self::PartialSum(ps) => {
+        match &self.0 {
+            PVEnum::Sum(ps) => {
                 ps.assert_invariants();
             }
-            Self::Value(v) => {
+            PVEnum::Value(v) => {
                 assert!(v.as_sum().is_none())
             }
             _ => {}
@@ -242,36 +252,36 @@ impl<V: AbstractValue> PartialValue<V> {
     }
 
     pub fn variant_values(&self, tag: usize, len: usize) -> Option<Vec<PartialValue<V>>> {
-        let vals = match self {
-            PartialValue::Bottom => return None,
-            PartialValue::Value(v) => {
+        let vals = match &self.0 {
+            PVEnum::Bottom => return None,
+            PVEnum::Value(v) => {
                 assert!(v.as_sum().is_none());
                 return None;
             }
-            PartialValue::PartialSum(ps) => ps.variant_values(tag, len)?,
-            PartialValue::Top => vec![PartialValue::Top; len],
+            PVEnum::Sum(ps) => ps.variant_values(tag, len)?,
+            PVEnum::Top => vec![PartialValue(PVEnum::Top); len],
         };
         assert_eq!(vals.len(), len);
         Some(vals)
     }
 
     pub fn supports_tag(&self, tag: usize) -> bool {
-        match self {
-            PartialValue::Bottom => false,
-            PartialValue::Value(v) => {
+        match &self.0 {
+            PVEnum::Bottom => false,
+            PVEnum::Value(v) => {
                 assert!(v.as_sum().is_none());
                 false
             }
-            PartialValue::PartialSum(ps) => ps.supports_tag(tag),
-            PartialValue::Top => true,
+            PVEnum::Sum(ps) => ps.supports_tag(tag),
+            PVEnum::Top => true,
         }
     }
 
     pub fn try_into_value(self, typ: &Type) -> Result<ValueOrSum<V>, Self> {
-        match self {
-            Self::Value(v) => Ok(ValueOrSum::Value(v.clone())),
-            Self::PartialSum(ps) => ps.try_into_value(typ).map_err(Self::PartialSum),
-            x => Err(x),
+        match self.0 {
+            PVEnum::Value(v) => return Ok(ValueOrSum::Value(v.clone())),
+            PVEnum::Sum(ps) => ps.try_into_value(typ).map_err(Self::from),
+            _ => Err(self),
         }
     }
 }
@@ -280,41 +290,40 @@ impl<V: AbstractValue> Lattice for PartialValue<V> {
     fn join_mut(&mut self, other: Self) -> bool {
         self.assert_invariants();
         // println!("join {self:?}\n{:?}", &other);
-        match (&*self, other) {
-            (Self::Top, _) => false,
-            (_, other @ Self::Top) => {
-                *self = other;
+        match (&self.0, other.0) {
+            (PVEnum::Top, _) => false,
+            (_, other @ PVEnum::Top) => {
+                self.0 = other;
                 true
             }
-            (_, Self::Bottom) => false,
-            (Self::Bottom, other) => {
-                *self = other;
+            (_, PVEnum::Bottom) => false,
+            (PVEnum::Bottom, other) => {
+                self.0 = other;
                 true
             }
-            (Self::Value(h1), Self::Value(h2)) => {
+            (PVEnum::Value(h1), PVEnum::Value(h2)) => {
                 if h1 == &h2 {
                     false
                 } else {
-                    *self = Self::Top;
+                    self.0 = PVEnum::Top;
                     true
                 }
             }
-            (Self::PartialSum(_), Self::PartialSum(ps2)) => {
-                let Self::PartialSum(ps1) = self else {
+            (PVEnum::Sum(_), PVEnum::Sum(ps2)) => {
+                let Self(PVEnum::Sum(ps1)) = self else {
                     unreachable!()
                 };
                 match ps1.try_join_mut(ps2) {
                     Ok(ch) => ch,
                     Err(_) => {
-                        *self = Self::Top;
+                        self.0 = PVEnum::Top;
                         true
                     }
                 }
             }
-            (Self::Value(ref v), Self::PartialSum(_))
-            | (Self::PartialSum(_), Self::Value(ref v)) => {
+            (PVEnum::Value(ref v), PVEnum::Sum(_)) | (PVEnum::Sum(_), PVEnum::Value(ref v)) => {
                 assert!(v.as_sum().is_none());
-                *self = Self::Top;
+                self.0 = PVEnum::Top;
                 true
             }
         }
@@ -327,41 +336,41 @@ impl<V: AbstractValue> Lattice for PartialValue<V> {
 
     fn meet_mut(&mut self, other: Self) -> bool {
         self.assert_invariants();
-        match (&*self, other) {
-            (Self::Bottom, _) => false,
-            (_, other @ Self::Bottom) => {
-                *self = other;
+        match (&self.0, other.0) {
+            (PVEnum::Bottom, _) => false,
+            (_, other @ PVEnum::Bottom) => {
+                self.0 = other;
                 true
             }
-            (_, Self::Top) => false,
-            (Self::Top, other) => {
-                *self = other;
+            (_, PVEnum::Top) => false,
+            (PVEnum::Top, other) => {
+                self.0 = other;
                 true
             }
-            (Self::Value(h1), Self::Value(h2)) => {
+            (PVEnum::Value(h1), PVEnum::Value(h2)) => {
                 if h1 == &h2 {
                     false
                 } else {
-                    *self = Self::Bottom;
+                    self.0 = PVEnum::Bottom;
                     true
                 }
             }
-            (Self::PartialSum(_), Self::PartialSum(ps2)) => {
-                let Self::PartialSum(ps1) = self else {
-                    unreachable!()
+            (PVEnum::Sum(_), PVEnum::Sum(ps2)) => {
+                let ps1 = match &mut self.0 {
+                    PVEnum::Sum(ps1) => ps1,
+                    _ => unreachable!(),
                 };
                 match ps1.try_meet_mut(ps2) {
                     Ok(ch) => ch,
                     Err(_) => {
-                        *self = Self::Bottom;
+                        self.0 = PVEnum::Bottom;
                         true
                     }
                 }
             }
-            (Self::Value(ref v), Self::PartialSum(_))
-            | (Self::PartialSum(_), Self::Value(ref v)) => {
+            (PVEnum::Value(ref v), PVEnum::Sum(_)) | (PVEnum::Sum(_), PVEnum::Value(ref v)) => {
                 assert!(v.as_sum().is_none());
-                *self = Self::Bottom;
+                self.0 = PVEnum::Bottom;
                 true
             }
         }
@@ -370,26 +379,26 @@ impl<V: AbstractValue> Lattice for PartialValue<V> {
 
 impl<V: AbstractValue> BoundedLattice for PartialValue<V> {
     fn top() -> Self {
-        Self::Top
+        Self(PVEnum::Top)
     }
 
     fn bottom() -> Self {
-        Self::Bottom
+        Self(PVEnum::Bottom)
     }
 }
 
 impl<V: PartialEq> PartialOrd for PartialValue<V> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         use std::cmp::Ordering;
-        match (self, other) {
-            (Self::Bottom, Self::Bottom) => Some(Ordering::Equal),
-            (Self::Top, Self::Top) => Some(Ordering::Equal),
-            (Self::Bottom, _) => Some(Ordering::Less),
-            (_, Self::Bottom) => Some(Ordering::Greater),
-            (Self::Top, _) => Some(Ordering::Greater),
-            (_, Self::Top) => Some(Ordering::Less),
-            (Self::Value(v1), Self::Value(v2)) => (v1 == v2).then_some(Ordering::Equal),
-            (Self::PartialSum(ps1), Self::PartialSum(ps2)) => ps1.partial_cmp(ps2),
+        match (&self.0, &other.0) {
+            (PVEnum::Bottom, PVEnum::Bottom) => Some(Ordering::Equal),
+            (PVEnum::Top, PVEnum::Top) => Some(Ordering::Equal),
+            (PVEnum::Bottom, _) => Some(Ordering::Less),
+            (_, PVEnum::Bottom) => Some(Ordering::Greater),
+            (PVEnum::Top, _) => Some(Ordering::Greater),
+            (_, PVEnum::Top) => Some(Ordering::Less),
+            (PVEnum::Value(v1), PVEnum::Value(v2)) => (v1 == v2).then_some(Ordering::Equal),
+            (PVEnum::Sum(ps1), PVEnum::Sum(ps2)) => ps1.partial_cmp(ps2),
             _ => None,
         }
     }
@@ -408,7 +417,7 @@ mod test {
         types::{Type, TypeArg, TypeEnum},
     };
 
-    use super::{PartialSum, PartialValue};
+    use super::{PVEnum, PartialSum, PartialValue};
     use crate::const_fold2::value_handle::{ValueHandle, ValueKey};
 
     impl Arbitrary for ValueHandle {
@@ -566,10 +575,10 @@ mod test {
         }
 
         fn type_check(&self, pv: &PartialValue<ValueHandle>) -> bool {
-            match (self, pv) {
-                (_, PartialValue::Bottom) | (_, PartialValue::Top) => true,
-                (_, PartialValue::Value(v)) => self.get_type() == v.get_type(),
-                (TestSumType::Branch(_, sop), PartialValue::PartialSum(ps)) => {
+            match (self, pv.as_enum()) {
+                (_, PVEnum::Bottom) | (_, PVEnum::Top) => true,
+                (_, PVEnum::Value(v)) => self.get_type() == v.get_type(),
+                (TestSumType::Branch(_, sop), PVEnum::Sum(ps)) => {
                     for (k, v) in &ps.0 {
                         if *k >= sop.len() {
                             return false;
@@ -584,7 +593,7 @@ mod test {
                     }
                     true
                 }
-                (Self::Leaf(l), PartialValue::PartialSum(ps)) => l.type_check(ps),
+                (Self::Leaf(l), PVEnum::Sum(ps)) => l.type_check(ps),
             }
         }
     }

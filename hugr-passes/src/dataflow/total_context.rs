@@ -1,5 +1,6 @@
 use std::hash::Hash;
 
+use ascent::lattice::BoundedLattice;
 use hugr_core::{ops::OpTrait, Hugr, HugrView, IncomingPort, Node, OutgoingPort, PortIndex};
 
 use super::partial_value::{AbstractValue, PartialValue, ValueOrSum};
@@ -42,7 +43,7 @@ impl<V: AbstractValue, T: TotalContext<V>> DFContext<V> for T {
             .collect::<Vec<_>>();
         let known_outs = self.interpret_leaf_op(node, &known_ins);
         (!known_outs.is_empty()).then(|| {
-            let mut res = vec![PartialValue::Bottom; sig.output_count()];
+            let mut res = vec![PartialValue::bottom(); sig.output_count()];
             for (p, v) in known_outs {
                 res[p.index()] = v.into();
             }
