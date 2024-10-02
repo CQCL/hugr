@@ -46,16 +46,17 @@ impl<V: AbstractValue> PartialSum<V> {
         }
     }
 
-    // Err with key if any common rows have different lengths (self may have been mutated)
-    fn try_join_mut(&mut self, other: Self) -> Result<bool, usize> {
+    // Err with key if any common rows have different lengths (self not mutated)
+    pub fn try_join_mut(&mut self, other: Self) -> Result<bool, usize> {
+        for (k, v) in &other.0 {
+            if self.0.get(k).is_some_and(|row| row.len() != v.len()) {
+                return Err(*k);
+            }
+        }
         let mut changed = false;
 
         for (k, v) in other.0 {
             if let Some(row) = self.0.get_mut(&k) {
-                if v.len() != row.len() {
-                    // Better to check first and avoid mutation, but fine here
-                    return Err(k);
-                }
                 for (lhs, rhs) in zip_eq(row.iter_mut(), v.into_iter()) {
                     changed |= lhs.join_mut(rhs);
                 }
@@ -68,7 +69,7 @@ impl<V: AbstractValue> PartialSum<V> {
     }
 
     // Error with key if any common rows have different lengths ( => Bottom)
-    fn try_meet_mut(&mut self, other: Self) -> Result<bool, usize> {
+    pub fn try_meet_mut(&mut self, other: Self) -> Result<bool, usize> {
         let mut changed = false;
         let mut keys_to_remove = vec![];
         for (k, v) in self.0.iter() {
