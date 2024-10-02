@@ -133,7 +133,7 @@ where
             .read_out_wire_partial_value(w)
             .and_then(|pv| pv.try_into_value(&typ).ok())
             .ok_or(None)?;
-        Ok(v.try_into().map_err(Some)?)
+        v.try_into().map_err(Some)
     }
 }
 
