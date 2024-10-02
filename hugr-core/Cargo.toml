@@ -19,6 +19,7 @@ workspace = true
 [features]
 extension_inference = []
 declarative = ["serde_yaml"]
+model = ["hugr-model"]
 
 [dependencies]
 portgraph = { workspace = true, features = ["serde", "petgraph"] }
@@ -46,7 +47,7 @@ paste = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
 semver = { version = "1.0.23", features = ["serde"] }
-hugr-model = { path = "../hugr-model" }
+hugr-model = { path = "../hugr-model", optional = true }
 indexmap.workspace = true
 tinyvec.workspace = true
 fxhash.workspace = true

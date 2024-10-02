@@ -4,7 +4,6 @@
 //! It is included in the library to allow for early experimentation, and for
 //! the core and model to converge incrementally.
 //!
-//!
 //! # Terms
 //!
 //! Terms form a meta language that is used to describe types, parameters and metadata that

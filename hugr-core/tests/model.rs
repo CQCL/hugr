@@ -1,7 +1,11 @@
+#[cfg(feature = "model")]
 use hugr::std_extensions::std_reg;
+#[cfg(feature = "model")]
 use hugr_core::{export::export_hugr, import::import_hugr};
+#[cfg(feature = "model")]
 use hugr_model::v0 as model;
 
+#[cfg(feature = "model")]
 #[test]
 pub fn test_import_export() {
     let bump = bumpalo::Bump::new();

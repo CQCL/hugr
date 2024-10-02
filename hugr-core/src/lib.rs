@@ -7,12 +7,13 @@
 // https://github.com/rust-lang/rust/issues/120363
 // https://github.com/proptest-rs/proptest/issues/447
 #![cfg_attr(test, allow(non_local_definitions))]
-
 pub mod builder;
 pub mod core;
+#[cfg(feature = "model")]
 pub mod export;
 pub mod extension;
 pub mod hugr;
+#[cfg(feature = "model")]
 pub mod import;
 pub mod macros;
 pub mod ops;
