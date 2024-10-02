@@ -2,7 +2,7 @@ WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
 COMMENT    = _{ ";" ~ (!("\n") ~ ANY)* ~ "\n" }
 identifier = @{ (ASCII_ALPHA | "_" | "-") ~ (ASCII_ALPHANUMERIC | "_" | "-")* }
 symbol     = @{ identifier ~ ("." ~ identifier)+ }
-tag        = @{ ASCII_NONZERO_DIGIT ~ ASCII_DIGIT* }
+tag        = @{ (ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*) | "0" }
 
 string    = @{ "\"" ~ (!("\"") ~ ANY)* ~ "\"" }
 list_tail =  { "." }

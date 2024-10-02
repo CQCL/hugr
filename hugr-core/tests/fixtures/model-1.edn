@@ -36,3 +36,21 @@
   (forall ?b type)
   [?a ?b] [?b ?a] (ext)
   (dfg [(%a ?a) (%b ?b)] [(%b ?b) (%a ?a)]))
+
+(define-func example.loop
+  (forall ?a type)
+  [?a] [?a] (ext)
+  (dfg [(%5 ?a)] [(%6 ?a)]
+    (tail-loop [(%5 ?a)] [(%6 ?a)]
+      (dfg [(%7 ?a)] [(%8 (adt [[?a] [?a]]))]
+        (tag 0 [(%7 ?a)] [(%8 (adt [[?a] [?a]]))])))))
+
+(define-func example.cfg
+  (forall ?a type)
+  [?a] [?a] (ext)
+  (dfg [(%9 ?a)] [(%10 ?a)]
+    (cfg [(%9 ?a)] [(%10 ?a)]
+      (cfg [(%13 (ctrl [?a]))] [(%14 (ctrl [?a]))]
+        (block [(%13 (ctrl [?a]))] [(%14 (ctrl [?a]))]
+          (dfg [(%11 ?a)] [(%12 (adt [[?a]]))]
+            (tag 0 [(%11 ?a)] [(%12 (adt [[?a]]))])))))))

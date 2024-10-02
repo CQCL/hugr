@@ -409,9 +409,9 @@ impl<'a> Context<'a> {
     /// Creates a control flow region from the given node's children.
     pub fn export_cfg(&mut self, node: Node) -> model::RegionId {
         let mut children = self.hugr.children(node);
+        let mut region_children = BumpVec::with_capacity_in(children.len() + 1, self.bump);
 
         // The first child is the entry block.
-        // The entry block does have a dataflow subgraph, so we must still export it later.
         // We create a source port on the control flow region and connect it to the
         // first input port of the exported entry block.
         let entry_block = children.next().unwrap();
@@ -422,8 +422,14 @@ impl<'a> Context<'a> {
         ));
 
         let source = self.make_port(entry_block, IncomingPort::from(0)).unwrap();
+        region_children.push(self.export_node(entry_block));
 
-        // The second child is the exit block.
+        // Export the remaining children of the node, except for the last one.
+        for _ in 0..children.len() - 1 {
+            region_children.push(self.export_node(children.next().unwrap()));
+        }
+
+        // The last child is the exit block.
         // Contrary to the entry block, the exit block does not have a dataflow subgraph.
         // We therefore do not export the block itself, but simply use its output ports
         // as the target ports of the control flow region.
@@ -436,19 +442,11 @@ impl<'a> Context<'a> {
 
         let targets = self.make_ports(exit_block, Direction::Incoming);
 
-        // Now we export the child nodes, including the entry block.
-        let mut region_children = BumpVec::with_capacity_in(children.len() + 1, self.bump);
-
-        region_children.push(self.export_node(entry_block));
-        for child in children {
-            region_children.push(self.export_node(child));
-        }
-
         // TODO: We can determine the type of the region
         let r#type = self.module.insert_term(model::Term::Wildcard);
 
         self.module.insert_region(model::Region {
-            kind: model::RegionKind::DataFlow,
+            kind: model::RegionKind::ControlFlow,
             sources: self.bump.alloc_slice_copy(&[source]),
             targets,
             children: region_children.into_bump_slice(),

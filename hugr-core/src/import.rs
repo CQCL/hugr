@@ -711,9 +711,24 @@ impl<'a> Context<'a> {
     fn make_entry_node(
         &mut self,
         parent: Node,
+        parent_id: model::NodeId,
         ports: &'a [model::Port<'a>],
     ) -> Result<Node, ImportError> {
-        let types = self.get_port_types(ports)?;
+        let types = {
+            let [port] = ports else {
+                return Err(model::ModelError::InvalidRegions(parent_id).into());
+            };
+
+            let Some(port_type) = port.r#type else {
+                return Err(error_uninferred!("port type"));
+            };
+
+            let model::Term::Control { values: types } = self.get_term(port_type)? else {
+                return Err(model::ModelError::TypeError(port_type).into());
+            };
+
+            self.import_type_row(*types)?
+        };
 
         let node = self.hugr.add_node_with_parent(
             parent,
@@ -724,6 +739,8 @@ impl<'a> Context<'a> {
                 extension_delta: ExtensionSet::default(),
             }),
         );
+
+        self.record_links(node, Direction::Outgoing, ports);
 
         let node_input = self.hugr.add_node_with_parent(
             node,
@@ -769,13 +786,29 @@ impl<'a> Context<'a> {
     fn make_exit_node(
         &mut self,
         parent: Node,
+        parent_id: model::NodeId,
         ports: &'a [model::Port<'a>],
     ) -> Result<Node, ImportError> {
-        let cfg_outputs = self.get_port_types(ports)?;
+        let cfg_outputs = {
+            let [port] = ports else {
+                return Err(model::ModelError::InvalidRegions(parent_id).into());
+            };
+
+            let Some(port_type) = port.r#type else {
+                return Err(error_uninferred!("port type"));
+            };
+
+            let model::Term::Control { values: types } = self.get_term(port_type)? else {
+                return Err(model::ModelError::TypeError(port_type).into());
+            };
+
+            self.import_type_row(*types)?
+        };
+
         let node = self
             .hugr
             .add_node_with_parent(parent, OpType::ExitBlock(ExitBlock { cfg_outputs }));
-        self.record_links(node, Direction::Outgoing, ports);
+        self.record_links(node, Direction::Incoming, ports);
         Ok(node)
     }
 
@@ -787,25 +820,17 @@ impl<'a> Context<'a> {
     ) -> Result<(), ImportError> {
         let region_data = self.get_region(region)?;
 
-        if !matches!(region_data.kind, model::RegionKind::DataFlow) {
+        if !matches!(region_data.kind, model::RegionKind::ControlFlow) {
             return Err(model::ModelError::InvalidRegions(node_id).into());
         }
 
-        let node_entry = self.make_entry_node(node, region_data.sources)?;
+        self.make_entry_node(node, node_id, region_data.sources)?;
 
         for child in region_data.children {
             self.import_node(*child, node)?;
         }
 
-        let node_exit = self.make_exit_node(node, region_data.targets)?;
-
-        let entry_outputs = self.hugr.node_outputs(node_entry);
-        let first_block = self.hugr.children(node).nth(1).unwrap();
-        let first_block_inputs = self.hugr.node_inputs(first_block);
-
-        for (a, b) in entry_outputs.zip(first_block_inputs) {
-            self.hugr.connect(node_entry, a, node_exit, b);
-        }
+        self.make_exit_node(node, node_id, region_data.targets)?;
 
         Ok(())
     }
@@ -1105,7 +1130,9 @@ impl<'a> Context<'a> {
                         None => break,
                     }
                 }
-                _ => return Err(model::ModelError::TypeError(term_id).into()),
+                _ => {
+                    return Err(model::ModelError::TypeError(term_id).into());
+                }
             }
         }
 
