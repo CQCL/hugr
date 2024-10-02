@@ -9,9 +9,6 @@ use crate::v0::{
 type PrintError = ModelError;
 type PrintResult<T> = Result<T, PrintError>;
 
-// TODO: Print tail-loop nodes
-// TODO: Print conditional and case nodes
-
 /// Pretty-print a module to a string.
 pub fn print_to_string(module: &Module, width: usize) -> PrintResult<String> {
     let arena = Arena::new();
@@ -149,29 +146,29 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
             Operation::Dfg => {
                 this.print_group(|this| {
                     this.print_text("dfg");
-                    this.print_port_list(&node_data.inputs)?;
-                    this.print_port_list(&node_data.outputs)
+                    this.print_port_list(node_data.inputs)?;
+                    this.print_port_list(node_data.outputs)
                 })?;
                 this.print_meta(node_data.meta)?;
-                this.print_regions(&node_data.regions)
+                this.print_regions(node_data.regions)
             }
             Operation::Cfg => {
                 this.print_group(|this| {
                     this.print_text("cfg");
-                    this.print_port_list(&node_data.inputs)?;
-                    this.print_port_list(&node_data.outputs)
+                    this.print_port_list(node_data.inputs)?;
+                    this.print_port_list(node_data.outputs)
                 })?;
                 this.print_meta(node_data.meta)?;
-                this.print_regions(&node_data.regions)
+                this.print_regions(node_data.regions)
             }
             Operation::Block => {
                 this.print_group(|this| {
                     this.print_text("block");
-                    this.print_port_list(&node_data.inputs)?;
-                    this.print_port_list(&node_data.outputs)
+                    this.print_port_list(node_data.inputs)?;
+                    this.print_port_list(node_data.outputs)
                 })?;
                 this.print_meta(node_data.meta)?;
-                this.print_regions(&node_data.regions)
+                this.print_regions(node_data.regions)
             }
 
             Operation::DefineFunc { decl } => this.with_local_scope(decl.params, |this| {
@@ -201,7 +198,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 }
 
                 this.print_meta(node_data.meta)?;
-                this.print_regions(&node_data.regions)
+                this.print_regions(node_data.regions)
             }),
 
             Operation::DeclareFunc { decl } => this.with_local_scope(decl.params, |this| {
@@ -238,8 +235,8 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_group(|this| {
                     this.print_text("call");
                     this.print_term(*func)?;
-                    this.print_port_list(&node_data.inputs)?;
-                    this.print_port_list(&node_data.outputs)
+                    this.print_port_list(node_data.inputs)?;
+                    this.print_port_list(node_data.outputs)
                 })?;
                 this.print_meta(node_data.meta)?;
                 Ok(())
@@ -249,8 +246,8 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_group(|this| {
                     this.print_text("load-func");
                     this.print_term(*func)?;
-                    this.print_port_list(&node_data.inputs)?;
-                    this.print_port_list(&node_data.outputs)
+                    this.print_port_list(node_data.inputs)?;
+                    this.print_port_list(node_data.outputs)
                 })?;
                 this.print_meta(node_data.meta)?;
                 Ok(())
@@ -272,11 +269,11 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                         })?;
                     }
 
-                    this.print_port_list(&node_data.inputs)?;
-                    this.print_port_list(&node_data.outputs)
+                    this.print_port_list(node_data.inputs)?;
+                    this.print_port_list(node_data.outputs)
                 })?;
                 this.print_meta(node_data.meta)?;
-                this.print_regions(&node_data.regions)
+                this.print_regions(node_data.regions)
             }
 
             Operation::CustomFull { name } => {
@@ -292,11 +289,11 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                         Ok(())
                     })?;
 
-                    this.print_port_list(&node_data.inputs)?;
-                    this.print_port_list(&node_data.outputs)
+                    this.print_port_list(node_data.inputs)?;
+                    this.print_port_list(node_data.outputs)
                 })?;
                 this.print_meta(node_data.meta)?;
-                this.print_regions(&node_data.regions)
+                this.print_regions(node_data.regions)
             }
 
             Operation::DefineAlias { decl, value } => this.with_local_scope(decl.params, |this| {
@@ -344,6 +341,14 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_meta(node_data.meta)?;
                 this.print_regions(node_data.regions)
             }
+
+            Operation::Tag { tag } => {
+                this.print_text("tag");
+                this.print_text(format!("{}", tag));
+                this.print_port_list(node_data.inputs)?;
+                this.print_port_list(node_data.outputs)?;
+                this.print_meta(node_data.meta)
+            }
         })
     }
 
@@ -371,8 +376,8 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
             };
 
             if !region_data.sources.is_empty() || !region_data.targets.is_empty() {
-                this.print_port_list(&region_data.sources)?;
-                this.print_port_list(&region_data.targets)?;
+                this.print_port_list(region_data.sources)?;
+                this.print_port_list(region_data.targets)?;
             }
 
             this.print_meta(region_data.meta)?;

@@ -1,10 +1,8 @@
 use bumpalo::Bump;
-use indexmap::IndexSet;
 use pest::{
     iterators::{Pair, Pairs},
     Parser, RuleType,
 };
-use smol_str::{SmolStr, ToSmolStr};
 use thiserror::Error;
 
 use crate::v0::{
@@ -39,7 +37,8 @@ pub struct ParsedModule<'a> {
 /// Parses a HUGR module from its text representation.
 pub fn parse<'a>(input: &'a str, bump: &'a Bump) -> Result<ParsedModule<'a>, ParseError> {
     let mut context = ParseContext::new(bump);
-    let mut pairs = HugrParser::parse(Rule::module, input).map_err(ParseError)?;
+    let mut pairs =
+        HugrParser::parse(Rule::module, input).map_err(|err| ParseError(Box::new(err)))?;
     context.parse_module(pairs.next().unwrap())?;
 
     Ok(ParsedModule {
@@ -71,16 +70,11 @@ impl<'a> ParseContext<'a> {
             kind: RegionKind::DataFlow,
             sources: &[],
             targets: &[],
-            children: self.bump.alloc_slice_copy(&children),
+            children,
             meta,
         });
 
         self.module.root = root_region;
-
-        // TODO: Root region metadata
-        // self.module
-        //     .node_meta
-        //     .extend(meta.into_iter().map(|meta| (root, meta)));
 
         Ok(())
     }
@@ -409,6 +403,22 @@ impl<'a> ParseContext<'a> {
                     meta,
                 }
             }
+
+            Rule::node_tag => {
+                let tag = inner.next().unwrap().as_str().parse::<u16>().unwrap();
+                let inputs = self.parse_port_list(&mut inner)?;
+                let outputs = self.parse_port_list(&mut inner)?;
+                let meta = self.parse_meta(&mut inner)?;
+                Node {
+                    operation: Operation::Tag { tag },
+                    inputs,
+                    outputs,
+                    params: &[],
+                    regions: &[],
+                    meta,
+                }
+            }
+
             _ => unreachable!(),
         };
 
@@ -546,10 +556,10 @@ impl<'a> ParseContext<'a> {
         };
 
         let pair = pairs.next().unwrap();
-        let mut inner = pair.into_inner();
+        let inner = pair.into_inner();
         let mut ports = Vec::new();
 
-        while let Some(token) = inner.next() {
+        for token in inner {
             let port = self.parse_port(token)?;
             ports.push(port);
         }
@@ -620,7 +630,7 @@ fn filter_rule<'a, 'i, R: RuleType>(
 /// An error that occurred during parsing.
 #[derive(Debug, Clone, Error)]
 #[error("{0}")]
-pub struct ParseError(pest::error::Error<Rule>);
+pub struct ParseError(Box<pest::error::Error<Rule>>);
 
 impl ParseError {
     /// Line of the error in the input string.

@@ -120,7 +120,7 @@ impl<'a> Context<'a> {
             .iter()
             .map(|port| match port.r#type {
                 Some(r#type) => self.import_type(r#type),
-                None => return Err(error_uninferred!("port type")),
+                None => Err(error_uninferred!("port type")),
             })
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -203,7 +203,7 @@ impl<'a> Context<'a> {
 
         for (model_port, port) in ports.iter().zip(self.hugr.node_ports(node, direction)) {
             self.link_ports
-                .entry(model_port.link.clone())
+                .entry(model_port.link)
                 .or_default()
                 .push((node, port));
         }
@@ -449,7 +449,7 @@ impl<'a> Context<'a> {
                     .collect::<Result<Vec<TypeArg>, _>>()?;
 
                 self.static_edges.push((func_node, node_id));
-                let optype = OpType::Call(Call::try_new(func_sig, type_args, &self.extensions)?);
+                let optype = OpType::Call(Call::try_new(func_sig, type_args, self.extensions)?);
 
                 self.make_node(node_id, optype, parent)
             }
@@ -472,7 +472,7 @@ impl<'a> Context<'a> {
                 let optype = OpType::LoadFunction(LoadFunction::try_new(
                     func_sig,
                     type_args,
-                    &self.extensions,
+                    self.extensions,
                 )?);
 
                 self.make_node(node_id, optype, parent)
@@ -560,6 +560,18 @@ impl<'a> Context<'a> {
 
                 ctx.make_node(node_id, optype, parent)
             }),
+
+            model::Operation::Tag { tag } => {
+                let (variants, _) = self.import_adt_and_rest(node_id, node_data.outputs)?;
+                self.make_node(
+                    node_id,
+                    OpType::Tag(Tag {
+                        variants,
+                        tag: tag as _,
+                    }),
+                    parent,
+                )
+            }
         }
     }
 
@@ -927,7 +939,7 @@ impl<'a> Context<'a> {
             }
 
             model::Term::Str(value) => Ok(TypeArg::String {
-                arg: value.clone().into(),
+                arg: value.to_string(),
             }),
 
             model::Term::Quote { .. } => Ok(TypeArg::Type {
@@ -1004,7 +1016,7 @@ impl<'a> Context<'a> {
                     .collect::<Result<Vec<_>, _>>()?;
 
                 let name = self.get_global_name(*name)?;
-                let (extension, id) = self.import_custom_name(&name)?;
+                let (extension, id) = self.import_custom_name(name)?;
 
                 Ok(TypeBase::new_extension(CustomType::new(
                     id,
@@ -1133,7 +1145,7 @@ impl<'a> Context<'a> {
             .split_last()
             .ok_or_else(|| model::ModelError::MalformedName(symbol.to_smolstr()))?;
 
-        Ok((extension, id.into()))
+        Ok((extension, id))
     }
 }
 

@@ -254,6 +254,12 @@ pub enum Operation<'a> {
     /// - **Inputs**: `[(adt inputs)]` + `context`
     /// - **Outputs**: `outputs`
     Conditional,
+
+    /// Create an ADT value from a sequence of inputs.
+    Tag {
+        /// The tag of the ADT value.
+        tag: u16,
+    },
 }
 
 /// A region in the hugr.

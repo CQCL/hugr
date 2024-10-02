@@ -50,7 +50,6 @@ hugr-model = { path = "../hugr-model" }
 indexmap.workspace = true
 tinyvec.workspace = true
 fxhash.workspace = true
-ascent = "0.6.0"
 bumpalo = { workspace = true }
 
 [dev-dependencies]

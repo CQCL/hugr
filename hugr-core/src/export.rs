@@ -15,10 +15,8 @@ use hugr_model::v0::{self as model};
 use indexmap::IndexSet;
 use smol_str::ToSmolStr;
 
-pub(crate) const OP_FUNC_CALL_INDIRECT: &'static str = "func.call-indirect";
-pub(crate) const OP_ADT_TAG: &'static str = "adt.make-tag";
-
-const TERM_PARAM_TUPLE: &'static str = "param.tuple";
+pub(crate) const OP_FUNC_CALL_INDIRECT: &str = "func.call-indirect";
+const TERM_PARAM_TUPLE: &str = "param.tuple";
 
 /// Export a [`Hugr`] graph to its representation in the model.
 pub fn export_hugr<'a>(hugr: &'a Hugr, bump: &'a Bump) -> model::Module<'a> {
@@ -114,7 +112,7 @@ impl<'a> Context<'a> {
                     (OpType::DataflowBlock(block), Direction::Outgoing) => {
                         let mut types = Vec::new();
                         types.extend(
-                            (&block.sum_rows[port.index()])
+                            block.sum_rows[port.index()]
                                 .iter()
                                 .map(|t| self.export_type(t)),
                         );
@@ -293,21 +291,14 @@ impl<'a> Context<'a> {
 
             OpType::CallIndirect(_) => make_custom(OP_FUNC_CALL_INDIRECT),
 
-            OpType::Tag(_) => make_custom(OP_ADT_TAG),
+            OpType::Tag(tag) => model::Operation::Tag { tag: tag.tag as _ },
 
-            OpType::TailLoop(op) => {
+            OpType::TailLoop(_) => {
                 regions = self.bump.alloc_slice_copy(&[self.export_dfg(node)]);
                 model::Operation::TailLoop
             }
 
-            OpType::Conditional(op) => {
-                let mut types = BumpVec::new_in(self.bump);
-                types.extend(op.sum_rows.iter().map(|l| self.export_type_row(l)));
-                let types = types.into_bump_slice();
-                let sum_rows = model::Term::List {
-                    items: &types,
-                    tail: None,
-                };
+            OpType::Conditional(_) => {
                 regions = self.export_conditional_regions(node);
                 model::Operation::Conditional
             }

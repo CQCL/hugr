@@ -2,6 +2,7 @@ WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
 COMMENT    = _{ ";" ~ (!("\n") ~ ANY)* ~ "\n" }
 identifier = @{ (ASCII_ALPHA | "_" | "-") ~ (ASCII_ALPHANUMERIC | "_" | "-")* }
 symbol     = @{ identifier ~ ("." ~ identifier)+ }
+tag        = @{ ASCII_NONZERO_DIGIT ~ ASCII_DIGIT* }
 
 string    = @{ "\"" ~ (!("\"") ~ ANY)* ~ "\"" }
 list_tail =  { "." }
@@ -26,6 +27,7 @@ node = {
   | node_declare_alias
   | node_tail_loop
   | node_cond
+  | node_tag
   | node_custom
 }
 
@@ -39,6 +41,7 @@ node_define_alias  = { "(" ~ "define-alias" ~ alias_header ~ term ~ meta* ~ ")" 
 node_declare_alias = { "(" ~ "declare-alias" ~ alias_header ~ meta* ~ ")" }
 node_tail_loop     = { "(" ~ "tail-loop" ~ port_lists? ~ meta* ~ region* ~ ")" }
 node_cond          = { "(" ~ "cond" ~ port_lists? ~ meta* ~ region* ~ ")" }
+node_tag           = { "(" ~ "tag" ~ tag ~ port_lists? ~ meta* ~ region* ~ ")" }
 node_custom        = { "(" ~ (term_apply | term_apply_full) ~ port_lists? ~ meta* ~ region* ~ ")" }
 
 func_header  = { symbol ~ param* ~ term ~ term ~ term }
