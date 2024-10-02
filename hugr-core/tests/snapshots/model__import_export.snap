@@ -70,3 +70,23 @@ expression: roundtrip_str
             [(%18 ?0)]
             [(%19 (adt [[?0]]))]
             (tag 0 [(%18 ?0)] [(%19 (adt [[?0]]))])))))))
+
+(define-func example.cond
+  [(adt [[] []]) (@ arithmetic.int.types.int)]
+  [(@ arithmetic.int.types.int)]
+  (ext)
+  (dfg
+    [(%20 (adt [[] []])) (%21 (@ arithmetic.int.types.int))]
+    [(%22 (@ arithmetic.int.types.int))]
+    (cond
+      [(%20 (adt [[] []])) (%21 (@ arithmetic.int.types.int))]
+      [(%22 (@ arithmetic.int.types.int))]
+      (dfg
+        [(%23 (@ arithmetic.int.types.int))]
+        [(%23 (@ arithmetic.int.types.int))])
+      (dfg
+        [(%24 (@ arithmetic.int.types.int))]
+        [(%25 (@ arithmetic.int.types.int))]
+        (arithmetic.int.ineg
+          [(%24 (@ arithmetic.int.types.int))]
+          [(%25 (@ arithmetic.int.types.int))])))))

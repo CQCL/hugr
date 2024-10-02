@@ -54,3 +54,23 @@
         (block [(%13 (ctrl [?a]))] [(%14 (ctrl [?a]))]
           (dfg [(%11 ?a)] [(%12 (adt [[?a]]))]
             (tag 0 [(%11 ?a)] [(%12 (adt [[?a]]))])))))))
+
+(define-func example.cond
+  [(adt [[] []]) (@ arithmetic.int.types.int)]
+  [(@ arithmetic.int.types.int)]
+  (ext)
+  (dfg
+    [(%20 (adt [[] []])) (%21 (@ arithmetic.int.types.int))]
+    [(%22 (@ arithmetic.int.types.int))]
+    (cond
+      [(%20 (adt [[] []])) (%21 (@ arithmetic.int.types.int))]
+      [(%22 (@ arithmetic.int.types.int))]
+      (dfg
+        [(%23 (@ arithmetic.int.types.int))]
+        [(%23 (@ arithmetic.int.types.int))])
+      (dfg
+        [(%24 (@ arithmetic.int.types.int))]
+        [(%25 (@ arithmetic.int.types.int))]
+        ((@ arithmetic.int.ineg)
+          [(%24 (@ arithmetic.int.types.int))]
+          [(%25 (@ arithmetic.int.types.int))])))))
