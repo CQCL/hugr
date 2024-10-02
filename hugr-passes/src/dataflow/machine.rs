@@ -51,27 +51,33 @@ impl<V: AbstractValue, C: DFContext<V>> Machine<V, C> {
         self.1.as_ref().unwrap().get(&w).cloned()
     }
 
-    pub fn tail_loop_terminates(&self, hugr: impl HugrView, node: Node) -> TailLoopTermination {
-        assert!(hugr.get_optype(node).is_tail_loop());
+    pub fn tail_loop_terminates(
+        &self,
+        hugr: impl HugrView,
+        node: Node,
+    ) -> Option<TailLoopTermination> {
+        hugr.get_optype(node).as_tail_loop()?;
         let [_, out] = hugr.get_io(node).unwrap();
-        TailLoopTermination::from_control_value(
+        Some(TailLoopTermination::from_control_value(
             self.0
                 .in_wire_value
                 .iter()
                 .find_map(|(_, n, p, v)| (*n == out && p.index() == 0).then_some(v))
                 .unwrap(),
-        )
+        ))
     }
 
-    pub fn case_reachable(&self, hugr: impl HugrView, case: Node) -> bool {
-        assert!(hugr.get_optype(case).is_case());
-        let cond = hugr.get_parent(case).unwrap();
-        assert!(hugr.get_optype(cond).is_conditional());
-        self.0
-            .case_reachable
-            .iter()
-            .find_map(|(_, cond2, case2, i)| (&cond == cond2 && &case == case2).then_some(*i))
-            .unwrap()
+    pub fn case_reachable(&self, hugr: impl HugrView, case: Node) -> Option<bool> {
+        hugr.get_optype(case).as_case()?;
+        let cond = hugr.get_parent(case)?;
+        hugr.get_optype(cond).as_conditional()?;
+        Some(
+            self.0
+                .case_reachable
+                .iter()
+                .find_map(|(_, cond2, case2, i)| (&cond == cond2 && &case == case2).then_some(*i))
+                .unwrap(),
+        )
     }
 }
 

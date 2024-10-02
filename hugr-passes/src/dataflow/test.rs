@@ -6,11 +6,14 @@ use crate::{
 use ascent::lattice::BoundedLattice;
 use hugr_core::{
     builder::{endo_sig, DFGBuilder, Dataflow, DataflowSubContainer, HugrBuilder, SubContainer},
-    extension::prelude::{UnpackTuple, BOOL_T},
-    extension::{ExtensionSet, EMPTY_REG},
+    extension::{
+        prelude::{UnpackTuple, BOOL_T},
+        ExtensionSet, EMPTY_REG,
+    },
     ops::{handle::NodeHandle, OpTrait, Value},
     type_row,
     types::{Signature, SumType, Type, TypeRow},
+    HugrView,
 };
 
 use super::partial_value::PartialValue;
@@ -93,7 +96,7 @@ fn test_tail_loop_never_iterates() {
     let o_r = machine.read_out_wire_value(&hugr, tl_o).unwrap();
     assert_eq!(o_r, r_v);
     assert_eq!(
-        TailLoopTermination::ExactlyZeroContinues,
+        Some(TailLoopTermination::ExactlyZeroContinues),
         machine.tail_loop_terminates(&hugr, tail_loop.node())
     )
 }
@@ -125,9 +128,10 @@ fn test_tail_loop_always_iterates() {
     let o_r2 = machine.read_out_wire_partial_value(tl_o2).unwrap();
     assert_eq!(o_r2, PartialValue::bottom());
     assert_eq!(
-        TailLoopTermination::Bottom,
+        Some(TailLoopTermination::Bottom),
         machine.tail_loop_terminates(&hugr, tail_loop.node())
-    )
+    );
+    assert_eq!(machine.tail_loop_terminates(&hugr, hugr.root()), None);
 }
 
 #[test]
@@ -178,9 +182,10 @@ fn test_tail_loop_iterates_twice() {
     let _ = machine.read_out_wire_partial_value(o_w2).unwrap();
     // assert_eq!(o_r2, Value::true_val());
     assert_eq!(
-        TailLoopTermination::Top,
+        Some(TailLoopTermination::Top),
         machine.tail_loop_terminates(&hugr, tail_loop.node())
-    )
+    );
+    assert_eq!(machine.tail_loop_terminates(&hugr, hugr.root()), None);
 }
 
 #[test]
@@ -232,7 +237,8 @@ fn conditional() {
     assert_eq!(cond_r1, Value::false_val());
     assert!(machine.read_out_wire_value(&hugr, cond_o2).is_none());
 
-    assert!(!machine.case_reachable(&hugr, case1.node())); // arg_pv is variant 1 or 2 only
-    assert!(machine.case_reachable(&hugr, case2.node()));
-    assert!(machine.case_reachable(&hugr, case3.node()));
+    assert_eq!(machine.case_reachable(&hugr, case1.node()), Some(false)); // arg_pv is variant 1 or 2 only
+    assert_eq!(machine.case_reachable(&hugr, case2.node()), Some(true));
+    assert_eq!(machine.case_reachable(&hugr, case3.node()), Some(true));
+    assert_eq!(machine.case_reachable(&hugr, cond.node()), None);
 }
