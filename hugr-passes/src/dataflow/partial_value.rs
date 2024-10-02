@@ -29,9 +29,6 @@ pub enum ValueOrSum<V> {
 pub struct PartialSum<V>(pub HashMap<usize, Vec<PartialValue<V>>>);
 
 impl<V> PartialSum<V> {
-    pub fn unit() -> Self {
-        Self::variant(0, [])
-    }
     pub fn variant(tag: usize, values: impl IntoIterator<Item = PartialValue<V>>) -> Self {
         Self(HashMap::from([(tag, Vec::from_iter(values))]))
     }
@@ -481,7 +478,7 @@ mod test {
                         })
                         .boxed()
                 }
-                Self::Unit => Just(PartialSum::unit().into()).boxed(),
+                Self::Unit => Just(PartialValue::unit()).boxed(),
             }
         }
     }
