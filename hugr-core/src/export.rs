@@ -179,7 +179,7 @@ impl<'a> Context<'a> {
 
         fn make_custom(name: &'static str) -> model::Operation {
             model::Operation::Custom {
-                name: model::GlobalRef::Named(name),
+                operation: model::GlobalRef::Named(name),
             }
         }
 
@@ -317,7 +317,7 @@ impl<'a> Context<'a> {
                 let name =
                     self.bump
                         .alloc_str(&format!("{}.{}", op.def().extension(), op.def().name()));
-                let name = model::GlobalRef::Named(name);
+                let operation = model::GlobalRef::Named(name);
 
                 params = self
                     .bump
@@ -327,14 +327,14 @@ impl<'a> Context<'a> {
                     regions = self.bump.alloc_slice_copy(&[region]);
                 }
 
-                model::Operation::Custom { name }
+                model::Operation::Custom { operation }
             }
 
             OpType::OpaqueOp(op) => {
                 let name = self
                     .bump
                     .alloc_str(&format!("{}.{}", op.extension(), op.op_name()));
-                let name = model::GlobalRef::Named(name);
+                let operation = model::GlobalRef::Named(name);
 
                 params = self
                     .bump
@@ -344,7 +344,7 @@ impl<'a> Context<'a> {
                     regions = self.bump.alloc_slice_copy(&[region]);
                 }
 
-                model::Operation::Custom { name }
+                model::Operation::Custom { operation }
             }
         };
 

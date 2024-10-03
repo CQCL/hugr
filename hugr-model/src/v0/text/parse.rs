@@ -390,8 +390,8 @@ impl<'a> ParseContext<'a> {
                 }
 
                 let operation = match op_rule {
-                    Rule::term_apply_full => Operation::CustomFull { name },
-                    Rule::term_apply => Operation::Custom { name },
+                    Rule::term_apply_full => Operation::CustomFull { operation: name },
+                    Rule::term_apply => Operation::Custom { operation: name },
                     _ => unreachable!(),
                 };
 

@@ -9,11 +9,11 @@
 #![cfg_attr(test, allow(non_local_definitions))]
 pub mod builder;
 pub mod core;
-#[cfg(feature = "model")]
+#[cfg(feature = "model_unstable")]
 pub mod export;
 pub mod extension;
 pub mod hugr;
-#[cfg(feature = "model")]
+#[cfg(feature = "model_unstable")]
 pub mod import;
 pub mod macros;
 pub mod ops;

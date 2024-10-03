@@ -21,9 +21,9 @@ Please read the [API documentation here][].
   Not enabled by default.
 - `declarative`:
   Experimental support for declaring extensions in YAML files, support is limited.
-- `model`
+- `model_unstable`
   Import and export from the representation defined in the `hugr-model` crate.
-  Not enabled by default.
+  Unstable and subject to change. Not enabled by default.
 
 ## Recent Changes
 

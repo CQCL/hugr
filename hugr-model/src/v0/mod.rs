@@ -212,17 +212,22 @@ pub enum Operation<'a> {
     },
     /// Custom operation.
     ///
-    /// The implicit parameters of the operation are left out.
+    /// The node's parameters correspond to the explicit parameter of the custom operation,
+    /// leaving out the implicit parameters. Once the declaration of the custom operation
+    /// becomes known by resolving the reference, the node can be transformed into a [`Operation::CustomFull`]
+    /// by inferring terms for the implicit parameters or at least filling them in with a wildcard term.
     Custom {
         /// The name of the custom operation.
-        name: GlobalRef<'a>,
+        operation: GlobalRef<'a>,
     },
-    /// Custom operation.
+    /// Custom operation with full parameters.
     ///
-    /// The implicit parameters of the operation are included.
+    /// The node's parameters correspond to both the explicit and implicit parameters of the custom operation.
+    /// Since this can be tedious to write, the [`Operation::Custom`] variant can be used to indicate that
+    /// the implicit parameters should be inferred.
     CustomFull {
         /// The name of the custom operation.
-        name: GlobalRef<'a>,
+        operation: GlobalRef<'a>,
     },
     /// Alias definitions.
     DefineAlias {
@@ -416,6 +421,10 @@ pub enum Term<'a> {
 
     /// A symbolic function application.
     ///
+    /// The arguments of this application cover only the explicit parameters of the referenced declaration,
+    /// leaving out the implicit parameters. Once the type of the declaration is known, the implicit parameters
+    /// can be inferred and the term replaced with [`Term::ApplyFull`].
+    ///
     /// `(GLOBAL ARG-0 ... ARG-n)`
     Apply {
         /// Reference to the global declaration to apply.
@@ -425,6 +434,9 @@ pub enum Term<'a> {
     },
 
     /// A symbolic function application with all arguments applied.
+    ///
+    /// The arguments to this application cover both the implicit and explicit parameters of the referenced declaration.
+    /// Since this can be tedious to write out, only the explicit parameters can be provided via [`Term::Apply`].
     ///
     /// `(@GLOBAL ARG-0 ... ARG-n)`
     ApplyFull {
@@ -557,7 +569,8 @@ impl<'a> Default for Term<'a> {
 /// Implicit and explicit parameters share a namespace.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Param<'a> {
-    /// An implicit parameter that should be inferred.
+    /// An implicit parameter that should be inferred, unless a full application form is used
+    /// (see [`Term::ApplyFull`] and [`Operation::CustomFull`]).
     Implicit {
         /// The name of the parameter.
         name: &'a str,

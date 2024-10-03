@@ -258,13 +258,13 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 Ok(())
             }
 
-            Operation::Custom { name } => {
+            Operation::Custom { operation } => {
                 this.print_group(|this| {
                     if node_data.params.is_empty() {
-                        this.print_global_ref(*name)?;
+                        this.print_global_ref(*operation)?;
                     } else {
                         this.print_parens(|this| {
-                            this.print_global_ref(*name)?;
+                            this.print_global_ref(*operation)?;
 
                             for param in node_data.params {
                                 this.print_term(*param)?;
@@ -282,11 +282,11 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_regions(node_data.regions)
             }
 
-            Operation::CustomFull { name } => {
+            Operation::CustomFull { operation } => {
                 this.print_group(|this| {
                     this.print_parens(|this| {
                         this.print_text("@");
-                        this.print_global_ref(*name)?;
+                        this.print_global_ref(*operation)?;
 
                         for param in node_data.params {
                             this.print_term(*param)?;

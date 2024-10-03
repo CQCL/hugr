@@ -482,14 +482,14 @@ impl<'a> Context<'a> {
             model::Operation::Conditional => self.import_conditional(node_id, parent),
 
             model::Operation::CustomFull {
-                name: GlobalRef::Named(name),
+                operation: GlobalRef::Named(name),
             } if name == OP_FUNC_CALL_INDIRECT => {
                 let signature = self.get_node_signature(node_id)?;
                 let optype = OpType::CallIndirect(CallIndirect { signature });
                 self.make_node(node_id, optype, parent)
             }
 
-            model::Operation::CustomFull { name } => {
+            model::Operation::CustomFull { operation } => {
                 let signature = self.get_node_signature(node_id)?;
                 let args = node_data
                     .params
@@ -497,7 +497,7 @@ impl<'a> Context<'a> {
                     .map(|param| self.import_type_arg(*param))
                     .collect::<Result<Vec<_>, _>>()?;
 
-                let name = match name {
+                let name = match operation {
                     GlobalRef::Direct(_) => {
                         return Err(error_unsupported!(
                             "custom operation with direct reference to declaring node"

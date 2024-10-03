@@ -19,11 +19,11 @@ workspace = true
 [features]
 extension_inference = []
 declarative = ["serde_yaml"]
-model = ["hugr-model"]
+model_unstable = ["hugr-model"]
 
 [[test]]
 name = "model"
-required-features = ["model"]
+required-features = ["model_unstable"]
 
 [dependencies]
 portgraph = { workspace = true, features = ["serde", "petgraph"] }
