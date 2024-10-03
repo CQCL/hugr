@@ -21,6 +21,10 @@ extension_inference = []
 declarative = ["serde_yaml"]
 model = ["hugr-model"]
 
+[[test]]
+name = "model"
+required-features = ["model"]
+
 [dependencies]
 portgraph = { workspace = true, features = ["serde", "petgraph"] }
 thiserror = { workspace = true }

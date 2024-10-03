@@ -1,11 +1,7 @@
-#[cfg(feature = "model")]
 use hugr::std_extensions::std_reg;
-#[cfg(feature = "model")]
 use hugr_core::{export::export_hugr, import::import_hugr};
-#[cfg(feature = "model")]
 use hugr_model::v0 as model;
 
-#[cfg(feature = "model")]
 fn roundtrip(source: &str) -> String {
     let bump = bumpalo::Bump::new();
     let parsed_model = model::text::parse(source, &bump).unwrap();
@@ -14,43 +10,36 @@ fn roundtrip(source: &str) -> String {
     model::text::print_to_string(&exported_model, 80).unwrap()
 }
 
-#[cfg(feature = "model")]
 #[test]
 pub fn test_roundtrip_add() {
     insta::assert_snapshot!(roundtrip(include_str!("fixtures/model-add.edn")));
 }
 
-#[cfg(feature = "model")]
 #[test]
 pub fn test_roundtrip_call() {
     insta::assert_snapshot!(roundtrip(include_str!("fixtures/model-call.edn")));
 }
 
-#[cfg(feature = "model")]
 #[test]
 pub fn test_roundtrip_alias() {
     insta::assert_snapshot!(roundtrip(include_str!("fixtures/model-alias.edn")));
 }
 
-#[cfg(feature = "model")]
 #[test]
 pub fn test_roundtrip_cfg() {
     insta::assert_snapshot!(roundtrip(include_str!("fixtures/model-cfg.edn")));
 }
 
-#[cfg(feature = "model")]
 #[test]
 pub fn test_roundtrip_cond() {
     insta::assert_snapshot!(roundtrip(include_str!("fixtures/model-cond.edn")));
 }
 
-#[cfg(feature = "model")]
 #[test]
 pub fn test_roundtrip_loop() {
     insta::assert_snapshot!(roundtrip(include_str!("fixtures/model-loop.edn")));
 }
 
-#[cfg(feature = "model")]
 #[test]
 pub fn test_roundtrip_params() {
     insta::assert_snapshot!(roundtrip(include_str!("fixtures/model-params.edn")));
