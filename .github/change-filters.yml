@@ -6,6 +6,7 @@ rust: &rust
   - "hugr-cli/**"
   - "hugr-core/**"
   - "hugr-passes/**"
+  - "hugr-model/**"
   - "Cargo.toml"
   - "specification/schema/**"
   - ".github/workflows/ci-rs.yml"

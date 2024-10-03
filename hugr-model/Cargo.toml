@@ -13,7 +13,7 @@ repository.workspace = true
 license.workspace = true
 
 [dependencies]
-bumpalo = { workspace = true }
+bumpalo = { workspace = true, features = ["collections"] }
 fxhash.workspace = true
 indexmap.workspace = true
 pest = "2.7.12"
@@ -21,7 +21,6 @@ pest_derive = "2.7.12"
 pretty = "0.12.3"
 smol_str = { workspace = true, features = ["serde"] }
 thiserror.workspace = true
-tinyvec.workspace = true
 
 [lints]
 workspace = true
