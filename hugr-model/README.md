@@ -28,7 +28,7 @@ See [DEVELOPMENT.md](https://github.com/CQCL/hugr/blob/main/DEVELOPMENT.md) for 
 
 This project is licensed under Apache License, Version 2.0 ([LICENSE][] or http://www.apache.org/licenses/LICENSE-2.0).
 
-  [API documentation here]: https://docs.rs/hugr-core/
+  [API documentation here]: https://docs.rs/hugr-model/
   [build_status]: https://github.com/CQCL/hugr/actions/workflows/ci-rs.yml/badge.svg?branch=main
   [msrv]: https://img.shields.io/badge/rust-1.75.0%2B-blue.svg
   [crates]: https://img.shields.io/crates/v/hugr-core
