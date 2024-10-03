@@ -73,7 +73,7 @@ impl<'a> ParseContext<'a> {
             targets: &[],
             children,
             meta,
-            r#type,
+            signature: r#type,
         });
 
         self.module.root = root_region;
@@ -112,7 +112,7 @@ impl<'a> ParseContext<'a> {
                 }
 
                 Term::Apply {
-                    name,
+                    global: name,
                     args: self.bump.alloc_slice_copy(&args),
                 }
             }
@@ -126,7 +126,7 @@ impl<'a> ParseContext<'a> {
                 }
 
                 Term::ApplyFull {
-                    name,
+                    global: name,
                     args: self.bump.alloc_slice_copy(&args),
                 }
             }
@@ -238,7 +238,7 @@ impl<'a> ParseContext<'a> {
                     params: &[],
                     regions,
                     meta,
-                    r#type,
+                    signature: r#type,
                 }
             }
 
@@ -255,7 +255,7 @@ impl<'a> ParseContext<'a> {
                     params: &[],
                     regions,
                     meta,
-                    r#type,
+                    signature: r#type,
                 }
             }
 
@@ -272,7 +272,7 @@ impl<'a> ParseContext<'a> {
                     params: &[],
                     regions,
                     meta,
-                    r#type,
+                    signature: r#type,
                 }
             }
 
@@ -288,7 +288,7 @@ impl<'a> ParseContext<'a> {
                     params: &[],
                     regions,
                     meta,
-                    r#type,
+                    signature: r#type,
                 }
             }
 
@@ -303,7 +303,7 @@ impl<'a> ParseContext<'a> {
                     params: &[],
                     regions: &[],
                     meta,
-                    r#type,
+                    signature: r#type,
                 }
             }
 
@@ -320,7 +320,7 @@ impl<'a> ParseContext<'a> {
                     params: &[],
                     regions: &[],
                     meta,
-                    r#type,
+                    signature: r#type,
                 }
             }
 
@@ -337,7 +337,7 @@ impl<'a> ParseContext<'a> {
                     params: &[],
                     regions: &[],
                     meta,
-                    r#type,
+                    signature: r#type,
                 }
             }
 
@@ -353,7 +353,7 @@ impl<'a> ParseContext<'a> {
                     params: &[],
                     regions: &[],
                     meta,
-                    r#type,
+                    signature: r#type,
                 }
             }
 
@@ -368,7 +368,7 @@ impl<'a> ParseContext<'a> {
                     params: &[],
                     regions: &[],
                     meta,
-                    r#type,
+                    signature: r#type,
                 }
             }
 
@@ -407,7 +407,7 @@ impl<'a> ParseContext<'a> {
                     params: self.bump.alloc_slice_copy(&params),
                     regions,
                     meta,
-                    r#type,
+                    signature: r#type,
                 }
             }
 
@@ -424,7 +424,7 @@ impl<'a> ParseContext<'a> {
                     params: &[],
                     regions,
                     meta,
-                    r#type,
+                    signature: r#type,
                 }
             }
 
@@ -441,7 +441,7 @@ impl<'a> ParseContext<'a> {
                     params: &[],
                     regions,
                     meta,
-                    r#type,
+                    signature: r#type,
                 }
             }
 
@@ -458,7 +458,7 @@ impl<'a> ParseContext<'a> {
                     params: &[],
                     regions: &[],
                     meta,
-                    r#type,
+                    signature: r#type,
                 }
             }
 
@@ -502,7 +502,7 @@ impl<'a> ParseContext<'a> {
             targets,
             children,
             meta,
-            r#type,
+            signature: r#type,
         }))
     }
 
@@ -541,7 +541,11 @@ impl<'a> ParseContext<'a> {
             extensions,
         });
 
-        Ok(self.bump.alloc(FuncDecl { name, params, func }))
+        Ok(self.bump.alloc(FuncDecl {
+            name,
+            params,
+            signature: func,
+        }))
     }
 
     fn parse_alias_header(&mut self, pair: Pair<'a, Rule>) -> ParseResult<&'a AliasDecl<'a>> {

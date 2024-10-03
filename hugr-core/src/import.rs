@@ -436,7 +436,7 @@ impl<'a> Context<'a> {
             }
 
             model::Operation::CallFunc { func } => {
-                let model::Term::ApplyFull { name, args } = self.get_term(func)? else {
+                let model::Term::ApplyFull { global: name, args } = self.get_term(func)? else {
                     return Err(model::ModelError::TypeError(func).into());
                 };
 
@@ -455,7 +455,7 @@ impl<'a> Context<'a> {
             }
 
             model::Operation::LoadFunc { func } => {
-                let model::Term::ApplyFull { name, args } = self.get_term(func)? else {
+                let model::Term::ApplyFull { global: name, args } = self.get_term(func)? else {
                     return Err(model::ModelError::TypeError(func).into());
                 };
 
@@ -888,7 +888,7 @@ impl<'a> Context<'a> {
                 }
             }
 
-            let body = ctx.import_func_type::<RV>(decl.func)?;
+            let body = ctx.import_func_type::<RV>(decl.signature)?;
             in_scope(ctx, PolyFuncTypeBase::new(imported_params, body))
         })
     }
@@ -1034,7 +1034,7 @@ impl<'a> Context<'a> {
                 Err(error_uninferred!("application with implicit parameters"))
             }
 
-            model::Term::ApplyFull { name, args } => {
+            model::Term::ApplyFull { global: name, args } => {
                 let args = args
                     .iter()
                     .map(|arg| self.import_type_arg(*arg))

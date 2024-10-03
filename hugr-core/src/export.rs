@@ -66,7 +66,7 @@ impl<'a> Context<'a> {
             targets: &[],
             children: children.into_bump_slice(),
             meta: &[],
-            r#type,
+            signature: r#type,
         });
 
         self.module.root = root;
@@ -220,7 +220,11 @@ impl<'a> Context<'a> {
             OpType::FuncDefn(func) => {
                 let name = self.get_func_name(node).unwrap();
                 let (params, func) = self.export_poly_func_type(&func.signature);
-                let decl = self.bump.alloc(model::FuncDecl { name, params, func });
+                let decl = self.bump.alloc(model::FuncDecl {
+                    name,
+                    params,
+                    signature: func,
+                });
                 regions = self.bump.alloc_slice_copy(&[self.export_dfg(node)]);
                 model::Operation::DefineFunc { decl }
             }
@@ -228,7 +232,11 @@ impl<'a> Context<'a> {
             OpType::FuncDecl(func) => {
                 let name = self.get_func_name(node).unwrap();
                 let (params, func) = self.export_poly_func_type(&func.signature);
-                let decl = self.bump.alloc(model::FuncDecl { name, params, func });
+                let decl = self.bump.alloc(model::FuncDecl {
+                    name,
+                    params,
+                    signature: func,
+                });
                 model::Operation::DeclareFunc { decl }
             }
 
@@ -266,7 +274,7 @@ impl<'a> Context<'a> {
 
                 let func = self
                     .module
-                    .insert_term(model::Term::ApplyFull { name, args });
+                    .insert_term(model::Term::ApplyFull { global: name, args });
                 model::Operation::CallFunc { func }
             }
 
@@ -281,7 +289,7 @@ impl<'a> Context<'a> {
 
                 let func = self
                     .module
-                    .insert_term(model::Term::ApplyFull { name, args });
+                    .insert_term(model::Term::ApplyFull { global: name, args });
                 model::Operation::LoadFunc { func }
             }
 
@@ -349,7 +357,7 @@ impl<'a> Context<'a> {
             params,
             regions,
             meta: &[],
-            r#type,
+            signature: r#type,
         })
     }
 
@@ -399,7 +407,7 @@ impl<'a> Context<'a> {
             targets,
             children: region_children.into_bump_slice(),
             meta: &[],
-            r#type,
+            signature: r#type,
         })
     }
 
@@ -448,7 +456,7 @@ impl<'a> Context<'a> {
             targets,
             children: region_children.into_bump_slice(),
             meta: &[],
-            r#type,
+            signature: r#type,
         })
     }
 
@@ -494,7 +502,7 @@ impl<'a> Context<'a> {
                 let name = model::GlobalRef::Named(self.bump.alloc_str(alias.name()));
                 let args = &[];
                 self.module
-                    .insert_term(model::Term::ApplyFull { name, args })
+                    .insert_term(model::Term::ApplyFull { global: name, args })
             }
             TypeEnum::Function(func) => self.export_func_type(func),
             TypeEnum::Variable(index, _) => {
@@ -525,7 +533,7 @@ impl<'a> Context<'a> {
         let args = self
             .bump
             .alloc_slice_fill_iter(t.args().iter().map(|p| self.export_type_arg(p)));
-        let term = model::Term::ApplyFull { name, args };
+        let term = model::Term::ApplyFull { global: name, args };
         self.module.insert_term(term)
     }
 
@@ -610,7 +618,7 @@ impl<'a> Context<'a> {
                     .module
                     .insert_term(model::Term::List { items, tail: None });
                 self.module.insert_term(model::Term::ApplyFull {
-                    name: model::GlobalRef::Named(TERM_PARAM_TUPLE),
+                    global: model::GlobalRef::Named(TERM_PARAM_TUPLE),
                     args: self.bump.alloc_slice_copy(&[types]),
                 })
             }

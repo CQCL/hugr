@@ -149,7 +149,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                     this.print_port_list(node_data.inputs)?;
                     this.print_port_list(node_data.outputs)
                 })?;
-                this.print_type_hint(node_data.r#type)?;
+                this.print_type_hint(node_data.signature)?;
                 this.print_meta(node_data.meta)?;
                 this.print_regions(node_data.regions)
             }
@@ -159,7 +159,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                     this.print_port_list(node_data.inputs)?;
                     this.print_port_list(node_data.outputs)
                 })?;
-                this.print_type_hint(node_data.r#type)?;
+                this.print_type_hint(node_data.signature)?;
                 this.print_meta(node_data.meta)?;
                 this.print_regions(node_data.regions)
             }
@@ -169,7 +169,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                     this.print_port_list(node_data.inputs)?;
                     this.print_port_list(node_data.outputs)
                 })?;
-                this.print_type_hint(node_data.r#type)?;
+                this.print_type_hint(node_data.signature)?;
                 this.print_meta(node_data.meta)?;
                 this.print_regions(node_data.regions)
             }
@@ -184,7 +184,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                     this.print_param(*param)?;
                 }
 
-                match self.module.get_term(decl.func) {
+                match self.module.get_term(decl.signature) {
                     Some(Term::FuncType {
                         inputs,
                         outputs,
@@ -196,8 +196,8 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                             this.print_term(*extensions)
                         })?;
                     }
-                    Some(_) => return Err(PrintError::TypeError(decl.func)),
-                    None => return Err(PrintError::TermNotFound(decl.func)),
+                    Some(_) => return Err(PrintError::TypeError(decl.signature)),
+                    None => return Err(PrintError::TermNotFound(decl.signature)),
                 }
 
                 this.print_meta(node_data.meta)?;
@@ -214,7 +214,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                     this.print_param(*param)?;
                 }
 
-                match self.module.get_term(decl.func) {
+                match self.module.get_term(decl.signature) {
                     Some(Term::FuncType {
                         inputs,
                         outputs,
@@ -226,8 +226,8 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                             this.print_term(*extensions)
                         })?;
                     }
-                    Some(_) => return Err(PrintError::TypeError(decl.func)),
-                    None => return Err(PrintError::TermNotFound(decl.func)),
+                    Some(_) => return Err(PrintError::TypeError(decl.signature)),
+                    None => return Err(PrintError::TermNotFound(decl.signature)),
                 }
 
                 this.print_meta(node_data.meta)?;
@@ -241,7 +241,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                     this.print_port_list(node_data.inputs)?;
                     this.print_port_list(node_data.outputs)
                 })?;
-                this.print_type_hint(node_data.r#type)?;
+                this.print_type_hint(node_data.signature)?;
                 this.print_meta(node_data.meta)?;
                 Ok(())
             }
@@ -253,7 +253,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                     this.print_port_list(node_data.inputs)?;
                     this.print_port_list(node_data.outputs)
                 })?;
-                this.print_type_hint(node_data.r#type)?;
+                this.print_type_hint(node_data.signature)?;
                 this.print_meta(node_data.meta)?;
                 Ok(())
             }
@@ -277,7 +277,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                     this.print_port_list(node_data.inputs)?;
                     this.print_port_list(node_data.outputs)
                 })?;
-                this.print_type_hint(node_data.r#type)?;
+                this.print_type_hint(node_data.signature)?;
                 this.print_meta(node_data.meta)?;
                 this.print_regions(node_data.regions)
             }
@@ -298,7 +298,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                     this.print_port_list(node_data.inputs)?;
                     this.print_port_list(node_data.outputs)
                 })?;
-                this.print_type_hint(node_data.r#type)?;
+                this.print_type_hint(node_data.signature)?;
                 this.print_meta(node_data.meta)?;
                 this.print_regions(node_data.regions)
             }
@@ -337,7 +337,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_text("tail-loop");
                 this.print_port_list(node_data.inputs)?;
                 this.print_port_list(node_data.outputs)?;
-                this.print_type_hint(node_data.r#type)?;
+                this.print_type_hint(node_data.signature)?;
                 this.print_meta(node_data.meta)?;
                 this.print_regions(node_data.regions)
             }
@@ -346,7 +346,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_text("cond");
                 this.print_port_list(node_data.inputs)?;
                 this.print_port_list(node_data.outputs)?;
-                this.print_type_hint(node_data.r#type)?;
+                this.print_type_hint(node_data.signature)?;
                 this.print_meta(node_data.meta)?;
                 this.print_regions(node_data.regions)
             }
@@ -356,7 +356,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_text(format!("{}", tag));
                 this.print_port_list(node_data.inputs)?;
                 this.print_port_list(node_data.outputs)?;
-                this.print_type_hint(node_data.r#type)?;
+                this.print_type_hint(node_data.signature)?;
                 this.print_meta(node_data.meta)
             }
         })
@@ -390,7 +390,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_port_list(region_data.targets)?;
             }
 
-            this.print_type_hint(region_data.r#type)?;
+            this.print_type_hint(region_data.signature)?;
             this.print_meta(region_data.meta)?;
             this.print_nodes(region)
         })
@@ -482,7 +482,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 Ok(())
             }
             Term::Var(local_ref) => self.print_local_ref(*local_ref),
-            Term::Apply { name, args } => {
+            Term::Apply { global: name, args } => {
                 if args.is_empty() {
                     self.print_global_ref(*name)?;
                 } else {
@@ -497,7 +497,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
 
                 Ok(())
             }
-            Term::ApplyFull { name, args } => self.print_parens(|this| {
+            Term::ApplyFull { global: name, args } => self.print_parens(|this| {
                 this.print_text("@");
                 this.print_global_ref(*name)?;
                 for arg in args.iter() {

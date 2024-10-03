@@ -47,8 +47,7 @@ use thiserror::Error;
 pub mod text;
 
 macro_rules! define_index {
-    ($(#[$meta:meta])* $vis:vis struct $name:ident;) => {
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+    ($(#[$meta:meta])* $vis:vis struct $name:ident(pub u32);) => {
         #[repr(transparent)]
         $(#[$meta])*
         $vis struct $name(pub u32);
@@ -87,22 +86,26 @@ macro_rules! define_index {
 
 define_index! {
     /// Index of a node in a hugr graph.
-    pub struct NodeId;
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+    pub struct NodeId(pub u32);
 }
 
 define_index! {
     /// Index of a link in a hugr graph.
-    pub struct LinkId;
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+    pub struct LinkId(pub u32);
 }
 
 define_index! {
     /// Index of a region in a hugr graph.
-    pub struct RegionId;
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+    pub struct RegionId(pub u32);
 }
 
 define_index! {
     /// Index of a term in a hugr graph.
-    pub struct TermId;
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+    pub struct TermId(pub u32);
 }
 
 /// A module consisting of a hugr graph together with terms.
@@ -174,8 +177,8 @@ pub struct Node<'a> {
     pub regions: &'a [RegionId],
     /// The meta information attached to the node.
     pub meta: &'a [MetaItem<'a>],
-    /// The type of the node.
-    pub r#type: TermId,
+    /// The signature of the node.
+    pub signature: TermId,
 }
 
 /// Operations that nodes can perform.
@@ -276,8 +279,8 @@ pub struct Region<'a> {
     pub children: &'a [NodeId],
     /// The metadata attached to the region.
     pub meta: &'a [MetaItem<'a>],
-    /// The type of the region.
-    pub r#type: TermId,
+    /// The signature of the region.
+    pub signature: TermId,
 }
 
 /// The kind of a region.
@@ -305,8 +308,8 @@ pub struct FuncDecl<'a> {
     pub name: &'a str,
     /// The static parameters of the function.
     pub params: &'a [Param<'a>],
-    /// The type of the function.
-    pub func: TermId,
+    /// The signature of the function.
+    pub signature: TermId,
 }
 
 /// An alias declaration.
@@ -415,10 +418,8 @@ pub enum Term<'a> {
     ///
     /// `(GLOBAL ARG-0 ... ARG-n)`
     Apply {
-        // TODO: Should the name be replaced with the id of the node that defines
-        // the function to be applied? This could be a type, alias or function.
-        /// The name of the term.
-        name: GlobalRef<'a>,
+        /// Reference to the global declaration to apply.
+        global: GlobalRef<'a>,
         /// Arguments to the function, covering only the explicit parameters.
         args: &'a [TermId],
     },
@@ -427,8 +428,8 @@ pub enum Term<'a> {
     ///
     /// `(@GLOBAL ARG-0 ... ARG-n)`
     ApplyFull {
-        /// The name of the function to apply.
-        name: GlobalRef<'a>,
+        /// Reference to the global declaration to apply.
+        global: GlobalRef<'a>,
         /// Arguments to the function, covering both implicit and explicit parameters.
         args: &'a [TermId],
     },
