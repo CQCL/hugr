@@ -39,9 +39,6 @@ struct Context<'a> {
 
 impl<'a> Context<'a> {
     pub fn new(hugr: &'a Hugr, bump: &'a Bump) -> Self {
-        // let mut node_to_id = FxHashMap::default();
-        // node_to_id.reserve(hugr.node_count());
-
         let mut module = model::Module::default();
         module.nodes.reserve(hugr.node_count());
 
@@ -658,7 +655,6 @@ impl<'a> Context<'a> {
             [var] => Some(*var),
             _ => {
                 // TODO: We won't need this anymore once we have a core representation
-
                 // that ensures that extension sets have at most one variable.
                 panic!("Extension set with multiple variables")
             }
@@ -718,6 +714,5 @@ mod test {
         use bumpalo::Bump;
         let bump = Bump::new();
         let _model = super::export_hugr(&hugr, &bump);
-        // TODO check the model
     }
 }

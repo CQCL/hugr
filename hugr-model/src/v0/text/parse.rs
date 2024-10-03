@@ -504,8 +504,6 @@ impl<'a> ParseContext<'a> {
             meta,
             r#type,
         }))
-
-        // TODO: Attach region meta
     }
 
     fn parse_nodes(&mut self, pairs: &mut Pairs<'a, Rule>) -> ParseResult<&'a [NodeId]> {
@@ -528,7 +526,6 @@ impl<'a> ParseContext<'a> {
         let inputs = self.parse_term(inner.next().unwrap())?;
         let outputs = self.parse_term(inner.next().unwrap())?;
 
-        // TODO: This is subtly broken:
         let extensions = match inner.peek().map(|p| p.as_rule()) {
             Some(Rule::term_ext_set) => self.parse_term(inner.next().unwrap())?,
             _ => self.module.insert_term(Term::ExtSet {
