@@ -190,6 +190,22 @@
           ],
           "output": [
             {
+              "t": "Opaque",
+              "extension": "collections",
+              "id": "List",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
               "t": "I"
             }
           ],

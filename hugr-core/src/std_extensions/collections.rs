@@ -178,7 +178,7 @@ impl ListOp {
                     vec![l, either_type(e, Type::UNIT).into()],
                 )
                 .into(),
-            length => self.list_polytype(vec![l], vec![USIZE_T]).into(),
+            length => self.list_polytype(vec![l.clone()], vec![l, USIZE_T]).into(),
         }
     }
 
