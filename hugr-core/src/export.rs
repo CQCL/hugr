@@ -635,7 +635,6 @@ impl<'a> Context<'a> {
         // Until we have a better representation for extension sets, we therefore
         // need to try and parse each extension as a number to determine if it is
         // a variable or an extension.
-        println!("ext set: {:?}", t);
 
         // NOTE: This overprovisions the capacity since some of the entries of the row
         // may be variables. Since we panic when there is more than one variable, this
