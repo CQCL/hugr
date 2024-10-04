@@ -115,6 +115,7 @@ struct Context<'a> {
 }
 
 impl<'a> Context<'a> {
+    /// Get the types of the given ports and assemble them into a `TypeRow`.
     fn get_port_types(&mut self, ports: &[model::Port]) -> Result<TypeRow, ImportError> {
         let types = ports
             .iter()
@@ -198,8 +199,9 @@ impl<'a> Context<'a> {
     /// Associate links with the ports of the given node in the given direction.
     fn record_links(&mut self, node: Node, direction: Direction, ports: &'a [model::Port]) {
         let optype = self.hugr.get_optype(node);
-        let port_count = optype.port_count(direction);
-        assert!(ports.len() <= port_count);
+
+        // NOTE: `OpType::port_count` copies the signature, which significantly slows down the import.
+        debug_assert!(ports.len() <= optype.port_count(direction));
 
         for (model_port, port) in ports.iter().zip(self.hugr.node_ports(node, direction)) {
             self.link_ports
@@ -508,6 +510,11 @@ impl<'a> Context<'a> {
 
                 let (extension, name) = self.import_custom_name(name)?;
 
+                // TODO: Currently we do not have the description or any other metadata for
+                // the custom op. This will improve with declarative extensions being able
+                // to declare operations as a node, in which case the description will be attached
+                // to that node as metadata.
+
                 let optype = OpType::OpaqueOp(OpaqueOp::new(
                     extension,
                     name,
@@ -583,7 +590,7 @@ impl<'a> Context<'a> {
     ) -> Result<(), ImportError> {
         let region_data = self.get_region(region)?;
 
-        if !matches!(region_data.kind, model::RegionKind::DataFlow) {
+        if region_data.kind != model::RegionKind::DataFlow {
             return Err(model::ModelError::InvalidRegions(node_id).into());
         }
 
@@ -629,7 +636,7 @@ impl<'a> Context<'a> {
         parent: Node,
     ) -> Result<Node, ImportError> {
         let node_data = self.get_node(node_id)?;
-        assert!(matches!(node_data.operation, model::Operation::TailLoop));
+        debug_assert_eq!(node_data.operation, model::Operation::TailLoop);
 
         let [region] = node_data.regions else {
             return Err(model::ModelError::InvalidRegions(node_id).into());
@@ -641,6 +648,7 @@ impl<'a> Context<'a> {
         let (just_inputs, just_outputs) = {
             let mut sum_rows = sum_rows.into_iter();
 
+            // NOTE: This can not fail since else `import_adt_and_rest` would have failed before.
             let term = region_data.targets[0].r#type.unwrap();
 
             let Some(just_inputs) = sum_rows.next() else {
@@ -673,7 +681,7 @@ impl<'a> Context<'a> {
         parent: Node,
     ) -> Result<Node, ImportError> {
         let node_data = self.get_node(node_id)?;
-        assert!(matches!(node_data.operation, model::Operation::Conditional));
+        debug_assert_eq!(node_data.operation, model::Operation::Conditional);
 
         let (sum_rows, other_inputs) = self.import_adt_and_rest(node_id, node_data.inputs)?;
         let outputs = self.get_port_types(node_data.outputs)?;
@@ -820,7 +828,7 @@ impl<'a> Context<'a> {
     ) -> Result<(), ImportError> {
         let region_data = self.get_region(region)?;
 
-        if !matches!(region_data.kind, model::RegionKind::ControlFlow) {
+        if region_data.kind != model::RegionKind::ControlFlow {
             return Err(model::ModelError::InvalidRegions(node_id).into());
         }
 
@@ -841,7 +849,7 @@ impl<'a> Context<'a> {
         parent: Node,
     ) -> Result<Node, ImportError> {
         let node_data = self.get_node(node_id)?;
-        assert!(matches!(node_data.operation, model::Operation::Block));
+        debug_assert_eq!(node_data.operation, model::Operation::Block);
 
         let [region] = node_data.regions else {
             return Err(model::ModelError::InvalidRegions(node_id).into());
@@ -923,8 +931,7 @@ impl<'a> Context<'a> {
             model::Term::StrType => Ok(TypeParam::String),
             model::Term::ExtSetType => Ok(TypeParam::Extensions),
 
-            // TODO: What do we do about the bounds on naturals?
-            model::Term::NatType => todo!(),
+            model::Term::NatType => Ok(TypeParam::max_nat()),
 
             model::Term::Nat(_)
             | model::Term::Str(_)
@@ -1101,7 +1108,7 @@ impl<'a> Context<'a> {
         let model::Term::FuncType {
             inputs,
             outputs,
-            extensions: _,
+            extensions,
         } = term
         else {
             return Err(model::ModelError::TypeError(term_id).into());
@@ -1109,8 +1116,8 @@ impl<'a> Context<'a> {
 
         let inputs = self.import_type_row::<RV>(*inputs)?;
         let outputs = self.import_type_row::<RV>(*outputs)?;
-        // TODO: extensions
-        Ok(FuncTypeBase::new(inputs, outputs))
+        let extensions = self.import_extension_set(*extensions)?;
+        Ok(FuncTypeBase::new(inputs, outputs).with_extension_delta(extensions))
     }
 
     fn import_closed_list(

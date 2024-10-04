@@ -175,7 +175,7 @@ impl<'a> ParseContext<'a> {
                 let mut extensions = Vec::new();
                 let mut rest = None;
 
-                for token in filter_rule(&mut inner, Rule::identifier) {
+                for token in filter_rule(&mut inner, Rule::ext_name) {
                     extensions.push(token.as_str());
                 }
 
@@ -525,14 +525,7 @@ impl<'a> ParseContext<'a> {
 
         let inputs = self.parse_term(inner.next().unwrap())?;
         let outputs = self.parse_term(inner.next().unwrap())?;
-
-        let extensions = match inner.peek().map(|p| p.as_rule()) {
-            Some(Rule::term_ext_set) => self.parse_term(inner.next().unwrap())?,
-            _ => self.module.insert_term(Term::ExtSet {
-                extensions: &[],
-                rest: None,
-            }),
-        };
+        let extensions = self.parse_term(inner.next().unwrap())?;
 
         // Assemble the inputs, outputs and extensions into a function type.
         let func = self.module.insert_term(Term::FuncType {

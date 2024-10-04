@@ -13,7 +13,6 @@ use crate::{
 use bumpalo::{collections::Vec as BumpVec, Bump};
 use hugr_model::v0::{self as model};
 use indexmap::IndexSet;
-use smol_str::ToSmolStr;
 
 pub(crate) const OP_FUNC_CALL_INDIRECT: &str = "func.call-indirect";
 const TERM_PARAM_TUPLE: &str = "param.tuple";
@@ -635,41 +634,45 @@ impl<'a> Context<'a> {
         // Until we have a better representation for extension sets, we therefore
         // need to try and parse each extension as a number to determine if it is
         // a variable or an extension.
-        let mut extensions = Vec::new();
-        let mut variables = Vec::new();
+        println!("ext set: {:?}", t);
+
+        // NOTE: This overprovisions the capacity since some of the entries of the row
+        // may be variables. Since we panic when there is more than one variable, this
+        // may at most waste one slot. That is way better than having to allocate
+        // a temporary vector.
+        //
+        // Also `ExtensionSet` has no way of reporting its size, so we have to count
+        // the elements by iterating over them...
+        let capacity = t.iter().count();
+        let mut extensions = BumpVec::with_capacity_in(capacity, self.bump);
+        let mut rest = None;
 
         for ext in t.iter() {
             if let Ok(index) = ext.parse::<usize>() {
-                variables.push({
+                // Extension sets in the model support at most one variable. This is a
+                // deliberate limitation so that extension sets behave like polymorphic rows.
+                // The type theory of such rows and how to apply them to model (co)effects
+                // is well understood.
+                //
+                // Extension sets in `hugr-core` at this point have no such restriction.
+                // However, it appears that so far we never actually use extension sets with
+                // multiple variables, except for extension sets that are generated through
+                // property testing.
+                if rest.is_some() {
+                    // TODO: We won't need this anymore once we have a core representation
+                    // that ensures that extension sets have at most one variable.
+                    panic!("Extension set with multiple variables")
+                }
+
+                rest = Some(
                     self.module
-                        .insert_term(model::Term::Var(model::LocalRef::Index(index as _)))
-                });
+                        .insert_term(model::Term::Var(model::LocalRef::Index(index as _))),
+                );
             } else {
-                extensions.push(ext.to_smolstr());
+                extensions.push(self.bump.alloc_str(ext) as &str);
             }
         }
 
-        // Extension sets in the model support at most one variable. This is a
-        // deliberate limitation so that extension sets behave like polymorphic rows.
-        // The type theory of such rows and how to apply them to model (co)effects
-        // is well understood.
-        //
-        // Extension sets in `hugr-core` at this point have no such restriction.
-        // However, it appears that so far we never actually use extension sets with
-        // multiple variables, except for extension sets that are generated through
-        // property testing.
-        let rest = match variables.as_slice() {
-            [] => None,
-            [var] => Some(*var),
-            _ => {
-                // TODO: We won't need this anymore once we have a core representation
-                // that ensures that extension sets have at most one variable.
-                panic!("Extension set with multiple variables")
-            }
-        };
-
-        let mut extensions = BumpVec::with_capacity_in(extensions.len(), self.bump);
-        extensions.extend(t.iter().map(|ext| self.bump.alloc_str(ext) as &str));
         let extensions = extensions.into_bump_slice();
 
         self.module

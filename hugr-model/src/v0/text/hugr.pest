@@ -1,6 +1,7 @@
 WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
 COMMENT    = _{ ";" ~ (!("\n") ~ ANY)* ~ "\n" }
 identifier = @{ (ASCII_ALPHA | "_" | "-") ~ (ASCII_ALPHANUMERIC | "_" | "-")* }
+ext_name   = @{ identifier ~ ("." ~ identifier)* }
 symbol     = @{ identifier ~ ("." ~ identifier)+ }
 tag        = @{ (ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*) | "0" }
 
@@ -97,7 +98,7 @@ term_str          = { string }
 term_str_type     = { "str" }
 term_nat          = { (ASCII_DIGIT)+ }
 term_nat_type     = { "nat" }
-term_ext_set      = { "(" ~ "ext" ~ identifier* ~ (list_tail ~ term)? ~ ")" }
+term_ext_set      = { "(" ~ "ext" ~ ext_name* ~ (list_tail ~ term)? ~ ")" }
 term_ext_set_type = { "ext-set" }
 term_adt          = { "(" ~ "adt" ~ term ~ ")" }
 term_func_type    = { "(" ~ "fn" ~ term ~ term ~ term ~ ")" }
