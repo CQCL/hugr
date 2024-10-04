@@ -934,7 +934,7 @@ impl<'a> Context<'a> {
             | model::Term::Control { .. } => Err(model::ModelError::TypeError(term_id).into()),
 
             model::Term::ControlType => {
-                Err(error_unsupported!("type of control types as `TypeArg`"))
+                Err(error_unsupported!("type of control types as `TypeParam`"))
             }
         }
     }
