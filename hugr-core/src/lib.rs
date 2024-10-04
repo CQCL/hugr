@@ -10,6 +10,7 @@
 
 pub mod builder;
 pub mod core;
+pub mod export;
 pub mod extension;
 pub mod hugr;
 pub mod macros;
