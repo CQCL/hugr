@@ -49,8 +49,9 @@ impl<'a> Context<'a> {
         }
     }
 
+    /// Exports the root module of the HUGR graph.
     pub fn export_root(&mut self) {
-        let r#type = self.module.insert_term(model::Term::Wildcard);
+        let signature = self.module.insert_term(model::Term::Wildcard);
 
         let hugr_children = self.hugr.children(self.hugr.root());
         let mut children = BumpVec::with_capacity_in(hugr_children.len(), self.bump);
@@ -64,8 +65,8 @@ impl<'a> Context<'a> {
             sources: &[],
             targets: &[],
             children: children.into_bump_slice(),
-            meta: &[],
-            signature: r#type,
+            meta: &[], // TODO: Export metadata
+            signature,
         });
 
         self.module.root = root;
@@ -347,7 +348,7 @@ impl<'a> Context<'a> {
             }
         };
 
-        let r#type = self.module.insert_term(model::Term::Wildcard);
+        let signature = self.module.insert_term(model::Term::Wildcard);
 
         self.module.insert_node(model::Node {
             operation,
@@ -355,8 +356,8 @@ impl<'a> Context<'a> {
             outputs,
             params,
             regions,
-            meta: &[],
-            signature: r#type,
+            meta: &[], // TODO: Export metadata
+            signature,
         })
     }
 
@@ -398,15 +399,15 @@ impl<'a> Context<'a> {
         }
 
         // TODO: We can determine the type of the region
-        let r#type = self.module.insert_term(model::Term::Wildcard);
+        let signature = self.module.insert_term(model::Term::Wildcard);
 
         self.module.insert_region(model::Region {
             kind: model::RegionKind::DataFlow,
             sources,
             targets,
             children: region_children.into_bump_slice(),
-            meta: &[],
-            signature: r#type,
+            meta: &[], // TODO: Export metadata
+            signature,
         })
     }
 
@@ -447,15 +448,15 @@ impl<'a> Context<'a> {
         let targets = self.make_ports(exit_block, Direction::Incoming);
 
         // TODO: We can determine the type of the region
-        let r#type = self.module.insert_term(model::Term::Wildcard);
+        let signature = self.module.insert_term(model::Term::Wildcard);
 
         self.module.insert_region(model::Region {
             kind: model::RegionKind::ControlFlow,
             sources: self.bump.alloc_slice_copy(&[source]),
             targets,
             children: region_children.into_bump_slice(),
-            meta: &[],
-            signature: r#type,
+            meta: &[], // TODO: Export metadata
+            signature,
         })
     }
 
