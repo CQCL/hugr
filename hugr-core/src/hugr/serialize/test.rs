@@ -23,7 +23,7 @@ use crate::types::{
 use crate::{type_row, OutgoingPort};
 
 use itertools::Itertools;
-use jsonschema::{Draft, JSONSchema};
+use jsonschema::{Draft, Validator};
 use lazy_static::lazy_static;
 use portgraph::LinkView;
 use portgraph::{multiportgraph::MultiPortGraph, Hierarchy, LinkMut, PortMut, UnmanagedDenseMap};
@@ -45,11 +45,11 @@ struct SerTestingLatest {
 
 struct NamedSchema {
     name: &'static str,
-    schema: JSONSchema,
+    schema: Validator,
 }
 
 impl NamedSchema {
-    pub fn new(name: &'static str, schema: JSONSchema) -> Self {
+    pub fn new(name: &'static str, schema: Validator) -> Self {
         Self { name, schema }
     }
 
@@ -84,9 +84,9 @@ macro_rules! include_schema {
                         concat!("../../../../specification/schema/", $path, "_live.json")
                     ))
                     .unwrap();
-                    JSONSchema::options()
+                    Validator::options()
                         .with_draft(Draft::Draft7)
-                        .compile(&schema_val)
+                        .build(&schema_val)
                         .expect("Schema is invalid.")
                 });
         }
