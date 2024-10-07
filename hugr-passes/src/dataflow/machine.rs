@@ -10,7 +10,7 @@ use super::{
 /// 1. Get a new instance via [Self::default()]
 /// 2. Zero or more [Self::propolutate_out_wires] with initial values
 /// 3. Exactly one [Self::run] to do the analysis
-/// 4. Results then available via [Self::read_out_wire_partial_value] and [Self::read_out_wire_value]
+/// 4. Results then available via [Self::read_out_wire_partial_value]
 pub struct Machine<V: AbstractValue, C: DFContext<V>>(
     AscentProgram<V, C>,
     Option<HashMap<Wire, PartialValue<V>>>,
@@ -100,40 +100,6 @@ impl<V: AbstractValue, C: DFContext<V>> Machine<V, C> {
                 .find_map(|(_, cond2, case2, i)| (&cond == cond2 && &case == case2).then_some(*i))
                 .unwrap(),
         )
-    }
-}
-
-impl<V: AbstractValue, C: DFContext<V>> Machine<V, C>
-where
-    Value: From<V>,
-{
-    /// Gets the Hugr [Value] computed by [Self::run] for the given wire, if possible.
-    /// (Only if the analysis determined a single `V`, or a Sum of `V`s with a single
-    /// possible tag, was present on that wire.)
-    ///
-    /// # Errors
-    /// `None` if the analysis did not result in a single [ValueOrSum] on that wire
-    /// `Some(e)` if conversion to a [Value] produced a [ConstTypeError]
-    ///
-    /// # Panics
-    /// If a [Type] for the specified wire could not be extracted from the Hugr
-    ///
-    /// [Type]: hugr_core::types::Type
-    pub fn read_out_wire_value(
-        &self,
-        hugr: impl HugrView,
-        w: Wire,
-    ) -> Result<Value, Option<ConstTypeError>> {
-        // dbg!(&w);
-        let (_, typ) = hugr
-            .out_value_types(w.node())
-            .find(|(p, _)| *p == w.source())
-            .unwrap();
-        let v = self
-            .read_out_wire_partial_value(w)
-            .and_then(|pv| pv.try_into_value(&typ).ok())
-            .ok_or(None)?;
-        v.try_into().map_err(Some)
     }
 }
 

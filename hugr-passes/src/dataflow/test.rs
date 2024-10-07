@@ -29,7 +29,11 @@ fn test_make_tuple() {
     let mut machine = Machine::default();
     machine.run(HugrValueContext::new(&hugr));
 
-    let x = machine.read_out_wire_value(&hugr, v3).unwrap();
+    let x = machine
+        .read_out_wire_partial_value(v3)
+        .unwrap()
+        .try_into_wire_value(&hugr, v3)
+        .unwrap();
     assert_eq!(x, Value::tuple([Value::false_val(), Value::true_val()]));
 }
 
@@ -46,9 +50,17 @@ fn test_unpack_tuple_const() {
     let mut machine = Machine::default();
     machine.run(HugrValueContext::new(&hugr));
 
-    let o1_r = machine.read_out_wire_value(&hugr, o1).unwrap();
+    let o1_r = machine
+        .read_out_wire_partial_value(o1)
+        .unwrap()
+        .try_into_wire_value(&hugr, o1)
+        .unwrap();
     assert_eq!(o1_r, Value::false_val());
-    let o2_r = machine.read_out_wire_value(&hugr, o2).unwrap();
+    let o2_r = machine
+        .read_out_wire_partial_value(o2)
+        .unwrap()
+        .try_into_wire_value(&hugr, o2)
+        .unwrap();
     assert_eq!(o2_r, Value::true_val());
 }
 
@@ -65,7 +77,11 @@ fn test_unpack_const() {
     let mut machine = Machine::default();
     machine.run(HugrValueContext::new(&hugr));
 
-    let o_r = machine.read_out_wire_value(&hugr, o).unwrap();
+    let o_r = machine
+        .read_out_wire_partial_value(o)
+        .unwrap()
+        .try_into_wire_value(&hugr, o)
+        .unwrap();
     assert_eq!(o_r, Value::true_val());
 }
 
@@ -93,7 +109,11 @@ fn test_tail_loop_never_iterates() {
     // dbg!(&machine.tail_loop_io_node);
     // dbg!(&machine.out_wire_value);
 
-    let o_r = machine.read_out_wire_value(&hugr, tl_o).unwrap();
+    let o_r = machine
+        .read_out_wire_partial_value(tl_o)
+        .unwrap()
+        .try_into_wire_value(&hugr, tl_o)
+        .unwrap();
     assert_eq!(o_r, r_v);
     assert_eq!(
         Some(TailLoopTermination::ExactlyZeroContinues),
@@ -233,9 +253,17 @@ fn conditional() {
     machine.propolutate_out_wires([(arg_w, arg_pv)]);
     machine.run(HugrValueContext::new(&hugr));
 
-    let cond_r1 = machine.read_out_wire_value(&hugr, cond_o1).unwrap();
+    let cond_r1 = machine
+        .read_out_wire_partial_value(cond_o1)
+        .unwrap()
+        .try_into_wire_value(&hugr, cond_o1)
+        .unwrap();
     assert_eq!(cond_r1, Value::false_val());
-    assert!(machine.read_out_wire_value(&hugr, cond_o2).is_err());
+    assert!(machine
+        .read_out_wire_partial_value(cond_o2)
+        .unwrap()
+        .try_into_wire_value(&hugr, cond_o2)
+        .is_err());
 
     assert_eq!(machine.case_reachable(&hugr, case1.node()), Some(false)); // arg_pv is variant 1 or 2 only
     assert_eq!(machine.case_reachable(&hugr, case2.node()), Some(true));
