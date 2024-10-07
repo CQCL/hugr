@@ -41,6 +41,52 @@
 //! to efficiently allocate and free the parts of the data structure that isn't directly stored
 //! in the tables. For that purpose, we use the `'a` lifetime parameter to indicate the
 //! lifetime of the arena.
+//!
+//! # Remaining Mismatch with `hugr-core`
+//!
+//! This data model was designed to encode as much of `hugr-core` as possible while also
+//! filling in conceptual gaps and providing a forward-compatible foundation for future
+//! development. However, there are still some mismatches with `hugr-core` that are not
+//! addressed by conversions in import/export:
+//!
+//! - Some static types can not yet be represented in `hugr-core` although they should be.
+//! - `hugr-model` does not have constants for runtime types as `hugr-core` does ([#1425]).
+//!   The rationale for this is that runtime values can not be represented except at runtime
+//!   (they might e.g. be qubits or part of some extension in which values lack any semantics
+//!   in forms of sets altogether). We might resolve this by introducing ways to use static
+//!   values as "blueprints" for runtime values.
+//! - The model does not have types with a copy bound as `hugr-core` does, and instead uses
+//!   a more general form of type constraints ([#1556]). Similarly, the model does not have
+//!   bounded naturals. In both cases, we import these types with the most permissive bound
+//!   for now.
+//! - The model allows nodes to have multiple child regions, including for custom operations.
+//!   `hugr-core` does not support multiple regions, or any nesting for custom operations ([#1546]).
+//! - `hugr-core` has rows with multiple row variables, which can be in arbitrary positions
+//!   in the row. `hugr-core` rows correspond to lists in the model, and only support a single
+//!   variable at the end. The same applies to extension sets ([#1556]).
+//! - In a model module, ports are connected when they share the same link. This differs from
+//!   the type of port connectivity in the graph data structure used by `hugr-core`. However,
+//!   `hugr-core` restricts connectivity so that in any group of connected ports there is at
+//!   most one output port (for dataflow) or at most one input port (for control flow). In
+//!   these cases, there is no mismatch.
+//! - `hugr-core` has no support for constraints and does not make a distinction between
+//!   explicit and implicit parameters.
+//! - `hugr-core` only allows to define type aliases, but not aliases for other terms.
+//! - The model does not have a concept of "order edges". These ordering hints can be useful,
+//!   but expressing them via the same mechanism as data and control flow might not be the
+//!   correct approach.
+//! - Both `hugr-model` and `hugr-core` support metadata, but they use different encodings.
+//!   `hugr-core` encodes metadata as JSON objects, while `hugr-model` uses terms. Using
+//!   terms has the advantage that metadata can be validated with the same type checking
+//!   mechanism as the rest of the model ([#1553]).
+//! - `hugr-model` have a root region that corresponds to a root `Module` in `hugr-core`.
+//!   `hugr-core` however can have nodes with different operations as their root ([#1554]).
+//!
+//! [#1425]: https://github.com/CQCL/hugr/discussions/1425
+//! [#1556]: https://github.com/CQCL/hugr/discussions/1556
+//! [#1546]: https://github.com/CQCL/hugr/issues/1546
+//! [#1553]: https://github.com/CQCL/hugr/issues/1553
+//! [#1554]: https://github.com/CQCL/hugr/issues/1554
 use smol_str::SmolStr;
 use thiserror::Error;
 
