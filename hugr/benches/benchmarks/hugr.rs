@@ -9,9 +9,9 @@ use hugr::extension::prelude::{BOOL_T, QB_T, USIZE_T};
 use hugr::extension::PRELUDE_REGISTRY;
 use hugr::ops::OpName;
 use hugr::std_extensions::arithmetic::float_ops::FLOAT_OPS_REGISTRY;
-use hugr::std_extensions::arithmetic::float_types::{ConstF64, FLOAT64_TYPE};
+use hugr::std_extensions::arithmetic::float_types::FLOAT64_TYPE;
 use hugr::types::Signature;
-use hugr::{type_row, CircuitUnit, Extension, Hugr};
+use hugr::{type_row, Extension, Hugr};
 use lazy_static::lazy_static;
 pub fn simple_dfg_hugr() -> Hugr {
     let dfg_builder =
@@ -67,6 +67,21 @@ impl Serializer for JsonSer {
     }
 }
 
+struct CapnpSer;
+impl Serializer for CapnpSer {
+    fn serialize(&self, hugr: &Hugr) -> Vec<u8> {
+        let bump = bumpalo::Bump::new();
+        let module = hugr_core::export::export_hugr(hugr, &bump);
+        hugr_model::v0::binary::write_to_vec(&module)
+    }
+
+    fn deserialize(&self, bytes: &[u8]) -> Hugr {
+        let bump = bumpalo::Bump::new();
+        let module = hugr_model::v0::binary::read_from_slice(bytes, &bump).unwrap();
+        hugr_core::import::import_hugr(&module, &FLOAT_OPS_REGISTRY).unwrap()
+    }
+}
+
 fn roundtrip(hugr: &Hugr, serializer: impl Serializer) -> Hugr {
     let bytes = serializer.serialize(hugr);
     serializer.deserialize(&bytes)
@@ -112,9 +127,9 @@ pub fn circuit(layers: usize) -> Hugr {
     let cx_gate = QUANTUM_EXT
         .instantiate_extension_op("CX", [], &PRELUDE_REGISTRY)
         .unwrap();
-    let rz = QUANTUM_EXT
-        .instantiate_extension_op("Rz", [], &FLOAT_OPS_REGISTRY)
-        .unwrap();
+    // let rz = QUANTUM_EXT
+    //     .instantiate_extension_op("Rz", [], &FLOAT_OPS_REGISTRY)
+    //     .unwrap();
     let signature =
         Signature::new_endo(type_row![QB_T, QB_T]).with_extension_delta(QUANTUM_EXT.name().clone());
     let mut module_builder = ModuleBuilder::new();
@@ -133,13 +148,14 @@ pub fn circuit(layers: usize) -> Hugr {
             .append(cx_gate.clone(), [1, 0])
             .unwrap();
 
-        let angle = linear.add_constant(ConstF64::new(0.5));
-        linear
-            .append_and_consume(
-                rz.clone(),
-                [CircuitUnit::Linear(0), CircuitUnit::Wire(angle)],
-            )
-            .unwrap();
+        // TODO: Currently left out because we can not represent constants in the model
+        // let angle = linear.add_constant(ConstF64::new(0.5));
+        // linear
+        //     .append_and_consume(
+        //         rz.clone(),
+        //         [CircuitUnit::Linear(0), CircuitUnit::Wire(angle)],
+        //     )
+        //     .unwrap();
     }
 
     let outs = linear.finish();
@@ -157,13 +173,14 @@ fn bench_builder(c: &mut Criterion) {
 }
 
 fn bench_serialization(c: &mut Criterion) {
-    c.bench_function("simple_cfg_serialize", |b| {
+    c.bench_function("simple_cfg_serialize/json", |b| {
         let h = simple_cfg_hugr();
         b.iter(|| {
             black_box(roundtrip(&h, JsonSer));
         });
     });
-    let mut group = c.benchmark_group("circuit_roundtrip");
+
+    let mut group = c.benchmark_group("circuit_roundtrip/json");
     group.plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic));
     for size in [0, 1, 10, 100, 1000].iter() {
         group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
@@ -175,13 +192,25 @@ fn bench_serialization(c: &mut Criterion) {
     }
     group.finish();
 
-    let mut group = c.benchmark_group("circuit_serialize");
+    let mut group = c.benchmark_group("circuit_serialize/json");
     group.plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic));
     for size in [0, 1, 10, 100, 1000].iter() {
         group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
             let h = circuit(size);
             b.iter(|| {
                 black_box(JsonSer.serialize(&h));
+            });
+        });
+    }
+    group.finish();
+
+    let mut group = c.benchmark_group("circuit_roundtrip/capnp");
+    group.plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic));
+    for size in [0, 1, 10, 100, 1000].iter() {
+        group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
+            let h = circuit(size);
+            b.iter(|| {
+                black_box(roundtrip(&h, CapnpSer));
             });
         });
     }

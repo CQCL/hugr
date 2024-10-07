@@ -90,6 +90,7 @@
 use smol_str::SmolStr;
 use thiserror::Error;
 
+pub mod binary;
 pub mod text;
 
 macro_rules! define_index {
@@ -162,7 +163,7 @@ pub struct Module<'a> {
     /// Table of [`Node`]s.
     pub nodes: Vec<Node<'a>>,
     /// Table of [`Region`]s.
-    pub region: Vec<Region<'a>>,
+    pub regions: Vec<Region<'a>>,
     /// Table of [`Term`]s.
     pub terms: Vec<Term<'a>>,
 }
@@ -171,12 +172,18 @@ impl<'a> Module<'a> {
     /// Return the node data for a given node id.
     #[inline]
     pub fn get_node(&self, node_id: NodeId) -> Option<&Node<'a>> {
-        self.nodes.get(node_id.0 as usize)
+        self.nodes.get(node_id.index())
+    }
+
+    /// Return a mutable reference to the node data for a given node id.
+    #[inline]
+    pub fn get_node_mut(&mut self, node_id: NodeId) -> Option<&mut Node<'a>> {
+        self.nodes.get_mut(node_id.index())
     }
 
     /// Insert a new node into the module and return its id.
     pub fn insert_node(&mut self, node: Node<'a>) -> NodeId {
-        let id = NodeId(self.nodes.len() as u32);
+        let id = NodeId::new(self.nodes.len());
         self.nodes.push(node);
         id
     }
@@ -184,12 +191,18 @@ impl<'a> Module<'a> {
     /// Return the term data for a given term id.
     #[inline]
     pub fn get_term(&self, term_id: TermId) -> Option<&Term<'a>> {
-        self.terms.get(term_id.0 as usize)
+        self.terms.get(term_id.index())
+    }
+
+    /// Return a mutable reference to the term data for a given term id.
+    #[inline]
+    pub fn get_term_mut(&mut self, term_id: TermId) -> Option<&mut Term<'a>> {
+        self.terms.get_mut(term_id.index())
     }
 
     /// Insert a new term into the module and return its id.
     pub fn insert_term(&mut self, term: Term<'a>) -> TermId {
-        let id = TermId(self.terms.len() as u32);
+        let id = TermId::new(self.terms.len());
         self.terms.push(term);
         id
     }
@@ -197,26 +210,32 @@ impl<'a> Module<'a> {
     /// Return the region data for a given region id.
     #[inline]
     pub fn get_region(&self, region_id: RegionId) -> Option<&Region<'a>> {
-        self.region.get(region_id.0 as usize)
+        self.regions.get(region_id.index())
+    }
+
+    /// Return a mutable reference to the region data for a given region id.
+    #[inline]
+    pub fn get_region_mut(&mut self, region_id: RegionId) -> Option<&mut Region<'a>> {
+        self.regions.get_mut(region_id.index())
     }
 
     /// Insert a new region into the module and return its id.
     pub fn insert_region(&mut self, region: Region<'a>) -> RegionId {
-        let id = RegionId(self.region.len() as u32);
-        self.region.push(region);
+        let id = RegionId::new(self.regions.len());
+        self.regions.push(region);
         id
     }
 }
 
 /// Nodes in the hugr graph.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct Node<'a> {
     /// The operation that the node performs.
     pub operation: Operation<'a>,
     /// The input ports of the node.
-    pub inputs: &'a [Port<'a>],
+    pub inputs: &'a [LinkRef<'a>],
     /// The output ports of the node.
-    pub outputs: &'a [Port<'a>],
+    pub outputs: &'a [LinkRef<'a>],
     /// The parameters of the node.
     pub params: &'a [TermId],
     /// The regions of the node.
@@ -224,12 +243,17 @@ pub struct Node<'a> {
     /// The meta information attached to the node.
     pub meta: &'a [MetaItem<'a>],
     /// The signature of the node.
-    pub signature: TermId,
+    pub signature: Option<TermId>,
 }
 
 /// Operations that nodes can perform.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub enum Operation<'a> {
+    /// Invalid operation to be used as a placeholder.
+    /// This is useful for modules that have non-contiguous node ids, or modules
+    /// that have not yet been fully constructed.
+    #[default]
+    Invalid,
     /// Data flow graphs.
     Dfg,
     /// Control flow graphs.
@@ -323,15 +347,15 @@ pub struct Region<'a> {
     /// The kind of the region. See [`RegionKind`] for details.
     pub kind: RegionKind,
     /// The source ports of the region.
-    pub sources: &'a [Port<'a>],
+    pub sources: &'a [LinkRef<'a>],
     /// The target ports of the region.
-    pub targets: &'a [Port<'a>],
+    pub targets: &'a [LinkRef<'a>],
     /// The nodes in the region. The order of the nodes is not significant.
     pub children: &'a [NodeId],
     /// The metadata attached to the region.
     pub meta: &'a [MetaItem<'a>],
     /// The signature of the region.
-    pub signature: TermId,
+    pub signature: Option<TermId>,
 }
 
 /// The kind of a region.
@@ -341,15 +365,6 @@ pub enum RegionKind {
     DataFlow,
     /// Control flow region.
     ControlFlow,
-}
-
-/// A port attached to a [`Node`] or [`Region`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Port<'a> {
-    /// The link that the port is connected to.
-    pub link: LinkRef<'a>,
-    /// The type of the port.
-    pub r#type: Option<TermId>,
 }
 
 /// A function declaration.
@@ -408,8 +423,8 @@ impl std::fmt::Display for GlobalRef<'_> {
 /// Local variables are defined as parameters to nodes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum LocalRef<'a> {
-    /// Reference to the local variable by its parameter index.
-    Index(u16),
+    /// Reference to the local variable by its parameter index and its defining node.
+    Index(NodeId, u16),
     /// Reference to the local variable by its name.
     Named(&'a str),
 }
@@ -417,7 +432,7 @@ pub enum LocalRef<'a> {
 impl std::fmt::Display for LocalRef<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            LocalRef::Index(index) => write!(f, "?:{}", index),
+            LocalRef::Index(node, index) => write!(f, "?:{}:{}", node.index(), index),
             LocalRef::Named(name) => write!(f, "?{}", name),
         }
     }
@@ -442,9 +457,10 @@ impl std::fmt::Display for LinkRef<'_> {
 }
 
 /// A term in the compile time meta language.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub enum Term<'a> {
     /// Standin for any term.
+    #[default]
     Wildcard,
 
     /// The type of runtime types.
@@ -603,12 +619,6 @@ pub enum Term<'a> {
     ControlType,
 }
 
-impl<'a> Default for Term<'a> {
-    fn default() -> Self {
-        Self::Wildcard
-    }
-}
-
 /// A parameter to a function or alias.
 ///
 /// Parameter names must be unique within a parameter list.
@@ -678,4 +688,7 @@ pub enum ModelError {
     /// defines two cases for the same tag.
     #[error("condition node is malformed: {0:?}")]
     MalformedCondition(NodeId),
+    /// There is a node that is not well-formed or has the invalid operation.
+    #[error("invalid operation on node: {0:?}")]
+    InvalidOperation(NodeId),
 }

@@ -5,4 +5,5 @@
   (forall ?a type)
   (forall ?b type)
   [?a ?b] [?b ?a] (ext)
-  (dfg [(%a ?a) (%b ?b)] [(%b ?b) (%a ?a)]))
+  (dfg [%a %b] [%b %a]
+    (signature (fn [?a ?b] [?b ?a] (ext)))))

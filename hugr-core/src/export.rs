@@ -1,18 +1,23 @@
 //! Exporting HUGR graphs to their `hugr-model` representation.
 use crate::{
     extension::ExtensionSet,
-    ops::OpType,
+    hugr::IdentList,
+    ops::{DataflowBlock, OpTrait, OpType},
     types::{
         type_param::{TypeArgVariable, TypeParam},
         type_row::TypeRowBase,
-        CustomType, EdgeKind, FuncTypeBase, MaybeRV, PolyFuncTypeBase, RowVariable, SumType,
-        TypeArg, TypeBase, TypeEnum,
+        CustomType, FuncTypeBase, MaybeRV, PolyFuncTypeBase, RowVariable, SumType, TypeArg,
+        TypeBase, TypeEnum,
     },
-    Direction, Hugr, HugrView, IncomingPort, Node, Port, PortIndex,
+    Direction, Hugr, HugrView, IncomingPort, Node, Port,
 };
-use bumpalo::{collections::Vec as BumpVec, Bump};
+use bumpalo::{collections::String as BumpString, collections::Vec as BumpVec, Bump};
+use fxhash::FxHashMap;
 use hugr_model::v0::{self as model};
 use indexmap::IndexSet;
+use std::fmt::Write;
+
+type FxIndexSet<T> = IndexSet<T, fxhash::FxBuildHasher>;
 
 pub(crate) const OP_FUNC_CALL_INDIRECT: &str = "func.call-indirect";
 const TERM_PARAM_TUPLE: &str = "param.tuple";
@@ -32,8 +37,12 @@ struct Context<'a> {
     module: model::Module<'a>,
     /// Mapping from ports to link indices.
     /// This only includes the minimum port among groups of linked ports.
-    links: IndexSet<(Node, Port)>,
+    links: FxIndexSet<(Node, Port)>,
     bump: &'a Bump,
+    /// Stores the terms that we have already seen to avoid duplicates.
+    term_map: FxHashMap<model::Term<'a>, model::TermId>,
+    /// The current scope for local variables.
+    local_scope: Option<model::NodeId>,
 }
 
 impl<'a> Context<'a> {
@@ -45,14 +54,14 @@ impl<'a> Context<'a> {
             hugr,
             module,
             bump,
-            links: IndexSet::new(),
+            links: IndexSet::default(),
+            term_map: FxHashMap::default(),
+            local_scope: None,
         }
     }
 
     /// Exports the root module of the HUGR graph.
     pub fn export_root(&mut self) {
-        let signature = self.module.insert_term(model::Term::Wildcard);
-
         let hugr_children = self.hugr.children(self.hugr.root());
         let mut children = BumpVec::with_capacity_in(hugr_children.len(), self.bump);
 
@@ -66,7 +75,7 @@ impl<'a> Context<'a> {
             targets: &[],
             children: children.into_bump_slice(),
             meta: &[], // TODO: Export metadata
-            signature,
+            signature: None,
         });
 
         self.module.root = root;
@@ -75,9 +84,10 @@ impl<'a> Context<'a> {
     /// Returns the edge id for a given port, creating a new edge if necessary.
     ///
     /// Any two ports that are linked will be represented by the same link.
-    fn get_link_id(&mut self, node: Node, port: Port) -> model::LinkId {
+    fn get_link_id(&mut self, node: Node, port: impl Into<Port>) -> model::LinkId {
         // To ensure that linked ports are represented by the same edge, we take the minimum port
         // among all the linked ports, including the one we started with.
+        let port = port.into();
         let linked_ports = self.hugr.linked_ports(node, port);
         let all_ports = std::iter::once((node, port)).chain(linked_ports);
         let repr = all_ports.min().unwrap();
@@ -85,68 +95,43 @@ impl<'a> Context<'a> {
         model::LinkId(edge)
     }
 
-    pub fn make_ports(&mut self, node: Node, direction: Direction) -> &'a [model::Port<'a>] {
+    pub fn make_ports(
+        &mut self,
+        node: Node,
+        direction: Direction,
+        num_ports: usize,
+    ) -> &'a [model::LinkRef<'a>] {
         let ports = self.hugr.node_ports(node, direction);
-        let mut model_ports = BumpVec::with_capacity_in(ports.len(), self.bump);
+        let mut links = BumpVec::with_capacity_in(ports.len(), self.bump);
 
-        for port in ports {
-            if let Some(model_port) = self.make_port(node, port) {
-                model_ports.push(model_port);
-            }
+        for port in ports.take(num_ports) {
+            links.push(model::LinkRef::Id(self.get_link_id(node, port)));
         }
 
-        model_ports.into_bump_slice()
+        links.into_bump_slice()
     }
 
-    pub fn make_port(&mut self, node: Node, port: impl Into<Port>) -> Option<model::Port<'a>> {
-        let port: Port = port.into();
-        let op_type = self.hugr.get_optype(node);
+    pub fn make_term(&mut self, term: model::Term<'a>) -> model::TermId {
+        // Wildcard terms do not all represent the same term, so we should not deduplicate them.
+        if term == model::Term::Wildcard {
+            return self.module.insert_term(term);
+        }
 
-        let r#type = match op_type.port_kind(port)? {
-            EdgeKind::ControlFlow => {
-                // TODO: This should ideally be reported by the op itself
-                let types: Vec<_> = match (op_type, port.direction()) {
-                    (OpType::DataflowBlock(block), Direction::Incoming) => {
-                        block.inputs.iter().map(|t| self.export_type(t)).collect()
-                    }
-                    (OpType::DataflowBlock(block), Direction::Outgoing) => {
-                        let mut types = Vec::new();
-                        types.extend(
-                            block.sum_rows[port.index()]
-                                .iter()
-                                .map(|t| self.export_type(t)),
-                        );
-                        types.extend(block.other_outputs.iter().map(|t| self.export_type(t)));
-                        types
-                    }
-                    (OpType::ExitBlock(block), Direction::Incoming) => block
-                        .cfg_outputs
-                        .iter()
-                        .map(|t| self.export_type(t))
-                        .collect(),
-                    (OpType::ExitBlock(_), Direction::Outgoing) => vec![],
-                    _ => unreachable!("unexpected control flow port on non-control-flow op"),
-                };
+        *self
+            .term_map
+            .entry(term.clone())
+            .or_insert_with(|| self.module.insert_term(term))
+    }
 
-                let types = self.bump.alloc_slice_copy(&types);
-                let values = self.module.insert_term(model::Term::List {
-                    items: types,
-                    tail: None,
-                });
-                self.module.insert_term(model::Term::Control { values })
-            }
-            EdgeKind::Value(r#type) => self.export_type(&r#type),
-            EdgeKind::Const(_) => return None,
-            EdgeKind::Function(_) => return None,
-            EdgeKind::StateOrder => return None,
-        };
-
-        let link = model::LinkRef::Id(self.get_link_id(node, port));
-
-        Some(model::Port {
-            r#type: Some(r#type),
-            link,
-        })
+    pub fn make_named_global_ref(
+        &mut self,
+        extension: &IdentList,
+        name: impl AsRef<str>,
+    ) -> model::GlobalRef<'a> {
+        let capacity = extension.len() + name.as_ref().len() + 1;
+        let mut output = BumpString::with_capacity_in(capacity, self.bump);
+        let _ = write!(&mut output, "{}.{}", extension, name.as_ref());
+        model::GlobalRef::Named(output.into_bump_str())
     }
 
     /// Get the node that declares or defines the function associated with the given
@@ -171,19 +156,25 @@ impl<'a> Context<'a> {
         }
     }
 
+    fn with_local_scope<T>(&mut self, node: model::NodeId, f: impl FnOnce(&mut Self) -> T) -> T {
+        let old_scope = self.local_scope.replace(node);
+        let result = f(self);
+        self.local_scope = old_scope;
+        result
+    }
+
     pub fn export_node(&mut self, node: Node) -> model::NodeId {
-        let inputs = self.make_ports(node, Direction::Incoming);
-        let outputs = self.make_ports(node, Direction::Outgoing);
+        // We insert a dummy node with the invalid operation at this point to reserve
+        // the node id. This is necessary to establish the correct node id for the
+        // local scope introduced by some operations. We will overwrite this node later.
+        let node_id = self.module.insert_node(model::Node::default());
+
         let mut params: &[_] = &[];
         let mut regions: &[_] = &[];
 
-        fn make_custom(name: &'static str) -> model::Operation {
-            model::Operation::Custom {
-                operation: model::GlobalRef::Named(name),
-            }
-        }
+        let optype = self.hugr.get_optype(node);
 
-        let operation = match self.hugr.get_optype(node) {
+        let operation = match optype {
             OpType::Module(_) => todo!("this should be an error"),
 
             OpType::Input(_) => {
@@ -217,51 +208,51 @@ impl<'a> Context<'a> {
                 model::Operation::Block
             }
 
-            OpType::FuncDefn(func) => {
-                let name = self.get_func_name(node).unwrap();
-                let (params, func) = self.export_poly_func_type(&func.signature);
-                let decl = self.bump.alloc(model::FuncDecl {
+            OpType::FuncDefn(func) => self.with_local_scope(node_id, |this| {
+                let name = this.get_func_name(node).unwrap();
+                let (params, func) = this.export_poly_func_type(&func.signature);
+                let decl = this.bump.alloc(model::FuncDecl {
                     name,
                     params,
                     signature: func,
                 });
-                regions = self.bump.alloc_slice_copy(&[self.export_dfg(node)]);
+                regions = this.bump.alloc_slice_copy(&[this.export_dfg(node)]);
                 model::Operation::DefineFunc { decl }
-            }
+            }),
 
-            OpType::FuncDecl(func) => {
-                let name = self.get_func_name(node).unwrap();
-                let (params, func) = self.export_poly_func_type(&func.signature);
-                let decl = self.bump.alloc(model::FuncDecl {
+            OpType::FuncDecl(func) => self.with_local_scope(node_id, |this| {
+                let name = this.get_func_name(node).unwrap();
+                let (params, func) = this.export_poly_func_type(&func.signature);
+                let decl = this.bump.alloc(model::FuncDecl {
                     name,
                     params,
                     signature: func,
                 });
                 model::Operation::DeclareFunc { decl }
-            }
+            }),
 
-            OpType::AliasDecl(alias) => {
+            OpType::AliasDecl(alias) => self.with_local_scope(node_id, |this| {
                 // TODO: We should support aliases with different types and with parameters
-                let r#type = self.module.insert_term(model::Term::Type);
-                let decl = self.bump.alloc(model::AliasDecl {
+                let r#type = this.make_term(model::Term::Type);
+                let decl = this.bump.alloc(model::AliasDecl {
                     name: &alias.name,
                     params: &[],
                     r#type,
                 });
                 model::Operation::DeclareAlias { decl }
-            }
+            }),
 
-            OpType::AliasDefn(alias) => {
-                let value = self.export_type(&alias.definition);
+            OpType::AliasDefn(alias) => self.with_local_scope(node_id, |this| {
+                let value = this.export_type(&alias.definition);
                 // TODO: We should support aliases with different types and with parameters
-                let r#type = self.module.insert_term(model::Term::Type);
-                let decl = self.bump.alloc(model::AliasDecl {
+                let r#type = this.make_term(model::Term::Type);
+                let decl = this.bump.alloc(model::AliasDecl {
                     name: &alias.name,
                     params: &[],
                     r#type,
                 });
                 model::Operation::DefineAlias { decl, value }
-            }
+            }),
 
             OpType::Call(call) => {
                 // TODO: If the node is not connected to a function, we should do better than panic.
@@ -272,9 +263,7 @@ impl<'a> Context<'a> {
                 args.extend(call.type_args.iter().map(|arg| self.export_type_arg(arg)));
                 let args = args.into_bump_slice();
 
-                let func = self
-                    .module
-                    .insert_term(model::Term::ApplyFull { global: name, args });
+                let func = self.make_term(model::Term::ApplyFull { global: name, args });
                 model::Operation::CallFunc { func }
             }
 
@@ -287,16 +276,16 @@ impl<'a> Context<'a> {
                 args.extend(load.type_args.iter().map(|arg| self.export_type_arg(arg)));
                 let args = args.into_bump_slice();
 
-                let func = self
-                    .module
-                    .insert_term(model::Term::ApplyFull { global: name, args });
+                let func = self.make_term(model::Term::ApplyFull { global: name, args });
                 model::Operation::LoadFunc { func }
             }
 
             OpType::Const(_) => todo!("Export const nodes?"),
             OpType::LoadConstant(_) => todo!("Export load constant?"),
 
-            OpType::CallIndirect(_) => make_custom(OP_FUNC_CALL_INDIRECT),
+            OpType::CallIndirect(_) => model::Operation::CustomFull {
+                operation: model::GlobalRef::Named(OP_FUNC_CALL_INDIRECT),
+            },
 
             OpType::Tag(tag) => model::Operation::Tag { tag: tag.tag as _ },
 
@@ -314,10 +303,7 @@ impl<'a> Context<'a> {
             // regions of potentially different kinds. At the moment, we check if the node has any
             // children, in which case we create a dataflow region with those children.
             OpType::ExtensionOp(op) => {
-                let name =
-                    self.bump
-                        .alloc_str(&format!("{}.{}", op.def().extension(), op.def().name()));
-                let operation = model::GlobalRef::Named(name);
+                let operation = self.make_named_global_ref(op.def().extension(), op.def().name());
 
                 params = self
                     .bump
@@ -327,14 +313,11 @@ impl<'a> Context<'a> {
                     regions = self.bump.alloc_slice_copy(&[region]);
                 }
 
-                model::Operation::Custom { operation }
+                model::Operation::CustomFull { operation }
             }
 
             OpType::OpaqueOp(op) => {
-                let name = self
-                    .bump
-                    .alloc_str(&format!("{}.{}", op.extension(), op.op_name()));
-                let operation = model::GlobalRef::Named(name);
+                let operation = self.make_named_global_ref(op.extension(), op.op_name());
 
                 params = self
                     .bump
@@ -344,13 +327,35 @@ impl<'a> Context<'a> {
                     regions = self.bump.alloc_slice_copy(&[region]);
                 }
 
-                model::Operation::Custom { operation }
+                model::Operation::CustomFull { operation }
             }
         };
 
-        let signature = self.module.insert_term(model::Term::Wildcard);
+        let (signature, num_inputs, num_outputs) = match optype {
+            OpType::DataflowBlock(block) => {
+                let signature = self.export_block_signature(block);
+                (Some(signature), 1, block.sum_rows.len())
+            }
 
-        self.module.insert_node(model::Node {
+            // PERFORMANCE: As it stands, `OpType::dataflow_signature` copies and/or allocates.
+            // That might not seem like a big deal, but it's a significant portion of the time spent
+            // when exporting. However it is not trivial to change this at the moment.
+            _ => match &optype.dataflow_signature() {
+                Some(signature) => {
+                    let num_inputs = signature.input_types().len();
+                    let num_outputs = signature.output_types().len();
+                    let signature = self.export_func_type(signature);
+                    (Some(signature), num_inputs, num_outputs)
+                }
+                None => (None, 0, 0),
+            },
+        };
+
+        let inputs = self.make_ports(node, Direction::Incoming, num_inputs);
+        let outputs = self.make_ports(node, Direction::Outgoing, num_outputs);
+
+        // Replace the placeholder node with the actual node.
+        *self.module.get_node_mut(node_id).unwrap() = model::Node {
             operation,
             inputs,
             outputs,
@@ -358,6 +363,65 @@ impl<'a> Context<'a> {
             regions,
             meta: &[], // TODO: Export metadata
             signature,
+        };
+
+        node_id
+    }
+
+    /// Export the signature of a `DataflowBlock`. Here we can't use `OpType::dataflow_signature`
+    /// like for the other nodes since the ports are control flow ports.
+    pub fn export_block_signature(&mut self, block: &DataflowBlock) -> model::TermId {
+        let inputs = {
+            let mut inputs = BumpVec::with_capacity_in(block.inputs.len(), self.bump);
+            for input in block.inputs.iter() {
+                inputs.push(self.export_type(input));
+            }
+            let inputs = self.make_term(model::Term::List {
+                items: inputs.into_bump_slice(),
+                tail: None,
+            });
+            let inputs = self.make_term(model::Term::Control { values: inputs });
+            self.make_term(model::Term::List {
+                items: self.bump.alloc_slice_copy(&[inputs]),
+                tail: None,
+            })
+        };
+
+        let tail = {
+            let mut tail = BumpVec::with_capacity_in(block.other_outputs.len(), self.bump);
+            for other_output in block.other_outputs.iter() {
+                tail.push(self.export_type(other_output));
+            }
+            self.make_term(model::Term::List {
+                items: tail.into_bump_slice(),
+                tail: None,
+            })
+        };
+
+        let outputs = {
+            let mut outputs = BumpVec::with_capacity_in(block.sum_rows.len(), self.bump);
+            for sum_row in block.sum_rows.iter() {
+                let mut variant = BumpVec::with_capacity_in(sum_row.len(), self.bump);
+                for typ in sum_row.iter() {
+                    variant.push(self.export_type(typ));
+                }
+                let variant = self.make_term(model::Term::List {
+                    items: variant.into_bump_slice(),
+                    tail: Some(tail),
+                });
+                outputs.push(self.make_term(model::Term::Control { values: variant }));
+            }
+            self.make_term(model::Term::List {
+                items: outputs.into_bump_slice(),
+                tail: None,
+            })
+        };
+
+        let extensions = self.export_ext_set(&block.extension_delta);
+        self.make_term(model::Term::FuncType {
+            inputs,
+            outputs,
+            extensions,
         })
     }
 
@@ -380,16 +444,17 @@ impl<'a> Context<'a> {
 
         // The first child is an `Input` node, which we use to determine the region's sources.
         let input_node = children.next().unwrap();
-        assert!(matches!(self.hugr.get_optype(input_node), OpType::Input(_)));
-        let sources = self.make_ports(input_node, Direction::Outgoing);
+        let OpType::Input(input_op) = self.hugr.get_optype(input_node) else {
+            panic!("expected an `Input` node as the first child node");
+        };
+        let sources = self.make_ports(input_node, Direction::Outgoing, input_op.types.len());
 
         // The second child is an `Output` node, which we use to determine the region's targets.
         let output_node = children.next().unwrap();
-        assert!(matches!(
-            self.hugr.get_optype(output_node),
-            OpType::Output(_)
-        ));
-        let targets = self.make_ports(output_node, Direction::Incoming);
+        let OpType::Output(output_op) = self.hugr.get_optype(output_node) else {
+            panic!("expected an `Output` node as the second child node");
+        };
+        let targets = self.make_ports(output_node, Direction::Incoming, output_op.types.len());
 
         // Export the remaining children of the node.
         let mut region_children = BumpVec::with_capacity_in(children.len(), self.bump);
@@ -398,8 +463,20 @@ impl<'a> Context<'a> {
             region_children.push(self.export_node(child));
         }
 
-        // TODO: We can determine the type of the region
-        let signature = self.module.insert_term(model::Term::Wildcard);
+        let signature = {
+            let inputs = self.export_type_row(&input_op.types);
+            let outputs = self.export_type_row(&output_op.types);
+            // TODO: What about the extensions?
+            let extensions = self.make_term(model::Term::ExtSet {
+                extensions: &[],
+                rest: None,
+            });
+            Some(self.make_term(model::Term::FuncType {
+                inputs,
+                outputs,
+                extensions,
+            }))
+        };
 
         self.module.insert_region(model::Region {
             kind: model::RegionKind::DataFlow,
@@ -421,12 +498,11 @@ impl<'a> Context<'a> {
         // first input port of the exported entry block.
         let entry_block = children.next().unwrap();
 
-        assert!(matches!(
-            self.hugr.get_optype(entry_block),
-            OpType::DataflowBlock(_)
-        ));
+        let OpType::DataflowBlock(_) = self.hugr.get_optype(entry_block) else {
+            panic!("expected a `DataflowBlock` node as the first child node");
+        };
 
-        let source = self.make_port(entry_block, IncomingPort::from(0)).unwrap();
+        let source = model::LinkRef::Id(self.get_link_id(entry_block, IncomingPort::from(0)));
         region_children.push(self.export_node(entry_block));
 
         // Export the remaining children of the node, except for the last one.
@@ -440,15 +516,15 @@ impl<'a> Context<'a> {
         // as the target ports of the control flow region.
         let exit_block = children.next().unwrap();
 
-        assert!(matches!(
-            self.hugr.get_optype(exit_block),
-            OpType::ExitBlock(_)
-        ));
+        let OpType::ExitBlock(_) = self.hugr.get_optype(exit_block) else {
+            panic!("expected an `ExitBlock` node as the last child node");
+        };
 
-        let targets = self.make_ports(exit_block, Direction::Incoming);
+        let targets = self.make_ports(exit_block, Direction::Incoming, 1);
 
-        // TODO: We can determine the type of the region
-        let signature = self.module.insert_term(model::Term::Wildcard);
+        // Get the signature of the control flow region.
+        // This is the same as the signature of the parent node.
+        let signature = Some(self.export_func_type(&self.hugr.signature(node).unwrap()));
 
         self.module.insert_region(model::Region {
             kind: model::RegionKind::ControlFlow,
@@ -501,14 +577,13 @@ impl<'a> Context<'a> {
             TypeEnum::Alias(alias) => {
                 let name = model::GlobalRef::Named(self.bump.alloc_str(alias.name()));
                 let args = &[];
-                self.module
-                    .insert_term(model::Term::ApplyFull { global: name, args })
+                self.make_term(model::Term::ApplyFull { global: name, args })
             }
             TypeEnum::Function(func) => self.export_func_type(func),
             TypeEnum::Variable(index, _) => {
                 // This ignores the type bound for now
-                self.module
-                    .insert_term(model::Term::Var(model::LocalRef::Index(*index as _)))
+                let node = self.local_scope.expect("local variable out of scope");
+                self.make_term(model::Term::Var(model::LocalRef::Index(node, *index as _)))
             }
             TypeEnum::RowVar(rv) => self.export_row_var(rv.as_rv()),
             TypeEnum::Sum(sum) => self.export_sum_type(sum),
@@ -519,7 +594,7 @@ impl<'a> Context<'a> {
         let inputs = self.export_type_row(t.input());
         let outputs = self.export_type_row(t.output());
         let extensions = self.export_ext_set(&t.extension_reqs);
-        self.module.insert_term(model::Term::FuncType {
+        self.make_term(model::Term::FuncType {
             inputs,
             outputs,
             extensions,
@@ -527,30 +602,26 @@ impl<'a> Context<'a> {
     }
 
     pub fn export_custom_type(&mut self, t: &CustomType) -> model::TermId {
-        let name = format!("{}.{}", t.extension(), t.name());
-        let name = model::GlobalRef::Named(self.bump.alloc_str(&name));
+        let global = self.make_named_global_ref(t.extension(), t.name());
 
         let args = self
             .bump
             .alloc_slice_fill_iter(t.args().iter().map(|p| self.export_type_arg(p)));
-        let term = model::Term::ApplyFull { global: name, args };
-        self.module.insert_term(term)
+        let term = model::Term::ApplyFull { global, args };
+        self.make_term(term)
     }
 
     pub fn export_type_arg(&mut self, t: &TypeArg) -> model::TermId {
         match t {
             TypeArg::Type { ty } => self.export_type(ty),
-            TypeArg::BoundedNat { n } => self.module.insert_term(model::Term::Nat(*n)),
-            TypeArg::String { arg } => self
-                .module
-                .insert_term(model::Term::Str(self.bump.alloc_str(arg))),
+            TypeArg::BoundedNat { n } => self.make_term(model::Term::Nat(*n)),
+            TypeArg::String { arg } => self.make_term(model::Term::Str(self.bump.alloc_str(arg))),
             TypeArg::Sequence { elems } => {
                 // For now we assume that the sequence is meant to be a list.
                 let items = self
                     .bump
                     .alloc_slice_fill_iter(elems.iter().map(|elem| self.export_type_arg(elem)));
-                self.module
-                    .insert_term(model::Term::List { items, tail: None })
+                self.make_term(model::Term::List { items, tail: None })
             }
             TypeArg::Extensions { es } => self.export_ext_set(es),
             TypeArg::Variable { v } => self.export_type_arg_var(v),
@@ -558,35 +629,38 @@ impl<'a> Context<'a> {
     }
 
     pub fn export_type_arg_var(&mut self, var: &TypeArgVariable) -> model::TermId {
-        self.module
-            .insert_term(model::Term::Var(model::LocalRef::Index(var.index() as _)))
+        let node = self.local_scope.expect("local variable out of scope");
+        self.make_term(model::Term::Var(model::LocalRef::Index(
+            node,
+            var.index() as _,
+        )))
     }
 
     pub fn export_row_var(&mut self, t: &RowVariable) -> model::TermId {
-        self.module
-            .insert_term(model::Term::Var(model::LocalRef::Index(t.0 as _)))
+        let node = self.local_scope.expect("local variable out of scope");
+        self.make_term(model::Term::Var(model::LocalRef::Index(node, t.0 as _)))
     }
 
     pub fn export_sum_type(&mut self, t: &SumType) -> model::TermId {
         match t {
             SumType::Unit { size } => {
                 let items = self.bump.alloc_slice_fill_iter((0..*size).map(|_| {
-                    self.module.insert_term(model::Term::List {
+                    self.make_term(model::Term::List {
                         items: &[],
                         tail: None,
                     })
                 }));
                 let list = model::Term::List { items, tail: None };
-                let variants = self.module.insert_term(list);
-                self.module.insert_term(model::Term::Adt { variants })
+                let variants = self.make_term(list);
+                self.make_term(model::Term::Adt { variants })
             }
             SumType::General { rows } => {
                 let items = self
                     .bump
                     .alloc_slice_fill_iter(rows.iter().map(|row| self.export_type_row(row)));
                 let list = model::Term::List { items, tail: None };
-                let variants = { self.module.insert_term(list) };
-                self.module.insert_term(model::Term::Adt { variants })
+                let variants = { self.make_term(list) };
+                self.make_term(model::Term::Adt { variants })
             }
         }
     }
@@ -595,36 +669,33 @@ impl<'a> Context<'a> {
         let mut items = BumpVec::with_capacity_in(t.len(), self.bump);
         items.extend(t.iter().map(|row| self.export_type(row)));
         let items = items.into_bump_slice();
-        self.module
-            .insert_term(model::Term::List { items, tail: None })
+        self.make_term(model::Term::List { items, tail: None })
     }
 
     pub fn export_type_param(&mut self, t: &TypeParam) -> model::TermId {
         match t {
             // This ignores the type bound for now.
-            TypeParam::Type { .. } => self.module.insert_term(model::Term::Type),
+            TypeParam::Type { .. } => self.make_term(model::Term::Type),
             // This ignores the type bound for now.
-            TypeParam::BoundedNat { .. } => self.module.insert_term(model::Term::NatType),
-            TypeParam::String => self.module.insert_term(model::Term::StrType),
+            TypeParam::BoundedNat { .. } => self.make_term(model::Term::NatType),
+            TypeParam::String => self.make_term(model::Term::StrType),
             TypeParam::List { param } => {
                 let item_type = self.export_type_param(param);
-                self.module.insert_term(model::Term::ListType { item_type })
+                self.make_term(model::Term::ListType { item_type })
             }
             TypeParam::Tuple { params } => {
                 let items = self.bump.alloc_slice_fill_iter(
                     params.iter().map(|param| self.export_type_param(param)),
                 );
-                let types = self
-                    .module
-                    .insert_term(model::Term::List { items, tail: None });
-                self.module.insert_term(model::Term::ApplyFull {
+                let types = self.make_term(model::Term::List { items, tail: None });
+                self.make_term(model::Term::ApplyFull {
                     global: model::GlobalRef::Named(TERM_PARAM_TUPLE),
                     args: self.bump.alloc_slice_copy(&[types]),
                 })
             }
             TypeParam::Extensions => {
                 let term = model::Term::ExtSetType;
-                self.module.insert_term(term)
+                self.make_term(term)
             }
         }
     }
@@ -664,9 +735,10 @@ impl<'a> Context<'a> {
                     panic!("Extension set with multiple variables")
                 }
 
+                let node = self.local_scope.expect("local variable out of scope");
                 rest = Some(
                     self.module
-                        .insert_term(model::Term::Var(model::LocalRef::Index(index as _))),
+                        .insert_term(model::Term::Var(model::LocalRef::Index(node, index as _))),
                 );
             } else {
                 extensions.push(self.bump.alloc_str(ext) as &str);
@@ -675,8 +747,7 @@ impl<'a> Context<'a> {
 
         let extensions = extensions.into_bump_slice();
 
-        self.module
-            .insert_term(model::Term::ExtSet { extensions, rest })
+        self.make_term(model::Term::ExtSet { extensions, rest })
     }
 }
 
