@@ -10,7 +10,7 @@ use super::{
 /// 1. Get a new instance via [Self::default()]
 /// 2. Zero or more [Self::propolutate_out_wires] with initial values
 /// 3. Exactly one [Self::run] to do the analysis
-/// 4. Results then available via [Self::read_out_wire_partial_value]
+/// 4. Results then available via [Self::read_out_wire]
 pub struct Machine<V: AbstractValue, C: DFContext<V>>(
     AscentProgram<V, C>,
     Option<HashMap<Wire, PartialValue<V>>>,
@@ -57,7 +57,7 @@ impl<V: AbstractValue, C: DFContext<V>> Machine<V, C> {
     }
 
     /// Gets the lattice value computed by [Self::run] for the given wire
-    pub fn read_out_wire_partial_value(&self, w: Wire) -> Option<PartialValue<V>> {
+    pub fn read_out_wire(&self, w: Wire) -> Option<PartialValue<V>> {
         self.1.as_ref().unwrap().get(&w).cloned()
     }
 

@@ -30,7 +30,7 @@ fn test_make_tuple() {
     machine.run(HugrValueContext::new(&hugr));
 
     let x = machine
-        .read_out_wire_partial_value(v3)
+        .read_out_wire(v3)
         .unwrap()
         .try_into_wire_value(&hugr, v3)
         .unwrap();
@@ -51,13 +51,13 @@ fn test_unpack_tuple_const() {
     machine.run(HugrValueContext::new(&hugr));
 
     let o1_r = machine
-        .read_out_wire_partial_value(o1)
+        .read_out_wire(o1)
         .unwrap()
         .try_into_wire_value(&hugr, o1)
         .unwrap();
     assert_eq!(o1_r, Value::false_val());
     let o2_r = machine
-        .read_out_wire_partial_value(o2)
+        .read_out_wire(o2)
         .unwrap()
         .try_into_wire_value(&hugr, o2)
         .unwrap();
@@ -78,7 +78,7 @@ fn test_unpack_const() {
     machine.run(HugrValueContext::new(&hugr));
 
     let o_r = machine
-        .read_out_wire_partial_value(o)
+        .read_out_wire(o)
         .unwrap()
         .try_into_wire_value(&hugr, o)
         .unwrap();
@@ -110,7 +110,7 @@ fn test_tail_loop_never_iterates() {
     // dbg!(&machine.out_wire_value);
 
     let o_r = machine
-        .read_out_wire_partial_value(tl_o)
+        .read_out_wire(tl_o)
         .unwrap()
         .try_into_wire_value(&hugr, tl_o)
         .unwrap();
@@ -143,9 +143,9 @@ fn test_tail_loop_always_iterates() {
     let mut machine = Machine::default();
     machine.run(HugrValueContext::new(&hugr));
 
-    let o_r1 = machine.read_out_wire_partial_value(tl_o1).unwrap();
+    let o_r1 = machine.read_out_wire(tl_o1).unwrap();
     assert_eq!(o_r1, PartialValue::bottom());
-    let o_r2 = machine.read_out_wire_partial_value(tl_o2).unwrap();
+    let o_r2 = machine.read_out_wire(tl_o2).unwrap();
     assert_eq!(o_r2, PartialValue::bottom());
     assert_eq!(
         Some(TailLoopTermination::Bottom),
@@ -197,9 +197,9 @@ fn test_tail_loop_iterates_twice() {
     // dbg!(&machine.out_wire_value);
 
     // TODO these hould be the propagated values for now they will bt join(true,false)
-    let _ = machine.read_out_wire_partial_value(o_w1).unwrap();
+    let _ = machine.read_out_wire(o_w1).unwrap();
     // assert_eq!(o_r1, PartialValue::top());
-    let _ = machine.read_out_wire_partial_value(o_w2).unwrap();
+    let _ = machine.read_out_wire(o_w2).unwrap();
     // assert_eq!(o_r2, Value::true_val());
     assert_eq!(
         Some(TailLoopTermination::Top),
@@ -254,13 +254,13 @@ fn conditional() {
     machine.run(HugrValueContext::new(&hugr));
 
     let cond_r1 = machine
-        .read_out_wire_partial_value(cond_o1)
+        .read_out_wire(cond_o1)
         .unwrap()
         .try_into_wire_value(&hugr, cond_o1)
         .unwrap();
     assert_eq!(cond_r1, Value::false_val());
     assert!(machine
-        .read_out_wire_partial_value(cond_o2)
+        .read_out_wire(cond_o2)
         .unwrap()
         .try_into_wire_value(&hugr, cond_o2)
         .is_err());
