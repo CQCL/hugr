@@ -39,6 +39,28 @@ impl IdentList {
         }
     }
 
+    /// Split off the last component of the path, returning the prefix and suffix.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use hugr_core::hugr::IdentList;
+    /// assert_eq!(
+    ///     IdentList::new("foo.bar.baz").unwrap().split_last(),
+    ///     Some((IdentList::new_unchecked("foo.bar"), "baz".into()))
+    /// );
+    /// assert_eq!(
+    ///    IdentList::new("foo").unwrap().split_last(),
+    ///    None
+    /// );
+    /// ```
+    pub fn split_last(&self) -> Option<(IdentList, SmolStr)> {
+        let (prefix, suffix) = self.0.rsplit_once('.')?;
+        let prefix = Self::new_unchecked(prefix);
+        let suffix = suffix.into();
+        Some((prefix, suffix))
+    }
+
     /// Create a new [IdentList] *without* doing the well-formedness check.
     /// This is a backdoor to be used sparingly, as we rely upon callers to
     /// validate names themselves. In tests, instead the [crate::const_extension_ids]

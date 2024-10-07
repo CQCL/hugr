@@ -1,0 +1,8 @@
+(hugr 0)
+
+(define-func example.swap
+  ; The types of the values to be swapped are passed as implicit parameters.
+  (forall ?a type)
+  (forall ?b type)
+  [?a ?b] [?b ?a] (ext)
+  (dfg [(%a ?a) (%b ?b)] [(%b ?b) (%a ?a)]))

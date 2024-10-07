@@ -19,6 +19,11 @@ workspace = true
 [features]
 extension_inference = []
 declarative = ["serde_yaml"]
+model_unstable = ["hugr-model"]
+
+[[test]]
+name = "model"
+required-features = ["model_unstable"]
 
 [dependencies]
 portgraph = { workspace = true, features = ["serde", "petgraph"] }
@@ -32,7 +37,7 @@ serde = { workspace = true, features = ["derive", "rc"] }
 serde_yaml = { workspace = true, optional = true }
 typetag = { workspace = true }
 smol_str = { workspace = true, features = ["serde"] }
-derive_more = { workspace = true, features=["display", "from"]}
+derive_more = { workspace = true, features = ["display", "from"] }
 itertools = { workspace = true }
 html-escape = { workspace = true }
 bitvec = { workspace = true, features = ["serde"] }
@@ -46,6 +51,10 @@ paste = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
 semver = { version = "1.0.23", features = ["serde"] }
+hugr-model = { path = "../hugr-model", optional = true }
+indexmap.workspace = true
+fxhash.workspace = true
+bumpalo = { workspace = true, features = ["collections"] }
 
 [dev-dependencies]
 rstest = { workspace = true }
@@ -61,3 +70,4 @@ regex-syntax = { workspace = true }
 
 # Required for documentation examples
 hugr = { path = "../hugr" }
+serde_yaml = "0.9.34"

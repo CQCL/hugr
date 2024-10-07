@@ -1,0 +1,26 @@
+[package]
+name = "hugr-model"
+version = "0.1.0"
+readme = "README.md"
+documentation = "https://docs.rs/hugr-model/"
+description = "Data model for Quantinuum's HUGR intermediate representation"
+keywords = ["Quantum", "Quantinuum"]
+categories = ["compilers"]
+rust-version.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+bumpalo = { workspace = true, features = ["collections"] }
+fxhash.workspace = true
+indexmap.workspace = true
+pest = "2.7.12"
+pest_derive = "2.7.12"
+pretty = "0.12.3"
+smol_str = { workspace = true, features = ["serde"] }
+thiserror.workspace = true
+
+[lints]
+workspace = true

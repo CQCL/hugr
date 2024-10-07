@@ -1,0 +1,10 @@
+(hugr 0)
+
+(define-func example.add
+  [(@ arithmetic.int.types.int) (@ arithmetic.int.types.int)]
+  [(@ arithmetic.int.types.int)]
+  (ext)
+  (dfg
+    [(%0 (@ arithmetic.int.types.int)) (%1 (@ arithmetic.int.types.int))]
+    [(%2 (@ arithmetic.int.types.int))]
+    ((@ arithmetic.int.iadd) [(%0 (@ arithmetic.int.types.int)) (%1 (@ arithmetic.int.types.int))] [(%2 (@ arithmetic.int.types.int))])))

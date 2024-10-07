@@ -1,0 +1,9 @@
+(hugr 0)
+
+(define-func example.loop
+  (forall ?a type)
+  [?a] [?a] (ext)
+  (dfg [(%0 ?a)] [(%1 ?a)]
+    (tail-loop [(%0 ?a)] [(%1 ?a)]
+      (dfg [(%2 ?a)] [(%3 (adt [[?a] [?a]]))]
+        (tag 0 [(%2 ?a)] [(%3 (adt [[?a] [?a]]))])))))
