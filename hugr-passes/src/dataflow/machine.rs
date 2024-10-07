@@ -2,16 +2,16 @@ use std::collections::HashMap;
 
 use hugr_core::{HugrView, Node, PortIndex, Wire};
 
-use super::{datalog::AscentProgram, AbstractValue, DFContext, PartialValue};
+use super::{datalog::AscentProgram, AbstractValue, DFContext};
 
 /// Basic structure for performing an analysis. Usage:
 /// 1. Get a new instance via [Self::default()]
 /// 2. Zero or more [Self::propolutate_out_wires] with initial values
 /// 3. Exactly one [Self::run] to do the analysis
 /// 4. Results then available via [Self::read_out_wire]
-pub struct Machine<V: AbstractValue, C: DFContext<V>>(
-    AscentProgram<V, C>,
-    Option<HashMap<Wire, PartialValue<V>>>,
+pub struct Machine<PV: AbstractValue, C: DFContext<PV>>(
+    AscentProgram<PV, C>,
+    Option<HashMap<Wire, PV>>,
 );
 
 /// derived-Default requires the context to be Defaultable, which is unnecessary
@@ -21,13 +21,10 @@ impl<V: AbstractValue, C: DFContext<V>> Default for Machine<V, C> {
     }
 }
 
-impl<V: AbstractValue, C: DFContext<V>> Machine<V, C> {
+impl<PV: AbstractValue, C: DFContext<PV>> Machine<PV, C> {
     /// Provide initial values for some wires.
     /// (For example, if some properties of the Hugr's inputs are known.)
-    pub fn propolutate_out_wires(
-        &mut self,
-        wires: impl IntoIterator<Item = (Wire, PartialValue<V>)>,
-    ) {
+    pub fn propolutate_out_wires(&mut self, wires: impl IntoIterator<Item = (Wire, PV)>) {
         assert!(self.1.is_none());
         self.0
             .out_wire_value_proto
@@ -55,7 +52,7 @@ impl<V: AbstractValue, C: DFContext<V>> Machine<V, C> {
     }
 
     /// Gets the lattice value computed by [Self::run] for the given wire
-    pub fn read_out_wire(&self, w: Wire) -> Option<PartialValue<V>> {
+    pub fn read_out_wire(&self, w: Wire) -> Option<PV> {
         self.1.as_ref().unwrap().get(&w).cloned()
     }
 
@@ -109,7 +106,7 @@ pub enum TailLoopTermination {
 }
 
 impl TailLoopTermination {
-    pub fn from_control_value<V: AbstractValue>(v: &PartialValue<V>) -> Self {
+    pub fn from_control_value(v: &impl AbstractValue) -> Self {
         let (may_continue, may_break) = (v.supports_tag(0), v.supports_tag(1));
         if may_break && !may_continue {
             Self::ExactlyZeroContinues

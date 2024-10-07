@@ -7,7 +7,7 @@ use hugr_core::ops::Value;
 use hugr_core::types::Type;
 use hugr_core::Node;
 
-use crate::dataflow::AbstractValue;
+use crate::dataflow::BaseValue;
 
 #[derive(Clone, Debug)]
 pub struct HashedConst {
@@ -85,7 +85,7 @@ impl ValueHandle {
     }
 }
 
-impl AbstractValue for ValueHandle {
+impl BaseValue for ValueHandle {
     fn as_sum(&self) -> Option<(usize, impl Iterator<Item = Self> + '_)> {
         match self.value() {
             Value::Sum(Sum { tag, values, .. }) => Some((

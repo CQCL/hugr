@@ -16,12 +16,7 @@ use std::ops::{Index, IndexMut};
 use hugr_core::extension::prelude::{MakeTuple, UnpackTuple};
 use hugr_core::ops::OpType;
 use hugr_core::types::Signature;
-use hugr_core::{HugrView, IncomingPort, Node, OutgoingPort, PortIndex as _};
-
-use super::partial_value::{AbstractValue, PartialValue};
-use super::DFContext;
-
-type PV<V> = super::partial_value::PartialValue<V>;
+use hugr_core::{Hugr, HugrView, IncomingPort, Node, OutgoingPort, PortIndex as _};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum IO {
@@ -29,19 +24,50 @@ pub enum IO {
     Output,
 }
 
+/// Clients of the dataflow framework (particular analyses, such as constant folding)
+/// must implement this trait (including providing an appropriate domain type `PV`).
+pub trait DFContext<PV: AbstractValue>: Clone + Eq + Hash + std::ops::Deref<Target = Hugr> {
+    /// Given lattice values for each input, produce lattice values for (what we know of)
+    /// the outputs. Returning `None` indicates nothing can be deduced.
+    fn interpret_leaf_op(&self, node: Node, ins: &[PV]) -> Option<Vec<PV>>;
+}
+
+/// Values which can be the domain for dataflow analysis. Must be able to deconstructed
+/// into (and constructed from) Sums as these determine control flow.
+pub trait AbstractValue: BoundedLattice + Clone + Eq + Hash + std::fmt::Debug {
+    /// Create a new instance representing a Sum with a single known tag
+    /// and (recursive) representations of the elements within that tag.
+    fn new_variant(tag: usize, values: impl IntoIterator<Item = Self>) -> Self;
+
+    /// New instance of unit type (i.e. the only possible value, with no contents)
+    fn new_unit() -> Self {
+        Self::new_variant(0, [])
+    }
+
+    /// Test whether this value *might* be a Sum with the specified tag.
+    fn supports_tag(&self, tag: usize) -> bool;
+
+    /// If this value might be a Sum with the specified tag, return values
+    /// describing the elements of the Sum, otherwise `None`.
+    ///
+    /// Implementations must hold the invariant that for all `x`, `tag` and `len`:
+    ///  `x.variant_values(tag, len).is_some() == x.supports_tag(tag)`
+    fn variant_values(&self, tag: usize, len: usize) -> Option<Vec<Self>>;
+}
+
 ascent::ascent! {
-    pub(super) struct AscentProgram<V: AbstractValue, C: DFContext<V>>;
+    pub(super) struct AscentProgram<PV: AbstractValue, C: DFContext<PV>>;
     relation context(C);
-    relation out_wire_value_proto(Node, OutgoingPort, PV<V>);
+    relation out_wire_value_proto(Node, OutgoingPort, PV);
 
     relation node(C, Node);
     relation in_wire(C, Node, IncomingPort);
     relation out_wire(C, Node, OutgoingPort);
     relation parent_of_node(C, Node, Node);
     relation io_node(C, Node, Node, IO);
-    lattice out_wire_value(C, Node, OutgoingPort, PV<V>);
-    lattice node_in_value_row(C, Node, ValueRow<V>);
-    lattice in_wire_value(C, Node, IncomingPort, PV<V>);
+    lattice out_wire_value(C, Node, OutgoingPort, PV);
+    lattice node_in_value_row(C, Node, ValueRow<PV>);
+    lattice in_wire_value(C, Node, IncomingPort, PV);
 
     node(c, n) <-- context(c), for n in c.nodes();
 
@@ -144,11 +170,11 @@ ascent::ascent! {
 
 }
 
-fn propagate_leaf_op<V: AbstractValue>(
-    c: &impl DFContext<V>,
+fn propagate_leaf_op<PV: AbstractValue>(
+    c: &impl DFContext<PV>,
     n: Node,
-    ins: &[PV<V>],
-) -> Option<ValueRow<V>> {
+    ins: &[PV],
+) -> Option<ValueRow<PV>> {
     match c.get_optype(n) {
         // Handle basics here. I guess (given the current interface) we could allow
         // DFContext to handle these but at the least we'd want these impls to be
@@ -192,21 +218,21 @@ fn value_outputs(h: &impl HugrView, n: Node) -> impl Iterator<Item = OutgoingPor
 // Wrap a (known-length) row of values into a lattice. Perhaps could be part of partial_value.rs?
 
 #[derive(PartialEq, Clone, Eq, Hash)]
-struct ValueRow<V>(Vec<PartialValue<V>>);
+struct ValueRow<PV>(Vec<PV>);
 
-impl<V: AbstractValue> ValueRow<V> {
+impl<PV: AbstractValue> ValueRow<PV> {
     pub fn new(len: usize) -> Self {
-        Self(vec![PartialValue::bottom(); len])
+        Self(vec![PV::bottom(); len])
     }
 
-    pub fn single_known(len: usize, idx: usize, v: PartialValue<V>) -> Self {
+    pub fn single_known(len: usize, idx: usize, v: PV) -> Self {
         assert!(idx < len);
         let mut r = Self::new(len);
         r.0[idx] = v;
         r
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = &PartialValue<V>> {
+    pub fn iter(&self) -> impl Iterator<Item = &PV> {
         self.0.iter()
     }
 
@@ -214,7 +240,7 @@ impl<V: AbstractValue> ValueRow<V> {
         &self,
         variant: usize,
         len: usize,
-    ) -> Option<impl Iterator<Item = PartialValue<V>> + '_> {
+    ) -> Option<impl Iterator<Item = PV> + '_> {
         self[0]
             .variant_values(variant, len)
             .map(|vals| vals.into_iter().chain(self.iter().skip(1).cloned()))
@@ -225,13 +251,13 @@ impl<V: AbstractValue> ValueRow<V> {
     // }
 }
 
-impl<V> FromIterator<PartialValue<V>> for ValueRow<V> {
-    fn from_iter<T: IntoIterator<Item = PartialValue<V>>>(iter: T) -> Self {
+impl<PV> FromIterator<PV> for ValueRow<PV> {
+    fn from_iter<T: IntoIterator<Item = PV>>(iter: T) -> Self {
         Self(iter.into_iter().collect())
     }
 }
 
-impl<V: PartialEq> PartialOrd for ValueRow<V> {
+impl<V: PartialEq + PartialOrd> PartialOrd for ValueRow<V> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.0.partial_cmp(&other.0)
     }
@@ -267,30 +293,30 @@ impl<V: AbstractValue> Lattice for ValueRow<V> {
     }
 }
 
-impl<V> IntoIterator for ValueRow<V> {
-    type Item = PartialValue<V>;
+impl<PV> IntoIterator for ValueRow<PV> {
+    type Item = PV;
 
-    type IntoIter = <Vec<PartialValue<V>> as IntoIterator>::IntoIter;
+    type IntoIter = <Vec<PV> as IntoIterator>::IntoIter;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
     }
 }
 
-impl<V, Idx> Index<Idx> for ValueRow<V>
+impl<PV, Idx> Index<Idx> for ValueRow<PV>
 where
-    Vec<PartialValue<V>>: Index<Idx>,
+    Vec<PV>: Index<Idx>,
 {
-    type Output = <Vec<PartialValue<V>> as Index<Idx>>::Output;
+    type Output = <Vec<PV> as Index<Idx>>::Output;
 
     fn index(&self, index: Idx) -> &Self::Output {
         self.0.index(index)
     }
 }
 
-impl<V, Idx> IndexMut<Idx> for ValueRow<V>
+impl<PV, Idx> IndexMut<Idx> for ValueRow<PV>
 where
-    Vec<PartialValue<V>>: IndexMut<Idx>,
+    Vec<PV>: IndexMut<Idx>,
 {
     fn index_mut(&mut self, index: Idx) -> &mut Self::Output {
         self.0.index_mut(index)

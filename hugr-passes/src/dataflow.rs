@@ -2,30 +2,16 @@
 //! Dataflow analysis of Hugrs.
 
 mod datalog;
+pub use datalog::{AbstractValue, DFContext};
 
 mod machine;
 pub use machine::Machine;
 
 mod partial_value;
-pub use partial_value::{AbstractValue, PVEnum, PartialSum, PartialValue, Sum};
+pub use partial_value::{BaseValue, PVEnum, PartialSum, PartialValue, Sum};
 
 mod total_context;
 pub use total_context::TotalContext;
-
-use hugr_core::{Hugr, Node};
-use std::hash::Hash;
-
-/// Clients of the dataflow framework (particular analyses, such as constant folding)
-/// must implement this trait (including providing an appropriate domain type `V`).
-pub trait DFContext<V>: Clone + Eq + Hash + std::ops::Deref<Target = Hugr> {
-    /// Given lattice values for each input, produce lattice values for (what we know of)
-    /// the outputs. Returning `None` indicates nothing can be deduced.
-    fn interpret_leaf_op(
-        &self,
-        node: Node,
-        ins: &[PartialValue<V>],
-    ) -> Option<Vec<PartialValue<V>>>;
-}
 
 #[cfg(test)]
 mod test;

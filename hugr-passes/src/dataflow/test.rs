@@ -1,6 +1,6 @@
 use crate::{
     const_fold2::HugrValueContext,
-    dataflow::{machine::TailLoopTermination, Machine},
+    dataflow::{machine::TailLoopTermination, AbstractValue, Machine},
 };
 
 use ascent::{lattice::BoundedLattice, Lattice};
