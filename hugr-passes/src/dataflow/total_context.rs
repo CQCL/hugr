@@ -3,7 +3,7 @@ use std::hash::Hash;
 use ascent::lattice::BoundedLattice;
 use hugr_core::{ops::OpTrait, Hugr, HugrView, IncomingPort, Node, OutgoingPort, PortIndex};
 
-use super::partial_value::{AbstractValue, PartialValue, ValueOrSum};
+use super::partial_value::{AbstractValue, PartialValue, Sum};
 use super::DFContext;
 
 /// A simpler interface like [DFContext] but where the context only cares about
@@ -11,7 +11,7 @@ use super::DFContext;
 /// Sums of potentially multiple variants.
 pub trait TotalContext<V>: Clone + Eq + Hash + std::ops::Deref<Target = Hugr> {
     /// The representation of values on which [Self::interpret_leaf_op] operates
-    type InterpretableVal: TryFrom<ValueOrSum<V>>;
+    type InterpretableVal: From<V> + TryFrom<Sum<Self::InterpretableVal>>;
     /// Interpret a leaf op.
     /// `ins` gives the input ports for which we know (interpretable) values, and will be non-empty.
     /// Returns a list of output ports for which we know (abstract) values (may be empty).
@@ -37,11 +37,8 @@ impl<V: AbstractValue, T: TotalContext<V>> DFContext<V> for T {
             .zip(ins.iter())
             .filter_map(|((i, ty), pv)| {
                 pv.clone()
-                    .try_into_value(ty)
-                    // Discard PVs which don't produce ValueOrSum, i.e. Bottom/Top :-)
+                    .try_into_value::<<Self as TotalContext<V>>::InterpretableVal>(ty)
                     .ok()
-                    // And discard any ValueOrSum that don't produce V - this is a bit silent :-(
-                    .and_then(|v_s| T::InterpretableVal::try_from(v_s).ok())
                     .map(|v| (IncomingPort::from(i), v))
             })
             .collect::<Vec<_>>();

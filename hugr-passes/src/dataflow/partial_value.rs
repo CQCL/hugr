@@ -25,19 +25,18 @@ pub trait AbstractValue: Clone + std::fmt::Debug + PartialEq + Eq + Hash {
     fn as_sum(&self) -> Option<(usize, impl Iterator<Item = Self> + '_)>;
 }
 
-/// A struct returned from [PartialValue::try_into_value] and [PartialSum::try_into_value]
-/// indicating the value is either a single value or a sum with a single known tag.
+/// Represents a sum with a single/known tag, abstracted over the representation of the elements.
+/// (Identical to [Sum](hugr_core::ops::constant::Sum) except for the type abstraction.)
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum ValueOrSum<V> {
-    /// Single value in the domain `V`
-    Value(V),
-    /// Sum with a single known Tag
-    #[allow(missing_docs)]
-    Sum {
-        tag: usize,
-        items: Vec<Self>,
-        st: SumType,
-    },
+pub struct Sum<V> {
+    /// The tag index of the variant.
+    pub tag: usize,
+    /// The value of the variant.
+    ///
+    /// Sum variants are always a row of values, hence the Vec.
+    pub values: Vec<V>,
+    /// The full type of the Sum, including the other variants.
+    pub st: SumType,
 }
 
 /// A representation of a value of [SumType], that may have one or more possible tags,
@@ -130,10 +129,14 @@ impl<V: AbstractValue> PartialSum<V> {
         self.0.contains_key(&tag)
     }
 
-    /// Turns this instance into a [ValueOrSum::Sum] if it has exactly one possible tag,
+    /// Turns this instance into a [Sum] if it has exactly one possible tag,
     /// otherwise failing and returning itself back unmodified (also if there is another
     /// error, e.g. this instance is not described by `typ`).
-    pub fn try_into_value(self, typ: &Type) -> Result<ValueOrSum<V>, Self> {
+    // ALAN is this too parametric? Should we fix V2 == Value? Is the 'Self' error useful (no?)
+    pub fn try_into_value<V2: From<V> + TryFrom<Sum<V2>>>(
+        self,
+        typ: &Type,
+    ) -> Result<Sum<V2>, Self> {
         let Ok((k, v)) = self.0.iter().exactly_one() else {
             Err(self)?
         };
@@ -154,9 +157,9 @@ impl<V: AbstractValue> PartialSum<V> {
             .map(|(v, t)| v.clone().try_into_value(t))
             .collect::<Result<Vec<_>, _>>()
         {
-            Ok(vs) => Ok(ValueOrSum::Sum {
+            Ok(values) => Ok(Sum {
                 tag: *k,
-                items: vs,
+                values,
                 st: st.clone(),
             }),
             Err(_) => Err(self),
@@ -313,14 +316,28 @@ impl<V: AbstractValue> PartialValue<V> {
         }
     }
 
-    /// Extracts a [ValueOrSum] if there is such a single representation,
-    /// given a [Type]
-    pub fn try_into_value(self, typ: &Type) -> Result<ValueOrSum<V>, Self> {
+    /// Extracts a value (in any representation supporting both leaf values and sums)
+    // ALAN is this too parametric? Should we fix V2 == Value? Is the error useful (should we have 'Self') or is it a smell?
+    pub fn try_into_value<V2: From<V> + TryFrom<Sum<V2>>>(
+        self,
+        typ: &Type,
+    ) -> Result<V2, Option<<V2 as TryFrom<Sum<V2>>>::Error>> {
         match self.0 {
-            PVEnum::Value(v) => Ok(ValueOrSum::Value(v.clone())),
-            PVEnum::Sum(ps) => ps.try_into_value(typ).map_err(Self::from),
-            _ => Err(self),
+            PVEnum::Value(v) => Ok(V2::from(v.clone())),
+            PVEnum::Sum(ps) => {
+                let v = ps.try_into_value(typ).map_err(|_| None)?;
+                V2::try_from(v).map_err(Some)
+            }
+            _ => Err(None),
         }
+    }
+}
+
+impl TryFrom<Sum<Value>> for Value {
+    type Error = ConstTypeError;
+
+    fn try_from(value: Sum<Value>) -> Result<Self, Self::Error> {
+        Self::sum(value.tag, value.values, value.st)
     }
 }
 
@@ -328,11 +345,11 @@ impl<V: AbstractValue> PartialValue<V>
 where
     Value: From<V>,
 {
-    /// Extracts a [ValueOrSum] if there is such a single representation,
-    /// given a HugrView and Wire that determine the type.
+    /// Turns this instance into a [Value], if it is either a single [value](PVEnum::Value) or
+    /// a [sum](PVEnum::Sum) with a single known tag, extracting the desired type from a HugrView and Wire.
     ///
     /// # Errors
-    /// `None` if the analysis did not result in a single [ValueOrSum] on that wire
+    /// `None` if the analysis did not result in a single value on that wire
     /// `Some(e)` if conversion to a [Value] produced a [ConstTypeError]
     ///
     /// # Panics
@@ -347,8 +364,7 @@ where
             .out_value_types(w.node())
             .find(|(p, _)| *p == w.source())
             .unwrap();
-        let vs = self.try_into_value(&typ).map_err(|_| None)?;
-        vs.try_into().map_err(Some)
+        self.try_into_value(&typ)
     }
 }
 

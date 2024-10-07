@@ -1,10 +1,8 @@
 use std::collections::HashMap;
 
-use hugr_core::{ops::Value, types::ConstTypeError, HugrView, Node, PortIndex, Wire};
+use hugr_core::{HugrView, Node, PortIndex, Wire};
 
-use super::{
-    datalog::AscentProgram, partial_value::ValueOrSum, AbstractValue, DFContext, PartialValue,
-};
+use super::{datalog::AscentProgram, AbstractValue, DFContext, PartialValue};
 
 /// Basic structure for performing an analysis. Usage:
 /// 1. Get a new instance via [Self::default()]
@@ -100,25 +98,6 @@ impl<V: AbstractValue, C: DFContext<V>> Machine<V, C> {
                 .find_map(|(_, cond2, case2, i)| (&cond == cond2 && &case == case2).then_some(*i))
                 .unwrap(),
         )
-    }
-}
-
-impl<V> TryFrom<ValueOrSum<V>> for Value
-where
-    Value: From<V>,
-{
-    type Error = ConstTypeError;
-    fn try_from(value: ValueOrSum<V>) -> Result<Self, ConstTypeError> {
-        match value {
-            ValueOrSum::Value(v) => Ok(v.into()),
-            ValueOrSum::Sum { tag, items, st } => {
-                let items = items
-                    .into_iter()
-                    .map(Value::try_from)
-                    .collect::<Result<Vec<_>, _>>()?;
-                Value::sum(tag, items, st.clone())
-            }
-        }
     }
 }
 
