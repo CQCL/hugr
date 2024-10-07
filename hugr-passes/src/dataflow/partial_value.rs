@@ -269,12 +269,6 @@ impl<V: AbstractValue> PartialValue<V> {
         }
     }
 
-    /// Computes the lattice-join (i.e. towards `Top`) of this [PartialValue] with another.
-    pub fn join(mut self, other: Self) -> Self {
-        self.join_mut(other);
-        self
-    }
-
     /// New instance of a sum with a single known tag.
     pub fn new_variant(tag: usize, values: impl IntoIterator<Item = Self>) -> Self {
         PartialSum::new_variant(tag, values).into()
@@ -328,6 +322,11 @@ impl<V: AbstractValue> PartialValue<V> {
 }
 
 impl<V: AbstractValue> Lattice for PartialValue<V> {
+    fn join(mut self, other: Self) -> Self {
+        self.join_mut(other);
+        self
+    }
+
     fn join_mut(&mut self, other: Self) -> bool {
         self.assert_invariants();
         // println!("join {self:?}\n{:?}", &other);

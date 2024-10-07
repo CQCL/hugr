@@ -9,6 +9,10 @@ use super::value_handle::{ValueHandle, ValueKey};
 use crate::dataflow::TotalContext;
 
 /// A context ([DFContext]) for doing analysis with [ValueHandle]s.
+/// Interprets [LoadConstant](OpType::LoadConstant) nodes,
+/// and [ExtensionOp](OpType::ExtensionOp) nodes where the extension does
+/// (using [Value]s for extension-op inputs).
+///
 /// Just stores a Hugr (actually any [HugrView]),
 /// (there is )no state for operation-interpretation.
 ///
@@ -17,6 +21,7 @@ use crate::dataflow::TotalContext;
 pub struct HugrValueContext<H: HugrView>(Arc<H>);
 
 impl<H: HugrView> HugrValueContext<H> {
+    /// Creates a new instance, given ownership of the [HugrView]
     pub fn new(hugr: H) -> Self {
         Self(Arc::new(hugr))
     }
@@ -30,6 +35,8 @@ impl<H: HugrView> Clone for HugrValueContext<H> {
     }
 }
 
+// Any value used in an Ascent program must be hashable.
+// However, there should only be one DFContext, so its hash is immaterial.
 impl<H: HugrView> Hash for HugrValueContext<H> {
     fn hash<I: Hasher>(&self, _state: &mut I) {}
 }

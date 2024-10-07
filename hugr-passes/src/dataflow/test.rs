@@ -3,7 +3,7 @@ use crate::{
     dataflow::{machine::TailLoopTermination, Machine},
 };
 
-use ascent::lattice::BoundedLattice;
+use ascent::{lattice::BoundedLattice, Lattice};
 use hugr_core::{
     builder::{endo_sig, DFGBuilder, Dataflow, DataflowSubContainer, HugrBuilder, SubContainer},
     extension::{

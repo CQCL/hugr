@@ -63,7 +63,7 @@ impl ValueKey {
         })
     }
 
-    pub fn field(self, i: usize) -> Self {
+    fn field(self, i: usize) -> Self {
         Self::Field(i, Box::new(self))
     }
 }
