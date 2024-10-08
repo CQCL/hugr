@@ -7,7 +7,7 @@ use hugr_core::{
         prelude::{UnpackTuple, BOOL_T},
         ExtensionSet, EMPTY_REG,
     },
-    ops::{handle::NodeHandle, DataflowOpTrait, Value},
+    ops::{handle::NodeHandle, DataflowOpTrait, Tag, Value},
     type_row,
     types::{Signature, SumType, Type},
     HugrView,
@@ -65,18 +65,14 @@ fn test_unpack_tuple_const() {
 fn test_tail_loop_never_iterates() {
     let mut builder = DFGBuilder::new(Signature::new_endo(vec![])).unwrap();
     let r_v = Value::unit_sum(3, 6).unwrap();
-    let r_w = builder.add_load_value(
-        Value::sum(
-            1,
-            [r_v.clone()],
-            SumType::new([type_row![], r_v.get_type().into()]),
-        )
-        .unwrap(),
-    );
+    let r_w = builder.add_load_value(r_v.clone());
+    let tag = Tag::new(1, vec![type_row![], r_v.get_type().into()]);
+    let tagged = builder.add_dataflow_op(tag, [r_w]).unwrap();
+
     let tlb = builder
         .tail_loop_builder([], [], vec![r_v.get_type()].into())
         .unwrap();
-    let tail_loop = tlb.finish_with_outputs(r_w, []).unwrap();
+    let tail_loop = tlb.finish_with_outputs(tagged.out_wire(0), []).unwrap();
     let [tl_o] = tail_loop.outputs_arr();
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
