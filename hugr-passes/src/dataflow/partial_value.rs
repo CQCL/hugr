@@ -618,7 +618,7 @@ mod test {
     }
 
     fn partial_sum_strat(
-        variants: &Vec<Vec<Arc<TestSumType>>>,
+        variants: &[Vec<Arc<TestSumType>>],
     ) -> impl Strategy<Value = PartialSum<TestValue>> {
         // We have to clone the `variants` here but only as far as the Vec<Vec<Arc<_>>>
         let tagged_variants = variants.iter().cloned().enumerate().collect::<Vec<_>>();
