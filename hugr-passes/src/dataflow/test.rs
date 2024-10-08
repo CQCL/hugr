@@ -65,27 +65,6 @@ fn test_unpack_tuple_const() {
 }
 
 #[test]
-fn test_unpack_const() {
-    let mut builder = DFGBuilder::new(endo_sig(vec![])).unwrap();
-    let v1 = builder.add_load_value(Value::tuple([Value::true_val()]));
-    let [o] = builder
-        .add_dataflow_op(UnpackTuple::new(type_row![BOOL_T]), [v1])
-        .unwrap()
-        .outputs_arr();
-    let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
-
-    let mut machine = Machine::default();
-    machine.run(HugrValueContext::new(&hugr));
-
-    let o_r = machine
-        .read_out_wire(o)
-        .unwrap()
-        .try_into_wire_value(&hugr, o)
-        .unwrap();
-    assert_eq!(o_r, Value::true_val());
-}
-
-#[test]
 fn test_tail_loop_never_iterates() {
     let mut builder = DFGBuilder::new(Signature::new_endo(vec![])).unwrap();
     let r_v = Value::unit_sum(3, 6).unwrap();
