@@ -108,10 +108,12 @@ pub enum TailLoopTermination {
 impl TailLoopTermination {
     pub fn from_control_value(v: &impl AbstractValue) -> Self {
         let (may_continue, may_break) = (v.supports_tag(0), v.supports_tag(1));
-        if may_break && !may_continue {
-            Self::ExactlyZeroContinues
-        } else if may_break && may_continue {
-            Self::Top
+        if may_break {
+            if may_continue {
+                Self::Top
+            } else {
+                Self::ExactlyZeroContinues
+            }
         } else {
             Self::Bottom
         }
