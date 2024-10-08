@@ -8,15 +8,13 @@ use hugr_core::{Hugr, HugrView, IncomingPort, Node, OutgoingPort};
 use super::value_handle::{ValueHandle, ValueKey};
 use crate::dataflow::TotalContext;
 
-/// A context ([DFContext]) for doing analysis with [ValueHandle]s.
+/// A [context](crate::dataflow::DFContext) for doing analysis with [ValueHandle]s.
 /// Interprets [LoadConstant](OpType::LoadConstant) nodes,
 /// and [ExtensionOp](OpType::ExtensionOp) nodes where the extension does
 /// (using [Value]s for extension-op inputs).
 ///
 /// Just stores a Hugr (actually any [HugrView]),
 /// (there is )no state for operation-interpretation.
-///
-/// [DFContext]: crate::dataflow::DFContext
 #[derive(Debug)]
 pub struct HugrValueContext<H: HugrView>(Arc<H>);
 
