@@ -95,7 +95,7 @@ fn test_tail_loop_never_iterates() {
         .unwrap();
     assert_eq!(o_r, r_v);
     assert_eq!(
-        Some(TailLoopTermination::ExactlyZeroContinues),
+        Some(TailLoopTermination::NeverContinues),
         machine.tail_loop_terminates(&hugr, tail_loop.node())
     )
 }
@@ -127,7 +127,7 @@ fn test_tail_loop_always_iterates() {
     let o_r2 = machine.read_out_wire(tl_o2).unwrap();
     assert_eq!(o_r2, PartialValue::bottom());
     assert_eq!(
-        Some(TailLoopTermination::Bottom),
+        Some(TailLoopTermination::NeverBreaks),
         machine.tail_loop_terminates(&hugr, tail_loop.node())
     );
     assert_eq!(machine.tail_loop_terminates(&hugr, hugr.root()), None);
@@ -181,7 +181,7 @@ fn test_tail_loop_iterates_twice() {
     let _ = machine.read_out_wire(o_w2).unwrap();
     // assert_eq!(o_r2, Value::true_val());
     assert_eq!(
-        Some(TailLoopTermination::Top),
+        Some(TailLoopTermination::BreaksAndContinues),
         machine.tail_loop_terminates(&hugr, tail_loop.node())
     );
     assert_eq!(machine.tail_loop_terminates(&hugr, hugr.root()), None);

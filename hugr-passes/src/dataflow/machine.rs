@@ -98,24 +98,34 @@ impl<PV: AbstractValue, C: DFContext<PV>> Machine<PV, C> {
     }
 }
 
+/// Tells whether a loop iterates (never, always, sometimes)
 #[derive(PartialEq, Eq, Hash, Debug, Clone, Copy)]
 pub enum TailLoopTermination {
-    Bottom,
-    ExactlyZeroContinues,
-    Top,
+    /// The loop never exits (is an infinite loop); no value is ever
+    /// returned out of the loop. (aka, Bottom.)
+    // TODO what about a loop that never exits OR continues because of a nested infinite loop?
+    NeverBreaks,
+    /// The loop never iterates (so is equivalent to a [DFG](hugr_core::ops::DFG),
+    /// modulo untupling of the control value)
+    NeverContinues,
+    /// The loop might iterate and/or exit. (aka, Top)
+    BreaksAndContinues,
 }
 
 impl TailLoopTermination {
+    /// Extracts the relevant information from a value that should represent
+    /// the value provided to the [Output](hugr_core::ops::Output) node child
+    /// of the [TailLoop](hugr_core::ops::TailLoop)
     pub fn from_control_value(v: &impl AbstractValue) -> Self {
         let (may_continue, may_break) = (v.supports_tag(0), v.supports_tag(1));
         if may_break {
             if may_continue {
-                Self::Top
+                Self::BreaksAndContinues
             } else {
-                Self::ExactlyZeroContinues
+                Self::NeverContinues
             }
         } else {
-            Self::Bottom
+            Self::NeverBreaks
         }
     }
 }
