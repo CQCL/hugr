@@ -451,7 +451,16 @@ impl<V: BaseValue> Lattice for PartialValue<V> {
                     _ => unreachable!(),
                 };
                 match ps1.try_meet_mut(ps2) {
-                    Ok(ch) => ch,
+                    Ok(ch) => {
+                        // ALAN the 'invariant' that a PartialSum always has >=1 tag can be broken here.
+                        // Fix this by rewriting to Bottom, but should probably be refactored - at the
+                        // least, it seems dangerous to expose a potentially-invalidating try_meet_mut.
+                        if ps1.0.is_empty() {
+                            assert!(ch);
+                            self.0 = PVEnum::Bottom
+                        }
+                        ch
+                    }
                     Err(_) => {
                         self.0 = PVEnum::Bottom;
                         true
@@ -712,10 +721,27 @@ mod test {
             let meet = v1.clone().meet(v2.clone());
             prop_assert!(meet <= v1, "meet not less <=: {:#?}", &meet);
             prop_assert!(meet <= v2, "meet not less <=: {:#?}", &meet);
+            prop_assert!(meet == v2.clone().meet(v1.clone()), "meet not symmetric");
+            prop_assert!(meet == meet.clone().meet(v1.clone()), "repeated meet should be a no-op");
+            prop_assert!(meet == meet.clone().meet(v2.clone()), "repeated meet should be a no-op");
 
             let join = v1.clone().join(v2.clone());
             prop_assert!(join >= v1, "join not >=: {:#?}", &join);
             prop_assert!(join >= v2, "join not >=: {:#?}", &join);
+            prop_assert!(join == v2.clone().join(v1.clone()), "join not symmetric");
+            prop_assert!(join == join.clone().join(v1.clone()), "repeated join should be a no-op");
+            prop_assert!(join == join.clone().join(v2.clone()), "repeated join should be a no-op");
+        }
+
+        #[test]
+        fn lattice_associative([v1, v2, v3] in any_partial_values()) {
+            let a = v1.clone().meet(v2.clone()).meet(v3.clone());
+            let b = v1.clone().meet(v2.clone().meet(v3.clone()));
+            prop_assert!(a==b, "meet not associative");
+
+            let a = v1.clone().join(v2.clone()).join(v3.clone());
+            let b = v1.clone().join(v2.clone().join(v3.clone()));
+            prop_assert!(a==b, "join not associative")
         }
     }
 }
