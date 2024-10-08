@@ -1,4 +1,5 @@
-use crate::const_fold2::HugrValueContext;
+use std::hash::{Hash, Hasher};
+use std::sync::Arc;
 
 use ascent::{lattice::BoundedLattice, Lattice};
 use hugr_core::{
@@ -13,7 +14,80 @@ use hugr_core::{
     HugrView,
 };
 
-use super::{AbstractValue, Machine, PartialValue, TailLoopTermination};
+use super::{AbstractValue, BaseValue, DFContext, Machine, PartialValue, TailLoopTermination};
+
+// ------- Minimal implementation of DFContext and BaseValue -------
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+enum Void {}
+
+impl BaseValue for Void {}
+
+struct TestContext<H>(Arc<H>);
+
+// Deriving Clone requires H:HugrView to implement Clone,
+// but we don't need that as we only clone the Arc.
+impl<H: HugrView> Clone for TestContext<H> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl<H: HugrView> std::ops::Deref for TestContext<H> {
+    type Target = hugr_core::Hugr;
+
+    fn deref(&self) -> &Self::Target {
+        self.0.base_hugr()
+    }
+}
+
+// Any value used in an Ascent program must be hashable.
+// However, there should only be one DFContext, so its hash is immaterial.
+impl<H: HugrView> Hash for TestContext<H> {
+    fn hash<I: Hasher>(&self, _state: &mut I) {}
+}
+
+impl<H: HugrView> PartialEq for TestContext<H> {
+    fn eq(&self, other: &Self) -> bool {
+        // Any AscentProgram should have only one DFContext (maybe cloned)
+        assert!(Arc::ptr_eq(&self.0, &other.0));
+        true
+    }
+}
+
+impl<H: HugrView> Eq for TestContext<H> {}
+
+impl<H: HugrView> PartialOrd for TestContext<H> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        // Any AscentProgram should have only one DFContext (maybe cloned)
+        assert!(Arc::ptr_eq(&self.0, &other.0));
+        Some(std::cmp::Ordering::Equal)
+    }
+}
+
+impl<H: HugrView> DFContext<PartialValue<Void>> for TestContext<H> {
+    fn interpret_leaf_op(
+        &self,
+        _node: hugr_core::Node,
+        _ins: &[PartialValue<Void>],
+    ) -> Option<Vec<PartialValue<Void>>> {
+        None
+    }
+}
+
+// This allows testing creation of tuple/sum Values (only)
+impl From<Void> for Value {
+    fn from(v: Void) -> Self {
+        match v {}
+    }
+}
+
+fn pv_false() -> PartialValue<Void> {
+    PartialValue::new_variant(0, [])
+}
+
+fn pv_true() -> PartialValue<Void> {
+    PartialValue::new_variant(1, [])
+}
 
 #[test]
 fn test_make_tuple() {
@@ -24,7 +98,8 @@ fn test_make_tuple() {
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
     let mut machine = Machine::default();
-    machine.run(HugrValueContext::new(&hugr));
+    machine.propolutate_out_wires([(v1, pv_false()), (v2, pv_true())]);
+    machine.run(TestContext(Arc::new(&hugr)));
 
     let x = machine
         .read_out_wire(v3)
@@ -45,7 +120,8 @@ fn test_unpack_tuple_const() {
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
     let mut machine = Machine::default();
-    machine.run(HugrValueContext::new(&hugr));
+    machine.propolutate_out_wires([(v, PartialValue::new_variant(0, [pv_false(), pv_true()]))]);
+    machine.run(TestContext(Arc::new(&hugr)));
 
     let o1_r = machine
         .read_out_wire(o1)
@@ -77,7 +153,8 @@ fn test_tail_loop_never_iterates() {
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
     let mut machine = Machine::default();
-    machine.run(HugrValueContext::new(&hugr));
+    machine.propolutate_out_wires([(r_w, PartialValue::new_variant(3, []))]);
+    machine.run(TestContext(Arc::new(&hugr)));
 
     let o_r = machine
         .read_out_wire(tl_o)
@@ -111,7 +188,7 @@ fn test_tail_loop_always_iterates() {
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
     let mut machine = Machine::default();
-    machine.run(HugrValueContext::new(&hugr));
+    machine.run(TestContext(Arc::new(&hugr)));
 
     let o_r1 = machine.read_out_wire(tl_o1).unwrap();
     assert_eq!(o_r1, PartialValue::bottom());
@@ -155,7 +232,8 @@ fn test_tail_loop_iterates_twice() {
     let [o_w1, o_w2] = tail_loop.outputs_arr();
 
     let mut machine = Machine::default();
-    machine.run(HugrValueContext::new(&hugr));
+    machine.propolutate_out_wires([(true_w, pv_true()), (false_w, pv_false())]);
+    machine.run(TestContext(Arc::new(&hugr)));
 
     let true_or_false = PartialValue::new_variant(0, []).join(PartialValue::new_variant(1, []));
     // TODO these should be the propagated values for now they will be join(true,false) - ALAN wtf?
@@ -211,7 +289,7 @@ fn conditional() {
         [PartialValue::new_variant(0, [])],
     ));
     machine.propolutate_out_wires([(arg_w, arg_pv)]);
-    machine.run(HugrValueContext::new(&hugr));
+    machine.run(TestContext(Arc::new(&hugr)));
 
     let cond_r1 = machine
         .read_out_wire(cond_o1)
