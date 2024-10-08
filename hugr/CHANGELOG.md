@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.13.0 (2024-10-08)
+
+### Bug Fixes
+
+- [**breaking**] Make list length op give back the list ([#1547](https://github.com/CQCL/hugr/pull/1547))
+
+### Features
+
+- [**breaking**] Allow CustomConsts to (optionally) be hashable ([#1397](https://github.com/CQCL/hugr/pull/1397))
+- Add an `OpLoadError` variant of `BuildError`. ([#1537](https://github.com/CQCL/hugr/pull/1537))
+- [**breaking**] `HugrMut::remove_node` and `SimpleReplacement` return removed weights ([#1516](https://github.com/CQCL/hugr/pull/1516))
+- Draft for `hugr-model` with export, import, parsing and pretty printing ([#1542](https://github.com/CQCL/hugr/pull/1542))
+
+
 ## 0.12.1 (2024-09-04)
 
 ### Bug Fixes
