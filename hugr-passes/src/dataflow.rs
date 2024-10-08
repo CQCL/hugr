@@ -10,5 +10,8 @@ pub use machine::{Machine, TailLoopTermination};
 mod partial_value;
 pub use partial_value::{BaseValue, PVEnum, PartialSum, PartialValue, Sum};
 
+mod total_context;
+pub use total_context::TotalContext;
+
 #[cfg(test)]
 mod test;
