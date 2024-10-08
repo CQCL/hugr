@@ -13,6 +13,7 @@ use hugr_core::{
     types::{Signature, SumType, Type},
     HugrView,
 };
+use itertools::Itertools;
 
 use super::{AbstractValue, BaseValue, DFContext, Machine, PartialValue, TailLoopTermination};
 
@@ -67,10 +68,27 @@ impl<H: HugrView> PartialOrd for TestContext<H> {
 impl<H: HugrView> DFContext<PartialValue<Void>> for TestContext<H> {
     fn interpret_leaf_op(
         &self,
-        _node: hugr_core::Node,
+        node: hugr_core::Node,
         _ins: &[PartialValue<Void>],
     ) -> Option<Vec<PartialValue<Void>>> {
-        None
+        // Interpret LoadConstants of sums of sums (without leaves), only
+        fn try_into_pv(v: &Value) -> Option<PartialValue<Void>> {
+            let Value::Sum(hugr_core::ops::constant::Sum { tag, values, .. }) = v else {
+                return None;
+            };
+            Some(PartialValue::new_variant(
+                *tag,
+                values
+                    .iter()
+                    .map(try_into_pv)
+                    .collect::<Option<Vec<PartialValue<Void>>>>()?,
+            ))
+        }
+        self.0.get_optype(node).as_load_constant().and_then(|_| {
+            let const_node = self.0.input_neighbours(node).exactly_one().ok().unwrap();
+            let v = self.0.get_optype(const_node).as_const().unwrap().value();
+            try_into_pv(v).map(|v| vec![v])
+        })
     }
 }
 
@@ -79,14 +97,6 @@ impl From<Void> for Value {
     fn from(v: Void) -> Self {
         match v {}
     }
-}
-
-fn pv_false() -> PartialValue<Void> {
-    PartialValue::new_variant(0, [])
-}
-
-fn pv_true() -> PartialValue<Void> {
-    PartialValue::new_variant(1, [])
 }
 
 #[test]
@@ -98,7 +108,6 @@ fn test_make_tuple() {
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
     let mut machine = Machine::default();
-    machine.propolutate_out_wires([(v1, pv_false()), (v2, pv_true())]);
     machine.run(TestContext(Arc::new(&hugr)));
 
     let x = machine
@@ -120,7 +129,6 @@ fn test_unpack_tuple_const() {
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
     let mut machine = Machine::default();
-    machine.propolutate_out_wires([(v, PartialValue::new_variant(0, [pv_false(), pv_true()]))]);
     machine.run(TestContext(Arc::new(&hugr)));
 
     let o1_r = machine
@@ -153,7 +161,6 @@ fn test_tail_loop_never_iterates() {
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
     let mut machine = Machine::default();
-    machine.propolutate_out_wires([(r_w, PartialValue::new_variant(3, []))]);
     machine.run(TestContext(Arc::new(&hugr)));
 
     let o_r = machine
@@ -232,7 +239,6 @@ fn test_tail_loop_iterates_twice() {
     let [o_w1, o_w2] = tail_loop.outputs_arr();
 
     let mut machine = Machine::default();
-    machine.propolutate_out_wires([(true_w, pv_true()), (false_w, pv_false())]);
     machine.run(TestContext(Arc::new(&hugr)));
 
     let true_or_false = PartialValue::new_variant(0, []).join(PartialValue::new_variant(1, []));
