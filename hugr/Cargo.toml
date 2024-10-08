@@ -1,6 +1,6 @@
 [package]
 name = "hugr"
-version = "0.12.1"
+version = "0.13.0"
 edition = { workspace = true }
 rust-version = { workspace = true }
 
@@ -24,13 +24,12 @@ path = "src/lib.rs"
 [features]
 extension_inference = ["hugr-core/extension_inference"]
 declarative = ["hugr-core/declarative"]
+model_unstable = ["hugr-core/model_unstable", "hugr-model"]
 
 [dependencies]
-hugr-core = { path = "../hugr-core", version = "0.9.1", features = [
-    "model_unstable",
-] }
-hugr-passes = { path = "../hugr-passes", version = "0.8.1" }
-hugr-model = { path = "../hugr-model" }
+hugr-model = { path = "../hugr-model", optional = true, version = "0.1.0" }
+hugr-core = { path = "../hugr-core", version = "0.10.0" }
+hugr-passes = { path = "../hugr-passes", version = "0.8.2" }
 
 [dev-dependencies]
 rstest = { workspace = true }
