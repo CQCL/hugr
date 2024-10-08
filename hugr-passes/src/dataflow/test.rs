@@ -1,7 +1,4 @@
-use crate::{
-    const_fold2::HugrValueContext,
-    dataflow::{machine::TailLoopTermination, AbstractValue, Machine},
-};
+use crate::const_fold2::HugrValueContext;
 
 use ascent::{lattice::BoundedLattice, Lattice};
 use hugr_core::{
@@ -10,13 +7,13 @@ use hugr_core::{
         prelude::{UnpackTuple, BOOL_T},
         ExtensionSet, EMPTY_REG,
     },
-    ops::{handle::NodeHandle, OpTrait, Value},
+    ops::{handle::NodeHandle, DataflowOpTrait, Value},
     type_row,
-    types::{Signature, SumType, Type, TypeRow},
+    types::{Signature, SumType, Type},
     HugrView,
 };
 
-use super::partial_value::PartialValue;
+use super::{AbstractValue, Machine, PartialValue, TailLoopTermination};
 
 #[test]
 fn test_make_tuple() {
@@ -85,8 +82,6 @@ fn test_tail_loop_never_iterates() {
 
     let mut machine = Machine::default();
     machine.run(HugrValueContext::new(&hugr));
-    // dbg!(&machine.tail_loop_io_node);
-    // dbg!(&machine.out_wire_value);
 
     let o_r = machine
         .read_out_wire(tl_o)
@@ -152,34 +147,26 @@ fn test_tail_loop_iterates_twice() {
         )
         .unwrap();
     assert_eq!(
-        tlb.loop_signature().unwrap().dataflow_signature().unwrap(),
+        tlb.loop_signature().unwrap().signature(),
         Signature::new_endo(type_row![BOOL_T, BOOL_T])
     );
     let [in_w1, in_w2] = tlb.input_wires_arr();
     let tail_loop = tlb.finish_with_outputs(in_w1, [in_w2, in_w1]).unwrap();
 
-    // let optype = builder.hugr().get_optype(tail_loop.node());
-    // for p in builder.hugr().node_outputs(tail_loop.node()) {
-    //     use hugr_core::ops::OpType;
-    //     println!("{:?}, {:?}", p, optype.port_kind(p));
-
-    // }
-
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
     // TODO once we can do conditionals put these wires inside `just_outputs` and
-    // we should be able to propagate their values
+    // we should be able to propagate their values...ALAN wtf? loop control type IS bool ATM
     let [o_w1, o_w2] = tail_loop.outputs_arr();
 
     let mut machine = Machine::default();
     machine.run(HugrValueContext::new(&hugr));
-    // dbg!(&machine.tail_loop_io_node);
-    // dbg!(&machine.out_wire_value);
 
-    // TODO these hould be the propagated values for now they will bt join(true,false)
-    let _ = machine.read_out_wire(o_w1).unwrap();
-    // assert_eq!(o_r1, PartialValue::top());
-    let _ = machine.read_out_wire(o_w2).unwrap();
-    // assert_eq!(o_r2, Value::true_val());
+    let true_or_false = PartialValue::new_variant(0, []).join(PartialValue::new_variant(1, []));
+    // TODO these should be the propagated values for now they will be join(true,false) - ALAN wtf?
+    let o_r1 = machine.read_out_wire(o_w1).unwrap();
+    assert_eq!(o_r1, true_or_false);
+    let o_r2 = machine.read_out_wire(o_w2).unwrap();
+    assert_eq!(o_r2, true_or_false);
     assert_eq!(
         Some(TailLoopTermination::BreaksAndContinues),
         machine.tail_loop_terminates(&hugr, tail_loop.node())
@@ -191,19 +178,17 @@ fn test_tail_loop_iterates_twice() {
 fn conditional() {
     let variants = vec![type_row![], type_row![], type_row![BOOL_T]];
     let cond_t = Type::new_sum(variants.clone());
-    let mut builder =
-        DFGBuilder::new(Signature::new(Into::<TypeRow>::into(cond_t), type_row![])).unwrap();
+    let mut builder = DFGBuilder::new(Signature::new(cond_t, type_row![])).unwrap();
     let [arg_w] = builder.input_wires_arr();
 
     let true_w = builder.add_load_value(Value::true_val());
     let false_w = builder.add_load_value(Value::false_val());
 
     let mut cond_builder = builder
-        .conditional_builder_exts(
+        .conditional_builder(
             (variants, arg_w),
             [(BOOL_T, true_w)],
             type_row!(BOOL_T, BOOL_T),
-            ExtensionSet::default(),
         )
         .unwrap();
     // will be unreachable
