@@ -538,7 +538,7 @@ mod test {
     }
 
     impl TestSumType {
-        fn type_check(&self, pv: &PartialValue<TestValue>) -> bool {
+        fn check_value(&self, pv: &PartialValue<TestValue>) -> bool {
             match (self, pv.as_enum()) {
                 (_, PVEnum::Bottom) | (_, PVEnum::Top) => true,
                 (Self::Leaf(None), _) => pv == &PartialValue::new_unit(),
@@ -552,7 +552,7 @@ mod test {
                         if prod.len() != v.len() {
                             return false;
                         }
-                        if !zip_eq(prod, v).all(|(lhs, rhs)| lhs.type_check(rhs)) {
+                        if !zip_eq(prod, v).all(|(lhs, rhs)| lhs.check_value(rhs)) {
                             return false;
                         }
                     }
@@ -683,7 +683,7 @@ mod test {
     proptest! {
         #[test]
         fn partial_value_type((tst, pv) in any_typed_partial_value()) {
-            prop_assert!(tst.type_check(&pv))
+            prop_assert!(tst.check_value(&pv))
         }
 
         // todo: ValidHandle is valid
