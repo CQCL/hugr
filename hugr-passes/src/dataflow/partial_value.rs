@@ -10,21 +10,26 @@ use std::hash::{Hash, Hasher};
 
 use super::AbstractValue;
 
-/// Trait for abstract values that may represent sums.
-/// Can be wrapped into an [AbstractValue] for analysis via [PartialValue].
+/// Trait for abstract values that can be wrapped by [PartialValue] for dataflow analysis.
+/// (Allows the values to represent sums, but does not require this).
 pub trait BaseValue: Clone + std::fmt::Debug + PartialEq + Eq + Hash {
-    /// Deconstruct an abstract value into a single known tag plus a row of values, if it is a [Sum].
-    /// Note that one can just always return `None` but this will mean the analysis
-    /// is unable to understand untupling, and may give inconsistent results wrt. [Tag]
-    /// operations, etc.
+    /// If the abstract value represents a [Sum] with a single known tag, deconstruct it
+    /// into that tag plus the elements. The default just returns `None` which is
+    /// appropriate if the abstract value never does (in which case [interpret_leaf_op]
+    /// must produce a [PartialValue::new_variant] for any operation producing
+    /// a sum).
     ///
     /// The signature is this way to optimize query/inspection (is-it-a-sum),
     /// at the cost of requiring more cloning during actual conversion
     /// (inside the lazy Iterator, or for the error case, as Self remains)
     ///
+    /// [interpret_leaf_op]: super::DFContext::interpret_leaf_op
     /// [Sum]: TypeEnum::Sum
     /// [Tag]: hugr_core::ops::Tag
-    fn as_sum(&self) -> Option<(usize, impl Iterator<Item = Self> + '_)>;
+    fn as_sum(&self) -> Option<(usize, impl Iterator<Item = Self> + '_)> {
+        let res: Option<(usize, <Vec<Self> as IntoIterator>::IntoIter)> = None;
+        res
+    }
 }
 
 /// Represents a sum with a single/known tag, abstracted over the representation of the elements.
@@ -494,179 +499,51 @@ mod test {
     use std::sync::Arc;
 
     use ascent::{lattice::BoundedLattice, Lattice};
-    use itertools::{zip_eq, Either, Itertools as _};
+    use itertools::{zip_eq, Itertools as _};
+    use prop::sample::subsequence;
     use proptest::prelude::*;
 
-    use hugr_core::{
-        std_extensions::arithmetic::int_types::{self, ConstInt, INT_TYPES, LOG_WIDTH_BOUND},
-        types::{Type, TypeArg, TypeEnum},
-    };
+    use proptest_recurse::{StrategyExt, StrategySet};
 
-    use super::{PVEnum, PartialSum, PartialValue};
-    use crate::{
-        const_fold2::value_handle::{ValueHandle, ValueKey},
-        dataflow::AbstractValue,
-    };
-
-    impl Arbitrary for ValueHandle {
-        type Parameters = ();
-        type Strategy = BoxedStrategy<Self>;
-        fn arbitrary_with(_params: Self::Parameters) -> Self::Strategy {
-            // prop_oneof![
-
-            // ]
-            todo!()
-        }
-    }
-
-    #[derive(Debug, PartialEq, Eq, Clone)]
-    enum TestSumLeafType {
-        Int(Type),
-        Unit,
-    }
-
-    impl TestSumLeafType {
-        fn assert_valid(&self) {
-            if let Self::Int(t) = self {
-                if let TypeEnum::Extension(ct) = t.as_type_enum() {
-                    assert_eq!("int", ct.name());
-                    assert_eq!(&int_types::EXTENSION_ID, ct.extension());
-                } else {
-                    panic!("Expected int type, got {:#?}", t);
-                }
-            }
-        }
-
-        fn get_type(&self) -> Type {
-            match self {
-                Self::Int(t) => t.clone(),
-                Self::Unit => Type::UNIT,
-            }
-        }
-
-        fn type_check(&self, ps: &PartialSum<ValueHandle>) -> bool {
-            match self {
-                Self::Int(_) => false,
-                Self::Unit => {
-                    if let Ok((0, v)) = ps.0.iter().exactly_one() {
-                        v.is_empty()
-                    } else {
-                        false
-                    }
-                }
-            }
-        }
-
-        fn partial_value_strategy(self) -> impl Strategy<Value = PartialValue<ValueHandle>> {
-            match self {
-                Self::Int(t) => {
-                    let TypeEnum::Extension(ct) = t.as_type_enum() else {
-                        unreachable!()
-                    };
-                    // TODO this should be get_log_width, but that's not pub
-                    let TypeArg::BoundedNat { n: lw } = ct.args()[0] else {
-                        panic!()
-                    };
-                    (0u64..(1 << (2u64.pow(lw as u32) - 1)))
-                        .prop_map(move |x| {
-                            let ki = ConstInt::new_u(lw as u8, x).unwrap();
-                            let k = ValueKey::try_new(ki.clone()).unwrap();
-                            ValueHandle::new(k, Arc::new(ki.into())).into()
-                        })
-                        .boxed()
-                }
-                Self::Unit => Just(PartialValue::new_unit()).boxed(),
-            }
-        }
-    }
-
-    impl Arbitrary for TestSumLeafType {
-        type Parameters = ();
-        type Strategy = BoxedStrategy<Self>;
-        fn arbitrary_with(_params: Self::Parameters) -> Self::Strategy {
-            let int_strat =
-                (0..LOG_WIDTH_BOUND).prop_map(|i| Self::Int(INT_TYPES[i as usize].clone()));
-            prop_oneof![Just(TestSumLeafType::Unit), int_strat].boxed()
-        }
-    }
+    use super::{BaseValue, PVEnum, PartialSum, PartialValue};
+    use crate::dataflow::AbstractValue;
 
     #[derive(Debug, PartialEq, Eq, Clone)]
     enum TestSumType {
-        Branch(usize, Vec<Vec<Arc<TestSumType>>>),
-        Leaf(TestSumLeafType),
+        Branch(Vec<Vec<Arc<TestSumType>>>),
+        /// None => unit, Some => TestValue <= this *usize*
+        Leaf(Option<usize>),
+    }
+
+    #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+    struct TestValue(usize);
+
+    impl BaseValue for TestValue {}
+
+    #[derive(Clone)]
+    struct SumTypeParams {
+        depth: usize,
+        desired_size: usize,
+        expected_branch_size: usize,
+    }
+
+    impl Default for SumTypeParams {
+        fn default() -> Self {
+            Self {
+                depth: 5,
+                desired_size: 20,
+                expected_branch_size: 5,
+            }
+        }
     }
 
     impl TestSumType {
-        #[allow(unused)] // ALAN ?
-        fn leaf(v: Type) -> Self {
-            TestSumType::Leaf(TestSumLeafType::Int(v))
-        }
-
-        fn branch(vs: impl IntoIterator<Item = Vec<Arc<Self>>>) -> Self {
-            let vec = vs.into_iter().collect_vec();
-            let depth: usize = vec
-                .iter()
-                .flat_map(|x| x.iter())
-                .map(|x| x.depth() + 1)
-                .max()
-                .unwrap_or(0);
-            Self::Branch(depth, vec)
-        }
-
-        fn depth(&self) -> usize {
-            match self {
-                TestSumType::Branch(x, _) => *x,
-                TestSumType::Leaf(_) => 0,
-            }
-        }
-
-        #[allow(unused)] // ALAN ?
-        fn is_leaf(&self) -> bool {
-            self.depth() == 0
-        }
-
-        fn assert_valid(&self) {
-            match self {
-                TestSumType::Branch(d, sop) => {
-                    assert!(!sop.is_empty(), "No variants");
-                    for v in sop.iter().flat_map(|x| x.iter()) {
-                        assert!(v.depth() < *d);
-                        v.assert_valid();
-                    }
-                }
-                TestSumType::Leaf(l) => {
-                    l.assert_valid();
-                }
-            }
-        }
-
-        fn select(self) -> impl Strategy<Value = Either<TestSumLeafType, (usize, Vec<Arc<Self>>)>> {
-            match self {
-                TestSumType::Branch(_, sop) => any::<prop::sample::Index>()
-                    .prop_map(move |i| {
-                        let index = i.index(sop.len());
-                        Either::Right((index, sop[index].clone()))
-                    })
-                    .boxed(),
-                TestSumType::Leaf(l) => Just(Either::Left(l)).boxed(),
-            }
-        }
-
-        fn get_type(&self) -> Type {
-            match self {
-                TestSumType::Branch(_, sop) => Type::new_sum(
-                    sop.iter()
-                        .map(|row| row.iter().map(|x| x.get_type()).collect_vec()),
-                ),
-                TestSumType::Leaf(l) => l.get_type(),
-            }
-        }
-
-        fn type_check(&self, pv: &PartialValue<ValueHandle>) -> bool {
+        fn type_check(&self, pv: &PartialValue<TestValue>) -> bool {
             match (self, pv.as_enum()) {
                 (_, PVEnum::Bottom) | (_, PVEnum::Top) => true,
-                (_, PVEnum::Value(v)) => self.get_type() == v.get_type(),
-                (TestSumType::Branch(_, sop), PVEnum::Sum(ps)) => {
+                (Self::Leaf(None), _) => pv == &PartialValue::new_unit(),
+                (Self::Leaf(Some(max)), PVEnum::Value(TestValue(val))) => val <= max,
+                (Self::Branch(sop), PVEnum::Sum(ps)) => {
                     for (k, v) in &ps.0 {
                         if *k >= sop.len() {
                             return false;
@@ -681,123 +558,126 @@ mod test {
                     }
                     true
                 }
-                (Self::Leaf(l), PVEnum::Sum(ps)) => l.type_check(ps),
-            }
-        }
-    }
-
-    impl From<TestSumLeafType> for TestSumType {
-        fn from(value: TestSumLeafType) -> Self {
-            Self::Leaf(value)
-        }
-    }
-
-    #[derive(Clone, PartialEq, Eq, Debug)]
-    struct UnarySumTypeParams {
-        depth: usize,
-        branch_width: usize,
-    }
-
-    impl UnarySumTypeParams {
-        pub fn descend(mut self, d: usize) -> Self {
-            assert!(d < self.depth);
-            self.depth = d;
-            self
-        }
-    }
-
-    impl Default for UnarySumTypeParams {
-        fn default() -> Self {
-            Self {
-                depth: 3,
-                branch_width: 3,
+                _ => false,
             }
         }
     }
 
     impl Arbitrary for TestSumType {
-        type Parameters = UnarySumTypeParams;
-        type Strategy = BoxedStrategy<Self>;
-        fn arbitrary_with(
-            params @ UnarySumTypeParams {
-                depth,
-                branch_width,
-            }: Self::Parameters,
-        ) -> Self::Strategy {
-            if depth == 0 {
-                any::<TestSumLeafType>().prop_map_into().boxed()
-            } else {
-                (0..depth)
-                    .prop_flat_map(move |d| {
-                        prop::collection::vec(
-                            prop::collection::vec(
-                                any_with::<Self>(params.clone().descend(d)).prop_map_into(),
-                                0..branch_width,
+        type Parameters = SumTypeParams;
+        type Strategy = SBoxedStrategy<Self>;
+        fn arbitrary_with(params: Self::Parameters) -> Self::Strategy {
+            fn arb(params: SumTypeParams, set: &mut StrategySet) -> SBoxedStrategy<TestSumType> {
+                use proptest::collection::vec;
+                let int_strat = (0..usize::MAX).prop_map(|i| TestSumType::Leaf(Some(i)));
+                let leaf_strat = prop_oneof![Just(TestSumType::Leaf(None)), int_strat].sboxed();
+                leaf_strat.prop_mutually_recursive(
+                    params.depth as u32,
+                    params.desired_size as u32,
+                    params.expected_branch_size as u32,
+                    set,
+                    move |set| {
+                        let self2 = params.clone();
+                        vec(
+                            vec(
+                                set.get::<TestSumType, _>(move |set| arb(self2, set))
+                                    .prop_map(Arc::new),
+                                1..=params.expected_branch_size,
                             ),
-                            1..=branch_width,
+                            1..=params.expected_branch_size,
                         )
-                        .prop_map(TestSumType::branch)
-                    })
-                    .boxed()
+                        .prop_map(TestSumType::Branch)
+                        .sboxed()
+                    },
+                )
             }
+
+            arb(params, &mut StrategySet::default())
         }
     }
 
-    proptest! {
-        #[test]
-        fn unary_sum_type_valid(ust: TestSumType) {
-            ust.assert_valid();
-        }
+    fn partial_sum_strat(
+        tag: usize,
+        elems_strat: impl Strategy<Value = Vec<PartialValue<TestValue>>>,
+    ) -> impl Strategy<Value = PartialSum<TestValue>> {
+        elems_strat.prop_map(move |elems| PartialSum::new_variant(tag, elems))
+    }
+
+    // Result gets fed into partial_sum_strat along with tag, so probably inline this into that
+    fn vec_strat(
+        elems: &Vec<Arc<TestSumType>>,
+    ) -> impl Strategy<Value = Vec<PartialValue<TestValue>>> {
+        elems
+            .into_iter()
+            .map(Arc::as_ref)
+            .map(any_partial_value_of_type)
+            .collect::<Vec<_>>()
+    }
+
+    fn multi_sum_strat(
+        variants: &Vec<Vec<Arc<TestSumType>>>,
+    ) -> impl Strategy<Value = PartialSum<TestValue>> {
+        let num_tags = variants.len();
+        // We have to clone the `variants` here but only as far as the Vec<Vec<Arc<_>>>
+        let s = subsequence(
+            variants.iter().cloned().enumerate().collect::<Vec<_>>(),
+            1..=num_tags,
+        );
+        let sum_strat: BoxedStrategy<Vec<PartialSum<TestValue>>> = s
+            .prop_flat_map(|selected_tagged_variants| {
+                selected_tagged_variants
+                    .into_iter()
+                    .map(|(tag, elems)| partial_sum_strat(tag, vec_strat(&elems)).boxed())
+                    .collect::<Vec<_>>()
+            })
+            .boxed();
+        sum_strat.prop_map(|psums: Vec<PartialSum<TestValue>>| {
+            let mut psums = psums.into_iter();
+            let first = psums.next().unwrap();
+            psums.fold(first, |mut a, b| {
+                a.try_join_mut(b).unwrap();
+                a
+            })
+        })
     }
 
     fn any_partial_value_of_type(
-        ust: TestSumType,
-    ) -> impl Strategy<Value = PartialValue<ValueHandle>> {
-        ust.select().prop_flat_map(|x| match x {
-            Either::Left(l) => l.partial_value_strategy().boxed(),
-            Either::Right((index, usts)) => {
-                let pvs = usts
-                    .into_iter()
-                    .map(|x| {
-                        any_partial_value_of_type(
-                            Arc::<TestSumType>::try_unwrap(x)
-                                .unwrap_or_else(|x| x.as_ref().clone()),
-                        )
-                    })
-                    .collect_vec();
-                pvs.prop_map(move |pvs| PartialValue::new_variant(index, pvs))
-                    .boxed()
-            }
-        })
+        ust: &TestSumType,
+    ) -> impl Strategy<Value = PartialValue<TestValue>> {
+        match ust {
+            TestSumType::Leaf(None) => Just(PartialValue::new_unit()).boxed(),
+            TestSumType::Leaf(Some(i)) => (0..*i)
+                .prop_map(TestValue)
+                .prop_map(PartialValue::from)
+                .boxed(),
+            TestSumType::Branch(sop) => multi_sum_strat(sop).prop_map(PartialValue::from).boxed(),
+        }
     }
 
     fn any_partial_value_with(
         params: <TestSumType as Arbitrary>::Parameters,
-    ) -> impl Strategy<Value = PartialValue<ValueHandle>> {
-        any_with::<TestSumType>(params).prop_flat_map(any_partial_value_of_type)
+    ) -> impl Strategy<Value = PartialValue<TestValue>> {
+        any_with::<TestSumType>(params).prop_flat_map(|t| any_partial_value_of_type(&t))
     }
 
-    fn any_partial_value() -> impl Strategy<Value = PartialValue<ValueHandle>> {
+    fn any_partial_value() -> impl Strategy<Value = PartialValue<TestValue>> {
         any_partial_value_with(Default::default())
     }
 
-    fn any_partial_values<const N: usize>() -> impl Strategy<Value = [PartialValue<ValueHandle>; N]>
-    {
+    fn any_partial_values<const N: usize>() -> impl Strategy<Value = [PartialValue<TestValue>; N]> {
         any::<TestSumType>().prop_flat_map(|ust| {
             TryInto::<[_; N]>::try_into(
                 (0..N)
-                    .map(|_| any_partial_value_of_type(ust.clone()))
+                    .map(|_| any_partial_value_of_type(&ust))
                     .collect_vec(),
             )
             .unwrap()
         })
     }
 
-    fn any_typed_partial_value() -> impl Strategy<Value = (TestSumType, PartialValue<ValueHandle>)>
-    {
-        any::<TestSumType>().prop_flat_map(|t| {
-            any_partial_value_of_type(t.clone()).prop_map(move |v| (t.clone(), v))
-        })
+    fn any_typed_partial_value() -> impl Strategy<Value = (TestSumType, PartialValue<TestValue>)> {
+        any::<TestSumType>()
+            .prop_flat_map(|t| any_partial_value_of_type(&t).prop_map(move |v| (t.clone(), v)))
     }
 
     proptest! {

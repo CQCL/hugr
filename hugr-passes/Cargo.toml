@@ -31,3 +31,4 @@ extension_inference = ["hugr-core/extension_inference"]
 rstest = { workspace = true }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
+proptest-recurse = { version = "0.5.0" }
