@@ -1,0 +1,11 @@
+(hugr 0)
+
+(define-func example.cfg
+  (forall ?a type)
+  [?a] [?a] (ext)
+  (dfg [(%0 ?a)] [(%1 ?a)]
+    (cfg [(%0 ?a)] [(%1 ?a)]
+      (cfg [(%2 (ctrl [?a]))] [(%4 (ctrl [?a]))]
+        (block [(%2 (ctrl [?a]))] [(%4 (ctrl [?a]))]
+          (dfg [(%5 ?a)] [(%6 (adt [[?a]]))]
+            (tag 0 [(%5 ?a)] [(%6 (adt [[?a]]))])))))))

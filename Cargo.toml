@@ -3,7 +3,7 @@ lto = "thin"
 
 [workspace]
 resolver = "2"
-members = ["hugr", "hugr-core", "hugr-passes", "hugr-cli"]
+members = ["hugr", "hugr-core", "hugr-passes", "hugr-cli", "hugr-model"]
 
 [workspace.package]
 rust-version = "1.75"
@@ -36,7 +36,7 @@ downcast-rs = "1.2.0"
 enum_dispatch = "0.3.11"
 html-escape = "0.2.13"
 itertools = "0.13.0"
-jsonschema = "0.18.0"
+jsonschema = "0.22.3"
 lazy_static = "1.4.0"
 num-rational = "0.4.1"
 paste = "1.0"
@@ -45,11 +45,11 @@ proptest = "1.4.0"
 proptest-derive = "0.5.0"
 regex = "1.9.5"
 regex-syntax = "0.8.3"
-rstest = "0.22.0"
+rstest = "0.23.0"
 serde = "1.0"
 serde_json = "1.0.97"
 serde_yaml = "0.9.19"
-smol_str = "0.2.0"
+smol_str = "0.3.1"
 strum = "0.26.1"
 strum_macros = "0.26.1"
 thiserror = "1.0.28"
@@ -62,6 +62,9 @@ clap-verbosity-flag = "2.2.0"
 assert_cmd = "2.0.14"
 assert_fs = "1.1.1"
 predicates = "3.1.0"
+indexmap = "2.3.0"
+fxhash = "0.2.1"
+bumpalo = { version = "3.16.0" }
 
 [profile.dev.package]
 insta.opt-level = 3

@@ -1,0 +1,19 @@
+---
+source: hugr-core/tests/model.rs
+expression: "roundtrip(include_str!(\"fixtures/model-loop.edn\"))"
+---
+(hugr 0)
+
+(define-func example.loop
+  (forall ?0 type)
+  [?0] [?0] (ext)
+  (dfg
+    [(%0 ?0)]
+    [(%1 ?0)]
+    (tail-loop
+      [(%0 ?0)]
+      [(%1 ?0)]
+      (dfg
+        [(%2 ?0)]
+        [(%3 (adt [[?0] [?0]]))]
+        (tag 0 [(%2 ?0)] [(%3 (adt [[?0] [?0]]))])))))

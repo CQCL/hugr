@@ -1,6 +1,6 @@
 [package]
 name = "hugr-passes"
-version = "0.8.1"
+version = "0.8.2"
 edition = { workspace = true }
 rust-version = { workspace = true }
 license = { workspace = true }
@@ -13,7 +13,7 @@ keywords = ["Quantum", "Quantinuum"]
 categories = ["compilers"]
 
 [dependencies]
-hugr-core = { path = "../hugr-core", version = "0.9.1" }
+hugr-core = { path = "../hugr-core", version = "0.10.0" }
 portgraph = { workspace = true }
 # This ascent commit has a fix for unsoundness in release/tag 0.6.0:
 ascent = {git = "https://github.com/s-arash/ascent", rev="9805d02cb830b6e66abcd4d48836a14cd98366f3"}

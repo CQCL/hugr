@@ -33,7 +33,7 @@ impl<T: NodeHandle> NodeHandle for BuildHandle<T> {
 impl<T: NodeHandle> BuildHandle<T> {
     #[inline]
     /// Number of Value kind outputs from this node.
-    fn num_value_outputs(&self) -> usize {
+    pub fn num_value_outputs(&self) -> usize {
         self.num_value_outputs
     }
 

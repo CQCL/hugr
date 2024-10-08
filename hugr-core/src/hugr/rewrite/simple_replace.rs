@@ -55,14 +55,14 @@ impl SimpleReplacement {
 
 impl Rewrite for SimpleReplacement {
     type Error = SimpleReplacementError;
-    type ApplyResult = ();
+    type ApplyResult = Vec<(Node, OpType)>;
     const UNCHANGED_ON_FAILURE: bool = true;
 
     fn verify(&self, _h: &impl HugrView) -> Result<(), SimpleReplacementError> {
         unimplemented!()
     }
 
-    fn apply(mut self, h: &mut impl HugrMut) -> Result<(), SimpleReplacementError> {
+    fn apply(mut self, h: &mut impl HugrMut) -> Result<Self::ApplyResult, Self::Error> {
         let parent = self.subgraph.get_parent(h);
         // 1. Check the parent node exists and is a DataflowParent.
         if !OpTag::DataflowParent.is_superset(h.get_optype(parent).tag()) {
@@ -184,10 +184,12 @@ impl Rewrite for SimpleReplacement {
             });
 
         // 3.5. Remove all nodes in self.removal and edges between them.
-        for &node in self.subgraph.nodes() {
-            h.remove_node(node);
-        }
-        Ok(())
+        Ok(self
+            .subgraph
+            .nodes()
+            .iter()
+            .map(|&node| (node, h.remove_node(node)))
+            .collect())
     }
 
     #[inline]
@@ -831,7 +833,7 @@ pub(in crate::hugr::rewrite) mod test {
     }
 
     fn apply_simple(h: &mut Hugr, rw: SimpleReplacement) {
-        h.apply_rewrite(rw).unwrap()
+        h.apply_rewrite(rw).unwrap();
     }
 
     fn apply_replace(h: &mut Hugr, rw: SimpleReplacement) {

@@ -1,0 +1,23 @@
+(hugr 0)
+
+(declare-func example.callee
+  (forall ?ext ext-set)
+  [(@ arithmetic.int.types.int)] [(@ arithmetic.int.types.int)] (ext arithmetic.int . ?ext)
+  (meta doc.title "Callee")
+  (meta doc.description "This is a function declaration."))
+
+(define-func example.caller
+  [(@ arithmetic.int.types.int)] [(@ arithmetic.int.types.int)] (ext arithmetic.int)
+  (meta doc.title "Caller")
+  (meta doc.description "This defines a function that calls the function which we declared earlier.")
+  (dfg
+    [(%3 (@ arithmetic.int.types.int))]
+    [(%4 (@ arithmetic.int.types.int))]
+    (call (@ example.callee (ext)) [(%3 (@ arithmetic.int.types.int))] [(%4 (@ arithmetic.int.types.int))])))
+
+(define-func example.load
+  [] [(fn [(@ arithmetic.int.types.int)] [(@ arithmetic.int.types.int)] (ext))] (ext)
+  (dfg
+    []
+    [(%5 (fn [(@ arithmetic.int.types.int)] [(@ arithmetic.int.types.int)] (ext)))]
+    (load-func (@ example.caller) [] [(%5 (fn [(@ arithmetic.int.types.int)] [(@ arithmetic.int.types.int)] (ext arithmetic.int)))])))
