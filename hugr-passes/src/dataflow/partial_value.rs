@@ -570,17 +570,17 @@ mod test {
             fn arb(params: SumTypeParams, set: &mut StrategySet) -> SBoxedStrategy<TestSumType> {
                 use proptest::collection::vec;
                 let int_strat = (0..usize::MAX).prop_map(|i| TestSumType::Leaf(Some(i)));
-                let leaf_strat = prop_oneof![Just(TestSumType::Leaf(None)), int_strat].sboxed();
+                let leaf_strat = prop_oneof![Just(TestSumType::Leaf(None)), int_strat];
                 leaf_strat.prop_mutually_recursive(
                     params.depth as u32,
                     params.desired_size as u32,
                     params.expected_branch_size as u32,
                     set,
                     move |set| {
-                        let self2 = params.clone();
+                        let params2 = params.clone();
                         vec(
                             vec(
-                                set.get::<TestSumType, _>(move |set| arb(self2, set))
+                                set.get::<TestSumType, _>(move |set| arb(params2, set))
                                     .prop_map(Arc::new),
                                 1..=params.expected_branch_size,
                             ),
@@ -596,42 +596,34 @@ mod test {
         }
     }
 
-    fn partial_sum_strat(
+    fn single_sum_strat(
         tag: usize,
-        elems_strat: impl Strategy<Value = Vec<PartialValue<TestValue>>>,
+        elems: Vec<Arc<TestSumType>>,
     ) -> impl Strategy<Value = PartialSum<TestValue>> {
-        elems_strat.prop_map(move |elems| PartialSum::new_variant(tag, elems))
-    }
-
-    // Result gets fed into partial_sum_strat along with tag, so probably inline this into that
-    fn vec_strat(
-        elems: &Vec<Arc<TestSumType>>,
-    ) -> impl Strategy<Value = Vec<PartialValue<TestValue>>> {
         elems
-            .into_iter()
+            .iter()
             .map(Arc::as_ref)
             .map(any_partial_value_of_type)
             .collect::<Vec<_>>()
+            .prop_map(move |elems| PartialSum::new_variant(tag, elems))
     }
 
-    fn multi_sum_strat(
+    fn partial_sum_strat(
         variants: &Vec<Vec<Arc<TestSumType>>>,
     ) -> impl Strategy<Value = PartialSum<TestValue>> {
-        let num_tags = variants.len();
         // We have to clone the `variants` here but only as far as the Vec<Vec<Arc<_>>>
-        let s = subsequence(
-            variants.iter().cloned().enumerate().collect::<Vec<_>>(),
-            1..=num_tags,
-        );
-        let sum_strat: BoxedStrategy<Vec<PartialSum<TestValue>>> = s
-            .prop_flat_map(|selected_tagged_variants| {
-                selected_tagged_variants
-                    .into_iter()
-                    .map(|(tag, elems)| partial_sum_strat(tag, vec_strat(&elems)).boxed())
-                    .collect::<Vec<_>>()
-            })
-            .boxed();
-        sum_strat.prop_map(|psums: Vec<PartialSum<TestValue>>| {
+        let tagged_variants = variants.iter().cloned().enumerate().collect::<Vec<_>>();
+        // The type annotation here (and the .boxed() enabling it) are just for documentation
+        let sum_variants_strat: BoxedStrategy<Vec<PartialSum<TestValue>>> =
+            subsequence(tagged_variants, 1..=variants.len())
+                .prop_flat_map(|selected_variants| {
+                    selected_variants
+                        .into_iter()
+                        .map(|(tag, elems)| single_sum_strat(tag, elems))
+                        .collect::<Vec<_>>()
+                })
+                .boxed();
+        sum_variants_strat.prop_map(|psums: Vec<PartialSum<TestValue>>| {
             let mut psums = psums.into_iter();
             let first = psums.next().unwrap();
             psums.fold(first, |mut a, b| {
@@ -650,7 +642,7 @@ mod test {
                 .prop_map(TestValue)
                 .prop_map(PartialValue::from)
                 .boxed(),
-            TestSumType::Branch(sop) => multi_sum_strat(sop).prop_map(PartialValue::from).boxed(),
+            TestSumType::Branch(sop) => partial_sum_strat(sop).prop_map(PartialValue::from).boxed(),
         }
     }
 
