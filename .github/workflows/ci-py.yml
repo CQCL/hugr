@@ -29,11 +29,11 @@ jobs:
     outputs:
       python: ${{ github.ref_name == github.event.repository.default_branch || steps.filter.outputs.python }}
     steps:
-    - uses: actions/checkout@v4
-    - uses: dorny/paths-filter@v3
-      id: filter
-      with:
-        filters: .github/change-filters.yml
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: .github/change-filters.yml
 
   check:
     needs: changes
@@ -44,7 +44,7 @@ jobs:
 
     strategy:
       matrix:
-        python-version: ['3.10', '3.12']
+        python-version: ["3.10", "3.12"]
 
     steps:
       - uses: actions/checkout@v4
@@ -58,7 +58,7 @@ jobs:
           enable-cache: true
       - name: Install Python
         run: uv python install ${{ matrix.python-version }}
-        
+
       - name: Setup dependencies. Fail if the lockfile is outdated.
         run: uv sync --locked
 
@@ -86,6 +86,8 @@ jobs:
       - uses: mozilla-actions/sccache-action@v0.0.6
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
+      - name: Install CapnProto
+        run: sudo apt-get install -y capnproto
       - name: Build HUGR binary
         run: cargo build -p hugr-cli
       - name: Upload the binary to the artifacts
@@ -102,11 +104,11 @@ jobs:
     strategy:
       matrix:
         python-version:
-          - { py: '3.10', coverage: false }
-          - { py: '3.12', coverage: true }
+          - { py: "3.10", coverage: false }
+          - { py: "3.12", coverage: true }
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up uv
         uses: astral-sh/setup-uv@v3
         with:
@@ -182,7 +184,6 @@ jobs:
             echo "Please run 'just update-schema' and commit the changes"
             exit 1
           fi
-
 
   # This is a meta job to mark successful completion of the required checks,
   # even if they are skipped due to no changes in the relevant files.
