@@ -162,6 +162,7 @@ impl<'a> ParseContext<'a> {
             Rule::term_str => {
                 // TODO: Escaping?
                 let value = inner.next().unwrap().as_str();
+                let value = &value[1..value.len() - 1];
                 Term::Str(value)
             }
 
@@ -613,7 +614,7 @@ impl<'a> ParseContext<'a> {
     fn parse_port(&mut self, pair: Pair<'a, Rule>) -> ParseResult<LinkRef<'a>> {
         debug_assert!(matches!(pair.as_rule(), Rule::port));
         let mut inner = pair.into_inner();
-        let link = LinkRef::Named(inner.next().unwrap().as_str());
+        let link = LinkRef::Named(&inner.next().unwrap().as_str()[1..]);
         Ok(link)
     }
 

@@ -62,7 +62,7 @@ fn write_operation(mut builder: hugr_capnp::operation::Builder, operation: &mode
             builder.set_signature(decl.signature.0);
         }
         model::Operation::DeclareFunc { decl } => {
-            let mut builder = builder.init_func_defn();
+            let mut builder = builder.init_func_decl();
             builder.set_name(decl.name);
             write_list!(builder, init_params, write_param, decl.params);
             builder.set_signature(decl.signature.0);
@@ -76,7 +76,7 @@ fn write_operation(mut builder: hugr_capnp::operation::Builder, operation: &mode
             builder.set_value(value.0);
         }
         model::Operation::DeclareAlias { decl } => {
-            let mut builder = builder.init_alias_defn();
+            let mut builder = builder.init_alias_decl();
             builder.set_name(decl.name);
             write_list!(builder, init_params, write_param, decl.params);
             builder.set_type(decl.r#type.0);
