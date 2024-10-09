@@ -58,7 +58,7 @@ jobs:
           enable-cache: true
       - name: Install Python
         run: uv python install ${{ matrix.python-version }}
-        
+
       - name: Setup dependencies. Fail if the lockfile is outdated.
         run: uv sync --locked
 
@@ -106,7 +106,7 @@ jobs:
           - { py: '3.12', coverage: true }
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up uv
         uses: astral-sh/setup-uv@v3
         with:

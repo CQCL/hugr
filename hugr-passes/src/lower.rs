@@ -55,7 +55,7 @@ pub enum LowerError {
 pub fn lower_ops(
     hugr: &mut impl HugrMut,
     lowering: impl Fn(&OpType) -> Option<Hugr>,
-) -> Result<Vec<Node>, LowerError> {
+) -> Result<Vec<(Node, OpType)>, LowerError> {
     let replacements = hugr
         .nodes()
         .filter_map(|node| {
@@ -69,9 +69,9 @@ pub fn lower_ops(
         .map(|(node, replacement)| {
             let subcirc = SiblingSubgraph::try_from_nodes([node], hugr)?;
             let rw = subcirc.create_simple_replacement(hugr, replacement)?;
-            // TODO return weights once https://github.com/CQCL/hugr/issues/476 is done.
-            hugr.apply_rewrite(rw)?;
-            Ok(node)
+            let mut repls = hugr.apply_rewrite(rw)?;
+            debug_assert_eq!(repls.len(), 1);
+            Ok(repls.remove(0))
         })
         .collect()
 }
