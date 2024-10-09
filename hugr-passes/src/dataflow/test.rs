@@ -235,7 +235,7 @@ fn test_tail_loop_iterates_twice() {
     machine.propolutate_out_wires([(true_w, pv_true()), (false_w, pv_false())]);
     machine.run(TestContext(Arc::new(&hugr)));
 
-    let true_or_false = PartialValue::new_variant(0, []).join(PartialValue::new_variant(1, []));
+    let true_or_false = pv_true().join(pv_false());
     // TODO these should be the propagated values for now they will be join(true,false) - ALAN wtf?
     let o_r1 = machine.read_out_wire(o_w1).unwrap();
     assert_eq!(o_r1, true_or_false);
