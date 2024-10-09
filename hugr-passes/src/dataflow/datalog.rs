@@ -122,22 +122,22 @@ ascent::ascent! {
         in_wire_value(c, tl, p, v);
 
     // Output node of child region propagate to Input node of child region
-    out_wire_value(c, in_n, out_p, v) <-- node(c, tl_n),
+    out_wire_value(c, in_n, OutgoingPort::from(out_p), v) <-- node(c, tl_n),
         if let Some(tailloop) = c.get_optype(*tl_n).as_tail_loop(),
         io_node(c,tl_n,in_n, IO::Input),
         io_node(c,tl_n,out_n, IO::Output),
         node_in_value_row(c, out_n, out_in_row), // get the whole input row for the output node
 
         if let Some(fields) = out_in_row.unpack_first(0, tailloop.just_inputs.len()), // if it is possible for tag to be 0
-        for (out_p, v) in (0..).map(OutgoingPort::from).zip(fields);
+        for (out_p, v) in fields.enumerate();
 
     // Output node of child region propagate to outputs of tail loop
-    out_wire_value(c, tl_n, out_p, v) <-- node(c, tl_n),
+    out_wire_value(c, tl_n, OutgoingPort::from(out_p), v) <-- node(c, tl_n),
         if let Some(tailloop) = c.get_optype(*tl_n).as_tail_loop(),
         io_node(c,tl_n,out_n, IO::Output),
         node_in_value_row(c, out_n, out_in_row), // get the whole input row for the output node
         if let Some(fields) = out_in_row.unpack_first(1, tailloop.just_outputs.len()), // if it is possible for the tag to be 1
-        for (out_p, v) in (0..).map(OutgoingPort::from).zip(fields);
+        for (out_p, v) in fields.enumerate();
 
     // Conditional
     relation conditional_node(C, Node);
@@ -149,14 +149,14 @@ ascent::ascent! {
       if c.get_optype(case).is_case();
 
     // inputs of conditional propagate into case nodes
-    out_wire_value(c, i_node, i_p, v) <--
+    out_wire_value(c, i_node, OutgoingPort::from(out_p), v) <--
       case_node(c, cond, case_index, case),
       io_node(c, case, i_node, IO::Input),
       node_in_value_row(c, cond, in_row),
       //in_wire_value(c, cond, cond_in_p, cond_in_v),
       if let Some(conditional) = c.get_optype(*cond).as_conditional(),
       if let Some(fields) = in_row.unpack_first(*case_index, conditional.sum_rows[*case_index].len()),
-      for (i_p, v) in (0..).map(OutgoingPort::from).zip(fields);
+      for (out_p, v) in fields.enumerate();
 
     // outputs of case nodes propagate to outputs of conditional
     out_wire_value(c, cond, OutgoingPort::from(o_p.index()), v) <--
@@ -188,7 +188,7 @@ ascent::ascent! {
         in_wire_value(c, cfg, p, v);
 
     // Outputs of each block propagated to successor blocks or (if exit block) then CFG itself
-    out_wire_value(c, dest, out_p, v) <--
+    out_wire_value(c, dest, OutgoingPort::from(out_p), v) <--
         dfb_block(c, cfg, pred),
         if let Some(df_block) = c.get_optype(*pred).as_dataflow_block(),
         for (succ_n, succ) in c.output_neighbours(*pred).enumerate(),
@@ -196,7 +196,7 @@ ascent::ascent! {
         _cfg_succ_dest(c, cfg, succ, dest),
         node_in_value_row(c, out_n, out_in_row),
         if let Some(fields) = out_in_row.unpack_first(succ_n, df_block.sum_rows.get(succ_n).unwrap().len()),
-        for (out_p, v) in (0..).map(OutgoingPort::from).zip(fields);
+        for (out_p, v) in fields.enumerate();
 }
 
 fn propagate_leaf_op<PV: AbstractValue>(
