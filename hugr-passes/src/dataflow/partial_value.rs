@@ -378,11 +378,6 @@ where
 }
 
 impl<V: BaseValue> Lattice for PartialValue<V> {
-    fn join(mut self, other: Self) -> Self {
-        self.join_mut(other);
-        self
-    }
-
     fn join_mut(&mut self, other: Self) -> bool {
         self.assert_invariants();
         // println!("join {self:?}\n{:?}", &other);
@@ -423,11 +418,6 @@ impl<V: BaseValue> Lattice for PartialValue<V> {
                 true
             }
         }
-    }
-
-    fn meet(mut self, other: Self) -> Self {
-        self.meet_mut(other);
-        self
     }
 
     fn meet_mut(&mut self, other: Self) -> bool {

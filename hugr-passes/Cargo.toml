@@ -16,7 +16,7 @@ categories = ["compilers"]
 hugr-core = { path = "../hugr-core", version = "0.10.0" }
 portgraph = { workspace = true }
 # This ascent commit has a fix for unsoundness in release/tag 0.6.0:
-ascent = {git = "https://github.com/s-arash/ascent", rev="9805d02cb830b6e66abcd4d48836a14cd98366f3"}
+ascent = { version = "0.7.0" }
 downcast-rs = { workspace = true }
 itertools = { workspace = true }
 lazy_static = { workspace = true }

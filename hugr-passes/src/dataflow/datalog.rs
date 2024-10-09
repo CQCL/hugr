@@ -264,16 +264,6 @@ impl<V: PartialEq + PartialOrd> PartialOrd for ValueRow<V> {
 }
 
 impl<V: AbstractValue> Lattice for ValueRow<V> {
-    fn meet(mut self, other: Self) -> Self {
-        self.meet_mut(other);
-        self
-    }
-
-    fn join(mut self, other: Self) -> Self {
-        self.join_mut(other);
-        self
-    }
-
     fn join_mut(&mut self, other: Self) -> bool {
         assert_eq!(self.0.len(), other.0.len());
         let mut changed = false;
