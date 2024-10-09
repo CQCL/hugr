@@ -202,20 +202,17 @@ fn test_tail_loop_always_iterates() {
 }
 
 #[test]
-fn test_tail_loop_iterates_twice() {
+fn test_tail_loop_two_iters() {
     let mut builder = DFGBuilder::new(Signature::new_endo(vec![])).unwrap();
-    // let var_type = Type::new_sum([type_row![BOOL_T,BOOL_T], type_row![BOOL_T,BOOL_T]]);
 
     let true_w = builder.add_load_value(Value::true_val());
     let false_w = builder.add_load_value(Value::false_val());
 
-    // let r_w = builder
-    //     .add_load_value(Value::sum(0, [], SumType::new([type_row![], BOOL_T.into()])).unwrap());
     let tlb = builder
         .tail_loop_builder_exts(
             [],
             [(BOOL_T, false_w), (BOOL_T, true_w)],
-            vec![].into(),
+            type_row![],
             ExtensionSet::new(),
         )
         .unwrap();
@@ -227,8 +224,6 @@ fn test_tail_loop_iterates_twice() {
     let tail_loop = tlb.finish_with_outputs(in_w1, [in_w2, in_w1]).unwrap();
 
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
-    // TODO once we can do conditionals put these wires inside `just_outputs` and
-    // we should be able to propagate their values...ALAN wtf? loop control type IS bool ATM
     let [o_w1, o_w2] = tail_loop.outputs_arr();
 
     let mut machine = Machine::default();
@@ -236,7 +231,6 @@ fn test_tail_loop_iterates_twice() {
     machine.run(TestContext(Arc::new(&hugr)));
 
     let true_or_false = pv_true().join(pv_false());
-    // TODO these should be the propagated values for now they will be join(true,false) - ALAN wtf?
     let o_r1 = machine.read_out_wire(o_w1).unwrap();
     assert_eq!(o_r1, true_or_false);
     let o_r2 = machine.read_out_wire(o_w2).unwrap();
