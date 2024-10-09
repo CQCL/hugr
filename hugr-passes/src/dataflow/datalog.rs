@@ -221,22 +221,22 @@ fn value_outputs(h: &impl HugrView, n: Node) -> impl Iterator<Item = OutgoingPor
 struct ValueRow<PV>(Vec<PV>);
 
 impl<PV: AbstractValue> ValueRow<PV> {
-    pub fn new(len: usize) -> Self {
+    fn new(len: usize) -> Self {
         Self(vec![PV::bottom(); len])
     }
 
-    pub fn single_known(len: usize, idx: usize, v: PV) -> Self {
+    fn single_known(len: usize, idx: usize, v: PV) -> Self {
         assert!(idx < len);
         let mut r = Self::new(len);
         r.0[idx] = v;
         r
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = &PV> {
+    fn iter(&self) -> impl Iterator<Item = &PV> {
         self.0.iter()
     }
 
-    pub fn unpack_first(
+    fn unpack_first(
         &self,
         variant: usize,
         len: usize,
@@ -245,10 +245,6 @@ impl<PV: AbstractValue> ValueRow<PV> {
             .variant_values(variant, len)
             .map(|vals| vals.into_iter().chain(self.iter().skip(1).cloned()))
     }
-
-    // fn initialised(&self) -> bool {
-    //     self.0.iter().all(|x| x != &PV::top())
-    // }
 }
 
 impl<PV> FromIterator<PV> for ValueRow<PV> {
