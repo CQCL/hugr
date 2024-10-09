@@ -38,3 +38,7 @@ release = true
 [[package]]
 name = "hugr-cli"
 release = true
+
+[[package]]
+name = "hugr-model"
+release = true
