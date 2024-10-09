@@ -169,6 +169,34 @@ ascent::ascent! {
         in_wire_value(c, cond, IncomingPort::from(0), v),
         let reachable = v.supports_tag(*i);
 
+    // CFG
+    relation cfg_node(C, Node);
+    relation dfb_block(C, Node, Node);
+    cfg_node(c,n) <-- node(c, n), if c.get_optype(*n).is_cfg();
+    dfb_block(c,cfg,blk) <-- cfg_node(c, cfg), for blk in c.children(*cfg), if c.get_optype(blk).is_dataflow_block();
+
+    // Where do the values "fed" along a control-flow edge come out?
+    relation _cfg_succ_dest(C, Node, Node, Node);
+    _cfg_succ_dest(c, cfg, blk, inp) <-- dfb_block(c, cfg, blk), io_node(c, blk, inp, IO::Input);
+    _cfg_succ_dest(c, cfg, exit, cfg) <-- cfg_node(c, cfg), if let Some(exit) = c.children(*cfg).skip(1).next();
+
+    // Inputs of CFG propagate to entry block
+    out_wire_value(c, i_node, OutgoingPort::from(p.index()), v) <--
+        cfg_node(c, cfg),
+        if let Some(entry) = c.children(*cfg).next(),
+        io_node(c, entry, i_node, IO::Input),
+        in_wire_value(c, cfg, p, v);
+
+    // Outputs of each block propagated to successor blocks or (if exit block) then CFG itself
+    out_wire_value(c, dest, out_p, v) <--
+        dfb_block(c, cfg, pred),
+        if let Some(df_block) = c.get_optype(*pred).as_dataflow_block(),
+        for (succ_n, succ) in c.output_neighbours(*pred).enumerate(),
+        io_node(c, pred, out_n, IO::Output),
+        _cfg_succ_dest(c, cfg, succ, dest),
+        node_in_value_row(c, out_n, out_in_row),
+        if let Some(fields) = out_in_row.unpack_first(succ_n, df_block.sum_rows.get(succ_n).unwrap().len()),
+        for (out_p, v) in (0..).map(OutgoingPort::from).zip(fields);
 }
 
 fn propagate_leaf_op<PV: AbstractValue>(
