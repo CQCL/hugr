@@ -390,26 +390,24 @@ and evaluating it.  The `Sum` produced controls iteration of the loop:
 ##### Control Flow Graphs
 
 When Conditional and `TailLoop` are not sufficient, the HUGR allows
-arbitrarily-complex (even irreducible) control flow via an explicit CFG,
-expressed using `ControlFlow` edges between `BasicBlock`-nodes that are
-children of a CFG-node. `BasicBlock`-nodes only exist as children of CFG-nodes.
+arbitrarily-complex (even irreducible) control flow via an explicit `CFG` node:
+a dataflow node defined by a child control sibling graph. This sibling
+graph contains `BasicBlock` nodes (and [scoped definitions](#scoped-definitions)),
+with the `BasicBock` nodes connected by `ControlFlow` edges (not dataflow).
+`BasicBlock`-nodes only exist as children of `CFG`-nodes.
 
 There are two kinds of `BasicBlock`: `DFB` (dataflow block) and `Exit`.
+Each `DFB` node is parent to a dataflow sibling graph. `Exit` blocks
+have only incoming control-flow edges, and no children.
 
-`DFB` nodes are CFG basic blocks. Edges between them are
-control-flow (as opposed to dataflow), and express traditional
-control-flow concepts of branch/merge. Each `DFB` node is
-parent to a dataflow sibling graph. `Exit` blocks have only incoming control-flow edges, and no children.
-
-A `CFG` node is a dataflow node which is defined by a child control
-sibling graph. The children are all `BasicBlock`s or [scoped definitions](#scoped-definitions).
-The first child is the entry block and must be a `DFB`, with inputs the same as the CFG-node; the second child is an
+The first child of the `CFG` is the entry block and must be a `DFB`,
+with inputs the same as the CFG-node; the second child is an
 `Exit` node, whose inputs match the outputs of the CFG-node.
 The remaining children are either `DFB`s or [scoped definitions](#scoped-definitions).
 
-The first output of the graph contained in a `BasicBlock` has type
-`Sum(#t0,...#t(n-1))`, where the node has `n` successors, and the
-remaining outputs are a row `#x`. `#ti` with `#x` appended matches the
+The first output of the graph contained in a `DFB` has type
+`Sum(\#t(0),...,#t(n-1))`, where the node has `n` successors, and the
+remaining outputs are a row `#x`. `#t(i)` with `#x` appended matches the
 inputs of successor `i`.
 
 Some normalizations are possible:
