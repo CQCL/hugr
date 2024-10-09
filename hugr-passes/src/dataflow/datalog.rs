@@ -114,27 +114,28 @@ ascent::ascent! {
 
 
     // TailLoop
-    relation tail_loop_node(C, Node);
-    tail_loop_node(c,n) <-- node(c, n), if c.get_optype(*n).is_tail_loop();
 
     // inputs of tail loop propagate to Input node of child region
-    out_wire_value(c, i, OutgoingPort::from(p.index()), v) <-- tail_loop_node(c, tl),
-        io_node(c,tl,i, IO::Input), in_wire_value(c, tl, p, v);
+    out_wire_value(c, i, OutgoingPort::from(p.index()), v) <-- node(c, tl),
+        if c.get_optype(*tl).is_tail_loop(),
+        io_node(c,tl,i, IO::Input),
+        in_wire_value(c, tl, p, v);
 
     // Output node of child region propagate to Input node of child region
-    out_wire_value(c, in_n, out_p, v) <-- tail_loop_node(c, tl_n),
+    out_wire_value(c, in_n, out_p, v) <-- node(c, tl_n),
+        if let Some(tailloop) = c.get_optype(*tl_n).as_tail_loop(),
         io_node(c,tl_n,in_n, IO::Input),
         io_node(c,tl_n,out_n, IO::Output),
         node_in_value_row(c, out_n, out_in_row), // get the whole input row for the output node
-        if let Some(tailloop) = c.get_optype(*tl_n).as_tail_loop(),
+
         if let Some(fields) = out_in_row.unpack_first(0, tailloop.just_inputs.len()), // if it is possible for tag to be 0
         for (out_p, v) in (0..).map(OutgoingPort::from).zip(fields);
 
     // Output node of child region propagate to outputs of tail loop
-    out_wire_value(c, tl_n, out_p, v) <-- tail_loop_node(c, tl_n),
+    out_wire_value(c, tl_n, out_p, v) <-- node(c, tl_n),
+        if let Some(tailloop) = c.get_optype(*tl_n).as_tail_loop(),
         io_node(c,tl_n,out_n, IO::Output),
         node_in_value_row(c, out_n, out_in_row), // get the whole input row for the output node
-        if let Some(tailloop) = c.get_optype(*tl_n).as_tail_loop(),
         if let Some(fields) = out_in_row.unpack_first(1, tailloop.just_outputs.len()), // if it is possible for the tag to be 1
         for (out_p, v) in (0..).map(OutgoingPort::from).zip(fields);
 
@@ -232,18 +233,11 @@ impl<PV: AbstractValue> ValueRow<PV> {
         r
     }
 
-    fn iter(&self) -> impl Iterator<Item = &PV> {
-        self.0.iter()
-    }
-
-    fn unpack_first(
-        &self,
-        variant: usize,
-        len: usize,
-    ) -> Option<impl Iterator<Item = PV> + '_> {
+    fn unpack_first(&self, variant: usize, len: usize) -> Option<impl Iterator<Item = PV>> {
+        let rest: Vec<_> = self.0[1..].to_owned();
         self[0]
             .variant_values(variant, len)
-            .map(|vals| vals.into_iter().chain(self.iter().skip(1).cloned()))
+            .map(|vals| vals.into_iter().chain(rest))
     }
 }
 
