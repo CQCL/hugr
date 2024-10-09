@@ -15,7 +15,6 @@ categories = ["compilers"]
 [dependencies]
 hugr-core = { path = "../hugr-core", version = "0.10.0" }
 portgraph = { workspace = true }
-# This ascent commit has a fix for unsoundness in release/tag 0.6.0:
 ascent = { version = "0.7.0" }
 downcast-rs = { workspace = true }
 itertools = { workspace = true }
