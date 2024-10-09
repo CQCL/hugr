@@ -101,8 +101,11 @@ impl<V: BaseValue> PartialSum<V> {
     /// Mutates self according to lattice meet operation (towards `Bottom`). If successful,
     /// returns whether `self` has changed.
     ///
-    /// Fails (without mutation) with the conflicting tag if any common rows have different lengths
-    pub fn try_meet_mut(&mut self, other: Self) -> Result<bool, usize> {
+    /// # Errors
+    /// Fails without mutation, either:
+    /// * `Some(tag)` if the two [PartialSum]s both had rows with that `tag` but of different lengths
+    /// * `None` if the two instances had no rows in common (i.e., the result is "Bottom")
+    pub fn try_meet_mut(&mut self, other: Self) -> Result<bool, Option<usize>> {
         let mut changed = false;
         let mut keys_to_remove = vec![];
         for (k, v) in self.0.iter() {
@@ -110,10 +113,13 @@ impl<V: BaseValue> PartialSum<V> {
                 None => keys_to_remove.push(*k),
                 Some(o_v) => {
                     if v.len() != o_v.len() {
-                        return Err(*k);
+                        return Err(Some(*k));
                     }
                 }
             }
+        }
+        if keys_to_remove.len() == self.0.len() {
+            return Err(None);
         }
         for (k, v) in other.0 {
             if let Some(row) = self.0.get_mut(&k) {
@@ -451,16 +457,7 @@ impl<V: BaseValue> Lattice for PartialValue<V> {
                     _ => unreachable!(),
                 };
                 match ps1.try_meet_mut(ps2) {
-                    Ok(ch) => {
-                        // ALAN the 'invariant' that a PartialSum always has >=1 tag can be broken here.
-                        // Fix this by rewriting to Bottom, but should probably be refactored - at the
-                        // least, it seems dangerous to expose a potentially-invalidating try_meet_mut.
-                        if ps1.0.is_empty() {
-                            assert!(ch);
-                            self.0 = PVEnum::Bottom
-                        }
-                        ch
-                    }
+                    Ok(ch) => ch,
                     Err(_) => {
                         self.0 = PVEnum::Bottom;
                         true
