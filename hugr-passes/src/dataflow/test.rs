@@ -243,6 +243,67 @@ fn test_tail_loop_two_iters() {
 }
 
 #[test]
+fn test_tail_loop_containing_conditional() {
+    let mut builder = DFGBuilder::new(Signature::new_endo(vec![])).unwrap();
+    let body_out_variants = vec![type_row![BOOL_T; 2]; 2];
+
+    let true_w = builder.add_load_value(Value::true_val());
+    let false_w = builder.add_load_value(Value::false_val());
+
+    let mut tlb = builder
+        .tail_loop_builder_exts(
+            [(BOOL_T, false_w), (BOOL_T, true_w)],
+            [],
+            type_row![BOOL_T, BOOL_T],
+            ExtensionSet::new(),
+        )
+        .unwrap();
+    assert_eq!(
+        tlb.loop_signature().unwrap().signature(),
+        Signature::new_endo(type_row![BOOL_T, BOOL_T])
+    );
+    let [in_w1, in_w2] = tlb.input_wires_arr();
+
+    // Branch on in_w1, so first iter (false, true) uses false == tag 0 == continue with (true, true)
+    // second iter (true, true) uses true == tag 1 == break with (true, true)
+    let mut cond = tlb
+        .conditional_builder(
+            (vec![type_row![]; 2], in_w1),
+            [],
+            Type::new_sum(body_out_variants.clone()).into(),
+        )
+        .unwrap();
+    for (tag, second_output) in [(0, true_w), (1, false_w)] {
+        let mut case_b = cond.case_builder(tag).unwrap();
+        let r = case_b
+            .add_dataflow_op(Tag::new(tag, body_out_variants), [in_w2, second_output])
+            .unwrap()
+            .outputs();
+        case_b.finish_with_outputs(r).unwrap();
+    }
+    let [r] = cond.finish_sub_container().unwrap().outputs_arr();
+
+    let tail_loop = tlb.finish_with_outputs(r, []).unwrap();
+
+    let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
+    let [o_w1, o_w2] = tail_loop.outputs_arr();
+
+    let mut machine = Machine::default();
+    machine.propolutate_out_wires([(true_w, pv_true()), (false_w, pv_false())]);
+    machine.run(TestContext(Arc::new(&hugr)));
+
+    let o_r1 = machine.read_out_wire(o_w1).unwrap();
+    assert_eq!(o_r1, pv_true());
+    let o_r2 = machine.read_out_wire(o_w2).unwrap();
+    assert_eq!(o_r2, pv_false());
+    assert_eq!(
+        Some(TailLoopTermination::BreaksAndContinues),
+        machine.tail_loop_terminates(&hugr, tail_loop.node())
+    );
+    assert_eq!(machine.tail_loop_terminates(&hugr, hugr.root()), None);
+}
+
+#[test]
 fn conditional() {
     let variants = vec![type_row![], type_row![], type_row![BOOL_T]];
     let cond_t = Type::new_sum(variants.clone());
