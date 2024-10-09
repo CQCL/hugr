@@ -2,6 +2,7 @@ use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
 use ascent::{lattice::BoundedLattice, Lattice};
+
 use hugr_core::{
     builder::{endo_sig, DFGBuilder, Dataflow, DataflowSubContainer, HugrBuilder, SubContainer},
     extension::{
@@ -245,42 +246,49 @@ fn test_tail_loop_two_iters() {
 #[test]
 fn test_tail_loop_containing_conditional() {
     let mut builder = DFGBuilder::new(Signature::new_endo(vec![])).unwrap();
-    let body_out_variants = vec![type_row![BOOL_T; 2]; 2];
+    let control_variants = vec![type_row![BOOL_T;2]; 2];
+    let control_t = Type::new_sum(control_variants.clone());
+    let body_out_variants = vec![control_t.clone().into(), type_row![BOOL_T; 2]];
 
-    let true_w = builder.add_load_value(Value::true_val());
-    let false_w = builder.add_load_value(Value::false_val());
+    let init = builder.add_load_value(
+        Value::sum(
+            0,
+            [Value::false_val(), Value::true_val()],
+            SumType::new(control_variants.clone()),
+        )
+        .unwrap(),
+    );
 
     let mut tlb = builder
-        .tail_loop_builder_exts(
-            [(BOOL_T, false_w), (BOOL_T, true_w)],
-            [],
-            type_row![BOOL_T, BOOL_T],
-            ExtensionSet::new(),
-        )
+        .tail_loop_builder([(control_t, init)], [], type_row![BOOL_T; 2])
         .unwrap();
-    assert_eq!(
-        tlb.loop_signature().unwrap().signature(),
-        Signature::new_endo(type_row![BOOL_T, BOOL_T])
-    );
-    let [in_w1, in_w2] = tlb.input_wires_arr();
+    let [in_w] = tlb.input_wires_arr();
 
-    // Branch on in_w1, so first iter (false, true) uses false == tag 0 == continue with (true, true)
-    // second iter (true, true) uses true == tag 1 == break with (true, true)
+    // Branch on in_wire, so first iter 0(false, true)...
     let mut cond = tlb
         .conditional_builder(
-            (vec![type_row![]; 2], in_w1),
+            (control_variants.clone(), in_w),
             [],
             Type::new_sum(body_out_variants.clone()).into(),
         )
         .unwrap();
-    for (tag, second_output) in [(0, true_w), (1, false_w)] {
-        let mut case_b = cond.case_builder(tag).unwrap();
-        let r = case_b
-            .add_dataflow_op(Tag::new(tag, body_out_variants), [in_w2, second_output])
-            .unwrap()
-            .outputs();
-        case_b.finish_with_outputs(r).unwrap();
-    }
+    let mut case0_b = cond.case_builder(0).unwrap();
+    let [a, b] = case0_b.input_wires_arr();
+    // Builds value for next iter as 1(true, false) by flipping arguments
+    let [next_input] = case0_b
+        .add_dataflow_op(Tag::new(1, control_variants), [b, a])
+        .unwrap()
+        .outputs_arr();
+    let cont = case0_b
+        .add_dataflow_op(Tag::new(0, body_out_variants.clone()), [next_input])
+        .unwrap();
+    case0_b.finish_with_outputs(cont.outputs()).unwrap();
+    // Second iter 1(true, false) => exit with (true, false)
+    let mut case1_b = cond.case_builder(1).unwrap();
+    let loop_res = case1_b
+        .add_dataflow_op(Tag::new(1, body_out_variants), case1_b.input_wires())
+        .unwrap();
+    case1_b.finish_with_outputs(loop_res.outputs()).unwrap();
     let [r] = cond.finish_sub_container().unwrap().outputs_arr();
 
     let tail_loop = tlb.finish_with_outputs(r, []).unwrap();
@@ -289,7 +297,7 @@ fn test_tail_loop_containing_conditional() {
     let [o_w1, o_w2] = tail_loop.outputs_arr();
 
     let mut machine = Machine::default();
-    machine.propolutate_out_wires([(true_w, pv_true()), (false_w, pv_false())]);
+    machine.propolutate_out_wires([(init, PartialValue::new_variant(0, [pv_false(), pv_true()]))]);
     machine.run(TestContext(Arc::new(&hugr)));
 
     let o_r1 = machine.read_out_wire(o_w1).unwrap();
