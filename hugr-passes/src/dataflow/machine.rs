@@ -99,6 +99,24 @@ impl<V: AbstractValue, C: DFContext<V>> Machine<V, C> {
                 .unwrap(),
         )
     }
+
+    /// Tells us if a block ([DataflowBlock] or [ExitBlock]) in a [CFG] is known
+    /// to be reachable. (Returns `None` if argument is not a child of a CFG.)
+    pub fn bb_reachable(&self, hugr: impl HugrView, bb: Node) -> Option<bool> {
+        let cfg = hugr.get_parent(bb)?; // Not really required...??
+        hugr.get_optype(cfg).as_cfg()?;
+        let t = hugr.get_optype(bb);
+        if !t.is_dataflow_block() && !t.is_exit_block() {
+            return None;
+        };
+        Some(
+            self.0
+                .bb_reachable
+                .iter()
+                .find(|(_, cfg2, bb2)| *cfg2 == cfg && *bb2 == bb)
+                .is_some(),
+        )
+    }
 }
 
 /// Tells whether a loop iterates (never, always, sometimes)

@@ -462,7 +462,6 @@ fn xor_and_cfg() -> (Hugr, Node) {
 }
 
 #[rstest]
-#[should_panic] // first case failing
 #[case(pv_true(), pv_true(), pv_false(), pv_true())]
 #[case(pv_true(), pv_false(), pv_true(), pv_false())]
 //#[case(pv_true(), pv_true_or_false(), pv_true_or_false())]

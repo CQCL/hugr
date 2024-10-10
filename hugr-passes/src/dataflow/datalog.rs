@@ -150,6 +150,16 @@ ascent::ascent! {
     cfg_node(c,n) <-- node(c, n), if c.get_optype(*n).is_cfg();
     dfb_block(c,cfg,blk) <-- cfg_node(c, cfg), for blk in c.children(*cfg), if c.get_optype(blk).is_dataflow_block();
 
+    // Reachability
+    relation bb_reachable(C, Node, Node);
+    bb_reachable(c, cfg, entry) <-- cfg_node(c, cfg), if let Some(entry) = c.children(*cfg).next();
+    bb_reachable(c, cfg, bb) <-- cfg_node(c, cfg),
+        bb_reachable(c, cfg, pred),
+        io_node(c, pred, pred_out, IO::Output),
+        in_wire_value(c, pred_out, IncomingPort::from(0), predicate),
+        for (tag, bb) in c.output_neighbours(*pred).enumerate(),
+        if predicate.supports_tag(tag);
+
     // Where do the values "fed" along a control-flow edge come out?
     relation _cfg_succ_dest(C, Node, Node, Node);
     _cfg_succ_dest(c, cfg, blk, inp) <-- dfb_block(c, cfg, blk), io_node(c, blk, inp, IO::Input);
@@ -162,9 +172,10 @@ ascent::ascent! {
         io_node(c, entry, i_node, IO::Input),
         in_wire_value(c, cfg, p, v);
 
-    // Outputs of each block propagated to successor blocks or (if exit block) then CFG itself
+    // Outputs of each reachable block propagated to successor block or (if exit block) then CFG itself
     out_wire_value(c, dest, OutgoingPort::from(out_p), v) <--
         dfb_block(c, cfg, pred),
+        bb_reachable(c, cfg, pred),
         let df_block = c.get_optype(*pred).as_dataflow_block().unwrap(),
         for (succ_n, succ) in c.output_neighbours(*pred).enumerate(),
         io_node(c, pred, out_n, IO::Output),
