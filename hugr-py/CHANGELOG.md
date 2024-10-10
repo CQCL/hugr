@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.9.0](https://github.com/CQCL/hugr/compare/hugr-py-v0.8.1...hugr-py-v0.9.0) (2024-10-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* The `length` op in the std `collections` extensions now also returns the list.
+
+### Bug Fixes
+
+* Make list length op give back the list ([#1547](https://github.com/CQCL/hugr/issues/1547)) ([cf31698](https://github.com/CQCL/hugr/commit/cf31698113ea02e2d13596638b1fe0f4f118a601))
+
 ## [0.8.1](https://github.com/CQCL/hugr/compare/hugr-py-v0.8.0...hugr-py-v0.8.1) (2024-09-04)
 
 
