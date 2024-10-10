@@ -3,9 +3,15 @@
 (define-func example.cfg
   (forall ?a type)
   [?a] [?a] (ext)
-  (dfg [(%0 ?a)] [(%1 ?a)]
-    (cfg [(%0 ?a)] [(%1 ?a)]
-      (cfg [(%2 (ctrl [?a]))] [(%4 (ctrl [?a]))]
-        (block [(%2 (ctrl [?a]))] [(%4 (ctrl [?a]))]
-          (dfg [(%5 ?a)] [(%6 (adt [[?a]]))]
-            (tag 0 [(%5 ?a)] [(%6 (adt [[?a]]))])))))))
+  (dfg [%0] [%1]
+    (signature (fn [?a] [?a] (ext)))
+    (cfg [%0] [%1]
+      (signature (fn [?a] [?a] (ext)))
+      (cfg [%2] [%4]
+        (signature (fn [(ctrl [?a])] [(ctrl [?a])] (ext)))
+        (block [%2] [%4]
+          (signature (fn [(ctrl [?a])] [(ctrl [?a])] (ext)))
+          (dfg [%5] [%6]
+            (signature (fn [?a] [(adt [[?a]])] (ext)))
+            (tag 0 [%5] [%6]
+              (signature (fn [?a] [(adt [[?a]])] (ext))))))))))

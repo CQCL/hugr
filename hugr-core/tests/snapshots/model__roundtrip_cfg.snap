@@ -8,19 +8,22 @@ expression: "roundtrip(include_str!(\"fixtures/model-cfg.edn\"))"
   (forall ?0 type)
   [?0] [?0] (ext)
   (dfg
-    [(%0 ?0)]
-    [(%1 ?0)]
-    (cfg [(%0 ?0)] [(%1 ?0)]
+    [%0] [%1]
+    (signature (fn [?0] [?0] (ext)))
+    (cfg [%0] [%1]
+      (signature (fn [?0] [?0] (ext)))
       (cfg
-        [(%2 (ctrl [?0]))]
-        [(%6 (ctrl [?0]))]
-        (block [(%2 (ctrl [?0]))] [(%3 (ctrl [?0]))]
+        [%2] [%8]
+        (signature (fn [?0] [?0] (ext)))
+        (block [%2] [%5]
+          (signature (fn [(ctrl [?0])] [(ctrl [?0 . []])] (ext)))
           (dfg
-            [(%4 ?0)]
-            [(%5 (adt [[?0]]))]
-            (tag 0 [(%4 ?0)] [(%5 (adt [[?0]]))])))
-        (block [(%3 (ctrl [?0]))] [(%6 (ctrl [?0]))]
+            [%3] [%4]
+            (signature (fn [?0] [(adt [[?0]])] (ext)))
+            (tag 0 [%3] [%4] (signature (fn [?0] [(adt [[?0]])] (ext))))))
+        (block [%5] [%8]
+          (signature (fn [(ctrl [?0])] [(ctrl [?0 . []])] (ext)))
           (dfg
-            [(%7 ?0)]
-            [(%8 (adt [[?0]]))]
-            (tag 0 [(%7 ?0)] [(%8 (adt [[?0]]))])))))))
+            [%6] [%7]
+            (signature (fn [?0] [(adt [[?0]])] (ext)))
+            (tag 0 [%6] [%7] (signature (fn [?0] [(adt [[?0]])] (ext))))))))))

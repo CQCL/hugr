@@ -8,4 +8,4 @@ expression: "roundtrip(include_str!(\"fixtures/model-params.edn\"))"
   (forall ?0 type)
   (forall ?1 type)
   [?0 ?1] [?1 ?0] (ext)
-  (dfg [(%0 ?0) (%1 ?1)] [(%1 ?1) (%0 ?0)]))
+  (dfg [%0 %1] [%1 %0] (signature (fn [?0 ?1] [?1 ?0] (ext)))))

@@ -10,14 +10,15 @@
   [(@ arithmetic.int.types.int)] [(@ arithmetic.int.types.int)] (ext arithmetic.int)
   (meta doc.title "Caller")
   (meta doc.description "This defines a function that calls the function which we declared earlier.")
-  (dfg
-    [(%3 (@ arithmetic.int.types.int))]
-    [(%4 (@ arithmetic.int.types.int))]
-    (call (@ example.callee (ext)) [(%3 (@ arithmetic.int.types.int))] [(%4 (@ arithmetic.int.types.int))])))
+  (dfg [%3] [%4]
+    (signature (fn [(@ arithmetic.int.types.int)] [(@ arithmetic.int.types.int)] (ext)))
+    (call (@ example.callee (ext)) [%3] [%4]
+      (signature (fn [(@ arithmetic.int.types.int)] [(@ arithmetic.int.types.int)] (ext))))))
 
 (define-func example.load
-  [] [(fn [(@ arithmetic.int.types.int)] [(@ arithmetic.int.types.int)] (ext))] (ext)
+  [] [(fn [(@ arithmetic.int.types.int)] [(@ arithmetic.int.types.int)] (ext arithmetic.int))] (ext)
   (dfg
     []
-    [(%5 (fn [(@ arithmetic.int.types.int)] [(@ arithmetic.int.types.int)] (ext)))]
-    (load-func (@ example.caller) [] [(%5 (fn [(@ arithmetic.int.types.int)] [(@ arithmetic.int.types.int)] (ext arithmetic.int)))])))
+    [%5]
+    (signature (fn [] [(fn [(@ arithmetic.int.types.int)] [(@ arithmetic.int.types.int)] (ext arithmetic.int))] (ext)))
+    (load-func (@ example.caller) [] [%5])))

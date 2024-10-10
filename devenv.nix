@@ -22,6 +22,7 @@ in
       pkgs-stable.cargo-llvm-cov
       pkgs.graphviz
       pkgs.cargo-insta
+      pkgs.capnproto
     ] ++ lib.optionals
       pkgs.stdenv.isDarwin
       (with pkgs.darwin.apple_sdk; [

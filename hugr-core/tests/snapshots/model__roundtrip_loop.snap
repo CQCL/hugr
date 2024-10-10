@@ -8,12 +8,12 @@ expression: "roundtrip(include_str!(\"fixtures/model-loop.edn\"))"
   (forall ?0 type)
   [?0] [?0] (ext)
   (dfg
-    [(%0 ?0)]
-    [(%1 ?0)]
+    [%0] [%1]
+    (signature (fn [?0] [?0] (ext)))
     (tail-loop
-      [(%0 ?0)]
-      [(%1 ?0)]
+      [%0] [%1]
+      (signature (fn [?0] [?0] (ext)))
       (dfg
-        [(%2 ?0)]
-        [(%3 (adt [[?0] [?0]]))]
-        (tag 0 [(%2 ?0)] [(%3 (adt [[?0] [?0]]))])))))
+        [%2] [%3]
+        (signature (fn [?0] [(adt [[?0] [?0]])] (ext)))
+        (tag 0 [%2] [%3] (signature (fn [?0] [(adt [[?0] [?0]])] (ext))))))))
