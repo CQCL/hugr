@@ -4,7 +4,6 @@ use std::sync::Arc;
 use ascent::{lattice::BoundedLattice, Lattice};
 
 use hugr_core::builder::CFGBuilder;
-use hugr_core::types::TypeRow;
 use hugr_core::{
     builder::{endo_sig, DFGBuilder, Dataflow, DataflowSubContainer, HugrBuilder, SubContainer},
     extension::{
