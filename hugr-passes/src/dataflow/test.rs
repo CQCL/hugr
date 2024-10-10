@@ -381,11 +381,11 @@ fn conditional() {
 
 #[rstest]
 #[case(pv_true(), pv_true(), pv_true())] // OK
-#[case(pv_true(), pv_false(), pv_true_or_false())] // Result should be false ??
-#[case(pv_false(), pv_true(), pv_true_or_false())] // Result should be false ??
-#[case(pv_false(), pv_false(), pv_true_or_false())] // Result should be true??
+#[case(pv_true(), pv_false(), pv_false())] // OK
+#[case(pv_false(), pv_true(), pv_false())] // OK
+#[case(pv_false(), pv_false(), pv_true())] // OK
 #[case(PartialValue::top(), pv_true(), PartialValue::top())] // Result should be true_or_false? TOP means all inputs inside cases are TOP
-#[case(PartialValue::top(), pv_false(), PartialValue::top())] // Result should be true_or_false?
+#[case(PartialValue::top(), pv_false(), pv_true_or_false())] // OK
 fn cfg(
     #[case] inp0: PartialValue<Void>,
     #[case] inp1: PartialValue<Void>,

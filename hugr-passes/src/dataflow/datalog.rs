@@ -157,9 +157,11 @@ ascent::ascent! {
       if let Some(fields) = in_row.unpack_first(*case_index, conditional.sum_rows[*case_index].len()),
       for (out_p, v) in fields.enumerate();
 
-    // outputs of case nodes propagate to outputs of conditional
+    // outputs of case nodes propagate to outputs of conditional *if* case reachable
     out_wire_value(c, cond, OutgoingPort::from(o_p.index()), v) <--
-      case_node(c, cond, _, case),
+      case_node(c, cond, i, case),
+      in_wire_value(c, cond, IncomingPort::from(0), control),
+      if control.supports_tag(*i),
       io_node(c, case, o, IO::Output),
       in_wire_value(c, o, o_p, v);
 
