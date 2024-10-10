@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.10.1 (2024-10-10)
+
+### Features
+
+- Make `BuildHandle::num_value_outputs` public ([#1560](https://github.com/CQCL/hugr/pull/1560))
+
+
 ## 0.10.0 (2024-10-08)
 
 ### Bug Fixes

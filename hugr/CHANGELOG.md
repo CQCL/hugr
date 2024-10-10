@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.13.1 (2024-10-10)
+
+### Features
+
+- Return replaced ops from lowering ([#1568](https://github.com/CQCL/hugr/pull/1568))
+- Make `BuildHandle::num_value_outputs` public ([#1560](https://github.com/CQCL/hugr/pull/1560))
+
+
 ## 0.13.0 (2024-10-08)
 
 ### Bug Fixes
