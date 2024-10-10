@@ -74,6 +74,8 @@ pub trait HugrMutInternals: RootTagged {
     /// The `direction` parameter specifies whether to add ports to the incoming
     /// or outgoing list.
     ///
+    /// Returns the range of newly created ports.
+    ///
     /// # Panics
     ///
     /// If the node is not in the graph.
@@ -129,6 +131,9 @@ pub trait HugrMutInternals: RootTagged {
     /// Replace the OpType at node and return the old OpType.
     /// In general this invalidates the ports, which may need to be resized to
     /// match the OpType signature.
+    ///
+    /// Returns the old OpType.
+    ///
     /// TODO: Add a version which ignores input extensions
     ///
     /// # Errors
