@@ -153,8 +153,7 @@ ascent::ascent! {
       case_node(c, cond, case_index, case),
       io_node(c, case, i_node, IO::Input),
       node_in_value_row(c, cond, in_row),
-      //in_wire_value(c, cond, cond_in_p, cond_in_v),
-      if let Some(conditional) = c.get_optype(*cond).as_conditional(),
+      let conditional = c.get_optype(*cond).as_conditional().unwrap(),
       if let Some(fields) = in_row.unpack_first(*case_index, conditional.sum_rows[*case_index].len()),
       for (out_p, v) in fields.enumerate();
 
@@ -190,7 +189,7 @@ ascent::ascent! {
     // Outputs of each block propagated to successor blocks or (if exit block) then CFG itself
     out_wire_value(c, dest, OutgoingPort::from(out_p), v) <--
         dfb_block(c, cfg, pred),
-        if let Some(df_block) = c.get_optype(*pred).as_dataflow_block(),
+        let df_block = c.get_optype(*pred).as_dataflow_block().unwrap(),
         for (succ_n, succ) in c.output_neighbours(*pred).enumerate(),
         io_node(c, pred, out_n, IO::Output),
         _cfg_succ_dest(c, cfg, succ, dest),
@@ -262,10 +261,8 @@ impl<PV: AbstractValue> ValueRow<PV> {
     }
 
     fn unpack_first(&self, variant: usize, len: usize) -> Option<impl Iterator<Item = PV>> {
-        let rest: Vec<_> = self.0[1..].to_owned();
-        self[0]
-            .variant_values(variant, len)
-            .map(|vals| vals.into_iter().chain(rest))
+        let vals = self[0].variant_values(variant, len)?;
+        Some(vals.into_iter().chain(self.0[1..].to_owned()))
     }
 }
 
