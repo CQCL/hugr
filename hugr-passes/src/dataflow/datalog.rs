@@ -178,7 +178,7 @@ ascent::ascent! {
     // Where do the values "fed" along a control-flow edge come out?
     relation _cfg_succ_dest(C, Node, Node, Node);
     _cfg_succ_dest(c, cfg, blk, inp) <-- dfb_block(c, cfg, blk), io_node(c, blk, inp, IO::Input);
-    _cfg_succ_dest(c, cfg, exit, cfg) <-- cfg_node(c, cfg), if let Some(exit) = c.children(*cfg).skip(1).next();
+    _cfg_succ_dest(c, cfg, exit, cfg) <-- cfg_node(c, cfg), if let Some(exit) = c.children(*cfg).nth(1);
 
     // Inputs of CFG propagate to entry block
     out_wire_value(c, i_node, OutgoingPort::from(p.index()), v) <--
