@@ -5,7 +5,6 @@ use ascent::{lattice::BoundedLattice, Lattice};
 
 use hugr_core::builder::CFGBuilder;
 use hugr_core::types::TypeRow;
-use hugr_core::Wire;
 use hugr_core::{
     builder::{endo_sig, DFGBuilder, Dataflow, DataflowSubContainer, HugrBuilder, SubContainer},
     extension::{
@@ -17,7 +16,8 @@ use hugr_core::{
     types::{Signature, SumType, Type},
     HugrView,
 };
-use rstest::rstest;
+use hugr_core::{Hugr, Node, Wire};
+use rstest::{fixture, rstest};
 
 use super::{AbstractValue, BaseValue, DFContext, Machine, PartialValue, TailLoopTermination};
 
@@ -379,22 +379,14 @@ fn conditional() {
     assert_eq!(machine.case_reachable(&hugr, cond.node()), None);
 }
 
-#[rstest]
-#[case(pv_true(), pv_true(), pv_true())]
-#[case(pv_true(), pv_false(), pv_false())]
-#[case(pv_true(), pv_true_or_false(), pv_true_or_false())]
-#[case(pv_false(), pv_true(), pv_false())]
-#[case(pv_false(), pv_false(), pv_true())]
-#[case(pv_false(), pv_true_or_false(), pv_true_or_false())]
-#[case(PartialValue::top(), pv_true(), PartialValue::top())] // Ideally, result should be true_or_false
-#[case(PartialValue::top(), pv_false(), pv_true_or_false())]
-#[case(pv_true_or_false(), pv_true(), pv_true_or_false())]
-#[case(pv_true_or_false(), pv_false(), pv_true_or_false())]
-fn cfg(
-    #[case] inp0: PartialValue<Void>,
-    #[case] inp1: PartialValue<Void>,
-    #[case] outp: PartialValue<Void>,
-) {
+// Tuple of
+//   1. Hugr being a function on bools: (b,c) => !b XOR c
+//   2. Input node of entry block
+//   3. Wire out from "True" constant
+// Result readable from root node outputs
+// Inputs should be placed onto out-wires of the Node (2.)
+#[fixture]
+fn xnor_cfg() -> (Hugr, Node, Wire) {
     //        Entry
     //       /0   1\
     //      A --1-> B
@@ -478,8 +470,29 @@ fn cfg(
     builder.branch(&a, 1, &b).unwrap();
     builder.branch(&b, 0, &x).unwrap();
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
-
     let [entry_input, _] = hugr.get_io(entry.node()).unwrap();
+    (hugr, entry_input, true_w)
+}
+
+#[rstest]
+#[case(pv_true(), pv_true(), pv_true())]
+#[case(pv_true(), pv_false(), pv_false())]
+#[case(pv_true(), pv_true_or_false(), pv_true_or_false())]
+#[case(pv_false(), pv_true(), pv_false())]
+#[case(pv_false(), pv_false(), pv_true())]
+#[case(pv_false(), pv_true_or_false(), pv_true_or_false())]
+#[case(PartialValue::top(), pv_true(), PartialValue::top())] // Ideally, result should be true_or_false
+#[case(PartialValue::top(), pv_false(), pv_true_or_false())]
+#[case(pv_true_or_false(), pv_true(), pv_true_or_false())]
+#[case(pv_true_or_false(), pv_false(), pv_true_or_false())]
+fn test_cfg(
+    #[case] inp0: PartialValue<Void>,
+    #[case] inp1: PartialValue<Void>,
+    #[case] outp: PartialValue<Void>,
+    xnor_cfg: (Hugr, Node, Wire),
+) {
+    let (hugr, entry_input, true_w) = xnor_cfg;
+
     let [in_w0, in_w1] = [0, 1].map(|i| Wire::new(entry_input, i));
 
     let mut machine = Machine::default();
