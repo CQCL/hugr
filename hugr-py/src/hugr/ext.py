@@ -218,6 +218,20 @@ class OpDef(ExtensionObject):
             return f"{ext_name}.{self.name}"
         return self.name
 
+    def instantiate(
+        self,
+        args: Sequence[tys.TypeArg] | None = None,
+        concrete_signature: tys.FunctionType | None = None,
+    ) -> ops.ExtOp:
+        """Instantiate an operation from this definition.
+
+        Args:
+            args: Type arguments corresponding to the type parameters of the definition.
+            concrete_signature: Concrete function type of the operation, only required
+            if the operation is polymorphic.
+        """
+        return ops.ExtOp(self, concrete_signature, list(args or []))
+
 
 @dataclass
 class ExtensionValue(ExtensionObject):
