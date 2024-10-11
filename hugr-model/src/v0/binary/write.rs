@@ -1,6 +1,7 @@
 use crate::hugr_v0_capnp as hugr_capnp;
 use crate::v0 as model;
 
+/// Write a list of items into a list builder.
 macro_rules! write_list {
     ($builder:expr, $init:ident, $write:expr, $list:expr) => {
         let mut __list_builder = $builder.reborrow().$init($list.len() as _);

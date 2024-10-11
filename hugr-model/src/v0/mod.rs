@@ -243,6 +243,9 @@ pub struct Node<'a> {
     /// The meta information attached to the node.
     pub meta: &'a [MetaItem<'a>],
     /// The signature of the node.
+    ///
+    /// Can be `None` to indicate that the node's signature should be inferred,
+    /// or for nodes with operations that do not have a signature.
     pub signature: Option<TermId>,
 }
 
@@ -355,6 +358,8 @@ pub struct Region<'a> {
     /// The metadata attached to the region.
     pub meta: &'a [MetaItem<'a>],
     /// The signature of the region.
+    ///
+    /// Can be `None` to indicate that the region signature should be inferred.
     pub signature: Option<TermId>,
 }
 

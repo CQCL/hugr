@@ -13,6 +13,7 @@ pub fn read_from_slice<'a>(slice: &[u8], bump: &'a Bump) -> ReadResult<model::Mo
     read_module(bump, root)
 }
 
+/// Read a list of structs from a reader into a slice allocated through the bump allocator.
 macro_rules! read_list {
     ($bump:expr, $reader:expr, $get:ident, $read:expr) => {{
         let mut __list_reader = $reader.$get()?;
@@ -24,6 +25,7 @@ macro_rules! read_list {
     }};
 }
 
+/// Read a list of scalars from a reader into a slice allocated through the bump allocator.
 macro_rules! read_scalar_list {
     ($bump:expr, $reader:expr, $get:ident, $wrap:path) => {{
         let mut __list_reader = $reader.$get()?;
