@@ -29,17 +29,17 @@ def test_package():
     validate(package)
 
     p = PackagePointer(package)
-    assert p.get_package() == package
+    assert p.package == package
 
     m = ModulePointer(package, 1)
-    assert m.module() == mod2.hugr
+    assert m.module == mod2.hugr
 
     f = FuncDeclPointer(package, 1, f_id_decl)
-    assert f.func_decl() == mod2.hugr[f_id_decl].op
+    assert f.func_decl == mod2.hugr[f_id_decl].op
 
     f = FuncDefnPointer(package, 0, f_id.to_node())
 
-    assert f.func_defn() == mod.hugr[f_id.to_node()].op
+    assert f.func_defn == mod.hugr[f_id.to_node()].op
 
     main = m.to_executable_package()
-    assert main.entry_point_node() == f_main.to_node()
+    assert main.entry_point_node == f_main.to_node()

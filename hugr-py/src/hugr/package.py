@@ -49,10 +49,6 @@ class PackagePointer:
 
     package: Package
 
-    def get_package(self) -> Package:
-        """Get the package pointed to."""
-        return self.package
-
 
 @dataclass
 class ModulePointer(PackagePointer):
@@ -60,6 +56,7 @@ class ModulePointer(PackagePointer):
 
     module_index: int
 
+    @property
     def module(self) -> Hugr:
         """Hugr definition of the module."""
         return self.package.modules[self.module_index]
@@ -70,7 +67,7 @@ class ModulePointer(PackagePointer):
         Raises:
             StopIteration: If the module does not contain a main function.
         """
-        module = self.module()
+        module = self.module
         main_node = next(
             n
             for n in module.children()
@@ -86,6 +83,7 @@ class ExtensionPointer(PackagePointer):
 
     extension_index: int
 
+    @property
     def extension(self) -> Extension:
         """Extension definition."""
         return self.package.extensions[self.extension_index]
@@ -100,31 +98,35 @@ class NodePointer(Generic[OpType], ModulePointer):
 
     node: Node
 
+    @property
     def node_op(self) -> OpType:
         """Get the operation of the node."""
-        return cast(OpType, self.module()[self.node].op)
+        return cast(OpType, self.module[self.node].op)
 
 
 @dataclass
 class FuncDeclPointer(NodePointer[FuncDecl]):
     """Pointer to a function declaration in a module."""
 
+    @property
     def func_decl(self) -> FuncDecl:
         """Function declaration."""
-        return self.node_op()
+        return self.node_op
 
 
 @dataclass
 class FuncDefnPointer(NodePointer[FuncDefn]):
     """Pointer to a function definition in a module."""
 
+    @property
     def func_defn(self) -> FuncDefn:
         """Function definition."""
-        return self.node_op()
+        return self.node_op
 
 
 @dataclass
 class ExecutablePackage(FuncDefnPointer):
+    @property
     def entry_point_node(self) -> Node:
         """Get the entry point node of the package."""
         return self.node
