@@ -44,7 +44,7 @@ jobs:
 
     strategy:
       matrix:
-        python-version: ["3.10", "3.12"]
+        python-version: ['3.10', '3.13']
 
     steps:
       - uses: actions/checkout@v4
@@ -104,8 +104,8 @@ jobs:
     strategy:
       matrix:
         python-version:
-          - { py: "3.10", coverage: false }
-          - { py: "3.12", coverage: true }
+          - { py: '3.10', coverage: false }
+          - { py: '3.13', coverage: true }
     steps:
       - uses: actions/checkout@v4
 
@@ -167,7 +167,7 @@ jobs:
           version: "0.4.18"
           enable-cache: true
       - name: Install Python
-        run: uv python install 3.12
+        run: uv python install 3.13
 
       - name: Setup dependencies
         run: uv sync
