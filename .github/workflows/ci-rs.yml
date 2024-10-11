@@ -15,7 +15,7 @@ env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
   RUSTFLAGS: "--cfg=ci_run"
-  MIRIFLAGS: '-Zmiri-permissive-provenance' # Required due to warnings in bitvec 1.0.1
+  MIRIFLAGS: "-Zmiri-permissive-provenance" # Required due to warnings in bitvec 1.0.1
   CI: true # insta snapshots behave differently on ci
   SCCACHE_GHA_ENABLED: "true"
   RUSTC_WRAPPER: "sccache"
@@ -34,11 +34,11 @@ jobs:
     outputs:
       rust: ${{ github.ref_name == github.event.repository.default_branch || steps.filter.outputs.rust }}
     steps:
-    - uses: actions/checkout@v4
-    - uses: dorny/paths-filter@v3
-      id: filter
-      with:
-        filters: .github/change-filters.yml
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: .github/change-filters.yml
 
   check:
     needs: changes
@@ -51,6 +51,8 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
+      - name: Install CapnProto
+        run: sudo apt-get install -y capnproto
       - name: Check formatting
         run: cargo fmt -- --check
       - name: Run clippy
@@ -70,6 +72,8 @@ jobs:
       - uses: mozilla-actions/sccache-action@v0.0.6
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
+      - name: Install CapnProto
+        run: sudo apt-get install -y capnproto
       - name: Build benchmarks with no features
         run: cargo bench --verbose --no-run --workspace --no-default-features
       - name: Build benchmarks with all features
@@ -87,9 +91,11 @@ jobs:
       - id: toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 'stable'
+          toolchain: "stable"
       - name: Configure default rust toolchain
         run: rustup override set ${{steps.toolchain.outputs.name}}
+      - name: Install CapnProto
+        run: sudo apt-get install -y capnproto
       - name: Build with no features
         run: cargo test --verbose --workspace --no-default-features --no-run
       - name: Tests with no features
@@ -107,9 +113,11 @@ jobs:
       - id: toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 'stable'
+          toolchain: "stable"
       - name: Configure default rust toolchain
         run: rustup override set ${{steps.toolchain.outputs.name}}
+      - name: Install CapnProto
+        run: sudo apt-get install -y capnproto
       - name: Build with all features
         run: cargo test --verbose --workspace --all-features --no-run
       - name: Tests with all features
@@ -132,7 +140,7 @@ jobs:
       matrix:
         # Stable is covered by `tests-stable-no-features` and `tests-stable-all-features`
         # Nightly is covered by `tests-nightly-coverage`
-        rust: ['1.75', beta]
+        rust: ["1.75", beta]
     name: tests (Rust ${{ matrix.rust }})
     steps:
       - uses: actions/checkout@v4
@@ -143,6 +151,8 @@ jobs:
           toolchain: ${{ matrix.rust }}
       - name: Configure default rust toolchain
         run: rustup override set ${{steps.toolchain.outputs.name}}
+      - name: Install CapnProto
+        run: sudo apt-get install -y capnproto
       - name: Build with no features
         run: cargo test --verbose --workspace --no-default-features --no-run
       - name: Tests with no features
@@ -190,15 +200,17 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           # Nightly is required to count doctests coverage
-          toolchain: 'nightly'
+          toolchain: "nightly"
           components: llvm-tools-preview
+      - name: Install CapnProto
+        run: sudo apt-get install -y capnproto
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
       - name: Run tests with coverage instrumentation
         run: |
-            cargo llvm-cov clean --workspace
-            cargo llvm-cov --no-report --workspace --no-default-features --doctests
-            cargo llvm-cov --no-report --workspace --all-features --doctests
+          cargo llvm-cov clean --workspace
+          cargo llvm-cov --no-report --workspace --no-default-features --doctests
+          cargo llvm-cov --no-report --workspace --all-features --doctests
       - name: Generate coverage report
         run: cargo llvm-cov --all-features report --codecov --output-path coverage.json
       - name: Upload coverage to codecov.io
@@ -213,7 +225,14 @@ jobs:
   # even if they are skipped due to no changes in the relevant files.
   required-checks:
     name: Required checks 🦀
-    needs: [changes, check, tests-stable-no-features, tests-stable-all-features, std-extensions]
+    needs:
+      [
+        changes,
+        check,
+        tests-stable-no-features,
+        tests-stable-all-features,
+        std-extensions,
+      ]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:

@@ -24,8 +24,10 @@ path = "src/lib.rs"
 [features]
 extension_inference = ["hugr-core/extension_inference"]
 declarative = ["hugr-core/declarative"]
+model_unstable = ["hugr-core/model_unstable", "hugr-model"]
 
 [dependencies]
+hugr-model = { path = "../hugr-model", optional = true, version = "0.1.0" }
 hugr-core = { path = "../hugr-core", version = "0.10.0" }
 hugr-passes = { path = "../hugr-passes", version = "0.8.2" }
 
@@ -34,7 +36,11 @@ rstest = { workspace = true }
 lazy_static = { workspace = true }
 criterion = { workspace = true, features = ["html_reports"] }
 serde_json = { workspace = true }
+bumpalo = { workspace = true, features = ["collections"] }
 
 [[bench]]
 name = "bench_main"
 harness = false
+
+[profile.bench]
+debug = true
