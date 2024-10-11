@@ -17,7 +17,10 @@ expression: "roundtrip(include_str!(\"fixtures/model-call.edn\"))"
   (dfg
     [%0] [%1]
     (signature
-      (fn [(@ arithmetic.int.types.int)] [(@ arithmetic.int.types.int)] (ext)))
+      (fn
+        [(@ arithmetic.int.types.int)]
+        [(@ arithmetic.int.types.int)]
+        (ext arithmetic.int)))
     (call (@ example.callee (ext)) [%0] [%1]
       (signature
         (fn

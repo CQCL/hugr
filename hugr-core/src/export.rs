@@ -185,8 +185,11 @@ impl<'a> Context<'a> {
                 panic!("output nodes should have been handled by the region export")
             }
 
-            OpType::DFG(_) => {
-                regions = self.bump.alloc_slice_copy(&[self.export_dfg(node)]);
+            OpType::DFG(dfg) => {
+                let extensions = self.export_ext_set(&dfg.signature.extension_reqs);
+                regions = self
+                    .bump
+                    .alloc_slice_copy(&[self.export_dfg(node, extensions)]);
                 model::Operation::Dfg
             }
 
@@ -203,20 +206,26 @@ impl<'a> Context<'a> {
                 todo!("case nodes should have been handled by the region export")
             }
 
-            OpType::DataflowBlock(_) => {
-                regions = self.bump.alloc_slice_copy(&[self.export_dfg(node)]);
+            OpType::DataflowBlock(block) => {
+                let extensions = self.export_ext_set(&block.extension_delta);
+                regions = self
+                    .bump
+                    .alloc_slice_copy(&[self.export_dfg(node, extensions)]);
                 model::Operation::Block
             }
 
             OpType::FuncDefn(func) => self.with_local_scope(node_id, |this| {
                 let name = this.get_func_name(node).unwrap();
-                let (params, func) = this.export_poly_func_type(&func.signature);
+                let (params, signature) = this.export_poly_func_type(&func.signature);
                 let decl = this.bump.alloc(model::FuncDecl {
                     name,
                     params,
-                    signature: func,
+                    signature,
                 });
-                regions = this.bump.alloc_slice_copy(&[this.export_dfg(node)]);
+                let extensions = this.export_ext_set(&func.signature.body().extension_reqs);
+                regions = this
+                    .bump
+                    .alloc_slice_copy(&[this.export_dfg(node, extensions)]);
                 model::Operation::DefineFunc { decl }
             }),
 
@@ -289,8 +298,11 @@ impl<'a> Context<'a> {
 
             OpType::Tag(tag) => model::Operation::Tag { tag: tag.tag as _ },
 
-            OpType::TailLoop(_) => {
-                regions = self.bump.alloc_slice_copy(&[self.export_dfg(node)]);
+            OpType::TailLoop(tail_loop) => {
+                let extensions = self.export_ext_set(&tail_loop.extension_delta);
+                regions = self
+                    .bump
+                    .alloc_slice_copy(&[self.export_dfg(node, extensions)]);
                 model::Operation::TailLoop
             }
 
@@ -309,7 +321,13 @@ impl<'a> Context<'a> {
                     .bump
                     .alloc_slice_fill_iter(op.args().iter().map(|arg| self.export_type_arg(arg)));
 
-                if let Some(region) = self.export_dfg_if_present(node) {
+                // PERFORMANCE: Currently the API does not appear to allow to get the extension
+                // set without copying it.
+                // NOTE: We assume here that the extension set of the dfg region must be the same
+                // as that of the node. This might change in the future.
+                let extensions = self.export_ext_set(&op.extension_delta());
+
+                if let Some(region) = self.export_dfg_if_present(node, extensions) {
                     regions = self.bump.alloc_slice_copy(&[region]);
                 }
 
@@ -323,7 +341,13 @@ impl<'a> Context<'a> {
                     .bump
                     .alloc_slice_fill_iter(op.args().iter().map(|arg| self.export_type_arg(arg)));
 
-                if let Some(region) = self.export_dfg_if_present(node) {
+                // PERFORMANCE: Currently the API does not appear to allow to get the extension
+                // set without copying it.
+                // NOTE: We assume here that the extension set of the dfg region must be the same
+                // as that of the node. This might change in the future.
+                let extensions = self.export_ext_set(&op.extension_delta());
+
+                if let Some(region) = self.export_dfg_if_present(node, extensions) {
                     regions = self.bump.alloc_slice_copy(&[region]);
                 }
 
@@ -428,18 +452,22 @@ impl<'a> Context<'a> {
     /// Create a region from the given node's children, if it has any.
     ///
     /// See [`Self::export_dfg`].
-    pub fn export_dfg_if_present(&mut self, node: Node) -> Option<model::RegionId> {
+    pub fn export_dfg_if_present(
+        &mut self,
+        node: Node,
+        extensions: model::TermId,
+    ) -> Option<model::RegionId> {
         if self.hugr.children(node).next().is_none() {
             None
         } else {
-            Some(self.export_dfg(node))
+            Some(self.export_dfg(node, extensions))
         }
     }
 
     /// Creates a data flow region from the given node's children.
     ///
     /// `Input` and `Output` nodes are used to determine the source and target ports of the region.
-    pub fn export_dfg(&mut self, node: Node) -> model::RegionId {
+    pub fn export_dfg(&mut self, node: Node, extensions: model::TermId) -> model::RegionId {
         let mut children = self.hugr.children(node);
 
         // The first child is an `Input` node, which we use to determine the region's sources.
@@ -466,11 +494,7 @@ impl<'a> Context<'a> {
         let signature = {
             let inputs = self.export_type_row(&input_op.types);
             let outputs = self.export_type_row(&output_op.types);
-            // TODO: What about the extensions?
-            let extensions = self.make_term(model::Term::ExtSet {
-                extensions: &[],
-                rest: None,
-            });
+
             Some(self.make_term(model::Term::FuncType {
                 inputs,
                 outputs,
@@ -542,8 +566,12 @@ impl<'a> Context<'a> {
         let mut regions = BumpVec::with_capacity_in(children.len(), self.bump);
 
         for child in children {
-            assert!(matches!(self.hugr.get_optype(child), OpType::Case(_)));
-            regions.push(self.export_dfg(child));
+            let OpType::Case(case_op) = self.hugr.get_optype(child) else {
+                panic!("expected a `Case` node as a child of a `Conditional` node");
+            };
+
+            let extensions = self.export_ext_set(&case_op.signature.extension_reqs);
+            regions.push(self.export_dfg(child, extensions));
         }
 
         regions.into_bump_slice()
