@@ -272,6 +272,22 @@ class Extension:
             operations={k: v._to_serial() for k, v in self.operations.items()},
         )
 
+    def to_json(self) -> str:
+        """Serialize the extension to a JSON string."""
+        return self._to_serial().model_dump_json()
+
+    @classmethod
+    def from_json(cls, json_str: str) -> Extension:
+        """Deserialize a JSON string to a Extension object.
+
+        Args:
+            json_str: The JSON string representing a Extension.
+
+        Returns:
+            The deserialized Extension object.
+        """
+        return ext_s.Extension.model_validate_json(json_str).deserialize()
+
     def add_op_def(self, op_def: OpDef) -> OpDef:
         """Add an operation definition to the extension.
 
