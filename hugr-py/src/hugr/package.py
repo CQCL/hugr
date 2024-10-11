@@ -46,6 +46,18 @@ class Package:
     def to_json(self) -> str:
         return self._to_serial().model_dump_json()
 
+    @classmethod
+    def from_json(cls, json_str: str) -> Package:
+        """Deserialize a JSON string to a Package object.
+
+        Args:
+            json_str: The JSON string representing a Package.
+
+        Returns:
+            The deserialized Package object.
+        """
+        return ext_s.Package.model_validate_json(json_str).deserialize()
+
 
 @dataclass(frozen=True)
 class PackagePointer:
