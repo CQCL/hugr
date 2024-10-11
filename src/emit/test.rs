@@ -1,7 +1,7 @@
 use std::iter;
 
 use crate::custom::int::add_int_extensions;
-use crate::custom::prelude::add_default_prelude_extensions;
+use crate::custom::CodegenExtsBuilder;
 use crate::fat::FatNode;
 use crate::types::HugrFuncType;
 use anyhow::{anyhow, Result};
@@ -516,6 +516,6 @@ fn test_exec(mut exec_ctx: TestContext) {
             let konst = builder.add_load_value(ConstUsize::new(42));
             builder.finish_with_outputs([konst]).unwrap()
         });
-    exec_ctx.add_extensions(add_default_prelude_extensions);
+    exec_ctx.add_extensions(CodegenExtsBuilder::add_default_prelude_extensions);
     assert_eq!(42, exec_ctx.exec_hugr_u64(hugr, "main"));
 }

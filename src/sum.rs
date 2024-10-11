@@ -5,6 +5,7 @@ use delegate::delegate;
 use hugr::types::TypeRow;
 use inkwell::{
     builder::Builder,
+    context::Context,
     types::{AnyType, AsTypeRef, BasicType, BasicTypeEnum, IntType, StructType},
     values::{AnyValue, AsValueRef, BasicValue, BasicValueEnum, IntValue, StructValue},
 };
@@ -31,8 +32,25 @@ fn sum_type_has_tag_field(st: &HugrSumType) -> bool {
 pub struct LLVMSumType<'c>(StructType<'c>, HugrSumType);
 
 impl<'c> LLVMSumType<'c> {
+    pub fn try_new2(
+        context: &'c Context,
+        variants: Vec<Vec<BasicTypeEnum<'c>>>,
+        sum_type: HugrSumType,
+    ) -> Result<Self> {
+        let has_tag_field = sum_type_has_tag_field(&sum_type);
+        let types = has_tag_field
+            .then_some(context.i32_type().as_basic_type_enum())
+            .into_iter()
+            .chain(
+                variants
+                    .iter()
+                    .map(|lty_vec| context.struct_type(lty_vec, false).into()),
+            )
+            .collect_vec();
+        Ok(Self(context.struct_type(&types, false), sum_type.clone()))
+    }
     /// Attempt to create a new `LLVMSumType` from a [HugrSumType].
-    pub fn try_new<H>(session: &TypingSession<'c, H>, sum_type: HugrSumType) -> Result<Self> {
+    pub fn try_new(session: &TypingSession<'c>, sum_type: HugrSumType) -> Result<Self> {
         assert!(sum_type.num_variants() < u32::MAX as usize);
         let variants = (0..sum_type.num_variants())
             .map(|i| {
@@ -42,20 +60,7 @@ impl<'c> LLVMSumType<'c> {
                     .collect::<Result<Vec<_>>>()
             })
             .collect::<Result<Vec<_>>>()?;
-        let has_tag_field = sum_type_has_tag_field(&sum_type);
-        let types = has_tag_field
-            .then_some(session.iw_context().i32_type().as_basic_type_enum())
-            .into_iter()
-            .chain(
-                variants
-                    .iter()
-                    .map(|lty_vec| session.iw_context().struct_type(lty_vec, false).into()),
-            )
-            .collect_vec();
-        Ok(Self(
-            session.iw_context().struct_type(&types, false),
-            sum_type.clone(),
-        ))
+        Self::try_new2(session.iw_context(), variants, sum_type)
     }
 
     /// Returns an LLVM constant value of `undef`.

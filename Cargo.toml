@@ -31,6 +31,7 @@ delegate = "0.12.0"
 petgraph = "0.6.5"
 lazy_static = "1.4.0"
 downcast-rs= "1.2.1"
+strum = "0.26.3"
 
 [dev-dependencies]
 insta = "1.39.0"

@@ -1,107 +1,89 @@
 use hugr::{
-    extension::{simple_op::MakeExtensionOp, ExtensionId},
-    ops::{ExtensionOp, Value},
+    extension::simple_op::MakeExtensionOp,
+    ops::{ExtensionOp, NamedOp, Value},
     std_extensions::logic::{self, LogicOp},
-    types::{CustomType, SumType},
+    types::SumType,
     HugrView,
 };
-use inkwell::{types::BasicTypeEnum, IntPredicate};
+use inkwell::IntPredicate;
 
 use crate::{
     emit::{emit_value, func::EmitFuncContext, EmitOpArgs},
     sum::LLVMSumValue,
-    types::TypingSession,
 };
 
-use super::{CodegenExtension, CodegenExtsMap};
+use super::CodegenExtsBuilder;
 use anyhow::{anyhow, Result};
 
-/// A [CodegenExtension] for the [hugr::std_extensions::logic]
-/// extension.
-pub struct LogicCodegenExtension;
-
-impl<H: HugrView> CodegenExtension<H> for LogicCodegenExtension {
-    fn extension(&self) -> ExtensionId {
-        logic::EXTENSION_ID
+fn emit_logic_op<'c, H: HugrView>(
+    context: &mut EmitFuncContext<'c, H>,
+    args: EmitOpArgs<'c, '_, ExtensionOp, H>,
+) -> Result<()> {
+    let lot = LogicOp::from_optype(&args.node().generalise()).ok_or(anyhow!(
+        "LogicOpEmitter: from_optype_failed: {:?}",
+        args.node().as_ref()
+    ))?;
+    let builder = context.builder();
+    // Turn bool sum inputs into i1's
+    let mut inputs = vec![];
+    for inp in args.inputs {
+        let bool_ty = context.llvm_sum_type(SumType::new_unary(2))?;
+        let bool_val = LLVMSumValue::try_new(inp, bool_ty)?;
+        inputs.push(bool_val.build_get_tag(builder)?);
     }
-
-    fn llvm_type<'c>(
-        &self,
-        _context: &TypingSession<'c, H>,
-        hugr_type: &CustomType,
-    ) -> Result<BasicTypeEnum<'c>> {
-        Err(anyhow!(
-            "LogicCodegenExtension: unsupported type: {}",
-            hugr_type
-        ))
-    }
-
-    fn emit_extension_op<'c>(
-        &self,
-        context: &mut EmitFuncContext<'c, H>,
-        args: EmitOpArgs<'c, '_, ExtensionOp, H>,
-    ) -> Result<()> {
-        let lot = LogicOp::from_optype(&args.node().generalise()).ok_or(anyhow!(
-            "LogicOpEmitter: from_optype_failed: {:?}",
-            args.node().as_ref()
-        ))?;
-        let builder = context.builder();
-        // Turn bool sum inputs into i1's
-        let mut inputs = vec![];
-        for inp in args.inputs {
-            let bool_ty = context.llvm_sum_type(SumType::Unit { size: 2 })?;
-            let bool_val = LLVMSumValue::try_new(inp, bool_ty)?;
-            inputs.push(bool_val.build_get_tag(builder)?);
+    let res = match lot {
+        LogicOp::And => {
+            let mut acc = inputs[0];
+            for inp in inputs.into_iter().skip(1) {
+                acc = builder.build_and(acc, inp, "")?;
+            }
+            acc
         }
-        let res = match lot {
-            LogicOp::And => {
-                let mut acc = inputs[0];
-                for inp in inputs.into_iter().skip(1) {
-                    acc = builder.build_and(acc, inp, "")?;
-                }
-                acc
+        LogicOp::Or => {
+            let mut acc = inputs[0];
+            for inp in inputs.into_iter().skip(1) {
+                acc = builder.build_or(acc, inp, "")?;
             }
-            LogicOp::Or => {
-                let mut acc = inputs[0];
-                for inp in inputs.into_iter().skip(1) {
-                    acc = builder.build_or(acc, inp, "")?;
-                }
-                acc
+            acc
+        }
+        LogicOp::Eq => {
+            let x = inputs.pop().unwrap();
+            let y = inputs.pop().unwrap();
+            let mut acc = builder.build_int_compare(IntPredicate::EQ, x, y, "")?;
+            for inp in inputs {
+                let eq = builder.build_int_compare(IntPredicate::EQ, inp, x, "")?;
+                acc = builder.build_and(acc, eq, "")?;
             }
-            LogicOp::Eq => {
-                let x = inputs.pop().unwrap();
-                let y = inputs.pop().unwrap();
-                let mut acc = builder.build_int_compare(IntPredicate::EQ, x, y, "")?;
-                for inp in inputs {
-                    let eq = builder.build_int_compare(IntPredicate::EQ, inp, x, "")?;
-                    acc = builder.build_and(acc, eq, "")?;
-                }
-                acc
-            }
-            op => {
-                return Err(anyhow!("LogicOpEmitter: Unknown op: {op:?}"));
-            }
-        };
-        // Turn result back into sum
-        let res = builder.build_int_cast(res, context.iw_context().bool_type(), "")?;
-        let true_val = emit_value(context, &Value::true_val())?;
-        let false_val = emit_value(context, &Value::false_val())?;
-        let res = context
-            .builder()
-            .build_select(res, true_val, false_val, "")?;
-        args.outputs.finish(context.builder(), vec![res])
-    }
+            acc
+        }
+        op => {
+            return Err(anyhow!("LogicOpEmitter: Unknown op: {op:?}"));
+        }
+    };
+    // Turn result back into sum
+    let res = builder.build_int_cast(res, context.iw_context().bool_type(), "")?;
+    let true_val = emit_value(context, &Value::true_val())?;
+    let false_val = emit_value(context, &Value::false_val())?;
+    let res = context
+        .builder()
+        .build_select(res, true_val, false_val, "")?;
+    args.outputs.finish(context.builder(), vec![res])
 }
 
-/// Populates a [CodegenExtsMap] with all extensions needed to lower logic ops,
-/// types, and constants.
-pub fn add_logic_extensions<H: HugrView>(cem: CodegenExtsMap<'_, H>) -> CodegenExtsMap<'_, H> {
-    cem.add_cge(LogicCodegenExtension)
+/// Populates a [CodegenExtsBuilder] with all extensions needed to lower logic
+/// ops.
+pub fn add_logic_extensions<'a, H: HugrView + 'a>(
+    cem: CodegenExtsBuilder<'a, H>,
+) -> CodegenExtsBuilder<'a, H> {
+    cem.extension_op(logic::EXTENSION_ID, LogicOp::Eq.name(), emit_logic_op)
+        .extension_op(logic::EXTENSION_ID, LogicOp::And.name(), emit_logic_op)
+        .extension_op(logic::EXTENSION_ID, LogicOp::Or.name(), emit_logic_op)
+        .extension_op(logic::EXTENSION_ID, LogicOp::Not.name(), emit_logic_op)
 }
 
-impl<H: HugrView> CodegenExtsMap<'_, H> {
-    /// Populates a [CodegenExtsMap] with all extensions needed to lower logic ops,
-    /// types, and constants.
+impl<'a, H: HugrView + 'a> CodegenExtsBuilder<'a, H> {
+    /// Populates a [CodegenExtsBuilder] with all extensions needed to lower
+    /// logic ops.
     pub fn add_logic_extensions(self) -> Self {
         add_logic_extensions(self)
     }

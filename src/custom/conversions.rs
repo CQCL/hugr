@@ -1,4 +1,4 @@
-use super::{CodegenExtension, CodegenExtsMap};
+use super::{CodegenExtension, CodegenExtsBuilder};
 
 use anyhow::{anyhow, Result};
 
@@ -6,18 +6,14 @@ use hugr::{
     extension::{
         prelude::{sum_with_error, ConstError, BOOL_T},
         simple_op::MakeExtensionOp,
-        ExtensionId,
     },
     ops::{constant::Value, custom::ExtensionOp},
-    std_extensions::arithmetic::{
-        conversions::{self, ConvertOpDef, ConvertOpType},
-        int_types::INT_TYPES,
-    },
-    types::{CustomType, TypeArg, TypeEnum},
+    std_extensions::arithmetic::{conversions::ConvertOpDef, int_types::INT_TYPES},
+    types::{TypeArg, TypeEnum},
     HugrView,
 };
 
-use inkwell::{types::BasicTypeEnum, values::BasicValue, FloatPredicate, IntPredicate};
+use inkwell::{values::BasicValue, FloatPredicate, IntPredicate};
 
 use crate::{
     emit::{
@@ -26,7 +22,6 @@ use crate::{
         EmitOpArgs,
     },
     sum::LLVMSumValue,
-    types::TypingSession,
 };
 
 fn build_trunc_op<'c, H: HugrView>(
@@ -134,127 +129,112 @@ fn build_trunc_op<'c, H: HugrView>(
     })
 }
 
-pub struct ConversionsCodegenExtension;
+fn emit_conversion_op<'c, H: HugrView>(
+    context: &mut EmitFuncContext<'c, H>,
+    args: EmitOpArgs<'c, '_, ExtensionOp, H>,
+    conversion_op: ConvertOpDef,
+) -> Result<()> {
+    match conversion_op {
+        ConvertOpDef::trunc_u | ConvertOpDef::trunc_s => {
+            let signed = conversion_op == ConvertOpDef::trunc_s;
+            let Some(TypeArg::BoundedNat { n: log_width }) = args.node().args().last().cloned()
+            else {
+                panic!("This op should have one type arg only: the log-width of the int we're truncating to.: {:?}", conversion_op.type_args())
+            };
 
-impl<H: HugrView> CodegenExtension<H> for ConversionsCodegenExtension {
-    fn extension(&self) -> ExtensionId {
-        conversions::EXTENSION_ID
-    }
+            build_trunc_op(context, signed, log_width, args)
+        }
 
-    fn llvm_type<'c>(
-        &self,
-        _context: &TypingSession<'c, H>,
-        hugr_type: &CustomType,
-    ) -> Result<BasicTypeEnum<'c>> {
-        Err(anyhow!(
-            "ConversionEmitter: unsupported type: {}",
-            hugr_type
-        ))
-    }
+        ConvertOpDef::convert_u => emit_custom_unary_op(context, args, |ctx, arg, out_tys| {
+            let out_ty = out_tys.last().unwrap();
+            Ok(vec![ctx
+                .builder()
+                .build_unsigned_int_to_float(arg.into_int_value(), out_ty.into_float_type(), "")?
+                .as_basic_value_enum()])
+        }),
 
-    fn emit_extension_op<'c>(
-        &self,
-        context: &mut EmitFuncContext<'c, H>,
-        args: EmitOpArgs<'c, '_, ExtensionOp, H>,
-    ) -> Result<()> {
-        let conversion_op =
-            ConvertOpType::from_optype(&args.node().generalise()).ok_or(anyhow!(
-                "ConversionsEmitter from_optype failed: {:?}",
-                args.node().as_ref()
-            ))?;
+        ConvertOpDef::convert_s => emit_custom_unary_op(context, args, |ctx, arg, out_tys| {
+            let out_ty = out_tys.last().unwrap();
+            Ok(vec![ctx
+                .builder()
+                .build_signed_int_to_float(arg.into_int_value(), out_ty.into_float_type(), "")?
+                .as_basic_value_enum()])
+        }),
+        // These ops convert between hugr's `USIZE` and u64. The former is
+        // implementation-dependent and we define them to be the same.
+        // Hence our implementation is a noop.
+        ConvertOpDef::itousize | ConvertOpDef::ifromusize => {
+            emit_custom_unary_op(context, args, |_, arg, _| Ok(vec![arg]))
+        }
+        ConvertOpDef::itobool | ConvertOpDef::ifrombool => {
+            assert!(conversion_op.type_args().is_empty()); // Always 1-bit int <-> bool
+            let i0_ty = context
+                .typing_session()
+                .llvm_type(&INT_TYPES[0])?
+                .into_int_type();
+            let sum_ty = context
+                .typing_session()
+                .llvm_sum_type(match BOOL_T.as_type_enum() {
+                    TypeEnum::Sum(st) => st.clone(),
+                    _ => panic!("Hugr prelude BOOL_T not a Sum"),
+                })?;
 
-        match conversion_op.def() {
-            ConvertOpDef::trunc_u | ConvertOpDef::trunc_s => {
-                let signed = conversion_op.def() == &ConvertOpDef::trunc_s;
-                let Some(TypeArg::BoundedNat { n: log_width }) =
-                    conversion_op.type_args().last().cloned()
-                else {
-                    panic!("This op should have one type arg only: the log-width of the int we're truncating to.")
-                };
-
-                build_trunc_op(context, signed, log_width, args)
-            }
-
-            ConvertOpDef::convert_u => emit_custom_unary_op(context, args, |ctx, arg, out_tys| {
-                let out_ty = out_tys.last().unwrap();
-                Ok(vec![ctx
-                    .builder()
-                    .build_unsigned_int_to_float(
+            emit_custom_unary_op(context, args, |ctx, arg, _| {
+                let res = if conversion_op == ConvertOpDef::itobool {
+                    let is1 = ctx.builder().build_int_compare(
+                        IntPredicate::EQ,
                         arg.into_int_value(),
-                        out_ty.into_float_type(),
+                        i0_ty.const_int(1, false),
+                        "eq1",
+                    )?;
+                    let sum_f = sum_ty.build_tag(ctx.builder(), 0, vec![])?;
+                    let sum_t = sum_ty.build_tag(ctx.builder(), 1, vec![])?;
+                    ctx.builder().build_select(is1, sum_t, sum_f, "")?
+                } else {
+                    let tag_ty = sum_ty.get_tag_type();
+                    let tag = LLVMSumValue::try_new(arg, sum_ty)?.build_get_tag(ctx.builder())?;
+                    let is_true = ctx.builder().build_int_compare(
+                        IntPredicate::EQ,
+                        tag,
+                        tag_ty.const_int(1, false),
+                        "",
+                    )?;
+                    ctx.builder().build_select(
+                        is_true,
+                        i0_ty.const_int(1, false),
+                        i0_ty.const_int(0, false),
                         "",
                     )?
-                    .as_basic_value_enum()])
-            }),
-
-            ConvertOpDef::convert_s => emit_custom_unary_op(context, args, |ctx, arg, out_tys| {
-                let out_ty = out_tys.last().unwrap();
-                Ok(vec![ctx
-                    .builder()
-                    .build_signed_int_to_float(arg.into_int_value(), out_ty.into_float_type(), "")?
-                    .as_basic_value_enum()])
-            }),
-            // These ops convert between hugr's `USIZE` and u64. The former is
-            // implementation-dependent and we define them to be the same.
-            // Hence our implementation is a noop.
-            ConvertOpDef::itousize | ConvertOpDef::ifromusize => {
-                emit_custom_unary_op(context, args, |_, arg, _| Ok(vec![arg]))
-            }
-            ConvertOpDef::itobool | ConvertOpDef::ifrombool => {
-                assert!(conversion_op.type_args().is_empty()); // Always 1-bit int <-> bool
-                let i0_ty = context
-                    .typing_session()
-                    .llvm_type(&INT_TYPES[0])?
-                    .into_int_type();
-                let sum_ty =
-                    context
-                        .typing_session()
-                        .llvm_sum_type(match BOOL_T.as_type_enum() {
-                            TypeEnum::Sum(st) => st.clone(),
-                            _ => panic!("Hugr prelude BOOL_T not a Sum"),
-                        })?;
-
-                emit_custom_unary_op(context, args, |ctx, arg, _| {
-                    let res = if conversion_op.def() == &ConvertOpDef::itobool {
-                        let is1 = ctx.builder().build_int_compare(
-                            IntPredicate::EQ,
-                            arg.into_int_value(),
-                            i0_ty.const_int(1, false),
-                            "eq1",
-                        )?;
-                        let sum_f = sum_ty.build_tag(ctx.builder(), 0, vec![])?;
-                        let sum_t = sum_ty.build_tag(ctx.builder(), 1, vec![])?;
-                        ctx.builder().build_select(is1, sum_t, sum_f, "")?
-                    } else {
-                        let tag_ty = sum_ty.get_tag_type();
-                        let tag =
-                            LLVMSumValue::try_new(arg, sum_ty)?.build_get_tag(ctx.builder())?;
-                        let is_true = ctx.builder().build_int_compare(
-                            IntPredicate::EQ,
-                            tag,
-                            tag_ty.const_int(1, false),
-                            "",
-                        )?;
-                        ctx.builder().build_select(
-                            is_true,
-                            i0_ty.const_int(1, false),
-                            i0_ty.const_int(0, false),
-                            "",
-                        )?
-                    };
-                    Ok(vec![res])
-                })
-            }
-            _ => Err(anyhow!(
-                "Conversion op not implemented: {:?}",
-                args.node().as_ref()
-            )),
+                };
+                Ok(vec![res])
+            })
         }
+        _ => Err(anyhow!(
+            "Conversion op not implemented: {:?}",
+            args.node().as_ref()
+        )),
     }
 }
 
-pub fn add_conversions_extension<H: HugrView>(cem: CodegenExtsMap<'_, H>) -> CodegenExtsMap<'_, H> {
-    cem.add_cge(ConversionsCodegenExtension)
+#[derive(Clone, Debug)]
+pub struct ConversionExtension;
+
+impl CodegenExtension for ConversionExtension {
+    fn add_extension<'a, H: HugrView + 'a>(
+        self,
+        builder: CodegenExtsBuilder<'a, H>,
+    ) -> CodegenExtsBuilder<'a, H>
+    where
+        Self: 'a,
+    {
+        builder.simple_extension_op(emit_conversion_op)
+    }
+}
+
+impl<'a, H: HugrView + 'a> CodegenExtsBuilder<'a, H> {
+    pub fn add_conversion_extensions(self) -> Self {
+        self.add_extension(ConversionExtension)
+    }
 }
 
 #[cfg(test)]
@@ -263,10 +243,6 @@ mod test {
     use super::*;
 
     use crate::check_emission;
-    use crate::custom::{
-        float::add_float_extensions, int::add_int_extensions,
-        prelude::add_default_prelude_extensions,
-    };
     use crate::emit::test::{SimpleHugrConfig, DFGW};
     use crate::test::{exec_ctx, llvm_ctx, TestContext};
     use hugr::builder::SubContainer;
@@ -315,9 +291,11 @@ mod test {
     #[case("convert_u", 4)]
     #[case("convert_s", 5)]
     fn test_convert(mut llvm_ctx: TestContext, #[case] op_name: &str, #[case] log_width: u8) -> () {
-        llvm_ctx.add_extensions(add_int_extensions);
-        llvm_ctx.add_extensions(add_float_extensions);
-        llvm_ctx.add_extensions(add_conversions_extension);
+        llvm_ctx.add_extensions(|ceb| {
+            ceb.add_int_extensions()
+                .add_float_extensions()
+                .add_conversion_extensions()
+        });
         let in_ty = INT_TYPES[log_width as usize].clone();
         let out_ty = FLOAT64_TYPE;
         let hugr = test_conversion_op(op_name, in_ty, out_ty, log_width);
@@ -332,10 +310,13 @@ mod test {
         #[case] op_name: &str,
         #[case] log_width: u8,
     ) -> () {
-        llvm_ctx.add_extensions(add_int_extensions);
-        llvm_ctx.add_extensions(add_float_extensions);
-        llvm_ctx.add_extensions(add_conversions_extension);
-        llvm_ctx.add_extensions(add_default_prelude_extensions);
+        llvm_ctx.add_extensions(|builder| {
+            builder
+                .add_int_extensions()
+                .add_float_extensions()
+                .add_conversion_extensions()
+                .add_default_prelude_extensions()
+        });
         let in_ty = FLOAT64_TYPE;
         let out_ty = sum_with_error(INT_TYPES[log_width as usize].clone());
         let hugr = test_conversion_op(op_name, in_ty, out_ty.into(), log_width);
@@ -355,9 +336,12 @@ mod test {
             tys.reverse()
         };
         let [in_t, out_t] = tys;
-        llvm_ctx.add_extensions(add_int_extensions);
-        llvm_ctx.add_extensions(add_float_extensions);
-        llvm_ctx.add_extensions(add_conversions_extension);
+        llvm_ctx.add_extensions(|builder| {
+            builder
+                .add_int_extensions()
+                .add_float_extensions()
+                .add_conversion_extensions()
+        });
         let hugr = SimpleHugrConfig::new()
             .with_ins(vec![in_t])
             .with_outs(vec![out_t])
@@ -385,7 +369,7 @@ mod test {
                 let konst = builder.add_load_value(ConstUsize::new(42));
                 builder.finish_with_outputs([konst]).unwrap()
             });
-        exec_ctx.add_extensions(add_default_prelude_extensions);
+        exec_ctx.add_extensions(CodegenExtsBuilder::add_default_prelude_extensions);
         assert_eq!(42, exec_ctx.exec_hugr_u64(hugr, "main"));
     }
 
@@ -409,9 +393,12 @@ mod test {
                     .outputs_arr();
                 builder.finish_with_outputs([usize_]).unwrap()
             });
-        exec_ctx.add_extensions(add_int_extensions);
-        exec_ctx.add_extensions(add_conversions_extension);
-        exec_ctx.add_extensions(add_default_prelude_extensions);
+        exec_ctx.add_extensions(|builder| {
+            builder
+                .add_int_extensions()
+                .add_conversion_extensions()
+                .add_default_prelude_extensions()
+        });
         assert_eq!(val, exec_ctx.exec_hugr_u64(hugr, "main"));
     }
 
@@ -464,10 +451,13 @@ mod test {
     }
 
     fn add_extensions(ctx: &mut TestContext) {
-        ctx.add_extensions(add_conversions_extension);
-        ctx.add_extensions(add_default_prelude_extensions);
-        ctx.add_extensions(add_float_extensions);
-        ctx.add_extensions(add_int_extensions);
+        ctx.add_extensions(|builder| {
+            builder
+                .add_conversion_extensions()
+                .add_default_prelude_extensions()
+                .add_float_extensions()
+                .add_int_extensions()
+        });
     }
 
     #[rstest]
@@ -524,9 +514,12 @@ mod test {
                 let res = cond.finish_sub_container().unwrap();
                 builder.finish_with_outputs(res.outputs()).unwrap()
             });
-        exec_ctx.add_extensions(add_conversions_extension);
-        exec_ctx.add_extensions(add_default_prelude_extensions);
-        exec_ctx.add_extensions(add_int_extensions);
+        exec_ctx.add_extensions(|builder| {
+            builder
+                .add_conversion_extensions()
+                .add_default_prelude_extensions()
+                .add_int_extensions()
+        });
         assert_eq!(i * 5 + 1, exec_ctx.exec_hugr_u64(hugr, "main"));
     }
 
@@ -547,9 +540,12 @@ mod test {
                 let [i] = builder.add_dataflow_op(b2i, [b]).unwrap().outputs_arr();
                 builder.finish_with_outputs([i]).unwrap()
             });
-        exec_ctx.add_extensions(add_conversions_extension);
-        exec_ctx.add_extensions(add_default_prelude_extensions);
-        exec_ctx.add_extensions(add_int_extensions);
+        exec_ctx.add_extensions(|builder| {
+            builder
+                .add_conversion_extensions()
+                .add_default_prelude_extensions()
+                .add_int_extensions()
+        });
         assert_eq!(i, exec_ctx.exec_hugr_u64(hugr, "main"));
     }
 }

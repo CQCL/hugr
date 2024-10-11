@@ -1,18 +1,15 @@
 use std::rc::Rc;
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use delegate::delegate;
-use hugr::types::{Signature, SumType, Type};
+use hugr::extension::ExtensionId;
+use hugr::types::{SumType, Type, TypeName};
 use inkwell::types::FunctionType;
-use inkwell::AddressSpace;
-use inkwell::{
-    context::Context,
-    types::{BasicMetadataTypeEnum, BasicType, BasicTypeEnum},
-};
+use inkwell::{context::Context, types::BasicTypeEnum};
 
+use crate::custom::types::{LLVMCustomTypeFn, LLVMTypeMapping};
 pub use crate::sum::LLVMSumType;
-
-use super::custom::CodegenExtsMap;
+use crate::utils::type_map::TypeMap;
 
 /// A type alias for a hugr function type. We use this to disambiguate from
 /// the LLVM [FunctionType].
@@ -24,125 +21,82 @@ pub type HugrType = Type;
 /// A type alias for a hugr sum type.
 pub type HugrSumType = SumType;
 
-/// This type is mostly vestigal, it does very little but hold a &[Context].
-///
-/// I had thought it would grow some configuration that it would use while
-/// constructing a [TypingSession].
-#[derive(Copy, Clone, Debug)]
-pub struct TypeConverter<'c> {
-    context: &'c Context,
-}
-
 /// A type that holds [Rc] shared pointers to everything needed to convert from
 /// a hugr [HugrType] to an LLVM [Type](inkwell::types).
-pub struct TypingSession<'c, H> {
-    tc: Rc<TypeConverter<'c>>,
-    extensions: Rc<CodegenExtsMap<'c, H>>,
+///
+// TODO add another lifetime parameter and substitute it for 'static in `type_converter`
+#[derive(Clone)]
+pub struct TypingSession<'c> {
+    iw_context: &'c Context,
+    type_converter: Rc<TypeConverter<'static>>,
 }
 
-impl<'c, H> TypingSession<'c, H> {
+impl<'c> TypingSession<'c> {
     delegate! {
-        to self.tc {
-            /// Returns a reference to the inner [Context].
-            pub fn iw_context(&self) -> &'c Context;
+        to self.type_converter.clone() {
+            /// Convert a [HugrType] into an LLVM [Type](BasicTypeEnum).
+            pub fn llvm_type(&self, [self.clone()], hugr_type: &HugrType) -> Result<BasicTypeEnum<'c>>;
+            /// Convert a [HugrFuncType] into an LLVM [FunctionType].
+            pub fn llvm_func_type(&self, [self.clone()], hugr_type: &HugrFuncType) -> Result<FunctionType<'c>>;
+            /// Convert a hugr [HugrSumType] into an LLVM [LLVMSumType].
+            pub fn llvm_sum_type(&self, [self.clone()], hugr_type: HugrSumType) -> Result<LLVMSumType<'c>>;
         }
     }
 
     /// Creates a new `TypingSession`.
-    pub fn new(tc: Rc<TypeConverter<'c>>, extensions: Rc<CodegenExtsMap<'c, H>>) -> Self {
-        TypingSession { tc, extensions }
-    }
-
-    /// Convert a [HugrType] into an LLVM [Type](BasicTypeEnum).
-    pub fn llvm_type(&self, hugr_type: &HugrType) -> Result<BasicTypeEnum<'c>> {
-        use hugr::types::TypeEnum;
-        match hugr_type.as_type_enum() {
-            TypeEnum::Extension(ref custom_type) => self.extensions.llvm_type(self, custom_type),
-            TypeEnum::Sum(sum) => self.llvm_sum_type(sum.clone()).map(Into::into),
-            TypeEnum::Function(func_ty) => {
-                let func_ty: Signature = func_ty.as_ref().clone().try_into()?;
-                Ok(self
-                    .llvm_func_type(&func_ty)?
-                    .ptr_type(AddressSpace::default()) // Note: deprecated in LLVM >= 15
-                    .into())
-            }
-            x => Err(anyhow!("Invalid type: {:?}", x)),
+    pub fn new(iw_context: &'c Context, type_converter: Rc<TypeConverter<'static>>) -> Self {
+        Self {
+            iw_context,
+            type_converter,
         }
-    }
-
-    /// Convert a [HugrFuncType] into an LLVM [FunctionType].
-    pub fn llvm_func_type(
-        &self,
-        hugr_type: &HugrFuncType,
-    ) -> Result<inkwell::types::FunctionType<'c>> {
-        let args = hugr_type
-            .input()
-            .iter()
-            .map(|x| self.llvm_type(x).map(Into::<BasicMetadataTypeEnum>::into))
-            .collect::<Result<Vec<_>>>()?;
-        let res_unpacked = hugr_type
-            .output()
-            .iter()
-            .map(|x| self.llvm_type(x))
-            .collect::<Result<Vec<_>>>()?;
-
-        Ok(match res_unpacked.as_slice() {
-            &[] => self.iw_context().void_type().fn_type(&args, false),
-            [res] => res.fn_type(&args, false),
-            ress => self
-                .iw_context()
-                .struct_type(ress, false)
-                .fn_type(&args, false),
-        })
-    }
-
-    /// Convert a hugr [HugrSumType] into an LLVM [LLVMSumType].
-    pub fn llvm_sum_type(&self, sum_type: HugrSumType) -> Result<LLVMSumType<'c>> {
-        LLVMSumType::try_new(self, sum_type)
-    }
-}
-
-impl<'c> TypeConverter<'c> {
-    /// Create a new `TypeConverter`.
-    pub fn new(context: &'c Context) -> Rc<Self> {
-        Self { context }.into()
     }
 
     /// Returns a reference to the inner [Context].
     pub fn iw_context(&self) -> &'c Context {
-        self.context
+        self.iw_context
+    }
+}
+
+#[derive(Default)]
+pub struct TypeConverter<'a>(TypeMap<'a, LLVMTypeMapping>);
+
+impl<'a> TypeConverter<'a> {
+    pub(super) fn custom_type(
+        &mut self,
+        custom_type: (ExtensionId, TypeName),
+        handler: impl LLVMCustomTypeFn<'a>,
+    ) {
+        self.0.set_callback(custom_type, handler);
     }
 
-    /// Creates a new [TypingSession].
-    pub fn session<H>(self: Rc<Self>, exts: Rc<CodegenExtsMap<'c, H>>) -> TypingSession<'c, H> {
-        TypingSession::new(self, exts)
-    }
-
-    /// Convert a [HugrType] into an LLVM [Type](BasicTypeEnum).
-    pub fn llvm_type<H>(
+    pub fn llvm_type<'c>(
         self: Rc<Self>,
-        extensions: Rc<CodegenExtsMap<'c, H>>,
+        context: TypingSession<'c>,
         hugr_type: &HugrType,
     ) -> Result<BasicTypeEnum<'c>> {
-        self.session(extensions).llvm_type(hugr_type)
+        self.0.map_type(hugr_type, context)
     }
 
-    /// Convert a [HugrFuncType] into an LLVM [FunctionType].
-    pub fn llvm_func_type<H>(
+    pub fn llvm_func_type<'c>(
         self: Rc<Self>,
-        extensions: Rc<CodegenExtsMap<'c, H>>,
+        context: TypingSession<'c>,
         hugr_type: &HugrFuncType,
     ) -> Result<FunctionType<'c>> {
-        self.session(extensions).llvm_func_type(hugr_type)
+        self.0.map_function_type(hugr_type, context)
     }
 
-    /// Convert a hugr [HugrSumType] into an LLVM [LLVMSumType].
-    pub fn llvm_sum_type<H>(
+    pub fn llvm_sum_type(
         self: Rc<Self>,
-        extensions: Rc<CodegenExtsMap<'c, H>>,
-        sum_type: HugrSumType,
-    ) -> Result<LLVMSumType<'c>> {
-        self.session(extensions).llvm_sum_type(sum_type)
+        context: TypingSession<'_>,
+        hugr_type: HugrSumType,
+    ) -> Result<LLVMSumType<'_>> {
+        self.0.map_sum_type(&hugr_type, context)
+    }
+}
+
+impl TypeConverter<'static> {
+    pub fn session(self: Rc<Self>, iw_context: &Context) -> TypingSession<'_> {
+        TypingSession::new(iw_context, self)
     }
 }
 

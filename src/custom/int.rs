@@ -1,10 +1,7 @@
-use std::{any::TypeId, collections::HashSet};
-
 use hugr::{
-    extension::{simple_op::MakeExtensionOp, ExtensionId},
     ops::{constant::CustomConst, ExtensionOp, NamedOp, Value},
     std_extensions::arithmetic::{
-        int_ops::{self, ConcreteIntOp, IntOpDef},
+        int_ops::IntOpDef,
         int_types::{self, ConstInt},
     },
     types::{CustomType, TypeArg},
@@ -21,8 +18,8 @@ use crate::emit::{
 };
 use crate::types::TypingSession;
 
-use super::{CodegenExtension, CodegenExtsMap};
-use anyhow::{anyhow, bail, Result};
+use super::CodegenExtsBuilder;
+use anyhow::{anyhow, Result};
 
 /// Emit an integer comparison operation.
 fn emit_icmp<'c, H: HugrView>(
@@ -48,172 +45,114 @@ fn emit_icmp<'c, H: HugrView>(
     })
 }
 
-/// A [CodegenExtension] for the [hugr::std_extensions::arithmetic::int_ops]
-/// extension.
-///
-/// TODO: very incomplete
-pub struct IntOpsCodegenExtension;
-
-impl<H: HugrView> CodegenExtension<H> for IntOpsCodegenExtension {
-    fn extension(&self) -> ExtensionId {
-        int_ops::EXTENSION_ID
-    }
-
-    fn llvm_type<'c>(
-        &self,
-        _context: &TypingSession<'c, H>,
-        hugr_type: &CustomType,
-    ) -> Result<BasicTypeEnum<'c>> {
-        Err(anyhow!(
-            "IntOpsCodegenExtension: unsupported type: {}",
-            hugr_type
-        ))
-    }
-
-    fn emit_extension_op<'c>(
-        &self,
-        context: &mut EmitFuncContext<'c, H>,
-        args: EmitOpArgs<'c, '_, ExtensionOp, H>,
-    ) -> Result<()> {
-        let iot = ConcreteIntOp::from_optype(&args.node().generalise()).ok_or(anyhow!(
-            "IntOpEmitter from_optype failed: {:?}",
-            args.node().as_ref()
-        ))?;
-        match iot.def {
-            IntOpDef::iadd => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
-                Ok(vec![ctx
-                    .builder()
-                    .build_int_add(lhs.into_int_value(), rhs.into_int_value(), "")?
-                    .as_basic_value_enum()])
-            }),
-            IntOpDef::imul => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
-                Ok(vec![ctx
-                    .builder()
-                    .build_int_mul(lhs.into_int_value(), rhs.into_int_value(), "")?
-                    .as_basic_value_enum()])
-            }),
-            IntOpDef::isub => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
-                Ok(vec![ctx
-                    .builder()
-                    .build_int_sub(lhs.into_int_value(), rhs.into_int_value(), "")?
-                    .as_basic_value_enum()])
-            }),
-            IntOpDef::idiv_s => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
-                Ok(vec![ctx
-                    .builder()
-                    .build_int_signed_div(lhs.into_int_value(), rhs.into_int_value(), "")?
-                    .as_basic_value_enum()])
-            }),
-            IntOpDef::idiv_u => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
-                Ok(vec![ctx
-                    .builder()
-                    .build_int_unsigned_div(lhs.into_int_value(), rhs.into_int_value(), "")?
-                    .as_basic_value_enum()])
-            }),
-            IntOpDef::imod_s => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
-                Ok(vec![ctx
-                    .builder()
-                    .build_int_signed_rem(lhs.into_int_value(), rhs.into_int_value(), "")?
-                    .as_basic_value_enum()])
-            }),
-            IntOpDef::ineg => emit_custom_unary_op(context, args, |ctx, arg, _| {
-                Ok(vec![ctx
-                    .builder()
-                    .build_int_neg(arg.into_int_value(), "")?
-                    .as_basic_value_enum()])
-            }),
-            IntOpDef::ieq => emit_icmp(context, args, inkwell::IntPredicate::EQ),
-            IntOpDef::ilt_s => emit_icmp(context, args, inkwell::IntPredicate::SLT),
-            IntOpDef::igt_s => emit_icmp(context, args, inkwell::IntPredicate::SGT),
-            IntOpDef::ile_s => emit_icmp(context, args, inkwell::IntPredicate::SLE),
-            IntOpDef::ige_s => emit_icmp(context, args, inkwell::IntPredicate::SGE),
-            IntOpDef::ilt_u => emit_icmp(context, args, inkwell::IntPredicate::ULT),
-            IntOpDef::igt_u => emit_icmp(context, args, inkwell::IntPredicate::UGT),
-            IntOpDef::ile_u => emit_icmp(context, args, inkwell::IntPredicate::ULE),
-            IntOpDef::ige_u => emit_icmp(context, args, inkwell::IntPredicate::UGE),
-            _ => Err(anyhow!("IntOpEmitter: unimplemented op: {}", iot.name())),
-        }
+fn emit_int_op<'c, H: HugrView>(
+    context: &mut EmitFuncContext<'c, H>,
+    args: EmitOpArgs<'c, '_, ExtensionOp, H>,
+    op: IntOpDef,
+) -> Result<()> {
+    match op {
+        IntOpDef::iadd => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
+            Ok(vec![ctx
+                .builder()
+                .build_int_add(lhs.into_int_value(), rhs.into_int_value(), "")?
+                .as_basic_value_enum()])
+        }),
+        IntOpDef::imul => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
+            Ok(vec![ctx
+                .builder()
+                .build_int_mul(lhs.into_int_value(), rhs.into_int_value(), "")?
+                .as_basic_value_enum()])
+        }),
+        IntOpDef::isub => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
+            Ok(vec![ctx
+                .builder()
+                .build_int_sub(lhs.into_int_value(), rhs.into_int_value(), "")?
+                .as_basic_value_enum()])
+        }),
+        IntOpDef::idiv_s => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
+            Ok(vec![ctx
+                .builder()
+                .build_int_signed_div(lhs.into_int_value(), rhs.into_int_value(), "")?
+                .as_basic_value_enum()])
+        }),
+        IntOpDef::idiv_u => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
+            Ok(vec![ctx
+                .builder()
+                .build_int_unsigned_div(lhs.into_int_value(), rhs.into_int_value(), "")?
+                .as_basic_value_enum()])
+        }),
+        IntOpDef::imod_s => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
+            Ok(vec![ctx
+                .builder()
+                .build_int_signed_rem(lhs.into_int_value(), rhs.into_int_value(), "")?
+                .as_basic_value_enum()])
+        }),
+        IntOpDef::ineg => emit_custom_unary_op(context, args, |ctx, arg, _| {
+            Ok(vec![ctx
+                .builder()
+                .build_int_neg(arg.into_int_value(), "")?
+                .as_basic_value_enum()])
+        }),
+        IntOpDef::ieq => emit_icmp(context, args, inkwell::IntPredicate::EQ),
+        IntOpDef::ilt_s => emit_icmp(context, args, inkwell::IntPredicate::SLT),
+        IntOpDef::igt_s => emit_icmp(context, args, inkwell::IntPredicate::SGT),
+        IntOpDef::ile_s => emit_icmp(context, args, inkwell::IntPredicate::SLE),
+        IntOpDef::ige_s => emit_icmp(context, args, inkwell::IntPredicate::SGE),
+        IntOpDef::ilt_u => emit_icmp(context, args, inkwell::IntPredicate::ULT),
+        IntOpDef::igt_u => emit_icmp(context, args, inkwell::IntPredicate::UGT),
+        IntOpDef::ile_u => emit_icmp(context, args, inkwell::IntPredicate::ULE),
+        IntOpDef::ige_u => emit_icmp(context, args, inkwell::IntPredicate::UGE),
+        _ => Err(anyhow!("IntOpEmitter: unimplemented op: {}", op.name())),
     }
 }
 
-/// A [CodegenExtension] for the [hugr::std_extensions::arithmetic::int_types]
-/// extension.
-pub struct IntTypesCodegenExtension;
-
-impl<H: HugrView> CodegenExtension<H> for IntTypesCodegenExtension {
-    fn extension(&self) -> ExtensionId {
-        int_types::EXTENSION_ID
-    }
-
-    fn llvm_type<'c>(
-        &self,
-        context: &TypingSession<'c, H>,
-        hugr_type: &CustomType,
-    ) -> Result<BasicTypeEnum<'c>> {
-        if let [TypeArg::BoundedNat { n }] = hugr_type.args() {
-            let m = *n as usize;
-            if m < int_types::INT_TYPES.len() && int_types::INT_TYPES[m] == hugr_type.clone().into()
-            {
-                return Ok(match m {
-                    0..=3 => context.iw_context().i8_type(),
-                    4 => context.iw_context().i16_type(),
-                    5 => context.iw_context().i32_type(),
-                    6 => context.iw_context().i64_type(),
-                    _ => Err(anyhow!(
-                        "IntTypesCodegenExtension: unsupported log_width: {}",
-                        m
-                    ))?,
-                }
-                .into());
+fn llvm_type<'c>(context: TypingSession<'c>, hugr_type: &CustomType) -> Result<BasicTypeEnum<'c>> {
+    if let [TypeArg::BoundedNat { n }] = hugr_type.args() {
+        let m = *n as usize;
+        if m < int_types::INT_TYPES.len() && int_types::INT_TYPES[m] == hugr_type.clone().into() {
+            return Ok(match m {
+                0..=3 => context.iw_context().i8_type(),
+                4 => context.iw_context().i16_type(),
+                5 => context.iw_context().i32_type(),
+                6 => context.iw_context().i64_type(),
+                _ => Err(anyhow!(
+                    "IntTypesCodegenExtension: unsupported log_width: {}",
+                    m
+                ))?,
             }
+            .into());
         }
-        Err(anyhow!(
-            "IntTypesCodegenExtension: unsupported type: {}",
-            hugr_type
-        ))
     }
-
-    fn emit_extension_op<'c>(
-        &self,
-        _: &mut EmitFuncContext<'c, H>,
-        args: EmitOpArgs<'c, '_, ExtensionOp, H>,
-    ) -> Result<()> {
-        bail!("Unsupported op: {:?}", args.node().as_ref())
-    }
-
-    fn supported_consts(&self) -> HashSet<TypeId> {
-        [TypeId::of::<ConstInt>()].into_iter().collect()
-    }
-
-    fn load_constant<'c>(
-        &self,
-        context: &mut EmitFuncContext<'c, H>,
-        konst: &dyn CustomConst,
-    ) -> Result<Option<BasicValueEnum<'c>>> {
-        let Some(k) = konst.downcast_ref::<ConstInt>() else {
-            return Ok(None);
-        };
-        let ty: IntType<'c> = context
-            .llvm_type(&k.get_type())?
-            .try_into()
-            .map_err(|_| anyhow!("Failed to get ConstInt as IntType"))?;
-        // k.value_u() is in two's complement representation of the exactly
-        // correct bit width, so we are safe to unconditionally retrieve the
-        // unsigned value and do no sign extension.
-        Ok(Some(ty.const_int(k.value_u(), false).into()))
-    }
+    Err(anyhow!(
+        "IntTypesCodegenExtension: unsupported type: {}",
+        hugr_type
+    ))
 }
 
-/// Populates a [CodegenExtsMap] with all extensions needed to lower int ops,
-/// types, and constants.
-pub fn add_int_extensions<H: HugrView>(cem: CodegenExtsMap<'_, H>) -> CodegenExtsMap<'_, H> {
-    cem.add_cge(IntOpsCodegenExtension)
-        .add_cge(IntTypesCodegenExtension)
+fn emit_const_int<'c, H: HugrView>(
+    context: &mut EmitFuncContext<'c, H>,
+    k: &ConstInt,
+) -> Result<BasicValueEnum<'c>> {
+    let ty: IntType = context.llvm_type(&k.get_type())?.try_into().unwrap();
+    // k.value_u() is in two's complement representation of the exactly
+    // correct bit width, so we are safe to unconditionally retrieve the
+    // unsigned value and do no sign extension.
+    Ok(ty.const_int(k.value_u(), false).as_basic_value_enum())
 }
 
-impl<H: HugrView> CodegenExtsMap<'_, H> {
-    /// Populates a [CodegenExtsMap] with all extensions needed to lower int ops,
-    /// types, and constants.
+/// Populates a [CodegenExtsBuilder] with all extensions needed to lower int
+/// ops, types, and constants.
+pub fn add_int_extensions<'a, H: HugrView + 'a>(
+    cem: CodegenExtsBuilder<'a, H>,
+) -> CodegenExtsBuilder<'a, H> {
+    cem.custom_const(emit_const_int)
+        .custom_type((int_types::EXTENSION_ID, "int".into()), llvm_type)
+        .simple_extension_op::<IntOpDef>(emit_int_op)
+}
+
+impl<'a, H: HugrView + 'a> CodegenExtsBuilder<'a, H> {
+    /// Populates a [CodegenExtsBuilder] with all extensions needed to lower int
+    /// ops, types, and constants.
     pub fn add_int_extensions(self) -> Self {
         add_int_extensions(self)
     }

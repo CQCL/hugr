@@ -228,7 +228,7 @@ mod test {
     use rstest::rstest;
 
     use crate::custom::int::add_int_extensions;
-    use crate::custom::prelude::add_default_prelude_extensions;
+    use crate::custom::CodegenExtsBuilder;
     use crate::emit::test::SimpleHugrConfig;
     use crate::test::{llvm_ctx, TestContext};
 
@@ -287,7 +287,7 @@ mod test {
                 let [cfg_out] = cfg.outputs_arr();
                 builder.finish_with_outputs([cfg_out]).unwrap()
             });
-        llvm_ctx.add_extensions(add_default_prelude_extensions);
+        llvm_ctx.add_extensions(CodegenExtsBuilder::add_default_prelude_extensions);
         check_emission!(hugr, llvm_ctx);
     }
 

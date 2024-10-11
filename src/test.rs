@@ -9,7 +9,7 @@ use itertools::Itertools as _;
 use rstest::fixture;
 
 use crate::{
-    custom::CodegenExtsMap,
+    custom::{CodegenExtsBuilder, CodegenExtsMap},
     emit::{test::Emission, EmitHugr, EmitModuleContext, Namer},
     fat::FatExt,
     types::{TypeConverter, TypingSession},
@@ -60,20 +60,33 @@ pub fn no_extensions(id: CodegenExtsMap<'_, THugrView>) -> CodegenExtsMap<'_, TH
     id
 }
 
+pub trait MakeCodegenExtsMapFn:
+    Fn(CodegenExtsBuilder<'static, THugrView>) -> CodegenExtsBuilder<'static, THugrView> + 'static
+{
+}
+
+impl<
+        F: Fn(CodegenExtsBuilder<'static, THugrView>) -> CodegenExtsBuilder<'static, THugrView>
+            + ?Sized
+            + 'static,
+    > MakeCodegenExtsMapFn for F
+{
+}
+
+type MakeCodegenExtsMapBox = Box<dyn MakeCodegenExtsMapFn>;
 // We would like to just stor a CodegenExtsMap, but we can't because it's
 // lifetime parameter would need to be the lifetime of TestContext, which is
 // prohibitted. Instead, we store a factory function as below.
-type MakeCodegenExtsMapFn = Box<dyn for<'a> Fn(&'a Context) -> CodegenExtsMap<'a, THugrView>>;
 pub struct TestContext {
     context: Context,
-    mk_exts: MakeCodegenExtsMapFn,
+    mk_exts: MakeCodegenExtsMapBox,
     _insta: Option<insta::internals::SettingsBindDropGuard>,
     namer: Namer,
 }
 
 impl TestContext {
     fn new(
-        ext_builder: impl for<'a> Fn(&'a Context) -> CodegenExtsMap<'a, THugrView> + 'static,
+        ext_builder: impl MakeCodegenExtsMapFn + 'static,
         insta_settings: Option<InstaSettingsBuilder>,
     ) -> Self {
         let context = Context::create();
@@ -89,53 +102,36 @@ impl TestContext {
         self.context.i32_type().as_basic_type_enum()
     }
 
-    pub fn type_converter(&'_ self) -> Rc<TypeConverter<'_>> {
-        TypeConverter::new(&self.context)
+    pub fn type_converter(&self) -> Rc<TypeConverter<'static>> {
+        self.extensions().type_converter
     }
 
-    pub fn extensions(&'_ self) -> Rc<CodegenExtsMap<'_, THugrView>> {
-        Rc::new((self.mk_exts)(&self.context))
+    pub fn extensions(&self) -> CodegenExtsMap<'static, THugrView> {
+        (self.mk_exts)(Default::default()).finish()
     }
 
-    pub fn add_extensions<
-        F: for<'a> Fn(CodegenExtsMap<'a, THugrView>) -> CodegenExtsMap<'a, THugrView> + 'static,
-    >(
-        &'_ mut self,
-        f: F,
-    ) {
-        self.add_extensions_with_context(move |_, exts| f(exts))
-    }
-
-    pub fn add_extensions_with_context<
-        F: for<'a> Fn(&'a Context, CodegenExtsMap<'a, THugrView>) -> CodegenExtsMap<'a, THugrView>
-            + 'static,
-    >(
-        &'_ mut self,
-        f: F,
-    ) {
-        fn dummy(_: &'_ Context) -> CodegenExtsMap<'_, THugrView> {
-            unreachable!()
-        }
-        let mut old_mk_exts: MakeCodegenExtsMapFn = Box::new(dummy);
-        std::mem::swap(&mut self.mk_exts, &mut old_mk_exts);
-        let new_mk_exts: MakeCodegenExtsMapFn = Box::new(move |ctx| f(ctx, (old_mk_exts)(ctx)));
-        self.mk_exts = new_mk_exts;
+    pub fn add_extensions(&'_ mut self, f: impl MakeCodegenExtsMapFn) {
+        let old_mk_exts = {
+            let mut tmp: MakeCodegenExtsMapBox = Box::new(|x| x);
+            std::mem::swap(&mut self.mk_exts, &mut tmp);
+            tmp
+        };
+        self.mk_exts = Box::new(move |cem| f(old_mk_exts(cem)))
     }
 
     pub fn iw_context(&self) -> &Context {
         &self.context
     }
 
-    pub fn get_typing_session(&'_ self) -> TypingSession<'_, THugrView> {
-        self.type_converter().session(self.extensions())
+    pub fn get_typing_session(&self) -> TypingSession {
+        self.type_converter().session(&self.context)
     }
 
     pub fn get_emit_hugr(&'_ self) -> EmitHugr<'_, THugrView> {
         let ctx = self.iw_context();
         let m = ctx.create_module("test_context");
-        let namer = self.namer.clone().into();
         let exts = self.extensions();
-        EmitHugr::new(ctx, m, namer, exts)
+        EmitHugr::new(ctx, m, Rc::new(self.namer.clone()), Rc::new(exts))
     }
 
     pub fn set_namer(&mut self, namer: Namer) {
@@ -146,10 +142,10 @@ impl TestContext {
         let ctx = self.iw_context();
         let m = ctx.create_module("test_context");
         EmitModuleContext::new(
+            &self.context,
             m,
             self.namer.clone().into(),
-            self.extensions(),
-            self.type_converter(),
+            self.extensions().into(),
         )
     }
 
@@ -175,7 +171,7 @@ impl TestContext {
 pub fn test_ctx(#[default(-1)] id: i32) -> TestContext {
     let id = (id >= 0).then_some(id as usize);
     TestContext::new(
-        |_| CodegenExtsMap::default(),
+        |_| CodegenExtsBuilder::default(),
         Some(InstaSettingsBuilder::new(id)),
     )
 }
@@ -184,7 +180,7 @@ pub fn test_ctx(#[default(-1)] id: i32) -> TestContext {
 pub fn llvm_ctx(#[default(-1)] id: i32) -> TestContext {
     let id = (id >= 0).then_some(id as usize);
     TestContext::new(
-        |_| CodegenExtsMap::default(),
+        |_| CodegenExtsBuilder::default(),
         Some(InstaSettingsBuilder::new_llvm(id)),
     )
 }
@@ -193,7 +189,7 @@ pub fn llvm_ctx(#[default(-1)] id: i32) -> TestContext {
 pub fn exec_ctx(#[default(-1)] id: i32) -> TestContext {
     let id = (id >= 0).then_some(id as usize);
     let mut r = TestContext::new(
-        |_| CodegenExtsMap::default(),
+        |_| CodegenExtsBuilder::default(),
         Some(InstaSettingsBuilder::new_llvm(id)),
     );
     // we need to refer to functions by name, so no mangling

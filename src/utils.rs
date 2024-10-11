@@ -4,6 +4,7 @@ pub mod array_op_builder;
 pub mod inline_constant_functions;
 pub mod int_op_builder;
 pub mod logic_op_builder;
+pub mod type_map;
 pub mod unwrap_builder;
 
 pub use array_op_builder::ArrayOpBuilder;

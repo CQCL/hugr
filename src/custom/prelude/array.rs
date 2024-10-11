@@ -338,9 +338,9 @@ pub fn emit_array_op<'c, H: HugrView>(
 }
 
 /// Helper function to emit the pop operations.
-fn emit_pop_op<'c, H: HugrView>(
+fn emit_pop_op<'c>(
     builder: &Builder<'c>,
-    ts: &TypingSession<'c, H>,
+    ts: &TypingSession<'c>,
     elem_ty: HugrType,
     size: u64,
     array_v: ArrayValue<'c>,
@@ -407,7 +407,7 @@ mod test {
 
     use crate::{
         check_emission,
-        custom::prelude::add_default_prelude_extensions,
+        custom::CodegenExtsBuilder,
         emit::test::SimpleHugrConfig,
         test::{exec_ctx, llvm_ctx, TestContext},
         utils::{
@@ -425,7 +425,7 @@ mod test {
                     .unwrap();
                 builder.finish_sub_container().unwrap()
             });
-        llvm_ctx.add_extensions(add_default_prelude_extensions);
+        llvm_ctx.add_extensions(CodegenExtsBuilder::add_default_prelude_extensions);
         check_emission!(hugr, llvm_ctx);
     }
 
@@ -440,7 +440,7 @@ mod test {
                 builder.add_array_get(USIZE_T, 2, arr, us1).unwrap();
                 builder.finish_with_outputs([]).unwrap()
             });
-        llvm_ctx.add_extensions(add_default_prelude_extensions);
+        llvm_ctx.add_extensions(CodegenExtsBuilder::add_default_prelude_extensions);
         check_emission!(hugr, llvm_ctx);
     }
 
@@ -495,7 +495,7 @@ mod test {
                 };
                 builder.finish_with_outputs([r]).unwrap()
             });
-        exec_ctx.add_extensions(add_default_prelude_extensions);
+        exec_ctx.add_extensions(CodegenExtsBuilder::add_default_prelude_extensions);
         assert_eq!(expected, exec_ctx.exec_hugr_u64(hugr, "main"));
     }
 

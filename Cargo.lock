@@ -510,6 +510,7 @@ dependencies = [
  "rstest",
  "serde",
  "serde_json",
+ "strum",
  "tket2",
  "typetag",
 ]

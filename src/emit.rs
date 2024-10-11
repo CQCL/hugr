@@ -17,11 +17,7 @@ use std::{collections::HashSet, rc::Rc};
 
 use crate::types::{HugrFuncType, HugrSumType, HugrType, TypingSession};
 
-use crate::{
-    custom::CodegenExtsMap,
-    fat::FatNode,
-    types::{LLVMSumType, TypeConverter},
-};
+use crate::{custom::CodegenExtsMap, fat::FatNode, types::LLVMSumType};
 
 pub mod args;
 pub mod func;
@@ -34,26 +30,28 @@ pub use func::{EmitFuncContext, RowPromise};
 pub use namer::Namer;
 pub use ops::emit_value;
 
+/// A context holding data required for emitting HUGRs into an LLVM module.
+/// This includes the module itself, a set of extensions for lowering custom
+/// elements, and policy for naming various HUGR elements.
+///
+/// `'c` names the lifetime of the LLVM context.
+// TODO add another lifetime parameter for `extensions` below.
 pub struct EmitModuleContext<'c, H> {
+    iw_context: &'c Context,
     module: Module<'c>,
-    extensions: Rc<CodegenExtsMap<'c, H>>,
-    typer: Rc<TypeConverter<'c>>,
+    extensions: Rc<CodegenExtsMap<'static, H>>,
     namer: Rc<Namer>,
 }
 
 impl<'c, H> EmitModuleContext<'c, H> {
     delegate! {
-        to self.typer {
-            /// Returns a reference to the inner [Context].
-            pub fn iw_context(&self) -> &'c Context;
-        }
-        to self.typer.clone() {
+        to self.typing_session() {
             /// Convert a [HugrType] into an LLVM [Type](BasicTypeEnum).
-            pub fn llvm_type(&self, [self.extensions()], hugr_type: &HugrType) -> Result<BasicTypeEnum<'c>>;
+            pub fn llvm_type(&self, hugr_type: &HugrType) -> Result<BasicTypeEnum<'c>>;
             /// Convert a [HugrFuncType] into an LLVM [FunctionType].
-            pub fn llvm_func_type(&self, [self.extensions()], hugr_type: &HugrFuncType) -> Result<FunctionType<'c>>;
+            pub fn llvm_func_type(&self, hugr_type: &HugrFuncType) -> Result<FunctionType<'c>>;
             /// Convert a hugr [HugrSumType] into an LLVM [LLVMSumType].
-            pub fn llvm_sum_type(&self, [self.extensions()], sum_type: HugrSumType) -> Result<LLVMSumType<'c>>;
+            pub fn llvm_sum_type(&self, sum_type: HugrSumType) -> Result<LLVMSumType<'c>>;
         }
 
         to self.namer {
@@ -62,19 +60,23 @@ impl<'c, H> EmitModuleContext<'c, H> {
         }
     }
 
+    pub fn iw_context(&self) -> &'c Context {
+        self.iw_context
+    }
+
     /// Creates a new  `EmitModuleContext`. We take ownership of the [Module],
     /// and return it in [EmitModuleContext::finish].
     pub fn new(
+        iw_context: &'c Context,
         module: Module<'c>,
         namer: Rc<Namer>,
-        extensions: Rc<CodegenExtsMap<'c, H>>,
-        typer: Rc<TypeConverter<'c>>,
+        extensions: Rc<CodegenExtsMap<'static, H>>,
     ) -> Self {
         Self {
+            iw_context,
             module,
             namer,
             extensions,
-            typer,
         }
     }
 
@@ -86,13 +88,16 @@ impl<'c, H> EmitModuleContext<'c, H> {
     }
 
     /// Returns a reference to the inner [CodegenExtsMap].
-    pub fn extensions(&self) -> Rc<CodegenExtsMap<'c, H>> {
+    pub fn extensions(&self) -> Rc<CodegenExtsMap<'static, H>> {
         self.extensions.clone()
     }
 
     /// Returns a [TypingSession] constructed from it's members.
-    pub fn typing_session(&self) -> TypingSession<'c, H> {
-        self.typer.clone().session::<H>(self.extensions())
+    pub fn typing_session(&self) -> TypingSession<'c> {
+        self.extensions
+            .type_converter
+            .clone()
+            .session(self.iw_context)
     }
 
     fn get_func_impl(
@@ -249,20 +254,15 @@ impl<'c, H: HugrView> EmitHugr<'c, H> {
 
     /// Creates a new  `EmitHugr`. We take ownership of the [Module], and return it in [Self::finish].
     pub fn new(
-        context: &'c Context,
+        iw_context: &'c Context,
         module: Module<'c>,
         namer: Rc<Namer>,
-        extensions: Rc<CodegenExtsMap<'c, H>>,
+        extensions: Rc<CodegenExtsMap<'static, H>>,
     ) -> Self {
-        assert_eq!(context, &module.get_context());
+        assert_eq!(iw_context, &module.get_context());
         Self {
             emitted: Default::default(),
-            module_context: EmitModuleContext::new(
-                module,
-                namer,
-                extensions,
-                TypeConverter::new(context),
-            ),
+            module_context: EmitModuleContext::new(iw_context, module, namer, extensions),
         }
     }
 

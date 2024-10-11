@@ -2,7 +2,7 @@ use std::{collections::HashMap, rc::Rc};
 
 use anyhow::{anyhow, Result};
 use hugr::{
-    ops::{FuncDecl, FuncDefn},
+    ops::{constant::CustomConst, ExtensionOp, FuncDecl, FuncDefn},
     types::Type,
     HugrView, NodeIndex, PortIndex, Wire,
 };
@@ -12,7 +12,7 @@ use inkwell::{
     context::Context,
     module::Module,
     types::{BasicType, BasicTypeEnum, FunctionType},
-    values::{FunctionValue, GlobalValue},
+    values::{BasicValueEnum, FunctionValue, GlobalValue},
 };
 use itertools::zip_eq;
 
@@ -22,7 +22,7 @@ use delegate::delegate;
 
 use self::mailbox::ValueMailBox;
 
-use super::{EmissionSet, EmitModuleContext};
+use super::{EmissionSet, EmitModuleContext, EmitOpArgs};
 
 mod mailbox;
 pub use mailbox::{RowMailBox, RowPromise};
@@ -43,6 +43,8 @@ pub use mailbox::{RowMailBox, RowPromise};
 /// [MailBox](RowMailBox)es are stack allocations that are `alloca`ed in the
 /// first basic block of the function, read from to get the input values of each
 /// node, and written to with the output values of each node.
+///
+// TODO add another lifetime parameter which `emit_context` will need.
 pub struct EmitFuncContext<'c, H> {
     emit_context: EmitModuleContext<'c, H>,
     todo: EmissionSet,
@@ -59,9 +61,9 @@ impl<'c, H: HugrView> EmitFuncContext<'c, H> {
             /// Returns the inkwell [Context].
             pub fn iw_context(&self) ->  &'c Context;
             /// Returns the internal [CodegenExtsMap] .
-            pub fn extensions(&self) ->  Rc<CodegenExtsMap<'c,H>>;
+            pub fn extensions(&self) ->  Rc<CodegenExtsMap<'static,H>>;
             /// Returns a new [TypingSession].
-            pub fn typing_session(&self) -> TypingSession<'c,H>;
+            pub fn typing_session(&self) -> TypingSession<'c>;
             /// Convert hugr [HugrType] into an LLVM [Type](BasicTypeEnum).
             pub fn llvm_type(&self, hugr_type: &HugrType) -> Result<BasicTypeEnum<'c> >;
             /// Convert a [HugrFuncType] into an LLVM [FunctionType].
@@ -104,11 +106,6 @@ impl<'c, H: HugrView> EmitFuncContext<'c, H> {
     pub fn push_todo_func(&mut self, node: FatNode<'_, FuncDefn, H>) {
         self.todo.insert(node.node());
     }
-
-    // TODO likely we don't need this
-    // pub fn func(&self) -> &FunctionValue<'c> {
-    //     &self.func
-    // }
 
     /// Returns the internal [Builder]. Callers must ensure that it is
     /// positioned at the end of a basic block. This invariant is not checked(it
@@ -289,6 +286,23 @@ impl<'c, H: HugrView> EmitFuncContext<'c, H> {
 
     pub fn get_current_module(&self) -> &Module<'c> {
         self.emit_context.module()
+    }
+
+    pub(crate) fn emit_custom_const(&mut self, v: &dyn CustomConst) -> Result<BasicValueEnum<'c>> {
+        let exts = self.extensions();
+        exts.as_ref()
+            .load_constant_handlers
+            .emit_load_constant(self, v)
+    }
+
+    pub(crate) fn emit_extension_op(
+        &mut self,
+        args: EmitOpArgs<'c, '_, ExtensionOp, H>,
+    ) -> Result<()> {
+        let exts = self.extensions();
+        exts.as_ref()
+            .extension_op_handlers
+            .emit_extension_op(self, args)
     }
 
     /// Consumes the `EmitFuncContext` and returns both the inner

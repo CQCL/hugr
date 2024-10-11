@@ -1,20 +1,11 @@
-use std::{any::TypeId, collections::HashSet};
-
-use anyhow::{anyhow, bail, Result};
-use hugr::extension::simple_op::MakeExtensionOp;
-use hugr::extension::ExtensionId;
+use anyhow::{anyhow, Result};
 use hugr::ops::ExtensionOp;
 use hugr::ops::{constant::CustomConst, Value};
 use hugr::std_extensions::arithmetic::float_ops::FloatOps;
-use hugr::types::CustomType;
 use hugr::{
-    std_extensions::arithmetic::{
-        float_ops,
-        float_types::{self, ConstF64, FLOAT64_CUSTOM_TYPE},
-    },
+    std_extensions::arithmetic::float_types::{self, ConstF64},
     HugrView,
 };
-use inkwell::types::BasicTypeEnum;
 use inkwell::{
     types::{BasicType, FloatType},
     values::{BasicValue, BasicValueEnum},
@@ -23,137 +14,8 @@ use inkwell::{
 use crate::emit::emit_value;
 use crate::emit::ops::{emit_custom_binary_op, emit_custom_unary_op};
 use crate::emit::{func::EmitFuncContext, EmitOpArgs};
-use crate::types::TypingSession;
 
-use super::{CodegenExtension, CodegenExtsMap};
-
-/// A [CodegenExtension] for the [hugr::std_extensions::arithmetic::float_types] extension.
-pub struct FloatTypesCodegenExtension;
-
-impl<H: HugrView> CodegenExtension<H> for FloatTypesCodegenExtension {
-    fn extension(&self) -> ExtensionId {
-        float_types::EXTENSION_ID
-    }
-
-    fn llvm_type<'c>(
-        &self,
-        context: &TypingSession<'c, H>,
-        hugr_type: &CustomType,
-    ) -> anyhow::Result<BasicTypeEnum<'c>> {
-        if hugr_type == &FLOAT64_CUSTOM_TYPE {
-            Ok(context.iw_context().f64_type().as_basic_type_enum())
-        } else {
-            Err(anyhow!(
-                "FloatCodegenExtension: Unsupported type: {}",
-                hugr_type
-            ))
-        }
-    }
-
-    fn emit_extension_op<'c>(
-        &self,
-        _: &mut EmitFuncContext<'c, H>,
-        args: EmitOpArgs<'c, '_, ExtensionOp, H>,
-    ) -> Result<()> {
-        bail!("FloatTypesCodegenExtension does not implement any extension ops, try FloatOpsCodegenExtension for: {:?}", args.node().as_ref())
-    }
-    fn supported_consts(&self) -> HashSet<TypeId> {
-        [TypeId::of::<ConstF64>()].into_iter().collect()
-    }
-
-    fn load_constant<'c>(
-        &self,
-        context: &mut EmitFuncContext<'c, H>,
-        konst: &dyn hugr::ops::constant::CustomConst,
-    ) -> Result<Option<BasicValueEnum<'c>>> {
-        let Some(k) = konst.downcast_ref::<ConstF64>() else {
-            return Ok(None);
-        };
-        let ty: FloatType<'c> = context.llvm_type(&k.get_type())?.try_into().unwrap();
-        Ok(Some(ty.const_float(k.value()).as_basic_value_enum()))
-    }
-}
-
-struct FloatOpsCodegenExtension;
-
-impl<H: HugrView> CodegenExtension<H> for FloatOpsCodegenExtension {
-    fn extension(&self) -> hugr::extension::ExtensionId {
-        float_ops::EXTENSION_ID
-    }
-
-    fn llvm_type<'c>(
-        &self,
-        _context: &TypingSession<'c, H>,
-        hugr_type: &CustomType,
-    ) -> anyhow::Result<BasicTypeEnum<'c>> {
-        Err(anyhow!(
-            "FloatOpsCodegenExtension: unsupported type: {hugr_type}"
-        ))
-    }
-
-    fn emit_extension_op<'c>(
-        &self,
-        context: &mut EmitFuncContext<'c, H>,
-        args: EmitOpArgs<'c, '_, ExtensionOp, H>,
-    ) -> Result<()> {
-        let op = FloatOps::from_optype(&args.node().generalise()).ok_or(anyhow!(
-            "FloatOpEmitter: from_optype_failed: {:?}",
-            args.node().as_ref()
-        ))?;
-        // We emit the float comparison variants where NaN is an absorbing value.
-        // Any comparison with NaN is always false.
-        #[allow(clippy::wildcard_in_or_patterns)]
-        match op {
-            FloatOps::feq => emit_fcmp(context, args, inkwell::FloatPredicate::OEQ),
-            FloatOps::fne => emit_fcmp(context, args, inkwell::FloatPredicate::ONE),
-            FloatOps::flt => emit_fcmp(context, args, inkwell::FloatPredicate::OLT),
-            FloatOps::fgt => emit_fcmp(context, args, inkwell::FloatPredicate::OGT),
-            FloatOps::fle => emit_fcmp(context, args, inkwell::FloatPredicate::OLE),
-            FloatOps::fge => emit_fcmp(context, args, inkwell::FloatPredicate::OGE),
-            FloatOps::fadd => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
-                Ok(vec![ctx
-                    .builder()
-                    .build_float_add(lhs.into_float_value(), rhs.into_float_value(), "")?
-                    .as_basic_value_enum()])
-            }),
-            FloatOps::fsub => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
-                Ok(vec![ctx
-                    .builder()
-                    .build_float_sub(lhs.into_float_value(), rhs.into_float_value(), "")?
-                    .as_basic_value_enum()])
-            }),
-            FloatOps::fneg => emit_custom_unary_op(context, args, |ctx, v, _| {
-                Ok(vec![ctx
-                    .builder()
-                    .build_float_neg(v.into_float_value(), "")?
-                    .as_basic_value_enum()])
-            }),
-            FloatOps::fmul => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
-                Ok(vec![ctx
-                    .builder()
-                    .build_float_mul(lhs.into_float_value(), rhs.into_float_value(), "")?
-                    .as_basic_value_enum()])
-            }),
-            FloatOps::fdiv => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
-                Ok(vec![ctx
-                    .builder()
-                    .build_float_div(lhs.into_float_value(), rhs.into_float_value(), "")?
-                    .as_basic_value_enum()])
-            }),
-            // Missing ops, not supported by inkwell
-            FloatOps::fmax
-            | FloatOps::fmin
-            | FloatOps::fabs
-            | FloatOps::ffloor
-            | FloatOps::fceil
-            | FloatOps::ftostring
-            | _ => {
-                let name: &str = op.into();
-                Err(anyhow!("FloatOpEmitter: unimplemented op: {name}"))
-            }
-        }
-    }
-}
+use super::CodegenExtsBuilder;
 
 /// Emit a float comparison operation.
 fn emit_fcmp<'c, H: HugrView>(
@@ -179,12 +41,88 @@ fn emit_fcmp<'c, H: HugrView>(
     })
 }
 
-pub fn add_float_extensions<H: HugrView>(cem: CodegenExtsMap<'_, H>) -> CodegenExtsMap<'_, H> {
-    cem.add_cge(FloatTypesCodegenExtension)
-        .add_cge(FloatOpsCodegenExtension)
+fn emit_float_op<'c, H: HugrView>(
+    context: &mut EmitFuncContext<'c, H>,
+    args: EmitOpArgs<'c, '_, ExtensionOp, H>,
+    op: FloatOps,
+) -> Result<()> {
+    // We emit the float comparison variants where NaN is an absorbing value.
+    // Any comparison with NaN is always false.
+    #[allow(clippy::wildcard_in_or_patterns)]
+    match op {
+        FloatOps::feq => emit_fcmp(context, args, inkwell::FloatPredicate::OEQ),
+        FloatOps::fne => emit_fcmp(context, args, inkwell::FloatPredicate::ONE),
+        FloatOps::flt => emit_fcmp(context, args, inkwell::FloatPredicate::OLT),
+        FloatOps::fgt => emit_fcmp(context, args, inkwell::FloatPredicate::OGT),
+        FloatOps::fle => emit_fcmp(context, args, inkwell::FloatPredicate::OLE),
+        FloatOps::fge => emit_fcmp(context, args, inkwell::FloatPredicate::OGE),
+        FloatOps::fadd => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
+            Ok(vec![ctx
+                .builder()
+                .build_float_add(lhs.into_float_value(), rhs.into_float_value(), "")?
+                .as_basic_value_enum()])
+        }),
+        FloatOps::fsub => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
+            Ok(vec![ctx
+                .builder()
+                .build_float_sub(lhs.into_float_value(), rhs.into_float_value(), "")?
+                .as_basic_value_enum()])
+        }),
+        FloatOps::fneg => emit_custom_unary_op(context, args, |ctx, v, _| {
+            Ok(vec![ctx
+                .builder()
+                .build_float_neg(v.into_float_value(), "")?
+                .as_basic_value_enum()])
+        }),
+        FloatOps::fmul => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
+            Ok(vec![ctx
+                .builder()
+                .build_float_mul(lhs.into_float_value(), rhs.into_float_value(), "")?
+                .as_basic_value_enum()])
+        }),
+        FloatOps::fdiv => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
+            Ok(vec![ctx
+                .builder()
+                .build_float_div(lhs.into_float_value(), rhs.into_float_value(), "")?
+                .as_basic_value_enum()])
+        }),
+        // Missing ops, not supported by inkwell
+        FloatOps::fmax
+        | FloatOps::fmin
+        | FloatOps::fabs
+        | FloatOps::ffloor
+        | FloatOps::fceil
+        | FloatOps::ftostring
+        | _ => {
+            let name: &str = op.into();
+            Err(anyhow!("FloatOpEmitter: unimplemented op: {name}"))
+        }
+    }
 }
 
-impl<H: HugrView> CodegenExtsMap<'_, H> {
+fn emit_constf64<'c, H: HugrView>(
+    context: &mut EmitFuncContext<'c, H>,
+    k: &ConstF64,
+) -> Result<BasicValueEnum<'c>> {
+    let ty: FloatType = context.llvm_type(&k.get_type())?.try_into().unwrap();
+    Ok(ty.const_float(k.value()).as_basic_value_enum())
+}
+
+pub fn add_float_extensions<'a, H: HugrView + 'a>(
+    cem: CodegenExtsBuilder<'a, H>,
+) -> CodegenExtsBuilder<'a, H> {
+    cem.custom_type(
+        (
+            float_types::EXTENSION_ID,
+            float_types::FLOAT64_CUSTOM_TYPE.name().clone(),
+        ),
+        |ts, _custom_type| Ok(ts.iw_context().f64_type().as_basic_type_enum()),
+    )
+    .custom_const(emit_constf64)
+    .simple_extension_op::<FloatOps>(emit_float_op)
+}
+
+impl<'a, H: HugrView + 'a> CodegenExtsBuilder<'a, H> {
     pub fn add_float_extensions(self) -> Self {
         add_float_extensions(self)
     }

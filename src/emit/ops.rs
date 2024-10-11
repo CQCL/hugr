@@ -116,10 +116,7 @@ pub fn emit_value<'c, H: HugrView>(
     v: &Value,
 ) -> Result<BasicValueEnum<'c>> {
     match v {
-        Value::Extension { e } => {
-            let exts = context.extensions();
-            exts.load_constant(context, e.value())
-        }
+        Value::Extension { e } => context.emit_custom_const(e.value()),
         Value::Function { .. } => bail!(
             "Value::Function Const nodes are not supported. \
             Ensure you eliminate these from the HUGR before lowering to LLVM. \
@@ -315,10 +312,7 @@ fn emit_optype<'c, H: HugrView>(
         OpType::Tag(ref tag) => emit_tag(context, args.into_ot(tag)),
         OpType::DFG(_) => emit_dataflow_parent(context, args),
 
-        OpType::ExtensionOp(ref co) => {
-            let extensions = context.extensions();
-            extensions.emit(context, args.into_ot(co))
-        }
+        OpType::ExtensionOp(ref co) => context.emit_extension_op(args.into_ot(co)),
         OpType::LoadConstant(ref lc) => emit_load_constant(context, args.into_ot(lc)),
         OpType::Call(ref cl) => emit_call(context, args.into_ot(cl)),
         OpType::CallIndirect(ref cl) => emit_call_indirect(context, args.into_ot(cl)),
