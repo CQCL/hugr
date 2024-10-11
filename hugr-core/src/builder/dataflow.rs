@@ -8,8 +8,9 @@ use std::marker::PhantomData;
 
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::{HugrView, ValidationError};
+use crate::ops;
 use crate::ops::{DataflowParent, Input, Output};
-use crate::{ops, IncomingPort, OutgoingPort, Wire};
+use crate::{Direction, IncomingPort, OutgoingPort, Wire};
 
 use crate::types::{PolyFuncType, Signature, Type};
 
@@ -173,19 +174,16 @@ impl FunctionBuilder<Hugr> {
         });
 
         // Update the inner input node
-        let input_types = new_optype.signature.body().input.clone();
+        let types = new_optype.signature.body().input.clone();
         self.hugr_mut()
-            .replace_op(inp_node, Input { types: input_types })
+            .replace_op(inp_node, Input { types })
             .unwrap();
-        let new_port_id = self
-            .hugr_mut()
-            .add_ports(inp_node, portgraph::Direction::Outgoing, 1)
-            .next()
-            .unwrap();
+        let mut new_port = self.hugr_mut().add_ports(inp_node, Direction::Outgoing, 1);
+        let new_port = new_port.next().unwrap();
 
         // The last port in an input/output node is an order edge port, so we must shift any connections to it.
-        let new_value_port: OutgoingPort = (new_port_id - 1).into();
-        let new_order_port: OutgoingPort = new_port_id.into();
+        let new_value_port: OutgoingPort = (new_port - 1).into();
+        let new_order_port: OutgoingPort = new_port.into();
         let order_edge_targets = self
             .hugr()
             .linked_inputs(inp_node, new_value_port)
@@ -213,24 +211,16 @@ impl FunctionBuilder<Hugr> {
         });
 
         // Update the inner input node
-        let output_types = new_optype.signature.body().output.clone();
+        let types = new_optype.signature.body().output.clone();
         self.hugr_mut()
-            .replace_op(
-                out_node,
-                Output {
-                    types: output_types,
-                },
-            )
+            .replace_op(out_node, Output { types })
             .unwrap();
-        let new_port_id = self
-            .hugr_mut()
-            .add_ports(out_node, portgraph::Direction::Incoming, 1)
-            .next()
-            .unwrap();
+        let mut new_port = self.hugr_mut().add_ports(out_node, Direction::Incoming, 1);
+        let new_port = new_port.next().unwrap();
 
         // The last port in an input/output node is an order edge port, so we must shift any connections to it.
-        let new_value_port: IncomingPort = (new_port_id - 1).into();
-        let new_order_port: IncomingPort = new_port_id.into();
+        let new_value_port: IncomingPort = (new_port - 1).into();
+        let new_order_port: IncomingPort = new_port.into();
         let order_edge_sources = self
             .hugr()
             .linked_outputs(out_node, new_value_port)
