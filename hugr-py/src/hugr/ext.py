@@ -1,4 +1,4 @@
-"""HUGR extensions and packages."""
+"""HUGR extensions."""
 
 from __future__ import annotations
 
@@ -20,7 +20,6 @@ __all__ = [
     "OpDef",
     "ExtensionValue",
     "Extension",
-    "Package",
     "Version",
 ]
 
@@ -456,26 +455,3 @@ class ExtensionRegistry:
             return self.extensions[name]
         except KeyError as e:
             raise self.ExtensionNotFound(name) from e
-
-
-@dataclass
-class Package:
-    """A package of HUGR modules and extensions.
-
-
-    The HUGRs may refer to the included extensions or those not included.
-    """
-
-    #: HUGR modules in the package.
-    modules: list[Hugr]
-    #: Extensions included in the package.
-    extensions: list[Extension] = field(default_factory=list)
-
-    def _to_serial(self) -> ext_s.Package:
-        return ext_s.Package(
-            modules=[m._to_serial() for m in self.modules],
-            extensions=[e._to_serial() for e in self.extensions],
-        )
-
-    def to_json(self) -> str:
-        return self._to_serial().model_dump_json()

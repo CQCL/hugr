@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from syrupy.assertion import SnapshotAssertion
 
     from hugr.ops import ComWire
+    from hugr.package import Package
 
 QUANTUM_EXT = ext.Extension("pytest.quantum,", ext.Version(0, 1, 0))
 QUANTUM_EXT.add_op_def(
@@ -133,7 +134,7 @@ def mermaid(h: Hugr):
 
 
 def validate(
-    h: Hugr | ext.Package,
+    h: Hugr | Package,
     *,
     roundtrip: bool = True,
     snap: SnapshotAssertion | None = None,

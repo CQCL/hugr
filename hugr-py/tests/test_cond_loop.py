@@ -3,7 +3,7 @@ import pytest
 from hugr import ops, tys, val
 from hugr.build.cond_loop import Conditional, ConditionalError, TailLoop
 from hugr.build.dfg import Dfg
-from hugr.ext import Package
+from hugr.package import Package
 from hugr.std.int import INT_T, IntVal
 
 from .conftest import QUANTUM_EXT, H, Measure, validate
