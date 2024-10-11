@@ -40,19 +40,24 @@ commit_parsers = [
 name = "hugr"
 changelog_include = ["hugr-core", "hugr-passes"]
 release = true
+version_group = "hugr"
 
 [[package]]
 name = "hugr-core"
 release = true
+version_group = "hugr"
 
 [[package]]
 name = "hugr-passes"
 release = true
+version_group = "hugr"
 
 [[package]]
 name = "hugr-cli"
 release = true
+version_group = "hugr"
 
 [[package]]
 name = "hugr-model"
 release = true
+version_group = "hugr"
