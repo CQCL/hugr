@@ -95,8 +95,8 @@ impl<V: AbstractValue, C: DFContext<V>> Machine<V, C> {
             self.0
                 .case_reachable
                 .iter()
-                .find_map(|(_, cond2, case2, i)| (&cond == cond2 && &case == case2).then_some(*i))
-                .unwrap(),
+                .find(|(_, cond2, case2)| &cond == cond2 && &case == case2)
+                .is_some(),
         )
     }
 

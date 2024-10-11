@@ -134,14 +134,14 @@ ascent::ascent! {
     // outputs of case nodes propagate to outputs of conditional *if* case reachable
     out_wire_value(c, cond, OutgoingPort::from(o_p.index()), v) <--
       case_node(c, cond, _, case),
-      case_reachable(c, cond, case, true),
+      case_reachable(c, cond, case),
       io_node(c, case, o, IO::Output),
       in_wire_value(c, o, o_p, v);
 
-    lattice case_reachable(C, Node, Node, bool);
-    case_reachable(c, cond, case, reachable) <-- case_node(c,cond,i,case),
+    relation case_reachable(C, Node, Node);
+    case_reachable(c, cond, case) <-- case_node(c,cond,i,case),
         in_wire_value(c, cond, IncomingPort::from(0), v),
-        let reachable = v.supports_tag(*i);
+        if v.supports_tag(*i);
 
     // CFG
     relation cfg_node(C, Node);
