@@ -342,6 +342,12 @@ pub enum Operation<'a> {
         /// The tag of the ADT value.
         tag: u16,
     },
+
+    /// Declaration for a term constructor.
+    DeclareConstructor {
+        /// The declaration of the constructor.
+        decl: &'a ConstructorDecl<'a>,
+    },
 }
 
 /// A region in the hugr.
@@ -391,6 +397,17 @@ pub struct AliasDecl<'a> {
     /// The static parameters of the alias.
     pub params: &'a [Param<'a>],
     /// The type of the alias.
+    pub r#type: TermId,
+}
+
+/// A term constructor declaration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ConstructorDecl<'a> {
+    /// The name of the constructor to be declared.
+    pub name: &'a str,
+    /// The static parameters of the constructor.
+    pub params: &'a [Param<'a>],
+    /// The type of the constructed term.
     pub r#type: TermId,
 }
 

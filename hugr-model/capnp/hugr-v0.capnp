@@ -49,6 +49,7 @@ struct Operation {
         conditional @12 :Void;
         callFunc @13 :TermId;
         loadFunc @14 :TermId;
+        constructorDecl @15 :ConstructorDecl;
     }
 
     struct FuncDefn {
@@ -71,6 +72,12 @@ struct Operation {
     }
 
     struct AliasDecl {
+        name @0 :Text;
+        params @1 :List(Param);
+        type @2 :TermId;
+    }
+
+    struct ConstructorDecl {
         name @0 :Text;
         params @1 :List(Param);
         type @2 :TermId;
