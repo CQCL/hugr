@@ -8,11 +8,9 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
-use super::AbstractValue;
-
-/// Trait for abstract values that can be wrapped by [PartialValue] for dataflow analysis.
-/// (Allows the values to represent sums, but does not require this).
-pub trait BaseValue: Clone + std::fmt::Debug + PartialEq + Eq + Hash {
+/// Trait for an underlying domain of abstract values which can form the *elements* of a
+/// [PartialValue] and thus be used in dataflow analysis.
+pub trait AbstractValue: Clone + std::fmt::Debug + PartialEq + Eq + Hash {
     /// If the abstract value represents a [Sum] with a single known tag, deconstruct it
     /// into that tag plus the elements. The default just returns `None` which is
     /// appropriate if the abstract value never does (in which case [interpret_leaf_op]
@@ -65,7 +63,7 @@ impl<V> PartialSum<V> {
     }
 }
 
-impl<V: BaseValue> PartialSum<V> {
+impl<V: AbstractValue> PartialSum<V> {
     fn assert_invariants(&self) {
         assert_ne!(self.num_variants(), 0);
         for pv in self.0.values().flat_map(|x| x.iter()) {
@@ -101,8 +99,11 @@ impl<V: BaseValue> PartialSum<V> {
     /// Mutates self according to lattice meet operation (towards `Bottom`). If successful,
     /// returns whether `self` has changed.
     ///
-    /// Fails (without mutation) with the conflicting tag if any common rows have different lengths
-    pub fn try_meet_mut(&mut self, other: Self) -> Result<bool, usize> {
+    /// # Errors
+    /// Fails without mutation, either:
+    /// * `Some(tag)` if the two [PartialSum]s both had rows with that `tag` but of different lengths
+    /// * `None` if the two instances had no rows in common (i.e., the result is "Bottom")
+    pub fn try_meet_mut(&mut self, other: Self) -> Result<bool, Option<usize>> {
         let mut changed = false;
         let mut keys_to_remove = vec![];
         for (k, v) in self.0.iter() {
@@ -110,10 +111,13 @@ impl<V: BaseValue> PartialSum<V> {
                 None => keys_to_remove.push(*k),
                 Some(o_v) => {
                     if v.len() != o_v.len() {
-                        return Err(*k);
+                        return Err(Some(*k));
                     }
                 }
             }
+        }
+        if keys_to_remove.len() == self.0.len() {
+            return Err(None);
         }
         for (k, v) in other.0 {
             if let Some(row) = self.0.get_mut(&k) {
@@ -226,15 +230,15 @@ impl<V: Hash> Hash for PartialSum<V> {
     }
 }
 
-/// Wraps some underlying representation of values (that `impl`s [BaseValue]) into
-/// a lattice for use in dataflow analysis, including that an instance may be
-/// a [PartialSum] of values of the underlying representation
+/// Wraps some underlying representation (knowledge) of values into a lattice
+/// for use in dataflow analysis, including that an instance may be a [PartialSum]
+/// of values of the underlying representation
 #[derive(PartialEq, Clone, Eq, Hash, Debug)]
 pub struct PartialValue<V>(PVEnum<V>);
 
 impl<V> PartialValue<V> {
     /// Allows to read the enum, which guarantees that we never return [PVEnum::Value]
-    /// for a value whose [BaseValue::as_sum] is `Some` - any such value will be
+    /// for a value whose [AbstractValue::as_sum] is `Some` - any such value will be
     /// in the form of a [PVEnum::Sum] instead.
     pub fn as_enum(&self) -> &PVEnum<V> {
         &self.0
@@ -254,7 +258,7 @@ pub enum PVEnum<V> {
     Top,
 }
 
-impl<V: BaseValue> From<V> for PartialValue<V> {
+impl<V: AbstractValue> From<V> for PartialValue<V> {
     fn from(v: V) -> Self {
         v.as_sum()
             .map(|(tag, values)| Self::new_variant(tag, values.map(Self::from)))
@@ -268,7 +272,7 @@ impl<V> From<PartialSum<V>> for PartialValue<V> {
     }
 }
 
-impl<V: BaseValue> PartialValue<V> {
+impl<V: AbstractValue> PartialValue<V> {
     fn assert_invariants(&self) {
         match &self.0 {
             PVEnum::Sum(ps) => {
@@ -278,6 +282,48 @@ impl<V: BaseValue> PartialValue<V> {
                 assert!(v.as_sum().is_none())
             }
             _ => {}
+        }
+    }
+
+    /// New instance of a sum with a single known tag.
+    pub fn new_variant(tag: usize, values: impl IntoIterator<Item = Self>) -> Self {
+        PartialSum::new_variant(tag, values).into()
+    }
+
+    /// New instance of unit type (i.e. the only possible value, with no contents)
+    pub fn new_unit() -> Self {
+        Self::new_variant(0, [])
+    }
+
+    /// If this value might be a Sum with the specified `tag`, get the elements inside that tag.
+    ///
+    /// # Panics
+    ///
+    /// if the value is believed, for that tag, to have a number of values other than `len`
+    pub fn variant_values(&self, tag: usize, len: usize) -> Option<Vec<PartialValue<V>>> {
+        let vals = match &self.0 {
+            PVEnum::Bottom => return None,
+            PVEnum::Value(v) => {
+                assert!(v.as_sum().is_none());
+                return None;
+            }
+            PVEnum::Sum(ps) => ps.variant_values(tag)?,
+            PVEnum::Top => vec![PartialValue(PVEnum::Top); len],
+        };
+        assert_eq!(vals.len(), len);
+        Some(vals)
+    }
+
+    /// Tells us whether this value might be a Sum with the specified `tag`
+    pub fn supports_tag(&self, tag: usize) -> bool {
+        match &self.0 {
+            PVEnum::Bottom => false,
+            PVEnum::Value(v) => {
+                assert!(v.as_sum().is_none());
+                false
+            }
+            PVEnum::Sum(ps) => ps.supports_tag(tag),
+            PVEnum::Top => true,
         }
     }
 
@@ -298,44 +344,6 @@ impl<V: BaseValue> PartialValue<V> {
     }
 }
 
-impl<V: BaseValue> AbstractValue for PartialValue<V> {
-    /// If this value might be a Sum with the specified `tag`, get the elements inside that tag.
-    ///
-    /// # Panics
-    ///
-    /// if the value is believed, for that tag, to have a number of values other than `len`
-    fn variant_values(&self, tag: usize, len: usize) -> Option<Vec<PartialValue<V>>> {
-        let vals = match &self.0 {
-            PVEnum::Bottom => return None,
-            PVEnum::Value(v) => {
-                assert!(v.as_sum().is_none());
-                return None;
-            }
-            PVEnum::Sum(ps) => ps.variant_values(tag)?,
-            PVEnum::Top => vec![PartialValue(PVEnum::Top); len],
-        };
-        assert_eq!(vals.len(), len);
-        Some(vals)
-    }
-
-    /// Tells us whether this value might be a Sum with the specified `tag`
-    fn supports_tag(&self, tag: usize) -> bool {
-        match &self.0 {
-            PVEnum::Bottom => false,
-            PVEnum::Value(v) => {
-                assert!(v.as_sum().is_none());
-                false
-            }
-            PVEnum::Sum(ps) => ps.supports_tag(tag),
-            PVEnum::Top => true,
-        }
-    }
-
-    fn new_variant(tag: usize, values: impl IntoIterator<Item = Self>) -> Self {
-        PartialSum::new_variant(tag, values).into()
-    }
-}
-
 impl TryFrom<Sum<Value>> for Value {
     type Error = ConstTypeError;
 
@@ -344,7 +352,7 @@ impl TryFrom<Sum<Value>> for Value {
     }
 }
 
-impl<V: BaseValue> PartialValue<V>
+impl<V: AbstractValue> PartialValue<V>
 where
     Value: From<V>,
 {
@@ -371,12 +379,7 @@ where
     }
 }
 
-impl<V: BaseValue> Lattice for PartialValue<V> {
-    fn join(mut self, other: Self) -> Self {
-        self.join_mut(other);
-        self
-    }
-
+impl<V: AbstractValue> Lattice for PartialValue<V> {
     fn join_mut(&mut self, other: Self) -> bool {
         self.assert_invariants();
         // println!("join {self:?}\n{:?}", &other);
@@ -419,11 +422,6 @@ impl<V: BaseValue> Lattice for PartialValue<V> {
         }
     }
 
-    fn meet(mut self, other: Self) -> Self {
-        self.meet_mut(other);
-        self
-    }
-
     fn meet_mut(&mut self, other: Self) -> bool {
         self.assert_invariants();
         match (&self.0, other.0) {
@@ -451,16 +449,7 @@ impl<V: BaseValue> Lattice for PartialValue<V> {
                     _ => unreachable!(),
                 };
                 match ps1.try_meet_mut(ps2) {
-                    Ok(ch) => {
-                        // ALAN the 'invariant' that a PartialSum always has >=1 tag can be broken here.
-                        // Fix this by rewriting to Bottom, but should probably be refactored - at the
-                        // least, it seems dangerous to expose a potentially-invalidating try_meet_mut.
-                        if ps1.0.is_empty() {
-                            assert!(ch);
-                            self.0 = PVEnum::Bottom
-                        }
-                        ch
-                    }
+                    Ok(ch) => ch,
                     Err(_) => {
                         self.0 = PVEnum::Bottom;
                         true
@@ -476,7 +465,7 @@ impl<V: BaseValue> Lattice for PartialValue<V> {
     }
 }
 
-impl<V: BaseValue> BoundedLattice for PartialValue<V> {
+impl<V: AbstractValue> BoundedLattice for PartialValue<V> {
     fn top() -> Self {
         Self(PVEnum::Top)
     }
@@ -514,8 +503,7 @@ mod test {
 
     use proptest_recurse::{StrategyExt, StrategySet};
 
-    use super::{BaseValue, PVEnum, PartialSum, PartialValue};
-    use crate::dataflow::AbstractValue;
+    use super::{AbstractValue, PVEnum, PartialSum, PartialValue};
 
     #[derive(Debug, PartialEq, Eq, Clone)]
     enum TestSumType {
@@ -527,7 +515,7 @@ mod test {
     #[derive(Clone, Debug, PartialEq, Eq, Hash)]
     struct TestValue(usize);
 
-    impl BaseValue for TestValue {}
+    impl AbstractValue for TestValue {}
 
     #[derive(Clone)]
     struct SumTypeParams {
@@ -618,7 +606,7 @@ mod test {
     }
 
     fn partial_sum_strat(
-        variants: &Vec<Vec<Arc<TestSumType>>>,
+        variants: &[Vec<Arc<TestSumType>>],
     ) -> impl Strategy<Value = PartialSum<TestValue>> {
         // We have to clone the `variants` here but only as far as the Vec<Vec<Arc<_>>>
         let tagged_variants = variants.iter().cloned().enumerate().collect::<Vec<_>>();

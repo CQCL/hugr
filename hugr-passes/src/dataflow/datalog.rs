@@ -16,7 +16,11 @@ use std::ops::{Index, IndexMut};
 use hugr_core::extension::prelude::{MakeTuple, UnpackTuple};
 use hugr_core::ops::OpType;
 use hugr_core::types::Signature;
-use hugr_core::{Hugr, HugrView, IncomingPort, Node, OutgoingPort, PortIndex as _};
+use hugr_core::{HugrView, IncomingPort, Node, OutgoingPort, PortIndex as _};
+
+use super::{AbstractValue, DFContext, PartialValue};
+
+type PV<V> = PartialValue<V>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum IO {
@@ -24,50 +28,19 @@ pub enum IO {
     Output,
 }
 
-/// Clients of the dataflow framework (particular analyses, such as constant folding)
-/// must implement this trait (including providing an appropriate domain type `PV`).
-pub trait DFContext<PV: AbstractValue>: Clone + Eq + Hash + std::ops::Deref<Target = Hugr> {
-    /// Given lattice values for each input, produce lattice values for (what we know of)
-    /// the outputs. Returning `None` indicates nothing can be deduced.
-    fn interpret_leaf_op(&self, node: Node, ins: &[PV]) -> Option<Vec<PV>>;
-}
-
-/// Values which can be the domain for dataflow analysis. Must be able to deconstructed
-/// into (and constructed from) Sums as these determine control flow.
-pub trait AbstractValue: BoundedLattice + Clone + Eq + Hash + std::fmt::Debug {
-    /// Create a new instance representing a Sum with a single known tag
-    /// and (recursive) representations of the elements within that tag.
-    fn new_variant(tag: usize, values: impl IntoIterator<Item = Self>) -> Self;
-
-    /// New instance of unit type (i.e. the only possible value, with no contents)
-    fn new_unit() -> Self {
-        Self::new_variant(0, [])
-    }
-
-    /// Test whether this value *might* be a Sum with the specified tag.
-    fn supports_tag(&self, tag: usize) -> bool;
-
-    /// If this value might be a Sum with the specified tag, return values
-    /// describing the elements of the Sum, otherwise `None`.
-    ///
-    /// Implementations must hold the invariant that for all `x`, `tag` and `len`:
-    ///  `x.variant_values(tag, len).is_some() == x.supports_tag(tag)`
-    fn variant_values(&self, tag: usize, len: usize) -> Option<Vec<Self>>;
-}
-
 ascent::ascent! {
-    pub(super) struct AscentProgram<PV: AbstractValue, C: DFContext<PV>>;
+    pub(super) struct AscentProgram<V: AbstractValue, C: DFContext<V>>;
     relation context(C);
-    relation out_wire_value_proto(Node, OutgoingPort, PV);
+    relation out_wire_value_proto(Node, OutgoingPort, PV<V>);
 
     relation node(C, Node);
     relation in_wire(C, Node, IncomingPort);
     relation out_wire(C, Node, OutgoingPort);
     relation parent_of_node(C, Node, Node);
     relation io_node(C, Node, Node, IO);
-    lattice out_wire_value(C, Node, OutgoingPort, PV);
-    lattice node_in_value_row(C, Node, ValueRow<PV>);
-    lattice in_wire_value(C, Node, IncomingPort, PV);
+    lattice out_wire_value(C, Node, OutgoingPort, PV<V>);
+    lattice node_in_value_row(C, Node, ValueRow<V>);
+    lattice in_wire_value(C, Node, IncomingPort, PV<V>);
 
     node(c, n) <-- context(c), for n in c.nodes();
 
@@ -114,29 +87,30 @@ ascent::ascent! {
 
 
     // TailLoop
-    relation tail_loop_node(C, Node);
-    tail_loop_node(c,n) <-- node(c, n), if c.get_optype(*n).is_tail_loop();
 
     // inputs of tail loop propagate to Input node of child region
-    out_wire_value(c, i, OutgoingPort::from(p.index()), v) <-- tail_loop_node(c, tl),
-        io_node(c,tl,i, IO::Input), in_wire_value(c, tl, p, v);
+    out_wire_value(c, i, OutgoingPort::from(p.index()), v) <-- node(c, tl),
+        if c.get_optype(*tl).is_tail_loop(),
+        io_node(c,tl,i, IO::Input),
+        in_wire_value(c, tl, p, v);
 
     // Output node of child region propagate to Input node of child region
-    out_wire_value(c, in_n, out_p, v) <-- tail_loop_node(c, tl_n),
+    out_wire_value(c, in_n, OutgoingPort::from(out_p), v) <-- node(c, tl_n),
+        if let Some(tailloop) = c.get_optype(*tl_n).as_tail_loop(),
         io_node(c,tl_n,in_n, IO::Input),
         io_node(c,tl_n,out_n, IO::Output),
         node_in_value_row(c, out_n, out_in_row), // get the whole input row for the output node
-        if let Some(tailloop) = c.get_optype(*tl_n).as_tail_loop(),
+
         if let Some(fields) = out_in_row.unpack_first(0, tailloop.just_inputs.len()), // if it is possible for tag to be 0
-        for (out_p, v) in (0..).map(OutgoingPort::from).zip(fields);
+        for (out_p, v) in fields.enumerate();
 
     // Output node of child region propagate to outputs of tail loop
-    out_wire_value(c, tl_n, out_p, v) <-- tail_loop_node(c, tl_n),
+    out_wire_value(c, tl_n, OutgoingPort::from(out_p), v) <-- node(c, tl_n),
+        if let Some(tailloop) = c.get_optype(*tl_n).as_tail_loop(),
         io_node(c,tl_n,out_n, IO::Output),
         node_in_value_row(c, out_n, out_in_row), // get the whole input row for the output node
-        if let Some(tailloop) = c.get_optype(*tl_n).as_tail_loop(),
         if let Some(fields) = out_in_row.unpack_first(1, tailloop.just_outputs.len()), // if it is possible for the tag to be 1
-        for (out_p, v) in (0..).map(OutgoingPort::from).zip(fields);
+        for (out_p, v) in fields.enumerate();
 
     // Conditional
     relation conditional_node(C, Node);
@@ -148,18 +122,19 @@ ascent::ascent! {
       if c.get_optype(case).is_case();
 
     // inputs of conditional propagate into case nodes
-    out_wire_value(c, i_node, i_p, v) <--
+    out_wire_value(c, i_node, OutgoingPort::from(out_p), v) <--
       case_node(c, cond, case_index, case),
       io_node(c, case, i_node, IO::Input),
       node_in_value_row(c, cond, in_row),
-      //in_wire_value(c, cond, cond_in_p, cond_in_v),
-      if let Some(conditional) = c.get_optype(*cond).as_conditional(),
+      let conditional = c.get_optype(*cond).as_conditional().unwrap(),
       if let Some(fields) = in_row.unpack_first(*case_index, conditional.sum_rows[*case_index].len()),
-      for (i_p, v) in (0..).map(OutgoingPort::from).zip(fields);
+      for (out_p, v) in fields.enumerate();
 
-    // outputs of case nodes propagate to outputs of conditional
+    // outputs of case nodes propagate to outputs of conditional *if* case reachable
     out_wire_value(c, cond, OutgoingPort::from(o_p.index()), v) <--
-      case_node(c, cond, _, case),
+      case_node(c, cond, i, case),
+      in_wire_value(c, cond, IncomingPort::from(0), control),
+      if control.supports_tag(*i),
       io_node(c, case, o, IO::Output),
       in_wire_value(c, o, o_p, v);
 
@@ -168,13 +143,41 @@ ascent::ascent! {
         in_wire_value(c, cond, IncomingPort::from(0), v),
         let reachable = v.supports_tag(*i);
 
+    // CFG
+    relation cfg_node(C, Node);
+    relation dfb_block(C, Node, Node);
+    cfg_node(c,n) <-- node(c, n), if c.get_optype(*n).is_cfg();
+    dfb_block(c,cfg,blk) <-- cfg_node(c, cfg), for blk in c.children(*cfg), if c.get_optype(blk).is_dataflow_block();
+
+    // Where do the values "fed" along a control-flow edge come out?
+    relation _cfg_succ_dest(C, Node, Node, Node);
+    _cfg_succ_dest(c, cfg, blk, inp) <-- dfb_block(c, cfg, blk), io_node(c, blk, inp, IO::Input);
+    _cfg_succ_dest(c, cfg, exit, cfg) <-- cfg_node(c, cfg), if let Some(exit) = c.children(*cfg).nth(1);
+
+    // Inputs of CFG propagate to entry block
+    out_wire_value(c, i_node, OutgoingPort::from(p.index()), v) <--
+        cfg_node(c, cfg),
+        if let Some(entry) = c.children(*cfg).next(),
+        io_node(c, entry, i_node, IO::Input),
+        in_wire_value(c, cfg, p, v);
+
+    // Outputs of each block propagated to successor blocks or (if exit block) then CFG itself
+    out_wire_value(c, dest, OutgoingPort::from(out_p), v) <--
+        dfb_block(c, cfg, pred),
+        let df_block = c.get_optype(*pred).as_dataflow_block().unwrap(),
+        for (succ_n, succ) in c.output_neighbours(*pred).enumerate(),
+        io_node(c, pred, out_n, IO::Output),
+        _cfg_succ_dest(c, cfg, succ, dest),
+        node_in_value_row(c, out_n, out_in_row),
+        if let Some(fields) = out_in_row.unpack_first(succ_n, df_block.sum_rows.get(succ_n).unwrap().len()),
+        for (out_p, v) in fields.enumerate();
 }
 
-fn propagate_leaf_op<PV: AbstractValue>(
-    c: &impl DFContext<PV>,
+fn propagate_leaf_op<V: AbstractValue>(
+    c: &impl DFContext<V>,
     n: Node,
-    ins: &[PV],
-) -> Option<ValueRow<PV>> {
+    ins: &[PV<V>],
+) -> Option<ValueRow<V>> {
     match c.get_optype(n) {
         // Handle basics here. I guess (given the current interface) we could allow
         // DFContext to handle these but at the least we'd want these impls to be
@@ -218,62 +221,43 @@ fn value_outputs(h: &impl HugrView, n: Node) -> impl Iterator<Item = OutgoingPor
 // Wrap a (known-length) row of values into a lattice. Perhaps could be part of partial_value.rs?
 
 #[derive(PartialEq, Clone, Eq, Hash)]
-struct ValueRow<PV>(Vec<PV>);
+struct ValueRow<V>(Vec<PartialValue<V>>);
 
-impl<PV: AbstractValue> ValueRow<PV> {
-    pub fn new(len: usize) -> Self {
-        Self(vec![PV::bottom(); len])
+impl<V: AbstractValue> ValueRow<V> {
+    fn new(len: usize) -> Self {
+        Self(vec![PartialValue::bottom(); len])
     }
 
-    pub fn single_known(len: usize, idx: usize, v: PV) -> Self {
+    fn single_known(len: usize, idx: usize, v: PartialValue<V>) -> Self {
         assert!(idx < len);
         let mut r = Self::new(len);
         r.0[idx] = v;
         r
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = &PV> {
-        self.0.iter()
-    }
-
     pub fn unpack_first(
         &self,
         variant: usize,
         len: usize,
-    ) -> Option<impl Iterator<Item = PV> + '_> {
-        self[0]
-            .variant_values(variant, len)
-            .map(|vals| vals.into_iter().chain(self.iter().skip(1).cloned()))
+    ) -> Option<impl Iterator<Item = PartialValue<V>>> {
+        let vals = self[0].variant_values(variant, len)?;
+        Some(vals.into_iter().chain(self.0[1..].to_owned()))
     }
-
-    // fn initialised(&self) -> bool {
-    //     self.0.iter().all(|x| x != &PV::top())
-    // }
 }
 
-impl<PV> FromIterator<PV> for ValueRow<PV> {
-    fn from_iter<T: IntoIterator<Item = PV>>(iter: T) -> Self {
+impl<V> FromIterator<PartialValue<V>> for ValueRow<V> {
+    fn from_iter<T: IntoIterator<Item = PartialValue<V>>>(iter: T) -> Self {
         Self(iter.into_iter().collect())
     }
 }
 
-impl<V: PartialEq + PartialOrd> PartialOrd for ValueRow<V> {
+impl<V: PartialEq> PartialOrd for ValueRow<V> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.0.partial_cmp(&other.0)
     }
 }
 
 impl<V: AbstractValue> Lattice for ValueRow<V> {
-    fn meet(mut self, other: Self) -> Self {
-        self.meet_mut(other);
-        self
-    }
-
-    fn join(mut self, other: Self) -> Self {
-        self.join_mut(other);
-        self
-    }
-
     fn join_mut(&mut self, other: Self) -> bool {
         assert_eq!(self.0.len(), other.0.len());
         let mut changed = false;
@@ -293,30 +277,30 @@ impl<V: AbstractValue> Lattice for ValueRow<V> {
     }
 }
 
-impl<PV> IntoIterator for ValueRow<PV> {
-    type Item = PV;
+impl<V> IntoIterator for ValueRow<V> {
+    type Item = PartialValue<V>;
 
-    type IntoIter = <Vec<PV> as IntoIterator>::IntoIter;
+    type IntoIter = <Vec<PartialValue<V>> as IntoIterator>::IntoIter;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
     }
 }
 
-impl<PV, Idx> Index<Idx> for ValueRow<PV>
+impl<V, Idx> Index<Idx> for ValueRow<V>
 where
-    Vec<PV>: Index<Idx>,
+    Vec<PartialValue<V>>: Index<Idx>,
 {
-    type Output = <Vec<PV> as Index<Idx>>::Output;
+    type Output = <Vec<PartialValue<V>> as Index<Idx>>::Output;
 
     fn index(&self, index: Idx) -> &Self::Output {
         self.0.index(index)
     }
 }
 
-impl<PV, Idx> IndexMut<Idx> for ValueRow<PV>
+impl<V, Idx> IndexMut<Idx> for ValueRow<V>
 where
-    Vec<PV>: IndexMut<Idx>,
+    Vec<PartialValue<V>>: IndexMut<Idx>,
 {
     fn index_mut(&mut self, index: Idx) -> &mut Self::Output {
         self.0.index_mut(index)
