@@ -18,13 +18,13 @@ use hugr_core::{
 use hugr_core::{Hugr, Node, Wire};
 use rstest::{fixture, rstest};
 
-use super::{AbstractValue, BaseValue, DFContext, Machine, PartialValue, TailLoopTermination};
+use super::{AbstractValue, DFContext, Machine, PartialValue, TailLoopTermination};
 
 // ------- Minimal implementation of DFContext and BaseValue -------
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 enum Void {}
 
-impl BaseValue for Void {}
+impl AbstractValue for Void {}
 
 struct TestContext<H>(Arc<H>);
 
@@ -68,7 +68,7 @@ impl<H: HugrView> PartialOrd for TestContext<H> {
     }
 }
 
-impl<H: HugrView> DFContext<PartialValue<Void>> for TestContext<H> {
+impl<H: HugrView> DFContext<Void> for TestContext<H> {
     fn interpret_leaf_op(
         &self,
         _node: hugr_core::Node,
