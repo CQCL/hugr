@@ -55,6 +55,7 @@ use hugr_core::{Direction, Hugr, Node};
 
 /// A "view" of a CFG in a Hugr which allows basic blocks in the underlying CFG to be split into
 /// multiple blocks in the view (or merged together).
+///
 /// `T` is the type of basic block; this can just be a BasicBlock (e.g. [`Node`]) in the Hugr,
 /// or an [IdentityCfgMap] if the extra level of indirection is not required. However, since
 /// SESE regions are bounded by edges between pairs of such `T`, such splitting may allow the
@@ -153,6 +154,7 @@ pub fn transform_cfg_to_nested<T: Copy + Eq + Hash + std::fmt::Debug>(
 
 /// Search the entire Hugr looking for CFGs, and transform each
 /// into as deeply-nested form as possible (as per [transform_cfg_to_nested]).
+///
 /// This search may be expensive, although if it finds much/many CFGs,
 /// the analysis/transformation on them is likely to be more expensive still!
 pub fn transform_all_cfgs(h: &mut Hugr) {

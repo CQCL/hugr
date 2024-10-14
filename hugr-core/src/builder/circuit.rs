@@ -11,6 +11,7 @@ use crate::{CircuitUnit, Wire};
 
 /// Builder to build regions of dataflow graphs that look like Circuits,
 /// where some inputs of operations directly correspond to some outputs.
+///
 /// Allows appending operations by indexing a vector of input wires.
 #[derive(Debug, PartialEq)]
 pub struct CircuitBuilder<'a, T: ?Sized> {
