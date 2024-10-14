@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.13.1](https://github.com/CQCL/hugr/compare/hugr-v0.13.0...hugr-v0.13.1) - 2024-10-14
+
+### New Features
+
+- return replaced ops from lowering ([#1568](https://github.com/CQCL/hugr/pull/1568))
+- Make `BuildHandle::num_value_outputs` public ([#1560](https://github.com/CQCL/hugr/pull/1560))
+- `FunctionBuilder::add_{in,out}put` ([#1570](https://github.com/CQCL/hugr/pull/1570))
+- Binary serialisation format for hugr-model based on capnproto. ([#1557](https://github.com/CQCL/hugr/pull/1557))
+
 ## 0.13.0 (2024-10-08)
 
 ### Bug Fixes

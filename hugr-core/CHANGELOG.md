@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.13.1](https://github.com/CQCL/hugr/compare/hugr-core-v0.10.0...hugr-core-v0.13.1) - 2024-10-14
+
+### New Features
+
+- Make `BuildHandle::num_value_outputs` public ([#1560](https://github.com/CQCL/hugr/pull/1560))
+- Binary serialisation format for hugr-model based on capnproto. ([#1557](https://github.com/CQCL/hugr/pull/1557))
+- `FunctionBuilder::add_{in,out}put` ([#1570](https://github.com/CQCL/hugr/pull/1570))
+
 ## 0.10.0 (2024-10-08)
 
 ### Bug Fixes
