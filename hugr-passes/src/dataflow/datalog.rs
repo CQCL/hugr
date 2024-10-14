@@ -15,7 +15,6 @@ use std::ops::{Index, IndexMut};
 
 use hugr_core::extension::prelude::{MakeTuple, UnpackTuple};
 use hugr_core::ops::OpType;
-use hugr_core::types::Signature;
 use hugr_core::{HugrView, IncomingPort, Node, OutgoingPort, PortIndex as _};
 
 use super::{AbstractValue, DFContext, PartialValue};
@@ -65,8 +64,8 @@ ascent::ascent! {
         out_wire_value(c, m, op, v);
 
 
-    node_in_value_row(c, n, ValueRow::new(input_count(c.as_ref(), *n))) <-- node(c, n);
-    node_in_value_row(c, n, ValueRow::single_known(c.signature(*n).unwrap().input.len(), p.index(), v.clone())) <-- in_wire_value(c, n, p, v);
+    node_in_value_row(c, n, ValueRow::new(sig.input_count())) <-- node(c, n), if let Some(sig) = c.signature(*n);
+    node_in_value_row(c, n, ValueRow::single_known(c.signature(*n).unwrap().input_count(), p.index(), v.clone())) <-- in_wire_value(c, n, p, v);
 
     out_wire_value(c, n, p, v) <--
        node(c, n),
@@ -201,13 +200,6 @@ fn propagate_leaf_op<V: AbstractValue>(
         // are not necessarily convertible to Value!
         _ => c.interpret_leaf_op(n, ins).map(ValueRow::from_iter),
     }
-}
-
-fn input_count(h: &impl HugrView, n: Node) -> usize {
-    h.signature(n)
-        .as_ref()
-        .map(Signature::input_count)
-        .unwrap_or(0)
 }
 
 fn value_inputs(h: &impl HugrView, n: Node) -> impl Iterator<Item = IncomingPort> + '_ {
