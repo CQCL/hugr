@@ -68,15 +68,7 @@ impl<H: HugrView> PartialOrd for TestContext<H> {
     }
 }
 
-impl<H: HugrView> DFContext<Void> for TestContext<H> {
-    fn interpret_leaf_op(
-        &self,
-        _node: hugr_core::Node,
-        _ins: &[PartialValue<Void>],
-    ) -> Option<Vec<PartialValue<Void>>> {
-        None
-    }
-}
+impl<H: HugrView> DFContext<Void> for TestContext<H> {}
 
 // This allows testing creation of tuple/sum Values (only)
 impl From<Void> for Value {
@@ -106,7 +98,6 @@ fn test_make_tuple() {
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
     let mut machine = Machine::default();
-    machine.propolutate_out_wires([(v1, pv_false()), (v2, pv_true())]);
     machine.run(TestContext(Arc::new(&hugr)));
 
     let x = machine
@@ -128,7 +119,6 @@ fn test_unpack_tuple_const() {
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
     let mut machine = Machine::default();
-    machine.propolutate_out_wires([(v, PartialValue::new_variant(0, [pv_false(), pv_true()]))]);
     machine.run(TestContext(Arc::new(&hugr)));
 
     let o1_r = machine
@@ -161,7 +151,6 @@ fn test_tail_loop_never_iterates() {
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
     let mut machine = Machine::default();
-    machine.propolutate_out_wires([(r_w, PartialValue::new_variant(3, []))]);
     machine.run(TestContext(Arc::new(&hugr)));
 
     let o_r = machine
@@ -235,7 +224,6 @@ fn test_tail_loop_two_iters() {
     let [o_w1, o_w2] = tail_loop.outputs_arr();
 
     let mut machine = Machine::default();
-    machine.propolutate_out_wires([(true_w, pv_true()), (false_w, pv_false())]);
     machine.run(TestContext(Arc::new(&hugr)));
 
     let o_r1 = machine.read_out_wire(o_w1).unwrap();
@@ -303,7 +291,6 @@ fn test_tail_loop_containing_conditional() {
     let [o_w1, o_w2] = tail_loop.outputs_arr();
 
     let mut machine = Machine::default();
-    machine.propolutate_out_wires([(init, PartialValue::new_variant(0, [pv_false(), pv_true()]))]);
     machine.run(TestContext(Arc::new(&hugr)));
 
     let o_r1 = machine.read_out_wire(o_w1).unwrap();
@@ -381,11 +368,10 @@ fn conditional() {
 // Tuple of
 //   1. Hugr being a function on bools: (b,c) => !b XOR c
 //   2. Input node of entry block
-//   3. Wire out from "True" constant
 // Result readable from root node outputs
 // Inputs should be placed onto out-wires of the Node (2.)
 #[fixture]
-fn xnor_cfg() -> (Hugr, Node, Wire) {
+fn xnor_cfg() -> (Hugr, Node) {
     //        Entry
     //       /0   1\
     //      A --1-> B
@@ -470,7 +456,7 @@ fn xnor_cfg() -> (Hugr, Node, Wire) {
     builder.branch(&b, 0, &x).unwrap();
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
     let [entry_input, _] = hugr.get_io(entry.node()).unwrap();
-    (hugr, entry_input, true_w)
+    (hugr, entry_input)
 }
 
 #[rstest]
@@ -488,14 +474,14 @@ fn test_cfg(
     #[case] inp0: PartialValue<Void>,
     #[case] inp1: PartialValue<Void>,
     #[case] outp: PartialValue<Void>,
-    xnor_cfg: (Hugr, Node, Wire),
+    xnor_cfg: (Hugr, Node),
 ) {
-    let (hugr, entry_input, true_w) = xnor_cfg;
+    let (hugr, entry_input) = xnor_cfg;
 
     let [in_w0, in_w1] = [0, 1].map(|i| Wire::new(entry_input, i));
 
     let mut machine = Machine::default();
-    machine.propolutate_out_wires([(in_w0, inp0), (in_w1, inp1), (true_w, pv_true())]);
+    machine.propolutate_out_wires([(in_w0, inp0), (in_w1, inp1)]);
     machine.run(TestContext(Arc::new(&hugr)));
 
     assert_eq!(

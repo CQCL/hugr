@@ -14,8 +14,7 @@ use std::hash::Hash;
 use std::ops::{Index, IndexMut};
 
 use hugr_core::extension::prelude::{MakeTuple, UnpackTuple};
-use hugr_core::ops::OpType;
-use hugr_core::types::Signature;
+use hugr_core::ops::{OpTrait, OpType};
 use hugr_core::{HugrView, IncomingPort, Node, OutgoingPort, PortIndex as _};
 
 use super::{AbstractValue, DFContext, PartialValue};
@@ -65,14 +64,16 @@ ascent::ascent! {
         out_wire_value(c, m, op, v);
 
 
-    node_in_value_row(c, n, ValueRow::new(input_count(c.as_ref(), *n))) <-- node(c, n);
-    node_in_value_row(c, n, ValueRow::single_known(c.signature(*n).unwrap().input.len(), p.index(), v.clone())) <-- in_wire_value(c, n, p, v);
+    node_in_value_row(c, n, ValueRow::new(sig.input_count())) <-- node(c, n), if let Some(sig) = c.signature(*n);
+    node_in_value_row(c, n, ValueRow::single_known(c.signature(*n).unwrap().input_count(), p.index(), v.clone())) <-- in_wire_value(c, n, p, v);
 
     out_wire_value(c, n, p, v) <--
        node(c, n),
-       if !c.get_optype(*n).is_container(),
+       let op_t = c.get_optype(*n),
+       if !op_t.is_container(),
+       if let Some(sig) = op_t.dataflow_signature(),
        node_in_value_row(c, n, vs),
-       if let Some(outs) = propagate_leaf_op(c, *n, &vs[..]),
+       if let Some(outs) = propagate_leaf_op(c, *n, &vs[..], sig.output_count()),
        for (p,v) in (0..).map(OutgoingPort::from).zip(outs);
 
     // DFG
@@ -177,6 +178,7 @@ fn propagate_leaf_op<V: AbstractValue>(
     c: &impl DFContext<V>,
     n: Node,
     ins: &[PV<V>],
+    num_outs: usize,
 ) -> Option<ValueRow<V>> {
     match c.get_optype(n) {
         // Handle basics here. I guess (given the current interface) we could allow
@@ -195,19 +197,32 @@ fn propagate_leaf_op<V: AbstractValue>(
             t.tag,
             ins.iter().cloned(),
         )])),
-        OpType::Input(_) | OpType::Output(_) => None, // handled by parent
-        // It'd be nice to convert these to [(IncomingPort, Value)] to pass to the context,
-        // thus keeping PartialValue hidden, but AbstractValues
-        // are not necessarily convertible to Value!
-        _ => c.interpret_leaf_op(n, ins).map(ValueRow::from_iter),
+        OpType::Input(_) | OpType::Output(_) | OpType::ExitBlock(_) => None, // handled by parent
+        OpType::Const(_) => None, // handled by LoadConstant:
+        OpType::LoadConstant(load_op) => {
+            assert!(ins.is_empty()); // static edge, so need to find constant
+            let const_node = c
+                .single_linked_output(n, load_op.constant_port())
+                .unwrap()
+                .0;
+            let const_val = c.get_optype(const_node).as_const().unwrap().value();
+            Some(ValueRow::single_known(
+                1,
+                0,
+                c.value_from_const(n, const_val),
+            ))
+        }
+        OpType::ExtensionOp(e) => {
+            // Interpret op. Default is we know nothing about the outputs (they still happen!)
+            let mut outs = vec![PartialValue::Top; num_outs];
+            // It'd be nice to convert these to [(IncomingPort, Value)] to pass to the context,
+            // thus keeping PartialValue hidden, but AbstractValues
+            // are not necessarily convertible to Value.
+            c.interpret_leaf_op(n, e, ins, &mut outs[..]);
+            Some(ValueRow::from_iter(outs))
+        }
+        o => todo!("Unhandled: {:?}", o), // At least CallIndirect, and OpType is "non-exhaustive"
     }
-}
-
-fn input_count(h: &impl HugrView, n: Node) -> usize {
-    h.signature(n)
-        .as_ref()
-        .map(Signature::input_count)
-        .unwrap_or(0)
 }
 
 fn value_inputs(h: &impl HugrView, n: Node) -> impl Iterator<Item = IncomingPort> + '_ {
