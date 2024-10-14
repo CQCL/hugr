@@ -212,5 +212,13 @@ fn write_term(mut builder: hugr_capnp::term::Builder, term: &model::Term) {
             builder.set_outputs(outputs.0);
             builder.set_extensions(extensions.0);
         }
+
+        model::Term::CopyConstraint { term } => {
+            builder.set_copy_constraint(term.0);
+        }
+
+        model::Term::DiscardConstraint { term } => {
+            builder.set_discard_constraint(term.0);
+        }
     }
 }

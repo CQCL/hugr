@@ -209,6 +209,16 @@ impl<'a> ParseContext<'a> {
                 Term::Control { values }
             }
 
+            Rule::term_copy => {
+                let term = self.parse_term(inner.next().unwrap())?;
+                Term::CopyConstraint { term }
+            }
+
+            Rule::term_discard => {
+                let term = self.parse_term(inner.next().unwrap())?;
+                Term::DiscardConstraint { term }
+            }
+
             r => unreachable!("term: {:?}", r),
         };
 

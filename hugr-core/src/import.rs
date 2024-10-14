@@ -116,7 +116,7 @@ struct Context<'a> {
     nodes: FxHashMap<model::NodeId, Node>,
 
     /// The types of the local variables that are currently in scope.
-    local_variables: FxIndexMap<&'a str, model::TermId>,
+    local_variables: FxIndexMap<&'a str, LocalVar>,
 
     custom_name_cache: FxHashMap<&'a str, (ExtensionId, SmolStr)>,
 }
@@ -159,16 +159,16 @@ impl<'a> Context<'a> {
     fn resolve_local_ref(
         &self,
         local_ref: &model::LocalRef,
-    ) -> Result<(usize, model::TermId), ImportError> {
+    ) -> Result<(usize, LocalVar), ImportError> {
         let term = match local_ref {
             model::LocalRef::Index(_, index) => self
                 .local_variables
                 .get_index(*index as usize)
-                .map(|(_, term)| (*index as usize, *term)),
+                .map(|(_, v)| (*index as usize, *v)),
             model::LocalRef::Named(name) => self
                 .local_variables
                 .get_full(name)
-                .map(|(index, _, term)| (index, *term)),
+                .map(|(index, _, v)| (index, *v)),
         };
 
         term.ok_or_else(|| model::ModelError::InvalidLocal(local_ref.to_string()).into())
@@ -893,20 +893,65 @@ impl<'a> Context<'a> {
             let mut imported_params = Vec::with_capacity(decl.params.len());
 
             for param in decl.params {
-                // TODO: `PolyFuncType` should be able to handle constraints
-                // and distinguish between implicit and explicit parameters.
                 match param {
                     model::Param::Implicit { name, r#type } => {
-                        imported_params.push(ctx.import_type_param(*r#type)?);
-                        ctx.local_variables.insert(name, *r#type);
+                        ctx.local_variables.insert(name, LocalVar::new(*r#type));
                     }
                     model::Param::Explicit { name, r#type } => {
-                        imported_params.push(ctx.import_type_param(*r#type)?);
-                        ctx.local_variables.insert(name, *r#type);
+                        ctx.local_variables.insert(name, LocalVar::new(*r#type));
                     }
-                    model::Param::Constraint { constraint: _ } => {
-                        return Err(error_unsupported!("constraints"));
+                    model::Param::Constraint { .. } => {}
+                }
+            }
+
+            for param in decl.params {
+                if let model::Param::Constraint { constraint } = param {
+                    let constraint = ctx.get_term(*constraint)?;
+
+                    match constraint {
+                        model::Term::CopyConstraint { term } => {
+                            let model::Term::Var(var) = ctx.get_term(*term)? else {
+                                return Err(error_unsupported!(
+                                    "constraint on term that is not a variable"
+                                ));
+                            };
+
+                            let var = ctx.resolve_local_ref(var)?.0;
+                            ctx.local_variables.get_index_mut(var).unwrap().1.copy = true;
+                        }
+                        model::Term::DiscardConstraint { term } => {
+                            let model::Term::Var(var) = ctx.get_term(*term)? else {
+                                return Err(error_unsupported!(
+                                    "constraint on term that is not a variable"
+                                ));
+                            };
+
+                            let var = ctx.resolve_local_ref(var)?.0;
+                            ctx.local_variables.get_index_mut(var).unwrap().1.discard = true;
+                        }
+                        _ => {
+                            return Err(error_unsupported!("constraint other than copy or discard"))
+                        }
                     }
+                }
+            }
+
+            let mut index = 0;
+
+            for param in decl.params {
+                // TODO: `PolyFuncType` should be able to distinguish between implicit and explicit parameters.
+                match param {
+                    model::Param::Implicit { r#type, .. } => {
+                        let bound = ctx.local_variables.get_index(index).unwrap().1.bound()?;
+                        imported_params.push(ctx.import_type_param(*r#type, bound)?);
+                        index += 1;
+                    }
+                    model::Param::Explicit { r#type, .. } => {
+                        let bound = ctx.local_variables.get_index(index).unwrap().1.bound()?;
+                        imported_params.push(ctx.import_type_param(*r#type, bound)?);
+                        index += 1;
+                    }
+                    model::Param::Constraint { constraint: _ } => {}
                 }
             }
 
@@ -916,17 +961,15 @@ impl<'a> Context<'a> {
     }
 
     /// Import a [`TypeParam`] from a term that represents a static type.
-    fn import_type_param(&mut self, term_id: model::TermId) -> Result<TypeParam, ImportError> {
+    fn import_type_param(
+        &mut self,
+        term_id: model::TermId,
+        bound: TypeBound,
+    ) -> Result<TypeParam, ImportError> {
         match self.get_term(term_id)? {
             model::Term::Wildcard => Err(error_uninferred!("wildcard")),
 
-            model::Term::Type => {
-                // As part of the migration from `TypeBound`s to constraints, we pretend that all
-                // `TypeBound`s are copyable.
-                Ok(TypeParam::Type {
-                    b: TypeBound::Copyable,
-                })
-            }
+            model::Term::Type => Ok(TypeParam::Type { b: bound }),
 
             model::Term::StaticType => Err(error_unsupported!("`type` as `TypeParam`")),
             model::Term::Constraint => Err(error_unsupported!("`constraint` as `TypeParam`")),
@@ -938,7 +981,7 @@ impl<'a> Context<'a> {
             model::Term::FuncType { .. } => Err(error_unsupported!("`(fn ...)` as `TypeParam`")),
 
             model::Term::ListType { item_type } => {
-                let param = Box::new(self.import_type_param(*item_type)?);
+                let param = Box::new(self.import_type_param(*item_type, TypeBound::Any)?);
                 Ok(TypeParam::List { param })
             }
 
@@ -952,7 +995,11 @@ impl<'a> Context<'a> {
             | model::Term::List { .. }
             | model::Term::ExtSet { .. }
             | model::Term::Adt { .. }
-            | model::Term::Control { .. } => Err(model::ModelError::TypeError(term_id).into()),
+            | model::Term::Control { .. }
+            | model::Term::CopyConstraint { .. }
+            | model::Term::DiscardConstraint { .. } => {
+                Err(model::ModelError::TypeError(term_id).into())
+            }
 
             model::Term::ControlType => {
                 Err(error_unsupported!("type of control types as `TypeParam`"))
@@ -960,7 +1007,7 @@ impl<'a> Context<'a> {
         }
     }
 
-    /// Import a `TypeArg` froma term that represents a static type or value.
+    /// Import a `TypeArg` from a term that represents a static type or value.
     fn import_type_arg(&mut self, term_id: model::TermId) -> Result<TypeArg, ImportError> {
         match self.get_term(term_id)? {
             model::Term::Wildcard => Err(error_uninferred!("wildcard")),
@@ -969,8 +1016,9 @@ impl<'a> Context<'a> {
             }
 
             model::Term::Var(var) => {
-                let (index, var_type) = self.resolve_local_ref(var)?;
-                let decl = self.import_type_param(var_type)?;
+                let (index, var) = self.resolve_local_ref(var)?;
+                let bound = var.bound()?;
+                let decl = self.import_type_param(var.r#type, bound)?;
                 Ok(TypeArg::new_var_use(index, decl))
             }
 
@@ -1008,7 +1056,11 @@ impl<'a> Context<'a> {
 
             model::Term::FuncType { .. }
             | model::Term::Adt { .. }
-            | model::Term::Control { .. } => Err(model::ModelError::TypeError(term_id).into()),
+            | model::Term::Control { .. }
+            | model::Term::CopyConstraint { .. }
+            | model::Term::DiscardConstraint { .. } => {
+                Err(model::ModelError::TypeError(term_id).into())
+            }
         }
     }
 
@@ -1109,7 +1161,11 @@ impl<'a> Context<'a> {
             | model::Term::List { .. }
             | model::Term::Control { .. }
             | model::Term::ControlType
-            | model::Term::Nat(_) => Err(model::ModelError::TypeError(term_id).into()),
+            | model::Term::Nat(_)
+            | model::Term::DiscardConstraint { .. }
+            | model::Term::CopyConstraint { .. } => {
+                Err(model::ModelError::TypeError(term_id).into())
+            }
         }
     }
 
@@ -1283,5 +1339,35 @@ impl<'a> Names<'a> {
         }
 
         Ok(Self { items })
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct LocalVar {
+    r#type: model::TermId,
+    copy: bool,
+    discard: bool,
+}
+
+impl LocalVar {
+    pub fn new(r#type: model::TermId) -> Self {
+        Self {
+            r#type,
+            copy: false,
+            discard: false,
+        }
+    }
+
+    pub fn bound(&self) -> Result<TypeBound, ImportError> {
+        match (self.copy, self.discard) {
+            (true, true) => Ok(TypeBound::Copyable),
+            (false, false) => Ok(TypeBound::Any),
+            (true, false) => Err(error_unsupported!(
+                "type that is copyable but not discardable"
+            )),
+            (false, true) => Err(error_unsupported!(
+                "type that is discardable but not copyable"
+            )),
+        }
     }
 }

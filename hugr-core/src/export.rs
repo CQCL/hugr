@@ -7,7 +7,7 @@ use crate::{
         type_param::{TypeArgVariable, TypeParam},
         type_row::TypeRowBase,
         CustomType, FuncTypeBase, MaybeRV, PolyFuncTypeBase, RowVariable, SumType, TypeArg,
-        TypeBase, TypeEnum,
+        TypeBase, TypeBound, TypeEnum,
     },
     Direction, Hugr, HugrView, IncomingPort, Node, Port,
 };
@@ -46,6 +46,8 @@ struct Context<'a> {
     term_map: FxHashMap<model::Term<'a>, model::TermId>,
     /// The current scope for local variables.
     local_scope: Option<model::NodeId>,
+    /// Constraints to be added to the local scope.
+    local_constraints: Vec<model::TermId>,
     /// Mapping from extension operations to their declarations.
     decl_operations: FxHashMap<(ExtensionId, OpName), model::NodeId>,
 }
@@ -63,6 +65,7 @@ impl<'a> Context<'a> {
             term_map: FxHashMap::default(),
             local_scope: None,
             decl_operations: FxHashMap::default(),
+            local_constraints: Vec::new(),
         }
     }
 
@@ -173,9 +176,11 @@ impl<'a> Context<'a> {
     }
 
     fn with_local_scope<T>(&mut self, node: model::NodeId, f: impl FnOnce(&mut Self) -> T) -> T {
-        let old_scope = self.local_scope.replace(node);
+        let prev_local_scope = self.local_scope.replace(node);
+        let prev_local_constraints = std::mem::take(&mut self.local_constraints);
         let result = f(self);
-        self.local_scope = old_scope;
+        self.local_scope = prev_local_scope;
+        self.local_constraints = prev_local_constraints;
         result
     }
 
@@ -676,13 +681,22 @@ impl<'a> Context<'a> {
         t: &PolyFuncTypeBase<RV>,
     ) -> (&'a [model::Param<'a>], model::TermId) {
         let mut params = BumpVec::with_capacity_in(t.params().len(), self.bump);
+        let scope = self
+            .local_scope
+            .expect("exporting poly func type outside of local scope");
 
         for (i, param) in t.params().iter().enumerate() {
             let name = self.bump.alloc_str(&i.to_string());
-            let r#type = self.export_type_param(param);
+            let r#type = self.export_type_param(param, Some(model::LocalRef::Index(scope, i as _)));
             let param = model::Param::Implicit { name, r#type };
             params.push(param)
         }
+
+        params.extend(
+            self.local_constraints
+                .drain(..)
+                .map(|constraint| model::Param::Constraint { constraint }),
+        );
 
         let body = self.export_func_type(t.body());
 
@@ -794,20 +808,35 @@ impl<'a> Context<'a> {
         self.make_term(model::Term::List { items, tail: None })
     }
 
-    pub fn export_type_param(&mut self, t: &TypeParam) -> model::TermId {
+    pub fn export_type_param(
+        &mut self,
+        t: &TypeParam,
+        var: Option<model::LocalRef<'static>>,
+    ) -> model::TermId {
         match t {
             // This ignores the type bound for now.
-            TypeParam::Type { .. } => self.make_term(model::Term::Type),
+            TypeParam::Type { b } => {
+                if let (Some(var), TypeBound::Copyable) = (var, b) {
+                    let term = self.make_term(model::Term::Var(var));
+                    let copy = self.make_term(model::Term::CopyConstraint { term });
+                    let discard = self.make_term(model::Term::DiscardConstraint { term });
+                    self.local_constraints.extend([copy, discard]);
+                }
+
+                self.make_term(model::Term::Type)
+            }
             // This ignores the type bound for now.
             TypeParam::BoundedNat { .. } => self.make_term(model::Term::NatType),
             TypeParam::String => self.make_term(model::Term::StrType),
             TypeParam::List { param } => {
-                let item_type = self.export_type_param(param);
+                let item_type = self.export_type_param(param, None);
                 self.make_term(model::Term::ListType { item_type })
             }
             TypeParam::Tuple { params } => {
                 let items = self.bump.alloc_slice_fill_iter(
-                    params.iter().map(|param| self.export_type_param(param)),
+                    params
+                        .iter()
+                        .map(|param| self.export_type_param(param, None)),
                 );
                 let types = self.make_term(model::Term::List { items, tail: None });
                 self.make_term(model::Term::ApplyFull {

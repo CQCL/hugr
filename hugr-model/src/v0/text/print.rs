@@ -598,6 +598,14 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 self.print_text("ctrl");
                 Ok(())
             }
+            Term::CopyConstraint { term } => self.print_parens(|this| {
+                this.print_text("copy");
+                this.print_term(*term)
+            }),
+            Term::DiscardConstraint { term } => self.print_parens(|this| {
+                this.print_text("discard");
+                this.print_term(*term)
+            }),
         }
     }
 

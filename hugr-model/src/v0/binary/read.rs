@@ -332,6 +332,13 @@ fn read_term<'a>(bump: &'a Bump, reader: hugr_capnp::term::Reader) -> ReadResult
         Which::Control(values) => model::Term::Control {
             values: model::TermId(values),
         },
+
+        Which::CopyConstraint(term) => model::Term::CopyConstraint {
+            term: model::TermId(term),
+        },
+        Which::DiscardConstraint(term) => model::Term::DiscardConstraint {
+            term: model::TermId(term),
+        },
     })
 }
 
