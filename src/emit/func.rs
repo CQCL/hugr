@@ -17,7 +17,7 @@ use inkwell::{
 use itertools::zip_eq;
 
 use crate::types::{HugrFuncType, HugrSumType, HugrType, TypingSession};
-use crate::{custom::CodegenExtsMap, fat::FatNode, types::LLVMSumType};
+use crate::{custom::CodegenExtsMap, types::LLVMSumType, utils::fat::FatNode};
 use delegate::delegate;
 
 use self::mailbox::ValueMailBox;

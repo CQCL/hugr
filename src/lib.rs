@@ -63,7 +63,7 @@
 //!
 pub mod custom;
 pub mod emit;
-pub mod fat;
+pub mod extension;
 pub mod sum;
 pub mod types;
 pub mod utils;
@@ -77,3 +77,5 @@ pub fn llvm_version() -> &'static str {
 
 #[cfg(test)]
 pub mod test;
+
+pub use custom::{CodegenExtension, CodegenExtsBuilder};

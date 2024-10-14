@@ -1,9 +1,9 @@
 use std::iter;
 
-use crate::custom::int::add_int_extensions;
 use crate::custom::CodegenExtsBuilder;
-use crate::fat::FatNode;
+use crate::extension::int::add_int_extensions;
 use crate::types::HugrFuncType;
+use crate::utils::fat::FatNode;
 use anyhow::{anyhow, Result};
 use hugr::builder::DataflowSubContainer;
 use hugr::builder::{
@@ -185,7 +185,7 @@ impl Default for SimpleHugrConfig {
 macro_rules! check_emission {
     // Call the macro with a snapshot name.
     ($snapshot_name:expr, $hugr: ident, $test_ctx:ident) => {{
-        let root = $crate::fat::FatExt::fat_root::<hugr::ops::Module>(&$hugr).unwrap();
+        let root = $crate::utils::fat::FatExt::fat_root::<hugr::ops::Module>(&$hugr).unwrap();
         let emission =
             $crate::emit::test::Emission::emit_hugr(root, $test_ctx.get_emit_hugr()).unwrap();
 

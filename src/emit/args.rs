@@ -1,7 +1,7 @@
 use hugr::{ops::OpType, HugrView};
 use inkwell::values::BasicValueEnum;
 
-use crate::fat::FatNode;
+use crate::utils::fat::FatNode;
 
 use super::func::RowPromise;
 

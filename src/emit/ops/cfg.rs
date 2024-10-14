@@ -14,8 +14,8 @@ use crate::{
         func::{EmitFuncContext, RowMailBox, RowPromise},
         EmitOpArgs,
     },
-    fat::FatNode,
     sum::LLVMSumValue,
+    utils::fat::FatNode,
 };
 
 use super::emit_dataflow_parent;
@@ -227,9 +227,9 @@ mod test {
     use itertools::Itertools as _;
     use rstest::rstest;
 
-    use crate::custom::int::add_int_extensions;
     use crate::custom::CodegenExtsBuilder;
     use crate::emit::test::SimpleHugrConfig;
+    use crate::extension::int::add_int_extensions;
     use crate::test::{llvm_ctx, TestContext};
 
     use crate::check_emission;

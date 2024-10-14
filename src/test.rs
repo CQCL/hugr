@@ -11,8 +11,8 @@ use rstest::fixture;
 use crate::{
     custom::{CodegenExtsBuilder, CodegenExtsMap},
     emit::{test::Emission, EmitHugr, EmitModuleContext, Namer},
-    fat::FatExt,
     types::{TypeConverter, TypingSession},
+    utils::fat::FatExt as _,
 };
 
 pub type THugrView = Hugr;

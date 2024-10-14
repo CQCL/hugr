@@ -29,21 +29,12 @@ pub mod extension_op;
 pub mod load_constant;
 pub mod types;
 
-// TODO move these extension implementations to crate::extension
-// https://github.com/CQCL/hugr-llvm/issues/121
-pub mod conversions;
-pub mod float;
-pub mod int;
-pub mod logic;
-pub mod prelude;
-pub mod rotation;
-
 /// A helper to register codegen extensions.
 ///
 /// Types that implement this trait can be registered with a [CodegenExtsBuilder]
 /// via [CodegenExtsBuilder::add_extension].
 ///
-/// See [prelude::PreludeCodegenExtension] for an example.
+/// See [crate::extension::PreludeCodegenExtension] for an example.
 pub trait CodegenExtension {
     /// Implementers should add each of their handlers to `builder` and return the
     /// resulting [CodegenExtsBuilder].
@@ -80,7 +71,7 @@ impl<'a, H: HugrView + 'a> CodegenExtsBuilder<'a, H> {
     /// Forwards to [CodegenExtension::add_extension].
     ///
     /// ```
-    /// use hugr_llvm::custom::{prelude::{PreludeCodegenExtension, DefaultPreludeCodegen}, CodegenExtsBuilder};
+    /// use hugr_llvm::{extension::{PreludeCodegenExtension, DefaultPreludeCodegen}, CodegenExtsBuilder};
     /// let ext = PreludeCodegenExtension::from(DefaultPreludeCodegen);
     /// CodegenExtsBuilder::<hugr::Hugr>::default().add_extension(ext);
     /// ```

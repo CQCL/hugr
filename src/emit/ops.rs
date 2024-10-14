@@ -13,8 +13,11 @@ use inkwell::values::{BasicValueEnum, CallableValue};
 use itertools::{zip_eq, Itertools};
 use petgraph::visit::Walker;
 
-use crate::{fat::FatExt as _, sum::LLVMSumValue};
-use crate::{fat::FatNode, types::LLVMSumType};
+use crate::types::LLVMSumType;
+use crate::{
+    sum::LLVMSumValue,
+    utils::fat::{FatExt as _, FatNode},
+};
 
 use super::{
     deaggregate_call_result,

@@ -1,6 +1,7 @@
 //! Module for utilities that do not depend on LLVM. These are candidates for
 //! upstreaming.
 pub mod array_op_builder;
+pub mod fat;
 pub mod inline_constant_functions;
 pub mod int_op_builder;
 pub mod logic_op_builder;

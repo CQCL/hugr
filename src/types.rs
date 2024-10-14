@@ -113,7 +113,7 @@ pub mod test {
     use insta::assert_snapshot;
     use rstest::rstest;
 
-    use crate::{custom::int::add_int_extensions, test::*, types::HugrFuncType};
+    use crate::{extension::int::add_int_extensions, test::*, types::HugrFuncType};
 
     #[rstest]
     #[case(0,HugrFuncType::new(type_row!(Type::new_unit_sum(2)), type_row!()))]

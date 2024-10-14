@@ -17,7 +17,7 @@ use std::{collections::HashSet, rc::Rc};
 
 use crate::types::{HugrFuncType, HugrSumType, HugrType, TypingSession};
 
-use crate::{custom::CodegenExtsMap, fat::FatNode, types::LLVMSumType};
+use crate::{custom::CodegenExtsMap, types::LLVMSumType, utils::fat::FatNode};
 
 pub mod args;
 pub mod func;
@@ -284,7 +284,7 @@ impl<'c, H: HugrView> EmitHugr<'c, H> {
         let pop = |wl: &mut EmissionSet| wl.iter().next().cloned().map(|x| wl.take(&x).unwrap());
 
         while let Some(next_node) = pop(&mut worklist) {
-            use crate::fat::FatExt as _;
+            use crate::utils::fat::FatExt as _;
             let Some(func) = node.hugr().try_fat(next_node) else {
                 panic!(
                     "emit_func: node in worklist was not a FuncDefn: {:?}",
