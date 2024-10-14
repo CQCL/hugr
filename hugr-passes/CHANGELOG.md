@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.13.1](https://github.com/CQCL/hugr/compare/hugr-passes-v0.8.2...hugr-passes-v0.13.1) - 2024-10-14
+
+### New Features
+
+- return replaced ops from lowering ([#1568](https://github.com/CQCL/hugr/pull/1568))
+
 ## 0.8.1 (2024-09-04)
 
 ### Features
