@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.9.0](https://github.com/CQCL/hugr/compare/hugr-py-v0.8.1...hugr-py-v0.9.0) (2024-10-14)
+
+
+### ⚠ BREAKING CHANGES
+
+* `Package` moved to new `hugr.package` module
+* The `length` op in the std `collections` extensions now also returns the list.
+
+### Features
+
+* `instantiate` method for `OpDef` ([#1576](https://github.com/CQCL/hugr/issues/1576)) ([36548ab](https://github.com/CQCL/hugr/commit/36548ab4e377ca9074a80355fabd51693d89c649)), closes [#1512](https://github.com/CQCL/hugr/issues/1512)
+* define wrappers around package that point to internals ([#1573](https://github.com/CQCL/hugr/issues/1573)) ([f74dbf3](https://github.com/CQCL/hugr/commit/f74dbf333fb69b2965cc38c513ad8dfbdfcb0e3c))
+* to/from json for extension/package ([#1575](https://github.com/CQCL/hugr/issues/1575)) ([f8bf61a](https://github.com/CQCL/hugr/commit/f8bf61aa54dd2424c42ecba7d1ae41b1d35f7f9d)), closes [#1523](https://github.com/CQCL/hugr/issues/1523)
+
+
+### Bug Fixes
+
+* Make list length op give back the list ([#1547](https://github.com/CQCL/hugr/issues/1547)) ([cf31698](https://github.com/CQCL/hugr/commit/cf31698113ea02e2d13596638b1fe0f4f118a601))
+
 ## [0.8.1](https://github.com/CQCL/hugr/compare/hugr-py-v0.8.0...hugr-py-v0.8.1) (2024-09-04)
 
 
