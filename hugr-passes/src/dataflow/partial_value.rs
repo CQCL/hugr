@@ -11,22 +11,24 @@ use std::hash::{Hash, Hasher};
 /// Trait for an underlying domain of abstract values which can form the *elements* of a
 /// [PartialValue] and thus be used in dataflow analysis.
 pub trait AbstractValue: Clone + std::fmt::Debug + PartialEq + Eq + Hash {
-    /// If the abstract value represents a [Sum] with a single known tag, deconstruct it
-    /// into that tag plus the elements. The default just returns `None` which is
-    /// appropriate if the abstract value never does (in which case [interpret_leaf_op]
-    /// must produce a [PartialValue::new_variant] for any operation producing
-    /// a sum).
+    /// Computes the join of two values (i.e. towards `Top``), if this is representable
+    /// within the underlying domain.
+    /// Otherwise return `None` (i.e. an instruction to use [PartialValue::Top]).
     ///
-    /// The signature is this way to optimize query/inspection (is-it-a-sum),
-    /// at the cost of requiring more cloning during actual conversion
-    /// (inside the lazy Iterator, or for the error case, as Self remains)
+    /// The default checks equality between `self` and `other` and returns `self` if
+    /// the two are identical, otherwise `None`.
+    fn try_join(self, other: Self) -> Option<Self> {
+        (self == other).then_some(self)
+    }
+
+    /// Computes the meet of two values (i.e. towards `Bottom`), if this is representable
+    /// within the underlying domain.
+    /// Otherwise return `None` (i.e. an instruction to use [PartialValue::Bottom]).
     ///
-    /// [interpret_leaf_op]: super::DFContext::interpret_leaf_op
-    /// [Sum]: TypeEnum::Sum
-    /// [Tag]: hugr_core::ops::Tag
-    fn as_sum(&self) -> Option<(usize, impl Iterator<Item = Self> + '_)> {
-        let res: Option<(usize, <Vec<Self> as IntoIterator>::IntoIter)> = None;
-        res
+    /// The default checks equality between `self` and `other` and returns `self` if
+    /// the two are identical, otherwise `None`.
+    fn try_meet(self, other: Self) -> Option<Self> {
+        (self == other).then_some(self)
     }
 }
 
@@ -247,9 +249,7 @@ pub enum PartialValue<V> {
 
 impl<V: AbstractValue> From<V> for PartialValue<V> {
     fn from(v: V) -> Self {
-        v.as_sum()
-            .map(|(tag, values)| Self::new_variant(tag, values.map(Self::from)))
-            .unwrap_or(Self::Value(v))
+        Self::Value(v)
     }
 }
 
@@ -264,9 +264,6 @@ impl<V: AbstractValue> PartialValue<V> {
         match self {
             Self::PartialSum(ps) => {
                 ps.assert_invariants();
-            }
-            Self::Value(v) => {
-                assert!(v.as_sum().is_none())
             }
             _ => {}
         }
@@ -289,11 +286,7 @@ impl<V: AbstractValue> PartialValue<V> {
     /// if the value is believed, for that tag, to have a number of values other than `len`
     pub fn variant_values(&self, tag: usize, len: usize) -> Option<Vec<PartialValue<V>>> {
         let vals = match self {
-            PartialValue::Bottom => return None,
-            PartialValue::Value(v) => {
-                assert!(v.as_sum().is_none());
-                return None;
-            }
+            PartialValue::Bottom | PartialValue::Value(_) => return None,
             PartialValue::PartialSum(ps) => ps.variant_values(tag)?,
             PartialValue::Top => vec![PartialValue::Top; len],
         };
@@ -304,11 +297,7 @@ impl<V: AbstractValue> PartialValue<V> {
     /// Tells us whether this value might be a Sum with the specified `tag`
     pub fn supports_tag(&self, tag: usize) -> bool {
         match self {
-            PartialValue::Bottom => false,
-            PartialValue::Value(v) => {
-                assert!(v.as_sum().is_none());
-                false
-            }
+            PartialValue::Bottom | PartialValue::Value(_) => false,
             PartialValue::PartialSum(ps) => ps.supports_tag(tag),
             PartialValue::Top => true,
         }
@@ -382,14 +371,17 @@ impl<V: AbstractValue> Lattice for PartialValue<V> {
                 *self = other;
                 true
             }
-            (Self::Value(h1), Self::Value(h2)) => {
-                if h1 == &h2 {
-                    false
-                } else {
+            (Self::Value(h1), Self::Value(h2)) => match h1.clone().try_join(h2) {
+                Some(h3) => {
+                    let ch = h3 != *h1;
+                    *self = Self::Value(h3);
+                    ch
+                }
+                None => {
                     *self = Self::Top;
                     true
                 }
-            }
+            },
             (Self::PartialSum(_), Self::PartialSum(ps2)) => {
                 let Self::PartialSum(ps1) = self else {
                     unreachable!()
@@ -402,9 +394,7 @@ impl<V: AbstractValue> Lattice for PartialValue<V> {
                     }
                 }
             }
-            (Self::Value(ref v), Self::PartialSum(_))
-            | (Self::PartialSum(_), Self::Value(ref v)) => {
-                assert!(v.as_sum().is_none());
+            (Self::Value(_), Self::PartialSum(_)) | (Self::PartialSum(_), Self::Value(_)) => {
                 *self = Self::Top;
                 true
             }
@@ -424,14 +414,17 @@ impl<V: AbstractValue> Lattice for PartialValue<V> {
                 *self = other;
                 true
             }
-            (Self::Value(h1), Self::Value(h2)) => {
-                if h1 == &h2 {
-                    false
-                } else {
+            (Self::Value(h1), Self::Value(h2)) => match h1.clone().try_meet(h2) {
+                Some(h3) => {
+                    let ch = h3 != *h1;
+                    *self = Self::Value(h3);
+                    ch
+                }
+                None => {
                     *self = Self::Bottom;
                     true
                 }
-            }
+            },
             (Self::PartialSum(_), Self::PartialSum(ps2)) => {
                 let Self::PartialSum(ps1) = self else {
                     unreachable!()
@@ -444,9 +437,7 @@ impl<V: AbstractValue> Lattice for PartialValue<V> {
                     }
                 }
             }
-            (Self::Value(ref v), Self::PartialSum(_))
-            | (Self::PartialSum(_), Self::Value(ref v)) => {
-                assert!(v.as_sum().is_none());
+            (Self::Value(_), Self::PartialSum(_)) | (Self::PartialSum(_), Self::Value(_)) => {
                 *self = Self::Bottom;
                 true
             }
