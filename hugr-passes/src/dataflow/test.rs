@@ -68,15 +68,7 @@ impl<H: HugrView> PartialOrd for TestContext<H> {
     }
 }
 
-impl<H: HugrView> DFContext<Void> for TestContext<H> {
-    fn interpret_leaf_op(
-        &self,
-        _node: hugr_core::Node,
-        _ins: &[PartialValue<Void>],
-    ) -> Option<Vec<PartialValue<Void>>> {
-        None
-    }
-}
+impl<H: HugrView> DFContext<Void> for TestContext<H> {}
 
 // This allows testing creation of tuple/sum Values (only)
 impl From<Void> for Value {

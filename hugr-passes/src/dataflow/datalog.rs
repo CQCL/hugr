@@ -14,7 +14,7 @@ use std::hash::Hash;
 use std::ops::{Index, IndexMut};
 
 use hugr_core::extension::prelude::{MakeTuple, UnpackTuple};
-use hugr_core::ops::OpType;
+use hugr_core::ops::{OpTrait, OpType};
 use hugr_core::{HugrView, IncomingPort, Node, OutgoingPort, PortIndex as _};
 
 use super::{AbstractValue, DFContext, PartialValue};
@@ -69,9 +69,11 @@ ascent::ascent! {
 
     out_wire_value(c, n, p, v) <--
        node(c, n),
-       if !c.get_optype(*n).is_container(),
+       let op_t = c.get_optype(*n),
+       if !op_t.is_container(),
+       if let Some(sig) = op_t.dataflow_signature(),
        node_in_value_row(c, n, vs),
-       if let Some(outs) = propagate_leaf_op(c, *n, &vs[..]),
+       if let Some(outs) = propagate_leaf_op(c, *n, &vs[..], sig.output_count(), &self.out_wire_value_proto[..]),
        for (p,v) in (0..).map(OutgoingPort::from).zip(outs);
 
     // DFG
@@ -176,6 +178,8 @@ fn propagate_leaf_op<V: AbstractValue>(
     c: &impl DFContext<V>,
     n: Node,
     ins: &[PV<V>],
+    num_outs: usize,
+    out_wire_proto: &[(Node, OutgoingPort, PV<V>)],
 ) -> Option<ValueRow<V>> {
     match c.get_optype(n) {
         // Handle basics here. I guess (given the current interface) we could allow
@@ -195,10 +199,20 @@ fn propagate_leaf_op<V: AbstractValue>(
             ins.iter().cloned(),
         )])),
         OpType::Input(_) | OpType::Output(_) => None, // handled by parent
-        // It'd be nice to convert these to [(IncomingPort, Value)] to pass to the context,
-        // thus keeping PartialValue hidden, but AbstractValues
-        // are not necessarily convertible to Value!
-        _ => c.interpret_leaf_op(n, ins).map(ValueRow::from_iter),
+        _ => {
+            // Interpret op. Default/worst-case is that we can't deduce anything about any
+            // output (just `Top`).
+            let mut outs = vec![PartialValue::Top; num_outs];
+            // However, we may have been told better outcomes:
+            for (_, p, v) in out_wire_proto.iter().filter(|(n2, _, _)| n == n2) {
+                outs[p.index()] = v.clone()
+            }
+            // It'd be nice to convert these to [(IncomingPort, Value)] to pass to the context,
+            // thus keeping PartialValue hidden, but AbstractValues
+            // are not necessarily convertible to Value!
+            c.interpret_leaf_op(n, ins, &mut outs[..]);
+            Some(ValueRow::from_iter(outs))
+        }
     }
 }
 
