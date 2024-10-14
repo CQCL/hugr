@@ -261,11 +261,8 @@ impl<V> From<PartialSum<V>> for PartialValue<V> {
 
 impl<V: AbstractValue> PartialValue<V> {
     fn assert_invariants(&self) {
-        match self {
-            Self::PartialSum(ps) => {
-                ps.assert_invariants();
-            }
-            _ => {}
+        if let Self::PartialSum(ps) = self {
+            ps.assert_invariants();
         }
     }
 
