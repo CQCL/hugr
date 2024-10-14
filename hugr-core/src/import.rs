@@ -545,6 +545,10 @@ impl<'a> Context<'a> {
                     parent,
                 )
             }
+
+            model::Operation::DeclareConstructor { .. } => {
+                Err(error_unsupported!("constructor declaration"))
+            }
         }
     }
 

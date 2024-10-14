@@ -6,8 +6,8 @@ use pest::{
 use thiserror::Error;
 
 use crate::v0::{
-    AliasDecl, FuncDecl, GlobalRef, LinkRef, LocalRef, MetaItem, Module, Node, NodeId, Operation,
-    Param, Region, RegionId, RegionKind, Term, TermId,
+    AliasDecl, ConstructorDecl, FuncDecl, GlobalRef, LinkRef, LocalRef, MetaItem, Module, Node,
+    NodeId, Operation, Param, Region, RegionId, RegionKind, Term, TermId,
 };
 
 mod pest_parser {
@@ -458,6 +458,20 @@ impl<'a> ParseContext<'a> {
                 }
             }
 
+            Rule::node_declare_ctr => {
+                let decl = self.parse_ctr_header(inner.next().unwrap())?;
+                let meta = self.parse_meta(&mut inner)?;
+                Node {
+                    operation: Operation::DeclareConstructor { decl },
+                    inputs: &[],
+                    outputs: &[],
+                    params: &[],
+                    regions: &[],
+                    meta,
+                    signature: None,
+                }
+            }
+
             _ => unreachable!(),
         };
 
@@ -546,6 +560,21 @@ impl<'a> ParseContext<'a> {
         let r#type = self.parse_term(inner.next().unwrap())?;
 
         Ok(self.bump.alloc(AliasDecl {
+            name,
+            params,
+            r#type,
+        }))
+    }
+
+    fn parse_ctr_header(&mut self, pair: Pair<'a, Rule>) -> ParseResult<&'a ConstructorDecl<'a>> {
+        debug_assert!(matches!(pair.as_rule(), Rule::ctr_header));
+
+        let mut inner = pair.into_inner();
+        let name = self.parse_symbol(&mut inner)?;
+        let params = self.parse_params(&mut inner)?;
+        let r#type = self.parse_term(inner.next().unwrap())?;
+
+        Ok(self.bump.alloc(ConstructorDecl {
             name,
             params,
             r#type,

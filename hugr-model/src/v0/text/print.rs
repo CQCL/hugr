@@ -327,6 +327,21 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 Ok(())
             }),
 
+            Operation::DeclareConstructor { decl } => this.with_local_scope(decl.params, |this| {
+                this.print_group(|this| {
+                    this.print_text("declare-ctr");
+                    this.print_text(decl.name);
+                });
+
+                for param in decl.params {
+                    this.print_param(*param)?;
+                }
+
+                this.print_term(decl.r#type)?;
+                this.print_meta(node_data.meta)?;
+                Ok(())
+            }),
+
             Operation::TailLoop => {
                 this.print_text("tail-loop");
                 this.print_port_lists(node_data.inputs, node_data.outputs)?;

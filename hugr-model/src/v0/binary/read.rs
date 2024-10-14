@@ -185,6 +185,18 @@ fn read_operation<'a>(
             });
             model::Operation::DeclareAlias { decl }
         }
+        Which::ConstructorDecl(reader) => {
+            let reader = reader?;
+            let name = bump.alloc_str(reader.get_name()?.to_str()?);
+            let params = read_list!(bump, reader, get_params, read_param);
+            let r#type = model::TermId(reader.get_type());
+            let decl = bump.alloc(model::ConstructorDecl {
+                name,
+                params,
+                r#type,
+            });
+            model::Operation::DeclareConstructor { decl }
+        }
         Which::Custom(name) => model::Operation::Custom {
             operation: read_global_ref(bump, name?)?,
         },
