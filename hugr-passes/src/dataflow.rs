@@ -7,7 +7,7 @@ mod machine;
 pub use machine::{Machine, TailLoopTermination};
 
 mod partial_value;
-pub use partial_value::{AbstractValue, PVEnum, PartialSum, PartialValue, Sum};
+pub use partial_value::{AbstractValue, PartialSum, PartialValue, Sum};
 
 use hugr_core::{Hugr, Node};
 use std::hash::Hash;
