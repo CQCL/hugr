@@ -73,7 +73,7 @@ ascent::ascent! {
        if !op_t.is_container(),
        if let Some(sig) = op_t.dataflow_signature(),
        node_in_value_row(c, n, vs),
-       if let Some(outs) = propagate_leaf_op(c, *n, &vs[..], sig.output_count(), &self.out_wire_value_proto[..]),
+       if let Some(outs) = propagate_leaf_op(c, *n, &vs[..], sig.output_count()),
        for (p,v) in (0..).map(OutgoingPort::from).zip(outs);
 
     // DFG
@@ -179,7 +179,6 @@ fn propagate_leaf_op<V: AbstractValue>(
     n: Node,
     ins: &[PV<V>],
     num_outs: usize,
-    out_wire_proto: &[(Node, OutgoingPort, PV<V>)],
 ) -> Option<ValueRow<V>> {
     match c.get_optype(n) {
         // Handle basics here. I guess (given the current interface) we could allow
@@ -198,21 +197,31 @@ fn propagate_leaf_op<V: AbstractValue>(
             t.tag,
             ins.iter().cloned(),
         )])),
-        OpType::Input(_) | OpType::Output(_) => None, // handled by parent
-        _ => {
-            // Interpret op. Default/worst-case is that we can't deduce anything about any
-            // output (just `Top`).
+        OpType::Input(_) | OpType::Output(_) | OpType::ExitBlock(_) => None, // handled by parent
+        OpType::Const(_) => None, // handled by LoadConstant:
+        OpType::LoadConstant(load_op) => {
+            assert!(ins.is_empty()); // static edge, so need to find constant
+            let const_node = c
+                .single_linked_output(n, load_op.constant_port())
+                .unwrap()
+                .0;
+            let const_val = c.get_optype(const_node).as_const().unwrap().value();
+            Some(ValueRow::single_known(
+                1,
+                0,
+                c.value_from_const(n, const_val),
+            ))
+        }
+        OpType::ExtensionOp(e) => {
+            // Interpret op. Default is we know nothing about the outputs (they still happen!)
             let mut outs = vec![PartialValue::Top; num_outs];
-            // However, we may have been told better outcomes:
-            for (_, p, v) in out_wire_proto.iter().filter(|(n2, _, _)| n == n2) {
-                outs[p.index()] = v.clone()
-            }
             // It'd be nice to convert these to [(IncomingPort, Value)] to pass to the context,
             // thus keeping PartialValue hidden, but AbstractValues
-            // are not necessarily convertible to Value!
-            c.interpret_leaf_op(n, ins, &mut outs[..]);
+            // are not necessarily convertible to Value.
+            c.interpret_leaf_op(n, e, ins, &mut outs[..]);
             Some(ValueRow::from_iter(outs))
         }
+        o => todo!("Unhandled: {:?}", o), // At least CallIndirect, and OpType is "non-exhaustive"
     }
 }
 

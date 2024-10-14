@@ -63,16 +63,16 @@ impl<V> PartialSum<V> {
     pub fn num_variants(&self) -> usize {
         self.0.len()
     }
-}
 
-impl<V: AbstractValue> PartialSum<V> {
     fn assert_invariants(&self) {
         assert_ne!(self.num_variants(), 0);
         for pv in self.0.values().flat_map(|x| x.iter()) {
             pv.assert_invariants();
         }
     }
+}
 
+impl<V: AbstractValue> PartialSum<V> {
     /// Joins (towards `Top`) self with another [PartialSum]. If successful, returns
     /// whether `self` has changed.
     ///
@@ -247,7 +247,7 @@ pub enum PartialValue<V> {
     Top,
 }
 
-impl<V: AbstractValue> From<V> for PartialValue<V> {
+impl<V> From<V> for PartialValue<V> {
     fn from(v: V) -> Self {
         Self::Value(v)
     }
@@ -259,7 +259,7 @@ impl<V> From<PartialSum<V>> for PartialValue<V> {
     }
 }
 
-impl<V: AbstractValue> PartialValue<V> {
+impl<V> PartialValue<V> {
     fn assert_invariants(&self) {
         if let Self::PartialSum(ps) = self {
             ps.assert_invariants();
@@ -275,7 +275,9 @@ impl<V: AbstractValue> PartialValue<V> {
     pub fn new_unit() -> Self {
         Self::new_variant(0, [])
     }
+}
 
+impl<V: AbstractValue> PartialValue<V> {
     /// If this value might be a Sum with the specified `tag`, get the elements inside that tag.
     ///
     /// # Panics
