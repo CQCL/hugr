@@ -44,9 +44,9 @@ pub struct Emission<'c> {
 
 impl<'c> Emission<'c> {
     /// Create an `Emission` from a HUGR.
-    pub fn emit_hugr<H: HugrView>(
+    pub fn emit_hugr<'a: 'c, H: HugrView>(
         hugr: FatNode<'c, hugr::ops::Module, H>,
-        eh: EmitHugr<'c, H>,
+        eh: EmitHugr<'c, 'a, H>,
     ) -> Result<Self> where {
         let module = eh.emit_module(hugr)?.finish();
         Ok(Self { module })

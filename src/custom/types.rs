@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use itertools::Itertools as _;
 
 use hugr::types::CustomType;
@@ -14,22 +16,22 @@ use crate::{
 };
 
 pub trait LLVMCustomTypeFn<'a>:
-    for<'c> Fn(TypingSession<'c>, &CustomType) -> Result<BasicTypeEnum<'c>> + 'a
+    for<'c> Fn(TypingSession<'c, 'a>, &CustomType) -> Result<BasicTypeEnum<'c>> + 'a
 {
 }
 
 impl<
         'a,
-        F: for<'c> Fn(TypingSession<'c>, &CustomType) -> Result<BasicTypeEnum<'c>> + 'a + ?Sized,
+        F: for<'c> Fn(TypingSession<'c, 'a>, &CustomType) -> Result<BasicTypeEnum<'c>> + 'a + ?Sized,
     > LLVMCustomTypeFn<'a> for F
 {
 }
 
 #[derive(Default, Clone)]
-pub struct LLVMTypeMapping;
+pub struct LLVMTypeMapping<'a>(PhantomData<&'a ()>);
 
-impl TypeMapping for LLVMTypeMapping {
-    type InV<'c> = TypingSession<'c>;
+impl<'a> TypeMapping for LLVMTypeMapping<'a> {
+    type InV<'c> = TypingSession<'c, 'a>;
 
     type OutV<'c> = BasicTypeEnum<'c>;
 
@@ -48,7 +50,7 @@ impl TypeMapping for LLVMTypeMapping {
     fn map_sum_type<'c>(
         &self,
         sum_type: &HugrSumType,
-        context: TypingSession<'c>,
+        context: TypingSession<'c, 'a>,
         variants: impl IntoIterator<Item = Vec<Self::OutV<'c>>>,
     ) -> Result<Self::SumOutV<'c>> {
         LLVMSumType::try_new2(
@@ -61,7 +63,7 @@ impl TypeMapping for LLVMTypeMapping {
     fn map_function_type<'c>(
         &self,
         _: &HugrFuncType,
-        context: TypingSession<'c>,
+        context: TypingSession<'c, 'a>,
         inputs: impl IntoIterator<Item = Self::OutV<'c>>,
         outputs: impl IntoIterator<Item = Self::OutV<'c>>,
     ) -> Result<Self::FuncOutV<'c>> {

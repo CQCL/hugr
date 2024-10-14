@@ -50,7 +50,7 @@ impl<'c> LLVMSumType<'c> {
         Ok(Self(context.struct_type(&types, false), sum_type.clone()))
     }
     /// Attempt to create a new `LLVMSumType` from a [HugrSumType].
-    pub fn try_new(session: &TypingSession<'c>, sum_type: HugrSumType) -> Result<Self> {
+    pub fn try_new(session: &TypingSession<'c, '_>, sum_type: HugrSumType) -> Result<Self> {
         assert!(sum_type.num_variants() < u32::MAX as usize);
         let variants = (0..sum_type.num_variants())
             .map(|i| {

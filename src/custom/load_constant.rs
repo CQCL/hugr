@@ -19,7 +19,7 @@ use crate::emit::EmitFuncContext;
 ///
 /// Callbacks may hold references with lifetimes older than `'a`.
 pub trait LoadConstantFn<'a, H: ?Sized, CC: CustomConst + ?Sized>:
-    for<'c> Fn(&mut EmitFuncContext<'c, H>, &CC) -> Result<BasicValueEnum<'c>> + 'a
+    for<'c> Fn(&mut EmitFuncContext<'c, 'a, H>, &CC) -> Result<BasicValueEnum<'c>> + 'a
 {
 }
 
@@ -27,7 +27,9 @@ impl<
         'a,
         H: ?Sized,
         CC: ?Sized + CustomConst,
-        F: 'a + ?Sized + for<'c> Fn(&mut EmitFuncContext<'c, H>, &CC) -> Result<BasicValueEnum<'c>>,
+        F: 'a
+            + ?Sized
+            + for<'c> Fn(&mut EmitFuncContext<'c, 'a, H>, &CC) -> Result<BasicValueEnum<'c>>,
     > LoadConstantFn<'a, H, CC> for F
 {
 }
@@ -59,7 +61,7 @@ impl<'a, H: HugrView> LoadConstantsMap<'a, H> {
     /// appropriate inner callbacks.
     pub fn emit_load_constant<'c>(
         &self,
-        context: &mut EmitFuncContext<'c, H>,
+        context: &mut EmitFuncContext<'c, 'a, H>,
         konst: &dyn CustomConst,
     ) -> Result<BasicValueEnum<'c>> {
         let type_id = konst.type_id();

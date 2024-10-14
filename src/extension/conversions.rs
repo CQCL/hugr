@@ -24,7 +24,7 @@ use crate::{
 };
 
 fn build_trunc_op<'c, H: HugrView>(
-    context: &mut EmitFuncContext<'c, H>,
+    context: &mut EmitFuncContext<'c, '_, H>,
     signed: bool,
     log_width: u64,
     args: EmitOpArgs<'c, '_, ExtensionOp, H>,
@@ -129,7 +129,7 @@ fn build_trunc_op<'c, H: HugrView>(
 }
 
 fn emit_conversion_op<'c, H: HugrView>(
-    context: &mut EmitFuncContext<'c, H>,
+    context: &mut EmitFuncContext<'c, '_, H>,
     args: EmitOpArgs<'c, '_, ExtensionOp, H>,
     conversion_op: ConvertOpDef,
 ) -> Result<()> {

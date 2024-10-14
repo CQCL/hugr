@@ -111,7 +111,7 @@ impl<'a, H: HugrView + 'a> CodegenExtsBuilder<'a, H> {
         mut self,
         handler: impl 'a
             + for<'c> Fn(
-                &mut EmitFuncContext<'c, H>,
+                &mut EmitFuncContext<'c, 'a, H>,
                 EmitOpArgs<'c, '_, ExtensionOp, H>,
                 Op,
             ) -> Result<()>,
@@ -151,4 +151,74 @@ pub struct CodegenExtsMap<'a, H> {
     pub load_constant_handlers: Rc<LoadConstantsMap<'a, H>>,
     pub extension_op_handlers: Rc<ExtensionOpMap<'a, H>>,
     pub type_converter: Rc<TypeConverter<'a>>,
+}
+
+#[cfg(test)]
+mod test {
+    use hugr::{
+        extension::prelude::{ConstString, PRELUDE_ID, PRINT_OP_ID, STRING_TYPE, STRING_TYPE_NAME},
+        Hugr,
+    };
+    use inkwell::{
+        context::Context,
+        types::BasicType,
+        values::{BasicMetadataValueEnum, BasicValue},
+    };
+    use itertools::Itertools as _;
+
+    use crate::{emit::libc::emit_libc_printf, CodegenExtsBuilder};
+
+    #[test]
+    fn types_with_lifetimes() {
+        let n = "name_with_lifetime".to_string();
+
+        let cem = CodegenExtsBuilder::<Hugr>::default()
+            .custom_type((PRELUDE_ID, STRING_TYPE_NAME), |session, _| {
+                let ctx = session.iw_context();
+                Ok(ctx
+                    .get_struct_type(n.as_ref())
+                    .unwrap_or_else(|| ctx.opaque_struct_type(n.as_ref()))
+                    .as_basic_type_enum())
+            })
+            .finish();
+
+        let ctx = Context::create();
+
+        let ty = cem
+            .type_converter
+            .session(&ctx)
+            .llvm_type(&STRING_TYPE)
+            .unwrap()
+            .into_struct_type();
+        let ty_n = ty.get_name().unwrap().to_str().unwrap();
+        assert_eq!(ty_n, n);
+    }
+
+    #[test]
+    fn custom_const_lifetime_of_context() {
+        let ctx = Context::create();
+
+        let _ = CodegenExtsBuilder::<Hugr>::default()
+            .custom_const::<ConstString>(|_, konst| {
+                Ok(ctx
+                    .const_string(konst.value().as_bytes(), true)
+                    .as_basic_value_enum())
+            })
+            .finish();
+    }
+
+    #[test]
+    fn extension_op_lifetime() {
+        let ctx = Context::create();
+
+        let _ = CodegenExtsBuilder::<Hugr>::default()
+            .extension_op(PRELUDE_ID, PRINT_OP_ID, |context, args| {
+                let mut print_args: Vec<BasicMetadataValueEnum> =
+                    vec![ctx.const_string("%s".as_bytes(), true).into()];
+                print_args.extend(args.inputs.into_iter().map_into::<BasicMetadataValueEnum>());
+                emit_libc_printf(context, &print_args)?;
+                args.outputs.finish(context.builder(), [])
+            })
+            .finish();
+    }
 }

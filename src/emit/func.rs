@@ -43,10 +43,11 @@ pub use mailbox::{RowMailBox, RowPromise};
 /// [MailBox](RowMailBox)es are stack allocations that are `alloca`ed in the
 /// first basic block of the function, read from to get the input values of each
 /// node, and written to with the output values of each node.
-///
-// TODO add another lifetime parameter which `emit_context` will need.
-pub struct EmitFuncContext<'c, H> {
-    emit_context: EmitModuleContext<'c, H>,
+pub struct EmitFuncContext<'c, 'a, H>
+where
+    'a: 'c,
+{
+    emit_context: EmitModuleContext<'c, 'a, H>,
     todo: EmissionSet,
     func: FunctionValue<'c>,
     env: HashMap<Wire, ValueMailBox<'c>>,
@@ -55,15 +56,15 @@ pub struct EmitFuncContext<'c, H> {
     launch_bb: BasicBlock<'c>,
 }
 
-impl<'c, H: HugrView> EmitFuncContext<'c, H> {
+impl<'c, 'a, H: HugrView> EmitFuncContext<'c, 'a, H> {
     delegate! {
         to self.emit_context {
             /// Returns the inkwell [Context].
             pub fn iw_context(&self) ->  &'c Context;
             /// Returns the internal [CodegenExtsMap] .
-            pub fn extensions(&self) ->  Rc<CodegenExtsMap<'static,H>>;
+            pub fn extensions(&self) ->  Rc<CodegenExtsMap<'a,H>>;
             /// Returns a new [TypingSession].
-            pub fn typing_session(&self) -> TypingSession<'c>;
+            pub fn typing_session(&self) -> TypingSession<'c, 'a>;
             /// Convert hugr [HugrType] into an LLVM [Type](BasicTypeEnum).
             pub fn llvm_type(&self, hugr_type: &HugrType) -> Result<BasicTypeEnum<'c> >;
             /// Convert a [HugrFuncType] into an LLVM [FunctionType].
@@ -143,9 +144,9 @@ impl<'c, H: HugrView> EmitFuncContext<'c, H> {
     ///
     /// TODO on failure return `emit_context`
     pub fn new(
-        emit_context: EmitModuleContext<'c, H>,
+        emit_context: EmitModuleContext<'c, 'a, H>,
         func: FunctionValue<'c>,
-    ) -> Result<EmitFuncContext<'c, H>> {
+    ) -> Result<EmitFuncContext<'c, 'a, H>> {
         if func.get_first_basic_block().is_some() {
             Err(anyhow!(
                 "EmitContext::new: Function already has a basic block: {:?}",
@@ -180,9 +181,9 @@ impl<'c, H: HugrView> EmitFuncContext<'c, H> {
     /// Create a new anonymous [RowMailBox]. This mailbox is not mapped to any
     /// [Wire]s, and so will not interact with any mailboxes returned from
     /// [EmitFuncContext::node_ins_rmb] or [EmitFuncContext::node_outs_rmb].
-    pub fn new_row_mail_box<'a>(
+    pub fn new_row_mail_box<'t>(
         &mut self,
-        ts: impl IntoIterator<Item = &'a Type>,
+        ts: impl IntoIterator<Item = &'t Type>,
         name: impl AsRef<str>,
     ) -> Result<RowMailBox<'c>> {
         Ok(RowMailBox::new(
@@ -307,7 +308,7 @@ impl<'c, H: HugrView> EmitFuncContext<'c, H> {
 
     /// Consumes the `EmitFuncContext` and returns both the inner
     /// [EmitModuleContext] and the scoped [FuncDefn]s that were encountered.
-    pub fn finish(self) -> Result<(EmitModuleContext<'c, H>, EmissionSet)> {
+    pub fn finish(self) -> Result<(EmitModuleContext<'c, 'a, H>, EmissionSet)> {
         self.builder.position_at_end(self.prologue_bb);
         self.builder.build_unconditional_branch(self.launch_bb)?;
         Ok((self.emit_context, self.todo))

@@ -25,7 +25,7 @@ use anyhow::{anyhow, Result};
 
 /// Emit an integer comparison operation.
 fn emit_icmp<'c, H: HugrView>(
-    context: &mut EmitFuncContext<'c, H>,
+    context: &mut EmitFuncContext<'c, '_, H>,
     args: EmitOpArgs<'c, '_, ExtensionOp, H>,
     pred: inkwell::IntPredicate,
 ) -> Result<()> {
@@ -48,7 +48,7 @@ fn emit_icmp<'c, H: HugrView>(
 }
 
 fn emit_int_op<'c, H: HugrView>(
-    context: &mut EmitFuncContext<'c, H>,
+    context: &mut EmitFuncContext<'c, '_, H>,
     args: EmitOpArgs<'c, '_, ExtensionOp, H>,
     op: IntOpDef,
 ) -> Result<()> {
@@ -108,7 +108,10 @@ fn emit_int_op<'c, H: HugrView>(
     }
 }
 
-fn llvm_type<'c>(context: TypingSession<'c>, hugr_type: &CustomType) -> Result<BasicTypeEnum<'c>> {
+fn llvm_type<'c>(
+    context: TypingSession<'c, '_>,
+    hugr_type: &CustomType,
+) -> Result<BasicTypeEnum<'c>> {
     if let [TypeArg::BoundedNat { n }] = hugr_type.args() {
         let m = *n as usize;
         if m < int_types::INT_TYPES.len() && int_types::INT_TYPES[m] == hugr_type.clone().into() {
@@ -132,7 +135,7 @@ fn llvm_type<'c>(context: TypingSession<'c>, hugr_type: &CustomType) -> Result<B
 }
 
 fn emit_const_int<'c, H: HugrView>(
-    context: &mut EmitFuncContext<'c, H>,
+    context: &mut EmitFuncContext<'c, '_, H>,
     k: &ConstInt,
 ) -> Result<BasicValueEnum<'c>> {
     let ty: IntType = context.llvm_type(&k.get_type())?.try_into().unwrap();

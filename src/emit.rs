@@ -34,16 +34,19 @@ pub use ops::emit_value;
 /// This includes the module itself, a set of extensions for lowering custom
 /// elements, and policy for naming various HUGR elements.
 ///
-/// `'c` names the lifetime of the LLVM context.
-// TODO add another lifetime parameter for `extensions` below.
-pub struct EmitModuleContext<'c, H> {
+/// `'c` names the lifetime of the LLVM context, while `'a` names the lifetime
+/// of other internal references.
+pub struct EmitModuleContext<'c, 'a, H>
+where
+    'a: 'c,
+{
     iw_context: &'c Context,
     module: Module<'c>,
-    extensions: Rc<CodegenExtsMap<'static, H>>,
+    extensions: Rc<CodegenExtsMap<'a, H>>,
     namer: Rc<Namer>,
 }
 
-impl<'c, H> EmitModuleContext<'c, H> {
+impl<'c, 'a, H> EmitModuleContext<'c, 'a, H> {
     delegate! {
         to self.typing_session() {
             /// Convert a [HugrType] into an LLVM [Type](BasicTypeEnum).
@@ -70,7 +73,7 @@ impl<'c, H> EmitModuleContext<'c, H> {
         iw_context: &'c Context,
         module: Module<'c>,
         namer: Rc<Namer>,
-        extensions: Rc<CodegenExtsMap<'static, H>>,
+        extensions: Rc<CodegenExtsMap<'a, H>>,
     ) -> Self {
         Self {
             iw_context,
@@ -88,12 +91,12 @@ impl<'c, H> EmitModuleContext<'c, H> {
     }
 
     /// Returns a reference to the inner [CodegenExtsMap].
-    pub fn extensions(&self) -> Rc<CodegenExtsMap<'static, H>> {
+    pub fn extensions(&self) -> Rc<CodegenExtsMap<'a, H>> {
         self.extensions.clone()
     }
 
     /// Returns a [TypingSession] constructed from it's members.
-    pub fn typing_session(&self) -> TypingSession<'c> {
+    pub fn typing_session(&self) -> TypingSession<'c, 'a> {
         self.extensions
             .type_converter
             .clone()
@@ -235,12 +238,15 @@ impl<'c, H> EmitModuleContext<'c, H> {
 type EmissionSet = HashSet<Node>;
 
 /// Emits [HugrView]s into an LLVM [Module].
-pub struct EmitHugr<'c, H> {
+pub struct EmitHugr<'c, 'a, H>
+where
+    'a: 'c,
+{
     emitted: EmissionSet,
-    module_context: EmitModuleContext<'c, H>,
+    module_context: EmitModuleContext<'c, 'a, H>,
 }
 
-impl<'c, H: HugrView> EmitHugr<'c, H> {
+impl<'c, 'a, H: HugrView> EmitHugr<'c, 'a, H> {
     delegate! {
         to self.module_context {
             /// Returns a reference to the inner [Context].
@@ -257,7 +263,7 @@ impl<'c, H: HugrView> EmitHugr<'c, H> {
         iw_context: &'c Context,
         module: Module<'c>,
         namer: Rc<Namer>,
-        extensions: Rc<CodegenExtsMap<'static, H>>,
+        extensions: Rc<CodegenExtsMap<'a, H>>,
     ) -> Self {
         assert_eq!(iw_context, &module.get_context());
         Self {

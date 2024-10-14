@@ -123,11 +123,11 @@ impl TestContext {
         &self.context
     }
 
-    pub fn get_typing_session(&self) -> TypingSession {
+    pub fn get_typing_session(&self) -> TypingSession<'_, 'static> {
         self.type_converter().session(&self.context)
     }
 
-    pub fn get_emit_hugr(&'_ self) -> EmitHugr<'_, THugrView> {
+    pub fn get_emit_hugr(&'_ self) -> EmitHugr<'_, 'static, THugrView> {
         let ctx = self.iw_context();
         let m = ctx.create_module("test_context");
         let exts = self.extensions();
@@ -138,7 +138,7 @@ impl TestContext {
         self.namer = namer;
     }
 
-    pub fn get_emit_module_context(&'_ self) -> EmitModuleContext<'_, THugrView> {
+    pub fn get_emit_module_context(&'_ self) -> EmitModuleContext<'_, 'static, THugrView> {
         let ctx = self.iw_context();
         let m = ctx.create_module("test_context");
         EmitModuleContext::new(

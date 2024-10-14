@@ -50,7 +50,7 @@ fn with_array_alloca<'c, T, E: From<BuilderError>>(
 
 pub fn emit_array_op<'c, H: HugrView>(
     pcg: &impl PreludeCodegen,
-    ctx: &mut EmitFuncContext<'c, H>,
+    ctx: &mut EmitFuncContext<'c, '_, H>,
     op: ArrayOp,
     inputs: Vec<BasicValueEnum<'c>>,
     outputs: RowPromise<'c>,
@@ -340,7 +340,7 @@ pub fn emit_array_op<'c, H: HugrView>(
 /// Helper function to emit the pop operations.
 fn emit_pop_op<'c>(
     builder: &Builder<'c>,
-    ts: &TypingSession<'c>,
+    ts: &TypingSession<'c, '_>,
     elem_ty: HugrType,
     size: u64,
     array_v: ArrayValue<'c>,

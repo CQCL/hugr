@@ -45,19 +45,19 @@ pub mod array;
 pub trait PreludeCodegen: Clone {
     /// Return the llvm type of [hugr::extension::prelude::USIZE_T]. That type
     /// must be an [IntType].
-    fn usize_type<'c>(&self, session: &TypingSession<'c>) -> IntType<'c> {
+    fn usize_type<'c>(&self, session: &TypingSession<'c, '_>) -> IntType<'c> {
         session.iw_context().i64_type()
     }
 
     /// Return the llvm type of [hugr::extension::prelude::QB_T].
-    fn qubit_type<'c>(&self, session: &TypingSession<'c>) -> impl BasicType<'c> {
+    fn qubit_type<'c>(&self, session: &TypingSession<'c, '_>) -> impl BasicType<'c> {
         session.iw_context().i16_type()
     }
 
     /// Return the llvm type of [hugr::extension::prelude::array_type].
     fn array_type<'c>(
         &self,
-        _session: &TypingSession<'c>,
+        _session: &TypingSession<'c, '_>,
         elem_ty: BasicTypeEnum<'c>,
         size: u64,
     ) -> impl BasicType<'c> {
@@ -67,7 +67,7 @@ pub trait PreludeCodegen: Clone {
     /// Emit a [hugr::extension::prelude::ArrayOp].
     fn emit_array_op<'c, H: HugrView>(
         &self,
-        ctx: &mut EmitFuncContext<'c, H>,
+        ctx: &mut EmitFuncContext<'c, '_, H>,
         op: ArrayOp,
         inputs: Vec<BasicValueEnum<'c>>,
         outputs: RowPromise<'c>,
@@ -310,11 +310,11 @@ mod test {
     #[derive(Clone)]
     struct TestPreludeCodegen;
     impl PreludeCodegen for TestPreludeCodegen {
-        fn usize_type<'c>(&self, session: &TypingSession<'c>) -> IntType<'c> {
+        fn usize_type<'c>(&self, session: &TypingSession<'c, '_>) -> IntType<'c> {
             session.iw_context().i32_type()
         }
 
-        fn qubit_type<'c>(&self, session: &TypingSession<'c>) -> impl BasicType<'c> {
+        fn qubit_type<'c>(&self, session: &TypingSession<'c, '_>) -> impl BasicType<'c> {
             session.iw_context().f64_type()
         }
     }

@@ -23,15 +23,13 @@ pub type HugrSumType = SumType;
 
 /// A type that holds [Rc] shared pointers to everything needed to convert from
 /// a hugr [HugrType] to an LLVM [Type](inkwell::types).
-///
-// TODO add another lifetime parameter and substitute it for 'static in `type_converter`
 #[derive(Clone)]
-pub struct TypingSession<'c> {
+pub struct TypingSession<'c, 'a> {
     iw_context: &'c Context,
-    type_converter: Rc<TypeConverter<'static>>,
+    type_converter: Rc<TypeConverter<'a>>,
 }
 
-impl<'c> TypingSession<'c> {
+impl<'c, 'a> TypingSession<'c, 'a> {
     delegate! {
         to self.type_converter.clone() {
             /// Convert a [HugrType] into an LLVM [Type](BasicTypeEnum).
@@ -44,7 +42,7 @@ impl<'c> TypingSession<'c> {
     }
 
     /// Creates a new `TypingSession`.
-    pub fn new(iw_context: &'c Context, type_converter: Rc<TypeConverter<'static>>) -> Self {
+    pub fn new(iw_context: &'c Context, type_converter: Rc<TypeConverter<'a>>) -> Self {
         Self {
             iw_context,
             type_converter,
@@ -58,7 +56,7 @@ impl<'c> TypingSession<'c> {
 }
 
 #[derive(Default)]
-pub struct TypeConverter<'a>(TypeMap<'a, LLVMTypeMapping>);
+pub struct TypeConverter<'a>(TypeMap<'a, LLVMTypeMapping<'a>>);
 
 impl<'a> TypeConverter<'a> {
     pub(super) fn custom_type(
@@ -71,7 +69,7 @@ impl<'a> TypeConverter<'a> {
 
     pub fn llvm_type<'c>(
         self: Rc<Self>,
-        context: TypingSession<'c>,
+        context: TypingSession<'c, 'a>,
         hugr_type: &HugrType,
     ) -> Result<BasicTypeEnum<'c>> {
         self.0.map_type(hugr_type, context)
@@ -79,23 +77,21 @@ impl<'a> TypeConverter<'a> {
 
     pub fn llvm_func_type<'c>(
         self: Rc<Self>,
-        context: TypingSession<'c>,
+        context: TypingSession<'c, 'a>,
         hugr_type: &HugrFuncType,
     ) -> Result<FunctionType<'c>> {
         self.0.map_function_type(hugr_type, context)
     }
 
-    pub fn llvm_sum_type(
+    pub fn llvm_sum_type<'c>(
         self: Rc<Self>,
-        context: TypingSession<'_>,
+        context: TypingSession<'c, 'a>,
         hugr_type: HugrSumType,
-    ) -> Result<LLVMSumType<'_>> {
+    ) -> Result<LLVMSumType<'c>> {
         self.0.map_sum_type(&hugr_type, context)
     }
-}
 
-impl TypeConverter<'static> {
-    pub fn session(self: Rc<Self>, iw_context: &Context) -> TypingSession<'_> {
+    pub fn session<'c>(self: Rc<Self>, iw_context: &'c Context) -> TypingSession<'c, 'a> {
         TypingSession::new(iw_context, self)
     }
 }

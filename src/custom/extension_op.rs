@@ -35,7 +35,7 @@ use crate::emit::{EmitFuncContext, EmitOpArgs};
 ///
 /// Callbacks may hold references with lifetimes older than `'a`.
 pub trait ExtensionOpFn<'a, H>:
-    for<'c> Fn(&mut EmitFuncContext<'c, H>, EmitOpArgs<'c, '_, ExtensionOp, H>) -> Result<()> + 'a
+    for<'c> Fn(&mut EmitFuncContext<'c, 'a, H>, EmitOpArgs<'c, '_, ExtensionOp, H>) -> Result<()> + 'a
 {
 }
 
@@ -43,7 +43,7 @@ impl<
         'a,
         H,
         F: for<'c> Fn(
-                &mut EmitFuncContext<'c, H>,
+                &mut EmitFuncContext<'c, 'a, H>,
                 EmitOpArgs<'c, '_, ExtensionOp, H>,
             ) -> Result<()>
             + ?Sized
@@ -76,7 +76,7 @@ impl<'a, H: HugrView> ExtensionOpMap<'a, H> {
         &mut self,
         handler: impl 'a
             + for<'c> Fn(
-                &mut EmitFuncContext<'c, H>,
+                &mut EmitFuncContext<'c, 'a, H>,
                 EmitOpArgs<'c, '_, ExtensionOp, H>,
                 Op,
             ) -> Result<()>,
@@ -96,7 +96,7 @@ impl<'a, H: HugrView> ExtensionOpMap<'a, H> {
     /// If no handler is registered for the op an error will be returned.
     pub fn emit_extension_op<'c>(
         &self,
-        context: &mut EmitFuncContext<'c, H>,
+        context: &mut EmitFuncContext<'c, 'a, H>,
         args: EmitOpArgs<'c, '_, ExtensionOp, H>,
     ) -> Result<()> {
         let node = args.node();

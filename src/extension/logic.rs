@@ -16,7 +16,7 @@ use crate::{
 use anyhow::{anyhow, Result};
 
 fn emit_logic_op<'c, H: HugrView>(
-    context: &mut EmitFuncContext<'c, H>,
+    context: &mut EmitFuncContext<'c, '_, H>,
     args: EmitOpArgs<'c, '_, ExtensionOp, H>,
 ) -> Result<()> {
     let lot = LogicOp::from_optype(&args.node().generalise()).ok_or(anyhow!(

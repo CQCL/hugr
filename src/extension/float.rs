@@ -19,7 +19,7 @@ use crate::custom::CodegenExtsBuilder;
 
 /// Emit a float comparison operation.
 fn emit_fcmp<'c, H: HugrView>(
-    context: &mut EmitFuncContext<'c, H>,
+    context: &mut EmitFuncContext<'c, '_, H>,
     args: EmitOpArgs<'c, '_, ExtensionOp, H>,
     pred: inkwell::FloatPredicate,
 ) -> Result<()> {
@@ -42,7 +42,7 @@ fn emit_fcmp<'c, H: HugrView>(
 }
 
 fn emit_float_op<'c, H: HugrView>(
-    context: &mut EmitFuncContext<'c, H>,
+    context: &mut EmitFuncContext<'c, '_, H>,
     args: EmitOpArgs<'c, '_, ExtensionOp, H>,
     op: FloatOps,
 ) -> Result<()> {
@@ -101,7 +101,7 @@ fn emit_float_op<'c, H: HugrView>(
 }
 
 fn emit_constf64<'c, H: HugrView>(
-    context: &mut EmitFuncContext<'c, H>,
+    context: &mut EmitFuncContext<'c, '_, H>,
     k: &ConstF64,
 ) -> Result<BasicValueEnum<'c>> {
     let ty: FloatType = context.llvm_type(&k.get_type())?.try_into().unwrap();

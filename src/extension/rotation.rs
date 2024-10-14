@@ -18,12 +18,12 @@ use tket2::extension::rotation::{
 /// We lower [ROTATION_CUSTOM_TYPE] to an `f64`, representing a number of half-turns.
 pub struct RotationCodegenExtension;
 
-fn llvm_angle_type<'c>(ts: &TypingSession<'c>) -> FloatType<'c> {
+fn llvm_angle_type<'c>(ts: &TypingSession<'c, '_>) -> FloatType<'c> {
     ts.iw_context().f64_type()
 }
 
 fn emit_rotation_op<'c, H: HugrView>(
-    context: &mut EmitFuncContext<'c, H>,
+    context: &mut EmitFuncContext<'c, '_, H>,
     args: EmitOpArgs<'c, '_, ExtensionOp, H>,
     op: RotationOp,
 ) -> Result<()> {
@@ -135,7 +135,7 @@ fn emit_rotation_op<'c, H: HugrView>(
 }
 
 fn emit_const_rotation<'c, H: HugrView>(
-    context: &mut EmitFuncContext<'c, H>,
+    context: &mut EmitFuncContext<'c, '_, H>,
     rotation: &ConstRotation,
 ) -> Result<BasicValueEnum<'c>> {
     let angle_ty = llvm_angle_type(&context.typing_session());
@@ -298,7 +298,7 @@ mod test {
         cem: CodegenExtsBuilder<'a, H>,
     ) -> CodegenExtsBuilder<'a, H> {
         fn emit_nonfinite_const<'c, H: HugrView>(
-            context: &mut EmitFuncContext<'c, H>,
+            context: &mut EmitFuncContext<'c, '_, H>,
             konst: &NonFiniteConst64,
         ) -> Result<BasicValueEnum<'c>> {
             Ok(context.iw_context().f64_type().const_float(konst.0).into())

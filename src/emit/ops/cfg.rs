@@ -34,7 +34,7 @@ impl<'c, 'hugr, H: HugrView> CfgEmitter<'c, 'hugr, H> {
     // the children in the llvm function. Note that this does not move the
     // position of the builder.
     pub fn new<'d>(
-        context: &'d mut EmitFuncContext<'c, H>,
+        context: &'d mut EmitFuncContext<'c, '_, H>,
         args: EmitOpArgs<'c, 'hugr, CFG, H>,
     ) -> Result<Self>
     where
@@ -95,7 +95,7 @@ impl<'c, 'hugr, H: HugrView> CfgEmitter<'c, 'hugr, H> {
 
     /// Consume the emitter by emitting each child of the node.
     /// After returning the builder will be at the end of the exit block.
-    pub fn emit_children(mut self, context: &mut EmitFuncContext<'c, H>) -> Result<()> {
+    pub fn emit_children(mut self, context: &mut EmitFuncContext<'c, '_, H>) -> Result<()> {
         // write the inputs of the cfg node into the inputs of the entry
         // dataflowblock node, and then branch to the basic block of that entry
         // node.
@@ -146,7 +146,7 @@ impl<'c, 'hugr, H: HugrView> CfgEmitter<'c, 'hugr, H> {
     }
     fn emit_dataflow_block(
         &mut self,
-        context: &mut EmitFuncContext<'c, H>,
+        context: &mut EmitFuncContext<'c, '_, H>,
         EmitOpArgs {
             node,
             inputs: _,
@@ -203,7 +203,7 @@ impl<'c, 'hugr, H: HugrView> CfgEmitter<'c, 'hugr, H> {
 
     fn emit_exit_block(
         &mut self,
-        context: &mut EmitFuncContext<'c, H>,
+        context: &mut EmitFuncContext<'c, '_, H>,
         args: EmitOpArgs<'c, 'hugr, ExitBlock, H>,
     ) -> Result<()> {
         let outputs = self.take_outputs()?;
