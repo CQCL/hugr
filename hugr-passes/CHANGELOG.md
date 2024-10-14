@@ -3,7 +3,7 @@
 
 ## [0.13.1](https://github.com/CQCL/hugr/compare/hugr-passes-v0.8.2...hugr-passes-v0.13.1) - 2024-10-14
 
-This release bumps the version to be inline with the other `hugr-*` crates.
+This release bumps the version to align with the other `hugr-*` crates.
 
 ### New Features
 
