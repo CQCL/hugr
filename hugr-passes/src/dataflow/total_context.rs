@@ -3,8 +3,7 @@ use std::hash::Hash;
 use ascent::lattice::BoundedLattice;
 use hugr_core::{ops::OpTrait, Hugr, HugrView, IncomingPort, Node, OutgoingPort, PortIndex};
 
-use super::partial_value::{PartialValue, Sum};
-use super::{BaseValue, DFContext};
+use super::{AbstractValue, DFContext, PartialValue, Sum};
 
 /// A simpler interface like [DFContext] but where the context only cares about
 /// values that are completely known (as `V`s), i.e. not `Bottom`, `Top`, or
@@ -22,7 +21,7 @@ pub trait TotalContext<V>: Clone + Eq + Hash + std::ops::Deref<Target = Hugr> {
     ) -> Vec<(OutgoingPort, V)>;
 }
 
-impl<V: BaseValue, T: TotalContext<V>> DFContext<PartialValue<V>> for T {
+impl<V: AbstractValue, T: TotalContext<V>> DFContext<V> for T {
     fn interpret_leaf_op(
         &self,
         node: Node,
