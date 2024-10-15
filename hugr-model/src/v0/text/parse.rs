@@ -7,7 +7,7 @@ use thiserror::Error;
 
 use crate::v0::{
     AliasDecl, ConstructorDecl, FuncDecl, GlobalRef, LinkRef, LocalRef, MetaItem, Module, Node,
-    NodeId, Operation, Param, Region, RegionId, RegionKind, Term, TermId,
+    NodeId, Operation, OperationDecl, Param, Region, RegionId, RegionKind, Term, TermId,
 };
 
 mod pest_parser {
@@ -472,6 +472,20 @@ impl<'a> ParseContext<'a> {
                 }
             }
 
+            Rule::node_declare_operation => {
+                let decl = self.parse_op_header(inner.next().unwrap())?;
+                let meta = self.parse_meta(&mut inner)?;
+                Node {
+                    operation: Operation::DeclareOperation { decl },
+                    inputs: &[],
+                    outputs: &[],
+                    params: &[],
+                    regions: &[],
+                    meta,
+                    signature: None,
+                }
+            }
+
             _ => unreachable!(),
         };
 
@@ -575,6 +589,21 @@ impl<'a> ParseContext<'a> {
         let r#type = self.parse_term(inner.next().unwrap())?;
 
         Ok(self.bump.alloc(ConstructorDecl {
+            name,
+            params,
+            r#type,
+        }))
+    }
+
+    fn parse_op_header(&mut self, pair: Pair<'a, Rule>) -> ParseResult<&'a OperationDecl<'a>> {
+        debug_assert!(matches!(pair.as_rule(), Rule::operation_header));
+
+        let mut inner = pair.into_inner();
+        let name = self.parse_symbol(&mut inner)?;
+        let params = self.parse_params(&mut inner)?;
+        let r#type = self.parse_term(inner.next().unwrap())?;
+
+        Ok(self.bump.alloc(OperationDecl {
             name,
             params,
             r#type,

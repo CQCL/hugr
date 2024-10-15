@@ -50,6 +50,7 @@ struct Operation {
         callFunc @13 :TermId;
         loadFunc @14 :TermId;
         constructorDecl @15 :ConstructorDecl;
+        operationDecl @16 :OperationDecl;
     }
 
     struct FuncDefn {
@@ -78,6 +79,12 @@ struct Operation {
     }
 
     struct ConstructorDecl {
+        name @0 :Text;
+        params @1 :List(Param);
+        type @2 :TermId;
+    }
+
+    struct OperationDecl {
         name @0 :Text;
         params @1 :List(Param);
         type @2 :TermId;
