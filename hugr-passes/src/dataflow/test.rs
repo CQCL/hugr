@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use ascent::{lattice::BoundedLattice, Lattice};
 
-use hugr_core::builder::{CFGBuilder, Container};
+use hugr_core::builder::{CFGBuilder, Container, DataflowHugr};
 use hugr_core::{
     builder::{endo_sig, DFGBuilder, Dataflow, DataflowSubContainer, HugrBuilder, SubContainer},
     extension::{
@@ -497,4 +497,44 @@ fn test_cfg(
         machine.read_out_wire(Wire::new(hugr.root(), 1)).unwrap(),
         out1
     );
+}
+
+#[rstest]
+#[case(pv_true(), pv_true(), pv_true())]
+#[case(pv_false(), pv_false(), pv_false())]
+#[case(pv_true(), pv_false(), pv_true_or_false())] // Two calls alias
+fn test_call(
+    #[case] inp0: PartialValue<Void>,
+    #[case] inp1: PartialValue<Void>,
+    #[case] out: PartialValue<Void>,
+) {
+    let mut builder = DFGBuilder::new(Signature::new_endo(type_row![BOOL_T; 2])).unwrap();
+    let func_bldr = builder
+        .define_function("id", Signature::new_endo(BOOL_T))
+        .unwrap();
+    let [v] = func_bldr.input_wires_arr();
+    let func_defn = func_bldr.finish_with_outputs([v]).unwrap();
+    let [a, b] = builder.input_wires_arr();
+    let [a2] = builder
+        .call(func_defn.handle(), &[], [a], &EMPTY_REG)
+        .unwrap()
+        .outputs_arr();
+    let [b2] = builder
+        .call(func_defn.handle(), &[], [b], &EMPTY_REG)
+        .unwrap()
+        .outputs_arr();
+    let hugr = builder
+        .finish_hugr_with_outputs([a2, b2], &EMPTY_REG)
+        .unwrap();
+
+    let [root_inp, _] = hugr.get_io(hugr.root()).unwrap();
+    let [inw0, inw1] = [0, 1].map(|i| Wire::new(root_inp, i));
+    let mut machine = Machine::default();
+    machine.propolutate_out_wires([(inw0, inp0), (inw1, inp1)]);
+    machine.run(TestContext(Arc::new(&hugr)));
+
+    let [res0, res1] = [0, 1].map(|i| machine.read_out_wire(Wire::new(hugr.root(), i)).unwrap());
+    // The two calls alias so both results will be the same:
+    assert_eq!(res0, out);
+    assert_eq!(res1, out);
 }

@@ -182,6 +182,23 @@ ascent::ascent! {
         node_in_value_row(c, out_n, out_in_row),
         if let Some(fields) = out_in_row.unpack_first(succ_n, df_block.sum_rows.get(succ_n).unwrap().len()),
         for (out_p, v) in fields.enumerate();
+
+    // Call
+    relation func_call(C, Node, Node);
+    func_call(c, call, func_defn) <--
+        node(c, call),
+        if c.get_optype(*call).is_call(),
+        if let Some(func_defn) = c.static_source(*call);
+
+    out_wire_value(c, inp, OutgoingPort::from(p.index()), v) <--
+        func_call(c, call, func),
+        io_node(c, func, inp, IO::Input),
+        in_wire_value(c, call, p, v);
+
+    out_wire_value(c, call, OutgoingPort::from(p.index()), v) <--
+        func_call(c, call, func),
+        io_node(c, func, outp, IO::Output),
+        in_wire_value(c, outp, p, v);
 }
 
 fn propagate_leaf_op<V: AbstractValue>(
@@ -208,6 +225,7 @@ fn propagate_leaf_op<V: AbstractValue>(
             ins.iter().cloned(),
         )])),
         OpType::Input(_) | OpType::Output(_) | OpType::ExitBlock(_) => None, // handled by parent
+        OpType::Call(_) => None,  // handled via Input/Output of FuncDefn
         OpType::Const(_) => None, // handled by LoadConstant:
         OpType::LoadConstant(load_op) => {
             assert!(ins.is_empty()); // static edge, so need to find constant
