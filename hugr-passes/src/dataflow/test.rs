@@ -20,7 +20,7 @@ use rstest::{fixture, rstest};
 
 use super::{AbstractValue, DFContext, Machine, PartialValue, TailLoopTermination};
 
-// ------- Minimal implementation of DFContext and BaseValue -------
+// ------- Minimal implementation of DFContext and AbstractValue -------
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 enum Void {}
 
