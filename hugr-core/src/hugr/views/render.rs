@@ -4,7 +4,7 @@
 use portgraph::render::{EdgeStyle, NodeStyle, PortStyle};
 use portgraph::{LinkView, NodeIndex, PortIndex, PortView};
 
-use crate::ops::NamedOp;
+use crate::ops::{NamedOp, OpType};
 use crate::types::EdgeKind;
 use crate::HugrView;
 
@@ -35,16 +35,24 @@ pub(super) fn node_style<H: HugrView + ?Sized>(
     h: &H,
     config: RenderConfig,
 ) -> Box<dyn FnMut(NodeIndex) -> NodeStyle + '_> {
+    fn node_name<H: HugrView + ?Sized>(h: &H, n: NodeIndex) -> String {
+        match h.get_optype(n.into()) {
+            OpType::FuncDecl(f) => format!("FuncDecl: \"{}\"", f.name),
+            OpType::FuncDefn(f) => format!("FuncDefn: \"{}\"", f.name),
+            op => op.name().to_string(),
+        }
+    }
+
     if config.node_indices {
         Box::new(move |n| {
             NodeStyle::Box(format!(
                 "({ni}) {name}",
                 ni = n.index(),
-                name = h.get_optype(n.into()).name()
+                name = node_name(h, n)
             ))
         })
     } else {
-        Box::new(move |n| NodeStyle::Box(h.get_optype(n.into()).name().to_string()))
+        Box::new(move |n| NodeStyle::Box(node_name(h, n)))
     }
 }
 
