@@ -348,6 +348,12 @@ pub enum Operation<'a> {
         /// The declaration of the constructor.
         decl: &'a ConstructorDecl<'a>,
     },
+
+    /// Declaration for a operation.
+    DeclareOperation {
+        /// The declaration of the operation.
+        decl: &'a OperationDecl<'a>,
+    },
 }
 
 /// A region in the hugr.
@@ -408,6 +414,17 @@ pub struct ConstructorDecl<'a> {
     /// The static parameters of the constructor.
     pub params: &'a [Param<'a>],
     /// The type of the constructed term.
+    pub r#type: TermId,
+}
+
+/// An operation declaration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct OperationDecl<'a> {
+    /// The name of the operation to be declared.
+    pub name: &'a str,
+    /// The static parameters of the operation.
+    pub params: &'a [Param<'a>],
+    /// The type of the operation. This must be a function type.
     pub r#type: TermId,
 }
 

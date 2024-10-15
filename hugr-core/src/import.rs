@@ -284,6 +284,8 @@ impl<'a> Context<'a> {
                 match item {
                     NamedItem::FuncDecl(node) => Ok(*node),
                     NamedItem::FuncDefn(node) => Ok(*node),
+                    NamedItem::CtrDecl(node) => Ok(*node),
+                    NamedItem::OperationDecl(node) => Ok(*node),
                 }
             }
         }
@@ -548,6 +550,10 @@ impl<'a> Context<'a> {
 
             model::Operation::DeclareConstructor { .. } => {
                 Err(error_unsupported!("constructor declaration"))
+            }
+
+            model::Operation::DeclareOperation { .. } => {
+                Err(error_unsupported!("operation declaration"))
             }
         }
     }
@@ -1192,6 +1198,8 @@ impl<'a> Context<'a> {
 enum NamedItem {
     FuncDecl(model::NodeId),
     FuncDefn(model::NodeId),
+    CtrDecl(model::NodeId),
+    OperationDecl(model::NodeId),
 }
 
 struct Names<'a> {
@@ -1211,6 +1219,12 @@ impl<'a> Names<'a> {
                 }
                 model::Operation::DeclareFunc { decl } => {
                     Some((decl.name, NamedItem::FuncDefn(node_id)))
+                }
+                model::Operation::DeclareConstructor { decl } => {
+                    Some((decl.name, NamedItem::CtrDecl(node_id)))
+                }
+                model::Operation::DeclareOperation { decl } => {
+                    Some((decl.name, NamedItem::OperationDecl(node_id)))
                 }
                 _ => None,
             };
