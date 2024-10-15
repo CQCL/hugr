@@ -89,6 +89,12 @@ fn write_operation(mut builder: hugr_capnp::operation::Builder, operation: &mode
             write_list!(builder, init_params, write_param, decl.params);
             builder.set_type(decl.r#type.0);
         }
+        model::Operation::DeclareOperation { decl } => {
+            let mut builder = builder.init_operation_decl();
+            builder.set_name(decl.name);
+            write_list!(builder, init_params, write_param, decl.params);
+            builder.set_type(decl.r#type.0);
+        }
 
         model::Operation::Invalid => builder.set_invalid(()),
     }
