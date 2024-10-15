@@ -104,8 +104,7 @@ impl<V: AbstractValue, C: DFContext<V>> Machine<V, C> {
             self.0
                 .case_reachable
                 .iter()
-                .find(|(_, cond2, case2)| &cond == cond2 && &case == case2)
-                .is_some(),
+                .any(|(_, cond2, case2)| &cond == cond2 && &case == case2),
         )
     }
 
@@ -122,8 +121,7 @@ impl<V: AbstractValue, C: DFContext<V>> Machine<V, C> {
             self.0
                 .bb_reachable
                 .iter()
-                .find(|(_, cfg2, bb2)| *cfg2 == cfg && *bb2 == bb)
-                .is_some(),
+                .any(|(_, cfg2, bb2)| *cfg2 == cfg && *bb2 == bb),
         )
     }
 }

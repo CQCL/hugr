@@ -81,7 +81,7 @@ fn traverse_value<V>(
             .map(PartialValue::from)
             .unwrap_or(PartialValue::Top),
         Value::Function { hugr } => s
-            .value_from_const_hugr(n, fields, &**hugr)
+            .value_from_const_hugr(n, fields, hugr)
             .map(PartialValue::from)
             .unwrap_or(PartialValue::Top),
     }
