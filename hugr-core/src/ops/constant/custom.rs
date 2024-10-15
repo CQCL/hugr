@@ -88,6 +88,8 @@ pub trait CustomConst:
     fn get_type(&self) -> Type;
 }
 
+/// Fallible hash function.
+///
 /// Prerequisite for `CustomConst`. Allows to declare a custom hash function,
 /// but the easiest options are either to `impl TryHash for ... {}` to indicate
 /// "not hashable", or else to implement/derive [Hash].

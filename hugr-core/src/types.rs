@@ -262,6 +262,7 @@ impl<RV: MaybeRV> TypeEnum<RV> {
     try_from = "serialize::SerSimpleType"
 )]
 /// A HUGR type - the valid types of [EdgeKind::Value] and [EdgeKind::Const] edges.
+///
 /// Such an edge is valid if the ports on either end agree on the [Type].
 /// Types have an optional [TypeBound] which places limits on the valid
 /// operations on a type.

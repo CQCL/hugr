@@ -230,7 +230,7 @@ class AsExtOp(DataflowOp, Protocol):
         Computed once using :meth:`op_def` :meth:`type_args` and :meth:`type_args`.
         Each of those methods should be deterministic.
         """
-        return ExtOp(self.op_def(), self.cached_signature(), self.type_args())
+        return self.op_def().instantiate(self.type_args(), self.cached_signature())
 
     def op_def(self) -> ext.OpDef:
         """The :class:`tys.OpDef` for this operation.
@@ -657,7 +657,7 @@ class CFG(DataflowOp):
 class DataflowBlock(DfParentOp):
     """Parent of non-entry basic block in a control flow graph."""
 
-    #: Inputs types of the innner dataflow graph.
+    #: Inputs types of the inner dataflow graph.
     inputs: tys.TypeRow
     _sum: tys.Sum | None = None
     _other_outputs: tys.TypeRow | None = field(default=None, repr=False)
@@ -879,7 +879,7 @@ class Conditional(DataflowOp):
 class Case(DfParentOp):
     """Parent of a dataflow graph that is a branch of a :class:`Conditional`."""
 
-    #: Inputs types of the innner dataflow graph.
+    #: Inputs types of the inner dataflow graph.
     inputs: tys.TypeRow
     _outputs: tys.TypeRow | None = field(default=None, repr=False)
     num_out: int = field(default=0, repr=False)

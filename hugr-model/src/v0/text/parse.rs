@@ -7,7 +7,7 @@ use thiserror::Error;
 
 use crate::v0::{
     AliasDecl, FuncDecl, GlobalRef, LinkRef, LocalRef, MetaItem, Module, Node, NodeId, Operation,
-    Param, Port, Region, RegionId, RegionKind, Term, TermId,
+    Param, Region, RegionId, RegionKind, Term, TermId,
 };
 
 mod pest_parser {
@@ -62,7 +62,6 @@ impl<'a> ParseContext<'a> {
     fn parse_module(&mut self, pair: Pair<'a, Rule>) -> ParseResult<()> {
         debug_assert!(matches!(pair.as_rule(), Rule::module));
         let mut inner = pair.into_inner();
-        let r#type = self.module.insert_term(Term::Wildcard);
         let meta = self.parse_meta(&mut inner)?;
 
         let children = self.parse_nodes(&mut inner)?;
@@ -73,7 +72,7 @@ impl<'a> ParseContext<'a> {
             targets: &[],
             children,
             meta,
-            signature: r#type,
+            signature: None,
         });
 
         self.module.root = root_region;
@@ -163,6 +162,7 @@ impl<'a> ParseContext<'a> {
             Rule::term_str => {
                 // TODO: Escaping?
                 let value = inner.next().unwrap().as_str();
+                let value = &value[1..value.len() - 1];
                 Term::Str(value)
             }
 
@@ -228,7 +228,7 @@ impl<'a> ParseContext<'a> {
             Rule::node_dfg => {
                 let inputs = self.parse_port_list(&mut inner)?;
                 let outputs = self.parse_port_list(&mut inner)?;
-                let r#type = self.parse_type_hint(&mut inner)?;
+                let signature = self.parse_signature(&mut inner)?;
                 let meta = self.parse_meta(&mut inner)?;
                 let regions = self.parse_regions(&mut inner)?;
                 Node {
@@ -238,14 +238,14 @@ impl<'a> ParseContext<'a> {
                     params: &[],
                     regions,
                     meta,
-                    signature: r#type,
+                    signature,
                 }
             }
 
             Rule::node_cfg => {
                 let inputs = self.parse_port_list(&mut inner)?;
                 let outputs = self.parse_port_list(&mut inner)?;
-                let r#type = self.parse_type_hint(&mut inner)?;
+                let signature = self.parse_signature(&mut inner)?;
                 let meta = self.parse_meta(&mut inner)?;
                 let regions = self.parse_regions(&mut inner)?;
                 Node {
@@ -255,14 +255,14 @@ impl<'a> ParseContext<'a> {
                     params: &[],
                     regions,
                     meta,
-                    signature: r#type,
+                    signature,
                 }
             }
 
             Rule::node_block => {
                 let inputs = self.parse_port_list(&mut inner)?;
                 let outputs = self.parse_port_list(&mut inner)?;
-                let r#type = self.parse_type_hint(&mut inner)?;
+                let signature = self.parse_signature(&mut inner)?;
                 let meta = self.parse_meta(&mut inner)?;
                 let regions = self.parse_regions(&mut inner)?;
                 Node {
@@ -272,13 +272,12 @@ impl<'a> ParseContext<'a> {
                     params: &[],
                     regions,
                     meta,
-                    signature: r#type,
+                    signature,
                 }
             }
 
             Rule::node_define_func => {
                 let decl = self.parse_func_header(inner.next().unwrap())?;
-                let r#type = self.module.insert_term(Term::Wildcard);
                 let meta = self.parse_meta(&mut inner)?;
                 let regions = self.parse_regions(&mut inner)?;
                 Node {
@@ -288,13 +287,12 @@ impl<'a> ParseContext<'a> {
                     params: &[],
                     regions,
                     meta,
-                    signature: r#type,
+                    signature: None,
                 }
             }
 
             Rule::node_declare_func => {
                 let decl = self.parse_func_header(inner.next().unwrap())?;
-                let r#type = self.module.insert_term(Term::Wildcard);
                 let meta = self.parse_meta(&mut inner)?;
                 Node {
                     operation: Operation::DeclareFunc { decl },
@@ -303,7 +301,7 @@ impl<'a> ParseContext<'a> {
                     params: &[],
                     regions: &[],
                     meta,
-                    signature: r#type,
+                    signature: None,
                 }
             }
 
@@ -311,7 +309,7 @@ impl<'a> ParseContext<'a> {
                 let func = self.parse_term(inner.next().unwrap())?;
                 let inputs = self.parse_port_list(&mut inner)?;
                 let outputs = self.parse_port_list(&mut inner)?;
-                let r#type = self.parse_type_hint(&mut inner)?;
+                let signature = self.parse_signature(&mut inner)?;
                 let meta = self.parse_meta(&mut inner)?;
                 Node {
                     operation: Operation::CallFunc { func },
@@ -320,7 +318,7 @@ impl<'a> ParseContext<'a> {
                     params: &[],
                     regions: &[],
                     meta,
-                    signature: r#type,
+                    signature,
                 }
             }
 
@@ -328,7 +326,7 @@ impl<'a> ParseContext<'a> {
                 let func = self.parse_term(inner.next().unwrap())?;
                 let inputs = self.parse_port_list(&mut inner)?;
                 let outputs = self.parse_port_list(&mut inner)?;
-                let r#type = self.parse_type_hint(&mut inner)?;
+                let signature = self.parse_signature(&mut inner)?;
                 let meta = self.parse_meta(&mut inner)?;
                 Node {
                     operation: Operation::LoadFunc { func },
@@ -337,14 +335,13 @@ impl<'a> ParseContext<'a> {
                     params: &[],
                     regions: &[],
                     meta,
-                    signature: r#type,
+                    signature,
                 }
             }
 
             Rule::node_define_alias => {
                 let decl = self.parse_alias_header(inner.next().unwrap())?;
                 let value = self.parse_term(inner.next().unwrap())?;
-                let r#type = self.module.insert_term(Term::Wildcard);
                 let meta = self.parse_meta(&mut inner)?;
                 Node {
                     operation: Operation::DefineAlias { decl, value },
@@ -353,13 +350,12 @@ impl<'a> ParseContext<'a> {
                     params: &[],
                     regions: &[],
                     meta,
-                    signature: r#type,
+                    signature: None,
                 }
             }
 
             Rule::node_declare_alias => {
                 let decl = self.parse_alias_header(inner.next().unwrap())?;
-                let r#type = self.module.insert_term(Term::Wildcard);
                 let meta = self.parse_meta(&mut inner)?;
                 Node {
                     operation: Operation::DeclareAlias { decl },
@@ -368,7 +364,7 @@ impl<'a> ParseContext<'a> {
                     params: &[],
                     regions: &[],
                     meta,
-                    signature: r#type,
+                    signature: None,
                 }
             }
 
@@ -397,7 +393,7 @@ impl<'a> ParseContext<'a> {
 
                 let inputs = self.parse_port_list(&mut inner)?;
                 let outputs = self.parse_port_list(&mut inner)?;
-                let r#type = self.parse_type_hint(&mut inner)?;
+                let signature = self.parse_signature(&mut inner)?;
                 let meta = self.parse_meta(&mut inner)?;
                 let regions = self.parse_regions(&mut inner)?;
                 Node {
@@ -407,14 +403,14 @@ impl<'a> ParseContext<'a> {
                     params: self.bump.alloc_slice_copy(&params),
                     regions,
                     meta,
-                    signature: r#type,
+                    signature,
                 }
             }
 
             Rule::node_tail_loop => {
                 let inputs = self.parse_port_list(&mut inner)?;
                 let outputs = self.parse_port_list(&mut inner)?;
-                let r#type = self.parse_type_hint(&mut inner)?;
+                let signature = self.parse_signature(&mut inner)?;
                 let meta = self.parse_meta(&mut inner)?;
                 let regions = self.parse_regions(&mut inner)?;
                 Node {
@@ -424,14 +420,14 @@ impl<'a> ParseContext<'a> {
                     params: &[],
                     regions,
                     meta,
-                    signature: r#type,
+                    signature,
                 }
             }
 
             Rule::node_cond => {
                 let inputs = self.parse_port_list(&mut inner)?;
                 let outputs = self.parse_port_list(&mut inner)?;
-                let r#type = self.parse_type_hint(&mut inner)?;
+                let signature = self.parse_signature(&mut inner)?;
                 let meta = self.parse_meta(&mut inner)?;
                 let regions = self.parse_regions(&mut inner)?;
                 Node {
@@ -441,7 +437,7 @@ impl<'a> ParseContext<'a> {
                     params: &[],
                     regions,
                     meta,
-                    signature: r#type,
+                    signature,
                 }
             }
 
@@ -449,7 +445,7 @@ impl<'a> ParseContext<'a> {
                 let tag = inner.next().unwrap().as_str().parse::<u16>().unwrap();
                 let inputs = self.parse_port_list(&mut inner)?;
                 let outputs = self.parse_port_list(&mut inner)?;
-                let r#type = self.parse_type_hint(&mut inner)?;
+                let signature = self.parse_signature(&mut inner)?;
                 let meta = self.parse_meta(&mut inner)?;
                 Node {
                     operation: Operation::Tag { tag },
@@ -458,7 +454,7 @@ impl<'a> ParseContext<'a> {
                     params: &[],
                     regions: &[],
                     meta,
-                    signature: r#type,
+                    signature,
                 }
             }
 
@@ -492,7 +488,7 @@ impl<'a> ParseContext<'a> {
 
         let sources = self.parse_port_list(&mut inner)?;
         let targets = self.parse_port_list(&mut inner)?;
-        let r#type = self.parse_type_hint(&mut inner)?;
+        let signature = self.parse_signature(&mut inner)?;
         let meta = self.parse_meta(&mut inner)?;
         let children = self.parse_nodes(&mut inner)?;
 
@@ -502,7 +498,7 @@ impl<'a> ParseContext<'a> {
             targets,
             children,
             meta,
-            signature: r#type,
+            signature,
         }))
     }
 
@@ -589,46 +585,37 @@ impl<'a> ParseContext<'a> {
         Ok(self.bump.alloc_slice_copy(&params))
     }
 
-    fn parse_type_hint(&mut self, pairs: &mut Pairs<'a, Rule>) -> ParseResult<TermId> {
-        let Some(Rule::type_hint) = pairs.peek().map(|p| p.as_rule()) else {
-            return Ok(self.module.insert_term(Term::Wildcard));
+    fn parse_signature(&mut self, pairs: &mut Pairs<'a, Rule>) -> ParseResult<Option<TermId>> {
+        let Some(Rule::signature) = pairs.peek().map(|p| p.as_rule()) else {
+            return Ok(None);
         };
 
         let pair = pairs.next().unwrap();
-        self.parse_term(pair.into_inner().next().unwrap())
+        let signature = self.parse_term(pair.into_inner().next().unwrap())?;
+        Ok(Some(signature))
     }
 
-    fn parse_port_list(&mut self, pairs: &mut Pairs<'a, Rule>) -> ParseResult<&'a [Port<'a>]> {
+    fn parse_port_list(&mut self, pairs: &mut Pairs<'a, Rule>) -> ParseResult<&'a [LinkRef<'a>]> {
         let Some(Rule::port_list) = pairs.peek().map(|p| p.as_rule()) else {
             return Ok(&[]);
         };
 
         let pair = pairs.next().unwrap();
         let inner = pair.into_inner();
-        let mut ports = Vec::new();
+        let mut links = Vec::new();
 
         for token in inner {
-            let port = self.parse_port(token)?;
-            ports.push(port);
+            links.push(self.parse_port(token)?);
         }
 
-        Ok(self.bump.alloc_slice_copy(&ports))
+        Ok(self.bump.alloc_slice_copy(&links))
     }
 
-    fn parse_port(&mut self, pair: Pair<'a, Rule>) -> ParseResult<Port<'a>> {
+    fn parse_port(&mut self, pair: Pair<'a, Rule>) -> ParseResult<LinkRef<'a>> {
         debug_assert!(matches!(pair.as_rule(), Rule::port));
-
         let mut inner = pair.into_inner();
-
-        let link = LinkRef::Named(inner.next().unwrap().as_str());
-
-        let mut r#type = None;
-
-        if inner.peek().is_some() {
-            r#type = Some(self.parse_term(inner.next().unwrap())?);
-        }
-
-        Ok(Port { link, r#type })
+        let link = LinkRef::Named(&inner.next().unwrap().as_str()[1..]);
+        Ok(link)
     }
 
     fn parse_meta(&mut self, pairs: &mut Pairs<'a, Rule>) -> ParseResult<&'a [MetaItem<'a>]> {

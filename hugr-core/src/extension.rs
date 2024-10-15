@@ -452,8 +452,9 @@ pub enum ExtensionBuildError {
 pub struct ExtensionSet(BTreeSet<ExtensionId>);
 
 /// A special ExtensionId which indicates that the delta of a non-Function
-/// container node should be computed by extension inference. See [`infer_extensions`]
-/// which lists the container nodes to which this can be applied.
+/// container node should be computed by extension inference.
+///
+/// See [`infer_extensions`] which lists the container nodes to which this can be applied.
 ///
 /// [`infer_extensions`]: crate::hugr::Hugr::infer_extensions
 pub const TO_BE_INFERRED: ExtensionId = ExtensionId::new_unchecked(".TO_BE_INFERRED");

@@ -6,6 +6,7 @@ from hugr import ext, ops, tys
 from hugr.build.dfg import Dfg
 from hugr.hugr import Hugr, Node
 from hugr.ops import AsExtOp, Custom, ExtOp
+from hugr.package import Package
 from hugr.std.float import FLOAT_T
 from hugr.std.float import FLOAT_TYPES_EXTENSION as FLOAT_EXT
 from hugr.std.int import INT_OPS_EXTENSION, INT_TYPES_EXTENSION, DivMod, int_t
@@ -56,7 +57,7 @@ def test_stringly_typed():
     n = dfg.add(StringlyOp("world")())
     dfg.set_outputs()
     assert dfg.hugr[n].op == StringlyOp("world")
-    validate(ext.Package([dfg.hugr], [STRINGLY_EXT]))
+    validate(Package([dfg.hugr], [STRINGLY_EXT]))
 
     new_h = Hugr._from_serial(dfg.hugr._to_serial())
 

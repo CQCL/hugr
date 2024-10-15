@@ -15,29 +15,41 @@ expression: "roundtrip(include_str!(\"fixtures/model-call.edn\"))"
   [(@ arithmetic.int.types.int)]
   (ext arithmetic.int)
   (dfg
-    [(%0 (@ arithmetic.int.types.int))]
-    [(%1 (@ arithmetic.int.types.int))]
-    (call
-      (@ example.callee (ext))
-      [(%0 (@ arithmetic.int.types.int))]
-      [(%1 (@ arithmetic.int.types.int))])))
+    [%0] [%1]
+    (signature
+      (fn
+        [(@ arithmetic.int.types.int)]
+        [(@ arithmetic.int.types.int)]
+        (ext arithmetic.int)))
+    (call (@ example.callee (ext)) [%0] [%1]
+      (signature
+        (fn
+          [(@ arithmetic.int.types.int)]
+          [(@ arithmetic.int.types.int)]
+          (ext arithmetic.int))))))
 
 (define-func example.load
   []
-  [(fn [(@ arithmetic.int.types.int)] [(@ arithmetic.int.types.int)] (ext))]
+  [(fn
+     [(@ arithmetic.int.types.int)]
+     [(@ arithmetic.int.types.int)]
+     (ext arithmetic.int))]
   (ext)
   (dfg
-    []
-    [(%2
-       (fn
-         [(@ arithmetic.int.types.int)]
-         [(@ arithmetic.int.types.int)]
-         (ext)))]
-    (load-func
-      (@ example.caller)
-      []
-      [(%2
-         (fn
+    (signature
+      (fn
+        []
+        [(fn
            [(@ arithmetic.int.types.int)]
            [(@ arithmetic.int.types.int)]
-           (ext arithmetic.int)))])))
+           (ext arithmetic.int))]
+        (ext)))
+    (load-func (@ example.caller)
+      (signature
+        (fn
+          []
+          [(fn
+             [(@ arithmetic.int.types.int)]
+             [(@ arithmetic.int.types.int)]
+             (ext arithmetic.int))]
+          (ext))))))

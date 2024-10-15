@@ -26,6 +26,8 @@ use itertools::Either;
 use smol_str::{SmolStr, ToSmolStr};
 use thiserror::Error;
 
+type FxIndexMap<K, V> = IndexMap<K, V, fxhash::FxBuildHasher>;
+
 /// Error during import.
 #[derive(Debug, Clone, Error)]
 pub enum ImportError {
@@ -76,6 +78,7 @@ pub fn import_hugr(
         extensions,
         nodes: FxHashMap::default(),
         local_variables: IndexMap::default(),
+        custom_name_cache: FxHashMap::default(),
     };
 
     ctx.import_root()?;
@@ -111,31 +114,19 @@ struct Context<'a> {
     nodes: FxHashMap<model::NodeId, Node>,
 
     /// The types of the local variables that are currently in scope.
-    local_variables: IndexMap<&'a str, model::TermId>,
+    local_variables: FxIndexMap<&'a str, model::TermId>,
+
+    custom_name_cache: FxHashMap<&'a str, (ExtensionId, SmolStr)>,
 }
 
 impl<'a> Context<'a> {
-    /// Get the types of the given ports and assemble them into a `TypeRow`.
-    fn get_port_types(&mut self, ports: &[model::Port]) -> Result<TypeRow, ImportError> {
-        let types = ports
-            .iter()
-            .map(|port| match port.r#type {
-                Some(r#type) => self.import_type(r#type),
-                None => Err(error_uninferred!("port type")),
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-
-        Ok(types.into())
-    }
-
-    /// Get the signature of the node with the given `NodeId`, using the type information
-    /// attached to the node's ports in the module.
+    /// Get the signature of the node with the given `NodeId`.
     fn get_node_signature(&mut self, node: model::NodeId) -> Result<Signature, ImportError> {
-        let node = self.get_node(node)?;
-        let inputs = self.get_port_types(node.inputs)?;
-        let outputs = self.get_port_types(node.outputs)?;
-        // This creates a signature with empty extension set.
-        Ok(Signature::new(inputs, outputs))
+        let node_data = self.get_node(node)?;
+        let signature = node_data
+            .signature
+            .ok_or_else(|| error_uninferred!("node signature"))?;
+        self.import_func_type(signature)
     }
 
     /// Get the node with the given `NodeId`, or return an error if it does not exist.
@@ -168,7 +159,7 @@ impl<'a> Context<'a> {
         local_ref: &model::LocalRef,
     ) -> Result<(usize, model::TermId), ImportError> {
         let term = match local_ref {
-            model::LocalRef::Index(index) => self
+            model::LocalRef::Index(_, index) => self
                 .local_variables
                 .get_index(*index as usize)
                 .map(|(_, term)| (*index as usize, *term)),
@@ -197,44 +188,14 @@ impl<'a> Context<'a> {
     }
 
     /// Associate links with the ports of the given node in the given direction.
-    fn record_links(&mut self, node: Node, direction: Direction, ports: &'a [model::Port]) {
+    fn record_links(&mut self, node: Node, direction: Direction, links: &'a [model::LinkRef<'a>]) {
         let optype = self.hugr.get_optype(node);
-
         // NOTE: `OpType::port_count` copies the signature, which significantly slows down the import.
-        debug_assert!(ports.len() <= optype.port_count(direction));
+        debug_assert!(links.len() <= optype.port_count(direction));
 
-        for (model_port, port) in ports.iter().zip(self.hugr.node_ports(node, direction)) {
-            self.link_ports
-                .entry(model_port.link)
-                .or_default()
-                .push((node, port));
+        for (link, port) in links.iter().zip(self.hugr.node_ports(node, direction)) {
+            self.link_ports.entry(*link).or_default().push((node, port));
         }
-    }
-
-    fn make_input_node(
-        &mut self,
-        parent: Node,
-        ports: &'a [model::Port],
-    ) -> Result<Node, ImportError> {
-        let types = self.get_port_types(ports)?;
-        let node = self
-            .hugr
-            .add_node_with_parent(parent, OpType::Input(Input { types }));
-        self.record_links(node, Direction::Outgoing, ports);
-        Ok(node)
-    }
-
-    fn make_output_node(
-        &mut self,
-        parent: Node,
-        ports: &'a [model::Port],
-    ) -> Result<Node, ImportError> {
-        let types = self.get_port_types(ports)?;
-        let node = self
-            .hugr
-            .add_node_with_parent(parent, OpType::Output(Output { types }));
-        self.record_links(node, Direction::Incoming, ports);
-        Ok(node)
     }
 
     /// Link up the ports in the hugr graph, according to the connectivity information that
@@ -377,6 +338,7 @@ impl<'a> Context<'a> {
         let node_data = self.get_node(node_id)?;
 
         match node_data.operation {
+            model::Operation::Invalid => Err(model::ModelError::InvalidOperation(node_id).into()),
             model::Operation::Dfg => {
                 let signature = self.get_node_signature(node_id)?;
                 let optype = OpType::DFG(DFG { signature });
@@ -569,7 +531,11 @@ impl<'a> Context<'a> {
             }),
 
             model::Operation::Tag { tag } => {
-                let (variants, _) = self.import_adt_and_rest(node_id, node_data.outputs)?;
+                let signature = node_data
+                    .signature
+                    .ok_or_else(|| error_uninferred!("node signature"))?;
+                let (_, outputs, _) = self.get_func_type(signature)?;
+                let (variants, _) = self.import_adt_and_rest(node_id, outputs)?;
                 self.make_node(
                     node_id,
                     OpType::Tag(Tag {
@@ -594,8 +560,29 @@ impl<'a> Context<'a> {
             return Err(model::ModelError::InvalidRegions(node_id).into());
         }
 
-        self.make_input_node(node, region_data.sources)?;
-        self.make_output_node(node, region_data.targets)?;
+        let signature = self.import_func_type(
+            region_data
+                .signature
+                .ok_or_else(|| error_uninferred!("region signature"))?,
+        )?;
+
+        // Create the input and output nodes
+        let input = self.hugr.add_node_with_parent(
+            node,
+            OpType::Input(Input {
+                types: signature.input,
+            }),
+        );
+        let output = self.hugr.add_node_with_parent(
+            node,
+            OpType::Output(Output {
+                types: signature.output,
+            }),
+        );
+
+        // Make sure that the ports of the input/output nodes are connected correctly
+        self.record_links(input, Direction::Outgoing, region_data.sources);
+        self.record_links(output, Direction::Incoming, region_data.targets);
 
         for child in region_data.children {
             self.import_node(*child, node)?;
@@ -607,25 +594,27 @@ impl<'a> Context<'a> {
     fn import_adt_and_rest(
         &mut self,
         node_id: model::NodeId,
-        ports: &'a [model::Port<'a>],
+        list: model::TermId,
     ) -> Result<(Vec<TypeRow>, TypeRow), ImportError> {
-        let Some((first, rest)) = ports.split_first() else {
+        let items = self.import_closed_list(list)?;
+
+        let Some((first, rest)) = items.split_first() else {
             return Err(model::ModelError::InvalidRegions(node_id).into());
         };
 
         let sum_rows: Vec<_> = {
-            let Some(term) = first.r#type else {
-                return Err(error_uninferred!("port type"));
-            };
-
-            let model::Term::Adt { variants } = self.get_term(term)? else {
-                return Err(model::ModelError::TypeError(term).into());
+            let model::Term::Adt { variants } = self.get_term(*first)? else {
+                return Err(model::ModelError::TypeError(*first).into());
             };
 
             self.import_type_rows(*variants)?
         };
 
-        let rest = self.get_port_types(rest)?;
+        let rest = rest
+            .iter()
+            .map(|term| self.import_type(*term))
+            .collect::<Result<Vec<_>, _>>()?
+            .into();
 
         Ok((sum_rows, rest))
     }
@@ -643,20 +632,22 @@ impl<'a> Context<'a> {
         };
         let region_data = self.get_region(*region)?;
 
-        let (sum_rows, rest) = self.import_adt_and_rest(node_id, region_data.targets)?;
+        let (_, region_outputs, _) = self.get_func_type(
+            region_data
+                .signature
+                .ok_or_else(|| error_uninferred!("region signature"))?,
+        )?;
+        let (sum_rows, rest) = self.import_adt_and_rest(node_id, region_outputs)?;
 
         let (just_inputs, just_outputs) = {
             let mut sum_rows = sum_rows.into_iter();
 
-            // NOTE: This can not fail since else `import_adt_and_rest` would have failed before.
-            let term = region_data.targets[0].r#type.unwrap();
-
             let Some(just_inputs) = sum_rows.next() else {
-                return Err(model::ModelError::TypeError(term).into());
+                return Err(model::ModelError::TypeError(region_outputs).into());
             };
 
             let Some(just_outputs) = sum_rows.next() else {
-                return Err(model::ModelError::TypeError(term).into());
+                return Err(model::ModelError::TypeError(region_outputs).into());
             };
 
             (just_inputs, just_outputs)
@@ -682,9 +673,13 @@ impl<'a> Context<'a> {
     ) -> Result<Node, ImportError> {
         let node_data = self.get_node(node_id)?;
         debug_assert_eq!(node_data.operation, model::Operation::Conditional);
-
-        let (sum_rows, other_inputs) = self.import_adt_and_rest(node_id, node_data.inputs)?;
-        let outputs = self.get_port_types(node_data.outputs)?;
+        let (inputs, outputs, _) = self.get_func_type(
+            node_data
+                .signature
+                .ok_or_else(|| error_uninferred!("node signature"))?,
+        )?;
+        let (sum_rows, other_inputs) = self.import_adt_and_rest(node_id, inputs)?;
+        let outputs = self.import_type_row(outputs)?;
 
         let optype = OpType::Conditional(Conditional {
             sum_rows,
@@ -697,10 +692,11 @@ impl<'a> Context<'a> {
 
         for region in node_data.regions {
             let region_data = self.get_region(*region)?;
-
-            let source_types = self.get_port_types(region_data.sources)?;
-            let target_types = self.get_port_types(region_data.targets)?;
-            let signature = FuncTypeBase::new(source_types, target_types);
+            let signature = self.import_func_type(
+                region_data
+                    .signature
+                    .ok_or_else(|| error_uninferred!("region signature"))?,
+            )?;
 
             let case_node = self
                 .hugr
@@ -709,114 +705,6 @@ impl<'a> Context<'a> {
             self.import_dfg_region(node_id, *region, case_node)?;
         }
 
-        Ok(node)
-    }
-
-    /// Create the entry block for a control flow region.
-    ///
-    /// Since the core hugr does not have explicit entry blocks yet, we create a dataflow block
-    /// that simply forwards its inputs to its outputs.
-    fn make_entry_node(
-        &mut self,
-        parent: Node,
-        parent_id: model::NodeId,
-        ports: &'a [model::Port<'a>],
-    ) -> Result<Node, ImportError> {
-        let types = {
-            let [port] = ports else {
-                return Err(model::ModelError::InvalidRegions(parent_id).into());
-            };
-
-            let Some(port_type) = port.r#type else {
-                return Err(error_uninferred!("port type"));
-            };
-
-            let model::Term::Control { values: types } = self.get_term(port_type)? else {
-                return Err(model::ModelError::TypeError(port_type).into());
-            };
-
-            self.import_type_row(*types)?
-        };
-
-        let node = self.hugr.add_node_with_parent(
-            parent,
-            OpType::DataflowBlock(DataflowBlock {
-                inputs: types.clone(),
-                other_outputs: TypeRow::default(),
-                sum_rows: vec![types.clone()],
-                extension_delta: ExtensionSet::default(),
-            }),
-        );
-
-        self.record_links(node, Direction::Outgoing, ports);
-
-        let node_input = self.hugr.add_node_with_parent(
-            node,
-            OpType::Input(Input {
-                types: types.clone(),
-            }),
-        );
-
-        let node_output = self.hugr.add_node_with_parent(
-            node,
-            OpType::Output(Output {
-                types: vec![Type::new_sum([types.clone()])].into(),
-            }),
-        );
-
-        let node_tag = self.hugr.add_node_with_parent(
-            node,
-            OpType::Tag(Tag {
-                tag: 0,
-                variants: vec![types],
-            }),
-        );
-
-        // Connect the input node to the tag node
-        let input_outputs = self.hugr.node_outputs(node_input);
-        let tag_inputs = self.hugr.node_inputs(node_tag);
-
-        for (a, b) in input_outputs.zip(tag_inputs) {
-            self.hugr.connect(node_input, a, node_tag, b);
-        }
-
-        // Connect the tag node to the output node
-        let tag_outputs = self.hugr.node_outputs(node_tag);
-        let output_inputs = self.hugr.node_inputs(node_output);
-
-        for (a, b) in tag_outputs.zip(output_inputs) {
-            self.hugr.connect(node_tag, a, node_output, b);
-        }
-
-        Ok(node)
-    }
-
-    fn make_exit_node(
-        &mut self,
-        parent: Node,
-        parent_id: model::NodeId,
-        ports: &'a [model::Port<'a>],
-    ) -> Result<Node, ImportError> {
-        let cfg_outputs = {
-            let [port] = ports else {
-                return Err(model::ModelError::InvalidRegions(parent_id).into());
-            };
-
-            let Some(port_type) = port.r#type else {
-                return Err(error_uninferred!("port type"));
-            };
-
-            let model::Term::Control { values: types } = self.get_term(port_type)? else {
-                return Err(model::ModelError::TypeError(port_type).into());
-            };
-
-            self.import_type_row(*types)?
-        };
-
-        let node = self
-            .hugr
-            .add_node_with_parent(parent, OpType::ExitBlock(ExitBlock { cfg_outputs }));
-        self.record_links(node, Direction::Incoming, ports);
         Ok(node)
     }
 
@@ -832,13 +720,105 @@ impl<'a> Context<'a> {
             return Err(model::ModelError::InvalidRegions(node_id).into());
         }
 
-        self.make_entry_node(node, node_id, region_data.sources)?;
+        let (region_source, region_targets, _) = self.get_func_type(
+            region_data
+                .signature
+                .ok_or_else(|| error_uninferred!("region signature"))?,
+        )?;
+
+        let region_source_types = self.import_closed_list(region_source)?;
+        let region_target_types = self.import_closed_list(region_targets)?;
+
+        // Create the entry node for the control flow region.
+        // Since the core hugr does not have explicit entry blocks yet, we create a dataflow block
+        // that simply forwards its inputs to its outputs.
+        {
+            let types = {
+                let [ctrl_type] = region_source_types.as_slice() else {
+                    return Err(model::ModelError::TypeError(region_source).into());
+                };
+
+                let model::Term::Control { values: types } = self.get_term(*ctrl_type)? else {
+                    return Err(model::ModelError::TypeError(*ctrl_type).into());
+                };
+
+                self.import_type_row(*types)?
+            };
+
+            let entry = self.hugr.add_node_with_parent(
+                node,
+                OpType::DataflowBlock(DataflowBlock {
+                    inputs: types.clone(),
+                    other_outputs: TypeRow::default(),
+                    sum_rows: vec![types.clone()],
+                    extension_delta: ExtensionSet::default(),
+                }),
+            );
+
+            self.record_links(entry, Direction::Outgoing, region_data.sources);
+
+            let node_input = self.hugr.add_node_with_parent(
+                entry,
+                OpType::Input(Input {
+                    types: types.clone(),
+                }),
+            );
+
+            let node_output = self.hugr.add_node_with_parent(
+                entry,
+                OpType::Output(Output {
+                    types: vec![Type::new_sum([types.clone()])].into(),
+                }),
+            );
+
+            let node_tag = self.hugr.add_node_with_parent(
+                entry,
+                OpType::Tag(Tag {
+                    tag: 0,
+                    variants: vec![types],
+                }),
+            );
+
+            // Connect the input node to the tag node
+            let input_outputs = self.hugr.node_outputs(node_input);
+            let tag_inputs = self.hugr.node_inputs(node_tag);
+
+            for (a, b) in input_outputs.zip(tag_inputs) {
+                self.hugr.connect(node_input, a, node_tag, b);
+            }
+
+            // Connect the tag node to the output node
+            let tag_outputs = self.hugr.node_outputs(node_tag);
+            let output_inputs = self.hugr.node_inputs(node_output);
+
+            for (a, b) in tag_outputs.zip(output_inputs) {
+                self.hugr.connect(node_tag, a, node_output, b);
+            }
+        }
 
         for child in region_data.children {
             self.import_node(*child, node)?;
         }
 
-        self.make_exit_node(node, node_id, region_data.targets)?;
+        // Create the exit node for the control flow region.
+        {
+            let cfg_outputs = {
+                let [ctrl_type] = region_target_types.as_slice() else {
+                    return Err(model::ModelError::TypeError(region_targets).into());
+                };
+
+                let model::Term::Control { values: types } = self.get_term(*ctrl_type)? else {
+                    return Err(model::ModelError::TypeError(*ctrl_type).into());
+                };
+
+                self.import_type_row(*types)?
+            };
+
+            let exit = self
+                .hugr
+                .add_node_with_parent(node, OpType::ExitBlock(ExitBlock { cfg_outputs }));
+            self.record_links(exit, Direction::Incoming, region_data.targets);
+        }
 
         Ok(())
     }
@@ -855,14 +835,20 @@ impl<'a> Context<'a> {
             return Err(model::ModelError::InvalidRegions(node_id).into());
         };
         let region_data = self.get_region(*region)?;
-        let inputs = self.get_port_types(region_data.sources)?;
-        let (sum_rows, other_outputs) = self.import_adt_and_rest(node_id, region_data.targets)?;
+        let (inputs, outputs, extensions) = self.get_func_type(
+            region_data
+                .signature
+                .ok_or_else(|| error_uninferred!("region signature"))?,
+        )?;
+        let inputs = self.import_type_row(inputs)?;
+        let (sum_rows, other_outputs) = self.import_adt_and_rest(node_id, outputs)?;
+        let extension_delta = self.import_extension_set(extensions)?;
 
         let optype = OpType::DataflowBlock(DataflowBlock {
             inputs,
             other_outputs,
             sum_rows,
-            extension_delta: ExtensionSet::new(),
+            extension_delta,
         });
         let node = self.make_node(node_id, optype, parent)?;
 
@@ -1099,24 +1085,28 @@ impl<'a> Context<'a> {
         }
     }
 
+    fn get_func_type(
+        &mut self,
+        term_id: model::TermId,
+    ) -> Result<(model::TermId, model::TermId, model::TermId), ImportError> {
+        match self.get_term(term_id)? {
+            model::Term::FuncType {
+                inputs,
+                outputs,
+                extensions,
+            } => Ok((*inputs, *outputs, *extensions)),
+            _ => Err(model::ModelError::TypeError(term_id).into()),
+        }
+    }
+
     fn import_func_type<RV: MaybeRV>(
         &mut self,
         term_id: model::TermId,
     ) -> Result<FuncTypeBase<RV>, ImportError> {
-        let term = self.get_term(term_id)?;
-
-        let model::Term::FuncType {
-            inputs,
-            outputs,
-            extensions,
-        } = term
-        else {
-            return Err(model::ModelError::TypeError(term_id).into());
-        };
-
-        let inputs = self.import_type_row::<RV>(*inputs)?;
-        let outputs = self.import_type_row::<RV>(*outputs)?;
-        let extensions = self.import_extension_set(*extensions)?;
+        let (inputs, outputs, extensions) = self.get_func_type(term_id)?;
+        let inputs = self.import_type_row::<RV>(inputs)?;
+        let outputs = self.import_type_row::<RV>(outputs)?;
+        let extensions = self.import_extension_set(extensions)?;
         Ok(FuncTypeBase::new(inputs, outputs).with_extension_delta(extensions))
     }
 
@@ -1124,6 +1114,9 @@ impl<'a> Context<'a> {
         &mut self,
         mut term_id: model::TermId,
     ) -> Result<Vec<model::TermId>, ImportError> {
+        // PERFORMANCE: We currently allocate a Vec here to collect list items
+        // into, in order to handle the case where the tail of the list is another
+        // list. We should avoid this.
         let mut list_items = Vec::new();
 
         loop {
@@ -1146,6 +1139,16 @@ impl<'a> Context<'a> {
         Ok(list_items)
     }
 
+    fn import_type_rows<RV: MaybeRV>(
+        &mut self,
+        term_id: model::TermId,
+    ) -> Result<Vec<TypeRowBase<RV>>, ImportError> {
+        self.import_closed_list(term_id)?
+            .iter()
+            .map(|row| self.import_type_row::<RV>(*row))
+            .collect()
+    }
+
     fn import_type_row<RV: MaybeRV>(
         &mut self,
         term_id: model::TermId,
@@ -1159,27 +1162,25 @@ impl<'a> Context<'a> {
         Ok(items.into())
     }
 
-    fn import_type_rows<RV: MaybeRV>(
+    fn import_custom_name(
         &mut self,
-        term_id: model::TermId,
-    ) -> Result<Vec<TypeRowBase<RV>>, ImportError> {
-        let items = self
-            .import_closed_list(term_id)?
-            .iter()
-            .map(|item| self.import_type_row(*item))
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(items)
-    }
+        symbol: &'a str,
+    ) -> Result<(ExtensionId, SmolStr), ImportError> {
+        use std::collections::hash_map::Entry;
+        match self.custom_name_cache.entry(symbol) {
+            Entry::Occupied(occupied_entry) => Ok(occupied_entry.get().clone()),
+            Entry::Vacant(vacant_entry) => {
+                let qualified_name = ExtensionId::new(symbol)
+                    .map_err(|_| model::ModelError::MalformedName(symbol.to_smolstr()))?;
 
-    fn import_custom_name(&self, symbol: &'a str) -> Result<(ExtensionId, SmolStr), ImportError> {
-        let qualified_name = ExtensionId::new(symbol)
-            .map_err(|_| model::ModelError::MalformedName(symbol.to_smolstr()))?;
+                let (extension, id) = qualified_name
+                    .split_last()
+                    .ok_or_else(|| model::ModelError::MalformedName(symbol.to_smolstr()))?;
 
-        let (extension, id) = qualified_name
-            .split_last()
-            .ok_or_else(|| model::ModelError::MalformedName(symbol.to_smolstr()))?;
-
-        Ok((extension, id))
+                vacant_entry.insert((extension.clone(), id.clone()));
+                Ok((extension, id))
+            }
+        }
     }
 }
 

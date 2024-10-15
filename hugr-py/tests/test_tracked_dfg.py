@@ -2,7 +2,7 @@ import pytest
 
 from hugr import tys
 from hugr.build.tracked_dfg import TrackedDfg
-from hugr.ext import Package
+from hugr.package import Package
 from hugr.std.float import FLOAT_T, FloatVal
 from hugr.std.logic import Not
 

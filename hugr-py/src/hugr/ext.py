@@ -1,4 +1,4 @@
-"""HUGR extensions and packages."""
+"""HUGR extensions."""
 
 from __future__ import annotations
 
@@ -20,7 +20,6 @@ __all__ = [
     "OpDef",
     "ExtensionValue",
     "Extension",
-    "Package",
     "Version",
 ]
 
@@ -219,6 +218,20 @@ class OpDef(ExtensionObject):
             return f"{ext_name}.{self.name}"
         return self.name
 
+    def instantiate(
+        self,
+        args: Sequence[tys.TypeArg] | None = None,
+        concrete_signature: tys.FunctionType | None = None,
+    ) -> ops.ExtOp:
+        """Instantiate an operation from this definition.
+
+        Args:
+            args: Type arguments corresponding to the type parameters of the definition.
+            concrete_signature: Concrete function type of the operation, only required
+            if the operation is polymorphic.
+        """
+        return ops.ExtOp(self, concrete_signature, list(args or []))
+
 
 @dataclass
 class ExtensionValue(ExtensionObject):
@@ -272,6 +285,22 @@ class Extension:
             values={k: v._to_serial() for k, v in self.values.items()},
             operations={k: v._to_serial() for k, v in self.operations.items()},
         )
+
+    def to_json(self) -> str:
+        """Serialize the extension to a JSON string."""
+        return self._to_serial().model_dump_json()
+
+    @classmethod
+    def from_json(cls, json_str: str) -> Extension:
+        """Deserialize a JSON string to a Extension object.
+
+        Args:
+            json_str: The JSON string representing a Extension.
+
+        Returns:
+            The deserialized Extension object.
+        """
+        return ext_s.Extension.model_validate_json(json_str).deserialize()
 
     def add_op_def(self, op_def: OpDef) -> OpDef:
         """Add an operation definition to the extension.
@@ -456,26 +485,3 @@ class ExtensionRegistry:
             return self.extensions[name]
         except KeyError as e:
             raise self.ExtensionNotFound(name) from e
-
-
-@dataclass
-class Package:
-    """A package of HUGR modules and extensions.
-
-
-    The HUGRs may refer to the included extensions or those not included.
-    """
-
-    #: HUGR modules in the package.
-    modules: list[Hugr]
-    #: Extensions included in the package.
-    extensions: list[Extension] = field(default_factory=list)
-
-    def _to_serial(self) -> ext_s.Package:
-        return ext_s.Package(
-            modules=[m._to_serial() for m in self.modules],
-            extensions=[e._to_serial() for e in self.extensions],
-        )
-
-    def to_json(self) -> str:
-        return self._to_serial().model_dump_json()

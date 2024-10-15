@@ -2,8 +2,8 @@ use pretty::{Arena, DocAllocator, RefDoc};
 use std::borrow::Cow;
 
 use crate::v0::{
-    GlobalRef, LinkRef, LocalRef, MetaItem, ModelError, Module, NodeId, Operation, Param, Port,
-    RegionId, RegionKind, Term, TermId,
+    GlobalRef, LinkRef, LocalRef, MetaItem, ModelError, Module, NodeId, Operation, Param, RegionId,
+    RegionKind, Term, TermId,
 };
 
 type PrintError = ModelError;
@@ -143,33 +143,31 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
             .ok_or_else(|| PrintError::NodeNotFound(node_id))?;
 
         self.print_parens(|this| match &node_data.operation {
+            Operation::Invalid => Err(ModelError::InvalidOperation(node_id)),
             Operation::Dfg => {
                 this.print_group(|this| {
                     this.print_text("dfg");
-                    this.print_port_list(node_data.inputs)?;
-                    this.print_port_list(node_data.outputs)
+                    this.print_port_lists(node_data.inputs, node_data.outputs)
                 })?;
-                this.print_type_hint(node_data.signature)?;
+                this.print_signature(node_data.signature)?;
                 this.print_meta(node_data.meta)?;
                 this.print_regions(node_data.regions)
             }
             Operation::Cfg => {
                 this.print_group(|this| {
                     this.print_text("cfg");
-                    this.print_port_list(node_data.inputs)?;
-                    this.print_port_list(node_data.outputs)
+                    this.print_port_lists(node_data.inputs, node_data.outputs)
                 })?;
-                this.print_type_hint(node_data.signature)?;
+                this.print_signature(node_data.signature)?;
                 this.print_meta(node_data.meta)?;
                 this.print_regions(node_data.regions)
             }
             Operation::Block => {
                 this.print_group(|this| {
                     this.print_text("block");
-                    this.print_port_list(node_data.inputs)?;
-                    this.print_port_list(node_data.outputs)
+                    this.print_port_lists(node_data.inputs, node_data.outputs)
                 })?;
-                this.print_type_hint(node_data.signature)?;
+                this.print_signature(node_data.signature)?;
                 this.print_meta(node_data.meta)?;
                 this.print_regions(node_data.regions)
             }
@@ -238,10 +236,9 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_group(|this| {
                     this.print_text("call");
                     this.print_term(*func)?;
-                    this.print_port_list(node_data.inputs)?;
-                    this.print_port_list(node_data.outputs)
+                    this.print_port_lists(node_data.inputs, node_data.outputs)
                 })?;
-                this.print_type_hint(node_data.signature)?;
+                this.print_signature(node_data.signature)?;
                 this.print_meta(node_data.meta)?;
                 Ok(())
             }
@@ -250,10 +247,9 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_group(|this| {
                     this.print_text("load-func");
                     this.print_term(*func)?;
-                    this.print_port_list(node_data.inputs)?;
-                    this.print_port_list(node_data.outputs)
+                    this.print_port_lists(node_data.inputs, node_data.outputs)
                 })?;
-                this.print_type_hint(node_data.signature)?;
+                this.print_signature(node_data.signature)?;
                 this.print_meta(node_data.meta)?;
                 Ok(())
             }
@@ -274,10 +270,9 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                         })?;
                     }
 
-                    this.print_port_list(node_data.inputs)?;
-                    this.print_port_list(node_data.outputs)
+                    this.print_port_lists(node_data.inputs, node_data.outputs)
                 })?;
-                this.print_type_hint(node_data.signature)?;
+                this.print_signature(node_data.signature)?;
                 this.print_meta(node_data.meta)?;
                 this.print_regions(node_data.regions)
             }
@@ -295,10 +290,9 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                         Ok(())
                     })?;
 
-                    this.print_port_list(node_data.inputs)?;
-                    this.print_port_list(node_data.outputs)
+                    this.print_port_lists(node_data.inputs, node_data.outputs)
                 })?;
-                this.print_type_hint(node_data.signature)?;
+                this.print_signature(node_data.signature)?;
                 this.print_meta(node_data.meta)?;
                 this.print_regions(node_data.regions)
             }
@@ -335,18 +329,16 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
 
             Operation::TailLoop => {
                 this.print_text("tail-loop");
-                this.print_port_list(node_data.inputs)?;
-                this.print_port_list(node_data.outputs)?;
-                this.print_type_hint(node_data.signature)?;
+                this.print_port_lists(node_data.inputs, node_data.outputs)?;
+                this.print_signature(node_data.signature)?;
                 this.print_meta(node_data.meta)?;
                 this.print_regions(node_data.regions)
             }
 
             Operation::Conditional => {
                 this.print_text("cond");
-                this.print_port_list(node_data.inputs)?;
-                this.print_port_list(node_data.outputs)?;
-                this.print_type_hint(node_data.signature)?;
+                this.print_port_lists(node_data.inputs, node_data.outputs)?;
+                this.print_signature(node_data.signature)?;
                 this.print_meta(node_data.meta)?;
                 this.print_regions(node_data.regions)
             }
@@ -354,9 +346,8 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
             Operation::Tag { tag } => {
                 this.print_text("tag");
                 this.print_text(format!("{}", tag));
-                this.print_port_list(node_data.inputs)?;
-                this.print_port_list(node_data.outputs)?;
-                this.print_type_hint(node_data.signature)?;
+                this.print_port_lists(node_data.inputs, node_data.outputs)?;
+                this.print_signature(node_data.signature)?;
                 this.print_meta(node_data.meta)
             }
         })
@@ -385,12 +376,8 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 }
             };
 
-            if !region_data.sources.is_empty() || !region_data.targets.is_empty() {
-                this.print_port_list(region_data.sources)?;
-                this.print_port_list(region_data.targets)?;
-            }
-
-            this.print_type_hint(region_data.signature)?;
+            this.print_port_lists(region_data.sources, region_data.targets)?;
+            this.print_signature(region_data.signature)?;
             this.print_meta(region_data.meta)?;
             this.print_nodes(region)
         })
@@ -409,25 +396,26 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
         Ok(())
     }
 
-    fn print_port_list(&mut self, ports: &'a [Port<'a>]) -> PrintResult<()> {
+    fn print_port_lists(
+        &mut self,
+        first: &'a [LinkRef<'a>],
+        second: &'a [LinkRef<'a>],
+    ) -> PrintResult<()> {
+        if !first.is_empty() && !second.is_empty() {
+            self.print_group(|this| {
+                this.print_port_list(first)?;
+                this.print_port_list(second)
+            })
+        } else {
+            Ok(())
+        }
+    }
+
+    fn print_port_list(&mut self, links: &'a [LinkRef<'a>]) -> PrintResult<()> {
         self.print_brackets(|this| {
-            for port in ports {
-                if port.r#type.is_some() {
-                    this.print_parens(|this| {
-                        this.print_link_ref(port.link);
-
-                        match port.r#type {
-                            Some(r#type) => this.print_term(r#type)?,
-                            None => this.print_text("_"),
-                        };
-
-                        Ok(())
-                    })?;
-                } else {
-                    this.print_link_ref(port.link);
-                }
+            for link in links {
+                this.print_link_ref(*link);
             }
-
             Ok(())
         })
     }
@@ -585,7 +573,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
 
     fn print_local_ref(&mut self, local_ref: LocalRef<'a>) -> PrintResult<()> {
         let name = match local_ref {
-            LocalRef::Index(i) => {
+            LocalRef::Index(_, i) => {
                 let Some(name) = self.locals.get(i as usize) else {
                     return Err(PrintError::InvalidLocal(local_ref.to_string()));
                 };
@@ -636,14 +624,14 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
         Ok(())
     }
 
-    fn print_type_hint(&mut self, term: TermId) -> PrintResult<()> {
-        if let Some(Term::Wildcard) = self.module.get_term(term) {
-            return Ok(());
+    fn print_signature(&mut self, term: Option<TermId>) -> PrintResult<()> {
+        if let Some(term) = term {
+            self.print_parens(|this| {
+                this.print_text("signature");
+                this.print_term(term)
+            })?;
         }
 
-        self.print_parens(|this| {
-            this.print_text("type-hint");
-            this.print_term(term)
-        })
+        Ok(())
     }
 }

@@ -18,6 +18,8 @@ jobs:
           token: ${{ secrets.HUGRBOT_PAT }}
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+      - name: Install CapnProto
+        run: sudo apt-get install -y capnproto
       - name: Run release-plz
         uses: MarcoIeni/release-plz-action@v0.5
         env:

@@ -1,5 +1,9 @@
 version = 1
-requires-python = ">=3.10, <3.13"
+requires-python = ">=3.10, <3.14"
+resolution-markers = [
+    "python_full_version < '3.13'",
+    "python_full_version >= '3.13'",
+]
 
 [manifest]
 members = [
@@ -258,7 +262,7 @@ wheels = [
 
 [[package]]
 name = "hugr"
-version = "0.8.1"
+version = "0.9.0"
 source = { editable = "hugr-py" }
 dependencies = [
     { name = "graphviz" },
