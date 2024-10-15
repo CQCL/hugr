@@ -305,7 +305,7 @@ fn test_tail_loop_containing_conditional() {
 }
 
 #[test]
-fn conditional() {
+fn test_conditional() {
     let variants = vec![type_row![], type_row![], type_row![BOOL_T]];
     let cond_t = Type::new_sum(variants.clone());
     let mut builder = DFGBuilder::new(Signature::new(cond_t, type_row![])).unwrap();
@@ -464,14 +464,16 @@ fn xor_and_cfg() -> (Hugr, Node) {
 #[rstest]
 #[case(pv_true(), pv_true(), pv_false(), pv_true())]
 #[case(pv_true(), pv_false(), pv_true(), pv_false())]
-//#[case(pv_true(), pv_true_or_false(), pv_true_or_false())]
+#[case(pv_true(), pv_true_or_false(), pv_true_or_false(), pv_true_or_false())]
+#[case(pv_true(), PartialValue::Top, pv_true_or_false(), pv_true_or_false())]
 #[case(pv_false(), pv_true(), pv_true(), pv_false())]
 #[case(pv_false(), pv_false(), pv_false(), pv_false())]
-/*#[case(pv_false(), pv_true_or_false(), pv_true_or_false())]
-#[case(PartialValue::top(), pv_true(), pv_true_or_false())]
-#[case(PartialValue::top(), pv_false(), PartialValue::top())] // Ideally pv_true_or_false
-#[case(pv_true_or_false(), pv_true(), pv_true_or_false())]
-#[case(pv_true_or_false(), pv_false(), pv_true_or_false())]*/
+#[case(pv_false(), pv_true_or_false(), pv_true_or_false(), pv_false())]
+#[case(pv_false(), PartialValue::Top, PartialValue::Top, pv_false())] // if !inp0 then out0=inp1
+#[case(pv_true_or_false(), pv_true(), pv_true_or_false(), pv_true_or_false())]
+#[case(pv_true_or_false(), pv_false(), pv_true_or_false(), pv_false())]
+#[case(PartialValue::Top, pv_true(), pv_true_or_false(), PartialValue::Top)]
+#[case(PartialValue::Top, pv_false(), PartialValue::Top, pv_false())]
 fn test_cfg(
     #[case] inp0: PartialValue<Void>,
     #[case] inp1: PartialValue<Void>,
