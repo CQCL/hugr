@@ -42,9 +42,8 @@ ascent::ascent! {
 
     node(c, n) <-- context(c), for n in c.nodes();
 
-    in_wire(c, n,p) <-- node(c, n), for p in value_inputs(c.as_ref(), *n);
-
-    out_wire(c, n,p) <-- node(c, n), for p in value_outputs(c.as_ref(), *n);
+    in_wire(c, n,p) <-- node(c, n), for (p,_) in c.in_value_types(*n); // Note, gets connected inports only
+    out_wire(c, n,p) <-- node(c, n), for (p,_) in c.out_value_types(*n); // (and likewise)
 
     parent_of_node(c, parent, child) <--
         node(c, child), if let Some(parent) = c.get_parent(*child);
@@ -220,8 +219,9 @@ fn propagate_leaf_op<V: AbstractValue>(
             ins.iter().cloned(),
         )])),
         op if op.cast::<UnpackTuple>().is_some() => {
+            let elem_tys = op.cast::<UnpackTuple>().unwrap().0;
             let [tup] = ins.iter().collect::<Vec<_>>().try_into().unwrap();
-            tup.variant_values(0, value_outputs(c.as_ref(), n).count())
+            tup.variant_values(0, elem_tys.len())
                 .map(ValueRow::from_iter)
         }
         OpType::Tag(t) => Some(ValueRow::from_iter([PV::new_variant(
@@ -257,16 +257,7 @@ fn propagate_leaf_op<V: AbstractValue>(
     }
 }
 
-fn value_inputs(h: &impl HugrView, n: Node) -> impl Iterator<Item = IncomingPort> + '_ {
-    h.in_value_types(n).map(|x| x.0)
-}
-
-fn value_outputs(h: &impl HugrView, n: Node) -> impl Iterator<Item = OutgoingPort> + '_ {
-    h.out_value_types(n).map(|x| x.0)
-}
-
-// Wrap a (known-length) row of values into a lattice. Perhaps could be part of partial_value.rs?
-
+// Wrap a (known-length) row of values into a lattice.
 #[derive(PartialEq, Clone, Eq, Hash)]
 struct ValueRow<V>(Vec<PartialValue<V>>);
 
