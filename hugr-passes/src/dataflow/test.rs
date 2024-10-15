@@ -15,7 +15,7 @@ use hugr_core::{
     types::{Signature, SumType, Type},
     HugrView,
 };
-use hugr_core::{Hugr, Node, Wire};
+use hugr_core::{Hugr, Wire};
 use rstest::{fixture, rstest};
 
 use super::{AbstractValue, DFContext, Machine, PartialValue, TailLoopTermination};
@@ -98,7 +98,7 @@ fn test_make_tuple() {
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
     let mut machine = Machine::default();
-    machine.run(TestContext(Arc::new(&hugr)));
+    machine.run(TestContext(Arc::new(&hugr)), []);
 
     let x = machine
         .read_out_wire(v3)
@@ -119,7 +119,7 @@ fn test_unpack_tuple_const() {
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
     let mut machine = Machine::default();
-    machine.run(TestContext(Arc::new(&hugr)));
+    machine.run(TestContext(Arc::new(&hugr)), []);
 
     let o1_r = machine
         .read_out_wire(o1)
@@ -151,7 +151,7 @@ fn test_tail_loop_never_iterates() {
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
     let mut machine = Machine::default();
-    machine.run(TestContext(Arc::new(&hugr)));
+    machine.run(TestContext(Arc::new(&hugr)), []);
 
     let o_r = machine
         .read_out_wire(tl_o)
@@ -185,7 +185,7 @@ fn test_tail_loop_always_iterates() {
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
     let mut machine = Machine::default();
-    machine.run(TestContext(Arc::new(&hugr)));
+    machine.run(TestContext(Arc::new(&hugr)), []);
 
     let o_r1 = machine.read_out_wire(tl_o1).unwrap();
     assert_eq!(o_r1, PartialValue::bottom());
@@ -224,7 +224,7 @@ fn test_tail_loop_two_iters() {
     let [o_w1, o_w2] = tail_loop.outputs_arr();
 
     let mut machine = Machine::default();
-    machine.run(TestContext(Arc::new(&hugr)));
+    machine.run(TestContext(Arc::new(&hugr)), []);
 
     let o_r1 = machine.read_out_wire(o_w1).unwrap();
     assert_eq!(o_r1, pv_true_or_false());
@@ -291,7 +291,7 @@ fn test_tail_loop_containing_conditional() {
     let [o_w1, o_w2] = tail_loop.outputs_arr();
 
     let mut machine = Machine::default();
-    machine.run(TestContext(Arc::new(&hugr)));
+    machine.run(TestContext(Arc::new(&hugr)), []);
 
     let o_r1 = machine.read_out_wire(o_w1).unwrap();
     assert_eq!(o_r1, pv_true());
@@ -344,8 +344,7 @@ fn test_conditional() {
         2,
         [PartialValue::new_variant(0, [])],
     ));
-    machine.propolutate_out_wires([(arg_w, arg_pv)]);
-    machine.run(TestContext(Arc::new(&hugr)));
+    machine.run(TestContext(Arc::new(&hugr)), [(0.into(), arg_pv)]);
 
     let cond_r1 = machine
         .read_out_wire(cond_o1)
@@ -365,13 +364,9 @@ fn test_conditional() {
     assert_eq!(machine.case_reachable(&hugr, cond.node()), None);
 }
 
-// Tuple of
-//   1. Hugr being a function on bools: (x, y) => (x XOR y, x AND y)
-//   2. Input node of entry block
-// Result readable from root node outputs
-// Inputs should be placed onto out-wires of the Node (2.)
+// A Hugr being a function on bools: (x, y) => (x XOR y, x AND y)
 #[fixture]
-fn xor_and_cfg() -> (Hugr, Node) {
+fn xor_and_cfg() -> Hugr {
     //        Entry
     //       /0   1\
     //      A --1-> B     A(x=true, y) => if y then X(false, true) else B(x=true)
@@ -456,9 +451,7 @@ fn xor_and_cfg() -> (Hugr, Node) {
     builder.branch(&a, 0, &x).unwrap();
     builder.branch(&a, 1, &b).unwrap();
     builder.branch(&b, 0, &x).unwrap();
-    let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
-    let [entry_input, _] = hugr.get_io(entry.node()).unwrap();
-    (hugr, entry_input)
+    builder.finish_hugr(&EMPTY_REG).unwrap()
 }
 
 #[rstest]
@@ -479,22 +472,24 @@ fn test_cfg(
     #[case] inp1: PartialValue<Void>,
     #[case] out0: PartialValue<Void>,
     #[case] out1: PartialValue<Void>,
-    xor_and_cfg: (Hugr, Node),
+    xor_and_cfg: Hugr,
 ) {
-    let (hugr, entry_input) = xor_and_cfg;
-
-    let [in_w0, in_w1] = [0, 1].map(|i| Wire::new(entry_input, i));
-
     let mut machine = Machine::default();
-    machine.propolutate_out_wires([(in_w0, inp0), (in_w1, inp1)]);
-    machine.run(TestContext(Arc::new(&hugr)));
+    machine.run(
+        TestContext(Arc::new(&xor_and_cfg)),
+        [(0.into(), inp0), (1.into(), inp1)],
+    );
 
     assert_eq!(
-        machine.read_out_wire(Wire::new(hugr.root(), 0)).unwrap(),
+        machine
+            .read_out_wire(Wire::new(xor_and_cfg.root(), 0))
+            .unwrap(),
         out0
     );
     assert_eq!(
-        machine.read_out_wire(Wire::new(hugr.root(), 1)).unwrap(),
+        machine
+            .read_out_wire(Wire::new(xor_and_cfg.root(), 1))
+            .unwrap(),
         out1
     );
 }
@@ -527,11 +522,11 @@ fn test_call(
         .finish_hugr_with_outputs([a2, b2], &EMPTY_REG)
         .unwrap();
 
-    let [root_inp, _] = hugr.get_io(hugr.root()).unwrap();
-    let [inw0, inw1] = [0, 1].map(|i| Wire::new(root_inp, i));
     let mut machine = Machine::default();
-    machine.propolutate_out_wires([(inw0, inp0), (inw1, inp1)]);
-    machine.run(TestContext(Arc::new(&hugr)));
+    machine.run(
+        TestContext(Arc::new(&hugr)),
+        [(0.into(), inp0), (1.into(), inp1)],
+    );
 
     let [res0, res1] = [0, 1].map(|i| machine.read_out_wire(Wire::new(hugr.root(), i)).unwrap());
     // The two calls alias so both results will be the same:

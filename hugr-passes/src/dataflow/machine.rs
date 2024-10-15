@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use hugr_core::{HugrView, Node, PortIndex, Wire};
+use hugr_core::{HugrView, IncomingPort, Node, PortIndex, Wire};
 
 use super::{datalog::AscentProgram, AbstractValue, DFContext, PartialValue};
 
@@ -23,26 +23,35 @@ impl<V: AbstractValue, C: DFContext<V>> Default for Machine<V, C> {
 
 impl<V: AbstractValue, C: DFContext<V>> Machine<V, C> {
     /// Provide initial values for some wires.
-    /// (For example, if some properties of the Hugr's inputs are known.)
-    pub fn propolutate_out_wires(
-        &mut self,
-        wires: impl IntoIterator<Item = (Wire, PartialValue<V>)>,
-    ) {
+    // Likely for test purposes only - should we make non-pub or #[cfg(test)] ?
+    pub fn prepopulate_wire(&mut self, h: &impl HugrView, wire: Wire, value: PartialValue<V>) {
         assert!(self.1.is_none());
-        self.0
-            .out_wire_value_proto
-            .extend(wires.into_iter().map(|(w, v)| (w.node(), w.source(), v)));
+        self.0.in_wire_value_proto.extend(
+            h.linked_inputs(wire.node(), wire.source())
+                .map(|(n, inp)| (n, inp, value.clone())),
+        );
     }
 
-    /// Run the analysis (iterate until a lattice fixpoint is reached).
+    /// Run the analysis (iterate until a lattice fixpoint is reached),
+    /// given initial values for some of the root node inputs.
+    /// (Note that `in_values` will not be useful for `Case` or `DFB`-rooted Hugrs,
+    /// but should handle other containers.)
     /// The context passed in allows interpretation of leaf operations.
     ///
     /// # Panics
     ///
     /// If this Machine has been run already.
     ///
-    pub fn run(&mut self, context: C) {
+    pub fn run(
+        &mut self,
+        context: C,
+        in_values: impl IntoIterator<Item = (IncomingPort, PartialValue<V>)>,
+    ) {
         assert!(self.1.is_none());
+        let root = context.root();
+        self.0
+            .in_wire_value_proto
+            .extend(in_values.into_iter().map(|(p, v)| (root, p, v)));
         self.0.context.push((context,));
         self.0.run();
         self.1 = Some(

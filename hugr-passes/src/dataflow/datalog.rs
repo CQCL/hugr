@@ -30,7 +30,6 @@ pub enum IO {
 ascent::ascent! {
     pub(super) struct AscentProgram<V: AbstractValue, C: DFContext<V>>;
     relation context(C);
-    relation out_wire_value_proto(Node, OutgoingPort, PV<V>);
 
     relation node(C, Node);
     relation in_wire(C, Node, IncomingPort);
@@ -38,8 +37,8 @@ ascent::ascent! {
     relation parent_of_node(C, Node, Node);
     relation io_node(C, Node, Node, IO);
     lattice out_wire_value(C, Node, OutgoingPort, PV<V>);
-    lattice node_in_value_row(C, Node, ValueRow<V>);
     lattice in_wire_value(C, Node, IncomingPort, PV<V>);
+    lattice node_in_value_row(C, Node, ValueRow<V>);
 
     node(c, n) <-- context(c), for n in c.nodes();
 
@@ -53,16 +52,21 @@ ascent::ascent! {
     io_node(c, parent, child, io) <-- node(c, parent),
       if let Some([i,o]) = c.get_io(*parent),
       for (child,io) in [(i,IO::Input),(o,IO::Output)];
-    // We support prepopulating out_wire_value via out_wire_value_proto.
-    //
-    // out wires that do not have prepopulation values are initialised to bottom.
+
+    // Initialize all wires to bottom
     out_wire_value(c, n,p, PV::bottom()) <-- out_wire(c, n,p);
-    out_wire_value(c, n, p, v) <-- out_wire(c,n,p) , out_wire_value_proto(n, p, v);
 
     in_wire_value(c, n, ip, v) <-- in_wire(c, n, ip),
         if let Some((m,op)) = c.single_linked_output(*n, *ip),
         out_wire_value(c, m, op, v);
 
+    // We support prepopulating in_wire_value via in_wire_value_proto.
+    relation in_wire_value_proto(Node, IncomingPort, PV<V>);
+    in_wire_value(c, n, p, PV::bottom()) <-- in_wire(c, n,p);
+    in_wire_value(c, n, p, v) <-- node(c,n),
+      if let Some(sig) = c.signature(*n),
+      for p in sig.input_ports(),
+      in_wire_value_proto(n, p, v);
 
     node_in_value_row(c, n, ValueRow::new(sig.input_count())) <-- node(c, n), if let Some(sig) = c.signature(*n);
     node_in_value_row(c, n, ValueRow::single_known(c.signature(*n).unwrap().input_count(), p.index(), v.clone())) <-- in_wire_value(c, n, p, v);
