@@ -6,8 +6,8 @@ use super::{datalog::AscentProgram, AbstractValue, DFContext, PartialValue};
 
 /// Basic structure for performing an analysis. Usage:
 /// 1. Get a new instance via [Self::default()]
-/// 2. Zero or more [Self::propolutate_out_wires] with initial values
-/// 3. Exactly one [Self::run] to do the analysis
+/// 2. (Optionally / for tests) zero or more [Self::prepopulate_wire] with initial values
+/// 3. Exactly one [Self::run], with initial values for root inputs, to do the analysis
 /// 4. Results then available via [Self::read_out_wire]
 pub struct Machine<V: AbstractValue, C: DFContext<V>>(
     AscentProgram<V, C>,
@@ -110,6 +110,10 @@ impl<V: AbstractValue, C: DFContext<V>> Machine<V, C> {
 
     /// Tells us if a block ([DataflowBlock] or [ExitBlock]) in a [CFG] is known
     /// to be reachable. (Returns `None` if argument is not a child of a CFG.)
+    ///
+    /// [CFG]: hugr_core::ops::CFG
+    /// [DataflowBlock]: hugr_core::ops::DataflowBlock
+    /// [ExitBlock]: hugr_core::ops::ExitBlock
     pub fn bb_reachable(&self, hugr: impl HugrView, bb: Node) -> Option<bool> {
         let cfg = hugr.get_parent(bb)?; // Not really required...??
         hugr.get_optype(cfg).as_cfg()?;
