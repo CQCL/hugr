@@ -37,7 +37,7 @@ serde = { workspace = true, features = ["derive", "rc"] }
 serde_yaml = { workspace = true, optional = true }
 typetag = { workspace = true }
 smol_str = { workspace = true, features = ["serde"] }
-derive_more = { workspace = true, features = ["display", "from"] }
+derive_more = { workspace = true, features = ["display", "error", "from"] }
 itertools = { workspace = true }
 html-escape = { workspace = true }
 bitvec = { workspace = true, features = ["serde"] }

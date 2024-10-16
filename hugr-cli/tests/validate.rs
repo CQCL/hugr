@@ -6,10 +6,9 @@
 
 use assert_cmd::Command;
 use assert_fs::{fixture::FileWriteStr, NamedTempFile};
-use hugr_cli::{validate::VALID_PRINT, Package};
-use hugr_core::builder::DFGBuilder;
-use hugr_core::types::Type;
-use hugr_core::{
+use hugr::builder::DFGBuilder;
+use hugr::types::Type;
+use hugr::{
     builder::{Container, Dataflow},
     extension::prelude::{BOOL_T, QB_T},
     std_extensions::arithmetic::float_types::FLOAT64_TYPE,
@@ -17,6 +16,7 @@ use hugr_core::{
     types::Signature,
     Hugr,
 };
+use hugr_cli::{validate::VALID_PRINT, Package};
 use predicates::{prelude::*, str::contains};
 use rstest::{fixture, rstest};
 
@@ -128,7 +128,7 @@ fn test_bad_json(mut val_cmd: Command) {
     val_cmd
         .assert()
         .failure()
-        .stderr(contains("Error parsing input"));
+        .stderr(contains("Error parsing package"));
 }
 
 #[rstest]
@@ -139,7 +139,7 @@ fn test_bad_json_silent(mut val_cmd: Command) {
     val_cmd
         .assert()
         .failure()
-        .stderr(contains("Error parsing input").not());
+        .stderr(contains("Error parsing package").not());
 }
 
 #[rstest]
@@ -188,7 +188,7 @@ fn test_float_extension(float_hugr_string: String, mut val_cmd: Command) {
 #[fixture]
 fn package_string(#[with(FLOAT64_TYPE)] test_hugr: Hugr) -> String {
     let rdr = std::fs::File::open(FLOAT_EXT_FILE).unwrap();
-    let float_ext: hugr_core::Extension = serde_json::from_reader(rdr).unwrap();
+    let float_ext: hugr::Extension = serde_json::from_reader(rdr).unwrap();
     let package = Package::new(vec![test_hugr], vec![float_ext]);
     serde_json::to_string(&package).unwrap()
 }

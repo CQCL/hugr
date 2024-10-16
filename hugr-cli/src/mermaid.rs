@@ -3,7 +3,7 @@ use std::io::Write;
 
 use clap::Parser;
 use clio::Output;
-use hugr_core::HugrView;
+use hugr::HugrView;
 
 /// Dump the standard extensions.
 #[derive(Parser, Debug)]

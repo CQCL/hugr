@@ -3,13 +3,16 @@
 use clap::Parser;
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 use clio::Input;
-use hugr_core::{Extension, Hugr};
+use derive_more::{Display, Error, From};
+use hugr::package::{PackageLoadError, PackageValidationError};
 use std::{ffi::OsString, path::PathBuf};
-use thiserror::Error;
 
 pub mod extensions;
 pub mod mermaid;
 pub mod validate;
+
+// TODO: Deprecated re-export. Remove on a breaking release.
+pub use hugr::package::Package;
 
 /// CLI arguments.
 #[derive(Parser, Debug)]
@@ -30,18 +33,21 @@ pub enum CliArgs {
 }
 
 /// Error type for the CLI.
-#[derive(Debug, Error)]
-#[error(transparent)]
+#[derive(Debug, Display, Error, From)]
 #[non_exhaustive]
 pub enum CliError {
     /// Error reading input.
-    #[error("Error reading from path: {0}")]
-    InputFile(#[from] std::io::Error),
+    #[display("Error reading from path: {_0}")]
+    InputFile(std::io::Error),
     /// Error parsing input.
-    #[error("Error parsing input: {0}")]
-    Parse(#[from] serde_json::Error),
+    #[display("Error parsing input: {_0}")]
+    Parse(serde_json::Error),
+    /// Error loading a package.
+    #[display("Error parsing package: {_0}")]
+    Package(PackageLoadError),
+    #[display("Error validating HUGR: {_0}")]
     /// Errors produced by the `validate` subcommand.
-    Validate(#[from] validate::ValError),
+    Validate(PackageValidationError),
 }
 
 /// Validate and visualise a HUGR file.
@@ -68,36 +74,10 @@ pub struct HugrArgs {
     pub extensions: Vec<PathBuf>,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-/// Package of module HUGRs and extensions.
-/// The HUGRs are validated against the extensions.
-pub struct Package {
-    /// Module HUGRs included in the package.
-    pub modules: Vec<Hugr>,
-    /// Extensions to validate against.
-    pub extensions: Vec<Extension>,
-}
-
-impl Package {
-    /// Create a new package.
-    pub fn new(modules: Vec<Hugr>, extensions: Vec<Extension>) -> Self {
-        Self {
-            modules,
-            extensions,
-        }
-    }
-}
-
 impl HugrArgs {
     /// Read either a package or a single hugr from the input.
     pub fn get_package(&mut self) -> Result<Package, CliError> {
-        let val: serde_json::Value = serde_json::from_reader(&mut self.input)?;
-        // read either a package or a single hugr
-        if let Ok(p) = serde_json::from_value::<Package>(val.clone()) {
-            Ok(p)
-        } else {
-            let hugr: Hugr = serde_json::from_value(val)?;
-            Ok(Package::new(vec![hugr], vec![]))
-        }
+        let pkg = Package::from_json_reader(&mut self.input)?;
+        Ok(pkg)
     }
 }

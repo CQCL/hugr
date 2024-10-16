@@ -92,6 +92,9 @@ impl ExtensionRegistry {
     /// If extension IDs match, the extension with the higher version is kept.
     /// If versions match, the original extension is kept.
     /// Returns a reference to the registered extension if successful.
+    ///
+    /// Avoids cloning the extension unless required. For a reference version see
+    /// [`ExtensionRegistry::register_updated_ref`].
     pub fn register_updated(
         &mut self,
         extension: Extension,
@@ -104,6 +107,30 @@ impl ExtensionRegistry {
                 Ok(prev.into_mut())
             }
             btree_map::Entry::Vacant(ve) => Ok(ve.insert(extension)),
+        }
+    }
+
+    /// Registers a new extension to the registry, keeping most up to date if
+    /// extension exists.
+    ///
+    /// If extension IDs match, the extension with the higher version is kept.
+    /// If versions match, the original extension is kept. Returns a reference
+    /// to the registered extension if successful.
+    ///
+    /// Clones the extension if required. For no-cloning version see
+    /// [`ExtensionRegistry::register_updated`].
+    pub fn register_updated_ref(
+        &mut self,
+        extension: &Extension,
+    ) -> Result<&Extension, ExtensionRegistryError> {
+        match self.0.entry(extension.name().clone()) {
+            btree_map::Entry::Occupied(mut prev) => {
+                if prev.get().version() < extension.version() {
+                    *prev.get_mut() = extension.clone();
+                }
+                Ok(prev.into_mut())
+            }
+            btree_map::Entry::Vacant(ve) => Ok(ve.insert(extension.clone())),
         }
     }
 
