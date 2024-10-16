@@ -291,6 +291,14 @@ pub(crate) mod test {
     }
 
     #[fixture]
+    pub(crate) fn simple_module_hugr() -> Hugr {
+        let mut builder = ModuleBuilder::new();
+        let sig = Signature::new(type_row![BIT], type_row![BIT]);
+        builder.declare("test", sig.into()).unwrap();
+        builder.finish_prelude_hugr().unwrap()
+    }
+
+    #[fixture]
     pub(crate) fn simple_cfg_hugr() -> Hugr {
         let mut cfg_builder =
             CFGBuilder::new(Signature::new(type_row![NAT], type_row![NAT])).unwrap();

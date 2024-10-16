@@ -72,6 +72,7 @@ fn node_connections(
 #[case::cfg("dot_cfg", crate::builder::test::simple_cfg_hugr())]
 #[case::empty_dfg("dot_empty_dfg", crate::builder::test::simple_dfg_hugr())]
 #[case::func("dot_func", crate::builder::test::simple_funcdef_hugr())]
+#[case::module("dot_module", crate::builder::test::simple_module_hugr())]
 #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
 fn dot_string(#[case] test_name: &str, #[case] h: Hugr) {
     insta::assert_snapshot!(test_name, h.dot_string());
@@ -86,6 +87,7 @@ fn dot_string(#[case] test_name: &str, #[case] h: Hugr) {
 #[case::cfg("mmd_cfg", crate::builder::test::simple_cfg_hugr())]
 #[case::empty_dfg("mmd_empty_dfg", crate::builder::test::simple_dfg_hugr())]
 #[case::func("mmd_func", crate::builder::test::simple_funcdef_hugr())]
+#[case::module("mmd_module", crate::builder::test::simple_module_hugr())]
 #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
 fn mermaid_string(#[case] test_name: &str, #[case] h: Hugr) {
     insta::assert_snapshot!(test_name, h.mermaid_string());
