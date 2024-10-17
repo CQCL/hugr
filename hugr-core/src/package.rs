@@ -3,11 +3,13 @@
 use derive_more::{Display, Error, From};
 use std::collections::HashMap;
 use std::path::Path;
-use std::{fs, io};
+use std::{fs, io, mem};
 
+use crate::builder::{Container, Dataflow, DataflowSubContainer, ModuleBuilder};
 use crate::extension::{ExtensionRegistry, ExtensionRegistryError};
+use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::{HugrView, ValidationError};
-use crate::ops::{NamedOp, OpType};
+use crate::ops::{Module, NamedOp, OpTag, OpTrait, OpType};
 use crate::{Extension, Hugr};
 
 #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
@@ -180,16 +182,40 @@ impl PartialEq for Package {
 ///
 /// The behaviour depends on the root optype. See [Package::from_hugr] for details.
 ///
-/// # Returns
+/// # Errors
 ///
-fn to_module_hugr(hugr: Hugr) -> Result<Hugr, PackageError> {
-    let root_op = hugr.get_optype(hugr.root());
-    match root_op {
-        OpType::Module(_) => Ok(hugr),
-        _ => Err(PackageError::CannotWrapHugr {
-            root_op: root_op.clone(),
-        }),
+/// Returns [PackageError::]
+fn to_module_hugr(mut hugr: Hugr) -> Result<Hugr, PackageError> {
+    let root = hugr.root();
+    let root_op = hugr.get_optype(root);
+    let tag = root_op.tag();
+
+    // Modules can be returned as is.
+    if root_op.is_module() {
+        return Ok(hugr);
     }
+    // If possible, wrap the hugr directly in a module.
+    if OpTag::ModuleOp.is_superset(tag) {
+        let new_root = hugr.add_node(Module::new().into());
+        hugr.set_root(new_root);
+        hugr.set_parent(root, new_root);
+        return Ok(hugr);
+    }
+    // Wrap it in a function definition named "main" inside the module otherwise.
+    if OpTag::DataflowChild.is_superset(tag) && !root_op.is_input() && !root_op.is_output() {
+        let signature = root_op
+            .dataflow_signature()
+            .unwrap_or_else(|| panic!("Dataflow child {} without signature", root_op.name()));
+        let mut new_hugr = ModuleBuilder::new();
+        let mut func = new_hugr.define_function("main", signature).unwrap();
+        let dataflow_node = func.add_hugr_with_wires(hugr, func.input_wires()).unwrap();
+        func.finish_with_outputs(dataflow_node.outputs()).unwrap();
+        return Ok(mem::take(new_hugr.hugr_mut()));
+    }
+    // Reject all other hugrs.
+    Err(PackageError::CannotWrapHugr {
+        root_op: root_op.clone(),
+    })
 }
 
 /// Error raised while loading a package.
@@ -240,6 +266,8 @@ mod test {
         simple_cfg_hugr, simple_dfg_hugr, simple_funcdef_hugr, simple_module_hugr,
     };
     use crate::extension::ExtensionId;
+    use crate::ops::dataflow::IOTrait;
+    use crate::ops::Input;
 
     use super::*;
     use rstest::{fixture, rstest};
@@ -261,6 +289,11 @@ mod test {
         }
     }
 
+    #[fixture]
+    fn simple_input_node() -> Hugr {
+        Hugr::new(Input::new(vec![]))
+    }
+
     #[rstest]
     #[case::empty(Package::default())]
     #[case::simple(simple_package())]
@@ -272,9 +305,10 @@ mod test {
 
     #[rstest]
     #[case::module(simple_module_hugr(), false)]
-    #[case::dfg(simple_funcdef_hugr(), true)]
-    #[case::dfg(simple_dfg_hugr(), true)]
-    #[case::cfg(simple_cfg_hugr(), true)]
+    #[case::funcdef(simple_funcdef_hugr(), false)]
+    #[case::dfg(simple_dfg_hugr(), false)]
+    #[case::cfg(simple_cfg_hugr(), false)]
+    #[case::unsupported_input(simple_input_node(), true)]
     fn hugr_to_package(#[case] hugr: Hugr, #[case] errors: bool) {
         match (Package::from_hugr(hugr), errors) {
             (Ok(package), false) => {
