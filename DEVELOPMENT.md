@@ -66,6 +66,23 @@ cargo +nightly miri test
 
 Run `just` to see all available commands.
 
+### 💥 API-breaking changes
+
+Any breaking change in the public Rust APIs will cause the next release to be a
+major version bump. You can check the next release version [draft release
+PR](https://github.com/CQCL/hugr/pulls?q=is%3Aopen+is%3Apr+label%3Arelease) on
+github.
+
+If all the changes before your PR were non-breaking, you can use `cargo
+semver-checks` to alert you of any problematic changes.
+
+```bash
+# Ensure you have cargo-semver-checks installed
+cargo install cargo-semver-checks --locked
+# Check for breaking changes
+cargo semver-checks
+```
+
 ## 💅 Coding Style
 
 The rustfmt tool is used to enforce a consistent rust coding style. The CI will fail if the code is not formatted correctly.

@@ -11,6 +11,7 @@ pr_draft = true
 # (This would normally only be enabled once there are multiple packages in the workspace)
 git_tag_name = "{{ package }}-v{{ version }}"
 git_release_name = "{{ package }}: v{{ version }}"
+pr_labels = ["release"]
 
 # Only create releases / push to crates.io after merging a release-please PR.
 # This lets merge new crates to `main` without worrying about accidentally creating
