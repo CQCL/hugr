@@ -8,7 +8,7 @@ use crate::extension::{ExtensionRegistry, ExtensionRegistryError};
 use crate::hugr::ValidationError;
 use crate::{Extension, Hugr};
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
 /// Package of module HUGRs and extensions.
 /// The HUGRs are validated against the extensions.
 pub struct Package {
@@ -19,7 +19,7 @@ pub struct Package {
 }
 
 impl Package {
-    /// Create a new package.
+    /// Create a new package from a list of hugrs and extensions.
     pub fn new(
         modules: impl IntoIterator<Item = Hugr>,
         extensions: impl IntoIterator<Item = Extension>,
@@ -46,7 +46,7 @@ impl Package {
     /// Read a Package in json format from an io reader.
     ///
     /// If the json encodes a single [Hugr] instead, it will be inserted in a new [Package].
-    pub fn from_json_reader(reader: impl io::Read) -> Result<Self, PackageLoadError> {
+    pub fn from_json_reader(reader: impl io::Read) -> Result<Self, PackageEncodingError> {
         let val: serde_json::Value = serde_json::from_reader(reader)?;
         let pkg_load_err = match serde_json::from_value::<Package>(val.clone()) {
             Ok(p) => return Ok(p),
@@ -58,30 +58,51 @@ impl Package {
         }
 
         // Return the original error from parsing the package.
-        Err(PackageLoadError::JsonEncoding(pkg_load_err))
+        Err(PackageEncodingError::JsonEncoding(pkg_load_err))
     }
 
     /// Read a Package from a json string.
     ///
     /// If the json encodes a single [Hugr] instead, it will be inserted in a new [Package].
-    pub fn from_json(json: impl AsRef<str>) -> Result<Self, PackageLoadError> {
+    pub fn from_json(json: impl AsRef<str>) -> Result<Self, PackageEncodingError> {
         Self::from_json_reader(json.as_ref().as_bytes())
     }
 
     /// Read a Package from a json file.
     ///
     /// If the json encodes a single [Hugr] instead, it will be inserted in a new [Package].
-    pub fn from_json_file(path: impl AsRef<Path>) -> Result<Self, PackageLoadError> {
+    pub fn from_json_file(path: impl AsRef<Path>) -> Result<Self, PackageEncodingError> {
         let file = fs::File::open(path)?;
         let reader = io::BufReader::new(file);
         Self::from_json_reader(reader)
+    }
+
+    /// Write the Package in json format into an io writer.
+    pub fn to_json_writer(&self, writer: impl io::Write) -> Result<(), PackageEncodingError> {
+        serde_json::to_writer(writer, self)?;
+        Ok(())
+    }
+
+    /// Write the Package into a json string.
+    ///
+    /// If the json encodes a single [Hugr] instead, it will be inserted in a new [Package].
+    pub fn to_json(&self) -> Result<String, PackageEncodingError> {
+        let json = serde_json::to_string(self)?;
+        Ok(json)
+    }
+
+    /// Write the Package into a json file.
+    pub fn to_json_file(&self, path: impl AsRef<Path>) -> Result<(), PackageEncodingError> {
+        let file = fs::File::open(path)?;
+        let writer = io::BufWriter::new(file);
+        self.to_json_writer(writer)
     }
 }
 
 /// Error raised while loading a package.
 #[derive(Debug, Display, Error, From)]
 #[non_exhaustive]
-pub enum PackageLoadError {
+pub enum PackageEncodingError {
     /// Error raised while parsing the package json.
     JsonEncoding(serde_json::Error),
     /// Error raised while reading from a file.

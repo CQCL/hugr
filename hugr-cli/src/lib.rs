@@ -4,7 +4,7 @@ use clap::Parser;
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 use clio::Input;
 use derive_more::{Display, Error, From};
-use hugr::package::{PackageLoadError, PackageValidationError};
+use hugr::package::{PackageEncodingError, PackageValidationError};
 use std::{ffi::OsString, path::PathBuf};
 
 pub mod extensions;
@@ -44,7 +44,7 @@ pub enum CliError {
     Parse(serde_json::Error),
     /// Error loading a package.
     #[display("Error parsing package: {_0}")]
-    Package(PackageLoadError),
+    Package(PackageEncodingError),
     #[display("Error validating HUGR: {_0}")]
     /// Errors produced by the `validate` subcommand.
     Validate(PackageValidationError),
