@@ -37,7 +37,7 @@ pub use prelude::{PRELUDE, PRELUDE_REGISTRY};
 pub mod declarative;
 
 /// Extension Registries store extensions to be looked up e.g. during validation.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ExtensionRegistry(BTreeMap<ExtensionId, Extension>);
 
 impl ExtensionRegistry {
@@ -445,7 +445,7 @@ impl Extension {
 
 impl PartialEq for Extension {
     fn eq(&self, other: &Self) -> bool {
-        self.name == other.name
+        self.name == other.name && self.version == other.version
     }
 }
 
@@ -639,7 +639,11 @@ pub mod test {
 
     #[test]
     fn test_register_update() {
+        // Two registers that should remain the same.
+        // We use them to test both `register_updated` and `register_updated_ref`.
         let mut reg = ExtensionRegistry::try_new([]).unwrap();
+        let mut reg_ref = ExtensionRegistry::try_new([]).unwrap();
+
         let ext_1_id = ExtensionId::new("ext1").unwrap();
         let ext_2_id = ExtensionId::new("ext2").unwrap();
         let ext1 = Extension::new(ext_1_id.clone(), Version::new(1, 0, 0));
@@ -648,7 +652,8 @@ pub mod test {
         let ext2 = Extension::new(ext_2_id, Version::new(1, 0, 0));
 
         reg.register(ext1.clone()).unwrap();
-        assert_eq!(reg.get("ext1").unwrap().version(), &Version::new(1, 0, 0));
+        reg_ref.register(ext1.clone()).unwrap();
+        assert_eq!(&reg, &reg_ref);
 
         // normal registration fails
         assert_eq!(
@@ -661,12 +666,16 @@ pub mod test {
         );
 
         // register with update works
+        reg_ref.register_updated_ref(&ext1_1).unwrap();
         reg.register_updated(ext1_1.clone()).unwrap();
         assert_eq!(reg.get("ext1").unwrap().version(), &Version::new(1, 1, 0));
+        assert_eq!(&reg, &reg_ref);
 
         // register with lower version does not change version
+        reg_ref.register_updated_ref(&ext1_2).unwrap();
         reg.register_updated(ext1_2.clone()).unwrap();
         assert_eq!(reg.get("ext1").unwrap().version(), &Version::new(1, 1, 0));
+        assert_eq!(&reg, &reg_ref);
 
         reg.register(ext2.clone()).unwrap();
         assert_eq!(reg.get("ext2").unwrap().version(), &Version::new(1, 0, 0));
