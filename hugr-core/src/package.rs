@@ -219,7 +219,7 @@ fn to_module_hugr(mut hugr: Hugr) -> Result<Hugr, PackageError> {
 }
 
 /// Error raised while loading a package.
-#[derive(Debug, Display, Error)]
+#[derive(Debug, Display, Error, PartialEq)]
 #[non_exhaustive]
 pub enum PackageError {
     /// A hugr in the package does not have an [OpType::Module] root.
@@ -262,10 +262,12 @@ pub enum PackageValidationError {
 
 #[cfg(test)]
 mod test {
+    use cool_asserts::assert_matches;
+
     use crate::builder::test::{
         simple_cfg_hugr, simple_dfg_hugr, simple_funcdef_hugr, simple_module_hugr,
     };
-    use crate::extension::ExtensionId;
+    use crate::extension::{ExtensionId, EMPTY_REG};
     use crate::ops::dataflow::IOTrait;
     use crate::ops::Input;
 
@@ -310,7 +312,7 @@ mod test {
     #[case::cfg(simple_cfg_hugr(), false)]
     #[case::unsupported_input(simple_input_node(), true)]
     fn hugr_to_package(#[case] hugr: Hugr, #[case] errors: bool) {
-        match (Package::from_hugr(hugr), errors) {
+        match (&Package::from_hugr(hugr.clone()), errors) {
             (Ok(package), false) => {
                 assert_eq!(package.modules.len(), 1);
                 let root_op = package.modules[0].get_optype(package.modules[0].root());
@@ -319,5 +321,25 @@ mod test {
             (Err(_), true) => {}
             (p, _) => panic!("Unexpected result {:?}", p),
         }
+    }
+
+    #[rstest]
+    fn package_properties() {
+        let module = simple_module_hugr();
+        let dfg = simple_dfg_hugr();
+
+        assert_matches!(
+            Package::new([module.clone(), dfg.clone()], []),
+            Err(PackageError::NonModuleHugr {
+                module_index: 1,
+                root_op: OpType::DFG(_),
+            })
+        );
+
+        let mut pkg = Package::from_hugrs([module, dfg], []).unwrap();
+        let mut reg = EMPTY_REG.clone();
+        pkg.validate(&mut reg).unwrap();
+
+        assert_eq!(pkg.modules.len(), 2);
     }
 }
