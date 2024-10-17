@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.14.0](https://github.com/CQCL/hugr/compare/hugr-core-v0.13.1...hugr-core-v0.14.0) - 2024-10-17
+
+### Bug Fixes
+
+- Allocate ports on root nodes ([#1585](https://github.com/CQCL/hugr/pull/1585))
+
+### New Features
+
+- Add `Package` definition on `hugr-core` ([#1587](https://github.com/CQCL/hugr/pull/1587))
+
 ## [0.13.1](https://github.com/CQCL/hugr/compare/hugr-core-v0.10.0...hugr-core-v0.13.1) - 2024-10-14
 
 ### New Features
