@@ -166,11 +166,25 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
             ))?;
         }
         // The Hugr can have only one root node.
+
+        for dir in Direction::BOTH {
+            // Check that we have the correct amount of ports and edges.
+            let num_ports = self.hugr.graph.num_ports(node.pg_index(), dir);
+            if num_ports != op_type.port_count(dir) {
+                return Err(ValidationError::WrongNumberOfPorts {
+                    node,
+                    optype: op_type.clone(),
+                    actual: num_ports,
+                    expected: op_type.port_count(dir),
+                    dir,
+                });
+            }
+        }
+
         if node == self.hugr.root() {
-            // The root node has no edges.
-            if self.hugr.graph.num_outputs(node.pg_index())
-                + self.hugr.graph.num_inputs(node.pg_index())
-                != 0
+            // The root node cannot have connected edges
+            if self.hugr.all_linked_inputs(node).next().is_some()
+                || self.hugr.all_linked_outputs(node).next().is_some()
             {
                 return Err(ValidationError::RootWithEdges { node });
             }
@@ -189,20 +203,6 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
                     parent_optype: parent_optype.clone(),
                     allowed_children,
                 });
-            }
-
-            for dir in Direction::BOTH {
-                // Check that we have the correct amount of ports and edges.
-                let num_ports = self.hugr.graph.num_ports(node.pg_index(), dir);
-                if num_ports != op_type.port_count(dir) {
-                    return Err(ValidationError::WrongNumberOfPorts {
-                        node,
-                        optype: op_type.clone(),
-                        actual: num_ports,
-                        expected: op_type.port_count(dir),
-                        dir,
-                    });
-                }
             }
         }
 
@@ -602,10 +602,14 @@ impl<'a, 'b> ValidationContext<'a, 'b> {
         }
 
         // Check port connections.
-        for dir in Direction::BOTH {
-            for (i, port_index) in self.hugr.graph.ports(node.pg_index(), dir).enumerate() {
-                let port = Port::new(dir, i);
-                self.validate_port(node, port, port_index, op_type, var_decls)?;
+        //
+        // Root nodes are ignored, as they cannot have connected edges.
+        if node != self.hugr.root() {
+            for dir in Direction::BOTH {
+                for (i, port_index) in self.hugr.graph.ports(node.pg_index(), dir).enumerate() {
+                    let port = Port::new(dir, i);
+                    self.validate_port(node, port, port_index, op_type, var_decls)?;
+                }
             }
         }
 

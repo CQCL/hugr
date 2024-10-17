@@ -25,7 +25,9 @@ use crate::types::{
     CustomType, FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, Type, TypeBound, TypeRV,
     TypeRow,
 };
-use crate::{const_extension_ids, test_file, type_row, Direction, IncomingPort, Node};
+use crate::{
+    const_extension_ids, test_file, type_row, Direction, IncomingPort, Node, OutgoingPort,
+};
 
 const NAT: Type = crate::extension::prelude::USIZE_T;
 
@@ -68,36 +70,44 @@ fn add_df_children(b: &mut Hugr, parent: Node, copies: usize) -> (Node, Node, No
 
 #[test]
 fn invalid_root() {
-    let declare_op: OpType = ops::FuncDecl {
-        name: "main".into(),
-        signature: Default::default(),
-    }
-    .into();
-
-    let mut b = Hugr::default();
+    let mut b = Hugr::new(LogicOp::Not);
     let root = b.root();
-    assert_eq!(b.validate(&EMPTY_REG), Ok(()));
+    assert_eq!(b.validate(&PRELUDE_REGISTRY), Ok(()));
+
+    // Change the number of ports in the root
+    b.set_num_ports(root, 1, 0);
+    assert_matches!(
+        b.validate(&PRELUDE_REGISTRY),
+        Err(ValidationError::WrongNumberOfPorts { node, .. }) => assert_eq!(node, root)
+    );
+    b.set_num_ports(root, 2, 2);
+
+    // Connect it to itself
+    b.connect(root, 0, root, 0);
+    assert_matches!(
+        b.validate(&PRELUDE_REGISTRY),
+        Err(ValidationError::RootWithEdges { node, .. }) => assert_eq!(node, root)
+    );
+    b.disconnect(root, OutgoingPort::from(0));
 
     // Add another hierarchy root
-    let other = b.add_node(ops::Module::new().into());
+    let module = b.add_node(ops::Module::new().into());
     assert_matches!(
-        b.validate(&EMPTY_REG),
-        Err(ValidationError::NoParent { node }) => assert_eq!(node, other)
+        b.validate(&PRELUDE_REGISTRY),
+        Err(ValidationError::NoParent { node }) => assert_eq!(node, module)
     );
-    b.set_parent(other, root);
-    b.replace_op(other, declare_op).unwrap();
-    b.add_ports(other, Direction::Outgoing, 1);
-    assert_eq!(b.validate(&EMPTY_REG), Ok(()));
 
     // Make the hugr root not a hierarchy root
-    {
-        let mut hugr = b.clone();
-        hugr.root = other.pg_index();
-        assert_matches!(
-            hugr.validate(&EMPTY_REG),
-            Err(ValidationError::RootNotRoot { node }) => assert_eq!(node, other)
-        );
-    }
+    b.set_parent(root, module);
+    assert_matches!(
+        b.validate(&PRELUDE_REGISTRY),
+        Err(ValidationError::RootNotRoot { node }) => assert_eq!(node, root)
+    );
+
+    // Fix the root
+    b.root = module.pg_index();
+    b.remove_node(root);
+    assert_eq!(b.validate(&PRELUDE_REGISTRY), Ok(()));
 }
 
 #[test]
