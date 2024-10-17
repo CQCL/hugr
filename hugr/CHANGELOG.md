@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.14.0](https://github.com/CQCL/hugr/compare/hugr-v0.13.1...hugr-v0.14.0) - 2024-10-17
+
+### Bug Fixes
+
+- Allocate ports on root nodes ([#1585](https://github.com/CQCL/hugr/pull/1585))
+
+### New Features
+
+- Render function names in `mermaid`/`dot` ([#1583](https://github.com/CQCL/hugr/pull/1583))
+- Add `Package` definition on `hugr-core` ([#1587](https://github.com/CQCL/hugr/pull/1587))
+
 ## [0.13.1](https://github.com/CQCL/hugr/compare/hugr-v0.13.0...hugr-v0.13.1) - 2024-10-14
 
 ### New Features
