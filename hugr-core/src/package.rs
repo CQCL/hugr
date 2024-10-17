@@ -94,7 +94,10 @@ impl Package {
     /// Validate the package against an extension registry.
     ///
     /// `reg` is updated with any new extensions.
-    pub fn validate(&mut self, reg: &mut ExtensionRegistry) -> Result<(), PackageValidationError> {
+    pub fn update_validate(
+        &mut self,
+        reg: &mut ExtensionRegistry,
+    ) -> Result<(), PackageValidationError> {
         for ext in &self.extensions {
             reg.register_updated_ref(ext)?;
         }
@@ -102,6 +105,22 @@ impl Package {
             hugr.update_validate(reg)?;
         }
         Ok(())
+    }
+
+    /// Validate the package against an extension registry.
+    ///
+    /// `reg` is updated with any new extensions.
+    ///
+    /// Returns the validated modules.
+    ///
+    /// deprecated: use [Package::update_validate] instead.
+    #[deprecated(since = "0.13.2", note = "Replaced by `Package::update_validate`")]
+    pub fn validate(
+        mut self,
+        reg: &mut ExtensionRegistry,
+    ) -> Result<Vec<Hugr>, PackageValidationError> {
+        self.update_validate(reg)?;
+        Ok(self.modules)
     }
 
     /// Read a Package in json format from an io reader.
@@ -258,6 +277,20 @@ pub enum PackageValidationError {
     Extension(ExtensionRegistryError),
     /// Error raised while validating the package hugrs.
     Validation(ValidationError),
+    /// Error validating HUGR.
+    #[deprecated(
+        since = "0.13.2",
+        note = "Replaced by `PackageValidationError::Validation`"
+    )]
+    #[from(ignore)]
+    Validate(ValidationError),
+    /// Error registering extension.
+    #[deprecated(
+        since = "0.13.2",
+        note = "Replaced by `PackageValidationError::Extension`"
+    )]
+    #[from(ignore)]
+    ExtReg(ExtensionRegistryError),
 }
 
 #[cfg(test)]
