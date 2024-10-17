@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.14.0](https://github.com/CQCL/hugr/compare/hugr-cli-v0.13.1...hugr-cli-v0.14.0) - 2024-10-17
+
+### New Features
+
+- Add `Package` definition on `hugr-core` ([#1587](https://github.com/CQCL/hugr/pull/1587))
+
 ## 0.13.1 (2024-10-14)
 
 This release bumps the version to align with the other `hugr-*` crates.
