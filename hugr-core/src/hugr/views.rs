@@ -680,11 +680,21 @@ where
     /// Filter an iterator of node-ports to only dataflow dependency specifying
     /// ports (Value and StateOrder)
     fn dataflow_ports_only(self, hugr: &impl HugrView) -> impl Iterator<Item = (Node, P)> {
+        self.filter_edge_kind(
+            |kind| matches!(kind, Some(EdgeKind::Value(..) | EdgeKind::StateOrder)),
+            hugr,
+        )
+    }
+
+    /// Filter an iterator of node-ports based on the port kind.
+    fn filter_edge_kind(
+        self,
+        predicate: impl Fn(Option<EdgeKind>) -> bool,
+        hugr: &impl HugrView,
+    ) -> impl Iterator<Item = (Node, P)> {
         self.filter(move |(n, p)| {
-            matches!(
-                hugr.get_optype(*n).port_kind(*p),
-                Some(EdgeKind::Value(_) | EdgeKind::StateOrder)
-            )
+            let kind = hugr.get_optype(*n).port_kind(*p);
+            predicate(kind)
         })
     }
 }

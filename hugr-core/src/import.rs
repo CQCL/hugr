@@ -221,7 +221,7 @@ impl<'a> Context<'a> {
 
             if inputs.is_empty() || outputs.is_empty() {
                 return Err(error_unsupported!(
-                    "link {:?} is missing either an input or an output port",
+                    "link {} is missing either an input or an output port",
                     link_id
                 ));
             }

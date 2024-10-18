@@ -15,6 +15,7 @@ license.workspace = true
 [dependencies]
 bumpalo = { workspace = true, features = ["collections"] }
 capnp = "0.20.1"
+derive_more = { version = "1.0.0", features = ["display"] }
 fxhash.workspace = true
 indexmap.workspace = true
 pest = "2.7.12"
