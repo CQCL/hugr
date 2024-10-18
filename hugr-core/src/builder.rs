@@ -152,10 +152,10 @@ pub enum BuildError {
     #[error("Constant failed typechecking: {0}")]
     BadConstant(#[from] ConstTypeError),
     /// CFG can only have one entry.
-    #[error("CFG entry node already built for CFG node: {0:?}.")]
+    #[error("CFG entry node already built for CFG node: {0}.")]
     EntryBuiltError(Node),
     /// Node was expected to have a certain type but was found to not.
-    #[error("Node with index {node:?} does not have type {op_desc:?} as expected.")]
+    #[error("Node with index {node} does not have type {op_desc} as expected.")]
     #[allow(missing_docs)]
     UnexpectedType {
         /// Index of node where error occurred.
@@ -168,7 +168,7 @@ pub enum BuildError {
     ConditionalError(#[from] conditional::ConditionalBuildError),
 
     /// Wire not found in Hugr
-    #[error("Wire not found in Hugr: {0:?}.")]
+    #[error("Wire not found in Hugr: {0}.")]
     WireNotFound(Wire),
 
     /// Error in CircuitBuilder

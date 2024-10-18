@@ -333,7 +333,7 @@ pub enum ConstTypeError {
     SumType(#[from] SumTypeError),
     /// Function constant missing a function type.
     #[error(
-        "A function constant cannot be defined using a Hugr with root of type {hugr_root_type:?}. Must be a monomorphic function.",
+        "A function constant cannot be defined using a Hugr with root of type {hugr_root_type}. Must be a monomorphic function.",
     )]
     NotMonomorphicFunction {
         /// The root node type of the Hugr that (claims to) define the function constant.
@@ -343,7 +343,7 @@ pub enum ConstTypeError {
     #[error("Value {1:?} does not match expected type {0}")]
     ConstCheckFail(Type, Value),
     /// Error when checking a custom value.
-    #[error("Error when checking custom type: {0:?}")]
+    #[error("Error when checking custom type: {0}")]
     CustomCheckFail(#[from] CustomCheckFailure),
 }
 
