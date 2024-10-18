@@ -709,10 +709,10 @@ pub enum InvalidSubgraph {
 #[non_exhaustive]
 pub enum InvalidSubgraphBoundary {
     /// A boundary port's node is not in the set of nodes.
-    #[error("(node {0:?}, port {1:?}) is in the boundary, but node {0:?} is not in the set.")]
+    #[error("(node {0}, port {1}) is in the boundary, but node {0} is not in the set.")]
     PortNodeNotInSet(Node, Port),
     /// A boundary port has no connections outside the subgraph.
-    #[error("(node {0:?}, port {1:?}) is in the boundary, but the port is not connected to a node outside the subgraph.")]
+    #[error("(node {0}, port {1}) is in the boundary, but the port is not connected to a node outside the subgraph.")]
     DisconnectedBoundaryPort(Node, Port),
     /// There's a non-unique input-boundary port.
     #[error("A port in the input boundary is used multiple times.")]

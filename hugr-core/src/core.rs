@@ -224,6 +224,12 @@ impl Wire {
     }
 }
 
+impl std::fmt::Display for Wire {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Wire({}, {})", self.0.index(), self.1.index)
+    }
+}
+
 /// Enum for uniquely identifying the origin of linear wires in a circuit-like
 /// dataflow region.
 ///
@@ -323,4 +329,4 @@ macro_rules! impl_display_from_debug {
         )*
     };
 }
-impl_display_from_debug!(Node, Port, IncomingPort, OutgoingPort, Wire, CircuitUnit);
+impl_display_from_debug!(Node, Port, IncomingPort, OutgoingPort, CircuitUnit);

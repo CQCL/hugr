@@ -20,7 +20,7 @@ pub enum RemoveError {
     #[error("Node is invalid (either not in HUGR or not correct operation).")]
     InvalidNode(Node),
     /// Node in use.
-    #[error("Node: {0:?} has non-zero outgoing connections.")]
+    #[error("Node: {0} has non-zero outgoing connections.")]
     ValueUsed(Node),
 }
 

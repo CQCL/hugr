@@ -392,7 +392,13 @@ fn invalid_types() {
         let (h, def) = identity_hugr_with_type(Type::new_extension(t));
         match h.validate(&reg) {
             Err(ValidationError::SignatureError { node, cause }) if node == def => cause,
-            e => panic!("Expected SignatureError at def node, got {:?}", e),
+            e => panic!(
+                "Expected SignatureError at def node, got {}",
+                match e {
+                    Ok(()) => "Ok".to_owned(),
+                    Err(e) => format!("{}", e),
+                }
+            ),
         }
     };
 
