@@ -73,15 +73,18 @@ major version bump. You can check the next release version [draft release
 PR](https://github.com/CQCL/hugr/pulls?q=is%3Aopen+is%3Apr+label%3Arelease) on
 github.
 
-If all the changes before your PR were non-breaking, you can use `cargo
-semver-checks` to alert you of any problematic changes.
+Use `cargo semver-checks` to alert you of any problematic changes.
+Replace the baseline-rev with a commit hash if your branch is not up-to-date with the main branch.
 
 ```bash
 # Ensure you have cargo-semver-checks installed
 cargo install cargo-semver-checks --locked
-# Check for breaking changes
-cargo semver-checks
+# Check for breaking changes against the main branch
+cargo semver-checks --baseline-rev origin/main
 ```
+
+These checks are also run on the CI. You will see a warning comment on your PR
+if you introduce a breaking change.
 
 ## 💅 Coding Style
 
