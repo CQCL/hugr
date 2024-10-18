@@ -151,3 +151,6 @@ pub use hugr_core::hugr::{Hugr, HugrView, SimpleReplacement};
 
 // Re-export macros.
 pub use hugr_core::macros::{const_extension_ids, type_row};
+
+/// A dummy non-breaking change to test the semver-checks workflow.
+pub struct DummyNonBreakingChange;
