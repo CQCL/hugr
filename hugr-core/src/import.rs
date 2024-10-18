@@ -301,6 +301,8 @@ impl<'a> Context<'a> {
                     model::Operation::DeclareFunc { decl } => decl.name,
                     model::Operation::DefineAlias { decl, .. } => decl.name,
                     model::Operation::DeclareAlias { decl } => decl.name,
+                    model::Operation::DeclareConstructor { decl } => decl.name,
+                    model::Operation::DeclareOperation { decl } => decl.name,
                     _ => {
                         return Err(model::ModelError::InvalidGlobal(global_ref.to_string()).into());
                     }
@@ -463,15 +465,7 @@ impl<'a> Context<'a> {
                     .map(|param| self.import_type_arg(*param))
                     .collect::<Result<Vec<_>, _>>()?;
 
-                let name = match operation {
-                    GlobalRef::Direct(_) => {
-                        return Err(error_unsupported!(
-                            "custom operation with direct reference to declaring node"
-                        ))
-                    }
-                    GlobalRef::Named(name) => name,
-                };
-
+                let name = self.get_global_name(operation)?;
                 let (extension, name) = self.import_custom_name(name)?;
 
                 // TODO: Currently we do not have the description or any other metadata for

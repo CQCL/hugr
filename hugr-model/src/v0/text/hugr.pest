@@ -28,6 +28,7 @@ node = {
   | node_define_alias
   | node_declare_alias
   | node_declare_ctr
+  | node_declare_operation
   | node_tail_loop
   | node_cond
   | node_tag
