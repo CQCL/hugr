@@ -30,7 +30,7 @@ fn run_validate(mut args: validate::ValArgs) {
     let result = args.run();
 
     if let Err(e) = result {
-        if args.verbosity(Level::Error) {
+        if args.test_verbosity(Level::Error) {
             eprintln!("{}", e);
         }
         std::process::exit(1);
