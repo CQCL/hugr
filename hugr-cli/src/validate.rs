@@ -26,14 +26,14 @@ impl ValArgs {
     /// Run the HUGR cli and validate against an extension registry.
     pub fn run(&mut self) -> Result<(Vec<Hugr>, ExtensionRegistry), CliError> {
         let result = self.hugr_args.validate()?;
-        if self.test_verbosity(Level::Info) {
+        if self.verbosity(Level::Info) {
             eprintln!("{}", VALID_PRINT);
         }
         Ok(result)
     }
 
     /// Test whether a `level` message should be output.
-    pub fn test_verbosity(&self, level: Level) -> bool {
+    pub fn verbosity(&self, level: Level) -> bool {
         self.hugr_args.verbosity(level)
     }
 }
