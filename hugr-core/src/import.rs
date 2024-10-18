@@ -338,7 +338,11 @@ impl<'a> Context<'a> {
         Ok(())
     }
 
-    fn import_node(&mut self, node_id: model::NodeId, parent: Node) -> Result<Node, ImportError> {
+    fn import_node(
+        &mut self,
+        node_id: model::NodeId,
+        parent: Node,
+    ) -> Result<Option<Node>, ImportError> {
         let node_data = self.get_node(node_id)?;
 
         match node_data.operation {
@@ -353,7 +357,7 @@ impl<'a> Context<'a> {
                 };
 
                 self.import_dfg_region(node_id, *region, node)?;
-                Ok(node)
+                Ok(Some(node))
             }
 
             model::Operation::Cfg => {
@@ -366,10 +370,13 @@ impl<'a> Context<'a> {
                 };
 
                 self.import_cfg_region(node_id, *region, node)?;
-                Ok(node)
+                Ok(Some(node))
             }
 
-            model::Operation::Block => self.import_cfg_block(node_id, parent),
+            model::Operation::Block => {
+                let node = self.import_cfg_block(node_id, parent)?;
+                Ok(Some(node))
+            }
 
             model::Operation::DefineFunc { decl } => {
                 self.import_poly_func_type(*decl, |ctx, signature| {
@@ -386,7 +393,7 @@ impl<'a> Context<'a> {
 
                     ctx.import_dfg_region(node_id, *region, node)?;
 
-                    Ok(node)
+                    Ok(Some(node))
                 })
             }
 
@@ -399,7 +406,7 @@ impl<'a> Context<'a> {
 
                     let node = ctx.make_node(node_id, optype, parent)?;
 
-                    Ok(node)
+                    Ok(Some(node))
                 })
             }
 
@@ -419,7 +426,8 @@ impl<'a> Context<'a> {
                 self.static_edges.push((func_node, node_id));
                 let optype = OpType::Call(Call::try_new(func_sig, type_args, self.extensions)?);
 
-                self.make_node(node_id, optype, parent)
+                let node = self.make_node(node_id, optype, parent)?;
+                Ok(Some(node))
             }
 
             model::Operation::LoadFunc { func } => {
@@ -443,18 +451,26 @@ impl<'a> Context<'a> {
                     self.extensions,
                 )?);
 
-                self.make_node(node_id, optype, parent)
+                let node = self.make_node(node_id, optype, parent)?;
+                Ok(Some(node))
             }
 
-            model::Operation::TailLoop => self.import_tail_loop(node_id, parent),
-            model::Operation::Conditional => self.import_conditional(node_id, parent),
+            model::Operation::TailLoop => {
+                let node = self.import_tail_loop(node_id, parent)?;
+                Ok(Some(node))
+            }
+            model::Operation::Conditional => {
+                let node = self.import_conditional(node_id, parent)?;
+                Ok(Some(node))
+            }
 
             model::Operation::CustomFull {
                 operation: GlobalRef::Named(name),
             } if name == OP_FUNC_CALL_INDIRECT => {
                 let signature = self.get_node_signature(node_id)?;
                 let optype = OpType::CallIndirect(CallIndirect { signature });
-                self.make_node(node_id, optype, parent)
+                let node = self.make_node(node_id, optype, parent)?;
+                Ok(Some(node))
             }
 
             model::Operation::CustomFull { operation } => {
@@ -489,7 +505,7 @@ impl<'a> Context<'a> {
                     _ => return Err(error_unsupported!("multiple regions in custom operation")),
                 }
 
-                Ok(node)
+                Ok(Some(node))
             }
 
             model::Operation::Custom { .. } => Err(error_unsupported!(
@@ -508,7 +524,8 @@ impl<'a> Context<'a> {
                     definition: ctx.import_type(value)?,
                 });
 
-                ctx.make_node(node_id, optype, parent)
+                let node = ctx.make_node(node_id, optype, parent)?;
+                Ok(Some(node))
             }),
 
             model::Operation::DeclareAlias { decl } => self.with_local_socpe(|ctx| {
@@ -523,7 +540,8 @@ impl<'a> Context<'a> {
                     bound: TypeBound::Copyable,
                 });
 
-                ctx.make_node(node_id, optype, parent)
+                let node = ctx.make_node(node_id, optype, parent)?;
+                Ok(Some(node))
             }),
 
             model::Operation::Tag { tag } => {
@@ -532,23 +550,19 @@ impl<'a> Context<'a> {
                     .ok_or_else(|| error_uninferred!("node signature"))?;
                 let (_, outputs, _) = self.get_func_type(signature)?;
                 let (variants, _) = self.import_adt_and_rest(node_id, outputs)?;
-                self.make_node(
+                let node = self.make_node(
                     node_id,
                     OpType::Tag(Tag {
                         variants,
                         tag: tag as _,
                     }),
                     parent,
-                )
+                )?;
+                Ok(Some(node))
             }
 
-            model::Operation::DeclareConstructor { .. } => {
-                Err(error_unsupported!("constructor declaration"))
-            }
-
-            model::Operation::DeclareOperation { .. } => {
-                Err(error_unsupported!("operation declaration"))
-            }
+            model::Operation::DeclareConstructor { .. } => Ok(None),
+            model::Operation::DeclareOperation { .. } => Ok(None),
         }
     }
 
