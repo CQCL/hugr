@@ -134,3 +134,13 @@ def test_complex_tail_loop() -> None:
     h.set_outputs(*tl[:3])
 
     validate(h.hugr)
+
+
+def test_conditional_bug() -> None:
+    # bug with case ordering https://github.com/CQCL/hugr/issues/1596
+    cond = Conditional(tys.Either([tys.USize()], [tys.Unit]), [])
+    with cond.add_case(1) as case:
+        case.set_outputs()
+    with cond.add_case(0) as case:
+        case.set_outputs()
+    validate(cond.hugr)
