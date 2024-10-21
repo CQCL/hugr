@@ -240,7 +240,7 @@ jobs:
   rs-semver-checks:
     needs: [changes, check]
     if: ${{ needs.changes.outputs.rust == 'true' && github.event_name == 'pull_request' }}
-    uses: CQCL/hugrverse-actions/.github/workflows/rs-semver-checks.yml@ab/cache-semver-checks
+    uses: CQCL/hugrverse-actions/.github/workflows/rs-semver-checks.yml@main
     with:
       apt-dependencies: capnproto
     secrets:
