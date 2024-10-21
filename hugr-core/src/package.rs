@@ -318,7 +318,7 @@ mod test {
     #[case::cfg(simple_cfg_hugr(), false)]
     #[case::unsupported_input(simple_input_node(), true)]
     fn hugr_to_package(#[case] hugr: Hugr, #[case] errors: bool) {
-        match (&Package::from_hugr(hugr.clone()), errors) {
+        match (&Package::from_hugr(hugr), errors) {
             (Ok(package), false) => {
                 assert_eq!(package.modules.len(), 1);
                 let root_op = package.modules[0].get_optype(package.modules[0].root());
