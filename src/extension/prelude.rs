@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Ok, Result};
+use anyhow::{anyhow, bail, ensure, Ok, Result};
 use hugr::{
     extension::{
         prelude::{
@@ -13,8 +13,8 @@ use hugr::{
     HugrView,
 };
 use inkwell::{
-    types::{BasicType, BasicTypeEnum, IntType},
-    values::{BasicValue as _, BasicValueEnum, IntValue},
+    types::{BasicType, BasicTypeEnum, IntType, PointerType},
+    values::{BasicValue as _, BasicValueEnum, StructValue},
     AddressSpace,
 };
 use itertools::Itertools;
@@ -32,16 +32,12 @@ use crate::{
 
 pub mod array;
 
-/// A helper trait for implementing [CodegenExtension]s for
-/// [hugr::extension::prelude].
+/// A helper trait for customising the lowering [hugr::extension::prelude]
+/// types, [CustomConst]s, and ops.
 ///
 /// All methods have sensible defaults provided, and [DefaultPreludeCodegen] is
-/// trivial implementation of this trait, which delegates everything to those
+/// a trivial implementation of this trait which delegates everything to those
 /// default implementations.
-///
-/// TODO several types and ops are unimplemented. We expect to add methods to
-/// this trait as necessary, allowing downstream users to customise the lowering
-/// of `prelude`.
 pub trait PreludeCodegen: Clone {
     /// Return the llvm type of [hugr::extension::prelude::USIZE_T]. That type
     /// must be an [IntType].
@@ -52,6 +48,24 @@ pub trait PreludeCodegen: Clone {
     /// Return the llvm type of [hugr::extension::prelude::QB_T].
     fn qubit_type<'c>(&self, session: &TypingSession<'c, '_>) -> impl BasicType<'c> {
         session.iw_context().i16_type()
+    }
+
+    /// Return the llvm type of [hugr::extension::prelude::ERROR_TYPE].
+    ///
+    /// The returned type must always match the type of the returned value of
+    /// [Self::emit_const_error], and the `err` argument of [Self::emit_panic].
+    ///
+    /// The default implementation is a struct type with an i32 field and an i8*
+    /// field for the code and message.
+    fn error_type<'c>(&self, session: &TypingSession<'c, '_>) -> Result<impl BasicType<'c>> {
+        let ctx = session.iw_context();
+        Ok(session.iw_context().struct_type(
+            &[
+                ctx.i32_type().into(),
+                ctx.i8_type().ptr_type(AddressSpace::default()).into(),
+            ],
+            false,
+        ))
     }
 
     /// Return the llvm type of [hugr::extension::prelude::array_type].
@@ -88,12 +102,43 @@ pub trait PreludeCodegen: Clone {
         emit_libc_printf(ctx, &[format_str.into(), text.into()])
     }
 
-    /// Emit a [hugr::extension::prelude::PANIC_OP_ID] node.
+    /// Emit instructions to materialise an LLVM value representing `err`.
+    ///
+    /// The type of the returned value must match [Self::error_type].
+    ///
+    /// The default implementation materialises an LLVM struct with the
+    /// [ConstError::signal] and [ConstError::message] of `err`.
+    fn emit_const_error<'c, H: HugrView>(
+        &self,
+        ctx: &mut EmitFuncContext<'c, '_, H>,
+        err: &ConstError,
+    ) -> Result<BasicValueEnum<'c>> {
+        let builder = ctx.builder();
+        let err_ty = ctx.llvm_type(&ERROR_TYPE)?.into_struct_type();
+        let signal = err_ty
+            .get_field_type_at_index(0)
+            .unwrap()
+            .into_int_type()
+            .const_int(err.signal as u64, false);
+        let message = builder
+            .build_global_string_ptr(&err.message, "")?
+            .as_basic_value_enum();
+        let err = err_ty.const_named_struct(&[signal.into(), message]);
+        Ok(err.into())
+    }
+
+    /// Emit instructions to halt execution with the error `err`.
+    ///
+    /// The type of `err` must match that returned from [Self::error_type].
+    ///
+    /// The default implementation emits calls to libc's `printf` and `abort`.
+    ///
+    /// Note that implementations of `emit_panic` must not emit `unreachable`
+    /// terminators, that, if appropriate, is the responsibilitiy of the caller.
     fn emit_panic<H: HugrView>(
         &self,
         ctx: &mut EmitFuncContext<H>,
-        signal: IntValue,
-        msg: BasicValueEnum,
+        err: BasicValueEnum,
     ) -> Result<()> {
         let format_str = ctx
             .builder()
@@ -102,6 +147,14 @@ pub trait PreludeCodegen: Clone {
                 "prelude.panic_template",
             )?
             .as_basic_value_enum();
+        let Some(err) = StructValue::try_from(err).ok() else {
+            bail!("emit_panic: Expected err value to be a struct type")
+        };
+        ensure!(err.get_type().count_fields() == 2);
+        let signal = ctx.builder().build_extract_value(err, 0, "")?;
+        ensure!(signal.get_type() == ctx.iw_context().i32_type().as_basic_type_enum());
+        let msg = ctx.builder().build_extract_value(err, 1, "")?;
+        ensure!(PointerType::try_from(msg.get_type()).is_ok());
         emit_libc_printf(ctx, &[format_str.into(), signal.into(), msg.into()])?;
         emit_libc_abort(ctx)
     }
@@ -180,12 +233,8 @@ fn add_prelude_extensions<'a, H: HugrView + 'a>(
         }
     })
     .custom_type((prelude::PRELUDE_ID, ERROR_CUSTOM_TYPE.name().clone()), {
-        move |ts, _| {
-            let ctx: &inkwell::context::Context = ts.iw_context();
-            let signal_ty = ctx.i32_type().into();
-            let message_ty = ctx.i8_type().ptr_type(AddressSpace::default()).into();
-            Ok(ctx.struct_type(&[signal_ty, message_ty], false).into())
-        }
+        let pcg = pcg.clone();
+        move |ts, _| Ok(pcg.error_type(&ts)?.as_basic_type_enum())
     })
     .custom_type((prelude::PRELUDE_ID, ARRAY_TYPE_NAME.into()), {
         let pcg = pcg.clone();
@@ -218,19 +267,18 @@ fn add_prelude_extensions<'a, H: HugrView + 'a>(
         let s = context.builder().build_global_string_ptr(k.value(), "")?;
         Ok(s.as_basic_value_enum())
     })
-    .custom_const::<ConstError>(|context, k| {
-        let builder = context.builder();
-        let err_ty = context.llvm_type(&ERROR_TYPE)?.into_struct_type();
-        let signal = err_ty
-            .get_field_type_at_index(0)
-            .unwrap()
-            .into_int_type()
-            .const_int(k.signal as u64, false);
-        let message = builder
-            .build_global_string_ptr(&k.message, "")?
-            .as_basic_value_enum();
-        let err = err_ty.const_named_struct(&[signal.into(), message]);
-        Ok(err.into())
+    .custom_const::<ConstError>({
+        let pcg = pcg.clone();
+        move |context, k| {
+            let err = pcg.emit_const_error(context, k)?;
+            ensure!(
+                err.get_type()
+                    == pcg
+                        .error_type(&context.typing_session())?
+                        .as_basic_type_enum()
+            );
+            Ok(err)
+        }
     })
     .simple_extension_op::<TupleOpDef>(|context, args, op| match op {
         TupleOpDef::UnpackTuple => {
@@ -275,11 +323,14 @@ fn add_prelude_extensions<'a, H: HugrView + 'a>(
     .extension_op(prelude::PRELUDE_ID, prelude::PANIC_OP_ID, {
         let pcg = pcg.clone();
         move |context, args| {
-            let builder = context.builder();
-            let err = args.inputs[0].into_struct_value();
-            let signal = builder.build_extract_value(err, 0, "")?.into_int_value();
-            let msg = builder.build_extract_value(err, 1, "")?;
-            pcg.emit_panic(context, signal, msg)?;
+            let err = args.inputs[0];
+            ensure!(
+                err.get_type()
+                    == pcg
+                        .error_type(&context.typing_session())?
+                        .as_basic_type_enum()
+            );
+            pcg.emit_panic(context, err)?;
             let returns = args
                 .outputs
                 .get_types()
