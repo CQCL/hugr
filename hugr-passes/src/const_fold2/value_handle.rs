@@ -2,12 +2,13 @@ use std::collections::hash_map::DefaultHasher; // Moves into std::hash in Rust 1
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
-use hugr_core::ops::constant::{CustomConst, Sum};
+use hugr_core::ops::constant::{CustomConst, OpaqueValue};
 use hugr_core::ops::Value;
 use hugr_core::types::Type;
-use hugr_core::Node;
+use hugr_core::{Hugr, HugrView, Node};
+use itertools::Either;
 
-use crate::dataflow::AbstractValue;
+use crate::dataflow::{AbstractValue, PartialValue};
 
 #[derive(Clone, Debug)]
 pub struct HashedConst {
@@ -69,36 +70,34 @@ impl ValueKey {
 }
 
 #[derive(Clone, Debug)]
-pub struct ValueHandle(ValueKey, Arc<Value>);
+pub struct ValueHandle(ValueKey, Arc<Either<OpaqueValue, Box<Hugr>>>);
 
 impl ValueHandle {
-    pub fn new(key: ValueKey, value: Arc<Value>) -> Self {
-        Self(key, value)
-    }
-
-    pub fn value(&self) -> &Value {
-        self.1.as_ref()
+    pub fn new(key: ValueKey, value: Value) -> PartialValue<Self> {
+        match value {
+            Value::Extension { e } => PartialValue::Value(Self(key, Arc::new(Either::Left(e)))),
+            Value::Function { hugr } => {
+                PartialValue::Value(Self(key, Arc::new(Either::Right(hugr))))
+            }
+            Value::Sum(sum) => PartialValue::new_variant(
+                sum.tag,
+                sum.values
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, v)| Self::new(key.clone().field(i), v)),
+            ),
+        }
     }
 
     pub fn get_type(&self) -> Type {
-        self.1.get_type()
-    }
-}
-
-impl AbstractValue for ValueHandle {
-    fn as_sum(&self) -> Option<(usize, impl Iterator<Item = Self> + '_)> {
-        match self.value() {
-            Value::Sum(Sum { tag, values, .. }) => Some((
-                *tag,
-                values
-                    .iter()
-                    .enumerate()
-                    .map(|(i, v)| Self(self.0.clone().field(i), Arc::new(v.clone()))),
-            )),
-            _ => None,
+        match &*self.1 {
+            Either::Left(e) => e.get_type(),
+            Either::Right(bh) => Type::new_function(bh.inner_function_type().unwrap()),
         }
     }
 }
+
+impl AbstractValue for ValueHandle {}
 
 impl PartialEq for ValueHandle {
     fn eq(&self, other: &Self) -> bool {
@@ -125,7 +124,10 @@ impl Hash for ValueHandle {
 
 impl From<ValueHandle> for Value {
     fn from(value: ValueHandle) -> Self {
-        (*value.1).clone()
+        match Arc::<Either<_, _>>::unwrap_or_clone(value.1) {
+            Either::Left(e) => Value::Extension { e },
+            Either::Right(hugr) => Value::Function { hugr },
+        }
     }
 }
 
@@ -143,6 +145,7 @@ mod test {
         },
         types::SumType,
     };
+    use itertools::Itertools;
 
     use super::*;
 
@@ -201,22 +204,26 @@ mod test {
     #[test]
     fn value_handle_eq() {
         let k_i = ConstInt::new_u(4, 2).unwrap();
-        let subject_val = Arc::new(
-            Value::sum(
-                0,
-                [k_i.clone().into()],
-                SumType::new([vec![k_i.get_type()], vec![]]),
-            )
-            .unwrap(),
-        );
+        let st = SumType::new([vec![k_i.get_type()], vec![]]);
+        let subject_val = Value::sum(0, [k_i.clone().into()], st).unwrap();
 
         let k1 = ValueKey::try_new(ConstString::new("foo".to_string())).unwrap();
-        let v1 = ValueHandle::new(k1.clone(), subject_val.clone());
-        let v2 = ValueHandle::new(k1.clone(), Value::extension(k_i).into());
+        let PartialValue::PartialSum(ps1) = ValueHandle::new(k1.clone(), subject_val.clone())
+        else {
+            panic!()
+        };
+        let (_tag, fields) = ps1.0.into_iter().exactly_one().unwrap();
+        let PartialValue::Value(vh1) = fields.into_iter().exactly_one().unwrap() else {
+            panic!()
+        };
 
-        let fields = v1.as_sum().unwrap().1.collect::<Vec<_>>();
+        let PartialValue::Value(v2) = ValueHandle::new(k1.clone(), Value::extension(k_i).into())
+        else {
+            panic!()
+        };
+
         // we do not compare the value, just the key
-        assert_ne!(fields[0], v2);
-        assert_eq!(fields[0].value(), v2.value());
+        assert_ne!(vh1, v2);
+        assert_eq!(vh1.1, v2.1);
     }
 }

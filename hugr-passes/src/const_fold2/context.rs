@@ -2,11 +2,11 @@ use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::sync::Arc;
 
-use hugr_core::ops::{OpType, Value};
+use hugr_core::ops::{ExtensionOp, Value};
 use hugr_core::{Hugr, HugrView, IncomingPort, Node, OutgoingPort};
 
 use super::value_handle::{ValueHandle, ValueKey};
-use crate::dataflow::TotalContext;
+use crate::dataflow::{PartialValue, TotalContext};
 
 /// A [context](crate::dataflow::DFContext) for doing analysis with [ValueHandle]s.
 /// Interprets [LoadConstant](OpType::LoadConstant) nodes,
@@ -71,31 +71,14 @@ impl<H: HugrView> TotalContext<ValueHandle> for HugrValueContext<H> {
     fn interpret_leaf_op(
         &self,
         n: Node,
+        op: &ExtensionOp,
         ins: &[(IncomingPort, Value)],
-    ) -> Vec<(OutgoingPort, ValueHandle)> {
-        match self.0.get_optype(n) {
-            OpType::LoadConstant(load_op) => {
-                assert!(ins.is_empty()); // static edge, so need to find constant
-                let const_node = self
-                    .0
-                    .single_linked_output(n, load_op.constant_port())
-                    .unwrap()
-                    .0;
-                let const_op = self.0.get_optype(const_node).as_const().unwrap();
-                vec![(
-                    OutgoingPort::from(0),
-                    ValueHandle::new(const_node.into(), Arc::new(const_op.value().clone())),
-                )]
-            }
-            OpType::ExtensionOp(op) => {
-                let ins = ins.iter().map(|(p, v)| (*p, v.clone())).collect::<Vec<_>>();
-                op.constant_fold(&ins).map_or(Vec::new(), |outs| {
-                    outs.into_iter()
-                        .map(|(p, v)| (p, ValueHandle::new(ValueKey::Node(n), Arc::new(v))))
-                        .collect()
-                })
-            }
-            _ => vec![],
-        }
+    ) -> Vec<(OutgoingPort, PartialValue<ValueHandle>)> {
+        let ins = ins.iter().map(|(p, v)| (*p, v.clone())).collect::<Vec<_>>();
+        op.constant_fold(&ins).map_or(Vec::new(), |outs| {
+            outs.into_iter()
+                .map(|(p, v)| (p, ValueHandle::new(ValueKey::Node(n), v)))
+                .collect()
+        })
     }
 }
