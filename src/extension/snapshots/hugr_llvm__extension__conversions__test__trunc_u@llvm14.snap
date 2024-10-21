@@ -12,7 +12,7 @@ alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  %within_upper_bound = fcmp ole double %0, 0x43F0000000000000
+  %within_upper_bound = fcmp olt double %0, 0x43F0000000000000
   %within_lower_bound = fcmp ole double 0.000000e+00, %0
   %success = and i1 %within_upper_bound, %within_lower_bound
   %trunc_result = fptoui double %0 to i64

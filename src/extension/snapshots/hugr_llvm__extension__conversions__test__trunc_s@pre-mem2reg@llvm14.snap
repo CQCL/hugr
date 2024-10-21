@@ -17,7 +17,7 @@ alloca_block:
 entry_block:                                      ; preds = %alloca_block
   store double %0, double* %"2_0", align 8
   %"2_01" = load double, double* %"2_0", align 8
-  %within_upper_bound = fcmp ole double %"2_01", 0x41DFFFFFFFC00000
+  %within_upper_bound = fcmp olt double %"2_01", 0x41DFFFFFFFC00000
   %within_lower_bound = fcmp ole double 0xC1E0000000000000, %"2_01"
   %success = and i1 %within_upper_bound, %within_lower_bound
   %trunc_result = fptosi double %"2_01" to i32
