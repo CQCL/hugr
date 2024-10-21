@@ -29,7 +29,7 @@ pub trait ArrayOpBuilder: Dataflow {
         input: Wire,
         index: Wire,
     ) -> Result<Wire, BuildError> {
-        // TODO Add an OpLoadError variant to BuildError
+        // TODO Add an OpLoadError variant to BuildError.
         let op = ArrayOpDef::get
             .instantiate(&[size.into(), elem_ty.into()])
             .unwrap();
