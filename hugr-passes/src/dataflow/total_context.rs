@@ -20,7 +20,7 @@ pub trait TotalContext<V>: Clone + Eq + Hash + std::ops::Deref<Target = Hugr> {
         node: Node,
         e: &ExtensionOp,
         ins: &[(IncomingPort, Self::InterpretableVal)],
-    ) -> Vec<(OutgoingPort, V)>;
+    ) -> Vec<(OutgoingPort, PartialValue<V>)>;
 }
 
 impl<V: AbstractValue, T: TotalContext<V>> DFContext<V> for T {
@@ -53,7 +53,7 @@ impl<V: AbstractValue, T: TotalContext<V>> DFContext<V> for T {
             })
             .collect::<Vec<_>>();
         for (p, v) in self.interpret_leaf_op(node, e, &known_ins) {
-            outs[p.index()] = PartialValue::Value(v);
+            outs[p.index()] = v;
         }
     }
 }
