@@ -22,10 +22,14 @@ impl<'c, TM: TypeMapping, F> TypeMapFnHelper<'c, TM> for F where
 
 /// A helper trait to name the type of the Callback used by
 /// [`TypeMap<TM>`](TypeMap).
-pub trait TypeMappingFn<'a, TM: TypeMapping>: for<'c> TypeMapFnHelper<'c, TM> + 'a {}
-impl<'a, TM: TypeMapping, F: for<'c> TypeMapFnHelper<'c, TM> + ?Sized + 'a> TypeMappingFn<'a, TM>
-    for F
-{
+pub trait TypeMappingFn<'a, TM: TypeMapping>: 'a {
+    fn map_type<'c>(&self, inv: TM::InV<'c>, ty: &CustomType) -> Result<TM::OutV<'c>>;
+}
+
+impl<'a, TM: TypeMapping, F: for<'c> TypeMapFnHelper<'c, TM> + 'a> TypeMappingFn<'a, TM> for F {
+    fn map_type<'c>(&self, inv: TM::InV<'c>, ty: &CustomType) -> Result<TM::OutV<'c>> {
+        self(inv, ty)
+    }
 }
 
 /// Defines a mapping from [HugrType] to `OutV`;
@@ -90,7 +94,7 @@ pub type CustomTypeKey = (ExtensionId, TypeName);
 #[derive(Default)]
 pub struct TypeMap<'a, TM: TypeMapping> {
     type_map: TM,
-    custom_hooks: HashMap<CustomTypeKey, Box<dyn TypeMappingFn<'a, TM>>>,
+    custom_hooks: HashMap<CustomTypeKey, Box<dyn TypeMappingFn<'a, TM> + 'a>>,
 }
 
 impl<'a, TM: TypeMapping + 'a> TypeMap<'a, TM> {
@@ -117,7 +121,7 @@ impl<'a, TM: TypeMapping + 'a> TypeMap<'a, TM> {
                 let Some(handler) = self.custom_hooks.get(&key) else {
                     return self.type_map.default_out(inv, &custom_type.clone().into());
                 };
-                handler(inv, custom_type)
+                handler.map_type(inv, custom_type)
             }
             TypeEnum::Sum(sum_type) => self
                 .map_sum_type(sum_type, inv)

@@ -159,13 +159,13 @@ impl<'c> From<LLVMSumType<'c>> for BasicTypeEnum<'c> {
     }
 }
 
-impl<'c> std::fmt::Display for LLVMSumType<'c> {
+impl std::fmt::Display for LLVMSumType<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.fmt(f)
     }
 }
 
-unsafe impl<'c> AsTypeRef for LLVMSumType<'c> {
+unsafe impl AsTypeRef for LLVMSumType<'_> {
     fn as_type_ref(&self) -> inkwell::llvm_sys::prelude::LLVMTypeRef {
         self.0.as_type_ref()
     }
@@ -186,7 +186,7 @@ impl<'c> From<LLVMSumValue<'c>> for BasicValueEnum<'c> {
     }
 }
 
-unsafe impl<'c> AsValueRef for LLVMSumValue<'c> {
+unsafe impl AsValueRef for LLVMSumValue<'_> {
     fn as_value_ref(&self) -> inkwell::llvm_sys::prelude::LLVMValueRef {
         self.0.as_value_ref()
     }

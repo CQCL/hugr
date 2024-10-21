@@ -289,7 +289,7 @@ impl<OT, H> Clone for FatNode<'_, OT, H> {
     }
 }
 
-impl<'hugr, OT: NamedOp, H: HugrView + ?Sized> std::fmt::Display for FatNode<'hugr, OT, H>
+impl<OT: NamedOp, H: HugrView + ?Sized> std::fmt::Display for FatNode<'_, OT, H>
 where
     for<'a> &'a OpType: TryInto<&'a OT>,
 {

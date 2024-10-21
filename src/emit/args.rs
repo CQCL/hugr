@@ -16,7 +16,7 @@ pub struct EmitOpArgs<'c, 'hugr, OT, H> {
     pub outputs: RowPromise<'c>,
 }
 
-impl<'c, 'hugr, OT, H> EmitOpArgs<'c, 'hugr, OT, H> {
+impl<'hugr, OT, H> EmitOpArgs<'_, 'hugr, OT, H> {
     /// Get the internal [FatNode]
     pub fn node(&self) -> FatNode<'hugr, OT, H> {
         self.node
