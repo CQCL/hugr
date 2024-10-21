@@ -30,7 +30,6 @@ pub enum IO {
 ascent::ascent! {
     pub(super) struct AscentProgram<V: AbstractValue, C: DFContext<V>>;
     relation context(C);
-    relation out_wire_value_proto(Node, OutgoingPort, PV<V>);
 
     relation node(C, Node);
     relation in_wire(C, Node, IncomingPort);
@@ -38,14 +37,13 @@ ascent::ascent! {
     relation parent_of_node(C, Node, Node);
     relation io_node(C, Node, Node, IO);
     lattice out_wire_value(C, Node, OutgoingPort, PV<V>);
-    lattice node_in_value_row(C, Node, ValueRow<V>);
     lattice in_wire_value(C, Node, IncomingPort, PV<V>);
+    lattice node_in_value_row(C, Node, ValueRow<V>);
 
     node(c, n) <-- context(c), for n in c.nodes();
 
-    in_wire(c, n,p) <-- node(c, n), for p in value_inputs(c.as_ref(), *n);
-
-    out_wire(c, n,p) <-- node(c, n), for p in value_outputs(c.as_ref(), *n);
+    in_wire(c, n,p) <-- node(c, n), for (p,_) in c.in_value_types(*n); // Note, gets connected inports only
+    out_wire(c, n,p) <-- node(c, n), for (p,_) in c.out_value_types(*n); // (and likewise)
 
     parent_of_node(c, parent, child) <--
         node(c, child), if let Some(parent) = c.get_parent(*child);
@@ -53,16 +51,21 @@ ascent::ascent! {
     io_node(c, parent, child, io) <-- node(c, parent),
       if let Some([i,o]) = c.get_io(*parent),
       for (child,io) in [(i,IO::Input),(o,IO::Output)];
-    // We support prepopulating out_wire_value via out_wire_value_proto.
-    //
-    // out wires that do not have prepopulation values are initialised to bottom.
+
+    // Initialize all wires to bottom
     out_wire_value(c, n,p, PV::bottom()) <-- out_wire(c, n,p);
-    out_wire_value(c, n, p, v) <-- out_wire(c,n,p) , out_wire_value_proto(n, p, v);
 
     in_wire_value(c, n, ip, v) <-- in_wire(c, n, ip),
         if let Some((m,op)) = c.single_linked_output(*n, *ip),
         out_wire_value(c, m, op, v);
 
+    // We support prepopulating in_wire_value via in_wire_value_proto.
+    relation in_wire_value_proto(Node, IncomingPort, PV<V>);
+    in_wire_value(c, n, p, PV::bottom()) <-- in_wire(c, n,p);
+    in_wire_value(c, n, p, v) <-- node(c,n),
+      if let Some(sig) = c.signature(*n),
+      for p in sig.input_ports(),
+      in_wire_value_proto(n, p, v);
 
     node_in_value_row(c, n, ValueRow::new(sig.input_count())) <-- node(c, n), if let Some(sig) = c.signature(*n);
     node_in_value_row(c, n, ValueRow::single_known(c.signature(*n).unwrap().input_count(), p.index(), v.clone())) <-- in_wire_value(c, n, p, v);
@@ -133,22 +136,31 @@ ascent::ascent! {
 
     // outputs of case nodes propagate to outputs of conditional *if* case reachable
     out_wire_value(c, cond, OutgoingPort::from(o_p.index()), v) <--
-      case_node(c, cond, i, case),
-      in_wire_value(c, cond, IncomingPort::from(0), control),
-      if control.supports_tag(*i),
+      case_node(c, cond, _, case),
+      case_reachable(c, cond, case),
       io_node(c, case, o, IO::Output),
       in_wire_value(c, o, o_p, v);
 
-    lattice case_reachable(C, Node, Node, bool);
-    case_reachable(c, cond, case, reachable) <-- case_node(c,cond,i,case),
+    relation case_reachable(C, Node, Node);
+    case_reachable(c, cond, case) <-- case_node(c,cond,i,case),
         in_wire_value(c, cond, IncomingPort::from(0), v),
-        let reachable = v.supports_tag(*i);
+        if v.supports_tag(*i);
 
     // CFG
     relation cfg_node(C, Node);
     relation dfb_block(C, Node, Node);
     cfg_node(c,n) <-- node(c, n), if c.get_optype(*n).is_cfg();
     dfb_block(c,cfg,blk) <-- cfg_node(c, cfg), for blk in c.children(*cfg), if c.get_optype(blk).is_dataflow_block();
+
+    // Reachability
+    relation bb_reachable(C, Node, Node);
+    bb_reachable(c, cfg, entry) <-- cfg_node(c, cfg), if let Some(entry) = c.children(*cfg).next();
+    bb_reachable(c, cfg, bb) <-- cfg_node(c, cfg),
+        bb_reachable(c, cfg, pred),
+        io_node(c, pred, pred_out, IO::Output),
+        in_wire_value(c, pred_out, IncomingPort::from(0), predicate),
+        for (tag, bb) in c.output_neighbours(*pred).enumerate(),
+        if predicate.supports_tag(tag);
 
     // Where do the values "fed" along a control-flow edge come out?
     relation _cfg_succ_dest(C, Node, Node, Node);
@@ -162,9 +174,10 @@ ascent::ascent! {
         io_node(c, entry, i_node, IO::Input),
         in_wire_value(c, cfg, p, v);
 
-    // Outputs of each block propagated to successor blocks or (if exit block) then CFG itself
+    // Outputs of each reachable block propagated to successor block or (if exit block) then CFG itself
     out_wire_value(c, dest, OutgoingPort::from(out_p), v) <--
         dfb_block(c, cfg, pred),
+        bb_reachable(c, cfg, pred),
         let df_block = c.get_optype(*pred).as_dataflow_block().unwrap(),
         for (succ_n, succ) in c.output_neighbours(*pred).enumerate(),
         io_node(c, pred, out_n, IO::Output),
@@ -172,6 +185,23 @@ ascent::ascent! {
         node_in_value_row(c, out_n, out_in_row),
         if let Some(fields) = out_in_row.unpack_first(succ_n, df_block.sum_rows.get(succ_n).unwrap().len()),
         for (out_p, v) in fields.enumerate();
+
+    // Call
+    relation func_call(C, Node, Node);
+    func_call(c, call, func_defn) <--
+        node(c, call),
+        if c.get_optype(*call).is_call(),
+        if let Some(func_defn) = c.static_source(*call);
+
+    out_wire_value(c, inp, OutgoingPort::from(p.index()), v) <--
+        func_call(c, call, func),
+        io_node(c, func, inp, IO::Input),
+        in_wire_value(c, call, p, v);
+
+    out_wire_value(c, call, OutgoingPort::from(p.index()), v) <--
+        func_call(c, call, func),
+        io_node(c, func, outp, IO::Output),
+        in_wire_value(c, outp, p, v);
 }
 
 fn propagate_leaf_op<V: AbstractValue>(
@@ -189,8 +219,9 @@ fn propagate_leaf_op<V: AbstractValue>(
             ins.iter().cloned(),
         )])),
         op if op.cast::<UnpackTuple>().is_some() => {
+            let elem_tys = op.cast::<UnpackTuple>().unwrap().0;
             let [tup] = ins.iter().collect::<Vec<_>>().try_into().unwrap();
-            tup.variant_values(0, value_outputs(c.as_ref(), n).count())
+            tup.variant_values(0, elem_tys.len())
                 .map(ValueRow::from_iter)
         }
         OpType::Tag(t) => Some(ValueRow::from_iter([PV::new_variant(
@@ -198,6 +229,7 @@ fn propagate_leaf_op<V: AbstractValue>(
             ins.iter().cloned(),
         )])),
         OpType::Input(_) | OpType::Output(_) | OpType::ExitBlock(_) => None, // handled by parent
+        OpType::Call(_) => None,  // handled via Input/Output of FuncDefn
         OpType::Const(_) => None, // handled by LoadConstant:
         OpType::LoadConstant(load_op) => {
             assert!(ins.is_empty()); // static edge, so need to find constant
@@ -225,16 +257,7 @@ fn propagate_leaf_op<V: AbstractValue>(
     }
 }
 
-fn value_inputs(h: &impl HugrView, n: Node) -> impl Iterator<Item = IncomingPort> + '_ {
-    h.in_value_types(n).map(|x| x.0)
-}
-
-fn value_outputs(h: &impl HugrView, n: Node) -> impl Iterator<Item = OutgoingPort> + '_ {
-    h.out_value_types(n).map(|x| x.0)
-}
-
-// Wrap a (known-length) row of values into a lattice. Perhaps could be part of partial_value.rs?
-
+// Wrap a (known-length) row of values into a lattice.
 #[derive(PartialEq, Clone, Eq, Hash)]
 struct ValueRow<V>(Vec<PartialValue<V>>);
 

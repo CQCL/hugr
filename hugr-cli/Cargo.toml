@@ -1,6 +1,6 @@
 [package]
 name = "hugr-cli"
-version = "0.6.1"
+version = "0.13.1"
 edition = { workspace = true }
 rust-version = { workspace = true }
 license = { workspace = true }
@@ -15,7 +15,7 @@ categories = ["compilers"]
 [dependencies]
 clap = { workspace = true, features = ["derive"] }
 clap-verbosity-flag.workspace = true
-hugr-core = { path = "../hugr-core", version = "0.10.0" }
+hugr-core = { path = "../hugr-core", version = "0.13.1" }
 serde_json.workspace = true
 serde.workspace = true
 thiserror.workspace = true

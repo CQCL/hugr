@@ -120,8 +120,9 @@ fn const_graph(consts: Vec<Value>, reg: &ExtensionRegistry) -> Hugr {
 }
 
 /// Given some `candidate_nodes` to search for LoadConstant operations in `hugr`,
-/// return an iterator of possible constant folding rewrites. The
-/// [`SimpleReplacement`] replaces an operation with constants that result from
+/// return an iterator of possible constant folding rewrites.
+///
+/// The [`SimpleReplacement`] replaces an operation with constants that result from
 /// evaluating it, the extension registry `reg` is used to validate the
 /// replacement HUGR. The vector of [`RemoveLoadConstant`] refer to the
 /// LoadConstant nodes that could be removed - they are not automatically

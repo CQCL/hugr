@@ -1,6 +1,11 @@
 # Changelog
 
 
+## 0.13.1 (2024-10-14)
+
+This release bumps the version to align with the other `hugr-*` crates.
+
+
 ## 0.6.0 (2024-09-04)
 
 ### Features

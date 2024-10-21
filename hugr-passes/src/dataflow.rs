@@ -5,7 +5,7 @@ mod datalog;
 
 mod machine;
 use hugr_core::ops::constant::CustomConst;
-pub use machine::{Machine, TailLoopTermination};
+pub use machine::{AnalysisResults, Machine, TailLoopTermination};
 
 mod partial_value;
 pub use partial_value::{AbstractValue, PartialSum, PartialValue, Sum};
@@ -81,7 +81,7 @@ fn traverse_value<V>(
             .map(PartialValue::from)
             .unwrap_or(PartialValue::Top),
         Value::Function { hugr } => s
-            .value_from_const_hugr(n, fields, &**hugr)
+            .value_from_const_hugr(n, fields, hugr)
             .map(PartialValue::from)
             .unwrap_or(PartialValue::Top),
     }

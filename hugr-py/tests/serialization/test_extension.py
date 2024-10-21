@@ -8,6 +8,7 @@ from hugr._serialization.extension import (
     TypeDef,
     TypeDefBound,
 )
+from hugr._serialization.ops import Module, OpType
 from hugr._serialization.serial_hugr import SerialHugr, serialization_version
 from hugr._serialization.tys import (
     FunctionType,
@@ -109,6 +110,8 @@ def test_extension():
     dumped_json = ext.model_dump_json()
 
     assert Extension.model_validate_json(dumped_json) == ext
+    hugr_ext = ext.deserialize()
+    assert hugr_ext.from_json(hugr_ext.to_json()) == hugr_ext
 
 
 def test_package():
@@ -123,9 +126,14 @@ def test_package():
         operations={},
     )
     ext_load = Extension.model_validate_json(EXAMPLE)
+
     package = Package(
-        extensions=[ext, ext_load], modules=[SerialHugr(nodes=[], edges=[])]
+        extensions=[ext, ext_load],
+        modules=[SerialHugr(nodes=[OpType(root=Module(parent=0))], edges=[])],
     )
 
     package_load = Package.model_validate_json(package.model_dump_json())
     assert package == package_load
+
+    hugr_package = package.deserialize()
+    assert hugr_package.from_json(hugr_package.to_json()) == hugr_package

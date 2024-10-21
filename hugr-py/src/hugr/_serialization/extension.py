@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Annotated, Any, Literal
 import pydantic as pd
 from pydantic_extra_types.semantic_version import SemanticVersion  # noqa: TCH002
 
+from hugr.hugr.base import Hugr
 from hugr.utils import deser_it
 
 from .ops import Value
@@ -156,5 +157,14 @@ class Package(ConfiguredBaseModel):
     def get_version(cls) -> str:
         return serialization_version()
 
+    def deserialize(self) -> package.Package:
+        return package.Package(
+            modules=[Hugr._from_serial(m) for m in self.modules],
+            extensions=[e.deserialize() for e in self.extensions],
+        )
 
-from hugr import ext  # noqa: E402
+
+from hugr import (  # noqa: E402
+    ext,
+    package,
+)

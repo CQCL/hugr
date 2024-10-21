@@ -7,9 +7,6 @@ release = false
 # Open the release PR as a draft
 pr_draft = true
 
-# Use a custom git-cliff configuration
-changelog_config = "cliff.toml"
-
 # Enforce adding the project name in the git tag, to avoid collisions with python.
 # (This would normally only be enabled once there are multiple packages in the workspace)
 git_tag_name = "{{ package }}-v{{ version }}"
@@ -22,19 +19,45 @@ git_release_name = "{{ package }}: v{{ version }}"
 # To trigger a release manually, merge a PR from a branch starting with `release-plz-`.
 release_always = false
 
+[changelog]
+sort_commits = "oldest"
+
+# Allowed conventional commit types
+commit_parsers = [
+    { message = "^feat", group = "New Features" },
+    { message = "^fix", group = "Bug Fixes" },
+    { message = "^docs", group = "Documentation" },
+    { message = "^style", group = "Styling" },
+    { message = "^refactor", group = "Refactor" },
+    { message = "^perf", group = "Performance" },
+    { message = "^test", group = "Testing" },
+    { message = "^chore", group = "Miscellaneous Tasks", skip = true },
+    { message = "^revert", group = "Reverted changes", skip = true },
+    { message = "^ci", group = "CI", skip = true },
+]
+
 [[package]]
 name = "hugr"
 changelog_include = ["hugr-core", "hugr-passes"]
 release = true
+version_group = "hugr"
 
 [[package]]
 name = "hugr-core"
 release = true
+version_group = "hugr"
 
 [[package]]
 name = "hugr-passes"
 release = true
+version_group = "hugr"
 
 [[package]]
 name = "hugr-cli"
 release = true
+version_group = "hugr"
+
+[[package]]
+name = "hugr-model"
+release = true
+version_group = "hugr"
