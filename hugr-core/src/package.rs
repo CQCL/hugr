@@ -90,11 +90,13 @@ impl Package {
         package.modules.push(module);
         Ok(package)
     }
-
     /// Validate the package against an extension registry.
     ///
     /// `reg` is updated with any new extensions.
-    pub fn validate(&mut self, reg: &mut ExtensionRegistry) -> Result<(), PackageValidationError> {
+    pub fn update_validate(
+        &mut self,
+        reg: &mut ExtensionRegistry,
+    ) -> Result<(), PackageValidationError> {
         for ext in &self.extensions {
             reg.register_updated_ref(ext)?;
         }
