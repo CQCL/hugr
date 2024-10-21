@@ -6,6 +6,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0](https://github.com/CQCL/hugr-llvm/compare/v0.5.1...v0.6.0) - 2024-10-21
+
+### Bug Fixes
+
+- Conversion operations having poison results  ([#131](https://github.com/CQCL/hugr-llvm/pull/131))
+
+### New Features
+
+- [**breaking**] Allow extension callbacks to have non-`'static` lifetimes ([#128](https://github.com/CQCL/hugr-llvm/pull/128))
+- [**breaking**] Support `tket2.rotation.from_halfturns_unchecked` ([#133](https://github.com/CQCL/hugr-llvm/pull/133))
+
+### Refactor
+
+- [**breaking**] remove trait emit op ([#104](https://github.com/CQCL/hugr-llvm/pull/104))
+- [**breaking**] rework extensions interface ([#119](https://github.com/CQCL/hugr-llvm/pull/119))
+- [**breaking**] move packaged extensions from `crate::custom` to `crate::extension` ([#126](https://github.com/CQCL/hugr-llvm/pull/126))
+
 ## [0.5.1](https://github.com/CQCL/hugr-llvm/compare/v0.5.0...v0.5.1) - 2024-09-23
 
 ### New Features
