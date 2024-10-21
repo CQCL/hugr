@@ -346,7 +346,7 @@ mod test {
 
         let mut pkg = Package::from_hugrs([module, dfg], []).unwrap();
         let mut reg = EMPTY_REG.clone();
-        pkg.validate(&mut reg).unwrap();
+        pkg.update_validate(&mut reg).unwrap();
 
         assert_eq!(pkg.modules.len(), 2);
     }

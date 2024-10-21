@@ -101,7 +101,7 @@ impl PackageOrHugr {
         reg: &mut ExtensionRegistry,
     ) -> Result<(), PackageValidationError> {
         match self {
-            PackageOrHugr::Package(pkg) => pkg.validate(reg),
+            PackageOrHugr::Package(pkg) => pkg.update_validate(reg),
             PackageOrHugr::Hugr(hugr) => hugr.update_validate(reg).map_err(Into::into),
         }
     }
