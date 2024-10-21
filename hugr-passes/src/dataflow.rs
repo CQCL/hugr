@@ -5,7 +5,7 @@ mod datalog;
 
 mod machine;
 use hugr_core::ops::constant::CustomConst;
-pub use machine::{Machine, TailLoopTermination};
+pub use machine::{AnalysisResults, Machine, TailLoopTermination};
 
 mod partial_value;
 pub use partial_value::{AbstractValue, PartialSum, PartialValue, Sum};

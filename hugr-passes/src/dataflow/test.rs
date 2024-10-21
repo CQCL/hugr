@@ -97,10 +97,9 @@ fn test_make_tuple() {
     let v3 = builder.make_tuple([v1, v2]).unwrap();
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
-    let mut machine = Machine::default();
-    machine.run(TestContext(Arc::new(&hugr)), []);
+    let results = Machine::default().run(TestContext(Arc::new(&hugr)), []);
 
-    let x = machine
+    let x = results
         .read_out_wire(v3)
         .unwrap()
         .try_into_wire_value(&hugr, v3)
@@ -118,16 +117,15 @@ fn test_unpack_tuple_const() {
         .outputs_arr();
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
-    let mut machine = Machine::default();
-    machine.run(TestContext(Arc::new(&hugr)), []);
+    let results = Machine::default().run(TestContext(Arc::new(&hugr)), []);
 
-    let o1_r = machine
+    let o1_r = results
         .read_out_wire(o1)
         .unwrap()
         .try_into_wire_value(&hugr, o1)
         .unwrap();
     assert_eq!(o1_r, Value::false_val());
-    let o2_r = machine
+    let o2_r = results
         .read_out_wire(o2)
         .unwrap()
         .try_into_wire_value(&hugr, o2)
@@ -150,10 +148,9 @@ fn test_tail_loop_never_iterates() {
     let [tl_o] = tail_loop.outputs_arr();
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
-    let mut machine = Machine::default();
-    machine.run(TestContext(Arc::new(&hugr)), []);
+    let results = Machine::default().run(TestContext(Arc::new(&hugr)), []);
 
-    let o_r = machine
+    let o_r = results
         .read_out_wire(tl_o)
         .unwrap()
         .try_into_wire_value(&hugr, tl_o)
@@ -161,7 +158,7 @@ fn test_tail_loop_never_iterates() {
     assert_eq!(o_r, r_v);
     assert_eq!(
         Some(TailLoopTermination::NeverContinues),
-        machine.tail_loop_terminates(&hugr, tail_loop.node())
+        results.tail_loop_terminates(tail_loop.node())
     )
 }
 
@@ -184,18 +181,17 @@ fn test_tail_loop_always_iterates() {
     let [tl_o1, tl_o2] = tail_loop.outputs_arr();
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
-    let mut machine = Machine::default();
-    machine.run(TestContext(Arc::new(&hugr)), []);
+    let results = Machine::default().run(TestContext(Arc::new(&hugr)), []);
 
-    let o_r1 = machine.read_out_wire(tl_o1).unwrap();
+    let o_r1 = results.read_out_wire(tl_o1).unwrap();
     assert_eq!(o_r1, PartialValue::bottom());
-    let o_r2 = machine.read_out_wire(tl_o2).unwrap();
+    let o_r2 = results.read_out_wire(tl_o2).unwrap();
     assert_eq!(o_r2, PartialValue::bottom());
     assert_eq!(
         Some(TailLoopTermination::NeverBreaks),
-        machine.tail_loop_terminates(&hugr, tail_loop.node())
+        results.tail_loop_terminates(tail_loop.node())
     );
-    assert_eq!(machine.tail_loop_terminates(&hugr, hugr.root()), None);
+    assert_eq!(results.tail_loop_terminates(hugr.root()), None);
 }
 
 #[test]
@@ -223,18 +219,17 @@ fn test_tail_loop_two_iters() {
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
     let [o_w1, o_w2] = tail_loop.outputs_arr();
 
-    let mut machine = Machine::default();
-    machine.run(TestContext(Arc::new(&hugr)), []);
+    let results = Machine::default().run(TestContext(Arc::new(&hugr)), []);
 
-    let o_r1 = machine.read_out_wire(o_w1).unwrap();
+    let o_r1 = results.read_out_wire(o_w1).unwrap();
     assert_eq!(o_r1, pv_true_or_false());
-    let o_r2 = machine.read_out_wire(o_w2).unwrap();
+    let o_r2 = results.read_out_wire(o_w2).unwrap();
     assert_eq!(o_r2, pv_true_or_false());
     assert_eq!(
         Some(TailLoopTermination::BreaksAndContinues),
-        machine.tail_loop_terminates(&hugr, tail_loop.node())
+        results.tail_loop_terminates(tail_loop.node())
     );
-    assert_eq!(machine.tail_loop_terminates(&hugr, hugr.root()), None);
+    assert_eq!(results.tail_loop_terminates(hugr.root()), None);
 }
 
 #[test]
@@ -290,18 +285,17 @@ fn test_tail_loop_containing_conditional() {
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
     let [o_w1, o_w2] = tail_loop.outputs_arr();
 
-    let mut machine = Machine::default();
-    machine.run(TestContext(Arc::new(&hugr)), []);
+    let results = Machine::default().run(TestContext(Arc::new(&hugr)), []);
 
-    let o_r1 = machine.read_out_wire(o_w1).unwrap();
+    let o_r1 = results.read_out_wire(o_w1).unwrap();
     assert_eq!(o_r1, pv_true());
-    let o_r2 = machine.read_out_wire(o_w2).unwrap();
+    let o_r2 = results.read_out_wire(o_w2).unwrap();
     assert_eq!(o_r2, pv_false());
     assert_eq!(
         Some(TailLoopTermination::BreaksAndContinues),
-        machine.tail_loop_terminates(&hugr, tail_loop.node())
+        results.tail_loop_terminates(tail_loop.node())
     );
-    assert_eq!(machine.tail_loop_terminates(&hugr, hugr.root()), None);
+    assert_eq!(results.tail_loop_terminates(hugr.root()), None);
 }
 
 #[test]
@@ -339,29 +333,28 @@ fn test_conditional() {
 
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
-    let mut machine = Machine::default();
     let arg_pv = PartialValue::new_variant(1, []).join(PartialValue::new_variant(
         2,
         [PartialValue::new_variant(0, [])],
     ));
-    machine.run(TestContext(Arc::new(&hugr)), [(0.into(), arg_pv)]);
+    let results = Machine::default().run(TestContext(Arc::new(&hugr)), [(0.into(), arg_pv)]);
 
-    let cond_r1 = machine
+    let cond_r1 = results
         .read_out_wire(cond_o1)
         .unwrap()
         .try_into_wire_value(&hugr, cond_o1)
         .unwrap();
     assert_eq!(cond_r1, Value::false_val());
-    assert!(machine
+    assert!(results
         .read_out_wire(cond_o2)
         .unwrap()
         .try_into_wire_value(&hugr, cond_o2)
         .is_err());
 
-    assert_eq!(machine.case_reachable(&hugr, case1.node()), Some(false)); // arg_pv is variant 1 or 2 only
-    assert_eq!(machine.case_reachable(&hugr, case2.node()), Some(true));
-    assert_eq!(machine.case_reachable(&hugr, case3.node()), Some(true));
-    assert_eq!(machine.case_reachable(&hugr, cond.node()), None);
+    assert_eq!(results.case_reachable(case1.node()), Some(false)); // arg_pv is variant 1 or 2 only
+    assert_eq!(results.case_reachable(case2.node()), Some(true));
+    assert_eq!(results.case_reachable(case3.node()), Some(true));
+    assert_eq!(results.case_reachable(cond.node()), None);
 }
 
 // A Hugr being a function on bools: (x, y) => (x XOR y, x AND y)
@@ -474,24 +467,14 @@ fn test_cfg(
     #[case] out1: PartialValue<Void>,
     xor_and_cfg: Hugr,
 ) {
-    let mut machine = Machine::default();
-    machine.run(
-        TestContext(Arc::new(&xor_and_cfg)),
+    let root = xor_and_cfg.root();
+    let results = Machine::default().run(
+        TestContext(Arc::new(xor_and_cfg)),
         [(0.into(), inp0), (1.into(), inp1)],
     );
 
-    assert_eq!(
-        machine
-            .read_out_wire(Wire::new(xor_and_cfg.root(), 0))
-            .unwrap(),
-        out0
-    );
-    assert_eq!(
-        machine
-            .read_out_wire(Wire::new(xor_and_cfg.root(), 1))
-            .unwrap(),
-        out1
-    );
+    assert_eq!(results.read_out_wire(Wire::new(root, 0)).unwrap(), out0);
+    assert_eq!(results.read_out_wire(Wire::new(root, 1)).unwrap(), out1);
 }
 
 #[rstest]
@@ -522,13 +505,12 @@ fn test_call(
         .finish_hugr_with_outputs([a2, b2], &EMPTY_REG)
         .unwrap();
 
-    let mut machine = Machine::default();
-    machine.run(
+    let results = Machine::default().run(
         TestContext(Arc::new(&hugr)),
         [(0.into(), inp0), (1.into(), inp1)],
     );
 
-    let [res0, res1] = [0, 1].map(|i| machine.read_out_wire(Wire::new(hugr.root(), i)).unwrap());
+    let [res0, res1] = [0, 1].map(|i| results.read_out_wire(Wire::new(hugr.root(), i)).unwrap());
     // The two calls alias so both results will be the same:
     assert_eq!(res0, out);
     assert_eq!(res1, out);

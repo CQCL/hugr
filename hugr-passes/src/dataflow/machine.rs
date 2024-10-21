@@ -1,23 +1,27 @@
 use std::collections::HashMap;
 
 use hugr_core::{HugrView, IncomingPort, Node, PortIndex, Wire};
+use itertools::Itertools;
 
 use super::{datalog::AscentProgram, AbstractValue, DFContext, PartialValue};
 
 /// Basic structure for performing an analysis. Usage:
 /// 1. Get a new instance via [Self::default()]
 /// 2. (Optionally / for tests) zero or more [Self::prepopulate_wire] with initial values
-/// 3. Exactly one [Self::run], with initial values for root inputs, to do the analysis
-/// 4. Results then available via [Self::read_out_wire]
-pub struct Machine<V: AbstractValue, C: DFContext<V>>(
-    AscentProgram<V, C>,
-    Option<HashMap<Wire, PartialValue<V>>>,
+/// 3. Call [Self::run] to produce [AnalysisResults] which can be inspected via
+/// [read_out_wire](AnalysisResults::read_out_wire)
+pub struct Machine<V: AbstractValue, C: DFContext<V>>(AscentProgram<V, C>);
+
+/// Results of a dataflow analysis.
+pub struct AnalysisResults<V: AbstractValue, C: DFContext<V>>(
+    AscentProgram<V, C>, // Already run - kept for tests/debug
+    HashMap<Wire, PartialValue<V>>,
 );
 
 /// derived-Default requires the context to be Defaultable, which is unnecessary
 impl<V: AbstractValue, C: DFContext<V>> Default for Machine<V, C> {
     fn default() -> Self {
-        Self(Default::default(), None)
+        Self(Default::default())
     }
 }
 
@@ -25,7 +29,6 @@ impl<V: AbstractValue, C: DFContext<V>> Machine<V, C> {
     /// Provide initial values for some wires.
     // Likely for test purposes only - should we make non-pub or #[cfg(test)] ?
     pub fn prepopulate_wire(&mut self, h: &impl HugrView, wire: Wire, value: PartialValue<V>) {
-        assert!(self.1.is_none());
         self.0.in_wire_value_proto.extend(
             h.linked_inputs(wire.node(), wire.source())
                 .map(|(n, inp)| (n, inp, value.clone())),
@@ -37,35 +40,36 @@ impl<V: AbstractValue, C: DFContext<V>> Machine<V, C> {
     /// (Note that `in_values` will not be useful for `Case` or `DFB`-rooted Hugrs,
     /// but should handle other containers.)
     /// The context passed in allows interpretation of leaf operations.
-    ///
-    /// # Panics
-    ///
-    /// If this Machine has been run already.
-    ///
     pub fn run(
-        &mut self,
+        mut self,
         context: C,
         in_values: impl IntoIterator<Item = (IncomingPort, PartialValue<V>)>,
-    ) {
-        assert!(self.1.is_none());
+    ) -> AnalysisResults<V, C> {
         let root = context.root();
         self.0
             .in_wire_value_proto
             .extend(in_values.into_iter().map(|(p, v)| (root, p, v)));
         self.0.context.push((context,));
         self.0.run();
-        self.1 = Some(
-            self.0
-                .out_wire_value
-                .iter()
-                .map(|(_, n, p, v)| (Wire::new(*n, *p), v.clone()))
-                .collect(),
-        )
+        let results = self
+            .0
+            .out_wire_value
+            .iter()
+            .map(|(_, n, p, v)| (Wire::new(*n, *p), v.clone()))
+            .collect();
+        AnalysisResults(self.0, results)
+    }
+}
+
+impl<V: AbstractValue, C: DFContext<V>> AnalysisResults<V, C> {
+    fn context(&self) -> &C {
+        let (c,) = self.0.context.iter().exactly_one().ok().unwrap();
+        c
     }
 
-    /// Gets the lattice value computed by [Self::run] for the given wire
+    /// Gets the lattice value computed for the given wire
     pub fn read_out_wire(&self, w: Wire) -> Option<PartialValue<V>> {
-        self.1.as_ref().unwrap().get(&w).cloned()
+        self.1.get(&w).cloned()
     }
 
     /// Tells whether a [TailLoop] node can terminate, i.e. whether
@@ -73,11 +77,8 @@ impl<V: AbstractValue, C: DFContext<V>> Machine<V, C> {
     /// Returns `None` if the specified `node` is not a [TailLoop].
     ///
     /// [TailLoop]: hugr_core::ops::TailLoop
-    pub fn tail_loop_terminates(
-        &self,
-        hugr: impl HugrView,
-        node: Node,
-    ) -> Option<TailLoopTermination> {
+    pub fn tail_loop_terminates(&self, node: Node) -> Option<TailLoopTermination> {
+        let hugr = self.context();
         hugr.get_optype(node).as_tail_loop()?;
         let [_, out] = hugr.get_io(node).unwrap();
         Some(TailLoopTermination::from_control_value(
@@ -96,7 +97,8 @@ impl<V: AbstractValue, C: DFContext<V>> Machine<V, C> {
     ///
     /// [Case]: hugr_core::ops::Case
     /// [Conditional]: hugr_core::ops::Conditional
-    pub fn case_reachable(&self, hugr: impl HugrView, case: Node) -> Option<bool> {
+    pub fn case_reachable(&self, case: Node) -> Option<bool> {
+        let hugr = self.context();
         hugr.get_optype(case).as_case()?;
         let cond = hugr.get_parent(case)?;
         hugr.get_optype(cond).as_conditional()?;
@@ -114,7 +116,8 @@ impl<V: AbstractValue, C: DFContext<V>> Machine<V, C> {
     /// [CFG]: hugr_core::ops::CFG
     /// [DataflowBlock]: hugr_core::ops::DataflowBlock
     /// [ExitBlock]: hugr_core::ops::ExitBlock
-    pub fn bb_reachable(&self, hugr: impl HugrView, bb: Node) -> Option<bool> {
+    pub fn bb_reachable(&self, bb: Node) -> Option<bool> {
+        let hugr = self.context();
         let cfg = hugr.get_parent(bb)?; // Not really required...??
         hugr.get_optype(cfg).as_cfg()?;
         let t = hugr.get_optype(bb);
