@@ -9,7 +9,7 @@ use super::{datalog::AscentProgram, AbstractValue, DFContext, PartialValue};
 /// 1. Get a new instance via [Self::default()]
 /// 2. (Optionally / for tests) zero or more [Self::prepopulate_wire] with initial values
 /// 3. Call [Self::run] to produce [AnalysisResults] which can be inspected via
-/// [read_out_wire](AnalysisResults::read_out_wire)
+///    [read_out_wire](AnalysisResults::read_out_wire)
 pub struct Machine<V: AbstractValue, C: DFContext<V>>(AscentProgram<V, C>);
 
 /// Results of a dataflow analysis.
