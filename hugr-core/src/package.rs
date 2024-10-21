@@ -178,6 +178,12 @@ impl PartialEq for Package {
     }
 }
 
+impl AsRef<[Hugr]> for Package {
+    fn as_ref(&self) -> &[Hugr] {
+        &self.modules
+    }
+}
+
 /// Alter an arbitrary hugr to contain an [OpType::Module] root.
 ///
 /// The behaviour depends on the root optype. See [Package::from_hugr] for details.

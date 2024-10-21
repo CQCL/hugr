@@ -85,14 +85,6 @@ pub enum PackageOrHugr {
 }
 
 impl PackageOrHugr {
-    /// Returns the slice of hugrs in the package.
-    pub fn hugrs(&self) -> &[Hugr] {
-        match self {
-            PackageOrHugr::Package(pkg) => &pkg.modules,
-            PackageOrHugr::Hugr(hugr) => std::slice::from_ref(hugr),
-        }
-    }
-
     /// Returns the list of hugrs in the package.
     pub fn into_hugrs(self) -> Vec<Hugr> {
         match self {
@@ -111,6 +103,15 @@ impl PackageOrHugr {
         match self {
             PackageOrHugr::Package(pkg) => pkg.validate(reg),
             PackageOrHugr::Hugr(hugr) => hugr.update_validate(reg).map_err(Into::into),
+        }
+    }
+}
+
+impl AsRef<[Hugr]> for PackageOrHugr {
+    fn as_ref(&self) -> &[Hugr] {
+        match self {
+            PackageOrHugr::Package(pkg) => &pkg.modules,
+            PackageOrHugr::Hugr(hugr) => std::slice::from_ref(hugr),
         }
     }
 }
