@@ -177,7 +177,7 @@ pub enum SignatureError {
     #[error("Definition name ({0}) and instantiation name ({1}) do not match.")]
     NameMismatch(TypeName, TypeName),
     /// Extension mismatch
-    #[error("Definition extension ({0:?}) and instantiation extension ({1:?}) do not match.")]
+    #[error("Definition extension ({0}) and instantiation extension ({1}) do not match.")]
     ExtensionMismatch(ExtensionId, ExtensionId),
     /// When the type arguments of the node did not match the params declared by the OpDef
     #[error("Type arguments of node did not match params declared by definition: {0}")]
@@ -198,7 +198,7 @@ pub enum SignatureError {
         expected: TypeBound,
     },
     /// A Type Variable's cache of its declared kind is incorrect
-    #[error("Type Variable claims to be {cached:?} but actual declaration {actual:?}")]
+    #[error("Type Variable claims to be {cached} but actual declaration {actual}")]
     TypeVarDoesNotMatchDeclaration {
         actual: TypeParam,
         cached: TypeParam,

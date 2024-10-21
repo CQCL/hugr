@@ -133,25 +133,25 @@ macro_rules! define_index {
 
 define_index! {
     /// Index of a node in a hugr graph.
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+    #[derive(Debug, derive_more::Display, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
     pub struct NodeId(pub u32);
 }
 
 define_index! {
     /// Index of a link in a hugr graph.
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+    #[derive(Debug, derive_more::Display, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
     pub struct LinkId(pub u32);
 }
 
 define_index! {
     /// Index of a region in a hugr graph.
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+    #[derive(Debug, derive_more::Display, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
     pub struct RegionId(pub u32);
 }
 
 define_index! {
     /// Index of a term in a hugr graph.
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+    #[derive(Debug, derive_more::Display, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
     pub struct TermId(pub u32);
 }
 
@@ -662,38 +662,38 @@ pub enum Param<'a> {
 #[derive(Debug, Clone, Error)]
 pub enum ModelError {
     /// There is a reference to a node that does not exist.
-    #[error("node not found: {0:?}")]
+    #[error("node not found: {0}")]
     NodeNotFound(NodeId),
     /// There is a reference to a term that does not exist.
-    #[error("term not found: {0:?}")]
+    #[error("term not found: {0}")]
     TermNotFound(TermId),
     /// There is a reference to a region that does not exist.
-    #[error("region not found: {0:?}")]
+    #[error("region not found: {0}")]
     RegionNotFound(RegionId),
     /// There is a local reference that does not resolve.
-    #[error("local variable invalid: {0:?}")]
+    #[error("local variable invalid: {0}")]
     InvalidLocal(String),
     /// There is a global reference that does not resolve to a node
     /// that defines a global variable.
-    #[error("global variable invalid: {0:?}")]
+    #[error("global variable invalid: {0}")]
     InvalidGlobal(String),
     /// The model contains an operation in a place where it is not allowed.
-    #[error("unexpected operation on node: {0:?}")]
+    #[error("unexpected operation on node: {0}")]
     UnexpectedOperation(NodeId),
     /// There is a term that is not well-typed.
-    #[error("type error in term: {0:?}")]
+    #[error("type error in term: {0}")]
     TypeError(TermId),
     /// There is a node whose regions are not well-formed according to the node's operation.
-    #[error("node has invalid regions: {0:?}")]
+    #[error("node has invalid regions: {0}")]
     InvalidRegions(NodeId),
     /// There is a name that is not well-formed.
     #[error("malformed name: {0}")]
     MalformedName(SmolStr),
     /// There is a condition node that lacks a case for a tag or
     /// defines two cases for the same tag.
-    #[error("condition node is malformed: {0:?}")]
+    #[error("condition node is malformed: {0}")]
     MalformedCondition(NodeId),
     /// There is a node that is not well-formed or has the invalid operation.
-    #[error("invalid operation on node: {0:?}")]
+    #[error("invalid operation on node: {0}")]
     InvalidOperation(NodeId),
 }

@@ -223,17 +223,17 @@ pub enum OutlineCfgError {
     #[error("The nodes did not all have the same parent")]
     NotSiblings,
     /// The parent node was not a CFG node
-    #[error("The parent node {0:?} was not a CFG but a {1:?}")]
+    #[error("The parent node {0} was not a CFG but a {1}")]
     ParentNotCfg(Node, OpType),
     /// Multiple blocks had incoming edges
-    #[error("Multiple blocks had predecessors outside the set - at least {0:?} and {1:?}")]
+    #[error("Multiple blocks had predecessors outside the set - at least {0} and {1}")]
     MultipleEntryNodes(Node, Node),
     /// Multiple blocks had outgoing edges
     // Note possible TODO: straightforward if all outgoing edges target the same BB
-    #[error("Multiple blocks had edges leaving the set - at least {0:?} and {1:?}")]
+    #[error("Multiple blocks had edges leaving the set - at least {0} and {1}")]
     MultipleExitNodes(Node, Node),
     /// One block had multiple outgoing edges
-    #[error("Exit block {0:?} had edges to multiple external blocks {1:?}")]
+    #[error("Exit block {0} had edges to multiple external blocks {1:?}")]
     MultipleExitEdges(Node, Vec<Node>),
     /// No block was identified as an entry block
     #[error("No block had predecessors outside the set")]

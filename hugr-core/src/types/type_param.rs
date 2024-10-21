@@ -138,7 +138,9 @@ impl From<UpperBound> for TypeParam {
 }
 
 /// A statically-known argument value to an operation.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize, derive_more::Display,
+)]
 #[non_exhaustive]
 #[serde(tag = "tya")]
 pub enum TypeArg {
@@ -159,6 +161,7 @@ pub enum TypeArg {
     },
     /// Instance of [TypeParam::List] or [TypeParam::Tuple], defined by a
     /// sequence of elements.
+    #[display("Sequence({})", "elems.iter().map(|t|t.to_string()).join(\", \")")]
     Sequence {
         #[allow(missing_docs)]
         elems: Vec<TypeArg>,
@@ -214,7 +217,10 @@ impl From<ExtensionSet> for TypeArg {
 /// Variable in a TypeArg, that is neither a [TypeArg::Extensions]
 /// nor a single [TypeArg::Type] (i.e. not a [Type::new_var_use]
 /// - it might be a [Type::new_row_var_use]).
-#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize, derive_more::Display,
+)]
+#[display("TypeArgVariable({idx})")]
 pub struct TypeArgVariable {
     idx: usize,
     cached_decl: TypeParam,
@@ -408,7 +414,7 @@ pub enum TypeArgError {
     /// For now, general case of a type arg not fitting a param.
     /// We'll have more cases when we allow general Containers.
     // TODO It may become possible to combine this with ConstTypeError.
-    #[error("Type argument {arg:?} does not fit declared parameter {param:?}")]
+    #[error("Type argument {arg} does not fit declared parameter {param}")]
     TypeMismatch { param: TypeParam, arg: TypeArg },
     /// Wrong number of type arguments (actual vs expected).
     // For now this only happens at the top level (TypeArgs of op/type vs TypeParams of Op/TypeDef).
@@ -420,7 +426,7 @@ pub enum TypeArgError {
     #[error("Wrong number of type arguments to tuple parameter: {0} vs expected {1} declared type parameters")]
     WrongNumberTuple(usize, usize),
     /// Opaque value type check error.
-    #[error("Opaque type argument does not fit declared parameter type: {0:?}")]
+    #[error("Opaque type argument does not fit declared parameter type: {0}")]
     OpaqueTypeMismatch(#[from] crate::types::CustomCheckFailure),
     /// Invalid value
     #[error("Invalid value of type argument")]

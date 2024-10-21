@@ -168,14 +168,14 @@ pub enum ChildrenValidationError {
     #[error("Exit basic blocks are only allowed as the second child in a CFG graph")]
     InternalExitChildren { child: NodeIndex },
     /// An operation only allowed as the first/second child was found as an intermediate child.
-    #[error("A {optype:?} operation is only allowed as a {expected_position} child")]
+    #[error("A {optype} operation is only allowed as a {expected_position} child")]
     InternalIOChildren {
         child: NodeIndex,
         optype: OpType,
         expected_position: &'static str,
     },
     /// The signature of the contained dataflow graph does not match the one of the container.
-    #[error("The {node_desc} node of a {container_desc} has a signature of {actual:?}, which differs from the expected type row {expected:?}")]
+    #[error("The {node_desc} node of a {container_desc} has a signature of {actual}, which differs from the expected type row {expected}")]
     IOSignatureMismatch {
         child: NodeIndex,
         actual: TypeRow,
@@ -184,7 +184,7 @@ pub enum ChildrenValidationError {
         container_desc: &'static str,
     },
     /// The signature of a child case in a conditional operation does not match the container's signature.
-    #[error("A conditional case has optype {optype:?}, which differs from the signature of Conditional container")]
+    #[error("A conditional case has optype {sig}, which differs from the signature of Conditional container", sig=optype.dataflow_signature().unwrap_or_default())]
     ConditionalCaseSignature { child: NodeIndex, optype: OpType },
     /// The conditional container's branching value does not match the number of children.
     #[error("The conditional container's branch Sum input should be a sum with {expected_count} elements, but it had {} elements. Sum rows: {actual_sum_rows:?}",
@@ -215,7 +215,7 @@ impl ChildrenValidationError {
 #[non_exhaustive]
 pub enum EdgeValidationError {
     /// The dataflow signature of two connected basic blocks does not match.
-    #[error("The dataflow signature of two connected basic blocks does not match. Output signature: {source_op:?}, input signature: {target_op:?}",
+    #[error("The dataflow signature of two connected basic blocks does not match. Output signature: {source_op}, input signature: {target_op}",
         source_op = edge.source_op,
         target_op = edge.target_op
     )]
