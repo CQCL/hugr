@@ -14,7 +14,7 @@ pub struct Machine<V: AbstractValue, C: DFContext<V>>(AscentProgram<V, C>);
 
 /// Results of a dataflow analysis.
 pub struct AnalysisResults<V: AbstractValue, C: DFContext<V>>(
-    AscentProgram<V, C>, // Already run - kept for tests/debug
+    AscentProgram<V, C>, // Already run
     HashMap<Wire, PartialValue<V>>,
 );
 
@@ -138,8 +138,8 @@ where
     Value: From<V>,
 {
     /// Reads a [Value] from an output wire, if the lattice value computed for it can be turned
-    /// into one. (The lattice value must be either a single [Value](Self::Value) or
-    /// a [Sum](PartialValue::PartialSum with a single known tag.)
+    /// into one. (The lattice value must be either a single [Value](PartialValue::Value) or
+    /// a [Sum](PartialValue::PartialSum) with a single known tag.)
     ///
     /// # Errors
     /// `None` if the analysis did not result in a single value on that wire
@@ -147,7 +147,7 @@ where
     ///
     /// # Panics
     ///
-    /// If a [Type] for the specified wire could not be extracted from the Hugr
+    /// If a [Type](hugr_core::types::Type) for the specified wire could not be extracted from the Hugr
     pub fn try_read_wire_value(&self, w: Wire) -> Result<Value, Option<ConstTypeError>> {
         let v = self.read_out_wire(w).ok_or(None)?;
         let (_, typ) = self
