@@ -99,11 +99,7 @@ fn test_make_tuple() {
 
     let results = Machine::default().run(TestContext(Arc::new(&hugr)), []);
 
-    let x = results
-        .read_out_wire(v3)
-        .unwrap()
-        .try_into_wire_value(&hugr, v3)
-        .unwrap();
+    let x = results.try_read_wire_value(v3).unwrap();
     assert_eq!(x, Value::tuple([Value::false_val(), Value::true_val()]));
 }
 
@@ -119,17 +115,9 @@ fn test_unpack_tuple_const() {
 
     let results = Machine::default().run(TestContext(Arc::new(&hugr)), []);
 
-    let o1_r = results
-        .read_out_wire(o1)
-        .unwrap()
-        .try_into_wire_value(&hugr, o1)
-        .unwrap();
+    let o1_r = results.try_read_wire_value(o1).unwrap();
     assert_eq!(o1_r, Value::false_val());
-    let o2_r = results
-        .read_out_wire(o2)
-        .unwrap()
-        .try_into_wire_value(&hugr, o2)
-        .unwrap();
+    let o2_r = results.try_read_wire_value(o2).unwrap();
     assert_eq!(o2_r, Value::true_val());
 }
 
@@ -150,11 +138,7 @@ fn test_tail_loop_never_iterates() {
 
     let results = Machine::default().run(TestContext(Arc::new(&hugr)), []);
 
-    let o_r = results
-        .read_out_wire(tl_o)
-        .unwrap()
-        .try_into_wire_value(&hugr, tl_o)
-        .unwrap();
+    let o_r = results.try_read_wire_value(tl_o).unwrap();
     assert_eq!(o_r, r_v);
     assert_eq!(
         Some(TailLoopTermination::NeverContinues),
@@ -339,17 +323,9 @@ fn test_conditional() {
     ));
     let results = Machine::default().run(TestContext(Arc::new(&hugr)), [(0.into(), arg_pv)]);
 
-    let cond_r1 = results
-        .read_out_wire(cond_o1)
-        .unwrap()
-        .try_into_wire_value(&hugr, cond_o1)
-        .unwrap();
+    let cond_r1 = results.try_read_wire_value(cond_o1).unwrap();
     assert_eq!(cond_r1, Value::false_val());
-    assert!(results
-        .read_out_wire(cond_o2)
-        .unwrap()
-        .try_into_wire_value(&hugr, cond_o2)
-        .is_err());
+    assert!(results.try_read_wire_value(cond_o2).is_err());
 
     assert_eq!(results.case_reachable(case1.node()), Some(false)); // arg_pv is variant 1 or 2 only
     assert_eq!(results.case_reachable(case2.node()), Some(true));

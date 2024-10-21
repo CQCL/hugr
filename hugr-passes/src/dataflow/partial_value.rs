@@ -2,7 +2,6 @@ use ascent::lattice::BoundedLattice;
 use ascent::Lattice;
 use hugr_core::ops::Value;
 use hugr_core::types::{ConstTypeError, SumType, Type, TypeEnum, TypeRow};
-use hugr_core::{HugrView, Wire};
 use itertools::{zip_eq, Itertools};
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -324,34 +323,6 @@ impl TryFrom<Sum<Value>> for Value {
 
     fn try_from(value: Sum<Value>) -> Result<Self, Self::Error> {
         Self::sum(value.tag, value.values, value.st)
-    }
-}
-
-impl<V: AbstractValue> PartialValue<V>
-where
-    Value: From<V>,
-{
-    /// Turns this instance into a [Value], if it is either a single [Value](Self::Value) or
-    /// a [Sum](PartialValue::PartialSum) with a single known tag, extracting the desired type
-    /// from a HugrView and Wire.
-    ///
-    /// # Errors
-    /// `None` if the analysis did not result in a single value on that wire
-    /// `Some(e)` if conversion to a [Value] produced a [ConstTypeError]
-    ///
-    /// # Panics
-    ///
-    /// If a [Type] for the specified wire could not be extracted from the Hugr
-    pub fn try_into_wire_value(
-        self,
-        hugr: &impl HugrView,
-        w: Wire,
-    ) -> Result<Value, Option<ConstTypeError>> {
-        let (_, typ) = hugr
-            .out_value_types(w.node())
-            .find(|(p, _)| *p == w.source())
-            .unwrap();
-        self.try_into_value(&typ)
     }
 }
 

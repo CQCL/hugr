@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use hugr_core::{HugrView, IncomingPort, Node, PortIndex, Wire};
+use hugr_core::{ops::Value, types::ConstTypeError, HugrView, IncomingPort, Node, PortIndex, Wire};
 use itertools::Itertools;
 
 use super::{datalog::AscentProgram, AbstractValue, DFContext, PartialValue};
@@ -130,6 +130,32 @@ impl<V: AbstractValue, C: DFContext<V>> AnalysisResults<V, C> {
                 .iter()
                 .any(|(_, cfg2, bb2)| *cfg2 == cfg && *bb2 == bb),
         )
+    }
+}
+
+impl<V: AbstractValue, C: DFContext<V>> AnalysisResults<V, C>
+where
+    Value: From<V>,
+{
+    /// Reads a [Value] from an output wire, if the lattice value computed for it can be turned
+    /// into one. (The lattice value must be either a single [Value](Self::Value) or
+    /// a [Sum](PartialValue::PartialSum with a single known tag.)
+    ///
+    /// # Errors
+    /// `None` if the analysis did not result in a single value on that wire
+    /// `Some(e)` if conversion to a [Value] produced a [ConstTypeError]
+    ///
+    /// # Panics
+    ///
+    /// If a [Type] for the specified wire could not be extracted from the Hugr
+    pub fn try_read_wire_value(&self, w: Wire) -> Result<Value, Option<ConstTypeError>> {
+        let v = self.read_out_wire(w).ok_or(None)?;
+        let (_, typ) = self
+            .context()
+            .out_value_types(w.node())
+            .find(|(p, _)| *p == w.source())
+            .unwrap();
+        v.try_into_value(&typ)
     }
 }
 
