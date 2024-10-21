@@ -1,0 +1,20 @@
+name: Check Conventional Commits format
+on:
+  pull_request_target:
+    branches:
+      - main
+    types:
+      - opened
+      - edited
+      - synchronize
+      - labeled
+      - unlabeled
+  merge_group:
+    types: [checks_requested]
+
+jobs:
+    check-title:
+        name: check-title
+        uses: CQCL/hugrverse-actions/.github/workflows/pr-title.yml@main
+        secrets:
+            GITHUB_PAT: ${{ secrets.HUGRBOT_PAT }}

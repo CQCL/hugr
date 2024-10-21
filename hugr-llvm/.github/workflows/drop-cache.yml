@@ -1,0 +1,9 @@
+name: cleanup caches by a branch
+on:
+  pull_request:
+    types:
+      - closed
+
+jobs:
+    drop-cache:
+        uses: CQCL/hugrverse-actions/.github/workflows/drop-cache.yml@main

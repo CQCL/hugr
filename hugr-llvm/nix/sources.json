@@ -1,0 +1,26 @@
+{
+    "crane": {
+        "branch": "master",
+        "description": "A Nix library for building cargo projects. Never build twice thanks to incremental artifact caching.",
+        "homepage": "https://crane.dev",
+        "owner": "ipetkov",
+        "repo": "crane",
+        "rev": "7443df1c478947bf96a2e699209f53b2db26209d",
+        "sha256": "0bvr05wwnli5h2hrgadd73p8s78d54gv3iqhadpbhwlicpnifdaf",
+        "type": "tarball",
+        "url": "https://github.com/ipetkov/crane/archive/7443df1c478947bf96a2e699209f53b2db26209d.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "nixpkgs": {
+        "branch": "nixpkgs-unstable",
+        "description": "Nix Packages collection",
+        "homepage": null,
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "3f316d2a50699a78afe5e77ca486ad553169061e",
+        "sha256": "1gfnjl8zjai1cjqhx96jjnnq7zjdn0ajd14xmb09jrgnjs0dw1im",
+        "type": "tarball",
+        "url": "https://github.com/NixOS/nixpkgs/archive/3f316d2a50699a78afe5e77ca486ad553169061e.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    }
+}
