@@ -106,6 +106,22 @@ impl Package {
         Ok(())
     }
 
+    /// Validate the package against an extension registry.
+    ///
+    /// `reg` is updated with any new extensions.
+    ///
+    /// Returns the validated modules.
+    ///
+    /// deprecated: use [Package::update_validate] instead.
+    #[deprecated(since = "0.13.2", note = "Replaced by `Package::update_validate`")]
+    pub fn validate(
+        mut self,
+        reg: &mut ExtensionRegistry,
+    ) -> Result<Vec<Hugr>, PackageValidationError> {
+        self.update_validate(reg)?;
+        Ok(self.modules)
+    }
+
     /// Read a Package in json format from an io reader.
     ///
     /// If the json encodes a single [Hugr] instead, it will be inserted in a new [Package].
@@ -259,13 +275,57 @@ pub enum PackageEncodingError {
 }
 
 /// Error raised while validating a package.
-#[derive(Debug, Display, Error, From)]
+#[derive(Debug, From)]
 #[non_exhaustive]
 pub enum PackageValidationError {
     /// Error raised while processing the package extensions.
     Extension(ExtensionRegistryError),
     /// Error raised while validating the package hugrs.
     Validation(ValidationError),
+    /// Error validating HUGR.
+    // TODO: Remove manual Display and Error impls when removing deprecated variants.
+    #[from(ignore)]
+    #[deprecated(
+        since = "0.13.2",
+        note = "Replaced by `PackageValidationError::Validation`"
+    )]
+    Validate(ValidationError),
+    /// Error registering extension.
+    // TODO: Remove manual Display and Error impls when removing deprecated variants.
+    #[from(ignore)]
+    #[deprecated(
+        since = "0.13.2",
+        note = "Replaced by `PackageValidationError::Extension`"
+    )]
+    ExtReg(ExtensionRegistryError),
+}
+
+// Note: We cannot use the `derive_more::Error` derive due to a bug with deprecated elements.
+// See https://github.com/JelteF/derive_more/issues/419
+#[allow(deprecated)]
+impl std::error::Error for PackageValidationError {
+    fn source(&self) -> Option<&(dyn derive_more::Error + 'static)> {
+        match self {
+            PackageValidationError::Extension(source) => Some(source),
+            PackageValidationError::Validation(source) => Some(source),
+            PackageValidationError::Validate(source) => Some(source),
+            PackageValidationError::ExtReg(source) => Some(source),
+        }
+    }
+}
+
+// Note: We cannot use the `derive_more::Display` derive due to a bug with deprecated elements.
+// See https://github.com/JelteF/derive_more/issues/419
+impl Display for PackageValidationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        #[allow(deprecated)]
+        match self {
+            PackageValidationError::Extension(e) => write!(f, "Error processing extensions: {}", e),
+            PackageValidationError::Validation(e) => write!(f, "Error validating HUGR: {}", e),
+            PackageValidationError::Validate(e) => write!(f, "Error validating HUGR: {}", e),
+            PackageValidationError::ExtReg(e) => write!(f, "Error registering extension: {}", e),
+        }
+    }
 }
 
 #[cfg(test)]

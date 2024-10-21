@@ -25,6 +25,13 @@ clio = { workspace = true, features = ["clap-parse"] }
 [lints]
 workspace = true
 
+[package.metadata.cargo-semver-checks.lints]
+workspace = true
+# Temporarily disabled due to Package being moved to `hugr-core` triggering an error in rustdoc
+# https://github.com/obi1kenobi/cargo-semver-checks/issues/355
+enum_missing = "warn"
+struct_missing = "warn"
+
 [dev-dependencies]
 assert_cmd = { workspace = true }
 assert_fs = { workspace = true }

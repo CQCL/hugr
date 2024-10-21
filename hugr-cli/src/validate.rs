@@ -7,6 +7,14 @@ use hugr::{extension::ExtensionRegistry, Extension, Hugr};
 
 use crate::{CliError, HugrArgs};
 
+// TODO: Deprecated re-export. Remove on a breaking release.
+#[doc(inline)]
+#[deprecated(
+    since = "0.13.2",
+    note = "Use `hugr::package::PackageValidationError` instead."
+)]
+pub use hugr::package::PackageValidationError as ValError;
+
 /// Validate and visualise a HUGR file.
 #[derive(Parser, Debug)]
 #[clap(version = "1.0", long_about = None)]
