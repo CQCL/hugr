@@ -1,0 +1,14 @@
+---
+source: src/emit/test.rs
+expression: module.to_string()
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define { { { i32, {}, {}, {}, {} }, i16 } } @_hl.main.1() {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  ret { { { i32, {}, {}, {}, {} }, i16 } } { { { i32, {}, {}, {}, {} }, i16 } { { i32, {}, {}, {}, {} } { i32 2, {} poison, {} poison, {} undef, {} poison }, i16 -24 } }
+}

@@ -1,0 +1,5 @@
+---
+source: src/types.rs
+expression: "Function([[]+[]] -> [[]][[]+[]+[]])"
+---
+"{ i32, {}, {}, {} } ({ i32, {}, {} })*"
