@@ -74,11 +74,11 @@ impl<'c, 'a, H: HugrView> EmitFuncContext<'c, 'a, H> {
             /// Adds or gets the [FunctionValue] in the [inkwell::module::Module] corresponding to the given [FuncDefn].
             ///
             /// The name of the result may have been mangled.
-            pub fn get_func_defn<'hugr>(&self, node: FatNode<'hugr, FuncDefn, H>) -> Result<FunctionValue<'c>>;
+            pub fn get_func_defn(&self, node: FatNode<FuncDefn, H>) -> Result<FunctionValue<'c>>;
             /// Adds or gets the [FunctionValue] in the [inkwell::module::Module] corresponding to the given [FuncDecl].
             ///
             /// The name of the result may have been mangled.
-            pub fn get_func_decl<'hugr>(&self, node: FatNode<'hugr, FuncDecl, H>) -> Result<FunctionValue<'c>>;
+            pub fn get_func_decl(&self, node: FatNode<FuncDecl, H>) -> Result<FunctionValue<'c>>;
             /// Adds or get the [FunctionValue] in the [inkwell::module::Module] with the given symbol
             /// and function type.
             ///

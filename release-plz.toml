@@ -62,3 +62,8 @@ version_group = "hugr"
 name = "hugr-model"
 release = true
 version_group = "hugr"
+
+[[package]]
+name = "hugr-llvm"
+release = true
+version_group = "hugr"

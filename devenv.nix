@@ -9,6 +9,11 @@ in
       default = true;
       description = "run `just setup` on entering shell";
     };
+
+    llvmVersion = lib.mkOption {
+      type = lib.types.str;
+      default = "14";
+    };
   };
 
   config = {
@@ -23,6 +28,10 @@ in
       pkgs.graphviz
       pkgs.cargo-insta
       pkgs.capnproto
+
+      # These are required for hugr-llvm to be able to link to llvm.
+      pkgs.libffi
+      pkgs.libxml2
     ] ++ lib.optionals
       pkgs.stdenv.isDarwin
       (with pkgs.darwin.apple_sdk; [
@@ -31,6 +40,11 @@ in
         # added for json schema validation tests
         frameworks.SystemConfiguration
       ]);
+
+    env = {
+      "LLVM_SYS_${cfg.llvmVersion}0_PREFIX" = "${pkgs."llvmPackages_${cfg.llvmVersion}".libllvm.dev}";
+    };
+
 
     # https://devenv.sh/scripts/
     scripts.hello.exec = "echo Welcome to hugr dev shell!";
