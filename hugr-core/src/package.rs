@@ -275,7 +275,7 @@ pub enum PackageEncodingError {
 }
 
 /// Error raised while validating a package.
-#[derive(Debug, Display, Error, From)]
+#[derive(Debug, From)]
 #[non_exhaustive]
 pub enum PackageValidationError {
     /// Error raised while processing the package extensions.
@@ -283,19 +283,49 @@ pub enum PackageValidationError {
     /// Error raised while validating the package hugrs.
     Validation(ValidationError),
     /// Error validating HUGR.
+    // TODO: Remove manual Display and Error impls when removing deprecated variants.
+    #[from(ignore)]
     #[deprecated(
         since = "0.13.2",
         note = "Replaced by `PackageValidationError::Validation`"
     )]
-    #[from(ignore)]
     Validate(ValidationError),
     /// Error registering extension.
+    // TODO: Remove manual Display and Error impls when removing deprecated variants.
+    #[from(ignore)]
     #[deprecated(
         since = "0.13.2",
         note = "Replaced by `PackageValidationError::Extension`"
     )]
-    #[from(ignore)]
     ExtReg(ExtensionRegistryError),
+}
+
+// Note: We cannot use the `derive_more::Error` derive due to a bug with deprecated elements.
+// See https://github.com/JelteF/derive_more/issues/419
+#[allow(deprecated)]
+impl std::error::Error for PackageValidationError {
+    fn source(&self) -> Option<&(dyn derive_more::Error + 'static)> {
+        match self {
+            PackageValidationError::Extension(source) => Some(source),
+            PackageValidationError::Validation(source) => Some(source),
+            PackageValidationError::Validate(source) => Some(source),
+            PackageValidationError::ExtReg(source) => Some(source),
+        }
+    }
+}
+
+// Note: We cannot use the `derive_more::Display` derive due to a bug with deprecated elements.
+// See https://github.com/JelteF/derive_more/issues/419
+impl Display for PackageValidationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        #[allow(deprecated)]
+        match self {
+            PackageValidationError::Extension(e) => write!(f, "Error processing extensions: {}", e),
+            PackageValidationError::Validation(e) => write!(f, "Error validating HUGR: {}", e),
+            PackageValidationError::Validate(e) => write!(f, "Error validating HUGR: {}", e),
+            PackageValidationError::ExtReg(e) => write!(f, "Error registering extension: {}", e),
+        }
+    }
 }
 
 #[cfg(test)]
