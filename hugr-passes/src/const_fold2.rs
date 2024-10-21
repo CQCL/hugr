@@ -1,4 +1,3 @@
-#![warn(missing_docs)]
 //! An (example) use of the [super::dataflow](dataflow-analysis framework)
 //! to perform constant-folding.
 
