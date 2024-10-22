@@ -2,66 +2,15 @@ use std::collections::HashMap;
 
 use hugr_core::{ops::Value, types::ConstTypeError, HugrView, IncomingPort, Node, PortIndex, Wire};
 
-use super::datalog::{run_datalog, DatalogResults};
-use super::{AbstractValue, DFContext, PartialValue};
-
-/// Basic structure for performing an analysis. Usage:
-/// 1. Get a new instance via [Self::default()]
-/// 2. (Optionally / for tests) zero or more [Self::prepopulate_wire] with initial values
-/// 3. Call [Self::run] to produce [AnalysisResults] which can be inspected via
-///    [read_out_wire](AnalysisResults::read_out_wire)
-pub struct Machine<V: AbstractValue>(Vec<(Node, IncomingPort, PartialValue<V>)>);
+use super::{AbstractValue, PartialValue};
 
 /// Results of a dataflow analysis, packaged with context for easy inspection
 pub struct AnalysisResults<V: AbstractValue, H: HugrView> {
-    hugr: H,
-    results: DatalogResults<V>,
-    out_wire_values: HashMap<Wire, PartialValue<V>>,
-}
-
-/// derived-Default requires the context to be Defaultable, which is unnecessary
-impl<V: AbstractValue> Default for Machine<V> {
-    fn default() -> Self {
-        Self(Default::default())
-    }
-}
-
-impl<V: AbstractValue> Machine<V> {
-    /// Provide initial values for some wires.
-    // Likely for test purposes only - should we make non-pub or #[cfg(test)] ?
-    pub fn prepopulate_wire(&mut self, h: &impl HugrView, wire: Wire, value: PartialValue<V>) {
-        self.0.extend(
-            h.linked_inputs(wire.node(), wire.source())
-                .map(|(n, inp)| (n, inp, value.clone())),
-        );
-    }
-
-    /// Run the analysis (iterate until a lattice fixpoint is reached),
-    /// given initial values for some of the root node inputs.
-    /// (Note that `in_values` will not be useful for `Case` or `DFB`-rooted Hugrs,
-    /// but should handle other containers.)
-    /// The context passed in allows interpretation of leaf operations.
-    pub fn run<H: HugrView>(
-        mut self,
-        context: &impl DFContext<V>,
-        hugr: H,
-        in_values: impl IntoIterator<Item = (IncomingPort, PartialValue<V>)>,
-    ) -> AnalysisResults<V, H> {
-        let root = hugr.root();
-        self.0
-            .extend(in_values.into_iter().map(|(p, v)| (root, p, v)));
-        let results = run_datalog(self.0, context, &hugr);
-        let out_wire_values = results
-            .out_wire_value
-            .iter()
-            .map(|(n, p, v)| (Wire::new(*n, *p), v.clone()))
-            .collect();
-        AnalysisResults {
-            hugr,
-            results,
-            out_wire_values,
-        }
-    }
+    pub(super) hugr: H,
+    pub(super) in_wire_value: Vec<(Node, IncomingPort, PartialValue<V>)>,
+    pub(super) case_reachable: Vec<(Node, Node)>,
+    pub(super) bb_reachable: Vec<(Node, Node)>,
+    pub(super) out_wire_values: HashMap<Wire, PartialValue<V>>,
 }
 
 impl<V: AbstractValue, H: HugrView> AnalysisResults<V, H> {
@@ -79,8 +28,7 @@ impl<V: AbstractValue, H: HugrView> AnalysisResults<V, H> {
         self.hugr.get_optype(node).as_tail_loop()?;
         let [_, out] = self.hugr.get_io(node).unwrap();
         Some(TailLoopTermination::from_control_value(
-            self.results
-                .in_wire_value
+            self.in_wire_value
                 .iter()
                 .find_map(|(n, p, v)| (*n == out && p.index() == 0).then_some(v))
                 .unwrap(),
@@ -99,8 +47,7 @@ impl<V: AbstractValue, H: HugrView> AnalysisResults<V, H> {
         let cond = self.hugr.get_parent(case)?;
         self.hugr.get_optype(cond).as_conditional()?;
         Some(
-            self.results
-                .case_reachable
+            self.case_reachable
                 .iter()
                 .any(|(cond2, case2)| &cond == cond2 && &case == case2),
         )
@@ -120,8 +67,7 @@ impl<V: AbstractValue, H: HugrView> AnalysisResults<V, H> {
             return None;
         };
         Some(
-            self.results
-                .bb_reachable
+            self.bb_reachable
                 .iter()
                 .any(|(cfg2, bb2)| *cfg2 == cfg && *bb2 == bb),
         )

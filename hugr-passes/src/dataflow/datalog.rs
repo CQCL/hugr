@@ -6,10 +6,10 @@ use std::hash::Hash;
 
 use hugr_core::extension::prelude::{MakeTuple, UnpackTuple};
 use hugr_core::ops::{OpTrait, OpType};
-use hugr_core::{HugrView, IncomingPort, Node, OutgoingPort, PortIndex as _};
+use hugr_core::{HugrView, IncomingPort, Node, OutgoingPort, PortIndex as _, Wire};
 
 use super::value_row::ValueRow;
-use super::{AbstractValue, DFContext, PartialValue};
+use super::{AbstractValue, AnalysisResults, DFContext, PartialValue};
 
 type PV<V> = PartialValue<V>;
 
@@ -19,18 +19,53 @@ pub enum IO {
     Output,
 }
 
-pub(super) struct DatalogResults<V> {
-    pub in_wire_value: Vec<(Node, IncomingPort, PV<V>)>,
-    pub out_wire_value: Vec<(Node, OutgoingPort, PV<V>)>,
-    pub case_reachable: Vec<(Node, Node)>,
-    pub bb_reachable: Vec<(Node, Node)>,
+/// Basic structure for performing an analysis. Usage:
+/// 1. Get a new instance via [Self::default()]
+/// 2. (Optionally / for tests) zero or more [Self::prepopulate_wire] with initial values
+/// 3. Call [Self::run] to produce [AnalysisResults] which can be inspected via
+///    [read_out_wire](AnalysisResults::read_out_wire)
+pub struct Machine<V: AbstractValue>(Vec<(Node, IncomingPort, PartialValue<V>)>);
+
+/// derived-Default requires the context to be Defaultable, which is unnecessary
+impl<V: AbstractValue> Default for Machine<V> {
+    fn default() -> Self {
+        Self(Default::default())
+    }
 }
 
-pub(super) fn run_datalog<V: AbstractValue>(
+impl<V: AbstractValue> Machine<V> {
+    /// Provide initial values for some wires.
+    // Likely for test purposes only - should we make non-pub or #[cfg(test)] ?
+    pub fn prepopulate_wire(&mut self, h: &impl HugrView, wire: Wire, value: PartialValue<V>) {
+        self.0.extend(
+            h.linked_inputs(wire.node(), wire.source())
+                .map(|(n, inp)| (n, inp, value.clone())),
+        );
+    }
+
+    /// Run the analysis (iterate until a lattice fixpoint is reached),
+    /// given initial values for some of the root node inputs.
+    /// (Note that `in_values` will not be useful for `Case` or `DFB`-rooted Hugrs,
+    /// but should handle other containers.)
+    /// The context passed in allows interpretation of leaf operations.
+    pub fn run<H: HugrView>(
+        mut self,
+        context: &impl DFContext<V>,
+        hugr: H,
+        in_values: impl IntoIterator<Item = (IncomingPort, PartialValue<V>)>,
+    ) -> AnalysisResults<V, H> {
+        let root = hugr.root();
+        self.0
+            .extend(in_values.into_iter().map(|(p, v)| (root, p, v)));
+        run_datalog(self.0, context, hugr)
+    }
+}
+
+pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
     in_wire_value_proto: Vec<(Node, IncomingPort, PV<V>)>,
     c: &impl DFContext<V>,
-    hugr: &impl HugrView,
-) -> DatalogResults<V> {
+    hugr: H,
+) -> AnalysisResults<V, H> {
     // ascent-(macro-)generated code generates a bunch of warnings,
     // keep code in here to a minimum.
     #![allow(
@@ -84,7 +119,7 @@ pub(super) fn run_datalog<V: AbstractValue>(
            if !op_t.is_container(),
            if let Some(sig) = op_t.dataflow_signature(),
            node_in_value_row(n, vs),
-           if let Some(outs) = propagate_leaf_op(c, hugr, *n, &vs[..], sig.output_count()),
+           if let Some(outs) = propagate_leaf_op(c, &hugr, *n, &vs[..], sig.output_count()),
            for (p, v) in (0..).map(OutgoingPort::from).zip(outs);
 
         // DFG
@@ -211,9 +246,15 @@ pub(super) fn run_datalog<V: AbstractValue>(
             io_node(func, outp, IO::Output),
             in_wire_value(outp, p, v);
     };
-    DatalogResults {
+    let out_wire_values = all_results
+        .out_wire_value
+        .iter()
+        .map(|(n, p, v)| (Wire::new(*n, *p), v.clone()))
+        .collect();
+    AnalysisResults {
+        hugr,
+        out_wire_values,
         in_wire_value: all_results.in_wire_value,
-        out_wire_value: all_results.out_wire_value,
         case_reachable: all_results.case_reachable,
         bb_reachable: all_results.bb_reachable,
     }

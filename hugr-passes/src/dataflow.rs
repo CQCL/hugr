@@ -2,10 +2,11 @@
 //! Dataflow analysis of Hugrs.
 
 mod datalog;
+pub use datalog::Machine;
 mod value_row;
 
 mod machine;
-pub use machine::{AnalysisResults, Machine, TailLoopTermination};
+pub use machine::{AnalysisResults, TailLoopTermination};
 
 mod partial_value;
 pub use partial_value::{AbstractValue, PartialSum, PartialValue, Sum};
