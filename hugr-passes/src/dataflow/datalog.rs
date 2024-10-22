@@ -182,9 +182,7 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
 
         // CFG
         relation cfg_node(Node);
-        relation dfb_block(Node, Node);
         cfg_node(n) <-- node(n), if hugr.get_optype(*n).is_cfg();
-        dfb_block(cfg, blk) <-- cfg_node(cfg), for blk in hugr.children(*cfg), if hugr.get_optype(blk).is_dataflow_block();
 
         // Reachability
         relation bb_reachable(Node, Node);
@@ -198,7 +196,10 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
 
         // Where do the values "fed" along a control-flow edge come out?
         relation _cfg_succ_dest(Node, Node, Node);
-        _cfg_succ_dest(cfg, blk, inp) <-- dfb_block(cfg, blk), input_child(blk, inp);
+        _cfg_succ_dest(cfg, blk, inp) <-- cfg_node(cfg),
+            for blk in hugr.children(*cfg),
+            if hugr.get_optype(blk).is_dataflow_block(),
+            input_child(blk, inp);
         _cfg_succ_dest(cfg, exit, cfg) <-- cfg_node(cfg), if let Some(exit) = hugr.children(*cfg).nth(1);
 
         // Inputs of CFG propagate to entry block
@@ -210,9 +211,8 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
 
         // Outputs of each reachable block propagated to successor block or (if exit block) then CFG itself
         out_wire_value(dest, OutgoingPort::from(out_p), v) <--
-            dfb_block(cfg, pred),
             bb_reachable(cfg, pred),
-            let df_block = hugr.get_optype(*pred).as_dataflow_block().unwrap(),
+            if let Some(df_block) = hugr.get_optype(*pred).as_dataflow_block(),
             for (succ_n, succ) in hugr.output_neighbours(*pred).enumerate(),
             output_child(pred, out_n),
             _cfg_succ_dest(cfg, succ, dest),
