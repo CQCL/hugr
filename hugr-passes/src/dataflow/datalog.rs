@@ -2,7 +2,6 @@
 
 use ascent::lattice::BoundedLattice;
 use itertools::Itertools;
-use std::hash::Hash;
 
 use hugr_core::extension::prelude::{MakeTuple, UnpackTuple};
 use hugr_core::ops::{OpTrait, OpType};
@@ -12,12 +11,6 @@ use super::value_row::ValueRow;
 use super::{AbstractValue, AnalysisResults, DFContext, PartialValue};
 
 type PV<V> = PartialValue<V>;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum IO {
-    Input,
-    Output,
-}
 
 /// Basic structure for performing an analysis. Usage:
 /// 1. Get a new instance via [Self::default()]
@@ -79,7 +72,8 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
         relation in_wire(Node, IncomingPort);
         relation out_wire(Node, OutgoingPort);
         relation parent_of_node(Node, Node);
-        relation io_node(Node, Node, IO);
+        relation input_child(Node, Node);
+        relation output_child(Node, Node);
         lattice out_wire_value(Node, OutgoingPort, PV<V>);
         lattice in_wire_value(Node, IncomingPort, PV<V>);
         lattice node_in_value_row(Node, ValueRow<V>);
@@ -92,9 +86,8 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
         parent_of_node(parent, child) <--
             node(child), if let Some(parent) = hugr.get_parent(*child);
 
-        io_node(parent, child, io) <-- node(parent),
-          if let Some([i, o]) = hugr.get_io(*parent),
-          for (child,io) in [(i,IO::Input),(o,IO::Output)];
+        input_child(parent, input) <-- node(parent), if let Some([input, _output]) = hugr.get_io(*parent);
+        output_child(parent, output) <-- node(parent), if let Some([_input, output]) = hugr.get_io(*parent);
 
         // Initialize all wires to bottom
         out_wire_value(n, p, PV::bottom()) <-- out_wire(n, p);
@@ -127,10 +120,10 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
         dfg_node(n) <-- node(n), if hugr.get_optype(*n).is_dfg();
 
         out_wire_value(i, OutgoingPort::from(p.index()), v) <-- dfg_node(dfg),
-          io_node(dfg, i, IO::Input), in_wire_value(dfg, p, v);
+          input_child(dfg, i), in_wire_value(dfg, p, v);
 
         out_wire_value(dfg, OutgoingPort::from(p.index()), v) <-- dfg_node(dfg),
-            io_node(dfg, o, IO::Output), in_wire_value(o, p, v);
+            output_child(dfg, o), in_wire_value(o, p, v);
 
 
         // TailLoop
@@ -138,23 +131,22 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
         // inputs of tail loop propagate to Input node of child region
         out_wire_value(i, OutgoingPort::from(p.index()), v) <-- node(tl),
             if hugr.get_optype(*tl).is_tail_loop(),
-            io_node(tl, i, IO::Input),
+            input_child(tl, i),
             in_wire_value(tl, p, v);
 
         // Output node of child region propagate to Input node of child region
         out_wire_value(in_n, OutgoingPort::from(out_p), v) <-- node(tl),
             if let Some(tailloop) = hugr.get_optype(*tl).as_tail_loop(),
-            io_node(tl, in_n, IO::Input),
-            io_node(tl, out_n, IO::Output),
+            input_child(tl, in_n),
+            output_child(tl, out_n),
             node_in_value_row(out_n, out_in_row), // get the whole input row for the output node
-
             if let Some(fields) = out_in_row.unpack_first(0, tailloop.just_inputs.len()), // if it is possible for tag to be 0
             for (out_p, v) in fields.enumerate();
 
         // Output node of child region propagate to outputs of tail loop
         out_wire_value(tl, OutgoingPort::from(out_p), v) <-- node(tl),
             if let Some(tailloop) = hugr.get_optype(*tl).as_tail_loop(),
-            io_node(tl, out_n, IO::Output),
+            output_child(tl, out_n),
             node_in_value_row(out_n, out_in_row), // get the whole input row for the output node
             if let Some(fields) = out_in_row.unpack_first(1, tailloop.just_outputs.len()), // if it is possible for the tag to be 1
             for (out_p, v) in fields.enumerate();
@@ -171,7 +163,7 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
         // inputs of conditional propagate into case nodes
         out_wire_value(i_node, OutgoingPort::from(out_p), v) <--
           case_node(cond, case_index, case),
-          io_node(case, i_node, IO::Input),
+          input_child(case, i_node),
           node_in_value_row(cond, in_row),
           let conditional = hugr.get_optype(*cond).as_conditional().unwrap(),
           if let Some(fields) = in_row.unpack_first(*case_index, conditional.sum_rows[*case_index].len()),
@@ -181,7 +173,7 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
         out_wire_value(cond, OutgoingPort::from(o_p.index()), v) <--
           case_node(cond, _i, case),
           case_reachable(cond, case),
-          io_node(case, o, IO::Output),
+          output_child(case, o),
           in_wire_value(o, o_p, v);
 
         relation case_reachable(Node, Node);
@@ -200,21 +192,21 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
         bb_reachable(cfg, entry) <-- cfg_node(cfg), if let Some(entry) = hugr.children(*cfg).next();
         bb_reachable(cfg, bb) <-- cfg_node(cfg),
             bb_reachable(cfg, pred),
-            io_node(pred, pred_out, IO::Output),
+            output_child(pred, pred_out),
             in_wire_value(pred_out, IncomingPort::from(0), predicate),
             for (tag, bb) in hugr.output_neighbours(*pred).enumerate(),
             if predicate.supports_tag(tag);
 
         // Where do the values "fed" along a control-flow edge come out?
         relation _cfg_succ_dest(Node, Node, Node);
-        _cfg_succ_dest(cfg, blk, inp) <-- dfb_block(cfg, blk), io_node(blk, inp, IO::Input);
+        _cfg_succ_dest(cfg, blk, inp) <-- dfb_block(cfg, blk), input_child(blk, inp);
         _cfg_succ_dest(cfg, exit, cfg) <-- cfg_node(cfg), if let Some(exit) = hugr.children(*cfg).nth(1);
 
         // Inputs of CFG propagate to entry block
         out_wire_value(i_node, OutgoingPort::from(p.index()), v) <--
             cfg_node(cfg),
             if let Some(entry) = hugr.children(*cfg).next(),
-            io_node(entry, i_node, IO::Input),
+            input_child(entry, i_node),
             in_wire_value(cfg, p, v);
 
         // Outputs of each reachable block propagated to successor block or (if exit block) then CFG itself
@@ -223,7 +215,7 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
             bb_reachable(cfg, pred),
             let df_block = hugr.get_optype(*pred).as_dataflow_block().unwrap(),
             for (succ_n, succ) in hugr.output_neighbours(*pred).enumerate(),
-            io_node(pred, out_n, IO::Output),
+            output_child(pred, out_n),
             _cfg_succ_dest(cfg, succ, dest),
             node_in_value_row(out_n, out_in_row),
             if let Some(fields) = out_in_row.unpack_first(succ_n, df_block.sum_rows.get(succ_n).unwrap().len()),
@@ -238,12 +230,12 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
 
         out_wire_value(inp, OutgoingPort::from(p.index()), v) <--
             func_call(call, func),
-            io_node(func, inp, IO::Input),
+            input_child(func, inp),
             in_wire_value(call, p, v);
 
         out_wire_value(call, OutgoingPort::from(p.index()), v) <--
             func_call(call, func),
-            io_node(func, outp, IO::Output),
+            output_child(func, outp),
             in_wire_value(outp, p, v);
     };
     let out_wire_values = all_results
