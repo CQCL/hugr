@@ -5,8 +5,8 @@ mod datalog;
 pub use datalog::Machine;
 mod value_row;
 
-mod machine;
-pub use machine::{AnalysisResults, TailLoopTermination};
+mod results;
+pub use results::{AnalysisResults, TailLoopTermination};
 
 mod partial_value;
 pub use partial_value::{AbstractValue, PartialSum, PartialValue, Sum};
