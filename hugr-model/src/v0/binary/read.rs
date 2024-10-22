@@ -234,6 +234,7 @@ fn read_region<'a>(
     let kind = match reader.get_kind()? {
         hugr_capnp::RegionKind::DataFlow => model::RegionKind::DataFlow,
         hugr_capnp::RegionKind::ControlFlow => model::RegionKind::ControlFlow,
+        hugr_capnp::RegionKind::Module => model::RegionKind::Module,
     };
 
     let sources = read_list!(bump, reader, get_sources, read_link_ref);

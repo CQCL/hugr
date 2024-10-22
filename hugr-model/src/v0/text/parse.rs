@@ -67,7 +67,7 @@ impl<'a> ParseContext<'a> {
         let children = self.parse_nodes(&mut inner)?;
 
         let root_region = self.module.insert_region(Region {
-            kind: RegionKind::DataFlow,
+            kind: RegionKind::Module,
             sources: &[],
             targets: &[],
             children,

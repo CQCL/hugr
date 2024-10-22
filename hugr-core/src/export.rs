@@ -70,7 +70,7 @@ impl<'a> Context<'a> {
         }
 
         let root = self.module.insert_region(model::Region {
-            kind: model::RegionKind::DataFlow,
+            kind: model::RegionKind::Module,
             sources: &[],
             targets: &[],
             children: children.into_bump_slice(),

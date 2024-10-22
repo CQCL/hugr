@@ -150,6 +150,7 @@ fn write_region(mut builder: hugr_capnp::region::Builder, region: &model::Region
     builder.set_kind(match region.kind {
         model::RegionKind::DataFlow => hugr_capnp::RegionKind::DataFlow,
         model::RegionKind::ControlFlow => hugr_capnp::RegionKind::ControlFlow,
+        model::RegionKind::Module => hugr_capnp::RegionKind::Module,
     });
 
     write_list!(builder, init_sources, write_link_ref, region.sources);
