@@ -1,6 +1,3 @@
-use std::hash::{Hash, Hasher};
-use std::sync::Arc;
-
 use ascent::{lattice::BoundedLattice, Lattice};
 
 use hugr_core::builder::{CFGBuilder, Container, DataflowHugr};
@@ -26,49 +23,9 @@ enum Void {}
 
 impl AbstractValue for Void {}
 
-struct TestContext<H>(Arc<H>);
+struct TestContext;
 
-// Deriving Clone requires H:HugrView to implement Clone,
-// but we don't need that as we only clone the Arc.
-impl<H: HugrView> Clone for TestContext<H> {
-    fn clone(&self) -> Self {
-        Self(self.0.clone())
-    }
-}
-
-impl<H: HugrView> std::ops::Deref for TestContext<H> {
-    type Target = hugr_core::Hugr;
-
-    fn deref(&self) -> &Self::Target {
-        self.0.base_hugr()
-    }
-}
-
-// Any value used in an Ascent program must be hashable.
-// However, there should only be one DFContext, so its hash is immaterial.
-impl<H: HugrView> Hash for TestContext<H> {
-    fn hash<I: Hasher>(&self, _state: &mut I) {}
-}
-
-impl<H: HugrView> PartialEq for TestContext<H> {
-    fn eq(&self, other: &Self) -> bool {
-        // Any AscentProgram should have only one DFContext (maybe cloned)
-        assert!(Arc::ptr_eq(&self.0, &other.0));
-        true
-    }
-}
-
-impl<H: HugrView> Eq for TestContext<H> {}
-
-impl<H: HugrView> PartialOrd for TestContext<H> {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        // Any AscentProgram should have only one DFContext (maybe cloned)
-        assert!(Arc::ptr_eq(&self.0, &other.0));
-        Some(std::cmp::Ordering::Equal)
-    }
-}
-
-impl<H: HugrView> DFContext<Void> for TestContext<H> {}
+impl DFContext<Void> for TestContext {}
 
 // This allows testing creation of tuple/sum Values (only)
 impl From<Void> for Value {
@@ -97,7 +54,7 @@ fn test_make_tuple() {
     let v3 = builder.make_tuple([v1, v2]).unwrap();
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
-    let results = Machine::default().run(TestContext(Arc::new(&hugr)), []);
+    let results = Machine::default().run(&TestContext, &hugr, []);
 
     let x = results.try_read_wire_value(v3).unwrap();
     assert_eq!(x, Value::tuple([Value::false_val(), Value::true_val()]));
@@ -113,7 +70,7 @@ fn test_unpack_tuple_const() {
         .outputs_arr();
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
-    let results = Machine::default().run(TestContext(Arc::new(&hugr)), []);
+    let results = Machine::default().run(&TestContext, &hugr, []);
 
     let o1_r = results.try_read_wire_value(o1).unwrap();
     assert_eq!(o1_r, Value::false_val());
@@ -136,7 +93,7 @@ fn test_tail_loop_never_iterates() {
     let [tl_o] = tail_loop.outputs_arr();
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
-    let results = Machine::default().run(TestContext(Arc::new(&hugr)), []);
+    let results = Machine::default().run(&TestContext, &hugr, []);
 
     let o_r = results.try_read_wire_value(tl_o).unwrap();
     assert_eq!(o_r, r_v);
@@ -165,7 +122,7 @@ fn test_tail_loop_always_iterates() {
     let [tl_o1, tl_o2] = tail_loop.outputs_arr();
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
 
-    let results = Machine::default().run(TestContext(Arc::new(&hugr)), []);
+    let results = Machine::default().run(&TestContext, &hugr, []);
 
     let o_r1 = results.read_out_wire(tl_o1).unwrap();
     assert_eq!(o_r1, PartialValue::bottom());
@@ -203,7 +160,7 @@ fn test_tail_loop_two_iters() {
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
     let [o_w1, o_w2] = tail_loop.outputs_arr();
 
-    let results = Machine::default().run(TestContext(Arc::new(&hugr)), []);
+    let results = Machine::default().run(&TestContext, &hugr, []);
 
     let o_r1 = results.read_out_wire(o_w1).unwrap();
     assert_eq!(o_r1, pv_true_or_false());
@@ -269,7 +226,7 @@ fn test_tail_loop_containing_conditional() {
     let hugr = builder.finish_hugr(&EMPTY_REG).unwrap();
     let [o_w1, o_w2] = tail_loop.outputs_arr();
 
-    let results = Machine::default().run(TestContext(Arc::new(&hugr)), []);
+    let results = Machine::default().run(&TestContext, &hugr, []);
 
     let o_r1 = results.read_out_wire(o_w1).unwrap();
     assert_eq!(o_r1, pv_true());
@@ -321,7 +278,7 @@ fn test_conditional() {
         2,
         [PartialValue::new_variant(0, [])],
     ));
-    let results = Machine::default().run(TestContext(Arc::new(&hugr)), [(0.into(), arg_pv)]);
+    let results = Machine::default().run(&TestContext, &hugr, [(0.into(), arg_pv)]);
 
     let cond_r1 = results.try_read_wire_value(cond_o1).unwrap();
     assert_eq!(cond_r1, Value::false_val());
@@ -445,7 +402,8 @@ fn test_cfg(
 ) {
     let root = xor_and_cfg.root();
     let results = Machine::default().run(
-        TestContext(Arc::new(xor_and_cfg)),
+        &TestContext,
+        &xor_and_cfg,
         [(0.into(), inp0), (1.into(), inp1)],
     );
 
@@ -481,10 +439,7 @@ fn test_call(
         .finish_hugr_with_outputs([a2, b2], &EMPTY_REG)
         .unwrap();
 
-    let results = Machine::default().run(
-        TestContext(Arc::new(&hugr)),
-        [(0.into(), inp0), (1.into(), inp1)],
-    );
+    let results = Machine::default().run(&TestContext, &hugr, [(0.into(), inp0), (1.into(), inp1)]);
 
     let [res0, res1] = [0, 1].map(|i| results.read_out_wire(Wire::new(hugr.root(), i)).unwrap());
     // The two calls alias so both results will be the same:
