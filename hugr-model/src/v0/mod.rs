@@ -382,12 +382,12 @@ pub struct Region<'a> {
 /// The kind of a region.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum RegionKind {
-    /// Module region.
-    Module,
     /// Data flow region.
-    DataFlow,
+    DataFlow = 0,
     /// Control flow region.
-    ControlFlow,
+    ControlFlow = 1,
+    /// Module region.
+    Module = 2,
 }
 
 /// A function declaration.
