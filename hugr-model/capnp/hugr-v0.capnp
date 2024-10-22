@@ -103,6 +103,7 @@ struct Region {
 enum RegionKind {
     dataFlow @0;
     controlFlow @1;
+    module @2;
 }
 
 struct MetaItem {

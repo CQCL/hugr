@@ -404,6 +404,9 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 RegionKind::ControlFlow => {
                     this.print_text("cfg");
                 }
+                RegionKind::Module => {
+                    this.print_text("module");
+                }
             };
 
             this.print_port_lists(region_data.sources, region_data.targets)?;
