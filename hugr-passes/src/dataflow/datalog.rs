@@ -1,11 +1,4 @@
 //! [ascent] datalog implementation of analysis.
-//! Since ascent-(macro-)generated code generates a bunch of warnings,
-//! keep code in here to a minimum.
-#![allow(
-    clippy::clone_on_copy,
-    clippy::unused_enumerate_index,
-    clippy::collapsible_if
-)]
 
 use ascent::lattice::{BoundedLattice, Lattice};
 use itertools::{zip_eq, Itertools};
@@ -39,6 +32,13 @@ pub(super) fn run_datalog<V: AbstractValue>(
     c: &impl DFContext<V>,
     hugr: &impl HugrView,
 ) -> DatalogResults<V> {
+    // ascent-(macro-)generated code generates a bunch of warnings,
+    // keep code in here to a minimum.
+    #![allow(
+        clippy::clone_on_copy,
+        clippy::unused_enumerate_index,
+        clippy::collapsible_if
+    )]
     let all_results = ascent::ascent_run! {
         pub(super) struct AscentProgram<V: AbstractValue>;
         relation node(Node);
@@ -145,7 +145,7 @@ pub(super) fn run_datalog<V: AbstractValue>(
 
         // outputs of case nodes propagate to outputs of conditional *if* case reachable
         out_wire_value(cond, OutgoingPort::from(o_p.index()), v) <--
-          case_node(cond, _, case),
+          case_node(cond, _i, case),
           case_reachable(cond, case),
           io_node(case, o, IO::Output),
           in_wire_value(o, o_p, v);
@@ -219,6 +219,7 @@ pub(super) fn run_datalog<V: AbstractValue>(
         bb_reachable: all_results.bb_reachable,
     }
 }
+
 fn propagate_leaf_op<V: AbstractValue>(
     c: &impl DFContext<V>,
     hugr: &impl HugrView,
