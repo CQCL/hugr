@@ -1,6 +1,13 @@
 # Changelog
 
 
+## [0.13.2](https://github.com/CQCL/hugr/compare/hugr-cli-v0.13.1...hugr-cli-v0.13.2) - 2024-10-22
+
+### New Features
+
+- Add `Package` definition on `hugr-core` ([#1587](https://github.com/CQCL/hugr/pull/1587))
+- Ensure packages always have modules at the root ([#1589](https://github.com/CQCL/hugr/pull/1589))
+
 ## 0.13.1 (2024-10-14)
 
 This release bumps the version to align with the other `hugr-*` crates.
