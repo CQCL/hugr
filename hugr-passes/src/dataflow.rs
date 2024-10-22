@@ -2,15 +2,15 @@
 //! Dataflow analysis of Hugrs.
 
 mod datalog;
+mod value_row;
 
 mod machine;
-use hugr_core::ops::constant::CustomConst;
 pub use machine::{AnalysisResults, Machine, TailLoopTermination};
 
 mod partial_value;
 pub use partial_value::{AbstractValue, PartialSum, PartialValue, Sum};
 
-use hugr_core::ops::{ExtensionOp, Value};
+use hugr_core::ops::{constant::CustomConst, ExtensionOp, Value};
 use hugr_core::{Hugr, Node};
 
 /// Clients of the dataflow framework (particular analyses, such as constant folding)
