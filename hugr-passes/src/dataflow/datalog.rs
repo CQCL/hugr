@@ -67,15 +67,15 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
     )]
     let all_results = ascent::ascent_run! {
         pub(super) struct AscentProgram<V: AbstractValue>;
-        relation node(Node);
-        relation in_wire(Node, IncomingPort);
-        relation out_wire(Node, OutgoingPort);
-        relation parent_of_node(Node, Node);
-        relation input_child(Node, Node);
-        relation output_child(Node, Node);
-        lattice out_wire_value(Node, OutgoingPort, PV<V>);
-        lattice in_wire_value(Node, IncomingPort, PV<V>);
-        lattice node_in_value_row(Node, ValueRow<V>);
+        relation node(Node); // <Node> exists in the hugr
+        relation in_wire(Node, IncomingPort); // <Node> has an <IncomingPort> of `EdgeKind::Value`
+        relation out_wire(Node, OutgoingPort); // <Node> has an <OutgoingPort> of `EdgeKind::Value`
+        relation parent_of_node(Node, Node); // <Node> is parent of <Node>
+        relation input_child(Node, Node); // <Node> has 1st child <Node> that is its `Input`
+        relation output_child(Node, Node); // <Node> has 2nd child <Node> that is its `Output`
+        lattice out_wire_value(Node, OutgoingPort, PV<V>); // <Node> produces, on <OutgoingPort>, the value <PV>
+        lattice in_wire_value(Node, IncomingPort, PV<V>); // <Node> receives, on <IncomingPort>, the value <PV>
+        lattice node_in_value_row(Node, ValueRow<V>); // <Node>'s inputs are <ValueRow>
 
         node(n) <-- for n in hugr.nodes();
 
@@ -95,13 +95,14 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
             if let Some((m, op)) = hugr.single_linked_output(*n, *ip),
             out_wire_value(m, op, v);
 
-        // We support prepopulating in_wire_value via in_wire_value_proto.
+        // Prepopulate in_wire_value from in_wire_value_proto.
         in_wire_value(n, p, PV::bottom()) <-- in_wire(n, p);
         in_wire_value(n, p, v) <-- for (n, p, v) in in_wire_value_proto.iter(),
           node(n),
           if let Some(sig) = hugr.signature(*n),
           if sig.input_ports().contains(p);
 
+        // Assemble in_value_row from in_value's
         node_in_value_row(n, ValueRow::new(sig.input_count())) <-- node(n), if let Some(sig) = hugr.signature(*n);
         node_in_value_row(n, ValueRow::single_known(hugr.signature(*n).unwrap().input_count(), p.index(), v.clone())) <-- in_wire_value(n, p, v);
 
@@ -115,7 +116,7 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
            for (p, v) in (0..).map(OutgoingPort::from).zip(outs);
 
         // DFG
-        relation dfg_node(Node);
+        relation dfg_node(Node); // <Node> is a `DFG`
         dfg_node(n) <-- node(n), if hugr.get_optype(*n).is_dfg();
 
         out_wire_value(i, OutgoingPort::from(p.index()), v) <-- dfg_node(dfg),
@@ -151,7 +152,8 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
             for (out_p, v) in fields.enumerate();
 
         // Conditional
-        relation conditional_node(Node);
+        relation conditional_node(Node); // <Node> is a `Conditional`
+        // <Node> is a `Conditional` and its <usize>'th child (a `Case`) is <Node>:
         relation case_node(Node, usize, Node);
 
         conditional_node(n)<-- node(n), if hugr.get_optype(*n).is_conditional();
@@ -175,16 +177,17 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
           output_child(case, o),
           in_wire_value(o, o_p, v);
 
+        // In `Conditional` <Node>, child `Case` <Node> is reachable given our knowledge of predicate
         relation case_reachable(Node, Node);
         case_reachable(cond, case) <-- case_node(cond, i, case),
             in_wire_value(cond, IncomingPort::from(0), v),
             if v.supports_tag(*i);
 
         // CFG
-        relation cfg_node(Node);
+        relation cfg_node(Node); // <Node> is a `CFG`
         cfg_node(n) <-- node(n), if hugr.get_optype(*n).is_cfg();
 
-        // Reachability
+        // In `CFG` <Node>, basic block <Node> is reachable given our knowledge of predicates
         relation bb_reachable(Node, Node);
         bb_reachable(cfg, entry) <-- cfg_node(cfg), if let Some(entry) = hugr.children(*cfg).next();
         bb_reachable(cfg, bb) <-- cfg_node(cfg),
@@ -194,15 +197,6 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
             for (tag, bb) in hugr.output_neighbours(*pred).enumerate(),
             if predicate.supports_tag(tag);
 
-        // Relation: in `CFG` <Node>, values fed along a control-flow edge to <Node>
-        //     come out of Value outports of <Node>.
-        relation _cfg_succ_dest(Node, Node, Node);
-        _cfg_succ_dest(cfg, blk, inp) <-- cfg_node(cfg),
-            for blk in hugr.children(*cfg),
-            if hugr.get_optype(blk).is_dataflow_block(),
-            input_child(blk, inp);
-        _cfg_succ_dest(cfg, exit, cfg) <-- cfg_node(cfg), if let Some(exit) = hugr.children(*cfg).nth(1);
-
         // Inputs of CFG propagate to entry block
         out_wire_value(i_node, OutgoingPort::from(p.index()), v) <--
             cfg_node(cfg),
@@ -210,7 +204,16 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
             input_child(entry, i_node),
             in_wire_value(cfg, p, v);
 
-        // Outputs of each reachable block propagated to successor block or (if exit block) then CFG itself
+        // In `CFG` <Node>, values fed along a control-flow edge to <Node>
+        //     come out of Value outports of <Node>.
+        relation _cfg_succ_dest(Node, Node, Node);
+        _cfg_succ_dest(cfg, exit, cfg) <-- cfg_node(cfg), if let Some(exit) = hugr.children(*cfg).nth(1);
+        _cfg_succ_dest(cfg, blk, inp) <-- cfg_node(cfg),
+            for blk in hugr.children(*cfg),
+            if hugr.get_optype(blk).is_dataflow_block(),
+            input_child(blk, inp);
+
+        // Outputs of each reachable block propagated to successor block or CFG itself
         out_wire_value(dest, OutgoingPort::from(out_p), v) <--
             bb_reachable(cfg, pred),
             if let Some(df_block) = hugr.get_optype(*pred).as_dataflow_block(),
@@ -222,7 +225,7 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
             for (out_p, v) in fields.enumerate();
 
         // Call
-        relation func_call(Node, Node);
+        relation func_call(Node, Node); // <Node> is a `Call` to `FuncDefn` <Node>
         func_call(call, func_defn) <--
             node(call),
             if hugr.get_optype(*call).is_call(),
