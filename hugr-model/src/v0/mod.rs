@@ -344,12 +344,16 @@ pub enum Operation<'a> {
     },
 
     /// Declaration for a term constructor.
+    ///
+    /// Nodes with this operation must be within a module region.
     DeclareConstructor {
         /// The declaration of the constructor.
         decl: &'a ConstructorDecl<'a>,
     },
 
     /// Declaration for a operation.
+    ///
+    /// Nodes with this operation must be within a module region.
     DeclareOperation {
         /// The declaration of the operation.
         decl: &'a OperationDecl<'a>,

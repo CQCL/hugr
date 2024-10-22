@@ -20,7 +20,6 @@ workspace = true
 extension_inference = []
 declarative = ["serde_yaml"]
 model_unstable = ["hugr-model"]
-default = ["model_unstable"]
 
 [[test]]
 name = "model"
