@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.13.2](https://github.com/CQCL/hugr/compare/hugr-model-v0.13.1...hugr-model-v0.13.2) - 2024-10-22
+
+### New Features
+
+- make errors more readable with Display impls ([#1597](https://github.com/CQCL/hugr/pull/1597))
+
 ## [0.13.1](https://github.com/CQCL/hugr/compare/hugr-model-v0.1.0...hugr-model-v0.13.1) - 2024-10-14
 
 This release bumps the version to align with the other `hugr-*` crates.
