@@ -15,8 +15,7 @@ type PV<V> = PartialValue<V>;
 /// Basic structure for performing an analysis. Usage:
 /// 1. Get a new instance via [Self::default()]
 /// 2. (Optionally / for tests) zero or more [Self::prepopulate_wire] with initial values
-/// 3. Call [Self::run] to produce [AnalysisResults] which can be inspected via
-///    [read_out_wire](AnalysisResults::read_out_wire)
+/// 3. Call [Self::run] to produce [AnalysisResults]
 pub struct Machine<V: AbstractValue>(Vec<(Node, IncomingPort, PartialValue<V>)>);
 
 /// derived-Default requires the context to be Defaultable, which is unnecessary

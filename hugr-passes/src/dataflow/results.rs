@@ -4,7 +4,8 @@ use hugr_core::{ops::Value, types::ConstTypeError, HugrView, IncomingPort, Node,
 
 use super::{AbstractValue, PartialValue};
 
-/// Results of a dataflow analysis, packaged with context for easy inspection
+/// Results of a dataflow analysis, packaged with the Hugr for easy inspection.
+/// Methods allow inspection, specifically [read_out_wire](Self::read_out_wire).
 pub struct AnalysisResults<V: AbstractValue, H: HugrView> {
     pub(super) hugr: H,
     pub(super) in_wire_value: Vec<(Node, IncomingPort, PartialValue<V>)>,
