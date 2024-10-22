@@ -1,35 +1,36 @@
 use std::collections::HashMap;
 
 use hugr_core::{ops::Value, types::ConstTypeError, HugrView, IncomingPort, Node, PortIndex, Wire};
-use itertools::Itertools;
 
-use super::{datalog::AscentProgram, AbstractValue, DFContext, PartialValue};
+use super::datalog::{run_datalog, DatalogResults};
+use super::{AbstractValue, DFContext, PartialValue};
 
 /// Basic structure for performing an analysis. Usage:
 /// 1. Get a new instance via [Self::default()]
 /// 2. (Optionally / for tests) zero or more [Self::prepopulate_wire] with initial values
 /// 3. Call [Self::run] to produce [AnalysisResults] which can be inspected via
 ///    [read_out_wire](AnalysisResults::read_out_wire)
-pub struct Machine<V: AbstractValue, C: DFContext<V>>(AscentProgram<V, C>);
+pub struct Machine<V: AbstractValue>(Vec<(Node, IncomingPort, PartialValue<V>)>);
 
-/// Results of a dataflow analysis.
-pub struct AnalysisResults<V: AbstractValue, C: DFContext<V>>(
-    AscentProgram<V, C>, // Already run
-    HashMap<Wire, PartialValue<V>>,
-);
+/// Results of a dataflow analysis, packaged with context for easy inspection
+pub struct AnalysisResults<V: AbstractValue, C: DFContext<V>> {
+    context: C,
+    results: DatalogResults<V>,
+    out_wire_values: HashMap<Wire, PartialValue<V>>,
+}
 
 /// derived-Default requires the context to be Defaultable, which is unnecessary
-impl<V: AbstractValue, C: DFContext<V>> Default for Machine<V, C> {
+impl<V: AbstractValue> Default for Machine<V> {
     fn default() -> Self {
         Self(Default::default())
     }
 }
 
-impl<V: AbstractValue, C: DFContext<V>> Machine<V, C> {
+impl<V: AbstractValue> Machine<V> {
     /// Provide initial values for some wires.
     // Likely for test purposes only - should we make non-pub or #[cfg(test)] ?
     pub fn prepopulate_wire(&mut self, h: &impl HugrView, wire: Wire, value: PartialValue<V>) {
-        self.0.in_wire_value_proto.extend(
+        self.0.extend(
             h.linked_inputs(wire.node(), wire.source())
                 .map(|(n, inp)| (n, inp, value.clone())),
         );
@@ -40,36 +41,36 @@ impl<V: AbstractValue, C: DFContext<V>> Machine<V, C> {
     /// (Note that `in_values` will not be useful for `Case` or `DFB`-rooted Hugrs,
     /// but should handle other containers.)
     /// The context passed in allows interpretation of leaf operations.
-    pub fn run(
+    pub fn run<C: DFContext<V>>(
         mut self,
         context: C,
         in_values: impl IntoIterator<Item = (IncomingPort, PartialValue<V>)>,
     ) -> AnalysisResults<V, C> {
         let root = context.root();
         self.0
-            .in_wire_value_proto
             .extend(in_values.into_iter().map(|(p, v)| (root, p, v)));
-        self.0.context.push((context,));
-        self.0.run();
-        let results = self
-            .0
+        let results = run_datalog(self.0, &context);
+        let out_wire_values = results
             .out_wire_value
             .iter()
-            .map(|(_, n, p, v)| (Wire::new(*n, *p), v.clone()))
+            .map(|(n, p, v)| (Wire::new(*n, *p), v.clone()))
             .collect();
-        AnalysisResults(self.0, results)
+        AnalysisResults {
+            context,
+            results,
+            out_wire_values,
+        }
     }
 }
 
 impl<V: AbstractValue, C: DFContext<V>> AnalysisResults<V, C> {
     fn context(&self) -> &C {
-        let (c,) = self.0.context.iter().exactly_one().ok().unwrap();
-        c
+        &self.context
     }
 
     /// Gets the lattice value computed for the given wire
     pub fn read_out_wire(&self, w: Wire) -> Option<PartialValue<V>> {
-        self.1.get(&w).cloned()
+        self.out_wire_values.get(&w).cloned()
     }
 
     /// Tells whether a [TailLoop] node can terminate, i.e. whether
@@ -82,10 +83,10 @@ impl<V: AbstractValue, C: DFContext<V>> AnalysisResults<V, C> {
         hugr.get_optype(node).as_tail_loop()?;
         let [_, out] = hugr.get_io(node).unwrap();
         Some(TailLoopTermination::from_control_value(
-            self.0
+            self.results
                 .in_wire_value
                 .iter()
-                .find_map(|(_, n, p, v)| (*n == out && p.index() == 0).then_some(v))
+                .find_map(|(n, p, v)| (*n == out && p.index() == 0).then_some(v))
                 .unwrap(),
         ))
     }
@@ -103,10 +104,10 @@ impl<V: AbstractValue, C: DFContext<V>> AnalysisResults<V, C> {
         let cond = hugr.get_parent(case)?;
         hugr.get_optype(cond).as_conditional()?;
         Some(
-            self.0
+            self.results
                 .case_reachable
                 .iter()
-                .any(|(_, cond2, case2)| &cond == cond2 && &case == case2),
+                .any(|(cond2, case2)| &cond == cond2 && &case == case2),
         )
     }
 
@@ -125,10 +126,10 @@ impl<V: AbstractValue, C: DFContext<V>> AnalysisResults<V, C> {
             return None;
         };
         Some(
-            self.0
+            self.results
                 .bb_reachable
                 .iter()
-                .any(|(_, cfg2, bb2)| *cfg2 == cfg && *bb2 == bb),
+                .any(|(cfg2, bb2)| *cfg2 == cfg && *bb2 == bb),
         )
     }
 }

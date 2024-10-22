@@ -8,7 +8,7 @@
 )]
 
 use ascent::lattice::{BoundedLattice, Lattice};
-use itertools::zip_eq;
+use itertools::{zip_eq, Itertools};
 use std::cmp::Ordering;
 use std::hash::Hash;
 use std::ops::{Index, IndexMut};
@@ -27,183 +27,197 @@ pub enum IO {
     Output,
 }
 
-ascent::ascent! {
-    pub(super) struct AscentProgram<V: AbstractValue, C: DFContext<V>>;
-    relation context(C);
-
-    relation node(C, Node);
-    relation in_wire(C, Node, IncomingPort);
-    relation out_wire(C, Node, OutgoingPort);
-    relation parent_of_node(C, Node, Node);
-    relation io_node(C, Node, Node, IO);
-    lattice out_wire_value(C, Node, OutgoingPort, PV<V>);
-    lattice in_wire_value(C, Node, IncomingPort, PV<V>);
-    lattice node_in_value_row(C, Node, ValueRow<V>);
-
-    node(c, n) <-- context(c), for n in c.nodes();
-
-    in_wire(c, n,p) <-- node(c, n), for (p,_) in c.in_value_types(*n); // Note, gets connected inports only
-    out_wire(c, n,p) <-- node(c, n), for (p,_) in c.out_value_types(*n); // (and likewise)
-
-    parent_of_node(c, parent, child) <--
-        node(c, child), if let Some(parent) = c.get_parent(*child);
-
-    io_node(c, parent, child, io) <-- node(c, parent),
-      if let Some([i,o]) = c.get_io(*parent),
-      for (child,io) in [(i,IO::Input),(o,IO::Output)];
-
-    // Initialize all wires to bottom
-    out_wire_value(c, n,p, PV::bottom()) <-- out_wire(c, n,p);
-
-    in_wire_value(c, n, ip, v) <-- in_wire(c, n, ip),
-        if let Some((m,op)) = c.single_linked_output(*n, *ip),
-        out_wire_value(c, m, op, v);
-
-    // We support prepopulating in_wire_value via in_wire_value_proto.
-    relation in_wire_value_proto(Node, IncomingPort, PV<V>);
-    in_wire_value(c, n, p, PV::bottom()) <-- in_wire(c, n,p);
-    in_wire_value(c, n, p, v) <-- node(c,n),
-      if let Some(sig) = c.signature(*n),
-      for p in sig.input_ports(),
-      in_wire_value_proto(n, p, v);
-
-    node_in_value_row(c, n, ValueRow::new(sig.input_count())) <-- node(c, n), if let Some(sig) = c.signature(*n);
-    node_in_value_row(c, n, ValueRow::single_known(c.signature(*n).unwrap().input_count(), p.index(), v.clone())) <-- in_wire_value(c, n, p, v);
-
-    out_wire_value(c, n, p, v) <--
-       node(c, n),
-       let op_t = c.get_optype(*n),
-       if !op_t.is_container(),
-       if let Some(sig) = op_t.dataflow_signature(),
-       node_in_value_row(c, n, vs),
-       if let Some(outs) = propagate_leaf_op(c, *n, &vs[..], sig.output_count()),
-       for (p,v) in (0..).map(OutgoingPort::from).zip(outs);
-
-    // DFG
-    relation dfg_node(C, Node);
-    dfg_node(c,n) <-- node(c, n), if c.get_optype(*n).is_dfg();
-
-    out_wire_value(c, i, OutgoingPort::from(p.index()), v) <-- dfg_node(c,dfg),
-      io_node(c, dfg, i, IO::Input), in_wire_value(c, dfg, p, v);
-
-    out_wire_value(c, dfg, OutgoingPort::from(p.index()), v) <-- dfg_node(c,dfg),
-        io_node(c,dfg,o, IO::Output), in_wire_value(c, o, p, v);
-
-
-    // TailLoop
-
-    // inputs of tail loop propagate to Input node of child region
-    out_wire_value(c, i, OutgoingPort::from(p.index()), v) <-- node(c, tl),
-        if c.get_optype(*tl).is_tail_loop(),
-        io_node(c,tl,i, IO::Input),
-        in_wire_value(c, tl, p, v);
-
-    // Output node of child region propagate to Input node of child region
-    out_wire_value(c, in_n, OutgoingPort::from(out_p), v) <-- node(c, tl_n),
-        if let Some(tailloop) = c.get_optype(*tl_n).as_tail_loop(),
-        io_node(c,tl_n,in_n, IO::Input),
-        io_node(c,tl_n,out_n, IO::Output),
-        node_in_value_row(c, out_n, out_in_row), // get the whole input row for the output node
-
-        if let Some(fields) = out_in_row.unpack_first(0, tailloop.just_inputs.len()), // if it is possible for tag to be 0
-        for (out_p, v) in fields.enumerate();
-
-    // Output node of child region propagate to outputs of tail loop
-    out_wire_value(c, tl_n, OutgoingPort::from(out_p), v) <-- node(c, tl_n),
-        if let Some(tailloop) = c.get_optype(*tl_n).as_tail_loop(),
-        io_node(c,tl_n,out_n, IO::Output),
-        node_in_value_row(c, out_n, out_in_row), // get the whole input row for the output node
-        if let Some(fields) = out_in_row.unpack_first(1, tailloop.just_outputs.len()), // if it is possible for the tag to be 1
-        for (out_p, v) in fields.enumerate();
-
-    // Conditional
-    relation conditional_node(C, Node);
-    relation case_node(C,Node,usize, Node);
-
-    conditional_node (c,n)<-- node(c, n), if c.get_optype(*n).is_conditional();
-    case_node(c,cond,i, case) <-- conditional_node(c,cond),
-      for (i, case) in c.children(*cond).enumerate(),
-      if c.get_optype(case).is_case();
-
-    // inputs of conditional propagate into case nodes
-    out_wire_value(c, i_node, OutgoingPort::from(out_p), v) <--
-      case_node(c, cond, case_index, case),
-      io_node(c, case, i_node, IO::Input),
-      node_in_value_row(c, cond, in_row),
-      let conditional = c.get_optype(*cond).as_conditional().unwrap(),
-      if let Some(fields) = in_row.unpack_first(*case_index, conditional.sum_rows[*case_index].len()),
-      for (out_p, v) in fields.enumerate();
-
-    // outputs of case nodes propagate to outputs of conditional *if* case reachable
-    out_wire_value(c, cond, OutgoingPort::from(o_p.index()), v) <--
-      case_node(c, cond, _, case),
-      case_reachable(c, cond, case),
-      io_node(c, case, o, IO::Output),
-      in_wire_value(c, o, o_p, v);
-
-    relation case_reachable(C, Node, Node);
-    case_reachable(c, cond, case) <-- case_node(c,cond,i,case),
-        in_wire_value(c, cond, IncomingPort::from(0), v),
-        if v.supports_tag(*i);
-
-    // CFG
-    relation cfg_node(C, Node);
-    relation dfb_block(C, Node, Node);
-    cfg_node(c,n) <-- node(c, n), if c.get_optype(*n).is_cfg();
-    dfb_block(c,cfg,blk) <-- cfg_node(c, cfg), for blk in c.children(*cfg), if c.get_optype(blk).is_dataflow_block();
-
-    // Reachability
-    relation bb_reachable(C, Node, Node);
-    bb_reachable(c, cfg, entry) <-- cfg_node(c, cfg), if let Some(entry) = c.children(*cfg).next();
-    bb_reachable(c, cfg, bb) <-- cfg_node(c, cfg),
-        bb_reachable(c, cfg, pred),
-        io_node(c, pred, pred_out, IO::Output),
-        in_wire_value(c, pred_out, IncomingPort::from(0), predicate),
-        for (tag, bb) in c.output_neighbours(*pred).enumerate(),
-        if predicate.supports_tag(tag);
-
-    // Where do the values "fed" along a control-flow edge come out?
-    relation _cfg_succ_dest(C, Node, Node, Node);
-    _cfg_succ_dest(c, cfg, blk, inp) <-- dfb_block(c, cfg, blk), io_node(c, blk, inp, IO::Input);
-    _cfg_succ_dest(c, cfg, exit, cfg) <-- cfg_node(c, cfg), if let Some(exit) = c.children(*cfg).nth(1);
-
-    // Inputs of CFG propagate to entry block
-    out_wire_value(c, i_node, OutgoingPort::from(p.index()), v) <--
-        cfg_node(c, cfg),
-        if let Some(entry) = c.children(*cfg).next(),
-        io_node(c, entry, i_node, IO::Input),
-        in_wire_value(c, cfg, p, v);
-
-    // Outputs of each reachable block propagated to successor block or (if exit block) then CFG itself
-    out_wire_value(c, dest, OutgoingPort::from(out_p), v) <--
-        dfb_block(c, cfg, pred),
-        bb_reachable(c, cfg, pred),
-        let df_block = c.get_optype(*pred).as_dataflow_block().unwrap(),
-        for (succ_n, succ) in c.output_neighbours(*pred).enumerate(),
-        io_node(c, pred, out_n, IO::Output),
-        _cfg_succ_dest(c, cfg, succ, dest),
-        node_in_value_row(c, out_n, out_in_row),
-        if let Some(fields) = out_in_row.unpack_first(succ_n, df_block.sum_rows.get(succ_n).unwrap().len()),
-        for (out_p, v) in fields.enumerate();
-
-    // Call
-    relation func_call(C, Node, Node);
-    func_call(c, call, func_defn) <--
-        node(c, call),
-        if c.get_optype(*call).is_call(),
-        if let Some(func_defn) = c.static_source(*call);
-
-    out_wire_value(c, inp, OutgoingPort::from(p.index()), v) <--
-        func_call(c, call, func),
-        io_node(c, func, inp, IO::Input),
-        in_wire_value(c, call, p, v);
-
-    out_wire_value(c, call, OutgoingPort::from(p.index()), v) <--
-        func_call(c, call, func),
-        io_node(c, func, outp, IO::Output),
-        in_wire_value(c, outp, p, v);
+pub(super) struct DatalogResults<V> {
+    pub in_wire_value: Vec<(Node, IncomingPort, PV<V>)>,
+    pub out_wire_value: Vec<(Node, OutgoingPort, PV<V>)>,
+    pub case_reachable: Vec<(Node, Node)>,
+    pub bb_reachable: Vec<(Node, Node)>,
 }
 
+pub(super) fn run_datalog<V: AbstractValue, C: DFContext<V>>(
+    in_wire_value_proto: Vec<(Node, IncomingPort, PV<V>)>,
+    c: &C,
+) -> DatalogResults<V> {
+    let all_results = ascent::ascent_run! {
+        pub(super) struct AscentProgram<V: AbstractValue>;
+        relation node(Node);
+        relation in_wire(Node, IncomingPort);
+        relation out_wire(Node, OutgoingPort);
+        relation parent_of_node(Node, Node);
+        relation io_node(Node, Node, IO);
+        lattice out_wire_value(Node, OutgoingPort, PV<V>);
+        lattice in_wire_value(Node, IncomingPort, PV<V>);
+        lattice node_in_value_row(Node, ValueRow<V>);
+
+        node(n) <-- for n in c.nodes();
+
+        in_wire(n, p) <-- node(n), for (p,_) in c.in_value_types(*n); // Note, gets connected inports only
+        out_wire(n, p) <-- node(n), for (p,_) in c.out_value_types(*n); // (and likewise)
+
+        parent_of_node(parent, child) <--
+            node(child), if let Some(parent) = c.get_parent(*child);
+
+        io_node(parent, child, io) <-- node(parent),
+          if let Some([i, o]) = c.get_io(*parent),
+          for (child,io) in [(i,IO::Input),(o,IO::Output)];
+
+        // Initialize all wires to bottom
+        out_wire_value(n, p, PV::bottom()) <-- out_wire(n, p);
+
+        in_wire_value(n, ip, v) <-- in_wire(n, ip),
+            if let Some((m, op)) = c.single_linked_output(*n, *ip),
+            out_wire_value(m, op, v);
+
+        // We support prepopulating in_wire_value via in_wire_value_proto.
+        in_wire_value(n, p, PV::bottom()) <-- in_wire(n, p);
+        in_wire_value(n, p, v) <-- for (n, p, v) in in_wire_value_proto.iter(),
+          node(n),
+          if let Some(sig) = c.signature(*n),
+          if sig.input_ports().contains(p);
+
+        node_in_value_row(n, ValueRow::new(sig.input_count())) <-- node(n), if let Some(sig) = c.signature(*n);
+        node_in_value_row(n, ValueRow::single_known(c.signature(*n).unwrap().input_count(), p.index(), v.clone())) <-- in_wire_value(n, p, v);
+
+        out_wire_value(n, p, v) <--
+           node(n),
+           let op_t = c.get_optype(*n),
+           if !op_t.is_container(),
+           if let Some(sig) = op_t.dataflow_signature(),
+           node_in_value_row(n, vs),
+           if let Some(outs) = propagate_leaf_op(c, *n, &vs[..], sig.output_count()),
+           for (p, v) in (0..).map(OutgoingPort::from).zip(outs);
+
+        // DFG
+        relation dfg_node(Node);
+        dfg_node(n) <-- node(n), if c.get_optype(*n).is_dfg();
+
+        out_wire_value(i, OutgoingPort::from(p.index()), v) <-- dfg_node(dfg),
+          io_node(dfg, i, IO::Input), in_wire_value(dfg, p, v);
+
+        out_wire_value(dfg, OutgoingPort::from(p.index()), v) <-- dfg_node(dfg),
+            io_node(dfg, o, IO::Output), in_wire_value(o, p, v);
+
+
+        // TailLoop
+
+        // inputs of tail loop propagate to Input node of child region
+        out_wire_value(i, OutgoingPort::from(p.index()), v) <-- node(tl),
+            if c.get_optype(*tl).is_tail_loop(),
+            io_node(tl, i, IO::Input),
+            in_wire_value(tl, p, v);
+
+        // Output node of child region propagate to Input node of child region
+        out_wire_value(in_n, OutgoingPort::from(out_p), v) <-- node(tl),
+            if let Some(tailloop) = c.get_optype(*tl).as_tail_loop(),
+            io_node(tl, in_n, IO::Input),
+            io_node(tl, out_n, IO::Output),
+            node_in_value_row(out_n, out_in_row), // get the whole input row for the output node
+
+            if let Some(fields) = out_in_row.unpack_first(0, tailloop.just_inputs.len()), // if it is possible for tag to be 0
+            for (out_p, v) in fields.enumerate();
+
+        // Output node of child region propagate to outputs of tail loop
+        out_wire_value(tl, OutgoingPort::from(out_p), v) <-- node(tl),
+            if let Some(tailloop) = c.get_optype(*tl).as_tail_loop(),
+            io_node(tl, out_n, IO::Output),
+            node_in_value_row(out_n, out_in_row), // get the whole input row for the output node
+            if let Some(fields) = out_in_row.unpack_first(1, tailloop.just_outputs.len()), // if it is possible for the tag to be 1
+            for (out_p, v) in fields.enumerate();
+
+        // Conditional
+        relation conditional_node(Node);
+        relation case_node(Node, usize, Node);
+
+        conditional_node(n)<-- node(n), if c.get_optype(*n).is_conditional();
+        case_node(cond, i, case) <-- conditional_node(cond),
+          for (i, case) in c.children(*cond).enumerate(),
+          if c.get_optype(case).is_case();
+
+        // inputs of conditional propagate into case nodes
+        out_wire_value(i_node, OutgoingPort::from(out_p), v) <--
+          case_node(cond, case_index, case),
+          io_node(case, i_node, IO::Input),
+          node_in_value_row(cond, in_row),
+          let conditional = c.get_optype(*cond).as_conditional().unwrap(),
+          if let Some(fields) = in_row.unpack_first(*case_index, conditional.sum_rows[*case_index].len()),
+          for (out_p, v) in fields.enumerate();
+
+        // outputs of case nodes propagate to outputs of conditional *if* case reachable
+        out_wire_value(cond, OutgoingPort::from(o_p.index()), v) <--
+          case_node(cond, _, case),
+          case_reachable(cond, case),
+          io_node(case, o, IO::Output),
+          in_wire_value(o, o_p, v);
+
+        relation case_reachable(Node, Node);
+        case_reachable(cond, case) <-- case_node(cond, i, case),
+            in_wire_value(cond, IncomingPort::from(0), v),
+            if v.supports_tag(*i);
+
+        // CFG
+        relation cfg_node(Node);
+        relation dfb_block(Node, Node);
+        cfg_node(n) <-- node(n), if c.get_optype(*n).is_cfg();
+        dfb_block(cfg, blk) <-- cfg_node(cfg), for blk in c.children(*cfg), if c.get_optype(blk).is_dataflow_block();
+
+        // Reachability
+        relation bb_reachable(Node, Node);
+        bb_reachable(cfg, entry) <-- cfg_node(cfg), if let Some(entry) = c.children(*cfg).next();
+        bb_reachable(cfg, bb) <-- cfg_node(cfg),
+            bb_reachable(cfg, pred),
+            io_node(pred, pred_out, IO::Output),
+            in_wire_value(pred_out, IncomingPort::from(0), predicate),
+            for (tag, bb) in c.output_neighbours(*pred).enumerate(),
+            if predicate.supports_tag(tag);
+
+        // Where do the values "fed" along a control-flow edge come out?
+        relation _cfg_succ_dest(Node, Node, Node);
+        _cfg_succ_dest(cfg, blk, inp) <-- dfb_block(cfg, blk), io_node(blk, inp, IO::Input);
+        _cfg_succ_dest(cfg, exit, cfg) <-- cfg_node(cfg), if let Some(exit) = c.children(*cfg).nth(1);
+
+        // Inputs of CFG propagate to entry block
+        out_wire_value(i_node, OutgoingPort::from(p.index()), v) <--
+            cfg_node(cfg),
+            if let Some(entry) = c.children(*cfg).next(),
+            io_node(entry, i_node, IO::Input),
+            in_wire_value(cfg, p, v);
+
+        // Outputs of each reachable block propagated to successor block or (if exit block) then CFG itself
+        out_wire_value(dest, OutgoingPort::from(out_p), v) <--
+            dfb_block(cfg, pred),
+            bb_reachable(cfg, pred),
+            let df_block = c.get_optype(*pred).as_dataflow_block().unwrap(),
+            for (succ_n, succ) in c.output_neighbours(*pred).enumerate(),
+            io_node(pred, out_n, IO::Output),
+            _cfg_succ_dest(cfg, succ, dest),
+            node_in_value_row(out_n, out_in_row),
+            if let Some(fields) = out_in_row.unpack_first(succ_n, df_block.sum_rows.get(succ_n).unwrap().len()),
+            for (out_p, v) in fields.enumerate();
+
+        // Call
+        relation func_call(Node, Node);
+        func_call(call, func_defn) <--
+            node(call),
+            if c.get_optype(*call).is_call(),
+            if let Some(func_defn) = c.static_source(*call);
+
+        out_wire_value(inp, OutgoingPort::from(p.index()), v) <--
+            func_call(call, func),
+            io_node(func, inp, IO::Input),
+            in_wire_value(call, p, v);
+
+        out_wire_value(call, OutgoingPort::from(p.index()), v) <--
+            func_call(call, func),
+            io_node(func, outp, IO::Output),
+            in_wire_value(outp, p, v);
+    };
+    DatalogResults {
+        in_wire_value: all_results.in_wire_value,
+        out_wire_value: all_results.out_wire_value,
+        case_reachable: all_results.case_reachable,
+        bb_reachable: all_results.bb_reachable,
+    }
+}
 fn propagate_leaf_op<V: AbstractValue>(
     c: &impl DFContext<V>,
     n: Node,
