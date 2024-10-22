@@ -194,7 +194,8 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
             for (tag, bb) in hugr.output_neighbours(*pred).enumerate(),
             if predicate.supports_tag(tag);
 
-        // Where do the values "fed" along a control-flow edge come out?
+        // Relation: in `CFG` <Node>, values fed along a control-flow edge to <Node>
+        //     come out of Value outports of <Node>.
         relation _cfg_succ_dest(Node, Node, Node);
         _cfg_succ_dest(cfg, blk, inp) <-- cfg_node(cfg),
             for blk in hugr.children(*cfg),
