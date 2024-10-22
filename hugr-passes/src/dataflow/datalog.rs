@@ -263,16 +263,15 @@ fn propagate_leaf_op<V: AbstractValue>(
     num_outs: usize,
 ) -> Option<ValueRow<V>> {
     match hugr.get_optype(n) {
-        // Handle basics here. I guess (given the current interface) we could allow
-        // DFContext to handle these but at the least we'd want these impls to be
-        // easily available for reuse.
+        // Handle basics here. We could instead leave these to DFContext,
+        // but at least we'd want these impls to be easily reusable.
         op if op.cast::<MakeTuple>().is_some() => Some(ValueRow::from_iter([PV::new_variant(
             0,
             ins.iter().cloned(),
         )])),
         op if op.cast::<UnpackTuple>().is_some() => {
             let elem_tys = op.cast::<UnpackTuple>().unwrap().0;
-            let [tup] = ins.iter().collect::<Vec<_>>().try_into().unwrap();
+            let tup = ins.iter().exactly_one().unwrap();
             tup.variant_values(0, elem_tys.len())
                 .map(ValueRow::from_iter)
         }
