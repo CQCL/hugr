@@ -14,7 +14,7 @@ use lazy_static::lazy_static;
 
 use crate::{
     custom::CodegenExtsBuilder,
-    emit::{emit_value, get_intrinsic, EmitFuncContext, EmitOpArgs},
+    emit::{emit_value, EmitFuncContext, EmitOpArgs},
     types::TypingSession,
     CodegenExtension,
 };
@@ -138,9 +138,7 @@ impl<PCG: PreludeCodegen> RotationCodegenExtension<PCG> {
         op: RotationOp,
     ) -> Result<()> {
         let ts = context.typing_session();
-        let module = context.get_current_module();
         let builder = context.builder();
-        let angle_ty = llvm_angle_type(&ts);
 
         match op {
             RotationOp::radd => {
@@ -204,27 +202,7 @@ impl<PCG: PreludeCodegen> RotationCodegenExtension<PCG> {
                     .map_err(|_| anyhow!("RotationOp::tohalfturns expects one argument"))?;
                 let half_turns = half_turns.into_float_value();
 
-                // normalised_half_turns is in the interval 0..2
-                let normalised_half_turns = {
-                    // normalised_rads = (half_turns/2 - floor(half_turns/2)) * 2
-                    // note that floor(x) gives the largest integral value less
-                    // than or equal to x so this deals with both positive and
-                    // negative rads.
-                    let turns =
-                        builder.build_float_div(half_turns, angle_ty.const_float(2.0), "")?;
-                    let floor_turns = {
-                        let floor = get_intrinsic(module, "llvm.floor", [angle_ty.into()])?;
-                        builder
-                            .build_call(floor, &[turns.into()], "")?
-                            .try_as_basic_value()
-                            .left()
-                            .ok_or(anyhow!("llvm.floor has no return value"))?
-                            .into_float_value()
-                    };
-                    let normalised_turns = builder.build_float_sub(turns, floor_turns, "")?;
-                    builder.build_float_mul(normalised_turns, angle_ty.const_float(2.0), "")?
-                };
-                args.outputs.finish(builder, [normalised_half_turns.into()])
+                args.outputs.finish(builder, [half_turns.into()])
             }
             op => bail!("Unsupported op: {op:?}"),
         }
@@ -314,7 +292,7 @@ mod test {
 
     #[rstest]
     #[case(ConstRotation::new(1.0).unwrap(), ConstRotation::new(0.5).unwrap(), 1.5)]
-    #[case(ConstRotation::PI, ConstRotation::new(1.5).unwrap(), 0.5)]
+    #[case(ConstRotation::PI, ConstRotation::new(1.5).unwrap(), 2.5)]
     fn exec_aadd(
         mut exec_ctx: TestContext,
         #[case] angle1: ConstRotation,
@@ -350,7 +328,7 @@ mod test {
 
     #[rstest]
     #[case(ConstRotation::PI, 1.0)]
-    #[case(ConstRotation::TAU, 0.0)]
+    #[case(ConstRotation::TAU, 2.0)]
     #[case(ConstRotation::PI_2, 0.5)]
     #[case(ConstRotation::PI_4, 0.25)]
     fn exec_to_halfturns(
@@ -420,13 +398,13 @@ mod test {
 
     #[rstest]
     #[case(1.0, Some(1.0))]
-    #[case(-1.0, Some(1.0))]
+    #[case(-1.0, Some (-1.0))]
     #[case(0.5, Some(0.5))]
-    #[case(-0.5, Some(1.5))]
+    #[case(-0.5, Some (-0.5))]
     #[case(0.25, Some(0.25))]
-    #[case(-0.25, Some(1.75))]
-    #[case(13.5, Some(1.5))]
-    #[case(-13.5, Some(0.5))]
+    #[case(-0.25, Some (-0.25))]
+    #[case(13.5, Some(13.5))]
+    #[case(-13.5, Some (-13.5))]
     #[case(f64::NAN, None)]
     #[case(f64::INFINITY, None)]
     #[case(f64::NEG_INFINITY, None)]

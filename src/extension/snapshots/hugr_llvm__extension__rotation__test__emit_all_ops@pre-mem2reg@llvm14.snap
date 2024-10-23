@@ -44,51 +44,47 @@ entry_block:                                      ; preds = %alloca_block
 9:                                                ; preds = %entry_block
   store double %"2_01", double* %"4_0", align 8
   %"4_02" = load double, double* %"4_0", align 8
-  %10 = fdiv double %"4_02", 2.000000e+00
-  %11 = call double @llvm.floor.f64(double %10)
-  %12 = fsub double %10, %11
-  %13 = fmul double %12, 2.000000e+00
-  store double %13, double* %"5_0", align 8
+  store double %"4_02", double* %"5_0", align 8
   %"5_03" = load double, double* %"5_0", align 8
-  %14 = fcmp oeq double %"5_03", 0x7FF0000000000000
-  %15 = fcmp oeq double %"5_03", 0xFFF0000000000000
-  %16 = fcmp uno double %"5_03", 0.000000e+00
-  %17 = or i1 %14, %15
-  %18 = or i1 %17, %16
-  %19 = xor i1 %18, true
-  %20 = insertvalue { double } undef, double %"5_03", 0
-  %21 = insertvalue { i32, {}, { double } } { i32 1, {} poison, { double } poison }, { double } %20, 2
-  %22 = select i1 %19, { i32, {}, { double } } %21, { i32, {}, { double } } { i32 0, {} undef, { double } poison }
-  store { i32, {}, { double } } %22, { i32, {}, { double } }* %"6_0", align 8
+  %10 = fcmp oeq double %"5_03", 0x7FF0000000000000
+  %11 = fcmp oeq double %"5_03", 0xFFF0000000000000
+  %12 = fcmp uno double %"5_03", 0.000000e+00
+  %13 = or i1 %10, %11
+  %14 = or i1 %13, %12
+  %15 = xor i1 %14, true
+  %16 = insertvalue { double } undef, double %"5_03", 0
+  %17 = insertvalue { i32, {}, { double } } { i32 1, {} poison, { double } poison }, { double } %16, 2
+  %18 = select i1 %15, { i32, {}, { double } } %17, { i32, {}, { double } } { i32 0, {} undef, { double } poison }
+  store { i32, {}, { double } } %18, { i32, {}, { double } }* %"6_0", align 8
   %"6_04" = load { i32, {}, { double } }, { i32, {}, { double } }* %"6_0", align 8
-  %23 = extractvalue { i32, {}, { double } } %"6_04", 0
-  switch i32 %23, label %24 [
-    i32 1, label %26
+  %19 = extractvalue { i32, {}, { double } } %"6_04", 0
+  switch i32 %19, label %20 [
+    i32 1, label %22
   ]
 
-24:                                               ; preds = %9
-  %25 = extractvalue { i32, {}, { double } } %"6_04", 1
+20:                                               ; preds = %9
+  %21 = extractvalue { i32, {}, { double } } %"6_04", 1
   br label %cond_7_case_0
 
-26:                                               ; preds = %9
-  %27 = extractvalue { i32, {}, { double } } %"6_04", 2
-  %28 = extractvalue { double } %27, 0
-  store double %28, double* %"08", align 8
+22:                                               ; preds = %9
+  %23 = extractvalue { i32, {}, { double } } %"6_04", 2
+  %24 = extractvalue { double } %23, 0
+  store double %24, double* %"08", align 8
   br label %cond_7_case_1
 
-cond_7_case_0:                                    ; preds = %24
+cond_7_case_0:                                    ; preds = %20
   store { i32, i8* } { i32 1, i8* getelementptr inbounds ([37 x i8], [37 x i8]* @1, i32 0, i32 0) }, { i32, i8* }* %"12_0", align 8
   %"12_06" = load { i32, i8* }, { i32, i8* }* %"12_0", align 8
-  %29 = extractvalue { i32, i8* } %"12_06", 0
-  %30 = extractvalue { i32, i8* } %"12_06", 1
-  %31 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([34 x i8], [34 x i8]* @prelude.panic_template.1, i32 0, i32 0), i32 %29, i8* %30)
+  %25 = extractvalue { i32, i8* } %"12_06", 0
+  %26 = extractvalue { i32, i8* } %"12_06", 1
+  %27 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([34 x i8], [34 x i8]* @prelude.panic_template.1, i32 0, i32 0), i32 %25, i8* %26)
   call void @abort()
   store double 0.000000e+00, double* %"13_0", align 8
   %"13_07" = load double, double* %"13_0", align 8
   store double %"13_07", double* %"0", align 8
   br label %cond_exit_7
 
-cond_7_case_1:                                    ; preds = %26
+cond_7_case_1:                                    ; preds = %22
   %"09" = load double, double* %"08", align 8
   store double %"09", double* %"15_0", align 8
   %"15_010" = load double, double* %"15_0", align 8
@@ -100,16 +96,11 @@ cond_exit_7:                                      ; preds = %cond_7_case_1, %con
   store double %"05", double* %"7_0", align 8
   %"4_011" = load double, double* %"4_0", align 8
   %"7_012" = load double, double* %"7_0", align 8
-  %32 = fadd double %"4_011", %"7_012"
-  store double %32, double* %"17_0", align 8
+  %28 = fadd double %"4_011", %"7_012"
+  store double %28, double* %"17_0", align 8
   ret void
 }
 
 declare i32 @printf(i8*, ...)
 
 declare void @abort()
-
-; Function Attrs: nofree nosync nounwind readnone speculatable willreturn
-declare double @llvm.floor.f64(double) #0
-
-attributes #0 = { nofree nosync nounwind readnone speculatable willreturn }
