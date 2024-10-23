@@ -13,7 +13,19 @@ use crate::dataflow::{AbstractValue, PartialValue};
 #[derive(Clone, Debug)]
 pub struct HashedConst {
     hash: u64,
-    val: Arc<dyn CustomConst>,
+    pub(super) val: Arc<dyn CustomConst>,
+}
+
+impl HashedConst {
+    pub(super) fn try_new(val: Arc<dyn CustomConst>) -> Option<Self> {
+        let mut hasher = DefaultHasher::new();
+        val.value().try_hash(&mut hasher).then(|| {
+            HashedConst {
+                hash: hasher.finish(),
+                val
+            }
+        })
+    }
 }
 
 impl PartialEq for HashedConst {
@@ -50,47 +62,23 @@ impl From<HashedConst> for ValueKey {
 }
 
 impl ValueKey {
-    pub fn new(n: Node, k: impl CustomConst) -> Self {
-        Self::try_new(k).unwrap_or(Self::Node(n))
-    }
-
-    pub fn try_new(cst: impl CustomConst) -> Option<Self> {
-        let mut hasher = DefaultHasher::new();
-        cst.try_hash(&mut hasher).then(|| {
-            Self::Const(HashedConst {
-                hash: hasher.finish(),
-                val: Arc::new(cst),
-            })
-        })
-    }
-
-    fn field(self, i: usize) -> Self {
+    pub(super) fn field(self, i: usize) -> Self {
         Self::Field(i, Box::new(self))
     }
 }
 
 #[derive(Clone, Debug)]
-pub struct ValueHandle(ValueKey, Arc<Either<OpaqueValue, Box<Hugr>>>);
+pub struct ValueHandle(pub(super) ValueKey, pub(super) Either<Arc<dyn CustomConst>, Arc<Hugr>>);
 
 impl ValueHandle {
-    pub fn new(key: ValueKey, value: Value) -> PartialValue<Self> {
-        match value {
-            Value::Extension { e } => PartialValue::Value(Self(key, Arc::new(Either::Left(e)))),
-            Value::Function { hugr } => {
-                PartialValue::Value(Self(key, Arc::new(Either::Right(hugr))))
-            }
-            Value::Sum(sum) => PartialValue::new_variant(
-                sum.tag,
-                sum.values
-                    .into_iter()
-                    .enumerate()
-                    .map(|(i, v)| Self::new(key.clone().field(i), v)),
-            ),
-        }
+    pub fn new_opaque(node: Node, fields: &[usize], val: OpaqueValue) -> Self {
+        let arc: Arc<dyn CustomConst> = Box::<dyn CustomConst>::from(val).into();
+        let key = HashedConst::try_new(arc.clone()).map_or(ValueKey::Node(node), ValueKey::Const);
+        Self(fields.iter().fold(key, |k,i| k.field(*i)), Either::Left(arc))
     }
 
     pub fn get_type(&self) -> Type {
-        match &*self.1 {
+        match &self.1 {
             Either::Left(e) => e.get_type(),
             Either::Right(bh) => Type::new_function(bh.inner_function_type().unwrap()),
         }
