@@ -15,7 +15,7 @@ use hugr_core::{
 use hugr_core::{Hugr, Wire};
 use rstest::{fixture, rstest};
 
-use super::{AbstractValue, DFContext, Machine, PartialValue, TailLoopTermination};
+use super::{AbstractValue, ConstLoader, DFContext, Machine, PartialValue, TailLoopTermination};
 
 // ------- Minimal implementation of DFContext and AbstractValue -------
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -25,6 +25,7 @@ impl AbstractValue for Void {}
 
 struct TestContext;
 
+impl ConstLoader<Void> for TestContext {}
 impl DFContext<Void> for TestContext {}
 
 // This allows testing creation of tuple/sum Values (only)
