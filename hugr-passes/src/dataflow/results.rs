@@ -1,75 +1,23 @@
 use std::collections::HashMap;
 
 use hugr_core::{ops::Value, types::ConstTypeError, HugrView, IncomingPort, Node, PortIndex, Wire};
-use itertools::Itertools;
 
-use super::{datalog::AscentProgram, AbstractValue, DFContext, PartialValue};
+use super::{AbstractValue, PartialValue};
 
-/// Basic structure for performing an analysis. Usage:
-/// 1. Get a new instance via [Self::default()]
-/// 2. (Optionally / for tests) zero or more [Self::prepopulate_wire] with initial values
-/// 3. Call [Self::run] to produce [AnalysisResults] which can be inspected via
-///    [read_out_wire](AnalysisResults::read_out_wire)
-pub struct Machine<V: AbstractValue, C: DFContext<V>>(AscentProgram<V, C>);
-
-/// Results of a dataflow analysis.
-pub struct AnalysisResults<V: AbstractValue, C: DFContext<V>>(
-    AscentProgram<V, C>, // Already run
-    HashMap<Wire, PartialValue<V>>,
-);
-
-/// derived-Default requires the context to be Defaultable, which is unnecessary
-impl<V: AbstractValue, C: DFContext<V>> Default for Machine<V, C> {
-    fn default() -> Self {
-        Self(Default::default())
-    }
+/// Results of a dataflow analysis, packaged with the Hugr for easy inspection.
+/// Methods allow inspection, specifically [read_out_wire](Self::read_out_wire).
+pub struct AnalysisResults<V: AbstractValue, H: HugrView> {
+    pub(super) hugr: H,
+    pub(super) in_wire_value: Vec<(Node, IncomingPort, PartialValue<V>)>,
+    pub(super) case_reachable: Vec<(Node, Node)>,
+    pub(super) bb_reachable: Vec<(Node, Node)>,
+    pub(super) out_wire_values: HashMap<Wire, PartialValue<V>>,
 }
 
-impl<V: AbstractValue, C: DFContext<V>> Machine<V, C> {
-    /// Provide initial values for some wires.
-    // Likely for test purposes only - should we make non-pub or #[cfg(test)] ?
-    pub fn prepopulate_wire(&mut self, h: &impl HugrView, wire: Wire, value: PartialValue<V>) {
-        self.0.in_wire_value_proto.extend(
-            h.linked_inputs(wire.node(), wire.source())
-                .map(|(n, inp)| (n, inp, value.clone())),
-        );
-    }
-
-    /// Run the analysis (iterate until a lattice fixpoint is reached),
-    /// given initial values for some of the root node inputs.
-    /// (Note that `in_values` will not be useful for `Case` or `DFB`-rooted Hugrs,
-    /// but should handle other containers.)
-    /// The context passed in allows interpretation of leaf operations.
-    pub fn run(
-        mut self,
-        context: C,
-        in_values: impl IntoIterator<Item = (IncomingPort, PartialValue<V>)>,
-    ) -> AnalysisResults<V, C> {
-        let root = context.root();
-        self.0
-            .in_wire_value_proto
-            .extend(in_values.into_iter().map(|(p, v)| (root, p, v)));
-        self.0.context.push((context,));
-        self.0.run();
-        let results = self
-            .0
-            .out_wire_value
-            .iter()
-            .map(|(_, n, p, v)| (Wire::new(*n, *p), v.clone()))
-            .collect();
-        AnalysisResults(self.0, results)
-    }
-}
-
-impl<V: AbstractValue, C: DFContext<V>> AnalysisResults<V, C> {
-    fn context(&self) -> &C {
-        let (c,) = self.0.context.iter().exactly_one().ok().unwrap();
-        c
-    }
-
+impl<V: AbstractValue, H: HugrView> AnalysisResults<V, H> {
     /// Gets the lattice value computed for the given wire
     pub fn read_out_wire(&self, w: Wire) -> Option<PartialValue<V>> {
-        self.1.get(&w).cloned()
+        self.out_wire_values.get(&w).cloned()
     }
 
     /// Tells whether a [TailLoop] node can terminate, i.e. whether
@@ -78,14 +26,12 @@ impl<V: AbstractValue, C: DFContext<V>> AnalysisResults<V, C> {
     ///
     /// [TailLoop]: hugr_core::ops::TailLoop
     pub fn tail_loop_terminates(&self, node: Node) -> Option<TailLoopTermination> {
-        let hugr = self.context();
-        hugr.get_optype(node).as_tail_loop()?;
-        let [_, out] = hugr.get_io(node).unwrap();
+        self.hugr.get_optype(node).as_tail_loop()?;
+        let [_, out] = self.hugr.get_io(node).unwrap();
         Some(TailLoopTermination::from_control_value(
-            self.0
-                .in_wire_value
+            self.in_wire_value
                 .iter()
-                .find_map(|(_, n, p, v)| (*n == out && p.index() == 0).then_some(v))
+                .find_map(|(n, p, v)| (*n == out && p.index() == 0).then_some(v))
                 .unwrap(),
         ))
     }
@@ -98,15 +44,13 @@ impl<V: AbstractValue, C: DFContext<V>> AnalysisResults<V, C> {
     /// [Case]: hugr_core::ops::Case
     /// [Conditional]: hugr_core::ops::Conditional
     pub fn case_reachable(&self, case: Node) -> Option<bool> {
-        let hugr = self.context();
-        hugr.get_optype(case).as_case()?;
-        let cond = hugr.get_parent(case)?;
-        hugr.get_optype(cond).as_conditional()?;
+        self.hugr.get_optype(case).as_case()?;
+        let cond = self.hugr.get_parent(case)?;
+        self.hugr.get_optype(cond).as_conditional()?;
         Some(
-            self.0
-                .case_reachable
+            self.case_reachable
                 .iter()
-                .any(|(_, cond2, case2)| &cond == cond2 && &case == case2),
+                .any(|(cond2, case2)| &cond == cond2 && &case == case2),
         )
     }
 
@@ -117,23 +61,21 @@ impl<V: AbstractValue, C: DFContext<V>> AnalysisResults<V, C> {
     /// [DataflowBlock]: hugr_core::ops::DataflowBlock
     /// [ExitBlock]: hugr_core::ops::ExitBlock
     pub fn bb_reachable(&self, bb: Node) -> Option<bool> {
-        let hugr = self.context();
-        let cfg = hugr.get_parent(bb)?; // Not really required...??
-        hugr.get_optype(cfg).as_cfg()?;
-        let t = hugr.get_optype(bb);
+        let cfg = self.hugr.get_parent(bb)?; // Not really required...??
+        self.hugr.get_optype(cfg).as_cfg()?;
+        let t = self.hugr.get_optype(bb);
         if !t.is_dataflow_block() && !t.is_exit_block() {
             return None;
         };
         Some(
-            self.0
-                .bb_reachable
+            self.bb_reachable
                 .iter()
-                .any(|(_, cfg2, bb2)| *cfg2 == cfg && *bb2 == bb),
+                .any(|(cfg2, bb2)| *cfg2 == cfg && *bb2 == bb),
         )
     }
 }
 
-impl<V: AbstractValue, C: DFContext<V>> AnalysisResults<V, C>
+impl<V: AbstractValue, H: HugrView> AnalysisResults<V, H>
 where
     Value: From<V>,
 {
@@ -151,7 +93,7 @@ where
     pub fn try_read_wire_value(&self, w: Wire) -> Result<Value, Option<ConstTypeError>> {
         let v = self.read_out_wire(w).ok_or(None)?;
         let (_, typ) = self
-            .context()
+            .hugr
             .out_value_types(w.node())
             .find(|(p, _)| *p == w.source())
             .unwrap();
