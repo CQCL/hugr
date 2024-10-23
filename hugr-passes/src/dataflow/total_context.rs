@@ -1,7 +1,7 @@
 use std::hash::Hash;
 
-use hugr_core::ops::ExtensionOp;
-use hugr_core::{ops::OpTrait, Hugr, HugrView, IncomingPort, Node, OutgoingPort, PortIndex};
+use hugr_core::ops::{DataflowOpTrait, ExtensionOp};
+use hugr_core::{Hugr, IncomingPort, Node, OutgoingPort, PortIndex};
 
 use super::partial_value::{AbstractValue, PartialValue, Sum};
 use super::DFContext;
@@ -27,14 +27,11 @@ impl<V: AbstractValue, T: TotalContext<V>> DFContext<V> for T {
     fn interpret_leaf_op(
         &self,
         node: Node,
-        e: &ExtensionOp,
+        op: &ExtensionOp,
         ins: &[PartialValue<V>],
         outs: &mut [PartialValue<V>],
     ) {
-        let op = self.get_optype(node);
-        let Some(sig) = op.dataflow_signature() else {
-            return;
-        };
+        let sig = op.signature();
         let known_ins = sig
             .input_types()
             .iter()
@@ -52,7 +49,7 @@ impl<V: AbstractValue, T: TotalContext<V>> DFContext<V> for T {
                 Some((IncomingPort::from(i), v))
             })
             .collect::<Vec<_>>();
-        for (p, v) in self.interpret_leaf_op(node, e, &known_ins) {
+        for (p, v) in self.interpret_leaf_op(node, op, &known_ins) {
             outs[p.index()] = v;
         }
     }
