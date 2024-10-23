@@ -1,7 +1,5 @@
-use std::hash::Hash;
-
 use hugr_core::ops::{DataflowOpTrait, ExtensionOp};
-use hugr_core::{Hugr, IncomingPort, Node, OutgoingPort, PortIndex};
+use hugr_core::{IncomingPort, Node, OutgoingPort, PortIndex};
 
 use super::partial_value::{AbstractValue, PartialValue, Sum};
 use super::DFContext;
@@ -9,7 +7,7 @@ use super::DFContext;
 /// A simpler interface like [DFContext] but where the context only cares about
 /// values that are completely known (in the lattice `V`) rather than partially
 /// (e.g. no [PartialSum]s of more than one variant, no top/bottom)
-pub trait TotalContext<V>: Clone + Eq + Hash + std::ops::Deref<Target = Hugr> {
+pub trait TotalContext<V> {
     /// Representation of a (single, non-partial) value usable for interpretation
     type InterpretableVal: From<V> + TryFrom<Sum<Self::InterpretableVal>>;
 
