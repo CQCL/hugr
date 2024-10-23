@@ -1,7 +1,7 @@
 use ascent::lattice::BoundedLattice;
 use ascent::Lattice;
-use hugr_core::ops::Value;
-use hugr_core::types::{ConstTypeError, SumType, Type, TypeEnum, TypeRow};
+use hugr_core::ops::constant::SumOf;
+use hugr_core::types::{Type, TypeEnum, TypeRow};
 use itertools::{zip_eq, Itertools};
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -31,22 +31,9 @@ pub trait AbstractValue: Clone + std::fmt::Debug + PartialEq + Eq + Hash {
     }
 }
 
-/// Represents a sum with a single/known tag, abstracted over the representation of the elements.
-/// (Identical to [Sum](hugr_core::ops::constant::Sum) except for the type abstraction.)
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Sum<V> {
-    /// The tag index of the variant.
-    pub tag: usize,
-    /// The value of the variant.
-    ///
-    /// Sum variants are always a row of values, hence the Vec.
-    pub values: Vec<V>,
-    /// The full type of the Sum, including the other variants.
-    pub st: SumType,
-}
-
-/// A representation of a value of [SumType], that may have one or more possible tags,
-/// with a [PartialValue] representation of each element-value of each possible tag.
+/// A representation of a value of [SumType](hugr_core::types::SumType), that may have
+/// one or more possible tags, with a [PartialValue] representation of each element-value
+/// of each possible tag.
 #[derive(PartialEq, Clone, Eq)]
 pub struct PartialSum<V>(pub HashMap<usize, Vec<PartialValue<V>>>);
 
@@ -57,8 +44,8 @@ impl<V> PartialSum<V> {
         Self(HashMap::from([(tag, Vec::from_iter(values))]))
     }
 
-    /// The number of possible variants we know about. (NOT the number
-    /// of tags possible for the value's type, whatever [SumType] that might be.)
+    /// The number of possible variants we know about. (NOT the number of tags possible
+    /// for the value's type, whatever [SumType](hugr_core::types::SumType) that might be.)
     pub fn num_variants(&self) -> usize {
         self.0.len()
     }
@@ -141,14 +128,14 @@ impl<V: AbstractValue> PartialSum<V> {
         self.0.contains_key(&tag)
     }
 
-    /// Turns this instance into a [Sum] if it has exactly one possible tag,
+    /// Turns this instance into a [SumOf] if it has exactly one possible tag,
     /// otherwise failing and returning itself back unmodified (also if there is another
     /// error, e.g. this instance is not described by `typ`).
     // ALAN is this too parametric? Should we fix V2 == Value? Is the 'Self' error useful (no?)
-    pub fn try_into_value<V2: From<V> + TryFrom<Sum<V2>>>(
+    pub fn try_into_value<V2: From<V> + TryFrom<SumOf<V2>>>(
         self,
         typ: &Type,
-    ) -> Result<Sum<V2>, Self> {
+    ) -> Result<SumOf<V2>, Self> {
         let Ok((k, v)) = self.0.iter().exactly_one() else {
             Err(self)?
         };
@@ -169,10 +156,10 @@ impl<V: AbstractValue> PartialSum<V> {
             .map(|(v, t)| v.clone().try_into_value(t))
             .collect::<Result<Vec<_>, _>>()
         {
-            Ok(values) => Ok(Sum {
+            Ok(values) => Ok(SumOf {
                 tag: *k,
                 values,
-                st: st.clone(),
+                sum_type: st.clone(),
             }),
             Err(_) => Err(self),
         }
@@ -303,10 +290,10 @@ impl<V: AbstractValue> PartialValue<V> {
 
     /// Extracts a value (in any representation supporting both leaf values and sums)
     // ALAN is this too parametric? Should we fix V2 == Value? Is the error useful (should we have 'Self') or is it a smell?
-    pub fn try_into_value<V2: From<V> + TryFrom<Sum<V2>>>(
+    pub fn try_into_value<V2: From<V> + TryFrom<SumOf<V2>>>(
         self,
         typ: &Type,
-    ) -> Result<V2, Option<<V2 as TryFrom<Sum<V2>>>::Error>> {
+    ) -> Result<V2, Option<<V2 as TryFrom<SumOf<V2>>>::Error>> {
         match self {
             Self::Value(v) => Ok(V2::from(v.clone())),
             Self::PartialSum(ps) => {
@@ -315,14 +302,6 @@ impl<V: AbstractValue> PartialValue<V> {
             }
             _ => Err(None),
         }
-    }
-}
-
-impl TryFrom<Sum<Value>> for Value {
-    type Error = ConstTypeError;
-
-    fn try_from(value: Sum<Value>) -> Result<Self, Self::Error> {
-        Self::sum(value.tag, value.values, value.st)
     }
 }
 

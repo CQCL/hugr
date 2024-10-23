@@ -10,7 +10,7 @@ use hugr_core::types::TypeArg;
 pub use results::{AnalysisResults, TailLoopTermination};
 
 mod partial_value;
-pub use partial_value::{AbstractValue, PartialSum, PartialValue, Sum};
+pub use partial_value::{AbstractValue, PartialSum, PartialValue};
 
 use hugr_core::ops::{constant::CustomConst, ExtensionOp, Value};
 use hugr_core::{Hugr, Node};

@@ -13,6 +13,7 @@ use crate::{Hugr, HugrView};
 
 use delegate::delegate;
 use itertools::Itertools;
+use serde::de::Error;
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 use thiserror::Error;
@@ -115,20 +116,41 @@ struct SerialSum {
     sum_type: Option<SumType>,
 }
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-#[serde(try_from = "SerialSum")]
-#[serde(into = "SerialSum")]
-/// A Sum variant, with a tag indicating the index of the variant and its
-/// value.
-pub struct Sum {
+/// A Sum variant, with a single tag, abstracted over the type of the elements.
+/// Outside of [hugr-passes::dataflow], clients will generally want to use [Sum].
+#[derive(Debug, Clone, PartialEq)]
+pub struct SumOf<V> {
     /// The tag index of the variant.
     pub tag: usize,
     /// The value of the variant.
     ///
     /// Sum variants are always a row of values, hence the Vec.
-    pub values: Vec<Value>,
+    pub values: Vec<V>,
     /// The full type of the Sum, including the other variants.
     pub sum_type: SumType,
+}
+
+/// A Sum variant, with a tag indicating the index of the variant and its
+/// value.
+pub type Sum = SumOf<Value>;
+
+impl<'de> Deserialize<'de> for Sum {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let ss = SerialSum::deserialize(deserializer)?;
+        Sum::try_from(ss).map_err(D::Error::custom)
+    }
+}
+
+impl<'a> serde::Serialize for Sum {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        SerialSum::from(self.clone()).serialize(serializer)
+    }
 }
 
 impl Sum {
@@ -548,6 +570,14 @@ where
 {
     fn from(value: T) -> Self {
         Self::extension(value)
+    }
+}
+
+impl TryFrom<Sum> for Value {
+    type Error = ConstTypeError;
+
+    fn try_from(value: Sum) -> Result<Self, Self::Error> {
+        Self::sum(value.tag, value.values, value.sum_type)
     }
 }
 
