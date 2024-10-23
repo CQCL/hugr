@@ -295,6 +295,20 @@ fn propagate_leaf_op<V: AbstractValue>(
                 c.value_from_const(n, const_val),
             ))
         }
+        OpType::LoadFunction(load_op) => {
+            assert!(ins.is_empty()); // static edge
+            let func_node = hugr
+                .single_linked_output(n, load_op.function_port())
+                .unwrap()
+                .0;
+            // Node could be a FuncDefn or a FuncDecl, so do not pass the node itself
+            Some(ValueRow::single_known(
+                1,
+                0,
+                c.value_from_function(func_node, &load_op.type_args)
+                    .map_or(PV::Top, PV::Value),
+            ))
+        }
         OpType::ExtensionOp(e) => {
             // Interpret op. Default is we know nothing about the outputs (they still happen!)
             let mut outs = vec![PartialValue::Top; num_outs];

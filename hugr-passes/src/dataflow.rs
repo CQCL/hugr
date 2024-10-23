@@ -6,6 +6,7 @@ pub use datalog::Machine;
 mod value_row;
 
 mod results;
+use hugr_core::types::TypeArg;
 pub use results::{AnalysisResults, TailLoopTermination};
 
 mod partial_value;
@@ -56,6 +57,12 @@ pub trait DFContext<V> {
     /// Produces an abstract value from a Hugr in a [Value::Function], if possible.
     /// The default just returns `None`, which will be interpreted as [PartialValue::Top].
     fn value_from_const_hugr(&self, _node: Node, _fields: &[usize], _h: &Hugr) -> Option<V> {
+        None
+    }
+
+    /// Produces an abstract value from a [FuncDefn] or [FuncDecl] node, if possible.
+    /// The default just returns `None`, which will be interpreted as [PartialValue::Top].
+    fn value_from_function(&self, _node: Node, _type_args: &[TypeArg]) -> Option<V> {
         None
     }
 }
