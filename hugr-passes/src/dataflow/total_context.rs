@@ -2,7 +2,7 @@ use hugr_core::ops::{DataflowOpTrait, ExtensionOp};
 use hugr_core::{IncomingPort, Node, OutgoingPort, PortIndex};
 
 use super::partial_value::{AbstractValue, PartialValue, Sum};
-use super::DFContext;
+use super::{ConstLoader, DFContext};
 
 /// A simpler interface like [DFContext] but where the context only cares about
 /// values that are completely known (in the lattice `V`) rather than partially
@@ -21,7 +21,7 @@ pub trait TotalContext<V> {
     ) -> Vec<(OutgoingPort, PartialValue<V>)>;
 }
 
-impl<V: AbstractValue, T: TotalContext<V>> DFContext<V> for T {
+impl<V: AbstractValue, T: TotalContext<V> + ConstLoader<V>> DFContext<V> for T {
     fn interpret_leaf_op(
         &self,
         node: Node,
