@@ -17,7 +17,7 @@ use hugr_core::{Hugr, Node};
 
 /// Clients of the dataflow framework (particular analyses, such as constant folding)
 /// must implement this trait (including providing an appropriate domain type `V`).
-pub trait DFContext<V> {
+pub trait DFContext<V>: ConstLoader<V> {
     /// Given lattice values for each input, update lattice values for the (dataflow) outputs.
     /// For extension ops only, excluding [MakeTuple] and [UnpackTuple].
     /// `_outs` is an array with one element per dataflow output, each initialized to [PartialValue::Top]
@@ -34,7 +34,12 @@ pub trait DFContext<V> {
         _outs: &mut [PartialValue<V>],
     ) {
     }
+}
 
+/// Trait for loading [PartialValue]s from constants in a Hugr. The default
+/// traverses [Sum](Value::Sum) constants to their non-Sum leaves but represents
+/// each leaf as [PartialValue::Top].
+pub trait ConstLoader<V> {
     /// Produces an abstract value from a constant. The default impl
     /// traverses the constant [Value] to its leaves ([Value::Extension] and [Value::Function]),
     /// converts these using [Self::value_from_custom_const] and [Self::value_from_const_hugr],
@@ -73,7 +78,7 @@ pub trait DFContext<V> {
 }
 
 fn traverse_value<V>(
-    s: &(impl DFContext<V> + ?Sized),
+    s: &(impl ConstLoader<V> + ?Sized),
     n: Node,
     fields: &mut Vec<usize>,
     cst: &Value,
