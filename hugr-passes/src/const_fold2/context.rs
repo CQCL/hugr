@@ -1,11 +1,8 @@
-use std::sync::Arc;
-
 use hugr_core::ops::constant::OpaqueValue;
 use hugr_core::ops::{ExtensionOp, Value};
 use hugr_core::{IncomingPort, Node, OutgoingPort};
-use itertools::Either;
 
-use super::value_handle::{HashedConst, ValueHandle, ValueKey};
+use super::value_handle::ValueHandle;
 use crate::dataflow::{ConstLoader, PartialValue, TotalContext};
 
 /// A [context](crate::dataflow::DFContext) that uses [ValueHandle]s
@@ -18,23 +15,38 @@ pub struct ConstFoldContext;
 
 impl ConstLoader<ValueHandle> for ConstFoldContext {
     fn value_from_opaque(
-            &self,
-            node: Node,
-            fields: &[usize],
-            val: &OpaqueValue
+        &self,
+        node: Node,
+        fields: &[usize],
+        val: &OpaqueValue,
     ) -> Option<ValueHandle> {
         Some(ValueHandle::new_opaque(node, fields, val.clone()))
     }
 
-    fn value_from_const_hugr(&self, node: Node, fields: &[usize], h: &hugr_core::Hugr) -> Option<ValueHandle> {
-        Some(ValueHandle(fields.iter().fold(ValueKey::Node(node), |k,i|k.field(*i)), Either::Right(Arc::new(h.clone()))))
+    fn value_from_const_hugr(
+        &self,
+        node: Node,
+        fields: &[usize],
+        h: &hugr_core::Hugr,
+    ) -> Option<ValueHandle> {
+        Some(ValueHandle::new_const_hugr(
+            node,
+            fields,
+            Box::new(h.clone()),
+        ))
     }
 
-    fn value_from_function(&self, _node: Node, _type_args: &[hugr_core::types::TypeArg]) -> Option<ValueHandle> {
-        
+    fn value_from_function(
+        &self,
+        node: Node,
+        type_args: &[hugr_core::types::TypeArg],
+    ) -> Option<ValueHandle> {
+        Some(ValueHandle::new_function(
+            node,
+            type_args.into_iter().cloned(),
+        ))
     }
 }
-
 
 impl TotalContext<ValueHandle> for ConstFoldContext {
     type InterpretableVal = Value;
@@ -48,7 +60,7 @@ impl TotalContext<ValueHandle> for ConstFoldContext {
         let ins = ins.iter().map(|(p, v)| (*p, v.clone())).collect::<Vec<_>>();
         op.constant_fold(&ins).map_or(Vec::new(), |outs| {
             outs.into_iter()
-                .map(|(p, v)| (p, ValueHandle::new(ValueKey::Node(n), v)))
+                .map(|(p, v)| (p, self.value_from_const(n, &v)))
                 .collect()
         })
     }

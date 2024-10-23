@@ -2,35 +2,33 @@ use std::collections::hash_map::DefaultHasher; // Moves into std::hash in Rust 1
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
-use hugr_core::ops::constant::{CustomConst, OpaqueValue};
+use hugr_core::ops::constant::OpaqueValue;
 use hugr_core::ops::Value;
-use hugr_core::types::Type;
-use hugr_core::{Hugr, HugrView, Node};
+use hugr_core::types::TypeArg;
+use hugr_core::{Hugr, Node};
 use itertools::Either;
 
-use crate::dataflow::{AbstractValue, PartialValue};
+use crate::dataflow::AbstractValue;
 
 #[derive(Clone, Debug)]
 pub struct HashedConst {
     hash: u64,
-    pub(super) val: Arc<dyn CustomConst>,
+    pub(super) val: Arc<OpaqueValue>,
 }
 
 impl HashedConst {
-    pub(super) fn try_new(val: Arc<dyn CustomConst>) -> Option<Self> {
+    pub(super) fn try_new(val: Arc<OpaqueValue>) -> Option<Self> {
         let mut hasher = DefaultHasher::new();
-        val.value().try_hash(&mut hasher).then(|| {
-            HashedConst {
-                hash: hasher.finish(),
-                val
-            }
+        val.value().try_hash(&mut hasher).then(|| HashedConst {
+            hash: hasher.finish(),
+            val,
         })
     }
 }
 
 impl PartialEq for HashedConst {
     fn eq(&self, other: &Self) -> bool {
-        self.hash == other.hash && self.val.equal_consts(other.val.as_ref())
+        self.hash == other.hash && self.val.value().equal_consts(other.val.value())
     }
 }
 
@@ -43,45 +41,41 @@ impl Hash for HashedConst {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum ValueKey {
-    Field(usize, Box<ValueKey>),
-    Const(HashedConst),
+enum NodePart {
+    Field(usize, Box<NodePart>),
     Node(Node),
 }
 
-impl From<Node> for ValueKey {
-    fn from(n: Node) -> Self {
-        Self::Node(n)
-    }
-}
-
-impl From<HashedConst> for ValueKey {
-    fn from(value: HashedConst) -> Self {
-        Self::Const(value)
-    }
-}
-
-impl ValueKey {
-    pub(super) fn field(self, i: usize) -> Self {
-        Self::Field(i, Box::new(self))
+impl NodePart {
+    fn new(node: Node, fields: &[usize]) -> Self {
+        fields
+            .iter()
+            .fold(Self::Node(node), |k, i| Self::Field(*i, Box::new(k)))
     }
 }
 
 #[derive(Clone, Debug)]
-pub struct ValueHandle(pub(super) ValueKey, pub(super) Either<Arc<dyn CustomConst>, Arc<Hugr>>);
+pub enum ValueHandle {
+    Hashable(HashedConst),
+    Unhashable(NodePart, Either<Arc<OpaqueValue>, Arc<Hugr>>),
+    Function(Node, Vec<TypeArg>),
+}
 
 impl ValueHandle {
     pub fn new_opaque(node: Node, fields: &[usize], val: OpaqueValue) -> Self {
-        let arc: Arc<dyn CustomConst> = Box::<dyn CustomConst>::from(val).into();
-        let key = HashedConst::try_new(arc.clone()).map_or(ValueKey::Node(node), ValueKey::Const);
-        Self(fields.iter().fold(key, |k,i| k.field(*i)), Either::Left(arc))
+        let arc = Arc::new(val);
+        HashedConst::try_new(arc.clone()).map_or(
+            Self::Unhashable(NodePart::new(node, fields), Either::Left(arc)),
+            Self::Hashable,
+        )
     }
 
-    pub fn get_type(&self) -> Type {
-        match &self.1 {
-            Either::Left(e) => e.get_type(),
-            Either::Right(bh) => Type::new_function(bh.inner_function_type().unwrap()),
-        }
+    pub fn new_const_hugr(node: Node, fields: &[usize], val: Box<Hugr>) -> Self {
+        Self::Unhashable(NodePart::new(node, fields), Either::Right(Arc::from(val)))
+    }
+
+    pub fn new_function(node: Node, type_args: impl IntoIterator<Item = TypeArg>) -> Self {
+        Self::Function(node, type_args.into_iter().collect())
     }
 }
 
@@ -89,16 +83,19 @@ impl AbstractValue for ValueHandle {}
 
 impl PartialEq for ValueHandle {
     fn eq(&self, other: &Self) -> bool {
-        // If the keys are equal, we return true since the values must have the
-        // same provenance, and so be equal. If the keys are different but the
-        // values are equal, we could return true if we didn't impl Eq, but
-        // since we do impl Eq, the Hash contract prohibits us from having equal
-        // values with different hashes.
-        let r = self.0 == other.0;
-        if r {
-            debug_assert_eq!(self.get_type(), other.get_type());
+        match (self, other) {
+            (Self::Function(n1, args1), Self::Function(n2, args2)) => n1 == n2 && args1 == args2,
+            (Self::Hashable(h1), Self::Hashable(h2)) => h1 == h2,
+            (Self::Unhashable(k1, _), Self::Unhashable(k2, _)) => {
+                // If the keys are equal, we return true since the values must have the
+                // same provenance, and so be equal. If the keys are different but the
+                // values are equal, we could return true if we didn't impl Eq, but
+                // since we do impl Eq, the Hash contract prohibits us from having equal
+                // values with different hashes.
+                k1 == k2
+            }
+            _ => false,
         }
-        r
     }
 }
 
@@ -106,16 +103,37 @@ impl Eq for ValueHandle {}
 
 impl Hash for ValueHandle {
     fn hash<I: Hasher>(&self, state: &mut I) {
-        self.0.hash(state);
+        match self {
+            ValueHandle::Hashable(hc) => hc.hash(state),
+            ValueHandle::Unhashable(key, _) => key.hash(state),
+            ValueHandle::Function(node, vec) => {
+                node.hash(state);
+                vec.hash(state);
+            }
+        }
     }
 }
 
-impl From<ValueHandle> for Value {
-    fn from(value: ValueHandle) -> Self {
-        match Arc::<Either<_, _>>::unwrap_or_clone(value.1) {
-            Either::Left(e) => Value::Extension { e },
-            Either::Right(hugr) => Value::Function { hugr },
-        }
+// Unfortunately we need From<ValueHandle> for Value to be able to pass
+// Value's into interpret_leaf_op. So that probably doesn't make sense...
+impl TryFrom<ValueHandle> for Value {
+    type Error = String;
+    fn try_from(value: ValueHandle) -> Result<Self, Self::Error> {
+        Ok(match value {
+            ValueHandle::Hashable(HashedConst { val, .. })
+            | ValueHandle::Unhashable(_, Either::Left(val)) => Value::Extension {
+                e: Arc::unwrap_or_clone(val),
+            },
+            ValueHandle::Unhashable(_, Either::Right(hugr)) => {
+                Value::function(Arc::unwrap_or_clone(hugr)).map_err(|e| e.to_string())?
+            }
+            ValueHandle::Function(node, _type_args) => {
+                return Err(format!(
+                    "Function defined externally ({}) cannot be turned into Value",
+                    node
+                ))
+            }
+        })
     }
 }
 
@@ -141,18 +159,29 @@ mod test {
     fn value_key_eq() {
         let n = Node::from(portgraph::NodeIndex::new(0));
         let n2: Node = portgraph::NodeIndex::new(1).into();
-        let k1 = ValueKey::new(n, ConstString::new("foo".to_string()));
-        let k2 = ValueKey::new(n2, ConstString::new("foo".to_string()));
-        let k3 = ValueKey::new(n, ConstString::new("bar".to_string()));
+        let k1 = ValueHandle::new_opaque(n, &[], ConstString::new("foo".to_string()).into());
+        let k2 = ValueHandle::new_opaque(n2, &[], ConstString::new("foo".to_string()).into());
+        let k3 = ValueHandle::new_opaque(n, &[], ConstString::new("bar".to_string()).into());
 
-        assert_eq!(k1, k2); // Node ignored
+        assert_eq!(k1, k2); // Node ignored as constant is hashable
         assert_ne!(k1, k3);
 
-        assert_eq!(ValueKey::from(n), ValueKey::from(n));
+        // Hashable vs Unhashable is not equal (even with same key):
         let f = ConstF64::new(std::f64::consts::PI);
-        assert_eq!(ValueKey::new(n, f.clone()), ValueKey::from(n));
+        assert_ne!(ValueHandle::new_opaque(n, &[], f.into()), k1);
+        assert_ne!(k1, ValueHandle::new_opaque(n, &[], f.into()));
 
-        assert_ne!(ValueKey::new(n, f.clone()), ValueKey::new(n2, f)); // Node taken into account
+        // Unhashable vals are compared only by key, not content
+        let f2 = ConstF64::new(std::f64::consts::E);
+        assert_eq!(
+            ValueKey::new_opaque(n, &[], f),
+            ValueKey::new_opaque(n, &[], f2)
+        );
+        assert_ne!(
+            ValueKey::new_opaque(n, &[], f),
+            ValueKey::new_opaque(n2, &[], f)
+        );
+
         let k4 = ValueKey::from(n);
         let k5 = ValueKey::from(n);
         let k6: ValueKey = ValueKey::from(n2);
