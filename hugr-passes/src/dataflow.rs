@@ -60,8 +60,13 @@ pub trait DFContext<V> {
         None
     }
 
-    /// Produces an abstract value from a [FuncDefn] or [FuncDecl] node, if possible.
+    /// Produces an abstract value from a [FuncDefn] or [FuncDecl] node (that has been loaded
+    /// via a [LoadFunction]), if possible.
     /// The default just returns `None`, which will be interpreted as [PartialValue::Top].
+    ///
+    /// [FuncDefn]: hugr_core::ops::FuncDefn
+    /// [FuncDecl]: hugr_core::ops::FuncDecl
+    /// [LoadFunction]: hugr_core::ops::LoadFunction
     fn value_from_function(&self, _node: Node, _type_args: &[TypeArg]) -> Option<V> {
         None
     }
