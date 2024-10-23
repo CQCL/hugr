@@ -6,14 +6,15 @@ pub use datalog::Machine;
 mod value_row;
 
 mod results;
-use hugr_core::types::TypeArg;
 pub use results::{AnalysisResults, TailLoopTermination};
 
 mod partial_value;
 pub use partial_value::{AbstractValue, PartialSum, PartialValue, Sum};
 
-use hugr_core::ops::{constant::CustomConst, ExtensionOp, Value};
 use hugr_core::{Hugr, Node};
+use hugr_core::ops::{ExtensionOp, Value};
+use hugr_core::ops::constant::OpaqueValue;
+use hugr_core::types::TypeArg;
 
 /// Clients of the dataflow framework (particular analyses, such as constant folding)
 /// must implement this trait (including providing an appropriate domain type `V`).
@@ -48,13 +49,13 @@ pub trait ConstLoader<V> {
         traverse_value(self, n, &mut Vec::new(), cst)
     }
 
-    /// Produces an abstract value from a [CustomConst], if possible.
+    /// Produces an abstract value from an [OpaqueValue], if possible.
     /// The default just returns `None`, which will be interpreted as [PartialValue::Top].
-    fn value_from_custom_const(
+    fn value_from_opaque(
         &self,
         _node: Node,
         _fields: &[usize],
-        _cc: &dyn CustomConst,
+        _val: &OpaqueValue,
     ) -> Option<V> {
         None
     }
@@ -94,7 +95,7 @@ fn traverse_value<V>(
             PartialValue::new_variant(*tag, elems)
         }
         Value::Extension { e } => s
-            .value_from_custom_const(n, fields, e.value())
+            .value_from_opaque(n, fields, e)
             .map(PartialValue::from)
             .unwrap_or(PartialValue::Top),
         Value::Function { hugr } => s
