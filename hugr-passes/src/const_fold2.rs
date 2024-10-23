@@ -4,4 +4,4 @@
 // These are pub because this "example" is used for testing the framework.
 mod context;
 pub mod value_handle;
-pub use context::HugrValueContext;
+pub use context::ConstFoldContext;
