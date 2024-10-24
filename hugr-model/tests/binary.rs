@@ -46,3 +46,8 @@ pub fn test_loop() {
 pub fn test_params() {
     binary_roundtrip(include_str!("fixtures/model-params.edn"));
 }
+
+#[test]
+pub fn test_decl_exts() {
+    binary_roundtrip(include_str!("fixtures/model-decl-exts.edn"));
+}
