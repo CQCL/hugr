@@ -14,45 +14,35 @@ pub fn binary_roundtrip(input: &str) {
 
 #[test]
 pub fn test_add() {
-    binary_roundtrip(include_str!("../../hugr-core/tests/fixtures/model-add.edn"));
+    binary_roundtrip(include_str!("fixtures/model-add.edn"));
 }
 
 #[test]
 pub fn test_alias() {
-    binary_roundtrip(include_str!(
-        "../../hugr-core/tests/fixtures/model-alias.edn"
-    ));
+    binary_roundtrip(include_str!("fixtures/model-alias.edn"));
 }
 
 #[test]
 pub fn test_call() {
-    binary_roundtrip(include_str!(
-        "../../hugr-core/tests/fixtures/model-call.edn"
-    ));
+    binary_roundtrip(include_str!("fixtures/model-call.edn"));
 }
 
 #[test]
 pub fn test_cfg() {
-    binary_roundtrip(include_str!("../../hugr-core/tests/fixtures/model-cfg.edn"));
+    binary_roundtrip(include_str!("fixtures/model-cfg.edn"));
 }
 
 #[test]
 pub fn test_cond() {
-    binary_roundtrip(include_str!(
-        "../../hugr-core/tests/fixtures/model-cond.edn"
-    ));
+    binary_roundtrip(include_str!("fixtures/model-cond.edn"));
 }
 
 #[test]
 pub fn test_loop() {
-    binary_roundtrip(include_str!(
-        "../../hugr-core/tests/fixtures/model-loop.edn"
-    ));
+    binary_roundtrip(include_str!("fixtures/model-loop.edn"));
 }
 
 #[test]
 pub fn test_params() {
-    binary_roundtrip(include_str!(
-        "../../hugr-core/tests/fixtures/model-params.edn"
-    ));
+    binary_roundtrip(include_str!("fixtures/model-params.edn"));
 }

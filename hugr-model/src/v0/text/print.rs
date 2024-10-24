@@ -1,4 +1,4 @@
-use pretty::{Arena, DocAllocator, RefDoc};
+use pretty::{docs, Arena, DocAllocator, RefDoc};
 use std::borrow::Cow;
 
 use crate::v0::{
@@ -546,10 +546,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_term(*item_type)
             }),
             Term::Str(str) => {
-                // TODO: escape
-                self.print_text("\"");
-                self.print_text(*str);
-                self.print_text("\"");
+                self.print_string(str);
                 Ok(())
             }
             Term::StrType => {
@@ -648,8 +645,10 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
     fn print_meta(&mut self, meta: &'a [MetaItem<'a>]) -> PrintResult<()> {
         for item in meta {
             self.print_parens(|this| {
-                this.print_text("meta");
-                this.print_text(item.name);
+                this.print_group(|this| {
+                    this.print_text("meta");
+                    this.print_text(item.name);
+                });
                 this.print_term(item.value)
             })?;
         }
@@ -666,5 +665,19 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
         }
 
         Ok(())
+    }
+
+    /// Print a string literal.
+    fn print_string(&mut self, string: &'p str) {
+        // TODO: escape
+        self.docs.push(
+            docs![
+                self.arena,
+                self.arena.text("\""),
+                self.arena.text(string),
+                self.arena.text("\"")
+            ]
+            .into_doc(),
+        );
     }
 }
