@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.1](https://github.com/CQCL/hugr/compare/hugr-py-v0.9.0...hugr-py-v0.9.1) (2024-10-24)
+
+
+### Bug Fixes
+
+* **py:** allow conditional cases to be defined out of order ([#1599](https://github.com/CQCL/hugr/issues/1599)) ([583d21d](https://github.com/CQCL/hugr/commit/583d21d371320851f8608daa295ef8b723d31326))
+
 ## [0.9.0](https://github.com/CQCL/hugr/compare/hugr-py-v0.8.1...hugr-py-v0.9.0) (2024-10-14)
 
 
