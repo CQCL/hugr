@@ -31,4 +31,5 @@ workspace = true
 capnpc = "0.20.0"
 
 [dev-dependencies]
+insta.workspace = true
 pretty_assertions = "1.4.1"

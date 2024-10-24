@@ -342,6 +342,22 @@ pub enum Operation<'a> {
         /// The tag of the ADT value.
         tag: u16,
     },
+
+    /// Declaration for a term constructor.
+    ///
+    /// Nodes with this operation must be within a module region.
+    DeclareConstructor {
+        /// The declaration of the constructor.
+        decl: &'a ConstructorDecl<'a>,
+    },
+
+    /// Declaration for a operation.
+    ///
+    /// Nodes with this operation must be within a module region.
+    DeclareOperation {
+        /// The declaration of the operation.
+        decl: &'a OperationDecl<'a>,
+    },
 }
 
 /// A region in the hugr.
@@ -367,9 +383,11 @@ pub struct Region<'a> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum RegionKind {
     /// Data flow region.
-    DataFlow,
+    DataFlow = 0,
     /// Control flow region.
-    ControlFlow,
+    ControlFlow = 1,
+    /// Module region.
+    Module = 2,
 }
 
 /// A function declaration.
@@ -391,6 +409,28 @@ pub struct AliasDecl<'a> {
     /// The static parameters of the alias.
     pub params: &'a [Param<'a>],
     /// The type of the alias.
+    pub r#type: TermId,
+}
+
+/// A term constructor declaration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ConstructorDecl<'a> {
+    /// The name of the constructor to be declared.
+    pub name: &'a str,
+    /// The static parameters of the constructor.
+    pub params: &'a [Param<'a>],
+    /// The type of the constructed term.
+    pub r#type: TermId,
+}
+
+/// An operation declaration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct OperationDecl<'a> {
+    /// The name of the operation to be declared.
+    pub name: &'a str,
+    /// The static parameters of the operation.
+    pub params: &'a [Param<'a>],
+    /// The type of the operation. This must be a function type.
     pub r#type: TermId,
 }
 

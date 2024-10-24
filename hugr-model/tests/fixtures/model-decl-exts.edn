@@ -1,0 +1,13 @@
+(hugr 0)
+
+(declare-ctr array.Array
+  (param ?t type)
+  (param ?n nat)
+  type
+  (meta docs.description "Fixed size array."))
+
+(declare-operation array.Init
+  (param ?t type)
+  (param ?n nat)
+  (fn [?t] [(array.Array ?t ?n)] (ext array))
+  (meta docs.description "Initialize an array of size ?n with copies of a default value."))
