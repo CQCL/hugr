@@ -21,7 +21,7 @@ env:
 
 jobs:
 
-   miri:
+  miri:
     name: "Miri"
     runs-on: ubuntu-latest
     steps:
@@ -38,3 +38,16 @@ jobs:
         run: sudo apt-get install -y capnproto
       - name: Test with Miri
         run: cargo miri test
+
+  notify-failure:
+    uses: CQCL/hugrverse-actions/.github/workflows/slack-notifier.yml@ab/slack-notifier
+    with:
+      channel-id: 'C04SHCL4FKP'
+      slack-message: |
+        The unsoundness check for CQCL/HUGR failed. <https://github.com/CQCL/hugr/actions/runs/${{ github.run_id }}|Please investigate>.
+      # An unique identifier for the message type, to use in rate limiting.
+      message-label: "hugr-unsoundness"
+      # Rate-limit the message to once per day
+      timeout-minutes: 1440
+    secrets:
+        SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
