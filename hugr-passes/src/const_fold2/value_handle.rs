@@ -40,7 +40,7 @@ impl Hash for HashedConst {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-enum NodePart {
+pub enum NodePart {
     Field(usize, Box<NodePart>),
     Node(Node),
 }
@@ -99,42 +99,33 @@ impl Hash for ValueHandle {
         match self {
             ValueHandle::Hashable(hc) => hc.hash(state),
             ValueHandle::Unhashable(key, _) => key.hash(state),
-            ValueHandle::Function(node, vec) => {
-                node.hash(state);
-                vec.hash(state);
-            }
         }
     }
 }
 
 // Unfortunately we need From<ValueHandle> for Value to be able to pass
 // Value's into interpret_leaf_op. So that probably doesn't make sense...
-impl TryFrom<ValueHandle> for Value {
-    type Error = String;
-    fn try_from(value: ValueHandle) -> Result<Self, Self::Error> {
-        Ok(match value {
+impl From<ValueHandle> for Value {
+    fn from(value: ValueHandle) -> Self {
+        match value {
             ValueHandle::Hashable(HashedConst { val, .. })
             | ValueHandle::Unhashable(_, Either::Left(val)) => Value::Extension {
                 e: Arc::unwrap_or_clone(val),
             },
             ValueHandle::Unhashable(_, Either::Right(hugr)) => {
-                Value::function(Arc::unwrap_or_clone(hugr)).map_err(|e| e.to_string())?
+                Value::function(Arc::unwrap_or_clone(hugr))
+                    .map_err(|e| e.to_string())
+                    .unwrap()
             }
-            ValueHandle::Function(node, _type_args) => {
-                return Err(format!(
-                    "Function defined externally ({}) cannot be turned into Value",
-                    node
-                ))
-            }
-        })
+        }
     }
 }
 
 #[cfg(test)]
 mod test {
     use hugr_core::{
-        extension::prelude::ConstString,
-        ops::constant::CustomConst as _,
+        builder::{endo_sig, DFGBuilder, Dataflow, DataflowHugr},
+        extension::prelude::{ConstString, USIZE_T},
         std_extensions::{
             arithmetic::{
                 float_types::{ConstF64, FLOAT64_TYPE},
@@ -142,9 +133,7 @@ mod test {
             },
             collections::ListValue,
         },
-        types::SumType,
     };
-    use itertools::Itertools;
 
     use super::*;
 
@@ -152,44 +141,37 @@ mod test {
     fn value_key_eq() {
         let n = Node::from(portgraph::NodeIndex::new(0));
         let n2: Node = portgraph::NodeIndex::new(1).into();
-        let k1 = ValueHandle::new_opaque(n, &[], ConstString::new("foo".to_string()).into());
-        let k2 = ValueHandle::new_opaque(n2, &[], ConstString::new("foo".to_string()).into());
-        let k3 = ValueHandle::new_opaque(n, &[], ConstString::new("bar".to_string()).into());
+        let h1 = ValueHandle::new_opaque(n, &[], ConstString::new("foo".to_string()).into());
+        let h2 = ValueHandle::new_opaque(n2, &[], ConstString::new("foo".to_string()).into());
+        let h3 = ValueHandle::new_opaque(n, &[], ConstString::new("bar".to_string()).into());
 
-        assert_eq!(k1, k2); // Node ignored as constant is hashable
-        assert_ne!(k1, k3);
+        assert_eq!(h1, h2); // Node ignored as constant is hashable
+        assert_ne!(h1, h3);
 
         // Hashable vs Unhashable is not equal (even with same key):
         let f = ConstF64::new(std::f64::consts::PI);
-        assert_ne!(ValueHandle::new_opaque(n, &[], f.into()), k1);
-        assert_ne!(k1, ValueHandle::new_opaque(n, &[], f.into()));
+        let h4 = ValueHandle::new_opaque(n, &[], f.clone().into());
+        assert_ne!(h4, h1);
+        assert_ne!(h1, h4);
 
         // Unhashable vals are compared only by key, not content
         let f2 = ConstF64::new(std::f64::consts::E);
+        assert_eq!(h4, ValueHandle::new_opaque(n, &[], f2.clone().into()));
+        assert_ne!(h4, ValueHandle::new_opaque(n, &[5], f2.into()));
+
+        let h = Box::new(make_hugr(1));
+        let h5 = ValueHandle::new_const_hugr(n, &[], h.clone());
         assert_eq!(
-            ValueKey::new_opaque(n, &[], f),
-            ValueKey::new_opaque(n, &[], f2)
+            h5,
+            ValueHandle::new_const_hugr(n, &[], Box::new(make_hugr(2)))
         );
-        assert_ne!(
-            ValueKey::new_opaque(n, &[], f),
-            ValueKey::new_opaque(n2, &[], f)
-        );
+        assert_ne!(h5, ValueHandle::new_const_hugr(n2, &[], h));
+    }
 
-        let k4 = ValueKey::from(n);
-        let k5 = ValueKey::from(n);
-        let k6: ValueKey = ValueKey::from(n2);
-
-        assert_eq!(&k4, &k5);
-        assert_ne!(&k4, &k6);
-
-        let k7 = k5.clone().field(3);
-        let k4 = k4.field(3);
-
-        assert_eq!(&k4, &k7);
-
-        let k5 = k5.field(2);
-
-        assert_ne!(&k5, &k7);
+    fn make_hugr(num_wires: usize) -> Hugr {
+        let d = DFGBuilder::new(endo_sig(vec![USIZE_T; num_wires])).unwrap();
+        let inputs = d.input_wires();
+        d.finish_prelude_hugr_with_outputs(inputs).unwrap()
     }
 
     #[test]
@@ -199,41 +181,17 @@ mod test {
         let v3 = ConstF64::new(std::f64::consts::PI);
 
         let n = Node::from(portgraph::NodeIndex::new(0));
-        let n2: Node = portgraph::NodeIndex::new(1).into();
 
         let lst = ListValue::new(INT_TYPES[0].clone(), [v1.into(), v2.into()]);
-        assert_eq!(ValueKey::new(n, lst.clone()), ValueKey::new(n2, lst));
+        assert_eq!(
+            ValueHandle::new_opaque(n, &[], lst.clone().into()),
+            ValueHandle::new_opaque(n, &[1], lst.into())
+        );
 
         let lst = ListValue::new(FLOAT64_TYPE, [v3.into()]);
         assert_ne!(
-            ValueKey::new(n, lst.clone()),
-            ValueKey::new(n2, lst.clone())
+            ValueHandle::new_opaque(n, &[], lst.clone().into()),
+            ValueHandle::new_opaque(n, &[3], lst.into())
         );
-    }
-
-    #[test]
-    fn value_handle_eq() {
-        let k_i = ConstInt::new_u(4, 2).unwrap();
-        let st = SumType::new([vec![k_i.get_type()], vec![]]);
-        let subject_val = Value::sum(0, [k_i.clone().into()], st).unwrap();
-
-        let k1 = ValueKey::try_new(ConstString::new("foo".to_string())).unwrap();
-        let PartialValue::PartialSum(ps1) = ValueHandle::new(k1.clone(), subject_val.clone())
-        else {
-            panic!()
-        };
-        let (_tag, fields) = ps1.0.into_iter().exactly_one().unwrap();
-        let PartialValue::Value(vh1) = fields.into_iter().exactly_one().unwrap() else {
-            panic!()
-        };
-
-        let PartialValue::Value(v2) = ValueHandle::new(k1.clone(), Value::extension(k_i).into())
-        else {
-            panic!()
-        };
-
-        // we do not compare the value, just the key
-        assert_ne!(vh1, v2);
-        assert_eq!(vh1.1, v2.1);
     }
 }
