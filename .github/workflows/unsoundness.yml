@@ -42,7 +42,7 @@ jobs:
 
 
   notify-slack:
-    uses: CQCL/hugrverse-actions/.github/workflows/slack-notifier.yml@ab/slack-notifier
+    uses: CQCL/hugrverse-actions/.github/workflows/slack-notifier.yml@main
     needs: miri
     if: ${{ needs.miri.result == 'failure' && ( github.event_name == 'workflow_dispatch' || github.event_name == 'push' ) }}
     with:
