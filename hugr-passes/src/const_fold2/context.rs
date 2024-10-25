@@ -36,16 +36,7 @@ impl ConstLoader<ValueHandle> for ConstFoldContext {
         ))
     }
 
-    fn value_from_function(
-        &self,
-        node: Node,
-        type_args: &[hugr_core::types::TypeArg],
-    ) -> Option<ValueHandle> {
-        Some(ValueHandle::new_function(
-            node,
-            type_args.into_iter().cloned(),
-        ))
-    }
+    // Do not handle (Load)Function/value_from_function yet.
 }
 
 impl TotalContext<ValueHandle> for ConstFoldContext {

@@ -4,7 +4,6 @@ use std::sync::Arc;
 
 use hugr_core::ops::constant::OpaqueValue;
 use hugr_core::ops::Value;
-use hugr_core::types::TypeArg;
 use hugr_core::{Hugr, Node};
 use itertools::Either;
 
@@ -58,7 +57,6 @@ impl NodePart {
 pub enum ValueHandle {
     Hashable(HashedConst),
     Unhashable(NodePart, Either<Arc<OpaqueValue>, Arc<Hugr>>),
-    Function(Node, Vec<TypeArg>),
 }
 
 impl ValueHandle {
@@ -73,10 +71,6 @@ impl ValueHandle {
     pub fn new_const_hugr(node: Node, fields: &[usize], val: Box<Hugr>) -> Self {
         Self::Unhashable(NodePart::new(node, fields), Either::Right(Arc::from(val)))
     }
-
-    pub fn new_function(node: Node, type_args: impl IntoIterator<Item = TypeArg>) -> Self {
-        Self::Function(node, type_args.into_iter().collect())
-    }
 }
 
 impl AbstractValue for ValueHandle {}
@@ -84,7 +78,6 @@ impl AbstractValue for ValueHandle {}
 impl PartialEq for ValueHandle {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::Function(n1, args1), Self::Function(n2, args2)) => n1 == n2 && args1 == args2,
             (Self::Hashable(h1), Self::Hashable(h2)) => h1 == h2,
             (Self::Unhashable(k1, _), Self::Unhashable(k2, _)) => {
                 // If the keys are equal, we return true since the values must have the
