@@ -11,124 +11,20 @@ on:
   workflow_dispatch: {}
 
 jobs:
-  check-coverage:
-    runs-on: ubuntu-latest
-    outputs:
-      msg: ${{ steps.make_msg.outputs.msg }}
-      should_notify: ${{ steps.get_coverage.outputs.should_notify }}
-    steps:
-      - name: Download commit sha of the most recent successful run
-        uses: dawidd6/action-download-artifact@v6
-        with:
-          # Downloads the artifact from the most recent successful run
-          workflow: 'notify-coverage.yml'
-          name: head-sha.txt
-          if_no_artifact_found: ignore
-      - name: Get today's and last run's coverage trends from codecov
-        id: get_coverage
-        # API reference: https://docs.codecov.com/reference/repos_totals_retrieve
-        run: |
-          # Get the previous commit coverage, if the last sha is available
-          if [ ! -f head-sha.txt ]
-          then
-            echo "No previous coverage found."
-
-            # Update the head-sha.txt file with the current sha,
-            # so next time we campare against the current coverage.
-            echo ${{ github.sha }} > head-sha.txt
-
-            echo "should_notify=false"  >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          PREV_SHA=$( cat head-sha.txt )
-          echo "Previous sha: \"$PREV_SHA\""
-
-          # Check if the sha has changed
-          if [ "$PREV_SHA" == "${{ github.sha }}" ]
-          then
-            echo "No new commits since last run."
-            echo "should_notify=false"  >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          # Query the previous coverage from codecov
-          curl --request GET \
-            --url "https://api.codecov.io/api/v2/github/${{ github.repository_owner }}/repos/${{ github.event.repository.name }}/totals/?sha=$PREV_SHA" \
-            --header 'accept: application/json' \
-            --header "authorization: Bearer ${{ secrets.CODECOV_GET_TOKEN }}" \
-            > coverage-prev.json
-          cat coverage-prev.json | jq ".totals.coverage" > coverage-prev.txt
-          echo "Previous coverage query result:"
-          cat coverage-prev.json | jq "del(.files)"
-          echo
-
-          # Query the current coverage from codecov
-          curl --request GET \
-            --url "https://api.codecov.io/api/v2/github/${{ github.repository_owner }}/repos/${{ github.event.repository.name }}/totals/?sha=${{ github.sha }}" \
-            --header 'accept: application/json' \
-            --header "authorization: Bearer ${{ secrets.CODECOV_GET_TOKEN }}" \
-            > coverage.json
-          cat coverage.json | jq ".totals.coverage" > coverage.txt
-          echo "Current coverage query result:"
-          cat coverage.json | jq "del(.files)"
-          echo
-
-          echo
-          echo "Previous coverage: `cat coverage-prev.txt`%"
-          echo "Current coverage: `cat coverage.txt`%"
-
-          # A `null` in either coverage means that the coverage is not available,
-          # so we don't want to notify about that.
-          if [ "$( cat coverage-prev.txt )" == "null" ]
-          then
-            echo "Previous coverage not available."
-            echo ${{ github.sha }} > head-sha.txt
-            echo "should_notify=false"  >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          if [ "$( cat coverage.txt )" == "null" ]
-          then
-            echo "Current coverage not available."
-            # Note that we don't update the head-sha.txt file here,
-            # so next time we compare against the one that had coverage data.
-            echo "should_notify=false"  >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          echo ${{ github.sha }} > head-sha.txt
-          echo "should_notify=true"  >> "$GITHUB_OUTPUT"
-      - name: Compare with previous summary and make message
-        id: make_msg
-        if: steps.get_coverage.outputs.should_notify == 'true'
-        run: |
-          prev=`cat coverage-prev.txt`
-          current=`cat coverage.txt`
-          change=`printf "%.2f%% --> %.2f%%" $prev $current`
-          codecov="https://codecov.io/gh/${{ github.repository }}?search=&trend=7%20days"
-          if (( $(echo "$prev < $current + 0.04" | bc -l) ))
-          then
-            MSG="msg=Coverage check for hugr shows no regression (${change}). ✅ ${codecov}"
-          else
-            MSG="msg=Coverage check for hugr shows regression (${change}). ❌ ${codecov}"
-          fi
-          echo $MSG
-          echo $MSG  >> "$GITHUB_OUTPUT"
-      - name: Upload current HEAD sha
-        uses: actions/upload-artifact@v4
-        with:
-          name: head-sha.txt
-          path: head-sha.txt
+  coverage-trend:
+    uses: CQCL/hugrverse-actions/.github/workflows/coverage-trend.yml@main
+    secrets:
+        CODECOV_GET_TOKEN: ${{ secrets.CODECOV_GET_TOKEN }}
 
   notify-slack:
-    needs: check-coverage
+    needs: coverage-trend
     runs-on: ubuntu-latest
-    if: needs.check-coverage.outputs.should_notify == 'true'
+    if: needs.coverage-trend.outputs.should_notify == 'true'
     steps:
       - name: Send notification
         uses: slackapi/slack-github-action@v1.27.0
         with:
           channel-id: 'C04SHCL4FKP'
-          slack-message: ${{ needs.check-coverage.outputs.msg }}
+          slack-message: ${{ needs.coverage-trend.outputs.msg }}
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
