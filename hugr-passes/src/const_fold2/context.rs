@@ -51,7 +51,12 @@ impl TotalContext<ValueHandle> for ConstFoldContext {
         let ins = ins.iter().map(|(p, v)| (*p, v.clone())).collect::<Vec<_>>();
         op.constant_fold(&ins).map_or(Vec::new(), |outs| {
             outs.into_iter()
-                .map(|(p, v)| (p, self.value_from_const(n, &v)))
+                .map(|(p, v)| {
+                    (
+                        p,
+                        self.value_from_const(n, &v), // Hmmm, should (at least) also key by p
+                    )
+                })
                 .collect()
         })
     }
