@@ -2,22 +2,26 @@
 //! to perform constant-folding.
 
 // These are pub because this "example" is used for testing the framework.
-mod context;
+mod test;
 pub mod value_handle;
 use std::collections::{HashSet, VecDeque};
 
-pub use context::ConstFoldContext;
 use hugr_core::{
     extension::ExtensionRegistry,
-    hugr::hugrmut::HugrMut,
-    ops::{Const, LoadConstant},
-    types::EdgeKind,
+    hugr::{
+        hugrmut::HugrMut,
+        views::{DescendantsGraph, ExtractHugr, HierarchyView},
+    },
+    ops::{constant::OpaqueValue, handle::FuncID, Const, ExtensionOp, LoadConstant, Value},
+    types::{EdgeKind, TypeArg},
     HugrView, IncomingPort, Node, OutgoingPort, Wire,
 };
 use value_handle::ValueHandle;
 
 use crate::{
-    dataflow::{AnalysisResults, Machine, TailLoopTermination},
+    dataflow::{
+        AnalysisResults, ConstLoader, Machine, PartialValue, TailLoopTermination, TotalContext,
+    },
     validation::{ValidatePassError, ValidationLevel},
 };
 
@@ -28,19 +32,80 @@ pub struct ConstFoldPass {
     pub allow_skip_loops: bool,
 }
 
-struct MutRefCell<'a, H>(&'a mut H);
+struct ConstFoldContext<'a, H>(&'a mut H);
 
-impl<'a, T: HugrView> AsRef<hugr_core::Hugr> for MutRefCell<'a, T> {
+impl<'a, T: HugrView> AsRef<hugr_core::Hugr> for ConstFoldContext<'a, T> {
     fn as_ref(&self) -> &hugr_core::Hugr {
         self.0.base_hugr()
+    }
+}
+
+impl<'a, H: HugrView> ConstLoader<ValueHandle> for ConstFoldContext<'a, H> {
+    fn value_from_opaque(
+        &self,
+        node: Node,
+        fields: &[usize],
+        val: &OpaqueValue,
+    ) -> Option<ValueHandle> {
+        Some(ValueHandle::new_opaque(node, fields, val.clone()))
+    }
+
+    fn value_from_const_hugr(
+        &self,
+        node: Node,
+        fields: &[usize],
+        h: &hugr_core::Hugr,
+    ) -> Option<ValueHandle> {
+        Some(ValueHandle::new_const_hugr(
+            node,
+            fields,
+            Box::new(h.clone()),
+        ))
+    }
+
+    fn value_from_function(&self, node: Node, type_args: &[TypeArg]) -> Option<ValueHandle> {
+        if type_args.len() > 0 {
+            // TODO: substitution across Hugr (https://github.com/CQCL/hugr/issues/709)
+            return None;
+        };
+        // Returning the function body as a value, here, would be sufficient for inlining IndirectCall
+        // but not for transforming to a direct Call.
+        let func = DescendantsGraph::<FuncID<true>>::try_new(self, node).ok()?;
+        Some(ValueHandle::new_const_hugr(
+            node,
+            &[],
+            Box::new(func.extract_hugr()),
+        ))
+    }
+}
+
+impl<'a, H: HugrView> TotalContext<ValueHandle> for ConstFoldContext<'a, H> {
+    type InterpretableVal = Value;
+
+    fn interpret_leaf_op(
+        &self,
+        n: Node,
+        op: &ExtensionOp,
+        ins: &[(IncomingPort, Value)],
+    ) -> Vec<(OutgoingPort, PartialValue<ValueHandle>)> {
+        let ins = ins.iter().map(|(p, v)| (*p, v.clone())).collect::<Vec<_>>();
+        op.constant_fold(&ins).map_or(Vec::new(), |outs| {
+            outs.into_iter()
+                .map(|(p, v)| {
+                    (
+                        p,
+                        self.value_from_const(n, &v), // Hmmm, should (at least) also key by p
+                    )
+                })
+                .collect()
+        })
     }
 }
 
 impl ConstFoldPass {
     /// Run the Constant Folding pass.
     fn run_no_validate(&self, hugr: &mut impl HugrMut) -> Result<(), ValidatePassError> {
-        let ctx = ConstFoldContext(MutRefCell(hugr));
-        let results = Machine::default().run(ctx, []);
+        let results = Machine::default().run(ConstFoldContext(hugr), []);
         let mut keep_nodes = HashSet::new();
         self.find_needed_nodes(&results, results.hugr.root(), &mut keep_nodes);
 
@@ -61,7 +126,7 @@ impl ConstFoldPass {
                         let parent = results.hugr.get_parent(n).unwrap();
                         let datatype = v.get_type();
                         // We could try hash-consing identical Consts, but not ATM
-                        let hugr_mut = &mut *results.hugr.0 .0;
+                        let hugr_mut = &mut *results.hugr.0;
                         let cst = hugr_mut.add_node_with_parent(parent, Const::new(v));
                         let lcst = hugr_mut.add_node_with_parent(parent, LoadConstant { datatype });
                         hugr_mut.connect(cst, OutgoingPort::from(0), lcst, IncomingPort::from(0));
