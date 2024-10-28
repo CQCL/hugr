@@ -528,6 +528,14 @@ impl RootTagged for Hugr {
     type RootHandle = Node;
 }
 
+impl RootTagged for &Hugr {
+    type RootHandle = Node;
+}
+
+impl RootTagged for &mut Hugr {
+    type RootHandle = Node;
+}
+
 // Explicit implementation to avoid cloning the Hugr.
 impl ExtractHugr for Hugr {
     fn extract_hugr(self) -> Hugr {
@@ -545,20 +553,6 @@ impl ExtractHugr for &mut Hugr {
     fn extract_hugr(self) -> Hugr {
         self.clone()
     }
-}
-
-impl<'a, H: RootTagged> RootTagged for &'a H
-where
-    &'a H: HugrView,
-{
-    type RootHandle = H::RootHandle;
-}
-
-impl<'a, H: RootTagged> RootTagged for &'a mut H
-where
-    &'a mut H: HugrView,
-{
-    type RootHandle = H::RootHandle;
 }
 
 impl<T: AsRef<Hugr>> HugrView for T {
