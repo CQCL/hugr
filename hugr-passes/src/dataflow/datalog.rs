@@ -307,8 +307,16 @@ fn propagate_leaf_op<V: AbstractValue>(
             ))
         }
         OpType::ExtensionOp(e) => {
-            // Interpret op. Default is we know nothing about the outputs (they still happen!)
-            let mut outs = vec![PartialValue::Top; num_outs];
+            // Interpret op.
+            let init =  if ins.iter().contains(&PartialValue::Bottom) {
+                // So far we think one or more inputs can't happen.
+                // So, don't pollute outputs with Top, and wait for better knowledge of inputs.
+                PartialValue::Bottom
+            } else {
+                // If we can't figure out anything about the outputs, assume nothing (they still happen!)
+                PartialValue::Top
+            };
+            let mut outs = vec![init; num_outs];
             // It'd be nice to convert these to [(IncomingPort, Value)] to pass to the context,
             // thus keeping PartialValue hidden, but AbstractValues
             // are not necessarily convertible to Value.
