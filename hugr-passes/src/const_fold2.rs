@@ -88,54 +88,51 @@ impl ConstFoldPass {
     fn find_needed_nodes<H: HugrView>(
         &self,
         results: &AnalysisResults<ValueHandle, H>,
-        container: Node,
+        root: Node,
         needed: &mut HashSet<Node>,
     ) {
+        let mut q = VecDeque::new();
+        q.push_back(root);
         let h = &results.hugr;
-        if h.get_optype(container).is_cfg() {
-            for bb in h.children(container) {
-                if results.bb_reachable(bb).unwrap()
-                    && needed.insert(bb)
-                    && h.get_optype(bb).is_dataflow_block()
-                {
-                    self.find_needed_nodes(results, bb, needed);
-                }
-            }
-        } else {
-            // Dataflow. Find minimal nodes necessary to compute output, including StateOrder edges.
-            let [_inp, outp] = h.get_io(container).unwrap();
-            let mut q = VecDeque::new();
-            q.push_back(outp);
-            // Add on anything that might not terminate. We might also allow a custom predicate for extension ops?
-            for n in h.children(container) {
-                if h.get_optype(n).is_cfg()
-                    || (!self.allow_skip_loops
-                        && h.get_optype(n).is_tail_loop()
-                        && results.tail_loop_terminates(n).unwrap()
-                            != TailLoopTermination::NeverContinues)
-                {
-                    q.push_back(n);
-                }
-            }
-            while let Some(n) = q.pop_front() {
-                if !needed.insert(n) {
-                    continue;
-                }
-                for (src, op) in h.all_linked_outputs(n) {
-                    let needs_predecessor = match h.get_optype(src).port_kind(op).unwrap() {
-                        EdgeKind::Value(_) => {
-                            results.try_read_wire_value(Wire::new(src, op)).is_err()
-                        }
-                        EdgeKind::StateOrder | EdgeKind::Const(_) | EdgeKind::Function(_) => true,
-                        EdgeKind::ControlFlow => panic!(),
-                        _ => true, // needed for non-exhaustive; not knowing what it is, assume the worst
-                    };
-                    if needs_predecessor {
-                        q.push_back(src);
+        while let Some(n) = q.pop_front() {
+            if !needed.insert(n) {
+                continue;
+            };
+            if h.get_optype(n).is_cfg() {
+                for bb in h.children(n) {
+                    if results.bb_reachable(bb).unwrap()
+                        && needed.insert(bb)
+                        && h.get_optype(bb).is_dataflow_block()
+                    {
+                        q.push_back(bb);
                     }
                 }
-                if h.get_optype(n).is_container() {
-                    self.find_needed_nodes(results, container, needed);
+            } else if let Some(inout) = h.get_io(n) {
+                // Dataflow. Find minimal nodes necessary to compute output, including StateOrder edges.
+                q.extend(inout); // Input also necessary for legality even if unreachable
+
+                // Also add on anything that might not terminate. We might also allow a custom predicate for extension ops?
+                for ch in h.children(n) {
+                    if h.get_optype(ch).is_cfg()
+                        || (!self.allow_skip_loops
+                            && h.get_optype(ch).is_tail_loop()
+                            && results.tail_loop_terminates(ch).unwrap()
+                                != TailLoopTermination::NeverContinues)
+                    {
+                        q.push_back(ch);
+                    }
+                }
+            }
+            // Also follow dataflow demand
+            for (src, op) in h.all_linked_outputs(n) {
+                let needs_predecessor = match h.get_optype(src).port_kind(op).unwrap() {
+                    EdgeKind::Value(_) => results.try_read_wire_value(Wire::new(src, op)).is_err(),
+                    EdgeKind::StateOrder | EdgeKind::Const(_) | EdgeKind::Function(_) => true,
+                    EdgeKind::ControlFlow => panic!(),
+                    _ => true, // needed for non-exhaustive; not knowing what it is, assume the worst
+                };
+                if needs_predecessor {
+                    q.push_back(src);
                 }
             }
         }
