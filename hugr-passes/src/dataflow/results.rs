@@ -2,11 +2,11 @@ use std::collections::HashMap;
 
 use hugr_core::{ops::Value, types::ConstTypeError, HugrView, IncomingPort, Node, PortIndex, Wire};
 
-use super::{AbstractValue, DFContext, PartialValue};
+use super::{AbstractValue, PartialValue};
 
 /// Results of a dataflow analysis, packaged with the Hugr for easy inspection.
 /// Methods allow inspection, specifically [read_out_wire](Self::read_out_wire).
-pub struct AnalysisResults<V: AbstractValue, H> {
+pub struct AnalysisResults<V: AbstractValue, H: HugrView> {
     pub(super) hugr: H,
     pub(super) in_wire_value: Vec<(Node, IncomingPort, PartialValue<V>)>,
     pub(super) case_reachable: Vec<(Node, Node)>,
@@ -14,7 +14,7 @@ pub struct AnalysisResults<V: AbstractValue, H> {
     pub(super) out_wire_values: HashMap<Wire, PartialValue<V>>,
 }
 
-impl<V: AbstractValue, C: DFContext<V>> AnalysisResults<V, C> {
+impl<V: AbstractValue, H: HugrView> AnalysisResults<V, H> {
     /// Gets the lattice value computed for the given wire
     pub fn read_out_wire(&self, w: Wire) -> Option<PartialValue<V>> {
         self.out_wire_values.get(&w).cloned()
@@ -75,7 +75,7 @@ impl<V: AbstractValue, C: DFContext<V>> AnalysisResults<V, C> {
     }
 }
 
-impl<V: AbstractValue, C: DFContext<V>> AnalysisResults<V, C>
+impl<V: AbstractValue, H: HugrView> AnalysisResults<V, H>
 where
     Value: From<V>,
 {

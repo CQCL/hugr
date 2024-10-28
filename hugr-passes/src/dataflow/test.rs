@@ -25,9 +25,8 @@ impl AbstractValue for Void {}
 
 struct TestContext<H>(H);
 
-impl<H: HugrView> std::ops::Deref for TestContext<H> {
-    type Target = Hugr;
-    fn deref(&self) -> &Hugr {
+impl<H: HugrView> AsRef<Hugr> for TestContext<H> {
+    fn as_ref(&self) -> &Hugr {
         self.0.base_hugr()
     }
 }

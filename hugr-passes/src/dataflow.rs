@@ -14,11 +14,11 @@ pub use partial_value::{AbstractValue, PartialSum, PartialValue, Sum};
 use hugr_core::ops::constant::OpaqueValue;
 use hugr_core::ops::{ExtensionOp, Value};
 use hugr_core::types::TypeArg;
-use hugr_core::{Hugr, Node};
+use hugr_core::{Hugr, HugrView, Node};
 
 /// Clients of the dataflow framework (particular analyses, such as constant folding)
 /// must implement this trait (including providing an appropriate domain type `V`).
-pub trait DFContext<V>: ConstLoader<V> + std::ops::Deref<Target = Hugr> {
+pub trait DFContext<V>: ConstLoader<V> + HugrView {
     /// Given lattice values for each input, update lattice values for the (dataflow) outputs.
     /// For extension ops only, excluding [MakeTuple] and [UnpackTuple].
     /// `_outs` is an array with one element per dataflow output, each initialized to [PartialValue::Top]
