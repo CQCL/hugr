@@ -1,15 +1,11 @@
-#![cfg(test)]
-
 use hugr_core::ops::{constant::CustomConst, Value};
 use hugr_core::std_extensions::arithmetic::{float_types::ConstF64, int_types::ConstInt};
 use hugr_core::{types::SumType, Hugr, Node};
 use itertools::Itertools;
 use rstest::rstest;
 
-use crate::{
-    const_fold2::ConstFoldContext,
-    dataflow::{ConstLoader, PartialValue},
-};
+use super::ConstFoldContext;
+use crate::dataflow::{ConstLoader, PartialValue};
 
 #[rstest]
 #[case(ConstInt::new_u(4, 2).unwrap(), true)]

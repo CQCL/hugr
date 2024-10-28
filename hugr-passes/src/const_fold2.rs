@@ -2,7 +2,6 @@
 //! to perform constant-folding.
 
 // These are pub because this "example" is used for testing the framework.
-mod test;
 pub mod value_handle;
 use std::collections::{HashSet, VecDeque};
 
@@ -25,6 +24,8 @@ use crate::{
     validation::{ValidatePassError, ValidationLevel},
 };
 
+#[derive(Debug, Clone, Default)]
+/// A configuration for the Constant Folding pass.
 pub struct ConstFoldPass {
     validation: ValidationLevel,
     /// If true, allow to skip evaluating loops (whose results are not needed) even if
@@ -32,77 +33,12 @@ pub struct ConstFoldPass {
     pub allow_skip_loops: bool,
 }
 
-struct ConstFoldContext<'a, H>(&'a mut H);
-
-impl<'a, T: HugrView> AsRef<hugr_core::Hugr> for ConstFoldContext<'a, T> {
-    fn as_ref(&self) -> &hugr_core::Hugr {
-        self.0.base_hugr()
-    }
-}
-
-impl<'a, H: HugrView> ConstLoader<ValueHandle> for ConstFoldContext<'a, H> {
-    fn value_from_opaque(
-        &self,
-        node: Node,
-        fields: &[usize],
-        val: &OpaqueValue,
-    ) -> Option<ValueHandle> {
-        Some(ValueHandle::new_opaque(node, fields, val.clone()))
-    }
-
-    fn value_from_const_hugr(
-        &self,
-        node: Node,
-        fields: &[usize],
-        h: &hugr_core::Hugr,
-    ) -> Option<ValueHandle> {
-        Some(ValueHandle::new_const_hugr(
-            node,
-            fields,
-            Box::new(h.clone()),
-        ))
-    }
-
-    fn value_from_function(&self, node: Node, type_args: &[TypeArg]) -> Option<ValueHandle> {
-        if type_args.len() > 0 {
-            // TODO: substitution across Hugr (https://github.com/CQCL/hugr/issues/709)
-            return None;
-        };
-        // Returning the function body as a value, here, would be sufficient for inlining IndirectCall
-        // but not for transforming to a direct Call.
-        let func = DescendantsGraph::<FuncID<true>>::try_new(self, node).ok()?;
-        Some(ValueHandle::new_const_hugr(
-            node,
-            &[],
-            Box::new(func.extract_hugr()),
-        ))
-    }
-}
-
-impl<'a, H: HugrView> TotalContext<ValueHandle> for ConstFoldContext<'a, H> {
-    type InterpretableVal = Value;
-
-    fn interpret_leaf_op(
-        &self,
-        n: Node,
-        op: &ExtensionOp,
-        ins: &[(IncomingPort, Value)],
-    ) -> Vec<(OutgoingPort, PartialValue<ValueHandle>)> {
-        let ins = ins.iter().map(|(p, v)| (*p, v.clone())).collect::<Vec<_>>();
-        op.constant_fold(&ins).map_or(Vec::new(), |outs| {
-            outs.into_iter()
-                .map(|(p, v)| {
-                    (
-                        p,
-                        self.value_from_const(n, &v), // Hmmm, should (at least) also key by p
-                    )
-                })
-                .collect()
-        })
-    }
-}
-
 impl ConstFoldPass {
+    pub fn validation_level(mut self, level: ValidationLevel) -> Self {
+        self.validation = level;
+        self
+    }
+
     /// Run the Constant Folding pass.
     fn run_no_validate(&self, hugr: &mut impl HugrMut) -> Result<(), ValidatePassError> {
         let results = Machine::default().run(ConstFoldContext(hugr), []);
@@ -205,3 +141,81 @@ impl ConstFoldPass {
         }
     }
 }
+
+/// Exhaustively apply constant folding to a HUGR.
+pub fn constant_fold_pass<H: HugrMut>(h: &mut H, reg: &ExtensionRegistry) {
+    ConstFoldPass::default().run(h, reg).unwrap()
+}
+
+struct ConstFoldContext<'a, H>(&'a mut H);
+
+impl<'a, T: HugrView> AsRef<hugr_core::Hugr> for ConstFoldContext<'a, T> {
+    fn as_ref(&self) -> &hugr_core::Hugr {
+        self.0.base_hugr()
+    }
+}
+
+impl<'a, H: HugrView> ConstLoader<ValueHandle> for ConstFoldContext<'a, H> {
+    fn value_from_opaque(
+        &self,
+        node: Node,
+        fields: &[usize],
+        val: &OpaqueValue,
+    ) -> Option<ValueHandle> {
+        Some(ValueHandle::new_opaque(node, fields, val.clone()))
+    }
+
+    fn value_from_const_hugr(
+        &self,
+        node: Node,
+        fields: &[usize],
+        h: &hugr_core::Hugr,
+    ) -> Option<ValueHandle> {
+        Some(ValueHandle::new_const_hugr(
+            node,
+            fields,
+            Box::new(h.clone()),
+        ))
+    }
+
+    fn value_from_function(&self, node: Node, type_args: &[TypeArg]) -> Option<ValueHandle> {
+        if type_args.len() > 0 {
+            // TODO: substitution across Hugr (https://github.com/CQCL/hugr/issues/709)
+            return None;
+        };
+        // Returning the function body as a value, here, would be sufficient for inlining IndirectCall
+        // but not for transforming to a direct Call.
+        let func = DescendantsGraph::<FuncID<true>>::try_new(self, node).ok()?;
+        Some(ValueHandle::new_const_hugr(
+            node,
+            &[],
+            Box::new(func.extract_hugr()),
+        ))
+    }
+}
+
+impl<'a, H: HugrView> TotalContext<ValueHandle> for ConstFoldContext<'a, H> {
+    type InterpretableVal = Value;
+
+    fn interpret_leaf_op(
+        &self,
+        n: Node,
+        op: &ExtensionOp,
+        ins: &[(IncomingPort, Value)],
+    ) -> Vec<(OutgoingPort, PartialValue<ValueHandle>)> {
+        let ins = ins.iter().map(|(p, v)| (*p, v.clone())).collect::<Vec<_>>();
+        op.constant_fold(&ins).map_or(Vec::new(), |outs| {
+            outs.into_iter()
+                .map(|(p, v)| {
+                    (
+                        p,
+                        self.value_from_const(n, &v), // Hmmm, should (at least) also key by p
+                    )
+                })
+                .collect()
+        })
+    }
+}
+
+#[cfg(test)]
+mod test;
