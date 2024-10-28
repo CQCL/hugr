@@ -21,7 +21,7 @@ use itertools::Itertools;
 use lazy_static::lazy_static;
 use rstest::rstest;
 
-use super::{constant_fold_pass, ConstFoldContext};
+use super::{constant_fold_pass, ConstFoldContext, ValueHandle};
 use crate::dataflow::{ConstLoader, DFContext, PartialValue};
 
 #[rstest]
@@ -98,13 +98,20 @@ fn f2c(f: f64) -> Value {
 #[case(23.5, 435.5, 459.0)]
 // c = a + b
 fn test_add(#[case] a: f64, #[case] b: f64, #[case] c: f64) {
+    fn unwrap_float(pv: PartialValue<ValueHandle>) -> f64 {
+        pv.try_into_value::<Value>(&FLOAT64_TYPE)
+            .unwrap()
+            .get_custom_value::<ConstF64>()
+            .unwrap()
+            .value()
+    }
     let [n, n_a, n_b] = [0, 1, 2].map(portgraph::NodeIndex::new).map(Node::from);
     let mut temp = Hugr::default();
     let ctx = ConstFoldContext(&mut temp);
     let v_a = ctx.value_from_const(n_a, &f2c(a));
     let v_b = ctx.value_from_const(n_b, &f2c(b));
-    assert_eq!(v_a.clone().try_into_value(&FLOAT64_TYPE), Ok(f2c(a)));
-    assert_eq!(v_b.clone().try_into_value(&FLOAT64_TYPE), Ok(f2c(b)));
+    assert_eq!(unwrap_float(v_a.clone()), a);
+    assert_eq!(unwrap_float(v_b.clone()), b);
 
     let mut outs = [PartialValue::Bottom];
     let OpType::ExtensionOp(add_op) = OpType::from(FloatOps::fadd) else {
@@ -112,7 +119,7 @@ fn test_add(#[case] a: f64, #[case] b: f64, #[case] c: f64) {
     };
     ctx.interpret_leaf_op(n, &add_op, &[v_a, v_b], &mut outs);
 
-    assert_eq!(outs[0].clone().try_into_value(&FLOAT64_TYPE), Ok(f2c(c)));
+    assert_eq!(unwrap_float(outs[0].clone()), c);
 }
 
 fn noargfn(outputs: impl Into<TypeRow>) -> Signature {
