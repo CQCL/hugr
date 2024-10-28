@@ -1,27 +1,61 @@
-use crate::const_fold::constant_fold_pass;
-use hugr_core::builder::{DFGBuilder, Dataflow, DataflowHugr};
+use hugr_core::builder::{inout_sig, Container, DFGBuilder, Dataflow, DataflowHugr};
 use hugr_core::extension::prelude::{
     const_ok, sum_with_error, ConstError, ConstString, UnpackTuple, BOOL_T, ERROR_TYPE, STRING_TYPE,
 };
 use hugr_core::extension::{ExtensionRegistry, PRELUDE};
-use hugr_core::ops::Value;
-use hugr_core::std_extensions::arithmetic;
-use hugr_core::std_extensions::arithmetic::int_ops::IntOpDef;
-use hugr_core::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
+use hugr_core::hugr::hugrmut::HugrMut;
+use hugr_core::ops::{constant::CustomConst, OpType, Value};
+use hugr_core::std_extensions::arithmetic::{
+    self,
+    conversions::ConvertOpDef,
+    float_ops::FloatOps,
+    float_types::{ConstF64, FLOAT64_TYPE},
+    int_ops::IntOpDef,
+    int_types::{ConstInt, INT_TYPES},
+};
 use hugr_core::std_extensions::logic::{self, LogicOp};
-use hugr_core::type_row;
-use hugr_core::types::{Signature, Type, TypeRow, TypeRowRV};
+use hugr_core::types::{Signature, SumType, Type, TypeRow, TypeRowRV};
+use hugr_core::{type_row, Hugr, HugrView, IncomingPort, Node};
 
+use itertools::Itertools;
+use lazy_static::lazy_static;
 use rstest::rstest;
 
-use lazy_static::lazy_static;
+use super::{constant_fold_pass, ConstFoldContext, ValueHandle};
+use crate::dataflow::{ConstLoader, DFContext, PartialValue};
 
-use super::*;
-use hugr_core::builder::Container;
-use hugr_core::ops::OpType;
-use hugr_core::std_extensions::arithmetic::conversions::ConvertOpDef;
-use hugr_core::std_extensions::arithmetic::float_ops::FloatOps;
-use hugr_core::std_extensions::arithmetic::float_types::{ConstF64, FLOAT64_TYPE};
+#[rstest]
+#[case(ConstInt::new_u(4, 2).unwrap(), true)]
+#[case(ConstF64::new(std::f64::consts::PI), false)]
+fn value_handling(#[case] k: impl CustomConst + Clone, #[case] eq: bool) {
+    let n = Node::from(portgraph::NodeIndex::new(7));
+    let st = SumType::new([vec![k.get_type()], vec![]]);
+    let subject_val = Value::sum(0, [k.clone().into()], st).unwrap();
+    let mut temp = Hugr::default();
+    let ctx: ConstFoldContext<Hugr> = ConstFoldContext(&mut temp);
+    let v1 = ctx.value_from_const(n, &subject_val);
+
+    let v1_subfield = {
+        let PartialValue::PartialSum(ps1) = v1 else {
+            panic!()
+        };
+        ps1.0
+            .into_iter()
+            .exactly_one()
+            .unwrap()
+            .1
+            .into_iter()
+            .exactly_one()
+            .unwrap()
+    };
+
+    let v2 = ctx.value_from_const(n, &k.into());
+    if eq {
+        assert_eq!(v1_subfield, v2);
+    } else {
+        assert_ne!(v1_subfield, v2);
+    }
+}
 
 /// Check that a hugr just loads and returns a single expected constant.
 pub fn assert_fully_folded(h: &Hugr, expected_value: &Value) {
@@ -64,15 +98,28 @@ fn f2c(f: f64) -> Value {
 #[case(23.5, 435.5, 459.0)]
 // c = a + b
 fn test_add(#[case] a: f64, #[case] b: f64, #[case] c: f64) {
-    let consts = vec![(0.into(), f2c(a)), (1.into(), f2c(b))];
-    let add_op: OpType = FloatOps::fadd.into();
-    let outs = fold_leaf_op(&add_op, &consts)
-        .unwrap()
-        .into_iter()
-        .map(|(p, v)| (p, v.get_custom_value::<ConstF64>().unwrap().value()))
-        .collect_vec();
+    fn unwrap_float(pv: PartialValue<ValueHandle>) -> f64 {
+        pv.try_into_value::<Value>(&FLOAT64_TYPE)
+            .unwrap()
+            .get_custom_value::<ConstF64>()
+            .unwrap()
+            .value()
+    }
+    let [n, n_a, n_b] = [0, 1, 2].map(portgraph::NodeIndex::new).map(Node::from);
+    let mut temp = Hugr::default();
+    let ctx = ConstFoldContext(&mut temp);
+    let v_a = ctx.value_from_const(n_a, &f2c(a));
+    let v_b = ctx.value_from_const(n_b, &f2c(b));
+    assert_eq!(unwrap_float(v_a.clone()), a);
+    assert_eq!(unwrap_float(v_b.clone()), b);
 
-    assert_eq!(outs.as_slice(), &[(0.into(), c)]);
+    let mut outs = [PartialValue::Bottom];
+    let OpType::ExtensionOp(add_op) = OpType::from(FloatOps::fadd) else {
+        panic!()
+    };
+    ctx.interpret_leaf_op(n, &add_op, &[v_a, v_b], &mut outs);
+
+    assert_eq!(unwrap_float(outs[0].clone()), c);
 }
 
 fn noargfn(outputs: impl Into<TypeRow>) -> Signature {

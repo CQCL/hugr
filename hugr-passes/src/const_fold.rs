@@ -1,220 +1,224 @@
-//! Constant folding routines.
+//! An (example) use of the [super::dataflow](dataflow-analysis framework)
+//! to perform constant-folding.
 
-use std::collections::{BTreeSet, HashMap};
+// These are pub because this "example" is used for testing the framework.
+pub mod value_handle;
+use std::collections::{HashSet, VecDeque};
 
-use hugr_core::builder::inout_sig;
-use itertools::Itertools;
-use thiserror::Error;
-
-use hugr_core::hugr::SimpleReplacementError;
-use hugr_core::types::SumType;
-use hugr_core::Direction;
 use hugr_core::{
-    builder::{DFGBuilder, Dataflow, DataflowHugr},
-    extension::{fold_out_row, ConstFoldResult, ExtensionRegistry},
+    extension::ExtensionRegistry,
     hugr::{
         hugrmut::HugrMut,
-        rewrite::consts::{RemoveConst, RemoveLoadConstant},
-        views::SiblingSubgraph,
+        views::{DescendantsGraph, ExtractHugr, HierarchyView},
     },
-    ops::{OpType, Value},
-    type_row, Hugr, HugrView, IncomingPort, Node, SimpleReplacement,
+    ops::{constant::OpaqueValue, handle::FuncID, Const, ExtensionOp, LoadConstant, Value},
+    types::{EdgeKind, TypeArg},
+    HugrView, IncomingPort, Node, OutgoingPort, Wire,
+};
+use value_handle::ValueHandle;
+
+use crate::{
+    dataflow::{
+        AnalysisResults, ConstLoader, Machine, PartialValue, TailLoopTermination, TotalContext,
+    },
+    validation::{ValidatePassError, ValidationLevel},
 };
 
-use crate::validation::{ValidatePassError, ValidationLevel};
-
-#[derive(Error, Debug)]
-#[allow(missing_docs)]
-pub enum ConstFoldError {
-    #[error(transparent)]
-    SimpleReplacementError(#[from] SimpleReplacementError),
-    #[error(transparent)]
-    ValidationError(#[from] ValidatePassError),
-}
-
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Default)]
 /// A configuration for the Constant Folding pass.
-pub struct ConstantFoldPass {
+pub struct ConstFoldPass {
     validation: ValidationLevel,
+    /// If true, allow to skip evaluating loops (whose results are not needed) even if
+    /// we are not sure they will terminate. (If they definitely terminate then fair game.)
+    pub allow_skip_loops: bool,
 }
 
-impl ConstantFoldPass {
-    /// Create a new `ConstFoldConfig` with default configuration.
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Build a `ConstFoldConfig` with the given [ValidationLevel].
+impl ConstFoldPass {
     pub fn validation_level(mut self, level: ValidationLevel) -> Self {
         self.validation = level;
         self
     }
 
     /// Run the Constant Folding pass.
+    fn run_no_validate(&self, hugr: &mut impl HugrMut) -> Result<(), ValidatePassError> {
+        let results = Machine::default().run(ConstFoldContext(hugr), []);
+        let mut keep_nodes = HashSet::new();
+        self.find_needed_nodes(&results, results.hugr.root(), &mut keep_nodes);
+
+        let remove_nodes = results
+            .hugr
+            .nodes()
+            .filter(|n| !keep_nodes.contains(n))
+            .collect::<HashSet<_>>();
+        for n in keep_nodes {
+            // Every input either (a) is in keep_nodes, or (b) has a known value. Break all wires (b).
+            for inport in results.hugr.node_inputs(n) {
+                if matches!(
+                    results.hugr.get_optype(n).port_kind(inport).unwrap(),
+                    EdgeKind::Value(_)
+                ) {
+                    let (src, outp) = results.hugr.single_linked_output(n, inport).unwrap();
+                    if results.hugr.get_optype(src).is_load_constant() {
+                        continue;
+                    }
+                    if let Ok(v) = results.try_read_wire_value(Wire::new(src, outp)) {
+                        let parent = results.hugr.get_parent(n).unwrap();
+                        let datatype = v.get_type();
+                        // We could try hash-consing identical Consts, but not ATM
+                        let hugr_mut = &mut *results.hugr.0;
+                        let cst = hugr_mut.add_node_with_parent(parent, Const::new(v));
+                        let lcst = hugr_mut.add_node_with_parent(parent, LoadConstant { datatype });
+                        hugr_mut.connect(cst, OutgoingPort::from(0), lcst, IncomingPort::from(0));
+                        hugr_mut.disconnect(n, inport);
+                        hugr_mut.connect(lcst, OutgoingPort::from(0), n, inport);
+                    }
+                }
+            }
+        }
+        for n in remove_nodes {
+            hugr.remove_node(n);
+        }
+        Ok(())
+    }
+
     pub fn run<H: HugrMut>(
         &self,
         hugr: &mut H,
         reg: &ExtensionRegistry,
-    ) -> Result<(), ConstFoldError> {
+    ) -> Result<(), ValidatePassError> {
         self.validation
-            .run_validated_pass(hugr, reg, |hugr: &mut H, _| {
-                loop {
-                    // We can only safely apply a single replacement. Applying a
-                    // replacement removes nodes and edges which may be referenced by
-                    // further replacements returned by find_consts. Even worse, if we
-                    // attempted to apply those replacements, expecting them to fail if
-                    // the nodes and edges they reference had been deleted,  they may
-                    // succeed because new nodes and edges reused the ids.
-                    //
-                    // We could be a lot smarter here, keeping track of `LoadConstant`
-                    // nodes and only looking at their out neighbours.
-                    let Some((replace, removes)) = find_consts(hugr, hugr.nodes(), reg).next()
-                    else {
-                        break Ok(());
-                    };
-                    hugr.apply_rewrite(replace)?;
-                    for rem in removes {
-                        // We are optimistically applying these [RemoveLoadConstant] and
-                        // [RemoveConst] rewrites without checking whether the nodes
-                        // they attempt to remove have remaining uses. If they do, then
-                        // the rewrite fails and we move on.
-                        if let Ok(const_node) = hugr.apply_rewrite(rem) {
-                            // if the LoadConst was removed, try removing the Const too.
-                            let _ = hugr.apply_rewrite(RemoveConst(const_node));
-                        }
+            .run_validated_pass(hugr, reg, |hugr: &mut H, _| self.run_no_validate(hugr))
+    }
+
+    fn find_needed_nodes<H: HugrView>(
+        &self,
+        results: &AnalysisResults<ValueHandle, H>,
+        root: Node,
+        needed: &mut HashSet<Node>,
+    ) {
+        let mut q = VecDeque::new();
+        q.push_back(root);
+        let h = &results.hugr;
+        while let Some(n) = q.pop_front() {
+            if !needed.insert(n) {
+                continue;
+            };
+            if h.get_optype(n).is_cfg() {
+                for bb in h.children(n) {
+                    if results.bb_reachable(bb).unwrap()
+                        && needed.insert(bb)
+                        && h.get_optype(bb).is_dataflow_block()
+                    {
+                        q.push_back(bb);
                     }
                 }
-            })
-    }
-}
+            } else if let Some(inout) = h.get_io(n) {
+                // Dataflow. Find minimal nodes necessary to compute output, including StateOrder edges.
+                q.extend(inout); // Input also necessary for legality even if unreachable
 
-/// For a given op and consts, attempt to evaluate the op.
-pub fn fold_leaf_op(op: &OpType, consts: &[(IncomingPort, Value)]) -> ConstFoldResult {
-    let fold_result = match op {
-        OpType::Tag(t) => fold_out_row([Value::sum(
-            t.tag,
-            consts.iter().map(|(_, konst)| konst.clone()),
-            SumType::new(t.variants.clone()),
-        )
-        .unwrap()]),
-        OpType::ExtensionOp(ext_op) => ext_op.constant_fold(consts),
-        _ => None,
-    };
-    debug_assert!(fold_result.as_ref().map_or(true, |x| x.len()
-        == op.value_port_count(Direction::Outgoing)));
-    fold_result
-}
-
-/// Generate a graph that loads and outputs `consts` in order, validating
-/// against `reg`.
-fn const_graph(consts: Vec<Value>, reg: &ExtensionRegistry) -> Hugr {
-    let const_types = consts.iter().map(Value::get_type).collect_vec();
-    let mut b = DFGBuilder::new(inout_sig(type_row![], const_types)).unwrap();
-
-    let outputs = consts
-        .into_iter()
-        .map(|c| b.add_load_const(c))
-        .collect_vec();
-
-    b.finish_hugr_with_outputs(outputs, reg).unwrap()
-}
-
-/// Given some `candidate_nodes` to search for LoadConstant operations in `hugr`,
-/// return an iterator of possible constant folding rewrites.
-///
-/// The [`SimpleReplacement`] replaces an operation with constants that result from
-/// evaluating it, the extension registry `reg` is used to validate the
-/// replacement HUGR. The vector of [`RemoveLoadConstant`] refer to the
-/// LoadConstant nodes that could be removed - they are not automatically
-/// removed as they may be used by other operations.
-pub fn find_consts<'a, 'r: 'a>(
-    hugr: &'a impl HugrView,
-    candidate_nodes: impl IntoIterator<Item = Node> + 'a,
-    reg: &'r ExtensionRegistry,
-) -> impl Iterator<Item = (SimpleReplacement, Vec<RemoveLoadConstant>)> + 'a {
-    // track nodes for operations that have already been considered for folding
-    let mut used_neighbours = BTreeSet::new();
-
-    candidate_nodes
-        .into_iter()
-        .filter_map(move |n| {
-            // only look at LoadConstant
-            hugr.get_optype(n).is_load_constant().then_some(())?;
-
-            let (out_p, _) = hugr.out_value_types(n).exactly_one().ok()?;
-            let neighbours = hugr
-                .linked_inputs(n, out_p)
-                .filter(|(n, _)| used_neighbours.insert(*n))
-                .collect_vec();
-            if neighbours.is_empty() {
-                // no uses of LoadConstant that haven't already been considered.
-                return None;
+                // Also add on anything that might not terminate. We might also allow a custom predicate for extension ops?
+                for ch in h.children(n) {
+                    if h.get_optype(ch).is_cfg()
+                        || (!self.allow_skip_loops
+                            && h.get_optype(ch).is_tail_loop()
+                            && results.tail_loop_terminates(ch).unwrap()
+                                != TailLoopTermination::NeverContinues)
+                    {
+                        q.push_back(ch);
+                    }
+                }
             }
-            let fold_iter = neighbours
-                .into_iter()
-                .filter_map(|(neighbour, _)| fold_op(hugr, neighbour, reg));
-            Some(fold_iter)
-        })
-        .flatten()
-}
-
-/// Attempt to evaluate and generate rewrites for the operation at `op_node`
-fn fold_op(
-    hugr: &impl HugrView,
-    op_node: Node,
-    reg: &ExtensionRegistry,
-) -> Option<(SimpleReplacement, Vec<RemoveLoadConstant>)> {
-    // only support leaf folding for now.
-    let neighbour_op = hugr.get_optype(op_node);
-    let (in_consts, removals): (Vec<_>, Vec<_>) = hugr
-        .node_inputs(op_node)
-        .filter_map(|in_p| {
-            let (con_op, load_n) = get_const(hugr, op_node, in_p)?;
-            Some(((in_p, con_op), RemoveLoadConstant(load_n)))
-        })
-        .unzip();
-    // attempt to evaluate op
-    let (nu_out, consts): (HashMap<_, _>, Vec<_>) = fold_leaf_op(neighbour_op, &in_consts)?
-        .into_iter()
-        .enumerate()
-        .filter_map(|(i, (op_out, konst))| {
-            // for each used port of the op give the nu_out entry and the
-            // corresponding Value
-            hugr.single_linked_input(op_node, op_out)
-                .map(|np| ((np, i.into()), konst))
-        })
-        .unzip();
-    let replacement = const_graph(consts, reg);
-    let sibling_graph = SiblingSubgraph::try_from_nodes([op_node], hugr)
-        .expect("Operation should form valid subgraph.");
-
-    let simple_replace = SimpleReplacement::new(
-        sibling_graph,
-        replacement,
-        // no inputs to replacement
-        HashMap::new(),
-        nu_out,
-    );
-    Some((simple_replace, removals))
-}
-
-/// If `op_node` is connected to a LoadConstant at `in_p`, return the constant
-/// and the LoadConstant node
-fn get_const(hugr: &impl HugrView, op_node: Node, in_p: IncomingPort) -> Option<(Value, Node)> {
-    let (load_n, _) = hugr.single_linked_output(op_node, in_p)?;
-    let load_op = hugr.get_optype(load_n).as_load_constant()?;
-    let const_node = hugr
-        .single_linked_output(load_n, load_op.constant_port())?
-        .0;
-    let const_op = hugr.get_optype(const_node).as_const()?;
-
-    // TODO avoid const clone here
-    Some((const_op.as_ref().clone(), load_n))
+            // Also follow dataflow demand
+            for (src, op) in h.all_linked_outputs(n) {
+                let needs_predecessor = match h.get_optype(src).port_kind(op).unwrap() {
+                    EdgeKind::Value(_) => {
+                        results.hugr.get_optype(src).is_load_constant()
+                            || results.try_read_wire_value(Wire::new(src, op)).is_err()
+                    }
+                    EdgeKind::StateOrder | EdgeKind::Const(_) | EdgeKind::Function(_) => true,
+                    EdgeKind::ControlFlow => panic!(),
+                    _ => true, // needed for non-exhaustive; not knowing what it is, assume the worst
+                };
+                if needs_predecessor {
+                    q.push_back(src);
+                }
+            }
+        }
+    }
 }
 
 /// Exhaustively apply constant folding to a HUGR.
 pub fn constant_fold_pass<H: HugrMut>(h: &mut H, reg: &ExtensionRegistry) {
-    ConstantFoldPass::default().run(h, reg).unwrap()
+    ConstFoldPass::default().run(h, reg).unwrap()
+}
+
+struct ConstFoldContext<'a, H>(&'a mut H);
+
+impl<'a, T: HugrView> AsRef<hugr_core::Hugr> for ConstFoldContext<'a, T> {
+    fn as_ref(&self) -> &hugr_core::Hugr {
+        self.0.base_hugr()
+    }
+}
+
+impl<'a, H: HugrView> ConstLoader<ValueHandle> for ConstFoldContext<'a, H> {
+    fn value_from_opaque(
+        &self,
+        node: Node,
+        fields: &[usize],
+        val: &OpaqueValue,
+    ) -> Option<ValueHandle> {
+        Some(ValueHandle::new_opaque(node, fields, val.clone()))
+    }
+
+    fn value_from_const_hugr(
+        &self,
+        node: Node,
+        fields: &[usize],
+        h: &hugr_core::Hugr,
+    ) -> Option<ValueHandle> {
+        Some(ValueHandle::new_const_hugr(
+            node,
+            fields,
+            Box::new(h.clone()),
+        ))
+    }
+
+    fn value_from_function(&self, node: Node, type_args: &[TypeArg]) -> Option<ValueHandle> {
+        if type_args.len() > 0 {
+            // TODO: substitution across Hugr (https://github.com/CQCL/hugr/issues/709)
+            return None;
+        };
+        // Returning the function body as a value, here, would be sufficient for inlining IndirectCall
+        // but not for transforming to a direct Call.
+        let func = DescendantsGraph::<FuncID<true>>::try_new(self, node).ok()?;
+        Some(ValueHandle::new_const_hugr(
+            node,
+            &[],
+            Box::new(func.extract_hugr()),
+        ))
+    }
+}
+
+impl<'a, H: HugrView> TotalContext<ValueHandle> for ConstFoldContext<'a, H> {
+    type InterpretableVal = Value;
+
+    fn interpret_leaf_op(
+        &self,
+        n: Node,
+        op: &ExtensionOp,
+        ins: &[(IncomingPort, Value)],
+    ) -> Vec<(OutgoingPort, PartialValue<ValueHandle>)> {
+        op.constant_fold(&ins).map_or(Vec::new(), |outs| {
+            outs.into_iter()
+                .map(|(p, v)| {
+                    (
+                        p,
+                        self.value_from_const(n, &v), // Hmmm, should (at least) also key by p
+                    )
+                })
+                .collect()
+        })
+    }
 }
 
 #[cfg(test)]
