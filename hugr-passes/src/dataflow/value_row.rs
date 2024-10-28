@@ -10,7 +10,7 @@ use itertools::zip_eq;
 
 use super::{AbstractValue, PartialValue};
 
-#[derive(PartialEq, Clone, Eq, Hash)]
+#[derive(PartialEq, Clone, Debug, Eq, Hash)]
 pub(super) struct ValueRow<V>(Vec<PartialValue<V>>);
 
 impl<V: AbstractValue> ValueRow<V> {
