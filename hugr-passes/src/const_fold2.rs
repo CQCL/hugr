@@ -66,6 +66,8 @@ impl ConstFoldPass {
                         let cst = hugr_mut.add_node_with_parent(parent, Const::new(v));
                         let lcst = hugr_mut.add_node_with_parent(parent, LoadConstant { datatype });
                         hugr_mut.connect(cst, OutgoingPort::from(0), lcst, IncomingPort::from(0));
+                        hugr_mut.disconnect(n, inport);
+                        hugr_mut.connect(lcst, OutgoingPort::from(0), n, inport);
                     }
                 }
             }
