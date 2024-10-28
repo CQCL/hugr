@@ -58,6 +58,9 @@ impl ConstFoldPass {
                     EdgeKind::Value(_)
                 ) {
                     let (src, outp) = results.hugr.single_linked_output(n, inport).unwrap();
+                    if results.hugr.get_optype(src).is_load_constant() {
+                        continue;
+                    }
                     if let Ok(v) = results.try_read_wire_value(Wire::new(src, outp)) {
                         let parent = results.hugr.get_parent(n).unwrap();
                         let datatype = v.get_type();
@@ -128,7 +131,10 @@ impl ConstFoldPass {
             // Also follow dataflow demand
             for (src, op) in h.all_linked_outputs(n) {
                 let needs_predecessor = match h.get_optype(src).port_kind(op).unwrap() {
-                    EdgeKind::Value(_) => results.try_read_wire_value(Wire::new(src, op)).is_err(),
+                    EdgeKind::Value(_) => {
+                        results.hugr.get_optype(src).is_load_constant()
+                            || results.try_read_wire_value(Wire::new(src, op)).is_err()
+                    }
                     EdgeKind::StateOrder | EdgeKind::Const(_) | EdgeKind::Function(_) => true,
                     EdgeKind::ControlFlow => panic!(),
                     _ => true, // needed for non-exhaustive; not knowing what it is, assume the worst
@@ -202,7 +208,6 @@ impl<'a, H: HugrView> TotalContext<ValueHandle> for ConstFoldContext<'a, H> {
         op: &ExtensionOp,
         ins: &[(IncomingPort, Value)],
     ) -> Vec<(OutgoingPort, PartialValue<ValueHandle>)> {
-        let ins = ins.iter().map(|(p, v)| (*p, v.clone())).collect::<Vec<_>>();
         op.constant_fold(&ins).map_or(Vec::new(), |outs| {
             outs.into_iter()
                 .map(|(p, v)| {
