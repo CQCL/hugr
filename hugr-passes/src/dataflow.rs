@@ -11,14 +11,14 @@ pub use results::{AnalysisResults, TailLoopTermination};
 mod partial_value;
 pub use partial_value::{AbstractValue, PartialSum, PartialValue, Sum};
 
-use hugr_core::{Hugr, Node};
-use hugr_core::ops::{ExtensionOp, Value};
 use hugr_core::ops::constant::OpaqueValue;
+use hugr_core::ops::{ExtensionOp, Value};
 use hugr_core::types::TypeArg;
+use hugr_core::{Hugr, Node};
 
 /// Clients of the dataflow framework (particular analyses, such as constant folding)
 /// must implement this trait (including providing an appropriate domain type `V`).
-pub trait DFContext<V>: ConstLoader<V> {
+pub trait DFContext<V>: ConstLoader<V> + std::ops::Deref<Target = Hugr> {
     /// Given lattice values for each input, update lattice values for the (dataflow) outputs.
     /// For extension ops only, excluding [MakeTuple] and [UnpackTuple].
     /// `_outs` is an array with one element per dataflow output, each initialized to [PartialValue::Top]
@@ -51,12 +51,7 @@ pub trait ConstLoader<V> {
 
     /// Produces an abstract value from an [OpaqueValue], if possible.
     /// The default just returns `None`, which will be interpreted as [PartialValue::Top].
-    fn value_from_opaque(
-        &self,
-        _node: Node,
-        _fields: &[usize],
-        _val: &OpaqueValue,
-    ) -> Option<V> {
+    fn value_from_opaque(&self, _node: Node, _fields: &[usize], _val: &OpaqueValue) -> Option<V> {
         None
     }
 

@@ -40,24 +40,22 @@ impl<V: AbstractValue> Machine<V> {
     /// (Note that `in_values` will not be useful for `Case` or `DFB`-rooted Hugrs,
     /// but should handle other containers.)
     /// The context passed in allows interpretation of leaf operations.
-    pub fn run<H: HugrView>(
+    pub fn run<C: DFContext<V>>(
         mut self,
-        context: &impl DFContext<V>,
-        hugr: H,
+        context: C,
         in_values: impl IntoIterator<Item = (IncomingPort, PartialValue<V>)>,
-    ) -> AnalysisResults<V, H> {
-        let root = hugr.root();
+    ) -> AnalysisResults<V, C> {
+        let root = context.root();
         self.0
             .extend(in_values.into_iter().map(|(p, v)| (root, p, v)));
-        run_datalog(self.0, context, hugr)
+        run_datalog(context, self.0)
     }
 }
 
-pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
+pub(super) fn run_datalog<V: AbstractValue, C: DFContext<V>>(
+    ctx: C,
     in_wire_value_proto: Vec<(Node, IncomingPort, PV<V>)>,
-    c: &impl DFContext<V>,
-    hugr: H,
-) -> AnalysisResults<V, H> {
+) -> AnalysisResults<V, C> {
     // ascent-(macro-)generated code generates a bunch of warnings,
     // keep code in here to a minimum.
     #![allow(
@@ -77,47 +75,47 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
         lattice in_wire_value(Node, IncomingPort, PV<V>); // <Node> receives, on <IncomingPort>, the value <PV>
         lattice node_in_value_row(Node, ValueRow<V>); // <Node>'s inputs are <ValueRow>
 
-        node(n) <-- for n in hugr.nodes();
+        node(n) <-- for n in ctx.nodes();
 
-        in_wire(n, p) <-- node(n), for (p,_) in hugr.in_value_types(*n); // Note, gets connected inports only
-        out_wire(n, p) <-- node(n), for (p,_) in hugr.out_value_types(*n); // (and likewise)
+        in_wire(n, p) <-- node(n), for (p,_) in ctx.in_value_types(*n); // Note, gets connected inports only
+        out_wire(n, p) <-- node(n), for (p,_) in ctx.out_value_types(*n); // (and likewise)
 
         parent_of_node(parent, child) <--
-            node(child), if let Some(parent) = hugr.get_parent(*child);
+            node(child), if let Some(parent) = ctx.get_parent(*child);
 
-        input_child(parent, input) <-- node(parent), if let Some([input, _output]) = hugr.get_io(*parent);
-        output_child(parent, output) <-- node(parent), if let Some([_input, output]) = hugr.get_io(*parent);
+        input_child(parent, input) <-- node(parent), if let Some([input, _output]) = ctx.get_io(*parent);
+        output_child(parent, output) <-- node(parent), if let Some([_input, output]) = ctx.get_io(*parent);
 
         // Initialize all wires to bottom
         out_wire_value(n, p, PV::bottom()) <-- out_wire(n, p);
 
         in_wire_value(n, ip, v) <-- in_wire(n, ip),
-            if let Some((m, op)) = hugr.single_linked_output(*n, *ip),
+            if let Some((m, op)) = ctx.single_linked_output(*n, *ip),
             out_wire_value(m, op, v);
 
         // Prepopulate in_wire_value from in_wire_value_proto.
         in_wire_value(n, p, PV::bottom()) <-- in_wire(n, p);
         in_wire_value(n, p, v) <-- for (n, p, v) in in_wire_value_proto.iter(),
           node(n),
-          if let Some(sig) = hugr.signature(*n),
+          if let Some(sig) = ctx.signature(*n),
           if sig.input_ports().contains(p);
 
         // Assemble in_value_row from in_value's
-        node_in_value_row(n, ValueRow::new(sig.input_count())) <-- node(n), if let Some(sig) = hugr.signature(*n);
-        node_in_value_row(n, ValueRow::single_known(hugr.signature(*n).unwrap().input_count(), p.index(), v.clone())) <-- in_wire_value(n, p, v);
+        node_in_value_row(n, ValueRow::new(sig.input_count())) <-- node(n), if let Some(sig) = ctx.signature(*n);
+        node_in_value_row(n, ValueRow::single_known(ctx.signature(*n).unwrap().input_count(), p.index(), v.clone())) <-- in_wire_value(n, p, v);
 
         out_wire_value(n, p, v) <--
            node(n),
-           let op_t = hugr.get_optype(*n),
+           let op_t = ctx.get_optype(*n),
            if !op_t.is_container(),
            if let Some(sig) = op_t.dataflow_signature(),
            node_in_value_row(n, vs),
-           if let Some(outs) = propagate_leaf_op(c, &hugr, *n, &vs[..], sig.output_count()),
+           if let Some(outs) = propagate_leaf_op(&ctx, *n, &vs[..], sig.output_count()),
            for (p, v) in (0..).map(OutgoingPort::from).zip(outs);
 
         // DFG
         relation dfg_node(Node); // <Node> is a `DFG`
-        dfg_node(n) <-- node(n), if hugr.get_optype(*n).is_dfg();
+        dfg_node(n) <-- node(n), if ctx.get_optype(*n).is_dfg();
 
         out_wire_value(i, OutgoingPort::from(p.index()), v) <-- dfg_node(dfg),
           input_child(dfg, i), in_wire_value(dfg, p, v);
@@ -130,13 +128,13 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
 
         // inputs of tail loop propagate to Input node of child region
         out_wire_value(i, OutgoingPort::from(p.index()), v) <-- node(tl),
-            if hugr.get_optype(*tl).is_tail_loop(),
+            if ctx.get_optype(*tl).is_tail_loop(),
             input_child(tl, i),
             in_wire_value(tl, p, v);
 
         // Output node of child region propagate to Input node of child region
         out_wire_value(in_n, OutgoingPort::from(out_p), v) <-- node(tl),
-            if let Some(tailloop) = hugr.get_optype(*tl).as_tail_loop(),
+            if let Some(tailloop) = ctx.get_optype(*tl).as_tail_loop(),
             input_child(tl, in_n),
             output_child(tl, out_n),
             node_in_value_row(out_n, out_in_row), // get the whole input row for the output node
@@ -145,7 +143,7 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
 
         // Output node of child region propagate to outputs of tail loop
         out_wire_value(tl, OutgoingPort::from(out_p), v) <-- node(tl),
-            if let Some(tailloop) = hugr.get_optype(*tl).as_tail_loop(),
+            if let Some(tailloop) = ctx.get_optype(*tl).as_tail_loop(),
             output_child(tl, out_n),
             node_in_value_row(out_n, out_in_row), // get the whole input row for the output node
             if let Some(fields) = out_in_row.unpack_first(1, tailloop.just_outputs.len()), // if it is possible for the tag to be 1
@@ -156,17 +154,17 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
         // <Node> is a `Conditional` and its <usize>'th child (a `Case`) is <Node>:
         relation case_node(Node, usize, Node);
 
-        conditional_node(n)<-- node(n), if hugr.get_optype(*n).is_conditional();
+        conditional_node(n)<-- node(n), if ctx.get_optype(*n).is_conditional();
         case_node(cond, i, case) <-- conditional_node(cond),
-          for (i, case) in hugr.children(*cond).enumerate(),
-          if hugr.get_optype(case).is_case();
+          for (i, case) in ctx.children(*cond).enumerate(),
+          if ctx.get_optype(case).is_case();
 
         // inputs of conditional propagate into case nodes
         out_wire_value(i_node, OutgoingPort::from(out_p), v) <--
           case_node(cond, case_index, case),
           input_child(case, i_node),
           node_in_value_row(cond, in_row),
-          let conditional = hugr.get_optype(*cond).as_conditional().unwrap(),
+          let conditional = ctx.get_optype(*cond).as_conditional().unwrap(),
           if let Some(fields) = in_row.unpack_first(*case_index, conditional.sum_rows[*case_index].len()),
           for (out_p, v) in fields.enumerate();
 
@@ -185,39 +183,39 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
 
         // CFG
         relation cfg_node(Node); // <Node> is a `CFG`
-        cfg_node(n) <-- node(n), if hugr.get_optype(*n).is_cfg();
+        cfg_node(n) <-- node(n), if ctx.get_optype(*n).is_cfg();
 
         // In `CFG` <Node>, basic block <Node> is reachable given our knowledge of predicates
         relation bb_reachable(Node, Node);
-        bb_reachable(cfg, entry) <-- cfg_node(cfg), if let Some(entry) = hugr.children(*cfg).next();
+        bb_reachable(cfg, entry) <-- cfg_node(cfg), if let Some(entry) = ctx.children(*cfg).next();
         bb_reachable(cfg, bb) <-- cfg_node(cfg),
             bb_reachable(cfg, pred),
             output_child(pred, pred_out),
             in_wire_value(pred_out, IncomingPort::from(0), predicate),
-            for (tag, bb) in hugr.output_neighbours(*pred).enumerate(),
+            for (tag, bb) in ctx.output_neighbours(*pred).enumerate(),
             if predicate.supports_tag(tag);
 
         // Inputs of CFG propagate to entry block
         out_wire_value(i_node, OutgoingPort::from(p.index()), v) <--
             cfg_node(cfg),
-            if let Some(entry) = hugr.children(*cfg).next(),
+            if let Some(entry) = ctx.children(*cfg).next(),
             input_child(entry, i_node),
             in_wire_value(cfg, p, v);
 
         // In `CFG` <Node>, values fed along a control-flow edge to <Node>
         //     come out of Value outports of <Node>.
         relation _cfg_succ_dest(Node, Node, Node);
-        _cfg_succ_dest(cfg, exit, cfg) <-- cfg_node(cfg), if let Some(exit) = hugr.children(*cfg).nth(1);
+        _cfg_succ_dest(cfg, exit, cfg) <-- cfg_node(cfg), if let Some(exit) = ctx.children(*cfg).nth(1);
         _cfg_succ_dest(cfg, blk, inp) <-- cfg_node(cfg),
-            for blk in hugr.children(*cfg),
-            if hugr.get_optype(blk).is_dataflow_block(),
+            for blk in ctx.children(*cfg),
+            if ctx.get_optype(blk).is_dataflow_block(),
             input_child(blk, inp);
 
         // Outputs of each reachable block propagated to successor block or CFG itself
         out_wire_value(dest, OutgoingPort::from(out_p), v) <--
             bb_reachable(cfg, pred),
-            if let Some(df_block) = hugr.get_optype(*pred).as_dataflow_block(),
-            for (succ_n, succ) in hugr.output_neighbours(*pred).enumerate(),
+            if let Some(df_block) = ctx.get_optype(*pred).as_dataflow_block(),
+            for (succ_n, succ) in ctx.output_neighbours(*pred).enumerate(),
             output_child(pred, out_n),
             _cfg_succ_dest(cfg, succ, dest),
             node_in_value_row(out_n, out_in_row),
@@ -228,8 +226,8 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
         relation func_call(Node, Node); // <Node> is a `Call` to `FuncDefn` <Node>
         func_call(call, func_defn) <--
             node(call),
-            if hugr.get_optype(*call).is_call(),
-            if let Some(func_defn) = hugr.static_source(*call);
+            if ctx.get_optype(*call).is_call(),
+            if let Some(func_defn) = ctx.static_source(*call);
 
         out_wire_value(inp, OutgoingPort::from(p.index()), v) <--
             func_call(call, func),
@@ -247,7 +245,7 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
         .map(|(n, p, v)| (Wire::new(*n, *p), v.clone()))
         .collect();
     AnalysisResults {
-        hugr,
+        hugr: ctx,
         out_wire_values,
         in_wire_value: all_results.in_wire_value,
         case_reachable: all_results.case_reachable,
@@ -256,13 +254,12 @@ pub(super) fn run_datalog<V: AbstractValue, H: HugrView>(
 }
 
 fn propagate_leaf_op<V: AbstractValue>(
-    c: &impl DFContext<V>,
-    hugr: &impl HugrView,
+    ctx: &impl DFContext<V>,
     n: Node,
     ins: &[PV<V>],
     num_outs: usize,
 ) -> Option<ValueRow<V>> {
-    match hugr.get_optype(n) {
+    match ctx.get_optype(n) {
         // Handle basics here. We could instead leave these to DFContext,
         // but at least we'd want these impls to be easily reusable.
         op if op.cast::<MakeTuple>().is_some() => Some(ValueRow::from_iter([PV::new_variant(
@@ -284,20 +281,20 @@ fn propagate_leaf_op<V: AbstractValue>(
         OpType::Const(_) => None, // handled by LoadConstant:
         OpType::LoadConstant(load_op) => {
             assert!(ins.is_empty()); // static edge, so need to find constant
-            let const_node = hugr
+            let const_node = ctx
                 .single_linked_output(n, load_op.constant_port())
                 .unwrap()
                 .0;
-            let const_val = hugr.get_optype(const_node).as_const().unwrap().value();
+            let const_val = ctx.get_optype(const_node).as_const().unwrap().value();
             Some(ValueRow::single_known(
                 1,
                 0,
-                c.value_from_const(n, const_val),
+                ctx.value_from_const(n, const_val),
             ))
         }
         OpType::LoadFunction(load_op) => {
             assert!(ins.is_empty()); // static edge
-            let func_node = hugr
+            let func_node = ctx
                 .single_linked_output(n, load_op.function_port())
                 .unwrap()
                 .0;
@@ -305,7 +302,7 @@ fn propagate_leaf_op<V: AbstractValue>(
             Some(ValueRow::single_known(
                 1,
                 0,
-                c.value_from_function(func_node, &load_op.type_args)
+                ctx.value_from_function(func_node, &load_op.type_args)
                     .map_or(PV::Top, PV::Value),
             ))
         }
@@ -315,7 +312,7 @@ fn propagate_leaf_op<V: AbstractValue>(
             // It'd be nice to convert these to [(IncomingPort, Value)] to pass to the context,
             // thus keeping PartialValue hidden, but AbstractValues
             // are not necessarily convertible to Value.
-            c.interpret_leaf_op(n, e, ins, &mut outs[..]);
+            ctx.interpret_leaf_op(n, e, ins, &mut outs[..]);
             Some(ValueRow::from_iter(outs))
         }
         o => todo!("Unhandled: {:?}", o), // At least CallIndirect, and OpType is "non-exhaustive"
