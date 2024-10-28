@@ -12,9 +12,9 @@ use crate::dataflow::{ConstLoader, PartialValue, TotalContext};
 /// Just stores a Hugr (actually any [HugrView]),
 /// (there is )no state for operation-interpretation.
 #[derive(Debug)]
-pub struct ConstFoldContext<H>(pub H);
+pub struct ConstFoldContext<H: HugrView>(pub(super) H);
 
-impl<H:HugrView> AsRef<Hugr> for ConstFoldContext<H> {
+impl<H: HugrView> AsRef<Hugr> for ConstFoldContext<H> {
     fn as_ref(&self) -> &Hugr {
         self.0.base_hugr()
     }

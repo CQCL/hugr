@@ -7,7 +7,7 @@ use super::{ConstLoader, DFContext};
 /// A simpler interface like [DFContext] but where the context only cares about
 /// values that are completely known (in the lattice `V`) rather than partially
 /// (e.g. no [PartialSum]s of more than one variant, no top/bottom)
-pub trait TotalContext<V> {
+pub trait TotalContext<V>: ConstLoader<V> {
     /// Representation of a (single, non-partial) value usable for interpretation
     type InterpretableVal: From<V> + TryFrom<Sum<Self::InterpretableVal>>;
 

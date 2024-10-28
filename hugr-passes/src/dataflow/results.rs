@@ -7,7 +7,7 @@ use super::{AbstractValue, PartialValue};
 /// Results of a dataflow analysis, packaged with the Hugr for easy inspection.
 /// Methods allow inspection, specifically [read_out_wire](Self::read_out_wire).
 pub struct AnalysisResults<V: AbstractValue, H: HugrView> {
-    pub(super) hugr: H,
+    pub hugr: H,
     pub(super) in_wire_value: Vec<(Node, IncomingPort, PartialValue<V>)>,
     pub(super) case_reachable: Vec<(Node, Node)>,
     pub(super) bb_reachable: Vec<(Node, Node)>,
