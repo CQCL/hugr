@@ -1,5 +1,5 @@
 use hugr_core::ops::{DataflowOpTrait, ExtensionOp};
-use hugr_core::{IncomingPort, Node, OutgoingPort, PortIndex};
+use hugr_core::{HugrView, IncomingPort, Node, OutgoingPort, PortIndex};
 
 use super::partial_value::{AbstractValue, PartialValue, Sum};
 use super::{ConstLoader, DFContext};
@@ -21,7 +21,7 @@ pub trait TotalContext<V> {
     ) -> Vec<(OutgoingPort, PartialValue<V>)>;
 }
 
-impl<V: AbstractValue, T: TotalContext<V> + ConstLoader<V>> DFContext<V> for T {
+impl<V: AbstractValue, T: TotalContext<V> + ConstLoader<V> + HugrView> DFContext<V> for T {
     fn interpret_leaf_op(
         &self,
         node: Node,

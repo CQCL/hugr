@@ -1,7 +1,7 @@
 use hugr_core::hugr::views::{DescendantsGraph, ExtractHugr, HierarchyView};
 use hugr_core::ops::{constant::OpaqueValue, handle::FuncID, ExtensionOp, Value};
 use hugr_core::types::TypeArg;
-use hugr_core::{HugrView, IncomingPort, Node, OutgoingPort};
+use hugr_core::{Hugr, HugrView, IncomingPort, Node, OutgoingPort};
 
 use super::value_handle::ValueHandle;
 use crate::dataflow::{ConstLoader, PartialValue, TotalContext};
@@ -13,6 +13,12 @@ use crate::dataflow::{ConstLoader, PartialValue, TotalContext};
 /// (there is )no state for operation-interpretation.
 #[derive(Debug)]
 pub struct ConstFoldContext<H>(pub H);
+
+impl<H:HugrView> AsRef<Hugr> for ConstFoldContext<H> {
+    fn as_ref(&self) -> &Hugr {
+        self.0.base_hugr()
+    }
+}
 
 impl<H: HugrView> ConstLoader<ValueHandle> for ConstFoldContext<H> {
     fn value_from_opaque(
