@@ -245,7 +245,7 @@ pub(super) fn run_datalog<V: AbstractValue, C: DFContext<V>>(
         .map(|(n, p, v)| (Wire::new(*n, *p), v.clone()))
         .collect();
     AnalysisResults {
-        hugr: ctx,
+        ctx,
         out_wire_values,
         in_wire_value: all_results.in_wire_value,
         case_reachable: all_results.case_reachable,
@@ -308,7 +308,7 @@ fn propagate_leaf_op<V: AbstractValue>(
         }
         OpType::ExtensionOp(e) => {
             // Interpret op.
-            let init =  if ins.iter().contains(&PartialValue::Bottom) {
+            let init = if ins.iter().contains(&PartialValue::Bottom) {
                 // So far we think one or more inputs can't happen.
                 // So, don't pollute outputs with Top, and wait for better knowledge of inputs.
                 PartialValue::Bottom
