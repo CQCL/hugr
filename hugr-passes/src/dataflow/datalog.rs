@@ -245,7 +245,7 @@ pub(super) fn run_datalog<V: AbstractValue, C: DFContext<V>>(
         .map(|(n, p, v)| (Wire::new(*n, *p), v.clone()))
         .collect();
     AnalysisResults {
-        hugr: ctx,
+        ctx,
         out_wire_values,
         in_wire_value: all_results.in_wire_value,
         case_reachable: all_results.case_reachable,
