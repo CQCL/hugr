@@ -101,7 +101,7 @@ impl ConstFoldPass {
 
     fn find_needed_nodes<H: HugrView>(
         &self,
-        results: &AnalysisResults<ValueHandle, H>,
+        results: &AnalysisResults<ValueHandle, ConstFoldContext<H>>,
         root: Node,
         needed: &mut HashSet<Node>,
     ) {
@@ -163,9 +163,10 @@ pub fn constant_fold_pass<H: HugrMut>(h: &mut H, reg: &ExtensionRegistry) {
 
 struct ConstFoldContext<'a, H>(&'a mut H);
 
-impl<'a, T: HugrView> AsRef<hugr_core::Hugr> for ConstFoldContext<'a, T> {
-    fn as_ref(&self) -> &hugr_core::Hugr {
-        self.0.base_hugr()
+impl<'a, H: HugrView> std::ops::Deref for ConstFoldContext<'a, H> {
+    type Target = H;
+    fn deref(&self) -> &H {
+        self.0
     }
 }
 
@@ -199,7 +200,7 @@ impl<'a, H: HugrView> ConstLoader<ValueHandle> for ConstFoldContext<'a, H> {
         };
         // Returning the function body as a value, here, would be sufficient for inlining IndirectCall
         // but not for transforming to a direct Call.
-        let func = DescendantsGraph::<FuncID<true>>::try_new(self, node).ok()?;
+        let func = DescendantsGraph::<FuncID<true>>::try_new(&**self, node).ok()?;
         Some(ValueHandle::new_const_hugr(
             node,
             &[],
@@ -209,6 +210,8 @@ impl<'a, H: HugrView> ConstLoader<ValueHandle> for ConstFoldContext<'a, H> {
 }
 
 impl<'a, H: HugrView> DFContext<ValueHandle> for ConstFoldContext<'a, H> {
+    type View = H;
+
     fn interpret_leaf_op(
         &self,
         node: Node,
