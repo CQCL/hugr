@@ -11,15 +11,18 @@ use hugr_core::{
         hugrmut::HugrMut,
         views::{DescendantsGraph, ExtractHugr, HierarchyView},
     },
-    ops::{constant::OpaqueValue, handle::FuncID, Const, ExtensionOp, LoadConstant, Value},
+    ops::{
+        constant::OpaqueValue, handle::FuncID, Const, DataflowOpTrait, ExtensionOp, LoadConstant,
+        Value,
+    },
     types::{EdgeKind, TypeArg},
-    HugrView, IncomingPort, Node, OutgoingPort, Wire,
+    HugrView, IncomingPort, Node, OutgoingPort, PortIndex, Wire,
 };
 use value_handle::ValueHandle;
 
 use crate::{
     dataflow::{
-        AnalysisResults, ConstLoader, Machine, PartialValue, TailLoopTermination, TotalContext,
+        AnalysisResults, ConstLoader, DFContext, Machine, PartialValue, TailLoopTermination,
     },
     validation::{ValidatePassError, ValidationLevel},
 };
@@ -205,25 +208,35 @@ impl<'a, H: HugrView> ConstLoader<ValueHandle> for ConstFoldContext<'a, H> {
     }
 }
 
-impl<'a, H: HugrView> TotalContext<ValueHandle> for ConstFoldContext<'a, H> {
-    type InterpretableVal = Value;
-
+impl<'a, H: HugrView> DFContext<ValueHandle> for ConstFoldContext<'a, H> {
     fn interpret_leaf_op(
         &self,
-        n: Node,
+        node: Node,
         op: &ExtensionOp,
-        ins: &[(IncomingPort, Value)],
-    ) -> Vec<(OutgoingPort, PartialValue<ValueHandle>)> {
-        op.constant_fold(&ins).map_or(Vec::new(), |outs| {
-            outs.into_iter()
-                .map(|(p, v)| {
-                    (
-                        p,
-                        self.value_from_const(n, &v), // Hmmm, should (at least) also key by p
-                    )
-                })
-                .collect()
-        })
+        ins: &[PartialValue<ValueHandle>],
+        outs: &mut [PartialValue<ValueHandle>],
+    ) {
+        let sig = op.signature();
+        let known_ins = sig
+            .input_types()
+            .iter()
+            .enumerate()
+            .zip(ins.iter())
+            .filter_map(|((i, ty), pv)| {
+                let v = match pv {
+                    PartialValue::Bottom | PartialValue::Top => None,
+                    PartialValue::Value(v) => Some(v.clone().into()),
+                    PartialValue::PartialSum(ps) => {
+                        Value::try_from(ps.clone().try_into_value::<Value>(ty).ok()?).ok()
+                    }
+                }?;
+                Some((IncomingPort::from(i), v))
+            })
+            .collect::<Vec<_>>();
+        for (p, v) in op.constant_fold(&known_ins).unwrap_or(Vec::new()) {
+            // Hmmm, we should (at least) key the value also by p
+            outs[p.index()] = self.value_from_const(node, &v);
+        }
     }
 }
 

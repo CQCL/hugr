@@ -100,8 +100,5 @@ fn traverse_value<V>(
     }
 }
 
-mod total_context;
-pub use total_context::TotalContext;
-
 #[cfg(test)]
 mod test;
