@@ -110,10 +110,10 @@ impl From<ValueHandle> for Value {
         match value {
             ValueHandle::Hashable(HashedConst { val, .. })
             | ValueHandle::Unhashable(_, Either::Left(val)) => Value::Extension {
-                e: Arc::unwrap_or_clone(val),
+                e: Arc::try_unwrap(val).unwrap_or_else(|a| a.as_ref().clone()),
             },
             ValueHandle::Unhashable(_, Either::Right(hugr)) => {
-                Value::function(Arc::unwrap_or_clone(hugr))
+                Value::function(Arc::try_unwrap(hugr).unwrap_or_else(|a| a.as_ref().clone()))
                     .map_err(|e| e.to_string())
                     .unwrap()
             }

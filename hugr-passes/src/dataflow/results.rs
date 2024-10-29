@@ -17,7 +17,7 @@ pub struct AnalysisResults<V: AbstractValue, C: DFContext<V>> {
 impl<V: AbstractValue, C: DFContext<V>> AnalysisResults<V, C> {
     /// Allows to use the [HugrView] contained within
     pub fn hugr(&self) -> &C::View {
-        &*self.hugr
+        &self.hugr
     }
 
     /// Gets the lattice value computed for the given wire

@@ -194,7 +194,7 @@ impl<'a, H: HugrView> ConstLoader<ValueHandle> for ConstFoldContext<'a, H> {
     }
 
     fn value_from_function(&self, node: Node, type_args: &[TypeArg]) -> Option<ValueHandle> {
-        if type_args.len() > 0 {
+        if !type_args.is_empty() {
             // TODO: substitution across Hugr (https://github.com/CQCL/hugr/issues/709)
             return None;
         };
@@ -236,7 +236,7 @@ impl<'a, H: HugrView> DFContext<ValueHandle> for ConstFoldContext<'a, H> {
                 Some((IncomingPort::from(i), v))
             })
             .collect::<Vec<_>>();
-        for (p, v) in op.constant_fold(&known_ins).unwrap_or(Vec::new()) {
+        for (p, v) in op.constant_fold(&known_ins).unwrap_or_default() {
             // Hmmm, we should (at least) key the value also by p
             outs[p.index()] = self.value_from_const(node, &v);
         }

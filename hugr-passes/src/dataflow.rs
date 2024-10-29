@@ -19,6 +19,8 @@ use hugr_core::{Hugr, HugrView, Node};
 /// Clients of the dataflow framework (particular analyses, such as constant folding)
 /// must implement this trait (including providing an appropriate domain type `V`).
 pub trait DFContext<V>: ConstLoader<V> + std::ops::Deref<Target = Self::View> {
+    /// Type of view contained within this context. (Ideally we'd constrain
+    /// by `std::ops::Deref<Target: impl HugrView` but that's not stable yet.)
     type View: HugrView;
 
     /// Given lattice values for each input, update lattice values for the (dataflow) outputs.
