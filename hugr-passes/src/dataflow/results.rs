@@ -7,7 +7,7 @@ use super::{AbstractValue, PartialValue};
 /// Results of a dataflow analysis, packaged with the Hugr for easy inspection.
 /// Methods allow inspection, specifically [read_out_wire](Self::read_out_wire).
 pub struct AnalysisResults<V: AbstractValue, H: HugrView> {
-    pub hugr: H,
+    pub(super) hugr: H,
     pub(super) in_wire_value: Vec<(Node, IncomingPort, PartialValue<V>)>,
     pub(super) case_reachable: Vec<(Node, Node)>,
     pub(super) bb_reachable: Vec<(Node, Node)>,
@@ -15,6 +15,16 @@ pub struct AnalysisResults<V: AbstractValue, H: HugrView> {
 }
 
 impl<V: AbstractValue, H: HugrView> AnalysisResults<V, H> {
+    /// Allows to use the [HugrView] contained within
+    pub fn hugr(&self) -> &H {
+        &self.hugr
+    }
+
+    /// Discards the results, allowing to get back the [HugrView] within
+    pub fn into_hugr(self) -> H {
+        self.hugr
+    }
+
     /// Gets the lattice value computed for the given wire
     pub fn read_out_wire(&self, w: Wire) -> Option<PartialValue<V>> {
         self.out_wire_values.get(&w).cloned()

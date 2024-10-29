@@ -308,7 +308,7 @@ fn propagate_leaf_op<V: AbstractValue>(
         }
         OpType::ExtensionOp(e) => {
             // Interpret op.
-            let init =  if ins.iter().contains(&PartialValue::Bottom) {
+            let init = if ins.iter().contains(&PartialValue::Bottom) {
                 // So far we think one or more inputs can't happen.
                 // So, don't pollute outputs with Top, and wait for better knowledge of inputs.
                 PartialValue::Bottom

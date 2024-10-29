@@ -43,40 +43,46 @@ impl ConstFoldPass {
     fn run_no_validate(&self, hugr: &mut impl HugrMut) -> Result<(), ValidatePassError> {
         let results = Machine::default().run(ConstFoldContext(hugr), []);
         let mut keep_nodes = HashSet::new();
-        self.find_needed_nodes(&results, results.hugr.root(), &mut keep_nodes);
+        self.find_needed_nodes(&results, results.hugr().root(), &mut keep_nodes);
 
         let remove_nodes = results
-            .hugr
+            .hugr()
             .nodes()
             .filter(|n| !keep_nodes.contains(n))
             .collect::<HashSet<_>>();
-        for n in keep_nodes {
-            // Every input either (a) is in keep_nodes, or (b) has a known value. Break all wires (b).
-            for inport in results.hugr.node_inputs(n) {
-                if matches!(
-                    results.hugr.get_optype(n).port_kind(inport).unwrap(),
+        let wires_to_break = keep_nodes
+            .into_iter()
+            .flat_map(|n| results.hugr().node_inputs(n).map(move |ip| (n, ip)))
+            .filter(|(n, ip)| {
+                matches!(
+                    results.hugr().get_optype(*n).port_kind(*ip).unwrap(),
                     EdgeKind::Value(_)
-                ) {
-                    let (src, outp) = results.hugr.single_linked_output(n, inport).unwrap();
-                    if results.hugr.get_optype(src).is_load_constant() {
-                        continue;
-                    }
-                    if let Ok(v) = results.try_read_wire_value(Wire::new(src, outp)) {
-                        let parent = results.hugr.get_parent(n).unwrap();
-                        let datatype = v.get_type();
-                        // We could try hash-consing identical Consts, but not ATM
-                        let hugr_mut = &mut *results.hugr.0;
-                        let cst = hugr_mut.add_node_with_parent(parent, Const::new(v));
-                        let lcst = hugr_mut.add_node_with_parent(parent, LoadConstant { datatype });
-                        hugr_mut.connect(cst, OutgoingPort::from(0), lcst, IncomingPort::from(0));
-                        hugr_mut.disconnect(n, inport);
-                        hugr_mut.connect(lcst, OutgoingPort::from(0), n, inport);
-                    }
-                }
-            }
+                )
+            })
+            // Note we COULD filter out (avoid breaking) wires from other nodes that we are keeping.
+            // This would insert fewer constants, but potentially expose less parallelism.
+            .filter_map(|(n, ip)| {
+                let (src, outp) = results.hugr().single_linked_output(n, ip).unwrap();
+                (!results.hugr().get_optype(src).is_load_constant()).then_some((
+                    n,
+                    ip,
+                    results.try_read_wire_value(Wire::new(src, outp)).ok()?,
+                ))
+            })
+            .collect::<Vec<_>>();
+        let hugr_mut = results.into_hugr().0; // and drop 'results'
+        for (n, inport, v) in wires_to_break {
+            let parent = hugr_mut.get_parent(n).unwrap();
+            let datatype = v.get_type();
+            // We could try hash-consing identical Consts, but not ATM
+            let cst = hugr_mut.add_node_with_parent(parent, Const::new(v));
+            let lcst = hugr_mut.add_node_with_parent(parent, LoadConstant { datatype });
+            hugr_mut.connect(cst, OutgoingPort::from(0), lcst, IncomingPort::from(0));
+            hugr_mut.disconnect(n, inport);
+            hugr_mut.connect(lcst, OutgoingPort::from(0), n, inport);
         }
         for n in remove_nodes {
-            hugr.remove_node(n);
+            hugr_mut.remove_node(n);
         }
         Ok(())
     }
@@ -98,7 +104,7 @@ impl ConstFoldPass {
     ) {
         let mut q = VecDeque::new();
         q.push_back(root);
-        let h = &results.hugr;
+        let h = results.hugr();
         while let Some(n) = q.pop_front() {
             if !needed.insert(n) {
                 continue;
@@ -132,7 +138,7 @@ impl ConstFoldPass {
             for (src, op) in h.all_linked_outputs(n) {
                 let needs_predecessor = match h.get_optype(src).port_kind(op).unwrap() {
                     EdgeKind::Value(_) => {
-                        results.hugr.get_optype(src).is_load_constant()
+                        results.hugr().get_optype(src).is_load_constant()
                             || results.try_read_wire_value(Wire::new(src, op)).is_err()
                     }
                     EdgeKind::StateOrder | EdgeKind::Const(_) | EdgeKind::Function(_) => true,
