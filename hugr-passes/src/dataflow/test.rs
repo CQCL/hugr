@@ -25,12 +25,13 @@ impl AbstractValue for Void {}
 
 struct TestContext<H>(H);
 
-impl<H> ConstLoader<Void> for TestContext<H> {}
-impl<H: HugrView> DFContext<Void> for TestContext<H> {
-    fn hugr(&self) -> &impl HugrView {
-        &self.0
+impl<H: HugrView> AsRef<Hugr> for TestContext<H> {
+    fn as_ref(&self) -> &Hugr {
+        self.0.base_hugr()
     }
 }
+impl<H> ConstLoader<Void> for TestContext<H> {}
+impl<H: HugrView> DFContext<Void> for TestContext<H> {}
 
 // This allows testing creation of tuple/sum Values (only)
 impl From<Void> for Value {
