@@ -8,6 +8,8 @@ use super::{ConstLoader, DFContext};
 /// values that are completely known (in the lattice `V`) rather than partially
 /// (e.g. no [PartialSum]s of more than one variant, no top/bottom)
 pub trait TotalContext<V>: ConstLoader<V> {
+    fn hugr(&self) -> &impl HugrView;
+
     /// Representation of a (single, non-partial) value usable for interpretation
     type InterpretableVal: From<V> + TryFrom<Sum<Self::InterpretableVal>>;
 
@@ -21,7 +23,11 @@ pub trait TotalContext<V>: ConstLoader<V> {
     ) -> Vec<(OutgoingPort, PartialValue<V>)>;
 }
 
-impl<V: AbstractValue, T: TotalContext<V> + ConstLoader<V> + HugrView> DFContext<V> for T {
+impl<V: AbstractValue + 'static, T: TotalContext<V> + ConstLoader<V>> DFContext<V> for T {
+    fn hugr(&self) -> &impl HugrView {
+        TotalContext::hugr(self)
+    }
+
     fn interpret_leaf_op(
         &self,
         node: Node,
