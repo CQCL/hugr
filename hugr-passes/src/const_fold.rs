@@ -73,19 +73,19 @@ impl ConstFoldPass {
                 ))
             })
             .collect::<Vec<_>>();
-        let hugr_mut = results.into_hugr().0; // and drop 'results'
+
         for (n, inport, v) in wires_to_break {
-            let parent = hugr_mut.get_parent(n).unwrap();
+            let parent = hugr.get_parent(n).unwrap();
             let datatype = v.get_type();
             // We could try hash-consing identical Consts, but not ATM
-            let cst = hugr_mut.add_node_with_parent(parent, Const::new(v));
-            let lcst = hugr_mut.add_node_with_parent(parent, LoadConstant { datatype });
-            hugr_mut.connect(cst, OutgoingPort::from(0), lcst, IncomingPort::from(0));
-            hugr_mut.disconnect(n, inport);
-            hugr_mut.connect(lcst, OutgoingPort::from(0), n, inport);
+            let cst = hugr.add_node_with_parent(parent, Const::new(v));
+            let lcst = hugr.add_node_with_parent(parent, LoadConstant { datatype });
+            hugr.connect(cst, OutgoingPort::from(0), lcst, IncomingPort::from(0));
+            hugr.disconnect(n, inport);
+            hugr.connect(lcst, OutgoingPort::from(0), n, inport);
         }
         for n in remove_nodes {
-            hugr_mut.remove_node(n);
+            hugr.remove_node(n);
         }
         Ok(())
     }
