@@ -13,7 +13,6 @@ use hugr_core::{
     },
     ops::{
         constant::OpaqueValue, handle::FuncID, Const, DataflowOpTrait, ExtensionOp, LoadConstant,
-        Value,
     },
     types::{EdgeKind, TypeArg},
     HugrView, IncomingPort, Node, OutgoingPort, PortIndex, Wire,
@@ -226,14 +225,7 @@ impl<'a, H: HugrView> DFContext<ValueHandle> for ConstFoldContext<'a, H> {
             .enumerate()
             .zip(ins.iter())
             .filter_map(|((i, ty), pv)| {
-                let v = match pv {
-                    PartialValue::Bottom | PartialValue::Top => None,
-                    PartialValue::Value(v) => Some(v.clone().into()),
-                    PartialValue::PartialSum(ps) => {
-                        Value::try_from(ps.clone().try_into_value::<Value>(ty).ok()?).ok()
-                    }
-                }?;
-                Some((IncomingPort::from(i), v))
+                Some((IncomingPort::from(i), pv.clone().try_into_value(ty).ok()?))
             })
             .collect::<Vec<_>>();
         for (p, v) in op.constant_fold(&known_ins).unwrap_or_default() {
