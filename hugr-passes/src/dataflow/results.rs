@@ -90,7 +90,7 @@ where
     ///
     /// # Errors
     /// `None` if the analysis did not produce a result for that wire
-    /// `Some(e)` if conversion to a [Value] failed with error `e`
+    /// `Some(e)` if conversion to a [Value] failed with error `e`, see [PartialValue::try_into_value]
     ///
     /// # Panics
     ///

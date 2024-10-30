@@ -142,15 +142,14 @@ impl<V: AbstractValue> PartialSum<V> {
         self.0.contains_key(&tag)
     }
 
-    /// Turns this instance into a [Sum] of some target value type `V2`,
+    /// Turns this instance into a [Sum] of some "concrete" value type `V2`,
     /// *if* this PartialSum has exactly one possible tag.
     ///
     /// # Errors
-    /// `None` if this PartialSum had multiple possible tags; or, if there was a single
-    /// tag, but `typ` was not a [TypeEnum::Sum] supporting that tag and containing no
-    /// row variables within that variant and of the correct number of variants
-    /// `Some(e)` if none of the error conditions above applied, but there was an error
-    /// `e` in converting one of the variant elements into `V2` via [PartialValue::try_into_value]
+    ///
+    /// If this PartialSum had multiple possible tags; or if `typ` was not a [TypeEnum::Sum]
+    /// supporting the single possible tag with the correct number of elements and no row variables;
+    /// or if converting a child element failed via [PartialValue::try_into_value].
     pub fn try_into_value<VE, SE, V2: TryFrom<V, Error = VE> + TryFrom<Sum<V2>, Error = SE>>(
         self,
         typ: &Type,
@@ -181,6 +180,8 @@ impl<V: AbstractValue> PartialSum<V> {
     }
 }
 
+/// An error converting a [PartialValue] or [PartialSum] into a concrete value type
+/// via [PartialValue::try_into_value] or [PartialSum::try_into_value]
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
 #[allow(missing_docs)]
 pub enum ExtractValueError<V, VE, SE> {
@@ -324,13 +325,15 @@ impl<V: AbstractValue> PartialValue<V> {
         }
     }
 
-    /// Turns this instance into a target value type `V2` if it is a single value,
-    /// or a [PartialValue::PartialSum] convertible by [PartialSum::try_into_value].
+    /// Turns this instance into some "concrete" value type `V2`, *if* it is a single value,
+    /// or a [Sum](PartialValue::PartialSum) (of a single tag) convertible by
+    /// [PartialSum::try_into_value].
     ///
     /// # Errors
     ///
-    /// `None` if this is [Bottom](PartialValue::Bottom) or [Top](PartialValue::Top),
-    /// otherwise as per [PartialSum::try_into_value]
+    /// If this PartialValue was `Top` or `Bottom`, or was a [PartialSum](PartialValue::PartialSum)
+    /// that could not be converted into a [Sum] by [PartialSum::try_into_value] (e.g. if `typ` is
+    /// incorrect), or if that [Sum] could not be converted into a `V2`.
     pub fn try_into_value<VE, SE, V2: TryFrom<V, Error = VE> + TryFrom<Sum<V2>, Error = SE>>(
         self,
         typ: &Type,
