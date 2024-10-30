@@ -98,7 +98,7 @@ where
     pub fn try_read_wire_value(
         &self,
         w: Wire,
-    ) -> Result<Value, Option<ExtractValueError<V, ConstTypeError>>> {
+    ) -> Result<Value, Option<ExtractValueError<V, std::convert::Infallible, ConstTypeError>>> {
         let v = self.read_out_wire(w).ok_or(None)?;
         let (_, typ) = self
             .hugr()
