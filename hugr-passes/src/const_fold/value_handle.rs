@@ -1,3 +1,5 @@
+//! Total equality (and hence [AbstractValue] support for [Value]s
+//! (by adding a source-Node and part unhashable constants)
 use std::collections::hash_map::DefaultHasher; // Moves into std::hash in Rust 1.76.
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
@@ -9,6 +11,7 @@ use itertools::Either;
 
 use crate::dataflow::AbstractValue;
 
+/// A custom constant that has been successfully hashed via [TryHash](hugr_core::ops::constant::TryHash)
 #[derive(Clone, Debug)]
 pub struct HashedConst {
     hash: u64,
@@ -39,9 +42,15 @@ impl Hash for HashedConst {
     }
 }
 
+/// A [Node] (expected to be a [Const]) and, for Sum constants, optionally,
+/// indices of elements (nested arbitrarily deeply) within that.
+///
+/// [Const]: hugr_core::ops::Const
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum NodePart {
+    /// The specified-index'th field of the [Sum](Value::Sum) constant identified by the RHS
     Field(usize, Box<NodePart>),
+    /// The entire value produced by the node
     Node(Node),
 }
 
@@ -53,13 +62,18 @@ impl NodePart {
     }
 }
 
+/// An [Eq]-able and [Hash]-able leaf (non-[Sum](Value::Sum)) Value
 #[derive(Clone, Debug)]
 pub enum ValueHandle {
+    /// A [Value::Extension] that has been hashed
     Hashable(HashedConst),
+    /// Either a [Value::Extension] that can't be hashed, or a [Value::Function].
     Unhashable(NodePart, Either<Arc<OpaqueValue>, Arc<Hugr>>),
 }
 
 impl ValueHandle {
+    /// Makes a new instance from an [OpaqueValue] given the node and (for a [Sum](Value::Sum))
+    /// field indices within that (used only if the custom constant is not hashable).
     pub fn new_opaque(node: Node, fields: &[usize], val: OpaqueValue) -> Self {
         let arc = Arc::new(val);
         HashedConst::try_new(arc.clone()).map_or(
@@ -68,6 +82,7 @@ impl ValueHandle {
         )
     }
 
+    /// New instance for a [Value::Function] found within a node
     pub fn new_const_hugr(node: Node, fields: &[usize], val: Box<Hugr>) -> Self {
         Self::Unhashable(NodePart::new(node, fields), Either::Right(Arc::from(val)))
     }

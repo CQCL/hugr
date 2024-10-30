@@ -1,7 +1,7 @@
+#![warn(missing_docs)]
 //! An (example) use of the [super::dataflow](dataflow-analysis framework)
 //! to perform constant-folding.
 
-// These are pub because this "example" is used for testing the framework.
 pub mod value_handle;
 use std::collections::{HashSet, VecDeque};
 
@@ -36,6 +36,7 @@ pub struct ConstFoldPass {
 }
 
 impl ConstFoldPass {
+    /// Sets the validation level used before and after the pass is run
     pub fn validation_level(mut self, level: ValidationLevel) -> Self {
         self.validation = level;
         self
@@ -89,6 +90,7 @@ impl ConstFoldPass {
         Ok(())
     }
 
+    /// Run the pass using this configuration
     pub fn run<H: HugrMut>(
         &self,
         hugr: &mut H,
