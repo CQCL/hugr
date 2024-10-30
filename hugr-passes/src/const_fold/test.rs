@@ -2,12 +2,13 @@ use std::collections::HashSet;
 
 use hugr_core::builder::{endo_sig, inout_sig, Container, DFGBuilder, Dataflow, DataflowHugr};
 use hugr_core::extension::prelude::{
-    const_ok, sum_with_error, ConstError, ConstString, MakeTuple, UnpackTuple, BOOL_T, ERROR_TYPE, STRING_TYPE
+    const_ok, sum_with_error, ConstError, ConstString, MakeTuple, UnpackTuple, BOOL_T, ERROR_TYPE,
+    STRING_TYPE,
 };
 use hugr_core::extension::{ExtensionRegistry, PRELUDE};
 use hugr_core::hugr::hugrmut::HugrMut;
-use hugr_core::ops::{OpTag, OpTrait};
 use hugr_core::ops::{constant::CustomConst, OpType, Value};
+use hugr_core::ops::{OpTag, OpTrait};
 use hugr_core::std_extensions::arithmetic::{
     self,
     conversions::ConvertOpDef,
@@ -1562,42 +1563,49 @@ fn test_fold_int_ops() {
 }
 
 #[test]
-fn test_via_tuple() {
-    // fn(x) -> let (a,b,c) = (4,5,x) // make tuple, unpack tuple
-    //          in (a+b)+c
+fn test_via_part_unknown_tuple() {
+    // fn(x) -> let (a,_b,c) = (4,x,5) // make tuple, unpack tuple
+    //          in a+b
     let mut builder = DFGBuilder::new(endo_sig(INT_TYPES[3].clone())).unwrap();
     let [x] = builder.input_wires_arr();
     let cst4 = builder.add_load_value(ConstInt::new_u(3, 4).unwrap());
     let cst5 = builder.add_load_value(ConstInt::new_u(3, 5).unwrap());
     let tuple_ty = TypeRow::from(vec![INT_TYPES[3].clone(); 3]);
-    let tup = builder.add_dataflow_op(MakeTuple::new(tuple_ty.clone()), [cst4, cst5, x]).unwrap();
-    let untup = builder.add_dataflow_op(UnpackTuple::new(tuple_ty), tup.outputs()).unwrap();
-    let [a,b,c] = untup.outputs_arr();
-    let add_ab = builder.add_dataflow_op(IntOpDef::iadd.with_log_width(3), [a,b]).unwrap();
-    let [ab] = add_ab.outputs_arr();
-    let res = builder.add_dataflow_op(IntOpDef::iadd.with_log_width(3), [ab,c]).unwrap();
+    let tup = builder
+        .add_dataflow_op(MakeTuple::new(tuple_ty.clone()), [cst4, x, cst5])
+        .unwrap();
+    let untup = builder
+        .add_dataflow_op(UnpackTuple::new(tuple_ty), tup.outputs())
+        .unwrap();
+    let [a, _b, c] = untup.outputs_arr();
+    let res = builder
+        .add_dataflow_op(IntOpDef::iadd.with_log_width(3), [a, c])
+        .unwrap();
     let reg = ExtensionRegistry::try_new([arithmetic::int_types::EXTENSION.to_owned()]).unwrap();
-    let mut hugr = builder.finish_hugr_with_outputs(res.outputs(), &reg).unwrap();
-    
-    constant_fold_pass(&mut hugr, &reg);
-    println!("{}", hugr.mermaid_string());
+    let mut hugr = builder
+        .finish_hugr_with_outputs(res.outputs(), &reg)
+        .unwrap();
 
-    // We expect: root dfg, input, output, const 9, load constant, iadd, MAKETUPLE, UNPACKTUPLE
-    let mut expected_op_tags = Vec::from_iter([OpTag::Dfg, OpTag::Input, OpTag::Output, OpTag::Const, OpTag::LoadConst]);
-    let mut expected_opaque_names: HashSet<_, std::hash::RandomState> = HashSet::from_iter(["MakeTuple", "UnpackTuple", "iadd"]);
+    constant_fold_pass(&mut hugr, &reg);
+
+    // We expect: root dfg, input, output, const 9, load constant, iadd
+    let mut expected_op_tags: HashSet<_, std::hash::RandomState> = [
+        OpTag::Dfg,
+        OpTag::Input,
+        OpTag::Output,
+        OpTag::Const,
+        OpTag::LoadConst,
+    ]
+    .map(|t| t.to_string())
+    .into_iter()
+    .collect();
     for n in hugr.nodes() {
         let t = hugr.get_optype(n);
-        if let Some(e) = t.as_extension_op() {
-            let removed = expected_opaque_names.remove(e.def().name().as_str());
-            assert!(removed);
-        } else {
-            let Some((idx, _)) = expected_op_tags.iter().enumerate().find(|(_,v)| **v == t.tag()) else {
-                panic!("Did not expect {:?}", t);
-            };
-            expected_op_tags.remove(idx);
-            if let Some(c) = t.as_const() {
-                assert_eq!(c.value, ConstInt::new_u(3, 9).unwrap().into())
-            }
+        let removed = expected_op_tags.remove(&t.tag().to_string());
+        assert!(removed);
+        if let Some(c) = t.as_const() {
+            assert_eq!(c.value, ConstInt::new_u(3, 9).unwrap().into())
         }
     }
+    assert!(expected_op_tags.is_empty());
 }
