@@ -46,8 +46,8 @@ pub trait DataflowOpTrait {
     /// If not None, an extra input port of that kind will be present after the
     /// dataflow input ports and before any [`DataflowOpTrait::other_input`] ports.
     #[inline]
-    fn static_input(&self) -> Option<EdgeKind> {
-        None
+    fn static_input(&self) -> Vec<EdgeKind> {
+        vec![]
     }
 }
 
@@ -148,7 +148,7 @@ impl<T: DataflowOpTrait> OpTrait for T {
         DataflowOpTrait::other_output(self)
     }
 
-    fn static_input(&self) -> Option<EdgeKind> {
+    fn static_input(&self) ->Vec<EdgeKind> {
         DataflowOpTrait::static_input(self)
     }
 }
@@ -184,8 +184,8 @@ impl DataflowOpTrait for Call {
         self.instantiation.clone()
     }
 
-    fn static_input(&self) -> Option<EdgeKind> {
-        Some(EdgeKind::Function(self.called_function_type().clone()))
+    fn static_input(&self) -> Vec<EdgeKind> {
+        vec![EdgeKind::Function(self.called_function_type().clone())]
     }
 }
 impl Call {
@@ -300,8 +300,8 @@ impl DataflowOpTrait for LoadConstant {
         Signature::new(TypeRow::new(), vec![self.datatype.clone()])
     }
 
-    fn static_input(&self) -> Option<EdgeKind> {
-        Some(EdgeKind::Const(self.constant_type().clone()))
+    fn static_input(&self) -> Vec<EdgeKind> {
+        vec![EdgeKind::Const(self.constant_type().clone())]
     }
 }
 impl LoadConstant {
@@ -355,8 +355,8 @@ impl DataflowOpTrait for LoadFunction {
         self.signature.clone()
     }
 
-    fn static_input(&self) -> Option<EdgeKind> {
-        Some(EdgeKind::Function(self.func_sig.clone()))
+    fn static_input(&self) -> Vec<EdgeKind> {
+        vec![EdgeKind::Function(self.func_sig.clone())]
     }
 }
 impl LoadFunction {
