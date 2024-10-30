@@ -151,7 +151,7 @@ impl<V: AbstractValue> PartialSum<V> {
     /// row variables within that variant and of the correct number of variants
     /// `Some(e)` if none of the error conditions above applied, but there was an error
     /// `e` in converting one of the variant elements into `V2` via [PartialValue::try_into_value]
-    pub fn try_into_value<E, V2: From<V> + TryFrom<Sum<V2>, Error=E>>(
+    pub fn try_into_value<E, V2: From<V> + TryFrom<Sum<V2>, Error = E>>(
         self,
         typ: &Type,
     ) -> Result<Sum<V2>, ExtractValueError<V, E>> {
