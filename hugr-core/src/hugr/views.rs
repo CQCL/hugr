@@ -416,11 +416,13 @@ pub trait HugrView: HugrInternals {
             .finish()
     }
 
-    /// If a node has a static input, return the source node.
-    fn static_source(&self, node: Node) -> Option<Node> {
-        self.linked_outputs(node, self.get_optype(node).static_input_port()?)
-            .next()
-            .map(|(n, _)| n)
+    /// If a node has static inputs, return the source nodes.
+    fn static_sources(&self, node: Node) -> Vec<Node> {
+        self.get_optype(node)
+            .static_input_ports()
+            .into_iter()
+            .filter_map(|port| self.linked_outputs(node, port).next().map(|(n, _)| n))
+            .collect()
     }
 
     /// If a node has a static output, return the targets.

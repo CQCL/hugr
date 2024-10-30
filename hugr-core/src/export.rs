@@ -151,7 +151,7 @@ impl<'a> Context<'a> {
     /// Get the node that declares or defines the function associated with the given
     /// node via the static input. Returns `None` if the node is not connected to a function.
     fn connected_function(&self, node: Node) -> Option<Node> {
-        let func_node = self.hugr.static_source(node)?;
+        let func_node = *self.hugr.static_sources(node).first()?;
 
         match self.hugr.get_optype(func_node) {
             OpType::FuncDecl(_) => Some(func_node),

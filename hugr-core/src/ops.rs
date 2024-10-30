@@ -157,17 +157,10 @@ impl OpType {
     /// given direction after any dataflow ports and before any
     /// [`OpType::other_port_kind`] ports.
     #[inline]
-    pub fn static_port_kind(&self, dir: Direction) -> Option<EdgeKind> {
+    pub fn static_port_kind(&self, dir: Direction) -> Vec<EdgeKind> {
         match dir {
-            Direction::Incoming => {
-                let mut v = self.static_input();
-                if v.is_empty() {
-                    None
-                } else {
-                   Some(v.remove(0))
-                }
-            }
-            Direction::Outgoing => self.static_output(),
+            Direction::Incoming => self.static_input(),
+            Direction::Outgoing => self.static_output().map(|k| vec![k]).unwrap_or_default(),
         }
     }
 
@@ -188,11 +181,10 @@ impl OpType {
         }
 
         // Constant port
-        let static_kind = self.static_port_kind(dir);
-        if port.index() == port_count {
-            if let Some(kind) = static_kind {
-                return Some(kind);
-            }
+        let mut static_kind = self.static_port_kind(dir);
+        let static_offset = port.index() - port_count;
+        if static_offset < static_kind.len() {
+            return Some(static_kind.remove(static_offset));
         }
 
         // Non-dataflow ports
@@ -232,28 +224,35 @@ impl OpType {
             .map(|p| p.as_outgoing().unwrap())
     }
 
-    /// If the op has a static port, the port of that input.
+    /// The static ports of the operation.
     ///
-    /// See [`OpType::static_input_port`] and [`OpType::static_output_port`].
+    /// See [`OpType::static_input_ports`] and [`OpType::static_output_port`].
     #[inline]
-    pub fn static_port(&self, dir: Direction) -> Option<Port> {
-        self.static_port_kind(dir)?;
-        Some(Port::new(dir, self.value_port_count(dir)))
+    pub fn static_ports(&self, dir: Direction) -> Vec<Port> {
+        let static_len = self.static_port_kind(dir).len();
+        (0..static_len)
+            .map(|i| Port::new(dir, self.value_port_count(dir) + i))
+            .collect()
     }
 
-    /// If the op has a static input ([`Call`], [`LoadConstant`], and [`LoadFunction`]), the port of
-    /// that input.
+    /// If the op has static inputs, the port of those inputs.
     #[inline]
-    pub fn static_input_port(&self) -> Option<IncomingPort> {
-        self.static_port(Direction::Incoming)
+    pub fn static_input_ports(&self) -> Vec<IncomingPort> {
+        self.static_ports(Direction::Incoming)
+            .into_iter()
             .map(|p| p.as_incoming().unwrap())
+            .collect()
     }
 
     /// If the op has a static output ([`Const`], [`FuncDefn`], [`FuncDecl`]), the port of that output.
     #[inline]
     pub fn static_output_port(&self) -> Option<OutgoingPort> {
-        self.static_port(Direction::Outgoing)
-            .map(|p| p.as_outgoing().unwrap())
+        if let [p] = self.static_ports(Direction::Outgoing).as_slice() {
+            Some(p.as_outgoing().unwrap())
+        } else {
+            None
+        }
+        // .map(|p| p.as_outgoing().unwrap()).collect()
     }
 
     /// The number of Value ports in given direction.
@@ -279,9 +278,9 @@ impl OpType {
     /// Returns the number of ports for the given direction.
     #[inline]
     pub fn port_count(&self, dir: Direction) -> usize {
-        let has_static_port = self.static_port_kind(dir).is_some();
+        let static_len = self.static_port_kind(dir).len();
         let non_df_count = self.non_df_port_count(dir);
-        self.value_port_count(dir) + has_static_port as usize + non_df_count
+        self.value_port_count(dir) + static_len + non_df_count
     }
 
     /// Returns the number of inputs ports for the operation.

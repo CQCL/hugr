@@ -148,7 +148,7 @@ impl<T: DataflowOpTrait> OpTrait for T {
         DataflowOpTrait::other_output(self)
     }
 
-    fn static_input(&self) ->Vec<EdgeKind> {
+    fn static_input(&self) -> Vec<EdgeKind> {
         DataflowOpTrait::static_input(self)
     }
 }
@@ -215,7 +215,7 @@ impl Call {
 
     /// The IncomingPort which links to the function being called.
     ///
-    /// This matches [`OpType::static_input_port`].
+    /// This matches [`OpType::static_input_ports`].
     ///
     /// ```
     /// # use hugr::ops::dataflow::Call;
@@ -226,10 +226,10 @@ impl Call {
     /// let signature = Signature::new(vec![QB_T, QB_T], vec![QB_T, QB_T]);
     /// let call = Call::try_new(signature.into(), &[], &PRELUDE_REGISTRY).unwrap();
     /// let op = OpType::Call(call.clone());
-    /// assert_eq!(op.static_input_port(), Some(call.called_function_port()));
+    /// assert_eq!(op.static_input_ports(), vec![call.called_function_port()]);
     /// ```
     ///
-    /// [`OpType::static_input_port`]: crate::ops::OpType::static_input_port
+    /// [`OpType::static_input_ports`]: crate::ops::OpType::static_input_ports
     #[inline]
     pub fn called_function_port(&self) -> IncomingPort {
         self.instantiation.input_count().into()
@@ -313,7 +313,7 @@ impl LoadConstant {
 
     /// The IncomingPort which links to the loaded constant.
     ///
-    /// This matches [`OpType::static_input_port`].
+    /// This matches [`OpType::static_input_ports`].
     ///
     /// ```
     /// # use hugr::ops::dataflow::LoadConstant;
@@ -322,10 +322,10 @@ impl LoadConstant {
     /// let datatype = Type::UNIT;
     /// let load_constant = LoadConstant { datatype };
     /// let op = OpType::LoadConstant(load_constant.clone());
-    /// assert_eq!(op.static_input_port(), Some(load_constant.constant_port()));
+    /// assert_eq!(op.static_input_ports(), vec![load_constant.constant_port()]);
     /// ```
     ///
-    /// [`OpType::static_input_port`]: crate::ops::OpType::static_input_port
+    /// [`OpType::static_input_ports`]: crate::ops::OpType::static_input_ports
     #[inline]
     pub fn constant_port(&self) -> IncomingPort {
         0.into()
@@ -387,9 +387,9 @@ impl LoadFunction {
 
     /// The IncomingPort which links to the loaded function.
     ///
-    /// This matches [`OpType::static_input_port`].
+    /// This matches [`OpType::static_input_ports`].
     ///
-    /// [`OpType::static_input_port`]: crate::ops::OpType::static_input_port
+    /// [`OpType::static_input_ports`]: crate::ops::OpType::static_input_ports
     #[inline]
     pub fn function_port(&self) -> IncomingPort {
         0.into()

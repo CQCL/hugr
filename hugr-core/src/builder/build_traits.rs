@@ -672,7 +672,7 @@ pub trait Dataflow: Container {
             }
         };
         let op: OpType = ops::Call::try_new(type_scheme, type_args, exts)?.into();
-        let const_in_port = op.static_input_port().unwrap();
+        let const_in_port = op.static_input_ports()[0];
         let op_id = self.add_dataflow_op(op, input_wires)?;
         let src_port = self.hugr_mut().num_outputs(function.node()) - 1;
 

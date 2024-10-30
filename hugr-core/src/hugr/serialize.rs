@@ -181,8 +181,11 @@ impl TryFrom<&Hugr> for SerHugrLatest {
 
         let find_offset = |node: Node, offset: usize, dir: Direction, hugr: &Hugr| {
             let op = hugr.get_optype(node);
-            let is_value_port = offset < op.value_port_count(dir);
-            let is_static_input = op.static_port(dir).map_or(false, |p| p.index() == offset);
+            let value_count = op.value_port_count(dir);
+            let is_value_port = offset < value_count;
+            let static_len = op.static_ports(dir).len();
+            let is_static_input = offset < (value_count + static_len);
+            // let is_static_input = op.static_port(dir).map_or(false, |p| p.index() == offset);
             let offset = (is_value_port || is_static_input).then_some(offset as u16);
             (node_rekey[&node], offset)
         };

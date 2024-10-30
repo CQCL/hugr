@@ -322,7 +322,7 @@ fn test_local_const() {
 
     h.connect(cst, 0, lcst, 0);
     h.connect(lcst, 0, and, 1);
-    assert_eq!(h.static_source(lcst), Some(cst));
+    assert_eq!(h.static_sources(lcst), vec![cst]);
     // There is no edge from Input to LoadConstant, but that's OK:
     h.update_validate(&EMPTY_REG).unwrap();
 }

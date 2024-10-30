@@ -251,7 +251,12 @@ impl<'a> Context<'a> {
             let src = self.nodes[&src_id];
             let dst = self.nodes[&dst_id];
             let src_port = self.hugr.get_optype(src).static_output_port().unwrap();
-            let dst_port = self.hugr.get_optype(dst).static_input_port().unwrap();
+            let dst_port = *self
+                .hugr
+                .get_optype(dst)
+                .static_input_ports()
+                .first()
+                .unwrap();
             self.hugr.connect(src, src_port, dst, dst_port);
         }
 

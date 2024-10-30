@@ -160,7 +160,7 @@ fn static_targets() {
 
     let h = dfg.finish_prelude_hugr_with_outputs([load]).unwrap();
 
-    assert_eq!(h.static_source(load.node()), Some(c.node()));
+    assert_eq!(h.static_sources(load.node()), vec![c.node()]);
 
     assert_eq!(
         &h.static_targets(c.node()).unwrap().collect_vec()[..],
