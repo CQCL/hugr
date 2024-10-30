@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use hugr_core::{ops::Value, types::ConstTypeError, HugrView, IncomingPort, Node, PortIndex, Wire};
 
-use super::{AbstractValue, DFContext, PartialValue};
+use super::{partial_value::ExtractValueError, AbstractValue, DFContext, PartialValue};
 
 /// Results of a dataflow analysis, packaged with the Hugr for easy inspection.
 /// Methods allow inspection, specifically [read_out_wire](Self::read_out_wire).
@@ -89,20 +89,23 @@ where
     /// a [Sum](PartialValue::PartialSum) with a single known tag.)
     ///
     /// # Errors
-    /// `None` if the analysis did not result in a single value on that wire
-    /// `Some(e)` if conversion to a [Value] produced a [ConstTypeError]
+    /// `None` if the analysis did not produce a result for that wire
+    /// `Some(e)` if conversion to a [Value] failed with error `e`
     ///
     /// # Panics
     ///
     /// If a [Type](hugr_core::types::Type) for the specified wire could not be extracted from the Hugr
-    pub fn try_read_wire_value(&self, w: Wire) -> Result<Value, Option<ConstTypeError>> {
+    pub fn try_read_wire_value(
+        &self,
+        w: Wire,
+    ) -> Result<Value, Option<ExtractValueError<V, ConstTypeError>>> {
         let v = self.read_out_wire(w).ok_or(None)?;
         let (_, typ) = self
             .hugr()
             .out_value_types(w.node())
             .find(|(p, _)| *p == w.source())
             .unwrap();
-        v.try_into_value(&typ)
+        v.try_into_value(&typ).map_err(Some)
     }
 }
 

@@ -6,6 +6,7 @@ use itertools::{zip_eq, Itertools};
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
+use thiserror::Error;
 
 /// Trait for an underlying domain of abstract values which can form the *elements* of a
 /// [PartialValue] and thus be used in dataflow analysis.
@@ -150,29 +151,55 @@ impl<V: AbstractValue> PartialSum<V> {
     /// row variables within that variant and of the correct number of variants
     /// `Some(e)` if none of the error conditions above applied, but there was an error
     /// `e` in converting one of the variant elements into `V2` via [PartialValue::try_into_value]
-    pub fn try_into_value<V2: From<V> + TryFrom<Sum<V2>>>(
+    pub fn try_into_value<E, V2: From<V> + TryFrom<Sum<V2>, Error=E>>(
         self,
         typ: &Type,
-    ) -> Result<Sum<V2>, Option<<V2 as TryFrom<Sum<V2>>>::Error>> {
-        let (k, v) = self.0.iter().exactly_one().map_err(|_| None)?;
-        let TypeEnum::Sum(st) = typ.as_type_enum() else {
-            Err(None)?
+    ) -> Result<Sum<V2>, ExtractValueError<V, E>> {
+        let Ok((k, v)) = self.0.iter().exactly_one() else {
+            return Err(ExtractValueError::MultipleVariants(self));
         };
-        let Some(r) = st.get_variant(*k) else {
-            Err(None)?
-        };
-        let r: TypeRow = r.clone().try_into().map_err(|_| None)?;
-        if v.len() != r.len() {
-            return Err(None);
+        if let TypeEnum::Sum(st) = typ.as_type_enum() {
+            if let Some(r) = st.get_variant(*k) {
+                if let Ok(r) = TypeRow::try_from(r.clone()) {
+                    if v.len() == r.len() {
+                        return Ok(Sum {
+                            tag: *k,
+                            values: zip_eq(v, r.iter())
+                                .map(|(v, t)| v.clone().try_into_value(t))
+                                .collect::<Result<Vec<_>, _>>()?,
+                            st: st.clone(),
+                        });
+                    }
+                }
+            }
         }
-        Ok(Sum {
+        Err(ExtractValueError::BadSumType {
+            typ: typ.clone(),
             tag: *k,
-            values: zip_eq(v, r.iter())
-                .map(|(v, t)| v.clone().try_into_value(t))
-                .collect::<Result<Vec<_>, _>>()?,
-            st: st.clone(),
+            num_elements: v.len(),
         })
     }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Error)]
+#[allow(missing_docs)]
+pub enum ExtractValueError<V, E> {
+    #[error("PartialSum value had multiple possible tags: {0}")]
+    MultipleVariants(PartialSum<V>),
+    #[error("Value contained `Bottom`")]
+    ValueIsBottom,
+    #[error("Value contained `Top`")]
+    ValueIsTop,
+    #[error("Could not convert element from abstract value into concrete: {0}")]
+    CouldNotConvert(V, #[source] E),
+    #[error("Could not build Sum from concrete element values")]
+    CouldNotBuildSum(#[source] E),
+    #[error("Expected a SumType with tag {tag} having {num_elements} elements, found {typ}")]
+    BadSumType {
+        typ: Type,
+        tag: usize,
+        num_elements: usize,
+    },
 }
 
 impl<V: Clone> PartialSum<V> {
@@ -307,14 +334,15 @@ impl<V: AbstractValue> PartialValue<V> {
     pub fn try_into_value<V2: From<V> + TryFrom<Sum<V2>>>(
         self,
         typ: &Type,
-    ) -> Result<V2, Option<<V2 as TryFrom<Sum<V2>>>::Error>> {
+    ) -> Result<V2, ExtractValueError<V, <V2 as TryFrom<Sum<V2>>>::Error>> {
         match self {
             Self::Value(v) => Ok(V2::from(v.clone())),
             Self::PartialSum(ps) => {
                 let v = ps.try_into_value(typ)?;
-                V2::try_from(v).map_err(Some)
+                V2::try_from(v).map_err(ExtractValueError::CouldNotBuildSum)
             }
-            _ => Err(None),
+            Self::Top => Err(ExtractValueError::ValueIsTop),
+            Self::Bottom => Err(ExtractValueError::ValueIsBottom),
         }
     }
 }
