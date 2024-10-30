@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
-use hugr_core::{ops::Value, types::ConstTypeError, HugrView, IncomingPort, Node, PortIndex, Wire};
+use hugr_core::{HugrView, IncomingPort, Node, PortIndex, Wire};
 
-use super::{partial_value::ExtractValueError, AbstractValue, DFContext, PartialValue};
+use super::{partial_value::ExtractValueError, AbstractValue, DFContext, PartialValue, Sum};
 
 /// Results of a dataflow analysis, packaged with the Hugr for easy inspection.
 /// Methods allow inspection, specifically [read_out_wire](Self::read_out_wire).
@@ -78,27 +78,25 @@ impl<V: AbstractValue, C: DFContext<V>> AnalysisResults<V, C> {
                 .any(|(cfg2, bb2)| *cfg2 == cfg && *bb2 == bb),
         )
     }
-}
 
-impl<V: AbstractValue, C: DFContext<V>> AnalysisResults<V, C>
-where
-    Value: From<V>,
-{
-    /// Reads a [Value] from an output wire, if the lattice value computed for it can be turned
-    /// into one. (The lattice value must be either a single [Value](PartialValue::Value) or
-    /// a [Sum](PartialValue::PartialSum) with a single known tag.)
+    /// Reads a concrete representation of the value on an output wire, if the lattice value
+    /// computed for the wire can be turned into such. (The lattice value must be either a
+    /// [PartialValue::Value] or a [PartialValue::PartialSum] with a single possible tag.)
     ///
     /// # Errors
     /// `None` if the analysis did not produce a result for that wire
-    /// `Some(e)` if conversion to a [Value] failed with error `e`, see [PartialValue::try_into_value]
+    /// `Some(e)` if conversion to a concrete value failed with error `e`, see [PartialValue::try_into_value]
     ///
     /// # Panics
     ///
     /// If a [Type](hugr_core::types::Type) for the specified wire could not be extracted from the Hugr
-    pub fn try_read_wire_value(
+    pub fn try_read_wire_value<V2, VE, SE>(
         &self,
         w: Wire,
-    ) -> Result<Value, Option<ExtractValueError<V, std::convert::Infallible, ConstTypeError>>> {
+    ) -> Result<V2, Option<ExtractValueError<V, VE, SE>>>
+    where
+        V2: TryFrom<V, Error = VE> + TryFrom<Sum<V2>, Error = SE>,
+    {
         let v = self.read_out_wire(w).ok_or(None)?;
         let (_, typ) = self
             .hugr()
