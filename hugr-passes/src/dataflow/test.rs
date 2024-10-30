@@ -312,6 +312,7 @@ fn xor_and_cfg() -> Hugr {
     let mut builder =
         CFGBuilder::new(Signature::new(type_row![BOOL_T; 2], type_row![BOOL_T; 2])).unwrap();
     let false_c = builder.add_constant(Value::false_val());
+
     // entry (x, y) => if x {A(y, x=true)} else B(y)}
     let entry_outs = [type_row![BOOL_T;2], type_row![BOOL_T]];
     let mut entry = builder

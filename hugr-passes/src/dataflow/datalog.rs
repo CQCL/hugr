@@ -1,5 +1,8 @@
 //! [ascent] datalog implementation of analysis.
 
+use std::collections::HashSet;
+use std::hash::RandomState;
+
 use ascent::lattice::BoundedLattice;
 use itertools::Itertools;
 
@@ -51,20 +54,16 @@ impl<V: AbstractValue> Machine<V> {
         // Any inputs we don't have values for, we must assume `Top` to ensure safety of analysis
         // (Consider: for a conditional that selects *either* the unknown input *or* value V,
         // analysis must produce Top == we-know-nothing, not `V` !)
-        let mut have_inputs =
-            vec![false; context.signature(root).unwrap_or_default().input_count()];
+        let mut need_inputs: HashSet<_, RandomState> = HashSet::from_iter(
+            (0..context.signature(root).unwrap_or_default().input_count()).map(IncomingPort::from),
+        );
         self.0.iter().for_each(|(n, p, _)| {
             if n == &root {
-                if let Some(e) = have_inputs.get_mut(p.index()) {
-                    *e = true;
-                }
+                need_inputs.remove(p);
             }
         });
-        for (i, b) in have_inputs.into_iter().enumerate() {
-            if !b {
-                self.0
-                    .push((root, IncomingPort::from(i), PartialValue::Top));
-            }
+        for p in need_inputs {
+            self.0.push((root, p, PartialValue::Top));
         }
         // Note/TODO, if analysis is running on a subregion then we should do similar
         // for any nonlocal edges providing values from outside the region.
@@ -109,6 +108,7 @@ pub(super) fn run_datalog<V: AbstractValue, C: DFContext<V>>(
         // Initialize all wires to bottom
         out_wire_value(n, p, PV::bottom()) <-- out_wire(n, p);
 
+        // Outputs to inputs
         in_wire_value(n, ip, v) <-- in_wire(n, ip),
             if let Some((m, op)) = ctx.single_linked_output(*n, *ip),
             out_wire_value(m, op, v);
@@ -120,10 +120,11 @@ pub(super) fn run_datalog<V: AbstractValue, C: DFContext<V>>(
           if let Some(sig) = ctx.signature(*n),
           if sig.input_ports().contains(p);
 
-        // Assemble in_value_row from in_value's
+        // Assemble node_in_value_row from in_wire_value's
         node_in_value_row(n, ValueRow::new(sig.input_count())) <-- node(n), if let Some(sig) = ctx.signature(*n);
         node_in_value_row(n, ValueRow::single_known(ctx.signature(*n).unwrap().input_count(), p.index(), v.clone())) <-- in_wire_value(n, p, v);
 
+        // Interpret leaf ops
         out_wire_value(n, p, v) <--
            node(n),
            let op_t = ctx.get_optype(*n),
@@ -133,7 +134,7 @@ pub(super) fn run_datalog<V: AbstractValue, C: DFContext<V>>(
            if let Some(outs) = propagate_leaf_op(&ctx, *n, &vs[..], sig.output_count()),
            for (p, v) in (0..).map(OutgoingPort::from).zip(outs);
 
-        // DFG
+        // DFG --------------------
         relation dfg_node(Node); // <Node> is a `DFG`
         dfg_node(n) <-- node(n), if ctx.get_optype(*n).is_dfg();
 
@@ -143,9 +144,7 @@ pub(super) fn run_datalog<V: AbstractValue, C: DFContext<V>>(
         out_wire_value(dfg, OutgoingPort::from(p.index()), v) <-- dfg_node(dfg),
             output_child(dfg, o), in_wire_value(o, p, v);
 
-
-        // TailLoop
-
+        // TailLoop --------------------
         // inputs of tail loop propagate to Input node of child region
         out_wire_value(i, OutgoingPort::from(p.index()), v) <-- node(tl),
             if ctx.get_optype(*tl).is_tail_loop(),
@@ -169,13 +168,11 @@ pub(super) fn run_datalog<V: AbstractValue, C: DFContext<V>>(
             if let Some(fields) = out_in_row.unpack_first(1, tailloop.just_outputs.len()), // if it is possible for the tag to be 1
             for (out_p, v) in fields.enumerate();
 
-        // Conditional
-        relation conditional_node(Node); // <Node> is a `Conditional`
+        // Conditional --------------------
         // <Node> is a `Conditional` and its <usize>'th child (a `Case`) is <Node>:
         relation case_node(Node, usize, Node);
-
-        conditional_node(n)<-- node(n), if ctx.get_optype(*n).is_conditional();
-        case_node(cond, i, case) <-- conditional_node(cond),
+        case_node(cond, i, case) <-- node(cond),
+          if ctx.get_optype(*cond).is_conditional(),
           for (i, case) in ctx.children(*cond).enumerate(),
           if ctx.get_optype(case).is_case();
 
@@ -195,17 +192,17 @@ pub(super) fn run_datalog<V: AbstractValue, C: DFContext<V>>(
           output_child(case, o),
           in_wire_value(o, o_p, v);
 
-        // In `Conditional` <Node>, child `Case` <Node> is reachable given our knowledge of predicate
+        // In `Conditional` <Node>, child `Case` <Node> is reachable given our knowledge of predicate:
         relation case_reachable(Node, Node);
         case_reachable(cond, case) <-- case_node(cond, i, case),
             in_wire_value(cond, IncomingPort::from(0), v),
             if v.supports_tag(*i);
 
-        // CFG
+        // CFG --------------------
         relation cfg_node(Node); // <Node> is a `CFG`
         cfg_node(n) <-- node(n), if ctx.get_optype(*n).is_cfg();
 
-        // In `CFG` <Node>, basic block <Node> is reachable given our knowledge of predicates
+        // In `CFG` <Node>, basic block <Node> is reachable given our knowledge of predicates:
         relation bb_reachable(Node, Node);
         bb_reachable(cfg, entry) <-- cfg_node(cfg), if let Some(entry) = ctx.children(*cfg).next();
         bb_reachable(cfg, bb) <-- cfg_node(cfg),
@@ -223,7 +220,7 @@ pub(super) fn run_datalog<V: AbstractValue, C: DFContext<V>>(
             in_wire_value(cfg, p, v);
 
         // In `CFG` <Node>, values fed along a control-flow edge to <Node>
-        //     come out of Value outports of <Node>.
+        //     come out of Value outports of <Node>:
         relation _cfg_succ_dest(Node, Node, Node);
         _cfg_succ_dest(cfg, exit, cfg) <-- cfg_node(cfg), if let Some(exit) = ctx.children(*cfg).nth(1);
         _cfg_succ_dest(cfg, blk, inp) <-- cfg_node(cfg),
@@ -242,7 +239,7 @@ pub(super) fn run_datalog<V: AbstractValue, C: DFContext<V>>(
             if let Some(fields) = out_in_row.unpack_first(succ_n, df_block.sum_rows.get(succ_n).unwrap().len()),
             for (out_p, v) in fields.enumerate();
 
-        // Call
+        // Call --------------------
         relation func_call(Node, Node); // <Node> is a `Call` to `FuncDefn` <Node>
         func_call(call, func_defn) <--
             node(call),
@@ -327,7 +324,7 @@ fn propagate_leaf_op<V: AbstractValue>(
             ))
         }
         OpType::ExtensionOp(e) => {
-            // Interpret op.
+            // Interpret op using DFContext
             let init = if ins.iter().contains(&PartialValue::Bottom) {
                 // So far we think one or more inputs can't happen.
                 // So, don't pollute outputs with Top, and wait for better knowledge of inputs.
@@ -337,9 +334,8 @@ fn propagate_leaf_op<V: AbstractValue>(
                 PartialValue::Top
             };
             let mut outs = vec![init; num_outs];
-            // It'd be nice to convert these to [(IncomingPort, Value)] to pass to the context,
-            // thus keeping PartialValue hidden, but AbstractValues
-            // are not necessarily convertible to Value.
+            // It might be nice to convert these to [(IncomingPort, Value)], or some concrete value,
+            // for the context, but PV contains more information, and try_into_value may fail.
             ctx.interpret_leaf_op(n, e, ins, &mut outs[..]);
             Some(ValueRow::from_iter(outs))
         }

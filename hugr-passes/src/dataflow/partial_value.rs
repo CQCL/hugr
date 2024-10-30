@@ -362,7 +362,6 @@ impl TryFrom<Sum<Value>> for Value {
 impl<V: AbstractValue> Lattice for PartialValue<V> {
     fn join_mut(&mut self, other: Self) -> bool {
         self.assert_invariants();
-        // println!("join {self:?}\n{:?}", &other);
         match (&*self, other) {
             (Self::Top, _) => false,
             (_, other @ Self::Top) => {
