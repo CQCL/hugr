@@ -47,7 +47,7 @@ pub trait DFContext<V>: ConstLoader<V> + std::ops::Deref<Target = Self::View> {
 pub trait ConstLoader<V> {
     /// Produces an abstract value from a constant. The default impl
     /// traverses the constant [Value] to its leaves ([Value::Extension] and [Value::Function]),
-    /// converts these using [Self::value_from_custom_const] and [Self::value_from_const_hugr],
+    /// converts these using [Self::value_from_opaque] and [Self::value_from_const_hugr],
     /// and builds nested [PartialValue::new_variant] to represent the structure.
     fn value_from_const(&self, n: Node, cst: &Value) -> PartialValue<V> {
         traverse_value(self, n, &mut Vec::new(), cst)
