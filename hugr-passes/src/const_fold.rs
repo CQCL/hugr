@@ -115,12 +115,8 @@ impl ConstFoldPass {
             };
             if h.get_optype(n).is_cfg() {
                 for bb in h.children(n) {
-                    if results.bb_reachable(bb).unwrap()
-                        && needed.insert(bb)
-                        && h.get_optype(bb).is_dataflow_block()
-                    {
-                        q.push_back(bb);
-                    }
+                    //if results.bb_reachable(bb).unwrap() { // no, we'd need to patch up predicates
+                    q.push_back(bb);
                 }
             } else if let Some(inout) = h.get_io(n) {
                 // Dataflow. Find minimal nodes necessary to compute output, including StateOrder edges.
