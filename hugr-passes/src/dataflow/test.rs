@@ -1,6 +1,8 @@
 use ascent::{lattice::BoundedLattice, Lattice};
 
 use hugr_core::builder::{CFGBuilder, Container, DataflowHugr};
+use hugr_core::hugr::views::{DescendantsGraph, HierarchyView};
+use hugr_core::ops::handle::DfgID;
 use hugr_core::{
     builder::{endo_sig, DFGBuilder, Dataflow, DataflowSubContainer, HugrBuilder, SubContainer},
     extension::{
@@ -453,4 +455,57 @@ fn test_call(
     // The two calls alias so both results will be the same:
     assert_eq!(res0, out);
     assert_eq!(res1, out);
+}
+
+#[test]
+fn test_region() {
+    let mut builder =
+        DFGBuilder::new(Signature::new(type_row![BOOL_T], type_row![BOOL_T;2])).unwrap();
+    let [in_w] = builder.input_wires_arr();
+    let cst_w = builder.add_load_const(Value::false_val());
+    let nested = builder
+        .dfg_builder(Signature::new_endo(type_row![BOOL_T; 2]), [in_w, cst_w])
+        .unwrap();
+    let nested_ins = nested.input_wires();
+    let nested = nested.finish_with_outputs(nested_ins).unwrap();
+    let hugr = builder
+        .finish_prelude_hugr_with_outputs(nested.outputs())
+        .unwrap();
+    let [nested_input, _] = hugr.get_io(nested.node()).unwrap();
+    let whole_hugr_results = Machine::default().run(TestContext(&hugr), [(0.into(), pv_true())]);
+    assert_eq!(
+        whole_hugr_results.read_out_wire(Wire::new(nested_input, 0)),
+        Some(pv_true())
+    );
+    assert_eq!(
+        whole_hugr_results.read_out_wire(Wire::new(nested_input, 1)),
+        Some(pv_false())
+    );
+    assert_eq!(
+        whole_hugr_results.read_out_wire(Wire::new(hugr.root(), 0)),
+        Some(pv_true())
+    );
+    assert_eq!(
+        whole_hugr_results.read_out_wire(Wire::new(hugr.root(), 1)),
+        Some(pv_false())
+    );
+
+    let subview = DescendantsGraph::<DfgID>::try_new(&hugr, nested.node()).unwrap();
+    // Do not provide a value on the second input (constant false in the whole hugr, above)
+    let sub_hugr_results = Machine::default().run(TestContext(subview), [(0.into(), pv_true())]);
+    assert_eq!(
+        sub_hugr_results.read_out_wire(Wire::new(nested_input, 0)),
+        Some(pv_true())
+    );
+    // TODO this should really be `Top` - safety says we have to assume it could be anything, not that it can't happen
+    assert_eq!(
+        sub_hugr_results.read_out_wire(Wire::new(nested_input, 1)),
+        Some(PartialValue::Bottom)
+    );
+    for w in [0, 1] {
+        assert_eq!(
+            sub_hugr_results.read_out_wire(Wire::new(hugr.root(), w)),
+            None
+        );
+    }
 }
