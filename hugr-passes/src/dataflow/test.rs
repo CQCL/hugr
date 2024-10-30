@@ -497,10 +497,9 @@ fn test_region() {
         sub_hugr_results.read_out_wire(Wire::new(nested_input, 0)),
         Some(pv_true())
     );
-    // TODO this should really be `Top` - safety says we have to assume it could be anything, not that it can't happen
     assert_eq!(
         sub_hugr_results.read_out_wire(Wire::new(nested_input, 1)),
-        Some(PartialValue::Bottom)
+        Some(PartialValue::Top)
     );
     for w in [0, 1] {
         assert_eq!(

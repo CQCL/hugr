@@ -48,6 +48,26 @@ impl<V: AbstractValue> Machine<V> {
         let root = context.root();
         self.0
             .extend(in_values.into_iter().map(|(p, v)| (root, p, v)));
+        // Any inputs we don't have values for, we must assume `Top` to ensure safety of analysis
+        // (Consider: for a conditional that selects *either* the unknown input *or* value V,
+        // analysis must produce Top == we-know-nothing, not `V` !)
+        let mut have_inputs =
+            vec![false; context.signature(root).unwrap_or_default().input_count()];
+        self.0.iter().for_each(|(n, p, _)| {
+            if n == &root {
+                if let Some(e) = have_inputs.get_mut(p.index()) {
+                    *e = true;
+                }
+            }
+        });
+        for (i, b) in have_inputs.into_iter().enumerate() {
+            if !b {
+                self.0
+                    .push((root, IncomingPort::from(i), PartialValue::Top));
+            }
+        }
+        // Note/TODO, if analysis is running on a subregion then we should do similar
+        // for any nonlocal edges providing values from outside the region.
         run_datalog(context, self.0)
     }
 }
