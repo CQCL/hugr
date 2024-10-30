@@ -564,4 +564,23 @@ mod test {
 
         Ok(())
     }
+
+    #[test]
+    fn metadata() {
+        let mut hugr = Hugr::default();
+
+        // Create the root module definition
+        let root: Node = hugr.root();
+
+        assert_eq!(hugr.get_metadata(root, "meta"), None);
+
+        *hugr.get_metadata_mut(root, "meta") = "test".into();
+        assert_eq!(hugr.get_metadata(root, "meta"), Some(&"test".into()));
+
+        hugr.set_metadata(root, "meta", "new");
+        assert_eq!(hugr.get_metadata(root, "meta"), Some(&"new".into()));
+
+        hugr.remove_metadata(root, "meta");
+        assert_eq!(hugr.get_metadata(root, "meta"), None);
+    }
 }
