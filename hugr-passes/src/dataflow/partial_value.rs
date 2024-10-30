@@ -141,41 +141,37 @@ impl<V: AbstractValue> PartialSum<V> {
         self.0.contains_key(&tag)
     }
 
-    /// Turns this instance into a [Sum] if it has exactly one possible tag,
-    /// otherwise failing and returning itself back unmodified (also if there is another
-    /// error, e.g. this instance is not described by `typ`).
-    // ALAN is this too parametric? Should we fix V2 == Value? Is the 'Self' error useful (no?)
+    /// Turns this instance into a [Sum] of some target value type `V2`,
+    /// *if* this PartialSum has exactly one possible tag.
+    ///
+    /// # Errors
+    /// `None` if this PartialSum had multiple possible tags; or, if there was a single
+    /// tag, but `typ` was not a [TypeEnum::Sum] supporting that tag and containing no
+    /// row variables within that variant and of the correct number of variants
+    /// `Some(e)` if none of the error conditions above applied, but there was an error
+    /// `e` in converting one of the variant elements into `V2` via [PartialValue::try_into_value]
     pub fn try_into_value<V2: From<V> + TryFrom<Sum<V2>>>(
         self,
         typ: &Type,
-    ) -> Result<Sum<V2>, Self> {
-        let Ok((k, v)) = self.0.iter().exactly_one() else {
-            Err(self)?
-        };
-
+    ) -> Result<Sum<V2>, Option<<V2 as TryFrom<Sum<V2>>>::Error>> {
+        let (k, v) = self.0.iter().exactly_one().map_err(|_| None)?;
         let TypeEnum::Sum(st) = typ.as_type_enum() else {
-            Err(self)?
+            Err(None)?
         };
         let Some(r) = st.get_variant(*k) else {
-            Err(self)?
+            Err(None)?
         };
-        let Ok(r) = TypeRow::try_from(r.clone()) else {
-            Err(self)?
-        };
+        let r: TypeRow = r.clone().try_into().map_err(|_| None)?;
         if v.len() != r.len() {
-            return Err(self);
+            return Err(None);
         }
-        match zip_eq(v, r.iter())
-            .map(|(v, t)| v.clone().try_into_value(t))
-            .collect::<Result<Vec<_>, _>>()
-        {
-            Ok(values) => Ok(Sum {
-                tag: *k,
-                values,
-                st: st.clone(),
-            }),
-            Err(_) => Err(self),
-        }
+        Ok(Sum {
+            tag: *k,
+            values: zip_eq(v, r.iter())
+                .map(|(v, t)| v.clone().try_into_value(t))
+                .collect::<Result<Vec<_>, _>>()?,
+            st: st.clone(),
+        })
     }
 }
 
@@ -301,8 +297,13 @@ impl<V: AbstractValue> PartialValue<V> {
         }
     }
 
-    /// Extracts a value (in any representation supporting both leaf values and sums)
-    // ALAN is this too parametric? Should we fix V2 == Value? Is the error useful (should we have 'Self') or is it a smell?
+    /// Turns this instance into a target value type `V2` if it is a single value,
+    /// or a [PartialValue::PartialSum] convertible by [PartialSum::try_into_value].
+    ///
+    /// # Errors
+    ///
+    /// `None` if this is [Bottom](PartialValue::Bottom) or [Top](PartialValue::Top),
+    /// otherwise as per [PartialSum::try_into_value]
     pub fn try_into_value<V2: From<V> + TryFrom<Sum<V2>>>(
         self,
         typ: &Type,
@@ -310,7 +311,7 @@ impl<V: AbstractValue> PartialValue<V> {
         match self {
             Self::Value(v) => Ok(V2::from(v.clone())),
             Self::PartialSum(ps) => {
-                let v = ps.try_into_value(typ).map_err(|_| None)?;
+                let v = ps.try_into_value(typ)?;
                 V2::try_from(v).map_err(Some)
             }
             _ => Err(None),
