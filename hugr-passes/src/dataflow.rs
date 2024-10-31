@@ -20,7 +20,7 @@ use hugr_core::{Hugr, HugrView, Node};
 /// must implement this trait (including providing an appropriate domain type `V`).
 pub trait DFContext<V>: ConstLoader<V> + std::ops::Deref<Target = Self::View> {
     /// Type of view contained within this context. (Ideally we'd constrain
-    /// by `std::ops::Deref<Target: impl HugrView` but that's not stable yet.)
+    /// by `std::ops::Deref<Target: impl HugrView>` but that's not stable yet.)
     type View: HugrView;
 
     /// Given lattice values for each input, update lattice values for the (dataflow) outputs.
@@ -41,12 +41,14 @@ pub trait DFContext<V>: ConstLoader<V> + std::ops::Deref<Target = Self::View> {
     }
 }
 
-/// Trait for loading [PartialValue]s from constants in a Hugr. The default
-/// traverses [Sum](Value::Sum) constants to their non-Sum leaves but represents
-/// each leaf as [PartialValue::Top].
+/// Trait for loading [PartialValue]s from constant [Value]s in a Hugr.
+/// Implementors will likely want to override some/all of [Self::value_from_opaque],
+/// [Self::value_from_const_hugr], and [Self::value_from_function]: the defaults
+/// are "correct" but maximally conservative (minimally informative).
 pub trait ConstLoader<V> {
-    /// Produces an abstract value from a constant. The default impl
-    /// traverses the constant [Value] to its leaves ([Value::Extension] and [Value::Function]),
+    /// Produces a [PartialValue] from a constant. The default impl (expected
+    /// to be appropriate in most cases) traverses [Sum](Value::Sum) constants
+    /// to their leaves ([Value::Extension] and [Value::Function]),
     /// converts these using [Self::value_from_opaque] and [Self::value_from_const_hugr],
     /// and builds nested [PartialValue::new_variant] to represent the structure.
     fn value_from_const(&self, n: Node, cst: &Value) -> PartialValue<V> {
@@ -65,8 +67,8 @@ pub trait ConstLoader<V> {
         None
     }
 
-    /// Produces an abstract value from a [FuncDefn] or [FuncDecl] node (that has been loaded
-    /// via a [LoadFunction]), if possible.
+    /// Produces an abstract value from a [FuncDefn] or [FuncDecl] node
+    /// (that has been loaded via a [LoadFunction]), if possible.
     /// The default just returns `None`, which will be interpreted as [PartialValue::Top].
     ///
     /// [FuncDefn]: hugr_core::ops::FuncDefn

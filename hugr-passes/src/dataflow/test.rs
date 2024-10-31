@@ -1,6 +1,8 @@
 use ascent::{lattice::BoundedLattice, Lattice};
 
 use hugr_core::builder::{CFGBuilder, Container, DataflowHugr};
+use hugr_core::hugr::views::{DescendantsGraph, HierarchyView};
+use hugr_core::ops::handle::DfgID;
 use hugr_core::{
     builder::{endo_sig, DFGBuilder, Dataflow, DataflowSubContainer, HugrBuilder, SubContainer},
     extension::{
@@ -65,7 +67,7 @@ fn test_make_tuple() {
 
     let results = Machine::default().run(TestContext(hugr), []);
 
-    let x = results.try_read_wire_value(v3).unwrap();
+    let x: Value = results.try_read_wire_value(v3).unwrap();
     assert_eq!(x, Value::tuple([Value::false_val(), Value::true_val()]));
 }
 
@@ -81,9 +83,9 @@ fn test_unpack_tuple_const() {
 
     let results = Machine::default().run(TestContext(hugr), []);
 
-    let o1_r = results.try_read_wire_value(o1).unwrap();
+    let o1_r: Value = results.try_read_wire_value(o1).unwrap();
     assert_eq!(o1_r, Value::false_val());
-    let o2_r = results.try_read_wire_value(o2).unwrap();
+    let o2_r: Value = results.try_read_wire_value(o2).unwrap();
     assert_eq!(o2_r, Value::true_val());
 }
 
@@ -104,7 +106,7 @@ fn test_tail_loop_never_iterates() {
 
     let results = Machine::default().run(TestContext(hugr), []);
 
-    let o_r = results.try_read_wire_value(tl_o).unwrap();
+    let o_r: Value = results.try_read_wire_value(tl_o).unwrap();
     assert_eq!(o_r, r_v);
     assert_eq!(
         Some(TailLoopTermination::NeverContinues),
@@ -289,9 +291,9 @@ fn test_conditional() {
     ));
     let results = Machine::default().run(TestContext(hugr), [(0.into(), arg_pv)]);
 
-    let cond_r1 = results.try_read_wire_value(cond_o1).unwrap();
+    let cond_r1: Value = results.try_read_wire_value(cond_o1).unwrap();
     assert_eq!(cond_r1, Value::false_val());
-    assert!(results.try_read_wire_value(cond_o2).is_err());
+    assert!(results.try_read_wire_value::<Value, _, _>(cond_o2).is_err());
 
     assert_eq!(results.case_reachable(case1.node()), Some(false)); // arg_pv is variant 1 or 2 only
     assert_eq!(results.case_reachable(case2.node()), Some(true));
@@ -310,6 +312,7 @@ fn xor_and_cfg() -> Hugr {
     let mut builder =
         CFGBuilder::new(Signature::new(type_row![BOOL_T; 2], type_row![BOOL_T; 2])).unwrap();
     let false_c = builder.add_constant(Value::false_val());
+
     // entry (x, y) => if x {A(y, x=true)} else B(y)}
     let entry_outs = [type_row![BOOL_T;2], type_row![BOOL_T]];
     let mut entry = builder
@@ -453,4 +456,56 @@ fn test_call(
     // The two calls alias so both results will be the same:
     assert_eq!(res0, out);
     assert_eq!(res1, out);
+}
+
+#[test]
+fn test_region() {
+    let mut builder =
+        DFGBuilder::new(Signature::new(type_row![BOOL_T], type_row![BOOL_T;2])).unwrap();
+    let [in_w] = builder.input_wires_arr();
+    let cst_w = builder.add_load_const(Value::false_val());
+    let nested = builder
+        .dfg_builder(Signature::new_endo(type_row![BOOL_T; 2]), [in_w, cst_w])
+        .unwrap();
+    let nested_ins = nested.input_wires();
+    let nested = nested.finish_with_outputs(nested_ins).unwrap();
+    let hugr = builder
+        .finish_prelude_hugr_with_outputs(nested.outputs())
+        .unwrap();
+    let [nested_input, _] = hugr.get_io(nested.node()).unwrap();
+    let whole_hugr_results = Machine::default().run(TestContext(&hugr), [(0.into(), pv_true())]);
+    assert_eq!(
+        whole_hugr_results.read_out_wire(Wire::new(nested_input, 0)),
+        Some(pv_true())
+    );
+    assert_eq!(
+        whole_hugr_results.read_out_wire(Wire::new(nested_input, 1)),
+        Some(pv_false())
+    );
+    assert_eq!(
+        whole_hugr_results.read_out_wire(Wire::new(hugr.root(), 0)),
+        Some(pv_true())
+    );
+    assert_eq!(
+        whole_hugr_results.read_out_wire(Wire::new(hugr.root(), 1)),
+        Some(pv_false())
+    );
+
+    let subview = DescendantsGraph::<DfgID>::try_new(&hugr, nested.node()).unwrap();
+    // Do not provide a value on the second input (constant false in the whole hugr, above)
+    let sub_hugr_results = Machine::default().run(TestContext(subview), [(0.into(), pv_true())]);
+    assert_eq!(
+        sub_hugr_results.read_out_wire(Wire::new(nested_input, 0)),
+        Some(pv_true())
+    );
+    assert_eq!(
+        sub_hugr_results.read_out_wire(Wire::new(nested_input, 1)),
+        Some(PartialValue::Top)
+    );
+    for w in [0, 1] {
+        assert_eq!(
+            sub_hugr_results.read_out_wire(Wire::new(hugr.root(), w)),
+            None
+        );
+    }
 }
