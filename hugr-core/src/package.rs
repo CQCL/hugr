@@ -9,7 +9,7 @@ use crate::builder::{Container, Dataflow, DataflowSubContainer, ModuleBuilder};
 use crate::extension::{ExtensionRegistry, ExtensionRegistryError};
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::{HugrView, ValidationError};
-use crate::ops::{Module, NamedOp, OpTag, OpTrait, OpType};
+use crate::ops::{FuncDefn, Module, NamedOp, OpTag, OpTrait, OpType};
 use crate::{Extension, Hugr};
 
 #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
@@ -211,7 +211,7 @@ impl AsRef<[Hugr]> for Package {
 /// Returns [PackageError::]
 fn to_module_hugr(mut hugr: Hugr) -> Result<Hugr, PackageError> {
     let root = hugr.root();
-    let root_op = hugr.get_optype(root);
+    let root_op = hugr.get_optype(root).clone();
     let tag = root_op.tag();
 
     // Modules can be returned as is.
@@ -220,6 +220,29 @@ fn to_module_hugr(mut hugr: Hugr) -> Result<Hugr, PackageError> {
     }
     // If possible, wrap the hugr directly in a module.
     if OpTag::ModuleOp.is_superset(tag) {
+        let new_root = hugr.add_node(Module::new().into());
+        hugr.set_root(new_root);
+        hugr.set_parent(root, new_root);
+        return Ok(hugr);
+    }
+    // If it is a DFG, make it into a "main" function definition and insert it into a module.
+    if OpTag::Dfg.is_superset(tag) {
+        let signature = root_op
+            .dataflow_signature()
+            .unwrap_or_else(|| panic!("Dataflow child {} without signature", root_op.name()));
+
+        // Convert the DFG into a `FuncDefn`
+        hugr.set_num_ports(root, 0, 1);
+        hugr.replace_op(
+            root,
+            FuncDefn {
+                name: "main".to_string(),
+                signature: signature.into(),
+            },
+        )
+        .expect("Hugr accepts any root node");
+
+        // Wrap it in a module.
         let new_root = hugr.add_node(Module::new().into());
         hugr.set_root(new_root);
         hugr.set_parent(root, new_root);
@@ -374,17 +397,20 @@ mod test {
     }
 
     #[rstest]
-    #[case::module(simple_module_hugr(), false)]
-    #[case::funcdef(simple_funcdef_hugr(), false)]
-    #[case::dfg(simple_dfg_hugr(), false)]
-    #[case::cfg(simple_cfg_hugr(), false)]
-    #[case::unsupported_input(simple_input_node(), true)]
-    fn hugr_to_package(#[case] hugr: Hugr, #[case] errors: bool) {
+    #[case::module("module", simple_module_hugr(), false)]
+    #[case::funcdef("funcdef", simple_funcdef_hugr(), false)]
+    #[case::dfg("dfg", simple_dfg_hugr(), false)]
+    #[case::cfg("cfg", simple_cfg_hugr(), false)]
+    #[case::unsupported_input("input", simple_input_node(), true)]
+    fn hugr_to_package(#[case] test_name: &str, #[case] hugr: Hugr, #[case] errors: bool) {
         match (&Package::from_hugr(hugr), errors) {
             (Ok(package), false) => {
                 assert_eq!(package.modules.len(), 1);
-                let root_op = package.modules[0].get_optype(package.modules[0].root());
+                let hugr = &package.modules[0];
+                let root_op = hugr.get_optype(hugr.root());
                 assert!(root_op.is_module());
+
+                insta::assert_snapshot!(test_name, hugr.mermaid_string());
             }
             (Err(_), true) => {}
             (p, _) => panic!("Unexpected result {:?}", p),
