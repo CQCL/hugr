@@ -7,13 +7,10 @@ use std::collections::{HashSet, VecDeque};
 
 use hugr_core::{
     extension::ExtensionRegistry,
-    hugr::{
-        hugrmut::HugrMut,
-        views::{DescendantsGraph, ExtractHugr, HierarchyView},
-    },
-    ops::{
-        constant::OpaqueValue, handle::FuncID, Const, DataflowOpTrait, ExtensionOp, LoadConstant,
-    },
+    hugr::hugrmut::HugrMut,
+    hugr::views::{DescendantsGraph, ExtractHugr, HierarchyView},
+    ops::constant::OpaqueValue,
+    ops::{handle::FuncID, Const, DataflowOpTrait, ExtensionOp, LoadConstant, Value},
     types::{EdgeKind, TypeArg},
     HugrView, IncomingPort, Node, OutgoingPort, PortIndex, Wire,
 };
@@ -69,7 +66,9 @@ impl ConstFoldPass {
                 (!results.hugr().get_optype(src).is_load_constant()).then_some((
                     n,
                     ip,
-                    results.try_read_wire_value(Wire::new(src, outp)).ok()?,
+                    results
+                        .try_read_wire_value::<Value, _, _>(Wire::new(src, outp))
+                        .ok()?,
                 ))
             })
             .collect::<Vec<_>>();
@@ -139,7 +138,9 @@ impl ConstFoldPass {
                 let needs_predecessor = match h.get_optype(src).port_kind(op).unwrap() {
                     EdgeKind::Value(_) => {
                         results.hugr().get_optype(src).is_load_constant()
-                            || results.try_read_wire_value(Wire::new(src, op)).is_err()
+                            || results
+                                .try_read_wire_value::<Value, _, _>(Wire::new(src, op))
+                                .is_err()
                     }
                     EdgeKind::StateOrder | EdgeKind::Const(_) | EdgeKind::Function(_) => true,
                     EdgeKind::ControlFlow => panic!(),

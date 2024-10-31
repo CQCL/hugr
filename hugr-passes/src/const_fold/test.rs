@@ -103,11 +103,8 @@ fn f2c(f: f64) -> Value {
 // c = a + b
 fn test_add(#[case] a: f64, #[case] b: f64, #[case] c: f64) {
     fn unwrap_float(pv: PartialValue<ValueHandle>) -> f64 {
-        pv.try_into_value::<Value>(&FLOAT64_TYPE)
-            .unwrap()
-            .get_custom_value::<ConstF64>()
-            .unwrap()
-            .value()
+        let v: Value = pv.try_into_value(&FLOAT64_TYPE).unwrap();
+        v.get_custom_value::<ConstF64>().unwrap().value()
     }
     let [n, n_a, n_b] = [0, 1, 2].map(portgraph::NodeIndex::new).map(Node::from);
     let mut temp = Hugr::default();
