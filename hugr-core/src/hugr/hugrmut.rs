@@ -48,6 +48,19 @@ pub trait HugrMut: HugrMutInternals {
         *entry = metadata.into();
     }
 
+    /// Remove a metadata entry associated with a node.
+    ///
+    /// # Panics
+    ///
+    /// If the node is not in the graph.
+    fn remove_metadata(&mut self, node: Node, key: impl AsRef<str>) {
+        panic_invalid_node(self, node);
+        let node_meta = self.hugr_mut().metadata.get_mut(node.pg_index());
+        if let Some(node_meta) = node_meta {
+            node_meta.remove(key.as_ref());
+        }
+    }
+
     /// Retrieve the complete metadata map for a node.
     fn take_node_metadata(&mut self, node: Node) -> Option<NodeMetadataMap> {
         if !self.valid_node(node) {
@@ -550,5 +563,24 @@ mod test {
         hugr.update_validate(&PRELUDE_REGISTRY)?;
 
         Ok(())
+    }
+
+    #[test]
+    fn metadata() {
+        let mut hugr = Hugr::default();
+
+        // Create the root module definition
+        let root: Node = hugr.root();
+
+        assert_eq!(hugr.get_metadata(root, "meta"), None);
+
+        *hugr.get_metadata_mut(root, "meta") = "test".into();
+        assert_eq!(hugr.get_metadata(root, "meta"), Some(&"test".into()));
+
+        hugr.set_metadata(root, "meta", "new");
+        assert_eq!(hugr.get_metadata(root, "meta"), Some(&"new".into()));
+
+        hugr.remove_metadata(root, "meta");
+        assert_eq!(hugr.get_metadata(root, "meta"), None);
     }
 }
