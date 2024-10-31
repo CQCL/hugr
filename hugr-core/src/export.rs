@@ -22,6 +22,7 @@ type FxIndexSet<T> = IndexSet<T, fxhash::FxBuildHasher>;
 pub(crate) const OP_FUNC_CALL_INDIRECT: &str = "func.call-indirect";
 const TERM_PARAM_TUPLE: &str = "param.tuple";
 const TERM_JSON: &str = "prelude.json";
+const META_DESCRIPTION: &str = "docs.description";
 
 /// Export a [`Hugr`] graph to its representation in the model.
 pub fn export_hugr<'a>(hugr: &'a Hugr, bump: &'a Bump) -> model::Module<'a> {
@@ -458,19 +459,29 @@ impl<'a> Context<'a> {
             decl
         });
 
-        // TODO: description
+        let meta = {
+            let description = Some(opdef.description()).filter(|d| !d.is_empty());
+            let meta_len = opdef.iter_misc().len() + description.is_some() as usize;
+            let mut meta = BumpVec::with_capacity_in(meta_len, self.bump);
 
-        let mut meta = BumpVec::with_capacity_in(opdef.iter_misc().len(), self.bump);
+            if let Some(description) = description {
+                let name = META_DESCRIPTION;
+                let value = self.make_term(model::Term::Str(self.bump.alloc_str(description)));
+                meta.push(model::MetaItem { name, value })
+            }
 
-        for (name, value) in opdef.iter_misc() {
-            let name = self.bump.alloc_str(name);
-            let value = self.export_json(value);
-            meta.push(model::MetaItem { name, value });
-        }
+            for (name, value) in opdef.iter_misc() {
+                let name = self.bump.alloc_str(name);
+                let value = self.export_json(value);
+                meta.push(model::MetaItem { name, value });
+            }
+
+            self.bump.alloc_slice_copy(&meta)
+        };
 
         let node_data = self.module.get_node_mut(node).unwrap();
         node_data.operation = model::Operation::DeclareOperation { decl };
-        node_data.meta = self.bump.alloc_slice_copy(&meta);
+        node_data.meta = meta;
 
         model::GlobalRef::Direct(node)
     }
