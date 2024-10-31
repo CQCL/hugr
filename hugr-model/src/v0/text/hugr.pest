@@ -27,29 +27,35 @@ node = {
   | node_load_func
   | node_define_alias
   | node_declare_alias
+  | node_declare_ctr
+  | node_declare_operation
   | node_tail_loop
   | node_cond
   | node_tag
   | node_custom
 }
 
-node_dfg           = { "(" ~ "dfg" ~ port_lists? ~ signature? ~ meta* ~ region* ~ ")" }
-node_cfg           = { "(" ~ "cfg" ~ port_lists? ~ signature? ~ meta* ~ region* ~ ")" }
-node_block         = { "(" ~ "block" ~ port_lists? ~ signature? ~ meta* ~ region* ~ ")" }
-node_define_func   = { "(" ~ "define-func" ~ func_header ~ meta* ~ region* ~ ")" }
-node_declare_func  = { "(" ~ "declare-func" ~ func_header ~ meta* ~ ")" }
-node_call_func     = { "(" ~ "call" ~ term ~ port_lists? ~ signature? ~ meta* ~ ")" }
-node_load_func     = { "(" ~ "load-func" ~ term ~ port_lists? ~ signature? ~ meta* ~ ")" }
-node_define_alias  = { "(" ~ "define-alias" ~ alias_header ~ term ~ meta* ~ ")" }
-node_declare_alias = { "(" ~ "declare-alias" ~ alias_header ~ meta* ~ ")" }
-node_tail_loop     = { "(" ~ "tail-loop" ~ port_lists? ~ signature? ~ meta* ~ region* ~ ")" }
-node_cond          = { "(" ~ "cond" ~ port_lists? ~ signature? ~ meta* ~ region* ~ ")" }
-node_tag           = { "(" ~ "tag" ~ tag ~ port_lists? ~ signature? ~ meta* ~ region* ~ ")" }
-node_custom        = { "(" ~ (term_apply | term_apply_full) ~ port_lists? ~ signature? ~ meta* ~ region* ~ ")" }
+node_dfg               = { "(" ~ "dfg" ~ port_lists? ~ signature? ~ meta* ~ region* ~ ")" }
+node_cfg               = { "(" ~ "cfg" ~ port_lists? ~ signature? ~ meta* ~ region* ~ ")" }
+node_block             = { "(" ~ "block" ~ port_lists? ~ signature? ~ meta* ~ region* ~ ")" }
+node_define_func       = { "(" ~ "define-func" ~ func_header ~ meta* ~ region* ~ ")" }
+node_declare_func      = { "(" ~ "declare-func" ~ func_header ~ meta* ~ ")" }
+node_call_func         = { "(" ~ "call" ~ term ~ port_lists? ~ signature? ~ meta* ~ ")" }
+node_load_func         = { "(" ~ "load-func" ~ term ~ port_lists? ~ signature? ~ meta* ~ ")" }
+node_define_alias      = { "(" ~ "define-alias" ~ alias_header ~ term ~ meta* ~ ")" }
+node_declare_alias     = { "(" ~ "declare-alias" ~ alias_header ~ meta* ~ ")" }
+node_declare_ctr       = { "(" ~ "declare-ctr" ~ ctr_header ~ meta* ~ ")" }
+node_declare_operation = { "(" ~ "declare-operation" ~ operation_header ~ meta* ~ ")" }
+node_tail_loop         = { "(" ~ "tail-loop" ~ port_lists? ~ signature? ~ meta* ~ region* ~ ")" }
+node_cond              = { "(" ~ "cond" ~ port_lists? ~ signature? ~ meta* ~ region* ~ ")" }
+node_tag               = { "(" ~ "tag" ~ tag ~ port_lists? ~ signature? ~ meta* ~ region* ~ ")" }
+node_custom            = { "(" ~ (term_apply | term_apply_full) ~ port_lists? ~ signature? ~ meta* ~ region* ~ ")" }
 
-signature    = { "(" ~ "signature" ~ term ~ ")" }
-func_header  = { symbol ~ param* ~ term ~ term ~ term }
-alias_header = { symbol ~ param* ~ term }
+signature        = { "(" ~ "signature" ~ term ~ ")" }
+func_header      = { symbol ~ param* ~ term ~ term ~ term }
+alias_header     = { symbol ~ param* ~ term }
+ctr_header       = { symbol ~ param* ~ term }
+operation_header = { symbol ~ param* ~ term }
 
 param = { param_implicit | param_explicit | param_constraint }
 

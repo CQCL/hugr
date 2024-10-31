@@ -450,6 +450,11 @@ impl OpDef {
     ) -> ConstFoldResult {
         (self.constant_folder.as_ref())?.fold(type_args, consts)
     }
+
+    /// Returns a reference to the signature function of this [`OpDef`].
+    pub fn signature_func(&self) -> &SignatureFunc {
+        &self.signature_func
+    }
 }
 
 impl Extension {
