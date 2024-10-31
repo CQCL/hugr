@@ -441,7 +441,7 @@ impl<'a> Context<'a> {
                     outputs: &[],
                     params: &[],
                     regions: &[],
-                    meta: &[], // TODO: Metadata
+                    meta: &[],
                     signature: None,
                 }))
             }
@@ -458,8 +458,19 @@ impl<'a> Context<'a> {
             decl
         });
 
-        self.module.get_node_mut(node).unwrap().operation =
-            model::Operation::DeclareOperation { decl };
+        // TODO: description
+
+        let mut meta = BumpVec::with_capacity_in(opdef.iter_misc().len(), self.bump);
+
+        for (name, value) in opdef.iter_misc() {
+            let name = self.bump.alloc_str(name);
+            let value = self.export_json(value);
+            meta.push(model::MetaItem { name, value });
+        }
+
+        let node_data = self.module.get_node_mut(node).unwrap();
+        node_data.operation = model::Operation::DeclareOperation { decl };
+        node_data.meta = self.bump.alloc_slice_copy(&meta);
 
         model::GlobalRef::Direct(node)
     }
@@ -858,21 +869,21 @@ impl<'a> Context<'a> {
 
         for (name, value) in metadata_map {
             let name = self.bump.alloc_str(name);
-
-            let json_ctr = model::GlobalRef::Named(TERM_JSON);
-
-            let value = serde_json::to_string(value).expect("json values are always serializable");
-            let value = self.make_term(model::Term::Str(self.bump.alloc_str(&value)));
-            let value = self.bump.alloc_slice_copy(&[value]);
-            let value = self.make_term(model::Term::ApplyFull {
-                global: json_ctr,
-                args: value,
-            });
-
+            let value = self.export_json(value);
             meta.push(model::MetaItem { name, value });
         }
 
         meta.into_bump_slice()
+    }
+
+    pub fn export_json(&mut self, value: &serde_json::Value) -> model::TermId {
+        let value = serde_json::to_string(value).expect("json values are always serializable");
+        let value = self.make_term(model::Term::Str(self.bump.alloc_str(&value)));
+        let value = self.bump.alloc_slice_copy(&[value]);
+        self.make_term(model::Term::ApplyFull {
+            global: model::GlobalRef::Named(TERM_JSON),
+            args: value,
+        })
     }
 }
 
