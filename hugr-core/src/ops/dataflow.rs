@@ -40,13 +40,13 @@ pub trait DataflowOpTrait {
         Some(EdgeKind::StateOrder)
     }
 
-    /// The edge kind for a single constant input of the operation, not
+    /// The edge kinds for static inputs to the operation, not
     /// described by the dataflow signature.
     ///
-    /// If not None, an extra input port of that kind will be present after the
+    /// If not empty, extra input ports of those kinds will be present after the
     /// dataflow input ports and before any [`DataflowOpTrait::other_input`] ports.
     #[inline]
-    fn static_input(&self) -> Vec<EdgeKind> {
+    fn static_inputs(&self) -> Vec<EdgeKind> {
         vec![]
     }
 }
@@ -148,8 +148,8 @@ impl<T: DataflowOpTrait> OpTrait for T {
         DataflowOpTrait::other_output(self)
     }
 
-    fn static_input(&self) -> Vec<EdgeKind> {
-        DataflowOpTrait::static_input(self)
+    fn static_inputs(&self) -> Vec<EdgeKind> {
+        DataflowOpTrait::static_inputs(self)
     }
 }
 impl<T: DataflowOpTrait> StaticTag for T {
@@ -184,7 +184,7 @@ impl DataflowOpTrait for Call {
         self.instantiation.clone()
     }
 
-    fn static_input(&self) -> Vec<EdgeKind> {
+    fn static_inputs(&self) -> Vec<EdgeKind> {
         vec![EdgeKind::Function(self.called_function_type().clone())]
     }
 }
@@ -300,7 +300,7 @@ impl DataflowOpTrait for LoadConstant {
         Signature::new(TypeRow::new(), vec![self.datatype.clone()])
     }
 
-    fn static_input(&self) -> Vec<EdgeKind> {
+    fn static_inputs(&self) -> Vec<EdgeKind> {
         vec![EdgeKind::Const(self.constant_type().clone())]
     }
 }
@@ -355,7 +355,7 @@ impl DataflowOpTrait for LoadFunction {
         self.signature.clone()
     }
 
-    fn static_input(&self) -> Vec<EdgeKind> {
+    fn static_inputs(&self) -> Vec<EdgeKind> {
         vec![EdgeKind::Function(self.func_sig.clone())]
     }
 }

@@ -159,7 +159,7 @@ impl OpType {
     #[inline]
     pub fn static_port_kind(&self, dir: Direction) -> Vec<EdgeKind> {
         match dir {
-            Direction::Incoming => self.static_input(),
+            Direction::Incoming => self.static_inputs(),
             Direction::Outgoing => self.static_output().map(|k| vec![k]).unwrap_or_default(),
         }
     }
@@ -385,12 +385,12 @@ pub trait OpTrait {
         None
     }
 
-    /// The edge kind for a single constant input of the operation, not
+    /// The edge kinds for static inputs to the operation, not
     /// described by the dataflow signature.
     ///
-    /// If not None, an extra input port of that kind will be present after the
-    /// dataflow input ports and before any [`OpTrait::other_input`] ports.
-    fn static_input(&self) -> Vec<EdgeKind> {
+    /// If not empty, extra input ports of those kinds will be present after the
+    /// dataflow input ports and before any [`DataflowOpTrait::other_input`] ports.
+    fn static_inputs(&self) -> Vec<EdgeKind> {
         vec![]
     }
 
