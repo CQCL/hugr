@@ -4,6 +4,9 @@ use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 
+#[cfg(test)]
+use {crate::proptest::RecursionDepth, ::proptest::prelude::*, proptest_derive::Arbitrary};
+
 use super::{
     ConstFold, ConstFoldResult, Extension, ExtensionBuildError, ExtensionId, ExtensionRegistry,
     ExtensionSet, SignatureError,
@@ -11,7 +14,7 @@ use super::{
 
 use crate::ops::{OpName, OpNameRef};
 use crate::types::type_param::{check_type_args, TypeArg, TypeParam};
-use crate::types::{FuncValueType, OpDefSignature, PolyFuncType, Signature};
+use crate::types::{FuncValueType, OpDefSignature, PolyFuncType, Signature, TypeRow};
 use crate::Hugr;
 mod serialize_signature_func;
 
@@ -224,7 +227,7 @@ impl SignatureFunc {
         def: &OpDef,
         args: &[TypeArg],
         exts: &ExtensionRegistry,
-    ) -> Result<Signature, SignatureError> {
+    ) -> Result<ExtOpSignature, SignatureError> {
         let temp: OpDefSignature; // to keep alive
         let (pf, args) = match &self {
             SignatureFunc::CustomValidator(custom) => {
@@ -244,11 +247,65 @@ impl SignatureFunc {
             // TODO raise warning: https://github.com/CQCL/hugr/issues/1432
             SignatureFunc::MissingValidateFunc(ts) => (ts, args),
         };
+        let static_inputs = pf.static_inputs().clone();
         let mut res = pf.instantiate(args, exts)?;
         res.extension_reqs.insert(&def.extension);
 
         // If there are any row variables left, this will fail with an error:
-        res.try_into()
+        let func_type = res.try_into()?;
+
+        Ok(ExtOpSignature {
+            func_type,
+            static_inputs,
+        })
+    }
+}
+
+/// Instantiated [OpDef] signature.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize)]
+#[cfg_attr(test, derive(Arbitrary), proptest(params = "RecursionDepth"))]
+pub struct ExtOpSignature {
+    #[serde(flatten)]
+    /// The dataflow function type of the signature.
+    pub func_type: Signature,
+    #[serde(default, skip_serializing_if = "TypeRow::is_empty")]
+    /// The static inputs of the signature.
+    pub static_inputs: TypeRow,
+}
+
+impl ExtOpSignature {
+    /// Returns the function type of the signature.
+    pub fn func_type(&self) -> &Signature {
+        &self.func_type
+    }
+
+    /// Returns the static inputs of the signature.
+    pub fn static_inputs(&self) -> &TypeRow {
+        &self.static_inputs
+    }
+}
+impl From<ExtOpSignature> for Signature {
+    fn from(v: ExtOpSignature) -> Self {
+        v.func_type
+    }
+}
+
+impl From<Signature> for ExtOpSignature {
+    fn from(v: Signature) -> Self {
+        Self {
+            func_type: v,
+            static_inputs: TypeRow::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for ExtOpSignature {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        if self.static_inputs.is_empty() {
+            write!(f, "{}", self.func_type)
+        } else {
+            write!(f, "<{}> {}", self.static_inputs, self.func_type)
+        }
     }
 }
 
@@ -364,7 +421,7 @@ impl OpDef {
         &self,
         args: &[TypeArg],
         exts: &ExtensionRegistry,
-    ) -> Result<Signature, SignatureError> {
+    ) -> Result<ExtOpSignature, SignatureError> {
         self.signature_func.compute_signature(self, args, exts)
     }
 
@@ -669,6 +726,7 @@ pub(super) mod test {
             Ok(
                 Signature::new(vec![USIZE_T; 3], vec![Type::new_tuple(vec![USIZE_T; 3])])
                     .with_extension_delta(EXT_ID)
+                    .into()
             )
         );
         assert_eq!(def.validate_args(&args, &PRELUDE_REGISTRY, &[]), Ok(()));
@@ -682,6 +740,7 @@ pub(super) mod test {
             Ok(
                 Signature::new(tyvars.clone(), vec![Type::new_tuple(tyvars)])
                     .with_extension_delta(EXT_ID)
+                    .into()
             )
         );
         def.validate_args(&args, &PRELUDE_REGISTRY, &[TypeBound::Copyable.into()])
@@ -735,7 +794,7 @@ pub(super) mod test {
         def.validate_args(&args, &EMPTY_REG, &decls).unwrap();
         assert_eq!(
             def.compute_signature(&args, &EMPTY_REG),
-            Ok(Signature::new_endo(tv).with_extension_delta(EXT_ID))
+            Ok(Signature::new_endo(tv).with_extension_delta(EXT_ID).into())
         );
         // But not with an external row variable
         let arg: TypeArg = TypeRV::new_row_var_use(0, TypeBound::Copyable).into();
@@ -776,7 +835,7 @@ pub(super) mod test {
             .unwrap();
         assert_eq!(
             def.compute_signature(&args, &PRELUDE_REGISTRY),
-            Ok(exp_fun_ty)
+            Ok(exp_fun_ty.into())
         );
         Ok(())
     }

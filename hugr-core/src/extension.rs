@@ -22,8 +22,8 @@ use crate::types::{Signature, TypeNameRef};
 
 mod op_def;
 pub use op_def::{
-    CustomSignatureFunc, CustomValidator, LowerFunc, OpDef, SignatureFromArgs, SignatureFunc,
-    ValidateJustArgs, ValidateTypeArgs,
+    CustomSignatureFunc, CustomValidator, ExtOpSignature, LowerFunc, OpDef, SignatureFromArgs,
+    SignatureFunc, ValidateJustArgs, ValidateTypeArgs,
 };
 mod type_def;
 pub use type_def::{TypeDef, TypeDefBound};

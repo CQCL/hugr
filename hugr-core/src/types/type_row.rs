@@ -102,6 +102,8 @@ impl<RV: MaybeRV> TypeRowBase<RV> {
         self.iter().try_for_each(|t| t.validate(exts, var_decls))
     }
 }
+/// Empty row of types.
+pub static EMPTY_ROW: TypeRow = TypeRow::new();
 
 impl TypeRow {
     delegate! {

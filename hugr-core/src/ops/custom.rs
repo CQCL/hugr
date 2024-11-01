@@ -10,13 +10,10 @@ use {
     ::proptest_derive::Arbitrary,
 };
 
-use crate::hugr::internal::HugrMutInternals;
+use crate::extension::{ConstFoldResult, ExtensionId, ExtensionRegistry, OpDef, SignatureError};
 use crate::hugr::HugrView;
 use crate::types::{type_param::TypeArg, Signature};
-use crate::{
-    extension::{ConstFoldResult, ExtensionId, ExtensionRegistry, OpDef, SignatureError},
-    types::Type,
-};
+use crate::{extension::ExtOpSignature, hugr::internal::HugrMutInternals, types::EdgeKind};
 use crate::{ops, Hugr, IncomingPort, Node};
 
 use super::dataflow::DataflowOpTrait;
@@ -39,7 +36,7 @@ pub struct ExtensionOp {
     )]
     def: Arc<OpDef>,
     args: Vec<TypeArg>,
-    signature: Signature, // Cache
+    signature: ExtOpSignature, // Cache
 }
 
 impl ExtensionOp {
@@ -72,7 +69,7 @@ impl ExtensionOp {
             Ok(sig) => sig,
             Err(SignatureError::MissingComputeFunc) => {
                 // TODO raise warning: https://github.com/CQCL/hugr/issues/1432
-                opaque.signature()
+                opaque.ext_op_signature()
             }
             Err(e) => return Err(e),
         };
@@ -112,7 +109,6 @@ impl ExtensionOp {
             description: self.def.description().into(),
             args: self.args.clone(),
             signature: self.signature.clone(),
-            static_inputs: vec![], // Initialize with empty vector
         }
     }
 }
@@ -130,7 +126,6 @@ impl From<ExtensionOp> for OpaqueOp {
             description: def.description().into(),
             args,
             signature,
-            static_inputs: vec![], // Initialize with empty vector
         }
     }
 }
@@ -158,7 +153,16 @@ impl DataflowOpTrait for ExtensionOp {
     }
 
     fn signature(&self) -> Signature {
-        self.signature.clone()
+        self.signature.func_type().clone()
+    }
+
+    fn static_inputs(&self) -> Vec<EdgeKind> {
+        self.signature
+            .static_inputs()
+            .iter()
+            .cloned()
+            .map(EdgeKind::Const)
+            .collect()
     }
 }
 
@@ -183,9 +187,7 @@ pub struct OpaqueOp {
     // note that the `signature` field might not include `extension`. Thus this must
     // remain private, and should be accessed through
     // `DataflowOpTrait::signature`.
-    signature: Signature,
-    #[serde(default)]
-    static_inputs: Vec<Type>,
+    signature: ExtOpSignature,
 }
 
 fn qualify_name(res_id: &ExtensionId, name: &OpNameRef) -> OpName {
@@ -199,16 +201,14 @@ impl OpaqueOp {
         name: impl Into<OpName>,
         description: String,
         args: impl Into<Vec<TypeArg>>,
-        signature: Signature,
-        static_inputs: Vec<Type>, // New parameter added
+        signature: impl Into<ExtOpSignature>,
     ) -> Self {
         Self {
             extension,
             name: name.into(),
             description,
             args: args.into(),
-            signature,
-            static_inputs, // Initialize new field
+            signature: signature.into(),
         }
     }
 }
@@ -234,6 +234,13 @@ impl OpaqueOp {
     pub fn extension(&self) -> &ExtensionId {
         &self.extension
     }
+
+    /// Instantiated signature of the operation.
+    pub fn ext_op_signature(&self) -> ExtOpSignature {
+        let mut sig = self.signature.clone();
+        sig.func_type = sig.func_type.with_extension_delta(self.extension.clone());
+        sig
+    }
 }
 
 impl DataflowOpTrait for OpaqueOp {
@@ -244,9 +251,7 @@ impl DataflowOpTrait for OpaqueOp {
     }
 
     fn signature(&self) -> Signature {
-        self.signature
-            .clone()
-            .with_extension_delta(self.extension().clone())
+        self.ext_op_signature().func_type
     }
 }
 
@@ -295,6 +300,7 @@ pub fn resolve_opaque_op(
                 r.name().clone(),
             ));
         };
+        dbg!(opaque.signature().extension_reqs);
         let ext_op = ExtensionOp::new_with_cached(
             def.clone(),
             opaque.args.clone(),
@@ -307,12 +313,14 @@ pub fn resolve_opaque_op(
             cause: e,
         })?;
         if opaque.signature() != ext_op.signature() {
+            dbg!(opaque.signature().extension_reqs);
+            dbg!(ext_op.signature().extension_reqs);
             return Err(OpaqueOpError::SignatureMismatch {
                 node,
                 extension: opaque.extension.clone(),
                 op: def.name().clone(),
-                computed: ext_op.signature.clone(),
-                stored: opaque.signature.clone(),
+                computed: ext_op.signature(),
+                stored: opaque.signature(),
             });
         };
         Ok(ext_op)
@@ -382,7 +390,6 @@ mod test {
             "desc".into(),
             vec![TypeArg::Type { ty: USIZE_T }],
             sig.clone(),
-            vec![], // Initialize with empty vector
         );
         assert_eq!(op.name(), "res.op");
         assert_eq!(DataflowOpTrait::description(&op), "desc");
@@ -403,7 +410,6 @@ mod test {
             "description".into(),
             vec![],
             Signature::new(i0.clone(), BOOL_T),
-            vec![], // Initialize with empty vector
         );
         let resolved =
             super::resolve_opaque_op(Node::from(portgraph::NodeIndex::new(1)), &opaque, registry)
@@ -439,16 +445,8 @@ mod test {
             "".into(),
             vec![],
             endo_sig.clone(),
-            vec![], // Initialize with empty vector
         );
-        let opaque_comp = OpaqueOp::new(
-            ext_id.clone(),
-            comp_name,
-            "".into(),
-            vec![],
-            endo_sig,
-            vec![], // Initialize with empty vector
-        );
+        let opaque_comp = OpaqueOp::new(ext_id.clone(), comp_name, "".into(), vec![], endo_sig);
         let resolved_val = super::resolve_opaque_op(
             Node::from(portgraph::NodeIndex::new(1)),
             &opaque_val,
@@ -462,7 +460,7 @@ mod test {
             &opaque_comp,
             &registry,
         )
-        .unwrap();
+        .unwrap_or_else(|e| panic!("{}", e));
         assert_eq!(resolved_comp.def().name(), comp_name);
     }
 }
