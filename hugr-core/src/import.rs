@@ -500,6 +500,7 @@ impl<'a> Context<'a> {
                     String::default(),
                     args,
                     signature,
+                    vec![],
                 ));
 
                 let node = self.make_node(node_id, optype, parent)?;

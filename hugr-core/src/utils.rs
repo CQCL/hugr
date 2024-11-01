@@ -113,17 +113,17 @@ pub(crate) mod test_quantum_extension {
         ops::ExtensionOp,
         std_extensions::arithmetic::float_types,
         type_row,
-        types::{PolyFuncTypeRV, Signature},
+        types::{OpDefSignature, Signature},
         Extension,
     };
 
     use lazy_static::lazy_static;
 
-    fn one_qb_func() -> PolyFuncTypeRV {
+    fn one_qb_func() -> OpDefSignature {
         FuncValueType::new_endo(QB_T).into()
     }
 
-    fn two_qb_func() -> PolyFuncTypeRV {
+    fn two_qb_func() -> OpDefSignature {
         FuncValueType::new_endo(type_row![QB_T, QB_T]).into()
     }
     /// The extension identifier.

@@ -15,7 +15,7 @@ use crate::ops::OpName;
 use crate::ops::{NamedOp, Value};
 use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::{
-    CustomType, FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, SumType, Type, TypeBound,
+    CustomType, FuncValueType, OpDefSignature, PolyFuncType, Signature, SumType, Type, TypeBound,
     TypeName, TypeRV, TypeRow, TypeRowRV,
 };
 use crate::utils::sorted_consts;
@@ -87,7 +87,7 @@ lazy_static! {
         .add_op(
             PANIC_OP_ID,
             "Panic with input error".to_string(),
-            PolyFuncTypeRV::new(
+            OpDefSignature::new(
                 [TypeParam::new_list(TypeBound::Any), TypeParam::new_list(TypeBound::Any)],
                 FuncValueType::new(
                     vec![TypeRV::new_extension(ERROR_CUSTOM_TYPE), TypeRV::new_row_var_use(0, TypeBound::Any)],
@@ -502,10 +502,10 @@ impl MakeOpDef for TupleOpDef {
         let param = TypeParam::new_list(TypeBound::Any);
         match self {
             TupleOpDef::MakeTuple => {
-                PolyFuncTypeRV::new([param], FuncValueType::new(rv, tuple_type))
+                OpDefSignature::new([param], FuncValueType::new(rv, tuple_type))
             }
             TupleOpDef::UnpackTuple => {
-                PolyFuncTypeRV::new([param], FuncValueType::new(tuple_type, rv))
+                OpDefSignature::new([param], FuncValueType::new(tuple_type, rv))
             }
         }
         .into()
@@ -784,7 +784,7 @@ impl std::str::FromStr for LiftDef {
 
 impl MakeOpDef for LiftDef {
     fn signature(&self) -> SignatureFunc {
-        PolyFuncTypeRV::new(
+        OpDefSignature::new(
             vec![TypeParam::Extensions, TypeParam::new_list(TypeBound::Any)],
             FuncValueType::new_endo(TypeRV::new_row_var_use(1, TypeBound::Any))
                 .with_extension_delta(ExtensionSet::type_var(0)),

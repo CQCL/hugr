@@ -25,7 +25,7 @@ use crate::types::Type;
 
 use crate::extension::SignatureError;
 
-use crate::types::PolyFuncTypeRV;
+use crate::types::OpDefSignature;
 
 use crate::types::type_param::TypeArg;
 use crate::Extension;
@@ -52,7 +52,7 @@ pub enum ArrayOpDef {
 const STATIC_SIZE_PARAM: &[TypeParam; 1] = &[TypeParam::max_nat()];
 
 impl SignatureFromArgs for ArrayOpDef {
-    fn compute_signature(&self, arg_values: &[TypeArg]) -> Result<PolyFuncTypeRV, SignatureError> {
+    fn compute_signature(&self, arg_values: &[TypeArg]) -> Result<OpDefSignature, SignatureError> {
         let [TypeArg::BoundedNat { n }] = *arg_values else {
             return Err(SignatureError::InvalidTypeArgs);
         };
@@ -60,14 +60,14 @@ impl SignatureFromArgs for ArrayOpDef {
         let array_ty = array_type(TypeArg::BoundedNat { n }, elem_ty_var.clone());
         let params = vec![TypeBound::Any.into()];
         let poly_func_ty = match self {
-            ArrayOpDef::new_array => PolyFuncTypeRV::new(
+            ArrayOpDef::new_array => OpDefSignature::new(
                 params,
                 FuncValueType::new(vec![elem_ty_var.clone(); n as usize], array_ty),
             ),
             ArrayOpDef::pop_left | ArrayOpDef::pop_right => {
                 let popped_array_ty =
                     array_type(TypeArg::BoundedNat { n: n - 1 }, elem_ty_var.clone());
-                PolyFuncTypeRV::new(
+                OpDefSignature::new(
                     params,
                     FuncValueType::new(
                         array_ty,
@@ -123,7 +123,7 @@ impl ArrayOpDef {
                     let copy_elem_ty = Type::new_var_use(1, TypeBound::Copyable);
                     let copy_array_ty = instantiate(array_def, size_var, copy_elem_ty.clone());
                     let option_type: Type = option_type(copy_elem_ty).into();
-                    PolyFuncTypeRV::new(
+                    OpDefSignature::new(
                         params,
                         FuncValueType::new(vec![copy_array_ty, USIZE_T], option_type),
                     )
@@ -131,7 +131,7 @@ impl ArrayOpDef {
                 set => {
                     let result_row = vec![elem_ty_var.clone(), array_ty.clone()];
                     let result_type: Type = either_type(result_row.clone(), result_row).into();
-                    PolyFuncTypeRV::new(
+                    OpDefSignature::new(
                         standard_params,
                         FuncValueType::new(
                             vec![array_ty.clone(), USIZE_T, elem_ty_var],
@@ -141,12 +141,12 @@ impl ArrayOpDef {
                 }
                 swap => {
                     let result_type: Type = either_type(array_ty.clone(), array_ty.clone()).into();
-                    PolyFuncTypeRV::new(
+                    OpDefSignature::new(
                         standard_params,
                         FuncValueType::new(vec![array_ty, USIZE_T, USIZE_T], result_type),
                     )
                 }
-                discard_empty => PolyFuncTypeRV::new(
+                discard_empty => OpDefSignature::new(
                     vec![TypeBound::Any.into()],
                     FuncValueType::new(
                         instantiate(array_def, 0, Type::new_var_use(0, TypeBound::Any)),

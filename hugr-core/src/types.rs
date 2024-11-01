@@ -16,7 +16,7 @@ use crate::types::type_param::check_type_arg;
 use crate::utils::display_list_with_separator;
 pub use check::SumTypeError;
 pub use custom::CustomType;
-pub use poly_func::{PolyFuncType, PolyFuncTypeRV};
+pub use poly_func::{OpDefSignature, PolyFuncType};
 pub use signature::{FuncValueType, Signature};
 use smol_str::SmolStr;
 pub use type_param::TypeArg;

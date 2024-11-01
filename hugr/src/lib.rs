@@ -43,17 +43,17 @@
 //!         },
 //!         ops::{ExtensionOp, OpName},
 //!         type_row,
-//!         types::{FuncValueType, PolyFuncTypeRV},
+//!         types::{FuncValueType, OpDefSignature},
 //!         Extension,
 //!     };
 //!
 //!     use lazy_static::lazy_static;
 //!
-//!     fn one_qb_func() -> PolyFuncTypeRV {
+//!     fn one_qb_func() -> OpDefSignature {
 //!         FuncValueType::new_endo(type_row![QB_T]).into()
 //!     }
 //!
-//!     fn two_qb_func() -> PolyFuncTypeRV {
+//!     fn two_qb_func() -> OpDefSignature {
 //!         FuncValueType::new_endo(type_row![QB_T, QB_T]).into()
 //!     }
 //!     /// The extension identifier.

@@ -11,7 +11,7 @@ use crate::extension::{
 use crate::ops::custom::ExtensionOp;
 use crate::ops::{NamedOp, OpName};
 use crate::type_row;
-use crate::types::{FuncValueType, PolyFuncTypeRV, TypeRowRV};
+use crate::types::{FuncValueType, OpDefSignature, TypeRowRV};
 use crate::utils::collect_array;
 
 use crate::{
@@ -227,20 +227,20 @@ pub(in crate::std_extensions::arithmetic) fn int_polytype(
     n_vars: usize,
     input: impl Into<TypeRowRV>,
     output: impl Into<TypeRowRV>,
-) -> PolyFuncTypeRV {
-    PolyFuncTypeRV::new(
+) -> OpDefSignature {
+    OpDefSignature::new(
         vec![LOG_WIDTH_TYPE_PARAM; n_vars],
         FuncValueType::new(input, output),
     )
 }
 
-fn ibinop_sig() -> PolyFuncTypeRV {
+fn ibinop_sig() -> OpDefSignature {
     let int_type_var = int_tv(0);
 
     int_polytype(1, vec![int_type_var.clone(); 2], vec![int_type_var])
 }
 
-fn iunop_sig() -> PolyFuncTypeRV {
+fn iunop_sig() -> OpDefSignature {
     let int_type_var = int_tv(0);
     int_polytype(1, vec![int_type_var.clone()], vec![int_type_var])
 }

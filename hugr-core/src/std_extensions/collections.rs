@@ -26,7 +26,7 @@ use crate::{
     ops::{custom::ExtensionOp, NamedOp},
     types::{
         type_param::{TypeArg, TypeParam},
-        CustomCheckFailure, CustomType, FuncValueType, PolyFuncTypeRV, Type, TypeBound,
+        CustomCheckFailure, CustomType, FuncValueType, OpDefSignature, Type, TypeBound,
     },
     Extension,
 };
@@ -187,8 +187,8 @@ impl ListOp {
         self,
         input: impl Into<TypeRowRV>,
         output: impl Into<TypeRowRV>,
-    ) -> PolyFuncTypeRV {
-        PolyFuncTypeRV::new(vec![Self::TP], FuncValueType::new(input, output))
+    ) -> OpDefSignature {
+        OpDefSignature::new(vec![Self::TP], FuncValueType::new(input, output))
     }
 
     /// Returns the type of a generic list, associated with the element type parameter at index `idx`.

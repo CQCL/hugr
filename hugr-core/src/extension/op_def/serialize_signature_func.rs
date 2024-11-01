@@ -1,10 +1,10 @@
 use serde::{Deserialize, Serialize};
 
-use super::{CustomValidator, PolyFuncTypeRV, SignatureFunc};
+use super::{CustomValidator, OpDefSignature, SignatureFunc};
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 struct SerSignatureFunc {
     /// If the type scheme is available explicitly, store it.
-    signature: Option<PolyFuncTypeRV>,
+    signature: Option<OpDefSignature>,
     /// Whether an associated binary function is expected.
     /// If `signature` is `None`, a true value here indicates a custom compute function.
     /// If `signature` is not `None`, a true value here indicates a custom validation function.
@@ -97,7 +97,7 @@ mod test {
             _arg_values: &[TypeArg],
             _def: &'o crate::extension::op_def::OpDef,
             _extension_registry: &crate::extension::ExtensionRegistry,
-        ) -> Result<crate::types::PolyFuncTypeRV, crate::extension::SignatureError> {
+        ) -> Result<crate::types::OpDefSignature, crate::extension::SignatureError> {
             Ok(Default::default())
         }
 
@@ -146,7 +146,7 @@ mod test {
         let mut deser = SignatureFunc::try_from(ser.clone()).unwrap();
         assert_matches!(&deser,
             SignatureFunc::MissingValidateFunc(poly_func) => {
-                assert_eq!(poly_func, &PolyFuncTypeRV::from(sig.clone()));
+                assert_eq!(poly_func, &OpDefSignature::from(sig.clone()));
             }
         );
 

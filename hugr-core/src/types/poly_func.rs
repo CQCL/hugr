@@ -1,8 +1,12 @@
 //! Polymorphic Function Types
 
+use delegate::delegate;
 use itertools::Itertools;
 
-use crate::extension::{ExtensionRegistry, SignatureError};
+use crate::{
+    extension::{ExtensionRegistry, SignatureError},
+    type_row,
+};
 #[cfg(test)]
 use {
     crate::proptest::RecursionDepth,
@@ -10,9 +14,12 @@ use {
     proptest_derive::Arbitrary,
 };
 
-use super::type_param::{check_type_args, TypeArg, TypeParam};
 use super::Substitution;
 use super::{signature::FuncTypeBase, MaybeRV, NoRV, RowVariable};
+use super::{
+    type_param::{check_type_args, TypeArg, TypeParam},
+    TypeRow,
+};
 
 /// A polymorphic type scheme, i.e. of a [FuncDecl], [FuncDefn] or [OpDef].
 /// (Nodes/operations in the Hugr are not polymorphic.)
@@ -47,9 +54,105 @@ pub type PolyFuncType = PolyFuncTypeBase<NoRV>;
 /// The polymorphic type of an [OpDef], whose number of input and outputs
 /// may vary according to how [RowVariable]s therein are instantiated.
 ///
+/// It may also have a row of static inputs.
+///
 /// [OpDef]: crate::extension::OpDef
-pub type PolyFuncTypeRV = PolyFuncTypeBase<RowVariable>;
+#[derive(
+    Clone,
+    PartialEq,
+    Debug,
+    Default,
+    Eq,
+    Hash,
+    derive_more::Display,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+#[cfg_attr(test, derive(Arbitrary), proptest(params = "RecursionDepth"))]
+#[display("{}{}{}", self.display_params(), self.static_inputs, self.body())]
+pub struct OpDefSignature {
+    #[serde(flatten)]
+    signature: PolyFuncTypeBase<RowVariable>,
+    #[serde(default, skip_serializing_if = "TypeRow::is_empty")]
+    static_inputs: TypeRow,
+}
 
+impl OpDefSignature {
+    /// Creates a new `OpDefSignature` with the given parameters and body.
+    ///
+    ///
+    /// Use `OpDefSignature::with_static_inputs` to set the static inputs.
+    ///
+    /// # Arguments
+    ///
+    /// * `params` - A collection of type parameters.
+    /// * `body` - The function type base.
+    pub fn new(
+        params: impl Into<Vec<TypeParam>>,
+        body: impl Into<FuncTypeBase<RowVariable>>,
+    ) -> Self {
+        Self {
+            signature: PolyFuncTypeBase::new(params, body),
+            static_inputs: type_row![],
+        }
+    }
+
+    /// Sets the static inputs for the `OpDefSignature`.
+    ///
+    /// # Arguments
+    ///
+    /// * `static_inputs` - A `TypeRow` representing the static input types.
+    pub fn with_static_inputs(mut self, static_inputs: TypeRow) -> Self {
+        self.static_inputs = static_inputs;
+        self
+    }
+
+    /// Returns a reference to the static inputs of the `OpDefSignature`.
+    pub fn static_inputs(&self) -> &TypeRow {
+        &self.static_inputs
+    }
+
+    /// Returns a reference to the polymorphic function type of the `OpDefSignature`.
+    pub fn poly_func_type(&self) -> &PolyFuncTypeBase<RowVariable> {
+        &self.signature
+    }
+
+    delegate! {
+        to self.signature {
+            /// The type parameters.
+            pub fn params(&self) -> &[TypeParam];
+
+            /// Returns a reference to the function body type.
+            pub fn body(&self) -> &FuncTypeBase<RowVariable>;
+
+            /// Validates the signature against the given extension registry.
+            ///
+            /// # Arguments
+            ///
+            /// * `reg` - A reference to the `ExtensionRegistry`.
+            ///
+            /// # Raises
+            ///
+            /// A `SignatureError` if validation fails.
+            pub fn validate(&self, reg: &ExtensionRegistry) -> Result<(), SignatureError>;
+
+            /// Displays the type parameters as a string.
+            pub fn display_params(&self) -> String;
+
+            /// Instantiates the function type base with the given arguments and extension registry.
+            ///
+            /// # Arguments
+            ///
+            /// * `args` - A slice of `TypeArg`.
+            /// * `ext_reg` - A reference to the `ExtensionRegistry`.
+            ///
+            /// # Raises
+            ///
+            /// A `SignatureError` if instantiation fails.
+            pub fn instantiate(&self, args: &[TypeArg], ext_reg: &ExtensionRegistry) -> Result<FuncTypeBase<RowVariable>, SignatureError>;
+        }
+    }
+}
 // deriving Default leads to an impl that only applies for RV: Default
 impl<RV: MaybeRV> Default for PolyFuncTypeBase<RV> {
     fn default() -> Self {
@@ -69,11 +172,37 @@ impl<RV: MaybeRV> From<FuncTypeBase<RV>> for PolyFuncTypeBase<RV> {
     }
 }
 
-impl From<PolyFuncType> for PolyFuncTypeRV {
+impl From<PolyFuncType> for PolyFuncTypeBase<RowVariable> {
     fn from(value: PolyFuncType) -> Self {
         Self {
             params: value.params,
             body: value.body.into(),
+        }
+    }
+}
+impl From<PolyFuncType> for OpDefSignature {
+    fn from(value: PolyFuncType) -> Self {
+        Self {
+            signature: value.into(),
+            static_inputs: type_row![],
+        }
+    }
+}
+
+impl From<PolyFuncTypeBase<RowVariable>> for OpDefSignature {
+    fn from(value: PolyFuncTypeBase<RowVariable>) -> Self {
+        Self {
+            signature: value,
+            static_inputs: type_row![],
+        }
+    }
+}
+
+impl From<FuncTypeBase<RowVariable>> for OpDefSignature {
+    fn from(body: FuncTypeBase<RowVariable>) -> Self {
+        Self {
+            signature: body.into(),
+            static_inputs: type_row![],
         }
     }
 }

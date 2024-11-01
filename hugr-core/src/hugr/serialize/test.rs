@@ -17,7 +17,7 @@ use crate::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
 use crate::std_extensions::logic::LogicOp;
 use crate::types::type_param::TypeParam;
 use crate::types::{
-    FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, SumType, Type, TypeArg, TypeBound,
+    FuncValueType, OpDefSignature, PolyFuncType, Signature, SumType, Type, TypeArg, TypeBound,
     TypeRV,
 };
 use crate::{type_row, OutgoingPort};
@@ -37,7 +37,7 @@ const QB: Type = crate::extension::prelude::QB_T;
 struct SerTestingLatest {
     typ: Option<crate::types::TypeRV>,
     sum_type: Option<crate::types::SumType>,
-    poly_func_type: Option<crate::types::PolyFuncTypeRV>,
+    poly_func_type: Option<crate::types::OpDefSignature>,
     value: Option<crate::ops::Value>,
     optype: Option<NodeSer>,
     op_def: Option<SimpleOpDef>,
@@ -124,14 +124,14 @@ macro_rules! impl_sertesting_from {
 
 impl_sertesting_from!(crate::types::TypeRV, typ);
 impl_sertesting_from!(crate::types::SumType, sum_type);
-impl_sertesting_from!(crate::types::PolyFuncTypeRV, poly_func_type);
+impl_sertesting_from!(crate::types::OpDefSignature, poly_func_type);
 impl_sertesting_from!(crate::ops::Value, value);
 impl_sertesting_from!(NodeSer, optype);
 impl_sertesting_from!(SimpleOpDef, op_def);
 
 impl From<PolyFuncType> for SerTestingLatest {
     fn from(v: PolyFuncType) -> Self {
-        let v: PolyFuncTypeRV = v.into();
+        let v: OpDefSignature = v.into();
         v.into()
     }
 }
@@ -484,7 +484,7 @@ fn polyfunctype1() -> PolyFuncType {
     PolyFuncType::new([TypeParam::max_nat(), TypeParam::Extensions], function_type)
 }
 
-fn polyfunctype2() -> PolyFuncTypeRV {
+fn polyfunctype2() -> OpDefSignature {
     let tv0 = TypeRV::new_row_var_use(0, TypeBound::Any);
     let tv1 = TypeRV::new_row_var_use(1, TypeBound::Copyable);
     let params = [TypeBound::Any, TypeBound::Copyable].map(TypeParam::new_list);
@@ -492,7 +492,7 @@ fn polyfunctype2() -> PolyFuncTypeRV {
         TypeRV::new_function(FuncValueType::new(tv0.clone(), tv1.clone())),
         tv0,
     ];
-    let res = PolyFuncTypeRV::new(params, FuncValueType::new(inputs, tv1));
+    let res = OpDefSignature::new(params, FuncValueType::new(inputs, tv1));
     // Just check we've got the arguments the right way round
     // (not that it really matters for the serialization schema we have)
     res.validate(&EMPTY_REG).unwrap();
@@ -515,15 +515,15 @@ fn roundtrip_polyfunctype_fixedlen(#[case] poly_func_type: PolyFuncType) {
 
 #[rstest]
 #[case(FuncValueType::new_endo(type_row![]).into())]
-#[case(PolyFuncTypeRV::new([TypeParam::String], FuncValueType::new_endo(type_row![Type::new_var_use(0, TypeBound::Copyable)])))]
-#[case(PolyFuncTypeRV::new([TypeBound::Copyable.into()], FuncValueType::new_endo(type_row![Type::new_var_use(0, TypeBound::Copyable)])))]
-#[case(PolyFuncTypeRV::new([TypeParam::new_list(TypeBound::Any)], FuncValueType::new_endo(type_row![])))]
-#[case(PolyFuncTypeRV::new([TypeParam::Tuple { params: [TypeBound::Any.into(), TypeParam::bounded_nat(2.try_into().unwrap())].into() }], FuncValueType::new_endo(type_row![])))]
-#[case(PolyFuncTypeRV::new(
+#[case(OpDefSignature::new([TypeParam::String], FuncValueType::new_endo(type_row![Type::new_var_use(0, TypeBound::Copyable)])))]
+#[case(OpDefSignature::new([TypeBound::Copyable.into()], FuncValueType::new_endo(type_row![Type::new_var_use(0, TypeBound::Copyable)])))]
+#[case(OpDefSignature::new([TypeParam::new_list(TypeBound::Any)], FuncValueType::new_endo(type_row![])))]
+#[case(OpDefSignature::new([TypeParam::Tuple { params: [TypeBound::Any.into(), TypeParam::bounded_nat(2.try_into().unwrap())].into() }], FuncValueType::new_endo(type_row![])))]
+#[case(OpDefSignature::new(
     [TypeParam::new_list(TypeBound::Any)],
     FuncValueType::new_endo(TypeRV::new_row_var_use(0, TypeBound::Any))))]
 #[case(polyfunctype2())]
-fn roundtrip_polyfunctype_varlen(#[case] poly_func_type: PolyFuncTypeRV) {
+fn roundtrip_polyfunctype_varlen(#[case] poly_func_type: OpDefSignature) {
     check_testing_roundtrip(poly_func_type)
 }
 
@@ -563,7 +563,7 @@ mod proptest {
     use super::check_testing_roundtrip;
     use super::{NodeSer, SimpleOpDef};
     use crate::ops::{OpType, OpaqueOp, Value};
-    use crate::types::{PolyFuncTypeRV, Type};
+    use crate::types::{OpDefSignature, Type};
     use proptest::prelude::*;
 
     impl Arbitrary for NodeSer {
@@ -596,7 +596,7 @@ mod proptest {
         }
 
         #[test]
-        fn prop_roundtrip_poly_func_type(t: PolyFuncTypeRV) {
+        fn prop_roundtrip_poly_func_type(t: OpDefSignature) {
             check_testing_roundtrip(t)
         }
 

@@ -11,7 +11,7 @@ use super::{
 
 use crate::ops::{OpName, OpNameRef};
 use crate::types::type_param::{check_type_args, TypeArg, TypeParam};
-use crate::types::{FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature};
+use crate::types::{FuncValueType, OpDefSignature, PolyFuncType, Signature};
 use crate::Hugr;
 mod serialize_signature_func;
 
@@ -25,7 +25,7 @@ pub trait CustomSignatureFunc: Send + Sync {
         arg_values: &[TypeArg],
         def: &'o OpDef,
         extension_registry: &ExtensionRegistry,
-    ) -> Result<PolyFuncTypeRV, SignatureError>;
+    ) -> Result<OpDefSignature, SignatureError>;
     /// The declared type parameters which require values in order for signature to
     /// be computed.
     fn static_params(&self) -> &[TypeParam];
@@ -35,7 +35,7 @@ pub trait CustomSignatureFunc: Send + Sync {
 pub trait SignatureFromArgs: Send + Sync {
     /// Compute signature of node given
     /// values for the type parameters.
-    fn compute_signature(&self, arg_values: &[TypeArg]) -> Result<PolyFuncTypeRV, SignatureError>;
+    fn compute_signature(&self, arg_values: &[TypeArg]) -> Result<OpDefSignature, SignatureError>;
     /// The declared type parameters which require values in order for signature to
     /// be computed.
     fn static_params(&self) -> &[TypeParam];
@@ -48,7 +48,7 @@ impl<T: SignatureFromArgs> CustomSignatureFunc for T {
         arg_values: &[TypeArg],
         _def: &'o OpDef,
         _extension_registry: &ExtensionRegistry,
-    ) -> Result<PolyFuncTypeRV, SignatureError> {
+    ) -> Result<OpDefSignature, SignatureError> {
         SignatureFromArgs::compute_signature(self, arg_values)
     }
 
@@ -58,7 +58,7 @@ impl<T: SignatureFromArgs> CustomSignatureFunc for T {
     }
 }
 
-/// Trait for validating type arguments to a PolyFuncTypeRV beyond conformation to
+/// Trait for validating type arguments to a OpDefSignature beyond conformation to
 /// declared type parameter (which should have been checked beforehand).
 pub trait ValidateTypeArgs: Send + Sync {
     /// Validate the type arguments of node given
@@ -72,7 +72,7 @@ pub trait ValidateTypeArgs: Send + Sync {
     ) -> Result<(), SignatureError>;
 }
 
-/// Trait for validating type arguments to a PolyFuncTypeRV beyond conformation to
+/// Trait for validating type arguments to a OpDefSignature beyond conformation to
 /// declared type parameter (which should have been checked beforehand), given just the arguments.
 pub trait ValidateJustArgs: Send + Sync {
     /// Validate the type arguments of node given
@@ -115,20 +115,20 @@ pub trait CustomLowerFunc: Send + Sync {
     ) -> Option<Hugr>;
 }
 
-/// Encode a signature as [PolyFuncTypeRV] but with additional validation of type
+/// Encode a signature as [OpDefSignature] but with additional validation of type
 /// arguments via a custom binary. The binary cannot be serialized so will be
 /// lost over a serialization round-trip.
 pub struct CustomValidator {
-    poly_func: PolyFuncTypeRV,
+    poly_func: OpDefSignature,
     /// Custom function for validating type arguments before returning the signature.
     pub(crate) validate: Box<dyn ValidateTypeArgs>,
 }
 
 impl CustomValidator {
-    /// Encode a signature using a `PolyFuncTypeRV`, with a custom function for
+    /// Encode a signature using a `OpDefSignature`, with a custom function for
     /// validating type arguments before returning the signature.
     pub fn new(
-        poly_func: impl Into<PolyFuncTypeRV>,
+        poly_func: impl Into<OpDefSignature>,
         validate: impl ValidateTypeArgs + 'static,
     ) -> Self {
         Self {
@@ -141,11 +141,11 @@ impl CustomValidator {
 /// The ways in which an OpDef may compute the Signature of each operation node.
 pub enum SignatureFunc {
     /// An explicit polymorphic function type.
-    PolyFuncType(PolyFuncTypeRV),
+    PolyFuncType(OpDefSignature),
     /// A polymorphic function type (like [Self::PolyFuncType] but also with a custom binary for validating type arguments.
     CustomValidator(CustomValidator),
     /// Serialized declaration specified a custom validate binary but it was not provided.
-    MissingValidateFunc(PolyFuncTypeRV),
+    MissingValidateFunc(OpDefSignature),
     /// A custom binary which computes a polymorphic function type given values
     /// for its static type parameters.
     CustomFunc(Box<dyn CustomSignatureFunc>),
@@ -165,8 +165,8 @@ impl From<PolyFuncType> for SignatureFunc {
     }
 }
 
-impl From<PolyFuncTypeRV> for SignatureFunc {
-    fn from(v: PolyFuncTypeRV) -> Self {
+impl From<OpDefSignature> for SignatureFunc {
+    fn from(v: OpDefSignature) -> Self {
         Self::PolyFuncType(v)
     }
 }
@@ -225,7 +225,7 @@ impl SignatureFunc {
         args: &[TypeArg],
         exts: &ExtensionRegistry,
     ) -> Result<Signature, SignatureError> {
-        let temp: PolyFuncTypeRV; // to keep alive
+        let temp: OpDefSignature; // to keep alive
         let (pf, args) = match &self {
             SignatureFunc::CustomValidator(custom) => {
                 custom.validate.validate(args, def, exts)?;
@@ -333,7 +333,7 @@ impl OpDef {
         exts: &ExtensionRegistry,
         var_decls: &[TypeParam],
     ) -> Result<(), SignatureError> {
-        let temp: PolyFuncTypeRV; // to keep alive
+        let temp: OpDefSignature; // to keep alive
         let (pf, args) = match &self.signature_func {
             SignatureFunc::CustomValidator(ts) => (&ts.poly_func, args),
             SignatureFunc::PolyFuncType(ts) => (ts, args),
@@ -459,7 +459,7 @@ impl OpDef {
 
 impl Extension {
     /// Add an operation definition to the extension. Must be a type scheme
-    /// (defined by a [`PolyFuncTypeRV`]), a type scheme along with binary
+    /// (defined by a [`OpDefSignature`]), a type scheme along with binary
     /// validation for type arguments ([`CustomValidator`]), or a custom binary
     /// function for computing the signature given type arguments (`impl [CustomSignatureFunc]`).
     pub fn add_op(
@@ -501,7 +501,7 @@ pub(super) mod test {
     use crate::ops::OpName;
     use crate::std_extensions::collections::{EXTENSION, LIST_TYPENAME};
     use crate::types::type_param::{TypeArgError, TypeParam};
-    use crate::types::{PolyFuncTypeRV, Signature, Type, TypeArg, TypeBound, TypeRV};
+    use crate::types::{OpDefSignature, Signature, Type, TypeArg, TypeBound, TypeRV};
     use crate::{const_extension_ids, Extension};
 
     const_extension_ids! {
@@ -598,7 +598,7 @@ pub(super) mod test {
         let list_of_var =
             Type::new_extension(list_def.instantiate(vec![TypeArg::new_var_use(0, TP)])?);
         const OP_NAME: OpName = OpName::new_inline("Reverse");
-        let type_scheme = PolyFuncTypeRV::new(vec![TP], Signature::new_endo(vec![list_of_var]));
+        let type_scheme = OpDefSignature::new(vec![TP], Signature::new_endo(vec![list_of_var]));
 
         let def = e.add_op(OP_NAME, "desc".into(), type_scheme)?;
         def.add_lower_func(LowerFunc::FixedHugr {
@@ -629,7 +629,7 @@ pub(super) mod test {
 
     #[test]
     fn binary_polyfunc() -> Result<(), Box<dyn std::error::Error>> {
-        // Test a custom binary `compute_signature` that returns a PolyFuncTypeRV
+        // Test a custom binary `compute_signature` that returns a OpDefSignature
         // where the latter declares more type params itself. In particular,
         // we should be able to substitute (external) type variables into the latter,
         // but not pass them into the former (custom binary function).
@@ -638,7 +638,7 @@ pub(super) mod test {
             fn compute_signature(
                 &self,
                 arg_values: &[TypeArg],
-            ) -> Result<PolyFuncTypeRV, SignatureError> {
+            ) -> Result<OpDefSignature, SignatureError> {
                 const TP: TypeParam = TypeParam::Type { b: TypeBound::Any };
                 let [TypeArg::BoundedNat { n }] = arg_values else {
                     return Err(SignatureError::InvalidTypeArgs);
@@ -647,7 +647,7 @@ pub(super) mod test {
                 let tvs: Vec<Type> = (0..n)
                     .map(|_| Type::new_var_use(0, TypeBound::Any))
                     .collect();
-                Ok(PolyFuncTypeRV::new(
+                Ok(OpDefSignature::new(
                     vec![TP.to_owned()],
                     Signature::new(tvs.clone(), vec![Type::new_tuple(tvs)]),
                 ))
@@ -718,13 +718,13 @@ pub(super) mod test {
 
     #[test]
     fn type_scheme_instantiate_var() -> Result<(), Box<dyn std::error::Error>> {
-        // Check that we can instantiate a PolyFuncTypeRV-scheme with an (external)
+        // Check that we can instantiate a OpDefSignature-scheme with an (external)
         // type variable
         let mut e = Extension::new_test(EXT_ID);
         let def = e.add_op(
             "SimpleOp".into(),
             "".into(),
-            PolyFuncTypeRV::new(
+            OpDefSignature::new(
                 vec![TypeBound::Any.into()],
                 Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
             ),
@@ -764,7 +764,7 @@ pub(super) mod test {
         let def = e.add_op(
             "SimpleOp".into(),
             "".into(),
-            PolyFuncTypeRV::new(params.clone(), fun_ty),
+            OpDefSignature::new(params.clone(), fun_ty),
         )?;
 
         // Concrete extension set
@@ -788,7 +788,7 @@ pub(super) mod test {
         use crate::{
             builder::test::simple_dfg_hugr,
             extension::{op_def::LowerFunc, ExtensionId, ExtensionSet, OpDef, SignatureFunc},
-            types::PolyFuncTypeRV,
+            types::OpDefSignature,
         };
 
         impl Arbitrary for SignatureFunc {
@@ -798,7 +798,7 @@ pub(super) mod test {
                 // TODO there is also  SignatureFunc::CustomFunc, but for now
                 // this is not serialized. When it is, we should generate
                 // examples here .
-                any::<PolyFuncTypeRV>()
+                any::<OpDefSignature>()
                     .prop_map(SignatureFunc::PolyFuncType)
                     .boxed()
             }

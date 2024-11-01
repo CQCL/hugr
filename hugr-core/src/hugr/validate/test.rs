@@ -22,7 +22,7 @@ use crate::std_extensions::logic::LogicOp;
 use crate::std_extensions::logic::{self};
 use crate::types::type_param::{TypeArg, TypeArgError};
 use crate::types::{
-    CustomType, FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, Type, TypeBound, TypeRV,
+    CustomType, FuncValueType, OpDefSignature, PolyFuncType, Signature, Type, TypeBound, TypeRV,
     TypeRow,
 };
 use crate::{
@@ -594,14 +594,14 @@ pub(crate) fn extension_with_eval_parallel() -> Extension {
     let inputs = TypeRV::new_row_var_use(0, TypeBound::Any);
     let outputs = TypeRV::new_row_var_use(1, TypeBound::Any);
     let evaled_fn = TypeRV::new_function(FuncValueType::new(inputs.clone(), outputs.clone()));
-    let pf = PolyFuncTypeRV::new(
+    let pf = OpDefSignature::new(
         [rowp.clone(), rowp.clone()],
         FuncValueType::new(vec![evaled_fn, inputs], outputs),
     );
     e.add_op("eval".into(), "".into(), pf).unwrap();
 
     let rv = |idx| TypeRV::new_row_var_use(idx, TypeBound::Any);
-    let pf = PolyFuncTypeRV::new(
+    let pf = OpDefSignature::new(
         [rowp.clone(), rowp.clone(), rowp.clone(), rowp.clone()],
         Signature::new(
             vec![
@@ -709,7 +709,7 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
     e.add_op(
         "eval".into(),
         "".into(),
-        PolyFuncTypeRV::new(
+        OpDefSignature::new(
             params.clone(),
             Signature::new(
                 vec![evaled_fn, Type::new_var_use(0, TypeBound::Any)],

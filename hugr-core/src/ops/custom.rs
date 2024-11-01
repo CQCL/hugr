@@ -10,10 +10,13 @@ use {
     ::proptest_derive::Arbitrary,
 };
 
-use crate::extension::{ConstFoldResult, ExtensionId, ExtensionRegistry, OpDef, SignatureError};
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::HugrView;
 use crate::types::{type_param::TypeArg, Signature};
+use crate::{
+    extension::{ConstFoldResult, ExtensionId, ExtensionRegistry, OpDef, SignatureError},
+    types::Type,
+};
 use crate::{ops, Hugr, IncomingPort, Node};
 
 use super::dataflow::DataflowOpTrait;
@@ -109,6 +112,7 @@ impl ExtensionOp {
             description: self.def.description().into(),
             args: self.args.clone(),
             signature: self.signature.clone(),
+            static_inputs: vec![], // Initialize with empty vector
         }
     }
 }
@@ -126,6 +130,7 @@ impl From<ExtensionOp> for OpaqueOp {
             description: def.description().into(),
             args,
             signature,
+            static_inputs: vec![], // Initialize with empty vector
         }
     }
 }
@@ -179,6 +184,8 @@ pub struct OpaqueOp {
     // remain private, and should be accessed through
     // `DataflowOpTrait::signature`.
     signature: Signature,
+    #[serde(default)]
+    static_inputs: Vec<Type>,
 }
 
 fn qualify_name(res_id: &ExtensionId, name: &OpNameRef) -> OpName {
@@ -193,6 +200,7 @@ impl OpaqueOp {
         description: String,
         args: impl Into<Vec<TypeArg>>,
         signature: Signature,
+        static_inputs: Vec<Type>, // New parameter added
     ) -> Self {
         Self {
             extension,
@@ -200,6 +208,7 @@ impl OpaqueOp {
             description,
             args: args.into(),
             signature,
+            static_inputs, // Initialize new field
         }
     }
 }
@@ -373,6 +382,7 @@ mod test {
             "desc".into(),
             vec![TypeArg::Type { ty: USIZE_T }],
             sig.clone(),
+            vec![], // Initialize with empty vector
         );
         assert_eq!(op.name(), "res.op");
         assert_eq!(DataflowOpTrait::description(&op), "desc");
@@ -393,6 +403,7 @@ mod test {
             "description".into(),
             vec![],
             Signature::new(i0.clone(), BOOL_T),
+            vec![], // Initialize with empty vector
         );
         let resolved =
             super::resolve_opaque_op(Node::from(portgraph::NodeIndex::new(1)), &opaque, registry)
@@ -428,8 +439,16 @@ mod test {
             "".into(),
             vec![],
             endo_sig.clone(),
+            vec![], // Initialize with empty vector
         );
-        let opaque_comp = OpaqueOp::new(ext_id.clone(), comp_name, "".into(), vec![], endo_sig);
+        let opaque_comp = OpaqueOp::new(
+            ext_id.clone(),
+            comp_name,
+            "".into(),
+            vec![],
+            endo_sig,
+            vec![], // Initialize with empty vector
+        );
         let resolved_val = super::resolve_opaque_op(
             Node::from(portgraph::NodeIndex::new(1)),
             &opaque_val,
