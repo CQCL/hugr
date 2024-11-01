@@ -274,6 +274,14 @@ pub struct ExtOpSignature {
 }
 
 impl ExtOpSignature {
+    /// Create a new [ExtOpSignature] from a [Signature] and a [TypeRow].
+    pub fn new(func_type: Signature, static_inputs: impl Into<TypeRow>) -> Self {
+        Self {
+            func_type,
+            static_inputs: static_inputs.into(),
+        }
+    }
+
     /// Returns the function type of the signature.
     pub fn func_type(&self) -> &Signature {
         &self.func_type
@@ -549,10 +557,10 @@ pub(super) mod test {
 
     use itertools::Itertools;
 
-    use super::SignatureFromArgs;
+    use super::{ExtOpSignature, SignatureFromArgs};
     use crate::builder::{endo_sig, DFGBuilder, Dataflow, DataflowHugr};
     use crate::extension::op_def::{CustomValidator, LowerFunc, OpDef, SignatureFunc};
-    use crate::extension::prelude::USIZE_T;
+    use crate::extension::prelude::{QB_T, USIZE_T};
     use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE};
     use crate::extension::{SignatureError, EMPTY_REG, PRELUDE_REGISTRY};
     use crate::ops::OpName;
@@ -837,6 +845,36 @@ pub(super) mod test {
             def.compute_signature(&args, &PRELUDE_REGISTRY),
             Ok(exp_fun_ty.into())
         );
+        Ok(())
+    }
+
+    pub(crate) fn static_input_op() -> (Extension, OpName) {
+        let mut e = Extension::new_test(EXT_ID);
+        let def = e
+            .add_op(
+                "StaticInOp".into(),
+                "".into(),
+                OpDefSignature::new(vec![], Signature::new(vec![], vec![QB_T]))
+                    .with_static_inputs(USIZE_T),
+            )
+            .unwrap();
+        let op_name = def.name().clone();
+        (e, op_name)
+    }
+
+    #[test]
+    fn test_static_input_op() -> Result<(), Box<dyn std::error::Error>> {
+        let (e, op_name) = static_input_op();
+        let reg = ExtensionRegistry::try_new([PRELUDE.to_owned(), e])?;
+        let e = reg.get(&EXT_ID).unwrap();
+
+        let ext_op = e.instantiate_extension_op(&op_name, vec![], &reg).unwrap();
+        let sig = ext_op.ext_op_signature();
+        let expected = ExtOpSignature::new(
+            Signature::new(vec![], vec![QB_T]).with_extension_delta(e.name().clone()),
+            USIZE_T,
+        );
+        assert_eq!(sig, &expected);
         Ok(())
     }
 

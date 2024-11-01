@@ -102,8 +102,8 @@ impl OpDefSignature {
     /// # Arguments
     ///
     /// * `static_inputs` - A `TypeRow` representing the static input types.
-    pub fn with_static_inputs(mut self, static_inputs: TypeRow) -> Self {
-        self.static_inputs = static_inputs;
+    pub fn with_static_inputs(mut self, static_inputs: impl Into<TypeRow>) -> Self {
+        self.static_inputs = static_inputs.into();
         self
     }
 

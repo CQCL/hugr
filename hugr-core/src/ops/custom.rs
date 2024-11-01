@@ -111,6 +111,11 @@ impl ExtensionOp {
             signature: self.signature.clone(),
         }
     }
+
+    /// Returns the [`ExtOpSignature`] of this [`ExtensionOp`].
+    pub fn ext_op_signature(&self) -> &ExtOpSignature {
+        &self.signature
+    }
 }
 
 impl From<ExtensionOp> for OpaqueOp {
