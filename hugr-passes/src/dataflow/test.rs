@@ -350,10 +350,11 @@ fn xor_and_cfg() -> Hugr {
 
     let x = builder.exit_block();
 
-    builder.branch(&entry, 1, &a).unwrap(); // if true
-    builder.branch(&entry, 0, &b).unwrap(); // if false
-    builder.branch(&a, 1, &b).unwrap(); // if true
-    builder.branch(&a, 0, &x).unwrap(); // if false
+    let [fals, tru]: [usize; 2] = [0, 1];
+    builder.branch(&entry, tru, &a).unwrap(); // if true
+    builder.branch(&entry, fals, &b).unwrap(); // if false
+    builder.branch(&a, tru, &b).unwrap(); // if true
+    builder.branch(&a, fals, &x).unwrap(); // if false
     builder.branch(&b, 0, &x).unwrap();
     builder.finish_hugr(&EMPTY_REG).unwrap()
 }
