@@ -44,7 +44,7 @@ impl ConstFoldPass {
     fn run_no_validate(&self, hugr: &mut impl HugrMut) -> Result<(), ValidatePassError> {
         let results = Machine::default().run(ConstFoldContext(hugr), []);
         let mut keep_nodes = HashSet::new();
-        self.find_needed_nodes(&results, results.hugr().root(), &mut keep_nodes);
+        self.find_needed_nodes(&results, hugr.root(), &mut keep_nodes);
 
         let remove_nodes = results
             .hugr()
@@ -53,18 +53,18 @@ impl ConstFoldPass {
             .collect::<HashSet<_>>();
         let wires_to_break = keep_nodes
             .into_iter()
-            .flat_map(|n| results.hugr().node_inputs(n).map(move |ip| (n, ip)))
+            .flat_map(|n| hugr.node_inputs(n).map(move |ip| (n, ip)))
             .filter(|(n, ip)| {
                 matches!(
-                    results.hugr().get_optype(*n).port_kind(*ip).unwrap(),
+                    hugr.get_optype(*n).port_kind(*ip).unwrap(),
                     EdgeKind::Value(_)
                 )
             })
             // Note we COULD filter out (avoid breaking) wires from other nodes that we are keeping.
             // This would insert fewer constants, but potentially expose less parallelism.
             .filter_map(|(n, ip)| {
-                let (src, outp) = results.hugr().single_linked_output(n, ip).unwrap();
-                (!results.hugr().get_optype(src).is_load_constant()).then_some((
+                let (src, outp) = hugr.single_linked_output(n, ip).unwrap();
+                (!hugr.get_optype(src).is_load_constant()).then_some((
                     n,
                     ip,
                     results
@@ -137,7 +137,7 @@ impl ConstFoldPass {
             for (src, op) in h.all_linked_outputs(n) {
                 let needs_predecessor = match h.get_optype(src).port_kind(op).unwrap() {
                     EdgeKind::Value(_) => {
-                        results.hugr().get_optype(src).is_load_constant()
+                        h.get_optype(src).is_load_constant()
                             || results
                                 .try_read_wire_value::<Value, _, _>(Wire::new(src, op))
                                 .is_err()
@@ -185,7 +185,7 @@ pub fn constant_fold_pass<H: HugrMut>(h: &mut H, reg: &ExtensionRegistry) {
     ConstFoldPass::default().run(h, reg).unwrap()
 }
 
-struct ConstFoldContext<'a, H>(&'a mut H);
+struct ConstFoldContext<'a, H>(&'a H);
 
 impl<'a, H: HugrView> std::ops::Deref for ConstFoldContext<'a, H> {
     type Target = H;
