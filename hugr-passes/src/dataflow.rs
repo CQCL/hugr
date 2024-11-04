@@ -47,12 +47,9 @@ pub trait DFContext<V>: ConstLoader<V> + std::ops::Deref<Target = Self::View> {
 /// are "correct" but maximally conservative (minimally informative).
 pub trait ConstLoader<V> {
     /// Produces a [PartialValue] from a constant. The default impl (expected
-    /// to be appropriate in most cases) traverses [Sum](Value::Sum) constants
-    /// to their leaves ([Value::Extension] and [Value::Function]),
-    /// converts these using [Self::value_from_opaque] and [Self::value_from_const_hugr],
-    /// and builds nested [PartialValue::new_variant] to represent the structure.
+    /// to be appropriate in most cases) uses [partial_from_const].
     fn value_from_const(&self, n: Node, cst: &Value) -> PartialValue<V> {
-        traverse_value(self, n, &mut Vec::new(), cst)
+        partial_from_const(self, n, &mut Vec::new(), cst)
     }
 
     /// Produces an abstract value from an [OpaqueValue], if possible.
@@ -79,7 +76,11 @@ pub trait ConstLoader<V> {
     }
 }
 
-pub fn traverse_value<V>(
+/// Converts a constant [Value] by traversing [Sum](Value::Sum) constants
+/// to their leaves ([Value::Extension] and [Value::Function]),
+/// converting these using [ConstLoader::value_from_opaque] and [ConstLoader::value_from_const_hugr],
+/// and building nested [PartialValue::new_variant]s to represent the structure.
+pub fn partial_from_const<V>(
     s: &(impl ConstLoader<V> + ?Sized),
     n: Node,
     fields: &mut Vec<usize>,
@@ -89,7 +90,7 @@ pub fn traverse_value<V>(
         Value::Sum(hugr_core::ops::constant::Sum { tag, values, .. }) => {
             let elems = values.iter().enumerate().map(|(idx, elem)| {
                 fields.push(idx);
-                let r = traverse_value(s, n, fields, elem);
+                let r = partial_from_const(s, n, fields, elem);
                 fields.pop();
                 r
             });

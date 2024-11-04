@@ -22,7 +22,7 @@ use value_handle::ValueHandle;
 
 use crate::{
     dataflow::{
-        traverse_value, AnalysisResults, ConstLoader, DFContext, Machine, PartialValue,
+        partial_from_const, AnalysisResults, ConstLoader, DFContext, Machine, PartialValue,
         TailLoopTermination,
     },
     validation::{ValidatePassError, ValidationLevel},
@@ -61,7 +61,7 @@ impl ConstFoldPass {
         let inputs = self.inputs.iter().map(|(p, v)| {
             (
                 p.clone(),
-                traverse_value(&ConstFoldContext(hugr), fresh_node, &mut vec![p.index()], v),
+                partial_from_const(&ConstFoldContext(hugr), fresh_node, &mut vec![p.index()], v),
             )
         });
 
@@ -277,7 +277,7 @@ impl<'a, H: HugrView> DFContext<ValueHandle> for ConstFoldContext<'a, H> {
             })
             .collect::<Vec<_>>();
         for (p, v) in op.constant_fold(&known_ins).unwrap_or_default() {
-            outs[p.index()] = traverse_value(self, node, &mut vec![p.index()], &v);
+            outs[p.index()] = partial_from_const(self, node, &mut vec![p.index()], &v);
         }
     }
 }
