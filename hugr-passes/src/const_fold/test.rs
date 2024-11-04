@@ -1606,3 +1606,106 @@ fn test_via_part_unknown_tuple() {
     }
     assert!(expected_op_tags.is_empty());
 }
+
+#[test]
+fn test_tail_loop() {
+    let reg = ExtensionRegistry::try_new([arithmetic::int_types::EXTENSION.to_owned()]).unwrap();
+    let cst5 = ConstInt::new_u(3, 5).unwrap();
+    let h = {
+        let mut builder = DFGBuilder::new(inout_sig(BOOL_T, INT_TYPES[3].clone())).unwrap();
+        let [bool_w] = builder.input_wires_arr();
+        let cst5 = builder.add_load_value(cst5.clone());
+        let tlb = builder
+            .tail_loop_builder([], [(INT_TYPES[3].clone(), cst5)], type_row![])
+            .unwrap();
+        let [i] = tlb.input_wires_arr();
+        // Loop either always breaks, or always iterates, depending on the boolean input
+        let [loop_out_w] = tlb.finish_with_outputs(bool_w, [i]).unwrap().outputs_arr();
+        // The output of the loop is the constant, if the loop terminates
+        let add = builder
+            .add_dataflow_op(IntOpDef::iadd.with_log_width(3), [cst5, loop_out_w])
+            .unwrap();
+
+        builder
+            .finish_hugr_with_outputs(add.outputs(), &reg)
+            .unwrap()
+    };
+    let mut h2 = h.clone();
+    constant_fold_pass(&mut h2, &reg);
+    assert_eq!(h2.node_count(), 12);
+    let tl = h2
+        .nodes()
+        .filter(|n| h.get_optype(*n).is_tail_loop())
+        .exactly_one()
+        .ok()
+        .unwrap();
+    let mut dfg_nodes = Vec::new();
+    let mut loop_nodes = Vec::new();
+    for n in h2.nodes() {
+        if let Some(p) = h2.get_parent(n) {
+            if p == h2.root() {
+                dfg_nodes.push(n)
+            } else {
+                assert_eq!(p, tl);
+                loop_nodes.push(n);
+            }
+        }
+    }
+    let tag_string = |n: &Node| format!("{:?}", h2.get_optype(*n).tag());
+    assert_eq!(
+        dfg_nodes
+            .iter()
+            .map(tag_string)
+            .sorted()
+            .collect::<Vec<_>>(),
+        Vec::from([
+            "Const",
+            "Const",
+            "Input",
+            "LoadConst",
+            "LoadConst",
+            "Output",
+            "TailLoop"
+        ])
+    );
+
+    assert_eq!(
+        loop_nodes.iter().map(tag_string).collect::<Vec<_>>(),
+        Vec::from(["Input", "Output", "Const", "LoadConst"])
+    );
+
+    // In the loop, we have a new constant 5 instead of using the loop input
+    let [loop_in, loop_out] = h2.get_io(tl).unwrap();
+    let (loop_cst, v) = loop_nodes
+        .into_iter()
+        .filter_map(|n| h2.get_optype(n).as_const().map(|c| (n, c.value())))
+        .exactly_one()
+        .unwrap();
+    assert_eq!(v, &cst5.clone().into());
+    let loop_lcst = h2.output_neighbours(loop_cst).exactly_one().unwrap();
+    assert_eq!(h2.get_parent(loop_lcst), Some(tl));
+    assert_eq!(
+        h2.all_linked_inputs(loop_lcst).collect::<Vec<_>>(),
+        vec![(loop_out, IncomingPort::from(1))]
+    );
+    assert!(h2.input_neighbours(loop_in).next().is_none());
+
+    // Outer DFG contains two constants (we know) - a 5, used by the loop, and a 10, output.
+    let [_, root_out] = h2.get_io(h2.root()).unwrap();
+    let mut cst5 = Some(cst5.into());
+    for n in dfg_nodes {
+        let Some(cst) = h2.get_optype(n).as_const() else {
+            continue;
+        };
+        let lcst = h2.output_neighbours(n).exactly_one().unwrap();
+        let target = h2.output_neighbours(lcst).exactly_one().unwrap();
+        if Some(cst.value()) == cst5.as_ref() {
+            cst5 = None;
+            assert_eq!(target, tl);
+        } else {
+            assert_eq!(cst.value(), &ConstInt::new_u(3, 10).unwrap().into());
+            assert_eq!(target, root_out)
+        }
+    }
+    assert!(cst5.is_none()); // Found in loop
+}
