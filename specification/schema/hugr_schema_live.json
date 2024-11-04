@@ -657,6 +657,13 @@
                     },
                     "title": "Args",
                     "type": "array"
+                },
+                "static_inputs": {
+                    "items": {
+                        "$ref": "#/$defs/Type"
+                    },
+                    "title": "Static Inputs",
+                    "type": "array"
                 }
             },
             "required": [
@@ -1133,6 +1140,13 @@
                     "default": false,
                     "title": "Binary",
                     "type": "boolean"
+                },
+                "static_inputs": {
+                    "items": {
+                        "$ref": "#/$defs/Type"
+                    },
+                    "title": "Static Inputs",
+                    "type": "array"
                 },
                 "lower_funcs": {
                     "items": {
