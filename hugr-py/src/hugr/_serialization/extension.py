@@ -15,6 +15,7 @@ from .tys import (
     ExtensionId,
     ExtensionSet,
     PolyFuncType,
+    Type,
     TypeBound,
     TypeParam,
 )
@@ -98,6 +99,7 @@ class OpDef(ConfiguredBaseModel, populate_by_name=True):
     misc: dict[str, Any] | None = None
     signature: PolyFuncType | None = None
     binary: bool = False
+    static_inputs: list[Type] = pd.Field(default_factory=list)
     lower_funcs: list[FixedHugr] = pd.Field(default_factory=list)
 
     def deserialize(self, extension: ext.Extension) -> ext.OpDef:
@@ -108,7 +110,8 @@ class OpDef(ConfiguredBaseModel, populate_by_name=True):
                 misc=self.misc or {},
                 signature=ext.OpDefSig(
                     self.signature.deserialize() if self.signature else None,
-                    self.binary,
+                    static_inputs=[t.deserialize() for t in self.static_inputs],
+                    binary=self.binary,
                 ),
                 lower_funcs=[f.deserialize() for f in self.lower_funcs],
             )

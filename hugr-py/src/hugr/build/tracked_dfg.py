@@ -124,7 +124,13 @@ class TrackedDfg(Dfg):
             raise IndexError(msg)
         return tracked
 
-    def add(self, com: Command, *, metadata: dict[str, Any] | None = None) -> Node:
+    def add(
+        self,
+        com: Command,
+        *,
+        static_in: Iterable[Wire] | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> Node:
         """Add a command to the DFG.
 
         Overrides :meth:`Dfg.add <hugr.dfg.Dfg.add>` to allow Command inputs
@@ -139,6 +145,7 @@ class TrackedDfg(Dfg):
 
         Args:
             com: Command to append.
+            static_in: Any static input wires to the command.
             metadata: Metadata to attach to the function definition. Defaults to None.
 
         Returns:

@@ -164,12 +164,15 @@ class OpDefSig:
 
     #: The polymorphic function type of the operation (type scheme).
     poly_func: tys.PolyFuncType | None
+    #: Static input types of the operation.
+    static_inputs: tys.TypeRow
     #: If no static type scheme known, flag indicates a computation of the signature.
     binary: bool
 
     def __init__(
         self,
         poly_func: tys.PolyFuncType | tys.FunctionType | None,
+        static_inputs: tys.TypeRow | None = None,
         binary: bool = False,
     ) -> None:
         if poly_func is None and not binary:
@@ -182,6 +185,7 @@ class OpDefSig:
             poly_func = tys.PolyFuncType([], poly_func)
         self.poly_func = poly_func
         self.binary = binary
+        self.static_inputs = static_inputs or tys.TypeRow()
 
 
 @dataclass
@@ -209,6 +213,7 @@ class OpDef(ExtensionObject):
             if self.signature.poly_func
             else None,
             binary=self.signature.binary,
+            static_inputs=[t._to_serial_root() for t in self.signature.static_inputs],
             lower_funcs=[f._to_serial() for f in self.lower_funcs],
         )
 
@@ -413,7 +418,7 @@ class Extension:
         """
         if not isinstance(signature, OpDefSig):
             binary = signature is None
-            signature = OpDefSig(signature, binary)
+            signature = OpDefSig(signature, binary=binary)
 
         def _inner(cls: type[T]) -> type[T]:
             new_description = cls.__doc__ if description is None and cls.__doc__ else ""

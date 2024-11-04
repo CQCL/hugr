@@ -512,6 +512,7 @@ class ExtensionOp(DataflowOp):
     signature: stys.FunctionType = Field(default_factory=stys.FunctionType.empty)
     description: str = ""
     args: list[stys.TypeArg] = Field(default_factory=list)
+    static_inputs: list[Type] = Field(default_factory=list)
 
     def insert_port_types(self, in_types: TypeRow, out_types: TypeRow) -> None:
         self.signature = stys.FunctionType(input=list(in_types), output=list(out_types))
@@ -525,6 +526,7 @@ class ExtensionOp(DataflowOp):
             op_name=self.name,
             signature=self.signature.deserialize(),
             args=deser_it(self.args),
+            static_inputs=deser_it(self.static_inputs),
         )
 
     model_config = ConfigDict(

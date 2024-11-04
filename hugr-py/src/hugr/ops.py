@@ -313,6 +313,7 @@ class Custom(DataflowOp):
     description: str = ""
     extension: tys.ExtensionId = ""
     args: list[tys.TypeArg] = field(default_factory=list)
+    static_inputs: tys.TypeRow = field(default_factory=tys.TypeRow)
 
     def _to_serial(self, parent: Node) -> sops.ExtensionOp:
         return sops.ExtensionOp(
@@ -322,6 +323,7 @@ class Custom(DataflowOp):
             signature=self.signature._to_serial(),
             description=self.description,
             args=ser_it(self.args),
+            static_inputs=ser_it(self.static_inputs),
         )
 
     def outer_signature(self) -> tys.FunctionType:
@@ -378,12 +380,12 @@ class ExtOp(AsExtOp):
             sig = poly_func.body
         else:
             sig = self.signature
-
         return Custom(
             op_name=self._op_def.name,
             signature=sig,
             extension=ext.name if ext else "",
             args=self.args,
+            static_inputs=self._op_def.signature.static_inputs,
         )
 
     def _to_serial(self, parent: Node) -> sops.ExtensionOp:

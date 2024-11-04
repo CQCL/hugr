@@ -195,12 +195,19 @@ class DfBase(ParentBuilder[DP], DefinitionBuilder, AbstractContextManager):
 
         return replace(new_n, _num_out_ports=op.num_out)
 
-    def add(self, com: ops.Command, *, metadata: dict[str, Any] | None = None) -> Node:
+    def add(
+        self,
+        com: ops.Command,
+        *,
+        static_in: Iterable[Wire] | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> Node:
         """Add a command (holding a dataflow operation and the incoming wires)
         to the graph.
 
         Args:
             com: The command to add.
+            static_in: Any static input wires to the command.
             metadata: Metadata to attach to the function definition. Defaults to None.
 
         Example:
@@ -218,7 +225,15 @@ class DfBase(ParentBuilder[DP], DefinitionBuilder, AbstractContextManager):
         wires = (
             (w if not isinstance(w, int) else raise_no_ints()) for w in com.incoming
         )
-        return self.add_op(com.op, *wires, metadata=metadata)
+        node = self.add_op(com.op, *wires, metadata=metadata)
+
+        # wire up static inputs
+        static_inputs = list(static_in or [])
+        dataflow_in = self.hugr.num_incoming(node)
+        for i, w in enumerate(static_inputs):
+            # static inputs always come after dataflow inputs
+            self.hugr.add_link(w.out_port(), node.inp(dataflow_in + i))
+        return node
 
     def extend(self, *coms: ops.Command) -> list[Node]:
         """Add a series of commands to the DFG.

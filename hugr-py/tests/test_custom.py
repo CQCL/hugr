@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from hugr import ext, ops, tys
+from hugr import ext, ops, tys, val
 from hugr.build.dfg import Dfg
 from hugr.hugr import Hugr, Node
 from hugr.ops import AsExtOp, Custom, ExtOp
@@ -15,12 +15,20 @@ from hugr.std.logic import Not
 
 from .conftest import CX, QUANTUM_EXT, H, Measure, Rz, validate
 
-STRINGLY_EXT = ext.Extension("my_extension", ext.Version(0, 0, 0))
-_STRINGLY_DEF = STRINGLY_EXT.add_op_def(
+TEST_EXT = ext.Extension("my_extension", ext.Version(0, 0, 0))
+_STRINGLY_DEF = TEST_EXT.add_op_def(
     ext.OpDef(
         "StringlyOp",
         signature=ext.OpDefSig(
             tys.PolyFuncType([tys.StringParam()], tys.FunctionType.endo([]))
+        ),
+    )
+)
+_STATIC_DEF = TEST_EXT.add_op_def(
+    ext.OpDef(
+        "StaticInOp",
+        signature=ext.OpDefSig(
+            tys.FunctionType.endo([FLOAT_T]), static_inputs=[tys.Bool]
         ),
     )
 )
@@ -31,7 +39,7 @@ class StringlyOp(AsExtOp):
     tag: str
 
     def op_def(self) -> ext.OpDef:
-        return STRINGLY_EXT.get_op("StringlyOp")
+        return TEST_EXT.get_op("StringlyOp")
 
     def type_args(self) -> list[tys.TypeArg]:
         return [tys.StringArg(self.tag)]
@@ -57,7 +65,7 @@ def test_stringly_typed():
     n = dfg.add(StringlyOp("world")())
     dfg.set_outputs()
     assert dfg.hugr[n].op == StringlyOp("world")
-    validate(Package([dfg.hugr], [STRINGLY_EXT]))
+    validate(Package([dfg.hugr], [TEST_EXT]))
 
     new_h = Hugr._from_serial(dfg.hugr._to_serial())
 
@@ -69,10 +77,25 @@ def test_stringly_typed():
     # doesn't resolve without extension
     assert isinstance(new_h[n].op, Custom)
 
-    registry.add_extension(STRINGLY_EXT)
+    registry.add_extension(TEST_EXT)
     new_h.resolve_extensions(registry)
 
     assert isinstance(new_h[n].op, ExtOp)
+
+
+@dataclass
+class StaticInOp(AsExtOp):
+    def op_def(self) -> ext.OpDef:
+        return TEST_EXT.get_op("StaticInOp")
+
+
+def test_static_in_op():
+    dfg = Dfg(FLOAT_T)
+    tr = dfg.add_const(val.TRUE)
+    n = dfg.add(StaticInOp()(dfg.inputs()[0]), static_in=[tr])
+    dfg.set_outputs(n)
+    assert dfg.hugr[n].op == StaticInOp()
+    validate(Package([dfg.hugr], [TEST_EXT]))
 
 
 def test_registry():
@@ -92,7 +115,7 @@ def registry() -> ext.ExtensionRegistry:
     reg = ext.ExtensionRegistry()
     reg.add_extension(LOGIC_EXT)
     reg.add_extension(QUANTUM_EXT)
-    reg.add_extension(STRINGLY_EXT)
+    reg.add_extension(TEST_EXT)
     reg.add_extension(INT_TYPES_EXTENSION)
     reg.add_extension(INT_OPS_EXTENSION)
     reg.add_extension(FLOAT_EXT)
@@ -135,7 +158,7 @@ def test_custom_bad_eq():
     assert Not != bad_custom_args
 
 
-_LIST_T = STRINGLY_EXT.add_type_def(
+_LIST_T = TEST_EXT.add_type_def(
     ext.TypeDef(
         "List",
         description="A list of elements.",
