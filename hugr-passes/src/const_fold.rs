@@ -27,9 +27,10 @@ use crate::{
 /// A configuration for the Constant Folding pass.
 pub struct ConstFoldPass {
     validation: ValidationLevel,
-    /// If true, allow to skip evaluating loops (whose results are not needed) even if
-    /// we are not sure they will terminate. (If they definitely terminate then fair game.)
-    pub allow_skip_loops: bool,
+    /// If true, allow to skip evaluating [TailLoop]s and [CFGs] (whose results are known,
+    /// or not needed) even if we are not sure they will terminate. That is, allow
+    /// transforming a potentially non-terminating graph into a definitely-terminating one.
+    pub allow_increase_termination: bool,
 }
 
 impl ConstFoldPass {
@@ -112,6 +113,7 @@ impl ConstFoldPass {
             if !needed.insert(n) {
                 continue;
             };
+
             if h.get_optype(n).is_cfg() {
                 for bb in h.children(n) {
                     //if results.bb_reachable(bb).unwrap() { // no, we'd need to patch up predicates
@@ -121,15 +123,13 @@ impl ConstFoldPass {
                 // Dataflow. Find minimal nodes necessary to compute output, including StateOrder edges.
                 q.extend(inout); // Input also necessary for legality even if unreachable
 
-                // Also add on anything that might not terminate. We might also allow a custom predicate for extension ops?
-                for ch in h.children(n) {
-                    if h.get_optype(ch).is_cfg()
-                        || (!self.allow_skip_loops
-                            && h.get_optype(ch).is_tail_loop()
-                            && results.tail_loop_terminates(ch).unwrap()
-                                != TailLoopTermination::NeverContinues)
-                    {
-                        q.push_back(ch);
+                if !self.allow_increase_termination {
+                    // Also add on anything that might not terminate (even if results not required -
+                    // if its results are required we'll add it by following dataflow, below.)
+                    for ch in h.children(n) {
+                        if self.might_diverge(results, ch) {
+                            q.push_back(ch);
+                        }
                     }
                 }
             }
@@ -150,6 +150,32 @@ impl ConstFoldPass {
                     q.push_back(src);
                 }
             }
+        }
+    }
+
+    // "Diverge" aka "never-terminate"
+    // TODO would be more efficient to compute this bottom-up and cache (dynamic programming)
+    fn might_diverge(
+        &self,
+        results: &AnalysisResults<ValueHandle, impl DFContext<ValueHandle>>,
+        n: Node,
+    ) -> bool {
+        let op = results.hugr().get_optype(n);
+        if op.is_cfg() {
+            // TODO if the CFG has no cycles (that are possible given predicates)
+            // then we could say it definitely terminates (i.e. return false)
+            true
+        } else if op.is_tail_loop()
+            && results.tail_loop_terminates(n).unwrap() != TailLoopTermination::NeverContinues
+        {
+            // If we can even figure out the number of iterations is bounded that would allow returning false.
+            true
+        } else {
+            // Node does not introduce non-termination, but still non-terminates if any of its children does
+            results
+                .hugr()
+                .children(n)
+                .any(|ch| self.might_diverge(results, ch))
         }
     }
 }
