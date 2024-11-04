@@ -57,23 +57,11 @@ pub type PolyFuncType = PolyFuncTypeBase<NoRV>;
 /// It may also have a row of static inputs.
 ///
 /// [OpDef]: crate::extension::OpDef
-#[derive(
-    Clone,
-    PartialEq,
-    Debug,
-    Default,
-    Eq,
-    Hash,
-    derive_more::Display,
-    serde::Serialize,
-    serde::Deserialize,
-)]
+#[derive(Clone, PartialEq, Debug, Default, Eq, Hash, derive_more::Display)]
 #[cfg_attr(test, derive(Arbitrary), proptest(params = "RecursionDepth"))]
 #[display("{}{}{}", self.display_params(), self.static_inputs, self.body())]
 pub struct OpDefSignature {
-    #[serde(flatten)]
     signature: PolyFuncTypeBase<RowVariable>,
-    #[serde(default, skip_serializing_if = "TypeRow::is_empty")]
     static_inputs: TypeRow,
 }
 

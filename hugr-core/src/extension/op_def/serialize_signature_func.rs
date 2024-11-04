@@ -1,14 +1,18 @@
 use serde::{Deserialize, Serialize};
 
+use crate::types::{PolyFuncTypeBase, RowVariable, TypeRow};
+
 use super::{CustomValidator, OpDefSignature, SignatureFunc};
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 struct SerSignatureFunc {
     /// If the type scheme is available explicitly, store it.
-    signature: Option<OpDefSignature>,
+    signature: Option<PolyFuncTypeBase<RowVariable>>,
     /// Whether an associated binary function is expected.
     /// If `signature` is `None`, a true value here indicates a custom compute function.
     /// If `signature` is not `None`, a true value here indicates a custom validation function.
     binary: bool,
+    #[serde(default, skip_serializing_if = "TypeRow::is_empty")]
+    static_inputs: TypeRow,
 }
 
 pub(super) fn serialize<S>(value: &super::SignatureFunc, serializer: S) -> Result<S::Ok, S::Error>
@@ -16,17 +20,20 @@ where
     S: serde::Serializer,
 {
     match value {
-        SignatureFunc::PolyFuncType(poly) => SerSignatureFunc {
-            signature: Some(poly.clone()),
+        SignatureFunc::PolyFuncType(op_sig) => SerSignatureFunc {
+            signature: Some(op_sig.poly_func_type().clone()),
+            static_inputs: op_sig.static_inputs().clone(),
             binary: false,
         },
         SignatureFunc::CustomValidator(CustomValidator { poly_func, .. })
         | SignatureFunc::MissingValidateFunc(poly_func) => SerSignatureFunc {
-            signature: Some(poly_func.clone()),
+            signature: Some(poly_func.poly_func_type().clone()),
+            static_inputs: poly_func.static_inputs().clone(),
             binary: true,
         },
         SignatureFunc::CustomFunc(_) | SignatureFunc::MissingComputeFunc => SerSignatureFunc {
             signature: None,
+            static_inputs: TypeRow::new(),
             binary: true,
         },
     }
@@ -37,11 +44,19 @@ pub(super) fn deserialize<'de, D>(deserializer: D) -> Result<super::SignatureFun
 where
     D: serde::Deserializer<'de>,
 {
-    let SerSignatureFunc { signature, binary } = SerSignatureFunc::deserialize(deserializer)?;
+    let SerSignatureFunc {
+        signature,
+        binary,
+        static_inputs,
+    } = SerSignatureFunc::deserialize(deserializer)?;
 
     match (signature, binary) {
-        (Some(sig), false) => Ok(sig.into()),
-        (Some(sig), true) => Ok(SignatureFunc::MissingValidateFunc(sig)),
+        (Some(sig), false) => Ok(OpDefSignature::from(sig)
+            .with_static_inputs(static_inputs)
+            .into()),
+        (Some(sig), true) => Ok(SignatureFunc::MissingValidateFunc(
+            OpDefSignature::from(sig).with_static_inputs(static_inputs),
+        )),
         (None, true) => Ok(SignatureFunc::MissingComputeFunc),
         (None, false) => Err(serde::de::Error::custom(
             "No signature provided and custom computation not expected.",
@@ -57,10 +72,12 @@ mod test {
     use super::*;
     use crate::{
         extension::{
-            prelude::USIZE_T, CustomSignatureFunc, CustomValidator, ExtensionRegistry, OpDef,
-            SignatureError, ValidateTypeArgs,
+            prelude::{BOOL_T, USIZE_T},
+            CustomSignatureFunc, CustomValidator, ExtensionRegistry, OpDef, SignatureError,
+            ValidateTypeArgs,
         },
-        types::{FuncValueType, Signature, TypeArg},
+        type_row,
+        types::{Signature, TypeArg},
     };
 
     #[derive(serde::Deserialize, serde::Serialize, Debug)]
@@ -121,32 +138,35 @@ mod test {
     #[test]
     fn test_serial_sig_func() {
         // test round-trip
-        let sig: FuncValueType = Signature::new_endo(USIZE_T.clone()).into();
+        let sig = OpDefSignature::new([], Signature::new_endo(USIZE_T.clone()))
+            .with_static_inputs(BOOL_T);
         let simple: SignatureFunc = sig.clone().into();
         let ser: SerSignatureFunc = simple.into();
         let expected_ser = SerSignatureFunc {
-            signature: Some(sig.clone().into()),
+            signature: Some(sig.poly_func_type().clone()),
             binary: false,
+            static_inputs: type_row![BOOL_T],
         };
 
         assert_eq!(ser, expected_ser);
         let deser = SignatureFunc::try_from(ser).unwrap();
         assert_matches!( deser,
-        SignatureFunc::PolyFuncType(poly_func) => {
-            assert_eq!(poly_func, sig.clone().into());
+        SignatureFunc::PolyFuncType(op_def_sig) => {
+            assert_eq!(op_def_sig, sig.clone());
         });
 
         let with_custom: SignatureFunc = CustomValidator::new(sig.clone(), NoValidate).into();
         let ser: SerSignatureFunc = with_custom.into();
         let expected_ser = SerSignatureFunc {
-            signature: Some(sig.clone().into()),
+            signature: Some(sig.poly_func_type().clone()),
+            static_inputs: type_row![BOOL_T],
             binary: true,
         };
         assert_eq!(ser, expected_ser);
         let mut deser = SignatureFunc::try_from(ser.clone()).unwrap();
         assert_matches!(&deser,
             SignatureFunc::MissingValidateFunc(poly_func) => {
-                assert_eq!(poly_func, &OpDefSignature::from(sig.clone()));
+                assert_eq!(poly_func, &sig.clone());
             }
         );
 
@@ -162,6 +182,7 @@ mod test {
         let custom: SignatureFunc = CustomSig.into();
         let ser: SerSignatureFunc = custom.into();
         let expected_ser = SerSignatureFunc {
+            static_inputs: type_row![],
             signature: None,
             binary: true,
         };
@@ -174,6 +195,7 @@ mod test {
 
         let bad_ser = SerSignatureFunc {
             signature: None,
+            static_inputs: type_row![],
             binary: false,
         };
 
