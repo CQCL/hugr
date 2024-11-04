@@ -623,7 +623,11 @@ pub trait Dataflow: Container {
         tail_loop: ops::TailLoop,
         values: impl IntoIterator<Item = Wire>,
     ) -> Result<Wire, BuildError> {
-        self.make_sum(TailLoop::CONTINUE_TAG, [tail_loop.just_inputs, tail_loop.just_outputs], values)
+        self.make_sum(
+            TailLoop::CONTINUE_TAG,
+            [tail_loop.just_inputs, tail_loop.just_outputs],
+            values,
+        )
     }
 
     /// Use the wires in `values` to return a wire corresponding to the
@@ -640,7 +644,11 @@ pub trait Dataflow: Container {
         loop_op: ops::TailLoop,
         values: impl IntoIterator<Item = Wire>,
     ) -> Result<Wire, BuildError> {
-        self.make_sum(TailLoop::BREAK_TAG, [loop_op.just_inputs, loop_op.just_outputs], values)
+        self.make_sum(
+            TailLoop::BREAK_TAG,
+            [loop_op.just_inputs, loop_op.just_outputs],
+            values,
+        )
     }
 
     /// Add a [`ops::Call`] node, calling `function`, with inputs

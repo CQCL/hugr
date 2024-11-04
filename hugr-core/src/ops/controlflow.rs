@@ -40,12 +40,12 @@ impl DataflowOpTrait for TailLoop {
 
 impl TailLoop {
     /// The [tag] for a loop body output to indicate the loop should iterate again.
-    /// 
+    ///
     /// [tag]: crate::ops::constant::Sum::tag
     pub const CONTINUE_TAG: usize = 0;
-    
+
     /// The [tag] for a loop body output to indicate the loop should exit with the supplied values.
-    /// 
+    ///
     /// [tag]: crate::ops::constant::Sum::tag
     pub const BREAK_TAG: usize = 1;
 
