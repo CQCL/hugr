@@ -27,10 +27,7 @@ use crate::{
 /// A configuration for the Constant Folding pass.
 pub struct ConstFoldPass {
     validation: ValidationLevel,
-    /// If true, allow to skip evaluating [TailLoop]s and [CFGs] (whose results are known,
-    /// or not needed) even if we are not sure they will terminate. That is, allow
-    /// transforming a potentially non-terminating graph into a definitely-terminating one.
-    pub allow_increase_termination: bool,
+    allow_increase_termination: bool,
 }
 
 impl ConstFoldPass {
@@ -41,7 +38,10 @@ impl ConstFoldPass {
     }
 
     /// Allows the pass to remove potentially-non-terminating [TailLoop]s and [CFG] if their
-    /// result (if/when they do terminate) is either known or not needed
+    /// result (if/when they do terminate) is either known or not needed.
+    ///
+    /// [TailLoop]: hugr_core::ops::TailLoop
+    /// [CFG]: hugr_core::ops::CFG
     pub fn allow_increase_termination(mut self) -> Self {
         self.allow_increase_termination = true;
         self
