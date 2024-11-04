@@ -1607,33 +1607,39 @@ fn test_via_part_unknown_tuple() {
     assert!(expected_op_tags.is_empty());
 }
 
-#[test]
-fn test_tail_loop() {
+fn tail_loop_hugr(int_cst: ConstInt) -> (Hugr, ExtensionRegistry) {
     let reg = ExtensionRegistry::try_new([arithmetic::int_types::EXTENSION.to_owned()]).unwrap();
-    let cst5 = ConstInt::new_u(3, 5).unwrap();
-    let h = {
-        let mut builder = DFGBuilder::new(inout_sig(BOOL_T, INT_TYPES[3].clone())).unwrap();
-        let [bool_w] = builder.input_wires_arr();
-        let cst5 = builder.add_load_value(cst5.clone());
-        let tlb = builder
-            .tail_loop_builder([], [(INT_TYPES[3].clone(), cst5)], type_row![])
-            .unwrap();
-        let [i] = tlb.input_wires_arr();
-        // Loop either always breaks, or always iterates, depending on the boolean input
-        let [loop_out_w] = tlb.finish_with_outputs(bool_w, [i]).unwrap().outputs_arr();
-        // The output of the loop is the constant, if the loop terminates
-        let add = builder
-            .add_dataflow_op(IntOpDef::iadd.with_log_width(3), [cst5, loop_out_w])
-            .unwrap();
+    let int_ty = int_cst.get_type();
+    let lw = int_cst.log_width();
+    let mut builder = DFGBuilder::new(inout_sig(BOOL_T, int_ty.clone())).unwrap();
+    let [bool_w] = builder.input_wires_arr();
+    let lcst = builder.add_load_value(int_cst);
+    let tlb = builder
+        .tail_loop_builder([], [(int_ty, lcst)], type_row![])
+        .unwrap();
+    let [i] = tlb.input_wires_arr();
+    // Loop either always breaks, or always iterates, depending on the boolean input
+    let [loop_out_w] = tlb.finish_with_outputs(bool_w, [i]).unwrap().outputs_arr();
+    // The output of the loop is the constant, if the loop terminates
+    let add = builder
+        .add_dataflow_op(IntOpDef::iadd.with_log_width(lw), [lcst, loop_out_w])
+        .unwrap();
 
-        builder
-            .finish_hugr_with_outputs(add.outputs(), &reg)
-            .unwrap()
-    };
-    let mut h2 = h.clone();
-    constant_fold_pass(&mut h2, &reg);
-    assert_eq!(h2.node_count(), 12);
-    let tl = h2
+    let hugr = builder
+        .finish_hugr_with_outputs(add.outputs(), &reg)
+        .unwrap();
+    (hugr, reg)
+}
+
+#[test]
+fn test_tail_loop_unknown() {
+    let cst5 = ConstInt::new_u(3, 5).unwrap();
+    let (mut h, reg) = tail_loop_hugr(cst5.clone());
+
+    constant_fold_pass(&mut h, &reg);
+    // Must keep the loop, even though we know the output, in case the output doesn't happen
+    assert_eq!(h.node_count(), 12);
+    let tl = h
         .nodes()
         .filter(|n| h.get_optype(*n).is_tail_loop())
         .exactly_one()
@@ -1641,9 +1647,9 @@ fn test_tail_loop() {
         .unwrap();
     let mut dfg_nodes = Vec::new();
     let mut loop_nodes = Vec::new();
-    for n in h2.nodes() {
-        if let Some(p) = h2.get_parent(n) {
-            if p == h2.root() {
+    for n in h.nodes() {
+        if let Some(p) = h.get_parent(n) {
+            if p == h.root() {
                 dfg_nodes.push(n)
             } else {
                 assert_eq!(p, tl);
@@ -1651,7 +1657,7 @@ fn test_tail_loop() {
             }
         }
     }
-    let tag_string = |n: &Node| format!("{:?}", h2.get_optype(*n).tag());
+    let tag_string = |n: &Node| format!("{:?}", h.get_optype(*n).tag());
     assert_eq!(
         dfg_nodes
             .iter()
@@ -1675,30 +1681,30 @@ fn test_tail_loop() {
     );
 
     // In the loop, we have a new constant 5 instead of using the loop input
-    let [loop_in, loop_out] = h2.get_io(tl).unwrap();
+    let [loop_in, loop_out] = h.get_io(tl).unwrap();
+    assert!(h.input_neighbours(loop_in).next().is_none());
     let (loop_cst, v) = loop_nodes
         .into_iter()
-        .filter_map(|n| h2.get_optype(n).as_const().map(|c| (n, c.value())))
+        .filter_map(|n| h.get_optype(n).as_const().map(|c| (n, c.value())))
         .exactly_one()
         .unwrap();
     assert_eq!(v, &cst5.clone().into());
-    let loop_lcst = h2.output_neighbours(loop_cst).exactly_one().unwrap();
-    assert_eq!(h2.get_parent(loop_lcst), Some(tl));
+    let loop_lcst = h.output_neighbours(loop_cst).exactly_one().unwrap();
+    assert_eq!(h.get_parent(loop_lcst), Some(tl));
     assert_eq!(
-        h2.all_linked_inputs(loop_lcst).collect::<Vec<_>>(),
+        h.all_linked_inputs(loop_lcst).collect::<Vec<_>>(),
         vec![(loop_out, IncomingPort::from(1))]
     );
-    assert!(h2.input_neighbours(loop_in).next().is_none());
 
     // Outer DFG contains two constants (we know) - a 5, used by the loop, and a 10, output.
-    let [_, root_out] = h2.get_io(h2.root()).unwrap();
+    let [_, root_out] = h.get_io(h.root()).unwrap();
     let mut cst5 = Some(cst5.into());
     for n in dfg_nodes {
-        let Some(cst) = h2.get_optype(n).as_const() else {
+        let Some(cst) = h.get_optype(n).as_const() else {
             continue;
         };
-        let lcst = h2.output_neighbours(n).exactly_one().unwrap();
-        let target = h2.output_neighbours(lcst).exactly_one().unwrap();
+        let lcst = h.output_neighbours(n).exactly_one().unwrap();
+        let target = h.output_neighbours(lcst).exactly_one().unwrap();
         if Some(cst.value()) == cst5.as_ref() {
             cst5 = None;
             assert_eq!(target, tl);
@@ -1708,11 +1714,24 @@ fn test_tail_loop() {
         }
     }
     assert!(cst5.is_none()); // Found in loop
+}
 
-    let mut h3 = h.clone();
+#[test]
+fn test_tail_loop_never_iterates() {
+    let (mut h, reg) = tail_loop_hugr(ConstInt::new_u(4, 6).unwrap());
+    ConstFoldPass::default()
+        .with_inputs([(0, Value::true_val())]) // true = 1 = break
+        .run(&mut h, &reg)
+        .unwrap();
+    assert_fully_folded(&h, &ConstInt::new_u(4, 12).unwrap().into());
+}
+
+#[test]
+fn test_tail_loop_increase_termination() {
+    let (mut h, reg) = tail_loop_hugr(ConstInt::new_u(4, 6).unwrap());
     ConstFoldPass::default()
         .allow_increase_termination()
-        .run(&mut h3, &reg)
+        .run(&mut h, &reg)
         .unwrap();
-    assert_fully_folded(&h3, &ConstInt::new_u(3, 10).unwrap().into());
+    assert_fully_folded(&h, &ConstInt::new_u(4, 12).unwrap().into());
 }
