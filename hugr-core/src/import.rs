@@ -12,6 +12,7 @@ use crate::{
         FuncDecl, FuncDefn, Input, LoadFunction, Module, OpType, OpaqueOp, Output, Tag, TailLoop,
         CFG, DFG,
     },
+    type_row,
     types::{
         type_param::TypeParam, type_row::TypeRowBase, CustomType, FuncTypeBase, MaybeRV, NoRV,
         PolyFuncType, PolyFuncTypeBase, RowVariable, Signature, Type, TypeArg, TypeBase, TypeBound,
@@ -500,6 +501,7 @@ impl<'a> Context<'a> {
                     String::default(),
                     args,
                     signature,
+                    type_row![],
                 ));
 
                 let node = self.make_node(node_id, optype, parent)?;

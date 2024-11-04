@@ -10,13 +10,13 @@ use {
     ::proptest_derive::Arbitrary,
 };
 
-use crate::hugr::HugrView;
-use crate::types::{type_param::TypeArg, Signature};
+use crate::types::{type_param::TypeArg, Signature, Type};
 use crate::{extension::ExtOpSignature, hugr::internal::HugrMutInternals, types::EdgeKind};
 use crate::{
     extension::{ConstFoldResult, ExtensionId, ExtensionRegistry, OpDef, SignatureError},
     Direction,
 };
+use crate::{hugr::HugrView, types::TypeRow};
 use crate::{ops, Hugr, IncomingPort, Node};
 
 use super::dataflow::DataflowOpTrait;
@@ -111,7 +111,8 @@ impl ExtensionOp {
             name: self.def.name().clone(),
             description: self.def.description().into(),
             args: self.args.clone(),
-            signature: self.signature.clone(),
+            signature: self.signature.func_type.clone(),
+            static_inputs: self.signature.static_inputs.clone(),
         }
     }
 
@@ -126,7 +127,11 @@ impl From<ExtensionOp> for OpaqueOp {
         let ExtensionOp {
             def,
             args,
-            signature,
+            signature:
+                ExtOpSignature {
+                    func_type: signature,
+                    static_inputs,
+                },
         } = op;
         OpaqueOp {
             extension: def.extension().clone(),
@@ -134,6 +139,7 @@ impl From<ExtensionOp> for OpaqueOp {
             description: def.description().into(),
             args,
             signature,
+            static_inputs,
         }
     }
 }
@@ -203,7 +209,9 @@ pub struct OpaqueOp {
     // note that the `signature` field might not include `extension`. Thus this must
     // remain private, and should be accessed through
     // `DataflowOpTrait::signature`.
-    signature: ExtOpSignature,
+    signature: Signature,
+    #[serde(default, skip_serializing_if = "TypeRow::is_empty")]
+    static_inputs: TypeRow,
 }
 
 fn qualify_name(res_id: &ExtensionId, name: &OpNameRef) -> OpName {
@@ -217,7 +225,8 @@ impl OpaqueOp {
         name: impl Into<OpName>,
         description: String,
         args: impl Into<Vec<TypeArg>>,
-        signature: impl Into<ExtOpSignature>,
+        signature: impl Into<Signature>,
+        static_inputs: impl Into<TypeRow>,
     ) -> Self {
         Self {
             extension,
@@ -225,6 +234,7 @@ impl OpaqueOp {
             description,
             args: args.into(),
             signature: signature.into(),
+            static_inputs: static_inputs.into(),
         }
     }
 }
@@ -251,11 +261,17 @@ impl OpaqueOp {
         &self.extension
     }
 
+    /// Static inputs.
+    pub fn static_inputs(&self) -> &[Type] {
+        &self.static_inputs
+    }
+
     /// Instantiated signature of the operation.
     pub fn ext_op_signature(&self) -> ExtOpSignature {
-        let mut sig = self.signature.clone();
-        sig.func_type = sig.func_type.with_extension_delta(self.extension.clone());
-        sig
+        ExtOpSignature {
+            func_type: self.signature().clone(),
+            static_inputs: self.static_inputs.clone(),
+        }
     }
 }
 
@@ -267,12 +283,13 @@ impl DataflowOpTrait for OpaqueOp {
     }
 
     fn signature(&self) -> Signature {
-        self.ext_op_signature().func_type
+        self.signature
+            .clone()
+            .with_extension_delta(self.extension.clone())
     }
 
     fn static_inputs(&self) -> Vec<EdgeKind> {
-        self.signature
-            .static_inputs()
+        self.static_inputs
             .iter()
             .cloned()
             .map(EdgeKind::Const)
@@ -282,7 +299,7 @@ impl DataflowOpTrait for OpaqueOp {
     fn static_port_count(&self, dir: Direction) -> usize {
         // specialise as we can count without allocating
         match dir {
-            Direction::Incoming => self.signature.static_inputs().len(),
+            Direction::Incoming => self.static_inputs.len(),
             Direction::Outgoing => 0,
         }
     }
@@ -399,6 +416,7 @@ pub enum OpaqueOpError {
 mod test {
 
     use crate::std_extensions::arithmetic::conversions::{self, CONVERT_OPS_REGISTRY};
+    use crate::type_row;
     use crate::{
         extension::{
             prelude::{BOOL_T, QB_T, USIZE_T},
@@ -420,6 +438,7 @@ mod test {
             "desc".into(),
             vec![TypeArg::Type { ty: USIZE_T }],
             sig.clone(),
+            type_row![],
         );
         assert_eq!(op.name(), "res.op");
         assert_eq!(DataflowOpTrait::description(&op), "desc");
@@ -440,6 +459,7 @@ mod test {
             "description".into(),
             vec![],
             Signature::new(i0.clone(), BOOL_T),
+            type_row![],
         );
         let resolved =
             super::resolve_opaque_op(Node::from(portgraph::NodeIndex::new(1)), &opaque, registry)
@@ -475,8 +495,16 @@ mod test {
             "".into(),
             vec![],
             endo_sig.clone(),
+            type_row![],
         );
-        let opaque_comp = OpaqueOp::new(ext_id.clone(), comp_name, "".into(), vec![], endo_sig);
+        let opaque_comp = OpaqueOp::new(
+            ext_id.clone(),
+            comp_name,
+            "".into(),
+            vec![],
+            endo_sig,
+            type_row![],
+        );
         let resolved_val = super::resolve_opaque_op(
             Node::from(portgraph::NodeIndex::new(1)),
             &opaque_val,

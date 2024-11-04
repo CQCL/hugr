@@ -262,13 +262,12 @@ impl SignatureFunc {
 }
 
 /// Instantiated [OpDef] signature.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(test, derive(Arbitrary), proptest(params = "RecursionDepth"))]
 pub struct ExtOpSignature {
-    #[serde(flatten)]
+    // #[serde(flatten)]
     /// The dataflow function type of the signature.
     pub func_type: Signature,
-    #[serde(default, skip_serializing_if = "TypeRow::is_empty")]
     /// The static inputs of the signature.
     pub static_inputs: TypeRow,
 }
@@ -881,7 +880,8 @@ pub(super) mod test {
         ));
         let [inq] = dfg.input_wires_arr();
         let ext_op_node = dfg.add_dataflow_op_with_static(ext_op, vec![inq], [cnst.wire()])?;
-        dfg.finish_hugr_with_outputs(ext_op_node.outputs(), &reg)?;
+        let h = dfg.finish_hugr_with_outputs(ext_op_node.outputs(), &reg)?;
+        println!("{}", serde_json::to_string_pretty(&h).unwrap());
         Ok(())
     }
 
