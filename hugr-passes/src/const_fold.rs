@@ -144,7 +144,7 @@ impl ConstFoldPass {
                     }
                     EdgeKind::StateOrder | EdgeKind::Const(_) | EdgeKind::Function(_) => true,
                     EdgeKind::ControlFlow => panic!(),
-                    _ => true, // needed for non-exhaustive; not knowing what it is, assume the worst
+                    _ => true, // needed as EdgeKind non-exhaustive; not knowing what it is, assume the worst
                 };
                 if needs_predecessor {
                     q.push_back(src);
