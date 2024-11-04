@@ -3,22 +3,27 @@
 //! to perform constant-folding.
 
 pub mod value_handle;
-use std::collections::{HashSet, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use hugr_core::{
     extension::ExtensionRegistry,
-    hugr::hugrmut::HugrMut,
-    hugr::views::{DescendantsGraph, ExtractHugr, HierarchyView},
-    ops::constant::OpaqueValue,
-    ops::{handle::FuncID, Const, DataflowOpTrait, ExtensionOp, LoadConstant, Value},
+    hugr::{
+        hugrmut::HugrMut,
+        views::{DescendantsGraph, ExtractHugr, HierarchyView},
+    },
+    ops::{
+        constant::OpaqueValue, handle::FuncID, Const, DataflowOpTrait, ExtensionOp, LoadConstant,
+        Value,
+    },
     types::{EdgeKind, TypeArg},
-    HugrView, IncomingPort, Node, OutgoingPort, PortIndex, Wire,
+    HugrView, IncomingPort, Node, NodeIndex, OutgoingPort, PortIndex, Wire,
 };
 use value_handle::ValueHandle;
 
 use crate::{
     dataflow::{
-        AnalysisResults, ConstLoader, DFContext, Machine, PartialValue, TailLoopTermination,
+        traverse_value, AnalysisResults, ConstLoader, DFContext, Machine, PartialValue,
+        TailLoopTermination,
     },
     validation::{ValidatePassError, ValidationLevel},
 };
@@ -28,6 +33,7 @@ use crate::{
 pub struct ConstFoldPass {
     validation: ValidationLevel,
     allow_increase_termination: bool,
+    inputs: HashMap<IncomingPort, Value>,
 }
 
 impl ConstFoldPass {
@@ -49,7 +55,17 @@ impl ConstFoldPass {
 
     /// Run the Constant Folding pass.
     fn run_no_validate(&self, hugr: &mut impl HugrMut) -> Result<(), ValidatePassError> {
-        let results = Machine::default().run(ConstFoldContext(hugr), []);
+        let fresh_node = Node::from(portgraph::NodeIndex::new(
+            hugr.nodes().max().map_or(0, |n| n.index() + 1),
+        ));
+        let inputs = self.inputs.iter().map(|(p, v)| {
+            (
+                p.clone(),
+                traverse_value(&ConstFoldContext(hugr), fresh_node, &mut vec![p.index()], v),
+            )
+        });
+
+        let results = Machine::default().run(ConstFoldContext(hugr), inputs);
         let mut keep_nodes = HashSet::new();
         self.find_needed_nodes(&results, hugr.root(), &mut keep_nodes);
 
@@ -261,8 +277,7 @@ impl<'a, H: HugrView> DFContext<ValueHandle> for ConstFoldContext<'a, H> {
             })
             .collect::<Vec<_>>();
         for (p, v) in op.constant_fold(&known_ins).unwrap_or_default() {
-            // Hmmm, we should (at least) key the value also by p
-            outs[p.index()] = self.value_from_const(node, &v);
+            outs[p.index()] = traverse_value(self, node, &mut vec![p.index()], &v);
         }
     }
 }

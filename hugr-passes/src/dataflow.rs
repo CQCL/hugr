@@ -79,7 +79,7 @@ pub trait ConstLoader<V> {
     }
 }
 
-fn traverse_value<V>(
+pub fn traverse_value<V>(
     s: &(impl ConstLoader<V> + ?Sized),
     n: Node,
     fields: &mut Vec<usize>,
