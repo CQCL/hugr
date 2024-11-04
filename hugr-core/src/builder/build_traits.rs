@@ -191,7 +191,28 @@ pub trait Dataflow: Container {
 
         Ok(outs.into())
     }
+    /// Add a dataflow [`OpType`] to the sibling graph, wiring up the `input_wires` to the
+    /// incoming ports of the resulting node, and the `static_wires` to the static input ports.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`BuildError::OperationWiring`] error if the `input_wires` or `static_wires` cannot be connected.
+    fn add_dataflow_op_with_static(
+        &mut self,
+        nodetype: impl Into<OpType>,
+        input_wires: impl IntoIterator<Item = Wire>,
+        static_wires: impl IntoIterator<Item = Wire>,
+    ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
+        let op: OpType = nodetype.into();
+        let static_in_ports = op.static_input_ports();
+        let handle = self.add_dataflow_op(op, input_wires)?;
 
+        for (src, in_port) in static_wires.into_iter().zip(static_in_ports) {
+            self.hugr_mut()
+                .connect(src.node(), src.source(), handle.node(), in_port);
+        }
+        Ok(handle)
+    }
     /// Insert a hugr-defined op to the sibling graph, wiring up the
     /// `input_wires` to the incoming ports of the resulting root node.
     ///

@@ -1,6 +1,6 @@
 //! Handles to nodes in HUGR.
 use crate::types::{Type, TypeBound};
-use crate::Node;
+use crate::{Node, OutgoingPort, Wire};
 
 use derive_more::From as DerFrom;
 use smol_str::SmolStr;
@@ -100,6 +100,12 @@ impl<const DEF: bool> AliasID<DEF> {
 #[derive(DerFrom, Debug, Clone, PartialEq, Eq)]
 /// Handle to a [Const](crate::ops::OpType::Const) node.
 pub struct ConstID(Node);
+impl ConstID {
+    /// Retrieve the outgoing wire for the constant node.
+    pub fn wire(&self) -> Wire {
+        Wire::new(self.node(), OutgoingPort::from(0))
+    }
+}
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DerFrom, Debug)]
 /// Handle to a [DataflowBlock](crate::ops::DataflowBlock) or [Exit](crate::ops::ExitBlock) node.

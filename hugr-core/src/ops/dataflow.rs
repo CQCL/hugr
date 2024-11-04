@@ -5,7 +5,7 @@ use super::{impl_op_name, OpTag, OpTrait};
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 use crate::ops::StaticTag;
 use crate::types::{EdgeKind, PolyFuncType, Signature, Type, TypeArg, TypeRow};
-use crate::IncomingPort;
+use crate::{Direction, IncomingPort};
 
 #[cfg(test)]
 use ::proptest_derive::Arbitrary;
@@ -48,6 +48,15 @@ pub trait DataflowOpTrait {
     #[inline]
     fn static_inputs(&self) -> Vec<EdgeKind> {
         vec![]
+    }
+
+    /// The number of static input ports in the given direction.
+    #[inline]
+    fn static_port_count(&self, dir: Direction) -> usize {
+        match dir {
+            Direction::Incoming => self.static_inputs().len(),
+            Direction::Outgoing => 0,
+        }
     }
 }
 
@@ -150,6 +159,10 @@ impl<T: DataflowOpTrait> OpTrait for T {
 
     fn static_inputs(&self) -> Vec<EdgeKind> {
         DataflowOpTrait::static_inputs(self)
+    }
+
+    fn static_port_count(&self, dir: Direction) -> usize {
+        DataflowOpTrait::static_port_count(self, dir)
     }
 }
 impl<T: DataflowOpTrait> StaticTag for T {

@@ -46,8 +46,6 @@ pub enum OpTag {
     Input,
     /// A dataflow output.
     Output,
-    /// Dataflow node that has a static input
-    StaticInput,
     /// Node that has a static output
     StaticOutput,
     /// A function call.
@@ -127,11 +125,10 @@ impl OpTag {
             ],
             OpTag::TailLoop => &[OpTag::DataflowChild, OpTag::DataflowParent],
             OpTag::Conditional => &[OpTag::DataflowChild],
-            OpTag::StaticInput => &[OpTag::Any],
             OpTag::StaticOutput => &[OpTag::Any],
-            OpTag::FnCall => &[OpTag::StaticInput, OpTag::DataflowChild],
-            OpTag::LoadConst => &[OpTag::StaticInput, OpTag::DataflowChild],
-            OpTag::LoadFunc => &[OpTag::StaticInput, OpTag::DataflowChild],
+            OpTag::FnCall => &[OpTag::DataflowChild],
+            OpTag::LoadConst => &[OpTag::DataflowChild],
+            OpTag::LoadFunc => &[OpTag::DataflowChild],
             OpTag::Leaf => &[OpTag::DataflowChild],
             OpTag::DataflowParent => &[OpTag::Any],
         }
@@ -159,7 +156,6 @@ impl OpTag {
             OpTag::Cfg => "Nested control-flow operation",
             OpTag::TailLoop => "Tail-recursive loop",
             OpTag::Conditional => "Conditional operation",
-            OpTag::StaticInput => "Node with static input (LoadConst, LoadFunc, or FnCall)",
             OpTag::StaticOutput => "Node with static output (FuncDefn, FuncDecl, Const)",
             OpTag::FnCall => "Function call",
             OpTag::LoadConst => "Constant load operation",

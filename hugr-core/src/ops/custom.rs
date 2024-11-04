@@ -10,10 +10,13 @@ use {
     ::proptest_derive::Arbitrary,
 };
 
-use crate::extension::{ConstFoldResult, ExtensionId, ExtensionRegistry, OpDef, SignatureError};
 use crate::hugr::HugrView;
 use crate::types::{type_param::TypeArg, Signature};
 use crate::{extension::ExtOpSignature, hugr::internal::HugrMutInternals, types::EdgeKind};
+use crate::{
+    extension::{ConstFoldResult, ExtensionId, ExtensionRegistry, OpDef, SignatureError},
+    Direction,
+};
 use crate::{ops, Hugr, IncomingPort, Node};
 
 use super::dataflow::DataflowOpTrait;
@@ -169,6 +172,14 @@ impl DataflowOpTrait for ExtensionOp {
             .map(EdgeKind::Const)
             .collect()
     }
+
+    fn static_port_count(&self, dir: Direction) -> usize {
+        // specialise as we can count without allocating
+        match dir {
+            Direction::Incoming => self.signature.static_inputs().len(),
+            Direction::Outgoing => 0,
+        }
+    }
 }
 
 /// An opaquely-serialized op that refers to an as-yet-unresolved [`OpDef`].
@@ -258,6 +269,23 @@ impl DataflowOpTrait for OpaqueOp {
     fn signature(&self) -> Signature {
         self.ext_op_signature().func_type
     }
+
+    fn static_inputs(&self) -> Vec<EdgeKind> {
+        self.signature
+            .static_inputs()
+            .iter()
+            .cloned()
+            .map(EdgeKind::Const)
+            .collect()
+    }
+
+    fn static_port_count(&self, dir: Direction) -> usize {
+        // specialise as we can count without allocating
+        match dir {
+            Direction::Incoming => self.signature.static_inputs().len(),
+            Direction::Outgoing => 0,
+        }
+    }
 }
 
 /// Resolve serialized names of operations into concrete implementation (OpDefs) where possible
@@ -305,7 +333,6 @@ pub fn resolve_opaque_op(
                 r.name().clone(),
             ));
         };
-        dbg!(opaque.signature().extension_reqs);
         let ext_op = ExtensionOp::new_with_cached(
             def.clone(),
             opaque.args.clone(),
@@ -318,8 +345,6 @@ pub fn resolve_opaque_op(
             cause: e,
         })?;
         if opaque.signature() != ext_op.signature() {
-            dbg!(opaque.signature().extension_reqs);
-            dbg!(ext_op.signature().extension_reqs);
             return Err(OpaqueOpError::SignatureMismatch {
                 node,
                 extension: opaque.extension.clone(),

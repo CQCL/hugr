@@ -181,9 +181,10 @@ impl OpType {
         }
 
         // Constant port
-        let mut static_kind = self.static_port_kind(dir);
         let static_offset = port.index() - port_count;
-        if static_offset < static_kind.len() {
+        let static_port_count = self.static_port_count(dir);
+        if static_offset < static_port_count {
+            let mut static_kind = self.static_port_kind(dir);
             return Some(static_kind.remove(static_offset));
         }
 
@@ -197,12 +198,11 @@ impl OpType {
     /// Returns None if there is no such port, or if the operation defines multiple non-dataflow ports.
     pub fn other_port(&self, dir: Direction) -> Option<Port> {
         let df_count = self.value_port_count(dir);
+        let static_count = self.static_port_count(dir);
         let non_df_count = self.non_df_port_count(dir);
-        // if there is a static input it comes before the non_df_ports
-        let static_input =
-            (dir == Direction::Incoming && OpTag::StaticInput.is_superset(self.tag())) as usize;
+
         if self.other_port_kind(dir).is_some() && non_df_count >= 1 {
-            Some(Port::new(dir, df_count + static_input))
+            Some(Port::new(dir, df_count + static_count))
         } else {
             None
         }
@@ -229,9 +229,10 @@ impl OpType {
     /// See [`OpType::static_input_ports`] and [`OpType::static_output_port`].
     #[inline]
     pub fn static_ports(&self, dir: Direction) -> Vec<Port> {
-        let static_len = self.static_port_kind(dir).len();
+        let static_len = self.static_port_count(dir);
+        let value_port_count = self.value_port_count(dir);
         (0..static_len)
-            .map(|i| Port::new(dir, self.value_port_count(dir) + i))
+            .map(|i| Port::new(dir, value_port_count + i))
             .collect()
     }
 
@@ -278,7 +279,7 @@ impl OpType {
     /// Returns the number of ports for the given direction.
     #[inline]
     pub fn port_count(&self, dir: Direction) -> usize {
-        let static_len = self.static_port_kind(dir).len();
+        let static_len = self.static_port_count(dir);
         let non_df_count = self.non_df_port_count(dir);
         self.value_port_count(dir) + static_len + non_df_count
     }
@@ -410,6 +411,14 @@ pub trait OpTrait {
             Direction::Outgoing => self.other_output(),
         }
         .is_some() as usize
+    }
+
+    /// Get the number of static multiports.
+    fn static_port_count(&self, dir: Direction) -> usize {
+        match dir {
+            Direction::Incoming => self.static_inputs().len(),
+            Direction::Outgoing => self.static_output().is_some() as usize,
+        }
     }
 }
 

@@ -558,12 +558,12 @@ pub(super) mod test {
     use itertools::Itertools;
 
     use super::{ExtOpSignature, SignatureFromArgs};
-    use crate::builder::{endo_sig, DFGBuilder, Dataflow, DataflowHugr};
+    use crate::builder::{endo_sig, Container, DFGBuilder, Dataflow, DataflowHugr};
     use crate::extension::op_def::{CustomValidator, LowerFunc, OpDef, SignatureFunc};
     use crate::extension::prelude::{QB_T, USIZE_T};
     use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE};
     use crate::extension::{SignatureError, EMPTY_REG, PRELUDE_REGISTRY};
-    use crate::ops::OpName;
+    use crate::ops::{OpName, Value};
     use crate::std_extensions::collections::{EXTENSION, LIST_TYPENAME};
     use crate::types::type_param::{TypeArgError, TypeParam};
     use crate::types::{OpDefSignature, Signature, Type, TypeArg, TypeBound, TypeRV};
@@ -848,14 +848,13 @@ pub(super) mod test {
         Ok(())
     }
 
-    pub(crate) fn static_input_op() -> (Extension, OpName) {
+    fn static_input_op() -> (Extension, OpName) {
         let mut e = Extension::new_test(EXT_ID);
         let def = e
             .add_op(
                 "StaticInOp".into(),
                 "".into(),
-                OpDefSignature::new(vec![], Signature::new(vec![], vec![QB_T]))
-                    .with_static_inputs(USIZE_T),
+                OpDefSignature::new(vec![], Signature::new_endo(QB_T)).with_static_inputs(USIZE_T),
             )
             .unwrap();
         let op_name = def.name().clone();
@@ -871,10 +870,18 @@ pub(super) mod test {
         let ext_op = e.instantiate_extension_op(&op_name, vec![], &reg).unwrap();
         let sig = ext_op.ext_op_signature();
         let expected = ExtOpSignature::new(
-            Signature::new(vec![], vec![QB_T]).with_extension_delta(e.name().clone()),
+            Signature::new_endo(QB_T).with_extension_delta(e.name().clone()),
             USIZE_T,
         );
         assert_eq!(sig, &expected);
+
+        let mut dfg = DFGBuilder::new(expected.func_type.with_prelude())?;
+        let cnst = dfg.add_constant(Value::extension(
+            crate::extension::prelude::ConstUsize::new(42),
+        ));
+        let [inq] = dfg.input_wires_arr();
+        let ext_op_node = dfg.add_dataflow_op_with_static(ext_op, vec![inq], [cnst.wire()])?;
+        dfg.finish_hugr_with_outputs(ext_op_node.outputs(), &reg)?;
         Ok(())
     }
 
