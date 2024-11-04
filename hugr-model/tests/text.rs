@@ -10,3 +10,8 @@ fn roundtrip(source: &str) -> String {
 pub fn test_declarative_extensions() {
     insta::assert_snapshot!(roundtrip(include_str!("fixtures/model-decl-exts.edn")))
 }
+
+#[test]
+pub fn test_literals() {
+    insta::assert_snapshot!(roundtrip(include_str!("fixtures/model-literals.edn")))
+}
