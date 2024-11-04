@@ -417,7 +417,7 @@ impl<'a> Context<'a> {
         use std::collections::hash_map::Entry;
 
         let poly_func_type = match opdef.signature_func() {
-            SignatureFunc::PolyFuncType(poly_func_type) => poly_func_type,
+            SignatureFunc::PolyFuncType(op_def_sig) => op_def_sig.poly_func_type(),
             _ => return self.make_named_global_ref(opdef.extension(), opdef.name()),
         };
 
