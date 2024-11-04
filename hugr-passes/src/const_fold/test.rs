@@ -25,7 +25,7 @@ use itertools::Itertools;
 use lazy_static::lazy_static;
 use rstest::rstest;
 
-use super::{constant_fold_pass, ConstFoldContext, ValueHandle};
+use super::{constant_fold_pass, ConstFoldContext, ConstFoldPass, ValueHandle};
 use crate::dataflow::{ConstLoader, DFContext, PartialValue};
 
 #[rstest]
@@ -1708,4 +1708,11 @@ fn test_tail_loop() {
         }
     }
     assert!(cst5.is_none()); // Found in loop
+
+    let mut h3 = h.clone();
+    ConstFoldPass::default()
+        .allow_increase_termination()
+        .run(&mut h3, &reg)
+        .unwrap();
+    assert_fully_folded(&h3, &ConstInt::new_u(3, 10).unwrap().into());
 }

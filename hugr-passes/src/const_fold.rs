@@ -40,6 +40,13 @@ impl ConstFoldPass {
         self
     }
 
+    /// Allows the pass to remove potentially-non-terminating [TailLoop]s and [CFG] if their
+    /// result (if/when they do terminate) is either known or not needed
+    pub fn allow_increase_termination(mut self) -> Self {
+        self.allow_increase_termination = true;
+        self
+    }
+
     /// Run the Constant Folding pass.
     fn run_no_validate(&self, hugr: &mut impl HugrMut) -> Result<(), ValidatePassError> {
         let results = Machine::default().run(ConstFoldContext(hugr), []);
