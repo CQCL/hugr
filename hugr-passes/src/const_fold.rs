@@ -53,6 +53,17 @@ impl ConstFoldPass {
         self
     }
 
+    /// Specifies any number of external inputs to provide to the Hugr (on root-node
+    /// in-ports). Each supercedes any previous value on the same in-port.
+    pub fn with_inputs(
+        mut self,
+        inputs: impl IntoIterator<Item = (impl Into<IncomingPort>, Value)>,
+    ) -> Self {
+        self.inputs
+            .extend(inputs.into_iter().map(|(p, v)| (p.into(), v)));
+        self
+    }
+
     /// Run the Constant Folding pass.
     fn run_no_validate(&self, hugr: &mut impl HugrMut) -> Result<(), ValidatePassError> {
         let fresh_node = Node::from(portgraph::NodeIndex::new(
