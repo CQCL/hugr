@@ -182,12 +182,31 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         Returns:
             The updated node.
         """
-        self[node]._num_outs = num_outs or 0
-        node = replace(node, _num_out_ports=num_outs)
-        parent = self[node].parent
-        if parent is not None:
-            pos = self[parent].children.index(node)
-            self[parent].children[pos] = node
+        return self._update_port_count(node, num_outs=num_outs)
+
+    def _update_port_count(
+        self, node: Node, *, num_inps: int | None = None, num_outs: int | None
+    ) -> Node:
+        """Update the number of incoming and outgoing ports for a node.
+
+        If `num_inps` or `num_outs` is None, the corresponding count is not updated.
+
+        Returns:
+            The updated node.
+        """
+        if num_inps is None and num_outs is None:
+            return node
+
+        if num_inps is not None:
+            self[node]._num_inps = num_inps
+        if num_outs is not None:
+            self[node]._num_outs = num_outs
+            node = replace(node, _num_out_ports=num_outs)
+            parent = self[node].parent
+            if parent is not None:
+                pos = self[parent].children.index(node)
+                self[parent].children[pos] = node
+
         return node
 
     def add_node(
@@ -297,7 +316,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         Examples:
             >>> df = dfg.Dfg(tys.Bool)
             >>> df.hugr.add_link(df.input_node.out(0), df.output_node.inp(0))
-            >>> df.hugr.is_linked(df.input_node.out(0), df.output_node.inp(0))
+            >>> df.hugr.has_link(df.input_node.out(0), df.output_node.inp(0))
             True
         """
         return dst in self.linked_ports(src)
@@ -622,14 +641,11 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         )
 
     def _constrain_offset(self, p: P) -> PortOffset:
-        # negative offsets are used to refer to the last port
+        # An offset of -1 is a special case, indicating an order edge,
+        # not counted in the number of ports.
         if p.offset < 0:
-            match p.direction:
-                case Direction.INCOMING:
-                    current = self.num_incoming(p.node)
-                case Direction.OUTGOING:
-                    current = self.num_outgoing(p.node)
-            offset = current + p.offset + 1
+            assert p.offset == -1, "Only order edges are allowed with offset < 0"
+            offset = self.num_ports(p.node, p.direction)
         else:
             offset = p.offset
 

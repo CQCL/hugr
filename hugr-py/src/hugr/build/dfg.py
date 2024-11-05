@@ -619,6 +619,12 @@ class DfBase(ParentBuilder[DP], DefinitionBuilder, AbstractContextManager):
         tys = [self._wire_up_port(node, i, p) for i, p in enumerate(ports)]
         if isinstance(op := self.hugr[node].op, ops._PartialOp):
             op._set_in_types(tys)
+            if isinstance(op, ops.DataflowOp):
+                # Update the node's input and output port count
+                sig = op.outer_signature()
+                self.hugr._update_port_count(
+                    node, num_inps=len(sig.input), num_outs=len(sig.output)
+                )
         return tys
 
     def _get_dataflow_type(self, wire: Wire) -> tys.Type:
