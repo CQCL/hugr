@@ -179,7 +179,7 @@ impl ConstFoldPass {
                                 .is_err()
                     }
                     EdgeKind::StateOrder | EdgeKind::Const(_) | EdgeKind::Function(_) => true,
-                    EdgeKind::ControlFlow => panic!(),
+                    EdgeKind::ControlFlow => false, // we always include all children of a CFG above
                     _ => true, // needed as EdgeKind non-exhaustive; not knowing what it is, assume the worst
                 };
                 if needs_predecessor {
