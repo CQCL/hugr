@@ -78,7 +78,7 @@ impl ConstFoldPass {
 
         let results = Machine::default().run(ConstFoldContext(hugr), inputs);
         let mut keep_nodes = HashSet::new();
-        self.find_needed_nodes(&results, hugr.root(), &mut keep_nodes);
+        self.find_needed_nodes(&results, &mut keep_nodes);
 
         let remove_nodes = results
             .hugr()
@@ -137,12 +137,11 @@ impl ConstFoldPass {
     fn find_needed_nodes<H: HugrView>(
         &self,
         results: &AnalysisResults<ValueHandle, ConstFoldContext<H>>,
-        root: Node,
         needed: &mut HashSet<Node>,
     ) {
         let mut q = VecDeque::new();
-        q.push_back(root);
         let h = results.hugr();
+        q.push_back(h.root());
         while let Some(n) = q.pop_front() {
             if !needed.insert(n) {
                 continue;
