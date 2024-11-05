@@ -29,53 +29,55 @@ use crate::{
         type_row::TypeRowBase,
     },
 };
+use derive_more::{Display, Error, From};
 use fxhash::FxHashMap;
 use hugr_model::v0::table;
 use hugr_model::v0::{self as model};
 use itertools::{Either, Itertools};
 use smol_str::{SmolStr, ToSmolStr};
-use thiserror::Error;
 
 /// An error that can occur during import.
-#[derive(Debug, Clone, Error)]
-#[error("failed to import hugr")]
-pub struct ImportError(#[from] ImportErrorInner);
+#[derive(Debug, Display, Clone, Error, From)]
+#[display("failed to import hugr")]
+pub struct ImportError(ImportErrorInner);
 
-#[derive(Debug, Clone, Error)]
+#[derive(Debug, Display, Clone, Error, From)]
 enum ImportErrorInner {
     /// The model contains a feature that is not supported by the importer yet.
     /// Errors of this kind are expected to be removed as the model format and
     /// the core HUGR representation converge.
-    #[error("currently unsupported: {0}")]
+    #[display("currently unsupported: {_0}")]
+    #[error(ignore)] // Unary tuple struct without source nor backtrace
     Unsupported(String),
 
     /// The model contains implicit information that has not yet been inferred.
     /// This includes wildcards and application of functions with implicit parameters.
-    #[error("uninferred implicit: {0}")]
+    #[display("uninferred implicit: {_0}")]
+    #[error(ignore)] // Unary tuple struct without source nor backtrace
     Uninferred(String),
 
     /// The model is not well-formed.
-    #[error("{0}")]
+    #[display("{_0}")]
     Invalid(String),
 
     /// An error with additional context.
-    #[error("import failed in context: {1}")]
+    #[display("import failed in context: {1}")]
     Context(#[source] Box<ImportErrorInner>, String),
 
     /// A signature mismatch was detected during import.
-    #[error("signature error")]
+    #[display("signature error")]
     Signature(#[from] SignatureError),
 
     /// An error relating to the loaded extension registry.
-    #[error("extension error")]
+    #[display("extension error")]
     Extension(#[from] ExtensionError),
 
     /// Incorrect order hints.
-    #[error("incorrect order hint")]
+    #[display("incorrect order hint")]
     OrderHint(#[from] OrderHintError),
 
     /// Extension resolution.
-    #[error("extension resolution error")]
+    #[display("extension resolution error")]
     ExtensionResolution(#[from] ExtensionResolutionError),
 }
 

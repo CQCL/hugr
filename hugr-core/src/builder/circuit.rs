@@ -1,7 +1,6 @@
+use derive_more::{Display, Error, From};
 use std::collections::HashMap;
 use std::mem;
-
-use thiserror::Error;
 
 use crate::ops::{NamedOp, OpType, Value};
 use crate::utils::collect_array;
@@ -22,12 +21,12 @@ pub struct CircuitBuilder<'a, T: ?Sized> {
     builder: &'a mut T,
 }
 
-#[derive(Debug, Clone, PartialEq, Error)]
+#[derive(Debug, Display, Clone, PartialEq, Error)]
 /// Error in [`CircuitBuilder`]
 #[non_exhaustive]
 pub enum CircuitBuildError {
     /// Invalid index for stored wires.
-    #[error("Invalid wire index {invalid_index} while attempting to add operation {}.", .op.as_ref().map(|op| op.name()).unwrap_or_default())]
+    #[display("Invalid wire index {invalid_index} while attempting to add operation {}.", .op.as_ref().map(|op| op.name()).unwrap_or_default())]
     InvalidWireIndex {
         /// The operation.
         op: Option<Box<OpType>>,
@@ -35,7 +34,7 @@ pub enum CircuitBuildError {
         invalid_index: usize,
     },
     /// Some linear inputs had no corresponding output wire.
-    #[error("The linear inputs {:?} had no corresponding output wire in operation {}.", .index.as_slice(), .op.name())]
+    #[display("The linear inputs {:?} had no corresponding output wire in operation {}.", .index.as_slice(), .op.name())]
     MismatchedLinearInputs {
         /// The operation.
         op: Box<OpType>,

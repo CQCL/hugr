@@ -40,6 +40,7 @@ use super::{
     ExtensionBuildError, ExtensionId, ExtensionRegistry, ExtensionRegistryError, ExtensionSet,
     PRELUDE,
 };
+use derive_more::{Display, Error, From};
 use ops::OperationDeclaration;
 use smol_str::SmolStr;
 use types::TypeDeclaration;
@@ -186,29 +187,29 @@ struct DeclarationContext<'a> {
 }
 
 /// Errors that can occur while loading an extension set.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Display, Error, From)]
 #[non_exhaustive]
 pub enum ExtensionDeclarationError {
     /// An error occurred while deserializing the extension set.
-    #[error("Error while parsing the extension set yaml: {0}")]
-    Deserialize(#[from] serde_yaml::Error),
+    #[display("Error while parsing the extension set yaml: {_0}")]
+    Deserialize(serde_yaml::Error),
     /// An error in registering the loaded extensions.
-    #[error("Error registering the extensions.")]
-    ExtensionRegistryError(#[from] ExtensionRegistryError),
+    #[display("Error registering the extensions.")]
+    ExtensionRegistryError(ExtensionRegistryError),
     /// An error occurred while adding operations or types to the extension.
-    #[error("Error while adding operations or types to the extension: {0}")]
-    ExtensionBuildError(#[from] ExtensionBuildError),
+    #[display("Error while adding operations or types to the extension: {_0}")]
+    ExtensionBuildError(ExtensionBuildError),
     /// Invalid yaml file.
-    #[error("Invalid yaml declaration file {0}")]
-    InvalidFile(#[from] std::io::Error),
+    #[display("Invalid yaml declaration file: {_0}")]
+    InvalidFile(std::io::Error),
     /// A required extension is missing.
-    #[error("Missing required extension {ext}")]
+    #[display("Missing required extension {ext}")]
     MissingExtension {
         /// The missing imported extension.
         ext: ExtensionId,
     },
     /// Referenced an unknown type.
-    #[error("Extension {ext} referenced an unknown type {ty}.")]
+    #[display("Extension {ext} referenced an unknown type {ty}.")]
     MissingType {
         /// The extension that referenced the unknown type.
         ext: ExtensionId,
@@ -218,7 +219,7 @@ pub enum ExtensionDeclarationError {
     /// Parametric types are not currently supported as type parameters.
     ///
     /// TODO: Support this.
-    #[error("Found a currently unsupported higher-order type parameter {ty} in extension {ext}")]
+    #[display("Found a currently unsupported higher-order type parameter {ty} in extension {ext}")]
     ParametricTypeParameter {
         /// The extension that referenced the unsupported type parameter.
         ext: ExtensionId,
@@ -228,7 +229,7 @@ pub enum ExtensionDeclarationError {
     /// Parametric types are not currently supported as type parameters.
     ///
     /// TODO: Support this.
-    #[error("Found a currently unsupported parametric operation {op} in extension {ext}")]
+    #[display("Found a currently unsupported parametric operation {op} in extension {ext}")]
     ParametricOperation {
         /// The extension that referenced the unsupported op parameter.
         ext: ExtensionId,
@@ -238,7 +239,9 @@ pub enum ExtensionDeclarationError {
     /// Operation definitions with no signature are not currently supported.
     ///
     /// TODO: Support this.
-    #[error("Operation {op} in extension {ext} has no signature. This is not currently supported.")]
+    #[display(
+        "Operation {op} in extension {ext} has no signature. This is not currently supported."
+    )]
     MissingSignature {
         /// The extension containing the operation.
         ext: ExtensionId,
@@ -246,7 +249,7 @@ pub enum ExtensionDeclarationError {
         op: OpName,
     },
     /// An unknown type was specified in a signature.
-    #[error("Type {ty} is not in scope. In extension {ext}.")]
+    #[display("Type {ty} is not in scope. In extension {ext}.")]
     UnknownType {
         /// The extension that referenced the type.
         ext: ExtensionId,
@@ -256,7 +259,7 @@ pub enum ExtensionDeclarationError {
     /// Parametric port repetitions are not currently supported.
     ///
     /// TODO: Support this.
-    #[error("Unsupported port repetition {parametric_repetition} in extension {ext}")]
+    #[display("Unsupported port repetition {parametric_repetition} in extension {ext}")]
     UnsupportedPortRepetition {
         /// The extension that referenced the type.
         ext: crate::hugr::IdentList,
@@ -266,7 +269,7 @@ pub enum ExtensionDeclarationError {
     /// Lowering definitions for an operation are not currently supported.
     ///
     /// TODO: Support this.
-    #[error("Unsupported lowering definition for op {op} in extension {ext}")]
+    #[display("Unsupported lowering definition for op {op} in extension {ext}")]
     LoweringNotSupported {
         /// The extension.
         ext: crate::hugr::IdentList,

@@ -9,19 +9,20 @@ use crate::{Extension, ops::OpType, types::TypeArg};
 
 use super::{ExtensionBuildError, ExtensionId, OpDef, SignatureError, op_def::SignatureFunc};
 use delegate::delegate;
-use thiserror::Error;
+use derive_more::{Display, Error, From};
 
 /// Error loading operation.
-#[derive(Debug, Error, PartialEq, Clone)]
-#[error("{0}")]
+#[derive(Debug, Display, Error, PartialEq, Clone, From)]
 #[allow(missing_docs)]
 #[non_exhaustive]
 pub enum OpLoadError {
-    #[error("Op with name {0} is not a member of this set.")]
+    #[display("Op with name {_0} is not a member of this set.")]
+    #[error(ignore)] // Unary tuple struct without source nor backtrace
+    #[from(ignore)]
     NotMember(String),
-    #[error("Type args invalid: {0}.")]
-    InvalidArgs(#[from] SignatureError),
-    #[error("OpDef belongs to extension {0}, expected {1}.")]
+    #[display("Type args invalid: {_0}.")]
+    InvalidArgs(SignatureError),
+    #[display("OpDef belongs to extension {_0}, expected {_1}.")]
     WrongExtension(ExtensionId, ExtensionId),
 }
 

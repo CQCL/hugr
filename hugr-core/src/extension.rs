@@ -3,6 +3,7 @@
 //! TODO: YAML declaration and parsing. This should be similar to a plugin
 //! system (outside the `types` module), which also parses nested [`OpDef`]s.
 
+use derive_more::{Display, Error, From};
 use itertools::Itertools;
 use resolution::{ExtensionResolutionError, WeakExtensionRegistry};
 pub use semver::Version;
@@ -14,9 +15,6 @@ use std::fmt::Debug;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Weak};
 use std::{io, mem};
-
-use derive_more::Display;
-use thiserror::Error;
 
 use crate::hugr::IdentList;
 use crate::ops::custom::{ExtensionOp, OpaqueOp};
@@ -375,53 +373,54 @@ pub static EMPTY_REG: ExtensionRegistry = ExtensionRegistry {
 
 /// An error that can occur in computing the signature of a node.
 /// TODO: decide on failure modes
-#[derive(Debug, Clone, Error, PartialEq, Eq)]
-#[allow(missing_docs)]
+#[derive(Debug, Display, Clone, Error, PartialEq, Eq, From)]
 #[non_exhaustive]
 pub enum SignatureError {
     /// Name mismatch
-    #[error("Definition name ({0}) and instantiation name ({1}) do not match.")]
+    #[display("Definition name ({_0}) and instantiation name ({_1}) do not match.")]
     NameMismatch(TypeName, TypeName),
     /// Extension mismatch
-    #[error("Definition extension ({0}) and instantiation extension ({1}) do not match.")]
+    #[display("Definition extension ({_0}) and instantiation extension ({_1}) do not match.")]
     ExtensionMismatch(ExtensionId, ExtensionId),
     /// When the type arguments of the node did not match the params declared by the `OpDef`
     #[error("Type arguments of node did not match params declared by definition: {0}")]
-    TypeArgMismatch(#[from] TermTypeError),
+    #[display("Type arguments of node did not match params declared by definition: {_0}")]
+    #[from]
+    TypeArgMismatch(TermTypeError),
     /// Invalid type arguments
-    #[error("Invalid type arguments for operation")]
+    #[display("Invalid type arguments for operation")]
     InvalidTypeArgs,
     /// The weak [`Extension`] reference for a custom type has been dropped.
-    #[error(
+    #[display(
         "Type '{typ}' is defined in extension '{missing}', but the extension reference has been dropped."
     )]
     MissingTypeExtension { typ: TypeName, missing: ExtensionId },
     /// The Extension was found in the registry, but did not contain the Type(Def) referenced in the Signature
-    #[error("Extension '{exn}' did not contain expected TypeDef '{typ}'")]
+    #[display("Extension '{exn}' did not contain expected TypeDef '{typ}'")]
     ExtensionTypeNotFound { exn: ExtensionId, typ: TypeName },
     /// The bound recorded for a `CustomType` doesn't match what the `TypeDef` would compute
-    #[error("Bound on CustomType ({actual}) did not match TypeDef ({expected})")]
+    #[display("Bound on CustomType ({actual}) did not match TypeDef ({expected})")]
     WrongBound {
         actual: TypeBound,
         expected: TypeBound,
     },
     /// A Type Variable's cache of its declared kind is incorrect
-    #[error("Type Variable claims to be {cached} but actual declaration {actual}")]
+    #[display("Type Variable claims to be {cached} but actual declaration {actual}")]
     TypeVarDoesNotMatchDeclaration {
         actual: Box<TypeParam>,
         cached: Box<TypeParam>,
     },
     /// A type variable that was used has not been declared
-    #[error("Type variable {idx} was not declared ({num_decls} in scope)")]
+    #[display("Type variable {idx} was not declared ({num_decls} in scope)")]
     FreeTypeVar { idx: usize, num_decls: usize },
     /// A row variable was found outside of a variable-length row
-    #[error("Expected a single type, but found row variable {var}")]
+    #[display("Expected a single type, but found row variable {var}")]
     RowVarWhereTypeExpected { var: RowVariable },
     /// The result of the type application stored in a [Call]
     /// is not what we get by applying the type-args to the polymorphic function
     ///
     /// [Call]: crate::ops::dataflow::Call
-    #[error(
+    #[display(
         "Incorrect result of type application in Call - cached {cached} but expected {expected}"
     )]
     CallIncorrectlyAppliesType {
@@ -432,7 +431,7 @@ pub enum SignatureError {
     /// is not what we get by applying the type-args to the polymorphic function
     ///
     /// [`LoadFunction`]: crate::ops::dataflow::LoadFunction
-    #[error(
+    #[display(
         "Incorrect result of type application in LoadFunction - cached {cached} but expected {expected}"
     )]
     LoadFunctionIncorrectlyAppliesType {
@@ -442,12 +441,12 @@ pub enum SignatureError {
 
     /// Extension declaration specifies a binary compute signature function, but none
     /// was loaded.
-    #[error("Binary compute signature function not loaded.")]
+    #[display("Binary compute signature function not loaded.")]
     MissingComputeFunc,
 
     /// Extension declaration specifies a binary compute signature function, but none
     /// was loaded.
-    #[error("Binary validate signature function not loaded.")]
+    #[display("Binary validate signature function not loaded.")]
     MissingValidateFunc,
 }
 
@@ -690,16 +689,16 @@ impl PartialEq for Extension {
 }
 
 /// An error that can occur in defining an extension registry.
-#[derive(Debug, Clone, Error, PartialEq, Eq)]
+#[derive(Debug, Display, Clone, Error, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ExtensionRegistryError {
     /// Extension already defined.
-    #[error(
-        "The registry already contains an extension with id {0} and version {1}. New extension has version {2}."
+    #[display(
+        "The registry already contains an extension with id {_0} and version {_1}. New extension has version {_2}."
     )]
     AlreadyRegistered(ExtensionId, Box<Version>, Box<Version>),
     /// A registered extension has invalid signatures.
-    #[error("The extension {0} contains an invalid signature, {1}.")]
+    #[display("The extension {_0} contains an invalid signature, {_1}.")]
     InvalidSignature(ExtensionId, #[source] SignatureError),
 }
 
@@ -722,14 +721,16 @@ impl From<ExtensionResolutionError> for ExtensionRegistryLoadError {
 }
 
 /// An error that can occur in building a new extension.
-#[derive(Debug, Clone, Error, PartialEq, Eq)]
+#[derive(Debug, Display, Clone, Error, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ExtensionBuildError {
     /// Existing [`OpDef`]
-    #[error("Extension already has an op called {0}.")]
+    #[display("Extension already has an op called {_0}.")]
+    #[error(ignore)] // Unary tuple struct without source nor backtrace
     OpDefExists(OpName),
     /// Existing [`TypeDef`]
-    #[error("Extension already has an type called {0}.")]
+    #[display("Extension already has an type called {_0}.")]
+    #[error(ignore)] // Unary tuple struct without source nor backtrace
     TypeDefExists(TypeName),
 }
 

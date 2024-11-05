@@ -85,7 +85,7 @@
 //! # }
 //! # doctest().unwrap();
 //! ```
-use thiserror::Error;
+use derive_more::{Display, Error, From};
 
 use crate::extension::SignatureError;
 use crate::extension::simple_op::OpLoadError;
@@ -132,24 +132,25 @@ pub fn inout_sig(inputs: impl Into<TypeRow>, outputs: impl Into<TypeRow>) -> Sig
     Signature::new(inputs, outputs)
 }
 
-#[derive(Debug, Clone, PartialEq, Error)]
+#[derive(Debug, Display, Clone, PartialEq, Error, From)]
 #[non_exhaustive]
 /// Error while building the HUGR.
 pub enum BuildError {
     /// The constructed HUGR is invalid.
-    #[error("The constructed HUGR is invalid: {0}.")]
-    InvalidHUGR(#[from] ValidationError<Node>),
+    #[display("The constructed HUGR is invalid: {_0}")]
+    InvalidHUGR(ValidationError<Node>),
     /// `SignatureError` in trying to construct a node (differs from
     /// [`ValidationError::SignatureError`] in that we could not construct a node to report about)
-    #[error(transparent)]
-    SignatureError(#[from] SignatureError),
+    SignatureError(SignatureError),
     /// Tried to add a malformed [Const]
     ///
     /// [Const]: crate::ops::constant::Const
-    #[error("Constant failed typechecking: {0}")]
-    BadConstant(#[from] ConstTypeError),
+    #[display("Constant failed typechecking: {_0}")]
+    BadConstant(ConstTypeError),
     /// CFG can only have one entry.
-    #[error("CFG entry node already built for CFG node: {0}.")]
+    #[display("CFG entry node already built for CFG node: {_0}")]
+    #[error(ignore)] // Unary tuple struct without source nor backtrace
+    #[from(ignore)]
     EntryBuiltError(Node),
     /// We don't allow creating `BasicBlockBuilder<Hugr>`s when the sum-rows
     /// are not homogeneous. Use a `CFGBuilder` and create a valid graph instead.
@@ -158,8 +159,7 @@ pub enum BuildError {
     )]
     BasicBlockTooComplex,
     /// Node was expected to have a certain type but was found to not.
-    #[error("Node with index {node} does not have type {op_desc} as expected.")]
-    #[allow(missing_docs)]
+    #[display("Node with index {node} does not have type {op_desc} as expected.")]
     UnexpectedType {
         /// Index of node where error occurred.
         node: Node,
@@ -167,8 +167,8 @@ pub enum BuildError {
         op_desc: &'static str,
     },
     /// Error building Conditional node
-    #[error("Error building Conditional node: {0}.")]
-    ConditionalError(#[from] conditional::ConditionalBuildError),
+    #[display("Error building Conditional node: {_0}")]
+    ConditionalError(conditional::ConditionalBuildError),
 
     /// Node not found in Hugr
     #[error("{node} not found in the Hugr")]
@@ -178,19 +178,23 @@ pub enum BuildError {
     },
 
     /// Wire not found in Hugr
-    #[error("Wire not found in Hugr: {0}.")]
+    #[display("Wire not found in Hugr: {0}")]
+    #[error(ignore)] // Unary tuple struct without source nor backtrace
+    #[from(ignore)]
     WireNotFound(Wire),
 
     /// Error in `CircuitBuilder`
-    #[error("Error in CircuitBuilder: {0}.")]
+    #[display("Error in CircuitBuilder: {_0}")]
     CircuitError(#[from] circuit::CircuitBuildError),
 
     /// Invalid wires when setting outputs
-    #[error("Found an error while setting the outputs of a {} container, {container_node}. {error}", .container_op.name())]
-    #[allow(missing_docs)]
+    #[display("Found an error while setting the outputs of a {} container, {container_node}. {error}", container_op.name())]
     OutputWiring {
+        /// The type of the container
         container_op: Box<OpType>,
+        /// The node index of the container
         container_node: Node,
+        /// The error that occurred
         #[source]
         error: BuilderWiringError,
     },
@@ -198,25 +202,26 @@ pub enum BuildError {
     /// Invalid input wires to a new operation
     ///
     /// The internal error message already contains the node index.
-    #[error("Got an input wire while adding a {} to the circuit. {error}", .op.name())]
-    #[allow(missing_docs)]
+    #[display("Got an input wire while adding a {} to the circuit. {error}", op.name())]
     OperationWiring {
+        /// The operation we tried to insert
         op: Box<OpType>,
+        /// The error that occurred
         #[source]
         error: BuilderWiringError,
     },
 
-    #[error("Failed to load an extension op: {0}")]
-    #[allow(missing_docs)]
-    ExtensionOp(#[from] OpLoadError),
+    /// Error in loading extension ops
+    #[display("Failed to load an extension op: {_0}")]
+    ExtensionOp(OpLoadError),
 }
 
-#[derive(Debug, Clone, PartialEq, Error)]
+#[derive(Debug, Display, Clone, PartialEq, Error)]
 #[non_exhaustive]
 /// Error raised when wiring up a node during the build process.
 pub enum BuilderWiringError {
     /// Tried to copy a linear type.
-    #[error("Cannot copy linear type {typ} from output {src_offset} of node {src}")]
+    #[display("Cannot copy linear type {typ} from output {src_offset} of node {src}")]
     #[allow(missing_docs)]
     NoCopyLinear {
         typ: Box<Type>,
@@ -224,7 +229,7 @@ pub enum BuilderWiringError {
         src_offset: Port,
     },
     /// The ancestors of an inter-graph edge are not related.
-    #[error(
+    #[display(
         "Cannot connect an inter-graph edge between unrelated nodes. Tried connecting {src} ({src_offset}) with {dst} ({dst_offset})."
     )]
     #[allow(missing_docs)]
@@ -235,7 +240,7 @@ pub enum BuilderWiringError {
         dst_offset: Port,
     },
     /// Inter-Graph edges can only carry copyable data.
-    #[error(
+    #[display(
         "Inter-graph edges cannot carry non-copyable data {typ}. Tried connecting {src} ({src_offset}) with {dst} ({dst_offset})."
     )]
     #[allow(missing_docs)]

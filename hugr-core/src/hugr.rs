@@ -20,9 +20,9 @@ pub use ident::{IdentList, InvalidIdentifier};
 use itertools::Itertools;
 pub use patch::{Patch, SimpleReplacement, SimpleReplacementError};
 
+use derive_more::{Display, Error, From};
 use portgraph::multiportgraph::MultiPortGraph;
 use portgraph::{Hierarchy, PortMut, PortView, UnmanagedDenseMap};
-use thiserror::Error;
 
 pub use self::views::HugrView;
 use crate::core::NodeIndex;
@@ -403,8 +403,8 @@ impl Hugr {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Error)]
-#[error(
+#[derive(Debug, Display, Clone, PartialEq, Error)]
+#[display(
     "Parent node {parent} has extensions {parent_extensions} that are too restrictive for child node {child}, they must include child extensions {child_extensions}"
 )]
 /// An error in the extension deltas.
@@ -416,18 +416,19 @@ pub struct ExtensionError {
 }
 
 /// Errors that can occur while manipulating a Hugr.
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Display, Clone, PartialEq, Eq, Error)]
 #[non_exhaustive]
 pub enum HugrError {
     /// The node was not of the required [`OpTag`]
-    #[error("Invalid tag: required a tag in {required} but found {actual}")]
+    #[display("Invalid tag: required a tag in {required} but found {actual}")]
     #[allow(missing_docs)]
     InvalidTag { required: OpTag, actual: OpTag },
     /// An invalid port was specified.
-    #[error("Invalid port direction {0:?}.")]
+    #[display("Invalid port direction {_0}.")]
+    #[error(ignore)] // Unary tuple struct without source nor backtrace
     InvalidPortDirection(Direction),
     /// Cannot initialize a HUGR with the given entrypoint operation type.
-    #[error("Cannot initialize a HUGR with entrypoint type {op}")]
+    #[display("Cannot initialize a HUGR with entrypoint type {op}")]
     UnsupportedEntrypoint {
         /// The name of the unsupported operation.
         op: OpName,
