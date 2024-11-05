@@ -284,6 +284,24 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             sub_port = sub_port.next_sub_offset()
         return sub_port
 
+    def has_link(self, src: OutPort, dst: InPort) -> bool:
+        """Check if there is a link between two ports.
+
+        Args:
+            src: Source port.
+            dst: Destination port.
+
+        Returns:
+            True if there is a link, False otherwise.
+
+        Examples:
+            >>> df = dfg.Dfg(tys.Bool)
+            >>> df.hugr.add_link(df.input_node.out(0), df.output_node.inp(0))
+            >>> df.hugr.is_linked(df.input_node.out(0), df.output_node.inp(0))
+            True
+        """
+        return dst in self.linked_ports(src)
+
     def add_link(self, src: OutPort, dst: InPort) -> None:
         """Add a link (edge) between two nodes to the HUGR,
           from an outgoing port to an incoming port.
