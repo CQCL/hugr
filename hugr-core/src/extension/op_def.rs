@@ -145,7 +145,7 @@ impl CustomValidator {
 pub enum SignatureFunc {
     /// An explicit polymorphic function type.
     PolyFuncType(OpDefSignature),
-    /// A polymorphic function type (like [Self::PolyFuncType] but also with a custom binary for validating type arguments.
+    /// A polymorphic function type (like [Self::PolyFuncType]) but also with a custom binary for validating type arguments.
     CustomValidator(CustomValidator),
     /// Serialized declaration specified a custom validate binary but it was not provided.
     MissingValidateFunc(OpDefSignature),
