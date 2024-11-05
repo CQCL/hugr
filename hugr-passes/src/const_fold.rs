@@ -1,6 +1,6 @@
 #![warn(missing_docs)]
-//! An (example) use of the [super::dataflow](dataflow-analysis framework)
-//! to perform constant-folding.
+//! Constant-folding pass.
+//! An (example) use of the [dataflow analysis framework](super::dataflow).
 
 pub mod value_handle;
 use std::collections::{HashMap, HashSet, VecDeque};
