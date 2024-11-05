@@ -22,8 +22,8 @@ use value_handle::ValueHandle;
 
 use crate::{
     dataflow::{
-        partial_from_const, AnalysisResults, ConstLoader, DFContext, Machine, PartialValue,
-        TailLoopTermination,
+        partial_from_const, AbstractValue, AnalysisResults, ConstLoader, DFContext, Machine,
+        PartialValue, TailLoopTermination,
     },
     validation::{ValidatePassError, ValidationLevel},
 };
@@ -71,7 +71,7 @@ impl ConstFoldPass {
         ));
         let inputs = self.inputs.iter().map(|(p, v)| {
             (
-                p.clone(),
+                *p,
                 partial_from_const(&ConstFoldContext(hugr), fresh_node, &mut vec![p.index()], v),
             )
         });
@@ -163,7 +163,7 @@ impl ConstFoldPass {
                     // Also add on anything that might not terminate (even if results not required -
                     // if its results are required we'll add it by following dataflow, below.)
                     for ch in h.children(n) {
-                        if self.might_diverge(results, ch) {
+                        if might_diverge(results, ch) {
                             q.push_back(ch);
                         }
                     }
@@ -188,31 +188,30 @@ impl ConstFoldPass {
             }
         }
     }
+}
 
-    // "Diverge" aka "never-terminate"
-    // TODO would be more efficient to compute this bottom-up and cache (dynamic programming)
-    fn might_diverge(
-        &self,
-        results: &AnalysisResults<ValueHandle, impl DFContext<ValueHandle>>,
-        n: Node,
-    ) -> bool {
-        let op = results.hugr().get_optype(n);
-        if op.is_cfg() {
-            // TODO if the CFG has no cycles (that are possible given predicates)
-            // then we could say it definitely terminates (i.e. return false)
-            true
-        } else if op.is_tail_loop()
-            && results.tail_loop_terminates(n).unwrap() != TailLoopTermination::NeverContinues
-        {
-            // If we can even figure out the number of iterations is bounded that would allow returning false.
-            true
-        } else {
-            // Node does not introduce non-termination, but still non-terminates if any of its children does
-            results
-                .hugr()
-                .children(n)
-                .any(|ch| self.might_diverge(results, ch))
-        }
+// "Diverge" aka "never-terminate"
+// TODO would be more efficient to compute this bottom-up and cache (dynamic programming)
+fn might_diverge<V: AbstractValue>(
+    results: &AnalysisResults<V, impl DFContext<V>>,
+    n: Node,
+) -> bool {
+    let op = results.hugr().get_optype(n);
+    if op.is_cfg() {
+        // TODO if the CFG has no cycles (that are possible given predicates)
+        // then we could say it definitely terminates (i.e. return false)
+        true
+    } else if op.is_tail_loop()
+        && results.tail_loop_terminates(n).unwrap() != TailLoopTermination::NeverContinues
+    {
+        // If we can even figure out the number of iterations is bounded that would allow returning false.
+        true
+    } else {
+        // Node does not introduce non-termination, but still non-terminates if any of its children does
+        results
+            .hugr()
+            .children(n)
+            .any(|ch| might_diverge(results, ch))
     }
 }
 
