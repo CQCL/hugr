@@ -79,6 +79,7 @@ impl ConstFoldPass {
         let results = Machine::default().run(ConstFoldContext(hugr), inputs);
         let mut keep_nodes = HashSet::new();
         self.find_needed_nodes(&results, &mut keep_nodes);
+        let [root_inp, _] = hugr.get_io(hugr.root()).unwrap();
 
         let remove_nodes = results
             .hugr()
@@ -98,7 +99,9 @@ impl ConstFoldPass {
             // This would insert fewer constants, but potentially expose less parallelism.
             .filter_map(|(n, ip)| {
                 let (src, outp) = hugr.single_linked_output(n, ip).unwrap();
-                (!hugr.get_optype(src).is_load_constant()).then_some((
+                // Avoid breaking edges from existing LoadConstant (we'd only add another)
+                // or froom root input node (i.e. hardcoding provided "external inputs" into graph)
+                (!hugr.get_optype(src).is_load_constant() && src != root_inp).then_some((
                     n,
                     ip,
                     results
