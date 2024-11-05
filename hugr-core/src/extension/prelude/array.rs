@@ -40,13 +40,13 @@ use crate::types::type_param::TypeParam;
 #[non_exhaustive]
 pub enum ArrayOpDef {
     new_array,
-    new_uninitialized_array,
     get,
     set,
     swap,
     pop_left,
     pop_right,
     discard_empty,
+    new_uninitialized_array,
 }
 
 /// Static parameters for array operations. Includes array size. Type is part of the type scheme.
