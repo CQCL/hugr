@@ -62,7 +62,7 @@ fn value_handling(#[case] k: impl CustomConst + Clone, #[case] eq: bool) {
 }
 
 /// Check that a hugr just loads and returns a single expected constant.
-pub fn assert_fully_folded(h: &Hugr, expected_value: &Value) {
+pub fn assert_fully_folded(h: &impl HugrView, expected_value: &Value) {
     assert_fully_folded_with(h, |v| v == expected_value)
 }
 
@@ -71,7 +71,7 @@ pub fn assert_fully_folded(h: &Hugr, expected_value: &Value) {
 ///
 /// [CustomConst::equals_const] is not required to be implemented. Use this
 /// function for Values containing such a `CustomConst`.
-fn assert_fully_folded_with(h: &Hugr, check_value: impl Fn(&Value) -> bool) {
+fn assert_fully_folded_with(h: &impl HugrView, check_value: impl Fn(&Value) -> bool) {
     let mut node_count = 0;
 
     for node in h.children(h.root()) {
