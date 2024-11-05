@@ -1,12 +1,16 @@
 use std::collections::HashSet;
 
-use hugr_core::builder::{endo_sig, inout_sig, Container, DFGBuilder, Dataflow, DataflowHugr};
+use hugr_core::builder::{
+    endo_sig, inout_sig, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
+    SubContainer,
+};
 use hugr_core::extension::prelude::{
     const_ok, sum_with_error, ConstError, ConstString, MakeTuple, UnpackTuple, BOOL_T, ERROR_TYPE,
     STRING_TYPE,
 };
 use hugr_core::extension::{ExtensionRegistry, PRELUDE};
 use hugr_core::hugr::hugrmut::HugrMut;
+use hugr_core::hugr::views::{DescendantsGraph, HierarchyView};
 use hugr_core::ops::{constant::CustomConst, OpType, Value};
 use hugr_core::ops::{OpTag, OpTrait};
 use hugr_core::std_extensions::arithmetic::{
@@ -1734,4 +1738,128 @@ fn test_tail_loop_increase_termination() {
         .run(&mut h, &reg)
         .unwrap();
     assert_fully_folded(&h, &ConstInt::new_u(4, 12).unwrap().into());
+}
+
+fn cfg_hugr() -> (Hugr, ExtensionRegistry) {
+    let reg = ExtensionRegistry::try_new([arithmetic::int_types::EXTENSION.to_owned()]).unwrap();
+    let int_ty = INT_TYPES[4].clone();
+    let mut builder = DFGBuilder::new(inout_sig(vec![BOOL_T, BOOL_T], int_ty.clone())).unwrap();
+    let [p, q] = builder.input_wires_arr();
+    let int_cst = builder.add_load_value(ConstInt::new_u(4, 1).unwrap());
+    let mut nested = builder
+        .dfg_builder_endo([(int_ty.clone(), int_cst)])
+        .unwrap();
+    let [i] = nested.input_wires_arr();
+    let mut cfg = nested
+        .cfg_builder([(int_ty.clone(), i)], int_ty.clone().into())
+        .unwrap();
+    let mut entry = cfg.simple_entry_builder(int_ty.clone().into(), 2).unwrap();
+    let [e_i] = entry.input_wires_arr();
+    let e_cst7 = entry.add_load_value(ConstInt::new_u(4, 7).unwrap());
+    let e_add = entry
+        .add_dataflow_op(IntOpDef::iadd.with_log_width(4), [e_cst7, e_i])
+        .unwrap();
+    let entry = entry.finish_with_outputs(p, e_add.outputs()).unwrap();
+
+    let mut a = cfg
+        .simple_block_builder(endo_sig(int_ty.clone()), 2)
+        .unwrap();
+    let [a_i] = a.input_wires_arr();
+    let a_cst3 = a.add_load_value(ConstInt::new_u(4, 3).unwrap());
+    let a_add = a
+        .add_dataflow_op(IntOpDef::iadd.with_log_width(4), [a_cst3, a_i])
+        .unwrap();
+    let a = a.finish_with_outputs(q, a_add.outputs()).unwrap();
+
+    let x = cfg.exit_block();
+    let [tru, fals] = [1, 0];
+    cfg.branch(&entry, tru, &a).unwrap();
+    cfg.branch(&entry, fals, &x).unwrap();
+    cfg.branch(&a, tru, &entry).unwrap();
+    cfg.branch(&a, fals, &x).unwrap();
+    let cfg = cfg.finish_sub_container().unwrap();
+    let nested = nested.finish_with_outputs(cfg.outputs()).unwrap();
+    let hugr = builder
+        .finish_hugr_with_outputs(nested.outputs(), &reg)
+        .unwrap();
+    (hugr, reg)
+}
+
+#[rstest]
+#[case(&[(0,false)], true, false, Some(8))]
+#[case(&[(0,true), (1,false)], true, true, Some(11))]
+#[case(&[(1,false)], true, true, None)]
+#[case(&[], false, false, None)]
+fn test_cfg2(
+    #[case] inputs: &[(usize, bool)],
+    #[case] fold_entry: bool,
+    #[case] fold_blk: bool,
+    #[case] fold_res: Option<u16>,
+) {
+    use hugr_core::ops::handle::BasicBlockID;
+
+    let (backup, reg) = cfg_hugr();
+    let mut hugr = backup.clone();
+    let pass = ConstFoldPass::default()
+        .with_inputs(inputs.into_iter().map(|(p, b)| (*p, Value::from_bool(*b))));
+    pass.run(&mut hugr, &reg).unwrap();
+    // CFG inside DFG retained
+    let nested = hugr
+        .children(hugr.root())
+        .filter(|n| hugr.get_optype(*n).is_dfg())
+        .exactly_one()
+        .unwrap();
+    let cfg = hugr
+        .nodes()
+        .filter(|n| hugr.get_optype(*n).is_cfg())
+        .exactly_one()
+        .ok()
+        .unwrap();
+    assert_eq!(hugr.get_parent(cfg), Some(nested));
+    let [entry, exit, a] = hugr.children(cfg).collect::<Vec<_>>().try_into().unwrap();
+    assert!(hugr.get_optype(exit).is_exit_block());
+    for (blk, is_folded, folded_cst, unfolded_cst) in
+        [(entry, fold_entry, 8, 7), (a, fold_blk, 11, 3)]
+    {
+        if is_folded {
+            assert_fully_folded(
+                &DescendantsGraph::<BasicBlockID>::try_new(&hugr, blk).unwrap(),
+                &ConstInt::new_u(4, folded_cst).unwrap().into(),
+            );
+        } else {
+            let mut expected_tags =
+                HashSet::from(["Input", "Output", "Leaf", "Const", "LoadConst"]);
+            for ch in hugr.children(blk) {
+                let tag = format!("{:?}", hugr.get_optype(ch).tag());
+                assert!(expected_tags.remove(tag.as_str()), "Not found: {}", tag);
+                if let Some(cst) = hugr.get_optype(ch).as_const() {
+                    assert_eq!(
+                        cst.value(),
+                        &ConstInt::new_u(4, unfolded_cst).unwrap().into()
+                    );
+                } else if let Some(op) = hugr.get_optype(ch).as_extension_op() {
+                    assert_eq!(op.def().name(), "iadd");
+                }
+            }
+        }
+    }
+    let output_src = hugr
+        .input_neighbours(hugr.get_io(hugr.root()).unwrap()[1])
+        .exactly_one()
+        .unwrap();
+    if let Some(res_int) = fold_res {
+        let res_v = ConstInt::new_u(4, res_int as _).unwrap().into();
+        assert!(hugr.get_optype(output_src).is_load_constant());
+        let output_cst = hugr.input_neighbours(output_src).exactly_one().unwrap();
+        let cst = hugr.get_optype(output_cst).as_const().unwrap();
+        assert_eq!(cst.value(), &res_v);
+
+        let mut hugr2 = backup;
+        pass.allow_increase_termination()
+            .run(&mut hugr2, &reg)
+            .unwrap();
+        assert_fully_folded(&hugr2, &res_v);
+    } else {
+        assert_eq!(output_src, nested);
+    }
 }
