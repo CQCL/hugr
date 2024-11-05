@@ -22,6 +22,7 @@ jobs:
   build-publish:
     name: Build and publish wheels
     runs-on: ubuntu-latest
+    environment: pypi
     strategy:
       matrix:
         package:
@@ -67,8 +68,10 @@ jobs:
           echo "  - event_name: ${{ github.event_name }}"
           echo "  - ref_type: ${{ github.ref_type }}"
           echo "  - ref: ${{ github.ref }}"
-          uvx twine upload --skip-existing --verbose dist/*
-        env:
-          TWINE_NON_INTERACTIVE: 1
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_PUBLISH }}
+      - name: Publish package distributions to PyPI
+        # This workflow is a trusted publisher on PyPI for this package.
+        if: ${{ (github.event_name == 'release' && github.ref_type == 'tag' && startsWith(github.ref, format('refs/tags/{0}-v', matrix.package.dir))) || (github.event_name == 'workflow_dispatch' && github.ref_type == 'tag' && startsWith(github.ref, format('refs/tags/{0}-v', matrix.package.dir))) }}
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          verbose: true
+          skip-existing: true
