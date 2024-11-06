@@ -316,3 +316,17 @@ def test_alias() -> None:
     _dcl = mod.add_alias_decl("my_bool", tys.TypeBound.Copyable)
 
     validate(mod.hugr)
+
+
+# https://github.com/CQCL/hugr/issues/1625
+def test_dfg_unpack() -> None:
+    dfg = Dfg(tys.Tuple(tys.Bool, tys.Bool))
+    bool1, _unused_bool2 = dfg.add_op(ops.UnpackTuple(), *dfg.inputs())
+    cond = dfg.add_conditional(bool1)
+    with cond.add_case(0) as case:
+        case.set_outputs(bool1)
+    with cond.add_case(1) as case:
+        case.set_outputs(bool1)
+    dfg.set_outputs(*cond.outputs())
+
+    validate(dfg.hugr)

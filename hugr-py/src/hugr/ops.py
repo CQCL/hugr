@@ -72,6 +72,11 @@ class Op(Protocol):
 
 
 def _sig_port_type(sig: tys.FunctionType, port: InPort | OutPort) -> tys.Type:
+    """Get the type of the given dataflow port given the signature of the operation."""
+    if port.offset == -1:
+        # Order port
+        msg = "Order port has no type."
+        raise ValueError(msg)
     if port.direction == Direction.INCOMING:
         return sig.input[port.offset]
     return sig.output[port.offset]
