@@ -2,8 +2,8 @@ use pretty::{Arena, DocAllocator, RefDoc};
 use std::borrow::Cow;
 
 use crate::v0::{
-    ExtSetPart, GlobalRef, LinkRef, ListPart, LocalRef, MetaItem, ModelError, Module, NodeId,
-    Operation, Param, ParamSort, RegionId, RegionKind, Term, TermId,
+    ExtSetPart, LinkRef, ListPart, MetaItem, ModelError, Module, NodeId, Operation, Param,
+    ParamSort, RegionId, RegionKind, SymbolRef, Term, TermId, VarRef, VarRefError,
 };
 
 type PrintError = ModelError;
@@ -44,7 +44,8 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
         this.print_parens(|this| {
             this.print_text("hugr");
             this.print_text("0");
-        });
+            Ok(())
+        })?;
 
         this.print_root()?;
         Ok(this.finish())
@@ -88,19 +89,19 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
 
     /// Print a sequence of elements that are preferrably laid out together in the same line.
     #[inline]
-    fn print_group<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
+    fn print_group<T>(&mut self, f: impl FnOnce(&mut Self) -> PrintResult<T>) -> PrintResult<T> {
         self.print_delimited("", "", 0, f)
     }
 
     /// Print a sequence of elements in a parenthesized list.
     #[inline]
-    fn print_parens<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
+    fn print_parens<T>(&mut self, f: impl FnOnce(&mut Self) -> PrintResult<T>) -> PrintResult<T> {
         self.print_delimited("(", ")", 2, f)
     }
 
     /// Print a sequence of elements in a bracketed list.
     #[inline]
-    fn print_brackets<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
+    fn print_brackets<T>(&mut self, f: impl FnOnce(&mut Self) -> PrintResult<T>) -> PrintResult<T> {
         self.print_delimited("[", "]", 1, f)
     }
 
@@ -168,7 +169,8 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_group(|this| {
                     this.print_text("define-func");
                     this.print_text(decl.name);
-                });
+                    Ok(())
+                })?;
 
                 this.print_params(decl.params)?;
                 this.print_constraints(decl.constraints)?;
@@ -197,7 +199,8 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_group(|this| {
                     this.print_text("declare-func");
                     this.print_text(decl.name);
-                });
+                    Ok(())
+                })?;
 
                 this.print_params(decl.params)?;
                 this.print_constraints(decl.constraints)?;
@@ -247,10 +250,10 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
             Operation::Custom { operation } => {
                 this.print_group(|this| {
                     if node_data.params.is_empty() {
-                        this.print_global_ref(*operation)?;
+                        this.print_symbol_ref(*operation)?;
                     } else {
                         this.print_parens(|this| {
-                            this.print_global_ref(*operation)?;
+                            this.print_symbol_ref(*operation)?;
 
                             for param in node_data.params {
                                 this.print_term(*param)?;
@@ -271,7 +274,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_group(|this| {
                     this.print_parens(|this| {
                         this.print_text("@");
-                        this.print_global_ref(*operation)?;
+                        this.print_symbol_ref(*operation)?;
 
                         for param in node_data.params {
                             this.print_term(*param)?;
@@ -291,7 +294,8 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_group(|this| {
                     this.print_text("define-alias");
                     this.print_text(decl.name);
-                });
+                    Ok(())
+                })?;
 
                 this.print_params(decl.params)?;
 
@@ -304,7 +308,8 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_group(|this| {
                     this.print_text("declare-alias");
                     this.print_text(decl.name);
-                });
+                    Ok(())
+                })?;
 
                 this.print_params(decl.params)?;
 
@@ -317,7 +322,8 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_group(|this| {
                     this.print_text("declare-ctr");
                     this.print_text(decl.name);
-                });
+                    Ok(())
+                })?;
 
                 this.print_params(decl.params)?;
                 this.print_constraints(decl.constraints)?;
@@ -331,7 +337,8 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_group(|this| {
                     this.print_text("declare-operation");
                     this.print_text(decl.name);
-                });
+                    Ok(())
+                })?;
 
                 this.print_params(decl.params)?;
                 this.print_constraints(decl.constraints)?;
@@ -362,6 +369,12 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_text(format!("{}", tag));
                 this.print_port_lists(node_data.inputs, node_data.outputs)?;
                 this.print_signature(node_data.signature)?;
+                this.print_meta(node_data.meta)
+            }
+
+            Operation::Import { name } => {
+                this.print_text("import");
+                this.print_text(*name);
                 this.print_meta(node_data.meta)
             }
         })
@@ -429,16 +442,28 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
     fn print_port_list(&mut self, links: &'a [LinkRef<'a>]) -> PrintResult<()> {
         self.print_brackets(|this| {
             for link in links {
-                this.print_link_ref(*link);
+                this.print_link_ref(*link)?;
             }
             Ok(())
         })
     }
 
-    fn print_link_ref(&mut self, link_ref: LinkRef<'a>) {
+    fn print_link_ref(&mut self, link_ref: LinkRef<'a>) -> PrintResult<()> {
+        // TODO: We need some better textual representation for links with an id.
         match link_ref {
-            LinkRef::Id(link_id) => self.print_text(format!("%{}", link_id.0)),
-            LinkRef::Named(name) => self.print_text(format!("%{}", name)),
+            LinkRef::Id(link_id) => {
+                let _link = self
+                    .module
+                    .get_link(link_id)
+                    .ok_or_else(|| ModelError::LinkNotFound(link_id))?;
+
+                self.print_text(format!("%{}", link_id.0));
+                Ok(())
+            }
+            LinkRef::Named(name) => {
+                self.print_text(format!("%{}", name));
+                Ok(())
+            }
         }
     }
 
@@ -492,13 +517,13 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 self.print_text("constraint");
                 Ok(())
             }
-            Term::Var(local_ref) => self.print_local_ref(*local_ref),
-            Term::Apply { global: name, args } => {
+            Term::Var(var_ref) => self.print_var_ref(*var_ref),
+            Term::Apply { symbol: name, args } => {
                 if args.is_empty() {
-                    self.print_global_ref(*name)?;
+                    self.print_symbol_ref(*name)?;
                 } else {
                     self.print_parens(|this| {
-                        this.print_global_ref(*name)?;
+                        this.print_symbol_ref(*name)?;
                         for arg in args.iter() {
                             this.print_term(*arg)?;
                         }
@@ -508,9 +533,9 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
 
                 Ok(())
             }
-            Term::ApplyFull { global: name, args } => self.print_parens(|this| {
+            Term::ApplyFull { symbol, args } => self.print_parens(|this| {
                 this.print_text("@");
-                this.print_global_ref(*name)?;
+                this.print_symbol_ref(*symbol)?;
                 for arg in args.iter() {
                     this.print_term(*arg)?;
                 }
@@ -628,42 +653,36 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
         Ok(())
     }
 
-    fn print_local_ref(&mut self, local_ref: LocalRef<'a>) -> PrintResult<()> {
-        let name = match local_ref {
-            LocalRef::Index(_, i) => {
-                let Some(name) = self.locals.get(i as usize) else {
-                    return Err(PrintError::InvalidLocal(local_ref.to_string()));
-                };
-
-                name
-            }
-            LocalRef::Named(name) => name,
+    fn print_var_ref(&mut self, var_ref: VarRef<'a>) -> PrintResult<()> {
+        let name = match var_ref {
+            VarRef::Index(node, i) => self
+                .locals
+                .get(i as usize)
+                .ok_or(VarRefError::Invalid(node, i))?,
+            VarRef::Named(name) => name,
         };
 
         self.print_text(format!("?{}", name));
         Ok(())
     }
 
-    fn print_global_ref(&mut self, global_ref: GlobalRef<'a>) -> PrintResult<()> {
+    fn print_symbol_ref(&mut self, global_ref: SymbolRef<'a>) -> PrintResult<()> {
         match global_ref {
-            GlobalRef::Direct(node_id) => {
+            SymbolRef::Direct(node_id) => {
                 let node_data = self
                     .module
                     .get_node(node_id)
                     .ok_or(PrintError::NodeNotFound(node_id))?;
 
-                let name = match &node_data.operation {
-                    Operation::DefineFunc { decl } => decl.name,
-                    Operation::DeclareFunc { decl } => decl.name,
-                    Operation::DefineAlias { decl, .. } => decl.name,
-                    Operation::DeclareAlias { decl } => decl.name,
-                    _ => return Err(PrintError::UnexpectedOperation(node_id)),
-                };
+                let name = node_data
+                    .operation
+                    .symbol()
+                    .ok_or_else(|| PrintError::UnexpectedOperation(node_id))?;
 
                 self.print_text(name)
             }
 
-            GlobalRef::Named(symbol) => self.print_text(symbol),
+            SymbolRef::Named(symbol) => self.print_text(symbol),
         }
 
         Ok(())
@@ -675,7 +694,8 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_group(|this| {
                     this.print_text("meta");
                     this.print_text(item.name);
-                });
+                    Ok(())
+                })?;
                 this.print_term(item.value)
             })?;
         }

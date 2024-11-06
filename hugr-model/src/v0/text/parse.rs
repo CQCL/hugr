@@ -6,9 +6,9 @@ use pest::{
 use thiserror::Error;
 
 use crate::v0::{
-    AliasDecl, ConstructorDecl, ExtSetPart, FuncDecl, GlobalRef, LinkRef, ListPart, LocalRef,
-    MetaItem, Module, Node, NodeId, Operation, OperationDecl, Param, ParamSort, Region, RegionId,
-    RegionKind, Term, TermId,
+    AliasDecl, ConstructorDecl, ExtSetPart, FuncDecl, LinkRef, ListPart, MetaItem, Module, Node,
+    NodeId, Operation, OperationDecl, Param, ParamSort, Region, RegionId, RegionKind, SymbolRef,
+    Term, TermId, VarRef,
 };
 
 mod pest_parser {
@@ -100,11 +100,11 @@ impl<'a> ParseContext<'a> {
             Rule::term_var => {
                 let name_token = inner.next().unwrap();
                 let name = name_token.as_str();
-                Term::Var(LocalRef::Named(name))
+                Term::Var(VarRef::Named(name))
             }
 
             Rule::term_apply => {
-                let name = GlobalRef::Named(self.parse_symbol(&mut inner)?);
+                let name = SymbolRef::Named(self.parse_symbol(&mut inner)?);
                 let mut args = Vec::new();
 
                 for token in inner {
@@ -112,13 +112,13 @@ impl<'a> ParseContext<'a> {
                 }
 
                 Term::Apply {
-                    global: name,
+                    symbol: name,
                     args: self.bump.alloc_slice_copy(&args),
                 }
             }
 
             Rule::term_apply_full => {
-                let name = GlobalRef::Named(self.parse_symbol(&mut inner)?);
+                let name = SymbolRef::Named(self.parse_symbol(&mut inner)?);
                 let mut args = Vec::new();
 
                 for token in inner {
@@ -126,7 +126,7 @@ impl<'a> ParseContext<'a> {
                 }
 
                 Term::ApplyFull {
-                    global: name,
+                    symbol: name,
                     args: self.bump.alloc_slice_copy(&args),
                 }
             }
@@ -383,7 +383,7 @@ impl<'a> ParseContext<'a> {
                 let op_rule = op.as_rule();
                 let mut op_inner = op.into_inner();
 
-                let name = GlobalRef::Named(self.parse_symbol(&mut op_inner)?);
+                let name = SymbolRef::Named(self.parse_symbol(&mut op_inner)?);
 
                 let mut params = Vec::new();
 
@@ -483,6 +483,20 @@ impl<'a> ParseContext<'a> {
                 let meta = self.parse_meta(&mut inner)?;
                 Node {
                     operation: Operation::DeclareOperation { decl },
+                    inputs: &[],
+                    outputs: &[],
+                    params: &[],
+                    regions: &[],
+                    meta,
+                    signature: None,
+                }
+            }
+
+            Rule::node_import => {
+                let name = self.parse_symbol(&mut inner)?;
+                let meta = self.parse_meta(&mut inner)?;
+                Node {
+                    operation: Operation::Import { name },
                     inputs: &[],
                     outputs: &[],
                     params: &[],

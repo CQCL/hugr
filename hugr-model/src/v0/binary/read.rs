@@ -61,11 +61,18 @@ fn read_module<'a>(
         .map(|r| read_term(bump, r))
         .collect::<ReadResult<_>>()?;
 
+    let links = reader
+        .get_links()?
+        .iter()
+        .map(|r| read_link(bump, r))
+        .collect::<ReadResult<_>>()?;
+
     Ok(model::Module {
         root,
         nodes,
         regions,
         terms,
+        links,
     })
 }
 
@@ -89,29 +96,29 @@ fn read_node<'a>(bump: &'a Bump, reader: hugr_capnp::node::Reader) -> ReadResult
     })
 }
 
-fn read_local_ref<'a>(
+fn read_var_ref<'a>(
     bump: &'a Bump,
-    reader: hugr_capnp::local_ref::Reader,
-) -> ReadResult<model::LocalRef<'a>> {
-    use hugr_capnp::local_ref::Which;
+    reader: hugr_capnp::var_ref::Reader,
+) -> ReadResult<model::VarRef<'a>> {
+    use hugr_capnp::var_ref::Which;
     Ok(match reader.which()? {
         Which::Direct(reader) => {
             let index = reader.get_index();
             let node = model::NodeId(reader.get_node());
-            model::LocalRef::Index(node, index)
+            model::VarRef::Index(node, index)
         }
-        Which::Named(name) => model::LocalRef::Named(bump.alloc_str(name?.to_str()?)),
+        Which::Named(name) => model::VarRef::Named(bump.alloc_str(name?.to_str()?)),
     })
 }
 
-fn read_global_ref<'a>(
+fn read_symbol_ref<'a>(
     bump: &'a Bump,
-    reader: hugr_capnp::global_ref::Reader,
-) -> ReadResult<model::GlobalRef<'a>> {
-    use hugr_capnp::global_ref::Which;
+    reader: hugr_capnp::symbol_ref::Reader,
+) -> ReadResult<model::SymbolRef<'a>> {
+    use hugr_capnp::symbol_ref::Which;
     Ok(match reader.which()? {
-        Which::Node(node) => model::GlobalRef::Direct(model::NodeId(node)),
-        Which::Named(name) => model::GlobalRef::Named(bump.alloc_str(name?.to_str()?)),
+        Which::Node(node) => model::SymbolRef::Direct(model::NodeId(node)),
+        Which::Named(name) => model::SymbolRef::Named(bump.alloc_str(name?.to_str()?)),
     })
 }
 
@@ -218,10 +225,10 @@ fn read_operation<'a>(
             model::Operation::DeclareOperation { decl }
         }
         Which::Custom(name) => model::Operation::Custom {
-            operation: read_global_ref(bump, name?)?,
+            operation: read_symbol_ref(bump, name?)?,
         },
         Which::CustomFull(name) => model::Operation::CustomFull {
-            operation: read_global_ref(bump, name?)?,
+            operation: read_symbol_ref(bump, name?)?,
         },
         Which::Tag(tag) => model::Operation::Tag { tag },
         Which::TailLoop(()) => model::Operation::TailLoop,
@@ -231,6 +238,9 @@ fn read_operation<'a>(
         },
         Which::LoadFunc(func) => model::Operation::LoadFunc {
             func: model::TermId(func),
+        },
+        Which::Import(name) => model::Operation::Import {
+            name: bump.alloc_str(name?.to_str()?),
         },
     })
 }
@@ -274,20 +284,20 @@ fn read_term<'a>(bump: &'a Bump, reader: hugr_capnp::term::Reader) -> ReadResult
         Which::NatType(()) => model::Term::NatType,
         Which::ExtSetType(()) => model::Term::ExtSetType,
         Which::ControlType(()) => model::Term::ControlType,
-        Which::Variable(local_ref) => model::Term::Var(read_local_ref(bump, local_ref?)?),
+        Which::Variable(var_ref) => model::Term::Var(read_var_ref(bump, var_ref?)?),
 
         Which::Apply(reader) => {
             let reader = reader?;
-            let global = read_global_ref(bump, reader.get_global()?)?;
+            let symbol = read_symbol_ref(bump, reader.get_symbol()?)?;
             let args = read_scalar_list!(bump, reader, get_args, model::TermId);
-            model::Term::Apply { global, args }
+            model::Term::Apply { symbol, args }
         }
 
         Which::ApplyFull(reader) => {
             let reader = reader?;
-            let global = read_global_ref(bump, reader.get_global()?)?;
+            let symbol = read_symbol_ref(bump, reader.get_symbol()?)?;
             let args = read_scalar_list!(bump, reader, get_args, model::TermId);
-            model::Term::ApplyFull { global, args }
+            model::Term::ApplyFull { symbol, args }
         }
 
         Which::Quote(r#type) => model::Term::Quote {
@@ -380,4 +390,9 @@ fn read_param<'a>(
     };
 
     Ok(model::Param { name, r#type, sort })
+}
+
+fn read_link<'a>(bump: &'a Bump, reader: hugr_capnp::link::Reader) -> ReadResult<model::Link<'a>> {
+    let name = bump.alloc_str(reader.get_name()?.to_str()?);
+    Ok(model::Link { name })
 }

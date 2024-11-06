@@ -20,6 +20,7 @@ struct Module {
     nodes @1 :List(Node);
     regions @2 :List(Region);
     terms @3 :List(Term);
+    links @4 :List(Link);
 }
 
 struct Node {
@@ -42,8 +43,8 @@ struct Operation {
         funcDecl @5 :FuncDecl;
         aliasDefn @6 :AliasDefn;
         aliasDecl @7 :AliasDecl;
-        custom @8 :GlobalRef;
-        customFull @9 :GlobalRef;
+        custom @8 :SymbolRef;
+        customFull @9 :SymbolRef;
         tag @10 :UInt16;
         tailLoop @11 :Void;
         conditional @12 :Void;
@@ -51,6 +52,7 @@ struct Operation {
         loadFunc @14 :TermId;
         constructorDecl @15 :ConstructorDecl;
         operationDecl @16 :OperationDecl;
+        import @17 :Text;
     }
 
     struct FuncDefn {
@@ -122,14 +124,14 @@ struct LinkRef {
     }
 }
 
-struct GlobalRef {
+struct SymbolRef {
     union {
         node @0 :NodeId;
         named @1 :Text;
     }
 }
 
-struct LocalRef {
+struct VarRef {
     union {
         direct :group {
             index @0 :UInt16;
@@ -145,7 +147,7 @@ struct Term {
         runtimeType @1 :Void;
         staticType @2 :Void;
         constraint @3 :Void;
-        variable @4 :LocalRef;
+        variable @4 :VarRef;
         apply @5 :Apply;
         applyFull @6 :ApplyFull;
         quote @7 :TermId;
@@ -165,12 +167,12 @@ struct Term {
     }
 
     struct Apply {
-        global @0 :GlobalRef;
+        symbol @0 :SymbolRef;
         args @1 :List(TermId);
     }
 
     struct ApplyFull {
-        global @0 :GlobalRef;
+        symbol @0 :SymbolRef;
         args @1 :List(TermId);
     }
 
@@ -212,4 +214,8 @@ struct Param {
 enum ParamSort {
     implicit @0;
     explicit @1;
+}
+
+struct Link {
+    name @0 :Text;
 }

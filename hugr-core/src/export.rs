@@ -14,10 +14,7 @@ use crate::{
 use bumpalo::{collections::String as BumpString, collections::Vec as BumpVec, Bump};
 use fxhash::FxHashMap;
 use hugr_model::v0::{self as model};
-use indexmap::IndexSet;
 use std::fmt::Write;
-
-type FxIndexSet<T> = IndexSet<T, fxhash::FxBuildHasher>;
 
 pub(crate) const OP_FUNC_CALL_INDIRECT: &str = "func.call-indirect";
 const TERM_PARAM_TUPLE: &str = "param.tuple";
@@ -39,7 +36,7 @@ struct Context<'a> {
     module: model::Module<'a>,
     /// Mapping from ports to link indices.
     /// This only includes the minimum port among groups of linked ports.
-    links: FxIndexSet<(Node, Port)>,
+    links: FxHashMap<(Node, Port), model::LinkId>,
     /// The arena in which the model is allocated.
     bump: &'a Bump,
     /// Stores the terms that we have already seen to avoid duplicates.
@@ -72,7 +69,7 @@ impl<'a> Context<'a> {
             hugr,
             module,
             bump,
-            links: IndexSet::default(),
+            links: FxHashMap::default(),
             term_map: FxHashMap::default(),
             local_scope: None,
             decl_operations: FxHashMap::default(),
@@ -113,8 +110,10 @@ impl<'a> Context<'a> {
         let linked_ports = self.hugr.linked_ports(node, port);
         let all_ports = std::iter::once((node, port)).chain(linked_ports);
         let repr = all_ports.min().unwrap();
-        let edge = self.links.insert_full(repr).0 as _;
-        model::LinkId(edge)
+        *self
+            .links
+            .entry(repr)
+            .or_insert_with(|| self.module.insert_link(model::Link { name: "" }))
     }
 
     pub fn make_ports(
@@ -141,7 +140,7 @@ impl<'a> Context<'a> {
 
         *self
             .term_map
-            .entry(term.clone())
+            .entry(term)
             .or_insert_with(|| self.module.insert_term(term))
     }
 
@@ -156,12 +155,12 @@ impl<'a> Context<'a> {
         output.into_bump_str()
     }
 
-    pub fn make_named_global_ref(
+    pub fn make_named_symbol_ref(
         &mut self,
         extension: &IdentList,
         name: impl AsRef<str>,
-    ) -> model::GlobalRef<'a> {
-        model::GlobalRef::Named(self.make_qualified_name(extension, name))
+    ) -> model::SymbolRef<'a> {
+        model::SymbolRef::Named(self.make_qualified_name(extension, name))
     }
 
     /// Get the node that declares or defines the function associated with the given
@@ -300,26 +299,26 @@ impl<'a> Context<'a> {
             OpType::Call(call) => {
                 // TODO: If the node is not connected to a function, we should do better than panic.
                 let node = self.connected_function(node).unwrap();
-                let name = model::GlobalRef::Named(self.get_func_name(node).unwrap());
+                let symbol = model::SymbolRef::Named(self.get_func_name(node).unwrap());
 
                 let mut args = BumpVec::new_in(self.bump);
                 args.extend(call.type_args.iter().map(|arg| self.export_type_arg(arg)));
                 let args = args.into_bump_slice();
 
-                let func = self.make_term(model::Term::ApplyFull { global: name, args });
+                let func = self.make_term(model::Term::ApplyFull { symbol, args });
                 model::Operation::CallFunc { func }
             }
 
             OpType::LoadFunction(load) => {
                 // TODO: If the node is not connected to a function, we should do better than panic.
                 let node = self.connected_function(node).unwrap();
-                let name = model::GlobalRef::Named(self.get_func_name(node).unwrap());
+                let symbol = model::SymbolRef::Named(self.get_func_name(node).unwrap());
 
                 let mut args = BumpVec::new_in(self.bump);
                 args.extend(load.type_args.iter().map(|arg| self.export_type_arg(arg)));
                 let args = args.into_bump_slice();
 
-                let func = self.make_term(model::Term::ApplyFull { global: name, args });
+                let func = self.make_term(model::Term::ApplyFull { symbol, args });
                 model::Operation::LoadFunc { func }
             }
 
@@ -327,7 +326,7 @@ impl<'a> Context<'a> {
             OpType::LoadConstant(_) => todo!("Export load constant?"),
 
             OpType::CallIndirect(_) => model::Operation::CustomFull {
-                operation: model::GlobalRef::Named(OP_FUNC_CALL_INDIRECT),
+                operation: model::SymbolRef::Named(OP_FUNC_CALL_INDIRECT),
             },
 
             OpType::Tag(tag) => model::Operation::Tag { tag: tag.tag as _ },
@@ -369,7 +368,7 @@ impl<'a> Context<'a> {
             }
 
             OpType::OpaqueOp(op) => {
-                let operation = self.make_named_global_ref(op.extension(), op.op_name());
+                let operation = self.make_named_symbol_ref(op.extension(), op.op_name());
 
                 params = self
                     .bump
@@ -438,12 +437,12 @@ impl<'a> Context<'a> {
     /// of the operation. The node is added to the `decl_operations` map so that
     /// at the end of the export, the operation declaration nodes can be added
     /// to the module as children of the module region.
-    pub fn export_opdef(&mut self, opdef: &OpDef) -> model::GlobalRef<'a> {
+    pub fn export_opdef(&mut self, opdef: &OpDef) -> model::SymbolRef<'a> {
         use std::collections::hash_map::Entry;
 
         let poly_func_type = match opdef.signature_func() {
             SignatureFunc::PolyFuncType(poly_func_type) => poly_func_type,
-            _ => return self.make_named_global_ref(opdef.extension_id(), opdef.name()),
+            _ => return self.make_named_symbol_ref(opdef.extension_id(), opdef.name()),
         };
 
         let key = (opdef.extension_id().clone(), opdef.name().clone());
@@ -451,7 +450,7 @@ impl<'a> Context<'a> {
 
         let node = match entry {
             Entry::Occupied(occupied_entry) => {
-                return model::GlobalRef::Direct(*occupied_entry.get())
+                return model::SymbolRef::Direct(*occupied_entry.get())
             }
             Entry::Vacant(vacant_entry) => {
                 *vacant_entry.insert(self.module.insert_node(model::Node {
@@ -502,7 +501,7 @@ impl<'a> Context<'a> {
         node_data.operation = model::Operation::DeclareOperation { decl };
         node_data.meta = meta;
 
-        model::GlobalRef::Direct(node)
+        model::SymbolRef::Direct(node)
     }
 
     /// Export the signature of a `DataflowBlock`. Here we can't use `OpType::dataflow_signature`
@@ -683,7 +682,7 @@ impl<'a> Context<'a> {
 
         for (i, param) in t.params().iter().enumerate() {
             let name = self.bump.alloc_str(&i.to_string());
-            let r#type = self.export_type_param(param, Some(model::LocalRef::Index(scope, i as _)));
+            let r#type = self.export_type_param(param, Some(model::VarRef::Index(scope, i as _)));
             let param = model::Param {
                 name,
                 r#type,
@@ -706,14 +705,14 @@ impl<'a> Context<'a> {
         match t {
             TypeEnum::Extension(ext) => self.export_custom_type(ext),
             TypeEnum::Alias(alias) => {
-                let name = model::GlobalRef::Named(self.bump.alloc_str(alias.name()));
+                let symbol = model::SymbolRef::Named(self.bump.alloc_str(alias.name()));
                 let args = &[];
-                self.make_term(model::Term::ApplyFull { global: name, args })
+                self.make_term(model::Term::ApplyFull { symbol, args })
             }
             TypeEnum::Function(func) => self.export_func_type(func),
             TypeEnum::Variable(index, _) => {
                 let node = self.local_scope.expect("local variable out of scope");
-                self.make_term(model::Term::Var(model::LocalRef::Index(node, *index as _)))
+                self.make_term(model::Term::Var(model::VarRef::Index(node, *index as _)))
             }
             TypeEnum::RowVar(rv) => self.export_row_var(rv.as_rv()),
             TypeEnum::Sum(sum) => self.export_sum_type(sum),
@@ -732,12 +731,12 @@ impl<'a> Context<'a> {
     }
 
     pub fn export_custom_type(&mut self, t: &CustomType) -> model::TermId {
-        let global = self.make_named_global_ref(t.extension(), t.name());
+        let symbol = self.make_named_symbol_ref(t.extension(), t.name());
 
         let args = self
             .bump
             .alloc_slice_fill_iter(t.args().iter().map(|p| self.export_type_arg(p)));
-        let term = model::Term::ApplyFull { global, args };
+        let term = model::Term::ApplyFull { symbol, args };
         self.make_term(term)
     }
 
@@ -762,7 +761,7 @@ impl<'a> Context<'a> {
 
     pub fn export_type_arg_var(&mut self, var: &TypeArgVariable) -> model::TermId {
         let node = self.local_scope.expect("local variable out of scope");
-        self.make_term(model::Term::Var(model::LocalRef::Index(
+        self.make_term(model::Term::Var(model::VarRef::Index(
             node,
             var.index() as _,
         )))
@@ -770,7 +769,7 @@ impl<'a> Context<'a> {
 
     pub fn export_row_var(&mut self, t: &RowVariable) -> model::TermId {
         let node = self.local_scope.expect("local variable out of scope");
-        self.make_term(model::Term::Var(model::LocalRef::Index(node, t.0 as _)))
+        self.make_term(model::Term::Var(model::VarRef::Index(node, t.0 as _)))
     }
 
     pub fn export_sum_type(&mut self, t: &SumType) -> model::TermId {
@@ -834,7 +833,7 @@ impl<'a> Context<'a> {
     pub fn export_type_param(
         &mut self,
         t: &TypeParam,
-        var: Option<model::LocalRef<'static>>,
+        var: Option<model::VarRef<'static>>,
     ) -> model::TermId {
         match t {
             TypeParam::Type { b } => {
@@ -861,7 +860,7 @@ impl<'a> Context<'a> {
                 );
                 let types = self.make_term(model::Term::List { parts });
                 self.make_term(model::Term::ApplyFull {
-                    global: model::GlobalRef::Named(TERM_PARAM_TUPLE),
+                    symbol: model::SymbolRef::Named(TERM_PARAM_TUPLE),
                     args: self.bump.alloc_slice_copy(&[types]),
                 })
             }
@@ -881,7 +880,7 @@ impl<'a> Context<'a> {
             match ext.parse::<u16>() {
                 Ok(var) => {
                     let node = self.local_scope.expect("local variable out of scope");
-                    let local_ref = model::LocalRef::Index(node, var);
+                    let local_ref = model::VarRef::Index(node, var);
                     let term = self.make_term(model::Term::Var(local_ref));
                     parts.push(model::ExtSetPart::Splice(term));
                 }
@@ -914,7 +913,7 @@ impl<'a> Context<'a> {
         let value = self.make_term(model::Term::Str(self.bump.alloc_str(&value)));
         let value = self.bump.alloc_slice_copy(&[value]);
         self.make_term(model::Term::ApplyFull {
-            global: model::GlobalRef::Named(TERM_JSON),
+            symbol: model::SymbolRef::Named(TERM_JSON),
             args: value,
         })
     }

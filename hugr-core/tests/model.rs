@@ -6,7 +6,12 @@ use hugr_model::v0 as model;
 
 fn roundtrip(source: &str) -> String {
     let bump = bumpalo::Bump::new();
-    let parsed_model = model::text::parse(source, &bump).unwrap();
+    let mut parsed_model = model::text::parse(source, &bump).unwrap();
+    model::resolve::resolve(&mut parsed_model.module, &bump).unwrap();
+    println!(
+        "{}",
+        model::text::print_to_string(&parsed_model.module, 80).unwrap()
+    );
     let imported_hugr = import_hugr(&parsed_model.module, &std_reg()).unwrap();
     let exported_model = export_hugr(&imported_hugr, &bump);
     model::text::print_to_string(&exported_model, 80).unwrap()

@@ -20,7 +20,7 @@ use crate::{
     Direction, Hugr, HugrView, Node, Port,
 };
 use fxhash::FxHashMap;
-use hugr_model::v0::{self as model, GlobalRef};
+use hugr_model::v0::{self as model, SymbolRef};
 use indexmap::IndexMap;
 use itertools::Either;
 use smol_str::{SmolStr, ToSmolStr};
@@ -50,6 +50,18 @@ pub enum ImportError {
     Model(#[from] model::ModelError),
 }
 
+impl From<model::SymbolRefError> for ImportError {
+    fn from(e: model::SymbolRefError) -> Self {
+        Self::Model(e.into())
+    }
+}
+
+impl From<model::VarRefError> for ImportError {
+    fn from(e: model::VarRefError) -> Self {
+        Self::Model(e.into())
+    }
+}
+
 /// Helper macro to create an `ImportError::Unsupported` error with a formatted message.
 macro_rules! error_unsupported {
     ($($e:expr),*) => { ImportError::Unsupported(format!($($e),*)) }
@@ -65,15 +77,12 @@ pub fn import_hugr(
     module: &model::Module,
     extensions: &ExtensionRegistry,
 ) -> Result<Hugr, ImportError> {
-    let names = Names::new(module)?;
-
     // TODO: Module should know about the number of edges, so that we can use a vector here.
     // For now we use a hashmap, which will be slower.
     let edge_ports = FxHashMap::default();
 
     let mut ctx = Context {
         module,
-        names,
         hugr: Hugr::new(OpType::Module(Module {})),
         link_ports: edge_ports,
         static_edges: Vec::new(),
@@ -93,8 +102,6 @@ pub fn import_hugr(
 struct Context<'a> {
     /// The module being imported.
     module: &'a model::Module<'a>,
-
-    names: Names<'a>,
 
     /// The HUGR graph being constructed.
     hugr: Hugr,
@@ -155,23 +162,20 @@ impl<'a> Context<'a> {
             .ok_or_else(|| model::ModelError::RegionNotFound(region_id).into())
     }
 
-    /// Looks up a [`LocalRef`] within the current scope.
-    fn resolve_local_ref(
-        &self,
-        local_ref: &model::LocalRef,
-    ) -> Result<(usize, LocalVar), ImportError> {
-        let term = match local_ref {
-            model::LocalRef::Index(_, index) => self
-                .local_variables
-                .get_index(*index as usize)
-                .map(|(_, v)| (*index as usize, *v)),
-            model::LocalRef::Named(name) => self
-                .local_variables
-                .get_full(name)
-                .map(|(index, _, v)| (index, *v)),
-        };
-
-        term.ok_or_else(|| model::ModelError::InvalidLocal(local_ref.to_string()).into())
+    /// Looks up a [`VarRef`] within the current scope.
+    fn resolve_var_ref(&self, var_ref: model::VarRef) -> Result<(usize, LocalVar), ImportError> {
+        match var_ref {
+            model::VarRef::Index(node, index) => {
+                let (_, v) = self
+                    .local_variables
+                    .get_index(index as usize)
+                    .ok_or(model::VarRefError::Invalid(node, index))?;
+                Ok((index as usize, *v))
+            }
+            model::VarRef::Named(name) => {
+                Err(model::VarRefError::Unresolved(name.to_string()).into())
+            }
+        }
     }
 
     fn make_node(
@@ -278,49 +282,27 @@ impl<'a> Context<'a> {
         result
     }
 
-    fn resolve_global_ref(
+    fn resolve_symbol_ref(
         &self,
-        global_ref: &model::GlobalRef,
+        symbol_ref: &model::SymbolRef,
     ) -> Result<model::NodeId, ImportError> {
-        match global_ref {
-            model::GlobalRef::Direct(node_id) => Ok(*node_id),
-            model::GlobalRef::Named(name) => {
-                let item = self
-                    .names
-                    .items
-                    .get(name)
-                    .ok_or_else(|| model::ModelError::InvalidGlobal(global_ref.to_string()))?;
+        match symbol_ref {
+            model::SymbolRef::Direct(node_id) => Ok(*node_id),
+            model::SymbolRef::Named(_) => {
+                todo!("named global refs remaining")
+                // let item = self
+                //     .names
+                //     .items
+                //     .get(name)
+                //     .ok_or_else(|| model::ModelError::InvalidGlobal(global_ref.to_string()))?;
 
-                match item {
-                    NamedItem::FuncDecl(node) => Ok(*node),
-                    NamedItem::FuncDefn(node) => Ok(*node),
-                    NamedItem::CtrDecl(node) => Ok(*node),
-                    NamedItem::OperationDecl(node) => Ok(*node),
-                }
+                // match item {
+                //     NamedItem::FuncDecl(node) => Ok(*node),
+                //     NamedItem::FuncDefn(node) => Ok(*node),
+                //     NamedItem::CtrDecl(node) => Ok(*node),
+                //     NamedItem::OperationDecl(node) => Ok(*node),
+                // }
             }
-        }
-    }
-
-    fn get_global_name(&self, global_ref: model::GlobalRef<'a>) -> Result<&'a str, ImportError> {
-        match global_ref {
-            model::GlobalRef::Direct(node_id) => {
-                let node_data = self.get_node(node_id)?;
-
-                let name = match node_data.operation {
-                    model::Operation::DefineFunc { decl } => decl.name,
-                    model::Operation::DeclareFunc { decl } => decl.name,
-                    model::Operation::DefineAlias { decl, .. } => decl.name,
-                    model::Operation::DeclareAlias { decl } => decl.name,
-                    model::Operation::DeclareConstructor { decl } => decl.name,
-                    model::Operation::DeclareOperation { decl } => decl.name,
-                    _ => {
-                        return Err(model::ModelError::InvalidGlobal(global_ref.to_string()).into());
-                    }
-                };
-
-                Ok(name)
-            }
-            model::GlobalRef::Named(name) => Ok(name),
         }
     }
 
@@ -421,11 +403,11 @@ impl<'a> Context<'a> {
             }
 
             model::Operation::CallFunc { func } => {
-                let model::Term::ApplyFull { global: name, args } = self.get_term(func)? else {
+                let model::Term::ApplyFull { symbol, args } = self.get_term(func)? else {
                     return Err(model::ModelError::TypeError(func).into());
                 };
 
-                let func_node = self.resolve_global_ref(name)?;
+                let func_node = self.resolve_symbol_ref(symbol)?;
                 let func_sig = self.get_func_signature(func_node)?;
 
                 let type_args = args
@@ -441,11 +423,11 @@ impl<'a> Context<'a> {
             }
 
             model::Operation::LoadFunc { func } => {
-                let model::Term::ApplyFull { global: name, args } = self.get_term(func)? else {
+                let model::Term::ApplyFull { symbol, args } = self.get_term(func)? else {
                     return Err(model::ModelError::TypeError(func).into());
                 };
 
-                let func_node = self.resolve_global_ref(name)?;
+                let func_node = self.resolve_symbol_ref(symbol)?;
                 let func_sig = self.get_func_signature(func_node)?;
 
                 let type_args = args
@@ -475,7 +457,7 @@ impl<'a> Context<'a> {
             }
 
             model::Operation::CustomFull {
-                operation: GlobalRef::Named(name),
+                operation: SymbolRef::Named(name),
             } if name == OP_FUNC_CALL_INDIRECT => {
                 let signature = self.get_node_signature(node_id)?;
                 let optype = OpType::CallIndirect(CallIndirect { signature });
@@ -491,7 +473,7 @@ impl<'a> Context<'a> {
                     .map(|param| self.import_type_arg(*param))
                     .collect::<Result<Vec<_>, _>>()?;
 
-                let name = self.get_global_name(operation)?;
+                let name = self.module.symbol_name(operation)?;
                 let (extension, name) = self.import_custom_name(name)?;
 
                 // TODO: Currently we do not have the description or any other metadata for
@@ -573,6 +555,7 @@ impl<'a> Context<'a> {
 
             model::Operation::DeclareConstructor { .. } => Ok(None),
             model::Operation::DeclareOperation { .. } => Ok(None),
+            model::Operation::Import { .. } => Ok(None),
         }
     }
 
@@ -913,7 +896,7 @@ impl<'a> Context<'a> {
                             ));
                         };
 
-                        let var = ctx.resolve_local_ref(var)?.0;
+                        let var = ctx.resolve_var_ref(*var)?.0;
                         ctx.local_variables[var].bound = TypeBound::Copyable;
                     }
                     _ => return Err(error_unsupported!("constraint other than copy or discard")),
@@ -988,7 +971,7 @@ impl<'a> Context<'a> {
             }
 
             model::Term::Var(var) => {
-                let (index, var) = self.resolve_local_ref(var)?;
+                let (index, var) = self.resolve_var_ref(*var)?;
                 let decl = self.import_type_param(var.r#type, var.bound)?;
                 Ok(TypeArg::new_var_use(index, decl))
             }
@@ -1046,7 +1029,7 @@ impl<'a> Context<'a> {
                 model::Term::Wildcard => return Err(error_uninferred!("wildcard")),
 
                 model::Term::Var(var) => {
-                    let (index, _) = self.resolve_local_ref(var)?;
+                    let (index, _) = self.resolve_var_ref(*var)?;
                     es.insert_type_var(index);
                 }
 
@@ -1084,13 +1067,13 @@ impl<'a> Context<'a> {
                 Err(error_uninferred!("application with implicit parameters"))
             }
 
-            model::Term::ApplyFull { global: name, args } => {
+            model::Term::ApplyFull { symbol, args } => {
                 let args = args
                     .iter()
                     .map(|arg| self.import_type_arg(*arg))
                     .collect::<Result<Vec<_>, _>>()?;
 
-                let name = self.get_global_name(*name)?;
+                let name = self.module.symbol_name(*symbol)?;
                 let (extension, id) = self.import_custom_name(name)?;
 
                 Ok(TypeBase::new_extension(CustomType::new(
@@ -1105,7 +1088,7 @@ impl<'a> Context<'a> {
 
             model::Term::Var(var) => {
                 // We pretend that all `TypeBound`s are copyable.
-                let (index, _) = self.resolve_local_ref(var)?;
+                let (index, _) = self.resolve_var_ref(*var)?;
                 Ok(TypeBase::new_var_use(index, TypeBound::Copyable))
             }
 
@@ -1240,7 +1223,7 @@ impl<'a> Context<'a> {
                     }
                 }
                 model::Term::Var(var) => {
-                    let (index, _) = ctx.resolve_local_ref(var)?;
+                    let (index, _) = ctx.resolve_var_ref(*var)?;
                     let var = RV::try_from_rv(RowVariable(index, TypeBound::Any))
                         .map_err(|_| model::ModelError::TypeError(term_id))?;
                     types.push(TypeBase::new(TypeEnum::RowVar(var)));
@@ -1282,13 +1265,15 @@ impl<'a> Context<'a> {
         term_id: model::TermId,
     ) -> Result<serde_json::Value, ImportError> {
         let (global, args) = match self.get_term(term_id)? {
-            model::Term::Apply { global, args } | model::Term::ApplyFull { global, args } => {
-                (global, args)
+            model::Term::Apply { symbol, args } | model::Term::ApplyFull { symbol, args } => {
+                (symbol, args)
             }
             _ => return Err(model::ModelError::TypeError(term_id).into()),
         };
 
-        if global != &GlobalRef::Named(TERM_JSON) {
+        let name = self.module.symbol_name(*global)?;
+
+        if name != TERM_JSON {
             return Err(model::ModelError::TypeError(term_id).into());
         }
 
@@ -1304,51 +1289,6 @@ impl<'a> Context<'a> {
             serde_json::from_str(json_str).map_err(|_| model::ModelError::TypeError(term_id))?;
 
         Ok(json_value)
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-enum NamedItem {
-    FuncDecl(model::NodeId),
-    FuncDefn(model::NodeId),
-    CtrDecl(model::NodeId),
-    OperationDecl(model::NodeId),
-}
-
-struct Names<'a> {
-    items: FxHashMap<&'a str, NamedItem>,
-}
-
-impl<'a> Names<'a> {
-    pub fn new(module: &model::Module<'a>) -> Result<Self, ImportError> {
-        let mut items = FxHashMap::default();
-
-        for (node_id, node_data) in module.nodes.iter().enumerate() {
-            let node_id = model::NodeId(node_id as _);
-
-            let item = match node_data.operation {
-                model::Operation::DefineFunc { decl } => {
-                    Some((decl.name, NamedItem::FuncDecl(node_id)))
-                }
-                model::Operation::DeclareFunc { decl } => {
-                    Some((decl.name, NamedItem::FuncDefn(node_id)))
-                }
-                model::Operation::DeclareConstructor { decl } => {
-                    Some((decl.name, NamedItem::CtrDecl(node_id)))
-                }
-                model::Operation::DeclareOperation { decl } => {
-                    Some((decl.name, NamedItem::OperationDecl(node_id)))
-                }
-                _ => None,
-            };
-
-            if let Some((name, item)) = item {
-                // TODO: Deal with duplicates
-                items.insert(name, item);
-            }
-        }
-
-        Ok(Self { items })
     }
 }
 

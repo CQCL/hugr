@@ -91,6 +91,7 @@ use smol_str::SmolStr;
 use thiserror::Error;
 
 pub mod binary;
+pub mod resolve;
 pub mod text;
 
 macro_rules! define_index {
@@ -166,6 +167,8 @@ pub struct Module<'a> {
     pub regions: Vec<Region<'a>>,
     /// Table of [`Term`]s.
     pub terms: Vec<Term<'a>>,
+    /// Table of [`Link`]s.
+    pub links: Vec<Link<'a>>,
 }
 
 impl<'a> Module<'a> {
@@ -225,6 +228,39 @@ impl<'a> Module<'a> {
         self.regions.push(region);
         id
     }
+
+    /// Return the link data for a given link id.
+    #[inline]
+    pub fn get_link(&self, link_id: LinkId) -> Option<&Link<'a>> {
+        self.links.get(link_id.index())
+    }
+
+    /// Return a mutable reference to the link data for a given link id.
+    #[inline]
+    pub fn get_link_mut(&mut self, link_id: LinkId) -> Option<&mut Link<'a>> {
+        self.links.get_mut(link_id.index())
+    }
+
+    /// Insert a new link into the module and return its id.
+    pub fn insert_link(&mut self, link: Link<'a>) -> LinkId {
+        let id = LinkId::new(self.links.len());
+        self.links.push(link);
+        id
+    }
+
+    /// Get the name of the symbol referenced by a [`SymbolRef`].
+    pub fn symbol_name(&self, symbol_ref: SymbolRef<'a>) -> Result<&'a str, SymbolRefError> {
+        match symbol_ref {
+            SymbolRef::Direct(node_id) => self
+                .nodes
+                .get(node_id.index())
+                .ok_or(SymbolRefError::NodeNotFound(node_id))?
+                .operation
+                .symbol()
+                .ok_or(SymbolRefError::NoSymbol(node_id)),
+            SymbolRef::Named(name) => Ok(name),
+        }
+    }
 }
 
 /// Nodes in the hugr graph.
@@ -250,7 +286,7 @@ pub struct Node<'a> {
 }
 
 /// Operations that nodes can perform.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum Operation<'a> {
     /// Invalid operation to be used as a placeholder.
     /// This is useful for modules that have non-contiguous node ids, or modules
@@ -291,7 +327,7 @@ pub enum Operation<'a> {
     /// by inferring terms for the implicit parameters or at least filling them in with a wildcard term.
     Custom {
         /// The name of the custom operation.
-        operation: GlobalRef<'a>,
+        operation: SymbolRef<'a>,
     },
     /// Custom operation with full parameters.
     ///
@@ -300,7 +336,7 @@ pub enum Operation<'a> {
     /// the implicit parameters should be inferred.
     CustomFull {
         /// The name of the custom operation.
-        operation: GlobalRef<'a>,
+        operation: SymbolRef<'a>,
     },
     /// Alias definitions.
     DefineAlias {
@@ -358,6 +394,28 @@ pub enum Operation<'a> {
         /// The declaration of the operation.
         decl: &'a OperationDecl<'a>,
     },
+
+    /// Import a symbol.
+    Import {
+        /// The name of the symbol to import.
+        name: &'a str,
+    },
+}
+
+impl<'a> Operation<'a> {
+    /// The symbol associated with the operation, if any.
+    pub fn symbol(&self) -> Option<&'a str> {
+        match self {
+            Operation::DefineFunc { decl } => Some(decl.name),
+            Operation::DeclareFunc { decl } => Some(decl.name),
+            Operation::DefineAlias { decl, .. } => Some(decl.name),
+            Operation::DeclareAlias { decl } => Some(decl.name),
+            Operation::DeclareConstructor { decl } => Some(decl.name),
+            Operation::DeclareOperation { decl } => Some(decl.name),
+            Operation::Import { name } => Some(name),
+            _ => None,
+        }
+    }
 }
 
 /// A region in the hugr.
@@ -449,45 +507,48 @@ pub struct MetaItem<'a> {
     pub value: TermId,
 }
 
-/// A reference to a global variable.
+/// A reference to a symbol.
 ///
-/// Global variables are defined in nodes.
+/// Symbols are defined by nodes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum GlobalRef<'a> {
-    /// Reference to the global that is defined by the given node.
+pub enum SymbolRef<'a> {
+    /// Reference to the symbol that is defined by the given node.
     Direct(NodeId),
-    /// Reference to the global with the given name.
+    /// Reference to the symbol with the given name.
     Named(&'a str),
 }
 
-impl std::fmt::Display for GlobalRef<'_> {
+impl std::fmt::Display for SymbolRef<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            GlobalRef::Direct(id) => write!(f, ":{}", id.index()),
-            GlobalRef::Named(name) => write!(f, "{}", name),
+            SymbolRef::Direct(id) => write!(f, ":{}", id.index()),
+            SymbolRef::Named(name) => write!(f, "{}", name),
         }
     }
 }
 
-/// A reference to a local variable.
+/// A reference to a variable.
 ///
-/// Local variables are defined as parameters to nodes.
+/// Variables are defined by parameters to nodes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum LocalRef<'a> {
-    /// Reference to the local variable by its parameter index and its defining node.
-    Index(NodeId, u16),
-    /// Reference to the local variable by its name.
+pub enum VarRef<'a> {
+    /// Reference to the variable by its parameter index and its defining node.
+    Index(NodeId, VarIndex),
+    /// Reference to the variable by its name.
     Named(&'a str),
 }
 
-impl std::fmt::Display for LocalRef<'_> {
+impl std::fmt::Display for VarRef<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            LocalRef::Index(node, index) => write!(f, "?:{}:{}", node.index(), index),
-            LocalRef::Named(name) => write!(f, "?{}", name),
+            VarRef::Index(node, index) => write!(f, "?:{}:{}", node.index(), index),
+            VarRef::Named(name) => write!(f, "?{}", name),
         }
     }
 }
+
+/// The index of a variable within the defining node's parameter list.
+pub type VarIndex = u16;
 
 /// A reference to a link.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -508,7 +569,7 @@ impl std::fmt::Display for LinkRef<'_> {
 }
 
 /// A term in the compile time meta language.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum Term<'a> {
     /// Standin for any term.
     #[default]
@@ -530,7 +591,7 @@ pub enum Term<'a> {
     Constraint,
 
     /// A local variable.
-    Var(LocalRef<'a>),
+    Var(VarRef<'a>),
 
     /// A symbolic function application.
     ///
@@ -540,8 +601,8 @@ pub enum Term<'a> {
     ///
     /// `(GLOBAL ARG-0 ... ARG-n)`
     Apply {
-        /// Reference to the global declaration to apply.
-        global: GlobalRef<'a>,
+        /// The symbol to apply.
+        symbol: SymbolRef<'a>,
         /// Arguments to the function, covering only the explicit parameters.
         args: &'a [TermId],
     },
@@ -553,8 +614,8 @@ pub enum Term<'a> {
     ///
     /// `(@GLOBAL ARG-0 ... ARG-n)`
     ApplyFull {
-        /// Reference to the global declaration to apply.
-        global: GlobalRef<'a>,
+        /// The symbol to apply.
+        symbol: SymbolRef<'a>,
         /// Arguments to the function, covering both implicit and explicit parameters.
         args: &'a [TermId],
     },
@@ -706,6 +767,13 @@ pub enum ParamSort {
     Explicit,
 }
 
+/// A link in a module.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Link<'a> {
+    /// The name of the link.
+    pub name: &'a str,
+}
+
 /// Errors that can occur when traversing and interpreting the model.
 #[derive(Debug, Clone, Error)]
 pub enum ModelError {
@@ -718,13 +786,18 @@ pub enum ModelError {
     /// There is a reference to a region that does not exist.
     #[error("region not found: {0}")]
     RegionNotFound(RegionId),
-    /// There is a local reference that does not resolve.
-    #[error("local variable invalid: {0}")]
-    InvalidLocal(String),
-    /// There is a global reference that does not resolve to a node
-    /// that defines a global variable.
-    #[error("global variable invalid: {0}")]
-    InvalidGlobal(String),
+    /// There is a reference to a link that does not exist.
+    #[error("link not found: {0}")]
+    LinkNotFound(LinkId),
+    /// Errors that can occur when resolving variables.
+    #[error(transparent)]
+    VarRef(#[from] VarRefError),
+    /// Errors that can occur when resolving symbols.
+    #[error(transparent)]
+    SymbolRef(#[from] SymbolRefError),
+    /// Errors that can occur when introducing symbols.
+    #[error(transparent)]
+    SymbolIntro(#[from] SymbolIntroError),
     /// The model contains an operation in a place where it is not allowed.
     #[error("unexpected operation on node: {0}")]
     UnexpectedOperation(NodeId),
@@ -744,4 +817,52 @@ pub enum ModelError {
     /// There is a node that is not well-formed or has the invalid operation.
     #[error("invalid operation on node: {0}")]
     InvalidOperation(NodeId),
+}
+
+/// Errors that can occur when resolving symbols.
+#[derive(Debug, Clone, Error)]
+pub enum SymbolRefError {
+    /// A `SymbolRef::Direct` refers to a symbol that is not visible in the current scope.
+    #[error("the symbol defined by node {0} is not visible in the current scope")]
+    NotVisible(NodeId),
+    /// A `SymbolRef::Direct` refers to a node that does not define a symbol.
+    #[error("the node {0} does not define a symbol")]
+    NoSymbol(NodeId),
+    /// A `SymbolRef::Direct` refers to a node that does not exist.
+    #[error("the node {0} does not exist")]
+    NodeNotFound(NodeId),
+    /// A `SymbolRef::Named` refers to a symbol name that does not exist in the current scope.
+    #[error("the symbol name `{0}` does not exist in the current scope")]
+    NameNotFound(String),
+    /// A `SymbolRef::Named` was not be resolved to a `SymbolRef::Direct`.
+    #[error("the symbol name `{0}` was not resolved")]
+    Unresolved(String),
+}
+
+/// Errors that can occur in nodes that introduce symbols.
+#[derive(Debug, Clone, Error)]
+pub enum SymbolIntroError {
+    /// Two nodes introduce the same symbol in the same scope.
+    #[error("nodes {0} and {1} introduce the same symbol `{2}`")]
+    DuplicateSymbol(NodeId, NodeId, String),
+    /// A node introduces a symbol with two parameters that share the same name.
+    #[error("node {0} has two parameters that share the name `{3}`")]
+    DuplicateVar(NodeId, VarIndex, VarIndex, String),
+}
+
+/// Errors that can occur when resolving variables.
+#[derive(Debug, Clone, Error)]
+pub enum VarRefError {
+    /// A `VarRef::Index` refers to a variable that is not visible in the current scope.
+    #[error("the variable defined by node {0} at index {1} is not visible in the current scope")]
+    NotVisible(NodeId, VarIndex),
+    /// A `VarRef::Index` refers to a node that does not have a variable at the given index.
+    #[error("the node {0} does not have any variable at index {1}")]
+    Invalid(NodeId, VarIndex),
+    /// A `VarRef::Named` refers to a variable name that does not exist in the current scope.
+    #[error("the variable name `{0}` does not exist in the current scope")]
+    NameNotFound(String),
+    /// A `VarRef::Named` was not resolved to a `VarRef::Index`.
+    #[error("the variable name `{0}` was not resolved")]
+    Unresolved(String),
 }
