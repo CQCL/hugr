@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.13.3](https://github.com/CQCL/hugr/compare/hugr-core-v0.13.2...hugr-core-v0.13.3) - 2024-11-06
+
+### Bug Fixes
+
+- Insert DFG directly as a funcdefn in `Package::from_hugr`  ([#1621](https://github.com/CQCL/hugr/pull/1621))
+
+### New Features
+
+- `HugrMut::remove_metadata` ([#1619](https://github.com/CQCL/hugr/pull/1619))
+- Operation and constructor declarations in `hugr-model` ([#1605](https://github.com/CQCL/hugr/pull/1605))
+- Add TailLoop::BREAK_TAG and CONTINUE_TAG ([#1626](https://github.com/CQCL/hugr/pull/1626))
+
 ## [0.13.2](https://github.com/CQCL/hugr/compare/hugr-core-v0.13.1...hugr-core-v0.13.2) - 2024-10-22
 
 ### Bug Fixes
