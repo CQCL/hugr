@@ -24,7 +24,6 @@ jobs:
   miri:
     name: "Miri"
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - name: Install Miri
@@ -44,11 +43,12 @@ jobs:
   notify-slack:
     uses: CQCL/hugrverse-actions/.github/workflows/slack-notifier.yml@main
     needs: miri
-    if: ${{ needs.miri.result == 'failure' && ( github.event_name == 'workflow_dispatch' || github.event_name == 'push' ) }}
+    if: always() && needs.miri.result == 'failure'
     with:
       channel-id: 'C04SHCL4FKP'
       slack-message: |
-        💥 The unsoundness check for `CQCL/hugr` failed. <https://github.com/CQCL/hugr/actions/runs/${{ github.run_id }}|Please investigate>.
+        💥 The unsoundness check for `CQCL/hugr` failed.
+        <https://github.com/CQCL/hugr/actions/runs/${{ github.run_id }}|Please investigate>.
       # Rate-limit the message to once per day
       timeout-minutes: 1440
       # A repository variable used to store the last message timestamp.
