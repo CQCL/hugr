@@ -43,7 +43,7 @@ jobs:
   notify-slack:
     uses: CQCL/hugrverse-actions/.github/workflows/slack-notifier.yml@main
     needs: miri
-    if: always() && needs.miri.result == 'failure'
+    if: always() && needs.miri.result == 'failure' && github.event_name == 'push'
     with:
       channel-id: 'C04SHCL4FKP'
       slack-message: |
