@@ -1,0 +1,14 @@
+---
+source: hugr-core/src/package.rs
+expression: hugr.mermaid_string()
+---
+graph LR
+    subgraph 3 ["(3) Module"]
+        direction LR
+        subgraph 0 ["(0) FuncDefn: #quot;test#quot;"]
+            direction LR
+            1["(1) Input"]
+            2["(2) Output"]
+            1--"0:0<br>[]+[]"-->2
+        end
+    end

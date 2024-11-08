@@ -14,8 +14,8 @@ use crate::extension::ExtensionSet;
 use crate::types::{EdgeKind, Signature};
 use crate::{Direction, OutgoingPort, Port};
 use crate::{IncomingPort, PortIndex};
+use derive_more::Display;
 use paste::paste;
-
 use portgraph::NodeIndex;
 
 use enum_dispatch::enum_dispatch;
@@ -127,6 +127,12 @@ pub const DEFAULT_OPTYPE: OpType = OpType::Module(Module::new());
 impl Default for OpType {
     fn default() -> Self {
         DEFAULT_OPTYPE
+    }
+}
+
+impl Display for OpType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.name())
     }
 }
 

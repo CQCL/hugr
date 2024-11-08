@@ -43,8 +43,8 @@ coverage language="[rust|python]": (_run_lang language \
     )
 
 # Run unsoundness checks using miri
-miri:
-    PROPTEST_DISABLE_FAILURE_PERSISTENCE=true MIRIFLAGS='-Zmiri-env-forward=PROPTEST_DISABLE_FAILURE_PERSISTENCE' cargo +nightly miri test
+miri *TEST_ARGS:
+    PROPTEST_DISABLE_FAILURE_PERSISTENCE=true MIRIFLAGS='-Zmiri-env-forward=PROPTEST_DISABLE_FAILURE_PERSISTENCE' cargo +nightly miri test {{TEST_ARGS}}
 
 # Update the HUGR schema.
 update-schema:
@@ -59,8 +59,13 @@ gen-extensions:
     cargo run -p hugr-cli gen-extensions -o specification/std_extensions
     cp -r specification/std_extensions/* hugr-py/src/hugr/std/_json_defs/
 
+# Build the python documentation in hugr-py/docs.
 build-py-docs:
     cd hugr-py/docs && ./build.sh
+
+# Run rust semver-checks to detect breaking changes since the last release.
+semver-checks:
+    cargo semver-checks
 
 # Runs a rust and a python command, depending on the `language` variable.
 #

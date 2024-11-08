@@ -12,35 +12,49 @@ fn roundtrip(source: &str) -> String {
 
 #[test]
 pub fn test_roundtrip_add() {
-    insta::assert_snapshot!(roundtrip(include_str!("fixtures/model-add.edn")));
+    insta::assert_snapshot!(roundtrip(include_str!(
+        "../../hugr-model/tests/fixtures/model-add.edn"
+    )));
 }
 
 #[test]
 pub fn test_roundtrip_call() {
-    insta::assert_snapshot!(roundtrip(include_str!("fixtures/model-call.edn")));
+    insta::assert_snapshot!(roundtrip(include_str!(
+        "../../hugr-model/tests/fixtures/model-call.edn"
+    )));
 }
 
 #[test]
 pub fn test_roundtrip_alias() {
-    insta::assert_snapshot!(roundtrip(include_str!("fixtures/model-alias.edn")));
+    insta::assert_snapshot!(roundtrip(include_str!(
+        "../../hugr-model/tests/fixtures/model-alias.edn"
+    )));
 }
 
 #[test]
 pub fn test_roundtrip_cfg() {
-    insta::assert_snapshot!(roundtrip(include_str!("fixtures/model-cfg.edn")));
+    insta::assert_snapshot!(roundtrip(include_str!(
+        "../../hugr-model/tests/fixtures/model-cfg.edn"
+    )));
 }
 
 #[test]
 pub fn test_roundtrip_cond() {
-    insta::assert_snapshot!(roundtrip(include_str!("fixtures/model-cond.edn")));
+    insta::assert_snapshot!(roundtrip(include_str!(
+        "../../hugr-model/tests/fixtures/model-cond.edn"
+    )));
 }
 
 #[test]
 pub fn test_roundtrip_loop() {
-    insta::assert_snapshot!(roundtrip(include_str!("fixtures/model-loop.edn")));
+    insta::assert_snapshot!(roundtrip(include_str!(
+        "../../hugr-model/tests/fixtures/model-loop.edn"
+    )));
 }
 
 #[test]
 pub fn test_roundtrip_params() {
-    insta::assert_snapshot!(roundtrip(include_str!("fixtures/model-params.edn")));
+    insta::assert_snapshot!(roundtrip(include_str!(
+        "../../hugr-model/tests/fixtures/model-params.edn"
+    )));
 }

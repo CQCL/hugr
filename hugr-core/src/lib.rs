@@ -17,6 +17,7 @@ pub mod hugr;
 pub mod import;
 pub mod macros;
 pub mod ops;
+pub mod package;
 pub mod std_extensions;
 pub mod types;
 pub mod utils;

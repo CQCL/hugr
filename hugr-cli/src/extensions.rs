@@ -1,6 +1,6 @@
 //! Dump standard extensions in serialized form.
 use clap::Parser;
-use hugr_core::extension::ExtensionRegistry;
+use hugr::extension::ExtensionRegistry;
 use std::{io::Write, path::PathBuf};
 
 /// Dump the standard extensions.

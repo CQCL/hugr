@@ -1,6 +1,6 @@
 [package]
 name = "hugr-passes"
-version = "0.13.1"
+version = "0.13.3"
 edition = { workspace = true }
 rust-version = { workspace = true }
 license = { workspace = true }
@@ -13,7 +13,7 @@ keywords = ["Quantum", "Quantinuum"]
 categories = ["compilers"]
 
 [dependencies]
-hugr-core = { path = "../hugr-core", version = "0.13.1" }
+hugr-core = { path = "../hugr-core", version = "0.13.3" }
 portgraph = { workspace = true }
 ascent = { version = "0.7.0" }
 downcast-rs = { workspace = true }

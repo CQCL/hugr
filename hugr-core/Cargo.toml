@@ -1,6 +1,6 @@
 [package]
 name = "hugr-core"
-version = "0.13.1"
+version = "0.13.3"
 edition = { workspace = true }
 rust-version = { workspace = true }
 
@@ -37,7 +37,7 @@ serde = { workspace = true, features = ["derive", "rc"] }
 serde_yaml = { workspace = true, optional = true }
 typetag = { workspace = true }
 smol_str = { workspace = true, features = ["serde"] }
-derive_more = { workspace = true, features = ["display", "from"] }
+derive_more = { workspace = true, features = ["display", "error", "from"] }
 itertools = { workspace = true }
 html-escape = { workspace = true }
 bitvec = { workspace = true, features = ["serde"] }
@@ -51,7 +51,7 @@ paste = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
 semver = { version = "1.0.23", features = ["serde"] }
-hugr-model = { version = "0.13.1", path = "../hugr-model", optional = true }
+hugr-model = { version = "0.14.0", path = "../hugr-model", optional = true }
 indexmap.workspace = true
 fxhash.workspace = true
 bumpalo = { workspace = true, features = ["collections"] }
