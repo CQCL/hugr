@@ -1,7 +1,7 @@
 //! [ascent] datalog implementation of analysis.
 
-use std::collections::HashSet;
-use std::hash::RandomState;
+use std::collections::hash_map::RandomState;
+use std::collections::HashSet; // Moves to std::hash in Rust 1.76
 
 use ascent::lattice::BoundedLattice;
 use itertools::Itertools;
