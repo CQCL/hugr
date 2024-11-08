@@ -14,9 +14,7 @@ categories = ["compilers"]
 
 [dependencies]
 hugr-core = { path = "../hugr-core", version = "0.13.3" }
-portgraph = { workspace = true }
 ascent = { version = "0.7.0" }
-downcast-rs = { workspace = true }
 itertools = { workspace = true }
 lazy_static = { workspace = true }
 paste = { workspace = true }
