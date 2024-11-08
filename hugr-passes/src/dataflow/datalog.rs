@@ -7,7 +7,7 @@ use ascent::lattice::BoundedLattice;
 use itertools::Itertools;
 
 use hugr_core::extension::prelude::{MakeTuple, UnpackTuple};
-use hugr_core::ops::{OpTrait, OpType};
+use hugr_core::ops::{OpTrait, OpType, TailLoop};
 use hugr_core::{HugrView, IncomingPort, Node, OutgoingPort, PortIndex as _, Wire};
 
 use super::value_row::ValueRow;
@@ -156,16 +156,18 @@ pub(super) fn run_datalog<V: AbstractValue, C: DFContext<V>>(
             if let Some(tailloop) = ctx.get_optype(*tl).as_tail_loop(),
             input_child(tl, in_n),
             output_child(tl, out_n),
-            node_in_value_row(out_n, out_in_row), // get the whole input row for the output node
-            if let Some(fields) = out_in_row.unpack_first(0, tailloop.just_inputs.len()), // if it is possible for tag to be 0
+            node_in_value_row(out_n, out_in_row), // get the whole input row for the output node...
+            // ...and select just what's possible for CONTINUE_TAG, if anything
+            if let Some(fields) = out_in_row.unpack_first(TailLoop::CONTINUE_TAG, tailloop.just_inputs.len()),
             for (out_p, v) in fields.enumerate();
 
         // Output node of child region propagate to outputs of tail loop
         out_wire_value(tl, OutgoingPort::from(out_p), v) <-- node(tl),
             if let Some(tailloop) = ctx.get_optype(*tl).as_tail_loop(),
             output_child(tl, out_n),
-            node_in_value_row(out_n, out_in_row), // get the whole input row for the output node
-            if let Some(fields) = out_in_row.unpack_first(1, tailloop.just_outputs.len()), // if it is possible for the tag to be 1
+            node_in_value_row(out_n, out_in_row), // get the whole input row for the output node...
+            // ... and select just what's possible for BREAK_TAG, if anything
+            if let Some(fields) = out_in_row.unpack_first(TailLoop::BREAK_TAG, tailloop.just_outputs.len()),
             for (out_p, v) in fields.enumerate();
 
         // Conditional --------------------

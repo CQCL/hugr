@@ -3,6 +3,7 @@ use ascent::{lattice::BoundedLattice, Lattice};
 use hugr_core::builder::{CFGBuilder, Container, DataflowHugr};
 use hugr_core::hugr::views::{DescendantsGraph, HierarchyView};
 use hugr_core::ops::handle::DfgID;
+use hugr_core::ops::TailLoop;
 use hugr_core::{
     builder::{endo_sig, DFGBuilder, Dataflow, DataflowSubContainer, HugrBuilder, SubContainer},
     extension::{
@@ -94,7 +95,10 @@ fn test_tail_loop_never_iterates() {
     let mut builder = DFGBuilder::new(Signature::new_endo(vec![])).unwrap();
     let r_v = Value::unit_sum(3, 6).unwrap();
     let r_w = builder.add_load_value(r_v.clone());
-    let tag = Tag::new(1, vec![type_row![], r_v.get_type().into()]);
+    let tag = Tag::new(
+        TailLoop::BREAK_TAG,
+        vec![type_row![], r_v.get_type().into()],
+    );
     let tagged = builder.add_dataflow_op(tag, [r_w]).unwrap();
 
     let tlb = builder
@@ -117,8 +121,14 @@ fn test_tail_loop_never_iterates() {
 #[test]
 fn test_tail_loop_always_iterates() {
     let mut builder = DFGBuilder::new(Signature::new_endo(vec![])).unwrap();
-    let r_w = builder
-        .add_load_value(Value::sum(0, [], SumType::new([type_row![], BOOL_T.into()])).unwrap());
+    let r_w = builder.add_load_value(
+        Value::sum(
+            TailLoop::CONTINUE_TAG,
+            [],
+            SumType::new([type_row![], BOOL_T.into()]),
+        )
+        .unwrap(),
+    );
     let true_w = builder.add_load_value(Value::true_val());
 
     let tlb = builder
@@ -221,13 +231,19 @@ fn test_tail_loop_containing_conditional() {
         .unwrap()
         .outputs_arr();
     let cont = case0_b
-        .add_dataflow_op(Tag::new(0, body_out_variants.clone()), [next_input])
+        .add_dataflow_op(
+            Tag::new(TailLoop::CONTINUE_TAG, body_out_variants.clone()),
+            [next_input],
+        )
         .unwrap();
     case0_b.finish_with_outputs(cont.outputs()).unwrap();
     // Second iter 1(true, false) => exit with (true, false)
     let mut case1_b = cond.case_builder(1).unwrap();
     let loop_res = case1_b
-        .add_dataflow_op(Tag::new(1, body_out_variants), case1_b.input_wires())
+        .add_dataflow_op(
+            Tag::new(TailLoop::BREAK_TAG, body_out_variants),
+            case1_b.input_wires(),
+        )
         .unwrap();
     case1_b.finish_with_outputs(loop_res.outputs()).unwrap();
     let [r] = cond.finish_sub_container().unwrap().outputs_arr();
