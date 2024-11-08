@@ -213,6 +213,7 @@ fn test_tail_loop_containing_conditional() {
     let mut tlb = builder
         .tail_loop_builder([(control_t, init)], [], type_row![BOOL_T; 2])
         .unwrap();
+    let tl = tlb.loop_signature().unwrap().clone();
     let [in_w] = tlb.input_wires_arr();
 
     // Branch on in_wire, so first iter 0(false, true)...
@@ -230,22 +231,12 @@ fn test_tail_loop_containing_conditional() {
         .add_dataflow_op(Tag::new(1, control_variants), [b, a])
         .unwrap()
         .outputs_arr();
-    let cont = case0_b
-        .add_dataflow_op(
-            Tag::new(TailLoop::CONTINUE_TAG, body_out_variants.clone()),
-            [next_input],
-        )
-        .unwrap();
-    case0_b.finish_with_outputs(cont.outputs()).unwrap();
+    let cont = case0_b.make_continue(tl.clone(), [next_input]).unwrap();
+    case0_b.finish_with_outputs([cont]).unwrap();
     // Second iter 1(true, false) => exit with (true, false)
     let mut case1_b = cond.case_builder(1).unwrap();
-    let loop_res = case1_b
-        .add_dataflow_op(
-            Tag::new(TailLoop::BREAK_TAG, body_out_variants),
-            case1_b.input_wires(),
-        )
-        .unwrap();
-    case1_b.finish_with_outputs(loop_res.outputs()).unwrap();
+    let loop_res = case1_b.make_break(tl, case1_b.input_wires()).unwrap();
+    case1_b.finish_with_outputs([loop_res]).unwrap();
     let [r] = cond.finish_sub_container().unwrap().outputs_arr();
 
     let tail_loop = tlb.finish_with_outputs(r, []).unwrap();
