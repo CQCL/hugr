@@ -718,7 +718,10 @@ impl<'a> ParseContext<'a> {
                     _ => unreachable!(),
                 },
                 Rule::string_unicode => {
-                    let code_str = &token.as_str()[3..token.as_str().len() - 1];
+                    let token_str = token.as_str();
+                    debug_assert_eq!(&token_str[0..3], r"\u{");
+                    debug_assert_eq!(&token_str[token_str.len() - 1..], "}");
+                    let code_str = &token_str[3..token_str.len() - 1];
                     let code = u32::from_str_radix(code_str, 16).map_err(|_| {
                         ParseError::custom("invalid unicode escape sequence", token.as_span())
                     })?;
