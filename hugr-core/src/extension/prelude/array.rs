@@ -46,7 +46,7 @@ pub enum ArrayOpDef {
     pop_left,
     pop_right,
     discard_empty,
-    new_uninitialized_array,
+    repeat,
 }
 
 /// Static parameters for array operations. Includes array size. Type is part of the type scheme.
@@ -119,10 +119,14 @@ impl ArrayOpDef {
             let standard_params = vec![TypeParam::max_nat(), TypeBound::Any.into()];
 
             match self {
-                new_uninitialized_array => PolyFuncTypeRV::new(
-                    standard_params,
-                    FuncValueType::new(type_row![], array_ty.clone()),
-                ),
+                repeat => {
+                    let func =
+                        Type::new_function(FuncValueType::new(type_row![], elem_ty_var.clone()));
+                    PolyFuncTypeRV::new(
+                        standard_params,
+                        FuncValueType::new(vec![func], array_ty.clone()),
+                    )
+                }
                 get => {
                     let params = vec![TypeParam::max_nat(), TypeBound::Copyable.into()];
                     let copy_elem_ty = Type::new_var_use(1, TypeBound::Copyable);
@@ -184,9 +188,9 @@ impl MakeOpDef for ArrayOpDef {
     fn description(&self) -> String {
         match self {
             ArrayOpDef::new_array => "Create a new array from elements",
-            ArrayOpDef::new_uninitialized_array => {
-                "Create a new array with uninitialised elements. \
-                Reading such an unitialised element is undefined behaviour."
+            ArrayOpDef::repeat => {
+                "Creates a new array whose elements are initialised by calling \
+                the given function n times"
             }
             ArrayOpDef::get => "Get an element from an array",
             ArrayOpDef::set => "Set an element in an array",
@@ -255,7 +259,7 @@ impl MakeExtensionOp for ArrayOp {
                 );
                 vec![ty_arg]
             }
-            new_array | new_uninitialized_array | pop_left | pop_right | get | set | swap => {
+            new_array | repeat | pop_left | pop_right | get | set | swap => {
                 vec![TypeArg::BoundedNat { n: self.size }, ty_arg]
             }
         }
