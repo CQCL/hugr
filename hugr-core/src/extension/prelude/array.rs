@@ -333,6 +333,7 @@ mod tests {
         builder::{inout_sig, DFGBuilder, Dataflow, DataflowHugr},
         extension::prelude::{BOOL_T, QB_T},
         ops::{OpTrait, OpType},
+        types::Signature,
     };
 
     use super::*;
@@ -469,6 +470,25 @@ mod tests {
             (
                 &vec![array_type(size, element_ty.clone())].into(),
                 &type_row![]
+            )
+        );
+    }
+
+    #[test]
+    fn test_repeat() {
+        let size = 2;
+        let element_ty = QB_T;
+        let op = ArrayOpDef::repeat.to_concrete(element_ty.clone(), size);
+
+        let optype: OpType = op.into();
+
+        let sig = optype.dataflow_signature().unwrap();
+
+        assert_eq!(
+            sig.io(),
+            (
+                &vec![Type::new_function(Signature::new(vec![], vec![QB_T]))].into(),
+                &vec![array_type(size, element_ty.clone())].into(),
             )
         );
     }
