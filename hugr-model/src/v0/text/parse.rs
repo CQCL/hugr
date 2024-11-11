@@ -60,7 +60,7 @@ impl<'a> ParseContext<'a> {
     }
 
     fn parse_module(&mut self, pair: Pair<'a, Rule>) -> ParseResult<()> {
-        debug_assert!(matches!(pair.as_rule(), Rule::module));
+        debug_assert_eq!(pair.as_rule(), Rule::module);
         let mut inner = pair.into_inner();
         let meta = self.parse_meta(&mut inner)?;
 
@@ -81,7 +81,7 @@ impl<'a> ParseContext<'a> {
     }
 
     fn parse_term(&mut self, pair: Pair<'a, Rule>) -> ParseResult<TermId> {
-        debug_assert!(matches!(pair.as_rule(), Rule::term));
+        debug_assert_eq!(pair.as_rule(), Rule::term);
         let pair = pair.into_inner().next().unwrap();
         let rule = pair.as_rule();
         let mut inner = pair.into_inner();
@@ -216,7 +216,7 @@ impl<'a> ParseContext<'a> {
     }
 
     fn parse_node(&mut self, pair: Pair<'a, Rule>) -> ParseResult<NodeId> {
-        debug_assert!(matches!(pair.as_rule(), Rule::node));
+        debug_assert_eq!(pair.as_rule(), Rule::node);
         let pair = pair.into_inner().next().unwrap();
         let rule = pair.as_rule();
 
@@ -501,7 +501,7 @@ impl<'a> ParseContext<'a> {
     }
 
     fn parse_region(&mut self, pair: Pair<'a, Rule>) -> ParseResult<RegionId> {
-        debug_assert!(matches!(pair.as_rule(), Rule::region));
+        debug_assert_eq!(pair.as_rule(), Rule::region);
         let pair = pair.into_inner().next().unwrap();
         let rule = pair.as_rule();
         let mut inner = pair.into_inner();
@@ -539,7 +539,7 @@ impl<'a> ParseContext<'a> {
     }
 
     fn parse_func_header(&mut self, pair: Pair<'a, Rule>) -> ParseResult<&'a FuncDecl<'a>> {
-        debug_assert!(matches!(pair.as_rule(), Rule::func_header));
+        debug_assert_eq!(pair.as_rule(), Rule::func_header);
 
         let mut inner = pair.into_inner();
         let name = self.parse_symbol(&mut inner)?;
@@ -564,7 +564,7 @@ impl<'a> ParseContext<'a> {
     }
 
     fn parse_alias_header(&mut self, pair: Pair<'a, Rule>) -> ParseResult<&'a AliasDecl<'a>> {
-        debug_assert!(matches!(pair.as_rule(), Rule::alias_header));
+        debug_assert_eq!(pair.as_rule(), Rule::alias_header);
 
         let mut inner = pair.into_inner();
         let name = self.parse_symbol(&mut inner)?;
@@ -579,7 +579,7 @@ impl<'a> ParseContext<'a> {
     }
 
     fn parse_ctr_header(&mut self, pair: Pair<'a, Rule>) -> ParseResult<&'a ConstructorDecl<'a>> {
-        debug_assert!(matches!(pair.as_rule(), Rule::ctr_header));
+        debug_assert_eq!(pair.as_rule(), Rule::ctr_header);
 
         let mut inner = pair.into_inner();
         let name = self.parse_symbol(&mut inner)?;
@@ -594,7 +594,7 @@ impl<'a> ParseContext<'a> {
     }
 
     fn parse_op_header(&mut self, pair: Pair<'a, Rule>) -> ParseResult<&'a OperationDecl<'a>> {
-        debug_assert!(matches!(pair.as_rule(), Rule::operation_header));
+        debug_assert_eq!(pair.as_rule(), Rule::operation_header);
 
         let mut inner = pair.into_inner();
         let name = self.parse_symbol(&mut inner)?;
@@ -668,7 +668,7 @@ impl<'a> ParseContext<'a> {
     }
 
     fn parse_port(&mut self, pair: Pair<'a, Rule>) -> ParseResult<LinkRef<'a>> {
-        debug_assert!(matches!(pair.as_rule(), Rule::port));
+        debug_assert_eq!(pair.as_rule(), Rule::port);
         let mut inner = pair.into_inner();
         let link = LinkRef::Named(&inner.next().unwrap().as_str()[1..]);
         Ok(link)
@@ -697,7 +697,7 @@ impl<'a> ParseContext<'a> {
     }
 
     fn parse_string(&self, token: Pair<'a, Rule>) -> ParseResult<&'a str> {
-        assert_eq!(token.as_rule(), Rule::string);
+        debug_assert_eq!(token.as_rule(), Rule::string);
 
         // Any escape sequence is longer than the character it represents.
         // Therefore the length of this token (minus 2 for the quotes on either
