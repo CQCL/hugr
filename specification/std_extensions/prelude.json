@@ -334,54 +334,6 @@
       "signature": null,
       "binary": true
     },
-    "new_uninitialized_array": {
-      "extension": "prelude",
-      "name": "new_uninitialized_array",
-      "description": "Create a new array with uninitialised elements. Reading such an unitialised element is undefined behaviour.",
-      "signature": {
-        "params": [
-          {
-            "tp": "BoundedNat",
-            "bound": null
-          },
-          {
-            "tp": "Type",
-            "b": "A"
-          }
-        ],
-        "body": {
-          "input": [],
-          "output": [
-            {
-              "t": "Opaque",
-              "extension": "prelude",
-              "id": "array",
-              "args": [
-                {
-                  "tya": "Variable",
-                  "idx": 0,
-                  "cached_decl": {
-                    "tp": "BoundedNat",
-                    "bound": null
-                  }
-                },
-                {
-                  "tya": "Type",
-                  "ty": {
-                    "t": "V",
-                    "i": 1,
-                    "b": "A"
-                  }
-                }
-              ],
-              "bound": "A"
-            }
-          ],
-          "extension_reqs": []
-        }
-      },
-      "binary": false
-    },
     "panic": {
       "extension": "prelude",
       "name": "panic",
@@ -461,6 +413,67 @@
             }
           ],
           "output": [],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "repeat": {
+      "extension": "prelude",
+      "name": "repeat",
+      "description": "Creates a new array whose elements are initialised by calling the given function n times",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": null
+          },
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "G",
+              "input": [],
+              "output": [
+                {
+                  "t": "V",
+                  "i": 1,
+                  "b": "A"
+                }
+              ],
+              "extension_reqs": []
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "prelude",
+              "id": "array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ],
           "extension_reqs": []
         }
       },
