@@ -46,7 +46,7 @@ impl ExtensionOp {
         args: impl Into<Vec<TypeArg>>,
         exts: &ExtensionRegistry,
     ) -> Result<Self, SignatureError> {
-        let args = args.into();
+        let args: Vec<TypeArg> = args.into();
         let signature = def.compute_signature(&args, exts)?;
         Ok(Self {
             def,
@@ -62,7 +62,7 @@ impl ExtensionOp {
         opaque: &OpaqueOp,
         exts: &ExtensionRegistry,
     ) -> Result<Self, SignatureError> {
-        let args = args.into();
+        let args: Vec<TypeArg> = args.into();
         // TODO skip computation depending on config
         // see https://github.com/CQCL/hugr/issues/1363
         let signature = match def.compute_signature(&args, exts) {
@@ -421,7 +421,7 @@ mod test {
             SignatureFunc::MissingComputeFunc,
         )
         .unwrap();
-        let registry = ExtensionRegistry::try_new([ext]).unwrap();
+        let registry = ExtensionRegistry::try_new([ext.into()]).unwrap();
         let opaque_val = OpaqueOp::new(
             ext_id.clone(),
             val_name,

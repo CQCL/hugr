@@ -1,5 +1,7 @@
 //! Pointer type and operations.
 
+use std::sync::Arc;
+
 use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 
 use crate::builder::{BuildError, Dataflow};
@@ -84,7 +86,7 @@ const TYPE_PARAMS: [TypeParam; 1] = [TypeParam::Type {
 pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
 
 /// Extension for pointer operations.
-fn extension() -> Extension {
+fn extension() -> Arc<Extension> {
     let mut extension = Extension::new(EXTENSION_ID, VERSION);
     extension
         .add_type(
@@ -95,15 +97,15 @@ fn extension() -> Extension {
         )
         .unwrap();
     PtrOpDef::load_all_ops(&mut extension).unwrap();
-    extension
+    Arc::new(extension)
 }
 
 lazy_static! {
     /// Reference to the pointer Extension.
-    pub static ref EXTENSION: Extension = extension();
+    pub static ref EXTENSION: Arc<Extension> = extension();
     /// Registry required to validate pointer extension.
     pub static ref PTR_REG: ExtensionRegistry =
-        ExtensionRegistry::try_new([EXTENSION.to_owned()]).unwrap();
+        ExtensionRegistry::try_new([EXTENSION.clone()]).unwrap();
 }
 
 /// Integer type of a given bit width (specified by the TypeArg).  Depending on

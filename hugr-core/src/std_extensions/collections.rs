@@ -5,6 +5,7 @@ use std::hash::{Hash, Hasher};
 mod list_fold;
 
 use std::str::FromStr;
+use std::sync::Arc;
 
 use itertools::Itertools;
 use lazy_static::lazy_static;
@@ -249,7 +250,7 @@ impl MakeOpDef for ListOp {
 
 lazy_static! {
     /// Extension for list operations.
-    pub static ref EXTENSION: Extension = {
+    pub static ref EXTENSION: Arc<Extension> = {
         let mut extension = Extension::new(EXTENSION_ID, VERSION);
 
         // The list type must be defined before the operations are added.
@@ -263,13 +264,13 @@ lazy_static! {
 
         ListOp::load_all_ops(&mut extension).unwrap();
 
-        extension
+        Arc::new(extension)
     };
 
     /// Registry of extensions required to validate list operations.
     pub static ref COLLECTIONS_REGISTRY: ExtensionRegistry  = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        EXTENSION.to_owned(),
+        PRELUDE.clone(),
+        EXTENSION.clone(),
     ])
     .unwrap();
 }

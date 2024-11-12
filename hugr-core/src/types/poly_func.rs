@@ -330,7 +330,7 @@ pub(crate) mod test {
         )
         .unwrap();
 
-        let reg = ExtensionRegistry::try_new([e]).unwrap();
+        let reg = ExtensionRegistry::try_new([e.into()]).unwrap();
 
         let make_scheme = |tp: TypeParam| {
             PolyFuncTypeBase::new_validated(

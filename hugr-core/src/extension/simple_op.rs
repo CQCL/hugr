@@ -272,6 +272,8 @@ impl<T: MakeRegisteredOp> From<T> for OpType {
 
 #[cfg(test)]
 mod test {
+    use std::sync::Arc;
+
     use crate::{const_extension_ids, type_row, types::Signature};
 
     use super::*;
@@ -313,13 +315,13 @@ mod test {
     }
 
     lazy_static! {
-        static ref EXT: Extension = {
+        static ref EXT: Arc<Extension> = {
             let mut e = Extension::new_test(EXT_ID.clone());
             DummyEnum::Dumb.add_to_extension(&mut e).unwrap();
-            e
+            Arc::new(e)
         };
         static ref DUMMY_REG: ExtensionRegistry =
-            ExtensionRegistry::try_new([EXT.to_owned()]).unwrap();
+            ExtensionRegistry::try_new([EXT.clone()]).unwrap();
     }
     impl MakeRegisteredOp for DummyEnum {
         fn extension_id(&self) -> ExtensionId {
