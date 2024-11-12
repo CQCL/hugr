@@ -9,6 +9,11 @@ name: Build and publish python wheels
 # this workflow will publish the wheels to pypi.
 # If the version is already published, pypi just ignores it.
 
+
+permissions:
+  # This permission is required for trusted publishing on pypi
+  id-token: write
+
 on:
   workflow_dispatch:
   push:
