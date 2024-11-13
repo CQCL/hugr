@@ -23,7 +23,7 @@ missing_docs = "warn"
 debug_assert_with_mut_call = "warn"
 
 [workspace.dependencies]
-portgraph = { version = "0.12.2" }
+portgraph = { version = "0.12.3" }
 insta = { version = "1.34.0" }
 bitvec = "1.0.1"
 cgmath = "0.18.0"

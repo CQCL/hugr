@@ -67,7 +67,7 @@ pub fn lower_ops(
     replacements
         .into_iter()
         .map(|(node, replacement)| {
-            let subcirc = SiblingSubgraph::try_from_nodes([node], hugr)?;
+            let subcirc = SiblingSubgraph::from_node(node, hugr);
             let rw = subcirc.create_simple_replacement(hugr, replacement)?;
             let mut repls = hugr.apply_rewrite(rw)?;
             debug_assert_eq!(repls.len(), 1);

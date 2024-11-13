@@ -185,8 +185,7 @@ fn fold_op(
         })
         .unzip();
     let replacement = const_graph(consts, reg);
-    let sibling_graph = SiblingSubgraph::try_from_nodes([op_node], hugr)
-        .expect("Operation should form valid subgraph.");
+    let sibling_graph = SiblingSubgraph::from_node(op_node, hugr);
 
     let simple_replace = SimpleReplacement::new(
         sibling_graph,

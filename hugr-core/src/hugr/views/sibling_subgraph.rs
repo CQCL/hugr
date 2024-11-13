@@ -265,6 +265,33 @@ impl SiblingSubgraph {
         Self::try_new_with_checker(inputs, outputs, hugr, checker)
     }
 
+    /// Create a subgraph from a single node.
+    ///
+    /// `SiblingSubgraph::from_node(n,h)` is equivalent to
+    /// `SiblingSubgraph::try_from_nodes([n],h).unwrap()`.  A single node always
+    /// forms a convex subgraph, so `from_node` is infaliible.
+    ///
+    /// Panics if `node` is not present in `hugr`.
+    pub fn from_node(node: Node, hugr: &impl HugrView) -> Self {
+        // TODO once https://github.com/CQCL/portgraph/issues/155
+        // is fixed we can just call try_from_nodes here.
+        // Until then, doing this saves a lot of work.
+        let nodes = vec![node];
+        let inputs = hugr
+            .node_inputs(node)
+            .filter_map(|p| hugr.is_linked(node, p).then(|| vec![(node, p)]))
+            .collect_vec();
+        let outputs = hugr
+            .node_outputs(node)
+            .filter_map(|p| hugr.is_linked(node, p).then_some((node, p)))
+            .collect_vec();
+        Self {
+            nodes,
+            inputs,
+            outputs,
+        }
+    }
+
     /// An iterator over the nodes in the subgraph.
     pub fn nodes(&self) -> &[Node] {
         &self.nodes
