@@ -1,12 +1,6 @@
 # Changelog
 
 
-## [0.14.0](https://github.com/CQCL/hugr/compare/hugr-passes-v0.13.3...hugr-passes-v0.14.0) - 2024-11-13
-
-### Performance
-
-- Faster singleton SiblingSubgraph construction ([#1654](https://github.com/CQCL/hugr/pull/1654))
-
 ## [0.13.2](https://github.com/CQCL/hugr/compare/hugr-passes-v0.13.1...hugr-passes-v0.13.2) - 2024-10-22
 
 ### New Features

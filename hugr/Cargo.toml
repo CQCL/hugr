@@ -1,6 +1,6 @@
 [package]
 name = "hugr"
-version = "0.14.0"
+version = "0.13.4"
 edition = { workspace = true }
 rust-version = { workspace = true }
 
@@ -28,8 +28,8 @@ model_unstable = ["hugr-core/model_unstable", "hugr-model"]
 
 [dependencies]
 hugr-model = { path = "../hugr-model", optional = true, version = "0.14.1" }
-hugr-core = { path = "../hugr-core", version = "0.14.0" }
-hugr-passes = { path = "../hugr-passes", version = "0.14.0" }
+hugr-core = { path = "../hugr-core", version = "0.13.4" }
+hugr-passes = { path = "../hugr-passes", version = "0.13.4" }
 
 [dev-dependencies]
 rstest = { workspace = true }

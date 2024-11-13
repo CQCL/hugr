@@ -1,6 +1,6 @@
 [package]
 name = "hugr-core"
-version = "0.14.0"
+version = "0.13.4"
 edition = { workspace = true }
 rust-version = { workspace = true }
 

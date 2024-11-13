@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.14.0](https://github.com/CQCL/hugr/compare/hugr-v0.13.3...hugr-v0.14.0) - 2024-11-13
+## [0.13.4](https://github.com/CQCL/hugr/compare/hugr-v0.13.3...hugr-v0.13.4) - 2024-11-13
 
 ### New Features
 

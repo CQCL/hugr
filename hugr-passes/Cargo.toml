@@ -1,6 +1,6 @@
 [package]
 name = "hugr-passes"
-version = "0.14.0"
+version = "0.13.4"
 edition = { workspace = true }
 rust-version = { workspace = true }
 license = { workspace = true }
@@ -16,7 +16,7 @@ categories = ["compilers"]
 bench = false
 
 [dependencies]
-hugr-core = { path = "../hugr-core", version = "0.14.0" }
+hugr-core = { path = "../hugr-core", version = "0.13.4" }
 itertools = { workspace = true }
 lazy_static = { workspace = true }
 paste = { workspace = true }
