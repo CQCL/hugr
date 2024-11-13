@@ -146,6 +146,7 @@ struct Term {
         applyFull @6 :ApplyFull;
         quote @7 :TermId;
         list @8 :ListTerm;
+        listConcat @20 :ListConcat;
         listType @9 :TermId;
         string @10 :Text;
         stringType @11 :Void;
@@ -171,7 +172,12 @@ struct Term {
 
     struct ListTerm {
         items @0 :List(TermId);
-        tail @1 :OptionalTermId;
+        itemType @1 :TermId;
+    }
+
+    struct ListConcat {
+        lists @0 :List(TermId);
+        itemType @1 :TermId;
     }
 
     struct ExtSet {

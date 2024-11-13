@@ -190,10 +190,16 @@ fn write_term(mut builder: hugr_capnp::term::Builder, term: &model::Term) {
             let _ = builder.set_args(model::TermId::unwrap_slice(args));
         }
 
-        model::Term::List { items, tail } => {
+        model::Term::List { items, item_type } => {
             let mut builder = builder.init_list();
             let _ = builder.set_items(model::TermId::unwrap_slice(items));
-            builder.set_tail(tail.map_or(0, |t| t.0 + 1));
+            builder.set_item_type(item_type.0);
+        }
+
+        model::Term::ListConcat { lists, item_type } => {
+            let mut builder = builder.init_list_concat();
+            let _ = builder.set_lists(model::TermId::unwrap_slice(lists));
+            builder.set_item_type(item_type.0);
         }
 
         model::Term::ExtSet { extensions, rest } => {

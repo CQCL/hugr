@@ -289,8 +289,15 @@ fn read_term<'a>(bump: &'a Bump, reader: hugr_capnp::term::Reader) -> ReadResult
         Which::List(reader) => {
             let reader = reader?;
             let items = read_scalar_list!(bump, reader, get_items, model::TermId);
-            let tail = reader.get_tail().checked_sub(1).map(model::TermId);
-            model::Term::List { items, tail }
+            let item_type = model::TermId(reader.get_item_type());
+            model::Term::List { items, item_type }
+        }
+
+        Which::ListConcat(reader) => {
+            let reader = reader?;
+            let lists = read_scalar_list!(bump, reader, get_lists, model::TermId);
+            let item_type = model::TermId(reader.get_item_type());
+            model::Term::ListConcat { lists, item_type }
         }
 
         Which::ListType(item_type) => model::Term::ListType {

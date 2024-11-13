@@ -4,13 +4,12 @@ identifier = @{ (ASCII_ALPHA | "_" | "-") ~ (ASCII_ALPHANUMERIC | "_" | "-")* }
 ext_name   = @{ identifier ~ ("." ~ identifier)* }
 symbol     = @{ identifier ~ ("." ~ identifier)+ }
 tag        = @{ (ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*) | "0" }
+list_tail  =  { "." }
 
 string         =  { "\"" ~ (string_raw | string_escape | string_unicode)* ~ "\"" }
 string_raw     = @{ (!("\\" | "\"") ~ ANY)+ }
 string_escape  = @{ "\\" ~ ("\"" | "\\" | "n" | "r" | "t") }
 string_unicode = @{ "\\u" ~ "{" ~ ASCII_HEX_DIGIT+ ~ "}" }
-
-list_tail = { "." }
 
 module = { "(" ~ "hugr" ~ "0" ~ ")" ~ meta* ~ node* ~ EOI }
 
@@ -102,7 +101,7 @@ term_var          = { "?" ~ identifier }
 term_apply_full   = { ("(" ~ "@" ~ symbol ~ term* ~ ")") }
 term_apply        = { symbol | ("(" ~ symbol ~ term* ~ ")") }
 term_quote        = { "(" ~ "quote" ~ term ~ ")" }
-term_list         = { "[" ~ term* ~ (list_tail ~ term)? ~ "]" }
+term_list         = { "[" ~ (term_list_items | term_list_spread)* ~ "]" }
 term_list_type    = { "(" ~ "list" ~ term ~ ")" }
 term_str          = { string }
 term_str_type     = { "str" }
@@ -114,3 +113,6 @@ term_adt          = { "(" ~ "adt" ~ term ~ ")" }
 term_func_type    = { "(" ~ "fn" ~ term ~ term ~ term ~ ")" }
 term_ctrl         = { "(" ~ "ctrl" ~ term ~ ")" }
 term_ctrl_type    = { "ctrl" }
+
+term_list_items  = { term+ }
+term_list_spread = { term ~ "..." }

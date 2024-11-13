@@ -1,4 +1,4 @@
-use bumpalo::{collections::String as BumpString, Bump};
+use bumpalo::{collections::String as BumpString, collections::Vec as BumpVec, Bump};
 use pest::{
     iterators::{Pair, Pairs},
     Parser, RuleType,
@@ -136,21 +136,43 @@ impl<'a> ParseContext<'a> {
             }
 
             Rule::term_list => {
-                let mut items = Vec::new();
-                let mut tail = None;
+                // TODO: Avoid constructing the list concat term when it is not necessary:
+                // - For an empty list, prefer a list term.
+                // - For a list without spreads, prefer a list term.
+                // - For a list consisting of a single spread, prefer the spread term.
 
-                for token in filter_rule(&mut inner, Rule::term) {
-                    items.push(self.parse_term(token)?);
+                let item_type = self.module.insert_term(Term::Wildcard);
+                let mut lists = BumpVec::with_capacity_in(inner.len(), self.bump);
+
+                for token in inner {
+                    let list = match token.as_rule() {
+                        Rule::term_list_items => {
+                            let tokens = token.into_inner();
+                            let mut items = BumpVec::with_capacity_in(tokens.len(), self.bump);
+
+                            for token in tokens {
+                                items.push(self.parse_term(token)?);
+                            }
+
+                            self.module.insert_term(Term::List {
+                                items: items.into_bump_slice(),
+                                item_type,
+                            })
+                        }
+
+                        Rule::term_list_spread => {
+                            self.parse_term(token.into_inner().next().unwrap())?
+                        }
+
+                        _ => unreachable!(),
+                    };
+
+                    lists.push(list);
                 }
 
-                if inner.next().is_some() {
-                    let token = inner.next().unwrap();
-                    tail = Some(self.parse_term(token)?);
-                }
-
-                Term::List {
-                    items: self.bump.alloc_slice_copy(&items),
-                    tail,
+                Term::ListConcat {
+                    lists: lists.into_bump_slice(),
+                    item_type,
                 }
             }
 

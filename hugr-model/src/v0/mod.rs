@@ -563,19 +563,20 @@ pub enum Term<'a> {
         r#type: TermId,
     },
 
-    /// A list, with an optional tail.
-    ///
-    /// - `[ITEM-0 ... ITEM-n] : (list T)` where `T : static`, `ITEM-i : T`.
-    /// - `[ITEM-0 ... ITEM-n . TAIL] : (list item-type)` where `T : static`, `ITEM-i : T`, `TAIL : (list T)`.
+    /// A list.
     List {
         /// The items in the list.
-        ///
-        /// `item-i : item-type`
         items: &'a [TermId],
-        /// The tail of the list.
-        ///
-        /// `tail : (list item-type)`
-        tail: Option<TermId>,
+        /// The type of the items in the list.
+        item_type: TermId,
+    },
+
+    /// A concatenation of lists.
+    ListConcat {
+        /// The lists to concatenate.
+        lists: &'a [TermId],
+        /// The type of the items in the lists.
+        item_type: TermId,
     },
 
     /// The type of lists, given a type for the items.

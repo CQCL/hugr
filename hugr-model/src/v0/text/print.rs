@@ -531,16 +531,9 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_text("quote");
                 this.print_term(*r#type)
             }),
-            Term::List { items, tail } => self.print_brackets(|this| {
-                for item in items.iter() {
-                    this.print_term(*item)?;
-                }
-                if let Some(tail) = tail {
-                    this.print_text(".");
-                    this.print_term(*tail)?;
-                }
-                Ok(())
-            }),
+            Term::List { .. } | Term::ListConcat { .. } => {
+                self.print_brackets(|this| this.print_list(term_id))
+            }
             Term::ListType { item_type } => self.print_parens(|this| {
                 this.print_text("list");
                 this.print_term(*item_type)
@@ -599,6 +592,38 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 Ok(())
             }
         }
+    }
+
+    fn print_list(&mut self, term_id: TermId) -> PrintResult<()> {
+        let term_data = self
+            .module
+            .get_term(term_id)
+            .ok_or_else(|| PrintError::TermNotFound(term_id))?;
+
+        match term_data {
+            Term::List {
+                items,
+                item_type: _,
+            } => {
+                for item in *items {
+                    self.print_term(*item)?;
+                }
+            }
+            Term::ListConcat {
+                lists,
+                item_type: _,
+            } => {
+                for list in *lists {
+                    self.print_list(*list)?;
+                }
+            }
+            _ => {
+                self.print_term(term_id)?;
+                self.print_text("...");
+            }
+        }
+
+        Ok(())
     }
 
     fn print_local_ref(&mut self, local_ref: LocalRef<'a>) -> PrintResult<()> {
