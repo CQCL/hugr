@@ -693,7 +693,11 @@ impl<'a> Context<'a> {
         for (i, param) in t.params().iter().enumerate() {
             let name = self.bump.alloc_str(&i.to_string());
             let r#type = self.export_type_param(param, Some(model::LocalRef::Index(scope, i as _)));
-            let param = model::Param::Implicit { name, r#type };
+            let param = model::Param {
+                name,
+                r#type,
+                sort: model::ParamSort::Implicit,
+            };
             params.push(param)
         }
 

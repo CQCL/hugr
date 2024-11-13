@@ -7,7 +7,7 @@ use thiserror::Error;
 
 use crate::v0::{
     AliasDecl, ConstructorDecl, FuncDecl, GlobalRef, LinkRef, LocalRef, MetaItem, Module, Node,
-    NodeId, Operation, OperationDecl, Param, Region, RegionId, RegionKind, Term, TermId,
+    NodeId, Operation, OperationDecl, Param, ParamSort, Region, RegionId, RegionKind, Term, TermId,
 };
 
 mod pest_parser {
@@ -637,13 +637,21 @@ impl<'a> ParseContext<'a> {
                     let mut inner = param.into_inner();
                     let name = &inner.next().unwrap().as_str()[1..];
                     let r#type = self.parse_term(inner.next().unwrap())?;
-                    Param::Implicit { name, r#type }
+                    Param {
+                        name,
+                        r#type,
+                        sort: ParamSort::Implicit,
+                    }
                 }
                 Rule::param_explicit => {
                     let mut inner = param.into_inner();
                     let name = &inner.next().unwrap().as_str()[1..];
                     let r#type = self.parse_term(inner.next().unwrap())?;
-                    Param::Explicit { name, r#type }
+                    Param {
+                        name,
+                        r#type,
+                        sort: ParamSort::Explicit,
+                    }
                 }
                 _ => unreachable!(),
             };

@@ -195,18 +195,12 @@ struct Term {
 }
 
 struct Param {
-    union {
-        implicit @0 :Implicit;
-        explicit @1 :Explicit;
-    }
+    name @0 :Text;
+    type @1 :TermId;
+    sort @2 :ParamSort;
+}
 
-    struct Implicit {
-        name @0 :Text;
-        type @1 :TermId;
-    }
-
-    struct Explicit {
-        name @0 :Text;
-        type @1 :TermId;
-    }
+enum ParamSort {
+    implicit @0;
+    explicit @1;
 }

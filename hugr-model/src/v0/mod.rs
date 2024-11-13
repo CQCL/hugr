@@ -689,26 +689,23 @@ pub enum Term<'a> {
 /// Parameter names must be unique within a parameter list.
 /// Implicit and explicit parameters share a namespace.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum Param<'a> {
-    /// An implicit parameter that should be inferred, unless a full application form is used
+pub struct Param<'a> {
+    /// The name of the parameter.
+    pub name: &'a str,
+    /// The type of the parameter.
+    pub r#type: TermId,
+    /// The sort of the parameter (implicit or explicit).
+    pub sort: ParamSort,
+}
+
+/// The sort of a parameter (implicit or explicit).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ParamSort {
+    /// The parameter is implicit and should be inferred, unless a full application form is used
     /// (see [`Term::ApplyFull`] and [`Operation::CustomFull`]).
-    Implicit {
-        /// The name of the parameter.
-        name: &'a str,
-        /// The type of the parameter.
-        ///
-        /// This must be a term of type `static`.
-        r#type: TermId,
-    },
-    /// An explicit parameter that should always be provided.
-    Explicit {
-        /// The name of the parameter.
-        name: &'a str,
-        /// The type of the parameter.
-        ///
-        /// This must be a term of type `static`.
-        r#type: TermId,
-    },
+    Implicit,
+    /// The parameter is explicit and should always be provided.
+    Explicit,
 }
 
 /// Errors that can occur when traversing and interpreting the model.

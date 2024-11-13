@@ -367,19 +367,13 @@ fn read_param<'a>(
     bump: &'a Bump,
     reader: hugr_capnp::param::Reader,
 ) -> ReadResult<model::Param<'a>> {
-    use hugr_capnp::param::Which;
-    Ok(match reader.which()? {
-        Which::Implicit(reader) => {
-            let reader = reader?;
-            let name = bump.alloc_str(reader.get_name()?.to_str()?);
-            let r#type = model::TermId(reader.get_type());
-            model::Param::Implicit { name, r#type }
-        }
-        Which::Explicit(reader) => {
-            let reader = reader?;
-            let name = bump.alloc_str(reader.get_name()?.to_str()?);
-            let r#type = model::TermId(reader.get_type());
-            model::Param::Explicit { name, r#type }
-        }
-    })
+    let name = bump.alloc_str(reader.get_name()?.to_str()?);
+    let r#type = model::TermId(reader.get_type());
+
+    let sort = match reader.get_sort()? {
+        hugr_capnp::ParamSort::Implicit => model::ParamSort::Implicit,
+        hugr_capnp::ParamSort::Explicit => model::ParamSort::Explicit,
+    };
+
+    Ok(model::Param { name, r#type, sort })
 }

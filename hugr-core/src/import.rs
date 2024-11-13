@@ -892,16 +892,11 @@ impl<'a> Context<'a> {
         self.with_local_socpe(|ctx| {
             let mut imported_params = Vec::with_capacity(decl.params.len());
 
-            for param in decl.params {
-                match param {
-                    model::Param::Implicit { name, r#type } => {
-                        ctx.local_variables.insert(name, LocalVar::new(*r#type));
-                    }
-                    model::Param::Explicit { name, r#type } => {
-                        ctx.local_variables.insert(name, LocalVar::new(*r#type));
-                    }
-                }
-            }
+            ctx.local_variables.extend(
+                decl.params
+                    .iter()
+                    .map(|param| (param.name, LocalVar::new(param.r#type))),
+            );
 
             for constraint in decl.constraints {
                 match ctx.get_term(*constraint)? {
@@ -929,22 +924,10 @@ impl<'a> Context<'a> {
                 }
             }
 
-            let mut index = 0;
-
-            for param in decl.params {
+            for (index, param) in decl.params.iter().enumerate() {
                 // TODO: `PolyFuncType` should be able to distinguish between implicit and explicit parameters.
-                match param {
-                    model::Param::Implicit { r#type, .. } => {
-                        let bound = ctx.local_variables.get_index(index).unwrap().1.bound()?;
-                        imported_params.push(ctx.import_type_param(*r#type, bound)?);
-                        index += 1;
-                    }
-                    model::Param::Explicit { r#type, .. } => {
-                        let bound = ctx.local_variables.get_index(index).unwrap().1.bound()?;
-                        imported_params.push(ctx.import_type_param(*r#type, bound)?);
-                        index += 1;
-                    }
-                }
+                let bound = ctx.local_variables.get_index(index).unwrap().1.bound()?;
+                imported_params.push(ctx.import_type_param(param.r#type, bound)?);
             }
 
             let body = ctx.import_func_type::<RV>(decl.signature)?;

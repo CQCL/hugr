@@ -100,19 +100,13 @@ fn write_operation(mut builder: hugr_capnp::operation::Builder, operation: &mode
     }
 }
 
-fn write_param(builder: hugr_capnp::param::Builder, param: &model::Param) {
-    match param {
-        model::Param::Implicit { name, r#type } => {
-            let mut builder = builder.init_implicit();
-            builder.set_name(name);
-            builder.set_type(r#type.0);
-        }
-        model::Param::Explicit { name, r#type } => {
-            let mut builder = builder.init_explicit();
-            builder.set_name(name);
-            builder.set_type(r#type.0);
-        }
-    }
+fn write_param(mut builder: hugr_capnp::param::Builder, param: &model::Param) {
+    builder.set_name(param.name);
+    builder.set_type(param.r#type.0);
+    builder.set_sort(match param.sort {
+        model::ParamSort::Implicit => hugr_capnp::ParamSort::Implicit,
+        model::ParamSort::Explicit => hugr_capnp::ParamSort::Explicit,
+    });
 }
 
 fn write_global_ref(mut builder: hugr_capnp::global_ref::Builder, global_ref: &model::GlobalRef) {

@@ -2,8 +2,8 @@ use pretty::{Arena, DocAllocator, RefDoc};
 use std::borrow::Cow;
 
 use crate::v0::{
-    GlobalRef, LinkRef, LocalRef, MetaItem, ModelError, Module, NodeId, Operation, Param, RegionId,
-    RegionKind, Term, TermId,
+    GlobalRef, LinkRef, LocalRef, MetaItem, ModelError, Module, NodeId, Operation, Param,
+    ParamSort, RegionId, RegionKind, Term, TermId,
 };
 
 type PrintError = ModelError;
@@ -122,14 +122,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
         f: impl FnOnce(&mut Self) -> PrintResult<T>,
     ) -> PrintResult<T> {
         let locals = std::mem::take(&mut self.locals);
-
-        for param in params {
-            match param {
-                Param::Implicit { name, .. } => self.locals.push(name),
-                Param::Explicit { name, .. } => self.locals.push(name),
-            }
-        }
-
+        self.locals.extend(params.iter().map(|param| param.name));
         let result = f(self);
         self.locals = locals;
         result
@@ -462,17 +455,14 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
     }
 
     fn print_param(&mut self, param: Param<'a>) -> PrintResult<()> {
-        self.print_parens(|this| match param {
-            Param::Implicit { name, r#type } => {
-                this.print_text("forall");
-                this.print_text(format!("?{}", name));
-                this.print_term(r#type)
-            }
-            Param::Explicit { name, r#type } => {
-                this.print_text("param");
-                this.print_text(format!("?{}", name));
-                this.print_term(r#type)
-            }
+        self.print_parens(|this| {
+            match param.sort {
+                ParamSort::Implicit => this.print_text("forall"),
+                ParamSort::Explicit => this.print_text("param"),
+            };
+
+            this.print_text(format!("?{}", param.name));
+            this.print_term(param.r#type)
         })
     }
 
