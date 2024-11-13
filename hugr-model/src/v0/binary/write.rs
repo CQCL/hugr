@@ -60,12 +60,14 @@ fn write_operation(mut builder: hugr_capnp::operation::Builder, operation: &mode
             let mut builder = builder.init_func_defn();
             builder.set_name(decl.name);
             write_list!(builder, init_params, write_param, decl.params);
+            let _ = builder.set_constraints(model::TermId::unwrap_slice(decl.constraints));
             builder.set_signature(decl.signature.0);
         }
         model::Operation::DeclareFunc { decl } => {
             let mut builder = builder.init_func_decl();
             builder.set_name(decl.name);
             write_list!(builder, init_params, write_param, decl.params);
+            let _ = builder.set_constraints(model::TermId::unwrap_slice(decl.constraints));
             builder.set_signature(decl.signature.0);
         }
 
@@ -73,6 +75,7 @@ fn write_operation(mut builder: hugr_capnp::operation::Builder, operation: &mode
             let mut builder = builder.init_alias_defn();
             builder.set_name(decl.name);
             write_list!(builder, init_params, write_param, decl.params);
+            let _ = builder.set_constraints(model::TermId::unwrap_slice(decl.constraints));
             builder.set_type(decl.r#type.0);
             builder.set_value(value.0);
         }
@@ -80,6 +83,7 @@ fn write_operation(mut builder: hugr_capnp::operation::Builder, operation: &mode
             let mut builder = builder.init_alias_decl();
             builder.set_name(decl.name);
             write_list!(builder, init_params, write_param, decl.params);
+            let _ = builder.set_constraints(model::TermId::unwrap_slice(decl.constraints));
             builder.set_type(decl.r#type.0);
         }
 
@@ -87,12 +91,14 @@ fn write_operation(mut builder: hugr_capnp::operation::Builder, operation: &mode
             let mut builder = builder.init_constructor_decl();
             builder.set_name(decl.name);
             write_list!(builder, init_params, write_param, decl.params);
+            let _ = builder.set_constraints(model::TermId::unwrap_slice(decl.constraints));
             builder.set_type(decl.r#type.0);
         }
         model::Operation::DeclareOperation { decl } => {
             let mut builder = builder.init_operation_decl();
             builder.set_name(decl.name);
             write_list!(builder, init_params, write_param, decl.params);
+            let _ = builder.set_constraints(model::TermId::unwrap_slice(decl.constraints));
             builder.set_type(decl.r#type.0);
         }
 
