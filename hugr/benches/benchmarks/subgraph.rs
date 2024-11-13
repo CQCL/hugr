@@ -21,7 +21,7 @@ fn bench_singleton_subgraph(c: &mut Criterion) {
             &layers,
             |b, &layers| {
                 // Pick a node from the middle of the circuit.
-                let node = layer_ids.iter().nth(layers / 2).unwrap().cx1;
+                let node = layer_ids[layers / 2].cx1;
                 b.iter(|| black_box(SiblingSubgraph::try_from_nodes([node], &hugr)))
             },
         );
