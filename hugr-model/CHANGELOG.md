@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.14.1](https://github.com/CQCL/hugr/compare/hugr-model-v0.14.0...hugr-model-v0.14.1) - 2024-11-13
+
+### New Features
+
+- Export/import of JSON metadata ([#1622](https://github.com/CQCL/hugr/pull/1622))
+
+### Performance
+
+- Faster singleton SiblingSubgraph construction ([#1654](https://github.com/CQCL/hugr/pull/1654))
+
 ## [0.14.0](https://github.com/CQCL/hugr/compare/hugr-model-v0.13.2...hugr-model-v0.14.0) - 2024-11-06
 
 ### New Features

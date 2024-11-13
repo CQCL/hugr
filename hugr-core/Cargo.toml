@@ -1,6 +1,6 @@
 [package]
 name = "hugr-core"
-version = "0.13.3"
+version = "0.14.0"
 edition = { workspace = true }
 rust-version = { workspace = true }
 
@@ -54,7 +54,7 @@ paste = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
 semver = { version = "1.0.23", features = ["serde"] }
-hugr-model = { version = "0.14.0", path = "../hugr-model", optional = true }
+hugr-model = { version = "0.14.1", path = "../hugr-model", optional = true }
 indexmap.workspace = true
 fxhash.workspace = true
 bumpalo = { workspace = true, features = ["collections"] }
