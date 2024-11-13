@@ -237,10 +237,11 @@ impl<'a> Context<'a> {
 
             OpType::FuncDefn(func) => self.with_local_scope(node_id, |this| {
                 let name = this.get_func_name(node).unwrap();
-                let (params, signature) = this.export_poly_func_type(&func.signature);
+                let (params, constraints, signature) = this.export_poly_func_type(&func.signature);
                 let decl = this.bump.alloc(model::FuncDecl {
                     name,
                     params,
+                    constraints,
                     signature,
                 });
                 let extensions = this.export_ext_set(&func.signature.body().extension_reqs);
@@ -252,10 +253,11 @@ impl<'a> Context<'a> {
 
             OpType::FuncDecl(func) => self.with_local_scope(node_id, |this| {
                 let name = this.get_func_name(node).unwrap();
-                let (params, func) = this.export_poly_func_type(&func.signature);
+                let (params, constraints, func) = this.export_poly_func_type(&func.signature);
                 let decl = this.bump.alloc(model::FuncDecl {
                     name,
                     params,
+                    constraints,
                     signature: func,
                 });
                 model::Operation::DeclareFunc { decl }
@@ -267,6 +269,7 @@ impl<'a> Context<'a> {
                 let decl = this.bump.alloc(model::AliasDecl {
                     name: &alias.name,
                     params: &[],
+                    constraints: &[],
                     r#type,
                 });
                 model::Operation::DeclareAlias { decl }
@@ -279,6 +282,7 @@ impl<'a> Context<'a> {
                 let decl = this.bump.alloc(model::AliasDecl {
                     name: &alias.name,
                     params: &[],
+                    constraints: &[],
                     r#type,
                 });
                 model::Operation::DefineAlias { decl, value }
@@ -455,10 +459,11 @@ impl<'a> Context<'a> {
 
         let decl = self.with_local_scope(node, |this| {
             let name = this.make_qualified_name(opdef.extension(), opdef.name());
-            let (params, r#type) = this.export_poly_func_type(poly_func_type);
+            let (params, constraints, r#type) = this.export_poly_func_type(poly_func_type);
             let decl = this.bump.alloc(model::OperationDecl {
                 name,
                 params,
+                constraints,
                 r#type,
             });
             decl
@@ -679,7 +684,7 @@ impl<'a> Context<'a> {
     pub fn export_poly_func_type<RV: MaybeRV>(
         &mut self,
         t: &PolyFuncTypeBase<RV>,
-    ) -> (&'a [model::Param<'a>], model::TermId) {
+    ) -> (&'a [model::Param<'a>], &'a [model::TermId], model::TermId) {
         let mut params = BumpVec::with_capacity_in(t.params().len(), self.bump);
         let scope = self
             .local_scope
@@ -692,15 +697,13 @@ impl<'a> Context<'a> {
             params.push(param)
         }
 
-        params.extend(
-            self.local_constraints
-                .drain(..)
-                .map(|constraint| model::Param::Constraint { constraint }),
-        );
+        let constraints = self
+            .bump
+            .alloc_slice_fill_iter(self.local_constraints.drain(..));
 
         let body = self.export_func_type(t.body());
 
-        (params.into_bump_slice(), body)
+        (params.into_bump_slice(), constraints, body)
     }
 
     pub fn export_type<RV: MaybeRV>(&mut self, t: &TypeBase<RV>) -> model::TermId {

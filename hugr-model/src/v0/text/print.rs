@@ -127,7 +127,6 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
             match param {
                 Param::Implicit { name, .. } => self.locals.push(name),
                 Param::Explicit { name, .. } => self.locals.push(name),
-                Param::Constraint { .. } => {}
             }
         }
 
@@ -178,9 +177,8 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                     this.print_text(decl.name);
                 });
 
-                for param in decl.params {
-                    this.print_param(*param)?;
-                }
+                this.print_params(decl.params)?;
+                this.print_constraints(decl.constraints)?;
 
                 match self.module.get_term(decl.signature) {
                     Some(Term::FuncType {
@@ -208,9 +206,8 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                     this.print_text(decl.name);
                 });
 
-                for param in decl.params {
-                    this.print_param(*param)?;
-                }
+                this.print_params(decl.params)?;
+                this.print_constraints(decl.constraints)?;
 
                 match self.module.get_term(decl.signature) {
                     Some(Term::FuncType {
@@ -303,9 +300,8 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                     this.print_text(decl.name);
                 });
 
-                for param in decl.params {
-                    this.print_param(*param)?;
-                }
+                this.print_params(decl.params)?;
+                this.print_constraints(decl.constraints)?;
 
                 this.print_term(decl.r#type)?;
                 this.print_term(*value)?;
@@ -318,9 +314,8 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                     this.print_text(decl.name);
                 });
 
-                for param in decl.params {
-                    this.print_param(*param)?;
-                }
+                this.print_params(decl.params)?;
+                this.print_constraints(decl.constraints)?;
 
                 this.print_term(decl.r#type)?;
                 this.print_meta(node_data.meta)?;
@@ -333,9 +328,8 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                     this.print_text(decl.name);
                 });
 
-                for param in decl.params {
-                    this.print_param(*param)?;
-                }
+                this.print_params(decl.params)?;
+                this.print_constraints(decl.constraints)?;
 
                 this.print_term(decl.r#type)?;
                 this.print_meta(node_data.meta)?;
@@ -348,9 +342,8 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                     this.print_text(decl.name);
                 });
 
-                for param in decl.params {
-                    this.print_param(*param)?;
-                }
+                this.print_params(decl.params)?;
+                this.print_constraints(decl.constraints)?;
 
                 this.print_term(decl.r#type)?;
                 this.print_meta(node_data.meta)?;
@@ -460,6 +453,14 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
         }
     }
 
+    fn print_params(&mut self, params: &'a [Param<'a>]) -> PrintResult<()> {
+        for param in params {
+            self.print_param(*param)?;
+        }
+
+        Ok(())
+    }
+
     fn print_param(&mut self, param: Param<'a>) -> PrintResult<()> {
         self.print_parens(|this| match param {
             Param::Implicit { name, r#type } => {
@@ -472,11 +473,18 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_text(format!("?{}", name));
                 this.print_term(r#type)
             }
-            Param::Constraint { constraint } => {
-                this.print_text("where");
-                this.print_term(constraint)
-            }
         })
+    }
+
+    fn print_constraints(&mut self, terms: &'a [TermId]) -> PrintResult<()> {
+        for term in terms {
+            self.print_parens(|this| {
+                this.print_text("where");
+                this.print_term(*term)
+            })?;
+        }
+
+        Ok(())
     }
 
     fn print_term(&mut self, term_id: TermId) -> PrintResult<()> {

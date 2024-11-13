@@ -397,6 +397,8 @@ pub struct FuncDecl<'a> {
     pub name: &'a str,
     /// The static parameters of the function.
     pub params: &'a [Param<'a>],
+    /// The constraints on the static parameters.
+    pub constraints: &'a [TermId],
     /// The signature of the function.
     pub signature: TermId,
 }
@@ -408,6 +410,8 @@ pub struct AliasDecl<'a> {
     pub name: &'a str,
     /// The static parameters of the alias.
     pub params: &'a [Param<'a>],
+    /// The constraints on the static parameters.
+    pub constraints: &'a [TermId],
     /// The type of the alias.
     pub r#type: TermId,
 }
@@ -419,6 +423,8 @@ pub struct ConstructorDecl<'a> {
     pub name: &'a str,
     /// The static parameters of the constructor.
     pub params: &'a [Param<'a>],
+    /// The constraints on the static parameters.
+    pub constraints: &'a [TermId],
     /// The type of the constructed term.
     pub r#type: TermId,
 }
@@ -430,6 +436,8 @@ pub struct OperationDecl<'a> {
     pub name: &'a str,
     /// The static parameters of the operation.
     pub params: &'a [Param<'a>],
+    /// The constraints on the static parameters.
+    pub constraints: &'a [TermId],
     /// The type of the operation. This must be a function type.
     pub r#type: TermId,
 }
@@ -700,13 +708,6 @@ pub enum Param<'a> {
         ///
         /// This must be a term of type `static`.
         r#type: TermId,
-    },
-    /// A constraint that should be satisfied by other parameters in a parameter list.
-    Constraint {
-        /// The constraint to be satisfied.
-        ///
-        /// This must be a term of type `constraint`.
-        constraint: TermId,
     },
 }
 

@@ -900,39 +900,32 @@ impl<'a> Context<'a> {
                     model::Param::Explicit { name, r#type } => {
                         ctx.local_variables.insert(name, LocalVar::new(*r#type));
                     }
-                    model::Param::Constraint { .. } => {}
                 }
             }
 
-            for param in decl.params {
-                if let model::Param::Constraint { constraint } = param {
-                    let constraint = ctx.get_term(*constraint)?;
+            for constraint in decl.constraints {
+                match ctx.get_term(*constraint)? {
+                    model::Term::CopyConstraint { term } => {
+                        let model::Term::Var(var) = ctx.get_term(*term)? else {
+                            return Err(error_unsupported!(
+                                "constraint on term that is not a variable"
+                            ));
+                        };
 
-                    match constraint {
-                        model::Term::CopyConstraint { term } => {
-                            let model::Term::Var(var) = ctx.get_term(*term)? else {
-                                return Err(error_unsupported!(
-                                    "constraint on term that is not a variable"
-                                ));
-                            };
-
-                            let var = ctx.resolve_local_ref(var)?.0;
-                            ctx.local_variables.get_index_mut(var).unwrap().1.copy = true;
-                        }
-                        model::Term::DiscardConstraint { term } => {
-                            let model::Term::Var(var) = ctx.get_term(*term)? else {
-                                return Err(error_unsupported!(
-                                    "constraint on term that is not a variable"
-                                ));
-                            };
-
-                            let var = ctx.resolve_local_ref(var)?.0;
-                            ctx.local_variables.get_index_mut(var).unwrap().1.discard = true;
-                        }
-                        _ => {
-                            return Err(error_unsupported!("constraint other than copy or discard"))
-                        }
+                        let var = ctx.resolve_local_ref(var)?.0;
+                        ctx.local_variables.get_index_mut(var).unwrap().1.copy = true;
                     }
+                    model::Term::DiscardConstraint { term } => {
+                        let model::Term::Var(var) = ctx.get_term(*term)? else {
+                            return Err(error_unsupported!(
+                                "constraint on term that is not a variable"
+                            ));
+                        };
+
+                        let var = ctx.resolve_local_ref(var)?.0;
+                        ctx.local_variables.get_index_mut(var).unwrap().1.discard = true;
+                    }
+                    _ => return Err(error_unsupported!("constraint other than copy or discard")),
                 }
             }
 
@@ -951,7 +944,6 @@ impl<'a> Context<'a> {
                         imported_params.push(ctx.import_type_param(*r#type, bound)?);
                         index += 1;
                     }
-                    model::Param::Constraint { constraint: _ } => {}
                 }
             }
 

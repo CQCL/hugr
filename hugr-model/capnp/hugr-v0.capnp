@@ -56,38 +56,44 @@ struct Operation {
     struct FuncDefn {
         name @0 :Text;
         params @1 :List(Param);
-        signature @2 :TermId;
+        constraints @2 :List(TermId);
+        signature @3 :TermId;
     }
 
     struct FuncDecl {
         name @0 :Text;
         params @1 :List(Param);
-        signature @2 :TermId;
+        constraints @2 :List(TermId);
+        signature @3 :TermId;
     }
 
     struct AliasDefn {
         name @0 :Text;
         params @1 :List(Param);
-        type @2 :TermId;
-        value @3 :TermId;
+        constraints @2 :List(TermId);
+        type @3 :TermId;
+        value @4 :TermId;
     }
 
     struct AliasDecl {
         name @0 :Text;
         params @1 :List(Param);
-        type @2 :TermId;
+        constraints @2 :List(TermId);
+        type @3 :TermId;
     }
 
     struct ConstructorDecl {
         name @0 :Text;
         params @1 :List(Param);
-        type @2 :TermId;
+        constraints @2 :List(TermId);
+        type @3 :TermId;
     }
 
     struct OperationDecl {
         name @0 :Text;
         params @1 :List(Param);
-        type @2 :TermId;
+        constraints @2 :List(TermId);
+        type @3 :TermId;
     }
 }
 
@@ -192,7 +198,6 @@ struct Param {
     union {
         implicit @0 :Implicit;
         explicit @1 :Explicit;
-        constraint @2 :TermId;
     }
 
     struct Implicit {

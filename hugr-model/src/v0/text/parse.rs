@@ -554,6 +554,7 @@ impl<'a> ParseContext<'a> {
         let mut inner = pair.into_inner();
         let name = self.parse_symbol(&mut inner)?;
         let params = self.parse_params(&mut inner)?;
+        let constraints = self.parse_constraints(&mut inner)?;
 
         let inputs = self.parse_term(inner.next().unwrap())?;
         let outputs = self.parse_term(inner.next().unwrap())?;
@@ -569,6 +570,7 @@ impl<'a> ParseContext<'a> {
         Ok(self.bump.alloc(FuncDecl {
             name,
             params,
+            constraints,
             signature: func,
         }))
     }
@@ -579,11 +581,13 @@ impl<'a> ParseContext<'a> {
         let mut inner = pair.into_inner();
         let name = self.parse_symbol(&mut inner)?;
         let params = self.parse_params(&mut inner)?;
+        let constraints = self.parse_constraints(&mut inner)?;
         let r#type = self.parse_term(inner.next().unwrap())?;
 
         Ok(self.bump.alloc(AliasDecl {
             name,
             params,
+            constraints,
             r#type,
         }))
     }
@@ -594,11 +598,13 @@ impl<'a> ParseContext<'a> {
         let mut inner = pair.into_inner();
         let name = self.parse_symbol(&mut inner)?;
         let params = self.parse_params(&mut inner)?;
+        let constraints = self.parse_constraints(&mut inner)?;
         let r#type = self.parse_term(inner.next().unwrap())?;
 
         Ok(self.bump.alloc(ConstructorDecl {
             name,
             params,
+            constraints,
             r#type,
         }))
     }
@@ -609,11 +615,13 @@ impl<'a> ParseContext<'a> {
         let mut inner = pair.into_inner();
         let name = self.parse_symbol(&mut inner)?;
         let params = self.parse_params(&mut inner)?;
+        let constraints = self.parse_constraints(&mut inner)?;
         let r#type = self.parse_term(inner.next().unwrap())?;
 
         Ok(self.bump.alloc(OperationDecl {
             name,
             params,
+            constraints,
             r#type,
         }))
     }
@@ -637,11 +645,6 @@ impl<'a> ParseContext<'a> {
                     let r#type = self.parse_term(inner.next().unwrap())?;
                     Param::Explicit { name, r#type }
                 }
-                Rule::param_constraint => {
-                    let mut inner = param.into_inner();
-                    let constraint = self.parse_term(inner.next().unwrap())?;
-                    Param::Constraint { constraint }
-                }
                 _ => unreachable!(),
             };
 
@@ -649,6 +652,17 @@ impl<'a> ParseContext<'a> {
         }
 
         Ok(self.bump.alloc_slice_copy(&params))
+    }
+
+    fn parse_constraints(&mut self, pairs: &mut Pairs<'a, Rule>) -> ParseResult<&'a [TermId]> {
+        let mut constraints = Vec::new();
+
+        for pair in filter_rule(pairs, Rule::where_clause) {
+            let constraint = self.parse_term(pair.into_inner().next().unwrap())?;
+            constraints.push(constraint);
+        }
+
+        Ok(self.bump.alloc_slice_copy(&constraints))
     }
 
     fn parse_signature(&mut self, pairs: &mut Pairs<'a, Rule>) -> ParseResult<Option<TermId>> {

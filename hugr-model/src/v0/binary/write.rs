@@ -100,7 +100,7 @@ fn write_operation(mut builder: hugr_capnp::operation::Builder, operation: &mode
     }
 }
 
-fn write_param(mut builder: hugr_capnp::param::Builder, param: &model::Param) {
+fn write_param(builder: hugr_capnp::param::Builder, param: &model::Param) {
     match param {
         model::Param::Implicit { name, r#type } => {
             let mut builder = builder.init_implicit();
@@ -112,7 +112,6 @@ fn write_param(mut builder: hugr_capnp::param::Builder, param: &model::Param) {
             builder.set_name(name);
             builder.set_type(r#type.0);
         }
-        model::Param::Constraint { constraint } => builder.set_constraint(constraint.0),
     }
 }
 

@@ -140,10 +140,12 @@ fn read_operation<'a>(
             let reader = reader?;
             let name = bump.alloc_str(reader.get_name()?.to_str()?);
             let params = read_list!(bump, reader, get_params, read_param);
+            let constraints = read_scalar_list!(bump, reader, get_constraints, model::TermId);
             let signature = model::TermId(reader.get_signature());
             let decl = bump.alloc(model::FuncDecl {
                 name,
                 params,
+                constraints,
                 signature,
             });
             model::Operation::DefineFunc { decl }
@@ -152,10 +154,12 @@ fn read_operation<'a>(
             let reader = reader?;
             let name = bump.alloc_str(reader.get_name()?.to_str()?);
             let params = read_list!(bump, reader, get_params, read_param);
+            let constraints = read_scalar_list!(bump, reader, get_constraints, model::TermId);
             let signature = model::TermId(reader.get_signature());
             let decl = bump.alloc(model::FuncDecl {
                 name,
                 params,
+                constraints,
                 signature,
             });
             model::Operation::DeclareFunc { decl }
@@ -164,11 +168,13 @@ fn read_operation<'a>(
             let reader = reader?;
             let name = bump.alloc_str(reader.get_name()?.to_str()?);
             let params = read_list!(bump, reader, get_params, read_param);
+            let constraints = read_scalar_list!(bump, reader, get_constraints, model::TermId);
             let r#type = model::TermId(reader.get_type());
             let value = model::TermId(reader.get_value());
             let decl = bump.alloc(model::AliasDecl {
                 name,
                 params,
+                constraints,
                 r#type,
             });
             model::Operation::DefineAlias { decl, value }
@@ -177,10 +183,12 @@ fn read_operation<'a>(
             let reader = reader?;
             let name = bump.alloc_str(reader.get_name()?.to_str()?);
             let params = read_list!(bump, reader, get_params, read_param);
+            let constraints = read_scalar_list!(bump, reader, get_constraints, model::TermId);
             let r#type = model::TermId(reader.get_type());
             let decl = bump.alloc(model::AliasDecl {
                 name,
                 params,
+                constraints,
                 r#type,
             });
             model::Operation::DeclareAlias { decl }
@@ -189,10 +197,12 @@ fn read_operation<'a>(
             let reader = reader?;
             let name = bump.alloc_str(reader.get_name()?.to_str()?);
             let params = read_list!(bump, reader, get_params, read_param);
+            let constraints = read_scalar_list!(bump, reader, get_constraints, model::TermId);
             let r#type = model::TermId(reader.get_type());
             let decl = bump.alloc(model::ConstructorDecl {
                 name,
                 params,
+                constraints,
                 r#type,
             });
             model::Operation::DeclareConstructor { decl }
@@ -201,10 +211,12 @@ fn read_operation<'a>(
             let reader = reader?;
             let name = bump.alloc_str(reader.get_name()?.to_str()?);
             let params = read_list!(bump, reader, get_params, read_param);
+            let constraints = read_scalar_list!(bump, reader, get_constraints, model::TermId);
             let r#type = model::TermId(reader.get_type());
             let decl = bump.alloc(model::OperationDecl {
                 name,
                 params,
+                constraints,
                 r#type,
             });
             model::Operation::DeclareOperation { decl }
@@ -368,10 +380,6 @@ fn read_param<'a>(
             let name = bump.alloc_str(reader.get_name()?.to_str()?);
             let r#type = model::TermId(reader.get_type());
             model::Param::Explicit { name, r#type }
-        }
-        Which::Constraint(constraint) => {
-            let constraint = model::TermId(constraint);
-            model::Param::Constraint { constraint }
         }
     })
 }
