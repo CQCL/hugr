@@ -211,7 +211,7 @@ impl SiblingSubgraph {
     /// The subgraph signature will be given by the types of the incoming and
     /// outgoing edges ordered by the node order in `nodes` and within each node
     /// by the port order.
-
+    ///
     /// The in- and out-arity of the signature will match the
     /// number of incoming and outgoing edges respectively. In particular, the
     /// assumption is made that no two incoming edges have the same source
@@ -220,8 +220,15 @@ impl SiblingSubgraph {
         nodes: impl Into<Vec<Node>>,
         hugr: &impl HugrView,
     ) -> Result<Self, InvalidSubgraph> {
-        let checker = TopoConvexChecker::new(hugr);
-        Self::try_from_nodes_with_checker(nodes, hugr, &checker)
+        let nodes = nodes.into();
+        match nodes.len() {
+            0 => Err(InvalidSubgraph::EmptySubgraph),
+            1 => Ok(Self::from_node(nodes[0], hugr)),
+            _ => {
+                let checker = TopoConvexChecker::new(hugr);
+                Self::try_from_nodes_with_checker(nodes, hugr, &checker)
+            }
+        }
     }
 
     /// Create a subgraph from a set of nodes.
@@ -238,6 +245,14 @@ impl SiblingSubgraph {
         checker: &impl ConvexChecker,
     ) -> Result<Self, InvalidSubgraph> {
         let nodes = nodes.into();
+
+        // If there's one or less nodes, we don't need to check convexity.
+        match nodes.as_slice() {
+            [] => return Err(InvalidSubgraph::EmptySubgraph),
+            [node] => return Ok(Self::from_node(*node, hugr)),
+            _ => {}
+        };
+
         let nodes_set = nodes.iter().copied().collect::<HashSet<_>>();
         let incoming_edges = nodes
             .iter()
@@ -263,6 +278,20 @@ impl SiblingSubgraph {
             })
             .collect_vec();
         Self::try_new_with_checker(inputs, outputs, hugr, checker)
+    }
+
+    /// Create a subgraph containing a single node.
+    ///
+    /// The subgraph signature will be given by signature of the node.
+    pub fn from_node(node: Node, hugr: &impl HugrView) -> Self {
+        let nodes = vec![node];
+        let inputs = hugr.all_linked_inputs(node).map(|x| vec![x]).collect_vec();
+        let outputs = hugr.all_linked_outputs(node).collect_vec();
+        Self {
+            nodes,
+            inputs,
+            outputs,
+        }
     }
 
     /// An iterator over the nodes in the subgraph.
