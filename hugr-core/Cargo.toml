@@ -21,6 +21,9 @@ extension_inference = []
 declarative = ["serde_yaml"]
 model_unstable = ["hugr-model"]
 
+[lib]
+bench = false
+
 [[test]]
 name = "model"
 required-features = ["model_unstable"]
