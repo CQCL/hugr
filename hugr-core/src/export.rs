@@ -1,7 +1,7 @@
 //! Exporting HUGR graphs to their `hugr-model` representation.
 use crate::{
     extension::{ExtensionId, ExtensionSet, OpDef, SignatureFunc},
-    hugr::IdentList,
+    hugr::{IdentList, NodeMetadataMap},
     ops::{DataflowBlock, OpName, OpTrait, OpType},
     types::{
         type_param::{TypeArgVariable, TypeParam},
@@ -21,6 +21,8 @@ type FxIndexSet<T> = IndexSet<T, fxhash::FxBuildHasher>;
 
 pub(crate) const OP_FUNC_CALL_INDIRECT: &str = "func.call-indirect";
 const TERM_PARAM_TUPLE: &str = "param.tuple";
+const TERM_JSON: &str = "prelude.json";
+const META_DESCRIPTION: &str = "docs.description";
 
 /// Export a [`Hugr`] graph to its representation in the model.
 pub fn export_hugr<'a>(hugr: &'a Hugr, bump: &'a Bump) -> model::Module<'a> {
@@ -392,6 +394,11 @@ impl<'a> Context<'a> {
         let inputs = self.make_ports(node, Direction::Incoming, num_inputs);
         let outputs = self.make_ports(node, Direction::Outgoing, num_outputs);
 
+        let meta = match self.hugr.get_node_metadata(node) {
+            Some(metadata_map) => self.export_node_metadata(metadata_map),
+            None => &[],
+        };
+
         // Replace the placeholder node with the actual node.
         *self.module.get_node_mut(node_id).unwrap() = model::Node {
             operation,
@@ -399,7 +406,7 @@ impl<'a> Context<'a> {
             outputs,
             params,
             regions,
-            meta: &[], // TODO: Export metadata
+            meta,
             signature,
         };
 
@@ -435,7 +442,7 @@ impl<'a> Context<'a> {
                     outputs: &[],
                     params: &[],
                     regions: &[],
-                    meta: &[], // TODO: Metadata
+                    meta: &[],
                     signature: None,
                 }))
             }
@@ -452,8 +459,29 @@ impl<'a> Context<'a> {
             decl
         });
 
-        self.module.get_node_mut(node).unwrap().operation =
-            model::Operation::DeclareOperation { decl };
+        let meta = {
+            let description = Some(opdef.description()).filter(|d| !d.is_empty());
+            let meta_len = opdef.iter_misc().len() + description.is_some() as usize;
+            let mut meta = BumpVec::with_capacity_in(meta_len, self.bump);
+
+            if let Some(description) = description {
+                let name = META_DESCRIPTION;
+                let value = self.make_term(model::Term::Str(self.bump.alloc_str(description)));
+                meta.push(model::MetaItem { name, value })
+            }
+
+            for (name, value) in opdef.iter_misc() {
+                let name = self.bump.alloc_str(name);
+                let value = self.export_json(value);
+                meta.push(model::MetaItem { name, value });
+            }
+
+            self.bump.alloc_slice_copy(&meta)
+        };
+
+        let node_data = self.module.get_node_mut(node).unwrap();
+        node_data.operation = model::Operation::DeclareOperation { decl };
+        node_data.meta = meta;
 
         model::GlobalRef::Direct(node)
     }
@@ -842,6 +870,31 @@ impl<'a> Context<'a> {
         let extensions = extensions.into_bump_slice();
 
         self.make_term(model::Term::ExtSet { extensions, rest })
+    }
+
+    pub fn export_node_metadata(
+        &mut self,
+        metadata_map: &NodeMetadataMap,
+    ) -> &'a [model::MetaItem<'a>] {
+        let mut meta = BumpVec::with_capacity_in(metadata_map.len(), self.bump);
+
+        for (name, value) in metadata_map {
+            let name = self.bump.alloc_str(name);
+            let value = self.export_json(value);
+            meta.push(model::MetaItem { name, value });
+        }
+
+        meta.into_bump_slice()
+    }
+
+    pub fn export_json(&mut self, value: &serde_json::Value) -> model::TermId {
+        let value = serde_json::to_string(value).expect("json values are always serializable");
+        let value = self.make_term(model::Term::Str(self.bump.alloc_str(&value)));
+        let value = self.bump.alloc_slice_copy(&[value]);
+        self.make_term(model::Term::ApplyFull {
+            global: model::GlobalRef::Named(TERM_JSON),
+            args: value,
+        })
     }
 }
 
