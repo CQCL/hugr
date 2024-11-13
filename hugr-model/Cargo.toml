@@ -12,6 +12,9 @@ homepage.workspace = true
 repository.workspace = true
 license.workspace = true
 
+[lib]
+bench = false
+
 [dependencies]
 bumpalo = { workspace = true, features = ["collections"] }
 capnp = "0.20.1"

@@ -12,6 +12,9 @@ description = "Compiler passes for Quantinuum's HUGR"
 keywords = ["Quantum", "Quantinuum"]
 categories = ["compilers"]
 
+[lib]
+bench = false
+
 [dependencies]
 clap = { workspace = true, features = ["derive"] }
 clap-verbosity-flag.workspace = true
@@ -42,3 +45,4 @@ rstest.workspace = true
 name = "hugr"
 path = "src/main.rs"
 doc = false
+bench = false
