@@ -5,8 +5,12 @@ ext_name   = @{ identifier ~ ("." ~ identifier)* }
 symbol     = @{ identifier ~ ("." ~ identifier)+ }
 tag        = @{ (ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*) | "0" }
 
-string    = @{ "\"" ~ (!("\"") ~ ANY)* ~ "\"" }
-list_tail =  { "." }
+string         =  { "\"" ~ (string_raw | string_escape | string_unicode)* ~ "\"" }
+string_raw     = @{ (!("\\" | "\"") ~ ANY)+ }
+string_escape  = @{ "\\" ~ ("\"" | "\\" | "n" | "r" | "t") }
+string_unicode = @{ "\\u" ~ "{" ~ ASCII_HEX_DIGIT+ ~ "}" }
+
+list_tail = { "." }
 
 module = { "(" ~ "hugr" ~ "0" ~ ")" ~ meta* ~ node* ~ EOI }
 

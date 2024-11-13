@@ -26,6 +26,8 @@ use itertools::Either;
 use smol_str::{SmolStr, ToSmolStr};
 use thiserror::Error;
 
+const TERM_JSON: &str = "prelude.json";
+
 type FxIndexMap<K, V> = IndexMap<K, V, fxhash::FxBuildHasher>;
 
 /// Error during import.
@@ -184,6 +186,14 @@ impl<'a> Context<'a> {
         let node_data = self.get_node(node_id)?;
         self.record_links(node, Direction::Incoming, node_data.inputs);
         self.record_links(node, Direction::Outgoing, node_data.outputs);
+
+        for meta_item in node_data.meta {
+            // TODO: For now we expect all metadata to be JSON since this is how
+            // it is handled in `hugr-core`.
+            let value = self.import_json_value(meta_item.value)?;
+            self.hugr.set_metadata(node, meta_item.name, value);
+        }
+
         Ok(node)
     }
 
@@ -1199,6 +1209,35 @@ impl<'a> Context<'a> {
                 Ok((extension, id))
             }
         }
+    }
+
+    fn import_json_value(
+        &mut self,
+        term_id: model::TermId,
+    ) -> Result<serde_json::Value, ImportError> {
+        let (global, args) = match self.get_term(term_id)? {
+            model::Term::Apply { global, args } | model::Term::ApplyFull { global, args } => {
+                (global, args)
+            }
+            _ => return Err(model::ModelError::TypeError(term_id).into()),
+        };
+
+        if global != &GlobalRef::Named(TERM_JSON) {
+            return Err(model::ModelError::TypeError(term_id).into());
+        }
+
+        let [json_arg] = args else {
+            return Err(model::ModelError::TypeError(term_id).into());
+        };
+
+        let model::Term::Str(json_str) = self.get_term(*json_arg)? else {
+            return Err(model::ModelError::TypeError(term_id).into());
+        };
+
+        let json_value =
+            serde_json::from_str(json_str).map_err(|_| model::ModelError::TypeError(term_id))?;
+
+        Ok(json_value)
     }
 }
 
