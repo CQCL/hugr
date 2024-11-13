@@ -9,6 +9,7 @@
 //! while the former provide views for subgraphs within a single level of the
 //! hierarchy.
 
+use std::cell::OnceCell;
 use std::collections::HashSet;
 use std::mem;
 
@@ -453,15 +454,24 @@ fn combine_in_out<'a>(
 ///
 /// This can be used when constructing multiple sibling subgraphs to speed up
 /// convexity checking.
-pub struct TopoConvexChecker<'g, Base: 'g + HugrView>(
-    portgraph::algorithms::TopoConvexChecker<Base::Portgraph<'g>>,
-);
+pub struct TopoConvexChecker<'g, Base: 'g + HugrView> {
+    base: &'g Base,
+    checker: OnceCell<portgraph::algorithms::TopoConvexChecker<Base::Portgraph<'g>>>,
+}
 
 impl<'g, Base: HugrView> TopoConvexChecker<'g, Base> {
     /// Create a new convexity checker.
     pub fn new(base: &'g Base) -> Self {
-        let pg = base.portgraph();
-        Self(portgraph::algorithms::TopoConvexChecker::new(pg))
+        Self {
+            base,
+            checker: OnceCell::new(),
+        }
+    }
+
+    /// Returns the portgraph convexity checker, initializing it if necessary.
+    fn get_checker(&self) -> &portgraph::algorithms::TopoConvexChecker<Base::Portgraph<'g>> {
+        self.checker
+            .get_or_init(|| portgraph::algorithms::TopoConvexChecker::new(self.base.portgraph()))
     }
 }
 
@@ -472,7 +482,13 @@ impl<'g, Base: HugrView> ConvexChecker for TopoConvexChecker<'g, Base> {
         inputs: impl IntoIterator<Item = portgraph::PortIndex>,
         outputs: impl IntoIterator<Item = portgraph::PortIndex>,
     ) -> bool {
-        self.0.is_convex(nodes, inputs, outputs)
+        let mut nodes = nodes.into_iter().multipeek();
+        // If the node iterator contains less than two nodes, the subgraph is
+        // trivially convex.
+        if nodes.peek().is_none() || nodes.peek().is_none() {
+            return true;
+        };
+        self.get_checker().is_convex(nodes, inputs, outputs)
     }
 }
 
