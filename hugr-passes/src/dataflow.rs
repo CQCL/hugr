@@ -52,35 +52,17 @@ pub enum ConstLocation<'a> {
     Node(Node),
 }
 
+impl<'a> From<Node> for ConstLocation<'a> {
+    fn from(value: Node) -> Self {
+        ConstLocation::Node(value)
+    }
+}
+
 /// Trait for loading [PartialValue]s from constant [Value]s in a Hugr.
 /// Implementors will likely want to override some/all of [Self::value_from_opaque],
 /// [Self::value_from_const_hugr], and [Self::value_from_function]: the defaults
 /// are "correct" but maximally conservative (minimally informative).
 pub trait ConstLoader<V> {
-    /// Produces a [PartialValue] from a constant. The default impl (expected
-    /// to be appropriate in most cases) traverses [Sum](Value::Sum) constants
-    /// to their leaves ([Value::Extension] and [Value::Function]),
-    /// converts these using [Self::value_from_opaque] and [Self::value_from_const_hugr],
-    /// and builds nested [PartialValue::new_variant] to represent the structure.
-    fn partial_from_const(&self, loc: ConstLocation, cst: &Value) -> PartialValue<V> {
-        match cst {
-            Value::Sum(hugr_core::ops::constant::Sum { tag, values, .. }) => {
-                let elems = values.iter().enumerate().map(|(idx, elem)| {
-                    self.partial_from_const(ConstLocation::Field(idx, &loc), elem)
-                });
-                PartialValue::new_variant(*tag, elems)
-            }
-            Value::Extension { e } => self
-                .value_from_opaque(loc, e)
-                .map(PartialValue::from)
-                .unwrap_or(PartialValue::Top),
-            Value::Function { hugr } => self
-                .value_from_const_hugr(loc, hugr)
-                .map(PartialValue::from)
-                .unwrap_or(PartialValue::Top),
-        }
-    }
-
     /// Produces an abstract value from an [OpaqueValue], if possible.
     /// The default just returns `None`, which will be interpreted as [PartialValue::Top].
     fn value_from_opaque(&self, _loc: ConstLocation, _val: &OpaqueValue) -> Option<V> {
@@ -102,6 +84,35 @@ pub trait ConstLoader<V> {
     /// [LoadFunction]: hugr_core::ops::LoadFunction
     fn value_from_function(&self, _node: Node, _type_args: &[TypeArg]) -> Option<V> {
         None
+    }
+}
+
+/// Produces a [PartialValue] from a constant. Traverses [Sum](Value::Sum) constants
+/// to their leaves ([Value::Extension] and [Value::Function]),
+/// converts these using [ConstLoader::value_from_opaque] and [ConstLoader::value_from_const_hugr],
+/// and builds nested [PartialValue::new_variant] to represent the structure.
+fn partial_from_const<'a, V>(
+    cl: &impl ConstLoader<V>,
+    loc: impl Into<ConstLocation<'a>>,
+    cst: &Value,
+) -> PartialValue<V> {
+    let loc = loc.into();
+    match cst {
+        Value::Sum(hugr_core::ops::constant::Sum { tag, values, .. }) => {
+            let elems = values
+                .iter()
+                .enumerate()
+                .map(|(idx, elem)| partial_from_const(cl, ConstLocation::Field(idx, &loc), elem));
+            PartialValue::new_variant(*tag, elems)
+        }
+        Value::Extension { e } => cl
+            .value_from_opaque(loc, e)
+            .map(PartialValue::from)
+            .unwrap_or(PartialValue::Top),
+        Value::Function { hugr } => cl
+            .value_from_const_hugr(loc, hugr)
+            .map(PartialValue::from)
+            .unwrap_or(PartialValue::Top),
     }
 }
 
