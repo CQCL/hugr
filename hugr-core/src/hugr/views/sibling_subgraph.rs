@@ -220,15 +220,8 @@ impl SiblingSubgraph {
         nodes: impl Into<Vec<Node>>,
         hugr: &impl HugrView,
     ) -> Result<Self, InvalidSubgraph> {
-        let nodes = nodes.into();
-        match nodes.len() {
-            0 => Err(InvalidSubgraph::EmptySubgraph),
-            1 => Ok(Self::from_node(nodes[0], hugr)),
-            _ => {
-                let checker = TopoConvexChecker::new(hugr);
-                Self::try_from_nodes_with_checker(nodes, hugr, &checker)
-            }
-        }
+        let checker = TopoConvexChecker::new(hugr);
+        Self::try_from_nodes_with_checker(nodes, hugr, &checker)
     }
 
     /// Create a subgraph from a set of nodes.
@@ -290,7 +283,8 @@ impl SiblingSubgraph {
         let nodes = vec![node];
         let inputs = hugr
             .node_inputs(node)
-            .filter_map(|p| hugr.is_linked(node, p).then(|| vec![(node, p)]))
+            .filter(|&p| hugr.is_linked(node, p))
+            .map(|p| vec![(node, p)])
             .collect_vec();
         let outputs = hugr
             .node_outputs(node)
