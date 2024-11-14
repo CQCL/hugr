@@ -175,13 +175,25 @@ struct Term {
     }
 
     struct ListTerm {
-        items @0 :List(TermId);
-        tail @1 :OptionalTermId;
+        items @0 :List(ListItem);
+    }
+
+    struct ListItem {
+        union {
+            item @0 :TermId;
+            splice @1 :TermId;
+        }
     }
 
     struct ExtSet {
-        extensions @0 :List(Text);
-        rest @1 :OptionalTermId;
+        items @0 :List(ExtSetItem);
+    }
+
+    struct ExtSetItem {
+        union {
+            extension @0 :Text;
+            splice @1 :TermId;
+        }
     }
 
     struct FuncType {

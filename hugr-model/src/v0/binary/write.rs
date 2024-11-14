@@ -187,16 +187,14 @@ fn write_term(mut builder: hugr_capnp::term::Builder, term: &model::Term) {
             let _ = builder.set_args(model::TermId::unwrap_slice(args));
         }
 
-        model::Term::List { items, tail } => {
+        model::Term::List { items } => {
             let mut builder = builder.init_list();
-            let _ = builder.set_items(model::TermId::unwrap_slice(items));
-            builder.set_tail(tail.map_or(0, |t| t.0 + 1));
+            write_list!(builder, init_items, write_list_item, items);
         }
 
-        model::Term::ExtSet { extensions, rest } => {
+        model::Term::ExtSet { items } => {
             let mut builder = builder.init_ext_set();
-            let _ = builder.set_extensions(*extensions);
-            builder.set_rest(rest.map_or(0, |t| t.0 + 1));
+            write_list!(builder, init_items, write_ext_set_item, items);
         }
 
         model::Term::FuncType {
@@ -213,5 +211,22 @@ fn write_term(mut builder: hugr_capnp::term::Builder, term: &model::Term) {
         model::Term::NonLinearConstraint { term } => {
             builder.set_non_linear_constraint(term.0);
         }
+    }
+}
+
+fn write_list_item(mut builder: hugr_capnp::term::list_item::Builder, item: &model::ListItem) {
+    match item {
+        model::ListItem::Item(term_id) => builder.set_item(term_id.0),
+        model::ListItem::Splice(term_id) => builder.set_splice(term_id.0),
+    }
+}
+
+fn write_ext_set_item(
+    mut builder: hugr_capnp::term::ext_set_item::Builder,
+    item: &model::ExtSetItem,
+) {
+    match item {
+        model::ExtSetItem::Extension(ext) => builder.set_extension(ext),
+        model::ExtSetItem::Splice(term_id) => builder.set_splice(term_id.0),
     }
 }

@@ -56,3 +56,8 @@ pub fn test_decl_exts() {
 pub fn test_constraints() {
     binary_roundtrip(include_str!("fixtures/model-constraints.edn"));
 }
+
+#[test]
+pub fn test_lists() {
+    binary_roundtrip(include_str!("fixtures/model-lists.edn"));
+}

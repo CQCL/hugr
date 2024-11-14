@@ -296,9 +296,8 @@ fn read_term<'a>(bump: &'a Bump, reader: hugr_capnp::term::Reader) -> ReadResult
 
         Which::List(reader) => {
             let reader = reader?;
-            let items = read_scalar_list!(bump, reader, get_items, model::TermId);
-            let tail = reader.get_tail().checked_sub(1).map(model::TermId);
-            model::Term::List { items, tail }
+            let items = read_list!(bump, reader, get_items, read_list_item);
+            model::Term::List { items }
         }
 
         Which::ListType(item_type) => model::Term::ListType {
@@ -307,18 +306,8 @@ fn read_term<'a>(bump: &'a Bump, reader: hugr_capnp::term::Reader) -> ReadResult
 
         Which::ExtSet(reader) => {
             let reader = reader?;
-
-            let extensions = {
-                let extensions_reader = reader.get_extensions()?;
-                let mut extensions = BumpVec::with_capacity_in(extensions_reader.len() as _, bump);
-                for extension_reader in extensions_reader.iter() {
-                    extensions.push(bump.alloc_str(extension_reader?.to_str()?) as &str);
-                }
-                extensions.into_bump_slice()
-            };
-
-            let rest = reader.get_rest().checked_sub(1).map(model::TermId);
-            model::Term::ExtSet { extensions, rest }
+            let items = read_list!(bump, reader, get_items, read_ext_set_item);
+            model::Term::ExtSet { items }
         }
 
         Which::Adt(variants) => model::Term::Adt {
@@ -354,6 +343,28 @@ fn read_meta_item<'a>(
     let name = bump.alloc_str(reader.get_name()?.to_str()?);
     let value = model::TermId(reader.get_value());
     Ok(model::MetaItem { name, value })
+}
+
+fn read_list_item(
+    _: &Bump,
+    reader: hugr_capnp::term::list_item::Reader,
+) -> ReadResult<model::ListItem> {
+    use hugr_capnp::term::list_item::Which;
+    Ok(match reader.which()? {
+        Which::Item(term) => model::ListItem::Item(model::TermId(term)),
+        Which::Splice(list) => model::ListItem::Splice(model::TermId(list)),
+    })
+}
+
+fn read_ext_set_item<'a>(
+    bump: &'a Bump,
+    reader: hugr_capnp::term::ext_set_item::Reader,
+) -> ReadResult<model::ExtSetItem<'a>> {
+    use hugr_capnp::term::ext_set_item::Which;
+    Ok(match reader.which()? {
+        Which::Extension(ext) => model::ExtSetItem::Extension(bump.alloc_str(ext?.to_str()?)),
+        Which::Splice(list) => model::ExtSetItem::Splice(model::TermId(list)),
+    })
 }
 
 fn read_param<'a>(

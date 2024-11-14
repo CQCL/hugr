@@ -2,8 +2,8 @@ use pretty::{Arena, DocAllocator, RefDoc};
 use std::borrow::Cow;
 
 use crate::v0::{
-    GlobalRef, LinkRef, LocalRef, MetaItem, ModelError, Module, NodeId, Operation, Param,
-    ParamSort, RegionId, RegionKind, Term, TermId,
+    ExtSetItem, GlobalRef, LinkRef, ListItem, LocalRef, MetaItem, ModelError, Module, NodeId,
+    Operation, Param, ParamSort, RegionId, RegionKind, Term, TermId,
 };
 
 type PrintError = ModelError;
@@ -521,16 +521,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_text("quote");
                 this.print_term(*r#type)
             }),
-            Term::List { items, tail } => self.print_brackets(|this| {
-                for item in items.iter() {
-                    this.print_term(*item)?;
-                }
-                if let Some(tail) = tail {
-                    this.print_text(".");
-                    this.print_term(*tail)?;
-                }
-                Ok(())
-            }),
+            Term::List { .. } => self.print_brackets(|this| this.print_list_items(term_id)),
             Term::ListType { item_type } => self.print_parens(|this| {
                 this.print_text("list");
                 this.print_term(*item_type)
@@ -551,15 +542,9 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 self.print_text("nat");
                 Ok(())
             }
-            Term::ExtSet { extensions, rest } => self.print_parens(|this| {
+            Term::ExtSet { .. } => self.print_parens(|this| {
                 this.print_text("ext");
-                for extension in *extensions {
-                    this.print_text(*extension);
-                }
-                if let Some(rest) = rest {
-                    this.print_text(".");
-                    this.print_term(*rest)?;
-                }
+                this.print_ext_set_items(term_id)?;
                 Ok(())
             }),
             Term::ExtSetType => {
@@ -593,6 +578,54 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_term(*term)
             }),
         }
+    }
+
+    /// Prints the contents of a list.
+    ///
+    /// This is used so that spliced lists are merged into the parent list.
+    fn print_list_items(&mut self, term_id: TermId) -> PrintResult<()> {
+        let term_data = self
+            .module
+            .get_term(term_id)
+            .ok_or_else(|| PrintError::TermNotFound(term_id))?;
+
+        if let Term::List { items } = term_data {
+            for item in *items {
+                match item {
+                    ListItem::Item(term) => self.print_term(*term)?,
+                    ListItem::Splice(list) => self.print_list_items(*list)?,
+                }
+            }
+        } else {
+            self.print_term(term_id)?;
+            self.print_text("...");
+        }
+
+        Ok(())
+    }
+
+    /// Prints the contents of an extension set.
+    ///
+    /// This is used so that spliced extension sets are merged into the parent extension set.
+    fn print_ext_set_items(&mut self, term_id: TermId) -> PrintResult<()> {
+        let term_data = self
+            .module
+            .get_term(term_id)
+            .ok_or_else(|| PrintError::TermNotFound(term_id))?;
+
+        if let Term::ExtSet { items } = term_data {
+            for item in *items {
+                match item {
+                    ExtSetItem::Extension(ext) => self.print_text(*ext),
+                    ExtSetItem::Splice(list) => self.print_ext_set_items(*list)?,
+                }
+            }
+        } else {
+            self.print_term(term_id)?;
+            self.print_text("...");
+        }
+
+        Ok(())
     }
 
     fn print_local_ref(&mut self, local_ref: LocalRef<'a>) -> PrintResult<()> {

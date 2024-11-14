@@ -13,9 +13,9 @@ use crate::{
         CFG, DFG,
     },
     types::{
-        type_param::TypeParam, type_row::TypeRowBase, CustomType, FuncTypeBase, MaybeRV, NoRV,
+        type_param::TypeParam, type_row::TypeRowBase, CustomType, FuncTypeBase, MaybeRV,
         PolyFuncType, PolyFuncTypeBase, RowVariable, Signature, Type, TypeArg, TypeBase, TypeBound,
-        TypeRow,
+        TypeEnum, TypeRow,
     },
     Direction, Hugr, HugrView, Node, Port,
 };
@@ -1038,32 +1038,38 @@ impl<'a> Context<'a> {
         &mut self,
         term_id: model::TermId,
     ) -> Result<ExtensionSet, ImportError> {
-        match self.get_term(term_id)? {
-            model::Term::Wildcard => Err(error_uninferred!("wildcard")),
+        let mut es = ExtensionSet::new();
+        let mut stack = vec![term_id];
 
-            model::Term::Var(var) => {
-                let mut es = ExtensionSet::new();
-                let (index, _) = self.resolve_local_ref(var)?;
-                es.insert_type_var(index);
-                Ok(es)
-            }
+        while let Some(term_id) = stack.pop() {
+            match self.get_term(term_id)? {
+                model::Term::Wildcard => return Err(error_uninferred!("wildcard")),
 
-            model::Term::ExtSet { extensions, rest } => {
-                let mut es = match rest {
-                    Some(rest) => self.import_extension_set(*rest)?,
-                    None => ExtensionSet::new(),
-                };
-
-                for ext in extensions.iter() {
-                    let ext_ident = IdentList::new(*ext)
-                        .map_err(|_| model::ModelError::MalformedName(ext.to_smolstr()))?;
-                    es.insert(&ext_ident);
+                model::Term::Var(var) => {
+                    let (index, _) = self.resolve_local_ref(var)?;
+                    es.insert_type_var(index);
                 }
 
-                Ok(es)
+                model::Term::ExtSet { items } => {
+                    for item in *items {
+                        match item {
+                            model::ExtSetItem::Extension(ext) => {
+                                let ext_ident = IdentList::new(*ext).map_err(|_| {
+                                    model::ModelError::MalformedName(ext.to_smolstr())
+                                })?;
+                                es.insert(&ext_ident);
+                            }
+                            model::ExtSetItem::Splice(term_id) => {
+                                stack.push(*term_id);
+                            }
+                        }
+                    }
+                }
+                _ => return Err(model::ModelError::TypeError(term_id).into()),
             }
-            _ => Err(model::ModelError::TypeError(term_id).into()),
         }
+
+        Ok(es)
     }
 
     /// Import a `Type` from a term that represents a runtime type.
@@ -1103,7 +1109,7 @@ impl<'a> Context<'a> {
             }
 
             model::Term::FuncType { .. } => {
-                let func_type = self.import_func_type::<NoRV>(term_id)?;
+                let func_type = self.import_func_type::<RowVariable>(term_id)?;
                 Ok(TypeBase::new_function(func_type))
             }
 
@@ -1157,39 +1163,40 @@ impl<'a> Context<'a> {
         term_id: model::TermId,
     ) -> Result<FuncTypeBase<RV>, ImportError> {
         let (inputs, outputs, extensions) = self.get_func_type(term_id)?;
-        let inputs = self.import_type_row::<RV>(inputs)?;
-        let outputs = self.import_type_row::<RV>(outputs)?;
+        let inputs = self.import_type_row(inputs)?;
+        let outputs = self.import_type_row(outputs)?;
         let extensions = self.import_extension_set(extensions)?;
         Ok(FuncTypeBase::new(inputs, outputs).with_extension_delta(extensions))
     }
 
     fn import_closed_list(
         &mut self,
-        mut term_id: model::TermId,
+        term_id: model::TermId,
     ) -> Result<Vec<model::TermId>, ImportError> {
-        // PERFORMANCE: We currently allocate a Vec here to collect list items
-        // into, in order to handle the case where the tail of the list is another
-        // list. We should avoid this.
-        let mut list_items = Vec::new();
+        let mut types = Vec::new();
+        let mut stack = vec![term_id];
 
-        loop {
+        while let Some(term_id) = stack.pop() {
             match self.get_term(term_id)? {
-                model::Term::Var(_) => return Err(error_unsupported!("open lists")),
-                model::Term::List { items, tail } => {
-                    list_items.extend(items.iter());
+                model::Term::List { items } => {
+                    types.reserve(items.len());
 
-                    match tail {
-                        Some(tail) => term_id = *tail,
-                        None => break,
+                    for item in *items {
+                        match item {
+                            model::ListItem::Item(term_id) => {
+                                types.push(*term_id);
+                            }
+                            model::ListItem::Splice(term_id) => {
+                                stack.push(*term_id);
+                            }
+                        }
                     }
                 }
-                _ => {
-                    return Err(model::ModelError::TypeError(term_id).into());
-                }
+                _ => return Err(model::ModelError::TypeError(term_id).into()),
             }
         }
 
-        Ok(list_items)
+        Ok(types)
     }
 
     fn import_type_rows<RV: MaybeRV>(
@@ -1197,8 +1204,8 @@ impl<'a> Context<'a> {
         term_id: model::TermId,
     ) -> Result<Vec<TypeRowBase<RV>>, ImportError> {
         self.import_closed_list(term_id)?
-            .iter()
-            .map(|row| self.import_type_row::<RV>(*row))
+            .into_iter()
+            .map(|term_id| self.import_type_row::<RV>(term_id))
             .collect()
     }
 
@@ -1206,13 +1213,36 @@ impl<'a> Context<'a> {
         &mut self,
         term_id: model::TermId,
     ) -> Result<TypeRowBase<RV>, ImportError> {
-        let items = self
-            .import_closed_list(term_id)?
-            .iter()
-            .map(|item| self.import_type(*item))
-            .collect::<Result<Vec<_>, _>>()?;
+        let mut types = Vec::new();
+        let mut stack = vec![term_id];
 
-        Ok(items.into())
+        while let Some(term_id) = stack.pop() {
+            match self.get_term(term_id)? {
+                model::Term::List { items } => {
+                    types.reserve(items.len());
+
+                    for item in *items {
+                        match item {
+                            model::ListItem::Item(term_id) => {
+                                types.push(self.import_type::<RV>(*term_id)?);
+                            }
+                            model::ListItem::Splice(term_id) => {
+                                stack.push(*term_id);
+                            }
+                        }
+                    }
+                }
+                model::Term::Var(var) => {
+                    let (index, _) = self.resolve_local_ref(var)?;
+                    let var = RV::try_from_rv(RowVariable(index, TypeBound::Any))
+                        .map_err(|_| model::ModelError::TypeError(term_id))?;
+                    types.push(TypeBase::new(TypeEnum::RowVar(var)));
+                }
+                _ => return Err(model::ModelError::TypeError(term_id).into()),
+            }
+        }
+
+        Ok(types.into())
     }
 
     fn import_custom_name(

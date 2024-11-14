@@ -569,19 +569,12 @@ pub enum Term<'a> {
         r#type: TermId,
     },
 
-    /// A list, with an optional tail.
-    ///
-    /// - `[ITEM-0 ... ITEM-n] : (list T)` where `T : static`, `ITEM-i : T`.
-    /// - `[ITEM-0 ... ITEM-n . TAIL] : (list item-type)` where `T : static`, `ITEM-i : T`, `TAIL : (list T)`.
+    /// A list.
     List {
         /// The items in the list.
         ///
         /// `item-i : item-type`
-        items: &'a [TermId],
-        /// The tail of the list.
-        ///
-        /// `tail : (list item-type)`
-        tail: Option<TermId>,
+        items: &'a [ListItem],
     },
 
     /// The type of lists, given a type for the items.
@@ -615,14 +608,9 @@ pub enum Term<'a> {
     NatType,
 
     /// Extension set.
-    ///
-    /// - `(ext EXT-0 ... EXT-n) : ext-set`
-    /// - `(ext EXT-0 ... EXT-n . REST) : ext-set` where `REST : ext-set`.
     ExtSet {
         /// The items in the extension set.
-        extensions: &'a [&'a str],
-        /// The rest of the extension set.
-        rest: Option<TermId>,
+        items: &'a [ExtSetItem<'a>],
     },
 
     /// The type of extension sets.
@@ -674,6 +662,24 @@ pub enum Term<'a> {
         /// The runtime type that must be copyable and discardable.
         term: TermId,
     },
+}
+
+/// An item in a list term.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ListItem {
+    /// A single item.
+    Item(TermId),
+    /// A list to be spliced into the parent list.
+    Splice(TermId),
+}
+
+/// An item in an extension set term.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ExtSetItem<'a> {
+    /// An extension.
+    Extension(&'a str),
+    /// An extension set to be spliced into the parent extension set.
+    Splice(TermId),
 }
 
 /// A parameter to a function or alias.

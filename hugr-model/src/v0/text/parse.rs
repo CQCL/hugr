@@ -1,4 +1,4 @@
-use bumpalo::{collections::String as BumpString, Bump};
+use bumpalo::{collections::String as BumpString, collections::Vec as BumpVec, Bump};
 use pest::{
     iterators::{Pair, Pairs},
     Parser, RuleType,
@@ -6,8 +6,9 @@ use pest::{
 use thiserror::Error;
 
 use crate::v0::{
-    AliasDecl, ConstructorDecl, FuncDecl, GlobalRef, LinkRef, LocalRef, MetaItem, Module, Node,
-    NodeId, Operation, OperationDecl, Param, ParamSort, Region, RegionId, RegionKind, Term, TermId,
+    AliasDecl, ConstructorDecl, ExtSetItem, FuncDecl, GlobalRef, LinkRef, ListItem, LocalRef,
+    MetaItem, Module, Node, NodeId, Operation, OperationDecl, Param, ParamSort, Region, RegionId,
+    RegionKind, Term, TermId,
 };
 
 mod pest_parser {
@@ -136,21 +137,21 @@ impl<'a> ParseContext<'a> {
             }
 
             Rule::term_list => {
-                let mut items = Vec::new();
-                let mut tail = None;
+                let mut items = BumpVec::with_capacity_in(inner.len(), self.bump);
 
-                for token in filter_rule(&mut inner, Rule::term) {
-                    items.push(self.parse_term(token)?);
-                }
-
-                if inner.next().is_some() {
-                    let token = inner.next().unwrap();
-                    tail = Some(self.parse_term(token)?);
+                for token in inner {
+                    match token.as_rule() {
+                        Rule::term => items.push(ListItem::Item(self.parse_term(token)?)),
+                        Rule::spliced_term => {
+                            let term_token = token.into_inner().next().unwrap();
+                            items.push(ListItem::Splice(self.parse_term(term_token)?))
+                        }
+                        _ => unreachable!(),
+                    }
                 }
 
                 Term::List {
-                    items: self.bump.alloc_slice_copy(&items),
-                    tail,
+                    items: items.into_bump_slice(),
                 }
             }
 
@@ -170,21 +171,23 @@ impl<'a> ParseContext<'a> {
             }
 
             Rule::term_ext_set => {
-                let mut extensions = Vec::new();
-                let mut rest = None;
+                let mut items = BumpVec::with_capacity_in(inner.len(), self.bump);
 
-                for token in filter_rule(&mut inner, Rule::ext_name) {
-                    extensions.push(token.as_str());
-                }
-
-                if inner.next().is_some() {
-                    let token = inner.next().unwrap();
-                    rest = Some(self.parse_term(token)?);
+                for token in inner {
+                    match token.as_rule() {
+                        Rule::ext_name => {
+                            items.push(ExtSetItem::Extension(self.bump.alloc_str(token.as_str())))
+                        }
+                        Rule::spliced_term => {
+                            let term_token = token.into_inner().next().unwrap();
+                            items.push(ExtSetItem::Splice(self.parse_term(term_token)?))
+                        }
+                        _ => unreachable!(),
+                    }
                 }
 
                 Term::ExtSet {
-                    extensions: self.bump.alloc_slice_copy(&extensions),
-                    rest,
+                    items: items.into_bump_slice(),
                 }
             }
 
