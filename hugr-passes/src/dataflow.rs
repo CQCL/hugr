@@ -41,6 +41,42 @@ pub trait DFContext<V>: ConstLoader<V> + std::ops::Deref<Target = Self::View> {
     }
 }
 
+/// A location where a [Value] could be find in a Hugr. That is,
+/// (perhaps deeply nested within [Value::Sum]s) within a [Node]
+/// that is a [Const](hugr_core::ops::Const).
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum ConstLocation<C: AsRef<ConstLocation<C>>> {
+    /// The specified-index'th field of the [Value::Sum] constant identified by the RHS
+    Field(usize, C),
+    /// The entire ([Const::value](hugr_core::ops::Const::value)) of the node.
+    Node(Node),
+}
+
+struct SharedConstLocation<'a>(ConstLocation<&'a SharedConstLocation<'a>>);
+
+impl<'a> AsRef<ConstLocation<&'a SharedConstLocation<'a>>> for SharedConstLocation<'a> {
+    fn as_ref(&self) -> &ConstLocation<&'a SharedConstLocation<'a>> {
+        &self.0
+    }
+}
+
+struct BoxedConstLocation(Box<ConstLocation<BoxedConstLocation>>);
+
+impl AsRef<ConstLocation<BoxedConstLocation>> for BoxedConstLocation {
+    fn as_ref(&self) -> &ConstLocation<BoxedConstLocation> {
+        &self.0
+    }
+}
+
+impl<'a> From<&SharedConstLocation<'a>> for BoxedConstLocation {
+    fn from(value: &SharedConstLocation<'a>) -> Self {
+        BoxedConstLocation(Box::new(match value.0 {
+            ConstLocation::Node(n) => ConstLocation::Node(n),
+            ConstLocation::Field(idx, elem) => ConstLocation::Field(idx, elem.into()),
+        }))
+    }
+}
+
 /// Trait for loading [PartialValue]s from constant [Value]s in a Hugr.
 /// Implementors will likely want to override some/all of [Self::value_from_opaque],
 /// [Self::value_from_const_hugr], and [Self::value_from_function]: the defaults
@@ -52,18 +88,18 @@ pub trait ConstLoader<V> {
     /// converts these using [Self::value_from_opaque] and [Self::value_from_const_hugr],
     /// and builds nested [PartialValue::new_variant] to represent the structure.
     fn value_from_const(&self, n: Node, cst: &Value) -> PartialValue<V> {
-        traverse_value(self, n, &mut Vec::new(), cst)
+        traverse_value(self, SharedConstLocation(ConstLocation::Node(n)), cst)
     }
 
     /// Produces an abstract value from an [OpaqueValue], if possible.
     /// The default just returns `None`, which will be interpreted as [PartialValue::Top].
-    fn value_from_opaque(&self, _node: Node, _fields: &[usize], _val: &OpaqueValue) -> Option<V> {
+    fn value_from_opaque(&self, _loc: SharedConstLocation, _val: &OpaqueValue) -> Option<V> {
         None
     }
 
     /// Produces an abstract value from a Hugr in a [Value::Function], if possible.
     /// The default just returns `None`, which will be interpreted as [PartialValue::Top].
-    fn value_from_const_hugr(&self, _node: Node, _fields: &[usize], _h: &Hugr) -> Option<V> {
+    fn value_from_const_hugr(&self, _loc: SharedConstLocation, _h: &Hugr) -> Option<V> {
         None
     }
 
@@ -81,26 +117,22 @@ pub trait ConstLoader<V> {
 
 fn traverse_value<V>(
     s: &(impl ConstLoader<V> + ?Sized),
-    n: Node,
-    fields: &mut Vec<usize>,
+    loc: SharedConstLocation,
     cst: &Value,
 ) -> PartialValue<V> {
     match cst {
         Value::Sum(hugr_core::ops::constant::Sum { tag, values, .. }) => {
-            let elems = values.iter().enumerate().map(|(idx, elem)| {
-                fields.push(idx);
-                let r = traverse_value(s, n, fields, elem);
-                fields.pop();
-                r
-            });
+            let elems = values.iter().enumerate().map(|(idx, elem)| 
+                traverse_value(s, SharedConstLocation(ConstLocation::Field(idx, &loc)), elem)
+            );
             PartialValue::new_variant(*tag, elems)
         }
         Value::Extension { e } => s
-            .value_from_opaque(n, fields, e)
+            .value_from_opaque(loc, e)
             .map(PartialValue::from)
             .unwrap_or(PartialValue::Top),
         Value::Function { hugr } => s
-            .value_from_const_hugr(n, fields, hugr)
+            .value_from_const_hugr(loc, hugr)
             .map(PartialValue::from)
             .unwrap_or(PartialValue::Top),
     }
