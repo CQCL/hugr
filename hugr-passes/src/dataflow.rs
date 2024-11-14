@@ -44,7 +44,7 @@ pub trait DFContext<V>: ConstLoader<V> + std::ops::Deref<Target = Self::View> {
 /// A location where a [Value] could be find in a Hugr. That is,
 /// (perhaps deeply nested within [Value::Sum]s) within a [Node]
 /// that is a [Const](hugr_core::ops::Const).
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ConstLocation<'a> {
     /// The specified-index'th field of the [Value::Sum] constant identified by the RHS
     Field(usize, &'a ConstLocation<'a>),
