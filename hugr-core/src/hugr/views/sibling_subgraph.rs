@@ -284,9 +284,19 @@ impl SiblingSubgraph {
     ///
     /// The subgraph signature will be given by signature of the node.
     pub fn from_node(node: Node, hugr: &impl HugrView) -> Self {
+        // TODO once https://github.com/CQCL/portgraph/issues/155
+        // is fixed we can just call try_from_nodes here.
+        // Until then, doing this saves a lot of work.
         let nodes = vec![node];
-        let inputs = hugr.all_linked_inputs(node).map(|x| vec![x]).collect_vec();
-        let outputs = hugr.all_linked_outputs(node).collect_vec();
+        let inputs = hugr
+            .node_inputs(node)
+            .filter_map(|p| hugr.is_linked(node, p).then(|| vec![(node, p)]))
+            .collect_vec();
+        let outputs = hugr
+            .node_outputs(node)
+            .filter_map(|p| hugr.is_linked(node, p).then_some((node, p)))
+            .collect_vec();
+
         Self {
             nodes,
             inputs,
