@@ -402,6 +402,7 @@ mod test {
     #[case::dfg("dfg", simple_dfg_hugr(), false)]
     #[case::cfg("cfg", simple_cfg_hugr(), false)]
     #[case::unsupported_input("input", simple_input_node(), true)]
+    #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
     fn hugr_to_package(#[case] test_name: &str, #[case] hugr: Hugr, #[case] errors: bool) {
         match (&Package::from_hugr(hugr), errors) {
             (Ok(package), false) => {

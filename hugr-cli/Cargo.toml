@@ -1,6 +1,6 @@
 [package]
 name = "hugr-cli"
-version = "0.13.2"
+version = "0.13.3"
 edition = { workspace = true }
 rust-version = { workspace = true }
 license = { workspace = true }
@@ -12,11 +12,14 @@ description = "Compiler passes for Quantinuum's HUGR"
 keywords = ["Quantum", "Quantinuum"]
 categories = ["compilers"]
 
+[lib]
+bench = false
+
 [dependencies]
 clap = { workspace = true, features = ["derive"] }
 clap-verbosity-flag.workspace = true
 derive_more = { workspace = true, features = ["display", "error", "from"] }
-hugr = { path = "../hugr", version = "0.13.2" }
+hugr = { path = "../hugr", version = "0.13.3" }
 serde_json.workspace = true
 serde.workspace = true
 thiserror.workspace = true
@@ -42,3 +45,4 @@ rstest.workspace = true
 name = "hugr"
 path = "src/main.rs"
 doc = false
+bench = false

@@ -1,4 +1,4 @@
-use bumpalo::Bump;
+use bumpalo::{collections::String as BumpString, Bump};
 use pest::{
     iterators::{Pair, Pairs},
     Parser, RuleType,
@@ -60,7 +60,7 @@ impl<'a> ParseContext<'a> {
     }
 
     fn parse_module(&mut self, pair: Pair<'a, Rule>) -> ParseResult<()> {
-        debug_assert!(matches!(pair.as_rule(), Rule::module));
+        debug_assert_eq!(pair.as_rule(), Rule::module);
         let mut inner = pair.into_inner();
         let meta = self.parse_meta(&mut inner)?;
 
@@ -81,7 +81,7 @@ impl<'a> ParseContext<'a> {
     }
 
     fn parse_term(&mut self, pair: Pair<'a, Rule>) -> ParseResult<TermId> {
-        debug_assert!(matches!(pair.as_rule(), Rule::term));
+        debug_assert_eq!(pair.as_rule(), Rule::term);
         let pair = pair.into_inner().next().unwrap();
         let rule = pair.as_rule();
         let mut inner = pair.into_inner();
@@ -160,9 +160,7 @@ impl<'a> ParseContext<'a> {
             }
 
             Rule::term_str => {
-                // TODO: Escaping?
-                let value = inner.next().unwrap().as_str();
-                let value = &value[1..value.len() - 1];
+                let value = self.parse_string(inner.next().unwrap())?;
                 Term::Str(value)
             }
 
@@ -218,7 +216,7 @@ impl<'a> ParseContext<'a> {
     }
 
     fn parse_node(&mut self, pair: Pair<'a, Rule>) -> ParseResult<NodeId> {
-        debug_assert!(matches!(pair.as_rule(), Rule::node));
+        debug_assert_eq!(pair.as_rule(), Rule::node);
         let pair = pair.into_inner().next().unwrap();
         let rule = pair.as_rule();
 
@@ -503,7 +501,7 @@ impl<'a> ParseContext<'a> {
     }
 
     fn parse_region(&mut self, pair: Pair<'a, Rule>) -> ParseResult<RegionId> {
-        debug_assert!(matches!(pair.as_rule(), Rule::region));
+        debug_assert_eq!(pair.as_rule(), Rule::region);
         let pair = pair.into_inner().next().unwrap();
         let rule = pair.as_rule();
         let mut inner = pair.into_inner();
@@ -541,7 +539,7 @@ impl<'a> ParseContext<'a> {
     }
 
     fn parse_func_header(&mut self, pair: Pair<'a, Rule>) -> ParseResult<&'a FuncDecl<'a>> {
-        debug_assert!(matches!(pair.as_rule(), Rule::func_header));
+        debug_assert_eq!(pair.as_rule(), Rule::func_header);
 
         let mut inner = pair.into_inner();
         let name = self.parse_symbol(&mut inner)?;
@@ -566,7 +564,7 @@ impl<'a> ParseContext<'a> {
     }
 
     fn parse_alias_header(&mut self, pair: Pair<'a, Rule>) -> ParseResult<&'a AliasDecl<'a>> {
-        debug_assert!(matches!(pair.as_rule(), Rule::alias_header));
+        debug_assert_eq!(pair.as_rule(), Rule::alias_header);
 
         let mut inner = pair.into_inner();
         let name = self.parse_symbol(&mut inner)?;
@@ -581,7 +579,7 @@ impl<'a> ParseContext<'a> {
     }
 
     fn parse_ctr_header(&mut self, pair: Pair<'a, Rule>) -> ParseResult<&'a ConstructorDecl<'a>> {
-        debug_assert!(matches!(pair.as_rule(), Rule::ctr_header));
+        debug_assert_eq!(pair.as_rule(), Rule::ctr_header);
 
         let mut inner = pair.into_inner();
         let name = self.parse_symbol(&mut inner)?;
@@ -596,7 +594,7 @@ impl<'a> ParseContext<'a> {
     }
 
     fn parse_op_header(&mut self, pair: Pair<'a, Rule>) -> ParseResult<&'a OperationDecl<'a>> {
-        debug_assert!(matches!(pair.as_rule(), Rule::operation_header));
+        debug_assert_eq!(pair.as_rule(), Rule::operation_header);
 
         let mut inner = pair.into_inner();
         let name = self.parse_symbol(&mut inner)?;
@@ -670,7 +668,7 @@ impl<'a> ParseContext<'a> {
     }
 
     fn parse_port(&mut self, pair: Pair<'a, Rule>) -> ParseResult<LinkRef<'a>> {
-        debug_assert!(matches!(pair.as_rule(), Rule::port));
+        debug_assert_eq!(pair.as_rule(), Rule::port);
         let mut inner = pair.into_inner();
         let link = LinkRef::Named(&inner.next().unwrap().as_str()[1..]);
         Ok(link)
@@ -696,6 +694,47 @@ impl<'a> ParseContext<'a> {
         } else {
             unreachable!("expected a symbol");
         }
+    }
+
+    fn parse_string(&self, token: Pair<'a, Rule>) -> ParseResult<&'a str> {
+        debug_assert_eq!(token.as_rule(), Rule::string);
+
+        // Any escape sequence is longer than the character it represents.
+        // Therefore the length of this token (minus 2 for the quotes on either
+        // side) is an upper bound for the length of the string.
+        let capacity = token.as_str().len() - 2;
+        let mut string = BumpString::with_capacity_in(capacity, self.bump);
+        let tokens = token.into_inner();
+
+        for token in tokens {
+            match token.as_rule() {
+                Rule::string_raw => string.push_str(token.as_str()),
+                Rule::string_escape => match token.as_str().chars().nth(1).unwrap() {
+                    '"' => string.push('"'),
+                    '\\' => string.push('\\'),
+                    'n' => string.push('\n'),
+                    'r' => string.push('\r'),
+                    't' => string.push('\t'),
+                    _ => unreachable!(),
+                },
+                Rule::string_unicode => {
+                    let token_str = token.as_str();
+                    debug_assert_eq!(&token_str[0..3], r"\u{");
+                    debug_assert_eq!(&token_str[token_str.len() - 1..], "}");
+                    let code_str = &token_str[3..token_str.len() - 1];
+                    let code = u32::from_str_radix(code_str, 16).map_err(|_| {
+                        ParseError::custom("invalid unicode escape sequence", token.as_span())
+                    })?;
+                    let char = std::char::from_u32(code).ok_or_else(|| {
+                        ParseError::custom("invalid unicode code point", token.as_span())
+                    })?;
+                    string.push(char);
+                }
+                _ => unreachable!(),
+            }
+        }
+
+        Ok(string.into_bump_str())
     }
 }
 
@@ -749,6 +788,16 @@ impl ParseError {
             InputLocation::Pos(offset) => offset,
             InputLocation::Span((offset, _)) => offset,
         }
+    }
+
+    fn custom(message: &str, span: pest::Span) -> Self {
+        let error = pest::error::Error::new_from_span(
+            pest::error::ErrorVariant::CustomError {
+                message: message.to_string(),
+            },
+            span,
+        );
+        ParseError(Box::new(error))
     }
 }
 
