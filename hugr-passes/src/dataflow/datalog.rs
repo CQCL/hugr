@@ -11,7 +11,7 @@ use hugr_core::ops::{OpTrait, OpType, TailLoop};
 use hugr_core::{HugrView, IncomingPort, Node, OutgoingPort, PortIndex as _, Wire};
 
 use super::value_row::ValueRow;
-use super::{AbstractValue, AnalysisResults, DFContext, PartialValue};
+use super::{AbstractValue, AnalysisResults, ConstLocation, DFContext, PartialValue};
 
 type PV<V> = PartialValue<V>;
 
@@ -308,7 +308,7 @@ fn propagate_leaf_op<V: AbstractValue>(
             Some(ValueRow::single_known(
                 1,
                 0,
-                ctx.value_from_const(n, const_val),
+                ctx.partial_from_const(ConstLocation::Node(n), const_val),
             ))
         }
         OpType::LoadFunction(load_op) => {

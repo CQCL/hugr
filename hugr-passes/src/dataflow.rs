@@ -62,8 +62,23 @@ pub trait ConstLoader<V> {
     /// to their leaves ([Value::Extension] and [Value::Function]),
     /// converts these using [Self::value_from_opaque] and [Self::value_from_const_hugr],
     /// and builds nested [PartialValue::new_variant] to represent the structure.
-    fn value_from_const(&self, n: Node, cst: &Value) -> PartialValue<V> {
-        traverse_value(self, ConstLocation::Node(n), cst)
+    fn partial_from_const(&self, loc: ConstLocation, cst: &Value) -> PartialValue<V> {
+        match cst {
+            Value::Sum(hugr_core::ops::constant::Sum { tag, values, .. }) => {
+                let elems = values.iter().enumerate().map(|(idx, elem)| {
+                    self.partial_from_const(ConstLocation::Field(idx, &loc), elem)
+                });
+                PartialValue::new_variant(*tag, elems)
+            }
+            Value::Extension { e } => self
+                .value_from_opaque(loc, e)
+                .map(PartialValue::from)
+                .unwrap_or(PartialValue::Top),
+            Value::Function { hugr } => self
+                .value_from_const_hugr(loc, hugr)
+                .map(PartialValue::from)
+                .unwrap_or(PartialValue::Top),
+        }
     }
 
     /// Produces an abstract value from an [OpaqueValue], if possible.
@@ -87,29 +102,6 @@ pub trait ConstLoader<V> {
     /// [LoadFunction]: hugr_core::ops::LoadFunction
     fn value_from_function(&self, _node: Node, _type_args: &[TypeArg]) -> Option<V> {
         None
-    }
-}
-
-fn traverse_value<V>(
-    s: &(impl ConstLoader<V> + ?Sized),
-    loc: ConstLocation,
-    cst: &Value,
-) -> PartialValue<V> {
-    match cst {
-        Value::Sum(hugr_core::ops::constant::Sum { tag, values, .. }) => {
-            let elems = values.iter().enumerate().map(|(idx, elem)| 
-                traverse_value(s, ConstLocation::Field(idx, &loc), elem)
-            );
-            PartialValue::new_variant(*tag, elems)
-        }
-        Value::Extension { e } => s
-            .value_from_opaque(loc, e)
-            .map(PartialValue::from)
-            .unwrap_or(PartialValue::Top),
-        Value::Function { hugr } => s
-            .value_from_const_hugr(loc, hugr)
-            .map(PartialValue::from)
-            .unwrap_or(PartialValue::Top),
     }
 }
 
