@@ -29,13 +29,13 @@ pub type CaseBuilder<B> = DFGWrapper<B, BuildHandle<CaseID>>;
 #[non_exhaustive]
 pub enum ConditionalBuildError {
     /// Case already built.
-    #[error("Case {case} of Conditional node {conditional:?} has already been built.")]
+    #[error("Case {case} of Conditional node {conditional} has already been built.")]
     CaseBuilt { conditional: Node, case: usize },
     /// Case already built.
-    #[error("Conditional node {conditional:?} has no case with index {case}.")]
+    #[error("Conditional node {conditional} has no case with index {case}.")]
     NotCase { conditional: Node, case: usize },
     /// Not all cases of Conditional built.
-    #[error("Cases {cases:?} of Conditional node {conditional:?} have not been built.")]
+    #[error("Cases {cases:?} of Conditional node {conditional} have not been built.")]
     NotAllCasesBuilt {
         conditional: Node,
         cases: HashSet<usize>,

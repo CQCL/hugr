@@ -43,7 +43,7 @@ pub enum IdentityInsertionError {
     #[error("Node is invalid.")]
     InvalidNode(),
     /// Invalid port kind.
-    #[error("post_port has invalid kind {0:?}. Must be Value.")]
+    #[error("post_port has invalid kind {}. Must be Value.", _0.as_ref().map_or("None".to_string(), ToString::to_string))]
     InvalidPortKind(Option<EdgeKind>),
 }
 

@@ -69,14 +69,11 @@ impl<V: AbstractValue, C: DFContext<V>> AnalysisResults<V, C> {
         let cfg = self.hugr().get_parent(bb)?; // Not really required...??
         self.hugr().get_optype(cfg).as_cfg()?;
         let t = self.hugr().get_optype(bb);
-        if !t.is_dataflow_block() && !t.is_exit_block() {
-            return None;
-        };
-        Some(
+        (t.is_dataflow_block() || t.is_exit_block()).then(|| {
             self.bb_reachable
                 .iter()
-                .any(|(cfg2, bb2)| *cfg2 == cfg && *bb2 == bb),
-        )
+                .any(|(cfg2, bb2)| *cfg2 == cfg && *bb2 == bb)
+        })
     }
 
     /// Reads a concrete representation of the value on an output wire, if the lattice value

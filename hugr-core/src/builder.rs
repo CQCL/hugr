@@ -152,10 +152,10 @@ pub enum BuildError {
     #[error("Constant failed typechecking: {0}")]
     BadConstant(#[from] ConstTypeError),
     /// CFG can only have one entry.
-    #[error("CFG entry node already built for CFG node: {0:?}.")]
+    #[error("CFG entry node already built for CFG node: {0}.")]
     EntryBuiltError(Node),
     /// Node was expected to have a certain type but was found to not.
-    #[error("Node with index {node:?} does not have type {op_desc:?} as expected.")]
+    #[error("Node with index {node} does not have type {op_desc} as expected.")]
     #[allow(missing_docs)]
     UnexpectedType {
         /// Index of node where error occurred.
@@ -168,7 +168,7 @@ pub enum BuildError {
     ConditionalError(#[from] conditional::ConditionalBuildError),
 
     /// Wire not found in Hugr
-    #[error("Wire not found in Hugr: {0:?}.")]
+    #[error("Wire not found in Hugr: {0}.")]
     WireNotFound(Wire),
 
     /// Error in CircuitBuilder
@@ -280,6 +280,22 @@ pub(crate) mod test {
         let dfg_builder = DFGBuilder::new(Signature::new(type_row![BIT], type_row![BIT])).unwrap();
         let [i1] = dfg_builder.input_wires_arr();
         dfg_builder.finish_prelude_hugr_with_outputs([i1]).unwrap()
+    }
+
+    #[fixture]
+    pub(crate) fn simple_funcdef_hugr() -> Hugr {
+        let fn_builder =
+            FunctionBuilder::new("test", Signature::new(type_row![BIT], type_row![BIT])).unwrap();
+        let [i1] = fn_builder.input_wires_arr();
+        fn_builder.finish_prelude_hugr_with_outputs([i1]).unwrap()
+    }
+
+    #[fixture]
+    pub(crate) fn simple_module_hugr() -> Hugr {
+        let mut builder = ModuleBuilder::new();
+        let sig = Signature::new(type_row![BIT], type_row![BIT]);
+        builder.declare("test", sig.into()).unwrap();
+        builder.finish_prelude_hugr().unwrap()
     }
 
     #[fixture]

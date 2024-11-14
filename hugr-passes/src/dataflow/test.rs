@@ -3,6 +3,7 @@ use ascent::{lattice::BoundedLattice, Lattice};
 use hugr_core::builder::{CFGBuilder, Container, DataflowHugr};
 use hugr_core::hugr::views::{DescendantsGraph, HierarchyView};
 use hugr_core::ops::handle::DfgID;
+use hugr_core::ops::TailLoop;
 use hugr_core::{
     builder::{endo_sig, DFGBuilder, Dataflow, DataflowSubContainer, HugrBuilder, SubContainer},
     extension::{
@@ -94,7 +95,10 @@ fn test_tail_loop_never_iterates() {
     let mut builder = DFGBuilder::new(Signature::new_endo(vec![])).unwrap();
     let r_v = Value::unit_sum(3, 6).unwrap();
     let r_w = builder.add_load_value(r_v.clone());
-    let tag = Tag::new(1, vec![type_row![], r_v.get_type().into()]);
+    let tag = Tag::new(
+        TailLoop::BREAK_TAG,
+        vec![type_row![], r_v.get_type().into()],
+    );
     let tagged = builder.add_dataflow_op(tag, [r_w]).unwrap();
 
     let tlb = builder
@@ -117,8 +121,14 @@ fn test_tail_loop_never_iterates() {
 #[test]
 fn test_tail_loop_always_iterates() {
     let mut builder = DFGBuilder::new(Signature::new_endo(vec![])).unwrap();
-    let r_w = builder
-        .add_load_value(Value::sum(0, [], SumType::new([type_row![], BOOL_T.into()])).unwrap());
+    let r_w = builder.add_load_value(
+        Value::sum(
+            TailLoop::CONTINUE_TAG,
+            [],
+            SumType::new([type_row![], BOOL_T.into()]),
+        )
+        .unwrap(),
+    );
     let true_w = builder.add_load_value(Value::true_val());
 
     let tlb = builder
@@ -203,6 +213,7 @@ fn test_tail_loop_containing_conditional() {
     let mut tlb = builder
         .tail_loop_builder([(control_t, init)], [], type_row![BOOL_T; 2])
         .unwrap();
+    let tl = tlb.loop_signature().unwrap().clone();
     let [in_w] = tlb.input_wires_arr();
 
     // Branch on in_wire, so first iter 0(false, true)...
@@ -220,16 +231,12 @@ fn test_tail_loop_containing_conditional() {
         .add_dataflow_op(Tag::new(1, control_variants), [b, a])
         .unwrap()
         .outputs_arr();
-    let cont = case0_b
-        .add_dataflow_op(Tag::new(0, body_out_variants.clone()), [next_input])
-        .unwrap();
-    case0_b.finish_with_outputs(cont.outputs()).unwrap();
+    let cont = case0_b.make_continue(tl.clone(), [next_input]).unwrap();
+    case0_b.finish_with_outputs([cont]).unwrap();
     // Second iter 1(true, false) => exit with (true, false)
     let mut case1_b = cond.case_builder(1).unwrap();
-    let loop_res = case1_b
-        .add_dataflow_op(Tag::new(1, body_out_variants), case1_b.input_wires())
-        .unwrap();
-    case1_b.finish_with_outputs(loop_res.outputs()).unwrap();
+    let loop_res = case1_b.make_break(tl, case1_b.input_wires()).unwrap();
+    case1_b.finish_with_outputs([loop_res]).unwrap();
     let [r] = cond.finish_sub_container().unwrap().outputs_arr();
 
     let tail_loop = tlb.finish_with_outputs(r, []).unwrap();
@@ -304,90 +311,57 @@ fn test_conditional() {
 // A Hugr being a function on bools: (x, y) => (x XOR y, x AND y)
 #[fixture]
 fn xor_and_cfg() -> Hugr {
-    //        Entry
-    //       /0   1\
-    //      A --1-> B     A(x=true, y) => if y then X(false, true) else B(x=true)
-    //       \0    /      B(z) => X(z,false)
+    //        Entry       branch on first arg, passes arguments on unchanged
+    //       /T   F\
+    //      A --T-> B     A(x=true, y) branch on second arg, passing (first arg == true, false)
+    //       \F    /      B(w,v) => X(v,w)
     //        > X <
+    // Inputs received:
+    // Entry    A       B       X
+    // F,F      -       F,F     F,F
+    // F,T      -       F,T     T,F
+    // T,F      T,F     -       T,F
+    // T,T      T,T     T,F     F,T
     let mut builder =
         CFGBuilder::new(Signature::new(type_row![BOOL_T; 2], type_row![BOOL_T; 2])).unwrap();
-    let false_c = builder.add_constant(Value::false_val());
 
-    // entry (x, y) => if x {A(y, x=true)} else B(y)}
-    let entry_outs = [type_row![BOOL_T;2], type_row![BOOL_T]];
-    let mut entry = builder
-        .entry_builder(entry_outs.clone(), type_row![])
+    // entry (x, y) => (if x then A else B)(x=true, y)
+    let entry = builder
+        .entry_builder(vec![type_row![]; 2], type_row![BOOL_T;2])
         .unwrap();
     let [in_x, in_y] = entry.input_wires_arr();
-    let mut cond = entry
-        .conditional_builder(
-            (vec![type_row![]; 2], in_x),
-            [],
-            Type::new_sum(entry_outs.clone()).into(),
-        )
-        .unwrap();
-    let mut if_x_true = cond.case_builder(1).unwrap();
-    let br_to_a = if_x_true
-        .add_dataflow_op(Tag::new(0, entry_outs.to_vec()), [in_y, in_x])
-        .unwrap();
-    if_x_true.finish_with_outputs(br_to_a.outputs()).unwrap();
-    let mut if_x_false = cond.case_builder(0).unwrap();
-    let br_to_b = if_x_false
-        .add_dataflow_op(Tag::new(1, entry_outs.into()), [in_y])
-        .unwrap();
-    if_x_false.finish_with_outputs(br_to_b.outputs()).unwrap();
+    let entry = entry.finish_with_outputs(in_x, [in_x, in_y]).unwrap();
 
-    let [res] = cond.finish_sub_container().unwrap().outputs_arr();
-    let entry = entry.finish_with_outputs(res, []).unwrap();
-
-    // A(y, z always true) => if y {X(false, z)} else {B(z)}
-    let a_outs = vec![type_row![BOOL_T], type_row![]];
+    // A(x==true, y) => (if y then B else X)(x, false)
     let mut a = builder
         .block_builder(
             type_row![BOOL_T; 2],
-            a_outs.clone(),
-            type_row![BOOL_T], // Trailing z common to both branches
+            vec![type_row![]; 2],
+            type_row![BOOL_T; 2],
         )
         .unwrap();
-    let [in_y, in_z] = a.input_wires_arr();
+    let [in_x, in_y] = a.input_wires_arr();
+    let false_w1 = a.add_load_value(Value::false_val());
+    let a = a.finish_with_outputs(in_y, [in_x, false_w1]).unwrap();
 
-    let mut cond = a
-        .conditional_builder(
-            (vec![type_row![]; 2], in_y),
-            [],
-            Type::new_sum(a_outs.clone()).into(),
-        )
-        .unwrap();
-    let mut if_y_true = cond.case_builder(1).unwrap();
-    let false_w1 = if_y_true.load_const(&false_c);
-    let br_to_x = if_y_true
-        .add_dataflow_op(Tag::new(0, a_outs.clone()), [false_w1])
-        .unwrap();
-    if_y_true.finish_with_outputs(br_to_x.outputs()).unwrap();
-    let mut if_y_false = cond.case_builder(0).unwrap();
-    let br_to_b = if_y_false.add_dataflow_op(Tag::new(1, a_outs), []).unwrap();
-    if_y_false.finish_with_outputs(br_to_b.outputs()).unwrap();
-    let [res] = cond.finish_sub_container().unwrap().outputs_arr();
-    let a = a.finish_with_outputs(res, [in_z]).unwrap();
-
-    // B(v) => X(v, false)
+    // B(w, v) => X(v, w)
     let mut b = builder
-        .block_builder(type_row![BOOL_T], [type_row![]], type_row![BOOL_T; 2])
+        .block_builder(type_row![BOOL_T; 2], [type_row![]], type_row![BOOL_T; 2])
         .unwrap();
-    let [in_v] = b.input_wires_arr();
-    let false_w2 = b.load_const(&false_c);
+    let [in_w, in_v] = b.input_wires_arr();
     let [control] = b
         .add_dataflow_op(Tag::new(0, vec![type_row![]]), [])
         .unwrap()
         .outputs_arr();
-    let b = b.finish_with_outputs(control, [in_v, false_w2]).unwrap();
+    let b = b.finish_with_outputs(control, [in_v, in_w]).unwrap();
 
     let x = builder.exit_block();
 
-    builder.branch(&entry, 0, &a).unwrap();
-    builder.branch(&entry, 1, &b).unwrap();
-    builder.branch(&a, 0, &x).unwrap();
-    builder.branch(&a, 1, &b).unwrap();
+    let [fals, tru]: [usize; 2] = [0, 1];
+    builder.branch(&entry, tru, &a).unwrap(); // if true
+    builder.branch(&entry, fals, &b).unwrap(); // if false
+    builder.branch(&a, tru, &b).unwrap(); // if true
+    builder.branch(&a, fals, &x).unwrap(); // if false
     builder.branch(&b, 0, &x).unwrap();
     builder.finish_hugr(&EMPTY_REG).unwrap()
 }
@@ -402,9 +376,9 @@ fn xor_and_cfg() -> Hugr {
 #[case(pv_false(), pv_true_or_false(), pv_true_or_false(), pv_false())]
 #[case(pv_false(), PartialValue::Top, PartialValue::Top, pv_false())] // if !inp0 then out0=inp1
 #[case(pv_true_or_false(), pv_true(), pv_true_or_false(), pv_true_or_false())]
-#[case(pv_true_or_false(), pv_false(), pv_true_or_false(), pv_false())]
+#[case(pv_true_or_false(), pv_false(), pv_true_or_false(), pv_true_or_false())]
 #[case(PartialValue::Top, pv_true(), pv_true_or_false(), PartialValue::Top)]
-#[case(PartialValue::Top, pv_false(), PartialValue::Top, pv_false())]
+#[case(PartialValue::Top, pv_false(), PartialValue::Top, PartialValue::Top)]
 fn test_cfg(
     #[case] inp0: PartialValue<Void>,
     #[case] inp1: PartialValue<Void>,

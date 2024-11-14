@@ -9,7 +9,7 @@ use clap_verbosity_flag::Level;
 fn main() {
     match CliArgs::parse() {
         CliArgs::Validate(args) => run_validate(args),
-        CliArgs::GenExtensions(args) => args.run_dump(&hugr_core::std_extensions::STD_REG),
+        CliArgs::GenExtensions(args) => args.run_dump(&hugr::std_extensions::STD_REG),
         CliArgs::Mermaid(mut args) => args.run_print().unwrap(),
         CliArgs::External(_) => {
             // TODO: Implement support for external commands.

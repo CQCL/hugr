@@ -348,7 +348,7 @@ impl ConstUsize {
 #[typetag::serde]
 impl CustomConst for ConstUsize {
     fn name(&self) -> ValueName {
-        format!("ConstUsize({:?})", self.0).into()
+        format!("ConstUsize({})", self.0).into()
     }
 
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
@@ -394,7 +394,7 @@ impl ConstError {
 #[typetag::serde]
 impl CustomConst for ConstError {
     fn name(&self) -> ValueName {
-        format!("ConstError({:?}, {:?})", self.signal, self.message).into()
+        format!("ConstError({}, {:?})", self.signal, self.message).into()
     }
 
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {

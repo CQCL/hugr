@@ -30,7 +30,7 @@ use lazy_static::lazy_static;
 use rstest::rstest;
 
 use super::{constant_fold_pass, ConstFoldContext, ConstFoldPass, ValueHandle};
-use crate::dataflow::{ConstLoader, DFContext, PartialValue};
+use crate::dataflow::{partial_from_const, DFContext, PartialValue};
 
 #[rstest]
 #[case(ConstInt::new_u(4, 2).unwrap(), true)]
@@ -41,7 +41,7 @@ fn value_handling(#[case] k: impl CustomConst + Clone, #[case] eq: bool) {
     let subject_val = Value::sum(0, [k.clone().into()], st).unwrap();
     let mut temp = Hugr::default();
     let ctx: ConstFoldContext<Hugr> = ConstFoldContext(&mut temp);
-    let v1 = ctx.value_from_const(n, &subject_val);
+    let v1 = partial_from_const(&ctx, n, &subject_val);
 
     let v1_subfield = {
         let PartialValue::PartialSum(ps1) = v1 else {
@@ -57,7 +57,7 @@ fn value_handling(#[case] k: impl CustomConst + Clone, #[case] eq: bool) {
             .unwrap()
     };
 
-    let v2 = ctx.value_from_const(n, &k.into());
+    let v2 = partial_from_const(&ctx, n, &k.into());
     if eq {
         assert_eq!(v1_subfield, v2);
     } else {
@@ -83,7 +83,7 @@ fn assert_fully_folded_with(h: &impl HugrView, check_value: impl Fn(&Value) -> b
         match op {
             OpType::Input(_) | OpType::Output(_) | OpType::LoadConstant(_) => node_count += 1,
             OpType::Const(c) if check_value(c.value()) => node_count += 1,
-            _ => panic!("unexpected op: {:?}\n{}", op, h.mermaid_string()),
+            _ => panic!("unexpected op: {}\n{}", op, h.mermaid_string()),
         }
     }
 
@@ -113,8 +113,8 @@ fn test_add(#[case] a: f64, #[case] b: f64, #[case] c: f64) {
     let [n, n_a, n_b] = [0, 1, 2].map(portgraph::NodeIndex::new).map(Node::from);
     let mut temp = Hugr::default();
     let ctx = ConstFoldContext(&mut temp);
-    let v_a = ctx.value_from_const(n_a, &f2c(a));
-    let v_b = ctx.value_from_const(n_b, &f2c(b));
+    let v_a = partial_from_const(&ctx, n_a, &f2c(a));
+    let v_b = partial_from_const(&ctx, n_b, &f2c(b));
     assert_eq!(unwrap_float(v_a.clone()), a);
     assert_eq!(unwrap_float(v_b.clone()), b);
 

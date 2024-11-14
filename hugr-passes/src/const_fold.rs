@@ -20,13 +20,11 @@ use hugr_core::{
 };
 use value_handle::ValueHandle;
 
-use crate::{
-    dataflow::{
-        partial_from_const, AbstractValue, AnalysisResults, ConstLoader, DFContext, Machine,
-        PartialValue, TailLoopTermination,
-    },
-    validation::{ValidatePassError, ValidationLevel},
+use crate::dataflow::{
+    partial_from_const, AbstractValue, AnalysisResults, ConstLoader, ConstLocation, DFContext,
+    Machine, PartialValue, TailLoopTermination,
 };
+use crate::validation::{ValidatePassError, ValidationLevel};
 
 #[derive(Debug, Clone, Default)]
 /// A configuration for the Constant Folding pass.
@@ -72,7 +70,11 @@ impl ConstFoldPass {
         let inputs = self.inputs.iter().map(|(p, v)| {
             (
                 *p,
-                partial_from_const(&ConstFoldContext(hugr), fresh_node, &mut vec![p.index()], v),
+                partial_from_const(
+                    &ConstFoldContext(hugr),
+                    ConstLocation::Field(p.index(), &fresh_node.into()),
+                    v,
+                ),
             )
         });
 
@@ -81,8 +83,7 @@ impl ConstFoldPass {
         self.find_needed_nodes(&results, &mut keep_nodes);
         let [root_inp, _] = hugr.get_io(hugr.root()).unwrap();
 
-        let remove_nodes = results
-            .hugr()
+        let remove_nodes = hugr
             .nodes()
             .filter(|n| !keep_nodes.contains(n))
             .collect::<HashSet<_>>();
@@ -90,17 +91,16 @@ impl ConstFoldPass {
             .into_iter()
             .flat_map(|n| hugr.node_inputs(n).map(move |ip| (n, ip)))
             .filter(|(n, ip)| {
-                matches!(
-                    hugr.get_optype(*n).port_kind(*ip).unwrap(),
-                    EdgeKind::Value(_)
-                )
+                *n != hugr.root()
+                    && matches!(hugr.get_optype(*n).port_kind(*ip), Some(EdgeKind::Value(_)))
             })
             // Note we COULD filter out (avoid breaking) wires from other nodes that we are keeping.
             // This would insert fewer constants, but potentially expose less parallelism.
             .filter_map(|(n, ip)| {
                 let (src, outp) = hugr.single_linked_output(n, ip).unwrap();
                 // Avoid breaking edges from existing LoadConstant (we'd only add another)
-                // or froom root input node (i.e. hardcoding provided "external inputs" into graph)
+                // or from root input node (any "external inputs" provided will show up here
+                //   - potentially also in other places which this won't catch)
                 (!hugr.get_optype(src).is_load_constant() && src != root_inp).then_some((
                     n,
                     ip,
@@ -230,26 +230,16 @@ impl<'a, H: HugrView> std::ops::Deref for ConstFoldContext<'a, H> {
 }
 
 impl<'a, H: HugrView> ConstLoader<ValueHandle> for ConstFoldContext<'a, H> {
-    fn value_from_opaque(
-        &self,
-        node: Node,
-        fields: &[usize],
-        val: &OpaqueValue,
-    ) -> Option<ValueHandle> {
-        Some(ValueHandle::new_opaque(node, fields, val.clone()))
+    fn value_from_opaque(&self, loc: ConstLocation, val: &OpaqueValue) -> Option<ValueHandle> {
+        Some(ValueHandle::new_opaque(loc, val.clone()))
     }
 
     fn value_from_const_hugr(
         &self,
-        node: Node,
-        fields: &[usize],
+        loc: ConstLocation,
         h: &hugr_core::Hugr,
     ) -> Option<ValueHandle> {
-        Some(ValueHandle::new_const_hugr(
-            node,
-            fields,
-            Box::new(h.clone()),
-        ))
+        Some(ValueHandle::new_const_hugr(loc, Box::new(h.clone())))
     }
 
     fn value_from_function(&self, node: Node, type_args: &[TypeArg]) -> Option<ValueHandle> {
@@ -261,8 +251,7 @@ impl<'a, H: HugrView> ConstLoader<ValueHandle> for ConstFoldContext<'a, H> {
         // but not for transforming to a direct Call.
         let func = DescendantsGraph::<FuncID<true>>::try_new(&**self, node).ok()?;
         Some(ValueHandle::new_const_hugr(
-            node,
-            &[],
+            ConstLocation::Node(node),
             Box::new(func.extract_hugr()),
         ))
     }
@@ -289,7 +278,8 @@ impl<'a, H: HugrView> DFContext<ValueHandle> for ConstFoldContext<'a, H> {
             })
             .collect::<Vec<_>>();
         for (p, v) in op.constant_fold(&known_ins).unwrap_or_default() {
-            outs[p.index()] = partial_from_const(self, node, &mut vec![p.index()], &v);
+            outs[p.index()] =
+                partial_from_const(self, ConstLocation::Field(p.index(), &node.into()), &v);
         }
     }
 }

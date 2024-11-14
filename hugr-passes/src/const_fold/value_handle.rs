@@ -9,7 +9,7 @@ use hugr_core::ops::Value;
 use hugr_core::{Hugr, Node};
 use itertools::Either;
 
-use crate::dataflow::AbstractValue;
+use crate::dataflow::{AbstractValue, ConstLocation};
 
 /// A custom constant that has been successfully hashed via [TryHash](hugr_core::ops::constant::TryHash)
 #[derive(Clone, Debug)]
@@ -42,49 +42,54 @@ impl Hash for HashedConst {
     }
 }
 
-/// A [Node] (expected to be a [Const]) and, for Sum constants, optionally,
-/// indices of elements (nested arbitrarily deeply) within that.
-///
-/// [Const]: hugr_core::ops::Const
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum NodePart {
-    /// The specified-index'th field of the [Sum](Value::Sum) constant identified by the RHS
-    Field(usize, Box<NodePart>),
-    /// The entire value produced by the node
-    Node(Node),
-}
-
-impl NodePart {
-    fn new(node: Node, fields: &[usize]) -> Self {
-        fields
-            .iter()
-            .fold(Self::Node(node), |k, i| Self::Field(*i, Box::new(k)))
-    }
-}
-
 /// An [Eq]-able and [Hash]-able leaf (non-[Sum](Value::Sum)) Value
 #[derive(Clone, Debug)]
 pub enum ValueHandle {
     /// A [Value::Extension] that has been hashed
     Hashable(HashedConst),
     /// Either a [Value::Extension] that can't be hashed, or a [Value::Function].
-    Unhashable(NodePart, Either<Arc<OpaqueValue>, Arc<Hugr>>),
+    Unhashable {
+        node: Node,
+        fields: Vec<usize>,
+        value: Either<Arc<OpaqueValue>, Arc<Hugr>>,
+    },
+}
+
+fn node_and_fields(loc: &ConstLocation) -> (Node, Vec<usize>) {
+    match loc {
+        ConstLocation::Node(n) => (*n, vec![]),
+        ConstLocation::Field(idx, elem) => {
+            let (n, mut f) = node_and_fields(elem);
+            f.push(*idx);
+            (n, f)
+        }
+    }
 }
 
 impl ValueHandle {
     /// Makes a new instance from an [OpaqueValue] given the node and (for a [Sum](Value::Sum))
     /// field indices within that (used only if the custom constant is not hashable).
-    pub fn new_opaque(node: Node, fields: &[usize], val: OpaqueValue) -> Self {
+    pub fn new_opaque<'a>(loc: impl Into<ConstLocation<'a>>, val: OpaqueValue) -> Self {
         let arc = Arc::new(val);
+        let (node, fields) = node_and_fields(&loc.into());
         HashedConst::try_new(arc.clone()).map_or(
-            Self::Unhashable(NodePart::new(node, fields), Either::Left(arc)),
+            Self::Unhashable {
+                node,
+                fields,
+                value: Either::Left(arc),
+            },
             Self::Hashable,
         )
     }
 
     /// New instance for a [Value::Function] found within a node
-    pub fn new_const_hugr(node: Node, fields: &[usize], val: Box<Hugr>) -> Self {
-        Self::Unhashable(NodePart::new(node, fields), Either::Right(Arc::from(val)))
+    pub fn new_const_hugr<'a>(loc: impl Into<ConstLocation<'a>>, val: Box<Hugr>) -> Self {
+        let (node, fields) = node_and_fields(&loc.into());
+        Self::Unhashable {
+            node,
+            fields,
+            value: Either::Right(Arc::from(val)),
+        }
     }
 }
 
@@ -94,13 +99,24 @@ impl PartialEq for ValueHandle {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Hashable(h1), Self::Hashable(h2)) => h1 == h2,
-            (Self::Unhashable(k1, _), Self::Unhashable(k2, _)) => {
+            (
+                Self::Unhashable {
+                    node: n1,
+                    fields: f1,
+                    value: _,
+                },
+                Self::Unhashable {
+                    node: n2,
+                    fields: f2,
+                    value: _,
+                },
+            ) => {
                 // If the keys are equal, we return true since the values must have the
                 // same provenance, and so be equal. If the keys are different but the
                 // values are equal, we could return true if we didn't impl Eq, but
                 // since we do impl Eq, the Hash contract prohibits us from having equal
                 // values with different hashes.
-                k1 == k2
+                n1 == n2 && f1 == f2
             }
             _ => false,
         }
@@ -113,7 +129,14 @@ impl Hash for ValueHandle {
     fn hash<I: Hasher>(&self, state: &mut I) {
         match self {
             ValueHandle::Hashable(hc) => hc.hash(state),
-            ValueHandle::Unhashable(key, _) => key.hash(state),
+            ValueHandle::Unhashable {
+                node,
+                fields,
+                value: _,
+            } => {
+                node.hash(state);
+                fields.hash(state);
+            }
         }
     }
 }
@@ -124,14 +147,18 @@ impl From<ValueHandle> for Value {
     fn from(value: ValueHandle) -> Self {
         match value {
             ValueHandle::Hashable(HashedConst { val, .. })
-            | ValueHandle::Unhashable(_, Either::Left(val)) => Value::Extension {
+            | ValueHandle::Unhashable {
+                value: Either::Left(val),
+                ..
+            } => Value::Extension {
                 e: Arc::try_unwrap(val).unwrap_or_else(|a| a.as_ref().clone()),
             },
-            ValueHandle::Unhashable(_, Either::Right(hugr)) => {
-                Value::function(Arc::try_unwrap(hugr).unwrap_or_else(|a| a.as_ref().clone()))
-                    .map_err(|e| e.to_string())
-                    .unwrap()
-            }
+            ValueHandle::Unhashable {
+                value: Either::Right(hugr),
+                ..
+            } => Value::function(Arc::try_unwrap(hugr).unwrap_or_else(|a| a.as_ref().clone()))
+                .map_err(|e| e.to_string())
+                .unwrap(),
         }
     }
 }
@@ -156,31 +183,31 @@ mod test {
     fn value_key_eq() {
         let n = Node::from(portgraph::NodeIndex::new(0));
         let n2: Node = portgraph::NodeIndex::new(1).into();
-        let h1 = ValueHandle::new_opaque(n, &[], ConstString::new("foo".to_string()).into());
-        let h2 = ValueHandle::new_opaque(n2, &[], ConstString::new("foo".to_string()).into());
-        let h3 = ValueHandle::new_opaque(n, &[], ConstString::new("bar".to_string()).into());
+        let h1 = ValueHandle::new_opaque(n, ConstString::new("foo".to_string()).into());
+        let h2 = ValueHandle::new_opaque(n2, ConstString::new("foo".to_string()).into());
+        let h3 = ValueHandle::new_opaque(n, ConstString::new("bar".to_string()).into());
 
         assert_eq!(h1, h2); // Node ignored as constant is hashable
         assert_ne!(h1, h3);
 
         // Hashable vs Unhashable is not equal (even with same key):
         let f = ConstF64::new(std::f64::consts::PI);
-        let h4 = ValueHandle::new_opaque(n, &[], f.clone().into());
+        let h4 = ValueHandle::new_opaque(n, f.clone().into());
         assert_ne!(h4, h1);
         assert_ne!(h1, h4);
 
         // Unhashable vals are compared only by key, not content
         let f2 = ConstF64::new(std::f64::consts::E);
-        assert_eq!(h4, ValueHandle::new_opaque(n, &[], f2.clone().into()));
-        assert_ne!(h4, ValueHandle::new_opaque(n, &[5], f2.into()));
+        assert_eq!(h4, ValueHandle::new_opaque(n, f2.clone().into()));
+        assert_ne!(
+            h4,
+            ValueHandle::new_opaque(ConstLocation::Field(5, &n.into()), f2.into())
+        );
 
         let h = Box::new(make_hugr(1));
-        let h5 = ValueHandle::new_const_hugr(n, &[], h.clone());
-        assert_eq!(
-            h5,
-            ValueHandle::new_const_hugr(n, &[], Box::new(make_hugr(2)))
-        );
-        assert_ne!(h5, ValueHandle::new_const_hugr(n2, &[], h));
+        let h5 = ValueHandle::new_const_hugr(n, h.clone());
+        assert_eq!(h5, ValueHandle::new_const_hugr(n, Box::new(make_hugr(2))));
+        assert_ne!(h5, ValueHandle::new_const_hugr(n2, h));
     }
 
     fn make_hugr(num_wires: usize) -> Hugr {
@@ -199,14 +226,14 @@ mod test {
 
         let lst = ListValue::new(INT_TYPES[0].clone(), [v1.into(), v2.into()]);
         assert_eq!(
-            ValueHandle::new_opaque(n, &[], lst.clone().into()),
-            ValueHandle::new_opaque(n, &[1], lst.into())
+            ValueHandle::new_opaque(n, lst.clone().into()),
+            ValueHandle::new_opaque(ConstLocation::Field(1, &n.into()), lst.into())
         );
 
         let lst = ListValue::new(FLOAT64_TYPE, [v3.into()]);
         assert_ne!(
-            ValueHandle::new_opaque(n, &[], lst.clone().into()),
-            ValueHandle::new_opaque(n, &[3], lst.into())
+            ValueHandle::new_opaque(n, lst.clone().into()),
+            ValueHandle::new_opaque(ConstLocation::Field(3, &n.into()), lst.into())
         );
     }
 }

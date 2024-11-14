@@ -3,7 +3,7 @@ use std::io::Write;
 
 use clap::Parser;
 use clio::Output;
-use hugr_core::HugrView;
+use hugr::HugrView;
 
 /// Dump the standard extensions.
 #[derive(Parser, Debug)]
@@ -32,7 +32,7 @@ impl MermaidArgs {
         let hugrs = if self.validate {
             self.hugr_args.validate()?.0
         } else {
-            self.hugr_args.get_package()?.modules
+            self.hugr_args.get_package_or_hugr()?.into_hugrs()
         };
 
         for hugr in hugrs {

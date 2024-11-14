@@ -404,7 +404,7 @@ pub enum ReplaceError {
         replacement: OpTag,
     },
     /// Keys in [Replacement::adoptions] were not valid container nodes in [Replacement::replacement]
-    #[error("Node {0:?} was not an empty container node in the replacement")]
+    #[error("Node {0} was not an empty container node in the replacement")]
     InvalidAdoptingParent(Node),
     /// Some values in [Replacement::adoptions] were either descendants of other values, or not
     /// descendants of the [Replacement::removal]. The nodes are indicated on a best-effort basis.
@@ -599,7 +599,7 @@ mod test {
 
     fn find_node(h: &Hugr, s: &str) -> crate::Node {
         h.nodes()
-            .filter(|n| format!("{:?}", h.get_optype(*n)).contains(s))
+            .filter(|n| format!("{}", h.get_optype(*n)).contains(s))
             .exactly_one()
             .ok()
             .unwrap()

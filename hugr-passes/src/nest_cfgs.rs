@@ -191,7 +191,7 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> EdgeDest<T> {
 fn all_edges<'a, T: Copy + Clone + PartialEq + Eq + Hash + 'a>(
     cfg: &'a impl CfgNodeMap<T>,
     n: T,
-) -> impl Iterator<Item = EdgeDest<T>> + '_ {
+) -> impl Iterator<Item = EdgeDest<T>> + 'a {
     let extra = if n == cfg.exit_node() {
         vec![cfg.entry_node()]
     } else {

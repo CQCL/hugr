@@ -1,6 +1,6 @@
 [package]
 name = "hugr-model"
-version = "0.13.1"
+version = "0.14.0"
 readme = "README.md"
 documentation = "https://docs.rs/hugr-model/"
 description = "Data model for Quantinuum's HUGR intermediate representation"
@@ -15,6 +15,7 @@ license.workspace = true
 [dependencies]
 bumpalo = { workspace = true, features = ["collections"] }
 capnp = "0.20.1"
+derive_more = { version = "1.0.0", features = ["display"] }
 fxhash.workspace = true
 indexmap.workspace = true
 pest = "2.7.12"
@@ -30,4 +31,5 @@ workspace = true
 capnpc = "0.20.0"
 
 [dev-dependencies]
+insta.workspace = true
 pretty_assertions = "1.4.1"

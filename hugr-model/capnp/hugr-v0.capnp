@@ -49,6 +49,8 @@ struct Operation {
         conditional @12 :Void;
         callFunc @13 :TermId;
         loadFunc @14 :TermId;
+        constructorDecl @15 :ConstructorDecl;
+        operationDecl @16 :OperationDecl;
     }
 
     struct FuncDefn {
@@ -75,6 +77,18 @@ struct Operation {
         params @1 :List(Param);
         type @2 :TermId;
     }
+
+    struct ConstructorDecl {
+        name @0 :Text;
+        params @1 :List(Param);
+        type @2 :TermId;
+    }
+
+    struct OperationDecl {
+        name @0 :Text;
+        params @1 :List(Param);
+        type @2 :TermId;
+    }
 }
 
 struct Region {
@@ -89,6 +103,7 @@ struct Region {
 enum RegionKind {
     dataFlow @0;
     controlFlow @1;
+    module @2;
 }
 
 struct MetaItem {

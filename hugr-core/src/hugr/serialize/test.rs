@@ -54,7 +54,8 @@ impl NamedSchema {
     }
 
     pub fn check(&self, val: &serde_json::Value) {
-        if let Err(errors) = self.schema.validate(val) {
+        let mut errors = self.schema.iter_errors(val).peekable();
+        if errors.peek().is_some() {
             // errors don't necessarily implement Debug
             eprintln!("Schema failed to validate: {}", self.name);
             for error in errors {
