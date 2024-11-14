@@ -686,6 +686,14 @@ mod tests {
     }
 
     #[test]
+    fn test_scan_def() {
+        let op = ArrayScan::new(BOOL_T, QB_T, vec![USIZE_T], 2);
+        let optype: OpType = op.clone().into();
+        let new_op: ArrayScan = optype.cast().unwrap();
+        assert_eq!(new_op, op);
+    }
+
+    #[test]
     fn test_scan_map() {
         let size = 2;
         let src_ty = QB_T;
