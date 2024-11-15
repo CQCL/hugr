@@ -139,6 +139,11 @@ pub use hugr_core::{builder, core, extension, ops, package, std_extensions, type
 #[doc(inline)]
 pub use hugr_passes as algorithms;
 
+#[doc(inline)]
+#[cfg(feature = "llvm14-0")]
+pub use hugr_llvm as llvm;
+
+
 // Modules with hand-picked re-exports.
 pub mod hugr;
 
