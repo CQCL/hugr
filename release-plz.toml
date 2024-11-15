@@ -61,7 +61,9 @@ version_group = "hugr"
 [[package]]
 name = "hugr-model"
 release = true
-version_group = "hugr"
+# Use a separate version group while the dependency is `-unstable`,
+# to avoid breaking releases of the main package.
+version_group = "hugr-model"
 
 [[package]]
 name = "hugr-llvm"

@@ -510,7 +510,10 @@ class DfBase(ParentBuilder[DP], DefinitionBuilder, AbstractContextManager):
             [Node(2)]
         """
         # adds edge to the right of all existing edges
-        self.hugr.add_link(src.out(-1), dst.inp(-1))
+        source = src.out(-1)
+        target = dst.inp(-1)
+        if not self.hugr.has_link(source, target):
+            self.hugr.add_link(source, target)
 
     def load(
         self, const: ToNode | val.Value, const_parent: ToNode | None = None
@@ -616,6 +619,12 @@ class DfBase(ParentBuilder[DP], DefinitionBuilder, AbstractContextManager):
         tys = [self._wire_up_port(node, i, p) for i, p in enumerate(ports)]
         if isinstance(op := self.hugr[node].op, ops._PartialOp):
             op._set_in_types(tys)
+            if isinstance(op, ops.DataflowOp):
+                # Update the node's input and output port count
+                sig = op.outer_signature()
+                self.hugr._update_port_count(
+                    node, num_inps=len(sig.input), num_outs=len(sig.output)
+                )
         return tys
 
     def _get_dataflow_type(self, wire: Wire) -> tys.Type:

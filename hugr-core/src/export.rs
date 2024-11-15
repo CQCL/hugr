@@ -1,8 +1,8 @@
 //! Exporting HUGR graphs to their `hugr-model` representation.
 use crate::{
-    extension::ExtensionSet,
-    hugr::IdentList,
-    ops::{DataflowBlock, OpTrait, OpType},
+    extension::{ExtensionId, ExtensionSet, OpDef, SignatureFunc},
+    hugr::{IdentList, NodeMetadataMap},
+    ops::{DataflowBlock, OpName, OpTrait, OpType},
     types::{
         type_param::{TypeArgVariable, TypeParam},
         type_row::TypeRowBase,
@@ -21,6 +21,8 @@ type FxIndexSet<T> = IndexSet<T, fxhash::FxBuildHasher>;
 
 pub(crate) const OP_FUNC_CALL_INDIRECT: &str = "func.call-indirect";
 const TERM_PARAM_TUPLE: &str = "param.tuple";
+const TERM_JSON: &str = "prelude.json";
+const META_DESCRIPTION: &str = "docs.description";
 
 /// Export a [`Hugr`] graph to its representation in the model.
 pub fn export_hugr<'a>(hugr: &'a Hugr, bump: &'a Bump) -> model::Module<'a> {
@@ -38,11 +40,14 @@ struct Context<'a> {
     /// Mapping from ports to link indices.
     /// This only includes the minimum port among groups of linked ports.
     links: FxIndexSet<(Node, Port)>,
+    /// The arena in which the model is allocated.
     bump: &'a Bump,
     /// Stores the terms that we have already seen to avoid duplicates.
     term_map: FxHashMap<model::Term<'a>, model::TermId>,
     /// The current scope for local variables.
     local_scope: Option<model::NodeId>,
+    /// Mapping from extension operations to their declarations.
+    decl_operations: FxHashMap<(ExtensionId, OpName), model::NodeId>,
 }
 
 impl<'a> Context<'a> {
@@ -57,23 +62,26 @@ impl<'a> Context<'a> {
             links: IndexSet::default(),
             term_map: FxHashMap::default(),
             local_scope: None,
+            decl_operations: FxHashMap::default(),
         }
     }
 
     /// Exports the root module of the HUGR graph.
     pub fn export_root(&mut self) {
         let hugr_children = self.hugr.children(self.hugr.root());
-        let mut children = BumpVec::with_capacity_in(hugr_children.len(), self.bump);
+        let mut children = Vec::with_capacity(hugr_children.len());
 
         for child in self.hugr.children(self.hugr.root()) {
             children.push(self.export_node(child));
         }
 
+        children.extend(self.decl_operations.values().copied());
+
         let root = self.module.insert_region(model::Region {
-            kind: model::RegionKind::DataFlow,
+            kind: model::RegionKind::Module,
             sources: &[],
             targets: &[],
-            children: children.into_bump_slice(),
+            children: self.bump.alloc_slice_copy(&children),
             meta: &[], // TODO: Export metadata
             signature: None,
         });
@@ -123,15 +131,23 @@ impl<'a> Context<'a> {
             .or_insert_with(|| self.module.insert_term(term))
     }
 
+    pub fn make_qualified_name(
+        &mut self,
+        extension: &ExtensionId,
+        name: impl AsRef<str>,
+    ) -> &'a str {
+        let capacity = extension.len() + name.as_ref().len() + 1;
+        let mut output = BumpString::with_capacity_in(capacity, self.bump);
+        let _ = write!(&mut output, "{}.{}", extension, name.as_ref());
+        output.into_bump_str()
+    }
+
     pub fn make_named_global_ref(
         &mut self,
         extension: &IdentList,
         name: impl AsRef<str>,
     ) -> model::GlobalRef<'a> {
-        let capacity = extension.len() + name.as_ref().len() + 1;
-        let mut output = BumpString::with_capacity_in(capacity, self.bump);
-        let _ = write!(&mut output, "{}.{}", extension, name.as_ref());
-        model::GlobalRef::Named(output.into_bump_str())
+        model::GlobalRef::Named(self.make_qualified_name(extension, name))
     }
 
     /// Get the node that declares or defines the function associated with the given
@@ -315,7 +331,7 @@ impl<'a> Context<'a> {
             // regions of potentially different kinds. At the moment, we check if the node has any
             // children, in which case we create a dataflow region with those children.
             OpType::ExtensionOp(op) => {
-                let operation = self.make_named_global_ref(op.def().extension(), op.def().name());
+                let operation = self.export_opdef(op.def());
 
                 params = self
                     .bump
@@ -378,6 +394,11 @@ impl<'a> Context<'a> {
         let inputs = self.make_ports(node, Direction::Incoming, num_inputs);
         let outputs = self.make_ports(node, Direction::Outgoing, num_outputs);
 
+        let meta = match self.hugr.get_node_metadata(node) {
+            Some(metadata_map) => self.export_node_metadata(metadata_map),
+            None => &[],
+        };
+
         // Replace the placeholder node with the actual node.
         *self.module.get_node_mut(node_id).unwrap() = model::Node {
             operation,
@@ -385,11 +406,84 @@ impl<'a> Context<'a> {
             outputs,
             params,
             regions,
-            meta: &[], // TODO: Export metadata
+            meta,
             signature,
         };
 
         node_id
+    }
+
+    /// Export an `OpDef` as an operation declaration.
+    ///
+    /// Operations that allow a declarative form are exported as a reference to
+    /// an operation declaration node, and this node is reused for all instances
+    /// of the operation. The node is added to the `decl_operations` map so that
+    /// at the end of the export, the operation declaration nodes can be added
+    /// to the module as children of the module region.
+    pub fn export_opdef(&mut self, opdef: &OpDef) -> model::GlobalRef<'a> {
+        use std::collections::hash_map::Entry;
+
+        let poly_func_type = match opdef.signature_func() {
+            SignatureFunc::PolyFuncType(poly_func_type) => poly_func_type,
+            _ => return self.make_named_global_ref(opdef.extension(), opdef.name()),
+        };
+
+        let key = (opdef.extension().clone(), opdef.name().clone());
+        let entry = self.decl_operations.entry(key);
+
+        let node = match entry {
+            Entry::Occupied(occupied_entry) => {
+                return model::GlobalRef::Direct(*occupied_entry.get())
+            }
+            Entry::Vacant(vacant_entry) => {
+                *vacant_entry.insert(self.module.insert_node(model::Node {
+                    operation: model::Operation::Invalid,
+                    inputs: &[],
+                    outputs: &[],
+                    params: &[],
+                    regions: &[],
+                    meta: &[],
+                    signature: None,
+                }))
+            }
+        };
+
+        let decl = self.with_local_scope(node, |this| {
+            let name = this.make_qualified_name(opdef.extension(), opdef.name());
+            let (params, r#type) = this.export_poly_func_type(poly_func_type);
+            let decl = this.bump.alloc(model::OperationDecl {
+                name,
+                params,
+                r#type,
+            });
+            decl
+        });
+
+        let meta = {
+            let description = Some(opdef.description()).filter(|d| !d.is_empty());
+            let meta_len = opdef.iter_misc().len() + description.is_some() as usize;
+            let mut meta = BumpVec::with_capacity_in(meta_len, self.bump);
+
+            if let Some(description) = description {
+                let name = META_DESCRIPTION;
+                let value = self.make_term(model::Term::Str(self.bump.alloc_str(description)));
+                meta.push(model::MetaItem { name, value })
+            }
+
+            for (name, value) in opdef.iter_misc() {
+                let name = self.bump.alloc_str(name);
+                let value = self.export_json(value);
+                meta.push(model::MetaItem { name, value });
+            }
+
+            self.bump.alloc_slice_copy(&meta)
+        };
+
+        let node_data = self.module.get_node_mut(node).unwrap();
+        node_data.operation = model::Operation::DeclareOperation { decl };
+        node_data.meta = meta;
+
+        model::GlobalRef::Direct(node)
     }
 
     /// Export the signature of a `DataflowBlock`. Here we can't use `OpType::dataflow_signature`
@@ -776,6 +870,31 @@ impl<'a> Context<'a> {
         let extensions = extensions.into_bump_slice();
 
         self.make_term(model::Term::ExtSet { extensions, rest })
+    }
+
+    pub fn export_node_metadata(
+        &mut self,
+        metadata_map: &NodeMetadataMap,
+    ) -> &'a [model::MetaItem<'a>] {
+        let mut meta = BumpVec::with_capacity_in(metadata_map.len(), self.bump);
+
+        for (name, value) in metadata_map {
+            let name = self.bump.alloc_str(name);
+            let value = self.export_json(value);
+            meta.push(model::MetaItem { name, value });
+        }
+
+        meta.into_bump_slice()
+    }
+
+    pub fn export_json(&mut self, value: &serde_json::Value) -> model::TermId {
+        let value = serde_json::to_string(value).expect("json values are always serializable");
+        let value = self.make_term(model::Term::Str(self.bump.alloc_str(&value)));
+        let value = self.bump.alloc_slice_copy(&[value]);
+        self.make_term(model::Term::ApplyFull {
+            global: model::GlobalRef::Named(TERM_JSON),
+            args: value,
+        })
     }
 }
 

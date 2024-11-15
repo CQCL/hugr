@@ -32,7 +32,7 @@ impl MermaidArgs {
         let hugrs = if self.validate {
             self.hugr_args.validate()?.0
         } else {
-            self.hugr_args.get_package()?.modules
+            self.hugr_args.get_package_or_hugr()?.into_hugrs()
         };
 
         for hugr in hugrs {

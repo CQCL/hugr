@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.13.3](https://github.com/CQCL/hugr/compare/hugr-core-v0.13.2...hugr-core-v0.13.3) - 2024-11-06
+
+### Bug Fixes
+
+- Insert DFG directly as a funcdefn in `Package::from_hugr`  ([#1621](https://github.com/CQCL/hugr/pull/1621))
+
+### New Features
+
+- `HugrMut::remove_metadata` ([#1619](https://github.com/CQCL/hugr/pull/1619))
+- Operation and constructor declarations in `hugr-model` ([#1605](https://github.com/CQCL/hugr/pull/1605))
+- Add TailLoop::BREAK_TAG and CONTINUE_TAG ([#1626](https://github.com/CQCL/hugr/pull/1626))
+
+## [0.13.2](https://github.com/CQCL/hugr/compare/hugr-core-v0.13.1...hugr-core-v0.13.2) - 2024-10-22
+
+### Bug Fixes
+
+- Allocate ports on root nodes ([#1585](https://github.com/CQCL/hugr/pull/1585))
+
+### New Features
+
+- Add `Package` definition on `hugr-core` ([#1587](https://github.com/CQCL/hugr/pull/1587))
+- Render function names in `mermaid`/`dot` ([#1583](https://github.com/CQCL/hugr/pull/1583))
+- Add filter_edge_kind to PortIterator ([#1593](https://github.com/CQCL/hugr/pull/1593))
+- make errors more readable with Display impls ([#1597](https://github.com/CQCL/hugr/pull/1597))
+- Ensure packages always have modules at the root ([#1589](https://github.com/CQCL/hugr/pull/1589))
+
 ## [0.13.1](https://github.com/CQCL/hugr/compare/hugr-core-v0.10.0...hugr-core-v0.13.1) - 2024-10-14
 
 ### New Features

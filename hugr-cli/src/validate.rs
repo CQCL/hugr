@@ -7,6 +7,14 @@ use hugr::{extension::ExtensionRegistry, Extension, Hugr};
 
 use crate::{CliError, HugrArgs};
 
+// TODO: Deprecated re-export. Remove on a breaking release.
+#[doc(inline)]
+#[deprecated(
+    since = "0.13.2",
+    note = "Use `hugr::package::PackageValidationError` instead."
+)]
+pub use hugr::package::PackageValidationError as ValError;
+
 /// Validate and visualise a HUGR file.
 #[derive(Parser, Debug)]
 #[clap(version = "1.0", long_about = None)]
@@ -44,7 +52,7 @@ impl HugrArgs {
     /// Returns the validated modules and the extension registry the modules
     /// were validated against.
     pub fn validate(&mut self) -> Result<(Vec<Hugr>, ExtensionRegistry), CliError> {
-        let mut package = self.get_package()?;
+        let mut package = self.get_package_or_hugr()?;
 
         let mut reg: ExtensionRegistry = if self.no_std {
             hugr::extension::PRELUDE_REGISTRY.to_owned()
@@ -60,8 +68,8 @@ impl HugrArgs {
                 .map_err(PackageValidationError::Extension)?;
         }
 
-        package.validate(&mut reg)?;
-        Ok((package.modules, reg))
+        package.update_validate(&mut reg)?;
+        Ok((package.into_hugrs(), reg))
     }
 
     /// Test whether a `level` message should be output.

@@ -9,6 +9,7 @@
 //! while the former provide views for subgraphs within a single level of the
 //! hierarchy.
 
+use std::cell::OnceCell;
 use std::collections::HashSet;
 use std::mem;
 
@@ -210,7 +211,7 @@ impl SiblingSubgraph {
     /// The subgraph signature will be given by the types of the incoming and
     /// outgoing edges ordered by the node order in `nodes` and within each node
     /// by the port order.
-
+    ///
     /// The in- and out-arity of the signature will match the
     /// number of incoming and outgoing edges respectively. In particular, the
     /// assumption is made that no two incoming edges have the same source
@@ -237,6 +238,14 @@ impl SiblingSubgraph {
         checker: &impl ConvexChecker,
     ) -> Result<Self, InvalidSubgraph> {
         let nodes = nodes.into();
+
+        // If there's one or less nodes, we don't need to check convexity.
+        match nodes.as_slice() {
+            [] => return Err(InvalidSubgraph::EmptySubgraph),
+            [node] => return Ok(Self::from_node(*node, hugr)),
+            _ => {}
+        };
+
         let nodes_set = nodes.iter().copied().collect::<HashSet<_>>();
         let incoming_edges = nodes
             .iter()
@@ -262,6 +271,31 @@ impl SiblingSubgraph {
             })
             .collect_vec();
         Self::try_new_with_checker(inputs, outputs, hugr, checker)
+    }
+
+    /// Create a subgraph containing a single node.
+    ///
+    /// The subgraph signature will be given by signature of the node.
+    pub fn from_node(node: Node, hugr: &impl HugrView) -> Self {
+        // TODO once https://github.com/CQCL/portgraph/issues/155
+        // is fixed we can just call try_from_nodes here.
+        // Until then, doing this saves a lot of work.
+        let nodes = vec![node];
+        let inputs = hugr
+            .node_inputs(node)
+            .filter(|&p| hugr.is_linked(node, p))
+            .map(|p| vec![(node, p)])
+            .collect_vec();
+        let outputs = hugr
+            .node_outputs(node)
+            .filter_map(|p| hugr.is_linked(node, p).then_some((node, p)))
+            .collect_vec();
+
+        Self {
+            nodes,
+            inputs,
+            outputs,
+        }
     }
 
     /// An iterator over the nodes in the subgraph.
@@ -453,15 +487,24 @@ fn combine_in_out<'a>(
 ///
 /// This can be used when constructing multiple sibling subgraphs to speed up
 /// convexity checking.
-pub struct TopoConvexChecker<'g, Base: 'g + HugrView>(
-    portgraph::algorithms::TopoConvexChecker<Base::Portgraph<'g>>,
-);
+pub struct TopoConvexChecker<'g, Base: 'g + HugrView> {
+    base: &'g Base,
+    checker: OnceCell<portgraph::algorithms::TopoConvexChecker<Base::Portgraph<'g>>>,
+}
 
 impl<'g, Base: HugrView> TopoConvexChecker<'g, Base> {
     /// Create a new convexity checker.
     pub fn new(base: &'g Base) -> Self {
-        let pg = base.portgraph();
-        Self(portgraph::algorithms::TopoConvexChecker::new(pg))
+        Self {
+            base,
+            checker: OnceCell::new(),
+        }
+    }
+
+    /// Returns the portgraph convexity checker, initializing it if necessary.
+    fn get_checker(&self) -> &portgraph::algorithms::TopoConvexChecker<Base::Portgraph<'g>> {
+        self.checker
+            .get_or_init(|| portgraph::algorithms::TopoConvexChecker::new(self.base.portgraph()))
     }
 }
 
@@ -472,7 +515,13 @@ impl<'g, Base: HugrView> ConvexChecker for TopoConvexChecker<'g, Base> {
         inputs: impl IntoIterator<Item = portgraph::PortIndex>,
         outputs: impl IntoIterator<Item = portgraph::PortIndex>,
     ) -> bool {
-        self.0.is_convex(nodes, inputs, outputs)
+        let mut nodes = nodes.into_iter().multipeek();
+        // If the node iterator contains less than two nodes, the subgraph is
+        // trivially convex.
+        if nodes.peek().is_none() || nodes.peek().is_none() {
+            return true;
+        };
+        self.get_checker().is_convex(nodes, inputs, outputs)
     }
 }
 

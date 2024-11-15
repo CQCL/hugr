@@ -26,6 +26,8 @@ use itertools::Either;
 use smol_str::{SmolStr, ToSmolStr};
 use thiserror::Error;
 
+const TERM_JSON: &str = "prelude.json";
+
 type FxIndexMap<K, V> = IndexMap<K, V, fxhash::FxBuildHasher>;
 
 /// Error during import.
@@ -184,6 +186,14 @@ impl<'a> Context<'a> {
         let node_data = self.get_node(node_id)?;
         self.record_links(node, Direction::Incoming, node_data.inputs);
         self.record_links(node, Direction::Outgoing, node_data.outputs);
+
+        for meta_item in node_data.meta {
+            // TODO: For now we expect all metadata to be JSON since this is how
+            // it is handled in `hugr-core`.
+            let value = self.import_json_value(meta_item.value)?;
+            self.hugr.set_metadata(node, meta_item.name, value);
+        }
+
         Ok(node)
     }
 
@@ -284,6 +294,8 @@ impl<'a> Context<'a> {
                 match item {
                     NamedItem::FuncDecl(node) => Ok(*node),
                     NamedItem::FuncDefn(node) => Ok(*node),
+                    NamedItem::CtrDecl(node) => Ok(*node),
+                    NamedItem::OperationDecl(node) => Ok(*node),
                 }
             }
         }
@@ -299,6 +311,8 @@ impl<'a> Context<'a> {
                     model::Operation::DeclareFunc { decl } => decl.name,
                     model::Operation::DefineAlias { decl, .. } => decl.name,
                     model::Operation::DeclareAlias { decl } => decl.name,
+                    model::Operation::DeclareConstructor { decl } => decl.name,
+                    model::Operation::DeclareOperation { decl } => decl.name,
                     _ => {
                         return Err(model::ModelError::InvalidGlobal(global_ref.to_string()).into());
                     }
@@ -334,7 +348,11 @@ impl<'a> Context<'a> {
         Ok(())
     }
 
-    fn import_node(&mut self, node_id: model::NodeId, parent: Node) -> Result<Node, ImportError> {
+    fn import_node(
+        &mut self,
+        node_id: model::NodeId,
+        parent: Node,
+    ) -> Result<Option<Node>, ImportError> {
         let node_data = self.get_node(node_id)?;
 
         match node_data.operation {
@@ -349,7 +367,7 @@ impl<'a> Context<'a> {
                 };
 
                 self.import_dfg_region(node_id, *region, node)?;
-                Ok(node)
+                Ok(Some(node))
             }
 
             model::Operation::Cfg => {
@@ -362,10 +380,13 @@ impl<'a> Context<'a> {
                 };
 
                 self.import_cfg_region(node_id, *region, node)?;
-                Ok(node)
+                Ok(Some(node))
             }
 
-            model::Operation::Block => self.import_cfg_block(node_id, parent),
+            model::Operation::Block => {
+                let node = self.import_cfg_block(node_id, parent)?;
+                Ok(Some(node))
+            }
 
             model::Operation::DefineFunc { decl } => {
                 self.import_poly_func_type(*decl, |ctx, signature| {
@@ -382,7 +403,7 @@ impl<'a> Context<'a> {
 
                     ctx.import_dfg_region(node_id, *region, node)?;
 
-                    Ok(node)
+                    Ok(Some(node))
                 })
             }
 
@@ -395,7 +416,7 @@ impl<'a> Context<'a> {
 
                     let node = ctx.make_node(node_id, optype, parent)?;
 
-                    Ok(node)
+                    Ok(Some(node))
                 })
             }
 
@@ -415,7 +436,8 @@ impl<'a> Context<'a> {
                 self.static_edges.push((func_node, node_id));
                 let optype = OpType::Call(Call::try_new(func_sig, type_args, self.extensions)?);
 
-                self.make_node(node_id, optype, parent)
+                let node = self.make_node(node_id, optype, parent)?;
+                Ok(Some(node))
             }
 
             model::Operation::LoadFunc { func } => {
@@ -439,18 +461,26 @@ impl<'a> Context<'a> {
                     self.extensions,
                 )?);
 
-                self.make_node(node_id, optype, parent)
+                let node = self.make_node(node_id, optype, parent)?;
+                Ok(Some(node))
             }
 
-            model::Operation::TailLoop => self.import_tail_loop(node_id, parent),
-            model::Operation::Conditional => self.import_conditional(node_id, parent),
+            model::Operation::TailLoop => {
+                let node = self.import_tail_loop(node_id, parent)?;
+                Ok(Some(node))
+            }
+            model::Operation::Conditional => {
+                let node = self.import_conditional(node_id, parent)?;
+                Ok(Some(node))
+            }
 
             model::Operation::CustomFull {
                 operation: GlobalRef::Named(name),
             } if name == OP_FUNC_CALL_INDIRECT => {
                 let signature = self.get_node_signature(node_id)?;
                 let optype = OpType::CallIndirect(CallIndirect { signature });
-                self.make_node(node_id, optype, parent)
+                let node = self.make_node(node_id, optype, parent)?;
+                Ok(Some(node))
             }
 
             model::Operation::CustomFull { operation } => {
@@ -461,15 +491,7 @@ impl<'a> Context<'a> {
                     .map(|param| self.import_type_arg(*param))
                     .collect::<Result<Vec<_>, _>>()?;
 
-                let name = match operation {
-                    GlobalRef::Direct(_) => {
-                        return Err(error_unsupported!(
-                            "custom operation with direct reference to declaring node"
-                        ))
-                    }
-                    GlobalRef::Named(name) => name,
-                };
-
+                let name = self.get_global_name(operation)?;
                 let (extension, name) = self.import_custom_name(name)?;
 
                 // TODO: Currently we do not have the description or any other metadata for
@@ -493,7 +515,7 @@ impl<'a> Context<'a> {
                     _ => return Err(error_unsupported!("multiple regions in custom operation")),
                 }
 
-                Ok(node)
+                Ok(Some(node))
             }
 
             model::Operation::Custom { .. } => Err(error_unsupported!(
@@ -512,7 +534,8 @@ impl<'a> Context<'a> {
                     definition: ctx.import_type(value)?,
                 });
 
-                ctx.make_node(node_id, optype, parent)
+                let node = ctx.make_node(node_id, optype, parent)?;
+                Ok(Some(node))
             }),
 
             model::Operation::DeclareAlias { decl } => self.with_local_socpe(|ctx| {
@@ -527,7 +550,8 @@ impl<'a> Context<'a> {
                     bound: TypeBound::Copyable,
                 });
 
-                ctx.make_node(node_id, optype, parent)
+                let node = ctx.make_node(node_id, optype, parent)?;
+                Ok(Some(node))
             }),
 
             model::Operation::Tag { tag } => {
@@ -536,15 +560,19 @@ impl<'a> Context<'a> {
                     .ok_or_else(|| error_uninferred!("node signature"))?;
                 let (_, outputs, _) = self.get_func_type(signature)?;
                 let (variants, _) = self.import_adt_and_rest(node_id, outputs)?;
-                self.make_node(
+                let node = self.make_node(
                     node_id,
                     OpType::Tag(Tag {
                         variants,
                         tag: tag as _,
                     }),
                     parent,
-                )
+                )?;
+                Ok(Some(node))
             }
+
+            model::Operation::DeclareConstructor { .. } => Ok(None),
+            model::Operation::DeclareOperation { .. } => Ok(None),
         }
     }
 
@@ -1182,12 +1210,43 @@ impl<'a> Context<'a> {
             }
         }
     }
+
+    fn import_json_value(
+        &mut self,
+        term_id: model::TermId,
+    ) -> Result<serde_json::Value, ImportError> {
+        let (global, args) = match self.get_term(term_id)? {
+            model::Term::Apply { global, args } | model::Term::ApplyFull { global, args } => {
+                (global, args)
+            }
+            _ => return Err(model::ModelError::TypeError(term_id).into()),
+        };
+
+        if global != &GlobalRef::Named(TERM_JSON) {
+            return Err(model::ModelError::TypeError(term_id).into());
+        }
+
+        let [json_arg] = args else {
+            return Err(model::ModelError::TypeError(term_id).into());
+        };
+
+        let model::Term::Str(json_str) = self.get_term(*json_arg)? else {
+            return Err(model::ModelError::TypeError(term_id).into());
+        };
+
+        let json_value =
+            serde_json::from_str(json_str).map_err(|_| model::ModelError::TypeError(term_id))?;
+
+        Ok(json_value)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 enum NamedItem {
     FuncDecl(model::NodeId),
     FuncDefn(model::NodeId),
+    CtrDecl(model::NodeId),
+    OperationDecl(model::NodeId),
 }
 
 struct Names<'a> {
@@ -1207,6 +1266,12 @@ impl<'a> Names<'a> {
                 }
                 model::Operation::DeclareFunc { decl } => {
                     Some((decl.name, NamedItem::FuncDefn(node_id)))
+                }
+                model::Operation::DeclareConstructor { decl } => {
+                    Some((decl.name, NamedItem::CtrDecl(node_id)))
+                }
+                model::Operation::DeclareOperation { decl } => {
+                    Some((decl.name, NamedItem::OperationDecl(node_id)))
                 }
                 _ => None,
             };
