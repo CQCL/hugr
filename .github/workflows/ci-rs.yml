@@ -51,8 +51,11 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-      - name: Install Llvm
-        run: "sudo apt-get update && sudo apt-get install -y llvm-14"
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: "14.0"
+          env: true
       - name: Install CapnProto
         run: sudo apt-get install -y capnproto
       - name: Check formatting
@@ -96,8 +99,11 @@ jobs:
           toolchain: "stable"
       - name: Configure default rust toolchain
         run: rustup override set ${{steps.toolchain.outputs.name}}
-      - name: Install Llvm
-        run: "sudo apt-get update && sudo apt-get install -y llvm-14"
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: "14.0"
+          env: true
       - name: Install CapnProto
         run: sudo apt-get install -y capnproto
       - name: Build with no features
@@ -120,8 +126,11 @@ jobs:
           toolchain: "stable"
       - name: Configure default rust toolchain
         run: rustup override set ${{steps.toolchain.outputs.name}}
-      - name: Install Llvm
-        run: "sudo apt-get update && sudo apt-get install -y llvm-14"
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: "14.0"
+          env: true
       - name: Install CapnProto
         run: sudo apt-get install -y capnproto
       - name: Build with all features
@@ -157,8 +166,11 @@ jobs:
           toolchain: ${{ matrix.rust }}
       - name: Configure default rust toolchain
         run: rustup override set ${{steps.toolchain.outputs.name}}
-      - name: Install Llvm
-        run: "sudo apt-get update && sudo apt-get install -y llvm-14"
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: "14.0"
+          env: true
       - name: Install CapnProto
         run: sudo apt-get install -y capnproto
       - name: Build with no features
@@ -210,8 +222,11 @@ jobs:
           # Nightly is required to count doctests coverage
           toolchain: "nightly"
           components: llvm-tools-preview
-      - name: Install Llvm
-        run: "sudo apt-get update && sudo apt-get install -y llvm-14"
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: "14.0"
+          env: true
       - name: Install CapnProto
         run: sudo apt-get install -y capnproto
       - name: Install cargo-llvm-cov
