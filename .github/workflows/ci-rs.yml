@@ -23,7 +23,7 @@ env:
 
 jobs:
   # Check if changes were made to the relevant files.
-  # Always returns true if running on the default branch, to ensure all changes are throughly checked.
+  # Always returns true if running on the default branch, to ensure all changes are thoroughly checked.
   changes:
     name: Check for changes in Rust files
     runs-on: ubuntu-latest
