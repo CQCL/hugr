@@ -2,8 +2,8 @@ use std::rc::Rc;
 
 use anyhow::Result;
 use delegate::delegate;
-use hugr::extension::ExtensionId;
-use hugr::types::{SumType, Type, TypeName};
+use hugr_core::extension::ExtensionId;
+use hugr_core::types::{SumType, Type, TypeName};
 use inkwell::types::FunctionType;
 use inkwell::{context::Context, types::BasicTypeEnum};
 
@@ -13,7 +13,7 @@ use crate::utils::type_map::TypeMap;
 
 /// A type alias for a hugr function type. We use this to disambiguate from
 /// the LLVM [FunctionType].
-pub type HugrFuncType = hugr::types::Signature;
+pub type HugrFuncType = hugr_core::types::Signature;
 
 /// A type alias for a hugr type. We use this to disambiguate from LLVM types.
 pub type HugrType = Type;
@@ -100,7 +100,7 @@ impl<'a> TypeConverter<'a> {
 #[allow(drop_bounds)]
 pub mod test {
 
-    use hugr::{
+    use hugr_core::{
         std_extensions::arithmetic::int_types::INT_TYPES,
         type_row,
         types::{SumType, Type},

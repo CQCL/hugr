@@ -1,6 +1,6 @@
 use anyhow::{anyhow, bail, ensure, Result};
 
-use hugr::{
+use hugr_core::{
     extension::{
         prelude::{sum_with_error, ConstError, BOOL_T},
         simple_op::MakeExtensionOp,
@@ -250,9 +250,9 @@ mod test {
     use crate::check_emission;
     use crate::emit::test::{SimpleHugrConfig, DFGW};
     use crate::test::{exec_ctx, llvm_ctx, TestContext};
-    use hugr::builder::SubContainer;
-    use hugr::std_extensions::arithmetic::int_types::ConstInt;
-    use hugr::{
+    use hugr_core::builder::SubContainer;
+    use hugr_core::std_extensions::arithmetic::int_types::ConstInt;
+    use hugr_core::{
         builder::{Dataflow, DataflowSubContainer},
         extension::prelude::{ConstUsize, PRELUDE_REGISTRY, USIZE_T},
         std_extensions::arithmetic::{
@@ -569,7 +569,7 @@ mod test {
 
     #[rstest]
     fn itobool_cond(mut exec_ctx: TestContext, #[values(0, 1)] i: u64) {
-        use hugr::type_row;
+        use hugr_core::type_row;
 
         let hugr = SimpleHugrConfig::new()
             .with_outs(vec![USIZE_T])

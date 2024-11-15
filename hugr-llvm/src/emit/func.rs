@@ -1,7 +1,7 @@
 use std::{collections::HashMap, rc::Rc};
 
 use anyhow::{anyhow, Result};
-use hugr::{
+use hugr_core::{
     ops::{constant::CustomConst, ExtensionOp, FuncDecl, FuncDefn},
     types::Type,
     HugrView, NodeIndex, PortIndex, Wire,
@@ -269,7 +269,7 @@ impl<'c, 'a, H: HugrView> EmitFuncContext<'c, 'a, H> {
     fn map_wire<'hugr, OT>(
         &mut self,
         node: FatNode<'hugr, OT, H>,
-        port: hugr::OutgoingPort,
+        port: hugr_core::OutgoingPort,
         hugr_type: &Type,
     ) -> Result<ValueMailBox<'c>> {
         let wire = Wire::new(node.node(), port);

@@ -1,4 +1,4 @@
-use hugr::{
+use hugr_core::{
     extension::simple_op::MakeExtensionOp,
     ops::{ExtensionOp, NamedOp, Value},
     std_extensions::logic::{self, LogicOp},
@@ -91,7 +91,7 @@ impl<'a, H: HugrView + 'a> CodegenExtsBuilder<'a, H> {
 
 #[cfg(test)]
 mod test {
-    use hugr::{
+    use hugr_core::{
         builder::{Dataflow, DataflowSubContainer},
         extension::{prelude::BOOL_T, ExtensionRegistry},
         std_extensions::logic::{self, LogicOp},

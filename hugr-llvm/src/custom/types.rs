@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use itertools::Itertools as _;
 
-use hugr::types::CustomType;
+use hugr_core::types::CustomType;
 
 use anyhow::Result;
 use inkwell::types::{BasicMetadataTypeEnum, BasicType as _, BasicTypeEnum, FunctionType};

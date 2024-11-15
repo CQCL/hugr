@@ -2,7 +2,7 @@ use crate::types::{HugrSumType, TypingSession};
 
 use anyhow::{anyhow, Result};
 use delegate::delegate;
-use hugr::types::TypeRow;
+use hugr_core::types::TypeRow;
 use inkwell::{
     builder::Builder,
     context::Context,

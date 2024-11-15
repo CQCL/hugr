@@ -1,9 +1,9 @@
 use anyhow::{anyhow, bail, Result};
-use hugr::ops::{
+use hugr_core::ops::{
     constant::Sum, Call, CallIndirect, Case, Conditional, Const, ExtensionOp, Input, LoadConstant,
     LoadFunction, OpTag, OpTrait, OpType, Output, Tag, Value, CFG,
 };
-use hugr::{
+use hugr_core::{
     hugr::views::SiblingGraph,
     types::{SumType, Type, TypeEnum},
     HugrView, NodeIndex,

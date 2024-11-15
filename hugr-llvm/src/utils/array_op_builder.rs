@@ -1,4 +1,4 @@
-use hugr::{
+use hugr_core::{
     builder::{BuildError, Dataflow},
     extension::{
         prelude::{new_array_op, ArrayOpDef},
@@ -115,7 +115,7 @@ impl<D: Dataflow> ArrayOpBuilder for D {}
 
 #[cfg(test)]
 pub mod test {
-    use hugr::{
+    use hugr_core::{
         builder::{DFGBuilder, HugrBuilder},
         extension::{
             prelude::{array_type, either_type, option_type, ConstUsize, USIZE_T},

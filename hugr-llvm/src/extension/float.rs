@@ -1,8 +1,8 @@
 use anyhow::{anyhow, Result};
-use hugr::ops::ExtensionOp;
-use hugr::ops::{constant::CustomConst, Value};
-use hugr::std_extensions::arithmetic::float_ops::FloatOps;
-use hugr::{
+use hugr_core::ops::ExtensionOp;
+use hugr_core::ops::{constant::CustomConst, Value};
+use hugr_core::std_extensions::arithmetic::float_ops::FloatOps;
+use hugr_core::{
     std_extensions::arithmetic::float_types::{self, ConstF64},
     HugrView,
 };
@@ -130,12 +130,12 @@ impl<'a, H: HugrView + 'a> CodegenExtsBuilder<'a, H> {
 
 #[cfg(test)]
 mod test {
-    use hugr::extension::simple_op::MakeOpDef;
-    use hugr::extension::SignatureFunc;
-    use hugr::std_extensions::arithmetic::float_ops::{self, FloatOps};
-    use hugr::types::TypeRow;
-    use hugr::Hugr;
-    use hugr::{
+    use hugr_core::extension::simple_op::MakeOpDef;
+    use hugr_core::extension::SignatureFunc;
+    use hugr_core::std_extensions::arithmetic::float_ops::{self, FloatOps};
+    use hugr_core::types::TypeRow;
+    use hugr_core::Hugr;
+    use hugr_core::{
         builder::{Dataflow, DataflowSubContainer},
         std_extensions::arithmetic::{
             float_ops::FLOAT_OPS_REGISTRY,

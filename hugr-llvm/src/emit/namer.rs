@@ -1,4 +1,4 @@
-use hugr::{Node, NodeIndex as _};
+use hugr_core::{Node, NodeIndex as _};
 
 /// A type with features for mangling the naming of symbols.
 #[derive(Clone)]
@@ -19,7 +19,7 @@ impl Namer {
     ///
     /// ```
     /// use hugr_llvm::emit::Namer;
-    /// use hugr::Node;
+    /// use hugr_core::Node;
     /// let node = Node::from(portgraph::NodeIndex::new(7));
     /// let namer = Namer::default();
     /// assert_eq!(namer.name_func("name", node), "_hl.name.7");
@@ -34,7 +34,7 @@ impl Namer {
         }
     }
 
-    /// Mangle the the name of a [hugr::ops::FuncDefn] or [hugr::ops::FuncDecl].
+    /// Mangle the the name of a [hugr_core::ops::FuncDefn] or [hugr_core::ops::FuncDecl].
     pub fn name_func(&self, name: impl AsRef<str>, node: Node) -> String {
         let prefix = &self.prefix;
         let name = name.as_ref();

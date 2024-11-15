@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 use delegate::delegate;
-use hugr::{
+use hugr_core::{
     ops::{FuncDecl, FuncDefn, OpType},
     types::PolyFuncType,
     HugrView, Node,
@@ -274,7 +274,7 @@ impl<'c, 'a, H: HugrView> EmitHugr<'c, 'a, H> {
 
     /// Emits a FuncDefn into the inner [Module].
     ///
-    /// `node` need not be a child of a hugr [Module](hugr::ops::Module), but it will
+    /// `node` need not be a child of a hugr [Module](hugr_core::ops::Module), but it will
     /// be emitted as a top-level function in the inner [Module]. Indeed, there
     /// are only top-level functions in LLVM IR.
     ///
@@ -304,13 +304,13 @@ impl<'c, 'a, H: HugrView> EmitHugr<'c, 'a, H> {
         Ok(self)
     }
 
-    /// Emits all children of a hugr [Module](hugr::ops::Module).
+    /// Emits all children of a hugr [Module](hugr_core::ops::Module).
     ///
-    /// Note that type aliases are not supported, and that [hugr::ops::Const]
-    /// and [hugr::ops::FuncDecl] nodes are not emitted directly, but instead by
+    /// Note that type aliases are not supported, and that [hugr_core::ops::Const]
+    /// and [hugr_core::ops::FuncDecl] nodes are not emitted directly, but instead by
     /// emission of ops with static edges from them. So [FuncDefn] are the only
     /// interesting children.
-    pub fn emit_module(mut self, node: FatNode<'_, hugr::ops::Module, H>) -> Result<Self> {
+    pub fn emit_module(mut self, node: FatNode<'_, hugr_core::ops::Module, H>) -> Result<Self> {
         for c in node.children() {
             match c.as_ref() {
                 OpType::FuncDefn(ref fd) => {

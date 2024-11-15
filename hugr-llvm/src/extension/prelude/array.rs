@@ -1,6 +1,6 @@
 //! Codegen for prelude array operations.
 use anyhow::{anyhow, Ok, Result};
-use hugr::{
+use hugr_core::{
     extension::{
         prelude::{array_type, option_type, ArrayOp, ArrayOpDef},
         simple_op::MakeRegisteredOp,
@@ -386,7 +386,7 @@ fn emit_pop_op<'c>(
 
 #[cfg(test)]
 mod test {
-    use hugr::{
+    use hugr_core::{
         builder::{Dataflow, DataflowSubContainer, SubContainer},
         extension::{
             prelude::{self, array_type, option_type, ConstUsize, BOOL_T, USIZE_T},
@@ -518,7 +518,7 @@ mod test {
         //   - The element returned from set is `expected_elem`
         //   - The Oth element of the resulting array is `expected_arr_0`
 
-        use hugr::extension::prelude::either_type;
+        use hugr_core::extension::prelude::either_type;
         let int_ty = int_type(3);
         let hugr = SimpleHugrConfig::new()
             .with_outs(USIZE_T)

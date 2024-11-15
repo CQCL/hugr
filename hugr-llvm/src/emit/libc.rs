@@ -1,5 +1,5 @@
 use anyhow::Result;
-use hugr::HugrView;
+use hugr_core::HugrView;
 use inkwell::{values::BasicMetadataValueEnum, AddressSpace};
 
 use crate::emit::func::EmitFuncContext;

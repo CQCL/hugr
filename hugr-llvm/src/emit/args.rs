@@ -1,4 +1,4 @@
-use hugr::{ops::OpType, HugrView};
+use hugr_core::{ops::OpType, HugrView};
 use inkwell::values::BasicValueEnum;
 
 use crate::utils::fat::FatNode;
@@ -8,7 +8,7 @@ use super::func::RowPromise;
 /// A type used whenever emission is delegated to a function, for example in
 /// [crate::custom::extension_op::ExtensionOpMap::emit_extension_op].
 pub struct EmitOpArgs<'c, 'hugr, OT, H> {
-    /// The [HugrView] and [hugr::Node] we are emitting
+    /// The [HugrView] and [hugr_core::Node] we are emitting
     pub node: FatNode<'hugr, OT, H>,
     /// The values that should be used for all Value input ports of the node
     pub inputs: Vec<BasicValueEnum<'c>>,
@@ -51,7 +51,7 @@ impl<'c, 'hugr, H: HugrView> EmitOpArgs<'c, 'hugr, OpType, H> {
     /// Specialise the internal [FatNode].
     ///
     /// Panics if `OT` is not the [HugrView::get_optype] of the internal
-    /// [hugr::Node].
+    /// [hugr_core::Node].
     pub fn into_ot<OTInto: PartialEq + 'c>(self, ot: &OTInto) -> EmitOpArgs<'c, 'hugr, OTInto, H>
     where
         for<'a> &'a OpType: TryInto<&'a OTInto>,
