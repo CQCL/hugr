@@ -77,9 +77,7 @@ jobs:
       - name: Install CapnProto
         run: sudo apt-get install -y capnproto
       - name: Build benchmarks with no features
-        run: |
-          cargo bench --verbose --no-run --workspace --no-default-features --exclude hugr-llvm
-          cargo bench --verbose --no-run -p hugr-llvm
+        run: cargo bench --verbose --no-run --workspace --no-default-features --exclude hugr-llvm
       - name: Build benchmarks with all features
         run: cargo bench --verbose --no-run --workspace --all-features
 
@@ -103,13 +101,9 @@ jobs:
       - name: Install CapnProto
         run: sudo apt-get install -y capnproto
       - name: Build with no features
-        run: |
-          cargo test --verbose --workspace --no-default-features --exclude hugr-llvm --no-run
-          cargo test --verbose --no-run -p hugr-llvm
+        run: cargo test --verbose --workspace --no-default-features --exclude hugr-llvm --no-run
       - name: Tests with no features
-        run: |
-          cargo test --verbose --workspace --no-default-features --exclude hugr-llvm
-          cargo test --verbose -p hugr-llvm
+        run: cargo test --verbose --workspace --no-default-features --exclude hugr-llvm
 
   # Run tests on Rust stable
   tests-stable-all-features:
@@ -168,13 +162,9 @@ jobs:
       - name: Install CapnProto
         run: sudo apt-get install -y capnproto
       - name: Build with no features
-        run: | 
-          cargo test --verbose --workspace --no-default-features --exclude hugr-llvm --no-run
-          cargo test --verbose --no-run -p hugr-llvm
+        run: cargo test --verbose --workspace --no-default-features --exclude hugr-llvm --no-run
       - name: Tests with no features
-        run: |
-          cargo test --verbose --workspace --no-default-features --exclude hugr-llvm
-          cargo test --verbose -p hugr-llvm
+        run: cargo test --verbose --workspace --no-default-features --exclude hugr-llvm
       - name: Build with all features
         run: cargo test --verbose --workspace --all-features --no-run
       - name: Tests with all features
@@ -230,7 +220,6 @@ jobs:
         run: |
           cargo llvm-cov clean --workspace
           cargo llvm-cov --no-report --workspace --no-default-features --exclude hugr-llvm --doctests
-          cargo llvm-cov --no-report -p hugr-llvm --doctests
           cargo llvm-cov --no-report --workspace --all-features --doctests
       - name: Generate coverage report
         run: cargo llvm-cov --all-features report --codecov --output-path coverage.json
