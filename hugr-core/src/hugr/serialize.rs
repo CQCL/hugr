@@ -103,13 +103,13 @@ struct SerHugrLatest {
 #[non_exhaustive]
 pub enum HUGRSerializationError {
     /// Unexpected hierarchy error.
-    #[error("Failed to attach child to parent: {0:?}.")]
+    #[error("Failed to attach child to parent: {0}.")]
     AttachError(#[from] AttachError),
     /// Failed to add edge.
-    #[error("Failed to build edge when deserializing: {0:?}.")]
+    #[error("Failed to build edge when deserializing: {0}.")]
     LinkError(#[from] LinkError),
     /// Edges without port offsets cannot be present in operations without non-dataflow ports.
-    #[error("Cannot connect an {dir:?} edge without port offset to node {node:?} with operation type {op_type:?}.")]
+    #[error("Cannot connect an {dir:?} edge without port offset to node {node} with operation type {op_type}.")]
     MissingPortOffset {
         /// The node that has the port without offset.
         node: Node,
@@ -119,13 +119,13 @@ pub enum HUGRSerializationError {
         op_type: OpType,
     },
     /// Edges with wrong node indices
-    #[error("The edge endpoint {node:?} is not a node in the graph.")]
+    #[error("The edge endpoint {node} is not a node in the graph.")]
     UnknownEdgeNode {
         /// The node that has the port without offset.
         node: Node,
     },
     /// First node in node list must be the HUGR root.
-    #[error("The first node in the node list has parent {0:?}, should be itself (index 0)")]
+    #[error("The first node in the node list has parent {0}, should be itself (index 0)")]
     FirstNodeNotRoot(Node),
 }
 

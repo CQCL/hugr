@@ -39,6 +39,16 @@ impl DataflowOpTrait for TailLoop {
 }
 
 impl TailLoop {
+    /// The [tag] for a loop body output to indicate the loop should iterate again.
+    ///
+    /// [tag]: crate::ops::constant::Sum::tag
+    pub const CONTINUE_TAG: usize = 0;
+
+    /// The [tag] for a loop body output to indicate the loop should exit with the supplied values.
+    ///
+    /// [tag]: crate::ops::constant::Sum::tag
+    pub const BREAK_TAG: usize = 1;
+
     /// Build the output TypeRow of the child graph of a TailLoop node.
     pub(crate) fn body_output_row(&self) -> TypeRow {
         let sum_type = Type::new_sum([self.just_inputs.clone(), self.just_outputs.clone()]);

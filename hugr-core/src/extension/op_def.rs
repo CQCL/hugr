@@ -435,6 +435,11 @@ impl OpDef {
         self.misc.insert(k.to_string(), v)
     }
 
+    /// Iterate over all miscellaneous data in the [OpDef].
+    pub(crate) fn iter_misc(&self) -> impl ExactSizeIterator<Item = (&str, &serde_json::Value)> {
+        self.misc.iter().map(|(k, v)| (k.as_str(), v))
+    }
+
     /// Set the constant folding function for this Op, which can evaluate it
     /// given constant inputs.
     pub fn set_constant_folder(&mut self, fold: impl ConstFold + 'static) {
@@ -449,6 +454,11 @@ impl OpDef {
         consts: &[(crate::IncomingPort, crate::ops::Value)],
     ) -> ConstFoldResult {
         (self.constant_folder.as_ref())?.fold(type_args, consts)
+    }
+
+    /// Returns a reference to the signature function of this [`OpDef`].
+    pub fn signature_func(&self) -> &SignatureFunc {
+        &self.signature_func
     }
 }
 

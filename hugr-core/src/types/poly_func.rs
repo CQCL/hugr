@@ -1,5 +1,7 @@
 //! Polymorphic Function Types
 
+use itertools::Itertools;
+
 use crate::extension::{ExtensionRegistry, SignatureError};
 #[cfg(test)]
 use {
@@ -22,11 +24,7 @@ use super::{signature::FuncTypeBase, MaybeRV, NoRV, RowVariable};
     Clone, PartialEq, Debug, Eq, Hash, derive_more::Display, serde::Serialize, serde::Deserialize,
 )]
 #[cfg_attr(test, derive(Arbitrary), proptest(params = "RecursionDepth"))]
-#[display(
-    "forall {}. {}",
-    "params.iter().map(ToString::to_string).join(\" \")",
-    "body"
-)]
+#[display("{}{body}", self.display_params())]
 pub struct PolyFuncTypeBase<RV: MaybeRV> {
     /// The declared type parameters, i.e., these must be instantiated with
     /// the same number of [TypeArg]s before the function can be called. This
@@ -135,6 +133,17 @@ impl<RV: MaybeRV> PolyFuncTypeBase<RV> {
     pub fn validate(&self, reg: &ExtensionRegistry) -> Result<(), SignatureError> {
         // TODO https://github.com/CQCL/hugr/issues/624 validate TypeParams declared here, too
         self.body.validate(reg, &self.params)
+    }
+
+    /// Helper function for the Display implementation
+    fn display_params(&self) -> String {
+        if self.params.is_empty() {
+            return String::new();
+        }
+        format!(
+            "forall {}. ",
+            self.params.iter().map(ToString::to_string).join(" ")
+        )
     }
 }
 

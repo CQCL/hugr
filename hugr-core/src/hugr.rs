@@ -176,9 +176,7 @@ impl Hugr {
         let mut graph = MultiPortGraph::with_capacity(nodes, ports);
         let hierarchy = Hierarchy::new();
         let mut op_types = UnmanagedDenseMap::with_capacity(nodes);
-        let root = graph.add_node(0, 0);
-        // TODO: These extensions should be open in principle, but lets wait
-        // until extensions can be inferred for open sets until changing this
+        let root = graph.add_node(root_node.input_count(), root_node.output_count());
         op_types[root] = root_node;
 
         Self {

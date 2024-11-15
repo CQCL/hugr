@@ -1,0 +1,40 @@
+---
+source: hugr-core/src/package.rs
+expression: hugr.mermaid_string()
+---
+graph LR
+    subgraph 0 ["(0) Module"]
+        direction LR
+        subgraph 1 ["(1) FuncDefn: #quot;main#quot;"]
+            direction LR
+            2["(2) Input"]
+            3["(3) Output"]
+            subgraph 4 ["(4) CFG"]
+                direction LR
+                subgraph 6 ["(6) DataflowBlock"]
+                    direction LR
+                    7["(7) Input"]
+                    8["(8) Output"]
+                    9["(9) Tag"]
+                    7--"0:0<br>usize"-->9
+                    9--"0:0<br>[usize]+[usize]"-->8
+                end
+                5["(5) ExitBlock"]
+                subgraph 10 ["(10) DataflowBlock"]
+                    direction LR
+                    12["(12) Input"]
+                    13["(13) Output"]
+                    14["(14) const:seq:{}"]
+                    15["(15) LoadConstant"]
+                    12--"0:1<br>usize"-->13
+                    14--"0:0<br>[]"-->15
+                    15--"0:0<br>[]"-->13
+                end
+                6-."0:0".->10
+                6-."1:0".->5
+                10-."0:0".->5
+            end
+            2--"0:0<br>usize"-->4
+            4--"0:0<br>usize"-->3
+        end
+    end

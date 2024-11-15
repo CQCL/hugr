@@ -22,6 +22,12 @@ use smol_str::SmolStr;
 pub use type_param::TypeArg;
 pub use type_row::{TypeRow, TypeRowRV};
 
+// Unused in --no-features
+#[allow(unused_imports)]
+pub(crate) use poly_func::PolyFuncTypeBase;
+#[allow(unused_imports)]
+pub(crate) use signature::FuncTypeBase;
+
 use itertools::FoldWhile::{Continue, Done};
 use itertools::{repeat_n, Itertools};
 #[cfg(test)]
@@ -41,7 +47,9 @@ pub type TypeName = SmolStr;
 pub type TypeNameRef = str;
 
 /// The kinds of edges in a HUGR, excluding Hierarchy.
-#[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize, derive_more::Display,
+)]
 #[non_exhaustive]
 pub enum EdgeKind {
     /// Control edges of a CFG region.

@@ -83,7 +83,7 @@ fn assert_fully_folded_with(h: &impl HugrView, check_value: impl Fn(&Value) -> b
         match op {
             OpType::Input(_) | OpType::Output(_) | OpType::LoadConstant(_) => node_count += 1,
             OpType::Const(c) if check_value(c.value()) => node_count += 1,
-            _ => panic!("unexpected op: {:?}\n{}", op, h.mermaid_string()),
+            _ => panic!("unexpected op: {}\n{}", op, h.mermaid_string()),
         }
     }
 

@@ -1,6 +1,6 @@
 [package]
 name = "hugr-cli"
-version = "0.13.1"
+version = "0.13.3"
 edition = { workspace = true }
 rust-version = { workspace = true }
 license = { workspace = true }
@@ -12,10 +12,14 @@ description = "Compiler passes for Quantinuum's HUGR"
 keywords = ["Quantum", "Quantinuum"]
 categories = ["compilers"]
 
+[lib]
+bench = false
+
 [dependencies]
 clap = { workspace = true, features = ["derive"] }
 clap-verbosity-flag.workspace = true
-hugr-core = { path = "../hugr-core", version = "0.13.1" }
+derive_more = { workspace = true, features = ["display", "error", "from"] }
+hugr = { path = "../hugr", version = "0.13.3" }
 serde_json.workspace = true
 serde.workspace = true
 thiserror.workspace = true
@@ -23,6 +27,13 @@ clio = { workspace = true, features = ["clap-parse"] }
 
 [lints]
 workspace = true
+
+[package.metadata.cargo-semver-checks.lints]
+workspace = true
+# Temporarily disabled due to Package being moved to `hugr-core` triggering an error in rustdoc
+# https://github.com/obi1kenobi/cargo-semver-checks/issues/355
+enum_missing = "warn"
+struct_missing = "warn"
 
 [dev-dependencies]
 assert_cmd = { workspace = true }
@@ -34,3 +45,4 @@ rstest.workspace = true
 name = "hugr"
 path = "src/main.rs"
 doc = false
+bench = false
