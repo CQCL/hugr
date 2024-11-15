@@ -98,7 +98,7 @@ impl ConstFoldPass {
             // Note we COULD filter out (avoid breaking) wires from other nodes that we are keeping.
             // This would insert fewer constants, but potentially expose less parallelism.
             .filter_map(|(n, ip)| {
-                let (src, outp) = hugr.single_linked_output(n, ip).unwrap();
+                let (src, outp) = hugr.single_linked_output(n, ip)?;
                 // Avoid breaking edges from existing LoadConstant (we'd only add another)
                 // or froom root input node (i.e. hardcoding provided "external inputs" into graph)
                 (!hugr.get_optype(src).is_load_constant() && src != root_inp).then_some((
