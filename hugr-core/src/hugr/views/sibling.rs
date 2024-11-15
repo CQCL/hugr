@@ -3,7 +3,7 @@
 use std::iter;
 
 use itertools::Itertools;
-use portgraph::{LinkView, MultiPortGraph, PortIndex, PortView};
+use portgraph::{LinkView, MultiPortGraph, PortView};
 
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::{HugrError, HugrMut};
@@ -113,9 +113,8 @@ impl<'g, Root: NodeHandle> HugrView for SiblingGraph<'g, Root> {
             .port_index(node.pg_index(), port.into().pg_offset())
             .unwrap();
         self.graph.port_links(port).map(|(_, link)| {
-            let port: PortIndex = link.into();
-            let node = self.graph.port_node(port).unwrap();
-            let offset = self.graph.port_offset(port).unwrap();
+            let node = self.graph.port_node(link).unwrap();
+            let offset = self.graph.port_offset(link).unwrap();
             (node.into(), offset.into())
         })
     }
@@ -123,12 +122,7 @@ impl<'g, Root: NodeHandle> HugrView for SiblingGraph<'g, Root> {
     fn node_connections(&self, node: Node, other: Node) -> impl Iterator<Item = [Port; 2]> + Clone {
         self.graph
             .get_connections(node.pg_index(), other.pg_index())
-            .map(|(p1, p2)| {
-                [p1, p2].map(|link| {
-                    let offset = self.graph.port_offset(link).unwrap();
-                    offset.into()
-                })
-            })
+            .map(|(p1, p2)| [p1, p2].map(|link| self.graph.port_offset(link).unwrap().into()))
     }
 
     #[inline]
@@ -223,16 +217,6 @@ pub struct SiblingMut<'g, Root = Node> {
     _phantom: std::marker::PhantomData<Root>,
 }
 
-impl<'g, Root> SiblingMut<'g, Root> {
-    fn graph(&self) -> FlatRegionGraph<'_> {
-        FlatRegionGraph::new_flat_region(
-            &self.hugr.graph,
-            &self.hugr.hierarchy,
-            self.root.pg_index(),
-        )
-    }
-}
-
 impl<'g, Root: NodeHandle> SiblingMut<'g, Root> {
     /// Create a new SiblingMut from a base.
     /// Equivalent to [HierarchyView::try_new] but takes a *mutable* reference.
@@ -296,30 +280,27 @@ impl<'g, Root: NodeHandle> HugrView for SiblingMut<'g, Root> {
         node: Node,
         port: impl Into<Port>,
     ) -> impl Iterator<Item = (Node, Port)> + Clone {
-        // Need to filter only to links inside the sibling graph
-        let graph = self.graph();
-        let port = graph
+        let port = self
+            .hugr
+            .graph
             .port_index(node.pg_index(), port.into().pg_offset())
             .unwrap();
         self.hugr
             .graph
             .port_links(port)
             .map(|(_, link)| {
-                let graph = self.graph();
-                let port: PortIndex = link.into();
-                let node: Node = graph.port_node(port).unwrap().into();
-                let offset: Port = graph.port_offset(port).unwrap().into();
+                let node: Node = self.hugr.graph.port_node(link).unwrap().into();
+                let offset: Port = self.hugr.graph.port_offset(link).unwrap().into();
                 (node, offset)
             })
             .filter(|(n, _)| self.contains_node(*n))
     }
 
     fn node_connections(&self, node: Node, other: Node) -> impl Iterator<Item = [Port; 2]> + Clone {
-        // Need to filter only to connections inside the sibling graph
-        SiblingGraph::<'_, Node>::new_unchecked(self.hugr, self.root)
-            .node_connections(node, other)
-            .collect::<Vec<_>>()
-            .into_iter()
+        self.hugr
+            .graph
+            .get_connections(node.pg_index(), other.pg_index())
+            .map(|(p1, p2)| [p1, p2].map(|link| self.hugr.graph.port_offset(link).unwrap().into()))
     }
 
     fn num_ports(&self, node: Node, dir: Direction) -> usize {
@@ -330,18 +311,19 @@ impl<'g, Root: NodeHandle> HugrView for SiblingMut<'g, Root> {
     }
 
     fn neighbours(&self, node: Node, dir: Direction) -> impl Iterator<Item = Node> + Clone {
-        // Need to filter to neighbours in the Sibling Graph
-        SiblingGraph::<'_, Node>::new_unchecked(self.hugr, self.root)
-            .neighbours(node, dir)
-            .collect::<Vec<_>>()
-            .into_iter()
+        self.hugr
+            .graph
+            .neighbours(node.pg_index(), dir)
+            .map_into()
+            .filter(|n| self.contains_node(*n))
     }
 
     fn all_neighbours(&self, node: Node) -> impl Iterator<Item = Node> + Clone {
-        SiblingGraph::<'_, Node>::new_unchecked(self.hugr, self.root)
-            .all_neighbours(node)
-            .collect::<Vec<_>>()
-            .into_iter()
+        self.hugr
+            .graph
+            .all_neighbours(node.pg_index())
+            .map_into()
+            .filter(|n| self.contains_node(*n))
     }
 }
 
