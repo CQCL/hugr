@@ -134,7 +134,7 @@ impl ConstFoldPass {
         reg: &ExtensionRegistry,
     ) -> Result<(), ValidatePassError> {
         self.validation
-            .run_validated_pass(hugr, reg, |hugr: &mut H, _| self.run_no_validate(hugr))
+            .run_validated_pass_mut(hugr, reg, |hugr: &mut H, _| self.run_no_validate(hugr))
     }
 
     fn find_needed_nodes<H: HugrView>(

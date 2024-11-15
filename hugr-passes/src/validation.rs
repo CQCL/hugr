@@ -58,7 +58,7 @@ impl ValidationLevel {
     /// Run an operation on a [HugrMut]. `hugr` will be verified according to
     /// [self](ValidationLevel), then `pass` will be invoked. If `pass` succeeds
     /// then `hugr` will be verified again.
-    pub fn run_validated_pass<H: HugrMut, E, T>(
+    pub fn run_validated_pass_mut<H: HugrMut, E, T>(
         &self,
         hugr: &mut H,
         reg: &ExtensionRegistry,
@@ -74,6 +74,22 @@ impl ValidationLevel {
         self.validation_impl(hugr, reg, |err, pretty_hugr| {
             ValidatePassError::OutputError { err, pretty_hugr }
         })?;
+        Ok(result)
+    }
+
+    pub fn run_validated_pass<H: HugrView, E, T>(
+        &self,
+        hugr: &H,
+        reg: &ExtensionRegistry,
+        pass: impl FnOnce(&H, &Self) -> Result<T, E>,
+    ) -> Result<T, E>
+    where
+        ValidatePassError: Into<E>,
+    {
+        self.validation_impl(hugr, reg, |err, pretty_hugr| {
+            ValidatePassError::InputError { err, pretty_hugr }
+        })?;
+        let result = pass(hugr, self)?;
         Ok(result)
     }
 
