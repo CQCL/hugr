@@ -1,4 +1,4 @@
-use hugr::{
+use hugr_core::{
     builder::{BuildError, Dataflow},
     std_extensions::logic::LogicOp,
     Wire,

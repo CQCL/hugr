@@ -1,13 +1,13 @@
 //! Provides an interface for extending `hugr-llvm` to emit [CustomType]s,
 //! [CustomConst]s, and [ExtensionOp]s.
 //!
-//! [CustomType]: hugr::types::CustomType
-//! [CustomConst]: hugr::ops::constant::CustomConst
-//! [ExtensionOp]: hugr::ops::ExtensionOp
+//! [CustomType]: hugr_core::types::CustomType
+//! [CustomConst]: hugr_core::ops::constant::CustomConst
+//! [ExtensionOp]: hugr_core::ops::ExtensionOp
 use std::rc::Rc;
 
 use self::extension_op::{ExtensionOpFn, ExtensionOpMap};
-use hugr::{
+use hugr_core::{
     extension::{simple_op::MakeOpDef, ExtensionId},
     ops::{constant::CustomConst, ExtensionOp, OpName},
     HugrView,
@@ -59,7 +59,7 @@ pub trait CodegenExtension {
 /// Registering any callback silently replaces any other callback registered for
 /// that same key.
 ///
-/// [CustomType]: hugr::types::CustomType
+/// [CustomType]: hugr_core::types::CustomType
 #[derive(Default)]
 pub struct CodegenExtsBuilder<'a, H> {
     load_constant_handlers: LoadConstantsMap<'a, H>,
@@ -73,7 +73,7 @@ impl<'a, H: HugrView + 'a> CodegenExtsBuilder<'a, H> {
     /// ```
     /// use hugr_llvm::{extension::{PreludeCodegenExtension, DefaultPreludeCodegen}, CodegenExtsBuilder};
     /// let ext = PreludeCodegenExtension::from(DefaultPreludeCodegen);
-    /// CodegenExtsBuilder::<hugr::Hugr>::default().add_extension(ext);
+    /// CodegenExtsBuilder::<hugr_core::Hugr>::default().add_extension(ext);
     /// ```
     pub fn add_extension(self, ext: impl CodegenExtension + 'a) -> Self {
         ext.add_extension(self)
@@ -81,7 +81,7 @@ impl<'a, H: HugrView + 'a> CodegenExtsBuilder<'a, H> {
 
     /// Register a callback to map a [CustomType] to a [BasicTypeEnum].
     ///
-    /// [CustomType]: hugr::types::CustomType
+    /// [CustomType]: hugr_core::types::CustomType
     /// [BasicTypeEnum]: inkwell::types::BasicTypeEnum
     pub fn custom_type(
         mut self,
@@ -155,7 +155,7 @@ pub struct CodegenExtsMap<'a, H> {
 
 #[cfg(test)]
 mod test {
-    use hugr::{
+    use hugr_core::{
         extension::prelude::{ConstString, PRELUDE_ID, PRINT_OP_ID, STRING_TYPE, STRING_TYPE_NAME},
         Hugr,
     };

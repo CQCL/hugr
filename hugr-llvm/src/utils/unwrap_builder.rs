@@ -1,6 +1,6 @@
 use std::iter;
 
-use hugr::{
+use hugr_core::{
     builder::{BuildError, BuildHandle, Dataflow, DataflowSubContainer, SubContainer},
     extension::{
         prelude::{ConstError, PANIC_OP_ID, PRELUDE_ID},

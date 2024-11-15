@@ -1,7 +1,7 @@
 //! Provides a generic mapping from [HugrType] into some domain.
 use std::collections::HashMap;
 
-use hugr::{
+use hugr_core::{
     extension::ExtensionId,
     types::{CustomType, TypeEnum, TypeName, TypeRow},
 };

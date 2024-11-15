@@ -1,5 +1,5 @@
 use anyhow::{anyhow, bail, ensure, Ok, Result};
-use hugr::{
+use hugr_core::{
     extension::{
         prelude::{
             self, ArrayOp, ArrayOpDef, ConstError, ConstExternalSymbol, ConstString, ConstUsize,
@@ -32,25 +32,25 @@ use crate::{
 
 pub mod array;
 
-/// A helper trait for customising the lowering [hugr::extension::prelude]
+/// A helper trait for customising the lowering [hugr_core::extension::prelude]
 /// types, [CustomConst]s, and ops.
 ///
 /// All methods have sensible defaults provided, and [DefaultPreludeCodegen] is
 /// a trivial implementation of this trait which delegates everything to those
 /// default implementations.
 pub trait PreludeCodegen: Clone {
-    /// Return the llvm type of [hugr::extension::prelude::USIZE_T]. That type
+    /// Return the llvm type of [hugr_core::extension::prelude::USIZE_T]. That type
     /// must be an [IntType].
     fn usize_type<'c>(&self, session: &TypingSession<'c, '_>) -> IntType<'c> {
         session.iw_context().i64_type()
     }
 
-    /// Return the llvm type of [hugr::extension::prelude::QB_T].
+    /// Return the llvm type of [hugr_core::extension::prelude::QB_T].
     fn qubit_type<'c>(&self, session: &TypingSession<'c, '_>) -> impl BasicType<'c> {
         session.iw_context().i16_type()
     }
 
-    /// Return the llvm type of [hugr::extension::prelude::ERROR_TYPE].
+    /// Return the llvm type of [hugr_core::extension::prelude::ERROR_TYPE].
     ///
     /// The returned type must always match the type of the returned value of
     /// [Self::emit_const_error], and the `err` argument of [Self::emit_panic].
@@ -68,7 +68,7 @@ pub trait PreludeCodegen: Clone {
         ))
     }
 
-    /// Return the llvm type of [hugr::extension::prelude::array_type].
+    /// Return the llvm type of [hugr_core::extension::prelude::array_type].
     fn array_type<'c>(
         &self,
         _session: &TypingSession<'c, '_>,
@@ -78,7 +78,7 @@ pub trait PreludeCodegen: Clone {
         elem_ty.array_type(size as u32)
     }
 
-    /// Emit a [hugr::extension::prelude::ArrayOp].
+    /// Emit a [hugr_core::extension::prelude::ArrayOp].
     fn emit_array_op<'c, H: HugrView>(
         &self,
         ctx: &mut EmitFuncContext<'c, '_, H>,
@@ -89,7 +89,7 @@ pub trait PreludeCodegen: Clone {
         array::emit_array_op(self, ctx, op, inputs, outputs)
     }
 
-    /// Emit a [hugr::extension::prelude::PRINT_OP_ID] node.
+    /// Emit a [hugr_core::extension::prelude::PRINT_OP_ID] node.
     fn emit_print<H: HugrView>(
         &self,
         ctx: &mut EmitFuncContext<H>,
@@ -343,10 +343,10 @@ fn add_prelude_extensions<'a, H: HugrView + 'a>(
 
 #[cfg(test)]
 mod test {
-    use hugr::builder::{Dataflow, DataflowSubContainer};
-    use hugr::extension::{PRELUDE, PRELUDE_REGISTRY};
-    use hugr::types::{Type, TypeArg};
-    use hugr::{type_row, Hugr};
+    use hugr_core::builder::{Dataflow, DataflowSubContainer};
+    use hugr_core::extension::{PRELUDE, PRELUDE_REGISTRY};
+    use hugr_core::types::{Type, TypeArg};
+    use hugr_core::{type_row, Hugr};
     use prelude::{BOOL_T, PANIC_OP_ID, PRINT_OP_ID, QB_T, USIZE_T};
     use rstest::rstest;
 

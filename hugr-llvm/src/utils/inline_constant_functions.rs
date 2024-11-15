@@ -1,4 +1,4 @@
-use hugr::{
+use hugr_core::{
     extension::ExtensionRegistry,
     hugr::hugrmut::HugrMut,
     ops::{FuncDefn, LoadFunction, Value},
@@ -89,7 +89,7 @@ fn inline_constant_functions_impl(
 
 #[cfg(test)]
 mod test {
-    use hugr::{
+    use hugr_core::{
         builder::{
             Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
             ModuleBuilder,

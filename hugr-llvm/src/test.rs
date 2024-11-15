@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use hugr::Hugr;
+use hugr_core::Hugr;
 use inkwell::{
     context::Context,
     types::{BasicType, BasicTypeEnum},
