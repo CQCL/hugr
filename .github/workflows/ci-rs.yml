@@ -35,6 +35,7 @@ jobs:
     outputs:
       rust: ${{ steps.filter.outputs.rust == 'true' || steps.override.outputs.out == 'true' }}
       python: ${{ steps.filter.outputs.python == 'true' || steps.override.outputs.out == 'true' }}
+      llvm: ${{ steps.filter.outputs.llvm == 'true' || steps.override.outputs.out == 'true' }}
     steps:
     - uses: actions/checkout@v4
     - name: Override label
@@ -91,9 +92,9 @@ jobs:
       - name: Install CapnProto
         run: sudo apt-get install -y capnproto
       - name: Build benchmarks with no features
-        run: cargo bench --verbose --no-run --workspace --no-default-features --exclude hugr-llvm
+        run: cargo bench --verbose --no-run --workspace --exclude hugr-llvm --no-default-features
       - name: Build benchmarks with all features
-        run: cargo bench --verbose --no-run --workspace --all-features
+        run: cargo bench --verbose --no-run --workspace --exclude hugr-llvm --all-features
 
   # Run tests on Rust stable
   tests-stable-no-features:
@@ -110,17 +111,13 @@ jobs:
           toolchain: "stable"
       - name: Configure default rust toolchain
         run: rustup override set ${{steps.toolchain.outputs.name}}
-      - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          version: "14.0"
-          env: true
+
       - name: Install CapnProto
         run: sudo apt-get install -y capnproto
       - name: Build with no features
-        run: cargo test --verbose --workspace --no-default-features --exclude hugr-llvm --no-run
+        run: cargo test --verbose --workspace --exclude hugr-llvm --no-default-features --no-run
       - name: Tests with no features
-        run: cargo test --verbose --workspace --no-default-features --exclude hugr-llvm
+        run: cargo test --verbose --workspace --exclude hugr-llvm --no-default-features
 
   # Run tests on Rust stable
   tests-stable-all-features:
@@ -137,17 +134,13 @@ jobs:
           toolchain: "stable"
       - name: Configure default rust toolchain
         run: rustup override set ${{steps.toolchain.outputs.name}}
-      - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          version: "14.0"
-          env: true
+
       - name: Install CapnProto
         run: sudo apt-get install -y capnproto
       - name: Build with all features
-        run: cargo test --verbose --workspace --all-features --no-run
+        run: cargo test --verbose --workspace --exclude hugr-llvm --all-features --no-run
       - name: Tests with all features
-        run: cargo test --verbose --workspace --all-features
+        run: cargo test --verbose --workspace --exclude hugr-llvm --all-features
       - name: Build HUGR binary
         run: cargo build -p hugr-cli
       - name: Upload the binary to the artifacts
@@ -177,21 +170,17 @@ jobs:
           toolchain: ${{ matrix.rust }}
       - name: Configure default rust toolchain
         run: rustup override set ${{steps.toolchain.outputs.name}}
-      - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          version: "14.0"
-          env: true
+
       - name: Install CapnProto
         run: sudo apt-get install -y capnproto
       - name: Build with no features
-        run: cargo test --verbose --workspace --no-default-features --exclude hugr-llvm --no-run
+        run: cargo test --verbose --workspace --exclude hugr-llvm --no-default-features --no-run
       - name: Tests with no features
-        run: cargo test --verbose --workspace --no-default-features --exclude hugr-llvm
+        run: cargo test --verbose --workspace --exclude hugr-llvm --no-default-features
       - name: Build with all features
-        run: cargo test --verbose --workspace --all-features --no-run
+        run: cargo test --verbose --workspace --exclude hugr-llvm --all-features --no-run
       - name: Tests with all features
-        run: cargo test --verbose --workspace --all-features
+        run: cargo test --verbose --workspace --exclude hugr-llvm --all-features
 
   # Ensure that serialized extensions match rust implementation
   std-extensions:
@@ -233,11 +222,6 @@ jobs:
           # Nightly is required to count doctests coverage
           toolchain: "nightly"
           components: llvm-tools-preview
-      - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          version: "14.0"
-          env: true
       - name: Install CapnProto
         run: sudo apt-get install -y capnproto
       - name: Install cargo-llvm-cov
@@ -245,8 +229,8 @@ jobs:
       - name: Run tests with coverage instrumentation
         run: |
           cargo llvm-cov clean --workspace
-          cargo llvm-cov --no-report --workspace --no-default-features --exclude hugr-llvm --doctests
-          cargo llvm-cov --no-report --workspace --all-features --doctests
+          cargo llvm-cov --no-report --workspace --exclude hugr-llvm --no-default-features --doctests
+          cargo llvm-cov --no-report --workspace --exclude hugr-llvm --all-features --doctests
       - name: Generate coverage report
         run: cargo llvm-cov --all-features report --codecov --output-path coverage.json
       - name: Upload coverage to codecov.io
@@ -256,8 +240,38 @@ jobs:
           name: rust
           flags: rust
           token: ${{ secrets.CODECOV_TOKEN }}
+    
+    tests-stable-llvm:
+      needs: changes
+      if: ${{ needs.changes.outputs.llvm == 'true' }}
+      runs-on: ubuntu-latest
+      name: tests hugr-llvm
+      strategy:
+      matrix:
+        llvm-version:
+          - ["14.0", "14-0"]
 
-  rs-semver-checks:
+      steps:
+        - uses: actions/checkout@v4
+        - uses: mozilla-actions/sccache-action@v0.0.6
+        - id: toolchain
+          uses: dtolnay/rust-toolchain@master
+          with:
+            toolchain: "stable"
+        - name: Configure default rust toolchain
+          run: rustup override set ${{steps.toolchain.outputs.name}}
+  
+        - name: Install LLVM and Clang
+          uses: KyleMayes/install-llvm-action@v2
+          with:
+            version: ${{ matrix.llvm-version[0] }}
+            env: true
+        - name: Build
+          run: cargo test --verbose --workspace --exclude hugr-llvm --features llvm${{ matrix.llvm-version[1] } --no-run
+        - name: Tests with no features
+          run: cargo test --verbose --workspace --exclude hugr-llvm --features llvm${{ matrix.llvm-version[1] }
+
+rs-semver-checks:
     needs: [changes, check]
     if: ${{ needs.changes.outputs.rust == 'true' && github.event_name == 'pull_request' }}
     uses: CQCL/hugrverse-actions/.github/workflows/rs-semver-checks.yml@main
