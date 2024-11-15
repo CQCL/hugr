@@ -6,7 +6,6 @@ use crate::types::EdgeKind;
 use crate::NodeIndex;
 use crate::{Node, Port};
 
-use context_iterators::{ContextIterator, IntoContextIterator, MapWithCtx};
 use petgraph::visit as pv;
 
 /// Wrapper for a HugrView that implements petgraph's traits.
@@ -99,13 +98,14 @@ where
     T: HugrView,
 {
     type NodeRef = HugrNodeRef<'a>;
-    type NodeReferences = MapWithCtx<<T as HugrView>::Nodes<'a>, Self, HugrNodeRef<'a>>;
+    type NodeReferences = Box<dyn Iterator<Item = HugrNodeRef<'a>> + 'a>;
 
     fn node_references(self) -> Self::NodeReferences {
-        self.hugr
-            .nodes()
-            .with_context(self)
-            .map_with_context(|n, &wrapper| HugrNodeRef::from_node(n, wrapper.hugr))
+        Box::new(
+            self.hugr
+                .nodes()
+                .map(|n| HugrNodeRef::from_node(n, self.hugr)),
+        )
     }
 }
 
@@ -113,10 +113,10 @@ impl<'a, T> pv::IntoNodeIdentifiers for PetgraphWrapper<'a, T>
 where
     T: HugrView,
 {
-    type NodeIdentifiers = <T as HugrView>::Nodes<'a>;
+    type NodeIdentifiers = Box<dyn Iterator<Item = Node> + 'a>;
 
     fn node_identifiers(self) -> Self::NodeIdentifiers {
-        self.hugr.nodes()
+        Box::new(self.hugr.nodes())
     }
 }
 
@@ -124,10 +124,10 @@ impl<'a, T> pv::IntoNeighbors for PetgraphWrapper<'a, T>
 where
     T: HugrView,
 {
-    type Neighbors = <T as HugrView>::Neighbours<'a>;
+    type Neighbors = Box<dyn Iterator<Item = Node> + 'a>;
 
     fn neighbors(self, n: Self::NodeId) -> Self::Neighbors {
-        self.hugr.output_neighbours(n)
+        Box::new(self.hugr.output_neighbours(n))
     }
 }
 
@@ -135,14 +135,14 @@ impl<'a, T> pv::IntoNeighborsDirected for PetgraphWrapper<'a, T>
 where
     T: HugrView,
 {
-    type NeighborsDirected = <T as HugrView>::Neighbours<'a>;
+    type NeighborsDirected = Box<dyn Iterator<Item = Node> + 'a>;
 
     fn neighbors_directed(
         self,
         n: Self::NodeId,
         d: petgraph::Direction,
     ) -> Self::NeighborsDirected {
-        self.hugr.neighbours(n, d.into())
+        Box::new(self.hugr.neighbours(n, d.into()))
     }
 }
 
