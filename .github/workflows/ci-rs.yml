@@ -171,7 +171,6 @@ jobs:
           toolchain: ${{ matrix.rust }}
       - name: Configure default rust toolchain
         run: rustup override set ${{steps.toolchain.outputs.name}}
-
       - name: Install CapnProto
         run: sudo apt-get install -y capnproto
       - name: Build with no features
@@ -261,16 +260,17 @@ jobs:
           toolchain: "stable"
       - name: Configure default rust toolchain
         run: rustup override set ${{steps.toolchain.outputs.name}}
-
+      - name: Install CapnProto
+        run: sudo apt-get install -y capnproto
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v2
         with:
           version: ${{ matrix.llvm-version[0] }}
           env: true
       - name: Build
-        run: cargo test --verbose --workspace --exclude hugr-llvm --features llvm${{ matrix.llvm-version[1] }} --no-run
+        run: cargo test -p hugr-llvm --verbose --features llvm${{ matrix.llvm-version[1] }} --no-run
       - name: Tests with no features
-        run: cargo test --verbose --workspace --exclude hugr-llvm --features llvm${{ matrix.llvm-version[1] }}
+        run: cargo test -p hugr-llvm --verbose --features llvm${{ matrix.llvm-version[1] }}
 
   rs-semver-checks:
     needs: [changes, check]
