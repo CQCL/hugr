@@ -164,9 +164,7 @@ impl<V: AbstractValue> PartialSum<V> {
         self,
         typ: &Type,
     ) -> Result<Sum<V2>, ExtractValueError<V, VE, SE>>
-    where
-        V: TryInto<V2, Error = VE>,
-        Sum<V2>: TryInto<V2, Error = SE>,
+        where V: TryInto<V2, Error = VE>, Sum<V2>: TryInto<V2, Error = SE>
     {
         let Ok((k, v)) = self.0.iter().exactly_one() else {
             return Err(ExtractValueError::MultipleVariants(self));
@@ -348,15 +346,15 @@ impl<V: AbstractValue> PartialValue<V> {
     /// If this PartialValue was `Top` or `Bottom`, or was a [PartialSum](PartialValue::PartialSum)
     /// that could not be converted into a [Sum] by [PartialSum::try_into_value] (e.g. if `typ` is
     /// incorrect), or if that [Sum] could not be converted into a `V2`.
-    pub fn try_into_value<VE, SE, V2>(self, typ: &Type) -> Result<V2, ExtractValueError<V, VE, SE>>
-    where
-        V: TryInto<V2, Error = VE>,
-        Sum<V2>: TryInto<V2, Error = SE>,
+    pub fn try_into_value<VE, SE, V2> (
+        self,
+        typ: &Type,
+    ) -> Result<V2, ExtractValueError<V, VE, SE>> where
+        V: TryInto<V2,Error = VE>,
+        Sum<V2>: TryInto<V2, Error = SE>
     {
         match self {
-            Self::Value(v) => v
-                .clone()
-                .try_into()
+            Self::Value(v) => v.clone().try_into()
                 .map_err(|e| ExtractValueError::CouldNotConvert(v.clone(), e)),
             Self::PartialSum(ps) => {
                 let v = ps.try_into_value(typ)?;
