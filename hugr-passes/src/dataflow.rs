@@ -9,7 +9,7 @@ mod results;
 pub use results::{AnalysisResults, TailLoopTermination};
 
 mod partial_value;
-pub use partial_value::{AbstractValue, PartialSum, PartialValue, Sum, NoDefaultConversionToSum};
+pub use partial_value::{AbstractValue, NoDefaultConversionToSum, PartialSum, PartialValue, Sum};
 
 use hugr_core::ops::constant::OpaqueValue;
 use hugr_core::ops::{ExtensionOp, Value};

@@ -1801,7 +1801,7 @@ fn test_cfg2(
     let (backup, reg) = cfg_hugr();
     let mut hugr = backup.clone();
     let pass = ConstFoldPass::default()
-        .with_inputs(inputs.into_iter().map(|(p, b)| (*p, Value::from_bool(*b))));
+        .with_inputs(inputs.iter().map(|(p, b)| (*p, Value::from_bool(*b))));
     pass.run(&mut hugr, &reg).unwrap();
     // CFG inside DFG retained
     let nested = hugr
