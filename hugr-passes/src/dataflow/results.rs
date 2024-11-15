@@ -95,8 +95,7 @@ impl<V: AbstractValue, C: DFContext<V>> AnalysisResults<V, C> {
         w: Wire,
     ) -> Result<V2, Option<ExtractValueError<V, VE, SE>>>
     where
-        V: TryInto<V2, Error = VE>,
-        Sum<V2>: TryInto<V2, Error = SE>,
+        V2: TryFrom<V, Error = VE> + TryFrom<Sum<V2>, Error = SE>,
     {
         let v = self.read_out_wire(w).ok_or(None)?;
         let (_, typ) = self
