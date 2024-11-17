@@ -1,6 +1,5 @@
 ---
 source: hugr-passes/tests/static_circuit.rs
-assertion_line: 63
 expression: gates_to_str(gates)
 input_file: hugr-passes/tests/static_circuit/guppy_examples/2.py
 ---

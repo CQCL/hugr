@@ -240,7 +240,7 @@ pub fn check_results(results: impl IntoIterator<Item=(Node,Option<(Node, Vec<Gat
         let node_to_index = gates.iter().enumerate().map(|(i,gate)|
                                              (i, g.add_node(gate.clone()))).collect::<HashMap<_,_>>();
 
-        for (from, to) in gates.iter().enumerate().map(|(i,x)| gates[i]).tuple_windows() {
+        for (from, to) in gates.iter().enumerate().map(|(i,x)| node_to_index[&i]).tuple_windows() {
             g.add_edge(from,to, ());
         }
     }
