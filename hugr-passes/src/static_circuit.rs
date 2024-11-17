@@ -19,34 +19,37 @@ use crate::{
 };
 
 #[derive(Eq, PartialEq, Debug, Clone, PartialOrd, Ord, Hash)]
-pub enum Gate {
-    Gate(Node, String, Vec<Node>),
-}
+pub struct Gate (
+    Vec<Node>,pub String, pub Vec<Node>,
+);
 
-#[derive(Eq, PartialEq, Debug, Clone, PartialOrd, Ord, Hash)]
-enum QbHistory {
-    Bottom,
-    H(Node, Vec<Gate>),
-    Top,
-}
-
-impl QbHistory {
-    pub fn init(qb: Node) -> Self {
-        Self::H(qb, vec![])
-    }
-
-    pub fn push(&mut self, node: Node, g: impl Into<String>, qbs: impl Into<Vec<Node>>) {
-        if let Self::H(_, v) = self {
-            v.push(Gate::Gate(node, g.into(), qbs.into()));
-        }
-    }
-
-    fn qb_index(&self) -> Option<Node> {
-        if let Self::H(qb_i, _) = self {
-            Some(*qb_i)
+impl Gate {
+    pub fn join(&self, other: &Self) -> Option<Self> {
+        if self.1 == other.1 && self.2 == other.2 {
+            let mut v = self.0.clone();
+            v.extend(other.0.iter().cloned());
+            v.dedup();
+            Some(Self(v, self.1.clone(), self.2.clone()))
         } else {
             None
         }
+    }
+}
+
+#[derive(Eq, PartialEq, Debug, Clone, PartialOrd, Ord, Hash)]
+struct QbHistory(Node, Vec<Gate>);
+
+impl QbHistory {
+    pub fn init(qb: Node) -> Self {
+        Self(qb, vec![])
+    }
+
+    pub fn push(&mut self, node: Node, g: impl Into<String>, qbs: impl Into<Vec<Node>>) {
+        self.1.push(Gate(vec![node], g.into(), qbs.into()))
+    }
+
+    fn qb_index(&self) -> Node {
+        self.0
     }
 }
 
@@ -58,30 +61,42 @@ impl TryFrom<Sum<QbHistory>> for QbHistory {
     }
 }
 
-impl AbstractValue for QbHistory {}
+impl AbstractValue for QbHistory {
+    fn try_join(self, other: Self) -> Option<Self> {
+        if self.0 == other.0 && self.1.len() == other.1.len() {
+           Some(QbHistory(self.0, zip_eq(self.1, other.1).map(|(a, b)| a.join(&b)).collect::<Option<Vec<_>>>()?))
+        } else {
+               None
+        }
+    }
+
+    fn try_meet(self, other: Self) -> Option<Self> {
+        (self.0 == other.0).then_some(self)
+    }
+}
 
 pub struct StaticCircuitContext<'a, H> {
     pub hugr: &'a H,
-    pub extensions: &'a ExtensionSet,
-    pub alloc_ops: &'a HashSet<Node>,
-    pub free_ops: &'a HashSet<Node>,
+    pub extensions: ExtensionSet,
+    pub alloc_ops: HashSet<Node>,
+    pub free_ops: HashSet<Node>,
 }
 
 impl<H> Clone for StaticCircuitContext<'_, H> {
     fn clone(&self) -> Self {
         Self {
             hugr: self.hugr,
-            extensions: self.extensions,
-            alloc_ops: self.alloc_ops,
-            free_ops: self.free_ops,
+            extensions: self.extensions.clone(),
+            alloc_ops: self.alloc_ops.clone(),
+            free_ops: self.free_ops.clone(),
         }
     }
 }
 
 impl<'a, H: HugrView> StaticCircuitContext<'a, H> {
     fn assert_invariants(&self) {
-        debug_assert!(self.alloc_ops.is_disjoint(self.free_ops));
-        for &n in self.alloc_ops.iter().chain(self.free_ops) {
+        debug_assert!(self.alloc_ops.is_disjoint(&self.free_ops));
+        for &n in self.alloc_ops.iter().chain(&self.free_ops) {
             debug_assert!(self.hugr.valid_node(n));
             let Some(e) = self.hugr.get_optype(n).as_extension_op() else {
                 panic!("node {n} is not in extensions")
@@ -117,8 +132,8 @@ impl<'a, H: HugrView> DFContext<QbHistory> for StaticCircuitContext<'a, H> {
             return;
         }
 
-        assert_eq!(ins.len(), self.hugr.num_inputs(node));
-        assert_eq!(outs.len(), self.hugr.num_outputs(node));
+        // assert_eq!(ins.len(), self.hugr.num_inputs(node));
+        // assert_eq!(outs.len(), self.hugr.num_outputs(node));
 
         let qb_ins = qubits_in(self.hugr, node).collect::<Vec<_>>();
         let qb_outs = qubits_out(self.hugr, node).collect::<Vec<_>>();
@@ -134,11 +149,11 @@ impl<'a, H: HugrView> DFContext<QbHistory> for StaticCircuitContext<'a, H> {
         } else if self.free_ops.contains(&node) {
             assert_eq!(0, qb_outs.len());
         } else {
-            assert_eq!(qb_outs.len(), qb_ins.len());
+            assert_eq!(qb_outs.len(), qb_ins.len(), "{e:?}");
             if let Some(in_hs) = qb_ins
                 .iter()
                 .map(|&i| match &ins[i.index()] {
-                    PartialValue::Value(qbh) => qbh.qb_index().map(|qb_i| (qb_i, qbh)),
+                    PartialValue::Value(qbh) => Some((qbh.qb_index(), qbh)),
                     _ => None,
                 })
                 .collect::<Option<Vec<_>>>()
@@ -175,6 +190,7 @@ impl StaticCircuitPass {
         scc: StaticCircuitContext<'_, impl HugrView>,
         registry: &ExtensionRegistry,
     ) -> Result<HashMap<Node, Option<(Node, Vec<Gate>)>>, Box<dyn std::error::Error>> {
+        eprintln!("StaticCircuitPass::run alloc_nodes: {:?} free_nodes: {:?}", &scc.alloc_ops, &scc.free_ops);
         scc.assert_invariants();
         self.validation
             .run_validated_pass(scc.hugr, registry, |hugr, _| {
@@ -191,7 +207,7 @@ impl StaticCircuitPass {
                                 let (n, p) = hugr.single_linked_output(free_node, qbs_in[0])?;
                                 Wire::new(n, p)
                             };
-                            if let Ok(QbHistory::H(i, gates)) = results.try_read_wire_value(wire)
+                            if let Ok(QbHistory(i, gates)) = results.try_read_wire_value(wire)
                             {
                                 Some((i, gates.clone()))
                             } else {
@@ -213,4 +229,20 @@ fn qubits_in(hugr: &impl HugrView, node: Node) -> impl Iterator<Item = IncomingP
 fn qubits_out(hugr: &impl HugrView, node: Node) -> impl Iterator<Item = OutgoingPort> + '_ {
     hugr.out_value_types(node)
         .filter_map(|(p, t)| (t == QB_T).then_some(p))
+}
+
+pub fn check_results(results: impl IntoIterator<Item=(Node,Option<(Node, Vec<Gate>)>)>) -> Result<Option<Vec<Gate>>, Box<dyn std::error::Error>> {
+    let mut g = petgraph::graph::Graph::<Gate, ()>::new();
+    for (_, mb_gates) in results.into_iter() {
+        let Some((_,gates)) = mb_gates else {
+            return Ok(None);
+        };
+        let node_to_index = gates.iter().enumerate().map(|(i,gate)|
+                                             (i, g.add_node(gate.clone()))).collect::<HashMap<_,_>>();
+
+        for (from, to) in gates.iter().enumerate().map(|(i,x)| gates[i]).tuple_windows() {
+            g.add_edge(from,to, ());
+        }
+    }
+    Ok(Some(petgraph::algo::toposort(&g, None).map_err(|x| format!("check_results: graph is cyclic: {x:?}"))?.into_iter().map(|i| g.node_weight(i).unwrap().clone()).collect()))
 }

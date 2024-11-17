@@ -325,15 +325,7 @@ fn propagate_leaf_op<V: AbstractValue>(
         }
         OpType::ExtensionOp(e) => {
             // Interpret op using DFContext
-            let init = if ins.iter().contains(&PartialValue::Bottom) {
-                // So far we think one or more inputs can't happen.
-                // So, don't pollute outputs with Top, and wait for better knowledge of inputs.
-                PartialValue::Bottom
-            } else {
-                // If we can't figure out anything about the outputs, assume nothing (they still happen!)
-                PartialValue::Top
-            };
-            let mut outs = vec![init; num_outs];
+            let mut outs = vec![PartialValue::Bottom; num_outs];
             // It might be nice to convert these to [(IncomingPort, Value)], or some concrete value,
             // for the context, but PV contains more information, and try_into_value may fail.
             ctx.interpret_leaf_op(n, e, ins, &mut outs[..]);
