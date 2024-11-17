@@ -5,6 +5,7 @@
 pub mod value_handle;
 use std::collections::{HashMap, HashSet, VecDeque};
 
+use ascent::Lattice as _;
 use hugr_core::{
     extension::ExtensionRegistry,
     hugr::{
@@ -278,6 +279,14 @@ impl<'a, H: HugrView> DFContext<ValueHandle> for ConstFoldContext<'a, H> {
         ins: &[PartialValue<ValueHandle>],
         outs: &mut [PartialValue<ValueHandle>],
     ) {
+        // If any inputs are bottom this node is currently unreachable.
+        // We should not propagate anything to our outputs here.
+        // TODO perhaps this should be done by the caller and we should have a
+        // precondition here that no ins are Bottom;  this if statement
+        // would become a debug_assert!.
+        if ins.iter().any(|v| *v == PartialValue::Bottom) {
+            return;
+        }
         let sig = op.signature();
         let known_ins = sig
             .input_types()
@@ -288,8 +297,21 @@ impl<'a, H: HugrView> DFContext<ValueHandle> for ConstFoldContext<'a, H> {
                 Some((IncomingPort::from(i), pv.clone().try_into_value(ty).ok()?))
             })
             .collect::<Vec<_>>();
-        for (p, v) in op.constant_fold(&known_ins).unwrap_or_default() {
-            outs[p.index()] = partial_from_const(self, node, &mut vec![p.index()], &v);
+        // Collect the results of the fold. Any output wires that are not
+        // returned by `constant_fold` are set to Top.
+        let fold_outs: HashMap<OutgoingPort, Value> = op
+            .constant_fold(&known_ins)
+            .into_iter()
+            .flat_map(Vec::into_iter)
+            .collect();
+        for (p, o) in outs.iter_mut().enumerate() {
+            o.join_mut(
+                fold_outs
+                    .get(&OutgoingPort::from(p))
+                    .map_or(PartialValue::Top, |v| {
+                        partial_from_const(self, node, &mut vec![p.index()], v)
+                    }),
+            );
         }
     }
 }

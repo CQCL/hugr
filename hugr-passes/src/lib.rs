@@ -4,13 +4,13 @@ pub mod const_fold;
 pub mod dataflow;
 pub mod force_order;
 mod half_node;
+pub mod inline;
 pub mod lower;
 pub mod merge_bbs;
 pub mod nest_cfgs;
 pub mod non_local;
 pub mod static_circuit;
 pub mod validation;
-pub mod inline;
 
 pub use force_order::{force_order, force_order_by_key};
 pub use lower::{lower_ops, replace_many_ops};
