@@ -173,6 +173,7 @@ pub(super) mod test {
     use rstest::rstest;
 
     use crate::extension::PRELUDE_REGISTRY;
+    use crate::IncomingPort;
     use crate::{
         builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
         type_row,
@@ -222,6 +223,7 @@ pub(super) mod test {
         let (hugr, def, inner) = make_module_hgr()?;
 
         let region: DescendantsGraph = DescendantsGraph::try_new(&hugr, def)?;
+        let def_io = region.get_io(def).unwrap();
 
         assert_eq!(region.node_count(), 7);
         assert!(region.nodes().all(|n| n == def
@@ -237,10 +239,20 @@ pub(super) mod test {
                     .into()
             )
         );
+
         let inner_region: DescendantsGraph = DescendantsGraph::try_new(&hugr, inner)?;
         assert_eq!(
             inner_region.inner_function_type(),
             Some(Signature::new(type_row![NAT], type_row![NAT]))
+        );
+        assert_eq!(inner_region.node_count(), 3);
+        assert_eq!(inner_region.children(inner).count(), 2);
+        assert_eq!(inner_region.node_connections(inner, def_io[1]).count(), 0);
+        assert_eq!(
+            inner_region
+                .linked_ports(inner, IncomingPort::from(0))
+                .count(),
+            0
         );
 
         Ok(())
