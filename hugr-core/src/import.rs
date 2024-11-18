@@ -810,9 +810,11 @@ impl<'a> Context<'a> {
             // Connect the input node to the tag node
             let input_outputs = self.hugr.node_outputs(node_input);
             let tag_inputs = self.hugr.node_inputs(node_tag);
+            let mut connections =
+                Vec::with_capacity(input_outputs.size_hint().0 + tag_inputs.size_hint().0);
 
             for (a, b) in input_outputs.zip(tag_inputs) {
-                self.hugr.connect(node_input, a, node_tag, b);
+                connections.push((node_input, a, node_tag, b));
             }
 
             // Connect the tag node to the output node
@@ -820,7 +822,11 @@ impl<'a> Context<'a> {
             let output_inputs = self.hugr.node_inputs(node_output);
 
             for (a, b) in tag_outputs.zip(output_inputs) {
-                self.hugr.connect(node_tag, a, node_output, b);
+                connections.push((node_tag, a, node_output, b));
+            }
+
+            for (src, src_port, dst, dst_port) in connections {
+                self.hugr.connect(src, src_port, dst, dst_port);
             }
         }
 

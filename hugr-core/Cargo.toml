@@ -47,7 +47,6 @@ bitvec = { workspace = true, features = ["serde"] }
 enum_dispatch = { workspace = true }
 lazy_static = { workspace = true }
 petgraph = { workspace = true }
-context-iterators = { workspace = true }
 serde_json = { workspace = true }
 delegate = { workspace = true }
 paste = { workspace = true }
