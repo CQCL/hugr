@@ -255,6 +255,13 @@ pub(super) fn run_datalog<V: AbstractValue, C: DFContext<V>>(
             func_call(call, func),
             output_child(func, outp),
             in_wire_value(outp, p, v);
+
+        out_wire_value(func_i, OutgoingPort::from(p.index()), PartialValue::Top) <--
+            node(func_n),
+            if let Some(func) = ctx.get_optype(*func_n).as_func_defn(),
+            if func.name == "main",
+            input_child(func_n, func_i),
+            for (p,_) in ctx.out_value_types(*func_i);
     };
     let out_wire_values = all_results
         .out_wire_value
@@ -276,7 +283,8 @@ fn propagate_leaf_op<V: AbstractValue>(
     ins: &[PV<V>],
     num_outs: usize,
 ) -> Option<ValueRow<V>> {
-    match ctx.get_optype(n) {
+    eprintln!("plo:ins:{n} {ins:?}");
+    let r = match ctx.get_optype(n) {
         // Handle basics here. We could instead leave these to DFContext,
         // but at least we'd want these impls to be easily reusable.
         op if op.cast::<MakeTuple>().is_some() => Some(ValueRow::from_iter([PV::new_variant(
@@ -325,12 +333,22 @@ fn propagate_leaf_op<V: AbstractValue>(
         }
         OpType::ExtensionOp(e) => {
             // Interpret op using DFContext
-            let mut outs = vec![PartialValue::Bottom; num_outs];
+            let init = if ins.iter().contains(&PartialValue::Bottom) {
+                // So far we think one or more inputs can't happen.
+                // So, don't pollute outputs with Top, and wait for better knowledge of inputs.
+                PartialValue::Bottom
+            } else {
+                // If we can't figure out anything about the outputs, assume nothing (they still happen!)
+                PartialValue::Top
+            };
+            let mut outs = vec![init; num_outs];
             // It might be nice to convert these to [(IncomingPort, Value)], or some concrete value,
             // for the context, but PV contains more information, and try_into_value may fail.
             ctx.interpret_leaf_op(n, e, ins, &mut outs[..]);
             Some(ValueRow::from_iter(outs))
         }
         o => todo!("Unhandled: {:?}", o), // At least CallIndirect, and OpType is "non-exhaustive"
-    }
+    };
+    eprintln!("plo:outs:{n} {r:?}");
+    r
 }

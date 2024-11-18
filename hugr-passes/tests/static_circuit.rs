@@ -109,9 +109,11 @@ fn guppy_examples() {
         settings.set_omit_expression(true);
         settings.bind(|| {
             InlinePass::default().run(&mut hugr, &reg).unwrap();
+            eprintln!("{}", hugr.mermaid_string());
 
             let scc = scc(&hugr);
             let scr = StaticCircuitPass::default().run(scc.clone(), &reg).unwrap();
+            eprintln!("{:?}", &scr);
             insta::assert_snapshot!(format!(
                 "{program_src}\n===========================\n{}",
                 gates_to_str(scr.static_circuit(scc))

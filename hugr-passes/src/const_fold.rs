@@ -5,7 +5,6 @@
 pub mod value_handle;
 use std::collections::{HashMap, HashSet, VecDeque};
 
-use ascent::Lattice as _;
 use hugr_core::{
     extension::ExtensionRegistry,
     hugr::{
@@ -305,13 +304,11 @@ impl<'a, H: HugrView> DFContext<ValueHandle> for ConstFoldContext<'a, H> {
             .flat_map(Vec::into_iter)
             .collect();
         for (p, o) in outs.iter_mut().enumerate() {
-            o.join_mut(
-                fold_outs
-                    .get(&OutgoingPort::from(p))
-                    .map_or(PartialValue::Top, |v| {
-                        partial_from_const(self, node, &mut vec![p.index()], v)
-                    }),
-            );
+            *o = fold_outs
+                .get(&OutgoingPort::from(p))
+                .map_or(PartialValue::Top, |v| {
+                    partial_from_const(self, node, &mut vec![p.index()], v)
+                });
         }
     }
 }

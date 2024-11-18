@@ -114,7 +114,9 @@ impl TryFrom<Sum<QbHistory>> for QbHistory {
 impl AbstractValue for QbHistory {
     fn try_join(self, other: Self) -> Option<Self> {
         eprintln!("join: {:?} ^ {:?} ", &self, &other);
-        let r = if self.0 == other.0 && self.1.len() == other.1.len() {
+        
+        // eprintln!("join:  => {:?}", &r);
+        if self.0 == other.0 && self.1.len() == other.1.len() {
             Some(QbHistory(
                 self.0,
                 zip_eq(self.1, other.1)
@@ -123,10 +125,7 @@ impl AbstractValue for QbHistory {
             ))
         } else {
             None
-        };
-        panic!("dougrulz");
-        eprintln!("join:  => {:?}", &r);
-        r
+        }
     }
 
     fn try_meet(self, other: Self) -> Option<Self> {
@@ -192,9 +191,11 @@ impl<'a, H: HugrView> DFContext<QbHistory> for StaticCircuitContext<'a, H> {
         }
 
         if ins.iter().any(|x| x == &PartialValue::Bottom) {
+            eprintln!("interpret_leaf_op: {node}: At least one bottom input");
             return;
         }
 
+        eprintln!("interpret_leaf_op: {node}: No bottom inputs, continuing");
         // assert_eq!(ins.len(), self.hugr.num_inputs(node));
         // assert_eq!(outs.len(), self.hugr.num_outputs(node));
 
@@ -208,44 +209,28 @@ impl<'a, H: HugrView> DFContext<QbHistory> for StaticCircuitContext<'a, H> {
         if let Some(&qb_i) = self.alloc_ops.get(&node) {
             assert_eq!(0, qb_ins.len());
             assert_eq!(1, qb_outs.len());
-            for (i, out) in outs.iter_mut().enumerate() {
-                if qb_outs[0] == i.into() {
-                    out.join_mut(QbHistory::init(qb_i).into());
-                } else {
-                    out.join_mut(PartialValue::Top);
-                }
-            }
+            outs[qb_outs[0].index()] = QbHistory::init(qb_i).into();
         } else if self.free_ops.contains(&node) {
             assert_eq!(0, qb_outs.len());
-            for out in outs.iter_mut() {
-                out.join_mut(PartialValue::Top);
-            }
         } else {
             assert_eq!(qb_outs.len(), qb_ins.len(), "{e:?}");
-            let mb_in_qbs = qb_ins
+            if let Some(qbhs) = qb_ins
                 .iter()
                 .map(|&i| match &ins[i.index()] {
-                    PartialValue::Value(qbh) => Some((i, qbh)),
+                    PartialValue::Value(qbh) => Some(qbh),
                     _ => None,
                 })
-                .collect::<Option<HashMap<_, _>>>();
-            let gating_qbs = mb_in_qbs
-                .iter()
-                .flat_map(|hash_map| hash_map.iter().map(|(_, qbh)| qbh.qb_index()))
-                .collect_vec();
-            let qb_out_to_in: HashMap<_, _> = zip_eq(qb_outs, qb_ins).collect();
-            for (i, v) in outs.iter_mut().enumerate() {
-                let mb_join_val = (|| {
-                    let in_p = qb_out_to_in.get(&OutgoingPort::from(i))?;
-                    let hash_map = mb_in_qbs.as_ref()?;
-                    let qbh: &QbHistory = hash_map.get(in_p)?;
-                    let mut qbh = qbh.clone();
-                    qbh.push(node, e.name(), gating_qbs.clone());
-                    Some(qbh.into())
-                })();
+                .collect::<Option<Vec<_>>>()
+            {
+                let gating_nodes = qbhs.iter().map(|qbh| qbh.qb_index()).collect_vec();
 
-                v.join_mut(mb_join_val.unwrap_or(PartialValue::Top));
+                for (qbh, o) in zip_eq(qbhs, qb_outs) {
+                    let mut qbh = qbh.clone();
+                    qbh.push(node, e.name(), gating_nodes.clone());
+                    outs[o.index()] = qbh.into();
+                }
             }
+            assert!(outs.iter().all(|x| x != &PartialValue::Bottom))
         }
     }
 }
@@ -302,6 +287,7 @@ impl StaticCircuitPass {
     }
 }
 
+#[derive(Debug)]
 pub struct StaticCircuitResult {
     qubit_history: HashMap<Node, (Node, Vec<Gate>)>,
 }
@@ -364,35 +350,3 @@ fn qubits_out(hugr: &impl HugrView, node: Node) -> impl Iterator<Item = Outgoing
     hugr.out_value_types(node)
         .filter_map(|(p, t)| (t == QB_T).then_some(p))
 }
-
-// pub fn check_results(
-//     results: impl IntoIterator<Item = (Node, Option<(Node, Vec<Gate>)>)>,
-// ) -> Result<Option<Vec<Gate>>, Box<dyn std::error::Error>> {
-//     let mut g = petgraph::graph::Graph::<Gate, ()>::new();
-//     for (_, mb_gates) in results.into_iter() {
-//         let Some((_, gates)) = mb_gates else {
-//             return Ok(None);
-//         };
-//         let node_to_index = gates
-//             .iter()
-//             .enumerate()
-//             .map(|(i, gate)| (i, g.add_node(gate.clone())))
-//             .collect::<HashMap<_, _>>();
-
-//         for (from, to) in gates
-//             .iter()
-//             .enumerate()
-//             .map(|(i, x)| node_to_index[&i])
-//             .tuple_windows()
-//         {
-//             g.add_edge(from, to, ());
-//         }
-//     }
-//     Ok(Some(
-//         petgraph::algo::toposort(&g, None)
-//             .map_err(|x| format!("check_results: graph is cyclic: {x:?}"))?
-//             .into_iter()
-//             .map(|i| g.node_weight(i).unwrap().clone())
-//             .collect(),
-//     ))
-// }

@@ -18,4 +18,7 @@ def main(random: bool) -> None:
     discard(q1)
     discard(q2)
 ===========================
-No static circuit
+tket2.quantum.Reset [Node(67)] (Node(68))
+tket2.quantum.Reset [Node(79)] (Node(80))
+tket2.quantum.CX [Node(67),Node(79)] (Node(16))
+tket2.quantum.Rx [Node(67)] (Node(26),Node(37))
