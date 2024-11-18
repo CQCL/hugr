@@ -246,8 +246,35 @@ pub(super) mod test {
             Some(Signature::new(type_row![NAT], type_row![NAT]))
         );
         assert_eq!(inner_region.node_count(), 3);
+        assert_eq!(inner_region.edge_count(), 2);
         assert_eq!(inner_region.children(inner).count(), 2);
+        assert_eq!(inner_region.children(hugr.root()).count(), 0);
+        assert_eq!(
+            inner_region.num_ports(inner, Direction::Outgoing),
+            inner_region.node_ports(inner, Direction::Outgoing).count()
+        );
+        assert_eq!(
+            inner_region.num_ports(inner, Direction::Incoming)
+                + inner_region.num_ports(inner, Direction::Outgoing),
+            inner_region.all_node_ports(inner).count()
+        );
+
+        // The inner region filters out the connections to the main function I/O nodes,
+        // while the outer region includes them.
         assert_eq!(inner_region.node_connections(inner, def_io[1]).count(), 0);
+        assert_eq!(region.node_connections(inner, def_io[1]).count(), 1);
+        assert_eq!(
+            inner_region
+                .linked_ports(inner, IncomingPort::from(0))
+                .count(),
+            0
+        );
+        assert_eq!(region.linked_ports(inner, IncomingPort::from(0)).count(), 1);
+        assert_eq!(
+            inner_region.neighbours(inner, Direction::Outgoing).count(),
+            0
+        );
+        assert_eq!(inner_region.all_neighbours(inner).count(), 0);
         assert_eq!(
             inner_region
                 .linked_ports(inner, IncomingPort::from(0))

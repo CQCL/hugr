@@ -99,6 +99,7 @@ fn all_ports(sample_hugr: (Hugr, BuildHandle<DataflowOpID>, BuildHandle<Dataflow
     let (h, n1, n2) = sample_hugr;
 
     let all_output_ports = h.all_linked_outputs(n2.node()).collect_vec();
+    let all_ports = h.all_node_ports(n2.node()).collect_vec();
 
     assert_eq!(
         &all_output_ports[..],
@@ -108,6 +109,9 @@ fn all_ports(sample_hugr: (Hugr, BuildHandle<DataflowOpID>, BuildHandle<Dataflow
             (n1.node(), 2.into()),
         ]
     );
+    assert!(all_output_ports
+        .iter()
+        .all(|&(_, p)| all_ports.contains(&p.into())));
 
     let all_linked_inputs = h.all_linked_inputs(n1.node()).collect_vec();
     assert_eq!(
