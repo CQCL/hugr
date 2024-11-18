@@ -345,10 +345,7 @@ fn read_term<'a>(bump: &'a Bump, reader: hugr_capnp::term::Reader) -> ReadResult
             values: model::TermId(values),
         },
 
-        Which::CopyConstraint(term) => model::Term::CopyConstraint {
-            term: model::TermId(term),
-        },
-        Which::DiscardConstraint(term) => model::Term::DiscardConstraint {
+        Which::NonLinearConstraint(term) => model::Term::NonLinearConstraint {
             term: model::TermId(term),
         },
     })

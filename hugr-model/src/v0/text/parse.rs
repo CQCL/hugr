@@ -209,14 +209,9 @@ impl<'a> ParseContext<'a> {
                 Term::Control { values }
             }
 
-            Rule::term_copy => {
+            Rule::term_non_linear => {
                 let term = self.parse_term(inner.next().unwrap())?;
-                Term::CopyConstraint { term }
-            }
-
-            Rule::term_discard => {
-                let term = self.parse_term(inner.next().unwrap())?;
-                Term::DiscardConstraint { term }
+                Term::NonLinearConstraint { term }
             }
 
             r => unreachable!("term: {:?}", r),

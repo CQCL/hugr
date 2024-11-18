@@ -900,7 +900,7 @@ impl<'a> Context<'a> {
 
             for constraint in decl.constraints {
                 match ctx.get_term(*constraint)? {
-                    model::Term::CopyConstraint { term } => {
+                    model::Term::NonLinearConstraint { term } => {
                         let model::Term::Var(var) = ctx.get_term(*term)? else {
                             return Err(error_unsupported!(
                                 "constraint on term that is not a variable"
@@ -908,17 +908,7 @@ impl<'a> Context<'a> {
                         };
 
                         let var = ctx.resolve_local_ref(var)?.0;
-                        ctx.local_variables.get_index_mut(var).unwrap().1.copy = true;
-                    }
-                    model::Term::DiscardConstraint { term } => {
-                        let model::Term::Var(var) = ctx.get_term(*term)? else {
-                            return Err(error_unsupported!(
-                                "constraint on term that is not a variable"
-                            ));
-                        };
-
-                        let var = ctx.resolve_local_ref(var)?.0;
-                        ctx.local_variables.get_index_mut(var).unwrap().1.discard = true;
+                        ctx.local_variables[var].bound = TypeBound::Copyable;
                     }
                     _ => return Err(error_unsupported!("constraint other than copy or discard")),
                 }
@@ -926,7 +916,7 @@ impl<'a> Context<'a> {
 
             for (index, param) in decl.params.iter().enumerate() {
                 // TODO: `PolyFuncType` should be able to distinguish between implicit and explicit parameters.
-                let bound = ctx.local_variables.get_index(index).unwrap().1.bound()?;
+                let bound = ctx.local_variables[index].bound;
                 imported_params.push(ctx.import_type_param(param.r#type, bound)?);
             }
 
@@ -971,8 +961,7 @@ impl<'a> Context<'a> {
             | model::Term::ExtSet { .. }
             | model::Term::Adt { .. }
             | model::Term::Control { .. }
-            | model::Term::CopyConstraint { .. }
-            | model::Term::DiscardConstraint { .. } => {
+            | model::Term::NonLinearConstraint { .. } => {
                 Err(model::ModelError::TypeError(term_id).into())
             }
 
@@ -992,8 +981,7 @@ impl<'a> Context<'a> {
 
             model::Term::Var(var) => {
                 let (index, var) = self.resolve_local_ref(var)?;
-                let bound = var.bound()?;
-                let decl = self.import_type_param(var.r#type, bound)?;
+                let decl = self.import_type_param(var.r#type, var.bound)?;
                 Ok(TypeArg::new_var_use(index, decl))
             }
 
@@ -1032,8 +1020,7 @@ impl<'a> Context<'a> {
             model::Term::FuncType { .. }
             | model::Term::Adt { .. }
             | model::Term::Control { .. }
-            | model::Term::CopyConstraint { .. }
-            | model::Term::DiscardConstraint { .. } => {
+            | model::Term::NonLinearConstraint { .. } => {
                 Err(model::ModelError::TypeError(term_id).into())
             }
         }
@@ -1137,8 +1124,7 @@ impl<'a> Context<'a> {
             | model::Term::Control { .. }
             | model::Term::ControlType
             | model::Term::Nat(_)
-            | model::Term::DiscardConstraint { .. }
-            | model::Term::CopyConstraint { .. } => {
+            | model::Term::NonLinearConstraint { .. } => {
                 Err(model::ModelError::TypeError(term_id).into())
             }
         }
@@ -1320,29 +1306,14 @@ impl<'a> Names<'a> {
 #[derive(Debug, Clone, Copy)]
 struct LocalVar {
     r#type: model::TermId,
-    copy: bool,
-    discard: bool,
+    bound: TypeBound,
 }
 
 impl LocalVar {
     pub fn new(r#type: model::TermId) -> Self {
         Self {
             r#type,
-            copy: false,
-            discard: false,
-        }
-    }
-
-    pub fn bound(&self) -> Result<TypeBound, ImportError> {
-        match (self.copy, self.discard) {
-            (true, true) => Ok(TypeBound::Copyable),
-            (false, false) => Ok(TypeBound::Any),
-            (true, false) => Err(error_unsupported!(
-                "type that is copyable but not discardable"
-            )),
-            (false, true) => Err(error_unsupported!(
-                "type that is discardable but not copyable"
-            )),
+            bound: TypeBound::Any,
         }
     }
 }

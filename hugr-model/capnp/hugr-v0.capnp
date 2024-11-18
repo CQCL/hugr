@@ -163,8 +163,7 @@ struct Term {
         funcType @17 :FuncType;
         control @18 :TermId;
         controlType @19 :Void;
-        copyConstraint @20 :TermId;
-        discardConstraint @21 :TermId;
+        nonLinearConstraint @20 :TermId;
     }
 
     struct Apply {

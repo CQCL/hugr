@@ -3,13 +3,11 @@
 (declare-func array.replicate
   (forall ?t type)
   (forall ?n nat)
-  (where (copy ?t))
-  (where (discard ?t))
+  (where (nonlinear ?t))
   [?t] [(@ array.Array ?t ?n)]
   (ext))
 
-(declare-func tuple.copy
+(declare-func array.copy
   (forall ?t type)
-  (where (copy ?t))
-  (where (discard ?t))
-  [(@ foo.tuple ?t)] [(@ foo.tuple ?t) (@ foo.tuple ?t)] (ext))
+  (where (nonlinear ?t))
+  [(@ array.Array ?t)] [(@ array.Array ?t) (@ array.Array ?t)] (ext))

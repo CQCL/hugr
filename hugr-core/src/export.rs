@@ -825,9 +825,8 @@ impl<'a> Context<'a> {
             TypeParam::Type { b } => {
                 if let (Some(var), TypeBound::Copyable) = (var, b) {
                     let term = self.make_term(model::Term::Var(var));
-                    let copy = self.make_term(model::Term::CopyConstraint { term });
-                    let discard = self.make_term(model::Term::DiscardConstraint { term });
-                    self.local_constraints.extend([copy, discard]);
+                    let non_linear = self.make_term(model::Term::NonLinearConstraint { term });
+                    self.local_constraints.push(non_linear);
                 }
 
                 self.make_term(model::Term::Type)

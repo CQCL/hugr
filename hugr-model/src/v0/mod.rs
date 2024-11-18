@@ -671,15 +671,9 @@ pub enum Term<'a> {
     /// `ctrl : static`
     ControlType,
 
-    /// Constraint that requires a runtime type to be copyable.
-    CopyConstraint {
-        /// The runtime type that must be copyable.
-        term: TermId,
-    },
-
-    /// Constraint that requires a runtime type to be discardable.
-    DiscardConstraint {
-        /// The runtime type that must be discardable.
+    /// Constraint that requires a runtime type to be copyable and discardable.
+    NonLinearConstraint {
+        /// The runtime type that must be copyable and discardable.
         term: TermId,
     },
 }

@@ -92,8 +92,7 @@ term = {
   | term_ctrl_type
   | term_apply_full
   | term_apply
-  | term_copy
-  | term_discard
+  | term_non_linear
 }
 
 term_wildcard     = { "_" }
@@ -116,5 +115,4 @@ term_adt          = { "(" ~ "adt" ~ term ~ ")" }
 term_func_type    = { "(" ~ "fn" ~ term ~ term ~ term ~ ")" }
 term_ctrl         = { "(" ~ "ctrl" ~ term ~ ")" }
 term_ctrl_type    = { "ctrl" }
-term_copy         = { "(" ~ "copy" ~ term ~ ")" }
-term_discard      = { "(" ~ "discard" ~ term ~ ")" }
+term_non_linear   = { "(" ~ "nonlinear" ~ term ~ ")" }

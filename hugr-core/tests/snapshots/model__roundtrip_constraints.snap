@@ -7,12 +7,10 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-cons
 (declare-func array.replicate
   (forall ?0 type)
   (forall ?1 nat)
-  (where (copy ?0))
-  (where (discard ?0))
+  (where (nonlinear ?0))
   [?0] [(@ array.Array ?0 ?1)] (ext))
 
-(declare-func tuple.copy
+(declare-func array.copy
   (forall ?0 type)
-  (where (copy ?0))
-  (where (discard ?0))
-  [(@ foo.tuple ?0)] [(@ foo.tuple ?0) (@ foo.tuple ?0)] (ext))
+  (where (nonlinear ?0))
+  [(@ array.Array ?0)] [(@ array.Array ?0) (@ array.Array ?0)] (ext))
