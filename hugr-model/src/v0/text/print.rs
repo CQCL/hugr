@@ -1,4 +1,4 @@
-use pretty::{docs, Arena, DocAllocator, RefDoc};
+use pretty::{Arena, DocAllocator, RefDoc};
 use std::borrow::Cow;
 
 use crate::v0::{
@@ -668,16 +668,22 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
     }
 
     /// Print a string literal.
-    fn print_string(&mut self, string: &'p str) {
-        // TODO: escape
-        self.docs.push(
-            docs![
-                self.arena,
-                self.arena.text("\""),
-                self.arena.text(string),
-                self.arena.text("\"")
-            ]
-            .into_doc(),
-        );
+    fn print_string(&mut self, string: &str) {
+        let mut output = String::with_capacity(string.len() + 2);
+        output.push('"');
+
+        for c in string.chars() {
+            match c {
+                '\\' => output.push_str("\\\\"),
+                '"' => output.push_str("\\\""),
+                '\n' => output.push_str("\\n"),
+                '\r' => output.push_str("\\r"),
+                '\t' => output.push_str("\\t"),
+                _ => output.push(c),
+            }
+        }
+
+        output.push('"');
+        self.print_text(output);
     }
 }
