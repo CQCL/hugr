@@ -85,17 +85,15 @@ impl<V: AbstractValue> Machine<V> {
         } else {
             self.0
                 .extend(in_values.into_iter().map(|(p, v)| (root, p, v)));
-            let mut need_inputs: HashSet<_, RandomState> = HashSet::from_iter(
-                (0..context.signature(root).unwrap_or_default().input_count())
-                    .map(IncomingPort::from),
-            );
-            self.0.iter().for_each(|(n, p, _)| {
-                if n == &root {
-                    need_inputs.remove(p);
+            let got_inputs: HashSet<_, RandomState> = self
+                .0
+                .iter()
+                .filter_map(|(n, p, _)| (n == &root).then_some(*p))
+                .collect();
+            for p in context.signature(root).unwrap_or_default().input_ports() {
+                if !got_inputs.contains(&p) {
+                    self.0.push((root, p, PartialValue::Top));
                 }
-            });
-            for p in need_inputs {
-                self.0.push((root, p, PartialValue::Top));
             }
         }
         // Note/TODO, if analysis is running on a subregion then we should do similar
