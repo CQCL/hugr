@@ -17,8 +17,11 @@ use crate::{
     Hugr, HugrView,
 };
 
+/// A Dataflow graph from two qubits to two qubits that applies two CX operations on them.
+///
+/// Returns the Hugr and the two CX node ids.
 #[fixture]
-fn sample_hugr() -> (Hugr, BuildHandle<DataflowOpID>, BuildHandle<DataflowOpID>) {
+pub(crate) fn sample_hugr() -> (Hugr, BuildHandle<DataflowOpID>, BuildHandle<DataflowOpID>) {
     let mut dfg = DFGBuilder::new(endo_sig(type_row![QB_T, QB_T])).unwrap();
 
     let [q1, q2] = dfg.input_wires_arr();

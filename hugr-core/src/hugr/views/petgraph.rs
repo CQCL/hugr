@@ -211,3 +211,39 @@ impl pv::NodeRef for HugrNodeRef<'_> {
         self.op
     }
 }
+
+#[cfg(test)]
+mod test {
+    use petgraph::visit::{
+        EdgeCount, GetAdjacencyMatrix, IntoNodeReferences, NodeCount, NodeIndexable, NodeRef,
+    };
+
+    use crate::hugr::views::tests::sample_hugr;
+    use crate::ops::handle::NodeHandle;
+    use crate::HugrView;
+
+    use super::PetgraphWrapper;
+
+    #[test]
+    fn test_petgraph_wrapper() {
+        let (hugr, cx1, cx2) = sample_hugr();
+        let wrapper = PetgraphWrapper::from(&hugr);
+
+        assert_eq!(wrapper.node_count(), 5);
+        assert_eq!(wrapper.node_bound(), 5);
+        assert_eq!(wrapper.edge_count(), 7);
+
+        let cx1_index = cx1.node().pg_index().index();
+        assert_eq!(wrapper.to_index(cx1.node()), cx1_index);
+        assert_eq!(wrapper.from_index(cx1_index), cx1.node());
+
+        let cx1_ref = wrapper
+            .node_references()
+            .find(|n| n.id() == cx1.node())
+            .unwrap();
+        assert_eq!(cx1_ref.weight(), hugr.get_optype(cx1.node()));
+
+        let adj = wrapper.adjacency_matrix();
+        assert!(wrapper.is_adjacent(&adj, cx1.node(), cx2.node()));
+    }
+}
