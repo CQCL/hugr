@@ -370,10 +370,9 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
     }
 
     fn print_regions(&mut self, regions: &'a [RegionId]) -> PrintResult<()> {
-        for region in regions {
-            self.print_region(*region)?;
-        }
-        Ok(())
+        regions
+            .iter()
+            .try_for_each(|region| self.print_region(*region))
     }
 
     fn print_region(&mut self, region: RegionId) -> PrintResult<()> {
@@ -408,11 +407,10 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
             .get_region(region)
             .ok_or(PrintError::RegionNotFound(region))?;
 
-        for node_id in region_data.children {
-            self.print_node(*node_id)?;
-        }
-
-        Ok(())
+        region_data
+            .children
+            .iter()
+            .try_for_each(|node_id| self.print_node(*node_id))
     }
 
     fn print_port_lists(
@@ -447,11 +445,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
     }
 
     fn print_params(&mut self, params: &'a [Param<'a>]) -> PrintResult<()> {
-        for param in params {
-            self.print_param(*param)?;
-        }
-
-        Ok(())
+        params.iter().try_for_each(|param| self.print_param(*param))
     }
 
     fn print_param(&mut self, param: Param<'a>) -> PrintResult<()> {
