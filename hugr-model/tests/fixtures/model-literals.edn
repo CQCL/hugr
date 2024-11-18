@@ -1,0 +1,3 @@
+(hugr 0)
+
+(define-alias mod.string str "\"\n\r\t\\\u{1F44D}")

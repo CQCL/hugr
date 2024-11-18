@@ -12,6 +12,9 @@ description = "Compiler passes for Quantinuum's HUGR"
 keywords = ["Quantum", "Quantinuum"]
 categories = ["compilers"]
 
+[lib]
+bench = false
+
 [dependencies]
 hugr-core = { path = "../hugr-core", version = "0.13.3" }
 portgraph = { workspace = true }
