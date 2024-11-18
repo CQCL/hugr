@@ -1,4 +1,3 @@
-
 use ascent::hashbrown::HashMap;
 use hugr_core::{
     extension::ExtensionRegistry,
@@ -99,7 +98,8 @@ impl CallGraph {
 
         let node_to_cg: HashMap<_, _> = hugr
             .nodes()
-            .filter(|&n| (hugr.get_optype(n).is_func_decl() || hugr.get_optype(n).is_func_defn())).map(|n| (n, g.add_node(n)))
+            .filter(|&n| (hugr.get_optype(n).is_func_decl() || hugr.get_optype(n).is_func_defn()))
+            .map(|n| (n, g.add_node(n)))
             .collect();
 
         for n in hugr.nodes() {

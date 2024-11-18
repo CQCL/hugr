@@ -1,15 +1,17 @@
 use std::{
-    collections::{BTreeSet, HashMap, HashSet}, hash::{Hash, Hasher}, ops::Deref
+    collections::{BTreeSet, HashMap, HashSet},
+    hash::{Hash, Hasher},
+    ops::Deref,
 };
 
-use ascent::{Lattice};
+use ascent::Lattice;
 use hugr_core::{
     extension::{prelude::QB_T, ExtensionRegistry, ExtensionSet},
     ops::{ExtensionOp, NamedOp as _},
     HugrView, IncomingPort, Node, OutgoingPort, PortIndex, Wire,
 };
 use itertools::{zip_eq, Itertools};
-use petgraph::{algo::toposort, visit::{IntoNeighborsDirected, Topo}};
+use petgraph::algo::toposort;
 
 use crate::{
     dataflow::{
@@ -19,7 +21,7 @@ use crate::{
 };
 
 #[derive(Eq, PartialEq, Debug, Clone, PartialOrd, Ord)]
-pub struct Gate{
+pub struct Gate {
     // The nodes that execute this gate. They must form a "co-cycle" i.e. every
     // path from input to output contains at most one of these nodes
     nodes: BTreeSet<Node>,
@@ -30,7 +32,12 @@ pub struct Gate{
 
 impl Gate {
     pub fn show(&self) -> String {
-        format!("{} [{}] ({})", &self.gate, self.gating_nodes.iter().join(","), self.nodes.iter().join(","))
+        format!(
+            "{} [{}] ({})",
+            &self.gate,
+            self.gating_nodes.iter().join(","),
+            self.nodes.iter().join(",")
+        )
     }
 
     fn calc_hash(&mut self) {
@@ -41,11 +48,19 @@ impl Gate {
         self.hash = hasher.finish()
     }
 
-    pub fn new(node: Node, gate: impl Into<String>, gating_nodes: impl IntoIterator<Item=Node>) -> Self {
-        let mut g = Self { nodes: BTreeSet::from_iter([node]), gate: gate.into(), gating_nodes: BTreeSet::from_iter(gating_nodes), hash: 0 };
+    pub fn new(
+        node: Node,
+        gate: impl Into<String>,
+        gating_nodes: impl IntoIterator<Item = Node>,
+    ) -> Self {
+        let mut g = Self {
+            nodes: BTreeSet::from_iter([node]),
+            gate: gate.into(),
+            gating_nodes: BTreeSet::from_iter(gating_nodes),
+            hash: 0,
+        };
         g.calc_hash();
         g
-
     }
     pub fn join(mut self, other: Self) -> Option<Self> {
         if self.gate != other.gate || self.gating_nodes != other.gating_nodes {
@@ -59,7 +74,7 @@ impl Gate {
 
     pub fn commutes_lt(&self, other: &Self) -> bool {
         if self.gating_nodes.intersection(&other.gating_nodes).count() != 0 || self <= other {
-            return false
+            return false;
         };
         true
     }
@@ -79,7 +94,7 @@ impl QbHistory {
         Self(qb, vec![])
     }
 
-    pub fn push(&mut self, node: Node, g: impl Into<String>, qbs: impl IntoIterator<Item=Node>) {
+    pub fn push(&mut self, node: Node, g: impl Into<String>, qbs: impl IntoIterator<Item = Node>) {
         self.1.push(Gate::new(node, g.into(), qbs))
     }
 
@@ -213,9 +228,12 @@ impl<'a, H: HugrView> DFContext<QbHistory> for StaticCircuitContext<'a, H> {
                     PartialValue::Value(qbh) => Some((i, qbh)),
                     _ => None,
                 })
-                .collect::<Option<HashMap<_,_>>>();
-            let gating_qbs = mb_in_qbs.iter().flat_map(|hash_map| hash_map.iter().map(|(_,qbh)| qbh.qb_index())).collect_vec();
-            let qb_out_to_in: HashMap<_,_> = zip_eq(qb_outs,qb_ins).collect();
+                .collect::<Option<HashMap<_, _>>>();
+            let gating_qbs = mb_in_qbs
+                .iter()
+                .flat_map(|hash_map| hash_map.iter().map(|(_, qbh)| qbh.qb_index()))
+                .collect_vec();
+            let qb_out_to_in: HashMap<_, _> = zip_eq(qb_outs, qb_ins).collect();
             for (i, v) in outs.iter_mut().enumerate() {
                 let mb_join_val = (|| {
                     let in_p = qb_out_to_in.get(&OutgoingPort::from(i))?;
@@ -227,7 +245,6 @@ impl<'a, H: HugrView> DFContext<QbHistory> for StaticCircuitContext<'a, H> {
                 })();
 
                 v.join_mut(mb_join_val.unwrap_or(PartialValue::Top));
-
             }
         }
     }
@@ -241,7 +258,6 @@ pub struct StaticCircuitPass {
 
 #[derive(Debug)]
 struct StaticCircuitPassError(Box<dyn std::error::Error>);
-
 
 impl StaticCircuitPass {
     /// Sets the validation level used before and after the pass is run
@@ -264,30 +280,34 @@ impl StaticCircuitPass {
             .run_validated_pass(scc.hugr, registry, |hugr, _| {
                 let results = Machine::default().run(scc.clone(), []);
 
-                Ok(StaticCircuitResult { qubit_history: scc
-                    .free_ops
-                    .iter()
-                    .filter_map(|&free_node| {
-                        let wire = {
-                            let qbs_in = qubits_in(hugr, free_node).collect::<Vec<_>>();
-                            assert_eq!(1, qbs_in.len());
-                            let (n, p) = hugr.single_linked_output(free_node, qbs_in[0])?;
-                            Wire::new(n, p)
-                        };
+                Ok(StaticCircuitResult {
+                    qubit_history: scc
+                        .free_ops
+                        .iter()
+                        .filter_map(|&free_node| {
+                            let wire = {
+                                let qbs_in = qubits_in(hugr, free_node).collect::<Vec<_>>();
+                                assert_eq!(1, qbs_in.len());
+                                let (n, p) = hugr.single_linked_output(free_node, qbs_in[0])?;
+                                Wire::new(n, p)
+                            };
 
-                        let QbHistory(alloc_node, gates) = results.try_read_wire_value(wire).ok()?;
-                        Some((free_node, (alloc_node,gates)))
-                    }).collect::<HashMap<_,_>>() })
+                            let QbHistory(alloc_node, gates) =
+                                results.try_read_wire_value(wire).ok()?;
+                            Some((free_node, (alloc_node, gates)))
+                        })
+                        .collect::<HashMap<_, _>>(),
+                })
             })
     }
 }
 
 pub struct StaticCircuitResult {
-    qubit_history: HashMap<Node, (Node, Vec<Gate>)>
+    qubit_history: HashMap<Node, (Node, Vec<Gate>)>,
 }
 
 impl StaticCircuitResult {
-    pub fn static_circuit<H>(self, scc: StaticCircuitContext<'_,H>) -> Option<Vec<Gate>> {
+    pub fn static_circuit<H>(self, scc: StaticCircuitContext<'_, H>) -> Option<Vec<Gate>> {
         let mut frees = scc.free_ops.clone();
         let mut allocs = scc.alloc_ops.clone();
         let mut gate_graph = petgraph::graph::Graph::<Gate, ()>::new();
@@ -296,10 +316,17 @@ impl StaticCircuitResult {
             assert!(frees.remove(&free_node));
             assert!(allocs.remove(&alloc_node));
 
-            let gate_indices = qb_gates.into_iter().map(|gate| *gate_to_node.entry(gate).or_insert_with_key(|gate| gate_graph.add_node(gate.clone()))).collect_vec();
+            let gate_indices = qb_gates
+                .into_iter()
+                .map(|gate| {
+                    *gate_to_node
+                        .entry(gate)
+                        .or_insert_with_key(|gate| gate_graph.add_node(gate.clone()))
+                })
+                .collect_vec();
 
             for (from, to) in gate_indices.into_iter().tuple_windows() {
-                gate_graph.add_edge(from,to,());
+                gate_graph.add_edge(from, to, ());
             }
         }
 
@@ -307,17 +334,20 @@ impl StaticCircuitResult {
             None?
         }
 
-
-        let mut gates = toposort(&gate_graph, None).ok()?.into_iter().map(|x| gate_graph[x].clone()).collect_vec();
+        let mut gates = toposort(&gate_graph, None)
+            .ok()?
+            .into_iter()
+            .map(|x| gate_graph[x].clone())
+            .collect_vec();
 
         let mut changes = true;
         while changes {
             changes = false;
 
-            for (g1,g2) in (0..gates.len()).tuple_windows() {
+            for (g1, g2) in (0..gates.len()).tuple_windows() {
                 if gates[g1].commutes_lt(&gates[g2]) {
                     changes = true;
-                    gates.swap(g1,g2)
+                    gates.swap(g1, g2)
                 }
             }
         }

@@ -1,6 +1,4 @@
-use std::{
-    fs, path::Path, process::Command,
-};
+use std::{fs, path::Path, process::Command};
 
 use hugr_core::{
     extension::ExtensionSet, hugr::IdentList, ops::NamedOp, package::Package,
@@ -8,7 +6,7 @@ use hugr_core::{
 };
 use hugr_passes::{
     inline::InlinePass,
-    static_circuit::{Gate, StaticCircuitContext, StaticCircuitPass, StaticCircuitResult},
+    static_circuit::{Gate, StaticCircuitContext, StaticCircuitPass},
 };
 use insta::{self, glob};
 use itertools::Itertools;
@@ -73,10 +71,7 @@ fn scc<H: HugrView>(hugr: &H) -> StaticCircuitContext<'_, H> {
 
 fn gates_to_str(gates: Option<Vec<Gate>>) -> String {
     gates.map_or("No static circuit".into(), |gates| {
-        gates
-            .iter()
-            .map(Gate::show)
-            .join("\n")
+        gates.iter().map(Gate::show).join("\n")
     })
 }
 
@@ -93,9 +88,15 @@ fn guppy_examples() {
 
         let program_src = {
             let src = fs::read_to_string(path).unwrap();
-            let start = src.lines().enumerate().find_map(|(i, line)| line.starts_with("## BEGIN").then_some(i));
-            let end = src.lines().enumerate().find_map(|(i, line)| line.starts_with("## END").then_some(i));
-            if let (Some(start), Some(end)) = (start,end) {
+            let start = src
+                .lines()
+                .enumerate()
+                .find_map(|(i, line)| line.starts_with("## BEGIN").then_some(i));
+            let end = src
+                .lines()
+                .enumerate()
+                .find_map(|(i, line)| line.starts_with("## END").then_some(i));
+            if let (Some(start), Some(end)) = (start, end) {
                 assert!(start < end);
                 src.lines().skip(start + 1).take(end - start - 1).join("\n")
             } else {
@@ -111,7 +112,10 @@ fn guppy_examples() {
 
             let scc = scc(&hugr);
             let scr = StaticCircuitPass::default().run(scc.clone(), &reg).unwrap();
-            insta::assert_snapshot!(format!("{program_src}\n===========================\n{}",gates_to_str(scr.static_circuit(scc))));
+            insta::assert_snapshot!(format!(
+                "{program_src}\n===========================\n{}",
+                gates_to_str(scr.static_circuit(scc))
+            ));
         });
     });
 }
