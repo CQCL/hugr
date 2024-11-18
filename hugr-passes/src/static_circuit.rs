@@ -2,7 +2,7 @@ use std::{
     collections::{BTreeSet, HashMap, HashSet}, hash::{Hash, Hasher}, ops::Deref
 };
 
-use ascent::Lattice;
+use ascent::{Lattice};
 use hugr_core::{
     extension::{prelude::QB_T, ExtensionRegistry, ExtensionSet},
     ops::{ExtensionOp, NamedOp as _},
@@ -98,7 +98,8 @@ impl TryFrom<Sum<QbHistory>> for QbHistory {
 
 impl AbstractValue for QbHistory {
     fn try_join(self, other: Self) -> Option<Self> {
-        if self.0 == other.0 && self.1.len() == other.1.len() {
+        eprintln!("join: {:?} ^ {:?} ", &self, &other);
+        let r = if self.0 == other.0 && self.1.len() == other.1.len() {
             Some(QbHistory(
                 self.0,
                 zip_eq(self.1, other.1)
@@ -107,7 +108,10 @@ impl AbstractValue for QbHistory {
             ))
         } else {
             None
-        }
+        };
+        panic!("dougrulz");
+        eprintln!("join:  => {:?}", &r);
+        r
     }
 
     fn try_meet(self, other: Self) -> Option<Self> {
@@ -172,6 +176,10 @@ impl<'a, H: HugrView> DFContext<QbHistory> for StaticCircuitContext<'a, H> {
             return;
         }
 
+        if ins.iter().any(|x| x == &PartialValue::Bottom) {
+            return;
+        }
+
         // assert_eq!(ins.len(), self.hugr.num_inputs(node));
         // assert_eq!(outs.len(), self.hugr.num_outputs(node));
 
@@ -185,25 +193,41 @@ impl<'a, H: HugrView> DFContext<QbHistory> for StaticCircuitContext<'a, H> {
         if let Some(&qb_i) = self.alloc_ops.get(&node) {
             assert_eq!(0, qb_ins.len());
             assert_eq!(1, qb_outs.len());
-            outs[0].join_mut(QbHistory::init(qb_i).into());
+            for (i, out) in outs.iter_mut().enumerate() {
+                if qb_outs[0] == i.into() {
+                    out.join_mut(QbHistory::init(qb_i).into());
+                } else {
+                    out.join_mut(PartialValue::Top);
+                }
+            }
         } else if self.free_ops.contains(&node) {
             assert_eq!(0, qb_outs.len());
+            for out in outs.iter_mut() {
+                out.join_mut(PartialValue::Top);
+            }
         } else {
             assert_eq!(qb_outs.len(), qb_ins.len(), "{e:?}");
-            if let Some(in_hs) = qb_ins
+            let mb_in_qbs = qb_ins
                 .iter()
                 .map(|&i| match &ins[i.index()] {
-                    PartialValue::Value(qbh) => Some((qbh.qb_index(), qbh)),
+                    PartialValue::Value(qbh) => Some((i, qbh)),
                     _ => None,
                 })
-                .collect::<Option<Vec<_>>>()
-            {
-                let qbs = in_hs.iter().map(|(qb_i, _)| *qb_i).collect_vec();
-                for ((_, qbh), o) in zip_eq(in_hs, qb_outs) {
+                .collect::<Option<HashMap<_,_>>>();
+            let gating_qbs = mb_in_qbs.iter().flat_map(|hash_map| hash_map.iter().map(|(_,qbh)| qbh.qb_index())).collect_vec();
+            let qb_out_to_in: HashMap<_,_> = zip_eq(qb_outs,qb_ins).collect();
+            for (i, v) in outs.iter_mut().enumerate() {
+                let mb_join_val = (|| {
+                    let in_p = qb_out_to_in.get(&OutgoingPort::from(i))?;
+                    let hash_map = mb_in_qbs.as_ref()?;
+                    let qbh: &QbHistory = hash_map.get(in_p)?;
                     let mut qbh = qbh.clone();
-                    qbh.push(node, e.name(), qbs.clone());
-                    outs[o.index()].join_mut(qbh.into());
-                }
+                    qbh.push(node, e.name(), gating_qbs.clone());
+                    Some(qbh.into())
+                })();
+
+                v.join_mut(mb_join_val.unwrap_or(PartialValue::Top));
+
             }
         }
     }
@@ -278,6 +302,12 @@ impl StaticCircuitResult {
                 gate_graph.add_edge(from,to,());
             }
         }
+
+        if !frees.is_empty() || !allocs.is_empty() {
+            None?
+        }
+
+
         let mut gates = toposort(&gate_graph, None).ok()?.into_iter().map(|x| gate_graph[x].clone()).collect_vec();
 
         let mut changes = true;

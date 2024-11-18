@@ -1,8 +1,16 @@
 ---
 source: hugr-passes/tests/static_circuit.rs
-expression: gates_to_str(scr.static_circuit(scc))
 input_file: hugr-passes/tests/static_circuit/guppy_examples/1.py
 ---
+@guppy
+def main() -> None:
+    q1,q2 = qubit(),qubit()
+
+    cx(q1,q2)
+
+    discard(q1)
+    discard(q2)
+===========================
 tket2.quantum.Reset [Node(41)] (Node(42))
 tket2.quantum.Reset [Node(53)] (Node(54))
 tket2.quantum.CX [Node(41),Node(53)] (Node(16))

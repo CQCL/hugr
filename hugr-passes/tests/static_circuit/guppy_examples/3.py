@@ -2,6 +2,8 @@ from guppylang.decorator import guppy
 from guppylang.std.quantum import discard, measure, qubit, cx, angle,rx
 
 ## BEGIN
+# This currently doesn't work, for reasons I don't yet understand.  I expect to
+# be able to infer coherent histories here
 @guppy
 def main(random: bool) -> None:
     q1,q2 = qubit(),qubit()
