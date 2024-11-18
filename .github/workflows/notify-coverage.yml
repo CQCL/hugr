@@ -22,7 +22,7 @@ jobs:
     if: needs.coverage-trend.outputs.should_notify == 'true'
     steps:
       - name: Send notification
-        uses: slackapi/slack-github-action@v1.27.0
+        uses: slackapi/slack-github-action@v2.0.0
         with:
           channel-id: 'C04SHCL4FKP'
           slack-message: ${{ needs.coverage-trend.outputs.msg }}
