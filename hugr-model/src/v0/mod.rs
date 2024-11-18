@@ -410,8 +410,6 @@ pub struct AliasDecl<'a> {
     pub name: &'a str,
     /// The static parameters of the alias.
     pub params: &'a [Param<'a>],
-    /// The constraints on the static parameters.
-    pub constraints: &'a [TermId],
     /// The type of the alias.
     pub r#type: TermId,
 }

@@ -57,7 +57,7 @@ node_custom            = { "(" ~ (term_apply | term_apply_full) ~ port_lists? ~ 
 
 signature        = { "(" ~ "signature" ~ term ~ ")" }
 func_header      = { symbol ~ param* ~ where_clause* ~ term ~ term ~ term }
-alias_header     = { symbol ~ param* ~ where_clause* ~ term }
+alias_header     = { symbol ~ param* ~ term }
 ctr_header       = { symbol ~ param* ~ where_clause* ~ term }
 operation_header = { symbol ~ param* ~ where_clause* ~ term }
 

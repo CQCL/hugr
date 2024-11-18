@@ -576,13 +576,11 @@ impl<'a> ParseContext<'a> {
         let mut inner = pair.into_inner();
         let name = self.parse_symbol(&mut inner)?;
         let params = self.parse_params(&mut inner)?;
-        let constraints = self.parse_constraints(&mut inner)?;
         let r#type = self.parse_term(inner.next().unwrap())?;
 
         Ok(self.bump.alloc(AliasDecl {
             name,
             params,
-            constraints,
             r#type,
         }))
     }

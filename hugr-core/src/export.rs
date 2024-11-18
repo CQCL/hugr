@@ -269,7 +269,6 @@ impl<'a> Context<'a> {
                 let decl = this.bump.alloc(model::AliasDecl {
                     name: &alias.name,
                     params: &[],
-                    constraints: &[],
                     r#type,
                 });
                 model::Operation::DeclareAlias { decl }
@@ -282,7 +281,6 @@ impl<'a> Context<'a> {
                 let decl = this.bump.alloc(model::AliasDecl {
                     name: &alias.name,
                     params: &[],
-                    constraints: &[],
                     r#type,
                 });
                 model::Operation::DefineAlias { decl, value }

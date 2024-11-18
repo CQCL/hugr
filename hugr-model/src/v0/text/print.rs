@@ -294,7 +294,6 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 });
 
                 this.print_params(decl.params)?;
-                this.print_constraints(decl.constraints)?;
 
                 this.print_term(decl.r#type)?;
                 this.print_term(*value)?;
@@ -308,7 +307,6 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 });
 
                 this.print_params(decl.params)?;
-                this.print_constraints(decl.constraints)?;
 
                 this.print_term(decl.r#type)?;
                 this.print_meta(node_data.meta)?;

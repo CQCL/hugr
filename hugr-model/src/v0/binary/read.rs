@@ -168,13 +168,11 @@ fn read_operation<'a>(
             let reader = reader?;
             let name = bump.alloc_str(reader.get_name()?.to_str()?);
             let params = read_list!(bump, reader, get_params, read_param);
-            let constraints = read_scalar_list!(bump, reader, get_constraints, model::TermId);
             let r#type = model::TermId(reader.get_type());
             let value = model::TermId(reader.get_value());
             let decl = bump.alloc(model::AliasDecl {
                 name,
                 params,
-                constraints,
                 r#type,
             });
             model::Operation::DefineAlias { decl, value }
@@ -183,12 +181,10 @@ fn read_operation<'a>(
             let reader = reader?;
             let name = bump.alloc_str(reader.get_name()?.to_str()?);
             let params = read_list!(bump, reader, get_params, read_param);
-            let constraints = read_scalar_list!(bump, reader, get_constraints, model::TermId);
             let r#type = model::TermId(reader.get_type());
             let decl = bump.alloc(model::AliasDecl {
                 name,
                 params,
-                constraints,
                 r#type,
             });
             model::Operation::DeclareAlias { decl }

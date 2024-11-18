@@ -70,16 +70,14 @@ struct Operation {
     struct AliasDefn {
         name @0 :Text;
         params @1 :List(Param);
-        constraints @2 :List(TermId);
-        type @3 :TermId;
-        value @4 :TermId;
+        type @2 :TermId;
+        value @3 :TermId;
     }
 
     struct AliasDecl {
         name @0 :Text;
         params @1 :List(Param);
-        constraints @2 :List(TermId);
-        type @3 :TermId;
+        type @2 :TermId;
     }
 
     struct ConstructorDecl {
