@@ -436,6 +436,7 @@ impl OpDef {
     }
 
     /// Iterate over all miscellaneous data in the [OpDef].
+    #[allow(unused)] // Unused when no features are enabled
     pub(crate) fn iter_misc(&self) -> impl ExactSizeIterator<Item = (&str, &serde_json::Value)> {
         self.misc.iter().map(|(k, v)| (k.as_str(), v))
     }

@@ -69,7 +69,7 @@ impl<'a> Context<'a> {
     /// Exports the root module of the HUGR graph.
     pub fn export_root(&mut self) {
         let hugr_children = self.hugr.children(self.hugr.root());
-        let mut children = Vec::with_capacity(hugr_children.len());
+        let mut children = Vec::with_capacity(hugr_children.size_hint().0);
 
         for child in self.hugr.children(self.hugr.root()) {
             children.push(self.export_node(child));
@@ -110,7 +110,7 @@ impl<'a> Context<'a> {
         num_ports: usize,
     ) -> &'a [model::LinkRef<'a>] {
         let ports = self.hugr.node_ports(node, direction);
-        let mut links = BumpVec::with_capacity_in(ports.len(), self.bump);
+        let mut links = BumpVec::with_capacity_in(ports.size_hint().0, self.bump);
 
         for port in ports.take(num_ports) {
             links.push(model::LinkRef::Id(self.get_link_id(node, port)));
@@ -579,7 +579,7 @@ impl<'a> Context<'a> {
         let targets = self.make_ports(output_node, Direction::Incoming, output_op.types.len());
 
         // Export the remaining children of the node.
-        let mut region_children = BumpVec::with_capacity_in(children.len(), self.bump);
+        let mut region_children = BumpVec::with_capacity_in(children.size_hint().0, self.bump);
 
         for child in children {
             region_children.push(self.export_node(child));
@@ -609,7 +609,7 @@ impl<'a> Context<'a> {
     /// Creates a control flow region from the given node's children.
     pub fn export_cfg(&mut self, node: Node) -> model::RegionId {
         let mut children = self.hugr.children(node);
-        let mut region_children = BumpVec::with_capacity_in(children.len() + 1, self.bump);
+        let mut region_children = BumpVec::with_capacity_in(children.size_hint().0 + 1, self.bump);
 
         // The first child is the entry block.
         // We create a source port on the control flow region and connect it to the
@@ -623,16 +623,16 @@ impl<'a> Context<'a> {
         let source = model::LinkRef::Id(self.get_link_id(entry_block, IncomingPort::from(0)));
         region_children.push(self.export_node(entry_block));
 
-        // Export the remaining children of the node, except for the last one.
-        for _ in 0..children.len() - 1 {
-            region_children.push(self.export_node(children.next().unwrap()));
-        }
-
         // The last child is the exit block.
         // Contrary to the entry block, the exit block does not have a dataflow subgraph.
         // We therefore do not export the block itself, but simply use its output ports
         // as the target ports of the control flow region.
-        let exit_block = children.next().unwrap();
+        let exit_block = children.next_back().unwrap();
+
+        // Export the remaining children of the node, except for the last one.
+        for child in children {
+            region_children.push(self.export_node(child));
+        }
 
         let OpType::ExitBlock(_) = self.hugr.get_optype(exit_block) else {
             panic!("expected an `ExitBlock` node as the last child node");
@@ -657,7 +657,7 @@ impl<'a> Context<'a> {
     /// Export the `Case` node children of a `Conditional` node as data flow regions.
     pub fn export_conditional_regions(&mut self, node: Node) -> &'a [model::RegionId] {
         let children = self.hugr.children(node);
-        let mut regions = BumpVec::with_capacity_in(children.len(), self.bump);
+        let mut regions = BumpVec::with_capacity_in(children.size_hint().0, self.bump);
 
         for child in children {
             let OpType::Case(case_op) = self.hugr.get_optype(child) else {
