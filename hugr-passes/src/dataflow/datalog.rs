@@ -7,7 +7,7 @@ use ascent::lattice::BoundedLattice;
 use itertools::Itertools;
 
 use hugr_core::extension::prelude::{MakeTuple, UnpackTuple};
-use hugr_core::ops::{OpTrait, OpType, TailLoop};
+use hugr_core::ops::{DataflowParent, NamedOp, OpTrait, OpType, TailLoop};
 use hugr_core::{HugrView, IncomingPort, Node, OutgoingPort, PortIndex as _, Wire};
 
 use super::value_row::ValueRow;
@@ -29,44 +29,97 @@ impl<V: AbstractValue> Default for Machine<V> {
 }
 
 impl<V: AbstractValue> Machine<V> {
-    /// Provide initial values for some wires.
-    // Likely for test purposes only - should we make non-pub or #[cfg(test)] ?
-    pub fn prepopulate_wire(&mut self, h: &impl HugrView, wire: Wire, value: PartialValue<V>) {
+    // Provide initial values for a wire - these will be `join`d with any computed.
+    // pub(crate) so can be used for tests.
+    pub(crate) fn prepopulate_wire(&mut self, h: &impl HugrView, w: Wire, v: PartialValue<V>) {
         self.0.extend(
-            h.linked_inputs(wire.node(), wire.source())
-                .map(|(n, inp)| (n, inp, value.clone())),
+            h.linked_inputs(w.node(), w.source())
+                .map(|(n, inp)| (n, inp, v.clone())),
         );
     }
 
     /// Run the analysis (iterate until a lattice fixpoint is reached),
-    /// given initial values for some of the root node inputs.
-    /// (Note that `in_values` will not be useful for `Case` or `DFB`-rooted Hugrs,
-    /// but should handle other containers.)
+    /// given initial values for some of the root node inputs. For a
+    /// [Module](OpType::Module)-rooted  Hugr, these are input to the function `"main"`.
     /// The context passed in allows interpretation of leaf operations.
+    ///
+    /// [Module]: OpType::Module
     pub fn run<C: DFContext<V>>(
         mut self,
         context: C,
         in_values: impl IntoIterator<Item = (IncomingPort, PartialValue<V>)>,
     ) -> AnalysisResults<V, C> {
         let root = context.root();
-        self.0
-            .extend(in_values.into_iter().map(|(p, v)| (root, p, v)));
+        // Some nodes do not accept values as dataflow inputs - for these
+        // we must find the corresponding Output node.
+        let out_node_parent = match context.get_optype(root) {
+            OpType::Module(_) => Some(
+                context
+                    .children(root)
+                    .find(|n| {
+                        context
+                            .get_optype(*n)
+                            .as_func_defn()
+                            .is_some_and(|f| f.name() == "main")
+                    })
+                    .expect("Module must contain a 'main' function to be analysed"),
+            ),
+            OpType::DataflowBlock(_) | OpType::Case(_) | OpType::FuncDefn(_) => Some(root),
+            // Could also do Dfg above, but ok here too:
+            _ => None, // Just feed into node inputs
+        };
+        // Now write values onto Input node out-wires or Outputs.
         // Any inputs we don't have values for, we must assume `Top` to ensure safety of analysis
         // (Consider: for a conditional that selects *either* the unknown input *or* value V,
         // analysis must produce Top == we-know-nothing, not `V` !)
-        let mut need_inputs: HashSet<_, RandomState> = HashSet::from_iter(
-            (0..context.signature(root).unwrap_or_default().input_count()).map(IncomingPort::from),
-        );
-        self.0.iter().for_each(|(n, p, _)| {
-            if n == &root {
-                need_inputs.remove(p);
+        if let Some(p) = out_node_parent {
+            let [inp, _] = context.get_io(p).unwrap();
+            let mut vals =
+                vec![PartialValue::Top; context.signature(inp).unwrap().output_types().len()];
+            for (ip, v) in in_values {
+                vals[ip.index()] = v;
             }
-        });
-        for p in need_inputs {
-            self.0.push((root, p, PartialValue::Top));
+            for (i, v) in vals.into_iter().enumerate() {
+                self.prepopulate_wire(&*context, Wire::new(inp, i), v);
+            }
+        } else {
+            self.0
+                .extend(in_values.into_iter().map(|(p, v)| (root, p, v)));
+            let mut need_inputs: HashSet<_, RandomState> = HashSet::from_iter(
+                (0..context.signature(root).unwrap_or_default().input_count())
+                    .map(IncomingPort::from),
+            );
+            self.0.iter().for_each(|(n, p, _)| {
+                if n == &root {
+                    need_inputs.remove(p);
+                }
+            });
+            for p in need_inputs {
+                self.0.push((root, p, PartialValue::Top));
+            }
         }
         // Note/TODO, if analysis is running on a subregion then we should do similar
         // for any nonlocal edges providing values from outside the region.
+        run_datalog(context, self.0)
+    }
+
+    /// Run the analysis (iterate until a lattice fixpoint is reached),
+    /// for a [Module]-rooted Hugr where all functions are assumed callable
+    /// (from a client) with any arguments.
+    /// The context passed in allows interpretation of leaf operations.
+    pub fn run_lib<C: DFContext<V>>(mut self, context: C) -> AnalysisResults<V, C> {
+        let root = context.root();
+        if !context.get_optype(root).is_module() {
+            panic!("Hugr not Module-rooted")
+        }
+        for n in context.children(root) {
+            if let Some(fd) = context.get_optype(n).as_func_defn() {
+                let [inp, _] = context.get_io(n).unwrap();
+                for p in 0..fd.inner_signature().input_count() {
+                    self.prepopulate_wire(&*context, Wire::new(inp, p), PartialValue::Top);
+                }
+            }
+        }
         run_datalog(context, self.0)
     }
 }
