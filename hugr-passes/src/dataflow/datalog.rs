@@ -1,8 +1,5 @@
 //! [ascent] datalog implementation of analysis.
 
-use std::collections::hash_map::RandomState;
-use std::collections::HashSet; // Moves to std::hash in Rust 1.76
-
 use ascent::lattice::BoundedLattice;
 use itertools::Itertools;
 
@@ -85,15 +82,13 @@ impl<V: AbstractValue> Machine<V> {
         } else {
             self.0
                 .extend(in_values.into_iter().map(|(p, v)| (root, p, v)));
-            let got_inputs: HashSet<_, RandomState> = self
-                .0
-                .iter()
-                .filter_map(|(n, p, _)| (n == &root).then_some(*p))
-                .collect();
-            for p in context.signature(root).unwrap_or_default().input_ports() {
-                if !got_inputs.contains(&p) {
-                    self.0.push((root, p, PartialValue::Top));
-                }
+            let mut need_inputs =
+                vec![true; context.signature(root).unwrap_or_default().input_count()];
+            for (_, p, _) in self.0.iter().filter(|(n, _, _)| n == &root) {
+                need_inputs[p.index()] = false;
+            }
+            for (i, _) in need_inputs.into_iter().enumerate().filter(|(_, b)| *b) {
+                self.0.push((root, i.into(), PartialValue::Top));
             }
         }
         // Note/TODO, if analysis is running on a subregion then we should do similar
