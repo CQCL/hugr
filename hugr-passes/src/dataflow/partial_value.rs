@@ -163,17 +163,18 @@ impl<V: AbstractValue> PartialSum<V> {
         V: TryInto<V2, Error = VE>,
         Sum<V2>: TryInto<V2, Error = SE>,
     {
-        let Ok((k, v)) = self.0.iter().exactly_one() else {
+        if self.0.len() != 1 {
             return Err(ExtractValueError::MultipleVariants(self));
-        };
+        }
+        let (tag, v) = self.0.into_iter().exactly_one().unwrap();
         if let TypeEnum::Sum(st) = typ.as_type_enum() {
-            if let Some(r) = st.get_variant(*k) {
+            if let Some(r) = st.get_variant(tag) {
                 if let Ok(r) = TypeRow::try_from(r.clone()) {
                     if v.len() == r.len() {
                         return Ok(Sum {
-                            tag: *k,
+                            tag,
                             values: zip_eq(v, r.iter())
-                                .map(|(v, t)| v.clone().try_into_value(t))
+                                .map(|(v, t)| v.try_into_value(t))
                                 .collect::<Result<Vec<_>, _>>()?,
                             st: st.clone(),
                         });
@@ -183,7 +184,7 @@ impl<V: AbstractValue> PartialSum<V> {
         }
         Err(ExtractValueError::BadSumType {
             typ: typ.clone(),
-            tag: *k,
+            tag,
             num_elements: v.len(),
         })
     }
