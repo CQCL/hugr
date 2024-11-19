@@ -8,27 +8,32 @@ use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use thiserror::Error;
 
+use super::row_contains_bottom;
+
 /// Trait for an underlying domain of abstract values which can form the *elements* of a
 /// [PartialValue] and thus be used in dataflow analysis.
 pub trait AbstractValue: Clone + std::fmt::Debug + PartialEq + Eq + Hash {
     /// Computes the join of two values (i.e. towards `Top``), if this is representable
-    /// within the underlying domain.
-    /// Otherwise return `None` (i.e. an instruction to use [PartialValue::Top]).
+    /// within the underlying domain. Return the new value, and whether this is different from
+    /// the old `self`.
     ///
-    /// The default checks equality between `self` and `other` and returns `self` if
+    /// If the join is not representable, return `None` - i.e., we should use [PartialValue::Top].
+    ///
+    /// The default checks equality between `self` and `other` and returns `(self,false)` if
     /// the two are identical, otherwise `None`.
-    fn try_join(self, other: Self) -> Option<Self> {
-        (self == other).then_some(self)
+    fn try_join(self, other: Self) -> Option<(Self, bool)> {
+        (self == other).then_some((self, false))
     }
 
     /// Computes the meet of two values (i.e. towards `Bottom`), if this is representable
-    /// within the underlying domain.
-    /// Otherwise return `None` (i.e. an instruction to use [PartialValue::Bottom]).
+    /// within the underlying domain. Return the new value, and whether this is different from
+    /// the old `self`.
+    /// If the meet is not representable, return `None` - i.e., we should use [PartialValue::Bottom].
     ///
-    /// The default checks equality between `self` and `other` and returns `self` if
+    /// The default checks equality between `self` and `other` and returns `(self, false)` if
     /// the two are identical, otherwise `None`.
-    fn try_meet(self, other: Self) -> Option<Self> {
-        (self == other).then_some(self)
+    fn try_meet(self, other: Self) -> Option<(Self, bool)> {
+        (self == other).then_some((self, false))
     }
 }
 
@@ -150,24 +155,26 @@ impl<V: AbstractValue> PartialSum<V> {
     /// If this PartialSum had multiple possible tags; or if `typ` was not a [TypeEnum::Sum]
     /// supporting the single possible tag with the correct number of elements and no row variables;
     /// or if converting a child element failed via [PartialValue::try_into_value].
-    pub fn try_into_value<V2, VE, SE>(
+    pub fn try_into_sum<V2, VE, SE>(
         self,
         typ: &Type,
     ) -> Result<Sum<V2>, ExtractValueError<V, VE, SE>>
     where
-        V2: TryFrom<V, Error = VE> + TryFrom<Sum<V2>, Error = SE>,
+        V: TryInto<V2, Error = VE>,
+        Sum<V2>: TryInto<V2, Error = SE>,
     {
-        let Ok((k, v)) = self.0.iter().exactly_one() else {
+        if self.0.len() != 1 {
             return Err(ExtractValueError::MultipleVariants(self));
-        };
+        }
+        let (tag, v) = self.0.into_iter().exactly_one().unwrap();
         if let TypeEnum::Sum(st) = typ.as_type_enum() {
-            if let Some(r) = st.get_variant(*k) {
+            if let Some(r) = st.get_variant(tag) {
                 if let Ok(r) = TypeRow::try_from(r.clone()) {
                     if v.len() == r.len() {
                         return Ok(Sum {
-                            tag: *k,
+                            tag,
                             values: zip_eq(v, r.iter())
-                                .map(|(v, t)| v.clone().try_into_value(t))
+                                .map(|(v, t)| v.try_into_value(t))
                                 .collect::<Result<Vec<_>, _>>()?,
                             st: st.clone(),
                         });
@@ -177,9 +184,16 @@ impl<V: AbstractValue> PartialSum<V> {
         }
         Err(ExtractValueError::BadSumType {
             typ: typ.clone(),
-            tag: *k,
+            tag,
             num_elements: v.len(),
         })
+    }
+
+    /// Can this ever occur at runtime? See [PartialValue::contains_bottom]
+    pub fn contains_bottom(&self) -> bool {
+        self.0
+            .iter()
+            .all(|(_tag, elements)| row_contains_bottom(elements))
     }
 }
 
@@ -330,26 +344,41 @@ impl<V: AbstractValue> PartialValue<V> {
 
     /// Turns this instance into some "concrete" value type `V2`, *if* it is a single value,
     /// or a [Sum](PartialValue::PartialSum) (of a single tag) convertible by
-    /// [PartialSum::try_into_value].
+    /// [PartialSum::try_into_sum].
     ///
     /// # Errors
     ///
     /// If this PartialValue was `Top` or `Bottom`, or was a [PartialSum](PartialValue::PartialSum)
-    /// that could not be converted into a [Sum] by [PartialSum::try_into_value] (e.g. if `typ` is
+    /// that could not be converted into a [Sum] by [PartialSum::try_into_sum] (e.g. if `typ` is
     /// incorrect), or if that [Sum] could not be converted into a `V2`.
     pub fn try_into_value<V2, VE, SE>(self, typ: &Type) -> Result<V2, ExtractValueError<V, VE, SE>>
     where
-        V2: TryFrom<V, Error = VE> + TryFrom<Sum<V2>, Error = SE>,
+        V: TryInto<V2, Error = VE>,
+        Sum<V2>: TryInto<V2, Error = SE>,
     {
         match self {
-            Self::Value(v) => V2::try_from(v.clone())
+            Self::Value(v) => v
+                .clone()
+                .try_into()
                 .map_err(|e| ExtractValueError::CouldNotConvert(v.clone(), e)),
-            Self::PartialSum(ps) => {
-                let v = ps.try_into_value(typ)?;
-                V2::try_from(v).map_err(ExtractValueError::CouldNotBuildSum)
-            }
+            Self::PartialSum(ps) => ps
+                .try_into_sum(typ)?
+                .try_into()
+                .map_err(ExtractValueError::CouldNotBuildSum),
             Self::Top => Err(ExtractValueError::ValueIsTop),
             Self::Bottom => Err(ExtractValueError::ValueIsBottom),
+        }
+    }
+
+    /// A value contains bottom means that it cannot occur during execution:
+    /// it may be an artefact during bootstrapping of the analysis, or else
+    /// the value depends upon a `panic` or a loop that
+    /// [never terminates](super::TailLoopTermination::NeverBreaks).
+    pub fn contains_bottom(&self) -> bool {
+        match self {
+            PartialValue::Bottom => true,
+            PartialValue::Top | PartialValue::Value(_) => false,
+            PartialValue::PartialSum(ps) => ps.contains_bottom(),
         }
     }
 }
@@ -365,88 +394,48 @@ impl TryFrom<Sum<Value>> for Value {
 impl<V: AbstractValue> Lattice for PartialValue<V> {
     fn join_mut(&mut self, other: Self) -> bool {
         self.assert_invariants();
-        match (&*self, other) {
-            (Self::Top, _) => false,
-            (_, other @ Self::Top) => {
-                *self = other;
-                true
-            }
-            (_, Self::Bottom) => false,
-            (Self::Bottom, other) => {
-                *self = other;
-                true
-            }
+        let mut old_self = Self::Top;
+        std::mem::swap(self, &mut old_self);
+        let (res, ch) = match (old_self, other) {
+            (old @ Self::Top, _) | (old, Self::Bottom) => (old, false),
+            (_, other @ Self::Top) | (Self::Bottom, other) => (other, true),
             (Self::Value(h1), Self::Value(h2)) => match h1.clone().try_join(h2) {
-                Some(h3) => {
-                    let ch = h3 != *h1;
-                    *self = Self::Value(h3);
-                    ch
-                }
-                None => {
-                    *self = Self::Top;
-                    true
-                }
+                Some((h3, b)) => (Self::Value(h3), b),
+                None => (Self::Top, true),
             },
-            (Self::PartialSum(_), Self::PartialSum(ps2)) => {
-                let Self::PartialSum(ps1) = self else {
-                    unreachable!()
-                };
-                match ps1.try_join_mut(ps2) {
-                    Ok(ch) => ch,
-                    Err(_) => {
-                        *self = Self::Top;
-                        true
-                    }
-                }
-            }
+            (Self::PartialSum(mut ps1), Self::PartialSum(ps2)) => match ps1.try_join_mut(ps2) {
+                Ok(ch) => (Self::PartialSum(ps1), ch),
+                Err(_) => (Self::Top, true),
+            },
             (Self::Value(_), Self::PartialSum(_)) | (Self::PartialSum(_), Self::Value(_)) => {
-                *self = Self::Top;
-                true
+                (Self::Top, true)
             }
-        }
+        };
+        *self = res;
+        ch
     }
 
     fn meet_mut(&mut self, other: Self) -> bool {
         self.assert_invariants();
-        match (&*self, other) {
-            (Self::Bottom, _) => false,
-            (_, other @ Self::Bottom) => {
-                *self = other;
-                true
-            }
-            (_, Self::Top) => false,
-            (Self::Top, other) => {
-                *self = other;
-                true
-            }
-            (Self::Value(h1), Self::Value(h2)) => match h1.clone().try_meet(h2) {
-                Some(h3) => {
-                    let ch = h3 != *h1;
-                    *self = Self::Value(h3);
-                    ch
-                }
-                None => {
-                    *self = Self::Bottom;
-                    true
-                }
+        let mut old_self = Self::Bottom;
+        std::mem::swap(self, &mut old_self);
+        let (res, ch) = match (old_self, other) {
+            (old @ Self::Bottom, _) | (old, Self::Top) => (old, false),
+            (_, other @ Self::Bottom) | (Self::Top, other) => (other, true),
+            (Self::Value(h1), Self::Value(h2)) => match h1.try_meet(h2) {
+                Some((h3, ch)) => (Self::Value(h3), ch),
+                None => (Self::Bottom, true),
             },
-            (Self::PartialSum(_), Self::PartialSum(ps2)) => {
-                let Self::PartialSum(ps1) = self else {
-                    unreachable!()
-                };
-                match ps1.try_meet_mut(ps2) {
-                    Ok(ch) => ch,
-                    Err(_) => {
-                        *self = Self::Bottom;
-                        true
-                    }
-                }
-            }
+            (Self::PartialSum(mut ps1), Self::PartialSum(ps2)) => match ps1.try_meet_mut(ps2) {
+                Ok(ch) => (Self::PartialSum(ps1), ch),
+                Err(_) => (Self::Bottom, true),
+            },
             (Self::Value(_), Self::PartialSum(_)) | (Self::PartialSum(_), Self::Value(_)) => {
-                *self = Self::Bottom;
-                true
+                (Self::Bottom, true)
             }
-        }
+        };
+        *self = res;
+        ch
     }
 }
 

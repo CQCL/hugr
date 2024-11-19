@@ -7,17 +7,23 @@ use ascent::lattice::BoundedLattice;
 use itertools::Itertools;
 
 use hugr_core::extension::prelude::{MakeTuple, UnpackTuple};
-use hugr_core::ops::{OpTrait, OpType, TailLoop};
+use hugr_core::ops::{NamedOp, OpTrait, OpType, TailLoop};
 use hugr_core::{HugrView, IncomingPort, Node, OutgoingPort, PortIndex as _, Wire};
 
 use super::value_row::ValueRow;
-use super::{partial_from_const, AbstractValue, AnalysisResults, DFContext, PartialValue};
+use super::{
+    partial_from_const, row_contains_bottom, AbstractValue, AnalysisResults, DFContext,
+    PartialValue,
+};
 
 type PV<V> = PartialValue<V>;
 
 /// Basic structure for performing an analysis. Usage:
 /// 1. Get a new instance via [Self::default()]
-/// 2. (Optionally / for tests) zero or more [Self::prepopulate_wire] with initial values
+/// 2. (Optionally) zero or more calls to [Self::prepopulate_wire] with initial values.
+///    For example, for a [Module](OpType::Module)-rooted Hugr, each externally-callable
+///    [FuncDefn](OpType::FuncDefn) should have the out-wires from its [Input](OpType::Input)
+///    node prepopulated with [PartialValue::Top].
 /// 3. Call [Self::run] to produce [AnalysisResults]
 pub struct Machine<V: AbstractValue>(Vec<(Node, IncomingPort, PartialValue<V>)>);
 
@@ -29,41 +35,75 @@ impl<V: AbstractValue> Default for Machine<V> {
 }
 
 impl<V: AbstractValue> Machine<V> {
-    /// Provide initial values for some wires.
-    // Likely for test purposes only - should we make non-pub or #[cfg(test)] ?
-    pub fn prepopulate_wire(&mut self, h: &impl HugrView, wire: Wire, value: PartialValue<V>) {
+    /// Provide initial values for a wire - these will be `join`d with any computed.
+    pub fn prepopulate_wire(&mut self, h: &impl HugrView, w: Wire, v: PartialValue<V>) {
         self.0.extend(
-            h.linked_inputs(wire.node(), wire.source())
-                .map(|(n, inp)| (n, inp, value.clone())),
+            h.linked_inputs(w.node(), w.source())
+                .map(|(n, inp)| (n, inp, v.clone())),
         );
     }
 
     /// Run the analysis (iterate until a lattice fixpoint is reached),
-    /// given initial values for some of the root node inputs.
-    /// (Note that `in_values` will not be useful for `Case` or `DFB`-rooted Hugrs,
-    /// but should handle other containers.)
+    /// given initial values for some of the root node inputs. For a
+    /// [Module](OpType::Module)-rooted Hugr, these are input to the function `"main"`.
     /// The context passed in allows interpretation of leaf operations.
+    ///
+    /// # Panics
+    /// May panic in various ways if the Hugr is invalid;
+    /// or if any `in_values` are provided for a module-rooted Hugr without a function `"main"`.
     pub fn run<C: DFContext<V>>(
         mut self,
         context: C,
         in_values: impl IntoIterator<Item = (IncomingPort, PartialValue<V>)>,
     ) -> AnalysisResults<V, C> {
+        let mut in_values = in_values.into_iter();
         let root = context.root();
-        self.0
-            .extend(in_values.into_iter().map(|(p, v)| (root, p, v)));
+        // Some nodes do not accept values as dataflow inputs - for these
+        // we must find the corresponding Input node.
+        let input_node_parent = match context.get_optype(root) {
+            OpType::Module(_) => {
+                let main = context.children(root).find(|n| {
+                    context
+                        .get_optype(*n)
+                        .as_func_defn()
+                        .is_some_and(|f| f.name() == "main")
+                });
+                if main.is_none() && in_values.next().is_some() {
+                    panic!("Cannot give inputs to module with no 'main'");
+                }
+                main
+            }
+            OpType::DataflowBlock(_) | OpType::Case(_) | OpType::FuncDefn(_) => Some(root),
+            // Could also do Dfg above, but ok here too:
+            _ => None, // Just feed into node inputs
+        };
         // Any inputs we don't have values for, we must assume `Top` to ensure safety of analysis
         // (Consider: for a conditional that selects *either* the unknown input *or* value V,
         // analysis must produce Top == we-know-nothing, not `V` !)
-        let mut need_inputs: HashSet<_, RandomState> = HashSet::from_iter(
-            (0..context.signature(root).unwrap_or_default().input_count()).map(IncomingPort::from),
-        );
-        self.0.iter().for_each(|(n, p, _)| {
-            if n == &root {
-                need_inputs.remove(p);
+        if let Some(p) = input_node_parent {
+            // Put values onto out-wires of Input node
+            let [inp, _] = context.get_io(p).unwrap();
+            let mut vals =
+                vec![PartialValue::Top; context.signature(inp).unwrap().output_types().len()];
+            for (ip, v) in in_values {
+                vals[ip.index()] = v;
             }
-        });
-        for p in need_inputs {
-            self.0.push((root, p, PartialValue::Top));
+            for (i, v) in vals.into_iter().enumerate() {
+                self.prepopulate_wire(&*context, Wire::new(inp, i), v);
+            }
+        } else {
+            // Put values onto in-wires of root node, datalog will do the rest
+            self.0.extend(in_values.map(|(p, v)| (root, p, v)));
+            let got_inputs: HashSet<_, RandomState> = self
+                .0
+                .iter()
+                .filter_map(|(n, p, _)| (n == &root).then_some(*p))
+                .collect();
+            for p in context.signature(root).unwrap_or_default().input_ports() {
+                if !got_inputs.contains(&p) {
+                    self.0.push((root, p, PartialValue::Top));
+                }
+            }
         }
         // Note/TODO, if analysis is running on a subregion then we should do similar
         // for any nonlocal edges providing values from outside the region.
@@ -122,7 +162,7 @@ pub(super) fn run_datalog<V: AbstractValue, C: DFContext<V>>(
 
         // Assemble node_in_value_row from in_wire_value's
         node_in_value_row(n, ValueRow::new(sig.input_count())) <-- node(n), if let Some(sig) = ctx.signature(*n);
-        node_in_value_row(n, ValueRow::single_known(ctx.signature(*n).unwrap().input_count(), p.index(), v.clone())) <-- in_wire_value(n, p, v);
+        node_in_value_row(n, ValueRow::new(ctx.signature(*n).unwrap().input_count()).set(p.index(), v.clone())) <-- in_wire_value(n, p, v);
 
         // Interpret leaf ops
         out_wire_value(n, p, v) <--
@@ -139,7 +179,10 @@ pub(super) fn run_datalog<V: AbstractValue, C: DFContext<V>>(
         dfg_node(n) <-- node(n), if ctx.get_optype(*n).is_dfg();
 
         out_wire_value(i, OutgoingPort::from(p.index()), v) <-- dfg_node(dfg),
-          input_child(dfg, i), in_wire_value(dfg, p, v);
+          input_child(dfg, i),
+          node_in_value_row(dfg, row),
+          if !row_contains_bottom(&row[..]), // Treat the DFG as a scheduling barrier
+          for (p, v) in row[..].iter().enumerate();
 
         out_wire_value(dfg, OutgoingPort::from(p.index()), v) <-- dfg_node(dfg),
             output_child(dfg, o), in_wire_value(o, p, v);
@@ -158,7 +201,7 @@ pub(super) fn run_datalog<V: AbstractValue, C: DFContext<V>>(
             output_child(tl, out_n),
             node_in_value_row(out_n, out_in_row), // get the whole input row for the output node...
             // ...and select just what's possible for CONTINUE_TAG, if anything
-            if let Some(fields) = out_in_row.unpack_first(TailLoop::CONTINUE_TAG, tailloop.just_inputs.len()),
+            if let Some(fields) = out_in_row.unpack_first_no_bottom(TailLoop::CONTINUE_TAG, tailloop.just_inputs.len()),
             for (out_p, v) in fields.enumerate();
 
         // Output node of child region propagate to outputs of tail loop
@@ -167,7 +210,7 @@ pub(super) fn run_datalog<V: AbstractValue, C: DFContext<V>>(
             output_child(tl, out_n),
             node_in_value_row(out_n, out_in_row), // get the whole input row for the output node...
             // ... and select just what's possible for BREAK_TAG, if anything
-            if let Some(fields) = out_in_row.unpack_first(TailLoop::BREAK_TAG, tailloop.just_outputs.len()),
+            if let Some(fields) = out_in_row.unpack_first_no_bottom(TailLoop::BREAK_TAG, tailloop.just_outputs.len()),
             for (out_p, v) in fields.enumerate();
 
         // Conditional --------------------
@@ -184,7 +227,7 @@ pub(super) fn run_datalog<V: AbstractValue, C: DFContext<V>>(
           input_child(case, i_node),
           node_in_value_row(cond, in_row),
           let conditional = ctx.get_optype(*cond).as_conditional().unwrap(),
-          if let Some(fields) = in_row.unpack_first(*case_index, conditional.sum_rows[*case_index].len()),
+          if let Some(fields) = in_row.unpack_first_no_bottom(*case_index, conditional.sum_rows[*case_index].len()),
           for (out_p, v) in fields.enumerate();
 
         // outputs of case nodes propagate to outputs of conditional *if* case reachable
@@ -219,7 +262,9 @@ pub(super) fn run_datalog<V: AbstractValue, C: DFContext<V>>(
             cfg_node(cfg),
             if let Some(entry) = ctx.children(*cfg).next(),
             input_child(entry, i_node),
-            in_wire_value(cfg, p, v);
+            node_in_value_row(cfg, row),
+            if !row_contains_bottom(&row[..]),
+            for (p, v) in row[..].iter().enumerate();
 
         // In `CFG` <Node>, values fed along a control-flow edge to <Node>
         //     come out of Value outports of <Node>:
@@ -238,7 +283,7 @@ pub(super) fn run_datalog<V: AbstractValue, C: DFContext<V>>(
             output_child(pred, out_n),
             _cfg_succ_dest(cfg, succ, dest),
             node_in_value_row(out_n, out_in_row),
-            if let Some(fields) = out_in_row.unpack_first(succ_n, df_block.sum_rows.get(succ_n).unwrap().len()),
+            if let Some(fields) = out_in_row.unpack_first_no_bottom(succ_n, df_block.sum_rows.get(succ_n).unwrap().len()),
             for (out_p, v) in fields.enumerate();
 
         // Call --------------------
@@ -305,11 +350,7 @@ fn propagate_leaf_op<V: AbstractValue>(
                 .unwrap()
                 .0;
             let const_val = ctx.get_optype(const_node).as_const().unwrap().value();
-            Some(ValueRow::single_known(
-                1,
-                0,
-                partial_from_const(ctx, n, const_val),
-            ))
+            Some(ValueRow::singleton(partial_from_const(ctx, n, const_val)))
         }
         OpType::LoadFunction(load_op) => {
             assert!(ins.is_empty()); // static edge
@@ -318,28 +359,25 @@ fn propagate_leaf_op<V: AbstractValue>(
                 .unwrap()
                 .0;
             // Node could be a FuncDefn or a FuncDecl, so do not pass the node itself
-            Some(ValueRow::single_known(
-                1,
-                0,
+            Some(ValueRow::singleton(
                 ctx.value_from_function(func_node, &load_op.type_args)
                     .map_or(PV::Top, PV::Value),
             ))
         }
         OpType::ExtensionOp(e) => {
-            // Interpret op using DFContext
-            let init = if ins.iter().contains(&PartialValue::Bottom) {
+            Some(ValueRow::from_iter(if row_contains_bottom(ins) {
                 // So far we think one or more inputs can't happen.
                 // So, don't pollute outputs with Top, and wait for better knowledge of inputs.
-                PartialValue::Bottom
+                vec![PartialValue::Bottom; num_outs]
             } else {
-                // If we can't figure out anything about the outputs, assume nothing (they still happen!)
-                PartialValue::Top
-            };
-            let mut outs = vec![init; num_outs];
-            // It might be nice to convert these to [(IncomingPort, Value)], or some concrete value,
-            // for the context, but PV contains more information, and try_into_value may fail.
-            ctx.interpret_leaf_op(n, e, ins, &mut outs[..]);
-            Some(ValueRow::from_iter(outs))
+                // Interpret op using DFContext
+                // Default to Top i.e.  can't figure out anything about the outputs
+                let mut outs = vec![PartialValue::Top; num_outs];
+                // It might be nice to convert `ins`` to [(IncomingPort, Value)], or some concrete value,
+                // for the context, but PV contains more information, and try_into_value may fail.
+                ctx.interpret_leaf_op(n, e, ins, &mut outs[..]);
+                outs
+            }))
         }
         o => todo!("Unhandled: {:?}", o), // At least CallIndirect, and OpType is "non-exhaustive"
     }
