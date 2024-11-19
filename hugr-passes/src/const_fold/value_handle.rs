@@ -49,9 +49,12 @@ pub enum ValueHandle {
     Hashable(HashedConst),
     /// Either a [Value::Extension] that can't be hashed, or a [Value::Function].
     Unhashable {
+        /// The node (i.e. a [Const](hugr_core::ops::Const)) containing the constant
         node: Node,
+        /// Indices within [Value::Sum]s containing the unhashable [Self::Unhashable::leaf]
         fields: Vec<usize>,
-        value: Either<Arc<OpaqueValue>, Arc<Hugr>>,
+        /// The unhashable [Value::Extension] or [Value::Function]
+        leaf: Either<Arc<OpaqueValue>, Arc<Hugr>>,
     },
 }
 
@@ -76,7 +79,7 @@ impl ValueHandle {
             Self::Unhashable {
                 node,
                 fields,
-                value: Either::Left(arc),
+                leaf: Either::Left(arc),
             },
             Self::Hashable,
         )
@@ -88,7 +91,7 @@ impl ValueHandle {
         Self::Unhashable {
             node,
             fields,
-            value: Either::Right(Arc::from(val)),
+            leaf: Either::Right(Arc::from(val)),
         }
     }
 }
@@ -103,12 +106,12 @@ impl PartialEq for ValueHandle {
                 Self::Unhashable {
                     node: n1,
                     fields: f1,
-                    value: _,
+                    leaf: _,
                 },
                 Self::Unhashable {
                     node: n2,
                     fields: f2,
-                    value: _,
+                    leaf: _,
                 },
             ) => {
                 // If the keys are equal, we return true since the values must have the
@@ -132,7 +135,7 @@ impl Hash for ValueHandle {
             ValueHandle::Unhashable {
                 node,
                 fields,
-                value: _,
+                leaf: _,
             } => {
                 node.hash(state);
                 fields.hash(state);
@@ -148,13 +151,13 @@ impl From<ValueHandle> for Value {
         match value {
             ValueHandle::Hashable(HashedConst { val, .. })
             | ValueHandle::Unhashable {
-                value: Either::Left(val),
+                leaf: Either::Left(val),
                 ..
             } => Value::Extension {
                 e: Arc::try_unwrap(val).unwrap_or_else(|a| a.as_ref().clone()),
             },
             ValueHandle::Unhashable {
-                value: Either::Right(hugr),
+                leaf: Either::Right(hugr),
                 ..
             } => Value::function(Arc::try_unwrap(hugr).unwrap_or_else(|a| a.as_ref().clone()))
                 .map_err(|e| e.to_string())
