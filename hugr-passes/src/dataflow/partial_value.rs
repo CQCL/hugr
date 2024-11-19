@@ -155,12 +155,13 @@ impl<V: AbstractValue> PartialSum<V> {
     /// If this PartialSum had multiple possible tags; or if `typ` was not a [TypeEnum::Sum]
     /// supporting the single possible tag with the correct number of elements and no row variables;
     /// or if converting a child element failed via [PartialValue::try_into_value].
-    pub fn try_into_value<V2, VE, SE>(
+    pub fn try_into_sum<V2, VE, SE>(
         self,
         typ: &Type,
     ) -> Result<Sum<V2>, ExtractValueError<V, VE, SE>>
     where
-        V2: TryFrom<V, Error = VE> + TryFrom<Sum<V2>, Error = SE>,
+        V: TryInto<V2, Error = VE>,
+        Sum<V2>: TryInto<V2, Error = SE>,
     {
         let Ok((k, v)) = self.0.iter().exactly_one() else {
             return Err(ExtractValueError::MultipleVariants(self));
@@ -351,15 +352,18 @@ impl<V: AbstractValue> PartialValue<V> {
     /// incorrect), or if that [Sum] could not be converted into a `V2`.
     pub fn try_into_value<V2, VE, SE>(self, typ: &Type) -> Result<V2, ExtractValueError<V, VE, SE>>
     where
-        V2: TryFrom<V, Error = VE> + TryFrom<Sum<V2>, Error = SE>,
+        V: TryInto<V2, Error = VE>,
+        Sum<V2>: TryInto<V2, Error = SE>,
     {
         match self {
-            Self::Value(v) => V2::try_from(v.clone())
+            Self::Value(v) => v
+                .clone()
+                .try_into()
                 .map_err(|e| ExtractValueError::CouldNotConvert(v.clone(), e)),
-            Self::PartialSum(ps) => {
-                let v = ps.try_into_value(typ)?;
-                V2::try_from(v).map_err(ExtractValueError::CouldNotBuildSum)
-            }
+            Self::PartialSum(ps) => ps
+                .try_into_sum(typ)?
+                .try_into()
+                .map_err(ExtractValueError::CouldNotBuildSum),
             Self::Top => Err(ExtractValueError::ValueIsTop),
             Self::Bottom => Err(ExtractValueError::ValueIsBottom),
         }
