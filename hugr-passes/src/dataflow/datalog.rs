@@ -15,10 +15,11 @@ use super::{partial_from_const, AbstractValue, AnalysisResults, DFContext, Parti
 
 type PV<V> = PartialValue<V>;
 
+#[allow(rustdoc::private_intra_doc_links)]
 /// Basic structure for performing an analysis. Usage:
 /// 1. Get a new instance via [Self::default()]
 /// 2. (Optionally / for tests) zero or more [Self::prepopulate_wire] with initial values
-/// 3. Call [Self::run] to produce [AnalysisResults]
+/// 3. Call [Self::run] or [Self::run_library] to produce [AnalysisResults]
 pub struct Machine<V: AbstractValue>(Vec<(Node, IncomingPort, PartialValue<V>)>);
 
 /// derived-Default requires the context to be Defaultable, which is unnecessary
@@ -102,10 +103,10 @@ impl<V: AbstractValue> Machine<V> {
     }
 
     /// Run the analysis (iterate until a lattice fixpoint is reached),
-    /// for a [Module]-rooted Hugr where all functions are assumed callable
+    /// for a [Module](OpType::Module)-rooted Hugr where all functions are assumed callable
     /// (from a client) with any arguments.
     /// The context passed in allows interpretation of leaf operations.
-    pub fn run_lib<C: DFContext<V>>(mut self, context: C) -> AnalysisResults<V, C> {
+    pub fn run_library<C: DFContext<V>>(mut self, context: C) -> AnalysisResults<V, C> {
         let root = context.root();
         if !context.get_optype(root).is_module() {
             panic!("Hugr not Module-rooted")
