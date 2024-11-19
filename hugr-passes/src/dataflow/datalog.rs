@@ -7,7 +7,7 @@ use ascent::lattice::BoundedLattice;
 use itertools::Itertools;
 
 use hugr_core::extension::prelude::{MakeTuple, UnpackTuple};
-use hugr_core::ops::{DataflowParent, NamedOp, OpTrait, OpType, TailLoop};
+use hugr_core::ops::{DataflowParent, FuncDefn, NamedOp, OpTrait, OpType, TailLoop};
 use hugr_core::{HugrView, IncomingPort, Node, OutgoingPort, PortIndex as _, Wire};
 
 use super::value_row::ValueRow;
@@ -18,11 +18,12 @@ use super::{
 
 type PV<V> = PartialValue<V>;
 
-#[allow(rustdoc::private_intra_doc_links)]
 /// Basic structure for performing an analysis. Usage:
 /// 1. Get a new instance via [Self::default()]
-/// 2. (Optionally / for tests) zero or more [Self::prepopulate_wire] with initial values
-/// 3. Call [Self::run] or [Self::run_library] to produce [AnalysisResults]
+/// 2. (Optionally) For [Module](OpType::Module)-rooted Hugrs, zero or more calls
+/// to [Self::publish_function]
+// or [Self::prepopulate_wire] with initial values
+/// 3. Call [Self::run] to produce [AnalysisResults]
 pub struct Machine<V: AbstractValue>(Vec<(Node, IncomingPort, PartialValue<V>)>);
 
 /// derived-Default requires the context to be Defaultable, which is unnecessary
@@ -44,39 +45,35 @@ impl<V: AbstractValue> Machine<V> {
 
     /// Run the analysis (iterate until a lattice fixpoint is reached),
     /// given initial values for some of the root node inputs. For a
-    /// [Module](OpType::Module)-rooted  Hugr, these are input to the function `"main"`.
+    /// [Module](OpType::Module)-rooted  Hugr, these are input to the function `"main"`
+    /// (it is an error if inputs are provided and there is no `"main"``).
     /// The context passed in allows interpretation of leaf operations.
-    ///
-    /// [Module]: OpType::Module
     pub fn run<C: DFContext<V>>(
         mut self,
         context: C,
         in_values: impl IntoIterator<Item = (IncomingPort, PartialValue<V>)>,
     ) -> AnalysisResults<V, C> {
+        let mut in_values = in_values.into_iter();
         let root = context.root();
         // Some nodes do not accept values as dataflow inputs - for these
         // we must find the corresponding Output node.
-        let out_node_parent = match context.get_optype(root) {
-            OpType::Module(_) => Some(
-                context
-                    .children(root)
-                    .find(|n| {
-                        context
-                            .get_optype(*n)
-                            .as_func_defn()
-                            .is_some_and(|f| f.name() == "main")
-                    })
-                    .expect("Module must contain a 'main' function to be analysed"),
-            ),
+        let input_node_parent = match context.get_optype(root) {
+            OpType::Module(_) => {
+                let main = find_func(&*context, "main");
+                if main.is_none() && in_values.next().is_some() {
+                    panic!("Cannot give inputs to module with no 'main'");
+                }
+                main.map(|(n, _)| n)
+            }
             OpType::DataflowBlock(_) | OpType::Case(_) | OpType::FuncDefn(_) => Some(root),
             // Could also do Dfg above, but ok here too:
             _ => None, // Just feed into node inputs
         };
-        // Now write values onto Input node out-wires or Outputs.
         // Any inputs we don't have values for, we must assume `Top` to ensure safety of analysis
         // (Consider: for a conditional that selects *either* the unknown input *or* value V,
         // analysis must produce Top == we-know-nothing, not `V` !)
-        if let Some(p) = out_node_parent {
+        if let Some(p) = input_node_parent {
+            // Put values onto out-wires of Input node
             let [inp, _] = context.get_io(p).unwrap();
             let mut vals =
                 vec![PartialValue::Top; context.signature(inp).unwrap().output_types().len()];
@@ -87,6 +84,7 @@ impl<V: AbstractValue> Machine<V> {
                 self.prepopulate_wire(&*context, Wire::new(inp, i), v);
             }
         } else {
+            // Put values onto in-wires of root node
             self.0
                 .extend(in_values.into_iter().map(|(p, v)| (root, p, v)));
             let got_inputs: HashSet<_, RandomState> = self
@@ -105,25 +103,26 @@ impl<V: AbstractValue> Machine<V> {
         run_datalog(context, self.0)
     }
 
-    /// Run the analysis (iterate until a lattice fixpoint is reached),
-    /// for a [Module](OpType::Module)-rooted Hugr where all functions are assumed callable
-    /// (from a client) with any arguments.
-    /// The context passed in allows interpretation of leaf operations.
-    pub fn run_library<C: DFContext<V>>(mut self, context: C) -> AnalysisResults<V, C> {
-        let root = context.root();
-        if !context.get_optype(root).is_module() {
-            panic!("Hugr not Module-rooted")
+    /// For [Module](OpType::Module)-rooted Hugrs, mark a FuncDefn that is a child
+    /// of the root node as externally callable, i.e. with any arguments.
+    pub fn publish_function<C: DFContext<V>>(&mut self, context: C, name: &str) {
+        let (n, fd) = find_func(&*context, name).unwrap();
+        let [inp, _] = context.get_io(n).unwrap();
+        for p in 0..fd.inner_signature().input_count() {
+            self.prepopulate_wire(&*context, Wire::new(inp, p), PartialValue::Top);
         }
-        for n in context.children(root) {
-            if let Some(fd) = context.get_optype(n).as_func_defn() {
-                let [inp, _] = context.get_io(n).unwrap();
-                for p in 0..fd.inner_signature().input_count() {
-                    self.prepopulate_wire(&*context, Wire::new(inp, p), PartialValue::Top);
-                }
-            }
-        }
-        run_datalog(context, self.0)
     }
+}
+
+fn find_func<'a>(h: &'a impl HugrView, name: &str) -> Option<(Node, &'a FuncDefn)> {
+    assert!(h.get_optype(h.root()).is_module());
+    h.children(h.root())
+        .filter_map(|n| {
+            h.get_optype(n)
+                .as_func_defn()
+                .and_then(|f| (f.name() == name).then_some((n, f)))
+        })
+        .next()
 }
 
 pub(super) fn run_datalog<V: AbstractValue, C: DFContext<V>>(
