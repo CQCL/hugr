@@ -11,7 +11,10 @@ use hugr_core::ops::{DataflowParent, NamedOp, OpTrait, OpType, TailLoop};
 use hugr_core::{HugrView, IncomingPort, Node, OutgoingPort, PortIndex as _, Wire};
 
 use super::value_row::ValueRow;
-use super::{partial_from_const, AbstractValue, AnalysisResults, DFContext, PartialValue};
+use super::{
+    partial_from_const, row_contains_bottom, AbstractValue, AnalysisResults, DFContext,
+    PartialValue,
+};
 
 type PV<V> = PartialValue<V>;
 
@@ -378,20 +381,19 @@ fn propagate_leaf_op<V: AbstractValue>(
             ))
         }
         OpType::ExtensionOp(e) => {
-            // Interpret op using DFContext
-            let init = if ins.iter().contains(&PartialValue::Bottom) {
+            Some(ValueRow::from_iter(if row_contains_bottom(ins) {
                 // So far we think one or more inputs can't happen.
                 // So, don't pollute outputs with Top, and wait for better knowledge of inputs.
-                PartialValue::Bottom
+                vec![PartialValue::Bottom; num_outs]
             } else {
-                // If we can't figure out anything about the outputs, assume nothing (they still happen!)
-                PartialValue::Top
-            };
-            let mut outs = vec![init; num_outs];
-            // It might be nice to convert these to [(IncomingPort, Value)], or some concrete value,
-            // for the context, but PV contains more information, and try_into_value may fail.
-            ctx.interpret_leaf_op(n, e, ins, &mut outs[..]);
-            Some(ValueRow::from_iter(outs))
+                // Interpret op using DFContext
+                // Default to Top i.e.  can't figure out anything about the outputs
+                let mut outs = vec![PartialValue::Top; num_outs];
+                // It might be nice to convert `ins`` to [(IncomingPort, Value)], or some concrete value,
+                // for the context, but PV contains more information, and try_into_value may fail.
+                ctx.interpret_leaf_op(n, e, ins, &mut outs[..]);
+                outs
+            }))
         }
         o => todo!("Unhandled: {:?}", o), // At least CallIndirect, and OpType is "non-exhaustive"
     }
