@@ -344,12 +344,12 @@ impl<V: AbstractValue> PartialValue<V> {
 
     /// Turns this instance into some "concrete" value type `V2`, *if* it is a single value,
     /// or a [Sum](PartialValue::PartialSum) (of a single tag) convertible by
-    /// [PartialSum::try_into_value].
+    /// [PartialSum::try_into_sum].
     ///
     /// # Errors
     ///
     /// If this PartialValue was `Top` or `Bottom`, or was a [PartialSum](PartialValue::PartialSum)
-    /// that could not be converted into a [Sum] by [PartialSum::try_into_value] (e.g. if `typ` is
+    /// that could not be converted into a [Sum] by [PartialSum::try_into_sum] (e.g. if `typ` is
     /// incorrect), or if that [Sum] could not be converted into a `V2`.
     pub fn try_into_value<V2, VE, SE>(self, typ: &Type) -> Result<V2, ExtractValueError<V, VE, SE>>
     where
