@@ -93,8 +93,7 @@ impl<V: AbstractValue> Machine<V> {
             }
         } else {
             // Put values onto in-wires of root node, datalog will do the rest
-            self.0
-                .extend(in_values.into_iter().map(|(p, v)| (root, p, v)));
+            self.0.extend(in_values.map(|(p, v)| (root, p, v)));
             let got_inputs: HashSet<_, RandomState> = self
                 .0
                 .iter()

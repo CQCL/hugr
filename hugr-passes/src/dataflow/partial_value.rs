@@ -370,8 +370,8 @@ impl<V: AbstractValue> PartialValue<V> {
         }
     }
 
-    /// A value contains bottom means that it cannot occur during execution
-    /// - it may be an artefact during bootstrapping of the analysis, or else
+    /// A value contains bottom means that it cannot occur during execution:
+    /// it may be an artefact during bootstrapping of the analysis, or else
     /// the value depends upon a `panic` or a loop that
     /// [never terminates](super::TailLoopTermination::NeverBreaks).
     pub fn contains_bottom(&self) -> bool {
