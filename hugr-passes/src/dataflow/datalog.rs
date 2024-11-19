@@ -7,7 +7,7 @@ use ascent::lattice::BoundedLattice;
 use itertools::Itertools;
 
 use hugr_core::extension::prelude::{MakeTuple, UnpackTuple};
-use hugr_core::ops::{DataflowParent, FuncDefn, NamedOp, OpTrait, OpType, TailLoop};
+use hugr_core::ops::{NamedOp, OpTrait, OpType, TailLoop};
 use hugr_core::{HugrView, IncomingPort, Node, OutgoingPort, PortIndex as _, Wire};
 
 use super::value_row::ValueRow;
@@ -20,9 +20,10 @@ type PV<V> = PartialValue<V>;
 
 /// Basic structure for performing an analysis. Usage:
 /// 1. Get a new instance via [Self::default()]
-/// 2. (Optionally) For [Module](OpType::Module)-rooted Hugrs, zero or more calls
-/// to [Self::publish_function]
-// or [Self::prepopulate_wire] with initial values
+/// 2. (Optionally) zero or more calls to [Self::prepopulate_wire] with initial values.
+///    For example, for a [Module](OpType::Module)-rooted Hugr, each externally-callable
+///    [FuncDefn](OpType::FuncDefn) should have the out-wires from its [Input](OpType::Input)
+///    node prepopulated with [PartialValue::Top].
 /// 3. Call [Self::run] to produce [AnalysisResults]
 pub struct Machine<V: AbstractValue>(Vec<(Node, IncomingPort, PartialValue<V>)>);
 
@@ -34,9 +35,8 @@ impl<V: AbstractValue> Default for Machine<V> {
 }
 
 impl<V: AbstractValue> Machine<V> {
-    // Provide initial values for a wire - these will be `join`d with any computed.
-    // pub(crate) so can be used for tests.
-    pub(crate) fn prepopulate_wire(&mut self, h: &impl HugrView, w: Wire, v: PartialValue<V>) {
+    /// Provide initial values for a wire - these will be `join`d with any computed.
+    pub fn prepopulate_wire(&mut self, h: &impl HugrView, w: Wire, v: PartialValue<V>) {
         self.0.extend(
             h.linked_inputs(w.node(), w.source())
                 .map(|(n, inp)| (n, inp, v.clone())),
@@ -45,9 +45,12 @@ impl<V: AbstractValue> Machine<V> {
 
     /// Run the analysis (iterate until a lattice fixpoint is reached),
     /// given initial values for some of the root node inputs. For a
-    /// [Module](OpType::Module)-rooted  Hugr, these are input to the function `"main"`
-    /// (it is an error if inputs are provided and there is no `"main"``).
+    /// [Module](OpType::Module)-rooted Hugr, these are input to the function `"main"`.
     /// The context passed in allows interpretation of leaf operations.
+    ///
+    /// # Panics
+    /// May panic in various ways if the Hugr is invalid;
+    /// or if any `in_values` are provided for a module-rooted Hugr without a function `"main"`.
     pub fn run<C: DFContext<V>>(
         mut self,
         context: C,
@@ -56,14 +59,19 @@ impl<V: AbstractValue> Machine<V> {
         let mut in_values = in_values.into_iter();
         let root = context.root();
         // Some nodes do not accept values as dataflow inputs - for these
-        // we must find the corresponding Output node.
+        // we must find the corresponding Input node.
         let input_node_parent = match context.get_optype(root) {
             OpType::Module(_) => {
-                let main = find_func(&*context, "main");
+                let main = context.children(root).find(|n| {
+                    context
+                        .get_optype(*n)
+                        .as_func_defn()
+                        .is_some_and(|f| f.name() == "main")
+                });
                 if main.is_none() && in_values.next().is_some() {
                     panic!("Cannot give inputs to module with no 'main'");
                 }
-                main.map(|(n, _)| n)
+                main
             }
             OpType::DataflowBlock(_) | OpType::Case(_) | OpType::FuncDefn(_) => Some(root),
             // Could also do Dfg above, but ok here too:
@@ -84,7 +92,7 @@ impl<V: AbstractValue> Machine<V> {
                 self.prepopulate_wire(&*context, Wire::new(inp, i), v);
             }
         } else {
-            // Put values onto in-wires of root node
+            // Put values onto in-wires of root node, datalog will do the rest
             self.0
                 .extend(in_values.into_iter().map(|(p, v)| (root, p, v)));
             let got_inputs: HashSet<_, RandomState> = self
@@ -102,27 +110,6 @@ impl<V: AbstractValue> Machine<V> {
         // for any nonlocal edges providing values from outside the region.
         run_datalog(context, self.0)
     }
-
-    /// For [Module](OpType::Module)-rooted Hugrs, mark a FuncDefn that is a child
-    /// of the root node as externally callable, i.e. with any arguments.
-    pub fn publish_function<C: DFContext<V>>(&mut self, context: C, name: &str) {
-        let (n, fd) = find_func(&*context, name).unwrap();
-        let [inp, _] = context.get_io(n).unwrap();
-        for p in 0..fd.inner_signature().input_count() {
-            self.prepopulate_wire(&*context, Wire::new(inp, p), PartialValue::Top);
-        }
-    }
-}
-
-fn find_func<'a>(h: &'a impl HugrView, name: &str) -> Option<(Node, &'a FuncDefn)> {
-    assert!(h.get_optype(h.root()).is_module());
-    h.children(h.root())
-        .filter_map(|n| {
-            h.get_optype(n)
-                .as_func_defn()
-                .and_then(|f| (f.name() == name).then_some((n, f)))
-        })
-        .next()
 }
 
 pub(super) fn run_datalog<V: AbstractValue, C: DFContext<V>>(
