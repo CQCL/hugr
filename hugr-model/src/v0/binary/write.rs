@@ -97,6 +97,7 @@ fn write_operation(mut builder: hugr_capnp::operation::Builder, operation: &mode
         }
 
         model::Operation::Invalid => builder.set_invalid(()),
+        model::Operation::Const { value } => builder.set_const(value.0),
     }
 }
 

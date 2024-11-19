@@ -358,6 +358,12 @@ pub enum Operation<'a> {
         /// The declaration of the operation.
         decl: &'a OperationDecl<'a>,
     },
+
+    /// Produce a constant runtime value.
+    Const {
+        /// A static recipe by which the constant runtime value is produced.
+        value: TermId,
+    },
 }
 
 /// A region in the hugr.

@@ -380,6 +380,14 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_signature(node_data.signature)?;
                 this.print_meta(node_data.meta)
             }
+
+            Operation::Const { value } => {
+                this.print_text("const");
+                this.print_term(*value)?;
+                this.print_port_lists(node_data.inputs, node_data.outputs)?;
+                this.print_signature(node_data.signature)?;
+                this.print_meta(node_data.meta)
+            }
         })
     }
 

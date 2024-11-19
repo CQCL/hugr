@@ -224,6 +224,9 @@ fn read_operation<'a>(
         Which::LoadFunc(func) => model::Operation::LoadFunc {
             func: model::TermId(func),
         },
+        Which::Const(value) => model::Operation::Const {
+            value: model::TermId(value),
+        },
     })
 }
 

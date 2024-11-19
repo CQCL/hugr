@@ -522,6 +522,8 @@ impl<'a> Context<'a> {
                 "custom operation with implicit parameters"
             )),
 
+            model::Operation::Const { .. } => Err(error_unsupported!("const operation")),
+
             model::Operation::DefineAlias { decl, value } => self.with_local_socpe(|ctx| {
                 if !decl.params.is_empty() {
                     return Err(error_unsupported!(
