@@ -14,23 +14,26 @@ use super::row_contains_bottom;
 /// [PartialValue] and thus be used in dataflow analysis.
 pub trait AbstractValue: Clone + std::fmt::Debug + PartialEq + Eq + Hash {
     /// Computes the join of two values (i.e. towards `Top``), if this is representable
-    /// within the underlying domain.
-    /// Otherwise return `None` (i.e. an instruction to use [PartialValue::Top]).
+    /// within the underlying domain. Return the new value, and whether this is different from
+    /// the old `self`.
     ///
-    /// The default checks equality between `self` and `other` and returns `self` if
+    /// If the join is not representable, return `None` - i.e., we should use [PartialValue::Top].
+    ///
+    /// The default checks equality between `self` and `other` and returns `(self,false)` if
     /// the two are identical, otherwise `None`.
-    fn try_join(self, other: Self) -> Option<Self> {
-        (self == other).then_some(self)
+    fn try_join(self, other: Self) -> Option<(Self, bool)> {
+        (self == other).then_some((self, false))
     }
 
     /// Computes the meet of two values (i.e. towards `Bottom`), if this is representable
-    /// within the underlying domain.
-    /// Otherwise return `None` (i.e. an instruction to use [PartialValue::Bottom]).
+    /// within the underlying domain. Return the new value, and whether this is different from
+    /// the old `self`.
+    /// If the meet is not representable, return `None` - i.e., we should use [PartialValue::Bottom].
     ///
-    /// The default checks equality between `self` and `other` and returns `self` if
+    /// The default checks equality between `self` and `other` and returns `(self, false)` if
     /// the two are identical, otherwise `None`.
-    fn try_meet(self, other: Self) -> Option<Self> {
-        (self == other).then_some(self)
+    fn try_meet(self, other: Self) -> Option<(Self, bool)> {
+        (self == other).then_some((self, false))
     }
 }
 
@@ -398,8 +401,7 @@ impl<V: AbstractValue> Lattice for PartialValue<V> {
                 true
             }
             (Self::Value(h1), Self::Value(h2)) => match h1.clone().try_join(h2) {
-                Some(h3) => {
-                    let ch = h3 != *h1;
+                Some((h3, ch)) => {
                     *self = Self::Value(h3);
                     ch
                 }
@@ -441,8 +443,7 @@ impl<V: AbstractValue> Lattice for PartialValue<V> {
                 true
             }
             (Self::Value(h1), Self::Value(h2)) => match h1.clone().try_meet(h2) {
-                Some(h3) => {
-                    let ch = h3 != *h1;
+                Some((h3, ch)) => {
                     *self = Self::Value(h3);
                     ch
                 }
