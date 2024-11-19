@@ -116,5 +116,13 @@ fn partial_from_const<'a, V>(
     }
 }
 
+/// A row of inputs to a node contains bottom (can't happen, the node
+/// can't execute) if any element [contains_bottom](PartialValue::contains_bottom).
+pub fn row_contains_bottom<'a, V: AbstractValue + 'a>(
+    elements: impl IntoIterator<Item = &'a PartialValue<V>>,
+) -> bool {
+    elements.into_iter().any(PartialValue::contains_bottom)
+}
+
 #[cfg(test)]
 mod test;

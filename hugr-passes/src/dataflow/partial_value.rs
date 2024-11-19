@@ -8,6 +8,8 @@ use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use thiserror::Error;
 
+use super::row_contains_bottom;
+
 /// Trait for an underlying domain of abstract values which can form the *elements* of a
 /// [PartialValue] and thus be used in dataflow analysis.
 pub trait AbstractValue: Clone + std::fmt::Debug + PartialEq + Eq + Hash {
@@ -181,6 +183,13 @@ impl<V: AbstractValue> PartialSum<V> {
             num_elements: v.len(),
         })
     }
+
+    /// Can this ever occur at runtime? See [PartialValue::contains_bottom]
+    pub fn contains_bottom(&self) -> bool {
+        self.0
+            .iter()
+            .all(|(_tag, elements)| row_contains_bottom(elements))
+    }
 }
 
 /// An error converting a [PartialValue] or [PartialSum] into a concrete value type
@@ -350,6 +359,18 @@ impl<V: AbstractValue> PartialValue<V> {
             }
             Self::Top => Err(ExtractValueError::ValueIsTop),
             Self::Bottom => Err(ExtractValueError::ValueIsBottom),
+        }
+    }
+
+    /// A value contains bottom means that it cannot occur during execution
+    /// - it may be an artefact during bootstrapping of the analysis, or else
+    /// the value depends upon a `panic` or a loop that
+    /// [never terminates](super::TailLoopTermination::NeverBreaks).
+    pub fn contains_bottom(&self) -> bool {
+        match self {
+            PartialValue::Bottom => true,
+            PartialValue::Top | PartialValue::Value(_) => false,
+            PartialValue::PartialSum(ps) => ps.contains_bottom(),
         }
     }
 }
