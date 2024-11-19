@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.14.0](https://github.com/CQCL/hugr/compare/hugr-v0.13.3...hugr-v0.14.0) - 2024-11-19
+
+### New Features
+
+- Export/import of JSON metadata ([#1622](https://github.com/CQCL/hugr/pull/1622))
+- Add `SiblingSubgraph::from_node` ([#1655](https://github.com/CQCL/hugr/pull/1655))
+- [**breaking**] Replace GATs with `impl Iterator` returns (RPITIT) on `HugrView` ([#1660](https://github.com/CQCL/hugr/pull/1660))
+
+### Performance
+
+- Faster singleton SiblingSubgraph construction ([#1654](https://github.com/CQCL/hugr/pull/1654))
+
 ## [0.13.3](https://github.com/CQCL/hugr/compare/hugr-v0.13.2...hugr-v0.13.3) - 2024-11-06
 
 ### Bug Fixes
