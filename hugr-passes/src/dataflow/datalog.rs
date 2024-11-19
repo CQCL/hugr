@@ -163,7 +163,7 @@ pub(super) fn run_datalog<V: AbstractValue, C: DFContext<V>>(
 
         // Assemble node_in_value_row from in_wire_value's
         node_in_value_row(n, ValueRow::new(sig.input_count())) <-- node(n), if let Some(sig) = ctx.signature(*n);
-        node_in_value_row(n, ValueRow::single_known(ctx.signature(*n).unwrap().input_count(), p.index(), v.clone())) <-- in_wire_value(n, p, v);
+        node_in_value_row(n, ValueRow::new(ctx.signature(*n).unwrap().input_count()).set(p.index(), v.clone())) <-- in_wire_value(n, p, v);
 
         // Interpret leaf ops
         out_wire_value(n, p, v) <--
@@ -351,11 +351,7 @@ fn propagate_leaf_op<V: AbstractValue>(
                 .unwrap()
                 .0;
             let const_val = ctx.get_optype(const_node).as_const().unwrap().value();
-            Some(ValueRow::single_known(
-                1,
-                0,
-                partial_from_const(ctx, n, const_val),
-            ))
+            Some(ValueRow::singleton(partial_from_const(ctx, n, const_val)))
         }
         OpType::LoadFunction(load_op) => {
             assert!(ins.is_empty()); // static edge
@@ -364,9 +360,7 @@ fn propagate_leaf_op<V: AbstractValue>(
                 .unwrap()
                 .0;
             // Node could be a FuncDefn or a FuncDecl, so do not pass the node itself
-            Some(ValueRow::single_known(
-                1,
-                0,
+            Some(ValueRow::singleton(
                 ctx.value_from_function(func_node, &load_op.type_args)
                     .map_or(PV::Top, PV::Value),
             ))

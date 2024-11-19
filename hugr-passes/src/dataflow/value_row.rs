@@ -18,11 +18,13 @@ impl<V: AbstractValue> ValueRow<V> {
         Self(vec![PartialValue::bottom(); len])
     }
 
-    pub fn single_known(len: usize, idx: usize, v: PartialValue<V>) -> Self {
-        assert!(idx < len);
-        let mut r = Self::new(len);
-        r.0[idx] = v;
-        r
+    pub fn set(mut self, idx: usize, v: PartialValue<V>) -> Self {
+        *self.0.get_mut(idx).unwrap() = v;
+        self
+    }
+
+    pub fn singleton(v: PartialValue<V>) -> Self {
+        Self(vec![v])
     }
 
     /// If the first value in this ValueRow is a sum, that might contain
