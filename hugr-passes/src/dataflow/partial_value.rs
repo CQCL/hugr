@@ -394,68 +394,48 @@ impl TryFrom<Sum<Value>> for Value {
 impl<V: AbstractValue> Lattice for PartialValue<V> {
     fn join_mut(&mut self, other: Self) -> bool {
         self.assert_invariants();
-        let mut old_self = Self::Top; // Good default result
+        let mut old_self = Self::Top;
         std::mem::swap(self, &mut old_self);
-        match (old_self, other) {
-            (Self::Top, _) => false, // result is Top
-            (_, Self::Top) => true,  // result is Top
-            (old, Self::Bottom) => {
-                *self = old; // reinstate
-                false
-            }
-            (Self::Bottom, other) => {
-                *self = other;
-                true
-            }
+        let (res, ch) = match (old_self, other) {
+            (old @ Self::Top, _) | (old, Self::Bottom) => (old, false),
+            (_, other @ Self::Top) | (Self::Bottom, other) => (other, true),
             (Self::Value(h1), Self::Value(h2)) => match h1.clone().try_join(h2) {
-                Some((h3, b)) => {
-                    *self = Self::Value(h3);
-                    b
-                }
-                None => true, // result is Top
+                Some((h3, b)) => (Self::Value(h3), b),
+                None => (Self::Top, true),
             },
             (Self::PartialSum(mut ps1), Self::PartialSum(ps2)) => match ps1.try_join_mut(ps2) {
-                Ok(ch) => {
-                    *self = Self::PartialSum(ps1);
-                    ch
-                }
-                Err(_) => true, // result is Top
+                Ok(ch) => (Self::PartialSum(ps1), ch),
+                Err(_) => (Self::Top, true),
             },
-            (Self::Value(_), Self::PartialSum(_)) | (Self::PartialSum(_), Self::Value(_)) => true, // result is Top
-        }
+            (Self::Value(_), Self::PartialSum(_)) | (Self::PartialSum(_), Self::Value(_)) => {
+                (Self::Top, true)
+            }
+        };
+        *self = res;
+        ch
     }
 
     fn meet_mut(&mut self, other: Self) -> bool {
         self.assert_invariants();
-        let mut old_self = Self::Bottom; // Good default result
+        let mut old_self = Self::Bottom;
         std::mem::swap(self, &mut old_self);
-        match (old_self, other) {
-            (Self::Bottom, _) => false, // result is Bottom
-            (_, Self::Bottom) => true,  // result is Bottom
-            (old, Self::Top) => {
-                *self = old; //reinstate
-                false
-            }
-            (Self::Top, other) => {
-                *self = other;
-                true
-            }
+        let (res, ch) = match (old_self, other) {
+            (old @ Self::Bottom, _) | (old, Self::Top) => (old, false),
+            (_, other @ Self::Bottom) | (Self::Top, other) => (other, true),
             (Self::Value(h1), Self::Value(h2)) => match h1.try_meet(h2) {
-                Some((h3, ch)) => {
-                    *self = Self::Value(h3);
-                    ch
-                }
-                None => true, //result is Bottom
+                Some((h3, ch)) => (Self::Value(h3), ch),
+                None => (Self::Bottom, true),
             },
             (Self::PartialSum(mut ps1), Self::PartialSum(ps2)) => match ps1.try_meet_mut(ps2) {
-                Ok(ch) => {
-                    *self = Self::PartialSum(ps1);
-                    ch
-                }
-                Err(_) => true,
+                Ok(ch) => (Self::PartialSum(ps1), ch),
+                Err(_) => (Self::Bottom, true),
             },
-            (Self::Value(_), Self::PartialSum(_)) | (Self::PartialSum(_), Self::Value(_)) => true, // result is Bottom
-        }
+            (Self::Value(_), Self::PartialSum(_)) | (Self::PartialSum(_), Self::Value(_)) => {
+                (Self::Bottom, true)
+            }
+        };
+        *self = res;
+        ch
     }
 }
 
