@@ -20,10 +20,11 @@ type PV<V> = PartialValue<V>;
 
 /// Basic structure for performing an analysis. Usage:
 /// 1. Get a new instance via [Self::default()]
-/// 2. (Optionally) zero or more calls to [Self::prepopulate_wire] with initial values.
-///    For example, for a [Module](OpType::Module)-rooted Hugr, each externally-callable
-///    [FuncDefn](OpType::FuncDefn) should have the out-wires from its [Input](OpType::Input)
-///    node prepopulated with [PartialValue::Top].
+/// 2. (Optionally) zero or more calls to [Self::prepopulate_wire] and/or
+///    [Self::prepopulate_df_inputs] with initial values.
+///    For example, to analyse a [Module](OpType::Module)-rooted Hugr as a library,
+///    [Self::prepopulate_df_inputs] can be used on each externally-callable
+///    [FuncDefn](OpType::FuncDefn) to set all inputs to [PartialValue::Top].
 /// 3. Call [Self::run] to produce [AnalysisResults]
 pub struct Machine<V: AbstractValue>(Vec<(Node, IncomingPort, PartialValue<V>)>);
 
@@ -41,6 +42,26 @@ impl<V: AbstractValue> Machine<V> {
             h.linked_inputs(w.node(), w.source())
                 .map(|(n, inp)| (n, inp, v.clone())),
         );
+    }
+
+    /// Provide initial values for the inputs to a [DataflowParent](hugr_core::ops::OpTag::DataflowParent)
+    /// (that is, values on the wires leaving the [Input](OpType::Input) child thereof).
+    /// Any out-ports of said same `Input` node, not given values by `in_values`, are set to [PartialValue::Top].
+    pub fn prepopulate_df_inputs(
+        &mut self,
+        h: &impl HugrView,
+        parent: Node,
+        in_values: impl IntoIterator<Item = (OutgoingPort, PartialValue<V>)>,
+    ) {
+        // Put values onto out-wires of Input node
+        let [inp, _] = h.get_io(parent).unwrap();
+        let mut vals = vec![PartialValue::Top; h.signature(inp).unwrap().output_types().len()];
+        for (ip, v) in in_values {
+            vals[ip.index()] = v;
+        }
+        for (i, v) in vals.into_iter().enumerate() {
+            self.prepopulate_wire(h, Wire::new(inp, i), v);
+        }
     }
 
     /// Run the analysis (iterate until a lattice fixpoint is reached),
@@ -81,16 +102,11 @@ impl<V: AbstractValue> Machine<V> {
         // (Consider: for a conditional that selects *either* the unknown input *or* value V,
         // analysis must produce Top == we-know-nothing, not `V` !)
         if let Some(p) = input_node_parent {
-            // Put values onto out-wires of Input node
-            let [inp, _] = context.get_io(p).unwrap();
-            let mut vals =
-                vec![PartialValue::Top; context.signature(inp).unwrap().output_types().len()];
-            for (ip, v) in in_values {
-                vals[ip.index()] = v;
-            }
-            for (i, v) in vals.into_iter().enumerate() {
-                self.prepopulate_wire(&*context, Wire::new(inp, i), v);
-            }
+            self.prepopulate_df_inputs(
+                &*context,
+                p,
+                in_values.map(|(p, v)| (OutgoingPort::from(p.index()), v)),
+            );
         } else {
             // Put values onto in-wires of root node, datalog will do the rest
             self.0.extend(in_values.map(|(p, v)| (root, p, v)));
