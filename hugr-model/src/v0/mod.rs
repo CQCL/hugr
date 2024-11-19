@@ -556,7 +556,7 @@ pub enum Term<'a> {
     /// Quote a runtime type as a static type.
     ///
     /// `(quote T) : static` where `T : type`.
-    Quote {
+    Const {
         /// The runtime type to be quoted.
         ///
         /// **Type:** `type`

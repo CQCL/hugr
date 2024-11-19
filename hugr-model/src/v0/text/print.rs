@@ -527,7 +527,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
 
                 Ok(())
             }),
-            Term::Quote { r#type } => self.print_parens(|this| {
+            Term::Const { r#type } => self.print_parens(|this| {
                 this.print_text("quote");
                 this.print_term(*r#type)
             }),

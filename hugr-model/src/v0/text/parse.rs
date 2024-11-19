@@ -130,9 +130,9 @@ impl<'a> ParseContext<'a> {
                 }
             }
 
-            Rule::term_quote => {
+            Rule::term_const => {
                 let r#type = self.parse_term(inner.next().unwrap())?;
-                Term::Quote { r#type }
+                Term::Const { r#type }
             }
 
             Rule::term_list => {
