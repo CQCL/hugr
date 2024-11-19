@@ -400,16 +400,14 @@ impl<V: AbstractValue> Lattice for PartialValue<V> {
                 *self = other;
                 true
             }
-            (Self::Value(h1), Self::Value(h2)) => match h1.clone().try_join(h2) {
-                Some((h3, ch)) => {
-                    *self = Self::Value(h3);
-                    ch
-                }
-                None => {
-                    *self = Self::Top;
-                    true
-                }
-            },
+            (Self::Value(h1), Self::Value(h2)) => {
+                let (nv, ch) = match h1.clone().try_join(h2) {
+                    Some((h3, b)) => (Self::Value(h3), b),
+                    None => (Self::Top, true),
+                };
+                *self = nv;
+                ch
+            }
             (Self::PartialSum(_), Self::PartialSum(ps2)) => {
                 let Self::PartialSum(ps1) = self else {
                     unreachable!()
@@ -442,16 +440,14 @@ impl<V: AbstractValue> Lattice for PartialValue<V> {
                 *self = other;
                 true
             }
-            (Self::Value(h1), Self::Value(h2)) => match h1.clone().try_meet(h2) {
-                Some((h3, ch)) => {
-                    *self = Self::Value(h3);
-                    ch
-                }
-                None => {
-                    *self = Self::Bottom;
-                    true
-                }
-            },
+            (Self::Value(h1), Self::Value(h2)) => {
+                let (h3, ch) = match h1.clone().try_meet(h2) {
+                    Some((h3, ch)) => (Self::Value(h3), ch),
+                    None => (Self::Bottom, true),
+                };
+                *self = h3;
+                ch
+            }
             (Self::PartialSum(_), Self::PartialSum(ps2)) => {
                 let Self::PartialSum(ps1) = self else {
                     unreachable!()
