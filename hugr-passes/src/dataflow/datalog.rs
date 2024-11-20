@@ -195,10 +195,7 @@ pub(super) fn run_datalog<V: AbstractValue, C: DFContext<V>>(
         dfg_node(n) <-- node(n), if ctx.get_optype(*n).is_dfg();
 
         out_wire_value(i, OutgoingPort::from(p.index()), v) <-- dfg_node(dfg),
-          input_child(dfg, i),
-          node_in_value_row(dfg, row),
-          if !row_contains_bottom(&row[..]), // Treat the DFG as a scheduling barrier
-          for (p, v) in row[..].iter().enumerate();
+          input_child(dfg, i), in_wire_value(dfg, p, v);
 
         out_wire_value(dfg, OutgoingPort::from(p.index()), v) <-- dfg_node(dfg),
             output_child(dfg, o), in_wire_value(o, p, v);
@@ -217,7 +214,7 @@ pub(super) fn run_datalog<V: AbstractValue, C: DFContext<V>>(
             output_child(tl, out_n),
             node_in_value_row(out_n, out_in_row), // get the whole input row for the output node...
             // ...and select just what's possible for CONTINUE_TAG, if anything
-            if let Some(fields) = out_in_row.unpack_first_no_bottom(TailLoop::CONTINUE_TAG, tailloop.just_inputs.len()),
+            if let Some(fields) = out_in_row.unpack_first(TailLoop::CONTINUE_TAG, tailloop.just_inputs.len()),
             for (out_p, v) in fields.enumerate();
 
         // Output node of child region propagate to outputs of tail loop
@@ -226,7 +223,7 @@ pub(super) fn run_datalog<V: AbstractValue, C: DFContext<V>>(
             output_child(tl, out_n),
             node_in_value_row(out_n, out_in_row), // get the whole input row for the output node...
             // ... and select just what's possible for BREAK_TAG, if anything
-            if let Some(fields) = out_in_row.unpack_first_no_bottom(TailLoop::BREAK_TAG, tailloop.just_outputs.len()),
+            if let Some(fields) = out_in_row.unpack_first(TailLoop::BREAK_TAG, tailloop.just_outputs.len()),
             for (out_p, v) in fields.enumerate();
 
         // Conditional --------------------
@@ -243,7 +240,7 @@ pub(super) fn run_datalog<V: AbstractValue, C: DFContext<V>>(
           input_child(case, i_node),
           node_in_value_row(cond, in_row),
           let conditional = ctx.get_optype(*cond).as_conditional().unwrap(),
-          if let Some(fields) = in_row.unpack_first_no_bottom(*case_index, conditional.sum_rows[*case_index].len()),
+          if let Some(fields) = in_row.unpack_first(*case_index, conditional.sum_rows[*case_index].len()),
           for (out_p, v) in fields.enumerate();
 
         // outputs of case nodes propagate to outputs of conditional *if* case reachable
@@ -278,9 +275,7 @@ pub(super) fn run_datalog<V: AbstractValue, C: DFContext<V>>(
             cfg_node(cfg),
             if let Some(entry) = ctx.children(*cfg).next(),
             input_child(entry, i_node),
-            node_in_value_row(cfg, row),
-            if !row_contains_bottom(&row[..]),
-            for (p, v) in row[..].iter().enumerate();
+            in_wire_value(cfg, p, v);
 
         // In `CFG` <Node>, values fed along a control-flow edge to <Node>
         //     come out of Value outports of <Node>:
@@ -299,7 +294,7 @@ pub(super) fn run_datalog<V: AbstractValue, C: DFContext<V>>(
             output_child(pred, out_n),
             _cfg_succ_dest(cfg, succ, dest),
             node_in_value_row(out_n, out_in_row),
-            if let Some(fields) = out_in_row.unpack_first_no_bottom(succ_n, df_block.sum_rows.get(succ_n).unwrap().len()),
+            if let Some(fields) = out_in_row.unpack_first(succ_n, df_block.sum_rows.get(succ_n).unwrap().len()),
             for (out_p, v) in fields.enumerate();
 
         // Call --------------------
