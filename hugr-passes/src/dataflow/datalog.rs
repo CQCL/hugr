@@ -7,7 +7,7 @@ use ascent::lattice::BoundedLattice;
 use itertools::Itertools;
 
 use hugr_core::extension::prelude::{MakeTuple, UnpackTuple};
-use hugr_core::ops::{NamedOp, OpTrait, OpType, TailLoop};
+use hugr_core::ops::{OpTrait, OpType, TailLoop};
 use hugr_core::{HugrView, IncomingPort, Node, OutgoingPort, PortIndex as _, Wire};
 
 use super::value_row::ValueRow;
