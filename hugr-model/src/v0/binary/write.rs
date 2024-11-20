@@ -60,12 +60,14 @@ fn write_operation(mut builder: hugr_capnp::operation::Builder, operation: &mode
             let mut builder = builder.init_func_defn();
             builder.set_name(decl.name);
             write_list!(builder, init_params, write_param, decl.params);
+            let _ = builder.set_constraints(model::TermId::unwrap_slice(decl.constraints));
             builder.set_signature(decl.signature.0);
         }
         model::Operation::DeclareFunc { decl } => {
             let mut builder = builder.init_func_decl();
             builder.set_name(decl.name);
             write_list!(builder, init_params, write_param, decl.params);
+            let _ = builder.set_constraints(model::TermId::unwrap_slice(decl.constraints));
             builder.set_signature(decl.signature.0);
         }
 
@@ -87,12 +89,14 @@ fn write_operation(mut builder: hugr_capnp::operation::Builder, operation: &mode
             let mut builder = builder.init_constructor_decl();
             builder.set_name(decl.name);
             write_list!(builder, init_params, write_param, decl.params);
+            let _ = builder.set_constraints(model::TermId::unwrap_slice(decl.constraints));
             builder.set_type(decl.r#type.0);
         }
         model::Operation::DeclareOperation { decl } => {
             let mut builder = builder.init_operation_decl();
             builder.set_name(decl.name);
             write_list!(builder, init_params, write_param, decl.params);
+            let _ = builder.set_constraints(model::TermId::unwrap_slice(decl.constraints));
             builder.set_type(decl.r#type.0);
         }
 
@@ -101,19 +105,12 @@ fn write_operation(mut builder: hugr_capnp::operation::Builder, operation: &mode
 }
 
 fn write_param(mut builder: hugr_capnp::param::Builder, param: &model::Param) {
-    match param {
-        model::Param::Implicit { name, r#type } => {
-            let mut builder = builder.init_implicit();
-            builder.set_name(name);
-            builder.set_type(r#type.0);
-        }
-        model::Param::Explicit { name, r#type } => {
-            let mut builder = builder.init_explicit();
-            builder.set_name(name);
-            builder.set_type(r#type.0);
-        }
-        model::Param::Constraint { constraint } => builder.set_constraint(constraint.0),
-    }
+    builder.set_name(param.name);
+    builder.set_type(param.r#type.0);
+    builder.set_sort(match param.sort {
+        model::ParamSort::Implicit => hugr_capnp::ParamSort::Implicit,
+        model::ParamSort::Explicit => hugr_capnp::ParamSort::Explicit,
+    });
 }
 
 fn write_global_ref(mut builder: hugr_capnp::global_ref::Builder, global_ref: &model::GlobalRef) {
@@ -211,6 +208,10 @@ fn write_term(mut builder: hugr_capnp::term::Builder, term: &model::Term) {
             builder.set_inputs(inputs.0);
             builder.set_outputs(outputs.0);
             builder.set_extensions(extensions.0);
+        }
+
+        model::Term::NonLinearConstraint { term } => {
+            builder.set_non_linear_constraint(term.0);
         }
     }
 }

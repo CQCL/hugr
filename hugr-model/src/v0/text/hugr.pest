@@ -56,16 +56,16 @@ node_tag               = { "(" ~ "tag" ~ tag ~ port_lists? ~ signature? ~ meta* 
 node_custom            = { "(" ~ (term_apply | term_apply_full) ~ port_lists? ~ signature? ~ meta* ~ region* ~ ")" }
 
 signature        = { "(" ~ "signature" ~ term ~ ")" }
-func_header      = { symbol ~ param* ~ term ~ term ~ term }
+func_header      = { symbol ~ param* ~ where_clause* ~ term ~ term ~ term }
 alias_header     = { symbol ~ param* ~ term }
-ctr_header       = { symbol ~ param* ~ term }
-operation_header = { symbol ~ param* ~ term }
+ctr_header       = { symbol ~ param* ~ where_clause* ~ term }
+operation_header = { symbol ~ param* ~ where_clause* ~ term }
 
-param = { param_implicit | param_explicit | param_constraint }
+param = { param_implicit | param_explicit }
 
-param_implicit   = { "(" ~ "forall" ~ term_var ~ term ~ ")" }
-param_explicit   = { "(" ~ "param" ~ term_var ~ term ~ ")" }
-param_constraint = { "(" ~ "where" ~ term ~ ")" }
+param_implicit = { "(" ~ "forall" ~ term_var ~ term ~ ")" }
+param_explicit = { "(" ~ "param" ~ term_var ~ term ~ ")" }
+where_clause   = { "(" ~ "where" ~ term ~ ")" }
 
 region     = { region_dfg | region_cfg }
 region_dfg = { "(" ~ "dfg" ~ port_lists? ~ signature? ~ meta* ~ node* ~ ")" }
@@ -92,6 +92,7 @@ term = {
   | term_ctrl_type
   | term_apply_full
   | term_apply
+  | term_non_linear
 }
 
 term_wildcard     = { "_" }
@@ -114,3 +115,4 @@ term_adt          = { "(" ~ "adt" ~ term ~ ")" }
 term_func_type    = { "(" ~ "fn" ~ term ~ term ~ term ~ ")" }
 term_ctrl         = { "(" ~ "ctrl" ~ term ~ ")" }
 term_ctrl_type    = { "ctrl" }
+term_non_linear   = { "(" ~ "nonlinear" ~ term ~ ")" }

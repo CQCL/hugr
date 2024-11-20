@@ -7,7 +7,7 @@ use thiserror::Error;
 
 use crate::v0::{
     AliasDecl, ConstructorDecl, FuncDecl, GlobalRef, LinkRef, LocalRef, MetaItem, Module, Node,
-    NodeId, Operation, OperationDecl, Param, Region, RegionId, RegionKind, Term, TermId,
+    NodeId, Operation, OperationDecl, Param, ParamSort, Region, RegionId, RegionKind, Term, TermId,
 };
 
 mod pest_parser {
@@ -207,6 +207,11 @@ impl<'a> ParseContext<'a> {
             Rule::term_ctrl => {
                 let values = self.parse_term(inner.next().unwrap())?;
                 Term::Control { values }
+            }
+
+            Rule::term_non_linear => {
+                let term = self.parse_term(inner.next().unwrap())?;
+                Term::NonLinearConstraint { term }
             }
 
             r => unreachable!("term: {:?}", r),
@@ -544,6 +549,7 @@ impl<'a> ParseContext<'a> {
         let mut inner = pair.into_inner();
         let name = self.parse_symbol(&mut inner)?;
         let params = self.parse_params(&mut inner)?;
+        let constraints = self.parse_constraints(&mut inner)?;
 
         let inputs = self.parse_term(inner.next().unwrap())?;
         let outputs = self.parse_term(inner.next().unwrap())?;
@@ -559,6 +565,7 @@ impl<'a> ParseContext<'a> {
         Ok(self.bump.alloc(FuncDecl {
             name,
             params,
+            constraints,
             signature: func,
         }))
     }
@@ -584,11 +591,13 @@ impl<'a> ParseContext<'a> {
         let mut inner = pair.into_inner();
         let name = self.parse_symbol(&mut inner)?;
         let params = self.parse_params(&mut inner)?;
+        let constraints = self.parse_constraints(&mut inner)?;
         let r#type = self.parse_term(inner.next().unwrap())?;
 
         Ok(self.bump.alloc(ConstructorDecl {
             name,
             params,
+            constraints,
             r#type,
         }))
     }
@@ -599,11 +608,13 @@ impl<'a> ParseContext<'a> {
         let mut inner = pair.into_inner();
         let name = self.parse_symbol(&mut inner)?;
         let params = self.parse_params(&mut inner)?;
+        let constraints = self.parse_constraints(&mut inner)?;
         let r#type = self.parse_term(inner.next().unwrap())?;
 
         Ok(self.bump.alloc(OperationDecl {
             name,
             params,
+            constraints,
             r#type,
         }))
     }
@@ -619,18 +630,21 @@ impl<'a> ParseContext<'a> {
                     let mut inner = param.into_inner();
                     let name = &inner.next().unwrap().as_str()[1..];
                     let r#type = self.parse_term(inner.next().unwrap())?;
-                    Param::Implicit { name, r#type }
+                    Param {
+                        name,
+                        r#type,
+                        sort: ParamSort::Implicit,
+                    }
                 }
                 Rule::param_explicit => {
                     let mut inner = param.into_inner();
                     let name = &inner.next().unwrap().as_str()[1..];
                     let r#type = self.parse_term(inner.next().unwrap())?;
-                    Param::Explicit { name, r#type }
-                }
-                Rule::param_constraint => {
-                    let mut inner = param.into_inner();
-                    let constraint = self.parse_term(inner.next().unwrap())?;
-                    Param::Constraint { constraint }
+                    Param {
+                        name,
+                        r#type,
+                        sort: ParamSort::Explicit,
+                    }
                 }
                 _ => unreachable!(),
             };
@@ -639,6 +653,17 @@ impl<'a> ParseContext<'a> {
         }
 
         Ok(self.bump.alloc_slice_copy(&params))
+    }
+
+    fn parse_constraints(&mut self, pairs: &mut Pairs<'a, Rule>) -> ParseResult<&'a [TermId]> {
+        let mut constraints = Vec::new();
+
+        for pair in filter_rule(pairs, Rule::where_clause) {
+            let constraint = self.parse_term(pair.into_inner().next().unwrap())?;
+            constraints.push(constraint);
+        }
+
+        Ok(self.bump.alloc_slice_copy(&constraints))
     }
 
     fn parse_signature(&mut self, pairs: &mut Pairs<'a, Rule>) -> ParseResult<Option<TermId>> {
