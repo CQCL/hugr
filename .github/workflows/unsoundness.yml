@@ -40,19 +40,17 @@ jobs:
         run: cargo miri test
 
 
-  notify-slack:
-    uses: CQCL/hugrverse-actions/.github/workflows/slack-notifier.yml@main
+  create-issue:
+    uses: CQCL/hugrverse-actions/.github/workflows/create-issue.yml@main
     needs: miri
     if: always() && needs.miri.result == 'failure' && github.event_name == 'push'
-    with:
-      channel-id: 'C04SHCL4FKP'
-      slack-message: |
-        💥 The unsoundness check for `CQCL/hugr` failed.
-        <https://github.com/CQCL/hugr/actions/runs/${{ github.run_id }}|Please investigate>.
-      # Rate-limit the message to once per day
-      timeout-minutes: 1440
-      # A repository variable used to store the last message timestamp.
-      timeout-variable: "UNSOUNDNESS_MSG_SENT"
     secrets:
-        SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
         GITHUB_PAT: ${{ secrets.HUGRBOT_PAT }}
+    with:
+        title: "💥 Unsoundness check failed on main"
+        body: |
+            The unsoundness check for `CQCL/hugr` failed.
+
+            [https://github.com/CQCL/hugr/actions/runs/${{ github.run_id }}](Please investigate).
+        unique-label: "unsoundness-checks"
+        other-labels: "bug"
