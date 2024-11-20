@@ -453,8 +453,8 @@ mod test {
         // `add_hugr_with_wires` does not return an InsertionResult, so recover the nodes manually:
         let cfg = cfg.node();
         let exit_node = h.children(cfg).nth(1).unwrap();
-        let tail = h.input_neighbours(exit_node).exactly_one().unwrap();
-        let head = h.input_neighbours(tail).exactly_one().unwrap();
+        let tail = h.input_neighbours(exit_node).exactly_one().ok().unwrap();
+        let head = h.input_neighbours(tail).exactly_one().ok().unwrap();
         // Just sanity-check we have the correct nodes
         assert!(h.get_optype(exit_node).is_exit_block());
         assert_eq!(

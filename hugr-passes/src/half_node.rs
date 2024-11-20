@@ -64,7 +64,6 @@ impl<H: RootTagged<RootHandle = CfgID>> HalfNodeView<H> {
 }
 
 impl<H: RootTagged<RootHandle = CfgID>> CfgNodeMap<HalfNode> for HalfNodeView<H> {
-    type Iterator<'c> = <Vec<HalfNode> as IntoIterator>::IntoIter where Self: 'c;
     fn entry_node(&self) -> HalfNode {
         HalfNode::N(self.entry)
     }
@@ -72,7 +71,7 @@ impl<H: RootTagged<RootHandle = CfgID>> CfgNodeMap<HalfNode> for HalfNodeView<H>
         assert!(self.bb_succs(self.exit).count() == 0);
         HalfNode::N(self.exit)
     }
-    fn predecessors(&self, h: HalfNode) -> Self::Iterator<'_> {
+    fn predecessors(&self, h: HalfNode) -> impl Iterator<Item = HalfNode> {
         let mut ps = Vec::new();
         match h {
             HalfNode::N(ni) => ps.extend(self.bb_preds(ni).map(|n| self.resolve_out(n))),
@@ -83,7 +82,7 @@ impl<H: RootTagged<RootHandle = CfgID>> CfgNodeMap<HalfNode> for HalfNodeView<H>
         }
         ps.into_iter()
     }
-    fn successors(&self, n: HalfNode) -> Self::Iterator<'_> {
+    fn successors(&self, n: HalfNode) -> impl Iterator<Item = HalfNode> {
         let mut succs = Vec::new();
         match n {
             HalfNode::N(ni) if self.is_multi_node(ni) => succs.push(HalfNode::X(ni)),

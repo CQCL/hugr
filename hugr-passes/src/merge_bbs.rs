@@ -276,7 +276,7 @@ mod test {
             .nodes()
             .filter(|n| h.get_optype(*n).cast::<Noop>().is_some());
         let (entry_nop, expected_backedge_target) = if self_loop {
-            assert_eq!(h.children(r).len(), 2);
+            assert_eq!(h.children(r).count(), 2);
             (nops.exactly_one().ok().unwrap(), entry)
         } else {
             let [_, _, no_b2] = h.children(r).collect::<Vec<_>>().try_into().unwrap();
