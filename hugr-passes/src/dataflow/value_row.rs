@@ -8,7 +8,7 @@ use std::{
 use ascent::{lattice::BoundedLattice, Lattice};
 use itertools::zip_eq;
 
-use super::{AbstractValue, PartialValue};
+use super::{row_contains_bottom, AbstractValue, PartialValue};
 
 #[derive(PartialEq, Clone, Debug, Eq, Hash)]
 pub(super) struct ValueRow<V>(Vec<PartialValue<V>>);
@@ -27,16 +27,19 @@ impl<V: AbstractValue> ValueRow<V> {
         Self(vec![v])
     }
 
-    /// The first value in this ValueRow must be a sum;
-    /// returns a new ValueRow given by unpacking the elements of the specified variant of said first value,
-    /// then appending the rest of the values in this row.
-    pub fn unpack_first(
+    /// If the first value in this ValueRow is a sum, that might contain
+    /// the specified tag, then unpack the elements of that tag, append the rest
+    /// of this ValueRow, and if none of the elements of that row [contain bottom](PartialValue::contains_bottom),
+    /// return it.
+    /// Otherwise (if no such tag, or values contain bottom), return None.
+    pub fn unpack_first_no_bottom(
         &self,
         variant: usize,
         len: usize,
     ) -> Option<impl Iterator<Item = PartialValue<V>>> {
         let vals = self[0].variant_values(variant, len)?;
-        Some(vals.into_iter().chain(self.0[1..].to_owned()))
+        (!row_contains_bottom(vals.iter().chain(self.0[1..].iter())))
+            .then(|| vals.into_iter().chain(self.0[1..].to_owned()))
     }
 }
 

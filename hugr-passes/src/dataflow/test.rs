@@ -302,10 +302,10 @@ fn test_conditional() {
     assert_eq!(cond_r1, Value::false_val());
     assert!(results.try_read_wire_value::<Value, _, _>(cond_o2).is_err());
 
-    assert_eq!(results.case_reachable(case1.node()), Some(false)); // arg_pv is variant 1 or 2 only
-    assert_eq!(results.case_reachable(case2.node()), Some(true));
-    assert_eq!(results.case_reachable(case3.node()), Some(true));
-    assert_eq!(results.case_reachable(cond.node()), None);
+    assert_eq!(results.reachable(case1.node()), false); // arg_pv is variant 1 or 2 only
+    assert!(results.reachable(case2.node()));
+    assert!(results.reachable(case3.node()));
+    assert!(results.reachable(cond.node()));
 }
 
 // A Hugr being a function on bools: (x, y) => (x XOR y, x AND y)

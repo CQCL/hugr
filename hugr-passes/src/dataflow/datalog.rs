@@ -7,7 +7,7 @@ use ascent::lattice::BoundedLattice;
 use itertools::Itertools;
 
 use hugr_core::extension::prelude::{MakeTuple, UnpackTuple};
-use hugr_core::ops::{NamedOp, OpTrait, OpType, TailLoop};
+use hugr_core::ops::{NamedOp, OpTag, OpTrait, OpType, TailLoop};
 use hugr_core::{HugrView, IncomingPort, Node, OutgoingPort, PortIndex as _, Wire};
 
 use super::value_row::ValueRow;
@@ -129,7 +129,7 @@ impl<V: AbstractValue> Machine<V> {
 
 pub(super) fn run_datalog<V: AbstractValue, C: DFContext<V>>(
     ctx: C,
-    in_wire_value_proto: Vec<(Node, IncomingPort, PV<V>)>,
+    in_wire_values_given: Vec<(Node, IncomingPort, PV<V>)>,
 ) -> AnalysisResults<V, C> {
     // ascent-(macro-)generated code generates a bunch of warnings,
     // keep code in here to a minimum.
@@ -141,15 +141,21 @@ pub(super) fn run_datalog<V: AbstractValue, C: DFContext<V>>(
     let all_results = ascent::ascent_run! {
         pub(super) struct AscentProgram<V: AbstractValue>;
         relation node(Node); // <Node> exists in the hugr
+        relation reachable(Node); // <Node> exists and is reachable
         relation in_wire(Node, IncomingPort); // <Node> has an <IncomingPort> of `EdgeKind::Value`
         relation out_wire(Node, OutgoingPort); // <Node> has an <OutgoingPort> of `EdgeKind::Value`
         relation parent_of_node(Node, Node); // <Node> is parent of <Node>
         relation input_child(Node, Node); // <Node> has 1st child <Node> that is its `Input`
         relation output_child(Node, Node); // <Node> has 2nd child <Node> that is its `Output`
-        lattice out_wire_value(Node, OutgoingPort, PV<V>); // <Node> produces, on <OutgoingPort>, the value <PV>
-        lattice in_wire_value(Node, IncomingPort, PV<V>); // <Node> receives, on <IncomingPort>, the value <PV>
-        lattice node_in_value_row(Node, ValueRow<V>); // <Node>'s inputs are <ValueRow>
-
+        // <Node> produces, on <OutgoingPort>, the value <PV>:
+        lattice out_wire_value(Node, OutgoingPort, PV<V>);
+        // <Node>'s inputs would be <ValueRow>, ignoring reachability:
+        lattice node_in_value_row_proto(Node, ValueRow<V>);
+        // <Node>'s receives <ValueRow> inputs, taking account of reachability:
+        lattice node_in_value_row(Node, ValueRow<V>);
+        // <Node> receives, on <IncomingPort>, the value <PV>, accounting for reachability:
+        lattice in_wire_value(Node, IncomingPort, PV<V>); 
+        
         node(n) <-- for n in ctx.nodes();
 
         in_wire(n, p) <-- node(n), for (p,_) in ctx.in_value_types(*n); // Note, gets connected inports only
@@ -164,25 +170,36 @@ pub(super) fn run_datalog<V: AbstractValue, C: DFContext<V>>(
         // Initialize all wires to bottom
         out_wire_value(n, p, PV::bottom()) <-- out_wire(n, p);
 
-        // Outputs to inputs
-        in_wire_value(n, ip, v) <-- in_wire(n, ip),
-            if let Some((m, op)) = ctx.single_linked_output(*n, *ip),
+        // out_wires -> node_in_value_row_proto, elements will be combined via join
+        node_in_value_row_proto(n, ValueRow::new(sig.input_count())) <-- node(n), if let Some(sig) = ctx.signature(*n);
+        node_in_value_row_proto(n, ValueRow::new(ctx.signature(*n).unwrap().input_count()).set(p.index(), v.clone())) <-- in_wire(n, p),
+            if let Some((m, op)) = ctx.single_linked_output(*n, *p),
             out_wire_value(m, op, v);
 
-        // Prepopulate in_wire_value from in_wire_value_proto.
-        in_wire_value(n, p, PV::bottom()) <-- in_wire(n, p);
-        in_wire_value(n, p, v) <-- for (n, p, v) in in_wire_value_proto.iter(),
+        // Also prepopulate in_wire_value_proto from in_wire_values_given.
+        node_in_value_row_proto(n, ValueRow::new(sig.input_count()).set(p.index(), v.clone())) <--
+          for (n, p, v) in in_wire_values_given.iter(),
           node(n),
           if let Some(sig) = ctx.signature(*n),
           if sig.input_ports().contains(p);
 
-        // Assemble node_in_value_row from in_wire_value's
-        node_in_value_row(n, ValueRow::new(sig.input_count())) <-- node(n), if let Some(sig) = ctx.signature(*n);
-        node_in_value_row(n, ValueRow::new(ctx.signature(*n).unwrap().input_count()).set(p.index(), v.clone())) <-- in_wire_value(n, p, v);
+        // node_in_value_row from node_in_value_row_proto if parent reachable
+        node_in_value_row(n, r) <-- node_in_value_row_proto(n,r), reachable(n);
+        
+        // in_wire_value by decomposing node_in_value_row
+        in_wire_value(n, IncomingPort::from(p), v) <-- node_in_value_row(n, r), for (p,v) in r[..].iter().enumerate();
+
+        // Reachability for dataflow regions (Conditional->Case and CFG->BB handled separately)
+        reachable(ctx.root());
+        reachable(n) <-- parent_of_node(p, n),
+           if OpTag::DataflowParent.is_superset(ctx.get_optype(*p).tag()),
+           reachable(p),
+           node_in_value_row_proto(n, r),
+           if !row_contains_bottom(&r[..]);
 
         // Interpret leaf ops
         out_wire_value(n, p, v) <--
-           node(n),
+           node(n), reachable(n),
            let op_t = ctx.get_optype(*n),
            if !op_t.is_container(),
            if let Some(sig) = op_t.dataflow_signature(),
@@ -195,7 +212,9 @@ pub(super) fn run_datalog<V: AbstractValue, C: DFContext<V>>(
         dfg_node(n) <-- node(n), if ctx.get_optype(*n).is_dfg();
 
         out_wire_value(i, OutgoingPort::from(p.index()), v) <-- dfg_node(dfg),
-          input_child(dfg, i), in_wire_value(dfg, p, v);
+          input_child(dfg, i),
+          node_in_value_row(dfg, row),
+          for (p, v) in row[..].iter().enumerate();
 
         out_wire_value(dfg, OutgoingPort::from(p.index()), v) <-- dfg_node(dfg),
             output_child(dfg, o), in_wire_value(o, p, v);
@@ -214,7 +233,7 @@ pub(super) fn run_datalog<V: AbstractValue, C: DFContext<V>>(
             output_child(tl, out_n),
             node_in_value_row(out_n, out_in_row), // get the whole input row for the output node...
             // ...and select just what's possible for CONTINUE_TAG, if anything
-            if let Some(fields) = out_in_row.unpack_first(TailLoop::CONTINUE_TAG, tailloop.just_inputs.len()),
+            if let Some(fields) = out_in_row.unpack_first_no_bottom(TailLoop::CONTINUE_TAG, tailloop.just_inputs.len()),
             for (out_p, v) in fields.enumerate();
 
         // Output node of child region propagate to outputs of tail loop
@@ -223,7 +242,7 @@ pub(super) fn run_datalog<V: AbstractValue, C: DFContext<V>>(
             output_child(tl, out_n),
             node_in_value_row(out_n, out_in_row), // get the whole input row for the output node...
             // ... and select just what's possible for BREAK_TAG, if anything
-            if let Some(fields) = out_in_row.unpack_first(TailLoop::BREAK_TAG, tailloop.just_outputs.len()),
+            if let Some(fields) = out_in_row.unpack_first_no_bottom(TailLoop::BREAK_TAG, tailloop.just_outputs.len()),
             for (out_p, v) in fields.enumerate();
 
         // Conditional --------------------
@@ -240,61 +259,61 @@ pub(super) fn run_datalog<V: AbstractValue, C: DFContext<V>>(
           input_child(case, i_node),
           node_in_value_row(cond, in_row),
           let conditional = ctx.get_optype(*cond).as_conditional().unwrap(),
-          if let Some(fields) = in_row.unpack_first(*case_index, conditional.sum_rows[*case_index].len()),
+          if let Some(fields) = in_row.unpack_first_no_bottom(*case_index, conditional.sum_rows[*case_index].len()),
           for (out_p, v) in fields.enumerate();
 
         // outputs of case nodes propagate to outputs of conditional *if* case reachable
         out_wire_value(cond, OutgoingPort::from(o_p.index()), v) <--
           case_node(cond, _i, case),
-          case_reachable(cond, case),
+          reachable(case),
           output_child(case, o),
           in_wire_value(o, o_p, v);
 
         // In `Conditional` <Node>, child `Case` <Node> is reachable given our knowledge of predicate:
-        relation case_reachable(Node, Node);
-        case_reachable(cond, case) <-- case_node(cond, i, case),
+        reachable(case) <-- case_node(cond, i, case),
             in_wire_value(cond, IncomingPort::from(0), v),
-            if v.supports_tag(*i);
+            if v.supports_tag(*i); // TODO better to check no Bottom within variant (or whole row)
 
         // CFG --------------------
-        relation cfg_node(Node); // <Node> is a `CFG`
-        cfg_node(n) <-- node(n), if ctx.get_optype(*n).is_cfg();
+        relation cfg_parent(Node, Node); // <Node> is a `CFG` and parent of <Node>
+        cfg_parent(p, n) <-- node(p), if ctx.get_optype(*p).is_cfg(), for n in ctx.children(*p);
 
         // In `CFG` <Node>, basic block <Node> is reachable given our knowledge of predicates:
-        relation bb_reachable(Node, Node);
-        bb_reachable(cfg, entry) <-- cfg_node(cfg), if let Some(entry) = ctx.children(*cfg).next();
-        bb_reachable(cfg, bb) <-- cfg_node(cfg),
-            bb_reachable(cfg, pred),
-            output_child(pred, pred_out),
-            in_wire_value(pred_out, IncomingPort::from(0), predicate),
-            for (tag, bb) in ctx.output_neighbours(*pred).enumerate(),
-            if predicate.supports_tag(tag);
-
+        reachable(entry) <-- cfg_parent(cfg, entry), if Some(*entry) == ctx.children(*cfg).next();
         // Inputs of CFG propagate to entry block
         out_wire_value(i_node, OutgoingPort::from(p.index()), v) <--
-            cfg_node(cfg),
-            if let Some(entry) = ctx.children(*cfg).next(),
+            cfg_parent(cfg, entry),
+            if Some(*entry) == ctx.children(*cfg).next(),
             input_child(entry, i_node),
-            in_wire_value(cfg, p, v);
+            node_in_value_row(cfg, row),
+            for (p, v) in row[..].iter().enumerate();
 
         // In `CFG` <Node>, values fed along a control-flow edge to <Node>
         //     come out of Value outports of <Node>:
         relation _cfg_succ_dest(Node, Node, Node);
-        _cfg_succ_dest(cfg, exit, cfg) <-- cfg_node(cfg), if let Some(exit) = ctx.children(*cfg).nth(1);
-        _cfg_succ_dest(cfg, blk, inp) <-- cfg_node(cfg),
-            for blk in ctx.children(*cfg),
-            if ctx.get_optype(blk).is_dataflow_block(),
+        _cfg_succ_dest(cfg, exit, cfg) <-- cfg_parent(cfg, exit), if Some(*exit) == ctx.children(*cfg).nth(1);
+        _cfg_succ_dest(cfg, blk, inp) <-- cfg_parent(cfg, blk),
+            if ctx.get_optype(*blk).is_dataflow_block(),
             input_child(blk, inp);
 
         // Outputs of each reachable block propagated to successor block or CFG itself
+        reachable(bb) <--
+            cfg_parent(cfg, pred),
+            //reachable(pred), // Output will only get values if pred reachable
+            output_child(pred, pred_out),
+            in_wire_value(pred_out, IncomingPort::from(0), predicate),
+            for (tag, bb) in ctx.output_neighbours(*pred).enumerate(),
+            if predicate.supports_tag(tag); // TODO Better to check no Bottom in row or at least predicate-variant
+
         out_wire_value(dest, OutgoingPort::from(out_p), v) <--
-            bb_reachable(cfg, pred),
+            cfg_parent(cfg, pred),
+            //reachable(pred), // Output will only get values if pred reachable
             if let Some(df_block) = ctx.get_optype(*pred).as_dataflow_block(),
             for (succ_n, succ) in ctx.output_neighbours(*pred).enumerate(),
             output_child(pred, out_n),
             _cfg_succ_dest(cfg, succ, dest),
             node_in_value_row(out_n, out_in_row),
-            if let Some(fields) = out_in_row.unpack_first(succ_n, df_block.sum_rows.get(succ_n).unwrap().len()),
+            if let Some(fields) = out_in_row.unpack_first_no_bottom(succ_n, df_block.sum_rows.get(succ_n).unwrap().len()),
             for (out_p, v) in fields.enumerate();
 
         // Call --------------------
@@ -303,6 +322,7 @@ pub(super) fn run_datalog<V: AbstractValue, C: DFContext<V>>(
             node(call),
             if ctx.get_optype(*call).is_call(),
             if let Some(func_defn) = ctx.static_source(*call);
+        reachable(func_defn) <-- func_call(call, func_defn), reachable(call);
 
         out_wire_value(inp, OutgoingPort::from(p.index()), v) <--
             func_call(call, func),
@@ -323,8 +343,7 @@ pub(super) fn run_datalog<V: AbstractValue, C: DFContext<V>>(
         ctx,
         out_wire_values,
         in_wire_value: all_results.in_wire_value,
-        case_reachable: all_results.case_reachable,
-        bb_reachable: all_results.bb_reachable,
+        reachable: all_results.reachable.into_iter().map(|(x,)|x).collect()
     }
 }
 
@@ -376,19 +395,16 @@ fn propagate_leaf_op<V: AbstractValue>(
             ))
         }
         OpType::ExtensionOp(e) => {
-            Some(ValueRow::from_iter(if row_contains_bottom(ins) {
-                // So far we think one or more inputs can't happen.
-                // So, don't pollute outputs with Top, and wait for better knowledge of inputs.
-                vec![PartialValue::Bottom; num_outs]
-            } else {
-                // Interpret op using DFContext
-                // Default to Top i.e.  can't figure out anything about the outputs
-                let mut outs = vec![PartialValue::Top; num_outs];
-                // It might be nice to convert `ins`` to [(IncomingPort, Value)], or some concrete value,
-                // for the context, but PV contains more information, and try_into_value may fail.
-                ctx.interpret_leaf_op(n, e, ins, &mut outs[..]);
-                outs
-            }))
+            // If the inputs contain bottom (can't happen), the node should be unreachable.
+            assert!(!row_contains_bottom(ins));
+            
+            // Interpret op using DFContext
+            // Default to Top i.e.  can't figure out anything about the outputs
+            let mut outs = vec![PartialValue::Top; num_outs];
+            // It might be nice to convert `ins`` to [(IncomingPort, Value)], or some concrete value,
+            // for the context, but PV contains more information, and try_into_value may fail.
+            ctx.interpret_leaf_op(n, e, ins, &mut outs[..]);
+            Some(ValueRow::from_iter(outs))
         }
         o => todo!("Unhandled: {:?}", o), // At least CallIndirect, and OpType is "non-exhaustive"
     }

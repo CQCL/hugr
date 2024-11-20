@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use hugr_core::{HugrView, IncomingPort, Node, PortIndex, Wire};
 
@@ -9,8 +9,7 @@ use super::{partial_value::ExtractValueError, AbstractValue, DFContext, PartialV
 pub struct AnalysisResults<V: AbstractValue, C: DFContext<V>> {
     pub(super) ctx: C,
     pub(super) in_wire_value: Vec<(Node, IncomingPort, PartialValue<V>)>,
-    pub(super) case_reachable: Vec<(Node, Node)>,
-    pub(super) bb_reachable: Vec<(Node, Node)>,
+    pub(super) reachable: HashSet<Node>,
     pub(super) out_wire_values: HashMap<Wire, PartialValue<V>>,
 }
 
@@ -41,39 +40,20 @@ impl<V: AbstractValue, C: DFContext<V>> AnalysisResults<V, C> {
         ))
     }
 
-    /// Tells whether a [Case] node is reachable, i.e. whether the predicate
-    /// to its parent [Conditional] may possibly have the tag corresponding to the [Case].
-    /// Returns `None` if the specified `case` is not a [Case], or is not within a [Conditional]
-    /// (e.g. a [Case]-rooted Hugr).
+    /// Tells whether a node is reachable, i.e. can actually be evaluated if the Hugr was.
+    /// This includes
+    /// - Any dataflow node is only reachable if its parent is reachable *and* all the node's inputs are non-[PartialValue::Bottom]
+    /// - [Case] nodes being reachable only if their parent [Conditional] might possibly receive the corresponding tag
+    /// - [DataflowBlock]s and [ExitBlock]s only being reachable if some [CFG]-predecessor is reachable
+    ///   and might (according to predicate) pass control flow to the block.
     ///
     /// [Case]: hugr_core::ops::Case
     /// [Conditional]: hugr_core::ops::Conditional
-    pub fn case_reachable(&self, case: Node) -> Option<bool> {
-        self.hugr().get_optype(case).as_case()?;
-        let cond = self.hugr().get_parent(case)?;
-        self.hugr().get_optype(cond).as_conditional()?;
-        Some(
-            self.case_reachable
-                .iter()
-                .any(|(cond2, case2)| &cond == cond2 && &case == case2),
-        )
-    }
-
-    /// Tells us if a block ([DataflowBlock] or [ExitBlock]) in a [CFG] is known
-    /// to be reachable. (Returns `None` if argument is not a child of a CFG.)
-    ///
     /// [CFG]: hugr_core::ops::CFG
     /// [DataflowBlock]: hugr_core::ops::DataflowBlock
     /// [ExitBlock]: hugr_core::ops::ExitBlock
-    pub fn bb_reachable(&self, bb: Node) -> Option<bool> {
-        let cfg = self.hugr().get_parent(bb)?; // Not really required...??
-        self.hugr().get_optype(cfg).as_cfg()?;
-        let t = self.hugr().get_optype(bb);
-        (t.is_dataflow_block() || t.is_exit_block()).then(|| {
-            self.bb_reachable
-                .iter()
-                .any(|(cfg2, bb2)| *cfg2 == cfg && *bb2 == bb)
-        })
+    pub fn reachable(&self, case: Node) -> bool {
+        self.reachable.contains(&case)
     }
 
     /// Reads a concrete representation of the value on an output wire, if the lattice value
