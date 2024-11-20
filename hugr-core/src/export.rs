@@ -44,10 +44,21 @@ struct Context<'a> {
     bump: &'a Bump,
     /// Stores the terms that we have already seen to avoid duplicates.
     term_map: FxHashMap<model::Term<'a>, model::TermId>,
+
     /// The current scope for local variables.
+    ///
+    /// This is set to the id of the smallest enclosing node that defines a polymorphic type.
+    /// We use this when exporting local variables in terms.
     local_scope: Option<model::NodeId>,
+
     /// Constraints to be added to the local scope.
+    ///
+    /// When exporting a node that defines a polymorphic type, we use this field
+    /// to collect the constraints that need to be added to that polymorphic
+    /// type. Currently this is used to record `nonlinear` constraints on uses
+    /// of `TypeParam::Type` with a `TypeBound::Copyable` bound.
     local_constraints: Vec<model::TermId>,
+
     /// Mapping from extension operations to their declarations.
     decl_operations: FxHashMap<(ExtensionId, OpName), model::NodeId>,
 }
@@ -679,6 +690,12 @@ impl<'a> Context<'a> {
         regions.into_bump_slice()
     }
 
+    /// Exports a polymorphic function type.
+    ///
+    /// The returned triple consists of:
+    ///  - The static parameters of the polymorphic function type.
+    ///  - The constraints of the polymorphic function type.
+    ///  - The function type itself.
     pub fn export_poly_func_type<RV: MaybeRV>(
         &mut self,
         t: &PolyFuncTypeBase<RV>,
@@ -699,10 +716,7 @@ impl<'a> Context<'a> {
             params.push(param)
         }
 
-        let constraints = self
-            .bump
-            .alloc_slice_fill_iter(self.local_constraints.drain(..));
-
+        let constraints = self.bump.alloc_slice_copy(&self.local_constraints);
         let body = self.export_func_type(t.body());
 
         (params.into_bump_slice(), constraints, body)
@@ -722,7 +736,6 @@ impl<'a> Context<'a> {
             }
             TypeEnum::Function(func) => self.export_func_type(func),
             TypeEnum::Variable(index, _) => {
-                // This ignores the type bound for now
                 let node = self.local_scope.expect("local variable out of scope");
                 self.make_term(model::Term::Var(model::LocalRef::Index(node, *index as _)))
             }
@@ -813,13 +826,18 @@ impl<'a> Context<'a> {
         self.make_term(model::Term::List { items, tail: None })
     }
 
+    /// Exports a `TypeParam` to a term.
+    ///
+    /// The `var` argument is set when the type parameter being exported is the
+    /// type of a parameter to a polymorphic definition. In that case we can
+    /// generate a `nonlinear` constraint for the type of runtime types marked as
+    /// `TypeBound::Copyable`.
     pub fn export_type_param(
         &mut self,
         t: &TypeParam,
         var: Option<model::LocalRef<'static>>,
     ) -> model::TermId {
         match t {
-            // This ignores the type bound for now.
             TypeParam::Type { b } => {
                 if let (Some(var), TypeBound::Copyable) = (var, b) {
                     let term = self.make_term(model::Term::Var(var));
@@ -829,7 +847,7 @@ impl<'a> Context<'a> {
 
                 self.make_term(model::Term::Type)
             }
-            // This ignores the type bound for now.
+            // This ignores the bound on the natural for now.
             TypeParam::BoundedNat { .. } => self.make_term(model::Term::NatType),
             TypeParam::String => self.make_term(model::Term::StrType),
             TypeParam::List { param } => {

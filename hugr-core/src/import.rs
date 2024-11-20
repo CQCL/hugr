@@ -115,7 +115,7 @@ struct Context<'a> {
     /// A map from `NodeId` to the imported `Node`.
     nodes: FxHashMap<model::NodeId, Node>,
 
-    /// The types of the local variables that are currently in scope.
+    /// The local variables that are currently in scope.
     local_variables: FxIndexMap<&'a str, LocalVar>,
 
     custom_name_cache: FxHashMap<&'a str, (ExtensionId, SmolStr)>,
@@ -155,7 +155,7 @@ impl<'a> Context<'a> {
             .ok_or_else(|| model::ModelError::RegionNotFound(region_id).into())
     }
 
-    /// Looks up a [`LocalRef`] within the current scope and returns its index and type.
+    /// Looks up a [`LocalRef`] within the current scope.
     fn resolve_local_ref(
         &self,
         local_ref: &model::LocalRef,
@@ -915,7 +915,7 @@ impl<'a> Context<'a> {
             }
 
             for (index, param) in decl.params.iter().enumerate() {
-                // TODO: `PolyFuncType` should be able to distinguish between implicit and explicit parameters.
+                // NOTE: `PolyFuncType` only has explicit type parameters at present.
                 let bound = ctx.local_variables[index].bound;
                 imported_params.push(ctx.import_type_param(param.r#type, bound)?);
             }
@@ -946,6 +946,8 @@ impl<'a> Context<'a> {
             model::Term::FuncType { .. } => Err(error_unsupported!("`(fn ...)` as `TypeParam`")),
 
             model::Term::ListType { item_type } => {
+                // At present `hugr-model` has no way to express that the item
+                // type of a list must be copyable. Therefore we import it as `Any`.
                 let param = Box::new(self.import_type_param(*item_type, TypeBound::Any)?);
                 Ok(TypeParam::List { param })
             }
@@ -1303,9 +1305,12 @@ impl<'a> Names<'a> {
     }
 }
 
+/// Information about a local variable.
 #[derive(Debug, Clone, Copy)]
 struct LocalVar {
+    /// The type of the variable.
     r#type: model::TermId,
+    /// The type bound of the variable.
     bound: TypeBound,
 }
 
