@@ -4,7 +4,7 @@
 //! methods that return [FatNode]s rather than [Node]s.
 use std::{cmp::Ordering, hash::Hash, marker::PhantomData, ops::Deref};
 
-use hugr::{
+use hugr_core::{
     hugr::{views::HierarchyView, HugrError},
     ops::{DataflowBlock, ExitBlock, Input, NamedOp, OpType, Output, CFG},
     types::Type,
@@ -23,7 +23,7 @@ use itertools::Itertools as _;
 /// stored node, so will silently malfunction if used with [FatNode]s from
 /// different base [Hugr]s. Note that [Node] has this same behaviour.
 ///
-/// [FuncDefn]: [hugr::ops::FuncDefn]
+/// [FuncDefn]: [hugr_core::ops::FuncDefn]
 #[derive(Debug)]
 pub struct FatNode<'hugr, OT = OpType, H = Hugr>
 where

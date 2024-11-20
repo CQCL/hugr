@@ -1,6 +1,6 @@
 use std::{collections::HashMap, rc::Rc};
 
-use hugr::{
+use hugr_core::{
     extension::{
         simple_op::{MakeExtensionOp, MakeOpDef},
         ExtensionId,

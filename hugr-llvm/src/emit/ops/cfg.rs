@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use anyhow::{anyhow, Result};
-use hugr::{
+use hugr_core::{
     ops::{DataflowBlock, ExitBlock, OpType, CFG},
     types::SumType,
     HugrView, NodeIndex,
@@ -217,12 +217,12 @@ impl<'c, 'hugr, H: HugrView> CfgEmitter<'c, 'hugr, H> {
 
 #[cfg(test)]
 mod test {
-    use hugr::builder::{Dataflow, DataflowSubContainer, SubContainer};
-    use hugr::extension::prelude::{self, BOOL_T};
-    use hugr::extension::{ExtensionRegistry, ExtensionSet};
-    use hugr::ops::Value;
-    use hugr::std_extensions::arithmetic::int_types::{self, INT_TYPES};
-    use hugr::type_row;
+    use hugr_core::builder::{Dataflow, DataflowSubContainer, SubContainer};
+    use hugr_core::extension::prelude::{self, BOOL_T};
+    use hugr_core::extension::{ExtensionRegistry, ExtensionSet};
+    use hugr_core::ops::Value;
+    use hugr_core::std_extensions::arithmetic::int_types::{self, INT_TYPES};
+    use hugr_core::type_row;
 
     use itertools::Itertools as _;
     use rstest::rstest;

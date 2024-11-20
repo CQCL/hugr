@@ -1,7 +1,7 @@
 //! Provides the implementation for a collection of [CustomConst] callbacks.
 use std::{any::TypeId, collections::HashMap};
 
-use hugr::{ops::constant::CustomConst, HugrView};
+use hugr_core::{ops::constant::CustomConst, HugrView};
 use inkwell::values::BasicValueEnum;
 
 use anyhow::{anyhow, bail, ensure, Result};

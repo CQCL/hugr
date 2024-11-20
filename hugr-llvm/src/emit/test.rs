@@ -5,19 +5,19 @@ use crate::extension::int::add_int_extensions;
 use crate::types::HugrFuncType;
 use crate::utils::fat::FatNode;
 use anyhow::{anyhow, Result};
-use hugr::builder::DataflowSubContainer;
-use hugr::builder::{
+use hugr_core::builder::DataflowSubContainer;
+use hugr_core::builder::{
     BuildHandle, Container, DFGWrapper, Dataflow, HugrBuilder, ModuleBuilder, SubContainer,
 };
-use hugr::extension::prelude::{ConstUsize, BOOL_T, USIZE_T};
-use hugr::extension::{ExtensionRegistry, EMPTY_REG, PRELUDE_REGISTRY};
-use hugr::ops::constant::CustomConst;
-use hugr::ops::handle::FuncID;
-use hugr::ops::{CallIndirect, Tag, Value};
-use hugr::std_extensions::arithmetic::int_ops::{self, INT_OPS_REGISTRY};
-use hugr::std_extensions::arithmetic::int_types::ConstInt;
-use hugr::types::{Signature, Type, TypeRow};
-use hugr::{type_row, Hugr, HugrView};
+use hugr_core::extension::prelude::{ConstUsize, BOOL_T, USIZE_T};
+use hugr_core::extension::{ExtensionRegistry, EMPTY_REG, PRELUDE_REGISTRY};
+use hugr_core::ops::constant::CustomConst;
+use hugr_core::ops::handle::FuncID;
+use hugr_core::ops::{CallIndirect, Tag, Value};
+use hugr_core::std_extensions::arithmetic::int_ops::{self, INT_OPS_REGISTRY};
+use hugr_core::std_extensions::arithmetic::int_types::ConstInt;
+use hugr_core::types::{Signature, Type, TypeRow};
+use hugr_core::{type_row, Hugr, HugrView};
 use inkwell::module::Module;
 use inkwell::passes::PassManager;
 use inkwell::values::GenericValue;
@@ -45,7 +45,7 @@ pub struct Emission<'c> {
 impl<'c> Emission<'c> {
     /// Create an `Emission` from a HUGR.
     pub fn emit_hugr<'a: 'c, H: HugrView>(
-        hugr: FatNode<'c, hugr::ops::Module, H>,
+        hugr: FatNode<'c, hugr_core::ops::Module, H>,
         eh: EmitHugr<'c, 'a, H>,
     ) -> Result<Self> where {
         let module = eh.emit_module(hugr)?.finish();
@@ -185,7 +185,7 @@ impl Default for SimpleHugrConfig {
 macro_rules! check_emission {
     // Call the macro with a snapshot name.
     ($snapshot_name:expr, $hugr: ident, $test_ctx:ident) => {{
-        let root = $crate::utils::fat::FatExt::fat_root::<hugr::ops::Module>(&$hugr).unwrap();
+        let root = $crate::utils::fat::FatExt::fat_root::<hugr_core::ops::Module>(&$hugr).unwrap();
         let emission =
             $crate::emit::test::Emission::emit_hugr(root, $test_ctx.get_emit_hugr()).unwrap();
 

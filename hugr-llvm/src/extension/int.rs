@@ -1,4 +1,4 @@
-use hugr::{
+use hugr_core::{
     ops::{constant::CustomConst, ExtensionOp, NamedOp, Value},
     std_extensions::arithmetic::{
         int_ops::IntOpDef,
@@ -165,7 +165,7 @@ impl<'a, H: HugrView + 'a> CodegenExtsBuilder<'a, H> {
 
 #[cfg(test)]
 mod test {
-    use hugr::{
+    use hugr_core::{
         builder::{Dataflow, DataflowSubContainer},
         extension::prelude::BOOL_T,
         std_extensions::arithmetic::{int_ops, int_types::INT_TYPES},

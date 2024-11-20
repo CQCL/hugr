@@ -1,4 +1,4 @@
-use hugr::{
+use hugr_core::{
     builder::{BuildError, Dataflow},
     extension::simple_op::HasConcrete as _,
     std_extensions::arithmetic::int_ops::IntOpDef,
