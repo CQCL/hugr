@@ -129,7 +129,7 @@ impl<V: AbstractValue> Machine<V> {
 
 pub(super) fn run_datalog<V: AbstractValue, C: DFContext<V>>(
     ctx: C,
-    in_wire_value_proto: Vec<(Node, IncomingPort, PV<V>)>,
+    in_wire_values_given: Vec<(Node, IncomingPort, PV<V>)>,
 ) -> AnalysisResults<V, C> {
     // ascent-(macro-)generated code generates a bunch of warnings,
     // keep code in here to a minimum.
@@ -169,9 +169,9 @@ pub(super) fn run_datalog<V: AbstractValue, C: DFContext<V>>(
             if let Some((m, op)) = ctx.single_linked_output(*n, *ip),
             out_wire_value(m, op, v);
 
-        // Prepopulate in_wire_value from in_wire_value_proto.
+        // Prepopulate in_wire_value from in_wire_values_given.
         in_wire_value(n, p, PV::bottom()) <-- in_wire(n, p);
-        in_wire_value(n, p, v) <-- for (n, p, v) in in_wire_value_proto.iter(),
+        in_wire_value(n, p, v) <-- for (n, p, v) in in_wire_values_given.iter(),
           node(n),
           if let Some(sig) = ctx.signature(*n),
           if sig.input_ports().contains(p);
