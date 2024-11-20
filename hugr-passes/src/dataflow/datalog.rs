@@ -87,7 +87,7 @@ impl<V: AbstractValue> Machine<V> {
                     context
                         .get_optype(*n)
                         .as_func_defn()
-                        .is_some_and(|f| f.name() == "main")
+                        .is_some_and(|f| f.name == "main")
                 });
                 if main.is_none() && in_values.next().is_some() {
                     panic!("Cannot give inputs to module with no 'main'");
