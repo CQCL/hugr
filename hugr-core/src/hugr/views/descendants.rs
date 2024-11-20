@@ -1,8 +1,7 @@
 //! DescendantsGraph: view onto the subgraph of the HUGR starting from a root
 //! (all descendants at all depths).
 
-use context_iterators::{ContextIterator, IntoContextIterator, MapWithCtx};
-use itertools::{Itertools, MapInto};
+use itertools::Itertools;
 use portgraph::{LinkView, MultiPortGraph, PortIndex, PortView};
 
 use crate::hugr::HugrError;
@@ -40,36 +39,6 @@ pub struct DescendantsGraph<'g, Root = Node> {
     _phantom: std::marker::PhantomData<Root>,
 }
 impl<'g, Root: NodeHandle> HugrView for DescendantsGraph<'g, Root> {
-    type Nodes<'a> = MapInto<<RegionGraph<'g> as PortView>::Nodes<'a>, Node>
-    where
-        Self: 'a;
-
-    type NodePorts<'a> = MapInto<<RegionGraph<'g> as PortView>::NodePortOffsets<'a>, Port>
-    where
-        Self: 'a;
-
-    type Children<'a> = MapInto<portgraph::hierarchy::Children<'a>, Node>
-    where
-        Self: 'a;
-
-    type Neighbours<'a> = MapInto<<RegionGraph<'g> as LinkView>::Neighbours<'a>, Node>
-    where
-        Self: 'a;
-
-    type PortLinks<'a> = MapWithCtx<
-        <RegionGraph<'g> as LinkView>::PortLinks<'a>,
-        &'a Self,
-        (Node, Port),
-    > where
-        Self: 'a;
-
-    type NodeConnections<'a> = MapWithCtx<
-        <RegionGraph<'g> as LinkView>::NodeConnections<'a>,
-        &'a Self,
-        [Port; 2],
-    > where
-        Self: 'a;
-
     #[inline]
     fn contains_node(&self, node: Node) -> bool {
         self.graph.contains_node(node.pg_index())
@@ -86,43 +55,43 @@ impl<'g, Root: NodeHandle> HugrView for DescendantsGraph<'g, Root> {
     }
 
     #[inline]
-    fn nodes(&self) -> Self::Nodes<'_> {
+    fn nodes(&self) -> impl Iterator<Item = Node> + Clone {
         self.graph.nodes_iter().map_into()
     }
 
     #[inline]
-    fn node_ports(&self, node: Node, dir: Direction) -> Self::NodePorts<'_> {
+    fn node_ports(&self, node: Node, dir: Direction) -> impl Iterator<Item = Port> + Clone {
         self.graph.port_offsets(node.pg_index(), dir).map_into()
     }
 
     #[inline]
-    fn all_node_ports(&self, node: Node) -> Self::NodePorts<'_> {
+    fn all_node_ports(&self, node: Node) -> impl Iterator<Item = Port> + Clone {
         self.graph.all_port_offsets(node.pg_index()).map_into()
     }
 
-    fn linked_ports(&self, node: Node, port: impl Into<Port>) -> Self::PortLinks<'_> {
+    fn linked_ports(
+        &self,
+        node: Node,
+        port: impl Into<Port>,
+    ) -> impl Iterator<Item = (Node, Port)> + Clone {
         let port = self
             .graph
             .port_index(node.pg_index(), port.into().pg_offset())
             .unwrap();
-        self.graph
-            .port_links(port)
-            .with_context(self)
-            .map_with_context(|(_, link), region| {
-                let port: PortIndex = link.into();
-                let node = region.graph.port_node(port).unwrap();
-                let offset = region.graph.port_offset(port).unwrap();
-                (node.into(), offset.into())
-            })
+        self.graph.port_links(port).map(|(_, link)| {
+            let port: PortIndex = link.into();
+            let node = self.graph.port_node(port).unwrap();
+            let offset = self.graph.port_offset(port).unwrap();
+            (node.into(), offset.into())
+        })
     }
 
-    fn node_connections(&self, node: Node, other: Node) -> Self::NodeConnections<'_> {
+    fn node_connections(&self, node: Node, other: Node) -> impl Iterator<Item = [Port; 2]> + Clone {
         self.graph
             .get_connections(node.pg_index(), other.pg_index())
-            .with_context(self)
-            .map_with_context(|(p1, p2), hugr| {
+            .map(|(p1, p2)| {
                 [p1, p2].map(|link| {
-                    let offset = hugr.graph.port_offset(link).unwrap();
+                    let offset = self.graph.port_offset(link).unwrap();
                     offset.into()
                 })
             })
@@ -134,7 +103,7 @@ impl<'g, Root: NodeHandle> HugrView for DescendantsGraph<'g, Root> {
     }
 
     #[inline]
-    fn children(&self, node: Node) -> Self::Children<'_> {
+    fn children(&self, node: Node) -> impl DoubleEndedIterator<Item = Node> + Clone {
         match self.graph.contains_node(node.pg_index()) {
             true => self
                 .base_hugr()
@@ -146,12 +115,12 @@ impl<'g, Root: NodeHandle> HugrView for DescendantsGraph<'g, Root> {
     }
 
     #[inline]
-    fn neighbours(&self, node: Node, dir: Direction) -> Self::Neighbours<'_> {
+    fn neighbours(&self, node: Node, dir: Direction) -> impl Iterator<Item = Node> + Clone {
         self.graph.neighbours(node.pg_index(), dir).map_into()
     }
 
     #[inline]
-    fn all_neighbours(&self, node: Node) -> Self::Neighbours<'_> {
+    fn all_neighbours(&self, node: Node) -> impl Iterator<Item = Node> + Clone {
         self.graph.all_neighbours(node.pg_index()).map_into()
     }
 }
@@ -204,6 +173,7 @@ pub(super) mod test {
     use rstest::rstest;
 
     use crate::extension::PRELUDE_REGISTRY;
+    use crate::IncomingPort;
     use crate::{
         builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
         type_row,
@@ -253,6 +223,7 @@ pub(super) mod test {
         let (hugr, def, inner) = make_module_hgr()?;
 
         let region: DescendantsGraph = DescendantsGraph::try_new(&hugr, def)?;
+        let def_io = region.get_io(def).unwrap();
 
         assert_eq!(region.node_count(), 7);
         assert!(region.nodes().all(|n| n == def
@@ -268,10 +239,47 @@ pub(super) mod test {
                     .into()
             )
         );
+
         let inner_region: DescendantsGraph = DescendantsGraph::try_new(&hugr, inner)?;
         assert_eq!(
             inner_region.inner_function_type(),
             Some(Signature::new(type_row![NAT], type_row![NAT]))
+        );
+        assert_eq!(inner_region.node_count(), 3);
+        assert_eq!(inner_region.edge_count(), 2);
+        assert_eq!(inner_region.children(inner).count(), 2);
+        assert_eq!(inner_region.children(hugr.root()).count(), 0);
+        assert_eq!(
+            inner_region.num_ports(inner, Direction::Outgoing),
+            inner_region.node_ports(inner, Direction::Outgoing).count()
+        );
+        assert_eq!(
+            inner_region.num_ports(inner, Direction::Incoming)
+                + inner_region.num_ports(inner, Direction::Outgoing),
+            inner_region.all_node_ports(inner).count()
+        );
+
+        // The inner region filters out the connections to the main function I/O nodes,
+        // while the outer region includes them.
+        assert_eq!(inner_region.node_connections(inner, def_io[1]).count(), 0);
+        assert_eq!(region.node_connections(inner, def_io[1]).count(), 1);
+        assert_eq!(
+            inner_region
+                .linked_ports(inner, IncomingPort::from(0))
+                .count(),
+            0
+        );
+        assert_eq!(region.linked_ports(inner, IncomingPort::from(0)).count(), 1);
+        assert_eq!(
+            inner_region.neighbours(inner, Direction::Outgoing).count(),
+            0
+        );
+        assert_eq!(inner_region.all_neighbours(inner).count(), 0);
+        assert_eq!(
+            inner_region
+                .linked_ports(inner, IncomingPort::from(0))
+                .count(),
+            0
         );
 
         Ok(())

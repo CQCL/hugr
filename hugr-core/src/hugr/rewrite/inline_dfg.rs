@@ -208,7 +208,7 @@ mod test {
 
         // Sanity checks
         assert_eq!(
-            outer.children(inner.node()).len(),
+            outer.children(inner.node()).count(),
             if nonlocal { 3 } else { 6 }
         ); // Input, Output, add; + const, load_const, lift
         assert_eq!(find_dfgs(&outer), vec![outer.root(), inner.node()]);
@@ -217,7 +217,7 @@ mod test {
             outer.get_parent(outer.get_parent(add).unwrap()),
             outer.get_parent(sub)
         );
-        assert_eq!(outer.nodes().len(), 11); // 6 above + inner DFG + outer (DFG + Input + Output + sub)
+        assert_eq!(outer.nodes().count(), 11); // 6 above + inner DFG + outer (DFG + Input + Output + sub)
         {
             // Check we can't inline the outer DFG
             let mut h = outer.clone();
@@ -230,7 +230,7 @@ mod test {
 
         outer.apply_rewrite(InlineDFG(*inner.handle()))?;
         outer.validate(&reg)?;
-        assert_eq!(outer.nodes().len(), 8);
+        assert_eq!(outer.nodes().count(), 8);
         assert_eq!(find_dfgs(&outer), vec![outer.root()]);
         let [_lift, add, sub] = extension_ops(&outer).try_into().unwrap();
         assert_eq!(outer.get_parent(add), Some(outer.root()));
@@ -265,8 +265,8 @@ mod test {
 
         let mut h = h.finish_hugr_with_outputs(cx.outputs(), &reg)?;
         assert_eq!(find_dfgs(&h), vec![h.root(), swap.node()]);
-        assert_eq!(h.nodes().len(), 8); // Dfg+I+O, H, CX, Dfg+I+O
-                                        // No permutation outside the swap DFG:
+        assert_eq!(h.nodes().count(), 8); // Dfg+I+O, H, CX, Dfg+I+O
+                                          // No permutation outside the swap DFG:
         assert_eq!(
             h.node_connections(p_h.node(), swap.node())
                 .collect::<Vec<_>>(),
@@ -292,7 +292,7 @@ mod test {
 
         h.apply_rewrite(InlineDFG(*swap.handle()))?;
         assert_eq!(find_dfgs(&h), vec![h.root()]);
-        assert_eq!(h.nodes().len(), 5); // Dfg+I+O
+        assert_eq!(h.nodes().count(), 5); // Dfg+I+O
         let mut ops = extension_ops(&h);
         ops.sort_by_key(|n| h.num_outputs(*n)); // Put H before CX
         let [h_gate, cx] = ops.try_into().unwrap();

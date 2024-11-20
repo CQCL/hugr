@@ -67,15 +67,10 @@ pub trait CfgNodeMap<T> {
     fn entry_node(&self) -> T;
     /// The unique exit node of the CFG. The only node to have no successors.
     fn exit_node(&self) -> T;
-    /// Allows the trait implementor to define a type of iterator it will return from
-    /// `successors` and `predecessors`.
-    type Iterator<'c>: Iterator<Item = T>
-    where
-        Self: 'c;
     /// Returns an iterator over the successors of the specified basic block.
-    fn successors(&self, node: T) -> Self::Iterator<'_>;
+    fn successors(&self, node: T) -> impl Iterator<Item = T>;
     /// Returns an iterator over the predecessors of the specified basic block.
-    fn predecessors(&self, node: T) -> Self::Iterator<'_>;
+    fn predecessors(&self, node: T) -> impl Iterator<Item = T>;
 }
 
 /// Extension of [CfgNodeMap] to that can perform (mutable/destructive)
@@ -242,15 +237,11 @@ impl<H: HugrView> CfgNodeMap<Node> for IdentityCfgMap<H> {
         self.exit
     }
 
-    type Iterator<'c> = <H as HugrView>::Neighbours<'c>
-    where
-        Self: 'c;
-
-    fn successors(&self, node: Node) -> Self::Iterator<'_> {
+    fn successors(&self, node: Node) -> impl Iterator<Item = Node> {
         self.h.neighbours(node, Direction::Outgoing)
     }
 
-    fn predecessors(&self, node: Node) -> Self::Iterator<'_> {
+    fn predecessors(&self, node: Node) -> impl Iterator<Item = Node> {
         self.h.neighbours(node, Direction::Incoming)
     }
 }
@@ -731,9 +722,9 @@ pub(crate) mod test {
         //             |          \-> right -/             |
         //             \---<---<---<---<---<---<---<---<---/
         // split is unique successor of head
-        let split = h.output_neighbours(head).exactly_one().unwrap();
+        let split = h.output_neighbours(head).exactly_one().ok().unwrap();
         // merge is unique predecessor of tail
-        let merge = h.input_neighbours(tail).exactly_one().unwrap();
+        let merge = h.input_neighbours(tail).exactly_one().ok().unwrap();
 
         // There's no need to use a view of a region here but we do so just to check
         // that we *can* (as we'll need to for "real" module Hugr's)

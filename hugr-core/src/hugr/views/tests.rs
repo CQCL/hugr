@@ -17,8 +17,11 @@ use crate::{
     Hugr, HugrView,
 };
 
+/// A Dataflow graph from two qubits to two qubits that applies two CX operations on them.
+///
+/// Returns the Hugr and the two CX node ids.
 #[fixture]
-fn sample_hugr() -> (Hugr, BuildHandle<DataflowOpID>, BuildHandle<DataflowOpID>) {
+pub(crate) fn sample_hugr() -> (Hugr, BuildHandle<DataflowOpID>, BuildHandle<DataflowOpID>) {
     let mut dfg = DFGBuilder::new(endo_sig(type_row![QB_T, QB_T])).unwrap();
 
     let [q1, q2] = dfg.input_wires_arr();
@@ -99,6 +102,7 @@ fn all_ports(sample_hugr: (Hugr, BuildHandle<DataflowOpID>, BuildHandle<Dataflow
     let (h, n1, n2) = sample_hugr;
 
     let all_output_ports = h.all_linked_outputs(n2.node()).collect_vec();
+    let all_ports = h.all_node_ports(n2.node()).collect_vec();
 
     assert_eq!(
         &all_output_ports[..],
@@ -108,6 +112,9 @@ fn all_ports(sample_hugr: (Hugr, BuildHandle<DataflowOpID>, BuildHandle<Dataflow
             (n1.node(), 2.into()),
         ]
     );
+    assert!(all_output_ports
+        .iter()
+        .all(|&(_, p)| all_ports.contains(&p.into())));
 
     let all_linked_inputs = h.all_linked_inputs(n1.node()).collect_vec();
     assert_eq!(
