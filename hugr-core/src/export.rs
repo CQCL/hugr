@@ -509,19 +509,19 @@ impl<'a> Context<'a> {
     /// like for the other nodes since the ports are control flow ports.
     pub fn export_block_signature(&mut self, block: &DataflowBlock) -> model::TermId {
         let inputs = {
-            let inputs = self.export_type_row(&block.inputs, None);
+            let inputs = self.export_type_row(&block.inputs);
             let inputs = self.make_term(model::Term::Control { values: inputs });
             self.make_term(model::Term::List {
                 items: self.bump.alloc_slice_copy(&[model::ListItem::Item(inputs)]),
             })
         };
 
-        let tail = self.export_type_row(&block.other_outputs, None);
+        let tail = self.export_type_row(&block.other_outputs);
 
         let outputs = {
             let mut outputs = BumpVec::with_capacity_in(block.sum_rows.len(), self.bump);
             for sum_row in block.sum_rows.iter() {
-                let variant = self.export_type_row(sum_row, Some(tail));
+                let variant = self.export_type_row_with_tail(sum_row, Some(tail));
                 let control = self.make_term(model::Term::Control { values: variant });
                 outputs.push(model::ListItem::Item(control));
             }
@@ -581,8 +581,8 @@ impl<'a> Context<'a> {
         }
 
         let signature = {
-            let inputs = self.export_type_row(&input_op.types, None);
-            let outputs = self.export_type_row(&output_op.types, None);
+            let inputs = self.export_type_row(&input_op.types);
+            let outputs = self.export_type_row(&output_op.types);
 
             Some(self.make_term(model::Term::FuncType {
                 inputs,
@@ -721,8 +721,8 @@ impl<'a> Context<'a> {
     }
 
     pub fn export_func_type<RV: MaybeRV>(&mut self, t: &FuncTypeBase<RV>) -> model::TermId {
-        let inputs = self.export_type_row(t.input(), None);
-        let outputs = self.export_type_row(t.output(), None);
+        let inputs = self.export_type_row(t.input());
+        let outputs = self.export_type_row(t.output());
         let extensions = self.export_ext_set(&t.extension_reqs);
         self.make_term(model::Term::FuncType {
             inputs,
@@ -785,7 +785,7 @@ impl<'a> Context<'a> {
             SumType::General { rows } => {
                 let items = self.bump.alloc_slice_fill_iter(
                     rows.iter()
-                        .map(|row| model::ListItem::Item(self.export_type_row(row, None))),
+                        .map(|row| model::ListItem::Item(self.export_type_row(row))),
                 );
                 let list = model::Term::List { items };
                 let variants = { self.make_term(list) };
@@ -794,7 +794,12 @@ impl<'a> Context<'a> {
         }
     }
 
-    pub fn export_type_row<RV: MaybeRV>(
+    #[inline]
+    pub fn export_type_row<RV: MaybeRV>(&mut self, row: &TypeRowBase<RV>) -> model::TermId {
+        self.export_type_row_with_tail(row, None)
+    }
+
+    pub fn export_type_row_with_tail<RV: MaybeRV>(
         &mut self,
         row: &TypeRowBase<RV>,
         tail: Option<model::TermId>,
@@ -852,7 +857,7 @@ impl<'a> Context<'a> {
                 let items = self.bump.alloc_slice_fill_iter(
                     params
                         .iter()
-                        .map(|param| model::ListItem::Item(self.export_type_param(param))),
+                        .map(|param| model::ListItem::Item(self.export_type_param(param, None))),
                 );
                 let types = self.make_term(model::Term::List { items });
                 self.make_term(model::Term::ApplyFull {
