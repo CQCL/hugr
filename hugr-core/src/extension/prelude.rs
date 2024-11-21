@@ -25,6 +25,10 @@ use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 
 use super::ExtensionRegistry;
 
+mod unwrap_builder;
+
+pub use unwrap_builder::UnwrapBuilder;
+
 /// Array type and operations.
 pub mod array;
 pub use array::{array_type, new_array_op, ArrayOp, ArrayOpDef, ARRAY_TYPE_NAME, NEW_ARRAY_OP_ID};
