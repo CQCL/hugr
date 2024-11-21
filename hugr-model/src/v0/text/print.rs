@@ -2,8 +2,8 @@ use pretty::{Arena, DocAllocator, RefDoc};
 use std::borrow::Cow;
 
 use crate::v0::{
-    GlobalRef, LinkRef, LocalRef, MetaItem, ModelError, Module, NodeId, Operation, Param, RegionId,
-    RegionKind, Term, TermId,
+    GlobalRef, LinkRef, LocalRef, MetaItem, ModelError, Module, NodeId, Operation, Param,
+    ParamSort, RegionId, RegionKind, Term, TermId,
 };
 
 type PrintError = ModelError;
@@ -122,15 +122,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
         f: impl FnOnce(&mut Self) -> PrintResult<T>,
     ) -> PrintResult<T> {
         let locals = std::mem::take(&mut self.locals);
-
-        for param in params {
-            match param {
-                Param::Implicit { name, .. } => self.locals.push(name),
-                Param::Explicit { name, .. } => self.locals.push(name),
-                Param::Constraint { .. } => {}
-            }
-        }
-
+        self.locals.extend(params.iter().map(|param| param.name));
         let result = f(self);
         self.locals = locals;
         result
@@ -178,9 +170,8 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                     this.print_text(decl.name);
                 });
 
-                for param in decl.params {
-                    this.print_param(*param)?;
-                }
+                this.print_params(decl.params)?;
+                this.print_constraints(decl.constraints)?;
 
                 match self.module.get_term(decl.signature) {
                     Some(Term::FuncType {
@@ -208,9 +199,8 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                     this.print_text(decl.name);
                 });
 
-                for param in decl.params {
-                    this.print_param(*param)?;
-                }
+                this.print_params(decl.params)?;
+                this.print_constraints(decl.constraints)?;
 
                 match self.module.get_term(decl.signature) {
                     Some(Term::FuncType {
@@ -303,9 +293,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                     this.print_text(decl.name);
                 });
 
-                for param in decl.params {
-                    this.print_param(*param)?;
-                }
+                this.print_params(decl.params)?;
 
                 this.print_term(decl.r#type)?;
                 this.print_term(*value)?;
@@ -318,9 +306,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                     this.print_text(decl.name);
                 });
 
-                for param in decl.params {
-                    this.print_param(*param)?;
-                }
+                this.print_params(decl.params)?;
 
                 this.print_term(decl.r#type)?;
                 this.print_meta(node_data.meta)?;
@@ -333,9 +319,8 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                     this.print_text(decl.name);
                 });
 
-                for param in decl.params {
-                    this.print_param(*param)?;
-                }
+                this.print_params(decl.params)?;
+                this.print_constraints(decl.constraints)?;
 
                 this.print_term(decl.r#type)?;
                 this.print_meta(node_data.meta)?;
@@ -348,9 +333,8 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                     this.print_text(decl.name);
                 });
 
-                for param in decl.params {
-                    this.print_param(*param)?;
-                }
+                this.print_params(decl.params)?;
+                this.print_constraints(decl.constraints)?;
 
                 this.print_term(decl.r#type)?;
                 this.print_meta(node_data.meta)?;
@@ -384,10 +368,9 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
     }
 
     fn print_regions(&mut self, regions: &'a [RegionId]) -> PrintResult<()> {
-        for region in regions {
-            self.print_region(*region)?;
-        }
-        Ok(())
+        regions
+            .iter()
+            .try_for_each(|region| self.print_region(*region))
     }
 
     fn print_region(&mut self, region: RegionId) -> PrintResult<()> {
@@ -422,11 +405,10 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
             .get_region(region)
             .ok_or(PrintError::RegionNotFound(region))?;
 
-        for node_id in region_data.children {
-            self.print_node(*node_id)?;
-        }
-
-        Ok(())
+        region_data
+            .children
+            .iter()
+            .try_for_each(|node_id| self.print_node(*node_id))
     }
 
     fn print_port_lists(
@@ -460,23 +442,31 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
         }
     }
 
+    fn print_params(&mut self, params: &'a [Param<'a>]) -> PrintResult<()> {
+        params.iter().try_for_each(|param| self.print_param(*param))
+    }
+
     fn print_param(&mut self, param: Param<'a>) -> PrintResult<()> {
-        self.print_parens(|this| match param {
-            Param::Implicit { name, r#type } => {
-                this.print_text("forall");
-                this.print_text(format!("?{}", name));
-                this.print_term(r#type)
-            }
-            Param::Explicit { name, r#type } => {
-                this.print_text("param");
-                this.print_text(format!("?{}", name));
-                this.print_term(r#type)
-            }
-            Param::Constraint { constraint } => {
-                this.print_text("where");
-                this.print_term(constraint)
-            }
+        self.print_parens(|this| {
+            match param.sort {
+                ParamSort::Implicit => this.print_text("forall"),
+                ParamSort::Explicit => this.print_text("param"),
+            };
+
+            this.print_text(format!("?{}", param.name));
+            this.print_term(param.r#type)
         })
+    }
+
+    fn print_constraints(&mut self, terms: &'a [TermId]) -> PrintResult<()> {
+        for term in terms {
+            self.print_parens(|this| {
+                this.print_text("where");
+                this.print_term(*term)
+            })?;
+        }
+
+        Ok(())
     }
 
     fn print_term(&mut self, term_id: TermId) -> PrintResult<()> {
@@ -598,6 +588,10 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 self.print_text("ctrl");
                 Ok(())
             }
+            Term::NonLinearConstraint { term } => self.print_parens(|this| {
+                this.print_text("nonlinear");
+                this.print_term(*term)
+            }),
         }
     }
 

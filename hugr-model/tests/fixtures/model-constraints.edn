@@ -1,0 +1,13 @@
+(hugr 0)
+
+(declare-func array.replicate
+  (forall ?t type)
+  (forall ?n nat)
+  (where (nonlinear ?t))
+  [?t] [(@ array.Array ?t ?n)]
+  (ext))
+
+(declare-func array.copy
+  (forall ?t type)
+  (where (nonlinear ?t))
+  [(@ array.Array ?t)] [(@ array.Array ?t) (@ array.Array ?t)] (ext))

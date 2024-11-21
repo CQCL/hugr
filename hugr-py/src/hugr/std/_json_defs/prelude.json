@@ -418,6 +418,189 @@
       },
       "binary": false
     },
+    "repeat": {
+      "extension": "prelude",
+      "name": "repeat",
+      "description": "Creates a new array whose elements are initialised by calling the given function n times",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": null
+          },
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "G",
+              "input": [],
+              "output": [
+                {
+                  "t": "V",
+                  "i": 1,
+                  "b": "A"
+                }
+              ],
+              "extension_reqs": []
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "prelude",
+              "id": "array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
+    "scan": {
+      "extension": "prelude",
+      "name": "scan",
+      "description": "A combination of map and foldl. Applies a function to each element of the array with an accumulator that is passed through from start to finish. Returns the resulting array and the final state of the accumulator.",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": null
+          },
+          {
+            "tp": "Type",
+            "b": "A"
+          },
+          {
+            "tp": "Type",
+            "b": "A"
+          },
+          {
+            "tp": "List",
+            "param": {
+              "tp": "Type",
+              "b": "A"
+            }
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "prelude",
+              "id": "array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "G",
+              "input": [
+                {
+                  "t": "V",
+                  "i": 1,
+                  "b": "A"
+                },
+                {
+                  "t": "R",
+                  "i": 3,
+                  "b": "A"
+                }
+              ],
+              "output": [
+                {
+                  "t": "V",
+                  "i": 2,
+                  "b": "A"
+                },
+                {
+                  "t": "R",
+                  "i": 3,
+                  "b": "A"
+                }
+              ],
+              "extension_reqs": []
+            },
+            {
+              "t": "R",
+              "i": 3,
+              "b": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "prelude",
+              "id": "array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 2,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "R",
+              "i": 3,
+              "b": "A"
+            }
+          ],
+          "extension_reqs": []
+        }
+      },
+      "binary": false
+    },
     "set": {
       "extension": "prelude",
       "name": "set",
