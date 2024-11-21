@@ -240,7 +240,7 @@ jobs:
           name: rust
           flags: rust
           token: ${{ secrets.CODECOV_TOKEN }}
-    
+
   tests-stable-llvm:
     needs: changes
     if: ${{ needs.changes.outputs.llvm == 'true' && github.event_name == 'push'}}
