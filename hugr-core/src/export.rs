@@ -512,7 +512,7 @@ impl<'a> Context<'a> {
             let inputs = self.export_type_row(&block.inputs);
             let inputs = self.make_term(model::Term::Control { values: inputs });
             self.make_term(model::Term::List {
-                items: self.bump.alloc_slice_copy(&[model::ListItem::Item(inputs)]),
+                parts: self.bump.alloc_slice_copy(&[model::ListPart::Item(inputs)]),
             })
         };
 
@@ -523,10 +523,10 @@ impl<'a> Context<'a> {
             for sum_row in block.sum_rows.iter() {
                 let variant = self.export_type_row_with_tail(sum_row, Some(tail));
                 let control = self.make_term(model::Term::Control { values: variant });
-                outputs.push(model::ListItem::Item(control));
+                outputs.push(model::ListPart::Item(control));
             }
             self.make_term(model::Term::List {
-                items: outputs.into_bump_slice(),
+                parts: outputs.into_bump_slice(),
             })
         };
 
@@ -748,12 +748,12 @@ impl<'a> Context<'a> {
             TypeArg::String { arg } => self.make_term(model::Term::Str(self.bump.alloc_str(arg))),
             TypeArg::Sequence { elems } => {
                 // For now we assume that the sequence is meant to be a list.
-                let items = self.bump.alloc_slice_fill_iter(
+                let parts = self.bump.alloc_slice_fill_iter(
                     elems
                         .iter()
-                        .map(|elem| model::ListItem::Item(self.export_type_arg(elem))),
+                        .map(|elem| model::ListPart::Item(self.export_type_arg(elem))),
                 );
-                self.make_term(model::Term::List { items })
+                self.make_term(model::Term::List { parts })
             }
             TypeArg::Extensions { es } => self.export_ext_set(es),
             TypeArg::Variable { v } => self.export_type_arg_var(v),
@@ -776,18 +776,18 @@ impl<'a> Context<'a> {
     pub fn export_sum_type(&mut self, t: &SumType) -> model::TermId {
         match t {
             SumType::Unit { size } => {
-                let items = self.bump.alloc_slice_fill_iter((0..*size).map(|_| {
-                    model::ListItem::Item(self.make_term(model::Term::List { items: &[] }))
+                let parts = self.bump.alloc_slice_fill_iter((0..*size).map(|_| {
+                    model::ListPart::Item(self.make_term(model::Term::List { parts: &[] }))
                 }));
-                let variants = self.make_term(model::Term::List { items });
+                let variants = self.make_term(model::Term::List { parts });
                 self.make_term(model::Term::Adt { variants })
             }
             SumType::General { rows } => {
-                let items = self.bump.alloc_slice_fill_iter(
+                let parts = self.bump.alloc_slice_fill_iter(
                     rows.iter()
-                        .map(|row| model::ListItem::Item(self.export_type_row(row))),
+                        .map(|row| model::ListPart::Item(self.export_type_row(row))),
                 );
-                let list = model::Term::List { items };
+                let list = model::Term::List { parts };
                 let variants = { self.make_term(list) };
                 self.make_term(model::Term::Adt { variants })
             }
@@ -804,25 +804,25 @@ impl<'a> Context<'a> {
         row: &TypeRowBase<RV>,
         tail: Option<model::TermId>,
     ) -> model::TermId {
-        let mut items = BumpVec::with_capacity_in(row.len() + tail.is_some() as usize, self.bump);
+        let mut parts = BumpVec::with_capacity_in(row.len() + tail.is_some() as usize, self.bump);
 
         for t in row.iter() {
             match t.as_type_enum() {
                 TypeEnum::RowVar(var) => {
-                    items.push(model::ListItem::Splice(self.export_row_var(var.as_rv())));
+                    parts.push(model::ListPart::Splice(self.export_row_var(var.as_rv())));
                 }
                 _ => {
-                    items.push(model::ListItem::Item(self.export_type(t)));
+                    parts.push(model::ListPart::Item(self.export_type(t)));
                 }
             }
         }
 
         if let Some(tail) = tail {
-            items.push(model::ListItem::Splice(tail));
+            parts.push(model::ListPart::Splice(tail));
         }
 
-        let items = items.into_bump_slice();
-        self.make_term(model::Term::List { items })
+        let parts = parts.into_bump_slice();
+        self.make_term(model::Term::List { parts })
     }
 
     /// Exports a `TypeParam` to a term.
@@ -854,12 +854,12 @@ impl<'a> Context<'a> {
                 self.make_term(model::Term::ListType { item_type })
             }
             TypeParam::Tuple { params } => {
-                let items = self.bump.alloc_slice_fill_iter(
+                let parts = self.bump.alloc_slice_fill_iter(
                     params
                         .iter()
-                        .map(|param| model::ListItem::Item(self.export_type_param(param, None))),
+                        .map(|param| model::ListPart::Item(self.export_type_param(param, None))),
                 );
-                let types = self.make_term(model::Term::List { items });
+                let types = self.make_term(model::Term::List { parts });
                 self.make_term(model::Term::ApplyFull {
                     global: model::GlobalRef::Named(TERM_PARAM_TUPLE),
                     args: self.bump.alloc_slice_copy(&[types]),
@@ -874,7 +874,7 @@ impl<'a> Context<'a> {
 
     pub fn export_ext_set(&mut self, ext_set: &ExtensionSet) -> model::TermId {
         let capacity = ext_set.iter().size_hint().0;
-        let mut items = BumpVec::with_capacity_in(capacity, self.bump);
+        let mut parts = BumpVec::with_capacity_in(capacity, self.bump);
 
         for ext in ext_set.iter() {
             // `ExtensionSet`s represent variables by extension names that parse to integers.
@@ -883,14 +883,14 @@ impl<'a> Context<'a> {
                     let node = self.local_scope.expect("local variable out of scope");
                     let local_ref = model::LocalRef::Index(node, var);
                     let term = self.make_term(model::Term::Var(local_ref));
-                    items.push(model::ExtSetItem::Splice(term));
+                    parts.push(model::ExtSetPart::Splice(term));
                 }
-                Err(_) => items.push(model::ExtSetItem::Extension(self.bump.alloc_str(ext))),
+                Err(_) => parts.push(model::ExtSetPart::Extension(self.bump.alloc_str(ext))),
             }
         }
 
         self.make_term(model::Term::ExtSet {
-            items: items.into_bump_slice(),
+            parts: parts.into_bump_slice(),
         })
     }
 

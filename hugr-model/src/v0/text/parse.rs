@@ -6,7 +6,7 @@ use pest::{
 use thiserror::Error;
 
 use crate::v0::{
-    AliasDecl, ConstructorDecl, ExtSetItem, FuncDecl, GlobalRef, LinkRef, ListItem, LocalRef,
+    AliasDecl, ConstructorDecl, ExtSetPart, FuncDecl, GlobalRef, LinkRef, ListPart, LocalRef,
     MetaItem, Module, Node, NodeId, Operation, OperationDecl, Param, ParamSort, Region, RegionId,
     RegionKind, Term, TermId,
 };
@@ -137,21 +137,21 @@ impl<'a> ParseContext<'a> {
             }
 
             Rule::term_list => {
-                let mut items = BumpVec::with_capacity_in(inner.len(), self.bump);
+                let mut parts = BumpVec::with_capacity_in(inner.len(), self.bump);
 
                 for token in inner {
                     match token.as_rule() {
-                        Rule::term => items.push(ListItem::Item(self.parse_term(token)?)),
+                        Rule::term => parts.push(ListPart::Item(self.parse_term(token)?)),
                         Rule::spliced_term => {
                             let term_token = token.into_inner().next().unwrap();
-                            items.push(ListItem::Splice(self.parse_term(term_token)?))
+                            parts.push(ListPart::Splice(self.parse_term(term_token)?))
                         }
                         _ => unreachable!(),
                     }
                 }
 
                 Term::List {
-                    items: items.into_bump_slice(),
+                    parts: parts.into_bump_slice(),
                 }
             }
 
@@ -171,23 +171,23 @@ impl<'a> ParseContext<'a> {
             }
 
             Rule::term_ext_set => {
-                let mut items = BumpVec::with_capacity_in(inner.len(), self.bump);
+                let mut parts = BumpVec::with_capacity_in(inner.len(), self.bump);
 
                 for token in inner {
                     match token.as_rule() {
                         Rule::ext_name => {
-                            items.push(ExtSetItem::Extension(self.bump.alloc_str(token.as_str())))
+                            parts.push(ExtSetPart::Extension(self.bump.alloc_str(token.as_str())))
                         }
                         Rule::spliced_term => {
                             let term_token = token.into_inner().next().unwrap();
-                            items.push(ExtSetItem::Splice(self.parse_term(term_token)?))
+                            parts.push(ExtSetPart::Splice(self.parse_term(term_token)?))
                         }
                         _ => unreachable!(),
                     }
                 }
 
                 Term::ExtSet {
-                    items: items.into_bump_slice(),
+                    parts: parts.into_bump_slice(),
                 }
             }
 

@@ -571,8 +571,8 @@ pub enum Term<'a> {
 
     /// A list. May include individual items or other lists to be spliced in.
     List {
-        /// The items in the list.
-        items: &'a [ListItem],
+        /// The parts of the list.
+        parts: &'a [ListPart],
     },
 
     /// The type of lists, given a type for the items.
@@ -607,8 +607,10 @@ pub enum Term<'a> {
 
     /// Extension set.
     ExtSet {
-        /// The items in the extension set.
-        items: &'a [ExtSetItem<'a>],
+        /// The parts of the extension set.
+        ///
+        /// Since extension sets are unordered, the parts may occur in any order.
+        parts: &'a [ExtSetPart<'a>],
     },
 
     /// The type of extension sets.
@@ -662,18 +664,18 @@ pub enum Term<'a> {
     },
 }
 
-/// An item in a list term.
+/// A part of a list term.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum ListItem {
+pub enum ListPart {
     /// A single item.
     Item(TermId),
     /// A list to be spliced into the parent list.
     Splice(TermId),
 }
 
-/// An item in an extension set term.
+/// A part of an extension set term.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum ExtSetItem<'a> {
+pub enum ExtSetPart<'a> {
     /// An extension.
     Extension(&'a str),
     /// An extension set to be spliced into the parent extension set.

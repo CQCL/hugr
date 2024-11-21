@@ -175,10 +175,10 @@ struct Term {
     }
 
     struct ListTerm {
-        items @0 :List(ListItem);
+        items @0 :List(ListPart);
     }
 
-    struct ListItem {
+    struct ListPart {
         union {
             item @0 :TermId;
             splice @1 :TermId;
@@ -186,10 +186,10 @@ struct Term {
     }
 
     struct ExtSet {
-        items @0 :List(ExtSetItem);
+        items @0 :List(ExtSetPart);
     }
 
-    struct ExtSetItem {
+    struct ExtSetPart {
         union {
             extension @0 :Text;
             splice @1 :TermId;

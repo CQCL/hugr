@@ -1050,16 +1050,17 @@ impl<'a> Context<'a> {
                     es.insert_type_var(index);
                 }
 
-                model::Term::ExtSet { items } => {
-                    for item in *items {
-                        match item {
-                            model::ExtSetItem::Extension(ext) => {
+                model::Term::ExtSet { parts } => {
+                    for part in *parts {
+                        match part {
+                            model::ExtSetPart::Extension(ext) => {
                                 let ext_ident = IdentList::new(*ext).map_err(|_| {
                                     model::ModelError::MalformedName(ext.to_smolstr())
                                 })?;
                                 es.insert(&ext_ident);
                             }
-                            model::ExtSetItem::Splice(term_id) => {
+                            model::ExtSetPart::Splice(term_id) => {
+                                // The order in an extension set does not matter.
                                 stack.push(*term_id);
                             }
                         }
@@ -1173,29 +1174,34 @@ impl<'a> Context<'a> {
         &mut self,
         term_id: model::TermId,
     ) -> Result<Vec<model::TermId>, ImportError> {
-        let mut types = Vec::new();
-        let mut stack = vec![term_id];
+        fn import_into(
+            ctx: &mut Context,
+            term_id: model::TermId,
+            types: &mut Vec<model::TermId>,
+        ) -> Result<(), ImportError> {
+            match ctx.get_term(term_id)? {
+                model::Term::List { parts } => {
+                    types.reserve(parts.len());
 
-        while let Some(term_id) = stack.pop() {
-            match self.get_term(term_id)? {
-                model::Term::List { items } => {
-                    types.reserve(items.len());
-
-                    for item in *items {
-                        match item {
-                            model::ListItem::Item(term_id) => {
+                    for part in *parts {
+                        match part {
+                            model::ListPart::Item(term_id) => {
                                 types.push(*term_id);
                             }
-                            model::ListItem::Splice(term_id) => {
-                                stack.push(*term_id);
+                            model::ListPart::Splice(term_id) => {
+                                import_into(ctx, *term_id, types)?;
                             }
                         }
                     }
                 }
                 _ => return Err(model::ModelError::TypeError(term_id).into()),
             }
+
+            Ok(())
         }
 
+        let mut types = Vec::new();
+        import_into(self, term_id, &mut types)?;
         Ok(types)
     }
 
@@ -1213,35 +1219,40 @@ impl<'a> Context<'a> {
         &mut self,
         term_id: model::TermId,
     ) -> Result<TypeRowBase<RV>, ImportError> {
-        let mut types = Vec::new();
-        let mut stack = vec![term_id];
+        fn import_into<RV: MaybeRV>(
+            ctx: &mut Context,
+            term_id: model::TermId,
+            types: &mut Vec<TypeBase<RV>>,
+        ) -> Result<(), ImportError> {
+            match ctx.get_term(term_id)? {
+                model::Term::List { parts } => {
+                    types.reserve(parts.len());
 
-        while let Some(term_id) = stack.pop() {
-            match self.get_term(term_id)? {
-                model::Term::List { items } => {
-                    types.reserve(items.len());
-
-                    for item in *items {
+                    for item in *parts {
                         match item {
-                            model::ListItem::Item(term_id) => {
-                                types.push(self.import_type::<RV>(*term_id)?);
+                            model::ListPart::Item(term_id) => {
+                                types.push(ctx.import_type::<RV>(*term_id)?);
                             }
-                            model::ListItem::Splice(term_id) => {
-                                stack.push(*term_id);
+                            model::ListPart::Splice(term_id) => {
+                                import_into(ctx, *term_id, types)?;
                             }
                         }
                     }
                 }
                 model::Term::Var(var) => {
-                    let (index, _) = self.resolve_local_ref(var)?;
+                    let (index, _) = ctx.resolve_local_ref(var)?;
                     let var = RV::try_from_rv(RowVariable(index, TypeBound::Any))
                         .map_err(|_| model::ModelError::TypeError(term_id))?;
                     types.push(TypeBase::new(TypeEnum::RowVar(var)));
                 }
                 _ => return Err(model::ModelError::TypeError(term_id).into()),
             }
+
+            Ok(())
         }
 
+        let mut types = Vec::new();
+        import_into(self, term_id, &mut types)?;
         Ok(types.into())
     }
 

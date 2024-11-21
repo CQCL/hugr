@@ -2,7 +2,7 @@ use pretty::{Arena, DocAllocator, RefDoc};
 use std::borrow::Cow;
 
 use crate::v0::{
-    ExtSetItem, GlobalRef, LinkRef, ListItem, LocalRef, MetaItem, ModelError, Module, NodeId,
+    ExtSetPart, GlobalRef, LinkRef, ListPart, LocalRef, MetaItem, ModelError, Module, NodeId,
     Operation, Param, ParamSort, RegionId, RegionKind, Term, TermId,
 };
 
@@ -521,7 +521,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 this.print_text("quote");
                 this.print_term(*r#type)
             }),
-            Term::List { .. } => self.print_brackets(|this| this.print_list_items(term_id)),
+            Term::List { .. } => self.print_brackets(|this| this.print_list_parts(term_id)),
             Term::ListType { item_type } => self.print_parens(|this| {
                 this.print_text("list");
                 this.print_term(*item_type)
@@ -544,7 +544,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
             }
             Term::ExtSet { .. } => self.print_parens(|this| {
                 this.print_text("ext");
-                this.print_ext_set_items(term_id)?;
+                this.print_ext_set_parts(term_id)?;
                 Ok(())
             }),
             Term::ExtSetType => {
@@ -583,17 +583,17 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
     /// Prints the contents of a list.
     ///
     /// This is used so that spliced lists are merged into the parent list.
-    fn print_list_items(&mut self, term_id: TermId) -> PrintResult<()> {
+    fn print_list_parts(&mut self, term_id: TermId) -> PrintResult<()> {
         let term_data = self
             .module
             .get_term(term_id)
             .ok_or_else(|| PrintError::TermNotFound(term_id))?;
 
-        if let Term::List { items } = term_data {
-            for item in *items {
-                match item {
-                    ListItem::Item(term) => self.print_term(*term)?,
-                    ListItem::Splice(list) => self.print_list_items(*list)?,
+        if let Term::List { parts } = term_data {
+            for part in *parts {
+                match part {
+                    ListPart::Item(term) => self.print_term(*term)?,
+                    ListPart::Splice(list) => self.print_list_parts(*list)?,
                 }
             }
         } else {
@@ -607,17 +607,17 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
     /// Prints the contents of an extension set.
     ///
     /// This is used so that spliced extension sets are merged into the parent extension set.
-    fn print_ext_set_items(&mut self, term_id: TermId) -> PrintResult<()> {
+    fn print_ext_set_parts(&mut self, term_id: TermId) -> PrintResult<()> {
         let term_data = self
             .module
             .get_term(term_id)
             .ok_or_else(|| PrintError::TermNotFound(term_id))?;
 
-        if let Term::ExtSet { items } = term_data {
-            for item in *items {
-                match item {
-                    ExtSetItem::Extension(ext) => self.print_text(*ext),
-                    ExtSetItem::Splice(list) => self.print_ext_set_items(*list)?,
+        if let Term::ExtSet { parts } = term_data {
+            for part in *parts {
+                match part {
+                    ExtSetPart::Extension(ext) => self.print_text(*ext),
+                    ExtSetPart::Splice(list) => self.print_ext_set_parts(*list)?,
                 }
             }
         } else {
