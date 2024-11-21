@@ -101,6 +101,7 @@ lazy_static! {
         NoopDef.add_to_extension(&mut prelude).unwrap();
         LiftDef.add_to_extension(&mut prelude).unwrap();
         array::ArrayOpDef::load_all_ops(&mut prelude).unwrap();
+        array::ArrayScanDef.add_to_extension(&mut prelude).unwrap();
         prelude
     };
     /// An extension registry containing only the prelude
