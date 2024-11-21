@@ -413,11 +413,11 @@ impl MakeOpDef for ArrayScanDef {
             .into()
     }
 
-    /// Add an operation implemented as an [MakeOpDef], which can provide the data
+    /// Add an operation implemented as a [MakeOpDef], which can provide the data
     /// required to define an [OpDef], to an extension.
     //
     // This method is re-defined here since we need to pass the array type def while
-    //  computing the signature, to avoid recursive loops initializing the extension.
+    // computing the signature, to avoid recursive loops initializing the extension.
     fn add_to_extension(
         &self,
         extension: &mut Extension,
