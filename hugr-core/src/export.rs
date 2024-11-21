@@ -877,6 +877,7 @@ impl<'a> Context<'a> {
         let mut items = BumpVec::with_capacity_in(capacity, self.bump);
 
         for ext in ext_set.iter() {
+            // `ExtensionSet`s represent variables by extension names that parse to integers.
             match ext.parse::<u16>() {
                 Ok(var) => {
                     let node = self.local_scope.expect("local variable out of scope");

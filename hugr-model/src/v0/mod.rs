@@ -569,11 +569,9 @@ pub enum Term<'a> {
         r#type: TermId,
     },
 
-    /// A list.
+    /// A list. May include individual items or other lists to be spliced in.
     List {
         /// The items in the list.
-        ///
-        /// `item-i : item-type`
         items: &'a [ListItem],
     },
 
