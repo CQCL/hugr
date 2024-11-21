@@ -407,8 +407,8 @@ impl MakeOpDef for ArrayScanDef {
 
     fn description(&self) -> String {
         "A combination of map and foldl. Applies a function to each element \
-        of the array with an accumulator that is passed trough from left to \
-        right. Returns the resulting array and the final state of the \
+        of the array with an accumulator that is passed through from start to \
+        finish. Returns the resulting array and the final state of the \
         accumulator."
             .into()
     }
