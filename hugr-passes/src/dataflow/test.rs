@@ -499,7 +499,7 @@ fn test_module() {
     let [inp] = f2.input_wires_arr();
     let cst_true = f2.add_load_value(Value::true_val());
     let f2_call = f2
-        .call(&leaf_fn.handle(), &[], [inp, cst_true], &EMPTY_REG)
+        .call(leaf_fn.handle(), &[], [inp, cst_true], &EMPTY_REG)
         .unwrap();
     let f2 = f2.finish_with_outputs(f2_call.outputs()).unwrap();
 
@@ -509,7 +509,7 @@ fn test_module() {
     let [inp] = main.input_wires_arr();
     let cst_false = main.add_load_value(Value::false_val());
     let main_call = main
-        .call(&leaf_fn.handle(), &[], [inp, cst_false], &EMPTY_REG)
+        .call(leaf_fn.handle(), &[], [inp, cst_false], &EMPTY_REG)
         .unwrap();
     main.finish_with_outputs(main_call.outputs()).unwrap();
     let hugr = modb.finish_hugr(&EMPTY_REG).unwrap();
@@ -524,12 +524,12 @@ fn test_module() {
         // The first output of the Call comes from `main` because no value was fed in from f2
         assert_eq!(
             results_just_main.read_out_wire(Wire::new(call.node(), 0)),
-            Some(pv_true().into())
+            Some(pv_true())
         );
         // (Without reachability) the second output of the Call is the join of the two constant inputs from the two calls
         assert_eq!(
             results_just_main.read_out_wire(Wire::new(call.node(), 1)),
-            Some(pv_true_or_false().into())
+            Some(pv_true_or_false())
         );
     }
 
@@ -542,11 +542,11 @@ fn test_module() {
     for call in [f2_call, main_call] {
         assert_eq!(
             results_two_calls.read_out_wire(Wire::new(call.node(), 0)),
-            Some(pv_true_or_false().into())
+            Some(pv_true_or_false())
         );
         assert_eq!(
             results_two_calls.read_out_wire(Wire::new(call.node(), 1)),
-            Some(pv_true_or_false().into())
+            Some(pv_true_or_false())
         );
     }
 }
