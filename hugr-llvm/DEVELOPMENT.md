@@ -46,7 +46,7 @@ We use `rustfmt` to enforce a consistent coding style. The CI will fail if the c
 To format your code, run:
 
 ```bash
-cargo format
+cargo fmt
 ```
 
 We also use various linters to catch common mistakes and enforce best practices. To run these, see [our CI config](./.github/workflows/ci-rs.yml). TODO Provide a better way, contributions welcome.
@@ -66,7 +66,7 @@ cargo install cargo-llvm-cov
 Then run the tests, see [our CI config](/.github/workflows/ci-rs.yml).
 
 ```bash
-just coverage
+cargo llvm-cov --lcov --output-path lcov.info
 ```
 
 This will generate a coverage file that can be opened with your favourite coverage viewer. In VSCode, you can use

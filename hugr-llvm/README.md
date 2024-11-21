@@ -18,8 +18,6 @@ At present only `llvm14-0` is supported but we expect to introduce supported ver
 
 See the [llvm-sys][] crate for details on how to use your preferred llvm installation.
 
-For an example lowering [guppy][] programs to LLVM see [tests/guppy.rs](./tests/guppy.rs)
-
 ## Recent Changes
 
 See [CHANGELOG](CHANGELOG.md) for a list of changes. The minimum supported rust
@@ -39,4 +37,3 @@ This project is licensed under Apache License, Version 2.0 ([LICENCE](LICENCE) o
   [inkwell]: https://thedan64.github.io/inkwell/inkwell/index.html
   [llvm-sys]: https://crates.io/crates/llvm-sys
   [llvm]: https://llvm.org/
-  [guppy]: https://github.com/CQCL/guppylang
