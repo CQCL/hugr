@@ -58,3 +58,10 @@ pub fn test_roundtrip_params() {
         "../../hugr-model/tests/fixtures/model-params.edn"
     )));
 }
+
+#[test]
+pub fn test_roundtrip_constraints() {
+    insta::assert_snapshot!(roundtrip(include_str!(
+        "../../hugr-model/tests/fixtures/model-constraints.edn"
+    )));
+}

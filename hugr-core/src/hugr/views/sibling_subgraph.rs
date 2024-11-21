@@ -211,7 +211,7 @@ impl SiblingSubgraph {
     /// The subgraph signature will be given by the types of the incoming and
     /// outgoing edges ordered by the node order in `nodes` and within each node
     /// by the port order.
-
+    ///
     /// The in- and out-arity of the signature will match the
     /// number of incoming and outgoing edges respectively. In particular, the
     /// assumption is made that no two incoming edges have the same source
@@ -238,6 +238,14 @@ impl SiblingSubgraph {
         checker: &impl ConvexChecker,
     ) -> Result<Self, InvalidSubgraph> {
         let nodes = nodes.into();
+
+        // If there's one or less nodes, we don't need to check convexity.
+        match nodes.as_slice() {
+            [] => return Err(InvalidSubgraph::EmptySubgraph),
+            [node] => return Ok(Self::from_node(*node, hugr)),
+            _ => {}
+        };
+
         let nodes_set = nodes.iter().copied().collect::<HashSet<_>>();
         let incoming_edges = nodes
             .iter()
@@ -263,6 +271,31 @@ impl SiblingSubgraph {
             })
             .collect_vec();
         Self::try_new_with_checker(inputs, outputs, hugr, checker)
+    }
+
+    /// Create a subgraph containing a single node.
+    ///
+    /// The subgraph signature will be given by signature of the node.
+    pub fn from_node(node: Node, hugr: &impl HugrView) -> Self {
+        // TODO once https://github.com/CQCL/portgraph/issues/155
+        // is fixed we can just call try_from_nodes here.
+        // Until then, doing this saves a lot of work.
+        let nodes = vec![node];
+        let inputs = hugr
+            .node_inputs(node)
+            .filter(|&p| hugr.is_linked(node, p))
+            .map(|p| vec![(node, p)])
+            .collect_vec();
+        let outputs = hugr
+            .node_outputs(node)
+            .filter_map(|p| hugr.is_linked(node, p).then_some((node, p)))
+            .collect_vec();
+
+        Self {
+            nodes,
+            inputs,
+            outputs,
+        }
     }
 
     /// An iterator over the nodes in the subgraph.
@@ -424,15 +457,21 @@ impl SiblingSubgraph {
 
         // Connect the inserted nodes in-between the input and output nodes.
         let [inp, out] = extracted.get_io(extracted.root()).unwrap();
-        for (inp_port, repl_ports) in extracted.node_outputs(inp).zip(self.inputs.iter()) {
+        let inputs = extracted.node_outputs(inp).zip(self.inputs.iter());
+        let outputs = extracted.node_inputs(out).zip(self.outputs.iter());
+        let mut connections = Vec::with_capacity(inputs.size_hint().0 + outputs.size_hint().0);
+
+        for (inp_port, repl_ports) in inputs {
             for (repl_node, repl_port) in repl_ports {
-                extracted.connect(inp, inp_port, node_map[repl_node], *repl_port);
+                connections.push((inp, inp_port, node_map[repl_node], *repl_port));
             }
         }
-        for (out_port, (repl_node, repl_port)) in
-            extracted.node_inputs(out).zip(self.outputs.iter())
-        {
-            extracted.connect(node_map[repl_node], *repl_port, out, out_port);
+        for (out_port, (repl_node, repl_port)) in outputs {
+            connections.push((node_map[repl_node], *repl_port, out, out_port));
+        }
+
+        for (src, src_port, dst, dst_port) in connections {
+            extracted.connect(src, src_port, dst, dst_port);
         }
 
         extracted
@@ -1030,9 +1069,9 @@ mod tests {
         let (hugr, func_root) = build_3not_hugr().unwrap();
         let func: SiblingGraph<'_> = SiblingGraph::try_new(&hugr, func_root).unwrap();
         let [inp, _out] = hugr.get_io(func_root).unwrap();
-        let not1 = hugr.output_neighbours(inp).exactly_one().unwrap();
-        let not2 = hugr.output_neighbours(not1).exactly_one().unwrap();
-        let not3 = hugr.output_neighbours(not2).exactly_one().unwrap();
+        let not1 = hugr.output_neighbours(inp).exactly_one().ok().unwrap();
+        let not2 = hugr.output_neighbours(not1).exactly_one().ok().unwrap();
+        let not3 = hugr.output_neighbours(not2).exactly_one().ok().unwrap();
         let not1_inp = hugr.node_inputs(not1).next().unwrap();
         let not1_out = hugr.node_outputs(not1).next().unwrap();
         let not3_inp = hugr.node_inputs(not3).next().unwrap();
@@ -1053,11 +1092,12 @@ mod tests {
     fn convex_multiports() {
         let (hugr, func_root) = build_multiport_hugr().unwrap();
         let [inp, out] = hugr.get_io(func_root).unwrap();
-        let not1 = hugr.output_neighbours(inp).exactly_one().unwrap();
+        let not1 = hugr.output_neighbours(inp).exactly_one().ok().unwrap();
         let not2 = hugr
             .output_neighbours(not1)
             .filter(|&n| n != out)
             .exactly_one()
+            .ok()
             .unwrap();
 
         let subgraph = SiblingSubgraph::try_from_nodes([not1, not2], &hugr).unwrap();

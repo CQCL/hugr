@@ -115,8 +115,8 @@ struct Context<'a> {
     /// A map from `NodeId` to the imported `Node`.
     nodes: FxHashMap<model::NodeId, Node>,
 
-    /// The types of the local variables that are currently in scope.
-    local_variables: FxIndexMap<&'a str, model::TermId>,
+    /// The local variables that are currently in scope.
+    local_variables: FxIndexMap<&'a str, LocalVar>,
 
     custom_name_cache: FxHashMap<&'a str, (ExtensionId, SmolStr)>,
 }
@@ -155,20 +155,20 @@ impl<'a> Context<'a> {
             .ok_or_else(|| model::ModelError::RegionNotFound(region_id).into())
     }
 
-    /// Looks up a [`LocalRef`] within the current scope and returns its index and type.
+    /// Looks up a [`LocalRef`] within the current scope.
     fn resolve_local_ref(
         &self,
         local_ref: &model::LocalRef,
-    ) -> Result<(usize, model::TermId), ImportError> {
+    ) -> Result<(usize, LocalVar), ImportError> {
         let term = match local_ref {
             model::LocalRef::Index(_, index) => self
                 .local_variables
                 .get_index(*index as usize)
-                .map(|(_, term)| (*index as usize, *term)),
+                .map(|(_, v)| (*index as usize, *v)),
             model::LocalRef::Named(name) => self
                 .local_variables
                 .get_full(name)
-                .map(|(index, _, term)| (index, *term)),
+                .map(|(index, _, v)| (index, *v)),
         };
 
         term.ok_or_else(|| model::ModelError::InvalidLocal(local_ref.to_string()).into())
@@ -810,9 +810,11 @@ impl<'a> Context<'a> {
             // Connect the input node to the tag node
             let input_outputs = self.hugr.node_outputs(node_input);
             let tag_inputs = self.hugr.node_inputs(node_tag);
+            let mut connections =
+                Vec::with_capacity(input_outputs.size_hint().0 + tag_inputs.size_hint().0);
 
             for (a, b) in input_outputs.zip(tag_inputs) {
-                self.hugr.connect(node_input, a, node_tag, b);
+                connections.push((node_input, a, node_tag, b));
             }
 
             // Connect the tag node to the output node
@@ -820,7 +822,11 @@ impl<'a> Context<'a> {
             let output_inputs = self.hugr.node_inputs(node_output);
 
             for (a, b) in tag_outputs.zip(output_inputs) {
-                self.hugr.connect(node_tag, a, node_output, b);
+                connections.push((node_tag, a, node_output, b));
+            }
+
+            for (src, src_port, dst, dst_port) in connections {
+                self.hugr.connect(src, src_port, dst, dst_port);
             }
         }
 
@@ -892,22 +898,32 @@ impl<'a> Context<'a> {
         self.with_local_socpe(|ctx| {
             let mut imported_params = Vec::with_capacity(decl.params.len());
 
-            for param in decl.params {
-                // TODO: `PolyFuncType` should be able to handle constraints
-                // and distinguish between implicit and explicit parameters.
-                match param {
-                    model::Param::Implicit { name, r#type } => {
-                        imported_params.push(ctx.import_type_param(*r#type)?);
-                        ctx.local_variables.insert(name, *r#type);
+            ctx.local_variables.extend(
+                decl.params
+                    .iter()
+                    .map(|param| (param.name, LocalVar::new(param.r#type))),
+            );
+
+            for constraint in decl.constraints {
+                match ctx.get_term(*constraint)? {
+                    model::Term::NonLinearConstraint { term } => {
+                        let model::Term::Var(var) = ctx.get_term(*term)? else {
+                            return Err(error_unsupported!(
+                                "constraint on term that is not a variable"
+                            ));
+                        };
+
+                        let var = ctx.resolve_local_ref(var)?.0;
+                        ctx.local_variables[var].bound = TypeBound::Copyable;
                     }
-                    model::Param::Explicit { name, r#type } => {
-                        imported_params.push(ctx.import_type_param(*r#type)?);
-                        ctx.local_variables.insert(name, *r#type);
-                    }
-                    model::Param::Constraint { constraint: _ } => {
-                        return Err(error_unsupported!("constraints"));
-                    }
+                    _ => return Err(error_unsupported!("constraint other than copy or discard")),
                 }
+            }
+
+            for (index, param) in decl.params.iter().enumerate() {
+                // NOTE: `PolyFuncType` only has explicit type parameters at present.
+                let bound = ctx.local_variables[index].bound;
+                imported_params.push(ctx.import_type_param(param.r#type, bound)?);
             }
 
             let body = ctx.import_func_type::<RV>(decl.signature)?;
@@ -916,17 +932,15 @@ impl<'a> Context<'a> {
     }
 
     /// Import a [`TypeParam`] from a term that represents a static type.
-    fn import_type_param(&mut self, term_id: model::TermId) -> Result<TypeParam, ImportError> {
+    fn import_type_param(
+        &mut self,
+        term_id: model::TermId,
+        bound: TypeBound,
+    ) -> Result<TypeParam, ImportError> {
         match self.get_term(term_id)? {
             model::Term::Wildcard => Err(error_uninferred!("wildcard")),
 
-            model::Term::Type => {
-                // As part of the migration from `TypeBound`s to constraints, we pretend that all
-                // `TypeBound`s are copyable.
-                Ok(TypeParam::Type {
-                    b: TypeBound::Copyable,
-                })
-            }
+            model::Term::Type => Ok(TypeParam::Type { b: bound }),
 
             model::Term::StaticType => Err(error_unsupported!("`type` as `TypeParam`")),
             model::Term::Constraint => Err(error_unsupported!("`constraint` as `TypeParam`")),
@@ -938,7 +952,9 @@ impl<'a> Context<'a> {
             model::Term::FuncType { .. } => Err(error_unsupported!("`(fn ...)` as `TypeParam`")),
 
             model::Term::ListType { item_type } => {
-                let param = Box::new(self.import_type_param(*item_type)?);
+                // At present `hugr-model` has no way to express that the item
+                // type of a list must be copyable. Therefore we import it as `Any`.
+                let param = Box::new(self.import_type_param(*item_type, TypeBound::Any)?);
                 Ok(TypeParam::List { param })
             }
 
@@ -952,7 +968,10 @@ impl<'a> Context<'a> {
             | model::Term::List { .. }
             | model::Term::ExtSet { .. }
             | model::Term::Adt { .. }
-            | model::Term::Control { .. } => Err(model::ModelError::TypeError(term_id).into()),
+            | model::Term::Control { .. }
+            | model::Term::NonLinearConstraint { .. } => {
+                Err(model::ModelError::TypeError(term_id).into())
+            }
 
             model::Term::ControlType => {
                 Err(error_unsupported!("type of control types as `TypeParam`"))
@@ -960,7 +979,7 @@ impl<'a> Context<'a> {
         }
     }
 
-    /// Import a `TypeArg` froma term that represents a static type or value.
+    /// Import a `TypeArg` from a term that represents a static type or value.
     fn import_type_arg(&mut self, term_id: model::TermId) -> Result<TypeArg, ImportError> {
         match self.get_term(term_id)? {
             model::Term::Wildcard => Err(error_uninferred!("wildcard")),
@@ -969,8 +988,8 @@ impl<'a> Context<'a> {
             }
 
             model::Term::Var(var) => {
-                let (index, var_type) = self.resolve_local_ref(var)?;
-                let decl = self.import_type_param(var_type)?;
+                let (index, var) = self.resolve_local_ref(var)?;
+                let decl = self.import_type_param(var.r#type, var.bound)?;
                 Ok(TypeArg::new_var_use(index, decl))
             }
 
@@ -1008,7 +1027,10 @@ impl<'a> Context<'a> {
 
             model::Term::FuncType { .. }
             | model::Term::Adt { .. }
-            | model::Term::Control { .. } => Err(model::ModelError::TypeError(term_id).into()),
+            | model::Term::Control { .. }
+            | model::Term::NonLinearConstraint { .. } => {
+                Err(model::ModelError::TypeError(term_id).into())
+            }
         }
     }
 
@@ -1109,7 +1131,10 @@ impl<'a> Context<'a> {
             | model::Term::List { .. }
             | model::Term::Control { .. }
             | model::Term::ControlType
-            | model::Term::Nat(_) => Err(model::ModelError::TypeError(term_id).into()),
+            | model::Term::Nat(_)
+            | model::Term::NonLinearConstraint { .. } => {
+                Err(model::ModelError::TypeError(term_id).into())
+            }
         }
     }
 
@@ -1283,5 +1308,23 @@ impl<'a> Names<'a> {
         }
 
         Ok(Self { items })
+    }
+}
+
+/// Information about a local variable.
+#[derive(Debug, Clone, Copy)]
+struct LocalVar {
+    /// The type of the variable.
+    r#type: model::TermId,
+    /// The type bound of the variable.
+    bound: TypeBound,
+}
+
+impl LocalVar {
+    pub fn new(r#type: model::TermId) -> Self {
+        Self {
+            r#type,
+            bound: TypeBound::Any,
+        }
     }
 }
