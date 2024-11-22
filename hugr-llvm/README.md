@@ -1,8 +1,8 @@
 # hugr-llvm
 
-[![build_status][]](https://github.com/CQCL/hugr-llvm/actions)
-[![codecov](https://codecov.io/github/CQCL/hugr-llvm/graph/badge.svg?token=TN3DSNHF43)](https://codecov.io/github/CQCL/hugr-llvm)
-[![msrv][]](https://github.com/CQCL/hugr-llvm)
+[![build_status][]](https://github.com/CQCL/hugr/actions)
+[![codecov](https://codecov.io/github/CQCL/hugr/graph/badge.svg?token=TN3DSNHF43)](https://codecov.io/github/CQCL/hugr)
+[![msrv][]](https://github.com/CQCL/hugr/tree/main/hugr-llvm)
 
 A general, extensible, rust crate for lowering `HUGR`s into `LLVM` IR. Built on [hugr][], [inkwell][], and [llvm][].
 
@@ -31,7 +31,7 @@ See [DEVELOPMENT](DEVELOPMENT.md) for instructions on setting up the development
 
 This project is licensed under Apache License, Version 2.0 ([LICENCE](LICENCE) or <http://www.apache.org/licenses/LICENSE-2.0>).
 
-  [build_status]: https://github.com/CQCL/hugr-llvm/actions/workflows/ci-rs.yml/badge.svg?branch=main
+  [build_status]: https://github.com/CQCL/hugr/actions/workflows/ci-rs.yml/badge.svg?branch=main
   [msrv]: https://img.shields.io/badge/rust-1.75.0%2B-blue.svg
   [hugr]: https://lib.rs/crates/hugr
   [inkwell]: https://thedan64.github.io/inkwell/inkwell/index.html
