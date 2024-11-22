@@ -26,6 +26,7 @@ extension_inference = ["hugr-core/extension_inference"]
 declarative = ["hugr-core/declarative"]
 model_unstable = ["hugr-core/model_unstable", "hugr-model"]
 llvm = ["hugr-llvm/llvm14-0"]
+llvm-test = ["hugr-llvm/llvm14-0", "hugr-llvm/test"]
 
 [dependencies]
 hugr-model = { path = "../hugr-model", optional = true, version = "0.14.0" }

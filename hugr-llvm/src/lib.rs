@@ -75,7 +75,7 @@ pub fn llvm_version() -> &'static str {
     panic!("No recognised llvm feature")
 }
 
-#[cfg(test)]
+#[cfg(feature = "test")]
 pub mod test;
 
 pub use custom::{CodegenExtension, CodegenExtsBuilder};

@@ -403,5 +403,5 @@ pub fn get_intrinsic<'c>(
         ))
 }
 
-#[cfg(test)]
+#[cfg(feature = "test")]
 pub mod test;

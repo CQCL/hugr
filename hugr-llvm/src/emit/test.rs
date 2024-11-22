@@ -1,30 +1,16 @@
-use std::iter;
-
-use crate::custom::CodegenExtsBuilder;
-use crate::extension::int::add_int_extensions;
 use crate::types::HugrFuncType;
 use crate::utils::fat::FatNode;
 use anyhow::{anyhow, Result};
-use hugr_core::builder::DataflowSubContainer;
 use hugr_core::builder::{
-    BuildHandle, Container, DFGWrapper, Dataflow, HugrBuilder, ModuleBuilder, SubContainer,
+    BuildHandle, Container, DFGWrapper, HugrBuilder, ModuleBuilder, SubContainer,
 };
-use hugr_core::extension::prelude::{ConstUsize, BOOL_T, USIZE_T};
-use hugr_core::extension::{ExtensionRegistry, EMPTY_REG, PRELUDE_REGISTRY};
-use hugr_core::ops::constant::CustomConst;
+use hugr_core::extension::{ExtensionRegistry, EMPTY_REG};
 use hugr_core::ops::handle::FuncID;
-use hugr_core::ops::{CallIndirect, Tag, Value};
-use hugr_core::std_extensions::arithmetic::int_ops::{self, INT_OPS_REGISTRY};
-use hugr_core::std_extensions::arithmetic::int_types::ConstInt;
-use hugr_core::types::{Signature, Type, TypeRow};
-use hugr_core::{type_row, Hugr, HugrView};
+use hugr_core::types::TypeRow;
+use hugr_core::{Hugr, HugrView};
 use inkwell::module::Module;
 use inkwell::passes::PassManager;
 use inkwell::values::GenericValue;
-use itertools::Itertools;
-use rstest::rstest;
-
-use crate::test::*;
 
 use super::EmitHugr;
 
@@ -225,297 +211,326 @@ macro_rules! check_emission {
     };
 }
 
-#[rstest]
-fn emit_hugr_tag(llvm_ctx: TestContext) {
-    let hugr = SimpleHugrConfig::new()
-        .with_outs(Type::new_unit_sum(3))
-        .finish(|mut builder: DFGW| {
-            let tag = builder
-                .add_dataflow_op(
-                    Tag::new(1, vec![vec![].into(), vec![].into(), vec![].into()]),
-                    builder.input_wires(),
-                )
-                .unwrap();
-            builder.finish_with_outputs(tag.outputs()).unwrap()
-        });
-    let _ = check_emission!(hugr, llvm_ctx);
-}
+#[cfg(test)]
+mod test_fns {
+    use super::*;
+    use crate::custom::CodegenExtsBuilder;
+    use crate::extension::int::add_int_extensions;
+    use crate::types::HugrFuncType;
 
-#[rstest]
-fn emit_hugr_dfg(llvm_ctx: TestContext) {
-    let hugr = SimpleHugrConfig::new()
-        .with_ins(Type::UNIT)
-        .with_outs(Type::UNIT)
-        .finish(|mut builder: DFGW| {
-            let dfg = {
-                let b = builder
-                    .dfg_builder(HugrFuncType::new_endo(Type::UNIT), builder.input_wires())
-                    .unwrap();
-                let w = b.input_wires();
-                b.finish_with_outputs(w).unwrap()
-            };
-            builder.finish_with_outputs(dfg.outputs()).unwrap()
-        });
-    check_emission!(hugr, llvm_ctx);
-}
+    use hugr_core::builder::DataflowSubContainer;
+    use hugr_core::builder::{Container, Dataflow, HugrBuilder, ModuleBuilder, SubContainer};
+    use hugr_core::extension::prelude::{ConstUsize, BOOL_T, USIZE_T};
+    use hugr_core::extension::{EMPTY_REG, PRELUDE_REGISTRY};
+    use hugr_core::ops::constant::CustomConst;
 
-#[rstest]
-fn emit_hugr_conditional(llvm_ctx: TestContext) {
-    let hugr = {
-        let input_v_rows: Vec<TypeRow> = (0..3).map(Type::new_unit_sum).map_into().collect_vec();
-        let output_v_rows = {
-            let mut r = input_v_rows.clone();
-            r.reverse();
-            r
-        };
+    use hugr_core::ops::{CallIndirect, Tag, Value};
+    use hugr_core::std_extensions::arithmetic::int_ops::{self, INT_OPS_REGISTRY};
+    use hugr_core::std_extensions::arithmetic::int_types::ConstInt;
+    use hugr_core::types::{Signature, Type, TypeRow};
+    use hugr_core::{type_row, Hugr};
 
-        SimpleHugrConfig::new()
-            .with_ins(vec![Type::new_sum(input_v_rows.clone()), Type::UNIT])
-            .with_outs(vec![Type::new_sum(output_v_rows.clone()), Type::UNIT])
+    use itertools::Itertools;
+    use rstest::rstest;
+    use std::iter;
+
+    use crate::test::*;
+    #[rstest]
+    fn emit_hugr_tag(llvm_ctx: TestContext) {
+        let hugr = SimpleHugrConfig::new()
+            .with_outs(Type::new_unit_sum(3))
             .finish(|mut builder: DFGW| {
-                let cond = {
-                    let [sum_input, other_input] = builder.input_wires_arr();
-                    let mut cond_b = builder
-                        .conditional_builder(
-                            (input_v_rows.clone(), sum_input),
-                            [(Type::UNIT, other_input)],
-                            vec![Type::new_sum(output_v_rows.clone()), Type::UNIT].into(),
-                        )
-                        .unwrap();
-                    for i in 0..3 {
-                        let mut case_b = cond_b.case_builder(i).unwrap();
-                        let [case_input, other_input] = case_b.input_wires_arr();
-                        let tag = case_b
-                            .add_dataflow_op(Tag::new(2 - i, output_v_rows.clone()), [case_input])
-                            .unwrap();
-                        case_b
-                            .finish_with_outputs([tag.out_wire(0), other_input])
-                            .unwrap();
-                    }
-                    cond_b.finish_sub_container().unwrap()
-                };
-                let [o1, o2] = cond.outputs_arr();
-                builder.finish_with_outputs([o1, o2]).unwrap()
-            })
-    };
-    check_emission!(hugr, llvm_ctx);
-}
-
-#[rstest]
-fn emit_hugr_load_constant(mut llvm_ctx: TestContext) {
-    llvm_ctx.add_extensions(add_int_extensions);
-    let v = Value::tuple([
-        Value::unit_sum(2, 4).unwrap(),
-        ConstInt::new_s(4, -24).unwrap().into(),
-    ]);
-
-    let hugr = SimpleHugrConfig::new()
-        .with_outs(v.get_type())
-        .with_extensions(INT_OPS_REGISTRY.to_owned())
-        .finish(|mut builder: DFGW| {
-            let konst = builder.add_load_value(v);
-            builder.finish_with_outputs([konst]).unwrap()
-        });
-    check_emission!(hugr, llvm_ctx);
-}
-
-#[rstest]
-fn emit_hugr_call(llvm_ctx: TestContext) {
-    fn build_recursive(mod_b: &mut ModuleBuilder<Hugr>, name: &str, io: TypeRow) {
-        let f_id = mod_b
-            .declare(name, HugrFuncType::new_endo(io).into())
-            .unwrap();
-        let mut func_b = mod_b.define_declaration(&f_id).unwrap();
-        let call = func_b
-            .call(&f_id, &[], func_b.input_wires(), &EMPTY_REG)
-            .unwrap();
-        func_b.finish_with_outputs(call.outputs()).unwrap();
-    }
-
-    let mut mod_b = ModuleBuilder::new();
-    build_recursive(&mut mod_b, "main_void", type_row![]);
-    build_recursive(&mut mod_b, "main_unary", type_row![BOOL_T]);
-    build_recursive(&mut mod_b, "main_binary", type_row![BOOL_T, BOOL_T]);
-    let hugr = mod_b.finish_hugr(&EMPTY_REG).unwrap();
-    check_emission!(hugr, llvm_ctx);
-}
-
-#[rstest]
-fn emit_hugr_call_indirect(llvm_ctx: TestContext) {
-    fn build_recursive(mod_b: &mut ModuleBuilder<Hugr>, name: &str, io: TypeRow) {
-        let signature = HugrFuncType::new_endo(io);
-        let f_id = mod_b.declare(name, signature.clone().into()).unwrap();
-        let mut func_b = mod_b.define_declaration(&f_id).unwrap();
-        let func = func_b.load_func(&f_id, &[], &EMPTY_REG).unwrap();
-        let inputs = iter::once(func).chain(func_b.input_wires());
-        let call_indirect = func_b
-            .add_dataflow_op(CallIndirect { signature }, inputs)
-            .unwrap();
-        func_b.finish_with_outputs(call_indirect.outputs()).unwrap();
-    }
-
-    let mut mod_b = ModuleBuilder::new();
-    build_recursive(&mut mod_b, "main_void", type_row![]);
-    build_recursive(&mut mod_b, "main_unary", type_row![BOOL_T]);
-    build_recursive(&mut mod_b, "main_binary", type_row![BOOL_T, BOOL_T]);
-    let hugr = mod_b.finish_hugr(&EMPTY_REG).unwrap();
-    check_emission!(hugr, llvm_ctx);
-}
-
-#[rstest]
-fn emit_hugr_custom_op(mut llvm_ctx: TestContext) {
-    llvm_ctx.add_extensions(add_int_extensions);
-    let v1 = ConstInt::new_s(4, -24).unwrap();
-    let v2 = ConstInt::new_s(4, 24).unwrap();
-
-    let hugr = SimpleHugrConfig::new()
-        .with_outs(v1.get_type())
-        .with_extensions(INT_OPS_REGISTRY.to_owned())
-        .finish_with_exts(|mut builder: DFGW, ext_reg| {
-            let k1 = builder.add_load_value(v1);
-            let k2 = builder.add_load_value(v2);
-            let ext_op = int_ops::EXTENSION
-                .instantiate_extension_op("iadd", [4.into()], ext_reg)
-                .unwrap();
-            let add = builder.add_dataflow_op(ext_op, [k1, k2]).unwrap();
-            builder.finish_with_outputs(add.outputs()).unwrap()
-        });
-    check_emission!(hugr, llvm_ctx);
-}
-
-#[rstest]
-fn get_external_func(llvm_ctx: TestContext) {
-    let emc = llvm_ctx.get_emit_module_context();
-    let func_type1 = emc.iw_context().i32_type().fn_type(&[], false);
-    let func_type2 = emc.iw_context().f64_type().fn_type(&[], false);
-    let foo1 = emc.get_extern_func("foo", func_type1).unwrap();
-    assert_eq!(foo1.get_name().to_str().unwrap(), "foo");
-    let foo2 = emc.get_extern_func("foo", func_type1).unwrap();
-    assert_eq!(foo1, foo2);
-    assert!(emc.get_extern_func("foo", func_type2).is_err());
-}
-
-#[rstest]
-fn diverse_module_children(llvm_ctx: TestContext) {
-    let hugr = {
-        let mut builder = ModuleBuilder::new();
-        let _ = {
-            let fbuilder = builder
-                .define_function("f1", HugrFuncType::new_endo(type_row![]))
-                .unwrap();
-            fbuilder.finish_sub_container().unwrap()
-        };
-        let _ = {
-            let fbuilder = builder
-                .define_function("f2", HugrFuncType::new_endo(type_row![]))
-                .unwrap();
-            fbuilder.finish_sub_container().unwrap()
-        };
-        let _ = builder.add_constant(Value::true_val());
-        let _ = builder
-            .declare("decl", HugrFuncType::new_endo(type_row![]).into())
-            .unwrap();
-        builder.finish_hugr(&EMPTY_REG).unwrap()
-    };
-    check_emission!(hugr, llvm_ctx);
-}
-
-#[rstest]
-fn diverse_dfg_children(llvm_ctx: TestContext) {
-    let hugr = SimpleHugrConfig::new()
-        .with_outs(BOOL_T)
-        .finish(|mut builder: DFGW| {
-            let [r] = {
-                let mut builder = builder
-                    .dfg_builder(HugrFuncType::new(type_row![], BOOL_T), [])
+                let tag = builder
+                    .add_dataflow_op(
+                        Tag::new(1, vec![vec![].into(), vec![].into(), vec![].into()]),
+                        builder.input_wires(),
+                    )
                     .unwrap();
-                let konst = builder.add_constant(Value::false_val());
-                let func = {
-                    let mut builder = builder
-                        .define_function("scoped_func", HugrFuncType::new(type_row![], BOOL_T))
-                        .unwrap();
-                    let w = builder.load_const(&konst);
-                    builder.finish_with_outputs([w]).unwrap()
-                };
-                let [r] = builder
-                    .call(func.handle(), &[], [], &EMPTY_REG)
-                    .unwrap()
-                    .outputs_arr();
-                builder.finish_with_outputs([r]).unwrap().outputs_arr()
-            };
-            builder.finish_with_outputs([r]).unwrap()
-        });
-    check_emission!(hugr, llvm_ctx);
-}
+                builder.finish_with_outputs(tag.outputs()).unwrap()
+            });
+        let _ = check_emission!(hugr, llvm_ctx);
+    }
 
-#[rstest]
-fn diverse_cfg_children(llvm_ctx: TestContext) {
-    let hugr = SimpleHugrConfig::new()
-        .with_outs(BOOL_T)
-        .finish(|mut builder: DFGW| {
-            let [r] = {
-                let mut builder = builder.cfg_builder([], type_row![BOOL_T]).unwrap();
-                let konst = builder.add_constant(Value::false_val());
-                let func = {
-                    let mut builder = builder
-                        .define_function("scoped_func", HugrFuncType::new(type_row![], BOOL_T))
+    #[rstest]
+    fn emit_hugr_dfg(llvm_ctx: TestContext) {
+        let hugr = SimpleHugrConfig::new()
+            .with_ins(Type::UNIT)
+            .with_outs(Type::UNIT)
+            .finish(|mut builder: DFGW| {
+                let dfg = {
+                    let b = builder
+                        .dfg_builder(HugrFuncType::new_endo(Type::UNIT), builder.input_wires())
                         .unwrap();
-                    let w = builder.load_const(&konst);
-                    builder.finish_with_outputs([w]).unwrap()
+                    let w = b.input_wires();
+                    b.finish_with_outputs(w).unwrap()
                 };
-                let entry = {
+                builder.finish_with_outputs(dfg.outputs()).unwrap()
+            });
+        check_emission!(hugr, llvm_ctx);
+    }
+
+    #[rstest]
+    fn emit_hugr_conditional(llvm_ctx: TestContext) {
+        let hugr = {
+            let input_v_rows: Vec<TypeRow> =
+                (0..3).map(Type::new_unit_sum).map_into().collect_vec();
+            let output_v_rows = {
+                let mut r = input_v_rows.clone();
+                r.reverse();
+                r
+            };
+
+            SimpleHugrConfig::new()
+                .with_ins(vec![Type::new_sum(input_v_rows.clone()), Type::UNIT])
+                .with_outs(vec![Type::new_sum(output_v_rows.clone()), Type::UNIT])
+                .finish(|mut builder: DFGW| {
+                    let cond = {
+                        let [sum_input, other_input] = builder.input_wires_arr();
+                        let mut cond_b = builder
+                            .conditional_builder(
+                                (input_v_rows.clone(), sum_input),
+                                [(Type::UNIT, other_input)],
+                                vec![Type::new_sum(output_v_rows.clone()), Type::UNIT].into(),
+                            )
+                            .unwrap();
+                        for i in 0..3 {
+                            let mut case_b = cond_b.case_builder(i).unwrap();
+                            let [case_input, other_input] = case_b.input_wires_arr();
+                            let tag = case_b
+                                .add_dataflow_op(
+                                    Tag::new(2 - i, output_v_rows.clone()),
+                                    [case_input],
+                                )
+                                .unwrap();
+                            case_b
+                                .finish_with_outputs([tag.out_wire(0), other_input])
+                                .unwrap();
+                        }
+                        cond_b.finish_sub_container().unwrap()
+                    };
+                    let [o1, o2] = cond.outputs_arr();
+                    builder.finish_with_outputs([o1, o2]).unwrap()
+                })
+        };
+        check_emission!(hugr, llvm_ctx);
+    }
+
+    #[rstest]
+    fn emit_hugr_load_constant(mut llvm_ctx: TestContext) {
+        llvm_ctx.add_extensions(add_int_extensions);
+        let v = Value::tuple([
+            Value::unit_sum(2, 4).unwrap(),
+            ConstInt::new_s(4, -24).unwrap().into(),
+        ]);
+
+        let hugr = SimpleHugrConfig::new()
+            .with_outs(v.get_type())
+            .with_extensions(INT_OPS_REGISTRY.to_owned())
+            .finish(|mut builder: DFGW| {
+                let konst = builder.add_load_value(v);
+                builder.finish_with_outputs([konst]).unwrap()
+            });
+        check_emission!(hugr, llvm_ctx);
+    }
+
+    #[rstest]
+    fn emit_hugr_call(llvm_ctx: TestContext) {
+        fn build_recursive(mod_b: &mut ModuleBuilder<Hugr>, name: &str, io: TypeRow) {
+            let f_id = mod_b
+                .declare(name, HugrFuncType::new_endo(io).into())
+                .unwrap();
+            let mut func_b = mod_b.define_declaration(&f_id).unwrap();
+            let call = func_b
+                .call(&f_id, &[], func_b.input_wires(), &EMPTY_REG)
+                .unwrap();
+            func_b.finish_with_outputs(call.outputs()).unwrap();
+        }
+
+        let mut mod_b = ModuleBuilder::new();
+        build_recursive(&mut mod_b, "main_void", type_row![]);
+        build_recursive(&mut mod_b, "main_unary", type_row![BOOL_T]);
+        build_recursive(&mut mod_b, "main_binary", type_row![BOOL_T, BOOL_T]);
+        let hugr = mod_b.finish_hugr(&EMPTY_REG).unwrap();
+        check_emission!(hugr, llvm_ctx);
+    }
+
+    #[rstest]
+    fn emit_hugr_call_indirect(llvm_ctx: TestContext) {
+        fn build_recursive(mod_b: &mut ModuleBuilder<Hugr>, name: &str, io: TypeRow) {
+            let signature = HugrFuncType::new_endo(io);
+            let f_id = mod_b.declare(name, signature.clone().into()).unwrap();
+            let mut func_b = mod_b.define_declaration(&f_id).unwrap();
+            let func = func_b.load_func(&f_id, &[], &EMPTY_REG).unwrap();
+            let inputs = iter::once(func).chain(func_b.input_wires());
+            let call_indirect = func_b
+                .add_dataflow_op(CallIndirect { signature }, inputs)
+                .unwrap();
+            func_b.finish_with_outputs(call_indirect.outputs()).unwrap();
+        }
+
+        let mut mod_b = ModuleBuilder::new();
+        build_recursive(&mut mod_b, "main_void", type_row![]);
+        build_recursive(&mut mod_b, "main_unary", type_row![BOOL_T]);
+        build_recursive(&mut mod_b, "main_binary", type_row![BOOL_T, BOOL_T]);
+        let hugr = mod_b.finish_hugr(&EMPTY_REG).unwrap();
+        check_emission!(hugr, llvm_ctx);
+    }
+
+    #[rstest]
+    fn emit_hugr_custom_op(mut llvm_ctx: TestContext) {
+        llvm_ctx.add_extensions(add_int_extensions);
+        let v1 = ConstInt::new_s(4, -24).unwrap();
+        let v2 = ConstInt::new_s(4, 24).unwrap();
+
+        let hugr = SimpleHugrConfig::new()
+            .with_outs(v1.get_type())
+            .with_extensions(INT_OPS_REGISTRY.to_owned())
+            .finish_with_exts(|mut builder: DFGW, ext_reg| {
+                let k1 = builder.add_load_value(v1);
+                let k2 = builder.add_load_value(v2);
+                let ext_op = int_ops::EXTENSION
+                    .instantiate_extension_op("iadd", [4.into()], ext_reg)
+                    .unwrap();
+                let add = builder.add_dataflow_op(ext_op, [k1, k2]).unwrap();
+                builder.finish_with_outputs(add.outputs()).unwrap()
+            });
+        check_emission!(hugr, llvm_ctx);
+    }
+
+    #[rstest]
+    fn get_external_func(llvm_ctx: TestContext) {
+        let emc = llvm_ctx.get_emit_module_context();
+        let func_type1 = emc.iw_context().i32_type().fn_type(&[], false);
+        let func_type2 = emc.iw_context().f64_type().fn_type(&[], false);
+        let foo1 = emc.get_extern_func("foo", func_type1).unwrap();
+        assert_eq!(foo1.get_name().to_str().unwrap(), "foo");
+        let foo2 = emc.get_extern_func("foo", func_type1).unwrap();
+        assert_eq!(foo1, foo2);
+        assert!(emc.get_extern_func("foo", func_type2).is_err());
+    }
+
+    #[rstest]
+    fn diverse_module_children(llvm_ctx: TestContext) {
+        let hugr = {
+            let mut builder = ModuleBuilder::new();
+            let _ = {
+                let fbuilder = builder
+                    .define_function("f1", HugrFuncType::new_endo(type_row![]))
+                    .unwrap();
+                fbuilder.finish_sub_container().unwrap()
+            };
+            let _ = {
+                let fbuilder = builder
+                    .define_function("f2", HugrFuncType::new_endo(type_row![]))
+                    .unwrap();
+                fbuilder.finish_sub_container().unwrap()
+            };
+            let _ = builder.add_constant(Value::true_val());
+            let _ = builder
+                .declare("decl", HugrFuncType::new_endo(type_row![]).into())
+                .unwrap();
+            builder.finish_hugr(&EMPTY_REG).unwrap()
+        };
+        check_emission!(hugr, llvm_ctx);
+    }
+
+    #[rstest]
+    fn diverse_dfg_children(llvm_ctx: TestContext) {
+        let hugr = SimpleHugrConfig::new()
+            .with_outs(BOOL_T)
+            .finish(|mut builder: DFGW| {
+                let [r] = {
                     let mut builder = builder
-                        .entry_builder([type_row![]], type_row![BOOL_T])
+                        .dfg_builder(HugrFuncType::new(type_row![], BOOL_T), [])
                         .unwrap();
-                    let control = builder.add_load_value(Value::unary_unit_sum());
+                    let konst = builder.add_constant(Value::false_val());
+                    let func = {
+                        let mut builder = builder
+                            .define_function("scoped_func", HugrFuncType::new(type_row![], BOOL_T))
+                            .unwrap();
+                        let w = builder.load_const(&konst);
+                        builder.finish_with_outputs([w]).unwrap()
+                    };
                     let [r] = builder
                         .call(func.handle(), &[], [], &EMPTY_REG)
                         .unwrap()
                         .outputs_arr();
-                    builder.finish_with_outputs(control, [r]).unwrap()
+                    builder.finish_with_outputs([r]).unwrap().outputs_arr()
                 };
-                let exit = builder.exit_block();
-                builder.branch(&entry, 0, &exit).unwrap();
-                builder.finish_sub_container().unwrap().outputs_arr()
-            };
-            builder.finish_with_outputs([r]).unwrap()
-        });
-    check_emission!(hugr, llvm_ctx);
-}
+                builder.finish_with_outputs([r]).unwrap()
+            });
+        check_emission!(hugr, llvm_ctx);
+    }
 
-#[rstest]
-fn load_function(llvm_ctx: TestContext) {
-    let hugr = {
-        let mut builder = ModuleBuilder::new();
-        let target_sig = Signature::new_endo(type_row![]);
-        let target_func = builder
-            .declare("target_func", target_sig.clone().into())
-            .unwrap();
-        let _ = {
-            let mut builder = builder
-                .define_function(
-                    "main",
-                    Signature::new(type_row![], Type::new_function(target_sig)),
-                )
+    #[rstest]
+    fn diverse_cfg_children(llvm_ctx: TestContext) {
+        let hugr = SimpleHugrConfig::new()
+            .with_outs(BOOL_T)
+            .finish(|mut builder: DFGW| {
+                let [r] = {
+                    let mut builder = builder.cfg_builder([], type_row![BOOL_T]).unwrap();
+                    let konst = builder.add_constant(Value::false_val());
+                    let func = {
+                        let mut builder = builder
+                            .define_function("scoped_func", HugrFuncType::new(type_row![], BOOL_T))
+                            .unwrap();
+                        let w = builder.load_const(&konst);
+                        builder.finish_with_outputs([w]).unwrap()
+                    };
+                    let entry = {
+                        let mut builder = builder
+                            .entry_builder([type_row![]], type_row![BOOL_T])
+                            .unwrap();
+                        let control = builder.add_load_value(Value::unary_unit_sum());
+                        let [r] = builder
+                            .call(func.handle(), &[], [], &EMPTY_REG)
+                            .unwrap()
+                            .outputs_arr();
+                        builder.finish_with_outputs(control, [r]).unwrap()
+                    };
+                    let exit = builder.exit_block();
+                    builder.branch(&entry, 0, &exit).unwrap();
+                    builder.finish_sub_container().unwrap().outputs_arr()
+                };
+                builder.finish_with_outputs([r]).unwrap()
+            });
+        check_emission!(hugr, llvm_ctx);
+    }
+
+    #[rstest]
+    fn load_function(llvm_ctx: TestContext) {
+        let hugr = {
+            let mut builder = ModuleBuilder::new();
+            let target_sig = Signature::new_endo(type_row![]);
+            let target_func = builder
+                .declare("target_func", target_sig.clone().into())
                 .unwrap();
-            let r = builder.load_func(&target_func, &[], &EMPTY_REG).unwrap();
-            builder.finish_with_outputs([r]).unwrap()
+            let _ = {
+                let mut builder = builder
+                    .define_function(
+                        "main",
+                        Signature::new(type_row![], Type::new_function(target_sig)),
+                    )
+                    .unwrap();
+                let r = builder.load_func(&target_func, &[], &EMPTY_REG).unwrap();
+                builder.finish_with_outputs([r]).unwrap()
+            };
+            builder.finish_hugr(&EMPTY_REG).unwrap()
         };
-        builder.finish_hugr(&EMPTY_REG).unwrap()
-    };
 
-    check_emission!(hugr, llvm_ctx);
-}
+        check_emission!(hugr, llvm_ctx);
+    }
 
-#[rstest]
-fn test_exec(mut exec_ctx: TestContext) {
-    let hugr = SimpleHugrConfig::new()
-        .with_outs(USIZE_T)
-        .with_extensions(PRELUDE_REGISTRY.to_owned())
-        .finish(|mut builder: DFGW| {
-            let konst = builder.add_load_value(ConstUsize::new(42));
-            builder.finish_with_outputs([konst]).unwrap()
-        });
-    exec_ctx.add_extensions(CodegenExtsBuilder::add_default_prelude_extensions);
-    assert_eq!(42, exec_ctx.exec_hugr_u64(hugr, "main"));
+    #[rstest]
+    fn test_exec(mut exec_ctx: TestContext) {
+        let hugr = SimpleHugrConfig::new()
+            .with_outs(USIZE_T)
+            .with_extensions(PRELUDE_REGISTRY.to_owned())
+            .finish(|mut builder: DFGW| {
+                let konst = builder.add_load_value(ConstUsize::new(42));
+                builder.finish_with_outputs([konst]).unwrap()
+            });
+        exec_ctx.add_extensions(CodegenExtsBuilder::add_default_prelude_extensions);
+        assert_eq!(42, exec_ctx.exec_hugr_u64(hugr, "main"));
+    }
 }
