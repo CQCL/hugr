@@ -1,0 +1,40 @@
+[package]
+name = "hugr-llvm"
+version = "0.13.3"
+description = "A general and extensible crate for lowering HUGRs into LLVM IR"
+
+edition.workspace = true
+rust-version.workspace = true
+
+readme = "README.md"
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+documentation = "https://docs.rs/hugr-llvm"
+authors = ["TKET development team <tket-support@quantinuum.com>"]
+keywords = ["Quantum", "Quantinuum"]
+categories = ["compilers"]
+
+[features]
+default = ["llvm14-0"]
+llvm14-0 = ["inkwell/llvm14-0"]
+
+[dependencies]
+inkwell = { version = "0.4.0", default-features = false }
+hugr-core = { path = "../hugr-core", version = "0.13.3"}
+anyhow = "1.0.83"
+itertools.workspace = true
+delegate.workspace = true
+petgraph.workspace = true
+lazy_static.workspace = true
+downcast-rs.workspace = true
+strum.workspace = true
+
+[dev-dependencies]
+insta.workspace = true
+rstest.workspace = true
+portgraph.workspace = true
+pathsearch.workspace = true
+serde_json.workspace = true
+serde.workspace = true
+typetag.workspace = true
