@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [0.13.3](https://github.com/CQCL/hugr-llvm/compare/v0.6.0...v0.6.1) - 2024-11-25
+No changes - version bump to catch up with other hugr crates in repository move.
 
 ## [0.6.1](https://github.com/CQCL/hugr-llvm/compare/v0.6.0...v0.6.1) - 2024-10-23
 
