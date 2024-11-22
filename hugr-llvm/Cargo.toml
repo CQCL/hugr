@@ -16,7 +16,7 @@ keywords = ["Quantum", "Quantinuum"]
 categories = ["compilers"]
 
 [features]
-test = [
+test-utils = [
     "insta",
     "rstest",
     "portgraph",
@@ -50,4 +50,4 @@ serde = { workspace = true, optional = true }
 typetag = { workspace = true, optional = true }
 
 [dev-dependencies]
-hugr-llvm = {"path" = ".", features = ["test"]}
+hugr-llvm = {"path" = ".", features = ["test-utils"]}
