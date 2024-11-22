@@ -140,10 +140,12 @@ fn read_operation<'a>(
             let reader = reader?;
             let name = bump.alloc_str(reader.get_name()?.to_str()?);
             let params = read_list!(bump, reader, get_params, read_param);
+            let constraints = read_scalar_list!(bump, reader, get_constraints, model::TermId);
             let signature = model::TermId(reader.get_signature());
             let decl = bump.alloc(model::FuncDecl {
                 name,
                 params,
+                constraints,
                 signature,
             });
             model::Operation::DefineFunc { decl }
@@ -152,10 +154,12 @@ fn read_operation<'a>(
             let reader = reader?;
             let name = bump.alloc_str(reader.get_name()?.to_str()?);
             let params = read_list!(bump, reader, get_params, read_param);
+            let constraints = read_scalar_list!(bump, reader, get_constraints, model::TermId);
             let signature = model::TermId(reader.get_signature());
             let decl = bump.alloc(model::FuncDecl {
                 name,
                 params,
+                constraints,
                 signature,
             });
             model::Operation::DeclareFunc { decl }
@@ -189,10 +193,12 @@ fn read_operation<'a>(
             let reader = reader?;
             let name = bump.alloc_str(reader.get_name()?.to_str()?);
             let params = read_list!(bump, reader, get_params, read_param);
+            let constraints = read_scalar_list!(bump, reader, get_constraints, model::TermId);
             let r#type = model::TermId(reader.get_type());
             let decl = bump.alloc(model::ConstructorDecl {
                 name,
                 params,
+                constraints,
                 r#type,
             });
             model::Operation::DeclareConstructor { decl }
@@ -201,10 +207,12 @@ fn read_operation<'a>(
             let reader = reader?;
             let name = bump.alloc_str(reader.get_name()?.to_str()?);
             let params = read_list!(bump, reader, get_params, read_param);
+            let constraints = read_scalar_list!(bump, reader, get_constraints, model::TermId);
             let r#type = model::TermId(reader.get_type());
             let decl = bump.alloc(model::OperationDecl {
                 name,
                 params,
+                constraints,
                 r#type,
             });
             model::Operation::DeclareOperation { decl }
@@ -332,6 +340,10 @@ fn read_term<'a>(bump: &'a Bump, reader: hugr_capnp::term::Reader) -> ReadResult
         Which::Control(values) => model::Term::Control {
             values: model::TermId(values),
         },
+
+        Which::NonLinearConstraint(term) => model::Term::NonLinearConstraint {
+            term: model::TermId(term),
+        },
     })
 }
 
@@ -348,23 +360,13 @@ fn read_param<'a>(
     bump: &'a Bump,
     reader: hugr_capnp::param::Reader,
 ) -> ReadResult<model::Param<'a>> {
-    use hugr_capnp::param::Which;
-    Ok(match reader.which()? {
-        Which::Implicit(reader) => {
-            let reader = reader?;
-            let name = bump.alloc_str(reader.get_name()?.to_str()?);
-            let r#type = model::TermId(reader.get_type());
-            model::Param::Implicit { name, r#type }
-        }
-        Which::Explicit(reader) => {
-            let reader = reader?;
-            let name = bump.alloc_str(reader.get_name()?.to_str()?);
-            let r#type = model::TermId(reader.get_type());
-            model::Param::Explicit { name, r#type }
-        }
-        Which::Constraint(constraint) => {
-            let constraint = model::TermId(constraint);
-            model::Param::Constraint { constraint }
-        }
-    })
+    let name = bump.alloc_str(reader.get_name()?.to_str()?);
+    let r#type = model::TermId(reader.get_type());
+
+    let sort = match reader.get_sort()? {
+        hugr_capnp::ParamSort::Implicit => model::ParamSort::Implicit,
+        hugr_capnp::ParamSort::Explicit => model::ParamSort::Explicit,
+    };
+
+    Ok(model::Param { name, r#type, sort })
 }
