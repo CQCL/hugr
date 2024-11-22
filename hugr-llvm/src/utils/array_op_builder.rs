@@ -118,15 +118,15 @@ pub mod test {
     use hugr_core::{
         builder::{DFGBuilder, HugrBuilder},
         extension::{
-            prelude::{array_type, either_type, option_type, ConstUsize, USIZE_T},
+            prelude::{
+                array_type, either_type, option_type, ConstUsize, UnwrapBuilder as _, USIZE_T,
+            },
             PRELUDE_REGISTRY,
         },
         types::Signature,
         Hugr,
     };
     use rstest::rstest;
-
-    use crate::utils::UnwrapBuilder as _;
 
     use super::*;
 

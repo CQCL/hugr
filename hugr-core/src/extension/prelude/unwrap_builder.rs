@@ -1,6 +1,6 @@
 use std::iter;
 
-use hugr_core::{
+use crate::{
     builder::{BuildError, BuildHandle, Dataflow, DataflowSubContainer, SubContainer},
     extension::{
         prelude::{ConstError, PANIC_OP_ID, PRELUDE_ID},
@@ -12,7 +12,9 @@ use hugr_core::{
 };
 use itertools::{zip_eq, Itertools as _};
 
+/// Extend dataflow builders with methods for building unwrap operations.
 pub trait UnwrapBuilder: Dataflow {
+    /// Add a panic operation to the dataflow with the given error.
     fn add_panic(
         &mut self,
         reg: &ExtensionRegistry,
@@ -37,6 +39,8 @@ pub trait UnwrapBuilder: Dataflow {
         self.add_dataflow_op(op, iter::once(err).chain(input_wires))
     }
 
+    /// Build an unwrap operation for a sum type to extract the variant at the given tag
+    /// or panic if the tag is not the expected value.
     fn build_unwrap_sum<const N: usize>(
         &mut self,
         reg: &ExtensionRegistry,
@@ -75,3 +79,30 @@ pub trait UnwrapBuilder: Dataflow {
 }
 
 impl<D: Dataflow> UnwrapBuilder for D {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        builder::{DFGBuilder, DataflowHugr},
+        extension::{
+            prelude::{option_type, BOOL_T},
+            PRELUDE_REGISTRY,
+        },
+        types::Signature,
+    };
+
+    #[test]
+    fn test_build_unwrap() {
+        let mut builder =
+            DFGBuilder::new(Signature::new(Type::from(option_type(BOOL_T)), BOOL_T).with_prelude())
+                .unwrap();
+
+        let [opt] = builder.input_wires_arr();
+
+        let [res] = builder
+            .build_unwrap_sum(&PRELUDE_REGISTRY, 1, option_type(BOOL_T), opt)
+            .unwrap();
+        builder.finish_prelude_hugr_with_outputs([res]).unwrap();
+    }
+}

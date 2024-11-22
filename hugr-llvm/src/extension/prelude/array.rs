@@ -389,7 +389,9 @@ mod test {
     use hugr_core::{
         builder::{Dataflow, DataflowSubContainer, SubContainer},
         extension::{
-            prelude::{self, array_type, option_type, ConstUsize, BOOL_T, USIZE_T},
+            prelude::{
+                self, array_type, option_type, ConstUsize, UnwrapBuilder as _, BOOL_T, USIZE_T,
+            },
             ExtensionRegistry,
         },
         ops::Value,
@@ -410,9 +412,7 @@ mod test {
         custom::CodegenExtsBuilder,
         emit::test::SimpleHugrConfig,
         test::{exec_ctx, llvm_ctx, TestContext},
-        utils::{
-            array_op_builder, ArrayOpBuilder, IntOpBuilder, LogicOpBuilder, UnwrapBuilder as _,
-        },
+        utils::{array_op_builder, ArrayOpBuilder, IntOpBuilder, LogicOpBuilder},
     };
 
     #[rstest]
