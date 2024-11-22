@@ -242,7 +242,7 @@ jobs:
 
   tests-stable-llvm:
     needs: changes
-    if: ${{ ( needs.changes.outputs.llvm == 'true' && github.event_name == 'push' ) || needs.changes.outputs.override == 'true' }}  
+    if: ${{ ( needs.changes.outputs.llvm == 'true' && github.event_name == 'push' ) || needs.changes.outputs.override == 'true' }}
     runs-on: ubuntu-latest
     name: tests hugr-llvm
     strategy:
