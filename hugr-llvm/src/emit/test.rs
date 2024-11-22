@@ -156,6 +156,13 @@ impl Default for SimpleHugrConfig {
     }
 }
 
+#[doc(hidden)]
+pub use hugr_core;
+#[doc(hidden)]
+pub use inkwell;
+#[doc(hidden)]
+pub use insta;
+
 /// A macro used to check the emission of a Hugr module,
 /// and to assert the correctness of the emitted LLVM IR using [insta].
 ///
@@ -171,11 +178,15 @@ impl Default for SimpleHugrConfig {
 macro_rules! check_emission {
     // Call the macro with a snapshot name.
     ($snapshot_name:expr, $hugr: ident, $test_ctx:ident) => {{
-        let root = $crate::utils::fat::FatExt::fat_root::<hugr_core::ops::Module>(&$hugr).unwrap();
+        let root =
+            $crate::utils::fat::FatExt::fat_root::<$crate::emit::test::hugr_core::ops::Module>(
+                &$hugr,
+            )
+            .unwrap();
         let emission =
             $crate::emit::test::Emission::emit_hugr(root, $test_ctx.get_emit_hugr()).unwrap();
 
-        let mut settings = insta::Settings::clone_current();
+        let mut settings = $crate::emit::test::insta::Settings::clone_current();
         let new_suffix = settings
             .snapshot_suffix()
             .map_or("pre-mem2reg".into(), |x| format!("pre-mem2reg@{x}"));
@@ -183,25 +194,25 @@ macro_rules! check_emission {
         settings.bind(|| {
             let mod_str = emission.module().to_string();
             if $snapshot_name == "" {
-                insta::assert_snapshot!(mod_str)
+                $crate::emit::test::insta::assert_snapshot!(mod_str)
             } else {
-                insta::assert_snapshot!($snapshot_name, mod_str)
+                $crate::emit::test::insta::assert_snapshot!($snapshot_name, mod_str)
             }
         });
 
         emission.verify().unwrap();
 
         emission.opt(|| {
-            let pb = inkwell::passes::PassManager::create(());
+            let pb = $crate::emit::test::inkwell::passes::PassManager::create(());
             pb.add_promote_memory_to_register_pass();
             pb
         });
 
         let mod_str = emission.module().to_string();
         if $snapshot_name == "" {
-            insta::assert_snapshot!(mod_str)
+            $crate::emit::test::insta::assert_snapshot!(mod_str)
         } else {
-            insta::assert_snapshot!($snapshot_name, mod_str)
+            $crate::emit::test::insta::assert_snapshot!($snapshot_name, mod_str)
         }
         emission
     }};
