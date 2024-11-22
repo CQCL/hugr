@@ -93,9 +93,9 @@ jobs:
       - name: Install CapnProto
         run: sudo apt-get install -y capnproto
       - name: Build benchmarks with no features
-        run: cargo bench --verbose --no-run --workspace --exclude hugr-llvm --no-default-features
+        run: cargo bench --verbose --no-run  --no-default-features
       - name: Build benchmarks with all features
-        run: cargo bench --verbose --no-run --workspace --exclude hugr-llvm --all-features
+        run: cargo bench --verbose --no-run  --all-features
 
   # Run tests on Rust stable
   tests-stable-no-features:
@@ -116,9 +116,9 @@ jobs:
       - name: Install CapnProto
         run: sudo apt-get install -y capnproto
       - name: Build with no features
-        run: cargo test --verbose --workspace --exclude hugr-llvm --no-default-features --no-run
+        run: cargo test --verbose  --no-default-features --no-run
       - name: Tests with no features
-        run: cargo test --verbose --workspace --exclude hugr-llvm --no-default-features
+        run: cargo test --verbose  --no-default-features
 
   # Run tests on Rust stable
   tests-stable-all-features:
@@ -139,9 +139,9 @@ jobs:
       - name: Install CapnProto
         run: sudo apt-get install -y capnproto
       - name: Build with all features
-        run: cargo test --verbose --workspace --exclude hugr-llvm --all-features --no-run
+        run: cargo test --verbose  --all-features --no-run
       - name: Tests with all features
-        run: cargo test --verbose --workspace --exclude hugr-llvm --all-features
+        run: cargo test --verbose  --all-features
       - name: Build HUGR binary
         run: cargo build -p hugr-cli
       - name: Upload the binary to the artifacts
@@ -174,13 +174,13 @@ jobs:
       - name: Install CapnProto
         run: sudo apt-get install -y capnproto
       - name: Build with no features
-        run: cargo test --verbose --workspace --exclude hugr-llvm --no-default-features --no-run
+        run: cargo test --verbose  --no-default-features --no-run
       - name: Tests with no features
-        run: cargo test --verbose --workspace --exclude hugr-llvm --no-default-features
+        run: cargo test --verbose  --no-default-features
       - name: Build with all features
-        run: cargo test --verbose --workspace --exclude hugr-llvm --all-features --no-run
+        run: cargo test --verbose  --all-features --no-run
       - name: Tests with all features
-        run: cargo test --verbose --workspace --exclude hugr-llvm --all-features
+        run: cargo test --verbose  --all-features
 
   # Ensure that serialized extensions match rust implementation
   std-extensions:
@@ -229,8 +229,8 @@ jobs:
       - name: Run tests with coverage instrumentation
         run: |
           cargo llvm-cov clean --workspace
-          cargo llvm-cov --no-report --workspace --exclude hugr-llvm --no-default-features --doctests
-          cargo llvm-cov --no-report --workspace --exclude hugr-llvm --all-features --doctests
+          cargo llvm-cov --no-report  --no-default-features --doctests
+          cargo llvm-cov --no-report  --all-features --doctests
       - name: Generate coverage report
         run: cargo llvm-cov --all-features report --codecov --output-path coverage.json
       - name: Upload coverage to codecov.io
