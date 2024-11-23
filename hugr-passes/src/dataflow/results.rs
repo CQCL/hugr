@@ -81,13 +81,10 @@ impl<V: AbstractValue, C: DFContext<V>> AnalysisResults<V, C> {
     /// [PartialValue::Value] or a [PartialValue::PartialSum] with a single possible tag.)
     ///
     /// # Errors
-    /// `None` if the analysis did not produce a result for that wire
+    /// `None` if the analysis did not produce a result for that wire, or if
+    ///    the Hugr did not have a [Type](hugr_core::types::Type) for the specified wire
     /// `Some(e)` if [conversion to a concrete value](PartialValue::try_into_concrete) failed with error `e`
-    ///
-    /// # Panics
-    ///
-    /// If a [Type](hugr_core::types::Type) for the specified wire could not be extracted from the Hugr
-    pub fn try_read_wire_value<V2, VE, SE>(
+    pub fn try_read_wire_concrete<V2, VE, SE>(
         &self,
         w: Wire,
     ) -> Result<V2, Option<ExtractValueError<V, VE, SE>>>
@@ -99,7 +96,7 @@ impl<V: AbstractValue, C: DFContext<V>> AnalysisResults<V, C> {
             .hugr()
             .out_value_types(w.node())
             .find(|(p, _)| *p == w.source())
-            .unwrap();
+            .ok_or(None)?;
         v.try_into_concrete(&typ).map_err(Some)
     }
 }
