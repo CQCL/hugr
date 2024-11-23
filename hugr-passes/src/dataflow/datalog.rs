@@ -384,8 +384,9 @@ fn propagate_leaf_op<V: AbstractValue>(
                 // Interpret op using DFContext
                 // Default to Top i.e.  can't figure out anything about the outputs
                 let mut outs = vec![PartialValue::Top; num_outs];
-                // It might be nice to convert `ins`` to [(IncomingPort, Value)], or some concrete value,
-                // for the context, but PV contains more information, and try_into_value may fail.
+                // It might be nice to convert `ins` to [(IncomingPort, Value)], or some
+                // other concrete value, for the context, but PV contains more information,
+                // and try_into_concrete may fail.
                 ctx.interpret_leaf_op(n, e, ins, &mut outs[..]);
                 outs
             }))

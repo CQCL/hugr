@@ -82,7 +82,7 @@ impl<V: AbstractValue, C: DFContext<V>> AnalysisResults<V, C> {
     ///
     /// # Errors
     /// `None` if the analysis did not produce a result for that wire
-    /// `Some(e)` if conversion to a concrete value failed with error `e`, see [PartialValue::try_into_value]
+    /// `Some(e)` if [conversion to a concrete value](PartialValue::try_into_concrete) failed with error `e`
     ///
     /// # Panics
     ///
@@ -100,7 +100,7 @@ impl<V: AbstractValue, C: DFContext<V>> AnalysisResults<V, C> {
             .out_value_types(w.node())
             .find(|(p, _)| *p == w.source())
             .unwrap();
-        v.try_into_value(&typ).map_err(Some)
+        v.try_into_concrete(&typ).map_err(Some)
     }
 }
 
