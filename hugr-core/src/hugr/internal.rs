@@ -37,17 +37,17 @@ impl HugrInternals for Hugr {
 
     #[inline]
     fn portgraph(&self) -> Self::Portgraph<'_> {
-        &self.as_ref().graph
+        &self.graph
     }
 
     #[inline]
     fn base_hugr(&self) -> &Hugr {
-        self.as_ref()
+        self
     }
 
     #[inline]
     fn root_node(&self) -> Node {
-        self.as_ref().root.into()
+        self.root.into()
     }
 }
 
