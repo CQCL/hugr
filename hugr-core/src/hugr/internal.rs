@@ -62,6 +62,16 @@ impl<T: HugrInternals> HugrInternals for &T {
     }
 }
 
+impl<T: HugrInternals> HugrInternals for &mut T {
+    type Portgraph<'p> = T::Portgraph<'p> where Self: 'p;
+    delegate! {
+        to (**self) {
+            fn portgraph(&self) -> Self::Portgraph<'_>;
+            fn base_hugr(&self) -> &Hugr;
+            fn root_node(&self) -> Node;
+        }
+    }
+}
 /// Trait for accessing the mutable internals of a Hugr(Mut).
 ///
 /// Specifically, this trait lets you apply arbitrary modifications that may
