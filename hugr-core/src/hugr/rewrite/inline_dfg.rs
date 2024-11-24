@@ -147,8 +147,7 @@ mod test {
     use crate::std_extensions::arithmetic::int_types::{self, ConstInt};
     use crate::types::Signature;
     use crate::utils::test_quantum_extension;
-    use crate::{type_row, Direction, HugrView, Node, Port};
-    use crate::{Hugr, Wire};
+    use crate::{type_row, Direction, HugrView, Node, Port, Wire};
 
     use super::InlineDFG;
 
@@ -167,7 +166,7 @@ mod test {
     #[case(true)]
     #[case(false)]
     fn inline_add_load_const(#[case] nonlocal: bool) -> Result<(), Box<dyn std::error::Error>> {
-        use crate::extension::prelude::Lift;
+        use crate::{builder::Buildable, extension::prelude::Lift};
 
         let reg = ExtensionRegistry::try_new([
             PRELUDE.to_owned(),
@@ -179,7 +178,7 @@ mod test {
 
         let mut outer = DFGBuilder::new(inout_sig(vec![int_ty.clone(); 2], vec![int_ty.clone()]))?;
         let [a, b] = outer.input_wires_arr();
-        fn make_const<T: AsMut<Hugr> + AsRef<Hugr>>(
+        fn make_const<T: Buildable>(
             d: &mut DFGBuilder<T>,
         ) -> Result<Wire, Box<dyn std::error::Error>> {
             let int_ty = &int_types::INT_TYPES[6];

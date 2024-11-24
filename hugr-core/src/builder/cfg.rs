@@ -2,7 +2,7 @@ use super::{
     build_traits::SubContainer,
     dataflow::{DFGBuilder, DFGWrapper},
     handle::BuildHandle,
-    BasicBlockID, BuildError, CfgID, Container, Dataflow, HugrBuilder, Wire,
+    BasicBlockID, BuildError, Buildable, CfgID, Container, Dataflow, HugrBuilder, Wire,
 };
 
 use crate::{
@@ -124,7 +124,7 @@ pub struct CFGBuilder<T> {
     pub(super) n_out_wires: usize,
 }
 
-impl<B: AsMut<Hugr> + AsRef<Hugr>> Container for CFGBuilder<B> {
+impl<B: Buildable> Container for CFGBuilder<B> {
     #[inline]
     fn container_node(&self) -> Node {
         self.cfg_node
@@ -141,7 +141,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> Container for CFGBuilder<B> {
     }
 }
 
-impl<H: AsMut<Hugr> + AsRef<Hugr>> SubContainer for CFGBuilder<H> {
+impl<H: Buildable> SubContainer for CFGBuilder<H> {
     type ContainerHandle = BuildHandle<CfgID>;
     #[inline]
     fn finish_sub_container(self) -> Result<Self::ContainerHandle, BuildError> {
@@ -172,7 +172,7 @@ impl HugrBuilder for CFGBuilder<Hugr> {
     }
 }
 
-impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
+impl<B: Buildable> CFGBuilder<B> {
     pub(super) fn create(
         mut base: B,
         cfg_node: Node,
@@ -381,7 +381,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
 /// Builder for a [`DataflowBlock`] child graph.
 pub type BlockBuilder<B> = DFGWrapper<B, BasicBlockID>;
 
-impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
+impl<B: Buildable> BlockBuilder<B> {
     /// Set the outputs of the block, with `branch_wire` carrying  the value of the
     /// branch controlling Sum value.  `outputs` are the remaining outputs.
     pub fn set_outputs(
@@ -392,7 +392,11 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> BlockBuilder<B> {
         Dataflow::set_outputs(self, [branch_wire].into_iter().chain(outputs))
     }
     fn create(base: B, block_n: Node) -> Result<Self, BuildError> {
-        let block_op = base.get_optype(block_n).as_dataflow_block().unwrap();
+        let block_op = base
+            .as_ref()
+            .get_optype(block_n)
+            .as_dataflow_block()
+            .unwrap();
         let signature = block_op.inner_signature();
         let db = DFGBuilder::create_with_io(base, block_n, signature)?;
         Ok(BlockBuilder::from_dfg_builder(db))
@@ -505,7 +509,7 @@ pub(crate) mod test {
         Ok(())
     }
 
-    pub(crate) fn build_basic_cfg<T: AsMut<Hugr> + AsRef<Hugr>>(
+    pub(crate) fn build_basic_cfg<T: Buildable>(
         cfg_builder: &mut CFGBuilder<T>,
     ) -> Result<(), BuildError> {
         let sum2_variants = vec![type_row![NAT], type_row![NAT]];

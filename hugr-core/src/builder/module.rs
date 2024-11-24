@@ -1,7 +1,7 @@
 use super::{
     build_traits::HugrBuilder,
     dataflow::{DFGBuilder, FunctionBuilder},
-    BuildError, Container,
+    BuildError, Buildable, Container,
 };
 
 use crate::extension::ExtensionRegistry;
@@ -20,7 +20,7 @@ use smol_str::SmolStr;
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModuleBuilder<T>(pub(super) T);
 
-impl<T: AsMut<Hugr> + AsRef<Hugr>> Container for ModuleBuilder<T> {
+impl<T: Buildable> Container for ModuleBuilder<T> {
     #[inline]
     fn container_node(&self) -> Node {
         self.0.as_ref().root()
@@ -60,7 +60,7 @@ impl HugrBuilder for ModuleBuilder<Hugr> {
     }
 }
 
-impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
+impl<T: Buildable> ModuleBuilder<T> {
     /// Replace a [`ops::FuncDecl`] with [`ops::FuncDefn`] and return a builder for
     /// the defining graph.
     ///

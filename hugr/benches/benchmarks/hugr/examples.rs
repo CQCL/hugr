@@ -1,8 +1,8 @@
 //! Builders and utilities for benchmarks.
 
 use hugr::builder::{
-    BuildError, CFGBuilder, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
-    HugrBuilder, ModuleBuilder,
+    BuildError, Buildable, CFGBuilder, Container, DFGBuilder, Dataflow, DataflowHugr,
+    DataflowSubContainer, HugrBuilder, ModuleBuilder,
 };
 use hugr::extension::prelude::{BOOL_T, QB_T, USIZE_T};
 use hugr::extension::PRELUDE_REGISTRY;
@@ -20,9 +20,7 @@ pub fn simple_dfg_hugr() -> Hugr {
     dfg_builder.finish_prelude_hugr_with_outputs([i1]).unwrap()
 }
 
-pub fn simple_cfg_builder<T: AsMut<Hugr> + AsRef<Hugr>>(
-    cfg_builder: &mut CFGBuilder<T>,
-) -> Result<(), BuildError> {
+pub fn simple_cfg_builder<T: Buildable>(cfg_builder: &mut CFGBuilder<T>) -> Result<(), BuildError> {
     let sum2_variants = vec![type_row![USIZE_T], type_row![USIZE_T]];
     let mut entry_b = cfg_builder.entry_builder(sum2_variants.clone(), type_row![])?;
     let entry = {
