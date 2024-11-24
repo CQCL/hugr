@@ -2,6 +2,7 @@
 
 use std::ops::Range;
 
+use delegate::delegate;
 use portgraph::{LinkView, MultiPortGraph, PortMut, PortView};
 
 use crate::ops::handle::NodeHandle;
@@ -31,7 +32,7 @@ pub trait HugrInternals {
     fn root_node(&self) -> Node;
 }
 
-impl<T: AsRef<Hugr>> HugrInternals for T {
+impl HugrInternals for Hugr {
     type Portgraph<'p> = &'p MultiPortGraph where Self: 'p;
 
     #[inline]
@@ -47,6 +48,17 @@ impl<T: AsRef<Hugr>> HugrInternals for T {
     #[inline]
     fn root_node(&self) -> Node {
         self.as_ref().root.into()
+    }
+}
+
+impl<T: HugrInternals> HugrInternals for &T {
+    type Portgraph<'p> = T::Portgraph<'p> where Self: 'p;
+    delegate! {
+        to (**self) {
+            fn portgraph(&self) -> Self::Portgraph<'_>;
+            fn base_hugr(&self) -> &Hugr;
+            fn root_node(&self) -> Node;
+        }
     }
 }
 
