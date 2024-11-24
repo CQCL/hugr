@@ -448,7 +448,7 @@ mod test {
     use itertools::Itertools;
 
     use crate::builder::{
-        endo_sig, BuildError, Buildable, CFGBuilder, Container, DFGBuilder, Dataflow, DataflowHugr,
+        endo_sig, BuildError, CFGBuilder, Container, DFGBuilder, Dataflow, DataflowHugr,
         DataflowSubContainer, HugrBuilder, SubContainer,
     };
     use crate::extension::prelude::{BOOL_T, USIZE_T};
@@ -605,7 +605,7 @@ mod test {
             .unwrap()
     }
 
-    fn single_node_block<T: Buildable, O: DataflowOpTrait + Into<OpType>>(
+    fn single_node_block<T: AsRef<Hugr> + AsMut<Hugr>, O: DataflowOpTrait + Into<OpType>>(
         h: &mut CFGBuilder<T>,
         op: O,
         pred_const: &ConstID,

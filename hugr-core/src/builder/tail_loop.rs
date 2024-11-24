@@ -6,7 +6,6 @@ use crate::types::{Signature, TypeRow};
 use crate::{Hugr, Node};
 
 use super::handle::BuildHandle;
-use super::Buildable;
 use super::{
     dataflow::{DFGBuilder, DFGWrapper},
     BuildError, Container, Dataflow, TailLoopID, Wire,
@@ -15,7 +14,7 @@ use super::{
 /// Builder for a [`ops::TailLoop`] node.
 pub type TailLoopBuilder<B> = DFGWrapper<B, BuildHandle<TailLoopID>>;
 
-impl<B: Buildable> TailLoopBuilder<B> {
+impl<B: AsMut<Hugr> + AsRef<Hugr>> TailLoopBuilder<B> {
     pub(super) fn create_with_io(
         base: B,
         loop_node: Node,

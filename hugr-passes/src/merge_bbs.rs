@@ -162,9 +162,7 @@ mod test {
     use itertools::Itertools;
     use rstest::rstest;
 
-    use hugr_core::builder::{
-        endo_sig, inout_sig, Buildable, CFGBuilder, DFGWrapper, Dataflow, HugrBuilder,
-    };
+    use hugr_core::builder::{endo_sig, inout_sig, CFGBuilder, DFGWrapper, Dataflow, HugrBuilder};
     use hugr_core::extension::prelude::{ConstUsize, PRELUDE_ID, QB_T, USIZE_T};
     use hugr_core::extension::{ExtensionRegistry, PRELUDE, PRELUDE_REGISTRY};
     use hugr_core::hugr::views::sibling::SiblingMut;
@@ -172,7 +170,7 @@ mod test {
     use hugr_core::ops::handle::CfgID;
     use hugr_core::ops::{LoadConstant, OpTrait, OpType};
     use hugr_core::types::{Signature, Type, TypeRow};
-    use hugr_core::{const_extension_ids, type_row, Extension, HugrView, Wire};
+    use hugr_core::{const_extension_ids, type_row, Extension, Hugr, HugrView, Wire};
 
     use super::merge_basic_blocks;
 
@@ -197,7 +195,7 @@ mod test {
         e
     }
 
-    fn lifted_unary_unit_sum<B: Buildable, T>(b: &mut DFGWrapper<B, T>) -> Wire {
+    fn lifted_unary_unit_sum<B: AsMut<Hugr> + AsRef<Hugr>, T>(b: &mut DFGWrapper<B, T>) -> Wire {
         let lc = b.add_load_value(Value::unary_unit_sum());
         let lift = b
             .add_dataflow_op(

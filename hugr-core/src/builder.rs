@@ -102,7 +102,7 @@ pub use handle::BuildHandle;
 
 mod build_traits;
 pub use build_traits::{
-    Buildable, Container, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder, SubContainer,
+    Container, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder, SubContainer,
 };
 
 mod dataflow;

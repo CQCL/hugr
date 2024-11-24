@@ -568,7 +568,7 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> EdgeClassifier<T> {
 pub(crate) mod test {
     use super::*;
     use hugr_core::builder::{
-        endo_sig, BuildError, Buildable, CFGBuilder, Container, DataflowSubContainer, HugrBuilder,
+        endo_sig, BuildError, CFGBuilder, Container, DataflowSubContainer, HugrBuilder,
     };
     use hugr_core::extension::PRELUDE_REGISTRY;
     use hugr_core::extension::{prelude::USIZE_T, ExtensionSet};
@@ -839,7 +839,7 @@ pub(crate) mod test {
         dataflow_builder.finish_with_outputs([u].into_iter().chain(w))
     }
 
-    fn build_if_then_else_merge<T: Buildable>(
+    fn build_if_then_else_merge<T: AsMut<Hugr> + AsRef<Hugr>>(
         cfg: &mut CFGBuilder<T>,
         const_pred: &ConstID,
         unit_const: &ConstID,
@@ -849,7 +849,7 @@ pub(crate) mod test {
         Ok((split, merge))
     }
 
-    fn build_then_else_merge_from_if<T: Buildable>(
+    fn build_then_else_merge_from_if<T: AsMut<Hugr> + AsRef<Hugr>>(
         cfg: &mut CFGBuilder<T>,
         unit_const: &ConstID,
         split: BasicBlockID,
@@ -902,7 +902,7 @@ pub(crate) mod test {
         Ok((h, head, tail))
     }
 
-    pub(crate) fn build_conditional_in_loop<T: Buildable>(
+    pub(crate) fn build_conditional_in_loop<T: AsMut<Hugr> + AsRef<Hugr>>(
         cfg_builder: &mut CFGBuilder<T>,
         separate_headers: bool,
     ) -> Result<(BasicBlockID, BasicBlockID), BuildError> {

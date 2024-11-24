@@ -33,34 +33,6 @@ use crate::Hugr;
 
 use crate::hugr::HugrMut;
 
-/// A thing the builder can operate on. Either a `Hugr` or an `&mut Hugr`.
-pub trait Buildable {
-    /// Gets a reference to the underlying `Hugr`
-    fn as_ref(&self) -> &Hugr;
-    /// Gets a mutable reference to the underlying `Hugr`
-    fn as_mut(&mut self) -> &mut Hugr;
-}
-
-impl Buildable for Hugr {
-    fn as_ref(&self) -> &Hugr {
-        self
-    }
-
-    fn as_mut(&mut self) -> &mut Hugr {
-        self
-    }
-}
-
-impl Buildable for &mut Hugr {
-    fn as_ref(&self) -> &Hugr {
-        self
-    }
-
-    fn as_mut(&mut self) -> &mut Hugr {
-        self
-    }
-}
-
 /// Trait for HUGR container builders.
 /// Containers are nodes that are parents of sibling graphs.
 /// Implementations of this trait allow the child sibling graph to be added to

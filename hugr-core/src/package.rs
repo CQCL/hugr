@@ -392,7 +392,7 @@ mod test {
     #[case::simple(simple_package())]
     fn package_roundtrip(#[case] package: Package) {
         let json = package.to_json().unwrap();
-        let new_package = Package::from_json(json).unwrap();
+        let new_package = Package::from_json(&json).unwrap();
         assert_eq!(package, new_package);
     }
 
