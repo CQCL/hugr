@@ -596,9 +596,9 @@ impl HugrView for Hugr {
 }
 
 macro_rules! hugr_view_methods {
-    () => {
+    ($e:expr) => {
         delegate! {
-            to (**self) {
+            to ($e) {
 
                 #[inline]
                 fn contains_node(&self, node: Node) -> bool;
@@ -645,11 +645,11 @@ macro_rules! hugr_view_methods {
 }
 
 impl<T: HugrView> HugrView for &T {
-    hugr_view_methods! {}
+    hugr_view_methods!{**self}
 }
 
 impl<T: HugrView> HugrView for &mut T {
-    hugr_view_methods! {}
+    hugr_view_methods!{**self}
 }
 
 /// Trait implementing methods on port iterators.
