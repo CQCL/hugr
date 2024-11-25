@@ -279,15 +279,6 @@ jobs:
       - name: Tests with no features
         run: cargo test -p hugr-llvm --verbose --features llvm${{ matrix.llvm-version[1] }}
 
-  rs-semver-checks:
-    needs: [changes, check]
-    if: ${{ needs.changes.outputs.rust == 'true' && github.event_name == 'pull_request' }}
-    uses: CQCL/hugrverse-actions/.github/workflows/rs-semver-checks.yml@main
-    with:
-      apt-dependencies: capnproto
-    secrets:
-      GITHUB_PAT: ${{ secrets.HUGRBOT_PAT }}
-
   # This is a meta job to mark successful completion of the required checks,
   # even if they are skipped due to no changes in the relevant files.
   required-checks:
