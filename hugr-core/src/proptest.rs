@@ -186,7 +186,7 @@ pub fn any_serde_json_value() -> impl Strategy<Value = serde_json::Value> {
         .boxed()
 }
 
-/// A strategy for generating an arbitrary HUGRs.
+/// A strategy for generating an arbitrary HUGR.
 pub fn any_hugr() -> SBoxedStrategy<Hugr> {
     ANY_HUGR.to_owned()
 }
