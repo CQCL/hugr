@@ -514,7 +514,7 @@ impl<'g, Base: HugrView> TopoConvexChecker<'g, Base> {
     }
 }
 
-impl<'g, Base: HugrView> ConvexChecker for TopoConvexChecker<'g, Base> {
+impl<Base: HugrView> ConvexChecker for TopoConvexChecker<'_, Base> {
     fn is_convex(
         &self,
         nodes: impl IntoIterator<Item = portgraph::NodeIndex>,

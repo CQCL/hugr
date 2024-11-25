@@ -16,13 +16,13 @@ pub struct PetgraphWrapper<'a, T> {
     pub(crate) hugr: &'a T,
 }
 
-impl<'a, T> Clone for PetgraphWrapper<'a, T> {
+impl<T> Clone for PetgraphWrapper<'_, T> {
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<'a, T> Copy for PetgraphWrapper<'a, T> {}
+impl<T> Copy for PetgraphWrapper<'_, T> {}
 
 impl<'a, T> From<&'a T> for PetgraphWrapper<'a, T>
 where
@@ -33,7 +33,7 @@ where
     }
 }
 
-impl<'a, T> pv::GraphBase for PetgraphWrapper<'a, T>
+impl<T> pv::GraphBase for PetgraphWrapper<'_, T>
 where
     T: HugrView,
 {
@@ -41,16 +41,16 @@ where
     type EdgeId = ((Node, Port), (Node, Port));
 }
 
-impl<'a, T> pv::GraphProp for PetgraphWrapper<'a, T>
+impl<T> pv::GraphProp for PetgraphWrapper<'_, T>
 where
     T: HugrView,
 {
     type EdgeType = petgraph::Directed;
 }
 
-impl<'a, T> pv::GraphRef for PetgraphWrapper<'a, T> where T: HugrView {}
+impl<T> pv::GraphRef for PetgraphWrapper<'_, T> where T: HugrView {}
 
-impl<'a, T> pv::NodeCount for PetgraphWrapper<'a, T>
+impl<T> pv::NodeCount for PetgraphWrapper<'_, T>
 where
     T: HugrView,
 {
@@ -59,7 +59,7 @@ where
     }
 }
 
-impl<'a, T> pv::NodeIndexable for PetgraphWrapper<'a, T>
+impl<T> pv::NodeIndexable for PetgraphWrapper<'_, T>
 where
     T: HugrView,
 {
@@ -76,7 +76,7 @@ where
     }
 }
 
-impl<'a, T> pv::EdgeCount for PetgraphWrapper<'a, T>
+impl<T> pv::EdgeCount for PetgraphWrapper<'_, T>
 where
     T: HugrView,
 {
@@ -85,7 +85,7 @@ where
     }
 }
 
-impl<'a, T> pv::Data for PetgraphWrapper<'a, T>
+impl<T> pv::Data for PetgraphWrapper<'_, T>
 where
     T: HugrView,
 {
@@ -146,7 +146,7 @@ where
     }
 }
 
-impl<'a, T> pv::Visitable for PetgraphWrapper<'a, T>
+impl<T> pv::Visitable for PetgraphWrapper<'_, T>
 where
     T: HugrView,
 {
@@ -161,7 +161,7 @@ where
     }
 }
 
-impl<'a, T> pv::GetAdjacencyMatrix for PetgraphWrapper<'a, T>
+impl<T> pv::GetAdjacencyMatrix for PetgraphWrapper<'_, T>
 where
     T: HugrView,
 {

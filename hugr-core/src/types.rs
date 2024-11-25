@@ -540,7 +540,7 @@ impl From<Type> for TypeRV {
 /// (Variables out of the range of the list will result in a panic)
 pub(crate) struct Substitution<'a>(&'a [TypeArg], &'a ExtensionRegistry);
 
-impl<'a> Substitution<'a> {
+impl Substitution<'_> {
     pub(crate) fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg {
         let arg = self
             .0
