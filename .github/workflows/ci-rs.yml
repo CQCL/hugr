@@ -65,7 +65,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: mozilla-actions/sccache-action@v0.0.6
       - name: Install stable toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@beta
         with:
           components: rustfmt, clippy
       - name: Install CapnProto
