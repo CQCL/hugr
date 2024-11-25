@@ -223,6 +223,11 @@ jobs:
           components: llvm-tools-preview
       - name: Install CapnProto
         run: sudo apt-get install -y capnproto
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: "14.0"
+          env: true
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
       - name: Run tests with coverage instrumentation
@@ -230,6 +235,7 @@ jobs:
           cargo llvm-cov clean --workspace
           cargo llvm-cov --no-report  --no-default-features --doctests
           cargo llvm-cov --no-report  --all-features --doctests
+          cargo llvm-cov --no-report  -p hugr-llvm --features llvm14-0 --doctests
       - name: Generate coverage report
         run: cargo llvm-cov --all-features report --codecov --output-path coverage.json
       - name: Upload coverage to codecov.io
