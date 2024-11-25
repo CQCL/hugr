@@ -115,7 +115,6 @@ impl<D: Dataflow> ArrayOpBuilder for D {}
 
 #[cfg(test)]
 pub mod test {
-    use hugr_core::extension::prelude::PRELUDE_ID;
     use hugr_core::{
         builder::{DFGBuilder, HugrBuilder},
         extension::{
