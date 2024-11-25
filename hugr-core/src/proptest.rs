@@ -150,7 +150,7 @@ pub fn any_nonempty_smolstr() -> SBoxedStrategy<SmolStr> {
     ANY_NONEMPTY_STRING.to_owned().prop_map_into().sboxed()
 }
 
-/// A strategy for generating an arbitrary nonempty identity [String].
+/// A strategy for generating an arbitrary nonempty identifier [String].
 pub fn any_ident_string() -> SBoxedStrategy<String> {
     ANY_IDENT_STRING.to_owned()
 }
