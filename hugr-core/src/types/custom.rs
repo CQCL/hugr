@@ -139,7 +139,7 @@ impl From<CustomType> for Type {
 }
 
 #[cfg(test)]
-pub mod test {
+mod test {
 
     pub mod proptest {
         use crate::extension::ExtensionId;

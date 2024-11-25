@@ -1,3 +1,5 @@
+//! Generator functions for property testing the Hugr data structures.
+
 use ::proptest::collection::vec;
 use ::proptest::prelude::*;
 use lazy_static::lazy_static;

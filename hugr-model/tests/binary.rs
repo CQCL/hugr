@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use bumpalo::Bump;
 use hugr_model::v0 as model;
 use pretty_assertions::assert_eq;

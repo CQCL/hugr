@@ -514,10 +514,12 @@ pub(super) mod test {
         const EXT_ID: ExtensionId = "MyExt";
     }
 
+    /// A dummy wrapper over an operation definition.
     #[derive(serde::Serialize, serde::Deserialize, Debug)]
     pub struct SimpleOpDef(OpDef);
 
     impl SimpleOpDef {
+        /// Create a new dummy opdef.
         pub fn new(op_def: OpDef) -> Self {
             assert!(op_def.constant_folder.is_none());
             assert!(matches!(
