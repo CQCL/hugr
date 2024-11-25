@@ -134,7 +134,7 @@ pub mod test {
     #[rstest::fixture]
     #[default(DFGBuilder<Hugr>)]
     pub fn all_array_ops<B: Dataflow>(
-        #[default(DFGBuilder::new(Signature::new_endo(Type::EMPTY_TYPEROW).with_extension_delta(PRELUDE_ID)).unwrap())]
+        #[default(DFGBuilder::new(Signature::new_endo(Type::EMPTY_TYPEROW).with_prelude()).unwrap())]
         mut builder: B,
     ) -> B {
         let us0 = builder.add_load_value(ConstUsize::new(0));
