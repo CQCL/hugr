@@ -115,6 +115,7 @@ impl<D: Dataflow> ArrayOpBuilder for D {}
 
 #[cfg(test)]
 pub mod test {
+    use hugr_core::extension::prelude::PRELUDE_ID;
     use hugr_core::{
         builder::{DFGBuilder, HugrBuilder},
         extension::{
@@ -133,7 +134,7 @@ pub mod test {
     #[rstest::fixture]
     #[default(DFGBuilder<Hugr>)]
     pub fn all_array_ops<B: Dataflow>(
-        #[default(DFGBuilder::new(Signature::new_endo(Type::EMPTY_TYPEROW)).unwrap())]
+        #[default(DFGBuilder::new(Signature::new_endo(Type::EMPTY_TYPEROW).with_prelude()).unwrap())]
         mut builder: B,
     ) -> B {
         let us0 = builder.add_load_value(ConstUsize::new(0));

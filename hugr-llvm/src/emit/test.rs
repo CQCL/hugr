@@ -4,8 +4,13 @@ use anyhow::{anyhow, Result};
 use hugr_core::builder::{
     BuildHandle, Container, DFGWrapper, HugrBuilder, ModuleBuilder, SubContainer,
 };
-use hugr_core::extension::{ExtensionRegistry, EMPTY_REG};
+use hugr_core::extension::prelude::PRELUDE_ID;
+use hugr_core::extension::{ExtensionRegistry, ExtensionSet, EMPTY_REG};
 use hugr_core::ops::handle::FuncID;
+use hugr_core::std_extensions::arithmetic::{
+    conversions, float_ops, float_types, int_ops, int_types,
+};
+use hugr_core::std_extensions::logic;
 use hugr_core::types::TypeRow;
 use hugr_core::{Hugr, HugrView};
 use inkwell::module::Module;
@@ -137,7 +142,20 @@ impl SimpleHugrConfig {
     ) -> Hugr {
         let mut mod_b = ModuleBuilder::new();
         let func_b = mod_b
-            .define_function("main", HugrFuncType::new(self.ins, self.outs))
+            .define_function(
+                "main",
+                HugrFuncType::new(self.ins, self.outs).with_extension_delta(
+                    ExtensionSet::from_iter([
+                        PRELUDE_ID,
+                        int_types::EXTENSION_ID,
+                        int_ops::EXTENSION_ID,
+                        float_types::EXTENSION_ID,
+                        float_ops::EXTENSION_ID,
+                        conversions::EXTENSION_ID,
+                        logic::EXTENSION_ID,
+                    ]),
+                ),
+            )
             .unwrap();
         make(func_b, &self.extensions);
 
