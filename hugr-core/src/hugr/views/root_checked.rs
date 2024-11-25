@@ -8,7 +8,7 @@ use crate::hugr::{HugrError, HugrMut};
 use crate::ops::handle::NodeHandle;
 use crate::{Direction, Hugr, Node, Port};
 
-use super::{check_tag, HugrView, RootTagged};
+use super::{check_tag, hugr_view_methods, HugrView, RootTagged};
 
 /// A view of the whole Hugr.
 /// (Just provides static checking of the type of the root node)
@@ -59,49 +59,7 @@ impl<H: AsRef<Hugr>, Root> HugrInternals for RootChecked<H, Root> {
     }
 }
 impl<H: AsRef<Hugr>, Root> HugrView for RootChecked<H, Root> {
-    delegate! {
-        to self.as_ref() {
-            #[inline]
-            fn contains_node(&self, node: Node) -> bool;
-
-            #[inline]
-            fn node_count(&self) -> usize;
-
-            #[inline]
-            fn edge_count(&self) -> usize;
-
-            #[inline]
-            fn nodes(&self) -> impl Iterator<Item = Node> + Clone;
-
-            #[inline]
-            fn node_ports(&self, node: Node, dir: Direction) -> impl Iterator<Item = Port> + Clone;
-
-            #[inline]
-            fn all_node_ports(&self, node: Node) -> impl Iterator<Item = Port> + Clone;
-
-            #[inline]
-            fn linked_ports(
-                &self,
-                node: Node,
-                port: impl Into<Port>,
-            ) -> impl Iterator<Item = (Node, Port)> + Clone;
-
-            #[inline]
-            fn node_connections(&self, node: Node, other: Node) -> impl Iterator<Item = [Port; 2]> + Clone;
-
-            #[inline]
-            fn num_ports(&self, node: Node, dir: Direction) -> usize;
-
-            #[inline]
-            fn children(&self, node: Node) -> impl DoubleEndedIterator<Item = Node> + Clone;
-
-            #[inline]
-            fn neighbours(&self, node: Node, dir: Direction) -> impl Iterator<Item = Node> + Clone;
-
-            #[inline]
-            fn all_neighbours(&self, node: Node) -> impl Iterator<Item = Node> + Clone;
-        }
-    }
+    hugr_view_methods! {this, this.as_ref()}
 }
 
 impl<H: AsRef<Hugr>, Root: NodeHandle> RootTagged for RootChecked<H, Root> {
