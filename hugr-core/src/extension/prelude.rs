@@ -1,5 +1,7 @@
 //! Prelude extension - available in all contexts, defining common types,
 //! operations and constants.
+use std::sync::Arc;
+
 use itertools::Itertools;
 use lazy_static::lazy_static;
 
@@ -38,7 +40,7 @@ pub const PRELUDE_ID: ExtensionId = ExtensionId::new_unchecked("prelude");
 /// Extension version.
 pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
 lazy_static! {
-    static ref PRELUDE_DEF: Extension = {
+    static ref PRELUDE_DEF: Arc<Extension> = {
         let mut prelude = Extension::new(PRELUDE_ID, VERSION);
         prelude
             .add_type(
@@ -106,14 +108,15 @@ lazy_static! {
         LiftDef.add_to_extension(&mut prelude).unwrap();
         array::ArrayOpDef::load_all_ops(&mut prelude).unwrap();
         array::ArrayScanDef.add_to_extension(&mut prelude).unwrap();
-        prelude
+
+        Arc::new(prelude)
     };
     /// An extension registry containing only the prelude
     pub static ref PRELUDE_REGISTRY: ExtensionRegistry =
-        ExtensionRegistry::try_new([PRELUDE_DEF.to_owned()]).unwrap();
+        ExtensionRegistry::try_new([PRELUDE_DEF.clone()]).unwrap();
 
     /// Prelude extension
-    pub static ref PRELUDE: &'static Extension = PRELUDE_REGISTRY.get(&PRELUDE_ID).unwrap();
+    pub static ref PRELUDE: Arc<Extension> = PRELUDE_REGISTRY.get(&PRELUDE_ID).unwrap().clone();
 
 }
 

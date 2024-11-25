@@ -38,11 +38,11 @@ pub mod declarative;
 
 /// Extension Registries store extensions to be looked up e.g. during validation.
 #[derive(Clone, Debug, PartialEq)]
-pub struct ExtensionRegistry(BTreeMap<ExtensionId, Extension>);
+pub struct ExtensionRegistry(BTreeMap<ExtensionId, Arc<Extension>>);
 
 impl ExtensionRegistry {
     /// Gets the Extension with the given name
-    pub fn get(&self, name: &str) -> Option<&Extension> {
+    pub fn get(&self, name: &str) -> Option<&Arc<Extension>> {
         self.0.get(name)
     }
 
@@ -51,9 +51,9 @@ impl ExtensionRegistry {
         self.0.contains_key(name)
     }
 
-    /// Makes a new ExtensionRegistry, validating all the extensions in it
+    /// Makes a new [ExtensionRegistry], validating all the extensions in it.
     pub fn try_new(
-        value: impl IntoIterator<Item = Extension>,
+        value: impl IntoIterator<Item = Arc<Extension>>,
     ) -> Result<Self, ExtensionRegistryError> {
         let mut res = ExtensionRegistry(BTreeMap::new());
 
@@ -70,20 +70,28 @@ impl ExtensionRegistry {
             ext.validate(&res)
                 .map_err(|e| ExtensionRegistryError::InvalidSignature(ext.name().clone(), e))?;
         }
+
         Ok(res)
     }
 
     /// Registers a new extension to the registry.
     ///
     /// Returns a reference to the registered extension if successful.
-    pub fn register(&mut self, extension: Extension) -> Result<&Extension, ExtensionRegistryError> {
+    pub fn register(
+        &mut self,
+        extension: impl Into<Arc<Extension>>,
+    ) -> Result<(), ExtensionRegistryError> {
+        let extension = extension.into();
         match self.0.entry(extension.name().clone()) {
             btree_map::Entry::Occupied(prev) => Err(ExtensionRegistryError::AlreadyRegistered(
                 extension.name().clone(),
                 prev.get().version().clone(),
                 extension.version().clone(),
             )),
-            btree_map::Entry::Vacant(ve) => Ok(ve.insert(extension)),
+            btree_map::Entry::Vacant(ve) => {
+                ve.insert(extension);
+                Ok(())
+            }
         }
     }
 
@@ -93,21 +101,24 @@ impl ExtensionRegistry {
     /// If versions match, the original extension is kept.
     /// Returns a reference to the registered extension if successful.
     ///
-    /// Avoids cloning the extension unless required. For a reference version see
+    /// Takes an Arc to the extension. To avoid cloning Arcs unless necessary, see
     /// [`ExtensionRegistry::register_updated_ref`].
     pub fn register_updated(
         &mut self,
-        extension: Extension,
-    ) -> Result<&Extension, ExtensionRegistryError> {
+        extension: impl Into<Arc<Extension>>,
+    ) -> Result<(), ExtensionRegistryError> {
+        let extension = extension.into();
         match self.0.entry(extension.name().clone()) {
             btree_map::Entry::Occupied(mut prev) => {
                 if prev.get().version() < extension.version() {
                     *prev.get_mut() = extension;
                 }
-                Ok(prev.into_mut())
             }
-            btree_map::Entry::Vacant(ve) => Ok(ve.insert(extension)),
+            btree_map::Entry::Vacant(ve) => {
+                ve.insert(extension);
+            }
         }
+        Ok(())
     }
 
     /// Registers a new extension to the registry, keeping most up to date if
@@ -117,21 +128,23 @@ impl ExtensionRegistry {
     /// If versions match, the original extension is kept. Returns a reference
     /// to the registered extension if successful.
     ///
-    /// Clones the extension if required. For no-cloning version see
+    /// Clones the Arc only when required. For no-cloning version see
     /// [`ExtensionRegistry::register_updated`].
     pub fn register_updated_ref(
         &mut self,
-        extension: &Extension,
-    ) -> Result<&Extension, ExtensionRegistryError> {
+        extension: &Arc<Extension>,
+    ) -> Result<(), ExtensionRegistryError> {
         match self.0.entry(extension.name().clone()) {
             btree_map::Entry::Occupied(mut prev) => {
                 if prev.get().version() < extension.version() {
                     *prev.get_mut() = extension.clone();
                 }
-                Ok(prev.into_mut())
             }
-            btree_map::Entry::Vacant(ve) => Ok(ve.insert(extension.clone())),
+            btree_map::Entry::Vacant(ve) => {
+                ve.insert(extension.clone());
+            }
         }
+        Ok(())
     }
 
     /// Returns the number of extensions in the registry.
@@ -145,20 +158,20 @@ impl ExtensionRegistry {
     }
 
     /// Returns an iterator over the extensions in the registry.
-    pub fn iter(&self) -> impl Iterator<Item = (&ExtensionId, &Extension)> {
+    pub fn iter(&self) -> impl Iterator<Item = (&ExtensionId, &Arc<Extension>)> {
         self.0.iter()
     }
 
     /// Delete an extension from the registry and return it if it was present.
-    pub fn remove_extension(&mut self, name: &ExtensionId) -> Option<Extension> {
+    pub fn remove_extension(&mut self, name: &ExtensionId) -> Option<Arc<Extension>> {
         self.0.remove(name)
     }
 }
 
 impl IntoIterator for ExtensionRegistry {
-    type Item = (ExtensionId, Extension);
+    type Item = (ExtensionId, Arc<Extension>);
 
-    type IntoIter = <BTreeMap<ExtensionId, Extension> as IntoIterator>::IntoIter;
+    type IntoIter = <BTreeMap<ExtensionId, Arc<Extension>> as IntoIterator>::IntoIter;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
@@ -646,10 +659,10 @@ pub mod test {
 
         let ext_1_id = ExtensionId::new("ext1").unwrap();
         let ext_2_id = ExtensionId::new("ext2").unwrap();
-        let ext1 = Extension::new(ext_1_id.clone(), Version::new(1, 0, 0));
-        let ext1_1 = Extension::new(ext_1_id.clone(), Version::new(1, 1, 0));
-        let ext1_2 = Extension::new(ext_1_id.clone(), Version::new(0, 2, 0));
-        let ext2 = Extension::new(ext_2_id, Version::new(1, 0, 0));
+        let ext1 = Arc::new(Extension::new(ext_1_id.clone(), Version::new(1, 0, 0)));
+        let ext1_1 = Arc::new(Extension::new(ext_1_id.clone(), Version::new(1, 1, 0)));
+        let ext1_2 = Arc::new(Extension::new(ext_1_id.clone(), Version::new(0, 2, 0)));
+        let ext2 = Arc::new(Extension::new(ext_2_id, Version::new(1, 0, 0)));
 
         reg.register(ext1.clone()).unwrap();
         reg_ref.register(ext1.clone()).unwrap();

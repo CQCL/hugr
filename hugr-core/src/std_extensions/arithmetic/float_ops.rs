@@ -1,5 +1,7 @@
 //! Basic floating-point operations.
 
+use std::sync::Arc;
+
 use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 
 use super::float_types::FLOAT64_TYPE;
@@ -104,7 +106,7 @@ impl MakeOpDef for FloatOps {
 
 lazy_static! {
     /// Extension for basic float operations.
-    pub static ref EXTENSION: Extension = {
+    pub static ref EXTENSION: Arc<Extension> = {
         let mut extension = Extension::new(
             EXTENSION_ID,
             VERSION).with_reqs(
@@ -113,14 +115,14 @@ lazy_static! {
 
         FloatOps::load_all_ops(&mut extension).unwrap();
 
-        extension
+        Arc::new(extension)
     };
 
     /// Registry of extensions required to validate float operations.
     pub static ref FLOAT_OPS_REGISTRY: ExtensionRegistry  = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        super::float_types::EXTENSION.to_owned(),
-        EXTENSION.to_owned(),
+        PRELUDE.clone(),
+        super::float_types::EXTENSION.clone(),
+        EXTENSION.clone(),
     ])
     .unwrap();
 }

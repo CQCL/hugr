@@ -1,5 +1,7 @@
 //! Basic logical operations.
 
+use std::sync::Arc;
+
 use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 
 use crate::extension::{ConstFold, ConstFoldResult};
@@ -107,7 +109,7 @@ pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("logic");
 pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
 
 /// Extension for basic logical operations.
-fn extension() -> Extension {
+fn extension() -> Arc<Extension> {
     let mut extension = Extension::new(EXTENSION_ID, VERSION);
     LogicOp::load_all_ops(&mut extension).unwrap();
 
@@ -117,15 +119,15 @@ fn extension() -> Extension {
     extension
         .add_value(TRUE_NAME, ops::Value::true_val())
         .unwrap();
-    extension
+    Arc::new(extension)
 }
 
 lazy_static! {
     /// Reference to the logic Extension.
-    pub static ref EXTENSION: Extension = extension();
+    pub static ref EXTENSION: Arc<Extension> = extension();
     /// Registry required to validate logic extension.
     pub static ref LOGIC_REG: ExtensionRegistry =
-        ExtensionRegistry::try_new([EXTENSION.to_owned()]).unwrap();
+        ExtensionRegistry::try_new([EXTENSION.clone()]).unwrap();
 }
 
 impl MakeRegisteredOp for LogicOp {
@@ -159,6 +161,8 @@ fn read_inputs(consts: &[(IncomingPort, ops::Value)]) -> Option<Vec<bool>> {
 
 #[cfg(test)]
 pub(crate) mod test {
+    use std::sync::Arc;
+
     use super::{extension, LogicOp, FALSE_NAME, TRUE_NAME};
     use crate::{
         extension::{
@@ -174,7 +178,7 @@ pub(crate) mod test {
 
     #[test]
     fn test_logic_extension() {
-        let r: Extension = extension();
+        let r: Arc<Extension> = extension();
         assert_eq!(r.name() as &str, "logic");
         assert_eq!(r.operations().count(), 4);
 
@@ -196,7 +200,7 @@ pub(crate) mod test {
 
     #[test]
     fn test_values() {
-        let r: Extension = extension();
+        let r: Arc<Extension> = extension();
         let false_val = r.get_value(&FALSE_NAME).unwrap();
         let true_val = r.get_value(&TRUE_NAME).unwrap();
 

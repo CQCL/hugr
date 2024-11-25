@@ -617,7 +617,7 @@ pub(super) mod test {
         assert_eq!(def.misc.len(), 1);
 
         let reg =
-            ExtensionRegistry::try_new([PRELUDE.to_owned(), EXTENSION.to_owned(), e]).unwrap();
+            ExtensionRegistry::try_new([PRELUDE.clone(), EXTENSION.clone(), e.into()]).unwrap();
         let e = reg.get(&EXT_ID).unwrap();
 
         let list_usize =

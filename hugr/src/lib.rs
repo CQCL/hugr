@@ -47,6 +47,7 @@
 //!         Extension,
 //!     };
 //!
+//!     use std::sync::Arc;
 //!     use lazy_static::lazy_static;
 //!
 //!     fn one_qb_func() -> PolyFuncTypeRV {
@@ -59,7 +60,7 @@
 //!     /// The extension identifier.
 //!     pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("mini.quantum");
 //!     pub const VERSION: Version = Version::new(0, 1, 0);
-//!     fn extension() -> Extension {
+//!     fn extension() -> Arc<Extension> {
 //!         let mut extension = Extension::new(EXTENSION_ID, VERSION);
 //!
 //!         extension
@@ -78,15 +79,14 @@
 //!             )
 //!             .unwrap();
 //!
-//!         extension
+//!         Arc::new(extension)
 //!     }
 //!
 //!     lazy_static! {
 //!         /// Quantum extension definition.
-//!         pub static ref EXTENSION: Extension = extension();
+//!         pub static ref EXTENSION: Arc<Extension> = extension();
 //!         static ref REG: ExtensionRegistry =
-//!             ExtensionRegistry::try_new([EXTENSION.to_owned(), PRELUDE.to_owned()]).unwrap();
-//!
+//!             ExtensionRegistry::try_new([EXTENSION.clone(), PRELUDE.clone()]).unwrap();
 //!     }
 //!     fn get_gate(gate_name: impl Into<OpName>) -> ExtensionOp {
 //!         EXTENSION

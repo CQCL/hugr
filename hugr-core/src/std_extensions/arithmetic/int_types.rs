@@ -1,6 +1,7 @@
 //! Basic integer types
 
 use std::num::NonZeroU64;
+use std::sync::Arc;
 
 use crate::ops::constant::ValueName;
 use crate::types::TypeName;
@@ -186,7 +187,7 @@ impl CustomConst for ConstInt {
 }
 
 /// Extension for basic integer types.
-pub fn extension() -> Extension {
+pub fn extension() -> Arc<Extension> {
     let mut extension = Extension::new(EXTENSION_ID, VERSION);
 
     extension
@@ -198,12 +199,12 @@ pub fn extension() -> Extension {
         )
         .unwrap();
 
-    extension
+    Arc::new(extension)
 }
 
 lazy_static! {
     /// Lazy reference to int types extension.
-    pub static ref EXTENSION: Extension = extension();
+    pub static ref EXTENSION: Arc<Extension> = extension();
 }
 
 /// get an integer type with width corresponding to a type variable with id `var_id`
