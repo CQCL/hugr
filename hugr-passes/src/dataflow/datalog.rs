@@ -19,27 +19,28 @@ use super::{
 type PV<V> = PartialValue<V>;
 
 /// Basic structure for performing an analysis. Usage:
-/// 1. Get a new instance via [Self::default()]
+/// 1. Make a new instance via [Self::new()]
 /// 2. (Optionally) zero or more calls to [Self::prepopulate_wire] and/or
 ///    [Self::prepopulate_df_inputs] with initial values.
 ///    For example, to analyse a [Module](OpType::Module)-rooted Hugr as a library,
 ///    [Self::prepopulate_df_inputs] can be used on each externally-callable
 ///    [FuncDefn](OpType::FuncDefn) to set all inputs to [PartialValue::Top].
 /// 3. Call [Self::run] to produce [AnalysisResults]
-pub struct Machine<V: AbstractValue>(Vec<(Node, IncomingPort, PartialValue<V>)>);
+pub struct Machine<H: HugrView, V: AbstractValue>(H, Vec<(Node, IncomingPort, PartialValue<V>)>);
 
-/// derived-Default requires the context to be Defaultable, which is unnecessary
-impl<V: AbstractValue> Default for Machine<V> {
-    fn default() -> Self {
-        Self(Default::default())
+impl<H: HugrView, V: AbstractValue> Machine<H, V> {
+    /// Create a new Machine to analyse the given Hugr(View)
+    pub fn new(hugr: H) -> Self {
+        Self(hugr, Default::default())
     }
 }
 
-impl<V: AbstractValue> Machine<V> {
+impl<H: HugrView, V: AbstractValue> Machine<H, V> {
     /// Provide initial values for a wire - these will be `join`d with any computed.
-    pub fn prepopulate_wire(&mut self, h: &impl HugrView, w: Wire, v: PartialValue<V>) {
-        self.0.extend(
-            h.linked_inputs(w.node(), w.source())
+    pub fn prepopulate_wire(&mut self, w: Wire, v: PartialValue<V>) {
+        self.1.extend(
+            self.0
+                .linked_inputs(w.node(), w.source())
                 .map(|(n, inp)| (n, inp, v.clone())),
         );
     }
@@ -49,18 +50,17 @@ impl<V: AbstractValue> Machine<V> {
     /// Any out-ports of said same `Input` node, not given values by `in_values`, are set to [PartialValue::Top].
     pub fn prepopulate_df_inputs(
         &mut self,
-        h: &impl HugrView,
         parent: Node,
         in_values: impl IntoIterator<Item = (OutgoingPort, PartialValue<V>)>,
     ) {
         // Put values onto out-wires of Input node
-        let [inp, _] = h.get_io(parent).unwrap();
-        let mut vals = vec![PartialValue::Top; h.signature(inp).unwrap().output_types().len()];
+        let [inp, _] = self.0.get_io(parent).unwrap();
+        let mut vals = vec![PartialValue::Top; self.0.signature(inp).unwrap().output_types().len()];
         for (ip, v) in in_values {
             vals[ip.index()] = v;
         }
         for (i, v) in vals.into_iter().enumerate() {
-            self.prepopulate_wire(h, Wire::new(inp, i), v);
+            self.prepopulate_wire(Wire::new(inp, i), v);
         }
     }
 
@@ -72,20 +72,20 @@ impl<V: AbstractValue> Machine<V> {
     /// # Panics
     /// May panic in various ways if the Hugr is invalid;
     /// or if any `in_values` are provided for a module-rooted Hugr without a function `"main"`.
-    pub fn run<H: HugrView>(
+    pub fn run(
         mut self,
         context: &impl DFContext<V>,
-        hugr: H,
         in_values: impl IntoIterator<Item = (IncomingPort, PartialValue<V>)>,
     ) -> AnalysisResults<V, H> {
         let mut in_values = in_values.into_iter();
-        let root = hugr.root();
+        let root = self.0.root();
         // Some nodes do not accept values as dataflow inputs - for these
         // we must find the corresponding Input node.
-        let input_node_parent = match hugr.get_optype(root) {
+        let input_node_parent = match self.0.get_optype(root) {
             OpType::Module(_) => {
-                let main = hugr.children(root).find(|n| {
-                    hugr.get_optype(*n)
+                let main = self.0.children(root).find(|n| {
+                    self.0
+                        .get_optype(*n)
                         .as_func_defn()
                         .is_some_and(|f| f.name == "main")
                 });
@@ -103,27 +103,26 @@ impl<V: AbstractValue> Machine<V> {
         // analysis must produce Top == we-know-nothing, not `V` !)
         if let Some(p) = input_node_parent {
             self.prepopulate_df_inputs(
-                &hugr,
                 p,
                 in_values.map(|(p, v)| (OutgoingPort::from(p.index()), v)),
             );
         } else {
             // Put values onto in-wires of root node, datalog will do the rest
-            self.0.extend(in_values.map(|(p, v)| (root, p, v)));
+            self.1.extend(in_values.map(|(p, v)| (root, p, v)));
             let got_inputs: HashSet<_, RandomState> = self
-                .0
+                .1
                 .iter()
                 .filter_map(|(n, p, _)| (n == &root).then_some(*p))
                 .collect();
-            for p in hugr.signature(root).unwrap_or_default().input_ports() {
+            for p in self.0.signature(root).unwrap_or_default().input_ports() {
                 if !got_inputs.contains(&p) {
-                    self.0.push((root, p, PartialValue::Top));
+                    self.1.push((root, p, PartialValue::Top));
                 }
             }
         }
         // Note/TODO, if analysis is running on a subregion then we should do similar
         // for any nonlocal edges providing values from outside the region.
-        run_datalog(context, hugr, self.0)
+        run_datalog(context, self.0, self.1)
     }
 }
 
