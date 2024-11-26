@@ -99,7 +99,7 @@ impl Package {
         reg: &mut ExtensionRegistry,
     ) -> Result<(), PackageValidationError> {
         for ext in &self.extensions {
-            reg.register_updated_ref(ext)?;
+            reg.register_updated_ref(ext);
         }
         for hugr in self.modules.iter_mut() {
             hugr.update_validate(reg)?;

@@ -104,10 +104,7 @@ impl ExtensionRegistry {
     ///
     /// Takes an Arc to the extension. To avoid cloning Arcs unless necessary, see
     /// [`ExtensionRegistry::register_updated_ref`].
-    pub fn register_updated(
-        &mut self,
-        extension: impl Into<Arc<Extension>>,
-    ) -> Result<(), ExtensionRegistryError> {
+    pub fn register_updated(&mut self, extension: impl Into<Arc<Extension>>) {
         let extension = extension.into();
         match self.0.entry(extension.name().clone()) {
             btree_map::Entry::Occupied(mut prev) => {
@@ -119,7 +116,6 @@ impl ExtensionRegistry {
                 ve.insert(extension);
             }
         }
-        Ok(())
     }
 
     /// Registers a new extension to the registry, keeping most up to date if
@@ -131,10 +127,7 @@ impl ExtensionRegistry {
     ///
     /// Clones the Arc only when required. For no-cloning version see
     /// [`ExtensionRegistry::register_updated`].
-    pub fn register_updated_ref(
-        &mut self,
-        extension: &Arc<Extension>,
-    ) -> Result<(), ExtensionRegistryError> {
+    pub fn register_updated_ref(&mut self, extension: &Arc<Extension>) {
         match self.0.entry(extension.name().clone()) {
             btree_map::Entry::Occupied(mut prev) => {
                 if prev.get().version() < extension.version() {
@@ -145,7 +138,6 @@ impl ExtensionRegistry {
                 ve.insert(extension.clone());
             }
         }
-        Ok(())
     }
 
     /// Returns the number of extensions in the registry.
@@ -777,14 +769,14 @@ pub mod test {
         );
 
         // register with update works
-        reg_ref.register_updated_ref(&ext1_1).unwrap();
-        reg.register_updated(ext1_1.clone()).unwrap();
+        reg_ref.register_updated_ref(&ext1_1);
+        reg.register_updated(ext1_1.clone());
         assert_eq!(reg.get("ext1").unwrap().version(), &Version::new(1, 1, 0));
         assert_eq!(&reg, &reg_ref);
 
         // register with lower version does not change version
-        reg_ref.register_updated_ref(&ext1_2).unwrap();
-        reg.register_updated(ext1_2.clone()).unwrap();
+        reg_ref.register_updated_ref(&ext1_2);
+        reg.register_updated(ext1_2.clone());
         assert_eq!(reg.get("ext1").unwrap().version(), &Version::new(1, 1, 0));
         assert_eq!(&reg, &reg_ref);
 
