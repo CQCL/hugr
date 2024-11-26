@@ -2,11 +2,14 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::hugr::views::SiblingSubgraph;
+use crate::hugr::hugrmut::InsertionResult;
+use crate::hugr::views::{DescendantsGraph, HierarchyView, SiblingSubgraph};
 use crate::hugr::{HugrMut, HugrView, NodeMetadataMap, Rewrite};
 use crate::ops::{OpTag, OpTrait, OpType};
 use crate::{Hugr, IncomingPort, Node, OutgoingPort};
 use thiserror::Error;
+
+use super::inline_dfg::{InlineDFG, InlineDFGError};
 
 /// Specification of a simple replacement operation.
 #[derive(Debug, Clone)]
@@ -74,19 +77,23 @@ impl Rewrite for SimpleReplacement {
                 return Err(SimpleReplacementError::InvalidRemovedNode());
             }
         }
-        // 3. Do the replacement.
-        // 3.1. Add copies of all replacement nodes and edges to h. Exclude Input/Output nodes.
-        // Create map from old NodeIndex (in self.replacement) to new NodeIndex (in self).
+        // // 3. Do the replacement.
+        // // 3.1. Add copies of all replacement nodes and edges to h. Exclude Input/Output nodes.
+        // // Create map from old NodeIndex (in self.replacement) to new NodeIndex (in self).
         let mut index_map: HashMap<Node, Node> = HashMap::new();
-        let replacement_nodes = self
-            .replacement
-            .children(self.replacement.root())
+        let replace_io = self.replacement.get_io(self.replacement.root()).unwrap();
+        let replace_ignore_nodes = [replace_io[0], replace_io[1], self.replacement.root()];
+        let descendants: DescendantsGraph =
+            DescendantsGraph::try_new(&self.replacement, self.replacement.root())
+                .expect("parent already checked.");
+        let replacement_inner_nodes = descendants
+            .nodes()
+            .filter(|n| !replace_ignore_nodes.contains(n))
             .collect::<Vec<Node>>();
         // slice of nodes omitting Input and Output:
-        let replacement_inner_nodes = &replacement_nodes[2..];
+        // let replacement_inner_nodes = &replacement_nodes[2..];
         let self_output_node = h.children(parent).nth(1).unwrap();
-        let replacement_output_node = *replacement_nodes.get(1).unwrap();
-        for &node in replacement_inner_nodes {
+        for &node in replacement_inner_nodes.iter() {
             // Add the nodes.
             let op: &OpType = self.replacement.get_optype(node);
             let new_node = h.add_node_after(self_output_node, op.clone());
@@ -97,7 +104,7 @@ impl Rewrite for SimpleReplacement {
             h.overwrite_node_metadata(new_node, meta);
         }
         // Add edges between all newly added nodes matching those in replacement.
-        for &node in replacement_inner_nodes {
+        for &node in replacement_inner_nodes.iter() {
             let new_node = index_map.get(&node).unwrap();
             for outport in self.replacement.node_outputs(node) {
                 for target in self.replacement.linked_inputs(node, outport) {
@@ -108,6 +115,14 @@ impl Rewrite for SimpleReplacement {
                 }
             }
         }
+
+        // let InsertionResult {
+        //     new_root,
+        //     node_map: index_map,
+        // } = h.insert_hugr(parent, self.replacement.clone());
+        // println!("{}", h.mermaid_string());
+        // dbg!(new_root);
+        // h.apply_rewrite(InlineDFG(new_root.into()))?;
 
         // Now we proceed to connect the edges between the newly inserted
         // replacement and the rest of the graph.
@@ -136,6 +151,10 @@ impl Rewrite for SimpleReplacement {
                 ));
             }
         }
+        let replacement_output_node = self
+            .replacement
+            .get_io(self.replacement.root())
+            .expect("parent already checked.")[1];
         // 3.3. For each q = self.nu_out[p] such that the predecessor of q is not an Input port, add an
         // edge from (the new copy of) the predecessor of q to p.
         for ((rem_out_node, rem_out_port), rep_out_port) in &self.nu_out {
@@ -213,6 +232,9 @@ pub enum SimpleReplacementError {
     /// Node in replacement graph is invalid.
     #[error("A node in the replacement graph is invalid.")]
     InvalidReplacementNode(),
+    /// Inlining replacement failed.
+    #[error("Inlining replacement failed: {0}")]
+    InliningFailed(#[from] InlineDFGError),
 }
 
 #[cfg(test)]
@@ -814,9 +836,10 @@ pub(in crate::hugr::rewrite) mod test {
         assert_eq!(h.node_count(), 4);
 
         rewrite.apply(&mut h).unwrap_or_else(|e| panic!("{e}"));
-        assert_eq!(h.update_validate(&PRELUDE_REGISTRY), Ok(()));
-
         println!("{}", h.mermaid_string());
+        h.update_validate(&PRELUDE_REGISTRY)
+            .unwrap_or_else(|e| panic!("{e}"));
+
         assert_eq!(h.node_count(), 6);
     }
 
