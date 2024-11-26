@@ -1,5 +1,7 @@
 //! Conversions between integer and floating-point values.
 
+use std::sync::Arc;
+
 use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 
 use crate::extension::prelude::{BOOL_T, STRING_TYPE, USIZE_T};
@@ -155,7 +157,7 @@ impl MakeExtensionOp for ConvertOpType {
 
 lazy_static! {
     /// Extension for conversions between integers and floats.
-    pub static ref EXTENSION: Extension = {
+    pub static ref EXTENSION: Arc<Extension> = {
         let mut extension = Extension::new(
             EXTENSION_ID,
             VERSION).with_reqs(
@@ -167,15 +169,15 @@ lazy_static! {
 
         ConvertOpDef::load_all_ops(&mut extension).unwrap();
 
-        extension
+        Arc::new(extension)
     };
 
     /// Registry of extensions required to validate integer operations.
     pub static ref CONVERT_OPS_REGISTRY: ExtensionRegistry  = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        super::int_types::EXTENSION.to_owned(),
-        super::float_types::EXTENSION.to_owned(),
-        EXTENSION.to_owned(),
+        PRELUDE.clone(),
+        super::int_types::EXTENSION.clone(),
+        super::float_types::EXTENSION.clone(),
+        EXTENSION.clone(),
     ])
     .unwrap();
 }

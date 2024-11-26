@@ -386,7 +386,7 @@ fn invalid_types() {
         TypeDefBound::any(),
     )
     .unwrap();
-    let reg = ExtensionRegistry::try_new([e, PRELUDE.to_owned()]).unwrap();
+    let reg = ExtensionRegistry::try_new([e.into(), PRELUDE.clone()]).unwrap();
 
     let validate_to_sig_error = |t: CustomType| {
         let (h, def) = identity_hugr_with_type(Type::new_extension(t));
@@ -643,7 +643,7 @@ fn instantiate_row_variables() -> Result<(), Box<dyn std::error::Error>> {
     let eval2 = dfb.add_dataflow_op(eval2, [par_func, a, b])?;
     dfb.finish_hugr_with_outputs(
         eval2.outputs(),
-        &ExtensionRegistry::try_new([PRELUDE.to_owned(), e]).unwrap(),
+        &ExtensionRegistry::try_new([PRELUDE.clone(), e.into()]).unwrap(),
     )?;
     Ok(())
 }
@@ -683,7 +683,7 @@ fn row_variables() -> Result<(), Box<dyn std::error::Error>> {
     let par_func = fb.add_dataflow_op(par, [func_arg, id_usz])?;
     fb.finish_hugr_with_outputs(
         par_func.outputs(),
-        &ExtensionRegistry::try_new([PRELUDE.to_owned(), e]).unwrap(),
+        &ExtensionRegistry::try_new([PRELUDE.clone(), e.into()]).unwrap(),
     )?;
     Ok(())
 }
@@ -763,7 +763,7 @@ fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
         f.finish_with_outputs([tup])?
     };
 
-    let reg = ExtensionRegistry::try_new([e, PRELUDE.to_owned()])?;
+    let reg = ExtensionRegistry::try_new([e.into(), PRELUDE.clone()])?;
     let [func, tup] = d.input_wires_arr();
     let call = d.call(
         f.handle(),

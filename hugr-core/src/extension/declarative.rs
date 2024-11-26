@@ -136,8 +136,8 @@ impl ExtensionSetDeclaration {
                 registry,
             };
             let ext = decl.make_extension(&self.imports, ctx)?;
-            let ext = registry.register(ext)?;
-            scope.insert(ext.name())
+            scope.insert(ext.name());
+            registry.register(ext)?;
         }
 
         Ok(())
@@ -272,6 +272,7 @@ mod test {
     use itertools::Itertools;
     use rstest::rstest;
     use std::path::PathBuf;
+    use std::sync::Arc;
 
     use crate::extension::PRELUDE_REGISTRY;
     use crate::std_extensions;
@@ -406,7 +407,7 @@ extensions:
     fn new_extensions<'a>(
         reg: &'a ExtensionRegistry,
         dependencies: &'a ExtensionRegistry,
-    ) -> impl Iterator<Item = (&'a ExtensionId, &'a Extension)> {
+    ) -> impl Iterator<Item = (&'a ExtensionId, &'a Arc<Extension>)> {
         reg.iter()
             .filter(move |(id, _)| !dependencies.contains(id) && *id != &PRELUDE_ID)
     }

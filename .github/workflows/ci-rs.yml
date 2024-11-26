@@ -223,6 +223,11 @@ jobs:
           components: llvm-tools-preview
       - name: Install CapnProto
         run: sudo apt-get install -y capnproto
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: "14.0"
+          env: true
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
       - name: Run tests with coverage instrumentation
@@ -230,6 +235,7 @@ jobs:
           cargo llvm-cov clean --workspace
           cargo llvm-cov --no-report  --no-default-features --doctests
           cargo llvm-cov --no-report  --all-features --doctests
+          cargo llvm-cov --no-report  -p hugr-llvm --features llvm14-0 --doctests
       - name: Generate coverage report
         run: cargo llvm-cov --all-features report --codecov --output-path coverage.json
       - name: Upload coverage to codecov.io
@@ -272,15 +278,6 @@ jobs:
         run: cargo test -p hugr-llvm --verbose --features llvm${{ matrix.llvm-version[1] }} --no-run
       - name: Tests with no features
         run: cargo test -p hugr-llvm --verbose --features llvm${{ matrix.llvm-version[1] }}
-
-  rs-semver-checks:
-    needs: [changes, check]
-    if: ${{ needs.changes.outputs.rust == 'true' && github.event_name == 'pull_request' }}
-    uses: CQCL/hugrverse-actions/.github/workflows/rs-semver-checks.yml@main
-    with:
-      apt-dependencies: capnproto
-    secrets:
-      GITHUB_PAT: ${{ secrets.HUGRBOT_PAT }}
 
   # This is a meta job to mark successful completion of the required checks,
   # even if they are skipped due to no changes in the relevant files.

@@ -514,10 +514,12 @@ pub(super) mod test {
         const EXT_ID: ExtensionId = "MyExt";
     }
 
+    /// A dummy wrapper over an operation definition.
     #[derive(serde::Serialize, serde::Deserialize, Debug)]
     pub struct SimpleOpDef(OpDef);
 
     impl SimpleOpDef {
+        /// Create a new dummy opdef.
         pub fn new(op_def: OpDef) -> Self {
             assert!(op_def.constant_folder.is_none());
             assert!(matches!(
@@ -617,7 +619,7 @@ pub(super) mod test {
         assert_eq!(def.misc.len(), 1);
 
         let reg =
-            ExtensionRegistry::try_new([PRELUDE.to_owned(), EXTENSION.to_owned(), e]).unwrap();
+            ExtensionRegistry::try_new([PRELUDE.clone(), EXTENSION.clone(), e.into()]).unwrap();
         let e = reg.get(&EXT_ID).unwrap();
 
         let list_usize =

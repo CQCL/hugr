@@ -27,5 +27,5 @@ jobs:
           method: chat.postMessage
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           payload: |
-            channel: 'C04SHCL4FKP'
+            channel: 'C05GGH4GP4N'
             text: ${{ needs.coverage-trend.outputs.msg }}

@@ -1,5 +1,7 @@
 //! Basic floating-point types
 
+use std::sync::Arc;
+
 use crate::ops::constant::{TryHash, ValueName};
 use crate::types::TypeName;
 use crate::{
@@ -79,7 +81,7 @@ impl CustomConst for ConstF64 {
 
 lazy_static! {
     /// Extension defining the float type.
-    pub static ref EXTENSION: Extension = {
+    pub static ref EXTENSION: Arc<Extension> = {
         let mut extension = Extension::new(EXTENSION_ID, VERSION);
 
         extension
@@ -91,7 +93,7 @@ lazy_static! {
             )
             .unwrap();
 
-        extension
+        Arc::new(extension)
     };
 }
 #[cfg(test)]

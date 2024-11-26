@@ -1,5 +1,7 @@
 //! Basic integer operations.
 
+use std::sync::Arc;
+
 use super::int_types::{get_log_width, int_tv, LOG_WIDTH_TYPE_PARAM};
 use crate::extension::prelude::{sum_with_error, BOOL_T};
 use crate::extension::simple_op::{
@@ -247,7 +249,7 @@ fn iunop_sig() -> PolyFuncTypeRV {
 
 lazy_static! {
     /// Extension for basic integer operations.
-    pub static ref EXTENSION: Extension = {
+    pub static ref EXTENSION: Arc<Extension> = {
         let mut extension = Extension::new(
             EXTENSION_ID,
             VERSION).with_reqs(
@@ -256,14 +258,14 @@ lazy_static! {
 
         IntOpDef::load_all_ops(&mut extension).unwrap();
 
-        extension
+        Arc::new(extension)
     };
 
     /// Registry of extensions required to validate integer operations.
     pub static ref INT_OPS_REGISTRY: ExtensionRegistry  = ExtensionRegistry::try_new([
-        PRELUDE.to_owned(),
-        super::int_types::EXTENSION.to_owned(),
-        EXTENSION.to_owned(),
+        PRELUDE.clone(),
+        super::int_types::EXTENSION.clone(),
+        EXTENSION.clone(),
     ])
     .unwrap();
 }

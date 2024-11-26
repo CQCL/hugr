@@ -103,6 +103,8 @@ pub(crate) fn is_default<T: Default + PartialEq>(t: &T) -> bool {
 
 #[cfg(test)]
 pub(crate) mod test_quantum_extension {
+    use std::sync::Arc;
+
     use crate::ops::{OpName, OpNameRef};
     use crate::types::FuncValueType;
     use crate::{
@@ -128,7 +130,7 @@ pub(crate) mod test_quantum_extension {
     }
     /// The extension identifier.
     pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("test.quantum");
-    fn extension() -> Extension {
+    fn extension() -> Arc<Extension> {
         let mut extension = Extension::new_test(EXTENSION_ID);
 
         extension
@@ -170,13 +172,13 @@ pub(crate) mod test_quantum_extension {
             )
             .unwrap();
 
-        extension
+        Arc::new(extension)
     }
 
     lazy_static! {
         /// Quantum extension definition.
-        pub static ref EXTENSION: Extension = extension();
-        static ref REG: ExtensionRegistry = ExtensionRegistry::try_new([EXTENSION.to_owned(), PRELUDE.to_owned(), float_types::EXTENSION.to_owned()]).unwrap();
+        pub static ref EXTENSION: Arc<Extension> = extension();
+        static ref REG: ExtensionRegistry = ExtensionRegistry::try_new([EXTENSION.clone(), PRELUDE.clone(), float_types::EXTENSION.clone()]).unwrap();
 
     }
 

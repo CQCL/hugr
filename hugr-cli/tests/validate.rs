@@ -4,6 +4,8 @@
 //! calling the CLI binary, which Miri doesn't support.
 #![cfg(all(test, not(miri)))]
 
+use std::sync::Arc;
+
 use assert_cmd::Command;
 use assert_fs::{fixture::FileWriteStr, NamedTempFile};
 use hugr::builder::{DFGBuilder, DataflowSubContainer, ModuleBuilder};
@@ -49,7 +51,7 @@ fn test_package(#[default(BOOL_T)] id_type: Type) -> Package {
     let hugr = module.hugr().clone(); // unvalidated
 
     let rdr = std::fs::File::open(FLOAT_EXT_FILE).unwrap();
-    let float_ext: hugr::Extension = serde_json::from_reader(rdr).unwrap();
+    let float_ext: Arc<hugr::Extension> = serde_json::from_reader(rdr).unwrap();
     Package::new(vec![hugr], vec![float_ext]).unwrap()
 }
 

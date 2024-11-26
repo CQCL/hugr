@@ -257,9 +257,9 @@ mod test {
         let [q, p] = swap.outputs_arr();
         let cx = h.add_dataflow_op(test_quantum_extension::cx_gate(), [q, p])?;
         let reg = ExtensionRegistry::try_new([
-            test_quantum_extension::EXTENSION.to_owned(),
-            PRELUDE.to_owned(),
-            float_types::EXTENSION.to_owned(),
+            test_quantum_extension::EXTENSION.clone(),
+            PRELUDE.clone(),
+            float_types::EXTENSION.clone(),
         ])
         .unwrap();
 
