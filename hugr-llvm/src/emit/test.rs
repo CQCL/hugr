@@ -10,7 +10,7 @@ use hugr_core::ops::handle::FuncID;
 use hugr_core::std_extensions::arithmetic::{
     conversions, float_ops, float_types, int_ops, int_types,
 };
-use hugr_core::std_extensions::logic;
+use hugr_core::std_extensions::{collections, logic};
 use hugr_core::types::TypeRow;
 use hugr_core::{Hugr, HugrView};
 use inkwell::module::Module;
@@ -153,6 +153,7 @@ impl SimpleHugrConfig {
                         float_ops::EXTENSION_ID,
                         conversions::EXTENSION_ID,
                         logic::EXTENSION_ID,
+                        collections::EXTENSION_ID,
                     ]),
                 ),
             )

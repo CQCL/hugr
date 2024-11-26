@@ -59,6 +59,11 @@ impl ListValue {
     pub fn custom_type(&self) -> CustomType {
         list_custom_type(self.1.clone())
     }
+
+    /// Returns the values contained inside the `[ListValue]`.
+    pub fn get_contents(&self) -> &Vec<Value> {
+        &self.0
+    }
 }
 
 impl TryHash for ListValue {
