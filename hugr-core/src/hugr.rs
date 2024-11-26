@@ -168,6 +168,18 @@ impl Hugr {
         infer(self, self.root(), remove)?;
         Ok(())
     }
+
+    /// Destructively substitutes [Type Variables](crate::types::Type::Variable) (also [TypeArg::Variable])
+    /// given a new value for each.
+    pub fn substitute(mut self, subst: &Substitution) -> Self {
+        for n in self.graph.nodes_iter() {
+            let op_ty = self.op_types.get_mut(n);
+            let mut temp = OpType::default();
+            std::mem::swap(op_ty, &mut temp);
+            *op_ty = temp.substitute(subst);
+        }
+        self
+    }
 }
 
 /// Internal API for HUGRs, not intended for use by users.
