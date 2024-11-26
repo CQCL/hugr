@@ -32,7 +32,10 @@ pub trait HugrInternals {
 }
 
 impl<T: AsRef<Hugr>> HugrInternals for T {
-    type Portgraph<'p> = &'p MultiPortGraph where Self: 'p;
+    type Portgraph<'p>
+        = &'p MultiPortGraph
+    where
+        Self: 'p;
 
     #[inline]
     fn portgraph(&self) -> Self::Portgraph<'_> {

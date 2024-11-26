@@ -1,3 +1,5 @@
+//! Generator functions for property testing the Hugr data structures.
+
 use ::proptest::collection::vec;
 use ::proptest::prelude::*;
 use lazy_static::lazy_static;
@@ -38,6 +40,7 @@ pub struct RecursionDepth(usize);
 
 impl RecursionDepth {
     const DEFAULT_RECURSION_DEPTH: usize = 4;
+    /// Decrement the recursion depth counter.
     pub fn descend(&self) -> Self {
         if self.leaf() {
             *self
@@ -46,10 +49,12 @@ impl RecursionDepth {
         }
     }
 
+    /// Returns `true` if the recursion depth counter is zero.
     pub fn leaf(&self) -> bool {
         self.0 == 0
     }
 
+    /// Create a new [RecursionDepth] with the default recursion depth.
     pub fn new() -> Self {
         Self(Self::DEFAULT_RECURSION_DEPTH)
     }
@@ -135,26 +140,32 @@ lazy_static! {
     };
 }
 
+/// A strategy for generating an arbitrary nonempty [String].
 pub fn any_nonempty_string() -> SBoxedStrategy<String> {
     ANY_NONEMPTY_STRING.to_owned()
 }
 
+/// A strategy for generating an arbitrary nonempty [SmolStr].
 pub fn any_nonempty_smolstr() -> SBoxedStrategy<SmolStr> {
     ANY_NONEMPTY_STRING.to_owned().prop_map_into().sboxed()
 }
 
+/// A strategy for generating an arbitrary nonempty identifier [String].
 pub fn any_ident_string() -> SBoxedStrategy<String> {
     ANY_IDENT_STRING.to_owned()
 }
 
+/// A strategy for generating an arbitrary [String].
 pub fn any_string() -> SBoxedStrategy<String> {
     ANY_STRING.to_owned()
 }
 
+/// A strategy for generating an arbitrary [SmolStr].
 pub fn any_smolstr() -> SBoxedStrategy<SmolStr> {
     ANY_STRING.clone().prop_map_into().sboxed()
 }
 
+/// A strategy for generating an arbitrary [serde_json::Value].
 pub fn any_serde_json_value() -> impl Strategy<Value = serde_json::Value> {
     ANY_SERDE_JSON_VALUE_LEAF
         .clone()
@@ -175,6 +186,7 @@ pub fn any_serde_json_value() -> impl Strategy<Value = serde_json::Value> {
         .boxed()
 }
 
+/// A strategy for generating an arbitrary HUGR.
 pub fn any_hugr() -> SBoxedStrategy<Hugr> {
     ANY_HUGR.to_owned()
 }

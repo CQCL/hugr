@@ -109,7 +109,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
         let root_data = self
             .module
             .get_region(root_id)
-            .ok_or_else(|| PrintError::RegionNotFound(root_id))?;
+            .ok_or(PrintError::RegionNotFound(root_id))?;
 
         self.print_meta(root_data.meta)?;
         self.print_nodes(root_id)?;
@@ -132,7 +132,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
         let node_data = self
             .module
             .get_node(node_id)
-            .ok_or_else(|| PrintError::NodeNotFound(node_id))?;
+            .ok_or(PrintError::NodeNotFound(node_id))?;
 
         self.print_parens(|this| match &node_data.operation {
             Operation::Invalid => Err(ModelError::InvalidOperation(node_id)),
@@ -473,7 +473,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
         let term_data = self
             .module
             .get_term(term_id)
-            .ok_or_else(|| PrintError::TermNotFound(term_id))?;
+            .ok_or(PrintError::TermNotFound(term_id))?;
 
         match term_data {
             Term::Wildcard => {
@@ -617,7 +617,7 @@ impl<'p, 'a: 'p> PrintContext<'p, 'a> {
                 let node_data = self
                     .module
                     .get_node(node_id)
-                    .ok_or_else(|| PrintError::NodeNotFound(node_id))?;
+                    .ok_or(PrintError::NodeNotFound(node_id))?;
 
                 let name = match &node_data.operation {
                     Operation::DefineFunc { decl } => decl.name,

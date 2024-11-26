@@ -124,7 +124,7 @@ impl<'g, Root: NodeHandle> HugrView for DescendantsGraph<'g, Root> {
         self.graph.all_neighbours(node.pg_index()).map_into()
     }
 }
-impl<'g, Root: NodeHandle> RootTagged for DescendantsGraph<'g, Root> {
+impl<Root: NodeHandle> RootTagged for DescendantsGraph<'_, Root> {
     type RootHandle = Root;
 }
 
@@ -144,13 +144,16 @@ where
     }
 }
 
-impl<'g, Root: NodeHandle> ExtractHugr for DescendantsGraph<'g, Root> {}
+impl<Root: NodeHandle> ExtractHugr for DescendantsGraph<'_, Root> {}
 
 impl<'g, Root> super::HugrInternals for DescendantsGraph<'g, Root>
 where
     Root: NodeHandle,
 {
-    type Portgraph<'p> = &'p RegionGraph<'g> where Self: 'p;
+    type Portgraph<'p>
+        = &'p RegionGraph<'g>
+    where
+        Self: 'p;
 
     #[inline]
     fn portgraph(&self) -> Self::Portgraph<'_> {

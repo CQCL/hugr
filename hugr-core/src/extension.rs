@@ -624,6 +624,7 @@ impl FromIterator<ExtensionId> for ExtensionSet {
     }
 }
 
+/// Extension tests.
 #[cfg(test)]
 pub mod test {
     // We re-export this here because mod op_def is private.

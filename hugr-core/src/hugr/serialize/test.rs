@@ -1,3 +1,5 @@
+//! Tests for the HUGR serialization format.
+
 use super::*;
 use crate::builder::{
     endo_sig, inout_sig, test::closed_dfg_root_hugr, Container, DFGBuilder, Dataflow, DataflowHugr,
@@ -182,6 +184,7 @@ pub fn check_hugr_roundtrip(hugr: &Hugr, check_schema: bool) -> Hugr {
     new_hugr
 }
 
+/// Deserialize a HUGR json, ensuring that it is valid against the schema.
 pub fn check_hugr_deserialize(hugr: &Hugr, value: serde_json::Value, check_schema: bool) -> Hugr {
     let new_hugr = ser_deserialize_check_schema(value, get_schemas(check_schema));
 
@@ -189,6 +192,7 @@ pub fn check_hugr_deserialize(hugr: &Hugr, value: serde_json::Value, check_schem
     new_hugr
 }
 
+/// Check that two HUGRs are equivalent, up to node renumbering.
 pub fn check_hugr(lhs: &Hugr, rhs: &Hugr) {
     // Original HUGR, with canonicalized node indices
     //

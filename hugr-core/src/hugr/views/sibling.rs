@@ -140,7 +140,7 @@ impl<'g, Root: NodeHandle> HugrView for SiblingGraph<'g, Root> {
         self.graph.all_neighbours(node.pg_index()).map_into()
     }
 }
-impl<'g, Root: NodeHandle> RootTagged for SiblingGraph<'g, Root> {
+impl<Root: NodeHandle> RootTagged for SiblingGraph<'_, Root> {
     type RootHandle = Root;
 }
 
@@ -171,13 +171,16 @@ where
     }
 }
 
-impl<'g, Root: NodeHandle> ExtractHugr for SiblingGraph<'g, Root> {}
+impl<Root: NodeHandle> ExtractHugr for SiblingGraph<'_, Root> {}
 
 impl<'g, Root> HugrInternals for SiblingGraph<'g, Root>
 where
     Root: NodeHandle,
 {
-    type Portgraph<'p> = &'p FlatRegionGraph<'g> where Self: 'p;
+    type Portgraph<'p>
+        = &'p FlatRegionGraph<'g>
+    where
+        Self: 'p;
 
     #[inline]
     fn portgraph(&self) -> Self::Portgraph<'_> {
@@ -236,10 +239,14 @@ impl<'g, Root: NodeHandle> SiblingMut<'g, Root> {
     }
 }
 
-impl<'g, Root: NodeHandle> ExtractHugr for SiblingMut<'g, Root> {}
+impl<Root: NodeHandle> ExtractHugr for SiblingMut<'_, Root> {}
 
 impl<'g, Root: NodeHandle> HugrInternals for SiblingMut<'g, Root> {
-    type Portgraph<'p> = FlatRegionGraph<'p> where 'g: 'p, Root: 'p;
+    type Portgraph<'p>
+        = FlatRegionGraph<'p>
+    where
+        'g: 'p,
+        Root: 'p;
 
     fn portgraph(&self) -> Self::Portgraph<'_> {
         FlatRegionGraph::new_flat_region(
@@ -311,17 +318,17 @@ impl<'g, Root: NodeHandle> HugrView for SiblingMut<'g, Root> {
     }
 }
 
-impl<'g, Root: NodeHandle> RootTagged for SiblingMut<'g, Root> {
+impl<Root: NodeHandle> RootTagged for SiblingMut<'_, Root> {
     type RootHandle = Root;
 }
 
-impl<'g, Root: NodeHandle> HugrMutInternals for SiblingMut<'g, Root> {
+impl<Root: NodeHandle> HugrMutInternals for SiblingMut<'_, Root> {
     fn hugr_mut(&mut self) -> &mut Hugr {
         self.hugr
     }
 }
 
-impl<'g, Root: NodeHandle> HugrMut for SiblingMut<'g, Root> {}
+impl<Root: NodeHandle> HugrMut for SiblingMut<'_, Root> {}
 
 #[cfg(test)]
 mod test {
