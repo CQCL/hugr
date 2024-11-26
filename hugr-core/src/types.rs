@@ -538,9 +538,9 @@ impl From<Type> for TypeRV {
 
 /// Details a replacement of type variables with a finite list of known values.
 /// (Variables out of the range of the list will result in a panic)
-pub(crate) struct Substitution<'a>(&'a [TypeArg], &'a ExtensionRegistry);
+pub struct Substitution<'a>(&'a [TypeArg], &'a ExtensionRegistry);
 
-impl Substitution<'_> {
+impl<'a> Substitution<'a> {
     pub(crate) fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg {
         let arg = self
             .0
@@ -580,7 +580,7 @@ impl Substitution<'_> {
         }
     }
 
-    fn extension_registry(&self) -> &ExtensionRegistry {
+    pub(crate) fn extension_registry(&self) -> &ExtensionRegistry {
         self.1
     }
 }

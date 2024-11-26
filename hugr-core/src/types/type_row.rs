@@ -71,7 +71,7 @@ impl<RV: MaybeRV> TypeRowBase<RV> {
     /// Applies a substitution to the row.
     /// For `TypeRowRV`, note this may change the length of the row.
     /// For `TypeRow`, guaranteed not to change the length of the row.
-    pub(super) fn substitute(&self, s: &Substitution) -> Self {
+    pub(crate) fn substitute(&self, s: &Substitution) -> Self {
         self.iter()
             .flat_map(|ty| ty.substitute(s))
             .collect::<Vec<_>>()

@@ -36,6 +36,15 @@ impl DataflowOpTrait for TailLoop {
             [&self.just_inputs, &self.just_outputs].map(|row| row.extend(self.rest.iter()));
         Signature::new(inputs, outputs).with_extension_delta(self.extension_delta.clone())
     }
+
+    fn substitute(self, subst: &crate::types::Substitution) -> Self {
+        Self {
+            just_inputs: self.just_inputs.substitute(subst),
+            just_outputs: self.just_outputs.substitute(subst),
+            rest: self.rest.substitute(subst),
+            extension_delta: self.extension_delta.substitute(subst),
+        }
+    }
 }
 
 impl TailLoop {
@@ -100,6 +109,19 @@ impl DataflowOpTrait for Conditional {
         Signature::new(inputs, self.outputs.clone())
             .with_extension_delta(self.extension_delta.clone())
     }
+
+    fn substitute(self, subst: &crate::types::Substitution) -> Self {
+        Self {
+            sum_rows: self
+                .sum_rows
+                .into_iter()
+                .map(|r| r.substitute(subst))
+                .collect(),
+            other_inputs: self.other_inputs.substitute(subst),
+            outputs: self.outputs.substitute(subst),
+            extension_delta: self.extension_delta.substitute(subst),
+        }
+    }
 }
 
 impl Conditional {
@@ -128,6 +150,12 @@ impl DataflowOpTrait for CFG {
 
     fn signature(&self) -> Signature {
         self.signature.clone()
+    }
+
+    fn substitute(self, subst: &crate::types::Substitution) -> Self {
+        Self {
+            signature: self.signature.substitute(subst),
+        }
     }
 }
 
@@ -209,6 +237,19 @@ impl OpTrait for DataflowBlock {
             Direction::Outgoing => self.sum_rows.len(),
         }
     }
+
+    fn substitute(self, subst: &crate::types::Substitution) -> Self {
+        Self {
+            inputs: self.inputs.substitute(subst),
+            other_outputs: self.other_outputs.substitute(subst),
+            sum_rows: self
+                .sum_rows
+                .into_iter()
+                .map(|r| r.substitute(subst))
+                .collect(),
+            extension_delta: self.extension_delta.substitute(subst),
+        }
+    }
 }
 
 impl OpTrait for ExitBlock {
@@ -232,6 +273,12 @@ impl OpTrait for ExitBlock {
         match dir {
             Direction::Incoming => 1,
             Direction::Outgoing => 0,
+        }
+    }
+
+    fn substitute(self, subst: &crate::types::Substitution) -> Self {
+        Self {
+            cfg_outputs: self.cfg_outputs.substitute(subst),
         }
     }
 }
@@ -296,6 +343,12 @@ impl OpTrait for Case {
 
     fn tag(&self) -> OpTag {
         <Self as StaticTag>::TAG
+    }
+
+    fn substitute(self, subst: &crate::types::Substitution) -> Self {
+        Self {
+            signature: self.signature.substitute(subst),
+        }
     }
 }
 

@@ -81,6 +81,8 @@ impl OpTrait for FuncDefn {
     fn static_output(&self) -> Option<EdgeKind> {
         Some(EdgeKind::Function(self.signature.clone()))
     }
+
+    // Cannot refer to TypeArgs of enclosing Hugr (it binds its own), so no substitute()
 }
 
 /// External function declaration, linked at runtime.
@@ -111,6 +113,8 @@ impl OpTrait for FuncDecl {
     fn static_output(&self) -> Option<EdgeKind> {
         Some(EdgeKind::Function(self.signature.clone()))
     }
+
+    // Cannot refer to TypeArgs of enclosing Hugr (the type binds its own), so no substitute()
 }
 
 /// A type alias definition, used only for debug/metadata.
@@ -135,6 +139,9 @@ impl OpTrait for AliasDefn {
     fn tag(&self) -> OpTag {
         <Self as StaticTag>::TAG
     }
+
+    // Cannot refer to TypeArgs of enclosing Hugr (? - we planned to make this
+    // polymorphic so it binds its own, and we never combine binders), so no substitute()
 }
 
 /// A type alias declaration. Resolved at link time.
@@ -175,4 +182,7 @@ impl OpTrait for AliasDecl {
     fn tag(&self) -> OpTag {
         <Self as StaticTag>::TAG
     }
+
+    // Cannot refer to TypeArgs of enclosing Hugr (? - we planned to make this
+    // polymorphic so it binds its own, and we never combine binders), so no substitute()
 }
