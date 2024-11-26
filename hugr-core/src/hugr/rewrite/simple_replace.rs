@@ -221,11 +221,12 @@ pub(in crate::hugr::rewrite) mod test {
     use rstest::{fixture, rstest};
     use std::collections::{HashMap, HashSet};
 
+    use crate::builder::test::n_identity;
     use crate::builder::{
         endo_sig, inout_sig, BuildError, Container, DFGBuilder, Dataflow, DataflowHugr,
         DataflowSubContainer, HugrBuilder, ModuleBuilder,
     };
-    use crate::extension::prelude::BOOL_T;
+    use crate::extension::prelude::{BOOL_T, QB_T};
     use crate::extension::{ExtensionSet, EMPTY_REG, PRELUDE_REGISTRY};
     use crate::hugr::views::{HugrView, SiblingSubgraph};
     use crate::hugr::{Hugr, HugrMut, Rewrite};
@@ -772,6 +773,51 @@ pub(in crate::hugr::rewrite) mod test {
 
         assert_eq!(hugr.update_validate(&PRELUDE_REGISTRY), Ok(()));
         assert_eq!(hugr.node_count(), 4);
+    }
+
+    #[rstest]
+    fn test_nested_replace(dfg_hugr2: Hugr) {
+        // replace a node with a hugr with children
+
+        let mut h = dfg_hugr2;
+        let h_node = h
+            .nodes()
+            .find(|node: &Node| *h.get_optype(*node) == h_gate().into())
+            .unwrap();
+
+        // build a nested identity hugr
+        let mut nest_build = DFGBuilder::new(Signature::new_endo(QB_T)).unwrap();
+        let [input] = nest_build.input_wires_arr();
+        let inner_build = nest_build.dfg_builder_endo([(QB_T, input)]).unwrap();
+        let inner_dfg = n_identity(inner_build).unwrap();
+        let inner_dfg_node = inner_dfg.node();
+        let replacement = nest_build
+            .finish_prelude_hugr_with_outputs([inner_dfg.out_wire(0)])
+            .unwrap();
+        let subgraph = SiblingSubgraph::try_from_nodes(vec![h_node], &h).unwrap();
+        let nu_inp = vec![(
+            (inner_dfg_node, IncomingPort::from(0)),
+            (h_node, IncomingPort::from(0)),
+        )]
+        .into_iter()
+        .collect();
+
+        let nu_out = vec![(
+            (h.get_io(h.root()).unwrap()[1], IncomingPort::from(0)),
+            IncomingPort::from(0),
+        )]
+        .into_iter()
+        .collect();
+
+        let rewrite = SimpleReplacement::new(subgraph, replacement, nu_inp, nu_out);
+
+        assert_eq!(h.node_count(), 4);
+
+        rewrite.apply(&mut h).unwrap_or_else(|e| panic!("{e}"));
+        assert_eq!(h.update_validate(&PRELUDE_REGISTRY), Ok(()));
+
+        println!("{}", h.mermaid_string());
+        assert_eq!(h.node_count(), 6);
     }
 
     use crate::hugr::rewrite::replace::Replacement;
