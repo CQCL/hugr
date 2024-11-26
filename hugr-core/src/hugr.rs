@@ -4,12 +4,13 @@ pub mod hugrmut;
 
 pub(crate) mod ident;
 pub mod internal;
+mod monomorphize;
 pub mod rewrite;
 pub mod serialize;
 pub mod validate;
 pub mod views;
 
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::iter;
 
 pub(crate) use self::hugrmut::HugrMut;
@@ -19,7 +20,7 @@ pub use ident::{IdentList, InvalidIdentifier};
 pub use rewrite::{Rewrite, SimpleReplacement, SimpleReplacementError};
 
 use portgraph::multiportgraph::MultiPortGraph;
-use portgraph::{Hierarchy, PortMut, PortView, UnmanagedDenseMap};
+use portgraph::{Hierarchy, PortMut, UnmanagedDenseMap};
 use thiserror::Error;
 
 pub use self::views::{HugrView, RootTagged};
@@ -28,8 +29,9 @@ use crate::extension::{ExtensionRegistry, ExtensionSet, TO_BE_INFERRED};
 use crate::ops::custom::resolve_extension_ops;
 use crate::ops::{OpTag, OpTrait};
 pub use crate::ops::{OpType, DEFAULT_OPTYPE};
-use crate::types::Substitution;
 use crate::{Direction, Node};
+
+use monomorphize::mono_scan;
 
 /// The Hugr data structure.
 #[derive(Clone, Debug, PartialEq)]
@@ -171,13 +173,9 @@ impl Hugr {
 
     /// Destructively substitutes [Type Variables](crate::types::Type::Variable) (also [TypeArg::Variable])
     /// given a new value for each.
-    pub fn substitute(mut self, subst: &Substitution) -> Self {
-        for n in self.graph.nodes_iter() {
-            let op_ty = self.op_types.get_mut(n);
-            let mut temp = OpType::default();
-            std::mem::swap(op_ty, &mut temp);
-            *op_ty = temp.substitute(subst);
-        }
+    pub fn monomorphize(mut self, reg: &ExtensionRegistry) -> Self {
+        let root = self.root(); // I.e. "all monomorphic funcs" for Module-Rooted Hugrs...right?
+        mono_scan(&mut self, root, None, &mut HashMap::new(), reg);
         self
     }
 }

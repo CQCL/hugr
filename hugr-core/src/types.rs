@@ -541,6 +541,10 @@ impl From<Type> for TypeRV {
 pub struct Substitution<'a>(&'a [TypeArg], &'a ExtensionRegistry);
 
 impl<'a> Substitution<'a> {
+    pub(crate) fn new(items: &'a [TypeArg], exts: &'a ExtensionRegistry) -> Self {
+        Self(items, exts)
+    }
+
     pub(crate) fn apply_var(&self, idx: usize, decl: &TypeParam) -> TypeArg {
         let arg = self
             .0
