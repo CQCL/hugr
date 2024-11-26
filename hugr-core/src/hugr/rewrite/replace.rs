@@ -463,7 +463,7 @@ mod test {
     use crate::std_extensions::collections::{self, list_type, ListOp};
     use crate::types::{Signature, Type, TypeRow};
     use crate::utils::depth;
-    use crate::{type_row, Direction, Hugr, HugrView, OutgoingPort};
+    use crate::{type_row, Direction, Extension, Hugr, HugrView, OutgoingPort};
 
     use super::{NewEdgeKind, NewEdgeSpec, ReplaceError, Replacement};
 
@@ -638,10 +638,26 @@ mod test {
 
     #[test]
     fn test_invalid() {
-        let mut new_ext = crate::Extension::new_test("new_ext".try_into().unwrap());
-        let ext_name = new_ext.name().clone();
         let utou = Signature::new_endo(vec![USIZE_T]);
-        let mut mk_op = |s| new_ext.simple_ext_op(s, utou.clone());
+        let ext = Extension::new_test_arc("new_ext".try_into().unwrap(), |ext, extension_ref| {
+            ext.add_op("foo".into(), "".to_string(), utou.clone(), extension_ref)
+                .unwrap();
+            ext.add_op("bar".into(), "".to_string(), utou.clone(), extension_ref)
+                .unwrap();
+            ext.add_op("baz".into(), "".to_string(), utou.clone(), extension_ref)
+                .unwrap();
+        });
+        let ext_name = ext.name().clone();
+        let foo = ext
+            .instantiate_extension_op("foo", [], &PRELUDE_REGISTRY)
+            .unwrap();
+        let bar = ext
+            .instantiate_extension_op("bar", [], &PRELUDE_REGISTRY)
+            .unwrap();
+        let baz = ext
+            .instantiate_extension_op("baz", [], &PRELUDE_REGISTRY)
+            .unwrap();
+
         let mut h = DFGBuilder::new(
             Signature::new(type_row![USIZE_T, BOOL_T], type_row![USIZE_T])
                 .with_extension_delta(ext_name.clone()),
@@ -657,23 +673,17 @@ mod test {
             )
             .unwrap();
         let mut case1 = cond.case_builder(0).unwrap();
-        let foo = case1
-            .add_dataflow_op(mk_op("foo"), case1.input_wires())
-            .unwrap();
+        let foo = case1.add_dataflow_op(foo, case1.input_wires()).unwrap();
         let case1 = case1.finish_with_outputs(foo.outputs()).unwrap().node();
         let mut case2 = cond.case_builder(1).unwrap();
-        let bar = case2
-            .add_dataflow_op(mk_op("bar"), case2.input_wires())
-            .unwrap();
+        let bar = case2.add_dataflow_op(bar, case2.input_wires()).unwrap();
         let mut baz_dfg = case2
             .dfg_builder(
                 utou.clone().with_extension_delta(ext_name.clone()),
                 bar.outputs(),
             )
             .unwrap();
-        let baz = baz_dfg
-            .add_dataflow_op(mk_op("baz"), baz_dfg.input_wires())
-            .unwrap();
+        let baz = baz_dfg.add_dataflow_op(baz, baz_dfg.input_wires()).unwrap();
         let baz_dfg = baz_dfg.finish_with_outputs(baz.outputs()).unwrap();
         let case2 = case2.finish_with_outputs(baz_dfg.outputs()).unwrap().node();
         let cond = cond.finish_sub_container().unwrap();

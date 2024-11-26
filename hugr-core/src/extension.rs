@@ -7,7 +7,8 @@ pub use semver::Version;
 use std::collections::btree_map;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{Debug, Display, Formatter};
-use std::sync::Arc;
+use std::mem;
+use std::sync::{Arc, Weak};
 
 use thiserror::Error;
 
@@ -335,6 +336,45 @@ impl ExtensionValue {
 pub type ExtensionId = IdentList;
 
 /// A extension is a set of capabilities required to execute a graph.
+///
+/// These are normally defined once and shared across multiple graphs and
+/// operations wrapped in [`Arc`]s inside [`ExtensionRegistry`].
+///
+/// # Example
+///
+/// The following example demonstrates how to define a new extension with a
+/// custom operation and a custom type.
+///
+/// When using `arc`s, the extension can only be modified at creation time. The
+/// defined operations and types keep a [`Weak`] reference to their extension. We provide a
+/// helper method [`Extension::new_arc`] to aid their definition.
+///
+/// ```
+/// # use hugr_core::types::Signature;
+/// # use hugr_core::extension::{Extension, ExtensionId, Version};
+/// # use hugr_core::extension::{TypeDefBound};
+/// Extension::new_arc(
+///     ExtensionId::new_unchecked("my.extension"),
+///     Version::new(0, 1, 0),
+///     |ext, extension_ref| {
+///         // Add a custom type definition
+///         ext.add_type(
+///             "MyType".into(),
+///             vec![], // No type parameters
+///             "Some type".into(),
+///             TypeDefBound::any(),
+///             extension_ref,
+///         );
+///         // Add a custom operation
+///         ext.add_op(
+///             "MyOp".into(),
+///             "Some operation".into(),
+///             Signature::new_endo(vec![]),
+///             extension_ref,
+///         );
+///     },
+/// );
+/// ```
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Extension {
     /// Extension version, follows semver.
@@ -361,6 +401,12 @@ pub struct Extension {
 
 impl Extension {
     /// Creates a new extension with the given name.
+    ///
+    /// In most cases extensions are contained inside an [`Arc`] so that they
+    /// can be shared across hugr instances and operation definitions.
+    ///
+    /// See [`Extension::new_arc`] for a more ergonomic way to create boxed
+    /// extensions.
     pub fn new(name: ExtensionId, version: Version) -> Self {
         Self {
             name,
@@ -372,12 +418,61 @@ impl Extension {
         }
     }
 
-    /// Extend the requirements of this extension with another set of extensions.
-    pub fn with_reqs(self, extension_reqs: impl Into<ExtensionSet>) -> Self {
-        Self {
-            extension_reqs: self.extension_reqs.union(extension_reqs.into()),
-            ..self
+    /// Creates a new extension wrapped in an [`Arc`].
+    ///
+    /// The closure lets us use a weak reference to the arc while the extension
+    /// is being built. This is necessary for calling [`Extension::add_op`] and
+    /// [`Extension::add_type`].
+    pub fn new_arc(
+        name: ExtensionId,
+        version: Version,
+        init: impl FnOnce(&mut Extension, &Weak<Extension>),
+    ) -> Arc<Self> {
+        Arc::new_cyclic(|extension_ref| {
+            let mut ext = Self::new(name, version);
+            init(&mut ext, extension_ref);
+            ext
+        })
+    }
+
+    /// Creates a new extension wrapped in an [`Arc`], using a fallible
+    /// initialization function.
+    ///
+    /// The closure lets us use a weak reference to the arc while the extension
+    /// is being built. This is necessary for calling [`Extension::add_op`] and
+    /// [`Extension::add_type`].
+    pub fn try_new_arc<E>(
+        name: ExtensionId,
+        version: Version,
+        init: impl FnOnce(&mut Extension, &Weak<Extension>) -> Result<(), E>,
+    ) -> Result<Arc<Self>, E> {
+        // Annoying hack around not having `Arc::try_new_cyclic` that can return
+        // a Result.
+        // https://github.com/rust-lang/rust/issues/75861#issuecomment-980455381
+        //
+        // When there is an error, we store it in `error` and return it at the
+        // end instead of the partially-initialized extension.
+        let mut error = None;
+        let ext = Arc::new_cyclic(|extension_ref| {
+            let mut ext = Self::new(name, version);
+            match init(&mut ext, extension_ref) {
+                Ok(_) => ext,
+                Err(e) => {
+                    error = Some(e);
+                    ext
+                }
+            }
+        });
+        match error {
+            Some(e) => Err(e),
+            None => Ok(ext),
         }
+    }
+
+    /// Extend the requirements of this extension with another set of extensions.
+    pub fn set_reqs(&mut self, extension_reqs: impl Into<ExtensionSet>) {
+        let reqs = mem::take(&mut self.extension_reqs);
+        self.extension_reqs = reqs.union(extension_reqs.into());
     }
 
     /// Allows read-only access to the operations in this Extension
@@ -634,20 +729,22 @@ pub mod test {
 
     impl Extension {
         /// Create a new extension for testing, with a 0 version.
-        pub(crate) fn new_test(name: ExtensionId) -> Self {
-            Self::new(name, Version::new(0, 0, 0))
+        pub(crate) fn new_test_arc(
+            name: ExtensionId,
+            init: impl FnOnce(&mut Extension, &Weak<Extension>),
+        ) -> Arc<Self> {
+            Self::new_arc(name, Version::new(0, 0, 0), init)
         }
 
-        /// Add a simple OpDef to the extension and return an extension op for it.
-        /// No description, no type parameters.
-        pub(crate) fn simple_ext_op(
-            &mut self,
-            name: &str,
-            signature: impl Into<SignatureFunc>,
-        ) -> ExtensionOp {
-            self.add_op(name.into(), "".to_string(), signature).unwrap();
-            self.instantiate_extension_op(name, [], &PRELUDE_REGISTRY)
-                .unwrap()
+        /// Create a new extension for testing, with a 0 version.
+        pub(crate) fn try_new_test_arc(
+            name: ExtensionId,
+            init: impl FnOnce(
+                &mut Extension,
+                &Weak<Extension>,
+            ) -> Result<(), Box<dyn std::error::Error>>,
+        ) -> Result<Arc<Self>, Box<dyn std::error::Error>> {
+            Self::try_new_arc(name, Version::new(0, 0, 0), init)
         }
     }
 

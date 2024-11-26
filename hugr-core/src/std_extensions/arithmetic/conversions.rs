@@ -50,7 +50,7 @@ pub enum ConvertOpDef {
 
 impl MakeOpDef for ConvertOpDef {
     fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError> {
-        crate::extension::simple_op::try_from_name(op_def.name(), op_def.extension())
+        crate::extension::simple_op::try_from_name(op_def.name(), op_def.extension_id())
     }
 
     fn extension(&self) -> ExtensionId {
@@ -158,18 +158,15 @@ impl MakeExtensionOp for ConvertOpType {
 lazy_static! {
     /// Extension for conversions between integers and floats.
     pub static ref EXTENSION: Arc<Extension> = {
-        let mut extension = Extension::new(
-            EXTENSION_ID,
-            VERSION).with_reqs(
-            ExtensionSet::from_iter(vec![
-                super::int_types::EXTENSION_ID,
-                super::float_types::EXTENSION_ID,
-            ]),
-        );
+        Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
+            extension.set_reqs(
+                ExtensionSet::from_iter(vec![
+                    super::int_types::EXTENSION_ID,
+                    super::float_types::EXTENSION_ID,
+            ]));
 
-        ConvertOpDef::load_all_ops(&mut extension).unwrap();
-
-        Arc::new(extension)
+            ConvertOpDef::load_all_ops(extension, extension_ref).unwrap();
+        })
     };
 
     /// Registry of extensions required to validate integer operations.

@@ -50,7 +50,7 @@ pub enum FloatOps {
 
 impl MakeOpDef for FloatOps {
     fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError> {
-        crate::extension::simple_op::try_from_name(op_def.name(), op_def.extension())
+        crate::extension::simple_op::try_from_name(op_def.name(), op_def.extension_id())
     }
 
     fn extension(&self) -> ExtensionId {
@@ -107,15 +107,10 @@ impl MakeOpDef for FloatOps {
 lazy_static! {
     /// Extension for basic float operations.
     pub static ref EXTENSION: Arc<Extension> = {
-        let mut extension = Extension::new(
-            EXTENSION_ID,
-            VERSION).with_reqs(
-            ExtensionSet::singleton(&super::int_types::EXTENSION_ID),
-        );
-
-        FloatOps::load_all_ops(&mut extension).unwrap();
-
-        Arc::new(extension)
+        Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
+            extension.set_reqs(ExtensionSet::singleton(&super::int_types::EXTENSION_ID));
+            FloatOps::load_all_ops(extension, extension_ref).unwrap();
+        })
     };
 
     /// Registry of extensions required to validate float operations.
