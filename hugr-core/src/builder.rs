@@ -256,7 +256,7 @@ pub(crate) mod test {
     pub(super) const QB: Type = crate::extension::prelude::QB_T;
 
     /// Wire up inputs of a Dataflow container to the outputs.
-    pub(super) fn n_identity<T: DataflowSubContainer>(
+    pub(crate) fn n_identity<T: DataflowSubContainer>(
         dataflow_builder: T,
     ) -> Result<T::ContainerHandle, BuildError> {
         let w = dataflow_builder.input_wires();
